@@ -1,0 +1,28 @@
+diff --git a/node_modules/expo-firebase-core/android/build.gradle b/node_modules/expo-firebase-core/android/build.gradle
+index 9bda09b..f1d0925 100644
+--- a/node_modules/expo-firebase-core/android/build.gradle
++++ b/node_modules/expo-firebase-core/android/build.gradle
+@@ -37,15 +37,20 @@ buildscript {
+ 
+ // Creating sources with comments
+ task androidSourcesJar(type: Jar) {
+-  classifier = 'sources'
+-  from android.sourceSets.main.java.srcDirs
++  archiveClassifier.set('sources')
++  if (project.hasProperty("android")) {
++    from android.sourceSets.main.java.srcDirs
++  }
+ }
+ 
+ afterEvaluate {
+   publishing {
+     publications {
+       release(MavenPublication) {
+-        from components.release
++        def releaseComponent = components.findByName("release")
++        if (releaseComponent != null) {
++          from releaseComponent
++        }
+         // Add additional sourcesJar to artifacts
+         artifact(androidSourcesJar)
+       }
