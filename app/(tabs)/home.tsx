@@ -14,6 +14,10 @@ import EmptyState from '../../components/EmptyState';
 import { useAuth } from '../_layout';
 import { getAvatarSource } from '../../constants/avatars';
 import { EventService, type EventModel } from '../../services/event';
+import DailyCheckInModal from '../../components/DailyCheckInModal';
+import WelcomeFlowModal from '../../components/WelcomeFlowModal';
+import { BadgeService } from '../../services/engagement';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width } = Dimensions.get('window');
 
@@ -237,6 +241,10 @@ export default function HomeScreen() {
   }, [firebaseUser]);
   const [showCreatePost, setShowCreatePost] = useState(false);
 
+  // ★ Engagement: Check-in & Welcome
+  const [showCheckIn, setShowCheckIn] = useState(false);
+  const [showWelcome, setShowWelcome] = useState(false);
+
   // Refs to avoid stale closures
   const postsRef = useRef(posts);
   postsRef.current = posts;
@@ -290,6 +298,30 @@ export default function HomeScreen() {
   // İlk yükleme
   useEffect(() => { loadAll(); }, []);
   useEffect(() => { loadPosts(false); }, [activeTab, firebaseUser]);
+
+  // ★ Engagement: İlk giriş kontrolü + günlük check-in
+  useEffect(() => {
+    if (!firebaseUser) return;
+    (async () => {
+      // Rozet kontrolü
+      BadgeService.checkAndUnlock(firebaseUser.uid, 'login').catch(() => {});
+
+      // İlk giriş mi?
+      const welcomeKey = `welcome_shown_${firebaseUser.uid}`;
+      const welcomeShown = await AsyncStorage.getItem(welcomeKey).catch(() => null);
+      if (!welcomeShown) {
+        setShowWelcome(true);
+        return; // Welcome gösterirken check-in gösterme
+      }
+
+      // Günlük check-in — bugün ilk giriş mi?
+      const checkInKey = `checkin_shown_${firebaseUser.uid}_${new Date().toISOString().split('T')[0]}`;
+      const checkInShown = await AsyncStorage.getItem(checkInKey).catch(() => null);
+      if (!checkInShown) {
+        setTimeout(() => setShowCheckIn(true), 1000); // 1sn gecikme
+      }
+    })();
+  }, [firebaseUser]);
 
   // Realtime oda güncellemesi
   useEffect(() => {
@@ -447,6 +479,38 @@ export default function HomeScreen() {
         userAvatar={profile?.avatar_url || 'https://i.pravatar.cc/40?img=1'}
         userName={profile?.display_name || 'Kullanıcı'}
         onPostCreated={() => loadPosts(false)}
+      />
+
+      {/* ★ Günlük Check-in Modal */}
+      <DailyCheckInModal
+        visible={showCheckIn}
+        userId={firebaseUser?.uid || ''}
+        onDismiss={async () => {
+          setShowCheckIn(false);
+          if (firebaseUser) {
+            const key = `checkin_shown_${firebaseUser.uid}_${new Date().toISOString().split('T')[0]}`;
+            await AsyncStorage.setItem(key, 'true').catch(() => {});
+          }
+        }}
+        onCoinsEarned={(coins) => {
+          // Refresh profile to update coin count
+        }}
+      />
+
+      {/* ★ Hoşgeldin Akışı */}
+      <WelcomeFlowModal
+        visible={showWelcome}
+        displayName={profile?.display_name || 'Kullanıcı'}
+        avatarUrl={profile?.avatar_url}
+        onComplete={async (interests) => {
+          setShowWelcome(false);
+          if (firebaseUser) {
+            await AsyncStorage.setItem(`welcome_shown_${firebaseUser.uid}`, 'true').catch(() => {});
+            // İlgi alanlarını profile'a kaydet (ileride kullanılacak)
+            // Günlük check-in'i göster
+            setTimeout(() => setShowCheckIn(true), 500);
+          }
+        }}
       />
     </View>
   );

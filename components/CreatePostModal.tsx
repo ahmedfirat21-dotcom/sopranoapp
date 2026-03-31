@@ -11,6 +11,7 @@ import { SocialService } from '../services/social';
 import { showToast } from './Toast';
 import * as ImagePicker from 'expo-image-picker';
 import { StorageService } from '../services/storage';
+import { BadgeService } from '../services/engagement';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -65,6 +66,8 @@ export function CreatePostModal({ visible, onClose, userId, userAvatar, userName
         showToast({ title: '📝 Gönderi paylaşıldı!', type: 'success' });
         setContent('');
         setImageUri(null);
+        // Rozet kontrolü
+        BadgeService.checkAndUnlock(userId, 'post_created').catch(() => {});
         onPostCreated();
         onClose();
       } else {

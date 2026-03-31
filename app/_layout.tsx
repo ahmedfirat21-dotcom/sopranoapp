@@ -1,4 +1,4 @@
-import '@livekit/react-native'; // LiveKit RN polyfill
+try { require('@livekit/react-native'); } catch(e) { console.warn('[LiveKit] polyfill yüklenemedi:', e); } // LiveKit RN polyfill
 import { useEffect, useState, useRef, createContext, useContext } from 'react';
 import { View, StyleSheet, Animated, Dimensions, Platform } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';

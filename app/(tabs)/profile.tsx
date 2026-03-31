@@ -13,6 +13,7 @@ import { ProfileService } from '../../services/database';
 import { showToast } from '../../components/Toast';
 import SopranoCoin from '../../components/SopranoCoin';
 import PremiumAlert from '../../components/PremiumAlert';
+import { BadgeService, ALL_BADGES, type Badge } from '../../services/engagement';
 
 /** Son görülme zamanını insanca formatlayan yardımcı */
 function _formatLastSeen(dateStr: string): string {
@@ -50,6 +51,7 @@ export default function ProfileScreen() {
   const [referralCodeText, setReferralCodeText] = useState('');
   const [submittingReferral, setSubmittingReferral] = useState(false);
   const [showBoostAlert, setShowBoostAlert] = useState(false);
+  const [badges, setBadges] = useState<Badge[]>([]);
 
   const loadStats = useCallback(async () => {
     if (!userId) return;
@@ -79,6 +81,10 @@ export default function ProfileScreen() {
         following: followingCount ?? 0,
         rooms: roomCount ?? 0,
       });
+
+      // Rozetleri yükle
+      const userBadges = await BadgeService.getUserBadges(userId);
+      setBadges(userBadges);
     } catch (err) {
       console.warn('Stats yuklenemedi:', err);
     }
@@ -184,6 +190,28 @@ export default function ProfileScreen() {
               </View>
             ))}
           </View>
+
+          {/* ★ Başarı Rozetleri */}
+          {badges.length > 0 && (
+            <View style={styles.badgesSection}>
+              <Text style={styles.badgesTitle}>🏆 Rozetler</Text>
+              <View style={styles.badgesRow}>
+                {badges.map(badge => (
+                  <View key={badge.id} style={styles.badgeItem}>
+                    <Text style={styles.badgeIcon}>{badge.icon}</Text>
+                    <Text style={styles.badgeName} numberOfLines={1}>{badge.name}</Text>
+                  </View>
+                ))}
+                {/* Boş slotlar */}
+                {badges.length < ALL_BADGES.length && (
+                  <View style={[styles.badgeItem, styles.badgeItemLocked]}>
+                    <Text style={styles.badgeIcon}>🔒</Text>
+                    <Text style={[styles.badgeName, { color: Colors.text3 }]}>+{ALL_BADGES.length - badges.length}</Text>
+                  </View>
+                )}
+              </View>
+            </View>
+          )}
 
           {/* Edit Profile button */}
           <Pressable style={styles.editBtn} onPress={() => router.push('/edit-profile')}>
@@ -436,4 +464,13 @@ const styles = StyleSheet.create({
   upgradeTextWrap: { gap: 2 },
   upgradeTitle: { fontSize: 13, fontWeight: '700', color: Colors.text },
   upgradeDesc: { fontSize: 11, color: Colors.text2 },
+
+  // Badges
+  badgesSection: { marginHorizontal: 20, marginTop: 12, marginBottom: 4 },
+  badgesTitle: { fontSize: 14, fontWeight: '700', color: '#F1F5F9', marginBottom: 8 },
+  badgesRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  badgeItem: { alignItems: 'center', gap: 4, paddingVertical: 8, paddingHorizontal: 10, borderRadius: 12, backgroundColor: 'rgba(20,184,166,0.1)', borderWidth: 1, borderColor: 'rgba(20,184,166,0.25)', minWidth: 60 },
+  badgeItemLocked: { backgroundColor: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' },
+  badgeIcon: { fontSize: 20 },
+  badgeName: { fontSize: 10, fontWeight: '600', color: Colors.teal },
 });

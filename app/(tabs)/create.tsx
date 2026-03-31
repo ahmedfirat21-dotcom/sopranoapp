@@ -9,6 +9,7 @@ import { supabase } from '../../constants/supabase';
 import { useAuth } from '../_layout';
 import { showToast } from '../../components/Toast';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { BadgeService } from '../../services/engagement';
 
 const CATEGORIES = [
   { id: 'chat', icon: 'mic', label: 'Sohbet', color: Colors.teal },
@@ -95,6 +96,8 @@ export default function CreateScreen() {
 
       setRoomName('');
       setDescription('');
+      // Rozet kontrolü
+      BadgeService.checkAndUnlock(firebaseUser.uid, 'room_created').catch(() => {});
       router.push(`/room/${room.id}`);
     } catch (error) {
       console.error('Oda oluşturma hatası:', error);
