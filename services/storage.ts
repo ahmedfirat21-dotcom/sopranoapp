@@ -1,9 +1,11 @@
 import { supabase } from '../constants/supabase';
 import * as ImageManipulator from 'expo-image-manipulator';
+import * as FileSystem from 'expo-file-system';
+import { decode } from 'base64-arraybuffer';
 
 export const StorageService = {
   /**
-   * Universal upload function
+   * Universal upload function — React Native uyumlu (base64 → ArrayBuffer)
    */
   async uploadFile(bucket: string, path: string, imageUri: string): Promise<string> {
     try {
@@ -14,23 +16,27 @@ export const StorageService = {
         { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG }
       );
 
-      // 2. Fetch the local file into a Blob
-      const response = await fetch(manipResult.uri);
-      const blob = await response.blob();
+      // 2. Read the file as base64 string (React Native uyumlu yöntem)
+      const base64 = await FileSystem.readAsStringAsync(manipResult.uri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
 
-      // 3. Upload to Supabase Storage
+      // 3. Decode base64 to ArrayBuffer
+      const arrayBuffer = decode(base64);
+
+      // 4. Upload to Supabase Storage
       const { data, error } = await supabase.storage
         .from(bucket)
-        .upload(path, blob, {
+        .upload(path, arrayBuffer, {
           contentType: 'image/jpeg',
-          upsert: true, // Overwrite if same name
+          upsert: true,
         });
 
       if (error) {
         throw error;
       }
 
-      // 4. Get the public URL
+      // 5. Get the public URL
       const { data: publicUrlData } = supabase.storage
         .from(bucket)
         .getPublicUrl(path);
