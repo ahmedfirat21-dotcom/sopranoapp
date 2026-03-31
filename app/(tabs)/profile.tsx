@@ -12,6 +12,7 @@ import { ReferralService } from '../../services/referral';
 import { ProfileService } from '../../services/database';
 import { showToast } from '../../components/Toast';
 import SopranoCoin from '../../components/SopranoCoin';
+import PremiumAlert from '../../components/PremiumAlert';
 
 /** Son görülme zamanını insanca formatlayan yardımcı */
 function _formatLastSeen(dateStr: string): string {
@@ -48,6 +49,7 @@ export default function ProfileScreen() {
   const [showReferral, setShowReferral] = useState(false);
   const [referralCodeText, setReferralCodeText] = useState('');
   const [submittingReferral, setSubmittingReferral] = useState(false);
+  const [showBoostAlert, setShowBoostAlert] = useState(false);
 
   const loadStats = useCallback(async () => {
     if (!userId) return;
@@ -200,7 +202,7 @@ export default function ProfileScreen() {
             </View>
             <View>
               <Text style={styles.coinLabel}>Soprano Coin</Text>
-              <Text style={styles.coinBalance}>{coins} SC</Text>
+              <Text style={styles.coinBalance}>{coins} Soprano Coin</Text>
             </View>
           </View>
           <Ionicons name="chevron-forward" size={16} color={Colors.text3} />
@@ -232,28 +234,7 @@ export default function ProfileScreen() {
             <Ionicons name="wallet-outline" size={22} color={Colors.teal} />
             <Text style={styles.actionLabel}>Cüzdan</Text>
           </Pressable>
-          <Pressable style={styles.actionCard} onPress={() => {
-            Alert.alert(
-              'Profil Boost',
-              'Profilini 1 saat boyunca Keşfet sayfasında öne çıkar.\n\nBedel: 10 Soprano Coin',
-              [
-                { text: 'Vazgeç', style: 'cancel' },
-                {
-                  text: 'Boost Et (10 SC)',
-                  onPress: async () => {
-                    if (!profile?.id) return;
-                    try {
-                      await ProfileService.boostProfile(profile.id, 10);
-                      await refreshProfile();
-                      showToast({ title: 'Profil Boost aktif!', message: 'Keşfet\'te 1 saat boyunca öne çıkacaksın.', type: 'success' });
-                    } catch (err: any) {
-                      showToast({ title: 'Boost başarısız', message: err.message || 'Hata oluştu', type: 'error' });
-                    }
-                  },
-                },
-              ]
-            );
-          }}>
+          <Pressable style={styles.actionCard} onPress={() => setShowBoostAlert(true)}>
             <Ionicons name="rocket-outline" size={22} color={Colors.cyan} />
             <Text style={styles.actionLabel}>Profil Boost</Text>
           </Pressable>
@@ -314,6 +295,32 @@ export default function ProfileScreen() {
 
 
       </ScrollView>
+
+      {/* Profil Boost Premium Alert */}
+      <PremiumAlert
+        visible={showBoostAlert}
+        title="Profil Boost"
+        message={"Profilini 1 saat boyunca Keşfet sayfasında öne çıkar.\n\nBedel: 10 Soprano Coin"}
+        type="info"
+        icon="rocket"
+        onDismiss={() => setShowBoostAlert(false)}
+        buttons={[
+          { text: 'Vazgeç', style: 'cancel' },
+          {
+            text: 'Boost Et (10 Coin)',
+            onPress: async () => {
+              if (!profile?.id) return;
+              try {
+                await ProfileService.boostProfile(profile.id, 10);
+                await refreshProfile();
+                showToast({ title: 'Profil Boost aktif!', message: 'Keşfet\'te 1 saat boyunca öne çıkacaksın.', type: 'success' });
+              } catch (err: any) {
+                showToast({ title: 'Boost başarısız', message: err.message || 'Hata oluştu', type: 'error' });
+              }
+            },
+          },
+        ]}
+      />
     </View>
   );
 }

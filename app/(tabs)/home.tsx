@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, Image, Pressable, Dimensions,
-  ActivityIndicator, FlatList, RefreshControl,
+  ActivityIndicator, FlatList, RefreshControl, Share, Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -24,9 +24,6 @@ function Header({ avatarUrl }: { avatarUrl?: string }) {
     <View style={styles.header}>
       <Image source={require('../../assets/logo.png')} style={styles.headerLogo} resizeMode="contain" />
       <View style={styles.headerBtns}>
-        <Pressable style={styles.headerBtn} onPress={() => router.push('/(tabs)/discover')}>
-          <Ionicons name="search" size={20} color="#FFF" />
-        </Pressable>
         <Pressable style={styles.headerBtn} onPress={() => router.push('/notifications')}>
           <Ionicons name="notifications-outline" size={20} color="#FFF" />
           <View style={styles.notifDot} />
@@ -91,8 +88,9 @@ function SectionDivider() {
 }
 
 // ========== COMPACT POST CARD (Vertical Feed) ==========
-const CompactPostCard = React.memo(function CompactPostCard({ post, currentUserId }: { post: Post; currentUserId?: string }) {
+const CompactPostCard = React.memo(function CompactPostCard({ post, currentUserId, onLike, onDelete }: { post: Post; currentUserId?: string; onLike?: (postId: string) => void; onDelete?: (postId: string) => void }) {
   const router = useRouter();
+  const isOwn = post.user_id === currentUserId;
   return (
     <Pressable
       style={({ pressed }) => [styles.postCard, pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] }]}
@@ -104,7 +102,7 @@ const CompactPostCard = React.memo(function CompactPostCard({ post, currentUserI
           style={styles.postUser}
           onPress={() => {
             if (post.user_id) {
-              if (post.user_id === currentUserId) router.push('/(tabs)/profile');
+              if (isOwn) router.push('/(tabs)/profile');
               else router.push(`/user/${post.user_id}` as any);
             }
           }}
@@ -115,7 +113,14 @@ const CompactPostCard = React.memo(function CompactPostCard({ post, currentUserI
             <Text style={styles.postTime}>{formatTimeAgo(post.created_at)}</Text>
           </View>
         </Pressable>
-        <Pressable hitSlop={8}>
+        <Pressable hitSlop={8} onPress={() => {
+          Alert.alert('Seçenekler', undefined, [
+            ...(isOwn ? [{ text: '🗑️ Gönderiyi Sil', style: 'destructive' as const, onPress: () => onDelete?.(post.id) }] : []),
+            { text: '🚩 Rapor Et', onPress: () => router.push(`/post/${post.id}` as any) },
+            { text: '📤 Paylaş', onPress: () => Share.share({ message: `${post.content?.substring(0, 80)}...\n\n📲 SopranoChat: https://sopranochat.app/post/${post.id}` }) },
+            { text: 'Vazgeç', style: 'cancel' as const },
+          ]);
+        }}>
           <Ionicons name="ellipsis-horizontal" size={16} color={Colors.text3} />
         </Pressable>
       </View>
@@ -128,19 +133,19 @@ const CompactPostCard = React.memo(function CompactPostCard({ post, currentUserI
         <Image source={{ uri: post.image_url }} style={styles.postThumbnail} />
       )}
 
-      {/* Meta (beğeni + yorum) */}
+      {/* Meta (beğeni + yorum + paylaş) */}
       <View style={styles.postMeta}>
-        <View style={styles.metaItem}>
+        <Pressable style={styles.metaItem} onPress={() => onLike?.(post.id)}>
           <Ionicons name={post.liked_by_me ? 'heart' : 'heart-outline'} size={16} color={post.liked_by_me ? '#EF4444' : Colors.text3} />
-          <Text style={styles.metaText}>{post.likes_count || 0}</Text>
-        </View>
-        <View style={styles.metaItem}>
+          <Text style={[styles.metaText, post.liked_by_me && { color: '#EF4444' }]}>{post.likes_count || 0}</Text>
+        </Pressable>
+        <Pressable style={styles.metaItem} onPress={() => router.push(`/post/${post.id}` as any)}>
           <Ionicons name="chatbubble-outline" size={14} color={Colors.text3} />
           <Text style={styles.metaText}>{post.comments_count || 0}</Text>
-        </View>
-        <View style={styles.metaItem}>
+        </Pressable>
+        <Pressable style={styles.metaItem} onPress={() => Share.share({ message: `${post.content?.substring(0, 80)}...\n\n📲 SopranoChat: https://sopranochat.app/post/${post.id}` })}>
           <Ionicons name="share-social-outline" size={14} color={Colors.text3} />
-        </View>
+        </Pressable>
       </View>
     </Pressable>
   );
@@ -210,6 +215,26 @@ export default function HomeScreen() {
   const [postsHasMore, setPostsHasMore] = useState(true);
 
   const [activeTab, setActiveTab] = useState<'discover' | 'following'>('discover');
+
+  // Post like/delete handlers
+  const handlePostLike = useCallback(async (postId: string) => {
+    if (!firebaseUser) return;
+    const result = await SocialService.toggleLike(postId, firebaseUser.uid);
+    if (result.success) {
+      setPosts(prev => prev.map(p => p.id === postId ? { ...p, liked_by_me: result.liked, likes_count: result.liked ? (p.likes_count || 0) + 1 : Math.max(0, (p.likes_count || 0) - 1) } : p));
+    }
+  }, [firebaseUser]);
+
+  const handlePostDelete = useCallback(async (postId: string) => {
+    if (!firebaseUser) return;
+    Alert.alert('Gönderiyi Sil', 'Bu gönderi kalıcı olarak silinecek.', [
+      { text: 'Vazgeç', style: 'cancel' },
+      { text: 'Sil', style: 'destructive', onPress: async () => {
+        const result = await SocialService.deletePost(postId, firebaseUser.uid);
+        if (result.success) setPosts(prev => prev.filter(p => p.id !== postId));
+      }},
+    ]);
+  }, [firebaseUser]);
   const [showCreatePost, setShowCreatePost] = useState(false);
 
   // Refs to avoid stale closures
@@ -305,6 +330,26 @@ export default function HomeScreen() {
       {/* Canlı Oda Şeridi */}
       <LiveRoomStrip rooms={liveRooms} />
 
+      {/* Yaklaşan Etkinlikler (stories altında, erişilebilir) */}
+      {events.length > 0 && (
+        <>
+          <View style={styles.sectionHeader}>
+            <View style={styles.sectionTitleRow}>
+              <Ionicons name="calendar" size={14} color={Colors.cyan} />
+              <Text style={styles.sectionTitle}>Yaklaşan Etkinlikler</Text>
+            </View>
+            <Pressable onPress={() => router.push('/create-event')}>
+              <Ionicons name="add-circle" size={22} color={Colors.teal} />
+            </Pressable>
+          </View>
+          {events.map((ev) => (
+            <View key={ev.id} style={{ marginHorizontal: 16, marginBottom: 8 }}>
+              <EventCard event={ev} />
+            </View>
+          ))}
+        </>
+      )}
+
       <SectionDivider />
 
       {/* Gönderi Oluştur */}
@@ -325,7 +370,7 @@ export default function HomeScreen() {
           style={[styles.feedTab, activeTab === 'discover' && styles.feedTabActive]}
           onPress={() => setActiveTab('discover')}
         >
-          <Text style={[styles.feedTabText, activeTab === 'discover' && styles.feedTabTextActive]}>🔥 Keşfet</Text>
+          <Text style={[styles.feedTabText, activeTab === 'discover' && styles.feedTabTextActive]}>🔥 Son</Text>
         </Pressable>
         <Pressable
           style={[styles.feedTab, activeTab === 'following' && styles.feedTabActive]}
@@ -344,27 +389,6 @@ export default function HomeScreen() {
       )}
       {!postsHasMore && posts.length > 0 && (
         <Text style={styles.endText}>Hepsi bu kadar 🌟</Text>
-      )}
-
-      {/* Etkinlikler */}
-      {events.length > 0 && (
-        <>
-          <SectionDivider />
-          <View style={styles.sectionHeader}>
-            <View style={styles.sectionTitleRow}>
-              <Ionicons name="calendar" size={14} color={Colors.cyan} />
-              <Text style={styles.sectionTitle}>Yaklaşan Etkinlikler</Text>
-            </View>
-            <Pressable onPress={() => router.push('/create-event')}>
-              <Ionicons name="add-circle" size={22} color={Colors.teal} />
-            </Pressable>
-          </View>
-          {events.map((ev) => (
-            <View key={ev.id} style={{ marginHorizontal: 16, marginBottom: 8 }}>
-              <EventCard event={ev} />
-            </View>
-          ))}
-        </>
       )}
     </View>
   );
@@ -396,7 +420,7 @@ export default function HomeScreen() {
         data={posts}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <CompactPostCard post={item} currentUserId={firebaseUser?.uid} />
+          <CompactPostCard post={item} currentUserId={firebaseUser?.uid} onLike={handlePostLike} onDelete={handlePostDelete} />
         )}
         ListHeaderComponent={renderListHeader}
         ListFooterComponent={renderListFooter}

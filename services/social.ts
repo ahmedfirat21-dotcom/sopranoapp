@@ -162,5 +162,23 @@ export const SocialService = {
       console.error("Error adding comment:", e);
       return { success: false, error: e.message };
     }
+  },
+
+  /**
+   * Gönderiyi sil (sadece kendi gönderini)
+   */
+  async deletePost(postId: string, userId: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const { error } = await supabase
+        .from('posts')
+        .delete()
+        .eq('id', postId)
+        .eq('user_id', userId);
+      if (error) throw error;
+      return { success: true };
+    } catch (e: any) {
+      console.error("Error deleting post:", e);
+      return { success: false, error: e.message };
+    }
   }
 };
