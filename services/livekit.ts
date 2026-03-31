@@ -9,18 +9,23 @@ let _globalsRegistered = false;
 
 function getLK(): any {
   if (!_lk) {
-    // registerGlobals sadece 1 kez çağrılmalı (BUG-4 fix)
-    if (!_globalsRegistered) {
-      try {
-        const { registerGlobals } = require('@livekit/react-native');
-        registerGlobals();
-        _globalsRegistered = true;
-      } catch (e) {
-        console.warn('[LiveKit] registerGlobals başarısız:', e);
+    try {
+      // registerGlobals sadece 1 kez çağrılmalı (BUG-4 fix)
+      if (!_globalsRegistered) {
+        try {
+          const { registerGlobals } = require('@livekit/react-native');
+          registerGlobals();
+          _globalsRegistered = true;
+        } catch (e) {
+          console.warn('[LiveKit] registerGlobals başarısız (native modül eksik olabilir):', e);
+        }
       }
+      _lk = require('livekit-client');
+      console.log('[LiveKit] Client lazily loaded');
+    } catch (e) {
+      console.warn('[LiveKit] livekit-client yüklenemedi — mock modda çalışacak:', e);
+      return null;
     }
-    _lk = require('livekit-client');
-    console.log('[LiveKit] Client lazily loaded');
   }
   return _lk;
 }

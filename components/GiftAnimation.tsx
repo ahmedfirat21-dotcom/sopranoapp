@@ -1,7 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Animated, Dimensions } from 'react-native';
-import LottieView from 'lottie-react-native';
-import * as Haptics from 'expo-haptics';
+let LottieView: any = null;
+try { LottieView = require('lottie-react-native').default; } catch (e) { /* native module unavailable */ }
+let Haptics: any = { impactAsync: async () => {}, ImpactFeedbackStyle: { Light: 0, Medium: 1, Heavy: 2 } };
+try { Haptics = require('expo-haptics'); } catch (e) { /* haptics unavailable */ }
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors } from '../constants/theme';
 import ParticleEffect from './ParticleEffect';
