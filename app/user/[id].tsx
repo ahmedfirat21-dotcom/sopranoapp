@@ -78,7 +78,7 @@ export default function UserProfileScreen() {
       // Son 3 post
       const { data: postsData } = await supabase
         .from('posts')
-        .select('id, content, image_url, created_at, like_count, comment_count')
+        .select('id, content, image_url, created_at, likes_count, comments_count')
         .eq('user_id', id)
         .order('created_at', { ascending: false })
         .limit(3);
@@ -340,11 +340,11 @@ export default function UserProfileScreen() {
                   <View style={styles.postMeta}>
                     <View style={styles.postMetaItem}>
                       <Ionicons name="heart" size={12} color={Colors.red} />
-                      <Text style={styles.postMetaText}>{post.like_count || 0}</Text>
+                      <Text style={styles.postMetaText}>{post.likes_count || 0}</Text>
                     </View>
                     <View style={styles.postMetaItem}>
                       <Ionicons name="chatbubble" size={12} color={Colors.teal} />
-                      <Text style={styles.postMetaText}>{post.comment_count || 0}</Text>
+                      <Text style={styles.postMetaText}>{post.comments_count || 0}</Text>
                     </View>
                     <Text style={styles.postDate}>{_formatTimeAgo(post.created_at)}</Text>
                   </View>

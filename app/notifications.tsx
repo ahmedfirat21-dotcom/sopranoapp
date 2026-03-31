@@ -226,8 +226,12 @@ export default function NotificationsScreen() {
       <Pressable
         style={[styles.notifItem, !item.is_read && styles.notifUnread]}
         onPress={() => {
-          if (item.type === 'follow' || item.type === 'follow_request' || item.type === 'follow_accepted') {
-            router.push(`/user/${item.sender_id}`);
+          if (item.type === 'like' || item.type === 'comment') {
+            if (item.reference_id) router.push(`/post/${item.reference_id}` as any);
+          } else if (item.type === 'gift') {
+            router.push(`/user/${item.sender_id}` as any);
+          } else if (item.type === 'follow' || item.type === 'follow_request' || item.type === 'follow_accepted') {
+            router.push(`/user/${item.sender_id}` as any);
           }
         }}
       >

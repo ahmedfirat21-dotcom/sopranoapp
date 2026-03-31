@@ -138,23 +138,20 @@ export function CreatePostModal({ visible, onClose, userId, userAvatar, userName
                 <Ionicons name="image-outline" size={22} color={Colors.teal} />
                 <Text style={styles.toolText}>Fotoğraf</Text>
               </Pressable>
-              <Pressable style={styles.toolBtn} onPress={() => {
-                Alert.alert('🎵 Müzik Ekle', 'Spotify/Apple Music arama altyapısı bir sonraki güncellemede kullanıma sunulacak.', [{ text: 'Anladım' }]);
-              }}>
+              <Pressable style={[styles.toolBtn, { opacity: 0.4 }]} disabled>
                 <Ionicons name="musical-notes-outline" size={22} color={Colors.sapphire} />
                 <Text style={styles.toolText}>Müzik</Text>
+                <Text style={{ fontSize: 8, color: Colors.text3, fontWeight: '700' }}>Yakında</Text>
               </Pressable>
-              <Pressable style={styles.toolBtn} onPress={() => {
-                Alert.alert('📍 Konum Ekle', 'Konum paylaşımı için cihaz izinleri gerekecek.', [{ text: 'Anladım' }]);
-              }}>
+              <Pressable style={[styles.toolBtn, { opacity: 0.4 }]} disabled>
                 <Ionicons name="location-outline" size={22} color={Colors.emerald} />
                 <Text style={styles.toolText}>Konum</Text>
+                <Text style={{ fontSize: 8, color: Colors.text3, fontWeight: '700' }}>Yakında</Text>
               </Pressable>
-              <Pressable style={styles.toolBtn} onPress={() => {
-                Alert.alert('🏷️ Etiket', 'Arkadaşlarını etiketleme özelliği hazırlanıyor.', [{ text: 'Anladım' }]);
-              }}>
+              <Pressable style={[styles.toolBtn, { opacity: 0.4 }]} disabled>
                 <Ionicons name="pricetag-outline" size={22} color={Colors.gold} />
                 <Text style={styles.toolText}>Etiket</Text>
+                <Text style={{ fontSize: 8, color: Colors.text3, fontWeight: '700' }}>Yakında</Text>
               </Pressable>
             </View>
             <Text style={styles.charCount}>{content.length}/500</Text>

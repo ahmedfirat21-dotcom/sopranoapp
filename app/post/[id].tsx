@@ -3,7 +3,7 @@
  * Gonderi detayi, like toggle, yorum listesi ve ekleme
  */
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { View, Text, StyleSheet, Image, Pressable, FlatList, TextInput, KeyboardAvoidingView, Platform, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, Image, Pressable, FlatList, TextInput, KeyboardAvoidingView, Platform, ActivityIndicator, Alert, Share } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Colors, Radius } from '../../constants/theme';
@@ -212,10 +212,15 @@ export default function PostDetailScreen() {
                 <Ionicons name="chatbubble-outline" size={20} color={Colors.text3} />
                 <Text style={styles.actionText}>{comments.length}</Text>
               </Pressable>
-              <View style={styles.actionBtn}>
+              <Pressable style={styles.actionBtn} onPress={() => {
+                Share.share({
+                  message: `${post.content?.substring(0, 100)}...\n\n📲 SopranoChat'te gör: https://sopranochat.app/post/${post.id}`,
+                  title: 'SopranoChat Gönderi',
+                });
+              }}>
                 <Ionicons name="share-social-outline" size={20} color={Colors.text3} />
-                <Text style={styles.actionText}>Paylas</Text>
-              </View>
+                <Text style={styles.actionText}>Paylaş</Text>
+              </Pressable>
             </View>
 
             {/* Comments Header */}
