@@ -1,0 +1,540 @@
+MATCH 0
+<Animated.View key={i} style={{
+            position: 'absolute',
+            width: size, height: size, borderRadius: size/2,
+            backgroundColor: '#FFF',
+            opacity,
+            transform: [{ translateY }, { translateX }]
+          }} />
+        );
+      })}
+    </View>
+  );
+};
+
+//  YILDIZ ALANI (Twinkling Stars - sabit pozisyon) 
+const TwinklingStars = () => {
+  const stars = useRef(
+    Array.from({ length: 60 }).map(() => ({
+      x: Math.random() * W,
+      y: Math.random() * H * 0.55,
+      size: Math.random() * 2.2 + 0.4,
+      anim: new Animated.Value(Math.random()),
+      duration: 1200 + Math.random() * 3500,
+    }))
+  ).current;
+
+  useEffect(() => {
+    stars.forEach(s => {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(s.anim, { toValue: 1, duration: s.duration, useNativeDriver: true }),
+          Animated.timing(s.anim, { toValue: 0.1, duration: s.duration, useNativeDriver: true }),
+        ])
+      ).start();
+    });
+  }, []);
+
+  return (
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      {stars.map((s, i) => (
+        <Animated.View key={i} style={{
+          position: 'absolute', left: s.x, top: s.y,
+          width: s.size, height: s.size, borderRadius: s.size,
+          backgroundColor: '#fff',
+          opacity: s.anim.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0.1, 0.7, 0.2] }),
+        }} />
+      ))}
+    </View>
+  );
+};
+
+//  TEMA (mobil2 original)
+const COLORS = {
+  primary: '#5CE1E6',
+  deepNavy: '#000000',
+  vipGold: '#D4AF37',
+  vipGoldGlow: 'rgba(212,175,55,0.4)',
+  silver: '#E2E8F0',
+  silverDark: '#94A3B8',
+  white: '#FFFFFF',
+  error: '#EF4444'
+};
+
+/* 
+   KONUMA ANMASYONU
+    */
+function SpeakingRipple({ diameter, audioLevel = 0.5 }: { diameter: number; audioLevel?: number }) {
+  const ring1 = useRef(new Animated.Value(0)).current;
+  const ring2 = useRef(new Animated.Value(0)).current;
+  // Ses şiddetine göre halka genişleme oranı (0.0-1.0 → 1.15-1.6)
+  const maxScale = 1.15 + audioLevel * 0.45;
+  // Ses şiddetine göre halka kalınlığı
+  const borderW = 1 + audioLevel * 2;
+
+  useEffect(() => {
+    const speed = 1800 - audioLevel * 800; // Yüksek ses → daha hızlı
+    const anim = (v: Animated.Value, del: number) =>
+      Animated.loop(Animated.sequence([
+        Animated.delay(del),
+        Animated.timing(v, { toValue: 1, duration: speed, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+        Animated.timing(v, { toValue: 0, duration: 0, useNativeDriver: true }),
+      ]));
+    ring1.setValue(0); ring2.setValue(0);
+    const a1 = anim(ring1, 0); a1.start();
+    const a2 = anim(ring2, Math.max(200, speed / 3)); a2.start();
+    return () => { a1.stop(); a2.stop(); };
+  }, [Math.round(audioLevel * 5)]);
+
+  const makeStyle = (v: Animated.Value) => ({
+    position: 'absolute' as const,
+    width: diameter, height: diameter, borderRadius: diameter / 2,
+    borderWidth: borderW,
+    borderColor: `rgba(92,225,230,${0.3 + audioLevel * 0.4})`,
+    opacity: v.interpolate({ inputRange: [0, 1], outputRange: [0.3 + audioLevel * 0.4, 0] }),
+    transform: [{ scale: v.interpolate({ inputRange: [0, 1], outputRange: [1, maxScale] }) }],
+  });
+
+  return (
+    <>
+      <Animated.View style={makeStyle(ring1)} />
+      <Animated.View style={makeStyle(ring2)} />
+    </>
+  );
+}
+
+/* 
+   SES DALGASI (Avatar zerinde konuma gstergesi)
+    */
+function AudioWaveBar({ diameter, audioLevel = 0.5 }: { diameter: number; audioLevel?: number }) {
+  const bars = [useRef(new Animated.Value(0.3)).current, useRef(new Animated.Value(0.5)).current, useRef(new Animated.Value(0.2)).current, useRef(new Animated.Value(0.7)).current, useRef(new Animated.Value(0.4)).current];
+  // Ses şiddetine göre dalga yüksekliği: level 0→küçük titreşim, level 1→tam dalga
+  const levelRef = useRef(audioLevel);
+  levelRef.current = audioLevel;
+
+  useEffect(() => {
+    const al = levelRef.current;
+    const minH = 0.05 + al * 0.15; // ses yokken çok küçük
+    const maxH = 0.2 + al * 0.8;   // ses yüksekken tam boy
+    const speed = 200 - al * 100;    // yüksek ses → daha hızlı
+    bars.forEach((bar, i) => {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(bar, { toValue: minH + Math.random() * (maxH - minH), duration: Math.max(60, speed + i * 30), useNativeDriver: true }),
+          Animated.timing(bar, { toValue: minH + Math.random() * (maxH - minH) * 0.4, duration: Math.max(60, speed + i * 25), useNativeDriver: true }),
+        ])
+      ).start();
+    });
+  }, [Math.round(audioLevel * 5)]);
+
+  const barWidth = Math.max(2, diameter * 0.04);
+  const maxHeight = diameter * 0.35;
+
+  return (
+    <View style={{
+      position: 'absolute', top: '75%', marginTop: -maxHeight / 2, alignSelf: 'center',
+      flexDirection: 'row', gap: 2, alignItems: 'center', height: maxHeight, zIndex: 120
+    }}>
+      {bars.map((bar, i) => (
+        <Animated.View key={i} style={{
+          width: barWidth,
+          backgroundColor: '#4ADE80',
+          borderRadius: barWidth / 2,
+          height: maxHeight,
+          transform: [{ scaleY: bar }],
+          shadowColor: '#4ADE80',
+          shadowOpacity: 0.6,
+          shadowRadius: 3,
+          elevation: 3,
+        }} />
+      ))}
+    </View>
+  );
+}
+
+/* 
+   KOLTUK KARTI
+    */
+function SeatCard({ nick, role, speaking, mic, size, onPress, avatarUrl, micRequesting, audioLevel = 0, cameraOn = false }: {
+  nick: string; role: string; speaking: boolean; mic: boolean; size: number; onPress: () => void; avatarUrl?: string; micRequesting?: boolean; audioLevel?: number; cameraOn?: boolean;
+}) {
+  const isHost = role === 'host';
+  const initials = nick.slice(0, 2).toUpperCase();
+  const hostSpin = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (isHost) {
+      hostSpin.setValue(0);
+      Animated.loop(Animated.timing(hostSpin, { toValue: 1, duration: 6000, easing: Easing.linear, useNativeDriver: true })).start();
+    }
+  }, [isHost]);
+  const spinInterpolate = hostSpin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
+
+  return (
+    <TouchableOpacity
+      activeOpacity={0.75}
+      onPress={onPress}
+      style={{ alignItems: 'center', marginHorizontal: 6, marginBottom: 8, width: size * 1.25, paddingTop: 0 }}
+    >
+      <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+        {isHost && (
+          <Animated.View style={{
+            position: 'absolute', width: size + 16, height: size + 16, borderRadius: (size + 16) / 2,
+            transform: [{ rotate: spinInterpolate }], overflow: 'hidden', zIndex: -1
+          }}>
+            <LinearGradient colors={[COLORS.vipGold, '#FFA500', 'transparent', 'transparent']} style={StyleSheet.absoluteFill} />
+          </Animated.View>
+-------------
+MATCH 1
+<Animated.View style={[sty.vipBanner, { transform: [{ translateY: slideY }], opacity }]}>
+      <LinearGradient colors={[COLORS.vipGoldGlow, 'transparent']} style={StyleSheet.absoluteFill} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} />
+      <Ionicons name="diamond" size={14} color={COLORS.vipGold} />
+      <Text style={sty.vipBannerText}> {name} odaya giriş yaptı!</Text>
+    </Animated.View>
+-------------
+MATCH 2
+<Animated.View style={[sty.root, { opacity: fadeIn }]}>
+      <StatusBar hidden />
+      {/*  GÖKYÜZÜ ZEMİNİ (Akıcı Geçiş - Banding Önleyici)  */}
+      <LinearGradient
+        colors={['#081222', '#010306']}
+        style={StyleSheet.absoluteFillObject}
+        pointerEvents="none"
+      />
+      <TwinklingStars />
+
+      {/*  ST BLG UBUU (Header)   */}
+      <View style={[sty.header, { paddingTop: Math.max(insets.top, 12) + 2 }]}>
+        <View style={sty.headerL}>
+          <View style={sty.headerHostAvatar}>
+            <Text style={sty.headerHostInitials}>
+              {(room?.name || 'L').slice(0, 2).toUpperCase()}
+            </Text>
+          </View>
+          <View>
+            <Text style={sty.headerRoom} numberOfLines={1}>{room?.name}</Text>
+            <Text style={sty.headerStatus}>
+              {lk.connectionState === 'connected' ? ' Canlı' : lk.connectionState === 'connecting' ? ' Bağlanıyor' : ' Çevrimdışı'}
+            </Text>
+          </View>
+        </View>
+
+        <View style={sty.headerR}>
+          {/* Mic request badge - sadece host görür */}
+          {amIHost && micRequests.length > 0 && (
+            <TouchableOpacity style={[sty.headerIcon, { position: 'relative' }]} onPress={() => setShowMicRequests(!showMicRequests)}>
+              <Ionicons name="hand-left" size={18} color="#FFC107" />
+              <View style={{ position: 'absolute', top: -4, right: -4, backgroundColor: '#FF1744', borderRadius: 10, width: 18, height: 18, justifyContent: 'center', alignItems: 'center' }}>
+                <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>{micRequests.length}</Text>
+              </View>
+            </TouchableOpacity>
+          )}
+          <View style={sty.viewerPill}>
+            <Ionicons name="people" size={12} color={COLORS.primary} />
+            <Text style={sty.viewerCount}>{viewerCount}</Text>
+          </View>
+          <TouchableOpacity style={sty.headerIcon}>
+            <Ionicons name="share-outline" size={18} color="rgba(255,255,255,0.5)" />
+          </TouchableOpacity>
+          <TouchableOpacity style={sty.headerIcon} onPress={() => router.back()}>
+            <Ionicons name="chevron-down" size={18} color="rgba(255,255,255,0.5)" />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/*  SAHNE (Speakers)  */}
+      <View style={sty.stage}>
+        {stageUsers.length === 0 ? <Text style={{color: 'rgba(255,255,255,0.3)', marginTop: 20}}>Sahnede kimse yok</Text> : null}
+        
+        {(() => {
+          const speakerOnly = stageUsers.filter(u => u.role !== 'host');
+          const sc = speakerOnly.length;
+          // Dinamik boyutlandırma: kişi arttıkça küçül
+          const hostSize = sc <= 3 ? 84 : sc <= 6 ? 74 : sc <= 9 ? 66 : 58;
+          const speakerSize = sc <= 3 ? 62 : sc <= 6 ? 52 : sc <= 9 ? 44 : 38;
+          const stageGap = sc <= 3 ? 20 : sc <= 6 ? 14 : sc <= 9 ? 8 : 4;
+          const hostMb = sc <= 3 ? 20 : sc <= 6 ? 14 : 8;
+
+          return (
+            <>
+              {/* Host Center Top */}
+              <View style={{ alignItems: 'center', marginBottom: hostMb, width: '100%' }}>
+                {stageUsers.filter(u => u.role === 'host').map(u => {
+                   const st = getMicStatus(u.user_id);
+                   return (
+                    <SeatCard key={u.id} nick={u.user?.display_name || 'Misafir'} role={u.role} speaking={st.speaking} mic={st.mic} size={hostSize} onPress={() => { const _st = getMicStatus(u.user_id); if (_st.cameraOn && u.role !== 'listener') { setCameraExpandUser(u.user?.display_name || 'Misafir'); } else { setSelectedUser(u); } }} avatarUrl={u.user?.avatar_url} micRequesting={micRequests.includes(u.user_id)} audioLevel={st.audioLevel} cameraOn={st.cameraOn} />
+                  );
+                })}
+              </View>
+
+              {/* Lounge Speakers - Dinamik */}
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: stageGap, width: '100%', paddingHorizontal: 4 }}>
+                {speakerOnly.map(u => {
+                   const st = getMicStatus(u.user_id);
+                   return (
+                    <SeatCard key={u.id} nick={u.user?.display_name || 'Misafir'} role={u.role} speaking={st.speaking} mic={st.mic} size={speakerSize} onPress={() => { const _st = getMicStatus(u.user_id); if (_st.cameraOn && u.role !== 'listener') { setCameraExpandUser(u.user?.display_name || 'Misafir'); } else { setSelectedUser(u); } }} avatarUrl={u.user?.avatar_url} micRequesting={micRequests.includes(u.user_id)} audioLevel={st.audioLevel} cameraOn={st.cameraOn} />
+                  );
+                })}
+              </View>
+            </>
+          );
+        })()}
+      </View>
+
+      {/*  DİNLEYİCİLER  */}
+      {audienceUsers.length > 0 && (
+        <View style={sty.audience}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+            <Text style={sty.audienceLabel}>Dinleyiciler  {audienceUsers.length}</Text>
+            {audienceUsers.length > 12 && (
+              <TouchableOpacity onPress={() => setShowAudienceDrawer(true)} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(92,225,230,0.08)', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 0.5, borderColor: 'rgba(92,225,230,0.2)' }}>
+                <Text style={{ color: COLORS.primary, fontSize: 10, fontWeight: '600' }}>+{audienceUsers.length - 12} kişi</Text>
+                <Ionicons name="chevron-forward" size={10} color={COLORS.primary} />
+              </TouchableOpacity>
+            )}
+          </View>
+          <View style={sty.audienceGrid}>
+            {audienceUsers.slice(0, 12).map(u => {
+              const st = getMicStatus(u.user_id);
+              return (
+                <SeatCard
+                  key={u.id}
+                  nick={u.user?.display_name || 'Misafir'}
+                  role={u.role}
+                  speaking={st.speaking}
+                  mic={st.mic}
+                  size={36}
+                  onPress={() => setSelectedUser(u)}
+                  avatarUrl={u.user?.avatar_url}
+                  micRequesting={micRequests.includes(u.user_id)}
+                />
+              );
+            })}
+          </View>
+        </View>
+      )}
+
+      <View style={sty.chatArea} pointerEvents="box-none">
+        {/*  Ufuk Çizgisi (gradient fade)  */}
+        <LinearGradient
+          colors={['transparent', 'rgba(92,225,230,0.06)', 'transparent']}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+          style={{ height: 1, marginBottom: 6, marginHorizontal: -14 }}
+        />
+        <FlatList
+          ref={scrollViewRef as any}
+          data={displayMessages.slice(0, Math.min(8, displayMessages.length))}
+          keyExtractor={(m) => m.id}
+          renderItem={({ item, index }) => <ChatBubble key={item.id} message={item} index={index} total={displayMessages.length} />}
+          inverted
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingTop: 4, paddingBottom: 8 }}
+        />
+      </View>
+
+      {/*  VIP GİRİŞ BANTI  */}
+      {!!entryEffectName && (
+        <VIPEntryBanner name={entryEffectName} onDone={() => setEntryEffectName(null)} />
+      )}
+
+      {/*  MİKROFON İSTEK POPUP (HOST İÇİN)  */}
+      {showMicRequests && micRequests.length > 0 && (
+        <View style={{
+          position: 'absolute', top: 100, right: 12, width: 220,
+          backgroundColor: 'rgba(20,15,40,0.95)', borderRadius: 16,
+          borderWidth: 1, borderColor: 'rgba(92,225,230,0.3)',
+          padding: 12, zIndex: 999,
+        }}>
+          <Text style={{ color: '#FFC107', fontWeight: 'bold', fontSize: 14, marginBottom: 8 }}>
+             Mikrofon İstekleri
+          </Text>
+          {micRequests.map(uid => {
+            const p = participants.find(x => x.user_id === uid);
+            return (
+              <View key={uid} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8, gap: 8 }}>
+                <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(92,225,230,0.2)', justifyContent: 'center', alignItems: 'center' }}>
+                  <Text style={{ fontSize: 12 }}></Text>
+                </View>
+                <Text style={{ color: '#fff', flex: 1, fontSize: 13 }} numberOfLines={1}>
+                  {p?.user?.display_name || 'Kullanıcı'}
+                </Text>
+                <TouchableOpacity onPress={() => approveMicRequest(uid)} style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(76,175,80,0.3)', justifyContent: 'center', alignItems: 'center' }}>
+                  <Ionicons name="checkmark" size={16} color="#4CAF50" />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => rejectMicRequest(uid)} style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(244,67,54,0.3)', justifyContent: 'center', alignItems: 'center' }}>
+                  <Ionicons name="close" size={16} color="#F44336" />
+                </TouchableOpacity>
+              </View>
+            );
+          })}
+        </View>
+      )}
+
+
+      {/*  PREMIUM DOCK  */}
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+          <View style={[sty.dock, { paddingBottom: Math.max(insets.bottom, 6) }]}>
+            <LinearGradient
+              colors={['transparent', '#050a14']}
+              locations={[0, 1]}
+              style={[StyleSheet.absoluteFill, { top: -10 }]}
+            />
+
+            {/*  Input strip  */}
+            <View style={sty.inputStrip}>
+              <TouchableOpacity activeOpacity={0.7} style={sty.dockEmoji}>
+                <Text style={{ fontSize: 13 }}></Text>
+              </TouchableOpacity>
+              <TextInput
+                ref={chatInputRef}
+                style={sty.dockInput}
+                placeholder="Mesaj yaz..."
+                placeholderTextColor="rgba(255,255,255,0.15)"
+                selectionColor={COLORS.primary}
+                value={chatInput}
+                onChangeText={setChatInput}
+                onSubmitEditing={handleSendChat}
+                returnKeyType="send"
+                blurOnSubmit={false}
+              />
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={chatInput.trim() ? handleSendChat : undefined}
+                style={[sty.dockSend, chatInput.trim() && sty.dockSendActive]}
+              >
+                <Ionicons
+                  name="paper-plane"
+                  size={12}
+                  color={chatInput.trim() ? '#fff' : 'rgba(255,255,255,0.12)'}
+                />
+              </TouchableOpacity>
+            </View>
+
+            {/*  Control strip  */}
+            <View style={sty.controlStrip}>
+              <TouchableOpacity activeOpacity={0.7} style={sty.ghostBtn} onPress={() => {
+                const map: Record<string,string> = { live: 'empty', empty: 'half', half: 'full', full: 'live' };
+                setMockScenario(map[mockScenario] || 'live');
+                 setSimSpeaker(true);
+              }}>
+                <Ionicons name="flask" size={20} color={mockScenario !== 'live' ? '#ffeb3b' : 'rgba(255,255,255,0.6)'} />
+              </TouchableOpacity>
+              <Text style={{color: '#ffeb3b', fontSize: 8, position: 'absolute', top: -5}}>{mockScenario.toUpperCase()}</Text>
+              <TouchableOpacity activeOpacity={0.7} style={sty.ghostBtn} onPress={() => setRoomMuted(!roomMuted)}>
+                <Ionicons name={roomMuted ? 'volume-mute' : 'volume-medium'} size={20} color={roomMuted ? '#F44336' : 'rgba(255,255,255,0.6)'} />
+              </TouchableOpacity>
+              <TouchableOpacity activeOpacity={0.7} style={sty.ghostBtn} onPress={() => {
+                if (amIHost && micRequests.length > 0) {
+                  setShowMicRequests(!showMicRequests);
+                } else {
+                  handleMicPress();
+                }
+              }}>
+                <Ionicons name="hand-left" size={18} color={micRequests.length > 0 && amIHost ? '#FF9800' : myMicRequested ? '#5CE1E6' : 'rgba(255,255,255,0.6)'} />
+                {amIHost && micRequests.length > 0 && (
+                  <View style={{ position: 'absolute', top: -4, right: -4, backgroundColor: '#F44336', borderRadius: 8, width: 16, height: 16, alignItems: 'center', justifyContent: 'center' }}>
+                    <Text style={{ color: '#fff', fontSize: 9, fontWeight: 'bold' }}>{micRequests.length}</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                activeOpacity={0.85}
+                style={sty.micPill}
+                onPress={handleMicPress}
+              >
+                <LinearGradient
+                  colors={lk.isMicrophoneEnabled
+                    ? ['rgba(92,225,230,0.25)', 'rgba(56,189,248,0.15)']
+                    : ['rgba(255,255,255,0.04)', 'rgba(255,255,255,0.02)']}
+                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                  style={sty.micPillGrad}
+                >
+                  <Ionicons
+                    name={lk.isMicrophoneEnabled ? 'mic' : 'mic-off'}
+                    size={17}
+                    color={lk.isMicrophoneEnabled ? COLORS.primary : 'rgba(255,255,255,0.6)'}
+                  />
+                  <Text style={[
+                    sty.micPillLabel,
+                    lk.isMicrophoneEnabled && { color: COLORS.primary }
+                  ]}>
+                    {lk.isMicrophoneEnabled ? 'Açık' : 'Sessiz'}
+                  </Text>
+                </LinearGradient>
+                {lk.isMicrophoneEnabled && <View style={sty.micPillGlow} />}
+              </TouchableOpacity>
+
+              <TouchableOpacity activeOpacity={0.7} style={sty.ghostBtn} onPress={() => {}}>
+                <Ionicons name="videocam" size={20} color="rgba(255,255,255,0.6)" />
+              </TouchableOpacity>
+              
+              <TouchableOpacity activeOpacity={0.7} style={sty.giftBtn} onPress={() => setShowGiftPanel(true)}>
+                <Animated.Text style={{
+                  fontSize: 30,
+                  textShadowColor: 'rgba(255,180,50,0.9)',
+                  textShadowOffset: { width: 0, height: 0 },
+                  textShadowRadius: 15,
+                  transform: [{ translateY: giftBounce }],
+                }}>🎁</Animated.Text>
+              </TouchableOpacity>
+
+            </View>
+          </View>
+      </KeyboardAvoidingView>
+
+      {/*  KAMERA BÜYÜTME  */}
+      {!!cameraExpandUser && (
+        <CameraExpandModal nick={cameraExpandUser} onClose={() => setCameraExpandUser(null)} />
+      )}
+
+      {/*  DİNLEYİCİ ÇEKMECESİ  */}
+      {!!showAudienceDrawer && (
+        <AudienceDrawer
+          users={audienceUsers}
+          onClose={() => setShowAudienceDrawer(false)}
+          onSelectUser={(u) => { setShowAudienceDrawer(false); setSelectedUser(u); }}
+        />
+      )}
+
+      {/*  PROFİL EKRANI  */}
+      {!!selectedUser && (
+        <ProfileCard
+          nick={selectedUser.user?.display_name || 'Gizli'}
+          role={selectedUser.role}
+          avatarUrl={selectedUser.user?.avatar_url}
+          onClose={() => setSelectedUser(null)}
+          onMute={amIHost ? () => {} : undefined}
+          onRemoveFromStage={amIHost && selectedUser.role === 'speaker' ? () => liveKitService.promoteToSpeaker(id as string, selectedUser.user_id) : undefined}
+        />
+      )} EKRANI  */}
+      {!!selectedUser && (
+        <ProfileCard
+          nick={selectedUser.user?.display_name || 'Gizli'}
+          role={selectedUser.role}
+          onClose={() => setSelectedUser(null)}
+          onMute={amIHost ? () => {} : undefined}
+          onRemoveFromStage={amIHost && selectedUser.role === 'speaker' ? () => liveKitService.promoteToSpeaker(id as string, selectedUser.user_id) : undefined}
+        />
+      )}
+
+      {/*  HEDYE KAPLAMALARI  */}
+      <GiftPanel
+        visible={showGiftPanel}
+        onClose={() => setShowGiftPanel(false)}
+        userCoins={localCoins}
+        onSend={handleSendGift}
+        roomUsers={participants.map(p => ({
+          id: p.user_id,
+          name: p.user?.display_name || 'Misafir',
+          avatarUrl: p.user?.avatar_url,
+          role: p.role
+        }))}
+        defaultTargetId={selectedUser?.user_id || room?.host_id}
+      />
+      
+      <GiftAnimationQueue
+        gifts={giftQueue}
+        onGiftComplete={(gid) => setGiftQueue(prev => prev.filter(g => g.id !== gid))}
+      />
+    </Animated.View>
