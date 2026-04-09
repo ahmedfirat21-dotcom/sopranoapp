@@ -1,15 +1,21 @@
 /**
- * SopranoChat — Gelen Arama Overlay
- * DM üzerinden gelen arama bildirimi — kabul/red
+ * SopranoChat — Gelen Arama Overlay (WhatsApp Tarzı Tam Ekran)
+ * Full-screen overlay, 35sn auto-dismiss, anında ses kesme
+ * BUG-15: Sound cleanup race condition düzeltildi
+ * CALL-2: 35sn auto-dismiss 
+ * CALL-3: Kabul'de zil sesi anında durma
+ * CALL-6: Tam ekran WhatsApp tarzı UI
  */
-import { View, Text, StyleSheet, Image, TouchableOpacity, Animated, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Image, TouchableOpacity, Animated, Vibration, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
+import { Audio } from 'expo-av';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors } from '../constants/theme';
 import type { CallType } from '../services/call';
+import { getAvatarSource } from '../constants/avatars';
 
-const { width: W } = Dimensions.get('window');
+const { width: W, height: H } = Dimensions.get('window');
 
 type Props = {
   visible: boolean;
@@ -21,68 +27,208 @@ type Props = {
 };
 
 export function IncomingCallOverlay({ visible, callerName, callerAvatar, callType, onAccept, onReject }: Props) {
-  const slideAnim = useRef(new Animated.Value(-300)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
+  const ringPulseAnim = useRef(new Animated.Value(0.4)).current;
+  const acceptBtnAnim = useRef(new Animated.Value(0)).current;
+  const rejectBtnAnim = useRef(new Animated.Value(0)).current;
+  const soundRef = useRef<Audio.Sound | null>(null);
+  const cleaningUpRef = useRef(false);
+  const autoCloseTimerRef = useRef<NodeJS.Timeout | null>(null);
 
+  // ★ CALL-3 FIX: Senkron ses durdurma — kabul/red'de ANINDA çağrılır
+  const stopSoundImmediately = useCallback(async () => {
+    if (cleaningUpRef.current) return;
+    cleaningUpRef.current = true;
+    try {
+      if (soundRef.current) {
+        const sound = soundRef.current;
+        soundRef.current = null;
+        try { await sound.stopAsync(); } catch { /* silent */ }
+        try { await sound.unloadAsync(); } catch { /* silent */ }
+      }
+      try {
+        await Audio.setAudioModeAsync({
+          allowsRecordingIOS: true,
+          playsInSilentModeIOS: false,
+          staysActiveInBackground: false,
+          shouldDuckAndroid: false,
+          playThroughEarpieceAndroid: false,
+        });
+      } catch { /* silent */ }
+    } finally {
+      cleaningUpRef.current = false;
+    }
+  }, []);
+
+  // ★ CALL-3 FIX: Kabul — ÖNCE sesi durdur, SONRA callback
+  const handleAccept = useCallback(() => {
+    Vibration.cancel();
+    stopSoundImmediately();
+    if (autoCloseTimerRef.current) { clearTimeout(autoCloseTimerRef.current); autoCloseTimerRef.current = null; }
+    onAccept();
+  }, [onAccept, stopSoundImmediately]);
+
+  // Red — ÖNCE sesi durdur, SONRA callback
+  const handleReject = useCallback(() => {
+    Vibration.cancel();
+    stopSoundImmediately();
+    if (autoCloseTimerRef.current) { clearTimeout(autoCloseTimerRef.current); autoCloseTimerRef.current = null; }
+    onReject();
+  }, [onReject, stopSoundImmediately]);
+
+  // ★ Zil sesi + titreşim + animasyon
   useEffect(() => {
+    let isCancelled = false;
+
     if (visible) {
-      Animated.spring(slideAnim, {
-        toValue: 0,
+      cleaningUpRef.current = false;
+
+      // Titreşim pattern
+      const vibratePattern = [0, 800, 400, 800, 400, 800];
+      Vibration.vibrate(vibratePattern, true);
+
+      // Bildirim sesi çal (loop)
+      (async () => {
+        try {
+          await Audio.setAudioModeAsync({
+            allowsRecordingIOS: false,
+            playsInSilentModeIOS: true,
+            staysActiveInBackground: true,
+            shouldDuckAndroid: true,
+            playThroughEarpieceAndroid: false,
+          });
+          if (isCancelled) return;
+          const { sound } = await Audio.Sound.createAsync(
+            require('../assets/ringtone.mp3'),
+            { isLooping: true, volume: 1.0, shouldPlay: true }
+          );
+          if (isCancelled) {
+            await sound.stopAsync().catch(() => {});
+            await sound.unloadAsync().catch(() => {});
+            return;
+          }
+          soundRef.current = sound;
+        } catch (e) {
+          if (__DEV__) console.warn('[IncomingCall] Zil sesi yüklenemedi:', e);
+        }
+      })();
+
+      // ★ Fade-in animasyonu
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 300,
         useNativeDriver: true,
-        tension: 60,
-        friction: 10,
       }).start();
 
-      // Pulse animasyonu
+      // ★ Avatar pulse animasyonu
       Animated.loop(
         Animated.sequence([
-          Animated.timing(pulseAnim, { toValue: 1.1, duration: 600, useNativeDriver: true }),
-          Animated.timing(pulseAnim, { toValue: 1, duration: 600, useNativeDriver: true }),
+          Animated.timing(pulseAnim, { toValue: 1.08, duration: 800, useNativeDriver: true }),
+          Animated.timing(pulseAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
         ])
       ).start();
+
+      // ★ Halka pulse animasyonu (ring effect)
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(ringPulseAnim, { toValue: 0.8, duration: 1200, useNativeDriver: true }),
+          Animated.timing(ringPulseAnim, { toValue: 0.4, duration: 1200, useNativeDriver: true }),
+        ])
+      ).start();
+
+      // ★ Buton giriş animasyonu
+      Animated.stagger(100, [
+        Animated.spring(rejectBtnAnim, { toValue: 1, useNativeDriver: true, tension: 50, friction: 8 }),
+        Animated.spring(acceptBtnAnim, { toValue: 1, useNativeDriver: true, tension: 50, friction: 8 }),
+      ]).start();
+
+      // ★ CALL-2 FIX: 35sn otomatik kapanma — arayan taraftan 5sn sonra
+      autoCloseTimerRef.current = setTimeout(() => {
+        if (__DEV__) console.log('[IncomingCall] 35sn timeout — overlay otomatik kapanıyor');
+        handleReject();
+      }, 35000);
     } else {
-      Animated.timing(slideAnim, {
-        toValue: -300,
+      // Kapanış
+      Vibration.cancel();
+      stopSoundImmediately();
+
+      Animated.timing(fadeAnim, {
+        toValue: 0,
         duration: 200,
         useNativeDriver: true,
       }).start();
+
+      acceptBtnAnim.setValue(0);
+      rejectBtnAnim.setValue(0);
     }
+
+    return () => {
+      isCancelled = true;
+      Vibration.cancel();
+      stopSoundImmediately();
+      if (autoCloseTimerRef.current) { clearTimeout(autoCloseTimerRef.current); autoCloseTimerRef.current = null; }
+    };
   }, [visible]);
 
   if (!visible) return null;
 
   return (
-    <Animated.View style={[styles.container, { transform: [{ translateY: slideAnim }] }]}>
+    <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
       <LinearGradient
-        colors={['rgba(10,10,18,0.98)', 'rgba(18,18,37,0.98)']}
+        colors={['#0A0A18', '#0F1126', '#0A0A18']}
         style={styles.gradient}
       >
-        <View style={styles.content}>
-          {/* Avatar + bilgi */}
-          <View style={styles.callerInfo}>
-            <Animated.View style={[styles.avatarWrap, { transform: [{ scale: pulseAnim }] }]}>
-              <Image
-                source={{ uri: callerAvatar || 'https://i.pravatar.cc/80?img=5' }}
-                style={styles.avatar}
-              />
-            </Animated.View>
-            <View style={styles.textWrap}>
-              <Text style={styles.callerName} numberOfLines={1}>{callerName}</Text>
-              <Text style={styles.callTypeText}>
-                {callType === 'video' ? '📹 Görüntülü Arama' : '📞 Sesli Arama'}
-              </Text>
-            </View>
-          </View>
+        {/* Üst kısım — arama türü */}
+        <View style={styles.topSection}>
+          <Ionicons
+            name={callType === 'video' ? 'videocam' : 'call'}
+            size={18}
+            color={Colors.teal}
+          />
+          <Text style={styles.callTypeLabel}>
+            {callType === 'video' ? 'Görüntülü Arama' : 'Sesli Arama'}
+          </Text>
+        </View>
 
-          {/* Butonlar */}
-          <View style={styles.buttons}>
-            <TouchableOpacity style={styles.rejectBtn} onPress={onReject} activeOpacity={0.7}>
-              <Ionicons name="close" size={28} color="#fff" />
+        {/* Orta kısım — avatar + bilgi */}
+        <View style={styles.centerSection}>
+          {/* Pulse halka efekti */}
+          <Animated.View style={[styles.pulseRing, { opacity: ringPulseAnim, transform: [{ scale: pulseAnim }] }]} />
+          <Animated.View style={[styles.pulseRing2, { opacity: ringPulseAnim }]} />
+          
+          <Animated.View style={[styles.avatarWrap, { transform: [{ scale: pulseAnim }] }]}>
+            <Image
+              source={getAvatarSource(callerAvatar)}
+              style={styles.avatar}
+            />
+          </Animated.View>
+          
+          <Text style={styles.callerName} numberOfLines={1}>{callerName}</Text>
+          <Text style={styles.statusText}>Arıyor...</Text>
+        </View>
+
+        {/* Alt kısım — butonlar */}
+        <View style={styles.bottomSection}>
+          {/* Red butonu */}
+          <Animated.View style={{ transform: [{ scale: rejectBtnAnim }] }}>
+            <TouchableOpacity style={styles.rejectBtn} onPress={handleReject} activeOpacity={0.7}>
+              <View style={styles.rejectBtnInner}>
+                <Ionicons name="close" size={32} color="#fff" />
+              </View>
+              <Text style={styles.btnLabel}>Reddet</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.acceptBtn} onPress={onAccept} activeOpacity={0.7}>
-              <Ionicons name={callType === 'video' ? 'videocam' : 'call'} size={24} color="#fff" />
+          </Animated.View>
+
+          {/* Kabul butonu */}
+          <Animated.View style={{ transform: [{ scale: acceptBtnAnim }] }}>
+            <TouchableOpacity style={styles.acceptBtn} onPress={handleAccept} activeOpacity={0.7}>
+              <View style={styles.acceptBtnInner}>
+                <Ionicons name={callType === 'video' ? 'videocam' : 'call'} size={28} color="#fff" />
+              </View>
+              <Text style={styles.btnLabel}>Kabul Et</Text>
             </TouchableOpacity>
-          </View>
+          </Animated.View>
         </View>
       </LinearGradient>
     </Animated.View>
@@ -92,51 +238,120 @@ export function IncomingCallOverlay({ visible, callerName, callerAvatar, callTyp
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    top: 0, left: 0, right: 0,
+    top: 0, left: 0, right: 0, bottom: 0,
     zIndex: 9999,
     elevation: 999,
   },
   gradient: {
-    paddingTop: 54,
-    paddingBottom: 16,
-    paddingHorizontal: 16,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(92,225,230,0.2)',
-  },
-  content: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  callerInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
     flex: 1,
-    gap: 12,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: 80,
+    paddingBottom: 80,
+  },
+
+  // Üst
+  topSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    backgroundColor: 'rgba(92,225,230,0.08)',
+    borderRadius: 20,
+  },
+  callTypeLabel: {
+    fontSize: 14,
+    color: Colors.teal,
+    fontWeight: '600',
+  },
+
+  // Orta
+  centerSection: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pulseRing: {
+    position: 'absolute',
+    width: 180, height: 180, borderRadius: 90,
+    borderWidth: 2,
+    borderColor: 'rgba(92,225,230,0.3)',
+  },
+  pulseRing2: {
+    position: 'absolute',
+    width: 220, height: 220, borderRadius: 110,
+    borderWidth: 1,
+    borderColor: 'rgba(92,225,230,0.15)',
   },
   avatarWrap: {
-    width: 54, height: 54, borderRadius: 27,
-    borderWidth: 2, borderColor: Colors.teal,
-    justifyContent: 'center', alignItems: 'center',
+    width: 130, height: 130, borderRadius: 65,
+    borderWidth: 3,
+    borderColor: 'rgba(92,225,230,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: Colors.teal,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.4,
+    shadowRadius: 30,
+    elevation: 20,
   },
-  avatar: { width: 48, height: 48, borderRadius: 24 },
-  textWrap: { flex: 1 },
-  callerName: { fontSize: 16, fontWeight: '700', color: '#fff' },
-  callTypeText: { fontSize: 13, color: 'rgba(255,255,255,0.5)', marginTop: 2 },
-  buttons: {
+  avatar: { width: 120, height: 120, borderRadius: 60 },
+  callerName: {
+    fontSize: 26,
+    fontWeight: '700',
+    color: '#fff',
+    marginTop: 28,
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 8,
+  },
+  statusText: {
+    fontSize: 15,
+    color: 'rgba(255,255,255,0.5)',
+    marginTop: 8,
+    fontWeight: '500',
+  },
+
+  // Alt — butonlar
+  bottomSection: {
     flexDirection: 'row',
-    gap: 12,
+    justifyContent: 'center',
+    gap: 80,
+    alignItems: 'center',
   },
   rejectBtn: {
-    width: 48, height: 48, borderRadius: 24,
+    alignItems: 'center',
+    gap: 10,
+  },
+  rejectBtnInner: {
+    width: 68, height: 68, borderRadius: 34,
     backgroundColor: '#EF4444',
-    justifyContent: 'center', alignItems: 'center',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#EF4444',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.5,
+    shadowRadius: 12,
+    elevation: 10,
   },
   acceptBtn: {
-    width: 48, height: 48, borderRadius: 24,
+    alignItems: 'center',
+    gap: 10,
+  },
+  acceptBtnInner: {
+    width: 68, height: 68, borderRadius: 34,
     backgroundColor: '#22C55E',
-    justifyContent: 'center', alignItems: 'center',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#22C55E',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.5,
+    shadowRadius: 12,
+    elevation: 10,
+  },
+  btnLabel: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.7)',
+    fontWeight: '500',
   },
 });

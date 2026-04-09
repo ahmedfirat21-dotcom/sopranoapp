@@ -1,0 +1,445 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  View, Text, StyleSheet, Image, Pressable, ScrollView,
+  RefreshControl, Dimensions,
+} from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import AppBackground from '../../components/AppBackground';
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter, useFocusEffect } from 'expo-router';
+import { Colors } from '../../constants/theme';
+import { RoomService, type Room } from '../../services/database';
+import { RoomFollowService } from '../../services/roomFollow';
+import { supabase } from '../../constants/supabase';
+import { useAuth, useTheme } from '../_layout';
+import { getAvatarSource } from '../../constants/avatars';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { UserSearchModal } from '../../components/UserSearchModal';
+import { showToast } from '../../components/Toast';
+
+const { width: W } = Dimensions.get('window');
+
+// ════════════════════════════════════════════════════════════
+// YÖNETİLEN ODA KARTI — Yönet/Başlat butonları
+// ════════════════════════════════════════════════════════════
+function ManagedRoomCard({ room, onManage, onStart }: {
+  room: Room; onManage: () => void; onStart: () => void;
+}) {
+  const listeners = (room as any).participant_count || (room as any).listener_count || 0;
+  const isLive = room.is_live;
+  const isPersistent = (room as any).is_persistent;
+
+  return (
+    <View style={[mS.card, isPersistent && { borderColor: Colors.premiumGold, borderWidth: 1.5 }]}>
+      <View style={mS.cardLeft}>
+        <Image source={getAvatarSource(room.host?.avatar_url)} style={mS.avatar} />
+        <View style={mS.cardInfo}>
+          <Text style={mS.roomName} numberOfLines={1}>{room.name}</Text>
+          <View style={mS.metaRow}>
+            {isLive ? (
+              <View style={mS.liveBadge}>
+                <View style={mS.liveDot} />
+                <Text style={mS.liveText}>Canlı</Text>
+              </View>
+            ) : (
+              <Text style={mS.offlineText}>🌙 Uyku Modunda</Text>
+            )}
+          </View>
+        </View>
+      </View>
+      <View style={mS.cardRight}>
+        {isLive ? (
+          <Pressable style={mS.manageBtn} onPress={onManage}>
+            <Ionicons name="enter-outline" size={14} color={Colors.accentTeal} />
+            <Text style={mS.manageBtnText}>Odaya Git</Text>
+          </Pressable>
+        ) : (
+          <Pressable style={[mS.startBtn, { backgroundColor: 'rgba(251,191,36,0.12)', borderColor: 'rgba(251,191,36,0.3)' }]} onPress={onStart}>
+            <Ionicons name="sunny" size={14} color="#FBBF24" />
+            <Text style={[mS.startBtnText, { color: '#FBBF24' }]}>Uyandır</Text>
+          </Pressable>
+        )}
+      </View>
+    </View>
+  );
+}
+
+const mS = StyleSheet.create({
+  card: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginHorizontal: 16,
+    marginBottom: 10,
+    padding: 14,
+    borderRadius: 16,
+    backgroundColor: Colors.cardBg,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  cardLeft: { flexDirection: 'row', alignItems: 'center', flex: 1, gap: 12 },
+  avatar: { width: 52, height: 52, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.06)' },
+  cardInfo: { flex: 1 },
+  roomName: {
+    fontSize: 14, fontWeight: '700', color: '#F1F5F9',
+    textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
+  },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
+  liveBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(239,68,68,0.15)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
+  liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#EF4444' },
+  liveText: { fontSize: 10, fontWeight: '700', color: '#EF4444' },
+  offlineText: { fontSize: 11, color: '#94A3B8' },
+  cardRight: { alignItems: 'flex-end', gap: 6 },
+  manageBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10,
+    backgroundColor: 'rgba(115,194,189,0.1)', borderWidth: 1, borderColor: 'rgba(115,194,189,0.25)',
+  },
+  manageBtnText: { fontSize: 11, fontWeight: '700', color: Colors.accentTeal },
+  startBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10,
+    backgroundColor: 'rgba(115,194,189,0.1)', borderWidth: 1, borderColor: 'rgba(115,194,189,0.25)',
+  },
+  startBtnText: { fontSize: 11, fontWeight: '700', color: Colors.accentTeal },
+});
+
+// ════════════════════════════════════════════════════════════
+// TAKİP EDİLEN ODA KARTI — Gerçek veri
+// ════════════════════════════════════════════════════════════
+function FollowedRoomCard({ room }: { room: Room }) {
+  const router = useRouter();
+
+  return (
+    <Pressable
+      style={({ pressed }) => [flS.card, pressed && { opacity: 0.9 }]}
+      onPress={() => router.push(`/room/${room.id}`)}
+    >
+      <Image source={getAvatarSource(room.host?.avatar_url)} style={flS.thumb} />
+      <View style={flS.info}>
+        <Text style={flS.name} numberOfLines={1}>{room.name}</Text>
+        <Text style={flS.host} numberOfLines={1}>{room.host?.display_name || 'Anonim'}</Text>
+        <View style={flS.hostRow}>
+          <View style={flS.miniAvatar}>
+            <Text style={flS.miniInitials}>{(room.host?.display_name || 'A').slice(0, 1).toUpperCase()}</Text>
+          </View>
+          <Text style={flS.username}>@{(room.host as any)?.username || 'kullanıcı'}</Text>
+        </View>
+      </View>
+      <View style={flS.metaRight}>
+        {room.is_live && (
+          <View style={flS.liveBadge}>
+            <View style={flS.liveDot} />
+            <Text style={flS.liveText}>Canlı</Text>
+          </View>
+        )}
+        <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.2)" />
+      </View>
+    </Pressable>
+  );
+}
+
+const flS = StyleSheet.create({
+  card: {
+    flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, marginBottom: 10,
+    padding: 12, borderRadius: 16, backgroundColor: Colors.cardBg,
+    borderWidth: 1, borderColor: Colors.cardBorder, gap: 12,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 8, elevation: 6,
+  },
+  thumb: { width: 56, height: 56, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.06)' },
+  info: { flex: 1 },
+  name: {
+    fontSize: 14, fontWeight: '700', color: '#F1F5F9',
+    textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
+  },
+  host: {
+    fontSize: 11, color: '#94A3B8', marginTop: 1,
+    textShadowColor: 'rgba(0,0,0,0.3)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
+  },
+  hostRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
+  miniAvatar: {
+    width: 18, height: 18, borderRadius: 9,
+    backgroundColor: 'rgba(115,194,189,0.2)', alignItems: 'center', justifyContent: 'center',
+  },
+  miniInitials: { fontSize: 9, fontWeight: '700', color: Colors.accentTeal },
+  username: { fontSize: 10, color: '#64748B' },
+  metaRight: { alignItems: 'flex-end', gap: 6 },
+  liveBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(239,68,68,0.15)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
+  liveDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: '#EF4444' },
+  liveText: { fontSize: 10, fontWeight: '700', color: '#EF4444' },
+});
+
+// ════════════════════════════════════════════════════════════
+// ODALARIM EKRANI
+// ════════════════════════════════════════════════════════════
+export default function MyRoomsScreen() {
+  const router = useRouter();
+  const { firebaseUser, profile } = useAuth();
+  const insets = useSafeAreaInsets();
+  useTheme();
+
+  const [myRooms, setMyRooms] = useState<Room[]>([]);
+  const [followedRooms, setFollowedRooms] = useState<Room[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
+
+  const loadData = useCallback(async () => {
+    if (!firebaseUser) return;
+    try {
+      const managed = await RoomService.getMyRooms(firebaseUser.uid);
+      setMyRooms(managed);
+
+      const followed = await RoomFollowService.getFollowedRooms(firebaseUser.uid);
+      setFollowedRooms(followed);
+    } catch (err) {
+      if (__DEV__) console.warn('[MyRooms] Load error:', err);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [firebaseUser]);
+
+  useEffect(() => { loadData(); }, [loadData]);
+  useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
+
+  const handleRefresh = useCallback(() => {
+    setRefreshing(true);
+    loadData();
+  }, [loadData]);
+
+  // Uyuyan odayı uyandır — DB'de is_live=true yap, süre sıfırla, sonra odaya git
+  const handleWakeUp = async (room: Room) => {
+    if (!firebaseUser) return;
+    try {
+      const tier = (profile?.subscription_tier || 'Free') as any;
+      await RoomService.wakeUpRoom(room.id, firebaseUser.uid, tier);
+      showToast({ title: '☀️ Oda Uyandırıldı!', message: `"${room.name}" tekrar canlı!`, type: 'success' });
+      router.push(`/room/${room.id}`);
+    } catch (err: any) {
+      showToast({ title: 'Uyandırma Başarısız', message: err.message || 'Oda uyandırılamadı.', type: 'error' });
+    }
+  };
+
+  // Canlı odayı yönet — direkt odaya git
+  const handleManage = (room: Room) => {
+    if (room.is_live) {
+      router.push(`/room/${room.id}`);
+    } else {
+      // Uyuyan oda — önce uyandır
+      handleWakeUp(room);
+    }
+  };
+
+  return (
+    <AppBackground variant="myrooms">
+    <View style={s.container}>
+      {/* Header */}
+      <View style={[s.header, { paddingTop: insets.top + 4 }]}>
+        <Image source={require('../../assets/logo.png')} style={s.logo} resizeMode="contain" />
+        <View style={s.headerRight}>
+          <Pressable style={s.headerIconBtn} onPress={() => setShowSearch(true)}>
+            <Ionicons name="search-outline" size={20} color="#F1F5F9" />
+          </Pressable>
+          <Pressable style={s.headerIconBtn} onPress={() => router.push('/notifications' as any)}>
+            <Ionicons name="notifications-outline" size={20} color="#F1F5F9" />
+          </Pressable>
+          <Pressable style={s.headerIconBtn} onPress={() => router.push('/leaderboard' as any)}>
+            <Ionicons name="trophy-outline" size={20} color="#F1F5F9" />
+          </Pressable>
+        </View>
+      </View>
+
+      {/* Welcome */}
+      <View style={s.welcomeRow}>
+        <Pressable onPress={() => router.push('/(tabs)/profile')}>
+          <Image source={getAvatarSource(profile?.avatar_url)} style={s.avatar} />
+        </Pressable>
+        <View style={{ flex: 1 }}>
+          <Text style={s.welcomeTitle}>Hoş geldin, {profile?.display_name || 'Kullanıcı'}!</Text>
+          <Text style={s.welcomeSub}>Kullanıcı Adı: @{profile?.username || firebaseUser?.uid?.slice(0, 8)}</Text>
+        </View>
+      </View>
+
+      {/* Yeni Oda Oluştur — Premium Gradient */}
+      <Pressable style={s.ctaWrap} onPress={() => router.push('/create-room')}>
+        <LinearGradient
+          colors={['#14B8A6', '#0D9488', '#065F56']}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+          style={s.ctaGradient}
+        >
+          <View style={s.ctaIconWrap}>
+            <Ionicons name="add-circle" size={22} color="#FFF" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={s.ctaTitle}>Yeni Oda Oluştur</Text>
+            <Text style={s.ctaSub}>Sesli veya görüntülü oda aç</Text>
+          </View>
+          <Ionicons name="arrow-forward" size={20} color="rgba(255,255,255,0.7)" />
+        </LinearGradient>
+      </Pressable>
+
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={Colors.accentTeal} colors={[Colors.accentTeal]} />
+        }
+      >
+        {/* Yönettiğim Odalar */}
+        <Text style={s.sectionTitle}>Yönettiğim Odalar</Text>
+        {myRooms.length > 0 ? (
+          myRooms.map((room) => (
+            <ManagedRoomCard
+              key={room.id}
+              room={room}
+              onManage={() => handleManage(room)}
+              onStart={() => handleWakeUp(room)}
+            />
+          ))
+        ) : (
+          <View style={s.emptyCard}>
+            <View style={s.emptyImageWrap}>
+              <Image source={require('../../assets/images/mock/empty_room_mic.png')} style={s.emptyImage} resizeMode="contain" />
+            </View>
+            <Text style={s.emptyTitle}>Henüz bir odanız yok.{'\n'}İlk odanızı oluşturun!</Text>
+            <Text style={s.emptySub}>Sesli sohbet, müzik, oyun ve daha fazlası...</Text>
+          </View>
+        )}
+
+        {/* Takip Ettiğim Odalar */}
+        <Text style={s.sectionTitle}>Takip Ettiğim Odalar</Text>
+        {followedRooms.length > 0 ? (
+          followedRooms.map((room) => (
+            <FollowedRoomCard key={room.id} room={room} />
+          ))
+        ) : (
+          <View style={s.emptyFollowed}>
+            <Text style={s.emptyFollowedText}>
+              Henüz takip ettiğin bir oda yok.{'\n'}Favori odalarını buraya ekleyebilirsin.
+            </Text>
+          </View>
+        )}
+      </ScrollView>
+
+      {/* Arama Modalı */}
+      {firebaseUser && (
+        <UserSearchModal
+          visible={showSearch}
+          onClose={() => setShowSearch(false)}
+          currentUserId={firebaseUser.uid}
+          onSelectUser={(userId) => {
+            setShowSearch(false);
+            router.push(`/user/${userId}` as any);
+          }}
+        />
+      )}
+    </View></AppBackground>
+  );
+}
+
+// ════════════════════════════════════════════════════════════
+// ANA STİLLER
+// ════════════════════════════════════════════════════════════
+const s = StyleSheet.create({
+  container: { flex: 1, backgroundColor: 'transparent' },
+
+  /* Header */
+  header: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 14, paddingBottom: 6,
+  },
+  logo: { height: 32, width: 150 },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  headerIconBtn: {
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.06)', justifyContent: 'center', alignItems: 'center',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 3,
+  },
+
+  /* Welcome */
+  welcomeRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingHorizontal: 14, paddingBottom: 10,
+  },
+  avatar: {
+    width: 52, height: 52, borderRadius: 26,
+    borderWidth: 1.5, borderColor: 'rgba(115,194,189,0.35)',
+  },
+  welcomeTitle: {
+    fontSize: 15, fontWeight: '700', color: '#F1F5F9',
+    textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
+  },
+  welcomeSub: {
+    fontSize: 11, color: '#94A3B8', marginTop: 1,
+    textShadowColor: 'rgba(0,0,0,0.35)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
+  },
+
+  /* CTA — Premium Gradient */
+  ctaWrap: {
+    marginHorizontal: 16, marginBottom: 16,
+    borderRadius: 18, overflow: 'hidden',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.3, shadowRadius: 6, elevation: 5,
+  },
+  ctaGradient: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingVertical: 18, paddingHorizontal: 18, gap: 14,
+  },
+  ctaIconWrap: {
+    width: 44, height: 44, borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)',
+  },
+  ctaTitle: {
+    fontSize: 16, fontWeight: '800', color: '#FFF',
+    textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
+  },
+  ctaSub: {
+    fontSize: 12, color: 'rgba(255,255,255,0.75)', marginTop: 2,
+  },
+
+  /* Section Title */
+  sectionTitle: {
+    fontSize: 16, fontWeight: '700', color: '#F1F5F9', letterSpacing: 0.3,
+    paddingHorizontal: 16, marginTop: 16, marginBottom: 10,
+    textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
+  },
+
+  /* Empty — Yönettiğim Odalar */
+  emptyCard: {
+    marginHorizontal: 16, borderRadius: 16,
+    backgroundColor: '#414e5f', borderWidth: 1, borderColor: Colors.cardBorder,
+    overflow: 'hidden', alignItems: 'center', paddingBottom: 24,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 8, elevation: 6,
+  },
+  emptyImageWrap: {
+    width: '80%', marginTop: 12, marginBottom: 16, borderRadius: 80, overflow: 'hidden',
+  },
+  emptyImage: { width: '100%', height: 180 },
+  emptyTitle: {
+    fontSize: 15, fontWeight: '800', color: '#F1F5F9', textAlign: 'center', lineHeight: 22, marginBottom: 8,
+    textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
+  },
+  emptySub: {
+    fontSize: 12, color: '#94A3B8', textAlign: 'center', lineHeight: 18,
+    textShadowColor: 'rgba(0,0,0,0.3)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
+  },
+
+  /* Empty — Takip Ettiğim Odalar */
+  emptyFollowed: {
+    marginHorizontal: 16, padding: 20, borderRadius: 16,
+    backgroundColor: '#414e5f', borderWidth: 1, borderColor: Colors.cardBorder,
+    alignItems: 'center',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 8, elevation: 6,
+  },
+  emptyFollowedText: {
+    fontSize: 13, color: '#94A3B8', textAlign: 'center', lineHeight: 20,
+    textShadowColor: 'rgba(0,0,0,0.3)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
+  },
+});

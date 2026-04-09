@@ -1,8 +1,46 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+/**
+ * SopranoChat — Premium Profile Card (Oda İçi)
+ * Glassmorphism + Slide-up + 3 bölümlü kompakt tasarım
+ */
+import React, { useEffect, useRef } from 'react';
+import {
+  View, Text, StyleSheet, TouchableOpacity, Image,
+  Animated, Dimensions, Pressable,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { getAvatarSource } from '../../constants/avatars';
-import { COLORS, W } from './constants';
+
+const { height: H } = Dimensions.get('window');
+
+const C = {
+  glass: 'rgba(15,15,25,0.88)',
+  border: 'rgba(255,255,255,0.06)',
+  primary: '#5CE1E6',
+  gold: '#D4AF37',
+  white: '#F1F5F9',
+  white60: 'rgba(255,255,255,0.6)',
+  white30: 'rgba(255,255,255,0.3)',
+  white08: 'rgba(255,255,255,0.08)',
+  white04: 'rgba(255,255,255,0.04)',
+  green: '#22C55E',
+  red: '#EF4444',
+  redSoft: 'rgba(239,68,68,0.08)',
+  redBorder: 'rgba(239,68,68,0.15)',
+  orange: '#F97316',
+  purple: '#8B5CF6',
+  emerald: '#10B981',
+  amber: '#F59E0B',
+};
+
+// Rol konfigürasyonu
+const ROLE_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
+  owner: { label: 'Oda Sahibi', color: C.gold, bg: 'rgba(212,175,55,0.12)' },
+  host: { label: 'Oda Sahibi', color: C.gold, bg: 'rgba(212,175,55,0.12)' },
+  moderator: { label: 'Moderatör', color: C.purple, bg: 'rgba(139,92,246,0.12)' },
+  speaker: { label: 'Konuşmacı', color: C.primary, bg: 'rgba(92,225,230,0.1)' },
+  listener: { label: 'Dinleyici', color: C.white30, bg: C.white04 },
+  spectator: { label: 'Seyirci', color: 'rgba(255,255,255,0.2)', bg: 'rgba(255,255,255,0.02)' },
+};
 
 type ProfileCardProps = {
   nick: string;
@@ -10,8 +48,11 @@ type ProfileCardProps = {
   avatarUrl?: string;
   isOwnProfile?: boolean;
   isChatMuted?: boolean;
+  isMuted?: boolean;
+  mutedUntil?: string | null;
   onClose: () => void;
   onMute?: () => void;
+  onUnmute?: () => void;
   onKick?: () => void;
   onRemoveFromStage?: () => void;
   onPromoteToStage?: () => void;
@@ -22,171 +63,439 @@ type ProfileCardProps = {
   onViewProfile?: () => void;
   onFollow?: () => void;
   onDM?: () => void;
+  // Owner süper güçleri
+  onGhostMode?: () => void;
+  isGhost?: boolean;
+  onDisguise?: () => void;
+  onBanTemp?: () => void;
+  onBanPerm?: () => void;
 };
 
 export default function ProfileCard({
-  nick, role, avatarUrl, isOwnProfile, isChatMuted,
-  onClose, onMute, onKick, onRemoveFromStage, onPromoteToStage,
+  nick, role, avatarUrl, isOwnProfile, isChatMuted, isMuted, mutedUntil,
+  onClose, onMute, onUnmute, onKick, onRemoveFromStage, onPromoteToStage,
   onChatMute, onMakeModerator, onReport, onBlock,
   onViewProfile, onFollow, onDM,
+  onGhostMode, isGhost, onDisguise, onBanTemp, onBanPerm,
 }: ProfileCardProps) {
-  const roleLabel = role === 'host' ? 'Oda Sahibi' : role === 'moderator' ? 'Moderatör' : role === 'speaker' ? 'Konuşmacı' : 'Dinleyici';
+  // Slide-up animasyonu
+  const slideY = useRef(new Animated.Value(H * 0.3)).current;
+  const overlayOpacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.spring(slideY, { toValue: 0, useNativeDriver: true, tension: 80, friction: 12 }),
+      Animated.timing(overlayOpacity, { toValue: 1, duration: 200, useNativeDriver: true }),
+    ]).start();
+  }, []);
+
+  const handleClose = () => {
+    Animated.parallel([
+      Animated.timing(slideY, { toValue: H * 0.3, duration: 180, useNativeDriver: true }),
+      Animated.timing(overlayOpacity, { toValue: 0, duration: 180, useNativeDriver: true }),
+    ]).start(() => onClose());
+  };
+
+  // Mute süresi
+  const getMuteTimeLeft = () => {
+    if (!mutedUntil) return 'Süresiz';
+    const diff = new Date(mutedUntil).getTime() - Date.now();
+    if (diff <= 0) return null;
+    const mins = Math.ceil(diff / 60000);
+    return mins > 60 ? `${Math.floor(mins / 60)}sa ${mins % 60}dk` : `${mins}dk`;
+  };
+
+  const rc = ROLE_CONFIG[role] || ROLE_CONFIG.listener;
+  const hasModActions = onMute || onUnmute || onChatMute || onKick;
+  const hasStageActions = onPromoteToStage || onRemoveFromStage;
+
   return (
-    <View style={styles.profileOverlay}>
-      <TouchableOpacity style={StyleSheet.absoluteFill} onPress={onClose} activeOpacity={1} />
-      <View style={styles.profileCard}>
-        <View style={styles.profileHeader}>
-          <View style={[styles.profileAvatar, role === 'host' && { borderColor: COLORS.vipGold }, role === 'moderator' && { borderColor: '#8B5CF6' }]}>
+    <View style={sty.root}>
+      {/* Overlay */}
+      <Animated.View style={[sty.overlay, { opacity: overlayOpacity }]}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={handleClose} />
+      </Animated.View>
+
+      {/* Card */}
+      <Animated.View style={[sty.card, { transform: [{ translateY: slideY }] }]}>
+        {/* ──── Handle bar ──── */}
+        <View style={sty.handle} />
+
+        {/* ════════════════════════════════════════════
+            BÖLÜM 1: Profil Başlığı
+           ════════════════════════════════════════════ */}
+        <View style={sty.headerRow}>
+          {/* Avatar */}
+          <View style={[sty.avatar, { borderColor: rc.color }]}>
             {avatarUrl ? (
-              <Image source={getAvatarSource(avatarUrl)} style={{ width: '100%', height: '100%', borderRadius: 23 }} />
+              <Image source={getAvatarSource(avatarUrl)} style={sty.avatarImg} />
             ) : (
-              <Text style={styles.profileInitials}>{nick.slice(0, 2).toUpperCase()}</Text>
+              <Text style={sty.initials}>{nick.slice(0, 2).toUpperCase()}</Text>
             )}
+            {/* Online dot */}
+            <View style={sty.onlineDot} />
           </View>
-          <View style={{ flex: 1, marginLeft: 12 }}>
-            <Text style={styles.profileNick}>{nick}</Text>
-            <Text style={styles.profileRole}>{roleLabel}</Text>
+
+          {/* İsim + Rol badge + Durum etiketleri */}
+          <View style={sty.headerInfo}>
+            <Text style={sty.nick} numberOfLines={1}>{nick}</Text>
+            <View style={sty.badgeRow}>
+              {/* Rol badge */}
+              <View style={[sty.roleBadge, { backgroundColor: rc.bg }]}>
+                <Text style={[sty.roleText, { color: rc.color }]}>{rc.label}</Text>
+              </View>
+              {/* Muted badge */}
+              {isMuted && (
+                <View style={[sty.statusBadge, { backgroundColor: 'rgba(239,68,68,0.1)' }]}>
+                  <Ionicons name="volume-mute" size={9} color={C.red} />
+                  <Text style={[sty.statusText, { color: C.red }]}>{getMuteTimeLeft() || 'Bitti'}</Text>
+                </View>
+              )}
+              {/* Chat muted badge */}
+              {isChatMuted && (
+                <View style={[sty.statusBadge, { backgroundColor: 'rgba(249,115,22,0.1)' }]}>
+                  <Ionicons name="chatbox-outline" size={9} color={C.orange} />
+                  <Text style={[sty.statusText, { color: C.orange }]}>Yazı Kapalı</Text>
+                </View>
+              )}
+            </View>
           </View>
-          <TouchableOpacity onPress={onClose}>
-            <Ionicons name="close-circle" size={24} color="rgba(255,255,255,0.3)" />
+
+          {/* Kapat */}
+          <TouchableOpacity onPress={handleClose} style={sty.closeBtn} hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}>
+            <Ionicons name="close" size={16} color={C.white30} />
           </TouchableOpacity>
         </View>
 
+        {/* ════════════════════════════════════════════
+            BÖLÜM 2: Sosyal Aksiyonlar — Takip / DM / Profil
+           ════════════════════════════════════════════ */}
         {isOwnProfile ? (
-          <View style={{ gap: 8 }}>
-            <TouchableOpacity
-              style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 12, borderRadius: 12, backgroundColor: 'rgba(92,225,230,0.1)', borderWidth: 1, borderColor: 'rgba(92,225,230,0.2)' }}
-              onPress={onViewProfile}
-            >
-              <Ionicons name="person-circle-outline" size={18} color={COLORS.primary} />
-              <Text style={{ color: COLORS.primary, fontSize: 13, fontWeight: '700' }}>Profili Görüntüle</Text>
+          <TouchableOpacity style={sty.primaryPill} onPress={onViewProfile} activeOpacity={0.7}>
+            <Ionicons name="person-circle-outline" size={16} color={C.primary} />
+            <Text style={[sty.pillText, { color: C.primary }]}>Profili Görüntüle</Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={sty.socialRow}>
+            <TouchableOpacity style={sty.primaryPill} onPress={onFollow} activeOpacity={0.7}>
+              <Ionicons name="person-add" size={13} color={C.primary} />
+              <Text style={[sty.pillText, { color: C.primary }]}>Takip Et</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={sty.outlinePill} onPress={onDM} activeOpacity={0.7}>
+              <Ionicons name="chatbubble-ellipses" size={13} color={C.white60} />
+              <Text style={[sty.pillText, { color: C.white60 }]}>DM</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={sty.outlinePill} onPress={onViewProfile} activeOpacity={0.7}>
+              <Ionicons name="person-circle-outline" size={13} color={C.white60} />
+              <Text style={[sty.pillText, { color: C.white60 }]}>Profil</Text>
             </TouchableOpacity>
           </View>
-        ) : (
-          <>
-            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
-              <TouchableOpacity
-                style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: 12, backgroundColor: 'rgba(92,225,230,0.1)', borderWidth: 1, borderColor: 'rgba(92,225,230,0.2)' }}
-                onPress={onFollow}
-              >
-                <Ionicons name="person-add" size={14} color={COLORS.primary} />
-                <Text style={{ color: COLORS.primary, fontSize: 11, fontWeight: '600' }}>Takip Et</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.04)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' }}
-                onPress={onDM}
-              >
-                <Ionicons name="chatbubble-ellipses" size={14} color="rgba(255,255,255,0.6)" />
-                <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11, fontWeight: '600' }}>DM Gönder</Text>
-              </TouchableOpacity>
-            </View>
+        )}
 
-            {/* Sahne Yönetimi */}
-            {(onPromoteToStage || onRemoveFromStage) && (
-              <View style={{ flexDirection: 'row', gap: 6, marginBottom: 8 }}>
+        {/* ════════════════════════════════════════════
+            BÖLÜM 3: Sahne + Moderasyon (sadece yetkili görür)
+           ════════════════════════════════════════════ */}
+        {!isOwnProfile && (hasStageActions || hasModActions || onMakeModerator) && (
+          <>
+            <View style={sty.divider} />
+
+            {/* Sahne kontrolleri */}
+            {hasStageActions && (
+              <View style={sty.actionRow}>
                 {onPromoteToStage && (
-                  <TouchableOpacity style={[styles.profileBtn, { flex: 1, backgroundColor: 'rgba(16,185,129,0.08)', borderColor: 'rgba(16,185,129,0.2)' }]} onPress={onPromoteToStage}>
-                    <Ionicons name="arrow-up-circle" size={16} color="#10B981" />
-                    <Text style={[styles.profileBtnText, { color: '#10B981' }]}>Sahneye Al</Text>
+                  <TouchableOpacity style={[sty.actionPill, { borderColor: 'rgba(16,185,129,0.2)' }]} onPress={onPromoteToStage} activeOpacity={0.7}>
+                    <Ionicons name="arrow-up-circle" size={14} color={C.emerald} />
+                    <Text style={[sty.actionText, { color: C.emerald }]}>Sahneye Al</Text>
                   </TouchableOpacity>
                 )}
                 {onRemoveFromStage && (
-                  <TouchableOpacity style={[styles.profileBtn, { flex: 1 }]} onPress={onRemoveFromStage}>
-                    <Ionicons name="arrow-down-circle" size={16} color="#FBBF24" />
-                    <Text style={styles.profileBtnText}>İndir</Text>
+                  <TouchableOpacity style={[sty.actionPill, { borderColor: 'rgba(251,191,36,0.2)' }]} onPress={onRemoveFromStage} activeOpacity={0.7}>
+                    <Ionicons name="arrow-down-circle" size={14} color={C.amber} />
+                    <Text style={[sty.actionText, { color: C.amber }]}>İndir</Text>
                   </TouchableOpacity>
                 )}
               </View>
             )}
 
-            {/* Host/Mod Moderasyon İşlemleri */}
-            <View style={styles.profileActions}>
-              {onMute && (
-                <TouchableOpacity style={styles.profileBtn} onPress={onMute}>
-                  <Ionicons name="volume-mute" size={16} color="#F59E0B" />
-                  <Text style={[styles.profileBtnText, { color: '#F59E0B' }]}>Ses Sustur</Text>
-                </TouchableOpacity>
-              )}
-              {onChatMute && (
-                <TouchableOpacity style={[styles.profileBtn, { borderColor: isChatMuted ? 'rgba(16,185,129,0.2)' : 'rgba(249,115,22,0.2)' }]} onPress={onChatMute}>
-                  <Ionicons name={isChatMuted ? 'chatbox' : 'chatbox-outline'} size={16} color={isChatMuted ? '#10B981' : '#F97316'} />
-                  <Text style={[styles.profileBtnText, { color: isChatMuted ? '#10B981' : '#F97316' }]}>{isChatMuted ? 'Yazı Aç' : 'Yazı Kapat'}</Text>
-                </TouchableOpacity>
-              )}
-              {onKick && (
-                <TouchableOpacity style={[styles.profileBtn, { borderColor: 'rgba(239,68,68,0.2)' }]} onPress={onKick}>
-                  <Ionicons name="exit" size={16} color={COLORS.error} />
-                  <Text style={[styles.profileBtnText, { color: COLORS.error }]}>Çıkar</Text>
-                </TouchableOpacity>
-              )}
-            </View>
+            {/* Moderasyon kontrolleri */}
+            {hasModActions && (
+              <View style={sty.actionRow}>
+                {isMuted && onUnmute ? (
+                  <TouchableOpacity style={[sty.actionPill, { borderColor: 'rgba(16,185,129,0.2)' }]} onPress={onUnmute} activeOpacity={0.7}>
+                    <Ionicons name="volume-high" size={14} color={C.emerald} />
+                    <Text style={[sty.actionText, { color: C.emerald }]}>Aç</Text>
+                  </TouchableOpacity>
+                ) : onMute ? (
+                  <TouchableOpacity style={[sty.actionPill, { borderColor: 'rgba(245,158,11,0.2)' }]} onPress={onMute} activeOpacity={0.7}>
+                    <Ionicons name="volume-mute" size={14} color={C.amber} />
+                    <Text style={[sty.actionText, { color: C.amber }]}>Sustur</Text>
+                  </TouchableOpacity>
+                ) : null}
+                {onChatMute && (
+                  <TouchableOpacity style={[sty.actionPill, { borderColor: isChatMuted ? 'rgba(16,185,129,0.2)' : 'rgba(249,115,22,0.15)' }]} onPress={onChatMute} activeOpacity={0.7}>
+                    <Ionicons name={isChatMuted ? 'chatbox' : 'chatbox-outline'} size={14} color={isChatMuted ? C.emerald : C.orange} />
+                    <Text style={[sty.actionText, { color: isChatMuted ? C.emerald : C.orange }]}>{isChatMuted ? 'Yazı Aç' : 'Yazı Kapat'}</Text>
+                  </TouchableOpacity>
+                )}
+                {onKick && (
+                  <TouchableOpacity style={[sty.actionPill, { borderColor: C.redBorder }]} onPress={onKick} activeOpacity={0.7}>
+                    <Ionicons name="exit" size={14} color={C.red} />
+                    <Text style={[sty.actionText, { color: C.red }]}>Çıkar</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
 
-            {/* Moderatör Yap/Kaldır */}
+            {/* Moderatör yap/kaldır */}
             {onMakeModerator && (
-              <TouchableOpacity
-                style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 8, paddingVertical: 8, borderRadius: 10, backgroundColor: role === 'moderator' ? 'rgba(139,92,246,0.08)' : 'rgba(139,92,246,0.04)', borderWidth: 1, borderColor: role === 'moderator' ? 'rgba(139,92,246,0.25)' : 'rgba(139,92,246,0.1)' }}
-                onPress={onMakeModerator}
-              >
-                <Ionicons name="shield" size={14} color="#8B5CF6" />
-                <Text style={{ color: '#8B5CF6', fontSize: 11, fontWeight: '700' }}>{role === 'moderator' ? 'Moderatörlüğü Kaldır' : 'Moderatör Yap'}</Text>
+              <TouchableOpacity style={[sty.modPill, role === 'moderator' && { borderColor: 'rgba(139,92,246,0.25)' }]} onPress={onMakeModerator} activeOpacity={0.7}>
+                <Ionicons name="shield" size={13} color={C.purple} />
+                <Text style={[sty.actionText, { color: C.purple }]}>{role === 'moderator' ? 'Moderatörlüğü Kaldır' : 'Moderatör Yap'}</Text>
               </TouchableOpacity>
             )}
 
-            {/* Şikayet Et & Engelle */}
-            <View style={{ flexDirection: 'row', gap: 6, marginTop: 8 }}>
+            {/* Owner Süper Güçleri */}
+            {(onGhostMode || onDisguise || onBanTemp || onBanPerm) && (
+              <>
+                <View style={sty.divider} />
+                <View style={sty.actionRow}>
+                  {onGhostMode && (
+                    <TouchableOpacity style={[sty.actionPill, { borderColor: 'rgba(168,85,247,0.2)' }]} onPress={onGhostMode} activeOpacity={0.7}>
+                      <Ionicons name={isGhost ? 'eye' : 'eye-off'} size={14} color="#A855F7" />
+                      <Text style={[sty.actionText, { color: '#A855F7' }]}>{isGhost ? 'Görünür Ol' : 'Görünmez Ol'}</Text>
+                    </TouchableOpacity>
+                  )}
+                  {onDisguise && (
+                    <TouchableOpacity style={[sty.actionPill, { borderColor: 'rgba(236,72,153,0.2)' }]} onPress={onDisguise} activeOpacity={0.7}>
+                      <Ionicons name="person-circle" size={14} color="#EC4899" />
+                      <Text style={[sty.actionText, { color: '#EC4899' }]}>Kılık Değiştir</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+                {(onBanTemp || onBanPerm) && (
+                  <View style={sty.actionRow}>
+                    {onBanTemp && (
+                      <TouchableOpacity style={[sty.actionPill, { borderColor: C.redBorder }]} onPress={onBanTemp} activeOpacity={0.7}>
+                        <Ionicons name="timer" size={14} color={C.red} />
+                        <Text style={[sty.actionText, { color: C.red }]}>Geçici Ban</Text>
+                      </TouchableOpacity>
+                    )}
+                    {onBanPerm && (
+                      <TouchableOpacity style={[sty.actionPill, { borderColor: C.redBorder, backgroundColor: 'rgba(239,68,68,0.06)' }]} onPress={onBanPerm} activeOpacity={0.7}>
+                        <Ionicons name="ban" size={14} color={C.red} />
+                        <Text style={[sty.actionText, { color: C.red }]}>Kalıcı Ban</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                )}
+              </>
+            )}
+          </>
+        )}
+
+        {/* ════════════════════════════════════════════
+            BÖLÜM 4: Şikayet & Engelle (herkes görür)
+           ════════════════════════════════════════════ */}
+        {!isOwnProfile && (onReport || onBlock) && (
+          <>
+            <View style={sty.divider} />
+            <View style={sty.bottomRow}>
               {onReport && (
-                <TouchableOpacity 
-                  style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 8, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.03)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' }}
-                  onPress={onReport}
-                >
-                  <Ionicons name="flag" size={13} color="#94A3B8" />
-                  <Text style={{ color: '#94A3B8', fontSize: 10, fontWeight: '600' }}>Şikayet Et</Text>
+                <TouchableOpacity onPress={onReport} style={sty.textBtn} activeOpacity={0.6}>
+                  <Ionicons name="flag-outline" size={12} color="#64748B" />
+                  <Text style={sty.textBtnLabel}>Şikayet Et</Text>
                 </TouchableOpacity>
               )}
+              {onReport && onBlock && <View style={sty.dotSep} />}
               {onBlock && (
-                <TouchableOpacity 
-                  style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 8, borderRadius: 10, backgroundColor: 'rgba(239,68,68,0.04)', borderWidth: 1, borderColor: 'rgba(239,68,68,0.1)' }}
-                  onPress={onBlock}
-                >
-                  <Ionicons name="ban" size={13} color="#EF4444" />
-                  <Text style={{ color: '#EF4444', fontSize: 10, fontWeight: '600' }}>Engelle</Text>
+                <TouchableOpacity onPress={onBlock} style={sty.textBtn} activeOpacity={0.6}>
+                  <Ionicons name="ban-outline" size={12} color="rgba(239,68,68,0.5)" />
+                  <Text style={[sty.textBtnLabel, { color: 'rgba(239,68,68,0.5)' }]}>Engelle</Text>
                 </TouchableOpacity>
               )}
             </View>
           </>
         )}
-      </View>
+      </Animated.View>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  profileOverlay: {
+const sty = StyleSheet.create({
+  root: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    justifyContent: 'center', alignItems: 'center', zIndex: 200,
+    zIndex: 200,
+    justifyContent: 'flex-end',
   },
-  profileCard: {
-    width: W * 0.82, backgroundColor: 'rgba(16,24,42,0.95)',
-    borderRadius: 20, padding: 18,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.6)',
   },
-  profileHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
-  profileAvatar: {
-    width: 46, height: 46, borderRadius: 23,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderWidth: 2, borderColor: COLORS.primary,
-    alignItems: 'center', justifyContent: 'center',
+  card: {
+    marginHorizontal: 10,
+    marginBottom: 12,
+    backgroundColor: C.glass,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: C.border,
+    padding: 18,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 24,
+    elevation: 20,
   },
-  profileInitials: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  profileNick: { color: '#fff', fontSize: 15, fontWeight: '700' },
-  profileRole: { color: 'rgba(255,255,255,0.4)', fontSize: 11, marginTop: 2 },
-  profileActions: { flexDirection: 'row', gap: 8 },
-  profileBtn: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4,
-    paddingVertical: 10, borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.04)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
+  handle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: C.white08,
+    alignSelf: 'center',
+    marginBottom: 14,
   },
-  profileBtnText: { color: 'rgba(255,255,255,0.6)', fontSize: 11, fontWeight: '600' },
+
+  // Header
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  avatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: C.white04,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarImg: { width: 44, height: 44, borderRadius: 22 },
+  initials: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  onlineDot: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: C.green,
+    borderWidth: 2,
+    borderColor: 'rgba(15,15,25,0.9)',
+  },
+  headerInfo: { flex: 1, marginLeft: 12 },
+  nick: { color: C.white, fontSize: 15, fontWeight: '700', letterSpacing: 0.1 },
+  badgeRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4, flexWrap: 'wrap' },
+  roleBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 99,
+  },
+  roleText: { fontSize: 10, fontWeight: '700', letterSpacing: 0.3 },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 99,
+  },
+  statusText: { fontSize: 9, fontWeight: '700' },
+  closeBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: C.white04,
+    borderWidth: 1,
+    borderColor: C.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // Social row
+  socialRow: { flexDirection: 'row', gap: 8 },
+  primaryPill: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    height: 38,
+    borderRadius: 99,
+    backgroundColor: 'rgba(92,225,230,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(92,225,230,0.18)',
+  },
+  outlinePill: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    height: 38,
+    borderRadius: 99,
+    backgroundColor: C.white04,
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+  pillText: { fontSize: 12, fontWeight: '600' },
+
+  // Divider
+  divider: {
+    height: 1,
+    backgroundColor: C.border,
+    marginVertical: 12,
+  },
+
+  // Action rows
+  actionRow: { flexDirection: 'row', gap: 6, marginBottom: 6 },
+  actionPill: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    height: 34,
+    borderRadius: 99,
+    backgroundColor: C.white04,
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+  actionText: { fontSize: 11, fontWeight: '600' },
+  modPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    height: 34,
+    borderRadius: 99,
+    backgroundColor: C.white04,
+    borderWidth: 1,
+    borderColor: 'rgba(139,92,246,0.12)',
+    marginTop: 2,
+  },
+
+  // Bottom text buttons
+  bottomRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 16,
+  },
+  textBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 4,
+  },
+  textBtnLabel: {
+    color: '#64748B',
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  dotSep: {
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
 });

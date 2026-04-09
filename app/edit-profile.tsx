@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, Image, Pressable, TextInput,
-  ScrollView, Alert, ActivityIndicator,
+  ScrollView, Alert, ActivityIndicator, Switch,
   Platform, Keyboard, Dimensions, Share,
 } from 'react-native';
 
@@ -47,6 +47,10 @@ export default function EditProfileScreen() {
   const [showAvatarPicker, setShowAvatarPicker] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  // === Privacy toggles ===
+  const [hideOwnedRooms, setHideOwnedRooms] = useState((profile as any)?.hide_owned_rooms || false);
+  const [privacyMode, setPrivacyMode] = useState<'public' | 'followers_only' | 'private'>((profile as any)?.privacy_mode || 'public');
 
   // === Account linking (anonymous upgrade) ===
   const [showEmailRegister, setShowEmailRegister] = useState(false);
@@ -146,11 +150,13 @@ export default function EditProfileScreen() {
     Keyboard.dismiss();
     setSaving(true);
     try {
-      const updated = await ProfileService.update(userId, {
+      await ProfileService.update(userId, {
         display_name: displayName.trim(),
         username: username.trim() || null,
         bio: bio.trim(),
         avatar_url: avatarUrl,
+        hide_owned_rooms: hideOwnedRooms,
+        privacy_mode: privacyMode,
       });
 
       // Firebase profile da güncelle
@@ -161,8 +167,10 @@ export default function EditProfileScreen() {
         }).catch(() => {});
       }
 
-      setProfile(updated);
-      setUser({ name: updated.display_name, avatar: updated.avatar_url });
+      // Lokal state güncelle (update void döner, DB'den tekrar çekmek yerine mevcut değerleri kullan)
+      const updatedProfile = { ...profile!, display_name: displayName.trim(), username: username.trim() || null, bio: bio.trim(), avatar_url: avatarUrl };
+      setProfile(updatedProfile);
+      setUser({ name: updatedProfile.display_name, avatar: updatedProfile.avatar_url });
       showToast({ title: 'Başarılı ✓', message: 'Profil güncellendi!', type: 'success' });
       router.back();
     } catch (error: any) {
@@ -301,7 +309,9 @@ export default function EditProfileScreen() {
     displayName !== (profile?.display_name || '') ||
     username !== (profile?.username || '') ||
     bio !== (profile?.bio || '') ||
-    avatarUrl !== (profile?.avatar_url || '');
+    avatarUrl !== (profile?.avatar_url || '') ||
+    hideOwnedRooms !== ((profile as any)?.hide_owned_rooms || false) ||
+    privacyMode !== ((profile as any)?.privacy_mode || 'public');
 
   // Auth type label
   const getAuthTypeInfo = () => {
@@ -466,7 +476,7 @@ export default function EditProfileScreen() {
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
             <View>
               <Text style={styles.fieldLabel}>Oluşturduğun Davet Kodun</Text>
-              <Text style={styles.fieldHint}>Arkadaşlarınla paylaş, kayıt oldukça 50'şer Coin kazanın.</Text>
+              <Text style={styles.fieldHint}>Arkadaşlarınla paylaş, kayıt oldukça 50'şer SP kazanın.</Text>
             </View>
             <View style={styles.verifiedBadge}>
               <Ionicons name="people" size={16} color={Colors.teal} />
@@ -632,9 +642,66 @@ export default function EditProfileScreen() {
         <View style={styles.infoCard}>
           <Ionicons name="information-circle" size={18} color={Colors.teal} />
           <Text style={styles.infoText}>
-            Tier seviyeniz ve coin bakiyeniz profil düzenleme ile değiştirilemez.{' '}
-            Coin satın almak için Cüzdan sayfasını kullanın.
+            Tier seviyeniz ve SP bakiyeniz profil düzenleme ile değiştirilemez.{' '}
+            SP kazanmak için platformu aktif kullanın.
           </Text>
+        </View>
+
+        {/* ===== GİZLİLİK AYARLARI ===== */}
+        <View style={styles.sectionDivider}>
+          <Text style={styles.sectionLabel}>GİZLİLİK</Text>
+        </View>
+
+        <View style={styles.accountInfoCard}>
+          {/* Odalarımı Gizle */}
+          <View style={[styles.accountRow, { justifyContent: 'space-between' }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 12 }}>
+              <View style={[styles.accountIcon, { backgroundColor: 'rgba(168,85,247,0.12)' }]}>
+                <Ionicons name="eye-off-outline" size={18} color="#A855F7" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.accountLabel}>Odalarımı Gizle</Text>
+                <Text style={styles.fieldHint}>Profilinde odaların görünmez</Text>
+              </View>
+            </View>
+            <Switch
+              value={hideOwnedRooms}
+              onValueChange={setHideOwnedRooms}
+              trackColor={{ false: 'rgba(255,255,255,0.08)', true: 'rgba(168,85,247,0.4)' }}
+              thumbColor={hideOwnedRooms ? '#A855F7' : '#64748B'}
+            />
+          </View>
+
+          {/* Profil Gizliliği */}
+          <View style={{ marginTop: 16 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 10 }}>
+              <View style={[styles.accountIcon, { backgroundColor: 'rgba(20,184,166,0.12)' }]}>
+                <Ionicons name="lock-closed-outline" size={18} color={Colors.teal} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.accountLabel}>Profil Gizliliği</Text>
+                <Text style={styles.fieldHint}>Profilini kimler görebilir?</Text>
+              </View>
+            </View>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              {([['public', 'Herkes', 'globe-outline'], ['followers_only', 'Takipçiler', 'people-outline'], ['private', 'Gizli', 'lock-closed']] as const).map(([mode, label, icon]) => (
+                <Pressable
+                  key={mode}
+                  style={[{
+                    flex: 1, paddingVertical: 10, borderRadius: 10,
+                    backgroundColor: privacyMode === mode ? 'rgba(20,184,166,0.15)' : 'rgba(255,255,255,0.04)',
+                    borderWidth: 1,
+                    borderColor: privacyMode === mode ? 'rgba(20,184,166,0.4)' : 'rgba(255,255,255,0.08)',
+                    alignItems: 'center', gap: 4,
+                  }]}
+                  onPress={() => setPrivacyMode(mode)}
+                >
+                  <Ionicons name={icon as any} size={16} color={privacyMode === mode ? Colors.teal : 'rgba(255,255,255,0.4)'} />
+                  <Text style={{ fontSize: 11, fontWeight: '600', color: privacyMode === mode ? Colors.teal : 'rgba(255,255,255,0.5)' }}>{label}</Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
         </View>
       </ScrollView>
     </View>

@@ -1,19 +1,23 @@
 import { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, Image, Pressable, ScrollView, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, Image, Pressable, ScrollView, ActivityIndicator, Alert, DeviceEventEmitter } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { Colors, Gradients, Radius } from '../../constants/theme';
+import { Colors, Radius } from '../../constants/theme';
+import { TIER_DEFINITIONS } from '../../constants/tiers';
+import { TierBadge } from '../../components/progression';
+import type { TierName } from '../../types';
 import { getAvatarSource } from '../../constants/avatars';
 import { ProfileService, type Profile } from '../../services/database';
 import { FriendshipService, type FriendshipStatus } from '../../services/friendship';
 import { ModerationService } from '../../services/moderation';
-import { GiftService } from '../../services/gift';
-import { GiftPanel } from '../../components/GiftPanel';
+
 import { ReportModal } from '../../components/ReportModal';
 import { showToast } from '../../components/Toast';
 import { useAuth } from '../_layout';
 import { supabase } from '../../constants/supabase';
+import { BadgeCheckerService, type UserBadge } from '../../services/engagement/badges';
+import { BadgeGrid } from '../../components/progression';
 
 /** Zamanı insanca formatlayan yardımcı */
 function _formatTimeAgo(dateStr: string): string {
@@ -39,10 +43,11 @@ export default function UserProfileScreen() {
   const [followStatus, setFollowStatus] = useState<FriendshipStatus | null>(null);
   const [followLoading, setFollowLoading] = useState(false);
   const [stats, setStats] = useState({ followers: 0, following: 0, rooms: 0 });
-  const [showGiftPanel, setShowGiftPanel] = useState(false);
+
   const [showReportModal, setShowReportModal] = useState(false);
   const [isUserBlocked, setIsUserBlocked] = useState(false);
   const [recentPosts, setRecentPosts] = useState<any[]>([]);
+  const [userBadges, setUserBadges] = useState<UserBadge[]>([]);
 
   const isOwnProfile = firebaseUser?.uid === id;
 
@@ -83,6 +88,12 @@ export default function UserProfileScreen() {
         .order('created_at', { ascending: false })
         .limit(3);
       setRecentPosts(postsData || []);
+
+      // Rozetleri yükle
+      try {
+        const badges = await BadgeCheckerService.getUserBadges(id);
+        setUserBadges(badges);
+      } catch {}
     } catch (err) {
       console.warn('Profil yuklenemedi:', err);
     } finally {
@@ -188,10 +199,9 @@ export default function UserProfileScreen() {
     );
   }
 
-  const tier = userProfile.tier || 'Silver';
-  const tierGradient = tier === 'VIP' ? Gradients.vipGold : tier === 'Plat' ? Gradients.plat : Gradients.silverG;
-  const tierIcon = tier === 'VIP' ? 'trophy' : tier === 'Plat' ? 'diamond-outline' : 'shield-half-outline';
-  const tierBorderColor = tier === 'VIP' ? Colors.amber : tier === 'Plat' ? Colors.cyan : Colors.silver;
+  const tier = (userProfile.subscription_tier || 'Free') as TierName;
+  const tierDef = TIER_DEFINITIONS[tier] || TIER_DEFINITIONS.Free;
+  const tierBorderColor = tierDef.color;
 
   const isFollowing = followStatus === 'accepted';
   const isPending = followStatus === 'pending';
@@ -220,10 +230,7 @@ export default function UserProfileScreen() {
               source={getAvatarSource(userProfile.avatar_url)}
               style={[styles.avatar, { borderColor: tierBorderColor }]}
             />
-            <LinearGradient colors={tierGradient as [string, string]} style={styles.tierBadge}>
-              <Ionicons name={tierIcon as any} size={10} color="#fff" />
-              <Text style={styles.tierText}>{tier}</Text>
-            </LinearGradient>
+            <TierBadge tier={tier} size="sm" />
           </View>
 
           <View style={styles.nameRow}>
@@ -296,90 +303,60 @@ export default function UserProfileScreen() {
                 onPress={() => router.push(`/chat/${id}`)}
               >
                 <Ionicons name="chatbubble" size={16} color={Colors.teal} />
-                <Text style={styles.messageBtnText}>Mesaj</Text>
               </Pressable>
 
+              {/* ★ Sesli Arama Butonu */}
               <Pressable
-                style={styles.giftBtn}
-                onPress={() => setShowGiftPanel(true)}
+                style={styles.callBtn}
+                onPress={() => {
+                  if (!firebaseUser || !id) return;
+                  router.push(`/call/${id}?type=audio` as any);
+                }}
               >
-                <Ionicons name="gift" size={16} color={Colors.amber} />
+                <Ionicons name="call" size={16} color="#4ADE80" />
               </Pressable>
+
+              {/* ★ Görüntülü Arama Butonu */}
+              <Pressable
+                style={styles.videoCallBtn}
+                onPress={() => {
+                  if (!firebaseUser || !id) return;
+                  router.push(`/call/${id}?type=video` as any);
+                }}
+              >
+                <Ionicons name="videocam" size={16} color="#38BDF8" />
+              </Pressable>
+
             </View>
           )}
         </View>
 
-        {/* Coin Info */}
-        {userProfile.is_plus && (
+        {/* Tier Badge Card */}
+        {tier !== 'Free' && (
           <View style={styles.plusBadgeCard}>
             <View style={styles.plusLeft}>
-              <View style={[styles.plusIconWrap, { backgroundColor: `${Colors.teal}18` }]}>
-                <Ionicons name="star" size={18} color={Colors.teal} />
+              <View style={[styles.plusIconWrap, { backgroundColor: `${tierDef.color}18` }]}>
+                <Ionicons name={tierDef.icon as any} size={18} color={tierDef.color} />
               </View>
-              <Text style={styles.plusLabel}>SopranoChat Plus Uyesi</Text>
+              <Text style={styles.plusLabel}>{tierDef.emoji} {tierDef.label} Üyesi</Text>
             </View>
-            <Ionicons name="checkmark-circle" size={20} color={Colors.teal} />
+            <Ionicons name="checkmark-circle" size={20} color={tierDef.color} />
           </View>
         )}
 
-        {/* Son Paylaşımlar */}
-        {recentPosts.length > 0 && (
-          <View style={styles.recentPostsSection}>
-            <Text style={styles.sectionTitle}>Son Paylaşımlar</Text>
-            {recentPosts.map((post) => (
-              <Pressable
-                key={post.id}
-                style={styles.postCard}
-                onPress={() => router.push(`/post/${post.id}`)}
-              >
-                {post.image_url && (
-                  <Image source={{ uri: post.image_url }} style={styles.postImage} />
-                )}
-                <View style={styles.postContent}>
-                  <Text style={styles.postText} numberOfLines={2}>{post.content}</Text>
-                  <View style={styles.postMeta}>
-                    <View style={styles.postMetaItem}>
-                      <Ionicons name="heart" size={12} color={Colors.red} />
-                      <Text style={styles.postMetaText}>{post.likes_count || 0}</Text>
-                    </View>
-                    <View style={styles.postMetaItem}>
-                      <Ionicons name="chatbubble" size={12} color={Colors.teal} />
-                      <Text style={styles.postMetaText}>{post.comments_count || 0}</Text>
-                    </View>
-                    <Text style={styles.postDate}>{_formatTimeAgo(post.created_at)}</Text>
-                  </View>
-                </View>
-              </Pressable>
-            ))}
+        {/* Rozetler */}
+        {userBadges.length > 0 && (
+          <View style={{ marginHorizontal: 20, marginTop: 16 }}>
+            <BadgeGrid unlockedBadges={userBadges} compact />
           </View>
         )}
+
+
 
         <View style={{ height: 30 }} />
       </ScrollView>
 
-      <GiftPanel
-        visible={showGiftPanel}
-        onClose={() => setShowGiftPanel(false)}
-        userCoins={currentUserProfile?.coins ?? 0}
-        roomUsers={userProfile ? [{ id: id!, name: userProfile.display_name || 'Kullanıcı', avatarUrl: userProfile.avatar_url, role: 'listener' }] : []}
-        defaultTargetId={id}
-        onSend={async (giftId, _giftPrice, _count, _targetId) => {
-          if (!firebaseUser || !id) return false;
-          try {
-            const result = await GiftService.sendGift(null, firebaseUser.uid, id, giftId);
-            if (result.success) {
-              await refreshProfile();
-              return true;
-            } else {
-              showToast({ title: 'Hata', message: result.error, type: 'error' });
-              return false;
-            }
-          } catch (e: any) {
-            showToast({ title: 'Hediye Gönderilemedi', type: 'error' });
-            return false;
-          }
-        }}
-      />
+
 
       {/* Report Modal */}
       {firebaseUser && id && (
@@ -454,11 +431,20 @@ const styles = StyleSheet.create({
   },
   followBtnText: { fontSize: 14, fontWeight: '700', color: '#fff' },
   messageBtn: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
-    paddingVertical: 12, borderRadius: Radius.full,
+    width: 44, height: 44, borderRadius: 22,
     backgroundColor: 'rgba(20,184,166,0.1)', borderWidth: 1, borderColor: 'rgba(20,184,166,0.2)',
+    alignItems: 'center', justifyContent: 'center',
   },
-  messageBtnText: { fontSize: 13, fontWeight: '700', color: Colors.teal },
+  callBtn: {
+    width: 44, height: 44, borderRadius: 22,
+    backgroundColor: 'rgba(74,222,128,0.1)', borderWidth: 1, borderColor: 'rgba(74,222,128,0.25)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  videoCallBtn: {
+    width: 44, height: 44, borderRadius: 22,
+    backgroundColor: 'rgba(56,189,248,0.1)', borderWidth: 1, borderColor: 'rgba(56,189,248,0.25)',
+    alignItems: 'center', justifyContent: 'center',
+  },
   giftBtn: {
     width: 44, height: 44, borderRadius: 22,
     backgroundColor: 'rgba(251,191,36,0.1)', borderWidth: 1, borderColor: 'rgba(251,191,36,0.2)',

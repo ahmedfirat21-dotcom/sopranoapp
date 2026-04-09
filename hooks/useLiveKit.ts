@@ -17,19 +17,72 @@ export default function useLiveKit({ roomId, enabled = true, userId, displayName
   const [isMicEnabled, setIsMicEnabled] = useState(false);
   const [isCamEnabled, setIsCamEnabled] = useState(false);
   const [connectFailed, setConnectFailed] = useState(false);
-  const connectAttemptedRef = useRef(false);
+  const connectingRef = useRef(false); // Aktif bağlantı denemesi var mı
+  const mountedRef = useRef(true);
   const appStateRef = useRef(AppState.currentState);
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reconnectCountRef = useRef(0);
+  // ★ FIX: Reconnect sonrası mic/cam restore
+  const prevMicRef = useRef(false);
+  const prevCamRef = useRef(false);
 
-  useEffect(() => {
-    if (!roomId || !enabled || !userId || !displayName) return;
-    if (connectAttemptedRef.current) return;
-
-    connectAttemptedRef.current = true;
+  // ★ Bağlantı kurma fonksiyonu — retry ile
+  const doConnect = useCallback(async () => {
+    if (!roomId || !userId || !displayName) return;
+    if (connectingRef.current) return; // Zaten bağlanıyor
+    
+    connectingRef.current = true;
     setConnectFailed(false);
 
-    liveKitService.connect(roomId, userId, displayName, {
-      onConnectionStateChange: (state) => setConnectionState(state),
+    const success = await liveKitService.connect(roomId, userId, displayName, {
+      onConnectionStateChange: (state) => {
+        if (!mountedRef.current) return;
+        setConnectionState(state);
+        
+        // ★ Bağlantı koptuğunda otomatik yeniden bağlanma (max 3)
+        if (state === 'disconnected' && mountedRef.current && reconnectCountRef.current < 3) {
+          reconnectCountRef.current++;
+          const delay = Math.min(3000 * Math.pow(2, reconnectCountRef.current - 1), 30000);
+          if (__DEV__) console.log(`[useLiveKit] Otomatik reconnect planlandı (${reconnectCountRef.current}/3), ${delay}ms sonra`);
+          
+          if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
+          reconnectTimerRef.current = setTimeout(() => {
+            if (mountedRef.current) {
+              connectingRef.current = false; // Kilidi aç
+              doConnect();
+            }
+          }, delay);
+        } else if (state === 'disconnected' && reconnectCountRef.current >= 3) {
+          if (__DEV__) console.warn('[useLiveKit] Max reconnect aşıldı, bağlantı bırakıldı.');
+        }
+        
+        // ★ Başarılı bağlantıda sayacı sıfırla + önceki durumu restore et
+        if (state === 'connected') {
+          // Reconnect sonrası mic/cam restore — 1sn sonra dene
+          if (reconnectCountRef.current > 0) {
+            setTimeout(async () => {
+              if (!mountedRef.current) return;
+              try {
+                if (prevMicRef.current) await liveKitService.enableMicrophone();
+                if (prevCamRef.current) await liveKitService.enableCamera();
+              } catch (e) { console.warn('[useLiveKit] Restore hatası:', e); }
+            }, 1000);
+          }
+          setTimeout(() => {
+            if (mountedRef.current) {
+              reconnectCountRef.current = 0;
+            }
+          }, 10000);
+        }
+
+        // ★ Bağlantı kopmadan önce durumu sakla
+        if (state === 'disconnected' || state === 'reconnecting') {
+          prevMicRef.current = liveKitService.isMicrophoneEnabled;
+          prevCamRef.current = liveKitService.isCameraEnabled;
+        }
+      },
       onParticipantUpdate: (parts) => {
+        if (!mountedRef.current) return;
         setParticipants(prev => {
           // Shallow compare — aynı veri ise state güncelleme (re-render engelle)
           if (prev.length === parts.length && prev.every((p, i) => 
@@ -37,6 +90,7 @@ export default function useLiveKit({ roomId, enabled = true, userId, displayName
             p.isMuted === parts[i].isMuted && 
             p.isSpeaking === parts[i].isSpeaking &&
             p.isCameraEnabled === parts[i].isCameraEnabled &&
+            p.isScreenShareEnabled === parts[i].isScreenShareEnabled &&
             Math.abs(p.audioLevel - parts[i].audioLevel) < 0.05
           )) return prev;
           return parts;
@@ -44,19 +98,35 @@ export default function useLiveKit({ roomId, enabled = true, userId, displayName
       },
       // ★ BUG-2 FIX: State callback ile mic/cam durumu her zaman güncel
       onMicStateChange: (mic, cam) => {
+        if (!mountedRef.current) return;
         setIsMicEnabled(mic);
         setIsCamEnabled(cam);
       },
-    }, qualityPreset).then((success) => {
-      if (!success) {
-        // ★ BUG-3 FIX: Bağlantı hatası state'e yazdır
-        setConnectFailed(true);
-        console.warn('LiveKit bağlantısı başarısız.');
-      }
-    });
+    }, qualityPreset);
+
+    connectingRef.current = false;
+
+    if (!success && mountedRef.current) {
+      setConnectFailed(true);
+      if (__DEV__) console.warn('[useLiveKit] Bağlantı başarısız.');
+    }
+  }, [roomId, userId, displayName, qualityPreset]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    reconnectCountRef.current = 0;
+    
+    if (!roomId || !enabled || !userId || !displayName) return;
+
+    doConnect();
 
     return () => {
-      connectAttemptedRef.current = false;
+      mountedRef.current = false;
+      connectingRef.current = false;
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = null;
+      }
       liveKitService.disconnect();
       setConnectionState('disconnected');
       setParticipants([]);
@@ -103,6 +173,25 @@ export default function useLiveKit({ roomId, enabled = true, userId, displayName
     await liveKitService.flipCamera();
   }, []);
 
+  const disableMic = useCallback(async () => {
+    await liveKitService.disableMicrophone();
+  }, []);
+
+  const disableCamera = useCallback(async () => {
+    await liveKitService.disableCamera();
+  }, []);
+
+  const enableCamera = useCallback(async () => {
+    await liveKitService.enableCamera();
+  }, []);
+
+  const toggleScreenShare = useCallback(async () => {
+    return await liveKitService.toggleScreenShare();
+  }, []);
+
+  // ★ FIX: isScreenSharing'i participants state'inden türet — reaktif olsun
+  const isScreenSharing = participants.some(p => p.isScreenShareEnabled);
+
   return {
     muteRoomAudio,
     connectionState,
@@ -112,8 +201,13 @@ export default function useLiveKit({ roomId, enabled = true, userId, displayName
     toggleCamera,
     flipCamera,
     enableMic,
+    disableMic,
+    disableCamera,
+    enableCamera,
+    toggleScreenShare,
     setMicMode,
     isCameraEnabled: isCamEnabled,
     isMicrophoneEnabled: isMicEnabled,
+    isScreenSharing,
   };
 }

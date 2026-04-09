@@ -3,19 +3,21 @@
  * Platform sahibi için sınırsız yetki ile yönetim ekranı
  */
 import { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, Alert, ActivityIndicator, Image, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, Image, RefreshControl } from 'react-native';
+import PremiumAlert, { type AlertButton } from '../components/PremiumAlert';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { Colors, Radius } from '../constants/theme';
+import { Colors } from '../constants/theme';
 import { supabase } from '../constants/supabase';
 import { ModerationService } from '../services/moderation';
 import { RoomService } from '../services/database';
 import { getAvatarSource } from '../constants/avatars';
 import { showToast } from '../components/Toast';
-import SopranoCoin from '../components/SopranoCoin';
+
 import { useAuth } from './_layout';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import AppBackground from '../components/AppBackground';
 
 type ReportItem = {
   id: string;
@@ -61,18 +63,22 @@ export default function AdminPanel() {
   const [recentUsers, setRecentUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [adAlert, setAdAlert] = useState<{visible:boolean;title:string;message:string;type?:any;buttons?:AlertButton[]}>({visible:false,title:'',message:''});
+  const showAdAlert = (title:string,message:string,buttons:AlertButton[],type:any='warning') => setAdAlert({visible:true,title,message,type,buttons});
 
   // Admin kontrolü
   if (!profile?.is_admin) {
     return (
+      <AppBackground>
       <View style={[s.container, { justifyContent: 'center', alignItems: 'center' }]}>
         <Ionicons name="shield-outline" size={64} color="#EF4444" />
         <Text style={{ color: '#EF4444', fontSize: 18, fontWeight: '700', marginTop: 16 }}>Erişim Reddedildi</Text>
         <Text style={{ color: Colors.text3, fontSize: 13, marginTop: 8 }}>Bu sayfaya erişim yetkiniz yok.</Text>
-        <Pressable style={s.backBtn} onPress={() => router.back()}>
+        <Pressable style={s.backBtn} onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)/home')}>
           <Text style={{ color: Colors.teal, fontWeight: '600' }}>Geri Dön</Text>
         </Pressable>
       </View>
+      </AppBackground>
     );
   }
 
@@ -153,7 +159,7 @@ export default function AdminPanel() {
 
   // ========== AKSIYON HANDLER'LARI ==========
   const handleDismissReport = (reportId: string) => {
-    Alert.alert('Şikayeti Kapat', 'Bu şikayeti "geçersiz" olarak kapatmak istiyor musun?', [
+    showAdAlert('Şikayeti Kapat', 'Bu şikayeti "geçersiz" olarak kapatmak istiyor musun?', [
       { text: 'İptal', style: 'cancel' },
       { text: 'Kapat', onPress: async () => {
         await ModerationService.resolveReport(reportId, 'dismissed');
@@ -164,11 +170,10 @@ export default function AdminPanel() {
   };
 
   const handleWarnUser = (reportId: string, userId: string) => {
-    Alert.alert('Kullanıcıyı Uyar', 'Bu kullanıcıya uyarı vermek istiyor musun?', [
+    showAdAlert('Kullanıcıyı Uyar', 'Bu kullanıcıya uyarı vermek istiyor musun?', [
       { text: 'İptal', style: 'cancel' },
       { text: 'Uyar', onPress: async () => {
         await ModerationService.resolveReport(reportId, 'warned');
-        // Inbox'a uyarı mesajı gönder
         await supabase.from('inbox').insert({
           user_id: userId,
           type: 'system',
@@ -182,20 +187,19 @@ export default function AdminPanel() {
   };
 
   const handleBanUser = (reportId: string, userId: string, displayName: string) => {
-    Alert.alert('Kullanıcıyı Banla', `${displayName} adlı kullanıcıyı BANLAMAK istiyor musun?\n\nBu işlem geri alınabilir.`, [
+    showAdAlert('Kullanıcıyı Banla', `${displayName} adlı kullanıcıyı BANLAMAK istiyor musun?\n\nBu işlem geri alınabilir.`, [
       { text: 'İptal', style: 'cancel' },
       { text: 'Banla', style: 'destructive', onPress: async () => {
         await ModerationService.resolveReport(reportId, 'banned');
-        // Kullanıcıyı devre dışı bırak
         await supabase.from('profiles').update({ is_banned: true }).eq('id', userId);
         showToast({ title: 'Kullanıcı Banlandı', message: displayName, type: 'success' });
         loadAll();
       }},
-    ]);
+    ], 'error');
   };
 
   const handleCloseRoom = (roomId: string, roomName: string) => {
-    Alert.alert('Odayı Kapat', `"${roomName}" odasını kapatmak istiyor musun?`, [
+    showAdAlert('Odayı Kapat', `"${roomName}" odasını kapatmak istiyor musun?`, [
       { text: 'İptal', style: 'cancel' },
       { text: 'Kapat', style: 'destructive', onPress: async () => {
         await RoomService.close(roomId);
@@ -207,7 +211,7 @@ export default function AdminPanel() {
 
   const handleToggleBan = (userId: string, displayName: string, currentBanned: boolean) => {
     const action = currentBanned ? 'Banı Kaldır' : 'Banla';
-    Alert.alert(action, `${displayName} - ${action}?`, [
+    showAdAlert(action, `${displayName} - ${action}?`, [
       { text: 'İptal', style: 'cancel' },
       { text: action, style: currentBanned ? 'default' : 'destructive', onPress: async () => {
         await supabase.from('profiles').update({ is_banned: !currentBanned }).eq('id', userId);
@@ -219,40 +223,42 @@ export default function AdminPanel() {
 
   const handleToggleAdmin = (userId: string, displayName: string, currentAdmin: boolean) => {
     const action = currentAdmin ? 'Adminliği Kaldır' : 'Admin Yap';
-    Alert.alert(action, `${displayName} - ${action}?`, [
+    showAdAlert(action, `${displayName} - ${action}?`, [
       { text: 'İptal', style: 'cancel' },
       { text: action, onPress: async () => {
         await supabase.from('profiles').update({ is_admin: !currentAdmin }).eq('id', userId);
         showToast({ title: currentAdmin ? 'Adminlik Kaldırıldı' : 'Admin Yapıldı', message: displayName, type: 'success' });
         loadAll();
       }},
-    ]);
+    ], 'info');
   };
 
-  const handleGiveCoins = (userId: string, displayName: string) => {
-    Alert.alert('Coin Ver', `${displayName} adlı kullanıcıya kaç coin vermek istiyorsun?`, [
+  const handleGiveSP = (userId: string, displayName: string) => {
+    showAdAlert('SP Ver', `${displayName} adlı kullanıcıya kaç SP vermek istiyorsun?`, [
       { text: 'İptal', style: 'cancel' },
-      { text: '100 Coin', onPress: () => giveCoins(userId, displayName, 100) },
-      { text: '500 Coin', onPress: () => giveCoins(userId, displayName, 500) },
-      { text: '1000 Coin', onPress: () => giveCoins(userId, displayName, 1000) },
-    ]);
+      { text: '100 SP', onPress: () => giveSP(userId, displayName, 100) },
+      { text: '500 SP', onPress: () => giveSP(userId, displayName, 500) },
+      { text: '1000 SP', onPress: () => giveSP(userId, displayName, 1000) },
+    ], 'success');
   };
 
-  const giveCoins = async (userId: string, displayName: string, amount: number) => {
-    const { data: user } = await supabase.from('profiles').select('coins').eq('id', userId).single();
+  const giveSP = async (userId: string, displayName: string, amount: number) => {
+    const { data: user } = await supabase.from('profiles').select('system_points').eq('id', userId).single();
     if (user) {
-      await supabase.from('profiles').update({ coins: (user.coins || 0) + amount }).eq('id', userId);
-      showToast({ title: `${amount} Coin Verildi`, message: displayName, type: 'success' });
+      await supabase.from('profiles').update({ system_points: (user.system_points || 0) + amount }).eq('id', userId);
+      showToast({ title: `${amount} SP Verildi`, message: displayName, type: 'success' });
     }
   };
 
   // ========== UI ==========
   if (loading) {
     return (
+      <AppBackground>
       <View style={[s.container, { justifyContent: 'center', alignItems: 'center' }]}>
         <ActivityIndicator size="large" color={Colors.teal} />
         <Text style={{ color: Colors.text2, marginTop: 12 }}>GodMaster yükleniyor...</Text>
       </View>
+      </AppBackground>
     );
   }
 
@@ -264,6 +270,7 @@ export default function AdminPanel() {
   ] as const;
 
   return (
+    <AppBackground>
     <View style={s.container}>
       {/* HEADER */}
       <LinearGradient
@@ -271,7 +278,7 @@ export default function AdminPanel() {
         style={[s.header, { paddingTop: insets.top + 8 }]}
       >
         <View style={s.headerRow}>
-          <Pressable onPress={() => router.back()} style={s.headerBackBtn}>
+          <Pressable onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)/home')} style={s.headerBackBtn}>
             <Ionicons name="chevron-back" size={22} color={Colors.text} />
           </Pressable>
           <View style={{ flex: 1 }}>
@@ -324,7 +331,7 @@ export default function AdminPanel() {
                 loadAll();
               }} />
               <QuickAction icon="megaphone" color="#F59E0B" label="Tüm Kullanıcılara Duyuru Gönder" onPress={() => {
-                Alert.alert('Duyuru', 'Bu özellik yakında eklenecek. Şimdilik Supabase inbox tablosundan gönderebilirsin.');
+                showAdAlert('Duyuru', 'Bu özellik yakında eklenecek. Şimdilik Supabase inbox tablosundan gönderebilirsin.', [{text:'Tamam'}], 'info');
               }} />
             </View>
           </>
@@ -426,16 +433,18 @@ export default function AdminPanel() {
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                     <Text style={s.userName}>{user.display_name}</Text>
                     {user.is_admin && <Ionicons name="shield-checkmark" size={12} color="#EF4444" />}
-                    {user.is_plus && <Ionicons name="star" size={12} color={Colors.teal} />}
+                    {(user.subscription_tier || user.tier) && (user.subscription_tier || user.tier) !== 'Free' && (
+                      <Text style={{ fontSize: 9, fontWeight: '800', color: Colors.teal }}>{user.subscription_tier || user.tier}</Text>
+                    )}
                     {user.is_banned && <Text style={{ color: '#EF4444', fontSize: 10, fontWeight: '700' }}> BANLANDI</Text>}
                   </View>
                   <Text style={s.userMeta}>
-                    {user.tier} · {user.coins || 0} SC · {user.is_online ? 'Çevrimiçi' : 'Çevrimdışı'}
+                    {user.subscription_tier || user.tier || 'Free'} · {user.system_points || 0} SP · {user.is_online ? 'Çevrimiçi' : 'Çevrimdışı'}
                   </Text>
                 </View>
                 <View style={{ flexDirection: 'row', gap: 4 }}>
-                  <Pressable style={s.userActionBtn} onPress={() => handleGiveCoins(user.id, user.display_name)}>
-                    <SopranoCoin size={14} />
+                  <Pressable style={s.userActionBtn} onPress={() => handleGiveSP(user.id, user.display_name)}>
+                    <Ionicons name="star" size={14} color={Colors.gold} />
                   </Pressable>
                   <Pressable style={s.userActionBtn} onPress={() => handleToggleAdmin(user.id, user.display_name, user.is_admin || false)}>
                     <Ionicons name="shield" size={14} color={user.is_admin ? '#EF4444' : '#64748B'} />
@@ -449,7 +458,9 @@ export default function AdminPanel() {
           </>
         )}
       </ScrollView>
+      <PremiumAlert visible={adAlert.visible} title={adAlert.title} message={adAlert.message} type={adAlert.type||'warning'} buttons={adAlert.buttons} onDismiss={()=>setAdAlert(p=>({...p,visible:false}))} />
     </View>
+    </AppBackground>
   );
 }
 
@@ -480,7 +491,7 @@ function QuickAction({ icon, color, label, onPress }: { icon: string; color: str
 
 // ========== STILLER ==========
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0B0F1A' },
+  container: { flex: 1, backgroundColor: 'transparent' },
   backBtn: { marginTop: 20, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12, backgroundColor: Colors.teal + '15', borderWidth: 1, borderColor: Colors.teal + '30' },
 
   // Header

@@ -1,14 +1,18 @@
 /**
  * SopranoChat — Günlük Check-in & Başarı Rozetleri Servisi
+ * SP (Sistem Puanları) entegrasyonlu.
  */
 import { supabase } from '../constants/supabase';
+import { BadgeCheckerService } from './engagement/badges';
+import { GamificationService } from './gamification';
 
 // ─── Günlük Check-in Ödülleri ─────────────────
 const DAILY_REWARDS = [5, 10, 15, 20, 25, 35, 50]; // 7 günlük seri
 
 export interface CheckInResult {
   success: boolean;
-  coinsEarned: number;
+  /** Kazanılan SP miktarı */
+  spEarned: number;
   streak: number;
   alreadyCheckedIn: boolean;
   error?: string;
@@ -17,33 +21,34 @@ export interface CheckInResult {
 export interface Badge {
   id: string;
   name: string;
-  icon: string;
+  icon: string;       // Ionicons icon adı
+  color: string;      // Badge rengi
   description: string;
-  condition: string; // Koşul açıklaması
+  condition: string;
   unlockedAt?: string;
 }
 
-// Tüm rozetler
+// Tüm rozetler — Modern Ionicons
 export const ALL_BADGES: Badge[] = [
-  { id: 'first_room', name: 'İlk Oda', icon: '🎙️', description: 'İlk odasını oluşturdu', condition: 'Bir oda oluştur' },
-  { id: 'social_butterfly', name: 'Sosyal Kelebek', icon: '💬', description: '50 mesaj gönderdi', condition: '50 mesaj gönder' },
-  { id: 'generous', name: 'Cömert', icon: '🎁', description: '10 hediye gönderdi', condition: '10 hediye gönder' },
-  { id: 'streak_7', name: '7 Gün Seri', icon: '🔥', description: '7 gün üst üste giriş yaptı', condition: '7 gün üst üste giriş yap' },
-  { id: 'followers_100', name: '100 Takipçi', icon: '⭐', description: '100 takipçiye ulaştı', condition: '100 takipçiye ulaş' },
-  { id: 'first_post', name: 'İlk Gönderi', icon: '📝', description: 'İlk gönderisini paylaştı', condition: 'Bir gönderi paylaş' },
-  { id: 'night_owl', name: 'Gece Kuşu', icon: '🦉', description: 'Gece 2-5 arası aktif', condition: 'Gece 2-5 arası giriş yap' },
-  { id: 'early_bird', name: 'Erken Kuş', icon: '🐦', description: 'Sabah 5-7 arası aktif', condition: 'Sabah 5-7 arası giriş yap' },
-  { id: 'room_veteran', name: 'Oda Ustası', icon: '🏆', description: '10 oda oluşturdu', condition: '10 oda oluştur' },
-  { id: 'coin_collector', name: 'Coin Avcısı', icon: '💰', description: '1000 coin biriktirdi', condition: '1000 coin birikmiş ol' },
+  { id: 'first_room',       name: 'İlk Oda',        icon: 'mic',                 color: '#5CC6C6', description: 'İlk odasını oluşturdu',       condition: 'Bir oda oluştur' },
+  { id: 'social_butterfly',  name: 'Sosyal Kelebek', icon: 'chatbubbles',         color: '#3B82F6', description: '50 mesaj gönderdi',           condition: '50 mesaj gönder' },
+  { id: 'streak_7',          name: '7 Gün Seri',     icon: 'flame',               color: '#F97316', description: '7 gün üst üste giriş yaptı', condition: '7 gün üst üste giriş yap' },
+  { id: 'followers_100',     name: '100 Takipçi',    icon: 'people',              color: '#A855F7', description: '100 takipçiye ulaştı',       condition: '100 takipçiye ulaş' },
+  { id: 'first_post',        name: 'İlk Gönderi',    icon: 'create',              color: '#10B981', description: 'İlk gönderisini paylaştı',   condition: 'Bir gönderi paylaş' },
+  { id: 'night_owl',         name: 'Gece Kuşu',      icon: 'moon',                color: '#6366F1', description: 'Gece 2-5 arası aktif',       condition: 'Gece 2-5 arası giriş yap' },
+  { id: 'early_bird',        name: 'Erken Kuş',      icon: 'sunny',               color: '#F59E0B', description: 'Sabah 5-7 arası aktif',      condition: 'Sabah 5-7 arası giriş yap' },
+  { id: 'room_veteran',      name: 'Oda Ustası',     icon: 'trophy',              color: '#EAB308', description: '10 oda oluşturdu',            condition: '10 oda oluştur' },
+  { id: 'sp_master',         name: 'SP Ustası',      icon: 'star',                color: '#14B8A6', description: '5000 SP biriktirdi',         condition: '5000 SP birikmiş ol' },
 ];
 
 export const DailyCheckInService = {
   /**
-   * Günlük check-in yap — coin kazan
+   * Günlük check-in yap — SP kazan
    */
   async checkIn(userId: string): Promise<CheckInResult> {
     try {
-      const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+      const now = new Date();
+      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
       // Bugün zaten check-in yaptı mı?
       const { data: existing } = await supabase
@@ -54,13 +59,13 @@ export const DailyCheckInService = {
         .maybeSingle();
 
       if (existing) {
-        return { success: true, coinsEarned: 0, streak: existing.streak, alreadyCheckedIn: true };
+        return { success: true, spEarned: 0, streak: existing.streak, alreadyCheckedIn: true };
       }
 
       // Dünkü check-in — seri kontrolü
       const yesterday = new Date();
       yesterday.setDate(yesterday.getDate() - 1);
-      const yesterdayStr = yesterday.toISOString().split('T')[0];
+      const yesterdayStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
 
       const { data: yesterdayCheck } = await supabase
         .from('daily_checkins')
@@ -71,35 +76,39 @@ export const DailyCheckInService = {
 
       const newStreak = yesterdayCheck ? (yesterdayCheck.streak || 0) + 1 : 1;
       const rewardIndex = Math.min(newStreak - 1, DAILY_REWARDS.length - 1);
-      const coinsEarned = DAILY_REWARDS[rewardIndex];
+      const spReward = DAILY_REWARDS[rewardIndex];
 
       // Check-in kaydet
       await supabase.from('daily_checkins').insert({
         user_id: userId,
         check_date: today,
         streak: newStreak,
-        coins_earned: coinsEarned,
+        sp_earned: spReward, // SP-only ekonomi — DB kolonu sp_earned
       });
 
-      // Coin ekle
-      const { error: rpcError } = await supabase.rpc('increment_coins', { uid: userId, amount: coinsEarned });
-      if (rpcError) {
-        // RPC yoksa fallback
-        const { data } = await supabase.from('profiles').select('coins').eq('id', userId).single();
-        if (data) {
-          await supabase.from('profiles').update({ coins: (data.coins || 0) + coinsEarned }).eq('id', userId);
+      // SP kazandır
+      let spEarned = 0;
+      try { spEarned = await GamificationService.onDailyLogin(userId); } catch {}
+      // Seri bonusu ek SP
+      const streakBonus = Math.min(newStreak, 7) * 2;
+      try {
+        const { error: rpcError } = await supabase.rpc('grant_system_points', { p_user_id: userId, p_amount: spReward + streakBonus, p_action: 'daily_checkin' });
+        if (rpcError) {
+          const { data } = await supabase.from('profiles').select('system_points').eq('id', userId).single();
+          if (data) {
+            await supabase.from('profiles').update({ system_points: (data.system_points || 0) + spReward + streakBonus }).eq('id', userId);
+          }
         }
-      }
+        spEarned += spReward + streakBonus;
+      } catch {}
 
-      // 7 gün seri rozeti kontrol
-      if (newStreak >= 7) {
-        await BadgeService.unlock(userId, 'streak_7');
-      }
+      // Seri rozeti kontrolü
+      await BadgeCheckerService.checkForAction(userId, 'daily_checkin');
 
-      return { success: true, coinsEarned, streak: newStreak, alreadyCheckedIn: false };
+      return { success: true, spEarned, streak: newStreak, alreadyCheckedIn: false };
     } catch (e: any) {
       console.error('Check-in error:', e);
-      return { success: false, coinsEarned: 0, streak: 0, alreadyCheckedIn: false, error: e.message };
+      return { success: false, spEarned: 0, streak: 0, alreadyCheckedIn: false, error: e.message };
     }
   },
 
@@ -108,7 +117,9 @@ export const DailyCheckInService = {
    */
   async getStreak(userId: string): Promise<{ streak: number; checkedInToday: boolean }> {
     try {
-      const today = new Date().toISOString().split('T')[0];
+      // ★ NEW-8 FIX: Yerel tarih kullan
+      const now = new Date();
+      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
       const { data } = await supabase
         .from('daily_checkins')
         .select('streak, check_date')
@@ -127,31 +138,10 @@ export const DailyCheckInService = {
 
 export const BadgeService = {
   /**
-   * Rozet aç
+   * Rozet aç — yeni servise delege et
    */
   async unlock(userId: string, badgeId: string): Promise<boolean> {
-    try {
-      // Zaten var mı?
-      const { data: existing } = await supabase
-        .from('user_badges')
-        .select('id')
-        .eq('user_id', userId)
-        .eq('badge_id', badgeId)
-        .maybeSingle();
-
-      if (existing) return false; // Zaten açılmış
-
-      await supabase.from('user_badges').insert({
-        user_id: userId,
-        badge_id: badgeId,
-        unlocked_at: new Date().toISOString(),
-      });
-
-      return true;
-    } catch (e) {
-      console.warn('Badge unlock error:', e);
-      return false;
-    }
+    return BadgeCheckerService.unlock(userId, badgeId);
   },
 
   /**
@@ -159,78 +149,32 @@ export const BadgeService = {
    */
   async getUserBadges(userId: string): Promise<Badge[]> {
     try {
-      const { data } = await supabase
-        .from('user_badges')
-        .select('badge_id, unlocked_at')
-        .eq('user_id', userId);
-
-      if (!data) return [];
-
-      return data.map(ub => {
-        const badge = ALL_BADGES.find(b => b.id === ub.badge_id);
-        return badge ? { ...badge, unlockedAt: ub.unlocked_at } : null;
-      }).filter(Boolean) as Badge[];
+      const enriched = await BadgeCheckerService.getUserBadges(userId);
+      // Badge tipine dönüştür
+      return enriched.map(b => ({
+        id: b.id,
+        name: b.name,
+        icon: b.icon,
+        color: b.color,
+        description: b.description,
+        condition: b.condition,
+        unlockedAt: b.unlockedAt,
+      }));
     } catch {
       return [];
     }
   },
 
   /**
-   * Otomatik rozet kontrolü — belirli eylemlerde çağrılır
+   * Otomatik rozet kontrolü — yeni servise delege et
    */
-  async checkAndUnlock(userId: string, action: 'post_created' | 'room_created' | 'message_sent' | 'gift_sent' | 'login'): Promise<string | null> {
-    try {
-      switch (action) {
-        case 'post_created': {
-          const { count } = await supabase.from('posts').select('*', { count: 'exact', head: true }).eq('user_id', userId);
-          if ((count || 0) >= 1) {
-            const unlocked = await this.unlock(userId, 'first_post');
-            if (unlocked) return 'first_post';
-          }
-          break;
-        }
-        case 'room_created': {
-          const { count } = await supabase.from('rooms').select('*', { count: 'exact', head: true }).eq('host_id', userId);
-          if ((count || 0) >= 1) {
-            const unlocked = await this.unlock(userId, 'first_room');
-            if (unlocked) return 'first_room';
-          }
-          if ((count || 0) >= 10) {
-            const unlocked = await this.unlock(userId, 'room_veteran');
-            if (unlocked) return 'room_veteran';
-          }
-          break;
-        }
-        case 'gift_sent': {
-          const { count } = await supabase.from('gifts').select('*', { count: 'exact', head: true }).eq('sender_id', userId);
-          if ((count || 0) >= 10) {
-            const unlocked = await this.unlock(userId, 'generous');
-            if (unlocked) return 'generous';
-          }
-          break;
-        }
-        case 'login': {
-          const hour = new Date().getHours();
-          if (hour >= 2 && hour < 5) {
-            const unlocked = await this.unlock(userId, 'night_owl');
-            if (unlocked) return 'night_owl';
-          }
-          if (hour >= 5 && hour < 7) {
-            const unlocked = await this.unlock(userId, 'early_bird');
-            if (unlocked) return 'early_bird';
-          }
-          // Coin kontrolü
-          const { data: prof } = await supabase.from('profiles').select('coins').eq('id', userId).single();
-          if (prof && (prof.coins || 0) >= 1000) {
-            const unlocked = await this.unlock(userId, 'coin_collector');
-            if (unlocked) return 'coin_collector';
-          }
-          break;
-        }
-      }
-      return null;
-    } catch {
-      return null;
-    }
+  async checkAndUnlock(userId: string, action: 'post_created' | 'room_created' | 'message_sent' | 'login'): Promise<string | null> {
+    const actionMap: Record<string, string> = {
+      'post_created': 'wall_post',
+      'room_created': 'room_created',
+      'message_sent': 'message_sent',
+      'login': 'login',
+    };
+    return BadgeCheckerService.checkForAction(userId, actionMap[action] || action);
   },
 };

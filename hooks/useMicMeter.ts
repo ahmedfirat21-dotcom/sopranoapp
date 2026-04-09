@@ -7,13 +7,12 @@
  * ⚡ Performans: useRef ile state güncellemesi throttle edildi (250ms)
  *    önceki 80ms interval → saniyede 12 re-render → donma yapıyordu
  */
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 export function useMicMeter(enabled: boolean): number {
   const [audioLevel, setAudioLevel] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const phaseRef = useRef(0);
-  const lastUpdateRef = useRef(0);
   const levelRef = useRef(0);
 
   useEffect(() => {

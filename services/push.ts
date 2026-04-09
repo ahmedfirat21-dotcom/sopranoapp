@@ -4,7 +4,7 @@
  */
 import { supabase } from '../constants/supabase';
 
-export type PushType = 'dm' | 'follow' | 'follow_request' | 'follow_accepted' | 'gift' | 'room_invite' | 'event_reminder';
+export type PushType = 'dm' | 'follow' | 'follow_request' | 'follow_accepted' | 'gift' | 'room_invite' | 'room_live' | 'event_reminder' | 'missed_call' | 'incoming_call';
 
 export const PushService = {
   /**
@@ -14,23 +14,17 @@ export const PushService = {
     targetUserId: string,
     title: string,
     body: string,
-    data?: { type: PushType; route: string }
+    data?: { type: PushType; route: string; [key: string]: any }
   ): Promise<void> {
     try {
-      // 1. Hedef kullanıcının push token'ını al
       const { data: profile, error: profileErr } = await supabase
         .from('profiles')
         .select('push_token')
         .eq('id', targetUserId)
         .single();
 
-      if (profileErr || !profile?.push_token) {
-        // Token yoksa sessizce çık (kullanıcı bildirimlere izin vermemiş olabilir)
-        return;
-      }
+      if (profileErr || !profile?.push_token) return;
 
-      // 2. Expo Push API'ye doğrudan istek at
-      // (Edge Function deploy edildiğinde oraya yönlendirilebilir)
       const response = await fetch('https://exp.host/--/api/v2/push/send', {
         method: 'POST',
         headers: {
@@ -47,7 +41,7 @@ export const PushService = {
       });
 
       if (!response.ok) {
-        console.warn('[Push] Gönderim hatası:', response.status);
+        if (__DEV__) console.warn('[Push] Gönderim hatası:', response.status);
       }
     } catch (err: any) {
       console.error('[Push] Gönderilemedi:', err.message);
@@ -55,13 +49,13 @@ export const PushService = {
   },
 
   /**
-   * Bir odadaki tüm katılımcılara push gönder (bir kişiyi hariç tutarak)
+   * Bir odadaki tüm katılımcılara push gönder
    */
   async sendToRoom(
     roomId: string,
     title: string,
     body: string,
-    data?: { type: PushType; route: string },
+    data?: { type: PushType; route: string; [key: string]: any },
     excludeUserId?: string
   ): Promise<void> {
     try {
@@ -76,7 +70,6 @@ export const PushService = {
         .map(p => p.user_id)
         .filter(id => id !== excludeUserId);
 
-      // Her katılımcıya ayrı gönder (batch optimize edilebilir)
       await Promise.allSettled(
         targets.map(userId => this.sendToUser(userId, title, body, data))
       );
@@ -115,29 +108,6 @@ export const PushService = {
     );
   },
 
-  /** Etkinlik hatırlatıcısı — tüm katılımcılara */
-  async sendEventReminder(eventId: string, eventTitle: string): Promise<void> {
-    try {
-      const { data: attendees, error } = await supabase
-        .from('event_attendees')
-        .select('user_id')
-        .eq('event_id', eventId);
-
-      if (error || !attendees) return;
-
-      await Promise.allSettled(
-        attendees.map(a => this.sendToUser(
-          a.user_id,
-          '📅 Etkinlik Hatırlatması',
-          `"${eventTitle}" birazdan başlıyor!`,
-          { type: 'event_reminder', route: `/event/${eventId}` }
-        ))
-      );
-    } catch (err: any) {
-      console.error('[Push] Event reminder hatası:', err.message);
-    }
-  },
-
   /** DM bildirimi gönder */
   async sendDMNotification(targetUserId: string, senderName: string, preview: string, senderId: string): Promise<void> {
     const msg = preview.length > 50 ? preview.slice(0, 50) + '...' : preview;
@@ -146,6 +116,22 @@ export const PushService = {
       `💬 ${senderName}`,
       msg,
       { type: 'dm', route: `/chat/${senderId}` }
+    );
+  },
+
+  /** Cevapsız arama bildirimi gönder */
+  async sendMissedCallNotification(
+    targetUserId: string,
+    callerName: string,
+    callerId: string,
+    callType: 'audio' | 'video'
+  ): Promise<void> {
+    const icon = callType === 'video' ? '📹' : '📞';
+    await this.sendToUser(
+      targetUserId,
+      `${icon} Cevapsız Arama`,
+      `${callerName} seni aradı`,
+      { type: 'missed_call', route: `/chat/${callerId}` }
     );
   },
 };

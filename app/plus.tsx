@@ -1,38 +1,88 @@
 import { useState } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator } from 'react-native';
+import PremiumAlert, { type AlertButton } from '../components/PremiumAlert';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { Colors, Gradients, Radius } from '../constants/theme';
+import { Colors } from '../constants/theme';
 import { useAuth } from './_layout';
 import { showToast } from '../components/Toast';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ROOM_TIER_LIMITS } from '../services/database';
+import { ROOM_TIER_LIMITS } from '../constants/tiers';
 import { supabase } from '../constants/supabase';
+import AppBackground from '../components/AppBackground';
 
-// ─── Tier Planları ──────────────────────────────────────
+type AlertConfig = { visible: boolean; title: string; message: string; type?: any; buttons?: AlertButton[] };
+
 const PLANS = [
   {
-    id: 'plat',
-    tier: 'Plat' as const,
-    name: 'Plus',
+    id: 'bronze',
+    tier: 'Bronze' as const,
+    name: 'Bronze',
+    subtitle: 'Başlangıç',
+    icon: 'medal-outline',
+    gradient: ['#CD7F32', '#A0522D'] as [string, string],
+    color: '#CD7F32',
+    monthly: 49.99,
+    yearly: 399.99,
+    savePct: 33,
+    features: [
+      { text: `${ROOM_TIER_LIMITS.Bronze.maxSpeakers} kişi sahne`, included: true },
+      { text: `${ROOM_TIER_LIMITS.Bronze.maxListeners} dinleyici`, included: true },
+      { text: `${ROOM_TIER_LIMITS.Bronze.maxCameras} kamera`, included: true },
+      { text: `${ROOM_TIER_LIMITS.Bronze.durationHours} saat oda süresi`, included: true },
+      { text: `Günde ${ROOM_TIER_LIMITS.Bronze.dailyRooms} oda`, included: true },
+      { text: 'Açık + Şifreli oda', included: true },
+      { text: '480p video', included: true },
+      { text: 'Reklamsız deneyim', included: true },
+    ],
+  },
+  {
+    id: 'silver',
+    tier: 'Silver' as const,
+    name: 'Silver',
     subtitle: 'Popüler',
-    icon: 'diamond-outline',
-    gradient: ['#14B8A6', '#0891B2'] as [string, string],
-    color: Colors.teal,
+    icon: 'star',
+    gradient: ['#C0C0C0', '#A8A9AD'] as [string, string],
+    color: '#C0C0C0',
     monthly: 99.99,
     yearly: 799.99,
     savePct: 33,
     features: [
-      { text: `${ROOM_TIER_LIMITS.Plat.maxSpeakers} kişi sahne`, included: true },
-      { text: `${ROOM_TIER_LIMITS.Plat.maxListeners} dinleyici`, included: true },
-      { text: `${ROOM_TIER_LIMITS.Plat.durationHours} saat oda süresi`, included: true },
-      { text: `Günde ${ROOM_TIER_LIMITS.Plat.dailyRooms} oda`, included: true },
-      { text: 'Açık + Kapalı oda', included: true },
-      { text: 'HD ses kalitesi', included: true },
-      { text: 'Profil çerçevesi', included: true },
+      { text: `${ROOM_TIER_LIMITS.Silver.maxSpeakers} kişi sahne`, included: true },
+      { text: `${ROOM_TIER_LIMITS.Silver.maxListeners} dinleyici`, included: true },
+      { text: `${ROOM_TIER_LIMITS.Silver.maxCameras} kamera`, included: true },
+      { text: `${ROOM_TIER_LIMITS.Silver.durationHours} saat oda süresi`, included: true },
+      { text: `Günde ${ROOM_TIER_LIMITS.Silver.dailyRooms} oda`, included: true },
+      { text: 'Oda teması + çerçeve', included: true },
+      { text: 'HD ses + 720p video', included: true },
+      { text: 'Yaş/Dil filtresi', included: true },
       { text: 'Reklamsız deneyim', included: true },
-      { text: 'Öncelikli sıra', included: true },
+    ],
+  },
+  {
+    id: 'gold',
+    tier: 'Gold' as const,
+    name: 'Gold',
+    subtitle: 'Premium',
+    icon: 'diamond',
+    gradient: ['#FFD700', '#FFA500'] as [string, string],
+    color: '#FFD700',
+    monthly: 149.99,
+    yearly: 1199.99,
+    savePct: 33,
+    features: [
+      { text: `${ROOM_TIER_LIMITS.Gold.maxSpeakers} kişi sahne`, included: true },
+      { text: `${ROOM_TIER_LIMITS.Gold.maxListeners} dinleyici`, included: true },
+      { text: `${ROOM_TIER_LIMITS.Gold.maxCameras} kamera`, included: true },
+      { text: 'Sınırsız oda süresi', included: true },
+      { text: 'Sınırsız oda oluşturma', included: true },
+      { text: 'Tüm oda türleri + Davetli', included: true },
+      { text: 'HD ses + 1080p video', included: true },
+      { text: 'Oda müziği + Resim', included: true },
+      { text: 'Takipçi-only mod', included: true },
+      { text: 'Hediye al + Cashout', included: true },
+      { text: 'Reklamsız deneyim', included: true },
     ],
   },
   {
@@ -40,25 +90,25 @@ const PLANS = [
     tier: 'VIP' as const,
     name: 'VIP',
     subtitle: 'En İyi',
-    icon: 'trophy',
-    gradient: ['#F59E0B', '#D97706'] as [string, string],
-    color: Colors.amber,
-    monthly: 199.99,
-    yearly: 1599.99,
+    icon: 'diamond',
+    gradient: ['#00BFFF', '#8B5CF6'] as [string, string],
+    color: '#00BFFF',
+    monthly: 299.99,
+    yearly: 2399.99,
     savePct: 33,
     features: [
       { text: `${ROOM_TIER_LIMITS.VIP.maxSpeakers} kişi sahne`, included: true },
-      { text: `${ROOM_TIER_LIMITS.VIP.maxListeners.toLocaleString()} dinleyici`, included: true },
+      { text: 'Sınırsız dinleyici', included: true },
+      { text: `${ROOM_TIER_LIMITS.VIP.maxCameras} kamera`, included: true },
       { text: 'Sınırsız oda süresi', included: true },
       { text: 'Sınırsız oda oluşturma', included: true },
       { text: 'Tüm oda türleri', included: true },
-      { text: 'HD ses + video', included: true },
-      { text: 'Premium çerçeveler', included: true },
-      { text: 'Reklamsız deneyim', included: true },
-      { text: 'Öncelikli sıra', included: true },
-      { text: 'Özel emoji paketi', included: true },
+      { text: 'HD ses stereo + 1080p', included: true },
+      { text: 'Ghost mode + Kılık', included: true },
       { text: 'VIP giriş efekti', included: true },
+      { text: 'Düşük komisyon cashout', included: true },
       { text: 'Haftalık boost', included: true },
+      { text: 'Reklamsız deneyim', included: true },
     ],
   },
 ];
@@ -67,11 +117,12 @@ export default function PlusScreen() {
   const router = useRouter();
   const { profile, refreshProfile } = useAuth();
   const insets = useSafeAreaInsets();
-  const [selectedTier, setSelectedTier] = useState<'plat' | 'vip'>('plat');
+  const [selectedTier, setSelectedTier] = useState<'bronze' | 'silver' | 'gold' | 'vip'>('silver');
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('yearly');
   const [activating, setActivating] = useState(false);
+  const [alertCfg, setAlertCfg] = useState<AlertConfig>({ visible: false, title: '', message: '' });
 
-  const currentTier = profile?.tier || 'Silver';
+  const currentTier = profile?.subscription_tier || 'Free';
   const selectedPlan = PLANS.find(p => p.id === selectedTier)!;
 
   const handleActivate = async () => {
@@ -84,10 +135,12 @@ export default function PlusScreen() {
       ? `${selectedPlan.monthly}₺/ay`
       : `${selectedPlan.yearly}₺/yıl`;
 
-    Alert.alert(
-      `${selectedPlan.name}'a Yükselt`,
-      `${selectedPlan.name} planına geçmek istediğinize emin misiniz?\n\nFiyat: ${price}\n\n⚠️ Test modunda — gerçek ödeme alınmaz.`,
-      [
+    setAlertCfg({
+      visible: true,
+      title: `${selectedPlan.name}'a Yükselt`,
+      message: `${selectedPlan.name} planına geçmek istediğinize emin misiniz?\n\nFiyat: ${price}\n\n⚠️ Test modunda — gerçek ödeme alınmaz.`,
+      type: 'info',
+      buttons: [
         { text: 'Vazgeç', style: 'cancel' },
         {
           text: `${selectedPlan.name}'a Geç`,
@@ -96,16 +149,11 @@ export default function PlusScreen() {
             try {
               const { error } = await supabase
                 .from('profiles')
-                .update({ tier: selectedPlan.tier, is_plus: true })
+                .update({ subscription_tier: selectedPlan.tier })
                 .eq('id', profile.id);
               if (error) throw error;
-
               await refreshProfile();
-              showToast({
-                title: `${selectedPlan.name} Aktif! 🎉`,
-                message: `Tebrikler! Artık ${selectedPlan.name} üyesisiniz.`,
-                type: 'success',
-              });
+              showToast({ title: `${selectedPlan.name} Aktif! 🎉`, message: `Tebrikler! Artık ${selectedPlan.name} üyesisiniz.`, type: 'success' });
             } catch (err: any) {
               showToast({ title: 'Hata', message: err.message || 'Yükseltme başarısız.', type: 'error' });
             } finally {
@@ -113,28 +161,30 @@ export default function PlusScreen() {
             }
           },
         },
-      ]
-    );
+      ],
+    });
   };
 
   const handleDowngrade = () => {
-    Alert.alert(
-      'Planı İptal Et',
-      `Mevcut planınız: ${currentTier === 'Plat' ? 'Plus' : currentTier}.\n\nSilver (ücretsiz) plana dönmek ister misiniz?\nPremium özellikleriniz devre dışı kalacak.`,
-      [
+    setAlertCfg({
+      visible: true,
+      title: 'Planı İptal Et',
+      message: `Mevcut planınız: ${currentTier}.\n\nFree (ücretsiz) plana dönmek ister misiniz?\nPremium özellikleriniz devre dışı kalacak.`,
+      type: 'warning',
+      buttons: [
         { text: 'Hayır', style: 'cancel' },
         {
-          text: "Silver'a Dön",
+          text: "Free'ye Dön",
           style: 'destructive',
           onPress: async () => {
             setActivating(true);
             try {
               await supabase
                 .from('profiles')
-                .update({ tier: 'Silver', is_plus: false })
+                .update({ subscription_tier: 'Free' })
                 .eq('id', profile!.id);
               await refreshProfile();
-              showToast({ title: 'Plan değiştirildi', message: 'Silver plana geri döndünüz.', type: 'info' });
+              showToast({ title: 'Plan değiştirildi', message: 'Free plana geri döndünüz.', type: 'info' });
             } catch (err: any) {
               showToast({ title: 'Hata', message: err.message, type: 'error' });
             } finally {
@@ -142,15 +192,14 @@ export default function PlusScreen() {
             }
           },
         },
-      ]
-    );
+      ],
+    });
   };
 
   return (
-    <View style={styles.container}>
-      {/* Header */}
+    <AppBackground><View style={styles.container}>{/* Header */}
       <View style={[styles.header, { paddingTop: Math.max(insets.top, 20) + 8 }]}>
-        <Pressable onPress={() => router.back()} style={styles.backBtn}>
+        <Pressable onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)/home')} style={styles.backBtn}>
           <Ionicons name="chevron-back" size={24} color={Colors.text} />
         </Pressable>
         <Text style={styles.headerTitle}>Üyelik Planları</Text>
@@ -162,13 +211,13 @@ export default function PlusScreen() {
         <View style={styles.currentTierBar}>
           <Text style={styles.currentTierLabel}>Mevcut planın:</Text>
           <View style={[styles.currentTierBadge, {
-            backgroundColor: currentTier === 'VIP' ? '#F59E0B18' : currentTier === 'Plat' ? '#14B8A618' : '#6B728018'
+            backgroundColor: currentTier === 'VIP' ? '#00BFFF18' : currentTier === 'Gold' ? '#FFD70018' : '#6B728018'
           }]}>
             <Text style={{
-              color: currentTier === 'VIP' ? Colors.amber : currentTier === 'Plat' ? Colors.teal : '#9CA3AF',
+              color: currentTier === 'VIP' ? '#00BFFF' : currentTier === 'Gold' ? '#FFD700' : '#9CA3AF',
               fontSize: 12, fontWeight: '700'
             }}>
-              {currentTier === 'Plat' ? 'Plus' : currentTier}
+              {currentTier}
             </Text>
           </View>
         </View>
@@ -216,7 +265,7 @@ export default function PlusScreen() {
                   start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                   style={styles.planCardHeader}
                 >
-                  {plan.id === 'plat' && (
+                  {plan.id === 'silver' && (
                     <View style={styles.popularBadge}>
                       <Text style={styles.popularText}>POPÜLER</Text>
                     </View>
@@ -279,25 +328,30 @@ export default function PlusScreen() {
         <View style={styles.compareTable}>
           <View style={styles.compareHeader}>
             <Text style={[styles.compareCell, { flex: 1.5 }]}> </Text>
-            <Text style={[styles.compareCellHead, { color: '#9CA3AF' }]}>Silver</Text>
-            <Text style={[styles.compareCellHead, { color: Colors.teal }]}>Plus</Text>
-            <Text style={[styles.compareCellHead, { color: Colors.amber }]}>VIP</Text>
+            <Text style={[styles.compareCellHead, { color: '#9CA3AF' }]}>Free</Text>
+            <Text style={[styles.compareCellHead, { color: '#C0C0C0' }]}>Silver</Text>
+            <Text style={[styles.compareCellHead, { color: '#FFD700' }]}>Gold</Text>
+            <Text style={[styles.compareCellHead, { color: '#00BFFF' }]}>VIP</Text>
           </View>
           {[
-            { label: 'Sahne', values: ['4', '8', '12'] },
-            { label: 'Dinleyici', values: ['100', '500', '2K'] },
-            { label: 'Süre', values: ['1.5sa', '4sa', '∞'] },
-            { label: 'Günlük', values: ['2', '5', '∞'] },
-            { label: 'Oda Türü', values: ['Açık', 'A+K', 'Hepsi'] },
-            { label: 'HD Ses', values: ['—', '✓', '✓'] },
-            { label: 'Çerçeve', values: ['—', '✓', 'VIP'] },
-            { label: 'Reklam', values: ['Var', 'Yok', 'Yok'] },
+            { label: 'Sahne', values: [`${ROOM_TIER_LIMITS.Free.maxSpeakers}`, `${ROOM_TIER_LIMITS.Silver.maxSpeakers}`, `${ROOM_TIER_LIMITS.Gold.maxSpeakers}`, `${ROOM_TIER_LIMITS.VIP.maxSpeakers}`] },
+            { label: 'Dinleyici', values: [`${ROOM_TIER_LIMITS.Free.maxListeners}`, `${ROOM_TIER_LIMITS.Silver.maxListeners}`, `${ROOM_TIER_LIMITS.Gold.maxListeners}`, '∞'] },
+            { label: 'Kamera', values: [`${ROOM_TIER_LIMITS.Free.maxCameras}`, `${ROOM_TIER_LIMITS.Silver.maxCameras}`, `${ROOM_TIER_LIMITS.Gold.maxCameras}`, `${ROOM_TIER_LIMITS.VIP.maxCameras}`] },
+            { label: 'Oda Süresi', values: [`${ROOM_TIER_LIMITS.Free.durationHours}sa`, `${ROOM_TIER_LIMITS.Silver.durationHours}sa`, '24sa', '∞'] },
+            { label: 'Günlük Oda', values: [`${ROOM_TIER_LIMITS.Free.dailyRooms}`, `${ROOM_TIER_LIMITS.Silver.dailyRooms}`, '∞', '∞'] },
+            { label: 'Oda Türü', values: ['Açık', 'A+Ş', 'Hepsi', 'Hepsi'] },
+            { label: 'HD Ses', values: ['—', '✓', '✓', 'Stereo'] },
+            { label: 'Video', values: ['—', '720p', '1080p', '1080p'] },
+            { label: 'Tema', values: ['—', '✓', '✓', '✓'] },
+            { label: 'Cashout', values: ['—', '—', '%30', '%15'] },
+            { label: 'Çerçeve', values: ['—', '✓', '✓', 'VIP'] },
+            { label: 'Reklam', values: ['Var', 'Yok', 'Yok', 'Yok'] },
           ].map((row, i) => (
             <View key={i} style={[styles.compareRow, i % 2 === 0 && { backgroundColor: 'rgba(255,255,255,0.02)' }]}>
               <Text style={[styles.compareCell, { flex: 1.5, color: Colors.text2 }]}>{row.label}</Text>
               {row.values.map((v, j) => (
                 <Text key={j} style={[styles.compareCell, {
-                  color: j === 0 ? '#6B7280' : j === 1 ? Colors.teal : Colors.amber
+                  color: j === 0 ? '#6B7280' : j === 1 ? '#C0C0C0' : j === 2 ? Colors.amber : '#00BFFF'
                 }]}>{v}</Text>
               ))}
             </View>
@@ -327,9 +381,9 @@ export default function PlusScreen() {
         )}
 
         {/* Silver'a dönme */}
-        {currentTier !== 'Silver' && (
+        {currentTier !== 'Free' && (
           <Pressable style={styles.downgradeBtn} onPress={handleDowngrade}>
-            <Text style={styles.downgradeText}>Planı İptal Et / Silver'a Dön</Text>
+            <Text style={styles.downgradeText}>Planı İptal Et / Free'ye Dön</Text>
           </Pressable>
         )}
 
@@ -338,12 +392,21 @@ export default function PlusScreen() {
           Fiyatlara KDV dahildir.
         </Text>
       </ScrollView>
-    </View>
+
+      <PremiumAlert
+        visible={alertCfg.visible}
+        title={alertCfg.title}
+        message={alertCfg.message}
+        type={alertCfg.type || 'info'}
+        buttons={alertCfg.buttons}
+        onDismiss={() => setAlertCfg(prev => ({ ...prev, visible: false }))}
+      />
+    </View></AppBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.bg },
+  container: { flex: 1, backgroundColor: 'transparent' },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 16, paddingBottom: 12,

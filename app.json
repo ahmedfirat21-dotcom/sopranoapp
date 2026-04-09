@@ -4,13 +4,13 @@
     "slug": "SopranoChat",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/marka.png",
     "userInterfaceStyle": "dark",
     "scheme": "sopranochat",
     "splash": {
       "image": "./assets/splash_s.png",
       "resizeMode": "contain",
-      "backgroundColor": "#07080A"
+      "backgroundColor": "#E8F4F8"
     },
     "ios": {
       "supportsTablet": true,
@@ -19,10 +19,8 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#07080A",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png",
-        "backgroundImage": "./assets/android-icon-background.png"
+        "backgroundColor": "#E8F4F8",
+        "foregroundImage": "./assets/adaptive-icon.png"
       },
       "package": "com.sopranochat.mobil2",
       "versionCode": 2,
@@ -35,9 +33,7 @@
         "android.permission.VIBRATE",
         "android.permission.ACCESS_NETWORK_STATE",
         "android.permission.MODIFY_AUDIO_SETTINGS",
-        "android.permission.SYSTEM_ALERT_WINDOW",
-        "android.permission.WAKE_LOCK",
-        "android.permission.BLUETOOTH"
+        "android.permission.WAKE_LOCK"
       ],
       "intentFilters": [
         {
@@ -76,7 +72,7 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/icon.png",
+          "icon": "./assets/marka.png",
           "color": "#14B8A6",
           "defaultChannel": "default",
           "sounds": []

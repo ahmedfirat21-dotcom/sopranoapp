@@ -215,4 +215,12 @@ export const PushNotificationService = {
     if (!Notifications) return null;
     return Notifications.addNotificationResponseReceivedListener(callback);
   },
+
+  /**
+   * Bildirim Alınma Dinleyicisi — uygulama ön plandayken gelen push bildirimleri
+   */
+  addReceivedListener(callback: (notification: any) => void) {
+    if (!Notifications) return null;
+    return Notifications.addNotificationReceivedListener(callback);
+  },
 };

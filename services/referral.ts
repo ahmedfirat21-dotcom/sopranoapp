@@ -1,7 +1,15 @@
 import { supabase } from '../constants/supabase';
 
 export const ReferralService = {
-  // Kullanıcının kendi davet kodunu getir
+  // Rastgele 6 haneli büyük harf+rakam kodu üret
+  _generateCode: (): string => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // karışıklık yaratabilecek 0/O/1/I hariç
+    let code = '';
+    for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
+    return code;
+  },
+
+  // Kullanıcının kendi davet kodunu getir (yoksa oluştur)
   getMyCode: async (userId: string): Promise<string | null> => {
     try {
       const { data, error } = await supabase
@@ -11,31 +19,86 @@ export const ReferralService = {
         .single();
       
       if (error) throw error;
-      return data?.referral_code || null;
+      
+      // Kod varsa döndür
+      if (data?.referral_code) return data.referral_code;
+      
+      // Yoksa otomatik oluştur
+      const newCode = ReferralService._generateCode();
+      const { error: updateErr } = await supabase
+        .from('profiles')
+        .update({ referral_code: newCode })
+        .eq('id', userId);
+      
+      if (updateErr) {
+        if (__DEV__) console.warn('Referral code oluşturulamadı:', updateErr.message);
+        return null;
+      }
+      return newCode;
     } catch (e: any) {
       console.error('Error fetching referral code:', e.message);
       return null;
     }
   },
   
-  // Davet kodunu kullan (onboarding'de çağrılacak)
+  // Davet kodunu kullan
   applyCode: async (referralCode: string, referredUserId: string): Promise<{ success: boolean; message: string }> => {
     try {
       if (!referralCode || referralCode.trim().length === 0) {
         return { success: false, message: 'Geçersiz davet kodu' };
       }
 
-      const { data, error } = await supabase.rpc('process_referral_reward', {
-        p_referral_code: referralCode.trim().toUpperCase(),
-        p_referred_id: referredUserId
-      });
+      const code = referralCode.trim().toUpperCase();
 
-      if (error) {
-        console.error('Error applying referral RPC:', error.message);
-        return { success: false, message: 'İşlem sırasında sunucu hatası oluştu.' };
+      // 1. Kod sahibini bul
+      const { data: owner, error: ownerErr } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('referral_code', code)
+        .maybeSingle();
+
+      if (ownerErr || !owner) {
+        return { success: false, message: 'Bu davet kodu bulunamadı.' };
       }
 
-      return { success: data.success, message: data.message || (data.success ? 'Yüklendi' : 'Başarısız') };
+      // Kendi kodunu kullanmasın
+      if (owner.id === referredUserId) {
+        return { success: false, message: 'Kendi davet kodunuzu kullanamazsınız.' };
+      }
+
+      // 2. Daha önce bu kişi başka bir kod kullanmış mı?
+      const { data: existing } = await supabase
+        .from('referrals')
+        .select('id')
+        .eq('referred_id', referredUserId)
+        .maybeSingle();
+
+      if (existing) {
+        return { success: false, message: 'Zaten bir davet kodu kullanmışsınız.' };
+      }
+
+      // 3. Referral kaydı oluştur
+      const { error: insertErr } = await supabase.from('referrals').insert({
+        referrer_id: owner.id,
+        referred_id: referredUserId,
+        referral_code: code,
+      });
+
+      if (insertErr) {
+        if (__DEV__) console.warn('Referral insert error:', insertErr.message);
+        return { success: false, message: 'İşlem sırasında hata oluştu.' };
+      }
+
+      // 4. Her iki tarafa 100 SP ver
+      const giveSP = async (uid: string, amount: number) => {
+        const { data: p } = await supabase.from('profiles').select('system_points').eq('id', uid).single();
+        if (p) await supabase.from('profiles').update({ system_points: (p.system_points || 0) + amount }).eq('id', uid);
+      };
+
+      await giveSP(owner.id, 100);      // Davet eden
+      await giveSP(referredUserId, 100); // Davet edilen
+
+      return { success: true, message: 'Tebrikler! Her ikiniz de 100 SP kazandınız.' };
     } catch (e: any) {
       console.error('Error applying code:', e.message);
       return { success: false, message: e.message };

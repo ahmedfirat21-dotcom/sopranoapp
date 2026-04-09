@@ -25,7 +25,7 @@ export const StorageService = {
       const arrayBuffer = decode(base64);
 
       // 4. Upload to Supabase Storage
-      const { data, error } = await supabase.storage
+      const { error } = await supabase.storage
         .from(bucket)
         .upload(path, arrayBuffer, {
           contentType: 'image/jpeg',
@@ -67,12 +67,61 @@ export const StorageService = {
   },
 
   /**
+   * Upload a chat image to the 'chat-images' bucket
+   */
+  async uploadChatImage(userId: string, imageUri: string): Promise<string> {
+    const timestamp = new Date().getTime();
+    const path = `chat/${userId}/${timestamp}.jpg`;
+    // chat-images bucket yoksa post-images kullan
+    try {
+      return await this.uploadFile('chat-images', path, imageUri);
+    } catch {
+      return await this.uploadFile('post-images', path, imageUri);
+    }
+  },
+
+  /**
    * Delete a file from a specified bucket
    */
   async deleteFile(bucket: string, path: string): Promise<void> {
     const { error } = await supabase.storage.from(bucket).remove([path]);
     if (error) {
       console.error(`[StorageService] Delete Error in ${bucket}/${path}:`, error.message);
+      throw error;
+    }
+  },
+
+  /**
+   * Upload a voice note (audio file) — ImageManipulator kullanmaz
+   */
+  async uploadVoiceNote(userId: string, audioUri: string): Promise<string> {
+    try {
+      const timestamp = new Date().getTime();
+      const path = `${userId}/voice_${timestamp}.m4a`;
+
+      // Ses dosyasını base64 olarak oku (resim işleme yok!)
+      const base64 = await FileSystem.readAsStringAsync(audioUri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+
+      const arrayBuffer = decode(base64);
+
+      const { error } = await supabase.storage
+        .from('post-images')  // TODO: voice-notes bucket oluşturulunca değiştir
+        .upload(path, arrayBuffer, {
+          contentType: 'audio/mp4',
+          upsert: true,
+        });
+
+      if (error) throw error;
+
+      const { data: publicUrlData } = supabase.storage
+        .from('post-images')
+        .getPublicUrl(path);
+
+      return publicUrlData.publicUrl;
+    } catch (error: any) {
+      console.error(`[StorageService] Voice Upload Error:`, error.message);
       throw error;
     }
   }

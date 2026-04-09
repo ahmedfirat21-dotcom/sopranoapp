@@ -34,10 +34,6 @@ export const BAD_WORDS: string[] = [
   'sg', 'sktir', 'sktr',
 ];
 
-// Türkçe harf sınıfı — word boundary hesabında kullanılır
-const TR_WORD_CHAR = '[a-zA-ZçğıöüşÇĞİÖÜŞ0-9_]';
-const TR_NON_WORD_CHAR = `(?:(?<=${TR_WORD_CHAR})(?!${TR_WORD_CHAR})|(?<!${TR_WORD_CHAR})(?=${TR_WORD_CHAR}))`;
-
 // Regex oluştururken özel karakterleri escape et
 function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

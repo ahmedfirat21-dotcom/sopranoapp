@@ -5,15 +5,21 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Colors, Gradients, Radius } from '../../constants/theme';
-import { getAvatarSource } from '../../constants/avatars';
-import { useAuth } from '../_layout';
+import { getAvatarSource, getLevelFromSP, getLevelColors, getTierBadgeInfo } from '../../constants/avatars';
+import { useAuth, useTheme } from '../_layout';
 import { supabase } from '../../constants/supabase';
 import { ReferralService } from '../../services/referral';
 import { ProfileService } from '../../services/database';
 import { showToast } from '../../components/Toast';
-import SopranoCoin from '../../components/SopranoCoin';
+
+import AppBackground from '../../components/AppBackground';
 import PremiumAlert from '../../components/PremiumAlert';
-import { BadgeService, ALL_BADGES, type Badge } from '../../services/engagement';
+import { BadgeCheckerService, type UserBadge } from '../../services/engagement/badges';
+import AnimatedAvatar from '../../components/AnimatedAvatar';
+import { TierBadge, BadgeGrid } from '../../components/progression';
+import { TIER_DEFINITIONS } from '../../constants/tiers';
+import { migrateLegacyTier } from '../../types';
+import type { SubscriptionTier } from '../../types';
 
 /** Son görülme zamanını insanca formatlayan yardımcı */
 function _formatLastSeen(dateStr: string): string {
@@ -33,13 +39,14 @@ export default function ProfileScreen() {
   const router = useRouter();
   const { profile, user, firebaseUser, refreshProfile } = useAuth();
   const insets = useSafeAreaInsets();
+  useTheme();
 
   const displayName = profile?.display_name || user?.name || 'Kullanıcı';
   const avatarUrl = profile?.avatar_url || user?.avatar || 'https://i.pravatar.cc/120?img=3';
   const bio = profile?.bio || 'Henüz bir şey yazmadı ☕';
-  const tier = profile?.tier || 'Silver';
-  const coins = profile?.coins ?? 0;
-  const isPlus = profile?.is_plus || false;
+  const tier = profile?.subscription_tier || 'Free';
+  const subscriptionTier: SubscriptionTier = migrateLegacyTier(profile?.subscription_tier || 'Free');
+  const isPaid = subscriptionTier !== 'Free';
   const userId = firebaseUser?.uid || profile?.id;
 
 
@@ -51,7 +58,7 @@ export default function ProfileScreen() {
   const [referralCodeText, setReferralCodeText] = useState('');
   const [submittingReferral, setSubmittingReferral] = useState(false);
   const [showBoostAlert, setShowBoostAlert] = useState(false);
-  const [badges, setBadges] = useState<Badge[]>([]);
+  const [badges, setBadges] = useState<UserBadge[]>([]);
 
   const loadStats = useCallback(async () => {
     if (!userId) return;
@@ -82,8 +89,9 @@ export default function ProfileScreen() {
         rooms: roomCount ?? 0,
       });
 
-      // Rozetleri yükle
-      const userBadges = await BadgeService.getUserBadges(userId);
+      // Rozetleri yükle + otomatik kontrol
+      await BadgeCheckerService.checkAll(userId);
+      const userBadges = await BadgeCheckerService.getUserBadges(userId);
       setBadges(userBadges);
     } catch (err) {
       console.warn('Stats yuklenemedi:', err);
@@ -96,7 +104,7 @@ export default function ProfileScreen() {
     try {
       const res = await ReferralService.applyCode(referralCodeText, userId);
       if (res.success) {
-        showToast({ title: 'Tebrikler! 50 Coin kazandınız.', type: 'success' });
+        showToast({ title: 'Tebrikler! 50 SP kazandınız.', type: 'success' });
         setShowReferral(false);
         setReferralCodeText('');
       } else {
@@ -115,10 +123,11 @@ export default function ProfileScreen() {
 
   // Admin (GodMaster) özel tier
   const isAdmin = profile?.is_admin || false;
-  const displayTier = isAdmin ? 'GodMaster' : tier;
-  const tierGradient = isAdmin ? ['#DC2626', '#7F1D1D'] : tier === 'VIP' ? Gradients.vipGold : tier === 'Plat' ? Gradients.plat : Gradients.silverG;
-  const tierIcon = isAdmin ? 'shield-checkmark' : tier === 'VIP' ? 'trophy' : tier === 'Plat' ? 'diamond-outline' : 'shield-half-outline';
-  const tierBorderColor = isAdmin ? '#DC2626' : tier === 'VIP' ? Colors.amber : tier === 'Plat' ? Colors.cyan : Colors.silver;
+  const displayTier = isAdmin ? 'GodMaster' : subscriptionTier;
+  const tierDef = TIER_DEFINITIONS[subscriptionTier as keyof typeof TIER_DEFINITIONS];
+  const tierGradient = isAdmin ? ['#DC2626', '#7F1D1D'] : tierDef ? tierDef.gradient : ['#94A3B8', '#64748B'];
+  const tierIcon = isAdmin ? 'shield-checkmark' : tierDef?.icon || 'person-outline';
+  const tierBorderColor = isAdmin ? '#DC2626' : tierDef?.color || '#94A3B8';
 
   const STATS_DATA = [
     { label: 'Takipçi', value: String(stats.followers) },
@@ -127,12 +136,13 @@ export default function ProfileScreen() {
   ];
 
   return (
+    <AppBackground variant="profile">
     <View style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 16) + 70 }}>
         {/* Header — sadece settings butonu */}
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Profilim</Text>
-          <Pressable style={styles.settingsBtn} onPress={() => router.push('/settings')}>
+          <Pressable style={styles.settingsBtn} onPress={() => router.push('/settings' as any)}>
             <Ionicons name="settings-outline" size={20} color={Colors.text2} />
           </Pressable>
         </View>
@@ -191,27 +201,10 @@ export default function ProfileScreen() {
             ))}
           </View>
 
-          {/* ★ Başarı Rozetleri */}
-          {badges.length > 0 && (
-            <View style={styles.badgesSection}>
-              <Text style={styles.badgesTitle}>🏆 Rozetler</Text>
-              <View style={styles.badgesRow}>
-                {badges.map(badge => (
-                  <View key={badge.id} style={styles.badgeItem}>
-                    <Text style={styles.badgeIcon}>{badge.icon}</Text>
-                    <Text style={styles.badgeName} numberOfLines={1}>{badge.name}</Text>
-                  </View>
-                ))}
-                {/* Boş slotlar */}
-                {badges.length < ALL_BADGES.length && (
-                  <View style={[styles.badgeItem, styles.badgeItemLocked]}>
-                    <Text style={styles.badgeIcon}>🔒</Text>
-                    <Text style={[styles.badgeName, { color: Colors.text3 }]}>+{ALL_BADGES.length - badges.length}</Text>
-                  </View>
-                )}
-              </View>
-            </View>
-          )}
+          {/* ★ Başarı Rozetleri — Premium Grid */}
+          <View style={styles.badgesSection}>
+            <BadgeGrid unlockedBadges={badges} compact />
+          </View>
 
           {/* Edit Profile button */}
           <Pressable style={styles.editBtn} onPress={() => router.push('/edit-profile')}>
@@ -222,72 +215,76 @@ export default function ProfileScreen() {
 
 
 
-        {/* Coin balance card */}
-        <Pressable style={styles.coinCard} onPress={() => router.push('/wallet')}>
-          <View style={styles.coinLeft}>
-            <View style={[styles.coinIconWrap, { backgroundColor: `${Colors.gold}18` }]}>
-              <SopranoCoin size={20} />
-            </View>
-            <View>
-              <Text style={styles.coinLabel}>Soprano Coin</Text>
-              <Text style={styles.coinBalance}>{coins} Soprano Coin</Text>
-            </View>
-          </View>
-          <Ionicons name="chevron-forward" size={16} color={Colors.text3} />
-        </Pressable>
 
-        {/* Üyelik Planları */}
-        <Pressable style={styles.plusCard} onPress={() => router.push('/plus')}>
-          <View style={styles.coinLeft}>
-            <View style={[styles.coinIconWrap, { backgroundColor: `${Colors.teal}18` }]}>
-              <Ionicons name="star" size={20} color={isPlus ? Colors.gold : Colors.teal} />
+        {/* ★ Hesabım — Üyelik Kartı */}
+        <Pressable style={styles.walletCard} onPress={() => router.push('/plus')}>
+          <View style={styles.walletHeader}>
+            <Text style={styles.walletTitle}>Hesabım</Text>
+            <Ionicons name="chevron-forward" size={16} color="#64748B" />
+          </View>
+          <View style={styles.walletRow}>
+            {/* SP */}
+            <View style={styles.walletItem}>
+              <View style={[styles.walletIconWrap, { backgroundColor: `${Colors.gold}15` }]}>
+                <Ionicons name="star" size={18} color={Colors.gold} />
+              </View>
+              <Text style={styles.walletAmount}>{(profile?.system_points || 0).toLocaleString()}</Text>
+              <Text style={styles.walletLabel}>SP</Text>
             </View>
-            <View>
-              <Text style={styles.coinLabel}>Üyelik Planları</Text>
-              <Text style={[styles.coinBalance, { color: isPlus ? Colors.teal : Colors.text3 }]}>
-                {isPlus ? `✓ ${tier === 'VIP' ? 'VIP' : 'Plus'} Aktif` : 'Planları Gör'}
+            {/* Divider */}
+            <View style={styles.walletDivider} />
+            {/* Membership */}
+            <Pressable style={styles.walletItem} onPress={() => router.push('/plus')}>
+              <View style={[styles.walletIconWrap, { backgroundColor: `${tierDef?.color || Colors.teal}15` }]}>
+                <Ionicons name={isPaid ? 'star' : 'star-outline'} size={18} color={isPaid ? (tierDef?.color || Colors.gold) : Colors.accentTeal} />
+              </View>
+              <Text style={[styles.walletAmount, { color: isPaid ? (tierDef?.color || Colors.gold) : '#94A3B8', fontSize: 13 }]}>
+                {isPaid ? 'Aktif ✓' : 'Yükselt'}
               </Text>
-            </View>
+              <Text style={styles.walletLabel}>{isPaid ? subscriptionTier : 'Üyelik'}</Text>
+            </Pressable>
           </View>
-          <Ionicons name="chevron-forward" size={16} color={Colors.text3} />
         </Pressable>
 
-        {/* Quick Actions — her biri farklı sayfaya */}
+        {/* ★ Quick Actions — 4-column grid */}
         <View style={styles.quickActions}>
-          <Pressable style={styles.actionCard} onPress={() => router.push('/store')}>
-            <Ionicons name="cart-outline" size={22} color={Colors.gold} />
-            <Text style={styles.actionLabel}>Mağaza</Text>
-          </Pressable>
-          <Pressable style={styles.actionCard} onPress={() => router.push('/wallet')}>
-            <Ionicons name="wallet-outline" size={22} color={Colors.teal} />
-            <Text style={styles.actionLabel}>Cüzdan</Text>
-          </Pressable>
-          <Pressable style={styles.actionCard} onPress={() => setShowBoostAlert(true)}>
-            <Ionicons name="rocket-outline" size={22} color={Colors.cyan} />
-            <Text style={styles.actionLabel}>Profil Boost</Text>
-          </Pressable>
-          <Pressable style={styles.actionCard} onPress={() => setShowReferral(true)}>
-            <Ionicons name="gift-outline" size={22} color={Colors.amber} />
-            <Text style={styles.actionLabel}>Davet Kodu</Text>
-          </Pressable>
+          {[
+            { icon: 'mic-outline' as const, label: 'Oda Kur', color: Colors.accentTeal, route: '/create-room' },
+            { icon: 'cart-outline' as const, label: 'Üyelik', color: Colors.gold, route: '/plus' },
+            { icon: 'trophy-outline' as const, label: 'Sıralama', color: '#F59E0B', route: '/leaderboard' },
+            { icon: 'gift-outline' as const, label: 'Davet', color: '#A78BFA', route: null },
+          ].map((action, i) => (
+            <Pressable
+              key={i}
+              style={styles.actionCard}
+              onPress={() => action.route ? router.push(action.route as any) : setShowReferral(true)}
+            >
+              <View style={[styles.actionIconWrap, { backgroundColor: action.color + '12' }]}>
+                <Ionicons name={action.icon} size={20} color={action.color} />
+              </View>
+              <Text style={styles.actionLabel}>{action.label}</Text>
+            </Pressable>
+          ))}
         </View>
 
         {/* GodMaster Admin Paneli — sadece admin */}
         {profile?.is_admin && (
           <Pressable
-            style={[styles.coinCard, { marginTop: 16, borderColor: 'rgba(239,68,68,0.3)', backgroundColor: 'rgba(239,68,68,0.04)' }]}
+            style={[styles.walletCard, { marginTop: 16, borderColor: 'rgba(239,68,68,0.25)', backgroundColor: 'rgba(239,68,68,0.04)' }]}
             onPress={() => router.push('/admin' as any)}
           >
-            <View style={styles.coinLeft}>
-              <View style={[styles.coinIconWrap, { backgroundColor: '#EF444418' }]}>
-                <Ionicons name="shield-checkmark" size={20} color="#EF4444" />
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                <View style={[styles.walletIconWrap, { backgroundColor: '#EF444418' }]}>
+                  <Ionicons name="shield-checkmark" size={20} color="#EF4444" />
+                </View>
+                <View>
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: '#F1F5F9' }}>GodMaster Panel</Text>
+                  <Text style={{ fontSize: 11, color: '#EF4444', marginTop: 2 }}>Platform Yönetimi</Text>
+                </View>
               </View>
-              <View>
-                <Text style={styles.coinLabel}>GodMaster Panel</Text>
-                <Text style={[styles.coinBalance, { color: '#EF4444' }]}>Platform Yönetimi</Text>
-              </View>
+              <Ionicons name="chevron-forward" size={16} color="#EF4444" />
             </View>
-            <Ionicons name="chevron-forward" size={16} color="#EF4444" />
           </Pressable>
         )}
 
@@ -301,7 +298,7 @@ export default function ProfileScreen() {
                   <Ionicons name="close" size={24} color={Colors.text2} />
                 </Pressable>
               </View>
-              <Text style={styles.modalDesc}>Eger bir arkadasin seni davet ettiyse, onun kodunu girip 50 Soprano Coin kazanabilirsin.</Text>
+              <Text style={styles.modalDesc}>Eger bir arkadasin seni davet ettiyse, onun kodunu girip 50 SP kazanabilirsin.</Text>
               <TextInput
                 style={styles.modalInput}
                 placeholder="Örn: XHFDK9"
@@ -328,14 +325,14 @@ export default function ProfileScreen() {
       <PremiumAlert
         visible={showBoostAlert}
         title="Profil Boost"
-        message={"Profilini 1 saat boyunca Keşfet sayfasında öne çıkar.\n\nBedel: 10 Soprano Coin"}
+        message={"Profilini 1 saat boyunca Keşfet sayfasında öne çıkar.\n\nBedel: 10 SP"}
         type="info"
         icon="rocket"
         onDismiss={() => setShowBoostAlert(false)}
         buttons={[
           { text: 'Vazgeç', style: 'cancel' },
           {
-            text: 'Boost Et (10 Coin)',
+            text: 'Boost Et (10 SP)',
             onPress: async () => {
               if (!profile?.id) return;
               try {
@@ -350,11 +347,12 @@ export default function ProfileScreen() {
         ]}
       />
     </View>
+    </AppBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.bg },
+  container: { flex: 1, backgroundColor: 'transparent' },
   
   // Header  
   header: { 
@@ -427,34 +425,43 @@ const styles = StyleSheet.create({
   },
   editBtnText: { fontSize: 13, fontWeight: '600', color: Colors.teal },
 
-  // Coin card
-  coinCard: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    marginHorizontal: 20, marginBottom: 10, padding: 16, height: 75,
-    borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.03)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+  // ★ Birleşik Cüzdan Kartı
+  walletCard: {
+    marginHorizontal: 20, marginBottom: 14, padding: 16,
+    borderRadius: 16, backgroundColor: Colors.cardBg,
+    borderWidth: 1, borderColor: Colors.cardBorder,
   },
-  plusCard: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    marginHorizontal: 20, marginBottom: 16, padding: 16,
-    borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.03)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+  walletHeader: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    marginBottom: 14,
   },
-  coinLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  coinIconWrap: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
-  coinLabel: { fontSize: 14, fontWeight: '600', color: Colors.text },
-  coinBalance: { fontSize: 12, color: Colors.gold, marginTop: 2 },
+  walletTitle: { fontSize: 14, fontWeight: '700', color: '#E2E8F0', letterSpacing: 0.3 },
+  walletRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around',
+  },
+  walletItem: { alignItems: 'center', gap: 4, flex: 1 },
+  walletIconWrap: {
+    width: 38, height: 38, borderRadius: 12,
+    justifyContent: 'center', alignItems: 'center',
+  },
+  walletAmount: { fontSize: 16, fontWeight: '700', color: Colors.gold },
+  walletLabel: { fontSize: 10, fontWeight: '600', color: '#64748B', letterSpacing: 0.5, textTransform: 'uppercase' },
+  walletDivider: { width: 1, height: 36, backgroundColor: 'rgba(255,255,255,0.06)' },
 
   // Quick actions grid
   quickActions: { 
     flexDirection: 'row', gap: 10, paddingHorizontal: 20, marginTop: 4,
   },
   actionCard: {
-    flex: 1, alignItems: 'center', gap: 8, paddingVertical: 16,
-    borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.04)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+    flex: 1, alignItems: 'center', gap: 6, paddingVertical: 14,
+    borderRadius: 16, backgroundColor: Colors.cardBg,
+    borderWidth: 1, borderColor: Colors.cardBorder,
   },
-  actionLabel: { fontSize: 11, fontWeight: '600', color: '#94A3B8', letterSpacing: 0.5 },
+  actionIconWrap: {
+    width: 36, height: 36, borderRadius: 12,
+    justifyContent: 'center', alignItems: 'center',
+  },
+  actionLabel: { fontSize: 10, fontWeight: '600', color: '#94A3B8', letterSpacing: 0.5 },
   
   // Upgrade Banner
   upgradeCard: { marginHorizontal: 20, marginBottom: 16, borderRadius: Radius.default, overflow: 'hidden', borderWidth: 1, borderColor: Colors.teal + '30' },
@@ -467,10 +474,4 @@ const styles = StyleSheet.create({
 
   // Badges
   badgesSection: { marginHorizontal: 20, marginTop: 12, marginBottom: 4 },
-  badgesTitle: { fontSize: 14, fontWeight: '700', color: '#F1F5F9', marginBottom: 8 },
-  badgesRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  badgeItem: { alignItems: 'center', gap: 4, paddingVertical: 8, paddingHorizontal: 10, borderRadius: 12, backgroundColor: 'rgba(20,184,166,0.1)', borderWidth: 1, borderColor: 'rgba(20,184,166,0.25)', minWidth: 60 },
-  badgeItemLocked: { backgroundColor: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' },
-  badgeIcon: { fontSize: 20 },
-  badgeName: { fontSize: 10, fontWeight: '600', color: Colors.teal },
 });

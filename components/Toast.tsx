@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, StyleSheet, Animated, DeviceEventEmitter, Platform, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Colors } from '../constants/theme';
 
 export type ToastType = 'success' | 'error' | 'info' | 'warning';
 
@@ -35,7 +36,7 @@ export function Toast() {
       // Yumuşak giriş
       Animated.parallel([
         Animated.spring(translateY, {
-          toValue: Platform.OS === 'ios' ? Math.max(insets.top, 44) : 36,
+          toValue: Platform.OS === 'ios' ? 0 : 0,
           useNativeDriver: true,
           tension: 80,
           friction: 12,
@@ -80,7 +81,7 @@ export function Toast() {
 
   return (
     <Animated.View style={[styles.container, { transform: [{ translateY }], opacity }]}>
-      <View style={[styles.toast, { borderColor: border, backgroundColor: '#1A1F27' }]}>
+      <View style={[styles.toast, { borderColor: border, backgroundColor: 'rgba(45,61,77,0.95)' }]}>
         {/* Sol renkli çizgi */}
         <View style={[styles.accentBar, { backgroundColor: color }]} />
         <View style={[styles.iconWrap, { backgroundColor: accent }]}>
@@ -98,7 +99,7 @@ export function Toast() {
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    top: 0,
+    top: '40%',
     left: 20,
     right: 20,
     zIndex: 99999,

@@ -14,7 +14,7 @@ export type UserSettings = {
   notification_vibration: boolean;
 
   // Görünüm
-  theme: 'oled' | 'dark' | 'midnight';
+  theme: 'dark' | 'light';
 
   // Dil
   language: 'tr' | 'en';
@@ -22,26 +22,21 @@ export type UserSettings = {
   // Gizlilik
   profile_private: boolean;
   show_online_status: boolean;
-
-  // Güvenlik
-  two_factor_enabled: boolean;
 };
 
 export const DEFAULT_SETTINGS: UserSettings = {
   notifications_enabled: true,
   notification_sound: true,
   notification_vibration: true,
-  theme: 'oled',
+  theme: 'dark',
   language: 'tr',
   profile_private: false,
   show_online_status: true,
-  two_factor_enabled: false,
 };
 
 export const THEME_OPTIONS = [
-  { key: 'oled' as const, label: 'OLED Siyah', desc: 'Derin siyah arka plan, AMOLED ekranlar için ideal' },
-  { key: 'dark' as const, label: 'Koyu', desc: 'Yumuşak koyu gri tonlar' },
-  { key: 'midnight' as const, label: 'Gece Mavisi', desc: 'Koyu mavi tonlarında gece teması' },
+  { key: 'dark' as const, label: 'Koyu', desc: 'Soprano klasik koyu tema' },
+  { key: 'light' as const, label: 'Açık Tema', desc: 'Pastel mavi-beyaz aydınlık tema' },
 ];
 
 export const LANGUAGE_OPTIONS = [
@@ -58,7 +53,7 @@ export const SettingsService = {
         return { ...DEFAULT_SETTINGS, ...JSON.parse(json) };
       }
     } catch (e) {
-      console.warn('Ayarlar yüklenemedi:', e);
+      if (__DEV__) console.warn('Ayarlar yüklenemedi:', e);
     }
     return { ...DEFAULT_SETTINGS };
   },
@@ -70,7 +65,7 @@ export const SettingsService = {
     try {
       await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(updated));
     } catch (e) {
-      console.warn('Ayarlar kaydedilemedi:', e);
+      if (__DEV__) console.warn('Ayarlar kaydedilemedi:', e);
     }
     return updated;
   },
@@ -80,7 +75,7 @@ export const SettingsService = {
     try {
       await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(DEFAULT_SETTINGS));
     } catch (e) {
-      console.warn('Ayarlar sıfırlanamadı:', e);
+      if (__DEV__) console.warn('Ayarlar sıfırlanamadı:', e);
     }
     return { ...DEFAULT_SETTINGS };
   },

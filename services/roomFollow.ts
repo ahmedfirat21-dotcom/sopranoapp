@@ -1,0 +1,143 @@
+/**
+ * SopranoChat — Oda Takip Servisi
+ * Kullanıcılar odaları takip edebilir, takip bırakabilir.
+ * Takip edilen odalar "Odalarım" ve "Keşfet" sayfalarında görünür.
+ */
+import { supabase } from '../constants/supabase';
+import type { Room } from './database';
+
+export interface RoomFollow {
+  id: string;
+  room_id: string;
+  user_id: string;
+  created_at: string;
+}
+
+export const RoomFollowService = {
+  /** Odayı takip et */
+  async follow(roomId: string, userId: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const { error } = await supabase.from('room_follows').upsert({
+        room_id: roomId,
+        user_id: userId,
+      }, { onConflict: 'room_id,user_id' });
+      if (error) throw error;
+      return { success: true };
+    } catch (e: any) {
+      return { success: false, error: e.message };
+    }
+  },
+
+  /** Odayı takipten çık */
+  async unfollow(roomId: string, userId: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const { error } = await supabase
+        .from('room_follows')
+        .delete()
+        .eq('room_id', roomId)
+        .eq('user_id', userId);
+      if (error) throw error;
+      return { success: true };
+    } catch (e: any) {
+      return { success: false, error: e.message };
+    }
+  },
+
+  /** Kullanıcı bu odayı takip ediyor mu? */
+  async isFollowing(roomId: string, userId: string): Promise<boolean> {
+    const { data } = await supabase
+      .from('room_follows')
+      .select('id')
+      .eq('room_id', roomId)
+      .eq('user_id', userId)
+      .maybeSingle();
+    return !!data;
+  },
+
+  /** Odanın takipçi sayısı */
+  async getFollowerCount(roomId: string): Promise<number> {
+    const { count, error } = await supabase
+      .from('room_follows')
+      .select('*', { count: 'exact', head: true })
+      .eq('room_id', roomId);
+    if (error) return 0;
+    return count || 0;
+  },
+
+  /** Kullanıcının takip ettiği odaları getir (canlı + kapalı kalıcı) */
+  async getFollowedRooms(userId: string): Promise<Room[]> {
+    const { data, error } = await supabase
+      .from('room_follows')
+      .select('room_id, rooms:rooms!room_id(*, host:profiles!host_id(*))')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      if (__DEV__) console.warn('[RoomFollowService] getFollowedRooms error:', error);
+      return [];
+    }
+
+    // rooms join'den gelen nested data'yı düzleştir
+    return (data || [])
+      .map((d: any) => d.rooms)
+      .filter(Boolean)
+      .filter((r: any) => r.is_live || r.is_persistent) as Room[];
+  },
+
+  /** Toplu takip durumu sorgulama (N+1 önleme) */
+  async getBatchFollowStatus(userId: string, roomIds: string[]): Promise<Record<string, boolean>> {
+    if (!roomIds.length) return {};
+    const { data, error } = await supabase
+      .from('room_follows')
+      .select('room_id')
+      .eq('user_id', userId)
+      .in('room_id', roomIds);
+    if (error) return {};
+    const map: Record<string, boolean> = {};
+    (data || []).forEach((d: any) => { map[d.room_id] = true; });
+    return map;
+  },
+
+  /** Host'un takipçi ID'lerini getir (friendships tablosundan) */
+  async getFollowerIds(hostUserId: string): Promise<string[]> {
+    try {
+      const { data, error } = await supabase
+        .from('friendships')
+        .select('follower_id')
+        .eq('following_id', hostUserId)
+        .eq('status', 'accepted');
+      if (error) throw error;
+      return (data || []).map((d: any) => d.follower_id).filter(Boolean);
+    } catch (e) {
+      if (__DEV__) console.warn('[RoomFollowService] getFollowerIds error:', e);
+      return [];
+    }
+  },
+
+  /** Takipçilere "yeni oda açıldı" bildirimi gönder */
+  async notifyFollowersRoomLive(hostUserId: string, roomName: string, roomId: string): Promise<void> {
+    try {
+      const followerIds = await RoomFollowService.getFollowerIds(hostUserId);
+      if (followerIds.length === 0) return;
+
+      // Toplu notification insert (max 50 kişi)
+      const batch = followerIds.slice(0, 50).map(uid => ({
+        user_id: uid,
+        sender_id: hostUserId,
+        type: 'room_live',
+        reference_id: roomId,
+        body: `🎤 yeni bir oda açtı: "${roomName}"`,
+      }));
+
+      const { error } = await supabase.from('notifications').insert(batch);
+      if (error) {
+        if (__DEV__) console.warn('[RoomFollowService] notify error:', error.message);
+        // body kolonu yoksa body olmadan tekrar dene
+        const batchNoBody = batch.map(({ body, ...rest }) => rest);
+        await supabase.from('notifications').insert(batchNoBody);
+      }
+    } catch (e) {
+      if (__DEV__) console.warn('[RoomFollowService] notifyFollowersRoomLive error:', e);
+    }
+  },
+};

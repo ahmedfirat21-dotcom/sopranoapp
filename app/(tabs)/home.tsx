@@ -1,651 +1,716 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, Image, Pressable, Dimensions,
-  ActivityIndicator, FlatList, RefreshControl, Share, Alert,
+  ActivityIndicator, ScrollView, RefreshControl, Animated,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import { Colors, Gradients, Spacing } from '../../constants/theme';
-import { RoomService, RealtimeService, type Room } from '../../services/database';
-import { SocialService, type Post } from '../../services/social';
-import { CreatePostModal } from '../../components/CreatePostModal';
-import EmptyState from '../../components/EmptyState';
-import { useAuth } from '../_layout';
+import { useRouter, useFocusEffect } from 'expo-router';
+import { Colors, Shadows } from '../../constants/theme';
+import { RoomService, type Room } from '../../services/database';
+import { FriendshipService, type FollowUser } from '../../services/friendship';
+
+import { RoomHistoryService, type RoomHistoryItem } from '../../services/roomHistory';
+import { supabase } from '../../constants/supabase';
+import { useAuth, useTheme } from '../_layout';
 import { getAvatarSource } from '../../constants/avatars';
-import { EventService, type EventModel } from '../../services/event';
-import DailyCheckInModal from '../../components/DailyCheckInModal';
-import WelcomeFlowModal from '../../components/WelcomeFlowModal';
-import { BadgeService } from '../../services/engagement';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import NotificationDrawer from '../../components/NotificationDrawer';
+import { UserSearchModal } from '../../components/UserSearchModal';
+import AppBackground from '../../components/AppBackground';
 
-const { width } = Dimensions.get('window');
+import { showToast } from '../../components/Toast';
+import { getSystemRooms, isSystemRoom } from '../../services/showcaseRooms';
 
-// ========== HEADER ==========
-function Header({ avatarUrl }: { avatarUrl?: string }) {
-  const router = useRouter();
+const { width: W } = Dimensions.get('window');
+
+// ════════════════════════════════════════════════════════════
+// BİRLEŞİK AKILLI FİLTRE (Kategori + Etiket → Tek Bar)
+// ════════════════════════════════════════════════════════════
+const SMART_FILTERS = [
+  { id: 'all',       label: 'Tümü',      icon: 'apps',             type: 'category' as const },
+  { id: 'chat',      label: 'Sohbet',    icon: 'chatbubbles',      type: 'category' as const },
+  { id: 'music',     label: 'Müzik',     icon: 'musical-notes',    type: 'category' as const },
+  { id: 'game',      label: 'Oyun',      icon: 'game-controller',  type: 'category' as const },
+  { id: 'tech',      label: 'Teknoloji', icon: 'code-slash',       type: 'category' as const },
+  { id: 'book',      label: 'Kitap',     icon: 'book',             type: 'category' as const },
+  { id: 'film',      label: 'Film',      icon: 'film',             type: 'category' as const },
+] as const;
+
+// ════════════════════════════════════════════════════════════
+// RASTGELE ODA BUTONU — Hero
+// ════════════════════════════════════════════════════════════
+
+
+// ════════════════════════════════════════════════════════════
+// SON GİRDİĞİN ODALAR — Kısayol Kartı
+// ════════════════════════════════════════════════════════════
+function RecentRoomCard({ item, onPress }: { item: RoomHistoryItem; onPress: () => void }) {
   return (
-    <View style={styles.header}>
-      <Image source={require('../../assets/logo.png')} style={styles.headerLogo} resizeMode="contain" />
-      <View style={styles.headerBtns}>
-        <Pressable style={styles.headerBtn} onPress={() => router.push('/notifications')}>
-          <Ionicons name="notifications-outline" size={20} color="#FFF" />
-          <View style={styles.notifDot} />
-        </Pressable>
-        <Pressable onPress={() => router.push('/(tabs)/profile')}>
-          <LinearGradient colors={['#14B8A6', '#06B6D4']} style={styles.avatarBorder} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
-            <Image source={getAvatarSource(avatarUrl)} style={styles.headerAvatar} />
+    <Pressable
+      style={({ pressed }) => [s.recentCard, pressed && { opacity: 0.85, transform: [{ scale: 0.97 }] }]}
+      onPress={onPress}
+    >
+      <Image source={getAvatarSource(item.hostAvatar)} style={s.recentAvatar} />
+      <Text style={s.recentName} numberOfLines={1}>{item.name}</Text>
+      <Text style={s.recentHost} numberOfLines={1}>{item.hostName}</Text>
+    </Pressable>
+  );
+}
+
+// ════════════════════════════════════════════════════════════
+// ŞU AN CANLI — Büyük Dikey Oda Kartı
+// ════════════════════════════════════════════════════════════
+
+// Kategori bazlı gradient renkleri + ikon
+const CATEGORY_THEME: Record<string, { colors: [string, string, string]; icon: string }> = {
+  chat:  { colors: ['#1E3A5F', '#0F2744', '#0A1929'], icon: 'chatbubbles' },
+  music: { colors: ['#3B1F5E', '#2D1648', '#1A0D2E'], icon: 'musical-notes' },
+  game:  { colors: ['#4A1525', '#3A0F1E', '#260A14'], icon: 'game-controller' },
+  tech:  { colors: ['#0F2E4A', '#0A2038', '#061525'], icon: 'code-slash' },
+  book:  { colors: ['#3D2E10', '#2E2108', '#1F1605'], icon: 'book' },
+  film:  { colors: ['#3B1042', '#2D0C34', '#1F0824'], icon: 'film' },
+  other: { colors: ['#1E293B', '#151E2E', '#0F172A'], icon: 'ellipsis-horizontal' },
+};
+
+function BigLiveRoomCard({ room, onJoin }: { room: Room; onJoin: () => void }) {
+  const isPersistent = (room as any).is_persistent;
+  const hostName = room.host?.display_name || 'Anonim';
+  const listenerCount = room.listener_count || 0;
+  const isSystem = room.id.startsWith('system_');
+  const theme = CATEGORY_THEME[room.category] || CATEGORY_THEME.other;
+  const isBoosted = (room as any).boost_expires_at && new Date((room as any).boost_expires_at) > new Date();
+
+  return (
+    <Pressable
+      style={({ pressed }) => [
+        s.bigCard,
+        isSystem && { borderColor: '#14B8A6', borderWidth: 1.5 },
+        isPersistent && { borderColor: Colors.premiumGold, borderWidth: 1.5 },
+        pressed && { opacity: 0.95, transform: [{ scale: 0.985 }] },
+      ]}
+      onPress={onJoin}
+    >
+      {/* Kategori bazlı gradient arka plan */}
+      <LinearGradient
+        colors={theme.colors}
+        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+        style={StyleSheet.absoluteFillObject}
+      />
+      {/* Büyük soluk kategori ikonu — sağ üst köşe */}
+      <View style={s.bigCategoryIconWrap}>
+        <Ionicons name={theme.icon as any} size={72} color="rgba(255,255,255,0.06)" />
+      </View>
+
+      {/* === Üst Bar: Badges === */}
+      <View style={s.bigBadgeRow}>
+        {room.is_live && (
+          <View style={s.bigLiveBadge}>
+            <View style={s.bigLiveDot} />
+            <Text style={s.bigLiveText}>CANLI</Text>
+          </View>
+        )}
+        {isSystem && (
+          <View style={[s.bigShowcaseBadge, { backgroundColor: 'rgba(20,184,166,0.15)', borderColor: 'rgba(20,184,166,0.3)' }]}>
+            <Ionicons name="shield-checkmark" size={10} color="#14B8A6" />
+            <Text style={[s.bigShowcaseText, { color: '#14B8A6' }]}>Resmi</Text>
+          </View>
+        )}
+
+        {isPersistent && (
+          <View style={s.bigPremiumBadge}>
+            <Ionicons name="trophy" size={10} color={Colors.premiumGold} />
+            <Text style={s.bigPremiumText}>Premium</Text>
+          </View>
+        )}
+        {isBoosted && (
+          <View style={[s.bigShowcaseBadge, { backgroundColor: 'rgba(251,146,60,0.15)', borderColor: 'rgba(251,146,60,0.3)' }]}>
+            <Ionicons name="flame" size={10} color="#FB923C" />
+            <Text style={[s.bigShowcaseText, { color: '#FB923C' }]}>Boost</Text>
+          </View>
+        )}
+      </View>
+
+      {/* === Başlık === */}
+      <Text style={s.bigCardTitle} numberOfLines={2}>{room.name}</Text>
+
+      {/* === Host + Stats satırı === */}
+      <View style={s.bigHostStatsRow}>
+        <Image source={getAvatarSource(room.host?.avatar_url)} style={s.bigHostAvatar} />
+        <Text style={s.bigHostName} numberOfLines={1}>{hostName}</Text>
+        <View style={s.bigStatDivider} />
+        <Ionicons name="people" size={12} color="#64748B" />
+        <Text style={s.bigStatText}>{listenerCount}</Text>
+        <Ionicons name="mic" size={12} color="#64748B" />
+        <Text style={s.bigStatText}>{room.max_speakers || 4}</Text>
+      </View>
+
+      {/* === Alt: Tags + Katıl Butonu === */}
+      <View style={s.bigBottomRow}>
+        {(room as any).tags && (room as any).tags.length > 0 && (
+          <View style={s.bigTagRow}>
+            {((room as any).tags as string[]).slice(0, 3).map((tag: string) => (
+              <View key={tag} style={s.bigTagChip}>
+                <Text style={s.bigTagText}>#{tag}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+        <Pressable onPress={onJoin} style={{ marginLeft: 'auto' }}>
+          <LinearGradient
+            colors={['#14B8A6', '#0D9488', '#065F56']}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+            style={s.bigJoinBtn}
+          >
+            <Ionicons name="headset" size={14} color="#FFF" />
+            <Text style={s.bigJoinText}>Katıl</Text>
           </LinearGradient>
         </Pressable>
       </View>
-    </View>
-  );
-}
-
-// ========== LIVE ROOM STORY STRIP ==========
-const LiveRoomStory = React.memo(function LiveRoomStory({ room, isFollowing }: { room: Room; isFollowing?: boolean }) {
-  const router = useRouter();
-  const borderColors: [string, string] = isFollowing
-    ? ['#FFD700', '#FFA500']  // Altın halka — takip edilen
-    : ['#14B8A6', '#06B6D4']; // Teal halka — normal
-
-  return (
-    <Pressable
-      style={({ pressed }) => [styles.storyItem, pressed && { opacity: 0.8, transform: [{ scale: 0.95 }] }]}
-      onPress={() => router.push(`/room/${room.id}`)}
-    >
-      <LinearGradient colors={borderColors} style={styles.storyRing} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
-        <Image source={getAvatarSource(room.host?.avatar_url)} style={styles.storyAvatar} />
-      </LinearGradient>
-      {room.is_live && <View style={styles.storyLiveBadge}><Text style={styles.storyLiveText}>CANLI</Text></View>}
-      <Text style={styles.storyName} numberOfLines={1}>{room.host?.display_name || 'Anonim'}</Text>
-      <Text style={styles.storyRoomName} numberOfLines={1}>{room.name}</Text>
-    </Pressable>
-  );
-});
-
-function LiveRoomStrip({ rooms }: { rooms: Room[] }) {
-  if (rooms.length === 0) return null;
-  return (
-    <View style={styles.stripContainer}>
-      <FlatList
-        data={rooms}
-        keyExtractor={(item) => item.id}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.stripScroll}
-        renderItem={({ item }) => <LiveRoomStory room={item} />}
-      />
-    </View>
-  );
-}
-
-// ========== SECTION COMPONENTS ==========
-function SectionDivider() {
-  return (
-    <LinearGradient
-      colors={['transparent', 'rgba(255,255,255,0.04)', 'transparent']}
-      start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-      style={styles.sectionDivider}
-    />
-  );
-}
-
-// ========== COMPACT POST CARD (Vertical Feed) ==========
-const CompactPostCard = React.memo(function CompactPostCard({ post, currentUserId, onLike, onDelete }: { post: Post; currentUserId?: string; onLike?: (postId: string) => void; onDelete?: (postId: string) => void }) {
-  const router = useRouter();
-  const isOwn = post.user_id === currentUserId;
-  return (
-    <Pressable
-      style={({ pressed }) => [styles.postCard, pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] }]}
-      onPress={() => router.push(`/post/${post.id}` as any)}
-    >
-      {/* Kullanıcı Bilgisi */}
-      <View style={styles.postHeader}>
-        <Pressable
-          style={styles.postUser}
-          onPress={() => {
-            if (post.user_id) {
-              if (isOwn) router.push('/(tabs)/profile');
-              else router.push(`/user/${post.user_id}` as any);
-            }
-          }}
-        >
-          <Image source={getAvatarSource(post.profiles?.avatar_url)} style={styles.postAvatar} />
-          <View>
-            <Text style={styles.postUserName}>{post.profiles?.display_name || 'Kullanıcı'}</Text>
-            <Text style={styles.postTime}>{formatTimeAgo(post.created_at)}</Text>
-          </View>
-        </Pressable>
-        <Pressable hitSlop={8} onPress={() => {
-          Alert.alert('Seçenekler', undefined, [
-            ...(isOwn ? [{ text: '🗑️ Gönderiyi Sil', style: 'destructive' as const, onPress: () => onDelete?.(post.id) }] : []),
-            { text: '🚩 Rapor Et', onPress: () => router.push(`/post/${post.id}` as any) },
-            { text: '📤 Paylaş', onPress: () => Share.share({ message: `${post.content?.substring(0, 80)}...\n\n📲 SopranoChat: https://sopranochat.app/post/${post.id}` }) },
-            { text: 'Vazgeç', style: 'cancel' as const },
-          ]);
-        }}>
-          <Ionicons name="ellipsis-horizontal" size={16} color={Colors.text3} />
-        </Pressable>
-      </View>
-
-      {/* İçerik */}
-      <Text style={styles.postContent} numberOfLines={3}>{post.content}</Text>
-
-      {/* Görsel (varsa — küçük thumbnail) */}
-      {post.image_url && (
-        <Image source={{ uri: post.image_url }} style={styles.postThumbnail} />
-      )}
-
-      {/* Meta (beğeni + yorum + paylaş) */}
-      <View style={styles.postMeta}>
-        <Pressable style={styles.metaItem} onPress={() => onLike?.(post.id)}>
-          <Ionicons name={post.liked_by_me ? 'heart' : 'heart-outline'} size={16} color={post.liked_by_me ? '#EF4444' : Colors.text3} />
-          <Text style={[styles.metaText, post.liked_by_me && { color: '#EF4444' }]}>{post.likes_count || 0}</Text>
-        </Pressable>
-        <Pressable style={styles.metaItem} onPress={() => router.push(`/post/${post.id}` as any)}>
-          <Ionicons name="chatbubble-outline" size={14} color={Colors.text3} />
-          <Text style={styles.metaText}>{post.comments_count || 0}</Text>
-        </Pressable>
-        <Pressable style={styles.metaItem} onPress={() => Share.share({ message: `${post.content?.substring(0, 80)}...\n\n📲 SopranoChat: https://sopranochat.app/post/${post.id}` })}>
-          <Ionicons name="share-social-outline" size={14} color={Colors.text3} />
-        </Pressable>
-      </View>
-    </Pressable>
-  );
-});
-
-// ========== EVENT CARD ==========
-function EventCard({ event }: { event: EventModel }) {
-  const router = useRouter();
-  const evDate = new Date(event.scheduled_at);
-  const now = new Date();
-  const isTimeArrived = now.getTime() >= evDate.getTime() - (5 * 60 * 1000);
-
-  return (
-    <Pressable
-      style={({ pressed }) => [styles.eventCard, pressed && { opacity: 0.9 }]}
-      onPress={() => router.push(`/event/${event.id}` as any)}
-    >
-      <Image
-        source={{ uri: event.cover_image_url || 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=100&h=100&fit=crop' }}
-        style={styles.eventImage}
-      />
-      <View style={styles.eventInfo}>
-        <Text style={styles.eventTitle} numberOfLines={1}>{event.title}</Text>
-        <Text style={styles.eventDesc} numberOfLines={1}>
-          {evDate.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })} • {evDate.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
-        </Text>
-        <View style={styles.eventTags}>
-          <View style={[styles.eventTag, { backgroundColor: `${Colors.teal}18` }]}>
-            <Text style={[styles.eventTagText, { color: Colors.teal }]}>#{event.category}</Text>
-          </View>
-          {isTimeArrived && (
-            <View style={[styles.eventTag, { backgroundColor: `${Colors.red}18` }]}>
-              <Text style={[styles.eventTagText, { color: Colors.red }]}>Şimdi Katıl</Text>
-            </View>
-          )}
-        </View>
-      </View>
     </Pressable>
   );
 }
 
-// ========== HELPER ==========
-function formatTimeAgo(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'Az önce';
-  if (mins < 60) return `${mins}dk`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}sa`;
-  const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}g`;
-  return `${Math.floor(days / 7)}hf`;
-}
-
-// ========== HOME SCREEN ==========
+// ════════════════════════════════════════════════════════════
+// ANA EKRAN — KEŞFET (SopranoChat v2)
+// ════════════════════════════════════════════════════════════
 export default function HomeScreen() {
   const router = useRouter();
   const { firebaseUser, profile } = useAuth();
+  const insets = useSafeAreaInsets();
+  useTheme();
 
-  const [liveRooms, setLiveRooms] = useState<Room[]>([]);
-  const [posts, setPosts] = useState<Post[]>([]);
-  const [events, setEvents] = useState<EventModel[]>([]);
+  const [rooms, setRooms] = useState<Room[]>([]);
+  const [filteredRooms, setFilteredRooms] = useState<Room[]>([]);
+  const [recentRooms, setRecentRooms] = useState<RoomHistoryItem[]>([]);
+  const [onlineFriends, setOnlineFriends] = useState<FollowUser[]>([]);
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [postsLoadingMore, setPostsLoadingMore] = useState(false);
-  const [postsHasMore, setPostsHasMore] = useState(true);
+  const [showNotif, setShowNotif] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [activeFilter, setActiveFilter] = useState('all');
 
-  const [activeTab, setActiveTab] = useState<'discover' | 'following'>('discover');
-
-  // Post like/delete handlers
-  const handlePostLike = useCallback(async (postId: string) => {
-    if (!firebaseUser) return;
-    const result = await SocialService.toggleLike(postId, firebaseUser.uid);
-    if (result.success) {
-      setPosts(prev => prev.map(p => p.id === postId ? { ...p, liked_by_me: result.liked, likes_count: result.liked ? (p.likes_count || 0) + 1 : Math.max(0, (p.likes_count || 0) - 1) } : p));
-    }
-  }, [firebaseUser]);
-
-  const handlePostDelete = useCallback(async (postId: string) => {
-    if (!firebaseUser) return;
-    Alert.alert('Gönderiyi Sil', 'Bu gönderi kalıcı olarak silinecek.', [
-      { text: 'Vazgeç', style: 'cancel' },
-      { text: 'Sil', style: 'destructive', onPress: async () => {
-        const result = await SocialService.deletePost(postId, firebaseUser.uid);
-        if (result.success) setPosts(prev => prev.filter(p => p.id !== postId));
-      }},
-    ]);
-  }, [firebaseUser]);
-  const [showCreatePost, setShowCreatePost] = useState(false);
-
-  // ★ Engagement: Check-in & Welcome
-  const [showCheckIn, setShowCheckIn] = useState(false);
-  const [showWelcome, setShowWelcome] = useState(false);
-
-  // Refs to avoid stale closures
-  const postsRef = useRef(posts);
-  postsRef.current = posts;
-
-  const loadAll = useCallback(async () => {
+  const loadData = useCallback(async () => {
     try {
-      setLoading(true);
-      const [roomData, eventData] = await Promise.all([
-        RoomService.getLive(30, 0),
-        EventService.getUpcoming(10),
-      ]);
-      setLiveRooms(roomData);
-      setEvents(eventData);
+      const liveRooms = await RoomService.getLive(firebaseUser?.uid);
+      const history = await RoomHistoryService.getRecent(6);
 
-      // Süresi dolan odaları background'da temizle
-      RoomService.autoCloseExpired().catch(() => {});
+      // Sistem odaları her zaman üstte + kullanıcı odaları altında
+      const systemRooms = getSystemRooms();
+      const userRooms = liveRooms.filter(r => !r.id.startsWith('system_'));
+      const allRooms = [...systemRooms, ...userRooms];
+
+      setRooms(allRooms);
+      setRecentRooms(history);
+      setFilteredRooms(allRooms);
+
+      if (firebaseUser) {
+        const following = await FriendshipService.getFollowing(firebaseUser.uid);
+
+        const onl = following.filter((f: FollowUser) => f.is_online);
+        setOnlineFriends(onl);
+
+        const { count } = await supabase
+          .from('notifications')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', firebaseUser.uid)
+          .eq('is_read', false);
+        setUnreadCount(count || 0);
+      }
     } catch (err) {
-      console.warn('Home yükleme hatası:', err);
+      if (__DEV__) console.warn('[Home] Load error:', err);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
-  }, []);
-
-  const loadPosts = useCallback(async (isLoadMore = false) => {
-    if (!firebaseUser) return;
-    try {
-      if (isLoadMore) setPostsLoadingMore(true);
-
-      const currentPosts = isLoadMore ? postsRef.current : [];
-      const lastTs = isLoadMore && currentPosts.length > 0
-        ? currentPosts[currentPosts.length - 1].created_at
-        : null;
-
-      const fetcher = activeTab === 'discover'
-        ? SocialService.getDiscoverFeed
-        : SocialService.getFollowingFeed;
-
-      const { feed, error } = await fetcher(firebaseUser.uid, 20, lastTs);
-      if (error) throw error;
-
-      const newPosts = feed || [];
-      setPostsHasMore(newPosts.length >= 20);
-      setPosts(isLoadMore ? [...currentPosts, ...newPosts] : newPosts);
-    } catch (err) {
-      console.warn('Postlar yüklenemedi:', err);
-    } finally {
-      setPostsLoadingMore(false);
-    }
-  }, [firebaseUser, activeTab]);
-
-  // İlk yükleme
-  useEffect(() => { loadAll(); }, []);
-  useEffect(() => { loadPosts(false); }, [activeTab, firebaseUser]);
-
-  // ★ Engagement: İlk giriş kontrolü + günlük check-in
-  useEffect(() => {
-    if (!firebaseUser) return;
-    (async () => {
-      // Rozet kontrolü
-      BadgeService.checkAndUnlock(firebaseUser.uid, 'login').catch(() => {});
-
-      // İlk giriş mi?
-      const welcomeKey = `welcome_shown_${firebaseUser.uid}`;
-      const welcomeShown = await AsyncStorage.getItem(welcomeKey).catch(() => null);
-      if (!welcomeShown) {
-        setShowWelcome(true);
-        return; // Welcome gösterirken check-in gösterme
-      }
-
-      // Günlük check-in — bugün ilk giriş mi?
-      const checkInKey = `checkin_shown_${firebaseUser.uid}_${new Date().toISOString().split('T')[0]}`;
-      const checkInShown = await AsyncStorage.getItem(checkInKey).catch(() => null);
-      if (!checkInShown) {
-        setTimeout(() => setShowCheckIn(true), 1000); // 1sn gecikme
-      }
-    })();
   }, [firebaseUser]);
 
-  // Realtime oda güncellemesi
+  useEffect(() => { loadData(); }, [loadData]);
+  useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
+
   useEffect(() => {
-    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
-    const channel = RealtimeService.onRoomsChange((updatedRooms) => {
-      if (debounceTimer) clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(() => setLiveRooms(updatedRooms), 2000);
-    });
-    return () => {
-      if (debounceTimer) clearTimeout(debounceTimer);
-      RealtimeService.unsubscribe(channel);
-    };
-  }, []);
-
-  // Pull-to-refresh
-  const handleRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await Promise.all([loadAll(), loadPosts(false)]);
-    setRefreshing(false);
-  }, [loadAll, loadPosts]);
-
-  // Load more posts
-  const handleLoadMorePosts = useCallback(() => {
-    if (!postsLoadingMore && postsHasMore && posts.length > 0) {
-      loadPosts(true);
+    if (activeFilter === 'all') {
+      // İlgi alanına göre sırala — eşleşen odalar üste
+      const userInterests = (profile as any)?.interests || (profile as any)?.metadata?.interests || [];
+      if (userInterests.length > 0) {
+        const sorted = [...rooms].sort((a, b) => {
+          const aMatch = userInterests.includes(a.category) ? 1 : 0;
+          const bMatch = userInterests.includes(b.category) ? 1 : 0;
+          return bMatch - aMatch; // eşleşenler üstte
+        });
+        setFilteredRooms(sorted);
+      } else {
+        setFilteredRooms(rooms);
+      }
+      return;
     }
-  }, [postsLoadingMore, postsHasMore, posts.length, loadPosts]);
+    setFilteredRooms(rooms.filter(r => r.category === activeFilter));
+  }, [activeFilter, rooms]);
 
-  // ========== RENDER HELPERS ==========
-  const renderListHeader = () => (
-    <View>
-      {/* Ambient Background Orbs */}
-      <View style={StyleSheet.absoluteFill} pointerEvents="none">
-        <View style={[styles.meshOrb, styles.meshNavy]} />
-        <View style={[styles.meshOrb, styles.meshGold]} />
-      </View>
+  const handleRefresh = useCallback(() => {
+    setRefreshing(true);
+    loadData();
+  }, [loadData]);
 
-      {/* Canlı Oda Şeridi */}
-      <LiveRoomStrip rooms={liveRooms} />
+  const handleJoinRoom = (roomId: string) => {
+    if (!firebaseUser) {
+      showToast({ title: 'Giriş Gerekli', message: 'Odaya katılmak için giriş yapmalısınız.', type: 'warning' });
+      return;
+    }
+    // ★ Kategori tercihi kaydet (keşfet algoritması için)
+    const room = rooms.find(r => r.id === roomId);
+    if (room?.category) {
+      RoomService.trackCategoryVisit(firebaseUser.uid, room.category).catch(() => {});
+    }
+    router.push(`/room/${roomId}`);
+  };
 
-      {/* Yaklaşan Etkinlikler (stories altında, erişilebilir) */}
-      {events.length > 0 && (
-        <>
-          <View style={styles.sectionHeader}>
-            <View style={styles.sectionTitleRow}>
-              <Ionicons name="calendar" size={14} color={Colors.cyan} />
-              <Text style={styles.sectionTitle}>Yaklaşan Etkinlikler</Text>
-            </View>
-            <Pressable onPress={() => router.push('/create-event')}>
-              <Ionicons name="add-circle" size={22} color={Colors.teal} />
-            </Pressable>
-          </View>
-          {events.map((ev) => (
-            <View key={ev.id} style={{ marginHorizontal: 16, marginBottom: 8 }}>
-              <EventCard event={ev} />
-            </View>
-          ))}
-        </>
-      )}
-
-      <SectionDivider />
-
-      {/* Gönderi Oluştur */}
-      <Pressable
-        style={({ pressed }) => [styles.createPostBar, pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] }]}
-        onPress={() => setShowCreatePost(true)}
-      >
-        <Image source={getAvatarSource(profile?.avatar_url)} style={styles.createPostAvatar} />
-        <Text style={styles.createPostPlaceholder}>Ne düşünüyorsun? 💭</Text>
-        <View style={styles.createPostIconWrap}>
-          <Ionicons name="create-outline" size={16} color="#14B8A6" />
-        </View>
-      </Pressable>
-
-      {/* Feed Tabları */}
-      <View style={styles.feedTabsWrap}>
-        <Pressable
-          style={[styles.feedTab, activeTab === 'discover' && styles.feedTabActive]}
-          onPress={() => setActiveTab('discover')}
-        >
-          <Text style={[styles.feedTabText, activeTab === 'discover' && styles.feedTabTextActive]}>🔥 Son</Text>
-        </Pressable>
-        <Pressable
-          style={[styles.feedTab, activeTab === 'following' && styles.feedTabActive]}
-          onPress={() => setActiveTab('following')}
-        >
-          <Text style={[styles.feedTabText, activeTab === 'following' && styles.feedTabTextActive]}>👥 Takip</Text>
-        </Pressable>
-      </View>
-    </View>
-  );
-
-  const renderListFooter = () => (
-    <View style={{ paddingBottom: 100 }}>
-      {postsLoadingMore && (
-        <ActivityIndicator size="small" color={Colors.teal} style={{ marginVertical: 20 }} />
-      )}
-      {!postsHasMore && posts.length > 0 && (
-        <Text style={styles.endText}>Hepsi bu kadar 🌟</Text>
-      )}
-    </View>
-  );
-
-  const renderEmptyPosts = () => (
-    <EmptyState
-      icon="newspaper-outline"
-      title="Henüz gönderi yok"
-      subtitle="İlk gönderiyi paylaşarak akışı başlat!"
-      actionLabel="Gönderi Paylaş"
-      onAction={() => setShowCreatePost(true)}
-    />
-  );
-
-  if (loading && posts.length === 0) {
+  if (loading) {
     return (
-      <View style={styles.container}>
-        <Header avatarUrl={profile?.avatar_url} />
-        <ActivityIndicator size="large" color={Colors.teal} style={{ marginTop: 50 }} />
-      </View>
+      <AppBackground variant="explore">
+        <View style={[s.container, { justifyContent: 'center', alignItems: 'center' }]}>
+          <ActivityIndicator size="large" color={Colors.accentTeal} />
+        </View>
+      </AppBackground>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <Header avatarUrl={profile?.avatar_url} />
+    <AppBackground variant="explore">
+    <View style={s.container}>
+      {/* ═══ Üst Bar ═══ */}
+      <View style={[s.topBar, { paddingTop: insets.top + 4 }]}>
+        <Image source={require('../../assets/logo.png')} style={s.logo} resizeMode="contain" />
+        <View style={s.headerRight}>
+          <Pressable style={s.headerIconBtn} onPress={() => setShowSearch(true)}>
+            <Ionicons name="search-outline" size={20} color="#F1F5F9" />
+          </Pressable>
+          <Pressable style={s.headerIconBtn} onPress={() => setShowNotif(!showNotif)}>
+            <Ionicons name="notifications-outline" size={20} color="#F1F5F9" />
+            {unreadCount > 0 && (
+              <View style={s.notifBadge}>
+                <Text style={s.notifBadgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
+              </View>
+            )}
+          </Pressable>
+          <Pressable style={s.headerIconBtn} onPress={() => router.push('/create-room')}>
+            <Ionicons name="add-circle-outline" size={20} color="#F1F5F9" />
+          </Pressable>
+        </View>
+      </View>
 
-      <FlatList
-        data={posts}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <CompactPostCard post={item} currentUserId={firebaseUser?.uid} onLike={handlePostLike} onDelete={handlePostDelete} />
-        )}
-        ListHeaderComponent={renderListHeader}
-        ListFooterComponent={renderListFooter}
-        ListEmptyComponent={renderEmptyPosts}
+      {showNotif && firebaseUser && (
+        <NotificationDrawer
+          userId={firebaseUser.uid}
+          visible={showNotif}
+          onClose={() => setShowNotif(false)}
+          anchorTop={insets.top + 52}
+        />
+      )}
+
+      <ScrollView
         showsVerticalScrollIndicator={false}
-        onEndReached={handleLoadMorePosts}
-        onEndReachedThreshold={0.5}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}
         refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={handleRefresh}
-            tintColor={Colors.teal}
-            colors={[Colors.teal]}
-            progressBackgroundColor={Colors.bg2}
-          />
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={Colors.accentTeal} colors={[Colors.accentTeal]} />
         }
-      />
+      >
+        {/* ═══ Hoşgeldin + Avatar ═══ */}
+        <View style={s.welcomeRow}>
+          <Pressable onPress={() => router.push('/(tabs)/profile')}>
+            <Image source={getAvatarSource(profile?.avatar_url)} style={s.avatar} />
+          </Pressable>
+          <View style={{ flex: 1 }}>
+            <Text style={s.welcomeTitle}>Merhaba{profile?.display_name ? `, ${profile.display_name}` : ''} 👋</Text>
+            <Text style={s.welcomeSub}>
+              {(() => {
+                const realRooms = rooms.filter(r => !isSystemRoom(r.id));
+                const totalListeners = rooms.reduce((sum, r) => sum + (r.listener_count || 0), 0);
+                if (realRooms.length > 0) {
+                  return `🔴 ${realRooms.length} oda canlı · ${totalListeners} kişi aktif`;
+                }
+                return `🎙️ ${rooms.length} oda keşfedilmeyi bekliyor`;
+              })()}
+            </Text>
+          </View>
+        </View>
 
-      {/* Gönderi Oluşturma Modalı */}
-      <CreatePostModal
-        visible={showCreatePost}
-        onClose={() => setShowCreatePost(false)}
-        userId={firebaseUser?.uid || ''}
-        userAvatar={profile?.avatar_url || 'https://i.pravatar.cc/40?img=1'}
-        userName={profile?.display_name || 'Kullanıcı'}
-        onPostCreated={() => loadPosts(false)}
-      />
 
-      {/* ★ Günlük Check-in Modal */}
-      <DailyCheckInModal
-        visible={showCheckIn}
-        userId={firebaseUser?.uid || ''}
-        onDismiss={async () => {
-          setShowCheckIn(false);
-          if (firebaseUser) {
-            const key = `checkin_shown_${firebaseUser.uid}_${new Date().toISOString().split('T')[0]}`;
-            await AsyncStorage.setItem(key, 'true').catch(() => {});
-          }
-        }}
-        onCoinsEarned={(coins) => {
-          // Refresh profile to update coin count
-        }}
-      />
+        {/* ═══ Birleşik Akıllı Filtre ═══ */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={s.categoryBar}
+        >
+          {SMART_FILTERS.map((filter) => {
+            const isActive = activeFilter === filter.id;
+            return (
+              <Pressable
+                key={filter.id}
+                style={[s.categoryChip, isActive && s.categoryChipActive]}
+                onPress={() => setActiveFilter(isActive && filter.id !== 'all' ? 'all' : filter.id)}
+              >
+                <Ionicons
+                  name={filter.icon as any}
+                  size={14}
+                  color={isActive ? '#FFF' : '#94A3B8'}
+                />
+                <Text style={[s.categoryText, isActive && s.categoryTextActive]}>
+                  {filter.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
 
-      {/* ★ Hoşgeldin Akışı */}
-      <WelcomeFlowModal
-        visible={showWelcome}
-        displayName={profile?.display_name || 'Kullanıcı'}
-        avatarUrl={profile?.avatar_url}
-        onComplete={async (interests) => {
-          setShowWelcome(false);
-          if (firebaseUser) {
-            await AsyncStorage.setItem(`welcome_shown_${firebaseUser.uid}`, 'true').catch(() => {});
-            // İlgi alanlarını profile'a kaydet (ileride kullanılacak)
-            // Günlük check-in'i göster
-            setTimeout(() => setShowCheckIn(true), 500);
-          }
-        }}
-      />
+        {/* ═══ Şu An Canlı — Büyük Kartlar ═══ */}
+        <Text style={s.sectionTitle}>
+          <Ionicons name="radio" size={16} color="#EF4444" />
+          {'  '}
+          {activeFilter === 'all'
+            ? 'Şu An Canlı'
+            : `${SMART_FILTERS.find(f => f.id === activeFilter)?.label || ''} Odaları`}
+        </Text>
+
+        {filteredRooms.length > 0 ? (
+          filteredRooms.map((room) => (
+            <BigLiveRoomCard
+              key={room.id}
+              room={room}
+              onJoin={() => handleJoinRoom(room.id)}
+            />
+          ))
+        ) : (
+          /* ═══ Premium Boş Durum CTA ═══ */
+          <Pressable
+            style={s.heroEmptyCard}
+            onPress={() => router.push('/create-room')}
+          >
+            <LinearGradient
+              colors={['rgba(20,184,166,0.15)', 'rgba(13,148,136,0.08)', 'rgba(6,95,86,0.05)']}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+              style={s.heroEmptyGradient}
+            >
+              <View style={s.heroEmptyIconWrap}>
+                <Ionicons name="mic" size={32} color="#14B8A6" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={s.heroEmptyTitle}>
+                  {activeFilter === 'all' 
+                    ? '✨ Sahne Seni Bekliyor'
+                    : 'Bu Kategoride İlk Ol'}
+                </Text>
+                <Text style={s.heroEmptySub}>
+                  {activeFilter === 'all'
+                    ? 'Günün ilk locasını kur ve sahnede yerini al. Herkes seni dinlesin!'
+                    : `İlk ${SMART_FILTERS.find(f => f.id === activeFilter)?.label || ''} odasını açarak öncü ol!`}
+                </Text>
+              </View>
+              <Ionicons name="add-circle" size={24} color="rgba(255,255,255,0.8)" />
+            </LinearGradient>
+          </Pressable>
+        )}
+
+        {/* ═══ Son Girdiğin Odalar ═══ */}
+        {recentRooms.length > 0 && (
+          <>
+            <Text style={s.sectionTitle}>
+              <Ionicons name="time-outline" size={16} color={Colors.accentTeal} />
+              {'  Son Girdiğin Odalar'}
+            </Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ paddingHorizontal: 16 }}
+              style={{ marginBottom: 4 }}
+            >
+              {recentRooms.map((item) => (
+                <RecentRoomCard
+                  key={item.id}
+                  item={item}
+                  onPress={() => handleJoinRoom(item.id)}
+                />
+              ))}
+            </ScrollView>
+          </>
+        )}
+
+        {/* ═══ Online Arkadaşlar ═══ */}
+        {onlineFriends.length > 0 && (
+          <>
+            <Text style={s.sectionTitle}>Online Arkadaşların</Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={s.friendStrip}
+            >
+              {onlineFriends.map((friend) => (
+                <Pressable
+                  key={friend.id}
+                  style={s.friendChip}
+                  onPress={() => router.push(`/user/${friend.id}` as any)}
+                >
+                  <View style={s.friendAvatarWrap}>
+                    <Image source={getAvatarSource(friend.avatar_url)} style={s.friendAvatar} />
+                    <View style={s.onlineDot} />
+                  </View>
+                  <Text style={s.friendName} numberOfLines={1}>{friend.display_name?.split(' ')[0] || 'Kullanıcı'}</Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </>
+        )}
+
+
+
+
+      </ScrollView>
+
+      {/* ═══ Arama Modalı ═══ */}
+      {firebaseUser && (
+        <UserSearchModal
+          visible={showSearch}
+          onClose={() => setShowSearch(false)}
+          currentUserId={firebaseUser.uid}
+          onSelectUser={(userId) => {
+            setShowSearch(false);
+            router.push(`/user/${userId}` as any);
+          }}
+        />
+      )}
     </View>
+    </AppBackground>
   );
 }
 
-// ========== STYLES ==========
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.bg, paddingTop: 54 },
+// ════════════════════════════════════════════════════════════
+// STİLLER
+// ════════════════════════════════════════════════════════════
+const s = StyleSheet.create({
+  container: { flex: 1, backgroundColor: 'transparent' },
 
-  // Ambient Orbs
-  meshOrb: { position: 'absolute', width: width * 1.5, height: width * 1.5, borderRadius: width },
-  meshNavy: { backgroundColor: '#0F1F47', bottom: -width * 0.2, left: -width * 0.5, opacity: 0.15 },
-  meshGold: { backgroundColor: '#D4AF37', top: -width * 0.4, right: -width * 0.6, opacity: 0.06 },
+  // Top Bar
+  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingBottom: 6 },
+  logo: { height: 32, width: 150 },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  headerIconBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.06)', justifyContent: 'center', alignItems: 'center', overflow: 'visible', ...Shadows.icon },
+  notifBadge: { position: 'absolute', top: -2, right: -2, backgroundColor: '#EF4444', minWidth: 16, height: 16, borderRadius: 8, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3, borderWidth: 1.5, borderColor: Colors.bg },
+  notifBadgeText: { fontSize: 9, fontWeight: '800', color: '#FFF' },
 
-  // Header
-  header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingBottom: 8,
+  // Welcome
+  welcomeRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingBottom: 12 },
+  avatar: { width: 48, height: 48, borderRadius: 24, borderWidth: 1.5, borderColor: 'rgba(115,194,189,0.35)' },
+  welcomeTitle: { fontSize: 16, fontWeight: '700', color: '#F1F5F9', ...Shadows.text },
+  welcomeSub: { fontSize: 11, color: '#94A3B8', marginTop: 1, ...Shadows.textLight },
+
+
+  // ═══ Son Girdiğin Odalar ═══
+  recentCard: {
+    width: 80,
+    alignItems: 'center',
+    marginRight: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 6,
+    borderRadius: 14,
+    backgroundColor: Colors.cardBg,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+    ...Shadows.card,
   },
-  headerLogo: { height: 36, width: 140 },
-  headerBtns: { flexDirection: 'row', gap: 12, alignItems: 'center' },
-  headerBtn: { padding: 2, position: 'relative' },
-  notifDot: {
-    position: 'absolute', top: 0, right: 0, width: 7, height: 7, borderRadius: 4,
-    backgroundColor: '#FF4500', borderWidth: 1.5, borderColor: Colors.bg,
+  recentAvatar: { width: 44, height: 44, borderRadius: 22, marginBottom: 6 },
+  recentName: { fontSize: 10, fontWeight: '700', color: '#F1F5F9', textAlign: 'center', ...Shadows.text },
+  recentHost: { fontSize: 9, color: '#94A3B8', textAlign: 'center', marginTop: 1 },
+
+  // ═══ Birleşik Akıllı Filtre ═══
+  categoryBar: { paddingHorizontal: 14, paddingVertical: 8, gap: 8 },
+  categoryChip: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
+  categoryChipActive: { backgroundColor: Colors.accentTeal, borderColor: Colors.accentTeal },
+  categoryText: { fontSize: 12, fontWeight: '600', color: '#94A3B8' },
+  categoryTextActive: { color: '#FFF' },
+
+  // ═══ Online Arkadaşlar ═══
+  friendStrip: { paddingHorizontal: 14, paddingVertical: 6, gap: 14 },
+  friendChip: { alignItems: 'center', width: 56 },
+  friendAvatarWrap: { position: 'relative' },
+  friendAvatar: { width: 48, height: 48, borderRadius: 24, borderWidth: 2, borderColor: 'rgba(115,194,189,0.3)' },
+  onlineDot: { position: 'absolute', bottom: 1, right: 1, width: 12, height: 12, borderRadius: 6, backgroundColor: '#4ADE80', borderWidth: 2, borderColor: '#2f404f' },
+  friendName: { fontSize: 10, color: 'rgba(255,255,255,0.5)', marginTop: 4, textAlign: 'center', ...Shadows.textLight },
+
+  // ═══ Büyük Canlı Oda Kartı ═══
+  bigCard: {
+    marginHorizontal: 16,
+    marginBottom: 14,
+    borderRadius: 18,
+    overflow: 'hidden',
+    backgroundColor: Colors.cardBg,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+    padding: 16,
+    ...Shadows.card,
   },
-  avatarBorder: {
-    width: 34, height: 34, borderRadius: 17,
-    justifyContent: 'center', alignItems: 'center',
+  bigCategoryIconWrap: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
   },
-  headerAvatar: {
-    width: 30, height: 30, borderRadius: 15,
-    borderWidth: 2, borderColor: Colors.bg,
+  bigBadgeRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 10,
+  },
+  bigShowcaseBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  bigShowcaseText: { fontSize: 9, fontWeight: '600', color: '#94A3B8' },
+  bigLiveBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(239,68,68,0.9)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+  },
+  bigLiveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#FFF' },
+  bigLiveText: { fontSize: 10, fontWeight: '800', color: '#FFF', letterSpacing: 0.5 },
+  bigPremiumBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Colors.premiumGold,
+  },
+  bigPremiumText: { fontSize: 9, fontWeight: '700', color: Colors.premiumGold },
+  bigCardTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#F1F5F9',
+    marginBottom: 10,
+    ...Shadows.text,
+  },
+  bigHostStatsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 12,
+  },
+  bigHostAvatar: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 1,
+    borderColor: 'rgba(115,194,189,0.4)',
+  },
+  bigHostName: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: Colors.accentTeal,
+    maxWidth: 100,
+  },
+  bigStatDivider: {
+    width: 1,
+    height: 14,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    marginHorizontal: 4,
+  },
+  bigStatText: {
+    fontSize: 11,
+    color: '#64748B',
+    fontWeight: '600',
+    marginLeft: 2,
+    marginRight: 6,
+  },
+  bigBottomRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  bigTagRow: {
+    flexDirection: 'row',
+    gap: 6,
+    flexWrap: 'wrap',
+    flex: 1,
+  },
+  bigTagChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    backgroundColor: 'rgba(20,184,166,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(20,184,166,0.2)',
+  },
+  bigTagText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: Colors.accentTeal,
+  },
+  bigJoinBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
+  },
+  bigJoinText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#FFF',
   },
 
-  // Live Room Strip (Stories)
-  stripContainer: { marginTop: 4 },
-  stripScroll: { paddingHorizontal: 12, gap: 14 },
-  storyItem: { alignItems: 'center', width: 72 },
-  storyRing: {
-    width: 64, height: 64, borderRadius: 32,
-    justifyContent: 'center', alignItems: 'center',
-  },
-  storyAvatar: {
-    width: 56, height: 56, borderRadius: 28,
-    borderWidth: 2.5, borderColor: Colors.bg,
-  },
-  storyLiveBadge: {
-    position: 'absolute', top: 50, left: 10, right: 10,
-    backgroundColor: '#EF4444', borderRadius: 6,
-    paddingVertical: 1, alignItems: 'center',
-    borderWidth: 1.5, borderColor: Colors.bg,
-  },
-  storyLiveText: { fontSize: 7, fontWeight: '800', color: '#FFF', letterSpacing: 0.5 },
-  storyName: { fontSize: 10, fontWeight: '600', color: '#E2E8F0', marginTop: 6, textAlign: 'center' },
-  storyRoomName: { fontSize: 8, color: Colors.text3, textAlign: 'center' },
+  // ═══ Section ═══
+  sectionTitle: { fontSize: 18, fontWeight: '800', color: '#F1F5F9', letterSpacing: 0.2, paddingHorizontal: 16, marginTop: 20, marginBottom: 12, ...Shadows.text },
 
-  // Section Divider
-  sectionDivider: { height: 1, marginHorizontal: 20, marginVertical: 10 },
 
-  // Create Post Bar
-  createPostBar: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    marginHorizontal: 16, marginTop: 4, marginBottom: 4, padding: 12,
-    borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.04)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+  // ═══ Hero Empty State — RandomRoomButton DNA ═══
+  heroEmptyCard: {
+    marginHorizontal: 16,
+    marginBottom: 16,
+    borderRadius: 18,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(20,184,166,0.25)',
+    backgroundColor: 'rgba(10,18,30,0.6)',
   },
-  createPostAvatar: { width: 30, height: 30, borderRadius: 15 },
-  createPostPlaceholder: { flex: 1, fontSize: 13, color: 'rgba(255,255,255,0.4)' },
-  createPostIconWrap: {
-    width: 28, height: 28, borderRadius: 14,
-    backgroundColor: 'rgba(20,184,166,0.12)',
-    justifyContent: 'center', alignItems: 'center',
+  heroEmptyGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 22,
+    paddingHorizontal: 18,
+    gap: 14,
   },
-
-  // Feed Tabs
-  feedTabsWrap: { flexDirection: 'row', gap: 10, paddingHorizontal: 16, paddingTop: 8, paddingBottom: 8 },
-  feedTab: {
-    paddingVertical: 8, paddingHorizontal: 18, borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+  heroEmptyIconWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: 18,
+    backgroundColor: 'rgba(20,184,166,0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(20,184,166,0.25)',
   },
-  feedTabActive: {
-    backgroundColor: 'rgba(139,92,246,0.25)', borderColor: 'rgba(139,92,246,0.5)',
+  heroEmptyTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#F1F5F9',
   },
-  feedTabText: { fontSize: 13, fontWeight: '600', color: 'rgba(255,255,255,0.5)' },
-  feedTabTextActive: { color: '#FFF', fontWeight: '700' },
-
-  // Compact Post Card
-  postCard: {
-    marginHorizontal: 16, marginBottom: 10, padding: 14,
-    borderRadius: 18, backgroundColor: 'rgba(20,20,30,0.5)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+  heroEmptySub: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.5)',
+    marginTop: 3,
+    lineHeight: 17,
   },
-  postHeader: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  postUser: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  postAvatar: {
-    width: 32, height: 32, borderRadius: 16,
-    borderWidth: 1.5, borderColor: 'rgba(20,184,166,0.3)',
-  },
-  postUserName: { fontSize: 13, fontWeight: '700', color: '#E2E8F0' },
-  postTime: { fontSize: 10, color: Colors.text3, marginTop: 1 },
-  postContent: { fontSize: 13, color: '#CBD5E1', lineHeight: 19 },
-  postThumbnail: {
-    width: '100%', height: 160, borderRadius: 12,
-    marginTop: 10, backgroundColor: 'rgba(255,255,255,0.03)',
-  },
-  postMeta: { flexDirection: 'row', alignItems: 'center', gap: 16, marginTop: 10 },
-  metaItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  metaText: { fontSize: 12, color: '#64748B' },
-
-  // Section Header
-  sectionHeader: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingTop: 8, paddingBottom: 8,
-  },
-  sectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  sectionTitle: { fontSize: 14, fontWeight: '700', color: '#F8FAFC', letterSpacing: 0.3 },
-
-  endText: { textAlign: 'center', color: Colors.text3, marginVertical: 20, fontSize: 13 },
-
-  // Events
-  eventCard: {
-    flexDirection: 'row', gap: 10, padding: 14,
-    borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.03)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)', overflow: 'hidden',
-  },
-  eventImage: { width: 44, height: 44, borderRadius: 12 },
-  eventInfo: { flex: 1 },
-  eventTitle: { fontSize: 13, fontWeight: '700', color: '#E2E8F0', marginBottom: 2 },
-  eventDesc: { fontSize: 11, color: '#64748B' },
-  eventTags: { flexDirection: 'row', gap: 4, marginTop: 4 },
-  eventTag: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 },
-  eventTagText: { fontSize: 9, fontWeight: '700' },
 });
