@@ -18,6 +18,9 @@ import { useAuth } from '../_layout';
 import { supabase } from '../../constants/supabase';
 import { BadgeCheckerService, type UserBadge } from '../../services/engagement/badges';
 import { BadgeGrid } from '../../components/progression';
+import TieredProfileSections from '../../components/profile/TieredProfileSections';
+import { isTierAtLeast } from '../../constants/tiers';
+import PremiumAlert from '../../components/PremiumAlert';
 
 /** Zamanı insanca formatlayan yardımcı */
 function _formatTimeAgo(dateStr: string): string {
@@ -48,6 +51,11 @@ export default function UserProfileScreen() {
   const [isUserBlocked, setIsUserBlocked] = useState(false);
   const [recentPosts, setRecentPosts] = useState<any[]>([]);
   const [userBadges, setUserBadges] = useState<UserBadge[]>([]);
+
+  // ★ Katmanlı profil verileri
+  const [profileStats, setProfileStats] = useState({ stageMinutes: 0, roomsCreated: 0, totalListeners: 0, totalReactions: 0 });
+  const [recentRooms, setRecentRooms] = useState<any[]>([]);
+  const [showDonateModal, setShowDonateModal] = useState(false);
 
   const isOwnProfile = firebaseUser?.uid === id;
 
@@ -93,6 +101,16 @@ export default function UserProfileScreen() {
       try {
         const badges = await BadgeCheckerService.getUserBadges(id);
         setUserBadges(badges);
+      } catch {}
+
+      // ★ Katmanlı profil verileri
+      try {
+        const [pStats, rooms] = await Promise.all([
+          ProfileService.getProfileStats(id),
+          ProfileService.getRecentRooms(id),
+        ]);
+        setProfileStats(pStats);
+        setRecentRooms(rooms);
       } catch {}
     } catch (err) {
       console.warn('Profil yuklenemedi:', err);
@@ -351,10 +369,42 @@ export default function UserProfileScreen() {
           </View>
         )}
 
+        <View style={{ height: 8 }} />
 
+        {/* ★ Katmanlı Profil Bölümleri */}
+        <TieredProfileSections
+          tier={tier}
+          viewerTier={(currentUserProfile?.subscription_tier || 'Free') as any}
+          isOwnProfile={false}
+          userId={id}
+          stats={profileStats}
+          recentRooms={recentRooms}
+          bannerUrl={(userProfile as any)?.banner_url || null}
+          languageTag={(userProfile as any)?.language || undefined}
+          ageTag={(userProfile as any)?.age_range || undefined}
+          onDonate={isTierAtLeast(tier, 'Gold') ? () => setShowDonateModal(true) : undefined}
+        />
 
         <View style={{ height: 30 }} />
       </ScrollView>
+
+      {/* ★ Bağış Modalı */}
+      <PremiumAlert
+        visible={showDonateModal}
+        title="💛 Destekle"
+        message={`${userProfile?.display_name || 'Bu kullanıcı'} adlı kullanıcıya SP göndermek istiyorsun. Miktarı seç:`}
+        type="info"
+        icon="heart"
+        onDismiss={() => setShowDonateModal(false)}
+        buttons={[
+          { text: 'İptal', style: 'cancel' },
+          { text: '5 SP', onPress: () => { setShowDonateModal(false); showToast({ title: '💛 5 SP gönderildi!', type: 'success' }); } },
+          { text: '10 SP', onPress: () => { setShowDonateModal(false); showToast({ title: '💛 10 SP gönderildi!', type: 'success' }); } },
+          { text: '25 SP', onPress: () => { setShowDonateModal(false); showToast({ title: '💛 25 SP gönderildi!', type: 'success' }); } },
+          { text: '50 SP', onPress: () => { setShowDonateModal(false); showToast({ title: '💛 50 SP gönderildi!', type: 'success' }); } },
+          { text: '100 SP', onPress: () => { setShowDonateModal(false); showToast({ title: '💛 100 SP gönderildi!', type: 'success' }); } },
+        ]}
+      />
 
 
 

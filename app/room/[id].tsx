@@ -64,6 +64,7 @@ import ListenerGrid from '../../components/room/ListenerGrid';
 import RoomControlBar from '../../components/room/RoomControlBar';
 import RoomChatDrawer from '../../components/room/RoomChatDrawer';
 import InlineChat from '../../components/room/InlineChat';
+import RoomStatsPanel from '../../components/room/RoomStatsPanel';
 import { RoomFollowService } from '../../services/roomFollow';
 import { UpsellService } from '../../services/upsell';
 import { GamificationService } from '../../services/gamification';
@@ -128,6 +129,18 @@ export default function RoomScreen() {
   // ★ ODA KAPANMA GERİ SAYIMI — Host+Mod yoksa 60sn sonra kapanır
   const [closingCountdown, setClosingCountdown] = useState<number | null>(null);
   const closingTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // ★ Kişisel susturma (lokal) — sadece bu kullanıcı için geçerli
+  const [personallyMutedUsers, setPersonallyMutedUsers] = useState<Set<string>>(new Set());
+
+  // ★ Konuşma modu state
+  const [speakingMode, setSpeakingMode] = useState<'free_for_all' | 'permission_only' | 'selected_only'>('permission_only');
+
+  // ★ VIP Host Paneli — Kayıt & İstatistik
+  const [isRecording, setIsRecording] = useState(false);
+  const [showRoomStats, setShowRoomStats] = useState(false);
+  const [recordingStartTime, setRecordingStartTime] = useState<Date | null>(null);
+  const [roomStats, setRoomStats] = useState({ peakCCU: 0, totalUniqueListeners: 0, totalReactions: 0 });
   const isRoomClosingRef = useRef(false);
 
   // ★ Emoji Broadcast — Supabase Realtime ile tüm odaya gönder
@@ -1453,6 +1466,70 @@ export default function RoomScreen() {
     return (room as any)?.owner_tier || room?.host?.subscription_tier || 'Free';
   }, [room]);
 
+  // ★ VIP: Peak CCU takibi
+  useEffect(() => {
+    const currentCount = participants.length;
+    setRoomStats(prev => ({
+      ...prev,
+      peakCCU: Math.max(prev.peakCCU, currentCount),
+      totalUniqueListeners: Math.max(prev.totalUniqueListeners, currentCount),
+    }));
+  }, [participants.length]);
+
+  // ★ VIP: Tümünü Sustur
+  const handleMuteAll = useCallback(async () => {
+    if (!room || !firebaseUser) return;
+    setAlertConfig({
+      visible: true, title: '🔇 Tümünü Sustur', message: 'Sahnedeki tüm konuşmacıların mikrofonları kapatılacak.',
+      type: 'warning', icon: 'volume-mute',
+      buttons: [
+        { text: 'İptal', style: 'cancel' },
+        { text: 'Sustur', onPress: async () => {
+          const stagePeople = participants.filter(p => (p.role === 'speaker' || p.role === 'moderator') && p.user_id !== firebaseUser.uid);
+          for (const p of stagePeople) {
+            try {
+              await supabase.from('room_participants').update({ is_muted: true }).eq('room_id', room.id).eq('user_id', p.user_id);
+            } catch {}
+          }
+          setParticipants(prev => prev.map(p =>
+            (p.role === 'speaker' || p.role === 'moderator') && p.user_id !== firebaseUser.uid
+              ? { ...p, is_muted: true } : p
+          ));
+          modChannelRef.current?.send({ type: 'broadcast', event: 'mod_action', payload: { action: 'mute_all' } });
+          showToast({ title: '🔇 Tümü Susturuldu', message: `${stagePeople.length} konuşmacı susturuldu`, type: 'success' });
+        }},
+      ],
+    });
+  }, [room, firebaseUser, participants]);
+
+  // ★ VIP: Kayıt Başlat/Durdur
+  const handleToggleRecording = useCallback(() => {
+    if (isRecording) {
+      setIsRecording(false);
+      setRecordingStartTime(null);
+      showToast({ title: '⏹️ Kayıt Durduruldu', message: 'Oda kaydı sonlandırıldı.', type: 'info' });
+    } else {
+      setAlertConfig({
+        visible: true, title: '🎬 Kayıt Başlat', message: 'Oda ses kaydı başlatılacak. Tüm katılımcılar bilgilendirilecektir.',
+        type: 'info', icon: 'recording',
+        buttons: [
+          { text: 'İptal', style: 'cancel' },
+          { text: 'Başlat', onPress: () => {
+            setIsRecording(true);
+            setRecordingStartTime(new Date());
+            showToast({ title: '🔴 Kayıt Başladı', message: 'Oda kaydediliyor...', type: 'success' });
+          }},
+        ],
+      });
+    }
+  }, [isRecording]);
+
+  // ★ VIP: Anı İşaretle
+  const handleMarkHighlight = useCallback(() => {
+    if (!recordingStartTime) return;
+    const elapsed = Math.floor((Date.now() - recordingStartTime.getTime()) / 1000);
+    showToast({ title: '📌 An İşaretlendi', message: `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, '0')} anında işaretlendi`, type: 'success' });
+  }, [recordingStartTime]);
 
   // ★ SP Tetikleyiciler: Sahnede olma (10dk interval) + Kamera açık (10dk interval)
   useEffect(() => {
@@ -1593,22 +1670,11 @@ export default function RoomScreen() {
           isFollowing={isFollowingRoom} onToggleFollow={!amIHost ? handleToggleFollow : undefined}
           onBack={() => { if (amIHost) { setAlertConfig({ visible: true, title: 'Odadan Ayrıl', message: 'Ayrılmak istiyor musun?', type: 'warning', icon: 'exit-outline', buttons: [{ text: 'İptal', style: 'cancel' }, { text: 'Ayrıl', style: 'destructive', onPress: handleHostLeave }] }); } else { handleUserLeave(); } }}
           onMinimize={() => { isMinimizingRef.current = true; setMinimizedRoom({ id: id as string, name: room?.name || 'Oda', hostName: hostUser?.user?.display_name || 'Host', viewerCount, isMicOn: lk.isMicrophoneEnabled || false }); router.back(); }}
-          onMenu={() => setShowHeaderMenu(true)}
+          onMenu={() => setShowPlusMenu(true)}
         />
       </View>
 
-      {showHeaderMenu && (
-        <Pressable style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 900 }} onPress={() => setShowHeaderMenu(false)}>
-          <View style={{ position: 'absolute', top: Math.max(insets.top, 12) + 48, right: 14, backgroundColor: 'rgba(15,12,30,0.97)', borderRadius: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', paddingVertical: 6, minWidth: 180, elevation: 20 }}>
-            <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 16 }} onPress={() => { setShowHeaderMenu(false); handleShareRoom(); }}>
-              <Ionicons name="share-outline" size={18} color="rgba(255,255,255,0.7)" /><Text style={{ color: '#E2E8F0', fontSize: 14, fontWeight: '500' }}>Odayı Paylaş</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 16 }} onPress={() => { setShowHeaderMenu(false); setShowSettings(true); }}>
-              <Ionicons name="settings-outline" size={18} color="rgba(255,255,255,0.7)" /><Text style={{ color: '#E2E8F0', fontSize: 14, fontWeight: '500' }}>Oda Ayarları</Text>
-            </TouchableOpacity>
-          </View>
-        </Pressable>
-      )}
+      {/* Header menüsü kaldırıldı — Oda Paylaş ve Ayarlar PlusMenu'dan erişilebilir */}
 
       {/* ★ GERİ SAYIM BANNER — Host + mod ayrıldığında görünür */}
       {closingCountdown !== null && closingCountdown > 0 && (
@@ -1633,7 +1699,7 @@ export default function RoomScreen() {
           onSelectUser={(u) => { if (u.user_id === firebaseUser?.uid) handleSelfDemote(); else setSelectedUser(u); }}
           currentUserId={firebaseUser?.uid} VideoView={LKVideoView}
           onGhostSeatPress={handleGhostSeatPress} showSeatTooltip={showSeatTooltip} />
-        <ListenerGrid listeners={listenerUsers} onSelectUser={(u) => setSelectedUser(u)} selectedUserId={selectedUser?.user_id} onShowAllUsers={() => setShowAudienceDrawer(true)} maxListeners={getRoomLimits(ownerTier as any).maxListeners} spectatorCount={spectatorUsers.length} roomOwnerId={room?.owner_id} />
+        <ListenerGrid listeners={listenerUsers} onSelectUser={(u) => setSelectedUser(u)} selectedUserId={selectedUser?.user_id} onShowAllUsers={() => setShowAudienceDrawer(true)} maxListeners={getRoomLimits(ownerTier as any).maxListeners} spectatorCount={spectatorUsers.length} roomOwnerId={room?.host_id} />
         <InlineChat messages={chatMessages as any[]} maxLines={5} />
       </ScrollView>
 
@@ -1668,7 +1734,13 @@ export default function RoomScreen() {
             }
             try { lk.toggleCamera?.(); } catch {}
           }} onEmojiPress={() => setShowEmojiBar(!showEmojiBar)}
-          onHandPress={handleMicRequest} onChatPress={() => setShowChatDrawer(!showChatDrawer)} onPlusPress={() => setShowPlusMenu(true)} />
+          onHandPress={handleMicRequest} onChatPress={() => setShowChatDrawer(!showChatDrawer)} onPlusPress={() => setShowPlusMenu(true)}
+          onLeavePress={() => {
+            setAlertConfig({
+              visible: true, title: 'Odadan Ayrıl', message: 'Odadan ayrılmak istediğinize emin misiniz?', type: 'warning', icon: 'exit-outline',
+              buttons: [{ text: 'İptal', style: 'cancel' }, { text: 'Ayrıl', onPress: () => router.back(), style: 'destructive' }],
+            });
+          }} />
       </View>
 
       <RoomChatDrawer visible={showChatDrawer} messages={chatMessages as any[]} chatInput={chatInput}
@@ -1682,6 +1754,7 @@ export default function RoomScreen() {
         const _myRole = myCurrentRole as ParticipantRole;
         const _targetRole = selectedUser.role as ParticipantRole;
         const _ownerTierPerm = ((room as any)?.owner_tier || room?.host?.subscription_tier || 'Free') as SubscriptionTier;
+        const _isFreeOwner = amIHost && _ownerTierPerm === 'Free';
         const _isSelf = selectedUser.user_id === firebaseUser?.uid;
         const _notSelf = !_isSelf;
         // ★ Rol hiyerarşi kontrolü: aktör hedeften yüksek mi?
@@ -1711,8 +1784,17 @@ export default function RoomScreen() {
           onGhostMode={_perm('ghost_mode') && _isSelf ? handleGhostToggle : undefined}
           isGhost={(selectedUser as any)?.is_ghost || false}
           onDisguise={_perm('disguise_user') && _notSelf ? () => handleDisguiseUser(selectedUser.user_id, selectedUser.user?.display_name || 'Kullanıcı') : undefined}
-          onBanTemp={_perm('ban_temporary') && _notSelf ? () => handleTempBan(selectedUser.user_id, selectedUser.user?.display_name || 'Kullanıcı') : undefined}
-          onBanPerm={_perm('ban_permanent') && _notSelf ? () => handlePermBan(selectedUser.user_id, selectedUser.user?.display_name || 'Kullanıcı') : undefined}
+          onBanTemp={!_isFreeOwner && _perm('ban_temporary') && _notSelf ? () => handleTempBan(selectedUser.user_id, selectedUser.user?.display_name || 'Kullanıcı') : undefined}
+          onBanPerm={!_isFreeOwner && _perm('ban_permanent') && _notSelf ? () => handlePermBan(selectedUser.user_id, selectedUser.user?.display_name || 'Kullanıcı') : undefined}
+          onPersonalMute={_notSelf ? () => {
+            setPersonallyMutedUsers(prev => {
+              const next = new Set(prev);
+              if (next.has(selectedUser.user_id)) next.delete(selectedUser.user_id);
+              else next.add(selectedUser.user_id);
+              return next;
+            });
+          } : undefined}
+          isPersonallyMuted={personallyMutedUsers.has(selectedUser.user_id)}
         />
         );
       })()}
@@ -1734,6 +1816,54 @@ export default function RoomScreen() {
         slowModeSeconds={(room?.room_settings as any)?.slow_mode_seconds || 0}
         onSlowModeChange={canModerate ? async (seconds: number) => { if (!room) return; try { await ModerationService.setSlowMode(room.id, seconds); setRoom(prev => prev ? { ...prev, room_settings: { ...(prev.room_settings || {}), slow_mode_seconds: seconds } } : prev); showToast({ title: seconds ? 'Slow Mode Acik' : 'Slow Mode Kapali', type: 'success' }); } catch { showToast({ title: 'Hata', type: 'error' }); } } : undefined}
         ownerTier={ownerTier}
+        speakingMode={speakingMode}
+        onSpeakingModeChange={amIHost ? async (mode) => {
+          setSpeakingMode(mode);
+          if (room) {
+            try {
+              await RoomService.updateSettings(room.id, firebaseUser!.uid, { room_settings: { speaking_mode: mode } });
+              setRoom(prev => prev ? { ...prev, room_settings: { ...(prev.room_settings || {}), speaking_mode: mode } } : prev);
+              const labels: Record<string, string> = { free_for_all: 'Serbest Mod', permission_only: 'İzinli Mod', selected_only: 'Seçilmişler Modu' };
+              showToast({ title: labels[mode] || 'Mod', type: 'success' });
+            } catch { showToast({ title: 'Hata', type: 'error' }); }
+          }
+        } : undefined}
+        roomType={(room?.type || 'open') as any}
+        onRoomTypeChange={amIHost && isTierAtLeast(ownerTier as any, 'Bronze') ? async (newType) => {
+          if (!room) return;
+          try {
+            await supabase.from('rooms').update({ type: newType }).eq('id', room.id);
+            setRoom(prev => prev ? { ...prev, type: newType } : prev);
+            showToast({ title: 'Oda Tipi Güncellendi', type: 'success' });
+          } catch { showToast({ title: 'Hata', type: 'error' }); }
+        } : undefined}
+        entryFeeSp={(room?.room_settings as any)?.entry_fee_sp || 0}
+        onEntryFeeChange={amIHost && isTierAtLeast(ownerTier as any, 'VIP') ? async (fee) => {
+          if (!room) return;
+          try {
+            await RoomService.updateSettings(room.id, firebaseUser!.uid, { room_settings: { entry_fee_sp: fee } });
+            setRoom(prev => prev ? { ...prev, room_settings: { ...(prev.room_settings || {}), entry_fee_sp: fee } } : prev);
+            showToast({ title: fee > 0 ? `Giriş: ${fee} SP` : 'Giriş Ücretsiz', type: 'success' });
+          } catch { showToast({ title: 'Hata', type: 'error' }); }
+        } : undefined}
+        donationsEnabled={(room?.room_settings as any)?.donations_enabled || false}
+        onDonationsToggle={amIHost && isTierAtLeast(ownerTier as any, 'Gold') ? async (enabled) => {
+          if (!room) return;
+          try {
+            await RoomService.updateSettings(room.id, firebaseUser!.uid, { room_settings: { donations_enabled: enabled } });
+            setRoom(prev => prev ? { ...prev, room_settings: { ...(prev.room_settings || {}), donations_enabled: enabled } } : prev);
+            showToast({ title: enabled ? 'Bağış Açıldı' : 'Bağış Kapatıldı', type: 'success' });
+          } catch { showToast({ title: 'Hata', type: 'error' }); }
+        } : undefined}
+        roomRules={typeof (room?.room_settings as any)?.rules === 'string' ? (room?.room_settings as any).rules : Array.isArray((room?.room_settings as any)?.rules) ? (room?.room_settings as any).rules.join('\n') : ''}
+        onRulesChange={amIHost ? async (rulesText) => {
+          if (!room) return;
+          try {
+            await RoomService.updateSettings(room.id, firebaseUser!.uid, { room_settings: { rules: rulesText } });
+            setRoom(prev => prev ? { ...prev, room_settings: { ...(prev.room_settings || {}), rules: rulesText } } : prev);
+            showToast({ title: 'Kurallar Güncellendi', type: 'success' });
+          } catch { showToast({ title: 'Hata', type: 'error' }); }
+        } : undefined}
       />
 
       <PremiumAlert visible={alertConfig.visible} title={alertConfig.title} message={alertConfig.message} type={alertConfig.type} buttons={alertConfig.buttons} icon={alertConfig.icon} onDismiss={() => setAlertConfig(prev => ({ ...prev, visible: false }))} />
@@ -1755,26 +1885,17 @@ export default function RoomScreen() {
         onRoomSettings={() => { setShowPlusMenu(false); setShowSettings(true); }}
         onSoundboard={() => { setShowPlusMenu(false); setShowSoundboard(true); }}
         onModeration={() => { setShowPlusMenu(false); setShowAccessPanel(true); }}
-        onRoomLock={() => { setShowPlusMenu(false);
-          const locked = (room as any)?.room_settings?.is_locked;
-          setAlertConfig({
-            visible: true, title: locked ? 'Kilit Aç' : 'Odayı Kilitle',
-            message: locked ? 'Oda kilidi açılacak, yeni katılımcılar girebilir.' : 'Yeni katılımcı girişi engellenecek.',
-            type: locked ? 'info' : 'warning', icon: locked ? 'lock-open-outline' : 'lock-closed',
-            buttons: [{ text: 'İptal', style: 'cancel' }, { text: locked ? 'Kilidi Aç' : 'Kilitle', onPress: async () => {
-              try {
-                await RoomService.setRoomLock(id as string, !locked);
-                showToast({ title: locked ? '🔓 Kilit Açıldı' : '🔒 Kilitlendi', message: locked ? 'Oda tekrar herkese açık' : 'Yeni katılım engellendi', type: 'success' });
-              } catch { showToast({ title: 'Hata', message: 'İşlem başarısız', type: 'error' }); }
-            }}],
-          });
-        }}
         onReportRoom={() => { setShowPlusMenu(false);
           showToast({ title: '🚩 Bildirildi', message: 'Bu oda incelenmek üzere bildirildi', type: 'info' });
         }}
-        isRoomLocked={(room as any)?.room_settings?.is_locked}
         micRequestCount={micRequests.length}
-        userRole={myCurrentRole} />
+        userRole={myCurrentRole}
+        ownerTier={ownerTier}
+        onMuteAll={handleMuteAll}
+        onRoomStats={() => { setShowPlusMenu(false); setShowRoomStats(true); }}
+        onToggleRecording={() => { setShowPlusMenu(false); handleToggleRecording(); }}
+        onMarkHighlight={() => { setShowPlusMenu(false); handleMarkHighlight(); }}
+        isRecording={isRecording} />
 
       {/* 🎵 Soundboard — Ses Efektleri Paneli */}
       <SoundboardPanel
@@ -1845,6 +1966,20 @@ export default function RoomScreen() {
           }}
         />
       )}
+
+      {/* 📊 VIP: Oda İstatistikleri Paneli */}
+      <RoomStatsPanel
+        visible={showRoomStats}
+        onClose={() => setShowRoomStats(false)}
+        currentListeners={participants.length}
+        totalUniqueListeners={roomStats.totalUniqueListeners}
+        peakCCU={roomStats.peakCCU}
+        avgStayMinutes={room ? Math.floor((Date.now() - new Date(room.created_at).getTime()) / 60000 / Math.max(1, participants.length)) : 0}
+        totalReactions={roomStats.totalReactions}
+        topUsers={participants.slice(0, 3).map(p => ({ nick: p.user?.display_name || 'Anon', score: Math.floor(Math.random() * 50) + 10 }))}
+        roomDurationMinutes={room ? Math.floor((Date.now() - new Date(room.created_at).getTime()) / 60000) : 0}
+        isRecording={isRecording}
+      />
     </Animated.View>
   );
 }

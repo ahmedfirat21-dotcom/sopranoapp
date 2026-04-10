@@ -1,6 +1,7 @@
 import React, { useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView, Animated, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { isTierAtLeast } from '../../constants/tiers';
 
 const { width: W, height: H } = Dimensions.get('window');
 
@@ -32,6 +33,14 @@ type PlusMenuProps = {
   isRoomLocked?: boolean;
   micRequestCount?: number;
   userRole?: 'owner' | 'moderator' | 'speaker' | 'listener';
+  /** Oda sahibinin tier'ı — UI filtresi için */
+  ownerTier?: string;
+  // ★ VIP Host Paneli Props
+  onMuteAll?: () => void;
+  onRoomStats?: () => void;
+  onToggleRecording?: () => void;
+  onMarkHighlight?: () => void;
+  isRecording?: boolean;
 };
 
 const ROLE_META: Record<string, { label: string; color: string; icon: string }> = {
@@ -47,6 +56,9 @@ export function PlusMenu({
   onModeration, onRoomLock, onReportRoom,
   isRoomLocked, micRequestCount,
   userRole = 'listener',
+  ownerTier = 'Free',
+  onMuteAll, onRoomStats, onToggleRecording, onMarkHighlight,
+  isRecording,
 }: PlusMenuProps) {
   // ═══ Animasyon ═══
   const slideAnim = useRef(new Animated.Value(200)).current; // yukarı kayma
@@ -79,25 +91,46 @@ export function PlusMenu({
   const isOnStage = isOwner || isMod || userRole === 'speaker';
   const role = ROLE_META[userRole] || ROLE_META.listener;
 
-  // ═══ ROL-BAZLI MENÜ ÖĞELERİ ═══
+  const isFreeOwner = isOwner && ownerTier === 'Free';
+
+  // ★ ROL-BAZLI MENÜ ÖĞELERİ — TÜM TİER FILTRESİ ═══
   const items: MenuItem[] = [];
 
+  // 1️⃣ Oda Ayarları (Owner)
   if (isOwner && onRoomSettings) {
     items.push({ id: 'settings', icon: 'settings-outline', label: 'Oda Ayarları', accent: '#D4AF37', onPress: onRoomSettings });
   }
-  if ((isOwner || isMod) && onModeration) {
+  // 2️⃣ Moderasyon (Bronze+ owner veya mod)
+  if ((isOwner || isMod) && onModeration && !isFreeOwner) {
     items.push({ id: 'moderation', icon: 'shield-checkmark-outline', label: 'Moderasyon', accent: '#A78BFA', onPress: onModeration, badge: micRequestCount });
   }
-  if (isOwner && onRoomLock) {
-    items.push({ id: 'lock', icon: isRoomLocked ? 'lock-closed' : 'lock-open-outline', label: isRoomLocked ? 'Kilidi Aç' : 'Odayı Kilitle', accent: isRoomLocked ? '#EF4444' : '#F59E0B', onPress: onRoomLock });
+  // 4️⃣ Tümünü Sustur (Gold+ owner)
+  if (isOwner && onMuteAll && isTierAtLeast(ownerTier as any, 'Gold')) {
+    items.push({ id: 'mute_all', icon: 'volume-mute-outline', label: 'Tümünü Sustur', accent: '#EF4444', onPress: onMuteAll });
   }
+  // 5️⃣ Ses Efektleri (Bronze+ sahnede)
+  if (isOnStage && onSoundboard && isTierAtLeast(ownerTier as any, 'Bronze')) {
+    items.push({ id: 'soundboard', icon: 'musical-notes-outline', label: 'Ses Efektleri', accent: '#8B5CF6', onPress: onSoundboard });
+  }
+  // 6️⃣ Davet (sahnedeki herkes)
   if (isOnStage) {
     items.push({ id: 'invite', icon: 'person-add-outline', label: 'Arkadaşlarını Davet Et', accent: '#14B8A6', onPress: onInviteFriends });
   }
+  // 7️⃣ Link Paylaş (herkes)
   items.push({ id: 'share', icon: 'share-social-outline', label: 'Oda Linkini Paylaş', accent: '#3B82F6', onPress: onShareLink });
-  if (isOnStage && onSoundboard) {
-    items.push({ id: 'soundboard', icon: 'musical-notes-outline', label: 'Ses Efektleri', accent: '#8B5CF6', onPress: onSoundboard });
+  // 8️⃣ Oda İstatistikleri (VIP owner)
+  if (isOwner && onRoomStats && isTierAtLeast(ownerTier as any, 'VIP')) {
+    items.push({ id: 'stats', icon: 'stats-chart-outline', label: 'Oda İstatistikleri', accent: '#3B82F6', onPress: onRoomStats });
   }
+  // 9️⃣ Kayıt Başlat/Durdur (VIP owner)
+  if (isOwner && onToggleRecording && isTierAtLeast(ownerTier as any, 'VIP')) {
+    items.push({ id: 'record', icon: isRecording ? 'stop-circle-outline' : 'recording-outline', label: isRecording ? 'Kaydı Durdur' : 'Kayıt Başlat', accent: '#EF4444', onPress: onToggleRecording });
+  }
+  // 📌 Anı İşaretle (VIP owner, kayıt aktifken)
+  if (isOwner && onMarkHighlight && isRecording && isTierAtLeast(ownerTier as any, 'VIP')) {
+    items.push({ id: 'highlight', icon: 'bookmark-outline', label: 'Anı İşaretle', accent: '#F59E0B', onPress: onMarkHighlight });
+  }
+  // 🚩 Bildir (dinleyiciler)
   if (!isOnStage && onReportRoom) {
     items.push({ id: 'report', icon: 'flag-outline', label: 'Odayı Bildir', accent: '#EF4444', onPress: onReportRoom, destructive: true });
   }

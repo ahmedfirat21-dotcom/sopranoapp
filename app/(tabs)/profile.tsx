@@ -20,6 +20,7 @@ import { TierBadge, BadgeGrid } from '../../components/progression';
 import { TIER_DEFINITIONS } from '../../constants/tiers';
 import { migrateLegacyTier } from '../../types';
 import type { SubscriptionTier } from '../../types';
+import TieredProfileSections from '../../components/profile/TieredProfileSections';
 
 /** Son görülme zamanını insanca formatlayan yardımcı */
 function _formatLastSeen(dateStr: string): string {
@@ -52,6 +53,11 @@ export default function ProfileScreen() {
 
   // Dinamik istatistikler
   const [stats, setStats] = useState({ followers: 0, following: 0, rooms: 0 });
+
+  // ★ Katmanlı profil verileri
+  const [profileStats, setProfileStats] = useState({ stageMinutes: 0, roomsCreated: 0, totalListeners: 0, totalReactions: 0 });
+  const [recentRooms, setRecentRooms] = useState<any[]>([]);
+  const [incomeStats, setIncomeStats] = useState({ totalEarned: 0, roomFeeRooms: 0, donationsReceived: 0 });
 
   // Referans Modal
   const [showReferral, setShowReferral] = useState(false);
@@ -93,6 +99,18 @@ export default function ProfileScreen() {
       await BadgeCheckerService.checkAll(userId);
       const userBadges = await BadgeCheckerService.getUserBadges(userId);
       setBadges(userBadges);
+
+      // ★ Katmanlı profil verileri
+      try {
+        const [pStats, rooms, income] = await Promise.all([
+          ProfileService.getProfileStats(userId),
+          ProfileService.getRecentRooms(userId),
+          ProfileService.getIncomeStats(userId),
+        ]);
+        setProfileStats(pStats);
+        setRecentRooms(rooms);
+        setIncomeStats(income);
+      } catch {}
     } catch (err) {
       console.warn('Stats yuklenemedi:', err);
     }
@@ -212,6 +230,20 @@ export default function ProfileScreen() {
             <Text style={styles.editBtnText}>Profili Düzenle</Text>
           </Pressable>
         </View>
+
+        {/* ★ Katmanlı Profil Bölümleri */}
+        <TieredProfileSections
+          tier={subscriptionTier}
+          isOwnProfile={true}
+          userId={userId}
+          stats={profileStats}
+          recentRooms={recentRooms}
+          bannerUrl={(profile as any)?.banner_url || null}
+          languageTag={(profile as any)?.language || undefined}
+          ageTag={(profile as any)?.age_range || undefined}
+          isGhost={false}
+          incomeStats={incomeStats}
+        />
 
 
 

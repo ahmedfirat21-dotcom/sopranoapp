@@ -41,6 +41,8 @@ interface Props {
   onMicPress: () => void; onCameraPress: () => void;
   onEmojiPress: () => void; onHandPress: () => void;
   onChatPress: () => void; onPlusPress: () => void;
+  /** Odadan çıkış handler */
+  onLeavePress?: () => void;
   /** Oda sesini kıs/aç handler (dinleyici modu) */
   onMuteRoomPress?: () => void;
 }
@@ -61,7 +63,7 @@ export default function RoomControlBar({
   handBadgeCount, canModerate, chatBadgeCount, isChatOpen,
   isListener,
   onMicPress, onCameraPress, onEmojiPress,
-  onHandPress, onChatPress, onPlusPress, onMuteRoomPress,
+  onHandPress, onChatPress, onPlusPress, onLeavePress, onMuteRoomPress,
 }: Props) {
   return (
     <View style={s.wrap}>
@@ -144,6 +146,13 @@ export default function RoomControlBar({
         <BarBtn onPress={onPlusPress}>
           <Text style={{ fontSize: 22, color: '#94A3B8', fontWeight: '300' }}>+</Text>
         </BarBtn>
+
+        {/* ═══ 🚪 Çıkış ═══ */}
+        {onLeavePress && (
+          <BarBtn onPress={onLeavePress} destructive>
+            <Ionicons name="exit-outline" size={20} color="#EF4444" />
+          </BarBtn>
+        )}
       </View>
     </View>
   );

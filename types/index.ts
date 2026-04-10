@@ -188,6 +188,8 @@ export type RoomSettings = {
   is_locked?: boolean;
   /** Sahne kapasitesi (owner dahil) — VIP: max 13 */
   max_stage_capacity?: number;
+  /** Konuşma modu: free_for_all | permission_only | selected_only (VIP) */
+  speaking_mode?: 'free_for_all' | 'permission_only' | 'selected_only';
 
   // ── Gelişmiş Alanlar ──
   /** Sahne düzeni (Silver+) */
@@ -200,6 +202,30 @@ export type RoomSettings = {
   age_filter_min?: number;
   /** Dil filtresi (Silver+). Boş dizi = filtre yok */
   language_filter?: RoomLanguage[];
+
+  // ── VIP Alanlar ──
+  /** Planlı oda başlangıç zamanı (ISO string) */
+  scheduled_at?: string;
+  /** Kayıt aktif mi (VIP) */
+  is_recording?: boolean;
+  /** Kayıt dosyası URL'si */
+  recording_url?: string;
+  /** Önemli anlar / clip işaretleri */
+  highlights?: RoomHighlight[];
+  /** SP cinsinden giriş ücreti. 0 = ücretsiz (VIP) */
+  entry_fee_sp?: number;
+  /** Bağış kabul aktif mi (Gold+) */
+  donations_enabled?: boolean;
+};
+
+/** Oda içi önemli an işareti (VIP) */
+export type RoomHighlight = {
+  id: string;
+  /** Kayıt başlangıcından itibaren saniye */
+  timestamp: number;
+  label: string;
+  created_by: string;
+  created_at: string;
 };
 
 // ============================================
@@ -328,6 +354,10 @@ export type OwnerPermission =
   // ── VIP Özellikler ──
   | 'ghost_mode'            // Görünmez olarak odada bulun
   | 'disguise_user'         // Kullanıcının görüntüsünü/adını geçici değiştir
+  | 'mute_all'              // Tüm sahnedeki konuşmacıları toplu sustur
+  | 'record_room'           // Oda ses kaydı başlat/durdur
+  | 'set_entry_fee'         // SP giriş ücreti belirle
+  | 'room_analytics'        // Canlı oda istatistikleri görüntüle
   ;
 
 /**
@@ -394,6 +424,10 @@ export const ALL_PERMISSIONS: Record<OwnerPermission, PermissionDefinition> = {
   // ── VIP ──
   ghost_mode:           { minRole: 'owner', requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false, minTier: 'VIP' },
   disguise_user:        { minRole: 'owner', requiresTarget: true,  requiresLowerTarget: true,  hiddenOnSelf: true,  minTier: 'VIP' },
+  mute_all:             { minRole: 'owner', requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false, minTier: 'Gold' },
+  record_room:          { minRole: 'owner', requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false, minTier: 'VIP' },
+  set_entry_fee:        { minRole: 'owner', requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false, minTier: 'VIP' },
+  room_analytics:       { minRole: 'owner', requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false, minTier: 'VIP' },
 };
 
 // ============================================

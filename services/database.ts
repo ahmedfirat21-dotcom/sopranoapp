@@ -120,6 +120,91 @@ export const ProfileService = {
     } catch { /* SP transaction opsiyonel */ }
     return { success: true, boost_expires_at: boostUntil };
   },
+
+  /** ★ Profil istatistikleri — sahne süresi, oda geçmişi, toplam dinleyici */
+  async getProfileStats(userId: string): Promise<{
+    stageMinutes: number;
+    roomsCreated: number;
+    totalListeners: number;
+    totalReactions: number;
+  }> {
+    try {
+      // Oluşturulan oda sayısı
+      const { count: roomsCreated } = await supabase
+        .from('rooms')
+        .select('id', { count: 'exact', head: true })
+        .eq('host_id', userId);
+
+      // SP transaction'lardan sahne süresi tahmini (stage_time tetikleyicisi 10dk'da 1)
+      const { count: stageEvents } = await supabase
+        .from('sp_transactions')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .eq('type', 'stage_time');
+
+      // Toplam dinleyici (odalarının listener_count toplamı)
+      const { data: rooms } = await supabase
+        .from('rooms')
+        .select('listener_count')
+        .eq('host_id', userId);
+      const totalListeners = (rooms || []).reduce((sum, r) => sum + (r.listener_count || 0), 0);
+
+      return {
+        stageMinutes: (stageEvents || 0) * 10,
+        roomsCreated: roomsCreated || 0,
+        totalListeners,
+        totalReactions: 0, // Placeholder — gerçek reaction sayacı henüz yok
+      };
+    } catch {
+      return { stageMinutes: 0, roomsCreated: 0, totalListeners: 0, totalReactions: 0 };
+    }
+  },
+
+  /** ★ Son oluşturulan odalar (profilde gösterilir) */
+  async getRecentRooms(userId: string, limit = 5): Promise<{ id: string; name: string; created_at: string; listener_count: number; category: string }[]> {
+    try {
+      const { data, error } = await supabase
+        .from('rooms')
+        .select('id, name, created_at, listener_count, category')
+        .eq('host_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(limit);
+      if (error) return [];
+      return (data || []) as any[];
+    } catch {
+      return [];
+    }
+  },
+
+  /** ★ VIP gelir istatistikleri — SP giriş ücreti + bağış gelirleri */
+  async getIncomeStats(userId: string): Promise<{
+    totalEarned: number;
+    roomFeeRooms: number;
+    donationsReceived: number;
+  }> {
+    try {
+      // SP giriş ücreti gelirleri
+      const { data: feeData } = await supabase
+        .from('sp_transactions')
+        .select('amount')
+        .eq('user_id', userId)
+        .in('type', ['room_entry_fee', 'donation_received']);
+
+      const totalEarned = (feeData || []).reduce((sum, t) => sum + Math.abs(t.amount || 0), 0);
+      const donationsReceived = (feeData || []).filter((t: any) => t.type === 'donation_received').length;
+
+      // Ücretli oda sayısı
+      const { data: feeRooms } = await supabase
+        .from('rooms')
+        .select('room_settings')
+        .eq('host_id', userId);
+      const roomFeeRooms = (feeRooms || []).filter(r => (r.room_settings as any)?.entry_fee_sp > 0).length;
+
+      return { totalEarned, roomFeeRooms, donationsReceived };
+    } catch {
+      return { totalEarned: 0, roomFeeRooms: 0, donationsReceived: 0 };
+    }
+  },
 };
 
 // ============================================
@@ -379,6 +464,10 @@ export const RoomService = {
       welcome_message?: string;
       rules?: string;
       room_password?: string;
+      speaking_mode?: 'free_for_all' | 'permission_only' | 'selected_only';
+      scheduled_at?: string;
+      entry_fee_sp?: number;
+      donations_enabled?: boolean;
     },
     tier: SubscriptionTier = 'Free'
   ): Promise<Room> {
@@ -394,6 +483,10 @@ export const RoomService = {
     const roomSettings: RoomSettings = {};
     if (options.welcome_message) roomSettings.welcome_message = options.welcome_message;
     if (options.rules) roomSettings.rules = options.rules;
+    if (options.speaking_mode) roomSettings.speaking_mode = options.speaking_mode;
+    if (options.scheduled_at) roomSettings.scheduled_at = options.scheduled_at;
+    if (options.entry_fee_sp) roomSettings.entry_fee_sp = options.entry_fee_sp;
+    if (options.donations_enabled) roomSettings.donations_enabled = options.donations_enabled;
 
     // Tüm kolonlarla dene, eksik kolon varsa minimal fallback
     let data: any;

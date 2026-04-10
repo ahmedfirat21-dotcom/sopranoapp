@@ -69,6 +69,9 @@ type ProfileCardProps = {
   onDisguise?: () => void;
   onBanTemp?: () => void;
   onBanPerm?: () => void;
+  // Kişisel susturma (lokal)
+  onPersonalMute?: () => void;
+  isPersonallyMuted?: boolean;
 };
 
 export default function ProfileCard({
@@ -77,6 +80,7 @@ export default function ProfileCard({
   onChatMute, onMakeModerator, onReport, onBlock,
   onViewProfile, onFollow, onDM,
   onGhostMode, isGhost, onDisguise, onBanTemp, onBanPerm,
+  onPersonalMute, isPersonallyMuted,
 }: ProfileCardProps) {
   // Slide-up animasyonu
   const slideY = useRef(new Animated.Value(H * 0.3)).current;
@@ -176,6 +180,7 @@ export default function ProfileCard({
             <Text style={[sty.pillText, { color: C.primary }]}>Profili Görüntüle</Text>
           </TouchableOpacity>
         ) : (
+          <>
           <View style={sty.socialRow}>
             <TouchableOpacity style={sty.primaryPill} onPress={onFollow} activeOpacity={0.7}>
               <Ionicons name="person-add" size={13} color={C.primary} />
@@ -190,6 +195,20 @@ export default function ProfileCard({
               <Text style={[sty.pillText, { color: C.white60 }]}>Profil</Text>
             </TouchableOpacity>
           </View>
+          {/* Kişisel Susturma (Lokal) */}
+          {onPersonalMute && (
+            <TouchableOpacity
+              style={[sty.personalMutePill, isPersonallyMuted && { borderColor: 'rgba(239,68,68,0.25)', backgroundColor: 'rgba(239,68,68,0.06)' }]}
+              onPress={onPersonalMute}
+              activeOpacity={0.7}
+            >
+              <Ionicons name={isPersonallyMuted ? 'volume-high' : 'volume-mute'} size={13} color={isPersonallyMuted ? C.emerald : '#F97316'} />
+              <Text style={[sty.pillText, { color: isPersonallyMuted ? C.emerald : '#F97316' }]}>
+                {isPersonallyMuted ? 'Sesi Aç' : 'Benim İçin Sustur'}
+              </Text>
+            </TouchableOpacity>
+          )}
+          </>
         )}
 
         {/* ════════════════════════════════════════════
@@ -497,5 +516,19 @@ const sty = StyleSheet.create({
     height: 3,
     borderRadius: 1.5,
     backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+
+  // Kişisel susturma butonu
+  personalMutePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    height: 34,
+    borderRadius: 99,
+    backgroundColor: 'rgba(249,115,22,0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(249,115,22,0.15)',
+    marginTop: 8,
   },
 });

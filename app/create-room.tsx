@@ -4,6 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { RoomService, getRoomLimits, type TierName } from '../services/database';
+import { isTierAtLeast } from '../constants/tiers';
 import { GamificationService } from '../services/gamification';
 import { Colors } from '../constants/theme';
 import { showToast } from '../components/Toast';
@@ -76,6 +77,9 @@ export default function CreateRoomScreen() {
   const [language, setLanguage] = useState('tr');
   const [password, setPassword] = useState('');
   const [creating, setCreating] = useState(false);
+  const [speakingMode, setSpeakingMode] = useState<'free_for_all' | 'permission_only' | 'selected_only'>('permission_only');
+  const [entryFeeSp, setEntryFeeSp] = useState(0);
+  const [donationsEnabled, setDonationsEnabled] = useState(false);
 
   const canCreate = name.trim().length >= 2 && (type !== 'closed' || password.trim().length >= 4);
 
@@ -117,6 +121,9 @@ export default function CreateRoomScreen() {
           welcome_message: welcomeMsg.trim() || undefined,
           rules: rules.trim() || undefined,
           room_password: type === 'closed' ? password.trim() : undefined,
+          speaking_mode: speakingMode,
+          entry_fee_sp: entryFeeSp > 0 ? entryFeeSp : undefined,
+          donations_enabled: donationsEnabled || undefined,
         },
         tier
       );
@@ -406,6 +413,147 @@ export default function CreateRoomScreen() {
             <View style={{ marginTop: 12, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <Ionicons name="image-outline" size={14} color="#64748B" />
               <Text style={{ color: '#64748B', fontSize: 11 }}>Oda kapak resmi Gold+ ile açılır</Text>
+            </View>
+          )}
+        </View>
+
+        {/* Konuşma Modu */}
+        <View style={s.section}>
+          <Text style={s.label}>Konuşma Modu</Text>
+          <Text style={s.labelHint}>Kim sahneye çıkabilir?</Text>
+          <View style={s.modeRow}>
+            <Pressable
+              style={[s.modeCard, speakingMode === 'free_for_all' && s.modeCardActive]}
+              onPress={() => setSpeakingMode('free_for_all')}
+            >
+              <Ionicons name="people" size={28} color={speakingMode === 'free_for_all' ? Colors.accentTeal : '#64748B'} />
+              <Text style={[s.modeLabel, speakingMode === 'free_for_all' && { color: '#F1F5F9' }]}>Serbest</Text>
+              <Text style={s.modeDesc}>Herkes konuşabilir</Text>
+            </Pressable>
+            <Pressable
+              style={[s.modeCard, speakingMode === 'permission_only' && s.modeCardActive]}
+              onPress={() => setSpeakingMode('permission_only')}
+            >
+              <Ionicons name="hand-left" size={28} color={speakingMode === 'permission_only' ? Colors.accentTeal : '#64748B'} />
+              <Text style={[s.modeLabel, speakingMode === 'permission_only' && { color: '#F1F5F9' }]}>İzinli</Text>
+              <Text style={s.modeDesc}>El kaldırarak söz iste</Text>
+            </Pressable>
+            <Pressable
+              style={[s.modeCard, speakingMode === 'selected_only' && s.modeCardActive, !isTierAtLeast(tier, 'VIP') && { opacity: 0.35 }]}
+              onPress={() => {
+                if (!isTierAtLeast(tier, 'VIP')) {
+                  showToast({ title: '🔒 VIP Gerekli', message: 'Sadece Seçilmişler modu VIP üyelik gerektirir.', type: 'warning' });
+                  return;
+                }
+                setSpeakingMode('selected_only');
+              }}
+            >
+              <Ionicons name="shield-checkmark" size={28} color={speakingMode === 'selected_only' ? '#D4AF37' : '#64748B'} />
+              <Text style={[s.modeLabel, speakingMode === 'selected_only' && { color: '#D4AF37' }]}>Seçilmişler</Text>
+              <Text style={s.modeDesc}>Sadece davetliler</Text>
+              {!isTierAtLeast(tier, 'VIP') && (
+                <View style={s.lockBadge}>
+                  <Ionicons name="lock-closed" size={8} color="#F59E0B" />
+                  <Text style={[s.lockText, { fontSize: 8 }]}>VIP</Text>
+                </View>
+              )}
+            </Pressable>
+          </View>
+        </View>
+
+        {/* Kapasite Bilgisi */}
+        <View style={s.section}>
+          <Text style={s.label}>Oda Kapasitesi</Text>
+          <View style={[s.tierInfo, { marginHorizontal: 0, marginBottom: 0 }]}>
+            <View style={{ flex: 1, gap: 6 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Ionicons name="mic" size={14} color="#14B8A6" />
+                <Text style={s.tierText}>Sahne: {limits.maxSpeakers} kişi</Text>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Ionicons name="people" size={14} color="#14B8A6" />
+                <Text style={s.tierText}>Dinleyici: {limits.maxListeners} kişi</Text>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Ionicons name="eye" size={14} color="#14B8A6" />
+                <Text style={s.tierText}>Seyirci: {limits.maxSpectators} kişi</Text>
+              </View>
+            </View>
+          </View>
+        </View>
+
+        {/* ★ Gelişmiş Ayarlar — Tier-Bazlı */}
+        <View style={s.section}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+            <Text style={s.label}>Gelişmiş Ayarlar</Text>
+            {!isTierAtLeast(tier, 'Bronze') && (
+              <View style={s.lockBadge}>
+                <Ionicons name="lock-closed" size={10} color="#F59E0B" />
+                <Text style={s.lockText}>Premium</Text>
+              </View>
+            )}
+          </View>
+          {[
+            { icon: 'people-circle-outline', label: 'Çoklu Moderatör Atama', minTier: 'Bronze' as const, color: '#14B8A6', desc: `Max ${limits.maxModerators} mod` },
+            { icon: 'eye-off-outline',       label: 'Özel Oda Görünürlüğü',  minTier: 'Bronze' as const, color: '#3B82F6', desc: 'Davetiye ile giriş' },
+            { icon: 'color-palette-outline', label: 'Oda Teması',            minTier: 'Silver' as const, color: '#A78BFA', desc: 'Özel renk teması' },
+            { icon: 'grid-outline',          label: 'Sahne Düzeni',          minTier: 'Silver' as const, color: '#8B5CF6', desc: 'Grid / Spotlight / Theater' },
+            { icon: 'trending-up-outline',   label: 'Keşette Öne Çıkarma', minTier: 'Silver' as const, color: '#F59E0B', desc: 'SP ile boost' },
+            { icon: 'musical-notes-outline', label: 'Oda Müziği',           minTier: 'Gold' as const,   color: '#EC4899', desc: 'Arka plan müzik' },
+            { icon: 'image-outline',         label: 'Oda Kapak Resmi',       minTier: 'Gold' as const,   color: '#F97316', desc: 'Özel kapak foto' },
+            { icon: 'heart-outline',         label: 'Bağış Kabul',          minTier: 'Gold' as const,   color: '#EF4444', desc: 'SP bağışı al' },
+            { icon: 'recording-outline',     label: 'Oda Kaydı',             minTier: 'VIP' as const,    color: '#EF4444', desc: 'Ses kaydı al' },
+            { icon: 'cash-outline',          label: 'Premium Giriş',         minTier: 'VIP' as const,    color: '#D4AF37', desc: 'SP giriş ücreti' },
+            { icon: 'stats-chart-outline',   label: 'Canlı İstatistik',      minTier: 'VIP' as const,    color: '#3B82F6', desc: 'Oda analitiği' },
+          ].map((item) => {
+            const unlocked = isTierAtLeast(tier, item.minTier);
+            return (
+              <Pressable
+                key={item.label}
+                style={[s.typeCard, !unlocked && { opacity: 0.35 }]}
+                onPress={() => {
+                  if (!unlocked) {
+                    showToast({ title: `🔒 ${item.minTier}+ Gerekli`, message: `${item.label} için üyeliğinizi yükseltin.`, type: 'warning' });
+                  } else if (item.label === 'Bağış Kabul') {
+                    setDonationsEnabled(!donationsEnabled);
+                  }
+                }}
+              >
+                <View style={s.typeLeft}>
+                  <Ionicons name={item.icon as any} size={20} color={unlocked ? item.color : '#475569'} />
+                  <View>
+                    <Text style={[s.typeLabel, !unlocked && { color: '#475569' }]}>{item.label}</Text>
+                    <Text style={{ fontSize: 10, color: '#64748B', marginTop: 1 }}>{item.desc}</Text>
+                  </View>
+                </View>
+                {unlocked ? (
+                  <View style={[s.lockBadge, { borderColor: 'rgba(20,184,166,0.3)', backgroundColor: 'rgba(20,184,166,0.08)' }]}>
+                    <Ionicons name="checkmark" size={10} color="#14B8A6" />
+                    <Text style={[s.lockText, { color: '#14B8A6' }]}>Açık</Text>
+                  </View>
+                ) : (
+                  <View style={s.lockBadge}>
+                    <Ionicons name="lock-closed" size={10} color="#F59E0B" />
+                    <Text style={s.lockText}>{item.minTier}+</Text>
+                  </View>
+                )}
+              </Pressable>
+            );
+          })}
+
+          {/* VIP: Giriş Ücreti Input */}
+          {isTierAtLeast(tier, 'VIP') && (
+            <View style={{ marginTop: 12 }}>
+              <Text style={[s.label, { fontSize: 12 }]}>SP Giriş Ücreti</Text>
+              <Text style={s.labelHint}>0 = ücretsiz giriş</Text>
+              <TextInput
+                style={[s.input, { width: 120, textAlign: 'center' }]}
+                value={entryFeeSp > 0 ? String(entryFeeSp) : ''}
+                onChangeText={(t) => setEntryFeeSp(parseInt(t) || 0)}
+                keyboardType="number-pad"
+                placeholder="0"
+                placeholderTextColor="#475569"
+              />
             </View>
           )}
         </View>
