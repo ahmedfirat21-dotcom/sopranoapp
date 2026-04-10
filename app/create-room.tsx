@@ -13,6 +13,9 @@ import { useAuth } from './_layout';
 import AppBackground from '../components/AppBackground';
 import { UpsellService } from '../services/upsell';
 import { supabase } from '../constants/supabase';
+import InviteFriendsModal from '../components/room/InviteFriendsModal';
+import { PushService } from '../services/push';
+import type { FollowUser } from '../services/friendship';
 
 const { width: W } = Dimensions.get('window');
 
@@ -80,6 +83,9 @@ export default function CreateRoomScreen() {
   const [speakingMode, setSpeakingMode] = useState<'free_for_all' | 'permission_only' | 'selected_only'>('permission_only');
   const [entryFeeSp, setEntryFeeSp] = useState(0);
   const [donationsEnabled, setDonationsEnabled] = useState(false);
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [createdRoomId, setCreatedRoomId] = useState<string | null>(null);
+  const [createdRoomName, setCreatedRoomName] = useState('');
 
   const canCreate = name.trim().length >= 2 && (type !== 'closed' || password.trim().length >= 4);
 
@@ -130,7 +136,10 @@ export default function CreateRoomScreen() {
       showToast({ title: 'Oda Oluşturuldu!', message: `"${name.trim()}" odası hazır.`, type: 'success' });
       // ★ SP kazanımı: Oda oluşturma
       try { await GamificationService.onRoomCreate(firebaseUser!.uid); } catch {}
-      router.replace(`/room/${room.id}`);
+      // ★ Faz 8: Arkadaş davet modalını göster (opsiyonel)
+      setCreatedRoomId(room.id);
+      setCreatedRoomName(name.trim());
+      setShowInviteModal(true);
     } catch (err: any) {
       showToast({ title: 'Hata', message: err.message || 'Oda oluşturulamadı.', type: 'error' });
     } finally {
@@ -138,8 +147,7 @@ export default function CreateRoomScreen() {
     }
   };
 
-  return (
-    <AppBackground>
+  const mainContent = (
     <View style={s.container}>
       {/* Header */}
       <View style={[s.header, { paddingTop: insets.top + 8 }]}>
@@ -592,6 +600,37 @@ export default function CreateRoomScreen() {
         </Pressable>
       </ScrollView>
     </View>
+  );
+
+  // ★ Arkadaş davet modalı — oda oluşturulduktan sonra gösterilir
+  const handleInviteFriends = async (selectedUsers: FollowUser[]) => {
+    if (!createdRoomId || !firebaseUser || !profile) return;
+    const hostName = profile.display_name || 'Birisi';
+    // Her seçilen arkadaşa push bildirim gönder
+    for (const user of selectedUsers) {
+      PushService.sendRoomInvite(user.id, hostName, createdRoomName, createdRoomId).catch(() => {});
+    }
+    showToast({ title: 'Davetler Gönderildi!', message: `${selectedUsers.length} arkadaşına davet gönderildi.`, type: 'success' });
+  };
+
+  return (
+    <AppBackground>
+    {mainContent}
+    {showInviteModal && firebaseUser && (
+      <InviteFriendsModal
+        visible={showInviteModal}
+        userId={firebaseUser.uid}
+        onClose={() => {
+          setShowInviteModal(false);
+          if (createdRoomId) router.replace(`/room/${createdRoomId}`);
+        }}
+        onInvite={(selectedUsers: FollowUser[]) => {
+          handleInviteFriends(selectedUsers);
+          setShowInviteModal(false);
+          if (createdRoomId) router.replace(`/room/${createdRoomId}`);
+        }}
+      />
+    )}
     </AppBackground>
   );
 }

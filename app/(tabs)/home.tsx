@@ -232,22 +232,39 @@ export default function HomeScreen() {
 
   useEffect(() => {
     if (activeFilter === 'all') {
-      // İlgi alanına göre sırala — eşleşen odalar üste
+      // ★ Gelişmiş Keşfet Algoritması — çok katmanlı sıralama
       const userInterests = (profile as any)?.interests || (profile as any)?.metadata?.interests || [];
-      if (userInterests.length > 0) {
-        const sorted = [...rooms].sort((a, b) => {
-          const aMatch = userInterests.includes(a.category) ? 1 : 0;
-          const bMatch = userInterests.includes(b.category) ? 1 : 0;
-          return bMatch - aMatch; // eşleşenler üstte
-        });
-        setFilteredRooms(sorted);
-      } else {
-        setFilteredRooms(rooms);
-      }
+      const followingIds = new Set(onlineFriends.map(f => f.id));
+      const now = new Date().toISOString();
+
+      const scored = [...rooms].map(room => {
+        let score = 0;
+        const isSystem = room.id.startsWith('system_');
+        if (isSystem) return { room, score: 9999 }; // Sistem odaları her zaman üstte
+
+        // Katman 1: Boost aktifse +100
+        if ((room as any).boost_expires_at && (room as any).boost_expires_at > now) {
+          score += 100 + ((room as any).boost_score || 0);
+        }
+        // Katman 2: Takip edilen kişinin odası +50
+        if (followingIds.has(room.host_id)) score += 50;
+        // Katman 3: İlgi alanı eşleşmesi +20
+        if (userInterests.length > 0 && userInterests.includes(room.category)) score += 20;
+        // Katman 4: Dinleyici sayısı (normalleştirilmiş)
+        score += Math.min((room.listener_count || 0) * 2, 40);
+        // Katman 5: Yeni odalar hafif bonus (+5 ilk 30dk)
+        const ageMs = Date.now() - new Date(room.created_at).getTime();
+        if (ageMs < 30 * 60 * 1000) score += 5;
+
+        return { room, score };
+      });
+
+      scored.sort((a, b) => b.score - a.score);
+      setFilteredRooms(scored.map(s => s.room));
       return;
     }
     setFilteredRooms(rooms.filter(r => r.category === activeFilter));
-  }, [activeFilter, rooms]);
+  }, [activeFilter, rooms, onlineFriends, profile]);
 
   const handleRefresh = useCallback(() => {
     setRefreshing(true);

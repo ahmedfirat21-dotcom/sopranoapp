@@ -736,6 +736,32 @@ export const RoomService = {
     return new Date(room.expires_at) < new Date();
   },
 
+  /**
+   * ★ Keşfet Boost — Odayı keşfette öne çıkar.
+   * boost_expires_at ve boost_score günceller.
+   * @param durationHours 1 veya 6 saat
+   */
+  async activateBoost(roomId: string, hostId: string, durationHours: 1 | 6): Promise<void> {
+    const { data: room } = await supabase.from('rooms').select('host_id').eq('id', roomId).single();
+    if (!room || room.host_id !== hostId) throw new Error('Bu odanın sahibi değilsiniz');
+    const boostUntil = new Date(Date.now() + durationHours * 60 * 60 * 1000).toISOString();
+    const boostScore = durationHours === 6 ? 100 : 50;
+    try {
+      await supabase.from('rooms').update({
+        boost_expires_at: boostUntil,
+        boost_score: boostScore,
+      }).eq('id', roomId);
+    } catch {
+      // boost_expires_at / boost_score kolonu yoksa room_settings'e yaz
+      const { data: r2 } = await supabase.from('rooms').select('room_settings').eq('id', roomId).single();
+      const settings = (r2?.room_settings || {}) as any;
+      settings.boost_expires_at = boostUntil;
+      settings.boost_score = boostScore;
+      await supabase.from('rooms').update({ room_settings: settings }).eq('id', roomId);
+    }
+  },
+
+
 
   /** ★ Oda temasını değiştir (host + Silver+ gerekli) */
   async setRoomTheme(roomId: string, hostId: string, themeId: string | null) {

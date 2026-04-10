@@ -7,6 +7,7 @@
  */
 import { supabase } from '../constants/supabase';
 import { PushService } from './push';
+import { GamificationService } from './gamification';
 
 export type FriendshipStatus = 'pending' | 'accepted' | 'blocked';
 
@@ -206,8 +207,8 @@ export const FriendshipService = {
         if (nErr) await supabase.from('notifications').insert(notifPayload);
       } catch { /* silent */ }
 
-      // SP: Yeni takipçi kazanan kişiye +15 SP
-      try { await supabase.rpc('grant_system_points', { p_user_id: userId, p_amount: 15, p_action: 'new_follower' }); } catch {}
+      // SP: Yeni takipçi kazanan kişiye SP (GamificationService ile cooldown/cap kontrollü)
+      try { await GamificationService.onFollowerGain(userId); } catch {}
 
       return { success: true };
     } catch (e: any) {

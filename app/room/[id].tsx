@@ -67,6 +67,7 @@ import InlineChat from '../../components/room/InlineChat';
 import RoomStatsPanel from '../../components/room/RoomStatsPanel';
 import { RoomFollowService } from '../../services/roomFollow';
 import { UpsellService } from '../../services/upsell';
+import SPToast, { type SPToastRef } from '../../components/SPToast';
 import { GamificationService } from '../../services/gamification';
 
 
@@ -142,6 +143,9 @@ export default function RoomScreen() {
   const [recordingStartTime, setRecordingStartTime] = useState<Date | null>(null);
   const [roomStats, setRoomStats] = useState({ peakCCU: 0, totalUniqueListeners: 0, totalReactions: 0 });
   const isRoomClosingRef = useRef(false);
+
+  // ★ SP Toast ref — animasyonlu SP kazanım bildirimi
+  const spToastRef = useRef<SPToastRef>(null);
 
   // ★ Emoji Broadcast — Supabase Realtime ile tüm odaya gönder
   const emojiBroadcastRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
@@ -481,6 +485,13 @@ export default function RoomScreen() {
             showToast({ title: '👁️ Seyirci Olarak Katıldın', message: 'Dinleyici alanı dolu. Seyirci olarak izliyorsun.', type: 'info' });
           } else if (joinRole === 'listener') {
             showToast({ title: '🎧 Odaya Katıldın!', message: '+10 SP kazandın', type: 'success' });
+            // ★ SP: Günlük giriş + Prime-time SP
+            GamificationService.onDailyLogin(firebaseUser.uid).then(sp => {
+              if (sp > 0) spToastRef.current?.show(sp, 'Günlük');
+            }).catch(() => {});
+            GamificationService.onPrimeTimeReturn(firebaseUser.uid).then(sp => {
+              if (sp > 0) spToastRef.current?.show(sp, 'Prime Time');
+            }).catch(() => {});
             // Sahne boşsa toast göster
             const stageUsers = p.filter(x => x.role === 'owner' || x.role === 'speaker');
             if (stageUsers.length === 0) {
@@ -552,7 +563,10 @@ export default function RoomScreen() {
       if (room?.host_id === firebaseUser?.uid && newParticipants.length !== prevCount) {
         GamificationService.onCCUMilestone(firebaseUser!.uid, newParticipants.length, prevCount)
           .then(sp => {
-            if (sp > 0) showToast({ title: '🏆 Milestone!', message: `Odanda ${newParticipants.length} kişi! +${sp} SP kazandın.`, type: 'success' });
+            if (sp > 0) {
+              showToast({ title: '🏆 Milestone!', message: `Odanda ${newParticipants.length} kişi! +${sp} SP kazandın.`, type: 'success' });
+              spToastRef.current?.show(sp, 'Milestone');
+            }
           })
           .catch(() => {});
       }
@@ -719,6 +733,10 @@ export default function RoomScreen() {
       await RoomChatService.send(id as string, firebaseUser.uid, chatInput.trim());
       setChatInput('');
       setTimeout(() => chatInputRef.current?.focus(), 100);
+      // ★ SP: Mesaj gönderme (30sn cooldown ile)
+      GamificationService.onMessageSent(firebaseUser.uid).then(sp => {
+        if (sp > 0) spToastRef.current?.show(sp, 'Mesaj');
+      }).catch(() => {});
     } catch { /* silent fail */ }
   };
 
@@ -1538,13 +1556,17 @@ export default function RoomScreen() {
 
     // 10 dakikada bir sahne SP'si
     const stageTimer = setInterval(() => {
-      GamificationService.onStageTime(firebaseUser.uid).catch(() => {});
+      GamificationService.onStageTime(firebaseUser.uid).then(sp => {
+        if (sp > 0) spToastRef.current?.show(sp, 'Sahne');
+      }).catch(() => {});
     }, 10 * 60 * 1000);
 
     // 10 dakikada bir kamera SP'si (kamera açıksa)
     const cameraTimer = setInterval(() => {
       if (lk.isCameraEnabled) {
-        GamificationService.onCameraTime(firebaseUser.uid).catch(() => {});
+        GamificationService.onCameraTime(firebaseUser.uid).then(sp => {
+          if (sp > 0) spToastRef.current?.show(sp, 'Kamera');
+        }).catch(() => {});
       }
     }, 10 * 60 * 1000);
 
@@ -1632,6 +1654,33 @@ export default function RoomScreen() {
     }
   }, [room?.name, id]);
 
+  // ★ Boost Satın Alma — Host için keşfette öne çıkarma
+  const handleBoostRoom = useCallback(() => {
+    if (!room || !firebaseUser?.uid) return;
+    setAlertConfig({
+      visible: true, title: '🚀 Keşfette Öne Çıkar', message: 'Odanı keşfet sayfasında üst sıralara çıkar!\n\n⭐ 1 Saat = 100 SP\n⭐ 6 Saat = 400 SP', type: 'info', icon: 'rocket',
+      buttons: [
+        { text: 'Vazgeç', style: 'cancel' },
+        { text: '1 Saat (100 SP)', onPress: async () => {
+          try {
+            const result = await GamificationService.purchaseRoomBoost(firebaseUser.uid, 1);
+            if (!result.success) { showToast({ title: 'Yetersiz SP', message: result.error || 'SP bakiyeniz yeterli değil.', type: 'warning' }); return; }
+            await RoomService.activateBoost(room.id, firebaseUser.uid, 1);
+            showToast({ title: '🚀 Boost Aktif!', message: '1 saat boyunca keşfette öne çıkacaksın!', type: 'success' });
+          } catch (e: any) { showToast({ title: 'Hata', message: e.message || 'Boost aktifleştirilemedi', type: 'error' }); }
+        }},
+        { text: '6 Saat (400 SP)', onPress: async () => {
+          try {
+            const result = await GamificationService.purchaseRoomBoost(firebaseUser.uid, 6);
+            if (!result.success) { showToast({ title: 'Yetersiz SP', message: result.error || 'SP bakiyeniz yeterli değil.', type: 'warning' }); return; }
+            await RoomService.activateBoost(room.id, firebaseUser.uid, 6);
+            showToast({ title: '🚀 Boost Aktif!', message: '6 saat boyunca keşfette öne çıkacaksın!', type: 'success' });
+          } catch (e: any) { showToast({ title: 'Hata', message: e.message || 'Boost aktifleştirilemedi', type: 'error' }); }
+        }},
+      ],
+    });
+  }, [room, firebaseUser?.uid]);
+
   // ★ Oda takip durumu yükle
   useEffect(() => {
     if (room?.id && firebaseUser?.uid) {
@@ -1705,6 +1754,7 @@ export default function RoomScreen() {
 
       {!!entryEffectName && <PremiumEntryBanner name={entryEffectName} onDone={() => setEntryEffectName(null)} />}
       <FloatingReactionsView ref={floatingRef} />
+      <SPToast ref={spToastRef} />
       {showEmojiBar && (<View style={{ position: 'absolute', bottom: Math.max(insets.bottom, 14) + 70, left: 0, right: 0, alignItems: 'center', zIndex: 50 }}><EmojiReactionBar onReaction={(emoji) => sendEmojiReaction(emoji)} /></View>)}
 
       <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, paddingBottom: Math.max(insets.bottom, 14) + 2 }}>
