@@ -5,7 +5,11 @@
  * Keşfet algoritması, heartbeat, zombie temizliği.
  */
 import { supabase } from '../constants/supabase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PushService } from './push';
+// ★ Lazy import — circular dependency önleme (friendship.ts zaten supabase import ediyor)
+const _getFriendshipService = () => require('./friendship').FriendshipService;
+const FriendshipService = { _getBlockedIds: (userId: string) => _getFriendshipService()._getBlockedIds(userId) } as { _getBlockedIds: (userId: string) => Promise<Set<string>> };
 import { getRoomLimits, getBroadcastLimits, TIER_ORDER, isTierAtLeast, getTierLevel } from '../constants/tiers';
 import type {
   Profile, Room, RoomParticipant, RoomSettings,
@@ -85,7 +89,7 @@ export const ProfileService = {
     const { data, error } = await supabase
       .from('profiles')
       .upsert(
-        { id: userId, ...profileData, username },
+        { id: userId, tier: 'free', ...profileData, username },
         { onConflict: 'id' }
       )
       .select()
@@ -95,7 +99,7 @@ export const ProfileService = {
   },
 
   /** Profili öne çıkar (Boost) — SP ile */
-  async boostProfile(userId: string, spCost: number = 50) {
+  async boostProfile(userId: string, spCost: number = 10) {
     const profile = await ProfileService.get(userId);
     if (!profile || profile.system_points < spCost) {
       throw new Error('Yetersiz SP');
@@ -332,27 +336,41 @@ export const RoomService = {
     }
   },
 
-  /** Gizli profil odaları filtrele */
+  /**
+   * Gizli profil odaları filtrele
+   * ★ BUG-F7 FIX: N+1 sorgu → toplu sorgu ile değiştirildi
+   */
   async _filterPrivateRooms(rooms: Room[], viewerId: string): Promise<Room[]> {
-    const filtered: Room[] = [];
-    for (const room of rooms) {
-      if (room.host && (room.host as any).is_private) {
-        // Takipçi kontrolü
-        const { data } = await supabase
-          .from('friendships')
-          .select('status')
-          .eq('user_id', viewerId)
-          .eq('friend_id', room.host_id)
-          .eq('status', 'accepted')
-          .maybeSingle();
-        if (data || room.host_id === viewerId) {
-          filtered.push(room);
-        }
-      } else {
-        filtered.push(room);
-      }
-    }
-    return filtered;
+    if (!rooms.length) return rooms;
+
+    // Gizli profil host'larını topla
+    const privateHostIds = rooms
+      .filter(room => room.host && (room.host as any).is_private)
+      .map(room => room.host_id);
+
+    // Gizli host yoksa doğrudan dön
+    if (privateHostIds.length === 0) return rooms;
+
+    const uniqueHostIds = [...new Set(privateHostIds)];
+
+    // Tek sorguda tüm takip durumlarını al
+    const { data: followData } = await supabase
+      .from('friendships')
+      .select('friend_id')
+      .eq('user_id', viewerId)
+      .in('friend_id', uniqueHostIds)
+      .eq('status', 'accepted');
+
+    const followedHostIds = new Set((followData || []).map((r: any) => r.friend_id));
+
+    return rooms.filter(room => {
+      // Public oda → göster
+      if (!room.host || !(room.host as any).is_private) return true;
+      // Kendi odam → göster
+      if (room.host_id === viewerId) return true;
+      // Gizli profil oda → takip ediyorsam göster
+      return followedHostIds.has(room.host_id);
+    });
   },
 
   /**
@@ -459,7 +477,6 @@ export const RoomService = {
       type?: string;
       description?: string;
       mode?: string;
-      tags?: string[];
       language?: string;
       welcome_message?: string;
       rules?: string;
@@ -468,12 +485,46 @@ export const RoomService = {
       scheduled_at?: string;
       entry_fee_sp?: number;
       donations_enabled?: boolean;
+      followers_only?: boolean;
+      theme_id?: string;
+      room_image_url?: string;
+      card_image_url?: string;
+      tags?: string[];
     },
     tier: SubscriptionTier = 'Free'
   ): Promise<Room> {
-    // Tier normalize et
-    const normalizedTier = migrateLegacyTier(tier);
+    // ★ Admin (GodMaster) kontrolü — admin odaları VIP limitleriyle oluşturulur
+    let normalizedTier = migrateLegacyTier(tier);
+    const { data: creatorProfile } = await supabase
+      .from('profiles')
+      .select('is_admin')
+      .eq('id', hostId)
+      .single();
+    if (creatorProfile?.is_admin) {
+      normalizedTier = 'VIP' as any;
+    }
+
     const limits = getRoomLimits(normalizedTier);
+
+    // ★ BUG-T1 FIX: allowedTypes backend guard — tier'ın izni olmayan oda tipi engellenir
+    const requestedType = options.type || 'open';
+    if (!limits.allowedTypes.includes(requestedType)) {
+      throw new Error(`${normalizedTier} planıyla "${requestedType}" oda açılamaz. İzinli tipler: ${limits.allowedTypes.join(', ')}`);
+    }
+
+    // ★ BUG-T3 FIX: dailyRooms limiti — bugün oluşturulan oda sayısını kontrol et
+    if (limits.dailyRooms < 999) {
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const { count } = await supabase
+        .from('rooms')
+        .select('*', { count: 'exact', head: true })
+        .eq('host_id', hostId)
+        .gte('created_at', todayStart.toISOString());
+      if ((count || 0) >= limits.dailyRooms) {
+        throw new Error(`Günlük oda limiti doldu (max ${limits.dailyRooms}/${normalizedTier}). Yarın tekrar deneyin.`);
+      }
+    }
 
     // Oda süresini hesapla
     const expiresAt = limits.durationHours > 0
@@ -487,6 +538,20 @@ export const RoomService = {
     if (options.scheduled_at) roomSettings.scheduled_at = options.scheduled_at;
     if (options.entry_fee_sp) roomSettings.entry_fee_sp = options.entry_fee_sp;
     if (options.donations_enabled) roomSettings.donations_enabled = options.donations_enabled;
+    if (options.followers_only) roomSettings.followers_only = options.followers_only;
+    if (options.card_image_url) (roomSettings as any).card_image_url = options.card_image_url;
+
+    // ★ BUG-T4 FIX: maxPersistentRooms limiti — kalıcı oda sayısı kontrolü
+    if (limits.persistent && limits.maxPersistentRooms < 999) {
+      const { count } = await supabase
+        .from('rooms')
+        .select('*', { count: 'exact', head: true })
+        .eq('host_id', hostId)
+        .eq('is_persistent', true);
+      if ((count || 0) >= limits.maxPersistentRooms) {
+        throw new Error(`Kalıcı oda limitine ulaştınız (max ${limits.maxPersistentRooms}/${normalizedTier}). Mevcut odalarınızı silebilirsiniz.`);
+      }
+    }
 
     // Tüm kolonlarla dene, eksik kolon varsa minimal fallback
     let data: any;
@@ -509,10 +574,11 @@ export const RoomService = {
       is_persistent: limits.persistent,
       language: options.language || 'tr',
       mode: options.mode || 'audio',
-      tags: options.tags || [],
       room_settings: roomSettings,
       room_password: options.room_password || null,
       expires_at: expiresAt,
+      ...(options.theme_id ? { theme_id: options.theme_id } : {}),
+      ...(options.room_image_url ? { room_image_url: options.room_image_url } : {}),
     };
 
     ({ data, error } = await supabase
@@ -531,6 +597,9 @@ export const RoomService = {
       (roomSettings as any).max_moderators = limits.maxModerators;
       (roomSettings as any).is_persistent = limits.persistent;
       if (options.room_password) (roomSettings as any).room_password = options.room_password;
+      if (options.theme_id) (roomSettings as any).theme_id = options.theme_id;
+      if (options.room_image_url) (roomSettings as any).room_image_url = options.room_image_url;
+      if (options.tags?.length) (roomSettings as any).tags = options.tags;
 
       ({ data, error } = await supabase
         .from('rooms')
@@ -544,7 +613,6 @@ export const RoomService = {
           listener_count: 0,
           max_speakers: limits.maxSpeakers,
           max_listeners: limits.maxListeners,
-          tags: options.tags || [],
           room_settings: roomSettings,
           expires_at: expiresAt,
         })
@@ -602,7 +670,8 @@ export const RoomService = {
       .eq('id', roomId)
       .single();
 
-    let role: string = 'listener';
+    // ★ BUG-R5 FIX: roleHint parametresini dikkate al
+    let role: string = roleHint || 'listener';
     if (room) {
       const settings = (room.room_settings || {}) as RoomSettings;
       if (settings.original_host_id === userId || room.host_id === userId) {
@@ -651,14 +720,24 @@ export const RoomService = {
 
     if (error) throw error;
 
-    // Dinleyici sayısını artır
-    await supabase.rpc('increment_listener_count', { room_id_input: roomId });
+    // BUG-RD4 FIX: Sadece listener/spectator rollerinde sayacı artır (owner/speaker/mod hariç)
+    if (role === 'listener' || role === 'spectator') {
+      await supabase.rpc('increment_listener_count', { room_id_input: roomId });
+    }
 
     return data as RoomParticipant;
   },
 
   /** Odadan ayrıl */
   async leave(roomId: string, userId: string): Promise<void> {
+    // BUG-RD7 FIX: Önce rolü kontrol et, sadece listener/spectator ise sayacı azalt
+    const { data: participant } = await supabase
+      .from('room_participants')
+      .select('role')
+      .eq('room_id', roomId)
+      .eq('user_id', userId)
+      .maybeSingle();
+
     // Katılımcıyı sil
     await supabase
       .from('room_participants')
@@ -666,8 +745,10 @@ export const RoomService = {
       .eq('room_id', roomId)
       .eq('user_id', userId);
 
-    // Dinleyici sayısını azalt
-    await supabase.rpc('decrement_listener_count', { room_id_input: roomId });
+    // Sadece listener/spectator ise sayacı azalt (owner/speaker/mod azaltmaz)
+    if (participant && (participant.role === 'listener' || participant.role === 'spectator')) {
+      await supabase.rpc('decrement_listener_count', { room_id_input: roomId });
+    }
   },
 
   /** Oda katılımcılarını getir (ghost filtreleme opsiyonel) */
@@ -723,8 +804,43 @@ export const RoomService = {
 
   /** Odayı kapat (geçici oda) */
   async close(roomId: string): Promise<void> {
-    await supabase.from('rooms').update({ is_live: false }).eq('id', roomId);
+    // BUG-RD3 FIX: listener_count da sıfırla — uyandırılınca hayalet sayı göstermesin
+    await supabase.from('rooms').update({ is_live: false, listener_count: 0 }).eq('id', roomId);
     await supabase.from('room_participants').delete().eq('room_id', roomId);
+  },
+
+  /**
+   * ★ Manuel Oda Dondurma — Owner odayı dondurur.
+   * Oda is_live=false olur ama silinmez. Katılımcılar temizlenir.
+   * Daha sonra wakeUpRoom ile tekrar aktifleştirilebilir.
+   * Sadece Bronze+ kullanıcılar (persistent: true) için.
+   */
+  async freezeRoom(roomId: string, hostId: string): Promise<void> {
+    const { data: room } = await supabase
+      .from('rooms')
+      .select('host_id, room_settings')
+      .eq('id', roomId)
+      .single();
+
+    if (!room || room.host_id !== hostId) throw new Error('Bu odanın sahibi değilsiniz');
+
+    const updatedSettings = {
+      ...(room.room_settings || {}),
+      original_host_id: hostId,
+      frozen_at: new Date().toISOString(),
+    };
+
+    // Odayı dondur — is_live: false, listener_count sıfırla, oda silinmez
+    await supabase
+      .from('rooms')
+      .update({ is_live: false, listener_count: 0, room_settings: updatedSettings })
+      .eq('id', roomId);
+
+    // Tüm katılımcıları temizle
+    await supabase
+      .from('room_participants')
+      .delete()
+      .eq('room_id', roomId);
   },
 
   /**
@@ -739,11 +855,49 @@ export const RoomService = {
   /**
    * ★ Keşfet Boost — Odayı keşfette öne çıkar.
    * boost_expires_at ve boost_score günceller.
+   * ★ SP kontrolü dahil — yeterli SP yoksa hata fırlatır.
    * @param durationHours 1 veya 6 saat
    */
   async activateBoost(roomId: string, hostId: string, durationHours: 1 | 6): Promise<void> {
     const { data: room } = await supabase.from('rooms').select('host_id').eq('id', roomId).single();
     if (!room || room.host_id !== hostId) throw new Error('Bu odanın sahibi değilsiniz');
+
+    // ★ BUG-A2 FIX: SP kontrolü — ücretsiz boost exploit önleme
+    const spCost = durationHours === 6 ? 400 : 100;
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('system_points')
+      .eq('id', hostId)
+      .single();
+    const currentSP = profile?.system_points || 0;
+    if (currentSP < spCost) {
+      throw new Error(`Yetersiz SP. Gerekli: ${spCost}, Mevcut: ${currentSP}`);
+    }
+
+    // SP düş (atomic RPC yoksa manuel)
+    try {
+      const { error: rpcError } = await supabase.rpc('grant_system_points', {
+        p_user_id: hostId,
+        p_amount: -spCost,
+        p_action: 'room_boost',
+      });
+      if (rpcError) throw rpcError;
+    } catch {
+      await supabase.from('profiles')
+        .update({ system_points: currentSP - spCost })
+        .eq('id', hostId);
+    }
+
+    // SP işlem kaydı
+    try {
+      await supabase.from('sp_transactions').insert({
+        user_id: hostId,
+        amount: -spCost,
+        type: 'room_boost',
+        description: `Keşfet boost: ${durationHours} saat`,
+      });
+    } catch { /* sp_transactions yoksa sessiz */ }
+
     const boostUntil = new Date(Date.now() + durationHours * 60 * 60 * 1000).toISOString();
     const boostScore = durationHours === 6 ? 100 : 50;
     try {
@@ -815,8 +969,27 @@ export const RoomService = {
     return participants;
   },
 
-  /** Host: Kullanıcıyı konuşmacıya yükselt */
+  /** Host: Kullanıcıyı konuşmacıya yükselt — ★ BUG-R4 FIX: Backend slot limiti */
   async promoteSpeaker(roomId: string, userId: string): Promise<void> {
+    // ★ Sahne slot limiti kontrolü (backend guard)
+    const { data: roomInfo } = await supabase
+      .from('rooms')
+      .select('owner_tier, host_id')
+      .eq('id', roomId)
+      .single();
+    const ownerTier = migrateLegacyTier(roomInfo?.owner_tier);
+    const limits = getRoomLimits(ownerTier);
+    // Owner ve host her zaman sahneye çıkabilir  (slot aşılsa bile)
+    if (roomInfo?.host_id !== userId) {
+      const { count } = await supabase
+        .from('room_participants')
+        .select('*', { count: 'exact', head: true })
+        .eq('room_id', roomId)
+        .in('role', ['owner', 'speaker', 'moderator']);
+      if ((count || 0) >= limits.maxSpeakers) {
+        throw new Error(`Sahne dolu (max ${limits.maxSpeakers}). Tier: ${ownerTier}`);
+      }
+    }
     await supabase
       .from('room_participants')
       .update({ role: 'speaker', is_muted: false })
@@ -863,21 +1036,30 @@ export const RoomService = {
   },
 
   /**
-   * Host çıkınca: Yetki zinciri ile devret (Mod → Speaker → Uyku/Kapanış)
+   * Host çıkınca: Yetki zinciri ile devret (Mod → Speaker → Tier-bazlı politika)
    *
-   *   Free: Oda kapanır (close)
-   *   Bronze: 60sn geri sayım (countdown_60s)
-   *   Silver+: Uyku modu (sleep — oda kapanmaz, tekrar açılabilir)
+   *   Free: Devredilecek kimse yoksa oda kapanır (close)
+   *   Bronze+: Oda açık kalır, host manuel yönetir (keep_alive)
    */
-  async transferHost(roomId: string, oldHostId: string): Promise<{ newHostId: string | null; sleepMode?: boolean }> {
+  async transferHost(roomId: string, oldHostId: string): Promise<{ newHostId: string | null; keepAlive?: boolean }> {
     // Odanın bilgilerini al
     const { data: roomInfo } = await supabase
       .from('rooms')
-      .select('is_persistent, owner_tier, room_settings')
+      .select('is_persistent, owner_tier, room_settings, host_id')
       .eq('id', roomId)
       .single();
 
-    const ownerTier = migrateLegacyTier(roomInfo?.owner_tier);
+    // ★ Admin (GodMaster) kontrolü — admin odaları her zaman VIP gibi davranır
+    let ownerTier = migrateLegacyTier(roomInfo?.owner_tier);
+    const { data: hostProfile } = await supabase
+      .from('profiles')
+      .select('is_admin, subscription_tier')
+      .eq('id', oldHostId)
+      .single();
+    if (hostProfile?.is_admin) {
+      ownerTier = 'VIP' as any;
+    }
+
     const limits = getRoomLimits(ownerTier);
     const isPersistent = roomInfo?.is_persistent || false;
 
@@ -933,39 +1115,44 @@ export const RoomService = {
         .eq('room_id', roomId)
         .eq('user_id', oldHostId);
 
-      await supabase.rpc('decrement_listener_count', { room_id_input: roomId });
+      // BUG-RD8 FIX: Owner rolü listener_count'a katkıda bulunmaz, decrement gereksiz
       return { newHostId };
     }
 
     // ── Kimse bulunamadı ──
-    if (isPersistent || limits.ownerLeavePolicy === 'sleep') {
-      // Silver+: Uyku moduna al — oda kapanmaz, tekrar açılabilir
+
+    // ★ keep_alive (Silver/Gold/VIP): Oda açık kalır, host bilgisi korunur
+    // Otomatik uyku YOK — kullanıcı manuel dondurur
+    if (limits.ownerLeavePolicy === 'keep_alive') {
       const updatedSettings = {
         ...(roomInfo?.room_settings || {}),
         original_host_id: oldHostId,
       };
       await supabase
         .from('rooms')
-        .update({ is_live: false, room_settings: updatedSettings })
+        .update({ room_settings: updatedSettings })
         .eq('id', roomId);
 
+      // Host'u sil
       await supabase
         .from('room_participants')
         .delete()
-        .eq('room_id', roomId);
+        .eq('room_id', roomId)
+        .eq('user_id', oldHostId);
+      // BUG-RD8 FIX: Owner rolü listener_count'a katkıda bulunmaz, decrement gereksiz
 
-      return { newHostId: null, sleepMode: true };
+      return { newHostId: null, keepAlive: true };
     }
 
-    // Free (close) / Bronze (countdown_60s): null döner → frontend davranış belirler
+    // ★ Free (close): null döner → frontend odayı kapatır
     await supabase
       .from('room_participants')
       .delete()
       .eq('room_id', roomId)
       .eq('user_id', oldHostId);
-    await supabase.rpc('decrement_listener_count', { room_id_input: roomId });
+    // BUG-RD8 FIX: Owner rolü listener_count'a katkıda bulunmaz, decrement gereksiz
 
-    return { newHostId: null, sleepMode: false };
+    return { newHostId: null };
   },
 
   /** Host/Mod: Kullanıcıyı metin sohbetinde sustur/aç */
@@ -1089,44 +1276,59 @@ export const RoomService = {
     try { await supabase.rpc('decrement_listener_count', { room_id_input: roomId }); } catch {}
   },
 
-  /** ⛔ Geçici ban (dakika cinsinden) */
+  /**
+   * ⛔ Geçici ban (dakika cinsinden)
+   * ★ BUG-A1/B3 FIX: Katılımcı siliniyor + listener_count azaltılıyor.
+   * Artık muted_until yerine room_bans.expires_at kullanılıyor.
+   */
   async banTemporary(roomId: string, userId: string, durationMinutes: number): Promise<void> {
     const banUntil = new Date(Date.now() + durationMinutes * 60 * 1000).toISOString();
-    // Rol → banned, ban_until set
-    await supabase
-      .from('room_participants')
-      .update({ role: 'banned', muted_until: banUntil })
-      .eq('room_id', roomId)
-      .eq('user_id', userId);
-    // Ban kaydı
+
+    // 1. Ban kaydı (room_bans tablosu — tek kaynak)
     try {
-      await supabase.from('room_bans').insert({
+      await supabase.from('room_bans').upsert({
         room_id: roomId,
         user_id: userId,
         ban_type: 'temporary',
         expires_at: banUntil,
-      });
+      }, { onConflict: 'room_id,user_id' });
     } catch { /* tablo yoksa sessiz */ }
-  },
 
-  /** ⛔ Kalıcı ban (sadece owner) */
-  async banPermanent(roomId: string, userId: string): Promise<void> {
-    // Participantı sil
+    // 2. Katılımcıyı sil (hayalet katılımcı önleme)
     await supabase
       .from('room_participants')
       .delete()
       .eq('room_id', roomId)
       .eq('user_id', userId);
+
+    // 3. Listener count azalt
     try { await supabase.rpc('decrement_listener_count', { room_id_input: roomId }); } catch {}
-    // Kalıcı ban kaydı
+  },
+
+  /**
+   * ⛔ Kalıcı ban (sadece owner)
+   * ★ BUG-A1 FIX: Ban kaydı önce yapılıyor (upsert ile duplikat önleme).
+   */
+  async banPermanent(roomId: string, userId: string): Promise<void> {
+    // 1. Kalıcı ban kaydı (tek kaynak: room_bans)
     try {
-      await supabase.from('room_bans').insert({
+      await supabase.from('room_bans').upsert({
         room_id: roomId,
         user_id: userId,
         ban_type: 'permanent',
         expires_at: null,
-      });
+      }, { onConflict: 'room_id,user_id' });
     } catch { /* tablo yoksa sessiz */ }
+
+    // 2. Katılımcıyı sil
+    await supabase
+      .from('room_participants')
+      .delete()
+      .eq('room_id', roomId)
+      .eq('user_id', userId);
+
+    // 3. Listener count azalt
+    try { await supabase.rpc('decrement_listener_count', { room_id_input: roomId }); } catch {}
   },
 
   /** Ban kontrolü — kullanıcı bu odada banlı mı? */
@@ -1155,87 +1357,63 @@ export const RoomService = {
       .eq('room_id', roomId)
       .eq('user_id', userId);
   },
-
   /**
-   * Süresi dolan + boş + terk edilmiş odaları otomatik kapat/uyut.
-   * Tier-bazlı süre/uyku mantığı
+   * Free tier odalar için otomatik temizlik.
+   * ★ HİBRİT MODEL:
+   *   - Free: Boş odalar 30dk sonra kapanır + expires_at dolunca kapanır
+   *   - Bronze+: Hiçbir otomatik müdahale YOK — host manuel yönetir (dondur/kapat/sil)
    */
   async autoCloseExpired(): Promise<number> {
     const now = new Date().toISOString();
     let closedCount = 0;
 
-    // 1. expires_at set edilmiş ve süresi geçmiş odaları kapat
+    // ═══ 1. Free tier: expires_at süresi dolmuş odaları kapat ═══
+    // Bronze+ odalar süre limitinden muaf — host kendi yönetir
     const { data: expired } = await supabase
       .from('rooms')
-      .select('id, is_persistent')
+      .select('id, owner_tier')
       .eq('is_live', true)
       .not('expires_at', 'is', null)
       .lte('expires_at', now);
 
     if (expired && expired.length > 0) {
       for (const room of expired) {
-        if (room.is_persistent) {
-          // Kalıcı oda — uyku moduna al
-          await supabase.from('rooms').update({ is_live: false }).eq('id', room.id);
-        } else {
-          // Geçici oda — kapat
-          await supabase.from('rooms').update({ is_live: false }).eq('id', room.id);
-        }
+        const roomTier = migrateLegacyTier((room as any).owner_tier);
+        if (roomTier !== 'Free') continue; // Bronze+ muaf
+        await supabase.from('rooms').update({ is_live: false, listener_count: 0 }).eq('id', room.id);
         await supabase.from('room_participants').delete().eq('room_id', room.id);
-      }
-      closedCount += expired.length;
-    }
-
-    // 2. Boş odaları kapat/uyut
-    const { data: liveRooms } = await supabase
-      .from('rooms')
-      .select('id, is_persistent')
-      .eq('is_live', true);
-
-    if (liveRooms && liveRooms.length > 0) {
-      for (const room of liveRooms) {
-        const { count } = await supabase
-          .from('room_participants')
-          .select('*', { count: 'exact', head: true })
-          .eq('room_id', room.id);
-
-        if (count === 0) {
-          await supabase.from('rooms').update({ is_live: false }).eq('id', room.id);
-          closedCount++;
-          if (__DEV__) console.log(`[AutoClose] Boş oda ${room.is_persistent ? 'uyutuldu' : 'kapatıldı'}: ${room.id}`);
-        }
+        closedCount++;
+        if (__DEV__) console.log(`[AutoClose] Süresi dolan Free oda kapatıldı: ${room.id}`);
       }
     }
 
-    // 3. Host'suz odaları kontrol et
-    const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
-    const { data: hostlessRooms } = await supabase
+    // ═══ 2. Free tier: 30+ dakika boş kalan odaları kapat ═══
+    // Bronze+ odalar boş kalsa bile kapanmaz — host'un kararına bırakılır
+    const thirtyMinAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+    const { data: freeRooms } = await supabase
       .from('rooms')
-      .select('id, host_id, is_persistent')
+      .select('id, owner_tier')
       .eq('is_live', true)
-      .lt('created_at', tenMinutesAgo);
+      .lt('created_at', thirtyMinAgo); // En az 30dk önce oluşturulmuş
 
-    if (hostlessRooms && hostlessRooms.length > 0) {
-      for (const room of hostlessRooms) {
-        const { data: hostP } = await supabase
+    if (freeRooms && freeRooms.length > 0) {
+      // Sadece Free tier odaları filtrele
+      const freeOnly = freeRooms.filter(r => migrateLegacyTier((r as any).owner_tier) === 'Free');
+      if (freeOnly.length > 0) {
+        const freeIds = freeOnly.map(r => r.id);
+        const { data: activeParticipants } = await supabase
           .from('room_participants')
-          .select('id')
-          .eq('room_id', room.id)
-          .eq('role', 'owner')
-          .maybeSingle();
+          .select('room_id')
+          .in('room_id', freeIds);
 
-        if (!hostP) {
-          const { count: authCount } = await supabase
-            .from('room_participants')
-            .select('*', { count: 'exact', head: true })
-            .eq('room_id', room.id)
-            .in('role', ['moderator', 'speaker']);
+        const roomsWithParticipants = new Set((activeParticipants || []).map((p: any) => p.room_id));
 
-          if (!authCount || authCount === 0) {
-            await supabase.from('rooms').update({ is_live: false }).eq('id', room.id);
+        for (const room of freeOnly) {
+          if (!roomsWithParticipants.has(room.id)) {
+            await supabase.from('rooms').update({ is_live: false, listener_count: 0 }).eq('id', room.id);
             await supabase.from('room_participants').delete().eq('room_id', room.id);
             closedCount++;
-            if (__DEV__) console.log(`[AutoClose] Yetkisiz oda ${room.is_persistent ? 'uyutuldu' : 'kapatıldı'}: ${room.id}`);
+            if (__DEV__) console.log(`[AutoClose] 30dk+ boş Free oda kapatıldı: ${room.id}`);
           }
         }
       }
@@ -1244,68 +1422,7 @@ export const RoomService = {
     return closedCount;
   },
 
-  // ════════════════════════════════════════════════════════════
-  // ODA BOOST (SP harcama ile keşfette öne çıkarma)
-  // ════════════════════════════════════════════════════════════
-
-  /**
-   * Odayı SP harcayarak boost et — keşfette öne çıkar.
-   * 100 SP = 1 saat boost. boost_score artar, boost_expires_at güncellenir.
-   */
-  async boostRoom(roomId: string, userId: string, spAmount: number): Promise<{ success: boolean; error?: string }> {
-    try {
-      // SP bakiyesini kontrol et
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('system_points')
-        .eq('id', userId)
-        .single();
-
-      if (!profile || (profile.system_points || 0) < spAmount) {
-        return { success: false, error: 'Yetersiz SP bakiyesi' };
-      }
-
-      const boostHours = Math.floor(spAmount / 100);
-      if (boostHours < 1) return { success: false, error: 'Minimum 100 SP gerekli' };
-
-      const boostUntil = new Date(Date.now() + boostHours * 60 * 60 * 1000).toISOString();
-
-      // SP düş
-      await supabase
-        .from('profiles')
-        .update({ system_points: (profile.system_points || 0) - spAmount })
-        .eq('id', userId);
-
-      // Boost uygula
-      const { data: room } = await supabase
-        .from('rooms')
-        .select('boost_score')
-        .eq('id', roomId)
-        .single();
-
-      await supabase
-        .from('rooms')
-        .update({
-          boost_score: (room?.boost_score || 0) + spAmount,
-          boost_expires_at: boostUntil,
-        })
-        .eq('id', roomId);
-
-      // SP log
-      try {
-        await supabase.from('sp_transactions').insert({
-          user_id: userId,
-          amount: -spAmount,
-          type: 'room_boost',
-          description: `Oda boost: ${boostHours} saat`,
-        });
-      } catch { /* sp_transactions yoksa sessiz */ }
-
-      return { success: true };
-    } catch (err) {
-      return { success: false, error: String(err) };
-    }
-  },
+  // ════════════════════════════════════════════════════════════\n  // ODA BOOST\n  // ★ BUG-A2 FIX: boostRoom() duplike fonksiyonu kaldırıldı.\n  // Tek kaynak: activateBoost() (SP kontrolü dahil).\n  // ════════════════════════════════════════════════════════════\n
 
   // ════════════════════════════════════════════════════════════
   // ERİŞİM İSTEKLERİ (Davetli/Kapalı Odalar)
@@ -1396,9 +1513,11 @@ export const RoomService = {
   // ODA KAPATMA
   // ════════════════════════════════════════════════════════════
 
-  /** Odayı tamamen kapat (owner veya admin tarafından) */
+  /** Odayı tamamen kapat (owner veya admin tarafından)
+   *  ★ BUG-A5 FIX: listener_count da sıfırlanıyor — hayalet kalabalık önleme.
+   */
   async closeRoom(roomId: string): Promise<void> {
-    await supabase.from('rooms').update({ is_live: false }).eq('id', roomId);
+    await supabase.from('rooms').update({ is_live: false, listener_count: 0 }).eq('id', roomId);
     await supabase.from('room_participants').delete().eq('room_id', roomId);
   },
 };
@@ -1407,27 +1526,131 @@ export const RoomService = {
 // MESAJ İŞLEMLERİ
 // ============================================
 export const MessageService = {
-  /** Gelen kutusunu (Inbox) getir (N+1 engellenmiş RPC ile) */
+  /** Gelen kutusunu (Inbox) getir */
   async getInbox(userId: string) {
-    const { data, error } = await supabase.rpc('get_user_inbox', { p_user_id: userId });
-    if (error) throw error;
-    return (data || []) as InboxItem[];
+    // Kullanıcının gönderdiği veya aldığı tüm silinmemiş mesajları çek
+    let data: any[] | null = null;
+
+    // is_deleted sütunu varsa filtrele, yoksa filtresiz çek
+    const { data: d1, error: e1 } = await supabase
+      .from('messages')
+      .select('id, sender_id, receiver_id, content, is_read, created_at, is_deleted')
+      .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
+      .not('is_deleted', 'is', true)
+      .order('created_at', { ascending: false })
+      .limit(500);
+
+    if (e1 && e1.code === '42703') {
+      // is_deleted sütunu henüz yok — filtresiz çek
+      const { data: d2, error: e2 } = await supabase
+        .from('messages')
+        .select('id, sender_id, receiver_id, content, is_read, created_at')
+        .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
+        .order('created_at', { ascending: false })
+        .limit(500);
+      if (e2) throw e2;
+      data = d2;
+    } else if (e1) {
+      throw e1;
+    } else {
+      data = d1;
+    }
+
+    if (!data || data.length === 0) return [] as InboxItem[];
+
+    // Partner bazında grupla — her partner için son mesajı bul
+    const partnerMap = new Map<string, { lastMsg: any; unread: number }>();
+    for (const msg of data) {
+      const partnerId = msg.sender_id === userId ? msg.receiver_id : msg.sender_id;
+      // ★ Null/undefined partnerId — bozuk veri, atla
+      if (!partnerId) continue;
+      if (!partnerMap.has(partnerId)) {
+        partnerMap.set(partnerId, { lastMsg: msg, unread: 0 });
+      }
+      // Okunmamış sayısı: karşı taraftan gelen + okunmamış
+      if (msg.receiver_id === userId && !msg.is_read) {
+        const entry = partnerMap.get(partnerId)!;
+        entry.unread++;
+      }
+    }
+
+    // ★ Engellenen kişileri filtrele — inbox'ta görünmesinler
+    const blockedIds = await FriendshipService._getBlockedIds(userId);
+
+    // Partner profil bilgilerini toplu çek
+    const partnerIds = Array.from(partnerMap.keys()).filter(id => !blockedIds.has(id));
+    if (partnerIds.length === 0) return [] as InboxItem[];
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, display_name, avatar_url, is_online')
+      .in('id', partnerIds);
+    const profileMap = new Map((profiles || []).map(p => [p.id, p]));
+
+    // InboxItem formatına dönüştür
+    const inbox: InboxItem[] = [];
+    for (const [partnerId, { lastMsg, unread }] of partnerMap) {
+      const prof = profileMap.get(partnerId);
+      const isSentByMe = lastMsg.sender_id === userId;
+      let preview = lastMsg.content || '';
+      // Media tespiti content'ten (sütun yok)
+      if (preview.startsWith('🎤') || preview.includes('voice_messages/')) preview = '🎤 Sesli mesaj';
+      else if (preview.startsWith('📷') || preview.match(/^https?.*\.(jpg|png|webp)/i)) preview = '📷 Fotoğraf';
+      if (isSentByMe && !preview.startsWith('Sen:')) preview = `Sen: ${preview}`;
+
+      inbox.push({
+        partner_id: partnerId,
+        partner_name: prof?.display_name || 'Kullanıcı',
+        partner_avatar: prof?.avatar_url || '',
+        partner_is_online: prof?.is_online || false,
+        last_message_content: preview,
+        last_message_time: lastMsg.created_at,
+        unread_count: unread,
+      });
+    }
+
+    // Son mesaja göre sırala (en yeni üste)
+    inbox.sort((a, b) => new Date(b.last_message_time).getTime() - new Date(a.last_message_time).getTime());
+    return inbox;
   },
 
   /** İki kişi arasındaki tüm konuşma geçmişini getir */
-  async getConversation(user1Id: string, user2Id: string, limit = 50) {
-    const { data, error } = await supabase
+  async getConversation(user1Id: string, user2Id: string, limit = 200) {
+    // ★ is_deleted sütunu varsa filtrele, yoksa filtresiz — getInbox ile aynı strateji
+    const orFilter = `and(sender_id.eq.${user1Id},receiver_id.eq.${user2Id}),and(sender_id.eq.${user2Id},receiver_id.eq.${user1Id})`;
+
+    const { data: d1, error: e1 } = await supabase
       .from('messages')
       .select('*, sender:profiles!sender_id(*)')
-      .or(`and(sender_id.eq.${user1Id},receiver_id.eq.${user2Id}),and(sender_id.eq.${user2Id},receiver_id.eq.${user1Id})`)
+      .or(orFilter)
+      .not('is_deleted', 'is', true)
       .order('created_at', { ascending: true })
       .limit(limit);
-    if (error) throw error;
-    return (data || []) as Message[];
+
+    if (e1 && e1.code === '42703') {
+      // is_deleted sütunu yok — filtresiz çek
+      const { data: d2, error: e2 } = await supabase
+        .from('messages')
+        .select('*, sender:profiles!sender_id(*)')
+        .or(orFilter)
+        .order('created_at', { ascending: true })
+        .limit(limit);
+      if (e2) throw e2;
+      return (d2 || []) as Message[];
+    }
+    if (e1) throw e1;
+    return (d1 || []) as Message[];
   },
 
-  /** Yeni mesaj gönder — voice_url/voice_duration desteği */
-  async send(senderId: string, receiverId: string, content: string, imageUrl?: string, voiceUrl?: string, voiceDuration?: number) {
+  /** Yeni mesaj gönder — voice desteği + engel kontrolü */
+  async send(senderId: string, receiverId: string, content: string, imageUrlOrIsRequest?: string | boolean, voiceUrl?: string, voiceDuration?: number) {
+    // ★ Engel kontrolü: Her iki yönüe de mesaj engellenir
+    const blockedIds = await FriendshipService._getBlockedIds(senderId);
+    if (blockedIds.has(receiverId)) {
+      throw new Error('Bu kullanıcıyla mesajlaşamazsınız.');
+    }
+
+    const imageUrl = typeof imageUrlOrIsRequest === 'string' ? imageUrlOrIsRequest : undefined;
+
     const insertData: any = { sender_id: senderId, receiver_id: receiverId, content };
     if (imageUrl) insertData.image_url = imageUrl;
     if (voiceUrl) insertData.voice_url = voiceUrl;
@@ -1443,44 +1666,99 @@ export const MessageService = {
     // Push bildirim gönder (arka planda, hata yutulur)
     const senderName = (msg as any).sender?.display_name || 'Birisi';
     const preview = voiceUrl ? '🎙️ Sesli mesaj' : imageUrl ? '📷 Fotoğraf' : (content.length > 50 ? content.substring(0, 50) + '...' : content);
-    PushService.sendToUser(receiverId, 'Yeni Mesaj', `${senderName}: ${preview}`, {
+    const pushTitle = 'Yeni Mesaj';
+    PushService.sendToUser(receiverId, pushTitle, `${senderName}: ${preview}`, {
       type: 'dm',
       route: `/chat/${senderId}`,
     }).catch(() => {});
 
+    // ★ Rozet trigger: mesaj gönderme rozeti kontrolü (arka planda)
+    try {
+      const { BadgeCheckerService } = require('./engagement/badges');
+      BadgeCheckerService.checkForAction(senderId, 'message_sent').catch(() => {});
+    } catch {}
+
     return msg as Message;
   },
 
-  /** Karşı tarafın gönderdiği mesajları okundu olarak işaretle */
+  /** Karşı tarafın gönderdiği mesajları okundu olarak işaretle — silinmişler hariç */
   async markAsRead(currentUserId: string, otherUserId: string) {
     const { error } = await supabase
       .from('messages')
       .update({ is_read: true })
       .eq('receiver_id', currentUserId)
       .eq('sender_id', otherUserId)
-      .eq('is_read', false);
+      .eq('is_read', false)
+      .not('is_deleted', 'is', true);
     if (error && error.code !== 'PGRST116') {
       if (__DEV__) console.warn('Okundu işaretleme hatası:', error.message);
     }
   },
 
-  /** Mesaj sil (sadece kendi gönderdiğin mesajlar) */
+  /** Mesaj sil — soft delete (sadece kendi gönderdiğin mesajlar) */
   async deleteMessage(messageId: string, senderId: string) {
     const { error } = await supabase
       .from('messages')
-      .delete()
+      .update({ is_deleted: true })
       .eq('id', messageId)
       .eq('sender_id', senderId);
     if (error) throw error;
   },
 
-  /** Okunmamış toplam mesaj sayısı (genel) */
+  /** ★ Emoji tepki güncelle (WhatsApp tarzı) */
+  async updateReaction(messageId: string, reactionsJson: string) {
+    const { error } = await supabase
+      .from('messages')
+      .update({ reactions: reactionsJson })
+      .eq('id', messageId);
+    if (error && error.code !== '42703') throw error; // 42703 = column doesn't exist yet
+  },
+
+  /**
+   * ★ Sohbeti gizle — tek taraflı (WhatsApp modeli)
+   * DB'deki mesajları DEĞİŞTİRMEZ — sadece AsyncStorage'a gizleme timestamp'i yazar.
+   * Bu sayede:
+   *   1. Karşı taraf mesajlarını hâlâ görür
+   *   2. Gizlemeden sonra gelen yeni mesajlar tekrar inbox'ta görünür
+   */
+  async deleteConversation(userId: string, partnerId: string) {
+    // 1. Okunmamış mesajları temizle (badge sıfırla)
+    await this.markAsRead(userId, partnerId);
+
+    // 2. AsyncStorage'a gizleme zamanı yaz
+    const key = `hidden_conversations_${userId}`;
+    const raw = await AsyncStorage.getItem(key);
+    const map: Record<string, string> = raw ? JSON.parse(raw) : {};
+    map[partnerId] = new Date().toISOString();
+    await AsyncStorage.setItem(key, JSON.stringify(map));
+  },
+
+  /** Gizlenmiş sohbet timestamp'lerini oku */
+  async getHiddenConversations(userId: string): Promise<Record<string, string>> {
+    const key = `hidden_conversations_${userId}`;
+    const raw = await AsyncStorage.getItem(key);
+    return raw ? JSON.parse(raw) : {};
+  },
+
+  /** Okunmamış toplam mesaj sayısı (genel) — is_deleted filtreli + engellenenler hariç */
   async getUnreadCount(userId: string) {
-    const { count, error } = await supabase
+    // ★ Engellenen kişilerden gelen mesajları sayma
+    const blockedIds = await FriendshipService._getBlockedIds(userId);
+    
+    let query = supabase
       .from('messages')
       .select('*', { count: 'exact', head: true })
       .eq('receiver_id', userId)
-      .eq('is_read', false);
+      .eq('is_read', false)
+      .not('is_deleted', 'is', true);
+    
+    // Supabase .not().in() ile engellenen sender'ları filtrele
+    if (blockedIds.size > 0) {
+      const blockedArr = Array.from(blockedIds);
+      query = query.not('sender_id', 'in', `(${blockedArr.map(id => `"${id}"`).join(',')})`);
+    }
+    
+    const { count, error } = await query;
     if (error) throw error;
     return count || 0;
   },
@@ -1504,7 +1782,7 @@ export const MessageService = {
         },
         async (payload) => {
           const { data } = await supabase.from('messages').select('*, sender:profiles!sender_id(*)').eq('id', payload.new.id).single();
-          if (data) callback(data as Message);
+          if (data && !(data as any).is_deleted) callback(data as Message);
         }
       )
       .subscribe();

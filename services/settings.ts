@@ -13,8 +13,8 @@ export type UserSettings = {
   notification_sound: boolean;
   notification_vibration: boolean;
 
-  // Görünüm
-  theme: 'dark' | 'light';
+  // Görünüm (şu an yalnızca 'dark' destekleniyor — themeEngine.ts ile senkronize)
+  theme: 'dark';
 
   // Dil
   language: 'tr' | 'en';
@@ -36,7 +36,8 @@ export const DEFAULT_SETTINGS: UserSettings = {
 
 export const THEME_OPTIONS = [
   { key: 'dark' as const, label: 'Koyu', desc: 'Soprano klasik koyu tema' },
-  { key: 'light' as const, label: 'Açık Tema', desc: 'Pastel mavi-beyaz aydınlık tema' },
+  // Açık tema henüz uygulanmadı — themeEngine.ts sadece 'dark' destekliyor
+  // Yeni tema eklendiğinde buraya eklenmeli + themeEngine.ts güncellenmeli
 ];
 
 export const LANGUAGE_OPTIONS = [

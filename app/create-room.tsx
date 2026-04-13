@@ -1,13 +1,15 @@
 import { useState, useMemo } from 'react';
-import { View, Text, StyleSheet, TextInput, Pressable, ScrollView, ActivityIndicator, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TextInput, Pressable, ScrollView, ActivityIndicator, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { safeGoBack } from '../constants/navigation';
 import { RoomService, getRoomLimits, type TierName } from '../services/database';
 import { isTierAtLeast } from '../constants/tiers';
 import { GamificationService } from '../services/gamification';
 import { Colors } from '../constants/theme';
 import { showToast } from '../components/Toast';
+import { getAvatarSource } from '../constants/avatars';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from './_layout';
 import AppBackground from '../components/AppBackground';
@@ -16,30 +18,32 @@ import { supabase } from '../constants/supabase';
 import InviteFriendsModal from '../components/room/InviteFriendsModal';
 import { PushService } from '../services/push';
 import type { FollowUser } from '../services/friendship';
+import * as ImagePicker from 'expo-image-picker';
 
-const { width: W } = Dimensions.get('window');
 
-const POPULAR_TAGS = [
-  { id: 'sohbet', label: '#sohbet', icon: '💬' },
-  { id: 'müzik', label: '#müzik', icon: '🎵' },
-  { id: 'spor', label: '#spor', icon: '⚽' },
-  { id: 'siyaset', label: '#siyaset', icon: '🏛️' },
-  { id: 'aşk', label: '#aşk', icon: '❤️' },
-  { id: 'eğlence', label: '#eğlence', icon: '🎉' },
-  { id: 'oyun', label: '#oyun', icon: '🎮' },
-  { id: 'film', label: '#film', icon: '🎬' },
-  { id: 'kitap', label: '#kitap', icon: '📖' },
-  { id: 'teknoloji', label: '#teknoloji', icon: '💻' },
+
+// Tema haritası — RoomSettingsSheet ile aynı
+const ROOM_THEMES: { id: string; name: string; colors: [string, string] }[] = [
+  { id: 'ocean',   name: 'Okyanus',    colors: ['#0E4D6F', '#083344'] },
+  { id: 'sunset',  name: 'Gün Batımı', colors: ['#7F1D1D', '#4C0519'] },
+  { id: 'forest',  name: 'Orman',      colors: ['#14532D', '#052E16'] },
+  { id: 'galaxy',  name: 'Galaksi',    colors: ['#312E81', '#1E1B4B'] },
+  { id: 'aurora',  name: 'Aurora',     colors: ['#134E4A', '#042F2E'] },
+  { id: 'cherry',  name: 'Kiraz',      colors: ['#831843', '#500724'] },
+  { id: 'cyber',   name: 'Cyber',      colors: ['#1E3A8A', '#172554'] },
+  { id: 'volcano', name: 'Volkan',     colors: ['#7C2D12', '#431407'] },
 ];
 
-const LANGUAGES = [
-  { id: 'tr', label: 'Türkçe', flag: '🇹🇷' },
-  { id: 'en', label: 'English', flag: '🇬🇧' },
-  { id: 'ar', label: 'العربية', flag: '🇸🇦' },
-  { id: 'de', label: 'Deutsch', flag: '🇩🇪' },
-  { id: 'fr', label: 'Français', flag: '🇫🇷' },
-  { id: 'ru', label: 'Русский', flag: '🇷🇺' },
-];
+// Kategori önizleme theme'leri (keşfet sayfasındaki oda kartı ile aynı)
+const CATEGORY_THEME_PREVIEW: Record<string, { colors: [string, string, string] }> = {
+  chat:  { colors: ['#1E3A5F', '#0F2744', '#0A1929'] },
+  music: { colors: ['#3B1F5E', '#2D1648', '#1A0D2E'] },
+  game:  { colors: ['#4A1525', '#3A0F1E', '#260A14'] },
+  tech:  { colors: ['#0F2E4A', '#0A2038', '#061525'] },
+  book:  { colors: ['#3D2E10', '#2E2108', '#1F1605'] },
+  film:  { colors: ['#3B1042', '#2D0C34', '#1F0824'] },
+  other: { colors: ['#1E293B', '#151E2E', '#0F172A'] },
+};
 
 const CATEGORIES = [
   { id: 'chat', label: 'Sohbet', icon: 'chatbubbles', color: '#14B8A6' },
@@ -57,16 +61,48 @@ const ROOM_TYPES = [
   { id: 'invite', label: 'Davetli', icon: 'mail-outline', desc: 'Sadece davetliler', minTier: 'Gold' },
 ] as const;
 
-const MODES = [
-  { id: 'audio', label: 'Sesli Sohbet', icon: 'mic', desc: 'Yalnızca ses' },
-  { id: 'video', label: 'Görüntülü', icon: 'videocam', desc: 'Ses + Kamera' },
+const SPEAKING_MODES = [
+  { id: 'free_for_all', label: 'Serbest', icon: 'people', desc: 'Herkes konuşur', minTier: 'Free' as const },
+  { id: 'permission_only', label: 'İzinli', icon: 'hand-left', desc: 'El kaldır', minTier: 'Free' as const },
+  { id: 'selected_only', label: 'Seçilmişler', icon: 'shield-checkmark', desc: 'Sadece davetli', minTier: 'VIP' as const },
 ];
+
+/**
+ * ★ BUG-CR1: Yerel file:// URI'yi Supabase Storage'a yükle
+ * Diğer kullanıcılar yerel URI'lere erişemez — public URL gerekli.
+ */
+async function uploadRoomImage(userId: string, localUri: string, prefix: 'card' | 'bg'): Promise<string> {
+  try {
+    const ext = localUri.split('.').pop()?.toLowerCase() || 'jpg';
+    const fileName = `room-images/${userId}/${prefix}_${Date.now()}.${ext}`;
+
+    const response = await fetch(localUri);
+    const blob = await response.blob();
+
+    const { error } = await supabase.storage
+      .from('public')
+      .upload(fileName, blob, { contentType: `image/${ext === 'png' ? 'png' : 'jpeg'}`, upsert: true });
+
+    if (error) {
+      if (__DEV__) console.warn('[UploadRoomImage] Upload error:', error.message);
+      return ''; // Yükleme başarısız — görselsiz devam et
+    }
+
+    const { data: urlData } = supabase.storage.from('public').getPublicUrl(fileName);
+    return urlData?.publicUrl || '';
+  } catch (e) {
+    if (__DEV__) console.warn('[UploadRoomImage] Error:', e);
+    return '';
+  }
+}
 
 export default function CreateRoomScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { firebaseUser, profile } = useAuth();
-  const tier = (profile?.subscription_tier || 'Free') as TierName;
+  const isAdmin = profile?.is_admin === true;
+  // GodMaster admin = sınırsız VIP yetki
+  const tier = (isAdmin ? 'VIP' : (profile?.subscription_tier || 'Free')) as TierName;
   const limits = useMemo(() => getRoomLimits(tier), [tier]);
 
   const [name, setName] = useState('');
@@ -74,15 +110,18 @@ export default function CreateRoomScreen() {
   const [type, setType] = useState('open');
   const [mode, setMode] = useState('audio');
   const [description, setDescription] = useState('');
-  const [welcomeMsg, setWelcomeMsg] = useState('');
-  const [rules, setRules] = useState('');
-  const [tags, setTags] = useState<string[]>([]);
-  const [language, setLanguage] = useState('tr');
+
   const [password, setPassword] = useState('');
   const [creating, setCreating] = useState(false);
   const [speakingMode, setSpeakingMode] = useState<'free_for_all' | 'permission_only' | 'selected_only'>('permission_only');
-  const [entryFeeSp, setEntryFeeSp] = useState(0);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  // Gelişmiş Ayarlar (tier-gated)
+  const [entryFee, setEntryFee] = useState(0);
   const [donationsEnabled, setDonationsEnabled] = useState(false);
+  const [followersOnly, setFollowersOnly] = useState(false);
+  const [selectedTheme, setSelectedTheme] = useState<string | null>(null);
+  const [backgroundImage, setBackgroundImage] = useState('');
+  const [cardImage, setCardImage] = useState('');
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [createdRoomId, setCreatedRoomId] = useState<string | null>(null);
   const [createdRoomName, setCreatedRoomName] = useState('');
@@ -92,13 +131,11 @@ export default function CreateRoomScreen() {
   const handleCreate = async () => {
     if (!canCreate || !firebaseUser || creating) return;
 
-    // Tier kontrolü
     if (!limits.allowedTypes.includes(type)) {
       showToast({ title: 'Yetersiz Üyelik', message: 'Bu oda tipini açmak için üyeliğinizi yükseltin.', type: 'warning' });
       return;
     }
 
-    // Günlük oda limiti kontrolü
     if (limits.dailyRooms < 999) {
       try {
         const todayStart = new Date();
@@ -110,33 +147,49 @@ export default function CreateRoomScreen() {
           .gte('created_at', todayStart.toISOString());
         if ((count || 0) >= limits.dailyRooms) {
           UpsellService.onDailyRoomLimit(tier);
-          showToast({ title: 'Günlük Limit', message: `Bugün en fazla ${limits.dailyRooms} oda açabilirsiniz. Üyelik yükseltmesi ile limiti artırın.`, type: 'warning' });
+          showToast({ title: 'Günlük Limit', message: `Bugün en fazla ${limits.dailyRooms} oda açabilirsiniz.`, type: 'warning' });
           return;
         }
-      } catch {} // Limit kontrolü başarısız olursa geç
+      } catch { }
     }
 
     setCreating(true);
     try {
+      // ★ BUG-CR1 FIX: Yerel file:// URI'leri Supabase Storage'a yükle
+      let uploadedCardUrl = '';
+      let uploadedBgUrl = '';
+      if (cardImage && cardImage.startsWith('file://')) {
+        uploadedCardUrl = await uploadRoomImage(firebaseUser.uid, cardImage, 'card');
+      }
+      if (backgroundImage && backgroundImage.startsWith('file://')) {
+        uploadedBgUrl = await uploadRoomImage(firebaseUser.uid, backgroundImage, 'bg');
+      }
+
       const room = await RoomService.create(
         firebaseUser.uid,
         {
           name: name.trim(), category, type,
           description: description.trim() || undefined,
-          mode, tags, language,
-          welcome_message: welcomeMsg.trim() || undefined,
-          rules: rules.trim() || undefined,
-          room_password: type === 'closed' ? password.trim() : undefined,
+          mode,
           speaking_mode: speakingMode,
-          entry_fee_sp: entryFeeSp > 0 ? entryFeeSp : undefined,
+          room_password: type === 'closed' ? password.trim() : undefined,
+          entry_fee_sp: entryFee > 0 ? entryFee : undefined,
           donations_enabled: donationsEnabled || undefined,
+          followers_only: followersOnly || undefined,
+          theme_id: selectedTheme || undefined,
+          room_image_url: uploadedBgUrl || undefined,
+          card_image_url: uploadedCardUrl || undefined,
         },
         tier
       );
       showToast({ title: 'Oda Oluşturuldu!', message: `"${name.trim()}" odası hazır.`, type: 'success' });
-      // ★ SP kazanımı: Oda oluşturma
-      try { await GamificationService.onRoomCreate(firebaseUser!.uid); } catch {}
-      // ★ Faz 8: Arkadaş davet modalını göster (opsiyonel)
+      try { await GamificationService.onRoomCreate(firebaseUser!.uid); } catch { }
+      // ★ Rozet trigger: oda oluşturma rozetlerini kontrol et
+      try {
+        const { BadgeCheckerService } = require('../services/engagement/badges');
+        const badge = await BadgeCheckerService.checkForAction(firebaseUser!.uid, 'room_created');
+        if (badge) showToast({ title: '🏆 Rozet Kazanıldı!', message: `"${badge}" rozeti açıldı!`, type: 'success' });
+      } catch { }
       setCreatedRoomId(room.id);
       setCreatedRoomName(name.trim());
       setShowInviteModal(true);
@@ -147,611 +200,750 @@ export default function CreateRoomScreen() {
     }
   };
 
-  const mainContent = (
-    <View style={s.container}>
-      {/* Header */}
-      <View style={[s.header, { paddingTop: insets.top + 8 }]}>
-        <Pressable onPress={() => router.back()} style={s.backBtn}>
-          <Ionicons name="chevron-back" size={24} color="#F1F5F9" />
-        </Pressable>
-        <Text style={s.headerTitle}>Yeni Oda Oluştur</Text>
-        <View style={{ width: 36 }} />
-      </View>
-
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}
-        keyboardShouldPersistTaps="handled"
-      >
-        {/* Oda Adı */}
-        <View style={s.section}>
-          <Text style={s.label}>Oda Adı</Text>
-          <TextInput
-            style={s.input}
-            placeholder="Odana bir isim ver..."
-            placeholderTextColor="#64748B"
-            value={name}
-            onChangeText={setName}
-            maxLength={50}
-          />
-          <Text style={s.charCount}>{name.length}/50</Text>
-        </View>
-
-        {/* Kategori */}
-        <View style={s.section}>
-          <Text style={s.label}>Kategori</Text>
-          <View style={s.chipGrid}>
-            {CATEGORIES.map((cat) => (
-              <Pressable
-                key={cat.id}
-                style={[s.chip, category === cat.id && { backgroundColor: cat.color, borderColor: cat.color }]}
-                onPress={() => setCategory(cat.id)}
-              >
-                <Ionicons name={cat.icon as any} size={16} color={category === cat.id ? '#FFF' : '#94A3B8'} />
-                <Text style={[s.chipText, category === cat.id && { color: '#FFF' }]}>{cat.label}</Text>
-              </Pressable>
-            ))}
-          </View>
-        </View>
-
-        {/* Mod */}
-        <View style={s.section}>
-          <Text style={s.label}>Mod</Text>
-          <View style={s.modeRow}>
-            {MODES.map((m) => (
-              <Pressable
-                key={m.id}
-                style={[s.modeCard, mode === m.id && s.modeCardActive]}
-                onPress={() => setMode(m.id)}
-              >
-                <Ionicons name={m.icon as any} size={28} color={mode === m.id ? Colors.accentTeal : '#64748B'} />
-                <Text style={[s.modeLabel, mode === m.id && { color: '#F1F5F9' }]}>{m.label}</Text>
-                <Text style={s.modeDesc}>{m.desc}</Text>
-              </Pressable>
-            ))}
-          </View>
-        </View>
-
-        {/* Oda Tipi */}
-        <View style={s.section}>
-          <Text style={s.label}>Oda Tipi</Text>
-          {ROOM_TYPES.map((rt) => {
-            const locked = !limits.allowedTypes.includes(rt.id);
-            return (
-              <Pressable
-                key={rt.id}
-                style={[s.typeCard, type === rt.id && s.typeCardActive, locked && { opacity: 0.4 }]}
-                onPress={() => { if (!locked) setType(rt.id); }}
-                disabled={locked}
-              >
-                <View style={s.typeLeft}>
-                  <Ionicons name={rt.icon as any} size={22} color={type === rt.id ? Colors.accentTeal : '#94A3B8'} />
-                  <View>
-                    <Text style={[s.typeLabel, type === rt.id && { color: '#F1F5F9' }]}>{rt.label}</Text>
-                    <Text style={s.typeDesc}>{rt.desc}</Text>
-                  </View>
-                </View>
-                {locked && (
-                  <View style={s.lockBadge}>
-                    <Ionicons name="lock-closed" size={12} color="#F59E0B" />
-                    <Text style={s.lockText}>{rt.minTier}+</Text>
-                  </View>
-                )}
-                {type === rt.id && !locked && (
-                  <Ionicons name="checkmark-circle" size={22} color={Colors.accentTeal} />
-                )}
-              </Pressable>
-            );
-          })}
-        </View>
-
-        {/* Şifreli oda — şifre input'u */}
-        {type === 'closed' && (
-          <View style={s.section}>
-            <Text style={s.label}>Oda Şifresi</Text>
-            <Text style={s.labelHint}>En az 4 karakter. Katılımcılar bu şifreyi girerek odaya girer.</Text>
-            <TextInput
-              style={s.input}
-              placeholder="Şifre belirleyin..."
-              placeholderTextColor="#64748B"
-              value={password}
-              onChangeText={setPassword}
-              maxLength={20}
-              secureTextEntry
-            />
-            {password.length > 0 && password.length < 4 && (
-              <Text style={{ color: '#EF4444', fontSize: 10, marginTop: 4 }}>En az 4 karakter gerekli</Text>
-            )}
-          </View>
-        )}
-
-        {/* Açıklama */}
-        <View style={s.section}>
-          <Text style={s.label}>Açıklama (İsteğe bağlı)</Text>
-          <TextInput
-            style={[s.input, { height: 80, textAlignVertical: 'top' }]}
-            placeholder="Odanı tanımla..."
-            placeholderTextColor="#64748B"
-            value={description}
-            onChangeText={setDescription}
-            maxLength={200}
-            multiline
-          />
-        </View>
-
-        {/* Giriş Mesajı */}
-        <View style={s.section}>
-          <Text style={s.label}>Giriş Mesajı (İsteğe bağlı)</Text>
-          <Text style={s.labelHint}>Odaya giren herkes bu mesajı görür</Text>
-          <TextInput
-            style={[s.input, { height: 70, textAlignVertical: 'top' }]}
-            placeholder="Hoş geldiniz! Kurallarımıza saygı gösterin 🙏"
-            placeholderTextColor="#64748B"
-            value={welcomeMsg}
-            onChangeText={setWelcomeMsg}
-            maxLength={200}
-            multiline
-          />
-        </View>
-
-        {/* Oda Kuralları */}
-        <View style={s.section}>
-          <Text style={s.label}>Oda Kuralları (İsteğe bağlı)</Text>
-          <Text style={s.labelHint}>Menüden görülebilir — saygılı ortam için</Text>
-          <TextInput
-            style={[s.input, { height: 70, textAlignVertical: 'top' }]}
-            placeholder="1. Hakaret yok
-2. Herkes konuşabilir
-3. Eğlenin!"
-            placeholderTextColor="#64748B"
-            value={rules}
-            onChangeText={setRules}
-            maxLength={300}
-            multiline
-          />
-        </View>
-
-        {/* Etiketler */}
-        <View style={s.section}>
-          <Text style={s.label}>Etiketler (max 5)</Text>
-          <View style={s.chipGrid}>
-            {POPULAR_TAGS.map((tag) => {
-              const isSelected = tags.includes(tag.id);
-              return (
-                <Pressable
-                  key={tag.id}
-                  style={[s.tagChip, isSelected && s.tagChipActive]}
-                  onPress={() => {
-                    if (isSelected) {
-                      setTags(tags.filter(t => t !== tag.id));
-                    } else if (tags.length < 5) {
-                      setTags([...tags, tag.id]);
-                    }
-                  }}
-                >
-                  <Text style={{ fontSize: 13 }}>{tag.icon}</Text>
-                  <Text style={[s.tagChipText, isSelected && { color: '#FFF' }]}>{tag.label}</Text>
-                  {isSelected && <Ionicons name="close-circle" size={14} color="rgba(255,255,255,0.7)" />}
-                </Pressable>
-              );
-            })}
-          </View>
-          {tags.length > 0 && (
-            <Text style={s.tagCount}>{tags.length}/5 etiket seçildi</Text>
-          )}
-        </View>
-
-        {/* Dil Seçimi */}
-        <View style={s.section}>
-          <Text style={s.label}>Oda Dili</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-            {LANGUAGES.map((lang) => (
-              <Pressable
-                key={lang.id}
-                style={[s.langChip, language === lang.id && s.langChipActive]}
-                onPress={() => setLanguage(lang.id)}
-              >
-                <Text style={{ fontSize: 18 }}>{lang.flag}</Text>
-                <Text style={[s.langChipText, language === lang.id && { color: '#FFF' }]}>{lang.label}</Text>
-                {language === lang.id && <Ionicons name="checkmark-circle" size={16} color={Colors.accentTeal} />}
-              </Pressable>
-            ))}
-          </ScrollView>
-        </View>
-
-        {/* Oda Kişiselleştirme — Silver+ */}
-        <View style={s.section}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-            <Text style={s.label}>Kişiselleştirme</Text>
-            {!limits.canCustomizeTheme && (
-              <View style={s.lockBadge}>
-                <Ionicons name="lock-closed" size={10} color="#F59E0B" />
-                <Text style={s.lockText}>Silver+</Text>
-              </View>
-            )}
-          </View>
-
-          {/* Tema Rengi */}
-          <View style={[{ opacity: limits.canCustomizeTheme ? 1 : 0.35 }]}>
-            <Text style={[s.labelHint, { marginBottom: 8 }]}>Oda İç Tema Rengi</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
-              {[
-                { id: 'default', color: '#14B8A6', label: 'Teal' },
-                { id: 'purple', color: '#8B5CF6', label: 'Mor' },
-                { id: 'pink', color: '#EC4899', label: 'Pembe' },
-                { id: 'blue', color: '#3B82F6', label: 'Mavi' },
-                { id: 'gold', color: '#F59E0B', label: 'Altın' },
-                { id: 'red', color: '#EF4444', label: 'Kırmızı' },
-              ].map(theme => (
-                <Pressable
-                  key={theme.id}
-                  disabled={!limits.canCustomizeTheme}
-                  style={{
-                    width: 44, height: 44, borderRadius: 22,
-                    backgroundColor: theme.color,
-                    borderWidth: 2.5,
-                    borderColor: 'transparent',
-                    alignItems: 'center', justifyContent: 'center',
-                  }}
-                >
-                  {!limits.canCustomizeTheme && (
-                    <Ionicons name="lock-closed" size={14} color="rgba(255,255,255,0.7)" />
-                  )}
-                </Pressable>
-              ))}
-            </ScrollView>
-          </View>
-
-          {/* Oda Resmi */}
-          {limits.canCustomizeImage ? (
-            <View style={{ marginTop: 16 }}>
-              <Text style={[s.labelHint, { marginBottom: 8 }]}>Oda Kapak Resmi (Gold+)</Text>
-              <Pressable style={{
-                height: 80, borderRadius: 14,
-                backgroundColor: 'rgba(255,255,255,0.04)',
-                borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.08)',
-                borderStyle: 'dashed',
-                alignItems: 'center', justifyContent: 'center', gap: 6,
-              }}>
-                <Ionicons name="image-outline" size={24} color="#64748B" />
-                <Text style={{ color: '#64748B', fontSize: 11 }}>Resim yükle (yakında)</Text>
-              </Pressable>
-            </View>
-          ) : (
-            <View style={{ marginTop: 12, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Ionicons name="image-outline" size={14} color="#64748B" />
-              <Text style={{ color: '#64748B', fontSize: 11 }}>Oda kapak resmi Gold+ ile açılır</Text>
-            </View>
-          )}
-        </View>
-
-        {/* Konuşma Modu */}
-        <View style={s.section}>
-          <Text style={s.label}>Konuşma Modu</Text>
-          <Text style={s.labelHint}>Kim sahneye çıkabilir?</Text>
-          <View style={s.modeRow}>
-            <Pressable
-              style={[s.modeCard, speakingMode === 'free_for_all' && s.modeCardActive]}
-              onPress={() => setSpeakingMode('free_for_all')}
-            >
-              <Ionicons name="people" size={28} color={speakingMode === 'free_for_all' ? Colors.accentTeal : '#64748B'} />
-              <Text style={[s.modeLabel, speakingMode === 'free_for_all' && { color: '#F1F5F9' }]}>Serbest</Text>
-              <Text style={s.modeDesc}>Herkes konuşabilir</Text>
-            </Pressable>
-            <Pressable
-              style={[s.modeCard, speakingMode === 'permission_only' && s.modeCardActive]}
-              onPress={() => setSpeakingMode('permission_only')}
-            >
-              <Ionicons name="hand-left" size={28} color={speakingMode === 'permission_only' ? Colors.accentTeal : '#64748B'} />
-              <Text style={[s.modeLabel, speakingMode === 'permission_only' && { color: '#F1F5F9' }]}>İzinli</Text>
-              <Text style={s.modeDesc}>El kaldırarak söz iste</Text>
-            </Pressable>
-            <Pressable
-              style={[s.modeCard, speakingMode === 'selected_only' && s.modeCardActive, !isTierAtLeast(tier, 'VIP') && { opacity: 0.35 }]}
-              onPress={() => {
-                if (!isTierAtLeast(tier, 'VIP')) {
-                  showToast({ title: '🔒 VIP Gerekli', message: 'Sadece Seçilmişler modu VIP üyelik gerektirir.', type: 'warning' });
-                  return;
-                }
-                setSpeakingMode('selected_only');
-              }}
-            >
-              <Ionicons name="shield-checkmark" size={28} color={speakingMode === 'selected_only' ? '#D4AF37' : '#64748B'} />
-              <Text style={[s.modeLabel, speakingMode === 'selected_only' && { color: '#D4AF37' }]}>Seçilmişler</Text>
-              <Text style={s.modeDesc}>Sadece davetliler</Text>
-              {!isTierAtLeast(tier, 'VIP') && (
-                <View style={s.lockBadge}>
-                  <Ionicons name="lock-closed" size={8} color="#F59E0B" />
-                  <Text style={[s.lockText, { fontSize: 8 }]}>VIP</Text>
-                </View>
-              )}
-            </Pressable>
-          </View>
-        </View>
-
-        {/* Kapasite Bilgisi */}
-        <View style={s.section}>
-          <Text style={s.label}>Oda Kapasitesi</Text>
-          <View style={[s.tierInfo, { marginHorizontal: 0, marginBottom: 0 }]}>
-            <View style={{ flex: 1, gap: 6 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Ionicons name="mic" size={14} color="#14B8A6" />
-                <Text style={s.tierText}>Sahne: {limits.maxSpeakers} kişi</Text>
-              </View>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Ionicons name="people" size={14} color="#14B8A6" />
-                <Text style={s.tierText}>Dinleyici: {limits.maxListeners} kişi</Text>
-              </View>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Ionicons name="eye" size={14} color="#14B8A6" />
-                <Text style={s.tierText}>Seyirci: {limits.maxSpectators} kişi</Text>
-              </View>
-            </View>
-          </View>
-        </View>
-
-        {/* ★ Gelişmiş Ayarlar — Tier-Bazlı */}
-        <View style={s.section}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-            <Text style={s.label}>Gelişmiş Ayarlar</Text>
-            {!isTierAtLeast(tier, 'Bronze') && (
-              <View style={s.lockBadge}>
-                <Ionicons name="lock-closed" size={10} color="#F59E0B" />
-                <Text style={s.lockText}>Premium</Text>
-              </View>
-            )}
-          </View>
-          {[
-            { icon: 'people-circle-outline', label: 'Çoklu Moderatör Atama', minTier: 'Bronze' as const, color: '#14B8A6', desc: `Max ${limits.maxModerators} mod` },
-            { icon: 'eye-off-outline',       label: 'Özel Oda Görünürlüğü',  minTier: 'Bronze' as const, color: '#3B82F6', desc: 'Davetiye ile giriş' },
-            { icon: 'color-palette-outline', label: 'Oda Teması',            minTier: 'Silver' as const, color: '#A78BFA', desc: 'Özel renk teması' },
-            { icon: 'grid-outline',          label: 'Sahne Düzeni',          minTier: 'Silver' as const, color: '#8B5CF6', desc: 'Grid / Spotlight / Theater' },
-            { icon: 'trending-up-outline',   label: 'Keşette Öne Çıkarma', minTier: 'Silver' as const, color: '#F59E0B', desc: 'SP ile boost' },
-            { icon: 'musical-notes-outline', label: 'Oda Müziği',           minTier: 'Gold' as const,   color: '#EC4899', desc: 'Arka plan müzik' },
-            { icon: 'image-outline',         label: 'Oda Kapak Resmi',       minTier: 'Gold' as const,   color: '#F97316', desc: 'Özel kapak foto' },
-            { icon: 'heart-outline',         label: 'Bağış Kabul',          minTier: 'Gold' as const,   color: '#EF4444', desc: 'SP bağışı al' },
-            { icon: 'recording-outline',     label: 'Oda Kaydı',             minTier: 'VIP' as const,    color: '#EF4444', desc: 'Ses kaydı al' },
-            { icon: 'cash-outline',          label: 'Premium Giriş',         minTier: 'VIP' as const,    color: '#D4AF37', desc: 'SP giriş ücreti' },
-            { icon: 'stats-chart-outline',   label: 'Canlı İstatistik',      minTier: 'VIP' as const,    color: '#3B82F6', desc: 'Oda analitiği' },
-          ].map((item) => {
-            const unlocked = isTierAtLeast(tier, item.minTier);
-            return (
-              <Pressable
-                key={item.label}
-                style={[s.typeCard, !unlocked && { opacity: 0.35 }]}
-                onPress={() => {
-                  if (!unlocked) {
-                    showToast({ title: `🔒 ${item.minTier}+ Gerekli`, message: `${item.label} için üyeliğinizi yükseltin.`, type: 'warning' });
-                  } else if (item.label === 'Bağış Kabul') {
-                    setDonationsEnabled(!donationsEnabled);
-                  }
-                }}
-              >
-                <View style={s.typeLeft}>
-                  <Ionicons name={item.icon as any} size={20} color={unlocked ? item.color : '#475569'} />
-                  <View>
-                    <Text style={[s.typeLabel, !unlocked && { color: '#475569' }]}>{item.label}</Text>
-                    <Text style={{ fontSize: 10, color: '#64748B', marginTop: 1 }}>{item.desc}</Text>
-                  </View>
-                </View>
-                {unlocked ? (
-                  <View style={[s.lockBadge, { borderColor: 'rgba(20,184,166,0.3)', backgroundColor: 'rgba(20,184,166,0.08)' }]}>
-                    <Ionicons name="checkmark" size={10} color="#14B8A6" />
-                    <Text style={[s.lockText, { color: '#14B8A6' }]}>Açık</Text>
-                  </View>
-                ) : (
-                  <View style={s.lockBadge}>
-                    <Ionicons name="lock-closed" size={10} color="#F59E0B" />
-                    <Text style={s.lockText}>{item.minTier}+</Text>
-                  </View>
-                )}
-              </Pressable>
-            );
-          })}
-
-          {/* VIP: Giriş Ücreti Input */}
-          {isTierAtLeast(tier, 'VIP') && (
-            <View style={{ marginTop: 12 }}>
-              <Text style={[s.label, { fontSize: 12 }]}>SP Giriş Ücreti</Text>
-              <Text style={s.labelHint}>0 = ücretsiz giriş</Text>
-              <TextInput
-                style={[s.input, { width: 120, textAlign: 'center' }]}
-                value={entryFeeSp > 0 ? String(entryFeeSp) : ''}
-                onChangeText={(t) => setEntryFeeSp(parseInt(t) || 0)}
-                keyboardType="number-pad"
-                placeholder="0"
-                placeholderTextColor="#475569"
-              />
-            </View>
-          )}
-        </View>
-
-        {/* Tier Bilgisi */}
-        <View style={s.tierInfo}>
-          <Ionicons name="information-circle-outline" size={16} color="#94A3B8" />
-          <Text style={s.tierText}>
-            {tier} üyeliğin ile: {limits.maxSpeakers} sahne, {limits.maxListeners} dinleyici, {limits.durationHours > 0 ? `${limits.durationHours} saat` : 'sınırsız süre'}, {limits.dailyRooms < 999 ? `günlük ${limits.dailyRooms} oda` : 'sınırsız oda'}
-          </Text>
-        </View>
-
-        {/* Oluştur Butonu — Premium Gradient */}
-        <Pressable
-          style={[s.createBtn, !canCreate && { opacity: 0.4 }]}
-          onPress={handleCreate}
-          disabled={!canCreate || creating}
-        >
-          <LinearGradient
-            colors={['#14B8A6', '#0D9488', '#065F56']}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-            style={s.createBtnGradient}
-          >
-            {creating ? (
-              <ActivityIndicator color="#FFF" size="small" />
-            ) : (
-              <>
-                <View style={s.createBtnIconWrap}>
-                  <Ionicons name="add-circle" size={22} color="#FFF" />
-                </View>
-                <Text style={s.createBtnText}>Odayı Oluştur</Text>
-                <Ionicons name="arrow-forward" size={18} color="rgba(255,255,255,0.7)" />
-              </>
-            )}
-          </LinearGradient>
-        </Pressable>
-      </ScrollView>
-    </View>
-  );
-
-  // ★ Arkadaş davet modalı — oda oluşturulduktan sonra gösterilir
   const handleInviteFriends = async (selectedUsers: FollowUser[]) => {
     if (!createdRoomId || !firebaseUser || !profile) return;
     const hostName = profile.display_name || 'Birisi';
-    // Her seçilen arkadaşa push bildirim gönder
     for (const user of selectedUsers) {
-      PushService.sendRoomInvite(user.id, hostName, createdRoomName, createdRoomId).catch(() => {});
+      PushService.sendRoomInvite(user.id, hostName, createdRoomName, createdRoomId).catch(() => { });
     }
     showToast({ title: 'Davetler Gönderildi!', message: `${selectedUsers.length} arkadaşına davet gönderildi.`, type: 'success' });
   };
 
   return (
     <AppBackground>
-    {mainContent}
-    {showInviteModal && firebaseUser && (
-      <InviteFriendsModal
-        visible={showInviteModal}
-        userId={firebaseUser.uid}
-        onClose={() => {
-          setShowInviteModal(false);
-          if (createdRoomId) router.replace(`/room/${createdRoomId}`);
-        }}
-        onInvite={(selectedUsers: FollowUser[]) => {
-          handleInviteFriends(selectedUsers);
-          setShowInviteModal(false);
-          if (createdRoomId) router.replace(`/room/${createdRoomId}`);
-        }}
-      />
-    )}
+      <View style={s.container}>
+        {/* Header */}
+        <View style={[s.header, { paddingTop: insets.top + 6 }]}>
+          <Pressable onPress={() => safeGoBack(router)} style={s.backBtn}>
+            <Ionicons name="chevron-back" size={22} color="#F1F5F9" />
+          </Pressable>
+          <Text style={s.headerTitle}>Yeni Oda</Text>
+          <View style={[s.tierChip, isAdmin && { backgroundColor: 'rgba(239,68,68,0.12)', borderColor: 'rgba(239,68,68,0.25)' }]}>
+            <Text style={[s.tierChipText, isAdmin && { color: '#EF4444' }]}>{isAdmin ? '⚡ GodMaster' : tier}</Text>
+          </View>
+        </View>
+
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: insets.bottom + 30 }}
+          keyboardShouldPersistTaps="handled"
+        >
+          {/* ═══ ODA ADI + ÖNİZLEME ═══ */}
+          <View style={s.card}>
+            <View style={s.cardRow}>
+              <Ionicons name="text" size={16} color={Colors.teal} />
+              <Text style={s.cardLabel}>Oda Adı</Text>
+              <Text style={s.charCount}>{name.length}/50</Text>
+            </View>
+            <TextInput
+              style={s.input}
+              placeholder="Odana bir isim ver..."
+              placeholderTextColor="#475569"
+              value={name}
+              onChangeText={setName}
+              maxLength={50}
+            />
+
+            {/* ── Oda Kartı Görseli Yükleme ── */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.04)' }}>
+              <Pressable
+                style={[s.cardImgPickerBtn, cardImage ? { borderColor: '#14B8A6' } : {}]}
+                onPress={async () => {
+                  try {
+                    const result = await ImagePicker.launchImageLibraryAsync({
+                      mediaTypes: 'images',
+                      allowsEditing: true,
+                      aspect: [16, 9],
+                      quality: 0.8,
+                    });
+                    if (!result.canceled && result.assets?.[0]) {
+                      const asset = result.assets[0];
+                      if (asset.fileSize && asset.fileSize > 5 * 1024 * 1024) {
+                        showToast({ title: 'Dosya Çok Büyük', message: 'Kart görseli en fazla 5MB olabilir.', type: 'warning' });
+                        return;
+                      }
+                      setCardImage(asset.uri);
+                    }
+                  } catch {
+                    showToast({ title: 'Hata', message: 'Görsel seçilemedi.', type: 'error' });
+                  }
+                }}
+              >
+                {cardImage ? (
+                  <Image source={{ uri: cardImage }} style={s.cardImgPreview} />
+                ) : (
+                  <View style={s.cardImgPlaceholder}>
+                    <Ionicons name="camera-outline" size={18} color="#64748B" />
+                  </View>
+                )}
+              </Pressable>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 11, fontWeight: '600', color: '#E2E8F0' }}>Kart Görseli</Text>
+                <Text style={{ fontSize: 9, color: '#475569', marginTop: 2 }}>Keşfet sayfasında görünecek kapak resmi</Text>
+              </View>
+              {cardImage ? (
+                <Pressable onPress={() => setCardImage('')} style={{ padding: 6 }}>
+                  <Ionicons name="trash-outline" size={16} color="#EF4444" />
+                </Pressable>
+              ) : null}
+            </View>
+
+            {/* ── Oda Kartı Önizleme ── */}
+            {name.trim().length >= 2 && (
+              <View style={[s.previewWrap, !cardImage && { marginTop: 10 }]}>
+                <Text style={{ fontSize: 9, color: '#475569', fontWeight: '600', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>Oda kartı önizlemesi</Text>
+                <View style={s.previewCard}>
+                  {/* Arka plan: kart görseli veya kategori gradient */}
+                  {cardImage ? (
+                    <>
+                      <Image source={{ uri: cardImage }} style={[StyleSheet.absoluteFillObject, { borderRadius: 11 }]} resizeMode="cover" />
+                      {/* Koyu overlay — yazılar okunabilir olsun */}
+                      <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: 11 }]} />
+                    </>
+                  ) : (
+                    <LinearGradient
+                      colors={(CATEGORY_THEME_PREVIEW[category] || CATEGORY_THEME_PREVIEW.other).colors}
+                      start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                      style={StyleSheet.absoluteFillObject}
+                    />
+                  )}
+                  {/* Büyük soluk kategori ikonu */}
+                  {!cardImage && (
+                    <View style={{ position: 'absolute', top: -6, right: -6 }}>
+                      <Ionicons name={(CATEGORIES.find(c => c.id === category)?.icon || 'chatbubbles') as any} size={48} color="rgba(255,255,255,0.06)" />
+                    </View>
+                  )}
+                  {/* Canlı badge */}
+                  <View style={s.previewBadge}>
+                    <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: '#FFF' }} />
+                    <Text style={{ fontSize: 8, fontWeight: '800', color: '#FFF', letterSpacing: 0.5 }}>CANLI</Text>
+                  </View>
+                  {/* Oda adı + filtre badge'leri */}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 2 }}>
+                    <Text style={[s.previewTitle, { flex: 1, marginBottom: 0 }]} numberOfLines={1}>{name.trim()}</Text>
+                    {type === 'closed' && (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, backgroundColor: 'rgba(245,158,11,0.15)', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4, borderWidth: 1, borderColor: 'rgba(245,158,11,0.3)' }}>
+                        <Ionicons name="lock-closed" size={7} color="#F59E0B" />
+                        <Text style={{ fontSize: 7, fontWeight: '700', color: '#F59E0B' }}>Şifreli</Text>
+                      </View>
+                    )}
+                    {type === 'invite' && (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, backgroundColor: 'rgba(139,92,246,0.15)', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4, borderWidth: 1, borderColor: 'rgba(139,92,246,0.3)' }}>
+                        <Ionicons name="mail" size={7} color="#8B5CF6" />
+                        <Text style={{ fontSize: 7, fontWeight: '700', color: '#8B5CF6' }}>Davetli</Text>
+                      </View>
+                    )}
+                    {entryFee > 0 && (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, backgroundColor: 'rgba(212,175,55,0.15)', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4, borderWidth: 1, borderColor: 'rgba(212,175,55,0.3)' }}>
+                        <Text style={{ fontSize: 7, fontWeight: '700', color: '#D4AF37' }}>{entryFee} SP</Text>
+                      </View>
+                    )}
+                    {followersOnly && (
+                      <Ionicons name="people" size={9} color="#A78BFA" />
+                    )}
+                    {donationsEnabled && (
+                      <Ionicons name="heart" size={8} color="#EF4444" />
+                    )}
+                  </View>
+                  {/* Host bilgisi */}
+                  <View style={s.previewHostRow}>
+                    <Image source={getAvatarSource(profile?.avatar_url)} style={s.previewAvatar} />
+                    <Text style={s.previewHostName} numberOfLines={1}>{profile?.display_name || 'Host'}</Text>
+                    <View style={{ width: 1, height: 10, backgroundColor: 'rgba(255,255,255,0.1)', marginHorizontal: 4 }} />
+                    <Ionicons name="people" size={10} color="#64748B" />
+                    <Text style={{ fontSize: 9, color: '#64748B', fontWeight: '600', marginLeft: 2 }}>0</Text>
+                    <Ionicons name={mode === 'video' ? 'videocam' : 'mic'} size={10} color="#64748B" style={{ marginLeft: 6 }} />
+                  </View>
+                  {/* Katıl butonu */}
+                  <View style={{ alignItems: 'flex-end', marginTop: 4 }}>
+                    <LinearGradient colors={['#14B8A6', '#0D9488']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.previewJoinBtn}>
+                      <Ionicons name="headset" size={10} color="#FFF" />
+                      <Text style={{ fontSize: 9, fontWeight: '700', color: '#FFF' }}>Katıl</Text>
+                    </LinearGradient>
+                  </View>
+                </View>
+              </View>
+            )}
+          </View>
+
+          {/* ═══ KATEGORİ ═══ */}
+          <View style={s.card}>
+            <View style={s.cardRow}>
+              <Ionicons name="grid" size={16} color={Colors.teal} />
+              <Text style={s.cardLabel}>Kategori</Text>
+            </View>
+            <View style={s.chipGrid}>
+              {CATEGORIES.map((cat) => (
+                <Pressable
+                  key={cat.id}
+                  style={[s.catChip, category === cat.id && { backgroundColor: cat.color, borderColor: cat.color }]}
+                  onPress={() => setCategory(cat.id)}
+                >
+                  <Ionicons name={cat.icon as any} size={13} color={category === cat.id ? '#FFF' : '#94A3B8'} />
+                  <Text style={[s.catChipText, category === cat.id && { color: '#FFF' }]}>{cat.label}</Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+
+          {/* ═══ MOD ═══ */}
+          <View style={s.card}>
+            <View style={s.cardRow}>
+              <Ionicons name="settings" size={16} color={Colors.teal} />
+              <Text style={s.cardLabel}>Oda Modu</Text>
+            </View>
+
+            {/* Mod: Sesli / Görüntülü */}
+            <View style={s.toggleRow}>
+              <Pressable style={[s.toggleBtn, mode === 'audio' && s.toggleBtnActive]} onPress={() => setMode('audio')}>
+                <Ionicons name="mic" size={16} color={mode === 'audio' ? '#fff' : '#94A3B8'} />
+                <Text style={[s.toggleText, mode === 'audio' && s.toggleTextActive]}>Sesli</Text>
+              </Pressable>
+              <Pressable style={[s.toggleBtn, mode === 'video' && s.toggleBtnActive]} onPress={() => setMode('video')}>
+                <Ionicons name="videocam" size={16} color={mode === 'video' ? '#fff' : '#94A3B8'} />
+                <Text style={[s.toggleText, mode === 'video' && s.toggleTextActive]}>Görüntülü</Text>
+              </Pressable>
+            </View>
+          </View>
+
+          {/* ═══ KONUŞMA MODU ═══ */}
+          <View style={s.card}>
+            <View style={s.cardRow}>
+              <Ionicons name="hand-left" size={16} color={Colors.teal} />
+              <Text style={s.cardLabel}>Konuşma Modu</Text>
+            </View>
+            <View style={s.toggleRow}>
+              {SPEAKING_MODES.map((sm) => {
+                const locked = !isTierAtLeast(tier, sm.minTier);
+                const active = speakingMode === sm.id;
+                return (
+                  <Pressable
+                    key={sm.id}
+                    style={[s.toggleBtn, active && s.toggleBtnActive, locked && { opacity: 0.35 }]}
+                    onPress={() => {
+                      if (locked) {
+                        showToast({ title: `${sm.minTier}+ Gerekli`, type: 'warning' });
+                      } else {
+                        setSpeakingMode(sm.id as any);
+                      }
+                    }}
+                  >
+                    <Ionicons name={sm.icon as any} size={14} color={active ? '#fff' : '#94A3B8'} />
+                    <Text style={[s.toggleText, active && s.toggleTextActive]}>{sm.label}</Text>
+                    {locked && <Ionicons name="lock-closed" size={9} color="#F59E0B" />}
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+
+
+          {/* ═══ AÇIKLAMA (opsiyonel) ═══ */}
+          <View style={s.card}>
+            <View style={s.cardRow}>
+              <Ionicons name="document-text" size={16} color={Colors.teal} />
+              <Text style={s.cardLabel}>Açıklama</Text>
+              <Text style={s.optionalBadge}>opsiyonel</Text>
+            </View>
+            <TextInput
+              style={[s.input, { height: 60, textAlignVertical: 'top' }]}
+              placeholder="Odanı kısa tanımla..."
+              placeholderTextColor="#475569"
+              value={description}
+              onChangeText={setDescription}
+              maxLength={200}
+              multiline
+            />
+          </View>
+
+          {/* ═══ GELİŞMİŞ AYARLAR (Katlanabilir) ═══ */}
+          <Pressable style={s.advancedToggle} onPress={() => setShowAdvanced(!showAdvanced)}>
+            <Ionicons name="options" size={16} color="#94A3B8" />
+            <Text style={s.advancedToggleText}>Gelişmiş Ayarlar</Text>
+            <Ionicons name={showAdvanced ? 'chevron-up' : 'chevron-down'} size={16} color="#64748B" />
+          </Pressable>
+
+          {showAdvanced && (
+            <View style={s.card}>
+              {/* ── Giriş Tipi — Free(Açık) / Bronze+(Şifreli) / Gold+(Davetli) ── */}
+              <View style={{ paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.03)' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                  <Ionicons name="shield-checkmark" size={16} color="#14B8A6" />
+                  <Text style={s.advLabel}>Giriş Tipi</Text>
+                </View>
+                <View style={s.toggleRow}>
+                  {ROOM_TYPES.map((rt) => {
+                    const locked = !limits.allowedTypes.includes(rt.id);
+                    const active = type === rt.id;
+                    return (
+                      <Pressable
+                        key={rt.id}
+                        style={[s.toggleBtn, active && s.toggleBtnActive, locked && { opacity: 0.35 }]}
+                        onPress={() => {
+                          if (locked) {
+                            showToast({ title: `🔒 ${rt.minTier}+ Gerekli`, message: `Bu giriş tipi ${rt.minTier} ve üzeri üyeliklerde kullanılabilir.`, type: 'info' });
+                          } else {
+                            setType(rt.id);
+                          }
+                        }}
+                      >
+                        <Ionicons name={rt.icon as any} size={14} color={active ? '#fff' : locked ? '#475569' : '#94A3B8'} />
+                        <Text style={[s.toggleText, active && s.toggleTextActive]}>{rt.label}</Text>
+                        {locked && <Ionicons name="lock-closed" size={9} color="#F59E0B" />}
+                      </Pressable>
+                    );
+                  })}
+                </View>
+                {/* Şifre Input */}
+                {type === 'closed' && (
+                  <TextInput
+                    style={[s.input, { marginTop: 8 }]}
+                    placeholder="Oda şifresi (min 4 karakter)..."
+                    placeholderTextColor="#475569"
+                    value={password}
+                    onChangeText={setPassword}
+                    maxLength={20}
+                    secureTextEntry
+                  />
+                )}
+              </View>
+
+              {/* ── Oda Teması — Silver+ ── */}
+              {isTierAtLeast(tier, 'Silver') ? (
+                <View style={{ paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.03)' }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                    <Ionicons name="color-palette" size={16} color="#A78BFA" />
+                    <Text style={s.advLabel}>Oda Teması</Text>
+                    <Text style={s.advDesc}>{selectedTheme ? ROOM_THEMES.find(t => t.id === selectedTheme)?.name || '' : 'Varsayılan'}</Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                    {/* Varsayılan (temayı kaldır) */}
+                    <Pressable style={[s.themeCircle, !selectedTheme && s.themeCircleActive]} onPress={() => setSelectedTheme(null)}>
+                      <LinearGradient colors={['#0E1420', '#070B14']} style={s.themeGrad}>
+                        <Ionicons name="moon-outline" size={12} color="rgba(255,255,255,0.35)" />
+                      </LinearGradient>
+                      {!selectedTheme && <View style={s.themeCheck}><Ionicons name="checkmark" size={7} color="#FFF" /></View>}
+                    </Pressable>
+                    {ROOM_THEMES.map(theme => {
+                      const active = selectedTheme === theme.id;
+                      return (
+                        <Pressable key={theme.id} style={[s.themeCircle, active && s.themeCircleActive]} onPress={() => setSelectedTheme(theme.id)}>
+                          <LinearGradient colors={theme.colors} style={s.themeGrad}>
+                            <Text style={{ fontSize: 8, fontWeight: '700', color: '#FFF' }}>{theme.name.slice(0, 2)}</Text>
+                          </LinearGradient>
+                          {active && <View style={s.themeCheck}><Ionicons name="checkmark" size={7} color="#FFF" /></View>}
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+
+                  {/* Arkaplan Görseli (Image Picker) — Silver+ */}
+                  <View style={{ marginTop: 10 }}>
+                    <Pressable
+                      style={[s.bgPickerBtn, backgroundImage ? { borderColor: '#14B8A6' } : {}]}
+                      onPress={async () => {
+                        try {
+                          const result = await ImagePicker.launchImageLibraryAsync({
+                            mediaTypes: 'images',
+                            allowsEditing: true,
+                            aspect: [16, 9],
+                            quality: 0.8,
+                          });
+                          if (!result.canceled && result.assets?.[0]) {
+                            const asset = result.assets[0];
+                            // Boyut kontrolü (max 5MB)
+                            if (asset.fileSize && asset.fileSize > 5 * 1024 * 1024) {
+                              showToast({ title: 'Dosya Çok Büyük', message: 'Arkaplan görseli en fazla 5MB olabilir.', type: 'warning' });
+                              return;
+                            }
+                            // Çözünürlük kontrolü (min 720px genişlik)
+                            if (asset.width && asset.width < 720) {
+                              showToast({ title: 'Düşük Çözünürlük', message: 'Arkaplan görseli en az 720px genişlikte olmalıdır.', type: 'warning' });
+                              return;
+                            }
+                            setBackgroundImage(asset.uri);
+                          }
+                        } catch {
+                          showToast({ title: 'Hata', message: 'Görsel seçilemedi.', type: 'error' });
+                        }
+                      }}
+                    >
+                      {backgroundImage ? (
+                        <Image source={{ uri: backgroundImage }} style={s.bgPreview} />
+                      ) : (
+                        <View style={s.bgPickerPlaceholder}>
+                          <Ionicons name="image-outline" size={20} color="#64748B" />
+                          <Text style={{ color: '#64748B', fontSize: 10, marginTop: 4 }}>Arkaplan Seç</Text>
+                        </View>
+                      )}
+                    </Pressable>
+                    {backgroundImage && (
+                      <Pressable onPress={() => setBackgroundImage('')} style={{ position: 'absolute', top: 2, right: 2, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 10, padding: 2 }}>
+                        <Ionicons name="close" size={12} color="#FFF" />
+                      </Pressable>
+                    )}
+                  </View>
+                </View>
+              ) : (
+                <Pressable style={[s.advRow, { opacity: 0.4 }]} onPress={() => showToast({ title: '🔒 Silver+ ile açılır', message: 'Oda teması Silver ve üzeri üyeliklerde kullanılabilir.', type: 'info' })}>
+                  <Ionicons name="color-palette-outline" size={16} color="#475569" />
+                  <View style={{ flex: 1 }}>
+                    <Text style={[s.advLabel, { color: '#475569' }]}>Oda Teması & Arkaplan</Text>
+                    <Text style={s.advDesc}>Özel renk teması ve arkaplan görseli</Text>
+                  </View>
+                  <View style={s.lockBadge}><Ionicons name="lock-closed" size={9} color="#F59E0B" /><Text style={s.lockText}>Silver</Text></View>
+                </Pressable>
+              )}
+
+              {/* ── Giriş Ücreti — VIP ── */}
+              {isTierAtLeast(tier, 'VIP') ? (
+                <View style={s.advRow}>
+                  <Ionicons name="cash" size={16} color="#D4AF37" />
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.advLabel}>{entryFee > 0 ? `Giriş Ücreti: ${entryFee} SP` : 'Giriş Ücretsiz'}</Text>
+                    <Text style={s.advDesc}>Odaya giriş için SP ücreti</Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', gap: 4 }}>
+                    {[0, 10, 50, 100].map(fee => (
+                      <Pressable key={fee} style={[s.feePill, entryFee === fee && s.feePillActive]} onPress={() => setEntryFee(fee)}>
+                        <Text style={[s.feePillText, entryFee === fee && s.feePillTextActive]}>{fee === 0 ? 'Free' : `${fee}`}</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                </View>
+              ) : (
+                <Pressable style={[s.advRow, { opacity: 0.4 }]} onPress={() => showToast({ title: '🔒 VIP ile açılır', message: 'Giriş ücreti belirlemek için VIP üyelik gerekli.', type: 'info' })}>
+                  <Ionicons name="cash-outline" size={16} color="#475569" />
+                  <View style={{ flex: 1 }}>
+                    <Text style={[s.advLabel, { color: '#475569' }]}>Ücretli Giriş</Text>
+                    <Text style={s.advDesc}>SP giriş ücreti belirle</Text>
+                  </View>
+                  <View style={s.lockBadge}><Ionicons name="lock-closed" size={9} color="#F59E0B" /><Text style={s.lockText}>VIP</Text></View>
+                </Pressable>
+              )}
+
+              {/* ── Bağış Kabul — Gold+ ── */}
+              {isTierAtLeast(tier, 'Gold') ? (
+                <Pressable style={s.advRow} onPress={() => setDonationsEnabled(!donationsEnabled)}>
+                  <Ionicons name="heart" size={16} color={donationsEnabled ? '#EF4444' : '#64748B'} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.advLabel}>{donationsEnabled ? 'Bağış Açık' : 'Bağış Kapalı'}</Text>
+                    <Text style={s.advDesc}>Dinleyicilerden SP bağışı kabul et</Text>
+                  </View>
+                  <View style={[s.switchTrack, donationsEnabled && s.switchTrackActive]}>
+                    <View style={[s.switchKnob, donationsEnabled && s.switchKnobActive]} />
+                  </View>
+                </Pressable>
+              ) : (
+                <Pressable style={[s.advRow, { opacity: 0.4 }]} onPress={() => showToast({ title: '🔒 Gold+ ile açılır', message: 'Bağış özelliği Gold ve üzeri üyeliklerde kullanılabilir.', type: 'info' })}>
+                  <Ionicons name="heart-outline" size={16} color="#475569" />
+                  <View style={{ flex: 1 }}>
+                    <Text style={[s.advLabel, { color: '#475569' }]}>Bağış Kabul</Text>
+                    <Text style={s.advDesc}>SP bağışı al</Text>
+                  </View>
+                  <View style={s.lockBadge}><Ionicons name="lock-closed" size={9} color="#F59E0B" /><Text style={s.lockText}>Gold</Text></View>
+                </Pressable>
+              )}
+
+              {/* ── Takipçilere Özel — Gold+ ── */}
+              {isTierAtLeast(tier, 'Gold') ? (
+                <Pressable style={s.advRow} onPress={() => setFollowersOnly(!followersOnly)}>
+                  <Ionicons name="people" size={16} color={followersOnly ? '#D4AF37' : '#64748B'} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.advLabel}>{followersOnly ? 'Takipçilere Özel' : 'Herkese Açık'}</Text>
+                    <Text style={s.advDesc}>{followersOnly ? 'Sadece takipçiler katılabilir' : 'Herkes odaya katılabilir'}</Text>
+                  </View>
+                  <View style={[s.switchTrack, followersOnly && s.switchTrackActive]}>
+                    <View style={[s.switchKnob, followersOnly && s.switchKnobActive]} />
+                  </View>
+                </Pressable>
+              ) : (
+                <Pressable style={[s.advRow, { opacity: 0.4 }]} onPress={() => showToast({ title: '🔒 Gold+ ile açılır', message: 'Takipçilere özel mod Gold ve üzeri üyeliklerde kullanılabilir.', type: 'info' })}>
+                  <Ionicons name="people-outline" size={16} color="#475569" />
+                  <View style={{ flex: 1 }}>
+                    <Text style={[s.advLabel, { color: '#475569' }]}>Takipçilere Özel</Text>
+                    <Text style={s.advDesc}>Sadece takipçiler girebilir</Text>
+                  </View>
+                  <View style={s.lockBadge}><Ionicons name="lock-closed" size={9} color="#F59E0B" /><Text style={s.lockText}>Gold</Text></View>
+                </Pressable>
+              )}
+
+              {/* ── Oda içi ayar ipucu ── */}
+              <View style={s.advHint}>
+                <Ionicons name="information-circle-outline" size={14} color="#475569" />
+                <Text style={s.advHintText}>Boost, sahne düzeni, oda kaydı ve diğer ayarları oda içindeki ⚙️ Ayarlar panelinden yapılandırabilirsin.</Text>
+              </View>
+            </View>
+          )}
+
+          {/* ═══ KAPASİTE BİLGİSİ ═══ */}
+          <View style={s.capacityBar}>
+            <CapItem icon="mic" label="Sahne" value={limits.maxSpeakers} />
+            <View style={s.capDivider} />
+            <CapItem icon="people" label="Dinleyici" value={limits.maxListeners} />
+            <View style={s.capDivider} />
+            <CapItem icon="videocam" label="Kamera" value={limits.maxCameras} />
+            <View style={s.capDivider} />
+            <CapItem icon="time" label="Süre" value={limits.durationHours === 0 ? '∞' : `${limits.durationHours}sa`} />
+          </View>
+
+          {/* ═══ OLUŞTUR BUTONU ═══ */}
+          <Pressable
+            style={[s.createBtn, !canCreate && { opacity: 0.4 }]}
+            onPress={handleCreate}
+            disabled={!canCreate || creating}
+          >
+            <LinearGradient
+              colors={['#14B8A6', '#0D9488', '#065F56']}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+              style={s.createBtnGrad}
+            >
+              {creating ? (
+                <ActivityIndicator color="#FFF" size="small" />
+              ) : (
+                <>
+                  <Ionicons name="add-circle" size={20} color="#FFF" />
+                  <Text style={s.createBtnText}>Odayı Oluştur</Text>
+                  <Ionicons name="arrow-forward" size={16} color="rgba(255,255,255,0.6)" />
+                </>
+              )}
+            </LinearGradient>
+          </Pressable>
+        </ScrollView>
+      </View>
+
+      {showInviteModal && firebaseUser && (
+        <InviteFriendsModal
+          visible={showInviteModal}
+          userId={firebaseUser.uid}
+          onClose={() => {
+            setShowInviteModal(false);
+            if (createdRoomId) router.replace(`/room/${createdRoomId}`);
+          }}
+          onInvite={(selectedUsers: FollowUser[]) => {
+            handleInviteFriends(selectedUsers);
+            setShowInviteModal(false);
+            if (createdRoomId) router.replace(`/room/${createdRoomId}`);
+          }}
+        />
+      )}
     </AppBackground>
+  );
+}
+
+function CapItem({ icon, label, value }: { icon: string; label: string; value: number | string }) {
+  return (
+    <View style={{ alignItems: 'center', flex: 1 }}>
+      <Ionicons name={icon as any} size={14} color={Colors.teal} />
+      <Text style={{ fontSize: 14, fontWeight: '800', color: '#E2E8F0', marginTop: 2 }}>{value}</Text>
+      <Text style={{ fontSize: 9, color: '#64748B', fontWeight: '600' }}>{label}</Text>
+    </View>
   );
 }
 
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: 'transparent' },
 
+  // Header
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 14, paddingBottom: 12,
+    paddingHorizontal: 14, paddingBottom: 10,
   },
   backBtn: {
-    width: 36, height: 36, borderRadius: 18,
+    width: 34, height: 34, borderRadius: 12,
     backgroundColor: 'rgba(255,255,255,0.06)', justifyContent: 'center', alignItems: 'center',
   },
-  headerTitle: {
-    fontSize: 18, fontWeight: '800', color: '#F1F5F9',
-    textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
+  headerTitle: { fontSize: 17, fontWeight: '800', color: '#F1F5F9' },
+  tierChip: {
+    paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8,
+    backgroundColor: 'rgba(20,184,166,0.12)', borderWidth: 1, borderColor: 'rgba(20,184,166,0.25)',
   },
+  tierChipText: { fontSize: 10, fontWeight: '800', color: Colors.teal },
 
-  section: { paddingHorizontal: 16, marginBottom: 20 },
-  label: {
-    fontSize: 13, fontWeight: '700', color: '#94A3B8', letterSpacing: 0.5,
-    marginBottom: 8, textTransform: 'uppercase',
+  // Card — her bölüm bir kartta (parlak→koyu gradient + alt gölge)
+  card: {
+    borderRadius: 14, marginBottom: 12, overflow: 'hidden' as any,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+    // Alt gölge (aşağı doğru)
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 8,
+    // İç parlaklık efekti için gradient içeride uygulanır
+    backgroundColor: 'rgba(18,30,48,0.95)',
+    borderTopColor: 'rgba(255,255,255,0.12)',
+    padding: 14,
   },
-  labelHint: {
-    fontSize: 11, color: '#64748B', marginBottom: 8, marginTop: -4,
+  cardRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10,
   },
+  cardLabel: { flex: 1, fontSize: 12, fontWeight: '700', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 0.3 },
+  charCount: { fontSize: 10, color: '#475569', fontWeight: '600' },
+  optionalBadge: { fontSize: 9, color: '#475569', fontWeight: '600', fontStyle: 'italic' },
+
+  // Input
   input: {
-    backgroundColor: Colors.cardBg, borderWidth: 1, borderColor: Colors.cardBorder,
-    borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14,
-    fontSize: 15, color: '#F1F5F9', fontWeight: '500',
-  },
-  charCount: {
-    fontSize: 10, color: '#64748B', textAlign: 'right', marginTop: 4,
+    backgroundColor: 'rgba(255,255,255,0.04)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
+    borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10,
+    fontSize: 14, color: '#F1F5F9', fontWeight: '500',
   },
 
-  chipGrid: {
-    flexDirection: 'row', flexWrap: 'wrap', gap: 8,
+  // Card image picker
+  cardImgPickerBtn: {
+    width: 56, height: 36, borderRadius: 8, overflow: 'hidden',
+    borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.08)', borderStyle: 'dashed' as any,
+    backgroundColor: 'rgba(255,255,255,0.03)',
   },
-  chip: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
-  },
-  chipText: { fontSize: 13, fontWeight: '600', color: '#94A3B8' },
-
-  modeRow: { flexDirection: 'row', gap: 12 },
-  modeCard: {
-    flex: 1, alignItems: 'center', padding: 16, borderRadius: 16,
-    backgroundColor: Colors.cardBg, borderWidth: 1, borderColor: Colors.cardBorder, gap: 6,
-  },
-  modeCardActive: { borderColor: Colors.accentTeal, backgroundColor: 'rgba(115,194,189,0.08)' },
-  modeLabel: { fontSize: 13, fontWeight: '700', color: '#94A3B8' },
-  modeDesc: { fontSize: 10, color: '#64748B' },
-
-  typeCard: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    padding: 14, borderRadius: 14, marginBottom: 8,
-    backgroundColor: Colors.cardBg, borderWidth: 1, borderColor: Colors.cardBorder,
-  },
-  typeCardActive: { borderColor: Colors.accentTeal, backgroundColor: 'rgba(115,194,189,0.08)' },
-  typeLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  typeLabel: { fontSize: 14, fontWeight: '700', color: '#94A3B8' },
-  typeDesc: { fontSize: 11, color: '#64748B', marginTop: 1 },
-  lockBadge: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8,
-    backgroundColor: 'rgba(245,158,11,0.1)', borderWidth: 1, borderColor: 'rgba(245,158,11,0.3)',
-  },
-  lockText: { fontSize: 10, fontWeight: '700', color: '#F59E0B' },
-
-  tierInfo: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    marginHorizontal: 16, marginBottom: 16, padding: 12, borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.03)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
-  },
-  tierText: { fontSize: 11, color: '#94A3B8', flex: 1 },
-
-  createBtn: {
-    marginHorizontal: 16,
-    borderRadius: 18,
-    overflow: 'hidden',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 8, elevation: 6,
-  },
-  createBtnGradient: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12,
-    paddingVertical: 18, paddingHorizontal: 18,
-  },
-  createBtnIconWrap: {
-    width: 36, height: 36, borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.15)',
+  cardImgPreview: { width: '100%', height: '100%', borderRadius: 7 } as any,
+  cardImgPlaceholder: {
+    width: '100%', height: '100%',
     alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)',
-  },
-  createBtnText: {
-    flex: 1,
-    fontSize: 17, fontWeight: '800', color: '#FFF', letterSpacing: 0.3,
-    textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
-  },
+  } as any,
 
-  // ═══ Etiket Chip'leri ═══
-  tagChip: {
+  // Kategori chip
+  chipGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  catChip: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
-    paddingHorizontal: 12, paddingVertical: 9, borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+    paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.04)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
   },
-  tagChipActive: {
-    backgroundColor: 'rgba(20,184,166,0.2)', borderColor: Colors.accentTeal,
-  },
-  tagChipText: { fontSize: 12, fontWeight: '600', color: '#94A3B8' },
-  tagCount: { fontSize: 10, color: Colors.accentTeal, marginTop: 6, textAlign: 'right' },
+  catChipText: { fontSize: 11, fontWeight: '600', color: '#94A3B8' },
 
-  // ═══ Dil Seçimi ═══
-  langChip: {
+  // Toggle row
+  toggleRow: { flexDirection: 'row', gap: 6 },
+  toggleBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5,
+    paddingVertical: 9, borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.04)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
+  },
+  toggleBtnActive: { backgroundColor: Colors.teal, borderColor: Colors.teal },
+  toggleText: { fontSize: 11, fontWeight: '700', color: '#94A3B8' },
+  toggleTextActive: { color: '#fff' },
+
+  // Room card preview
+  previewWrap: {
+    marginTop: 12, paddingTop: 8,
+    borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.04)',
+  },
+  previewCard: {
+    borderRadius: 12, padding: 10, overflow: 'hidden' as any,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+  },
+  previewBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: 'rgba(239,68,68,0.85)',
+    paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6,
+    alignSelf: 'flex-start', marginBottom: 5,
+  },
+  previewTitle: { fontSize: 13, fontWeight: '800', color: '#F1F5F9', marginBottom: 5 },
+  previewHostRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  previewAvatar: { width: 16, height: 16, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(115,194,189,0.3)' },
+  previewHostName: { fontSize: 9, fontWeight: '600', color: '#14B8A6', maxWidth: 80 },
+  previewJoinBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8,
+  },
+
+  // Advanced toggle
+  advancedToggle: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
-    paddingHorizontal: 14, paddingVertical: 10, borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+    padding: 12, borderRadius: 14, marginBottom: 12,
+    backgroundColor: 'rgba(18,30,48,0.7)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
+    borderTopColor: 'rgba(255,255,255,0.1)',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 6, elevation: 4,
   },
-  langChipActive: {
-    backgroundColor: 'rgba(20,184,166,0.12)', borderColor: Colors.accentTeal,
+  advancedToggleText: { flex: 1, fontSize: 12, fontWeight: '600', color: '#94A3B8' },
+
+  // Advanced row
+  advRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.03)',
   },
-  langChipText: { fontSize: 13, fontWeight: '600', color: '#94A3B8' },
+  advLabel: { fontSize: 12, fontWeight: '600', color: '#E2E8F0' },
+  advDesc: { fontSize: 9, color: '#64748B', marginTop: 1 },
+  unlockBadge: {
+    width: 22, height: 22, borderRadius: 11, justifyContent: 'center', alignItems: 'center',
+    backgroundColor: 'rgba(20,184,166,0.12)', borderWidth: 1, borderColor: 'rgba(20,184,166,0.25)',
+  },
+  lockBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    paddingHorizontal: 6, paddingVertical: 3, borderRadius: 6,
+    backgroundColor: 'rgba(245,158,11,0.1)', borderWidth: 1, borderColor: 'rgba(245,158,11,0.25)',
+  },
+  lockText: { fontSize: 8, fontWeight: '700', color: '#F59E0B' },
+
+  // Fee pills
+  feePill: {
+    paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.04)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
+  },
+  feePillActive: { backgroundColor: 'rgba(212,175,55,0.15)', borderColor: 'rgba(212,175,55,0.3)' },
+  feePillText: { fontSize: 10, fontWeight: '600', color: '#64748B' },
+  feePillTextActive: { color: '#D4AF37' },
+
+  // Switch toggle
+  switchTrack: {
+    width: 36, height: 20, borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    justifyContent: 'center', paddingHorizontal: 2,
+  },
+  switchTrackActive: { backgroundColor: 'rgba(20,184,166,0.35)' },
+  switchKnob: {
+    width: 16, height: 16, borderRadius: 8,
+    backgroundColor: '#475569',
+  },
+  switchKnobActive: { backgroundColor: '#14B8A6', alignSelf: 'flex-end' as const },
+
+  // Theme circles
+  themeCircle: {
+    width: 36, height: 36, borderRadius: 18,
+    borderWidth: 2, borderColor: 'rgba(255,255,255,0.06)', overflow: 'hidden',
+  },
+  themeCircleActive: { borderColor: '#14B8A6', borderWidth: 2 },
+  themeGrad: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' } as any,
+  themeCheck: {
+    position: 'absolute' as const, bottom: -1, right: -1,
+    width: 12, height: 12, borderRadius: 6,
+    backgroundColor: '#14B8A6', alignItems: 'center' as any, justifyContent: 'center' as any,
+  },
+
+  // Background image picker
+  bgPickerBtn: {
+    width: 80, height: 48, borderRadius: 8, overflow: 'hidden',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: 'rgba(255,255,255,0.03)',
+  },
+  bgPreview: { width: '100%', height: '100%', borderRadius: 7 } as any,
+  bgPickerPlaceholder: {
+    width: '100%', height: '100%',
+    alignItems: 'center', justifyContent: 'center',
+  } as any,
+
+  // Advanced hint
+  advHint: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: 6,
+    marginTop: 10, paddingTop: 10,
+    borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.04)',
+  },
+  advHintText: { flex: 1, fontSize: 10, color: '#475569', lineHeight: 14 },
+
+  // Capacity
+  capacityBar: {
+    flexDirection: 'row', alignItems: 'center',
+    padding: 12, borderRadius: 12, marginBottom: 14,
+    backgroundColor: 'rgba(20,184,166,0.04)', borderWidth: 1, borderColor: 'rgba(20,184,166,0.12)',
+  },
+  capDivider: { width: 1, height: 24, backgroundColor: 'rgba(255,255,255,0.06)' },
+
+  // Create button
+  createBtn: {
+    borderRadius: 14, overflow: 'hidden', marginBottom: 10,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.3, shadowRadius: 6, elevation: 6,
+  },
+  createBtnGrad: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
+    paddingVertical: 15,
+  },
+  createBtnText: { fontSize: 16, fontWeight: '800', color: '#FFF' },
 });

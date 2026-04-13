@@ -72,6 +72,14 @@ type ProfileCardProps = {
   // Kişisel susturma (lokal)
   onPersonalMute?: () => void;
   isPersonallyMuted?: boolean;
+  // Bağış (Tip)
+  onTip?: () => void;
+  donationsEnabled?: boolean;
+  // ★ M5 FIX: Takip durumu
+  isFollowing?: boolean;
+  isPending?: boolean;
+  // ★ M6 FIX: Kendi profil — sahneden in
+  onSelfDemote?: () => void;
 };
 
 export default function ProfileCard({
@@ -81,6 +89,8 @@ export default function ProfileCard({
   onViewProfile, onFollow, onDM,
   onGhostMode, isGhost, onDisguise, onBanTemp, onBanPerm,
   onPersonalMute, isPersonallyMuted,
+  onTip, donationsEnabled,
+  isFollowing, isPending, onSelfDemote,
 }: ProfileCardProps) {
   // Slide-up animasyonu
   const slideY = useRef(new Animated.Value(H * 0.3)).current;
@@ -175,16 +185,26 @@ export default function ProfileCard({
             BÖLÜM 2: Sosyal Aksiyonlar — Takip / DM / Profil
            ════════════════════════════════════════════ */}
         {isOwnProfile ? (
-          <TouchableOpacity style={sty.primaryPill} onPress={onViewProfile} activeOpacity={0.7}>
-            <Ionicons name="person-circle-outline" size={16} color={C.primary} />
-            <Text style={[sty.pillText, { color: C.primary }]}>Profili Görüntüle</Text>
-          </TouchableOpacity>
+          <View style={sty.socialRow}>
+            <TouchableOpacity style={sty.primaryPill} onPress={onViewProfile} activeOpacity={0.7}>
+              <Ionicons name="person-circle-outline" size={16} color={C.primary} />
+              <Text style={[sty.pillText, { color: C.primary }]}>Profili Görüntüle</Text>
+            </TouchableOpacity>
+            {/* ★ M6 FIX: Kendi profil — sahneden in (sahnedeyse) */}
+            {onSelfDemote && (role === 'speaker' || role === 'moderator') && (
+              <TouchableOpacity style={[sty.outlinePill, { borderColor: 'rgba(239,68,68,0.2)', backgroundColor: 'rgba(239,68,68,0.06)' }]} onPress={() => { handleClose(); setTimeout(() => onSelfDemote(), 200); }} activeOpacity={0.7}>
+                <Ionicons name="arrow-down-circle-outline" size={13} color={C.red} />
+                <Text style={[sty.pillText, { color: C.red }]}>Sahneden İn</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         ) : (
           <>
           <View style={sty.socialRow}>
-            <TouchableOpacity style={sty.primaryPill} onPress={onFollow} activeOpacity={0.7}>
-              <Ionicons name="person-add" size={13} color={C.primary} />
-              <Text style={[sty.pillText, { color: C.primary }]}>Takip Et</Text>
+            {/* ★ M5 FIX: Takip durumuna göre buton metni değişir */}
+            <TouchableOpacity style={[sty.primaryPill, (isFollowing || isPending) && { backgroundColor: 'rgba(20,184,166,0.1)', borderColor: 'rgba(20,184,166,0.25)' }]} onPress={onFollow} activeOpacity={0.7}>
+              <Ionicons name={isFollowing ? 'checkmark-circle' : isPending ? 'time-outline' : 'person-add'} size={13} color={isFollowing ? '#14B8A6' : isPending ? '#FBBF24' : C.primary} />
+              <Text style={[sty.pillText, { color: isFollowing ? '#14B8A6' : isPending ? '#FBBF24' : C.primary }]}>{isFollowing ? 'Takip Ediliyor' : isPending ? 'Bekliyor' : 'Takip Et'}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={sty.outlinePill} onPress={onDM} activeOpacity={0.7}>
               <Ionicons name="chatbubble-ellipses" size={13} color={C.white60} />
@@ -195,6 +215,13 @@ export default function ProfileCard({
               <Text style={[sty.pillText, { color: C.white60 }]}>Profil</Text>
             </TouchableOpacity>
           </View>
+          {/* ★ Bağış (Tip) butonu — donations aktifse ve kendi profili değilse */}
+          {donationsEnabled && onTip && (
+            <TouchableOpacity style={sty.tipPill} onPress={onTip} activeOpacity={0.7}>
+              <Ionicons name="heart" size={14} color="#EF4444" />
+              <Text style={[sty.pillText, { color: '#EF4444' }]}>SP Bağış Yap</Text>
+            </TouchableOpacity>
+          )}
           {/* Kişisel Susturma (Lokal) */}
           {onPersonalMute && (
             <TouchableOpacity
@@ -529,6 +556,19 @@ const sty = StyleSheet.create({
     backgroundColor: 'rgba(249,115,22,0.06)',
     borderWidth: 1,
     borderColor: 'rgba(249,115,22,0.15)',
+    marginTop: 8,
+  },
+  // Bağış (Tip) butonu
+  tipPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    height: 36,
+    borderRadius: 99,
+    backgroundColor: 'rgba(239,68,68,0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(239,68,68,0.15)',
     marginTop: 8,
   },
 });

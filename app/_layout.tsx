@@ -18,12 +18,16 @@ import { supabase } from '../constants/supabase';
 import { PushNotificationService } from '../services/pushNotifications';
 import { SettingsService } from '../services/settings';
 import { CallService, type CallSignal } from '../services/call';
+import { RevenueCatService } from '../services/revenuecat';
 import { i18n } from '../services/i18n';
 import { Toast } from '../components/Toast';
 import { IncomingCallOverlay } from '../components/IncomingCallOverlay';
 import MiniRoomCard, { type MinimizedRoom } from '../components/MiniRoomCard';
 import ErrorBoundary from '../components/ErrorBoundary';
 import SplashOverlay from '../components/SplashOverlay';
+import NotificationDrawer from '../components/NotificationDrawer';
+import { OnlineFriendsProvider } from '../providers/OnlineFriendsProvider';
+export { useOnlineFriends } from '../providers/OnlineFriendsProvider';
 import { useFonts, Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
 
 SplashScreen.preventAutoHideAsync();
@@ -69,6 +73,9 @@ type AuthContextType = {
   /** ★ Aktif arama takibi — meşgul durumu için */
   activeCallId: string | null;
   setActiveCallId: (id: string | null) => void;
+  /** ★ BUG-4: Global bildirim drawer kontrolü */
+  showNotifDrawer: boolean;
+  setShowNotifDrawer: (v: boolean) => void;
 };
 
 export const AuthContext = createContext<AuthContextType>({
@@ -87,6 +94,8 @@ export const AuthContext = createContext<AuthContextType>({
   consumeCallSignal: () => undefined,
   activeCallId: null,
   setActiveCallId: () => {},
+  showNotifDrawer: false,
+  setShowNotifDrawer: () => {},
 });
 
 export function useAuth() {
@@ -143,11 +152,14 @@ function RealtimeBadgeProvider({ userId, children }: { userId: string | null; ch
         MessageService.getUnreadCount(userId),
         FriendshipService.getPendingCount(userId),
         (async () => {
+          // ★ Zil badge'i SADECE oda + arama + hediye bildirimlerini sayar
+          // follow_* → arkadaş simgesi, dm → mesajlar tab'ında zaten badge var
           const { count } = await supabase
             .from('notifications')
             .select('*', { count: 'exact', head: true })
             .eq('user_id', userId)
-            .eq('is_read', false);
+            .eq('is_read', false)
+            .in('type', ['room_live', 'room_invite', 'missed_call', 'incoming_call', 'gift', 'event_reminder']);
           return count || 0;
         })(),
       ]);
@@ -190,6 +202,8 @@ function RealtimeBadgeProvider({ userId, children }: { userId: string | null; ch
     });
 
     // 3. Notifications realtime — yeni bildirim gelince sayıyı artır
+    // ★ Zil badge'ine dahil olan bildirim tipleri (oda + arama + hediye)
+    const BELL_NOTIF_TYPES = ['room_live', 'room_invite', 'missed_call', 'incoming_call', 'gift', 'event_reminder'];
     const notifSub = supabase
       .channel(`badge_notif:${userId}`)
       .on('postgres_changes', {
@@ -197,7 +211,9 @@ function RealtimeBadgeProvider({ userId, children }: { userId: string | null; ch
         schema: 'public',
         table: 'notifications',
         filter: `user_id=eq.${userId}`,
-      }, () => {
+      }, (payload: any) => {
+        const notifType = payload.new?.type;
+        if (!BELL_NOTIF_TYPES.includes(notifType)) return; // Sadece oda/arama/hediye bildirimlerini say
         setUnreadNotifs(prev => prev + 1);
       })
       .subscribe();
@@ -236,8 +252,8 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
       }
     } else {
       // Giris yapmis, ama profil tam mi?
-      // birth_date kontrol edilir, eger yoksa kayit yarim kalmistir.
-      const hasCompleteProfile = profile && profile.birth_date && profile.gender;
+      // display_name kontrol edilir, yoksa onboarding tamamlanmamistir.
+      const hasCompleteProfile = profile && profile.display_name;
 
       if (!profile || !hasCompleteProfile) {
         // Eksik profil -> Kesinlikle onboarding e girmeli
@@ -301,6 +317,7 @@ export default function RootLayout() {
   const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [minimizedRoom, setMinimizedRoom] = useState<MinimizedRoom | null>(null);
+  const [showNotifDrawer, setShowNotifDrawer] = useState(false);
 
   // Gelen arama state
   const [incomingCall, setIncomingCall] = useState<CallSignal | null>(null);
@@ -399,6 +416,9 @@ export default function RootLayout() {
           await GamificationService.onDailyLogin(fbUser.uid);
           await GamificationService.onPrimeTimeReturn(fbUser.uid);
         } catch { /* SP kazandırma başarısız olursa sessiz geç */ }
+
+        // ★ RevenueCat: SDK başlat + kullanıcı kimliğini bağla
+        RevenueCatService.init(fbUser.uid).catch(() => {});
       } else {
         setProfile(null);
       }
@@ -654,9 +674,10 @@ export default function RootLayout() {
   }
 
   return (
-    <AuthContext.Provider value={{ isAuthReady, isLoggedIn, setIsLoggedIn, user, setUser, firebaseUser, profile, setProfile, refreshProfile, minimizedRoom, setMinimizedRoom, pendingCallSignals, consumeCallSignal, activeCallId, setActiveCallId: updateActiveCallId }}>
+    <AuthContext.Provider value={{ isAuthReady, isLoggedIn, setIsLoggedIn, user, setUser, firebaseUser, profile, setProfile, refreshProfile, minimizedRoom, setMinimizedRoom, pendingCallSignals, consumeCallSignal, activeCallId, setActiveCallId: updateActiveCallId, showNotifDrawer, setShowNotifDrawer }}>
       <ThemeContext.Provider value={{ themeVersion, applyTheme }}>
       <RealtimeBadgeProvider userId={firebaseUser?.uid || null}>
+      <OnlineFriendsProvider userId={firebaseUser?.uid || null}>
       <View style={styles.container}>
         {/* Status bar her zaman light (koyu tema) */}
         <StatusBar style="light" />
@@ -702,6 +723,13 @@ export default function RootLayout() {
         )}
         <Toast />
 
+        {/* ★ BUG-4 FIX: NotificationDrawer artık global — tüm sayfalarda tek instance */}
+        <NotificationDrawer
+          visible={showNotifDrawer}
+          onClose={() => setShowNotifDrawer(false)}
+          userId={firebaseUser?.uid}
+        />
+
         {/* Gelen Arama Overlay — ★ CALL-6: Tam ekran WhatsApp tarzı */}
         <IncomingCallOverlay
           visible={!!incomingCall}
@@ -724,6 +752,7 @@ export default function RootLayout() {
           }}
         />
       </View>
+    </OnlineFriendsProvider>
     </RealtimeBadgeProvider>
     </ThemeContext.Provider>
     </AuthContext.Provider>

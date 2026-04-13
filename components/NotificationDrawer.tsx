@@ -1,8 +1,10 @@
 /**
- * SopranoChat — Bildirim Dropdown (Facebook tarzı)
+ * SopranoChat — Bildirim Dropdown (X.com tarzı)
  * Zil ikonuna yapışık açılan kompakt dropdown panel
+ * ★ Sadece oda + arama + hediye bildirimleri gösterilir
+ * Takip istekleri → FriendsDrawer, DM → Mesajlar tab'ında
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, Pressable, FlatList,
   Image, ActivityIndicator, Dimensions, Modal,
@@ -11,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { supabase } from '../constants/supabase';
 import { getAvatarSource } from '../constants/avatars';
+import { showToast } from './Toast';
 
 const { width: W, height: H } = Dimensions.get('window');
 
@@ -33,30 +36,29 @@ interface Props {
 }
 
 // Bildirim tipi → simge eşleşmesi
+// ★ Zil drawer'ında gösterilecek bildirim tipleri (oda + arama + hediye)
+const BELL_NOTIF_TYPES = ['room_live', 'room_invite', 'missed_call', 'incoming_call', 'gift', 'event_reminder'];
+
 function getNotifIcon(type: string): { name: string; color: string } {
   switch (type) {
-    case 'follow_request': return { name: 'person-add', color: '#60A5FA' };
-    case 'follow_accepted': return { name: 'checkmark-circle', color: '#22C55E' };
     case 'gift': return { name: 'gift', color: '#F59E0B' };
     case 'room_live': return { name: 'mic', color: '#EF4444' };
     case 'room_invite': return { name: 'mail-open', color: '#14B8A6' };
-    case 'dm': return { name: 'chatbubble', color: '#8B5CF6' };
     case 'missed_call': return { name: 'call', color: '#EF4444' };
     case 'incoming_call': return { name: 'videocam', color: '#60A5FA' };
+    case 'event_reminder': return { name: 'calendar', color: '#A78BFA' };
     default: return { name: 'notifications', color: '#94A3B8' };
   }
 }
 
 function getDefaultBody(type: string): string {
   switch (type) {
-    case 'follow_request': return 'seni takip etmek istiyor';
-    case 'follow_accepted': return 'takip isteğini kabul etti';
     case 'gift': return 'sana hediye gönderdi';
     case 'room_live': return 'odası canlıya geçti';
     case 'room_invite': return 'seni odaya davet etti';
-    case 'dm': return 'sana mesaj gönderdi';
     case 'missed_call': return 'Cevapsız sesli arama';
     case 'incoming_call': return 'Cevapsız görüntülü arama';
+    case 'event_reminder': return 'Etkinlik hatırlatması';
     default: return '';
   }
 }
@@ -75,22 +77,106 @@ export default function NotificationDrawer({ visible, onClose, userId, anchorTop
   const router = useRouter();
   const [items, setItems] = useState<NotifItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [showAll, setShowAll] = useState(false); // ★ Tümünü Gör — modal içinde genişlet
+  const [clearing, setClearing] = useState(false); // ★ Tümünü Temizle loading state
 
   useEffect(() => {
-    if (visible && userId) loadNotifications();
+    if (visible && userId) {
+      setShowAll(false);
+      loadNotifications();
+      // ★ Drawer açılınca sadece zil bildirimleri okundu olarak işaretle
+      supabase.from('notifications')
+        .update({ is_read: true })
+        .eq('user_id', userId)
+        .eq('is_read', false)
+        .in('type', BELL_NOTIF_TYPES)
+        .then(() => {});
+    }
   }, [visible, userId]);
 
-  const loadNotifications = async () => {
+  // ★ Realtime: Bildirimler + takipleşme değişimlerini anlık dinle
+  // SADECE drawer açıkken aktif — kapalıyken hayalet temizleme bildirimleri silmesin
+  useEffect(() => {
+    if (!userId || !visible) return;
+
+    const channel = supabase
+      .channel(`notif-sync-${userId}`)
+      // ── Notifications tablosu: INSERT / DELETE / UPDATE ──
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'notifications',
+        filter: `user_id=eq.${userId}`,
+      }, async (payload) => {
+        const { data } = await supabase
+          .from('notifications')
+          .select('*, sender:profiles!notifications_sender_id_fkey(display_name, avatar_url)')
+          .eq('id', payload.new.id)
+          .single();
+        if (data) {
+          setItems(prev => {
+            if (prev.some(n => n.id === data.id)) return prev;
+            return [data as NotifItem, ...prev];
+          });
+        }
+      })
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'notifications',
+        filter: `user_id=eq.${userId}`,
+      }, (payload) => {
+        const updated = payload.new as any;
+        if (updated?.id) {
+          setItems(prev => prev.map(n => n.id === updated.id ? { ...n, ...updated } : n));
+        }
+      })
+      .on('postgres_changes', {
+        event: 'DELETE',
+        schema: 'public',
+        table: 'notifications',
+        // ★ BUG-F17 FIX: Supabase DELETE'te filter desteklemeyebilir,
+        // callback içinde user_id kontrolü yapılıyor.
+      }, (payload) => {
+        const deleted = (payload.old as any);
+        // Sadece kendi bildirimlerimizse UI'dan kaldır
+        if (deleted?.user_id && deleted.user_id !== userId) return;
+        const deletedId = deleted?.id;
+        if (deletedId) {
+          setItems(prev => prev.filter(n => n.id !== deletedId));
+        }
+      })
+      // ── Friendships tablosu: Takipleşme değişimi → listeyi yenile ──
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'friendships',
+        filter: `friend_id=eq.${userId}`,
+      }, () => {
+        // Takipleşme durumu değişti — bildirimleri tazele (drawer açık)
+        loadNotifications();
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [userId, visible]);
+
+  const loadNotifications = async (loadAll = false) => {
     if (!userId) return;
     setLoading(true);
     try {
+      // ★ Sadece oda + arama + hediye bildirimlerini getir
+      // follow_* → FriendsDrawer'da, dm → Mesajlar tab'ında gösteriliyor
       const { data, error } = await supabase
         .from('notifications')
         .select('*, sender:profiles!notifications_sender_id_fkey(display_name, avatar_url)')
         .eq('user_id', userId)
+        .in('type', BELL_NOTIF_TYPES)
         .order('created_at', { ascending: false })
-        .limit(20);
-      if (!error) setItems((data || []) as NotifItem[]);
+        .limit(loadAll ? 100 : 20);
+      if (!error && data) {
+        setItems(data as NotifItem[]);
+      }
     } catch {}
     setLoading(false);
   };
@@ -103,16 +189,30 @@ export default function NotificationDrawer({ visible, onClose, userId, anchorTop
   const handlePress = (item: NotifItem) => {
     markAsRead(item.id);
     onClose();
-    if (item.type === 'follow_request' || item.type === 'follow_accepted') {
-      router.push(`/user/${item.sender_id}` as any);
-    } else if (item.type === 'room_live' && item.reference_id) {
+    if (item.type === 'room_live' && item.reference_id) {
       router.push(`/room/${item.reference_id}` as any);
-    } else if (item.type === 'dm' && item.reference_id) {
-      router.push(`/chat/${item.reference_id}` as any);
+    } else if (item.type === 'room_invite' && item.reference_id) {
+      router.push(`/room/${item.reference_id}` as any);
+    } else if (item.type === 'missed_call' && item.sender_id) {
+      router.push(`/user/${item.sender_id}` as any);
     } else if (item.type === 'gift') {
       router.push(`/wallet` as any);
     }
   };
+
+  // ★ Tümünü Temizle — sadece zil bildirimlerini sil
+  const handleClearAll = useCallback(async () => {
+    if (!userId || items.length === 0) return;
+    setClearing(true);
+    try {
+      await supabase.from('notifications').delete().eq('user_id', userId).in('type', BELL_NOTIF_TYPES);
+      setItems([]);
+    } catch {
+      showToast({ title: 'Hata', message: 'Bildirimler temizlenemedi', type: 'error' });
+    } finally {
+      setClearing(false);
+    }
+  }, [userId, items.length]);
 
   const unreadCount = items.filter(n => !n.is_read).length;
 
@@ -135,6 +235,22 @@ export default function NotificationDrawer({ visible, onClose, userId, anchorTop
               <Text style={s.badgeText}>{unreadCount}</Text>
             </View>
           )}
+          {/* ★ Tümünü Temizle butonu */}
+          {items.length > 0 && (
+            <Pressable
+              style={({ pressed }) => [s.clearBtn, pressed && { opacity: 0.6 }]}
+              onPress={handleClearAll}
+              disabled={clearing}
+              hitSlop={8}
+            >
+              {clearing ? (
+                <ActivityIndicator size={13} color="#94A3B8" />
+              ) : (
+                <Ionicons name="trash-outline" size={15} color="#94A3B8" />
+              )}
+              <Text style={s.clearBtnText}>Temizle</Text>
+            </Pressable>
+          )}
         </View>
 
         {loading ? (
@@ -148,44 +264,57 @@ export default function NotificationDrawer({ visible, onClose, userId, anchorTop
           <FlatList
             data={items}
             keyExtractor={(item) => item.id}
-            showsVerticalScrollIndicator={false}
-            style={{ maxHeight: H * 0.45 }}
+            showsVerticalScrollIndicator={true}
+            style={{ maxHeight: showAll ? H * 0.7 : H * 0.45 }}
             ItemSeparatorComponent={() => <View style={s.separator} />}
             renderItem={({ item }) => {
               const icon = getNotifIcon(item.type);
+
               return (
-                <Pressable
-                  style={({ pressed }) => [s.notifItem, !item.is_read && s.notifUnread, pressed && { opacity: 0.7 }]}
-                  onPress={() => handlePress(item)}
-                >
-                  {/* Avatar + tip ikonu overlay */}
-                  <View style={s.avatarWrap}>
-                    <Image source={getAvatarSource(item.sender?.avatar_url)} style={s.notifAvatar} />
-                    <View style={[s.typeIconBadge, { backgroundColor: icon.color }]}>
-                      <Ionicons name={icon.name as any} size={10} color="#FFF" />
+                <View>
+                  <Pressable
+                    style={({ pressed }) => [s.notifItem, !item.is_read && s.notifUnread, pressed && { opacity: 0.7 }]}
+                    onPress={() => handlePress(item)}
+                  >
+                    {/* Avatar + tip ikonu overlay */}
+                    <View style={s.avatarWrap}>
+                      <Image source={getAvatarSource(item.sender?.avatar_url)} style={s.notifAvatar} />
+                      <View style={[s.typeIconBadge, { backgroundColor: icon.color }]}>
+                        <Ionicons name={icon.name as any} size={10} color="#FFF" />
+                      </View>
                     </View>
-                  </View>
 
-                  {/* İçerik */}
-                  <View style={{ flex: 1 }}>
-                    <Text style={s.notifText} numberOfLines={2}>
-                      <Text style={s.notifSender}>{item.sender?.display_name || 'Birisi'}</Text>
-                      {' '}{item.body || getDefaultBody(item.type)}
-                    </Text>
-                    <Text style={s.notifTime}>{timeAgo(item.created_at)}</Text>
-                  </View>
+                    {/* İçerik */}
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.notifText} numberOfLines={2}>
+                        <Text style={s.notifSender}>{item.sender?.display_name || 'Birisi'}</Text>
+                        {' '}{item.body || getDefaultBody(item.type)}
+                      </Text>
+                      <Text style={s.notifTime}>{timeAgo(item.created_at)}</Text>
+                    </View>
 
-                  {!item.is_read && <View style={s.unreadDot} />}
-                </Pressable>
+                    {!item.is_read && <View style={s.unreadDot} />}
+                  </Pressable>
+
+                </View>
               );
             }}
           />
         )}
 
-        {/* Tümünü Gör */}
-        <Pressable style={s.seeAllBtn} onPress={() => { onClose(); router.push('/notifications' as any); }}>
-          <Text style={s.seeAllText}>Tümünü Gör</Text>
-        </Pressable>
+        {/* Tümünü Gör — aynı modal içinde genişlet */}
+        {!showAll && items.length >= 20 && (
+          <Pressable style={s.seeAllBtn} onPress={() => { setShowAll(true); loadNotifications(true); }}>
+            <Text style={s.seeAllText}>Tümünü Gör</Text>
+            <Ionicons name="chevron-down" size={14} color="#14B8A6" />
+          </Pressable>
+        )}
+        {showAll && (
+          <Pressable style={s.seeAllBtn} onPress={() => { setShowAll(false); loadNotifications(false); }}>
+            <Text style={s.seeAllText}>Daralt</Text>
+            <Ionicons name="chevron-up" size={14} color="#14B8A6" />
+          </Pressable>
+        )}
       </View>
     </Modal>
   );
@@ -269,10 +398,32 @@ const s = StyleSheet.create({
     width: 8, height: 8, borderRadius: 4,
     backgroundColor: '#14B8A6',
   },
+
   seeAllBtn: {
-    alignItems: 'center', paddingVertical: 10,
+    flexDirection: 'row',
+    alignItems: 'center', justifyContent: 'center',
+    gap: 4,
+    paddingVertical: 10,
     borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.06)',
     marginTop: 2,
   },
   seeAllText: { fontSize: 13, fontWeight: '600', color: '#14B8A6' },
+
+  // ★ Tümünü Temizle butonu
+  clearBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    backgroundColor: 'rgba(239,68,68,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(239,68,68,0.12)',
+  },
+  clearBtnText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#94A3B8',
+  },
 });

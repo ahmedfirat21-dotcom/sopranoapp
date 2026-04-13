@@ -67,17 +67,12 @@ export const StorageService = {
   },
 
   /**
-   * Upload a chat image to the 'chat-images' bucket
+   * Upload a chat image — 'post-images' bucket kullanır
    */
   async uploadChatImage(userId: string, imageUri: string): Promise<string> {
     const timestamp = new Date().getTime();
     const path = `chat/${userId}/${timestamp}.jpg`;
-    // chat-images bucket yoksa post-images kullan
-    try {
-      return await this.uploadFile('chat-images', path, imageUri);
-    } catch {
-      return await this.uploadFile('post-images', path, imageUri);
-    }
+    return await this.uploadFile('post-images', path, imageUri);
   },
 
   /**

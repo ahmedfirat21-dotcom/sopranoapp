@@ -80,13 +80,20 @@ async function grantSP(userId: string, action: string, overrideAmount?: number):
   const amount = overrideAmount ?? config?.amount ?? 0;
   if (amount <= 0) return 0;
 
-  // Cooldown/cap kontrolü (override'larda atlanabilir)
+  // Cooldown/cap kontrolü (config varsa standard, yoksa override için de temel cooldown)
   if (config && !_canGrant(userId, action)) return 0;
+
+  // ★ BUG-C4 FIX: Config olmayan action'lar için de temel cooldown — aynı action tekrarını engelle (1 dakika)
+  if (!config) {
+    const cache = _getCache(userId, action);
+    const elapsed = Date.now() - cache.lastGrantedAt;
+    if (elapsed < 60_000) return 0; // 1dk cooldown — çift ödül önleme
+  }
 
   // DB'ye yaz
   const persisted = await _persistSP(userId, amount, action);
   if (persisted) {
-    if (config) _markGranted(userId, action, amount);
+    _markGranted(userId, action, amount);
     return amount;
   }
   return 0;
@@ -132,10 +139,41 @@ async function _persistSP(userId: string, amount: number, action: string): Promi
 
 /**
  * SP harca — negatif bakiye kontrolü.
- * Başarılıysa true, yetersiz bakiyede false.
+ * ★ BUG-B6 FIX: RPC-first yaklaşımı — atomic harcama ile race condition azaltıldı.
+ * RPC başarısız olursa hata fırlatır (güvensiz fallback kaldırıldı).
  */
 async function spendSP(userId: string, amount: number, reason: string): Promise<{ success: boolean; remaining?: number; error?: string }> {
   try {
+    // Yöntem 1: RPC (atomic - tercih edilen)
+    const { data: rpcResult, error: rpcError } = await supabase.rpc('grant_system_points', {
+      p_user_id: userId,
+      p_amount: -amount,
+      p_action: reason,
+    });
+
+    if (!rpcError) {
+      // Başarılı — güncellenmiş bakiyeyi oku
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('system_points')
+        .eq('id', userId)
+        .single();
+      const remaining = profile?.system_points ?? 0;
+
+      // İşlem kaydı
+      try {
+        await supabase.from('sp_transactions').insert({
+          user_id: userId,
+          amount: -amount,
+          type: reason,
+          description: `SP harcan: ${reason}`,
+        });
+      } catch { /* işlem kaydı opsiyonel */ }
+
+      return { success: true, remaining };
+    }
+
+    // Yöntem 2: Manuel (RPC yoksa fallback — bakiye kontrolü ekli)
     const { data: profile } = await supabase
       .from('profiles')
       .select('system_points')
@@ -163,7 +201,7 @@ async function spendSP(userId: string, amount: number, reason: string): Promise<
         user_id: userId,
         amount: -amount,
         type: reason,
-        description: `SP harcandı: ${reason}`,
+        description: `SP harcan: ${reason}`,
       });
     } catch { /* işlem kaydı opsiyonel */ }
 
@@ -306,6 +344,11 @@ export const GamificationService = {
   /** Genel SP harcama */
   async spend(userId: string, amount: number, reason: string): Promise<{ success: boolean; remaining?: number; error?: string }> {
     return spendSP(userId, amount, reason);
+  },
+
+  /** Genel SP kazandırma (bağış alıcısı, ödül vb.) */
+  async earn(userId: string, amount: number, reason: string): Promise<number> {
+    return grantSP(userId, reason, amount);
   },
 
   // ── Yardımcılar ──

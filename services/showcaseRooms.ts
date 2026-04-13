@@ -154,11 +154,14 @@ export function getShowcaseRoomInserts(systemUserId: string): Partial<Room>[] {
  * Kullanıcı odası yokken Keşfet'te gösterilir.
  */
 export function getSystemRooms(): Room[] {
-  return SHOWCASE_ROOMS.map(room => ({
+  // ★ BUG-K2 FIX: Sabit listener_count ve created_at — her çağrıda rastgele değişmesin
+  const STABLE_COUNTS = [8, 5, 3, 6]; // Her sistem odası için sabit değer
+  const STABLE_DATE = '2026-01-01T00:00:00.000Z'; // Sabit tarih — "yeni oda" bonusu almaz
+  return SHOWCASE_ROOMS.map((room, idx) => ({
     ...room,
     host_id: 'system',
-    listener_count: Math.floor(Math.random() * 15) + 3,
-    created_at: new Date().toISOString(),
+    listener_count: STABLE_COUNTS[idx] || 4,
+    created_at: STABLE_DATE,
     host: {
       id: 'system',
       display_name: 'SopranoChat',

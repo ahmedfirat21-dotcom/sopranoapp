@@ -33,9 +33,12 @@ const LockedFeatureHint: React.FC<LockedHintProps> = ({ label, requiredTier, ico
         </View>
         <Text style={lk.label}>{label}</Text>
       </View>
-      <View style={[lk.badge, { borderColor: `${tierDef.color}40`, backgroundColor: `${tierDef.color}10` }]}>
-        <Ionicons name="lock-closed" size={8} color={tierDef.color} />
-        <Text style={[lk.badgeText, { color: tierDef.color }]}>{requiredTier}+</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+        <View style={[lk.badge, { borderColor: `${tierDef.color}40`, backgroundColor: `${tierDef.color}10` }]}>
+          <Ionicons name="lock-closed" size={8} color={tierDef.color} />
+          <Text style={[lk.badgeText, { color: tierDef.color }]}>{requiredTier}+</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.15)" />
       </View>
     </Pressable>
   );
@@ -44,17 +47,16 @@ const LockedFeatureHint: React.FC<LockedHintProps> = ({ label, requiredTier, ico
 const lk = StyleSheet.create({
   container: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingVertical: 11, paddingHorizontal: 14, borderRadius: 12, marginBottom: 6,
-    backgroundColor: 'rgba(255,255,255,0.02)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.04)',
+    paddingVertical: 14, 
+    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.03)',
   },
-  left: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  iconWrap: { width: 30, height: 30, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  label: { fontSize: 12, fontWeight: '600', color: 'rgba(255,255,255,0.35)' },
+  left: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  iconWrap: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  label: { fontSize: 14, fontWeight: '500', color: '#E2E8F0' },
   badge: {
-    flexDirection: 'row', alignItems: 'center', gap: 3,
-    paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6, borderWidth: 1,
+    flexDirection: 'row', alignItems: 'center', gap: 4,
   },
-  badgeText: { fontSize: 9, fontWeight: '700' },
+  badgeText: { fontSize: 11, fontWeight: '600' },
 });
 
 // ── Props ─────────────────────────────────────────
@@ -164,103 +166,83 @@ export default function TieredProfileSections({
         <LockedFeatureHint label="Dil & Yaş Etiketleri" requiredTier="Silver" icon="globe-outline" />
       )}
 
-      {/* ═══ Temel İstatistikler — Tüm tier'lar ═══ */}
-      <View style={s.statsCard}>
-        <Text style={s.sectionTitle}>📊 İstatistikler</Text>
-        <View style={s.statsGrid}>
-          <View style={s.statBox}>
-            <Ionicons name="mic" size={16} color="#14B8A6" />
-            <Text style={s.statNumber}>{formatStageTime(stats.stageMinutes)}</Text>
-            <Text style={s.statDesc}>Sahne Süresi</Text>
-          </View>
-          <View style={s.statBox}>
-            <Ionicons name="home" size={16} color="#8B5CF6" />
-            <Text style={s.statNumber}>{stats.roomsCreated}</Text>
-            <Text style={s.statDesc}>Oda Açıldı</Text>
-          </View>
-          <View style={s.statBox}>
-            <Ionicons name="people" size={16} color="#F59E0B" />
-            <Text style={s.statNumber}>{stats.totalListeners}</Text>
-            <Text style={s.statDesc}>Dinleyici</Text>
-          </View>
+      {/* ═══ Son Aktif Odalar (Aktivite Alanı) ═══ */}
+      {recentRooms.length > 0 ? (
+        <View style={s.sectionCard}>
+          <Text style={s.sectionTitle}>📡 Son Aktif Odalar</Text>
+          {recentRooms.slice(0, isTierAtLeast(tier, 'Bronze') ? recentRooms.length : 5).map((room) => {
+            const cat = CAT_ICONS[room.category] || CAT_ICONS.other;
+            return (
+              <Pressable key={room.id} style={s.roomRow} onPress={() => router.push(`/room/${room.id}` as any)}>
+                <View style={[s.roomIcon, { backgroundColor: `${cat.color}15` }]}>
+                  <Ionicons name={cat.icon as any} size={14} color={cat.color} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.roomName} numberOfLines={1}>{room.name}</Text>
+                  <Text style={s.roomMeta}>{formatDate(room.created_at)} · Katılım</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.15)" />
+              </Pressable>
+            );
+          })}
         </View>
-      </View>
-
-      {/* ═══ Bronze+ Oda Kurucu Geçmişi ═══ */}
-      {isTierAtLeast(tier, 'Bronze') ? (
-        recentRooms.length > 0 ? (
-          <View style={s.sectionCard}>
-            <Text style={s.sectionTitle}>🏠 Oda Geçmişi</Text>
-            {recentRooms.map((room) => {
-              const cat = CAT_ICONS[room.category] || CAT_ICONS.other;
-              return (
-                <Pressable key={room.id} style={s.roomRow} onPress={() => router.push(`/room/${room.id}` as any)}>
-                  <View style={[s.roomIcon, { backgroundColor: `${cat.color}15` }]}>
-                    <Ionicons name={cat.icon as any} size={14} color={cat.color} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={s.roomName} numberOfLines={1}>{room.name}</Text>
-                    <Text style={s.roomMeta}>{formatDate(room.created_at)} · {room.listener_count} dinleyici</Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.15)" />
-                </Pressable>
-              );
-            })}
-          </View>
-        ) : (
-          <View style={s.sectionCard}>
-            <Text style={s.sectionTitle}>🏠 Oda Geçmişi</Text>
-            <Text style={s.emptyText}>Henüz oda oluşturulmamış</Text>
-          </View>
-        )
       ) : (
-        <LockedFeatureHint label="Oda Kurucu Geçmişi" requiredTier="Bronze" icon="home-outline" />
+        <View style={s.sectionCard}>
+          <Text style={s.sectionTitle}>📡 Son Aktif Odalar</Text>
+          <Text style={s.emptyText}>Henüz aktif olunan oda yok</Text>
+        </View>
       )}
 
-      {/* ═══ Silver+ Profil Teması ═══ */}
-      {!isTierAtLeast(tier, 'Silver') && (
-        <LockedFeatureHint label="Profil Teması" requiredTier="Silver" icon="color-palette-outline" />
-      )}
+      {/* ═══ Premium Özellikler Listesi (Settings List Match) ═══ */}
+      <View style={s.sectionCard}>
+        <Text style={s.sectionTitle}>PREMİUM ÖZELLİKLER (Önizleme)</Text>
 
-      {/* ═══ Gold+ Banner Kartı ═══ */}
-      {!isTierAtLeast(tier, 'Gold') && (
-        <LockedFeatureHint label="Kapak Fotoğrafı" requiredTier="Gold" icon="image-outline" />
-      )}
+        {!isTierAtLeast(tier, 'Bronze') && (
+          <LockedFeatureHint label="Kapsamlı Moderasyon Geçmişi" requiredTier="Bronze" icon="shield-checkmark-outline" />
+        )}
+        
+        {!isTierAtLeast(tier, 'Silver') && (
+          <LockedFeatureHint label="Profil Teması" requiredTier="Silver" icon="color-palette-outline" />
+        )}
 
-      {/* ═══ Gold+ Destekle / Bağış Butonu ═══ */}
-      {isTierAtLeast(tier, 'Gold') ? (
-        !isOwnProfile && onDonate ? (
-          <Pressable style={s.donateBtn} onPress={onDonate}>
-            <LinearGradient colors={['#F59E0B', '#D97706']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.donateBtnGradient}>
-              <Ionicons name="heart" size={16} color="#FFF" />
-              <Text style={s.donateBtnText}>Destekle (SP Gönder)</Text>
-            </LinearGradient>
-          </Pressable>
-        ) : null
-      ) : (
-        !isOwnProfile && <LockedFeatureHint label="Destekle / SP Bağış" requiredTier="Gold" icon="heart-outline" />
-      )}
+        {!isTierAtLeast(tier, 'Gold') && (
+          <LockedFeatureHint label="Kapak Fotoğrafı" requiredTier="Gold" icon="image-outline" />
+        )}
 
-      {/* ═══ Gold+ Takipçilere Özel İçerik ═══ */}
-      {!isTierAtLeast(tier, 'Gold') && (
-        <LockedFeatureHint label="Takipçilere Özel İçerik" requiredTier="Gold" icon="lock-closed-outline" />
-      )}
+        {!isTierAtLeast(tier, 'Gold') && (
+          <LockedFeatureHint label="Takipçilere Özel İçerik" requiredTier="Gold" icon="lock-closed-outline" />
+        )}
 
-      {/* ═══ VIP Ghost Mode Göstergesi ═══ */}
-      {isTierAtLeast(tier, 'VIP') ? (
-        isGhost ? (
-          <View style={[s.sectionCard, { borderColor: 'rgba(139,92,246,0.2)' }]}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <View style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: 'rgba(139,92,246,0.15)', alignItems: 'center', justifyContent: 'center' }}>
-                <Text style={{ fontSize: 14 }}>👻</Text>
-              </View>
-              <Text style={{ color: '#A78BFA', fontSize: 12, fontWeight: '700' }}>Ghost Mode Aktif</Text>
+        {isTierAtLeast(tier, 'Gold') ? (
+          !isOwnProfile && onDonate ? (
+            <View style={[lk.container, { borderBottomWidth: 0, paddingVertical: 8 }]}>
+              <Pressable style={[s.donateBtn, { width: '100%' }]} onPress={onDonate}>
+                <LinearGradient colors={['#F59E0B', '#D97706']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.donateBtnGradient}>
+                  <Ionicons name="heart" size={16} color="#FFF" />
+                  <Text style={s.donateBtnText}>Destekle (SP Gönder)</Text>
+                </LinearGradient>
+              </Pressable>
             </View>
-          </View>
-        ) : null
-      ) : (
-        <LockedFeatureHint label="Ghost Mode Göstergesi" requiredTier="VIP" icon="eye-off-outline" />
-      )}
+          ) : null
+        ) : (
+          !isOwnProfile && <LockedFeatureHint label="Destekle / SP Bağış" requiredTier="Gold" icon="heart-outline" />
+        )}
+
+        {isTierAtLeast(tier, 'VIP') ? (
+          isGhost ? (
+            <View style={[lk.container, { borderBottomWidth: 0 }]}>
+              <View style={lk.left}>
+                <View style={[lk.iconWrap, { backgroundColor: 'rgba(139,92,246,0.15)' }]}>
+                  <Text style={{ fontSize: 14 }}>👻</Text>
+                </View>
+                <Text style={lk.label}>Ghost Mode Aktif</Text>
+              </View>
+            </View>
+          ) : null
+        ) : (
+          <LockedFeatureHint label="Ghost Mode Göstergesi" requiredTier="VIP" icon="eye-off-outline" />
+        )}
+      </View>
 
       {/* ═══ VIP Gelişmiş İstatistik Paneli ═══ */}
       {isTierAtLeast(tier, 'VIP') ? (
@@ -362,51 +344,43 @@ const s = StyleSheet.create({
   },
   tagText: { fontSize: 11, color: '#94A3B8', fontWeight: '600' },
 
-  // Stats card
-  statsCard: {
-    padding: 14, borderRadius: 14, backgroundColor: Colors.cardBg,
-    borderWidth: 1, borderColor: Colors.cardBorder,
-  },
-  statsGrid: { flexDirection: 'row', justifyContent: 'space-around', marginTop: 10 },
-  statBox: { alignItems: 'center', gap: 4 },
-  statNumber: { fontSize: 15, fontWeight: '800', color: '#E2E8F0' },
-  statDesc: { fontSize: 10, color: '#64748B', fontWeight: '600' },
 
-  // Section card
+  // Section card (Subtle Glass Area)
   sectionCard: {
-    padding: 14, borderRadius: 14, backgroundColor: Colors.cardBg,
-    borderWidth: 1, borderColor: Colors.cardBorder,
+    paddingHorizontal: 14, paddingVertical: 12, borderRadius: 16, 
+    backgroundColor: 'rgba(255,255,255,0.015)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.03)',
   },
-  sectionTitle: { fontSize: 13, fontWeight: '700', color: '#E2E8F0', marginBottom: 8 },
-  emptyText: { fontSize: 11, color: '#475569', textAlign: 'center', paddingVertical: 12 },
+  sectionTitle: { fontSize: 12, fontWeight: '700', color: '#CBD5E1', marginBottom: 10, textTransform: 'uppercase', letterSpacing: 0.5 },
+  emptyText: { fontSize: 12, color: '#475569', textAlign: 'center', paddingVertical: 16 },
 
-  // Room row
+  // Room row timeline style
   roomRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8,
-    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.03)',
+    flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10,
+    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.02)',
   },
-  roomIcon: { width: 32, height: 32, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  roomName: { fontSize: 13, fontWeight: '600', color: '#E2E8F0' },
-  roomMeta: { fontSize: 10, color: '#64748B', marginTop: 2 },
+  roomIcon: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  roomName: { fontSize: 14, fontWeight: '600', color: '#F1F5F9' },
+  roomMeta: { fontSize: 11, color: '#64748B', marginTop: 2 },
 
   // Donate button
-  donateBtn: { borderRadius: 12, overflow: 'hidden' },
+  donateBtn: { borderRadius: 16, overflow: 'hidden' },
   donateBtnGradient: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    paddingVertical: 13, paddingHorizontal: 20,
+    paddingVertical: 14, paddingHorizontal: 20,
   },
-  donateBtnText: { fontSize: 14, fontWeight: '700', color: '#FFF' },
+  donateBtnText: { fontSize: 15, fontWeight: '700', color: '#FFF' },
 
   // VIP Stats
   vipStatsGrid: { flexDirection: 'row', justifyContent: 'space-around', marginTop: 8 },
-  vipStatBox: { alignItems: 'center', gap: 3 },
-  vipStatNum: { fontSize: 16, fontWeight: '800' },
-  vipStatLabel: { fontSize: 9, color: '#64748B', fontWeight: '600', textTransform: 'uppercase' },
+  vipStatBox: { alignItems: 'center', gap: 4 },
+  vipStatNum: { fontSize: 18, fontWeight: '800' },
+  vipStatLabel: { fontSize: 10, color: '#94A3B8', fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
 
   // Income
-  incomeGrid: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', marginTop: 8 },
-  incomeBox: { alignItems: 'center', gap: 3, flex: 1 },
-  incomeNum: { fontSize: 17, fontWeight: '800' },
-  incomeLabel: { fontSize: 9, color: '#64748B', fontWeight: '600' },
-  incomeDivider: { width: 1, height: 28, backgroundColor: 'rgba(255,255,255,0.06)' },
+  incomeGrid: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', marginTop: 10 },
+  incomeBox: { alignItems: 'center', gap: 4, flex: 1 },
+  incomeNum: { fontSize: 18, fontWeight: '800' },
+  incomeLabel: { fontSize: 10, color: '#94A3B8', fontWeight: '600' },
+  incomeDivider: { width: 1, height: 30, backgroundColor: 'rgba(255,255,255,0.05)' },
 });

@@ -25,9 +25,9 @@ export interface TierDefinition {
   icon: string;          // Ionicons name
   color: string;         // Ana renk
   gradient: [string, string];
-  /** Aylık fiyat (USD). 0 = ücretsiz */
+  /** Aylık fiyat (TL). 0 = ücretsiz */
   monthlyPrice: number;
-  /** Yıllık fiyat (USD). 0 = ücretsiz */
+  /** Yıllık fiyat (TL). 0 = ücretsiz */
   yearlyPrice: number;
   /** Marketing açıklaması */
   tagline: string;
@@ -52,8 +52,8 @@ export const TIER_DEFINITIONS: Record<SubscriptionTier, TierDefinition> = {
     icon: 'shield-outline',
     color: '#CD7F32',
     gradient: ['#CD7F32', '#A0522D'],
-    monthlyPrice: 2.99,
-    yearlyPrice: 24.99,
+    monthlyPrice: 79.99,
+    yearlyPrice: 699.99,
     tagline: 'İlk adımı at, daha fazlasını keşfet',
   },
   Silver: {
@@ -63,8 +63,8 @@ export const TIER_DEFINITIONS: Record<SubscriptionTier, TierDefinition> = {
     icon: 'star',
     color: '#C0C0C0',
     gradient: ['#C0C0C0', '#A8A8A8'],
-    monthlyPrice: 5.99,
-    yearlyPrice: 49.99,
+    monthlyPrice: 149.99,
+    yearlyPrice: 1299.99,
     tagline: 'Kişiselleştir, özelleştir, öne çık',
   },
   Gold: {
@@ -74,8 +74,8 @@ export const TIER_DEFINITIONS: Record<SubscriptionTier, TierDefinition> = {
     icon: 'diamond',
     color: '#FFD700',
     gradient: ['#FFD700', '#DAA520'],
-    monthlyPrice: 9.99,
-    yearlyPrice: 79.99,
+    monthlyPrice: 279.99,
+    yearlyPrice: 2399.99,
     tagline: 'Profesyonel yayıncı deneyimi',
   },
   VIP: {
@@ -85,8 +85,8 @@ export const TIER_DEFINITIONS: Record<SubscriptionTier, TierDefinition> = {
     icon: 'diamond',
     color: '#FF6B35',
     gradient: ['#FF6B35', '#E55100'],
-    monthlyPrice: 19.99,
-    yearlyPrice: 159.99,
+    monthlyPrice: 549.99,
+    yearlyPrice: 4699.99,
     tagline: 'Sınırsız güç, maksimum prestij',
   },
 } as const;
@@ -123,7 +123,7 @@ export interface RoomLimits {
   durationHours: number;
   /** Günlük oda açma limiti. 999 = sınırsız */
   dailyRooms: number;
-  /** Oda kalıcı mı? (kapatılınca uyku moduna alınır, silinmez) */
+  /** Oda kalıcı mı? (kapatılınca dondurulur, silinmez — wakeUpRoom ile tekrar aktif) */
   persistent: boolean;
   /** Max kalıcı oda sayısı */
   maxPersistentRooms: number;
@@ -151,8 +151,8 @@ export interface RoomLimits {
   canUseFilters: boolean;
   /** Takipçi-only mod kullanabilir mi? */
   canUseFollowersOnly: boolean;
-  /** Sahip çıkınca ne olur? */
-  ownerLeavePolicy: 'close' | 'countdown_60s' | 'sleep';
+  /** Sahip çıkınca ne olur? close: kapanır, keep_alive: açık kalır (host manuel yönetir) */
+  ownerLeavePolicy: 'close' | 'keep_alive';
 }
 
 export const ROOM_TIER_LIMITS: Record<SubscriptionTier, RoomLimits> = {
@@ -160,7 +160,7 @@ export const ROOM_TIER_LIMITS: Record<SubscriptionTier, RoomLimits> = {
     maxSpeakers: 4,
     maxListeners: 10,
     maxSpectators: 50,
-    maxCameras: 1,
+    maxCameras: 2,
     maxModerators: 0,
     durationHours: 2,
     dailyRooms: 3,
@@ -183,12 +183,12 @@ export const ROOM_TIER_LIMITS: Record<SubscriptionTier, RoomLimits> = {
     maxSpeakers: 6,
     maxListeners: 15,
     maxSpectators: 100,
-    maxCameras: 2,
+    maxCameras: 5,
     maxModerators: 1,
     durationHours: 6,
     dailyRooms: 5,
-    persistent: false,
-    maxPersistentRooms: 0,
+    persistent: true,
+    maxPersistentRooms: 1,
     allowedTypes: ['open', 'closed'] as readonly string[],
     audioSampleRate: 32000,
     audioChannels: 1,
@@ -200,44 +200,44 @@ export const ROOM_TIER_LIMITS: Record<SubscriptionTier, RoomLimits> = {
     canUseRoomMusic: false,
     canUseFilters: false,
     canUseFollowersOnly: false,
-    ownerLeavePolicy: 'countdown_60s',
+    ownerLeavePolicy: 'keep_alive',
   },
   Silver: {
     maxSpeakers: 8,
     maxListeners: 20,
     maxSpectators: 200,
-    maxCameras: 4,
+    maxCameras: 6,
     maxModerators: 2,
     durationHours: 12,
     dailyRooms: 10,
     persistent: true,
-    maxPersistentRooms: 1,
+    maxPersistentRooms: 2,
     allowedTypes: ['open', 'closed'] as readonly string[],
     audioSampleRate: 32000,
     audioChannels: 1,
     videoMaxRes: 720,
-    canCustomizeImage: false,
+    canCustomizeImage: true,
     canCustomizeTheme: true,
     canUseAvatarFrame: true,
     allowedStageLayouts: ['grid', 'spotlight'] as readonly StageLayout[],
     canUseRoomMusic: false,
     canUseFilters: true,
     canUseFollowersOnly: false,
-    ownerLeavePolicy: 'sleep',
+    ownerLeavePolicy: 'keep_alive',
   },
   Gold: {
     maxSpeakers: 10,
-    maxListeners: 20,
+    maxListeners: 25,
     maxSpectators: 500,
-    maxCameras: 6,
+    maxCameras: 8,
     maxModerators: 3,
     durationHours: 24,
     dailyRooms: 999,
     persistent: true,
-    maxPersistentRooms: 3,
+    maxPersistentRooms: 5,
     allowedTypes: ['open', 'closed', 'invite'] as readonly string[],
     audioSampleRate: 48000,
-    audioChannels: 1,
+    audioChannels: 2,
     videoMaxRes: 1080,
     canCustomizeImage: true,
     canCustomizeTheme: true,
@@ -246,13 +246,13 @@ export const ROOM_TIER_LIMITS: Record<SubscriptionTier, RoomLimits> = {
     canUseRoomMusic: true,
     canUseFilters: true,
     canUseFollowersOnly: true,
-    ownerLeavePolicy: 'sleep',
+    ownerLeavePolicy: 'keep_alive',
   },
   VIP: {
     maxSpeakers: 13,           // ★ Owner dahil 13 kişi
-    maxListeners: 20,
+    maxListeners: 30,          // ★ Gold(25)'ten fazla
     maxSpectators: 999,        // ★ Sınırsız seyirci
-    maxCameras: 8,
+    maxCameras: 10,            // ★ Gold(8)'den fazla
     maxModerators: 5,
     durationHours: 0,          // ★ 7/24 açık
     dailyRooms: 999,
@@ -269,7 +269,7 @@ export const ROOM_TIER_LIMITS: Record<SubscriptionTier, RoomLimits> = {
     canUseRoomMusic: true,
     canUseFilters: true,
     canUseFollowersOnly: true,
-    ownerLeavePolicy: 'sleep',
+    ownerLeavePolicy: 'keep_alive',
   },
 } as const;
 
@@ -374,8 +374,11 @@ export const CHECKIN_MULTIPLIER: Record<SubscriptionTier, number> = {
   VIP:    3,
 };
 
-/** Check-in ödülünü hesapla */
+/** Check-in ödülünü hesapla
+ *  ★ BUG-C5 FIX: streak=0 durumunda NaN önleme.
+ */
 export function getCheckinReward(streak: number, tier: SubscriptionTier): number {
+  if (streak <= 0) return 0; // ★ Guard: streak 0 veya negatifse ödül yok
   const rewardIndex = Math.min(streak - 1, DAILY_BASE_REWARDS.length - 1);
   const base = DAILY_BASE_REWARDS[rewardIndex];
   const multiplier = CHECKIN_MULTIPLIER[tier] || 1;

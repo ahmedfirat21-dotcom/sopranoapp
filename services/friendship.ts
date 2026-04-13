@@ -45,9 +45,39 @@ export const FriendshipService = {
   /**
    * Takip isteği gönder (pending)
    * Karşı taraf onaylayana kadar "İstek Gönderildi" durumunda kalır.
+   * ★ 24h cooldown: Reddedilen isteğin ardından 24 saat beklenmeli (X.com/Instagram standardı)
    */
   async follow(userId: string, targetId: string): Promise<{ success: boolean; error?: string }> {
     try {
+      // ★ Cooldown kontrolü: Bu kullanıcıya (userId) hedef (targetId) tarafından
+      // gönderilmiş bir 'follow_rejected' bildirimi var mı kontrol et.
+      // Eğer varsa ve 24 saatten yeniyse, tekrar istek gönderilemez.
+      const cooldownHours = 24;
+      const cooldownDate = new Date(Date.now() - cooldownHours * 60 * 60 * 1000).toISOString();
+      const { data: recentReject } = await supabase
+        .from('notifications')
+        .select('id, created_at')
+        .eq('user_id', userId)         // Reddedilen kişi (istek gönderen) — bildirim buraya kaydedilir
+        .eq('sender_id', targetId)     // Reddeden kişi (istek alan)
+        .eq('type', 'follow_rejected')
+        .gte('created_at', cooldownDate)
+        .limit(1);
+      if (recentReject && recentReject.length > 0) {
+        return { success: false, error: 'Bu kullanıcıya tekrar istek göndermek için 24 saat beklemelisiniz.' };
+      }
+
+      // ★ blocklist kontrolü: Engellenmişsem istek gönderemem
+      const { data: blocked } = await supabase
+        .from('friendships')
+        .select('status')
+        .eq('user_id', targetId)
+        .eq('friend_id', userId)
+        .eq('status', 'blocked')
+        .maybeSingle();
+      if (blocked) {
+        return { success: false, error: 'Bu kullanıcıya istek gönderemezsiniz.' };
+      }
+
       const { error } = await supabase
         .from('friendships')
         .upsert({
@@ -67,10 +97,17 @@ export const FriendshipService = {
 
       // ★ Bildirimler tablosuna kaydet (zil + dropdown + sayfa için)
       try {
-        const notifPayload: any = { user_id: targetId, sender_id: userId, type: 'follow_request', reference_id: null };
-        const { error: nErr } = await supabase.from('notifications').insert({ ...notifPayload, body: 'seni takip etmek istiyor' });
-        if (nErr) await supabase.from('notifications').insert(notifPayload);
-      } catch { /* silent */ }
+        const { error: nErr } = await supabase.from('notifications').insert({
+          user_id: targetId,
+          sender_id: userId,
+          type: 'follow_request',
+          reference_id: null,
+          body: 'seni takip etmek istiyor',
+        });
+        if (nErr && __DEV__) console.warn('[Friendship] Bildirim insert hatası:', nErr.message);
+      } catch (notifErr) {
+        if (__DEV__) console.warn('[Friendship] Bildirim catch:', notifErr);
+      }
 
       return { success: true };
     } catch (e: any) {
@@ -90,6 +127,18 @@ export const FriendshipService = {
         .eq('user_id', userId)
         .eq('friend_id', targetId);
       if (error) throw error;
+
+      // ★ Karşı taraftaki follow_request bildirimini temizle (pending iptal durumu)
+      try {
+        await supabase.from('notifications')
+          .delete()
+          .eq('user_id', targetId)
+          .eq('sender_id', userId)
+          .eq('type', 'follow_request');
+      } catch (err) {
+        if (__DEV__) console.warn('[Friendship] unfollow bildirim silme başarısız:', err);
+      }
+
       return { success: true };
     } catch (e: any) {
       console.error('Takipten cikma hatasi:', e);
@@ -99,17 +148,46 @@ export const FriendshipService = {
 
   /**
    * Kullanıcıyı engelle
+   * ★ BUG-F11 FIX: Her iki yöndeki accepted/pending kayıtları sil, sonra blocked oluştur
    */
   async block(userId: string, targetId: string): Promise<{ success: boolean; error?: string }> {
     try {
+      // Önce karşı taraftaki takip kaydını sil (accepted veya pending)
+      await supabase
+        .from('friendships')
+        .delete()
+        .eq('user_id', targetId)
+        .eq('friend_id', userId)
+        .in('status', ['accepted', 'pending']);
+
+      // Kendi taraftaki mevcut accepted/pending kaydını sil
+      await supabase
+        .from('friendships')
+        .delete()
+        .eq('user_id', userId)
+        .eq('friend_id', targetId)
+        .in('status', ['accepted', 'pending']);
+
+      // Blocked kaydı oluştur
       const { error } = await supabase
         .from('friendships')
-        .upsert({
+        .insert({
           user_id: userId,
           friend_id: targetId,
           status: 'blocked',
-        }, { onConflict: 'user_id,friend_id' });
+        });
       if (error) throw error;
+
+      // İlgili bildirimleri temizle
+      try {
+        await supabase.from('notifications')
+          .delete()
+          .or(`and(user_id.eq.${userId},sender_id.eq.${targetId}),and(user_id.eq.${targetId},sender_id.eq.${userId})`)
+          .in('type', ['follow_request', 'follow_accepted', 'follow_rejected']);
+      } catch (err) {
+        if (__DEV__) console.warn('[Friendship] Block bildirim temizleme hatası:', err);
+      }
+
       return { success: true };
     } catch (e: any) {
       return { success: false, error: e.message };
@@ -118,42 +196,94 @@ export const FriendshipService = {
 
   /**
    * İki kullanıcı arasındaki ilişki durumu
-   * Hem user→target hem target→user yönünü kontrol eder.
+   * ★ BUG-F4 FIX: Sadece outgoing yönünü döndürür (userId → targetId).
+   * Incoming yönü için getDetailedStatus() veya getIncomingStatus() kullanın.
    */
   async getStatus(userId: string, targetId: string): Promise<FriendshipStatus | null> {
     try {
-      // Benim gönderdiğim istek
-      const { data, error } = await supabase
+      // Sadece userId'nin targetId'ye gönderdiği istek/takip durumunu döndür
+      const { data } = await supabase
         .from('friendships')
         .select('status')
         .eq('user_id', userId)
         .eq('friend_id', targetId)
-        .single();
-      if (error && error.code !== 'PGRST116') throw error;
-      return data?.status || null;
+        .maybeSingle();
+      return (data?.status as FriendshipStatus) || null;
     } catch (e: any) {
       return null;
     }
   },
 
   /**
-   * Toplu takip durumu sorgulama (N+1 problemini çözer)
-   * Tek sorguda birden fazla kullanıcının takip durumunu döndürür.
+   * Karşı tarafın bana gönderdiği istek durumu (targetId → userId)
    */
-  async getBatchStatus(userId: string, targetIds: string[]): Promise<Record<string, FriendshipStatus>> {
+  async getIncomingStatus(userId: string, targetId: string): Promise<FriendshipStatus | null> {
+    try {
+      const { data } = await supabase
+        .from('friendships')
+        .select('status')
+        .eq('user_id', targetId)
+        .eq('friend_id', userId)
+        .maybeSingle();
+      // Karşı taraf bizi engellemiş olabilir — bu bilgiyi gösterme
+      if (data?.status === 'blocked') return null;
+      return (data?.status as FriendshipStatus) || null;
+    } catch (e: any) {
+      return null;
+    }
+  },
+
+  /**
+   * ★ X.com tarzı çift yönlü takip durumu
+   * Hem "ben onu takip ediyor muyum?" hem "o beni takip etmek istiyor mu?" bilgisini verir
+   */
+  async getDetailedStatus(userId: string, targetId: string): Promise<{
+    outgoing: FriendshipStatus | null;  // Ben → Hedef
+    incoming: FriendshipStatus | null;  // Hedef → Ben
+  }> {
+    try {
+      const [outRes, inRes] = await Promise.all([
+        supabase.from('friendships').select('status').eq('user_id', userId).eq('friend_id', targetId).maybeSingle(),
+        supabase.from('friendships').select('status').eq('user_id', targetId).eq('friend_id', userId).maybeSingle(),
+      ]);
+      return {
+        outgoing: (outRes.data?.status as FriendshipStatus) || null,
+        incoming: (inRes.data?.status as FriendshipStatus) || null,
+      };
+    } catch {
+      return { outgoing: null, incoming: null };
+    }
+  },
+
+  /**
+   * Toplu takip durumu sorgulama (N+1 problemini çözer)
+   * ★ BUG-F15 FIX: Her iki yönü de kontrol eder (outgoing + incoming)
+   */
+  async getBatchStatus(userId: string, targetIds: string[]): Promise<Record<string, { outgoing: FriendshipStatus | null; incoming: FriendshipStatus | null }>> {
     if (!targetIds.length) return {};
     try {
-      const { data, error } = await supabase
+      // Outgoing: userId → targets
+      const { data: outgoing } = await supabase
         .from('friendships')
         .select('friend_id, status')
         .eq('user_id', userId)
         .in('friend_id', targetIds);
-      if (error) throw error;
-      const map: Record<string, FriendshipStatus> = {};
-      (data || []).forEach((row: any) => {
-        map[row.friend_id] = row.status;
-      });
-      return map;
+
+      // Incoming: targets → userId
+      const { data: incoming } = await supabase
+        .from('friendships')
+        .select('user_id, status')
+        .eq('friend_id', userId)
+        .in('user_id', targetIds);
+
+      const result: Record<string, { outgoing: FriendshipStatus | null; incoming: FriendshipStatus | null }> = {};
+      for (const id of targetIds) {
+        result[id] = {
+          outgoing: (outgoing || []).find((r: any) => r.friend_id === id)?.status || null,
+          incoming: (incoming || []).find((r: any) => r.user_id === id)?.status || null,
+        };
+      }
+      return result;
     } catch (e: any) {
       if (__DEV__) console.warn('Batch friendship status error:', e);
       return {};
@@ -192,6 +322,17 @@ export const FriendshipService = {
         .eq('status', 'pending');
       if (error) throw error;
 
+      // ★ Eski follow_request bildirimini sil — hayalet bildirim önleme
+      try {
+        await supabase.from('notifications')
+          .delete()
+          .eq('user_id', userId)
+          .eq('sender_id', followerId)
+          .eq('type', 'follow_request');
+      } catch (err) {
+        if (__DEV__) console.warn('[Friendship] approveRequest bildirim silme başarısız:', err);
+      }
+
       // Onaylayan kullanıcıya bildirim gönder
       const { data: approver } = await supabase.from('profiles').select('display_name').eq('id', userId).single();
       const name = approver?.display_name || 'Birisi';
@@ -202,13 +343,26 @@ export const FriendshipService = {
 
       // ★ Bildirimler tablosuna kaydet
       try {
-        const notifPayload: any = { user_id: followerId, sender_id: userId, type: 'follow_accepted', reference_id: null };
-        const { error: nErr } = await supabase.from('notifications').insert({ ...notifPayload, body: 'takip isteğini kabul etti' });
-        if (nErr) await supabase.from('notifications').insert(notifPayload);
-      } catch { /* silent */ }
+        const { error: nErr } = await supabase.from('notifications').insert({
+          user_id: followerId,
+          sender_id: userId,
+          type: 'follow_accepted',
+          reference_id: null,
+          body: 'takip isteğini kabul etti',
+        });
+        if (nErr && __DEV__) console.warn('[Friendship] Onay bildirimi insert hatası:', nErr.message);
+      } catch (notifErr) {
+        if (__DEV__) console.warn('[Friendship] Onay bildirimi catch:', notifErr);
+      }
 
-      // SP: Yeni takipçi kazanan kişiye SP (GamificationService ile cooldown/cap kontrollü)
+      // ★ BUG-F16 FIX: İsteği onaylayan (userId) yeni bir takipçi kazandı → SP ver
+      // userId = B (onaylayan, takipçi kazanan), followerId = A (istek gönderen, takip eden)
       try { await GamificationService.onFollowerGain(userId); } catch {}
+      // ★ Rozet trigger: takipçi kazanım rozetlerini kontrol et
+      try {
+        const { BadgeCheckerService } = require('./engagement/badges');
+        await BadgeCheckerService.checkForAction(userId, 'new_follower');
+      } catch {}
 
       return { success: true };
     } catch (e: any) {
@@ -219,6 +373,7 @@ export const FriendshipService = {
 
   /**
    * Takip isteğini reddet (satırı sil)
+   * ★ follow_rejected bildirimi kaydeder → cooldown mekanizması bu kayda bakar
    */
   async rejectRequest(userId: string, followerId: string): Promise<{ success: boolean; error?: string }> {
     try {
@@ -229,6 +384,28 @@ export const FriendshipService = {
         .eq('friend_id', userId)
         .eq('status', 'pending');
       if (error) throw error;
+
+      // ★ Eski follow_request bildirimini sil — hayalet bildirim önleme
+      try {
+        await supabase.from('notifications')
+          .delete()
+          .eq('user_id', userId)
+          .eq('sender_id', followerId)
+          .eq('type', 'follow_request');
+      } catch (err) {
+        if (__DEV__) console.warn('[Friendship] rejectRequest bildirim silme başarısız:', err);
+      }
+
+      // ★ Cooldown kaydı: Reddedilen kişiye bildirim ekle (24h spam engelleme)
+      try {
+        await supabase.from('notifications').insert({
+          user_id: followerId,
+          sender_id: userId,
+          type: 'follow_rejected',
+          body: 'takip isteğini reddetti',
+        });
+      } catch { /* silent */ }
+
       return { success: true };
     } catch (e: any) {
       console.error('Istek reddetme hatasi:', e);
@@ -247,7 +424,12 @@ export const FriendshipService = {
         .eq('friend_id', userId)
         .eq('status', 'accepted');
       if (error) throw error;
-      return (data || []).map((d: any) => d.profiles).filter(Boolean) as FollowUser[];
+      const all = (data || []).map((d: any) => d.profiles).filter(Boolean) as FollowUser[];
+
+      // ★ Engellenen kişileri filtrele
+      const blockedIds = await this._getBlockedIds(userId);
+      if (blockedIds.size === 0) return all;
+      return all.filter(f => !blockedIds.has(f.id));
     } catch (e: any) {
       console.error('Takipci listesi hatasi:', e);
       return [];
@@ -265,9 +447,55 @@ export const FriendshipService = {
         .eq('user_id', userId)
         .eq('status', 'accepted');
       if (error) throw error;
-      return (data || []).map((d: any) => d.profiles).filter(Boolean) as FollowUser[];
+      const all = (data || []).map((d: any) => d.profiles).filter(Boolean) as FollowUser[];
+
+      // ★ Engellenen kişileri filtrele (her iki yön)
+      const blockedIds = await this._getBlockedIds(userId);
+      if (blockedIds.size === 0) return all;
+      return all.filter(f => !blockedIds.has(f.id));
     } catch (e: any) {
       console.error('Takip listesi hatasi:', e);
+      return [];
+    }
+  },
+
+  /**
+   * ★ Karşılıklı takip edilen kişiler (mutual friends)
+   * Hem "ben onu takip ediyorum" hem "o beni takip ediyor" durumundaki kişileri döndürür.
+   * Online arkadaş şeridi, arama butonu gibi arkadaşlık gerektiren yerlerde kullanılır.
+   */
+  async getMutualFriends(userId: string): Promise<FollowUser[]> {
+    try {
+      // 1. Benim takip ettiklerim (userId → friend_id, accepted)
+      const { data: outgoing, error: e1 } = await supabase
+        .from('friendships')
+        .select('friend_id')
+        .eq('user_id', userId)
+        .eq('status', 'accepted');
+      if (e1) throw e1;
+      const outgoingIds = new Set((outgoing || []).map((r: any) => r.friend_id));
+      if (outgoingIds.size === 0) return [];
+
+      // 2. Beni takip edenler (friend_id → userId, accepted) — sadece outgoingIds içindekiler
+      const { data: incoming, error: e2 } = await supabase
+        .from('friendships')
+        .select('user_id')
+        .eq('friend_id', userId)
+        .eq('status', 'accepted')
+        .in('user_id', Array.from(outgoingIds));
+      if (e2) throw e2;
+      const mutualIds = (incoming || []).map((r: any) => r.user_id);
+      if (mutualIds.length === 0) return [];
+
+      // 3. Mutual friend profillerini toplu çek
+      const { data: profiles, error: e3 } = await supabase
+        .from('profiles')
+        .select('id, display_name, avatar_url, username, subscription_tier, is_online')
+        .in('id', mutualIds);
+      if (e3) throw e3;
+      return (profiles || []) as FollowUser[];
+    } catch (e: any) {
+      if (__DEV__) console.warn('[Friendship] getMutualFriends hatası:', e);
       return [];
     }
   },
@@ -318,10 +546,12 @@ export const FriendshipService = {
   /**
    * Bana gelen takip istekleri değiştiğinde anlık tetiklenir.
    * INSERT (yeni istek), UPDATE (onay/red), DELETE (iptal) hepsini kapsar.
+   * ★ BUG-F12 FIX: Sabit kanal adı — her çağrıda Date.now() eklenmez.
    */
   onFriendshipChange(userId: string, callback: (requests: PendingRequest[]) => void) {
+    const channelName = `friendships:${userId}`;
     return supabase
-      .channel(`friendships:${userId}`)
+      .channel(channelName)
       .on(
         'postgres_changes',
         {
@@ -353,9 +583,13 @@ export const FriendshipService = {
 
   /**
    * Gizli profili görüntüleme yetkisi kontrolü
+   * ★ BUG-F14 FIX: Yorum netleştirildi.
    * - is_private = false → herkes görebilir
    * - is_private = true → sadece takipçiler (accepted) görebilir
    * - Kendi profilin → her zaman görebilirsin
+   *
+   * isFollowing(A, B) = "A, B'yi takip ediyor" = "A, B'nin takipçisi"
+   * Gizli profili görmek için viewer, target'ın takipçisi olmalıdır → isFollowing(viewer, target) ✓
    */
   async canViewProfile(viewerId: string, targetId: string): Promise<boolean> {
     // Kendi profilim — her zaman görebilirim
@@ -371,7 +605,7 @@ export const FriendshipService = {
     // Profil bulunamadı veya açık profil — görebilir
     if (!target || !target.is_private) return true;
 
-    // Gizli profil — takipçi miyim?
+    // Gizli profil — viewer, target'ı takip ediyor mu? (yani viewer, target'ın takipçisi mi?)
     return this.isFollowing(viewerId, targetId);
   },
 
@@ -435,5 +669,57 @@ export const FriendshipService = {
 
     if (error) return [];
     return data || [];
+  },
+
+  /**
+   * ★ BUG-F1 FIX: Takipçi çıkarma (accepted olan takipçiyi siler)
+   * rejectRequest sadece pending kaydı sildiği için, accepted takipçi çıkarmak
+   * için bu ayrı fonksiyon gerekli. Sessizce siler — cooldown bildirimi OLUŞTURMAZ.
+   */
+  async removeFollower(userId: string, followerId: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const { error } = await supabase
+        .from('friendships')
+        .delete()
+        .eq('user_id', followerId)
+        .eq('friend_id', userId)
+        .eq('status', 'accepted');
+      if (error) throw error;
+      return { success: true };
+    } catch (e: any) {
+      if (__DEV__) console.warn('[Friendship] removeFollower hatası:', e);
+      return { success: false, error: e.message };
+    }
+  },
+
+  /**
+   * ★ Engellenen kullanıcı ID'lerini getir (her iki yön + her iki tablo)
+   * Kaynak 1: friendships tablosu (status = 'blocked')
+   * Kaynak 2: blocked_users tablosu (ModerationService)
+   */
+  async _getBlockedIds(userId: string): Promise<Set<string>> {
+    try {
+      const [
+        { data: iBlockedFship },
+        { data: blockedMeFship },
+        { data: iBlockedMod },
+        { data: blockedMeMod },
+      ] = await Promise.all([
+        // friendships tablosundan
+        supabase.from('friendships').select('friend_id').eq('user_id', userId).eq('status', 'blocked'),
+        supabase.from('friendships').select('user_id').eq('friend_id', userId).eq('status', 'blocked'),
+        // blocked_users tablosundan (ModerationService)
+        supabase.from('blocked_users').select('blocked_id').eq('blocker_id', userId),
+        supabase.from('blocked_users').select('blocker_id').eq('blocked_id', userId),
+      ]);
+      const ids = new Set<string>();
+      (iBlockedFship || []).forEach((r: any) => ids.add(r.friend_id));
+      (blockedMeFship || []).forEach((r: any) => ids.add(r.user_id));
+      (iBlockedMod || []).forEach((r: any) => ids.add(r.blocked_id));
+      (blockedMeMod || []).forEach((r: any) => ids.add(r.blocker_id));
+      return ids;
+    } catch {
+      return new Set();
+    }
   },
 };

@@ -78,6 +78,7 @@ export default function PremiumAlert({ visible, title, message, type = 'info', b
 
   const defaultButtons: AlertButton[] = buttons || [{ text: 'Tamam', onPress: onDismiss }];
   const useGrid = defaultButtons.length >= 4;
+  const useVertical = defaultButtons.length >= 3 && !useGrid;
 
   if (!visible) return null;
 
@@ -109,7 +110,7 @@ export default function PremiumAlert({ visible, title, message, type = 'info', b
           {customContent || null}
 
           {/* Buttons — grid veya row */}
-          <View style={useGrid ? sty.buttonGrid : sty.buttonRow}>
+          <View style={useGrid ? sty.buttonGrid : useVertical ? sty.buttonColumn : sty.buttonRow}>
             {defaultButtons.map((btn, i) => {
               const isDestructive = btn.style === 'destructive';
               const isCancel = btn.style === 'cancel';
@@ -121,7 +122,7 @@ export default function PremiumAlert({ visible, title, message, type = 'info', b
                   activeOpacity={0.7}
                   onPress={() => { btn.onPress?.(); onDismiss?.(); }}
                   style={[
-                    useGrid ? sty.gridButton : sty.button,
+                    useGrid ? sty.gridButton : useVertical ? sty.verticalButton : sty.button,
                     isPrimary && { backgroundColor: config.accentColor + '18', borderColor: config.accentColor + '40' },
                     isDestructive && { backgroundColor: 'rgba(239,68,68,0.1)', borderColor: 'rgba(239,68,68,0.25)' },
                     isCancel && { backgroundColor: 'rgba(255,255,255,0.04)', borderColor: 'rgba(255,255,255,0.08)' },
@@ -133,7 +134,7 @@ export default function PremiumAlert({ visible, title, message, type = 'info', b
                     isPrimary && { color: config.accentColor },
                     isDestructive && { color: '#F87171' },
                     isCancel && { color: 'rgba(255,255,255,0.45)' },
-                  ]} numberOfLines={1}>
+                  ]} numberOfLines={useVertical ? undefined : 1}>
                     {btn.text}
                   </Text>
                 </TouchableOpacity>
@@ -158,8 +159,8 @@ const sty = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.6)',
   },
   container: {
-    width: W - 80,
-    maxWidth: 320,
+    width: W - 64,
+    maxWidth: 360,
     backgroundColor: 'rgba(45,61,77,0.95)',
     borderRadius: 16,
     borderWidth: 1,
@@ -224,6 +225,24 @@ const sty = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: 36,
+  },
+  // Vertical: 3 buton
+  buttonColumn: {
+    flexDirection: 'column',
+    gap: 8,
+    width: '100%',
+  },
+  verticalButton: {
+    width: '100%',
+    paddingVertical: 11,
+    paddingHorizontal: 16,
+    borderRadius: 99,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 40,
   },
   // Grid: 4+ buton
   buttonGrid: {

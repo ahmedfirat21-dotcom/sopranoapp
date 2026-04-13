@@ -57,11 +57,13 @@ export const RoomAccessService = {
     }
 
     // ── 4. Yaş filtresi kontrolü (Silver+) ──
-    if (settings.age_filter_min && settings.age_filter_min > 0) {
-      if (!userAge || userAge < settings.age_filter_min) {
+    // age_restricted boolean desteği: true ise age_filter_min yoksa 18 olarak kabul et
+    const ageFilterMin = settings.age_filter_min || ((settings as any).age_restricted === true ? 18 : 0);
+    if (ageFilterMin > 0) {
+      if (!userAge || userAge < ageFilterMin) {
         return {
           allowed: false,
-          reason: `Bu odaya katılmak için en az ${settings.age_filter_min} yaşında olmalısınız.`,
+          reason: `Bu odaya katılmak için en az ${ageFilterMin} yaşında olmalısınız.`,
           action: 'age_restricted',
         };
       }

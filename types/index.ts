@@ -216,6 +216,20 @@ export type RoomSettings = {
   entry_fee_sp?: number;
   /** Bağış kabul aktif mi (Gold+) */
   donations_enabled?: boolean;
+
+  // ── Kart & Görsel Alanlar ──
+  /** Oda kart resmi (keşfet ekranı) */
+  card_image_url?: string | null;
+  /** Oda kapak resmi (oda içi) */
+  room_image_url?: string | null;
+  /** Oda kapak resmi (alternatif alan) */
+  cover_image_url?: string | null;
+  /** Oda dili (tek dil seçimi) */
+  room_language?: RoomLanguage;
+  /** Yaş kısıtlaması (+18) */
+  age_restricted?: boolean;
+  /** Oda müzik parçası URL'si (basit mod) */
+  music_track?: string | null;
 };
 
 /** Oda içi önemli an işareti (VIP) */
@@ -386,25 +400,25 @@ export const ALL_PERMISSIONS: Record<OwnerPermission, PermissionDefinition> = {
   mute_camera:          { minRole: 'moderator', requiresTarget: true,  requiresLowerTarget: true,  hiddenOnSelf: false },
   // ── Moderasyon ──
   kick:                 { minRole: 'moderator', requiresTarget: true,  requiresLowerTarget: true,  hiddenOnSelf: true },
-  ban_temporary:        { minRole: 'moderator', requiresTarget: true,  requiresLowerTarget: true,  hiddenOnSelf: true },
-  ban_permanent:        { minRole: 'owner',     requiresTarget: true,  requiresLowerTarget: true,  hiddenOnSelf: true },
-  chat_block:           { minRole: 'moderator', requiresTarget: true,  requiresLowerTarget: true,  hiddenOnSelf: true },
-  slow_mode:            { minRole: 'moderator', requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false },
-  timed_mute:           { minRole: 'moderator', requiresTarget: true,  requiresLowerTarget: true,  hiddenOnSelf: true },
-  pin_chat_message:     { minRole: 'moderator', requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false },
-  clear_chat:           { minRole: 'owner',     requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false },
+  ban_temporary:        { minRole: 'moderator', requiresTarget: true,  requiresLowerTarget: true,  hiddenOnSelf: true, minTier: 'Bronze' },
+  ban_permanent:        { minRole: 'owner',     requiresTarget: true,  requiresLowerTarget: true,  hiddenOnSelf: true, minTier: 'VIP' },
+  chat_block:           { minRole: 'moderator', requiresTarget: true,  requiresLowerTarget: true,  hiddenOnSelf: true, minTier: 'Bronze' },
+  slow_mode:            { minRole: 'moderator', requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false, minTier: 'Bronze' },
+  timed_mute:           { minRole: 'moderator', requiresTarget: true,  requiresLowerTarget: true,  hiddenOnSelf: true, minTier: 'Bronze' },
+  pin_chat_message:     { minRole: 'moderator', requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false, minTier: 'Bronze' },
+  clear_chat:           { minRole: 'owner',     requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false, minTier: 'Gold' },
   // ── Rol Yönetimi ──
   promote_speaker:      { minRole: 'moderator', requiresTarget: true,  requiresLowerTarget: false, hiddenOnSelf: true },
   demote_speaker:       { minRole: 'moderator', requiresTarget: true,  requiresLowerTarget: true,  hiddenOnSelf: true },
   promote_listener:     { minRole: 'moderator', requiresTarget: true,  requiresLowerTarget: false, hiddenOnSelf: true },
-  set_moderator:        { minRole: 'owner',     requiresTarget: true,  requiresLowerTarget: true,  hiddenOnSelf: true },
-  remove_moderator:     { minRole: 'owner',     requiresTarget: true,  requiresLowerTarget: true,  hiddenOnSelf: true },
+  set_moderator:        { minRole: 'owner',     requiresTarget: true,  requiresLowerTarget: true,  hiddenOnSelf: true, minTier: 'Bronze' },
+  remove_moderator:     { minRole: 'owner',     requiresTarget: true,  requiresLowerTarget: true,  hiddenOnSelf: true, minTier: 'Bronze' },
   spotlight_user:       { minRole: 'moderator', requiresTarget: true,  requiresLowerTarget: false, hiddenOnSelf: false, minTier: 'Silver' },
-  transfer_ownership:   { minRole: 'owner',     requiresTarget: true,  requiresLowerTarget: true,  hiddenOnSelf: true },
+  transfer_ownership:   { minRole: 'owner',     requiresTarget: true,  requiresLowerTarget: true,  hiddenOnSelf: true, minTier: 'Silver' },
   // ── Oda Düzenleme ──
   edit_room_name:       { minRole: 'owner',     requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false },
-  edit_welcome_message: { minRole: 'owner',     requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false },
-  room_announce:        { minRole: 'owner',     requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false },
+  edit_welcome_message: { minRole: 'owner',     requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false, minTier: 'Bronze' },
+  room_announce:        { minRole: 'owner',     requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false, minTier: 'Bronze' },
   invite_user:          { minRole: 'moderator', requiresTarget: true,  requiresLowerTarget: false, hiddenOnSelf: true },
   set_room_password:    { minRole: 'owner',     requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false, minTier: 'Bronze' },
   share_room_link:      { minRole: 'speaker',   requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false },

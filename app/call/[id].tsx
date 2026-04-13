@@ -13,6 +13,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity, Dimensions, StatusBar, Animated, Easing, BackHandler } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { safeGoBack } from '../../constants/navigation';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Audio } from 'expo-av';
 import { Colors } from '../../constants/theme';
@@ -193,27 +194,25 @@ export default function CallScreen() {
       } else if (signal.action === 'call_rejected') {
         setCallStatus('ended');
         callStatusRef.current = 'ended';
-        setEndReason('Arama Reddedildi'); // ★ CALL-5
+        setEndReason('Arama Reddedildi');
         setActiveCallId(null);
-        showToast({ title: 'Arama Reddedildi', message: 'Karşı taraf aramayı reddetti.', type: 'info' });
-        setTimeout(() => { if (mountedRef.current) router.back(); }, 2500);
+        setTimeout(() => { if (mountedRef.current) safeGoBack(router); }, 2500);
       } else if (signal.action === 'call_ended') {
         setCallStatus('ended');
         callStatusRef.current = 'ended';
         setEndReason(duration > 0 ? `Arama Süresi: ${formatDuration(duration)}` : 'Arama Sonlandı'); // ★ CALL-5
         setActiveCallId(null);
         liveKitService.disconnect().catch(() => {});
-        setTimeout(() => { if (mountedRef.current) router.back(); }, 3000); // ★ CALL-5: 3sn özet
+        setTimeout(() => { if (mountedRef.current) safeGoBack(router); }, 3000); // ★ CALL-5: 3sn özet
       } else if (signal.action === 'call_busy') {
         setCallStatus('ended');
         callStatusRef.current = 'ended';
-        setEndReason('Meşgul'); // ★ CALL-5
+        setEndReason('Meşgul');
         setActiveCallId(null);
         // ★ Meşgul sesi çal (beep-beep)
         stopRingbackTone();
         playBusyTone();
-        showToast({ title: 'Meşgul', message: 'Karşı taraf başka bir aramada.', type: 'warning' });
-        setTimeout(() => { if (mountedRef.current) router.back(); }, 2500);
+        setTimeout(() => { if (mountedRef.current) safeGoBack(router); }, 2500);
       }
     });
 
@@ -233,8 +232,7 @@ export default function CallScreen() {
         callStatusRef.current = 'ended';
         setEndReason('Arama Reddedildi');
         setActiveCallId(null);
-        showToast({ title: 'Arama Reddedildi', message: 'Karşı taraf aramayı reddetti.', type: 'info' });
-        setTimeout(() => { if (mountedRef.current) router.back(); }, 2500);
+        setTimeout(() => { if (mountedRef.current) safeGoBack(router); }, 2500);
       }
       // ★ Cached busy kontrolü
       const cachedBusy = consumeCallSignal(callId, 'call_busy');
@@ -244,8 +242,7 @@ export default function CallScreen() {
         callStatusRef.current = 'ended';
         setEndReason('Meşgul');
         setActiveCallId(null);
-        showToast({ title: 'Meşgul', message: 'Karşı taraf başka bir aramada.', type: 'warning' });
-        setTimeout(() => { if (mountedRef.current) router.back(); }, 2500);
+        setTimeout(() => { if (mountedRef.current) safeGoBack(router); }, 2500);
       }
     }
 
@@ -263,9 +260,8 @@ export default function CallScreen() {
         if (callStatusRef.current === 'calling') {
           setCallStatus('ended');
           callStatusRef.current = 'ended';
-          setEndReason('Cevap Vermedi'); // ★ CALL-5
+          setEndReason('Cevap Vermedi');
           setActiveCallId(null);
-          showToast({ title: 'Cevap Vermedi', message: 'Karşı taraf aramaya cevap vermedi.', type: 'warning' });
 
           // Cevapsız arama kaydı oluştur
           if (firebaseUser && id) {
@@ -278,7 +274,7 @@ export default function CallScreen() {
             ).catch(() => {});
           }
 
-          setTimeout(() => { if (mountedRef.current) router.back(); }, 3000); // ★ CALL-5: 3sn özet
+          setTimeout(() => { if (mountedRef.current) safeGoBack(router); }, 3000); // ★ CALL-5: 3sn özet
         }
       }, 30000); // ★ 30sn timeout
     }
@@ -381,8 +377,7 @@ export default function CallScreen() {
                   setCallStatus('ended');
                   callStatusRef.current = 'ended';
                   setEndReason('Bağlantı Koptu');
-                  showToast({ title: 'Bağlantı Koptu', message: 'Arama bağlantısı kesildi.', type: 'warning' });
-                  setTimeout(() => { if (mountedRef.current) router.back(); }, 3000);
+                  setTimeout(() => { if (mountedRef.current) safeGoBack(router); }, 3000);
                 }
               }, 5000);
             }
@@ -411,8 +406,7 @@ export default function CallScreen() {
               CallService.endCall(firebaseUser.uid, id, callId).catch(() => {});
             }
             
-            showToast({ title: 'Arama Sonlandı', message: 'Karşı taraf bağlantıyı kesti.', type: 'info' });
-            setTimeout(() => { if (mountedRef.current) router.back(); }, 3000);
+            setTimeout(() => { if (mountedRef.current) safeGoBack(router); }, 3000);
           },
         },
         {
@@ -495,7 +489,7 @@ export default function CallScreen() {
       }
     }
     // ★ CALL-5: 3sn özet göster, sonra geri dön
-    setTimeout(() => { if (mountedRef.current) router.back(); }, 3000);
+    setTimeout(() => { if (mountedRef.current) safeGoBack(router); }, 3000);
   };
 
   // ─── BUG-9 FIX: Mikrofon toggle — LiveKit callback ile senkronize ────

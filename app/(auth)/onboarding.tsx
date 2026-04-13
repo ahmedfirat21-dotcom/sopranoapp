@@ -77,25 +77,58 @@ export default function OnboardingScreen() {
     setSaving(true);
 
     try {
-      const newProfileInfo = {
+      const baseUsername = (firebaseUser.email ? firebaseUser.email.split('@')[0] : `user_${firebaseUser.uid.substring(0,6)}`).toLowerCase().replace(/[^a-z0-9_]/g, '');
+      const username = `${baseUsername}_${firebaseUser.uid.substring(0, 4)}`;
+
+      // Temel alanlar — her fazda gönderilmeli (DB constraint'leri karşılamak için)
+      // NOT: Eski 'tier' kolonu da gönderilmeli — profiles_tier_check constraint'i NULL kabul etmiyor
+      const baseData = {
         id: firebaseUser.uid,
         display_name: displayName.trim() || 'Misafir',
         avatar_url: avatarUrl,
-        username: firebaseUser.email ? firebaseUser.email.split('@')[0] : `user_${firebaseUser.uid.substring(0,6)}`,
-        gender: 'unspecified' as any,
-        birth_date: '2000-01-01',
+        username,
         is_online: true,
-        subscription_tier: 'Free' as any,
+        tier: 'free',
+        subscription_tier: 'Free',
         system_points: 0,
       };
 
-      const savedProfile = await ProfileService.create(firebaseUser.uid, newProfileInfo);
-      setTempProfile(savedProfile);
+      // Faz 1: Tüm alanlarla dene (gender + birth_date dahil)
+      const { data, error } = await supabase
+        .from('profiles')
+        .upsert(
+          { ...baseData, gender: 'unspecified', birth_date: '2000-01-01' },
+          { onConflict: 'id' }
+        )
+        .select()
+        .single();
+
+      if (!error && data) {
+        setTempProfile(data);
+        setStep(2);
+        return;
+      }
+
+      // Faz 2: gender/birth_date kolonu yoksa sadece temel alanlarla yeniden dene
+      if (__DEV__) console.warn('[Onboarding] Faz 1 hata:', error?.message, error?.code);
+
+      const { data: data2, error: error2 } = await supabase
+        .from('profiles')
+        .upsert(baseData, { onConflict: 'id' })
+        .select()
+        .single();
+
+      if (error2) {
+        console.error('[Onboarding] Faz 2 de başarısız:', error2.message, error2.code, error2.details);
+        throw error2;
+      }
+
+      setTempProfile(data2);
       setStep(2);
       
     } catch (error: any) {
-      console.error('Onboarding kaydetme hatasi:', error);
-      showToast({ title: 'Hata', message: 'Profil oluşturulurken sorun yaşandı.', type: 'error' });
+      console.error('Onboarding kaydetme hatasi:', error?.message || error, error?.code, error?.details);
+      showToast({ title: 'Hata', message: error?.message || 'Profil oluşturulurken sorun yaşandı.', type: 'error' });
     } finally {
       setSaving(false);
     }
@@ -354,7 +387,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 28, fontWeight: '800', color: Colors.text, marginBottom: 8 },
   subtitle: { fontSize: 13, color: Colors.text3, marginBottom: 20, textAlign: 'center', paddingHorizontal: 20 },
   
-  // Steps Indicator — artık sadece 2 nokta
+  // Steps Indicator — 3 nokta (profil → ilgi alanları → davet kodu)
   stepContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', width: 80 },
   stepDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: Colors.glass3 },
   stepActive: { backgroundColor: Colors.teal, shadowColor: Colors.teal, shadowOffset: {width:0, height:0}, shadowRadius: 6, shadowOpacity: 0.8 },

@@ -8,6 +8,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { safeGoBack } from '../constants/navigation';
 import * as AuthSession from 'expo-auth-session';
 import {
   GoogleAuthProvider,
@@ -25,6 +26,7 @@ import { useAuth } from './_layout';
 import { showToast } from '../components/Toast';
 import { ReferralService } from '../services/referral';
 import * as ImagePicker from 'expo-image-picker';
+import * as ExpoClipboard from 'expo-clipboard';
 import { StorageService } from '../services/storage';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -37,7 +39,7 @@ const discovery = {
 
 export default function EditProfileScreen() {
   const router = useRouter();
-  const { profile, firebaseUser, setProfile, setUser } = useAuth();
+  const { profile, firebaseUser, setProfile, setUser, refreshProfile } = useAuth();
 
   // === Profile fields ===
   const [displayName, setDisplayName] = useState(profile?.display_name || '');
@@ -150,6 +152,9 @@ export default function EditProfileScreen() {
     Keyboard.dismiss();
     setSaving(true);
     try {
+      // ★ B1 FIX: privacy_mode'dan is_private türet — tek kaynak
+      const derivedIsPrivate = privacyMode !== 'public';
+
       await ProfileService.update(userId, {
         display_name: displayName.trim(),
         username: username.trim() || null,
@@ -157,6 +162,7 @@ export default function EditProfileScreen() {
         avatar_url: avatarUrl,
         hide_owned_rooms: hideOwnedRooms,
         privacy_mode: privacyMode,
+        is_private: derivedIsPrivate,
       });
 
       // Firebase profile da güncelle
@@ -167,12 +173,25 @@ export default function EditProfileScreen() {
         }).catch(() => {});
       }
 
-      // Lokal state güncelle (update void döner, DB'den tekrar çekmek yerine mevcut değerleri kullan)
-      const updatedProfile = { ...profile!, display_name: displayName.trim(), username: username.trim() || null, bio: bio.trim(), avatar_url: avatarUrl };
+      // ★ B2 FIX: Lokal state — tüm güncellenen alanları kapsayan güncellenme
+      const updatedProfile = {
+        ...profile!,
+        display_name: displayName.trim(),
+        username: username.trim() || null,
+        bio: bio.trim(),
+        avatar_url: avatarUrl,
+        hide_owned_rooms: hideOwnedRooms,
+        privacy_mode: privacyMode,
+        is_private: derivedIsPrivate,
+      };
       setProfile(updatedProfile);
       setUser({ name: updatedProfile.display_name, avatar: updatedProfile.avatar_url });
+
+      // ★ U3 FIX: Profil tab'ı dönüşte güncel veriyi görsün
+      refreshProfile().catch(() => {});
+
       showToast({ title: 'Başarılı ✓', message: 'Profil güncellendi!', type: 'success' });
-      router.back();
+      safeGoBack(router);
     } catch (error: any) {
       if (error?.message?.includes('duplicate') || error?.code === '23505') {
         showToast({ type: 'error', title: 'Hata', message: 'Bu kullanıcı adı zaten alınmış.' });
@@ -325,7 +344,7 @@ export default function EditProfileScreen() {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backBtn}>
+        <Pressable onPress={() => safeGoBack(router)} style={styles.backBtn}>
           <Ionicons name="close" size={24} color={Colors.text} />
         </Pressable>
         <Text style={styles.headerTitle}>Profili Düzenle</Text>
@@ -490,8 +509,8 @@ export default function EditProfileScreen() {
               <Pressable 
                 style={styles.copyBtn} 
                 onPress={async () => {
-                  const { Clipboard: RNClipboard } = require('react-native');
-                  RNClipboard.setString(myReferralCode);
+                  // ★ B4 FIX: Deprecated RN Clipboard → expo-clipboard
+                  await ExpoClipboard.setStringAsync(myReferralCode);
                   showToast({ title: 'Kopyalandı', type: 'success' });
                 }}
               >

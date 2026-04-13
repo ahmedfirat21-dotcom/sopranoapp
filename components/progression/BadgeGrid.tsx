@@ -330,7 +330,11 @@ export default function BadgeGrid({ unlockedBadges, compact = false }: BadgeGrid
           </View>
         </View>
 
-        <View style={compactStyles.row}>
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false} 
+          contentContainerStyle={compactStyles.row}
+        >
           {displayBadges.map(badge => (
             <Pressable key={badge.id} style={compactStyles.item} onPress={() => handleBadgePress(badge)}>
               <View style={[compactStyles.iconWrap, { backgroundColor: badge.color + '18' }]}>
@@ -350,7 +354,7 @@ export default function BadgeGrid({ unlockedBadges, compact = false }: BadgeGrid
               </Text>
             </Pressable>
           )}
-        </View>
+        </ScrollView>
 
         {/* Progress bar */}
         <View style={compactStyles.progressRow}>
@@ -483,8 +487,9 @@ const compactStyles = StyleSheet.create({
   },
   row: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    alignItems: 'center',
     gap: 8,
+    paddingVertical: 2,
   },
   item: {
     alignItems: 'center',

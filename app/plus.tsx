@@ -4,12 +4,14 @@ import PremiumAlert, { type AlertButton } from '../components/PremiumAlert';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { safeGoBack } from '../constants/navigation';
 import { Colors } from '../constants/theme';
 import { useAuth } from './_layout';
 import { showToast } from '../components/Toast';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ROOM_TIER_LIMITS } from '../constants/tiers';
 import { supabase } from '../constants/supabase';
+import { RevenueCatService, REVENUECAT_MOCK_MODE } from '../services/revenuecat';
 import AppBackground from '../components/AppBackground';
 
 type AlertConfig = { visible: boolean; title: string; message: string; type?: any; buttons?: AlertButton[] };
@@ -135,10 +137,12 @@ export default function PlusScreen() {
       ? `${selectedPlan.monthly}₺/ay`
       : `${selectedPlan.yearly}₺/yıl`;
 
+    const modeText = REVENUECAT_MOCK_MODE ? '\n\n⚠️ Test modunda — gerçek ödeme alınmaz.' : '';
+
     setAlertCfg({
       visible: true,
       title: `${selectedPlan.name}'a Yükselt`,
-      message: `${selectedPlan.name} planına geçmek istediğinize emin misiniz?\n\nFiyat: ${price}\n\n⚠️ Test modunda — gerçek ödeme alınmaz.`,
+      message: `${selectedPlan.name} planına geçmek istediğinize emin misiniz?\n\nFiyat: ${price}${modeText}`,
       type: 'info',
       buttons: [
         { text: 'Vazgeç', style: 'cancel' },
@@ -147,13 +151,17 @@ export default function PlusScreen() {
           onPress: async () => {
             setActivating(true);
             try {
-              const { error } = await supabase
-                .from('profiles')
-                .update({ subscription_tier: selectedPlan.tier })
-                .eq('id', profile.id);
-              if (error) throw error;
-              await refreshProfile();
-              showToast({ title: `${selectedPlan.name} Aktif! 🎉`, message: `Tebrikler! Artık ${selectedPlan.name} üyesisiniz.`, type: 'success' });
+              const result = await RevenueCatService.purchasePackage(
+                { identifier: `tier_${selectedPlan.id}`, billingCycle },
+                profile.id,
+                selectedPlan.tier,
+              );
+              if (result.error) throw new Error(result.error);
+              if (result.newTier) {
+                await refreshProfile();
+                showToast({ title: `${selectedPlan.name} Aktif! 🎉`, message: `Tebrikler! Artık ${selectedPlan.name} üyesisiniz.`, type: 'success' });
+              }
+              // newTier = null ve error yok → kullanıcı iptal etti
             } catch (err: any) {
               showToast({ title: 'Hata', message: err.message || 'Yükseltme başarısız.', type: 'error' });
             } finally {
@@ -179,12 +187,13 @@ export default function PlusScreen() {
           onPress: async () => {
             setActivating(true);
             try {
-              await supabase
-                .from('profiles')
-                .update({ subscription_tier: 'Free' })
-                .eq('id', profile!.id);
-              await refreshProfile();
-              showToast({ title: 'Plan değiştirildi', message: 'Free plana geri döndünüz.', type: 'info' });
+              const success = await RevenueCatService.cancelSubscription(profile!.id);
+              if (success) {
+                await refreshProfile();
+                showToast({ title: 'Plan değiştirildi', message: 'Free plana geri döndünüz.', type: 'info' });
+              } else {
+                showToast({ title: 'Bilgi', message: 'Aboneliğinizi Google Play ayarlarından iptal edebilirsiniz.', type: 'info' });
+              }
             } catch (err: any) {
               showToast({ title: 'Hata', message: err.message, type: 'error' });
             } finally {
@@ -199,7 +208,7 @@ export default function PlusScreen() {
   return (
     <AppBackground><View style={styles.container}>{/* Header */}
       <View style={[styles.header, { paddingTop: Math.max(insets.top, 20) + 8 }]}>
-        <Pressable onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)/home')} style={styles.backBtn}>
+        <Pressable onPress={() => safeGoBack(router)} style={styles.backBtn}>
           <Ionicons name="chevron-back" size={24} color={Colors.text} />
         </Pressable>
         <Text style={styles.headerTitle}>Üyelik Planları</Text>

@@ -1,13 +1,12 @@
 /**
  * SopranoChat — Moderasyon Servis Katmanı
  * ═══════════════════════════════════════════════════
- * Raporlama, Engelleme, Oda Susturma, Ban, Ghost Mode, Disguise,
- * Slow Mode, Kick, Room Lock, Followers-Only, Age/Language Filters,
- * Stage Layout, Room Music, Edit Room Name/Welcome Message
+ * Raporlama, Engelleme, Oda Susturma, Ban,
+ * Oda İsmi/Hoş Geldin Düzenleme.
+ * Ghost Mode, Lock, Filters vb. RoomService’e taşındı.
  */
 import { supabase } from '../constants/supabase';
 import { filterBadWords, containsBadWords } from '../constants/badwords';
-import type { RoomLanguage, StageLayout, RoomMusicConfig, RoomSettings } from '../types';
 
 export type ReportReason =
   | 'spam' | 'harassment' | 'hate_speech' | 'inappropriate_content'
@@ -65,6 +64,9 @@ export const ModerationService = {
       status: 'pending',
     });
     if (error) throw error;
+
+    // ★ BUG-C3 FIX: Admin bildirimi eklendi
+    this._notifyAdmins(reporterId, reason, 'post').catch(e => console.warn('Admin bildirim hatası:', e));
     return true;
   },
 
@@ -77,6 +79,9 @@ export const ModerationService = {
       status: 'pending',
     });
     if (error) throw error;
+
+    // ★ BUG-C3 FIX: Admin bildirimi eklendi
+    this._notifyAdmins(reporterId, reason, 'message').catch(e => console.warn('Admin bildirim hatası:', e));
     return true;
   },
 
@@ -290,19 +295,15 @@ export const ModerationService = {
         }, { onConflict: 'room_id,user_id' });
       if (error) throw error;
 
-      // Katılımcı rolünü 'banned' yap
-      await supabase
-        .from('room_participants')
-        .update({ role: 'banned' })
-        .eq('room_id', roomId)
-        .eq('user_id', targetUserId);
-
       // Katılımcıyı odadan sil
       await supabase
         .from('room_participants')
         .delete()
         .eq('room_id', roomId)
         .eq('user_id', targetUserId);
+
+      // Listener count azalt
+      try { await supabase.rpc('decrement_listener_count', { room_id_input: roomId }); } catch {}
 
       return { success: true };
     } catch (e: any) {
@@ -356,146 +357,21 @@ export const ModerationService = {
   },
 
   // ==========================================
-  // GHOST MODE (Owner Görünmezlik — VIP)
+  // ★ KALDIRILDI: Aşağıdaki fonksiyonlar RoomService'e taşındı.
+  // Ghost Mode      → RoomService.setGhostMode()
+  // Disguise        → RoomService.setDisguise()
+  // Slow Mode       → RoomService.updateSettings() ile room_settings
+  // Room Lock       → RoomService.setRoomLock()
+  // Followers Only  → RoomService.updateSettings() ile room_settings
+  // Age/Lang Filter → RoomService.updateSettings() ile room_settings
+  // Stage Layout    → RoomService.updateSettings() ile room_settings
+  // Room Music      → RoomService.updateSettings() ile room_settings
+  // Edit Room Name  → ModerationService.editRoomName (aşağıda korunuyor)
+  // Edit Welcome    → ModerationService.editWelcomeMessage (aşağıda korunuyor)
   // ==========================================
 
-  /**
-   * Owner'ı odada görünmez yap / göster.
-   * Ghost mode'da katılımcı listesinde gözükmez.
-   */
-  async setGhostMode(roomId: string, userId: string, enabled: boolean): Promise<void> {
-    await supabase
-      .from('room_participants')
-      .update({ is_ghost: enabled })
-      .eq('room_id', roomId)
-      .eq('user_id', userId);
-  },
-
   // ==========================================
-  // DISGUISE (Kılık Değiştirme — VIP)
-  // ==========================================
-
-  /**
-   * Hedef kullanıcının oda içi görüntüsünü geçici olarak değiştir.
-   * Sadece owner tarafından uygulanabilir.
-   */
-  async disguiseUser(
-    roomId: string,
-    targetUserId: string,
-    appliedBy: string,
-    displayName: string,
-    avatarUrl: string,
-  ): Promise<void> {
-    const disguise = {
-      display_name: displayName,
-      avatar_url: avatarUrl,
-      applied_by: appliedBy,
-      applied_at: new Date().toISOString(),
-    };
-    await supabase
-      .from('room_participants')
-      .update({ disguise })
-      .eq('room_id', roomId)
-      .eq('user_id', targetUserId);
-  },
-
-  /** Kılık değiştirmeyi kaldır */
-  async removeDisguise(roomId: string, targetUserId: string): Promise<void> {
-    await supabase
-      .from('room_participants')
-      .update({ disguise: null })
-      .eq('room_id', roomId)
-      .eq('user_id', targetUserId);
-  },
-
-  // ==========================================
-  // SLOW MODE
-  // ==========================================
-
-  /** Slow mode aç/kapat — saniye cinsinden interval. 0 = kapalı */
-  async setSlowMode(roomId: string, seconds: number): Promise<void> {
-    const settings = await this._getRoomSettings(roomId);
-    await this._updateRoomSettings(roomId, { ...settings, slow_mode_seconds: seconds });
-  },
-
-  // ==========================================
-  // KICK (Odadan At)
-  // ==========================================
-
-  /** Kullanıcıyı odadan at (ban olmadan — tekrar katılabilir) */
-  async kickFromRoom(roomId: string, targetUserId: string): Promise<void> {
-    await supabase
-      .from('room_participants')
-      .delete()
-      .eq('room_id', roomId)
-      .eq('user_id', targetUserId);
-
-    // Dinleyici sayısını azalt
-    await supabase.rpc('decrement_listener_count', { room_id_input: roomId });
-  },
-
-  // ==========================================
-  // ODA KİLİTLEME (Silver+)
-  // ==========================================
-
-  /** Odayı kilitle / aç — yeni katılımcı girişini engeller */
-  async setRoomLock(roomId: string, locked: boolean): Promise<void> {
-    const settings = await this._getRoomSettings(roomId);
-    await this._updateRoomSettings(roomId, { ...settings, is_locked: locked });
-  },
-
-  // ==========================================
-  // FOLLOWERS-ONLY MOD (Gold+)
-  // ==========================================
-
-  /** Yalnızca takipçilere açık modu aç/kapat */
-  async setFollowersOnly(roomId: string, enabled: boolean): Promise<void> {
-    const settings = await this._getRoomSettings(roomId);
-    await this._updateRoomSettings(roomId, { ...settings, followers_only: enabled });
-  },
-
-  // ==========================================
-  // YAŞ FİLTRESİ (Silver+)
-  // ==========================================
-
-  /** Minimum yaş filtresi uygula. 0 = kapalı */
-  async setAgeFilter(roomId: string, minAge: number): Promise<void> {
-    const settings = await this._getRoomSettings(roomId);
-    await this._updateRoomSettings(roomId, { ...settings, age_filter_min: minAge });
-  },
-
-  // ==========================================
-  // DİL FİLTRESİ (Silver+)
-  // ==========================================
-
-  /** Dil filtresi uygula. Boş dizi = filtre yok */
-  async setLanguageFilter(roomId: string, languages: RoomLanguage[]): Promise<void> {
-    const settings = await this._getRoomSettings(roomId);
-    await this._updateRoomSettings(roomId, { ...settings, language_filter: languages });
-  },
-
-  // ==========================================
-  // SAHNE DÜZENİ (Silver+)
-  // ==========================================
-
-  /** Sahne düzeni değiştir: grid / spotlight / theater */
-  async setStageLayout(roomId: string, layout: StageLayout): Promise<void> {
-    const settings = await this._getRoomSettings(roomId);
-    await this._updateRoomSettings(roomId, { ...settings, stage_layout: layout });
-  },
-
-  // ==========================================
-  // ODA MÜZİĞİ (Gold+)
-  // ==========================================
-
-  /** Oda müziği yapılandır */
-  async setRoomMusic(roomId: string, config: RoomMusicConfig | null): Promise<void> {
-    const settings = await this._getRoomSettings(roomId);
-    await this._updateRoomSettings(roomId, { ...settings, room_music: config });
-  },
-
-  // ==========================================
-  // ODA İSMİ DÜZENLEME
+  // ODA İSMİ DÜZENLEME (korunuyor — moderation yetki kapsamında)
   // ==========================================
 
   /** Oda ismini düzenle */
@@ -507,34 +383,20 @@ export const ModerationService = {
   },
 
   // ==========================================
-  // HOŞ GELDİN MESAJI DÜZENLEME
+  // HOŞ GELDİN MESAJI DÜZENLEME (korunuyor — moderation yetki kapsamında)
   // ==========================================
 
   /** Hoş geldin mesajını düzenle */
   async editWelcomeMessage(roomId: string, message: string): Promise<void> {
-    const settings = await this._getRoomSettings(roomId);
-    await this._updateRoomSettings(roomId, { ...settings, welcome_message: message });
-  },
-
-  // ==========================================
-  // YARDIMCI: room_settings JSONB işlemleri
-  // ==========================================
-
-  /** Oda settings JSONB'sini oku */
-  async _getRoomSettings(roomId: string): Promise<RoomSettings> {
     const { data: room } = await supabase
       .from('rooms')
       .select('room_settings')
       .eq('id', roomId)
       .single();
-    return (room?.room_settings || {}) as RoomSettings;
-  },
-
-  /** Oda settings JSONB'sini güncelle */
-  async _updateRoomSettings(roomId: string, settings: RoomSettings): Promise<void> {
+    const settings = (room?.room_settings || {}) as any;
     await supabase
       .from('rooms')
-      .update({ room_settings: settings })
+      .update({ room_settings: { ...settings, welcome_message: message } })
       .eq('id', roomId);
   },
 };

@@ -103,11 +103,10 @@ export default function RoomStatsPanel({
             {stats.map((s) => (
               <View key={s.label} style={st.statCard}>
                 <View style={[st.statIcon, { backgroundColor: s.color + '14' }]}>
-                  <Ionicons name={s.icon as any} size={16} color={s.color} />
+                  <Ionicons name={s.icon as any} size={13} color={s.color} />
                 </View>
                 <Text style={st.statValue}>{s.value}</Text>
                 <Text style={st.statLabel}>{s.label}</Text>
-                {s.desc && <Text style={st.statDesc}>{s.desc}</Text>}
               </View>
             ))}
           </View>
@@ -148,8 +147,8 @@ const st = StyleSheet.create({
     borderTopRightRadius: 20,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.06)',
-    paddingHorizontal: 16,
-    paddingBottom: 40,
+    paddingHorizontal: 14,
+    paddingBottom: 28,
   },
   handle: {
     width: 36,
@@ -164,21 +163,21 @@ const st = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingBottom: 14,
+    paddingBottom: 10,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.04)',
-    marginBottom: 14,
+    marginBottom: 10,
   },
   headerIcon: {
-    width: 30,
-    height: 30,
-    borderRadius: 10,
+    width: 24,
+    height: 24,
+    borderRadius: 8,
     backgroundColor: 'rgba(59,130,246,0.12)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   headerTitle: {
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: '700',
     color: '#E2E8F0',
     letterSpacing: 0.2,
@@ -217,41 +216,41 @@ const st = StyleSheet.create({
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
+    gap: 6,
   },
   statCard: {
-    width: (W - 32 - 20) / 3,
+    width: '31%',
     backgroundColor: 'rgba(255,255,255,0.03)',
-    borderRadius: 12,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.04)',
-    padding: 12,
+    padding: 6,
     alignItems: 'center',
-    gap: 4,
+    gap: 1,
   },
   statIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
+    width: 20,
+    height: 20,
+    borderRadius: 6,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: 1,
   },
   statValue: {
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: '800',
     color: '#F1F5F9',
     letterSpacing: -0.3,
   },
   statLabel: {
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '600',
     color: '#94A3B8',
   },
   statDesc: {
-    fontSize: 8,
+    fontSize: 7,
     color: '#475569',
-    textAlign: 'center',
+    textAlign: 'center' as any,
   },
 
   // Top Users

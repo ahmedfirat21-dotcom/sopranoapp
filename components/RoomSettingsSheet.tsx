@@ -28,6 +28,11 @@ const ROOM_THEME_MAP: Record<string, { name: string; colors: [string, string]; }
   cherry:  { name: 'Kiraz',    colors: ['#831843', '#500724'] },
   cyber:   { name: 'Cyber',    colors: ['#1E3A8A', '#172554'] },
   volcano: { name: 'Volkan',   colors: ['#7C2D12', '#431407'] },
+  midnight:{ name: 'Gece',     colors: ['#0C0A3E', '#1B1464'] },
+  rose:    { name: 'Gül',      colors: ['#9F1239', '#881337'] },
+  arctic:  { name: 'Kutup',    colors: ['#164E63', '#0E7490'] },
+  amber:   { name: 'Kehribar', colors: ['#78350F', '#92400E'] },
+  slate:   { name: 'Arduvaz', colors: ['#1E293B', '#334155'] },
 };
 
 export type MicMode = 'normal' | 'music';
@@ -92,6 +97,24 @@ interface RoomSettingsProps {
   onDonationsToggle?: (enabled: boolean) => void;
   roomRules?: string;
   onRulesChange?: (rules: string) => void;
+  // Manuel Oda Dondurma (Bronze+)
+  canFreezeRoom?: boolean;
+  onFreezeRoom?: () => void;
+  // Oda Silme (Host-only — tüm tier'lar)
+  canDeleteRoom?: boolean;
+  onDeleteRoom?: () => void;
+  // Dil Filtresi (Silver+)
+  roomLanguage?: string;
+  onLanguageChange?: (lang: string) => void;
+  // Yaş Filtresi (Silver+)
+  ageRestricted?: boolean;
+  onAgeRestrictedChange?: (enabled: boolean) => void;
+  // Oda Kapak Görseli (Gold+)
+  onChangeCoverImage?: (imageUri: string | null) => void;
+  coverImage?: string | null;
+  // Oda Müziği (Gold+)
+  musicTrack?: string | null;
+  onMusicChange?: (track: string | null) => void;
 }
 
 // ═══════════════════════════════════════════════════
@@ -191,6 +214,12 @@ export default function RoomSettingsSheet(props: RoomSettingsProps) {
     entryFeeSp, onEntryFeeChange,
     donationsEnabled, onDonationsToggle,
     roomRules, onRulesChange,
+    canFreezeRoom, onFreezeRoom,
+    canDeleteRoom, onDeleteRoom,
+    roomLanguage, onLanguageChange,
+    ageRestricted, onAgeRestrictedChange,
+    onChangeCoverImage, coverImage,
+    musicTrack, onMusicChange,
   } = props;
 
   const [activeTab, setActiveTab] = React.useState<TabId>('general');
@@ -300,7 +329,29 @@ export default function RoomSettingsSheet(props: RoomSettingsProps) {
       {canCloseRoom && onCloseRoom && (
         <Pressable style={s.closeRoomBtn} onPress={() => { onClose(); onCloseRoom(); }}>
           <View style={s.closeRoomIcon}><Ionicons name="power" size={18} color="#EF4444" /></View>
-          <View><Text style={s.closeRoomTitle}>Odayı Kapat</Text><Text style={s.closeRoomDesc}>Tüm kullanıcılar çıkarılır</Text></View>
+          <View><Text style={s.closeRoomTitle}>Odayı Kapat</Text><Text style={s.closeRoomDesc}>Tüm kullanıcılar çıkarılır, oda silinir</Text></View>
+        </Pressable>
+      )}
+
+      {/* Odayı Dondur — Bronze+ */}
+      {canFreezeRoom && onFreezeRoom && (
+        <Pressable style={[s.closeRoomBtn, { borderColor: 'rgba(59,130,246,0.2)', backgroundColor: 'rgba(59,130,246,0.06)' }]} onPress={() => { onClose(); onFreezeRoom(); }}>
+          <View style={[s.closeRoomIcon, { backgroundColor: 'rgba(59,130,246,0.12)' }]}><Ionicons name="snow" size={18} color="#3B82F6" /></View>
+          <View>
+            <Text style={[s.closeRoomTitle, { color: '#3B82F6' }]}>Odayı Dondur</Text>
+            <Text style={s.closeRoomDesc}>Oda dondurulur, dilediğinde tekrar aktifleştir</Text>
+          </View>
+        </Pressable>
+      )}
+
+      {/* Odayı Kalıcı Sil — Host only, tüm tier'lar */}
+      {canDeleteRoom && onDeleteRoom && (
+        <Pressable style={[s.closeRoomBtn, { borderColor: 'rgba(239,68,68,0.3)', backgroundColor: 'rgba(239,68,68,0.08)', marginTop: 8 }]} onPress={() => { onClose(); onDeleteRoom(); }}>
+          <View style={[s.closeRoomIcon, { backgroundColor: 'rgba(239,68,68,0.15)' }]}><Ionicons name="trash" size={18} color="#EF4444" /></View>
+          <View>
+            <Text style={s.closeRoomTitle}>Odayı Kalıcı Sil</Text>
+            <Text style={s.closeRoomDesc}>Oda tamamen silinir, bu işlem geri alınamaz</Text>
+          </View>
         </Pressable>
       )}
     </View>
@@ -352,13 +403,6 @@ export default function RoomSettingsSheet(props: RoomSettingsProps) {
 
       {/* Sahne Düzeni — Silver+ */}
       {isHost && !can('Silver') && <LockedRow icon="grid-outline" label="Sahne Düzeni (Kaç kişi konuşabilir)" requiredTier="Silver" />}
-
-      {/* Stereo Ses — VIP */}
-      {can('VIP') ? (
-        <SettingRow icon="headset" iconBg="rgba(255,107,53,0.2)" label="Stereo Ses" desc="48kHz yüksek kalite audio aktif"
-          right={<View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: 'rgba(255,107,53,0.12)' }}><Text style={{ fontSize: 8, fontWeight: '700', color: '#FF6B35' }}>48kHz</Text></View>}
-        />
-      ) : <LockedRow icon="headset" label="Stereo Ses / Yüksek Kalite Audio" requiredTier="VIP" />}
     </View>
   );
 
@@ -380,33 +424,31 @@ export default function RoomSettingsSheet(props: RoomSettingsProps) {
         />
       )}
 
-      {/* Moderatör Atama — Bronze+ */}
-      {can('Bronze') ? (
-        <SettingRow icon="person-add" iconBg="rgba(205,127,50,0.2)" label="Moderatör Atama" desc={`Limit: ${can('VIP') ? '5' : can('Gold') ? '3' : can('Silver') ? '2' : '1'} kişi`}
-          right={<View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: 'rgba(205,127,50,0.12)' }}><Text style={{ fontSize: 8, fontWeight: '700', color: '#CD7F32' }}>Bronze+</Text></View>}
-        />
-      ) : <LockedRow icon="person-add-outline" label="Moderatör Atama" requiredTier="Bronze" />}
-
-      {/* Geri Sayımlı Kapatma — Bronze+ */}
-      {can('Bronze') ? (
-        <SettingRow icon="timer" iconBg="rgba(205,127,50,0.2)" label="Geri Sayımlı Kapatma" desc="Host ayrıldığında 60sn geri sayım"
-          right={<View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: 'rgba(205,127,50,0.12)' }}><Text style={{ fontSize: 8, fontWeight: '700', color: '#CD7F32' }}>Aktif</Text></View>}
-        />
-      ) : <LockedRow icon="timer-outline" label="Geri Sayımlı Kapatma" requiredTier="Bronze" />}
-
       {/* Dil Filtresi — Silver+ */}
-      {can('Silver') ? (
-        <SettingRow icon="globe" iconBg="rgba(192,192,192,0.2)" label="Dil Filtresi" desc="Oda dil tercihini belirle"
-          right={<View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: 'rgba(192,192,192,0.12)' }}><Text style={{ fontSize: 8, fontWeight: '700', color: '#C0C0C0' }}>Silver+</Text></View>}
-        />
-      ) : <LockedRow icon="globe-outline" label="Dil Filtresi" requiredTier="Silver" />}
+      {isHost && (can('Silver') ? (
+        onLanguageChange && (
+          <SettingRow icon="globe" iconBg="rgba(192,192,192,0.2)" label={`Oda Dili: ${({'tr':'Türkçe','en':'English','de':'Deutsch','ar':'العربية'})[roomLanguage || 'tr'] || roomLanguage || 'Türkçe'}`} desc="Oda dil tercihini belirle"
+            right={
+              <View style={{ flexDirection: 'row', gap: 4 }}>
+                {['tr', 'en', 'de', 'ar'].map(lang => (
+                  <Pressable key={lang} style={[s.slowPill, roomLanguage === lang && s.slowPillActive]} onPress={() => onLanguageChange(lang)}>
+                    <Text style={[s.slowPillText, roomLanguage === lang && s.slowPillTextActive]}>{({'tr':'🇹🇷','en':'🇬🇧','de':'🇩🇪','ar':'🇸🇦'})[lang]}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            }
+          />
+        )
+      ) : <LockedRow icon="globe-outline" label="Dil Filtresi" requiredTier="Silver" />)}
 
-      {/* Yaş Filtresi — Silver+ */}
-      {can('Silver') ? (
-        <SettingRow icon="calendar" iconBg="rgba(192,192,192,0.2)" label="Yaş Filtresi" desc="Yaş aralığı seçerek katılımcıları filtrele"
-          right={<View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: 'rgba(192,192,192,0.12)' }}><Text style={{ fontSize: 8, fontWeight: '700', color: '#C0C0C0' }}>Silver+</Text></View>}
-        />
-      ) : <LockedRow icon="calendar-outline" label="Yaş Filtresi" requiredTier="Silver" />}
+      {/* Yaş Filtresi (+18) — Silver+ */}
+      {isHost && (can('Silver') ? (
+        onAgeRestrictedChange && (
+          <SettingRow icon="warning" iconBg={ageRestricted ? 'rgba(239,68,68,0.2)' : 'rgba(192,192,192,0.2)'} label={ageRestricted ? '+18 İçerik Aktif' : 'Yaş Sınırı Yok'} desc={ageRestricted ? 'Sadece 18 yaş üstü katılabilir' : 'Tüm yaş gruplarına açık'}
+            right={<Switch value={!!ageRestricted} onValueChange={onAgeRestrictedChange} trackColor={{ false: 'rgba(255,255,255,0.08)', true: 'rgba(239,68,68,0.4)' }} thumbColor={ageRestricted ? '#EF4444' : '#475569'} />}
+          />
+        )
+      ) : <LockedRow icon="calendar-outline" label="Yaş Filtresi (+18)" requiredTier="Silver" />)}
 
       {/* Takipçilere Özel — Gold+ */}
       {can('Gold') ? (
@@ -419,9 +461,6 @@ export default function RoomSettingsSheet(props: RoomSettingsProps) {
 
       {/* Tümünü Sustur — VIP */}
       {!can('VIP') && <LockedRow icon="volume-mute-outline" label="Tümünü Sustur (Cooldown ile)" requiredTier="VIP" />}
-
-      {/* Toplu Kontrol — VIP */}
-      {!can('VIP') && <LockedRow icon="people-circle-outline" label="Toplu Kontrol" requiredTier="VIP" />}
 
       {/* Gelişmiş Ban — VIP */}
       {!can('VIP') && <LockedRow icon="ban-outline" label="Gelişmiş Ban Seçenekleri" requiredTier="VIP" />}
@@ -477,17 +516,41 @@ export default function RoomSettingsSheet(props: RoomSettingsProps) {
       ) : <LockedRow icon="image-outline" label="Arka Plan Resmi" requiredTier="Silver" />}
 
       {/* Oda Kapak Görseli — Gold+ */}
-      {can('Gold') ? (
-        <SettingRow icon="albums" iconBg="rgba(255,215,0,0.2)" label="Oda Kapak Görseli" desc="Keşfet akışında görünen banner"
-          right={<View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: 'rgba(255,215,0,0.12)' }}><Text style={{ fontSize: 8, fontWeight: '700', color: '#FFD700' }}>Gold+</Text></View>}
-        />
-      ) : <LockedRow icon="albums-outline" label="Oda Kapak Görseli (Banner)" requiredTier="Gold" />}
+      {isHost && (can('Gold') ? (
+        onChangeCoverImage && (
+          <SettingRow icon="albums" iconBg="rgba(255,215,0,0.2)" label="Oda Kapak Görseli" desc={coverImage ? 'Banner ayarlandı' : 'Keşfet akışında görünen banner'}
+            right={
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                {coverImage ? (
+                  <Pressable onPress={() => onChangeCoverImage(null)} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8, backgroundColor: 'rgba(239,68,68,0.1)', borderWidth: 1, borderColor: 'rgba(239,68,68,0.2)' }}>
+                    <Ionicons name="trash-outline" size={12} color="#EF4444" /><Text style={{ fontSize: 10, fontWeight: '600', color: '#EF4444' }}>Kaldır</Text>
+                  </Pressable>
+                ) : (
+                  <Pressable onPress={() => onChangeCoverImage('pick')} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8, backgroundColor: 'rgba(255,215,0,0.1)', borderWidth: 1, borderColor: 'rgba(255,215,0,0.2)' }}>
+                    <Ionicons name="add" size={12} color="#FFD700" /><Text style={{ fontSize: 10, fontWeight: '600', color: '#FFD700' }}>Seç</Text>
+                  </Pressable>
+                )}
+              </View>
+            }
+          />
+        )
+      ) : <LockedRow icon="albums-outline" label="Oda Kapak Görseli (Banner)" requiredTier="Gold" />)}
 
       {/* Oda Müziği — Gold+ */}
       {can('Gold') ? (
-        <SettingRow icon="musical-notes" iconBg="rgba(255,215,0,0.2)" label="Oda Arka Plan Müziği" desc="Lofi, jazz, ambient ses döngüsü"
-          right={<View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: 'rgba(255,215,0,0.12)' }}><Text style={{ fontSize: 8, fontWeight: '700', color: '#FFD700' }}>Gold+</Text></View>}
-        />
+        isHost && onMusicChange && (
+          <SettingRow icon="musical-notes" iconBg="rgba(255,215,0,0.2)" label={musicTrack ? `Müzik: ${({'lofi':'Lofi','ambient':'Ambient','jazz':'Jazz'})[musicTrack] || musicTrack}` : 'Oda Müziği Kapalı'} desc="Arka planda ambient ses döngüsü"
+            right={
+              <View style={{ flexDirection: 'row', gap: 4 }}>
+                {([null, 'lofi', 'ambient', 'jazz'] as const).map(track => (
+                  <Pressable key={track || 'off'} style={[s.slowPill, musicTrack === track && s.slowPillActive]} onPress={() => onMusicChange(track)}>
+                    <Text style={[s.slowPillText, musicTrack === track && s.slowPillTextActive]}>{track === null ? '🔇' : track === 'lofi' ? '🎵' : track === 'ambient' ? '🌊' : '🎷'}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            }
+          />
+        )
       ) : <LockedRow icon="musical-notes-outline" label="Oda Arka Plan Müziği" requiredTier="Gold" />}
     </View>
   );
@@ -521,11 +584,13 @@ export default function RoomSettingsSheet(props: RoomSettingsProps) {
         )
       ) : <LockedRow icon="cash-outline" label="Giriş Ücreti Belirleme (SP)" requiredTier="VIP" />}
 
-      {/* Oda Boost — VIP */}
+      {/* Oda Boost — VIP (PlusMenu'dan yapılır) */}
       {can('VIP') ? (
-        <SettingRow icon="rocket" iconBg="rgba(255,107,53,0.2)" label="Odayı Öne Çıkar" desc="Keşfet akışında üst sıralarda göster"
-          right={<View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: 'rgba(255,107,53,0.12)' }}><Text style={{ fontSize: 8, fontWeight: '700', color: '#FF6B35' }}>VIP</Text></View>}
-        />
+        <Pressable onPress={() => { onClose(); showToast({ title: '🚀 Boost', message: '+ menüsünden "Odayı Öne Çıkar" ile boost aktifleştir.', type: 'info' }); }}>
+          <SettingRow icon="rocket" iconBg="rgba(255,107,53,0.2)" label="Odayı Öne Çıkar" desc="+ menüsünden boost aktifleştir"
+            right={<View style={{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, backgroundColor: 'rgba(255,107,53,0.12)', borderWidth: 1, borderColor: 'rgba(255,107,53,0.2)' }}><Text style={{ fontSize: 9, fontWeight: '700', color: '#FF6B35' }}>+ Menü</Text></View>}
+          />
+        </Pressable>
       ) : <LockedRow icon="rocket-outline" label="Odayı Öne Çıkarma / Boost" requiredTier="VIP" />}
     </View>
   );
@@ -533,40 +598,12 @@ export default function RoomSettingsSheet(props: RoomSettingsProps) {
   // ═══ GELİŞMİŞ ═══
   const renderAdvanced = () => (
     <View>
-      {/* Ghost Mode — VIP */}
-      {can('VIP') ? (
-        <SettingRow icon="eye-off" iconBg="rgba(139,92,246,0.2)" label="Ghost Mode" desc="Oda sahibi olarak gizlenebilirsin"
-          right={<View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: 'rgba(139,92,246,0.12)' }}><Text style={{ fontSize: 8, fontWeight: '700', color: '#A78BFA' }}>VIP</Text></View>}
-        />
-      ) : <LockedRow icon="eye-off-outline" label="Ghost Mode (Gizlenme)" requiredTier="VIP" />}
-
-      {/* Kılık Değiştirme — VIP */}
-      {can('VIP') ? (
-        <SettingRow icon="glasses" iconBg="rgba(139,92,246,0.2)" label="Kılık Değiştirme" desc="Farklı isim/ikon ile görün"
-          right={<View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: 'rgba(139,92,246,0.12)' }}><Text style={{ fontSize: 8, fontWeight: '700', color: '#A78BFA' }}>VIP</Text></View>}
-        />
-      ) : <LockedRow icon="glasses-outline" label="Kılık Değiştirme" requiredTier="VIP" />}
-
       {/* 13 Kişi Sahne — VIP */}
       {can('VIP') ? (
-        <SettingRow icon="people" iconBg="rgba(255,107,53,0.2)" label="13 Kişilik Sahne" desc="Genişletilmiş sahne kapasitesi"
+        <SettingRow icon="people" iconBg="rgba(255,107,53,0.2)" label="13 Kişilik Sahne" desc="Genişletilmiş sahne kapasitesi aktif"
           right={<View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: 'rgba(255,107,53,0.12)' }}><Text style={{ fontSize: 8, fontWeight: '700', color: '#FF6B35' }}>13 kişi</Text></View>}
         />
       ) : <LockedRow icon="people-outline" label="13 Kişilik Sahne" requiredTier="VIP" />}
-
-      {/* Oda Kaydı — VIP */}
-      {can('VIP') ? (
-        <SettingRow icon="radio" iconBg="rgba(239,68,68,0.2)" label="Oda Kaydı" desc="Sohbeti kaydet, daha sonra dinle"
-          right={<View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: 'rgba(239,68,68,0.12)' }}><Text style={{ fontSize: 8, fontWeight: '700', color: '#EF4444' }}>VIP</Text></View>}
-        />
-      ) : <LockedRow icon="radio-outline" label="Oda Kaydı (Recording)" requiredTier="VIP" />}
-
-      {/* Canlı İstatistik — VIP */}
-      {can('VIP') ? (
-        <SettingRow icon="stats-chart" iconBg="rgba(59,130,246,0.2)" label="Canlı İstatistik Paneli" desc="CCU, süre, etkileşim"
-          right={<View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: 'rgba(59,130,246,0.12)' }}><Text style={{ fontSize: 8, fontWeight: '700', color: '#3B82F6' }}>VIP</Text></View>}
-        />
-      ) : <LockedRow icon="stats-chart-outline" label="Canlı İstatistik Paneli" requiredTier="VIP" />}
     </View>
   );
 
@@ -665,12 +702,12 @@ const s = StyleSheet.create({
   speakerBtnText: { fontSize: 11, fontWeight: '600', color: '#94A3B8' },
 
   // Theme
-  themeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingBottom: 8 },
-  themeCircle: { width: 44, height: 44, borderRadius: 22, borderWidth: 2, borderColor: 'rgba(255,255,255,0.06)', overflow: 'hidden' },
+  themeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, paddingBottom: 8 },
+  themeCircle: { width: 36, height: 36, borderRadius: 18, borderWidth: 2, borderColor: 'rgba(255,255,255,0.06)', overflow: 'hidden' },
   themeCircleActive: { borderColor: '#14B8A6', borderWidth: 2 },
   themeGrad: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' } as any,
-  themeName: { fontSize: 10, fontWeight: '700', color: '#FFF' },
-  themeCheck: { position: 'absolute' as const, bottom: -1, right: -1, width: 14, height: 14, borderRadius: 7, backgroundColor: '#14B8A6', alignItems: 'center' as any, justifyContent: 'center' as any },
+  themeName: { fontSize: 8, fontWeight: '700', color: '#FFF' },
+  themeCheck: { position: 'absolute' as const, bottom: -1, right: -1, width: 12, height: 12, borderRadius: 6, backgroundColor: '#14B8A6', alignItems: 'center' as any, justifyContent: 'center' as any },
 
   // Close Room
   closeRoomBtn: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 20, padding: 14, borderRadius: 14, backgroundColor: 'rgba(239,68,68,0.06)', borderWidth: 1, borderColor: 'rgba(239,68,68,0.15)' },

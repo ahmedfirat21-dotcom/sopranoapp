@@ -15,14 +15,16 @@ interface Props {
   maxLines?: number;
 }
 
-export default function InlineChat({ messages, maxLines = 5 }: Props) {
+export default function InlineChat({ messages, maxLines = 6 }: Props) {
   if (messages.length === 0) return null;
-  const visible = messages.slice(0, maxLines).reverse();
+  // ★ UX-2 FIX: En yeni mesaj en altta, en parlak — eski mesajlar üstte, solgun
+  const visible = messages.slice(0, maxLines);
 
   return (
-    <View style={s.wrap}>
+    <View style={s.wrap} pointerEvents="none">
       {visible.map((msg, idx) => {
-        const opacity = 0.2 + (idx / (visible.length - 1 || 1)) * 0.8;
+        // idx=0 en yeni, idx=last en eski → eski mesajlar daha soluk
+        const opacity = 1 - (idx / (visible.length || 1)) * 0.7;
         if (msg.isSystem) {
           return (
             <Text key={msg.id} style={[s.sysLine, { opacity }]} numberOfLines={2}>
@@ -43,31 +45,31 @@ export default function InlineChat({ messages, maxLines = 5 }: Props) {
 
 const s = StyleSheet.create({
   wrap: {
-    paddingHorizontal: 16,
-    marginTop: 12,
-    marginHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 14,
-    backgroundColor: 'rgba(10,18,30,0.55)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
+    paddingHorizontal: 14,
+    paddingVertical: 4,
   },
   msgLine: {
-    paddingVertical: 2.5,
+    paddingVertical: 2,
+    textShadowColor: 'rgba(0,0,0,0.7)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
   msgName: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '700',
-    color: '#14B8A6',
+    color: '#5EEAD4',
   },
   msgText: {
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.75)',
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.8)',
   },
   sysLine: {
-    paddingVertical: 2,
-    fontSize: 11,
+    paddingVertical: 1.5,
+    fontSize: 10,
     color: 'rgba(255,255,255,0.4)',
     fontStyle: 'italic',
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
 });

@@ -8,9 +8,10 @@ interface UseLiveKitOptions {
   userId?: string;
   displayName?: string;
   qualityPreset?: { audioSampleRate?: number; audioChannels?: number; videoMaxRes?: number };
+  shouldDisconnectOnUnmount?: () => boolean;
 }
 
-export default function useLiveKit({ roomId, enabled = true, userId, displayName, qualityPreset }: UseLiveKitOptions) {
+export default function useLiveKit({ roomId, enabled = true, userId, displayName, qualityPreset, shouldDisconnectOnUnmount }: UseLiveKitOptions) {
   const [connectionState, setConnectionState] = useState<RoomConnectionState>('disconnected');
   const [participants, setParticipants] = useState<ParticipantUpdate[]>([]);
   // ★ BUG-2 FIX: Mic/Cam durumunu React state olarak takip et
@@ -127,13 +128,16 @@ export default function useLiveKit({ roomId, enabled = true, userId, displayName
         clearTimeout(reconnectTimerRef.current);
         reconnectTimerRef.current = null;
       }
-      liveKitService.disconnect();
-      setConnectionState('disconnected');
-      setParticipants([]);
-      setIsMicEnabled(false);
-      setIsCamEnabled(false);
+      const shouldDisconnect = shouldDisconnectOnUnmount ? shouldDisconnectOnUnmount() : true;
+      if (shouldDisconnect) {
+        liveKitService.disconnect();
+        setConnectionState('disconnected');
+        setParticipants([]);
+        setIsMicEnabled(false);
+        setIsCamEnabled(false);
+      }
     };
-  }, [roomId, enabled, userId, displayName]);
+  }, [roomId, enabled, userId, displayName, shouldDisconnectOnUnmount]);
   
   // App Background/Foreground state handling
   useEffect(() => {
@@ -150,8 +154,18 @@ export default function useLiveKit({ roomId, enabled = true, userId, displayName
   }, []);
 
   const toggleCamera = useCallback(async () => {
+    // ★ BUG-T5 FIX: maxCameras enforcement — kamera açarken limit kontrolü
+    if (!isCamEnabled) {
+      // Kamera açılıyor — mevcut kamera sayısını kontrol et
+      const cameraCount = participants.filter(p => p.isCameraEnabled).length;
+      // qualityPreset üzerinden max bilgisi olmadığı için basit limit: 10 (VIP max)
+      // Gerçek limit room/[id].tsx'de tier'dan çekilmeli
+      if (cameraCount >= 10) {
+        throw new Error('Kamera limiti doldu');
+      }
+    }
     return await liveKitService.toggleCamera();
-  }, []);
+  }, [isCamEnabled, participants]);
 
   const toggleMic = useCallback(async () => {
     return await liveKitService.toggleMicrophone();

@@ -13,11 +13,14 @@ let globalCallChannel: ReturnType<typeof supabase.channel> | null = null;
 let globalCallUserId: string | null = null;
 
 // ★ Sinyal dedup — retry nedeniyle aynı sinyalin iki kez işlenmesini önle
-const _processedSignals = new Set<string>();
+// Aynı callId+action kombini 5sn içinde tekrar gelirse duplikat sayılır
+const _processedSignals = new Map<string, number>();
 function isSignalDuplicate(signal: CallSignal): boolean {
   const key = `${signal.callId}_${signal.action}`;
-  if (_processedSignals.has(key)) return true;
-  _processedSignals.add(key);
+  const now = Date.now();
+  const lastSeen = _processedSignals.get(key);
+  if (lastSeen && (now - lastSeen) < 5000) return true;
+  _processedSignals.set(key, now);
   // 60sn sonra temizle (bellek sızıntısı önleme)
   setTimeout(() => _processedSignals.delete(key), 60000);
   return false;
@@ -60,9 +63,9 @@ export function getCallQuality(tier: TierName, callType: CallType): CallQuality 
  * Geçici kanal adı ile gönderim — globalCallChannel ile çakışma yok
  * - Her gönderim kendi geçici kanalını açar ve sonra kapatır
  * - Global dinleme kanalına dokunmaz
- * - 3 kez retry ile güvenilirliği artır
+ * - ★ SYNC FIX: Tek seferde gönder, push notification zaten yedek kanal
  */
-async function sendSignalToUser(targetUserId: string, signal: CallSignal, maxRetries = 3): Promise<void> {
+async function sendSignalToUser(targetUserId: string, signal: CallSignal): Promise<void> {
   // Hedefin dinlediği kanal adıyla AYNI olmalı — Supabase Broadcast bunu gerektirir
   const targetChannelName = `call_signal_${targetUserId}`;
 
@@ -80,25 +83,20 @@ async function sendSignalToUser(targetUserId: string, signal: CallSignal, maxRet
       sendChannel.subscribe((status) => {
         if (status === 'SUBSCRIBED') {
           clearTimeout(timeout);
-          // ★ 200ms gecikme — karşı tarafın da subscribe olmasını bekle
+          // ★ SYNC FIX: 500ms bekle — karşı tarafın subscribe olması için yeterli süre
           setTimeout(async () => {
-            for (let i = 0; i < maxRetries; i++) {
-              try {
-                await sendChannel.send({
-                  type: 'broadcast',
-                  event: 'call_signal',
-                  payload: signal,
-                });
-                if (__DEV__) console.log(`[CallService] Sinyal gönderildi → ${signal.action} (deneme ${i + 1}) (${signal.callId.slice(-8)})`);
-                if (i < maxRetries - 1) {
-                  await new Promise(r => setTimeout(r, 1000));
-                }
-              } catch (e) {
-                if (__DEV__) console.warn(`[CallService] Sinyal gönderme hatası (deneme ${i + 1}):`, e);
-              }
+            try {
+              await sendChannel.send({
+                type: 'broadcast',
+                event: 'call_signal',
+                payload: signal,
+              });
+              if (__DEV__) console.log(`[CallService] Sinyal gönderildi → ${signal.action} (${signal.callId.slice(-8)})`);
+            } catch (e) {
+              if (__DEV__) console.warn(`[CallService] Sinyal gönderme hatası:`, e);
             }
             resolve();
-          }, 200);
+          }, 500);
         } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
           clearTimeout(timeout);
           if (__DEV__) console.warn(`[CallService] Kanal hatası: ${status}`);
@@ -165,7 +163,7 @@ export const CallService = {
 
     // ★ WhatsApp tarzı: HER DURUMDA broadcast sinyal gönder
     // Offline kullanıcı push ile uygulamayı açarsa sinyali yakalayabilir
-    await sendSignalToUser(receiverId, signal, 2);
+    await sendSignalToUser(receiverId, signal);
 
     // ★ Her durumda push notification gönder — arka planda/kapalıyken arama almak için KRİTİK
     const callTypeLabel = callType === 'video' ? '📹 Görüntülü Arama' : '📞 Sesli Arama';
@@ -264,7 +262,7 @@ export const CallService = {
     });
   },
 
-  /** Aramayı bitir — 1x retry yeterli (hızlı gönder) */
+  /** Aramayı bitir */
   async endCall(callerId: string, otherUserId: string, callId: string) {
     await sendSignalToUser(otherUserId, {
       action: 'call_ended',
@@ -272,10 +270,10 @@ export const CallService = {
       callerId,
       callerName: '',
       callType: 'audio',
-    }, 1);
+    });
   },
 
-  /** ★ Meşgul sinyali gönder — 1x retry yeterli */
+  /** ★ Meşgul sinyali gönder */
   async sendBusy(callerId: string, receiverId: string, callId: string) {
     await sendSignalToUser(callerId, {
       action: 'call_busy',
@@ -283,7 +281,7 @@ export const CallService = {
       callerId: receiverId,
       callerName: '',
       callType: 'audio',
-    }, 1);
+    });
   },
 
   /** Gelen arama sinyallerini dinle — stabil kanal + dedup + reconnect */

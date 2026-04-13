@@ -7,7 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { getAvatarSource } from '../../constants/avatars';
 
 const { width: W, height: H } = Dimensions.get('window');
-const PANEL_W = W * 0.55; // Mockup'taki gibi ekranın sağ yarısı
+const PANEL_W = W * 0.85; // Geniş panel — tüm mesajlar rahat okunur
 
 interface ChatMsg {
   id: string;
@@ -85,12 +85,13 @@ export default function RoomChatDrawer({ visible, messages, chatInput, onChangeI
           </Pressable>
         </View>
 
-        {/* Mesajlar */}
+        {/* Mesajlar — ★ UX-6 FIX: inverted FlatList ile en yeni mesaj altta */}
         <FlatList
-          data={[...messages].reverse()}
+          data={messages}
           keyExtractor={(m) => m.id}
           renderItem={renderMessage}
           style={s.list}
+          inverted
           contentContainerStyle={{ paddingVertical: 8, paddingHorizontal: 8, gap: 10 }}
           showsVerticalScrollIndicator={false}
         />

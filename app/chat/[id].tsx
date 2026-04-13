@@ -1,13 +1,15 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { View, Text, StyleSheet, Image, Pressable, TextInput, FlatList, KeyboardAvoidingView, Platform, ActivityIndicator, Animated, Easing, NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
+import { View, Text, StyleSheet, Image, Pressable, TextInput, FlatList, KeyboardAvoidingView, Platform, ActivityIndicator, Animated, Easing, NativeScrollEvent, NativeSyntheticEvent, Modal } from 'react-native';
 import PremiumAlert, { type AlertButton } from '../../components/PremiumAlert';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Colors, Radius } from '../../constants/theme';
+import { safeGoBack } from '../../constants/navigation';
 import { MessageService, ProfileService, type Message, type Profile } from '../../services/database';
 import { supabase } from '../../constants/supabase';
 import { CallService } from '../../services/call';
 import { FriendshipService } from '../../services/friendship';
+import { ModerationService } from '../../services/moderation';
 import { EmojiPicker } from '../../components/EmojiPicker';
 import { ReportModal } from '../../components/ReportModal';
 import { showToast } from '../../components/Toast';
@@ -16,6 +18,10 @@ import { getAvatarSource } from '../../constants/avatars';
 import { StorageService } from '../../services/storage';
 import * as ImagePicker from 'expo-image-picker';
 import { Audio, type AVPlaybackStatus } from 'expo-av';
+import AppBackground from '../../components/AppBackground';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 
 
 function getChatColorStyle(colorId?: string | null) {
@@ -105,21 +111,112 @@ function VoiceMessagePlayer({ voiceUrl, duration, isMe }: { voiceUrl: string; du
   );
 }
 
-function MessageBubble({ message, isMe }: { message: Message; isMe: boolean }) {
+function MessageBubble({ message, isMe, senderAvatar, senderName, myAvatar, onDelete, onReport, onAction, onReaction, isReactionActive, onToggleReaction, onImagePress }: { message: Message; isMe: boolean; senderAvatar?: string; senderName?: string; myAvatar?: string; onDelete?: (msgId: string) => void; onReport?: (msgId: string) => void; onAction?: (buttons: any[]) => void; onReaction?: (msgId: string, emoji: string) => void; isReactionActive?: boolean; onToggleReaction?: (msgId: string | null) => void; onImagePress?: (uri: string) => void }) {
   const time = new Date(message.created_at).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
   const customStyle = getChatColorStyle(message.sender?.active_chat_color);
   const isTemp = message.id.startsWith('temp_');
   const hasVoice = !!message.voice_url;
-  // ★ FIX: image_url sütunu olmadığı için content'ten URL çıkar
-  const imageUrlFromContent = !hasVoice && message.content?.startsWith('📷 http') ? message.content.replace('📷 ', '') : null;
+  const isDeleted = !!(message as any).is_deleted;
+  const imageUrlFromContent = (() => {
+    if (hasVoice || !message.content) return null;
+    const match = message.content.match(/^📷\s+(https?:\/\/\S+)$/);
+    return match ? match[1] : null;
+  })();
   const hasImage = !!message.image_url || !!imageUrlFromContent;
   const imageUri = message.image_url || imageUrlFromContent;
 
+  // ★ Emoji tepkileri parse et
+  const reactions: Record<string, string[]> = (message as any).reactions ? JSON.parse((message as any).reactions) : {};
+  const QUICK_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
+
+  // ★ Pop-in animasyon
+  const scaleAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (isReactionActive) {
+      scaleAnim.setValue(0);
+      Animated.spring(scaleAnim, { toValue: 1, friction: 5, tension: 200, useNativeDriver: true }).start();
+    }
+  }, [isReactionActive]);
+
+  const handleTap = () => {
+    if (isTemp || isDeleted) return;
+    onToggleReaction?.(isReactionActive ? null : message.id);
+  };
+
+  const handleLongPress = () => {
+    if (isTemp || isDeleted) return;
+    onToggleReaction?.(null);
+    const buttons: any[] = [];
+    if (message.content && !hasVoice && !hasImage) {
+      buttons.push({ text: '📋 Kopyala', onPress: () => {
+        try { require('expo-clipboard').setStringAsync(message.content); } catch {}
+      }});
+    }
+    if (isMe) {
+      buttons.push({ text: '🗑️ Mesajı Sil', style: 'destructive', onPress: () => onDelete?.(message.id) });
+    }
+    if (!isMe) {
+      buttons.push({ text: '🚩 Rapor Et', style: 'destructive', onPress: () => onReport?.(message.id) });
+    }
+    buttons.push({ text: 'Vazgeç', style: 'cancel' });
+    onAction?.(buttons);
+  };
+
+  if (isDeleted) {
+    return (
+      <View style={[styles.bubbleWrap, isMe ? styles.bubbleRight : styles.bubbleLeft]}>
+        <View style={[styles.bubble, { backgroundColor: 'rgba(255,255,255,0.03)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' }]}>
+          <Text style={[styles.bubbleText, { color: 'rgba(255,255,255,0.25)', fontStyle: 'italic' }]}>🚫 Bu mesaj silindi</Text>
+        </View>
+        <View style={[styles.timeRow, isMe && styles.timeRowRight]}>
+          <Text style={styles.bubbleTime}>{time}</Text>
+        </View>
+      </View>
+    );
+  }
+
   return (
-    <View style={[styles.bubbleWrap, isMe ? styles.bubbleRight : styles.bubbleLeft]}>
+    <Pressable onPress={handleTap} onLongPress={handleLongPress} delayLongPress={400}>
+    <View style={[styles.bubbleWrap, isMe ? styles.bubbleRight : styles.bubbleLeft, Object.keys(reactions).length > 0 && { marginBottom: 10 }]}>
+      {/* ★ Emoji Reaction Bar — tek seferde sadece 1 mesajda, animasyonlu */}
+      {isReactionActive && (
+        <Animated.View style={[
+          styles.reactionBar,
+          isMe ? styles.reactionBarRight : styles.reactionBarLeft,
+          { transform: [{ scale: scaleAnim }], opacity: scaleAnim },
+        ]}>
+          {QUICK_EMOJIS.map((emoji, idx) => (
+            <Pressable
+              key={emoji}
+              style={styles.reactionEmoji}
+              onPress={() => {
+                onReaction?.(message.id, emoji);
+                onToggleReaction?.(null);
+              }}
+            >
+              <Animated.Text style={[styles.reactionEmojiText, {
+                transform: [{
+                  scale: scaleAnim.interpolate({
+                    inputRange: [0, 0.5, 1],
+                    outputRange: [0.3, 1.2, 1],
+                  })
+                }],
+              }]}>{emoji}</Animated.Text>
+            </Pressable>
+          ))}
+        </Animated.View>
+      )}
+      {/* ★ Karşı tarafın avatarı */}
+      {!isMe && (
+        <View style={styles.bubbleAvatarRow}>
+          <Image source={getAvatarSource(senderAvatar)} style={styles.bubbleAvatar} />
+        </View>
+      )}
       <View style={[styles.bubble, isMe ? styles.bubbleMe : styles.bubbleOther, customStyle]}>
         {hasImage && !hasVoice ? (
-          <Image source={{ uri: imageUri! }} style={styles.chatImage} resizeMode="cover" />
+          <Pressable onPress={() => onImagePress?.(imageUri!)}>
+            <Image source={{ uri: imageUri! }} style={styles.chatImage} resizeMode="cover" />
+          </Pressable>
         ) : null}
         {/* ★ MSG-6: Ses mesajı oynatıcı */}
         {hasVoice ? (
@@ -128,6 +225,27 @@ function MessageBubble({ message, isMe }: { message: Message; isMe: boolean }) {
           <Text style={styles.bubbleText}>{message.content}</Text>
         ) : null}
       </View>
+      {/* ★ Gönderenin avatarı (sağ taraf) */}
+      {isMe && (
+        <View style={styles.bubbleAvatarRow}>
+          <Image source={getAvatarSource(myAvatar)} style={styles.bubbleAvatar} />
+        </View>
+      )}
+      {/* ★ Emoji tepkileri göster — balon stilinde */}
+      {Object.keys(reactions).length > 0 && (
+        <View style={[styles.reactionDisplay, isMe ? styles.reactionDisplayRight : styles.reactionDisplayLeft]}>
+          {Object.entries(reactions).map(([emoji, users]) => (
+            <Pressable
+              key={emoji}
+              style={styles.reactionPill}
+              onPress={() => onReaction?.(message.id, emoji)}
+            >
+              <Text style={styles.reactionPillEmoji}>{emoji}</Text>
+              {users.length > 1 && <Text style={styles.reactionPillCount}>{users.length}</Text>}
+            </Pressable>
+          ))}
+        </View>
+      )}
       <View style={[styles.timeRow, isMe && styles.timeRowRight]}>
         <Text style={styles.bubbleTime}>{time}</Text>
         {isMe && (
@@ -146,6 +264,7 @@ function MessageBubble({ message, isMe }: { message: Message; isMe: boolean }) {
         )}
       </View>
     </View>
+    </Pressable>
   );
 }
 
@@ -162,6 +281,8 @@ export default function ChatScreen() {
   const [isTyping, setIsTyping] = useState(false);
   const [isCallingInProgress, setIsCallingInProgress] = useState(false); // ★ CALL-4: Çift tıklama koruması
   const [isFriend, setIsFriend] = useState(false); // ★ CALL-1: Takipçi kontrolü
+  const [isMutualFollow, setIsMutualFollow] = useState(false); // ★ DM-8: Karşılıklı takip kontrolü
+  const [isMessageRequest, setIsMessageRequest] = useState(false); // ★ DM-8: Mesaj isteği modu
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const flatListRef = useRef<FlatList>(null);
@@ -170,6 +291,11 @@ export default function ChatScreen() {
   const [reportMessageId, setReportMessageId] = useState<string | null>(null);
   const [cAlert, setCAlert] = useState<{visible:boolean;title:string;message:string;type?:any;buttons?:AlertButton[]}>({visible:false,title:'',message:''});
   const [activeRoom, setActiveRoom] = useState<{id: string; name: string} | null>(null);
+  const [activeReactionMsgId, setActiveReactionMsgId] = useState<string | null>(null); // ★ Tek seferde tek emoji bar
+  const [showKebabMenu, setShowKebabMenu] = useState(false); // ★ Kebab menü
+  const [isMuted, setIsMuted] = useState(false); // ★ Sessize al
+  const [isBlocked, setIsBlocked] = useState(false); // ★ Engel durumu
+  const [viewerImage, setViewerImage] = useState<string | null>(null); // ★ Tam ekran görsel
 
   // ★ Cevapsız Arama State (WhatsApp tarzı)
   type MissedCall = { id: string; callType: 'audio' | 'video'; time: string; callerName: string };
@@ -184,6 +310,8 @@ export default function ChatScreen() {
   const voiceTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
+  const recordingRef = useRef<Audio.Recording | null>(null); // ★ Ref to track recording outside stale closures
+
   const startRecording = async () => {
     try {
       const perm = await Audio.requestPermissionsAsync();
@@ -191,6 +319,18 @@ export default function ChatScreen() {
         showToast({ title: 'Mikrofon izni gerekli', message: 'Ayarlardan mikrofon iznini açın', type: 'warning' });
         return;
       }
+
+      // ★ Agresif cleanup — önceki recording'i tamamen temizle
+      const prev = recordingRef.current || recording;
+      if (prev) {
+        try { await prev.stopAndUnloadAsync(); } catch {}
+        recordingRef.current = null;
+        setRecording(null);
+      }
+      // Audio modunu sıfırla — "Only one Recording" hatasını kesinlikle önler
+      try { await Audio.setAudioModeAsync({ allowsRecordingIOS: false }); } catch {}
+      await new Promise(r => setTimeout(r, 100));
+
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: true,
         playsInSilentModeIOS: true,
@@ -198,21 +338,20 @@ export default function ChatScreen() {
         shouldDuckAndroid: true,
         playThroughEarpieceAndroid: false,
       });
-      await new Promise(r => setTimeout(r, 100));
+      await new Promise(r => setTimeout(r, 150));
 
       const recordingOptions = Audio.RecordingOptionsPresets.HIGH_QUALITY;
-      // Android'de isMeteringEnabled ayrı set edilmeli
       const { recording: rec } = await Audio.Recording.createAsync(
         recordingOptions,
         (status) => {
-          // ★ MSG-5: Metering callback — ses seviyesini oku
           if (status.isRecording && status.metering !== undefined) {
             const normalized = Math.min(1, Math.max(0, (status.metering + 50) / 50));
             setWaveformData(prev => [...prev.slice(-40), normalized]);
           }
         },
-        100 // 100ms interval
+        100
       );
+      recordingRef.current = rec;
       setRecording(rec);
       setIsRecording(true);
       setVoiceDuration(0);
@@ -228,9 +367,9 @@ export default function ChatScreen() {
       ).start();
     } catch (err: any) {
       console.error('Recording error:', err);
-      showToast({ title: 'Kayıt başlatılamadı', message: err?.message || 'Mikrofon hatası', type: 'error' });
       setIsRecording(false);
       setRecording(null);
+      recordingRef.current = null;
     }
   };
 
@@ -238,40 +377,42 @@ export default function ChatScreen() {
     if (voiceTimerRef.current) { clearInterval(voiceTimerRef.current); voiceTimerRef.current = null; }
     pulseAnim.stopAnimation();
     pulseAnim.setValue(1);
-    if (recording) {
-      try { await recording.stopAndUnloadAsync(); } catch {}
-      setRecording(null);
+    const rec = recordingRef.current || recording;
+    if (rec) {
+      try { await rec.stopAndUnloadAsync(); } catch {}
     }
+    recordingRef.current = null;
+    setRecording(null);
     setIsRecording(false);
     setVoiceDuration(0);
-    setWaveformData([]); // ★ MSG-5
-    await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
+    setWaveformData([]);
+    try { await Audio.setAudioModeAsync({ allowsRecordingIOS: false }); } catch {}
   };
 
   const stopAndSendRecording = async () => {
-    if (!recording || !firebaseUser || !id) return;
+    const currentRecording = recordingRef.current || recording;
+    if (!currentRecording || !firebaseUser || !id) return;
     if (voiceTimerRef.current) { clearInterval(voiceTimerRef.current); voiceTimerRef.current = null; }
     pulseAnim.stopAnimation();
     pulseAnim.setValue(1);
 
+    const currentDuration = voiceDuration;
+    recordingRef.current = null;
+    setRecording(null);
+    setIsRecording(false);
     setSendingVoice(true);
+
     try {
-      await recording.stopAndUnloadAsync();
+      await currentRecording.stopAndUnloadAsync();
       await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
-      const uri = recording.getURI();
-      setRecording(null);
-      setIsRecording(false);
+      const uri = currentRecording.getURI();
 
       if (!uri) { showToast({ title: 'Ses kaydı alınamadı', type: 'error' }); return; }
 
-      // ★ MSG-3 FIX: uploadVoiceNote kullan (uploadChatImage ses dosyasında crash yapıyor)
       const voiceUrl = await StorageService.uploadVoiceNote(firebaseUser.uid, uri);
-
-      // ★ MSG-4: voice_url ve voice_duration ile gönder
-      const newMsg = await MessageService.send(firebaseUser.uid, id, '🎙️ Sesli mesaj', undefined, voiceUrl, voiceDuration);
+      const newMsg = await MessageService.send(firebaseUser.uid, id, '🎙️ Sesli mesaj', isMessageRequest ? true : undefined, voiceUrl, currentDuration);
       setMessages(prev => [...prev, newMsg]);
-      setWaveformData([]); // ★ MSG-5
-      showToast({ title: '🎙️ Sesli mesaj gönderildi', type: 'success' });
+      setWaveformData([]);
     } catch (err: any) {
       console.error('Voice send error:', err);
       showToast({ title: 'Sesli mesaj gönderilemedi', message: err?.message || '', type: 'error' });
@@ -281,10 +422,16 @@ export default function ChatScreen() {
     }
   };
 
-  // Cleanup recording on unmount
+  // ★ Cleanup recording + timer on unmount — "Only one Recording" hatasını önler
   useEffect(() => {
     return () => {
       if (voiceTimerRef.current) clearInterval(voiceTimerRef.current);
+      const rec = recordingRef.current;
+      if (rec) {
+        rec.stopAndUnloadAsync().catch(() => {});
+        recordingRef.current = null;
+      }
+      Audio.setAudioModeAsync({ allowsRecordingIOS: false }).catch(() => {});
     };
   }, []);
 
@@ -299,6 +446,15 @@ export default function ChatScreen() {
 
     const loadChat = async () => {
       try {
+        // ★ S5 FIX: Engel kontrolü — engellenmiş kullanıcıyla chat açılamaz
+        const isBlocked = await ModerationService.isBlocked(firebaseUser.uid, id);
+        const blockedByThem = await ModerationService.isBlocked(id, firebaseUser.uid);
+        if (isBlocked || blockedByThem) {
+          showToast({ title: '⛔ Erişim Engellendi', message: 'Bu kullanıcıyla mesajlaşamazsınız.', type: 'error' });
+          router.back();
+          return;
+        }
+
         // Karşı kullanıcı profilini yükle
         const profile = await ProfileService.get(id);
         setOtherUser(profile);
@@ -316,16 +472,32 @@ export default function ChatScreen() {
           }
         } catch { setActiveRoom(null); }
 
-        // ★ CALL-1: Takipçi kontrolü — arama butonları sadece arkadaşlara gösterilir
+        // ★ CALL-1 + DM-8: Takipçi kontrolü — arama butonları ve DM izni
         try {
-          const status = await FriendshipService.getStatus(firebaseUser.uid, id);
-          const reverseStatus = await FriendshipService.getStatus(id, firebaseUser.uid);
-          setIsFriend(status === 'accepted' || reverseStatus === 'accepted');
-        } catch { setIsFriend(false); }
+          const detailed = await FriendshipService.getDetailedStatus(firebaseUser.uid, id);
+          const meFollowsThem = detailed.outgoing === 'accepted';
+          const theyFollowMe = detailed.incoming === 'accepted';
+          setIsFriend(meFollowsThem || theyFollowMe);
+          setIsMutualFollow(meFollowsThem && theyFollowMe);
+          // Karşılıklı takip yoksa → mesaj isteği modu
+          setIsMessageRequest(!meFollowsThem || !theyFollowMe);
+        } catch { setIsFriend(false); setIsMutualFollow(false); setIsMessageRequest(true); }
 
         // Mesaj geçmişini yükle
-        const history = await MessageService.getConversation(firebaseUser.uid, id);
-        setMessages(history);
+        try {
+          let history = await MessageService.getConversation(firebaseUser.uid, id);
+          // ★ Gizlenmiş sohbet timestamp'ini kontrol et — eski mesajları filtrele
+          const hiddenMap = await MessageService.getHiddenConversations(firebaseUser.uid);
+          const hiddenBefore = hiddenMap[id];
+          if (hiddenBefore) {
+            history = history.filter(m => new Date(m.created_at) > new Date(hiddenBefore));
+          }
+          if (__DEV__) console.log(`[Chat] getConversation: ${history.length} mesaj yüklendi (user: ${firebaseUser.uid}, partner: ${id})`);
+          setMessages(history);
+        } catch (convErr: any) {
+          if (__DEV__) console.error('[Chat] getConversation HATA:', convErr?.message, convErr?.code, JSON.stringify(convErr));
+          setMessages([]);
+        }
 
         // Mesajları okundu olarak işaretle + badge güncelle
         await MessageService.markAsRead(firebaseUser.uid, id);
@@ -350,6 +522,17 @@ export default function ChatScreen() {
             })));
           }
         } catch { /* silent */ }
+
+        // ★ Mute ve Block durumunu yükle
+        try {
+          const muteKey = `mute_chat_${firebaseUser.uid}_${id}`;
+          const muteVal = await AsyncStorage.getItem(muteKey);
+          setIsMuted(muteVal === 'true');
+        } catch {}
+        try {
+          const blocked = await ModerationService.isBlocked(firebaseUser.uid, id);
+          setIsBlocked(blocked);
+        } catch {}
       } catch (err) {
         if (__DEV__) console.warn('Sohbet yüklenemedi:', err);
       } finally {
@@ -479,6 +662,8 @@ export default function ChatScreen() {
     }
   };
 
+  const insets = useSafeAreaInsets(); // ★ Hook’lar koşullu return’den ÖNCE olmalı (Rules of Hooks)
+
   if (loading) {
     return (
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
@@ -488,7 +673,9 @@ export default function ChatScreen() {
     );
   }
 
+
   return (
+    <AppBackground>
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -496,8 +683,8 @@ export default function ChatScreen() {
     >
 
       {/* Header */}
-      <View style={styles.header}>
-        <Pressable onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)/home')} style={styles.backBtn}>
+      <View style={[styles.header, { paddingTop: insets.top + 6 }]}>
+        <Pressable onPress={() => safeGoBack(router)} style={styles.backBtn}>
           <Ionicons name="chevron-back" size={24} color={Colors.text} />
         </Pressable>
         <Image source={getAvatarSource(otherUser?.avatar_url)} style={styles.headerAvatar} />
@@ -514,15 +701,15 @@ export default function ChatScreen() {
             )}
           </View>
         </View>
-        {/* ★ CALL-1: Arama butonları sadece arkadaşlara gösterilir */}
-        {isFriend && (
+        {/* ★ Arama butonları + Kebab menü — aynı row'da */}
+        {!loading && otherUser && (
           <View style={styles.headerActions}>
             <Pressable
               style={[styles.headerAction, isCallingInProgress && { opacity: 0.4 }]}
               disabled={isCallingInProgress}
               onPress={async () => {
                 if (!firebaseUser || !id || isCallingInProgress) return;
-                setIsCallingInProgress(true); // ★ CALL-4: Çift tıklama koruması
+                setIsCallingInProgress(true);
                 const tier = profile?.subscription_tier || 'Free';
                 try {
                   const { callId, receiverIsOnline } = await CallService.initiateCall(
@@ -547,8 +734,7 @@ export default function ChatScreen() {
               onPress={async () => {
                 if (!firebaseUser || !id || isCallingInProgress) return;
                 const tier = profile?.subscription_tier || 'Free';
-                // Tüm tier'lar görüntülü arama yapabilir
-                setIsCallingInProgress(true); // ★ CALL-4: Çift tıklama koruması
+                setIsCallingInProgress(true);
                 try {
                   const { callId, receiverIsOnline } = await CallService.initiateCall(
                     firebaseUser.uid,
@@ -566,9 +752,33 @@ export default function ChatScreen() {
             >
               <Ionicons name="videocam" size={20} color={Colors.teal} />
             </Pressable>
+            {/* ★ Kebab menü butonu */}
+            <Pressable
+              style={styles.kebabBtn}
+              onPress={() => setShowKebabMenu(true)}
+              hitSlop={{ top: 16, bottom: 16, left: 12, right: 12 }}
+            >
+              <Ionicons name="ellipsis-vertical" size={22} color={Colors.text} />
+            </Pressable>
           </View>
         )}
       </View>
+
+      {/* ★ DM-8: Mesaj İsteği Banner'ı — header altında, koyu tema */}
+      {isMessageRequest && !loading && (
+        <View style={styles.msgRequestBanner}>
+          <View style={styles.msgRequestBannerInner}>
+            <Ionicons name="information-circle-outline" size={16} color="#94A3B8" />
+            <Text style={styles.msgRequestDesc}>
+              {isMutualFollow
+                ? ''
+                : isFriend
+                  ? 'Karşılıklı takip yok. Mesajın "Mesaj İsteği" olarak gönderilecek.'
+                  : `${otherUser?.display_name || 'Bu kul.'} ile takipleşmiyorsunuz. Mesajın İstek olarak gönderilecek.`}
+            </Text>
+          </View>
+        </View>
+      )}
 
       {/* Messages */}
       <FlatList
@@ -576,39 +786,71 @@ export default function ChatScreen() {
         data={messages}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <Pressable
-            onLongPress={() => {
-              const isOwn = item.sender_id === firebaseUser?.uid;
-              setCAlert({visible:true,title:'Mesaj Seçenekleri',message:'Ne yapmak istersin?',type:'info',buttons:[
-                ...(isOwn ? [{ text: '🗑️ Mesajı Sil', onPress: async () => {
-                  try {
-                    await MessageService.deleteMessage(item.id, firebaseUser!.uid);
-                    setMessages(prev => prev.filter(m => m.id !== item.id));
-                    showToast({ title: 'Mesaj silindi', type: 'success' });
-                  } catch {
-                    showToast({ title: 'Mesaj silinemedi', message: 'Lütfen tekrar deneyin', type: 'error' });
-                  }
-                }, style: 'destructive' as const }] : []),
-                ...(!isOwn ? [{ text: '🚩 Mesajı Rapor Et', onPress: () => {
-                  setReportMessageId(item.id);
-                  setShowReportModal(true);
-                }, style: 'destructive' as const }] : []),
-                { text: 'Vazgeç', style: 'cancel' as const },
-              ]});
+          <MessageBubble
+            message={item}
+            isMe={item.sender_id === firebaseUser?.uid}
+            senderAvatar={item.sender_id !== firebaseUser?.uid ? otherUser?.avatar_url || '' : undefined}
+            senderName={item.sender_id !== firebaseUser?.uid ? otherUser?.display_name || '' : undefined}
+            myAvatar={profile?.avatar_url || ''}
+            isReactionActive={activeReactionMsgId === item.id}
+            onToggleReaction={setActiveReactionMsgId}
+            onDelete={async (msgId) => {
+              try {
+                await MessageService.deleteMessage(msgId, firebaseUser!.uid);
+                setMessages(prev => prev.map(m => m.id === msgId ? { ...m, is_deleted: true } as any : m));
+              } catch {
+                showToast({ title: 'Mesaj silinemedi', type: 'error' });
+              }
             }}
-            delayLongPress={500}
-          >
-            <MessageBubble message={item} isMe={item.sender_id === firebaseUser?.uid} />
-          </Pressable>
+            onReport={(msgId) => {
+              setReportMessageId(msgId);
+              setShowReportModal(true);
+            }}
+            onAction={(buttons) => {
+              setCAlert({ visible: true, title: 'Mesaj Seçenekleri', message: '', type: 'info', buttons });
+            }}
+            onReaction={async (msgId, emoji) => {
+              if (!firebaseUser) return;
+              try {
+                const msg = messages.find(m => m.id === msgId);
+                const existing: Record<string, string[]> = (msg as any)?.reactions ? JSON.parse((msg as any).reactions) : {};
+                
+                const myId = firebaseUser.uid;
+                if (existing[emoji]?.includes(myId)) {
+                  existing[emoji] = existing[emoji].filter(id => id !== myId);
+                  if (existing[emoji].length === 0) delete existing[emoji];
+                } else {
+                  if (!existing[emoji]) existing[emoji] = [];
+                  existing[emoji].push(myId);
+                }
+                
+                const reactionsJson = JSON.stringify(existing);
+                await MessageService.updateReaction(msgId, reactionsJson);
+                setMessages(prev => prev.map(m =>
+                  m.id === msgId ? { ...m, reactions: reactionsJson } as any : m
+                ));
+              } catch (err) {
+                if (__DEV__) console.warn('[Chat] Emoji tepki hatası:', err);
+              }
+            }}
+            onImagePress={(uri) => setViewerImage(uri)}
+          />
         )}
         style={styles.messageList}
         contentContainerStyle={styles.messageContent}
         showsVerticalScrollIndicator={false}
+        onContentSizeChange={() => {
+          if (isAtBottomRef.current) {
+            flatListRef.current?.scrollToEnd({ animated: false });
+          }
+        }}
         onLayout={() => flatListRef.current?.scrollToEnd({ animated: false })}
         onScroll={(e: NativeSyntheticEvent<NativeScrollEvent>) => {
           const { layoutMeasurement, contentOffset, contentSize } = e.nativeEvent;
           const isBottom = layoutMeasurement.height + contentOffset.y >= contentSize.height - 40;
           isAtBottomRef.current = isBottom;
+          // ★ Scroll edince emoji bar'ı kapat
+          if (activeReactionMsgId) setActiveReactionMsgId(null);
         }}
         scrollEventThrottle={200}
         ListHeaderComponent={
@@ -759,7 +1001,6 @@ export default function ChatScreen() {
               // ★ FIX: image_url sütunu yok — URL'yi content içine göm
               const newMsg = await MessageService.send(firebaseUser.uid, id, `📷 ${imageUrl}`);
               setMessages(prev => prev.map(m => m.id === tempId ? newMsg : m));
-              showToast({ title: '📷 Gönderildi', type: 'success' });
             } catch (err: any) {
               showToast({ title: 'Fotoğraf gönderilemedi', message: err.message || '', type: 'error' });
             }
@@ -774,7 +1015,6 @@ export default function ChatScreen() {
               try {
                 const newMsg = await MessageService.send(firebaseUser.uid, id, inviteContent);
                 setMessages(prev => [...prev, newMsg]);
-                showToast({ title: '🎙️ Davet gönderildi!', message: `${otherUser?.display_name || 'Kullanıcı'} odaya davet edildi`, type: 'success' });
               } catch {
                 showToast({ title: 'Davet gönderilemedi', type: 'error' });
               }
@@ -821,23 +1061,171 @@ export default function ChatScreen() {
         />
       )}
       <PremiumAlert visible={cAlert.visible} title={cAlert.title} message={cAlert.message} type={cAlert.type||'info'} buttons={cAlert.buttons} onDismiss={()=>setCAlert(p=>({...p,visible:false}))} />
+
+      {/* ★ Kebab Menü Modal */}
+      <Modal
+        visible={showKebabMenu}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowKebabMenu(false)}
+      >
+        <Pressable style={styles.kebabOverlay} onPress={() => setShowKebabMenu(false)}>
+          <View style={styles.kebabDropdown}>
+            {/* Sohbeti Sil */}
+            <Pressable
+              style={styles.kebabItem}
+              onPress={async () => {
+                setShowKebabMenu(false);
+                setCAlert({
+                  visible: true,
+                  title: 'Sohbeti Sil',
+                  message: 'Bu sohbet geçmişi silinecek. Bu işlem geri alınamaz.',
+                  type: 'warning',
+                  buttons: [
+                    {
+                      text: 'Sil',
+                      style: 'destructive',
+                      onPress: async () => {
+                        try {
+                          await MessageService.deleteConversation(firebaseUser!.uid, id);
+                          setMessages([]);
+                        } catch {}
+                      },
+                    },
+                    { text: 'Vazgeç', style: 'cancel' },
+                  ],
+                });
+              }}
+            >
+              <Ionicons name="trash-outline" size={20} color="#EF4444" />
+              <Text style={[styles.kebabItemText, { color: '#EF4444' }]}>Sohbeti Sil</Text>
+            </Pressable>
+
+            {/* Sessize Al / Sesini Aç */}
+            <Pressable
+              style={styles.kebabItem}
+              onPress={async () => {
+                setShowKebabMenu(false);
+                try {
+                  const muteKey = `mute_chat_${firebaseUser!.uid}_${id}`;
+                  const newVal = !isMuted;
+                  await AsyncStorage.setItem(muteKey, newVal ? 'true' : 'false');
+                  setIsMuted(newVal);
+                } catch {}
+              }}
+            >
+              <Ionicons name={isMuted ? 'notifications-outline' : 'notifications-off-outline'} size={20} color={Colors.text2} />
+              <Text style={styles.kebabItemText}>{isMuted ? 'Sesi Aç' : 'Sessize Al'}</Text>
+            </Pressable>
+
+            {/* Engelle / Engeli Kaldır */}
+            <Pressable
+              style={styles.kebabItem}
+              onPress={async () => {
+                setShowKebabMenu(false);
+                if (isBlocked) {
+                  // Engeli kaldır
+                  setCAlert({
+                    visible: true,
+                    title: 'Engeli Kaldır',
+                    message: `${otherUser?.display_name || 'Bu kullanıcı'} engelden çıkarılacak.`,
+                    type: 'info',
+                    buttons: [
+                      {
+                        text: 'Kaldır',
+                        onPress: async () => {
+                          try {
+                            await ModerationService.unblockUser(firebaseUser!.uid, id);
+                            setIsBlocked(false);
+                          } catch {}
+                        },
+                      },
+                      { text: 'Vazgeç', style: 'cancel' },
+                    ],
+                  });
+                } else {
+                  // Engelle
+                  setCAlert({
+                    visible: true,
+                    title: 'Kullanıcıyı Engelle',
+                    message: `${otherUser?.display_name || 'Bu kullanıcı'} engellenecek ve mesaj gönderemeyecek.`,
+                    type: 'warning',
+                    buttons: [
+                      {
+                        text: 'Engelle',
+                        style: 'destructive',
+                        onPress: async () => {
+                          try {
+                            await ModerationService.blockUser(firebaseUser!.uid, id);
+                            setIsBlocked(true);
+                          } catch {}
+                        },
+                      },
+                      { text: 'Vazgeç', style: 'cancel' },
+                    ],
+                  });
+                }
+              }}
+            >
+              <Ionicons name={isBlocked ? 'person-add-outline' : 'ban-outline'} size={20} color={isBlocked ? Colors.teal : '#F59E0B'} />
+              <Text style={[styles.kebabItemText, { color: isBlocked ? Colors.teal : '#F59E0B' }]}>
+                {isBlocked ? 'Engeli Kaldır' : 'Engelle'}
+              </Text>
+            </Pressable>
+
+            {/* Bildir */}
+            <Pressable
+              style={[styles.kebabItem, { borderBottomWidth: 0 }]}
+              onPress={() => {
+                setShowKebabMenu(false);
+                setReportMessageId(id); // set target to user id for report
+                setShowReportModal(true);
+              }}
+            >
+              <Ionicons name="flag-outline" size={20} color={Colors.text3} />
+              <Text style={[styles.kebabItemText, { color: Colors.text3 }]}>Bildir</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
+
+      {/* ★ Tam Ekran Görsel Görüntüleyici */}
+      <Modal
+        visible={!!viewerImage}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setViewerImage(null)}
+      >
+        <View style={styles.imageViewerOverlay}>
+          <Pressable style={styles.imageViewerClose} onPress={() => setViewerImage(null)}>
+            <Ionicons name="close" size={28} color="#fff" />
+          </Pressable>
+          {viewerImage && (
+            <Image
+              source={{ uri: viewerImage }}
+              style={styles.imageViewerImage}
+              resizeMode="contain"
+            />
+          )}
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
+    </AppBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.bg },
+  container: { flex: 1, backgroundColor: 'transparent' },
 
   // Header
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 12,
-    paddingTop: 54,
     paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.glassBorder,
-    backgroundColor: Colors.bg2,
+    borderBottomColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: 'rgba(15,23,42,0.85)',
   },
   backBtn: { width: 36, height: 36, justifyContent: 'center', alignItems: 'center' },
   headerAvatar: { width: 38, height: 38, borderRadius: 19, marginLeft: 4 },
@@ -856,13 +1244,80 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  kebabBtn: {
+    width: 32,
+    height: 36,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 2,
+  },
+  kebabOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-start',
+    alignItems: 'flex-end',
+    paddingTop: 80,
+    paddingRight: 12,
+  },
+  kebabDropdown: {
+    backgroundColor: 'rgba(15, 23, 42, 0.97)',
+    borderRadius: 14,
+    minWidth: 200,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.5,
+    shadowRadius: 16,
+    elevation: 20,
+  },
+  kebabItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+    gap: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.05)',
+  },
+  kebabItemText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.text2,
+  },
+  // ★ Image Viewer
+  imageViewerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.95)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imageViewerClose: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    zIndex: 10,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imageViewerImage: {
+    width: '92%',
+    height: '75%',
+  },
 
   // Messages
   messageList: { flex: 1 },
   messageContent: { padding: 16, gap: 8, flexGrow: 1 },
   bubbleWrap: { marginBottom: 4 },
-  bubbleLeft: { alignItems: 'flex-start' },
+  bubbleLeft: { alignItems: 'flex-start', flexDirection: 'row', gap: 8 },
   bubbleRight: { alignItems: 'flex-end' },
+  bubbleAvatarRow: { paddingTop: 4 },
+  bubbleAvatar: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#1E293B', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
   bubble: {
     maxWidth: '78%',
     paddingHorizontal: 14,
@@ -890,6 +1345,23 @@ const styles = StyleSheet.create({
   typingText: { fontSize: 13, color: Colors.text2, fontStyle: 'italic' },
   emptyChat: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 80, gap: 12 },
   emptyChatText: { fontSize: 13, color: Colors.text3, textAlign: 'center', paddingHorizontal: 40 },
+
+  // ★ DM-8: Mesaj İsteği Banner — koyu tema uyumlu
+  msgRequestBanner: {
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.04)',
+  },
+  msgRequestBannerInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  msgRequestDesc: {
+    fontSize: 11, color: '#94A3B8', lineHeight: 15, flex: 1,
+  },
 
   // Input
   inputBar: {
@@ -1015,6 +1487,69 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     color: '#fff',
+  },
+  // ★ Emoji Tepki Stiller — WhatsApp tarzı
+  reactionBar: {
+    position: 'absolute',
+    top: -48,
+    flexDirection: 'row',
+    backgroundColor: 'rgba(20, 30, 48, 0.92)',
+    borderRadius: 28,
+    paddingHorizontal: 6,
+    paddingVertical: 5,
+    gap: 0,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    elevation: 16,
+    zIndex: 999,
+  },
+  reactionBarLeft: {
+    left: 0,
+  },
+  reactionBarRight: {
+    right: 0,
+  },
+  reactionEmoji: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  reactionEmojiText: {
+    fontSize: 24,
+  },
+  reactionDisplay: {
+    position: 'absolute',
+    bottom: -4,
+    flexDirection: 'row',
+    gap: 3,
+    zIndex: 10,
+  },
+  reactionDisplayLeft: {
+    left: 36,
+  },
+  reactionDisplayRight: {
+    right: 36,
+  },
+  reactionPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+    borderRadius: 10,
+    paddingHorizontal: 1,
+    paddingVertical: 0,
+    gap: 1,
+  },
+  reactionPillEmoji: {
+    fontSize: 16,
+  },
+  reactionPillCount: {
+    fontSize: 10,
+    color: 'rgba(255,255,255,0.5)',
+    fontWeight: '600',
   },
 });
 

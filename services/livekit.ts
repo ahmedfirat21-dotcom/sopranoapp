@@ -168,7 +168,7 @@ export class LiveKitService {
 
         // Her bağlantı denemesinde temiz room oluştur
         if (this.room) {
-          try { this.room.disconnect(); } catch(_) {}
+          try { if (this.room.state === 'connected' || this.room.state === 'reconnecting') this.room.disconnect(); } catch(_) {}
           this.room = null;
         }
         this.room = new lk.Room({
@@ -205,7 +205,7 @@ export class LiveKitService {
         if (attempt < MAX_RETRIES) {
           // Tekrar denemeden önce room'u temizle
           if (this.room) {
-            try { this.room.disconnect(); } catch(_) {}
+            try { if (this.room.state === 'connected' || this.room.state === 'reconnecting') this.room.disconnect(); } catch(_) {}
             this.room = null;
           }
           await new Promise(r => setTimeout(r, 2000)); // 2sn bekle
@@ -214,7 +214,7 @@ export class LiveKitService {
         
         // Son deneme de başarısız
         if (this.room) {
-          try { this.room.disconnect(); } catch(_) {}
+          try { if (this.room.state === 'connected' || this.room.state === 'reconnecting') this.room.disconnect(); } catch(_) {}
         }
         this.room = null;
         this.onConnectionStateChange?.('disconnected');

@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, Image, Pressable, ScrollView, ActivityIndicator, Alert, DeviceEventEmitter } from 'react-native';
+import { View, Text, StyleSheet, Image, Pressable, ScrollView, ActivityIndicator, DeviceEventEmitter } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { Colors, Radius } from '../../constants/theme';
+import { safeGoBack } from '../../constants/navigation';
+import { Colors, Radius, Shadows } from '../../constants/theme';
 import { TIER_DEFINITIONS } from '../../constants/tiers';
 import { TierBadge } from '../../components/progression';
 import type { TierName } from '../../types';
@@ -18,24 +19,12 @@ import { useAuth } from '../_layout';
 import { supabase } from '../../constants/supabase';
 import { BadgeCheckerService, type UserBadge } from '../../services/engagement/badges';
 import { BadgeGrid } from '../../components/progression';
-import TieredProfileSections from '../../components/profile/TieredProfileSections';
 import { isTierAtLeast } from '../../constants/tiers';
-import PremiumAlert from '../../components/PremiumAlert';
+import PremiumAlert, { type AlertButton } from '../../components/PremiumAlert';
+import AppBackground from '../../components/AppBackground';
+import FollowListModal from '../../components/FollowListModal';
 
-/** Zamanı insanca formatlayan yardımcı */
-function _formatTimeAgo(dateStr: string): string {
-  const now = Date.now();
-  const then = new Date(dateStr).getTime();
-  const diffMs = now - then;
-  const mins = Math.floor(diffMs / 60000);
-  if (mins < 1) return 'az önce';
-  if (mins < 60) return `${mins} dk`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours} sa`;
-  const days = Math.floor(hours / 24);
-  if (days < 7) return `${days} gün`;
-  return `${Math.floor(days / 7)} hf`;
-}
+
 
 export default function UserProfileScreen() {
   const router = useRouter();
@@ -44,18 +33,24 @@ export default function UserProfileScreen() {
   const [userProfile, setUserProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [followStatus, setFollowStatus] = useState<FriendshipStatus | null>(null);
+  // ★ X.com tarzı: karşı tarafın bana gönderdiği istek durumu
+  const [incomingStatus, setIncomingStatus] = useState<FriendshipStatus | null>(null);
   const [followLoading, setFollowLoading] = useState(false);
+  const [incomingLoading, setIncomingLoading] = useState(false);
   const [stats, setStats] = useState({ followers: 0, following: 0, rooms: 0 });
 
   const [showReportModal, setShowReportModal] = useState(false);
   const [isUserBlocked, setIsUserBlocked] = useState(false);
-  const [recentPosts, setRecentPosts] = useState<any[]>([]);
+  const [cAlert, setCAlert] = useState<{ visible: boolean; title: string; message: string; type?: 'info' | 'warning' | 'error' | 'success'; buttons?: AlertButton[] }>({ visible: false, title: '', message: '' });
+
   const [userBadges, setUserBadges] = useState<UserBadge[]>([]);
 
   // ★ Katmanlı profil verileri
   const [profileStats, setProfileStats] = useState({ stageMinutes: 0, roomsCreated: 0, totalListeners: 0, totalReactions: 0 });
   const [recentRooms, setRecentRooms] = useState<any[]>([]);
-  const [showDonateModal, setShowDonateModal] = useState(false);
+
+  const [showFollowList, setShowFollowList] = useState(false);
+  const [followListTab, setFollowListTab] = useState<'followers' | 'following'>('followers');
 
   const isOwnProfile = firebaseUser?.uid === id;
 
@@ -65,10 +60,17 @@ export default function UserProfileScreen() {
       const profile = await ProfileService.get(id);
       setUserProfile(profile);
 
-      // Takip durumu
+      // ★ X.com tarzı: Çift yönlü takip durumu
       if (firebaseUser && !isOwnProfile) {
-        const status = await FriendshipService.getStatus(firebaseUser.uid, id);
-        setFollowStatus(status);
+        const detailed = await FriendshipService.getDetailedStatus(firebaseUser.uid, id);
+        setFollowStatus(detailed.outgoing);   // Ben → Hedef
+        setIncomingStatus(detailed.incoming);  // Hedef → Ben
+
+        // ★ BUG-10 FIX: Engel durumunu yükle
+        try {
+          const blocked = await ModerationService.getBlockedUsers(firebaseUser.uid);
+          setIsUserBlocked(blocked.includes(id));
+        } catch {}
       }
 
       // Istatistikler
@@ -88,14 +90,7 @@ export default function UserProfileScreen() {
         rooms: roomCount ?? 0,
       });
 
-      // Son 3 post
-      const { data: postsData } = await supabase
-        .from('posts')
-        .select('id, content, image_url, created_at, likes_count, comments_count')
-        .eq('user_id', id)
-        .order('created_at', { ascending: false })
-        .limit(3);
-      setRecentPosts(postsData || []);
+
 
       // Rozetleri yükle
       try {
@@ -128,32 +123,61 @@ export default function UserProfileScreen() {
     setFollowLoading(true);
     try {
       if (followStatus === 'accepted') {
-        // Takipten çık
         const result = await FriendshipService.unfollow(firebaseUser.uid, id);
         if (result.success) {
           setFollowStatus(null);
           setStats(prev => ({ ...prev, followers: Math.max(0, prev.followers - 1) }));
-          showToast({ title: 'Takipten çıkıldı', type: 'info' });
         }
       } else if (followStatus === 'pending') {
-        // İsteği iptal et
         const result = await FriendshipService.unfollow(firebaseUser.uid, id);
         if (result.success) {
           setFollowStatus(null);
-          showToast({ title: 'İstek iptal edildi', type: 'info' });
         }
       } else {
-        // Yeni takip isteği gönder
         const result = await FriendshipService.follow(firebaseUser.uid, id);
         if (result.success) {
           setFollowStatus('pending');
-          showToast({ title: 'Takip isteği gönderildi!', type: 'success' });
+        } else if (result.error) {
+          showToast({ title: result.error, type: 'warning' });
         }
       }
     } catch (err) {
       showToast({ title: 'Hata oluştu', type: 'error' });
     } finally {
       setFollowLoading(false);
+    }
+  };
+
+  // ★ X.com tarzı: Gelen takip isteğini onayla
+  const handleApproveIncoming = async () => {
+    if (!firebaseUser || !id) return;
+    setIncomingLoading(true);
+    try {
+      const result = await FriendshipService.approveRequest(firebaseUser.uid, id);
+      if (result.success) {
+        setIncomingStatus('accepted');
+        setStats(prev => ({ ...prev, followers: prev.followers + 1 }));
+      }
+    } catch {
+      // silent
+    } finally {
+      setIncomingLoading(false);
+    }
+  };
+
+  // ★ X.com tarzı: Gelen takip isteğini reddet
+  const handleRejectIncoming = async () => {
+    if (!firebaseUser || !id) return;
+    setIncomingLoading(true);
+    try {
+      const result = await FriendshipService.rejectRequest(firebaseUser.uid, id);
+      if (result.success) {
+        setIncomingStatus(null);
+      }
+    } catch {
+      // silent
+    } finally {
+      setIncomingLoading(false);
     }
   };
 
@@ -164,13 +188,14 @@ export default function UserProfileScreen() {
       try {
         await ModerationService.unblockUser(firebaseUser.uid, id);
         setIsUserBlocked(false);
-        showToast({ title: 'Engel kaldırıldı', type: 'success' });
-      } catch (e) { showToast({ title: 'Hata', type: 'error' }); }
+      } catch (e) { /* silent */ }
     } else {
-      Alert.alert(
-        'Kullanıcıyı Engelle',
-        `${userProfile?.display_name || 'Bu kullanıcı'} engellenecek. Engellenmiş kullanıcıların postlarını ve mesajlarını göremezsiniz.`,
-        [
+      setCAlert({
+        visible: true,
+        title: 'Kullanıcıyı Engelle',
+        message: `${userProfile?.display_name || 'Bu kullanıcı'} engellenecek. Engellenmiş kullanıcıların postlarını ve mesajlarını göremezsiniz.`,
+        type: 'warning',
+        buttons: [
           { text: 'Vazgeç', style: 'cancel' },
           {
             text: 'Engelle', style: 'destructive',
@@ -178,31 +203,38 @@ export default function UserProfileScreen() {
               try {
                 await ModerationService.blockUser(firebaseUser.uid, id);
                 setIsUserBlocked(true);
+                // ★ EX-4 FIX: Engelleme sonrası takipten de çıkar
+                if (followStatus === 'accepted' || followStatus === 'pending') {
+                  await FriendshipService.unfollow(firebaseUser.uid, id).catch(() => {});
+                  setFollowStatus(null);
+                }
                 showToast({ title: 'Kullanıcı engellendi', type: 'info' });
-              } catch (e) { showToast({ title: 'Engelleme başarısız', type: 'error' }); }
+              } catch (e) { /* silent */ }
             },
           },
-        ]
-      );
+        ],
+      });
     }
   };
 
   const handleMoreMenu = () => {
     if (!firebaseUser || !id || isOwnProfile) return;
-    Alert.alert(
-      'Seçenekler',
-      undefined,
-      [
+    setCAlert({
+      visible: true,
+      title: 'Seçenekler',
+      message: '',
+      type: 'info',
+      buttons: [
         { text: '🚩 Rapor Et', onPress: () => setShowReportModal(true) },
         { text: isUserBlocked ? '✅ Engeli Kaldır' : '🚫 Engelle', onPress: handleBlock, style: isUserBlocked ? 'default' : 'destructive' },
         { text: 'Vazgeç', style: 'cancel' },
-      ]
-    );
+      ],
+    });
   };
 
   if (loading) {
     return (
-      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+      <View style={[s.container, { justifyContent: 'center', alignItems: 'center' }]}>
         <ActivityIndicator size="large" color={Colors.teal} />
       </View>
     );
@@ -210,7 +242,7 @@ export default function UserProfileScreen() {
 
   if (!userProfile) {
     return (
-      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+      <View style={[s.container, { justifyContent: 'center', alignItems: 'center' }]}>
         <Ionicons name="person-outline" size={48} color={Colors.text3} />
         <Text style={{ color: Colors.text2, marginTop: 12 }}>Kullanici bulunamadi</Text>
       </View>
@@ -223,190 +255,192 @@ export default function UserProfileScreen() {
 
   const isFollowing = followStatus === 'accepted';
   const isPending = followStatus === 'pending';
-  const isBlocked = followStatus === 'blocked';
+  // ★ BUG-11 FIX: isBlocked artık block_list'ten gelen isUserBlocked state'ini kullanıyor
+  const isBlocked = isUserBlocked;
+  // ★ X.com tarzı: Karşılıklı takip kontrolü
+  const isMutual = isFollowing && incomingStatus === 'accepted';
+  const hasIncomingPending = incomingStatus === 'pending';
 
   return (
-    <View style={styles.container}>
+    <AppBackground variant="profile">
+    <View style={s.container}>
       {/* Header */}
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="chevron-back" size={24} color={Colors.text} />
+      <View style={s.header}>
+        <Pressable onPress={() => safeGoBack(router)} style={s.backBtn}>
+          <Ionicons name="chevron-back" size={22} color="#F1F5F9" />
         </Pressable>
-        <Text style={styles.headerTitle}>Profil</Text>
-        {!isOwnProfile && (
-          <Pressable style={styles.moreBtn} onPress={handleMoreMenu}>
-            <Ionicons name="ellipsis-horizontal" size={20} color={Colors.text2} />
+        <Text style={s.headerTitle}>Profil</Text>
+        {!isOwnProfile ? (
+          <Pressable style={s.moreBtn} onPress={handleMoreMenu}>
+            <Ionicons name="ellipsis-horizontal" size={20} color="#94A3B8" />
           </Pressable>
-        )}
+        ) : <View style={{ width: 36 }} />}
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Profile Card */}
-        <View style={styles.profileCard}>
-          <View style={styles.avatarContainer}>
-            <Image
-              source={getAvatarSource(userProfile.avatar_url)}
-              style={[styles.avatar, { borderColor: tierBorderColor }]}
-            />
-            <TierBadge tier={tier} size="sm" />
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+        {/* ═══ Profil Kartı ═══ */}
+        <View style={s.card}>
+          <LinearGradient
+            colors={[tierDef.color + '15', 'transparent']}
+            style={s.cardGlow}
+          />
+          <View style={s.identityRow}>
+            <View style={{ position: 'relative' as const }}>
+              <View style={[s.avatarRing, { borderColor: tierBorderColor, shadowColor: tierBorderColor }]}>
+                <Image source={getAvatarSource(userProfile.avatar_url)} style={s.avatarImg} />
+              </View>
+              <LinearGradient colors={tierDef.gradient as [string, string]} style={s.tierPill}>
+                <Ionicons name={tierDef.icon as any} size={7} color="#fff" />
+                <Text style={s.tierPillText}>{tierDef.label}</Text>
+              </LinearGradient>
+            </View>
+            <View style={{ flex: 1 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Text style={[s.displayName, userProfile.is_admin && { color: '#F87171' }]} numberOfLines={1}>{userProfile.display_name}</Text>
+                {userProfile.is_admin && (
+                  <Ionicons name="shield-checkmark" size={13} color="#DC2626" style={{ marginLeft: 4 }} />
+                )}
+                {userProfile.is_online && (
+                  <View style={s.onlineBadge}>
+                    <View style={s.onlineDot} />
+                  </View>
+                )}
+              </View>
+              {userProfile.username && <Text style={s.username}>@{userProfile.username}</Text>}
+              <Text style={s.bio} numberOfLines={2}>{userProfile.bio || 'Merhaba! SopranoChat kullanıyorum.'}</Text>
+            </View>
           </View>
 
-          <View style={styles.nameRow}>
-            <Text style={styles.profileName}>{userProfile.display_name}</Text>
-            {userProfile.is_online && (
-              <View style={styles.onlineBadge}>
-                <View style={styles.onlineDot} />
-                <Text style={styles.onlineText}>Online</Text>
+          {/* Stat Satırı — Pressable: tıklayınca FollowListModal */}
+          <View style={s.statsRow}>
+            <Pressable style={s.statItem} onPress={() => { setFollowListTab('followers'); setShowFollowList(true); }}>
+              <Text style={s.statNum}>{stats.followers}</Text>
+              <Text style={s.statLabel}>Takipçi</Text>
+            </Pressable>
+            <View style={s.statDiv} />
+            <Pressable style={s.statItem} onPress={() => { setFollowListTab('following'); setShowFollowList(true); }}>
+              <Text style={s.statNum}>{stats.following}</Text>
+              <Text style={s.statLabel}>Takip</Text>
+            </Pressable>
+            <View style={s.statDiv} />
+            <View style={s.statItem}>
+              <Text style={s.statNum}>{stats.rooms}</Text>
+              <Text style={s.statLabel}>Oda</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* ═══ Etkileşim Butonları ═══ */}
+        {!isOwnProfile && (
+          <>
+            {/* ★ X.com tarzı: Gelen takip isteği banner'ı */}
+            {hasIncomingPending && (
+              <View style={s.incomingBanner}>
+                <View style={s.incomingBannerLeft}>
+                  <Ionicons name="person-add" size={16} color="#F59E0B" />
+                  <Text style={s.incomingBannerText}>
+                    <Text style={{ fontWeight: '800', color: '#F1F5F9' }}>{userProfile.display_name}</Text>
+                    {' '}seni takip etmek istiyor
+                  </Text>
+                </View>
+                <View style={s.incomingBannerActions}>
+                  {incomingLoading ? (
+                    <ActivityIndicator size="small" color="#14B8A6" />
+                  ) : (
+                    <>
+                      <Pressable style={s.incomingApproveBtn} onPress={handleApproveIncoming}>
+                        <Ionicons name="checkmark" size={16} color="#FFF" />
+                        <Text style={s.incomingApproveBtnText}>Onayla</Text>
+                      </Pressable>
+                      <Pressable style={s.incomingRejectBtn} onPress={handleRejectIncoming}>
+                        <Ionicons name="close" size={16} color="#94A3B8" />
+                        <Text style={s.incomingRejectBtnText}>Sil</Text>
+                      </Pressable>
+                    </>
+                  )}
+                </View>
               </View>
             )}
-          </View>
 
-          {userProfile.username && (
-            <Text style={styles.profileUsername}>@{userProfile.username}</Text>
-          )}
-
-          <Text style={styles.profileBio}>{userProfile.bio || 'SopranoChat kullanıcısı'}</Text>
-
-          {/* Stats */}
-          <View style={styles.statsRow}>
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{stats.followers}</Text>
-              <Text style={styles.statLabel}>Takipci</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{stats.following}</Text>
-              <Text style={styles.statLabel}>Takip</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{stats.rooms}</Text>
-              <Text style={styles.statLabel}>Oda</Text>
-            </View>
-          </View>
-
-          {/* Action Buttons */}
-          {!isOwnProfile && (
-            <View style={styles.actionsRow}>
+            <View style={s.interactionRow}>
               <Pressable
-                style={[styles.followBtn, (isFollowing || isPending) && styles.followBtnActive]}
+                style={[s.followBtn, (isFollowing || isPending) && s.followBtnActive, isMutual && s.followBtnMutual]}
                 onPress={handleFollow}
                 disabled={followLoading || isBlocked}
               >
                 {followLoading ? (
                   <ActivityIndicator size="small" color="#fff" />
                 ) : isBlocked ? (
-                  <>
-                    <Ionicons name="ban" size={16} color={Colors.red} />
-                    <Text style={[styles.followBtnText, { color: Colors.red }]}>Engellendi</Text>
-                  </>
+                  <Text style={[s.followBtnText, { color: '#EF4444' }]}>Engellendi</Text>
+                ) : isMutual ? (
+                  <><Ionicons name="people" size={16} color="#14B8A6" /><Text style={[s.followBtnText, { color: '#14B8A6' }]}>Karşılıklı</Text></>
                 ) : isFollowing ? (
-                  <>
-                    <Ionicons name="checkmark" size={16} color={Colors.teal} />
-                    <Text style={[styles.followBtnText, { color: Colors.teal }]}>Takip Ediliyor</Text>
-                  </>
+                  <Text style={[s.followBtnText, { color: 'rgba(255,255,255,0.8)' }]}>Takip Ediliyor</Text>
                 ) : isPending ? (
-                  <>
-                    <Ionicons name="time-outline" size={16} color={Colors.amber} />
-                    <Text style={[styles.followBtnText, { color: Colors.amber }]}>İstek Gönderildi</Text>
-                  </>
+                  <Text style={[s.followBtnText, { color: '#FBBF24' }]}>Bekliyor</Text>
                 ) : (
-                  <>
-                    <Ionicons name="person-add" size={16} color="#fff" />
-                    <Text style={styles.followBtnText}>Takip Et</Text>
-                  </>
+                  <Text style={s.followBtnText}>Takip Et</Text>
                 )}
               </Pressable>
-
-              <Pressable
-                style={styles.messageBtn}
-                onPress={() => router.push(`/chat/${id}`)}
-              >
-                <Ionicons name="chatbubble" size={16} color={Colors.teal} />
-              </Pressable>
-
-              {/* ★ Sesli Arama Butonu */}
-              <Pressable
-                style={styles.callBtn}
-                onPress={() => {
-                  if (!firebaseUser || !id) return;
-                  router.push(`/call/${id}?type=audio` as any);
-                }}
-              >
-                <Ionicons name="call" size={16} color="#4ADE80" />
-              </Pressable>
-
-              {/* ★ Görüntülü Arama Butonu */}
-              <Pressable
-                style={styles.videoCallBtn}
-                onPress={() => {
-                  if (!firebaseUser || !id) return;
-                  router.push(`/call/${id}?type=video` as any);
-                }}
-              >
-                <Ionicons name="videocam" size={16} color="#38BDF8" />
-              </Pressable>
-
+              {/* ★ S1 FIX: Mesaj → herkese açık (DM-8 isteği yönetir), Arama → sadece karşılıklı takip */}
+              {!isBlocked && (
+                <View style={s.secondaryRow}>
+                  <Pressable style={s.secondaryBtn} onPress={() => router.push(`/chat/${id}`)}>
+                    <Ionicons name="chatbubble-outline" size={18} color="#E2E8F0" />
+                  </Pressable>
+                  {isMutual && (
+                    <Pressable style={s.secondaryBtn} onPress={() => router.push(`/call/${id}?callType=audio` as any)}>
+                      <Ionicons name="call-outline" size={18} color="#E2E8F0" />
+                    </Pressable>
+                  )}
+                </View>
+              )}
             </View>
-          )}
-        </View>
-
-        {/* Tier Badge Card */}
-        {tier !== 'Free' && (
-          <View style={styles.plusBadgeCard}>
-            <View style={styles.plusLeft}>
-              <View style={[styles.plusIconWrap, { backgroundColor: `${tierDef.color}18` }]}>
-                <Ionicons name={tierDef.icon as any} size={18} color={tierDef.color} />
-              </View>
-              <Text style={styles.plusLabel}>{tierDef.emoji} {tierDef.label} Üyesi</Text>
-            </View>
-            <Ionicons name="checkmark-circle" size={20} color={tierDef.color} />
-          </View>
+          </>
         )}
 
-        {/* Rozetler */}
+        {/* ═══ Rozetler (kompakt) ═══ */}
         {userBadges.length > 0 && (
-          <View style={{ marginHorizontal: 20, marginTop: 16 }}>
+          <View style={s.listContainer}>
             <BadgeGrid unlockedBadges={userBadges} compact />
           </View>
         )}
 
-        <View style={{ height: 8 }} />
+        {/* ═══ Son Aktif Odalar — sadece canlı olanlar ═══ */}
+        {recentRooms.length > 0 && (
+          <View style={s.listContainer}>
+            <Text style={s.sectionInnerTitle}>📡 Son Aktif Odalar</Text>
+            {recentRooms.slice(0, 3).map((room: any) => (
+              <Pressable
+                key={room.id}
+                style={s.roomItem}
+                onPress={() => router.push(`/room/${room.id}` as any)}
+              >
+                <View style={s.roomIconWrap}>
+                  <Ionicons name="mic" size={14} color={Colors.accentTeal} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.roomItemName} numberOfLines={1}>{room.name}</Text>
+                  <Text style={s.roomItemMeta}>
+                    {room.listener_count || 0} dinleyici
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.15)" />
+              </Pressable>
+            ))}
+          </View>
+        )}
 
-        {/* ★ Katmanlı Profil Bölümleri */}
-        <TieredProfileSections
-          tier={tier}
-          viewerTier={(currentUserProfile?.subscription_tier || 'Free') as any}
-          isOwnProfile={false}
-          userId={id}
-          stats={profileStats}
-          recentRooms={recentRooms}
-          bannerUrl={(userProfile as any)?.banner_url || null}
-          languageTag={(userProfile as any)?.language || undefined}
-          ageTag={(userProfile as any)?.age_range || undefined}
-          onDonate={isTierAtLeast(tier, 'Gold') ? () => setShowDonateModal(true) : undefined}
-        />
+        {/* ═══ Gold+ Destekle Butonu — SP transfer servisi henüz hazır değil ═══ */}
+        {/* TODO: ProfileService.donateToUser() implementasyonu yapıldığında aktifleştirilecek */}
 
-        <View style={{ height: 30 }} />
+        {/* ═══ Banner (Gold+) ═══ */}
+        {isTierAtLeast(tier, 'Gold') && (userProfile as any)?.banner_url && (
+          <View style={s.bannerWrap}>
+            <Image source={{ uri: (userProfile as any).banner_url }} style={s.bannerImg} />
+          </View>
+        )}
       </ScrollView>
-
-      {/* ★ Bağış Modalı */}
-      <PremiumAlert
-        visible={showDonateModal}
-        title="💛 Destekle"
-        message={`${userProfile?.display_name || 'Bu kullanıcı'} adlı kullanıcıya SP göndermek istiyorsun. Miktarı seç:`}
-        type="info"
-        icon="heart"
-        onDismiss={() => setShowDonateModal(false)}
-        buttons={[
-          { text: 'İptal', style: 'cancel' },
-          { text: '5 SP', onPress: () => { setShowDonateModal(false); showToast({ title: '💛 5 SP gönderildi!', type: 'success' }); } },
-          { text: '10 SP', onPress: () => { setShowDonateModal(false); showToast({ title: '💛 10 SP gönderildi!', type: 'success' }); } },
-          { text: '25 SP', onPress: () => { setShowDonateModal(false); showToast({ title: '💛 25 SP gönderildi!', type: 'success' }); } },
-          { text: '50 SP', onPress: () => { setShowDonateModal(false); showToast({ title: '💛 50 SP gönderildi!', type: 'success' }); } },
-          { text: '100 SP', onPress: () => { setShowDonateModal(false); showToast({ title: '💛 100 SP gönderildi!', type: 'success' }); } },
-        ]}
-      />
-
-
 
       {/* Report Modal */}
       {firebaseUser && id && (
@@ -417,132 +451,198 @@ export default function UserProfileScreen() {
           target={{ type: 'user', id }}
         />
       )}
+
+      {/* FollowList Modal */}
+      {firebaseUser && id && (
+        <FollowListModal
+          visible={showFollowList}
+          onClose={() => setShowFollowList(false)}
+          userId={id}
+          currentUserId={firebaseUser.uid}
+          initialTab={followListTab}
+          isOwnProfile={isOwnProfile}
+        />
+      )}
+      <PremiumAlert {...cAlert} onDismiss={() => setCAlert(prev => ({ ...prev, visible: false }))} />
     </View>
+    </AppBackground>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.bg },
+// ★ DUP-1 FIX: Shadows.card ve Shadows.text theme.ts'den geliyor — yerel kopya kaldırıldı
+const _cardShadow = Shadows.card;
+const _textGlow = Shadows.text;
+
+const s = StyleSheet.create({
+  container: { flex: 1, backgroundColor: 'transparent' },
 
   // Header
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: 54,
-    paddingBottom: 12,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 16, paddingTop: 54, paddingBottom: 12,
   },
-  backBtn: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
-  headerTitle: { fontSize: 18, fontWeight: '700', color: Colors.text },
-  moreBtn: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
-
-  // Profile Card
-  profileCard: { alignItems: 'center', paddingHorizontal: 20, paddingTop: 12 },
-  avatarContainer: { position: 'relative', marginBottom: 12 },
-  avatar: { width: 100, height: 100, borderRadius: 50, borderWidth: 3 },
-  tierBadge: {
-    position: 'absolute', bottom: -2, right: -2,
-    flexDirection: 'row', alignItems: 'center', gap: 3,
-    paddingHorizontal: 8, paddingVertical: 3, borderRadius: Radius.full,
-    borderWidth: 2, borderColor: Colors.bg,
+  backBtn: {
+    width: 36, height: 36, borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.04)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
+    justifyContent: 'center', alignItems: 'center',
   },
-  tierText: { fontSize: 9, fontWeight: '700', color: '#fff' },
+  headerTitle: { fontSize: 18, fontWeight: '800', color: '#F1F5F9', ..._textGlow },
+  moreBtn: {
+    width: 36, height: 36, borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.04)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
+    justifyContent: 'center', alignItems: 'center',
+  },
 
-  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
-  profileName: { fontSize: 22, fontWeight: '800', color: Colors.text },
+  // Profil Kartı
+  card: {
+    marginHorizontal: 16, marginBottom: 10,
+    borderRadius: 16, overflow: 'hidden',
+    backgroundColor: '#414e5f',
+    borderWidth: 1, borderColor: '#5b9a8b',
+    ..._cardShadow,
+  },
+  cardGlow: {
+    position: 'absolute', top: 0, left: 0, right: 0, height: 80,
+    borderTopLeftRadius: 16, borderTopRightRadius: 16,
+  },
+  identityRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingHorizontal: 16, paddingTop: 18, paddingBottom: 12,
+  },
+  avatarRing: {
+    width: 64, height: 64, borderRadius: 32,
+    borderWidth: 2.5, padding: 2,
+    shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.5, shadowRadius: 10, elevation: 6,
+  },
+  avatarImg: { width: '100%', height: '100%', borderRadius: 30, backgroundColor: 'rgba(255,255,255,0.05)' },
+  tierPill: {
+    position: 'absolute' as const, bottom: -3, right: -6,
+    flexDirection: 'row', alignItems: 'center', gap: 2,
+    paddingHorizontal: 5, paddingVertical: 2, borderRadius: 10,
+    borderWidth: 2, borderColor: '#414e5f',
+  },
+  tierPillText: { fontSize: 7, fontWeight: '800', color: '#fff', letterSpacing: 0.3, ..._textGlow },
+  displayName: { fontSize: 16, fontWeight: '800', color: '#F1F5F9', letterSpacing: 0.2, ..._textGlow },
+  username: { fontSize: 10, color: '#CBD5E1', marginTop: 1, ..._textGlow },
+  bio: { fontSize: 10, color: '#94A3B8', marginTop: 3, lineHeight: 14, ..._textGlow },
   onlineBadge: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: 'rgba(16,185,129,0.12)',
-    paddingHorizontal: 8, paddingVertical: 3, borderRadius: Radius.full,
+    width: 10, height: 10, borderRadius: 5,
+    backgroundColor: '#22C55E', borderWidth: 2, borderColor: '#414e5f',
+    marginLeft: 6,
   },
-  onlineDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.emerald },
-  onlineText: { fontSize: 10, fontWeight: '600', color: Colors.emerald },
-
-  profileUsername: { fontSize: 13, color: Colors.teal, marginBottom: 4 },
-  profileBio: { fontSize: 13, color: Colors.text2, textAlign: 'center', marginBottom: 16, paddingHorizontal: 20 },
+  onlineDot: { display: 'none' as any },
 
   // Stats
-  statsRow: { flexDirection: 'row', gap: 32, marginBottom: 16 },
-  statItem: { alignItems: 'center' },
-  statValue: { fontSize: 18, fontWeight: '800', color: Colors.text },
-  statLabel: { fontSize: 11, color: Colors.text3, marginTop: 2 },
+  statsRow: {
+    flexDirection: 'row', alignItems: 'center',
+    marginHorizontal: 12, marginBottom: 14, paddingVertical: 10,
+    borderRadius: 12, backgroundColor: 'rgba(0,0,0,0.15)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
+  },
+  statItem: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  statNum: { fontSize: 15, fontWeight: '800', color: '#F1F5F9', marginBottom: 1, ..._textGlow },
+  statLabel: { fontSize: 9, fontWeight: '600', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 0.5 },
+  statDiv: { width: 1, height: 22, backgroundColor: 'rgba(255,255,255,0.08)' },
 
-  // Actions
-  actionsRow: { flexDirection: 'row', gap: 10, marginBottom: 24 },
+  // Interaction
+  interactionRow: { flexDirection: 'row', paddingHorizontal: 16, gap: 10, marginBottom: 12 },
   followBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    paddingHorizontal: 28, paddingVertical: 12, borderRadius: Radius.full,
-    backgroundColor: Colors.teal,
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    paddingVertical: 12, borderRadius: 12, backgroundColor: Colors.teal,
+    ..._cardShadow,
   },
-  followBtnActive: {
-    backgroundColor: Colors.glass3,
-    borderWidth: 1, borderColor: Colors.teal + '40',
-  },
-  followBtnText: { fontSize: 14, fontWeight: '700', color: '#fff' },
-  messageBtn: {
-    width: 44, height: 44, borderRadius: 22,
-    backgroundColor: 'rgba(20,184,166,0.1)', borderWidth: 1, borderColor: 'rgba(20,184,166,0.2)',
+  followBtnActive: { backgroundColor: 'rgba(20,184,166,0.4)' },
+  // ★ X.com tarzı: Karşılıklı takip stili
+  followBtnMutual: { backgroundColor: 'rgba(20,184,166,0.15)', borderWidth: 1, borderColor: 'rgba(20,184,166,0.3)' },
+  followBtnText: { fontSize: 14, fontWeight: '700', color: '#fff', ..._textGlow },
+  secondaryRow: { flexDirection: 'row', gap: 8 },
+  secondaryBtn: {
+    width: 44, height: 44, borderRadius: 14,
+    backgroundColor: '#414e5f', borderWidth: 1, borderColor: '#95a1ae',
     alignItems: 'center', justifyContent: 'center',
-  },
-  callBtn: {
-    width: 44, height: 44, borderRadius: 22,
-    backgroundColor: 'rgba(74,222,128,0.1)', borderWidth: 1, borderColor: 'rgba(74,222,128,0.25)',
-    alignItems: 'center', justifyContent: 'center',
-  },
-  videoCallBtn: {
-    width: 44, height: 44, borderRadius: 22,
-    backgroundColor: 'rgba(56,189,248,0.1)', borderWidth: 1, borderColor: 'rgba(56,189,248,0.25)',
-    alignItems: 'center', justifyContent: 'center',
-  },
-  giftBtn: {
-    width: 44, height: 44, borderRadius: 22,
-    backgroundColor: 'rgba(251,191,36,0.1)', borderWidth: 1, borderColor: 'rgba(251,191,36,0.2)',
-    alignItems: 'center', justifyContent: 'center',
+    ..._cardShadow,
   },
 
-  // Plus badge card
-  plusBadgeCard: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    marginHorizontal: 20, marginTop: 12, padding: 16,
-    borderRadius: Radius.default, backgroundColor: Colors.bg3,
-    borderWidth: 1, borderColor: Colors.glassBorder,
+  // ★ X.com tarzı: Gelen takip isteği banner
+  incomingBanner: {
+    marginHorizontal: 16, marginBottom: 10,
+    paddingHorizontal: 14, paddingVertical: 12,
+    borderRadius: 14,
+    backgroundColor: 'rgba(245,158,11,0.08)',
+    borderWidth: 1, borderColor: 'rgba(245,158,11,0.2)',
+    ..._cardShadow,
   },
-  plusLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  plusIconWrap: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
-  plusLabel: { fontSize: 14, fontWeight: '600', color: Colors.text },
+  incomingBannerLeft: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    marginBottom: 10,
+  },
+  incomingBannerText: {
+    fontSize: 13, color: '#CBD5E1', flex: 1, lineHeight: 18,
+  },
+  incomingBannerActions: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+  },
+  incomingApproveBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4,
+    backgroundColor: '#14B8A6',
+    paddingVertical: 10, borderRadius: 10,
+  },
+  incomingApproveBtnText: {
+    fontSize: 13, fontWeight: '700', color: '#FFF',
+  },
+  incomingRejectBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    paddingVertical: 10, borderRadius: 10,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
+  },
+  incomingRejectBtnText: {
+    fontSize: 13, fontWeight: '600', color: '#94A3B8',
+  },
 
-  // Recent Posts
-  recentPostsSection: {
-    marginHorizontal: 20, marginTop: 20,
+  // Section
+  sectionTitle: { fontSize: 11, fontWeight: '700', color: '#64748B', letterSpacing: 1, ..._textGlow },
+  sectionInnerTitle: { fontSize: 12, fontWeight: '700', color: '#CBD5E1', marginBottom: 8, textTransform: 'uppercase' as const, letterSpacing: 0.5 },
+  listContainer: {
+    marginHorizontal: 16, marginBottom: 10,
+    backgroundColor: '#414e5f',
+    borderRadius: 16, borderWidth: 1, borderColor: '#5b9a8b',
+    padding: 14,
+    ..._cardShadow,
   },
-  sectionTitle: {
-    fontSize: 16, fontWeight: '700', color: Colors.text, marginBottom: 12,
+
+  // Room items (3rd party compact)
+  roomItem: {
+    flexDirection: 'row' as const, alignItems: 'center' as const, gap: 10,
+    paddingVertical: 10,
+    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.04)',
   },
-  postCard: {
-    flexDirection: 'row', gap: 12, marginBottom: 12, padding: 12,
-    borderRadius: Radius.default, backgroundColor: Colors.bg3,
-    borderWidth: 1, borderColor: Colors.glassBorder,
+  roomIconWrap: {
+    width: 32, height: 32, borderRadius: 16,
+    backgroundColor: 'rgba(20,184,166,0.1)',
+    alignItems: 'center' as const, justifyContent: 'center' as const,
   },
-  postImage: {
-    width: 56, height: 56, borderRadius: Radius.sm,
+  roomItemName: { fontSize: 13, fontWeight: '700', color: '#F1F5F9', ..._textGlow },
+  roomItemMeta: { fontSize: 10, color: '#64748B', marginTop: 1 },
+
+  // Donate card
+  donateCard: {
+    marginHorizontal: 16, marginBottom: 10,
+    borderRadius: 14, overflow: 'hidden' as const,
+    ..._cardShadow,
   },
-  postContent: {
-    flex: 1, justifyContent: 'center',
+  donateGradient: {
+    flexDirection: 'row' as const, alignItems: 'center' as const, justifyContent: 'center' as const,
+    gap: 8, paddingVertical: 14,
   },
-  postText: {
-    fontSize: 13, color: Colors.text, lineHeight: 18, marginBottom: 6,
+  donateText: { fontSize: 15, fontWeight: '700', color: '#FFF', ..._textGlow },
+
+  // Banner
+  bannerWrap: {
+    marginHorizontal: 16, marginBottom: 10,
+    height: 80, borderRadius: 14, overflow: 'hidden' as const,
+    ..._cardShadow,
   },
-  postMeta: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-  },
-  postMetaItem: {
-    flexDirection: 'row', alignItems: 'center', gap: 3,
-  },
-  postMetaText: {
-    fontSize: 11, color: Colors.text3,
-  },
-  postDate: {
-    fontSize: 11, color: Colors.text3, marginLeft: 'auto',
-  },
+  bannerImg: { width: '100%' as any, height: '100%' as any, borderRadius: 14 },
 });
+

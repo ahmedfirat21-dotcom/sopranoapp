@@ -1,7 +1,7 @@
 /**
- * SopranoChat — Kullanıcı Arama Modalı (Yeni Mesaj Başlatma)
- * Mesajlar ekranındaki compose butonuna bağlı
- * Arkadaş listesi + arama → seçilen kullanıcıyla sohbet başlat
+ * SopranoChat — Keşfet Arama Modalı
+ * Oda ve kişi araması — keşfet ekranındaki arama ikonuna bağlı
+ * Hem oda hem kullanıcı sonuçlarını listeler
  */
 import { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, Modal, Pressable, TextInput, FlatList, Image, ActivityIndicator } from 'react-native';
@@ -16,12 +16,17 @@ type UserSearchModalProps = {
   onClose: () => void;
   currentUserId: string;
   onSelectUser: (userId: string, displayName: string) => void;
+  onSelectRoom?: (roomId: string) => void;
+  mode?: 'discover' | 'compose';
 };
 
-export function UserSearchModal({ visible, onClose, currentUserId, onSelectUser }: UserSearchModalProps) {
+export function UserSearchModal({ visible, onClose, currentUserId, onSelectUser, onSelectRoom, mode = 'compose' }: UserSearchModalProps) {
+  const isDiscover = mode === 'discover';
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<Profile[]>([]);
+  const [roomResults, setRoomResults] = useState<any[]>([]);
   const [friends, setFriends] = useState<Profile[]>([]);
+  const [suggestedUsers, setSuggestedUsers] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(false);
   const [friendsLoading, setFriendsLoading] = useState(true);
 
@@ -29,8 +34,10 @@ export function UserSearchModal({ visible, onClose, currentUserId, onSelectUser 
   useEffect(() => {
     if (!visible || !currentUserId) return;
     loadFriends();
+    if (isDiscover) loadSuggestedUsers();
     setQuery('');
     setResults([]);
+    setRoomResults([]);
   }, [visible, currentUserId]);
 
   const loadFriends = async () => {
@@ -43,7 +50,7 @@ export function UserSearchModal({ visible, onClose, currentUserId, onSelectUser 
         .eq('user_id', currentUserId)
         .eq('status', 'accepted');
 
-      if (!following || following.length === 0) { setFriendsLoading(false); return; }
+      if (!following || following.length === 0) { setFriends([]); setFriendsLoading(false); return; }
 
       const followingIds = following.map(f => f.friend_id);
 
@@ -60,6 +67,32 @@ export function UserSearchModal({ visible, onClose, currentUserId, onSelectUser 
     }
   };
 
+  /** Keşfet modunda — takip edilmeyen online/yeni üyeleri öner */
+  const loadSuggestedUsers = async () => {
+    try {
+      // Takip edilen ID'leri al
+      const { data: following } = await supabase
+        .from('friendships')
+        .select('friend_id')
+        .eq('user_id', currentUserId)
+        .eq('status', 'accepted');
+      const followingIds = (following || []).map(f => f.friend_id);
+      followingIds.push(currentUserId); // Kendimi de hariç tut
+
+      // Önce online kullanıcıları getir, sonra son kayıtları
+      const { data: suggested } = await supabase
+        .from('profiles')
+        .select('*')
+        .not('id', 'in', `(${followingIds.join(',')})`)
+        .order('is_online', { ascending: false })
+        .order('created_at', { ascending: false })
+        .limit(20);
+      setSuggestedUsers(suggested as Profile[] || []);
+    } catch (e) {
+      if (__DEV__) console.warn('[UserSearch] Önerilen kullanıcı hatası:', e);
+    }
+  };
+
   const searchUsers = useCallback(async (searchQuery: string) => {
     if (searchQuery.length < 2) { setResults([]); return; }
     setLoading(true);
@@ -72,6 +105,19 @@ export function UserSearchModal({ visible, onClose, currentUserId, onSelectUser 
         .limit(20);
       if (error) throw error;
       setResults(data as Profile[] || []);
+
+      // Keşfet modunda odaları da ara
+      if (isDiscover && searchQuery.length >= 2) {
+        const { data: rooms } = await supabase
+          .from('rooms')
+          .select('id, name, category, is_live, listener_count, host:profiles!host_id(display_name, avatar_url)')
+          .ilike('name', `%${searchQuery}%`)
+          .eq('is_live', true)
+          .limit(10);
+        setRoomResults(rooms || []);
+      } else {
+        setRoomResults([]);
+      }
     } catch (e) {
       if (__DEV__) console.warn('[UserSearch] Arama hatası:', e);
     } finally {
@@ -86,8 +132,9 @@ export function UserSearchModal({ visible, onClose, currentUserId, onSelectUser 
     return () => clearTimeout(timeout);
   };
 
-  const displayList = query.length >= 2 ? results : friends;
   const isSearchMode = query.length >= 2;
+  // Keşfet modunda boş durumda: arkadaşlar + önerilen üyeler
+  const displayList = isSearchMode ? results : friends;
 
   const renderUser = ({ item }: { item: Profile }) => (
     <Pressable
@@ -105,7 +152,7 @@ export function UserSearchModal({ visible, onClose, currentUserId, onSelectUser 
         <Text style={s.displayName}>{item.display_name || 'Kullanıcı'}</Text>
         {item.username && <Text style={s.username}>@{item.username}</Text>}
       </View>
-      <Ionicons name="chatbubble-outline" size={18} color={Colors.teal} />
+      <Ionicons name={isDiscover ? 'open-outline' : 'chatbubble-outline'} size={18} color={Colors.teal} />
     </Pressable>
   );
 
@@ -117,8 +164,8 @@ export function UserSearchModal({ visible, onClose, currentUserId, onSelectUser 
           {/* Header */}
           <View style={s.header}>
             <View style={s.headerLeft}>
-              <Ionicons name="create" size={18} color={Colors.teal} />
-              <Text style={s.headerTitle}>Yeni Mesaj</Text>
+              <Ionicons name={isDiscover ? 'search' : 'create'} size={18} color={Colors.teal} />
+              <Text style={s.headerTitle}>{isDiscover ? 'Keşfet' : 'Yeni Mesaj'}</Text>
             </View>
             <Pressable style={s.closeBtn} onPress={onClose}>
               <Ionicons name="close" size={20} color={Colors.text2} />
@@ -130,7 +177,7 @@ export function UserSearchModal({ visible, onClose, currentUserId, onSelectUser 
             <Ionicons name="search" size={16} color={Colors.text3} />
             <TextInput
               style={s.searchInput}
-              placeholder="İsim veya kullanıcı adı ara..."
+              placeholder={isDiscover ? 'Oda, kişi veya üye ara...' : 'İsim veya kullanıcı adı ara...'}
               placeholderTextColor={Colors.text3}
               value={query}
               onChangeText={handleQueryChange}
@@ -144,39 +191,136 @@ export function UserSearchModal({ visible, onClose, currentUserId, onSelectUser 
           </View>
 
           {/* Başlık */}
-          <View style={s.sectionHeader}>
-            <Ionicons name={isSearchMode ? 'search' : 'people'} size={13} color={Colors.text3} />
-            <Text style={s.sectionTitle}>
-              {isSearchMode ? 'Arama Sonuçları' : 'Takip Ettiklerin'}
-            </Text>
-          </View>
-
-          {/* Liste */}
-          {(friendsLoading || loading) ? (
-            <ActivityIndicator size="large" color={Colors.teal} style={{ marginTop: 40 }} />
+          {isDiscover && isSearchMode && roomResults.length > 0 && (
+            <>
+              <View style={s.sectionHeader}>
+                <Ionicons name="radio" size={13} color={Colors.text3} />
+                <Text style={s.sectionTitle}>Odalar</Text>
+              </View>
+              {roomResults.map((room: any) => (
+                <Pressable
+                  key={room.id}
+                  style={({ pressed }) => [s.userRow, pressed && { opacity: 0.8, backgroundColor: 'rgba(92,225,230,0.06)' }]}
+                  onPress={() => { onSelectRoom?.(room.id); onClose(); }}
+                >
+                  <View style={[s.avatarWrap, { backgroundColor: 'rgba(20,184,166,0.1)', width: 48, height: 48, borderRadius: 14, justifyContent: 'center', alignItems: 'center' }]}>
+                    <Ionicons name="mic" size={20} color={Colors.teal} />
+                  </View>
+                  <View style={s.userInfo}>
+                    <Text style={s.displayName}>{room.name}</Text>
+                    <Text style={s.username}>{room.host?.display_name || 'Anonim'} · {room.listener_count || 0} dinleyici</Text>
+                  </View>
+                  <Ionicons name="enter-outline" size={18} color={Colors.teal} />
+                </Pressable>
+              ))}
+            </>
+          )}
+          {isSearchMode ? (
+            /* ═══ Arama Sonuçları ═══ */
+            <>
+              <View style={s.sectionHeader}>
+                <Ionicons name="search" size={13} color={Colors.text3} />
+                <Text style={s.sectionTitle}>Kişiler</Text>
+              </View>
+              {loading ? (
+                <ActivityIndicator size="large" color={Colors.teal} style={{ marginTop: 40 }} />
+              ) : (
+                <FlatList
+                  data={displayList}
+                  keyExtractor={(item) => item.id}
+                  renderItem={renderUser}
+                  showsVerticalScrollIndicator={false}
+                  contentContainerStyle={{ paddingBottom: 40 }}
+                  ListEmptyComponent={
+                    <View style={s.emptyState}>
+                      <Ionicons name="search-outline" size={36} color="rgba(92,225,230,0.2)" />
+                      <Text style={s.emptyText}>Kullanıcı bulunamadı</Text>
+                    </View>
+                  }
+                />
+              )}
+            </>
           ) : (
-            <FlatList
-              data={displayList}
-              keyExtractor={(item) => item.id}
-              renderItem={renderUser}
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={{ paddingBottom: 40 }}
-              ListEmptyComponent={
-                <View style={s.emptyState}>
-                  <Ionicons
-                    name={isSearchMode ? 'search-outline' : 'people-outline'}
-                    size={36}
-                    color="rgba(92,225,230,0.2)"
-                  />
-                  <Text style={s.emptyText}>
-                    {isSearchMode ? 'Kullanıcı bulunamadı' : 'Henüz kimseyi takip etmiyorsun'}
-                  </Text>
-                  {!isSearchMode && (
-                    <Text style={s.emptySubtext}>Keşfet sayfasından yeni kişileri takip et!</Text>
-                  )}
-                </View>
-              }
-            />
+            /* ═══ Boş Durum: Takip Ettiklerin + Önerilen Üyeler ═══ */
+            <>
+              {friendsLoading ? (
+                <ActivityIndicator size="large" color={Colors.teal} style={{ marginTop: 40 }} />
+              ) : (
+                <FlatList
+                  data={[]} // Header-only — gerçek veriler ListHeader'da
+                  keyExtractor={() => 'dummy'}
+                  renderItem={() => null}
+                  showsVerticalScrollIndicator={false}
+                  contentContainerStyle={{ paddingBottom: 40 }}
+                  ListHeaderComponent={
+                    <>
+                      {/* Takip Ettiklerin */}
+                      {friends.length > 0 && (
+                        <>
+                          <View style={s.sectionHeader}>
+                            <Ionicons name="people" size={13} color={Colors.text3} />
+                            <Text style={s.sectionTitle}>Takip Ettiklerin</Text>
+                          </View>
+                          {friends.map((item) => (
+                            <Pressable
+                              key={item.id}
+                              style={({ pressed }) => [s.userRow, pressed && { opacity: 0.8, backgroundColor: 'rgba(92,225,230,0.06)' }]}
+                              onPress={() => { onSelectUser(item.id, item.display_name || 'Kullanıcı'); onClose(); }}
+                            >
+                              <View style={s.avatarWrap}>
+                                <Image source={getAvatarSource(item.avatar_url)} style={s.avatar} />
+                                {item.is_online && <View style={s.onlineDot} />}
+                              </View>
+                              <View style={s.userInfo}>
+                                <Text style={s.displayName}>{item.display_name || 'Kullanıcı'}</Text>
+                                {item.username && <Text style={s.username}>@{item.username}</Text>}
+                              </View>
+                              <Ionicons name={isDiscover ? 'open-outline' : 'chatbubble-outline'} size={18} color={Colors.teal} />
+                            </Pressable>
+                          ))}
+                        </>
+                      )}
+
+                      {/* Önerilen Üyeler — sadece keşfet modunda */}
+                      {isDiscover && suggestedUsers.length > 0 && (
+                        <>
+                          <View style={[s.sectionHeader, { marginTop: friends.length > 0 ? 8 : 0 }]}>
+                            <Ionicons name="sparkles" size={13} color={Colors.teal} />
+                            <Text style={s.sectionTitle}>Keşfet — Tüm Üyeler</Text>
+                          </View>
+                          {suggestedUsers.map((item) => (
+                            <Pressable
+                              key={item.id}
+                              style={({ pressed }) => [s.userRow, pressed && { opacity: 0.8, backgroundColor: 'rgba(92,225,230,0.06)' }]}
+                              onPress={() => { onSelectUser(item.id, item.display_name || 'Kullanıcı'); onClose(); }}
+                            >
+                              <View style={s.avatarWrap}>
+                                <Image source={getAvatarSource(item.avatar_url)} style={s.avatar} />
+                                {item.is_online && <View style={s.onlineDot} />}
+                              </View>
+                              <View style={s.userInfo}>
+                                <Text style={s.displayName}>{item.display_name || 'Kullanıcı'}</Text>
+                                {item.username && <Text style={s.username}>@{item.username}</Text>}
+                              </View>
+                              <Ionicons name="open-outline" size={18} color={Colors.teal} />
+                            </Pressable>
+                          ))}
+                        </>
+                      )}
+
+                      {/* Hiç arkadaş ve öneri yoksa */}
+                      {friends.length === 0 && suggestedUsers.length === 0 && (
+                        <View style={s.emptyState}>
+                          <Ionicons name="people-outline" size={36} color="rgba(92,225,230,0.2)" />
+                          <Text style={s.emptyText}>Henüz kimseyi takip etmiyorsun</Text>
+                          <Text style={s.emptySubtext}>Yukarıdaki arama çubuğundan tüm üyeleri arayabilirsin!</Text>
+                        </View>
+                      )}
+                    </>
+                  }
+                />
+              )}
+            </>
           )}
         </View>
       </View>

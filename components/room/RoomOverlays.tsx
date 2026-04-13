@@ -26,7 +26,6 @@ type PlusMenuProps = {
   onInviteFriends: () => void;
   onShareLink: () => void;
   onRoomSettings?: () => void;
-  onSoundboard?: () => void;
   onModeration?: () => void;
   onRoomLock?: () => void;
   onReportRoom?: () => void;
@@ -38,9 +37,7 @@ type PlusMenuProps = {
   // ★ VIP Host Paneli Props
   onMuteAll?: () => void;
   onRoomStats?: () => void;
-  onToggleRecording?: () => void;
-  onMarkHighlight?: () => void;
-  isRecording?: boolean;
+
 };
 
 const ROLE_META: Record<string, { label: string; color: string; icon: string }> = {
@@ -52,13 +49,12 @@ const ROLE_META: Record<string, { label: string; color: string; icon: string }> 
 
 export function PlusMenu({
   visible, onClose,
-  onInviteFriends, onShareLink, onRoomSettings, onSoundboard,
+  onInviteFriends, onShareLink, onRoomSettings,
   onModeration, onRoomLock, onReportRoom,
   isRoomLocked, micRequestCount,
   userRole = 'listener',
   ownerTier = 'Free',
-  onMuteAll, onRoomStats, onToggleRecording, onMarkHighlight,
-  isRecording,
+  onMuteAll, onRoomStats,
 }: PlusMenuProps) {
   // ═══ Animasyon ═══
   const slideAnim = useRef(new Animated.Value(200)).current; // yukarı kayma
@@ -100,19 +96,21 @@ export function PlusMenu({
   if (isOwner && onRoomSettings) {
     items.push({ id: 'settings', icon: 'settings-outline', label: 'Oda Ayarları', accent: '#D4AF37', onPress: onRoomSettings });
   }
-  // 2️⃣ Moderasyon (Bronze+ owner veya mod)
-  if ((isOwner || isMod) && onModeration && !isFreeOwner) {
-    items.push({ id: 'moderation', icon: 'shield-checkmark-outline', label: 'Moderasyon', accent: '#A78BFA', onPress: onModeration, badge: micRequestCount });
+  // 2️⃣ Moderasyon / El Kaldırma Kuyruğu (Owner veya Mod — Free dahil)
+  // ★ K3 FIX: Free owner da moderasyon paneline erişebilir (el kaldırma kuyruğu için)
+  if ((isOwner || isMod) && onModeration) {
+    items.push({ id: 'moderation', icon: 'shield-checkmark-outline', label: isFreeOwner ? 'El Kaldırma Kuyruğu' : 'Moderasyon', accent: '#A78BFA', onPress: onModeration, badge: micRequestCount });
+  }
+  // 3️⃣ Oda Kilitle (Silver+ owner)
+  // ★ M4 FIX: onRoomLock artık menüde kullanılıyor
+  if (isOwner && onRoomLock && isTierAtLeast(ownerTier as any, 'Silver')) {
+    items.push({ id: 'lock', icon: isRoomLocked ? 'lock-open-outline' : 'lock-closed-outline', label: isRoomLocked ? 'Kilidi Aç' : 'Odayı Kilitle', accent: '#F59E0B', onPress: onRoomLock });
   }
   // 4️⃣ Tümünü Sustur (Gold+ owner)
   if (isOwner && onMuteAll && isTierAtLeast(ownerTier as any, 'Gold')) {
     items.push({ id: 'mute_all', icon: 'volume-mute-outline', label: 'Tümünü Sustur', accent: '#EF4444', onPress: onMuteAll });
   }
-  // 5️⃣ Ses Efektleri (Bronze+ sahnede)
-  if (isOnStage && onSoundboard && isTierAtLeast(ownerTier as any, 'Bronze')) {
-    items.push({ id: 'soundboard', icon: 'musical-notes-outline', label: 'Ses Efektleri', accent: '#8B5CF6', onPress: onSoundboard });
-  }
-  // 6️⃣ Davet (sahnedeki herkes)
+  // 5️⃣ Davet (sahnedeki herkes)
   if (isOnStage) {
     items.push({ id: 'invite', icon: 'person-add-outline', label: 'Arkadaşlarını Davet Et', accent: '#14B8A6', onPress: onInviteFriends });
   }
@@ -121,14 +119,6 @@ export function PlusMenu({
   // 8️⃣ Oda İstatistikleri (VIP owner)
   if (isOwner && onRoomStats && isTierAtLeast(ownerTier as any, 'VIP')) {
     items.push({ id: 'stats', icon: 'stats-chart-outline', label: 'Oda İstatistikleri', accent: '#3B82F6', onPress: onRoomStats });
-  }
-  // 9️⃣ Kayıt Başlat/Durdur (VIP owner)
-  if (isOwner && onToggleRecording && isTierAtLeast(ownerTier as any, 'VIP')) {
-    items.push({ id: 'record', icon: isRecording ? 'stop-circle-outline' : 'recording-outline', label: isRecording ? 'Kaydı Durdur' : 'Kayıt Başlat', accent: '#EF4444', onPress: onToggleRecording });
-  }
-  // 📌 Anı İşaretle (VIP owner, kayıt aktifken)
-  if (isOwner && onMarkHighlight && isRecording && isTierAtLeast(ownerTier as any, 'VIP')) {
-    items.push({ id: 'highlight', icon: 'bookmark-outline', label: 'Anı İşaretle', accent: '#F59E0B', onPress: onMarkHighlight });
   }
   // 🚩 Bildir (dinleyiciler)
   if (!isOnStage && onReportRoom) {
@@ -274,6 +264,9 @@ const s = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
     letterSpacing: 0.3,
+    textShadowColor: 'rgba(0,0,0,0.4)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   closeBtn: {
     width: 22,
@@ -305,6 +298,11 @@ const s = StyleSheet.create({
     borderRadius: 7,
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 3,
   },
   rowText: {
     flex: 1,
@@ -322,6 +320,9 @@ const s = StyleSheet.create({
     fontSize: 10,
     color: '#475569',
     marginTop: 1,
+    textShadowColor: 'rgba(0,0,0,0.3)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 1,
   },
 
   // Badge

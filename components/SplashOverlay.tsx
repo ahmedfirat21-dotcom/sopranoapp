@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useCallback } from 'react';
-import { View, StyleSheet, Animated, Dimensions, Image, Easing } from 'react-native';
+import { View, StyleSheet, Animated, Dimensions, Image, ImageBackground, Easing } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 const { width, height } = Dimensions.get('window');
@@ -18,8 +18,6 @@ export default function SplashOverlay({ onFinish }: SplashOverlayProps) {
 
   const logoOpacity = useRef(new Animated.Value(0)).current;
   const logoScale = useRef(new Animated.Value(0.8)).current;
-  const sloganOpacity = useRef(new Animated.Value(0)).current;
-  const sloganY = useRef(new Animated.Value(10)).current;
   const glowX = useRef(new Animated.Value(-width * 0.6)).current;
   const glowOpacity = useRef(new Animated.Value(0)).current;
   const glow2Scale = useRef(new Animated.Value(0.85)).current;
@@ -73,19 +71,10 @@ export default function SplashOverlay({ onFinish }: SplashOverlayProps) {
       ]).start();
     }, 200);
 
-    setTimeout(() => {
-      Animated.parallel([
-        Animated.timing(sloganOpacity, { toValue: 1, duration: 500, easing: Easing.out(Easing.ease), useNativeDriver: true }),
-        Animated.timing(sloganY, { toValue: 0, duration: 400, easing: Easing.out(Easing.quad), useNativeDriver: true }),
-      ]).start();
-    }, 550);
-
     const timer = setTimeout(() => {
       Animated.parallel([
         Animated.timing(logoOpacity, { toValue: 0, duration: 300, useNativeDriver: true }),
         Animated.timing(logoScale, { toValue: 0.92, duration: 300, useNativeDriver: true }),
-        Animated.timing(sloganOpacity, { toValue: 0, duration: 250, useNativeDriver: true }),
-        Animated.timing(sloganY, { toValue: 4, duration: 250, useNativeDriver: true }),
       ]).start(() => {
         safeFinish();
       });
@@ -103,13 +92,12 @@ export default function SplashOverlay({ onFinish }: SplashOverlayProps) {
   }, []);
 
   return (
-    <View style={s.container}>
-      <LinearGradient
-        colors={['#020510', '#060B18', '#0A1228', '#060B18', '#020510']}
-        locations={[0, 0.2, 0.5, 0.8, 1]}
-        style={StyleSheet.absoluteFill}
-      />
-
+    <ImageBackground
+      source={require('../assets/images/app_bg.jpg')}
+      style={s.container}
+      resizeMode="cover"
+    >
+      {/* Teal ambient glow — üst katman */}
       <Animated.View style={[s.glowOrb, { opacity: glowOpacity, transform: [{ translateX: glowX }] }]}>
         <LinearGradient
           colors={['transparent', 'rgba(92,225,230,0.03)', 'rgba(92,225,230,0.08)', 'rgba(92,225,230,0.12)', 'rgba(92,225,230,0.08)', 'rgba(92,225,230,0.03)', 'transparent']}
@@ -139,28 +127,21 @@ export default function SplashOverlay({ onFinish }: SplashOverlayProps) {
       <Animated.View style={[s.star, { top: height * 0.62, left: width * 0.68 }, { opacity: star1 }]} />
       <Animated.View style={[s.star, { bottom: height * 0.22, left: width * 0.32 }, { opacity: star2 }]} />
 
-      <View style={{ alignItems: 'center' }}>
-        <Animated.View style={[s.logoWrap, { opacity: logoOpacity, transform: [{ scale: logoScale }] }]}>
-          <Image source={require('../assets/images/ikon.png')} style={s.appIcon} resizeMode="contain" />
-        </Animated.View>
-
-        <Animated.View style={[s.sloganWrap, { opacity: sloganOpacity, transform: [{ translateY: sloganY }] }]}>
-          <Image source={require('../assets/images/ikon2.png')} style={s.ikon2} resizeMode="contain" />
-        </Animated.View>
-      </View>
-    </View>
+      {/* ★ logo.png zaten "SopranoChat" + "Senin Sesin" metnini içeriyor */}
+      <Animated.View style={[s.logoWrap, { opacity: logoOpacity, transform: [{ scale: logoScale }] }]}>
+        <Image source={require('../assets/logo.png')} style={s.logoImage} resizeMode="contain" />
+      </Animated.View>
+    </ImageBackground>
   );
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#020510', alignItems: 'center', justifyContent: 'center' },
+  container: { flex: 1, backgroundColor: '#0F1926', alignItems: 'center', justifyContent: 'center' },
   glowOrb: { position: 'absolute', width: width * 1.4, height: height * 0.55, top: height * 0.18 },
   glowGradient: { width: '100%', height: '100%', borderRadius: 999 },
   glowCenter: { position: 'absolute', width: width * 0.9, height: width * 0.9, borderRadius: width * 0.45, top: height * 0.28, alignSelf: 'center', overflow: 'hidden' },
   glowPurple: { position: 'absolute', width: width * 0.8, height: height * 0.3, bottom: height * 0.1, alignSelf: 'center', borderRadius: 999, overflow: 'hidden' },
   star: { position: 'absolute', width: 2, height: 2, borderRadius: 1, backgroundColor: 'rgba(255,255,255,0.7)' },
   logoWrap: { alignItems: 'center', justifyContent: 'center' },
-  appIcon: { width: 380, height: 380, borderRadius: 80 },
-  sloganWrap: { position: 'absolute', right: 54, bottom: 110 },
-  ikon2: { width: 170, height: 52 },
+  logoImage: { width: 320, height: 90 },
 });

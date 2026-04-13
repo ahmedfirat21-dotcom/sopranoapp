@@ -98,16 +98,19 @@ export const RoomFollowService = {
     return map;
   },
 
-  /** Host'un takipçi ID'lerini getir (friendships tablosundan) */
+  /**
+   * Host'un takipçi ID'lerini getir (friendships tablosundan)
+   * ★ BUG-F2 FIX: Kolon adları düzeltildi — user_id (takip eden), friend_id (takip edilen)
+   */
   async getFollowerIds(hostUserId: string): Promise<string[]> {
     try {
       const { data, error } = await supabase
         .from('friendships')
-        .select('follower_id')
-        .eq('following_id', hostUserId)
+        .select('user_id')
+        .eq('friend_id', hostUserId)
         .eq('status', 'accepted');
       if (error) throw error;
-      return (data || []).map((d: any) => d.follower_id).filter(Boolean);
+      return (data || []).map((d: any) => d.user_id).filter(Boolean);
     } catch (e) {
       if (__DEV__) console.warn('[RoomFollowService] getFollowerIds error:', e);
       return [];

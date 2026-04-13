@@ -18,6 +18,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { safeGoBack } from '../constants/navigation';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../constants/supabase';
 import { getAvatarSource, getLevelFromSP, getTierBadgeInfo } from '../constants/avatars';
@@ -25,7 +26,7 @@ import { Colors } from '../constants/theme';
 import AppBackground from '../components/AppBackground';
 
 const { width: W } = Dimensions.get('window');
-const SCREEN_BG = '#2f404f';
+
 
 // ─── Zaman Filtreleri ────────────────────────────────────
 type TimePeriod = 'weekly' | 'monthly' | 'all';
@@ -434,7 +435,7 @@ export default function LeaderboardScreen() {
   return (
     <AppBackground><View style={s.container}>{/* ─── Header ─── */}
       <View style={[s.header, { paddingTop: insets.top + 8 }]}>
-        <Pressable style={[s.backBtn]} onPress={() => router.back()}>
+        <Pressable style={[s.backBtn]} onPress={() => safeGoBack(router)}>
           <Ionicons name="chevron-back" size={22} color="#F1F5F9" />
         </Pressable>
         <Text style={[s.headerTitle]}>Liderlik Tablosu</Text>

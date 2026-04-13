@@ -6,19 +6,19 @@ import { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, Pressable, Image, ActivityIndicator, RefreshControl, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { safeGoBack } from '../constants/navigation';
 import { Colors, Radius } from '../constants/theme';
 import { supabase } from '../constants/supabase';
 import { FriendshipService, type PendingRequest } from '../services/friendship';
 import { getAvatarSource } from '../constants/avatars';
 import EmptyState from '../components/EmptyState';
-import { showToast } from '../components/Toast';
 import { useAuth } from './_layout';
 
 type Notification = {
   id: string;
   user_id: string;
   sender_id: string;
-  type: 'like' | 'comment' | 'gift' | 'follow' | 'follow_request' | 'follow_accepted';
+  type: 'like' | 'comment' | 'gift' | 'follow' | 'follow_request' | 'follow_accepted' | 'follow_rejected';
   reference_id: string | null;
   is_read: boolean;
   created_at: string;
@@ -35,6 +35,9 @@ const NOTIF_CONFIG: Record<string, { icon: string; color: string; verb: string }
   follow: { icon: 'person-add', color: '#14B8A6', verb: 'seni takip etmeye başladı' },
   follow_request: { icon: 'person-add', color: '#F59E0B', verb: 'seni takip etmek istiyor' },
   follow_accepted: { icon: 'checkmark-circle', color: '#10B981', verb: 'takip isteğini kabul etti' },
+  // ★ BUG-F8 FIX: follow_rejected config'i eklendi (cooldown mekanizması için internal kayıt)
+  // Görüntülenmez — FlatList'te filtrelenir (BUG-F19)
+  follow_rejected: { icon: 'close-circle-outline', color: '#94A3B8', verb: '' },
 };
 
 function getRelativeTime(dateStr: string): string {
@@ -107,12 +110,9 @@ export default function NotificationsScreen() {
       const result = await FriendshipService.approveRequest(firebaseUser.uid, followerId);
       if (result.success) {
         setPendingRequests(prev => prev.filter(r => r.user_id !== followerId));
-        showToast({ title: 'Takip isteği onaylandı', type: 'success' });
-      } else {
-        showToast({ title: 'Hata oluştu', type: 'error' });
       }
     } catch {
-      showToast({ title: 'Hata oluştu', type: 'error' });
+      // silent
     } finally {
       setProcessingIds(prev => {
         const next = new Set(prev);
@@ -129,10 +129,9 @@ export default function NotificationsScreen() {
       const result = await FriendshipService.rejectRequest(firebaseUser.uid, followerId);
       if (result.success) {
         setPendingRequests(prev => prev.filter(r => r.user_id !== followerId));
-        showToast({ title: 'Takip isteği reddedildi', type: 'info' });
       }
     } catch {
-      showToast({ title: 'Hata', type: 'error' });
+      // silent
     } finally {
       setProcessingIds(prev => {
         const next = new Set(prev);
@@ -257,7 +256,7 @@ export default function NotificationsScreen() {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backBtn}>
+        <Pressable onPress={() => safeGoBack(router)} style={styles.backBtn}>
           <Ionicons name="chevron-back" size={24} color={Colors.text} />
         </Pressable>
         <Text style={styles.headerTitle}>Bildirimler</Text>
@@ -270,7 +269,7 @@ export default function NotificationsScreen() {
         </View>
       ) : (
         <FlatList
-          data={notifications}
+          data={notifications.filter(n => n.type !== 'follow_rejected')}
           keyExtractor={(item) => item.id}
           renderItem={renderNotification}
           contentContainerStyle={{ paddingBottom: 40 }}
