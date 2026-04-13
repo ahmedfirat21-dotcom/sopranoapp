@@ -576,52 +576,15 @@ export default function RoomScreen() {
     };
   }, [id, firebaseUser]); // BUG-7: room?.host_id kaldırıldı — ref ile takip
 
-  // ★ ZOMBİ ÖNLEME — AppState ile arka plan tespiti
-  useEffect(() => {
-    if (!id || !firebaseUser) return;
-    const bgTimerRef = { current: null as ReturnType<typeof setTimeout> | null };
-    const subscription = AppState.addEventListener('change', (nextState) => {
-      if (nextState === 'background' || nextState === 'inactive') {
-        // BUG-R8 FIX: Oda minimize edilmişse arka plan leave yapma
-        if (isMinimizingRef.current) return;
-        // 60 saniye arka planda kalırsa odadan çıkar
-        bgTimerRef.current = setTimeout(() => {
-          RoomService.leave(id as string, firebaseUser.uid).catch(() => {});
-        }, 60000);
-      } else if (nextState === 'active') {
-        // Ön plana döndüyse timeout'u iptal et
-        if (bgTimerRef.current) {
-          clearTimeout(bgTimerRef.current);
-          bgTimerRef.current = null;
-        }
-      }
-    });
-    return () => {
-      subscription.remove();
-      if (bgTimerRef.current) clearTimeout(bgTimerRef.current);
-    };
-  }, [id, firebaseUser]);
-
-  // ★ HEARTBEAT + ZOMBİ TEMİZLİĞİ — 60sn'de bir heartbeat + 90sn'de bir zombie temizle
-  useEffect(() => {
-    if (!id || !firebaseUser) return;
-    // Hemen ilk heartbeat + temizlik
-    RoomService.heartbeat(id as string, firebaseUser.uid).catch(() => {});
-    RoomService.cleanupZombies(id as string).catch(() => {});
-
-    const heartbeatInterval = setInterval(() => {
-      RoomService.heartbeat(id as string, firebaseUser.uid).catch(() => {});
-    }, 60000);
-
-    const cleanupInterval = setInterval(() => {
-      RoomService.cleanupZombies(id as string).catch(() => {});
-    }, 90000);
-
-    return () => {
-      clearInterval(heartbeatInterval);
-      clearInterval(cleanupInterval);
-    };
-  }, [id, firebaseUser]);
+  // ★ ARCH-1: Heartbeat, zombie, AppState → useRoomLifecycle hook
+  useRoomLifecycle({
+    roomId: id as string,
+    firebaseUser,
+    room,
+    router,
+    isMinimizingRef,
+    setMinimizedRoom,
+  });
 
   // ★ Host tier'ına göre ses/video kalite ayarları
   const hostTierForQuality = (room?.host?.subscription_tier as any) || 'Free';
@@ -1073,7 +1036,9 @@ export default function RoomScreen() {
   // ★ Moderasyon fonksiyonları useRoomModeration hook'una taşındı
 
 
-  // ========== ODA SÜRESİ ZAMANLAYICISI ==========
+  // ★ ARCH-1: Room timer → useRoomLifecycle hook'undan geliyor (yukarıda çağrıldı)
+  // Not: useRoomLifecycle zaten render'ın üstünde çağrılıyor — roomDuration/roomExpiry oradan gelecek
+  // Geçici: inline kalıyor çünkü lifecycle hook return'unu burada kullanamıyoruz (hook çağrı sırası)
   const [roomDuration, setRoomDuration] = useState('0 dk');
   const [roomExpiry, setRoomExpiry] = useState('');
   useEffect(() => {
@@ -1084,34 +1049,19 @@ export default function RoomScreen() {
       const hrs = Math.floor(mins / 60);
       if (hrs > 0) setRoomDuration(`${hrs} sa ${mins % 60} dk`);
       else setRoomDuration(`${mins} dk`);
-
-      // Kalan süre göstergesi (free odalar için)
       if (room.expires_at) {
         const remaining = new Date(room.expires_at).getTime() - Date.now();
         if (remaining <= 0) {
-            // Süre dolunca oda otomatik kapat + upsell
-            const _t = ((room as any)?.owner_tier || room?.host?.subscription_tier || 'Free') as any;
-            UpsellService.onRoomDurationExpired(_t);
+          const _t = ((room as any)?.owner_tier || room?.host?.subscription_tier || 'Free') as any;
+          UpsellService.onRoomDurationExpired(_t);
           setRoomExpiry('⏰ Süre doldu!');
-          // ★ BUG-K FIX: Free/Bronze odalar süre dolunca otomatik kapanmalı
           const isHost = room.host_id === firebaseUser?.uid;
           if (isHost) {
             showToast({ title: '⏰ Süre Doldu', message: 'Oda süresi doldu. Oda kapatılıyor...', type: 'warning' });
-            setTimeout(async () => {
-              try {
-                await RoomService.close(id as string);
-                liveKitService.disconnect().catch(() => {});
-                setMinimizedRoom(null);
-                safeGoBack(router);
-              } catch {}
-            }, 3000); // 3sn sonra oto-kapat (kullanıcı mesajı görsün)
+            setTimeout(async () => { try { await RoomService.close(id as string); liveKitService.disconnect().catch(() => {}); setMinimizedRoom(null); safeGoBack(router); } catch {} }, 3000);
           } else {
             showToast({ title: '⏰ Süre Doldu', message: 'Oda süresi doldu. Oda kapanıyor...', type: 'warning' });
-            setTimeout(() => {
-              liveKitService.disconnect().catch(() => {});
-              setMinimizedRoom(null);
-              safeGoBack(router);
-            }, 5000);
+            setTimeout(() => { liveKitService.disconnect().catch(() => {}); setMinimizedRoom(null); safeGoBack(router); }, 5000);
           }
           return;
         }
@@ -1122,7 +1072,6 @@ export default function RoomScreen() {
       }
     };
     updateDuration();
-    // BUG-RM4 FIX: Son 2 dakikada 5sn'de bir kontrol (süre doğruluğu)
     const remaining = room.expires_at ? new Date(room.expires_at).getTime() - Date.now() : Infinity;
     const interval = remaining < 120000 ? 5000 : 30000;
     const timer = setInterval(updateDuration, interval);
