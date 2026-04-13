@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, Pressable, Animated, Dimensions, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Animated, Dimensions, ScrollView, PanResponder } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 const { width: W, height: H } = Dimensions.get('window');
@@ -59,6 +59,17 @@ export default function RoomStatsPanel({
 
   if (!visible) return null;
 
+  // ★ Swipe-to-dismiss
+  const panResponder = PanResponder.create({
+    onStartShouldSetPanResponder: () => false,
+    onMoveShouldSetPanResponder: (_, g) => g.dy > 10 && Math.abs(g.dy) > Math.abs(g.dx) * 1.5,
+    onPanResponderMove: (_, g) => { if (g.dy > 0) slideAnim.setValue(g.dy); },
+    onPanResponderRelease: (_, g) => {
+      if (g.dy > 80 || g.vy > 0.5) { onClose(); }
+      else { Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true, tension: 100, friction: 12 }).start(); }
+    },
+  });
+
   const stats: StatItem[] = [
     { icon: 'people', label: 'Mevcut', value: currentListeners, color: '#14B8A6', desc: 'Anlık katılımcı' },
     { icon: 'person-add', label: 'Toplam', value: totalUniqueListeners, color: '#3B82F6', desc: 'Benzersiz katılımcı' },
@@ -74,7 +85,7 @@ export default function RoomStatsPanel({
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
       </Animated.View>
 
-      <Animated.View style={[st.panel, { transform: [{ translateY: slideAnim }] }]}>
+      <Animated.View style={[st.panel, { transform: [{ translateY: slideAnim }] }]} {...panResponder.panHandlers}>
         {/* Handle */}
         <View style={st.handle} />
 
@@ -92,9 +103,6 @@ export default function RoomStatsPanel({
               </View>
             )}
           </View>
-          <Pressable onPress={onClose} hitSlop={8} style={st.closeBtn}>
-            <Ionicons name="close" size={16} color="#64748B" />
-          </Pressable>
         </View>
 
         <ScrollView bounces={false} showsVerticalScrollIndicator={false} style={{ maxHeight: H * 0.55 }}>

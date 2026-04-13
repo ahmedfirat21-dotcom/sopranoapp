@@ -660,7 +660,6 @@ export default function RoomSettingsSheet(props: RoomSettingsProps) {
               <View style={s.headerIcon}><Ionicons name="settings-outline" size={18} color="#14B8A6" /></View>
               <Text style={s.headerTitle}>Oda Ayarları</Text>
             </View>
-            <Pressable onPress={onClose} style={s.closeBtn}><Ionicons name="close" size={18} color="rgba(255,255,255,0.4)" /></Pressable>
           </View>
 
           {/* Tab Bar */}

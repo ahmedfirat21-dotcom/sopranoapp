@@ -192,10 +192,7 @@ export default function ProfileCard({
             </View>
           </View>
 
-          {/* Kapat */}
-          <TouchableOpacity onPress={handleClose} style={sty.closeBtn} hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}>
-            <Ionicons name="close" size={16} color={C.white30} />
-          </TouchableOpacity>
+
         </View>
 
         {/* ════════════════════════════════════════════

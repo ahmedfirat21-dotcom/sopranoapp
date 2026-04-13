@@ -112,11 +112,6 @@ export function EmojiReactionBar({ onReaction, onClose }: { onReaction: (emoji: 
         <TouchableOpacity style={[sty.tabBtn, tab === 'gif' && sty.tabActive]} onPress={() => setTab('gif')}>
           <Text style={[sty.tabText, tab === 'gif' && sty.tabTextActive]}>GIF</Text>
         </TouchableOpacity>
-        {onClose && (
-          <TouchableOpacity style={{ marginLeft: 'auto', padding: 4 }} onPress={onClose}>
-            <Ionicons name="close-circle" size={22} color="rgba(255,255,255,0.4)" />
-          </TouchableOpacity>
-        )}
       </View>
 
       {/* ════ Emoji Tab ════ */}

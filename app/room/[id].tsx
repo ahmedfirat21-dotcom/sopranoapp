@@ -1531,13 +1531,15 @@ export default function RoomScreen() {
       {!!entryEffectName && <PremiumEntryBanner name={entryEffectName} onDone={() => setEntryEffectName(null)} />}
       <FloatingReactionsView ref={floatingRef} />
       <SPToast ref={spToastRef} />
-      {showEmojiBar && (<View style={{ position: 'absolute', bottom: Math.max(insets.bottom, 14) + 100, left: 0, right: 0, alignItems: 'center', zIndex: 50 }}><EmojiReactionBar onReaction={(emoji) => {
+      {showEmojiBar && (<>
+        <Pressable style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 49 }} onPress={() => setShowEmojiBar(false)} />
+        <View style={{ position: 'absolute', bottom: Math.max(insets.bottom, 14) + 100, left: 0, right: 0, alignItems: 'center', zIndex: 50 }}><EmojiReactionBar onReaction={(emoji) => {
         sendEmojiReaction(emoji);
-        // Chat mesajı olarak da gönder
         if (firebaseUser) {
           RoomChatService.send(id as string, firebaseUser.uid, emoji).catch(() => {});
         }
-      }} onClose={() => setShowEmojiBar(false)} /></View>)}
+      }} onClose={() => setShowEmojiBar(false)} /></View>
+      </>)}
 
       <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, paddingBottom: Math.max(insets.bottom, 14) + 2 }}>
         <LinearGradient colors={['transparent', 'rgba(5,10,20,0.95)']} locations={[0, 0.4]} style={[StyleSheet.absoluteFill, { top: -20 }]} pointerEvents="none" />
@@ -1570,7 +1572,7 @@ export default function RoomScreen() {
               return;
             }
             try { lk.toggleCamera?.(); } catch {}
-          }} onEmojiPress={() => setShowEmojiBar(true)}
+          }} onEmojiPress={() => setShowEmojiBar(!showEmojiBar)}
           onHandPress={handleMicRequest} onChatPress={() => setShowChatDrawer(!showChatDrawer)} onPlusPress={() => setShowPlusMenu(true)}
           onLeavePress={() => {
             setAlertConfig({

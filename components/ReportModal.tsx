@@ -98,9 +98,6 @@ export function ReportModal({ visible, onClose, reporterId, target }: ReportModa
               <Ionicons name="flag" size={16} color={C.red} />
             </View>
             <Text style={sty.title}>{targetLabel} Rapor Et</Text>
-            <TouchableOpacity onPress={onClose} style={sty.closeBtn}>
-              <Ionicons name="close" size={16} color={C.white30} />
-            </TouchableOpacity>
           </View>
 
           <ScrollView style={sty.scrollContent} showsVerticalScrollIndicator={false}>

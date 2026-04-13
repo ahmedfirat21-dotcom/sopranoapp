@@ -147,9 +147,6 @@ export default function HandRaiseQueuePanel({
                 </View>
               )}
             </View>
-            <Pressable style={s.closeBtn} onPress={onClose}>
-              <Ionicons name="close" size={20} color="#94A3B8" />
-            </Pressable>
           </View>
 
           {/* Sahne Durumu */}

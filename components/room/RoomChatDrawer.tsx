@@ -92,9 +92,6 @@ export default function RoomChatDrawer({ visible, messages, chatInput, onChangeI
         <View style={s.header}>
           <View style={s.headerDot} />
           <Text style={s.headerTitle}>Oda Sohbeti</Text>
-          <Pressable onPress={onClose} hitSlop={12}>
-            <Ionicons name="close" size={18} color="rgba(255,255,255,0.4)" />
-          </Pressable>
         </View>
 
         {/* Mesajlar — ★ UX-6 FIX: inverted FlatList ile en yeni mesaj altta */}

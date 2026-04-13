@@ -170,9 +170,6 @@ export function PlusMenu({
             <Ionicons name={role.icon as any} size={12} color={role.color} style={s.iconShadow} />
             <Text style={[s.roleLabel, { color: role.color }]}>{role.label}</Text>
           </View>
-          <Pressable onPress={onClose} style={s.closeBtn} hitSlop={8}>
-            <Ionicons name="close" size={16} color="#94A3B8" />
-          </Pressable>
         </View>
 
         {/* Items */}
