@@ -38,6 +38,11 @@ type PlusMenuProps = {
   onMuteAll?: () => void;
   onRoomStats?: () => void;
   onDeleteRoom?: () => void;
+  // ★ RM-4: Boost (Öne Çıkar)
+  onBoostRoom?: () => void;
+  // ★ RM-5: Oda takip (dinleyiciler için)
+  onToggleFollow?: () => void;
+  isFollowingRoom?: boolean;
 };
 
 const ROLE_META: Record<string, { label: string; color: string; icon: string }> = {
@@ -55,6 +60,7 @@ export function PlusMenu({
   userRole = 'listener',
   ownerTier = 'Free',
   onMuteAll, onRoomStats, onDeleteRoom,
+  onBoostRoom, onToggleFollow, isFollowingRoom,
 }: PlusMenuProps) {
   // ═══ Animasyon ═══
   const slideAnim = useRef(new Animated.Value(200)).current; // yukarı kayma
@@ -123,6 +129,14 @@ export function PlusMenu({
   // 🚩 Bildir (dinleyiciler)
   if (!isOnStage && onReportRoom) {
     items.push({ id: 'report', icon: 'flag-outline', label: 'Odayı Bildir', accent: '#EF4444', onPress: onReportRoom, destructive: true });
+  }
+  // ★ RM-4: Boost — Bronze+ owner
+  if (isOwner && onBoostRoom && isTierAtLeast(ownerTier as any, 'Bronze')) {
+    items.push({ id: 'boost', icon: 'rocket-outline', label: 'Keşfette Öne Çıkar', desc: 'SP ile boost', accent: '#F59E0B', onPress: onBoostRoom });
+  }
+  // ★ RM-5: Oda Takip Et/Bırak (dinleyiciler + speaker'lar, owner hariç)
+  if (!isOwner && onToggleFollow) {
+    items.push({ id: 'follow', icon: isFollowingRoom ? 'heart' : 'heart-outline', label: isFollowingRoom ? 'Takibi Bırak' : 'Odayı Takip Et', accent: isFollowingRoom ? '#EF4444' : '#EC4899', onPress: onToggleFollow });
   }
   // 🗑️ Odayı Sil (Owner)
   if (isOwner && onDeleteRoom) {

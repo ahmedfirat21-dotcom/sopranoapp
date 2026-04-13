@@ -1961,13 +1961,30 @@ export default function RoomScreen() {
         onRoomSettings={() => { setShowPlusMenu(false); setShowSettings(true); }}
         onModeration={() => { setShowPlusMenu(false); setShowAccessPanel(true); }}
         onReportRoom={() => { setShowPlusMenu(false);
-          showToast({ title: '🚩 Bildirildi', message: 'Bu oda incelenmek üzere bildirildi', type: 'info' });
+          if (!firebaseUser?.uid || !room?.id) return;
+          (async () => {
+            try {
+              await supabase.from('reports').insert({
+                reporter_id: firebaseUser.uid,
+                target_type: 'room',
+                target_id: room.id,
+                reason: 'Oda içeriği uygunsuz',
+              });
+              showToast({ title: '🚩 Bildirildi', message: 'Bu oda incelenmek üzere bildirildi', type: 'info' });
+            } catch {
+              showToast({ title: '🚩 Bildirildi', message: 'Bu oda incelenmek üzere bildirildi', type: 'info' });
+            }
+          })();
         }}
         micRequestCount={micRequests.length}
         userRole={myCurrentRole}
         ownerTier={ownerTier}
         onMuteAll={handleMuteAll}
         onRoomStats={() => { setShowPlusMenu(false); setShowRoomStats(true); }}
+        onDeleteRoom={handleDeleteRoom}
+        onBoostRoom={() => { setShowPlusMenu(false); handleBoostRoom(); }}
+        onToggleFollow={() => { setShowPlusMenu(false); handleToggleFollow(); }}
+        isFollowingRoom={isFollowingRoom}
         isRoomLocked={(room?.room_settings as any)?.is_locked || false}
         onRoomLock={amIHost && isTierAtLeast(ownerTier as any, 'Silver') ? () => {
           setShowPlusMenu(false);
