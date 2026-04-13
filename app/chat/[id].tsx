@@ -523,15 +523,11 @@ export default function ChatScreen() {
           }
         } catch { /* silent */ }
 
-        // ★ Mute ve Block durumunu yükle
+        // ★ Mute durumunu yükle (engel kontrolü zaten L449-456'da yapılıyor)
         try {
           const muteKey = `mute_chat_${firebaseUser.uid}_${id}`;
           const muteVal = await AsyncStorage.getItem(muteKey);
           setIsMuted(muteVal === 'true');
-        } catch {}
-        try {
-          const blocked = await ModerationService.isBlocked(firebaseUser.uid, id);
-          setIsBlocked(blocked);
         } catch {}
       } catch (err) {
         if (__DEV__) console.warn('Sohbet yüklenemedi:', err);

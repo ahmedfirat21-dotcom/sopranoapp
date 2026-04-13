@@ -291,6 +291,31 @@ export default function SettingsScreen() {
                     await supabase.from('block_list').delete().or(`blocker_id.eq.${uid},blocked_id.eq.${uid}`);
                   } catch { /* tablo yoksa sessiz */ }
 
+                  // 7b. Bildirimleri sil
+                  try {
+                    await supabase.from('notifications').delete().or(`user_id.eq.${uid},sender_id.eq.${uid}`);
+                  } catch { /* tablo yoksa sessiz */ }
+
+                  // 7c. Oda takiplerini sil
+                  try {
+                    await supabase.from('room_follows').delete().eq('user_id', uid);
+                  } catch { /* tablo yoksa sessiz */ }
+
+                  // 7d. Oda sohbet mesajlarını sil
+                  try {
+                    await supabase.from('room_chat_messages').delete().eq('user_id', uid);
+                  } catch { /* tablo yoksa sessiz */ }
+
+                  // 7e. Rozetleri sil
+                  try {
+                    await supabase.from('user_badges').delete().eq('user_id', uid);
+                  } catch { /* tablo yoksa sessiz */ }
+
+                  // 7f. Davet kodlarını sil
+                  try {
+                    await supabase.from('referral_codes').delete().eq('owner_id', uid);
+                  } catch { /* tablo yoksa sessiz */ }
+
                   // 8. Profili sil
                   await supabase.from('profiles').delete().eq('id', uid);
 

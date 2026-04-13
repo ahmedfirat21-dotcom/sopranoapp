@@ -278,6 +278,14 @@ export default function UserProfileScreen() {
   const isMutual = isFollowing && incomingStatus === 'accepted';
   const hasIncomingPending = incomingStatus === 'pending';
 
+  // ★ ECO-7 FIX: Gizli profil kontrolü — takipçi değilse detaylar gizlenir
+  const isPrivateProfile = !isOwnProfile && (
+    (userProfile as any)?.privacy_mode === 'private' ||
+    (userProfile as any)?.privacy_mode === 'followers_only' ||
+    (userProfile as any)?.is_private === true
+  );
+  const canSeeFullProfile = isOwnProfile || isFollowing || !isPrivateProfile;
+
   return (
     <AppBackground variant="profile">
     <View style={s.container}>
@@ -416,6 +424,17 @@ export default function UserProfileScreen() {
           </>
         )}
 
+        {/* ★ ECO-7: Gizli profil bildirimi */}
+        {!canSeeFullProfile && (
+          <View style={{ marginHorizontal: 16, marginBottom: 10, padding: 20, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.04)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', alignItems: 'center' }}>
+            <Ionicons name="lock-closed" size={28} color="#94A3B8" />
+            <Text style={{ color: '#94A3B8', fontSize: 13, fontWeight: '600', marginTop: 8, textAlign: 'center' }}>Bu hesap gizli</Text>
+            <Text style={{ color: '#64748B', fontSize: 11, marginTop: 4, textAlign: 'center' }}>İçerikleri görmek için takip et</Text>
+          </View>
+        )}
+
+        {canSeeFullProfile && (
+        <>
         {/* ═══ Rozetler (kompakt) ═══ */}
         {userBadges.length > 0 && (
           <View style={s.listContainer}>
@@ -479,6 +498,8 @@ export default function UserProfileScreen() {
           <View style={s.bannerWrap}>
             <Image source={{ uri: (userProfile as any).banner_url }} style={s.bannerImg} />
           </View>
+        )}
+        </>
         )}
       </ScrollView>
 
