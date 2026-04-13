@@ -651,79 +651,179 @@ export default function RoomSettingsSheet(props: RoomSettingsProps) {
 }
 
 // ═══════════════════════════════════════════════════
-// STYLES
+// STYLES — Premium Glassmorphism
 // ═══════════════════════════════════════════════════
 const s = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
   sheet: {
-    backgroundColor: '#2d3d4d',
-    borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    backgroundColor: '#1E293B',
+    borderTopLeftRadius: 28, borderTopRightRadius: 28,
     paddingHorizontal: 20, paddingBottom: 36,
-    borderWidth: 1, borderColor: 'rgba(20,184,166,0.12)', borderBottomWidth: 0,
+    borderWidth: 1, borderColor: 'rgba(20,184,166,0.15)', borderBottomWidth: 0,
+    shadowColor: '#000', shadowOffset: { width: 0, height: -8 }, shadowOpacity: 0.5, shadowRadius: 24, elevation: 20,
   },
-  handle: { width: 40, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.1)', alignSelf: 'center', marginTop: 12, marginBottom: 10 },
+  handle: { width: 40, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.12)', alignSelf: 'center', marginTop: 12, marginBottom: 10 },
 
   // Header
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.04)' },
+  header: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12,
+    paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)',
+  },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  headerIcon: { width: 36, height: 36, borderRadius: 12, backgroundColor: 'rgba(20,184,166,0.1)', borderWidth: 1, borderColor: 'rgba(20,184,166,0.2)', alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontSize: 17, fontWeight: '700', color: '#F1F5F9' },
-  closeBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.05)', alignItems: 'center', justifyContent: 'center' },
+  headerIcon: {
+    width: 38, height: 38, borderRadius: 12,
+    backgroundColor: 'rgba(20,184,166,0.12)', borderWidth: 1, borderColor: 'rgba(20,184,166,0.25)',
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#14B8A6', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 4,
+  },
+  headerTitle: {
+    fontSize: 17, fontWeight: '700', color: '#F1F5F9',
+    textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
+  },
+  closeBtn: {
+    width: 32, height: 32, borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+    alignItems: 'center', justifyContent: 'center',
+  },
 
   // Tab Bar
-  tabBar: { flexDirection: 'row', maxHeight: 36 },
+  tabBar: { flexDirection: 'row', maxHeight: 38 },
   tab: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    paddingHorizontal: 10, paddingVertical: 7, borderRadius: 10,
-    backgroundColor: 'rgba(255,255,255,0.03)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.04)',
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    paddingHorizontal: 11, paddingVertical: 8, borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.04)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
   },
-  tabActive: { backgroundColor: 'rgba(20,184,166,0.1)', borderColor: 'rgba(20,184,166,0.25)' },
-  tabText: { fontSize: 10, fontWeight: '600', color: '#475569' },
-  tabTextActive: { color: '#14B8A6' },
+  tabActive: {
+    backgroundColor: 'rgba(20,184,166,0.12)', borderColor: 'rgba(20,184,166,0.3)',
+    shadowColor: '#14B8A6', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.15, shadowRadius: 6, elevation: 2,
+  },
+  tabText: {
+    fontSize: 10, fontWeight: '600', color: '#64748B',
+    textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
+  },
+  tabTextActive: { color: '#5EEAD4' },
 
   // Section
-  sectionTitle: { fontSize: 12, fontWeight: '700', color: 'rgba(255,255,255,0.4)', letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 10 },
+  sectionTitle: {
+    fontSize: 12, fontWeight: '700', color: 'rgba(255,255,255,0.45)', letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 10,
+    textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
+  },
 
   // Row
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.03)' },
-  rowIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  row: {
+    flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 13,
+    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.04)',
+  },
+  rowIcon: {
+    width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 3,
+  },
   rowInfo: { flex: 1 },
-  rowLabel: { fontSize: 14, fontWeight: '600', color: '#F1F5F9' },
-  rowDesc: { fontSize: 11, color: '#64748B', marginTop: 2 },
+  rowLabel: {
+    fontSize: 14, fontWeight: '600', color: '#F1F5F9',
+    textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
+  },
+  rowDesc: {
+    fontSize: 11, color: '#94A3B8', marginTop: 2,
+    textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
+  },
 
   // Toggle Pill
-  togglePill: { flexDirection: 'row', borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.04)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)', overflow: 'hidden' },
-  toggleOption: { paddingHorizontal: 10, paddingVertical: 6 },
-  toggleOptionActive: { backgroundColor: 'rgba(20,184,166,0.2)' },
-  toggleText: { fontSize: 11, fontWeight: '600', color: '#64748B' },
-  toggleTextActive: { color: '#14B8A6' },
+  togglePill: {
+    flexDirection: 'row', borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.04)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', overflow: 'hidden',
+  },
+  toggleOption: { paddingHorizontal: 12, paddingVertical: 7 },
+  toggleOptionActive: {
+    backgroundColor: 'rgba(20,184,166,0.2)',
+    shadowColor: '#14B8A6', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.2, shadowRadius: 6,
+  },
+  toggleText: {
+    fontSize: 11, fontWeight: '600', color: '#64748B',
+    textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
+  },
+  toggleTextActive: { color: '#5EEAD4' },
 
   // Speaker Button
-  speakerBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' },
-  speakerBtnActive: { backgroundColor: 'rgba(245,158,11,0.1)', borderColor: 'rgba(245,158,11,0.25)' },
-  speakerBtnText: { fontSize: 11, fontWeight: '600', color: '#94A3B8' },
+  speakerBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8,
+    borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+  },
+  speakerBtnActive: {
+    backgroundColor: 'rgba(245,158,11,0.12)', borderColor: 'rgba(245,158,11,0.3)',
+    shadowColor: '#F59E0B', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.15, shadowRadius: 6,
+  },
+  speakerBtnText: {
+    fontSize: 11, fontWeight: '600', color: '#94A3B8',
+    textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
+  },
 
   // Theme
-  themeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, paddingBottom: 8 },
-  themeCircle: { width: 36, height: 36, borderRadius: 18, borderWidth: 2, borderColor: 'rgba(255,255,255,0.06)', overflow: 'hidden' },
-  themeCircleActive: { borderColor: '#14B8A6', borderWidth: 2 },
+  themeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingBottom: 8 },
+  themeCircle: {
+    width: 40, height: 40, borderRadius: 20, borderWidth: 2, borderColor: 'rgba(255,255,255,0.08)', overflow: 'hidden',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 3,
+  },
+  themeCircleActive: {
+    borderColor: '#14B8A6', borderWidth: 2.5,
+    shadowColor: '#14B8A6', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.3, shadowRadius: 8,
+  },
   themeGrad: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' } as any,
-  themeName: { fontSize: 8, fontWeight: '700', color: '#FFF' },
-  themeCheck: { position: 'absolute' as const, bottom: -1, right: -1, width: 12, height: 12, borderRadius: 6, backgroundColor: '#14B8A6', alignItems: 'center' as any, justifyContent: 'center' as any },
+  themeName: {
+    fontSize: 9, fontWeight: '700', color: '#FFF',
+    textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
+  },
+  themeCheck: {
+    position: 'absolute' as const, bottom: -1, right: -1, width: 14, height: 14, borderRadius: 7,
+    backgroundColor: '#14B8A6', alignItems: 'center' as any, justifyContent: 'center' as any,
+    shadowColor: '#14B8A6', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.4, shadowRadius: 4,
+  },
 
-  // Close Room
-  closeRoomBtn: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 20, padding: 14, borderRadius: 14, backgroundColor: 'rgba(239,68,68,0.06)', borderWidth: 1, borderColor: 'rgba(239,68,68,0.15)' },
-  closeRoomIcon: { width: 38, height: 38, borderRadius: 12, backgroundColor: 'rgba(239,68,68,0.12)', alignItems: 'center', justifyContent: 'center' },
-  closeRoomTitle: { fontSize: 14, fontWeight: '700', color: '#EF4444' },
-  closeRoomDesc: { fontSize: 11, color: '#64748B', marginTop: 2 },
+  // Close Room / Delete / Leave
+  closeRoomBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 20, padding: 14, borderRadius: 16,
+    backgroundColor: 'rgba(239,68,68,0.06)', borderWidth: 1, borderColor: 'rgba(239,68,68,0.18)',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 6, elevation: 3,
+  },
+  closeRoomIcon: {
+    width: 40, height: 40, borderRadius: 14, backgroundColor: 'rgba(239,68,68,0.12)',
+    alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(239,68,68,0.2)',
+  },
+  closeRoomTitle: {
+    fontSize: 14, fontWeight: '700', color: '#EF4444',
+    textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
+  },
+  closeRoomDesc: {
+    fontSize: 11, color: '#94A3B8', marginTop: 2,
+    textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
+  },
 
   // Name Edit
-  nameInput: { flex: 1, height: 40, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', paddingHorizontal: 12, color: '#F1F5F9', fontSize: 14 },
-  saveNameBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: 'rgba(20,184,166,0.25)', alignItems: 'center', justifyContent: 'center' },
+  nameInput: {
+    flex: 1, height: 42, borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
+    paddingHorizontal: 14, color: '#F1F5F9', fontSize: 14,
+  },
+  saveNameBtn: {
+    width: 38, height: 38, borderRadius: 12,
+    backgroundColor: 'rgba(20,184,166,0.25)', borderWidth: 1, borderColor: 'rgba(20,184,166,0.35)',
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#14B8A6', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.2, shadowRadius: 6,
+  },
 
-  // Slow Mode Pills
-  slowPill: { paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.04)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' },
-  slowPillActive: { backgroundColor: 'rgba(59,130,246,0.15)', borderColor: 'rgba(59,130,246,0.3)' },
-  slowPillText: { fontSize: 10, fontWeight: '600', color: '#64748B' },
-  slowPillTextActive: { color: '#60A5FA' },
+  // Slow Mode / Option Pills
+  slowPill: {
+    paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+  },
+  slowPillActive: {
+    backgroundColor: 'rgba(59,130,246,0.15)', borderColor: 'rgba(59,130,246,0.35)',
+    shadowColor: '#3B82F6', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.15, shadowRadius: 6,
+  },
+  slowPillText: {
+    fontSize: 10, fontWeight: '600', color: '#94A3B8',
+    textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
+  },
+  slowPillTextActive: { color: '#93C5FD' },
 });
