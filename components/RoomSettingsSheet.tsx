@@ -20,19 +20,19 @@ import type { SubscriptionTier } from '../types';
 
 // Inline tema tanımları
 const ROOM_THEME_MAP: Record<string, { name: string; colors: [string, string]; }> = {
-  ocean:   { name: 'Okyanus',  colors: ['#0E4D6F', '#083344'] },
-  sunset:  { name: 'Gün Batımı', colors: ['#7F1D1D', '#4C0519'] },
-  forest:  { name: 'Orman',    colors: ['#14532D', '#052E16'] },
-  galaxy:  { name: 'Galaksi',  colors: ['#312E81', '#1E1B4B'] },
-  aurora:  { name: 'Aurora',   colors: ['#134E4A', '#042F2E'] },
-  cherry:  { name: 'Kiraz',    colors: ['#831843', '#500724'] },
-  cyber:   { name: 'Cyber',    colors: ['#1E3A8A', '#172554'] },
-  volcano: { name: 'Volkan',   colors: ['#7C2D12', '#431407'] },
-  midnight:{ name: 'Gece',     colors: ['#0C0A3E', '#1B1464'] },
-  rose:    { name: 'Gül',      colors: ['#9F1239', '#881337'] },
-  arctic:  { name: 'Kutup',    colors: ['#164E63', '#0E7490'] },
-  amber:   { name: 'Kehribar', colors: ['#78350F', '#92400E'] },
-  slate:   { name: 'Arduvaz', colors: ['#1E293B', '#334155'] },
+  ocean: { name: 'Okyanus', colors: ['#0E4D6F', '#083344'] },
+  sunset: { name: 'Gün Batımı', colors: ['#7F1D1D', '#4C0519'] },
+  forest: { name: 'Orman', colors: ['#14532D', '#052E16'] },
+  galaxy: { name: 'Galaksi', colors: ['#312E81', '#1E1B4B'] },
+  aurora: { name: 'Aurora', colors: ['#134E4A', '#042F2E'] },
+  cherry: { name: 'Kiraz', colors: ['#831843', '#500724'] },
+  cyber: { name: 'Cyber', colors: ['#1E3A8A', '#172554'] },
+  volcano: { name: 'Volkan', colors: ['#7C2D12', '#431407'] },
+  midnight: { name: 'Gece', colors: ['#0C0A3E', '#1B1464'] },
+  rose: { name: 'Gül', colors: ['#9F1239', '#881337'] },
+  arctic: { name: 'Kutup', colors: ['#164E63', '#0E7490'] },
+  amber: { name: 'Kehribar', colors: ['#78350F', '#92400E'] },
+  slate: { name: 'Arduvaz', colors: ['#1E293B', '#334155'] },
 };
 
 export type MicMode = 'normal' | 'music';
@@ -183,12 +183,12 @@ function TogglePill({ active, labelA, labelB, onToggle }: {
 // ═══════════════════════════════════════════════════
 type TabId = 'general' | 'speaking' | 'moderation' | 'visual' | 'monetization' | 'advanced';
 const TABS: { id: TabId; label: string; icon: string }[] = [
-  { id: 'general',        label: 'Genel',        icon: 'settings-outline' },
-  { id: 'speaking',       label: 'Konuşma',      icon: 'mic-outline' },
-  { id: 'moderation',     label: 'Moderasyon',   icon: 'shield-outline' },
-  { id: 'visual',         label: 'Görsellik',    icon: 'color-palette-outline' },
-  { id: 'monetization',   label: 'Monetizasyon', icon: 'cash-outline' },
-  { id: 'advanced',       label: 'Gelişmiş',     icon: 'rocket-outline' },
+  { id: 'general', label: 'Genel', icon: 'settings-outline' },
+  { id: 'speaking', label: 'Konuşma', icon: 'mic-outline' },
+  { id: 'moderation', label: 'Moderasyon', icon: 'shield-outline' },
+  { id: 'visual', label: 'Görsellik', icon: 'color-palette-outline' },
+  { id: 'monetization', label: 'Monetizasyon', icon: 'cash-outline' },
+  { id: 'advanced', label: 'Gelişmiş', icon: 'rocket-outline' },
 ];
 
 // ═══════════════════════════════════════════════════
@@ -429,12 +429,12 @@ export default function RoomSettingsSheet(props: RoomSettingsProps) {
       {/* Dil Filtresi — Silver+ */}
       {isHost && (can('Silver') ? (
         onLanguageChange && (
-          <SettingRow icon="globe" iconBg="rgba(192,192,192,0.2)" label={`Oda Dili: ${({'tr':'Türkçe','en':'English','de':'Deutsch','ar':'العربية'})[roomLanguage || 'tr'] || roomLanguage || 'Türkçe'}`} desc="Oda dil tercihini belirle"
+          <SettingRow icon="globe" iconBg="rgba(192,192,192,0.2)" label={`Oda Dili: ${({ 'tr': 'Türkçe', 'en': 'English', 'de': 'Deutsch', 'ar': 'العربية' })[roomLanguage || 'tr'] || roomLanguage || 'Türkçe'}`} desc="Oda dil tercihini belirle"
             right={
               <View style={{ flexDirection: 'row', gap: 4 }}>
                 {['tr', 'en', 'de', 'ar'].map(lang => (
                   <Pressable key={lang} style={[s.slowPill, roomLanguage === lang && s.slowPillActive]} onPress={() => onLanguageChange(lang)}>
-                    <Text style={[s.slowPillText, roomLanguage === lang && s.slowPillTextActive]}>{({'tr':'🇹🇷','en':'🇬🇧','de':'🇩🇪','ar':'🇸🇦'})[lang]}</Text>
+                    <Text style={[s.slowPillText, roomLanguage === lang && s.slowPillTextActive]}>{({ 'tr': '🇹🇷', 'en': '🇬🇧', 'de': '🇩🇪', 'ar': '🇸🇦' })[lang]}</Text>
                   </Pressable>
                 ))}
               </View>
@@ -541,7 +541,7 @@ export default function RoomSettingsSheet(props: RoomSettingsProps) {
       {/* Oda Müziği — Gold+ */}
       {can('Gold') ? (
         isHost && onMusicChange && (
-          <SettingRow icon="musical-notes" iconBg="rgba(255,215,0,0.2)" label={musicTrack ? `Müzik: ${({'lofi':'Lofi','ambient':'Ambient','jazz':'Jazz'})[musicTrack] || musicTrack}` : 'Oda Müziği Kapalı'} desc="Arka planda ambient ses döngüsü"
+          <SettingRow icon="musical-notes" iconBg="rgba(255,215,0,0.2)" label={musicTrack ? `Müzik: ${({ 'lofi': 'Lofi', 'ambient': 'Ambient', 'jazz': 'Jazz' })[musicTrack] || musicTrack}` : 'Oda Müziği Kapalı'} desc="Arka planda ambient ses döngüsü"
             right={
               <View style={{ flexDirection: 'row', gap: 4 }}>
                 {([null, 'lofi', 'ambient', 'jazz'] as const).map(track => (
