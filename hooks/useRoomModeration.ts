@@ -125,6 +125,7 @@ export function useRoomModeration({
         type: 'broadcast', event: 'mod_action',
         payload: { action: !currentMuted ? 'chat_mute' : 'chat_unmute', targetUserId: userId },
       });
+      setParticipants(prev => prev.map(p => p.user_id === userId ? { ...p, is_chat_muted: !currentMuted } : p));
       setSelectedUser(null);
       showToast({
         title: !currentMuted ? 'Metin Susturuldu' : 'Metin Açıldı',
@@ -174,6 +175,7 @@ export function useRoomModeration({
                 payload: { action: 'make_moderator', targetUserId: userId },
               });
             }
+            setParticipants(prev => prev.map(p => p.user_id === userId ? { ...p, role: isMod ? 'speaker' as const : 'moderator' as const } : p));
             setSelectedUser(null);
             showToast({ title: isMod ? 'Moderatörlük Kaldırıldı' : 'Moderatör Yapıldı', message: displayName, type: 'success' });
           } catch (e) {
@@ -193,6 +195,7 @@ export function useRoomModeration({
         type: 'broadcast', event: 'mod_action',
         payload: { action: 'mute', targetUserId: userId, reason: `${durationMinutes ? durationMinutes + ' dakika' : 'Süresiz'} susturuldun.` },
       });
+      setParticipants(prev => prev.map(p => p.user_id === userId ? { ...p, is_muted: true, role: 'listener' as const } : p));
       setSelectedUser(null);
       const durationText = durationMinutes ? `${durationMinutes} dakika` : 'süresiz';
       showToast({ title: 'Susturuldu', message: `${displayName} ${durationText} susturuldu`, type: 'success' });
@@ -230,6 +233,7 @@ export function useRoomModeration({
         type: 'broadcast', event: 'mod_action',
         payload: { action: 'unmute', targetUserId: userId },
       });
+      setParticipants(prev => prev.map(p => p.user_id === userId ? { ...p, is_muted: false } : p));
       setSelectedUser(null);
       showToast({ title: 'Susturma Kaldırıldı', message: `${displayName} artık konuşabilir`, type: 'success' });
     } catch {
