@@ -9,13 +9,11 @@ import {
   Pressable,
   TextInput,
   ScrollView,
-  FlatList,
   Easing,
   Image,
   ImageBackground,
   KeyboardAvoidingView,
   Platform,
-  AppState,
   Share,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -27,7 +25,7 @@ import { Audio } from 'expo-av';
 import { safeGoBack } from '../../constants/navigation';
 
 // SopranoChat Services
-import { RoomService, RealtimeService, getRoomLimits, MessageService, type Room, type RoomParticipant } from '../../services/database';
+import { RoomService, RealtimeService, getRoomLimits, type Room, type RoomParticipant } from '../../services/database';
 import { RoomHistoryService } from '../../services/roomHistory';
 import { supabase } from '../../constants/supabase';
 import { RoomChatService, type RoomMessage } from '../../services/roomChat';
