@@ -1514,7 +1514,7 @@ export default function RoomScreen() {
 
       <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 130 }}>
         <SpeakerSection stageUsers={stageUsers} getMicStatus={getMicStatus}
-          onSelectUser={(u) => { if (u.user_id === firebaseUser?.uid) handleSelfDemote(); else setSelectedUser(u); }}
+          onSelectUser={(u) => setSelectedUser(u)}
           currentUserId={firebaseUser?.uid} VideoView={LKVideoView}
           onGhostSeatPress={handleGhostSeatPress} showSeatTooltip={showSeatTooltip} />
         <ListenerGrid listeners={listenerUsers} onSelectUser={(u) => setSelectedUser(u)} selectedUserId={selectedUser?.user_id} onShowAllUsers={() => setShowAudienceDrawer(true)} maxListeners={getRoomLimits(ownerTier as any).maxListeners} spectatorCount={spectatorUsers.length} roomOwnerId={room?.host_id} />
