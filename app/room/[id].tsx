@@ -72,6 +72,10 @@ import { UpsellService } from '../../services/upsell';
 import SPToast, { type SPToastRef } from '../../components/SPToast';
 import { GamificationService } from '../../services/gamification';
 import { useRoomModeration } from '../../hooks/useRoomModeration';
+import { useRoomBroadcast } from '../../hooks/useRoomBroadcast';
+import { useRoomDM } from '../../hooks/useRoomDM';
+import { useRoomLifecycle } from '../../hooks/useRoomLifecycle';
+import { useRoomGamification } from '../../hooks/useRoomGamification';
 
 
 // ★ LiveKit VideoView — native modül yoksa null (prod build gerektirmez)
@@ -124,9 +128,6 @@ export default function RoomScreen() {
   const [showAccessPanel, setShowAccessPanel] = useState(false);
   const [echoCancellation, setEchoCancellation] = useState(true);
   const [showInviteFriends, setShowInviteFriends] = useState(false);
-  const [dmTarget, setDmTarget] = useState<{ userId: string; nick: string } | null>(null);
-  const [dmText, setDmText] = useState('');
-  const [dmSending, setDmSending] = useState(false);
   const [isFollowingRoom, setIsFollowingRoom] = useState(false);
 
   // ★ Şifre Modal — closed (şifreli) odalar için
@@ -137,9 +138,14 @@ export default function RoomScreen() {
   const [accessPending, setAccessPending] = useState(false);
   // ★ Kullanıcıların takip durumu (oda içi ProfileCard için)
   const [userFollowStatus, setUserFollowStatus] = useState<Record<string, 'pending' | 'accepted' | 'blocked' | null>>({});
-  const [dmUnreadCount, setDmUnreadCount] = useState(0);
-  const [showDmPanel, setShowDmPanel] = useState(false);
-  const [dmInboxMessages, setDmInboxMessages] = useState<any[]>([]);
+
+  // ★ ARCH-1: DM hook — inline DM state/logic kaldırıldı
+  const {
+    dmUnreadCount, dmInboxMessages,
+    dmTarget, setDmTarget, dmText, setDmText, dmSending,
+    showDmPanel, setShowDmPanel,
+    handleSendDm, toggleDmPanel,
+  } = useRoomDM({ firebaseUser });
 
   // ★ ODA KAPANMA GERİ SAYIMI — Host+Mod yoksa 60sn sonra kapanır
   const [closingCountdown, setClosingCountdown] = useState<number | null>(null);
@@ -151,212 +157,32 @@ export default function RoomScreen() {
   // ★ Konuşma modu state
   const [speakingMode, setSpeakingMode] = useState<'free_for_all' | 'permission_only' | 'selected_only'>('permission_only');
   const [showRoomStats, setShowRoomStats] = useState(false);
-
-
   const [roomStats, setRoomStats] = useState({ peakCCU: 0, totalUniqueListeners: 0, totalReactions: 0 });
   const isRoomClosingRef = useRef(false);
 
   // ★ SP Toast ref — animasyonlu SP kazanım bildirimi
   const spToastRef = useRef<SPToastRef>(null);
 
-  // ★ Emoji Broadcast — Supabase Realtime ile tüm odaya gönder
-  const emojiBroadcastRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
-  useEffect(() => {
-    if (!id) return;
-    const ch = supabase.channel(`emoji:${id}`);
-    ch.on('broadcast', { event: 'emoji' }, (payload: any) => {
-      if (payload?.payload?.emoji) {
-        floatingRef.current?.spawn(payload.payload.emoji);
-      }
-    }).subscribe();
-    emojiBroadcastRef.current = ch;
-    return () => {
-      supabase.removeChannel(ch);
-    };
-  }, [id]);
-
-
-  // ★ MİKROFON İSTEĞİ BROADCAST — Supabase Realtime ile host/mod'a bildir
-  const micReqChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
-  useEffect(() => {
-    if (!id || !firebaseUser) return;
-    const ch = supabase.channel(`mic_req:${id}`);
-    ch.on('broadcast', { event: 'mic_request' }, (payload: any) => {
-      const data = payload?.payload;
-      if (!data) return;
-      if (data.type === 'request') {
-        setMicRequests(prev => {
-          if (prev.includes(data.userId)) return prev;
-          return [...prev, data.userId];
-        });
-        const reqMsg = {
-          id: `mic_req_${data.userId}_${Date.now()}`,
-          room_id: id as string,
-          user_id: data.userId,
-          content: '🤚 Mikrofon isteği gönderdi',
-          created_at: new Date().toISOString(),
-          profiles: { display_name: data.displayName || 'Kullanıcı' },
-          isSystem: true,
-        } as any;
-        setChatMessages(prev => [reqMsg, ...prev].slice(0, 100));
-      } else if (data.type === 'cancel') {
-        setMicRequests(prev => prev.filter(u => u !== data.userId));
-      } else if (data.type === 'approved' && data.userId === firebaseUser.uid) {
-        // ★ FEAT-1: Söz hakkı onaylandı — otomatik sahneye al + mikrofon aç
-        setMyMicRequested(false);
-        showToast({ title: '🤚 Onaylandı!', message: 'Sahneye alındınız! Mikrofon otomatik açılıyor...', type: 'success' });
-        // ★ BUG FIX: Optimistik state güncelleme — listener → speaker (UI anında sahneye taşır)
-        setParticipants(prev => prev.map(p => p.user_id === firebaseUser.uid ? { ...p, role: 'speaker' as const, is_muted: false } : p));
-        // Mikrofonu otomatik aç (bağlantı varsa)
-        setTimeout(() => {
-          lk.enableMic?.().catch(() => {});
-        }, 500);
-      } else if (data.type === 'rejected' && data.userId === firebaseUser.uid) {
-        setMyMicRequested(false);
-        showToast({ title: 'Reddedildi', message: 'Mikrofon isteğiniz reddedildi.', type: 'warning' });
-      }
-    }).subscribe();
-    micReqChannelRef.current = ch;
-    return () => { supabase.removeChannel(ch); };
-  }, [id, firebaseUser]);
-
-  // ★ BUG-8 FIX: Emoji rate-limit (throttle — max 3/sn)
-  const lastEmojiTimeRef = useRef(0);
-  const sendEmojiReaction = useCallback((emoji: string) => {
-    const now = Date.now();
-    if (now - lastEmojiTimeRef.current < 333) return; // 3/sn limit
-    lastEmojiTimeRef.current = now;
-    floatingRef.current?.spawn(emoji);
-    emojiBroadcastRef.current?.send({
-      type: 'broadcast',
-      event: 'emoji',
-      payload: { emoji },
-    });
-  }, []);
-
-  // ★ MODERASYON BROADCAST — Kick/Mute/Demote anlık bildirim
-  const modChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
-  useEffect(() => {
-    if (!id || !firebaseUser) return;
-    const ch = supabase.channel(`mod_action:${id}`);
-    ch.on('broadcast', { event: 'mod_action' }, (payload: any) => {
-      const data = payload?.payload;
-      if (!data) return;
-
-      // ★ Oda geneli eventlar — targetUserId filtresi UYGULANMAZ
-      if (data.action === 'room_closing_countdown') {
-        const seconds = data.seconds || 60;
-        setClosingCountdown(seconds);
-        showToast({ title: '⏳ Oda Kapanıyor', message: `Oda sahibi ve moderatör ayrıldı. Oda ${seconds} saniye içinde kapanacak.`, type: 'warning' });
-        return;
-      } else if (data.action === 'original_host_returned') {
-        setClosingCountdown(null);
-        showToast({ title: '👑 Oda Sahibi Döndü!', message: `${data.hostName || 'Oda sahibi'} geri döndü. Oda yönetimi devredildi.`, type: 'success' });
-        RoomService.get(id as string).then(setRoom).catch(() => {});
-        return;
-      } else if (data.action === 'host_claimed') {
-        setClosingCountdown(null);
-        showToast({ title: '👑 Yeni Host!', message: `${data.hostName || 'Birisi'} odanın host'u oldu. Geri sayım iptal edildi.`, type: 'success' });
-        RoomService.get(id as string).then(setRoom).catch(() => {});
-        return;
-      } else if (data.action === 'room_frozen') {
-        // ★ Oda donduruldu — tüm katılımcılar bilgilendirilip çıkarılır
-        showToast({ title: '❄️ Oda Donduruldu', message: `${data.hostName || 'Oda sahibi'} odayı dondurdu. Dilediğinde tekrar aktifleştirebilir.`, type: 'warning' });
-        setTimeout(() => {
-          liveKitService.disconnect().catch(() => {});
-          safeGoBack(router);
-        }, 2000);
-        return;
-      } else if (data.action === 'room_deleted') {
-        // ★ Oda kalıcı olarak silindi — tüm katılımcılar çıkarılır
-        showToast({ title: '🗑️ Oda Silindi', message: `${data.hostName || 'Oda sahibi'} odayı kalıcı olarak sildi.`, type: 'error' });
-        setTimeout(() => {
-          liveKitService.disconnect().catch(() => {});
-          safeGoBack(router);
-        }, 2000);
-        return;
-      }
-
-      // ★ mute_all — oda geneli, tüm sahnedeki kişiler için
-      if (data.action === 'mute_all') {
-        // BUG-RD5 FIX: Host kendini susturmasın
-        const amHost = roomHostRef.current === firebaseUser?.uid;
-        if (!amHost && lk.isMicrophoneEnabled) {
-          lk.toggleMic().catch(() => {});
-        }
-        showToast({ title: '🔇 Tümü Susturuldu', message: 'Oda sahibi tüm konuşmacıları susturdu.', type: 'warning' });
-        return;
-      }
-
-      // ★ Kullanıcı hedefli eventlar — sadece hedef kullanıcıya iletilir
-      if (data.targetUserId !== firebaseUser.uid) return;
-
-      if (data.action === 'kick') {
-        showToast({ title: '⛔ Odadan Çıkarıldın', message: data.reason || 'Moderatör seni odadan çıkardı.', type: 'error' });
-        setTimeout(() => {
-          liveKitService.disconnect().catch(() => {});
-          safeGoBack(router);
-        }, 1500);
-      } else if (data.action === 'mute') {
-        showToast({ title: '🔇 Susturuldun', message: data.reason || 'Moderatör seni susturdu.', type: 'warning' });
-        if (lk.isMicrophoneEnabled) {
-          lk.toggleMic().catch(() => {});
-        }
-      } else if (data.action === 'demote') {
-        showToast({ title: '⬇️ Sahneden İndirildin', message: 'Moderatör seni dinleyiciye düşürdü.', type: 'info' });
-        // ★ BUG FIX: Optimistik state güncelleme — speaker → listener (UI anında dinleyici grid'ine taşır)
-        setParticipants(prev => prev.map(p => p.user_id === firebaseUser.uid ? { ...p, role: 'listener' as const } : p));
-        if (lk.isMicrophoneEnabled) {
-          lk.toggleMic().catch(() => {});
-        }
-      } else if (data.action === 'promote') {
-        showToast({ title: '🎤 Sahneye Alındın!', message: 'Artık konuşabilirsin! Mikrofon otomatik açılıyor...', type: 'success' });
-        // ★ BUG FIX: Optimistik state güncelleme — listener → speaker (UI anında sahneye taşır)
-        setParticipants(prev => prev.map(p => p.user_id === firebaseUser.uid ? { ...p, role: 'speaker' as const, is_muted: false } : p));
-        setTimeout(() => {
-          lk.enableMic?.().catch(() => {});
-        }, 500);
-      } else if (data.action === 'make_moderator') {
-        showToast({ title: '🛡️ Moderatör Yapıldın!', message: 'Artık odayı yönetebilirsin.', type: 'success' });
-      } else if (data.action === 'remove_moderator') {
-        showToast({ title: '🛡️ Moderatörlük Kaldırıldı', message: 'Moderatörlük yetkin kaldırıldı.', type: 'info' });
-      } else if (data.action === 'chat_mute') {
-        showToast({ title: '💬 Metin Susturuldu', message: 'Moderatör metin sohbetini kapattı.', type: 'warning' });
-      } else if (data.action === 'chat_unmute') {
-        showToast({ title: '💬 Metin Açıldı', message: 'Artık mesaj yazabilirsin.', type: 'success' });
-      } else if (data.action === 'host_transferred') {
-        showToast({ title: '👑 Vekil Host Oldun!', message: `${data.oldHostName || 'Oda sahibi'} odayı sana devretti. Oda sahibi geri dönene kadar odayı yönetiyorsun!`, type: 'success' });
-      }
-    });
-
-    // ★ SETTINGS_CHANGED — Oda ayarları değiştiğinde tüm kullanıcılara yansıt
-    ch.on('broadcast', { event: 'settings_changed' }, (payload: any) => {
-      const newSettings = payload?.payload;
-      if (!newSettings) return;
-      // Room state'ini güncelle — room_settings merge, üst seviye alanlar override
-      setRoom(prev => {
-        if (!prev) return prev;
-        const merged: any = { ...prev };
-        if (newSettings.room_settings) {
-          merged.room_settings = { ...(prev.room_settings || {}), ...newSettings.room_settings };
-          // ★ BUG-R10 FIX: speakingMode broadcast'tan güncelle
-          const newSpeakingMode = newSettings.room_settings.speaking_mode;
-          if (newSpeakingMode && ['free_for_all', 'permission_only', 'selected_only'].includes(newSpeakingMode)) {
-            setSpeakingMode(newSpeakingMode);
-          }
-        }
-        if (newSettings.name !== undefined) merged.name = newSettings.name;
-        if (newSettings.type !== undefined) merged.type = newSettings.type;
-        if (newSettings.theme_id !== undefined) merged.theme_id = newSettings.theme_id;
-        if (newSettings.room_image_url !== undefined) merged.room_image_url = newSettings.room_image_url;
-        return merged;
-      });
-    });
-
-    ch.subscribe();
-    modChannelRef.current = ch;
-    return () => { supabase.removeChannel(ch); };
-  }, [id, firebaseUser]);
+  // ★ ARCH-1 FIX: Broadcast kanalları hook'a taşındı (~200 satır kaldırıldı)
+  const roomHostRef = useRef<string | null>(null);
+  const { emojiBroadcastRef, micReqChannelRef, modChannelRef, sendEmojiReaction } = useRoomBroadcast({
+    roomId: id as string,
+    firebaseUser,
+    profile,
+    room,
+    router,
+    floatingRef,
+    setRoom,
+    setParticipants,
+    setChatMessages,
+    setMicRequests,
+    setMyMicRequested,
+    setClosingCountdown,
+    setSpeakingMode,
+    setMinimizedRoom,
+    roomHostRef,
+    lk: { isMicrophoneEnabled: false, toggleMic: async () => {}, enableMic: async () => {} },
+  });
   // Mikrofon modu değiştiğinde LiveKit'i de güncelle
   const handleMicModeChange = (mode: MicMode) => {
     setMicMode(mode);
@@ -825,30 +651,13 @@ export default function RoomScreen() {
     }
   }, [lk.connectFailed, loading]);
 
-  // BUG-7 FIX: room.host_id için ref (stale closure önleme)
-  const roomHostRef = useRef<string | null>(null);
+  // BUG-7 FIX: room.host_id için ref sync (stale closure önleme)
+  // roomHostRef useRoomBroadcast hook'undan geliyor — burada sadece sync
   useEffect(() => {
     roomHostRef.current = room?.host_id || null;
   }, [room?.host_id]);
 
-  // ★ DM Okunmamış Mesaj Sayacı — badge için
-  useEffect(() => {
-    if (!firebaseUser?.uid) return;
-    // İlk yükle
-    MessageService.getUnreadCount(firebaseUser.uid).then(setDmUnreadCount).catch(() => {});
-    // Realtime: yeni mesaj gelince sayaç güncelle
-    const ch = supabase.channel(`dm_badge_${firebaseUser.uid}`)
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'messages',
-        filter: `receiver_id=eq.${firebaseUser.uid}`,
-      }, () => {
-        setDmUnreadCount(prev => prev + 1);
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(ch); };
-  }, [firebaseUser?.uid]);
+  // ★ DM okunmamış sayacı artık useRoomDM hook'unda
 
   // Gerçek zamanlı mikrofon ses seviyesi (expo-av metering)
   const localAudioLevel = useMicMeter(lk.isMicrophoneEnabled || false);
@@ -1626,53 +1435,9 @@ export default function RoomScreen() {
     ? { uri: hostUser.user.avatar_url }
     : getAvatarSource(room?.host_id?.includes('female') ? 'avatar_f_1.png' : 'avatar_m_2.png');
 
-  // ========== DM GÖNDER (Instagram/X.com tarzı: message request modeli) ==========
-  const handleSendDm = useCallback(async () => {
-    if (!dmTarget || !dmText.trim() || dmSending || !firebaseUser) return;
-    setDmSending(true);
-    try {
-      // BUG-DM-A FIX: Engel kontrolü — engellenen kişiye DM gönderilemesin
-      try {
-        const isBlocked = await ModerationService.isBlocked(firebaseUser.uid, dmTarget.userId);
-        if (isBlocked) {
-          showToast({ title: '⛔ Engellendin', message: 'Bu kullanıcıya mesaj gönderemezsin.', type: 'error' });
-          setDmTarget(null);
-          return;
-        }
-        const blockedByTarget = await ModerationService.isBlocked(dmTarget.userId, firebaseUser.uid);
-        if (blockedByTarget) {
-          showToast({ title: 'Mesaj Gönderilemedi', message: 'Bu kullanıcı seni engellemiş.', type: 'error' });
-          setDmTarget(null);
-          return;
-        }
-      } catch {} // Engel kontrolü başarısız olursa devam et (graceful)
 
-      // ★ Instagram/X.com tarzı: Takipleşme kontrolü
-      // Karşılıklı takipleşme yoksa → mesaj isteği olarak gönderilir
-      let isMessageRequest = false;
-      try {
-        const { outgoing, incoming } = await FriendshipService.getDetailedStatus(firebaseUser.uid, dmTarget.userId);
-        const isMutual = outgoing === 'accepted' && incoming === 'accepted';
-        if (!isMutual) {
-          isMessageRequest = true;
-        }
-      } catch {} // Takip kontrolü başarısız olursa normal gönder
+  // ★ ARCH-1: handleSendDm artık useRoomDM hook'undan geliyor
 
-      await MessageService.send(firebaseUser.uid, dmTarget.userId, dmText.trim(), isMessageRequest);
-
-      if (isMessageRequest) {
-        showToast({ title: '📩 Mesaj İsteği Gönderildi', message: `${dmTarget.nick} takipleşmediğiniz için mesaj isteği olarak gönderildi`, type: 'info' });
-      } else {
-        showToast({ title: 'Mesaj Gönderildi', message: `${dmTarget.nick}'e mesaj gönderildi`, type: 'success' });
-      }
-      setDmTarget(null);
-      setDmText('');
-    } catch {
-      showToast({ title: 'Hata', message: 'Mesaj gönderilemedi', type: 'error' });
-    } finally {
-      setDmSending(false);
-    }
-  }, [dmTarget, dmText, dmSending, firebaseUser]);
 
 
   // showChatDrawer state
@@ -1861,13 +1626,7 @@ export default function RoomScreen() {
           onJoinStagePress={handleOwnerModJoinStage}
           isRoomMuted={roomMuted}
           chatBadgeCount={0} isChatOpen={showChatDrawer}
-          dmBadgeCount={dmUnreadCount} onDmPress={() => {
-            setShowDmPanel(prev => !prev);
-            if (!showDmPanel) {
-              MessageService.getInbox(firebaseUser!.uid).then(msgs => setDmInboxMessages(msgs)).catch(() => {});
-              setDmUnreadCount(0);
-            }
-          }}
+          dmBadgeCount={dmUnreadCount} onDmPress={toggleDmPanel}
           onMicPress={handleMicPress}
           onMuteRoomPress={() => setRoomMuted(!roomMuted)}
           onCameraPress={() => {
