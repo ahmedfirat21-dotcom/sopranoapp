@@ -15,22 +15,12 @@ import { getAvatarSource } from '../../constants/avatars';
 import { UserSearchModal } from '../../components/UserSearchModal';
 import AppBackground from '../../components/AppBackground';
 import { showToast } from '../../components/Toast';
+import { getRelativeTime } from '../../constants/time';
 import PremiumAlert, { type AlertButton } from '../../components/PremiumAlert';
 import { ModerationService } from '../../services/moderation';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 
-
-function getRelativeTime(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'Az önce';
-  if (mins < 60) return `${mins}dk`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}sa`;
-  const days = Math.floor(hours / 24);
-  return `${days}g`;
-}
 
 // ═══ Pure-RN Swipe-to-Delete Row ═══
 function SwipeableRow({ children, onDelete }: { children: React.ReactNode; onDelete: () => void }) {

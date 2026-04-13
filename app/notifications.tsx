@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { safeGoBack } from '../constants/navigation';
 import { Colors } from '../constants/theme';
+import { getRelativeTime } from '../constants/time';
 import { supabase } from '../constants/supabase';
 import { FriendshipService, type PendingRequest } from '../services/friendship';
 import { getAvatarSource } from '../constants/avatars';
@@ -42,16 +43,7 @@ const NOTIF_CONFIG: Record<string, { icon: string; color: string; verb: string }
   follow_rejected: { icon: 'close-circle-outline', color: '#94A3B8', verb: '' },
 };
 
-function getRelativeTime(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'Az önce';
-  if (mins < 60) return `${mins}dk`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}sa`;
-  const days = Math.floor(hours / 24);
-  return `${days}g`;
-}
+
 
 export default function NotificationsScreen() {
   const router = useRouter();
