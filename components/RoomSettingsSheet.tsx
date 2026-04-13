@@ -326,7 +326,7 @@ export default function RoomSettingsSheet(props: RoomSettingsProps) {
 
       {/* Odayı Dondur — Bronze+ */}
       {canFreezeRoom && onFreezeRoom && (
-        <Pressable style={[s.closeRoomBtn, { borderColor: 'rgba(59,130,246,0.2)', backgroundColor: 'rgba(59,130,246,0.06)' }]} onPress={() => { onClose(); onFreezeRoom(); }}>
+        <Pressable style={s.closeRoomBtn} onPress={() => { onClose(); onFreezeRoom(); }}>
           <View style={[s.closeRoomIcon, { backgroundColor: 'rgba(59,130,246,0.12)', borderColor: 'rgba(59,130,246,0.25)' }]}><Ionicons name="snow" size={20} color="#3B82F6" /></View>
           <View style={{ flex: 1 }}>
             <Text style={[s.closeRoomTitle, { color: '#3B82F6' }]}>Odayı Dondur</Text>
@@ -348,7 +348,7 @@ export default function RoomSettingsSheet(props: RoomSettingsProps) {
 
       {/* Odadan Ayrıl */}
       {onLeaveRoom && (
-        <Pressable style={[s.closeRoomBtn, { borderColor: 'rgba(245,158,11,0.2)', backgroundColor: 'rgba(245,158,11,0.06)', marginTop: 10 }]} onPress={() => { onClose(); onLeaveRoom(); }}>
+        <Pressable style={[s.closeRoomBtn, { marginTop: 10 }]} onPress={() => { onClose(); onLeaveRoom(); }}>
           <View style={[s.closeRoomIcon, { backgroundColor: 'rgba(245,158,11,0.12)', borderColor: 'rgba(245,158,11,0.25)' }]}><Ionicons name="exit" size={20} color="#F59E0B" /></View>
           <View style={{ flex: 1 }}>
             <Text style={[s.closeRoomTitle, { color: '#F59E0B' }]}>Odadan Ayrıl</Text>
@@ -782,9 +782,8 @@ const s = StyleSheet.create({
 
   // Close Room / Delete / Leave
   closeRoomBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 20, padding: 14, borderRadius: 16,
-    backgroundColor: 'rgba(239,68,68,0.06)', borderWidth: 1, borderColor: 'rgba(239,68,68,0.18)',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 6, elevation: 3,
+    flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 16, padding: 14, borderRadius: 16,
+    backgroundColor: 'transparent',
   },
   closeRoomIcon: {
     width: 40, height: 40, borderRadius: 14, backgroundColor: 'rgba(239,68,68,0.12)',
