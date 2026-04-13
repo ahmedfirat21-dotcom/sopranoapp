@@ -5,7 +5,7 @@
 import React, { useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Image,
-  Animated, Dimensions, Pressable, ScrollView,
+  Animated, Dimensions, Pressable, ScrollView, PanResponder,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { getAvatarSource } from '../../constants/avatars';
@@ -105,10 +105,26 @@ export default function ProfileCard({
 
   const handleClose = () => {
     Animated.parallel([
-      Animated.timing(slideY, { toValue: H * 0.3, duration: 180, useNativeDriver: true }),
+      Animated.timing(slideY, { toValue: H * 0.5, duration: 200, useNativeDriver: true }),
       Animated.timing(overlayOpacity, { toValue: 0, duration: 180, useNativeDriver: true }),
     ]).start(() => onClose());
   };
+
+  // ★ Swipe-to-dismiss PanResponder
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_, g) => g.dy > 10 && Math.abs(g.dy) > Math.abs(g.dx) * 1.5,
+      onPanResponderMove: (_, g) => { if (g.dy > 0) slideY.setValue(g.dy); },
+      onPanResponderRelease: (_, g) => {
+        if (g.dy > 80 || g.vy > 0.5) {
+          handleClose();
+        } else {
+          Animated.spring(slideY, { toValue: 0, useNativeDriver: true, tension: 100, friction: 12 }).start();
+        }
+      },
+    })
+  ).current;
 
   // Mute süresi
   const getMuteTimeLeft = () => {
@@ -131,8 +147,8 @@ export default function ProfileCard({
       </Animated.View>
 
       {/* Card */}
-      <Animated.View style={[sty.card, { transform: [{ translateY: slideY }] }]}>
-        {/* ──── Handle bar ──── */}
+      <Animated.View style={[sty.card, { transform: [{ translateY: slideY }] }]} {...panResponder.panHandlers}>
+        {/* ──── Handle bar (sürükle) ──── */}
         <View style={sty.handle} />
         <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
 

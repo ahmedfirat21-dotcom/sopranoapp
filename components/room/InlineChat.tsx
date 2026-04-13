@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, Image, StyleSheet } from 'react-native';
 
 interface ChatMsg {
   id: string;
@@ -25,6 +25,7 @@ export default function InlineChat({ messages, maxLines = 6 }: Props) {
       {visible.map((msg, idx) => {
         // idx=0 en yeni, idx=last en eski → eski mesajlar daha soluk
         const opacity = 1 - (idx / (visible.length || 1)) * 0.7;
+
         if (msg.isSystem) {
           return (
             <Text key={msg.id} style={[s.sysLine, { opacity }]} numberOfLines={2}>
@@ -32,6 +33,30 @@ export default function InlineChat({ messages, maxLines = 6 }: Props) {
             </Text>
           );
         }
+
+        // GIF mesajı kontrolü
+        const gifMatch = msg.content.match(/^\[gif:(.*)\]$/);
+        // Tek emoji kontrolü
+        const emojiOnly = /^[\p{Emoji_Presentation}\p{Extended_Pictographic}\u200d\uFE0F\u20E3]{1,6}$/u.test(msg.content) && msg.content.length <= 14;
+
+        if (gifMatch) {
+          return (
+            <View key={msg.id} style={[s.gifRow, { opacity }]}>
+              <Text style={s.msgName}>{msg.profiles?.display_name || 'Kullanıcı'}  </Text>
+              <Image source={{ uri: gifMatch[1] }} style={s.gifThumb} resizeMode="cover" />
+            </View>
+          );
+        }
+
+        if (emojiOnly) {
+          return (
+            <Text key={msg.id} style={[s.msgLine, { opacity }]} numberOfLines={1}>
+              <Text style={s.msgName}>{msg.profiles?.display_name || 'Kullanıcı'}  </Text>
+              <Text style={{ fontSize: 22 }}>{msg.content}</Text>
+            </Text>
+          );
+        }
+
         return (
           <Text key={msg.id} style={[s.msgLine, { opacity }]} numberOfLines={1}>
             <Text style={s.msgName}>{msg.profiles?.display_name || 'Kullanıcı'}  </Text>
@@ -62,6 +87,17 @@ const s = StyleSheet.create({
   msgText: {
     fontSize: 12,
     color: 'rgba(255,255,255,0.8)',
+  },
+  gifRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 2,
+    gap: 6,
+  },
+  gifThumb: {
+    width: 48,
+    height: 36,
+    borderRadius: 6,
   },
   sysLine: {
     paddingVertical: 1.5,

@@ -11,6 +11,7 @@
 import React from 'react';
 import {
   View, Text, StyleSheet, Pressable, Modal, Switch, ScrollView, TextInput,
+  PanResponder, Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -232,6 +233,24 @@ export default function RoomSettingsSheet(props: RoomSettingsProps) {
   const tier = (ownerTier || 'Free') as SubscriptionTier;
   const can = (req: SubscriptionTier) => isTierAtLeast(tier, req);
   const themeEntries = Object.entries(ROOM_THEME_MAP);
+
+  // ★ Swipe-to-dismiss
+  const swipeY = React.useRef(new Animated.Value(0)).current;
+  const panResponder = React.useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_, g) => g.dy > 10 && Math.abs(g.dy) > Math.abs(g.dx) * 1.5,
+      onPanResponderMove: (_, g) => { if (g.dy > 0) swipeY.setValue(g.dy); },
+      onPanResponderRelease: (_, g) => {
+        if (g.dy > 100 || g.vy > 0.5) {
+          onClose();
+          swipeY.setValue(0);
+        } else {
+          Animated.spring(swipeY, { toValue: 0, useNativeDriver: true, tension: 100, friction: 12 }).start();
+        }
+      },
+    })
+  ).current;
 
   // ── Tab bar (horizontal scrollable) ──
   const renderTabBar = () => (
@@ -630,7 +649,8 @@ export default function RoomSettingsSheet(props: RoomSettingsProps) {
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={s.overlay} onPress={onClose}>
-        <Pressable style={s.sheet} onPress={e => e.stopPropagation()}>
+        <Animated.View style={[s.sheet, { transform: [{ translateY: swipeY }] }]} {...panResponder.panHandlers}>
+        <Pressable onPress={e => e.stopPropagation()} style={{ flex: 1 }}>
           {/* Handle */}
           <View style={s.handle} />
 
@@ -651,6 +671,7 @@ export default function RoomSettingsSheet(props: RoomSettingsProps) {
             {renderContent()}
           </ScrollView>
         </Pressable>
+        </Animated.View>
       </Pressable>
     </Modal>
   );

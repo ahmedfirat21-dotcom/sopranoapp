@@ -6,6 +6,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, Modal, Pressable, FlatList,
   Image, TextInput, ActivityIndicator, Alert,
+  PanResponder, Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -109,10 +110,25 @@ export default function HostAccessPanel({ visible, onClose, roomId, roomType, ho
     }
   };
 
+  // ★ Swipe-to-dismiss
+  const swipeY = React.useRef(new Animated.Value(0)).current;
+  const panR = React.useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_, g) => g.dy > 10 && Math.abs(g.dy) > Math.abs(g.dx) * 1.5,
+      onPanResponderMove: (_, g) => { if (g.dy > 0) swipeY.setValue(g.dy); },
+      onPanResponderRelease: (_, g) => {
+        if (g.dy > 100 || g.vy > 0.5) { onClose(); swipeY.setValue(0); }
+        else { Animated.spring(swipeY, { toValue: 0, useNativeDriver: true, tension: 100, friction: 12 }).start(); }
+      },
+    })
+  ).current;
+
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={s.overlay} onPress={onClose}>
-        <Pressable style={s.sheet} onPress={e => e.stopPropagation()}>
+        <Animated.View style={[s.sheet, { transform: [{ translateY: swipeY }] }]} {...panR.panHandlers}>
+        <Pressable onPress={e => e.stopPropagation()} style={{ flex: 1 }}>
           {/* Handle */}
           <View style={s.handle} />
           <Text style={s.title}>
@@ -254,6 +270,7 @@ export default function HostAccessPanel({ visible, onClose, roomId, roomType, ho
             </View>
           )}
         </Pressable>
+        </Animated.View>
       </Pressable>
     </Modal>
   );
