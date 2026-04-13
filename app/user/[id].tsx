@@ -232,6 +232,21 @@ export default function UserProfileScreen() {
     });
   };
 
+  const handleDonate = async (amount: number) => {
+    if (!firebaseUser || !id) return;
+    try {
+      const result = await ProfileService.donateToUser(firebaseUser.uid, id, amount);
+      if (result.success) {
+        showToast({ title: `${amount} SP gönderildi! 💎`, type: 'success' });
+        refreshProfile(); // SP bakiyesini güncelle
+      } else {
+        showToast({ title: result.error || 'Transfer başarısız', type: 'error' });
+      }
+    } catch {
+      showToast({ title: 'Bir hata oluştu', type: 'error' });
+    }
+  };
+
   if (loading) {
     return (
       <View style={[s.container, { justifyContent: 'center', alignItems: 'center' }]}>
@@ -431,8 +446,31 @@ export default function UserProfileScreen() {
           </View>
         )}
 
-        {/* ═══ Gold+ Destekle Butonu — SP transfer servisi henüz hazır değil ═══ */}
-        {/* TODO: ProfileService.donateToUser() implementasyonu yapıldığında aktifleştirilecek */}
+        {/* ═══ SP Gönder Butonu ═══ */}
+        {!isOwnProfile && !isBlocked && firebaseUser && (
+          <Pressable
+            style={s.donateCard}
+            onPress={() => {
+              setCAlert({
+                visible: true,
+                title: '💎 SP Gönder',
+                message: `${userProfile.display_name || 'Bu kullanıcı'} adlı kişiye kaç SP göndermek istiyorsun?\n\nBakiyen: ${currentUserProfile?.system_points || 0} SP`,
+                type: 'info',
+                buttons: [
+                  { text: '10 SP', onPress: () => handleDonate(10) },
+                  { text: '50 SP', onPress: () => handleDonate(50) },
+                  { text: '100 SP', onPress: () => handleDonate(100) },
+                  { text: 'Vazgeç', style: 'cancel' },
+                ],
+              });
+            }}
+          >
+            <LinearGradient colors={['#F59E0B', '#EF4444']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.donateGradient}>
+              <Ionicons name="gift-outline" size={18} color="#FFF" />
+              <Text style={s.donateText}>SP Gönder</Text>
+            </LinearGradient>
+          </Pressable>
+        )}
 
         {/* ═══ Banner (Gold+) ═══ */}
         {isTierAtLeast(tier, 'Gold') && (userProfile as any)?.banner_url && (

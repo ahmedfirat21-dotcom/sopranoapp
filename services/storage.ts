@@ -102,7 +102,7 @@ export const StorageService = {
       const arrayBuffer = decode(base64);
 
       const { error } = await supabase.storage
-        .from('post-images')  // TODO: voice-notes bucket oluşturulunca değiştir
+        .from('voice-notes')
         .upload(path, arrayBuffer, {
           contentType: 'audio/mp4',
           upsert: true,
@@ -111,7 +111,7 @@ export const StorageService = {
       if (error) throw error;
 
       const { data: publicUrlData } = supabase.storage
-        .from('post-images')
+        .from('voice-notes')
         .getPublicUrl(path);
 
       return publicUrlData.publicUrl;

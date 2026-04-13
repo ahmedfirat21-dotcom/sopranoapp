@@ -1,7 +1,7 @@
 // LiveKit Sesli/Görüntülü Sohbet Servisi
 // Lazy-load (getLK) mekanizması ile WebRTC uyumsuz cihazlarda çökme önlenir
 
-import { supabase } from '../constants/supabase';
+import { supabase, SUPABASE_ANON_KEY } from '../constants/supabase';
 import { LIVEKIT_URL, LIVEKIT_TOKEN_ENDPOINT } from '../constants/livekit';
 
 let _lk: any = null;
@@ -40,8 +40,6 @@ function getLK(): any {
 
 // ─── Token Servisi ──────────────────────────────────────────
 async function fetchToken(roomId: string, userId: string, displayName: string): Promise<string> {
-  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtwb2ZpdWN6eWplc2pscWp4c3doIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0MzkxNjMsImV4cCI6MjA4ODAxNTE2M30.w3QMkePoTddmI6jdj_jJsdwV4LoxkOg6Nh4sIXrsAQA';
-
   const response = await fetch(LIVEKIT_TOKEN_ENDPOINT, {
     method: 'POST',
     headers: {
@@ -238,6 +236,10 @@ export class LiveKitService {
 
   // ─── Bağlantıyı Kes ──────────────────────────────────────
   async disconnect(): Promise<void> {
+    // ★ Ekran paylaşımı açıksa önce temizle — referans sızıntısı önleme
+    if (this.screenShareTrack || this.screenShareStream) {
+      try { await this.stopScreenShare(); } catch { /* silent */ }
+    }
     if (this.room) {
       try {
         if (this.room.state === 'connected' || this.room.state === 'reconnecting') {

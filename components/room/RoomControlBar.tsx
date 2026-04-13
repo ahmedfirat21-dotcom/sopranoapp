@@ -58,8 +58,9 @@ interface Props {
   onMicPress: () => void; onCameraPress: () => void;
   onEmojiPress: () => void; onHandPress: () => void;
   onChatPress: () => void; onPlusPress: () => void;
-  onLeavePress?: () => void;
   onMuteRoomPress?: () => void;
+  // ★ Odadan ayrıl butonu
+  onLeavePress?: () => void;
   // ★ Gömülü chat input
   chatInput?: string;
   onChatInputChange?: (t: string) => void;
@@ -75,8 +76,8 @@ export default function RoomControlBar({
   handBadgeCount, canModerate, chatBadgeCount, isChatOpen,
   isListener, isOwnerInListenerMode, isModInListenerMode,
   onMicPress, onCameraPress, onEmojiPress,
-  onHandPress, onChatPress, onPlusPress, onLeavePress, onMuteRoomPress,
-  onJoinStagePress,
+  onHandPress, onChatPress, onPlusPress, onMuteRoomPress,
+  onLeavePress, onJoinStagePress,
   chatInput, onChatInputChange, onChatSend, chatInputRef,
   dmBadgeCount, onDmPress,
 }: Props) {
@@ -178,15 +179,6 @@ export default function RoomControlBar({
           <BarBtn onPress={onPlusPress}>
             <Ionicons name="add-circle-outline" size={26} color="#B4BDC4" />
           </BarBtn>
-
-          {/* ★ K2 FIX: Çıkış butonu — odadan ayrılma */}
-          {onLeavePress && (
-            <Pressable onPress={onLeavePress} style={{ position: 'relative' }}>
-              <View style={s.leaveBtn}>
-                <Ionicons name="exit-outline" size={20} color="#FFF" />
-              </View>
-            </Pressable>
-          )}
         </View>
 
       </View>
@@ -287,15 +279,4 @@ const s = StyleSheet.create({
     borderWidth: 1.5, borderColor: '#2D3740',
   },
   badgeText: { color: '#FFF', fontSize: 8, fontWeight: '800' },
-  // ★ K2 FIX: Çıkış butonu stili
-  leaveBtn: {
-    width: BTN_SIZE,
-    height: BTN_SIZE,
-    borderRadius: BTN_SIZE / 2,
-    backgroundColor: 'rgba(239,68,68,0.2)',
-    borderWidth: 1,
-    borderColor: 'rgba(239,68,68,0.35)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
 });

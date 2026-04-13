@@ -169,7 +169,20 @@ export const RevenueCatService = {
    */
   async init(userId?: string): Promise<void> {
     if (REVENUECAT_MOCK_MODE) {
-      if (__DEV__) console.log('[RevenueCat] Mock mode — SDK başlatılmadı');
+      if (__DEV__) {
+        console.log('[RevenueCat] Mock mode — SDK başlatılmadı');
+      } else {
+        // ★ PRODUCTION GÜVENLİK UYARISI: Mock mode production build'de aktif!
+        // Bu durum ödeme almadan tier yükseltmesi yapılmasına sebep olur.
+        console.error(
+          '\n' +
+          '╔══════════════════════════════════════════════════════╗\n' +
+          '║  ⚠️  REVENUECAT_MOCK_MODE = true (PRODUCTION!)     ║\n' +
+          '║  Ödeme bypass riski! revenuecat.ts dosyasında       ║\n' +
+          '║  REVENUECAT_MOCK_MODE = false yapın.                ║\n' +
+          '╚══════════════════════════════════════════════════════╝\n'
+        );
+      }
       return;
     }
     if (this._initialized) return;

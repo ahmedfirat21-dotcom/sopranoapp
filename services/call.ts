@@ -15,14 +15,43 @@ let globalCallUserId: string | null = null;
 // ★ Sinyal dedup — retry nedeniyle aynı sinyalin iki kez işlenmesini önle
 // Aynı callId+action kombini 5sn içinde tekrar gelirse duplikat sayılır
 const _processedSignals = new Map<string, number>();
+const SIGNAL_DEDUP_WINDOW_MS = 5000;
+const SIGNAL_CLEANUP_INTERVAL_MS = 30000;
+const SIGNAL_MAP_MAX_SIZE = 200;
+
+// ★ ARCH-2 FIX: Lazy singleton — hot reload'da birikmez, gerektiğinde başlar
+let _cleanupIntervalId: ReturnType<typeof setInterval> | null = null;
+
+function _ensureCleanupInterval() {
+  if (_cleanupIntervalId) return;
+  _cleanupIntervalId = setInterval(() => {
+    const now = Date.now();
+    for (const [key, ts] of _processedSignals) {
+      if (now - ts > SIGNAL_DEDUP_WINDOW_MS * 2) {
+        _processedSignals.delete(key);
+      }
+    }
+    // ★ Map tamamen boşsa interval'i durdur — gereksiz CPU tüketimi önleme
+    if (_processedSignals.size === 0 && _cleanupIntervalId) {
+      clearInterval(_cleanupIntervalId);
+      _cleanupIntervalId = null;
+    }
+  }, SIGNAL_CLEANUP_INTERVAL_MS);
+}
+
 function isSignalDuplicate(signal: CallSignal): boolean {
+  _ensureCleanupInterval(); // ★ ARCH-2: İlk sinyal geldiğinde temizlik başlatılır
   const key = `${signal.callId}_${signal.action}`;
   const now = Date.now();
   const lastSeen = _processedSignals.get(key);
-  if (lastSeen && (now - lastSeen) < 5000) return true;
+  if (lastSeen && (now - lastSeen) < SIGNAL_DEDUP_WINDOW_MS) return true;
+  // ★ Güvenlik: Map çok şişerse en eski girişleri temizle
+  if (_processedSignals.size >= SIGNAL_MAP_MAX_SIZE) {
+    const entries = [..._processedSignals.entries()].sort((a, b) => a[1] - b[1]);
+    const toDelete = entries.slice(0, Math.floor(SIGNAL_MAP_MAX_SIZE / 2));
+    toDelete.forEach(([k]) => _processedSignals.delete(k));
+  }
   _processedSignals.set(key, now);
-  // 60sn sonra temizle (bellek sızıntısı önleme)
-  setTimeout(() => _processedSignals.delete(key), 60000);
   return false;
 }
 

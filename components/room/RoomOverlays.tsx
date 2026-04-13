@@ -37,7 +37,7 @@ type PlusMenuProps = {
   // ★ VIP Host Paneli Props
   onMuteAll?: () => void;
   onRoomStats?: () => void;
-
+  onDeleteRoom?: () => void;
 };
 
 const ROLE_META: Record<string, { label: string; color: string; icon: string }> = {
@@ -54,7 +54,7 @@ export function PlusMenu({
   isRoomLocked, micRequestCount,
   userRole = 'listener',
   ownerTier = 'Free',
-  onMuteAll, onRoomStats,
+  onMuteAll, onRoomStats, onDeleteRoom,
 }: PlusMenuProps) {
   // ═══ Animasyon ═══
   const slideAnim = useRef(new Animated.Value(200)).current; // yukarı kayma
@@ -123,6 +123,10 @@ export function PlusMenu({
   // 🚩 Bildir (dinleyiciler)
   if (!isOnStage && onReportRoom) {
     items.push({ id: 'report', icon: 'flag-outline', label: 'Odayı Bildir', accent: '#EF4444', onPress: onReportRoom, destructive: true });
+  }
+  // 🗑️ Odayı Sil (Owner)
+  if (isOwner && onDeleteRoom) {
+    items.push({ id: 'delete_room', icon: 'trash-outline', label: 'Odayı Sil', desc: 'Kalıcı olarak siler', accent: '#EF4444', onPress: onDeleteRoom, destructive: true });
   }
 
   return (

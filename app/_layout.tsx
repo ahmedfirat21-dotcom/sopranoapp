@@ -24,7 +24,7 @@ import { Toast } from '../components/Toast';
 import { IncomingCallOverlay } from '../components/IncomingCallOverlay';
 import MiniRoomCard, { type MinimizedRoom } from '../components/MiniRoomCard';
 import ErrorBoundary from '../components/ErrorBoundary';
-import SplashOverlay from '../components/SplashOverlay';
+// SplashOverlay import kaldırıldı — ARCH-4 FIX (ölü kod temizliği)
 import NotificationDrawer from '../components/NotificationDrawer';
 import { OnlineFriendsProvider } from '../providers/OnlineFriendsProvider';
 export { useOnlineFriends } from '../providers/OnlineFriendsProvider';
@@ -44,7 +44,23 @@ if (!__DEV__) {
     if (_ErrorUtils && typeof _ErrorUtils.getGlobalHandler === 'function') {
       const defaultHandler = _ErrorUtils.getGlobalHandler();
       _ErrorUtils.setGlobalHandler((error: Error, isFatal?: boolean) => {
-        // TODO: Crashlytics/Sentry entegrasyonunda buraya raporlama eklenecek
+        // ★ Crash log'u AsyncStorage'a kaydet — Sentry/Crashlytics eklenince buradan okunabilir
+        try {
+          const crashEntry = JSON.stringify({
+            timestamp: new Date().toISOString(),
+            message: error?.message || 'Unknown error',
+            stack: error?.stack?.substring(0, 500),
+            isFatal,
+          });
+          // Asenkron ama await etmiyoruz — handler senkron olmalı
+          AsyncStorage.getItem('soprano_crash_logs').then(raw => {
+            const logs: string[] = raw ? JSON.parse(raw) : [];
+            logs.unshift(crashEntry);
+            // Son 20 hatayı tut — bellek şişmesini önle
+            if (logs.length > 20) logs.length = 20;
+            AsyncStorage.setItem('soprano_crash_logs', JSON.stringify(logs)).catch(() => {});
+          }).catch(() => {});
+        } catch { /* crash handler içinde hata olursa sessiz geç */ }
         console.error(`[SopranoChat] ${isFatal ? 'FATAL' : 'NON-FATAL'} ERROR:`, error?.message);
         if (defaultHandler) defaultHandler(error, isFatal);
       });
@@ -289,26 +305,11 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
 const { width, height } = Dimensions.get('window');
 
 export default function RootLayout() {
-  const [showSplash, setShowSplash] = useState<boolean | null>(false);
-
-  // Splash sadece ilk açılışta gösterilir
+  // ★ ARCH-4 FIX: Splash logic temizlendi — showSplash her zaman false'tı (ölü kod)
+  // SplashScreen.hideAsync() artık tek yerde (auth ready sonrası) çağrılır
   useEffect(() => {
-    (async () => {
-      try {
-        await AsyncStorage.setItem('soprano_splash_seen', 'true');
-        setShowSplash(false);
-      } catch {
-        setShowSplash(false);
-      } finally {
-        // ★ CRITICAL: Native splash screen'i gizle — yoksa production build'de takılır
-        try {
-          await SplashScreen.hideAsync();
-        } catch (e) {
-          // hideAsync bazen çift çağrılırsa hata verebilir — güvenli geç
-          if (__DEV__) console.log('[Splash] hideAsync:', (e as any)?.message);
-        }
-      }
-    })();
+    // Native splash screen'i hemen gizle — auth guard kendi loading'ini gösterecek
+    SplashScreen.hideAsync().catch(() => {});
   }, []);
 
   const [isAuthReady, setIsAuthReady] = useState(false);
@@ -523,7 +524,7 @@ export default function RootLayout() {
           tier: (data.tier as any) || 'Free',
         });
       } else if (data?.route) {
-        try { router2.push(data.route as any); } catch (e) { /* ignore */ }
+        try { routerRef.current?.push(data.route as any); } catch (e) { /* ignore */ }
       }
     });
 
@@ -628,16 +629,16 @@ export default function RootLayout() {
     };
   }, [firebaseUser]);
 
-  // Deep Link handler
-  const router2 = useRouter();
+  // ★ ARCH-8 FIX: router2 kaldırıldı — tek router ref ile yönetiliyor
+  const routerRef = useRef(useRouter());
   useEffect(() => {
     function handleDeepLink(url: string) {
       try {
         const parsed = Linking.parse(url);
         if (parsed.path?.startsWith('room/')) {
-          router2.push(`/room/${parsed.path.replace('room/', '')}`);
+          routerRef.current.push(`/room/${parsed.path.replace('room/', '')}`);
         } else if (parsed.path?.startsWith('user/')) {
-          router2.push(`/user/${parsed.path.replace('user/', '')}`);
+          routerRef.current.push(`/user/${parsed.path.replace('user/', '')}`);
         }
       } catch (e) { /* ignore */ }
     }
@@ -648,10 +649,6 @@ export default function RootLayout() {
     return () => sub?.remove();
   }, []);
 
-  useEffect(() => {
-    SplashScreen.hideAsync();
-  }, []);
-
   // ★ Inter font yükleme (non-blocking — yüklenene kadar sistem fontu kullanılır)
   const [fontsLoaded] = useFonts({
     Inter_400Regular,
@@ -660,18 +657,7 @@ export default function RootLayout() {
     Inter_700Bold,
   });
 
-  // Splash henüz kontrol edilmedi
-  if (showSplash === null) {
-    return <View style={{ flex: 1, backgroundColor: Colors.bg }} />;
-  }
-
-  if (showSplash) {
-    return <SplashOverlay onFinish={async () => {
-      if (__DEV__) console.log('[RootLayout] Splash finished, saving flag...');
-      try { await AsyncStorage.setItem('soprano_splash_seen', 'true'); } catch {}
-      setShowSplash(false);
-    }} />;
-  }
+  // ★ ARCH-4 FIX: SplashOverlay render bloğu kaldırıldı (ölü kod — showSplash her zaman false'tı)
 
   return (
     <AuthContext.Provider value={{ isAuthReady, isLoggedIn, setIsLoggedIn, user, setUser, firebaseUser, profile, setProfile, refreshProfile, minimizedRoom, setMinimizedRoom, pendingCallSignals, consumeCallSignal, activeCallId, setActiveCallId: updateActiveCallId, showNotifDrawer, setShowNotifDrawer }}>
@@ -716,7 +702,7 @@ export default function RootLayout() {
             onExpand={() => {
               const roomId = minimizedRoom.id;
               setMinimizedRoom(null);
-              router2.push(`/room/${roomId}`);
+              routerRef.current.push(`/room/${roomId}`);
             }}
             onClose={() => setMinimizedRoom(null)}
           />
@@ -742,7 +728,7 @@ export default function RootLayout() {
             CallService.acceptCall(incomingCall.callerId, firebaseUser.uid, incomingCall.callId).catch(() => {});
             const callData = incomingCall;
             updateIncomingCall(null);
-            router2.push(`/call/${callData.callerId}?callId=${callData.callId}&callType=${callData.callType}&isIncoming=true` as any);
+            routerRef.current.push(`/call/${callData.callerId}?callId=${callData.callId}&callType=${callData.callType}&isIncoming=true` as any);
           }}
           onReject={() => {
             if (!incomingCall || !firebaseUser) return;

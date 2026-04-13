@@ -58,9 +58,6 @@ interface RoomSettingsProps {
   // Status
   isMicEnabled: boolean;
   isCameraEnabled: boolean;
-  // Room close
-  canCloseRoom?: boolean;
-  onCloseRoom?: () => void;
   // Theme (Silver+)
   isHost?: boolean;
   currentThemeId?: string | null;
@@ -100,9 +97,6 @@ interface RoomSettingsProps {
   // Manuel Oda Dondurma (Bronze+)
   canFreezeRoom?: boolean;
   onFreezeRoom?: () => void;
-  // Oda Silme (Host-only — tüm tier'lar)
-  canDeleteRoom?: boolean;
-  onDeleteRoom?: () => void;
   // Dil Filtresi (Silver+)
   roomLanguage?: string;
   onLanguageChange?: (lang: string) => void;
@@ -115,6 +109,11 @@ interface RoomSettingsProps {
   // Oda Müziği (Gold+)
   musicTrack?: string | null;
   onMusicChange?: (track: string | null) => void;
+  // ★ Odadan Ayrıl (Settings üzerinden)
+  onLeaveRoom?: () => void;
+  // ★ Oda Silme (Owner-only)
+  canDeleteRoom?: boolean;
+  onDeleteRoom?: () => void;
 }
 
 // ═══════════════════════════════════════════════════
@@ -200,7 +199,6 @@ export default function RoomSettingsSheet(props: RoomSettingsProps) {
     visible, onClose,
     micMode, onMicModeChange, noiseCancellation, onNoiseCancellationChange,
     useSpeaker, onSpeakerChange,
-    canCloseRoom, onCloseRoom,
     isHost, currentThemeId, onChangeTheme,
     isLocked, onToggleLock,
     roomName, onRenameRoom,
@@ -215,11 +213,12 @@ export default function RoomSettingsSheet(props: RoomSettingsProps) {
     donationsEnabled, onDonationsToggle,
     roomRules, onRulesChange,
     canFreezeRoom, onFreezeRoom,
-    canDeleteRoom, onDeleteRoom,
     roomLanguage, onLanguageChange,
     ageRestricted, onAgeRestrictedChange,
     onChangeCoverImage, coverImage,
     musicTrack, onMusicChange,
+    onLeaveRoom,
+    canDeleteRoom, onDeleteRoom,
   } = props;
 
   const [activeTab, setActiveTab] = React.useState<TabId>('general');
@@ -325,14 +324,6 @@ export default function RoomSettingsSheet(props: RoomSettingsProps) {
         )
       ) : <LockedRow icon="lock-closed" label="Oda Kilitleme" requiredTier="Silver" />)}
 
-      {/* Odayı Kapat */}
-      {canCloseRoom && onCloseRoom && (
-        <Pressable style={s.closeRoomBtn} onPress={() => { onClose(); onCloseRoom(); }}>
-          <View style={s.closeRoomIcon}><Ionicons name="power" size={18} color="#EF4444" /></View>
-          <View><Text style={s.closeRoomTitle}>Odayı Kapat</Text><Text style={s.closeRoomDesc}>Tüm kullanıcılar çıkarılır, oda silinir</Text></View>
-        </Pressable>
-      )}
-
       {/* Odayı Dondur — Bronze+ */}
       {canFreezeRoom && onFreezeRoom && (
         <Pressable style={[s.closeRoomBtn, { borderColor: 'rgba(59,130,246,0.2)', backgroundColor: 'rgba(59,130,246,0.06)' }]} onPress={() => { onClose(); onFreezeRoom(); }}>
@@ -344,13 +335,24 @@ export default function RoomSettingsSheet(props: RoomSettingsProps) {
         </Pressable>
       )}
 
-      {/* Odayı Kalıcı Sil — Host only, tüm tier'lar */}
+      {/* Odayı Sil — Owner-only */}
       {canDeleteRoom && onDeleteRoom && (
-        <Pressable style={[s.closeRoomBtn, { borderColor: 'rgba(239,68,68,0.3)', backgroundColor: 'rgba(239,68,68,0.08)', marginTop: 8 }]} onPress={() => { onClose(); onDeleteRoom(); }}>
-          <View style={[s.closeRoomIcon, { backgroundColor: 'rgba(239,68,68,0.15)' }]}><Ionicons name="trash" size={18} color="#EF4444" /></View>
+        <Pressable style={s.closeRoomBtn} onPress={() => { onClose(); onDeleteRoom(); }}>
+          <View style={s.closeRoomIcon}><Ionicons name="trash" size={18} color="#EF4444" /></View>
           <View>
-            <Text style={s.closeRoomTitle}>Odayı Kalıcı Sil</Text>
-            <Text style={s.closeRoomDesc}>Oda tamamen silinir, bu işlem geri alınamaz</Text>
+            <Text style={s.closeRoomTitle}>Odayı Sil</Text>
+            <Text style={s.closeRoomDesc}>Oda kalıcı olarak silinir, geri alınamaz</Text>
+          </View>
+        </Pressable>
+      )}
+
+      {/* Odadan Ayrıl */}
+      {onLeaveRoom && (
+        <Pressable style={[s.closeRoomBtn, { borderColor: 'rgba(245,158,11,0.2)', backgroundColor: 'rgba(245,158,11,0.06)', marginTop: canDeleteRoom ? 8 : 20 }]} onPress={() => { onClose(); onLeaveRoom(); }}>
+          <View style={[s.closeRoomIcon, { backgroundColor: 'rgba(245,158,11,0.12)' }]}><Ionicons name="exit" size={18} color="#F59E0B" /></View>
+          <View>
+            <Text style={[s.closeRoomTitle, { color: '#F59E0B' }]}>Odadan Ayrıl</Text>
+            <Text style={s.closeRoomDesc}>Odadan çık ve ana sayfaya dön</Text>
           </View>
         </Pressable>
       )}

@@ -252,7 +252,7 @@ export default function MyRoomsScreen() {
     try {
       const tier = (profile?.subscription_tier || 'Free') as any;
       await RoomService.wakeUpRoom(room.id, firebaseUser.uid, tier);
-      showToast({ title: '☀️ Oda Uyandırıldı!', message: `"${room.name}" tekrar canlı!`, type: 'success' });
+      // Başarı toast gereksiz — kullanıcı direkt odaya yönlendiriliyor
       router.push(`/room/${room.id}`);
     } catch (err: any) {
       showToast({ title: 'Uyandırma Başarısız', message: err.message || 'Oda uyandırılamadı.', type: 'error' });

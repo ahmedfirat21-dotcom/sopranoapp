@@ -362,11 +362,7 @@ export default function RoomScreen() {
     setMicMode(mode);
     if (mode === 'music') setNoiseCancellation(false);
     lk.setMicMode?.(mode);
-    showToast({ 
-      title: mode === 'music' ? 'Müzik Modu' : 'Konuşma Modu', 
-      message: mode === 'music' ? 'Stereo ses, gürültü engelleme kapalı' : 'Mono ses, gürültü engelleme açık',
-      type: 'success' 
-    });
+    // Bilgi ayarlar panelinde zaten görünür — toast spam önleme
   };
 
   // Gürültü engelleme: Müzik moduna dolaylı etki — mod tekrar uygulanır
@@ -492,7 +488,7 @@ export default function RoomScreen() {
         // Sistem odalarında DB join yapma — lokal katılımcı zaten eklendi
         if (isSystemRoom(id as string)) {
           // Sistem odasında sadece hoş geldin mesajı göster
-          showToast({ title: '🎵 Sistem Odasına Hoş Geldin!', message: 'Kendi odanı açmak için + butonunu kullan.', type: 'success' });
+          // Hoş geldin bilgisi gereksiz — kullanıcı zaten odada
           return;
         }
         // ★ ODA GİRİŞ KONTROLÜ — RoomAccessService.checkAccess() ile merkezi kontrol
@@ -577,7 +573,8 @@ export default function RoomScreen() {
                 });
                 return;
               }
-              showToast({ title: `💰 ${entryFee} SP Kesildi`, message: `Kalan: ${result.remaining ?? '?'} SP`, type: 'info' });
+              // SP bilgisi SPToast ile gösterilir — çift toast önleme
+              spToastRef.current?.show(-entryFee, 'Giriş Ücreti');
             } catch {
               // SP servisi hata verirse girişe izin ver (graceful degradation)
             }
@@ -605,9 +602,9 @@ export default function RoomScreen() {
               type: 'broadcast', event: 'mod_action',
               payload: { action: 'original_host_returned', hostName: profile.display_name || 'Oda sahibi' },
             });
-            showToast({ title: '👑 Hoş Geldin!', message: 'Oda sahibi olarak geri döndün. Host yetkilerin aktif.', type: 'success' });
+            // Host zaten biliyor — toast gereksiz
           } else if (joinRole === 'spectator') {
-            showToast({ title: '👁️ Seyirci Olarak Katıldın', message: 'Dinleyici alanı dolu. Seyirci olarak izliyorsun.', type: 'info' });
+            // Seyirci durumu UI'da inline gösteriliyor
           } else if (joinRole === 'listener') {
             // ★ UX-3 FIX: Toast spam azaltma — SP bildirimleri SPToast ile gösterilir, ayrı showToast gereksiz
             // SP: Günlük giriş + Prime-time SP (sessiz — sadece SPToast badge)
@@ -673,7 +670,6 @@ export default function RoomScreen() {
         GamificationService.onCCUMilestone(firebaseUser!.uid, newParticipants.length, prevCount)
           .then(sp => {
             if (sp > 0) {
-              showToast({ title: '🏆 Milestone!', message: `Odanda ${newParticipants.length} kişi! +${sp} SP kazandın.`, type: 'success' });
               spToastRef.current?.show(sp, 'Milestone');
             }
           })
@@ -934,7 +930,7 @@ export default function RoomScreen() {
           displayName: profile?.display_name || 'Kullanıcı',
         },
       });
-      showToast({ title: '🤚 Sahne Talebi Gönderildi', message: 'Sahneye çıkma isteğiniz oda sahibine iletildi', type: 'success' });
+      // Buton state'i (myMicRequested) zaten UI'da gösterilir
     }
   };
 
@@ -1017,32 +1013,25 @@ export default function RoomScreen() {
     });
   };
 
-  // ========== HOST/GODMASTER: ODAYI KAPAT ==========
-  const handleCloseRoom = () => {
-    if (!amIHost && !profile?.is_admin) return;
-    // ★ Vekil host odayı kapatamaz — sadece asıl sahip veya admin kapatabilir
-    if (amIActingHost && !profile?.is_admin) {
-      showToast({ title: 'Yetki Yok', message: 'Vekil host olarak odayı kapatamazsın. Sadece oda sahibi kapatabilir.', type: 'warning' });
-      return;
+  // ========== AYARLAR PANELİNDEN ODADAN ÇIKIŞ ==========
+  const handleSettingsLeave = () => {
+    if (amIHost) {
+      setAlertConfig({
+        visible: true, title: 'Odadan Ayrıl', message: 'Oda sahibi olarak ayrılmak istediğine emin misin? Yetki uygun birine devredilecek.', type: 'warning', icon: 'exit-outline',
+        buttons: [
+          { text: 'İptal', style: 'cancel' },
+          { text: 'Ayrıl', style: 'destructive', onPress: () => { isRoomClosingRef.current = true; handleHostLeave(); } },
+        ],
+      });
+    } else {
+      setAlertConfig({
+        visible: true, title: 'Odadan Ayrıl', message: 'Odadan ayrılmak istediğine emin misin?', type: 'warning', icon: 'exit-outline',
+        buttons: [
+          { text: 'İptal', style: 'cancel' },
+          { text: 'Ayrıl', style: 'destructive', onPress: () => { isRoomClosingRef.current = true; handleUserLeave(); } },
+        ],
+      });
     }
-    setAlertConfig({
-      visible: true, title: 'Odayı Kapat', message: 'Bu oda tamamen kapatılacak ve tüm kullanıcılar çıkarılacak. Devam etmek istiyor musun?', type: 'error', icon: 'power',
-      buttons: [
-        { text: 'İptal', style: 'cancel' },
-        { text: 'Odayı Kapat', style: 'destructive', onPress: async () => {
-          try {
-            // BUG-RM1 FIX: cleanup effect'in tekrar close çağırmasını engelle
-            isRoomClosingRef.current = true;
-            await RoomService.close(id as string);
-            showToast({ title: 'Oda Kapatıldı', message: 'Oda başarıyla kapatıldı', type: 'success' });
-            setMinimizedRoom(null);
-            safeGoBack(router);
-          } catch (e) {
-            showToast({ title: 'Hata', message: 'Oda kapatılamadı', type: 'error' });
-          }
-        }}
-      ]
-    });
   };
 
   // ========== HOST: ODAYI KALICI SİL ==========
@@ -1068,7 +1057,7 @@ export default function RoomScreen() {
             await RoomService.deleteRoom(id as string, firebaseUser!.uid);
             liveKitService.disconnect().catch(() => {});
             setMinimizedRoom(null);
-            showToast({ title: '🗑️ Oda Silindi', message: 'Oda kalıcı olarak silindi', type: 'success' });
+            // Başarı toast gereksiz — sayfadan çıkılıyor
             safeGoBack(router);
           } catch (e: any) {
             showToast({ title: 'Hata', message: e.message || 'Oda silinemedi', type: 'error' });
@@ -1100,14 +1089,14 @@ export default function RoomScreen() {
           type: 'broadcast', event: 'mod_action',
           payload: { action: 'host_transferred', targetUserId: result.newHostId, oldHostName: profile?.display_name || 'Oda sahibi' },
         });
-        showToast({ title: 'Oda Devredildi', message: 'Oda yetki zincirine göre devredildi', type: 'success' });
+        // Başarı toast gereksiz — sayfadan çıkılıyor
       } else if (result.keepAlive) {
         // ★ Bronze+: Oda açık kalır — sahibi dilediğinde geri dönebilir veya manuel dondurabilir
-        showToast({ title: '🏠 Oda Açık', message: 'Odan açık kaldı. Odalarım\'dan geri dönebilir veya dondurabilirsin.', type: 'info' });
+        // Başarı toast gereksiz — sayfadan çıkılıyor
       } else {
         // ★ Free: Devralacak kimse yok — oda kapanır
         await RoomService.close(id as string);
-        showToast({ title: '🔑 Oda Kapandı', message: 'Oda sahibi çıktığı için oda kapatıldı.', type: 'info' });
+        // Başarı toast gereksiz — sayfadan çıkılıyor
       }
       liveKitService.disconnect().catch(() => {});
       setMinimizedRoom(null);
@@ -2086,7 +2075,7 @@ export default function RoomScreen() {
         noiseCancellation={noiseCancellation} onNoiseCancellationChange={handleNoiseCancellation} cameraFacing={cameraFacing}
         onCameraFacingChange={setCameraFacing} useSpeaker={useSpeaker} onSpeakerChange={handleSpeakerToggle}
         isMicEnabled={lk.isMicrophoneEnabled || false} isCameraEnabled={lk.isCameraEnabled || false}
-        canCloseRoom={amIHost || amIGodMaster} onCloseRoom={handleCloseRoom}
+        onLeaveRoom={handleSettingsLeave}
         canDeleteRoom={(amIHost && !amIActingHost) || amIGodMaster} onDeleteRoom={handleDeleteRoom}
         isHost={amIHost} currentThemeId={room?.theme_id}
         onChangeTheme={amIHost && isTierAtLeast(ownerTier as any, 'Silver') ? async (themeId) => { if (!room || !firebaseUser) return; try { await RoomService.setRoomTheme(room.id, firebaseUser.uid, themeId); setRoom(prev => prev ? { ...prev, theme_id: themeId } : prev); modChannelRef.current?.send({ type: 'broadcast', event: 'settings_changed', payload: { theme_id: themeId } }); showToast({ title: '🎨 Tema!', type: 'success' }); } catch (err: any) { showToast({ title: 'Hata', message: err.message, type: 'error' }); } } : undefined}
@@ -2201,16 +2190,13 @@ export default function RoomScreen() {
                 onPress: async () => {
                   if (!room || !firebaseUser) return;
                   try {
-                    // Broadcast: odadaki herkese bildir
                     modChannelRef.current?.send({
                       type: 'broadcast',
                       event: 'mod_action',
                       payload: { action: 'room_frozen', hostName: firebaseUser.displayName || 'Oda Sahibi' },
                     });
-                    // Backend: odayı dondur
-                    isRoomClosingRef.current = true; // cleanup tekrar leave yapmasın
+                    isRoomClosingRef.current = true;
                     await RoomService.freezeRoom(room.id, firebaseUser.uid);
-                    // LiveKit bağlantısını kes
                     liveKitService.disconnect().catch(() => {});
                     setMinimizedRoom(null);
                     showToast({ title: '❄️ Oda Donduruldu', message: 'Odalarım sekmesinden tekrar aktifleştirebilirsin.', type: 'success' });

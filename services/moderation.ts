@@ -17,6 +17,22 @@ export const ModerationService = {
   // RAPORLAMA
   // ==========================================
 
+  /**
+   * ★ SEC-5: Rate limiting — kullanıcı başına max 5 rapor/saat
+   * Report flooding ve admin spam'i önler.
+   */
+  async _checkReportRateLimit(reporterId: string): Promise<void> {
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    const { count } = await supabase
+      .from('reports')
+      .select('*', { count: 'exact', head: true })
+      .eq('reporter_id', reporterId)
+      .gte('created_at', oneHourAgo);
+    if ((count || 0) >= 5) {
+      throw new Error('Çok fazla şikayet gönderdiniz. Lütfen 1 saat sonra tekrar deneyin.');
+    }
+  },
+
   /** Admin kullanıcıları DB'den çek (profiles.is_admin = true) */
   async _getAdminIds(): Promise<string[]> {
     const { data } = await supabase
@@ -27,11 +43,12 @@ export const ModerationService = {
   },
 
   async reportUser(reporterId: string, reportedUserId: string, reason: ReportReason, description?: string) {
+    await this._checkReportRateLimit(reporterId); // ★ SEC-5
     const { error } = await supabase.from('reports').insert({
       reporter_id: reporterId,
       reported_user_id: reportedUserId,
       reason,
-      description: description || null,
+      description: (description || '').slice(0, 500) || null, // ★ SEC-8: Max 500 char
       status: 'pending',
     });
     if (error) throw error;
@@ -42,11 +59,12 @@ export const ModerationService = {
   },
 
   async reportRoom(reporterId: string, roomId: string, reason: ReportReason, description?: string) {
+    await this._checkReportRateLimit(reporterId); // ★ SEC-5
     const { error } = await supabase.from('reports').insert({
       reporter_id: reporterId,
       reported_room_id: roomId,
       reason,
-      description: description || null,
+      description: (description || '').slice(0, 500) || null, // ★ SEC-8: Max 500 char
       status: 'pending',
     });
     if (error) throw error;
@@ -56,11 +74,12 @@ export const ModerationService = {
   },
 
   async reportPost(reporterId: string, postId: string, reason: ReportReason, description?: string) {
+    await this._checkReportRateLimit(reporterId); // ★ SEC-5
     const { error } = await supabase.from('reports').insert({
       reporter_id: reporterId,
       reported_post_id: postId,
       reason,
-      description: description || null,
+      description: (description || '').slice(0, 500) || null, // ★ SEC-8
       status: 'pending',
     });
     if (error) throw error;
@@ -71,11 +90,12 @@ export const ModerationService = {
   },
 
   async reportMessage(reporterId: string, messageId: string, reason: ReportReason, description?: string) {
+    await this._checkReportRateLimit(reporterId); // ★ SEC-5
     const { error } = await supabase.from('reports').insert({
       reporter_id: reporterId,
       reported_message_id: messageId,
       reason,
-      description: description || null,
+      description: (description || '').slice(0, 500) || null, // ★ SEC-8
       status: 'pending',
     });
     if (error) throw error;
@@ -374,11 +394,14 @@ export const ModerationService = {
   // ODA İSMİ DÜZENLEME (korunuyor — moderation yetki kapsamında)
   // ==========================================
 
-  /** Oda ismini düzenle */
+  /** Oda ismini düzenle — ★ SEC-8: Input validation */
   async editRoomName(roomId: string, newName: string): Promise<void> {
+    // ★ SEC-8: Max 60 karakter, HTML/script tag strip
+    const sanitized = (newName || '').trim().replace(/<[^>]*>/g, '').slice(0, 60);
+    if (sanitized.length < 1) throw new Error('Oda ismi boş olamaz');
     await supabase
       .from('rooms')
-      .update({ name: newName })
+      .update({ name: sanitized })
       .eq('id', roomId);
   },
 
@@ -386,8 +409,10 @@ export const ModerationService = {
   // HOŞ GELDİN MESAJI DÜZENLEME (korunuyor — moderation yetki kapsamında)
   // ==========================================
 
-  /** Hoş geldin mesajını düzenle */
+  /** Hoş geldin mesajını düzenle — ★ SEC-8: Input validation */
   async editWelcomeMessage(roomId: string, message: string): Promise<void> {
+    // ★ SEC-8: Max 500 karakter, HTML/script tag strip
+    const sanitized = (message || '').trim().replace(/<[^>]*>/g, '').slice(0, 500);
     const { data: room } = await supabase
       .from('rooms')
       .select('room_settings')
@@ -396,7 +421,7 @@ export const ModerationService = {
     const settings = (room?.room_settings || {}) as any;
     await supabase
       .from('rooms')
-      .update({ room_settings: { ...settings, welcome_message: message } })
+      .update({ room_settings: { ...settings, welcome_message: sanitized } })
       .eq('id', roomId);
   },
 };

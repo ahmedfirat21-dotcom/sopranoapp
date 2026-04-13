@@ -88,7 +88,10 @@ export const RoomChatService = {
   async send(roomId: string, userId: string, content: string): Promise<RoomMessage | null> {
     // Sistem odalarında DB'ye yazma (UUID değil)
     if (isSystemRoom(roomId)) return null;
-    const filteredContent = filterBadWords(content);
+    // ★ SEC-8c: Input sanitization — max 500 char, HTML strip, boş mesaj engelleme
+    const sanitized = (content || '').trim().replace(/<[^>]*>/g, '').slice(0, 500);
+    if (sanitized.length < 1) return null;
+    const filteredContent = filterBadWords(sanitized);
     const { data, error } = await supabase
       .from('messages')
       .insert({ room_id: roomId, sender_id: userId, content: filteredContent })
