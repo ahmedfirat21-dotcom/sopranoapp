@@ -327,8 +327,8 @@ export default function RoomSettingsSheet(props: RoomSettingsProps) {
       {/* Odayı Dondur — Bronze+ */}
       {canFreezeRoom && onFreezeRoom && (
         <Pressable style={[s.closeRoomBtn, { borderColor: 'rgba(59,130,246,0.2)', backgroundColor: 'rgba(59,130,246,0.06)' }]} onPress={() => { onClose(); onFreezeRoom(); }}>
-          <View style={[s.closeRoomIcon, { backgroundColor: 'rgba(59,130,246,0.12)' }]}><Ionicons name="snow" size={18} color="#3B82F6" /></View>
-          <View>
+          <View style={[s.closeRoomIcon, { backgroundColor: 'rgba(59,130,246,0.12)', borderColor: 'rgba(59,130,246,0.25)' }]}><Ionicons name="snow" size={20} color="#3B82F6" /></View>
+          <View style={{ flex: 1 }}>
             <Text style={[s.closeRoomTitle, { color: '#3B82F6' }]}>Odayı Dondur</Text>
             <Text style={s.closeRoomDesc}>Oda dondurulur, dilediğinde tekrar aktifleştir</Text>
           </View>
@@ -337,9 +337,9 @@ export default function RoomSettingsSheet(props: RoomSettingsProps) {
 
       {/* Odayı Sil — Owner-only */}
       {canDeleteRoom && onDeleteRoom && (
-        <Pressable style={s.closeRoomBtn} onPress={() => { onClose(); onDeleteRoom(); }}>
-          <View style={s.closeRoomIcon}><Ionicons name="trash" size={18} color="#EF4444" /></View>
-          <View>
+        <Pressable style={[s.closeRoomBtn, { marginTop: 10 }]} onPress={() => { onClose(); onDeleteRoom(); }}>
+          <View style={s.closeRoomIcon}><Ionicons name="trash" size={20} color="#EF4444" /></View>
+          <View style={{ flex: 1 }}>
             <Text style={s.closeRoomTitle}>Odayı Sil</Text>
             <Text style={s.closeRoomDesc}>Oda kalıcı olarak silinir, geri alınamaz</Text>
           </View>
@@ -348,9 +348,9 @@ export default function RoomSettingsSheet(props: RoomSettingsProps) {
 
       {/* Odadan Ayrıl */}
       {onLeaveRoom && (
-        <Pressable style={[s.closeRoomBtn, { borderColor: 'rgba(245,158,11,0.2)', backgroundColor: 'rgba(245,158,11,0.06)', marginTop: canDeleteRoom ? 8 : 20 }]} onPress={() => { onClose(); onLeaveRoom(); }}>
-          <View style={[s.closeRoomIcon, { backgroundColor: 'rgba(245,158,11,0.12)' }]}><Ionicons name="exit" size={18} color="#F59E0B" /></View>
-          <View>
+        <Pressable style={[s.closeRoomBtn, { borderColor: 'rgba(245,158,11,0.2)', backgroundColor: 'rgba(245,158,11,0.06)', marginTop: 10 }]} onPress={() => { onClose(); onLeaveRoom(); }}>
+          <View style={[s.closeRoomIcon, { backgroundColor: 'rgba(245,158,11,0.12)', borderColor: 'rgba(245,158,11,0.25)' }]}><Ionicons name="exit" size={20} color="#F59E0B" /></View>
+          <View style={{ flex: 1 }}>
             <Text style={[s.closeRoomTitle, { color: '#F59E0B' }]}>Odadan Ayrıl</Text>
             <Text style={s.closeRoomDesc}>Odadan çık ve ana sayfaya dön</Text>
           </View>
