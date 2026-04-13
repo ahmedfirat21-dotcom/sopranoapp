@@ -1579,37 +1579,62 @@ export default function RoomScreen() {
       {/* ★ DM MİNİ PANELİ — Oda içi mesaj bildirimleri (odadan çıkarmaz) */}
       {showDmPanel && (
         <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
-          <Pressable style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.3)' }]} onPress={() => setShowDmPanel(false)} />
+          <Pressable style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.45)' }]} onPress={() => setShowDmPanel(false)} />
           <Animated.View style={{
             position: 'absolute', bottom: Math.max(insets.bottom, 14) + 110, right: 10, left: 10,
-            maxHeight: 320, borderRadius: 16, backgroundColor: '#1E293B',
-            borderWidth: 1, borderColor: 'rgba(20,184,166,0.12)',
-            shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.4, shadowRadius: 16, elevation: 16,
+            maxHeight: 360, borderRadius: 20, backgroundColor: 'rgba(15,23,42,0.97)',
+            borderWidth: 1, borderColor: 'rgba(20,184,166,0.15)',
+            shadowColor: '#000', shadowOffset: { width: 0, height: -6 }, shadowOpacity: 0.5, shadowRadius: 20, elevation: 20,
             overflow: 'hidden',
           }}>
             {/* Header */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)', backgroundColor: 'rgba(20,184,166,0.04)' }}>
-              <Ionicons name="mail" size={16} color="#14B8A6" />
-              <Text style={{ color: '#F1F5F9', fontSize: 14, fontWeight: '700', marginLeft: 8, flex: 1 }}>Mesajlar</Text>
-              <Pressable onPress={() => setShowDmPanel(false)} hitSlop={8}>
-                <Ionicons name="close" size={16} color="rgba(255,255,255,0.3)" />
+            <View style={{
+              flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12,
+              borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)',
+              backgroundColor: 'rgba(20,184,166,0.06)',
+            }}>
+              <View style={{
+                width: 30, height: 30, borderRadius: 10,
+                backgroundColor: 'rgba(20,184,166,0.15)', borderWidth: 1, borderColor: 'rgba(20,184,166,0.25)',
+                alignItems: 'center', justifyContent: 'center',
+              }}>
+                <Ionicons name="chatbubbles" size={14} color="#14B8A6" />
+              </View>
+              <Text style={{ color: '#F1F5F9', fontSize: 15, fontWeight: '800', marginLeft: 10, flex: 1, letterSpacing: -0.2 }}>Mesajlar</Text>
+              {dmUnreadCount > 0 && (
+                <View style={{ minWidth: 20, height: 20, borderRadius: 10, backgroundColor: '#14B8A6', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5, marginRight: 10 }}>
+                  <Text style={{ color: '#FFF', fontSize: 10, fontWeight: '800' }}>{dmUnreadCount > 99 ? '99+' : dmUnreadCount}</Text>
+                </View>
+              )}
+              <Pressable onPress={() => setShowDmPanel(false)} hitSlop={8} style={{
+                width: 26, height: 26, borderRadius: 13,
+                backgroundColor: 'rgba(255,255,255,0.06)', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <Ionicons name="close" size={14} color="rgba(255,255,255,0.4)" />
               </Pressable>
             </View>
             {/* Mesaj listesi */}
-            <ScrollView style={{ maxHeight: 260 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 8, gap: 4 }}>
+            <ScrollView style={{ maxHeight: 290 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 8, gap: 2 }}>
               {dmInboxMessages.length === 0 ? (
-                <View style={{ alignItems: 'center', paddingVertical: 24 }}>
-                  <Ionicons name="chatbubbles-outline" size={32} color="rgba(255,255,255,0.1)" />
-                  <Text style={{ color: 'rgba(255,255,255,0.25)', fontSize: 12, marginTop: 8 }}>Henüz mesaj yok</Text>
+                <View style={{ alignItems: 'center', paddingVertical: 32 }}>
+                  <View style={{
+                    width: 48, height: 48, borderRadius: 24,
+                    backgroundColor: 'rgba(20,184,166,0.08)', alignItems: 'center', justifyContent: 'center',
+                    marginBottom: 10,
+                  }}>
+                    <Ionicons name="chatbubbles-outline" size={24} color="rgba(20,184,166,0.3)" />
+                  </View>
+                  <Text style={{ color: 'rgba(255,255,255,0.35)', fontSize: 13, fontWeight: '600' }}>Henüz mesaj yok</Text>
+                  <Text style={{ color: 'rgba(255,255,255,0.15)', fontSize: 11, marginTop: 4 }}>Birine tıklayarak mesaj gönderebilirsin</Text>
                 </View>
               ) : (
                 dmInboxMessages.slice(0, 10).map((msg: any, idx: number) => {
-                  const senderName = msg.sender_display_name || msg.other_display_name || 'Birisi';
-                  const senderAvatar = msg.sender_avatar_url || msg.other_avatar_url;
-                  const preview = msg.last_message || msg.content || '';
-                  const isUnread = msg.unread_count > 0 || !msg.is_read;
-                  const senderId = msg.other_user_id || msg.sender_id;
-                  const timeAgo = msg.last_message_at || msg.created_at;
+                  const senderName = msg.partner_name || msg.sender_display_name || msg.other_display_name || 'Kullanıcı';
+                  const senderAvatar = msg.partner_avatar || msg.sender_avatar_url || msg.other_avatar_url;
+                  const preview = msg.last_message_content || msg.last_message || msg.content || '';
+                  const isUnread = (msg.unread_count || 0) > 0 || !msg.is_read;
+                  const senderId = msg.partner_id || msg.other_user_id || msg.sender_id;
+                  const timeAgo = msg.last_message_time || msg.last_message_at || msg.created_at;
                   const mins = timeAgo ? Math.floor((Date.now() - new Date(timeAgo).getTime()) / 60000) : 0;
                   const timeLabel = mins < 1 ? 'şimdi' : mins < 60 ? `${mins}dk` : mins < 1440 ? `${Math.floor(mins / 60)}sa` : `${Math.floor(mins / 1440)}g`;
                   return (
@@ -1621,22 +1646,45 @@ export default function RoomScreen() {
                         setDmText('');
                       }}
                       style={({ pressed }) => ({
-                        flexDirection: 'row', alignItems: 'center', gap: 10,
-                        paddingVertical: 8, paddingHorizontal: 8, borderRadius: 10,
-                        backgroundColor: pressed ? 'rgba(255,255,255,0.04)' : isUnread ? 'rgba(20,184,166,0.06)' : 'transparent',
+                        flexDirection: 'row', alignItems: 'center', gap: 12,
+                        paddingVertical: 10, paddingHorizontal: 10, borderRadius: 14,
+                        backgroundColor: pressed ? 'rgba(20,184,166,0.08)' : isUnread ? 'rgba(20,184,166,0.04)' : 'transparent',
                       })}
                     >
-                      {/* ★ Gönderici Avatarı */}
-                      <Image source={getAvatarSource(senderAvatar)} style={{ width: 36, height: 36, borderRadius: 18, borderWidth: 1, borderColor: isUnread ? 'rgba(20,184,166,0.3)' : 'rgba(255,255,255,0.06)' }} />
+                      {/* Gönderici Avatarı */}
+                      <View style={{ position: 'relative' }}>
+                        <Image source={getAvatarSource(senderAvatar)} style={{
+                          width: 42, height: 42, borderRadius: 21,
+                          borderWidth: 1.5, borderColor: isUnread ? 'rgba(20,184,166,0.4)' : 'rgba(255,255,255,0.08)',
+                        }} />
+                        {/* Online dot */}
+                        {msg.partner_is_online && (
+                          <View style={{
+                            position: 'absolute', bottom: 0, right: 0,
+                            width: 12, height: 12, borderRadius: 6,
+                            backgroundColor: '#22C55E', borderWidth: 2, borderColor: '#0F172A',
+                          }} />
+                        )}
+                      </View>
                       <View style={{ flex: 1 }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                          <Text style={{ color: isUnread ? '#F1F5F9' : 'rgba(255,255,255,0.6)', fontSize: 13, fontWeight: isUnread ? '700' : '500' }} numberOfLines={1}>{senderName}</Text>
-                          <Text style={{ color: 'rgba(255,255,255,0.2)', fontSize: 10 }}>{timeLabel}</Text>
+                          <Text style={{
+                            color: isUnread ? '#F1F5F9' : 'rgba(255,255,255,0.6)',
+                            fontSize: 14, fontWeight: isUnread ? '700' : '500',
+                            maxWidth: '70%',
+                          }} numberOfLines={1}>{senderName}</Text>
+                          <Text style={{ color: isUnread ? 'rgba(20,184,166,0.6)' : 'rgba(255,255,255,0.15)', fontSize: 10, fontWeight: '500' }}>{timeLabel}</Text>
                         </View>
-                        <Text style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, marginTop: 1 }} numberOfLines={1}>{preview}</Text>
+                        <Text style={{
+                          color: isUnread ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.25)',
+                          fontSize: 12, marginTop: 2, fontWeight: isUnread ? '500' : '400',
+                        }} numberOfLines={1}>{preview}</Text>
                       </View>
-                      {isUnread && msg.unread_count > 0 && (
-                        <View style={{ minWidth: 18, height: 18, borderRadius: 9, backgroundColor: '#14B8A6', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 }}>
+                      {isUnread && (msg.unread_count || 0) > 0 && (
+                        <View style={{
+                          minWidth: 20, height: 20, borderRadius: 10,
+                          backgroundColor: '#14B8A6', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5,
+                        }}>
                           <Text style={{ color: '#FFF', fontSize: 9, fontWeight: '800' }}>{msg.unread_count > 9 ? '9+' : msg.unread_count}</Text>
                         </View>
                       )}

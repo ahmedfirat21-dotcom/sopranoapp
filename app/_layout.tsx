@@ -29,6 +29,8 @@ import NotificationDrawer from '../components/NotificationDrawer';
 import { OnlineFriendsProvider } from '../providers/OnlineFriendsProvider';
 export { useOnlineFriends } from '../providers/OnlineFriendsProvider';
 import { useFonts, Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
+import { RoomService } from '../services/database';
+import { liveKitService } from '../services/livekit';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -319,6 +321,30 @@ export default function RootLayout() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [minimizedRoom, setMinimizedRoom] = useState<MinimizedRoom | null>(null);
   const [showNotifDrawer, setShowNotifDrawer] = useState(false);
+
+  // ★ Minimize heartbeat — oda küçültüldüğünde heartbeat global olarak devam eder
+  const minimizedHeartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  useEffect(() => {
+    if (minimizedRoom && firebaseUser?.uid) {
+      // Heartbeat başlat — zombie temizliğine maruz kalmayı önle
+      RoomService.heartbeat(minimizedRoom.id, firebaseUser.uid).catch(() => {});
+      minimizedHeartbeatRef.current = setInterval(() => {
+        RoomService.heartbeat(minimizedRoom.id, firebaseUser.uid).catch(() => {});
+      }, 45000); // 45sn — zombie threshold (90sn) altında
+    } else {
+      // Heartbeat durdur
+      if (minimizedHeartbeatRef.current) {
+        clearInterval(minimizedHeartbeatRef.current);
+        minimizedHeartbeatRef.current = null;
+      }
+    }
+    return () => {
+      if (minimizedHeartbeatRef.current) {
+        clearInterval(minimizedHeartbeatRef.current);
+        minimizedHeartbeatRef.current = null;
+      }
+    };
+  }, [minimizedRoom?.id, firebaseUser?.uid]);
 
   // Gelen arama state
   const [incomingCall, setIncomingCall] = useState<CallSignal | null>(null);
@@ -704,7 +730,16 @@ export default function RootLayout() {
               setMinimizedRoom(null);
               routerRef.current.push(`/room/${roomId}`);
             }}
-            onClose={() => setMinimizedRoom(null)}
+            onClose={() => {
+              // ★ Temiz çıkış — LiveKit disconnect + odadan ayrıl
+              const roomId = minimizedRoom.id;
+              const uid = firebaseUser?.uid;
+              setMinimizedRoom(null);
+              if (uid) {
+                RoomService.leave(roomId, uid).catch(() => {});
+              }
+              liveKitService.disconnect().catch(() => {});
+            }}
           />
         )}
         <Toast />
