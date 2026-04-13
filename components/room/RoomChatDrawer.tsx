@@ -56,12 +56,24 @@ export default function RoomChatDrawer({ visible, messages, chatInput, onChangeI
         </View>
       );
     }
+
+    // GIF mesajı kontrolü
+    const gifMatch = item.content.match(/^\[gif:(.*)\]$/);
+    // Tek emoji kontrolü (1-2 emoji karakter — büyük göster)
+    const emojiOnly = /^[\p{Emoji_Presentation}\p{Extended_Pictographic}\u200d\uFE0F\u20E3]{1,6}$/u.test(item.content) && item.content.length <= 14;
+
     return (
       <View style={s.msgRow}>
         <Image source={getAvatarSource(item.profiles?.avatar_url)} style={s.msgAvatar} />
-        <View style={s.msgBubble}>
+        <View style={[s.msgBubble, gifMatch && { backgroundColor: 'transparent', borderWidth: 0, paddingHorizontal: 4, paddingVertical: 2 }]}>
           <Text style={s.msgName}>{item.profiles?.display_name || 'Kullanıcı'}</Text>
-          <Text style={s.msgText}>{item.content}</Text>
+          {gifMatch ? (
+            <Image source={{ uri: gifMatch[1] }} style={{ width: 160, height: 120, borderRadius: 10 }} resizeMode="cover" />
+          ) : emojiOnly ? (
+            <Text style={{ fontSize: 36, lineHeight: 44 }}>{item.content}</Text>
+          ) : (
+            <Text style={s.msgText}>{item.content}</Text>
+          )}
         </View>
       </View>
     );
@@ -137,7 +149,7 @@ const s = StyleSheet.create({
     top: 70,
     bottom: 80,
     width: PANEL_W,
-    backgroundColor: 'rgba(45,61,77,0.95)',
+    backgroundColor: 'rgba(45,55,64,0.95)',
     borderTopLeftRadius: 18,
     borderBottomLeftRadius: 18,
     borderWidth: 1,

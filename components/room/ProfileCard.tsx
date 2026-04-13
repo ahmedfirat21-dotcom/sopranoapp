@@ -5,7 +5,7 @@
 import React, { useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Image,
-  Animated, Dimensions, Pressable,
+  Animated, Dimensions, Pressable, ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { getAvatarSource } from '../../constants/avatars';
@@ -134,6 +134,7 @@ export default function ProfileCard({
       <Animated.View style={[sty.card, { transform: [{ translateY: slideY }] }]}>
         {/* ──── Handle bar ──── */}
         <View style={sty.handle} />
+        <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
 
         {/* ════════════════════════════════════════════
             BÖLÜM 1: Profil Başlığı
@@ -362,6 +363,7 @@ export default function ProfileCard({
             </View>
           </>
         )}
+        </ScrollView>
       </Animated.View>
     </View>
   );
@@ -379,12 +381,13 @@ const sty = StyleSheet.create({
   },
   card: {
     marginHorizontal: 10,
-    marginBottom: 12,
+    marginBottom: 90,
     backgroundColor: C.glass,
     borderRadius: 20,
     borderWidth: 1,
     borderColor: C.border,
     padding: 18,
+    maxHeight: H * 0.72,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -8 },
     shadowOpacity: 0.4,
