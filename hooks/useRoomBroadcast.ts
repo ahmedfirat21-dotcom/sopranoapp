@@ -176,7 +176,52 @@ export function useRoomBroadcast(params: UseRoomBroadcastParams) {
       }
 
       // ── Kullanıcı hedefli eventlar ──
-      if (data.targetUserId !== firebaseUser.uid) return;
+      // Not: targetUserId olmayan veya bize yönelik olmayan eventlar
+      // diğer kullanıcılar için katılımcı listesini günceller
+      const isTargetMe = data.targetUserId === firebaseUser.uid;
+
+      // ★ Herkesin görmesi gereken participant güncellemeleri
+      if (data.action === 'promote' && !isTargetMe) {
+        setParticipants(prev => prev.map(p => p.user_id === data.targetUserId ? { ...p, role: 'speaker' as const, is_muted: false } : p));
+        return;
+      } else if (data.action === 'demote' && !isTargetMe) {
+        setParticipants(prev => prev.map(p => p.user_id === data.targetUserId ? { ...p, role: 'listener' as const } : p));
+        return;
+      } else if (data.action === 'make_moderator' && !isTargetMe) {
+        setParticipants(prev => prev.map(p => p.user_id === data.targetUserId ? { ...p, role: 'moderator' as const } : p));
+        return;
+      } else if (data.action === 'remove_moderator' && !isTargetMe) {
+        setParticipants(prev => prev.map(p => p.user_id === data.targetUserId ? { ...p, role: 'speaker' as const } : p));
+        return;
+      } else if ((data.action === 'kick' || data.action === 'ban' || data.action === 'permban') && !isTargetMe) {
+        setParticipants(prev => prev.filter(p => p.user_id !== data.targetUserId));
+        return;
+      } else if (data.action === 'chat_mute' && !isTargetMe) {
+        setParticipants(prev => prev.map(p => p.user_id === data.targetUserId ? { ...p, is_chat_muted: true } : p));
+        return;
+      } else if (data.action === 'chat_unmute' && !isTargetMe) {
+        setParticipants(prev => prev.map(p => p.user_id === data.targetUserId ? { ...p, is_chat_muted: false } : p));
+        return;
+      } else if (data.action === 'ghost_on' && !isTargetMe) {
+        setParticipants(prev => prev.map(p => p.user_id === data.targetUserId ? { ...p, is_ghost: true } as any : p));
+        return;
+      } else if (data.action === 'ghost_off' && !isTargetMe) {
+        setParticipants(prev => prev.map(p => p.user_id === data.targetUserId ? { ...p, is_ghost: false } as any : p));
+        return;
+      } else if (data.action === 'disguise' && !isTargetMe) {
+        // Kılık değiştirme — diğer kullanıcılar yeni isim/avatarı görecek
+        if (data.newName) {
+          setParticipants(prev => prev.map(p => p.user_id === data.targetUserId ? { ...p, display_name: data.newName, avatar_url: data.newAvatar } as any : p));
+        }
+        return;
+      } else if (data.action === 'undisguise' && !isTargetMe) {
+        // Orijinal bilgilere dön — reload ile çözeriz
+        RoomService.get(roomId as string).then(setRoom).catch(() => {});
+        return;
+      }
+
+      // ── Bana yönelik eventlar ──
+      if (!isTargetMe) return;
 
       if (data.action === 'kick') {
         showToast({ title: '⛔ Odadan Çıkarıldın', message: data.reason || 'Moderatör seni odadan çıkardı.', type: 'error' });
@@ -184,9 +229,23 @@ export function useRoomBroadcast(params: UseRoomBroadcastParams) {
           liveKitService.disconnect().catch(() => {});
           safeGoBack(router);
         }, 1500);
+      } else if (data.action === 'ban') {
+        showToast({ title: '⛔ Yasaklandın', message: data.reason || 'Bu odadan geçici olarak yasaklandın.', type: 'error' });
+        setTimeout(() => {
+          liveKitService.disconnect().catch(() => {});
+          safeGoBack(router);
+        }, 1500);
+      } else if (data.action === 'permban') {
+        showToast({ title: '⛔ Kalıcı Yasaklandın', message: data.reason || 'Bu odaya bir daha giremezsin.', type: 'error' });
+        setTimeout(() => {
+          liveKitService.disconnect().catch(() => {});
+          safeGoBack(router);
+        }, 1500);
       } else if (data.action === 'mute') {
         showToast({ title: '🔇 Susturuldun', message: data.reason || 'Moderatör seni susturdu.', type: 'warning' });
         if (lk.isMicrophoneEnabled) { lk.toggleMic().catch(() => {}); }
+      } else if (data.action === 'unmute') {
+        showToast({ title: '🔊 Susturma Kaldırıldı', message: 'Artık tekrar konuşabilirsin.', type: 'success' });
       } else if (data.action === 'demote') {
         showToast({ title: '⬇️ Sahneden İndirildin', message: 'Moderatör seni dinleyiciye düşürdü.', type: 'info' });
         setParticipants(prev => prev.map(p => p.user_id === firebaseUser.uid ? { ...p, role: 'listener' as const } : p));
@@ -197,8 +256,10 @@ export function useRoomBroadcast(params: UseRoomBroadcastParams) {
         setTimeout(() => { lk.enableMic?.().catch(() => {}); }, 500);
       } else if (data.action === 'make_moderator') {
         showToast({ title: '🛡️ Moderatör Yapıldın!', message: 'Artık odayı yönetebilirsin.', type: 'success' });
+        setParticipants(prev => prev.map(p => p.user_id === firebaseUser.uid ? { ...p, role: 'moderator' as const } : p));
       } else if (data.action === 'remove_moderator') {
         showToast({ title: '🛡️ Moderatörlük Kaldırıldı', message: 'Moderatörlük yetkin kaldırıldı.', type: 'info' });
+        setParticipants(prev => prev.map(p => p.user_id === firebaseUser.uid ? { ...p, role: 'speaker' as const } : p));
       } else if (data.action === 'chat_mute') {
         showToast({ title: '💬 Metin Susturuldu', message: 'Moderatör metin sohbetini kapattı.', type: 'warning' });
       } else if (data.action === 'chat_unmute') {

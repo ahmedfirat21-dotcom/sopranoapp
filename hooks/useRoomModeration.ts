@@ -223,12 +223,16 @@ export function useRoomModeration({
   const executeUnmute = useCallback(async (userId: string, displayName: string) => {
     try {
       await ModerationService.unmuteInRoom(roomId, userId);
+      modChannelRef.current?.send({
+        type: 'broadcast', event: 'mod_action',
+        payload: { action: 'unmute', targetUserId: userId },
+      });
       setSelectedUser(null);
       showToast({ title: 'Susturma Kaldırıldı', message: `${displayName} artık konuşabilir`, type: 'success' });
     } catch {
       showToast({ title: 'Hata', message: 'İşlem başarısız', type: 'error' });
     }
-  }, [roomId]);
+  }, [roomId, modChannelRef]);
 
   // ========== GHOST MODE ==========
   const handleGhostToggle = useCallback(async () => {
@@ -237,6 +241,11 @@ export function useRoomModeration({
     const isCurrentlyGhost = (myPart as any)?.is_ghost || false;
     try {
       await RoomService.setGhostMode(roomId, firebaseUser.uid, !isCurrentlyGhost);
+      modChannelRef.current?.send({
+        type: 'broadcast', event: 'mod_action',
+        payload: { action: !isCurrentlyGhost ? 'ghost_on' : 'ghost_off', targetUserId: firebaseUser.uid },
+      });
+      setParticipants(prev => prev.map(p => p.user_id === firebaseUser.uid ? { ...p, is_ghost: !isCurrentlyGhost } as any : p));
       setSelectedUser(null);
       showToast({
         title: !isCurrentlyGhost ? '👻 Görünmez Oldun' : '👁️ Görünür Oldun',
@@ -244,7 +253,7 @@ export function useRoomModeration({
         type: 'info',
       });
     } catch { showToast({ title: 'Hata', message: 'İşlem başarısız', type: 'error' }); }
-  }, [roomId, firebaseUser, participants]);
+  }, [roomId, firebaseUser, participants, modChannelRef]);
 
   // ========== KILIK DEĞİŞTİRME ==========
   const handleDisguiseUser = useCallback((userId: string, displayName: string) => {
@@ -261,7 +270,7 @@ export function useRoomModeration({
             });
             modChannelRef.current?.send({
               type: 'broadcast', event: 'mod_action',
-              payload: { action: 'disguise', targetUserId: userId },
+              payload: { action: 'disguise', targetUserId: userId, newName: 'Anonim Kullanıcı', newAvatar: 'https://ui-avatars.com/api/?name=Anonim&background=1E293B&color=64748B' },
             });
             setSelectedUser(null);
             showToast({ title: '🎭 Kılık Değiştirildi', message: `${displayName} artık "Anonim Kullanıcı" olarak görünüyor`, type: 'success' });
