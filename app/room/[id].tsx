@@ -1522,7 +1522,7 @@ export default function RoomScreen() {
       </ScrollView>
 
       {/* ★ Inline Chat — alt barın üstünde, şeffaf metin (tıklayınca drawer açılır, drawer açıkken gizle) */}
-      {!showChatDrawer && (
+      {!showChatDrawer && !showDmPanel && (
         <Pressable onPress={() => setShowChatDrawer(true)} style={{ position: 'absolute', bottom: Math.max(insets.bottom, 14) + 120, left: 0, right: 0, zIndex: 5 }}>
           <InlineChat messages={chatMessages as any[]} maxLines={4} />
         </Pressable>
