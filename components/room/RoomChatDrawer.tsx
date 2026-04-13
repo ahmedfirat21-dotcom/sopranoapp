@@ -68,7 +68,7 @@ export default function RoomChatDrawer({ visible, messages, chatInput, onChangeI
         <View style={[s.msgBubble, gifMatch && { backgroundColor: 'transparent', borderWidth: 0, paddingHorizontal: 4, paddingVertical: 2 }]}>
           <Text style={s.msgName}>{item.profiles?.display_name || 'Kullanıcı'}</Text>
           {gifMatch ? (
-            <Image source={{ uri: gifMatch[1] }} style={{ width: 160, height: 120, borderRadius: 10 }} resizeMode="cover" />
+            <Image source={{ uri: gifMatch[1] }} style={{ width: 220, height: 165, borderRadius: 12 }} resizeMode="cover" />
           ) : emojiOnly ? (
             <Text style={{ fontSize: 36, lineHeight: 44 }}>{item.content}</Text>
           ) : (

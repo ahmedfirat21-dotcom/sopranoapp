@@ -77,12 +77,14 @@ export const StoreService = {
 
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('system_points, purchased_items')
+      .select('system_points, purchased_items, is_admin')
       .eq('id', userId)
       .single();
 
     if (profileError || !profile) throw new Error('Profil bulunamadı');
-    if (profile.system_points < price) throw new Error('Yetersiz SP');
+    // ★ GodMaster bypass — admin kullanıcılar sınırsız SP
+    const isAdmin = profile.is_admin === true;
+    if (!isAdmin && profile.system_points < price) throw new Error('Yetersiz SP');
 
     const owned: string[] = Array.isArray(profile.purchased_items) ? profile.purchased_items : [];
     if (owned.includes(itemId)) throw new Error('Bu ürüne zaten sahipsin!');

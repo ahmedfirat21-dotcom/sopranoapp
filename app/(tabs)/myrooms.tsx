@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, Image, Pressable, ScrollView,
-  RefreshControl,
+  RefreshControl, Animated,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import AppBackground from '../../components/AppBackground';
@@ -16,12 +16,15 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { showToast } from '../../components/Toast';
 import { RoomHistoryService, type RoomHistoryItem } from '../../services/roomHistory';
+import { useOnlineFriends } from '../../providers/OnlineFriendsProvider';
+import { SPService } from '../../services/sp';
+import RoomManageSheet from '../../components/room/RoomManageSheet';
 
 // ════════════════════════════════════════════════════════════
 // YÖNETİLEN ODA KARTI — Yönet/Başlat butonları
 // ════════════════════════════════════════════════════════════
-function ManagedRoomCard({ room, onManage, onStart }: {
-  room: Room; onManage: () => void; onStart: () => void;
+function ManagedRoomCard({ room, onManage, onStart, onSettings }: {
+  room: Room; onManage: () => void; onStart: () => void; onSettings: () => void;
 }) {
   const listeners = (room as any).participant_count || (room as any).listener_count || 0;
   const isLive = room.is_live;
@@ -71,6 +74,10 @@ function ManagedRoomCard({ room, onManage, onStart }: {
         </View>
       </View>
       <View style={mS.cardRight}>
+        {/* ⚙️ Yönet butonu — her zaman göster */}
+        <Pressable style={mS.settingsBtn} onPress={onSettings}>
+          <Ionicons name="settings-outline" size={14} color="#94A3B8" />
+        </Pressable>
         {isLive ? (
           <Pressable style={mS.manageBtn} onPress={onManage}>
             <Ionicons name="enter-outline" size={14} color={Colors.accentTeal} />
@@ -93,16 +100,16 @@ const mS = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginHorizontal: 16,
-    marginBottom: 10,
-    padding: 14,
-    borderRadius: 16,
+    marginBottom: 6,
+    padding: 10,
+    borderRadius: 14,
     backgroundColor: Colors.cardBg,
     borderWidth: 1,
     borderColor: Colors.cardBorder,
     ...Shadows.card,
   },
-  cardLeft: { flexDirection: 'row', alignItems: 'center', flex: 1, gap: 12 },
-  avatar: { width: 52, height: 52, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.06)' },
+  cardLeft: { flexDirection: 'row', alignItems: 'center', flex: 1, gap: 10 },
+  avatar: { width: 44, height: 44, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.06)' },
   cardInfo: { flex: 1 },
   roomName: {
     fontSize: 14, fontWeight: '700', color: '#F1F5F9',
@@ -119,7 +126,12 @@ const mS = StyleSheet.create({
     borderRadius: 6, borderWidth: 1, borderColor: 'rgba(245,158,11,0.25)',
   },
   typeBadgeText: { fontSize: 8, fontWeight: '700' },
-  cardRight: { alignItems: 'flex-end', gap: 6 },
+  cardRight: { alignItems: 'flex-end', gap: 4 },
+  settingsBtn: {
+    width: 28, height: 28, borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(149,161,174,0.15)',
+    justifyContent: 'center', alignItems: 'center',
+  },
   manageBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10,
@@ -166,6 +178,254 @@ const rcS = StyleSheet.create({
 });
 
 // ════════════════════════════════════════════════════════════
+// ARKADAŞLARIN CANLI — Sosyal FOMO Kartı
+// ════════════════════════════════════════════════════════════
+type FriendInRoom = {
+  friendId: string;
+  friendName: string;
+  friendAvatar: string;
+  roomId: string;
+  roomName: string;
+};
+
+function FriendLiveCard({ item, onPress }: { item: FriendInRoom; onPress: () => void }) {
+  return (
+    <Pressable
+      style={({ pressed }) => [flcS.card, pressed && { opacity: 0.85, transform: [{ scale: 0.97 }] }]}
+      onPress={onPress}
+    >
+      <View style={flcS.avatarWrap}>
+        <Image source={getAvatarSource(item.friendAvatar)} style={flcS.avatar} />
+        <View style={flcS.onlineDot} />
+      </View>
+      <Text style={flcS.friendName} numberOfLines={1}>{item.friendName}</Text>
+      <Text style={flcS.roomName} numberOfLines={1}>{item.roomName}</Text>
+      <View style={flcS.joinBtn}>
+        <Ionicons name="enter-outline" size={10} color="#22C55E" />
+        <Text style={flcS.joinText}>Katıl</Text>
+      </View>
+    </Pressable>
+  );
+}
+
+const flcS = StyleSheet.create({
+  card: {
+    width: 88, alignItems: 'center', marginRight: 12,
+    paddingVertical: 10, paddingHorizontal: 6, borderRadius: 14,
+    backgroundColor: Colors.cardBg, borderWidth: 1, borderColor: Colors.cardBorder,
+    ...Shadows.card, position: 'relative',
+  },
+  avatarWrap: { position: 'relative', marginBottom: 6 },
+  avatar: { width: 44, height: 44, borderRadius: 22 },
+  onlineDot: {
+    position: 'absolute', bottom: 0, right: -2,
+    width: 12, height: 12, borderRadius: 6,
+    backgroundColor: '#22C55E',
+    borderWidth: 2, borderColor: Colors.cardBg,
+  },
+  friendName: {
+    fontSize: 10, fontWeight: '700', color: '#F1F5F9', textAlign: 'center',
+    ...Shadows.text,
+  },
+  roomName: {
+    fontSize: 8, color: '#94A3B8', textAlign: 'center', marginTop: 2,
+    lineHeight: 11,
+  },
+  joinBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    marginTop: 5, backgroundColor: 'rgba(34,197,94,0.12)',
+    paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8,
+    borderWidth: 1, borderColor: 'rgba(34,197,94,0.25)',
+  },
+  joinText: { fontSize: 9, fontWeight: '800', color: '#22C55E' },
+});
+
+// ════════════════════════════════════════════════════════════
+// SP KAZANÇ ÖZETİ — Motivasyon Banner
+// ════════════════════════════════════════════════════════════
+function SPBanner({ weeklySP }: { weeklySP: number }) {
+  // Pulsing glow animasyonu
+  const pulseAnim = React.useRef(new Animated.Value(1)).current;
+  React.useEffect(() => {
+    if (weeklySP > 0) {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, { toValue: 1.05, duration: 1500, useNativeDriver: true }),
+          Animated.timing(pulseAnim, { toValue: 1, duration: 1500, useNativeDriver: true }),
+        ])
+      ).start();
+    }
+  }, [weeklySP]);
+
+  const motivationText = weeklySP === 0
+    ? 'Bu hafta henüz SP kazanmadın. Oda aç ve kazan!'
+    : weeklySP < 50
+      ? 'İyi başlangıç! Daha fazla kazanmak için devam et 💪'
+      : weeklySP < 200
+        ? 'Harika gidiyorsun! Rakamlar yükseliyor 📈'
+        : 'Efsane bir hafta! Sen bir SP makinesisin 🔥';
+
+  return (
+    <View style={spS.wrap}>
+      <LinearGradient
+        colors={['#7C3AED', '#6D28D9', '#4C1D95']}
+        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+        style={spS.gradient}
+      >
+        {/* Dekoratif arka plan daireleri */}
+        <View style={spS.decorCircle1} />
+        <View style={spS.decorCircle2} />
+
+        <View style={spS.row}>
+          <Animated.View style={[spS.iconWrap, { transform: [{ scale: pulseAnim }] }]}>
+            <Text style={spS.iconText}>💎</Text>
+          </Animated.View>
+          <View style={spS.textCol}>
+            <Text style={spS.title}>Bu Hafta Kazandığın SP</Text>
+            <Text style={spS.amount}>{weeklySP.toLocaleString('tr-TR')} SP</Text>
+          </View>
+        </View>
+        <Text style={spS.motivation}>{motivationText}</Text>
+      </LinearGradient>
+    </View>
+  );
+}
+
+const spS = StyleSheet.create({
+  wrap: {
+    marginHorizontal: 16, marginTop: 6, marginBottom: 12,
+    borderRadius: 16, overflow: 'hidden',
+    ...Shadows.card,
+  },
+  gradient: {
+    paddingVertical: 16, paddingHorizontal: 16,
+    position: 'relative', overflow: 'hidden',
+  },
+  decorCircle1: {
+    position: 'absolute', top: -20, right: -20,
+    width: 80, height: 80, borderRadius: 40,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+  },
+  decorCircle2: {
+    position: 'absolute', bottom: -15, left: -15,
+    width: 60, height: 60, borderRadius: 30,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+  },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  iconWrap: {
+    width: 44, height: 44, borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)',
+  },
+  iconText: { fontSize: 22 },
+  textCol: { flex: 1 },
+  title: {
+    fontSize: 11, fontWeight: '600', color: 'rgba(255,255,255,0.7)',
+    letterSpacing: 0.3,
+  },
+  amount: {
+    fontSize: 22, fontWeight: '900', color: '#FFF', marginTop: 2,
+    textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
+  },
+  motivation: {
+    fontSize: 11, color: 'rgba(255,255,255,0.65)', marginTop: 10,
+    lineHeight: 16, fontWeight: '500',
+  },
+});
+
+// ════════════════════════════════════════════════════════════
+// ODA İSTATİSTİKLERİ — Kompakt Bar
+// ════════════════════════════════════════════════════════════
+type RoomStats = {
+  totalRooms: number;
+  liveRooms: number;
+  totalListeners: number;
+  weeklySP: number;
+};
+
+function StatsBar({ stats }: { stats: RoomStats }) {
+  const items = [
+    { value: stats.totalRooms, label: 'Oda', color: '#38BDF8', icon: 'home' as const },
+    { value: stats.liveRooms, label: 'Canlı', color: '#EF4444', icon: 'radio' as const },
+    { value: stats.totalListeners, label: 'Dinleyici', color: '#22C55E', icon: 'people' as const },
+    { value: stats.weeklySP, label: 'SP/Hafta', color: '#A78BFA', icon: 'diamond' as const },
+  ];
+
+  return (
+    <View style={dashS.bar}>
+      {items.map((item, i) => (
+        <React.Fragment key={i}>
+          {i > 0 && <View style={dashS.sep} />}
+          <View style={dashS.cell}>
+            <View style={dashS.valueRow}>
+              <Ionicons name={item.icon} size={11} color={item.color} />
+              <Text style={[dashS.value, { color: item.color }]}>
+                {item.value > 999 ? `${(item.value / 1000).toFixed(1)}k` : item.value}
+              </Text>
+            </View>
+            <Text style={dashS.label}>{item.label}</Text>
+          </View>
+        </React.Fragment>
+      ))}
+    </View>
+  );
+}
+
+const dashS = StyleSheet.create({
+  bar: {
+    flexDirection: 'row', alignItems: 'center',
+    marginHorizontal: 16, marginBottom: 8,
+    paddingVertical: 8, paddingHorizontal: 6,
+    borderRadius: 12,
+    backgroundColor: 'rgba(51,59,69,0.7)',
+    borderWidth: 1, borderColor: 'rgba(149,161,174,0.15)',
+  },
+  sep: {
+    width: 1, height: 22, backgroundColor: 'rgba(148,163,184,0.15)',
+  },
+  cell: {
+    flex: 1, alignItems: 'center',
+  },
+  valueRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+  },
+  value: {
+    fontSize: 14, fontWeight: '800',
+  },
+  label: {
+    fontSize: 8, fontWeight: '600', color: '#64748B',
+    marginTop: 1, letterSpacing: 0.2,
+  },
+});
+
+// ════════════════════════════════════════════════════════════
+// HIZLI ODA ŞABLONLARI
+// ════════════════════════════════════════════════════════════
+const ROOM_TEMPLATES = [
+  { id: 'chat', emoji: '💬', label: 'Sohbet', name: '', category: 'chat', type: 'open', mode: 'audio', speaking: 'free_for_all', colors: ['#14B8A6', '#065F56'] as [string, string] },
+  { id: 'music', emoji: '🎵', label: 'Müzik', name: '', category: 'music', type: 'open', mode: 'audio', speaking: 'permission_only', colors: ['#8B5CF6', '#4C1D95'] as [string, string] },
+  { id: 'game', emoji: '🎮', label: 'Oyun', name: '', category: 'game', type: 'open', mode: 'audio', speaking: 'free_for_all', colors: ['#EF4444', '#7F1D1D'] as [string, string] },
+  { id: 'private', emoji: '🔒', label: 'Özel', name: '', category: 'chat', type: 'closed', mode: 'audio', speaking: 'permission_only', colors: ['#F59E0B', '#78350F'] as [string, string] },
+  { id: 'podcast', emoji: '🎤', label: 'Podcast', name: '', category: 'tech', type: 'open', mode: 'audio', speaking: 'selected_only', colors: ['#3B82F6', '#1E3A8A'] as [string, string] },
+];
+
+const tplS = StyleSheet.create({
+  card: {
+    marginRight: 8, borderRadius: 10, overflow: 'hidden',
+  },
+  gradient: {
+    width: 64, height: 52, alignItems: 'center', justifyContent: 'center',
+    borderRadius: 10,
+  },
+  emoji: { fontSize: 18 },
+  label: {
+    fontSize: 8, fontWeight: '700', color: 'rgba(255,255,255,0.85)',
+    marginTop: 2, letterSpacing: 0.2,
+  },
+});
+
+// ════════════════════════════════════════════════════════════
 // ODALARIM EKRANI
 // ════════════════════════════════════════════════════════════
 export default function MyRoomsScreen() {
@@ -176,16 +436,51 @@ export default function MyRoomsScreen() {
 
   const [myRooms, setMyRooms] = useState<Room[]>([]);
   const [recentRooms, setRecentRooms] = useState<RoomHistoryItem[]>([]);
+  const [friendsLive, setFriendsLive] = useState<FriendInRoom[]>([]);
+  const [weeklySP, setWeeklySP] = useState(0);
+  const [roomStats, setRoomStats] = useState<RoomStats>({ totalRooms: 0, liveRooms: 0, totalListeners: 0, weeklySP: 0 });
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
 
   const { unreadNotifs: unreadCount } = useBadges();
+  const { allFriends } = useOnlineFriends();
 
   const loadData = useCallback(async () => {
     if (!firebaseUser) return;
     try {
       const managed = await RoomService.getMyRooms(firebaseUser.uid);
+
+      // ★ STATS FIX: Gerçek katılımcı sayısını room_participants'tan hesapla
+      // listener_count DB'de güncel olmayabilir (RPC yoksa)
+      const liveRoomIds = managed.filter(r => r.is_live).map(r => r.id);
+      let totalListeners = 0;
+      if (liveRoomIds.length > 0) {
+        try {
+          const { data: participantRows } = await supabase
+            .from('room_participants')
+            .select('room_id')
+            .in('room_id', liveRoomIds);
+          // Room bazlı sayım
+          const countMap = new Map<string, number>();
+          (participantRows || []).forEach((row: any) => {
+            countMap.set(row.room_id, (countMap.get(row.room_id) || 0) + 1);
+          });
+          // Her odaya gerçek katılımcı sayısını ata
+          managed.forEach(r => {
+            if (countMap.has(r.id)) {
+              (r as any).participant_count = countMap.get(r.id) || 0;
+            }
+          });
+          totalListeners = Array.from(countMap.values()).reduce((sum, c) => sum + c, 0);
+        } catch {
+          // Fallback: listener_count'u kullan
+          totalListeners = managed.reduce((sum, r) => sum + ((r as any).listener_count || 0), 0);
+        }
+      }
       setMyRooms(managed);
+      const liveRooms = liveRoomIds.length;
+      setRoomStats(prev => ({ ...prev, totalRooms: managed.length, liveRooms, totalListeners }));
 
       // ★ OPT-M1 FIX: getLive() kaldırıldı — history ID'leriyle toplu kontrol
       const history = await RoomHistoryService.getRecent(6);
@@ -202,6 +497,58 @@ export default function MyRoomsScreen() {
         setRecentRooms([]);
       }
 
+      // ★ Faz 1: Arkadaşlarının canlı olduğu odalar
+      try {
+        const friendIds = allFriends.map(f => f.id);
+        if (friendIds.length > 0) {
+          const { data: participantData } = await supabase
+            .from('room_participants')
+            .select('user_id, room_id, rooms:rooms!room_id(id, name, is_live), profiles:profiles!user_id(display_name, avatar_url)')
+            .in('user_id', friendIds.slice(0, 50));
+
+          const liveItems: FriendInRoom[] = (participantData || [])
+            .filter((p: any) => p.rooms?.is_live)
+            .map((p: any) => ({
+              friendId: p.user_id,
+              friendName: p.profiles?.display_name || 'Arkadaş',
+              friendAvatar: p.profiles?.avatar_url || '',
+              roomId: p.rooms?.id || p.room_id,
+              roomName: p.rooms?.name || 'Oda',
+            }));
+          // Aynı arkadaşı tekrar gösterme (birden fazla oda katılımı olabilir)
+          const seen = new Set<string>();
+          const unique = liveItems.filter(item => {
+            if (seen.has(item.friendId)) return false;
+            seen.add(item.friendId);
+            return true;
+          });
+          setFriendsLive(unique.slice(0, 10));
+        } else {
+          setFriendsLive([]);
+        }
+      } catch (flErr) {
+        if (__DEV__) console.warn('[MyRooms] Friends live error:', flErr);
+        setFriendsLive([]);
+      }
+
+      // ★ Faz 1: Haftalık SP kazancı
+      try {
+        const weekAgo = new Date();
+        weekAgo.setDate(weekAgo.getDate() - 7);
+        const { data: spData } = await supabase
+          .from('sp_transactions')
+          .select('amount')
+          .eq('user_id', firebaseUser.uid)
+          .gt('amount', 0)
+          .gte('created_at', weekAgo.toISOString());
+        const total = (spData || []).reduce((sum: number, t: any) => sum + (t.amount || 0), 0);
+        setWeeklySP(total);
+        // ★ Faz 2: Stats dashboard güncelle (SP dahil)
+        setRoomStats(prev => ({ ...prev, weeklySP: total }));
+      } catch (spErr) {
+        if (__DEV__) console.warn('[MyRooms] SP load error:', spErr);
+      }
+
 
     } catch (err) {
       if (__DEV__) console.warn('[MyRooms] Load error:', err);
@@ -209,37 +556,130 @@ export default function MyRoomsScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [firebaseUser]);
+  }, [firebaseUser, allFriends]);
 
   useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
 
-  // BUG-M1 FIX: Realtime oda değişikliklerini dinle (canlı↔uyku, katılımcı sayısı)
+  // ★ Yardımcı: Sadece arkadaşların canlı olduğu odaları yenile (hafif sorgu)
+  const refreshFriendsLive = useCallback(async () => {
+    if (!firebaseUser) return;
+    try {
+      const friendIds = allFriends.map(f => f.id);
+      if (friendIds.length === 0) { setFriendsLive([]); return; }
+      const { data: participantData } = await supabase
+        .from('room_participants')
+        .select('user_id, room_id, rooms:rooms!room_id(id, name, is_live), profiles:profiles!user_id(display_name, avatar_url)')
+        .in('user_id', friendIds.slice(0, 50));
+
+      const liveItems: FriendInRoom[] = (participantData || [])
+        .filter((p: any) => p.rooms?.is_live)
+        .map((p: any) => ({
+          friendId: p.user_id,
+          friendName: p.profiles?.display_name || 'Arkadaş',
+          friendAvatar: p.profiles?.avatar_url || '',
+          roomId: p.rooms?.id || p.room_id,
+          roomName: p.rooms?.name || 'Oda',
+        }));
+      const seen = new Set<string>();
+      const unique = liveItems.filter(item => {
+        if (seen.has(item.friendId)) return false;
+        seen.add(item.friendId);
+        return true;
+      });
+      setFriendsLive(unique.slice(0, 10));
+    } catch (e) {
+      if (__DEV__) console.warn('[MyRooms] Friends live refresh error:', e);
+    }
+  }, [firebaseUser, allFriends]);
+
+  // ════════════════════════════════════════════════════════════
+  // REALTIME MOTOR — 3 kanal
+  // ════════════════════════════════════════════════════════════
   useEffect(() => {
     if (!firebaseUser) return;
-    // ★ BUG-M2 FIX: Sadece anlamlı değişikliklerde yeniden yükle (listener_count hariç)
-    const channel = supabase
+
+    // ── Kanal 1: Yönettiğim Odalar (rooms tablosu) ──
+    const roomsChannel = supabase
       .channel('myrooms-realtime')
       .on('postgres_changes', {
         event: '*', schema: 'public', table: 'rooms',
         filter: `host_id=eq.${firebaseUser.uid}`,
       }, (payload) => {
-        // INSERT/DELETE → her zaman yenile
         if (payload.eventType !== 'UPDATE') { loadData(); return; }
-        // UPDATE → sadece is_live, name, type gibi önemli alan değişikliklerinde yenile
         const updated = payload.new as any;
         const old = payload.old as any;
         if (updated.is_live !== old?.is_live || updated.name !== old?.name || updated.type !== old?.type) {
           loadData();
         } else {
-          // listener_count gibi kozmetik değişikliklerde inline güncelle
-          setMyRooms(prev => prev.map(r =>
-            r.id === updated.id ? { ...r, listener_count: updated.listener_count } : r
-          ));
+          // ★ Kozmetik değişiklik (listener_count, room_settings vb.) → inline güncelle + stats barı
+          const mergedFields: Record<string, any> = {
+            listener_count: updated.listener_count,
+            ...(updated.room_settings ? { room_settings: updated.room_settings } : {}),
+            ...(updated.theme_id !== undefined ? { theme_id: updated.theme_id } : {}),
+            ...(updated.name ? { name: updated.name } : {}),
+            ...(updated.type ? { type: updated.type } : {}),
+          };
+          setMyRooms(prev => {
+            const next = prev.map(r =>
+              r.id === updated.id ? { ...r, ...mergedFields } : r
+            );
+            // Stats barını da güncelle
+            const liveCount = next.filter(r => r.is_live).length;
+            const totalListeners = next.reduce((sum, r) => sum + ((r as any).listener_count || (r as any).participant_count || 0), 0);
+            setRoomStats(prev2 => ({ ...prev2, totalRooms: next.length, liveRooms: liveCount, totalListeners }));
+            return next;
+          });
+          // ★ SYNC FIX: Açık olan RoomManageSheet'i de güncelle
+          setSelectedRoom(prev =>
+            prev && prev.id === updated.id ? { ...prev, ...mergedFields } : prev
+          );
         }
       })
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [firebaseUser, loadData]);
+
+    // ── Kanal 2: Arkadaşların Canlı (room_participants tablosu) ──
+    const friendsChannel = supabase
+      .channel('friends-live-rt')
+      .on('postgres_changes', {
+        event: 'INSERT', schema: 'public', table: 'room_participants',
+      }, (payload) => {
+        const friendSet = new Set(allFriends.map(f => f.id));
+        if (friendSet.has((payload.new as any).user_id)) {
+          refreshFriendsLive();
+        }
+      })
+      .on('postgres_changes', {
+        event: 'DELETE', schema: 'public', table: 'room_participants',
+      }, (payload) => {
+        const friendSet = new Set(allFriends.map(f => f.id));
+        if (friendSet.has((payload.old as any)?.user_id)) {
+          refreshFriendsLive();
+        }
+      })
+      .subscribe();
+
+    // ── Kanal 3: SP Kazancı (sp_transactions tablosu) ──
+    const spChannel = supabase
+      .channel('sp-rt')
+      .on('postgres_changes', {
+        event: 'INSERT', schema: 'public', table: 'sp_transactions',
+        filter: `user_id=eq.${firebaseUser.uid}`,
+      }, (payload) => {
+        const newAmount = (payload.new as any)?.amount || 0;
+        if (newAmount > 0) {
+          // ★ İnkremental güncelleme — tam yenileme gerekmez
+          setWeeklySP(prev => prev + newAmount);
+          setRoomStats(prev => ({ ...prev, weeklySP: prev.weeklySP + newAmount }));
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(roomsChannel);
+      supabase.removeChannel(friendsChannel);
+      supabase.removeChannel(spChannel);
+    };
+  }, [firebaseUser, loadData, allFriends, refreshFriendsLive]);
 
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
@@ -306,6 +746,26 @@ export default function MyRoomsScreen() {
         </LinearGradient>
       </Pressable>
 
+      {/* 🚀 Hızlı Şablonlar */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 6 }}
+      >
+        {ROOM_TEMPLATES.map((tpl) => (
+          <Pressable
+            key={tpl.id}
+            style={({ pressed }) => [tplS.card, pressed && { opacity: 0.8, transform: [{ scale: 0.95 }] }]}
+            onPress={() => router.push(`/create-room?t_name=${encodeURIComponent(tpl.name)}&t_category=${tpl.category}&t_type=${tpl.type}&t_mode=${tpl.mode}&t_speaking=${tpl.speaking}`)}
+          >
+            <LinearGradient colors={tpl.colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={tplS.gradient}>
+              <Text style={tplS.emoji}>{tpl.emoji}</Text>
+              <Text style={tplS.label}>{tpl.label}</Text>
+            </LinearGradient>
+          </Pressable>
+        ))}
+      </ScrollView>
+
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}
@@ -313,6 +773,9 @@ export default function MyRoomsScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={Colors.accentTeal} colors={[Colors.accentTeal]} />
         }
       >
+        {/* 📊 Kompakt İstatistik Barı */}
+        {myRooms.length > 0 && <StatsBar stats={roomStats} />}
+
         {/* Yönettiğim Odalar */}
         <Text style={s.sectionTitle}>Yönettiğim Odalar</Text>
         {myRooms.length > 0 ? (
@@ -322,6 +785,7 @@ export default function MyRoomsScreen() {
               room={room}
               onManage={() => handleManage(room)}
               onStart={() => handleWakeUp(room)}
+              onSettings={() => setSelectedRoom(room)}
             />
           ))
         ) : (
@@ -358,8 +822,47 @@ export default function MyRoomsScreen() {
             </Text>
           </View>
         )}
+
+        {/* 👥 Arkadaşların Canlı */}
+        <Text style={s.sectionTitle}>Arkadaşların Canlı</Text>
+        {friendsLive.length > 0 ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: 16 }}
+            style={{ marginBottom: 4 }}
+          >
+            {friendsLive.map((item) => (
+              <FriendLiveCard
+                key={item.friendId}
+                item={item}
+                onPress={() => router.push(`/room/${item.roomId}`)}
+              />
+            ))}
+          </ScrollView>
+        ) : (
+          <View style={s.emptyFollowed}>
+            <Text style={s.emptyFollowedText}>
+              Arkadaşların şu an bir odada değil.{`\n`}Takip ettiğin kişiler odaya girdiğinde burada görünür!
+            </Text>
+          </View>
+        )}
+
+        {/* 💰 SP Kazanç Özeti */}
+        <Text style={s.sectionTitle}>SP Kazanç Özeti</Text>
+        <SPBanner weeklySP={weeklySP} />
       </ScrollView>
 
+      {/* ★ Oda Yönetim Paneli — odaya girmeden ayarları yönet */}
+      <RoomManageSheet
+        visible={!!selectedRoom}
+        room={selectedRoom}
+        hostId={firebaseUser?.uid || ''}
+        ownerTier={profile?.subscription_tier || 'Free'}
+        onClose={() => setSelectedRoom(null)}
+        onWakeUp={(room) => { setSelectedRoom(null); handleWakeUp(room); }}
+        onDeleted={() => { setSelectedRoom(null); loadData(); }}
+      />
 
     </View></AppBackground>
   );
@@ -409,58 +912,58 @@ const s = StyleSheet.create({
 
   /* CTA — Premium Gradient */
   ctaWrap: {
-    marginHorizontal: 16, marginBottom: 16,
-    borderRadius: 18, overflow: 'hidden',
+    marginHorizontal: 16, marginBottom: 10,
+    borderRadius: 14, overflow: 'hidden',
     shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.3, shadowRadius: 6, elevation: 5,
   },
   ctaGradient: {
     flexDirection: 'row', alignItems: 'center',
-    paddingVertical: 18, paddingHorizontal: 18, gap: 14,
+    paddingVertical: 12, paddingHorizontal: 14, gap: 10,
   },
   ctaIconWrap: {
-    width: 44, height: 44, borderRadius: 14,
+    width: 36, height: 36, borderRadius: 12,
     backgroundColor: 'rgba(255,255,255,0.15)',
     alignItems: 'center', justifyContent: 'center',
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)',
   },
   ctaTitle: {
-    fontSize: 16, fontWeight: '800', color: '#FFF',
+    fontSize: 14, fontWeight: '800', color: '#FFF',
     textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
   },
   ctaSub: {
-    fontSize: 12, color: 'rgba(255,255,255,0.75)', marginTop: 2,
+    fontSize: 11, color: 'rgba(255,255,255,0.75)', marginTop: 1,
   },
 
   /* Section Title */
   sectionTitle: {
-    fontSize: 16, fontWeight: '700', color: '#F1F5F9', letterSpacing: 0.3,
-    paddingHorizontal: 16, marginTop: 16, marginBottom: 10,
+    fontSize: 14, fontWeight: '700', color: '#F1F5F9', letterSpacing: 0.3,
+    paddingHorizontal: 16, marginTop: 10, marginBottom: 6,
     textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
 
   /* Empty — Yönettiğim Odalar */
   emptyCard: {
-    marginHorizontal: 16, borderRadius: 16,
+    marginHorizontal: 16, borderRadius: 14,
     backgroundColor: '#414e5f', borderWidth: 1, borderColor: Colors.cardBorder,
-    overflow: 'hidden', alignItems: 'center', paddingBottom: 24,
+    overflow: 'hidden', alignItems: 'center', paddingBottom: 16,
     shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 8, elevation: 6,
   },
   emptyImageWrap: {
-    width: '80%', marginTop: 12, marginBottom: 16, borderRadius: 80, overflow: 'hidden',
+    width: '70%', marginTop: 10, marginBottom: 10, borderRadius: 80, overflow: 'hidden',
   },
-  emptyImage: { width: '100%', height: 180 },
+  emptyImage: { width: '100%', height: 140 },
   emptyTitle: {
-    fontSize: 15, fontWeight: '800', color: '#F1F5F9', textAlign: 'center', lineHeight: 22, marginBottom: 8,
+    fontSize: 13, fontWeight: '800', color: '#F1F5F9', textAlign: 'center', lineHeight: 20, marginBottom: 4,
     textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
   emptySub: {
-    fontSize: 12, color: '#94A3B8', textAlign: 'center', lineHeight: 18,
+    fontSize: 11, color: '#94A3B8', textAlign: 'center', lineHeight: 16,
     textShadowColor: 'rgba(0,0,0,0.3)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
   },
 
   /* Empty — Takip Ettiğim Odalar */
   emptyFollowed: {
-    marginHorizontal: 16, padding: 20, borderRadius: 16,
+    marginHorizontal: 16, padding: 14, borderRadius: 14,
     backgroundColor: '#414e5f', borderWidth: 1, borderColor: Colors.cardBorder,
     alignItems: 'center',
     shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 8, elevation: 6,

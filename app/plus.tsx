@@ -5,11 +5,12 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { safeGoBack } from '../constants/navigation';
-import { Colors } from '../constants/theme';
+import { Colors, Shadows } from '../constants/theme';
 import { useAuth } from './_layout';
 import { showToast } from '../components/Toast';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ROOM_TIER_LIMITS } from '../constants/tiers';
+import { ROOM_TIER_LIMITS, TIER_DEFINITIONS } from '../constants/tiers';
+import { migrateLegacyTier } from '../types';
 import { supabase } from '../constants/supabase';
 import { RevenueCatService, REVENUECAT_MOCK_MODE } from '../services/revenuecat';
 import AppBackground from '../components/AppBackground';
@@ -18,96 +19,50 @@ type AlertConfig = { visible: boolean; title: string; message: string; type?: an
 
 const PLANS = [
   {
-    id: 'bronze',
-    tier: 'Bronze' as const,
-    name: 'Bronze',
-    subtitle: 'Başlangıç',
-    icon: 'medal-outline',
-    gradient: ['#CD7F32', '#A0522D'] as [string, string],
-    color: '#CD7F32',
-    monthly: 49.99,
-    yearly: 399.99,
-    savePct: 33,
+    id: 'plus',
+    tier: 'Plus' as const,
+    name: TIER_DEFINITIONS.Plus.label,
+    subtitle: 'Gelişmiş',
+    icon: 'rocket',
+    gradient: TIER_DEFINITIONS.Plus.gradient,
+    color: TIER_DEFINITIONS.Plus.color,
+    monthly: TIER_DEFINITIONS.Plus.monthlyPrice,
+    yearly: TIER_DEFINITIONS.Plus.yearlyPrice,
+    savePct: 27,
     features: [
-      { text: `${ROOM_TIER_LIMITS.Bronze.maxSpeakers} kişi sahne`, included: true },
-      { text: `${ROOM_TIER_LIMITS.Bronze.maxListeners} dinleyici`, included: true },
-      { text: `${ROOM_TIER_LIMITS.Bronze.maxCameras} kamera`, included: true },
-      { text: `${ROOM_TIER_LIMITS.Bronze.durationHours} saat oda süresi`, included: true },
-      { text: `Günde ${ROOM_TIER_LIMITS.Bronze.dailyRooms} oda`, included: true },
-      { text: 'Açık + Şifreli oda', included: true },
-      { text: '480p video', included: true },
-      { text: 'Reklamsız deneyim', included: true },
-    ],
-  },
-  {
-    id: 'silver',
-    tier: 'Silver' as const,
-    name: 'Silver',
-    subtitle: 'Popüler',
-    icon: 'star',
-    gradient: ['#C0C0C0', '#A8A9AD'] as [string, string],
-    color: '#C0C0C0',
-    monthly: 99.99,
-    yearly: 799.99,
-    savePct: 33,
-    features: [
-      { text: `${ROOM_TIER_LIMITS.Silver.maxSpeakers} kişi sahne`, included: true },
-      { text: `${ROOM_TIER_LIMITS.Silver.maxListeners} dinleyici`, included: true },
-      { text: `${ROOM_TIER_LIMITS.Silver.maxCameras} kamera`, included: true },
-      { text: `${ROOM_TIER_LIMITS.Silver.durationHours} saat oda süresi`, included: true },
-      { text: `Günde ${ROOM_TIER_LIMITS.Silver.dailyRooms} oda`, included: true },
-      { text: 'Oda teması + çerçeve', included: true },
+      { text: `${ROOM_TIER_LIMITS.Plus.maxSpeakers} kişi sahne`, included: true },
+      { text: `${ROOM_TIER_LIMITS.Plus.maxListeners} dinleyici`, included: true },
+      { text: `${ROOM_TIER_LIMITS.Plus.maxCameras} kamera`, included: true },
+      { text: `${ROOM_TIER_LIMITS.Plus.durationHours} saat oda süresi`, included: true },
+      { text: `Günde ${ROOM_TIER_LIMITS.Plus.dailyRooms} oda`, included: true },
+      { text: 'Tüm oda türleri', included: true },
       { text: 'HD ses + 720p video', included: true },
+      { text: 'Oda teması + çerçeve', included: true },
       { text: 'Yaş/Dil filtresi', included: true },
       { text: 'Reklamsız deneyim', included: true },
     ],
   },
   {
-    id: 'gold',
-    tier: 'Gold' as const,
-    name: 'Gold',
-    subtitle: 'Premium',
-    icon: 'diamond',
-    gradient: ['#FFD700', '#FFA500'] as [string, string],
-    color: '#FFD700',
-    monthly: 149.99,
-    yearly: 1199.99,
-    savePct: 33,
+    id: 'pro',
+    tier: 'Pro' as const,
+    name: TIER_DEFINITIONS.Pro.label,
+    subtitle: 'Sınırsız',
+    icon: 'flame',
+    gradient: TIER_DEFINITIONS.Pro.gradient,
+    color: TIER_DEFINITIONS.Pro.color,
+    monthly: TIER_DEFINITIONS.Pro.monthlyPrice,
+    yearly: TIER_DEFINITIONS.Pro.yearlyPrice,
+    savePct: 25,
     features: [
-      { text: `${ROOM_TIER_LIMITS.Gold.maxSpeakers} kişi sahne`, included: true },
-      { text: `${ROOM_TIER_LIMITS.Gold.maxListeners} dinleyici`, included: true },
-      { text: `${ROOM_TIER_LIMITS.Gold.maxCameras} kamera`, included: true },
-      { text: 'Sınırsız oda süresi', included: true },
-      { text: 'Sınırsız oda oluşturma', included: true },
-      { text: 'Tüm oda türleri + Davetli', included: true },
-      { text: 'HD ses + 1080p video', included: true },
-      { text: 'Oda müziği + Resim', included: true },
-      { text: 'Takipçi-only mod', included: true },
-      { text: 'Hediye al + Cashout', included: true },
-      { text: 'Reklamsız deneyim', included: true },
-    ],
-  },
-  {
-    id: 'vip',
-    tier: 'VIP' as const,
-    name: 'VIP',
-    subtitle: 'En İyi',
-    icon: 'diamond',
-    gradient: ['#00BFFF', '#8B5CF6'] as [string, string],
-    color: '#00BFFF',
-    monthly: 299.99,
-    yearly: 2399.99,
-    savePct: 33,
-    features: [
-      { text: `${ROOM_TIER_LIMITS.VIP.maxSpeakers} kişi sahne`, included: true },
+      { text: `${ROOM_TIER_LIMITS.Pro.maxSpeakers} kişi sahne`, included: true },
       { text: 'Sınırsız dinleyici', included: true },
-      { text: `${ROOM_TIER_LIMITS.VIP.maxCameras} kamera`, included: true },
+      { text: `${ROOM_TIER_LIMITS.Pro.maxCameras} kamera`, included: true },
       { text: 'Sınırsız oda süresi', included: true },
       { text: 'Sınırsız oda oluşturma', included: true },
-      { text: 'Tüm oda türleri', included: true },
-      { text: 'HD ses stereo + 1080p', included: true },
+      { text: 'HD stereo ses + 1080p', included: true },
+      { text: 'Oda müziği + Arka plan', included: true },
       { text: 'Ghost mode + Kılık', included: true },
-      { text: 'VIP giriş efekti', included: true },
+      { text: 'Takipçi-only mod', included: true },
       { text: 'Düşük komisyon cashout', included: true },
       { text: 'Haftalık boost', included: true },
       { text: 'Reklamsız deneyim', included: true },
@@ -119,12 +74,12 @@ export default function PlusScreen() {
   const router = useRouter();
   const { profile, refreshProfile } = useAuth();
   const insets = useSafeAreaInsets();
-  const [selectedTier, setSelectedTier] = useState<'bronze' | 'silver' | 'gold' | 'vip'>('silver');
+  const [selectedTier, setSelectedTier] = useState<'plus' | 'pro'>('plus');
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('yearly');
   const [activating, setActivating] = useState(false);
   const [alertCfg, setAlertCfg] = useState<AlertConfig>({ visible: false, title: '', message: '' });
 
-  const currentTier = profile?.subscription_tier || 'Free';
+  const currentTier = migrateLegacyTier(profile?.subscription_tier);
   const selectedPlan = PLANS.find(p => p.id === selectedTier)!;
 
   const handleActivate = async () => {
@@ -220,10 +175,10 @@ export default function PlusScreen() {
         <View style={styles.currentTierBar}>
           <Text style={styles.currentTierLabel}>Mevcut planın:</Text>
           <View style={[styles.currentTierBadge, {
-            backgroundColor: currentTier === 'VIP' ? '#00BFFF18' : currentTier === 'Gold' ? '#FFD70018' : '#6B728018'
+            backgroundColor: currentTier === 'Pro' ? '#F59E0B18' : currentTier === 'Plus' ? '#A855F718' : '#6B728018'
           }]}>
             <Text style={{
-              color: currentTier === 'VIP' ? '#00BFFF' : currentTier === 'Gold' ? '#FFD700' : '#9CA3AF',
+              color: currentTier === 'Pro' ? '#F59E0B' : currentTier === 'Plus' ? '#A855F7' : '#9CA3AF',
               fontSize: 12, fontWeight: '700'
             }}>
               {currentTier}
@@ -234,23 +189,27 @@ export default function PlusScreen() {
         {/* Aylık/Yıllık Toggle */}
         <View style={styles.billingToggle}>
           <Pressable
-            style={[styles.billingBtn, billingCycle === 'monthly' && styles.billingActive]}
+            style={[styles.billingBtn, billingCycle === 'monthly' && styles.billingActive, { overflow: 'hidden' }]}
             onPress={() => setBillingCycle('monthly')}
+            android_ripple={{ color: 'rgba(255,255,255,0.1)' }}
           >
-            <Text style={[styles.billingText, billingCycle === 'monthly' && { color: Colors.text }]}>Aylık</Text>
+            {billingCycle === 'monthly' && <View style={styles.billingDot} />}
+            <Text style={[styles.billingText, billingCycle === 'monthly' && styles.billingTextActive]}>Aylık</Text>
           </Pressable>
           <Pressable
-            style={[styles.billingBtn, billingCycle === 'yearly' && styles.billingActive]}
+            style={[styles.billingBtn, billingCycle === 'yearly' && styles.billingActive, { overflow: 'hidden' }]}
             onPress={() => setBillingCycle('yearly')}
+            android_ripple={{ color: 'rgba(255,255,255,0.1)' }}
           >
-            <Text style={[styles.billingText, billingCycle === 'yearly' && { color: Colors.text }]}>Yıllık</Text>
-            <View style={[styles.saveBadge, { backgroundColor: Colors.emerald }]}>
-              <Text style={styles.saveText}>%33</Text>
+            {billingCycle === 'yearly' && <View style={styles.billingDot} />}
+            <Text style={[styles.billingText, billingCycle === 'yearly' && styles.billingTextActive]}>Yıllık</Text>
+            <View style={styles.saveBadge}>
+              <Text style={styles.saveText}>-27%</Text>
             </View>
           </Pressable>
         </View>
 
-        {/* ═══ YAN YANA PLAN KARTLARI ═══ */}
+        {/* ═══ YAN YANA PLAN KARTLARI (2 Plan) ═══ */}
         <View style={styles.plansRow}>
           {PLANS.map(plan => {
             const isSelected = selectedTier === plan.id;
@@ -274,17 +233,12 @@ export default function PlusScreen() {
                   start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                   style={styles.planCardHeader}
                 >
-                  {plan.id === 'silver' && (
-                    <View style={styles.popularBadge}>
-                      <Text style={styles.popularText}>POPÜLER</Text>
-                    </View>
-                  )}
-                  {plan.id === 'vip' && (
+                  {plan.id === 'pro' && (
                     <View style={[styles.popularBadge, { backgroundColor: '#D97706' }]}>
                       <Text style={styles.popularText}>EN İYİ</Text>
                     </View>
                   )}
-                  <Ionicons name={plan.icon as any} size={28} color="rgba(255,255,255,0.9)" />
+                  <Ionicons name={plan.icon as any} size={32} color="rgba(255,255,255,0.95)" style={{ textShadowColor: 'rgba(0,0,0,0.3)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 6 }} />
                   <Text style={styles.planCardName}>{plan.name}</Text>
                 </LinearGradient>
 
@@ -300,15 +254,15 @@ export default function PlusScreen() {
 
                   {/* Özellik Listesi */}
                   <View style={styles.planFeatures}>
-                    {plan.features.filter(f => f.included).slice(0, 6).map((f, i) => (
+                    {plan.features.filter(f => f.included).slice(0, 7).map((f, i) => (
                       <View key={i} style={styles.planFeatureRow}>
                         <Ionicons name="checkmark" size={13} color={plan.color} />
                         <Text style={styles.planFeatureText} numberOfLines={1}>{f.text}</Text>
                       </View>
                     ))}
-                    {plan.features.filter(f => f.included).length > 6 && (
+                    {plan.features.filter(f => f.included).length > 7 && (
                       <Text style={[styles.planFeatureMore, { color: plan.color }]}>
-                        +{plan.features.filter(f => f.included).length - 6} daha
+                        +{plan.features.filter(f => f.included).length - 7} daha
                       </Text>
                     )}
                   </View>
@@ -332,64 +286,70 @@ export default function PlusScreen() {
           })}
         </View>
 
-        {/* Karşılaştırma Tablosu */}
+        {/* Karşılaştırma Tablosu — 3 Sütun */}
         <Text style={styles.sectionTitle}>Plan Karşılaştırması</Text>
-        <View style={styles.compareTable}>
+        <LinearGradient
+          colors={['rgba(40,48,62,0.95)', 'rgba(30,38,50,0.85)', 'rgba(25,32,44,0.9)']}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+          style={styles.compareTable}
+        >
           <View style={styles.compareHeader}>
             <Text style={[styles.compareCell, { flex: 1.5 }]}> </Text>
             <Text style={[styles.compareCellHead, { color: '#9CA3AF' }]}>Free</Text>
-            <Text style={[styles.compareCellHead, { color: '#C0C0C0' }]}>Silver</Text>
-            <Text style={[styles.compareCellHead, { color: '#FFD700' }]}>Gold</Text>
-            <Text style={[styles.compareCellHead, { color: '#00BFFF' }]}>VIP</Text>
+            <Text style={[styles.compareCellHead, { color: TIER_DEFINITIONS.Plus.color }]}>Plus</Text>
+            <Text style={[styles.compareCellHead, { color: TIER_DEFINITIONS.Pro.color }]}>Pro</Text>
           </View>
           {[
-            { label: 'Sahne', values: [`${ROOM_TIER_LIMITS.Free.maxSpeakers}`, `${ROOM_TIER_LIMITS.Silver.maxSpeakers}`, `${ROOM_TIER_LIMITS.Gold.maxSpeakers}`, `${ROOM_TIER_LIMITS.VIP.maxSpeakers}`] },
-            { label: 'Dinleyici', values: [`${ROOM_TIER_LIMITS.Free.maxListeners}`, `${ROOM_TIER_LIMITS.Silver.maxListeners}`, `${ROOM_TIER_LIMITS.Gold.maxListeners}`, '∞'] },
-            { label: 'Kamera', values: [`${ROOM_TIER_LIMITS.Free.maxCameras}`, `${ROOM_TIER_LIMITS.Silver.maxCameras}`, `${ROOM_TIER_LIMITS.Gold.maxCameras}`, `${ROOM_TIER_LIMITS.VIP.maxCameras}`] },
-            { label: 'Oda Süresi', values: [`${ROOM_TIER_LIMITS.Free.durationHours}sa`, `${ROOM_TIER_LIMITS.Silver.durationHours}sa`, '24sa', '∞'] },
-            { label: 'Günlük Oda', values: [`${ROOM_TIER_LIMITS.Free.dailyRooms}`, `${ROOM_TIER_LIMITS.Silver.dailyRooms}`, '∞', '∞'] },
-            { label: 'Oda Türü', values: ['Açık', 'A+Ş', 'Hepsi', 'Hepsi'] },
-            { label: 'HD Ses', values: ['—', '✓', '✓', 'Stereo'] },
-            { label: 'Video', values: ['—', '720p', '1080p', '1080p'] },
-            { label: 'Tema', values: ['—', '✓', '✓', '✓'] },
-            { label: 'Cashout', values: ['—', '—', '%30', '%15'] },
-            { label: 'Çerçeve', values: ['—', '✓', '✓', 'VIP'] },
-            { label: 'Reklam', values: ['Var', 'Yok', 'Yok', 'Yok'] },
+            { label: 'Sahne', values: [`${ROOM_TIER_LIMITS.Free.maxSpeakers}`, `${ROOM_TIER_LIMITS.Plus.maxSpeakers}`, `${ROOM_TIER_LIMITS.Pro.maxSpeakers}`] },
+            { label: 'Dinleyici', values: [`${ROOM_TIER_LIMITS.Free.maxListeners}`, `${ROOM_TIER_LIMITS.Plus.maxListeners}`, '∞'] },
+            { label: 'Kamera', values: [`${ROOM_TIER_LIMITS.Free.maxCameras}`, `${ROOM_TIER_LIMITS.Plus.maxCameras}`, `${ROOM_TIER_LIMITS.Pro.maxCameras}`] },
+            { label: 'Oda Süresi', values: [`${ROOM_TIER_LIMITS.Free.durationHours}sa`, `${ROOM_TIER_LIMITS.Plus.durationHours}sa`, '∞'] },
+            { label: 'Günlük Oda', values: [`${ROOM_TIER_LIMITS.Free.dailyRooms}`, `${ROOM_TIER_LIMITS.Plus.dailyRooms}`, '∞'] },
+            { label: 'Oda Türü', values: ['Açık', 'Hepsi', 'Hepsi'] },
+            { label: 'Ses', values: ['Mono', 'HD', 'Stereo'] },
+            { label: 'Video', values: ['480p', '720p', '1080p'] },
+            { label: 'Tema', values: ['—', '✓', '✓'] },
+            { label: 'Çerçeve', values: ['—', '✓', 'Pro'] },
+            { label: 'Müzik', values: ['—', '—', '✓'] },
+            { label: 'Cashout', values: ['—', '%30', '%15'] },
+            { label: 'Reklam', values: ['Var', 'Yok', 'Yok'] },
           ].map((row, i) => (
-            <View key={i} style={[styles.compareRow, i % 2 === 0 && { backgroundColor: 'rgba(255,255,255,0.02)' }]}>
+            <View key={i} style={[styles.compareRow, i % 2 === 0 && { backgroundColor: 'rgba(255,255,255,0.03)' }]}>
               <Text style={[styles.compareCell, { flex: 1.5, color: Colors.text2 }]}>{row.label}</Text>
               {row.values.map((v, j) => (
                 <Text key={j} style={[styles.compareCell, {
-                  color: j === 0 ? '#6B7280' : j === 1 ? '#C0C0C0' : j === 2 ? Colors.amber : '#00BFFF'
+                  color: j === 0 ? '#6B7280' : j === 1 ? TIER_DEFINITIONS.Plus.color : TIER_DEFINITIONS.Pro.color
                 }]}>{v}</Text>
               ))}
             </View>
           ))}
-        </View>
+        </LinearGradient>
 
         {/* CTA */}
         {currentTier !== selectedPlan.tier && (
-          <Pressable style={styles.ctaWrap} onPress={handleActivate} disabled={activating}>
-            <LinearGradient
-              colors={selectedPlan.gradient}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-              style={styles.ctaBtn}
-            >
-              {activating ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <>
-                  <Ionicons name="star" size={18} color="#fff" />
-                  <Text style={styles.ctaText}>
-                    {selectedPlan.name}'a Yükselt — {billingCycle === 'monthly' ? `${selectedPlan.monthly}₺/ay` : `${selectedPlan.yearly}₺/yıl`}
-                  </Text>
-                </>
-              )}
-            </LinearGradient>
-          </Pressable>
+          <View style={styles.ctaWrap}>
+            <Pressable onPress={handleActivate} disabled={activating} style={styles.ctaOuter}>
+              <LinearGradient
+                colors={selectedPlan.gradient}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                style={styles.ctaBtn}
+              >
+                {activating ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <>
+                    <Ionicons name={selectedPlan.icon as any} size={20} color="#fff" style={{ textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4 }} />
+                    <Text style={styles.ctaText}>
+                      {selectedPlan.name}'a Yükselt — {billingCycle === 'monthly' ? `${selectedPlan.monthly}₺/ay` : `${selectedPlan.yearly}₺/yıl`}
+                    </Text>
+                  </>
+                )}
+              </LinearGradient>
+            </Pressable>
+          </View>
         )}
 
-        {/* Silver'a dönme */}
+        {/* Free'ye dönme */}
         {currentTier !== 'Free' && (
           <Pressable style={styles.downgradeBtn} onPress={handleDowngrade}>
             <Text style={styles.downgradeText}>Planı İptal Et / Free'ye Dön</Text>
@@ -420,89 +380,134 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 16, paddingBottom: 12,
   },
-  backBtn: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
-  headerTitle: { fontSize: 18, fontWeight: '700', color: Colors.text },
+  backBtn: {
+    width: 38, height: 38, borderRadius: 14, justifyContent: 'center', alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    ...Shadows.icon,
+  },
+  headerTitle: {
+    fontSize: 17, fontWeight: '800', color: '#F1F5F9', letterSpacing: 0.3,
+    ...Shadows.text,
+  },
 
   currentTierBar: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 8, marginTop: 4, marginBottom: 12,
+    gap: 8, marginTop: 4, marginBottom: 14,
   },
-  currentTierLabel: { color: Colors.text3, fontSize: 13 },
-  currentTierBadge: { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 8 },
-
-  billingToggle: { flexDirection: 'row', marginHorizontal: 20, marginBottom: 16, gap: 8 },
-  billingBtn: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 6, paddingVertical: 10, borderRadius: 10,
-    backgroundColor: 'rgba(255,255,255,0.04)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
-  },
-  billingActive: { borderColor: 'rgba(255,255,255,0.2)', backgroundColor: 'rgba(255,255,255,0.06)' },
-  billingText: { fontSize: 13, fontWeight: '600', color: Colors.text3 },
-  saveBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
-  saveText: { fontSize: 9, fontWeight: '700', color: '#fff' },
-
-  plansRow: { flexDirection: 'row', paddingHorizontal: 12, gap: 10 },
-  planCard: {
-    flex: 1, borderRadius: 16, overflow: 'hidden',
-    backgroundColor: 'rgba(255,255,255,0.03)',
-    borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.08)',
-  },
-  planCardHeader: { alignItems: 'center', paddingVertical: 18, gap: 4, position: 'relative' },
-  planCardName: { fontSize: 18, fontWeight: '800', color: '#fff' },
-  popularBadge: {
-    position: 'absolute', top: 8, right: 8,
-    backgroundColor: '#0891B2', borderRadius: 4,
-    paddingHorizontal: 5, paddingVertical: 2,
-  },
-  popularText: { fontSize: 8, fontWeight: '800', color: '#fff', letterSpacing: 0.5 },
-
-  planCardBody: { padding: 12, gap: 4 },
-  planPrice: { fontSize: 24, fontWeight: '800' },
-  planPeriod: { fontSize: 11, color: Colors.text3, marginLeft: 2 },
-  planMonthly: { fontSize: 10, color: Colors.text3, textAlign: 'center', marginBottom: 2 },
-
-  planFeatures: { marginTop: 8, gap: 4 },
-  planFeatureRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  planFeatureText: { fontSize: 10, color: Colors.text2, flex: 1 },
-  planFeatureMore: { fontSize: 10, fontWeight: '600', textAlign: 'center', marginTop: 2 },
-
-  planSelectBtn: {
-    marginTop: 10, flexDirection: 'row', justifyContent: 'center', alignItems: 'center',
-    gap: 4, paddingVertical: 8, borderRadius: 10,
-    backgroundColor: 'rgba(255,255,255,0.05)',
+  currentTierLabel: { color: Colors.text3, fontSize: 13, fontWeight: '500' },
+  currentTierBadge: {
+    paddingHorizontal: 12, paddingVertical: 4, borderRadius: 10,
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
   },
-  planSelectText: { fontSize: 12, fontWeight: '700', color: Colors.text3 },
+
+  billingToggle: {
+    flexDirection: 'row', marginHorizontal: 20, marginBottom: 18, gap: 6,
+  },
+  billingBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 6, paddingVertical: 10, borderRadius: 12,
+    backgroundColor: Colors.cardBg, borderWidth: 1, borderColor: Colors.cardBorder,
+    ...Shadows.icon,
+  },
+  billingActive: {
+    backgroundColor: '#3D4F57', borderColor: 'rgba(115,194,189,0.35)',
+  },
+  billingDot: {
+    width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.accentTeal,
+  },
+  billingText: {
+    fontSize: 13, fontWeight: '700', color: '#94A3B8',
+    ...Shadows.textLight,
+  },
+  billingTextActive: { color: Colors.accentTeal },
+  saveBadge: {
+    paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6,
+    backgroundColor: 'rgba(245,158,11,0.15)', borderWidth: 1, borderColor: 'rgba(245,158,11,0.25)',
+  },
+  saveText: { fontSize: 9, fontWeight: '800', color: '#F59E0B' },
+
+  plansRow: { flexDirection: 'row', paddingHorizontal: 14, gap: 12 },
+  planCard: {
+    flex: 1, borderRadius: 18, overflow: 'hidden',
+    backgroundColor: Colors.cardBg,
+    borderWidth: 1.5, borderColor: Colors.cardBorder + '40',
+    ...Shadows.card,
+  },
+  planCardHeader: {
+    alignItems: 'center', paddingVertical: 20, gap: 6, position: 'relative',
+  },
+  planCardName: {
+    fontSize: 20, fontWeight: '900', color: '#fff', letterSpacing: 0.5,
+    ...Shadows.text,
+  },
+  popularBadge: {
+    position: 'absolute', top: 10, right: 10,
+    backgroundColor: '#0891B2', borderRadius: 6,
+    paddingHorizontal: 6, paddingVertical: 3,
+    ...Shadows.icon,
+  },
+  popularText: { fontSize: 8, fontWeight: '900', color: '#fff', letterSpacing: 0.8 },
+
+  planCardBody: { padding: 14, gap: 6 },
+  planPrice: { fontSize: 26, fontWeight: '900', ...Shadows.textLight },
+  planPeriod: { fontSize: 11, color: Colors.text3, marginLeft: 2, fontWeight: '600' },
+  planMonthly: { fontSize: 10, color: Colors.text3, textAlign: 'center', marginBottom: 2, fontWeight: '500' },
+
+  planFeatures: { marginTop: 10, gap: 5 },
+  planFeatureRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  planFeatureText: { fontSize: 11, color: '#CBD5E1', flex: 1, fontWeight: '500' },
+  planFeatureMore: { fontSize: 11, fontWeight: '700', textAlign: 'center', marginTop: 4 },
+
+  planSelectBtn: {
+    marginTop: 12, flexDirection: 'row', justifyContent: 'center', alignItems: 'center',
+    gap: 4, paddingVertical: 10, borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.12)',
+  },
+  planSelectText: { fontSize: 13, fontWeight: '800', color: Colors.text3 },
 
   sectionTitle: {
-    fontSize: 15, fontWeight: '700', color: Colors.text,
-    paddingHorizontal: 20, marginTop: 24, marginBottom: 12,
+    fontSize: 16, fontWeight: '800', color: '#F1F5F9',
+    paddingHorizontal: 20, marginTop: 28, marginBottom: 14,
+    ...Shadows.text,
   },
   compareTable: {
-    marginHorizontal: 20, borderRadius: 12, overflow: 'hidden',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
+    marginHorizontal: 16, borderRadius: 16, overflow: 'hidden',
+    borderWidth: 1.5, borderColor: Colors.cardBorder + '30',
+    backgroundColor: Colors.cardBg,
+    ...Shadows.card,
   },
   compareHeader: {
-    flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.04)',
-    paddingVertical: 10, paddingHorizontal: 12,
+    flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.05)',
+    paddingVertical: 12, paddingHorizontal: 14,
+    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)',
   },
-  compareCellHead: { flex: 1, textAlign: 'center', fontSize: 11, fontWeight: '700' },
-  compareRow: { flexDirection: 'row', paddingVertical: 9, paddingHorizontal: 12 },
-  compareCell: { flex: 1, textAlign: 'center', fontSize: 11, fontWeight: '500', color: Colors.text2 },
+  compareCellHead: { flex: 1, textAlign: 'center', fontSize: 12, fontWeight: '800' },
+  compareRow: { flexDirection: 'row', paddingVertical: 10, paddingHorizontal: 14 },
+  compareCell: { flex: 1, textAlign: 'center', fontSize: 11, fontWeight: '600', color: Colors.text2 },
 
-  ctaWrap: { paddingHorizontal: 20, marginTop: 24 },
+  ctaWrap: { paddingHorizontal: 20, marginTop: 26 },
+  ctaOuter: {
+    borderRadius: 14, overflow: 'hidden',
+    ...Shadows.button,
+  },
   ctaBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 8, paddingVertical: 16, borderRadius: 14,
+    gap: 10, paddingVertical: 16,
   },
-  ctaText: { fontSize: 15, fontWeight: '700', color: '#fff' },
+  ctaText: {
+    fontSize: 15, fontWeight: '800', color: '#fff',
+    ...Shadows.text,
+  },
   disclaimer: {
     fontSize: 11, color: Colors.text3, textAlign: 'center',
     paddingHorizontal: 40, marginTop: 16, lineHeight: 16,
   },
   downgradeBtn: {
-    alignSelf: 'center', marginTop: 12, paddingVertical: 10, paddingHorizontal: 24,
+    alignSelf: 'center', marginTop: 14, paddingVertical: 10, paddingHorizontal: 24,
+    borderRadius: 10,
+    backgroundColor: 'rgba(239,68,68,0.08)',
+    borderWidth: 1, borderColor: 'rgba(239,68,68,0.2)',
   },
-  downgradeText: { fontSize: 13, color: Colors.red, fontWeight: '600' },
+  downgradeText: { fontSize: 13, color: Colors.red, fontWeight: '700' },
 });

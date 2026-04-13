@@ -376,6 +376,22 @@ export const ModerationService = {
     return data || [];
   },
 
+  /** Odanın susturulan kullanıcı listesi */
+  async getRoomMutes(roomId: string) {
+    const { data, error } = await supabase
+      .from('room_mutes')
+      .select('*, user:profiles!muted_user_id(id, display_name, avatar_url)')
+      .eq('room_id', roomId)
+      .order('created_at', { ascending: false });
+    if (error) return [];
+    // Süresi dolmuşları filtrele
+    const now = new Date();
+    return (data || []).filter((m: any) => {
+      if (m.expires_at && new Date(m.expires_at) < now) return false;
+      return true;
+    });
+  },
+
 
   // ==========================================
   // ★ KALDIRILDI: Aşağıdaki fonksiyonlar RoomService'e taşındı.

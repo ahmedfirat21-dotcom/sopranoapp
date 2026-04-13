@@ -6,7 +6,7 @@
  * Sekmeler: Genel | Konuşma | Moderasyon | Görsellik | Monetizasyon | Gelişmiş
  *
  * Kilitli özellikler gri ama görünür.
- * Tıklayınca → "VIP ile açılır" toast.
+ * Tıklayınca → "Pro ile açılır" toast.
  */
 import React from 'react';
 import {
@@ -59,17 +59,17 @@ interface RoomSettingsProps {
   // Status
   isMicEnabled: boolean;
   isCameraEnabled: boolean;
-  // Theme (Silver+)
+  // Theme (Plus+)
   isHost?: boolean;
   currentThemeId?: string | null;
   onChangeTheme?: (themeId: string | null) => void;
-  // Oda Kilidi (Silver+)
+  // Oda Kilidi (Plus+)
   isLocked?: boolean;
   onToggleLock?: (locked: boolean) => void;
   // Oda İsmi Düzenleme (Free)
   roomName?: string;
   onRenameRoom?: (newName: string) => void;
-  // Takipçilere Özel (Gold+)
+  // Takipçilere Özel (Pro+)
   followersOnly?: boolean;
   onToggleFollowersOnly?: (enabled: boolean) => void;
   // Slow Mode
@@ -77,7 +77,7 @@ interface RoomSettingsProps {
   onSlowModeChange?: (seconds: number) => void;
   // Owner tier
   ownerTier?: string;
-  // Arka Plan Resmi (Silver+)
+  // Arka Plan Resmi (Plus+)
   backgroundImage?: string | null;
   onChangeBackgroundImage?: (imageUri: string | null) => void;
   // Hoş Geldin Mesajı
@@ -86,7 +86,7 @@ interface RoomSettingsProps {
   // Konuşma Modu
   speakingMode?: 'free_for_all' | 'permission_only' | 'selected_only';
   onSpeakingModeChange?: (mode: 'free_for_all' | 'permission_only' | 'selected_only') => void;
-  // VIP
+  // Pro
   roomType?: 'open' | 'closed' | 'invite';
   onRoomTypeChange?: (type: 'open' | 'closed' | 'invite') => void;
   entryFeeSp?: number;
@@ -95,19 +95,19 @@ interface RoomSettingsProps {
   onDonationsToggle?: (enabled: boolean) => void;
   roomRules?: string;
   onRulesChange?: (rules: string) => void;
-  // Manuel Oda Dondurma (Bronze+)
+  // Manuel Oda Dondurma (Plus+)
   canFreezeRoom?: boolean;
   onFreezeRoom?: () => void;
-  // Dil Filtresi (Silver+)
+  // Dil Filtresi (Plus+)
   roomLanguage?: string;
   onLanguageChange?: (lang: string) => void;
-  // Yaş Filtresi (Silver+)
+  // Yaş Filtresi (Plus+)
   ageRestricted?: boolean;
   onAgeRestrictedChange?: (enabled: boolean) => void;
-  // Oda Kapak Görseli (Gold+)
+  // Oda Kapak Görseli (Pro+)
   onChangeCoverImage?: (imageUri: string | null) => void;
   coverImage?: string | null;
-  // Oda Müziği (Gold+)
+  // Oda Müziği (Pro+)
   musicTrack?: string | null;
   onMusicChange?: (track: string | null) => void;
   // ★ Odadan Ayrıl (Settings üzerinden)
@@ -317,8 +317,8 @@ export default function RoomSettingsSheet(props: RoomSettingsProps) {
         </View>
       )}
 
-      {/* Oda Tipi — Bronze+ (şifreli oda) */}
-      {isHost && (can('Bronze') ? (
+      {/* Oda Tipi — Plus+ (şifreli oda) */}
+      {isHost && (can('Plus') ? (
         onRoomTypeChange && (
           <SettingRow icon="globe" iconBg="rgba(59,130,246,0.2)" label={roomType === 'open' ? 'Herkese Açık' : roomType === 'closed' ? 'Şifreli Oda' : 'Davetiye ile'} desc="Oda erişim tipini değiştir"
             right={
@@ -332,18 +332,18 @@ export default function RoomSettingsSheet(props: RoomSettingsProps) {
             }
           />
         )
-      ) : <LockedRow icon="key-outline" label="Şifreli Oda Oluşturma" requiredTier="Bronze" />)}
+      ) : <LockedRow icon="key-outline" label="Şifreli Oda Oluşturma" requiredTier="Plus" />)}
 
-      {/* Oda Kilidi — Silver+ */}
-      {isHost && (can('Silver') ? (
+      {/* Oda Kilidi — Plus+ */}
+      {isHost && (can('Plus') ? (
         onToggleLock && (
           <SettingRow icon="lock-closed" iconBg="rgba(245,158,11,0.2)" label={isLocked ? 'Oda Kilitli' : 'Oda Açık'} desc={isLocked ? 'Yeni girişler engellendi' : 'Herkes katılabilir'}
             right={<Switch value={!!isLocked} onValueChange={onToggleLock} trackColor={{ false: 'rgba(255,255,255,0.08)', true: 'rgba(245,158,11,0.4)' }} thumbColor={isLocked ? '#F59E0B' : '#475569'} />}
           />
         )
-      ) : <LockedRow icon="lock-closed" label="Oda Kilitleme" requiredTier="Silver" />)}
+      ) : <LockedRow icon="lock-closed" label="Oda Kilitleme" requiredTier="Plus" />)}
 
-      {/* Odayı Dondur — Bronze+ (Premium Gradient CTA) */}
+      {/* Odayı Dondur — Plus+ (Premium Gradient CTA) */}
       {canFreezeRoom && onFreezeRoom && (
         <Pressable style={s.actionCta} onPress={() => { onClose(); onFreezeRoom(); }}>
           <LinearGradient colors={['#3B82F6', '#2563EB', '#1D4ED8']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.actionCtaGrad}>
@@ -407,18 +407,18 @@ export default function RoomSettingsSheet(props: RoomSettingsProps) {
         }
       />
 
-      {/* Konuşma Modu — Free (2 mod) / VIP (3 mod) */}
+      {/* Konuşma Modu — Free (2 mod) / Pro (3 mod) */}
       {isHost && onSpeakingModeChange && (
         <SettingRow icon="mic-circle" iconBg="rgba(20,184,166,0.25)" label={speakingMode === 'free_for_all' ? 'Herkes Konuşabilir' : speakingMode === 'selected_only' ? 'Sadece Seçilmişler' : 'Sadece İzinli'} desc={speakingMode === 'free_for_all' ? 'Dinleyiciler doğrudan sahneye çıkabilir' : speakingMode === 'selected_only' ? 'Sadece owner tarafından seçilen kişiler' : 'Dinleyiciler el kaldırarak söz ister'}
           right={
             <View style={{ flexDirection: 'row', gap: 4 }}>
               {(['free_for_all', 'permission_only', 'selected_only'] as const).map(m => {
-                const isVIPOnly = m === 'selected_only';
-                const locked = isVIPOnly && !can('VIP');
+                const isProOnly = m === 'selected_only';
+                const locked = isProOnly && !can('Pro');
                 const labels: Record<string, string> = { free_for_all: 'Serbest', permission_only: 'İzinli', selected_only: 'Seçili' };
                 return (
                   <Pressable key={m} style={[s.slowPill, speakingMode === m && s.slowPillActive, locked && { opacity: 0.35 }]}
-                    onPress={() => { if (locked) showToast({ title: '🔒 VIP+ ile açılır', type: 'info' }); else onSpeakingModeChange(m); }}>
+                    onPress={() => { if (locked) showToast({ title: '🔒 Pro+ ile açılır', type: 'info' }); else onSpeakingModeChange(m); }}>
                     <Text style={[s.slowPillText, speakingMode === m && s.slowPillTextActive]}>{locked ? '🔒' : ''}{labels[m]}</Text>
                   </Pressable>
                 );
@@ -428,8 +428,8 @@ export default function RoomSettingsSheet(props: RoomSettingsProps) {
         />
       )}
 
-      {/* Sahne Düzeni — Silver+ */}
-      {isHost && !can('Silver') && <LockedRow icon="grid-outline" label="Sahne Düzeni (Kaç kişi konuşabilir)" requiredTier="Silver" />}
+      {/* Sahne Düzeni — Plus+ */}
+      {isHost && !can('Plus') && <LockedRow icon="grid-outline" label="Sahne Düzeni (Kaç kişi konuşabilir)" requiredTier="Plus" />}
     </View>
   );
 
@@ -451,8 +451,8 @@ export default function RoomSettingsSheet(props: RoomSettingsProps) {
         />
       )}
 
-      {/* Dil Filtresi — Silver+ */}
-      {isHost && (can('Silver') ? (
+      {/* Dil Filtresi — Plus+ */}
+      {isHost && (can('Plus') ? (
         onLanguageChange && (
           <SettingRow icon="globe" iconBg="rgba(192,192,192,0.2)" label={`Oda Dili: ${({ 'tr': 'Türkçe', 'en': 'English', 'de': 'Deutsch', 'ar': 'العربية' })[roomLanguage || 'tr'] || roomLanguage || 'Türkçe'}`} desc="Oda dil tercihini belirle"
             right={
@@ -466,39 +466,39 @@ export default function RoomSettingsSheet(props: RoomSettingsProps) {
             }
           />
         )
-      ) : <LockedRow icon="globe-outline" label="Dil Filtresi" requiredTier="Silver" />)}
+      ) : <LockedRow icon="globe-outline" label="Dil Filtresi" requiredTier="Plus" />)}
 
-      {/* Yaş Filtresi (+18) — Silver+ */}
-      {isHost && (can('Silver') ? (
+      {/* Yaş Filtresi (+18) — Plus+ */}
+      {isHost && (can('Plus') ? (
         onAgeRestrictedChange && (
           <SettingRow icon="warning" iconBg={ageRestricted ? 'rgba(239,68,68,0.2)' : 'rgba(192,192,192,0.2)'} label={ageRestricted ? '+18 İçerik Aktif' : 'Yaş Sınırı Yok'} desc={ageRestricted ? 'Sadece 18 yaş üstü katılabilir' : 'Tüm yaş gruplarına açık'}
             right={<Switch value={!!ageRestricted} onValueChange={onAgeRestrictedChange} trackColor={{ false: 'rgba(255,255,255,0.08)', true: 'rgba(239,68,68,0.4)' }} thumbColor={ageRestricted ? '#EF4444' : '#475569'} />}
           />
         )
-      ) : <LockedRow icon="calendar-outline" label="Yaş Filtresi (+18)" requiredTier="Silver" />)}
+      ) : <LockedRow icon="calendar-outline" label="Yaş Filtresi (+18)" requiredTier="Plus" />)}
 
-      {/* Takipçilere Özel — Gold+ */}
-      {can('Gold') ? (
+      {/* Takipçilere Özel — Pro+ */}
+      {can('Pro') ? (
         onToggleFollowersOnly && (
           <SettingRow icon="people" iconBg="rgba(212,175,55,0.2)" label={followersOnly ? 'Takipçilere Özel' : 'Herkese Açık'} desc={followersOnly ? 'Sadece takipçiler katılabilir' : 'Herkes odaya katılabilir'}
             right={<Switch value={!!followersOnly} onValueChange={onToggleFollowersOnly} trackColor={{ false: 'rgba(255,255,255,0.08)', true: 'rgba(212,175,55,0.4)' }} thumbColor={followersOnly ? '#D4AF37' : '#475569'} />}
           />
         )
-      ) : <LockedRow icon="people-outline" label="Sadece Takipçiler Girebilir" requiredTier="Gold" />}
+      ) : <LockedRow icon="people-outline" label="Sadece Takipçiler Girebilir" requiredTier="Pro" />}
 
-      {/* Tümünü Sustur — VIP */}
-      {!can('VIP') && <LockedRow icon="volume-mute-outline" label="Tümünü Sustur (Cooldown ile)" requiredTier="VIP" />}
+      {/* Tümünü Sustur — Pro */}
+      {!can('Pro') && <LockedRow icon="volume-mute-outline" label="Tümünü Sustur (Cooldown ile)" requiredTier="Pro" />}
 
-      {/* Gelişmiş Ban — VIP */}
-      {!can('VIP') && <LockedRow icon="ban-outline" label="Gelişmiş Ban Seçenekleri" requiredTier="VIP" />}
+      {/* Gelişmiş Ban — Pro */}
+      {!can('Pro') && <LockedRow icon="ban-outline" label="Gelişmiş Ban Seçenekleri" requiredTier="Pro" />}
     </View>
   );
 
   // ═══ GÖRSELLİK ═══
   const renderVisual = () => (
     <View>
-      {/* Oda Teması — Silver+ */}
-      {can('Silver') ? (
+      {/* Oda Teması — Plus+ */}
+      {can('Plus') ? (
         isHost && onChangeTheme && (
           <View>
             <Text style={[s.sectionTitle, { marginBottom: 8 }]}>🎨 Oda Teması</Text>
@@ -519,10 +519,10 @@ export default function RoomSettingsSheet(props: RoomSettingsProps) {
             </View>
           </View>
         )
-      ) : <LockedRow icon="color-palette-outline" label="Oda Teması" requiredTier="Silver" />}
+      ) : <LockedRow icon="color-palette-outline" label="Oda Teması" requiredTier="Plus" />}
 
-      {/* Arka Plan Resmi — Silver+ */}
-      {can('Silver') ? (
+      {/* Arka Plan Resmi — Plus+ */}
+      {can('Plus') ? (
         isHost && onChangeBackgroundImage && (
           <SettingRow icon="image" iconBg="rgba(139,92,246,0.2)" label="Arka Plan Resmi" desc={backgroundImage ? 'Arka plan ayarlandı' : 'Üyelik statüsüne göre'}
             right={
@@ -540,10 +540,10 @@ export default function RoomSettingsSheet(props: RoomSettingsProps) {
             }
           />
         )
-      ) : <LockedRow icon="image-outline" label="Arka Plan Resmi" requiredTier="Silver" />}
+      ) : <LockedRow icon="image-outline" label="Arka Plan Resmi" requiredTier="Plus" />}
 
-      {/* Oda Kapak Görseli — Gold+ */}
-      {isHost && (can('Gold') ? (
+      {/* Oda Kapak Görseli — Pro+ */}
+      {isHost && (can('Pro') ? (
         onChangeCoverImage && (
           <SettingRow icon="albums" iconBg="rgba(255,215,0,0.2)" label="Oda Kapak Görseli" desc={coverImage ? 'Banner ayarlandı' : 'Keşfet akışında görünen banner'}
             right={
@@ -561,10 +561,10 @@ export default function RoomSettingsSheet(props: RoomSettingsProps) {
             }
           />
         )
-      ) : <LockedRow icon="albums-outline" label="Oda Kapak Görseli (Banner)" requiredTier="Gold" />)}
+      ) : <LockedRow icon="albums-outline" label="Oda Kapak Görseli (Banner)" requiredTier="Pro" />)}
 
-      {/* Oda Müziği — Gold+ */}
-      {can('Gold') ? (
+      {/* Oda Müziiği — Pro+ */}
+      {can('Pro') ? (
         isHost && onMusicChange && (
           <SettingRow icon="musical-notes" iconBg="rgba(255,215,0,0.2)" label={musicTrack ? `Müzik: ${({ 'lofi': 'Lofi', 'ambient': 'Ambient', 'jazz': 'Jazz' })[musicTrack] || musicTrack}` : 'Oda Müziği Kapalı'} desc="Arka planda ambient ses döngüsü"
             right={
@@ -578,24 +578,24 @@ export default function RoomSettingsSheet(props: RoomSettingsProps) {
             }
           />
         )
-      ) : <LockedRow icon="musical-notes-outline" label="Oda Arka Plan Müziği" requiredTier="Gold" />}
+      ) : <LockedRow icon="musical-notes-outline" label="Oda Arka Plan Müziği" requiredTier="Pro" />}
     </View>
   );
 
   // ═══ MONETİZASYON ═══
   const renderMonetization = () => (
     <View>
-      {/* Bağış Toggle — Gold+ */}
-      {can('Gold') ? (
+      {/* Bağış Toggle — Pro+ */}
+      {can('Pro') ? (
         onDonationsToggle && (
           <SettingRow icon="heart" iconBg="rgba(239,68,68,0.2)" label={donationsEnabled ? 'Bağış Açık' : 'Bağış Kapalı'} desc="Dinleyicilerden SP bağışı kabul et"
             right={<Switch value={!!donationsEnabled} onValueChange={onDonationsToggle} trackColor={{ false: 'rgba(255,255,255,0.08)', true: 'rgba(239,68,68,0.4)' }} thumbColor={donationsEnabled ? '#EF4444' : '#475569'} />}
           />
         )
-      ) : <LockedRow icon="heart-outline" label="Bağış (Tip) Aç/Kapat" requiredTier="Gold" />}
+      ) : <LockedRow icon="heart-outline" label="Bağış (Tip) Aç/Kapat" requiredTier="Pro" />}
 
-      {/* Giriş Ücreti — VIP */}
-      {can('VIP') ? (
+      {/* Giriş Ücreti — Pro */}
+      {can('Pro') ? (
         onEntryFeeChange && (
           <SettingRow icon="cash" iconBg="rgba(212,175,55,0.2)" label={entryFeeSp ? `Giriş: ${entryFeeSp} SP` : 'Giriş Ücretsiz'} desc="SP cinsinden oda giriş ücreti"
             right={
@@ -609,28 +609,28 @@ export default function RoomSettingsSheet(props: RoomSettingsProps) {
             }
           />
         )
-      ) : <LockedRow icon="cash-outline" label="Giriş Ücreti Belirleme (SP)" requiredTier="VIP" />}
+      ) : <LockedRow icon="cash-outline" label="Giriş Ücreti Belirleme (SP)" requiredTier="Pro" />}
 
-      {/* Oda Boost — VIP (PlusMenu'dan yapılır) */}
-      {can('VIP') ? (
+      {/* Oda Boost — Pro (PlusMenu'dan yapılır) */}
+      {can('Pro') ? (
         <Pressable onPress={() => { onClose(); showToast({ title: '🚀 Boost', message: '+ menüsünden "Odayı Öne Çıkar" ile boost aktifleştir.', type: 'info' }); }}>
           <SettingRow icon="rocket" iconBg="rgba(255,107,53,0.2)" label="Odayı Öne Çıkar" desc="+ menüsünden boost aktifleştir"
             right={<View style={{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, backgroundColor: 'rgba(255,107,53,0.12)', borderWidth: 1, borderColor: 'rgba(255,107,53,0.2)' }}><Text style={{ fontSize: 9, fontWeight: '700', color: '#FF6B35' }}>+ Menü</Text></View>}
           />
         </Pressable>
-      ) : <LockedRow icon="rocket-outline" label="Odayı Öne Çıkarma / Boost" requiredTier="VIP" />}
+      ) : <LockedRow icon="rocket-outline" label="Odayı Öne Çıkarma / Boost" requiredTier="Pro" />}
     </View>
   );
 
   // ═══ GELİŞMİŞ ═══
   const renderAdvanced = () => (
     <View>
-      {/* 13 Kişi Sahne — VIP */}
-      {can('VIP') ? (
+      {/* 13 Kişi Sahne — Pro */}
+      {can('Pro') ? (
         <SettingRow icon="people" iconBg="rgba(255,107,53,0.2)" label="13 Kişilik Sahne" desc="Genişletilmiş sahne kapasitesi aktif"
           right={<View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: 'rgba(255,107,53,0.12)' }}><Text style={{ fontSize: 8, fontWeight: '700', color: '#FF6B35' }}>13 kişi</Text></View>}
         />
-      ) : <LockedRow icon="people-outline" label="13 Kişilik Sahne" requiredTier="VIP" />}
+      ) : <LockedRow icon="people-outline" label="13 Kişilik Sahne" requiredTier="Pro" />}
     </View>
   );
 

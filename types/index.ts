@@ -4,7 +4,7 @@
  * Tüm uygulama genelinde kullanılan tipler burada tanımlanır.
  *
  * Mimari:
- *   - Tier sistemi: Free/Bronze/Silver/Gold/VIP (5 katman)
+ *   - Tier sistemi: Free/Plus/Pro (3 katman)
  *   - Rol hiyerarşisi: owner/moderator/speaker/listener/spectator/guest/banned (7 katman)
  *   - 3 katmanlı katılımcı modeli: Sahne / Dinleyici Grid / Seyirci
  *   - 35 owner permission tanımı
@@ -12,37 +12,47 @@
  */
 
 // ============================================
-// ABONELİK TIER SİSTEMİ (5 Katman)
+// ABONELİK TIER SİSTEMİ (3 Katman)
 // ============================================
 
 /**
- * Abonelik bazlı 5 katmanlı tier sistemi.
+ * Abonelik bazlı 3 katmanlı tier sistemi.
  * Oda limitleri, yetki hiyerarşisi ve kişiselleştirme
  * tamamen bu tier'a bağlıdır.
+ *
+ * Free → Ücretsiz temel deneyim
+ * Plus → Gelişmiş özellikler, daha yüksek limitler
+ * Pro  → Sınırsız güç, maksimum prestij
  */
-export type SubscriptionTier = 'Free' | 'Bronze' | 'Silver' | 'Gold' | 'VIP';
+export type SubscriptionTier = 'Free' | 'Plus' | 'Pro';
 
 /** Alias — tüm kod tabanında uyumluluk */
 export type TierName = SubscriptionTier;
 
 /**
  * Bilinmeyen veya eski tier isimlerini güncel sisteme map eder.
+ * Legacy 5-tier → 3-tier dönüşümü:
+ *   Bronze/Silver → Plus
+ *   Gold/VIP      → Pro
  * Bilinmeyen tier → Free.
  */
 export function migrateLegacyTier(oldTier: string | null | undefined): SubscriptionTier {
   if (!oldTier) return 'Free';
   const mapping: Record<string, SubscriptionTier> = {
+    // Yeni sistem
     'Free': 'Free',
-    'Bronze': 'Bronze',
-    'Silver': 'Silver',
-    'Gold': 'Gold',
-    'VIP': 'VIP',
-    // Eski sistem eşleşmeleri
-    'Plus': 'Silver',
-    'Premium': 'Gold',
+    'Plus': 'Plus',
+    'Pro': 'Pro',
+    // Legacy 5-tier → 3-tier
+    'Bronze': 'Plus',
+    'Silver': 'Plus',
+    'Gold': 'Pro',
+    'VIP': 'Pro',
+    // Çok eski eşleşmeler
+    'Premium': 'Pro',
     'Newcomer': 'Free',
-    'Plat': 'Gold',
-    'Diamond': 'VIP',
+    'Plat': 'Pro',
+    'Diamond': 'Pro',
   };
   return mapping[oldTier] || 'Free';
 }
@@ -155,11 +165,11 @@ export type Room = {
   total_gifts?: number;
 
   // ── Kişiselleştirme ──
-  /** Oda kart resmi (Gold+) */
+  /** Oda kart resmi (Pro+) */
   room_image_url?: string | null;
-  /** Oda iç renk teması (Silver+) — JSON { primary, secondary, accent } */
+  /** Oda iç renk teması (Plus+) — JSON { primary, secondary, accent } */
   room_color_theme?: RoomColorTheme | null;
-  /** Şifreli oda parolası (Bronze+) */
+  /** Şifreli oda parolası (Plus+) */
   room_password?: string | null;
 
   // ── Sistem Odaları ──
@@ -186,35 +196,35 @@ export type RoomSettings = {
   slow_mode_seconds?: number;
   /** Oda kilitli mi? (yeni katılımcı giriş engeli) */
   is_locked?: boolean;
-  /** Sahne kapasitesi (owner dahil) — VIP: max 13 */
+  /** Sahne kapasitesi (owner dahil) — Pro: max 13 */
   max_stage_capacity?: number;
-  /** Konuşma modu: free_for_all | permission_only | selected_only (VIP) */
+  /** Konuşma modu: free_for_all | permission_only | selected_only (Pro) */
   speaking_mode?: 'free_for_all' | 'permission_only' | 'selected_only';
 
   // ── Gelişmiş Alanlar ──
-  /** Sahne düzeni (Silver+) */
+  /** Sahne düzeni (Plus+) */
   stage_layout?: StageLayout;
-  /** Oda müziği yapılandırması (Gold+) */
+  /** Oda müziği yapılandırması (Pro+) */
   room_music?: RoomMusicConfig | null;
-  /** Yalnızca takipçilere açık mod (Gold+) */
+  /** Yalnızca takipçilere açık mod (Pro+) */
   followers_only?: boolean;
-  /** Minimum yaş filtresi (Silver+). 0 = kapalı */
+  /** Minimum yaş filtresi (Plus+). 0 = kapalı */
   age_filter_min?: number;
-  /** Dil filtresi (Silver+). Boş dizi = filtre yok */
+  /** Dil filtresi (Plus+). Boş dizi = filtre yok */
   language_filter?: RoomLanguage[];
 
-  // ── VIP Alanlar ──
+  // ── Pro Alanlar ──
   /** Planlı oda başlangıç zamanı (ISO string) */
   scheduled_at?: string;
-  /** Kayıt aktif mi (VIP) */
+  /** Kayıt aktif mi (Pro) */
   is_recording?: boolean;
   /** Kayıt dosyası URL'si */
   recording_url?: string;
   /** Önemli anlar / clip işaretleri */
   highlights?: RoomHighlight[];
-  /** SP cinsinden giriş ücreti. 0 = ücretsiz (VIP) */
+  /** SP cinsinden giriş ücreti. 0 = ücretsiz (Pro) */
   entry_fee_sp?: number;
-  /** Bağış kabul aktif mi (Gold+) */
+  /** Bağış kabul aktif mi (Pro+) */
   donations_enabled?: boolean;
 
   // ── Kart & Görsel Alanlar ──
@@ -232,7 +242,7 @@ export type RoomSettings = {
   music_track?: string | null;
 };
 
-/** Oda içi önemli an işareti (VIP) */
+/** Oda içi önemli an işareti (Pro) */
 export type RoomHighlight = {
   id: string;
   /** Kayıt başlangıcından itibaren saniye */
@@ -354,18 +364,18 @@ export type OwnerPermission =
   | 'share_room_link'       // Oda davet linki paylaş
   // ── Katılımcı Aksiyonları ──
   | 'request_stage'         // Sahneye çıkma isteği gönder (listener)
-  // ── Silver+ Özellikler ──
+  // ── Plus+ Özellikler ──
   | 'lock_room'             // Odayı anlık kilitle (yeni giriş engeli)
   | 'change_theme'          // Oda temasını değiştir
   | 'select_avatar_frame'   // Avatar çerçevesi seç
   | 'set_stage_layout'      // Sahne düzeni değiştir (grid/spotlight/theater)
   | 'set_age_filter'        // Yaş filtresi uygula
   | 'set_language_filter'   // Dil filtresi uygula
-  // ── Gold+ Özellikler ──
+  // ── Pro+ Özellikler ──
   | 'change_room_image'     // Oda kapak fotoğrafı değiştir
   | 'set_room_music'        // Oda müziği aç/kapat
   | 'set_followers_only'    // Yalnızca takipçilere açık mod
-  // ── VIP Özellikler ──
+  // ── Pro Özellikler ──
   | 'ghost_mode'            // Görünmez olarak odada bulun
   | 'disguise_user'         // Kullanıcının görüntüsünü/adını geçici değiştir
   | 'mute_all'              // Tüm sahnedeki konuşmacıları toplu sustur
@@ -400,48 +410,47 @@ export const ALL_PERMISSIONS: Record<OwnerPermission, PermissionDefinition> = {
   mute_camera:          { minRole: 'moderator', requiresTarget: true,  requiresLowerTarget: true,  hiddenOnSelf: false },
   // ── Moderasyon ──
   kick:                 { minRole: 'moderator', requiresTarget: true,  requiresLowerTarget: true,  hiddenOnSelf: true },
-  ban_temporary:        { minRole: 'moderator', requiresTarget: true,  requiresLowerTarget: true,  hiddenOnSelf: true, minTier: 'Bronze' },
-  ban_permanent:        { minRole: 'owner',     requiresTarget: true,  requiresLowerTarget: true,  hiddenOnSelf: true, minTier: 'VIP' },
-  chat_block:           { minRole: 'moderator', requiresTarget: true,  requiresLowerTarget: true,  hiddenOnSelf: true, minTier: 'Bronze' },
-  slow_mode:            { minRole: 'moderator', requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false, minTier: 'Bronze' },
-  timed_mute:           { minRole: 'moderator', requiresTarget: true,  requiresLowerTarget: true,  hiddenOnSelf: true, minTier: 'Bronze' },
-  pin_chat_message:     { minRole: 'moderator', requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false, minTier: 'Bronze' },
-  clear_chat:           { minRole: 'owner',     requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false, minTier: 'Gold' },
+  ban_temporary:        { minRole: 'moderator', requiresTarget: true,  requiresLowerTarget: true,  hiddenOnSelf: true, minTier: 'Plus' },
+  ban_permanent:        { minRole: 'owner',     requiresTarget: true,  requiresLowerTarget: true,  hiddenOnSelf: true, minTier: 'Pro' },
+  chat_block:           { minRole: 'moderator', requiresTarget: true,  requiresLowerTarget: true,  hiddenOnSelf: true, minTier: 'Plus' },
+  slow_mode:            { minRole: 'moderator', requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false, minTier: 'Plus' },
+  timed_mute:           { minRole: 'moderator', requiresTarget: true,  requiresLowerTarget: true,  hiddenOnSelf: true, minTier: 'Plus' },
+  pin_chat_message:     { minRole: 'moderator', requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false, minTier: 'Plus' },
+  clear_chat:           { minRole: 'owner',     requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false, minTier: 'Pro' },
   // ── Rol Yönetimi ──
   promote_speaker:      { minRole: 'moderator', requiresTarget: true,  requiresLowerTarget: false, hiddenOnSelf: true },
   demote_speaker:       { minRole: 'moderator', requiresTarget: true,  requiresLowerTarget: true,  hiddenOnSelf: true },
   promote_listener:     { minRole: 'moderator', requiresTarget: true,  requiresLowerTarget: false, hiddenOnSelf: true },
-  set_moderator:        { minRole: 'owner',     requiresTarget: true,  requiresLowerTarget: true,  hiddenOnSelf: true, minTier: 'Bronze' },
-  remove_moderator:     { minRole: 'owner',     requiresTarget: true,  requiresLowerTarget: true,  hiddenOnSelf: true, minTier: 'Bronze' },
-  spotlight_user:       { minRole: 'moderator', requiresTarget: true,  requiresLowerTarget: false, hiddenOnSelf: false, minTier: 'Silver' },
-  transfer_ownership:   { minRole: 'owner',     requiresTarget: true,  requiresLowerTarget: true,  hiddenOnSelf: true, minTier: 'Silver' },
+  set_moderator:        { minRole: 'owner',     requiresTarget: true,  requiresLowerTarget: true,  hiddenOnSelf: true, minTier: 'Plus' },
+  remove_moderator:     { minRole: 'owner',     requiresTarget: true,  requiresLowerTarget: true,  hiddenOnSelf: true, minTier: 'Plus' },
+  spotlight_user:       { minRole: 'moderator', requiresTarget: true,  requiresLowerTarget: false, hiddenOnSelf: false, minTier: 'Plus' },
+  transfer_ownership:   { minRole: 'owner',     requiresTarget: true,  requiresLowerTarget: true,  hiddenOnSelf: true, minTier: 'Plus' },
   // ── Oda Düzenleme ──
   edit_room_name:       { minRole: 'owner',     requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false },
-  edit_welcome_message: { minRole: 'owner',     requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false, minTier: 'Bronze' },
-  room_announce:        { minRole: 'owner',     requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false, minTier: 'Bronze' },
+  edit_welcome_message: { minRole: 'owner',     requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false, minTier: 'Plus' },
+  room_announce:        { minRole: 'owner',     requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false, minTier: 'Plus' },
   invite_user:          { minRole: 'moderator', requiresTarget: true,  requiresLowerTarget: false, hiddenOnSelf: true },
-  set_room_password:    { minRole: 'owner',     requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false, minTier: 'Bronze' },
+  set_room_password:    { minRole: 'owner',     requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false, minTier: 'Plus' },
   share_room_link:      { minRole: 'speaker',   requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false },
   // ── Katılımcı ──
   request_stage:        { minRole: 'listener',  requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false },
-  // ── Silver+ ──
-  lock_room:            { minRole: 'owner', requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false, minTier: 'Silver' },
-  change_theme:         { minRole: 'owner', requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false, minTier: 'Silver' },
-  select_avatar_frame:  { minRole: 'owner', requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false, minTier: 'Silver' },
-  set_stage_layout:     { minRole: 'owner', requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false, minTier: 'Silver' },
-  set_age_filter:       { minRole: 'owner', requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false, minTier: 'Silver' },
-  set_language_filter:  { minRole: 'owner', requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false, minTier: 'Silver' },
-  // ── Gold+ ──
-  change_room_image:    { minRole: 'owner', requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false, minTier: 'Gold' },
-  set_room_music:       { minRole: 'owner', requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false, minTier: 'Gold' },
-  set_followers_only:   { minRole: 'owner', requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false, minTier: 'Gold' },
-  // ── VIP ──
-  ghost_mode:           { minRole: 'owner', requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false, minTier: 'VIP' },
-  disguise_user:        { minRole: 'owner', requiresTarget: true,  requiresLowerTarget: true,  hiddenOnSelf: true,  minTier: 'VIP' },
-  mute_all:             { minRole: 'owner', requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false, minTier: 'Gold' },
-  record_room:          { minRole: 'owner', requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false, minTier: 'VIP' },
-  set_entry_fee:        { minRole: 'owner', requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false, minTier: 'VIP' },
-  room_analytics:       { minRole: 'owner', requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false, minTier: 'VIP' },
+  // ── Plus+ ──
+  lock_room:            { minRole: 'owner', requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false, minTier: 'Plus' },
+  change_theme:         { minRole: 'owner', requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false, minTier: 'Plus' },
+  select_avatar_frame:  { minRole: 'owner', requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false, minTier: 'Plus' },
+  set_stage_layout:     { minRole: 'owner', requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false, minTier: 'Plus' },
+  set_age_filter:       { minRole: 'owner', requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false, minTier: 'Plus' },
+  set_language_filter:  { minRole: 'owner', requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false, minTier: 'Plus' },
+  // ── Pro ──
+  change_room_image:    { minRole: 'owner', requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false, minTier: 'Pro' },
+  set_room_music:       { minRole: 'owner', requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false, minTier: 'Pro' },
+  set_followers_only:   { minRole: 'owner', requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false, minTier: 'Pro' },
+  ghost_mode:           { minRole: 'owner', requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false, minTier: 'Pro' },
+  disguise_user:        { minRole: 'owner', requiresTarget: true,  requiresLowerTarget: true,  hiddenOnSelf: true,  minTier: 'Pro' },
+  mute_all:             { minRole: 'owner', requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false, minTier: 'Pro' },
+  record_room:          { minRole: 'owner', requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false, minTier: 'Pro' },
+  set_entry_fee:        { minRole: 'owner', requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false, minTier: 'Pro' },
+  room_analytics:       { minRole: 'owner', requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false, minTier: 'Pro' },
 };
 
 // ============================================
@@ -537,19 +546,6 @@ export type UserPurchase = {
 
 
 // ============================================
-// ROZETLER
-// ============================================
-export type Badge = {
-  id: string;
-  name: string;
-  icon: string;
-  color: string;
-  description: string;
-  condition: string;
-  unlockedAt?: string;
-};
-
-// ============================================
 // BİLDİRİMLER
 // ============================================
 export type NotificationType =
@@ -558,7 +554,6 @@ export type NotificationType =
   | 'follow_request'
   | 'follow_accepted'
   | 'tier_up'
-  | 'badge_unlocked'
   | 'room_invite'
   | 'room_request'
   | 'upsell'

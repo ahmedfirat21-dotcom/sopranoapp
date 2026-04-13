@@ -98,9 +98,18 @@ export const MessageService = {
       });
     }
 
+    // ★ FIX: Gizlenmiş sohbetleri filtrele — deleteConversation ile gizlenenler
+    const hiddenMap = await this.getHiddenConversations(userId);
+    const filteredInbox = inbox.filter(item => {
+      const hiddenAt = hiddenMap[item.partner_id];
+      if (!hiddenAt) return true; // gizlenmemiş
+      // Son mesaj gizleme tarihinden sonra geldiyse tekrar göster
+      return new Date(item.last_message_time).getTime() > new Date(hiddenAt).getTime();
+    });
+
     // Son mesaja göre sırala (en yeni üste)
-    inbox.sort((a, b) => new Date(b.last_message_time).getTime() - new Date(a.last_message_time).getTime());
-    return inbox;
+    filteredInbox.sort((a, b) => new Date(b.last_message_time).getTime() - new Date(a.last_message_time).getTime());
+    return filteredInbox;
   },
 
   /** İki kişi arasındaki tüm konuşma geçmişini getir */
@@ -161,12 +170,6 @@ export const MessageService = {
       type: 'dm',
       route: `/chat/${senderId}`,
     }).catch(() => {});
-
-    // ★ Rozet trigger: mesaj gönderme rozeti kontrolü (arka planda)
-    try {
-      const { BadgeCheckerService } = require('./engagement/badges');
-      BadgeCheckerService.checkForAction(senderId, 'message_sent').catch(() => {});
-    } catch {}
 
     return msg as Message;
   },

@@ -358,11 +358,6 @@ export const FriendshipService = {
       // ★ BUG-F16 FIX: İsteği onaylayan (userId) yeni bir takipçi kazandı → SP ver
       // userId = B (onaylayan, takipçi kazanan), followerId = A (istek gönderen, takip eden)
       try { await GamificationService.onFollowerGain(userId); } catch {}
-      // ★ Rozet trigger: takipçi kazanım rozetlerini kontrol et
-      try {
-        const { BadgeCheckerService } = require('./engagement/badges');
-        await BadgeCheckerService.checkForAction(userId, 'new_follower');
-      } catch {}
 
       return { success: true };
     } catch (e: any) {

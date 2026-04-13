@@ -18,7 +18,8 @@ import {
   reauthenticateWithCredential,
   updateProfile,
 } from 'firebase/auth';
-import { Colors, Gradients, Radius } from '../constants/theme';
+import { Colors, Gradients, Radius, Shadows } from '../constants/theme';
+import AppBackground from '../components/AppBackground';
 import { ProfileService } from '../services/database';
 import { auth, GOOGLE_WEB_CLIENT_ID } from '../constants/firebase';
 import { AVATAR_OPTIONS, getAvatarSource } from '../constants/avatars';
@@ -341,6 +342,7 @@ export default function EditProfileScreen() {
   const authInfo = getAuthTypeInfo();
 
   return (
+    <AppBackground>
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
@@ -389,15 +391,17 @@ export default function EditProfileScreen() {
           <View style={styles.avatarPicker}>
             <Text style={styles.pickerTitle}>Avatar Seç</Text>
             
-            <Pressable style={styles.uploadBtn} onPress={handlePickAvatar} disabled={uploadingAvatar}>
-              {uploadingAvatar ? (
-                <ActivityIndicator color="#fff" size="small" />
-              ) : (
-                <>
-                  <Ionicons name="images" size={20} color="#fff" />
-                  <Text style={styles.uploadBtnText}>Galeriden Yükle</Text>
-                </>
-              )}
+            <Pressable style={styles.ctaWrap} onPress={handlePickAvatar} disabled={uploadingAvatar}>
+              <LinearGradient colors={['#14B8A6', '#0D9488', '#065F56']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.ctaGradient}>
+                {uploadingAvatar ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <>
+                    <View style={styles.ctaIconWrap}><Ionicons name="images" size={16} color="#FFF" /></View>
+                    <Text style={styles.ctaTitle}>Galeriden Yükle</Text>
+                  </>
+                )}
+              </LinearGradient>
             </Pressable>
 
             <View style={styles.avatarGrid}>
@@ -492,14 +496,14 @@ export default function EditProfileScreen() {
         </View>
 
         <View style={styles.accountInfoCard}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-            <View>
-              <Text style={styles.fieldLabel}>Oluşturduğun Davet Kodun</Text>
-              <Text style={styles.fieldHint}>Arkadaşlarınla paylaş, kayıt oldukça 50'şer SP kazanın.</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.fieldLabel}>Davet Kodun</Text>
+              <Text style={styles.fieldHint}>Paylaş, kayıt olunca 50'şer SP kazanın.</Text>
             </View>
             <View style={styles.verifiedBadge}>
-              <Ionicons name="people" size={16} color={Colors.teal} />
-              <Text style={{ fontSize: 13, fontWeight: '700', color: Colors.teal }}>{referralCount} Kişi</Text>
+              <Ionicons name="people" size={14} color={Colors.teal} />
+              <Text style={{ fontSize: 11, fontWeight: '700', color: Colors.teal }}>{referralCount} Kişi</Text>
             </View>
           </View>
 
@@ -521,21 +525,15 @@ export default function EditProfileScreen() {
             <ActivityIndicator size="small" color={Colors.teal} style={{ marginVertical: 10 }} />
           )}
 
-          <Pressable 
-            style={[styles.saveBtn, { width: '100%', alignItems: 'center', marginTop: 12 }]}
-            onPress={async () => {
+          <Pressable style={styles.ctaWrap} onPress={async () => {
               if (!myReferralCode) return;
-              try {
-                await Share.share({
-                  message: `SopranoChat'e katıl!\nDavet kodum: ${myReferralCode}\nhttps://sopranochat.app/`,
-                  title: 'Ödüllü Davet Kodu'
-                });
-              } catch (e) {
-                console.error('[EditProfile] İşlem hatası:', e);
-              }
-            }}
-          >
-            <Text style={{ fontSize: 13, fontWeight: '700', color: '#fff' }}>Kodu Paylaş</Text>
+              try { await Share.share({ message: `SopranoChat'e katıl!\nDavet kodum: ${myReferralCode}\nhttps://sopranochat.app/`, title: 'Ödüllü Davet Kodu' }); } catch (e) { console.error('[EditProfile] İşlem hatası:', e); }
+            }}>
+            <LinearGradient colors={['#14B8A6', '#0D9488', '#065F56']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.ctaGradient}>
+              <View style={styles.ctaIconWrap}><Ionicons name="share-social" size={16} color="#FFF" /></View>
+              <Text style={styles.ctaTitle}>Kodu Paylaş</Text>
+              <Ionicons name="arrow-forward" size={16} color="rgba(255,255,255,0.6)" />
+            </LinearGradient>
           </Pressable>
         </View>
 
@@ -561,7 +559,7 @@ export default function EditProfileScreen() {
           </View>
 
           {userEmail && (
-            <View style={[styles.accountRow, { marginTop: 12 }]}>
+            <View style={[styles.accountRow, { marginTop: 8 }]}>
               <View style={[styles.accountIcon, { backgroundColor: `${Colors.ice}18` }]}>
                 <Ionicons name="mail-outline" size={18} color={Colors.ice} />
               </View>
@@ -638,19 +636,17 @@ export default function EditProfileScreen() {
                   />
                 </View>
 
-                <Pressable
-                  style={[styles.registerBtn, { backgroundColor: Colors.amber }, changingPassword && { opacity: 0.6 }]}
-                  onPress={handleChangePassword}
-                  disabled={changingPassword}
-                >
-                  {changingPassword ? (
-                    <ActivityIndicator size="small" color="#fff" />
-                  ) : (
-                    <>
-                      <Ionicons name="checkmark-circle" size={18} color="#fff" />
-                      <Text style={styles.registerBtnText}>Şifreyi Güncelle</Text>
-                    </>
-                  )}
+                <Pressable style={[styles.ctaWrap, changingPassword && { opacity: 0.6 }]} onPress={handleChangePassword} disabled={changingPassword}>
+                  <LinearGradient colors={['#F59E0B', '#D97706', '#92400E']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.ctaGradient}>
+                    {changingPassword ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <>
+                        <View style={styles.ctaIconWrap}><Ionicons name="checkmark-circle" size={16} color="#FFF" /></View>
+                        <Text style={styles.ctaTitle}>Şifreyi Güncelle</Text>
+                      </>
+                    )}
+                  </LinearGradient>
                 </Pressable>
               </View>
             )}
@@ -724,43 +720,64 @@ export default function EditProfileScreen() {
         </View>
       </ScrollView>
     </View>
+    </AppBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.bg },
+  container: { flex: 1, backgroundColor: 'transparent' },
 
   // Header
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 16, paddingTop: 54, paddingBottom: 12,
-    borderBottomWidth: 1, borderBottomColor: Colors.glassBorder,
-    backgroundColor: Colors.bg, zIndex: 10,
+    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: 'transparent', zIndex: 10,
   },
   backBtn: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
-  headerTitle: { fontSize: 17, fontWeight: '700', color: Colors.text },
-  saveBtn: { paddingHorizontal: 18, paddingVertical: 8, borderRadius: Radius.full, backgroundColor: Colors.teal },
-  saveBtnDisabled: { backgroundColor: Colors.glass3 },
-  saveBtnText: { fontSize: 13, fontWeight: '700', color: '#fff' },
-  saveBtnTextDisabled: { color: Colors.text3 },
+  headerTitle: { fontSize: 17, fontWeight: '700', color: Colors.text, ...Shadows.textLight },
+  saveBtn: { paddingHorizontal: 18, paddingVertical: 8, borderRadius: Radius.full, backgroundColor: '#14B8A6', ...Shadows.icon },
+  saveBtnDisabled: { backgroundColor: 'rgba(255,255,255,0.1)', shadowOpacity: 0 },
+  saveBtnText: { fontSize: 13, fontWeight: '700', color: '#fff', ...Shadows.textLight },
+  saveBtnTextDisabled: { color: 'rgba(255,255,255,0.4)' },
+
+  // CTA
+  ctaWrap: {
+    borderRadius: 12, overflow: 'hidden', marginTop: 8,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 4, elevation: 4,
+  },
+  ctaGradient: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingVertical: 8, paddingHorizontal: 12, gap: 8,
+  },
+  ctaIconWrap: {
+    width: 26, height: 26, borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)',
+  },
+  ctaTitle: {
+    flex: 1, fontSize: 12, fontWeight: '800', color: '#FFF',
+    textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
+  },
 
   // Avatar
-  avatarSection: { alignItems: 'center', paddingTop: 24, paddingBottom: 8 },
-  avatarWrap: { position: 'relative', marginBottom: 10 },
-  avatarImage: { width: 100, height: 100, borderRadius: 50, borderWidth: 3, borderColor: Colors.teal },
+  avatarSection: { alignItems: 'center', paddingTop: 10, paddingBottom: 4 },
+  avatarWrap: { position: 'relative', marginBottom: 6 },
+  avatarImage: { width: 64, height: 64, borderRadius: 32, borderWidth: 2, borderColor: Colors.teal },
   cameraBtn: {
-    position: 'absolute', bottom: 0, right: 0,
-    width: 32, height: 32, borderRadius: 16,
+    position: 'absolute', bottom: -2, right: -4,
+    width: 24, height: 24, borderRadius: 12,
     backgroundColor: Colors.teal, justifyContent: 'center', alignItems: 'center',
-    borderWidth: 3, borderColor: Colors.bg,
+    borderWidth: 2, borderColor: Colors.bg,
   },
-  changeAvatarText: { fontSize: 13, fontWeight: '600', color: Colors.teal },
-  avatarPicker: { marginTop: 16, padding: 16, backgroundColor: Colors.bg2, borderRadius: Radius.default, borderWidth: 1, borderColor: Colors.glassBorder },
-  pickerTitle: { fontSize: 14, fontWeight: '700', color: Colors.text, marginBottom: 16 },
-  uploadBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: Colors.teal, paddingVertical: 12, borderRadius: Radius.full, marginBottom: 16 },
-  uploadBtnText: { color: '#fff', fontSize: 14, fontWeight: '600' },
-  avatarGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'center' },
-  avatarOption: { width: 50, height: 50, borderRadius: 25, borderWidth: 2, borderColor: 'transparent', overflow: 'hidden' },
+  changeAvatarText: { fontSize: 11, fontWeight: '600', color: Colors.teal },
+  avatarPicker: { marginHorizontal: 16, marginTop: 6, padding: 10, backgroundColor: '#414e5f', borderRadius: 12, borderWidth: 1, borderColor: '#95a1ae' },
+  pickerTitle: { fontSize: 12, fontWeight: '700', color: Colors.text, marginBottom: 8, ...Shadows.textLight },
+  uploadBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: Colors.teal, paddingVertical: 8, borderRadius: Radius.full, marginBottom: 8 },
+  uploadBtnText: { color: '#fff', fontSize: 12, fontWeight: '600' },
+  avatarGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center' },
+  avatarOption: { width: 42, height: 42, borderRadius: 21, borderWidth: 2, borderColor: 'transparent', overflow: 'hidden' },
   avatarOptionSelected: { borderColor: Colors.teal },
   avatarOptionImg: { width: '100%', height: '100%', borderRadius: 24 },
   selectedCheck: {
@@ -771,108 +788,99 @@ const styles = StyleSheet.create({
   },
 
   // Form
-  form: { paddingHorizontal: 20, paddingTop: 20 },
-  field: { marginBottom: 20 },
-  fieldLabel: { fontSize: 13, fontWeight: '700', color: Colors.text, marginBottom: 8 },
+  form: {
+    marginHorizontal: 16, padding: 10, paddingTop: 12,
+    backgroundColor: '#414e5f', borderRadius: 12,
+    borderWidth: 1, borderColor: '#95a1ae',
+    ...Shadows.card, marginBottom: 4,
+  },
+  field: { marginBottom: 8 },
+  fieldLabel: { fontSize: 10, fontWeight: '700', color: '#F1F5F9', marginBottom: 3, ...Shadows.textLight },
   textInput: {
-    height: 48, borderRadius: Radius.default,
-    backgroundColor: Colors.bg3, borderWidth: 1, borderColor: Colors.glassBorder,
-    paddingHorizontal: 16, fontSize: 14, color: Colors.text,
+    height: 34, borderRadius: 8,
+    backgroundColor: 'rgba(0,0,0,0.15)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+    paddingHorizontal: 10, fontSize: 12, color: '#E2E8F0',
   },
   usernameWrap: { flexDirection: 'row', alignItems: 'center' },
   usernameAt: {
-    height: 48, lineHeight: 48, paddingLeft: 16, paddingRight: 0,
-    borderRadius: Radius.default, borderTopRightRadius: 0, borderBottomRightRadius: 0,
-    backgroundColor: Colors.bg3, borderWidth: 1, borderColor: Colors.glassBorder,
-    borderRightWidth: 0, fontSize: 14, fontWeight: '700', color: Colors.teal,
+    height: 34, lineHeight: 34, paddingLeft: 10, paddingRight: 0,
+    borderRadius: 8, borderTopRightRadius: 0, borderBottomRightRadius: 0,
+    backgroundColor: 'rgba(0,0,0,0.25)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+    borderRightWidth: 0, fontSize: 12, fontWeight: '700', color: '#14B8A6',
   },
   usernameInput: { flex: 1, borderTopLeftRadius: 0, borderBottomLeftRadius: 0, paddingLeft: 4 },
-  bioInput: { height: 90, paddingTop: 12, textAlignVertical: 'top' },
-  charCount: { fontSize: 10, color: Colors.text3, textAlign: 'right', marginTop: 4 },
-  fieldHint: { fontSize: 10, color: Colors.text3, marginTop: 4 },
+  bioInput: { height: 44, paddingTop: 8, textAlignVertical: 'top' },
+  charCount: { fontSize: 9, color: '#94A3B8', textAlign: 'right', marginTop: 2 },
+  fieldHint: { fontSize: 9, color: '#94A3B8', marginTop: 1 },
 
   // Section divider
   sectionDivider: {
-    paddingHorizontal: 20, marginTop: 8, marginBottom: 16,
-    borderTopWidth: 1, borderTopColor: Colors.glassBorder, paddingTop: 20,
+    paddingHorizontal: 20, marginTop: 4, marginBottom: 6,
   },
   sectionLabel: {
-    fontSize: 12, fontWeight: '700', color: Colors.text3,
-    textTransform: 'uppercase', letterSpacing: 0.5,
+    fontSize: 10, fontWeight: '800', color: '#94A3B8',
+    textTransform: 'uppercase', letterSpacing: 1, ...Shadows.textLight,
   },
 
   // Account info
   accountInfoCard: {
-    marginHorizontal: 20, padding: 16,
-    borderRadius: Radius.default, backgroundColor: Colors.bg3,
-    borderWidth: 1, borderColor: Colors.glassBorder, marginBottom: 16,
+    marginHorizontal: 16, padding: 10,
+    borderRadius: 12, backgroundColor: '#414e5f',
+    borderWidth: 1, borderColor: '#95a1ae', marginBottom: 4,
+    ...Shadows.card,
   },
   accountRow: { flexDirection: 'row', alignItems: 'center' },
   accountIcon: {
-    width: 36, height: 36, borderRadius: Radius.xs,
-    justifyContent: 'center', alignItems: 'center', marginRight: 12,
+    width: 20, height: 20, borderRadius: 6,
+    justifyContent: 'center', alignItems: 'center', marginRight: 8,
   },
-  accountLabel: { fontSize: 11, color: Colors.text3 },
-  accountValue: { fontSize: 14, fontWeight: '600', color: Colors.text, marginTop: 1 },
+  accountLabel: { fontSize: 9, color: '#94A3B8', fontWeight: '600' },
+  accountValue: { fontSize: 11, fontWeight: '600', color: '#F1F5F9', marginTop: 0 },
   verifiedBadge: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  verifiedText: { fontSize: 11, fontWeight: '600', color: Colors.emerald },
+  verifiedText: { fontSize: 10, fontWeight: '600', color: Colors.emerald },
 
-  referralBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.bg2, borderRadius: Radius.default, borderWidth: 1, borderColor: Colors.glassBorder, overflow: 'hidden' },
-  referralCodeText: { flex: 1, fontSize: 18, fontWeight: '800', color: Colors.text, letterSpacing: 2, textAlign: 'center', paddingVertical: 12 },
-  copyBtn: { padding: 14, borderLeftWidth: 1, borderLeftColor: Colors.glassBorder, backgroundColor: Colors.glass2 },
+  referralBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.15)', borderRadius: 8, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', overflow: 'hidden' },
+  referralCodeText: { flex: 1, fontSize: 14, fontWeight: '800', color: Colors.text, letterSpacing: 2, textAlign: 'center', paddingVertical: 8 },
+  copyBtn: { padding: 8, borderLeftWidth: 1, borderLeftColor: 'rgba(255,255,255,0.08)', backgroundColor: 'rgba(255,255,255,0.05)' },
 
   // Upgrade section
   upgradeSection: { marginHorizontal: 20, marginBottom: 16 },
-  upgradeBanner: {
-    borderRadius: Radius.default, padding: 20,
-    borderWidth: 1, borderColor: Colors.teal + '25',
-  },
+  upgradeBanner: { borderRadius: Radius.default, padding: 20, borderWidth: 1, borderColor: Colors.teal + '25' },
   upgradeBannerHeader: { flexDirection: 'row', marginBottom: 20 },
   upgradeTitle: { fontSize: 16, fontWeight: '800', color: Colors.text, marginBottom: 4 },
   upgradeDesc: { fontSize: 12, lineHeight: 18, color: Colors.text2 },
 
   // Link buttons
   linkBtn: { marginBottom: 10 },
-  linkBtnGradient: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
-    paddingVertical: 14, borderRadius: Radius.default,
-  },
+  linkBtnGradient: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 14, borderRadius: Radius.default },
   linkBtnText: { fontSize: 15, fontWeight: '700', color: '#fff' },
-  emailToggleBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    paddingVertical: 12, borderRadius: Radius.default,
-    backgroundColor: Colors.bg4, borderWidth: 1, borderColor: Colors.glassBorder,
-  },
+  emailToggleBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 12, borderRadius: Radius.default, backgroundColor: Colors.bg4, borderWidth: 1, borderColor: Colors.glassBorder },
   emailToggleBtnText: { fontSize: 14, fontWeight: '600', color: Colors.teal },
 
   // Email form
   emailForm: { marginTop: 16 },
-  registerBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    paddingVertical: 14, borderRadius: Radius.default, backgroundColor: Colors.teal,
-    marginTop: 4,
-  },
+  registerBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, borderRadius: Radius.default, backgroundColor: Colors.teal, marginTop: 4 },
   registerBtnText: { fontSize: 15, fontWeight: '700', color: '#fff' },
 
   // Password section
-  passwordSection: { marginHorizontal: 20, marginBottom: 16 },
+  passwordSection: { marginHorizontal: 16, marginBottom: 6 },
   passwordToggle: {
-    flexDirection: 'row', alignItems: 'center', padding: 16,
-    borderRadius: Radius.default, backgroundColor: Colors.bg3,
-    borderWidth: 1, borderColor: Colors.glassBorder,
+    flexDirection: 'row', alignItems: 'center', padding: 10,
+    borderRadius: 12, backgroundColor: '#414e5f',
+    borderWidth: 1, borderColor: '#95a1ae', ...Shadows.card,
   },
   passwordForm: {
-    marginTop: 8, padding: 16, borderRadius: Radius.default,
-    backgroundColor: Colors.bg3, borderWidth: 1, borderColor: Colors.glassBorder,
+    marginTop: 4, padding: 10, borderRadius: 12,
+    backgroundColor: '#414e5f', borderWidth: 1, borderColor: '#95a1ae', ...Shadows.card,
   },
-  menuLabel: { fontSize: 14, fontWeight: '500', color: Colors.text },
+  menuLabel: { fontSize: 12, fontWeight: '600', color: '#F1F5F9', ...Shadows.textLight },
 
   // Info
   infoCard: {
-    flexDirection: 'row', gap: 10,
-    marginHorizontal: 20, marginTop: 8, marginBottom: 16, padding: 14,
-    borderRadius: Radius.default, backgroundColor: `${Colors.teal}08`,
-    borderWidth: 1, borderColor: `${Colors.teal}20`,
+    flexDirection: 'row', gap: 8,
+    marginHorizontal: 16, marginTop: 2, marginBottom: 6, padding: 10,
+    borderRadius: 10, backgroundColor: 'rgba(20,184,166,0.15)',
+    borderWidth: 1, borderColor: 'rgba(20,184,166,0.3)',
   },
-  infoText: { flex: 1, fontSize: 12, lineHeight: 18, color: Colors.text3 },
+  infoText: { flex: 1, fontSize: 10, lineHeight: 14, color: '#E2E8F0', ...Shadows.textLight },
 });

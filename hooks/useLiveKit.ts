@@ -158,7 +158,7 @@ export default function useLiveKit({ roomId, enabled = true, userId, displayName
     if (!isCamEnabled) {
       // Kamera açılıyor — mevcut kamera sayısını kontrol et
       const cameraCount = participants.filter(p => p.isCameraEnabled).length;
-      // qualityPreset üzerinden max bilgisi olmadığı için basit limit: 10 (VIP max)
+      // qualityPreset üzerinden max bilgisi olmadığı için basit limit: 10 (Pro max)
       // Gerçek limit room/[id].tsx'de tier'dan çekilmeli
       if (cameraCount >= 10) {
         throw new Error('Kamera limiti doldu');

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, Image, Pressable,
-  ActivityIndicator, ScrollView, RefreshControl,
+  ActivityIndicator, ScrollView, RefreshControl, Dimensions, Animated, Easing,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,6 +9,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { Colors, Shadows } from '../../constants/theme';
 import { RoomService, type Room } from '../../services/database';
 import { RoomFollowService } from '../../services/roomFollow';
+import { ProfileService } from '../../services/profile';
 import { supabase } from '../../constants/supabase';
 import { useAuth, useTheme, useBadges, useOnlineFriends } from '../_layout';
 import { getAvatarSource } from '../../constants/avatars';
@@ -27,13 +28,13 @@ import { isSystemRoom } from '../../services/showcaseRooms';
 // BİRLEŞİK AKILLI FİLTRE (Kategori + Etiket → Tek Bar)
 // ════════════════════════════════════════════════════════════
 const SMART_FILTERS = [
-  { id: 'all',       label: 'Tümü',      icon: 'apps',             type: 'category' as const },
-  { id: 'chat',      label: 'Sohbet',    icon: 'chatbubbles',      type: 'category' as const },
-  { id: 'music',     label: 'Müzik',     icon: 'musical-notes',    type: 'category' as const },
-  { id: 'game',      label: 'Oyun',      icon: 'game-controller',  type: 'category' as const },
-  { id: 'tech',      label: 'Teknoloji', icon: 'code-slash',       type: 'category' as const },
-  { id: 'book',      label: 'Kitap',     icon: 'book',             type: 'category' as const },
-  { id: 'film',      label: 'Film',      icon: 'film',             type: 'category' as const },
+  { id: 'all',       label: 'Tümü',      icon: 'apps',             type: 'category' as const, accent: '#14B8A6' },
+  { id: 'chat',      label: 'Sohbet',    icon: 'chatbubbles',      type: 'category' as const, accent: '#3B82F6' },
+  { id: 'music',     label: 'Müzik',     icon: 'musical-notes',    type: 'category' as const, accent: '#8B5CF6' },
+  { id: 'game',      label: 'Oyun',      icon: 'game-controller',  type: 'category' as const, accent: '#EF4444' },
+  { id: 'tech',      label: 'Teknoloji', icon: 'code-slash',       type: 'category' as const, accent: '#06B6D4' },
+  { id: 'book',      label: 'Kitap',     icon: 'book',             type: 'category' as const, accent: '#D97706' },
+  { id: 'film',      label: 'Film',      icon: 'film',             type: 'category' as const, accent: '#EC4899' },
 ] as const;
 
 // ════════════════════════════════════════════════════════════
@@ -42,33 +43,140 @@ const SMART_FILTERS = [
 
 
 // ════════════════════════════════════════════════════════════
-// TAKİP EDİLEN ODA KARTI (keşfetten erişim)
+// TAKİP EDİLEN ODA KARTI — Premium Horizontal Scroll
 // ════════════════════════════════════════════════════════════
-function FollowedRoomCard({ room }: { room: Room }) {
+
+// Oda teması → gradient mapping (create-room ile senkron)
+const ROOM_THEME_GRADIENTS: Record<string, [string, string]> = {
+  ocean:   ['#0E4D6F', '#083344'],
+  sunset:  ['#7F1D1D', '#4C0519'],
+  forest:  ['#14532D', '#052E16'],
+  galaxy:  ['#312E81', '#1E1B4B'],
+  aurora:  ['#134E4A', '#042F2E'],
+  cherry:  ['#831843', '#500724'],
+  cyber:   ['#1E3A8A', '#172554'],
+  volcano: ['#7C2D12', '#431407'],
+};
+
+const { width: SCREEN_W } = Dimensions.get('window');
+const FOLLOWED_CARD_W = SCREEN_W * 0.44;
+
+function FollowedRoomCard({ room, index }: { room: Room; index: number }) {
   const router = useRouter();
+  const shimmerAnim = React.useRef(new Animated.Value(-1)).current;
+
+  React.useEffect(() => {
+    Animated.loop(
+      Animated.timing(shimmerAnim, {
+        toValue: 1,
+        duration: 2400 + index * 300,
+        easing: Easing.inOut(Easing.ease),
+        useNativeDriver: true,
+      })
+    ).start();
+  }, []);
+
+  const shimmerTranslate = shimmerAnim.interpolate({
+    inputRange: [-1, 1],
+    outputRange: [-FOLLOWED_CARD_W * 1.5, FOLLOWED_CARD_W * 1.5],
+  });
+
+  const themeId = (room.room_settings as any)?.theme_id;
+  const themeGrad = themeId && ROOM_THEME_GRADIENTS[themeId]
+    ? ROOM_THEME_GRADIENTS[themeId]
+    : null;
+  const catTheme = CATEGORY_THEME[room.category] || CATEGORY_THEME.other;
+  const cardImage = (room.room_settings as any)?.card_image_url;
+  const isLive = room.is_live && (room.listener_count || 0) > 0;
+  const isEmpty = room.is_live && (room.listener_count || 0) === 0;
+  const isSleeping = !room.is_live;
+
+  const isPersistent = (room as any).is_persistent;
+  const ownerTier = (room as any).owner_tier || room.host?.subscription_tier || 'Free';
+  const isPremiumOwner = ownerTier === 'Plus' || ownerTier === 'Pro';
+
   return (
     <Pressable
-      style={({ pressed }) => [s.followedCard, pressed && { opacity: 0.9 }]}
+      style={({ pressed }) => [
+        s.fCard,
+        isPremiumOwner && { borderColor: Colors.premiumGold, borderWidth: 1.5 },
+        pressed && { opacity: 0.92, transform: [{ scale: 0.97 }] },
+      ]}
       onPress={() => router.push(`/room/${room.id}`)}
     >
-      <Image source={getAvatarSource(room.host?.avatar_url)} style={s.followedThumb} />
-      <View style={s.followedInfo}>
-        <Text style={s.followedName} numberOfLines={1}>{room.name}</Text>
-        <Text style={s.followedHost} numberOfLines={1}>{room.host?.display_name || 'Anonim'}</Text>
-      </View>
-      <View style={s.followedMeta}>
-        {room.is_live && (room.listener_count || 0) > 0 ? (
-          <View style={s.followedLiveBadge}>
-            <View style={s.followedLiveDot} />
-            <Text style={s.followedLiveText}>Canlı</Text>
+      {/* Arka plan: öncelik → kart görseli > tema > kategori */}
+      {cardImage ? (
+        <>
+          <Image source={{ uri: cardImage }} style={[StyleSheet.absoluteFillObject, { borderRadius: 18 }]} resizeMode="cover" />
+          <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: 18 }]} />
+        </>
+      ) : themeGrad ? (
+        <LinearGradient
+          colors={[themeGrad[0], themeGrad[1], 'rgba(0,0,0,0.4)']}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFillObject}
+        />
+      ) : (
+        <LinearGradient
+          colors={catTheme.colors}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFillObject}
+        />
+      )}
+
+      {/* Shimmer / Parlak ışık efekti */}
+      <Animated.View style={[
+        s.fShimmer,
+        { transform: [{ translateX: shimmerTranslate }] },
+      ]} />
+
+      {/* Üst: durum badge + premium */}
+      <View style={s.fTopRow}>
+        {isLive ? (
+          <View style={s.fLiveBadge}>
+            <View style={s.fLiveDot} />
+            <Text style={s.fLiveText}>CANLI · {room.listener_count}</Text>
           </View>
-        ) : room.is_live ? (
-          <View style={[s.followedLiveBadge, { backgroundColor: 'rgba(148,163,184,0.12)', borderColor: 'rgba(148,163,184,0.2)' }]}>
-            <Ionicons name="moon-outline" size={9} color="#94A3B8" />
-            <Text style={[s.followedLiveText, { color: '#94A3B8' }]}>Boş</Text>
+        ) : isEmpty ? (
+          <View style={s.fEmptyBadge}>
+            <Ionicons name="radio-outline" size={9} color="#94A3B8" />
+            <Text style={s.fEmptyText}>Boş</Text>
+          </View>
+        ) : isSleeping ? (
+          <View style={s.fSleepBadge}>
+            <Ionicons name="moon" size={9} color="#F59E0B" />
+            <Text style={s.fSleepText}>Uyuyor</Text>
           </View>
         ) : null}
-        <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.2)" />
+        {isPremiumOwner && (
+          <View style={s.fPremiumBadge}>
+            <Ionicons name="trophy" size={8} color={Colors.premiumGold} />
+            <Text style={s.fPremiumText}>Premium</Text>
+          </View>
+        )}
+      </View>
+
+      {/* Asimetrik alt bölge — avatar + isim + dinleyici */}
+      <View style={s.fBottom}>
+        <View style={s.fBottomLeft}>
+          <Text style={s.fRoomName} numberOfLines={2}>{room.name}</Text>
+          <View style={s.fHostRow}>
+            <Image source={getAvatarSource(room.host?.avatar_url)} style={s.fHostAvatar} />
+            <Text style={s.fHostName} numberOfLines={1}>{room.host?.display_name || 'Anonim'}</Text>
+            {(room.listener_count || 0) > 0 && (
+              <View style={s.fListenerPill}>
+                <Ionicons name="people" size={9} color="rgba(255,255,255,0.6)" />
+                <Text style={s.fListenerText}>{room.listener_count}</Text>
+              </View>
+            )}
+          </View>
+        </View>
+        {/* Büyük soluk kategori ikonu — sağ alt */}
+        {!cardImage && (
+          <View style={s.fCatIconWrap}>
+            <Ionicons name={catTheme.icon as any} size={28} color="rgba(255,255,255,0.07)" />
+          </View>
+        )}
       </View>
     </Pressable>
   );
@@ -97,6 +205,13 @@ function BigLiveRoomCard({ room, onJoin, isFollowed, onToggleFollow }: { room: R
   const listenerCount = room.listener_count || 0;
   const isSystem = room.id.startsWith('system_');
   const theme = CATEGORY_THEME[room.category] || CATEGORY_THEME.other;
+
+  // Oda temasını kontrol et (oda sahibinin seçtiği tema)
+  const roomThemeId = (room.room_settings as any)?.theme_id;
+  const roomThemeGrad = roomThemeId && ROOM_THEME_GRADIENTS[roomThemeId]
+    ? ROOM_THEME_GRADIENTS[roomThemeId]
+    : null;
+
   const isBoosted = (room as any).boost_expires_at && new Date((room as any).boost_expires_at) > new Date();
 
   return (
@@ -115,6 +230,12 @@ function BigLiveRoomCard({ room, onJoin, isFollowed, onToggleFollow }: { room: R
           <Image source={{ uri: (room.room_settings as any).card_image_url }} style={[StyleSheet.absoluteFillObject, { borderRadius: 14 }]} resizeMode="cover" />
           <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: 14 }]} />
         </>
+      ) : roomThemeGrad ? (
+        <LinearGradient
+          colors={[roomThemeGrad[0], roomThemeGrad[1], 'rgba(0,0,0,0.3)']}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFillObject}
+        />
       ) : (
         <LinearGradient
           colors={theme.colors}
@@ -257,6 +378,7 @@ export default function HomeScreen() {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [filteredRooms, setFilteredRooms] = useState<Room[]>([]);
   const [followedRooms, setFollowedRooms] = useState<Room[]>([]);
+  const [boostedProfiles, setBoostedProfiles] = useState<any[]>([]);
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -288,9 +410,13 @@ export default function HomeScreen() {
         // Takip edilen odaları yükle
         const followed = await RoomFollowService.getFollowedRooms(firebaseUser.uid);
         setFollowedRooms(followed);
-
-
       }
+
+      // Öne Çıkan Profiller (herkes görebilir)
+      try {
+        const bp = await ProfileService.getBoostedProfiles(8);
+        setBoostedProfiles(bp);
+      } catch {}
     } catch (err) {
       if (__DEV__) console.warn('[Home] Load error:', err);
     } finally {
@@ -302,7 +428,7 @@ export default function HomeScreen() {
   useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
 
   // ★ Periyodik: Free tier boş/süresi dolmuş odaları otomatik kapat
-  // Bronze+ odalar muaf — host manuel yönetir (dondur/kapat/sil)
+  // Plus+ odalar muaf — host manuel yönetir (dondur/kapat/sil)
   useEffect(() => {
     const cleanup = async () => {
       try {
@@ -373,9 +499,14 @@ export default function HomeScreen() {
         const isSystem = room.id.startsWith('system_');
         if (isSystem) return { room, score: 9999 }; // Sistem odaları her zaman üstte
 
-        // Katman 1: Boost aktifse +100
+        // Katman 1: Oda boost aktifse +100
         if ((room as any).boost_expires_at && (room as any).boost_expires_at > now) {
           score += 100 + ((room as any).boost_score || 0);
+        }
+        // Katman 1.5: Host profil boost aktifse +75 (profil öne çıkarma → odaları da öne çıkar)
+        const hostBoost = (room.host as any)?.profile_boost_expires_at;
+        if (hostBoost && hostBoost > now) {
+          score += 75;
         }
         // Katman 2: Takip edilen kişinin odası +50
         if (followingIds.has(room.host_id)) score += 50;
@@ -475,8 +606,6 @@ export default function HomeScreen() {
         </View>
       </View>
 
-
-
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}
@@ -484,7 +613,6 @@ export default function HomeScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={Colors.accentTeal} colors={[Colors.accentTeal]} />
         }
       >
-
 
         {/* ═══ Birleşik Akıllı Filtre ═══ */}
         <ScrollView
@@ -497,7 +625,17 @@ export default function HomeScreen() {
             return (
               <Pressable
                 key={filter.id}
-                style={[s.categoryChip, isActive && s.categoryChipActive]}
+                style={[
+                  s.categoryChip,
+                  isActive && {
+                    backgroundColor: filter.accent,
+                    borderColor: filter.accent,
+                    shadowColor: filter.accent,
+                    shadowOpacity: 0.4,
+                    shadowRadius: 6,
+                    elevation: 5,
+                  },
+                ]}
                 onPress={() => setActiveFilter(isActive && filter.id !== 'all' ? 'all' : filter.id)}
               >
                 <Ionicons
@@ -513,7 +651,35 @@ export default function HomeScreen() {
           })}
         </ScrollView>
 
-
+        {/* ═══ Öne Çıkan Profiller ═══ */}
+        {boostedProfiles.length > 0 && (
+          <View style={{ marginBottom: 4 }}>
+            <Text style={s.sectionTitle}>
+              <Ionicons name="rocket" size={16} color="#F472B6" />
+              {'  Öne Çıkan Profiller'}
+            </Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ paddingHorizontal: 16, gap: 10 }}
+            >
+              {boostedProfiles.map((bp) => (
+                <Pressable
+                  key={bp.id}
+                  style={({ pressed }) => [
+                    s.boostCard,
+                    pressed && { opacity: 0.9, transform: [{ scale: 0.96 }] },
+                  ]}
+                  onPress={() => router.push(`/user/${bp.id}` as any)}
+                >
+                  <Image source={getAvatarSource(bp.avatar_url)} style={s.boostAvatar} />
+                  <Text style={s.boostName} numberOfLines={1}>{bp.display_name || 'Kullanıcı'}</Text>
+                  {bp.is_online && <View style={s.boostOnline} />}
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+        )}
 
         {/* ═══ Şu An Canlı — Büyük Kartlar ═══ */}
         <Text style={s.sectionTitle}>
@@ -532,7 +698,6 @@ export default function HomeScreen() {
               onJoin={() => handleJoinRoom(room.id)}
               isFollowed={!!followedRoomIds[room.id]}
               onToggleFollow={firebaseUser ? async () => {
-                // ★ BUG-K4 FIX: Hata yönetimi + optimistic revert
                 const isNow = !!followedRoomIds[room.id];
                 try {
                   if (isNow) {
@@ -543,7 +708,6 @@ export default function HomeScreen() {
                     await RoomFollowService.follow(room.id, firebaseUser.uid);
                   }
                 } catch {
-                  // Hata durumunda state'i revert et
                   if (isNow) {
                     setFollowedRoomIds(prev => ({ ...prev, [room.id]: true }));
                   } else {
@@ -555,7 +719,6 @@ export default function HomeScreen() {
             />
           ))
         ) : (
-          /* ═══ Premium Boş Durum CTA ═══ */
           <Pressable
             style={s.heroEmptyCard}
             onPress={() => router.push('/create-room')}
@@ -585,23 +748,28 @@ export default function HomeScreen() {
           </Pressable>
         )}
 
-        {/* ═══ Takip Ettiğin Odalar ═══ */}
+        {/* ═══ Takip Ettiğin Odalar — Canlı odaların altında, doğal akışta ═══ */}
         {followedRooms.length > 0 && (
-          <>
-            <Text style={s.sectionTitle}>
-              <Ionicons name="bookmark" size={16} color={Colors.accentTeal} />
-              {'  Takip Ettiğin Odalar'}
-            </Text>
-            {followedRooms.map((room) => (
-              <FollowedRoomCard key={room.id} room={room} />
-            ))}
-          </>
+          <View style={{ marginTop: 8 }}>
+            <View style={s.followedPanelHeader}>
+              <Ionicons name="bookmark" size={14} color={Colors.accentTeal} />
+              <Text style={s.followedPanelTitle}>Takip Ettiğin Odalar</Text>
+              <Text style={s.followedPanelCount}>{followedRooms.length}</Text>
+            </View>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ paddingHorizontal: 16, gap: 10, paddingBottom: 8 }}
+              decelerationRate="fast"
+              snapToInterval={FOLLOWED_CARD_W + 10}
+              snapToAlignment="start"
+            >
+              {followedRooms.map((room, i) => (
+                <FollowedRoomCard key={room.id} room={room} index={i} />
+              ))}
+            </ScrollView>
+          </View>
         )}
-
-
-
-
-
 
       </ScrollView>
 
@@ -685,10 +853,36 @@ const s = StyleSheet.create({
 
   // ═══ Birleşik Akıllı Filtre ═══
   categoryBar: { paddingHorizontal: 14, paddingVertical: 8, gap: 8 },
-  categoryChip: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
-  categoryChipActive: { backgroundColor: Colors.accentTeal, borderColor: Colors.accentTeal },
+  categoryChip: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.25, shadowRadius: 4, elevation: 3 },
+  categoryChipActive: { /* artık dinamik inline stil kullanılıyor */ },
   categoryText: { fontSize: 12, fontWeight: '600', color: '#94A3B8' },
   categoryTextActive: { color: '#FFF' },
+
+  // ═══ Öne Çıkan Profiller ═══
+  boostCard: {
+    alignItems: 'center',
+    width: 72, paddingVertical: 8,
+    borderRadius: 14,
+    backgroundColor: 'rgba(244,114,182,0.06)',
+    borderWidth: 1, borderColor: 'rgba(244,114,182,0.15)',
+    shadowColor: '#F472B6', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15, shadowRadius: 6, elevation: 3,
+  },
+  boostAvatar: {
+    width: 44, height: 44, borderRadius: 22,
+    borderWidth: 2, borderColor: 'rgba(244,114,182,0.4)',
+    marginBottom: 4,
+  },
+  boostName: {
+    fontSize: 9, fontWeight: '700', color: '#E2E8F0',
+    textAlign: 'center', maxWidth: 64,
+  },
+  boostOnline: {
+    position: 'absolute', top: 6, right: 12,
+    width: 10, height: 10, borderRadius: 5,
+    backgroundColor: '#22C55E',
+    borderWidth: 2, borderColor: 'rgba(10,18,30,0.9)',
+  },
 
 
 
@@ -886,26 +1080,130 @@ const s = StyleSheet.create({
     lineHeight: 17,
   },
 
-  // ═══ Takip Edilen Oda Kartı ═══
-  followedCard: {
-    flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, marginBottom: 10,
-    padding: 12, borderRadius: 16, backgroundColor: Colors.cardBg,
-    borderWidth: 1, borderColor: Colors.cardBorder, gap: 12,
+  // ═══ Takip Edilen Oda — Premium Horizontal Card ═══
+  fCard: {
+    width: FOLLOWED_CARD_W,
+    height: 120,
+    borderRadius: 14,
+    overflow: 'hidden',
+    backgroundColor: Colors.cardBg,
+    borderWidth: 1,
+    borderColor: 'rgba(20,184,166,0.15)',
+    padding: 10,
+    justifyContent: 'space-between',
     ...Shadows.card,
+    shadowColor: '#000',
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
-  followedThumb: { width: 56, height: 56, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.06)' },
-  followedInfo: { flex: 1 },
-  followedName: {
-    fontSize: 14, fontWeight: '700', color: '#F1F5F9',
+  fShimmer: {
+    position: 'absolute',
+    top: 0, bottom: 0,
+    width: 40,
+    backgroundColor: 'transparent',
+    borderRadius: 14,
+    opacity: 0.3,
+    borderLeftWidth: 1,
+    borderLeftColor: 'rgba(255,255,255,0.12)',
+    borderRightWidth: 1,
+    borderRightColor: 'rgba(255,255,255,0.06)',
+  },
+  fTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
+    alignItems: 'center',
+    gap: 5,
+  },
+  fLiveBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: 'rgba(239,68,68,0.9)',
+    paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8,
+  },
+  fLiveDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: '#FFF' },
+  fLiveText: { fontSize: 9, fontWeight: '800', color: '#FFF', letterSpacing: 0.3 },
+  fEmptyBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    backgroundColor: 'rgba(148,163,184,0.15)',
+    paddingHorizontal: 7, paddingVertical: 3, borderRadius: 8,
+    borderWidth: 1, borderColor: 'rgba(148,163,184,0.2)',
+  },
+  fEmptyText: { fontSize: 9, fontWeight: '700', color: '#94A3B8' },
+  fSleepBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    backgroundColor: 'rgba(245,158,11,0.12)',
+    paddingHorizontal: 7, paddingVertical: 3, borderRadius: 8,
+    borderWidth: 1, borderColor: 'rgba(245,158,11,0.25)',
+  },
+  fSleepText: { fontSize: 9, fontWeight: '700', color: '#F59E0B' },
+  fBottom: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+  },
+  fBottomLeft: {
+    flex: 1,
+    marginRight: 8,
+  },
+  fRoomName: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#F1F5F9',
+    marginBottom: 4,
+    textShadowColor: 'rgba(0,0,0,0.7)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  fHostRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  fHostAvatar: {
+    width: 20, height: 20, borderRadius: 10,
+    borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.3)',
+  },
+  fHostName: {
+    fontSize: 10, fontWeight: '600', color: 'rgba(255,255,255,0.7)',
+    maxWidth: 80,
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  fListenerPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    paddingHorizontal: 5, paddingVertical: 1.5, borderRadius: 6,
+    marginLeft: 4,
+  },
+  fListenerText: {
+    fontSize: 9, fontWeight: '700', color: 'rgba(255,255,255,0.6)',
+  },
+  fCatIconWrap: {
+    opacity: 0.4,
+  },
+  fPremiumBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    backgroundColor: 'rgba(212,175,55,0.15)',
+    paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6,
+    borderWidth: 1, borderColor: 'rgba(212,175,55,0.3)',
+    marginLeft: 'auto',
+  },
+  fPremiumText: { fontSize: 7, fontWeight: '800', color: Colors.premiumGold },
+
+  // ═══ Takip Edilen Odalar Panel Header ═══
+  followedPanelHeader: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: 16, marginBottom: 8,
+  },
+  followedPanelTitle: {
+    fontSize: 14, fontWeight: '800', color: '#E2E8F0', flex: 1,
     ...Shadows.text,
   },
-  followedHost: {
-    fontSize: 11, color: '#94A3B8', marginTop: 1,
-    ...Shadows.textLight,
+  followedPanelCount: {
+    fontSize: 11, fontWeight: '800', color: Colors.accentTeal,
+    backgroundColor: 'rgba(20,184,166,0.1)',
+    paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8,
   },
-  followedMeta: { alignItems: 'flex-end', gap: 6 },
-  followedLiveBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(239,68,68,0.15)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
-  followedLiveDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: '#EF4444' },
-  followedLiveText: { fontSize: 10, fontWeight: '700', color: '#EF4444' },
 });
 

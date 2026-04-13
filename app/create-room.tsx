@@ -57,14 +57,14 @@ const CATEGORIES = [
 
 const ROOM_TYPES = [
   { id: 'open', label: 'Açık', icon: 'globe-outline', desc: 'Herkes katılabilir', minTier: 'Free' },
-  { id: 'closed', label: 'Şifreli', icon: 'lock-closed-outline', desc: 'Şifre ile giriş', minTier: 'Bronze' },
-  { id: 'invite', label: 'Davetli', icon: 'mail-outline', desc: 'Sadece davetliler', minTier: 'Gold' },
+  { id: 'closed', label: 'Şifreli', icon: 'lock-closed-outline', desc: 'Şifre ile giriş', minTier: 'Plus' },
+  { id: 'invite', label: 'Davetli', icon: 'mail-outline', desc: 'Sadece davetliler', minTier: 'Pro' },
 ] as const;
 
 const SPEAKING_MODES = [
   { id: 'free_for_all', label: 'Serbest', icon: 'people', desc: 'Herkes konuşur', minTier: 'Free' as const },
   { id: 'permission_only', label: 'İzinli', icon: 'hand-left', desc: 'El kaldır', minTier: 'Free' as const },
-  { id: 'selected_only', label: 'Seçilmişler', icon: 'shield-checkmark', desc: 'Sadece davetli', minTier: 'VIP' as const },
+  { id: 'selected_only', label: 'Seçilmişler', icon: 'shield-checkmark', desc: 'Sadece davetli', minTier: 'Pro' as const },
 ];
 
 /**
@@ -101,8 +101,8 @@ export default function CreateRoomScreen() {
   const insets = useSafeAreaInsets();
   const { firebaseUser, profile } = useAuth();
   const isAdmin = profile?.is_admin === true;
-  // GodMaster admin = sınırsız VIP yetki
-  const tier = (isAdmin ? 'VIP' : (profile?.subscription_tier || 'Free')) as TierName;
+  // GodMaster admin = sınırsız Pro yetki
+  const tier = (isAdmin ? 'Pro' : (profile?.subscription_tier || 'Free')) as TierName;
   const limits = useMemo(() => getRoomLimits(tier), [tier]);
 
   const [name, setName] = useState('');
@@ -465,7 +465,7 @@ export default function CreateRoomScreen() {
 
           {showAdvanced && (
             <View style={s.card}>
-              {/* ── Giriş Tipi — Free(Açık) / Bronze+(Şifreli) / Gold+(Davetli) ── */}
+              {/* ── Giriş Tipi — Free(Açık) / Plus+(Şifreli) / Pro+(Davetli) ── */}
               <View style={{ paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.03)' }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                   <Ionicons name="shield-checkmark" size={16} color="#14B8A6" />
@@ -508,8 +508,8 @@ export default function CreateRoomScreen() {
                 )}
               </View>
 
-              {/* ── Oda Teması — Silver+ ── */}
-              {isTierAtLeast(tier, 'Silver') ? (
+              {/* ── Oda Teması — Plus+ ── */}
+              {isTierAtLeast(tier, 'Plus') ? (
                 <View style={{ paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.03)' }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                     <Ionicons name="color-palette" size={16} color="#A78BFA" />
@@ -537,7 +537,7 @@ export default function CreateRoomScreen() {
                     })}
                   </View>
 
-                  {/* Arkaplan Görseli (Image Picker) — Silver+ */}
+                  {/* Arkaplan Görseli (Image Picker) — Plus+ */}
                   <View style={{ marginTop: 10 }}>
                     <Pressable
                       style={[s.bgPickerBtn, backgroundImage ? { borderColor: '#14B8A6' } : {}]}
@@ -585,18 +585,18 @@ export default function CreateRoomScreen() {
                   </View>
                 </View>
               ) : (
-                <Pressable style={[s.advRow, { opacity: 0.4 }]} onPress={() => showToast({ title: '🔒 Silver+ ile açılır', message: 'Oda teması Silver ve üzeri üyeliklerde kullanılabilir.', type: 'info' })}>
+                <Pressable style={[s.advRow, { opacity: 0.4 }]} onPress={() => showToast({ title: '🔒 Plus+ ile açılır', message: 'Oda teması Plus ve üzeri üyeliklerde kullanılabilir.', type: 'info' })}>
                   <Ionicons name="color-palette-outline" size={16} color="#475569" />
                   <View style={{ flex: 1 }}>
                     <Text style={[s.advLabel, { color: '#475569' }]}>Oda Teması & Arkaplan</Text>
                     <Text style={s.advDesc}>Özel renk teması ve arkaplan görseli</Text>
                   </View>
-                  <View style={s.lockBadge}><Ionicons name="lock-closed" size={9} color="#F59E0B" /><Text style={s.lockText}>Silver</Text></View>
+                  <View style={s.lockBadge}><Ionicons name="lock-closed" size={9} color="#F59E0B" /><Text style={s.lockText}>Plus</Text></View>
                 </Pressable>
               )}
 
-              {/* ── Giriş Ücreti — VIP ── */}
-              {isTierAtLeast(tier, 'VIP') ? (
+              {/* ── Giriş Ücreti — Pro ── */}
+              {isTierAtLeast(tier, 'Pro') ? (
                 <View style={s.advRow}>
                   <Ionicons name="cash" size={16} color="#D4AF37" />
                   <View style={{ flex: 1 }}>
@@ -612,18 +612,18 @@ export default function CreateRoomScreen() {
                   </View>
                 </View>
               ) : (
-                <Pressable style={[s.advRow, { opacity: 0.4 }]} onPress={() => showToast({ title: '🔒 VIP ile açılır', message: 'Giriş ücreti belirlemek için VIP üyelik gerekli.', type: 'info' })}>
+                <Pressable style={[s.advRow, { opacity: 0.4 }]} onPress={() => showToast({ title: '🔒 Pro ile açılır', message: 'Giriş ücreti belirlemek için Pro üyelik gerekli.', type: 'info' })}>
                   <Ionicons name="cash-outline" size={16} color="#475569" />
                   <View style={{ flex: 1 }}>
                     <Text style={[s.advLabel, { color: '#475569' }]}>Ücretli Giriş</Text>
                     <Text style={s.advDesc}>SP giriş ücreti belirle</Text>
                   </View>
-                  <View style={s.lockBadge}><Ionicons name="lock-closed" size={9} color="#F59E0B" /><Text style={s.lockText}>VIP</Text></View>
+                  <View style={s.lockBadge}><Ionicons name="lock-closed" size={9} color="#F59E0B" /><Text style={s.lockText}>Pro</Text></View>
                 </Pressable>
               )}
 
-              {/* ── Bağış Kabul — Gold+ ── */}
-              {isTierAtLeast(tier, 'Gold') ? (
+              {/* ── Bağış Kabul — Pro+ ── */}
+              {isTierAtLeast(tier, 'Pro') ? (
                 <Pressable style={s.advRow} onPress={() => setDonationsEnabled(!donationsEnabled)}>
                   <Ionicons name="heart" size={16} color={donationsEnabled ? '#EF4444' : '#64748B'} />
                   <View style={{ flex: 1 }}>
@@ -635,18 +635,18 @@ export default function CreateRoomScreen() {
                   </View>
                 </Pressable>
               ) : (
-                <Pressable style={[s.advRow, { opacity: 0.4 }]} onPress={() => showToast({ title: '🔒 Gold+ ile açılır', message: 'Bağış özelliği Gold ve üzeri üyeliklerde kullanılabilir.', type: 'info' })}>
+                <Pressable style={[s.advRow, { opacity: 0.4 }]} onPress={() => showToast({ title: '🔒 Pro ile açılır', message: 'Bağış özelliği Pro ve üzeri üyeliklerde kullanılabilir.', type: 'info' })}>
                   <Ionicons name="heart-outline" size={16} color="#475569" />
                   <View style={{ flex: 1 }}>
                     <Text style={[s.advLabel, { color: '#475569' }]}>Bağış Kabul</Text>
                     <Text style={s.advDesc}>SP bağışı al</Text>
                   </View>
-                  <View style={s.lockBadge}><Ionicons name="lock-closed" size={9} color="#F59E0B" /><Text style={s.lockText}>Gold</Text></View>
+                  <View style={s.lockBadge}><Ionicons name="lock-closed" size={9} color="#F59E0B" /><Text style={s.lockText}>Pro</Text></View>
                 </Pressable>
               )}
 
-              {/* ── Takipçilere Özel — Gold+ ── */}
-              {isTierAtLeast(tier, 'Gold') ? (
+              {/* ── Takipçilere Özel — Pro+ ── */}
+              {isTierAtLeast(tier, 'Pro') ? (
                 <Pressable style={s.advRow} onPress={() => setFollowersOnly(!followersOnly)}>
                   <Ionicons name="people" size={16} color={followersOnly ? '#D4AF37' : '#64748B'} />
                   <View style={{ flex: 1 }}>
@@ -658,13 +658,13 @@ export default function CreateRoomScreen() {
                   </View>
                 </Pressable>
               ) : (
-                <Pressable style={[s.advRow, { opacity: 0.4 }]} onPress={() => showToast({ title: '🔒 Gold+ ile açılır', message: 'Takipçilere özel mod Gold ve üzeri üyeliklerde kullanılabilir.', type: 'info' })}>
+                <Pressable style={[s.advRow, { opacity: 0.4 }]} onPress={() => showToast({ title: '🔒 Pro ile açılır', message: 'Takipçilere özel mod Pro ve üzeri üyeliklerde kullanılabilir.', type: 'info' })}>
                   <Ionicons name="people-outline" size={16} color="#475569" />
                   <View style={{ flex: 1 }}>
                     <Text style={[s.advLabel, { color: '#475569' }]}>Takipçilere Özel</Text>
                     <Text style={s.advDesc}>Sadece takipçiler girebilir</Text>
                   </View>
-                  <View style={s.lockBadge}><Ionicons name="lock-closed" size={9} color="#F59E0B" /><Text style={s.lockText}>Gold</Text></View>
+                  <View style={s.lockBadge}><Ionicons name="lock-closed" size={9} color="#F59E0B" /><Text style={s.lockText}>Pro</Text></View>
                 </Pressable>
               )}
 

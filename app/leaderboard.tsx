@@ -3,8 +3,8 @@
  * ★ Premium glassmorphic dark UI
  *
  * Bölümler:
- * 1. En Çok Hediye Alan — altın/gümüş/bronz podium + liste
- * 2. En Cömert — en çok hediye gönderenler
+ * 1. En Zengin — en yüksek SP'ye sahip
+ * 2. En Popüler — en çok takipçisi olan
  * 3. En Popüler Odalar — en çok katılımcı alan
  * 4. En Aktif — en çok oda açanlar
  *
@@ -31,11 +31,11 @@ const { width: W } = Dimensions.get('window');
 // ─── Zaman Filtreleri ────────────────────────────────────
 type TimePeriod = 'weekly' | 'monthly' | 'all';
 
-const TIME_LABELS: Record<TimePeriod, string> = {
-  weekly: 'Haftalık',
-  monthly: 'Aylık',
-  all: 'Tüm Zamanlar',
-};
+const TIME_TABS: { key: TimePeriod; label: string }[] = [
+  { key: 'all', label: 'Genel' },
+  { key: 'weekly', label: 'Haftalık' },
+  { key: 'monthly', label: 'Aylık' },
+];
 
 function getDateCutoff(period: TimePeriod): string | null {
   if (period === 'all') return null;
@@ -77,60 +77,74 @@ function PodiumCard({ entry, rank, label }: { entry: LeaderEntry; rank: 1 | 2 | 
   const medal = MEDAL_COLORS[rank];
   const scaleAnim = useRef(new Animated.Value(0.85)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
+  const glowAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.parallel([
       Animated.spring(scaleAnim, { toValue: 1, friction: 5, tension: 60, useNativeDriver: true, delay: rank * 150 }),
       Animated.timing(opacityAnim, { toValue: 1, duration: 500, delay: rank * 150, useNativeDriver: true }),
     ]).start();
+    if (rank === 1) {
+      Animated.loop(Animated.sequence([
+        Animated.timing(glowAnim, { toValue: 1, duration: 1500, useNativeDriver: true }),
+        Animated.timing(glowAnim, { toValue: 0, duration: 1500, useNativeDriver: true }),
+      ])).start();
+    }
   }, []);
 
   const isFirst = rank === 1;
-  const avatarSize = isFirst ? 72 : 58;
+  const avatarSize = isFirst ? 76 : 60;
 
   return (
-    <Animated.View style={[{ flex: 1, opacity: opacityAnim, transform: [{ scale: scaleAnim }] }, isFirst && { marginTop: -10 }]}>
+    <Animated.View style={[{ flex: 1, opacity: opacityAnim, transform: [{ scale: scaleAnim }] }, isFirst && { marginTop: -14, zIndex: 2 }]}>
       <Pressable
-        style={({ pressed }) => [pS.card, pressed && { opacity: 0.85, transform: [{ scale: 0.97 }] }]}
+        style={({ pressed }) => [pS.card, pressed && { opacity: 0.85, transform: [{ scale: 0.97 }] },
+          { shadowColor: medal.bg[0], shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.45, shadowRadius: 16, elevation: 10 }]}
         onPress={() => router.push(`/user/${entry.user_id}` as any)}
       >
         <LinearGradient
-          colors={[medal.bg[0] + '18', medal.bg[1] + '08']}
+          colors={[medal.bg[0] + '25', medal.bg[1] + '12', 'rgba(15,23,42,0.7)']}
           style={StyleSheet.absoluteFillObject}
           start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
         />
+        <View style={[pS.shineLine, { backgroundColor: medal.bg[0] + '40' }]} />
 
-        {/* Rank Badge */}
-        <View style={[pS.rankBadge, { backgroundColor: medal.bg[0] }]}>
+        <LinearGradient colors={medal.bg} style={pS.rankBadge} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
           <Text style={pS.rankText}>{rank}</Text>
-        </View>
+        </LinearGradient>
 
-        {/* Avatar */}
-        <View style={[pS.avatarWrap, { width: avatarSize + 6, height: avatarSize + 6 }]}>
+        <View style={[pS.avatarWrap, { width: avatarSize + 8, height: avatarSize + 8 }]}>
           <LinearGradient
-            colors={medal.bg}
-            style={[pS.avatarRing, { width: avatarSize + 6, height: avatarSize + 6, borderRadius: (avatarSize + 6) / 2 }]}
+            colors={[medal.bg[0], medal.bg[1], medal.bg[0]]}
+            style={[pS.avatarRing, { width: avatarSize + 8, height: avatarSize + 8, borderRadius: (avatarSize + 8) / 2 }]}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
           >
             <Image
               source={getAvatarSource(entry.avatar_url)}
-              style={{ width: avatarSize, height: avatarSize, borderRadius: avatarSize / 2, borderWidth: 2.5, borderColor: Colors.bg }}
+              style={{ width: avatarSize, height: avatarSize, borderRadius: avatarSize / 2, borderWidth: 3, borderColor: 'rgba(15,23,42,0.9)' }}
             />
           </LinearGradient>
           {isFirst && (
-            <View style={pS.crownWrap}>
-              <Ionicons name="trophy" size={18} color="#FFD700" />
-            </View>
+            <Animated.View style={[pS.crownWrap, { opacity: glowAnim.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1] }) }]}>
+              <Text style={{ fontSize: 22 }}>👑</Text>
+            </Animated.View>
           )}
         </View>
 
-        {/* User Info */}
-        <Text style={[pS.name, { color: medal.text }]} numberOfLines={1}>{entry.display_name}</Text>
+        <Text style={[pS.name, { color: medal.text, textShadowColor: medal.bg[0] + '60', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 }]} numberOfLines={1}>
+          {entry.display_name}
+        </Text>
 
-        {/* Count */}
-        <View style={[pS.countPill, { borderColor: medal.bg[0] + '30' }]}>
-          <Text style={[pS.countText, { color: medal.text }]}>{entry.count}</Text>
-          <Text style={[pS.countLabel]}>{label}</Text>
-        </View>
+        {entry.tier && entry.tier !== 'Free' && (
+          <View style={[pS.tierPill, { backgroundColor: medal.bg[0] + '18', borderColor: medal.bg[0] + '30' }]}>
+            <Text style={[pS.tierText, { color: medal.text }]}>{getTierBadgeInfo(entry.tier).label}</Text>
+          </View>
+        )}
+
+        <LinearGradient colors={[medal.bg[0] + '20', medal.bg[1] + '10']} style={pS.countPill} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+          <Text style={[pS.countText, { color: medal.text, textShadowColor: medal.bg[0] + '80', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 8 }]}>{entry.count.toLocaleString()}</Text>
+          <Text style={pS.countLabel}>{label}</Text>
+        </LinearGradient>
       </Pressable>
     </Animated.View>
   );
@@ -138,32 +152,32 @@ function PodiumCard({ entry, rank, label }: { entry: LeaderEntry; rank: 1 | 2 | 
 
 const pS = StyleSheet.create({
   card: {
-    alignItems: 'center', paddingVertical: 16, paddingHorizontal: 4,
-    borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.03)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
+    alignItems: 'center', paddingVertical: 18, paddingHorizontal: 6,
+    borderRadius: 22, backgroundColor: 'rgba(30,41,59,0.65)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
     overflow: 'hidden',
   },
+  shineLine: { position: 'absolute', top: 0, left: 0, right: 0, height: 1.5 },
   rankBadge: {
     position: 'absolute', top: 8, right: 8,
-    width: 22, height: 22, borderRadius: 11,
+    width: 26, height: 26, borderRadius: 13,
     justifyContent: 'center', alignItems: 'center',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.5, shadowRadius: 4, elevation: 6,
   },
-  rankText: { fontSize: 11, fontWeight: '900', color: '#FFF' },
-  avatarWrap: { position: 'relative', marginBottom: 8 },
+  rankText: { fontSize: 12, fontWeight: '900', color: '#FFF', textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
+  avatarWrap: { position: 'relative', marginBottom: 10 },
   avatarRing: { justifyContent: 'center', alignItems: 'center' },
-  crownWrap: {
-    position: 'absolute', top: -12, alignSelf: 'center',
-    backgroundColor: 'rgba(13,20,33,0.8)', borderRadius: 12,
-    padding: 2,
-  },
-  name: { fontSize: 12, fontWeight: '700', letterSpacing: 0.1, textAlign: 'center' },
+  crownWrap: { position: 'absolute', top: -16, alignSelf: 'center' },
+  name: { fontSize: 13, fontWeight: '800', letterSpacing: 0.2, textAlign: 'center', marginHorizontal: 4 },
+  tierPill: { marginTop: 4, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8, borderWidth: 1 },
+  tierText: { fontSize: 8, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase' },
   countPill: {
-    marginTop: 6, paddingHorizontal: 10, paddingVertical: 4,
-    borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.04)',
-    borderWidth: 1, alignItems: 'center',
+    marginTop: 8, paddingHorizontal: 14, paddingVertical: 6,
+    borderRadius: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+    alignItems: 'center',
   },
-  countText: { fontSize: 16, fontWeight: '900' },
-  countLabel: { fontSize: 8, color: '#64748B', fontWeight: '600', letterSpacing: 0.5, textTransform: 'uppercase' },
+  countText: { fontSize: 18, fontWeight: '900' },
+  countLabel: { fontSize: 8, color: '#94A3B8', fontWeight: '700', letterSpacing: 0.8, textTransform: 'uppercase', marginTop: 1 },
 });
 
 // ═══════════════════════════════════════════════════════════
@@ -174,46 +188,58 @@ function LeaderListItem({ entry, rank, label }: { entry: LeaderEntry; rank: numb
   const enterAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    Animated.timing(enterAnim, { toValue: 1, duration: 400, delay: rank * 60, useNativeDriver: true }).start();
+    Animated.timing(enterAnim, { toValue: 1, duration: 400, delay: (rank - 3) * 80, useNativeDriver: true }).start();
   }, []);
 
+  const rankColor = rank <= 5 ? '#D4AF37' : '#94A3B8';
+
   return (
-    <Animated.View style={{ opacity: enterAnim, transform: [{ translateX: enterAnim.interpolate({ inputRange: [0, 1], outputRange: [30, 0] }) }] }}>
+    <Animated.View style={{ opacity: enterAnim, transform: [{ translateY: enterAnim.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }] }}>
       <Pressable
-        style={({ pressed }) => [liS.row, pressed && { opacity: 0.8 }]}
+        style={({ pressed }) => [liS.card, pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] }]}
         onPress={() => router.push(`/user/${entry.user_id}` as any)}
       >
-        <Text style={liS.rank}>{rank}</Text>
-        <Image source={getAvatarSource(entry.avatar_url)} style={[liS.avatar]} />
+        <LinearGradient
+          colors={['rgba(50,65,85,0.8)', 'rgba(30,41,59,0.6)']}
+          style={StyleSheet.absoluteFillObject}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 0.5 }}
+        />
+        <View style={[liS.rankCircle, { borderColor: rankColor + '50' }]}>
+          <Text style={[liS.rankText, { color: rankColor }]}>{rank}</Text>
+        </View>
+        <Image source={getAvatarSource(entry.avatar_url)} style={liS.avatar} />
         <View style={liS.info}>
-          <Text style={[liS.name]} numberOfLines={1}>{entry.display_name}</Text>
-          {entry.tier && (
-            <Text style={[liS.tier]}>{getTierBadgeInfo(entry.tier).label || entry.tier}</Text>
-          )}
+          <Text style={liS.name} numberOfLines={1}>{entry.display_name}</Text>
+          <Text style={liS.sub}>{label}: {entry.count.toLocaleString()}</Text>
         </View>
-        <View style={liS.countWrap}>
-          <Text style={liS.count}>{entry.count}</Text>
-          <Text style={liS.countLabel}>{label}</Text>
-        </View>
+        {entry.tier && entry.tier !== 'Free' && (
+          <View style={liS.tierBadge}>
+            <Ionicons name="shield-checkmark" size={14} color="#D4AF37" />
+          </View>
+        )}
       </Pressable>
     </Animated.View>
   );
 }
 
 const liS = StyleSheet.create({
-  row: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    paddingVertical: 10, paddingHorizontal: 14,
-    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.03)',
+  card: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    marginHorizontal: 16, marginBottom: 8,
+    paddingVertical: 14, paddingHorizontal: 14, paddingLeft: 10,
+    borderRadius: 16, overflow: 'hidden',
   },
-  rank: { fontSize: 14, fontWeight: '800', color: '#64748B', width: 24, textAlign: 'center' },
-  avatar: { width: 38, height: 38, borderRadius: 19, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.08)' },
+  rankCircle: {
+    width: 32, height: 32, borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 1.5,
+    justifyContent: 'center', alignItems: 'center',
+  },
+  rankText: { fontSize: 14, fontWeight: '900' },
+  avatar: { width: 46, height: 46, borderRadius: 23, borderWidth: 2, borderColor: 'rgba(255,255,255,0.15)' },
   info: { flex: 1 },
-  name: { fontSize: 13, fontWeight: '700', color: '#E2E8F0' },
-  tier: { fontSize: 10, color: '#94A3B8', marginTop: 1 },
-  countWrap: { alignItems: 'flex-end' },
-  count: { fontSize: 15, fontWeight: '800', color: '#D4AF37' },
-  countLabel: { fontSize: 8, color: '#64748B', fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.3 },
+  name: { fontSize: 15, fontWeight: '700', color: '#F1F5F9' },
+  sub: { fontSize: 11, color: '#94A3B8', marginTop: 2, fontWeight: '600' },
+  tierBadge: { marginLeft: 4 },
 });
 
 // ═══════════════════════════════════════════════════════════
@@ -221,39 +247,46 @@ const liS = StyleSheet.create({
 // ═══════════════════════════════════════════════════════════
 function RoomListItem({ entry, rank }: { entry: RoomEntry; rank: number }) {
   const router = useRouter();
+  const rankColor = rank <= 3 ? '#14B8A6' : '#94A3B8';
   return (
     <Pressable
-      style={({ pressed }) => [rS.row, pressed && { opacity: 0.8 }]}
+      style={({ pressed }) => [rlS.card, pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] }]}
       onPress={() => router.push(`/room/${entry.room_id}` as any)}
     >
-      <Text style={rS.rank}>{rank}</Text>
-      <Image source={getAvatarSource(entry.host_avatar)} style={[rS.avatar]} />
-      <View style={rS.info}>
-        <Text style={[rS.name]} numberOfLines={1}>{entry.room_name}</Text>
-        <Text style={[rS.host]}>{entry.host_name}</Text>
+      <LinearGradient
+        colors={['rgba(50,65,85,0.8)', 'rgba(30,41,59,0.6)']}
+        style={StyleSheet.absoluteFillObject}
+        start={{ x: 0, y: 0 }} end={{ x: 1, y: 0.5 }}
+      />
+      <View style={[rlS.rankCircle, { borderColor: rankColor + '50' }]}>
+        <Text style={[rlS.rankText, { color: rankColor }]}>{rank}</Text>
       </View>
-      <View style={rS.countWrap}>
-        <Text style={rS.count}>{entry.count}</Text>
-        <Text style={rS.countLabel}>katılımcı</Text>
+      <Image source={getAvatarSource(entry.host_avatar)} style={rlS.avatar} />
+      <View style={rlS.info}>
+        <Text style={rlS.name} numberOfLines={1}>{entry.room_name}</Text>
+        <Text style={rlS.sub}>{entry.host_name} · {entry.count} katılımcı</Text>
       </View>
     </Pressable>
   );
 }
 
-const rS = StyleSheet.create({
-  row: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    paddingVertical: 10, paddingHorizontal: 14,
-    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.03)',
+const rlS = StyleSheet.create({
+  card: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    marginHorizontal: 16, marginBottom: 8,
+    paddingVertical: 14, paddingHorizontal: 14, paddingLeft: 10,
+    borderRadius: 16, overflow: 'hidden',
   },
-  rank: { fontSize: 14, fontWeight: '800', color: '#64748B', width: 24, textAlign: 'center' },
-  avatar: { width: 38, height: 38, borderRadius: 19, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.08)' },
+  rankCircle: {
+    width: 32, height: 32, borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 1.5,
+    justifyContent: 'center', alignItems: 'center',
+  },
+  rankText: { fontSize: 14, fontWeight: '900' },
+  avatar: { width: 46, height: 46, borderRadius: 23, borderWidth: 2, borderColor: 'rgba(255,255,255,0.15)' },
   info: { flex: 1 },
-  name: { fontSize: 13, fontWeight: '700', color: '#E2E8F0' },
-  host: { fontSize: 10, color: '#94A3B8', marginTop: 1 },
-  countWrap: { alignItems: 'flex-end' },
-  count: { fontSize: 15, fontWeight: '800', color: '#5CC6C6' },
-  countLabel: { fontSize: 8, color: '#64748B', fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.3 },
+  name: { fontSize: 15, fontWeight: '700', color: '#F1F5F9' },
+  sub: { fontSize: 11, color: '#94A3B8', marginTop: 2, fontWeight: '600' },
 });
 
 // ═══════════════════════════════════════════════════════════
@@ -262,18 +295,18 @@ const rS = StyleSheet.create({
 function SectionHeader({ icon, iconColor, title }: { icon: string; iconColor: string; title: string }) {
   return (
     <View style={shS.wrap}>
-      <View style={[shS.iconWrap, { backgroundColor: iconColor + '15' }]}>
-        <Ionicons name={icon as any} size={16} color={iconColor} />
+      <View style={[shS.iconWrap, { backgroundColor: iconColor + '18', borderColor: iconColor + '25' }]}>
+        <Ionicons name={icon as any} size={18} color={iconColor} />
       </View>
-      <Text style={[shS.title]}>{title}</Text>
+      <Text style={shS.title}>{title}</Text>
     </View>
   );
 }
 
 const shS = StyleSheet.create({
-  wrap: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingTop: 22, paddingBottom: 10 },
-  iconWrap: { width: 32, height: 32, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
-  title: { fontSize: 16, fontWeight: '800', color: '#F1F5F9', letterSpacing: 0.2 },
+  wrap: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingTop: 24, paddingBottom: 10 },
+  iconWrap: { width: 36, height: 36, borderRadius: 12, justifyContent: 'center', alignItems: 'center', borderWidth: 1 },
+  title: { fontSize: 17, fontWeight: '800', color: '#F1F5F9', letterSpacing: 0.3 },
 });
 
 // ═══════════════════════════════════════════════════════════
@@ -297,49 +330,39 @@ export default function LeaderboardScreen() {
     try {
       const cutoff = getDateCutoff(period);
 
-      // ★ 1. En Çok Hediye Alan — receiver_id gruplaması
-      let receiverQuery = supabase
-        .from('room_live_gifts')
-        .select('receiver_id, receiver:profiles!receiver_id(display_name, avatar_url, subscription_tier)');
-      if (cutoff) receiverQuery = receiverQuery.gte('created_at', cutoff);
-      const { data: giftData } = await receiverQuery;
+      // ★ 1. En Zengin — SP sıralaması
+      const { data: spData } = await supabase
+        .from('profiles')
+        .select('id, display_name, avatar_url, subscription_tier, system_points')
+        .gt('system_points', 0)
+        .order('system_points', { ascending: false })
+        .limit(10);
 
-      if (giftData) {
-        const receiverMap: Record<string, LeaderEntry> = {};
-        giftData.forEach((g: any) => {
-          const uid = g.receiver_id;
-          const profile = Array.isArray(g.receiver) ? g.receiver[0] : g.receiver;
-          if (!receiverMap[uid]) {
-            receiverMap[uid] = {
-              user_id: uid,
-              display_name: profile?.display_name || 'Kullanıcı',
-              avatar_url: profile?.avatar_url || '',
-              tier: profile?.subscription_tier || 'Free',
-              count: 0,
-            };
-          }
-          receiverMap[uid].count++;
-        });
-        const sorted = Object.values(receiverMap).sort((a, b) => b.count - a.count).slice(0, 10);
-        setTopReceivers(sorted);
+      if (spData) {
+        setTopReceivers(spData.map((p: any) => ({
+          user_id: p.id,
+          display_name: p.display_name || 'Kullanıcı',
+          avatar_url: p.avatar_url || '',
+          tier: p.subscription_tier || 'Free',
+          count: p.system_points || 0,
+        })));
       } else {
         setTopReceivers([]);
       }
 
-      // ★ 2. En Cömert — sender_id gruplaması
-      let senderQuery = supabase
-        .from('room_live_gifts')
-        .select('sender_id, sender:profiles!sender_id(display_name, avatar_url, subscription_tier)');
-      if (cutoff) senderQuery = senderQuery.gte('created_at', cutoff);
-      const { data: senderData } = await senderQuery;
+      // ★ 2. En Popüler — En çok takipçisi olan
+      const { data: friendData } = await supabase
+        .from('friendships')
+        .select('friend_id, friend:profiles!friendships_friend_id_fkey(display_name, avatar_url, subscription_tier)')
+        .eq('status', 'accepted');
 
-      if (senderData) {
-        const senderMap: Record<string, LeaderEntry> = {};
-        senderData.forEach((g: any) => {
-          const uid = g.sender_id;
-          const profile = Array.isArray(g.sender) ? g.sender[0] : g.sender;
-          if (!senderMap[uid]) {
-            senderMap[uid] = {
+      if (friendData) {
+        const followerMap: Record<string, LeaderEntry> = {};
+        friendData.forEach((f: any) => {
+          const uid = f.friend_id;
+          const profile = Array.isArray(f.friend) ? f.friend[0] : f.friend;
+          if (!followerMap[uid]) {
+            followerMap[uid] = {
               user_id: uid,
               display_name: profile?.display_name || 'Kullanıcı',
               avatar_url: profile?.avatar_url || '',
@@ -347,9 +370,9 @@ export default function LeaderboardScreen() {
               count: 0,
             };
           }
-          senderMap[uid].count++;
+          followerMap[uid].count++;
         });
-        const sorted = Object.values(senderMap).sort((a, b) => b.count - a.count).slice(0, 10);
+        const sorted = Object.values(followerMap).sort((a, b) => b.count - a.count).slice(0, 10);
         setTopSenders(sorted);
       } else {
         setTopSenders([]);
@@ -442,19 +465,22 @@ export default function LeaderboardScreen() {
         <View style={{ width: 36 }} />
       </View>
 
-      {/* ─── Period Tabs ─── */}
-      <View style={s.periodBar}>
-        {(['weekly', 'monthly', 'all'] as TimePeriod[]).map((p) => (
-          <Pressable
-            key={p}
-            style={[s.periodTab, period === p && s.periodTabActive, period === p && Colors.isLight && { backgroundColor: 'rgba(212,175,55,0.15)', borderColor: 'rgba(212,175,55,0.3)' }]}
-            onPress={() => setPeriod(p)}
-          >
-            <Text style={[s.periodText, period === p && s.periodTextActive, period === p && Colors.isLight && { color: '#B8860B' }]}>
-              {TIME_LABELS[p]}
-            </Text>
-          </Pressable>
-        ))}
+      {/* ─── Segmented Control ─── */}
+      <View style={s.segmentBar}>
+        {TIME_TABS.map((t) => {
+          const isActive = period === t.key;
+          return (
+            <Pressable
+              key={t.key}
+              style={[s.segment, isActive && s.segmentActive]}
+              onPress={() => setPeriod(t.key)}
+            >
+              <Text style={[s.segmentText, isActive && s.segmentTextActive]}>
+                {t.label}
+              </Text>
+            </Pressable>
+          );
+        })}
       </View>
 
       {/* ─── Content ─── */}
@@ -478,50 +504,50 @@ export default function LeaderboardScreen() {
           }
         >
           {/* ════ BÖLÜM 1: EN ÇOK HEDİYE ALAN ════ */}
-          <SectionHeader icon="gift" iconColor="#D4AF37" title="En Çok Hediye Alan" />
+          <SectionHeader icon="diamond" iconColor="#D4AF37" title="En Zengin" />
 
           {topReceivers.length >= 3 ? (
             <>
               {/* Podium — 2, 1, 3 sıralamayla */}
               <View style={s.podiumRow}>
-                <PodiumCard entry={topReceivers[1]} rank={2} label="hediye" />
-                <PodiumCard entry={topReceivers[0]} rank={1} label="hediye" />
-                <PodiumCard entry={topReceivers[2]} rank={3} label="hediye" />
+                <PodiumCard entry={topReceivers[1]} rank={2} label="SP" />
+                <PodiumCard entry={topReceivers[0]} rank={1} label="SP" />
+                <PodiumCard entry={topReceivers[2]} rank={3} label="SP" />
               </View>
 
               {/* 4-10 arası liste */}
               <View style={[s.listCard]}>
                 {topReceivers.slice(3).map((entry, idx) => (
-                  <LeaderListItem key={entry.user_id} entry={entry} rank={idx + 4} label="hediye" />
+                  <LeaderListItem key={entry.user_id} entry={entry} rank={idx + 4} label="SP" />
                 ))}
               </View>
             </>
           ) : topReceivers.length > 0 ? (
             <View style={[s.listCard]}>
               {topReceivers.map((entry, idx) => (
-                <LeaderListItem key={entry.user_id} entry={entry} rank={idx + 1} label="hediye" />
+                <LeaderListItem key={entry.user_id} entry={entry} rank={idx + 1} label="SP" />
               ))}
             </View>
           ) : (
             <View style={[s.emptySection]}>
-              <Ionicons name="gift-outline" size={28} color="rgba(255,255,255,0.15)" />
-              <Text style={s.emptyText}>Henüz hediye verisi yok</Text>
+              <Ionicons name="diamond-outline" size={28} color="rgba(255,255,255,0.15)" />
+              <Text style={s.emptyText}>Henüz SP verisi yok</Text>
             </View>
           )}
 
           {/* ════ BÖLÜM 2: EN CÖMERT ════ */}
-          <SectionHeader icon="heart" iconColor="#EF4444" title="En Cömert" />
+          <SectionHeader icon="people" iconColor="#A855F7" title="En Popüler" />
 
           {topSenders.length > 0 ? (
             <View style={[s.listCard]}>
               {topSenders.map((entry, idx) => (
-                <LeaderListItem key={entry.user_id} entry={entry} rank={idx + 1} label="gönderim" />
+                <LeaderListItem key={entry.user_id} entry={entry} rank={idx + 1} label="takipçi" />
               ))}
             </View>
           ) : (
             <View style={[s.emptySection]}>
-              <Ionicons name="heart-outline" size={28} color="rgba(255,255,255,0.15)" />
-              <Text style={s.emptyText}>Henüz gönderim verisi yok</Text>
+              <Ionicons name="people-outline" size={28} color="rgba(255,255,255,0.15)" />
+              <Text style={s.emptyText}>Henüz takipçi verisi yok</Text>
             </View>
           )}
 
@@ -571,59 +597,57 @@ const s = StyleSheet.create({
   // Header
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingBottom: 10,
-  },
-  backBtn: {
-    width: 36, height: 36, borderRadius: 18,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
-    justifyContent: 'center', alignItems: 'center',
-  },
-  headerCenter: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  headerTitle: { fontSize: 18, fontWeight: '800', color: '#F1F5F9', letterSpacing: 0.2 },
-
-  // Period Tabs
-  periodBar: {
-    flexDirection: 'row', gap: 6,
     paddingHorizontal: 16, paddingBottom: 12,
   },
-  periodTab: {
+  backBtn: {
+    width: 38, height: 38, borderRadius: 14,
+    backgroundColor: 'rgba(30,41,59,0.65)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
+    justifyContent: 'center', alignItems: 'center',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.3, shadowRadius: 6, elevation: 4,
+  },
+  headerCenter: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  headerTitle: {
+    fontSize: 20, fontWeight: '900', color: '#F1F5F9', letterSpacing: 0.3,
+    textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4,
+  },
+
+  // Segmented Control
+  segmentBar: {
+    flexDirection: 'row',
+    marginHorizontal: 16, marginBottom: 16,
+    backgroundColor: 'rgba(15,23,42,0.7)',
+    borderRadius: 14, padding: 3,
+  },
+  segment: {
     flex: 1, paddingVertical: 10, borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.04)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
-    alignItems: 'center',
+    alignItems: 'center', justifyContent: 'center',
   },
-  periodTabActive: {
-    backgroundColor: 'rgba(212,175,55,0.12)',
-    borderColor: 'rgba(212,175,55,0.3)',
+  segmentActive: {
+    backgroundColor: 'rgba(255,255,255,0.12)',
   },
-  periodText: { fontSize: 12, fontWeight: '600', color: '#64748B' },
-  periodTextActive: { color: '#D4AF37', fontWeight: '700' },
+  segmentText: { fontSize: 14, fontWeight: '600', color: '#94A3B8' },
+  segmentTextActive: { color: '#FFFFFF', fontWeight: '700' },
 
   // Podium
   podiumRow: {
-    flexDirection: 'row', gap: 8,
+    flexDirection: 'row', gap: 10,
     paddingHorizontal: 16, alignItems: 'flex-end',
   },
 
-  // List Card
+  // List wrapper
   listCard: {
-    marginHorizontal: 16, marginTop: 8,
-    borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.03)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
-    overflow: 'hidden',
+    marginTop: 12,
   },
 
   // Empty
   emptySection: {
     alignItems: 'center', paddingVertical: 28, gap: 8,
     marginHorizontal: 16,
-    borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.02)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.04)',
   },
-  emptyText: { fontSize: 12, color: '#475569', fontWeight: '500' },
+  emptyText: { fontSize: 13, color: '#475569', fontWeight: '600' },
 
   // Loading
-  loadingWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 },
-  loadingText: { fontSize: 13, color: '#64748B', fontWeight: '500' },
+  loadingWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 14 },
+  loadingText: { fontSize: 14, color: '#64748B', fontWeight: '600' },
 });

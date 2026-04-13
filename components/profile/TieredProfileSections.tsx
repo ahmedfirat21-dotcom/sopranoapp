@@ -77,15 +77,15 @@ export interface TieredProfileSectionsProps {
   // Son odalar
   recentRooms: { id: string; name: string; created_at: string; listener_count: number; category: string }[];
 
-  // Gold+
+  // Pro+
   bannerUrl?: string | null;
   onDonate?: () => void;
 
-  // Silver+
+  // Plus+
   languageTag?: string;
   ageTag?: string;
 
-  // VIP
+  // Pro
   isGhost?: boolean;
   incomeStats?: { totalEarned: number; roomFeeRooms: number; donationsReceived: number };
 }
@@ -132,20 +132,20 @@ export default function TieredProfileSections({
   return (
     <View style={s.root}>
 
-      {/* ═══ Gold+ Banner ═══ */}
-      {isTierAtLeast(tier, 'Gold') && bannerUrl ? (
+      {/* ═══ Pro+ Banner ═══ */}
+      {isTierAtLeast(tier, 'Pro') && bannerUrl ? (
         <View style={s.bannerWrap}>
           <Image source={{ uri: bannerUrl }} style={s.bannerImage} />
           <LinearGradient colors={['transparent', 'rgba(11,21,32,0.9)']} style={s.bannerGradient} />
         </View>
-      ) : isTierAtLeast(tier, 'Gold') ? (
+      ) : isTierAtLeast(tier, 'Pro') ? (
         <View style={s.bannerWrap}>
           <LinearGradient colors={tierDef.gradient as [string, string]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[s.bannerImage, { opacity: 0.2 }]} />
         </View>
       ) : null}
 
-      {/* ═══ Silver+ Etiketler ═══ */}
-      {isTierAtLeast(tier, 'Silver') ? (
+      {/* ═══ Plus+ Etiketler ═══ */}
+      {isTierAtLeast(tier, 'Plus') ? (
         (languageTag || ageTag) ? (
           <View style={s.tagsRow}>
             {languageTag ? (
@@ -163,14 +163,14 @@ export default function TieredProfileSections({
           </View>
         ) : null
       ) : (
-        <LockedFeatureHint label="Dil & Yaş Etiketleri" requiredTier="Silver" icon="globe-outline" />
+        <LockedFeatureHint label="Dil & Yaş Etiketleri" requiredTier="Plus" icon="globe-outline" />
       )}
 
       {/* ═══ Son Aktif Odalar (Aktivite Alanı) ═══ */}
       {recentRooms.length > 0 ? (
         <View style={s.sectionCard}>
           <Text style={s.sectionTitle}>📡 Son Aktif Odalar</Text>
-          {recentRooms.slice(0, isTierAtLeast(tier, 'Bronze') ? recentRooms.length : 5).map((room) => {
+          {recentRooms.slice(0, isTierAtLeast(tier, 'Plus') ? recentRooms.length : 5).map((room) => {
             const cat = CAT_ICONS[room.category] || CAT_ICONS.other;
             return (
               <Pressable key={room.id} style={s.roomRow} onPress={() => router.push(`/room/${room.id}` as any)}>
@@ -197,23 +197,23 @@ export default function TieredProfileSections({
       <View style={s.sectionCard}>
         <Text style={s.sectionTitle}>PREMİUM ÖZELLİKLER (Önizleme)</Text>
 
-        {!isTierAtLeast(tier, 'Bronze') && (
-          <LockedFeatureHint label="Kapsamlı Moderasyon Geçmişi" requiredTier="Bronze" icon="shield-checkmark-outline" />
+        {!isTierAtLeast(tier, 'Plus') && (
+          <LockedFeatureHint label="Kapsamlı Moderasyon Geçmişi" requiredTier="Plus" icon="shield-checkmark-outline" />
         )}
         
-        {!isTierAtLeast(tier, 'Silver') && (
-          <LockedFeatureHint label="Profil Teması" requiredTier="Silver" icon="color-palette-outline" />
+        {!isTierAtLeast(tier, 'Plus') && (
+          <LockedFeatureHint label="Profil Teması" requiredTier="Plus" icon="color-palette-outline" />
         )}
 
-        {!isTierAtLeast(tier, 'Gold') && (
-          <LockedFeatureHint label="Kapak Fotoğrafı" requiredTier="Gold" icon="image-outline" />
+        {!isTierAtLeast(tier, 'Pro') && (
+          <LockedFeatureHint label="Kapak Fotoğrafı" requiredTier="Pro" icon="image-outline" />
         )}
 
-        {!isTierAtLeast(tier, 'Gold') && (
-          <LockedFeatureHint label="Takipçilere Özel İçerik" requiredTier="Gold" icon="lock-closed-outline" />
+        {!isTierAtLeast(tier, 'Pro') && (
+          <LockedFeatureHint label="Takipçilere Özel İçerik" requiredTier="Pro" icon="lock-closed-outline" />
         )}
 
-        {isTierAtLeast(tier, 'Gold') ? (
+        {isTierAtLeast(tier, 'Pro') ? (
           !isOwnProfile && onDonate ? (
             <View style={[lk.container, { borderBottomWidth: 0, paddingVertical: 8 }]}>
               <Pressable style={[s.donateBtn, { width: '100%' }]} onPress={onDonate}>
@@ -225,10 +225,10 @@ export default function TieredProfileSections({
             </View>
           ) : null
         ) : (
-          !isOwnProfile && <LockedFeatureHint label="Destekle / SP Bağış" requiredTier="Gold" icon="heart-outline" />
+          !isOwnProfile && <LockedFeatureHint label="Destekle / SP Bağış" requiredTier="Pro" icon="heart-outline" />
         )}
 
-        {isTierAtLeast(tier, 'VIP') ? (
+        {isTierAtLeast(tier, 'Pro') ? (
           isGhost ? (
             <View style={[lk.container, { borderBottomWidth: 0 }]}>
               <View style={lk.left}>
@@ -240,14 +240,14 @@ export default function TieredProfileSections({
             </View>
           ) : null
         ) : (
-          <LockedFeatureHint label="Ghost Mode Göstergesi" requiredTier="VIP" icon="eye-off-outline" />
+          <LockedFeatureHint label="Ghost Mode Göstergesi" requiredTier="Pro" icon="eye-off-outline" />
         )}
       </View>
 
-      {/* ═══ VIP Gelişmiş İstatistik Paneli ═══ */}
-      {isTierAtLeast(tier, 'VIP') ? (
+      {/* ═══ Pro Gelişmiş İstatistik Paneli ═══ */}
+      {isTierAtLeast(tier, 'Pro') ? (
         <View style={s.sectionCard}>
-          <Text style={s.sectionTitle}>👑 VIP İstatistikler</Text>
+          <Text style={s.sectionTitle}>👑 Pro İstatistikler</Text>
           <View style={s.vipStatsGrid}>
             <View style={s.vipStatBox}>
               <Text style={[s.vipStatNum, { color: '#FF6B35' }]}>{stats.totalListeners}</Text>
@@ -276,11 +276,11 @@ export default function TieredProfileSections({
           </View>
         </View>
       ) : (
-        <LockedFeatureHint label="Gelişmiş İstatistik Paneli" requiredTier="VIP" icon="stats-chart-outline" />
+        <LockedFeatureHint label="Gelişmiş İstatistik Paneli" requiredTier="Pro" icon="stats-chart-outline" />
       )}
 
-      {/* ═══ VIP Gelir Göstergesi ═══ */}
-      {isTierAtLeast(tier, 'VIP') ? (
+      {/* ═══ Pro Gelir Göstergesi ═══ */}
+      {isTierAtLeast(tier, 'Pro') ? (
         isOwnProfile && incomeStats ? (
           /* Kendi profili — tam gelir detayları */
           <View style={[s.sectionCard, { borderColor: 'rgba(255,107,53,0.15)' }]}>
@@ -314,12 +314,12 @@ export default function TieredProfileSections({
             </View>
             <View style={[lk.badge, { borderColor: 'rgba(255,107,53,0.3)', backgroundColor: 'rgba(255,107,53,0.08)' }]}>
               <Ionicons name="checkmark" size={8} color="#FF6B35" />
-              <Text style={[lk.badgeText, { color: '#FF6B35' }]}>VIP</Text>
+              <Text style={[lk.badgeText, { color: '#FF6B35' }]}>Pro</Text>
             </View>
           </View>
         ) : null
-      ) : isOwnProfile && !isTierAtLeast(tier, 'VIP') ? (
-        <LockedFeatureHint label="Gelir Göstergesi" requiredTier="VIP" icon="cash-outline" />
+      ) : isOwnProfile && !isTierAtLeast(tier, 'Pro') ? (
+        <LockedFeatureHint label="Gelir Göstergesi" requiredTier="Pro" icon="cash-outline" />
       ) : null}
 
     </View>
@@ -371,7 +371,7 @@ const s = StyleSheet.create({
   },
   donateBtnText: { fontSize: 15, fontWeight: '700', color: '#FFF' },
 
-  // VIP Stats
+  // Pro Stats
   vipStatsGrid: { flexDirection: 'row', justifyContent: 'space-around', marginTop: 8 },
   vipStatBox: { alignItems: 'center', gap: 4 },
   vipStatNum: { fontSize: 18, fontWeight: '800' },

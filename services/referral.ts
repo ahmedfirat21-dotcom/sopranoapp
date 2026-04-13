@@ -89,16 +89,47 @@ export const ReferralService = {
         return { success: false, message: 'İşlem sırasında hata oluştu.' };
       }
 
-      // 4. Her iki tarafa 100 SP ver
-      const giveSP = async (uid: string, amount: number) => {
+      // 4. Her iki tarafa 50 SP ver — doğrudan atomik güncelleme
+      // NOT: GamificationService.earn() cooldown engeline takılıyor, bu yüzden direkt güncelliyoruz
+      const giveReferralSP = async (uid: string, amount: number) => {
+        // Önce RPC dene (atomik)
+        const { error: rpcErr } = await supabase.rpc('grant_system_points', {
+          p_user_id: uid,
+          p_amount: amount,
+          p_action: 'referral_bonus',
+        });
+        if (!rpcErr) {
+          // Transaction kaydı
+          await supabase.from('sp_transactions').insert({
+            user_id: uid,
+            amount,
+            type: 'referral_bonus',
+            description: `Davet bonusu: +${amount} SP`,
+          }).catch(() => {});
+          return;
+        }
+
+        // RPC yoksa fallback: optimistic lock
         const { data: p } = await supabase.from('profiles').select('system_points').eq('id', uid).single();
-        if (p) await supabase.from('profiles').update({ system_points: (p.system_points || 0) + amount }).eq('id', uid);
+        if (p) {
+          const oldSP = p.system_points || 0;
+          await supabase.from('profiles')
+            .update({ system_points: oldSP + amount })
+            .eq('id', uid)
+            .eq('system_points', oldSP); // optimistic lock
+          await supabase.from('sp_transactions').insert({
+            user_id: uid,
+            amount,
+            type: 'referral_bonus',
+            description: `Davet bonusu: +${amount} SP`,
+          }).catch(() => {});
+        }
       };
 
-      await giveSP(owner.id, 100);      // Davet eden
-      await giveSP(referredUserId, 100); // Davet edilen
+      await giveReferralSP(owner.id, 50);       // Davet eden
+      await giveReferralSP(referredUserId, 50);  // Davet edilen
 
-      return { success: true, message: 'Tebrikler! Her ikiniz de 100 SP kazandınız.' };
+      return { success: true, message: 'Tebrikler! Her ikiniz de 50 SP kazandınız.' };
     } catch (e: any) {
       console.error('Error applying code:', e.message);
       return { success: false, message: e.message };

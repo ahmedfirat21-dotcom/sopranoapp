@@ -14,7 +14,8 @@ import { useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../constants/supabase';
 import { RoomService } from '../services/database';
 import { liveKitService } from '../services/livekit';
-import { showToast } from '../components/Toast';
+// ★ TOAST KALDIRMA: Oda içinde toast bildirimi yok
+const showToast = (_opts: { title?: string; message?: string; type?: string }) => {};
 import { safeGoBack } from '../constants/navigation';
 import type { Room, RoomParticipant } from '../types';
 import type { RoomMessage } from '../services/roomChat';

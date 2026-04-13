@@ -1,12 +1,13 @@
 /**
- * SopranoChat — Host Erişim Paneli
- * Kapalı oda isteklerini onaylama + Davetli odaya kişi davet etme
+ * SopranoChat — Host Erişim Paneli (v2)
+ * ★ FriendsDrawer tarzı sağdan kayan animasyonlu drawer
+ * Katılım istekleri + Davet + Banlı kullanıcılar
  */
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  View, Text, StyleSheet, Modal, Pressable, FlatList,
-  Image, TextInput, ActivityIndicator, Alert,
-  PanResponder, Animated,
+  View, Text, StyleSheet, Pressable, FlatList,
+  Image, TextInput, ActivityIndicator, Animated,
+  Dimensions, ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -16,16 +17,22 @@ import { ModerationService } from '../../services/moderation';
 import { getAvatarSource } from '../../constants/avatars';
 import { showToast } from '../Toast';
 
+const { width: W } = Dimensions.get('window');
+const DRAWER_W = W * 0.82;
+
 interface Props {
   visible: boolean;
   onClose: () => void;
   roomId: string;
-  roomType: string; // 'closed' | 'invite'
+  roomType: string; // 'closed' | 'invite' | 'open'
   hostId: string;
 }
 
 export default function HostAccessPanel({ visible, onClose, roomId, roomType, hostId }: Props) {
-  const [tab, setTab] = useState<'requests' | 'invite' | 'bans'>(roomType === 'invite' ? 'invite' : 'requests');
+  const slideAnim = useRef(new Animated.Value(DRAWER_W)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  const [tab, setTab] = useState<'requests' | 'invite' | 'bans'>(roomType === 'closed' ? 'requests' : roomType === 'invite' ? 'invite' : 'bans');
   const [requests, setRequests] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Profile[]>([]);
@@ -33,14 +40,31 @@ export default function HostAccessPanel({ visible, onClose, roomId, roomType, ho
   const [loadingRequests, setLoadingRequests] = useState(false);
   const [bannedUsers, setBannedUsers] = useState<any[]>([]);
   const [loadingBans, setLoadingBans] = useState(false);
+  const [processingIds, setProcessingIds] = useState<Set<string>>(new Set());
 
-  // İstekleri yükle
+  // ★ Animasyon
   useEffect(() => {
-    if (visible && roomType === 'closed') {
-      loadRequests();
-    }
     if (visible) {
+      Animated.parallel([
+        Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true, damping: 20, stiffness: 200 }),
+        Animated.timing(fadeAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.spring(slideAnim, { toValue: DRAWER_W, useNativeDriver: true, damping: 20, stiffness: 220 }),
+        Animated.timing(fadeAnim, { toValue: 0, duration: 150, useNativeDriver: true }),
+      ]).start();
+    }
+  }, [visible]);
+
+  // ★ Veri yükle
+  useEffect(() => {
+    if (visible) {
+      if (roomType === 'closed') loadRequests();
       loadBans();
+      // Reset search on open
+      setSearchQuery('');
+      setSearchResults([]);
     }
   }, [visible]);
 
@@ -62,35 +86,45 @@ export default function HostAccessPanel({ visible, onClose, roomId, roomType, ho
     setLoadingBans(false);
   };
 
+  const handleAccept = async (req: any) => {
+    setProcessingIds(prev => new Set(prev).add(req.id));
+    try {
+      await RoomAccessService.approveRequest(req.id, hostId);
+      setRequests(prev => prev.filter(r => r.id !== req.id));
+      showToast({ title: '✅ Kabul Edildi', message: `${req.user?.display_name || 'Kullanıcı'} artık odaya girebilir.`, type: 'success' });
+    } catch {} finally {
+      setProcessingIds(prev => { const n = new Set(prev); n.delete(req.id); return n; });
+    }
+  };
+
+  const handleReject = async (req: any) => {
+    setProcessingIds(prev => new Set(prev).add(req.id));
+    try {
+      await RoomAccessService.rejectRequest(req.id, hostId);
+      setRequests(prev => prev.filter(r => r.id !== req.id));
+      showToast({ title: '❌ Reddedildi', type: 'info' });
+    } catch {} finally {
+      setProcessingIds(prev => { const n = new Set(prev); n.delete(req.id); return n; });
+    }
+  };
+
   const handleUnban = async (ban: any) => {
+    setProcessingIds(prev => new Set(prev).add(ban.id));
     try {
       await ModerationService.unbanFromRoom(roomId, ban.user_id);
       setBannedUsers(prev => prev.filter(b => b.id !== ban.id));
       showToast({ title: '✅ Ban Kaldırıldı', message: `${ban.user?.display_name || 'Kullanıcı'} artık odaya girebilir.`, type: 'success' });
     } catch {
       showToast({ title: 'Hata', message: 'Ban kaldırılamadı', type: 'error' });
+    } finally {
+      setProcessingIds(prev => { const n = new Set(prev); n.delete(ban.id); return n; });
     }
-  };
-
-  const handleAccept = async (req: any) => {
-    await RoomAccessService.approveRequest(req.id, hostId);
-    setRequests(prev => prev.filter(r => r.id !== req.id));
-    showToast({ title: '✅ Kabul Edildi', message: `${req.user?.display_name || 'Kullanıcı'} artık odaya girebilir.`, type: 'success' });
-  };
-
-  const handleReject = async (req: any) => {
-    await RoomAccessService.rejectRequest(req.id, hostId);
-    setRequests(prev => prev.filter(r => r.id !== req.id));
-    showToast({ title: '❌ Reddedildi', type: 'info' });
   };
 
   // Kullanıcı ara (davet için)
   const handleSearch = useCallback(async (query: string) => {
     setSearchQuery(query);
-    if (query.length < 2) {
-      setSearchResults([]);
-      return;
-    }
+    if (query.length < 2) { setSearchResults([]); return; }
     setSearching(true);
     try {
       const results = await ProfileService.search(query, 15);
@@ -100,253 +134,362 @@ export default function HostAccessPanel({ visible, onClose, roomId, roomType, ho
   }, []);
 
   const handleInvite = async (user: Profile) => {
-    const result = await RoomAccessService.inviteUser(roomId, user.id, hostId);
-    if (result.success) {
-      showToast({ title: '📨 Davet Gönderildi', message: `${user.display_name} odaya davet edildi.`, type: 'success' });
-      // Aramadan kaldır
-      setSearchResults(prev => prev.filter(u => u.id !== user.id));
-    } else {
-      showToast({ title: 'Hata', message: result.error || 'Davet gönderilemedi.', type: 'error' });
+    setProcessingIds(prev => new Set(prev).add(user.id));
+    try {
+      const result = await RoomAccessService.inviteUser(roomId, user.id, hostId);
+      if (result.success) {
+        showToast({ title: '📨 Davet Gönderildi', message: `${user.display_name} odaya davet edildi.`, type: 'success' });
+        setSearchResults(prev => prev.filter(u => u.id !== user.id));
+      } else {
+        showToast({ title: 'Hata', message: result.error || 'Davet gönderilemedi.', type: 'error' });
+      }
+    } catch {} finally {
+      setProcessingIds(prev => { const n = new Set(prev); n.delete(user.id); return n; });
     }
   };
 
-  // ★ Swipe-to-dismiss
-  const swipeY = React.useRef(new Animated.Value(0)).current;
-  const panR = React.useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => false,
-      onMoveShouldSetPanResponder: (_, g) => g.dy > 10 && Math.abs(g.dy) > Math.abs(g.dx) * 1.5,
-      onPanResponderMove: (_, g) => { if (g.dy > 0) swipeY.setValue(g.dy); },
-      onPanResponderRelease: (_, g) => {
-        if (g.dy > 100 || g.vy > 0.5) { onClose(); swipeY.setValue(0); }
-        else { Animated.spring(swipeY, { toValue: 0, useNativeDriver: true, tension: 100, friction: 12 }).start(); }
-      },
-    })
-  ).current;
+  // Tab tanımları
+  const tabs = [
+    ...(roomType === 'closed' ? [{ id: 'requests' as const, label: 'İstekler', icon: 'hourglass-outline' as const, count: requests.length }] : []),
+    { id: 'invite' as const, label: 'Davet Et', icon: 'person-add-outline' as const, count: 0 },
+    { id: 'bans' as const, label: 'Banlılar', icon: 'ban-outline' as const, count: bannedUsers.length },
+  ];
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={s.overlay} onPress={onClose}>
-        <Animated.View style={[s.sheet, { transform: [{ translateY: swipeY }] }]} {...panR.panHandlers}>
-        <Pressable onPress={e => e.stopPropagation()} style={{ flex: 1 }}>
-          {/* Handle */}
-          <View style={s.handle} />
-          <Text style={s.title}>
-            {tab === 'bans' ? '⛔ Banlı Kullanıcılar' : roomType === 'invite' ? '📨 Davet Yönetimi' : '🔒 Katılım İstekleri'}
-          </Text>
+    <View style={StyleSheet.absoluteFill} pointerEvents={visible ? 'box-none' : 'none'}>
+      {/* Backdrop */}
+      <Animated.View style={[s.backdrop, { opacity: fadeAnim }]}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+      </Animated.View>
 
-          {/* Tab bar — her zaman göster (istekler/davet/banlılar) */}
-          <View style={s.tabBar}>
-            {roomType === 'closed' && (
-              <Pressable style={[s.tab, tab === 'requests' && s.tabActive]} onPress={() => setTab('requests')}>
-                <Text style={[s.tabText, tab === 'requests' && s.tabTextActive]}>
-                  İstekler {requests.length > 0 ? `(${requests.length})` : ''}
-                </Text>
-              </Pressable>
-            )}
-            <Pressable style={[s.tab, tab === 'invite' && s.tabActive]} onPress={() => setTab('invite')}>
-              <Text style={[s.tabText, tab === 'invite' && s.tabTextActive]}>Davet Et</Text>
-            </Pressable>
-            <Pressable style={[s.tab, tab === 'bans' && s.tabActive]} onPress={() => { setTab('bans'); loadBans(); }}>
-              <Text style={[s.tabText, tab === 'bans' && s.tabTextActive]}>
-                Banlılar {bannedUsers.length > 0 ? `(${bannedUsers.length})` : ''}
-              </Text>
-            </Pressable>
+      {/* Panel — sağdan süzülür */}
+      <Animated.View style={[s.panel, { transform: [{ translateX: slideAnim }] }]}>
+        {/* Üst parlak gradient efekti */}
+        <LinearGradient
+          colors={['rgba(167,139,250,0.12)', 'rgba(167,139,250,0.03)', 'transparent']}
+          style={s.topGlow}
+        />
+
+        {/* Başlık */}
+        <View style={s.header}>
+          <View style={s.headerIcon}>
+            <Ionicons name="shield-checkmark" size={14} color="#A78BFA" />
           </View>
+          <Text style={s.headerTitle}>Moderasyon</Text>
+          <View style={{ flex: 1 }} />
+          <Pressable onPress={onClose} hitSlop={12} style={s.closeBtn}>
+            <Ionicons name="close" size={16} color="rgba(255,255,255,0.4)" />
+          </Pressable>
+        </View>
 
-          {/* İstekler tab'ı */}
+        {/* Tab Bar */}
+        <View style={s.tabBar}>
+          {tabs.map(t => (
+            <Pressable
+              key={t.id}
+              style={[s.tab, tab === t.id && s.tabActive]}
+              onPress={() => { setTab(t.id); if (t.id === 'bans') loadBans(); }}
+            >
+              <Ionicons name={t.icon} size={12} color={tab === t.id ? '#A78BFA' : 'rgba(255,255,255,0.3)'} />
+              <Text style={[s.tabText, tab === t.id && s.tabTextActive]}>{t.label}</Text>
+              {t.count > 0 && (
+                <View style={s.tabBadge}>
+                  <Text style={s.tabBadgeText}>{t.count}</Text>
+                </View>
+              )}
+            </Pressable>
+          ))}
+        </View>
+
+        {/* İçerik */}
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 10, paddingBottom: 40 }}>
+
+          {/* ═══ İSTEKLER TAB ═══ */}
           {tab === 'requests' && roomType === 'closed' && (
-            <View style={{ flex: 1, minHeight: 200 }}>
+            <>
               {loadingRequests ? (
-                <ActivityIndicator color="#14B8A6" style={{ marginTop: 30 }} />
+                <ActivityIndicator color="#A78BFA" style={{ marginTop: 40 }} />
               ) : requests.length === 0 ? (
-                <View style={s.emptyState}>
-                  <Ionicons name="checkmark-circle" size={40} color="rgba(255,255,255,0.15)" />
-                  <Text style={s.emptyText}>Bekleyen istek yok</Text>
+                <View style={s.empty}>
+                  <View style={s.emptyIcon}>
+                    <Ionicons name="checkmark-circle" size={28} color="rgba(167,139,250,0.25)" />
+                  </View>
+                  <Text style={s.emptyTitle}>Bekleyen istek yok</Text>
+                  <Text style={s.emptySub}>Yeni katılım istekleri burada görünecek</Text>
                 </View>
               ) : (
-                <FlatList
-                  data={requests}
-                  keyExtractor={item => item.id}
-                  renderItem={({ item }) => (
-                    <View style={s.requestItem}>
-                      <Image source={getAvatarSource(item.user?.avatar_url)} style={s.avatar} />
-                      <Text style={s.userName} numberOfLines={1}>{item.user?.display_name || 'Kullanıcı'}</Text>
-                      <Pressable style={s.acceptBtn} onPress={() => handleAccept(item)}>
-                        <Ionicons name="checkmark" size={18} color="#fff" />
-                      </Pressable>
-                      <Pressable style={s.rejectBtn} onPress={() => handleReject(item)}>
-                        <Ionicons name="close" size={18} color="#EF4444" />
-                      </Pressable>
+                requests.map((req) => {
+                  const isProcessing = processingIds.has(req.id);
+                  return (
+                    <View key={req.id} style={s.row}>
+                      <Image source={getAvatarSource(req.user?.avatar_url)} style={s.avatar} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={s.name} numberOfLines={1}>{req.user?.display_name || 'Kullanıcı'}</Text>
+                      </View>
+                      {isProcessing ? (
+                        <ActivityIndicator size="small" color="#A78BFA" />
+                      ) : (
+                        <View style={{ flexDirection: 'row', gap: 6 }}>
+                          <Pressable style={s.acceptBtn} onPress={() => handleAccept(req)}>
+                            <Ionicons name="checkmark" size={15} color="#FFF" />
+                          </Pressable>
+                          <Pressable style={s.rejectBtn} onPress={() => handleReject(req)}>
+                            <Ionicons name="close" size={15} color="#94A3B8" />
+                          </Pressable>
+                        </View>
+                      )}
                     </View>
-                  )}
-                />
+                  );
+                })
               )}
-            </View>
+            </>
           )}
 
-          {/* Davet tab'ı */}
+          {/* ═══ DAVET TAB ═══ */}
           {tab === 'invite' && (
-            <View style={{ flex: 1, minHeight: 200 }}>
+            <>
               <View style={s.searchWrap}>
-                <Ionicons name="search" size={16} color="rgba(255,255,255,0.4)" />
+                <Ionicons name="search" size={14} color="rgba(255,255,255,0.3)" />
                 <TextInput
                   style={s.searchInput}
                   placeholder="Kullanıcı ara..."
-                  placeholderTextColor="rgba(255,255,255,0.3)"
+                  placeholderTextColor="rgba(255,255,255,0.2)"
                   value={searchQuery}
                   onChangeText={handleSearch}
+                  autoCapitalize="none"
                 />
+                {searchQuery.length > 0 && (
+                  <Pressable onPress={() => { setSearchQuery(''); setSearchResults([]); }} hitSlop={8}>
+                    <Ionicons name="close-circle" size={16} color="rgba(255,255,255,0.2)" />
+                  </Pressable>
+                )}
               </View>
 
               {searching ? (
-                <ActivityIndicator color="#14B8A6" style={{ marginTop: 20 }} />
+                <ActivityIndicator color="#A78BFA" style={{ marginTop: 30 }} />
               ) : searchResults.length === 0 && searchQuery.length >= 2 ? (
-                <Text style={s.noResult}>Sonuç bulunamadı</Text>
-              ) : (
-                <FlatList
-                  data={searchResults}
-                  keyExtractor={item => item.id}
-                  renderItem={({ item }) => (
-                    <View style={s.requestItem}>
-                      <Image source={getAvatarSource(item.avatar_url)} style={s.avatar} />
-                      <View style={{ flex: 1 }}>
-                        <Text style={s.userName} numberOfLines={1}>{item.display_name}</Text>
-                        {item.username && <Text style={s.usernameText}>@{item.username}</Text>}
-                      </View>
-                      <Pressable style={s.inviteBtn} onPress={() => handleInvite(item)}>
-                        <Text style={s.inviteBtnText}>Davet Et</Text>
-                      </Pressable>
-                    </View>
-                  )}
-                />
-              )}
-            </View>
-          )}
-
-          {/* Banlılar tab'ı */}
-          {tab === 'bans' && (
-            <View style={{ flex: 1, minHeight: 200 }}>
-              {loadingBans ? (
-                <ActivityIndicator color="#EF4444" style={{ marginTop: 30 }} />
-              ) : bannedUsers.length === 0 ? (
-                <View style={s.emptyState}>
-                  <Ionicons name="shield-checkmark" size={40} color="rgba(255,255,255,0.15)" />
-                  <Text style={s.emptyText}>Banlı kullanıcı yok</Text>
+                <View style={s.empty}>
+                  <Ionicons name="search-outline" size={28} color="rgba(255,255,255,0.15)" />
+                  <Text style={s.emptyTitle}>Sonuç bulunamadı</Text>
+                </View>
+              ) : searchResults.length === 0 && searchQuery.length < 2 ? (
+                <View style={s.empty}>
+                  <View style={s.emptyIcon}>
+                    <Ionicons name="person-add-outline" size={28} color="rgba(167,139,250,0.25)" />
+                  </View>
+                  <Text style={s.emptyTitle}>Kullanıcı Davet Et</Text>
+                  <Text style={s.emptySub}>Kullanıcı adını arayarak odana davet gönder</Text>
                 </View>
               ) : (
-                <FlatList
-                  data={bannedUsers}
-                  keyExtractor={item => item.id}
-                  renderItem={({ item }) => {
-                    const isPermanent = item.ban_type === 'permanent';
-                    const expiresAt = item.expires_at ? new Date(item.expires_at) : null;
-                    const isExpired = expiresAt && expiresAt < new Date();
-                    const remainingMin = expiresAt ? Math.max(0, Math.floor((expiresAt.getTime() - Date.now()) / 60000)) : 0;
-                    const timeLabel = isPermanent ? 'Kalıcı' : isExpired ? 'Süresi dolmuş' : remainingMin > 60 ? `${Math.floor(remainingMin / 60)}sa ${remainingMin % 60}dk` : `${remainingMin}dk kaldı`;
-                    return (
-                      <View style={s.requestItem}>
-                        <Image source={getAvatarSource(item.user?.avatar_url)} style={s.avatar} />
-                        <View style={{ flex: 1 }}>
-                          <Text style={s.userName} numberOfLines={1}>{item.user?.display_name || 'Kullanıcı'}</Text>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
-                            <View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: isPermanent ? 'rgba(239,68,68,0.15)' : 'rgba(245,158,11,0.15)' }}>
-                              <Text style={{ fontSize: 9, fontWeight: '700', color: isPermanent ? '#EF4444' : '#F59E0B' }}>{isPermanent ? '⛔ KALICI' : '⏳ GEÇİCİ'}</Text>
-                            </View>
-                            <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>{timeLabel}</Text>
-                          </View>
-                        </View>
-                        <Pressable
-                          style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, backgroundColor: 'rgba(20,184,166,0.12)', borderWidth: 1, borderColor: 'rgba(20,184,166,0.25)' }}
-                          onPress={() => handleUnban(item)}
-                        >
-                          <Text style={{ fontSize: 11, fontWeight: '700', color: '#14B8A6' }}>Ban Kaldır</Text>
-                        </Pressable>
+                searchResults.map((user) => {
+                  const isProcessing = processingIds.has(user.id);
+                  return (
+                    <View key={user.id} style={s.row}>
+                      <Image source={getAvatarSource(user.avatar_url)} style={s.avatar} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={s.name} numberOfLines={1}>{user.display_name}</Text>
+                        {user.username && <Text style={s.username}>@{user.username}</Text>}
                       </View>
-                    );
-                  }}
-                />
+                      {isProcessing ? (
+                        <ActivityIndicator size="small" color="#A78BFA" />
+                      ) : (
+                        <Pressable style={s.inviteBtn} onPress={() => handleInvite(user)}>
+                          <Ionicons name="person-add" size={12} color="#A78BFA" />
+                          <Text style={s.inviteBtnText}>Davet</Text>
+                        </Pressable>
+                      )}
+                    </View>
+                  );
+                })
               )}
-            </View>
+            </>
           )}
-        </Pressable>
-        </Animated.View>
-      </Pressable>
-    </Modal>
+
+          {/* ═══ BANLILAR TAB ═══ */}
+          {tab === 'bans' && (
+            <>
+              {loadingBans ? (
+                <ActivityIndicator color="#EF4444" style={{ marginTop: 40 }} />
+              ) : bannedUsers.length === 0 ? (
+                <View style={s.empty}>
+                  <View style={[s.emptyIcon, { backgroundColor: 'rgba(34,197,94,0.08)' }]}>
+                    <Ionicons name="shield-checkmark" size={28} color="rgba(34,197,94,0.3)" />
+                  </View>
+                  <Text style={s.emptyTitle}>Banlı kullanıcı yok</Text>
+                  <Text style={s.emptySub}>Oda temiz! 🎉</Text>
+                </View>
+              ) : (
+                bannedUsers.map((ban) => {
+                  const isPermanent = ban.ban_type === 'permanent';
+                  const expiresAt = ban.expires_at ? new Date(ban.expires_at) : null;
+                  const isExpired = expiresAt && expiresAt < new Date();
+                  const remainingMin = expiresAt ? Math.max(0, Math.floor((expiresAt.getTime() - Date.now()) / 60000)) : 0;
+                  const timeLabel = isPermanent ? 'Kalıcı' : isExpired ? 'Süresi dolmuş' : remainingMin > 60 ? `${Math.floor(remainingMin / 60)}sa ${remainingMin % 60}dk` : `${remainingMin}dk kaldı`;
+                  const isProcessing = processingIds.has(ban.id);
+
+                  return (
+                    <View key={ban.id} style={s.row}>
+                      <Image source={getAvatarSource(ban.user?.avatar_url)} style={s.avatar} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={s.name} numberOfLines={1}>{ban.user?.display_name || 'Kullanıcı'}</Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 }}>
+                          <View style={[s.banTypePill, isPermanent ? s.banPermanent : s.banTemp]}>
+                            <Text style={[s.banTypeText, { color: isPermanent ? '#EF4444' : '#F59E0B' }]}>
+                              {isPermanent ? '⛔ KALICI' : '⏳ GEÇİCİ'}
+                            </Text>
+                          </View>
+                          <Text style={s.banTime}>{timeLabel}</Text>
+                        </View>
+                      </View>
+                      {isProcessing ? (
+                        <ActivityIndicator size="small" color="#14B8A6" />
+                      ) : (
+                        <Pressable style={s.unbanBtn} onPress={() => handleUnban(ban)}>
+                          <Ionicons name="lock-open-outline" size={12} color="#14B8A6" />
+                          <Text style={s.unbanText}>Kaldır</Text>
+                        </Pressable>
+                      )}
+                    </View>
+                  );
+                })
+              )}
+            </>
+          )}
+        </ScrollView>
+      </Animated.View>
+    </View>
   );
 }
 
 const s = StyleSheet.create({
-  overlay: {
-    flex: 1, justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.6)',
+  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.35)' },
+  panel: {
+    position: 'absolute', right: 0, top: 0, bottom: 0,
+    width: DRAWER_W,
+    backgroundColor: 'rgba(45,55,64,0.95)',
+    borderTopLeftRadius: 22, borderBottomLeftRadius: 22,
+    borderWidth: 1, borderRightWidth: 0,
+    borderColor: 'rgba(167,139,250,0.08)',
+    overflow: 'hidden',
   },
-  sheet: {
-    backgroundColor: '#2D3740',
-    borderTopLeftRadius: 24, borderTopRightRadius: 24,
-    paddingHorizontal: 20, paddingBottom: 40,
-    maxHeight: '70%',
+  topGlow: {
+    position: 'absolute', top: 0, left: 0, right: 0, height: 120,
+    borderTopLeftRadius: 22,
   },
-  handle: {
-    width: 40, height: 4, borderRadius: 2,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    alignSelf: 'center', marginTop: 12, marginBottom: 16,
+  header: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingHorizontal: 14, paddingTop: 56, paddingBottom: 12,
+    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.04)',
   },
-  title: {
-    fontSize: 18, fontWeight: '700', color: '#EAEDF2',
-    marginBottom: 16, textAlign: 'center',
+  headerIcon: {
+    width: 28, height: 28, borderRadius: 9,
+    backgroundColor: 'rgba(167,139,250,0.12)',
+    borderWidth: 1, borderColor: 'rgba(167,139,250,0.2)',
+    alignItems: 'center', justifyContent: 'center',
   },
+  headerTitle: {
+    fontSize: 15, fontWeight: '700', color: '#F1F5F9',
+    textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
+  },
+  closeBtn: {
+    width: 28, height: 28, borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+
+  // Tab Bar
   tabBar: {
-    flexDirection: 'row', borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    padding: 3, marginBottom: 16,
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 10, paddingVertical: 8,
+    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.04)',
   },
   tab: {
-    flex: 1, paddingVertical: 8, borderRadius: 10,
-    alignItems: 'center',
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4,
+    paddingVertical: 7, borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.03)',
   },
-  tabActive: { backgroundColor: 'rgba(20,184,166,0.2)' },
-  tabText: { fontSize: 13, fontWeight: '600', color: 'rgba(255,255,255,0.5)' },
-  tabTextActive: { color: '#14B8A6' },
-  emptyState: {
-    alignItems: 'center', paddingVertical: 40, gap: 10,
+  tabActive: {
+    backgroundColor: 'rgba(167,139,250,0.1)',
+    borderWidth: 1, borderColor: 'rgba(167,139,250,0.18)',
   },
-  emptyText: { fontSize: 14, color: 'rgba(255,255,255,0.4)' },
-  requestItem: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingVertical: 10, gap: 10,
-    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)',
+  tabText: { fontSize: 10, fontWeight: '600', color: 'rgba(255,255,255,0.3)' },
+  tabTextActive: { color: '#A78BFA', fontWeight: '700' },
+  tabBadge: {
+    minWidth: 16, height: 16, borderRadius: 8,
+    backgroundColor: 'rgba(167,139,250,0.2)',
+    alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4,
   },
-  avatar: { width: 38, height: 38, borderRadius: 19 },
-  userName: { flex: 1, fontSize: 14, fontWeight: '600', color: '#EAEDF2' },
-  usernameText: { fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 1 },
+  tabBadgeText: { fontSize: 9, fontWeight: '800', color: '#A78BFA' },
+
+  // Rows
+  row: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingVertical: 10, paddingHorizontal: 6, borderRadius: 12,
+    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.03)',
+  },
+  avatar: {
+    width: 36, height: 36, borderRadius: 18,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
+  },
+  name: {
+    fontSize: 13, fontWeight: '600', color: '#F1F5F9',
+    textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
+  },
+  username: { fontSize: 10, color: 'rgba(255,255,255,0.3)', marginTop: 1 },
+
+  // Empty states
+  empty: { alignItems: 'center', paddingVertical: 50, gap: 8 },
+  emptyIcon: {
+    width: 52, height: 52, borderRadius: 26,
+    backgroundColor: 'rgba(167,139,250,0.08)',
+    alignItems: 'center', justifyContent: 'center', marginBottom: 4,
+  },
+  emptyTitle: { fontSize: 13, fontWeight: '600', color: 'rgba(255,255,255,0.35)' },
+  emptySub: { fontSize: 11, color: 'rgba(255,255,255,0.15)', textAlign: 'center' },
+
+  // Action buttons
   acceptBtn: {
-    width: 34, height: 34, borderRadius: 17,
-    backgroundColor: 'rgba(20,184,166,0.2)',
-    justifyContent: 'center', alignItems: 'center',
+    width: 32, height: 32, borderRadius: 10,
+    backgroundColor: '#14B8A6', alignItems: 'center', justifyContent: 'center',
   },
   rejectBtn: {
-    width: 34, height: 34, borderRadius: 17,
-    backgroundColor: 'rgba(239,68,68,0.1)',
-    justifyContent: 'center', alignItems: 'center',
-    borderWidth: 1, borderColor: 'rgba(239,68,68,0.2)',
+    width: 32, height: 32, borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.04)', alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
   },
   inviteBtn: {
-    paddingHorizontal: 14, paddingVertical: 6,
-    borderRadius: 20, backgroundColor: 'rgba(20,184,166,0.15)',
-    borderWidth: 1, borderColor: 'rgba(20,184,166,0.3)',
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10,
+    backgroundColor: 'rgba(167,139,250,0.1)',
+    borderWidth: 1, borderColor: 'rgba(167,139,250,0.2)',
   },
-  inviteBtnText: { fontSize: 12, fontWeight: '600', color: '#14B8A6' },
+  inviteBtnText: { fontSize: 11, fontWeight: '700', color: '#A78BFA' },
+
+  // Ban row extras
+  banTypePill: {
+    paddingHorizontal: 5, paddingVertical: 1.5, borderRadius: 4,
+  },
+  banPermanent: { backgroundColor: 'rgba(239,68,68,0.12)' },
+  banTemp: { backgroundColor: 'rgba(245,158,11,0.12)' },
+  banTypeText: { fontSize: 8, fontWeight: '700' },
+  banTime: { fontSize: 9, color: 'rgba(255,255,255,0.25)' },
+
+  unbanBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10,
+    backgroundColor: 'rgba(20,184,166,0.08)',
+    borderWidth: 1, borderColor: 'rgba(20,184,166,0.18)',
+  },
+  unbanText: { fontSize: 10, fontWeight: '700', color: '#14B8A6' },
+
+  // Search
   searchWrap: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderRadius: 12, paddingHorizontal: 12, marginBottom: 12,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderRadius: 12, paddingHorizontal: 12, marginVertical: 8,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
   },
   searchInput: {
-    flex: 1, paddingVertical: 10, fontSize: 14, color: '#EAEDF2',
-  },
-  noResult: {
-    textAlign: 'center', color: 'rgba(255,255,255,0.3)',
-    fontSize: 13, marginTop: 20,
+    flex: 1, paddingVertical: 10, fontSize: 13, color: '#F1F5F9',
   },
 });

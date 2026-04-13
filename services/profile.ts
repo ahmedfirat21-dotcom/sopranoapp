@@ -91,31 +91,48 @@ export const ProfileService = {
     return data as Profile;
   },
 
-  /** Profili öne çıkar (Boost) — SP ile */
-  async boostProfile(userId: string, spCost: number = 10) {
-    const profile = await ProfileService.get(userId);
-    if (!profile || profile.system_points < spCost) {
-      throw new Error('Yetersiz SP');
+  /** Profili öne çıkar (Boost) — süre bazlı fiyatlandırma */
+  async boostProfile(userId: string, spCost: number = 25, durationHours: number = 1) {
+    // ★ GamificationService üzerinden harca — tek kaynak
+    const { GamificationService } = require('./gamification');
+    const spResult = await GamificationService.spend(userId, spCost, 'profile_boost');
+    if (!spResult.success) {
+      throw new Error(spResult.error || 'Yetersiz SP');
     }
-    const boostUntil = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+
+    const boostUntil = new Date(Date.now() + durationHours * 60 * 60 * 1000).toISOString();
     const { error: updateErr } = await supabase
       .from('profiles')
-      .update({
-        system_points: profile.system_points - spCost,
-        profile_boost_expires_at: boostUntil,
-      })
+      .update({ profile_boost_expires_at: boostUntil })
       .eq('id', userId);
     if (updateErr) throw updateErr;
 
-    try {
-      await supabase.from('sp_transactions').insert({
-        user_id: userId,
-        amount: -spCost,
-        type: 'profile_boost',
-        description: 'Profil Boost (1 saat)',
-      });
-    } catch { /* SP transaction opsiyonel */ }
     return { success: true, boost_expires_at: boostUntil };
+  },
+
+  /** ★ Keşfet'te öne çıkan (boost aktif) profilleri getir */
+  async getBoostedProfiles(limit = 10): Promise<{
+    id: string; display_name: string; username: string | null;
+    avatar_url: string; subscription_tier: string; bio: string | null;
+    is_online: boolean;
+  }[]> {
+    try {
+      // RPC fonksiyonu varsa kullan, yoksa doğrudan sorgu
+      const { data: rpcData } = await supabase.rpc('get_boosted_profiles', { max_count: limit });
+      if (rpcData && rpcData.length > 0) return rpcData;
+
+      // Fallback: doğrudan sorgu
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, display_name, username, avatar_url, subscription_tier, bio, is_online, profile_boost_expires_at')
+        .gt('profile_boost_expires_at', new Date().toISOString())
+        .order('profile_boost_expires_at', { ascending: false })
+        .limit(limit);
+      if (error || !data) return [];
+      return data as any[];
+    } catch {
+      return [];
+    }
   },
 
   /** ★ Profil istatistikleri — sahne süresi, oda geçmişi, toplam dinleyici */
@@ -165,12 +182,13 @@ export const ProfileService = {
   },
 
   /** ★ Son oluşturulan odalar (profilde gösterilir) */
-  async getRecentRooms(userId: string, limit = 5): Promise<{ id: string; name: string; created_at: string; listener_count: number; category: string }[]> {
+  async getRecentRooms(userId: string, limit = 10): Promise<{ id: string; name: string; created_at: string; listener_count: number; category: string; is_live: boolean }[]> {
     try {
       const { data, error } = await supabase
         .from('rooms')
-        .select('id, name, created_at, listener_count, category')
+        .select('id, name, created_at, listener_count, category, is_live')
         .eq('host_id', userId)
+        .order('is_live', { ascending: false })
         .order('created_at', { ascending: false })
         .limit(limit);
       if (error) return [];
@@ -180,7 +198,7 @@ export const ProfileService = {
     }
   },
 
-  /** ★ VIP gelir istatistikleri — SP giriş ücreti + bağış gelirleri */
+  /** ★ Pro gelir istatistikleri — SP giriş ücreti + bağış gelirleri */
   async getIncomeStats(userId: string): Promise<{
     totalEarned: number;
     roomFeeRooms: number;
@@ -212,10 +230,7 @@ export const ProfileService = {
 
   /**
    * ★ SP Bağışı — Kullanıcıdan kullanıcıya SP transferi
-   * ★ SEC-4 FIX: Her iki tarafta optimistic lock + rate limiting + rollback doğrulama
-   * @param fromUserId Gönderen kullanıcı
-   * @param toUserId Alıcı kullanıcı
-   * @param amount Gönderilecek SP miktarı (1-1000 arası)
+   * GamificationService üzerinden geçer — atomik, cap kontrollü, transaction kayıtlı.
    */
   async donateToUser(fromUserId: string, toUserId: string, amount: number): Promise<{ success: boolean; error?: string }> {
     // Validasyon
@@ -223,7 +238,7 @@ export const ProfileService = {
     if (!Number.isInteger(amount) || amount < 1) return { success: false, error: 'Geçersiz miktar' };
     if (amount > 1000) return { success: false, error: 'Tek seferde en fazla 1000 SP gönderilebilir' };
 
-    // ★ SEC-4: Rate limiting — max 10 bağış/saat (SP drain attack önleme)
+    // Rate limiting — max 10 bağış/saat
     try {
       const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
       const { count } = await supabase
@@ -235,71 +250,24 @@ export const ProfileService = {
       if ((count || 0) >= 10) {
         return { success: false, error: 'Çok fazla bağış yaptınız. Lütfen 1 saat sonra tekrar deneyin.' };
       }
-    } catch { /* sp_transactions yoksa rate limit atla */ }
+    } catch {}
 
-    // Bakiye kontrolü — ★ SEC-4: Taze veri çek (stale read önleme)
-    const { data: sender, error: sErr } = await supabase
-      .from('profiles')
-      .select('system_points, display_name')
-      .eq('id', fromUserId)
-      .single();
-    if (sErr || !sender) return { success: false, error: 'Profil bulunamadı' };
-    if ((sender.system_points || 0) < amount) return { success: false, error: 'Yetersiz SP' };
-
-    // Alıcı kontrolü
-    const { data: receiver, error: rErr } = await supabase
-      .from('profiles')
-      .select('system_points, display_name')
-      .eq('id', toUserId)
-      .single();
-    if (rErr || !receiver) return { success: false, error: 'Alıcı bulunamadı' };
-
-    try {
-      // 1. Göndericiden düş — ★ SEC-4: Optimistic lock (SP değişmişse 0 row affected)
-      const { data: deductResult, error: deductErr } = await supabase
-        .from('profiles')
-        .update({ system_points: sender.system_points - amount })
-        .eq('id', fromUserId)
-        .eq('system_points', sender.system_points) // ★ Optimistic lock
-        .select('id');
-      if (deductErr) throw new Error('SP düşürme hatası');
-      if (!deductResult || deductResult.length === 0) {
-        return { success: false, error: 'Eşzamanlı işlem çakışması. Lütfen tekrar deneyin.' };
-      }
-
-      // 2. Alıcıya ekle — ★ SEC-4: Optimistic lock (alıcı tarafında da)
-      const { data: addResult, error: addErr } = await supabase
-        .from('profiles')
-        .update({ system_points: receiver.system_points + amount })
-        .eq('id', toUserId)
-        .eq('system_points', receiver.system_points) // ★ Optimistic lock
-        .select('id');
-
-      if (addErr || !addResult || addResult.length === 0) {
-        // ★ SEC-4: Doğrulanmış rollback — geri ekleme başarısını kontrol et
-        const { data: rollback } = await supabase
-          .from('profiles')
-          .update({ system_points: sender.system_points })
-          .eq('id', fromUserId)
-          .select('id');
-        if (!rollback || rollback.length === 0) {
-          // KRITIK: Rollback da başarısız — admin log'a yaz
-          console.error(`[CRITICAL] SP ROLLBACK FAILED: user=${fromUserId}, amount=${amount}, receiver=${toUserId}`);
-        }
-        throw new Error('SP ekleme hatası — tutar geri iade edildi');
-      }
-
-      // 3. Transaction kayıtları
-      try {
-        await supabase.from('sp_transactions').insert([
-          { user_id: fromUserId, amount: -amount, type: 'donation_sent', description: `${receiver.display_name || 'Kullanıcı'} adlı kişiye SP bağışı` },
-          { user_id: toUserId, amount: amount, type: 'donation_received', description: `${sender.display_name || 'Kullanıcı'} adlı kişiden SP bağışı` },
-        ]);
-      } catch { /* transaction kaydı opsiyonel */ }
-
-      return { success: true };
-    } catch (e: any) {
-      return { success: false, error: e.message || 'Transfer başarısız' };
+    // ★ GamificationService üzerinden harca
+    const { GamificationService } = require('./gamification');
+    const spResult = await GamificationService.spend(fromUserId, amount, 'donation_sent');
+    if (!spResult.success) {
+      return { success: false, error: spResult.error || 'Yetersiz SP' };
     }
+
+    // ★ Alıcıya ver — fail olursa refund
+    try {
+      await GamificationService.earn(toUserId, amount, 'donation_received');
+    } catch {
+      // Alıcıya verilemedi → göndericiye iade
+      await GamificationService.earn(fromUserId, amount, 'donation_refund');
+      return { success: false, error: 'Alıcıya ulaşılamadı — SP iade edildi.' };
+    }
+
+    return { success: true };
   },
 };

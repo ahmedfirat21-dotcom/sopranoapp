@@ -34,7 +34,7 @@ type PlusMenuProps = {
   userRole?: 'owner' | 'moderator' | 'speaker' | 'listener';
   /** Oda sahibinin tier'ı — UI filtresi için */
   ownerTier?: string;
-  // ★ VIP Host Paneli Props
+  // ★ Pro Host Paneli Props
   onMuteAll?: () => void;
   onRoomStats?: () => void;
   onDeleteRoom?: () => void;
@@ -106,12 +106,12 @@ export function PlusMenu({
   if ((isOwner || isMod) && onModeration) {
     items.push({ id: 'moderation', icon: 'shield-checkmark-outline', label: isFreeOwner ? 'El Kaldırma Kuyruğu' : 'Moderasyon', accent: '#A78BFA', onPress: onModeration, badge: micRequestCount });
   }
-  // 3️⃣ Oda Kilitle (Silver+ owner)
-  if (isOwner && onRoomLock && isTierAtLeast(ownerTier as any, 'Silver')) {
+  // 3️⃣ Oda Kilitle (Plus+ owner)
+  if (isOwner && onRoomLock && isTierAtLeast(ownerTier as any, 'Plus')) {
     items.push({ id: 'lock', icon: isRoomLocked ? 'lock-open-outline' : 'lock-closed-outline', label: isRoomLocked ? 'Kilidi Aç' : 'Odayı Kilitle', accent: '#F59E0B', onPress: onRoomLock });
   }
-  // 4️⃣ Tümünü Sustur (Gold+ owner)
-  if (isOwner && onMuteAll && isTierAtLeast(ownerTier as any, 'Gold')) {
+  // 4️⃣ Tümünü Sustur (Pro+ owner)
+  if (isOwner && onMuteAll && isTierAtLeast(ownerTier as any, 'Pro')) {
     items.push({ id: 'mute_all', icon: 'volume-mute-outline', label: 'Tümünü Sustur', accent: '#EF4444', onPress: onMuteAll });
   }
   // 5️⃣ Davet (sahnedeki herkes)
@@ -120,12 +120,12 @@ export function PlusMenu({
   }
   // 7️⃣ Link Paylaş (herkes)
   items.push({ id: 'share', icon: 'share-social-outline', label: 'Oda Linkini Paylaş', accent: '#3B82F6', onPress: onShareLink });
-  // 8️⃣ Oda İstatistikleri (VIP owner)
-  if (isOwner && onRoomStats && isTierAtLeast(ownerTier as any, 'VIP')) {
+  // 8️⃣ Oda İstatistikleri (Pro owner)
+  if (isOwner && onRoomStats && isTierAtLeast(ownerTier as any, 'Pro')) {
     items.push({ id: 'stats', icon: 'stats-chart-outline', label: 'Oda İstatistikleri', accent: '#3B82F6', onPress: onRoomStats });
   }
-  // ★ RM-4: Boost — Bronze+ owner
-  if (isOwner && onBoostRoom && isTierAtLeast(ownerTier as any, 'Bronze')) {
+  // ★ RM-4: Boost — Plus+ owner
+  if (isOwner && onBoostRoom && isTierAtLeast(ownerTier as any, 'Plus')) {
     items.push({ id: 'boost', icon: 'rocket-outline', label: 'Keşfette Öne Çıkar', desc: 'SP ile boost', accent: '#F59E0B', onPress: onBoostRoom });
   }
   // ★ RM-5: Oda Takip Et/Bırak (dinleyiciler + speaker'lar, owner hariç)

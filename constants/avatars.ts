@@ -49,15 +49,18 @@ export function getAvatarSource(sourceUrl?: string | null): ImageSourcePropType 
 
 /**
  * SP'den level hesapla (1-99)
- * Tier bonus: Silver → min Lv20, Gold → min Lv35, VIP → min Lv50
+ * Tier bonus: Plus → min Lv15, Pro → min Lv40
+ * Legacy uyumlu: eski tier isimlerini de destekler
  */
 export function getLevelFromSP(sp: number, tier?: string): number {
   const rawLevel = Math.min(99, Math.floor(sp / 100) + 1);
   const t = (tier || '').toLowerCase();
-  if (t === 'vip') return Math.max(50, rawLevel);
-  if (t === 'gold') return Math.max(35, rawLevel);
-  if (t === 'silver') return Math.max(20, rawLevel);
-  if (t === 'bronze') return Math.max(10, rawLevel);
+  // Yeni 3-tier
+  if (t === 'pro') return Math.max(40, rawLevel);
+  if (t === 'plus') return Math.max(15, rawLevel);
+  // Legacy backward compat
+  if (t === 'vip' || t === 'gold') return Math.max(40, rawLevel);
+  if (t === 'silver' || t === 'bronze') return Math.max(15, rawLevel);
   return rawLevel;
 }
 
@@ -78,7 +81,8 @@ export function getLevelColors(level: number): { ring: [string, string]; text: s
 
 /**
  * Tier badge görüntüleme bilgileri
- * Premium kullanıcıları özel hissettiren badge sistemi
+ * 3-tier sistemi: Plus (🚀 Mor) / Pro (🔥 Altın)
+ * Legacy uyumlu: eski tier isimlerini de destekler
  */
 export function getTierBadgeInfo(tier?: string): {
   icon: string | null;
@@ -86,25 +90,17 @@ export function getTierBadgeInfo(tier?: string): {
   badgeGradient: [string, string] | null;
 } {
   const t = (tier || '').toLowerCase();
-  if (t === 'vip') return {
-    icon: 'diamond',
-    label: 'VIP',
-    badgeGradient: ['#00BFFF', '#8B5CF6'],
+  // Pro tier (+ legacy uyumluluk: Gold/VIP → Pro)
+  if (t === 'pro' || t === 'vip' || t === 'gold') return {
+    icon: 'flame',
+    label: 'Pro',
+    badgeGradient: ['#F59E0B', '#D97706'],
   };
-  if (t === 'gold') return {
-    icon: 'star',
-    label: 'Gold',
-    badgeGradient: ['#FFD700', '#FFA500'],
-  };
-  if (t === 'silver') return {
-    icon: 'shield',
-    label: 'Silver',
+  // Plus tier (+ legacy uyumluluk: Bronze/Silver → Plus)
+  if (t === 'plus' || t === 'silver' || t === 'bronze') return {
+    icon: 'rocket',
+    label: 'Plus',
     badgeGradient: ['#A855F7', '#7C3AED'],
-  };
-  if (t === 'bronze') return {
-    icon: 'shield-half',
-    label: 'Bronze',
-    badgeGradient: ['#CD7F32', '#8B4513'],
   };
   return { icon: null, label: '', badgeGradient: null };  // Free — normal level badge
 }

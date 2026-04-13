@@ -95,9 +95,9 @@ const s = StyleSheet.create({
     gap: 6,
   },
   gifThumb: {
-    width: 48,
-    height: 36,
-    borderRadius: 6,
+    width: 80,
+    height: 60,
+    borderRadius: 8,
   },
   sysLine: {
     paddingVertical: 1.5,

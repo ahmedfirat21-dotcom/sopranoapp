@@ -2,7 +2,9 @@
  * SopranoChat — Gamification Servisi (SP — Tek Ekonomi)
  * ═══════════════════════════════════════════════════
  * Sistem Puanları (SP) kazanım ve harcama motoru.
- * Cooldown/cap kontrollü merkezi SP altyapısı.
+ * Cooldown + DB-backed günlük cap + atomik persist.
+ *
+ * ★ Tüm SP akışları bu servisten geçer — tek giriş noktası.
  */
 import { supabase } from '../constants/supabase';
 import {
@@ -19,8 +21,13 @@ import type { SubscriptionTier } from '../types';
 // İÇ DURUM — Cooldown & Günlük Cap Takibi
 // ════════════════════════════════════════════════════════════
 
-/** userId → action → { lastGrantedAt, todayTotal } */
-const _cooldownCache = new Map<string, Map<string, { lastGrantedAt: number; todayTotal: number; todayDate: string }>>();
+/** userId → action → { lastGrantedAt, todayTotal, todayDate, dbSynced } */
+const _cooldownCache = new Map<string, Map<string, {
+  lastGrantedAt: number;
+  todayTotal: number;
+  todayDate: string;
+  dbSynced: boolean;  // ★ DB'den başlangıç değeri yüklendi mi?
+}>>();
 
 function _getCache(userId: string, action: string) {
   if (!_cooldownCache.has(userId)) _cooldownCache.set(userId, new Map());
@@ -28,21 +35,54 @@ function _getCache(userId: string, action: string) {
   const today = new Date().toISOString().split('T')[0];
   let entry = userMap.get(action);
   if (!entry || entry.todayDate !== today) {
-    entry = { lastGrantedAt: 0, todayTotal: 0, todayDate: today };
+    entry = { lastGrantedAt: 0, todayTotal: 0, todayDate: today, dbSynced: false };
     userMap.set(action, entry);
   }
   return entry;
 }
 
 /**
+ * ★ DB-backed günlük cap kontrolü.
+ * İlk çağrıda sp_transactions'tan bugünkü toplam çekilir.
+ * App restart olsa bile doğru cap korunur.
+ */
+async function _syncDailyTotalFromDB(userId: string, action: string): Promise<void> {
+  const cache = _getCache(userId, action);
+  if (cache.dbSynced) return; // Zaten senkron
+
+  try {
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
+    const { data } = await supabase
+      .from('sp_transactions')
+      .select('amount')
+      .eq('user_id', userId)
+      .eq('type', action)
+      .gte('created_at', todayStart.toISOString())
+      .gt('amount', 0);
+
+    const dbTotal = (data || []).reduce((sum: number, t: any) => sum + (t.amount || 0), 0);
+    cache.todayTotal = Math.max(cache.todayTotal, dbTotal);
+    cache.dbSynced = true;
+  } catch {
+    // DB hatasında in-memory devam et (graceful degradation)
+    cache.dbSynced = true;
+  }
+}
+
+/**
  * Cooldown ve günlük cap kontrolü.
  * @returns true = verilebilir, false = sınır aşıldı
  */
-function _canGrant(userId: string, action: string): boolean {
+async function _canGrant(userId: string, action: string): Promise<boolean> {
   const config = SP_REWARDS[action];
   if (!config) return false;
 
   const cache = _getCache(userId, action);
+
+  // ★ İlk çağrıda DB'den günlük toplamı senkronize et
+  await _syncDailyTotalFromDB(userId, action);
 
   // Cooldown kontrolü
   if (config.cooldownMs > 0) {
@@ -80,17 +120,17 @@ async function grantSP(userId: string, action: string, overrideAmount?: number):
   const amount = overrideAmount ?? config?.amount ?? 0;
   if (amount <= 0) return 0;
 
-  // Cooldown/cap kontrolü (config varsa standard, yoksa override için de temel cooldown)
-  if (config && !_canGrant(userId, action)) return 0;
+  // Cooldown/cap kontrolü (config varsa)
+  if (config && !(await _canGrant(userId, action))) return 0;
 
-  // ★ BUG-C4 FIX: Config olmayan action'lar için de temel cooldown — aynı action tekrarını engelle (1 dakika)
+  // Config olmayan action'lar için de temel cooldown — aynı action tekrarını engelle (1 dakika)
   if (!config) {
     const cache = _getCache(userId, action);
     const elapsed = Date.now() - cache.lastGrantedAt;
-    if (elapsed < 60_000) return 0; // 1dk cooldown — çift ödül önleme
+    if (elapsed < 60_000) return 0;
   }
 
-  // DB'ye yaz
+  // DB'ye yaz (atomik + transaction kaydı)
   const persisted = await _persistSP(userId, amount, action);
   if (persisted) {
     _markGranted(userId, action, amount);
@@ -101,7 +141,7 @@ async function grantSP(userId: string, action: string, overrideAmount?: number):
 
 /**
  * SP'yi veritabanına kaydet.
- * Basitleştirilmiş: RPC → Manuel fallback (2 katman).
+ * ★ Atomik persist + zorunlu transaction kaydı.
  */
 async function _persistSP(userId: string, amount: number, action: string): Promise<boolean> {
   try {
@@ -111,25 +151,46 @@ async function _persistSP(userId: string, amount: number, action: string): Promi
       p_amount: amount,
       p_action: action,
     });
-    if (!rpcError) return true;
-
-    // Yöntem 2: Manuel increment (fallback)
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('system_points')
-      .eq('id', userId)
-      .single();
-
-    if (profile) {
-      const newTotal = (profile.system_points || 0) + amount;
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({ system_points: newTotal })
-        .eq('id', userId);
-      if (!updateError) return true;
+    if (!rpcError) {
+      // ★ Transaction kaydı — realtime dashboard için zorunlu
+      _logTransaction(userId, amount, action);
+      return true;
     }
 
-    if (__DEV__) console.warn(`[SP] Kayıt başarısız: ${userId} +${amount} (${action})`);
+    // Yöntem 2: Optimistic lock ile fallback (race condition korumalı)
+    const MAX_RETRIES = 2;
+    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('system_points')
+        .eq('id', userId)
+        .single();
+
+      if (!profile) return false;
+      const oldSP = profile.system_points || 0;
+      const newTotal = oldSP + amount;
+
+      // ★ Negatif bakiye koruması (harcama için)
+      if (newTotal < 0) return false;
+
+      // ★ Optimistic lock: sadece SP değişmemişse güncelle
+      const { data, error: lockErr } = await supabase
+        .from('profiles')
+        .update({ system_points: newTotal })
+        .eq('id', userId)
+        .eq('system_points', oldSP)
+        .select('id');
+
+      if (!lockErr && data && data.length > 0) {
+        _logTransaction(userId, amount, action);
+        return true;
+      }
+      if (attempt < MAX_RETRIES - 1) {
+        await new Promise(r => setTimeout(r, 100 * (attempt + 1)));
+      }
+    }
+
+    if (__DEV__) console.warn(`[SP] Persist başarısız (conflict): ${userId} +${amount} (${action})`);
     return false;
   } catch (e) {
     if (__DEV__) console.warn('[SP] Persist hatası:', e);
@@ -138,74 +199,87 @@ async function _persistSP(userId: string, amount: number, action: string): Promi
 }
 
 /**
- * SP harca — negatif bakiye kontrolü.
- * ★ BUG-B6 FIX: RPC-first yaklaşımı — atomic harcama ile race condition azaltıldı.
- * RPC başarısız olursa hata fırlatır (güvensiz fallback kaldırıldı).
+ * ★ Transaction kaydı — dashboard SP özeti ve realtime sync için zorunlu.
+ * Fire-and-forget (başarısızlık SP verilmesini engellemez).
+ */
+function _logTransaction(userId: string, amount: number, action: string) {
+  Promise.resolve(
+    supabase.from('sp_transactions').insert({
+      user_id: userId,
+      amount,
+      type: action,
+      description: amount > 0 ? `SP kazanıldı: ${action}` : `SP harcandı: ${action}`,
+    })
+  ).catch(() => {});
+}
+
+/**
+ * SP harca — negatif bakiye kontrolü + atomik.
+ * ★ GodMaster (is_admin) kullanıcılar için SP düşürülmez — sınırsız.
  */
 async function spendSP(userId: string, amount: number, reason: string): Promise<{ success: boolean; remaining?: number; error?: string }> {
   try {
+    // ★ GodMaster bypass — admin kullanıcılar sınırsız SP'ye sahip
+    const { data: adminCheck } = await supabase
+      .from('profiles')
+      .select('is_admin, system_points')
+      .eq('id', userId)
+      .single();
+    if (adminCheck?.is_admin) {
+      _logTransaction(userId, -amount, reason);
+      return { success: true, remaining: adminCheck.system_points || 999999 };
+    }
     // Yöntem 1: RPC (atomic - tercih edilen)
-    const { data: rpcResult, error: rpcError } = await supabase.rpc('grant_system_points', {
+    const { error: rpcError } = await supabase.rpc('grant_system_points', {
       p_user_id: userId,
       p_amount: -amount,
       p_action: reason,
     });
 
     if (!rpcError) {
-      // Başarılı — güncellenmiş bakiyeyi oku
       const { data: profile } = await supabase
         .from('profiles')
         .select('system_points')
         .eq('id', userId)
         .single();
       const remaining = profile?.system_points ?? 0;
-
-      // İşlem kaydı
-      try {
-        await supabase.from('sp_transactions').insert({
-          user_id: userId,
-          amount: -amount,
-          type: reason,
-          description: `SP harcan: ${reason}`,
-        });
-      } catch { /* işlem kaydı opsiyonel */ }
-
+      _logTransaction(userId, -amount, reason);
       return { success: true, remaining };
     }
 
-    // Yöntem 2: Manuel (RPC yoksa fallback — bakiye kontrolü ekli)
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('system_points')
-      .eq('id', userId)
-      .single();
+    // Yöntem 2: Optimistic lock fallback
+    const MAX_RETRIES = 2;
+    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('system_points')
+        .eq('id', userId)
+        .single();
 
-    if (!profile) return { success: false, error: 'Profil bulunamadı.' };
+      if (!profile) return { success: false, error: 'Profil bulunamadı.' };
+      const current = profile.system_points || 0;
+      if (current < amount) {
+        return { success: false, error: `Yetersiz SP. Mevcut: ${current}, Gerekli: ${amount}` };
+      }
 
-    const current = profile.system_points || 0;
-    if (current < amount) {
-      return { success: false, error: `Yetersiz SP. Mevcut: ${current}, Gerekli: ${amount}` };
+      const newTotal = current - amount;
+      const { data, error } = await supabase
+        .from('profiles')
+        .update({ system_points: newTotal })
+        .eq('id', userId)
+        .eq('system_points', current) // ★ optimistic lock
+        .select('id');
+
+      if (!error && data && data.length > 0) {
+        _logTransaction(userId, -amount, reason);
+        return { success: true, remaining: newTotal };
+      }
+      if (attempt < MAX_RETRIES - 1) {
+        await new Promise(r => setTimeout(r, 100));
+      }
     }
 
-    const newTotal = current - amount;
-    const { error } = await supabase
-      .from('profiles')
-      .update({ system_points: newTotal })
-      .eq('id', userId);
-
-    if (error) throw error;
-
-    // İşlem kaydı
-    try {
-      await supabase.from('sp_transactions').insert({
-        user_id: userId,
-        amount: -amount,
-        type: reason,
-        description: `SP harcan: ${reason}`,
-      });
-    } catch { /* işlem kaydı opsiyonel */ }
-
-    return { success: true, remaining: newTotal };
+    return { success: false, error: 'SP güncelleme başarısız (eşzamanlı işlem çakışması)' };
   } catch (e: any) {
     return { success: false, error: e.message };
   }
@@ -239,7 +313,7 @@ export const GamificationService = {
     return grantSP(userId, 'camera_time');
   },
 
-  /** Mesaj gönderme (30 sn cooldown) */
+  /** Mesaj gönderme (60 sn cooldown) */
   async onMessageSent(userId: string): Promise<number> {
     return grantSP(userId, 'message_sent');
   },
@@ -247,6 +321,11 @@ export const GamificationService = {
   /** Oda oluşturma */
   async onRoomCreate(userId: string): Promise<number> {
     return grantSP(userId, 'room_create');
+  },
+
+  /** Duvar postu oluşturma */
+  async onWallPost(userId: string): Promise<number> {
+    return grantSP(userId, 'wall_post');
   },
 
   // ── Yeni Tetikleyiciler ──
@@ -284,9 +363,9 @@ export const GamificationService = {
     return grantSP(userId, 'subscription_purchase', bonus);
   },
 
-  /** Mağaza alışverişi SP bonusu (tutar × 2) */
+  /** Mağaza alışverişi SP bonusu (tutar × 1) */
   async onStorePurchase(userId: string, purchaseAmount: number): Promise<number> {
-    const bonus = purchaseAmount * 2;
+    const bonus = Math.floor(purchaseAmount); // ★ Eskiden ×2 idi, şimdi ×1 (endüstri normu)
     if (bonus <= 0) return 0;
     return grantSP(userId, 'store_purchase', bonus);
   },
@@ -300,8 +379,7 @@ export const GamificationService = {
 
   /**
    * Oda sahibine saatlik bonus hesapla ve ver.
-   * Formül: floor((followers × 0.5) + (CCU × 2) + (log2(minutes + 1) × 3))
-   * Günlük cap: 250 SP
+   * Günlük cap: 80 SP
    */
   async grantOwnerBonus(
     userId: string,
@@ -312,7 +390,8 @@ export const GamificationService = {
     const bonus = calculateOwnerBonus(followerCount, concurrentUsers, totalListenMinutes);
     if (bonus <= 0) return 0;
 
-    // Günlük cap kontrolü
+    // Günlük cap kontrolü (DB-backed)
+    await _syncDailyTotalFromDB(userId, 'owner_bonus');
     const cache = _getCache(userId, 'owner_bonus');
     const remainingCap = OWNER_BONUS_DAILY_CAP - cache.todayTotal;
     if (remainingCap <= 0) return 0;

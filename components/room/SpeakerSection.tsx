@@ -20,6 +20,7 @@ interface Props {
   stageUsers: RoomParticipant[];
   getMicStatus: (uid: string) => MicStatus;
   onSelectUser: (user: RoomParticipant) => void;
+  onSelfDemote?: () => void;
   currentUserId?: string;
   VideoView?: any;
   onGhostSeatPress?: () => void;
@@ -94,8 +95,9 @@ function OwnerCrown({ size = 28 }: { size?: number }) {
   );
 }
 
-function SpeakerCard({ user, micStatus, onPress, isMe, cardWidth, cardHeight, VideoView }: {
+function SpeakerCard({ user, micStatus, onPress, onSelfDemote, isMe, cardWidth, cardHeight, VideoView }: {
   user: RoomParticipant; micStatus: MicStatus; onPress: () => void;
+  onSelfDemote?: () => void;
   isMe: boolean; cardWidth: number; cardHeight: number; VideoView?: any;
 }) {
   const isHost = user.role === 'owner';
@@ -124,16 +126,16 @@ function SpeakerCard({ user, micStatus, onPress, isMe, cardWidth, cardHeight, Vi
       </View>
       <Text style={[s.speakerName, isHost && s.speakerNameHost]} numberOfLines={1}>{displayName}</Text>
       {isMe && (
-        <View style={s.selfDemoteHint}>
+        <Pressable style={({ pressed }) => [s.selfDemoteHint, pressed && { opacity: 0.6 }]} onPress={onSelfDemote}>
           <Ionicons name="arrow-down-circle-outline" size={11} color="rgba(251,191,36,0.7)" />
           <Text style={s.selfDemoteText}>Sahneden İn</Text>
-        </View>
+        </Pressable>
       )}
     </Pressable>
   );
 }
 
-export default function SpeakerSection({ stageUsers, getMicStatus, onSelectUser, currentUserId, VideoView, onGhostSeatPress, showSeatTooltip }: Props) {
+export default function SpeakerSection({ stageUsers, getMicStatus, onSelectUser, onSelfDemote, currentUserId, VideoView, onGhostSeatPress, showSeatTooltip }: Props) {
   const sortedUsers = useMemo(() => {
     if (stageUsers.length === 0) return [];
     const roleOrder: Record<string, number> = { owner: 0, host: 0, moderator: 1, speaker: 2 };
@@ -206,6 +208,7 @@ export default function SpeakerSection({ stageUsers, getMicStatus, onSelectUser,
           const isMe = u.user_id === currentUserId;
           return (
             <SpeakerCard key={u.id} user={u} micStatus={st} onPress={() => onSelectUser(u)}
+              onSelfDemote={onSelfDemote}
               isMe={isMe} cardWidth={cardWidth} cardHeight={cardHeight} VideoView={VideoView} />
           );
         })}

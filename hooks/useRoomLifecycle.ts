@@ -17,7 +17,8 @@ import { RoomService } from '../services/database';
 import { getRoomLimits } from '../constants/tiers';
 import { UpsellService } from '../services/upsell';
 import { liveKitService } from '../services/livekit';
-import { showToast } from '../components/Toast';
+// ★ TOAST KALDIRMA: Oda içinde toast bildirimi yok
+const showToast = (_opts: { title?: string; message?: string; type?: string }) => {};
 import { safeGoBack } from '../constants/navigation';
 import type { Room } from '../types';
 

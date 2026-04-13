@@ -72,7 +72,7 @@ export const UpsellService = {
    * gerekli tier otomatik hesaplanır.
    */
   trigger(triggerType: UpsellTrigger, currentTier: SubscriptionTier, requiredTier?: SubscriptionTier): void {
-    const targetTier = requiredTier || getNextTier(currentTier) || 'Bronze';
+    const targetTier = requiredTier || getNextTier(currentTier) || 'Plus';
     const msgFn = UPSELL_MESSAGES[triggerType];
     const message = msgFn ? msgFn(targetTier) : `${targetTier} üyelik ile bu özelliği açın.`;
 

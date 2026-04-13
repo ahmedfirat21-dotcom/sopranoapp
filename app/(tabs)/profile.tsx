@@ -15,10 +15,12 @@ import FollowListModal from '../../components/FollowListModal';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import AppBackground from '../../components/AppBackground';
 import PremiumAlert, { type AlertButton } from '../../components/PremiumAlert';
-import { BadgeCheckerService, type UserBadge } from '../../services/engagement/badges';
+
 import { TIER_DEFINITIONS, isTierAtLeast } from '../../constants/tiers';
 import { migrateLegacyTier } from '../../types';
 import type { SubscriptionTier } from '../../types';
+import BoostPickerSheet, { type BoostTier } from '../../components/BoostPickerSheet';
+import { UserTitleService, type UserTitle } from '../../services/userTitles';
 
 
 export default function ProfileScreen() {
@@ -42,8 +44,8 @@ export default function ProfileScreen() {
   const [showReferral, setShowReferral] = useState(false);
   const [referralCodeText, setReferralCodeText] = useState('');
   const [submittingReferral, setSubmittingReferral] = useState(false);
-  const [showBoostAlert, setShowBoostAlert] = useState(false);
-  const [badges, setBadges] = useState<UserBadge[]>([]);
+  const [showBoostPicker, setShowBoostPicker] = useState(false);
+  const [userTitle, setUserTitle] = useState<UserTitle | null>(null);
   const [cAlert, setCAlert] = useState<{ visible: boolean; title: string; message: string; type?: any; buttons?: any[] }>({ visible: false, title: '', message: '' });
 
   // Takipçi/Takip listesi modal
@@ -68,22 +70,17 @@ export default function ProfileScreen() {
         rooms: roomRes.count ?? 0,
       });
 
-      // Rozetleri yükle + otomatik kontrol (saatte max 1 kez)
-      try {
-        const lastCheck = await AsyncStorage.getItem('soprano_badge_check_ts');
-        const oneHourAgo = Date.now() - 60 * 60 * 1000;
-        if (!lastCheck || parseInt(lastCheck) < oneHourAgo) {
-          await BadgeCheckerService.checkAll(userId);
-          await AsyncStorage.setItem('soprano_badge_check_ts', Date.now().toString());
-        }
-      } catch {}
-      const userBadges = await BadgeCheckerService.getUserBadges(userId);
-      setBadges(userBadges);
 
-      // Son odalar
+
       try {
         const rooms = await ProfileService.getRecentRooms(userId);
         setRecentRooms(rooms);
+      } catch {}
+
+      // Unvan
+      try {
+        const title = await UserTitleService.getPrimaryTitle(userId);
+        setUserTitle(title);
       } catch {}
     } catch (err) {
       console.warn('Stats yuklenemedi:', err);
@@ -157,6 +154,12 @@ export default function ProfileScreen() {
                 )}
               </View>
               {profile?.username && <Text style={p.username}>@{profile.username}</Text>}
+              {userTitle && (
+                <View style={[p.titleBadge, { backgroundColor: userTitle.bgColor }]}>
+                  <Text style={{ fontSize: 9 }}>{userTitle.emoji}</Text>
+                  <Text style={[p.titleText, { color: userTitle.color }]}>{userTitle.name}</Text>
+                </View>
+              )}
               <Text style={p.bio} numberOfLines={2}>{bio}</Text>
             </View>
             <Pressable style={p.editBtn} onPress={() => router.push('/edit-profile')}>
@@ -203,16 +206,27 @@ export default function ProfileScreen() {
               <Text style={p.walletAmount}>{spBalance.toLocaleString()}</Text>
               <Text style={p.walletSub}>Soprano Points</Text>
             </View>
-            <Pressable style={p.buyBtn} onPress={() => router.push('/sp-store' as any)}>
-              <Ionicons name="cart" size={14} color="#0F172A" />
-              <Text style={p.buyBtnText}>Mağaza</Text>
+            <Pressable style={p.storeWrap} onPress={() => router.push('/sp-store' as any)}>
+              <LinearGradient
+                colors={['#FBBF24', '#D97706', '#92400E']}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                style={p.storeGradient}
+              >
+                <View style={p.storeIconWrap}>
+                  <Ionicons name="cart" size={14} color="#FFF" />
+                </View>
+                <Text style={p.storeTitle}>Mağaza</Text>
+                <Ionicons name="arrow-forward" size={14} color="rgba(255,255,255,0.7)" />
+              </LinearGradient>
             </Pressable>
           </View>
         </View>
 
+
+
         {/* ═══ AYARLAR VE YÖNETİM ═══ */}
         <View style={{ marginHorizontal: 16, marginTop: 10, marginBottom: 6 }}>
-          <Text style={{ fontSize: 11, fontWeight: '700', color: '#64748B', letterSpacing: 1 }}>AYARLAR VE YÖNETİM</Text>
+          <Text style={{ fontSize: 11, fontWeight: '800', color: '#94A3B8', letterSpacing: 1, ...Shadows.textLight }}>AYARLAR VE YÖNETİM</Text>
         </View>
         <View style={styles.listContainer}>
           <Pressable style={styles.listItem} onPress={() => router.push('/settings' as any)}>
@@ -237,52 +251,22 @@ export default function ProfileScreen() {
             <Text style={{ fontSize: 10, color: '#A78BFA', fontWeight: '600', marginRight: 4 }}>+50 SP</Text>
             <Ionicons name="chevron-forward" size={16} color="#64748B" />
           </Pressable>
-          {/* ★ U5 FIX: Rozetler her zaman gösterilir */}
-          <Pressable style={styles.listItem} onPress={() => {
-            if (userId) router.push(`/user/${userId}` as any);
-          }}>
-            <Ionicons name="trophy" size={20} color="#FBBF24" />
-            <Text style={styles.listItemText}>Rozetlerim</Text>
-            <View style={{ backgroundColor: badges.length > 0 ? 'rgba(251,191,36,0.12)' : 'rgba(255,255,255,0.06)', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 10, borderWidth: 1, borderColor: badges.length > 0 ? 'rgba(251,191,36,0.2)' : 'rgba(255,255,255,0.08)', marginRight: 4 }}>
-              <Text style={{ fontSize: 10, color: badges.length > 0 ? '#FBBF24' : '#64748B', fontWeight: '700' }}>{badges.length > 0 ? badges.length : '—'}</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={16} color="#64748B" />
-          </Pressable>
+
           <Pressable style={[styles.listItem, { borderBottomWidth: 0 }]} onPress={() => {
-            if (isTierAtLeast(subscriptionTier, 'Bronze')) {
-              setShowBoostAlert(true);
+            if (isTierAtLeast(subscriptionTier, 'Plus')) {
+              setShowBoostPicker(true);
             } else {
-              showToast({ title: 'Bronze+ Gerekli', message: 'Profil boost özelliği Bronze ve üzeri üyeliklerde kullanılabilir.', type: 'warning' });
+              showToast({ title: 'Plus+ Gerekli', message: 'Profil boost özelliği Plus ve üzeri üyeliklerde kullanılabilir.', type: 'warning' });
             }
           }}>
             <Ionicons name="rocket" size={20} color="#F472B6" />
             <Text style={styles.listItemText}>Profilimi Öne Çıkar</Text>
-            <Text style={{ fontSize: 10, color: '#F472B6', fontWeight: '600', marginRight: 4 }}>10 SP</Text>
             <Ionicons name="chevron-forward" size={16} color="#64748B" />
           </Pressable>
         </View>
 
-        {/* ═══ YÖNETTİĞİM ODALAR ═══ */}
-        <View style={{ marginHorizontal: 16, marginTop: 10, marginBottom: 6 }}>
-          <Text style={{ fontSize: 11, fontWeight: '700', color: '#64748B', letterSpacing: 1 }}>YÖNETTİĞİM ODALAR</Text>
-        </View>
-        <View style={styles.listContainer}>
-          {recentRooms.length > 0 ? (
-            recentRooms.map((room, idx) => (
-              <Pressable key={room.id} style={[styles.listItem, idx === recentRooms.length - 1 && { borderBottomWidth: 0 }]} onPress={() => router.push(`/room/${room.id}` as any)}>
-                <Ionicons name="radio" size={16} color="#14B8A6" />
-                <Text style={[styles.listItemText, { marginLeft: 4 }]}>{room.name}</Text>
-                <Ionicons name="enter-outline" size={16} color="#94A3B8" />
-              </Pressable>
-            ))
-          ) : (
-            <Pressable style={[styles.listItem, { borderBottomWidth: 0 }]} onPress={() => router.push('/create-room' as any)}>
-               <Ionicons name="add-circle" size={20} color="#14B8A6" />
-               <Text style={styles.listItemText}>Yeni Oda Kur</Text>
-               <Ionicons name="chevron-forward" size={16} color="#64748B" />
-            </Pressable>
-          )}
-        </View>
+
+
 
         {/* GodMaster Admin Paneli — admin only */}
         {profile?.is_admin && (
@@ -302,13 +286,10 @@ export default function ProfileScreen() {
 
         {/* Referans Modal */}
         <Modal visible={showReferral} transparent animationType="fade">
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
+          <Pressable style={styles.modalOverlay} onPress={() => setShowReferral(false)}>
+            <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>Davet Kodu Gir</Text>
-                <Pressable onPress={() => setShowReferral(false)}>
-                  <Ionicons name="close" size={24} color={Colors.text2} />
-                </Pressable>
               </View>
               <Text style={styles.modalDesc}>Eğer bir arkadaşın seni davet ettiyse, onun kodunu girip 50 SP kazanabilirsin.</Text>
               <TextInput
@@ -326,38 +307,33 @@ export default function ProfileScreen() {
               >
                 {submittingReferral ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.modalBtnText}>Kodu Kullan</Text>}
               </Pressable>
-            </View>
-          </View>
+            </Pressable>
+          </Pressable>
         </Modal>
 
 
       </ScrollView>
 
-      {/* Profil Boost Premium Alert */}
-      {/* ★ U6 FIX: Boost alert'te mevcut SP bakiyesi gösterilir */}
-      <PremiumAlert
-        visible={showBoostAlert}
-        title="Profil Boost"
-        message={`Profilini 1 saat boyunca Keşfet sayfasında öne çıkar.\n\nBedel: 10 SP\nMevcut bakiye: ${spBalance.toLocaleString()} SP${spBalance < 10 ? '\n⚠️ Yetersiz bakiye!' : ''}`}
-        type="info"
-        icon="rocket"
-        onDismiss={() => setShowBoostAlert(false)}
-        buttons={[
-          { text: 'Vazgeç', style: 'cancel' },
-          {
-            text: 'Boost Et (10 SP)',
-            onPress: async () => {
-              if (!profile?.id) return;
-              try {
-                await ProfileService.boostProfile(profile.id, 10);
-                await refreshProfile();
-                showToast({ title: 'Profil Boost aktif!', message: 'Keşfet\'te 1 saat boyunca öne çıkacaksın.', type: 'success' });
-              } catch (err: any) {
-                showToast({ title: 'Boost başarısız', message: err.message || 'Hata oluştu', type: 'error' });
-              }
-            },
-          },
-        ]}
+      {/* Boost Picker — Premium Bottom Sheet */}
+      <BoostPickerSheet
+        visible={showBoostPicker}
+        onClose={() => setShowBoostPicker(false)}
+        currentSP={spBalance}
+        onBoost={async (tier: BoostTier) => {
+          if (!profile?.id) return;
+          try {
+            await ProfileService.boostProfile(profile.id, tier.cost, tier.duration);
+            await refreshProfile();
+            showToast({
+              title: `${tier.label} Aktif! 🚀`,
+              message: `Profilin ve odaların ${tier.duration} saat boyunca Keşfet'te öne çıkacak.`,
+              type: 'success',
+            });
+          } catch (err: any) {
+            showToast({ title: 'Boost başarısız', message: err.message || 'Hata oluştu', type: 'error' });
+            throw err; // BoostPickerSheet loading state'i kapatsın
+          }
+        }}
       />
 
       {/* Takipçi/Takip Listesi Modal */}
@@ -420,6 +396,13 @@ const p = StyleSheet.create({
   tierPillText: { fontSize: 7, fontWeight: '800', color: '#fff', letterSpacing: 0.3, ..._textGlow },
   displayName: { fontSize: 16, fontWeight: '800', color: '#F1F5F9', letterSpacing: 0.2, ..._textGlow },
   username: { fontSize: 10, color: '#CBD5E1', marginTop: 1, ..._textGlow },
+  titleBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    alignSelf: 'flex-start',
+    paddingHorizontal: 6, paddingVertical: 2,
+    borderRadius: 8, marginTop: 3,
+  },
+  titleText: { fontSize: 9, fontWeight: '700' },
   bio: { fontSize: 10, color: '#94A3B8', marginTop: 3, lineHeight: 14, ..._textGlow },
   editBtn: {
     width: 34, height: 34, borderRadius: 12,
@@ -462,13 +445,26 @@ const p = StyleSheet.create({
   },
   walletAmount: { fontSize: 28, fontWeight: '900', color: '#FBBF24', letterSpacing: -0.5, textShadowColor: 'rgba(251,191,36,0.3)', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 12 },
   walletSub: { fontSize: 9, fontWeight: '600', color: '#94A3B8', letterSpacing: 0.5, textTransform: 'uppercase', marginTop: 2 },
-  buyBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: '#FBBF24', paddingHorizontal: 14, paddingVertical: 8,
-    borderRadius: 10,
-    shadowColor: '#FBBF24', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 6, elevation: 4,
+  storeWrap: {
+    borderRadius: 12, overflow: 'hidden',
+    shadowColor: '#FBBF24', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3, shadowRadius: 6, elevation: 4,
   },
-  buyBtnText: { fontSize: 12, fontWeight: '800', color: '#0F172A' },
+  storeGradient: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingVertical: 8, paddingHorizontal: 10, gap: 6,
+  },
+  storeIconWrap: {
+    width: 26, height: 26, borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.25)',
+  },
+  storeTitle: {
+    fontSize: 12, fontWeight: '800', color: '#FFF',
+    textShadowColor: 'rgba(0,0,0,0.3)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
+  },
+
 });
 
 const styles = StyleSheet.create({

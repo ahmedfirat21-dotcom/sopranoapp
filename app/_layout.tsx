@@ -26,6 +26,7 @@ import MiniRoomCard, { type MinimizedRoom } from '../components/MiniRoomCard';
 import ErrorBoundary from '../components/ErrorBoundary';
 // SplashOverlay import kaldırıldı — ARCH-4 FIX (ölü kod temizliği)
 import NotificationDrawer from '../components/NotificationDrawer';
+
 import { OnlineFriendsProvider } from '../providers/OnlineFriendsProvider';
 export { useOnlineFriends } from '../providers/OnlineFriendsProvider';
 import { useFonts, Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
@@ -395,6 +396,8 @@ export default function RootLayout() {
     })();
   }, []);
 
+
+
   // ★ İzinleri uygulama başlangıcında bir kez iste (kamera, mikrofon)
   useEffect(() => {
     if (!isAuthReady || !isLoggedIn) return;
@@ -743,6 +746,7 @@ export default function RootLayout() {
           />
         )}
         <Toast />
+
 
         {/* ★ BUG-4 FIX: NotificationDrawer artık global — tüm sayfalarda tek instance */}
         <NotificationDrawer

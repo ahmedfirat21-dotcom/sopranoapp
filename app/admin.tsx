@@ -58,10 +58,13 @@ const REASON_TR: Record<string, string> = {
 
 const TIER_COLORS: Record<string, string> = {
   Free: '#64748B',
-  Bronze: '#CD7F32',
-  Silver: '#94A3B8',
-  Gold: '#D4AF37',
-  VIP: '#8B5CF6',
+  Plus: '#A855F7',
+  Pro: '#F59E0B',
+  // Legacy DB uyumluluk — eski tier isimleri için renk eşlemesi
+  Bronze: '#A855F7',
+  Silver: '#A855F7',
+  Gold: '#F59E0B',
+  VIP: '#F59E0B',
 };
 
 const CATEGORY_TR: Record<string, string> = {
@@ -286,7 +289,7 @@ export default function AdminPanel() {
 
 
   const handleChangeTier = (roomId: string, roomName: string, currentTier: string) => {
-    const tiers = ['Free', 'Bronze', 'Silver', 'Gold', 'VIP'];
+    const tiers = ['Free', 'Plus', 'Pro'];
     const buttons: AlertButton[] = tiers
       .filter(t => t !== currentTier)
       .map(t => ({
@@ -354,6 +357,57 @@ export default function AdminPanel() {
       await supabase.from('profiles').update({ system_points: (user.system_points || 0) + amount }).eq('id', userId);
       showToast({ title: `${amount} SP Verildi`, message: displayName, type: 'success' });
     }
+  };
+
+  const handleDeleteUser = (userId: string, displayName: string) => {
+    // Kendi hesabını silemez
+    if (userId === firebaseUser?.uid) {
+      showToast({ title: 'Hata', message: 'Kendi hesabını silemezsin!', type: 'error' });
+      return;
+    }
+    showAdAlert(
+      '⚠️ Kullanıcıyı Sil',
+      `"${displayName}" adlı kullanıcıyı KALICI olarak silmek istiyor musun?\n\nBu işlem GERİ ALINAMAZ!\n\nSilinecekler:\n• Profil\n• Tüm odalar\n• Mesajlar\n• Arkadaşlıklar\n• Raporlar`,
+      [
+        { text: 'İptal', style: 'cancel' },
+        {
+          text: 'Kalıcı Sil', style: 'destructive', onPress: async () => {
+            try {
+              // 1. Kullanıcının sahip olduğu odaları sil
+              const { data: ownedRooms } = await supabase.from('rooms').select('id').eq('host_id', userId);
+              if (ownedRooms && ownedRooms.length > 0) {
+                const roomIds = ownedRooms.map(r => r.id);
+                await supabase.from('room_participants').delete().in('room_id', roomIds);
+                await supabase.from('messages').delete().in('room_id', roomIds);
+                await supabase.from('rooms').delete().in('id', roomIds);
+              }
+              // 2. Kullanıcının katılımcı olduğu yerlerden çık
+              await supabase.from('room_participants').delete().eq('user_id', userId);
+              // 3. Mesajları sil
+              await supabase.from('messages').delete().eq('sender_id', userId);
+              // 4. Arkadaşlıkları sil
+              await supabase.from('friendships').delete().or(`user_id.eq.${userId},friend_id.eq.${userId}`);
+              // 5. Raporları sil
+              await supabase.from('reports').delete().or(`reporter_id.eq.${userId},reported_user_id.eq.${userId}`);
+              // 6. SP işlemlerini sil
+              try { await supabase.from('sp_transactions').delete().eq('user_id', userId); } catch {}
+              // 7. Inbox sil
+              try { await supabase.from('inbox').delete().eq('user_id', userId); } catch {}
+              // 8. Posts sil
+              try { await supabase.from('posts').delete().eq('user_id', userId); } catch {}
+              // 9. Profili sil
+              await supabase.from('profiles').delete().eq('id', userId);
+              
+              showToast({ title: 'Kullanıcı Silindi', message: `${displayName} kalıcı olarak silindi`, type: 'success' });
+              loadAll();
+            } catch (e: any) {
+              showToast({ title: 'Hata', message: e.message || 'Kullanıcı silinemedi', type: 'error' });
+            }
+          }
+        },
+      ],
+      'error'
+    );
   };
 
   // Filtrelenmiş Odalar
@@ -698,6 +752,9 @@ export default function AdminPanel() {
                     </Pressable>
                     <Pressable style={s.userActionBtn} onPress={() => handleToggleBan(user.id, user.display_name, user.is_banned || false)}>
                       <Ionicons name="ban" size={14} color={user.is_banned ? '#EF4444' : '#64748B'} />
+                    </Pressable>
+                    <Pressable style={[s.userActionBtn, { backgroundColor: '#EF444412' }]} onPress={() => handleDeleteUser(user.id, user.display_name)}>
+                      <Ionicons name="trash" size={14} color="#EF4444" />
                     </Pressable>
                   </View>
                 </View>

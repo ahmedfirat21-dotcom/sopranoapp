@@ -32,6 +32,21 @@ interface Props {
 // Kalp atışı (Heartbeat) göstergesi
 function ConnectionHeartbeat({ state, viewerCount }: { state: string, viewerCount: number }) {
   const pulseAnim = useRef(new Animated.Value(1)).current;
+  const [displayState, setDisplayState] = React.useState(state);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (state === 'connected') {
+      // Bağlantı geldi — anında yeşile dön
+      if (timerRef.current) clearTimeout(timerRef.current);
+      setDisplayState('connected');
+    } else {
+      // Kopma — 5sn bekle, hâlâ kopuksa kırmızıya dön (kısa kesintilerde yanıp sönmez)
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => setDisplayState(state), 5000);
+    }
+    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
+  }, [state]);
 
   useEffect(() => {
     Animated.loop(
@@ -43,8 +58,8 @@ function ConnectionHeartbeat({ state, viewerCount }: { state: string, viewerCoun
     ).start();
   }, []);
 
-  const isOk = state === 'connected';
-  const dotColor = isOk ? '#22C55E' : (state === 'reconnecting' ? '#FBBF24' : '#EF4444');
+  const isOk = displayState === 'connected';
+  const dotColor = isOk ? '#22C55E' : (displayState === 'reconnecting' ? '#FBBF24' : '#EF4444');
 
   return (
     <View style={s.viewerPill}>

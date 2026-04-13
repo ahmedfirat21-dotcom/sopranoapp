@@ -4,7 +4,7 @@
  * ★ ARCH-1 FIX: room/[id].tsx God Component decomposition — Hook 4
  *
  * Sorumluluk:
- *   - VIP: Peak CCU takibi
+ *   - Pro: Peak CCU takibi
  *   - SP tetikleyiciler: sahnede olma (10dk), kamera açık (10dk)
  *   - Sistem odası prompt (5dk)
  *
@@ -36,7 +36,7 @@ type UseRoomGamificationParams = {
 export function useRoomGamification(params: UseRoomGamificationParams) {
   const { roomId, firebaseUser, profile, room, myCurrentRole, participantCount, isCameraEnabled, spToastRef } = params;
 
-  // ── VIP: Peak CCU ─────────────────────────────
+  // ── Pro: Peak CCU ─────────────────────────────
   const [roomStats, setRoomStats] = useState<RoomStats>({ peakCCU: 0, totalUniqueListeners: 0 });
 
   useEffect(() => {

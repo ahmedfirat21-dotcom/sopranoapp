@@ -76,10 +76,10 @@ export const SocialService = {
       ]);
       if (error) throw error;
 
-      // SP: Oda duvarı postu → gamification servisi ile entegre
+      // SP: Oda duvarı postu → gamification servisi
       try {
         const { GamificationService } = require('./gamification');
-        await GamificationService.grantSP(userId, 5, 'wall_post');
+        await GamificationService.onWallPost(userId);
       } catch {}
 
       return { success: true };

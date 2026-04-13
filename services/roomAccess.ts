@@ -44,7 +44,7 @@ export const RoomAccessService = {
       return { allowed: false, reason: 'Oda şu anda kilitli. Yeni katılımcı kabul edilmiyor.', action: 'room_locked' };
     }
 
-    // ── 3. Followers-only modu kontrolü (Gold+) ──
+    // ── 3. Followers-only modu kontrolü (Pro+) ──
     if (settings.followers_only) {
       const isFollowing = await this._isFollowingHost(userId, room.host_id!);
       if (!isFollowing) {
@@ -56,7 +56,7 @@ export const RoomAccessService = {
       }
     }
 
-    // ── 4. Yaş filtresi kontrolü (Silver+) ──
+    // ── 4. Yaş filtresi kontrolü (Plus+) ──
     // age_restricted boolean desteği: true ise age_filter_min yoksa 18 olarak kabul et
     const ageFilterMin = settings.age_filter_min || ((settings as any).age_restricted === true ? 18 : 0);
     if (ageFilterMin > 0) {
@@ -69,7 +69,7 @@ export const RoomAccessService = {
       }
     }
 
-    // ── 5. Dil filtresi kontrolü (Silver+) ──
+    // ── 5. Dil filtresi kontrolü (Plus+) ──
     if (settings.language_filter && settings.language_filter.length > 0) {
       if (userLanguage && !settings.language_filter.includes(userLanguage as RoomLanguage)) {
         return {

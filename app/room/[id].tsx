@@ -15,6 +15,9 @@ import {
   KeyboardAvoidingView,
   Platform,
   Share,
+  FlatList,
+  ActivityIndicator,
+  PanResponder,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -23,9 +26,10 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Audio } from 'expo-av';
 import { safeGoBack } from '../../constants/navigation';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // SopranoChat Services
-import { RoomService, RealtimeService, getRoomLimits, type Room, type RoomParticipant } from '../../services/database';
+import { RoomService, MessageService, RealtimeService, getRoomLimits, type Room, type RoomParticipant } from '../../services/database';
 import { RoomHistoryService } from '../../services/roomHistory';
 import { supabase } from '../../constants/supabase';
 import { RoomChatService, type RoomMessage } from '../../services/roomChat';
@@ -37,7 +41,10 @@ import { ModerationService } from '../../services/moderation';
 import { RoomAccessService, type AccessCheckResult } from '../../services/roomAccess';
 
 import { getAvatarSource } from '../../constants/avatars';
-import { showToast } from '../../components/Toast';
+// ★ TOAST KALDIRMA: Kullanıcı talebi — oda içinde toast bildirimi yok
+// Tüm mevcut showToast çağrıları sessizce ignore edilir
+const showToast = (_opts: { title?: string; message?: string; type?: string }) => {};
+
 import { useAuth } from '../_layout';
 import useLiveKit from '../../hooks/useLiveKit';
 import { useMicMeter } from '../../hooks/useMicMeter';
@@ -82,6 +89,547 @@ try { LKVideoView = require('@livekit/react-native').VideoView; } catch {}
 
 
 const { width: W, height: H } = Dimensions.get('window');
+const DM_PANEL_W = W * 0.85;
+const DM_SWIPE_ACTION_W = 180; // 3 buton × 60px
+
+// ════════════════════════════════════════════════════════════
+// DM SWIPEABLE ROW — Sola kaydırarak Sil / Sessize Al / Engelle
+// ★ Mesajlar sayfasındaki SwipeableRow patterninden genişletilmiş
+// ════════════════════════════════════════════════════════════
+function DmSwipeableRow({ children, onDelete, onMute, onBlock, isMuted }: {
+  children: React.ReactNode;
+  onDelete: () => void;
+  onMute: () => void;
+  onBlock: () => void;
+  isMuted: boolean;
+}) {
+  const translateX = useRef(new Animated.Value(0)).current;
+  const actionOpacity = translateX.interpolate({
+    inputRange: [-DM_SWIPE_ACTION_W, -40, 0],
+    outputRange: [1, 0.5, 0],
+    extrapolate: 'clamp',
+  });
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gs) => Math.abs(gs.dx) > 15 && Math.abs(gs.dy) < 15,
+      onPanResponderMove: (_, gs) => {
+        if (gs.dx < 0) translateX.setValue(Math.max(gs.dx, -(DM_SWIPE_ACTION_W + 10)));
+      },
+      onPanResponderRelease: (_, gs) => {
+        if (gs.dx < -70) {
+          Animated.spring(translateX, { toValue: -DM_SWIPE_ACTION_W, useNativeDriver: true, tension: 100, friction: 10 }).start();
+        } else {
+          Animated.spring(translateX, { toValue: 0, useNativeDriver: true, tension: 100, friction: 10 }).start();
+        }
+      },
+    })
+  ).current;
+
+  const closeSwipe = () => {
+    Animated.spring(translateX, { toValue: 0, useNativeDriver: true, tension: 100, friction: 10 }).start();
+  };
+
+  return (
+    <View style={{ overflow: 'hidden', borderRadius: 14 }}>
+      {/* Arka plan — aksiyonlar (sadece swipe'ta görünür) */}
+      <Animated.View style={[dmSwipeS.actionRow, { opacity: actionOpacity }]}>
+        {/* Sil */}
+        <Pressable
+          onPress={() => { closeSwipe(); onDelete(); }}
+          style={[dmSwipeS.actionBtn, { backgroundColor: '#DC2626' }]}
+        >
+          <Ionicons name="trash-outline" size={18} color="#FFF" />
+          <Text style={dmSwipeS.actionLabel}>Sil</Text>
+        </Pressable>
+        {/* Sessize Al / Aç */}
+        <Pressable
+          onPress={() => { closeSwipe(); onMute(); }}
+          style={[dmSwipeS.actionBtn, { backgroundColor: isMuted ? '#14B8A6' : '#F59E0B' }]}
+        >
+          <Ionicons name={isMuted ? 'notifications-outline' : 'notifications-off-outline'} size={18} color="#FFF" />
+          <Text style={dmSwipeS.actionLabel}>{isMuted ? 'Sesi Aç' : 'Sessiz'}</Text>
+        </Pressable>
+        {/* Engelle */}
+        <Pressable
+          onPress={() => { closeSwipe(); onBlock(); }}
+          style={[dmSwipeS.actionBtn, { backgroundColor: '#7F1D1D' }]}
+        >
+          <Ionicons name="ban-outline" size={18} color="#FFF" />
+          <Text style={dmSwipeS.actionLabel}>Engelle</Text>
+        </Pressable>
+      </Animated.View>
+      {/* Ön plan — kaydırılabilir satır */}
+      <Animated.View style={{ transform: [{ translateX }] }} {...panResponder.panHandlers}>
+        {children}
+      </Animated.View>
+    </View>
+  );
+}
+
+const dmSwipeS = StyleSheet.create({
+  actionRow: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    bottom: 0,
+    width: DM_SWIPE_ACTION_W,
+    flexDirection: 'row',
+  },
+  actionBtn: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 2,
+  },
+  actionLabel: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#FFF',
+    letterSpacing: 0.2,
+  },
+});
+
+// ════════════════════════════════════════════════════════════
+// DM PANEL DRAWER — Sağdan kayan DM paneli (inbox + sohbet görünümü)
+// ★ Swipe-to-action aksiyonlar: engelle, sil, sessize al
+// ════════════════════════════════════════════════════════════
+function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, dmUnreadCount, firebaseUser, bottomInset, initialChatTarget }: {
+  visible: boolean;
+  onClose: () => void;
+  dmInboxMessages: any[];
+  setDmInboxMessages: React.Dispatch<React.SetStateAction<any[]>>;
+  dmUnreadCount: number;
+  firebaseUser: any;
+  bottomInset: number;
+  initialChatTarget?: { userId: string; name: string; avatar?: string } | null;
+}) {
+  const slideAnim = useRef(new Animated.Value(DM_PANEL_W)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  // ★ İç navigasyon: inbox vs chat
+  const [chatTarget, setChatTarget] = useState<{ userId: string; name: string; avatar?: string } | null>(null);
+  const [chatMessages, setChatMessages] = useState<any[]>([]);
+  const [chatInput, setChatInput] = useState('');
+  const [chatSending, setChatSending] = useState(false);
+  const [loadingChat, setLoadingChat] = useState(false);
+  // ★ Sessize alınmış DM kullanıcıları (AsyncStorage ile kalıcı)
+  const [mutedDmUsers, setMutedDmUsers] = useState<Set<string>>(new Set());
+
+  // ★ Sessize alma verilerini AsyncStorage'dan yükle
+  useEffect(() => {
+    if (!firebaseUser?.uid) return;
+    AsyncStorage.getItem(`muted_dm_users_${firebaseUser.uid}`).then(stored => {
+      if (stored) {
+        try { setMutedDmUsers(new Set(JSON.parse(stored))); } catch {}
+      }
+    });
+  }, [firebaseUser?.uid]);
+
+  // ★ Sessize al / sesini aç toggle
+  const toggleMuteDm = useCallback(async (userId: string) => {
+    setMutedDmUsers(prev => {
+      const next = new Set(prev);
+      if (next.has(userId)) {
+        next.delete(userId);
+      } else {
+        next.add(userId);
+      }
+      // AsyncStorage'a kaydet
+      if (firebaseUser?.uid) {
+        AsyncStorage.setItem(`muted_dm_users_${firebaseUser.uid}`, JSON.stringify([...next])).catch(() => {});
+      }
+      return next;
+    });
+  }, [firebaseUser?.uid]);
+
+  useEffect(() => {
+    if (visible) {
+      Animated.parallel([
+        Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true, damping: 18, stiffness: 180 }),
+        Animated.timing(fadeAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.spring(slideAnim, { toValue: DM_PANEL_W, useNativeDriver: true, damping: 18, stiffness: 200 }),
+        Animated.timing(fadeAnim, { toValue: 0, duration: 150, useNativeDriver: true }),
+      ]).start();
+      // Panel kapanırken sohbet görünümünü sıfırla
+      setTimeout(() => { setChatTarget(null); setChatMessages([]); }, 300);
+    }
+  }, [visible]);
+
+  // ★ initialChatTarget ile panel açıldığında otomatik sohbet başlat
+  useEffect(() => {
+    if (visible && initialChatTarget && !chatTarget) {
+      openChat(initialChatTarget.userId, initialChatTarget.name, initialChatTarget.avatar);
+    }
+  }, [visible, initialChatTarget]);
+
+  // ★ Sohbet görünümüne geçiş — mesajları yükle
+  const openChat = async (userId: string, name: string, avatar?: string) => {
+    setChatTarget({ userId, name, avatar });
+    setChatInput('');
+    setLoadingChat(true);
+    try {
+      const { data } = await supabase
+        .from('messages')
+        .select('*, sender:profiles!sender_id(display_name, avatar_url)')
+        .or(`and(sender_id.eq.${firebaseUser.uid},receiver_id.eq.${userId}),and(sender_id.eq.${userId},receiver_id.eq.${firebaseUser.uid})`)
+        .eq('is_deleted', false)
+        .order('created_at', { ascending: false })
+        .limit(50);
+      setChatMessages(data || []);
+      // Okundu işaretle
+      MessageService.markAsRead(firebaseUser.uid, userId).catch(() => {});
+    } catch {}
+    setLoadingChat(false);
+  };
+
+  // ★ Mesaj gönder — takip kontrolü + engel kontrolü
+  const handleSend = async () => {
+    if (!chatInput.trim() || !chatTarget || chatSending) return;
+    const text = chatInput.trim();
+    setChatInput('');
+    setChatSending(true);
+
+    try {
+      // ★ Engel kontrolü
+      const isBlocked = await ModerationService.isBlocked(firebaseUser.uid, chatTarget.userId);
+      if (isBlocked) {
+        setChatSending(false);
+        return;
+      }
+      const blockedByTarget = await ModerationService.isBlocked(chatTarget.userId, firebaseUser.uid);
+      if (blockedByTarget) {
+        setChatSending(false);
+        return;
+      }
+
+      // ★ Takipleşme kontrolü — karşılıklı değilse mesaj isteği olarak gönder
+      let isMessageRequest = false;
+      try {
+        const { outgoing, incoming } = await FriendshipService.getDetailedStatus(firebaseUser.uid, chatTarget.userId);
+        const isMutual = outgoing === 'accepted' && incoming === 'accepted';
+        if (!isMutual) isMessageRequest = true;
+      } catch {}
+
+      // Optimistic: hemen ekle
+      const optMsg = {
+        id: `opt_${Date.now()}`,
+        sender_id: firebaseUser.uid,
+        receiver_id: chatTarget.userId,
+        content: text,
+        created_at: new Date().toISOString(),
+        sender: { display_name: 'Sen', avatar_url: '' },
+        _isMessageRequest: isMessageRequest,
+      };
+      setChatMessages(prev => [optMsg, ...prev]);
+
+      await MessageService.send(firebaseUser.uid, chatTarget.userId, text, isMessageRequest);
+    } catch {}
+    setChatSending(false);
+  };
+
+  // ★ Realtime mesaj dinleme (sohbet açıkken)
+  useEffect(() => {
+    if (!chatTarget || !firebaseUser) return;
+    const channel = supabase
+      .channel(`dm-panel-rt-${chatTarget.userId}`)
+      .on('postgres_changes', {
+        event: 'INSERT', schema: 'public', table: 'messages',
+        filter: `sender_id=eq.${chatTarget.userId}`,
+      }, (payload) => {
+        const msg = payload.new as any;
+        if (msg.receiver_id === firebaseUser.uid) {
+          setChatMessages(prev => {
+            if (prev.some(m => m.id === msg.id)) return prev;
+            return [{ ...msg, sender: { display_name: chatTarget.name, avatar_url: chatTarget.avatar || '' } }, ...prev];
+          });
+          MessageService.markAsRead(firebaseUser.uid, chatTarget.userId).catch(() => {});
+        }
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [chatTarget?.userId, firebaseUser?.uid]);
+
+  // ★ Engelle aksiyonu
+  const handleBlock = async (userId: string) => {
+    try {
+      await ModerationService.blockUser(firebaseUser.uid, userId);
+      // ★ FIX: Inbox listesinden kaldır
+      setDmInboxMessages(prev => prev.filter(m => {
+        const pid = m.partner_id || m.other_user_id || m.sender_id;
+        return pid !== userId;
+      }));
+      setChatTarget(null);
+    } catch {}
+  };
+
+  // ★ Sohbeti sil aksiyonu
+  const handleDeleteConversation = async (userId: string) => {
+    try {
+      await MessageService.markAsRead(firebaseUser.uid, userId);
+      await MessageService.deleteConversation(firebaseUser.uid, userId);
+      // ★ FIX: Inbox listesinden kaldır (UI anında güncellenir)
+      setDmInboxMessages(prev => prev.filter(m => {
+        const pid = m.partner_id || m.other_user_id || m.sender_id;
+        return pid !== userId;
+      }));
+      setChatTarget(null);
+    } catch {}
+  };
+
+  if (!visible) return null;
+
+  return (
+    <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+      {/* Backdrop */}
+      <Animated.View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.35)', opacity: fadeAnim }]}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+      </Animated.View>
+
+      {/* Panel — sağdan kayar */}
+      <Animated.View style={{
+        position: 'absolute', right: 0, top: 70, bottom: 80,
+        width: DM_PANEL_W,
+        backgroundColor: 'rgba(45,55,64,0.95)',
+        borderTopLeftRadius: 18, borderBottomLeftRadius: 18,
+        borderWidth: 1, borderRightWidth: 0, borderColor: 'rgba(20,184,166,0.12)',
+        overflow: 'hidden',
+        shadowColor: '#000', shadowOffset: { width: -4, height: 0 }, shadowOpacity: 0.4, shadowRadius: 16, elevation: 20,
+        transform: [{ translateX: slideAnim }],
+      }}>
+
+        {/* ═══ SOHBET GÖRÜNÜMÜ ═══ */}
+        {chatTarget ? (
+          <View style={{ flex: 1 }}>
+            {/* Chat Header */}
+            <View style={{
+              flexDirection: 'row', alignItems: 'center', gap: 10,
+              paddingHorizontal: 12, paddingVertical: 10,
+              borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)',
+              backgroundColor: 'rgba(20,184,166,0.06)',
+            }}>
+              <Pressable onPress={() => setChatTarget(null)} hitSlop={12} style={{
+                width: 28, height: 28, borderRadius: 14,
+                backgroundColor: 'rgba(255,255,255,0.06)',
+                alignItems: 'center', justifyContent: 'center',
+              }}>
+                <Ionicons name="arrow-back" size={15} color="#F1F5F9" />
+              </Pressable>
+              <Image source={getAvatarSource(chatTarget.avatar)} style={{
+                width: 30, height: 30, borderRadius: 15,
+                borderWidth: 1, borderColor: 'rgba(20,184,166,0.3)',
+              }} />
+              <Text style={{ color: '#F1F5F9', fontSize: 13, fontWeight: '700', flex: 1 }} numberOfLines={1}>
+                {chatTarget.name}
+              </Text>
+              {/* ★ Sessize alma badge — chat header'da */}
+              {mutedDmUsers.has(chatTarget.userId) && (
+                <Ionicons name="notifications-off" size={14} color="rgba(245,158,11,0.5)" style={{ marginRight: 4 }} />
+              )}
+            </View>
+
+            {/* Mesaj Listesi — inverted */}
+            {loadingChat ? (
+              <ActivityIndicator color="#14B8A6" style={{ marginTop: 40 }} />
+            ) : (
+              <FlatList
+                data={chatMessages}
+                keyExtractor={(item, i) => item.id || `msg_${i}`}
+                inverted
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ padding: 10, gap: 4 }}
+                renderItem={({ item }) => {
+                  const isMine = item.sender_id === firebaseUser?.uid;
+                  return (
+                    <View style={{
+                      alignSelf: isMine ? 'flex-end' : 'flex-start',
+                      maxWidth: '80%',
+                      paddingHorizontal: 12, paddingVertical: 8,
+                      borderRadius: 16,
+                      borderBottomRightRadius: isMine ? 4 : 16,
+                      borderBottomLeftRadius: isMine ? 16 : 4,
+                      backgroundColor: isMine ? 'rgba(20,184,166,0.2)' : 'rgba(255,255,255,0.06)',
+                      borderWidth: 1,
+                      borderColor: isMine ? 'rgba(20,184,166,0.15)' : 'rgba(255,255,255,0.04)',
+                    }}>
+                      <Text style={{ color: '#F1F5F9', fontSize: 13, lineHeight: 18 }}>{item.content}</Text>
+                      <Text style={{
+                        color: 'rgba(255,255,255,0.2)', fontSize: 9,
+                        alignSelf: 'flex-end', marginTop: 2,
+                      }}>
+                        {new Date(item.created_at).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
+                      </Text>
+                    </View>
+                  );
+                }}
+                ListEmptyComponent={
+                  <View style={{ alignItems: 'center', paddingVertical: 40 }}>
+                    <Ionicons name="chatbubble-outline" size={24} color="rgba(255,255,255,0.1)" />
+                    <Text style={{ color: 'rgba(255,255,255,0.2)', fontSize: 12, marginTop: 8 }}>Henüz mesaj yok</Text>
+                  </View>
+                }
+              />
+            )}
+
+            {/* Input Bar */}
+            <View style={{
+              flexDirection: 'row', alignItems: 'center', gap: 8,
+              paddingHorizontal: 10, paddingVertical: 8,
+              borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.06)',
+              backgroundColor: 'rgba(30,40,50,0.5)',
+            }}>
+              <TextInput
+                style={{
+                  flex: 1, height: 36, borderRadius: 18,
+                  backgroundColor: 'rgba(255,255,255,0.06)',
+                  borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+                  paddingHorizontal: 14, fontSize: 13, color: '#F1F5F9',
+                }}
+                placeholder="Mesaj yaz..."
+                placeholderTextColor="rgba(255,255,255,0.2)"
+                value={chatInput}
+                onChangeText={setChatInput}
+                maxLength={500}
+                returnKeyType="send"
+                onSubmitEditing={handleSend}
+              />
+              <Pressable
+                onPress={handleSend}
+                style={{
+                  width: 36, height: 36, borderRadius: 18,
+                  backgroundColor: chatInput.trim() ? 'rgba(20,184,166,0.3)' : 'rgba(255,255,255,0.04)',
+                  alignItems: 'center', justifyContent: 'center',
+                }}
+                disabled={!chatInput.trim() || chatSending}
+              >
+                <Ionicons name="send" size={16} color={chatInput.trim() ? '#14B8A6' : 'rgba(255,255,255,0.15)'} />
+              </Pressable>
+            </View>
+          </View>
+        ) : (
+          /* ═══ İNBOX GÖRÜNÜMÜ ═══ */
+          <>
+            {/* Header */}
+            <View style={{
+              flexDirection: 'row', alignItems: 'center', gap: 8,
+              paddingHorizontal: 14, paddingVertical: 12,
+              borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)',
+              backgroundColor: 'rgba(20,184,166,0.06)',
+            }}>
+              <View style={{
+                width: 28, height: 28, borderRadius: 9,
+                backgroundColor: 'rgba(20,184,166,0.15)', borderWidth: 1, borderColor: 'rgba(20,184,166,0.25)',
+                alignItems: 'center', justifyContent: 'center',
+              }}>
+                <Ionicons name="chatbubbles" size={13} color="#14B8A6" />
+              </View>
+              <Text style={{ color: '#F1F5F9', fontSize: 14, fontWeight: '700', flex: 1, letterSpacing: -0.2 }}>Mesajlar</Text>
+              {dmUnreadCount > 0 && (
+                <View style={{
+                  minWidth: 20, height: 20, borderRadius: 10,
+                  backgroundColor: '#14B8A6', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5,
+                }}>
+                  <Text style={{ color: '#FFF', fontSize: 10, fontWeight: '800' }}>{dmUnreadCount > 99 ? '99+' : dmUnreadCount}</Text>
+                </View>
+              )}
+            </View>
+
+            {/* Mesaj listesi — ★ Swipe-to-action ile */}
+            <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 8, gap: 2 }}>
+              {dmInboxMessages.length === 0 ? (
+                <View style={{ alignItems: 'center', paddingVertical: 40 }}>
+                  <View style={{
+                    width: 48, height: 48, borderRadius: 24,
+                    backgroundColor: 'rgba(20,184,166,0.08)', alignItems: 'center', justifyContent: 'center',
+                    marginBottom: 10,
+                  }}>
+                    <Ionicons name="chatbubbles-outline" size={24} color="rgba(20,184,166,0.3)" />
+                  </View>
+                  <Text style={{ color: 'rgba(255,255,255,0.35)', fontSize: 13, fontWeight: '600' }}>Henüz mesaj yok</Text>
+                  <Text style={{ color: 'rgba(255,255,255,0.15)', fontSize: 11, marginTop: 4 }}>Birine tıklayarak mesaj gönderebilirsin</Text>
+                </View>
+              ) : (
+                dmInboxMessages.slice(0, 15).map((msg: any, idx: number) => {
+                  const senderName = msg.partner_name || msg.sender_display_name || msg.other_display_name || 'Kullanıcı';
+                  const senderAvatar = msg.partner_avatar || msg.sender_avatar_url || msg.other_avatar_url;
+                  const preview = msg.last_message_content || msg.last_message || msg.content || '';
+                  const isUnread = (msg.unread_count || 0) > 0 || !msg.is_read;
+                  const senderId = msg.partner_id || msg.other_user_id || msg.sender_id;
+                  const timeAgo = msg.last_message_time || msg.last_message_at || msg.created_at;
+                  const mins = timeAgo ? Math.floor((Date.now() - new Date(timeAgo).getTime()) / 60000) : 0;
+                  const timeLabel = mins < 1 ? 'şimdi' : mins < 60 ? `${mins}dk` : mins < 1440 ? `${Math.floor(mins / 60)}sa` : `${Math.floor(mins / 1440)}g`;
+                  const isMutedUser = mutedDmUsers.has(senderId);
+                  return (
+                    <DmSwipeableRow
+                      key={`dm_${idx}`}
+                      isMuted={isMutedUser}
+                      onDelete={() => handleDeleteConversation(senderId)}
+                      onMute={() => toggleMuteDm(senderId)}
+                      onBlock={() => handleBlock(senderId)}
+                    >
+                      <Pressable
+                        onPress={() => openChat(senderId, senderName, senderAvatar)}
+                        style={({ pressed }) => ({
+                          flexDirection: 'row', alignItems: 'center', gap: 12,
+                          paddingVertical: 10, paddingHorizontal: 10, borderRadius: 14,
+                          backgroundColor: pressed ? 'rgba(20,184,166,0.08)' : isUnread ? 'rgba(20,184,166,0.04)' : 'rgba(30,40,50,0.95)',
+                        })}
+                      >
+                        <View style={{ position: 'relative' }}>
+                          <Image source={getAvatarSource(senderAvatar)} style={{
+                            width: 40, height: 40, borderRadius: 20,
+                            borderWidth: 1.5, borderColor: isUnread ? 'rgba(20,184,166,0.4)' : 'rgba(255,255,255,0.08)',
+                          }} />
+                          {msg.partner_is_online && (
+                            <View style={{
+                              position: 'absolute', bottom: 0, right: 0,
+                              width: 11, height: 11, borderRadius: 6,
+                              backgroundColor: '#22C55E', borderWidth: 2, borderColor: '#2D3740',
+                            }} />
+                          )}
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, maxWidth: '70%' }}>
+                              <Text style={{
+                                color: isUnread ? '#F1F5F9' : 'rgba(255,255,255,0.6)',
+                                fontSize: 13, fontWeight: isUnread ? '700' : '500',
+                              }} numberOfLines={1}>{senderName}</Text>
+                              {/* ★ Sessize alma ikonu — ismin yanında */}
+                              {isMutedUser && (
+                                <Ionicons name="notifications-off" size={11} color="rgba(245,158,11,0.5)" />
+                              )}
+                            </View>
+                            <Text style={{ color: isUnread ? 'rgba(20,184,166,0.6)' : 'rgba(255,255,255,0.15)', fontSize: 10, fontWeight: '500' }}>{timeLabel}</Text>
+                          </View>
+                          <Text style={{
+                            color: isUnread ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.25)',
+                            fontSize: 11, marginTop: 2, fontWeight: isUnread ? '500' : '400',
+                          }} numberOfLines={1}>{preview}</Text>
+                        </View>
+                        {isUnread && (msg.unread_count || 0) > 0 && (
+                          <View style={{
+                            minWidth: 18, height: 18, borderRadius: 9,
+                            backgroundColor: '#14B8A6', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4,
+                          }}>
+                            <Text style={{ color: '#FFF', fontSize: 9, fontWeight: '800' }}>{msg.unread_count > 9 ? '9+' : msg.unread_count}</Text>
+                          </View>
+                        )}
+                      </Pressable>
+                    </DmSwipeableRow>
+                  );
+                })
+              )}
+            </ScrollView>
+          </>
+        )}
+      </Animated.View>
+    </View>
+  );
+}
 
 /* 
    ANA EKRAN
@@ -139,11 +687,14 @@ export default function RoomScreen() {
 
   // ★ ARCH-1: DM hook — inline DM state/logic kaldırıldı
   const {
-    dmUnreadCount, dmInboxMessages,
+    dmUnreadCount, dmInboxMessages, setDmInboxMessages,
     dmTarget, setDmTarget, dmText, setDmText, dmSending,
     showDmPanel, setShowDmPanel,
     handleSendDm, toggleDmPanel,
   } = useRoomDM({ firebaseUser });
+
+  // ★ DM panel için başlangıç hedefi (ProfileCard → DM butonu)
+  const [dmInitialTarget, setDmInitialTarget] = useState<{ userId: string; name: string; avatar?: string } | null>(null);
 
   // ★ ODA KAPANMA GERİ SAYIMI — Host+Mod yoksa 60sn sonra kapanır
   const [closingCountdown, setClosingCountdown] = useState<number | null>(null);
@@ -384,7 +935,8 @@ export default function RoomScreen() {
 
           // ★ Erişim onaylandı — Giriş Ücreti (SP) kontrolü (checkAccess sonrası)
           const entryFee = (roomData.room_settings as any)?.entry_fee_sp || 0;
-          if (entryFee > 0) {
+          const isOwner = roomData.host_id === firebaseUser.uid;
+          if (entryFee > 0 && !isOwner) { // ★ Owner kendi odasına ücret ödemez
             try {
               const result = await GamificationService.spend(firebaseUser.uid, entryFee, 'room_entry_fee');
               if (!result.success) {
@@ -398,7 +950,11 @@ export default function RoomScreen() {
                 });
                 return;
               }
-              // SP bilgisi SPToast ile gösterilir — çift toast önleme
+              // ★ Giriş ücretinin %90'ını oda sahibine ver (%10 platform komisyonu)
+              const ownerShare = Math.floor(entryFee * 0.9);
+              if (ownerShare > 0 && roomData.host_id) {
+                GamificationService.earn(roomData.host_id, ownerShare, 'entry_fee_income').catch(() => {});
+              }
               spToastRef.current?.show(-entryFee, 'Giriş Ücreti');
             } catch {
               // SP servisi hata verirse girişe izin ver (graceful degradation)
@@ -501,11 +1057,7 @@ export default function RoomScreen() {
           .catch(() => {});
       }
     });
-    // Mesaj geçmişi: Sadece oda sahibi geçmişi görebilir, yeni girenler sıfırdan başlar
-    const isHost = room?.host_id === firebaseUser?.uid;
-    if (isHost) {
-      RoomChatService.getMessages(id as string, 50).then(setChatMessages);
-    }
+    // Mesajlar: Eski mesajlar yüklenmez — herkes sıfırdan başlar, sadece realtime mesajlar gösterilir
     // BUG-11 FIX: Mesaj birikimi limitleme (max 100)
     const unsubscribeMsg = RoomChatService.subscribe(id as string, (msg) => setChatMessages(prev => [msg, ...prev].slice(0, 100)));
 
@@ -862,7 +1414,7 @@ export default function RoomScreen() {
         });
         // Başarı toast gereksiz — sayfadan çıkılıyor
       } else if (result.keepAlive) {
-        // ★ Bronze+: Oda açık kalır — sahibi dilediğinde geri dönebilir veya manuel dondurabilir
+        // ★ Plus+: Oda açık kalır — sahibi dilediğinde geri dönebilir veya manuel dondurabilir
         // Başarı toast gereksiz — sayfadan çıkılıyor
       } else {
         // ★ Free: Devralacak kimse yok — oda kapanır
@@ -905,7 +1457,7 @@ export default function RoomScreen() {
               payload: { action: 'room_closing_countdown', seconds: 60 },
             });
           }
-          // Bronze+: Geri sayım yok — oda açık kalır
+          // Plus+: Geri sayım yok — oda açık kalır
         }
       }
       
@@ -1009,27 +1561,18 @@ export default function RoomScreen() {
 
 
   // ========== SAHNEDEN İNME (Self-Demote) ==========
-  const handleSelfDemote = () => {
-    setAlertConfig({
-      visible: true, title: 'Sahneden İn', message: 'Sahneden inip dinleyici olarak devam etmek istiyor musun?', type: 'info', icon: 'arrow-down-circle',
-      buttons: [
-        { text: 'İptal', style: 'cancel' },
-        { text: 'Sahneden İn', onPress: async () => {
-          try {
-            if (firebaseUser?.uid) {
-              if (lk.isMicrophoneEnabled) await lk.toggleMic();
-              await RoomService.demoteSpeaker(id as string, firebaseUser.uid);
-              modChannelRef.current?.send({ type: 'broadcast', event: 'mod_action', payload: { action: 'demote', targetUserId: firebaseUser.uid } });
-              // ★ BUG FIX: Optimistik state güncelleme — speaker → listener (UI anında dinleyici grid'ine taşır)
-              setParticipants(prev => prev.map(p => p.user_id === firebaseUser!.uid ? { ...p, role: 'listener' as const } : p));
-              showToast({ title: 'Sahneden İndin', message: 'Artık dinleyicisin', type: 'info' });
-            }
-          } catch (e) {
-            showToast({ title: 'Hata', message: 'İşlem başarısız', type: 'error' });
-          }
-        }}
-      ]
-    });
+  const handleSelfDemote = async () => {
+    try {
+      if (firebaseUser?.uid) {
+        if (lk.isMicrophoneEnabled) await lk.toggleMic();
+        await RoomService.demoteSpeaker(id as string, firebaseUser.uid);
+        modChannelRef.current?.send({ type: 'broadcast', event: 'mod_action', payload: { action: 'demote', targetUserId: firebaseUser.uid } });
+        setParticipants(prev => prev.map(p => p.user_id === firebaseUser!.uid ? { ...p, role: 'listener' as const } : p));
+        showToast({ title: 'Sahneden İndin', message: 'Artık dinleyicisin', type: 'info' });
+      }
+    } catch (e) {
+      showToast({ title: 'Hata', message: 'İşlem başarısız', type: 'error' });
+    }
   };
 
 
@@ -1120,8 +1663,8 @@ export default function RoomScreen() {
 
   // ★ Owner tier'ı — oda yönetim özelliklerinin tier kilidini belirler
   const ownerTier = useMemo(() => {
-    // ★ Admin (GodMaster) her zaman VIP gibi davranır
-    if (profile?.is_admin) return 'VIP';
+    // ★ Admin (GodMaster) her zaman Pro gibi davranır
+    if (profile?.is_admin) return 'Pro';
     return (room as any)?.owner_tier || room?.host?.subscription_tier || 'Free';
   }, [room, profile?.is_admin]);
 
@@ -1174,7 +1717,7 @@ export default function RoomScreen() {
     }));
   }, [gamificationStats.peakCCU, gamificationStats.totalUniqueListeners]);
 
-  // ★ VIP: Tümünü Sustur
+  // ★ Pro: Tümünü Sustur
   const handleMuteAll = useCallback(async () => {
     if (!room || !firebaseUser) return;
     setAlertConfig({
@@ -1516,23 +2059,24 @@ export default function RoomScreen() {
       <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 130 }}>
         <SpeakerSection stageUsers={stageUsers} getMicStatus={getMicStatus}
           onSelectUser={(u) => setSelectedUser(u)}
+          onSelfDemote={handleSelfDemote}
           currentUserId={firebaseUser?.uid} VideoView={LKVideoView}
           onGhostSeatPress={handleGhostSeatPress} showSeatTooltip={showSeatTooltip} />
         <ListenerGrid listeners={listenerUsers} onSelectUser={(u) => setSelectedUser(u)} selectedUserId={selectedUser?.user_id} onShowAllUsers={() => setShowAudienceDrawer(true)} maxListeners={getRoomLimits(ownerTier as any).maxListeners} spectatorCount={spectatorUsers.length} roomOwnerId={room?.host_id} />
       </ScrollView>
 
-      {/* ★ Inline Chat — alt barın üstünde, şeffaf metin (tıklayınca drawer açılır, drawer açıkken gizle) */}
-      {!showChatDrawer && !showDmPanel && (
-        <Pressable onPress={() => setShowChatDrawer(true)} style={{ position: 'absolute', bottom: Math.max(insets.bottom, 14) + 120, left: 0, right: 0, zIndex: 5 }}>
-          <InlineChat messages={chatMessages as any[]} maxLines={4} />
+      {/* ★ Inline Chat — alt barın üstünde, şeffaf metin (emoji bar açıkken yukarı kayar) */}
+      {!showChatDrawer && !showDmPanel && !showPlusMenu && (
+        <Pressable onPress={() => setShowChatDrawer(true)} style={{ position: 'absolute', bottom: showEmojiBar ? Math.max(insets.bottom, 14) + 400 : Math.max(insets.bottom, 14) + 120, left: 0, right: 0, zIndex: showEmojiBar ? 51 : 2 }}>
+          <InlineChat messages={chatMessages as any[]} maxLines={showEmojiBar ? 3 : 4} />
         </Pressable>
       )}
 
       {!!entryEffectName && <PremiumEntryBanner name={entryEffectName} onDone={() => setEntryEffectName(null)} />}
-      <FloatingReactionsView ref={floatingRef} />
       <SPToast ref={spToastRef} />
       {showEmojiBar && (<>
-        <Pressable style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 49 }} onPress={() => setShowEmojiBar(false)} />
+        {/* ★ Backdrop — emoji picker'ın ÜSTÜNDEKI alanı kapatır, alt kısımda chat görünür kalır */}
+        <Pressable style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: Math.max(insets.bottom, 14) + 390, zIndex: 49, backgroundColor: 'rgba(0,0,0,0.15)' }} onPress={() => setShowEmojiBar(false)} />
         <View style={{ position: 'absolute', bottom: Math.max(insets.bottom, 14) + 100, left: 0, right: 0, alignItems: 'center', zIndex: 50 }}><EmojiReactionBar onReaction={(emoji) => {
         sendEmojiReaction(emoji);
         if (firebaseUser) {
@@ -1540,6 +2084,9 @@ export default function RoomScreen() {
         }
       }} onClose={() => setShowEmojiBar(false)} /></View>
       </>)}
+
+      {/* ★ Floating Reactions — her zaman en üstte, emoji bar açıkken de görünür */}
+      <FloatingReactionsView ref={floatingRef} />
 
       <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, paddingBottom: Math.max(insets.bottom, 14) + 2 }}>
         <LinearGradient colors={['transparent', 'rgba(5,10,20,0.95)']} locations={[0, 0.4]} style={[StyleSheet.absoluteFill, { top: -20 }]} pointerEvents="none" />
@@ -1585,121 +2132,17 @@ export default function RoomScreen() {
       <RoomChatDrawer visible={showChatDrawer} messages={chatMessages as any[]} chatInput={chatInput}
         onChangeInput={setChatInput} onSend={handleSendChat} onClose={() => setShowChatDrawer(false)} bottomInset={insets.bottom} />
 
-      {/* ★ DM MİNİ PANELİ — Oda içi mesaj bildirimleri (odadan çıkarmaz) */}
-      {showDmPanel && (
-        <View style={[StyleSheet.absoluteFill, { zIndex: 100 }]}>
-          <Pressable style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.45)' }]} onPress={() => setShowDmPanel(false)} />
-          <Animated.View style={{
-            position: 'absolute', bottom: Math.max(insets.bottom, 14) + 110, right: 10, left: 10,
-            maxHeight: 360, borderRadius: 20, backgroundColor: 'rgba(45,55,64,0.97)',
-            borderWidth: 1, borderColor: 'rgba(20,184,166,0.15)',
-            shadowColor: '#000', shadowOffset: { width: 0, height: -6 }, shadowOpacity: 0.5, shadowRadius: 20, elevation: 20,
-            overflow: 'hidden',
-          }}>
-            {/* Header */}
-            <View style={{
-              flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12,
-              borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)',
-              backgroundColor: 'rgba(20,184,166,0.06)',
-            }}>
-              <View style={{
-                width: 30, height: 30, borderRadius: 10,
-                backgroundColor: 'rgba(20,184,166,0.15)', borderWidth: 1, borderColor: 'rgba(20,184,166,0.25)',
-                alignItems: 'center', justifyContent: 'center',
-              }}>
-                <Ionicons name="chatbubbles" size={14} color="#14B8A6" />
-              </View>
-              <Text style={{ color: '#F1F5F9', fontSize: 15, fontWeight: '800', marginLeft: 10, flex: 1, letterSpacing: -0.2 }}>Mesajlar</Text>
-              {dmUnreadCount > 0 && (
-                <View style={{ minWidth: 20, height: 20, borderRadius: 10, backgroundColor: '#14B8A6', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5, marginRight: 10 }}>
-                  <Text style={{ color: '#FFF', fontSize: 10, fontWeight: '800' }}>{dmUnreadCount > 99 ? '99+' : dmUnreadCount}</Text>
-                </View>
-              )}
-
-            </View>
-            {/* Mesaj listesi */}
-            <ScrollView style={{ maxHeight: 290 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 8, gap: 2 }}>
-              {dmInboxMessages.length === 0 ? (
-                <View style={{ alignItems: 'center', paddingVertical: 32 }}>
-                  <View style={{
-                    width: 48, height: 48, borderRadius: 24,
-                    backgroundColor: 'rgba(20,184,166,0.08)', alignItems: 'center', justifyContent: 'center',
-                    marginBottom: 10,
-                  }}>
-                    <Ionicons name="chatbubbles-outline" size={24} color="rgba(20,184,166,0.3)" />
-                  </View>
-                  <Text style={{ color: 'rgba(255,255,255,0.35)', fontSize: 13, fontWeight: '600' }}>Henüz mesaj yok</Text>
-                  <Text style={{ color: 'rgba(255,255,255,0.15)', fontSize: 11, marginTop: 4 }}>Birine tıklayarak mesaj gönderebilirsin</Text>
-                </View>
-              ) : (
-                dmInboxMessages.slice(0, 10).map((msg: any, idx: number) => {
-                  const senderName = msg.partner_name || msg.sender_display_name || msg.other_display_name || 'Kullanıcı';
-                  const senderAvatar = msg.partner_avatar || msg.sender_avatar_url || msg.other_avatar_url;
-                  const preview = msg.last_message_content || msg.last_message || msg.content || '';
-                  const isUnread = (msg.unread_count || 0) > 0 || !msg.is_read;
-                  const senderId = msg.partner_id || msg.other_user_id || msg.sender_id;
-                  const timeAgo = msg.last_message_time || msg.last_message_at || msg.created_at;
-                  const mins = timeAgo ? Math.floor((Date.now() - new Date(timeAgo).getTime()) / 60000) : 0;
-                  const timeLabel = mins < 1 ? 'şimdi' : mins < 60 ? `${mins}dk` : mins < 1440 ? `${Math.floor(mins / 60)}sa` : `${Math.floor(mins / 1440)}g`;
-                  return (
-                    <Pressable
-                      key={`dm_${idx}`}
-                      onPress={() => {
-                        setShowDmPanel(false);
-                        setDmTarget({ userId: senderId, nick: senderName });
-                        setDmText('');
-                      }}
-                      style={({ pressed }) => ({
-                        flexDirection: 'row', alignItems: 'center', gap: 12,
-                        paddingVertical: 10, paddingHorizontal: 10, borderRadius: 14,
-                        backgroundColor: pressed ? 'rgba(20,184,166,0.08)' : isUnread ? 'rgba(20,184,166,0.04)' : 'transparent',
-                      })}
-                    >
-                      {/* Gönderici Avatarı */}
-                      <View style={{ position: 'relative' }}>
-                        <Image source={getAvatarSource(senderAvatar)} style={{
-                          width: 42, height: 42, borderRadius: 21,
-                          borderWidth: 1.5, borderColor: isUnread ? 'rgba(20,184,166,0.4)' : 'rgba(255,255,255,0.08)',
-                        }} />
-                        {/* Online dot */}
-                        {msg.partner_is_online && (
-                          <View style={{
-                            position: 'absolute', bottom: 0, right: 0,
-                            width: 12, height: 12, borderRadius: 6,
-                            backgroundColor: '#22C55E', borderWidth: 2, borderColor: '#0F172A',
-                          }} />
-                        )}
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                          <Text style={{
-                            color: isUnread ? '#F1F5F9' : 'rgba(255,255,255,0.6)',
-                            fontSize: 14, fontWeight: isUnread ? '700' : '500',
-                            maxWidth: '70%',
-                          }} numberOfLines={1}>{senderName}</Text>
-                          <Text style={{ color: isUnread ? 'rgba(20,184,166,0.6)' : 'rgba(255,255,255,0.15)', fontSize: 10, fontWeight: '500' }}>{timeLabel}</Text>
-                        </View>
-                        <Text style={{
-                          color: isUnread ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.25)',
-                          fontSize: 12, marginTop: 2, fontWeight: isUnread ? '500' : '400',
-                        }} numberOfLines={1}>{preview}</Text>
-                      </View>
-                      {isUnread && (msg.unread_count || 0) > 0 && (
-                        <View style={{
-                          minWidth: 20, height: 20, borderRadius: 10,
-                          backgroundColor: '#14B8A6', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5,
-                        }}>
-                          <Text style={{ color: '#FFF', fontSize: 9, fontWeight: '800' }}>{msg.unread_count > 9 ? '9+' : msg.unread_count}</Text>
-                        </View>
-                      )}
-                    </Pressable>
-                  );
-                })
-              )}
-            </ScrollView>
-          </Animated.View>
-        </View>
-      )}
+      {/* ★ DM MİNİ PANELİ — Oda içi mesajlaşma (inbox + sohbet) */}
+      <DmPanelDrawer
+        visible={showDmPanel}
+        onClose={() => { setShowDmPanel(false); setDmInitialTarget(null); }}
+        dmInboxMessages={dmInboxMessages}
+        setDmInboxMessages={setDmInboxMessages}
+        dmUnreadCount={dmUnreadCount}
+        firebaseUser={firebaseUser}
+        bottomInset={insets.bottom}
+        initialChatTarget={dmInitialTarget}
+      />
 
       <AudienceDrawer visible={showAudienceDrawer} users={[...stageUsers, ...listenerUsers, ...spectatorUsers]}
         onClose={() => setShowAudienceDrawer(false)} onSelectUser={(u) => setSelectedUser(u as any)} />
@@ -1749,7 +2192,15 @@ export default function RoomScreen() {
               setUserFollowStatus(prev => ({ ...prev, [selectedUser.user_id]: currentStatus ?? null }));
             }
           }}
-          onDM={() => { setDmTarget({ userId: selectedUser.user_id, nick: selectedUser.user?.display_name || 'Kullanıcı' }); setDmText(''); setSelectedUser(null); }}
+          onDM={() => {
+            setDmInitialTarget({
+              userId: selectedUser.user_id,
+              name: selectedUser.user?.display_name || 'Kullanıcı',
+              avatar: selectedUser.user?.avatar_url,
+            });
+            setShowDmPanel(true);
+            setSelectedUser(null);
+          }}
           onPromoteToStage={_perm('promote_speaker') && selectedUser.role === 'listener' && _notSelf ? () => handlePromoteToStage(selectedUser.user_id, selectedUser.user?.display_name || 'Kullanıcı') : undefined}
           onRemoveFromStage={_perm('demote_speaker') && (selectedUser.role === 'speaker') && _notSelf ? async () => { try { await RoomService.demoteSpeaker(id as string, selectedUser.user_id); modChannelRef.current?.send({ type: 'broadcast', event: 'mod_action', payload: { action: 'demote', targetUserId: selectedUser.user_id } }); setParticipants(prev => prev.map(p => p.user_id === selectedUser.user_id ? { ...p, role: 'listener' as const } : p)); setSelectedUser(null); } catch {} } : undefined}
           onMute={_perm('timed_mute') && _notSelf && !selectedUser.is_muted ? () => handleTimedMuteUser(selectedUser.user_id, selectedUser.user?.display_name || 'Kullanıcı') : undefined}
@@ -1784,7 +2235,15 @@ export default function RoomScreen() {
                   try {
                     const result = await GamificationService.spend(firebaseUser!.uid, amt, 'tip');
                     if (!result.success) { showToast({ title: 'Yetersiz SP', message: result.error || '', type: 'error' }); return; }
-                    await GamificationService.earn(selectedUser.user_id, amt, 'tip_received');
+                    // ★ earn fail olursa SP iade et (buharlaşma koruması)
+                    try {
+                      await GamificationService.earn(selectedUser.user_id, amt, 'tip_received');
+                    } catch {
+                      // Alıcıya verilemeyen SP'yi gönderene iade et
+                      await GamificationService.earn(firebaseUser!.uid, amt, 'tip_refund');
+                      showToast({ title: '⚠️ Bağış İade Edildi', message: 'Alıcıya ulaşılamadı, SP iade edildi.', type: 'error' });
+                      return;
+                    }
                     showToast({ title: `❤️ ${amt} SP Gönderildi!`, message: `${selectedUser.user?.display_name} bağışınız için teşekkürler`, type: 'success' });
                     spToastRef.current?.show(-amt, 'Bağış');
                     setSelectedUser(null);
@@ -1807,13 +2266,13 @@ export default function RoomScreen() {
         onLeaveRoom={handleSettingsLeave}
         canDeleteRoom={(amIHost && !amIActingHost) || amIGodMaster} onDeleteRoom={handleDeleteRoom}
         isHost={amIHost} currentThemeId={room?.theme_id}
-        onChangeTheme={amIHost && isTierAtLeast(ownerTier as any, 'Silver') ? async (themeId) => { if (!room || !firebaseUser) return; try { await RoomService.setRoomTheme(room.id, firebaseUser.uid, themeId); setRoom(prev => prev ? { ...prev, theme_id: themeId } : prev); modChannelRef.current?.send({ type: 'broadcast', event: 'settings_changed', payload: { theme_id: themeId } }); showToast({ title: '🎨 Tema!', type: 'success' }); } catch (err: any) { showToast({ title: 'Hata', message: err.message, type: 'error' }); } } : undefined}
+        onChangeTheme={amIHost && isTierAtLeast(ownerTier as any, 'Plus') ? async (themeId) => { if (!room || !firebaseUser) return; try { await RoomService.setRoomTheme(room.id, firebaseUser.uid, themeId); setRoom(prev => prev ? { ...prev, theme_id: themeId } : prev); modChannelRef.current?.send({ type: 'broadcast', event: 'settings_changed', payload: { theme_id: themeId } }); showToast({ title: '🎨 Tema!', type: 'success' }); } catch (err: any) { showToast({ title: 'Hata', message: err.message, type: 'error' }); } } : undefined}
         roomName={room?.name}
         onRenameRoom={amIHost ? async (newName: string) => { if (!room) return; try { await ModerationService.editRoomName(room.id, newName); setRoom(prev => prev ? { ...prev, name: newName } : prev); modChannelRef.current?.send({ type: 'broadcast', event: 'settings_changed', payload: { name: newName } }); showToast({ title: 'İsim Güncellendi', type: 'success' }); } catch { showToast({ title: 'Hata', type: 'error' }); } } : undefined}
         welcomeMessage={(room?.room_settings as any)?.welcome_message || ''}
         onChangeWelcomeMessage={amIHost ? async (msg: string) => { if (!room || !firebaseUser) return; try { await RoomService.updateSettings(room.id, firebaseUser.uid, { room_settings: { welcome_message: msg } }); setRoom(prev => prev ? { ...prev, room_settings: { ...(prev.room_settings || {}), welcome_message: msg } } : prev); modChannelRef.current?.send({ type: 'broadcast', event: 'settings_changed', payload: { room_settings: { welcome_message: msg } } }); showToast({ title: msg ? '✅ Hoş Geldin Mesajı Ayarlandı' : 'Hoş Geldin Mesajı Kaldırıldı', type: 'success' }); } catch { showToast({ title: 'Hata', type: 'error' }); } } : undefined}
         backgroundImage={(room as any)?.room_image_url || (room?.room_settings as any)?.room_image_url || null}
-        onChangeBackgroundImage={amIHost && isTierAtLeast(ownerTier as any, 'Silver') ? async (imageUri: string | null) => {
+        onChangeBackgroundImage={amIHost && isTierAtLeast(ownerTier as any, 'Plus') ? async (imageUri: string | null) => {
           if (!room || !firebaseUser) return;
           if (imageUri === 'default') {
             // Image picker aç
@@ -1844,9 +2303,9 @@ export default function RoomScreen() {
           }
         } : undefined}
         isLocked={(room?.room_settings as any)?.is_locked || false}
-        onToggleLock={amIHost && isTierAtLeast(ownerTier as any, 'Silver') ? async (locked: boolean) => { if (!room) return; try { await RoomService.setRoomLock(room.id, locked); setRoom(prev => prev ? { ...prev, room_settings: { ...(prev.room_settings || {}), is_locked: locked } } : prev); modChannelRef.current?.send({ type: 'broadcast', event: 'settings_changed', payload: { room_settings: { is_locked: locked } } }); showToast({ title: locked ? 'Oda Kilitlendi' : 'Kilit Açıldı', type: 'success' }); } catch { showToast({ title: 'Hata', type: 'error' }); } } : undefined}
+        onToggleLock={amIHost && isTierAtLeast(ownerTier as any, 'Plus') ? async (locked: boolean) => { if (!room) return; try { await RoomService.setRoomLock(room.id, locked); setRoom(prev => prev ? { ...prev, room_settings: { ...(prev.room_settings || {}), is_locked: locked } } : prev); modChannelRef.current?.send({ type: 'broadcast', event: 'settings_changed', payload: { room_settings: { is_locked: locked } } }); showToast({ title: locked ? 'Oda Kilitlendi' : 'Kilit Açıldı', type: 'success' }); } catch { showToast({ title: 'Hata', type: 'error' }); } } : undefined}
         followersOnly={(room?.room_settings as any)?.followers_only || false}
-        onToggleFollowersOnly={amIHost && isTierAtLeast(ownerTier as any, 'Gold') ? async (enabled: boolean) => { if (!room) return; try { await RoomService.updateSettings(room.id, firebaseUser!.uid, { room_settings: { followers_only: enabled } }); setRoom(prev => prev ? { ...prev, room_settings: { ...(prev.room_settings || {}), followers_only: enabled } } : prev); modChannelRef.current?.send({ type: 'broadcast', event: 'settings_changed', payload: { room_settings: { followers_only: enabled } } }); showToast({ title: enabled ? 'Takipçilere Özel' : 'Herkese Açık', type: 'success' }); } catch { showToast({ title: 'Hata', type: 'error' }); } } : undefined}
+        onToggleFollowersOnly={amIHost && isTierAtLeast(ownerTier as any, 'Pro') ? async (enabled: boolean) => { if (!room) return; try { await RoomService.updateSettings(room.id, firebaseUser!.uid, { room_settings: { followers_only: enabled } }); setRoom(prev => prev ? { ...prev, room_settings: { ...(prev.room_settings || {}), followers_only: enabled } } : prev); modChannelRef.current?.send({ type: 'broadcast', event: 'settings_changed', payload: { room_settings: { followers_only: enabled } } }); showToast({ title: enabled ? 'Takipçilere Özel' : 'Herkese Açık', type: 'success' }); } catch { showToast({ title: 'Hata', type: 'error' }); } } : undefined}
         slowModeSeconds={(room?.room_settings as any)?.slow_mode_seconds || 0}
         onSlowModeChange={canModerate ? async (seconds: number) => { if (!room) return; try { await RoomService.updateSettings(room.id, firebaseUser!.uid, { room_settings: { slow_mode_seconds: seconds } }); setRoom(prev => prev ? { ...prev, room_settings: { ...(prev.room_settings || {}), slow_mode_seconds: seconds } } : prev); modChannelRef.current?.send({ type: 'broadcast', event: 'settings_changed', payload: { room_settings: { slow_mode_seconds: seconds } } }); showToast({ title: seconds ? `Slow Mode: ${seconds}sn` : 'Slow Mode Kapalı', type: 'success' }); } catch { showToast({ title: 'Hata', type: 'error' }); } } : undefined}
         ownerTier={ownerTier}
@@ -1864,7 +2323,7 @@ export default function RoomScreen() {
           }
         } : undefined}
         roomType={(room?.type || 'open') as any}
-        onRoomTypeChange={amIHost && isTierAtLeast(ownerTier as any, 'Bronze') ? async (newType) => {
+        onRoomTypeChange={amIHost && isTierAtLeast(ownerTier as any, 'Plus') ? async (newType) => {
           if (!room) return;
           try {
             await supabase.from('rooms').update({ type: newType }).eq('id', room.id);
@@ -1874,7 +2333,7 @@ export default function RoomScreen() {
           } catch { showToast({ title: 'Hata', type: 'error' }); }
         } : undefined}
         entryFeeSp={(room?.room_settings as any)?.entry_fee_sp || 0}
-        onEntryFeeChange={amIHost && isTierAtLeast(ownerTier as any, 'VIP') ? async (fee) => {
+        onEntryFeeChange={amIHost && isTierAtLeast(ownerTier as any, 'Pro') ? async (fee) => {
           if (!room) return;
           try {
             await RoomService.updateSettings(room.id, firebaseUser!.uid, { room_settings: { entry_fee_sp: fee } });
@@ -1884,7 +2343,7 @@ export default function RoomScreen() {
           } catch { showToast({ title: 'Hata', type: 'error' }); }
         } : undefined}
         donationsEnabled={(room?.room_settings as any)?.donations_enabled || false}
-        onDonationsToggle={amIHost && isTierAtLeast(ownerTier as any, 'Gold') ? async (enabled) => {
+        onDonationsToggle={amIHost && isTierAtLeast(ownerTier as any, 'Pro') ? async (enabled) => {
           if (!room) return;
           try {
             await RoomService.updateSettings(room.id, firebaseUser!.uid, { room_settings: { donations_enabled: enabled } });
@@ -1903,8 +2362,8 @@ export default function RoomScreen() {
             showToast({ title: 'Kurallar Güncellendi', type: 'success' });
           } catch { showToast({ title: 'Hata', type: 'error' }); }
         } : undefined}
-        canFreezeRoom={amIHost && isTierAtLeast(ownerTier as any, 'Bronze')}
-        onFreezeRoom={amIHost && isTierAtLeast(ownerTier as any, 'Bronze') ? () => {
+        canFreezeRoom={amIHost && isTierAtLeast(ownerTier as any, 'Plus')}
+        onFreezeRoom={amIHost && isTierAtLeast(ownerTier as any, 'Plus') ? () => {
           setAlertConfig({
             visible: true,
             title: '❄️ Odayı Dondur',
@@ -1939,7 +2398,7 @@ export default function RoomScreen() {
           });
         } : undefined}
         roomLanguage={(room?.room_settings as any)?.room_language || (room as any)?.language || 'tr'}
-        onLanguageChange={amIHost && isTierAtLeast(ownerTier as any, 'Silver') ? async (lang) => {
+        onLanguageChange={amIHost && isTierAtLeast(ownerTier as any, 'Plus') ? async (lang) => {
           if (!room || !firebaseUser) return;
           try {
             await RoomService.updateSettings(room.id, firebaseUser.uid, { room_settings: { room_language: lang as any } });
@@ -1950,7 +2409,7 @@ export default function RoomScreen() {
           } catch { showToast({ title: 'Hata', type: 'error' }); }
         } : undefined}
         ageRestricted={(room?.room_settings as any)?.age_restricted || false}
-        onAgeRestrictedChange={amIHost && isTierAtLeast(ownerTier as any, 'Silver') ? async (enabled) => {
+        onAgeRestrictedChange={amIHost && isTierAtLeast(ownerTier as any, 'Plus') ? async (enabled) => {
           if (!room || !firebaseUser) return;
           try {
             await RoomService.updateSettings(room.id, firebaseUser.uid, { room_settings: { age_restricted: enabled } });
@@ -1960,7 +2419,7 @@ export default function RoomScreen() {
           } catch { showToast({ title: 'Hata', type: 'error' }); }
         } : undefined}
         coverImage={(room?.room_settings as any)?.cover_image_url || null}
-        onChangeCoverImage={amIHost && isTierAtLeast(ownerTier as any, 'Gold') ? async (imageUri) => {
+        onChangeCoverImage={amIHost && isTierAtLeast(ownerTier as any, 'Pro') ? async (imageUri) => {
           if (!room || !firebaseUser) return;
           try {
             if (imageUri === 'pick') {
@@ -1987,7 +2446,7 @@ export default function RoomScreen() {
           } catch { showToast({ title: 'Hata', type: 'error' }); }
         } : undefined}
         musicTrack={(room?.room_settings as any)?.music_track || null}
-        onMusicChange={amIHost && isTierAtLeast(ownerTier as any, 'Gold') ? async (track) => {
+        onMusicChange={amIHost && isTierAtLeast(ownerTier as any, 'Pro') ? async (track) => {
           if (!room || !firebaseUser) return;
           try {
             await RoomService.updateSettings(room.id, firebaseUser.uid, { room_settings: { music_track: track } });
@@ -2000,16 +2459,7 @@ export default function RoomScreen() {
 
       <PremiumAlert visible={alertConfig.visible} title={alertConfig.title} message={alertConfig.message} type={alertConfig.type} buttons={alertConfig.buttons} icon={alertConfig.icon} onDismiss={() => setAlertConfig(prev => ({ ...prev, visible: false }))} />
 
-      {dmTarget && (
-        <View style={dmSty.overlay}><Pressable style={StyleSheet.absoluteFill} onPress={() => setDmTarget(null)} />
-        <View style={dmSty.panel}><View style={dmSty.handle} />
-            <View style={dmSty.header}><Ionicons name="chatbubble-ellipses" size={16} color={COLORS.primary} /><Text style={dmSty.headerText} numberOfLines={1}>{dmTarget.nick} — Mesaj Gönder</Text>
-              </View>
-            <View style={dmSty.inputRow}><TextInput style={dmSty.input} placeholder="Mesajını yaz..." placeholderTextColor="rgba(255,255,255,0.25)" value={dmText} onChangeText={setDmText} maxLength={500} autoFocus returnKeyType="send" onSubmitEditing={handleSendDm} />
-              <TouchableOpacity style={[dmSty.sendBtn, (!dmText.trim() || dmSending) && { opacity: 0.35 }]} disabled={!dmText.trim() || dmSending} onPress={handleSendDm}><Ionicons name="send" size={16} color="#fff" /></TouchableOpacity></View>
-          </View>
-        </View>
-      )}
+
 
       <PlusMenu visible={showPlusMenu} onClose={() => setShowPlusMenu(false)}
         onInviteFriends={() => { setShowPlusMenu(false); setShowInviteFriends(true); }}
@@ -2042,7 +2492,7 @@ export default function RoomScreen() {
         onToggleFollow={() => { setShowPlusMenu(false); handleToggleFollow(); }}
         isFollowingRoom={isFollowingRoom}
         isRoomLocked={(room?.room_settings as any)?.is_locked || false}
-        onRoomLock={amIHost && isTierAtLeast(ownerTier as any, 'Silver') ? () => {
+        onRoomLock={amIHost && isTierAtLeast(ownerTier as any, 'Plus') ? () => {
           setShowPlusMenu(false);
           const newLocked = !(room?.room_settings as any)?.is_locked;
           (async () => {
@@ -2178,13 +2628,19 @@ export default function RoomScreen() {
                       setShowPasswordModal(false);
                       // Giriş ücreti kontrolü
                       const fee = (pendingRoomData.room.room_settings as any)?.entry_fee_sp || 0;
-                      if (fee > 0) {
+                      const isRoomOwner = pendingRoomData.room.host_id === firebaseUser.uid;
+                      if (fee > 0 && !isRoomOwner) {
                         try {
                           const spResult = await GamificationService.spend(firebaseUser.uid, fee, 'room_entry_fee');
                           if (!spResult.success) {
                             setAlertConfig({ visible: true, title: '💰 Yetersiz SP', message: `${fee} SP gerekiyor.`, type: 'warning', icon: 'wallet-outline', buttons: [{ text: 'Geri Dön', onPress: () => safeGoBack(router) }] });
                             setPendingRoomData(null);
                             return;
+                          }
+                          // ★ Giriş ücretinin %90'ını oda sahibine ver
+                          const ownerCut = Math.floor(fee * 0.9);
+                          if (ownerCut > 0 && pendingRoomData.room.host_id) {
+                            GamificationService.earn(pendingRoomData.room.host_id, ownerCut, 'entry_fee_income').catch(() => {});
                           }
                           showToast({ title: `💰 ${fee} SP Kesildi`, message: `Kalan: ${spResult.remaining ?? '?'} SP`, type: 'info' });
                         } catch {}
@@ -2214,7 +2670,7 @@ export default function RoomScreen() {
         </View>
       )}
 
-      {/* 📊 VIP: Oda İstatistikleri Paneli */}
+      {/* 📊 Pro: Oda İstatistikleri Paneli */}
       <RoomStatsPanel
         visible={showRoomStats}
         onClose={() => setShowRoomStats(false)}
@@ -2248,18 +2704,4 @@ export default function RoomScreen() {
 }
 const sty = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#0B1520' },
-});
-
-
-
-const dmSty = StyleSheet.create({
-  overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end', alignItems: 'center', zIndex: 300 },
-  panel: { width: W * 0.92, backgroundColor: 'rgba(45,55,64,0.97)', borderRadius: 20, padding: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)', marginBottom: 30 },
-  handle: { width: 36, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.08)', alignSelf: 'center', marginBottom: 14 },
-  header: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
-  headerText: { color: '#F1F5F9', fontSize: 14, fontWeight: '700', flex: 1 },
-  closeBtn: { width: 26, height: 26, borderRadius: 13, backgroundColor: 'rgba(255,255,255,0.04)', alignItems: 'center', justifyContent: 'center' },
-  inputRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  input: { flex: 1, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', paddingHorizontal: 14, fontSize: 13, color: '#F1F5F9' },
-  sendBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(20,184,166,0.2)', alignItems: 'center', justifyContent: 'center' },
 });

@@ -15,7 +15,6 @@ import { supabase } from '../constants/supabase';
 import { MessageService } from '../services/messages';
 import { ModerationService } from '../services/moderation';
 import { FriendshipService } from '../services/friendship';
-import { showToast } from '../components/Toast';
 
 type DmTarget = { userId: string; nick: string } | null;
 
@@ -60,13 +59,11 @@ export function useRoomDM(params: UseRoomDMParams) {
       try {
         const isBlocked = await ModerationService.isBlocked(firebaseUser.uid, dmTarget.userId);
         if (isBlocked) {
-          showToast({ title: '⛔ Engellendin', message: 'Bu kullanıcıya mesaj gönderemezsin.', type: 'error' });
           setDmTarget(null);
           return;
         }
         const blockedByTarget = await ModerationService.isBlocked(dmTarget.userId, firebaseUser.uid);
         if (blockedByTarget) {
-          showToast({ title: 'Mesaj Gönderilemedi', message: 'Bu kullanıcı seni engellemiş.', type: 'error' });
           setDmTarget(null);
           return;
         }
@@ -81,16 +78,10 @@ export function useRoomDM(params: UseRoomDMParams) {
       } catch {}
 
       await MessageService.send(firebaseUser.uid, dmTarget.userId, dmText.trim(), isMessageRequest);
-
-      if (isMessageRequest) {
-        showToast({ title: '📩 Mesaj İsteği Gönderildi', message: `${dmTarget.nick} takipleşmediğiniz için mesaj isteği olarak gönderildi`, type: 'info' });
-      } else {
-        showToast({ title: 'Mesaj Gönderildi', message: `${dmTarget.nick}'e mesaj gönderildi`, type: 'success' });
-      }
       setDmTarget(null);
       setDmText('');
     } catch {
-      showToast({ title: 'Hata', message: 'Mesaj gönderilemedi', type: 'error' });
+      // Sessiz hata — UI'da mesaj gönderilmemiş olarak kalır
     } finally {
       setDmSending(false);
     }
@@ -109,7 +100,7 @@ export function useRoomDM(params: UseRoomDMParams) {
 
   return {
     dmUnreadCount,
-    dmInboxMessages,
+    dmInboxMessages, setDmInboxMessages,
     dmTarget, setDmTarget,
     dmText, setDmText,
     dmSending,

@@ -46,6 +46,7 @@ type SettingItem = {
   desc?: string;
   type: 'toggle' | 'select' | 'action' | 'link';
   color?: string;
+  bg?: string;
   danger?: boolean;
   /** Ana toggle kapalıyken bu satır disabled olsun */
   parentKey?: string;
@@ -56,22 +57,22 @@ const SETTING_GROUPS: { title: string; icon: keyof typeof Ionicons.glyphMap; ite
     title: 'Bildirimler', icon: 'notifications-outline',
     items: [
       { key: 'notifications_enabled', icon: 'notifications', label: 'Bildirimler', desc: 'Push bildirimleri aç/kapat', type: 'toggle' },
-      { key: 'notification_sound', icon: 'volume-medium', label: 'Bildirim Sesi', desc: 'Bildirim gelince ses çal', type: 'toggle', parentKey: 'notifications_enabled' },
+      { key: 'notification_sound', icon: 'musical-notes', label: 'Bildirim Sesi', desc: 'Bildirim gelince ses çal', type: 'toggle', parentKey: 'notifications_enabled' },
       { key: 'notification_vibration', icon: 'phone-portrait', label: 'Titreşim', desc: 'Bildirimde titreşim', type: 'toggle', parentKey: 'notifications_enabled' },
     ],
   },
   {
     title: 'Görünüm', icon: 'color-palette-outline',
     items: [
-      { key: 'theme', icon: 'moon', label: 'Tema', desc: 'Uygulama teması seç', type: 'select' },
+      { key: 'theme', icon: 'color-fill', label: 'Tema', desc: 'Uygulama teması seç', type: 'select' },
       { key: 'language', icon: 'language', label: 'Dil', desc: 'Uygulama dili', type: 'select' },
     ],
   },
   {
     title: 'Gizlilik', icon: 'shield-checkmark-outline',
     items: [
-      { key: 'show_online_status', icon: 'ellipse', label: 'Çevrimiçi Durumu', desc: 'Diğerleri seni çevrimiçi görsün', type: 'toggle', color: '#4ADE80' },
-      { key: 'profile_private', icon: 'lock-closed', label: 'Gizli Profil', desc: 'Profilini sadece takipçiler görsün', type: 'toggle' },
+      { key: 'show_online_status', icon: 'logo-designernews', label: 'Çevrimiçi Durumu', desc: 'Diğerleri seni çevrimiçi görsün', type: 'toggle' },
+      { key: 'profile_private', icon: 'lock-closed', label: 'Gizli Profil', desc: 'Sadece takipçiler', type: 'toggle' },
     ],
   },
   {
@@ -85,7 +86,7 @@ const SETTING_GROUPS: { title: string; icon: keyof typeof Ionicons.glyphMap; ite
     title: 'Hakkında', icon: 'information-circle-outline',
     items: [
       { key: 'terms', icon: 'document-text', label: 'Kullanım Koşulları', type: 'link' },
-      { key: 'privacy', icon: 'shield', label: 'Gizlilik Politikası', type: 'link' },
+      { key: 'privacy', icon: 'shield-checkmark', label: 'Gizlilik Politikası', type: 'link' },
       { key: 'version', icon: 'code-slash', label: 'Versiyon', desc: 'v2.0.0', type: 'action' },
     ],
   },
@@ -134,27 +135,36 @@ export default function SettingsScreen() {
     })();
   }, [profile]);
 
-  const updateSetting = useCallback(async (key: keyof UserSettings, value: any) => {
-    const updated = await SettingsService.update({ [key]: value });
-    setSettings(updated);
+  const updateSetting = useCallback((key: keyof UserSettings, value: any) => {
+    // 🔥 ÖNEMLİ: Optimistic UI (Eşzamanlı Güncelleme)
+    // Switch bileşeni asenkron işlem beklerse git-gel "bug"ına girer. 
+    // Önce UI'ı anında güncelliyoruz, kaydetme işlemini arkada bırakıyoruz.
+    setSettings(prev => prev ? { ...prev, [key]: value } : prev);
 
-    // Özel aksiyonlar
-    if (key === 'theme') {
-      setActiveTheme(value as ThemeKey);
-      applyTheme(value as ThemeKey);
-    }
-    if (key === 'show_online_status' && firebaseUser) {
-      ProfileService.setOnline(firebaseUser.uid, value).catch(() => {});
-    }
-    // ★ B3 FIX: Gizli profil toggle — privacy_mode ve is_private birlikte güncellenir
-    if (key === 'profile_private' && firebaseUser) {
-      const newPrivacyMode = value ? 'private' : 'public';
-      ProfileService.update(firebaseUser.uid, {
-        is_private: value,
-        privacy_mode: newPrivacyMode,
-      } as any).catch(() => {});
-    }
-  }, [firebaseUser, applyTheme]);
+    (async () => {
+      await SettingsService.update({ [key]: value });
+
+      // Özel aksiyonlar
+      if (key === 'theme') {
+        setActiveTheme(value as ThemeKey);
+        applyTheme(value as ThemeKey);
+      }
+      if (key === 'show_online_status' && firebaseUser) {
+        ProfileService.setOnline(firebaseUser.uid, value).catch(() => {});
+      }
+      // ★ Gizli profil toggle
+      if (key === 'profile_private' && firebaseUser) {
+        const currentMode = (profile as any)?.privacy_mode || 'public';
+        const newPrivacyMode = value
+          ? (currentMode === 'followers_only' ? 'followers_only' : 'private')
+          : 'public';
+        ProfileService.update(firebaseUser.uid, {
+          is_private: value,
+          privacy_mode: newPrivacyMode,
+        } as any).catch(() => {});
+      }
+    })();
+  }, [firebaseUser, applyTheme, profile]);
 
   const handleAction = useCallback((key: string) => {
     switch (key) {
@@ -288,7 +298,7 @@ export default function SettingsScreen() {
 
                   // 7. Block listesini sil
                   try {
-                    await supabase.from('block_list').delete().or(`blocker_id.eq.${uid},blocked_id.eq.${uid}`);
+                    await supabase.from('blocked_users').delete().or(`blocker_id.eq.${uid},blocked_id.eq.${uid}`);
                   } catch { /* tablo yoksa sessiz */ }
 
                   // 7b. Bildirimleri sil
@@ -383,50 +393,30 @@ export default function SettingsScreen() {
                   <Pressable
                     key={item.key}
                     style={[s.row, !isLast && s.rowBorder, isDisabledByParent && { opacity: 0.4 }]}
-                    disabled={isDisabledByParent && item.type === 'toggle'}
+                    disabled={isDisabledByParent}
+                    android_ripple={{ color: 'rgba(255,255,255,0.05)' }}
                     onPress={() => {
                       if (isDisabledByParent) return;
                       if (item.type === 'action' || item.type === 'link') {
                         handleAction(item.key);
                       } else if (item.type === 'select') {
                         if (item.key === 'theme') {
-                          setCAlert({
-                            visible: true,
-                            title: '🎨 Tema Seç',
-                            message: 'Uygulama temasını seç:',
-                            type: 'info',
-                            buttons: [
-                              ...THEME_OPTIONS.map(opt => ({
-                                text: `${opt.key === settingValue ? '✓ ' : ''}${opt.label}`,
-                                onPress: () => updateSetting('theme', opt.key),
-                              })),
-                              { text: 'Kapat', style: 'cancel' as const },
-                            ],
-                          });
+                          updateSetting('theme', settingValue === 'dark' ? 'light' : 'dark');
                         } else if (item.key === 'language') {
-                          setCAlert({
-                            visible: true,
-                            title: '🌍 Dil Seç',
-                            message: 'Uygulama dilini seç:',
-                            type: 'info',
-                            buttons: [
-                              ...LANGUAGE_OPTIONS.map(opt => ({
-                                text: `${opt.key === settingValue ? '✓ ' : ''}${opt.flag} ${opt.label}`,
-                                onPress: () => updateSetting('language', opt.key),
-                              })),
-                              { text: 'Kapat', style: 'cancel' as const },
-                            ],
-                          });
+                          updateSetting('language', settingValue === 'tr' ? 'en' : 'tr');
                         }
+                      } else if (item.type === 'toggle') {
+                        updateSetting(item.key as keyof UserSettings, !settingValue);
                       }
                     }}
                   >
                     {/* Sol: ikon + label */}
-                    <View style={[s.rowIcon, item.danger && { backgroundColor: 'rgba(239,68,68,0.12)' }]}>
+                    <View style={s.rowIcon}>
                       <Ionicons
                         name={item.icon}
                         size={18}
-                        color={item.danger ? '#EF4444' : item.color || Colors.accentTeal}
+                        color={item.danger ? '#EF4444' : '#94A3B8'}
+                        style={{ textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 }}
                       />
                     </View>
                     <View style={s.rowText}>
@@ -446,20 +436,30 @@ export default function SettingsScreen() {
                           if (isDisabledByParent) return;
                           updateSetting(item.key as keyof UserSettings, v);
                         }}
-                        trackColor={{ false: 'rgba(255,255,255,0.08)', true: 'rgba(20,184,166,0.35)' }}
-                        thumbColor={settingValue ? '#14B8A6' : '#64748B'}
+                        trackColor={{ false: '#475569', true: '#14B8A6' }}
+                        thumbColor="#FFFFFF"
+                        ios_backgroundColor="#475569"
                         disabled={isDisabledByParent}
+                        style={{ transform: [{ scaleX: 0.9 }, { scaleY: 0.9 }] }}
                       />
                     )}
                     {item.type === 'select' && (
                       <View style={s.selectRow}>
-                        <Text style={s.selectValue}>
-                          {item.key === 'theme'
-                            ? THEME_OPTIONS.find(o => o.key === settingValue)?.label || 'Koyu'
-                            : LANGUAGE_OPTIONS.find(o => o.key === settingValue)?.label || 'Türkçe'
-                          }
-                        </Text>
-                        <Ionicons name="chevron-forward" size={16} color="#64748B" />
+                        {item.key === 'theme' ? (
+                          <Ionicons 
+                            name={settingValue === 'light' ? 'sunny' : 'moon'} 
+                            size={22} 
+                            color={settingValue === 'light' ? '#FBBF24' : '#94A3B8'} 
+                            style={{ textShadowColor: settingValue === 'light' ? 'rgba(251,191,36,0.4)' : 'rgba(148,163,184,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 }}
+                          />
+                        ) : item.key === 'language' ? (
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(255,255,255,0.06)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 }}>
+                            <Text style={{ fontSize: 13 }}>{settingValue === 'en' ? '🇬🇧' : '🇹🇷'}</Text>
+                            <Text style={[s.selectValue, { color: '#E2E8F0', letterSpacing: 1 }]}>
+                              {settingValue === 'en' ? 'EN' : 'TR'}
+                            </Text>
+                          </View>
+                        ) : null}
                       </View>
                     )}
                     {(item.type === 'action' || item.type === 'link') && !item.danger && (
@@ -499,28 +499,28 @@ const s = StyleSheet.create({
 
   // Groups
   group: {
-    marginTop: 20,
+    marginTop: 14,
     paddingHorizontal: 16,
   },
   groupHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginBottom: 8,
+    marginBottom: 6,
     paddingLeft: 4,
   },
   groupTitle: {
-    fontSize: 13, fontWeight: '700', color: '#94A3B8',
-    letterSpacing: 0.5,
-    textTransform: 'uppercase',
+    fontSize: 11, fontWeight: '800', color: '#94A3B8',
+    letterSpacing: 1, textTransform: 'uppercase',
+    ...Shadows.textLight,
   },
 
   // Card container
   groupCard: {
-    backgroundColor: Colors.cardBg,
+    backgroundColor: '#414e5f',
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: '#95a1ae',
     overflow: 'hidden',
     ...Shadows.card,
   },
@@ -529,27 +529,27 @@ const s = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 14,
-    gap: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    gap: 10,
   },
   rowBorder: {
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.04)',
+    borderBottomColor: 'rgba(255,255,255,0.06)',
   },
   rowIcon: {
-    width: 34, height: 34, borderRadius: 10,
-    backgroundColor: 'rgba(20,184,166,0.08)',
-    alignItems: 'center', justifyContent: 'center',
+    width: 22, alignItems: 'center', justifyContent: 'center',
   },
   rowText: {
     flex: 1,
   },
   rowLabel: {
-    fontSize: 15, fontWeight: '600', color: '#F1F5F9',
+    fontSize: 14, fontWeight: '600', color: '#F1F5F9',
+    ...Shadows.textLight,
   },
   rowDesc: {
     fontSize: 11, color: '#64748B', marginTop: 1,
+    ...Shadows.textLight,
   },
 
   // Select

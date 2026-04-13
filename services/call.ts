@@ -1,7 +1,7 @@
 /**
  * SopranoChat — DM Arama Servisi
  * Supabase Broadcast ile sinyalizasyon, LiveKit ile gerçek ses/video iletimi
- * Tier bazlı kalite: Free=16kHz ses, Bronze=32kHz+480p, Silver=32kHz+720p, Gold=48kHz+1080p, VIP=48kHz stereo+1080p
+ * Tier bazlı kalite: Free=16kHz mono+480p, Plus=32kHz mono+720p, Pro=48kHz stereo+1080p
  */
 import { DeviceEventEmitter } from 'react-native';
 import { supabase } from '../constants/supabase';

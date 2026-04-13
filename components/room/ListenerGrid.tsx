@@ -15,7 +15,7 @@ interface Props {
   onSelectUser: (user: RoomParticipant) => void;
   selectedUserId?: string | null;
   onShowAllUsers?: () => void;
-  /** Tier bazlı max dinleyici grid kapasitesi (Free=10, Bronze=15, Silver/Gold/VIP=20) */
+  /** Tier bazlı max dinleyici grid kapasitesi (Free=10, Plus=25, Pro=sınırsız) */
   maxListeners?: number;
   /** Seyirci sayısı — grid'de gösterilmez, sadece sayı badge'i */
   spectatorCount?: number;

@@ -592,7 +592,7 @@ export default function CallScreen() {
                 <View style={st.qualityPill}>
                   <Ionicons name="cellular" size={10} color={Colors.emerald} />
                   <Text style={st.qualityPillText}>
-                    {tier === 'VIP' ? 'HD Stereo' : tier === 'Gold' ? 'HD' : 'SD'}
+                    {tier === 'Pro' ? 'HD Stereo' : tier === 'Pro' ? 'HD' : 'SD'}
                   </Text>
                 </View>
                 {callType === 'video' && isCameraOn && (
@@ -716,7 +716,7 @@ export default function CallScreen() {
             <View style={st.statusChip}>
               <Ionicons name="cellular" size={12} color={Colors.emerald} />
               <Text style={[st.statusChipText, { color: Colors.emerald }]}>
-                {tier === 'VIP' ? 'HD Stereo' : tier === 'Gold' ? 'HD' : 'SD'}
+                {tier === 'Pro' ? 'HD Stereo' : tier === 'Pro' ? 'HD' : 'SD'}
               </Text>
             </View>
           )}

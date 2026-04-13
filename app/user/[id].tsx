@@ -17,8 +17,7 @@ import { ReportModal } from '../../components/ReportModal';
 import { showToast } from '../../components/Toast';
 import { useAuth } from '../_layout';
 import { supabase } from '../../constants/supabase';
-import { BadgeCheckerService, type UserBadge } from '../../services/engagement/badges';
-import { BadgeGrid } from '../../components/progression';
+
 import { isTierAtLeast } from '../../constants/tiers';
 import PremiumAlert, { type AlertButton } from '../../components/PremiumAlert';
 import AppBackground from '../../components/AppBackground';
@@ -45,7 +44,7 @@ export default function UserProfileScreen() {
   const [isUserBlocked, setIsUserBlocked] = useState(false);
   const [cAlert, setCAlert] = useState<{ visible: boolean; title: string; message: string; type?: 'info' | 'warning' | 'error' | 'success'; buttons?: AlertButton[] }>({ visible: false, title: '', message: '' });
 
-  const [userBadges, setUserBadges] = useState<UserBadge[]>([]);
+
 
   // ★ Katmanlı profil verileri
   const [profileStats, setProfileStats] = useState({ stageMinutes: 0, roomsCreated: 0, totalListeners: 0, totalReactions: 0 });
@@ -94,11 +93,7 @@ export default function UserProfileScreen() {
 
 
 
-      // Rozetleri yükle
-      try {
-        const badges = await BadgeCheckerService.getUserBadges(id);
-        setUserBadges(badges);
-      } catch {}
+
 
       // ★ Katmanlı profil verileri
       try {
@@ -435,35 +430,33 @@ export default function UserProfileScreen() {
 
         {canSeeFullProfile && (
         <>
-        {/* ═══ Rozetler (kompakt) ═══ */}
-        {userBadges.length > 0 && (
-          <View style={s.listContainer}>
-            <BadgeGrid unlockedBadges={userBadges} compact />
-          </View>
-        )}
 
-        {/* ═══ Son Aktif Odalar — sadece canlı olanlar ═══ */}
+
+        {/* ═══ Odaları ═══ */}
         {recentRooms.length > 0 && (
           <View style={s.listContainer}>
-            <Text style={s.sectionInnerTitle}>📡 Son Aktif Odalar</Text>
-            {recentRooms.slice(0, 3).map((room: any) => (
-              <Pressable
-                key={room.id}
-                style={s.roomItem}
-                onPress={() => router.push(`/room/${room.id}` as any)}
-              >
-                <View style={s.roomIconWrap}>
-                  <Ionicons name="mic" size={14} color={Colors.accentTeal} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={s.roomItemName} numberOfLines={1}>{room.name}</Text>
-                  <Text style={s.roomItemMeta}>
-                    {room.listener_count || 0} dinleyici
-                  </Text>
-                </View>
-                <Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.15)" />
-              </Pressable>
-            ))}
+            <Text style={s.sectionInnerTitle}>🎙️ Odaları ({recentRooms.length})</Text>
+            {recentRooms.map((room: any, idx: number) => {
+              const isLive = (room.listener_count || 0) > 0 || room.is_live;
+              return (
+                <Pressable
+                  key={room.id}
+                  style={[s.roomItem, idx === recentRooms.length - 1 && { borderBottomWidth: 0 }]}
+                  onPress={() => router.push(`/room/${room.id}` as any)}
+                >
+                  <View style={[s.roomIconWrap, isLive && { backgroundColor: 'rgba(34,197,94,0.15)' }]}>
+                    <Ionicons name={isLive ? 'radio' : 'mic'} size={14} color={isLive ? '#22C55E' : Colors.accentTeal} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.roomItemName} numberOfLines={1}>{room.name}</Text>
+                    <Text style={s.roomItemMeta}>
+                      {isLive ? `🔴 Canlı · ${room.listener_count || 0} dinleyici` : room.category || 'Oda'}
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.15)" />
+                </Pressable>
+              );
+            })}
           </View>
         )}
 
@@ -493,8 +486,8 @@ export default function UserProfileScreen() {
           </Pressable>
         )}
 
-        {/* ═══ Banner (Gold+) ═══ */}
-        {isTierAtLeast(tier, 'Gold') && (userProfile as any)?.banner_url && (
+        {/* ═══ Banner (Pro+) ═══ */}
+        {isTierAtLeast(tier, 'Pro') && (userProfile as any)?.banner_url && (
           <View style={s.bannerWrap}>
             <Image source={{ uri: (userProfile as any).banner_url }} style={s.bannerImg} />
           </View>

@@ -22,27 +22,28 @@ const REVENUECAT_API_KEY_IOS = 'appl_YOUR_REVENUECAT_API_KEY';     // App Store
 // ═══ ENTITLEMENT → TIER MAPPING ═══
 // RevenueCat Dashboard'daki entitlement ID'leri → SopranoChat tier'ları
 const ENTITLEMENT_TO_TIER: Record<string, SubscriptionTier> = {
-  'tier_bronze': 'Bronze',
-  'tier_silver': 'Silver',
-  'tier_gold': 'Gold',
-  'tier_vip': 'VIP',
-  'bronze': 'Bronze',
-  'silver': 'Silver',
-  'gold': 'Gold',
-  'vip': 'VIP',
+  'tier_plus': 'Plus',
+  'tier_pro': 'Pro',
+  'plus': 'Plus',
+  'pro': 'Pro',
+  // Legacy entitlements (eski 5-tier)
+  'tier_bronze': 'Plus',
+  'tier_silver': 'Plus',
+  'tier_gold': 'Pro',
+  'tier_vip': 'Pro',
+  'bronze': 'Plus',
+  'silver': 'Plus',
+  'gold': 'Pro',
+  'vip': 'Pro',
 };
 
 // ═══ PRODUCT ID'LER ═══
 // Google Play Console'da tanımlanan ürün ID'leri
 export const PRODUCT_IDS = {
-  bronze_monthly: 'soprano_bronze_monthly',
-  bronze_yearly: 'soprano_bronze_yearly',
-  silver_monthly: 'soprano_silver_monthly',
-  silver_yearly: 'soprano_silver_yearly',
-  gold_monthly: 'soprano_gold_monthly',
-  gold_yearly: 'soprano_gold_yearly',
-  vip_monthly: 'soprano_vip_monthly',
-  vip_yearly: 'soprano_vip_yearly',
+  plus_monthly: 'soprano_plus_monthly',
+  plus_yearly: 'soprano_plus_yearly',
+  pro_monthly: 'soprano_pro_monthly',
+  pro_yearly: 'soprano_pro_yearly',
 } as const;
 
 // ═══ MOCK DATA ═══
@@ -54,105 +55,53 @@ const MOCK_OFFERINGS = {
         identifier: '$rc_monthly',
         packageType: 'MONTHLY',
         product: {
-          identifier: PRODUCT_IDS.bronze_monthly,
-          title: 'Bronze Üyelik',
-          description: 'Aylık Bronze abonelik',
-          priceString: '₺49.99',
-          price: 49.99,
+          identifier: PRODUCT_IDS.plus_monthly,
+          title: 'Plus Üyelik',
+          description: 'Aylık Plus abonelik',
+          priceString: '₺39.99',
+          price: 39.99,
           currencyCode: 'TRY',
         },
-        offeringIdentifier: 'tier_bronze',
+        offeringIdentifier: 'tier_plus',
       },
       {
         identifier: '$rc_annual',
         packageType: 'ANNUAL',
         product: {
-          identifier: PRODUCT_IDS.bronze_yearly,
-          title: 'Bronze Üyelik (Yıllık)',
-          description: 'Yıllık Bronze abonelik',
-          priceString: '₺399.99',
-          price: 399.99,
+          identifier: PRODUCT_IDS.plus_yearly,
+          title: 'Plus Üyelik (Yıllık)',
+          description: 'Yıllık Plus abonelik',
+          priceString: '₺349.99',
+          price: 349.99,
           currencyCode: 'TRY',
         },
-        offeringIdentifier: 'tier_bronze',
+        offeringIdentifier: 'tier_plus',
       },
       {
         identifier: '$rc_monthly',
         packageType: 'MONTHLY',
         product: {
-          identifier: PRODUCT_IDS.silver_monthly,
-          title: 'Silver Üyelik',
-          description: 'Aylık Silver abonelik',
+          identifier: PRODUCT_IDS.pro_monthly,
+          title: 'Pro Üyelik',
+          description: 'Aylık Pro abonelik',
           priceString: '₺99.99',
           price: 99.99,
           currencyCode: 'TRY',
         },
-        offeringIdentifier: 'tier_silver',
+        offeringIdentifier: 'tier_pro',
       },
       {
         identifier: '$rc_annual',
         packageType: 'ANNUAL',
         product: {
-          identifier: PRODUCT_IDS.silver_yearly,
-          title: 'Silver Üyelik (Yıllık)',
-          description: 'Yıllık Silver abonelik',
-          priceString: '₺799.99',
-          price: 799.99,
+          identifier: PRODUCT_IDS.pro_yearly,
+          title: 'Pro Üyelik (Yıllık)',
+          description: 'Yıllık Pro abonelik',
+          priceString: '₺899.99',
+          price: 899.99,
           currencyCode: 'TRY',
         },
-        offeringIdentifier: 'tier_silver',
-      },
-      {
-        identifier: '$rc_monthly',
-        packageType: 'MONTHLY',
-        product: {
-          identifier: PRODUCT_IDS.gold_monthly,
-          title: 'Gold Üyelik',
-          description: 'Aylık Gold abonelik',
-          priceString: '₺149.99',
-          price: 149.99,
-          currencyCode: 'TRY',
-        },
-        offeringIdentifier: 'tier_gold',
-      },
-      {
-        identifier: '$rc_annual',
-        packageType: 'ANNUAL',
-        product: {
-          identifier: PRODUCT_IDS.gold_yearly,
-          title: 'Gold Üyelik (Yıllık)',
-          description: 'Yıllık Gold abonelik',
-          priceString: '₺1199.99',
-          price: 1199.99,
-          currencyCode: 'TRY',
-        },
-        offeringIdentifier: 'tier_gold',
-      },
-      {
-        identifier: '$rc_monthly',
-        packageType: 'MONTHLY',
-        product: {
-          identifier: PRODUCT_IDS.vip_monthly,
-          title: 'VIP Üyelik',
-          description: 'Aylık VIP abonelik',
-          priceString: '₺299.99',
-          price: 299.99,
-          currencyCode: 'TRY',
-        },
-        offeringIdentifier: 'tier_vip',
-      },
-      {
-        identifier: '$rc_annual',
-        packageType: 'ANNUAL',
-        product: {
-          identifier: PRODUCT_IDS.vip_yearly,
-          title: 'VIP Üyelik (Yıllık)',
-          description: 'Yıllık VIP abonelik',
-          priceString: '₺2399.99',
-          price: 2399.99,
-          currencyCode: 'TRY',
-        },
-        offeringIdentifier: 'tier_vip',
+        offeringIdentifier: 'tier_pro',
       },
     ],
   },
@@ -379,7 +328,7 @@ export const RevenueCatService = {
   _extractTierFromCustomerInfo(customerInfo: any): SubscriptionTier | null {
     if (!customerInfo?.entitlements?.active) return null;
 
-    const TIER_PRIORITY: SubscriptionTier[] = ['Free', 'Bronze', 'Silver', 'Gold', 'VIP'];
+    const TIER_PRIORITY: SubscriptionTier[] = ['Free', 'Plus', 'Pro'];
     let highestTier: SubscriptionTier | null = null;
 
     for (const [entitlementId] of Object.entries(customerInfo.entitlements.active)) {

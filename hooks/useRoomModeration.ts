@@ -8,7 +8,8 @@ import { RoomService, getRoomLimits } from '../services/database';
 import { migrateLegacyTier } from '../types';
 import { ModerationService } from '../services/moderation';
 import { supabase } from '../constants/supabase';
-import { showToast } from '../components/Toast';
+// ★ TOAST KALDIRMA: Oda içinde toast bildirimi yok
+const showToast = (_opts: { title?: string; message?: string; type?: string }) => {};
 import { UpsellService } from '../services/upsell';
 import type { RoomParticipant, Room } from '../services/database';
 import type { SubscriptionTier, ParticipantRole } from '../types';

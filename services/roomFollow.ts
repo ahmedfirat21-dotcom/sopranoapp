@@ -64,6 +64,26 @@ export const RoomFollowService = {
     return count || 0;
   },
 
+  /** Odanın takipçi profillerini getir (avatar + isim) */
+  async getRoomFollowers(roomId: string, limit = 20): Promise<{ id: string; display_name: string; avatar_url: string }[]> {
+    try {
+      const { data, error } = await supabase
+        .from('room_follows')
+        .select('user_id, profiles:profiles!user_id(id, display_name, avatar_url)')
+        .eq('room_id', roomId)
+        .order('created_at', { ascending: false })
+        .limit(limit);
+      if (error) throw error;
+      return (data || [])
+        .map((d: any) => d.profiles)
+        .filter(Boolean)
+        .map((p: any) => ({ id: p.id, display_name: p.display_name || 'Kullanıcı', avatar_url: p.avatar_url || '' }));
+    } catch (e) {
+      if (__DEV__) console.warn('[RoomFollowService] getRoomFollowers error:', e);
+      return [];
+    }
+  },
+
   /** Kullanıcının takip ettiği odaları getir (canlı + kapalı kalıcı) */
   async getFollowedRooms(userId: string): Promise<Room[]> {
     const { data, error } = await supabase

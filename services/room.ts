@@ -243,7 +243,7 @@ export const RoomService = {
     const now = new Date();
     const expiresAt = limits.durationHours > 0
       ? new Date(now.getTime() + limits.durationHours * 60 * 60 * 1000).toISOString()
-      : null; // VIP: süresiz
+      : null; // Pro: süresiz
 
     // Odayı uyandır
     const { data, error } = await supabase
@@ -308,7 +308,7 @@ export const RoomService = {
     if (options.room_password) options.room_password = options.room_password.trim().slice(0, 50);
     if (options.entry_fee_sp !== undefined) options.entry_fee_sp = Math.max(0, Math.min(options.entry_fee_sp || 0, 10000));
 
-    // ★ Admin (GodMaster) kontrolü — admin odaları VIP limitleriyle oluşturulur
+    // ★ Admin (GodMaster) kontrolü — admin odaları Pro limitleriyle oluşturulur
     let normalizedTier = migrateLegacyTier(tier);
     const { data: creatorProfile } = await supabase
       .from('profiles')
@@ -316,7 +316,7 @@ export const RoomService = {
       .eq('id', hostId)
       .single();
     if (creatorProfile?.is_admin) {
-      normalizedTier = 'VIP' as any;
+      normalizedTier = 'Pro';
     }
 
     const limits = getRoomLimits(normalizedTier);
@@ -633,7 +633,7 @@ export const RoomService = {
    * ★ Manuel Oda Dondurma — Owner odayı dondurur.
    * Oda is_live=false olur ama silinmez. Katılımcılar temizlenir.
    * Daha sonra wakeUpRoom ile tekrar aktifleştirilebilir.
-   * Sadece Bronze+ kullanıcılar (persistent: true) için.
+   * Sadece Plus+ kullanıcılar (persistent: true) için.
    */
   async freezeRoom(roomId: string, hostId: string): Promise<void> {
     const { data: room } = await supabase
@@ -668,7 +668,7 @@ export const RoomService = {
    * Hardcoded 3-saat fallback kaldırıldı.
    */
   isExpired(room: Partial<Room>): boolean {
-    if (!room.expires_at) return false; // Sınırsız süre (VIP/Gold 24h+)
+    if (!room.expires_at) return false; // Sınırsız süre (Pro)
     return new Date(room.expires_at) < new Date();
   },
 
@@ -735,13 +735,13 @@ export const RoomService = {
     }
   },
 
-  /** ★ Oda temasını değiştir (host + Silver+ gerekli) */
+  /** ★ Oda temasını değiştir (host + Plus+ gerekli) */
   async setRoomTheme(roomId: string, hostId: string, themeId: string | null) {
     const { data: room } = await supabase.from('rooms').select('host_id, owner_tier').eq('id', roomId).single();
     if (!room || room.host_id !== hostId) throw new Error('Bu odanın sahibi değilsiniz');
-    // ★ Tier guard: Silver+ gerekli
+    // ★ Tier guard: Plus+ gerekli
     const tier = migrateLegacyTier(room.owner_tier);
-    if (!isTierAtLeast(tier, 'Silver')) throw new Error('Tema değiştirmek için Silver+ üyelik gerekli.');
+    if (!isTierAtLeast(tier, 'Plus')) throw new Error('Tema değiştirmek için Plus+ üyelik gerekli.');
     const { error } = await supabase.from('rooms').update({ theme_id: themeId }).eq('id', roomId);
     if (error) throw error;
   },
@@ -774,7 +774,7 @@ export const RoomService = {
 
     const participants = (data || []) as (RoomParticipant & { user?: Profile })[];
 
-    // subscription_tier bazlı sıralama (VIP > Gold > Silver > Bronze > Free)
+    // subscription_tier bazlı sıralama (Pro > Plus > Free)
     participants.sort((a, b) => {
       const aTier = migrateLegacyTier((a.user as any)?.subscription_tier || (a.user as any)?.tier);
       const bTier = migrateLegacyTier((b.user as any)?.subscription_tier || (b.user as any)?.tier);
@@ -870,7 +870,7 @@ export const RoomService = {
       .eq('id', oldHostId)
       .single();
     if (hostProfile?.is_admin) {
-      ownerTier = 'VIP' as any;
+      ownerTier = 'Pro';
     }
 
     const limits = getRoomLimits(ownerTier);
@@ -932,7 +932,7 @@ export const RoomService = {
 
     // ── Kimse bulunamadı ──
 
-    // ★ keep_alive (Silver/Gold/VIP): Oda açık kalır, host bilgisi korunur
+    // ★ keep_alive (Plus/Pro): Oda açık kalır, host bilgisi korunur
     if (limits.ownerLeavePolicy === 'keep_alive') {
       const updatedSettings = {
         ...(roomInfo?.room_settings || {}),
@@ -1173,7 +1173,7 @@ export const RoomService = {
     if (expired && expired.length > 0) {
       for (const room of expired) {
         const roomTier = migrateLegacyTier((room as any).owner_tier);
-        if (roomTier !== 'Free') continue; // Bronze+ muaf
+        if (roomTier !== 'Free') continue; // Plus+ muaf
         await supabase.from('rooms').update({ is_live: false, listener_count: 0 }).eq('id', room.id);
         await supabase.from('room_participants').delete().eq('room_id', room.id);
         closedCount++;

@@ -3,19 +3,18 @@
  * ═══════════════════════════════════════════════════
  *
  * TEMEL FELSEFE:
- *   Altyapı VIP (maksimum) kapasiteye göre tasarlanır,
+ *   Altyapı Pro (maksimum) kapasiteye göre tasarlanır,
  *   alt paketler bundan kısıtlanarak (filtrelenerek) oluşturulur.
  *
- * 5 Tier: Free / Bronze / Silver / Gold / VIP
+ * 3 Tier: Free / Plus / Pro
  * SP tek ekonomi birimi.
  */
 import type { SubscriptionTier, StageLayout, RoomMusicConfig } from '../types';
 
-// Alias
 export type TierName = SubscriptionTier;
 
 // ════════════════════════════════════════════════════════════
-// ABONELİK TIER TANIMLARI (5 Katman)
+// ABONELİK TIER TANIMLARI (3 Tier: Free / Plus / Pro)
 // ════════════════════════════════════════════════════════════
 
 export interface TierDefinition {
@@ -45,54 +44,32 @@ export const TIER_DEFINITIONS: Record<SubscriptionTier, TierDefinition> = {
     yearlyPrice: 0,
     tagline: 'SopranoChat dünyasını keşfet',
   },
-  Bronze: {
-    name: 'Bronze',
-    label: 'Bronze',
-    emoji: '🥉',
-    icon: 'shield-outline',
-    color: '#CD7F32',
-    gradient: ['#CD7F32', '#A0522D'],
-    monthlyPrice: 79.99,
-    yearlyPrice: 699.99,
-    tagline: 'İlk adımı at, daha fazlasını keşfet',
+  Plus: {
+    name: 'Plus',
+    label: 'Plus',
+    emoji: '🚀',
+    icon: 'rocket',
+    color: '#A855F7',
+    gradient: ['#A855F7', '#7C3AED'],
+    monthlyPrice: 39.99,
+    yearlyPrice: 349.99,
+    tagline: 'Daha fazla güç, daha fazla özgürlük',
   },
-  Silver: {
-    name: 'Silver',
-    label: 'Silver',
-    emoji: '⭐',
-    icon: 'star',
-    color: '#C0C0C0',
-    gradient: ['#C0C0C0', '#A8A8A8'],
-    monthlyPrice: 149.99,
-    yearlyPrice: 1299.99,
-    tagline: 'Kişiselleştir, özelleştir, öne çık',
-  },
-  Gold: {
-    name: 'Gold',
-    label: 'Gold',
-    emoji: '💎',
-    icon: 'diamond',
-    color: '#FFD700',
-    gradient: ['#FFD700', '#DAA520'],
-    monthlyPrice: 279.99,
-    yearlyPrice: 2399.99,
-    tagline: 'Profesyonel yayıncı deneyimi',
-  },
-  VIP: {
-    name: 'VIP',
-    label: 'VIP',
+  Pro: {
+    name: 'Pro',
+    label: 'Pro',
     emoji: '👑',
-    icon: 'diamond',
-    color: '#FF6B35',
-    gradient: ['#FF6B35', '#E55100'],
-    monthlyPrice: 549.99,
-    yearlyPrice: 4699.99,
+    icon: 'flame',
+    color: '#F59E0B',
+    gradient: ['#F59E0B', '#D97706'],
+    monthlyPrice: 99.99,
+    yearlyPrice: 899.99,
     tagline: 'Sınırsız güç, maksimum prestij',
   },
 } as const;
 
 /** Sıralı tier listesi (düşükten yükseğe) */
-export const TIER_ORDER: SubscriptionTier[] = ['Free', 'Bronze', 'Silver', 'Gold', 'VIP'];
+export const TIER_ORDER: SubscriptionTier[] = ['Free', 'Plus', 'Pro'];
 
 /** Tier karşılaştırma: userTier >= requiredTier mi? */
 export function isTierAtLeast(userTier: SubscriptionTier, requiredTier: SubscriptionTier): boolean {
@@ -105,13 +82,13 @@ export function getTierLevel(tier: SubscriptionTier): number {
 }
 
 // ════════════════════════════════════════════════════════════
-// ODA LİMİTLERİ (5-Tier Matrisi)
+// ODA LİMİTLERİ (3-Tier Matrisi)
 // ════════════════════════════════════════════════════════════
 
 export interface RoomLimits {
   /** Sahnede aynı anda bulunabilecek max kişi (owner dahil) */
   maxSpeakers: number;
-  /** Dinleyici grid kapasitesi (tüm tierlarda 20) */
+  /** Dinleyici grid kapasitesi */
   maxListeners: number;
   /** Seyirci kapasitesi (grid'de görünmez). 999 = sınırsız */
   maxSpectators: number;
@@ -179,40 +156,17 @@ export const ROOM_TIER_LIMITS: Record<SubscriptionTier, RoomLimits> = {
     canUseFollowersOnly: false,
     ownerLeavePolicy: 'close',
   },
-  Bronze: {
-    maxSpeakers: 6,
-    maxListeners: 15,
-    maxSpectators: 100,
-    maxCameras: 5,
-    maxModerators: 1,
-    durationHours: 6,
-    dailyRooms: 5,
-    persistent: true,
-    maxPersistentRooms: 1,
-    allowedTypes: ['open', 'closed'] as readonly string[],
-    audioSampleRate: 32000,
-    audioChannels: 1,
-    videoMaxRes: 480,
-    canCustomizeImage: false,
-    canCustomizeTheme: false,
-    canUseAvatarFrame: false,
-    allowedStageLayouts: ['grid'] as readonly StageLayout[],
-    canUseRoomMusic: false,
-    canUseFilters: false,
-    canUseFollowersOnly: false,
-    ownerLeavePolicy: 'keep_alive',
-  },
-  Silver: {
+  Plus: {
     maxSpeakers: 8,
-    maxListeners: 20,
+    maxListeners: 25,
     maxSpectators: 200,
     maxCameras: 6,
     maxModerators: 2,
     durationHours: 12,
     dailyRooms: 10,
     persistent: true,
-    maxPersistentRooms: 2,
-    allowedTypes: ['open', 'closed'] as readonly string[],
+    maxPersistentRooms: 3,
+    allowedTypes: ['open', 'closed', 'invite'] as readonly string[],
     audioSampleRate: 32000,
     audioChannels: 1,
     videoMaxRes: 720,
@@ -225,42 +179,19 @@ export const ROOM_TIER_LIMITS: Record<SubscriptionTier, RoomLimits> = {
     canUseFollowersOnly: false,
     ownerLeavePolicy: 'keep_alive',
   },
-  Gold: {
-    maxSpeakers: 10,
-    maxListeners: 25,
-    maxSpectators: 500,
-    maxCameras: 8,
-    maxModerators: 3,
-    durationHours: 24,
-    dailyRooms: 999,
-    persistent: true,
-    maxPersistentRooms: 5,
-    allowedTypes: ['open', 'closed', 'invite'] as readonly string[],
-    audioSampleRate: 48000,
-    audioChannels: 2,
-    videoMaxRes: 1080,
-    canCustomizeImage: true,
-    canCustomizeTheme: true,
-    canUseAvatarFrame: true,
-    allowedStageLayouts: ['grid', 'spotlight', 'theater'] as readonly StageLayout[],
-    canUseRoomMusic: true,
-    canUseFilters: true,
-    canUseFollowersOnly: true,
-    ownerLeavePolicy: 'keep_alive',
-  },
-  VIP: {
-    maxSpeakers: 13,           // ★ Owner dahil 13 kişi
-    maxListeners: 30,          // ★ Gold(25)'ten fazla
-    maxSpectators: 999,        // ★ Sınırsız seyirci
-    maxCameras: 10,            // ★ Gold(8)'den fazla
+  Pro: {
+    maxSpeakers: 13,
+    maxListeners: 999,          // ★ Sınırsız dinleyici
+    maxSpectators: 999,         // ★ Sınırsız seyirci
+    maxCameras: 10,
     maxModerators: 5,
-    durationHours: 0,          // ★ 7/24 açık
+    durationHours: 0,           // ★ 7/24 açık
     dailyRooms: 999,
     persistent: true,
     maxPersistentRooms: 999,
     allowedTypes: ['open', 'closed', 'invite'] as readonly string[],
     audioSampleRate: 48000,
-    audioChannels: 2,          // ★ Stereo ses
+    audioChannels: 2,           // ★ Stereo ses
     videoMaxRes: 1080,
     canCustomizeImage: true,
     canCustomizeTheme: true,
@@ -292,10 +223,8 @@ export interface BroadcastLimits {
 
 export const BROADCAST_TIER_LIMITS: Record<SubscriptionTier, BroadcastLimits> = {
   Free:   { canBroadcast: false, durationMinutes: 0,   dailyBroadcasts: 0,   camera: false, screenShare: false, maxCoHosts: 0, canReceiveGifts: false },
-  Bronze: { canBroadcast: true,  durationMinutes: 30,  dailyBroadcasts: 1,   camera: true,  screenShare: false, maxCoHosts: 0, canReceiveGifts: false },
-  Silver: { canBroadcast: true,  durationMinutes: 60,  dailyBroadcasts: 2,   camera: true,  screenShare: false, maxCoHosts: 1, canReceiveGifts: true },
-  Gold:   { canBroadcast: true,  durationMinutes: 180, dailyBroadcasts: 5,   camera: true,  screenShare: true,  maxCoHosts: 2, canReceiveGifts: true },
-  VIP:    { canBroadcast: true,  durationMinutes: 0,   dailyBroadcasts: 999, camera: true,  screenShare: true,  maxCoHosts: 4, canReceiveGifts: true },
+  Plus:   { canBroadcast: true,  durationMinutes: 60,  dailyBroadcasts: 3,   camera: true,  screenShare: false, maxCoHosts: 1, canReceiveGifts: true },
+  Pro:    { canBroadcast: true,  durationMinutes: 0,   dailyBroadcasts: 999, camera: true,  screenShare: true,  maxCoHosts: 4, canReceiveGifts: true },
 } as const;
 
 export const getBroadcastLimits = (tier: SubscriptionTier = 'Free'): BroadcastLimits =>
@@ -315,63 +244,68 @@ export interface SPRewardConfig {
 }
 
 export const SP_REWARDS: Record<string, SPRewardConfig> = {
-  daily_login:           { amount: 15,   cooldownMs: 24 * 3600 * 1000, dailyCap: 15 },
-  prime_time_return:     { amount: 10,   cooldownMs: 3 * 3600 * 1000,  dailyCap: 20 },
-  stage_time:            { amount: 8,    cooldownMs: 10 * 60 * 1000,   dailyCap: 120 },
-  camera_time:           { amount: 12,   cooldownMs: 10 * 60 * 1000,   dailyCap: 180 },
-  message_sent:          { amount: 1,    cooldownMs: 30 * 1000,        dailyCap: 50 },
-  room_create:           { amount: 30,   cooldownMs: 0,                dailyCap: 90 },
-  follower_gain:         { amount: 5,    cooldownMs: 0,                dailyCap: 100 },
-  ccu_milestone_10:      { amount: 25,   cooldownMs: 0,                dailyCap: 200 },
-  ccu_milestone_25:      { amount: 50,   cooldownMs: 0,                dailyCap: 200 },
-  ccu_milestone_50:      { amount: 100,  cooldownMs: 0,                dailyCap: 200 },
-  store_purchase:        { amount: 0,    cooldownMs: 0,                dailyCap: 0 },    // Dinamik: tutar × 2
-  referral:              { amount: 100,  cooldownMs: 0,                dailyCap: 500 },
+  // ── Günlük & Giriş ──
+  daily_login:           { amount: 5,    cooldownMs: 24 * 3600 * 1000, dailyCap: 5 },   // 1×/gün
+  prime_time_return:     { amount: 3,    cooldownMs: 4 * 3600 * 1000,  dailyCap: 3 },   // 1×/gün (19-22)
+  // ── Oda İçi Aktivite ──
+  stage_time:            { amount: 2,    cooldownMs: 15 * 60 * 1000,   dailyCap: 16 },  // Max 2sa sahne = 16 SP
+  camera_time:           { amount: 2,    cooldownMs: 15 * 60 * 1000,   dailyCap: 16 },  // Max 2sa kamera = 16 SP
+  message_sent:          { amount: 1,    cooldownMs: 60 * 1000,        dailyCap: 10 },  // Max 10 mesaj ödülü/gün
+  // ── Üretim & Büyüme ──
+  room_create:           { amount: 5,    cooldownMs: 30 * 60 * 1000,   dailyCap: 10 },  // Max 2 oda/gün ödüllü
+  wall_post:             { amount: 3,    cooldownMs: 5 * 60 * 1000,    dailyCap: 9 },   // Max 3 post/gün ödüllü
+  follower_gain:         { amount: 2,    cooldownMs: 0,                dailyCap: 10 },  // Max 5 takipçi/gün ödüllü
+  // ── Milestone (tek sefer / cooldown ile) ──
+  ccu_milestone_10:      { amount: 10,   cooldownMs: 24 * 3600 * 1000, dailyCap: 10 },  // 1×/gün
+  ccu_milestone_25:      { amount: 20,   cooldownMs: 24 * 3600 * 1000, dailyCap: 20 },  // 1×/gün
+  ccu_milestone_50:      { amount: 40,   cooldownMs: 24 * 3600 * 1000, dailyCap: 40 },  // 1×/gün
+  // ── Mağaza & Referral ──
+  store_purchase:        { amount: 0,    cooldownMs: 0,                dailyCap: 0 },   // Dinamik: tutar × 1
+  referral:              { amount: 25,   cooldownMs: 0,                dailyCap: 50 },  // Max 2 referral/gün
 };
 
 /** Üyelik satın alma SP bonusları */
 export const SUBSCRIPTION_SP_BONUS: Record<SubscriptionTier, number> = {
   Free: 0,
-  Bronze: 500,
-  Silver: 800,
-  Gold: 1200,
-  VIP: 2000,
+  Plus: 300,
+  Pro: 800,
 };
 
 /**
  * Oda Sahibi Bonus Formülü
- * Her saat hesaplanır, günlük cap: 250 SP
+ * Her saat hesaplanır, günlük cap: 80 SP
  *
  * bonus = floor(
- *   (follower_count × 0.5) +
- *   (concurrent_users × 2) +
- *   (log2(total_listen_minutes + 1) × 3)
+ *   (follower_count × 0.1) +
+ *   (concurrent_users × 0.3) +
+ *   (log2(total_listen_minutes + 1) × 1)
  * )
+ *
+ * Referans: 50 takipçi + 10 CCU + 60dk = floor(5 + 3 + 6) = 14 SP/saat
+ * Günlük max (6 saat aktif): ~84 SP → cap 80 ile sınırlanır
  */
 export function calculateOwnerBonus(followerCount: number, ccu: number, totalListenMinutes: number): number {
-  const followerScore = followerCount * 0.5;
-  const ccuScore = ccu * 2;
-  const engagementScore = Math.log2(totalListenMinutes + 1) * 3;
+  const followerScore = followerCount * 0.1;
+  const ccuScore = ccu * 0.3;
+  const engagementScore = Math.log2(totalListenMinutes + 1) * 1;
   return Math.floor(followerScore + ccuScore + engagementScore);
 }
 
 /** Günlük oda sahibi bonus cap'i */
-export const OWNER_BONUS_DAILY_CAP = 250;
+export const OWNER_BONUS_DAILY_CAP = 80;
 
 // ════════════════════════════════════════════════════════════
 // GÜNLÜK CHECK-IN ÖDÜLLERİ (Tier çarpanlı)
 // ════════════════════════════════════════════════════════════
 
 /** 7 günlük seri baz ödülleri */
-export const DAILY_BASE_REWARDS = [5, 10, 15, 20, 25, 35, 50];
+export const DAILY_BASE_REWARDS = [2, 4, 6, 8, 10, 15, 25];
 
 /** Tier bazlı check-in çarpanı */
 export const CHECKIN_MULTIPLIER: Record<SubscriptionTier, number> = {
   Free:   1,
-  Bronze: 1.25,
-  Silver: 1.5,
-  Gold:   2,
-  VIP:    3,
+  Plus:   1.25,
+  Pro:    2,
 };
 
 /** Check-in ödülünü hesapla
@@ -390,24 +324,20 @@ export function getCheckinReward(streak: number, tier: SubscriptionTier): number
 // GİRİŞ EFEKTLERİ & SOHBET RENKLERİ
 // ════════════════════════════════════════════════════════════
 
-export const ENTRY_EFFECT_ACCESS: Record<SubscriptionTier, 'none' | 'basic' | 'silver' | 'gold' | 'vip'> = {
+export const ENTRY_EFFECT_ACCESS: Record<SubscriptionTier, 'none' | 'basic' | 'plus' | 'pro'> = {
   Free:   'none',
-  Bronze: 'basic',
-  Silver: 'silver',
-  Gold:   'gold',
-  VIP:    'vip',
+  Plus:   'plus',
+  Pro:    'pro',
 };
 
 export const CHAT_COLOR_LIMITS: Record<SubscriptionTier, number> = {
   Free:   0,   // Sadece beyaz
-  Bronze: 2,
-  Silver: 5,
-  Gold:   10,
-  VIP:    999, // Özel renk dahil tümü
+  Plus:   5,
+  Pro:    999, // Özel renk dahil tümü
 };
 
 // ════════════════════════════════════════════════════════════
-// ODA MÜZİĞİ PRESET'LERİ (Gold+ için)
+// ODA MÜZİĞİ PRESET'LERİ (Pro+ için)
 // ════════════════════════════════════════════════════════════
 
 export interface RoomMusicPreset {
@@ -450,10 +380,8 @@ export function getTierBadgeInfo(tier: SubscriptionTier | string) {
 /** Arama/keşfet önceliği */
 export const SEARCH_PRIORITY: Record<SubscriptionTier, number> = {
   Free:   0,
-  Bronze: 100,
-  Silver: 200,
-  Gold:   400,
-  VIP:    600,
+  Plus:   200,
+  Pro:    600,
 };
 
 /**
