@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, Image, Pressable, ScrollView, ActivityIndicator, DeviceEventEmitter } from 'react-native';
+import { View, Text, StyleSheet, Image, Pressable, ScrollView, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { safeGoBack } from '../../constants/navigation';
-import { Colors, Radius, Shadows } from '../../constants/theme';
+import { Colors, Shadows } from '../../constants/theme';
 import { TIER_DEFINITIONS } from '../../constants/tiers';
 import { TierBadge } from '../../components/progression';
 import type { TierName } from '../../types';
@@ -23,6 +23,7 @@ import { isTierAtLeast } from '../../constants/tiers';
 import PremiumAlert, { type AlertButton } from '../../components/PremiumAlert';
 import AppBackground from '../../components/AppBackground';
 import FollowListModal from '../../components/FollowListModal';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 
 
@@ -30,6 +31,7 @@ export default function UserProfileScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { firebaseUser, profile: currentUserProfile, refreshProfile } = useAuth();
+  const insets = useSafeAreaInsets();
   const [userProfile, setUserProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [followStatus, setFollowStatus] = useState<FriendshipStatus | null>(null);
@@ -280,7 +282,7 @@ export default function UserProfileScreen() {
     <AppBackground variant="profile">
     <View style={s.container}>
       {/* Header */}
-      <View style={s.header}>
+      <View style={[s.header, { paddingTop: insets.top + 8 }]}>
         <Pressable onPress={() => safeGoBack(router)} style={s.backBtn}>
           <Ionicons name="chevron-back" size={22} color="#F1F5F9" />
         </Pressable>
@@ -517,7 +519,7 @@ const s = StyleSheet.create({
   // Header
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingTop: 54, paddingBottom: 12,
+    paddingHorizontal: 16, paddingTop: 12, paddingBottom: 12,
   },
   backBtn: {
     width: 36, height: 36, borderRadius: 12,

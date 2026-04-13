@@ -7,12 +7,14 @@ import { View, Text, StyleSheet, FlatList, Pressable, Image, ActivityIndicator, 
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { safeGoBack } from '../constants/navigation';
-import { Colors, Radius } from '../constants/theme';
+import { Colors } from '../constants/theme';
 import { supabase } from '../constants/supabase';
 import { FriendshipService, type PendingRequest } from '../services/friendship';
 import { getAvatarSource } from '../constants/avatars';
 import EmptyState from '../components/EmptyState';
-import { useAuth } from './_layout';
+import AppBackground from '../components/AppBackground';
+import { useAuth, useBadges } from './_layout';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type Notification = {
   id: string;
@@ -54,6 +56,8 @@ function getRelativeTime(dateStr: string): string {
 export default function NotificationsScreen() {
   const router = useRouter();
   const { firebaseUser } = useAuth();
+  const { refreshBadges } = useBadges();
+  const insets = useSafeAreaInsets();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [pendingRequests, setPendingRequests] = useState<PendingRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -91,6 +95,8 @@ export default function NotificationsScreen() {
     } finally {
       setLoading(false);
       setRefreshing(false);
+      // ★ ECO-9 FIX: Badge numarası okundu olarak güncelle
+      refreshBadges();
     }
   }, [firebaseUser]);
 
@@ -253,9 +259,10 @@ export default function NotificationsScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <AppBackground>
+    <View style={[styles.container, { backgroundColor: 'transparent' }]}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <Pressable onPress={() => safeGoBack(router)} style={styles.backBtn}>
           <Ionicons name="chevron-back" size={24} color={Colors.text} />
         </Pressable>
@@ -289,11 +296,12 @@ export default function NotificationsScreen() {
         />
       )}
     </View>
+    </AppBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.bg },
+  container: { flex: 1 },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 16, paddingTop: 54, paddingBottom: 12,

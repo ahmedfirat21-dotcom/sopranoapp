@@ -702,8 +702,11 @@ export default function ChatScreen() {
           </View>
         </View>
         {/* ★ Arama butonları + Kebab menü — aynı row'da */}
+        {/* ★ ECO-1 FIX: Arama sadece karşılıklı takipleşenlere açık (user/[id] ve messages ile tutarlı) */}
         {!loading && otherUser && (
           <View style={styles.headerActions}>
+            {isMutualFollow && (
+            <>
             <Pressable
               style={[styles.headerAction, isCallingInProgress && { opacity: 0.4 }]}
               disabled={isCallingInProgress}
@@ -752,6 +755,8 @@ export default function ChatScreen() {
             >
               <Ionicons name="videocam" size={20} color={Colors.teal} />
             </Pressable>
+            </>
+            )}
             {/* ★ Kebab menü butonu */}
             <Pressable
               style={styles.kebabBtn}
