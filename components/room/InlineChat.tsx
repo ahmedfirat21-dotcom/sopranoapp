@@ -58,7 +58,7 @@ export default function InlineChat({ messages, maxLines = 6 }: Props) {
         }
 
         return (
-          <Text key={msg.id} style={[s.msgLine, { opacity }]} numberOfLines={1}>
+          <Text key={msg.id} style={[s.msgLine, { opacity }]} numberOfLines={2}>
             <Text style={s.msgName}>{msg.profiles?.display_name || 'Kullanıcı'}  </Text>
             <Text style={s.msgText}>{msg.content}</Text>
           </Text>

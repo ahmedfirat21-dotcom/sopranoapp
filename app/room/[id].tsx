@@ -1587,11 +1587,11 @@ export default function RoomScreen() {
 
       {/* ★ DM MİNİ PANELİ — Oda içi mesaj bildirimleri (odadan çıkarmaz) */}
       {showDmPanel && (
-        <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+        <View style={[StyleSheet.absoluteFill, { zIndex: 100 }]}>
           <Pressable style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.45)' }]} onPress={() => setShowDmPanel(false)} />
           <Animated.View style={{
             position: 'absolute', bottom: Math.max(insets.bottom, 14) + 110, right: 10, left: 10,
-            maxHeight: 360, borderRadius: 20, backgroundColor: 'rgba(15,23,42,0.97)',
+            maxHeight: 360, borderRadius: 20, backgroundColor: 'rgba(45,55,64,0.97)',
             borderWidth: 1, borderColor: 'rgba(20,184,166,0.15)',
             shadowColor: '#000', shadowOffset: { width: 0, height: -6 }, shadowOpacity: 0.5, shadowRadius: 20, elevation: 20,
             overflow: 'hidden',
@@ -1615,12 +1615,7 @@ export default function RoomScreen() {
                   <Text style={{ color: '#FFF', fontSize: 10, fontWeight: '800' }}>{dmUnreadCount > 99 ? '99+' : dmUnreadCount}</Text>
                 </View>
               )}
-              <Pressable onPress={() => setShowDmPanel(false)} hitSlop={8} style={{
-                width: 26, height: 26, borderRadius: 13,
-                backgroundColor: 'rgba(255,255,255,0.06)', alignItems: 'center', justifyContent: 'center',
-              }}>
-                <Ionicons name="close" size={14} color="rgba(255,255,255,0.4)" />
-              </Pressable>
+
             </View>
             {/* Mesaj listesi */}
             <ScrollView style={{ maxHeight: 290 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 8, gap: 2 }}>
@@ -2007,9 +2002,9 @@ export default function RoomScreen() {
 
       {dmTarget && (
         <View style={dmSty.overlay}><Pressable style={StyleSheet.absoluteFill} onPress={() => setDmTarget(null)} />
-          <View style={dmSty.panel}><View style={dmSty.handle} />
+        <View style={dmSty.panel}><View style={dmSty.handle} />
             <View style={dmSty.header}><Ionicons name="chatbubble-ellipses" size={16} color={COLORS.primary} /><Text style={dmSty.headerText} numberOfLines={1}>{dmTarget.nick} — Mesaj Gönder</Text>
-              <TouchableOpacity onPress={() => setDmTarget(null)} style={dmSty.closeBtn}><Ionicons name="close" size={14} color="rgba(255,255,255,0.3)" /></TouchableOpacity></View>
+              </View>
             <View style={dmSty.inputRow}><TextInput style={dmSty.input} placeholder="Mesajını yaz..." placeholderTextColor="rgba(255,255,255,0.25)" value={dmText} onChangeText={setDmText} maxLength={500} autoFocus returnKeyType="send" onSubmitEditing={handleSendDm} />
               <TouchableOpacity style={[dmSty.sendBtn, (!dmText.trim() || dmSending) && { opacity: 0.35 }]} disabled={!dmText.trim() || dmSending} onPress={handleSendDm}><Ionicons name="send" size={16} color="#fff" /></TouchableOpacity></View>
           </View>
@@ -2259,7 +2254,7 @@ const sty = StyleSheet.create({
 
 const dmSty = StyleSheet.create({
   overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end', alignItems: 'center', zIndex: 300 },
-  panel: { width: W * 0.92, backgroundColor: 'rgba(15,15,28,0.97)', borderRadius: 20, padding: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)', marginBottom: 30 },
+  panel: { width: W * 0.92, backgroundColor: 'rgba(45,55,64,0.97)', borderRadius: 20, padding: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)', marginBottom: 30 },
   handle: { width: 36, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.08)', alignSelf: 'center', marginBottom: 14 },
   header: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
   headerText: { color: '#F1F5F9', fontSize: 14, fontWeight: '700', flex: 1 },
