@@ -1018,6 +1018,7 @@ export default function RoomScreen() {
             if (firebaseUser?.uid) {
               if (lk.isMicrophoneEnabled) await lk.toggleMic();
               await RoomService.demoteSpeaker(id as string, firebaseUser.uid);
+              modChannelRef.current?.send({ type: 'broadcast', event: 'mod_action', payload: { action: 'demote', targetUserId: firebaseUser.uid } });
               // ★ BUG FIX: Optimistik state güncelleme — speaker → listener (UI anında dinleyici grid'ine taşır)
               setParticipants(prev => prev.map(p => p.user_id === firebaseUser!.uid ? { ...p, role: 'listener' as const } : p));
               showToast({ title: 'Sahneden İndin', message: 'Artık dinleyicisin', type: 'info' });
@@ -1278,11 +1279,13 @@ export default function RoomScreen() {
         if (isOwnerUser) {
           // Owner: role'ü tekrar 'owner' olarak ayarla (zaten host_id eşleşiyor)
           await RoomService.promoteSpeaker(room.id, firebaseUser.uid);
+          modChannelRef.current?.send({ type: 'broadcast', event: 'mod_action', payload: { action: 'promote', targetUserId: firebaseUser.uid } });
           setParticipants(prev => prev.map(p => p.user_id === firebaseUser!.uid ? { ...p, role: 'owner' as const, is_muted: false } : p));
         } else {
           await RoomService.promoteSpeaker(room.id, firebaseUser.uid);
           // Moderatör tekrar sahneye çıktığında rol moderatör olarak kalmalı
           await supabase.from('room_participants').update({ role: 'moderator' }).eq('room_id', room.id).eq('user_id', firebaseUser.uid);
+          modChannelRef.current?.send({ type: 'broadcast', event: 'mod_action', payload: { action: 'promote', targetUserId: firebaseUser.uid } });
           setParticipants(prev => prev.map(p => p.user_id === firebaseUser!.uid ? { ...p, role: 'moderator' as const, is_muted: false } : p));
         }
         showToast({ title: '🎤 Sahneye Çıktın!', message: 'Mikrofon otomatik açılıyor...', type: 'success' });
@@ -1297,6 +1300,7 @@ export default function RoomScreen() {
     if (isOwnerUser) {
       try {
         await RoomService.promoteSpeaker(room.id, firebaseUser.uid);
+        modChannelRef.current?.send({ type: 'broadcast', event: 'mod_action', payload: { action: 'promote', targetUserId: firebaseUser.uid } });
         setParticipants(prev => prev.map(p => p.user_id === firebaseUser!.uid ? { ...p, role: 'owner' as const, is_muted: false } : p));
         showToast({ title: '👑 Sahneye Çıktın!', message: 'Oda sahibi olarak sahneye döndün', type: 'success' });
         setTimeout(() => { lk.enableMic?.().catch(() => {}); }, 500);
