@@ -324,36 +324,42 @@ export default function RoomSettingsSheet(props: RoomSettingsProps) {
         )
       ) : <LockedRow icon="lock-closed" label="Oda Kilitleme" requiredTier="Silver" />)}
 
-      {/* Odayı Dondur — Bronze+ */}
+      {/* Odayı Dondur — Bronze+ (Premium Gradient CTA) */}
       {canFreezeRoom && onFreezeRoom && (
-        <Pressable style={[s.closeRoomBtn, { borderColor: 'rgba(59,130,246,0.2)', backgroundColor: 'rgba(59,130,246,0.06)' }]} onPress={() => { onClose(); onFreezeRoom(); }}>
-          <View style={[s.closeRoomIcon, { backgroundColor: 'rgba(59,130,246,0.12)', borderColor: 'rgba(59,130,246,0.25)' }]}><Ionicons name="snow" size={20} color="#3B82F6" /></View>
-          <View style={{ flex: 1 }}>
-            <Text style={[s.closeRoomTitle, { color: '#3B82F6' }]}>Odayı Dondur</Text>
-            <Text style={s.closeRoomDesc}>Oda dondurulur, dilediğinde tekrar aktifleştir</Text>
-          </View>
+        <Pressable style={s.actionCta} onPress={() => { onClose(); onFreezeRoom(); }}>
+          <LinearGradient colors={['#3B82F6', '#2563EB', '#1D4ED8']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.actionCtaGrad}>
+            <View style={s.actionCtaIcon}><Ionicons name="snow" size={20} color="#FFF" /></View>
+            <View style={{ flex: 1 }}>
+              <Text style={s.actionCtaTitle}>Odayı Dondur</Text>
+              <Text style={s.actionCtaSub}>Oda dondurulur, dilediğinde tekrar aktifleştir</Text>
+            </View>
+          </LinearGradient>
         </Pressable>
       )}
 
-      {/* Odayı Sil — Owner-only */}
+      {/* Odayı Sil — Owner-only (Premium Gradient CTA) */}
       {canDeleteRoom && onDeleteRoom && (
-        <Pressable style={[s.closeRoomBtn, { marginTop: 10 }]} onPress={() => { onClose(); onDeleteRoom(); }}>
-          <View style={s.closeRoomIcon}><Ionicons name="trash" size={20} color="#EF4444" /></View>
-          <View style={{ flex: 1 }}>
-            <Text style={s.closeRoomTitle}>Odayı Sil</Text>
-            <Text style={s.closeRoomDesc}>Oda kalıcı olarak silinir, geri alınamaz</Text>
-          </View>
+        <Pressable style={s.actionCta} onPress={() => { onClose(); onDeleteRoom(); }}>
+          <LinearGradient colors={['#EF4444', '#DC2626', '#B91C1C']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.actionCtaGrad}>
+            <View style={s.actionCtaIcon}><Ionicons name="trash" size={20} color="#FFF" /></View>
+            <View style={{ flex: 1 }}>
+              <Text style={s.actionCtaTitle}>Odayı Sil</Text>
+              <Text style={s.actionCtaSub}>Oda kalıcı olarak silinir, geri alınamaz</Text>
+            </View>
+          </LinearGradient>
         </Pressable>
       )}
 
-      {/* Odadan Ayrıl */}
+      {/* Odadan Ayrıl (Premium Gradient CTA) */}
       {onLeaveRoom && (
-        <Pressable style={[s.closeRoomBtn, { marginTop: 10 }]} onPress={() => { onClose(); onLeaveRoom(); }}>
-          <View style={[s.closeRoomIcon, { backgroundColor: 'rgba(245,158,11,0.15)', borderColor: 'rgba(245,158,11,0.3)' }]}><Ionicons name="exit" size={20} color="#F59E0B" /></View>
-          <View style={{ flex: 1 }}>
-            <Text style={[s.closeRoomTitle, { color: '#F59E0B' }]}>Odadan Ayrıl</Text>
-            <Text style={s.closeRoomDesc}>Odadan çık ve ana sayfaya dön</Text>
-          </View>
+        <Pressable style={s.actionCta} onPress={() => { onClose(); onLeaveRoom(); }}>
+          <LinearGradient colors={['#F59E0B', '#D97706', '#B45309']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.actionCtaGrad}>
+            <View style={s.actionCtaIcon}><Ionicons name="exit" size={20} color="#FFF" /></View>
+            <View style={{ flex: 1 }}>
+              <Text style={s.actionCtaTitle}>Odadan Ayrıl</Text>
+              <Text style={s.actionCtaSub}>Odadan çık ve ana sayfaya dön</Text>
+            </View>
+          </LinearGradient>
         </Pressable>
       )}
     </View>
@@ -780,23 +786,27 @@ const s = StyleSheet.create({
     shadowColor: '#14B8A6', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.4, shadowRadius: 4,
   },
 
-  // Close Room / Delete / Leave
-  closeRoomBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 16, padding: 14, borderRadius: 16,
-    backgroundColor: 'transparent',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 6,
+  // Action CTA — Premium Gradient (myrooms.tsx Oda Oluştur tarzı)
+  actionCta: {
+    marginTop: 12, borderRadius: 16, overflow: 'hidden',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.3, shadowRadius: 6,
   },
-  closeRoomIcon: {
-    width: 40, height: 40, borderRadius: 14, backgroundColor: 'rgba(239,68,68,0.12)',
-    alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(239,68,68,0.2)',
+  actionCtaGrad: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingVertical: 16, paddingHorizontal: 16, gap: 12,
   },
-  closeRoomTitle: {
-    fontSize: 14, fontWeight: '700', color: '#EF4444',
-    textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
+  actionCtaIcon: {
+    width: 42, height: 42, borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)',
   },
-  closeRoomDesc: {
-    fontSize: 11, color: '#94A3B8', marginTop: 2,
+  actionCtaTitle: {
+    fontSize: 15, fontWeight: '800', color: '#FFF',
     textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
+  },
+  actionCtaSub: {
+    fontSize: 11, color: 'rgba(255,255,255,0.75)', marginTop: 2,
   },
 
   // Name Edit
