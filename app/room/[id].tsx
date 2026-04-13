@@ -1154,15 +1154,25 @@ export default function RoomScreen() {
     lk,
   });
 
-  // ★ VIP: Peak CCU takibi
+  // ★ ARCH-1: Gamification (CCU, SP triggers, system prompt) → useRoomGamification hook
+  const { roomStats: gamificationStats } = useRoomGamification({
+    roomId: id as string,
+    firebaseUser,
+    profile,
+    room,
+    myCurrentRole,
+    participantCount: participants.length,
+    isCameraEnabled: lk.isCameraEnabled || false,
+    spToastRef,
+  });
+  // roomStats state'ini gamification hook'tan sync et
   useEffect(() => {
-    const currentCount = participants.length;
     setRoomStats(prev => ({
       ...prev,
-      peakCCU: Math.max(prev.peakCCU, currentCount),
-      totalUniqueListeners: Math.max(prev.totalUniqueListeners, currentCount),
+      peakCCU: Math.max(prev.peakCCU, gamificationStats.peakCCU),
+      totalUniqueListeners: Math.max(prev.totalUniqueListeners, gamificationStats.totalUniqueListeners),
     }));
-  }, [participants.length]);
+  }, [gamificationStats.peakCCU, gamificationStats.totalUniqueListeners]);
 
   // ★ VIP: Tümünü Sustur
   const handleMuteAll = useCallback(async () => {
@@ -1174,7 +1184,6 @@ export default function RoomScreen() {
         { text: 'İptal', style: 'cancel' },
         { text: 'Sustur', onPress: async () => {
           const stagePeople = participants.filter(p => (p.role === 'speaker' || p.role === 'moderator') && p.user_id !== firebaseUser.uid);
-          // ★ BUG-RM8 FIX: Seri yerine paralel DB çağrısı
           await Promise.all(stagePeople.map(async (p) => {
             try {
               await supabase.from('room_participants').update({ is_muted: true }).eq('room_id', room.id).eq('user_id', p.user_id);
@@ -1190,48 +1199,6 @@ export default function RoomScreen() {
       ],
     });
   }, [room, firebaseUser, participants]);
-
-
-  // ★ SP Tetikleyiciler: Sahnede olma (10dk interval) + Kamera açık (10dk interval)
-  useEffect(() => {
-    const isOnStage = myCurrentRole === 'owner' || myCurrentRole === 'moderator' || myCurrentRole === 'speaker';
-    if (!isOnStage || !firebaseUser?.uid) return;
-
-    // 10 dakikada bir sahne SP'si
-    const stageTimer = setInterval(() => {
-      GamificationService.onStageTime(firebaseUser.uid).then(sp => {
-        if (sp > 0) spToastRef.current?.show(sp, 'Sahne');
-      }).catch(() => {});
-    }, 10 * 60 * 1000);
-
-    // 10 dakikada bir kamera SP'si (kamera açıksa)
-    const cameraTimer = setInterval(() => {
-      if (lk.isCameraEnabled) {
-        GamificationService.onCameraTime(firebaseUser.uid).then(sp => {
-          if (sp > 0) spToastRef.current?.show(sp, 'Kamera');
-        }).catch(() => {});
-      }
-    }, 10 * 60 * 1000);
-
-    return () => {
-      clearInterval(stageTimer);
-      clearInterval(cameraTimer);
-    };
-  }, [myCurrentRole, firebaseUser?.uid, lk.isCameraEnabled]);
-  // Sistem odası 5dk prompt — "Kendi odanı aç ister misin?"
-  useEffect(() => {
-    if (!room || !isSystemRoom(id as string)) return;
-    const timer = setTimeout(() => {
-      const _tier = (profile?.subscription_tier || 'Free') as any;
-      UpsellService.onSystemRoomPrompt(_tier);
-      showToast({
-        title: '🏠 Kendi Odanı Aç!',
-        message: 'SopranoChat\'ta kendi kişisel odanı oluştur ve topluluğun lideri ol!',
-        type: 'info',
-      });
-    }, 5 * 60 * 1000); // 5 dakika
-    return () => clearTimeout(timer);
-  }, [room, id]);
 
   // ★ Boş sahne teklifi — inline tooltip + ghost koltuk yaklaşımı (modal yerine)
   const [showSeatTooltip, setShowSeatTooltip] = React.useState(false);
