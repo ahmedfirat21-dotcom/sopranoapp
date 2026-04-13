@@ -14,7 +14,7 @@ import { showToast } from './Toast';
 const { height: H } = Dimensions.get('window');
 
 const C = {
-  glass: 'rgba(15,15,25,0.92)',
+  glass: 'rgba(45,55,64,0.95)',
   border: 'rgba(255,255,255,0.06)',
   white: '#F1F5F9',
   white60: 'rgba(255,255,255,0.6)',

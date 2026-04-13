@@ -142,7 +142,7 @@ const st = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: '#1a2a3a',
+    backgroundColor: '#2D3740',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     borderWidth: 1,

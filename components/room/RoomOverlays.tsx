@@ -225,7 +225,7 @@ const s = StyleSheet.create({
     right: 10,
     width: 252,
     borderRadius: 18,
-    backgroundColor: '#1E293B',
+    backgroundColor: '#2D3740',
     borderWidth: 1,
     borderColor: 'rgba(20,184,166,0.12)',
     overflow: 'visible',
@@ -252,7 +252,7 @@ const s = StyleSheet.create({
     borderTopWidth: 8,
     borderLeftColor: 'transparent',
     borderRightColor: 'transparent',
-    borderTopColor: '#1E293B',
+    borderTopColor: '#2D3740',
   },
 
   // Header

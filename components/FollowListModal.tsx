@@ -243,7 +243,7 @@ const st = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   sheet: {
-    backgroundColor: '#1E293B',
+    backgroundColor: '#2D3740',
     borderTopLeftRadius: 22,
     borderTopRightRadius: 22,
     maxHeight: '75%',

@@ -241,7 +241,7 @@ const GIF_ITEM_SIZE = (W - 48) / 3;
 
 const sty = StyleSheet.create({
   picker: {
-    backgroundColor: 'rgba(0,0,0,0.82)',
+    backgroundColor: 'rgba(45,55,64,0.95)',
     borderRadius: 20,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.08)',

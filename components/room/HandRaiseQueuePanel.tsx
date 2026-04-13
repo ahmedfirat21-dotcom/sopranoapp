@@ -207,7 +207,7 @@ const s = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.6)',
   },
   panel: {
-    backgroundColor: '#2d3d4d',
+    backgroundColor: '#2D3740',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingHorizontal: 16,

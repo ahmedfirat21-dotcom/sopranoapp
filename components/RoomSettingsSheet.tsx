@@ -662,7 +662,7 @@ export default function RoomSettingsSheet(props: RoomSettingsProps) {
 const s = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
   sheet: {
-    backgroundColor: '#1E293B',
+    backgroundColor: '#2D3740',
     borderTopLeftRadius: 28, borderTopRightRadius: 28,
     paddingHorizontal: 20, paddingBottom: 36,
     borderWidth: 1, borderColor: 'rgba(20,184,166,0.15)', borderBottomWidth: 0,

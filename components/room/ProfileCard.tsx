@@ -13,7 +13,7 @@ import { getAvatarSource } from '../../constants/avatars';
 const { height: H } = Dimensions.get('window');
 
 const C = {
-  glass: 'rgba(15,15,25,0.88)',
+  glass: 'rgba(45,55,64,0.95)',
   border: 'rgba(255,255,255,0.06)',
   primary: '#5CE1E6',
   gold: '#D4AF37',
@@ -426,7 +426,7 @@ const sty = StyleSheet.create({
     borderRadius: 6,
     backgroundColor: C.green,
     borderWidth: 2,
-    borderColor: 'rgba(15,15,25,0.9)',
+    borderColor: 'rgba(45,55,64,0.95)',
   },
   headerInfo: { flex: 1, marginLeft: 12 },
   nick: { color: C.white, fontSize: 15, fontWeight: '700', letterSpacing: 0.1 },
