@@ -348,8 +348,8 @@ export default function RoomSettingsSheet(props: RoomSettingsProps) {
 
       {/* Odadan Ayrıl */}
       {onLeaveRoom && (
-        <Pressable style={[s.closeRoomBtn, { borderColor: 'rgba(245,158,11,0.2)', backgroundColor: 'rgba(245,158,11,0.06)', marginTop: 10 }]} onPress={() => { onClose(); onLeaveRoom(); }}>
-          <View style={[s.closeRoomIcon, { backgroundColor: 'rgba(245,158,11,0.12)', borderColor: 'rgba(245,158,11,0.25)' }]}><Ionicons name="exit" size={20} color="#F59E0B" /></View>
+        <Pressable style={[s.closeRoomBtn, { marginTop: 10 }]} onPress={() => { onClose(); onLeaveRoom(); }}>
+          <View style={[s.closeRoomIcon, { backgroundColor: 'rgba(245,158,11,0.15)', borderColor: 'rgba(245,158,11,0.3)' }]}><Ionicons name="exit" size={20} color="#F59E0B" /></View>
           <View style={{ flex: 1 }}>
             <Text style={[s.closeRoomTitle, { color: '#F59E0B' }]}>Odadan Ayrıl</Text>
             <Text style={s.closeRoomDesc}>Odadan çık ve ana sayfaya dön</Text>
@@ -784,7 +784,7 @@ const s = StyleSheet.create({
   closeRoomBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 16, padding: 14, borderRadius: 16,
     backgroundColor: 'transparent',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 6, elevation: 3,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 6,
   },
   closeRoomIcon: {
     width: 40, height: 40, borderRadius: 14, backgroundColor: 'rgba(239,68,68,0.12)',
