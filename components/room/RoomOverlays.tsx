@@ -6,7 +6,7 @@ import { isTierAtLeast } from '../../constants/tiers';
 const { width: W, height: H } = Dimensions.get('window');
 
 // ════════════════════════════════════════════════════════════
-// + MENÜSÜ — Akıcı Spring Animasyonlu Rol-Bazlı Panel
+// + MENÜSÜ — Premium Spring Animasyonlu Rol-Bazlı Panel
 // ════════════════════════════════════════════════════════════
 
 type MenuItem = {
@@ -49,7 +49,7 @@ const ROLE_META: Record<string, { label: string; color: string; icon: string }> 
   owner:     { label: 'Oda Sahibi',  color: '#D4AF37', icon: 'star' },
   moderator: { label: 'Moderatör',   color: '#A78BFA', icon: 'shield-checkmark' },
   speaker:   { label: 'Konuşmacı',   color: '#14B8A6', icon: 'mic' },
-  listener:  { label: 'Dinleyici',    color: '#64748B', icon: 'headset' },
+  listener:  { label: 'Dinleyici',    color: '#94A3B8', icon: 'headset' },
 };
 
 export function PlusMenu({
@@ -63,7 +63,7 @@ export function PlusMenu({
   onBoostRoom, onToggleFollow, isFollowingRoom,
 }: PlusMenuProps) {
   // ═══ Animasyon ═══
-  const slideAnim = useRef(new Animated.Value(200)).current; // yukarı kayma
+  const slideAnim = useRef(new Animated.Value(200)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.85)).current;
 
@@ -103,12 +103,10 @@ export function PlusMenu({
     items.push({ id: 'settings', icon: 'settings-outline', label: 'Oda Ayarları', accent: '#D4AF37', onPress: onRoomSettings });
   }
   // 2️⃣ Moderasyon / El Kaldırma Kuyruğu (Owner veya Mod — Free dahil)
-  // ★ K3 FIX: Free owner da moderasyon paneline erişebilir (el kaldırma kuyruğu için)
   if ((isOwner || isMod) && onModeration) {
     items.push({ id: 'moderation', icon: 'shield-checkmark-outline', label: isFreeOwner ? 'El Kaldırma Kuyruğu' : 'Moderasyon', accent: '#A78BFA', onPress: onModeration, badge: micRequestCount });
   }
   // 3️⃣ Oda Kilitle (Silver+ owner)
-  // ★ M4 FIX: onRoomLock artık menüde kullanılıyor
   if (isOwner && onRoomLock && isTierAtLeast(ownerTier as any, 'Silver')) {
     items.push({ id: 'lock', icon: isRoomLocked ? 'lock-open-outline' : 'lock-closed-outline', label: isRoomLocked ? 'Kilidi Aç' : 'Odayı Kilitle', accent: '#F59E0B', onPress: onRoomLock });
   }
@@ -126,10 +124,6 @@ export function PlusMenu({
   if (isOwner && onRoomStats && isTierAtLeast(ownerTier as any, 'VIP')) {
     items.push({ id: 'stats', icon: 'stats-chart-outline', label: 'Oda İstatistikleri', accent: '#3B82F6', onPress: onRoomStats });
   }
-  // 🚩 Bildir (dinleyiciler)
-  if (!isOnStage && onReportRoom) {
-    items.push({ id: 'report', icon: 'flag-outline', label: 'Odayı Bildir', accent: '#EF4444', onPress: onReportRoom, destructive: true });
-  }
   // ★ RM-4: Boost — Bronze+ owner
   if (isOwner && onBoostRoom && isTierAtLeast(ownerTier as any, 'Bronze')) {
     items.push({ id: 'boost', icon: 'rocket-outline', label: 'Keşfette Öne Çıkar', desc: 'SP ile boost', accent: '#F59E0B', onPress: onBoostRoom });
@@ -137,6 +131,10 @@ export function PlusMenu({
   // ★ RM-5: Oda Takip Et/Bırak (dinleyiciler + speaker'lar, owner hariç)
   if (!isOwner && onToggleFollow) {
     items.push({ id: 'follow', icon: isFollowingRoom ? 'heart' : 'heart-outline', label: isFollowingRoom ? 'Takibi Bırak' : 'Odayı Takip Et', accent: isFollowingRoom ? '#EF4444' : '#EC4899', onPress: onToggleFollow });
+  }
+  // 🚩 Bildir (dinleyiciler)
+  if (!isOnStage && onReportRoom) {
+    items.push({ id: 'report', icon: 'flag-outline', label: 'Odayı Bildir', accent: '#EF4444', onPress: onReportRoom, destructive: true });
   }
   // 🗑️ Odayı Sil (Owner)
   if (isOwner && onDeleteRoom) {
@@ -168,17 +166,17 @@ export function PlusMenu({
 
         {/* Header */}
         <View style={s.header}>
-          <View style={[s.rolePill, { backgroundColor: role.color + '18' }]}>
-            <Ionicons name={role.icon as any} size={11} color={role.color} />
+          <View style={[s.rolePill, { backgroundColor: role.color + '22', borderColor: role.color + '35' }]}>
+            <Ionicons name={role.icon as any} size={12} color={role.color} style={s.iconShadow} />
             <Text style={[s.roleLabel, { color: role.color }]}>{role.label}</Text>
           </View>
           <Pressable onPress={onClose} style={s.closeBtn} hitSlop={8}>
-            <Ionicons name="close" size={16} color="#475569" />
+            <Ionicons name="close" size={16} color="#94A3B8" />
           </Pressable>
         </View>
 
         {/* Items */}
-        <ScrollView bounces={false} showsVerticalScrollIndicator={false} style={{ maxHeight: 300 }}>
+        <ScrollView bounces={false} showsVerticalScrollIndicator={false} style={{ maxHeight: 340 }}>
           {items.map((item, i) => (
             <Pressable
               key={item.id}
@@ -189,8 +187,8 @@ export function PlusMenu({
                 i < items.length - 1 && s.rowBorder,
               ]}
             >
-              <View style={[s.iconCircle, { backgroundColor: item.accent + '14' }]}>
-                <Ionicons name={item.icon as any} size={14} color={item.destructive ? '#EF4444' : item.accent} />
+              <View style={[s.iconCircle, { backgroundColor: item.accent + '20', borderColor: item.accent + '30' }]}>
+                <Ionicons name={item.icon as any} size={16} color={item.destructive ? '#EF4444' : item.accent} style={s.iconShadow} />
               </View>
               <View style={s.rowText}>
                 <Text style={[s.rowLabel, item.destructive && { color: '#EF4444' }]}>{item.label}</Text>
@@ -200,9 +198,7 @@ export function PlusMenu({
                 <View style={s.badge}>
                   <Text style={s.badgeText}>{item.badge > 9 ? '9+' : item.badge}</Text>
                 </View>
-              ) : (
-                <Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.08)" />
-              )}
+              ) : null}
             </Pressable>
           ))}
         </ScrollView>
@@ -220,24 +216,24 @@ export function AdvancedSettingsPanel({ visible }: { visible: boolean; [key: str
 const s = StyleSheet.create({
   backdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.35)',
+    backgroundColor: 'rgba(0,0,0,0.45)',
   },
 
   panel: {
     position: 'absolute',
     bottom: 82,
     right: 10,
-    width: 232,
-    borderRadius: 14,
-    backgroundColor: '#2d3d4d',
+    width: 252,
+    borderRadius: 18,
+    backgroundColor: '#1E293B',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: 'rgba(20,184,166,0.12)',
     overflow: 'visible',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.45,
-    shadowRadius: 20,
-    elevation: 16,
+    shadowOffset: { width: 0, height: -6 },
+    shadowOpacity: 0.55,
+    shadowRadius: 24,
+    elevation: 20,
   },
 
   // Ok işareti — panelin altından + butonuna doğru
@@ -256,7 +252,7 @@ const s = StyleSheet.create({
     borderTopWidth: 8,
     borderLeftColor: 'transparent',
     borderRightColor: 'transparent',
-    borderTopColor: '#2d3d4d',
+    borderTopColor: '#1E293B',
   },
 
   // Header
@@ -264,97 +260,113 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 10,
-    paddingTop: 8,
-    paddingBottom: 6,
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    paddingBottom: 8,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.04)',
+    borderBottomColor: 'rgba(255,255,255,0.06)',
   },
   rolePill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: 6,
+    gap: 5,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
   },
   roleLabel: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '700',
     letterSpacing: 0.3,
-    textShadowColor: 'rgba(0,0,0,0.4)',
+    textShadowColor: 'rgba(0,0,0,0.6)',
     textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
+    textShadowRadius: 3,
   },
   closeBtn: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: 'rgba(255,255,255,0.04)',
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+
+  // Icon shadow — tüm ikonlara gölge verir
+  iconShadow: {
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
   },
 
   // Row
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
+    gap: 10,
+    paddingVertical: 11,
+    paddingHorizontal: 12,
   },
   rowPressed: {
-    backgroundColor: 'rgba(20,184,166,0.05)',
+    backgroundColor: 'rgba(20,184,166,0.08)',
   },
   rowBorder: {
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.025)',
+    borderBottomColor: 'rgba(255,255,255,0.04)',
   },
   iconCircle: {
-    width: 26,
-    height: 26,
-    borderRadius: 7,
+    width: 32,
+    height: 32,
+    borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
-    shadowRadius: 3,
-    elevation: 3,
+    shadowRadius: 4,
+    elevation: 4,
   },
   rowText: {
     flex: 1,
   },
   rowLabel: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '600',
-    color: '#E2E8F0',
-    letterSpacing: 0.1,
+    color: '#F1F5F9',
+    letterSpacing: 0.15,
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  rowDesc: {
+    fontSize: 10,
+    color: '#64748B',
+    marginTop: 2,
     textShadowColor: 'rgba(0,0,0,0.4)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
   },
-  rowDesc: {
-    fontSize: 10,
-    color: '#475569',
-    marginTop: 1,
-    textShadowColor: 'rgba(0,0,0,0.3)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 1,
-  },
 
   // Badge
   badge: {
-    minWidth: 18,
-    height: 18,
-    borderRadius: 9,
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
     backgroundColor: '#14B8A6',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 4,
+    paddingHorizontal: 5,
+    shadowColor: '#14B8A6',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
+    elevation: 4,
   },
   badgeText: {
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: '800',
     color: '#FFF',
   },
