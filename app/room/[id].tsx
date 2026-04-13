@@ -178,6 +178,7 @@ export default function RoomScreen() {
     setClosingCountdown,
     setSpeakingMode,
     setMinimizedRoom,
+    setAlertConfig,
     roomHostRef,
     lk: { isMicrophoneEnabled: false, toggleMic: async () => {}, enableMic: async () => {} },
   });

@@ -66,18 +66,21 @@ export function useRoomModeration({
       return;
     }
     try {
-      await RoomService.promoteSpeaker(roomId, userId);
-      setParticipants(prev => prev.map(p => p.user_id === userId ? { ...p, role: 'speaker' as const, is_muted: false } : p));
+      // ★ Sahneye davet gönder — direkt promote yerine
       modChannelRef.current?.send({
         type: 'broadcast', event: 'mod_action',
-        payload: { action: 'promote', targetUserId: userId },
+        payload: {
+          action: 'stage_invite',
+          targetUserId: userId,
+          inviterName: profile?.display_name || firebaseUser?.displayName || 'Moderatör',
+        },
       });
       setSelectedUser(null);
-      showToast({ title: 'Sahneye Alındı', message: `${displayName} artık konuşabilir`, type: 'success' });
+      showToast({ title: '📨 Sahne Daveti Gönderildi', message: `${displayName} sahneye davet edildi`, type: 'success' });
     } catch (e) {
-      showToast({ title: 'Hata', message: 'Sahneye alınamadı', type: 'error' });
+      showToast({ title: 'Hata', message: 'Davet gönderilemedi', type: 'error' });
     }
-  }, [roomId, room, participants, modChannelRef]);
+  }, [roomId, room, participants, modChannelRef, profile, firebaseUser]);
 
   // ========== KULLANICIYI ODADAN ÇIKAR ==========
   const handleKickUser = useCallback((userId: string, displayName: string) => {

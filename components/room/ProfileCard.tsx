@@ -251,7 +251,7 @@ export default function ProfileCard({
                 {onPromoteToStage && (
                   <TouchableOpacity style={[sty.actionPill, { borderColor: 'rgba(16,185,129,0.2)' }]} onPress={onPromoteToStage} activeOpacity={0.7}>
                     <Ionicons name="arrow-up-circle" size={14} color={C.emerald} />
-                    <Text style={[sty.actionText, { color: C.emerald }]}>Sahneye Al</Text>
+                    <Text style={[sty.actionText, { color: C.emerald }]}>Sahneye Davet Et</Text>
                   </TouchableOpacity>
                 )}
                 {onRemoveFromStage && (

@@ -39,6 +39,7 @@ type UseRoomBroadcastParams = {
   setClosingCountdown: React.Dispatch<React.SetStateAction<number | null>>;
   setSpeakingMode: React.Dispatch<React.SetStateAction<'free_for_all' | 'permission_only' | 'selected_only'>>;
   setMinimizedRoom: (val: any) => void;
+  setAlertConfig: React.Dispatch<React.SetStateAction<any>>;
   roomHostRef: React.MutableRefObject<string | null>;
   lk: {
     isMicrophoneEnabled: boolean;
@@ -52,7 +53,7 @@ export function useRoomBroadcast(params: UseRoomBroadcastParams) {
     roomId, firebaseUser, profile, room, router,
     floatingRef, setRoom, setParticipants, setChatMessages,
     setMicRequests, setMyMicRequested, setClosingCountdown,
-    setSpeakingMode, setMinimizedRoom, roomHostRef, lk,
+    setSpeakingMode, setMinimizedRoom, setAlertConfig, roomHostRef, lk,
   } = params;
 
   // ── Refs ───────────────────────────────────────
@@ -254,6 +255,41 @@ export function useRoomBroadcast(params: UseRoomBroadcastParams) {
         showToast({ title: '🎤 Sahneye Alındın!', message: 'Artık konuşabilirsin! Mikrofon otomatik açılıyor...', type: 'success' });
         setParticipants(prev => prev.map(p => p.user_id === firebaseUser.uid ? { ...p, role: 'speaker' as const, is_muted: false } : p));
         setTimeout(() => { lk.enableMic?.().catch(() => {}); }, 500);
+      } else if (data.action === 'stage_invite') {
+        // ★ Sahneye davet — kullanıcıya kabul/red modalı göster
+        setAlertConfig({
+          visible: true,
+          title: '🎤 Sahneye Davet',
+          message: `${data.inviterName || 'Moderatör'} seni sahneye davet ediyor. Kabul edersen konuşmaya başlayabilirsin.`,
+          type: 'info',
+          icon: 'mic',
+          buttons: [
+            { text: 'Reddet', style: 'cancel', onPress: () => {
+              // Reddettiğini bildirmek istersen broadcast gönderebilirsin
+              modChannelRef.current?.send({
+                type: 'broadcast', event: 'mod_action',
+                payload: { action: 'stage_invite_declined', targetUserId: firebaseUser.uid, displayName: profile?.display_name || 'Kullanıcı' },
+              });
+            }},
+            { text: 'Kabul Et', style: 'default', onPress: async () => {
+              try {
+                await RoomService.promoteSpeaker(roomId as string, firebaseUser.uid);
+                setParticipants(prev => prev.map(p => p.user_id === firebaseUser.uid ? { ...p, role: 'speaker' as const, is_muted: false } : p));
+                modChannelRef.current?.send({
+                  type: 'broadcast', event: 'mod_action',
+                  payload: { action: 'promote', targetUserId: firebaseUser.uid },
+                });
+                showToast({ title: '🎤 Sahneye Çıktın!', message: 'Mikrofon otomatik açılıyor...', type: 'success' });
+                setTimeout(() => { lk.enableMic?.().catch(() => {}); }, 500);
+              } catch {
+                showToast({ title: 'Hata', message: 'Sahneye çıkılamadı', type: 'error' });
+              }
+            }},
+          ],
+        });
+      } else if (data.action === 'stage_invite_declined' && !isTargetMe) {
+        // Davet eden kişiye bildirim (opsiyonel)
+        showToast({ title: '❌ Davet Reddedildi', message: `${data.displayName || 'Kullanıcı'} sahne davetini reddetti`, type: 'info' });
       } else if (data.action === 'make_moderator') {
         showToast({ title: '🛡️ Moderatör Yapıldın!', message: 'Artık odayı yönetebilirsin.', type: 'success' });
         setParticipants(prev => prev.map(p => p.user_id === firebaseUser.uid ? { ...p, role: 'moderator' as const } : p));
