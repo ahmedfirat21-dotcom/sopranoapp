@@ -11,6 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { RoomAccessService } from '../../services/roomAccess';
 import { ProfileService, type Profile } from '../../services/database';
+import { ModerationService } from '../../services/moderation';
 import { getAvatarSource } from '../../constants/avatars';
 import { showToast } from '../Toast';
 
@@ -23,17 +24,22 @@ interface Props {
 }
 
 export default function HostAccessPanel({ visible, onClose, roomId, roomType, hostId }: Props) {
-  const [tab, setTab] = useState<'requests' | 'invite'>(roomType === 'invite' ? 'invite' : 'requests');
+  const [tab, setTab] = useState<'requests' | 'invite' | 'bans'>(roomType === 'invite' ? 'invite' : 'requests');
   const [requests, setRequests] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Profile[]>([]);
   const [searching, setSearching] = useState(false);
   const [loadingRequests, setLoadingRequests] = useState(false);
+  const [bannedUsers, setBannedUsers] = useState<any[]>([]);
+  const [loadingBans, setLoadingBans] = useState(false);
 
   // İstekleri yükle
   useEffect(() => {
     if (visible && roomType === 'closed') {
       loadRequests();
+    }
+    if (visible) {
+      loadBans();
     }
   }, [visible]);
 
@@ -44,6 +50,25 @@ export default function HostAccessPanel({ visible, onClose, roomId, roomType, ho
       setRequests(reqs);
     } catch {}
     setLoadingRequests(false);
+  };
+
+  const loadBans = async () => {
+    setLoadingBans(true);
+    try {
+      const bans = await ModerationService.getRoomBans(roomId);
+      setBannedUsers(bans);
+    } catch {}
+    setLoadingBans(false);
+  };
+
+  const handleUnban = async (ban: any) => {
+    try {
+      await ModerationService.unbanFromRoom(roomId, ban.user_id);
+      setBannedUsers(prev => prev.filter(b => b.id !== ban.id));
+      showToast({ title: '✅ Ban Kaldırıldı', message: `${ban.user?.display_name || 'Kullanıcı'} artık odaya girebilir.`, type: 'success' });
+    } catch {
+      showToast({ title: 'Hata', message: 'Ban kaldırılamadı', type: 'error' });
+    }
   };
 
   const handleAccept = async (req: any) => {
@@ -91,22 +116,27 @@ export default function HostAccessPanel({ visible, onClose, roomId, roomType, ho
           {/* Handle */}
           <View style={s.handle} />
           <Text style={s.title}>
-            {roomType === 'invite' ? '📨 Davet Yönetimi' : '🔒 Katılım İstekleri'}
+            {tab === 'bans' ? '⛔ Banlı Kullanıcılar' : roomType === 'invite' ? '📨 Davet Yönetimi' : '🔒 Katılım İstekleri'}
           </Text>
 
-          {/* Tab bar (eğer kapalı oda ise her ikisi de göster) */}
-          {roomType === 'closed' && (
-            <View style={s.tabBar}>
+          {/* Tab bar — her zaman göster (istekler/davet/banlılar) */}
+          <View style={s.tabBar}>
+            {roomType === 'closed' && (
               <Pressable style={[s.tab, tab === 'requests' && s.tabActive]} onPress={() => setTab('requests')}>
                 <Text style={[s.tabText, tab === 'requests' && s.tabTextActive]}>
                   İstekler {requests.length > 0 ? `(${requests.length})` : ''}
                 </Text>
               </Pressable>
-              <Pressable style={[s.tab, tab === 'invite' && s.tabActive]} onPress={() => setTab('invite')}>
-                <Text style={[s.tabText, tab === 'invite' && s.tabTextActive]}>Davet Et</Text>
-              </Pressable>
-            </View>
-          )}
+            )}
+            <Pressable style={[s.tab, tab === 'invite' && s.tabActive]} onPress={() => setTab('invite')}>
+              <Text style={[s.tabText, tab === 'invite' && s.tabTextActive]}>Davet Et</Text>
+            </Pressable>
+            <Pressable style={[s.tab, tab === 'bans' && s.tabActive]} onPress={() => { setTab('bans'); loadBans(); }}>
+              <Text style={[s.tabText, tab === 'bans' && s.tabTextActive]}>
+                Banlılar {bannedUsers.length > 0 ? `(${bannedUsers.length})` : ''}
+              </Text>
+            </Pressable>
+          </View>
 
           {/* İstekler tab'ı */}
           {tab === 'requests' && roomType === 'closed' && (
@@ -173,6 +203,52 @@ export default function HostAccessPanel({ visible, onClose, roomId, roomType, ho
                       </Pressable>
                     </View>
                   )}
+                />
+              )}
+            </View>
+          )}
+
+          {/* Banlılar tab'ı */}
+          {tab === 'bans' && (
+            <View style={{ flex: 1, minHeight: 200 }}>
+              {loadingBans ? (
+                <ActivityIndicator color="#EF4444" style={{ marginTop: 30 }} />
+              ) : bannedUsers.length === 0 ? (
+                <View style={s.emptyState}>
+                  <Ionicons name="shield-checkmark" size={40} color="rgba(255,255,255,0.15)" />
+                  <Text style={s.emptyText}>Banlı kullanıcı yok</Text>
+                </View>
+              ) : (
+                <FlatList
+                  data={bannedUsers}
+                  keyExtractor={item => item.id}
+                  renderItem={({ item }) => {
+                    const isPermanent = item.ban_type === 'permanent';
+                    const expiresAt = item.expires_at ? new Date(item.expires_at) : null;
+                    const isExpired = expiresAt && expiresAt < new Date();
+                    const remainingMin = expiresAt ? Math.max(0, Math.floor((expiresAt.getTime() - Date.now()) / 60000)) : 0;
+                    const timeLabel = isPermanent ? 'Kalıcı' : isExpired ? 'Süresi dolmuş' : remainingMin > 60 ? `${Math.floor(remainingMin / 60)}sa ${remainingMin % 60}dk` : `${remainingMin}dk kaldı`;
+                    return (
+                      <View style={s.requestItem}>
+                        <Image source={getAvatarSource(item.user?.avatar_url)} style={s.avatar} />
+                        <View style={{ flex: 1 }}>
+                          <Text style={s.userName} numberOfLines={1}>{item.user?.display_name || 'Kullanıcı'}</Text>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                            <View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: isPermanent ? 'rgba(239,68,68,0.15)' : 'rgba(245,158,11,0.15)' }}>
+                              <Text style={{ fontSize: 9, fontWeight: '700', color: isPermanent ? '#EF4444' : '#F59E0B' }}>{isPermanent ? '⛔ KALICI' : '⏳ GEÇİCİ'}</Text>
+                            </View>
+                            <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>{timeLabel}</Text>
+                          </View>
+                        </View>
+                        <Pressable
+                          style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, backgroundColor: 'rgba(20,184,166,0.12)', borderWidth: 1, borderColor: 'rgba(20,184,166,0.25)' }}
+                          onPress={() => handleUnban(item)}
+                        >
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: '#14B8A6' }}>Ban Kaldır</Text>
+                        </Pressable>
+                      </View>
+                    );
+                  }}
                 />
               )}
             </View>

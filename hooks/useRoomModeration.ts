@@ -302,6 +302,7 @@ export function useRoomModeration({
         type: 'broadcast', event: 'mod_action',
         payload: { action: 'ban', targetUserId: userId, reason: `${mins >= 60 ? Math.floor(mins/60) + ' saat' : mins + ' dakika'} yasaklandın.` },
       });
+      setParticipants(prev => prev.filter(p => p.user_id !== userId));
       setSelectedUser(null);
       showToast({ title: '⛔ Yasaklandı', message: `${displayName} ${mins >= 60 ? Math.floor(mins/60) + ' saat' : mins + ' dakika'} yasaklandı`, type: 'success' });
     } catch { showToast({ title: 'Hata', message: 'Ban uygulanamadı', type: 'error' }); }
@@ -332,6 +333,7 @@ export function useRoomModeration({
               type: 'broadcast', event: 'mod_action',
               payload: { action: 'permban', targetUserId: userId, reason: 'Kalıcı olarak yasaklandın.' },
             });
+            setParticipants(prev => prev.filter(p => p.user_id !== userId));
             setSelectedUser(null);
             showToast({ title: '⛔ Kalıcı Yasaklandı', message: `${displayName} bu odaya bir daha giremez`, type: 'success' });
           } catch { showToast({ title: 'Hata', message: 'Ban uygulanamadı', type: 'error' }); }
