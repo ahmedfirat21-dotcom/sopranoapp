@@ -225,7 +225,7 @@ export default function EditProfileScreen() {
         showToast({ type: 'success', title: 'Başarılı ✓', message: 'Google hesabınız başarıyla bağlandı! Artık Google ile giriş yapabilirsiniz.' });
       }
     } catch (error: any) {
-      console.error('Google link error:', error);
+      if (__DEV__) console.error('Google link error:', error);
       if (error?.code === 'auth/credential-already-in-use') {
         showToast({ type: 'warning', title: 'Uyarı', message: 'Bu Google hesabı zaten başka bir kullanıcıya bağlı.' });
       } else if (error?.code === 'auth/provider-already-linked') {
@@ -266,7 +266,7 @@ export default function EditProfileScreen() {
       setRegPassword('');
       setRegPasswordConfirm('');
     } catch (error: any) {
-      console.error('Email link error:', error);
+      if (__DEV__) console.error('Email link error:', error);
       if (error?.code === 'auth/email-already-in-use') {
         showToast({ type: 'error', title: 'Hata', message: 'Bu e-posta adresi zaten kullanılıyor.' });
       } else if (error?.code === 'auth/invalid-email') {
@@ -312,7 +312,7 @@ export default function EditProfileScreen() {
       setNewPassword('');
       setNewPasswordConfirm('');
     } catch (error: any) {
-      console.error('Password change error:', error);
+      if (__DEV__) console.error('Password change error:', error);
       if (error?.code === 'auth/wrong-password') {
         showToast({ type: 'error', title: 'Hata', message: 'Mevcut şifreniz yanlış.' });
       } else if (error?.code === 'auth/requires-recent-login') {
@@ -527,7 +527,7 @@ export default function EditProfileScreen() {
 
           <Pressable style={styles.ctaWrap} onPress={async () => {
               if (!myReferralCode) return;
-              try { await Share.share({ message: `SopranoChat'e katıl!\nDavet kodum: ${myReferralCode}\nhttps://sopranochat.app/`, title: 'Ödüllü Davet Kodu' }); } catch (e) { console.error('[EditProfile] İşlem hatası:', e); }
+              try { await Share.share({ message: `SopranoChat'e katıl!\nDavet kodum: ${myReferralCode}\nhttps://sopranochat.com/`, title: 'Ödüllü Davet Kodu' }); } catch (e) { if (__DEV__) console.error('[EditProfile] İşlem hatası:', e); }
             }}>
             <LinearGradient colors={['#14B8A6', '#0D9488', '#065F56']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.ctaGradient}>
               <View style={styles.ctaIconWrap}><Ionicons name="share-social" size={16} color="#FFF" /></View>

@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SopranoChat — Sesli Sohbet Platformu</title>
+  <meta name="description" content="SopranoChat ile sesli sohbet odalarına katıl, arkadaşlarınla konuş ve yeni insanlarla tanış.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #0D1421;
+      color: #CBD5E1;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Animated gradient background */
+    .bg-glow {
+      position: fixed;
+      top: -40%;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 800px;
+      height: 800px;
+      background: radial-gradient(circle, rgba(20,184,166,0.15) 0%, rgba(20,184,166,0.05) 40%, transparent 70%);
+      pointer-events: none;
+      animation: pulse 6s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 0.6; transform: translateX(-50%) scale(1); }
+      50% { opacity: 1; transform: translateX(-50%) scale(1.1); }
+    }
+
+    .container {
+      position: relative;
+      z-index: 1;
+      max-width: 680px;
+      margin: 0 auto;
+      padding: 60px 24px;
+      text-align: center;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .logo-emoji {
+      font-size: 72px;
+      margin-bottom: 24px;
+      animation: float 3s ease-in-out infinite;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-10px); }
+    }
+
+    h1 {
+      font-size: 48px;
+      font-weight: 800;
+      background: linear-gradient(135deg, #14B8A6, #06B6D4, #8B5CF6);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 16px;
+      letter-spacing: -1px;
+    }
+
+    .tagline {
+      font-size: 20px;
+      color: #94A3B8;
+      margin-bottom: 40px;
+      line-height: 1.6;
+      font-weight: 400;
+    }
+
+    .badge-row {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-bottom: 48px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 16px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 500;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.08);
+      color: #94A3B8;
+      backdrop-filter: blur(10px);
+    }
+
+    .badge span { font-size: 16px; }
+
+    .store-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      padding: 16px 36px;
+      background: linear-gradient(135deg, #14B8A6, #0D9488);
+      color: white;
+      text-decoration: none;
+      border-radius: 16px;
+      font-size: 17px;
+      font-weight: 600;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 24px rgba(20,184,166,0.3);
+      margin-bottom: 48px;
+    }
+
+    .store-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 32px rgba(20,184,166,0.4);
+    }
+
+    .store-btn svg {
+      width: 24px;
+      height: 24px;
+    }
+
+    .features {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 56px;
+      width: 100%;
+    }
+
+    .feature-card {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 16px;
+      padding: 24px 20px;
+      text-align: center;
+      transition: all 0.3s ease;
+    }
+
+    .feature-card:hover {
+      background: rgba(255,255,255,0.06);
+      border-color: rgba(20,184,166,0.2);
+      transform: translateY(-2px);
+    }
+
+    .feature-icon {
+      font-size: 32px;
+      margin-bottom: 12px;
+    }
+
+    .feature-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: #E2E8F0;
+      margin-bottom: 6px;
+    }
+
+    .feature-desc {
+      font-size: 12px;
+      color: #64748B;
+      line-height: 1.5;
+    }
+
+    .links {
+      display: flex;
+      gap: 24px;
+      justify-content: center;
+      flex-wrap: wrap;
+      padding-top: 32px;
+      border-top: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .links a {
+      color: #64748B;
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+
+    .links a:hover { color: #14B8A6; }
+
+    .footer-copy {
+      margin-top: 24px;
+      color: #334155;
+      font-size: 12px;
+    }
+
+    @media (max-width: 520px) {
+      h1 { font-size: 36px; }
+      .tagline { font-size: 17px; }
+      .features { grid-template-columns: 1fr; }
+      .container { padding: 40px 20px; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="bg-glow"></div>
+
+<div class="container">
+  <div class="logo-emoji">🎙️</div>
+  <h1>SopranoChat</h1>
+  <p class="tagline">Sesli sohbet odaları ile arkadaşlarınla buluş,<br>yeni insanlarla tanış.</p>
+
+  <div class="badge-row">
+    <div class="badge"><span>🔊</span> Sesli Sohbet</div>
+    <div class="badge"><span>💬</span> Mesajlaşma</div>
+    <div class="badge"><span>🎮</span> Oyunlar</div>
+    <div class="badge"><span>🎁</span> Hediyeler</div>
+  </div>
+
+  <a href="https://play.google.com/store/apps/details?id=com.sopranochat" class="store-btn" id="download-btn">
+    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3.609 1.814L13.792 12 3.61 22.186a.996.996 0 01-.61-.92V2.734a1 1 0 01.609-.92zm10.89 10.893l2.302 2.302-10.937 6.333 8.635-8.635zm3.199-3.199l2.302 2.302-2.302 2.302-2.698-2.302 2.698-2.302zM5.864 2.658L16.8 8.99l-2.302 2.302-8.634-8.634z"/></svg>
+    Google Play'den İndir
+  </a>
+
+  <div class="features">
+    <div class="feature-card">
+      <div class="feature-icon">🎤</div>
+      <div class="feature-title">Sesli Odalar</div>
+      <div class="feature-desc">Canlı sesli sohbet odaları oluştur ve katıl</div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">👥</div>
+      <div class="feature-title">Sosyal Ağ</div>
+      <div class="feature-desc">Arkadaş ekle, profilleri keşfet</div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🏆</div>
+      <div class="feature-title">Sıralamalar</div>
+      <div class="feature-desc">XP kazan, seviyeleri aş, rozetler topla</div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🛡️</div>
+      <div class="feature-title">Güvenli</div>
+      <div class="feature-desc">Uçtan uca şifreli iletişim</div>
+    </div>
+  </div>
+
+  <div class="links">
+    <a href="/privacy-policy.html">Gizlilik Politikası</a>
+    <a href="/terms-of-service.html">Kullanım Koşulları</a>
+    <a href="mailto:destek@sopranochat.com">İletişim</a>
+  </div>
+
+  <p class="footer-copy">© 2026 SopranoChat. Tüm hakları saklıdır.</p>
+</div>
+
+</body>
+</html>

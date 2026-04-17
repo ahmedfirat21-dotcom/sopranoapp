@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Image, Pressable, ActivityIndicator, TextInput, KeyboardAvoidingView, Platform, Dimensions, ScrollView, Animated, Easing, Linking } from 'react-native';
-import PremiumAlert, { type AlertButton } from '../../components/PremiumAlert';
+import { View, Text, StyleSheet, Image, Pressable, ActivityIndicator, TextInput, KeyboardAvoidingView, Platform, Dimensions, ScrollView, Animated, Easing, Linking, ImageBackground } from 'react-native';
+import PremiumAlert from '../../components/PremiumAlert';
+import type { AlertButton } from '../../components/PremiumAlert';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors } from '../../constants/theme';
+import { Colors, Shadows, Gradients, Radius } from '../../constants/theme';
 import { supabase } from '../../constants/supabase';
 
 let GoogleSignin: any;
@@ -18,7 +19,7 @@ try {
   };
 }
 
-import { GoogleAuthProvider, signInWithCredential, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
+import { GoogleAuthProvider, signInWithCredential, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, sendEmailVerification } from 'firebase/auth';
 
 import { showToast } from '../../components/Toast';
 import { auth, GOOGLE_WEB_CLIENT_ID } from '../../constants/firebase';
@@ -29,7 +30,10 @@ const { height: SCREEN_HEIGHT, width: SCREEN_W } = Dimensions.get('window');
 export default function LoginScreen() {
   const { } = useAuth();
   const [loading, setLoading] = useState(false);
-  const [premAlert, setPremAlert] = useState<{visible:boolean;title:string;message:string;type?:any;buttons?:AlertButton[]}>({visible:false,title:'',message:''});
+
+  // ★ SEC-BF1: Brute force koruması — başarısız giriş denemesi takibi
+  const failedAttemptsRef = useRef(0);
+  const cooldownUntilRef = useRef(0);
 
   // Email state
   const [showEmailForm, setShowEmailForm] = useState(false);
@@ -49,7 +53,11 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
 
   // Animations
-  const orbFloat = useRef(new Animated.Value(0)).current;
+  const logoScale = useRef(new Animated.Value(0.85)).current;
+  const logoOpacity = useRef(new Animated.Value(0)).current;
+  const buttonsTranslateY = useRef(new Animated.Value(30)).current;
+  const buttonsOpacity = useRef(new Animated.Value(0)).current;
+  const statsOpacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     GoogleSignin.configure({ webClientId: GOOGLE_WEB_CLIENT_ID });
@@ -67,12 +75,22 @@ export default function LoginScreen() {
       }
     })();
 
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(orbFloat, { toValue: 20, duration: 4000, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-        Animated.timing(orbFloat, { toValue: -20, duration: 4000, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-      ])
-    ).start();
+    // Staggered entrance animations
+    Animated.parallel([
+      Animated.timing(logoOpacity, { toValue: 1, duration: 600, useNativeDriver: true }),
+      Animated.spring(logoScale, { toValue: 1, friction: 8, tension: 50, useNativeDriver: true }),
+    ]).start();
+
+    setTimeout(() => {
+      Animated.timing(statsOpacity, { toValue: 1, duration: 400, useNativeDriver: true }).start();
+    }, 300);
+
+    setTimeout(() => {
+      Animated.parallel([
+        Animated.timing(buttonsOpacity, { toValue: 1, duration: 500, useNativeDriver: true }),
+        Animated.timing(buttonsTranslateY, { toValue: 0, duration: 500, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+      ]).start();
+    }, 500);
   }, []);
 
   const handleGoogleLogin = async () => {
@@ -97,11 +115,26 @@ export default function LoginScreen() {
 
   const handleEmailLogin = async () => {
     if (!email || !password) return;
+    // ★ SEC-BF1: Cooldown kontrolü — 5 başarısız denemeden sonra 30sn bekleme
+    if (Date.now() < cooldownUntilRef.current) {
+      const remainSec = Math.ceil((cooldownUntilRef.current - Date.now()) / 1000);
+      showToast({ title: 'Çok fazla deneme', message: `Lütfen ${remainSec} saniye bekleyin.`, type: 'warning' });
+      return;
+    }
     setLoading(true);
     try {
       await signInWithEmailAndPassword(auth, email.trim(), password);
+      failedAttemptsRef.current = 0; // Başarılı — sayacı sıfırla
     } catch (error: any) {
-      if (error?.code === 'auth/invalid-credential' || error?.code === 'auth/wrong-password') {
+      failedAttemptsRef.current++;
+      // ★ SEC-BF1: 5 başarısız denemeden sonra 30sn cooldown
+      if (failedAttemptsRef.current >= 5) {
+        cooldownUntilRef.current = Date.now() + 30_000;
+        showToast({ title: 'Çok fazla deneme', message: '30 saniye bekleyip tekrar deneyin.', type: 'error' });
+      } else if (error?.code === 'auth/too-many-requests') {
+        cooldownUntilRef.current = Date.now() + 60_000;
+        showToast({ title: 'Hesap geçici kilitli', message: 'Çok fazla başarısız deneme. 1 dakika bekleyin.', type: 'error' });
+      } else if (error?.code === 'auth/invalid-credential' || error?.code === 'auth/wrong-password') {
         showToast({ title: 'Hata', message: 'Kullanıcı adı veya şifre yanlış.', type: 'error' });
       } else if (error?.code === 'auth/user-not-found') {
         showToast({ title: 'Hata', message: 'Böyle bir kullanıcı bulunamadı.', type: 'error' });
@@ -127,7 +160,17 @@ export default function LoginScreen() {
     }
     setLoading(true);
     try {
-      await createUserWithEmailAndPassword(auth, email.trim(), password);
+      const userCredential = await createUserWithEmailAndPassword(auth, email.trim(), password);
+      // ★ E-posta doğrulama gönder — kayıt sonrası otomatik
+      if (userCredential.user) {
+        try {
+          await sendEmailVerification(userCredential.user, {
+            url: 'https://sopranochat.com/verified',
+            handleCodeInApp: false,
+          });
+          showToast({ title: '✉️ Doğrulama E-postası Gönderildi', message: 'Lütfen e-posta kutunuzu kontrol edin.', type: 'success' });
+        } catch { /* doğrulama gönderilemezse sessiz — kullanıcı yine de giriş yapabilir */ }
+      }
     } catch (error: any) {
       if (error?.code === 'auth/email-already-in-use') {
         showToast({ title: 'Hata', message: 'Bu e-posta zaten kullanılıyor.', type: 'error' });
@@ -141,6 +184,7 @@ export default function LoginScreen() {
   };
 
   const handleForgotPassword = async () => {
+    if (resetLoading) return; // ★ SEC-FP: Çift tıklama koruması
     const trimmed = resetEmail.trim();
     if (!trimmed) {
       showToast({ title: 'Eksik Bilgi', message: 'Lütfen e-posta adresinizi yazın.', type: 'warning' });
@@ -169,287 +213,340 @@ export default function LoginScreen() {
   };
 
   return (
-    <KeyboardAvoidingView style={s.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      {/* Animated BG Orbs */}
-      <View style={StyleSheet.absoluteFill} pointerEvents="none">
-        <Animated.View style={[s.meshOrb, s.meshTeal, { transform: [{ translateY: orbFloat }] }]} />
-        <Animated.View style={[s.meshOrb, s.meshPurple, { transform: [{ translateY: Animated.multiply(orbFloat, -1) }] }]} />
-      </View>
+    <ImageBackground
+      source={require('../../assets/images/app_bg.jpg')}
+      style={s.root}
+      resizeMode="cover"
+    >
+      <KeyboardAvoidingView style={s.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        {/* Vignette overlay for depth */}
+        <LinearGradient
+          colors={['rgba(15,25,38,0.6)', 'transparent', 'transparent', 'rgba(15,25,38,0.7)']}
+          locations={[0, 0.25, 0.7, 1]}
+          style={StyleSheet.absoluteFill}
+          pointerEvents="none"
+        />
 
-      <LinearGradient
-        colors={['rgba(20,184,166,0.12)', 'rgba(139,92,246,0.06)', 'transparent']}
-        style={s.ambientTop}
-        pointerEvents="none"
-      />
+        {/* Ambient teal glow — top */}
+        <LinearGradient
+          colors={['rgba(20,184,166,0.08)', 'rgba(20,184,166,0.03)', 'transparent']}
+          style={s.ambientTop}
+          pointerEvents="none"
+        />
 
-      <ScrollView contentContainerStyle={s.contentContainer} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-        <View style={s.content}>
-          {/* LOGO */}
-          <View style={s.logoSection}>
-            <Image source={require('../../assets/logo.png')} style={{ width: 240, height: 56, marginBottom: 6 }} resizeMode="contain" />
-            <Text style={s.titleSub}>Senin Sesin</Text>
+        <ScrollView contentContainerStyle={s.contentContainer} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+          <View style={s.content}>
+            {/* ═══ LOGO ═══ */}
+            <Animated.View style={[s.logoSection, { opacity: logoOpacity, transform: [{ scale: logoScale }] }]}>
+              {/* logo.png içinde "Senin Sesin" var — overflow:hidden ile kırpıyoruz */}
+              <View style={s.logoClip}>
+                <Image source={require('../../assets/logo.png')} style={s.logoImage} resizeMode="contain" />
+              </View>
+            </Animated.View>
+
+            {/* ═══ STAT PILLS ═══ */}
+            <Animated.View style={[s.statsContainer, { opacity: statsOpacity }]}>
+              <View style={s.statsRow}>
+                <View style={s.statPill}>
+                  <View style={[s.statDot, { backgroundColor: '#4ADE80' }]} />
+                  <Text style={s.statText}>{formatStatNumber(onlineCount)} çevrimiçi</Text>
+                </View>
+                <View style={s.statPill}>
+                  <View style={[s.statDot, s.statDotLive]} />
+                  <Text style={s.statText}>{formatStatNumber(liveRoomCount)} canlı oda</Text>
+                </View>
+              </View>
+            </Animated.View>
+
+            {/* ═══ FORMS & BUTTONS ═══ */}
+            <Animated.View style={{ opacity: buttonsOpacity, transform: [{ translateY: buttonsTranslateY }] }}>
+              {loading ? (
+                <ActivityIndicator size="large" color="#14B8A6" style={{ marginVertical: 36 }} />
+              ) : showEmailForm ? (
+                <View style={s.formArea}>
+                  <View style={s.formHeader}>
+                    <Pressable onPress={() => { setShowEmailForm(false); setIsRegisterMode(false); }} style={s.backBtn}>
+                      <Ionicons name="arrow-back" size={18} color="#F1F5F9" />
+                    </Pressable>
+                    <Text style={s.formTitle}>{isRegisterMode ? 'Yeni Hesap Oluştur' : 'E-posta ile Giriş'}</Text>
+                  </View>
+
+                  {/* Email input */}
+                  <View style={s.inputWrap}>
+                    <Ionicons name="mail-outline" size={18} color="#64748B" style={s.inputIcon} />
+                    <TextInput
+                      style={s.glassInput}
+                      placeholder="E-posta adresiniz"
+                      placeholderTextColor="#475569"
+                      value={email}
+                      onChangeText={setEmail}
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      autoComplete="email"
+                    />
+                  </View>
+
+                  {/* Password input */}
+                  <View style={s.inputWrap}>
+                    <Ionicons name="lock-closed-outline" size={18} color="#64748B" style={s.inputIcon} />
+                    <TextInput
+                      style={s.glassInput}
+                      placeholder="Şifreniz"
+                      placeholderTextColor="#475569"
+                      value={password}
+                      onChangeText={setPassword}
+                      secureTextEntry={!showPassword}
+                    />
+                    <Pressable onPress={() => setShowPassword(!showPassword)} style={s.eyeBtn}>
+                      <Ionicons name={showPassword ? "eye-off-outline" : "eye-outline"} size={18} color="#64748B" />
+                    </Pressable>
+                  </View>
+
+                  {isRegisterMode && (
+                    <View style={s.inputWrap}>
+                      <Ionicons name="lock-closed-outline" size={18} color="#64748B" style={s.inputIcon} />
+                      <TextInput
+                        style={s.glassInput}
+                        placeholder="Şifre (Tekrar)"
+                        placeholderTextColor="#475569"
+                        value={passwordConfirm}
+                        onChangeText={setPasswordConfirm}
+                        secureTextEntry
+                      />
+                    </View>
+                  )}
+
+                  {/* CTA Button */}
+                  <Pressable
+                    style={({ pressed }) => [pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] }]}
+                    onPress={isRegisterMode ? handleEmailRegister : handleEmailLogin}
+                  >
+                    <LinearGradient
+                      colors={Gradients.teal as [string, string]}
+                      start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                      style={s.ctaGradient}
+                    >
+                      <Text style={s.ctaBtnText}>{isRegisterMode ? 'Kayıt Ol' : 'Giriş Yap'}</Text>
+                    </LinearGradient>
+                  </Pressable>
+
+                  {/* Şifremi Unuttum */}
+                  {!isRegisterMode && (
+                    <Pressable style={s.linkBtn} onPress={() => { setShowForgotPassword(true); setResetEmail(email); }}>
+                      <Text style={s.forgotText}>Şifremi Unuttum?</Text>
+                    </Pressable>
+                  )}
+
+                  {/* veya ayırıcı */}
+                  <View style={s.dividerRow}>
+                    <View style={s.dividerLine} />
+                    <Text style={s.dividerText}>veya</Text>
+                    <View style={s.dividerLine} />
+                  </View>
+
+                  <Pressable style={s.linkBtn} onPress={() => setIsRegisterMode(!isRegisterMode)}>
+                    <Text style={s.linkText}>
+                      {isRegisterMode ? 'Zaten hesabın var mı? Giriş Yap' : 'Hesabın yok mu? Kayıt Ol'}
+                    </Text>
+                  </Pressable>
+                </View>
+              ) : (
+                <View style={s.buttonsContainer}>
+                  {/* Google Button — Blue gradient */}
+                  <Pressable
+                    style={({ pressed }) => [pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] }]}
+                    onPress={handleGoogleLogin}
+                  >
+                    <LinearGradient
+                      colors={['#4285F4', '#3367D6']}
+                      start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                      style={s.socialGradient}
+                    >
+                      <View style={s.socialIconWrap}>
+                        <Ionicons name="logo-google" size={20} color="#FFF" />
+                      </View>
+                      <Text style={s.socialBtnText}>Google ile Devam Et</Text>
+                    </LinearGradient>
+                  </Pressable>
+
+                  {/* E-posta Button — Teal gradient */}
+                  <Pressable
+                    style={({ pressed }) => [pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] }]}
+                    onPress={() => setShowEmailForm(true)}
+                  >
+                    <LinearGradient
+                      colors={Gradients.teal as [string, string]}
+                      start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                      style={s.socialGradient}
+                    >
+                      <View style={s.socialIconWrap}>
+                        <Ionicons name="mail-outline" size={20} color="#FFF" />
+                      </View>
+                      <Text style={s.socialBtnText}>E-posta ile Giriş</Text>
+                    </LinearGradient>
+                  </Pressable>
+                </View>
+              )}
+            </Animated.View>
+
+            {/* Terms — pasif bilgilendirme */}
+            <Text style={s.terms}>
+              Devam ederek{' '}
+              <Text style={s.termsLink} onPress={() => Linking.openURL('https://sopranochat.com/terms')}>Kullanım Koşulları</Text>{' '}ve{' '}
+              <Text style={s.termsLink} onPress={() => Linking.openURL('https://sopranochat.com/privacy')}>Gizlilik Politikası</Text>'nı kabul edersiniz.
+            </Text>
           </View>
+        </ScrollView>
 
-          {/* Stat pills */}
-          <View style={s.statsContainer}>
-            <View style={s.statsRow}>
-              <View style={s.statPill}>
-                <View style={[s.statDot, { backgroundColor: '#4ADE80' }]} />
-                <Text style={s.statText}>{formatStatNumber(onlineCount)} çevrimiçi</Text>
-              </View>
-              <View style={s.statPill}>
-                <View style={[s.statDot, { backgroundColor: '#F43F5E' }]} />
-                <Text style={s.statText}>{formatStatNumber(liveRoomCount)} canlı oda</Text>
-              </View>
-            </View>
-          </View>
+        {/* ★ Dead code kaldırıldı — premAlert state'i bu ekranda yok */}
 
-          {/* FORMS & BUTTONS */}
-          {loading ? (
-            <ActivityIndicator size="large" color="#14B8A6" style={{ marginVertical: 36 }} />
-          ) : showEmailForm ? (
-            <View style={s.formArea}>
-              <View style={s.formHeader}>
-                <Pressable onPress={() => { setShowEmailForm(false); setIsRegisterMode(false); }} style={s.backBtn}>
-                  <Ionicons name="arrow-back" size={18} color="#F1F5F9" />
-                </Pressable>
-                <Text style={s.formTitle}>{isRegisterMode ? 'Yeni Hesap Oluştur' : 'E-posta ile Giriş'}</Text>
-              </View>
-
-              {/* Email input */}
+        {/* Şifre Sıfırlama Modal */}
+        <PremiumAlert
+          visible={showForgotPassword}
+          title="Şifre Sıfırlama"
+          type="info"
+          onDismiss={() => setShowForgotPassword(false)}
+          message=""
+          customContent={
+            <View style={{ width: '100%', paddingHorizontal: 4 }}>
+              <Text style={{ color: '#94A3B8', fontSize: 13, marginBottom: 16, lineHeight: 20 }}>
+                E-posta adresinizi girin, size şifre sıfırlama bağlantısı gönderelim.
+              </Text>
               <View style={s.inputWrap}>
                 <Ionicons name="mail-outline" size={18} color="#64748B" style={s.inputIcon} />
                 <TextInput
                   style={s.glassInput}
                   placeholder="E-posta adresiniz"
                   placeholderTextColor="#475569"
-                  value={email}
-                  onChangeText={setEmail}
+                  value={resetEmail}
+                  onChangeText={setResetEmail}
                   keyboardType="email-address"
                   autoCapitalize="none"
                   autoComplete="email"
                 />
               </View>
-
-              {/* Password input */}
-              <View style={s.inputWrap}>
-                <Ionicons name="lock-closed-outline" size={18} color="#64748B" style={s.inputIcon} />
-                <TextInput
-                  style={s.glassInput}
-                  placeholder="Şifreniz"
-                  placeholderTextColor="#475569"
-                  value={password}
-                  onChangeText={setPassword}
-                  secureTextEntry={!showPassword}
-                />
-                <Pressable onPress={() => setShowPassword(!showPassword)} style={s.eyeBtn}>
-                  <Ionicons name={showPassword ? "eye-off-outline" : "eye-outline"} size={18} color="#64748B" />
-                </Pressable>
-              </View>
-
-              {isRegisterMode && (
-                <View style={s.inputWrap}>
-                  <Ionicons name="lock-closed-outline" size={18} color="#64748B" style={s.inputIcon} />
-                  <TextInput
-                    style={s.glassInput}
-                    placeholder="Şifre (Tekrar)"
-                    placeholderTextColor="#475569"
-                    value={passwordConfirm}
-                    onChangeText={setPasswordConfirm}
-                    secureTextEntry
-                  />
-                </View>
-              )}
-
-              <Pressable
-                style={({ pressed }) => [s.ctaBtn, pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] }]}
-                onPress={isRegisterMode ? handleEmailRegister : handleEmailLogin}
-              >
-                <Text style={s.ctaBtnText}>{isRegisterMode ? 'Kayıt Ol' : 'Giriş Yap'}</Text>
-              </Pressable>
-
-              {/* Şifremi Unuttum */}
-              {!isRegisterMode && (
-                <Pressable style={s.linkBtn} onPress={() => { setShowForgotPassword(true); setResetEmail(email); }}>
-                  <Text style={s.forgotText}>Şifremi Unuttum?</Text>
-                </Pressable>
-              )}
-
-              {/* veya ayırıcı */}
-              <View style={s.dividerRow}>
-                <View style={s.dividerLine} />
-                <Text style={s.dividerText}>veya</Text>
-                <View style={s.dividerLine} />
-              </View>
-
-              <Pressable style={s.linkBtn} onPress={() => setIsRegisterMode(!isRegisterMode)}>
-                <Text style={s.linkText}>
-                  {isRegisterMode ? 'Zaten hesabın var mı? Giriş Yap' : 'Hesabın yok mu? Kayıt Ol'}
-                </Text>
-              </Pressable>
             </View>
-          ) : (
-            <View style={s.buttonsContainer}>
-              {/* Google */}
-              <Pressable
-                style={({ pressed }) => [s.socialBtn, pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] }]}
-                onPress={handleGoogleLogin}
-              >
-                <Ionicons name="logo-google" size={22} color="#FFF" style={s.socialIcon} />
-                <Text style={s.socialBtnText}>Google ile Devam Et</Text>
-              </Pressable>
-
-              {/* E-posta */}
-              <Pressable
-                style={({ pressed }) => [s.socialBtn, pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] }]}
-                onPress={() => setShowEmailForm(true)}
-              >
-                <Ionicons name="mail-outline" size={22} color="#FFF" style={s.socialIcon} />
-                <Text style={s.socialBtnText}>E-posta ile Giriş</Text>
-              </Pressable>
-            </View>
-          )}
-
-          {/* Terms */}
-          <Text style={s.terms}>
-            Devam ederek{' '}
-            <Text style={s.termsLink} onPress={() => Linking.openURL('https://sopranochat.app/terms')}>Kullanım Koşulları</Text>{' '}ve{' '}
-            <Text style={s.termsLink} onPress={() => Linking.openURL('https://sopranochat.app/privacy')}>Gizlilik Politikası</Text>'nı kabul edersiniz.
-          </Text>
-        </View>
-      </ScrollView>
-
-      <PremiumAlert visible={premAlert.visible} title={premAlert.title} message={premAlert.message} type={premAlert.type||'info'} buttons={premAlert.buttons} onDismiss={()=>setPremAlert(p=>({...p,visible:false}))} />
-
-      {/* Şifre Sıfırlama Modal */}
-      <PremiumAlert
-        visible={showForgotPassword}
-        title="Şifre Sıfırlama"
-        type="info"
-        onDismiss={() => setShowForgotPassword(false)}
-        message=""
-        customContent={
-          <View style={{ width: '100%', paddingHorizontal: 4 }}>
-            <Text style={{ color: '#94A3B8', fontSize: 13, marginBottom: 16, lineHeight: 20 }}>
-              E-posta adresinizi girin, size şifre sıfırlama bağlantısı gönderelim.
-            </Text>
-            <View style={s.inputWrap}>
-              <Ionicons name="mail-outline" size={18} color="#64748B" style={s.inputIcon} />
-              <TextInput
-                style={s.glassInput}
-                placeholder="E-posta adresiniz"
-                placeholderTextColor="#475569"
-                value={resetEmail}
-                onChangeText={setResetEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoComplete="email"
-              />
-            </View>
-          </View>
-        }
-        buttons={[
-          { text: 'İptal', onPress: () => setShowForgotPassword(false) },
-          { text: resetLoading ? 'Gönderiliyor...' : 'Gönder', onPress: handleForgotPassword },
-        ]}
-      />
-    </KeyboardAvoidingView>
+          }
+          buttons={[
+            { text: 'İptal', onPress: () => setShowForgotPassword(false) },
+            { text: resetLoading ? 'Gönderiliyor...' : 'Gönder', onPress: handleForgotPassword },
+          ]}
+        />
+      </KeyboardAvoidingView>
+    </ImageBackground>
   );
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#2f404f' },
+  root: { flex: 1, backgroundColor: '#0F1926' },
+  container: { flex: 1 },
   contentContainer: { flexGrow: 1, justifyContent: 'center' },
   content: { paddingHorizontal: 30, paddingVertical: 40 },
 
-  meshOrb: { position: 'absolute', width: SCREEN_W * 1.5, height: SCREEN_W * 1.5, borderRadius: SCREEN_W },
-  meshTeal: { backgroundColor: '#14B8A6', top: -SCREEN_W * 0.6, left: -SCREEN_W * 0.4, opacity: 0.05 },
-  meshPurple: { backgroundColor: '#8B5CF6', bottom: -SCREEN_W * 0.5, right: -SCREEN_W * 0.5, opacity: 0.04 },
-  ambientTop: { position: 'absolute', top: 0, left: 0, right: 0, height: SCREEN_HEIGHT * 0.45 },
+  ambientTop: { position: 'absolute', top: 0, left: 0, right: 0, height: SCREEN_HEIGHT * 0.4 },
 
-  logoSection: { alignItems: 'center', marginBottom: 28, marginTop: SCREEN_HEIGHT * 0.02 },
-  titleSub: { color: 'rgba(255,255,255,0.4)', fontSize: 14, fontWeight: '500', letterSpacing: 2, fontStyle: 'italic' },
+  // ═══ LOGO ═══
+  logoSection: { alignItems: 'center', marginBottom: 32, marginTop: SCREEN_HEIGHT * 0.02 },
+  logoClip: { width: 260, height: 40, overflow: 'hidden' },
+  logoImage: { width: 260, height: 60 },
 
+  // ═══ STAT PILLS ═══
   statsContainer: { alignItems: 'center', marginBottom: 40 },
   statsRow: { flexDirection: 'row', gap: 12 },
   statPill: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.04)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
-    paddingVertical: 8, paddingHorizontal: 16, borderRadius: 20,
-    gap: 6,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
+    paddingVertical: 10, paddingHorizontal: 18, borderRadius: 24,
+    gap: 8,
+    // Premium shadow
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 6,
   },
-  statDot: { width: 6, height: 6, borderRadius: 3 },
-  statText: { color: 'rgba(255,255,255,0.5)', fontSize: 13, fontWeight: '500' },
+  statDot: { width: 8, height: 8, borderRadius: 4, shadowColor: '#4ADE80', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.8, shadowRadius: 4, elevation: 3 },
+  statDotLive: { backgroundColor: '#F43F5E', shadowColor: '#F43F5E' },
+  statText: { color: 'rgba(255,255,255,0.7)', fontSize: 13, fontWeight: '600', letterSpacing: 0.3, ...Shadows.textLight },
 
+  // ═══ BUTTONS ═══
   buttonsContainer: { width: '100%', gap: 14 },
 
-  socialBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    height: 54, borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+  socialGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 56,
+    borderRadius: Radius.default,
+    overflow: 'hidden', // ★ FIX: Android'de elevation gölge dikdörtgenini önler
   },
-  socialIcon: { position: 'absolute', left: 24 },
-  socialBtnText: { color: '#F1F5F9', fontSize: 15, fontWeight: '600', letterSpacing: 0.3 },
+  socialIconWrap: {
+    position: 'absolute',
+    left: 20,
+    width: 32, height: 32, borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    justifyContent: 'center', alignItems: 'center',
+  },
+  socialBtnText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700', letterSpacing: 0.5, ...Shadows.text },
 
-  // Form
+  // ═══ FORM ═══
   formArea: { width: '100%' },
   formHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 24 },
   backBtn: {
-    width: 36, height: 36, borderRadius: 18,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    width: 38, height: 38, borderRadius: 19,
+    backgroundColor: 'rgba(255,255,255,0.08)',
     justifyContent: 'center', alignItems: 'center', marginRight: 12,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
   },
-  formTitle: { fontSize: 17, fontWeight: '700', color: '#F1F5F9', letterSpacing: 0.5 },
+  formTitle: { fontSize: 18, fontWeight: '700', color: '#F1F5F9', letterSpacing: 0.5, ...Shadows.text },
 
   inputWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: 52,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.04)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    height: 54,
+    borderRadius: Radius.default,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.15)',
     marginBottom: 14,
     paddingHorizontal: 16,
   },
   inputIcon: { marginRight: 12 },
   glassInput: {
     flex: 1,
-    fontSize: 14,
+    fontSize: 15,
     color: '#F1F5F9',
     letterSpacing: 0.3,
   },
   eyeBtn: { padding: 4 },
 
-  // CTA
-  ctaBtn: {
-    height: 52,
-    borderRadius: 14,
-    backgroundColor: '#14B8A6',
+  // CTA gradient button
+  ctaGradient: {
+    height: 54,
+    borderRadius: Radius.default,
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: 4,
+    overflow: 'hidden', // ★ FIX: Android gradient dikdörtgen gölge bugı
   },
-  ctaBtnText: { color: '#FFF', fontSize: 16, fontWeight: '700' },
+  ctaBtnText: { color: '#FFF', fontSize: 16, fontWeight: '700', letterSpacing: 0.5, ...Shadows.text },
 
   // Divider
   dividerRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14 },
-  dividerLine: { flex: 1, height: 1, backgroundColor: 'rgba(255,255,255,0.06)' },
+  dividerLine: { flex: 1, height: 1, backgroundColor: 'rgba(255,255,255,0.08)' },
   dividerText: { color: 'rgba(255,255,255,0.3)', fontSize: 12, fontWeight: '500' },
 
   // Links
   linkBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 10, marginTop: 4 },
-  linkText: { fontSize: 13, color: '#14B8A6', fontWeight: '600', letterSpacing: 0.3 },
-  forgotText: { fontSize: 12, color: '#14B8A6', fontWeight: '500', letterSpacing: 0.3 },
+  linkText: { fontSize: 13, color: '#14B8A6', fontWeight: '600', letterSpacing: 0.3, ...Shadows.textLight },
+  forgotText: { fontSize: 12, color: '#14B8A6', fontWeight: '500', letterSpacing: 0.3, ...Shadows.textLight },
 
-  // Terms
+  // Terms — pasif bilgilendirme
   terms: {
-    fontSize: 12, color: 'rgba(255,255,255,0.3)',
+    fontSize: 12, color: 'rgba(255,255,255,0.35)',
     textAlign: 'center', lineHeight: 20,
-    paddingHorizontal: 20, marginTop: 36,
+    paddingHorizontal: 16, marginTop: 28,
   },
-  termsLink: { color: '#14B8A6', fontWeight: '500' },
+  termsLink: { color: '#14B8A6', fontWeight: '600' },
 });

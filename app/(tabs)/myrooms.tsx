@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, Image, Pressable, ScrollView,
   RefreshControl, Animated,
@@ -11,14 +11,22 @@ import { Colors, Shadows } from '../../constants/theme';
 import { RoomService, type Room } from '../../services/database';
 import { supabase } from '../../constants/supabase';
 import { useAuth, useTheme, useBadges } from '../_layout';
-import { getAvatarSource } from '../../constants/avatars';
+
+import StatusAvatar from '../../components/StatusAvatar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { showToast } from '../../components/Toast';
 import { RoomHistoryService, type RoomHistoryItem } from '../../services/roomHistory';
 import { useOnlineFriends } from '../../providers/OnlineFriendsProvider';
 import { SPService } from '../../services/sp';
-import RoomManageSheet from '../../components/room/RoomManageSheet';
+import { PlusMenu } from '../../components/room/RoomOverlays';
+import { RoomFollowService } from '../../services/roomFollow';
+import { ModerationService } from '../../services/moderation';
+import { isTierAtLeast } from '../../constants/tiers';
+import InviteFriendsModal from '../../components/room/InviteFriendsModal';
+import { RoomAccessService } from '../../services/roomAccess';
+import { PushService } from '../../services/push';
+import type { FollowUser } from '../../services/friendship';
 
 // ════════════════════════════════════════════════════════════
 // YÖNETİLEN ODA KARTI — Yönet/Başlat butonları
@@ -33,8 +41,10 @@ function ManagedRoomCard({ room, onManage, onStart, onSettings }: {
 
   return (
     <View style={[mS.card, isPersistent && { borderColor: Colors.premiumGold, borderWidth: 1.5 }]}>
+      {/* Sol accent çizgisi — canlı: yeşil, dondurulmuş: gri */}
+      <View style={[mS.accentStripe, isLive ? { backgroundColor: '#14B8A6' } : { backgroundColor: '#475569' }]} />
       <View style={mS.cardLeft}>
-        <Image source={getAvatarSource(room.host?.avatar_url)} style={mS.avatar} />
+        <StatusAvatar uri={room.host?.avatar_url} size={40} tier={(room.host as any)?.subscription_tier} />
         <View style={mS.cardInfo}>
           <Text style={mS.roomName} numberOfLines={1}>{room.name}</Text>
           <View style={mS.metaRow}>
@@ -42,6 +52,7 @@ function ManagedRoomCard({ room, onManage, onStart, onSettings }: {
               <View style={mS.liveBadge}>
                 <View style={mS.liveDot} />
                 <Text style={mS.liveText}>Canlı</Text>
+                {listeners > 0 && <Text style={mS.listenerCount}>· {listeners}</Text>}
               </View>
             ) : (
               <Text style={mS.offlineText}>❄️ Dondurulmuş</Text>
@@ -76,17 +87,17 @@ function ManagedRoomCard({ room, onManage, onStart, onSettings }: {
       <View style={mS.cardRight}>
         {/* ⚙️ Yönet butonu — her zaman göster */}
         <Pressable style={mS.settingsBtn} onPress={onSettings}>
-          <Ionicons name="settings-outline" size={14} color="#94A3B8" />
+          <Ionicons name="settings-outline" size={18} color="#94A3B8" />
         </Pressable>
         {isLive ? (
-          <Pressable style={mS.manageBtn} onPress={onManage}>
+          <Pressable style={({ pressed }) => [mS.manageBtn, pressed && { opacity: 0.8 }]} onPress={onManage}>
             <Ionicons name="enter-outline" size={14} color={Colors.accentTeal} />
             <Text style={mS.manageBtnText}>Odaya Git</Text>
           </Pressable>
         ) : (
-          <Pressable style={[mS.startBtn, { backgroundColor: 'rgba(251,191,36,0.12)', borderColor: 'rgba(251,191,36,0.3)' }]} onPress={onStart}>
+          <Pressable style={({ pressed }) => [mS.startBtn, pressed && { opacity: 0.8 }]} onPress={onStart}>
             <Ionicons name="sunny" size={14} color="#FBBF24" />
-            <Text style={[mS.startBtnText, { color: '#FBBF24' }]}>Uyandır</Text>
+            <Text style={mS.startBtnText}>Uyandır</Text>
           </Pressable>
         )}
       </View>
@@ -100,13 +111,19 @@ const mS = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginHorizontal: 16,
-    marginBottom: 6,
-    padding: 10,
-    borderRadius: 14,
+    marginBottom: 8,
+    padding: 12,
+    paddingLeft: 16,
+    borderRadius: 16,
     backgroundColor: Colors.cardBg,
     borderWidth: 1,
     borderColor: Colors.cardBorder,
+    overflow: 'hidden',
     ...Shadows.card,
+  },
+  accentStripe: {
+    position: 'absolute', left: 0, top: 8, bottom: 8,
+    width: 3, borderRadius: 2,
   },
   cardLeft: { flexDirection: 'row', alignItems: 'center', flex: 1, gap: 10 },
   avatar: { width: 44, height: 44, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.06)' },
@@ -119,6 +136,7 @@ const mS = StyleSheet.create({
   liveBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(239,68,68,0.15)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
   liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#EF4444' },
   liveText: { fontSize: 10, fontWeight: '700', color: '#EF4444' },
+  listenerCount: { fontSize: 10, fontWeight: '600', color: '#94A3B8', marginLeft: 2 },
   offlineText: { fontSize: 11, color: '#94A3B8' },
   typeBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 3,
@@ -126,24 +144,24 @@ const mS = StyleSheet.create({
     borderRadius: 6, borderWidth: 1, borderColor: 'rgba(245,158,11,0.25)',
   },
   typeBadgeText: { fontSize: 8, fontWeight: '700' },
-  cardRight: { alignItems: 'flex-end', gap: 4 },
+  cardRight: { alignItems: 'flex-end', gap: 6 },
   settingsBtn: {
-    width: 28, height: 28, borderRadius: 8,
-    backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(149,161,174,0.15)',
+    width: 34, height: 34, borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 1, borderColor: 'rgba(149,161,174,0.18)',
     justifyContent: 'center', alignItems: 'center',
   },
   manageBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
-    paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10,
-    backgroundColor: 'rgba(115,194,189,0.1)', borderWidth: 1, borderColor: 'rgba(115,194,189,0.25)',
+    paddingHorizontal: 14, paddingVertical: 7, borderRadius: 12,
+    backgroundColor: 'rgba(20,184,166,0.12)', borderWidth: 1, borderColor: 'rgba(20,184,166,0.30)',
   },
   manageBtnText: { fontSize: 11, fontWeight: '700', color: Colors.accentTeal },
   startBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
-    paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10,
-    backgroundColor: 'rgba(115,194,189,0.1)', borderWidth: 1, borderColor: 'rgba(115,194,189,0.25)',
+    paddingHorizontal: 14, paddingVertical: 7, borderRadius: 12,
+    backgroundColor: 'rgba(251,191,36,0.12)', borderWidth: 1, borderColor: 'rgba(251,191,36,0.3)',
   },
-  startBtnText: { fontSize: 11, fontWeight: '700', color: Colors.accentTeal },
+  startBtnText: { fontSize: 11, fontWeight: '700', color: '#FBBF24' },
 });
 
 // ════════════════════════════════════════════════════════════
@@ -155,7 +173,7 @@ function RecentRoomCard({ item, onPress }: { item: RoomHistoryItem; onPress: () 
       style={({ pressed }) => [rcS.card, pressed && { opacity: 0.85, transform: [{ scale: 0.97 }] }]}
       onPress={onPress}
     >
-      <Image source={getAvatarSource(item.hostAvatar)} style={rcS.avatar} />
+      <StatusAvatar uri={item.hostAvatar} size={44} />
       <Text style={rcS.name} numberOfLines={1}>{item.name}</Text>
       <Text style={rcS.host} numberOfLines={1}>{item.hostName}</Text>
     </Pressable>
@@ -169,7 +187,7 @@ const rcS = StyleSheet.create({
     backgroundColor: Colors.cardBg, borderWidth: 1, borderColor: Colors.cardBorder,
     ...Shadows.card,
   },
-  avatar: { width: 44, height: 44, borderRadius: 22, marginBottom: 6 },
+
   name: {
     fontSize: 10, fontWeight: '700', color: '#F1F5F9', textAlign: 'center',
     ...Shadows.text,
@@ -194,10 +212,7 @@ function FriendLiveCard({ item, onPress }: { item: FriendInRoom; onPress: () => 
       style={({ pressed }) => [flcS.card, pressed && { opacity: 0.85, transform: [{ scale: 0.97 }] }]}
       onPress={onPress}
     >
-      <View style={flcS.avatarWrap}>
-        <Image source={getAvatarSource(item.friendAvatar)} style={flcS.avatar} />
-        <View style={flcS.onlineDot} />
-      </View>
+      <StatusAvatar uri={item.friendAvatar} size={36} isOnline={true} />
       <Text style={flcS.friendName} numberOfLines={1}>{item.friendName}</Text>
       <Text style={flcS.roomName} numberOfLines={1}>{item.roomName}</Text>
       <View style={flcS.joinBtn}>
@@ -215,14 +230,7 @@ const flcS = StyleSheet.create({
     backgroundColor: Colors.cardBg, borderWidth: 1, borderColor: Colors.cardBorder,
     ...Shadows.card, position: 'relative',
   },
-  avatarWrap: { position: 'relative', marginBottom: 6 },
-  avatar: { width: 44, height: 44, borderRadius: 22 },
-  onlineDot: {
-    position: 'absolute', bottom: 0, right: -2,
-    width: 12, height: 12, borderRadius: 6,
-    backgroundColor: '#22C55E',
-    borderWidth: 2, borderColor: Colors.cardBg,
-  },
+
   friendName: {
     fontSize: 10, fontWeight: '700', color: '#F1F5F9', textAlign: 'center',
     ...Shadows.text,
@@ -244,17 +252,20 @@ const flcS = StyleSheet.create({
 // SP KAZANÇ ÖZETİ — Motivasyon Banner
 // ════════════════════════════════════════════════════════════
 function SPBanner({ weeklySP }: { weeklySP: number }) {
-  // Pulsing glow animasyonu
+  // ★ BUG FIX: Pulsing glow animasyonu — cleanup eklendi (memory leak fix)
   const pulseAnim = React.useRef(new Animated.Value(1)).current;
+  const pulseRef = React.useRef<Animated.CompositeAnimation | null>(null);
   React.useEffect(() => {
     if (weeklySP > 0) {
-      Animated.loop(
+      pulseRef.current = Animated.loop(
         Animated.sequence([
           Animated.timing(pulseAnim, { toValue: 1.05, duration: 1500, useNativeDriver: true }),
           Animated.timing(pulseAnim, { toValue: 1, duration: 1500, useNativeDriver: true }),
         ])
-      ).start();
+      );
+      pulseRef.current.start();
     }
+    return () => { pulseRef.current?.stop(); };
   }, [weeklySP]);
 
   const motivationText = weeklySP === 0
@@ -272,20 +283,14 @@ function SPBanner({ weeklySP }: { weeklySP: number }) {
         start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
         style={spS.gradient}
       >
-        {/* Dekoratif arka plan daireleri */}
-        <View style={spS.decorCircle1} />
-        <View style={spS.decorCircle2} />
-
-        <View style={spS.row}>
-          <Animated.View style={[spS.iconWrap, { transform: [{ scale: pulseAnim }] }]}>
-            <Text style={spS.iconText}>💎</Text>
-          </Animated.View>
-          <View style={spS.textCol}>
-            <Text style={spS.title}>Bu Hafta Kazandığın SP</Text>
-            <Text style={spS.amount}>{weeklySP.toLocaleString('tr-TR')} SP</Text>
-          </View>
+        <Animated.View style={[spS.iconWrap, { transform: [{ scale: pulseAnim }] }]}>
+          <Text style={spS.iconText}>💎</Text>
+        </Animated.View>
+        <View style={spS.textCol}>
+          <Text style={spS.title}>Bu Hafta</Text>
+          <Text style={spS.amount}>{weeklySP.toLocaleString('tr-TR')} SP</Text>
         </View>
-        <Text style={spS.motivation}>{motivationText}</Text>
+        <Text style={spS.motivation} numberOfLines={1}>{motivationText}</Text>
       </LinearGradient>
     </View>
   );
@@ -294,43 +299,34 @@ function SPBanner({ weeklySP }: { weeklySP: number }) {
 const spS = StyleSheet.create({
   wrap: {
     marginHorizontal: 16, marginTop: 6, marginBottom: 12,
-    borderRadius: 16, overflow: 'hidden',
-    ...Shadows.card,
+    borderRadius: 14, overflow: 'hidden',
+    // Opak gradient — elevation güvenli
+    shadowColor: '#000', shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3, shadowRadius: 6, elevation: 4,
   },
   gradient: {
-    paddingVertical: 16, paddingHorizontal: 16,
-    position: 'relative', overflow: 'hidden',
+    flexDirection: 'row', alignItems: 'center',
+    paddingVertical: 10, paddingHorizontal: 14, gap: 10,
   },
-  decorCircle1: {
-    position: 'absolute', top: -20, right: -20,
-    width: 80, height: 80, borderRadius: 40,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-  },
-  decorCircle2: {
-    position: 'absolute', bottom: -15, left: -15,
-    width: 60, height: 60, borderRadius: 30,
-    backgroundColor: 'rgba(255,255,255,0.04)',
-  },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   iconWrap: {
-    width: 44, height: 44, borderRadius: 14,
+    width: 36, height: 36, borderRadius: 12,
     backgroundColor: 'rgba(255,255,255,0.12)',
     alignItems: 'center', justifyContent: 'center',
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)',
   },
-  iconText: { fontSize: 22 },
-  textCol: { flex: 1 },
+  iconText: { fontSize: 18 },
+  textCol: {},
   title: {
-    fontSize: 11, fontWeight: '600', color: 'rgba(255,255,255,0.7)',
+    fontSize: 10, fontWeight: '600', color: 'rgba(255,255,255,0.7)',
     letterSpacing: 0.3,
   },
   amount: {
-    fontSize: 22, fontWeight: '900', color: '#FFF', marginTop: 2,
+    fontSize: 16, fontWeight: '900', color: '#FFF',
     textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
   motivation: {
-    fontSize: 11, color: 'rgba(255,255,255,0.65)', marginTop: 10,
-    lineHeight: 16, fontWeight: '500',
+    flex: 1, fontSize: 10, color: 'rgba(255,255,255,0.55)',
+    textAlign: 'right', fontWeight: '500',
   },
 });
 
@@ -442,9 +438,14 @@ export default function MyRoomsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
+  const [showInviteFriends, setShowInviteFriends] = useState(false);
 
   const { unreadNotifs: unreadCount } = useBadges();
   const { allFriends } = useOnlineFriends();
+
+  // ★ Realtime kanal bağımlılık fix: ref pattern
+  const loadDataRef = useRef<() => Promise<void>>();
+  const refreshFriendsLiveRef = useRef<() => Promise<void>>();
 
   const loadData = useCallback(async () => {
     if (!firebaseUser) return;
@@ -558,6 +559,9 @@ export default function MyRoomsScreen() {
     }
   }, [firebaseUser, allFriends]);
 
+  // ★ Ref'leri güncel tut — realtime handler'ları için
+  useEffect(() => { loadDataRef.current = loadData; }, [loadData]);
+
   useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
 
   // ★ Yardımcı: Sadece arkadaşların canlı olduğu odaları yenile (hafif sorgu)
@@ -592,9 +596,12 @@ export default function MyRoomsScreen() {
     }
   }, [firebaseUser, allFriends]);
 
+  useEffect(() => { refreshFriendsLiveRef.current = refreshFriendsLive; }, [refreshFriendsLive]);
+
   // ════════════════════════════════════════════════════════════
   // REALTIME MOTOR — 3 kanal
   // ════════════════════════════════════════════════════════════
+  // ★ BUG FIX: Realtime kanal — ref pattern ile dependency döngüsü engellendi
   useEffect(() => {
     if (!firebaseUser) return;
 
@@ -605,11 +612,11 @@ export default function MyRoomsScreen() {
         event: '*', schema: 'public', table: 'rooms',
         filter: `host_id=eq.${firebaseUser.uid}`,
       }, (payload) => {
-        if (payload.eventType !== 'UPDATE') { loadData(); return; }
+        if (payload.eventType !== 'UPDATE') { loadDataRef.current?.(); return; }
         const updated = payload.new as any;
         const old = payload.old as any;
         if (updated.is_live !== old?.is_live || updated.name !== old?.name || updated.type !== old?.type) {
-          loadData();
+          loadDataRef.current?.();
         } else {
           // ★ Kozmetik değişiklik (listener_count, room_settings vb.) → inline güncelle + stats barı
           const mergedFields: Record<string, any> = {
@@ -642,19 +649,13 @@ export default function MyRoomsScreen() {
       .channel('friends-live-rt')
       .on('postgres_changes', {
         event: 'INSERT', schema: 'public', table: 'room_participants',
-      }, (payload) => {
-        const friendSet = new Set(allFriends.map(f => f.id));
-        if (friendSet.has((payload.new as any).user_id)) {
-          refreshFriendsLive();
-        }
+      }, () => {
+        refreshFriendsLiveRef.current?.();
       })
       .on('postgres_changes', {
         event: 'DELETE', schema: 'public', table: 'room_participants',
-      }, (payload) => {
-        const friendSet = new Set(allFriends.map(f => f.id));
-        if (friendSet.has((payload.old as any)?.user_id)) {
-          refreshFriendsLive();
-        }
+      }, () => {
+        refreshFriendsLiveRef.current?.();
       })
       .subscribe();
 
@@ -679,7 +680,7 @@ export default function MyRoomsScreen() {
       supabase.removeChannel(friendsChannel);
       supabase.removeChannel(spChannel);
     };
-  }, [firebaseUser, loadData, allFriends, refreshFriendsLive]);
+  }, [firebaseUser]); // ★ Sadece firebaseUser — ref pattern sayesinde diğerleri gerekmiyor
 
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
@@ -704,10 +705,161 @@ export default function MyRoomsScreen() {
     if (room.is_live) {
       router.push(`/room/${room.id}`);
     } else {
-      // Uyuyan oda — önce uyandır
       handleWakeUp(room);
     }
   };
+
+  // ★ PlusMenu için settings state + DB handlers
+  const [rmName, setRmName] = useState('');
+  const [rmType, setRmType] = useState('open');
+  const [rmSpeakingMode, setRmSpeakingMode] = useState('permission_only');
+  const [rmSlowMode, setRmSlowMode] = useState(0);
+  const [rmAgeRestricted, setRmAgeRestricted] = useState(false);
+  const [rmFollowersOnly, setRmFollowersOnly] = useState(false);
+  const [rmDonations, setRmDonations] = useState(false);
+  const [rmEntryFee, setRmEntryFee] = useState(0);
+  const [rmLang, setRmLang] = useState('tr');
+  const [rmWelcome, setRmWelcome] = useState('');
+  const [rmRules, setRmRules] = useState('');
+  const [rmThemeId, setRmThemeId] = useState<string | null>(null);
+  const [rmMusicTrack, setRmMusicTrack] = useState<string | null>(null);
+  const [rmBgImage, setRmBgImage] = useState<string | null>(null);
+  const [rmCoverImage, setRmCoverImage] = useState<string | null>(null);
+  const [rmPassword, setRmPassword] = useState('');
+  const [rmIsLocked, setRmIsLocked] = useState(false);
+  const [rmFollowerCount, setRmFollowerCount] = useState(0);
+
+  // selectedRoom değiştiğinde state'leri yükle
+  useEffect(() => {
+    if (!selectedRoom) return;
+    const rs = (selectedRoom.room_settings || {}) as any;
+    setRmName(selectedRoom.name || '');
+    setRmType(selectedRoom.type || 'open');
+    setRmSpeakingMode(rs.speaking_mode || 'permission_only');
+    setRmSlowMode(rs.slow_mode_seconds || 0);
+    setRmAgeRestricted(rs.age_restricted || false);
+    setRmFollowersOnly(rs.followers_only || false);
+    setRmDonations(rs.donations_enabled || false);
+    setRmEntryFee(rs.entry_fee_sp || 0);
+    setRmLang(rs.room_language || 'tr');
+    setRmWelcome(rs.welcome_message || '');
+    setRmRules(typeof rs.rules === 'string' ? rs.rules : Array.isArray(rs.rules) ? rs.rules.join('\n') : '');
+    setRmThemeId((selectedRoom as any).theme_id || null);
+    setRmMusicTrack(rs.music_track || null);
+    setRmBgImage(rs.room_image_url || (selectedRoom as any).room_image_url || null);
+    setRmCoverImage(rs.cover_image_url || null);
+    setRmPassword(rs.password || '');
+    setRmIsLocked(rs.is_locked || false);
+    // Takipçi sayısı
+    RoomFollowService.getFollowerCount(selectedRoom.id).then(c => setRmFollowerCount(c)).catch(() => {});
+  }, [selectedRoom?.id]);
+
+  // ★ Realtime broadcast — odadaki kullanıcılara ayar değişikliğini bildir
+  const broadcast = useCallback((roomId: string, payload: Record<string, any>) => {
+    const ch = supabase.channel(`mod_action:${roomId}`);
+    ch.subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        ch.send({ type: 'broadcast', event: 'settings_changed', payload }).then(() => {
+          setTimeout(() => { try { supabase.removeChannel(ch); } catch {} }, 1000);
+        });
+      }
+    });
+  }, []);
+
+  // DB güncelleme helpers
+  const updateRoomSetting = useCallback(async (field: string, value: any) => {
+    if (!selectedRoom || !firebaseUser) return;
+    try {
+      await RoomService.updateSettings(selectedRoom.id, firebaseUser.uid, { room_settings: { [field]: value } });
+      broadcast(selectedRoom.id, { room_settings: { [field]: value } });
+    } catch (e: any) { showToast({ title: 'Hata', message: e.message || '', type: 'error' }); }
+  }, [selectedRoom, firebaseUser, broadcast]);
+
+  const handleRoomRename = useCallback(async (name: string) => {
+    if (!selectedRoom || !firebaseUser || !name.trim()) return;
+    setRmName(name.trim());
+    try {
+      await ModerationService.editRoomName(selectedRoom.id, name.trim());
+      broadcast(selectedRoom.id, { name: name.trim() });
+    } catch { showToast({ title: 'Hata', type: 'error' }); }
+  }, [selectedRoom, firebaseUser, broadcast]);
+
+  const handleRoomTypeChange = useCallback(async (newType: string) => {
+    if (!selectedRoom || !firebaseUser) return;
+    setRmType(newType);
+    try {
+      await RoomService.updateSettings(selectedRoom.id, firebaseUser.uid, { type: newType as any });
+      broadcast(selectedRoom.id, { type: newType });
+    } catch { showToast({ title: 'Hata', type: 'error' }); setRmType(selectedRoom.type || 'open'); }
+  }, [selectedRoom, firebaseUser, broadcast]);
+
+  const handleRoomThemeChange = useCallback(async (id: string | null) => {
+    if (!selectedRoom || !firebaseUser) return;
+    setRmThemeId(id);
+    try {
+      await RoomService.updateSettings(selectedRoom.id, firebaseUser.uid, { theme_id: id });
+      broadcast(selectedRoom.id, { theme_id: id });
+    } catch { showToast({ title: 'Hata', type: 'error' }); }
+  }, [selectedRoom, firebaseUser, broadcast]);
+
+  const handleRoomDelete = useCallback(async () => {
+    if (!selectedRoom || !firebaseUser) return;
+    try {
+      await RoomService.deleteRoom(selectedRoom.id, firebaseUser.uid);
+      showToast({ title: 'Oda silindi', type: 'success' });
+      setSelectedRoom(null);
+      loadData();
+    } catch (e: any) { showToast({ title: 'Hata', message: e.message || '', type: 'error' }); }
+  }, [selectedRoom, firebaseUser, loadData]);
+
+  const handleRoomFreeze = useCallback(async () => {
+    if (!selectedRoom || !firebaseUser) return;
+    try {
+      await RoomService.freezeRoom(selectedRoom.id, firebaseUser.uid);
+      showToast({ title: 'Oda donduruldu', type: 'success' });
+      setSelectedRoom(null);
+      loadData();
+    } catch (e: any) { showToast({ title: 'Hata', message: e.message || '', type: 'error' }); }
+  }, [selectedRoom, firebaseUser, loadData]);
+
+  // settingsConfig objesi — PlusMenu'ye geçirilir
+  const settingsConfig = selectedRoom ? {
+    speakingMode: rmSpeakingMode,
+    onSpeakingModeChange: (m: string) => { setRmSpeakingMode(m); updateRoomSetting('speaking_mode', m); },
+    slowModeSeconds: rmSlowMode,
+    onSlowModeChange: (s: number) => { setRmSlowMode(s); updateRoomSetting('slow_mode_seconds', s); },
+    ageRestricted: rmAgeRestricted,
+    onAgeRestrictedChange: (v: boolean) => { setRmAgeRestricted(v); updateRoomSetting('age_restricted', v); },
+    followersOnly: rmFollowersOnly,
+    onToggleFollowersOnly: (v: boolean) => { setRmFollowersOnly(v); updateRoomSetting('followers_only', v); },
+    donationsEnabled: rmDonations,
+    onDonationsToggle: (v: boolean) => { setRmDonations(v); updateRoomSetting('donations_enabled', v); },
+    roomLanguage: rmLang,
+    onLanguageChange: (l: string) => { setRmLang(l); updateRoomSetting('room_language', l); },
+    roomName: rmName,
+    onRenameRoom: handleRoomRename,
+    welcomeMessage: rmWelcome,
+    onWelcomeMessageChange: (msg: string) => { setRmWelcome(msg); updateRoomSetting('welcome_message', msg); },
+    roomRules: rmRules,
+    onRulesChange: (r: string) => { setRmRules(r); updateRoomSetting('rules', r); },
+    roomType: rmType,
+    onRoomTypeChange: handleRoomTypeChange,
+    roomPassword: rmPassword,
+    onPasswordChange: (pw: string) => { setRmPassword(pw); updateRoomSetting('password', pw); },
+    themeId: rmThemeId,
+    onThemeChange: handleRoomThemeChange,
+    onFreezeRoom: handleRoomFreeze,
+    entryFee: rmEntryFee,
+    onEntryFeeChange: (f: number) => { setRmEntryFee(f); updateRoomSetting('entry_fee_sp', f); },
+    musicTrack: rmMusicTrack,
+    onMusicTrackChange: (t: string | null) => { setRmMusicTrack(t); updateRoomSetting('music_track', t); },
+    backgroundImage: rmBgImage,
+    onPickBackgroundImage: () => { /* TODO: image picker */ },
+    onRemoveBackgroundImage: () => { setRmBgImage(null); updateRoomSetting('room_image_url', null); },
+    coverImage: rmCoverImage,
+    onPickCoverImage: () => { /* TODO: image picker */ },
+    onRemoveCoverImage: () => { setRmCoverImage(null); updateRoomSetting('cover_image_url', null); },
+  } : undefined;
 
   return (
     <AppBackground variant="myrooms">
@@ -746,25 +898,6 @@ export default function MyRoomsScreen() {
         </LinearGradient>
       </Pressable>
 
-      {/* 🚀 Hızlı Şablonlar */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 6 }}
-      >
-        {ROOM_TEMPLATES.map((tpl) => (
-          <Pressable
-            key={tpl.id}
-            style={({ pressed }) => [tplS.card, pressed && { opacity: 0.8, transform: [{ scale: 0.95 }] }]}
-            onPress={() => router.push(`/create-room?t_name=${encodeURIComponent(tpl.name)}&t_category=${tpl.category}&t_type=${tpl.type}&t_mode=${tpl.mode}&t_speaking=${tpl.speaking}`)}
-          >
-            <LinearGradient colors={tpl.colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={tplS.gradient}>
-              <Text style={tplS.emoji}>{tpl.emoji}</Text>
-              <Text style={tplS.label}>{tpl.label}</Text>
-            </LinearGradient>
-          </Pressable>
-        ))}
-      </ScrollView>
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -777,7 +910,12 @@ export default function MyRoomsScreen() {
         {myRooms.length > 0 && <StatsBar stats={roomStats} />}
 
         {/* Yönettiğim Odalar */}
-        <Text style={s.sectionTitle}>Yönettiğim Odalar</Text>
+        {/* Section title — gradient accent çizgisi (home ile tutarlı) */}
+        <View style={s.sectionRow}>
+          <View style={[s.sectionAccent, { backgroundColor: '#14B8A6' }]} />
+          <Ionicons name="headset" size={14} color="#14B8A6" style={{ opacity: 0.7 }} />
+          <Text style={s.sectionTitle}>Yönettiğim Odalar</Text>
+        </View>
         {myRooms.length > 0 ? (
           myRooms.map((room) => (
             <ManagedRoomCard
@@ -790,16 +928,20 @@ export default function MyRoomsScreen() {
           ))
         ) : (
           <View style={s.emptyCard}>
+            <Text style={s.emptyTitle}>Henüz bir odanız yok.{'\n'}İlk odanızı oluşturun!</Text>
             <View style={s.emptyImageWrap}>
               <Image source={require('../../assets/images/mock/empty_room_mic.png')} style={s.emptyImage} resizeMode="contain" />
             </View>
-            <Text style={s.emptyTitle}>Henüz bir odanız yok.{'\n'}İlk odanızı oluşturun!</Text>
             <Text style={s.emptySub}>Sesli sohbet, müzik, oyun ve daha fazlası...</Text>
           </View>
         )}
 
         {/* Son Girdiğin Odalar */}
-        <Text style={s.sectionTitle}>Son Girdiğin Odalar</Text>
+        <View style={s.sectionRow}>
+          <View style={[s.sectionAccent, { backgroundColor: '#3B82F6' }]} />
+          <Ionicons name="time" size={14} color="#3B82F6" style={{ opacity: 0.7 }} />
+          <Text style={s.sectionTitle}>Son Girdiğin Odalar</Text>
+        </View>
         {recentRooms.length > 0 ? (
           <ScrollView
             horizontal
@@ -818,13 +960,17 @@ export default function MyRoomsScreen() {
         ) : (
           <View style={s.emptyFollowed}>
             <Text style={s.emptyFollowedText}>
-              Henüz bir odaya girmedin.{`\n`}Keşfet sayfasından odalara katıl!
+              🔇 Şu an canlı oda yok.{`\n`}Daha önce girdiğin odalar canlı olduğunda burada görünür!
             </Text>
           </View>
         )}
 
         {/* 👥 Arkadaşların Canlı */}
-        <Text style={s.sectionTitle}>Arkadaşların Canlı</Text>
+        <View style={s.sectionRow}>
+          <View style={[s.sectionAccent, { backgroundColor: '#22C55E' }]} />
+          <Ionicons name="people" size={14} color="#22C55E" style={{ opacity: 0.7 }} />
+          <Text style={s.sectionTitle}>Arkadaşların Canlı</Text>
+        </View>
         {friendsLive.length > 0 ? (
           <ScrollView
             horizontal
@@ -843,26 +989,77 @@ export default function MyRoomsScreen() {
         ) : (
           <View style={s.emptyFollowed}>
             <Text style={s.emptyFollowedText}>
-              Arkadaşların şu an bir odada değil.{`\n`}Takip ettiğin kişiler odaya girdiğinde burada görünür!
+              👥 Arkadaşların şu an bir odada değil.{`\n`}Takip ettiğin kişiler odaya girdiğinde burada görünür!
             </Text>
           </View>
         )}
 
         {/* 💰 SP Kazanç Özeti */}
-        <Text style={s.sectionTitle}>SP Kazanç Özeti</Text>
+        <View style={s.sectionRow}>
+          <View style={[s.sectionAccent, { backgroundColor: '#A78BFA' }]} />
+          <Ionicons name="diamond" size={14} color="#A78BFA" style={{ opacity: 0.7 }} />
+          <Text style={s.sectionTitle}>SP Kazanç Özeti</Text>
+        </View>
         <SPBanner weeklySP={weeklySP} />
       </ScrollView>
 
-      {/* ★ Oda Yönetim Paneli — odaya girmeden ayarları yönet */}
-      <RoomManageSheet
+      {/* ★ PlusMenu — Oda Yönetim Paneli (sağdan slide) */}
+      <PlusMenu
         visible={!!selectedRoom}
-        room={selectedRoom}
-        hostId={firebaseUser?.uid || ''}
-        ownerTier={profile?.subscription_tier || 'Free'}
         onClose={() => setSelectedRoom(null)}
-        onWakeUp={(room) => { setSelectedRoom(null); handleWakeUp(room); }}
-        onDeleted={() => { setSelectedRoom(null); loadData(); }}
+        onInviteFriends={() => setShowInviteFriends(true)}
+        onShareLink={async () => {
+          if (!selectedRoom) return;
+          try {
+            const { Share } = require('react-native');
+            await Share.share({
+              message: `🎤 "${selectedRoom.name || 'Oda'}" odasına gel! SopranoChat'te konuşalım:\nhttps://sopranochat.com/room/${selectedRoom.id}`,
+              title: selectedRoom.name || 'SopranoChat Odası',
+            });
+          } catch {}
+        }}
+        userRole="owner"
+        ownerTier={profile?.subscription_tier || 'Free'}
+        onDeleteRoom={handleRoomDelete}
+        isFollowingRoom={false}
+        isRoomLocked={rmIsLocked}
+        onRoomLock={isTierAtLeast((profile?.subscription_tier || 'Free') as any, 'Plus') ? () => {
+          const newLocked = !rmIsLocked;
+          setRmIsLocked(newLocked);
+          updateRoomSetting('is_locked', newLocked);
+        } : undefined}
+        settingsConfig={settingsConfig}
+        followerCount={rmFollowerCount}
+        micRequestCount={0}
       />
+
+      {/* ★ Arkadaş Davet Modalı — Odalarım sayfası */}
+      {firebaseUser && selectedRoom && (
+        <InviteFriendsModal
+          visible={showInviteFriends}
+          userId={firebaseUser.uid}
+          onClose={() => setShowInviteFriends(false)}
+          onInvite={async (selectedUsers: FollowUser[]) => {
+            if (!selectedRoom || !firebaseUser || !profile) {
+              setShowInviteFriends(false);
+              return;
+            }
+            const hostName = profile.display_name || 'Birisi';
+            let successCount = 0;
+            for (const user of selectedUsers) {
+              try {
+                const result = await RoomAccessService.inviteUser(selectedRoom.id, user.id, firebaseUser.uid);
+                if (result.success) successCount++;
+                PushService.sendRoomInvite(user.id, hostName, selectedRoom.name || 'Oda', selectedRoom.id).catch(() => {});
+              } catch {}
+            }
+            if (successCount > 0) {
+              showToast({ title: '📨 Davet Gönderildi', message: `${successCount} kişiye davet gönderildi`, type: 'success' });
+            }
+            setShowInviteFriends(false);
+          }}
+        />
+      )}
 
     </View></AppBackground>
   );
@@ -877,14 +1074,13 @@ const s = StyleSheet.create({
   /* Header */
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 14, paddingBottom: 2,
+    paddingHorizontal: 14, paddingBottom: 6,
   },
   logo: { height: 32, width: 150 },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   headerIconBtn: {
     width: 36, height: 36, borderRadius: 18,
     backgroundColor: 'rgba(255,255,255,0.06)', justifyContent: 'center', alignItems: 'center',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 3,
     overflow: 'visible',
   },
   notifBadge: {
@@ -892,23 +1088,7 @@ const s = StyleSheet.create({
   },
   notifBadgeText: { fontSize: 9, fontWeight: '800', color: '#FFF' },
 
-  /* Welcome */
-  welcomeRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    paddingHorizontal: 14, paddingBottom: 10,
-  },
-  avatar: {
-    width: 52, height: 52, borderRadius: 26,
-    borderWidth: 1.5, borderColor: 'rgba(115,194,189,0.35)',
-  },
-  welcomeTitle: {
-    fontSize: 15, fontWeight: '700', color: '#F1F5F9',
-    textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
-  },
-  welcomeSub: {
-    fontSize: 11, color: '#94A3B8', marginTop: 1,
-    textShadowColor: 'rgba(0,0,0,0.35)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
-  },
+
 
   /* CTA — Premium Gradient */
   ctaWrap: {
@@ -934,10 +1114,16 @@ const s = StyleSheet.create({
     fontSize: 11, color: 'rgba(255,255,255,0.75)', marginTop: 1,
   },
 
-  /* Section Title */
+  /* Section Title — gradient accent çizgisi */
+  sectionRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: 16, marginTop: 14, marginBottom: 8,
+  },
+  sectionAccent: {
+    width: 3, height: 16, borderRadius: 2,
+  },
   sectionTitle: {
     fontSize: 14, fontWeight: '700', color: '#F1F5F9', letterSpacing: 0.3,
-    paddingHorizontal: 16, marginTop: 10, marginBottom: 6,
     textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
 
@@ -949,11 +1135,11 @@ const s = StyleSheet.create({
     shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 8, elevation: 6,
   },
   emptyImageWrap: {
-    width: '70%', marginTop: 10, marginBottom: 10, borderRadius: 80, overflow: 'hidden',
+    width: '70%', marginBottom: 10, borderRadius: 80, overflow: 'hidden',
   },
   emptyImage: { width: '100%', height: 140 },
   emptyTitle: {
-    fontSize: 13, fontWeight: '800', color: '#F1F5F9', textAlign: 'center', lineHeight: 20, marginBottom: 4,
+    fontSize: 13, fontWeight: '800', color: '#F1F5F9', textAlign: 'center', lineHeight: 20, marginTop: 16, marginBottom: 10,
     textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
   emptySub: {
