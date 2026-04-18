@@ -247,8 +247,16 @@ export const RoomService = {
   /**
    * ★ Zombie Temizliği — 120 saniyeden uzun süredir heartbeat göndermeyen
    * katılımcıları otomatik çıkarır.
+   * Y8: v21 atomic RPC — delete + listener_count sync + auto-close tek transaction.
    */
   async cleanupZombies(roomId: string): Promise<void> {
+    try {
+      const { error } = await supabase.rpc('cleanup_room_zombies_atomic', { p_room_id: roomId });
+      if (!error) return;
+      if (__DEV__) console.warn('[cleanupZombies] RPC fallback:', error.message);
+    } catch { /* fall through */ }
+
+    // Fallback — v21 migrate edilmediyse eski yol
     const cutoff = new Date(Date.now() - 120_000).toISOString();
     try {
       const { data: zombies } = await supabase
@@ -262,7 +270,6 @@ export const RoomService = {
           .delete()
           .eq('room_id', roomId)
           .lt('last_seen_at', cutoff);
-        // ★ FIX: Zombie temizliğinden sonra listener_count sync + boş oda kontrolü
         await this.syncListenerCount(roomId);
         await this._autoCloseIfEmpty(roomId);
       }
@@ -517,14 +524,17 @@ export const RoomService = {
 
   /** Odaya katıl */
   async join(roomId: string, userId: string, roleHint?: string): Promise<RoomParticipant> {
-    // ★ Ban kontrolü — banlı kullanıcı giremez (host muaf)
-    const { data: roomCheck } = await supabase
+    // ★ O2 FIX: 3 ayrı sorgu → tek sorgu (performans + race condition önleme)
+    const { data: roomData } = await supabase
       .from('rooms')
-      .select('host_id, room_settings')
+      .select('host_id, room_settings, owner_tier')
       .eq('id', roomId)
       .single();
-    const isHost = roomCheck?.host_id === userId;
-    const isOriginalHost = (roomCheck?.room_settings as any)?.original_host_id === userId;
+
+    const isHost = roomData?.host_id === userId;
+    const isOriginalHost = (roomData?.room_settings as any)?.original_host_id === userId;
+
+    // ── 1. Ban kontrolü ──
     if (!isHost && !isOriginalHost) {
       const banned = await this.isBanned(roomId, userId);
       if (banned) {
@@ -532,18 +542,13 @@ export const RoomService = {
       }
     }
 
-    // ★ Kilitli oda kontrolü — room_settings.is_locked (JSONB tek kaynak)
-    const { data: lockCheck } = await supabase
-      .from('rooms')
-      .select('room_settings, host_id')
-      .eq('id', roomId)
-      .single();
-    const lockSettings = (lockCheck?.room_settings || {}) as any;
-    if (lockSettings.is_locked && lockCheck?.host_id !== userId) {
+    // ── 2. Kilitli oda kontrolü ──
+    const lockSettings = (roomData?.room_settings || {}) as any;
+    if (lockSettings.is_locked && !isHost) {
       throw new Error('Bu oda şu an kilitli. Yeni giriş kabul edilmiyor.');
     }
 
-    // ★ Zaten katılımcı mı kontrol et
+    // ── 3. Zaten katılımcı mı? ──
     const { data: existing } = await supabase
       .from('room_participants')
       .select('*')
@@ -555,21 +560,15 @@ export const RoomService = {
       return existing as RoomParticipant;
     }
 
-    // ★ Original Host Recovery — oda sahibi geri dönüyorsa owner olarak ata
-    const { data: room } = await supabase
-      .from('rooms')
-      .select('host_id, room_settings, owner_tier')
-      .eq('id', roomId)
-      .single();
-
+    // ── 4. Rol belirleme (roomData zaten elimizde) ──
     // ★ BUG-R5 FIX: roleHint parametresini dikkate al
     let role: string = roleHint || 'listener';
-    if (room) {
-      const settings = (room.room_settings || {}) as RoomSettings;
-      if (settings.original_host_id === userId || room.host_id === userId) {
+    if (roomData) {
+      const settings = (roomData.room_settings || {}) as RoomSettings;
+      if (settings.original_host_id === userId || roomData.host_id === userId) {
         role = 'owner';
         // Host geri dönüyorsa room'un host_id'sini güncelle
-        if (room.host_id !== userId) {
+        if (roomData.host_id !== userId) {
           await supabase
             .from('rooms')
             .update({ host_id: userId })
@@ -591,7 +590,7 @@ export const RoomService = {
           .eq('role', 'listener');
 
         // ★ BUG FIX: Sabit 20 yerine tier bazlı maxListeners kullan
-        const roomOwnerTier = migrateLegacyTier(room.owner_tier);
+        const roomOwnerTier = migrateLegacyTier(roomData.owner_tier);
         const roomLimits = getRoomLimits(roomOwnerTier);
         if ((count || 0) >= roomLimits.maxListeners) {
           role = 'spectator';
@@ -623,10 +622,10 @@ export const RoomService = {
           }
           // Host'a %90 pay, %10 platform komisyonu
           const hostShare = Math.round(entryFee * 0.9);
-          if (hostShare > 0 && room.host_id) {
+          if (hostShare > 0 && roomData.host_id) {
             try {
               await supabase.rpc('grant_system_points', {
-                p_user_id: room.host_id,
+                p_user_id: roomData.host_id,
                 p_amount: hostShare,
                 p_action: 'entry_fee_share',
               });
@@ -635,13 +634,13 @@ export const RoomService = {
               const { data: hostProfile } = await supabase
                 .from('profiles')
                 .select('system_points')
-                .eq('id', room.host_id)
+                .eq('id', roomData.host_id)
                 .single();
               if (hostProfile) {
                 await supabase
                   .from('profiles')
                   .update({ system_points: (hostProfile.system_points || 0) + hostShare })
-                  .eq('id', room.host_id);
+                  .eq('id', roomData.host_id);
               }
             }
           }
@@ -649,7 +648,7 @@ export const RoomService = {
           try {
             await supabase.from('sp_transactions').insert([
               { user_id: userId, amount: -entryFee, type: 'room_entry_fee', description: `Oda giriş ücreti` },
-              { user_id: room.host_id, amount: hostShare, type: 'entry_fee_share', description: `Giriş ücreti payı` },
+              { user_id: roomData.host_id, amount: hostShare, type: 'entry_fee_share', description: `Giriş ücreti payı` },
             ]);
           } catch { /* sp_transactions yoksa sessiz */ }
         }
@@ -667,7 +666,28 @@ export const RoomService = {
       .select('*, user:profiles!user_id(*)')
       .single();
 
-    if (error) throw error;
+    if (error) {
+      // ★ SP Rollback: katılımcı eklenemezse ödenen giriş ücretini iade et
+      const settings = (roomData?.room_settings || {}) as any;
+      const paidFee = (settings.entry_fee_sp || 0);
+      if (paidFee > 0 && role !== 'owner') {
+        try {
+          await supabase.rpc('grant_system_points', {
+            p_user_id: userId,
+            p_amount: paidFee,
+            p_action: 'entry_fee_refund',
+          });
+        } catch { /* rollback başarısız — kritik: manuel inceleme gerekebilir */ }
+      }
+      // ★ O2 FIX: RLS tarafından reddedilen kayıtlar — genellikle ban (v13 policy).
+      // Raw Postgres mesajı yerine kullanıcıya anlamlı metin.
+      const rawMsg = String((error as any)?.message || '').toLowerCase();
+      const rlsCode = String((error as any)?.code || '');
+      if (rlsCode === '42501' || rawMsg.includes('row-level security') || rawMsg.includes('policy')) {
+        throw new Error('Bu odaya erişiminiz yasaklanmış veya oda katılıma kapalı.');
+      }
+      throw error;
+    }
 
     // BUG-RD4 FIX: Sadece listener/spectator rollerinde sayacı artır (owner/speaker/mod hariç)
     if (role === 'listener' || role === 'spectator') {
@@ -986,9 +1006,28 @@ export const RoomService = {
     return participants;
   },
 
-  /** Host: Kullanıcıyı konuşmacıya yükselt — ★ BUG-R4 FIX: Backend slot limiti */
+  /**
+   * Host: Kullanıcıyı konuşmacıya yükselt.
+   * Y9/Y11: v21 atomic RPC — slot kontrolü + rol update + listener_count tek transaction.
+   */
   async promoteSpeaker(roomId: string, userId: string): Promise<void> {
-    // ★ Sahne slot limiti kontrolü (backend guard)
+    try {
+      const { error } = await supabase.rpc('promote_speaker_atomic', {
+        p_room_id: roomId,
+        p_user_id: userId,
+      });
+      if (!error) return;
+      if (__DEV__) console.warn('[promoteSpeaker] RPC fallback:', error.message);
+      // RPC tier dolu hata'sını da buradan fırlatsın (mesajdan anla)
+      if (/sahne dolu|slot|yetkiniz yok/i.test(error.message || '')) {
+        throw new Error(error.message);
+      }
+    } catch (rpcErr: any) {
+      // Sadece RPC yoksa fallback yapılır; yetki/slot hataları üst katmana geçer
+      if (rpcErr?.message && /sahne dolu|yetkiniz yok/i.test(rpcErr.message)) throw rpcErr;
+    }
+
+    // Fallback — v21 migrate edilmediyse eski yol (non-atomic)
     const { data: roomInfo } = await supabase
       .from('rooms')
       .select('owner_tier, host_id')
@@ -996,7 +1035,6 @@ export const RoomService = {
       .single();
     const ownerTier = migrateLegacyTier(roomInfo?.owner_tier);
     const limits = getRoomLimits(ownerTier);
-    // Owner ve host her zaman sahneye çıkabilir  (slot aşılsa bile)
     if (roomInfo?.host_id !== userId) {
       const { count } = await supabase
         .from('room_participants')
@@ -1007,21 +1045,55 @@ export const RoomService = {
         throw new Error(`Sahne dolu (max ${limits.maxSpeakers}). Tier: ${ownerTier}`);
       }
     }
+    const { data: currentPart } = await supabase
+      .from('room_participants')
+      .select('role')
+      .eq('room_id', roomId)
+      .eq('user_id', userId)
+      .maybeSingle();
     await supabase
       .from('room_participants')
       .update({ role: 'speaker', is_muted: false })
       .eq('room_id', roomId)
       .eq('user_id', userId);
+    if (currentPart && (currentPart.role === 'listener' || currentPart.role === 'spectator')) {
+      try { await supabase.rpc('decrement_listener_count', { room_id_input: roomId }); } catch { /* RPC yoksa sessiz */ }
+    }
   },
 
-  /** Host: Konuşmacıyı dinleyiciye düşür — ★ D4 FIX: Yetki kontrolü */
+  /**
+   * Host/Mod: Konuşmacıyı dinleyiciye düşür. Self-demote speaker→listener de desteklenir.
+   * Y9: v21 atomic RPC — rol update + listener_count tek transaction.
+   */
   async demoteSpeaker(roomId: string, userId: string, executorId?: string): Promise<void> {
+    try {
+      const { error } = await supabase.rpc('demote_speaker_atomic', {
+        p_room_id: roomId,
+        p_user_id: userId,
+      });
+      if (!error) return;
+      if (__DEV__) console.warn('[demoteSpeaker] RPC fallback:', error.message);
+      if (/yetkiniz yok|owner demote/i.test(error.message || '')) throw new Error(error.message);
+    } catch (rpcErr: any) {
+      if (rpcErr?.message && /yetkiniz yok|owner demote/i.test(rpcErr.message)) throw rpcErr;
+    }
+
+    // Fallback — v21 migrate edilmediyse eski yol
     if (executorId) await _requireRole(roomId, executorId, ['owner', 'moderator']);
+    const { data: currentPart } = await supabase
+      .from('room_participants')
+      .select('role')
+      .eq('room_id', roomId)
+      .eq('user_id', userId)
+      .maybeSingle();
     await supabase
       .from('room_participants')
       .update({ role: 'listener', is_muted: false })
       .eq('room_id', roomId)
       .eq('user_id', userId);
+    if (currentPart && (currentPart.role === 'speaker' || currentPart.role === 'moderator')) {
+      try { await supabase.rpc('increment_listener_count', { room_id_input: roomId }); } catch { /* RPC yoksa sessiz */ }
+    }
   },
 
   /**
@@ -1047,10 +1119,25 @@ export const RoomService = {
     if (error) throw error;
   },
 
-  /** Host: Kullanıcıyı moderatör yap — ★ D3+B3 FIX: Yetki + limit kontrolü */
+  /**
+   * Host: Kullanıcıyı moderatör yap.
+   * Y9: v21 atomic RPC — limit kontrolü + rol update + listener_count tek transaction.
+   */
   async setModerator(roomId: string, userId: string, executorId?: string): Promise<void> {
+    try {
+      const { error } = await supabase.rpc('set_moderator_atomic', {
+        p_room_id: roomId,
+        p_user_id: userId,
+      });
+      if (!error) return;
+      if (__DEV__) console.warn('[setModerator] RPC fallback:', error.message);
+      if (/limit|yetkiniz yok|tier/i.test(error.message || '')) throw new Error(error.message);
+    } catch (rpcErr: any) {
+      if (rpcErr?.message && /limit|yetkiniz yok|tier/i.test(rpcErr.message)) throw rpcErr;
+    }
+
+    // Fallback
     if (executorId) await _requireRole(roomId, executorId, ['owner']);
-    // ★ B3 FIX: Moderatör limiti kontrolü
     const { data: roomInfo } = await supabase.from('rooms').select('owner_tier').eq('id', roomId).single();
     const ownerTier = migrateLegacyTier(roomInfo?.owner_tier);
     const limits = getRoomLimits(ownerTier);
@@ -1065,8 +1152,24 @@ export const RoomService = {
       .eq('user_id', userId);
   },
 
-  /** Host/Mod: Kullanıcının moderatörlüğünü kaldır — ★ D3 FIX: Yetki kontrolü */
+  /**
+   * Host: Kullanıcının moderatörlüğünü kaldır.
+   * Y13: v21 atomic RPC — sadece owner veya mod kendisi demote edebilir, başka mod edemez.
+   */
   async removeModerator(roomId: string, userId: string, executorId?: string): Promise<void> {
+    try {
+      const { error } = await supabase.rpc('remove_moderator_atomic', {
+        p_room_id: roomId,
+        p_user_id: userId,
+      });
+      if (!error) return;
+      if (__DEV__) console.warn('[removeModerator] RPC fallback:', error.message);
+      if (/sadece oda sahibi|yetkiniz yok/i.test(error.message || '')) throw new Error(error.message);
+    } catch (rpcErr: any) {
+      if (rpcErr?.message && /sadece oda sahibi|yetkiniz yok/i.test(rpcErr.message)) throw rpcErr;
+    }
+
+    // Fallback
     if (executorId) await _requireRole(roomId, executorId, ['owner']);
     await supabase
       .from('room_participants')
@@ -1090,6 +1193,30 @@ export const RoomService = {
    * Host çıkınca: Yetki zinciri ile devret (Mod → Speaker → Tier-bazlı politika)
    */
   async transferHost(roomId: string, oldHostId: string): Promise<{ newHostId: string | null; keepAlive?: boolean }> {
+    // ★ K2/K3 FIX: Atomic RPC (v18). Aday seçimi + 3 adımlı UPDATE/DELETE
+    // tek transaction içinde. Eski 3-query flow arada kopunca sahipsiz oda
+    // veya çift-owner bırakıyordu.
+    try {
+      const { data, error } = await supabase.rpc('transfer_host_atomic', {
+        p_room_id: roomId,
+        p_old_host_id: oldHostId,
+      });
+      if (error) throw error;
+      const result = (data || {}) as { newHostId: string | null; keepAlive: boolean | null; noop?: boolean };
+      return {
+        newHostId: result.newHostId ?? null,
+        keepAlive: result.keepAlive ?? undefined,
+      };
+    } catch (rpcErr: any) {
+      // RPC henüz migrate edilmediyse fallback — eski (atomic olmayan) akış.
+      // Production'da bu dalla karşılaşılmamalı; v18 uygulandıktan sonra kalabilir.
+      if (__DEV__) console.warn('[transferHost] RPC fallback:', rpcErr?.message);
+      return this._transferHostLegacy(roomId, oldHostId);
+    }
+  },
+
+  /** @internal v18 RPC yoksa fallback. Production'da kullanılmamalı. */
+  async _transferHostLegacy(roomId: string, oldHostId: string): Promise<{ newHostId: string | null; keepAlive?: boolean }> {
     const { data: roomInfo } = await supabase
       .from('rooms')
       .select('is_persistent, owner_tier, room_settings, host_id')
@@ -1108,7 +1235,6 @@ export const RoomService = {
 
     const limits = getRoomLimits(ownerTier);
 
-    // ── Adım 1: En eski moderatörü bul ──
     const { data: mods } = await supabase
       .from('room_participants')
       .select('user_id, joined_at')
@@ -1122,7 +1248,6 @@ export const RoomService = {
     if (mods && mods.length > 0) {
       newHostId = mods[0].user_id;
     } else {
-      // ── Adım 2: Moderatör yok — en eski speaker'ı bul ──
       const { data: speakers } = await supabase
         .from('room_participants')
         .select('user_id, joined_at')
@@ -1137,7 +1262,6 @@ export const RoomService = {
       }
     }
 
-    // ── Devir yapılacak biri BULUNDU ──
     if (newHostId) {
       await supabase
         .from('room_participants')
@@ -1163,9 +1287,6 @@ export const RoomService = {
       return { newHostId };
     }
 
-    // ── Kimse bulunamadı ──
-
-    // ★ keep_alive (Plus/Pro): Oda açık kalır, host bilgisi korunur
     if (limits.ownerLeavePolicy === 'keep_alive') {
       const updatedSettings = {
         ...(roomInfo?.room_settings || {}),
@@ -1185,7 +1306,6 @@ export const RoomService = {
       return { newHostId: null, keepAlive: true };
     }
 
-    // ★ Free (close): null döner → frontend odayı kapatır
     await supabase
       .from('room_participants')
       .delete()
@@ -1193,6 +1313,65 @@ export const RoomService = {
       .eq('user_id', oldHostId);
 
     return { newHostId: null };
+  },
+
+  /**
+   * ★ K1 FIX: Host Claim — Geri sayım sırasında kullanıcı host olur.
+   * Backend guard: oda sahipsiz mi, kullanıcı uygun rolde mı kontrol eder.
+   * Frontend'deki raw Supabase query'leri bu fonksiyona taşındı.
+   */
+  async claimHost(roomId: string, userId: string): Promise<void> {
+    // 1. Oda mevcut mu?
+    const { data: roomInfo, error: roomErr } = await supabase
+      .from('rooms')
+      .select('host_id, room_settings')
+      .eq('id', roomId)
+      .single();
+    if (roomErr || !roomInfo) throw new Error('Oda bulunamadı');
+
+    // 2. Kullanıcı katılımcı mı ve uygun rolde mi?
+    const { data: myPart } = await supabase
+      .from('room_participants')
+      .select('role')
+      .eq('room_id', roomId)
+      .eq('user_id', userId)
+      .maybeSingle();
+    if (!myPart) throw new Error('Bu odada katılımcı değilsiniz.');
+    const BANNED_ROLES = ['banned', 'spectator', 'guest'];
+    if (BANNED_ROLES.includes(myPart.role)) {
+      throw new Error('Bu rolde host olamazsınız.');
+    }
+
+    // 3. Mevcut owner var mı kontrol et — sahipsiz değilse claim yapılamaz
+    const { data: currentOwner } = await supabase
+      .from('room_participants')
+      .select('user_id')
+      .eq('room_id', roomId)
+      .eq('role', 'owner')
+      .maybeSingle();
+    if (currentOwner) {
+      throw new Error('Bu odanın zaten bir sahibi var. Host değiştirme yapılamaz.');
+    }
+
+    // 4. Güvenli: Atomic RPC (v19). UPDATE + host_id tek transaction'da,
+    //    role escalation trigger'ı set_config ile yetkilendirilmiş şekilde geçer.
+    const { error: rpcErr } = await supabase.rpc('claim_host', {
+      p_room_id: roomId,
+      p_user_id: userId,
+    });
+    if (rpcErr) {
+      // Fallback: RPC henüz migrate edilmediyse eski yol (trigger yoksa çalışır).
+      if (__DEV__) console.warn('[claimHost] RPC fallback:', rpcErr?.message);
+      await supabase
+        .from('room_participants')
+        .update({ role: 'owner' })
+        .eq('room_id', roomId)
+        .eq('user_id', userId);
+      await supabase
+        .from('rooms')
+        .update({ host_id: userId })
+        .eq('id', roomId);
+    }
   },
 
   /** Host/Mod: Kullanıcıyı metin sohbetinde sustur/aç */
@@ -1323,7 +1502,8 @@ export const RoomService = {
       .eq('room_id', roomId)
       .eq('user_id', userId);
     if (participant && (participant.role === 'listener' || participant.role === 'spectator')) {
-      try { await supabase.rpc('decrement_listener_count', { room_id_input: roomId }); } catch { }
+      const { error: _rpcErr } = await supabase.rpc('decrement_listener_count', { room_id_input: roomId });
+      if (_rpcErr && __DEV__) console.warn('[Room] decrement_listener_count hatası:', _rpcErr.message);
     }
   },
 
@@ -1359,7 +1539,8 @@ export const RoomService = {
       .eq('user_id', userId);
 
     if (participant && (participant.role === 'listener' || participant.role === 'spectator')) {
-      try { await supabase.rpc('decrement_listener_count', { room_id_input: roomId }); } catch { }
+      const { error: _rpcErr } = await supabase.rpc('decrement_listener_count', { room_id_input: roomId });
+      if (_rpcErr && __DEV__) console.warn('[Room] decrement_listener_count hatası:', _rpcErr.message);
     }
   },
 
@@ -1394,7 +1575,8 @@ export const RoomService = {
       .eq('user_id', userId);
 
     if (participant && (participant.role === 'listener' || participant.role === 'spectator')) {
-      try { await supabase.rpc('decrement_listener_count', { room_id_input: roomId }); } catch { }
+      const { error: _rpcErr } = await supabase.rpc('decrement_listener_count', { room_id_input: roomId });
+      if (_rpcErr && __DEV__) console.warn('[Room] decrement_listener_count hatası:', _rpcErr.message);
     }
   },
 

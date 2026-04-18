@@ -16,9 +16,10 @@ import { ProfileService, type Profile } from '../../services/database';
 import { ModerationService } from '../../services/moderation';
 import { getAvatarSource } from '../../constants/avatars';
 import { showToast } from '../Toast';
+import { useSwipeToDismiss } from '../../hooks/useSwipeToDismiss';
 
 const { width: W } = Dimensions.get('window');
-const DRAWER_W = W * 0.82;
+const DRAWER_W = W * 0.72;
 
 interface Props {
   visible: boolean;
@@ -32,7 +33,14 @@ export default function HostAccessPanel({ visible, onClose, roomId, roomType, ho
   const slideAnim = useRef(new Animated.Value(DRAWER_W)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
-  const [tab, setTab] = useState<'requests' | 'invite' | 'bans'>(roomType === 'closed' ? 'requests' : roomType === 'invite' ? 'invite' : 'bans');
+  // ★ Swipe-right-to-dismiss (ChatDrawer ile aynı kalıp)
+  const { translateValue: swipeX, panHandlers } = useSwipeToDismiss({
+    direction: 'right',
+    threshold: 60,
+    onDismiss: onClose,
+  });
+
+  const [tab, setTab] = useState<'requests' | 'invite' | 'bans'>(roomType === 'closed' ? 'requests' : roomType === 'invite' ? 'requests' : 'bans');
   const [requests, setRequests] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Profile[]>([]);
@@ -60,7 +68,7 @@ export default function HostAccessPanel({ visible, onClose, roomId, roomType, ho
   // ★ Veri yükle
   useEffect(() => {
     if (visible) {
-      if (roomType === 'closed') loadRequests();
+      if (roomType === 'closed' || roomType === 'invite') loadRequests();
       loadBans();
       // Reset search on open
       setSearchQuery('');
@@ -150,20 +158,18 @@ export default function HostAccessPanel({ visible, onClose, roomId, roomType, ho
 
   // Tab tanımları
   const tabs = [
-    ...(roomType === 'closed' ? [{ id: 'requests' as const, label: 'İstekler', icon: 'hourglass-outline' as const, count: requests.length }] : []),
+    ...((roomType === 'closed' || roomType === 'invite') ? [{ id: 'requests' as const, label: 'İstekler', icon: 'hourglass-outline' as const, count: requests.length }] : []),
     { id: 'invite' as const, label: 'Davet Et', icon: 'person-add-outline' as const, count: 0 },
     { id: 'bans' as const, label: 'Banlılar', icon: 'ban-outline' as const, count: bannedUsers.length },
   ];
 
   return (
-    <View style={StyleSheet.absoluteFill} pointerEvents={visible ? 'box-none' : 'none'}>
-      {/* Backdrop */}
-      <Animated.View style={[s.backdrop, { opacity: fadeAnim }]}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-      </Animated.View>
+    <View style={[StyleSheet.absoluteFill, { zIndex: 9998 }]} pointerEvents={visible ? 'box-none' : 'none'}>
+      {/* Backdrop — sadece dismiss alanı, görsel efekt yok */}
+      <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
 
-      {/* Panel — sağdan süzülür */}
-      <Animated.View style={[s.panel, { transform: [{ translateX: slideAnim }] }]}>
+      {/* Panel — sağdan süzülür + sağa sürükle kapat */}
+      <Animated.View style={[s.panel, { transform: [{ translateX: Animated.add(slideAnim, swipeX) }] }]} {...panHandlers}>
         {/* Üst parlak gradient efekti */}
         <LinearGradient
           colors={['rgba(167,139,250,0.12)', 'rgba(167,139,250,0.03)', 'transparent']}
@@ -205,7 +211,7 @@ export default function HostAccessPanel({ visible, onClose, roomId, roomType, ho
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 10, paddingBottom: 40 }}>
 
           {/* ═══ İSTEKLER TAB ═══ */}
-          {tab === 'requests' && roomType === 'closed' && (
+          {tab === 'requests' && (roomType === 'closed' || roomType === 'invite') && (
             <>
               {loadingRequests ? (
                 <ActivityIndicator color="#A78BFA" style={{ marginTop: 40 }} />
@@ -362,15 +368,17 @@ export default function HostAccessPanel({ visible, onClose, roomId, roomType, ho
 }
 
 const s = StyleSheet.create({
-  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.35)' },
+  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'transparent' },
   panel: {
-    position: 'absolute', right: 0, top: 0, bottom: 0,
+    position: 'absolute', right: 0, top: 70, bottom: 80,
     width: DRAWER_W,
     backgroundColor: 'rgba(45,55,64,0.95)',
-    borderTopLeftRadius: 22, borderBottomLeftRadius: 22,
+    borderTopLeftRadius: 18, borderBottomLeftRadius: 18,
     borderWidth: 1, borderRightWidth: 0,
     borderColor: 'rgba(167,139,250,0.08)',
     overflow: 'hidden',
+    shadowColor: '#000', shadowOffset: { width: -2, height: 0 }, shadowOpacity: 0.2, shadowRadius: 8,
+    elevation: 8,
   },
   topGlow: {
     position: 'absolute', top: 0, left: 0, right: 0, height: 120,
@@ -378,7 +386,7 @@ const s = StyleSheet.create({
   },
   header: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
-    paddingHorizontal: 14, paddingTop: 56, paddingBottom: 12,
+    paddingHorizontal: 14, paddingTop: 14, paddingBottom: 12,
     borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.04)',
   },
   headerIcon: {
@@ -493,3 +501,4 @@ const s = StyleSheet.create({
     flex: 1, paddingVertical: 10, fontSize: 13, color: '#F1F5F9',
   },
 });
+ 

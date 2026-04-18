@@ -5,6 +5,7 @@
  * Oda İsmi/Hoş Geldin Düzenleme.
  * Ghost Mode, Lock, Filters vb. RoomService’e taşındı.
  */
+import { logger } from '../utils/logger';
 import { supabase } from '../constants/supabase';
 import { filterBadWords, containsBadWords } from '../constants/badwords';
 
@@ -54,7 +55,7 @@ export const ModerationService = {
     if (error) throw error;
 
     // Admin'e bildirim gönder
-    this._notifyAdmins(reporterId, reason, 'user').catch(e => console.warn('Admin bildirim hatası:', e));
+    this._notifyAdmins(reporterId, reason, 'user').catch(e => logger.warn('Admin bildirim hatası:', e));
     return true;
   },
 
@@ -69,7 +70,7 @@ export const ModerationService = {
     });
     if (error) throw error;
 
-    this._notifyAdmins(reporterId, reason, 'room').catch(e => console.warn('Admin bildirim hatası:', e));
+    this._notifyAdmins(reporterId, reason, 'room').catch(e => logger.warn('Admin bildirim hatası:', e));
     return true;
   },
 
@@ -85,7 +86,7 @@ export const ModerationService = {
     if (error) throw error;
 
     // ★ BUG-C3 FIX: Admin bildirimi eklendi
-    this._notifyAdmins(reporterId, reason, 'post').catch(e => console.warn('Admin bildirim hatası:', e));
+    this._notifyAdmins(reporterId, reason, 'post').catch(e => logger.warn('Admin bildirim hatası:', e));
     return true;
   },
 
@@ -101,7 +102,7 @@ export const ModerationService = {
     if (error) throw error;
 
     // ★ BUG-C3 FIX: Admin bildirimi eklendi
-    this._notifyAdmins(reporterId, reason, 'message').catch(e => console.warn('Admin bildirim hatası:', e));
+    this._notifyAdmins(reporterId, reason, 'message').catch(e => logger.warn('Admin bildirim hatası:', e));
     return true;
   },
 
@@ -169,10 +170,11 @@ export const ModerationService = {
 
     for (const adminId of adminIds) {
       try {
-        await supabase.from('inbox').insert({
+        // ★ SEC-ADMIN: notifications tablosunu kullan (inbox değil — uygulama notifications'dan okuyor)
+        await supabase.from('notifications').insert({
           user_id: adminId,
-          type: 'system',
-          title: 'Yeni Şikayet',
+          sender_id: reporterId,
+          type: 'admin_report',
           body,
         });
       } catch { /* admin bildirim hatası sessizce yoksay */ }
@@ -240,6 +242,18 @@ export const ModerationService = {
         expires_at: expiresAt,
       }, { onConflict: 'room_id,muted_user_id' });
     if (error) throw error;
+
+    // ★ Y19 FIX: room_participants.is_muted'i de sync et — reconnect / broadcast kayıp
+    // durumlarında bile listener_grid doğru mute badge'i göstersin, target's join flow
+    // mic'i default kapalı başlatsın.
+    try {
+      await supabase
+        .from('room_participants')
+        .update({ is_muted: true })
+        .eq('room_id', roomId)
+        .eq('user_id', mutedUserId);
+    } catch { /* row yoksa / RLS engel sessiz */ }
+
     return true;
   },
 
@@ -250,6 +264,16 @@ export const ModerationService = {
       .eq('room_id', roomId)
       .eq('muted_user_id', mutedUserId);
     if (error) throw error;
+
+    // ★ Y19 FIX: room_participants.is_muted'i de sıfırla
+    try {
+      await supabase
+        .from('room_participants')
+        .update({ is_muted: false })
+        .eq('room_id', roomId)
+        .eq('user_id', mutedUserId);
+    } catch { /* sessiz */ }
+
     return true;
   },
 
@@ -309,11 +333,20 @@ export const ModerationService = {
           room_id: roomId,
           user_id: targetUserId,
           banned_by: bannedBy,
+          ban_type: duration === 'permanent' ? 'permanent' : 'temporary',
           reason: reason || null,
           duration,
           expires_at: expiresAt,
         }, { onConflict: 'room_id,user_id' });
       if (error) throw error;
+
+      // Banneden önce rolü oku — sadece listener/spectator ise sayacı azalt
+      const { data: partData } = await supabase
+        .from('room_participants')
+        .select('role')
+        .eq('room_id', roomId)
+        .eq('user_id', targetUserId)
+        .maybeSingle();
 
       // Katılımcıyı odadan sil
       await supabase
@@ -322,8 +355,11 @@ export const ModerationService = {
         .eq('room_id', roomId)
         .eq('user_id', targetUserId);
 
-      // Listener count azalt
-      try { await supabase.rpc('decrement_listener_count', { room_id_input: roomId }); } catch {}
+      // Listener count sadece listener/spectator rolleri için azalt
+      if (partData?.role === 'listener' || partData?.role === 'spectator') {
+        const { error: rpcErr } = await supabase.rpc('decrement_listener_count', { room_id_input: roomId });
+        if (rpcErr && __DEV__) console.warn('[Moderation] decrement_listener_count hatası:', rpcErr.message);
+      }
 
       return { success: true };
     } catch (e: any) {
@@ -369,11 +405,23 @@ export const ModerationService = {
   async getRoomBans(roomId: string) {
     const { data, error } = await supabase
       .from('room_bans')
-      .select('*, user:profiles!user_id(id, display_name, avatar_url)')
+      .select('*')
       .eq('room_id', roomId)
       .order('created_at', { ascending: false });
-    if (error) return [];
-    return data || [];
+    if (error || !data || data.length === 0) return [];
+
+    // Profilleri ayrı çek (FK bağımlılığı olmadan)
+    const userIds = [...new Set(data.map((b: any) => b.user_id))];
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, display_name, avatar_url')
+      .in('id', userIds);
+    const profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
+
+    return data.map((ban: any) => ({
+      ...ban,
+      user: profileMap.get(ban.user_id) || { id: ban.user_id, display_name: 'Kullanıcı', avatar_url: null },
+    }));
   },
 
   /** Odanın susturulan kullanıcı listesi */
@@ -411,8 +459,18 @@ export const ModerationService = {
   // ODA İSMİ DÜZENLEME (korunuyor — moderation yetki kapsamında)
   // ==========================================
 
-  /** Oda ismini düzenle — ★ SEC-8: Input validation */
-  async editRoomName(roomId: string, newName: string): Promise<void> {
+  /** Oda ismini düzenle — ★ SEC-8: Input validation + ★ Y5 FIX: Yetki kontrolü */
+  async editRoomName(roomId: string, newName: string, executorId?: string): Promise<void> {
+    // ★ Y5 FIX: Yetki kontrolü — sadece host veya moderatör değiştirebilir
+    if (executorId) {
+      const { data: room } = await supabase.from('rooms').select('host_id').eq('id', roomId).single();
+      if (!room || room.host_id !== executorId) {
+        const { data: part } = await supabase.from('room_participants').select('role').eq('room_id', roomId).eq('user_id', executorId).maybeSingle();
+        if (!part || !['owner', 'moderator'].includes(part.role)) {
+          throw new Error('Bu işlem için yetkiniz yok.');
+        }
+      }
+    }
     // ★ SEC-8: Max 60 karakter, HTML/script tag strip
     const sanitized = (newName || '').trim().replace(/<[^>]*>/g, '').slice(0, 60);
     if (sanitized.length < 1) throw new Error('Oda ismi boş olamaz');
@@ -426,15 +484,22 @@ export const ModerationService = {
   // HOŞ GELDİN MESAJI DÜZENLEME (korunuyor — moderation yetki kapsamında)
   // ==========================================
 
-  /** Hoş geldin mesajını düzenle — ★ SEC-8: Input validation */
-  async editWelcomeMessage(roomId: string, message: string): Promise<void> {
+  /** Hoş geldin mesajını düzenle — ★ SEC-8: Input validation + ★ Y5 FIX: Yetki kontrolü */
+  async editWelcomeMessage(roomId: string, message: string, executorId?: string): Promise<void> {
     // ★ SEC-8: Max 500 karakter, HTML/script tag strip
     const sanitized = (message || '').trim().replace(/<[^>]*>/g, '').slice(0, 500);
     const { data: room } = await supabase
       .from('rooms')
-      .select('room_settings')
+      .select('room_settings, host_id')
       .eq('id', roomId)
       .single();
+    // ★ Y5 FIX: Yetki kontrolü — sadece host veya moderatör değiştirebilir
+    if (executorId && room && room.host_id !== executorId) {
+      const { data: part } = await supabase.from('room_participants').select('role').eq('room_id', roomId).eq('user_id', executorId).maybeSingle();
+      if (!part || !['owner', 'moderator'].includes(part.role)) {
+        throw new Error('Bu işlem için yetkiniz yok.');
+      }
+    }
     const settings = (room?.room_settings || {}) as any;
     await supabase
       .from('rooms')

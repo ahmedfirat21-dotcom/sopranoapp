@@ -12,6 +12,7 @@ import * as Device from 'expo-device';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { Platform } from 'react-native';
 import { supabase } from '../constants/supabase';
+import { logger } from '../utils/logger';
 
 const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
 
@@ -31,7 +32,7 @@ if (!isExpoGo) {
       }),
     });
   } catch (e) {
-    console.warn('expo-notifications yüklenirken hata oluştu:', e);
+    logger.warn('expo-notifications yüklenirken hata oluştu:', e);
   }
 }
 
@@ -60,7 +61,7 @@ export const PushNotificationService = {
     }
 
     if (!Notifications) {
-      console.warn('Notifications modülü henüz yüklenmemiş.');
+      logger.warn('Notifications modülü henüz yüklenmemiş.');
       return null;
     }
 
@@ -68,14 +69,19 @@ export const PushNotificationService = {
     const { status: existingStatus } = await Notifications.getPermissionsAsync();
     let finalStatus = existingStatus;
 
-    // İzin yoksa iste
+    // İzin yoksa ve daha önce reddedilmemişse iste
+    // ★ FIX: 'denied' ise tekrar sormak anlamsız — kullanıcı ayarlardan açmalı
     if (existingStatus !== 'granted') {
+      if (existingStatus === 'denied') {
+        logger.warn('Bildirim izni daha önce reddedildi. Ayarlardan açılmalı.');
+        return null;
+      }
       const { status } = await Notifications.requestPermissionsAsync();
       finalStatus = status;
     }
 
     if (finalStatus !== 'granted') {
-      console.warn('Bildirim izni reddedildi.');
+      logger.warn('Bildirim izni reddedildi.');
       return null;
     }
 
@@ -109,7 +115,7 @@ export const PushNotificationService = {
       });
       return tokenData.data;
     } catch (error) {
-      console.warn('Push token alınamadı (Emulator veya yetkisiz cihaz olabilir):', error);
+      logger.warn('Push token alınamadı (Emulator veya yetkisiz cihaz olabilir):', error);
       return null;
     }
   },
@@ -125,10 +131,10 @@ export const PushNotificationService = {
         .eq('id', userId);
       
       if (error) {
-        console.warn('Push token kayıt hatası:', error.message);
+        logger.warn('Push token kayıt hatası:', error.message);
       }
     } catch (err) {
-      console.error('Push token kayıt hatası:', err);
+      logger.error('Push token kayıt hatası:', err);
     }
   },
 

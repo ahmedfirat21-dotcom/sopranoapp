@@ -26,7 +26,7 @@ const BRAND_COLORS = {
   vipGold: '#D4AF37',
 
   // Semantic Card Colors
-  cardBg: '#333b45',
+  cardBg: '#414e5f',
   cardBorder: '#95a1ae',
   accentTeal: '#73c2bd',
   premiumGold: '#c9b981',

@@ -1,6 +1,6 @@
 /**
- * SopranoChat — DM Arama Ekranı (Gerçek Ses/Video)
- * LiveKit üzerinden 1:1 arama — tier bazlı kalite
+ * SopranoChat — DM Arama Ekranı (Yalnız Sesli)
+ * LiveKit üzerinden 1:1 sesli arama — tier bazlı kalite
  * 
  * WhatsApp-style UI + TÜM bug düzeltmeleri:
  *   BUG-4:  onMicStateChange callback düzeltildi (mic+cam)
@@ -10,7 +10,7 @@
  *   + 30sn timeout, Çalıyor/Arıyor durumları, süre sayacı, animasyonlar
  */
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, Dimensions, StatusBar, Animated, Easing, BackHandler } from 'react-native';
+import { View, Text, StyleSheet, Image, TouchableOpacity, Dimensions, StatusBar, Animated, Easing, BackHandler, AppState, Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { safeGoBack } from '../../constants/navigation';
@@ -25,9 +25,8 @@ import { showToast } from '../../components/Toast';
 import { useAuth } from '../_layout';
 import { getAvatarSource } from '../../constants/avatars';
 
-// ★ VideoView — native modül yoksa fallback (placeholder)
-let VideoView: any = null;
-try { VideoView = require('@livekit/react-native').VideoView; } catch { /* native modül yok */ }
+// Video kaldırıldı — yalnız sesli arama
+
 
 const { width: W, height: H } = Dimensions.get('window');
 
@@ -53,12 +52,12 @@ export default function CallScreen() {
   const [callStatus, setCallStatus] = useState<CallStatus>(isIncoming === 'true' ? 'connected' : 'calling');
   const [duration, setDuration] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
-  const [isSpeaker, setIsSpeaker] = useState(callTypeParam === 'video'); // Video aramada varsayılan hoparlör
-  const [isCameraOn, setIsCameraOn] = useState(callTypeParam === 'video');
+  const [isSpeaker, setIsSpeaker] = useState(false); // Sesli aramada varsayılan: ahize
+  const [isCameraOn, setIsCameraOn] = useState(false); // Video kaldırıldı
   const [isCameraFront, setIsCameraFront] = useState(true);
   const [remoteVideoTrack, setRemoteVideoTrack] = useState<any>(null);
   const [localVideoTrack, setLocalVideoTrack] = useState<any>(null);
-  const [remoteCameraOn, setRemoteCameraOn] = useState(false); // ★ Karşı tarafın kamerası açık mı?
+  const [remoteCameraOn, setRemoteCameraOn] = useState(false);
   const [receiverOnline] = useState(receiverOnlineParam === 'true');
   const [isReconnecting, setIsReconnecting] = useState(false); // ★ CALL-10
   const [endReason, setEndReason] = useState<string>(''); // ★ CALL-5: Arama sonu sebebi
@@ -301,6 +300,19 @@ export default function CallScreen() {
     };
   }, [callStatus]);
 
+  // ─── AppState: Arka plana gidince sesleri durdur ─────────
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'background' || state === 'inactive') {
+        stopRingbackTone();
+        if (busySoundRef.current) {
+          busySoundRef.current.stopAsync().catch(() => {});
+        }
+      }
+    });
+    return () => sub.remove();
+  }, []);
+
   // ─── Unmount cleanup ──────────────────────────────────────
   useEffect(() => {
     return () => {
@@ -331,7 +343,7 @@ export default function CallScreen() {
   const connectToLiveKit = useCallback(async () => {
     if (!firebaseUser || !callId) return;
 
-    const quality = getCallQuality(tier as any, callType);
+    const quality = getCallQuality(tier as any);
     const roomId = CallService.generateRoomId(callId);
 
     // ★ BUG-10: Eğer kullanıcı bir odadayken arama gelirse, önce disconnect
@@ -393,20 +405,31 @@ export default function CallScreen() {
             if (!mountedRef.current) return;
             if (callStatusRef.current === 'ended') return;
             if (__DEV__) console.log(`[Call] ★ Karşı taraf ayrıldı: ${identity}`);
-            
+
             // 1:1 aramada karşı taraf gidince arama biter
             setCallStatus('ended');
             callStatusRef.current = 'ended';
             setEndReason('Karşı Taraf Bağlantıyı Kesti');
             setActiveCallId(null);
             liveKitService.disconnect().catch(() => {});
-            
+
             // Sinyal gönder (karşı taraf zaten ayrılmış ama güvenlik için)
             if (firebaseUser && id && callId) {
               CallService.endCall(firebaseUser.uid, id, callId).catch(() => {});
             }
-            
+
             setTimeout(() => { if (mountedRef.current) safeGoBack(router); }, 3000);
+          },
+          // ★ K7: Mic/cam izni reddedildiyse kullanıcıyı bilgilendir + ayarlara yönlendir
+          onPermissionDenied: (device) => {
+            if (!mountedRef.current) return;
+            const label = device === 'microphone' ? 'Mikrofon' : 'Kamera';
+            showToast({
+              title: `⚠️ ${label} İzni Gerekli`,
+              message: `Aramada ${label.toLocaleLowerCase('tr-TR')} kullanmak için ayarlardan izin vermelisiniz.`,
+              type: 'warning',
+            });
+            Linking.openSettings().catch(() => {});
           },
         },
         {
@@ -420,20 +443,13 @@ export default function CallScreen() {
         // Mikrofonu aç
         await liveKitService.enableMicrophone();
 
-        // ★ BUG-13: Varsayılan ses çıkış ayarı
-        await updateAudioOutput(callTypeParam === 'video');
+        // ★ BUG-13: Varsayılan ses çıkış ayarı (sesli arama = ahize)
+        await updateAudioOutput(false);
 
-        // Video ise kamerayı aç
-        if (callType === 'video' && quality.videoEnabled) {
-          await new Promise(r => setTimeout(r, 500));
-          if (mountedRef.current) {
-            await liveKitService.toggleCamera();
-            if (__DEV__) console.log('[Call] Kamera açıldı — video track yayınlanıyor');
-          }
-        }
+        // Video kaldırıldı — kamera açma kodu yok
       }
     } catch (err: any) {
-      console.error('[Call] LiveKit bağlantı hatası:', err);
+      if (__DEV__) console.error('[Call] LiveKit bağlantı hatası:', err);
       if (mountedRef.current) {
         showToast({ title: 'Bağlantı Hatası', message: 'Arama bağlantısı kurulamadı.', type: 'error' });
       }
@@ -543,7 +559,8 @@ export default function CallScreen() {
     : callStatus === 'connected' ? formatDuration(duration)
     : endReason || 'Arama Sonlandı';
 
-  const isVideoConnected = (isCameraOn || remoteCameraOn) && callStatus === 'connected';
+  // Video özellikler kaldırıldı — yalnız sesli arama
+  const isVideoConnected = false;
 
   return (
     <View style={st.container}>
@@ -557,112 +574,7 @@ export default function CallScreen() {
         end={{ x: 1, y: 1 }}
       />
 
-      {/* ═══ VİDEO MODU — Tam ekran video + floating overlay'lar ═══ */}
-      {isVideoConnected && (
-        <View style={st.videoFullscreen}>
-          {/* Remote Video — tam ekran */}
-          {remoteVideoTrack && remoteCameraOn && VideoView ? (
-            <VideoView videoTrack={remoteVideoTrack} style={st.remoteVideo} objectFit="cover" />
-          ) : (
-            <View style={st.remoteVideoPlaceholder}>
-              <View style={st.waitingAvatarGlow}>
-                <Image source={getAvatarSource(otherUser?.avatar_url)} style={st.waitingAvatar} />
-              </View>
-              <Text style={st.waitingText}>{remoteCameraOn ? 'Kamera bekleniyor...' : 'Kamera kapalı'}</Text>
-            </View>
-          )}
-
-          {/* ★ Üst Gradient Overlay — isim, süre, kalite */}
-          <LinearGradient
-            colors={['rgba(0,0,0,0.65)', 'rgba(0,0,0,0.25)', 'transparent']}
-            style={st.topOverlay}
-          >
-            <View style={st.topBar}>
-              <View style={st.topInfo}>
-                <Image source={getAvatarSource(otherUser?.avatar_url)} style={st.topAvatar} />
-                <View>
-                  <Text style={st.topName}>{otherUser?.display_name || 'Kullanıcı'}</Text>
-                  <View style={st.topDurationRow}>
-                    <View style={st.liveDot} />
-                    <Text style={st.topDuration}>{formatDuration(duration)}</Text>
-                  </View>
-                </View>
-              </View>
-              <View style={st.topBadges}>
-                <View style={st.qualityPill}>
-                  <Ionicons name="cellular" size={10} color={Colors.emerald} />
-                  <Text style={st.qualityPillText}>
-                    {tier === 'Pro' ? 'HD Stereo' : tier === 'Pro' ? 'HD' : 'SD'}
-                  </Text>
-                </View>
-                {callType === 'video' && isCameraOn && (
-                  <TouchableOpacity style={st.flipCamBtn} onPress={handleFlipCamera}>
-                    <Ionicons name="camera-reverse" size={18} color="#FFF" />
-                  </TouchableOpacity>
-                )}
-              </View>
-            </View>
-          </LinearGradient>
-
-          {/* ★ PiP — Kendi kameranız (WhatsApp boyutunda) */}
-          {isCameraOn && (
-            <View style={st.pipContainer}>
-              {localVideoTrack && VideoView ? (
-                <VideoView videoTrack={localVideoTrack} style={st.pipVideo} objectFit="cover" mirror={isCameraFront} />
-              ) : (
-                <View style={st.pipPlaceholder}>
-                  <Ionicons name="person" size={28} color="rgba(255,255,255,0.4)" />
-                </View>
-              )}
-            </View>
-          )}
-
-          {/* ★ Alt Gradient Overlay — kontrol butonları */}
-          <LinearGradient
-            colors={['transparent', 'rgba(0,0,0,0.3)', 'rgba(0,0,0,0.7)']}
-            style={st.bottomOverlay}
-          >
-            <View style={st.videoControls}>
-              {/* Mikrofon */}
-              <TouchableOpacity style={st.ctrlCircle} onPress={handleToggleMute}>
-                <View style={[st.ctrlIconWrap, isMuted && st.ctrlIconWrapActive]}>
-                  <Ionicons name={isMuted ? 'mic-off' : 'mic'} size={20} color="#FFF" />
-                </View>
-                <Text style={st.ctrlLabel}>{isMuted ? 'Aç' : 'Sustur'}</Text>
-              </TouchableOpacity>
-
-              {/* Kamera */}
-              <TouchableOpacity style={st.ctrlCircle} onPress={handleToggleCamera}>
-                <View style={[st.ctrlIconWrap, !isCameraOn && st.ctrlIconWrapActive]}>
-                  <Ionicons name={isCameraOn ? 'videocam' : 'videocam-off'} size={20} color="#FFF" />
-                </View>
-                <Text style={st.ctrlLabel}>Kamera</Text>
-              </TouchableOpacity>
-
-              {/* ★ KAPAT — büyük kırmızı */}
-              <TouchableOpacity style={st.endBtn} onPress={handleEndCall}>
-                <Ionicons name="call" size={28} color="#FFF" style={{ transform: [{ rotate: '135deg' }] }} />
-              </TouchableOpacity>
-
-              {/* Hoparlör */}
-              <TouchableOpacity style={st.ctrlCircle} onPress={handleToggleSpeaker}>
-                <View style={[st.ctrlIconWrap, isSpeaker && st.ctrlIconWrapActive]}>
-                  <Ionicons name={isSpeaker ? 'volume-high' : 'volume-low'} size={20} color="#FFF" />
-                </View>
-                <Text style={st.ctrlLabel}>{isSpeaker ? 'Hoparlör' : 'Ahize'}</Text>
-              </TouchableOpacity>
-
-              {/* Çevir */}
-              <TouchableOpacity style={st.ctrlCircle} onPress={handleFlipCamera} disabled={!isCameraOn}>
-                <View style={[st.ctrlIconWrap, !isCameraOn && { opacity: 0.3 }]}>
-                  <Ionicons name="camera-reverse" size={20} color="#FFF" />
-                </View>
-                <Text style={st.ctrlLabel}>Çevir</Text>
-              </TouchableOpacity>
-            </View>
-          </LinearGradient>
-        </View>
-      )}
+      {/* Video modu kaldırıldı — yalnız sesli arama */}
 
       {/* ═══ SESLİ ARAMA veya BAĞLANMAMIŞ DURUM ═══ */}
       {!isVideoConnected && callStatus !== 'ended' && (
@@ -674,15 +586,17 @@ export default function CallScreen() {
 
           {/* Arama tipi göstergesi */}
           <View style={st.callTypePill}>
-            <Ionicons name={callType === 'video' ? 'videocam' : 'call'} size={13} color={Colors.teal} />
-            <Text style={st.callTypePillText}>
-              {callType === 'video' ? 'Görüntülü Arama' : 'Sesli Arama'}
-            </Text>
+            <Ionicons name="call" size={13} color={Colors.teal} />
+            <Text style={st.callTypePillText}>Sesli Arama</Text>
           </View>
 
-          {/* Avatar + pulse */}
-          <Animated.View style={[st.avatarOuter, { transform: [{ scale: pulseAnim }] }]}>
-            <View style={st.avatarInner}>
+          {/* Avatar + pulse + connected glow */}
+          <Animated.View style={[
+            st.avatarOuter, 
+            { transform: [{ scale: pulseAnim }] },
+            callStatus === 'connected' && st.avatarConnectedGlow,
+          ]}>
+            <View style={[st.avatarInner, callStatus === 'connected' && st.avatarInnerConnected]}>
               <Image source={getAvatarSource(otherUser?.avatar_url)} style={st.avatarImg} />
             </View>
           </Animated.View>
@@ -693,7 +607,7 @@ export default function CallScreen() {
           {/* Durum */}
           <Text style={[
             st.callStatusText,
-            callStatus === 'connected' && { color: Colors.emerald },
+            callStatus === 'connected' && st.callStatusConnected,
           ]}>
             {statusText}
           </Text>
@@ -716,7 +630,7 @@ export default function CallScreen() {
             <View style={st.statusChip}>
               <Ionicons name="cellular" size={12} color={Colors.emerald} />
               <Text style={[st.statusChipText, { color: Colors.emerald }]}>
-                {tier === 'Pro' ? 'HD Stereo' : tier === 'Pro' ? 'HD' : 'SD'}
+                {tier === 'Pro' ? 'HD Stereo' : tier === 'Plus' ? 'HD' : 'SD'}
               </Text>
             </View>
           )}
@@ -740,13 +654,7 @@ export default function CallScreen() {
                 <Text style={st.ctrlLabel}>{isSpeaker ? 'Hoparlör' : 'Ahize'}</Text>
               </TouchableOpacity>
 
-              {/* ★ Kamera — tüm arama tiplerinde göster (sesli→görüntülü geçiş) */}
-              <TouchableOpacity style={st.ctrlCircle} onPress={handleToggleCamera}>
-                <View style={[st.ctrlIconWrap, isCameraOn && st.ctrlIconWrapActive]}>
-                  <Ionicons name={isCameraOn ? 'videocam' : 'videocam-off'} size={22} color="#FFF" />
-                </View>
-                <Text style={st.ctrlLabel}>Kamera</Text>
-              </TouchableOpacity>
+              {/* Kamera kaldırıldı — yalnız sesli arama */}
             </View>
 
             {/* KAPAT */}
@@ -777,7 +685,7 @@ export default function CallScreen() {
               endReason.includes('Süresi') ? { borderColor: 'rgba(5,150,105,0.3)' } : { borderColor: 'rgba(239,68,68,0.3)' }
             ]}>
               <Ionicons
-                name={callType === 'video' ? 'videocam' : 'call'}
+                name="call"
                 size={28}
                 color={endReason.includes('Süresi') ? Colors.emerald : '#EF4444'}
               />
@@ -799,6 +707,29 @@ export default function CallScreen() {
               <Image source={getAvatarSource(otherUser?.avatar_url)} style={st.endUserAvatar} />
               <Text style={st.endUserName}>{otherUser?.display_name || 'Kullanıcı'}</Text>
             </View>
+
+            {/* ★ Geri Ara butonu */}
+            <TouchableOpacity
+              style={st.callBackBtn}
+              onPress={async () => {
+                if (!firebaseUser || !id) return;
+                const tier = profile?.subscription_tier || 'Free';
+                try {
+                  const { callId: newCallId, receiverIsOnline } = await CallService.initiateCall(
+                    firebaseUser.uid,
+                    profile?.display_name || 'Kullanıcı',
+                    profile?.avatar_url || undefined,
+                    id, 'audio', tier as any
+                  );
+                  router.replace(`/call/${id}?callId=${newCallId}&callType=audio&isIncoming=false&receiverOnline=${receiverIsOnline}` as any);
+                } catch (err: any) {
+                  showToast({ title: 'Arama Hatası', message: err.message || 'Arama başlatılamadı', type: 'error' });
+                }
+              }}
+            >
+              <Ionicons name="call" size={18} color="#FFF" />
+              <Text style={st.callBackBtnText}>Geri Ara</Text>
+            </TouchableOpacity>
 
             {/* Geri sayım göstergesi */}
             <Text style={st.endAutoClose}>Otomatik kapanıyor...</Text>
@@ -944,6 +875,16 @@ const st = StyleSheet.create({
     overflow: 'hidden',
   },
   avatarImg: { width: '100%', height: '100%', borderRadius: 72 },
+  // ★ Bağlandı durumunda yeşil neon glow
+  avatarConnectedGlow: {
+    borderColor: 'rgba(5,150,105,0.4)',
+    shadowColor: Colors.emerald,
+    shadowOpacity: 0.5,
+    shadowRadius: 30,
+  },
+  avatarInnerConnected: {
+    borderColor: 'rgba(5,150,105,0.25)',
+  },
 
   calleeName: {
     fontSize: 26, fontWeight: '800', color: '#FFF',
@@ -952,6 +893,11 @@ const st = StyleSheet.create({
   callStatusText: {
     fontSize: 15, color: 'rgba(255,255,255,0.5)', fontWeight: '500',
     marginBottom: 16,
+  },
+  callStatusConnected: {
+    fontSize: 28, color: Colors.emerald, fontWeight: '700',
+    fontVariant: ['tabular-nums'] as any,
+    letterSpacing: 1,
   },
 
   statusChip: {
@@ -1068,6 +1014,18 @@ const st = StyleSheet.create({
   },
   endAutoClose: {
     fontSize: 11, color: 'rgba(255,255,255,0.25)', marginTop: 4,
+  },
+  // ★ Geri Ara butonu
+  callBackBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: '#22C55E',
+    paddingHorizontal: 24, paddingVertical: 12,
+    borderRadius: 24, marginTop: 4,
+    shadowColor: '#22C55E', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4, shadowRadius: 12, elevation: 6,
+  },
+  callBackBtnText: {
+    fontSize: 14, fontWeight: '700', color: '#FFF', letterSpacing: 0.3,
   },
 });
 

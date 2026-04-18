@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, Animated, Easing, Image } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { getAvatarSource } from '../../constants/avatars';
@@ -27,6 +27,7 @@ interface Props {
   // ★ Host avatarı ve oda kuralları
   hostAvatarUrl?: string;
   roomRules?: string;
+  followerCount?: number;
 }
 
 // Kalp atışı (Heartbeat) göstergesi
@@ -75,88 +76,73 @@ export default function RoomInfoHeader({
   isFollowing, onBack, onMinimize, onToggleFollow,
   roomLanguage, ageRestricted, entryFeeSp, isLocked, followersOnly,
   donationsEnabled, speakingMode, roomType,
-  hostAvatarUrl, roomRules,
+  hostAvatarUrl, roomRules, followerCount,
 }: Props) {
   const langFlags: Record<string,string> = { tr: '🇹🇷', en: '🇬🇧', de: '🇩🇪', ar: '🇸🇦' };
+  const [showRules, setShowRules] = useState(false);
+
+  // Gösterilecek badge'ler — sadece önemli olanlar
+  const badges: { icon?: string; text?: string; emoji?: string; color: string; bg: string; border: string }[] = [];
+  if (ageRestricted) badges.push({ text: '+18', color: '#EF4444', bg: 'rgba(239,68,68,0.15)', border: 'rgba(239,68,68,0.3)' });
+  if (roomType === 'closed') badges.push({ icon: 'lock-closed', text: 'Şifreli', color: '#F59E0B', bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.25)' });
+  if (roomType === 'invite') badges.push({ icon: 'mail', text: 'Davetli', color: '#8B5CF6', bg: 'rgba(139,92,246,0.12)', border: 'rgba(139,92,246,0.25)' });
+  if (isLocked) badges.push({ icon: 'lock-closed', color: '#F59E0B', bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.25)' });
+  if ((entryFeeSp ?? 0) > 0) badges.push({ text: `${entryFeeSp} SP`, color: '#D4AF37', bg: 'rgba(212,175,55,0.12)', border: 'rgba(212,175,55,0.25)' });
+  if (followersOnly) badges.push({ icon: 'people', color: '#A78BFA', bg: 'rgba(139,92,246,0.12)', border: 'rgba(139,92,246,0.25)' });
+  if (roomLanguage && roomLanguage !== 'tr') badges.push({ emoji: langFlags[roomLanguage] || roomLanguage, color: '#3B82F6', bg: 'rgba(59,130,246,0.12)', border: 'rgba(59,130,246,0.25)' });
+  if (speakingMode === 'free_for_all') badges.push({ icon: 'chatbubbles', text: 'Serbest', color: '#22C55E', bg: 'rgba(34,197,94,0.12)', border: 'rgba(34,197,94,0.25)' });
 
   return (
     <View style={s.wrap}>
-      {/* Üst Satır - Oda İsmi ve Kontroller */}
+      {/* Satır 1 — Avatar + Süre + Oda İsmi + Aksiyonlar */}
       <View style={s.topNav}>
-        {/* Sol Üst - Oda İsmi & Premium Badge */}
         <View style={s.topLeft}>
-          {/* ★ Host Avatarı */}
-          <Image source={getAvatarSource(hostAvatarUrl)} style={s.hostMiniAvatar} />
-          <Text style={s.roomName} numberOfLines={1}>{roomName}</Text>
-          {isPremium && (
-            <View style={s.premBadge}>
-              <MaterialCommunityIcons name="crown" size={12} color="#FFDF00" />
-              <Text style={s.premText}>Premium</Text>
-            </View>
-          )}
-          {/* ★ Oda ayar badge'leri */}
-          {ageRestricted && (
-            <View style={[s.tagBadge, { backgroundColor: 'rgba(239,68,68,0.15)', borderColor: 'rgba(239,68,68,0.3)' }]}>
-              <Text style={{ fontSize: 9, fontWeight: '700', color: '#EF4444' }}>🔞 +18</Text>
-            </View>
-          )}
-          {roomLanguage && roomLanguage !== 'tr' && (
-            <View style={[s.tagBadge, { backgroundColor: 'rgba(59,130,246,0.12)', borderColor: 'rgba(59,130,246,0.25)' }]}>
-              <Text style={{ fontSize: 10 }}>{langFlags[roomLanguage] || roomLanguage}</Text>
-            </View>
-          )}
-          {isLocked && (
-            <View style={[s.tagBadge, { backgroundColor: 'rgba(245,158,11,0.12)', borderColor: 'rgba(245,158,11,0.25)' }]}>
-              <Ionicons name="lock-closed" size={9} color="#F59E0B" />
-            </View>
-          )}
-          {(entryFeeSp ?? 0) > 0 && (
-            <View style={[s.tagBadge, { backgroundColor: 'rgba(212,175,55,0.12)', borderColor: 'rgba(212,175,55,0.25)' }]}>
-              <Text style={{ fontSize: 9, fontWeight: '600', color: '#D4AF37' }}>{entryFeeSp} SP</Text>
-            </View>
-          )}
-          {followersOnly && (
-            <View style={[s.tagBadge, { backgroundColor: 'rgba(139,92,246,0.12)', borderColor: 'rgba(139,92,246,0.25)' }]}>
-              <Ionicons name="people" size={9} color="#A78BFA" />
-            </View>
-          )}
-          {/* Oda tipi badge'leri */}
-          {roomType === 'closed' && (
-            <View style={[s.tagBadge, { backgroundColor: 'rgba(245,158,11,0.12)', borderColor: 'rgba(245,158,11,0.25)' }]}>
-              <Ionicons name="lock-closed" size={8} color="#F59E0B" />
-              <Text style={{ fontSize: 8, fontWeight: '700', color: '#F59E0B' }}>Şifreli</Text>
-            </View>
-          )}
-          {roomType === 'invite' && (
-            <View style={[s.tagBadge, { backgroundColor: 'rgba(139,92,246,0.12)', borderColor: 'rgba(139,92,246,0.25)' }]}>
-              <Ionicons name="mail" size={8} color="#8B5CF6" />
-              <Text style={{ fontSize: 8, fontWeight: '700', color: '#8B5CF6' }}>Davetli</Text>
-            </View>
-          )}
-          {/* Bağış açık */}
-          {donationsEnabled && (
-            <View style={[s.tagBadge, { backgroundColor: 'rgba(239,68,68,0.12)', borderColor: 'rgba(239,68,68,0.25)' }]}>
-              <Ionicons name="heart" size={8} color="#EF4444" />
-            </View>
-          )}
-          {/* Konuşma modu — sadece varsayılandan (permission_only) farklıysa göster */}
-          {speakingMode === 'free_for_all' && (
-            <View style={[s.tagBadge, { backgroundColor: 'rgba(34,197,94,0.12)', borderColor: 'rgba(34,197,94,0.25)' }]}>
-              <Ionicons name="chatbubbles" size={8} color="#22C55E" />
-              <Text style={{ fontSize: 8, fontWeight: '600', color: '#22C55E' }}>Serbest</Text>
-            </View>
-          )}
-          {speakingMode === 'selected_only' && (
-            <View style={[s.tagBadge, { backgroundColor: 'rgba(59,130,246,0.12)', borderColor: 'rgba(59,130,246,0.25)' }]}>
-              <Ionicons name="shield-checkmark" size={8} color="#3B82F6" />
-              <Text style={{ fontSize: 8, fontWeight: '600', color: '#3B82F6' }}>Seçili</Text>
-            </View>
-          )}
+          {/* ★ Host avatar + süre göstergesi grubu */}
+          <View style={s.hostAvatarGroup}>
+            <Image source={getAvatarSource(hostAvatarUrl)} style={s.hostMiniAvatar} />
+            {/* ★ Kalan süre — avatar altında kum saati */}
+            {roomExpiry ? (
+              <View style={[s.expiryBadge, roomExpiry.includes('doldu') && s.expiryBadgeExpired]}>
+                <Ionicons
+                  name={roomExpiry.includes('doldu') ? 'alarm' : 'hourglass-outline'}
+                  size={7}
+                  color={roomExpiry.includes('doldu') ? '#EF4444' : '#FBBF24'}
+                />
+              </View>
+            ) : null}
+          </View>
+          {/* ★ Oda ismi + geçen süre tek satırda */}
+          <View style={s.nameTimeCol}>
+            <Text style={s.roomName} numberOfLines={1}>{roomName}</Text>
+            {roomDuration ? (
+              <View style={s.durationInline}>
+                <Ionicons name="time-outline" size={8} color="rgba(20,184,166,0.6)" />
+                <Text style={s.durationText}>{roomDuration}</Text>
+                {roomExpiry ? (
+                  <>
+                    <Text style={s.durationSep}>·</Text>
+                    <Ionicons name="hourglass-outline" size={7} color={roomExpiry.includes('doldu') ? '#EF4444' : 'rgba(251,191,36,0.7)'} />
+                    <Text style={[s.durationText, { color: roomExpiry.includes('doldu') ? '#EF4444' : 'rgba(251,191,36,0.7)' }]}>{roomExpiry}</Text>
+                  </>
+                ) : null}
+              </View>
+            ) : null}
+          </View>
         </View>
 
-        {/* Sağ Üst - Aksiyonlar ve Kalp Atışı */}
         <View style={s.topActions}>
           <ConnectionHeartbeat state={connectionState} viewerCount={viewerCount} />
+          {(followerCount ?? 0) > 0 && (
+            <View style={s.followerPill}>
+              <Ionicons name="heart" size={10} color="#EF4444" />
+              <Text style={s.followerText}>{followerCount}</Text>
+            </View>
+          )}
+          {roomRules ? (
+            <Pressable style={[s.actionBtn, showRules && s.followBtnActive]} onPress={() => setShowRules(!showRules)} hitSlop={6}>
+              <Ionicons name="document-text-outline" size={14} color={showRules ? '#F59E0B' : '#E2E8F0'} />
+            </Pressable>
+          ) : null}
           {onToggleFollow && (
             <Pressable style={[s.actionBtn, isFollowing && s.followBtnActive]} onPress={onToggleFollow} hitSlop={6}>
               <Ionicons name={isFollowing ? 'bookmark' : 'bookmark-outline'} size={14} color={isFollowing ? '#14B8A6' : '#E2E8F0'} />
@@ -171,15 +157,28 @@ export default function RoomInfoHeader({
         </View>
       </View>
 
-      {/* Alt Satır - Sadece Oda Kuralları */}
-      {roomRules ? (
-        <View style={s.infoRow}>
-          <View style={s.infoBlock}>
-            <Text style={s.infoText} numberOfLines={2}>
-              📋 {roomRules}
-            </Text>
-          </View>
+      {/* Satır 2 — Özellik Badge'leri (süre buradan kaldırıldı) */}
+      {badges.length > 0 && (
+        <View style={s.badgeRow}>
+          {badges.map((b, i) => (
+            <View key={i} style={[s.tagBadge, { backgroundColor: b.bg, borderColor: b.border }]}>
+              {b.emoji ? <Text style={{ fontSize: 10 }}>{b.emoji}</Text> : null}
+              {b.icon ? <Ionicons name={b.icon as any} size={8} color={b.color} /> : null}
+              {b.text ? <Text style={{ fontSize: 8, fontWeight: '700', color: b.color }}>{b.text}</Text> : null}
+            </View>
+          ))}
         </View>
+      )}
+
+      {/* ★ Kurallar balonu — sadece tıklanınca görünür */}
+      {showRules && roomRules ? (
+        <Pressable onPress={() => setShowRules(false)}>
+          <View style={s.rulesTooltip}>
+            <View style={s.rulesTooltipArrow} />
+            <Ionicons name="document-text" size={12} color="#F59E0B" />
+            <Text style={s.rulesTooltipText} numberOfLines={4}>{roomRules}</Text>
+          </View>
+        </Pressable>
       ) : null}
     </View>
   );
@@ -201,21 +200,69 @@ const s = StyleSheet.create({
     paddingRight: 10,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
+  },
+  hostAvatarGroup: {
+    position: 'relative',
+  },
+  expiryBadge: {
+    position: 'absolute', bottom: -3, right: -3,
+    width: 14, height: 14, borderRadius: 7,
+    backgroundColor: 'rgba(251,191,36,0.2)',
+    borderWidth: 1.5, borderColor: 'rgba(15,23,42,0.9)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  expiryBadgeExpired: {
+    backgroundColor: 'rgba(239,68,68,0.25)',
+  },
+  nameTimeCol: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  durationInline: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    marginTop: 1,
+  },
+  durationText: {
+    fontSize: 9,
+    fontWeight: '600',
+    color: 'rgba(20,184,166,0.6)',
+  },
+  durationSep: {
+    fontSize: 8,
+    color: 'rgba(255,255,255,0.15)',
+    marginHorizontal: 1,
+  },
+  badgeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 4,
+    paddingLeft: 36, // host avatar genişliği kadar indent
+    marginBottom: 2,
   },
   hostMiniAvatar: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     borderWidth: 1.5,
     borderColor: 'rgba(20,184,166,0.35)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
   },
   roomName: {
-    fontSize: 20, // Biraz daha kompakt ama vurgulu
-    fontWeight: '800',
+    fontSize: 15,
+    fontWeight: '700',
     color: '#F8FAFC',
-    letterSpacing: -0.5,
+    letterSpacing: -0.3,
     flexShrink: 1,
+    textShadowColor: 'rgba(0,0,0,0.4)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
   },
   premBadge: {
     flexDirection: 'row',
@@ -268,6 +315,22 @@ const s = StyleSheet.create({
     fontWeight: '700',
     color: '#14B8A6',
   },
+  followerPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: 'rgba(239,68,68,0.1)',
+    paddingHorizontal: 7,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(239,68,68,0.2)',
+  },
+  followerText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#EF4444',
+  },
   actionBtn: {
     width: 28,
     height: 28,
@@ -302,5 +365,33 @@ const s = StyleSheet.create({
   infoText: {
     fontSize: 11,
     color: 'rgba(248, 250, 252, 0.6)',
+  },
+  // ★ Kurallar tooltip balonu
+  rulesTooltip: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+    marginTop: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 10,
+    backgroundColor: 'rgba(245,158,11,0.08)',
+    borderWidth: 0.8,
+    borderColor: 'rgba(245,158,11,0.2)',
+  },
+  rulesTooltipArrow: {
+    position: 'absolute',
+    top: -5,
+    right: 50,
+    width: 0, height: 0,
+    borderLeftWidth: 5, borderRightWidth: 5, borderBottomWidth: 5,
+    borderLeftColor: 'transparent', borderRightColor: 'transparent',
+    borderBottomColor: 'rgba(245,158,11,0.2)',
+  },
+  rulesTooltipText: {
+    flex: 1,
+    fontSize: 10,
+    color: 'rgba(248,250,252,0.6)',
+    lineHeight: 14,
   },
 });

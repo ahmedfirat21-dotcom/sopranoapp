@@ -12,7 +12,7 @@
     }
   ],
   "rewrites": [
-    { "source": "/privacy", "destination": "/privacy-policy.html" },
-    { "source": "/terms", "destination": "/terms-of-service.html" }
+    { "source": "/privacy", "destination": "/privacy-policy" },
+    { "source": "/terms", "destination": "/terms-of-service" }
   ]
 }

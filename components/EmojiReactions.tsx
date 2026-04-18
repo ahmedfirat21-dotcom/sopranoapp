@@ -9,6 +9,7 @@ import {
   ScrollView, TextInput, Image, FlatList, ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { supabase } from '../constants/supabase';
 
 const { height: H, width: W } = Dimensions.get('window');
 
@@ -54,9 +55,58 @@ const EMOJI_CATEGORIES = [
   },
 ];
 
-// Tenor API
-const TENOR_API_KEY = 'AIzaSyAyimkuYQYF_FXVALexPuGQctUWRURdCYQ';
-const TENOR_BASE = 'https://tenor.googleapis.com/v2';
+// ★ Y18 FIX: Tenor API artık edge function proxy üzerinden çağrılır.
+// Key client'ta expose değil; NSFW filter + rate limit sunucuda uygulanır.
+// Edge function deploy edilmediyse legacy direct fetch fallback çalışır.
+const _TENOR_LEGACY_KEY = 'AIzaSyAyimkuYQYF_FXVALexPuGQctUWRURdCYQ';
+const _TENOR_BASE = 'https://tenor.googleapis.com/v2';
+let _tenorProxyAvailable: boolean | null = null;
+
+// ★ D2: In-memory GIF cache — TTL 10 dakika. Her picker açılışında 30 GIF re-fetch
+// etmek yerine cache'i kullan; memory pressure azalır, ağ trafiği düşer.
+const _GIF_CACHE_TTL_MS = 10 * 60_000;
+const _gifCache = new Map<string, { at: number; results: any[] }>();
+function _cacheKey(params: { type: string; q?: string; limit?: number }) {
+  return `${params.type}|${params.q || ''}|${params.limit || 30}`;
+}
+
+async function _callTenorProxy(params: { type: 'featured' | 'search'; q?: string; limit?: number }): Promise<any[]> {
+  const key = _cacheKey(params);
+  const hit = _gifCache.get(key);
+  if (hit && Date.now() - hit.at < _GIF_CACHE_TTL_MS) {
+    return hit.results;
+  }
+
+  // Proxy denemesi (daha önce başarısız olmadıysa)
+  if (_tenorProxyAvailable !== false) {
+    try {
+      const { data, error } = await supabase.functions.invoke('tenor-proxy', { body: params });
+      if (!error && data?.results) {
+        _tenorProxyAvailable = true;
+        _gifCache.set(key, { at: Date.now(), results: data.results });
+        return data.results;
+      }
+      if (error) _tenorProxyAvailable = false;
+    } catch {
+      _tenorProxyAvailable = false;
+    }
+  }
+
+  // Legacy fallback
+  try {
+    const limit = params.limit || 30;
+    const url = params.type === 'featured'
+      ? `${_TENOR_BASE}/featured?key=${_TENOR_LEGACY_KEY}&limit=${limit}&media_filter=tinygif&contentfilter=high`
+      : `${_TENOR_BASE}/search?key=${_TENOR_LEGACY_KEY}&q=${encodeURIComponent(params.q || '')}&limit=${limit}&media_filter=tinygif&contentfilter=high`;
+    const res = await fetch(url);
+    const data = await res.json();
+    const results = data?.results || [];
+    _gifCache.set(key, { at: Date.now(), results });
+    return results;
+  } catch {
+    return [];
+  }
+}
 
 // ═══════════════════════════════════════════════════
 // EMOJİ + GIF PICKER
@@ -77,9 +127,8 @@ export function EmojiReactionBar({ onReaction, onClose }: { onReaction: (emoji: 
   const fetchTrendingGifs = async () => {
     try {
       setLoadingGifs(true);
-      const res = await fetch(`${TENOR_BASE}/featured?key=${TENOR_API_KEY}&limit=30&media_filter=tinygif`);
-      const data = await res.json();
-      setTrendingGifs(data.results || []);
+      const results = await _callTenorProxy({ type: 'featured', limit: 30 });
+      setTrendingGifs(results);
     } catch { } finally { setLoadingGifs(false); }
   };
 
@@ -87,9 +136,8 @@ export function EmojiReactionBar({ onReaction, onClose }: { onReaction: (emoji: 
     if (q.length < 2) { setGifs([]); return; }
     try {
       setLoadingGifs(true);
-      const res = await fetch(`${TENOR_BASE}/search?key=${TENOR_API_KEY}&q=${encodeURIComponent(q)}&limit=30&media_filter=tinygif`);
-      const data = await res.json();
-      setGifs(data.results || []);
+      const results = await _callTenorProxy({ type: 'search', q, limit: 30 });
+      setGifs(results);
     } catch { } finally { setLoadingGifs(false); }
   };
 
@@ -150,7 +198,8 @@ export function EmojiReactionBar({ onReaction, onClose }: { onReaction: (emoji: 
           ) : (
             <ScrollView style={{ height: 180 }} contentContainerStyle={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, padding: 4 }} showsVerticalScrollIndicator={false}>
               {displayGifs.map((item: any, idx: number) => {
-                const gifUrl = item.media_formats?.tinygif?.url || item.media?.[0]?.tinygif?.url;
+                // ★ Y18: Proxy trimmed payload (item.url) — legacy tenor raw fallback da destekleniyor.
+                const gifUrl = item.url || item.media_formats?.tinygif?.url || item.media?.[0]?.tinygif?.url;
                 if (!gifUrl) return null;
                 return (
                   <TouchableOpacity key={item.id || idx} activeOpacity={0.7} onPress={() => onReaction(`[gif:${gifUrl}]`)} style={sty.gifItem}>
@@ -179,23 +228,40 @@ export interface FloatingReactionsRef {
 
 export const FloatingReactionsView = forwardRef<FloatingReactionsRef, {}>((_props, ref) => {
   const [emojis, setEmojis] = useState<FloatingEmoji[]>([]);
+  // ★ D1: Unmount sırasında dangling animasyon setState yakalanmasın.
+  const mountedRef = useRef(true);
+  const activeAnimsRef = useRef<Animated.CompositeAnimation[]>([]);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      activeAnimsRef.current.forEach(a => { try { a.stop(); } catch {} });
+      activeAnimsRef.current = [];
+    };
+  }, []);
 
   const spawn = useCallback((emoji: string) => {
+    if (!mountedRef.current) return;
     if (emoji.startsWith('[gif:')) return;
     const id = ++emojiCounter;
     const anim = new Animated.Value(0);
     const startX = W * 0.3 + Math.random() * W * 0.4;
     const drift = -30 + Math.random() * 60;
 
-    setEmojis(prev => [...prev.slice(-12), { id, emoji, startX, anim, drift }]);
+    setEmojis(prev => [...prev.slice(-8), { id, emoji, startX, anim, drift }]);
 
-    Animated.timing(anim, {
+    const animation = Animated.timing(anim, {
       toValue: 1,
       duration: 2200 + Math.random() * 800,
       easing: Easing.out(Easing.quad),
       useNativeDriver: true,
-    }).start(() => {
-      setEmojis(prev => prev.filter(e => e.id !== id));
+    });
+    activeAnimsRef.current.push(animation);
+    animation.start(() => {
+      activeAnimsRef.current = activeAnimsRef.current.filter(a => a !== animation);
+      if (mountedRef.current) {
+        setEmojis(prev => prev.filter(e => e.id !== id));
+      }
     });
   }, []);
 
@@ -236,11 +302,8 @@ const GIF_ITEM_SIZE = (W - 48) / 3;
 
 const sty = StyleSheet.create({
   picker: {
-    backgroundColor: 'rgba(45,55,64,0.95)',
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    width: W - 24,
+    backgroundColor: 'transparent',
+    width: '100%',
     overflow: 'hidden',
   },
   tabHeader: {

@@ -1,4 +1,5 @@
 import { ImageSourcePropType } from 'react-native';
+import { migrateLegacyTier } from '../types';
 
 export const LOCAL_AVATARS: Record<string, ImageSourcePropType> = {
   // Female Avatars
@@ -54,13 +55,10 @@ export function getAvatarSource(sourceUrl?: string | null): ImageSourcePropType 
  */
 export function getLevelFromSP(sp: number, tier?: string): number {
   const rawLevel = Math.min(99, Math.floor(sp / 100) + 1);
-  const t = (tier || '').toLowerCase();
-  // Yeni 3-tier
-  if (t === 'pro') return Math.max(40, rawLevel);
-  if (t === 'plus') return Math.max(15, rawLevel);
-  // Legacy backward compat
-  if (t === 'vip' || t === 'gold') return Math.max(40, rawLevel);
-  if (t === 'silver' || t === 'bronze') return Math.max(15, rawLevel);
+  // ★ Legacy temizlik: migrateLegacyTier ile normalize et (Gold/VIP/Bronze/Silver → Free/Plus/Pro)
+  const normalized = migrateLegacyTier(tier);
+  if (normalized === 'Pro') return Math.max(40, rawLevel);
+  if (normalized === 'Plus') return Math.max(15, rawLevel);
   return rawLevel;
 }
 
@@ -89,15 +87,14 @@ export function getTierBadgeInfo(tier?: string): {
   label: string;
   badgeGradient: [string, string] | null;
 } {
-  const t = (tier || '').toLowerCase();
-  // Pro tier (+ legacy uyumluluk: Gold/VIP → Pro)
-  if (t === 'pro' || t === 'vip' || t === 'gold') return {
+  // ★ Legacy temizlik: migrateLegacyTier ile normalize et
+  const normalized = migrateLegacyTier(tier);
+  if (normalized === 'Pro') return {
     icon: 'flame',
     label: 'Pro',
     badgeGradient: ['#F59E0B', '#D97706'],
   };
-  // Plus tier (+ legacy uyumluluk: Bronze/Silver → Plus)
-  if (t === 'plus' || t === 'silver' || t === 'bronze') return {
+  if (normalized === 'Plus') return {
     icon: 'rocket',
     label: 'Plus',
     badgeGradient: ['#A855F7', '#7C3AED'],

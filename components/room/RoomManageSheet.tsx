@@ -10,16 +10,16 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, Pressable, ScrollView, TextInput,
-  Animated, Dimensions, Image, ActivityIndicator, Switch,
+  Animated, Dimensions, ActivityIndicator, Switch,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Shadows } from '../../constants/theme';
-import { RoomService, type Room } from '../../services/database';
+import { RoomService, getRoomLimits, type Room } from '../../services/database';
 import { RoomFollowService } from '../../services/roomFollow';
 import { ModerationService } from '../../services/moderation';
 import { isTierAtLeast, TIER_DEFINITIONS } from '../../constants/tiers';
-import { getAvatarSource } from '../../constants/avatars';
+import StatusAvatar from '../StatusAvatar';
 import { showToast } from '../Toast';
 import { supabase } from '../../constants/supabase';
 import { useRouter } from 'expo-router';
@@ -88,6 +88,8 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
   // Settings â€” Genel
   const [isLocked, setIsLocked] = useState(false);
   const [roomType, setRoomType] = useState<string>('open');
+  const [roomPassword, setRoomPassword] = useState('');
+  const [editingPassword, setEditingPassword] = useState(false);
 
   // Settings â€” Konuşma
   const [speakingMode, setSpeakingMode] = useState<string>('permission_only');
@@ -133,6 +135,35 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
       ]).start();
     }
   }, [visible]);
+  // Sürükleyerek kapatma (sağa swipe)
+  const panResponder = useRef(
+    React.useMemo(() => {
+      let startX = 0;
+      return require('react-native').PanResponder.create({
+        onStartShouldSetPanResponder: () => false,
+        onMoveShouldSetPanResponder: (_: any, g: any) => g.dx > 10 && Math.abs(g.dy) < g.dx,
+        onPanResponderGrant: () => { startX = (slideAnim as any)._value || 0; },
+        onPanResponderMove: (_: any, g: any) => {
+          const newX = Math.max(0, startX + g.dx);
+          slideAnim.setValue(newX);
+          fadeAnim.setValue(1 - (newX / PANEL_W) * 0.8);
+        },
+        onPanResponderRelease: (_: any, g: any) => {
+          if (g.dx > 60 || g.vx > 0.5) {
+            Animated.parallel([
+              Animated.spring(slideAnim, { toValue: PANEL_W, useNativeDriver: true, damping: 18, stiffness: 200 }),
+              Animated.timing(fadeAnim, { toValue: 0, duration: 150, useNativeDriver: true }),
+            ]).start(() => onClose());
+          } else {
+            Animated.parallel([
+              Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true, damping: 18, stiffness: 180 }),
+              Animated.timing(fadeAnim, { toValue: 1, duration: 100, useNativeDriver: true }),
+            ]).start();
+          }
+        },
+      });
+    }, [])
+  ).current;
 
   // Load data
   useEffect(() => {
@@ -146,6 +177,8 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
     setSlowMode(rs.slow_mode_seconds || 0);
     setSpeakingMode(rs.speaking_mode || 'permission_only');
     setRoomType(room.type || 'open');
+    setRoomPassword(rs.room_password || '');
+    setEditingPassword(false);
     setRoomLang(rs.room_language || 'tr');
     setAgeRestricted(rs.age_restricted || false);
     setThemeId((room as any).theme_id || null);
@@ -202,6 +235,7 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
     setSlowMode(rs.slow_mode_seconds || 0);
     setSpeakingMode(rs.speaking_mode || 'permission_only');
     setRoomType(room.type || 'open');
+    setRoomPassword(rs.room_password || '');
     setRoomLang(rs.room_language || 'tr');
     setAgeRestricted(rs.age_restricted || false);
     setThemeId((room as any).theme_id || null);
@@ -248,7 +282,7 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
 
   const handleDelete = useCallback(async () => {
     if (!room || !hostId) return;
-    try { await RoomService.deleteRoom(room.id, hostId); showToast({ title: 'ğŸ—‘ï¸ Silindi', type: 'success' }); onDeleted(); onClose(); }
+    try { await RoomService.deleteRoom(room.id, hostId); showToast({ title: 'Oda Silindi', type: 'success' }); onDeleted(); onClose(); }
     catch (e: any) { showToast({ title: 'Hata', message: e.message || '', type: 'error' }); }
   }, [room, hostId, onDeleted, onClose]);
 
@@ -256,7 +290,7 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
     if (!room || !hostId) return;
     try {
       await RoomService.freezeRoom(room.id, hostId);
-      showToast({ title: 'â„ï¸ Oda Donduruldu', message: 'Odalarım sekmesinden tekrar aktifleştirebilirsin.', type: 'success' });
+      showToast({ title: 'Oda Donduruldu', message: 'Odalarım sekmesinden tekrar aktifleştirebilirsin.', type: 'success' });
       onDeleted(); // refresh list
       onClose();
     } catch (e: any) { showToast({ title: 'Hata', message: e.message || '', type: 'error' }); }
@@ -276,7 +310,7 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
         const url = await StorageService.uploadFile('post-images', fileName, result.assets[0].uri);
         await RoomService.updateSettings(room.id, hostId, { room_settings: { room_image_url: url } });
         setBackgroundImage(url);
-        showToast({ title: 'ğŸ–¼ï¸ Arka Plan Güncellendi', type: 'success' });
+        showToast({ title: 'Arka Plan Güncellendi', type: 'success' });
       } else {
         await RoomService.updateSettings(room.id, hostId, { room_settings: { room_image_url: null } });
         setBackgroundImage(null);
@@ -297,7 +331,7 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
         const url = await StorageService.uploadFile('post-images', fileName, result.assets[0].uri);
         await RoomService.updateSettings(room.id, hostId, { room_settings: { cover_image_url: url } });
         setCoverImage(url);
-        showToast({ title: 'ğŸ–¼ï¸ Banner Yüklendi', type: 'success' });
+        showToast({ title: 'Banner Yüklendi', type: 'success' });
       } else {
         await RoomService.updateSettings(room.id, hostId, { room_settings: { cover_image_url: null } });
         setCoverImage(null);
@@ -310,9 +344,9 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
 
   const isLive = room.is_live;
 
-  // ���������������������������������������������������
+  // ���������������������������������������������������
   // GENEL â€” RoomSettingsSheet ile birebir aynı
-  // ���������������������������������������������������
+  // ���������������������������������������������������
   const renderGeneral = () => (
     <View>
       {/* Oda İsmi â€” Free */}
@@ -323,7 +357,7 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
           <Pressable onPress={() => { setEditingName(false); setRoomName(room.name || ''); }}><Ionicons name="close" size={14} color="#64748B" /></Pressable>
         </View>
       ) : (
-        <Row icon="create" bg="rgba(59,130,246,0.2)" label="Oda İsmi" desc={roomName} right={<Pressable onPress={() => setEditingName(true)}><Ionicons name="chevron-forward" size={14} color="#475569" /></Pressable>} />
+        <Row icon="create" bg="rgba(59,130,246,0.2)" label="Oda İsmi" desc={roomName} onPress={() => setEditingName(true)} right={<Ionicons name="pencil-outline" size={10} color="rgba(255,255,255,0.15)" />} />
       )}
 
       {/* Hoş Geldin Mesajı â€” Free */}
@@ -335,7 +369,7 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
           <Pressable onPress={() => setEditingWelcome(false)}><Ionicons name="close" size={14} color="#64748B" /></Pressable>
         </View>
       ) : (
-        <Row icon="chatbubble-ellipses" bg="rgba(20,184,166,0.2)" label="Hoş Geldin Mesajı" desc={welcomeMsg || 'Ayarlanmadı'} right={<Pressable onPress={() => setEditingWelcome(true)}><Ionicons name="chevron-forward" size={14} color="#475569" /></Pressable>} />
+        <Row icon="chatbubble-ellipses" bg="rgba(20,184,166,0.2)" label="Hoş Geldin Mesajı" desc={welcomeMsg || 'Ayarlanmadı'} onPress={() => setEditingWelcome(true)} right={<Ionicons name="pencil-outline" size={10} color="rgba(255,255,255,0.15)" />} />
       )}
 
       {/* Kurallar â€” Free */}
@@ -346,7 +380,7 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
           <Pressable onPress={() => setEditingRules(false)}><Ionicons name="close" size={14} color="#64748B" /></Pressable>
         </View>
       ) : (
-        <Row icon="document-text" bg="rgba(245,158,11,0.2)" label="Oda Kuralları" desc={rules || 'Ayarlanmadı'} right={<Pressable onPress={() => setEditingRules(true)}><Ionicons name="chevron-forward" size={14} color="#475569" /></Pressable>} />
+        <Row icon="document-text" bg="rgba(245,158,11,0.2)" label="Oda Kuralları" desc={rules || 'Ayarlanmadı'} onPress={() => setEditingRules(true)} right={<Ionicons name="pencil-outline" size={10} color="rgba(255,255,255,0.15)" />} />
       )}
 
       {/* Oda Tipi â€” Plus+ */}
@@ -369,6 +403,20 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
           }
         />
       ) : <LockedRow label="Şifreli Oda Oluşturma" tier="Plus" />}
+
+      {/* Şifre — Plus+ (sadece roomType === 'closed') */}
+      {roomType === 'closed' && can('Plus') && (
+        editingPassword ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+            <TextInput style={[p.nameInput, { fontSize: 11 }]} value={roomPassword} onChangeText={setRoomPassword} autoFocus maxLength={20} returnKeyType="done" placeholder="Oda şifresi..." placeholderTextColor="#475569"
+              onSubmitEditing={() => { updateRS('room_password', roomPassword.trim()); setEditingPassword(false); }} />
+            <Pressable style={p.saveBtn} onPress={() => { updateRS('room_password', roomPassword.trim()); setEditingPassword(false); }}><Ionicons name="checkmark" size={14} color="#FFF" /></Pressable>
+            <Pressable onPress={() => setEditingPassword(false)}><Ionicons name="close" size={14} color="#64748B" /></Pressable>
+          </View>
+        ) : (
+          <Row icon="key" bg="rgba(245,158,11,0.2)" label="Oda Şifresi" desc={roomPassword || 'Ayarlanmadı'} onPress={() => setEditingPassword(true)} right={<Ionicons name="pencil-outline" size={10} color="rgba(255,255,255,0.15)" />} />
+        )
+      )}
 
       {/* Kilit â€” Plus+ */}
       {can('Plus') ? (
@@ -428,9 +476,9 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
     </View>
   );
 
-  // ���������������������������������������������������
+  // ���������������������������������������������������
   // KONUŞMA â€” RoomSettingsSheet ile birebir aynı
-  // ���������������������������������������������������
+  // ���������������������������������������������������
   const renderSpeaking = () => (
     <View>
       {/* Konuşma Modu â€” Free (2 mod) / Pro (3 mod) */}
@@ -442,8 +490,8 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
               const labels: Record<string, string> = { free_for_all: 'Serbest', permission_only: 'İzinli', selected_only: 'Seçili' };
               return (
                 <Pressable key={m} style={[p.pill, speakingMode === m && p.pillActive, locked && { opacity: 0.35 }]}
-                  onPress={() => { if (locked) { showToast({ title: '🔒 Pro+ ile açılır', type: 'info' }); return; } setSpeakingMode(m); updateRS('speaking_mode', m); }}>
-                  <Text style={[p.pillText, speakingMode === m && p.pillTextActive]}>{locked ? 'ğŸ”’' : ''}{labels[m]}</Text>
+                  onPress={() => { if (locked) { showToast({ title: 'Pro+ ile açılır', type: 'info' }); return; } setSpeakingMode(m); updateRS('speaking_mode', m); }}>
+                  <Text style={[p.pillText, speakingMode === m && p.pillTextActive]}>{labels[m]}</Text>
                 </Pressable>
               );
             })}
@@ -456,9 +504,9 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
     </View>
   );
 
-  // ���������������������������������������������������
+  // ���������������������������������������������������
   // MODERASYON â€” RoomSettingsSheet ile birebir aynı
-  // ���������������������������������������������������
+  // ���������������������������������������������������
   const renderModeration = () => (
     <View>
       {/* Slow Mode â€” Free */}
@@ -481,7 +529,7 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
             <View style={{ flexDirection: 'row', gap: 3 }}>
               {['tr', 'en', 'de', 'ar'].map(l => (
                 <Pressable key={l} style={[p.pill, roomLang === l && p.pillActive]} onPress={() => { setRoomLang(l); updateRS('room_language', l); }}>
-                  <Text style={[p.pillText, roomLang === l && p.pillTextActive]}>{({ tr: 'ğŸ‡¹ğŸ‡·', en: 'ğŸ‡¬ğŸ‡§', de: 'ğŸ‡©ğŸ‡ª', ar: 'ğŸ‡¸ğŸ‡¦' } as any)[l]}</Text>
+                  <Text style={[p.pillText, roomLang === l && p.pillTextActive]}>{({ tr: 'TR', en: 'EN', de: 'DE', ar: 'AR' } as any)[l]}</Text>
                 </Pressable>
               ))}
             </View>
@@ -507,15 +555,15 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
       {/* Gelişmiş Ban â€” Pro locked */}
       {!can('Pro') && <LockedRow label="Gelişmiş Ban Seçenekleri" tier="Pro" />}
 
-      {/* ��� BANLI KULLANICILAR ��� */}
+      {/* ��� BANLI KULLANICILAR ��� */}
       <View style={{ marginTop: 12 }}>
-        <Text style={p.subTitle}>ğŸš« Banlı Kullanıcılar ({bannedUsers.length})</Text>
+        <Text style={p.subTitle}>Banlı Kullanıcılar ({bannedUsers.length})</Text>
         {loadingModData ? (
           <ActivityIndicator color="#EF4444" style={{ marginVertical: 12 }} />
         ) : bannedUsers.length === 0 ? (
           <View style={p.emptyCard}>
             <Ionicons name="shield-checkmark" size={20} color="rgba(34,197,94,0.3)" />
-            <Text style={p.emptyText}>Banlı kullanıcı yok ğŸ‰</Text>
+            <Text style={p.emptyText}>Banlı kullanıcı yok</Text>
           </View>
         ) : (
           bannedUsers.map((ban: any) => {
@@ -526,12 +574,12 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
             const timeLabel = isPerm ? 'Kalıcı' : isExpired ? 'Süresi dolmuş' : remainMin > 60 ? `${Math.floor(remainMin / 60)}sa ${remainMin % 60}dk` : `${remainMin}dk kaldı`;
             return (
               <View key={ban.id} style={p.modRow}>
-                <Image source={getAvatarSource(ban.user?.avatar_url)} style={p.modAvatar} />
+                <StatusAvatar uri={ban.user?.avatar_url} size={28} />
                 <View style={{ flex: 1 }}>
                   <Text style={p.rowLabel} numberOfLines={1}>{ban.user?.display_name || 'Kullanıcı'}</Text>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
                     <View style={{ paddingHorizontal: 4, paddingVertical: 1, borderRadius: 3, backgroundColor: isPerm ? 'rgba(239,68,68,0.12)' : 'rgba(245,158,11,0.12)' }}>
-                      <Text style={{ fontSize: 7, fontWeight: '700', color: isPerm ? '#EF4444' : '#F59E0B' }}>{isPerm ? 'â›” KALICI' : 'â³ GEÇİCİ'}</Text>
+                      <Text style={{ fontSize: 7, fontWeight: '700', color: isPerm ? '#EF4444' : '#F59E0B' }}>{isPerm ? 'KALICI' : 'GEÇİCİ'}</Text>
                     </View>
                     <Text style={{ fontSize: 8, color: 'rgba(255,255,255,0.25)' }}>{timeLabel}</Text>
                   </View>
@@ -551,9 +599,9 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
         )}
       </View>
 
-      {/* ��� SUSTURULAN KULLANICILAR ��� */}
+      {/* ��� SUSTURULAN KULLANICILAR ��� */}
       <View style={{ marginTop: 12 }}>
-        <Text style={p.subTitle}>🔇 Susturulan Kullanıcılar ({mutedUsers.length})</Text>
+        <Text style={p.subTitle}>Susturulan Kullanıcılar ({mutedUsers.length})</Text>
         {loadingModData ? null : mutedUsers.length === 0 ? (
           <View style={p.emptyCard}>
             <Ionicons name="volume-high" size={20} color="rgba(34,197,94,0.3)" />
@@ -566,10 +614,10 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
             const timeLabel = expiresAt ? (remainMin > 60 ? `${Math.floor(remainMin / 60)}sa ${remainMin % 60}dk` : `${remainMin}dk kaldı`) : 'Süresiz';
             return (
               <View key={mute.id} style={p.modRow}>
-                <Image source={getAvatarSource(mute.user?.avatar_url)} style={p.modAvatar} />
+                <StatusAvatar uri={mute.user?.avatar_url} size={28} />
                 <View style={{ flex: 1 }}>
                   <Text style={p.rowLabel} numberOfLines={1}>{mute.user?.display_name || 'Kullanıcı'}</Text>
-                  <Text style={{ fontSize: 8, color: 'rgba(255,255,255,0.25)', marginTop: 1 }}>â³ {timeLabel}{mute.reason ? ` • ${mute.reason}` : ''}</Text>
+                  <Text style={{ fontSize: 8, color: 'rgba(255,255,255,0.25)', marginTop: 1 }}>{timeLabel}{mute.reason ? ` - ${mute.reason}` : ''}</Text>
                 </View>
                 <Pressable style={p.unbanBtn} onPress={async () => {
                   setMutedUsers(prev => prev.filter(m => m.id !== mute.id));
@@ -588,15 +636,15 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
     </View>
   );
 
-  // ���������������������������������������������������
+  // ���������������������������������������������������
   // GÖRSELLİK â€” RoomSettingsSheet ile birebir aynı
-  // ���������������������������������������������������
+  // ���������������������������������������������������
   const renderVisual = () => (
     <View>
       {/* Tema â€” Plus+ */}
       {can('Plus') ? (
         <View style={{ marginBottom: 8 }}>
-          <Text style={p.subTitle}>ğŸ¨ Oda Teması</Text>
+          <Text style={p.subTitle}>Oda Teması</Text>
           <View style={p.themeGrid}>
             <Pressable style={[p.themeCircle, !themeId && p.themeCircleActive]} onPress={() => { setThemeId(null); RoomService.setRoomTheme(room.id, hostId, null).then(() => broadcastSettingsChange({ theme_id: null })).catch(() => {}); }}>
               <LinearGradient colors={['#0E1420', '#070B14']} style={p.themeGrad}><Ionicons name="moon-outline" size={12} color="rgba(255,255,255,0.35)" /></LinearGradient>
@@ -612,7 +660,7 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
 
       {/* Arka Plan Resmi â€” Plus+ */}
       {can('Plus') ? (
-        <Row icon="image" bg="rgba(139,92,246,0.2)" label="Arka Plan Resmi" desc={backgroundImage ? 'Arka plan ayarlandı' : 'Ãœyelik statüsüne göre'}
+        <Row icon="image" bg="rgba(139,92,246,0.2)" label="Arka Plan Resmi" desc={backgroundImage ? 'Arka plan ayarlandı' : 'Üyelik statüsüne göre'}
           right={
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               {backgroundImage ? (
@@ -655,7 +703,7 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
             <View style={{ flexDirection: 'row', gap: 3 }}>
               {([null, 'lofi', 'ambient', 'jazz'] as const).map(t => (
                 <Pressable key={t || 'off'} style={[p.pill, musicTrack === t && p.pillActive]} onPress={() => { setMusicTrack(t); updateRS('music_track', t); }}>
-                  <Text style={[p.pillText, musicTrack === t && p.pillTextActive]}>{t === null ? 'ğŸ”‡' : t === 'lofi' ? 'ğŸµ' : t === 'ambient' ? 'ğŸŒŠ' : 'ğŸ·'}</Text>
+                  <Text style={[p.pillText, musicTrack === t && p.pillTextActive]}>{t === null ? 'Off' : t === 'lofi' ? 'Lo' : t === 'ambient' ? 'Am' : 'Jz'}</Text>
                 </Pressable>
               ))}
             </View>
@@ -665,9 +713,9 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
     </View>
   );
 
-  // ���������������������������������������������������
+  // ���������������������������������������������������
   // MONETİZASYON â€” RoomSettingsSheet ile birebir aynı
-  // ���������������������������������������������������
+  // ���������������������������������������������������
   const renderMonetization = () => (
     <View>
       {/* Bağış â€” Pro+ */}
@@ -679,10 +727,10 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
 
       {/* Giriş Ãœcreti â€” Pro */}
       {can('Pro') ? (
-        <Row icon="cash" bg="rgba(212,175,55,0.2)" label={entryFee ? `Giriş: ${entryFee} SP` : 'Giriş Ãœcretsiz'} desc="SP cinsinden oda giriş ücreti"
+        <Row icon="cash" bg="rgba(212,175,55,0.2)" label={entryFee ? `Giriş: ${entryFee} SP` : 'Giriş Ücretsiz'} desc="SP cinsinden oda giriş ücreti"
           right={
             <View style={{ flexDirection: 'row', gap: 3 }}>
-              {[0, 10, 50, 100].map(fee => (
+              {[0, 25, 50, 100, 250, 500].map(fee => (
                 <Pressable key={fee} style={[p.pill, entryFee === fee && p.pillActive]} onPress={() => { setEntryFee(fee); updateRS('entry_fee_sp', fee); }}>
                   <Text style={[p.pillText, entryFee === fee && p.pillTextActive]}>{fee === 0 ? 'Free' : `${fee}`}</Text>
                 </Pressable>
@@ -690,42 +738,47 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
             </View>
           }
         />
-      ) : <LockedRow label="Giriş Ãœcreti Belirleme (SP)" tier="Pro" />}
+      ) : <LockedRow label="Giriş Ücreti Belirleme (SP)" tier="Pro" />}
 
       {/* Oda Boost â€” Pro */}
-      {can('Pro') ? (
-        <Row icon="rocket" bg="rgba(255,107,53,0.2)" label="Odayı Öne Çıkar" desc="Oda içindeki + menüsünden boost aktifleştir"
-          right={<View style={{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, backgroundColor: 'rgba(255,107,53,0.12)', borderWidth: 1, borderColor: 'rgba(255,107,53,0.2)' }}><Text style={{ fontSize: 9, fontWeight: '700', color: '#FF6B35' }}>Oda İçi</Text></View>} />
-      ) : <LockedRow label="Odayı Öne Çıkarma / Boost" tier="Pro" />}
+      {can('Pro') && isLive ? (
+        <Row icon="rocket" bg="rgba(255,107,53,0.2)" label="Boost" desc="Odaya gir ve + den boost"
+          onPress={() => { onClose(); router.push(`/room/${room.id}`); }}
+          right={<Ionicons name="chevron-forward" size={12} color="#FF6B35" />} />
+      ) : !can('Pro') ? <LockedRow label="Boost" tier="Pro" /> : null}
     </View>
   );
 
-  // � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � 
+  // � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � 
   // GELİÅžMİÅž â€” RoomSettingsSheet ile birebir aynı
-  // � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � 
-  const renderAdvanced = () => (
+  // � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � � 
+  const renderAdvanced = () => {
+    const limits = getRoomLimits(tier as any);
+    return (
     <View>
-      {/* 13 Kişi Sahne â€” Pro */}
-      {can('Pro') ? (
-        <Row icon="people" bg="rgba(255,107,53,0.2)" label="13 Kişilik Sahne" desc="Genişletilmiş sahne kapasitesi aktif"
-          right={<View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: 'rgba(255,107,53,0.12)' }}><Text style={{ fontSize: 8, fontWeight: '700', color: '#FF6B35' }}>13 kişi</Text></View>} />
-      ) : <LockedRow label="13 Kişilik Sahne" tier="Pro" />}
+      <Row icon="people" bg="rgba(20,184,166,0.2)" label="Sahne Kapasitesi" desc={`Maks ${limits.maxSpeakers} konusmaci`}
+        right={<View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: 'rgba(20,184,166,0.12)' }}><Text style={{ fontSize: 8, fontWeight: '700', color: '#14B8A6' }}>{limits.maxSpeakers}</Text></View>} />
+      <Row icon="videocam" bg="rgba(139,92,246,0.2)" label="Kamera Limiti" desc={limits.maxCameras > 0 ? `Maks ${limits.maxCameras} kamera` : 'Yok'}
+        right={<View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: 'rgba(139,92,246,0.12)' }}><Text style={{ fontSize: 8, fontWeight: '700', color: '#A78BFA' }}>{limits.maxCameras || '-'}</Text></View>} />
+      <Row icon="time" bg="rgba(245,158,11,0.2)" label="Oda Suresi" desc={limits.durationHours === 0 ? 'Suresiz' : `Maks ${limits.durationHours} saat`}
+        right={<View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: 'rgba(245,158,11,0.12)' }}><Text style={{ fontSize: 8, fontWeight: '700', color: '#F59E0B' }}>{limits.durationHours === 0 ? '\u221e' : `${limits.durationHours}sa`}</Text></View>} />
+      {!can('Pro') && <LockedRow label="13 Kisilik Sahne" tier="Pro" />}
     </View>
-  );
-
-  // ���������������������������������������������������
+    );
+  };
+  // ���������������������������������������������������
   // TAKİPÇİLER
-  // ���������������������������������������������������
+  // ���������������������������������������������������
   const renderFollowers = () => (
     <View>
-      <Text style={p.subTitle}>❤️ {followerCount} Takipçi</Text>
+      <Text style={p.subTitle}>{followerCount} Takipçi</Text>
       {loadingFollowers ? (
         <ActivityIndicator color={Colors.accentTeal} style={{ marginVertical: 16 }} />
       ) : followers.length > 0 ? (
         <View style={p.followerGrid}>
           {followers.map(f => (
             <Pressable key={f.id} style={p.followerCard} onPress={() => { onClose(); router.push(`/user/${f.id}` as any); }}>
-              <Image source={getAvatarSource(f.avatar_url)} style={p.followerAvatar} />
+              <StatusAvatar uri={f.avatar_url} size={36} />
               <Text style={p.followerName} numberOfLines={1}>{f.display_name}</Text>
             </Pressable>
           ))}
@@ -760,10 +813,13 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
 
       {/* Panel â€” sağdan kayar */}
       <Animated.View style={[p.panel, { transform: [{ translateX: slideAnim }] }]}>
-        {/* Başlık */}
+        {/* Drag Handle - sadece buradan surukle */}
+        <View {...panResponder.panHandlers} style={p.dragHandle}>
+          <View style={p.dragPill} />
+        </View>
         <View style={p.header}>
           <View style={p.headerLeft}>
-            <Image source={getAvatarSource((room as any).host?.avatar_url)} style={p.headerAvatar} />
+            <StatusAvatar uri={(room as any).host?.avatar_url} size={30} tier={(room as any).host?.subscription_tier} />
             <View style={{ flex: 1 }}>
               <Text style={p.headerTitle} numberOfLines={1}>{roomName || room.name}</Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
@@ -779,7 +835,7 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
         </View>
 
         {/* Tab Bar */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 4, paddingHorizontal: 10 }} style={{ maxHeight: 34, marginBottom: 6 }}>
+        <ScrollView horizontal nestedScrollEnabled showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 4, paddingHorizontal: 10 }} style={{ maxHeight: 34, marginBottom: 6 }}>
           {TABS.map(tab => {
             const active = activeTab === tab.id;
             return (
@@ -805,22 +861,23 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
 }
 
 // â˜… Küçük yardımcı bileşenler
-function Row({ icon, bg, label, desc, right }: { icon: string; bg: string; label: string; desc?: string; right: React.ReactNode }) {
+function Row({ icon, bg, label, desc, right, onPress }: { icon: string; bg: string; label: string; desc?: string; right: React.ReactNode; onPress?: () => void }) {
+  const Container = onPress ? Pressable : View;
   return (
-    <View style={p.row}>
+    <Container style={p.row} onPress={onPress as any}>
       <View style={[p.rowIcon, { backgroundColor: bg }]}><Ionicons name={icon as any} size={14} color="#FFF" /></View>
       <View style={{ flex: 1 }}><Text style={p.rowLabel}>{label}</Text>{desc ? <Text style={p.rowDesc} numberOfLines={1}>{desc}</Text> : null}</View>
       {right}
-    </View>
+    </Container>
   );
 }
 
 function LockedRow({ label, tier }: { label: string; tier: string }) {
   const tierDef = TIER_DEFINITIONS[tier as SubscriptionTier];
   return (
-    <Pressable style={[p.row, { opacity: 0.35 }]} onPress={() => showToast({ title: `ğŸ”’ ${tier}+ ile açılır`, message: `"${label}" özelliği ${tier} ve üzeri üyeliklerde kullanılabilir.`, type: 'info' })}>
+    <Pressable style={[p.row, { opacity: 0.35 }]} onPress={() => showToast({ title: `${tier}+ ile açılır`, message: `"${label}" özelliği ${tier} ve üzeri üyeliklerde kullanılabilir.`, type: 'info' })}>
       <View style={[p.rowIcon, { backgroundColor: tierDef ? `${tierDef.color}15` : 'rgba(148,163,184,0.15)' }]}><Ionicons name="lock-closed" size={14} color={tierDef?.color || '#94A3B8'} /></View>
-      <View style={{ flex: 1 }}><Text style={p.rowLabel}>{label}</Text><Text style={p.rowDesc}>🔒 {tier}+ ile açılır</Text></View>
+      <View style={{ flex: 1 }}><Text style={p.rowLabel}>{label}</Text><Text style={p.rowDesc}>{tier}+ ile açılır</Text></View>
       {tierDef && (
         <View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: `${tierDef.color}12`, borderWidth: 1, borderColor: `${tierDef.color}30` }}>
           <Text style={{ fontSize: 8, fontWeight: '700', color: tierDef.color }}>{tierDef.emoji} {tier}</Text>
@@ -840,13 +897,22 @@ const p = StyleSheet.create({
     borderWidth: 1, borderRightWidth: 0, borderColor: Colors.cardBorder,
     overflow: 'hidden',
   },
+  dragHandle: {
+    alignItems: 'center', justifyContent: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: 1, borderBottomColor: 'rgba(149,161,174,0.06)',
+  },
+  dragPill: {
+    width: 36, height: 4, borderRadius: 2,
+    backgroundColor: 'rgba(148,163,184,0.35)',
+  },
   header: {
     flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: 12, paddingVertical: 10,
     borderBottomWidth: 1, borderBottomColor: 'rgba(149,161,174,0.1)',
   },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
-  headerAvatar: { width: 36, height: 36, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.06)' },
+
   headerTitle: { fontSize: 14, fontWeight: '800', color: '#F1F5F9', ...Shadows.text },
   liveBadge: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(239,68,68,0.15)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
   liveDot: { width: 5, height: 5, borderRadius: 2.5, backgroundColor: '#EF4444' },
@@ -858,15 +924,15 @@ const p = StyleSheet.create({
   tab: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     paddingHorizontal: 9, paddingVertical: 6, borderRadius: 10,
-    backgroundColor: 'rgba(255,255,255,0.04)', borderWidth: 1, borderColor: 'rgba(149,161,174,0.1)',
+    backgroundColor: 'rgba(255,255,255,0.04)',
   },
-  tabActive: { backgroundColor: 'rgba(115,194,189,0.12)', borderColor: 'rgba(115,194,189,0.3)' },
+  tabActive: { backgroundColor: 'rgba(115,194,189,0.12)' },
   tabText: { fontSize: 9, fontWeight: '700', color: '#64748B' },
   tabTextActive: { color: Colors.accentTeal },
 
   // Row
   row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: 'rgba(149,161,174,0.06)' },
-  rowIcon: { width: 30, height: 30, borderRadius: 8, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
+  rowIcon: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   rowLabel: { fontSize: 12, fontWeight: '700', color: '#F1F5F9', ...Shadows.textLight },
   rowDesc: { fontSize: 9, color: '#94A3B8', marginTop: 1 },
 
@@ -915,7 +981,7 @@ const p = StyleSheet.create({
   // Followers
   followerGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   followerCard: { alignItems: 'center', width: 56 },
-  followerAvatar: { width: 40, height: 40, borderRadius: 20, borderWidth: 1.5, borderColor: 'rgba(115,194,189,0.3)', marginBottom: 4 },
+
   followerName: { fontSize: 9, fontWeight: '600', color: '#94A3B8', textAlign: 'center' },
   emptyCard: { padding: 20, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.03)', alignItems: 'center', gap: 8 },
   emptyText: { fontSize: 11, color: '#64748B' },
@@ -926,10 +992,7 @@ const p = StyleSheet.create({
     paddingVertical: 8, paddingHorizontal: 4, borderRadius: 10,
     borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.03)',
   },
-  modAvatar: {
-    width: 32, height: 32, borderRadius: 16,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
-  },
+
   unbanBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 3,
     paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8,

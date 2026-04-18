@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { View, Text, StyleSheet, TextInput, Pressable, ScrollView, ActivityIndicator, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,7 +9,7 @@ import { isTierAtLeast } from '../constants/tiers';
 import { GamificationService } from '../services/gamification';
 import { Colors } from '../constants/theme';
 import { showToast } from '../components/Toast';
-import { getAvatarSource } from '../constants/avatars';
+import StatusAvatar from '../components/StatusAvatar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from './_layout';
 import AppBackground from '../components/AppBackground';
@@ -17,6 +17,7 @@ import { UpsellService } from '../services/upsell';
 import { supabase } from '../constants/supabase';
 import InviteFriendsModal from '../components/room/InviteFriendsModal';
 import { PushService } from '../services/push';
+import { RoomAccessService } from '../services/roomAccess';
 import type { FollowUser } from '../services/friendship';
 import * as ImagePicker from 'expo-image-picker';
 
@@ -128,6 +129,24 @@ export default function CreateRoomScreen() {
 
   const canCreate = name.trim().length >= 2 && (type !== 'closed' || password.trim().length >= 4);
 
+  // ★ Bugünkü oda açma sayısını göster
+  const [todayRoomCount, setTodayRoomCount] = useState(0);
+  useEffect(() => {
+    if (!firebaseUser?.uid || limits.dailyRooms >= 999) return;
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    (async () => {
+      try {
+        const { count } = await supabase
+          .from('rooms')
+          .select('id', { count: 'exact', head: true })
+          .eq('host_id', firebaseUser.uid)
+          .gte('created_at', todayStart.toISOString());
+        setTodayRoomCount(count || 0);
+      } catch {}
+    })();
+  }, [firebaseUser?.uid, limits.dailyRooms]);
+
   const handleCreate = async () => {
     if (!canCreate || !firebaseUser || creating) return;
 
@@ -184,12 +203,7 @@ export default function CreateRoomScreen() {
       );
       showToast({ title: 'Oda Oluşturuldu!', message: `"${name.trim()}" odası hazır.`, type: 'success' });
       try { await GamificationService.onRoomCreate(firebaseUser!.uid); } catch { }
-      // ★ Rozet trigger: oda oluşturma rozetlerini kontrol et
-      try {
-        const { BadgeCheckerService } = require('../services/engagement/badges');
-        const badge = await BadgeCheckerService.checkForAction(firebaseUser!.uid, 'room_created');
-        if (badge) showToast({ title: '🏆 Rozet Kazanıldı!', message: `"${badge}" rozeti açıldı!`, type: 'success' });
-      } catch { }
+      // Rozet sistemi kaldırıldı — eski badge modülü silindi
       setCreatedRoomId(room.id);
       setCreatedRoomName(name.trim());
       setShowInviteModal(true);
@@ -203,10 +217,17 @@ export default function CreateRoomScreen() {
   const handleInviteFriends = async (selectedUsers: FollowUser[]) => {
     if (!createdRoomId || !firebaseUser || !profile) return;
     const hostName = profile.display_name || 'Birisi';
+    let successCount = 0;
     for (const user of selectedUsers) {
-      PushService.sendRoomInvite(user.id, hostName, createdRoomName, createdRoomId).catch(() => { });
+      try {
+        // ★ INVITE-FIX: DB bildirim + room_invites kaydı yaz (zile düşsün)
+        const result = await RoomAccessService.inviteUser(createdRoomId, user.id, firebaseUser.uid);
+        if (result.success) successCount++;
+        // Push bildirim de gönder (arka plandaki kullanıcılar için)
+        PushService.sendRoomInvite(user.id, hostName, createdRoomName, createdRoomId).catch(() => { });
+      } catch {}
     }
-    showToast({ title: 'Davetler Gönderildi!', message: `${selectedUsers.length} arkadaşına davet gönderildi.`, type: 'success' });
+    showToast({ title: 'Davetler Gönderildi!', message: `${successCount} arkadaşına davet gönderildi.`, type: 'success' });
   };
 
   return (
@@ -302,7 +323,10 @@ export default function CreateRoomScreen() {
                     </>
                   ) : (
                     <LinearGradient
-                      colors={(CATEGORY_THEME_PREVIEW[category] || CATEGORY_THEME_PREVIEW.other).colors}
+                      colors={selectedTheme
+                        ? [...(ROOM_THEMES.find(t => t.id === selectedTheme)?.colors || ['#0E1420', '#070B14']), '#070B14']
+                        : (CATEGORY_THEME_PREVIEW[category] || CATEGORY_THEME_PREVIEW.other).colors
+                      }
                       start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                       style={StyleSheet.absoluteFillObject}
                     />
@@ -347,12 +371,17 @@ export default function CreateRoomScreen() {
                   </View>
                   {/* Host bilgisi */}
                   <View style={s.previewHostRow}>
-                    <Image source={getAvatarSource(profile?.avatar_url)} style={s.previewAvatar} />
+                    <StatusAvatar uri={profile?.avatar_url} size={16} tier={profile?.subscription_tier} />
                     <Text style={s.previewHostName} numberOfLines={1}>{profile?.display_name || 'Host'}</Text>
                     <View style={{ width: 1, height: 10, backgroundColor: 'rgba(255,255,255,0.1)', marginHorizontal: 4 }} />
                     <Ionicons name="people" size={10} color="#64748B" />
                     <Text style={{ fontSize: 9, color: '#64748B', fontWeight: '600', marginLeft: 2 }}>0</Text>
                     <Ionicons name={mode === 'video' ? 'videocam' : 'mic'} size={10} color="#64748B" style={{ marginLeft: 6 }} />
+                    {/* Konuşma modu badge */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, marginLeft: 4, backgroundColor: 'rgba(255,255,255,0.06)', paddingHorizontal: 4, paddingVertical: 1, borderRadius: 4 }}>
+                      <Ionicons name={speakingMode === 'free_for_all' ? 'people' : speakingMode === 'permission_only' ? 'hand-left' : 'shield-checkmark'} size={7} color="#64748B" />
+                      <Text style={{ fontSize: 7, fontWeight: '600', color: '#64748B' }}>{speakingMode === 'free_for_all' ? 'Serbest' : speakingMode === 'permission_only' ? 'İzinli' : 'Seçili'}</Text>
+                    </View>
                   </View>
                   {/* Katıl butonu */}
                   <View style={{ alignItems: 'flex-end', marginTop: 4 }}>
@@ -376,7 +405,7 @@ export default function CreateRoomScreen() {
               {CATEGORIES.map((cat) => (
                 <Pressable
                   key={cat.id}
-                  style={[s.catChip, category === cat.id && { backgroundColor: cat.color, borderColor: cat.color }]}
+                  style={[s.catChip, category === cat.id && { backgroundColor: cat.color, borderColor: cat.color, shadowColor: cat.color, shadowOpacity: 0.4, shadowRadius: 6, shadowOffset: { width: 0, height: 3 } }]}
                   onPress={() => setCategory(cat.id)}
                 >
                   <Ionicons name={cat.icon as any} size={13} color={category === cat.id ? '#FFF' : '#94A3B8'} />
@@ -604,7 +633,7 @@ export default function CreateRoomScreen() {
                     <Text style={s.advDesc}>Odaya giriş için SP ücreti</Text>
                   </View>
                   <View style={{ flexDirection: 'row', gap: 4 }}>
-                    {[0, 10, 50, 100].map(fee => (
+                    {[0, 25, 50, 100, 250, 500].map(fee => (
                       <Pressable key={fee} style={[s.feePill, entryFee === fee && s.feePillActive]} onPress={() => setEntryFee(fee)}>
                         <Text style={[s.feePillText, entryFee === fee && s.feePillTextActive]}>{fee === 0 ? 'Free' : `${fee}`}</Text>
                       </Pressable>
@@ -686,6 +715,23 @@ export default function CreateRoomScreen() {
             <View style={s.capDivider} />
             <CapItem icon="time" label="Süre" value={limits.durationHours === 0 ? '∞' : `${limits.durationHours}sa`} />
           </View>
+          {/* ★ Günlük oda kullanım göstergesi */}
+          {limits.dailyRooms < 999 && (
+            <View style={[s.capacityBar, { marginTop: 0, paddingVertical: 8, borderTopWidth: 0 }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Ionicons name="calendar-outline" size={13} color={todayRoomCount >= limits.dailyRooms ? '#EF4444' : todayRoomCount >= limits.dailyRooms - 1 ? '#FBBF24' : '#14B8A6'} />
+                <Text style={{ fontSize: 11, fontWeight: '700', color: todayRoomCount >= limits.dailyRooms ? '#EF4444' : '#E2E8F0' }}>
+                  Bugün: {todayRoomCount}/{limits.dailyRooms} oda
+                </Text>
+                {todayRoomCount >= limits.dailyRooms && (
+                  <Pressable onPress={() => router.push('/plus' as any)} style={{ flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(167,139,250,0.12)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, borderWidth: 1, borderColor: 'rgba(167,139,250,0.25)' }}>
+                    <Ionicons name="rocket" size={10} color="#A78BFA" />
+                    <Text style={{ fontSize: 9, fontWeight: '800', color: '#A78BFA' }}>Yükselt</Text>
+                  </Pressable>
+                )}
+              </View>
+            </View>
+          )}
 
           {/* ═══ OLUŞTUR BUTONU ═══ */}
           <Pressable
@@ -720,8 +766,9 @@ export default function CreateRoomScreen() {
             setShowInviteModal(false);
             if (createdRoomId) router.replace(`/room/${createdRoomId}`);
           }}
-          onInvite={(selectedUsers: FollowUser[]) => {
-            handleInviteFriends(selectedUsers);
+          onInvite={async (selectedUsers: FollowUser[]) => {
+            // ★ FIX: Davetleri bekle, sonra navigasyon yap
+            await handleInviteFriends(selectedUsers);
             setShowInviteModal(false);
             if (createdRoomId) router.replace(`/room/${createdRoomId}`);
           }}
@@ -765,14 +812,14 @@ const s = StyleSheet.create({
     borderRadius: 14, marginBottom: 12, overflow: 'hidden' as any,
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
     // Alt gölge (aşağı doğru)
-    shadowColor: '#000',
+    shadowColor: 'rgba(20,184,166,0.15)',
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
+    shadowOpacity: 0.5,
+    shadowRadius: 10,
     elevation: 8,
-    // İç parlaklık efekti için gradient içeride uygulanır
+    // İç parlaklık efekti
     backgroundColor: 'rgba(18,30,48,0.95)',
-    borderTopColor: 'rgba(255,255,255,0.12)',
+    borderTopColor: 'rgba(20,184,166,0.15)',
     padding: 14,
   },
   cardRow: {
@@ -817,7 +864,11 @@ const s = StyleSheet.create({
     paddingVertical: 9, borderRadius: 10,
     backgroundColor: 'rgba(255,255,255,0.04)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
   },
-  toggleBtnActive: { backgroundColor: Colors.teal, borderColor: Colors.teal },
+  toggleBtnActive: {
+    backgroundColor: Colors.teal, borderColor: Colors.teal,
+    shadowColor: Colors.teal, shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.4, shadowRadius: 6,
+  },
   toggleText: { fontSize: 11, fontWeight: '700', color: '#94A3B8' },
   toggleTextActive: { color: '#fff' },
 
@@ -838,7 +889,7 @@ const s = StyleSheet.create({
   },
   previewTitle: { fontSize: 13, fontWeight: '800', color: '#F1F5F9', marginBottom: 5 },
   previewHostRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  previewAvatar: { width: 16, height: 16, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(115,194,189,0.3)' },
+
   previewHostName: { fontSize: 9, fontWeight: '600', color: '#14B8A6', maxWidth: 80 },
   previewJoinBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
@@ -878,7 +929,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8,
     backgroundColor: 'rgba(255,255,255,0.04)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
   },
-  feePillActive: { backgroundColor: 'rgba(212,175,55,0.15)', borderColor: 'rgba(212,175,55,0.3)' },
+  feePillActive: { backgroundColor: 'rgba(212,175,55,0.15)', borderColor: 'rgba(212,175,55,0.3)', shadowColor: '#D4AF37', shadowOpacity: 0.35, shadowRadius: 5, shadowOffset: { width: 0, height: 2 } },
   feePillText: { fontSize: 10, fontWeight: '600', color: '#64748B' },
   feePillTextActive: { color: '#D4AF37' },
 

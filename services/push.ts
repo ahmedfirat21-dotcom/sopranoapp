@@ -2,9 +2,19 @@
  * SopranoChat — Push Bildirim Gönderim Servisi (Client-Side Helper)
  * Supabase Edge Function üzerinden push notification gönderir
  */
+import { logger } from '../utils/logger';
 import { supabase } from '../constants/supabase';
 
-export type PushType = 'dm' | 'follow' | 'follow_request' | 'follow_accepted' | 'gift' | 'room_invite' | 'room_live' | 'event_reminder' | 'missed_call' | 'incoming_call';
+export type PushType = 'dm' | 'follow' | 'follow_request' | 'follow_accepted' | 'gift' | 'room_invite' | 'room_live' | 'room_follow' | 'event_reminder' | 'missed_call' | 'incoming_call';
+
+// ★ SEC-PUSH: Per-user debounce — bildirim spam engeli
+const _lastPushTime = new Map<string, number>();
+setInterval(() => {
+  const stale = Date.now() - 60_000;
+  for (const [k, v] of _lastPushTime) {
+    if (v < stale) _lastPushTime.delete(k);
+  }
+}, 10 * 60_000);
 
 export const PushService = {
   /**
@@ -17,6 +27,14 @@ export const PushService = {
     data?: { type: PushType; route: string; [key: string]: any }
   ): Promise<void> {
     try {
+      // ★ SEC-PUSH: Per-user debounce (5sn) — incoming_call hariç (zaman kritik)
+      const pushType = data?.type;
+      if (pushType !== 'incoming_call') {
+        const lastSent = _lastPushTime.get(targetUserId) || 0;
+        if (Date.now() - lastSent < 5000) return; // 5sn debounce
+      }
+      _lastPushTime.set(targetUserId, Date.now());
+
       const { data: profile, error: profileErr } = await supabase
         .from('profiles')
         .select('push_token')
@@ -37,14 +55,20 @@ export const PushService = {
           body,
           sound: 'default',
           data: data || {},
+          // ★ Arama bildirimi için yüksek öncelik — uygulama kapalıyken heads-up gösterir
+          ...(data?.type === 'incoming_call' ? {
+            priority: 'high',
+            channelId: 'calls',
+            _contentAvailable: true,
+          } : {}),
         }),
       });
 
       if (!response.ok) {
-        if (__DEV__) console.warn('[Push] Gönderim hatası:', response.status);
+        if (__DEV__) logger.warn('[Push] Gönderim hatası:', response.status);
       }
     } catch (err: any) {
-      console.error('[Push] Gönderilemedi:', err.message);
+      logger.error('[Push] Gönderilemedi:', err.message);
     }
   },
 
@@ -74,7 +98,7 @@ export const PushService = {
         targets.map(userId => this.sendToUser(userId, title, body, data))
       );
     } catch (err: any) {
-      console.error('[Push] Oda push hatası:', err.message);
+      logger.error('[Push] Oda push hatası:', err.message);
     }
   },
 
@@ -124,14 +148,29 @@ export const PushService = {
     targetUserId: string,
     callerName: string,
     callerId: string,
-    callType: 'audio' | 'video'
+    callType?: string // backward compat
   ): Promise<void> {
-    const icon = callType === 'video' ? '📹' : '📞';
     await this.sendToUser(
       targetUserId,
-      `${icon} Cevapsız Arama`,
+      '📞 Cevapsız Arama',
       `${callerName} seni aradı`,
       { type: 'missed_call', route: `/chat/${callerId}` }
+    );
+  },
+
+  /** Oda takip bildirimi gönder — birisi odayı takip ettiğinde oda sahibine */
+  async sendRoomFollowNotification(
+    roomOwnerId: string,
+    followerName: string,
+    followerId: string,
+    roomId: string,
+    roomName: string
+  ): Promise<void> {
+    await this.sendToUser(
+      roomOwnerId,
+      '🏠 Yeni Oda Takipçisi',
+      `${followerName} "${roomName}" odanızı takip etmeye başladı`,
+      { type: 'room_follow', route: `/room/${roomId}` }
     );
   },
 };

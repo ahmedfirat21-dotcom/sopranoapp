@@ -1,49 +1,35 @@
 /**
  * SopranoChat — El Kaldırma Kuyruk Yönetim Paneli
- * Host/Moderatör için bottom sheet: Bekleyen konuşmacı isteklerini yönetir.
- * 
- * Özellikler:
- * - Sıra numaralı kuyruk listesi
- * - Bekleme süresi göstergesi (zamanlayıcı)
- * - "Sahneye Al" / "Reddet" butonları
- * - Plus kullanıcı öncelik badge'i
- * - "Sıradaki" tek tuşla ilk sıradakini sahneye alır
- * - Boş kuyruk güzel empty state
+ * ★ Alt barın üstünde, kompakt bottom sheet.
+ * Host/Moderatör için: Bekleyen konuşmacı isteklerini yönetir.
  */
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useRef, useEffect, useMemo } from 'react';
 import {
-  View, Text, StyleSheet, Modal, Pressable, FlatList,
-  Image, Animated, Dimensions,
+  View, Text, StyleSheet, Pressable, FlatList,
+  Image, Animated, Dimensions, PanResponder,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Colors, Shadows } from '../../constants/theme';
+import { Colors } from '../../constants/theme';
 import { getAvatarSource } from '../../constants/avatars';
-import { RoomService, type RoomParticipant } from '../../services/database';
+import { type RoomParticipant } from '../../services/database';
 
 const { width: W } = Dimensions.get('window');
+const PANEL_H = 300;
 
 interface Props {
   visible: boolean;
   onClose: () => void;
   roomId: string;
-  /** El kaldıran kullanıcıların user_id'leri */
   pendingUserIds: string[];
-  /** Tüm oda katılımcıları (kullanıcı bilgilerine erişmek için) */
   participants: RoomParticipant[];
-  /** Bir kullanıcıyı sahneye al */
   onApprove: (userId: string, displayName: string) => void;
-  /** Bir kullanıcıyı reddet */
   onReject: (userId: string) => void;
-  /** Sahne slot sayısı */
   maxStageSlots: number;
-  /** Mevcut sahnedeki kişi sayısı */
   currentStageCount: number;
+  bottomInset?: number;
 }
 
 function getWaitTime(idx: number): string {
-  // Basit tahmin — gerçek bekleme süresi mic_request broadcast zamanıyla yapılabilir
-  // Şimdilik sıra numarasına göre yaklaşık süre
   return `~${idx + 1} dk`;
 }
 
@@ -91,11 +77,11 @@ function QueueItem({
           onPress={onApprove}
           disabled={stageSlotsFull}
         >
-          <Ionicons name="mic" size={14} color="#FFF" />
+          <Ionicons name="mic" size={12} color="#FFF" />
           <Text style={q.approveBtnText}>Al</Text>
         </Pressable>
         <Pressable style={q.rejectBtn} onPress={onReject}>
-          <Ionicons name="close" size={14} color="#EF4444" />
+          <Ionicons name="close" size={12} color="#EF4444" />
         </Pressable>
       </View>
     </View>
@@ -107,211 +93,250 @@ export default function HandRaiseQueuePanel({
   pendingUserIds, participants,
   onApprove, onReject,
   maxStageSlots, currentStageCount,
+  bottomInset = 14,
 }: Props) {
+  const translateY = useRef(new Animated.Value(PANEL_H)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
   const stageSlotsFull = currentStageCount >= maxStageSlots;
 
-  // Kuyruk listesi — participant bilgisiyle eşleştir
   const queueList = useMemo(() => {
     return pendingUserIds
       .map(uid => participants.find(p => p.user_id === uid))
       .filter(Boolean) as RoomParticipant[];
   }, [pendingUserIds, participants]);
 
-  // "Sıradaki" — kuyruğun en başındakini otomatik sahneye al
+  // Aşağı sürükleyerek kapatma
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_, gs) => gs.dy > 10 && Math.abs(gs.dx) < 20,
+      onPanResponderMove: (_, gs) => {
+        if (gs.dy > 0) translateY.setValue(gs.dy);
+      },
+      onPanResponderRelease: (_, gs) => {
+        if (gs.dy > 50 || gs.vy > 0.5) {
+          Animated.timing(translateY, { toValue: PANEL_H, duration: 200, useNativeDriver: true }).start(() => onClose());
+        } else {
+          Animated.spring(translateY, { toValue: 0, useNativeDriver: true, damping: 20, stiffness: 200 }).start();
+        }
+      },
+    })
+  ).current;
+
+  useEffect(() => {
+    if (visible) {
+      Animated.parallel([
+        Animated.spring(translateY, { toValue: 0, useNativeDriver: true, damping: 20, stiffness: 200 }),
+        Animated.timing(fadeAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(translateY, { toValue: PANEL_H, duration: 200, useNativeDriver: true }),
+        Animated.timing(fadeAnim, { toValue: 0, duration: 150, useNativeDriver: true }),
+      ]).start();
+    }
+  }, [visible]);
+
   const handleNextInQueue = () => {
     if (queueList.length === 0 || stageSlotsFull) return;
     const first = queueList[0];
     onApprove(first.user_id, first.user?.display_name || 'Kullanıcı');
   };
 
+  if (!visible) return null;
+
+  const BAR_OFFSET = bottomInset + 56;
+
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={onClose}
-    >
-      <Pressable style={s.backdrop} onPress={onClose}>
-        <Pressable style={s.panel} onPress={e => e.stopPropagation()}>
-          {/* Handle Bar */}
+    <View style={[StyleSheet.absoluteFill, { zIndex: 100 }]} pointerEvents="box-none">
+      {/* Backdrop */}
+      <Animated.View style={[s.backdrop, { opacity: fadeAnim }]}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+      </Animated.View>
+
+      {/* Panel — alt barın üstünde, alttan kayar */}
+      <Animated.View
+        {...panResponder.panHandlers}
+        style={[s.panel, { bottom: BAR_OFFSET, transform: [{ translateY }] }]}
+      >
+        {/* Sürükleme tutamağı */}
+        <View style={s.handle}>
           <View style={s.handleBar} />
+        </View>
 
-          {/* Header */}
-          <View style={s.header}>
-            <View style={s.headerLeft}>
-              <Ionicons name="hand-left" size={20} color={Colors.accentTeal} />
-              <Text style={s.headerTitle}>El Kaldıranlar</Text>
-              {queueList.length > 0 && (
-                <View style={s.countBadge}>
-                  <Text style={s.countText}>{queueList.length}</Text>
-                </View>
-              )}
-            </View>
-          </View>
-
-          {/* Sahne Durumu */}
-          <View style={s.stageInfo}>
-            <View style={[s.stageBar, stageSlotsFull && { borderColor: '#EF4444' }]}>
-              <Ionicons name="people" size={12} color={stageSlotsFull ? '#EF4444' : Colors.accentTeal} />
-              <Text style={[s.stageText, stageSlotsFull && { color: '#EF4444' }]}>
-                Sahne: {currentStageCount}/{maxStageSlots}
-                {stageSlotsFull ? ' (Dolu)' : ''}
-              </Text>
-            </View>
-            {/* Sıradaki Butonu */}
-            {queueList.length > 0 && !stageSlotsFull && (
-              <Pressable style={s.nextBtn} onPress={handleNextInQueue}>
-                <Ionicons name="arrow-up-circle" size={14} color="#FFF" />
-                <Text style={s.nextBtnText}>Sıradaki</Text>
-              </Pressable>
-            )}
-          </View>
-
-          {/* Kuyruk Listesi */}
-          {queueList.length > 0 ? (
-            <FlatList
-              data={queueList}
-              keyExtractor={(item) => item.user_id}
-              style={{ maxHeight: 330 }}
-              showsVerticalScrollIndicator={false}
-              renderItem={({ item, index }) => (
-                <QueueItem
-                  participant={item}
-                  index={index}
-                  stageSlotsFull={stageSlotsFull}
-                  onApprove={() => onApprove(item.user_id, item.user?.display_name || 'Kullanıcı')}
-                  onReject={() => onReject(item.user_id)}
-                />
-              )}
-            />
-          ) : (
-            <View style={s.emptyState}>
-              <Ionicons name="hand-left-outline" size={40} color="rgba(255,255,255,0.08)" />
-              <Text style={s.emptyTitle}>Kuyruk Boş</Text>
-              <Text style={s.emptySub}>Henüz kimse el kaldırmadı</Text>
+        {/* Header */}
+        <View style={s.header}>
+          <View style={s.headerDot} />
+          <Text style={s.headerTitle}>El Kaldıranlar</Text>
+          {queueList.length > 0 && (
+            <View style={s.countBadge}>
+              <Text style={s.countText}>{queueList.length}</Text>
             </View>
           )}
-        </Pressable>
-      </Pressable>
-    </Modal>
+        </View>
+
+        {/* Sahne Durumu + Sıradaki */}
+        <View style={s.stageInfo}>
+          <View style={[s.stageBar, stageSlotsFull && { borderColor: '#EF4444' }]}>
+            <Ionicons name="people" size={11} color={stageSlotsFull ? '#EF4444' : '#14B8A6'} />
+            <Text style={[s.stageText, stageSlotsFull && { color: '#EF4444' }]}>
+              {currentStageCount}/{maxStageSlots}{stageSlotsFull ? ' Dolu' : ''}
+            </Text>
+          </View>
+          {queueList.length > 0 && !stageSlotsFull && (
+            <Pressable style={s.nextBtn} onPress={handleNextInQueue}>
+              <Ionicons name="arrow-up-circle" size={12} color="#FFF" />
+              <Text style={s.nextBtnText}>Sıradaki</Text>
+            </Pressable>
+          )}
+        </View>
+
+        {/* Kuyruk Listesi */}
+        {queueList.length > 0 ? (
+          <FlatList
+            data={queueList}
+            keyExtractor={(item) => item.user_id}
+            style={{ maxHeight: 160 }}
+            showsVerticalScrollIndicator={false}
+            renderItem={({ item, index }) => (
+              <QueueItem
+                participant={item}
+                index={index}
+                stageSlotsFull={stageSlotsFull}
+                onApprove={() => onApprove(item.user_id, item.user?.display_name || 'Kullanıcı')}
+                onReject={() => onReject(item.user_id)}
+              />
+            )}
+          />
+        ) : (
+          <View style={s.emptyState}>
+            <Ionicons name="hand-right-outline" size={24} color="rgba(255,255,255,0.06)" />
+            <Text style={s.emptyTitle}>Kuyruk Boş</Text>
+            <Text style={s.emptySub}>Henüz kimse el kaldırmadı</Text>
+          </View>
+        )}
+      </Animated.View>
+    </View>
   );
 }
 
 const s = StyleSheet.create({
   backdrop: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.25)',
   },
+  // ★ Panel — alt barın üstünde, kompakt bottom sheet
   panel: {
-    backgroundColor: '#2D3740',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingHorizontal: 16,
-    paddingBottom: 40,
-    maxHeight: '65%',
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    zIndex: 50,
+    backgroundColor: 'rgba(45,55,64,0.95)',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
+    borderBottomWidth: 0,
+    borderColor: 'rgba(255,255,255,0.08)',
+    overflow: 'hidden',
+    paddingBottom: 8,
+    elevation: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
   },
-  handleBar: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    alignSelf: 'center',
-    marginTop: 12,
-    marginBottom: 16,
-  },
+  handle: { alignItems: 'center', paddingVertical: 8 },
+  handleBar: { width: 36, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.2)' },
+  // Header
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 12,
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.06)',
   },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  headerDot: {
+    width: 6, height: 6, borderRadius: 3,
+    backgroundColor: '#FBBF24',
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: '800',
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '700',
     color: '#F1F5F9',
-    ...Shadows.text,
+    textShadowColor: 'rgba(0,0,0,0.4)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   countBadge: {
-    backgroundColor: Colors.accentTeal,
-    minWidth: 22,
-    height: 22,
-    borderRadius: 11,
+    backgroundColor: '#FBBF24',
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 6,
+    paddingHorizontal: 5,
   },
   countText: {
-    fontSize: 11,
+    fontSize: 9,
     fontWeight: '800',
-    color: '#FFF',
-  },
-  closeBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    color: '#1E1B12',
   },
   stageInfo: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.04)',
   },
   stageBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 10,
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
     borderWidth: 1,
-    borderColor: 'rgba(115,194,189,0.2)',
-    backgroundColor: 'rgba(115,194,189,0.06)',
+    borderColor: 'rgba(20,184,166,0.2)',
+    backgroundColor: 'rgba(20,184,166,0.06)',
   },
   stageText: {
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: '600',
-    color: Colors.accentTeal,
+    color: '#14B8A6',
   },
   nextBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 12,
-    backgroundColor: Colors.accentTeal,
-    ...Shadows.button,
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    backgroundColor: '#14B8A6',
   },
   nextBtnText: {
-    fontSize: 13,
+    fontSize: 10,
     fontWeight: '700',
     color: '#FFF',
   },
   emptyState: {
     alignItems: 'center',
-    paddingVertical: 48,
-    gap: 8,
+    paddingVertical: 24,
+    gap: 4,
   },
   emptyTitle: {
-    fontSize: 16,
+    fontSize: 13,
     fontWeight: '700',
-    color: '#64748B',
-    marginTop: 8,
+    color: '#475569',
+    marginTop: 6,
   },
   emptySub: {
-    fontSize: 12,
-    color: '#475569',
+    fontSize: 10,
+    color: '#334155',
   },
 });
 
@@ -319,77 +344,75 @@ const q = StyleSheet.create({
   item: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 8,
+    gap: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.04)',
   },
   orderBadge: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
+    width: 24,
+    height: 24,
+    borderRadius: 6,
     backgroundColor: 'rgba(255,255,255,0.06)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   orderText: {
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: '800',
     color: '#94A3B8',
   },
   avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    borderWidth: 1.5,
-    borderColor: 'rgba(115,194,189,0.3)',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(20,184,166,0.3)',
   },
   nameWrap: {
     flex: 1,
   },
   name: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '700',
     color: '#F1F5F9',
-    ...Shadows.text,
   },
   plusBadge: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
     backgroundColor: 'rgba(255,215,0,0.15)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   waitText: {
-    fontSize: 10,
+    fontSize: 9,
     color: '#64748B',
-    marginTop: 2,
+    marginTop: 1,
   },
   actions: {
     flexDirection: 'row',
-    gap: 6,
+    gap: 4,
   },
   approveBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 10,
-    backgroundColor: Colors.accentTeal,
-    ...Shadows.button,
+    gap: 3,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    backgroundColor: '#14B8A6',
   },
   approveBtnText: {
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: '700',
     color: '#FFF',
   },
   rejectBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
+    width: 26,
+    height: 26,
+    borderRadius: 8,
     backgroundColor: 'rgba(239,68,68,0.1)',
     borderWidth: 1,
     borderColor: 'rgba(239,68,68,0.2)',

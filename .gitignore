@@ -34,7 +34,18 @@ errors.txt
 .build-check/
 .idea/
 
+# Claude Code session data
+.claude/
+
 # Root-level test screenshots (dev artifacts)
+*.backup.tsx
+*.backup.ts
+intro_*.png
+vid_*.png
+vtest*.png
+onb_*.png
+scr_*.png
+scr*.png
 back_test.png
 beren_tap.png
 home_back.png
@@ -54,6 +65,11 @@ emulator_plus.png
 emulator_profile*.png
 emulator_profiltab*.png
 emulator_settings*.png
+intro_record.mp4
+dist-standalone/
+
+# Firebase service account key — ASLA commit edilmemeli!
+sopranochat-5738e-*.json
 
 # google-services.json — EAS Build için gerekli, gitignore'dan çıkarıldı
 
@@ -62,3 +78,19 @@ emulator_settings*.png
 
 expo-env.d.ts
 # @end expo-cli
+
+# Release keystore & upload certificates
+*.keystore
+*.pem
+upload_cert.pem
+upload_cert.der
+!android/app/debug.keystore
+
+# Google Play service account / EAS submit API keys — ASLA commit etme
+pc-api-key.json
+*-service-account.json
+
+# Native build artifacts
+_aab_check/
+
+.vercel

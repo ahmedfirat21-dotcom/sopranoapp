@@ -9,9 +9,11 @@ interface UseLiveKitOptions {
   displayName?: string;
   qualityPreset?: { audioSampleRate?: number; audioChannels?: number; videoMaxRes?: number };
   shouldDisconnectOnUnmount?: () => boolean;
+  /** K7: Mikrofon/kamera permission reddedildiğinde UI feedback için çağrılır. */
+  onPermissionDenied?: (device: 'microphone' | 'camera') => void;
 }
 
-export default function useLiveKit({ roomId, enabled = true, userId, displayName, qualityPreset, shouldDisconnectOnUnmount }: UseLiveKitOptions) {
+export default function useLiveKit({ roomId, enabled = true, userId, displayName, qualityPreset, shouldDisconnectOnUnmount, onPermissionDenied }: UseLiveKitOptions) {
   const [connectionState, setConnectionState] = useState<RoomConnectionState>('disconnected');
   const [participants, setParticipants] = useState<ParticipantUpdate[]>([]);
   // ★ BUG-2 FIX: Mic/Cam durumunu React state olarak takip et
@@ -28,18 +30,24 @@ export default function useLiveKit({ roomId, enabled = true, userId, displayName
   const prevCamRef = useRef(false);
 
   // ★ Bağlantı kurma fonksiyonu — retry ile
+  const intentionalLeaveRef = useRef(false); // Normal çıkışta Disconnected eventi yoksay
+
   const doConnect = useCallback(async () => {
     if (!roomId || !userId || !displayName) return;
     if (connectingRef.current) return; // Zaten bağlanıyor
-    
+
     connectingRef.current = true;
     setConnectFailed(false);
+    intentionalLeaveRef.current = false;
 
     const success = await liveKitService.connect(roomId, userId, displayName, {
       onConnectionStateChange: (state) => {
         if (!mountedRef.current) return;
         setConnectionState(state);
         
+        // ★ Normal (intentional) çıkışta reconnect döngüsünü başlatma
+        if (state === 'disconnected' && intentionalLeaveRef.current) return;
+
         // ★ Bağlantı koptuğunda otomatik yeniden bağlanma (max 3)
         if (state === 'disconnected' && mountedRef.current && reconnectCountRef.current < 3) {
           reconnectCountRef.current++;
@@ -103,6 +111,10 @@ export default function useLiveKit({ roomId, enabled = true, userId, displayName
         setIsMicEnabled(mic);
         setIsCamEnabled(cam);
       },
+      onPermissionDenied: (device) => {
+        if (!mountedRef.current) return;
+        onPermissionDenied?.(device);
+      },
     }, qualityPreset);
 
     connectingRef.current = false;
@@ -111,7 +123,7 @@ export default function useLiveKit({ roomId, enabled = true, userId, displayName
       setConnectFailed(true);
       if (__DEV__) console.warn('[useLiveKit] Bağlantı başarısız.');
     }
-  }, [roomId, userId, displayName, qualityPreset]);
+  }, [roomId, userId, displayName, qualityPreset, onPermissionDenied]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -130,6 +142,7 @@ export default function useLiveKit({ roomId, enabled = true, userId, displayName
       }
       const shouldDisconnect = shouldDisconnectOnUnmount ? shouldDisconnectOnUnmount() : true;
       if (shouldDisconnect) {
+        intentionalLeaveRef.current = true;
         liveKitService.disconnect();
         setConnectionState('disconnected');
         setParticipants([]);
@@ -203,8 +216,11 @@ export default function useLiveKit({ roomId, enabled = true, userId, displayName
     return await liveKitService.toggleScreenShare();
   }, []);
 
-  // ★ FIX: isScreenSharing'i participants state'inden türet — reaktif olsun
-  const isScreenSharing = participants.some(p => p.isScreenShareEnabled);
+  // ★ BUG FIX: isScreenSharing → LOCAL kullanıcının paylaşım durumu (toggle butonu için)
+  // Eski kod tüm katılımcıları kontrol ediyordu → başkası paylaşıyorsa buton yanlış görünüyordu
+  const isScreenSharing = liveKitService.isScreenSharing;
+  // Odada herhangi biri paylaşıyor mu? (video görüntüleme için)
+  const anyoneScreenSharing = participants.some(p => p.isScreenShareEnabled);
 
   return {
     muteRoomAudio,
@@ -223,5 +239,6 @@ export default function useLiveKit({ roomId, enabled = true, userId, displayName
     isCameraEnabled: isCamEnabled,
     isMicrophoneEnabled: isMicEnabled,
     isScreenSharing,
+    anyoneScreenSharing,
   };
 }

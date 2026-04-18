@@ -1,10 +1,10 @@
 import React from 'react';
-import { View, Text, StyleSheet, Image, Pressable, Animated, ScrollView, Dimensions, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Animated, ScrollView, Dimensions, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { FriendshipService, type FollowUser } from '../services/friendship';
 import { supabase } from '../constants/supabase';
-import { getAvatarSource } from '../constants/avatars';
+import StatusAvatar from './StatusAvatar';
 
 const { width: W } = Dimensions.get('window');
 const DRAWER_W = W * 0.72;
@@ -86,8 +86,42 @@ export default function FriendsDrawer({ visible, friends, onClose, onSelect, cur
     }
   }, [visible]);
 
-  const sorted = [...friends].sort((a, b) => (b.is_online ? 1 : 0) - (a.is_online ? 1 : 0));
-  const onlineCount = friends.filter(f => f.is_online).length;
+  // ★ Sürükleyerek kapatma (sağa swipe)
+  const panResponder = React.useRef(
+    React.useMemo(() => {
+      let startX = 0;
+      return require('react-native').PanResponder.create({
+        onStartShouldSetPanResponder: () => false,
+        onMoveShouldSetPanResponder: (_: any, g: any) => g.dx > 10 && Math.abs(g.dy) < g.dx,
+        onPanResponderGrant: () => { startX = (slideAnim as any)._value || 0; },
+        onPanResponderMove: (_: any, g: any) => {
+          const newX = Math.max(0, startX + g.dx);
+          slideAnim.setValue(newX);
+          // Backdrop opaklığını sürükleme mesafesiyle eşitle
+          fadeAnim.setValue(1 - (newX / DRAWER_W) * 0.8);
+        },
+        onPanResponderRelease: (_: any, g: any) => {
+          if (g.dx > 60 || g.vx > 0.5) {
+            // Eşik aşıldı — kapat
+            Animated.parallel([
+              Animated.spring(slideAnim, { toValue: DRAWER_W, useNativeDriver: true, damping: 20, stiffness: 220 }),
+              Animated.timing(fadeAnim, { toValue: 0, duration: 150, useNativeDriver: true }),
+            ]).start(() => onClose());
+          } else {
+            // Geri yay — açık kal
+            Animated.parallel([
+              Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true, damping: 20, stiffness: 200 }),
+              Animated.timing(fadeAnim, { toValue: 1, duration: 100, useNativeDriver: true }),
+            ]).start();
+          }
+        },
+      });
+    }, [])
+  ).current;
+
+  // ★ Sadece online arkadaşları göster (takip ilişkisi olan — her iki yön dahil)
+  const onlineOnly = friends.filter(f => f.is_online);
+  const onlineCount = onlineOnly.length;
   // ★ Bekleyen istek sayısı — handled olanları çıkar
   const activePendingCount = pendingRequests.filter(r => !handledIds[r.user_id]).length;
 
@@ -98,20 +132,20 @@ export default function FriendsDrawer({ visible, friends, onClose, onSelect, cur
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
       </Animated.View>
 
-      {/* Panel — sağdan süzülür */}
-      <Animated.View style={[fd.panel, { transform: [{ translateX: slideAnim }] }]}>
+      {/* Panel — sağdan süzülür + sürüklenebilir */}
+      <Animated.View {...panResponder.panHandlers} style={[fd.panel, { transform: [{ translateX: slideAnim }] }]}>
         {/* Üst parlak gradient efekti */}
         <LinearGradient
-          colors={['rgba(20,184,166,0.12)', 'rgba(20,184,166,0.03)', 'transparent']}
+          colors={['rgba(34,197,94,0.12)', 'rgba(34,197,94,0.03)', 'transparent']}
           style={fd.topGlow}
         />
 
         {/* Başlık */}
         <View style={fd.header}>
-          <Ionicons name="people" size={15} color="#14B8A6" />
-          <Text style={fd.headerTitle}>Arkadaşlarım</Text>
+          <Ionicons name="radio" size={15} color="#22C55E" />
+          <Text style={fd.headerTitle}>Çevrimiçi</Text>
           <View style={fd.countPill}>
-            <Text style={fd.countText}>{onlineCount} çevrimiçi</Text>
+            <Text style={fd.countText}>{onlineCount} aktif</Text>
           </View>
           <View style={{ flex: 1 }} />
           <Pressable onPress={onClose} hitSlop={12}>
@@ -145,7 +179,7 @@ export default function FriendsDrawer({ visible, friends, onClose, onSelect, cur
                       style={fd.requestAvatarWrap}
                       onPress={() => { onClose(); setTimeout(() => onSelect(req.user_id), 200); }}
                     >
-                      <Image source={getAvatarSource(sender?.avatar_url)} style={fd.requestAvatar} />
+                      <StatusAvatar uri={sender?.avatar_url} size={34} tier={sender?.subscription_tier} />
                     </Pressable>
                     <View style={{ flex: 1, marginRight: 6 }}>
                       <Text style={[fd.requestName, handled && { opacity: 0.6 }]} numberOfLines={1}>
@@ -182,34 +216,27 @@ export default function FriendsDrawer({ visible, friends, onClose, onSelect, cur
             </View>
           )}
 
-          {/* Arkadaş Listesi */}
-          {sorted.length === 0 && pendingRequests.length === 0 ? (
+          {/* Çevrimiçi Arkadaş Listesi — Sadece online olanlar */}
+          {onlineOnly.length === 0 && pendingRequests.length === 0 ? (
             <View style={fd.empty}>
-              <Ionicons name="people-outline" size={32} color="rgba(20,184,166,0.2)" />
-              <Text style={fd.emptyText}>Henüz takip ettiğin kimse yok</Text>
+              <Ionicons name="radio-outline" size={32} color="rgba(34,197,94,0.2)" />
+              <Text style={fd.emptyText}>Şu an çevrimiçi arkadaşın yok</Text>
+              <Text style={[fd.emptyText, { fontSize: 10, marginTop: -4 }]}>Çevrimdışı arkadaşların profilinde listelenir</Text>
             </View>
-          ) : sorted.map((friend) => {
-            const isOnline = friend.is_online;
-            return (
+          ) : onlineOnly.map((friend) => (
               <Pressable
                 key={friend.id}
                 style={({ pressed }) => [fd.row, pressed && { opacity: 0.8, backgroundColor: 'rgba(255,255,255,0.04)' }]}
                 onPress={() => { onClose(); setTimeout(() => onSelect(friend.id), 200); }}
               >
-                <View style={fd.avatarWrap}>
-                  <Image source={getAvatarSource(friend.avatar_url)} style={fd.avatar} />
-                  <View style={[fd.dot, isOnline ? fd.dotOn : fd.dotOff]} />
-                </View>
+                  <StatusAvatar uri={friend.avatar_url} size={33} isOnline={true} tier={(friend as any).subscription_tier} />
                 <View style={{ flex: 1 }}>
                   <Text style={fd.name} numberOfLines={1}>{friend.display_name}</Text>
-                  <Text style={[fd.status, isOnline && { color: '#22C55E' }]}>
-                    {isOnline ? 'Çevrimiçi' : 'Çevrimdışı'}
-                  </Text>
+                  <Text style={[fd.status, { color: '#22C55E' }]}>Çevrimiçi</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={12} color="rgba(255,255,255,0.1)" />
               </Pressable>
-            );
-          })}
+            ))}
         </ScrollView>
       </Animated.View>
     </View>
@@ -241,11 +268,11 @@ const fd = StyleSheet.create({
     textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
   countPill: {
-    backgroundColor: 'rgba(20,184,166,0.1)', borderRadius: 10,
+    backgroundColor: 'rgba(34,197,94,0.1)', borderRadius: 10,
     paddingHorizontal: 7, paddingVertical: 2,
-    borderWidth: 1, borderColor: 'rgba(20,184,166,0.18)',
+    borderWidth: 1, borderColor: 'rgba(34,197,94,0.18)',
   },
-  countText: { color: '#14B8A6', fontSize: 9, fontWeight: '700' },
+  countText: { color: '#22C55E', fontSize: 9, fontWeight: '700' },
   empty: { alignItems: 'center', paddingVertical: 60, gap: 10 },
   emptyText: { fontSize: 12, color: 'rgba(255,255,255,0.25)' },
   row: {

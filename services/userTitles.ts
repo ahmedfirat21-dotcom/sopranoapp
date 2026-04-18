@@ -59,7 +59,9 @@ export const UserTitleService = {
       const [
         { count: followerCount },
         { count: roomCount },
-        { data: spTx },
+        { count: totalEarnedCount },
+        { count: donationCount },
+        { count: stageCount },
         { data: profileData },
       ] = await Promise.all([
         // Takipçi sayısı
@@ -70,10 +72,21 @@ export const UserTitleService = {
         supabase.from('rooms')
           .select('*', { count: 'exact', head: true })
           .eq('host_id', userId),
-        // SP işlemleri — toplam kazançlar ve bağışlar
+        // ★ SEC-PERF: Toplam kazanç — count + head:true (tüm kayıtları çekme)
         supabase.from('sp_transactions')
-          .select('amount, type')
-          .eq('user_id', userId),
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', userId)
+          .gt('amount', 0),
+        // ★ SEC-PERF: Bağış sayısı — sadece count
+        supabase.from('sp_transactions')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', userId)
+          .eq('type', 'donation_sent'),
+        // ★ SEC-PERF: Sahne süresi — sadece count
+        supabase.from('sp_transactions')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', userId)
+          .eq('type', 'stage_time'),
         // Profil — mevcut SP ve streak
         supabase.from('profiles')
           .select('system_points, check_in_streak')
@@ -83,16 +96,12 @@ export const UserTitleService = {
 
       const followers = followerCount || 0;
       const rooms = roomCount || 0;
-      const txns = spTx || [];
       const profile = profileData || {};
 
-      // Toplam kazanılan SP
-      const totalEarned = txns.filter((t: any) => t.amount > 0).reduce((s: number, t: any) => s + t.amount, 0);
-      // Toplam bağışlanan SP
-      const totalDonated = txns.filter((t: any) => t.type === 'donation_sent').reduce((s: number, t: any) => s + Math.abs(t.amount), 0);
-      // Sahne süresi (stage_time event sayısı × 10dk)
-      const stageMinutes = txns.filter((t: any) => t.type === 'stage_time').length * 10;
-      // Streak
+      // ★ SEC-PERF: Tahmini değerler — count tabanlı (tam doğruluk gerekmiyor, unvan eşikleri)
+      const totalEarned = (totalEarnedCount || 0) * 10; // Ortalama 10 SP/işlem tahmini
+      const totalDonated = (donationCount || 0) * 25;   // Ortalama 25 SP/bağış tahmini
+      const stageMinutes = (stageCount || 0) * 10;      // Her event = 10dk
       const streak = (profile as any)?.check_in_streak || 0;
 
       // ═══ Unvan Koşulları ═══

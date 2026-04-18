@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, Image, StyleSheet } from 'react-native';
+import React, { useRef, useEffect } from 'react';
+import { View, Text, Image, StyleSheet, Animated, Easing } from 'react-native';
 
 interface ChatMsg {
   id: string;
@@ -15,6 +15,31 @@ interface Props {
   maxLines?: number;
 }
 
+// ★ Animated message wrapper — her yeni mesaj yumuşak fade+slide-up ile girer
+function AnimatedMsg({ children, delay = 0 }: { children: React.ReactNode; delay?: number }) {
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(10)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1, duration: 350, delay,
+        easing: Easing.out(Easing.cubic), useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0, duration: 350, delay,
+        easing: Easing.out(Easing.cubic), useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+
+  return (
+    <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
+      {children}
+    </Animated.View>
+  );
+}
+
 export default function InlineChat({ messages, maxLines = 6 }: Props) {
   if (messages.length === 0) return null;
   // ★ UX-2 FIX: En yeni mesaj en altta, en parlak — eski mesajlar üstte, solgun
@@ -28,40 +53,49 @@ export default function InlineChat({ messages, maxLines = 6 }: Props) {
 
         if (msg.isSystem) {
           return (
-            <Text key={msg.id} style={[s.sysLine, { opacity }]} numberOfLines={2}>
-              {msg.content}
-            </Text>
+            <AnimatedMsg key={msg.id} delay={idx === 0 ? 0 : 30}>
+              <Text style={[s.sysLine, { opacity }]} numberOfLines={2}>
+                {msg.content}
+              </Text>
+            </AnimatedMsg>
           );
         }
 
-        // GIF mesajı kontrolü
+        // GIF mesajı kontrolü — ★ SEC: URL whitelist doğrulaması
         const gifMatch = msg.content.match(/^\[gif:(.*)\]$/);
+        const isGifSafe = gifMatch?.[1] && /^https:\/\/(media\.tenor\.com|media[0-9]*\.giphy\.com|i\.giphy\.com)\//i.test(gifMatch[1]);
         // Tek emoji kontrolü
         const emojiOnly = /^[\p{Emoji_Presentation}\p{Extended_Pictographic}\u200d\uFE0F\u20E3]{1,6}$/u.test(msg.content) && msg.content.length <= 14;
 
-        if (gifMatch) {
+        if (isGifSafe) {
           return (
-            <View key={msg.id} style={[s.gifRow, { opacity }]}>
-              <Text style={s.msgName}>{msg.profiles?.display_name || 'Kullanıcı'}  </Text>
-              <Image source={{ uri: gifMatch[1] }} style={s.gifThumb} resizeMode="cover" />
-            </View>
+            <AnimatedMsg key={msg.id} delay={idx === 0 ? 0 : 30}>
+              <View style={[s.gifRow, { opacity }]}>
+                <Text style={s.msgName}>{msg.profiles?.display_name || 'Kullanıcı'}  </Text>
+                <Image source={{ uri: gifMatch![1] }} style={s.gifThumb} resizeMode="cover" />
+              </View>
+            </AnimatedMsg>
           );
         }
 
         if (emojiOnly) {
           return (
-            <Text key={msg.id} style={[s.msgLine, { opacity }]} numberOfLines={1}>
-              <Text style={s.msgName}>{msg.profiles?.display_name || 'Kullanıcı'}  </Text>
-              <Text style={{ fontSize: 22 }}>{msg.content}</Text>
-            </Text>
+            <AnimatedMsg key={msg.id} delay={idx === 0 ? 0 : 30}>
+              <Text style={[s.msgLine, { opacity }]} numberOfLines={1}>
+                <Text style={s.msgName}>{msg.profiles?.display_name || 'Kullanıcı'}  </Text>
+                <Text style={{ fontSize: 22 }}>{msg.content}</Text>
+              </Text>
+            </AnimatedMsg>
           );
         }
 
         return (
-          <Text key={msg.id} style={[s.msgLine, { opacity }]} numberOfLines={2}>
-            <Text style={s.msgName}>{msg.profiles?.display_name || 'Kullanıcı'}  </Text>
-            <Text style={s.msgText}>{msg.content}</Text>
-          </Text>
+          <AnimatedMsg key={msg.id} delay={idx === 0 ? 0 : 30}>
+            <Text style={[s.msgLine, { opacity }]} numberOfLines={2}>
+              <Text style={s.msgName}>{msg.profiles?.display_name || 'Kullanıcı'}  </Text>
+              <Text style={s.msgText}>{msg.content}</Text>
+            </Text>
+          </AnimatedMsg>
         );
       })}
     </View>

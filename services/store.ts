@@ -6,19 +6,31 @@
  */
 import { supabase } from '../constants/supabase';
 import type { StoreItem, UserPurchase } from '../types';
+import { getRoomLimits } from '../constants/tiers';
+import { migrateLegacyTier } from '../types';
 
 // ── Hardcoded mağaza kataloğu (DB tablosu eklenince kaldırılacak) ──
 const STORE_CATALOG: StoreItem[] = [
-  { id: 'frame_neon_teal', name: 'Neon Teal Çerçeve', description: 'Parlak teal renkli profil çerçevesi', type: 'profile_frame', price: 500, image_url: '', rarity: 'rare', is_limited: false, is_active: true, created_at: '2026-01-01' },
-  { id: 'frame_gold_crown', name: 'Altın Taç Çerçeve', description: 'Prestige altın taç efektli çerçeve', type: 'profile_frame', price: 1500, image_url: '', rarity: 'legendary', is_limited: true, is_active: true, created_at: '2026-01-01' },
+  // ★ Giriş Seviyesi — Küçük paketlerle bile alınabilir (50-150 SP)
+  { id: 'emoji_fire_pack', name: '🔥 Ateş Emoji Paketi', description: 'Özel ateş temalı emoji seti', type: 'chat_bubble', price: 50, image_url: '', rarity: 'common', is_limited: false, is_active: true, created_at: '2026-01-01' },
+  { id: 'emoji_star_pack', name: '⭐ Yıldız Emoji Paketi', description: 'Parlayan yıldız emoji seti', type: 'chat_bubble', price: 50, image_url: '', rarity: 'common', is_limited: false, is_active: true, created_at: '2026-01-01' },
+  { id: 'chat_mint_green', name: 'Nane Yeşili', description: 'Ferah nane yeşili sohbet rengi', type: 'chat_bubble', price: 80, image_url: '', rarity: 'common', is_limited: false, is_active: true, created_at: '2026-01-01' },
+  { id: 'chat_rose_pink', name: 'Gül Pembesi', description: 'Zarif pembe tonlarında sohbet rengi', type: 'chat_bubble', price: 80, image_url: '', rarity: 'common', is_limited: false, is_active: true, created_at: '2026-01-01' },
+  { id: 'frame_basic_glow', name: 'Basit Işıltı Çerçeve', description: 'Hafif parlayan profil çerçevesi', type: 'profile_frame', price: 120, image_url: '', rarity: 'common', is_limited: false, is_active: true, created_at: '2026-01-01' },
+  { id: 'entry_wave', name: 'El Sallama Girişi', description: 'Odaya girerken dostça el sallama', type: 'entry_effect', price: 150, image_url: '', rarity: 'common', is_limited: false, is_active: true, created_at: '2026-01-01' },
+  // ★ Orta Seviye (200-600 SP)
+  { id: 'chat_ocean_blue', name: 'Okyanus Mavisi', description: 'Sohbet balonlarına okyanus mavisi renk', type: 'chat_bubble', price: 200, image_url: '', rarity: 'common', is_limited: false, is_active: true, created_at: '2026-01-01' },
+  { id: 'chat_sunset_orange', name: 'Gün Batımı', description: 'Sıcak turuncu sohbet rengi', type: 'chat_bubble', price: 200, image_url: '', rarity: 'common', is_limited: false, is_active: true, created_at: '2026-01-01' },
+  { id: 'frame_neon_teal', name: 'Neon Teal Çerçeve', description: 'Parlak teal renkli profil çerçevesi', type: 'profile_frame', price: 400, image_url: '', rarity: 'rare', is_limited: false, is_active: true, created_at: '2026-01-01' },
+  { id: 'chat_galaxy_purple', name: 'Galaksi Moru', description: 'Uzay temalı mor sohbet rengi', type: 'chat_bubble', price: 500, image_url: '', rarity: 'rare', is_limited: false, is_active: true, created_at: '2026-01-01' },
+  // ★ Üst Seviye (600-1000 SP)
+  { id: 'frame_purple_aura', name: 'Mor Aura Çerçeve', description: 'Gizemli mor ışıltılı çerçeve', type: 'profile_frame', price: 700, image_url: '', rarity: 'epic', is_limited: false, is_active: true, created_at: '2026-01-01' },
+  { id: 'theme_midnight', name: 'Gece Yarısı Teması', description: 'Koyu mor ve yıldızlı oda teması', type: 'room_theme', price: 700, image_url: '', rarity: 'epic', is_limited: false, is_active: true, created_at: '2026-01-01' },
+  { id: 'entry_sparkle', name: 'Parıltı Girişi', description: 'Odaya girerken parıltılı efekt', type: 'entry_effect', price: 800, image_url: '', rarity: 'epic', is_limited: false, is_active: true, created_at: '2026-01-01' },
+  // ★ Premium / Legendary (1200-2000 SP)
+  { id: 'frame_gold_crown', name: 'Altın Taç Çerçeve', description: 'Prestige altın taç efektli çerçeve', type: 'profile_frame', price: 1200, image_url: '', rarity: 'legendary', is_limited: true, is_active: true, created_at: '2026-01-01' },
+  { id: 'entry_thunder', name: 'Şimşek Girişi', description: 'Güçlü şimşek efektiyle giriş', type: 'entry_effect', price: 1200, image_url: '', rarity: 'legendary', is_limited: false, is_active: true, created_at: '2026-01-01' },
   { id: 'frame_diamond_ring', name: 'Elmas Yüzük Çerçeve', description: 'Pırıl pırıl elmas efektli çerçeve', type: 'profile_frame', price: 2000, image_url: '', rarity: 'legendary', is_limited: false, is_active: true, created_at: '2026-01-01' },
-  { id: 'frame_purple_aura', name: 'Mor Aura Çerçeve', description: 'Gizemli mor ışıltılı çerçeve', type: 'profile_frame', price: 800, image_url: '', rarity: 'epic', is_limited: false, is_active: true, created_at: '2026-01-01' },
-  { id: 'chat_ocean_blue', name: 'Okyanus Mavisi', description: 'Sohbet balonlarına okyanus mavisi renk', type: 'chat_bubble', price: 300, image_url: '', rarity: 'common', is_limited: false, is_active: true, created_at: '2026-01-01' },
-  { id: 'chat_sunset_orange', name: 'Gün Batımı', description: 'Sıcak turuncu sohbet rengi', type: 'chat_bubble', price: 300, image_url: '', rarity: 'common', is_limited: false, is_active: true, created_at: '2026-01-01' },
-  { id: 'chat_galaxy_purple', name: 'Galaksi Moru', description: 'Uzay temalı mor sohbet rengi', type: 'chat_bubble', price: 600, image_url: '', rarity: 'rare', is_limited: false, is_active: true, created_at: '2026-01-01' },
-  { id: 'entry_sparkle', name: 'Parıltı Girişi', description: 'Odaya girerken parıltılı efekt', type: 'entry_effect', price: 1000, image_url: '', rarity: 'epic', is_limited: false, is_active: true, created_at: '2026-01-01' },
-  { id: 'entry_thunder', name: 'Şimşek Girişi', description: 'Güçlü şimşek efektiyle giriş', type: 'entry_effect', price: 1500, image_url: '', rarity: 'legendary', is_limited: false, is_active: true, created_at: '2026-01-01' },
-  { id: 'theme_midnight', name: 'Gece Yarısı Teması', description: 'Koyu mor ve yıldızlı oda teması', type: 'room_theme', price: 800, image_url: '', rarity: 'epic', is_limited: false, is_active: true, created_at: '2026-01-01' },
 ];
 
 // ============================================
@@ -77,29 +89,44 @@ export const StoreService = {
 
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('system_points, purchased_items, is_admin')
+      .select('system_points, purchased_items, is_admin, subscription_tier')
       .eq('id', userId)
       .single();
 
     if (profileError || !profile) throw new Error('Profil bulunamadı');
-    // ★ GodMaster bypass — admin kullanıcılar sınırsız SP
+
+    // ★ Tier kontrolü — avatar çerçevesi Plus+, giriş efekti Plus+ gerektirir
+    const userTier = migrateLegacyTier(profile.subscription_tier || 'Free');
+    const tierLimits = getRoomLimits(userTier);
     const isAdmin = profile.is_admin === true;
+    if (!isAdmin) {
+      if (item.type === 'profile_frame' && !tierLimits.canUseAvatarFrame) {
+        throw new Error('Avatar çerçevesi kullanmak için Plus veya Pro üyelik gereklidir.');
+      }
+    }
+
     if (!isAdmin && profile.system_points < price) throw new Error('Yetersiz SP');
 
     const owned: string[] = Array.isArray(profile.purchased_items) ? profile.purchased_items : [];
     if (owned.includes(itemId)) throw new Error('Bu ürüne zaten sahipsin!');
 
     const newOwned = [...owned, itemId];
+    // ★ B7 FIX: Admin ise SP düşürme — sadece purchased_items güncelle
+    const updatePayload: any = { purchased_items: newOwned };
+    if (!isAdmin) {
+      updatePayload.system_points = profile.system_points - price;
+    }
+
     // ★ SEC-7: Optimistic lock — concurrent satın alma koruması
-    const { data: updated, error: updateError } = await supabase
+    let query = supabase
       .from('profiles')
-      .update({
-        system_points: profile.system_points - price,
-        purchased_items: newOwned,
-      })
-      .eq('id', userId)
-      .eq('system_points', profile.system_points) // ★ SP değişmişse 0 row affected
-      .select('id');
+      .update(updatePayload)
+      .eq('id', userId);
+    // Optimistic lock sadece SP düşürülen durumlarda (admin hariç)
+    if (!isAdmin) {
+      query = query.eq('system_points', profile.system_points);
+    }
+    const { data: updated, error: updateError } = await query.select('id');
 
     if (updateError) throw new Error('Satın alma başarısız: ' + updateError.message);
     if (!updated || updated.length === 0) throw new Error('Eşzamanlı işlem çakışması. Lütfen tekrar deneyin.');
@@ -108,13 +135,13 @@ export const StoreService = {
     try {
       await supabase.from('sp_transactions').insert({
         user_id: userId,
-        amount: -price,
-        type: 'store_purchase',
+        amount: isAdmin ? 0 : -price,
+        type: isAdmin ? 'store_purchase [ADMIN]' : 'store_purchase',
         description: `Mağaza: ${item.name}`,
       });
     } catch { /* sp_transactions yoksa sessiz */ }
 
-    return { success: true, remaining_sp: profile.system_points - price };
+    return { success: true, remaining_sp: isAdmin ? (profile.system_points || 999999) : (profile.system_points - price) };
   },
 
   async equipItem(userId: string, itemId: string | null) {

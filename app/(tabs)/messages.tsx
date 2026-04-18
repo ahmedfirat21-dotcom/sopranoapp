@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { View, Text, StyleSheet, FlatList, Image, Pressable, ActivityIndicator, TextInput, ScrollView, Animated as RNAnimated, PanResponder, RefreshControl } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 
 import { useRouter } from 'expo-router';
 import { Colors, Shadows } from '../../constants/theme';
@@ -11,7 +12,7 @@ import { useAuth, useBadges, useTheme, useOnlineFriends } from '../_layout';
 import { useFocusEffect } from 'expo-router';
 import { useCallback } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { getAvatarSource } from '../../constants/avatars';
+import StatusAvatar from '../../components/StatusAvatar';
 import { UserSearchModal } from '../../components/UserSearchModal';
 import AppBackground from '../../components/AppBackground';
 import { showToast } from '../../components/Toast';
@@ -20,10 +21,8 @@ import PremiumAlert, { type AlertButton } from '../../components/PremiumAlert';
 import { ModerationService } from '../../services/moderation';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-
-
 // ═══ Pure-RN Swipe-to-Delete Row ═══
-function SwipeableRow({ children, onDelete }: { children: React.ReactNode; onDelete: () => void }) {
+function SwipeableRow({ children, onDelete, containerStyle }: { children: React.ReactNode; onDelete: () => void; containerStyle?: any }) {
   const translateX = useRef(new RNAnimated.Value(0)).current;
   const deleteOpacity = translateX.interpolate({ inputRange: [-80, -20, 0], outputRange: [1, 0.6, 0], extrapolate: 'clamp' });
   const panResponder = useRef(
@@ -43,18 +42,18 @@ function SwipeableRow({ children, onDelete }: { children: React.ReactNode; onDel
   ).current;
 
   return (
-    <View style={{ overflow: 'hidden' }}>
-      {/* Arka plan — kırmızı delete alanı (sadece swipe'ta görünür) */}
-      <RNAnimated.View style={[styles.swipeDeleteBtn, { opacity: deleteOpacity }]}>
-        <Pressable onPress={onDelete} style={{ flex: 1, justifyContent: 'center', alignItems: 'center', gap: 2 }}>
-          <Ionicons name="trash-outline" size={20} color="#FFF" />
-          <Text style={styles.swipeDeleteText}>Sil</Text>
-        </Pressable>
-      </RNAnimated.View>
-      {/* Ön plan — kaydırılabilir satır */}
-      <RNAnimated.View style={{ transform: [{ translateX }] }} {...panResponder.panHandlers}>
-        {children}
-      </RNAnimated.View>
+    <View style={containerStyle}>
+      <View style={styles.swipeClip}>
+        <RNAnimated.View style={[styles.swipeDeleteBtn, { opacity: deleteOpacity }]}>
+          <Pressable onPress={onDelete} style={{ flex: 1, justifyContent: 'center', alignItems: 'center', gap: 4 }}>
+            <Ionicons name="trash-outline" size={18} color="#FFF" />
+            <Text style={styles.swipeDeleteText}>Sil</Text>
+          </Pressable>
+        </RNAnimated.View>
+        <RNAnimated.View style={{ transform: [{ translateX }] }} {...panResponder.panHandlers}>
+          {children}
+        </RNAnimated.View>
+      </View>
     </View>
   );
 }
@@ -63,23 +62,19 @@ export default function MessagesScreen() {
   const router = useRouter();
   const { firebaseUser, setShowNotifDrawer } = useAuth();
   const { refreshBadges } = useBadges();
-  useTheme(); // Tema değişince re-render
+  useTheme();
   const [conversations, setConversations] = useState<InboxItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showComposeModal, setShowComposeModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // ★ DUP-3 FIX: Online friends artık merkezî provider'dan geliyor
   const { onlineFriends, friendIds, blockedIdsRef, refreshFriends } = useOnlineFriends();
-
   const { unreadNotifs: unreadCount } = useBadges();
   const [cAlert, setCAlert] = useState<{ visible: boolean; title: string; message: string; type?: 'info' | 'warning' | 'error' | 'success'; buttons?: AlertButton[] }>({ visible: false, title: '', message: '' });
-  // ★ Toplu silme modu
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
-  // Arama filtresi
   const filteredConversations = useMemo(() => {
     if (!searchQuery.trim()) return conversations;
     const q = searchQuery.toLowerCase();
@@ -89,14 +84,10 @@ export default function MessagesScreen() {
   const loadInbox = useCallback(async () => {
     if (!firebaseUser) return;
     try {
-      // ★ getInbox artık DB seviyesinde is_deleted filtresi yapıyor
       const inbox = await MessageService.getInbox(firebaseUser.uid);
-
-      // ★ Gizlenmiş sohbetleri filtrele (tek taraflı silme — WhatsApp modeli)
       const hiddenMap = await MessageService.getHiddenConversations(firebaseUser.uid);
       const filtered = inbox.filter(c => {
         if (blockedIdsRef.current.has(c.partner_id)) return false;
-        // Gizlenmiş sohbet varsa: son mesaj gizleme zamanından sonraysa tekrar göster
         const hiddenBefore = hiddenMap[c.partner_id];
         if (hiddenBefore && new Date(c.last_message_time) <= new Date(hiddenBefore)) return false;
         return true;
@@ -106,30 +97,19 @@ export default function MessagesScreen() {
       if (__DEV__) console.warn('Mesajlar yüklenemedi:', err);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, [firebaseUser]);
 
-  // Sayfaya her odaklandığında güncel inbox'ı çek
   useFocusEffect(
     useCallback(() => {
       loadInbox();
-      // ★ DUP-3 FIX: Online friends artık merkezî provider'dan geliyor
       refreshFriends();
-      // ★ Sayfa odaklandığında badge'i güncelle
       refreshBadges();
     }, [firebaseUser])
   );
 
-  // ★ DUP-3 FIX: Yerel loadFriends ve msg-online subscription kaldırıldı.
-  // Tüm online friends verisi useOnlineFriends() hook'undan geliyor.
-  // Yerel 30sn polling kaldırıldı.
-
-  // ★ DUP-3 FIX: Online friends Realtime subscription artık
-  // providers/OnlineFriendsProvider.tsx'de merkezileştirildi.
-  // Konuşma listesindeki partner_is_online güncellemesi aşağıdaki
-  // basitleştirilmiş effect ile yapılıyor.
   useEffect(() => {
-    // Online friends değiştiğinde konuşma listesindeki partner durumlarını güncelle
     const onlineIdSet = new Set(onlineFriends.map(f => f.id));
     setConversations(prev => {
       let changed = false;
@@ -147,36 +127,28 @@ export default function MessagesScreen() {
 
   useEffect(() => {
     if (!firebaseUser) return;
-
-    // BUG-DM1 FIX: Hem gelen hem gönderilen mesajları dinle
     const updateInbox = async (newMsg: Message) => {
       const otherId = newMsg.sender_id === firebaseUser.uid ? newMsg.receiver_id : newMsg.sender_id;
-      // ★ Engelli kullanıcı guard (ref ile stale closure önleme)
       if (blockedIdsRef.current.has(otherId)) return;
       const isSentByMe = newMsg.sender_id === firebaseUser.uid;
 
-      // ★ M2 FIX: Partner bilgisini güvenilir şekilde çöz
       let partnerName = 'Kullanıcı';
       let partnerAvatar = '';
       let partnerOnline = false;
       let resolved = false;
 
-      // 1. Gelen mesaj — sender karşı taraf, bilgisi JOIN'den gelir
       if (!isSentByMe && newMsg.sender) {
         partnerName = newMsg.sender.display_name || 'Kullanıcı';
         partnerAvatar = newMsg.sender.avatar_url || '';
         partnerOnline = newMsg.sender.is_online || false;
         resolved = true;
       }
-      // 2. Gönderilen mesaj — receiver profili eklenmiş olabilir
       if (!resolved && isSentByMe && newMsg.receiver) {
         partnerName = newMsg.receiver.display_name || 'Kullanıcı';
         partnerAvatar = newMsg.receiver.avatar_url || '';
         partnerOnline = newMsg.receiver.is_online || false;
         resolved = true;
       }
-
-      // 3. Fallback: Mevcut konuşma bilgisi veya API'den çek
       if (!resolved) {
         setConversations(prev => {
           const existingIdx = prev.findIndex(c => c.partner_id === otherId);
@@ -186,11 +158,10 @@ export default function MessagesScreen() {
             partnerOnline = prev[existingIdx].partner_is_online;
             resolved = true;
           }
-          return prev; // State değiştirmiyoruz, sadece okuyoruz
+          return prev;
         });
       }
       if (!resolved) {
-        // Son çare: API'den profil çek
         try {
           const prof = await ProfileService.get(otherId);
           if (prof) {
@@ -198,20 +169,17 @@ export default function MessagesScreen() {
             partnerAvatar = prof.avatar_url || '';
             partnerOnline = prof.is_online || false;
           }
-        } catch { /* silent */ }
+        } catch {}
       }
 
-      // ★ Yeni mesaj geldiğinde gizlenmiş sohbeti tekrar göster (silmeden sonra yeni mesaj)
-      // AsyncStorage'dan gizleme timestamp'i kontrol et
       const hiddenMap = await MessageService.getHiddenConversations(firebaseUser.uid);
       const hiddenBefore = hiddenMap[otherId];
       if (hiddenBefore && new Date(newMsg.created_at) > new Date(hiddenBefore)) {
-        // Yeni mesaj gizleme zamanından sonra — gizlemeyi kaldır
         delete hiddenMap[otherId];
         const key = `hidden_conversations_${firebaseUser.uid}`;
         await AsyncStorage.setItem(key, JSON.stringify(hiddenMap));
       } else if (hiddenBefore) {
-        return; // Hâlâ gizli — inbox'a ekleme
+        return;
       }
 
       setConversations(prev => {
@@ -226,20 +194,17 @@ export default function MessagesScreen() {
           unread_count: isSentByMe
             ? (existingIdx >= 0 ? prev[existingIdx].unread_count : 0)
             : (existingIdx >= 0 ? prev[existingIdx].unread_count + 1 : 1),
+          is_last_msg_mine: isSentByMe,
+          is_last_msg_read: isSentByMe ? !!newMsg.is_read : undefined,
         };
-
         const filtered = prev.filter(c => c.partner_id !== otherId);
         return [newItem, ...filtered];
       });
 
-      // ★ Badge'i güncelle (realtime yeni mesaj = okunmamış sayısı artar)
       if (!isSentByMe) refreshBadges();
     };
 
-    // Gelen mesajlar
     const incomingChannel = MessageService.onNewMessage(firebaseUser.uid, updateInbox);
-
-    // Gönderilen mesajlar — ayrı subscription
     const sentChannelName = `user_sent_${firebaseUser.uid}`;
     const sentChannel = supabase
       .channel(sentChannelName)
@@ -247,15 +212,12 @@ export default function MessagesScreen() {
         event: 'INSERT', schema: 'public', table: 'messages',
         filter: `sender_id=eq.${firebaseUser.uid}`,
       }, async (payload) => {
-        // ★ M2 FIX: Hem sender hem receiver profilini çek
         const { data } = await supabase
           .from('messages')
           .select('*, sender:profiles!sender_id(*), receiver:profiles!receiver_id(*)')
           .eq('id', payload.new.id)
           .single();
-        if (data && !(data as any).is_deleted) {
-          updateInbox(data as Message);
-        }
+        if (data && !(data as any).is_deleted) updateInbox(data as Message);
       })
       .subscribe();
 
@@ -270,7 +232,8 @@ export default function MessagesScreen() {
   return (
     <AppBackground variant="messages">
     <View style={[styles.container, { backgroundColor: 'transparent' }]}>
-      {/* ═══ Standart Logo Header (Keşfet/Odalarım ile tutarlı) ═══ */}
+
+      {/* ═══ Header ═══ */}
       <View style={[styles.topBar, { paddingTop: insets.top + 4 }]}>
         <Image source={require('../../assets/logo.png')} style={styles.logo} resizeMode="contain" />
         <View style={styles.headerRight}>
@@ -282,46 +245,52 @@ export default function MessagesScreen() {
               </View>
             )}
           </Pressable>
-          <Pressable style={styles.headerIconBtn} onPress={() => setShowComposeModal(true)}>
-            <Ionicons name="create-outline" size={20} color="#F1F5F9" />
+          <Pressable style={[styles.headerIconBtn, styles.composeBtn]} onPress={() => setShowComposeModal(true)}>
+            <Ionicons name="create-outline" size={19} color="#F1F5F9" />
           </Pressable>
         </View>
       </View>
 
-      {/* Sayfa Başlığı */}
+      {/* ═══ Sayfa Başlığı ═══ */}
       <View style={styles.pageTitleRow}>
         <View>
           <Text style={styles.headerTitle}>Mesajlar</Text>
-          <Text style={styles.headerSub}>Sohbetlerin</Text>
+          <Text style={styles.headerSub}>
+            {conversations.length > 0 ? `${conversations.length} sohbet` : 'Sohbetlerin'}
+          </Text>
         </View>
         {conversations.length > 0 && (
           <Pressable
-            style={styles.editBtn}
+            style={[styles.editBtn, selectionMode && styles.editBtnActive]}
             onPress={() => {
-              if (selectionMode) {
-                setSelectionMode(false);
-                setSelectedIds(new Set());
-              } else {
-                setSelectionMode(true);
-              }
+              if (selectionMode) { setSelectionMode(false); setSelectedIds(new Set()); }
+              else setSelectionMode(true);
             }}
           >
-            <Text style={styles.editBtnText}>{selectionMode ? 'Vazgeç' : 'Düzenle'}</Text>
+            <Text style={[styles.editBtnText, selectionMode && { color: '#F87171' }]}>
+              {selectionMode ? 'Vazgeç' : 'Düzenle'}
+            </Text>
           </Pressable>
         )}
       </View>
 
-      {/* ═══ ARAMA ÇUBUĞU — koyu glassmorphic ═══ */}
+      {/* ═══ Arama Çubuğu ═══ */}
       <View style={styles.searchWrap}>
-        <Ionicons name="search" size={16} color={Colors.teal} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Ara..."
-          placeholderTextColor="rgba(255,255,255,0.25)"
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          autoCorrect={false}
-        />
+        <Ionicons name="search" size={15} color={Colors.teal} style={{ textShadowColor: Colors.teal, textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 6 }} />
+        <View style={styles.searchInputWrap}>
+          <TextInput
+            style={styles.searchInput}
+            placeholder=""
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            autoCorrect={false}
+          />
+          {searchQuery.length === 0 && (
+            <View pointerEvents="none" style={styles.searchPlaceholderWrap}>
+              <Text style={styles.searchPlaceholder}>Sohbet ara...</Text>
+            </View>
+          )}
+        </View>
         {searchQuery.length > 0 && (
           <Pressable onPress={() => setSearchQuery('')}>
             <Ionicons name="close-circle" size={16} color="rgba(255,255,255,0.3)" />
@@ -329,15 +298,20 @@ export default function MessagesScreen() {
         )}
       </View>
 
-      {/* ═══ Online Arkadaşlar — Kompakt yatay avatar şeridi ═══ */}
-      <View style={styles.friendSection}>
-        <Text style={styles.friendSectionTitle}>Çevrimiçi Arkadaşlar</Text>
-        {onlineFriends.length > 0 ? (
+      {/* ═══ Online Arkadaşlar ═══ */}
+      {onlineFriends.length > 0 && (
+        <View style={styles.friendSection}>
+          <View style={styles.friendSectionHeader}>
+            <View style={styles.onlineDot} />
+            <Text style={styles.friendSectionTitle}>Çevrimiçi</Text>
+            <View style={styles.friendCountBadge}>
+              <Text style={styles.friendCountText}>{onlineFriends.length}</Text>
+            </View>
+          </View>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.friendStrip}
-            style={styles.friendStripWrap}
           >
             {onlineFriends.map((friend) => (
               <Pressable
@@ -345,26 +319,27 @@ export default function MessagesScreen() {
                 style={styles.friendChip}
                 onPress={() => router.push(`/chat/${friend.id}`)}
               >
-                <View style={styles.friendAvatarWrap}>
-                  <Image source={getAvatarSource(friend.avatar_url)} style={styles.friendAvatar} />
-                  <View style={styles.friendOnlineDot} />
-                </View>
+                <StatusAvatar uri={friend.avatar_url} size={52} isOnline={true} tier={(friend as any).subscription_tier} />
                 <Text style={styles.friendName} numberOfLines={1}>{friend.display_name?.split(' ')[0] || 'Kullanıcı'}</Text>
               </Pressable>
             ))}
           </ScrollView>
-        ) : (
-          <Text style={styles.friendEmptyText}>Şu an çevrimiçi arkadaşın yok</Text>
-        )}
-      </View>
+        </View>
+      )}
 
+      {/* ═══ Sohbet Listesi ═══ */}
       {loading ? (
-        <ActivityIndicator size="large" color={Colors.teal} style={{ marginTop: 40 }} />
+        <ActivityIndicator size="large" color={Colors.teal} style={{ marginTop: 50 }} />
       ) : (
         <FlatList
           data={filteredConversations}
           keyExtractor={(item) => item.partner_id}
           showsVerticalScrollIndicator={false}
+          removeClippedSubviews={true}
+          maxToRenderPerBatch={10}
+          windowSize={7}
+          initialNumToRender={12}
+          contentContainerStyle={{ paddingTop: 6, paddingBottom: 20 }}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -391,12 +366,19 @@ export default function MessagesScreen() {
           renderItem={({ item }) => {
             const unread = item.unread_count > 0;
             const isSelected = selectedIds.has(item.partner_id);
+            const cardGradient = isSelected
+              ? ['rgba(10,15,28,0.98)', 'rgba(20,184,166,0.10)', 'rgba(45,212,191,0.16)', 'rgba(20,184,166,0.08)', 'rgba(10,15,28,0.98)']
+              : unread
+                ? ['rgba(11,18,32,0.98)', 'rgba(56,189,248,0.09)', 'rgba(147,197,253,0.15)', 'rgba(56,189,248,0.07)', 'rgba(11,18,32,0.98)']
+                : ['rgba(10,15,28,0.97)', 'rgba(37,99,235,0.08)', 'rgba(255,255,255,0.09)', 'rgba(37,99,235,0.07)', 'rgba(10,15,28,0.97)'];
             return (
               <SwipeableRow
+                containerStyle={[styles.msgCard, isSelected && styles.msgCardSelected, unread && styles.msgCardUnread]}
                 onDelete={async () => {
+                  if (!firebaseUser) return;
                   try {
-                    await MessageService.markAsRead(firebaseUser!.uid, item.partner_id);
-                    await MessageService.deleteConversation(firebaseUser!.uid, item.partner_id);
+                    await MessageService.markAsRead(firebaseUser.uid, item.partner_id);
+                    await MessageService.deleteConversation(firebaseUser.uid, item.partner_id);
                     setConversations(prev => prev.filter(c => c.partner_id !== item.partner_id));
                     refreshBadges();
                   } catch {
@@ -405,7 +387,8 @@ export default function MessagesScreen() {
                 }}
               >
               <Pressable
-                style={[styles.msgRow, isSelected && styles.msgRowSelected]}
+                style={styles.msgPressable}
+                android_ripple={{ color: 'rgba(255,255,255,0.04)' }}
                 onPress={() => {
                   if (selectionMode) {
                     setSelectedIds(prev => {
@@ -425,28 +408,27 @@ export default function MessagesScreen() {
                     message: 'Bu sohbet için ne yapmak istersin?',
                     type: 'info',
                     buttons: [
-                      // ★ Arama seçenekleri — sadece takipleşen kişiler arayabilir
                       ...(friendIds.has(item.partner_id) ? [
-                        { text: '📞 Sesli Ara', onPress: () => {
-                          router.push(`/call/${item.partner_id}?callType=audio` as any);
-                        }},
-                        { text: '📹 Görüntülü Ara', onPress: () => {
-                          router.push(`/call/${item.partner_id}?callType=video&isIncoming=false` as any);
-                        }},
+                        { text: '📞 Sesli Ara', onPress: () => router.push(`/call/${item.partner_id}?callType=audio` as any) },
                       ] : []),
                       { text: '🗑️ Sohbeti Sil', style: 'destructive', onPress: async () => {
+                        if (!firebaseUser) return;
                         try {
-                          await MessageService.markAsRead(firebaseUser!.uid, item.partner_id);
-                          await MessageService.deleteConversation(firebaseUser!.uid, item.partner_id);
+                          await MessageService.markAsRead(firebaseUser.uid, item.partner_id);
+                          await MessageService.deleteConversation(firebaseUser.uid, item.partner_id);
                           setConversations(prev => prev.filter(c => c.partner_id !== item.partner_id));
                           refreshBadges();
                         } catch {}
                       }},
                       { text: '🚫 Engelle', style: 'destructive', onPress: async () => {
+                        if (!firebaseUser) return;
                         try {
-                          await ModerationService.blockUser(firebaseUser!.uid, item.partner_id);
+                          await ModerationService.blockUser(firebaseUser.uid, item.partner_id);
                           setConversations(prev => prev.filter(c => c.partner_id !== item.partner_id));
-                        } catch {}
+                          showToast({ title: '⛔ Engellendi', message: `${item.partner_name} engellendi.`, type: 'success' });
+                        } catch {
+                          showToast({ title: 'Hata', message: 'Engellenemedi.', type: 'error' });
+                        }
                       }},
                       { text: 'Vazgeç', style: 'cancel' },
                     ],
@@ -454,52 +436,73 @@ export default function MessagesScreen() {
                 }}
                 delayLongPress={500}
               >
-                {selectionMode && (
-                  <View style={styles.checkWrap}>
-                    <Ionicons name={isSelected ? 'checkbox' : 'square-outline'} size={22} color={isSelected ? Colors.teal : 'rgba(255,255,255,0.3)'} />
-                  </View>
-                )}
-                <Pressable 
-                  style={styles.avatarWrap}
-                  onPress={() => router.push(`/user/${item.partner_id}` as any)}
+                <LinearGradient
+                  colors={cardGradient as [string, string, string, string, string]}
+                  locations={[0, 0.28, 0.5, 0.72, 1]}
+                  start={{ x: 0, y: 0.5 }}
+                  end={{ x: 1, y: 0.5 }}
+                  style={styles.msgRow}
                 >
-                  <Image source={getAvatarSource(item.partner_avatar)} style={styles.avatar} />
-                  {item.partner_is_online && <View style={styles.onlineDot} />}
-                </Pressable>
-                <View style={styles.msgInfo}>
-                  <View style={styles.msgTop}>
-                    <Text style={styles.msgName}>{item.partner_name}</Text>
-                    <Text style={styles.msgTime}>{getRelativeTime(item.last_message_time)}</Text>
+                  {unread && <View style={styles.unreadStripe} />}
+
+                  {selectionMode && (
+                    <View style={styles.checkWrap}>
+                      <Ionicons name={isSelected ? 'checkbox' : 'square-outline'} size={22} color={isSelected ? Colors.teal : 'rgba(255,255,255,0.3)'} />
+                    </View>
+                  )}
+
+                  <Pressable
+                    style={styles.avatarWrap}
+                    onPress={() => router.push(`/user/${item.partner_id}` as any)}
+                  >
+                    <StatusAvatar uri={item.partner_avatar} size={52} isOnline={item.partner_is_online} tier={item.partner_tier} />
+                  </Pressable>
+
+                  <View style={styles.msgInfo}>
+                    <View style={styles.msgTop}>
+                      <Text style={[styles.msgName, unread && styles.msgNameUnread]} numberOfLines={1}>
+                        {item.partner_name}
+                      </Text>
+                      <Text style={[styles.msgTime, unread && styles.msgTimeUnread]}>
+                        {getRelativeTime(item.last_message_time)}
+                      </Text>
+                    </View>
+                    <View style={styles.msgPreviewRow}>
+                      {item.is_last_msg_mine && (
+                        <Ionicons
+                          name="checkmark-done"
+                          size={14}
+                          color={item.is_last_msg_read ? Colors.teal : 'rgba(255,255,255,0.3)'}
+                          style={{ marginRight: 2 }}
+                        />
+                      )}
+                      <Text style={[styles.msgText, unread && styles.msgTextUnread]} numberOfLines={1}>
+                        {item.is_last_msg_mine
+                          ? item.last_message_content?.replace(/^Sen:\s*/, '')
+                          : item.last_message_content}
+                      </Text>
+                    </View>
                   </View>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                    {/* ★ BUG-8 FIX: Gönderilen mesajlarda tek tik göster (karşı taraf okundu bilgisi DB'de yok) */}
-                    {item.last_message_content?.startsWith('Sen:') && (
-                      <View style={{ flexDirection: 'row' }}>
-                        <Ionicons name="checkmark" size={12} color="rgba(255,255,255,0.4)" />
+
+                  <View style={styles.msgRight}>
+                    {friendIds.has(item.partner_id) && !selectionMode && (
+                      <Pressable
+                        style={styles.msgCallBtn}
+                        onPress={(e) => {
+                          e.stopPropagation?.();
+                          router.push(`/call/${item.partner_id}?callType=audio` as any);
+                        }}
+                      >
+                        <Ionicons name="call" size={14} color="#4ADE80" />
+                      </Pressable>
+                    )}
+                    {unread && (
+                      <View style={styles.unreadBadge}>
+                        <Text style={styles.unreadCountText}>{item.unread_count > 99 ? '99+' : item.unread_count}</Text>
                       </View>
                     )}
-                    <Text style={[styles.msgText, unread && styles.msgTextUnread]} numberOfLines={1}>
-                      {item.last_message_content}
-                    </Text>
                   </View>
-                </View>
-                {/* ★ Sesli Arama Butonu — sadece arkadaşlara gösterilir */}
-                {friendIds.has(item.partner_id) && (
-                  <Pressable
-                    style={styles.msgCallBtn}
-                    onPress={(e) => {
-                      e.stopPropagation?.();
-                      router.push(`/call/${item.partner_id}?callType=audio` as any);
-                    }}
-                  >
-                    <Ionicons name="call" size={16} color="#4ADE80" />
-                  </Pressable>
-                )}
-                {unread && (
-                  <View style={styles.unreadBadge}>
-                    <Text style={styles.unreadCountText}>{item.unread_count}</Text>
-                  </View>
-                )}
+                </LinearGradient>
               </Pressable>
               </SwipeableRow>
             );
@@ -507,17 +510,14 @@ export default function MessagesScreen() {
         />
       )}
 
-      {/* ★ Toplu Silme Alt Bar */}
+      {/* ═══ Toplu Silme Alt Bar ═══ */}
       {selectionMode && selectedIds.size > 0 && (
-        <View style={styles.bulkBar}>
+        <View style={[styles.bulkBar, { paddingBottom: insets.bottom + 12 }]}>
           <Pressable
             style={styles.bulkSelectAll}
             onPress={() => {
-              if (selectedIds.size === conversations.length) {
-                setSelectedIds(new Set());
-              } else {
-                setSelectedIds(new Set(conversations.map(c => c.partner_id)));
-              }
+              if (selectedIds.size === conversations.length) setSelectedIds(new Set());
+              else setSelectedIds(new Set(conversations.map(c => c.partner_id)));
             }}
           >
             <Ionicons name={selectedIds.size === conversations.length ? 'checkbox' : 'square-outline'} size={20} color={Colors.text2} />
@@ -535,15 +535,14 @@ export default function MessagesScreen() {
                 type: 'warning',
                 buttons: [
                   {
-                    text: 'Sil',
-                    style: 'destructive',
+                    text: 'Sil', style: 'destructive',
                     onPress: async () => {
-                      // ★ BUG-MSG1 FIX: Seri yerine paralel silme
+                      if (!firebaseUser) return;
                       const ids = [...selectedIds];
                       await Promise.all(ids.map(async (pid) => {
                         try {
-                          await MessageService.markAsRead(firebaseUser!.uid, pid);
-                          await MessageService.deleteConversation(firebaseUser!.uid, pid);
+                          await MessageService.markAsRead(firebaseUser.uid, pid);
+                          await MessageService.deleteConversation(firebaseUser.uid, pid);
                         } catch {}
                       }));
                       setConversations(prev => prev.filter(c => !selectedIds.has(c.partner_id)));
@@ -557,13 +556,12 @@ export default function MessagesScreen() {
               });
             }}
           >
-            <Ionicons name="trash" size={18} color="#fff" />
+            <Ionicons name="trash" size={16} color="#fff" />
             <Text style={styles.bulkDeleteText}>{selectedIds.size} Sil</Text>
           </Pressable>
         </View>
       )}
 
-      {/* ★ MSG-1: Yeni Mesaj Modalı */}
       {firebaseUser && (
         <UserSearchModal
           visible={showComposeModal}
@@ -576,7 +574,6 @@ export default function MessagesScreen() {
         />
       )}
 
-
       <PremiumAlert {...cAlert} onDismiss={() => setCAlert(prev => ({ ...prev, visible: false }))} />
     </View>
     </AppBackground>
@@ -585,152 +582,203 @@ export default function MessagesScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  // ═══ Standart Logo Header ═══
+
+  // ─── Header ───
   topBar: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 14, paddingBottom: 2,
+    paddingHorizontal: 16, paddingBottom: 4,
   },
-  logo: { height: 32, width: 150 },
-  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  headerIconBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.06)', justifyContent: 'center', alignItems: 'center', overflow: 'visible' as const, ...Shadows.icon },
-  notifBadge: { position: 'absolute' as const, top: -2, right: -2, backgroundColor: '#EF4444', minWidth: 16, height: 16, borderRadius: 8, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3, borderWidth: 1.5, borderColor: Colors.bg },
-  notifBadgeText: { fontSize: 9, fontWeight: '800' as const, color: '#FFF' },
-  pageTitleRow: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 4, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  headerTitle: { fontSize: 22, fontWeight: '800' as const, color: '#F1F5F9', letterSpacing: -0.3 },
-  headerSub: { fontSize: 11, color: '#94A3B8', marginTop: 2 },
-  editBtn: {
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 16,
-    backgroundColor: 'rgba(45,212,191,0.12)',
-  },
-  editBtnText: { fontSize: 13, fontWeight: '600' as const, color: Colors.teal },
-  checkWrap: {
-    marginRight: 10,
-  },
-  msgRowSelected: {
-    backgroundColor: 'rgba(45,212,191,0.08)',
-  },
-  bulkBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    backgroundColor: 'rgba(15,23,42,0.97)',
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.06)',
-  },
-  bulkSelectAll: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  bulkSelectAllText: { fontSize: 13, color: Colors.text2, fontWeight: '500' as const },
-  bulkDeleteBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#EF4444',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-  },
-  bulkDeleteText: { fontSize: 13, fontWeight: '700' as const, color: '#fff' },
-  searchWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginHorizontal: 16,
-    marginBottom: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.04)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
-    gap: 8,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 13,
-    color: '#CBD5E1',
-    padding: 0,
-  },
-  // ★ Satır gölgesi (card shadow)
-  msgRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.04)', backgroundColor: 'rgba(15,23,42,0.95)', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 4, elevation: 3 },
-  avatarWrap: { position: 'relative', marginRight: 16 },
-  avatar: { width: 56, height: 56, borderRadius: 28, backgroundColor: '#1E293B', borderWidth: 1, borderColor: '#334155', shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.4, shadowRadius: 4, elevation: 4 },
-  onlineDot: {
-    position: 'absolute', bottom: 2, right: 2,
-    width: 14, height: 14, borderRadius: 7,
-    backgroundColor: '#4ADE80',
-    borderWidth: 2, borderColor: '#000',
-    shadowColor: '#4ADE80', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.8, shadowRadius: 6, elevation: 5,
-  },
-  msgInfo: { flex: 1, justifyContent: 'center' },
-  msgTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
-  msgName: { fontSize: 16, fontWeight: '400', color: '#F8FAFC', letterSpacing: 0.5 },
-  msgTime: { fontSize: 12, color: '#64748B' },
-  msgText: { fontSize: 14, color: 'rgba(255,255,255,0.5)', letterSpacing: 0.2 },
-  msgTextUnread: { color: '#F1F5F9', fontWeight: '600' },
-  unreadBadge: {
-    paddingHorizontal: 6,
-    minWidth: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: '#EF4444',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: 8,
-    shadowColor: '#EF4444',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 6,
-    elevation: 5,
-  },
-  msgCallBtn: {
+  logo: { height: 30, width: 140 },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  headerIconBtn: {
     width: 36, height: 36, borderRadius: 18,
-    backgroundColor: 'rgba(74,222,128,0.08)',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    justifyContent: 'center', alignItems: 'center',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)',
+  },
+  composeBtn: {
+    backgroundColor: 'rgba(20,184,166,0.15)',
+    borderColor: 'rgba(20,184,166,0.3)',
+  },
+  notifBadge: {
+    position: 'absolute', top: -2, right: -2,
+    backgroundColor: '#EF4444', minWidth: 16, height: 16,
+    borderRadius: 8, alignItems: 'center', justifyContent: 'center',
+    paddingHorizontal: 3, borderWidth: 1.5, borderColor: Colors.bg,
+  },
+  notifBadgeText: { fontSize: 9, fontWeight: '800', color: '#FFF', ...Shadows.textLight },
+
+  // ─── Sayfa Başlığı ───
+  pageTitleRow: {
+    paddingHorizontal: 20, paddingTop: 10, paddingBottom: 6,
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+  },
+  headerTitle: { fontSize: 24, fontWeight: '800', color: '#F1F5F9', letterSpacing: -0.5, ...Shadows.text },
+  headerSub: { fontSize: 11, color: '#64748B', marginTop: 2, ...Shadows.textLight },
+  editBtn: {
+    paddingHorizontal: 14, paddingVertical: 7,
+    borderRadius: 20,
+    backgroundColor: 'rgba(20,184,166,0.1)',
+    borderWidth: 1, borderColor: 'rgba(20,184,166,0.2)',
+  },
+  editBtnActive: {
+    backgroundColor: 'rgba(239,68,68,0.1)',
+    borderColor: 'rgba(239,68,68,0.25)',
+  },
+  editBtnText: { fontSize: 13, fontWeight: '600', color: Colors.teal, ...Shadows.textLight },
+
+  // ─── Arama ───
+  searchWrap: {
+    flexDirection: 'row', alignItems: 'center',
+    marginHorizontal: 16, marginBottom: 12,
+    paddingHorizontal: 14, paddingVertical: 10,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+    shadowColor: '#020617',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 5,
+    gap: 10,
+  },
+  searchInputWrap: {
+    flex: 1,
+    position: 'relative',
+    justifyContent: 'center',
+  },
+  searchInput: { fontSize: 13, color: '#CBD5E1', padding: 0, ...Shadows.textLight },
+  searchPlaceholder: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.22)',
+    ...Shadows.textLight,
+  },
+  searchPlaceholderWrap: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+  },
+
+  // ─── Online Arkadaşlar ───
+  friendSection: { marginBottom: 8 },
+  friendSectionHeader: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: 20, marginBottom: 8,
+  },
+  onlineDot: {
+    width: 7, height: 7, borderRadius: 3.5,
+    backgroundColor: '#22C55E',
+    shadowColor: '#22C55E', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.9, shadowRadius: 4, elevation: 2,
+  },
+  friendSectionTitle: {
+    fontSize: 12, fontWeight: '700', color: '#94A3B8',
+    letterSpacing: 0.8, textTransform: 'uppercase', ...Shadows.textLight,
+  },
+  friendCountBadge: {
+    minWidth: 20, height: 20, borderRadius: 10,
+    backgroundColor: 'rgba(20,184,166,0.15)',
+    borderWidth: 1, borderColor: 'rgba(20,184,166,0.25)',
+    justifyContent: 'center', alignItems: 'center', paddingHorizontal: 5,
+  },
+  friendCountText: { fontSize: 10, fontWeight: '800', color: Colors.teal, ...Shadows.textLight },
+  friendStrip: { paddingHorizontal: 16, paddingVertical: 4, gap: 16 },
+  friendChip: { alignItems: 'center', width: 60 },
+  friendName: {
+    fontSize: 10, color: 'rgba(255,255,255,0.6)',
+    marginTop: 5, textAlign: 'center', fontWeight: '500', ...Shadows.textLight,
+  },
+
+  // ─── Sohbet Kartı (SwipeableRow container) ───
+  msgCard: {
+    marginHorizontal: 14, marginVertical: 5,
+    borderRadius: 20,
+    backgroundColor: 'rgba(6,10,18,0.58)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)',
+    shadowColor: '#020617',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.28,
+    shadowRadius: 18,
+    elevation: 10,
+  },
+  msgCardSelected: {
+    borderColor: 'rgba(45,212,191,0.22)',
+  },
+  msgCardUnread: {
+    borderColor: 'rgba(56,189,248,0.18)',
+  },
+
+  swipeClip: {
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+
+  // ─── Sohbet Satırı (iç Pressable) ───
+  msgPressable: {
+    overflow: 'hidden',
+  },
+  msgRow: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 14, paddingVertical: 12,
+    position: 'relative',
+  },
+  unreadStripe: {
+    position: 'absolute', left: 0, top: 8, bottom: 8,
+    width: 3, borderRadius: 2,
+    backgroundColor: Colors.teal,
+    shadowColor: Colors.teal, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.8, shadowRadius: 4,
+  },
+  checkWrap: { marginRight: 10 },
+  avatarWrap: { marginRight: 12 },
+  msgInfo: { flex: 1, justifyContent: 'center', gap: 4 },
+  msgTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  msgName: { fontSize: 15, fontWeight: '500', color: '#94A3B8', flex: 1, marginRight: 8, ...Shadows.textLight },
+  msgNameUnread: { fontWeight: '700', color: '#F1F5F9' },
+  msgTime: { fontSize: 11, color: '#475569', ...Shadows.textLight },
+  msgTimeUnread: { color: Colors.teal, fontWeight: '600' },
+  msgPreviewRow: { flexDirection: 'row', alignItems: 'center' },
+  msgText: { fontSize: 13, color: 'rgba(255,255,255,0.35)', flex: 1, ...Shadows.textLight },
+  msgTextUnread: { color: '#94A3B8', fontWeight: '500' },
+
+  // ─── Sağ aksiyonlar ───
+  msgRight: { flexDirection: 'row', alignItems: 'center', gap: 6, marginLeft: 6 },
+  msgCallBtn: {
+    width: 32, height: 32, borderRadius: 16,
+    backgroundColor: 'rgba(74,222,128,0.1)',
     borderWidth: 1, borderColor: 'rgba(74,222,128,0.2)',
     alignItems: 'center', justifyContent: 'center',
-    marginLeft: 6,
   },
-  unreadCountText: { color: '#fff', fontSize: 11, fontWeight: '700' },
-  emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 80, gap: 8 },
-  emptyTitle: { fontSize: 16, fontWeight: '700', color: '#A0AEC0' },
-  emptyDesc: { fontSize: 12, color: '#64748B' },
-
-  // ═══ Online Arkadaşlar Şeridi ═══
-  friendSection: { marginBottom: 6 },
-  friendSectionTitle: { fontSize: 11, fontWeight: '700' as const, color: '#64748B', letterSpacing: 0.5, textTransform: 'uppercase' as const, paddingHorizontal: 20, marginBottom: 6 },
-  friendEmptyText: { fontSize: 12, color: 'rgba(255,255,255,0.2)', paddingHorizontal: 20, paddingBottom: 8 },
-  friendStripWrap: { },
-  friendStrip: { paddingHorizontal: 16, paddingVertical: 6, gap: 16 },
-  friendChip: { alignItems: 'center', width: 52 },
-  friendAvatarWrap: { position: 'relative' as const },
-  friendAvatar: { width: 44, height: 44, borderRadius: 22, borderWidth: 1.5, borderColor: 'rgba(34,197,94,0.3)' },
-  friendOnlineDot: {
-    position: 'absolute' as const, bottom: 0, right: 0,
-    width: 13, height: 13, borderRadius: 7,
-    backgroundColor: '#4ADE80', borderWidth: 2, borderColor: '#0F1923',
-    shadowColor: '#4ADE80', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.7, shadowRadius: 4, elevation: 3,
+  unreadBadge: {
+    minWidth: 20, height: 20, borderRadius: 10,
+    backgroundColor: Colors.teal,
+    justifyContent: 'center', alignItems: 'center', paddingHorizontal: 5,
+    shadowColor: Colors.teal, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.6, shadowRadius: 6, elevation: 4,
   },
-  friendName: { fontSize: 9, color: 'rgba(255,255,255,0.5)', marginTop: 3, textAlign: 'center' as const },
+  unreadCountText: { color: '#fff', fontSize: 10, fontWeight: '800', ...Shadows.textLight },
 
-  // ═══ Swipe-to-Delete ═══
+  // ─── Swipe-to-Delete ───
   swipeDeleteBtn: {
-    position: 'absolute' as const,
-    right: 0,
-    top: 0,
-    bottom: 0,
-    width: 80,
-    justifyContent: 'center',
-    alignItems: 'center',
+    position: 'absolute', right: 0, top: 0, bottom: 0, width: 80,
+    justifyContent: 'center', alignItems: 'center',
     backgroundColor: '#DC2626',
+    borderTopRightRadius: 20, borderBottomRightRadius: 20,
   },
-  swipeDeleteText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#FFF',
+  swipeDeleteText: { fontSize: 10, fontWeight: '700', color: '#FFF', ...Shadows.textLight },
+
+  // ─── Toplu Silme ───
+  bulkBar: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingHorizontal: 20, paddingTop: 14,
+    backgroundColor: 'rgba(15,23,42,0.98)',
+    borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.07)',
   },
+  bulkSelectAll: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  bulkSelectAllText: { fontSize: 13, color: Colors.text2, fontWeight: '500', ...Shadows.textLight },
+  bulkDeleteBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: '#EF4444',
+    paddingHorizontal: 18, paddingVertical: 10,
+    borderRadius: 20,
+    shadowColor: '#EF4444', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.4, shadowRadius: 6, elevation: 4,
+  },
+  bulkDeleteText: { fontSize: 13, fontWeight: '700', color: '#fff', ...Shadows.textLight },
 });

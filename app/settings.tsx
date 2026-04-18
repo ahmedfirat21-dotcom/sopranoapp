@@ -56,45 +56,51 @@ const SETTING_GROUPS: { title: string; icon: keyof typeof Ionicons.glyphMap; ite
   {
     title: 'Bildirimler', icon: 'notifications-outline',
     items: [
-      { key: 'notifications_enabled', icon: 'notifications', label: 'Bildirimler', desc: 'Push bildirimleri aç/kapat', type: 'toggle' },
-      { key: 'notification_sound', icon: 'musical-notes', label: 'Bildirim Sesi', desc: 'Bildirim gelince ses çal', type: 'toggle', parentKey: 'notifications_enabled' },
-      { key: 'notification_vibration', icon: 'phone-portrait', label: 'Titreşim', desc: 'Bildirimde titreşim', type: 'toggle', parentKey: 'notifications_enabled' },
+      { key: 'notifications_enabled', icon: 'notifications', label: 'Bildirimler', desc: 'Push bildirimleri aç/kapat', type: 'toggle', color: '#14B8A6', bg: 'rgba(20,184,166,0.18)' },
+      { key: 'notification_sound', icon: 'musical-notes', label: 'Bildirim Sesi', desc: 'Bildirim gelince ses çal', type: 'toggle', parentKey: 'notifications_enabled', color: '#A78BFA', bg: 'rgba(167,139,250,0.18)' },
+      { key: 'notification_vibration', icon: 'phone-portrait', label: 'Titreşim', desc: 'Bildirimde titreşim', type: 'toggle', parentKey: 'notifications_enabled', color: '#60A5FA', bg: 'rgba(96,165,250,0.18)' },
     ],
   },
   {
     title: 'Görünüm', icon: 'color-palette-outline',
     items: [
-      { key: 'theme', icon: 'color-fill', label: 'Tema', desc: 'Uygulama teması seç', type: 'select' },
-      { key: 'language', icon: 'language', label: 'Dil', desc: 'Uygulama dili', type: 'select' },
+      { key: 'theme', icon: 'color-fill', label: 'Tema', desc: 'Uygulama teması seç', type: 'select', color: '#FBBF24', bg: 'rgba(251,191,36,0.18)' },
+      { key: 'language', icon: 'language', label: 'Dil', desc: 'Türkçe (Yakında: English)', type: 'action', color: '#34D399', bg: 'rgba(52,211,153,0.18)' },
     ],
   },
   {
     title: 'Gizlilik', icon: 'shield-checkmark-outline',
     items: [
-      { key: 'show_online_status', icon: 'logo-designernews', label: 'Çevrimiçi Durumu', desc: 'Diğerleri seni çevrimiçi görsün', type: 'toggle' },
-      { key: 'profile_private', icon: 'lock-closed', label: 'Gizli Profil', desc: 'Sadece takipçiler', type: 'toggle' },
+      { key: 'show_online_status', icon: 'logo-designernews', label: 'Çevrimiçi Durumu', desc: 'Diğerleri seni çevrimiçi görsün', type: 'toggle', color: '#22C55E', bg: 'rgba(34,197,94,0.18)' },
+      { key: 'profile_private', icon: 'lock-closed', label: 'Gizli Profil', desc: 'Sadece takipçiler', type: 'toggle', color: '#F59E0B', bg: 'rgba(245,158,11,0.18)' },
     ],
   },
   {
     title: 'Hesap', icon: 'person-circle-outline',
     items: [
-      { key: 'edit_profile', icon: 'create', label: 'Profili Düzenle', type: 'action' },
-      { key: 'blocked_users', icon: 'ban', label: 'Engellenen Kullanıcılar', desc: 'Engellediğin kişileri yönet', type: 'action' },
+      { key: 'edit_profile', icon: 'create', label: 'Profili Düzenle', type: 'action', color: '#38BDF8', bg: 'rgba(56,189,248,0.18)' },
+      { key: 'blocked_users', icon: 'ban', label: 'Engellenen Kullanıcılar', desc: 'Engellediğin kişileri yönet', type: 'action', color: '#FB923C', bg: 'rgba(251,146,60,0.18)' },
     ],
   },
   {
     title: 'Hakkında', icon: 'information-circle-outline',
     items: [
-      { key: 'terms', icon: 'document-text', label: 'Kullanım Koşulları', type: 'link' },
-      { key: 'privacy', icon: 'shield-checkmark', label: 'Gizlilik Politikası', type: 'link' },
-      { key: 'version', icon: 'code-slash', label: 'Versiyon', desc: 'v2.0.0', type: 'action' },
+      { key: 'terms', icon: 'document-text', label: 'Kullanım Koşulları', type: 'link', color: '#94A3B8', bg: 'rgba(148,163,184,0.15)' },
+      { key: 'privacy', icon: 'shield-checkmark', label: 'Gizlilik Politikası', type: 'link', color: '#14B8A6', bg: 'rgba(20,184,166,0.18)' },
+      { key: 'version', icon: 'code-slash', label: 'Versiyon', desc: 'v2.0.0', type: 'action', color: '#818CF8', bg: 'rgba(129,140,248,0.18)' },
+    ],
+  },
+  {
+    title: 'Abonelik', icon: 'card-outline',
+    items: [
+      { key: 'restore_purchases', icon: 'refresh-circle', label: 'Satın Almaları Geri Yükle', desc: 'Cihaz değişikliği sonrası premium\'u geri yükle', type: 'action', color: '#D4AF37', bg: 'rgba(212,175,55,0.18)' },
     ],
   },
   {
     title: 'Oturum', icon: 'log-out-outline',
     items: [
-      { key: 'logout', icon: 'log-out', label: 'Çıkış Yap', type: 'action', danger: true },
-      { key: 'delete_account', icon: 'trash', label: 'Hesabı Sil', desc: 'Tüm veriler kalıcı olarak silinir', type: 'action', danger: true },
+      { key: 'logout', icon: 'log-out', label: 'Çıkış Yap', type: 'action', danger: true, color: '#EF4444', bg: 'rgba(239,68,68,0.15)' },
+      { key: 'delete_account', icon: 'trash', label: 'Hesabı Sil', desc: 'Tüm veriler kalıcı olarak silinir', type: 'action', danger: true, color: '#EF4444', bg: 'rgba(239,68,68,0.15)' },
     ],
   },
 ];
@@ -193,6 +199,8 @@ export default function SettingsScreen() {
                     await ProfileService.setOnline(firebaseUser.uid, false).catch(() => {});
                   }
                   try {
+                    // ★ FIX: revokeAccess() hesap cache'ini temizler — tekrar girişte hesap seçici açılır
+                    await GoogleSignin.revokeAccess();
                     await GoogleSignin.signOut();
                   } catch { /* Google sign-in yoksa sessiz geç */ }
                   await RevenueCatService.logout().catch(() => {});
@@ -208,8 +216,27 @@ export default function SettingsScreen() {
           ],
         });
         break;
+      case 'restore_purchases':
+        (async () => {
+          if (!firebaseUser) return;
+          showToast({ title: 'Geri Yükleniyor...', message: 'Satın almalar kontrol ediliyor', type: 'info' });
+          try {
+            const { restoredTier } = await RevenueCatService.restorePurchases(firebaseUser.uid);
+            if (restoredTier && restoredTier !== 'Free') {
+              showToast({ title: 'Başarılı!', message: `${restoredTier} üyeliğin geri yüklendi`, type: 'success' });
+            } else {
+              showToast({ title: 'Bulunamadı', message: 'Bu hesaba ait aktif abonelik yok', type: 'info' });
+            }
+          } catch {
+            showToast({ title: 'Hata', message: 'Geri yükleme başarısız', type: 'error' });
+          }
+        })();
+        break;
       case 'version':
-        showToast({ title: 'SopranoChat', message: 'v2.0.0 · Senin Sesin', type: 'info' });
+        showToast({ title: 'SopranoChat', message: 'v2.0.0', type: 'info' });
+        break;
+      case 'language':
+        showToast({ title: 'Çok Yakında', message: 'İngilizce dil desteği üzerinde çalışıyoruz.', type: 'info' });
         break;
       case 'blocked_users':
         (async () => {
@@ -338,6 +365,7 @@ export default function SettingsScreen() {
                   }
 
                   // 10. Çıkış yap
+                  try { await GoogleSignin.revokeAccess(); } catch {}
                   try { await GoogleSignin.signOut(); } catch {}
                   await RevenueCatService.logout().catch(() => {});
                   setIsLoggedIn(false);
@@ -411,12 +439,12 @@ export default function SettingsScreen() {
                     }}
                   >
                     {/* Sol: ikon + label */}
-                    <View style={s.rowIcon}>
+                    <View style={[s.rowIcon, item.bg && { backgroundColor: item.bg, borderRadius: 9 }]}>
                       <Ionicons
                         name={item.icon}
-                        size={18}
-                        color={item.danger ? '#EF4444' : '#94A3B8'}
-                        style={{ textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 }}
+                        size={17}
+                        color={item.color || '#94A3B8'}
+                        style={{ textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }}
                       />
                     </View>
                     <View style={s.rowText}>
@@ -538,7 +566,7 @@ const s = StyleSheet.create({
     borderBottomColor: 'rgba(255,255,255,0.06)',
   },
   rowIcon: {
-    width: 22, alignItems: 'center', justifyContent: 'center',
+    width: 32, height: 32, alignItems: 'center', justifyContent: 'center',
   },
   rowText: {
     flex: 1,

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator } from 'react-native';
 import PremiumAlert, { type AlertButton } from '../components/PremiumAlert';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -39,7 +39,7 @@ const PLANS = [
       { text: 'HD ses + 720p video', included: true },
       { text: 'Oda teması + çerçeve', included: true },
       { text: 'Yaş/Dil filtresi', included: true },
-      { text: 'Reklamsız deneyim', included: true },
+      { text: 'Kalıcı oda (3 adet)', included: true },
     ],
   },
   {
@@ -63,9 +63,9 @@ const PLANS = [
       { text: 'Oda müziği + Arka plan', included: true },
       { text: 'Ghost mode + Kılık', included: true },
       { text: 'Takipçi-only mod', included: true },
-      { text: 'Düşük komisyon cashout', included: true },
-      { text: 'Haftalık boost', included: true },
-      { text: 'Reklamsız deneyim', included: true },
+      { text: '2× SP kazanım çarpanı', included: true },
+      { text: 'Keşfet boost erişimi', included: true },
+      { text: 'Mağaza %20 SP indirimi', included: true },
     ],
   },
 ];
@@ -78,6 +78,9 @@ export default function PlusScreen() {
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('yearly');
   const [activating, setActivating] = useState(false);
   const [alertCfg, setAlertCfg] = useState<AlertConfig>({ visible: false, title: '', message: '' });
+
+  const mountedRef = useRef(true);
+  useEffect(() => () => { mountedRef.current = false; }, []);
 
   const currentTier = migrateLegacyTier(profile?.subscription_tier);
   const selectedPlan = PLANS.find(p => p.id === selectedTier)!;
@@ -92,7 +95,7 @@ export default function PlusScreen() {
       ? `${selectedPlan.monthly}₺/ay`
       : `${selectedPlan.yearly}₺/yıl`;
 
-    const modeText = REVENUECAT_MOCK_MODE ? '\n\n⚠️ Test modunda — gerçek ödeme alınmaz.' : '';
+    const modeText = (REVENUECAT_MOCK_MODE && __DEV__) ? '\n\n⚠️ Test modunda — gerçek ödeme alınmaz.' : '';
 
     setAlertCfg({
       visible: true,
@@ -104,23 +107,27 @@ export default function PlusScreen() {
         {
           text: `${selectedPlan.name}'a Geç`,
           onPress: async () => {
-            setActivating(true);
+            if (mountedRef.current) setActivating(true);
             try {
               const result = await RevenueCatService.purchasePackage(
                 { identifier: `tier_${selectedPlan.id}`, billingCycle },
                 profile.id,
                 selectedPlan.tier,
               );
+              if (!mountedRef.current) return;
               if (result.error) throw new Error(result.error);
               if (result.newTier) {
                 await refreshProfile();
-                showToast({ title: `${selectedPlan.name} Aktif! 🎉`, message: `Tebrikler! Artık ${selectedPlan.name} üyesisiniz.`, type: 'success' });
+                if (mountedRef.current) {
+                  showToast({ title: `${selectedPlan.name} Aktif! 🎉`, message: `Tebrikler! Artık ${selectedPlan.name} üyesisiniz.`, type: 'success' });
+                }
               }
-              // newTier = null ve error yok → kullanıcı iptal etti
             } catch (err: any) {
-              showToast({ title: 'Hata', message: err.message || 'Yükseltme başarısız.', type: 'error' });
+              if (mountedRef.current) {
+                showToast({ title: 'Hata', message: err.message || 'Yükseltme başarısız.', type: 'error' });
+              }
             } finally {
-              setActivating(false);
+              if (mountedRef.current) setActivating(false);
             }
           },
         },
@@ -140,19 +147,20 @@ export default function PlusScreen() {
           text: "Free'ye Dön",
           style: 'destructive',
           onPress: async () => {
-            setActivating(true);
+            if (mountedRef.current) setActivating(true);
             try {
               const success = await RevenueCatService.cancelSubscription(profile!.id);
+              if (!mountedRef.current) return;
               if (success) {
                 await refreshProfile();
-                showToast({ title: 'Plan değiştirildi', message: 'Free plana geri döndünüz.', type: 'info' });
+                if (mountedRef.current) showToast({ title: 'Plan değiştirildi', message: 'Free plana geri döndünüz.', type: 'info' });
               } else {
                 showToast({ title: 'Bilgi', message: 'Aboneliğinizi Google Play ayarlarından iptal edebilirsiniz.', type: 'info' });
               }
             } catch (err: any) {
-              showToast({ title: 'Hata', message: err.message, type: 'error' });
+              if (mountedRef.current) showToast({ title: 'Hata', message: err.message, type: 'error' });
             } finally {
-              setActivating(false);
+              if (mountedRef.current) setActivating(false);
             }
           },
         },

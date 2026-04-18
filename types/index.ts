@@ -102,6 +102,8 @@ export type Profile = {
   active_chat_color?: string | null;
   active_entry_effect?: string | null;
   profile_boost_expires_at?: string | null;
+  /** Pro+ banner resmi URL'i */
+  banner_url?: string | null;
 };
 
 // ============================================
@@ -414,7 +416,7 @@ export const ALL_PERMISSIONS: Record<OwnerPermission, PermissionDefinition> = {
   ban_permanent:        { minRole: 'owner',     requiresTarget: true,  requiresLowerTarget: true,  hiddenOnSelf: true, minTier: 'Pro' },
   chat_block:           { minRole: 'moderator', requiresTarget: true,  requiresLowerTarget: true,  hiddenOnSelf: true, minTier: 'Plus' },
   slow_mode:            { minRole: 'moderator', requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false, minTier: 'Plus' },
-  timed_mute:           { minRole: 'moderator', requiresTarget: true,  requiresLowerTarget: true,  hiddenOnSelf: true, minTier: 'Plus' },
+  timed_mute:           { minRole: 'owner',     requiresTarget: true,  requiresLowerTarget: true,  hiddenOnSelf: true },  // T-3: Free oda sahibi de temel mute yapabilir (moderatörler Plus+ odada)
   pin_chat_message:     { minRole: 'moderator', requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false, minTier: 'Plus' },
   clear_chat:           { minRole: 'owner',     requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false, minTier: 'Pro' },
   // ── Rol Yönetimi ──
@@ -475,9 +477,15 @@ export type InboxItem = {
   partner_name: string;
   partner_avatar: string;
   partner_is_online: boolean;
+  /** ★ Tier ring tutarlılığı — mesajlar sayfasında doğru çerçeve rengi */
+  partner_tier?: string;
   last_message_content: string;
   last_message_time: string;
   unread_count: number;
+  /** ★ WhatsApp tik göstergesi: son mesaj benim mi? */
+  is_last_msg_mine?: boolean;
+  /** ★ WhatsApp tik göstergesi: son mesaj okundu mu? */
+  is_last_msg_read?: boolean;
 };
 
 // ============================================
@@ -555,6 +563,8 @@ export type NotificationType =
   | 'follow_accepted'
   | 'tier_up'
   | 'room_invite'
+  | 'room_invite_accepted'
+  | 'room_invite_rejected'
   | 'room_request'
   | 'upsell'
   | 'system';
@@ -628,4 +638,18 @@ export type UpsellEvent = {
   current_tier: SubscriptionTier;
   required_tier: SubscriptionTier;
   message: string;
+};
+
+// ============================================
+// SUPABASE REALTİME PAYLOAD TİPLERİ
+// ============================================
+
+/** Supabase postgres_changes payload — `payload: any` yerine kullan */
+export type RealtimePayload<T> = {
+  new: T;
+  old: Partial<T>;
+  eventType: 'INSERT' | 'UPDATE' | 'DELETE';
+  schema: string;
+  table: string;
+  commit_timestamp: string;
 };

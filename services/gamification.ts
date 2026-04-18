@@ -41,6 +41,21 @@ function _getCache(userId: string, action: string) {
   return entry;
 }
 
+// ★ SEC-MEM: Periyodik cache temizliği — lazy init, modül yüklendiğinde değil ilk kullanımda başlar
+let _cacheCleanupId: ReturnType<typeof setInterval> | null = null;
+function _ensureCacheCleanup() {
+  if (_cacheCleanupId !== null) return;
+  _cacheCleanupId = setInterval(() => {
+    const stale = Date.now() - 30 * 60_000;
+    for (const [userId, actions] of _cooldownCache) {
+      for (const [action, entry] of actions) {
+        if (entry.lastGrantedAt > 0 && entry.lastGrantedAt < stale) actions.delete(action);
+      }
+      if (actions.size === 0) _cooldownCache.delete(userId);
+    }
+  }, 10 * 60_000);
+}
+
 /**
  * ★ DB-backed günlük cap kontrolü.
  * İlk çağrıda sp_transactions'tan bugünkü toplam çekilir.
@@ -110,28 +125,72 @@ function _markGranted(userId: string, action: string, amount: number) {
 // ════════════════════════════════════════════════════════════
 
 /**
+ * ★ Tier bazlı SP çarpanı — Pro: 2×, Plus: 1.25×, Free: 1×
+ * Sadece aktivite bazlı kazanımlarda uygulanır (bağış, satın alma hariç).
+ */
+const SP_TIER_MULTIPLIER: Record<string, number> = {
+  Free: 1,
+  Plus: 1.25,
+  Pro: 2,
+};
+
+/** Kullanıcının tier'ını hızlıca çek (cache'li) */
+const _tierCache = new Map<string, { tier: string; ts: number }>();
+async function _getUserTier(userId: string): Promise<string> {
+  const cached = _tierCache.get(userId);
+  if (cached && Date.now() - cached.ts < 5 * 60_000) return cached.tier; // 5dk cache
+  try {
+    const { data } = await supabase
+      .from('profiles')
+      .select('subscription_tier')
+      .eq('id', userId)
+      .single();
+    const tier = data?.subscription_tier || 'Free';
+    _tierCache.set(userId, { tier, ts: Date.now() });
+    return tier;
+  } catch {
+    return 'Free';
+  }
+}
+
+/**
  * SP kazandır — cooldown ve cap kontrollü.
+ * ★ Pro: 2× çarpan, Plus: 1.25× çarpan (aktivite bazlı kazanımlarda).
  * Başarılıysa kazandırılan miktarı döndürür, başarısızsa 0.
  */
-async function grantSP(userId: string, action: string, overrideAmount?: number): Promise<number> {
+async function grantSP(userId: string, action: string, overrideAmount?: number, externalRef?: string): Promise<number> {
   const config = SP_REWARDS[action];
   if (!config && !overrideAmount) return 0;
 
-  const amount = overrideAmount ?? config?.amount ?? 0;
+  let amount = overrideAmount ?? config?.amount ?? 0;
   if (amount <= 0) return 0;
 
-  // Cooldown/cap kontrolü (config varsa)
-  if (config && !(await _canGrant(userId, action))) return 0;
+  _ensureCacheCleanup();
+  // Cooldown/cap kontrolü — idempotent çağrılarda (externalRef ile) atla:
+  // RevenueCat satın alması / refund zaten unique key ile korunuyor.
+  if (!externalRef) {
+    if (config && !(await _canGrant(userId, action))) return 0;
+    if (!config) {
+      const cache = _getCache(userId, action);
+      const elapsed = Date.now() - cache.lastGrantedAt;
+      if (elapsed < 60_000) return 0;
+    }
+  }
 
-  // Config olmayan action'lar için de temel cooldown — aynı action tekrarını engelle (1 dakika)
-  if (!config) {
-    const cache = _getCache(userId, action);
-    const elapsed = Date.now() - cache.lastGrantedAt;
-    if (elapsed < 60_000) return 0;
+  // ★ Tier bazlı SP çarpanı — sadece aktivite kazanımlarında (tip, store_purchase gibi transfer'lerde DEĞİL)
+  const EXCLUDED_FROM_MULTIPLIER = ['tip_received', 'tip_refund', 'store_purchase', 'subscription_purchase', 'entry_fee_share', 'sp_purchase'];
+  if (!EXCLUDED_FROM_MULTIPLIER.includes(action)) {
+    try {
+      const userTier = await _getUserTier(userId);
+      const multiplier = SP_TIER_MULTIPLIER[userTier] || 1;
+      if (multiplier > 1) {
+        amount = Math.floor(amount * multiplier);
+      }
+    } catch { /* tier alınamazsa çarpan uygulanmaz */ }
   }
 
   // DB'ye yaz (atomik + transaction kaydı)
-  const persisted = await _persistSP(userId, amount, action);
+  const persisted = await _persistSP(userId, amount, action, externalRef);
   if (persisted) {
     _markGranted(userId, action, amount);
     return amount;
@@ -142,18 +201,45 @@ async function grantSP(userId: string, action: string, overrideAmount?: number):
 /**
  * SP'yi veritabanına kaydet.
  * ★ Atomik persist + zorunlu transaction kaydı.
+ * ★ externalRef: idempotency key (satın alma / retry dedup için). v20 RPC kullanılır.
  */
-async function _persistSP(userId: string, amount: number, action: string): Promise<boolean> {
+async function _persistSP(userId: string, amount: number, action: string, externalRef?: string): Promise<boolean> {
   try {
-    // Yöntem 1: RPC (tercih edilen — atomic)
-    const { error: rpcError } = await supabase.rpc('grant_system_points', {
+    // Yöntem 1: RPC (tercih edilen — atomic + idempotent).
+    // v20 migrasyonu sonrası external_ref varsa çifte harcama/verme engellenir.
+    if (externalRef) {
+      const { data, error: rpcError } = await supabase.rpc('grant_system_points', {
+        p_user_id: userId,
+        p_amount: amount,
+        p_action: action,
+        p_external_ref: externalRef,
+      });
+      if (!rpcError) {
+        const status = (data as any)?.status;
+        if (status === 'duplicate') {
+          if (__DEV__) console.log(`[SP] Idempotent skip — aynı external_ref daha önce işlendi: ${externalRef}`);
+          return false;
+        }
+        // ★ D4: Günlük cap durumunda kullanıcıya açık bildirim (sessiz fail yerine)
+        if (status === 'daily_cap') {
+          try {
+            const { showToast } = require('../components/Toast');
+            showToast({ title: 'Günlük Limit', message: 'Bugün 300 SP kazanım limitine ulaştın. Yarın tekrar dene.', type: 'warning', duration: 3000 });
+          } catch { /* toast yoksa sessiz */ }
+          return false;
+        }
+        return true;
+      }
+      if (__DEV__) console.warn('[SP] v20 RPC yok, legacy RPC fallback:', rpcError?.message);
+    }
+
+    const { error: legacyRpcError } = await supabase.rpc('grant_system_points', {
       p_user_id: userId,
       p_amount: amount,
       p_action: action,
     });
-    if (!rpcError) {
-      // ★ Transaction kaydı — realtime dashboard için zorunlu
-      _logTransaction(userId, amount, action);
+    if (!legacyRpcError) {
+      _logTransaction(userId, amount, action, externalRef);
       return true;
     }
 
@@ -170,10 +256,8 @@ async function _persistSP(userId: string, amount: number, action: string): Promi
       const oldSP = profile.system_points || 0;
       const newTotal = oldSP + amount;
 
-      // ★ Negatif bakiye koruması (harcama için)
       if (newTotal < 0) return false;
 
-      // ★ Optimistic lock: sadece SP değişmemişse güncelle
       const { data, error: lockErr } = await supabase
         .from('profiles')
         .update({ system_points: newTotal })
@@ -182,7 +266,7 @@ async function _persistSP(userId: string, amount: number, action: string): Promi
         .select('id');
 
       if (!lockErr && data && data.length > 0) {
-        _logTransaction(userId, amount, action);
+        _logTransaction(userId, amount, action, externalRef);
         return true;
       }
       if (attempt < MAX_RETRIES - 1) {
@@ -201,23 +285,25 @@ async function _persistSP(userId: string, amount: number, action: string): Promi
 /**
  * ★ Transaction kaydı — dashboard SP özeti ve realtime sync için zorunlu.
  * Fire-and-forget (başarısızlık SP verilmesini engellemez).
+ * externalRef: v20 öncesi fallback yollarında idempotency key saklamak için.
  */
-function _logTransaction(userId: string, amount: number, action: string) {
-  Promise.resolve(
-    supabase.from('sp_transactions').insert({
-      user_id: userId,
-      amount,
-      type: action,
-      description: amount > 0 ? `SP kazanıldı: ${action}` : `SP harcandı: ${action}`,
-    })
-  ).catch(() => {});
+function _logTransaction(userId: string, amount: number, action: string, externalRef?: string) {
+  const payload: any = {
+    user_id: userId,
+    amount,
+    type: action,
+    description: amount > 0 ? `SP kazanıldı: ${action}` : `SP harcandı: ${action}`,
+  };
+  if (externalRef) payload.external_ref = externalRef;
+  Promise.resolve(supabase.from('sp_transactions').insert(payload)).catch(() => {});
 }
 
 /**
  * SP harca — negatif bakiye kontrolü + atomik.
  * ★ GodMaster (is_admin) kullanıcılar için SP düşürülmez — sınırsız.
+ * ★ externalRef: idempotency key — çift tıklama / retry'da çift düşmeyi engeller.
  */
-async function spendSP(userId: string, amount: number, reason: string): Promise<{ success: boolean; remaining?: number; error?: string }> {
+async function spendSP(userId: string, amount: number, reason: string, externalRef?: string): Promise<{ success: boolean; remaining?: number; error?: string; duplicate?: boolean }> {
   try {
     // ★ GodMaster bypass — admin kullanıcılar sınırsız SP'ye sahip
     const { data: adminCheck } = await supabase
@@ -226,10 +312,35 @@ async function spendSP(userId: string, amount: number, reason: string): Promise<
       .eq('id', userId)
       .single();
     if (adminCheck?.is_admin) {
-      _logTransaction(userId, -amount, reason);
+      _logTransaction(userId, 0, `${reason} [ADMIN BYPASS]`, externalRef);
       return { success: true, remaining: adminCheck.system_points || 999999 };
     }
-    // Yöntem 1: RPC (atomic - tercih edilen)
+
+    // Yöntem 1: v20 idempotent RPC (externalRef verildiyse)
+    if (externalRef) {
+      const { data, error: rpcError } = await supabase.rpc('grant_system_points', {
+        p_user_id: userId,
+        p_amount: -amount,
+        p_action: reason,
+        p_external_ref: externalRef,
+      });
+      if (!rpcError) {
+        const status = (data as any)?.status;
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('system_points')
+          .eq('id', userId)
+          .single();
+        const remaining = profile?.system_points ?? 0;
+        if (status === 'duplicate') {
+          return { success: true, remaining, duplicate: true };
+        }
+        return { success: true, remaining };
+      }
+      if (__DEV__) console.warn('[SP spend] v20 RPC yok, legacy RPC fallback:', rpcError?.message);
+    }
+
+    // Yöntem 2: Legacy RPC (atomic)
     const { error: rpcError } = await supabase.rpc('grant_system_points', {
       p_user_id: userId,
       p_amount: -amount,
@@ -243,11 +354,11 @@ async function spendSP(userId: string, amount: number, reason: string): Promise<
         .eq('id', userId)
         .single();
       const remaining = profile?.system_points ?? 0;
-      _logTransaction(userId, -amount, reason);
+      _logTransaction(userId, -amount, reason, externalRef);
       return { success: true, remaining };
     }
 
-    // Yöntem 2: Optimistic lock fallback
+    // Yöntem 3: Optimistic lock fallback
     const MAX_RETRIES = 2;
     for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
       const { data: profile } = await supabase
@@ -267,11 +378,11 @@ async function spendSP(userId: string, amount: number, reason: string): Promise<
         .from('profiles')
         .update({ system_points: newTotal })
         .eq('id', userId)
-        .eq('system_points', current) // ★ optimistic lock
+        .eq('system_points', current)
         .select('id');
 
       if (!error && data && data.length > 0) {
-        _logTransaction(userId, -amount, reason);
+        _logTransaction(userId, -amount, reason, externalRef);
         return { success: true, remaining: newTotal };
       }
       if (attempt < MAX_RETRIES - 1) {
@@ -404,9 +515,9 @@ export const GamificationService = {
 
   // ── SP Harcama ──
 
-  /** Keşfet boost satın al (SP ile) */
+  /** Keşfet boost satın al (SP ile) — ★ Fiyat düşürüldü: erişilebilirlik artırıldı */
   async purchaseRoomBoost(userId: string, durationHours: 1 | 6): Promise<{ success: boolean; error?: string }> {
-    const cost = durationHours === 1 ? 100 : 400;
+    const cost = durationHours === 1 ? 50 : 200; // ★ Eski: 100/400 → Yeni: 50/200
     return spendSP(userId, cost, 'room_boost');
   },
 
@@ -421,13 +532,17 @@ export const GamificationService = {
   },
 
   /** Genel SP harcama */
-  async spend(userId: string, amount: number, reason: string): Promise<{ success: boolean; remaining?: number; error?: string }> {
-    return spendSP(userId, amount, reason);
+  async spend(userId: string, amount: number, reason: string, externalRef?: string): Promise<{ success: boolean; remaining?: number; error?: string; duplicate?: boolean }> {
+    return spendSP(userId, amount, reason, externalRef);
   },
 
-  /** Genel SP kazandırma (bağış alıcısı, ödül vb.) */
-  async earn(userId: string, amount: number, reason: string): Promise<number> {
-    return grantSP(userId, reason, amount);
+  /**
+   * Genel SP kazandırma (bağış alıcısı, ödül, satın alma vb.).
+   * externalRef: idempotency key — RevenueCat transactionId veya dahili UUID.
+   * Aynı externalRef ile ikinci çağrı no-op döner (K5/K6 koruması).
+   */
+  async earn(userId: string, amount: number, reason: string, externalRef?: string): Promise<number> {
+    return grantSP(userId, reason, amount, externalRef);
   },
 
   // ── Yardımcılar ──

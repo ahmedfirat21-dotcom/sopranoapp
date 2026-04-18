@@ -72,7 +72,7 @@ export const MessageService = {
     if (partnerIds.length === 0) return [] as InboxItem[];
     const { data: profiles } = await supabase
       .from('profiles')
-      .select('id, display_name, avatar_url, is_online')
+      .select('id, display_name, avatar_url, is_online, subscription_tier')
       .in('id', partnerIds);
     const profileMap = new Map((profiles || []).map(p => [p.id, p]));
 
@@ -92,9 +92,13 @@ export const MessageService = {
         partner_name: prof?.display_name || 'Kullanıcı',
         partner_avatar: prof?.avatar_url || '',
         partner_is_online: prof?.is_online || false,
+        partner_tier: (prof as any)?.subscription_tier || 'Free',
         last_message_content: preview,
         last_message_time: lastMsg.created_at,
         unread_count: unread,
+        // ★ WhatsApp tik göstergesi verileri
+        is_last_msg_mine: isSentByMe,
+        is_last_msg_read: isSentByMe ? !!lastMsg.is_read : undefined,
       });
     }
 
@@ -140,12 +144,47 @@ export const MessageService = {
     return (d1 || []) as Message[];
   },
 
-  /** Yeni mesaj gönder — voice desteği + engel kontrolü */
+  /** Yeni mesaj gönder — ★ A3+A4+SEC-DM FIX: arkadaşlık + rate limit + engel + content validation */
   async send(senderId: string, receiverId: string, content: string, imageUrlOrIsRequest?: string | boolean, voiceUrl?: string, voiceDuration?: number) {
-    // ★ Engel kontrolü: Her iki yönüe de mesaj engellenir
+    // ★ SEC-DM1: Content sanitizasyon + uzunluk limiti
+    // Unicode bidi override, zero-width karakterleri ve kontrol karakterlerini temizle
+    const sanitized = (content || '').replace(/[\u200B-\u200F\u202A-\u202E\u2066-\u2069\uFEFF\u00AD]/g, '').trim();
+    // Sesli mesaj ve fotoğraf dışında boş content engelle
+    if (!sanitized && !voiceUrl && typeof imageUrlOrIsRequest !== 'string') {
+      throw new Error('Boş mesaj gönderilemez.');
+    }
+    // Max 2000 karakter limiti
+    if (sanitized.length > 2000) {
+      throw new Error('Mesaj çok uzun (max 2000 karakter).');
+    }
+    content = sanitized;
+
+    // ★ Engel kontrolü: Her iki yönde de mesaj engellenir
     const blockedIds = await FriendshipService._getBlockedIds(senderId);
     if (blockedIds.has(receiverId)) {
       throw new Error('Bu kullanıcıyla mesajlaşamazsınız.');
+    }
+
+    // ★ A3 FIX: Arkadaşlık kontrolü — sadece accepted arkadaşlar mesajlaşabilir
+    const { data: friendship } = await supabase
+      .from('friendships')
+      .select('status')
+      .or(`and(user_id.eq.${senderId},friend_id.eq.${receiverId}),and(user_id.eq.${receiverId},friend_id.eq.${senderId})`)
+      .eq('status', 'accepted')
+      .maybeSingle();
+    if (!friendship) {
+      throw new Error('Mesaj göndermek için önce arkadaşlık isteği göndermelisiniz.');
+    }
+
+    // ★ A4 FIX: Rate limiting — son 1 dakikada max 30 mesaj
+    const oneMinuteAgo = new Date(Date.now() - 60_000).toISOString();
+    const { count: recentCount } = await supabase
+      .from('messages')
+      .select('*', { count: 'exact', head: true })
+      .eq('sender_id', senderId)
+      .gte('created_at', oneMinuteAgo);
+    if ((recentCount || 0) >= 30) {
+      throw new Error('Çok hızlı mesaj gönderiyorsunuz. Lütfen biraz bekleyin.');
     }
 
     const imageUrl = typeof imageUrlOrIsRequest === 'string' ? imageUrlOrIsRequest : undefined;
@@ -198,8 +237,22 @@ export const MessageService = {
     if (error) throw error;
   },
 
-  /** ★ Emoji tepki güncelle (WhatsApp tarzı) */
-  async updateReaction(messageId: string, reactionsJson: string) {
+  /** ★ Emoji tepki güncelle (WhatsApp tarzı) — SEC-DM2: Yetki kontrolü eklendi */
+  async updateReaction(messageId: string, reactionsJson: string, userId?: string) {
+    // ★ SEC-DM2: Yetki kontrolü — sadece mesajın göndericisi veya alıcısı tepki ekleyebilir
+    if (userId) {
+      const { data: msg } = await supabase
+        .from('messages')
+        .select('sender_id, receiver_id')
+        .eq('id', messageId)
+        .single();
+      if (!msg || (msg.sender_id !== userId && msg.receiver_id !== userId)) {
+        throw new Error('Bu mesaja tepki ekleme yetkiniz yok.');
+      }
+    }
+    // JSON formatı doğrulaması
+    try { JSON.parse(reactionsJson); } catch { throw new Error('Geçersiz tepki formatı.'); }
+
     const { error } = await supabase
       .from('messages')
       .update({ reactions: reactionsJson })
@@ -281,10 +334,14 @@ export const MessageService = {
     };
   },
 
-  /** Yazıyor... (Typing Indicator) - Gönderici */
+  /** Yazıyor... (Typing Indicator) - Gönderici — ★ C2 FIX: Block kontrolü */
   _typingChannels: new Map<string, ReturnType<typeof supabase.channel>>(),
 
   async sendTypingStatus(senderId: string, receiverId: string, isTyping: boolean) {
+    // ★ C2 FIX: Engellenen kişiye typing status gönderme
+    const blockedIds = await FriendshipService._getBlockedIds(senderId);
+    if (blockedIds.has(receiverId)) return;
+
     const channelKey = `typing_send_${receiverId}`;
     let channel = this._typingChannels.get(channelKey);
 

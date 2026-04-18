@@ -47,17 +47,30 @@ export function OnlineFriendsProvider({ userId, children }: { userId: string | n
   const refreshFriends = useCallback(async () => {
     if (!userId) return;
     try {
-      const [following, blocked] = await Promise.all([
+      const [following, followers, blocked] = await Promise.all([
         FriendshipService.getFollowing(userId),
+        FriendshipService.getFollowers(userId),
         ModerationService.getBlockedUsers(userId),
       ]);
       const blockedSet = new Set(blocked);
       setBlockedIds(blockedSet);
       blockedIdsRef.current = blockedSet;
 
-      setAllFriends(following);
-      setOnlineFriends(following.filter((f: FollowUser) => f.is_online));
-      setFriendIds(new Set(following.map((f: FollowUser) => f.id)));
+      // Birleştir + deduplicate (following + followers)
+      const seen = new Set<string>();
+      const merged: FollowUser[] = [];
+      for (const f of [...following, ...followers]) {
+        if (!seen.has(f.id) && f.id !== userId && !blockedSet.has(f.id)) {
+          seen.add(f.id);
+          merged.push(f);
+        }
+      }
+      // Online olanlar en üste
+      merged.sort((a, b) => (b.is_online ? 1 : 0) - (a.is_online ? 1 : 0));
+
+      setAllFriends(merged);
+      setOnlineFriends(merged.filter((f: FollowUser) => f.is_online));
+      setFriendIds(new Set(merged.map((f: FollowUser) => f.id)));
     } catch (e) {
       if (__DEV__) console.warn('[OnlineFriends] Load error:', e);
     }
@@ -76,11 +89,16 @@ export function OnlineFriendsProvider({ userId, children }: { userId: string | n
     refreshFriends();
   }, [userId, refreshFriends]);
 
-  // ★ Realtime: Arkadaşların online/offline durumu — TEK KANAL
-  const friendIdsKey = allFriends.map(f => f.id).sort().join(',');
+  // Ref ile güncel friend ID listesi — subscription closure'ını yeniden oluşturmadan güncellenir
+  const currentFriendIdsRef = useRef<string[]>([]);
   useEffect(() => {
-    if (!userId || allFriends.length === 0) return;
-    const ids = allFriends.map(f => f.id);
+    currentFriendIdsRef.current = allFriends.map(f => f.id);
+  }, [allFriends]);
+
+  // ★ Realtime: Arkadaşların online/offline durumu — TEK KANAL
+  // Dep: sadece userId — allFriends değişince subscription yeniden kurulmaz (loop riski yok)
+  useEffect(() => {
+    if (!userId) return;
 
     const channel = supabase
       .channel(`friends-online-status:${userId}`)
@@ -90,20 +108,16 @@ export function OnlineFriendsProvider({ userId, children }: { userId: string | n
         table: 'profiles',
       }, (payload) => {
         const updated = payload.new as any;
-        if (!updated?.id || !ids.includes(updated.id)) return;
-        // ★ Engellenen kişiyi online şeritte gösterme
+        if (!updated?.id || !currentFriendIdsRef.current.includes(updated.id)) return;
         if (blockedIdsRef.current.has(updated.id)) return;
 
-        // allFriends güncelle
         setAllFriends(prev => prev.map(f =>
           f.id === updated.id ? { ...f, is_online: updated.is_online } : f
         ));
 
-        // onlineFriends güncelle
         setOnlineFriends(prev => {
           const wasOnline = prev.some(f => f.id === updated.id);
           if (updated.is_online && !wasOnline) {
-            // ★ BUG-6 FIX: Stale closure önleme — functional updater
             setAllFriends(currentFriends => {
               const friend = currentFriends.find(f => f.id === updated.id);
               if (friend) {
@@ -125,7 +139,7 @@ export function OnlineFriendsProvider({ userId, children }: { userId: string | n
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [userId, friendIdsKey]);
+  }, [userId]);
 
   return (
     <OnlineFriendsContext.Provider value={{ allFriends, onlineFriends, friendIds, blockedIds, blockedIdsRef, refreshFriends }}>

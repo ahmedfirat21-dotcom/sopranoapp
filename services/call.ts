@@ -1,7 +1,7 @@
 /**
- * SopranoChat — DM Arama Servisi
- * Supabase Broadcast ile sinyalizasyon, LiveKit ile gerçek ses/video iletimi
- * Tier bazlı kalite: Free=16kHz mono+480p, Plus=32kHz mono+720p, Pro=48kHz stereo+1080p
+ * SopranoChat — DM Arama Servisi (Yalnız Sesli)
+ * Supabase Broadcast ile sinyalizasyon, LiveKit ile gerçek ses iletimi
+ * Tier bazlı kalite: Free=16kHz mono, Plus=32kHz mono, Pro=48kHz stereo
  */
 import { DeviceEventEmitter } from 'react-native';
 import { supabase } from '../constants/supabase';
@@ -56,7 +56,7 @@ function isSignalDuplicate(signal: CallSignal): boolean {
 }
 
 // ─── TYPES ──────────────────────────────────────────────────
-export type CallType = 'audio' | 'video';
+export type CallType = 'audio';
 export type CallStatus = 'idle' | 'calling' | 'ringing' | 'connected' | 'ended';
 
 export type CallSignal = {
@@ -77,13 +77,13 @@ export type CallQuality = {
 };
 
 // ─── TIER BAZLI KALİTE ─────────────────────────────────────
-export function getCallQuality(tier: TierName, callType: CallType): CallQuality {
+export function getCallQuality(tier: TierName): CallQuality {
   const limits = getRoomLimits(tier);
   return {
     audioSampleRate: limits.audioSampleRate,
     audioChannels: limits.audioChannels,
-    videoMaxRes: limits.videoMaxRes,
-    videoEnabled: callType === 'video',
+    videoMaxRes: 0,
+    videoEnabled: false,
   };
 }
 
@@ -163,7 +163,7 @@ export const CallService = {
     callType: CallType,
     tier: TierName = 'Free'
   ): Promise<{ callId: string; receiverIsOnline: boolean }> {
-    // Tüm tier'lar görüntülü arama yapabilir (kalite tier'a göre değişir)
+    // Tüm tier'lar sesli arama yapabilir (kalite tier'a göre değişir)
 
     // ★ CALL-1 FIX: Sadece karşılıklı takipçiler arayabilir
     const friendshipStatus = await FriendshipService.getStatus(callerId, receiverId);
@@ -195,7 +195,7 @@ export const CallService = {
     await sendSignalToUser(receiverId, signal);
 
     // ★ Her durumda push notification gönder — arka planda/kapalıyken arama almak için KRİTİK
-    const callTypeLabel = callType === 'video' ? '📹 Görüntülü Arama' : '📞 Sesli Arama';
+    const callTypeLabel = '📞 Sesli Arama';
     PushService.sendToUser(receiverId, callTypeLabel, `${callerName} seni arıyor`, {
       type: 'incoming_call',
       callId,
@@ -252,7 +252,7 @@ export const CallService = {
         user_id: receiverId,
         sender_id: callerId,
         type: 'missed_call',
-        body: callType === 'video' ? '📹 Cevapsız görüntülü arama' : '📞 Cevapsız sesli arama',
+        body: '📞 Cevapsız sesli arama',
       });
 
       // 2. Push bildirim gönder
@@ -325,13 +325,28 @@ export const CallService = {
       globalCallChannel = supabase.channel(`call_signal_${userId}`);
 
       globalCallChannel
-        .on('broadcast', { event: 'call_signal' }, (payload) => {
+        .on('broadcast', { event: 'call_signal' }, async (payload) => {
           const signal = payload.payload as CallSignal;
           if (__DEV__) console.log(`[CallService] ◀ Sinyal ALINDI: ${signal.action} (${signal.callId.slice(-8)})`);
           // ★ Dedup: Retry nedeniyle gelen tekrarlı sinyali filtrele
-          if (!isSignalDuplicate(signal)) {
-            DeviceEventEmitter.emit('onCallSignal', signal);
+          if (isSignalDuplicate(signal)) return;
+
+          // ★ SEC-CALL-AUTH: incoming_call sinyalinde friendship doğrulaması
+          // Arkadaş olmayan birinden gelen sahte arama sinyalini engelle
+          if (signal.action === 'incoming_call' && signal.callerId) {
+            try {
+              const status = await FriendshipService.getStatus(userId, signal.callerId);
+              const reverseStatus = status === 'accepted' ? 'accepted' : await FriendshipService.getStatus(signal.callerId, userId);
+              if (status !== 'accepted' && reverseStatus !== 'accepted') {
+                if (__DEV__) console.warn('[CallService] SEC-CALL-AUTH: Arkadaş olmayan arama sinyali yoksayıldı:', signal.callerId);
+                return;
+              }
+            } catch {
+              // Friendship kontrolü başarısız olursa sinyali yine de işle (graceful degradation)
+            }
           }
+
+          DeviceEventEmitter.emit('onCallSignal', signal);
         })
         .subscribe((status) => {
           if (__DEV__) console.log(`[CallService] Call signal kanal durumu: ${status} (user: ${userId.slice(0, 8)})`);

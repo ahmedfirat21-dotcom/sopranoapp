@@ -17,3 +17,17 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     },
   },
 });
+
+// ★ Firebase JWT → Supabase Third-Party Auth entegrasyonu
+// Token'ı dinamik olarak Supabase REST client header'ına enjekte eder.
+// _layout.tsx'ten çağrılır (Firebase auth state değiştiğinde).
+export function setSupabaseAuthToken(token: string | null) {
+  if (token) {
+    // @ts-ignore — internal API, supabase-js v2 için çalışır
+    supabase['rest']['headers']['Authorization'] = `Bearer ${token}`;
+  } else {
+    // Token yoksa anon key'e geri dön
+    // @ts-ignore
+    supabase['rest']['headers']['Authorization'] = `Bearer ${SUPABASE_ANON_KEY}`;
+  }
+}

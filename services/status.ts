@@ -48,11 +48,16 @@ export const StatusService = {
   },
 
   async create(userId: string, content: string, emoji: string = '💭'): Promise<UserStatus> {
+    // ★ SEC-STATUS: Input sanitization — max 200 char, HTML strip, emoji limit
+    const sanitizedContent = (content || '').trim().replace(/<[^>]*>/g, '').slice(0, 200);
+    if (sanitizedContent.length < 1) throw new Error('Durum metni boş olamaz');
+    const sanitizedEmoji = (emoji || '💭').slice(0, 6); // Max 1 emoji + variant selectors
+
     await supabase.from('user_statuses').delete().eq('user_id', userId);
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
     const { data, error } = await supabase
       .from('user_statuses')
-      .insert({ user_id: userId, content, type: 'text', emoji, expires_at: expiresAt })
+      .insert({ user_id: userId, content: sanitizedContent, type: 'text', emoji: sanitizedEmoji, expires_at: expiresAt })
       .select('*')
       .single();
     if (error) throw error;

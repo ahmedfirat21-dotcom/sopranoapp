@@ -14,6 +14,7 @@ import { supabase } from '../constants/supabase';
 import { ModerationService } from '../services/moderation';
 import { RoomService, getRoomLimits } from '../services/database';
 import { getAvatarSource } from '../constants/avatars';
+import StatusAvatar from '../components/StatusAvatar';
 import { showToast } from '../components/Toast';
 
 import { useAuth } from './_layout';
@@ -100,6 +101,15 @@ export default function AdminPanel() {
   const [roomSearch, setRoomSearch] = useState('');
   const [expandedRoomId, setExpandedRoomId] = useState<string | null>(null);
 
+  // ★ K-PROJE-1: Route guard — non-admin kullanıcı direkt URL ile gelirse hemen yönlendir.
+  // Backend her RPC'de ayrıca admin kontrol yapıyor (v25); bu sadece UI/UX.
+  useEffect(() => {
+    if (profile && !profile.is_admin) {
+      const t = setTimeout(() => safeGoBack(router), 2000);
+      return () => clearTimeout(t);
+    }
+  }, [profile?.is_admin, router]);
+
   // Admin kontrolü
   if (!profile?.is_admin) {
     return (
@@ -182,7 +192,7 @@ export default function AdminPanel() {
       setRecentUsers(users || []);
 
     } catch (e) {
-      console.error('Admin veri yükleme hatası:', e);
+      if (__DEV__) console.error('Admin veri yükleme hatası:', e);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -256,14 +266,14 @@ export default function AdminPanel() {
       { text: 'İptal', style: 'cancel' },
       {
         text: 'Kalıcı Sil', style: 'destructive', onPress: async () => {
-          try {
-            await supabase.from('room_participants').delete().eq('room_id', roomId);
-            await supabase.from('rooms').delete().eq('id', roomId);
-            showToast({ title: 'Oda Silindi', message: roomName, type: 'success' });
-            loadAll();
-          } catch {
-            showToast({ title: 'Hata', message: 'Oda silinemedi', type: 'error' });
+          // ★ K-PROJE-1: v25 RPC — admin bypass + cascade cleanup
+          const { error } = await supabase.rpc('admin_delete_room', { p_room_id: roomId });
+          if (error) {
+            showToast({ title: 'Hata', message: error.message || 'Oda silinemedi', type: 'error' });
+            return;
           }
+          showToast({ title: 'Oda Silindi', message: roomName, type: 'success' });
+          loadAll();
         }
       },
     ], 'error');
@@ -334,7 +344,15 @@ export default function AdminPanel() {
       { text: 'İptal', style: 'cancel' },
       {
         text: action, onPress: async () => {
-          await supabase.from('profiles').update({ is_admin: !currentAdmin }).eq('id', userId);
+          // ★ K-PROJE-1: v25 RPC — sessiz RLS fail yerine backend admin-verify.
+          const { error } = await supabase.rpc('admin_toggle_admin', {
+            p_user_id: userId,
+            p_make_admin: !currentAdmin,
+          });
+          if (error) {
+            showToast({ title: 'Hata', message: error.message || 'Yetki değişikliği başarısız', type: 'error' });
+            return;
+          }
           showToast({ title: currentAdmin ? 'Adminlik Kaldırıldı' : 'Admin Yapıldı', message: displayName, type: 'success' });
           loadAll();
         }
@@ -352,10 +370,17 @@ export default function AdminPanel() {
   };
 
   const giveSP = async (userId: string, displayName: string, amount: number) => {
-    const { data: user } = await supabase.from('profiles').select('system_points').eq('id', userId).single();
-    if (user) {
-      await supabase.from('profiles').update({ system_points: (user.system_points || 0) + amount }).eq('id', userId);
+    // ★ K-PROJE-1: v25 RPC — sp_transactions log + idempotency.
+    // Eskiden direkt UPDATE yapıyordu → V24 trigger bunu zaten engelliyor.
+    const { error } = await supabase.rpc('admin_grant_sp', {
+      p_user_id: userId,
+      p_amount: amount,
+      p_reason: `manual_grant_to_${displayName}`,
+    });
+    if (!error) {
       showToast({ title: `${amount} SP Verildi`, message: displayName, type: 'success' });
+    } else {
+      showToast({ title: 'Hata', message: error.message || 'SP verilemedi', type: 'error' });
     }
   };
 
@@ -372,37 +397,14 @@ export default function AdminPanel() {
         { text: 'İptal', style: 'cancel' },
         {
           text: 'Kalıcı Sil', style: 'destructive', onPress: async () => {
-            try {
-              // 1. Kullanıcının sahip olduğu odaları sil
-              const { data: ownedRooms } = await supabase.from('rooms').select('id').eq('host_id', userId);
-              if (ownedRooms && ownedRooms.length > 0) {
-                const roomIds = ownedRooms.map(r => r.id);
-                await supabase.from('room_participants').delete().in('room_id', roomIds);
-                await supabase.from('messages').delete().in('room_id', roomIds);
-                await supabase.from('rooms').delete().in('id', roomIds);
-              }
-              // 2. Kullanıcının katılımcı olduğu yerlerden çık
-              await supabase.from('room_participants').delete().eq('user_id', userId);
-              // 3. Mesajları sil
-              await supabase.from('messages').delete().eq('sender_id', userId);
-              // 4. Arkadaşlıkları sil
-              await supabase.from('friendships').delete().or(`user_id.eq.${userId},friend_id.eq.${userId}`);
-              // 5. Raporları sil
-              await supabase.from('reports').delete().or(`reporter_id.eq.${userId},reported_user_id.eq.${userId}`);
-              // 6. SP işlemlerini sil
-              try { await supabase.from('sp_transactions').delete().eq('user_id', userId); } catch {}
-              // 7. Inbox sil
-              try { await supabase.from('inbox').delete().eq('user_id', userId); } catch {}
-              // 8. Posts sil
-              try { await supabase.from('posts').delete().eq('user_id', userId); } catch {}
-              // 9. Profili sil
-              await supabase.from('profiles').delete().eq('id', userId);
-              
-              showToast({ title: 'Kullanıcı Silindi', message: `${displayName} kalıcı olarak silindi`, type: 'success' });
-              loadAll();
-            } catch (e: any) {
-              showToast({ title: 'Hata', message: e.message || 'Kullanıcı silinemedi', type: 'error' });
+            // ★ K-PROJE-1: v25 RPC — cascade delete tek transaction, RLS bypass.
+            const { error } = await supabase.rpc('admin_delete_user_cascade', { p_user_id: userId });
+            if (error) {
+              showToast({ title: 'Hata', message: error.message || 'Kullanıcı silinemedi', type: 'error' });
+              return;
             }
+            showToast({ title: 'Kullanıcı Silindi', message: `${displayName} kalıcı olarak silindi`, type: 'success' });
+            loadAll();
           }
         },
       ],
@@ -731,7 +733,7 @@ export default function AdminPanel() {
             <>
               {recentUsers.map(user => (
                 <View key={user.id} style={s.userCard}>
-                  <Image source={getAvatarSource(user.avatar_url)} style={s.userAvatar} />
+                  <StatusAvatar uri={user.avatar_url} size={40} isOnline={user.is_online} tier={user.subscription_tier} isAdmin={user.is_admin} />
                   <View style={{ flex: 1 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                       <Text style={s.userName}>{user.display_name}</Text>

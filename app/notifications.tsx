@@ -12,6 +12,7 @@ import { getRelativeTime } from '../constants/time';
 import { supabase } from '../constants/supabase';
 import { FriendshipService, type PendingRequest } from '../services/friendship';
 import { getAvatarSource } from '../constants/avatars';
+import StatusAvatar from '../components/StatusAvatar';
 import EmptyState from '../components/EmptyState';
 import AppBackground from '../components/AppBackground';
 import { useAuth, useBadges } from './_layout';
@@ -21,7 +22,7 @@ type Notification = {
   id: string;
   user_id: string;
   sender_id: string;
-  type: 'like' | 'comment' | 'gift' | 'follow' | 'follow_request' | 'follow_accepted' | 'follow_rejected';
+  type: 'like' | 'comment' | 'gift' | 'follow' | 'follow_request' | 'follow_accepted' | 'follow_rejected' | 'room_follow' | 'room_live';
   reference_id: string | null;
   is_read: boolean;
   created_at: string;
@@ -41,6 +42,9 @@ const NOTIF_CONFIG: Record<string, { icon: string; color: string; verb: string }
   // ★ BUG-F8 FIX: follow_rejected config'i eklendi (cooldown mekanizması için internal kayıt)
   // Görüntülenmez — FlatList'te filtrelenir (BUG-F19)
   follow_rejected: { icon: 'close-circle-outline', color: '#94A3B8', verb: '' },
+  // ★ Oda takip bildirimi
+  room_follow: { icon: 'home', color: '#EC4899', verb: 'odanızı takip etmeye başladı' },
+  room_live: { icon: 'radio', color: '#14B8A6', verb: 'yeni bir oda açtı' },
 };
 
 
@@ -83,7 +87,7 @@ export default function NotificationsScreen() {
         .eq('user_id', firebaseUser.uid)
         .eq('is_read', false);
     } catch (err) {
-      console.warn('Bildirimler yüklenemedi:', err);
+      if (__DEV__) console.warn('Bildirimler yüklenemedi:', err);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -174,10 +178,7 @@ export default function NotificationsScreen() {
                     style={styles.pendingUser}
                     onPress={() => router.push(`/user/${req.sender?.id || req.user_id}`)}
                   >
-                    <Image
-                      source={getAvatarSource(req.sender?.avatar_url)}
-                      style={styles.pendingAvatar}
-                    />
+                    <StatusAvatar uri={req.sender?.avatar_url} size={44} tier={(req.sender as any)?.subscription_tier} />
                     <View style={styles.pendingInfo}>
                       <Text style={styles.pendingName} numberOfLines={1}>
                         {req.sender?.display_name || 'Kullanıcı'}
@@ -229,16 +230,15 @@ export default function NotificationsScreen() {
             router.push(`/user/${item.sender_id}` as any);
           } else if (item.type === 'follow' || item.type === 'follow_request' || item.type === 'follow_accepted') {
             router.push(`/user/${item.sender_id}` as any);
+          } else if (item.type === 'room_follow' || item.type === 'room_live') {
+            if (item.reference_id) router.push(`/room/${item.reference_id}` as any);
           }
         }}
       >
         <View style={[styles.notifIcon, { backgroundColor: `${config.color}18` }]}>
           <Ionicons name={config.icon as any} size={18} color={config.color} />
         </View>
-        <Image
-          source={getAvatarSource(item.sender?.avatar_url)}
-          style={styles.notifAvatar}
-        />
+        <StatusAvatar uri={item.sender?.avatar_url} size={40} tier={(item.sender as any)?.subscription_tier} />
         <View style={styles.notifContent}>
           <Text style={styles.notifText}>
             <Text style={styles.notifName}>{item.sender?.display_name || 'Kullanıcı'}</Text>

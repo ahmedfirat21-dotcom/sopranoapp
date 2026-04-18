@@ -11,22 +11,33 @@
  * 4. REVENUECAT_MOCK_MODE = false yap
  */
 import { Platform } from 'react-native';
+import { logger } from '../utils/logger';
 import { supabase } from '../constants/supabase';
 import type { SubscriptionTier } from '../types';
 
 // ═══ KONFİGÜRASYON ═══
-export const REVENUECAT_MOCK_MODE = true;
-const REVENUECAT_API_KEY_ANDROID = 'goog_YOUR_REVENUECAT_API_KEY'; // Google Play
-const REVENUECAT_API_KEY_IOS = 'appl_YOUR_REVENUECAT_API_KEY';     // App Store
+// ★ RevenueCat henüz yapılandırılmadıysa production'da da mock mode kullanılır.
+//   Gerçek API key alındığında REVENUECAT_MOCK_MODE = false yapılmalıdır.
+const REVENUECAT_API_KEY_ANDROID = 'goog_VotOQmvKFoUfgzcHnZGoEjKImso'; // Google Play — RevenueCat Dashboard'dan alındı
+const REVENUECAT_API_KEY_IOS = 'appl_YOUR_REVENUECAT_API_KEY';     // App Store — iOS desteği eklendiğinde güncellenecek
+
+const _hasRealKey = !REVENUECAT_API_KEY_ANDROID.includes('YOUR_') || !REVENUECAT_API_KEY_IOS.includes('YOUR_');
+export const REVENUECAT_MOCK_MODE = !_hasRealKey; // Gerçek key yoksa otomatik mock mode
+
+// Production'da placeholder key varsa sadece uyarı ver (crash yapma)
+if (!__DEV__ && !_hasRealKey) {
+  console.warn('[RevenueCat] Placeholder API key — mock mode aktif. Gerçek ödeme sistemi devre dışı.');
+}
 
 // ═══ ENTITLEMENT → TIER MAPPING ═══
 // RevenueCat Dashboard'daki entitlement ID'leri → SopranoChat tier'ları
 const ENTITLEMENT_TO_TIER: Record<string, SubscriptionTier> = {
+  // ★ Aktif ürünler (3-tier: Free / Plus / Pro)
   'tier_plus': 'Plus',
   'tier_pro': 'Pro',
   'plus': 'Plus',
   'pro': 'Pro',
-  // Legacy entitlements (eski 5-tier)
+  // ★ Legacy migration (eski 5-tier → 3-tier) — eski entitlement'lar expire olunca kaldırılacak
   'tier_bronze': 'Plus',
   'tier_silver': 'Plus',
   'tier_gold': 'Pro',
@@ -111,47 +122,54 @@ const MOCK_OFFERINGS = {
 export const RevenueCatService = {
   _initialized: false,
   _Purchases: null as any,
+  _initPromise: null as Promise<void> | null,
+  _dashboardEmpty: false, // ★ Dashboard'da ürün yoksa true — mock offerings kullanılır
 
   /**
    * SDK'yı başlat — app mount'ta bir kez çağrılır.
-   * Mock mode'da no-op.
+   * Mock mode'da no-op. Promise kaydedilir, purchasePackage await eder.
    */
   async init(userId?: string): Promise<void> {
     if (REVENUECAT_MOCK_MODE) {
-      if (__DEV__) {
-        console.log('[RevenueCat] Mock mode — SDK başlatılmadı');
-      } else {
-        // ★ PRODUCTION GÜVENLİK UYARISI: Mock mode production build'de aktif!
-        // Bu durum ödeme almadan tier yükseltmesi yapılmasına sebep olur.
-        console.error(
-          '\n' +
-          '╔══════════════════════════════════════════════════════╗\n' +
-          '║  ⚠️  REVENUECAT_MOCK_MODE = true (PRODUCTION!)     ║\n' +
-          '║  Ödeme bypass riski! revenuecat.ts dosyasında       ║\n' +
-          '║  REVENUECAT_MOCK_MODE = false yapın.                ║\n' +
-          '╚══════════════════════════════════════════════════════╝\n'
-        );
-      }
+      if (__DEV__) logger.log('[RevenueCat] Mock mode — SDK başlatılmadı');
       return;
     }
     if (this._initialized) return;
+    // Çift çağrı koruması — aynı promise döner
+    if (this._initPromise) return this._initPromise;
 
-    try {
-      const Purchases = require('react-native-purchases').default;
-      this._Purchases = Purchases;
+    this._initPromise = (async () => {
+      try {
+        const Purchases = require('react-native-purchases').default;
+        this._Purchases = Purchases;
 
-      const apiKey = Platform.OS === 'ios' ? REVENUECAT_API_KEY_IOS : REVENUECAT_API_KEY_ANDROID;
-      await Purchases.configure({ apiKey });
+        const apiKey = Platform.OS === 'ios' ? REVENUECAT_API_KEY_IOS : REVENUECAT_API_KEY_ANDROID;
+        await Purchases.configure({ apiKey });
 
-      if (userId) {
-        await Purchases.logIn(userId);
+        if (userId) {
+          await Purchases.logIn(userId);
+        }
+
+        this._initialized = true;
+        if (__DEV__) logger.log('[RevenueCat] SDK başlatıldı');
+
+        // ★ Offerings pre-fetch — Dashboard'da ürün yoksa sessizce mock'a düş
+        try {
+          const offerings = await Purchases.getOfferings();
+          if (!offerings?.current?.availablePackages?.length) {
+            logger.warn('[RevenueCat] Dashboard\'da offering/ürün bulunamadı — mock offerings kullanılacak');
+            this._dashboardEmpty = true;
+          }
+        } catch {
+          // ConfigurationError (no products registered) — sessiz yakalama
+          this._dashboardEmpty = true;
+        }
+      } catch (e) {
+        this._initPromise = null; // Hata durumunda tekrar denenebilsin
+        logger.warn('[RevenueCat] SDK başlatma hatası:', e);
       }
-
-      this._initialized = true;
-      if (__DEV__) console.log('[RevenueCat] SDK başlatıldı');
-    } catch (e) {
-      console.warn('[RevenueCat] SDK başlatma hatası:', e);
-    }
+    })();
+    return this._initPromise;
   },
 
   /**
@@ -163,7 +181,7 @@ export const RevenueCatService = {
     try {
       await this._Purchases.logIn(userId);
     } catch (e) {
-      console.warn('[RevenueCat] identify hatası:', e);
+      logger.warn('[RevenueCat] identify hatası:', e);
     }
   },
 
@@ -172,12 +190,12 @@ export const RevenueCatService = {
    * Mock mode'da sabit fiyat listesi döner.
    */
   async getOfferings(): Promise<typeof MOCK_OFFERINGS> {
-    if (REVENUECAT_MOCK_MODE) return MOCK_OFFERINGS;
+    if (REVENUECAT_MOCK_MODE || this._dashboardEmpty) return MOCK_OFFERINGS;
     try {
       const offerings = await this._Purchases.getOfferings();
       return offerings;
     } catch (e) {
-      console.warn('[RevenueCat] getOfferings hatası:', e);
+      logger.warn('[RevenueCat] getOfferings hatası:', e);
       return MOCK_OFFERINGS; // Fallback
     }
   },
@@ -193,7 +211,7 @@ export const RevenueCatService = {
     userId: string,
     targetTier: SubscriptionTier,
   ): Promise<{ newTier: SubscriptionTier | null; error?: string }> {
-    if (REVENUECAT_MOCK_MODE) {
+    if (REVENUECAT_MOCK_MODE || this._dashboardEmpty) {
       // Mock: direkt DB güncelle
       try {
         const { error } = await supabase
@@ -206,6 +224,10 @@ export const RevenueCatService = {
         return { newTier: null, error: e.message };
       }
     }
+
+    // SDK init tamamlanana kadar bekle
+    if (this._initPromise) await this._initPromise;
+    if (!this._Purchases) return { newTier: null, error: 'RevenueCat SDK hazır değil' };
 
     try {
       const { customerInfo } = await this._Purchases.purchasePackage(pkg);
@@ -251,7 +273,7 @@ export const RevenueCatService = {
 
       return { restoredTier: tier || 'Free' };
     } catch (e) {
-      console.warn('[RevenueCat] restore hatası:', e);
+      logger.warn('[RevenueCat] restore hatası:', e);
       return { restoredTier: 'Free' };
     }
   },
@@ -315,7 +337,7 @@ export const RevenueCatService = {
     try {
       await this._Purchases.logOut();
     } catch (e) {
-      console.warn('[RevenueCat] logout hatası:', e);
+      logger.warn('[RevenueCat] logout hatası:', e);
     }
   },
 

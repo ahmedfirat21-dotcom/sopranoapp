@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
+import { useState, useRef, useEffect } from 'react';
+import { View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,34 +10,123 @@ import { useAuth } from './_layout';
 import AppBackground from '../components/AppBackground';
 import { showToast } from '../components/Toast';
 import PremiumAlert, { type AlertButton } from '../components/PremiumAlert';
+import { RevenueCatService, REVENUECAT_MOCK_MODE } from '../services/revenuecat';
+import { GamificationService } from '../services/gamification';
+import { supabase } from '../constants/supabase';
+import { migrateLegacyTier } from '../types';
 
 // ═══ SP Paketleri — Premium Ionicons ═══
+// ★ id alanları Google Play Console'daki In-App Product ID'leriyle eşleşmeli
 const SP_PACKAGES = [
-  { id: 'sp_50',   sp: 50,   price: 14.99,  icon: 'flash-outline' as const,     accent: '#60A5FA', gradient: ['#1E3A5F', '#0F2744'] as [string, string], bonus: 0,    popular: false },
-  { id: 'sp_150',  sp: 150,  price: 34.99,  icon: 'diamond-outline' as const,   accent: '#A78BFA', gradient: ['#3B1F5E', '#2D1648'] as [string, string], bonus: 10,   popular: false },
-  { id: 'sp_500',  sp: 500,  price: 99.99,  icon: 'trophy-outline' as const,    accent: '#FBBF24', gradient: ['#3D2E10', '#2E2108'] as [string, string], bonus: 50,   popular: true },
-  { id: 'sp_1200', sp: 1200, price: 199.99, icon: 'star-outline' as const,      accent: '#14B8A6', gradient: ['#0F2E4A', '#0A2038'] as [string, string], bonus: 200,  popular: false },
-  { id: 'sp_3000', sp: 3000, price: 449.99, icon: 'shield-checkmark-outline' as const, accent: '#F472B6', gradient: ['#3B1042', '#2D0C34'] as [string, string], bonus: 600,  popular: false },
-  { id: 'sp_7500', sp: 7500, price: 999.99, icon: 'rocket-outline' as const,    accent: '#FB923C', gradient: ['#4A1525', '#3A0F1E'] as [string, string], bonus: 2000, popular: false },
+  { id: 'soprano_sp_100',  sp: 100,  price: 14.99,  icon: 'flash-outline' as const,     accent: '#60A5FA', gradient: ['#1E3A5F', '#0F2744'] as [string, string], bonus: 0,    popular: false },
+  { id: 'soprano_sp_250',  sp: 250,  price: 34.99,  icon: 'diamond-outline' as const,   accent: '#A78BFA', gradient: ['#3B1F5E', '#2D1648'] as [string, string], bonus: 25,   popular: false },
+  { id: 'soprano_sp_600',  sp: 600,  price: 99.99,  icon: 'trophy-outline' as const,    accent: '#FBBF24', gradient: ['#3D2E10', '#2E2108'] as [string, string], bonus: 75,   popular: true },
+  { id: 'sp_1500', sp: 1500, price: 199.99, icon: 'star-outline' as const,      accent: '#14B8A6', gradient: ['#0F2E4A', '#0A2038'] as [string, string], bonus: 250,  popular: false },
+  { id: 'sp_4000', sp: 4000, price: 449.99, icon: 'shield-checkmark-outline' as const, accent: '#F472B6', gradient: ['#3B1042', '#2D0C34'] as [string, string], bonus: 800,  popular: false },
+  { id: 'sp_10000', sp: 10000, price: 999.99, icon: 'rocket-outline' as const,  accent: '#FB923C', gradient: ['#4A1525', '#3A0F1E'] as [string, string], bonus: 2500, popular: false },
 ];
 
 export default function SPStoreScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { profile } = useAuth();
+  const { profile, refreshProfile } = useAuth();
   const spBalance = profile?.system_points ?? (profile as any)?.sp ?? 0;
+  const userTier = migrateLegacyTier(profile?.subscription_tier);
+  // ★ Pro: %20, Plus: %10 ekstra SP bonusu (mağaza indirimi)
+  const storeBonusPct = userTier === 'Pro' ? 0.20 : userTier === 'Plus' ? 0.10 : 0;
   const [cAlert, setCAlert] = useState<{ visible: boolean; title: string; message: string; type?: 'info' | 'warning' | 'error' | 'success'; buttons?: AlertButton[] }>({ visible: false, title: '', message: '' });
+  const [purchasing, setPurchasing] = useState(false);
+  const mountedRef = useRef(true);
+  useEffect(() => () => { mountedRef.current = false; }, []);
 
   const handleBuy = (pkg: typeof SP_PACKAGES[0]) => {
+    if (!profile?.id) {
+      showToast({ title: 'Hata', message: 'Önce giriş yapmalısınız.', type: 'error' });
+      return;
+    }
+
+    // ★ Tier bonusu: Pro %20, Plus %10 ekstra SP
+    const tierBonus = Math.floor(pkg.sp * storeBonusPct);
+    const totalSP = pkg.sp + pkg.bonus + tierBonus;
+    const modeText = (REVENUECAT_MOCK_MODE && __DEV__) ? '\n\n⚠️ Test modunda — gerçek ödeme alınmaz.' : '';
+    const tierBonusText = tierBonus > 0 ? ` + ${tierBonus} ${userTier} bonus` : '';
+
     setCAlert({
       visible: true,
       title: `${pkg.sp.toLocaleString()} SP`,
-      message: `${pkg.price.toFixed(2)} ₺ karşılığında ${pkg.sp.toLocaleString()} SP${pkg.bonus > 0 ? ` + ${pkg.bonus} bonus SP` : ''} satın almak istediğine emin misin?`,
+      message: `${pkg.price.toFixed(2)} ₺ karşılığında ${pkg.sp.toLocaleString()} SP${pkg.bonus > 0 ? ` + ${pkg.bonus} bonus` : ''}${tierBonusText} satın almak istediğine emin misin?${modeText}`,
       type: 'info',
       buttons: [
         { text: 'Vazgeç', style: 'cancel' },
-        { text: 'Satın Al', onPress: () => {
-          showToast({ title: '🚧 Yakında!', message: 'Uygulama içi satın alma yakında aktif olacak.', type: 'info' });
+        { text: 'Satın Al', onPress: async () => {
+          if (mountedRef.current) setPurchasing(true);
+          try {
+            // ★ K-PROJE-6: Mock mode sadece __DEV__ build'de bedava SP veriyor.
+            // Production'da placeholder key varsa bile asla bypass yok → fake ödeme imkansız.
+            if (REVENUECAT_MOCK_MODE && __DEV__) {
+              const mockRef = `mock:${profile.id}:${pkg.id}:${Date.now()}`;
+              await GamificationService.earn(profile.id, totalSP, 'sp_purchase', mockRef);
+              await refreshProfile();
+              if (mountedRef.current) {
+                showToast({ title: '✅ SP Eklendi! (TEST)', message: `${totalSP.toLocaleString()} SP test modunda eklendi.`, type: 'success' });
+              }
+            } else if (REVENUECAT_MOCK_MODE && !__DEV__) {
+              // Production placeholder key → satın alma çalışmaz, açık uyarı
+              showToast({ title: 'Ödeme Sistemi Hazır Değil', message: 'Satın alma şu an aktif değil. Yakında açılacak.', type: 'warning' });
+              return;
+            } else {
+              // ★ Production: RevenueCat üzerinden gerçek satın alma
+              try {
+                await RevenueCatService.getOfferings();
+                const Purchases = require('react-native-purchases').default;
+                const purchaseResult = await Purchases.purchaseStoreProduct({
+                  identifier: pkg.id,
+                  priceString: `₺${pkg.price.toFixed(2)}`,
+                });
+
+                // ★ K5: Idempotency key = RevenueCat store transaction ID.
+                // purchaseResult.transactionIdentifier mevcutsa onu kullan;
+                // yoksa customerInfo.nonSubscriptionTransactions en yenisinden türet.
+                let externalRef: string | undefined;
+                const directTxId = (purchaseResult as any)?.transactionIdentifier
+                  || (purchaseResult as any)?.transaction?.transactionIdentifier;
+                if (directTxId) {
+                  externalRef = `rvn:${directTxId}`;
+                } else {
+                  try {
+                    const ci = await Purchases.getCustomerInfo();
+                    const txs = (ci?.nonSubscriptionTransactions || [])
+                      .filter((t: any) => t.productIdentifier === pkg.id)
+                      .sort((a: any, b: any) => new Date(b.purchaseDate).getTime() - new Date(a.purchaseDate).getTime());
+                    if (txs[0]?.transactionIdentifier) {
+                      externalRef = `rvn:${txs[0].transactionIdentifier}`;
+                    }
+                  } catch { /* ci alınamazsa externalRef undefined — legacy path */ }
+                }
+
+                await GamificationService.earn(profile.id, totalSP, 'sp_purchase', externalRef);
+                await refreshProfile();
+                if (mountedRef.current) {
+                  showToast({ title: '🎉 Satın Alma Başarılı!', message: `${totalSP.toLocaleString()} SP hesabına eklendi.`, type: 'success' });
+                }
+              } catch (purchaseErr: any) {
+                if (purchaseErr?.userCancelled) {
+                  return;
+                }
+                if (purchaseErr?.message?.includes('product') || purchaseErr?.code === 'PRODUCT_NOT_FOUND') {
+                  showToast({ title: '⏳ Ürün Hazırlanıyor', message: 'SP paketleri Google Play onayı bekliyor. Kısa süre sonra aktif olacak.', type: 'info' });
+                } else {
+                  throw purchaseErr;
+                }
+              }
+            }
+          } catch (err: any) {
+            if (mountedRef.current) {
+              showToast({ title: 'Hata', message: err.message || 'Satın alma başarısız.', type: 'error' });
+            }
+          } finally {
+            if (mountedRef.current) setPurchasing(false);
+          }
         }},
       ],
     });
@@ -68,7 +157,7 @@ export default function SPStoreScreen() {
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={s.bonusTitle}>Premium Bonus</Text>
-                <Text style={s.bonusDesc}>Premium üyelikle her satın almada %20 ekstra SP</Text>
+                <Text style={s.bonusDesc}>{storeBonusPct > 0 ? `${userTier} üyeliğinle %${Math.round(storeBonusPct * 100)} ekstra SP kazanıyorsun! 🎉` : 'Plus ile %10, Pro ile %20 ekstra SP kazan!'}</Text>
               </View>
             </View>
             <Ionicons name="chevron-forward" size={16} color="#64748B" />
@@ -110,11 +199,11 @@ export default function SPStoreScreen() {
                 <Text style={s.pkgSP}>{pkg.sp.toLocaleString()}</Text>
                 <Text style={s.pkgLabel}>SP</Text>
 
-                {/* Bonus */}
-                {pkg.bonus > 0 && (
+                {/* Bonus — paket bonusu + tier bonusu */}
+                {(pkg.bonus > 0 || storeBonusPct > 0) && (
                   <View style={s.bonusPill}>
                     <Ionicons name="add-circle" size={9} color="#22C55E" />
-                    <Text style={s.pkgBonus}>{pkg.bonus}</Text>
+                    <Text style={s.pkgBonus}>{pkg.bonus + Math.floor(pkg.sp * storeBonusPct)}</Text>
                   </View>
                 )}
 

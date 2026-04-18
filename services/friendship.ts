@@ -8,6 +8,7 @@
 import { supabase } from '../constants/supabase';
 import { PushService } from './push';
 import { GamificationService } from './gamification';
+import { logger } from '../utils/logger';
 
 export type FriendshipStatus = 'pending' | 'accepted' | 'blocked';
 
@@ -49,6 +50,18 @@ export const FriendshipService = {
    */
   async follow(userId: string, targetId: string): Promise<{ success: boolean; error?: string }> {
     try {
+      // ★ SEC-FOLLOW-RATE: Saatlik takip isteği limiti — bot spam engeli
+      const oneHourAgoRL = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+      const { count: recentFollowCount, error: rateError } = await supabase
+        .from('friendships')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .gte('created_at', oneHourAgoRL);
+      if (rateError) throw rateError;
+      if ((recentFollowCount || 0) >= 30) {
+        return { success: false, error: 'Çok fazla takip isteği gönderdiniz. Lütfen 1 saat sonra tekrar deneyin.' };
+      }
+
       // ★ Cooldown kontrolü: Bu kullanıcıya (userId) hedef (targetId) tarafından
       // gönderilmiş bir 'follow_rejected' bildirimi var mı kontrol et.
       // Eğer varsa ve 24 saatten yeniyse, tekrar istek gönderilemez.
@@ -111,7 +124,7 @@ export const FriendshipService = {
 
       return { success: true };
     } catch (e: any) {
-      console.error('Takip istegi hatasi:', e);
+      logger.error('Takip istegi hatasi:', e);
       return { success: false, error: e.message };
     }
   },
@@ -141,7 +154,7 @@ export const FriendshipService = {
 
       return { success: true };
     } catch (e: any) {
-      console.error('Takipten cikma hatasi:', e);
+      logger.error('Takipten cikma hatasi:', e);
       return { success: false, error: e.message };
     }
   },
@@ -304,7 +317,7 @@ export const FriendshipService = {
       if (error) throw error;
       return (data || []) as unknown as PendingRequest[];
     } catch (e: any) {
-      console.error('Bekleyen istek listesi hatasi:', e);
+      logger.error('Bekleyen istek listesi hatasi:', e);
       return [];
     }
   },
@@ -361,7 +374,7 @@ export const FriendshipService = {
 
       return { success: true };
     } catch (e: any) {
-      console.error('Istek onaylama hatasi:', e);
+      logger.error('Istek onaylama hatasi:', e);
       return { success: false, error: e.message };
     }
   },
@@ -403,7 +416,7 @@ export const FriendshipService = {
 
       return { success: true };
     } catch (e: any) {
-      console.error('Istek reddetme hatasi:', e);
+      logger.error('Istek reddetme hatasi:', e);
       return { success: false, error: e.message };
     }
   },
@@ -426,7 +439,7 @@ export const FriendshipService = {
       if (blockedIds.size === 0) return all;
       return all.filter(f => !blockedIds.has(f.id));
     } catch (e: any) {
-      console.error('Takipci listesi hatasi:', e);
+      logger.error('Takipci listesi hatasi:', e);
       return [];
     }
   },
@@ -449,7 +462,7 @@ export const FriendshipService = {
       if (blockedIds.size === 0) return all;
       return all.filter(f => !blockedIds.has(f.id));
     } catch (e: any) {
-      console.error('Takip listesi hatasi:', e);
+      logger.error('Takip listesi hatasi:', e);
       return [];
     }
   },

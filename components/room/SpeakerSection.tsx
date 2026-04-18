@@ -3,10 +3,23 @@ import { View, Text, StyleSheet, Pressable, Image, Dimensions, Animated, Easing,
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { getAvatarSource } from '../../constants/avatars';
+import AvatarPenaltyFlash, { type FlashType } from './AvatarPenaltyFlash';
 import type { RoomParticipant } from '../../services/database';
 
 const { width: W } = Dimensions.get('window');
-const CARD_GAP = 10;
+
+// ★ Dinamik sahne boyutlandırma — modern platform grid sistemi (Clubhouse/Spaces pattern)
+function getSpeakerMetrics(count: number) {
+  const availableW = W - 32;
+  let cols: number, gap: number;
+  if (count <= 2) { cols = 2; gap = 12; }
+  else if (count <= 6) { cols = 3; gap = 10; }
+  else if (count <= 9) { cols = 3; gap = 8; }
+  else { cols = 4; gap = 6; } // 10-13 compact
+  const cardWidth = Math.floor((availableW - gap * (cols - 1)) / cols);
+  const cardHeight = cardWidth;
+  return { cols, cardWidth, cardHeight, gap };
+}
 
 interface MicStatus {
   mic: boolean;
@@ -25,6 +38,9 @@ interface Props {
   VideoView?: any;
   onGhostSeatPress?: () => void;
   showSeatTooltip?: boolean;
+  /** Per-user avatar flash state */
+  avatarFlashes?: Record<string, FlashType | null>;
+  onFlashDone?: (userId: string) => void;
 }
 
 function SpeakingGlow({ speaking, borderRadius = 16 }: { speaking: boolean; borderRadius?: number }) {
@@ -78,19 +94,54 @@ function AudioWaveBars({ speaking, mic }: { speaking: boolean; mic: boolean }) {
   );
 }
 
-function OwnerCrown({ size = 28 }: { size?: number }) {
-  const rotateAnim = useRef(new Animated.Value(0)).current;
+function OwnerBadge() {
+  // ★ Premium animated golden glow pulse
+  const glowAnim = useRef(new Animated.Value(0.6)).current;
+  // ★ Subtle float
+  const floatAnim = useRef(new Animated.Value(0)).current;
+  // ★ Rotating sparkle orbit
+  const orbitAnim = useRef(new Animated.Value(0)).current;
+
   useEffect(() => {
+    // Golden glow pulse — breathe effect
     Animated.loop(Animated.sequence([
-      Animated.timing(rotateAnim, { toValue: 1, duration: 1400, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-      Animated.timing(rotateAnim, { toValue: -1, duration: 1400, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-      Animated.timing(rotateAnim, { toValue: 0, duration: 1400, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      Animated.timing(glowAnim, { toValue: 1, duration: 1800, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      Animated.timing(glowAnim, { toValue: 0.6, duration: 1800, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
     ])).start();
+
+    // Subtle float up/down
+    Animated.loop(Animated.sequence([
+      Animated.timing(floatAnim, { toValue: -1.5, duration: 1500, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      Animated.timing(floatAnim, { toValue: 1.5, duration: 1500, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+    ])).start();
+
+    // Orbit rotation for sparkle
+    Animated.loop(Animated.timing(orbitAnim, {
+      toValue: 1, duration: 4000, easing: Easing.linear, useNativeDriver: true,
+    })).start();
   }, []);
-  const rotate = rotateAnim.interpolate({ inputRange: [-1, 0, 1], outputRange: ['-18deg', '-15deg', '-12deg'] });
+
+  const rotateSparkle = orbitAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
+
   return (
-    <Animated.View style={[s.crownWrap, { transform: [{ rotate }], width: size * 1.5, height: size * 1.5 }]}>
-      <MaterialCommunityIcons name="crown" size={size} color="#FFD700" />
+    <Animated.View style={[s.ownerBadgeContainer, { transform: [{ translateY: floatAnim }] }]}>
+      {/* ★ Outer glow ring */}
+      <Animated.View style={[s.ownerGlowRing, { opacity: glowAnim }]} />
+      {/* ★ Badge body */}
+      <LinearGradient
+        colors={['#FFD700', '#F59E0B', '#D97706']}
+        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+        style={s.ownerBadgeBody}
+      >
+        <Ionicons name="star" size={14} color="#FFF" />
+      </LinearGradient>
+      {/* ★ Orbiting sparkle particle */}
+      <Animated.View style={[s.ownerSparkleOrbit, { transform: [{ rotate: rotateSparkle }] }]}>
+        <View style={s.ownerSparkleDot} />
+      </Animated.View>
     </Animated.View>
   );
 }
@@ -104,11 +155,15 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, isMe, cardWidth, 
   const isMod = user.role === 'moderator';
   const displayName = (user as any).disguise?.display_name || user.user?.display_name || 'Misafir';
   const avatarUrl = (user as any).disguise?.avatar_url || user.user?.avatar_url;
-  const { mic, speaking, videoTrack, cameraOn } = micStatus;
+  const { mic: rawMic, speaking, videoTrack, cameraOn } = micStatus;
   const isGhost = (user as any).is_ghost;
+  // ★ D3: DB'de is_muted=true ise UI'da kesinlikle "muted" olarak göster — LiveKit
+  // track state'i gecikmeli olabilir; DB kaydı mod aksiyonunu yansıtır.
+  const dbMuted = (user as any).is_muted === true && user.role !== 'listener';
+  const mic = rawMic && !dbMuted;
   return (
     <Pressable style={({ pressed }) => [s.speakerCard, { width: cardWidth }, pressed && { opacity: 0.9, transform: [{ scale: 0.97 }] }]} onPress={onPress}>
-      {isHost && <OwnerCrown />}
+      {isHost && <OwnerBadge />}
       <View style={[s.speakerCardInner, { height: cardHeight }]}>
         <LinearGradient colors={['rgba(30,41,59,0.7)', 'rgba(15,23,42,0.85)']} style={[StyleSheet.absoluteFill, { borderRadius: 16 }]} />
         {cameraOn && videoTrack && VideoView ? (
@@ -135,7 +190,7 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, isMe, cardWidth, 
   );
 }
 
-export default function SpeakerSection({ stageUsers, getMicStatus, onSelectUser, onSelfDemote, currentUserId, VideoView, onGhostSeatPress, showSeatTooltip }: Props) {
+export default function SpeakerSection({ stageUsers, getMicStatus, onSelectUser, onSelfDemote, currentUserId, VideoView, onGhostSeatPress, showSeatTooltip, avatarFlashes, onFlashDone }: Props) {
   const sortedUsers = useMemo(() => {
     if (stageUsers.length === 0) return [];
     const roleOrder: Record<string, number> = { owner: 0, host: 0, moderator: 1, speaker: 2 };
@@ -193,23 +248,69 @@ export default function SpeakerSection({ stageUsers, getMicStatus, onSelectUser,
   }
 
   const count = sortedUsers.length;
-  const availableW = W - 32;
-  const cardWidth = (availableW - CARD_GAP * 2) / 3;
-  const cardHeight = cardWidth;
+  const { cardWidth, cardHeight, gap } = getSpeakerMetrics(count);
+
+  // ★ Kamera açık kullanıcıları ayır — spotlight bölümü
+  const cameraUsers = sortedUsers.filter(u => {
+    const st = getMicStatus(u.user_id);
+    return st.cameraOn && st.videoTrack;
+  });
+  const audioOnlyUsers = sortedUsers.filter(u => {
+    const st = getMicStatus(u.user_id);
+    return !(st.cameraOn && st.videoTrack);
+  });
+
+  // ★ Spotlight: 1-2 kamera açık → geniş üst alan, 3+ → normal grid'e düşür
+  const showSpotlight = cameraUsers.length > 0 && cameraUsers.length <= 2 && VideoView;
+  const spotlightW = cameraUsers.length === 1 ? W - 32 : (W - 32 - gap) / 2;
+  const spotlightH = Math.round(spotlightW * 0.75); // 4:3 aspect
 
   return (
     <View style={s.wrap}>
-      <View style={s.header}>
-        <Text style={s.headerTitle}>Konuşmacılar ({count})</Text>
+      <View style={s.headerRow}>
+        <View style={s.headerPill}>
+          <LinearGradient
+            colors={['rgba(20,184,166,0.08)', 'rgba(20,184,166,0.02)', 'transparent']}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+            style={StyleSheet.absoluteFill}
+          />
+          <Ionicons name="mic" size={11} color="#14B8A6" />
+          <Text style={s.headerTitle}>Sahnedekiler</Text>
+          <View style={s.headerCount}>
+            <Text style={s.headerCountText}>{count}</Text>
+          </View>
+        </View>
       </View>
-      <View style={s.mainSpeakerGrid}>
-        {sortedUsers.map((u) => {
+
+      {/* ★ SPOTLIGHT — Kamera açık kullanıcılar üstte geniş gösterim */}
+      {showSpotlight && (
+        <View style={[s.spotlightRow, { gap, marginBottom: gap }]}>
+          {cameraUsers.map((u) => {
+            const st = getMicStatus(u.user_id);
+            const isMe = u.user_id === currentUserId;
+            return (
+              <SpeakerCard key={u.id} user={u} micStatus={st} onPress={() => onSelectUser(u)}
+                onSelfDemote={onSelfDemote}
+                isMe={isMe} cardWidth={spotlightW} cardHeight={spotlightH} VideoView={VideoView} />
+            );
+          })}
+        </View>
+      )}
+
+      {/* ★ Normal grid — kamera kapalılar veya spotlight yoksa herkes */}
+      <View style={[s.mainSpeakerGrid, { gap }]}>
+        {(showSpotlight ? audioOnlyUsers : sortedUsers).map((u) => {
           const st = getMicStatus(u.user_id);
           const isMe = u.user_id === currentUserId;
+          const isHost = u.role === 'owner';
+          // ★ Owner %15 büyük kart
+          const ownerScale = isHost ? 1.15 : 1;
+          const w = Math.floor(cardWidth * ownerScale);
+          const h = Math.floor(cardHeight * ownerScale);
           return (
             <SpeakerCard key={u.id} user={u} micStatus={st} onPress={() => onSelectUser(u)}
               onSelfDemote={onSelfDemote}
-              isMe={isMe} cardWidth={cardWidth} cardHeight={cardHeight} VideoView={VideoView} />
+              isMe={isMe} cardWidth={w} cardHeight={h} VideoView={VideoView} />
           );
         })}
       </View>
@@ -219,8 +320,31 @@ export default function SpeakerSection({ stageUsers, getMicStatus, onSelectUser,
 
 const s = StyleSheet.create({
   wrap: { paddingHorizontal: 16, marginTop: -4 },
-  header: { marginBottom: 6 },
-  headerTitle: { fontSize: 15, fontWeight: '800', color: '#F8FAFC', letterSpacing: -0.2 },
+  headerRow: {
+    flexDirection: 'row', alignItems: 'center',
+    justifyContent: 'space-between', marginBottom: 8,
+  },
+  headerPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    alignSelf: 'flex-start',
+    paddingHorizontal: 10, paddingVertical: 5,
+    borderRadius: 10,
+    backgroundColor: 'rgba(20,184,166,0.06)',
+    borderWidth: 0.8, borderColor: 'rgba(20,184,166,0.12)',
+    overflow: 'hidden',
+  },
+  headerTitle: {
+    fontSize: 12, fontWeight: '700', color: '#CBD5E1', letterSpacing: 0.5,
+    textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
+  },
+  headerCount: {
+    backgroundColor: 'rgba(20,184,166,0.15)', borderRadius: 8,
+    paddingHorizontal: 6, paddingVertical: 1,
+  },
+  headerCountText: { fontSize: 10, fontWeight: '800', color: '#14B8A6' },
+  spotlightRow: {
+    flexDirection: 'row', justifyContent: 'center', alignItems: 'flex-start',
+  },
   empty: { alignItems: 'center', justifyContent: 'center', paddingVertical: 32, gap: 6 },
   tooltipWrap: { alignItems: 'center', marginBottom: 4 },
   tooltipBubble: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(20,184,166,0.12)', borderWidth: 1, borderColor: 'rgba(20,184,166,0.25)', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 7 },
@@ -231,13 +355,40 @@ const s = StyleSheet.create({
   ghostSeatIcon: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(20,184,166,0.08)', alignItems: 'center', justifyContent: 'center' },
   ghostSeatLabel: { fontSize: 11, fontWeight: '600', color: 'rgba(20,184,166,0.5)', marginTop: 6, letterSpacing: 0.3 },
   emptyText: { color: 'rgba(255,255,255,0.3)', fontSize: 11, marginTop: 2 },
-  mainSpeakerGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: CARD_GAP },
+  mainSpeakerGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center' },
   speakerCard: { alignItems: 'center', marginBottom: 4, overflow: 'visible' },
   speakerCardInner: { width: '100%', borderRadius: 16, overflow: 'hidden', backgroundColor: 'rgba(30,41,59,0.6)', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.1)', position: 'relative', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 12, elevation: 6 },
   speakerAvatar: { width: '100%', height: '100%', resizeMode: 'cover' },
   roleBadge: { position: 'absolute', top: 8, left: 8, width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: 'rgba(15,23,42,0.8)' },
   roleBadgeMod: { backgroundColor: 'rgba(139,92,246,0.35)' },
-  crownWrap: { position: 'absolute', top: -10, left: -8, alignItems: 'center', justifyContent: 'center', zIndex: 20, shadowColor: '#FFD700', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.6, shadowRadius: 8, elevation: 10 },
+  ownerBadgeContainer: {
+    position: 'absolute', top: -10, left: -8, zIndex: 20,
+    width: 28, height: 28, alignItems: 'center', justifyContent: 'center',
+  },
+  ownerGlowRing: {
+    position: 'absolute', width: 32, height: 32, borderRadius: 16,
+    backgroundColor: 'transparent',
+    borderWidth: 1.5, borderColor: 'rgba(255,215,0,0.5)',
+    shadowColor: '#FFD700', shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8, shadowRadius: 8, elevation: 6,
+  },
+  ownerBadgeBody: {
+    width: 24, height: 24, borderRadius: 12,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.4)',
+    shadowColor: '#FFD700', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.7, shadowRadius: 6, elevation: 8,
+  },
+  ownerSparkleOrbit: {
+    position: 'absolute', width: 28, height: 28,
+    alignItems: 'center', justifyContent: 'flex-start',
+  },
+  ownerSparkleDot: {
+    width: 4, height: 4, borderRadius: 2,
+    backgroundColor: '#FFFACD',
+    shadowColor: '#FFF', shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 1, shadowRadius: 3, elevation: 4,
+  },
   micBadge: { position: 'absolute', bottom: 6, right: 6, width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'rgba(15,23,42,0.8)', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 4 },
   micBadgeOn: { backgroundColor: '#14B8A6' },
   micBadgeOff: { backgroundColor: 'rgba(239,68,68,0.85)' },

@@ -7,12 +7,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, Pressable, FlatList,
-  Image, ActivityIndicator, Dimensions, Modal,
+  ActivityIndicator, Dimensions, Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { supabase } from '../constants/supabase';
-import { getAvatarSource } from '../constants/avatars';
+import { RoomAccessService } from '../services/roomAccess';
+import StatusAvatar from './StatusAvatar';
 import { showToast } from './Toast';
 
 const { width: W, height: H } = Dimensions.get('window');
@@ -37,13 +38,15 @@ interface Props {
 
 // Bildirim tipi → simge eşleşmesi
 // ★ Zil drawer'ında gösterilecek bildirim tipleri (oda + arama + hediye)
-const BELL_NOTIF_TYPES = ['room_live', 'room_invite', 'missed_call', 'incoming_call', 'gift', 'event_reminder'];
+const BELL_NOTIF_TYPES = ['room_live', 'room_invite', 'room_invite_accepted', 'room_invite_rejected', 'missed_call', 'incoming_call', 'gift', 'event_reminder'];
 
 function getNotifIcon(type: string): { name: string; color: string } {
   switch (type) {
     case 'gift': return { name: 'gift', color: '#F59E0B' };
     case 'room_live': return { name: 'mic', color: '#EF4444' };
     case 'room_invite': return { name: 'mail-open', color: '#14B8A6' };
+    case 'room_invite_accepted': return { name: 'checkmark-circle', color: '#22C55E' };
+    case 'room_invite_rejected': return { name: 'close-circle', color: '#EF4444' };
     case 'missed_call': return { name: 'call', color: '#EF4444' };
     case 'incoming_call': return { name: 'videocam', color: '#60A5FA' };
     case 'event_reminder': return { name: 'calendar', color: '#A78BFA' };
@@ -56,6 +59,8 @@ function getDefaultBody(type: string): string {
     case 'gift': return 'sana hediye gönderdi';
     case 'room_live': return 'odası canlıya geçti';
     case 'room_invite': return 'seni odaya davet etti';
+    case 'room_invite_accepted': return 'oda davetini kabul etti 🎉';
+    case 'room_invite_rejected': return 'oda davetini reddetti';
     case 'missed_call': return 'Cevapsız sesli arama';
     case 'incoming_call': return 'Cevapsız görüntülü arama';
     case 'event_reminder': return 'Etkinlik hatırlatması';
@@ -79,6 +84,7 @@ export default function NotificationDrawer({ visible, onClose, userId, anchorTop
   const [loading, setLoading] = useState(false);
   const [showAll, setShowAll] = useState(false); // ★ Tümünü Gör — modal içinde genişlet
   const [clearing, setClearing] = useState(false); // ★ Tümünü Temizle loading state
+  const [processingInvites, setProcessingInvites] = useState<Set<string>>(new Set()); // ★ İşlenmekte olan davet ID'leri
 
   useEffect(() => {
     if (visible && userId) {
@@ -188,15 +194,53 @@ export default function NotificationDrawer({ visible, onClose, userId, anchorTop
 
   const handlePress = (item: NotifItem) => {
     markAsRead(item.id);
+    // room_invite tipinde tıklama ile değil, butonlarla aksiyon alınır
+    if (item.type === 'room_invite') return;
     onClose();
     if (item.type === 'room_live' && item.reference_id) {
       router.push(`/room/${item.reference_id}` as any);
-    } else if (item.type === 'room_invite' && item.reference_id) {
+    } else if ((item.type === 'room_invite_accepted' || item.type === 'room_invite_rejected') && item.reference_id) {
       router.push(`/room/${item.reference_id}` as any);
     } else if (item.type === 'missed_call' && item.sender_id) {
       router.push(`/user/${item.sender_id}` as any);
     } else if (item.type === 'gift') {
       router.push(`/wallet` as any);
+    }
+  };
+
+  // ★ Oda daveti kabul et
+  const handleAcceptInvite = async (item: NotifItem) => {
+    if (!userId || !item.reference_id) return;
+    setProcessingInvites(prev => new Set(prev).add(item.id));
+    try {
+      await RoomAccessService.acceptInvite(item.reference_id, userId);
+      // Bildirimi listeden kaldır
+      setItems(prev => prev.filter(n => n.id !== item.id));
+      // Bildirimi DB'den sil
+      try { await supabase.from('notifications').delete().eq('id', item.id); } catch {}
+      onClose();
+      // Odaya yönlendir
+      router.push(`/room/${item.reference_id}` as any);
+    } catch {
+      showToast({ title: 'Hata', message: 'Davet kabul edilemedi', type: 'error' });
+    } finally {
+      setProcessingInvites(prev => { const n = new Set(prev); n.delete(item.id); return n; });
+    }
+  };
+
+  // ★ Oda daveti reddet
+  const handleRejectInvite = async (item: NotifItem) => {
+    if (!userId || !item.reference_id) return;
+    setProcessingInvites(prev => new Set(prev).add(item.id));
+    try {
+      await RoomAccessService.rejectInvite(item.reference_id, userId);
+      // Bildirimi listeden kaldır
+      setItems(prev => prev.filter(n => n.id !== item.id));
+      showToast({ title: 'Davet Reddedildi', message: 'Oda daveti reddedildi', type: 'info' });
+    } catch {
+      showToast({ title: 'Hata', message: 'Davet reddedilemedi', type: 'error' });
+    } finally {
+      setProcessingInvites(prev => { const n = new Set(prev); n.delete(item.id); return n; });
     }
   };
 
@@ -278,7 +322,7 @@ export default function NotificationDrawer({ visible, onClose, userId, anchorTop
                   >
                     {/* Avatar + tip ikonu overlay */}
                     <View style={s.avatarWrap}>
-                      <Image source={getAvatarSource(item.sender?.avatar_url)} style={s.notifAvatar} />
+                      <StatusAvatar uri={item.sender?.avatar_url} size={38} />
                       <View style={[s.typeIconBadge, { backgroundColor: icon.color }]}>
                         <Ionicons name={icon.name as any} size={10} color="#FFF" />
                       </View>
@@ -296,6 +340,33 @@ export default function NotificationDrawer({ visible, onClose, userId, anchorTop
                     {!item.is_read && <View style={s.unreadDot} />}
                   </Pressable>
 
+                  {/* ★ Oda daveti: Kabul / Ret butonları */}
+                  {item.type === 'room_invite' && item.reference_id && (
+                    <View style={s.inviteActions}>
+                      <Pressable
+                        style={({ pressed }) => [s.inviteAcceptBtn, pressed && { opacity: 0.7 }]}
+                        onPress={() => handleAcceptInvite(item)}
+                        disabled={processingInvites.has(item.id)}
+                      >
+                        {processingInvites.has(item.id) ? (
+                          <ActivityIndicator size={12} color="#FFF" />
+                        ) : (
+                          <>
+                            <Ionicons name="checkmark" size={13} color="#FFF" />
+                            <Text style={s.inviteAcceptText}>Kabul Et</Text>
+                          </>
+                        )}
+                      </Pressable>
+                      <Pressable
+                        style={({ pressed }) => [s.inviteRejectBtn, pressed && { opacity: 0.7 }]}
+                        onPress={() => handleRejectInvite(item)}
+                        disabled={processingInvites.has(item.id)}
+                      >
+                        <Ionicons name="close" size={13} color="#94A3B8" />
+                        <Text style={s.inviteRejectText}>Reddet</Text>
+                      </Pressable>
+                    </View>
+                  )}
                 </View>
               );
             }}
@@ -423,6 +494,44 @@ const s = StyleSheet.create({
   },
   clearBtnText: {
     fontSize: 11,
+    fontWeight: '600',
+    color: '#94A3B8',
+  },
+
+  // ★ Oda daveti Kabul/Ret butonları
+  inviteActions: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 62, // avatar genişliği + padding hizası
+    paddingBottom: 8,
+  },
+  inviteAcceptBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 10,
+    backgroundColor: '#14B8A6',
+  },
+  inviteAcceptText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#FFF',
+  },
+  inviteRejectBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
+  inviteRejectText: {
+    fontSize: 12,
     fontWeight: '600',
     color: '#94A3B8',
   },

@@ -1,26 +1,29 @@
-import { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, Image, Pressable, ScrollView, Modal, TextInput, ActivityIndicator } from 'react-native';
+import { useState, useCallback } from 'react';
+import { View, Text, StyleSheet, Pressable, ScrollView, Modal, TextInput, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { Colors, Shadows } from '../../constants/theme';
-import { getAvatarSource, getLevelFromSP, getLevelColors } from '../../constants/avatars';
+import { getLevelFromSP, getLevelColors } from '../../constants/avatars';
 import { useAuth, useTheme } from '../_layout';
 import { supabase } from '../../constants/supabase';
 import { ReferralService } from '../../services/referral';
 import { ProfileService } from '../../services/database';
 import { showToast } from '../../components/Toast';
 import FollowListModal from '../../components/FollowListModal';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import AppBackground from '../../components/AppBackground';
-import PremiumAlert, { type AlertButton } from '../../components/PremiumAlert';
+import StatusAvatar from '../../components/StatusAvatar';
+import { useOnlineFriends } from '../../providers/OnlineFriendsProvider';
 
 import { TIER_DEFINITIONS, isTierAtLeast } from '../../constants/tiers';
 import { migrateLegacyTier } from '../../types';
 import type { SubscriptionTier } from '../../types';
 import BoostPickerSheet, { type BoostTier } from '../../components/BoostPickerSheet';
 import { UserTitleService, type UserTitle } from '../../services/userTitles';
+import PremiumAlert, { type AlertButton } from '../../components/PremiumAlert';
+import { auth } from '../../constants/firebase';
+import { signOut, deleteUser as firebaseDeleteUser } from 'firebase/auth';
 
 
 export default function ProfileScreen() {
@@ -30,15 +33,18 @@ export default function ProfileScreen() {
   useTheme();
 
   const displayName = profile?.display_name || user?.name || 'Kullanıcı';
-  const avatarUrl = profile?.avatar_url || user?.avatar || 'https://i.pravatar.cc/120?img=3';
+  const avatarUrl = profile?.avatar_url || user?.avatar || '';
   const bio = profile?.bio || 'Henüz bir şey yazmadı ☕';
   
   const subscriptionTier: SubscriptionTier = migrateLegacyTier(profile?.subscription_tier || 'Free');
   const userId = firebaseUser?.uid || profile?.id;
 
+  // ★ Tüm arkadaşlar (following + followers birleşik) — Profil sayfasında tam liste
+  const { allFriends } = useOnlineFriends();
+
   // Dinamik istatistikler
   const [stats, setStats] = useState({ followers: 0, following: 0, rooms: 0 });
-  const [recentRooms, setRecentRooms] = useState<any[]>([]);
+  const [profileStats, setProfileStats] = useState({ stageMinutes: 0, roomsCreated: 0, totalListeners: 0, totalReactions: 0 });
 
   // Referans Modal
   const [showReferral, setShowReferral] = useState(false);
@@ -46,7 +52,9 @@ export default function ProfileScreen() {
   const [submittingReferral, setSubmittingReferral] = useState(false);
   const [showBoostPicker, setShowBoostPicker] = useState(false);
   const [userTitle, setUserTitle] = useState<UserTitle | null>(null);
-  const [cAlert, setCAlert] = useState<{ visible: boolean; title: string; message: string; type?: any; buttons?: any[] }>({ visible: false, title: '', message: '' });
+
+  // ★ SEC-DEL: Hesap silme modalı (Google Play zorunlu)
+  const [deleteAlert, setDeleteAlert] = useState<{ visible: boolean; title: string; message: string; type?: 'info' | 'warning' | 'error' | 'success'; buttons?: AlertButton[] }>({ visible: false, title: '', message: '' });
 
   // Takipçi/Takip listesi modal
   const [followModalVisible, setFollowModalVisible] = useState(false);
@@ -71,10 +79,10 @@ export default function ProfileScreen() {
       });
 
 
-
+      // Aktivite istatistikleri
       try {
-        const rooms = await ProfileService.getRecentRooms(userId);
-        setRecentRooms(rooms);
+        const pStats = await ProfileService.getProfileStats(userId);
+        setProfileStats(pStats);
       } catch {}
 
       // Unvan
@@ -83,7 +91,7 @@ export default function ProfileScreen() {
         setUserTitle(title);
       } catch {}
     } catch (err) {
-      console.warn('Stats yuklenemedi:', err);
+      if (__DEV__) console.warn('Stats yuklenemedi:', err);
     }
   }, [userId]);
 
@@ -106,9 +114,13 @@ export default function ProfileScreen() {
     }
   };
 
-  useEffect(() => {
-    loadStats();
-  }, [loadStats]);
+  // ★ useFocusEffect: Sayfa her odaklandığında SP bakiyesi + istatistikleri güncelle
+  useFocusEffect(
+    useCallback(() => {
+      refreshProfile(); // SP bakiyesini yenile (profile.system_points)
+      loadStats();      // Takipçi, takip, oda sayılarını yenile
+    }, [loadStats])
+  );
 
   // Admin (GodMaster) özel tier
   const isAdmin = profile?.is_admin || false;
@@ -125,7 +137,7 @@ export default function ProfileScreen() {
   return (
     <AppBackground variant="profile">
     <View style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 16) + 70 }}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingTop: 18, paddingBottom: Math.max(insets.bottom, 16) + 70 }}>
 
         {/* ═══ Premium Profil Kartı ═══ */}
         <View style={p.card}>
@@ -136,55 +148,81 @@ export default function ProfileScreen() {
           {/* Üst: Avatar + Bilgi */}
           <View style={p.identityRow}>
             <View style={p.avatarBox}>
-              <View style={[p.avatarRing, { borderColor: tierBorderColor, shadowColor: tierBorderColor }]}>
-                <Image source={getAvatarSource(avatarUrl)} style={p.avatarImg} />
-              </View>
-              <LinearGradient colors={tierGradient as [string, string]} style={p.tierPill}>
-                <Ionicons name={tierIcon as any} size={7} color="#fff" />
-                <Text style={p.tierPillText}>{displayTier}</Text>
-              </LinearGradient>
-              {/* ★ U2 FIX: Online durumu avatar yanında */}
-              <View style={[p.onlineDot, { backgroundColor: profile?.is_online ? '#22C55E' : '#475569' }]} />
+              <StatusAvatar
+                uri={avatarUrl}
+                size={84}
+                tier={subscriptionTier}
+                isAdmin={isAdmin}
+                showTierBadge
+              />
             </View>
             <View style={{ flex: 1 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                 <Text style={[p.displayName, isAdmin && { color: '#F87171' }]} numberOfLines={1}>{displayName}</Text>
                 {isAdmin && (
-                  <Ionicons name="shield-checkmark" size={13} color="#DC2626" style={{ marginLeft: 4 }} />
+                  <Ionicons name="shield-checkmark" size={14} color="#DC2626" style={{ marginLeft: 4 }} />
                 )}
               </View>
               {profile?.username && <Text style={p.username}>@{profile.username}</Text>}
               {userTitle && (
                 <View style={[p.titleBadge, { backgroundColor: userTitle.bgColor }]}>
-                  <Text style={{ fontSize: 9 }}>{userTitle.emoji}</Text>
+                  <Text style={{ fontSize: 10 }}>{userTitle.emoji}</Text>
                   <Text style={[p.titleText, { color: userTitle.color }]}>{userTitle.name}</Text>
                 </View>
               )}
-              <Text style={p.bio} numberOfLines={2}>{bio}</Text>
+              <Text style={p.bio} numberOfLines={3}>{bio}</Text>
             </View>
             <Pressable style={p.editBtn} onPress={() => router.push('/edit-profile')}>
               <Ionicons name="create-outline" size={16} color="#14B8A6" />
             </Pressable>
           </View>
 
-          {/* ★ U2 FIX: Stat Satırı — Online durumu avatar yanına taşındı */}
+          {/* Stat Satırı */}
           <View style={p.statsRow}>
             <Pressable style={p.statItem} onPress={() => { setFollowModalTab('followers'); setFollowModalVisible(true); }}>
               <Text style={p.statNum}>{stats.followers}</Text>
-              <Text style={p.statLabel}>Takipçi</Text>
+              <Text style={p.statLabelClickable}>Takipçi</Text>
             </Pressable>
             <View style={p.statDiv} />
             <Pressable style={p.statItem} onPress={() => { setFollowModalTab('following'); setFollowModalVisible(true); }}>
               <Text style={p.statNum}>{stats.following}</Text>
-              <Text style={p.statLabel}>Takip</Text>
+              <Text style={p.statLabelClickable}>Takip</Text>
             </Pressable>
             <View style={p.statDiv} />
             <Pressable style={p.statItem} onPress={() => router.push('/(tabs)/myrooms' as any)}>
               <Text style={p.statNum}>{stats.rooms}</Text>
-              <Text style={p.statLabel}>Oda</Text>
+              <Text style={p.statLabelClickable}>Oda</Text>
             </Pressable>
           </View>
         </View>
+
+        {/* ═══ Aktivite İstatistikleri ═══ */}
+        {(profileStats.stageMinutes > 0 || profileStats.roomsCreated > 0 || profileStats.totalListeners > 0) && (
+          <View style={p.activityCard}>
+            <View style={p.activityGrid}>
+              <View style={p.activityItem}>
+                <Ionicons name="mic" size={20} color={Colors.teal} style={{ textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }} />
+                <Text style={p.activityNum}>{profileStats.stageMinutes}</Text>
+                <Text style={p.activityLabel}>dk sahne</Text>
+              </View>
+              <View style={p.activityItem}>
+                <Ionicons name="radio" size={20} color="#A855F7" style={{ textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }} />
+                <Text style={p.activityNum}>{profileStats.roomsCreated}</Text>
+                <Text style={p.activityLabel}>oda</Text>
+              </View>
+              <View style={p.activityItem}>
+                <Ionicons name="people" size={20} color="#F59E0B" style={{ textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }} />
+                <Text style={p.activityNum}>{profileStats.totalListeners}</Text>
+                <Text style={p.activityLabel}>dinleyici</Text>
+              </View>
+              <View style={p.activityItem}>
+                <Ionicons name="heart" size={20} color="#EF4444" style={{ textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }} />
+                <Text style={p.activityNum}>{profileStats.totalReactions}</Text>
+                <Text style={p.activityLabel}>reaksiyon</Text>
+              </View>
+            </View>
+          </View>
+        )}
 
         {/* ═══ SP Cüzdan Kartı ═══ */}
         <View style={p.walletCard}>
@@ -225,8 +263,8 @@ export default function ProfileScreen() {
 
 
         {/* ═══ AYARLAR VE YÖNETİM ═══ */}
-        <View style={{ marginHorizontal: 16, marginTop: 10, marginBottom: 6 }}>
-          <Text style={{ fontSize: 11, fontWeight: '800', color: '#94A3B8', letterSpacing: 1, ...Shadows.textLight }}>AYARLAR VE YÖNETİM</Text>
+        <View style={p.sectionHeader}>
+          <Text style={p.sectionHeaderText}>AYARLAR VE YÖNETİM</Text>
         </View>
         <View style={styles.listContainer}>
           <Pressable style={styles.listItem} onPress={() => router.push('/settings' as any)}>
@@ -252,7 +290,7 @@ export default function ProfileScreen() {
             <Ionicons name="chevron-forward" size={16} color="#64748B" />
           </Pressable>
 
-          <Pressable style={[styles.listItem, { borderBottomWidth: 0 }]} onPress={() => {
+          <Pressable style={styles.listItem} onPress={() => {
             if (isTierAtLeast(subscriptionTier, 'Plus')) {
               setShowBoostPicker(true);
             } else {
@@ -263,6 +301,18 @@ export default function ProfileScreen() {
             <Text style={styles.listItemText}>Profilimi Öne Çıkar</Text>
             <Ionicons name="chevron-forward" size={16} color="#64748B" />
           </Pressable>
+          {/* ★ SEC-DEL: Hesap silme — Settings'deki kapsamlı silme akışına yönlendir */}
+          <Pressable style={[styles.listItem, { borderBottomWidth: 0 }]} onPress={() => {
+            router.push('/settings' as any);
+            // Küçük gecikme ile toast göster — kullanıcıyı yönlendir
+            setTimeout(() => {
+              showToast({ title: 'Hesap Silme', message: 'Ayarlar → Oturum → Hesabı Sil seçeneğini kullanın.', type: 'info' });
+            }, 500);
+          }}>
+            <Ionicons name="trash-outline" size={20} color="#EF4444" />
+            <Text style={[styles.listItemText, { color: '#EF4444' }]}>Hesabımı Sil</Text>
+            <Ionicons name="chevron-forward" size={16} color="#EF4444" />
+          </Pressable>
         </View>
 
 
@@ -271,8 +321,8 @@ export default function ProfileScreen() {
         {/* GodMaster Admin Paneli — admin only */}
         {profile?.is_admin && (
           <>
-            <View style={{ marginHorizontal: 16, marginTop: 10, marginBottom: 6 }}>
-              <Text style={{ fontSize: 11, fontWeight: '700', color: '#EF4444', letterSpacing: 1 }}>SİSTEM YÖNETİMİ</Text>
+            <View style={p.sectionHeader}>
+              <Text style={[p.sectionHeaderText, { color: '#EF4444' }]}>SİSTEM YÖNETİMİ</Text>
             </View>
             <View style={[styles.listContainer, { borderColor: '#c94444' }]}>
               <Pressable style={[styles.listItem, { borderBottomWidth: 0 }]} onPress={() => router.push('/admin' as any)}>
@@ -280,6 +330,66 @@ export default function ProfileScreen() {
                 <Text style={styles.listItemText}>GodMaster Panel</Text>
                 <Ionicons name="chevron-forward" size={16} color="#EF4444" />
               </Pressable>
+            </View>
+          </>
+        )}
+
+        {/* ═══ TÜM ARKADAŞLAR ═══ */}
+        {allFriends.length > 0 && (
+          <>
+            <View style={p.sectionHeader}>
+              <Text style={p.sectionHeaderText}>TÜM ARKADAŞLAR</Text>
+            </View>
+            <View style={af.card}>
+              <LinearGradient
+                colors={['rgba(20,184,166,0.06)', 'transparent']}
+                style={af.cardGlow}
+              />
+              {/* Header */}
+              <View style={af.header}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Ionicons name="people" size={14} color="#14B8A6" />
+                  <Text style={af.headerTitle}>Arkadaşlarım</Text>
+                </View>
+                <View style={af.countBadge}>
+                  <Text style={af.countText}>{allFriends.length}</Text>
+                </View>
+              </View>
+              {/* Liste — ilk 8 kişi (nested ScrollView yerine flat liste) */}
+              {allFriends.slice(0, 8).map((friend, idx) => (
+                <Pressable
+                  key={friend.id}
+                  style={({ pressed }) => [
+                    af.row,
+                    idx === Math.min(allFriends.length, 8) - 1 && { borderBottomWidth: 0 },
+                    pressed && { backgroundColor: 'rgba(255,255,255,0.04)' },
+                  ]}
+                  onPress={() => router.push(`/user/${friend.id}` as any)}
+                >
+                  <StatusAvatar
+                    uri={friend.avatar_url}
+                    size={36}
+                    isOnline={friend.is_online}
+                    tier={(friend as any).subscription_tier}
+                  />
+                  <View style={{ flex: 1 }}>
+                    <Text style={af.name} numberOfLines={1}>{friend.display_name}</Text>
+                    <Text style={[af.status, friend.is_online && { color: '#22C55E' }]}>
+                      {friend.is_online ? 'Çevrimiçi' : 'Çevrimdışı'}
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.1)" />
+                </Pressable>
+              ))}
+              {allFriends.length > 8 && (
+                <Pressable
+                  style={af.showAllBtn}
+                  onPress={() => { setFollowModalTab('followers'); setFollowModalVisible(true); }}
+                >
+                  <Text style={af.showAllText}>Tümünü Gör ({allFriends.length})</Text>
+                  <Ionicons name="chevron-forward" size={14} color="#14B8A6" />
+                </Pressable>
+              )}
             </View>
           </>
         )}
@@ -347,7 +457,9 @@ export default function ProfileScreen() {
           isOwnProfile={true}
         />
       )}
-      <PremiumAlert {...cAlert} onDismiss={() => setCAlert(prev => ({ ...prev, visible: false }))} />
+
+      {/* ★ SEC-DEL: Hesap silme onay modalı */}
+      <PremiumAlert {...deleteAlert} onDismiss={() => setDeleteAlert(prev => ({ ...prev, visible: false }))} />
     </View>
     </AppBackground>
   );
@@ -364,7 +476,7 @@ const p = StyleSheet.create({
     marginHorizontal: 16, marginTop: 16, marginBottom: 10,
     borderRadius: 16, overflow: 'hidden',
     backgroundColor: '#414e5f',
-    borderWidth: 1, borderColor: '#5b9a8b',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
     ..._cardShadow,
   },
   cardGlow: {
@@ -372,38 +484,24 @@ const p = StyleSheet.create({
     borderTopLeftRadius: 16, borderTopRightRadius: 16,
   },
   identityRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    paddingHorizontal: 16, paddingTop: 18, paddingBottom: 12,
+    flexDirection: 'row', alignItems: 'flex-start', gap: 12,
+    paddingHorizontal: 16, paddingTop: 18, paddingBottom: 14,
   },
   avatarBox: { position: 'relative' as const },
-  onlineDot: {
-    position: 'absolute' as const, top: 0, right: -2,
-    width: 12, height: 12, borderRadius: 6,
-    borderWidth: 2, borderColor: '#414e5f',
-  },
-  avatarRing: {
-    width: 64, height: 64, borderRadius: 32,
-    borderWidth: 2.5, padding: 2,
-    shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.5, shadowRadius: 10, elevation: 6,
-  },
-  avatarImg: { width: '100%', height: '100%', borderRadius: 30, backgroundColor: 'rgba(255,255,255,0.05)' },
-  tierPill: {
-    position: 'absolute' as const, bottom: -3, right: -6,
-    flexDirection: 'row', alignItems: 'center', gap: 2,
-    paddingHorizontal: 5, paddingVertical: 2, borderRadius: 10,
-    borderWidth: 2, borderColor: '#414e5f',
-  },
-  tierPillText: { fontSize: 7, fontWeight: '800', color: '#fff', letterSpacing: 0.3, ..._textGlow },
-  displayName: { fontSize: 16, fontWeight: '800', color: '#F1F5F9', letterSpacing: 0.2, ..._textGlow },
-  username: { fontSize: 10, color: '#CBD5E1', marginTop: 1, ..._textGlow },
+
+  displayName: { fontSize: 18, fontWeight: '800', color: '#F1F5F9', letterSpacing: 0.2, ..._textGlow },
+  username: { fontSize: 11, color: '#94A3B8', marginTop: 1, ..._textGlow },
   titleBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 3,
     alignSelf: 'flex-start',
-    paddingHorizontal: 6, paddingVertical: 2,
+    paddingHorizontal: 7, paddingVertical: 2.5,
     borderRadius: 8, marginTop: 3,
   },
-  titleText: { fontSize: 9, fontWeight: '700' },
-  bio: { fontSize: 10, color: '#94A3B8', marginTop: 3, lineHeight: 14, ..._textGlow },
+  titleText: { fontSize: 10, fontWeight: '700' },
+  bio: { fontSize: 12, color: '#94A3B8', marginTop: 4, lineHeight: 17, ..._textGlow },
+  // ★ Section header — ortak stil
+  sectionHeader: { marginHorizontal: 16, marginTop: 10, marginBottom: 6 },
+  sectionHeaderText: { fontSize: 11, fontWeight: '800' as const, color: '#94A3B8', letterSpacing: 1, ..._textGlow },
   editBtn: {
     width: 34, height: 34, borderRadius: 12,
     backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)',
@@ -416,14 +514,28 @@ const p = StyleSheet.create({
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
   },
   statItem: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  statNum: { fontSize: 15, fontWeight: '800', color: '#F1F5F9', marginBottom: 1, ..._textGlow },
-  statLabel: { fontSize: 9, fontWeight: '600', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 0.5 },
+  statNum: { fontSize: 16, fontWeight: '800', color: '#F1F5F9', marginBottom: 1, ..._textGlow },
+
+  statLabelClickable: { fontSize: 9, fontWeight: '600', color: '#5CBFB5', textTransform: 'uppercase', letterSpacing: 0.5 },
   statDiv: { width: 1, height: 22, backgroundColor: 'rgba(255,255,255,0.08)' },
+  // ★ Aktivite istatistikleri
+  activityCard: {
+    marginHorizontal: 16, marginBottom: 10,
+    borderRadius: 16, overflow: 'hidden',
+    backgroundColor: '#414e5f',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+    paddingVertical: 14, paddingHorizontal: 10,
+    ..._cardShadow,
+  },
+  activityGrid: { flexDirection: 'row', justifyContent: 'space-around' },
+  activityItem: { alignItems: 'center', gap: 4 },
+  activityNum: { fontSize: 15, fontWeight: '800', color: '#F1F5F9', ..._textGlow },
+  activityLabel: { fontSize: 8, fontWeight: '600', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 0.3 },
   walletCard: {
     marginHorizontal: 16, marginBottom: 10,
     borderRadius: 16, overflow: 'hidden',
     backgroundColor: '#414e5f',
-    borderWidth: 1, borderColor: '#c9a227',
+    borderWidth: 1, borderColor: 'rgba(251,191,36,0.15)',
     padding: 16,
     ..._cardShadow,
   },
@@ -472,7 +584,7 @@ const styles = StyleSheet.create({
   listContainer: {
     marginHorizontal: 16, marginBottom: 10,
     backgroundColor: '#414e5f',
-    borderRadius: 16, borderWidth: 1, borderColor: '#95a1ae',
+    borderRadius: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
     ..._cardShadow,
   },
   listItem: {
@@ -482,11 +594,59 @@ const styles = StyleSheet.create({
   },
   listItemText: { flex: 1, fontSize: 13, fontWeight: '500', color: '#E2E8F0', ..._textGlow },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', padding: 20 },
-  modalContent: { backgroundColor: '#414e5f', width: '100%', borderRadius: 16, padding: 20, borderWidth: 1, borderColor: '#95a1ae' },
+  modalContent: { backgroundColor: '#414e5f', width: '100%', borderRadius: 16, padding: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   modalTitle: { fontSize: 18, fontWeight: '700', color: '#F1F5F9', ..._textGlow },
   modalDesc: { fontSize: 13, color: '#CBD5E1', lineHeight: 20, marginBottom: 20, ..._textGlow },
   modalInput: { backgroundColor: 'rgba(0,0,0,0.2)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', borderRadius: 12, padding: 14, color: '#F1F5F9', fontSize: 16, textAlign: 'center', marginBottom: 20, letterSpacing: 2 },
   modalBtn: { backgroundColor: Colors.teal, paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
   modalBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+});
+
+// ═══ Tüm Arkadaşlar Bölümü Stilleri ═══
+const af = StyleSheet.create({
+  card: {
+    marginHorizontal: 16, marginBottom: 10,
+    borderRadius: 16, overflow: 'hidden',
+    backgroundColor: '#414e5f',
+    borderWidth: 1, borderColor: 'rgba(20,184,166,0.2)',
+    ..._cardShadow,
+  },
+  cardGlow: {
+    position: 'absolute', top: 0, left: 0, right: 0, height: 50,
+    borderTopLeftRadius: 16, borderTopRightRadius: 16,
+  },
+  header: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingHorizontal: 14, paddingTop: 14, paddingBottom: 10,
+    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)',
+  },
+  headerTitle: {
+    fontSize: 13, fontWeight: '700', color: '#F1F5F9', letterSpacing: 0.3, ..._textGlow,
+  },
+  countBadge: {
+    backgroundColor: 'rgba(20,184,166,0.12)', borderRadius: 10,
+    paddingHorizontal: 8, paddingVertical: 3,
+    borderWidth: 1, borderColor: 'rgba(20,184,166,0.25)',
+  },
+  countText: { fontSize: 10, fontWeight: '800', color: '#14B8A6' },
+  row: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingVertical: 9, paddingHorizontal: 14,
+    borderBottomWidth: 0.5, borderBottomColor: 'rgba(255,255,255,0.04)',
+  },
+  name: {
+    fontSize: 13, fontWeight: '600', color: '#F1F5F9', ..._textGlow,
+  },
+  status: {
+    fontSize: 10, color: '#64748B', marginTop: 1,
+  },
+  showAllBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4,
+    paddingVertical: 10,
+    borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.06)',
+  },
+  showAllText: {
+    fontSize: 12, fontWeight: '600', color: '#14B8A6', ..._textGlow,
+  },
 });

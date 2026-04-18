@@ -14,13 +14,21 @@ import { EmojiPicker } from '../../components/EmojiPicker';
 import { ReportModal } from '../../components/ReportModal';
 import { showToast } from '../../components/Toast';
 import { useAuth, useBadges } from '../_layout';
-import { getAvatarSource } from '../../constants/avatars';
+import StatusAvatar from '../../components/StatusAvatar';
 import { StorageService } from '../../services/storage';
 import * as ImagePicker from 'expo-image-picker';
 import { Audio, type AVPlaybackStatus } from 'expo-av';
 import AppBackground from '../../components/AppBackground';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+
+// ★ SEC-MSG: Mesaj sanitizasyonu + flood koruması
+const MSG_MAX_LENGTH = 2000;
+const MSG_THROTTLE_MS = 500;
+const UNICODE_JUNK = /[\u200B-\u200F\u202A-\u202E\u2060-\u2064\uFEFF]/g;
+function sanitizeMessage(text: string): string {
+  return text.replace(UNICODE_JUNK, '').substring(0, MSG_MAX_LENGTH);
+}
 
 
 
@@ -209,7 +217,7 @@ function MessageBubble({ message, isMe, senderAvatar, senderName, myAvatar, onDe
       {/* ★ Karşı tarafın avatarı */}
       {!isMe && (
         <View style={styles.bubbleAvatarRow}>
-          <Image source={getAvatarSource(senderAvatar)} style={styles.bubbleAvatar} />
+          <StatusAvatar uri={senderAvatar} size={28} />
         </View>
       )}
       <View style={[styles.bubble, isMe ? styles.bubbleMe : styles.bubbleOther, customStyle]}>
@@ -228,7 +236,7 @@ function MessageBubble({ message, isMe, senderAvatar, senderName, myAvatar, onDe
       {/* ★ Gönderenin avatarı (sağ taraf) */}
       {isMe && (
         <View style={styles.bubbleAvatarRow}>
-          <Image source={getAvatarSource(myAvatar)} style={styles.bubbleAvatar} />
+          <StatusAvatar uri={myAvatar} size={28} />
         </View>
       )}
       {/* ★ Emoji tepkileri göster — balon stilinde */}
@@ -298,7 +306,7 @@ export default function ChatScreen() {
   const [viewerImage, setViewerImage] = useState<string | null>(null); // ★ Tam ekran görsel
 
   // ★ Cevapsız Arama State (WhatsApp tarzı)
-  type MissedCall = { id: string; callType: 'audio' | 'video'; time: string; callerName: string };
+  type MissedCall = { id: string; callType: 'audio'; time: string; callerName: string };
   const [missedCalls, setMissedCalls] = useState<MissedCall[]>([]);
 
   // ─── Ses Notu ────────────────────────────────────────
@@ -314,9 +322,10 @@ export default function ChatScreen() {
 
   const startRecording = async () => {
     try {
-      const perm = await Audio.requestPermissionsAsync();
+      // ★ FIX: İzni tekrar sormak yerine mevcut durumu kontrol et — izin zaten _layout.tsx'te istendi
+      const perm = await Audio.getPermissionsAsync();
       if (!perm.granted) {
-        showToast({ title: 'Mikrofon izni gerekli', message: 'Ayarlardan mikrofon iznini açın', type: 'warning' });
+        showToast({ title: 'Mikrofon izni gerekli', message: 'Ayarlar → Uygulamalar → SopranoChat → İzinler\'den mikrofonu açın', type: 'warning' });
         return;
       }
 
@@ -366,7 +375,7 @@ export default function ChatScreen() {
         ])
       ).start();
     } catch (err: any) {
-      console.error('Recording error:', err);
+      if (__DEV__) console.error('Recording error:', err);
       setIsRecording(false);
       setRecording(null);
       recordingRef.current = null;
@@ -414,7 +423,7 @@ export default function ChatScreen() {
       setMessages(prev => [...prev, newMsg]);
       setWaveformData([]);
     } catch (err: any) {
-      console.error('Voice send error:', err);
+      if (__DEV__) console.error('Voice send error:', err);
       showToast({ title: 'Sesli mesaj gönderilemedi', message: err?.message || '', type: 'error' });
     } finally {
       setSendingVoice(false);
@@ -516,7 +525,7 @@ export default function ChatScreen() {
           if (missedData && missedData.length > 0) {
             setMissedCalls(missedData.map((mc: any) => ({
               id: mc.id,
-              callType: mc.body?.includes('görüntülü') ? 'video' : 'audio',
+              callType: 'audio' as const,
               time: mc.created_at,
               callerName: mc.sender?.display_name || 'Kullanıcı',
             })));
@@ -621,10 +630,22 @@ export default function ChatScreen() {
     }
   };
 
+  // ★ SEC-FLOOD: Son gönderim zamanı — throttle için
+  const lastSendRef = useRef(0);
+
   const handleSend = async () => {
     if (!inputText.trim() || !firebaseUser || !id) return;
 
-    const content = inputText.trim();
+    // ★ SEC-FLOOD: 500ms throttle — flood engeli
+    const now = Date.now();
+    if (now - lastSendRef.current < MSG_THROTTLE_MS) {
+      return;
+    }
+    lastSendRef.current = now;
+
+    // ★ SEC-MSG: Sanitize + trim
+    const content = sanitizeMessage(inputText.trim());
+    if (!content) return;
     setInputText('');
     setSending(true);
 
@@ -649,7 +670,7 @@ export default function ChatScreen() {
       // Geçici mesajı gerçek veritabanı ID'li mesaj ile değiştir
       setMessages(prev => prev.map(m => m.id === tempId ? newMsg : m));
     } catch (err) {
-      console.error('Mesaj gönderilemedi:', err);
+      if (__DEV__) console.error('Mesaj gönderilemedi:', err);
       // Hata durumunda mesajı listeden çıkar ve geri metin kutusuna koy
       setMessages(prev => prev.filter(m => m.id !== tempId));
       setInputText(content);
@@ -683,28 +704,44 @@ export default function ChatScreen() {
         <Pressable onPress={() => safeGoBack(router)} style={styles.backBtn}>
           <Ionicons name="chevron-back" size={24} color={Colors.text} />
         </Pressable>
-        <Image source={getAvatarSource(otherUser?.avatar_url)} style={styles.headerAvatar} />
-        <View style={styles.headerInfo}>
-          <Text style={styles.headerName}>{otherUser?.display_name || 'Kullanıcı'}</Text>
+        {/* ★ UX-NAV: Avatar + isim alanına basınca profil sayfasına git */}
+        <Pressable onPress={() => router.push(`/user/${id}` as any)} style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+          <StatusAvatar uri={otherUser?.avatar_url} size={36} isOnline={otherUser?.is_online} tier={otherUser?.subscription_tier} />
+          <View style={styles.headerInfo}>
+            <Text style={styles.headerName}>{otherUser?.display_name || 'Kullanıcı'}</Text>
           <View style={styles.onlineRow}>
-            {otherUser?.is_online ? (
+            {isTyping ? (
+              <>
+                <Text style={styles.typingHeaderText}>yazıyor</Text>
+                <Text style={styles.typingDots}>…</Text>
+              </>
+            ) : otherUser?.is_online ? (
               <>
                 <View style={styles.onlineDot} />
                 <Text style={styles.onlineText}>Çevrimiçi</Text>
               </>
             ) : (
-              <Text style={styles.offlineText}>Çevrimdışı</Text>
+              <Text style={styles.offlineText}>
+                {otherUser?.last_seen
+                  ? `Son görülme: ${new Date(otherUser.last_seen).toLocaleString('tr-TR', { hour: '2-digit', minute: '2-digit' })}`
+                  : 'Çevrimdışı'}
+              </Text>
             )}
           </View>
-        </View>
-        {/* ★ Arama butonları + Kebab menü — aynı row'da */}
+          </View>
+        </Pressable>
+        {/* ★ Arama butonu + Kebab menü — aynı row'da */}
         {!loading && otherUser && (
           <View style={styles.headerActions}>
             <Pressable
-              style={[styles.headerAction, isCallingInProgress && { opacity: 0.4 }]}
-              disabled={isCallingInProgress}
+              style={[styles.headerAction, (isCallingInProgress || !isMutualFollow) && { opacity: 0.35 }]}
+              disabled={isCallingInProgress || !isMutualFollow}
               onPress={async () => {
                 if (!firebaseUser || !id || isCallingInProgress) return;
+                if (!isMutualFollow) {
+                  showToast({ title: 'Arama Yapılamaz', message: 'Karşılıklı takip gerekli', type: 'error' });
+                  return;
+                }
                 setIsCallingInProgress(true);
                 const tier = profile?.subscription_tier || 'Free';
                 try {
@@ -722,31 +759,7 @@ export default function ChatScreen() {
                 }
               }}
             >
-              <Ionicons name="call" size={20} color={Colors.teal} />
-            </Pressable>
-            <Pressable
-              style={[styles.headerAction, isCallingInProgress && { opacity: 0.4 }]}
-              disabled={isCallingInProgress}
-              onPress={async () => {
-                if (!firebaseUser || !id || isCallingInProgress) return;
-                const tier = profile?.subscription_tier || 'Free';
-                setIsCallingInProgress(true);
-                try {
-                  const { callId, receiverIsOnline } = await CallService.initiateCall(
-                    firebaseUser.uid,
-                    profile?.display_name || 'Kullanıcı',
-                    profile?.avatar_url || undefined,
-                    id, 'video', tier as any
-                  );
-                  router.push(`/call/${id}?callId=${callId}&callType=video&isIncoming=false&receiverOnline=${receiverIsOnline}` as any);
-                } catch (err: any) {
-                  showToast({ title: 'Arama Hatası', message: err.message || 'Arama başlatılamadı', type: 'error' });
-                } finally {
-                  setTimeout(() => setIsCallingInProgress(false), 2000);
-                }
-              }}
-            >
-              <Ionicons name="videocam" size={20} color={Colors.teal} />
+              <Ionicons name="call" size={20} color={isMutualFollow ? Colors.teal : '#475569'} />
             </Pressable>
             {/* ★ Kebab menü butonu */}
             <Pressable
@@ -859,14 +872,14 @@ export default function ChatScreen() {
                   <View key={mc.id} style={styles.missedCallCard}>
                     <View style={styles.missedCallIcon}>
                       <Ionicons
-                        name={mc.callType === 'video' ? 'videocam' : 'call'}
+                        name="call"
                         size={16}
                         color="#EF4444"
                       />
                     </View>
                     <View style={styles.missedCallInfo}>
                       <Text style={styles.missedCallTitle}>
-                        Cevapsız {mc.callType === 'video' ? 'görüntülü' : 'sesli'} arama
+                        Cevapsız sesli arama
                       </Text>
                       <Text style={styles.missedCallTime}>{timeStr}</Text>
                     </View>
@@ -894,7 +907,7 @@ export default function ChatScreen() {
                         }
                       }}
                     >
-                      <Ionicons name={mc.callType === 'video' ? 'videocam' : 'call'} size={16} color="#fff" />
+                      <Ionicons name="call" size={16} color="#fff" />
                       <Text style={styles.missedCallBackText}>Geri Ara</Text>
                     </Pressable>
                   </View>
@@ -973,6 +986,7 @@ export default function ChatScreen() {
             value={inputText}
             onChangeText={handleInputChange}
             multiline
+            maxLength={MSG_MAX_LENGTH}
             onFocus={() => setShowEmojiPicker(false)}
           />
           <Pressable style={styles.inputAction} onPress={async () => {
@@ -1231,6 +1245,8 @@ const styles = StyleSheet.create({
   onlineDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: Colors.emerald },
   onlineText: { fontSize: 11, color: Colors.emerald },
   offlineText: { fontSize: 11, color: Colors.text3 },
+  typingHeaderText: { fontSize: 11, color: Colors.teal, fontWeight: '600' as const },
+  typingDots: { fontSize: 11, color: Colors.teal, fontWeight: '600' as const, marginLeft: 1 },
   headerActions: { flexDirection: 'row', gap: 8 },
   headerAction: {
     width: 36,
@@ -1311,9 +1327,9 @@ const styles = StyleSheet.create({
   messageContent: { padding: 16, gap: 8, flexGrow: 1 },
   bubbleWrap: { marginBottom: 4 },
   bubbleLeft: { alignItems: 'flex-start', flexDirection: 'row', gap: 8 },
-  bubbleRight: { alignItems: 'flex-end' },
+  bubbleRight: { alignItems: 'flex-end', flexDirection: 'row-reverse', gap: 8 },
   bubbleAvatarRow: { paddingTop: 4 },
-  bubbleAvatar: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#1E293B', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
+
   bubble: {
     maxWidth: '78%',
     paddingHorizontal: 14,

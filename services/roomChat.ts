@@ -2,6 +2,7 @@
  * SopranoChat — Oda Ici Canli Mesajlasma Servisi
  * Supabase Realtime ile canli metin sohbeti
  */
+import { logger } from '../utils/logger';
 import { supabase } from '../constants/supabase';
 import { filterBadWords } from '../constants/badwords';
 import { isSystemRoom } from './showcaseRooms';
@@ -56,6 +57,25 @@ async function _getCachedProfile(userId: string): Promise<CachedProfile | null> 
   return null;
 }
 
+// ★ SEC-FLOOD: Per-user rate limiter — emoji flood & chat spam koruması
+// Map<"roomId:userId", { timestamps: number[], lastEmoji: number }>
+const _rateLimitMap = new Map<string, { timestamps: number[]; lastEmoji: number }>();
+const RATE_LIMIT_WINDOW = 2000; // 2 saniye pencere
+const RATE_LIMIT_MAX = 5;       // 2 saniye içinde max 5 mesaj
+const EMOJI_COOLDOWN = 500;     // Emoji-only mesajlar arası min 500ms
+
+// Periyodik temizlik — lazy init, modül yüklendiğinde değil ilk kullanımda başlar
+let _cleanupIntervalId: ReturnType<typeof setInterval> | null = null;
+function _ensureCleanupInterval() {
+  if (_cleanupIntervalId !== null) return;
+  _cleanupIntervalId = setInterval(() => {
+    const stale = Date.now() - 60_000;
+    for (const [key, val] of _rateLimitMap) {
+      if (val.timestamps.every(t => t < stale)) _rateLimitMap.delete(key);
+    }
+  }, 5 * 60 * 1000);
+}
+
 export const RoomChatService = {
   /**
    * Odadaki mesajlari getir (son 50)
@@ -70,7 +90,7 @@ export const RoomChatService = {
       .order('created_at', { ascending: true })
       .limit(limit);
     if (error) {
-      if (__DEV__) console.warn('Room messages yuklenemedi:', error);
+      if (__DEV__) logger.warn('Room messages yuklenemedi:', error);
       return [];
     }
     // Cache'i doldur
@@ -83,7 +103,7 @@ export const RoomChatService = {
   },
 
   /**
-   * Mesaj gonder
+   * Mesaj gonder — ★ SEC-FLOOD: Rate limit uygulanır
    */
   async send(roomId: string, userId: string, content: string): Promise<RoomMessage | null> {
     // Sistem odalarında DB'ye yazma (UUID değil)
@@ -91,6 +111,79 @@ export const RoomChatService = {
     // ★ SEC-8c: Input sanitization — max 500 char, HTML strip, boş mesaj engelleme
     const sanitized = (content || '').trim().replace(/<[^>]*>/g, '').slice(0, 500);
     if (sanitized.length < 1) return null;
+
+    _ensureCleanupInterval();
+    // ★ SEC-FLOOD: Per-user rate limit — emoji flood & genel spam koruması
+    const rateLimitKey = `${roomId}:${userId}`;
+    const now = Date.now();
+    let entry = _rateLimitMap.get(rateLimitKey);
+    if (!entry) {
+      entry = { timestamps: [], lastEmoji: 0 };
+      _rateLimitMap.set(rateLimitKey, entry);
+    }
+
+    // Pencere dışındaki eski timestamp'leri temizle
+    entry.timestamps = entry.timestamps.filter(t => now - t < RATE_LIMIT_WINDOW);
+
+    // Genel rate limit kontrolü
+    if (entry.timestamps.length >= RATE_LIMIT_MAX) {
+      if (__DEV__) logger.warn(`[RoomChat] Rate limit aşıldı: ${userId} (${entry.timestamps.length}/${RATE_LIMIT_MAX})`);
+      return null; // Sessizce engelle
+    }
+
+    // Emoji-only mesajlar için ek cooldown
+    const isEmojiOnly = /^[\p{Emoji_Presentation}\p{Extended_Pictographic}\u200d\uFE0F\u20E3]{1,6}$/u.test(sanitized) && sanitized.length <= 14;
+    if (isEmojiOnly && now - entry.lastEmoji < EMOJI_COOLDOWN) {
+      return null; // Emoji flood koruması — sessizce engelle
+    }
+
+    // Timestamp kaydet
+    entry.timestamps.push(now);
+    if (isEmojiOnly) entry.lastEmoji = now;
+
+    // ★ O4 FIX: chat_muted backend kontrolü — client bypass koruması
+    // ★ A5 FIX: Slow mode backend enforcement — frontend bypass koruma
+    try {
+      const { data: roomData } = await supabase
+        .from('rooms')
+        .select('room_settings, host_id')
+        .eq('id', roomId)
+        .single();
+
+      // ★ O4 FIX: chat_muted kontrolü — moderatör tarafından susturulan kullanıcı mesaj gönderemez
+      if (roomData?.host_id !== userId) {
+        const { data: partData } = await supabase
+          .from('room_participants')
+          .select('is_chat_muted')
+          .eq('room_id', roomId)
+          .eq('user_id', userId)
+          .maybeSingle();
+        if (partData?.is_chat_muted) {
+          return null; // Chat mute — sessizce engelle
+        }
+      }
+
+      const rs = (roomData?.room_settings || {}) as any;
+      const slowModeSec = rs.slow_mode_seconds || 0;
+      // Host ve moderatörler slow mode'dan muaf
+      if (slowModeSec > 0 && roomData?.host_id !== userId) {
+        const { data: lastMsg } = await supabase
+          .from('messages')
+          .select('created_at')
+          .eq('room_id', roomId)
+          .eq('sender_id', userId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (lastMsg) {
+          const elapsed = Date.now() - new Date(lastMsg.created_at).getTime();
+          if (elapsed < slowModeSec * 1000) {
+            return null; // Slow mode — sessizce engelle
+          }
+        }
+      }
+    } catch { /* slow mode / chat mute kontrolü başarısız olursa mesajı engelleme */ }
+
     const filteredContent = filterBadWords(sanitized);
     const { data, error } = await supabase
       .from('messages')
@@ -98,7 +191,7 @@ export const RoomChatService = {
       .select('*, profiles!messages_sender_id_fkey(display_name, avatar_url)')
       .single();
     if (error) {
-      console.error('Room mesaji gonderilemedi:', error);
+      logger.error('Room mesaji gonderilemedi:', error);
       return null;
     }
 
@@ -106,24 +199,22 @@ export const RoomChatService = {
   },
 
   /**
-   * Realtime yeni mesaj dinleyici — ★ profil cache ile N+1 sorunu çözüldü
+   * Realtime yeni mesaj dinleyici — ★ profil cache ile N+1 sorunu çözüldü.
+   * ★ O11: onDelete callback — soft-delete (is_deleted=true UPDATE) olursa tetiklenir.
    */
-  subscribe(roomId: string, onNewMessage: (msg: RoomMessage) => void) {
-    // Sistem odalarında DB dinleme yapma
+  subscribe(
+    roomId: string,
+    onNewMessage: (msg: RoomMessage) => void,
+    onDelete?: (messageId: string) => void,
+  ) {
     if (isSystemRoom(roomId)) return () => {};
     const channel = supabase
       .channel(`room_chat:${roomId}`)
       .on(
         'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'messages',
-          filter: `room_id=eq.${roomId}`,
-        },
+        { event: 'INSERT', schema: 'public', table: 'messages', filter: `room_id=eq.${roomId}` },
         async (payload) => {
           const newMsg = payload.new as any;
-          // ★ Önce cache'e bak — DB sorgusu yapmadan profil al
           const cachedProfile = await _getCachedProfile(newMsg.sender_id);
           if (cachedProfile) {
             const msg: RoomMessage = {
@@ -142,7 +233,6 @@ export const RoomChatService = {
             };
             onNewMessage(msg);
           } else {
-            // Fallback: cache miss — tek sorgu yap
             const { data } = await supabase
               .from('messages')
               .select('*, profiles!messages_sender_id_fkey(display_name, avatar_url, active_chat_color, active_frame)')
@@ -150,6 +240,25 @@ export const RoomChatService = {
               .single();
             if (data) onNewMessage(data as RoomMessage);
           }
+        }
+      )
+      // ★ O11: soft-delete takibi (is_deleted UPDATE) ve hard DELETE
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'messages', filter: `room_id=eq.${roomId}` },
+        (payload) => {
+          const updated = payload.new as any;
+          if (updated?.is_deleted && !(payload.old as any)?.is_deleted) {
+            onDelete?.(updated.id);
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'messages', filter: `room_id=eq.${roomId}` },
+        (payload) => {
+          const old = payload.old as any;
+          if (old?.id) onDelete?.(old.id);
         }
       )
       .subscribe();

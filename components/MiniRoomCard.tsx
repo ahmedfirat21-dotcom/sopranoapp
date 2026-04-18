@@ -1,26 +1,16 @@
 /**
  * SopranoChat — Mini Oda Kartı (Floating PiP)
- * Oda küçültüldüğünde tüm ekranlarda altta görünen canlı mini kart.
+ * Oda küçültüldüğünde tüm ekranlarda altta görünen kompakt canlı kart.
+ * ★ Yayılma (ripple) animasyonu ile "aktif oda" hissi.
  */
 import React, { useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Animated, Dimensions,
-  PanResponder
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { width: W } = Dimensions.get('window');
-
-const COLORS = {
-  primary: '#5CE1E6',
-  bg: 'rgba(12,16,30,0.95)',
-  border: 'rgba(92,225,230,0.2)',
-  text: '#F8FAFC',
-  text2: '#94A3B8',
-};
 
 export interface MinimizedRoom {
   id: string;
@@ -38,169 +28,199 @@ interface MiniRoomCardProps {
 
 export default function MiniRoomCard({ room, onExpand, onClose }: MiniRoomCardProps) {
   const insets = useSafeAreaInsets();
-  const slideIn = useRef(new Animated.Value(100)).current;
+  const slideIn = useRef(new Animated.Value(80)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
+  const ripple1 = useRef(new Animated.Value(0)).current;
+  const ripple2 = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     // Giriş animasyonu
-    Animated.spring(slideIn, { toValue: 0, friction: 8, tension: 60, useNativeDriver: true }).start();
+    Animated.spring(slideIn, { toValue: 0, friction: 10, tension: 80, useNativeDriver: true }).start();
 
-    // Canlı gösterge nabız animasyonu
-    Animated.loop(
+    // Canlı gösterge nabız
+    const pulse = Animated.loop(
       Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 1.3, duration: 800, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1.4, duration: 700, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 700, useNativeDriver: true }),
       ])
-    ).start();
+    );
+    pulse.start();
+
+    // Yayılma (ripple) animasyonları — canlı olduğunu gösterir
+    const makeRipple = (anim: Animated.Value, delay: number) =>
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(delay),
+          Animated.timing(anim, { toValue: 1, duration: 2000, useNativeDriver: true }),
+          Animated.timing(anim, { toValue: 0, duration: 0, useNativeDriver: true }),
+        ])
+      );
+
+    const r1 = makeRipple(ripple1, 0);
+    const r2 = makeRipple(ripple2, 1000);
+    r1.start();
+    r2.start();
+
+    return () => { pulse.stop(); r1.stop(); r2.stop(); };
   }, []);
 
   const handleClose = () => {
-    Animated.timing(slideIn, { toValue: 150, duration: 200, useNativeDriver: true }).start(() => {
+    Animated.timing(slideIn, { toValue: 120, duration: 200, useNativeDriver: true }).start(() => {
       onClose();
     });
   };
 
+  // Ripple interpolations
+  const rippleScale = (anim: Animated.Value) =>
+    anim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.15] });
+  const rippleOpacity = (anim: Animated.Value) =>
+    anim.interpolate({ inputRange: [0, 0.3, 1], outputRange: [0.4, 0.15, 0] });
+
   return (
     <Animated.View style={[
       s.container,
-      { 
-        bottom: Math.max(insets.bottom, 8) + 60, // Tab bar üstünde
-        transform: [{ translateY: slideIn }] 
-      }
+      {
+        bottom: Math.max(insets.bottom, 8) + 72, // Tab bar üstünde
+        transform: [{ translateY: slideIn }],
+      },
     ]}>
-      <TouchableOpacity activeOpacity={0.9} onPress={onExpand} style={s.card}>
-        <LinearGradient
-          colors={['rgba(16,22,40,0.98)', 'rgba(10,14,28,0.98)']}
-          style={s.gradient}
-        >
-          {/* Canlı gösterge */}
-          <View style={s.liveIndicator}>
-            <Animated.View style={[s.liveDot, { transform: [{ scale: pulseAnim }] }]} />
-            <Text style={s.liveText}>CANLI</Text>
-          </View>
+      {/* Yayılma (ripple) halkaları — canlı oda efekti */}
+      <Animated.View style={[
+        s.ripple,
+        {
+          transform: [{ scale: rippleScale(ripple1) }],
+          opacity: rippleOpacity(ripple1),
+        },
+      ]} />
+      <Animated.View style={[
+        s.ripple,
+        {
+          transform: [{ scale: rippleScale(ripple2) }],
+          opacity: rippleOpacity(ripple2),
+        },
+      ]} />
 
-          {/* Oda bilgisi */}
-          <View style={s.info}>
-            <Text style={s.roomName} numberOfLines={1}>{room.name}</Text>
-            <View style={s.metaRow}>
-              <Ionicons name="person" size={10} color={COLORS.text2} />
-              <Text style={s.metaText}>{room.hostName}</Text>
-              <Text style={s.metaDot}>·</Text>
-              <Ionicons name="people" size={10} color={COLORS.text2} />
-              <Text style={s.metaText}>{room.viewerCount}</Text>
-            </View>
-          </View>
+      {/* Ana kart */}
+      <TouchableOpacity activeOpacity={0.85} onPress={onExpand} style={s.card}>
+        {/* Canlı gösterge */}
+        <View style={s.liveIndicator}>
+          <Animated.View style={[s.liveDot, { transform: [{ scale: pulseAnim }] }]} />
+          <Text style={s.liveText}>CANLI</Text>
+        </View>
 
-          {/* Sağ taraf: Mic durumu + Kapat */}
-          <View style={s.actions}>
-            <View style={[s.micBadge, room.isMicOn && s.micBadgeOn]}>
-              <Ionicons 
-                name={room.isMicOn ? 'mic' : 'mic-off'} 
-                size={14} 
-                color={room.isMicOn ? COLORS.primary : '#64748B'} 
-              />
-            </View>
-            
-            <TouchableOpacity onPress={handleClose} style={s.closeBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-              <Ionicons name="close" size={16} color="#EF4444" />
-            </TouchableOpacity>
+        {/* Oda bilgisi — tek satır */}
+        <View style={s.info}>
+          <Text style={s.roomName} numberOfLines={1}>{room.name}</Text>
+          <View style={s.metaRow}>
+            <Ionicons name="person" size={9} color="#94A3B8" />
+            <Text style={s.metaText}>{room.hostName}</Text>
+            <Text style={s.metaDot}>·</Text>
+            <Ionicons name="people" size={9} color="#94A3B8" />
+            <Text style={s.metaText}>{room.viewerCount}</Text>
           </View>
+        </View>
 
-          {/* Alt kenar ışığı */}
-          <LinearGradient
-            colors={['transparent', 'rgba(92,225,230,0.15)', 'transparent']}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-            style={s.bottomGlow}
-          />
-        </LinearGradient>
+        {/* Mic + Kapat */}
+        <View style={s.actions}>
+          <View style={[s.micBadge, room.isMicOn && s.micOn]}>
+            <Ionicons
+              name={room.isMicOn ? 'mic' : 'mic-off'}
+              size={12}
+              color={room.isMicOn ? '#14B8A6' : '#64748B'}
+            />
+          </View>
+          <TouchableOpacity onPress={handleClose} style={s.closeBtn} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+            <Ionicons name="close" size={14} color="#EF4444" />
+          </TouchableOpacity>
+        </View>
       </TouchableOpacity>
     </Animated.View>
   );
 }
 
+const CARD_BG = '#1a2636'; // Tema uyumlu koyu ton (lacivert değil)
+
 const s = StyleSheet.create({
   container: {
     position: 'absolute',
-    left: 12, right: 12,
+    left: 20, right: 20,
     zIndex: 999,
-    elevation: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // Ripple halkaları
+  ripple: {
+    position: 'absolute',
+    left: 0, right: 0,
+    top: 0, bottom: 0,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: 'rgba(20,184,166,0.4)',
   },
   card: {
-    borderRadius: 16,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOpacity: 0.5,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 20,
-  },
-  gradient: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: 16,
+    width: '100%',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 14,
+    backgroundColor: CARD_BG,
     borderWidth: 1,
-    borderColor: COLORS.border,
-    gap: 10,
+    borderColor: 'rgba(20,184,166,0.15)',
+    gap: 8,
   },
   liveIndicator: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(239,68,68,0.15)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
+    gap: 3,
+    backgroundColor: 'rgba(239,68,68,0.12)',
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 6,
     borderWidth: 1,
-    borderColor: 'rgba(239,68,68,0.3)',
+    borderColor: 'rgba(239,68,68,0.25)',
   },
   liveDot: {
-    width: 6, height: 6, borderRadius: 3,
+    width: 5, height: 5, borderRadius: 2.5,
     backgroundColor: '#EF4444',
   },
   liveText: {
-    fontSize: 9, fontWeight: '800', color: '#EF4444',
+    fontSize: 8, fontWeight: '800', color: '#EF4444',
     letterSpacing: 0.5,
   },
   info: {
     flex: 1,
   },
   roomName: {
-    fontSize: 13, fontWeight: '700', color: COLORS.text,
+    fontSize: 12, fontWeight: '700', color: '#F1F5F9',
     letterSpacing: 0.2,
   },
   metaRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 2,
+    flexDirection: 'row', alignItems: 'center', gap: 2, marginTop: 1,
   },
   metaText: {
-    fontSize: 10, color: COLORS.text2,
+    fontSize: 9, color: '#94A3B8',
   },
   metaDot: {
-    fontSize: 10, color: COLORS.text2, marginHorizontal: 1,
+    fontSize: 9, color: '#64748B', marginHorizontal: 1,
   },
   actions: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
+    flexDirection: 'row', alignItems: 'center', gap: 6,
   },
   micBadge: {
-    width: 30, height: 30, borderRadius: 15,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    width: 26, height: 26, borderRadius: 13,
+    backgroundColor: 'rgba(255,255,255,0.05)',
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
     alignItems: 'center', justifyContent: 'center',
   },
-  micBadgeOn: {
-    backgroundColor: 'rgba(92,225,230,0.12)',
-    borderColor: 'rgba(92,225,230,0.3)',
+  micOn: {
+    backgroundColor: 'rgba(20,184,166,0.1)',
+    borderColor: 'rgba(20,184,166,0.25)',
   },
   closeBtn: {
-    width: 26, height: 26, borderRadius: 13,
-    backgroundColor: 'rgba(239,68,68,0.12)',
-    borderWidth: 1, borderColor: 'rgba(239,68,68,0.25)',
+    width: 24, height: 24, borderRadius: 12,
+    backgroundColor: 'rgba(239,68,68,0.1)',
+    borderWidth: 1, borderColor: 'rgba(239,68,68,0.2)',
     alignItems: 'center', justifyContent: 'center',
-  },
-  bottomGlow: {
-    position: 'absolute',
-    bottom: 0, left: 20, right: 20,
-    height: 1,
   },
 });

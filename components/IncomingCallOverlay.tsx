@@ -1,10 +1,8 @@
 /**
- * SopranoChat — Gelen Arama Overlay (WhatsApp Tarzı Tam Ekran)
+ * SopranoChat — Gelen Arama Overlay (WhatsApp Tarzı Tam Ekran — Yalnız Sesli)
  * Full-screen overlay, 35sn auto-dismiss, anında ses kesme
- * BUG-15: Sound cleanup race condition düzeltildi
- * CALL-2: 35sn auto-dismiss 
- * CALL-3: Kabul'de zil sesi anında durma
- * CALL-6: Tam ekran WhatsApp tarzı UI
+ * ★ Cihazın varsayılan zil sesini kullanır (Android)
+ * ★ Fallback: Gömülü ringtone.mp3
  */
 import { View, Text, StyleSheet, Image, TouchableOpacity, Animated, Vibration, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -12,8 +10,8 @@ import { useEffect, useRef, useCallback } from 'react';
 import { Audio } from 'expo-av';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors } from '../constants/theme';
-import type { CallType } from '../services/call';
 import { getAvatarSource } from '../constants/avatars';
+import { Platform } from 'react-native';
 
 const { width: W, height: H } = Dimensions.get('window');
 
@@ -21,7 +19,7 @@ type Props = {
   visible: boolean;
   callerName: string;
   callerAvatar?: string;
-  callType: CallType;
+  callType?: string; // backward compat — artık her zaman 'audio'
   onAccept: () => void;
   onReject: () => void;
 };
@@ -88,7 +86,8 @@ export function IncomingCallOverlay({ visible, callerName, callerAvatar, callTyp
       const vibratePattern = [0, 800, 400, 800, 400, 800];
       Vibration.vibrate(vibratePattern, true);
 
-      // Bildirim sesi çal (loop)
+      // ★ Cihazın varsayılan zil sesini çal (Android)
+      // Fallback: Gömülü ringtone.mp3
       (async () => {
         try {
           await Audio.setAudioModeAsync({
@@ -99,10 +98,32 @@ export function IncomingCallOverlay({ visible, callerName, callerAvatar, callTyp
             playThroughEarpieceAndroid: false,
           });
           if (isCancelled) return;
-          const { sound } = await Audio.Sound.createAsync(
-            require('../assets/ringtone.mp3'),
-            { isLooping: true, volume: 1.0, shouldPlay: true }
-          );
+
+          let sound: Audio.Sound | null = null;
+
+          // Android: Cihazın varsayılan zil sesini dene
+          if (Platform.OS === 'android') {
+            try {
+              const { sound: sysSound } = await Audio.Sound.createAsync(
+                { uri: 'content://settings/system/ringtone' },
+                { isLooping: true, volume: 1.0, shouldPlay: true }
+              );
+              sound = sysSound;
+            } catch {
+              // Sistem zil sesi alınamazsa fallback
+              sound = null;
+            }
+          }
+
+          // Fallback: Gömülü ringtone
+          if (!sound) {
+            const { sound: fallbackSound } = await Audio.Sound.createAsync(
+              require('../assets/ringtone.mp3'),
+              { isLooping: true, volume: 1.0, shouldPlay: true }
+            );
+            sound = fallbackSound;
+          }
+
           if (isCancelled) {
             await sound.stopAsync().catch(() => {});
             await sound.unloadAsync().catch(() => {});
@@ -182,13 +203,11 @@ export function IncomingCallOverlay({ visible, callerName, callerAvatar, callTyp
         {/* Üst kısım — arama türü */}
         <View style={styles.topSection}>
           <Ionicons
-            name={callType === 'video' ? 'videocam' : 'call'}
+            name="call"
             size={18}
             color={Colors.teal}
           />
-          <Text style={styles.callTypeLabel}>
-            {callType === 'video' ? 'Görüntülü Arama' : 'Sesli Arama'}
-          </Text>
+          <Text style={styles.callTypeLabel}>Sesli Arama</Text>
         </View>
 
         {/* Orta kısım — avatar + bilgi */}
@@ -224,7 +243,7 @@ export function IncomingCallOverlay({ visible, callerName, callerAvatar, callTyp
           <Animated.View style={{ transform: [{ scale: acceptBtnAnim }] }}>
             <TouchableOpacity style={styles.acceptBtn} onPress={handleAccept} activeOpacity={0.7}>
               <View style={styles.acceptBtnInner}>
-                <Ionicons name={callType === 'video' ? 'videocam' : 'call'} size={28} color="#fff" />
+                <Ionicons name="call" size={28} color="#fff" />
               </View>
               <Text style={styles.btnLabel}>Kabul Et</Text>
             </TouchableOpacity>

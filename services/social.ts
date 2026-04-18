@@ -3,6 +3,7 @@
  * Sadece oda bağlamında post/yorum/beğeni işlemleri.
  * Genel sosyal feed (discover/following) kaldırıldı — SopranoChat bir oda platformudur.
  */
+import { logger } from '../utils/logger';
 import { supabase } from '../constants/supabase';
 import { filterBadWords } from '../constants/badwords';
 
@@ -56,10 +57,14 @@ export const SocialService = {
     }
   ): Promise<{ success: boolean; error?: string }> {
     try {
+      // ★ SEC-POST1: Content sanitizasyon — max 2000 char + HTML strip
+      const sanitized = (content || '').trim().replace(/<[^>]*>/g, '').slice(0, 2000);
+      if (sanitized.length < 1) return { success: false, error: 'Gönderi içeriği boş olamaz.' };
+
       const { error } = await supabase.from('posts').insert([
         {
           user_id: userId,
-          content: filterBadWords(content),
+          content: filterBadWords(sanitized),
           image_url: imageUrl || null,
           location_name: meta?.locationName || null,
           location_lat: meta?.locationLat || null,
@@ -84,7 +89,7 @@ export const SocialService = {
 
       return { success: true };
     } catch (e: any) {
-      console.error("Error creating post:", e);
+      logger.error("Error creating post:", e);
       return { success: false, error: e.message };
     }
   },
@@ -118,12 +123,12 @@ export const SocialService = {
               await supabase.from('notifications').insert(notifPayload);
             }
           }
-        } catch (ne) { if (__DEV__) console.warn('[Like Notif] hata:', ne); }
+        } catch (ne) { if (__DEV__) logger.warn('[Like Notif] hata:', ne); }
       }
 
       return { success: true, liked: data.liked };
     } catch (e: any) {
-      console.error("Error toggling like:", e);
+      logger.error("Error toggling like:", e);
       return { success: false, error: e.message };
     }
   },
@@ -133,8 +138,12 @@ export const SocialService = {
    */
   async addComment(postId: string, userId: string, content: string): Promise<{ success: boolean; error?: string }> {
     try {
+      // ★ SEC-POST2: Yorum uzunluk limiti — max 500 char + HTML strip
+      const sanitizedComment = (content || '').trim().replace(/<[^>]*>/g, '').slice(0, 500);
+      if (sanitizedComment.length < 1) return { success: false, error: 'Yorum boş olamaz.' };
+
       const { error } = await supabase.from('post_comments').insert([
-        { post_id: postId, user_id: userId, content: filterBadWords(content) }
+        { post_id: postId, user_id: userId, content: filterBadWords(sanitizedComment) }
       ]);
       if (error) throw error;
 
@@ -167,11 +176,11 @@ export const SocialService = {
             await supabase.from('notifications').insert(notifPayload);
           }
         }
-      } catch (ne) { if (__DEV__) console.warn('[Comment Notif] hata:', ne); }
+      } catch (ne) { if (__DEV__) logger.warn('[Comment Notif] hata:', ne); }
       
       return { success: true };
     } catch (e: any) {
-      console.error("Error adding comment:", e);
+      logger.error("Error adding comment:", e);
       return { success: false, error: e.message };
     }
   },
@@ -189,7 +198,7 @@ export const SocialService = {
       if (error) throw error;
       return { success: true };
     } catch (e: any) {
-      console.error("Error deleting post:", e);
+      logger.error("Error deleting post:", e);
       return { success: false, error: e.message };
     }
   },
@@ -233,7 +242,7 @@ export const SocialService = {
 
       return { feed: feedWithLikes as any };
     } catch (e: any) {
-      console.error('Error fetching room wall:', e);
+      logger.error('Error fetching room wall:', e);
       return { feed: [], error: e.message };
     }
   },

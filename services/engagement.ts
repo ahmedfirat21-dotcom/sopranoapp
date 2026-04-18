@@ -4,6 +4,7 @@
  */
 import { supabase } from '../constants/supabase';
 import { GamificationService } from './gamification';
+import { logger } from '../utils/logger';
 
 // ─── Günlük Check-in Ödülleri ─────────────────
 const DAILY_REWARDS = [2, 4, 6, 8, 10, 15, 25]; // 7 günlük seri (tiers.ts ile senkron)
@@ -74,7 +75,7 @@ export const DailyCheckInService = {
 
       return { success: true, spEarned, streak: newStreak, alreadyCheckedIn: false };
     } catch (e: any) {
-      console.error('Check-in error:', e);
+      logger.error('Check-in error:', e);
       return { success: false, spEarned: 0, streak: 0, alreadyCheckedIn: false, error: e.message };
     }
   },

@@ -1,7 +1,26 @@
+import { logger } from '../utils/logger';
 import { supabase } from '../constants/supabase';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as FileSystem from 'expo-file-system';
 import { decode } from 'base64-arraybuffer';
+
+// ★ SEC-STORAGE: Upload boyut limitleri
+const MAX_IMAGE_SIZE = 10 * 1024 * 1024;  // 10MB
+const MAX_VOICE_SIZE = 5 * 1024 * 1024;   // 5MB
+
+async function _validateFileSize(uri: string, maxBytes: number, label: string): Promise<void> {
+  try {
+    const info = await FileSystem.getInfoAsync(uri);
+    if (info.exists && (info as any).size && (info as any).size > maxBytes) {
+      const sizeMB = ((info as any).size / (1024 * 1024)).toFixed(1);
+      const limitMB = (maxBytes / (1024 * 1024)).toFixed(0);
+      throw new Error(`${label} çok büyük (${sizeMB}MB). Maksimum: ${limitMB}MB`);
+    }
+  } catch (e: any) {
+    // getInfoAsync hatası durumunda devam et — Supabase kendi limitini de uygular
+    if (e.message?.includes('çok büyük')) throw e;
+  }
+}
 
 export const StorageService = {
   /**
@@ -9,6 +28,9 @@ export const StorageService = {
    */
   async uploadFile(bucket: string, path: string, imageUri: string): Promise<string> {
     try {
+      // ★ SEC-STORAGE: Upload öncesi boyut kontrolü
+      await _validateFileSize(imageUri, MAX_IMAGE_SIZE, 'Dosya');
+
       // 1. Resize image to optimize upload speed & storage space
       const manipResult = await ImageManipulator.manipulateAsync(
         imageUri,
@@ -43,7 +65,7 @@ export const StorageService = {
 
       return publicUrlData.publicUrl;
     } catch (error: any) {
-      console.error(`[StorageService] Upload Error to ${bucket}/${path}:`, error.message);
+      logger.error(`[StorageService] Upload Error to ${bucket}/${path}:`, error.message);
       throw error;
     }
   },
@@ -81,7 +103,7 @@ export const StorageService = {
   async deleteFile(bucket: string, path: string): Promise<void> {
     const { error } = await supabase.storage.from(bucket).remove([path]);
     if (error) {
-      console.error(`[StorageService] Delete Error in ${bucket}/${path}:`, error.message);
+      logger.error(`[StorageService] Delete Error in ${bucket}/${path}:`, error.message);
       throw error;
     }
   },
@@ -91,6 +113,9 @@ export const StorageService = {
    */
   async uploadVoiceNote(userId: string, audioUri: string): Promise<string> {
     try {
+      // ★ SEC-STORAGE: Ses dosyası boyut kontrolü (max 5MB)
+      await _validateFileSize(audioUri, MAX_VOICE_SIZE, 'Ses dosyası');
+
       const timestamp = new Date().getTime();
       const path = `${userId}/voice_${timestamp}.m4a`;
 
@@ -116,7 +141,7 @@ export const StorageService = {
 
       return publicUrlData.publicUrl;
     } catch (error: any) {
-      console.error(`[StorageService] Voice Upload Error:`, error.message);
+      logger.error(`[StorageService] Voice Upload Error:`, error.message);
       throw error;
     }
   }

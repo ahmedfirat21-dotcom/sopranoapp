@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, Pressable, Animated, Dimensions, ScrollView, PanResponder } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Animated, Dimensions, ScrollView, PanResponder, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 const { width: W, height: H } = Dimensions.get('window');
@@ -32,6 +32,9 @@ type Props = {
   roomDurationMinutes: number;
   /** Kayıt aktif mi */
   isRecording?: boolean;
+  /** ★ Takipçi sistemi */
+  followerCount?: number;
+  followers?: { id: string; display_name: string; avatar_url: string }[];
 };
 
 export default function RoomStatsPanel({
@@ -39,6 +42,7 @@ export default function RoomStatsPanel({
   currentListeners, totalUniqueListeners, peakCCU,
   avgStayMinutes, totalReactions, topUsers,
   roomDurationMinutes, isRecording,
+  followerCount = 0, followers = [],
 }: Props) {
   const slideAnim = useRef(new Animated.Value(H)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -77,10 +81,11 @@ export default function RoomStatsPanel({
     { icon: 'time', label: 'Ort. Kalma', value: `${avgStayMinutes}dk`, color: '#8B5CF6', desc: 'Ortalama süre' },
     { icon: 'heart', label: 'Reaksiyonlar', value: totalReactions, color: '#EF4444', desc: 'Toplam emoji' },
     { icon: 'timer', label: 'Süre', value: `${roomDurationMinutes}dk`, color: '#F59E0B', desc: 'Oda açık süresi' },
+    { icon: 'people-circle', label: 'Takipçi', value: followerCount, color: '#EC4899', desc: 'Oda takipçisi' },
   ];
 
   return (
-    <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+    <View style={[StyleSheet.absoluteFill, { zIndex: 9997, elevation: 50 }]} pointerEvents="box-none">
       <Animated.View style={[st.backdrop, { opacity: fadeAnim }]}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
       </Animated.View>
@@ -134,6 +139,28 @@ export default function RoomStatsPanel({
               ))}
             </View>
           )}
+
+          {/* ★ Takipçi Listesi */}
+          {followers.length > 0 && (
+            <View style={st.topSection}>
+              <Text style={st.sectionTitle}>❤️ Oda Takipçileri ({followerCount})</Text>
+              {followers.slice(0, 20).map((f) => (
+                <View key={f.id} style={st.followerRow}>
+                  {f.avatar_url ? (
+                    <Image source={{ uri: f.avatar_url }} style={st.followerAvatar} />
+                  ) : (
+                    <View style={[st.followerAvatar, { backgroundColor: 'rgba(255,255,255,0.06)', justifyContent: 'center', alignItems: 'center' }]}>
+                      <Ionicons name="person" size={12} color="#64748B" />
+                    </View>
+                  )}
+                  <Text style={st.followerName} numberOfLines={1}>{f.display_name}</Text>
+                </View>
+              ))}
+              {followerCount > 20 && (
+                <Text style={{ fontSize: 9, color: '#64748B', textAlign: 'center', marginTop: 6 }}>+{followerCount - 20} daha...</Text>
+              )}
+            </View>
+          )}
         </ScrollView>
       </Animated.View>
     </View>
@@ -144,6 +171,7 @@ const st = StyleSheet.create({
   backdrop: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.45)',
+    elevation: 49,
   },
   panel: {
     position: 'absolute',
@@ -157,6 +185,7 @@ const st = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.06)',
     paddingHorizontal: 14,
     paddingBottom: 28,
+    elevation: 50,
   },
   handle: {
     width: 36,
@@ -306,5 +335,28 @@ const st = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     color: '#14B8A6',
+  },
+
+  // ★ Takipçi listesi
+  followerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.02)',
+  },
+  followerAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
+  followerName: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#CBD5E1',
   },
 });

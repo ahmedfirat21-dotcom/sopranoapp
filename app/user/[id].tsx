@@ -12,6 +12,7 @@ import { getAvatarSource } from '../../constants/avatars';
 import { ProfileService, type Profile } from '../../services/database';
 import { FriendshipService, type FriendshipStatus } from '../../services/friendship';
 import { ModerationService } from '../../services/moderation';
+import { UserTitleService, type UserTitle } from '../../services/userTitles';
 
 import { ReportModal } from '../../components/ReportModal';
 import { showToast } from '../../components/Toast';
@@ -49,6 +50,7 @@ export default function UserProfileScreen() {
   // ★ Katmanlı profil verileri
   const [profileStats, setProfileStats] = useState({ stageMinutes: 0, roomsCreated: 0, totalListeners: 0, totalReactions: 0 });
   const [recentRooms, setRecentRooms] = useState<any[]>([]);
+  const [userTitle, setUserTitle] = useState<UserTitle | null>(null);
 
   const [showFollowList, setShowFollowList] = useState(false);
   const [followListTab, setFollowListTab] = useState<'followers' | 'following'>('followers');
@@ -103,9 +105,14 @@ export default function UserProfileScreen() {
         ]);
         setProfileStats(pStats);
         setRecentRooms(rooms);
+        // ★ FIX-P2: Unvan badge — kendi profille tutarlı
+        try {
+          const title = await UserTitleService.getPrimaryTitle(id);
+          setUserTitle(title);
+        } catch {}
       } catch {}
     } catch (err) {
-      console.warn('Profil yuklenemedi:', err);
+      if (__DEV__) console.warn('Profil yuklenemedi:', err);
     } finally {
       setLoading(false);
     }
@@ -214,20 +221,7 @@ export default function UserProfileScreen() {
     }
   };
 
-  const handleMoreMenu = () => {
-    if (!firebaseUser || !id || isOwnProfile) return;
-    setCAlert({
-      visible: true,
-      title: 'Seçenekler',
-      message: '',
-      type: 'info',
-      buttons: [
-        { text: '🚩 Rapor Et', onPress: () => setShowReportModal(true) },
-        { text: isUserBlocked ? '✅ Engeli Kaldır' : '🚫 Engelle', onPress: handleBlock, style: isUserBlocked ? 'default' : 'destructive' },
-        { text: 'Vazgeç', style: 'cancel' },
-      ],
-    });
-  };
+  // handleMoreMenu kaldırıldı — inline butonlar kullanılıyor
 
   const handleDonate = async (amount: number) => {
     if (!firebaseUser || !id) return;
@@ -275,9 +269,9 @@ export default function UserProfileScreen() {
 
   // ★ ECO-7 FIX: Gizli profil kontrolü — takipçi değilse detaylar gizlenir
   const isPrivateProfile = !isOwnProfile && (
-    (userProfile as any)?.privacy_mode === 'private' ||
-    (userProfile as any)?.privacy_mode === 'followers_only' ||
-    (userProfile as any)?.is_private === true
+    userProfile?.privacy_mode === 'private' ||
+    userProfile?.privacy_mode === 'followers_only' ||
+    userProfile?.is_private === true
   );
   const canSeeFullProfile = isOwnProfile || isFollowing || !isPrivateProfile;
 
@@ -290,11 +284,7 @@ export default function UserProfileScreen() {
           <Ionicons name="chevron-back" size={22} color="#F1F5F9" />
         </Pressable>
         <Text style={s.headerTitle}>Profil</Text>
-        {!isOwnProfile ? (
-          <Pressable style={s.moreBtn} onPress={handleMoreMenu}>
-            <Ionicons name="ellipsis-horizontal" size={20} color="#94A3B8" />
-          </Pressable>
-        ) : <View style={{ width: 36 }} />}
+        <View style={{ width: 36 }} />
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
@@ -310,24 +300,29 @@ export default function UserProfileScreen() {
                 <Image source={getAvatarSource(userProfile.avatar_url)} style={s.avatarImg} />
               </View>
               <LinearGradient colors={tierDef.gradient as [string, string]} style={s.tierPill}>
-                <Ionicons name={tierDef.icon as any} size={7} color="#fff" />
+                <Ionicons name={tierDef.icon as any} size={8} color="#fff" />
                 <Text style={s.tierPillText}>{tierDef.label}</Text>
               </LinearGradient>
+              {/* Online durumu — avatar köşesinde */}
+              {userProfile.is_online && (
+                <View style={s.onlineDot} />
+              )}
             </View>
             <View style={{ flex: 1 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                 <Text style={[s.displayName, userProfile.is_admin && { color: '#F87171' }]} numberOfLines={1}>{userProfile.display_name}</Text>
                 {userProfile.is_admin && (
-                  <Ionicons name="shield-checkmark" size={13} color="#DC2626" style={{ marginLeft: 4 }} />
-                )}
-                {userProfile.is_online && (
-                  <View style={s.onlineBadge}>
-                    <View style={s.onlineDot} />
-                  </View>
+                  <Ionicons name="shield-checkmark" size={14} color="#DC2626" style={{ marginLeft: 4 }} />
                 )}
               </View>
               {userProfile.username && <Text style={s.username}>@{userProfile.username}</Text>}
-              <Text style={s.bio} numberOfLines={2}>{userProfile.bio || 'Merhaba! SopranoChat kullanıyorum.'}</Text>
+              {userTitle && (
+                <View style={[s.titleBadge, { backgroundColor: userTitle.bgColor }]}>
+                  <Text style={{ fontSize: 10 }}>{userTitle.emoji}</Text>
+                  <Text style={[s.titleText, { color: userTitle.color }]}>{userTitle.name}</Text>
+                </View>
+              )}
+              <Text style={s.bio} numberOfLines={3}>{userProfile.bio || 'Henüz bir şey yazmadı ☕'}</Text>
             </View>
           </View>
 
@@ -335,12 +330,12 @@ export default function UserProfileScreen() {
           <View style={s.statsRow}>
             <Pressable style={s.statItem} onPress={() => { setFollowListTab('followers'); setShowFollowList(true); }}>
               <Text style={s.statNum}>{stats.followers}</Text>
-              <Text style={s.statLabel}>Takipçi</Text>
+              <Text style={s.statLabelClickable}>Takipçi</Text>
             </Pressable>
             <View style={s.statDiv} />
             <Pressable style={s.statItem} onPress={() => { setFollowListTab('following'); setShowFollowList(true); }}>
               <Text style={s.statNum}>{stats.following}</Text>
-              <Text style={s.statLabel}>Takip</Text>
+              <Text style={s.statLabelClickable}>Takip</Text>
             </Pressable>
             <View style={s.statDiv} />
             <View style={s.statItem}>
@@ -384,16 +379,17 @@ export default function UserProfileScreen() {
 
             <View style={s.interactionRow}>
               <Pressable
-                style={[s.followBtn, (isFollowing || isPending) && s.followBtnActive, isMutual && s.followBtnMutual]}
+                style={[s.followBtn, (isFollowing || isPending || isMutual) && s.followBtnActive]}
                 onPress={handleFollow}
                 disabled={followLoading || isBlocked}
+                android_ripple={{ color: 'rgba(255,255,255,0.1)', borderless: false }}
               >
                 {followLoading ? (
                   <ActivityIndicator size="small" color="#fff" />
                 ) : isBlocked ? (
                   <Text style={[s.followBtnText, { color: '#EF4444' }]}>Engellendi</Text>
                 ) : isMutual ? (
-                  <><Ionicons name="people" size={16} color="#14B8A6" /><Text style={[s.followBtnText, { color: '#14B8A6' }]}>Karşılıklı</Text></>
+                  <><Ionicons name="swap-horizontal" size={16} color="#F1F5F9" /><Text style={[s.followBtnText, { color: '#F1F5F9' }]}>Karşılıklı Takip</Text></>
                 ) : isFollowing ? (
                   <Text style={[s.followBtnText, { color: 'rgba(255,255,255,0.8)' }]}>Takip Ediliyor</Text>
                 ) : isPending ? (
@@ -431,11 +427,63 @@ export default function UserProfileScreen() {
         {canSeeFullProfile && (
         <>
 
+        {/* ═══ Aktivite İstatistikleri ═══ */}
+        {(profileStats.stageMinutes > 0 || profileStats.roomsCreated > 0 || profileStats.totalListeners > 0) && (
+          <View style={s.activityCard}>
+            <View style={s.activityGrid}>
+              <View style={s.activityItem}>
+                <Ionicons name="mic" size={20} color={Colors.teal} style={{ textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }} />
+                <Text style={s.activityNum}>{profileStats.stageMinutes}</Text>
+                <Text style={s.activityLabel}>dk sahne</Text>
+              </View>
+              <View style={s.activityItem}>
+                <Ionicons name="radio" size={20} color="#A855F7" style={{ textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }} />
+                <Text style={s.activityNum}>{profileStats.roomsCreated}</Text>
+                <Text style={s.activityLabel}>oda</Text>
+              </View>
+              <View style={s.activityItem}>
+                <Ionicons name="people" size={20} color="#F59E0B" style={{ textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }} />
+                <Text style={s.activityNum}>{profileStats.totalListeners}</Text>
+                <Text style={s.activityLabel}>dinleyici</Text>
+              </View>
+              <View style={s.activityItem}>
+                <Ionicons name="heart" size={20} color="#EF4444" style={{ textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }} />
+                <Text style={s.activityNum}>{profileStats.totalReactions}</Text>
+                <Text style={s.activityLabel}>reaksiyon</Text>
+              </View>
+            </View>
+          </View>
+        )}
+
+        {/* ═══ Tier Bilgi Kartı ═══ */}
+        <View style={s.tierCard}>
+          <LinearGradient
+            colors={[tierDef.color + '18', 'transparent']}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFillObject}
+          />
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+            <LinearGradient colors={tierDef.gradient as [string, string]} style={s.tierCardIcon}>
+              <Ionicons name={tierDef.icon as any} size={16} color="#fff" />
+            </LinearGradient>
+            <View style={{ flex: 1 }}>
+              <Text style={[s.tierCardTitle, { color: tierDef.color }]}>{tierDef.label} Üye</Text>
+              <Text style={s.tierCardDesc}>{tier === 'Pro' ? 'Sınırsız oda · 1080p · Stereo ses' : tier === 'Plus' ? 'HD ses · 720p video · Tüm oda türleri' : 'Ücretsiz plan · Temel özellikler'}</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* ═══ Banner (Pro+) — Tier kartının hemen altında ═══ */}
+        {isTierAtLeast(tier, 'Pro') && userProfile?.banner_url && (
+          <View style={s.bannerWrap}>
+            <Image source={{ uri: userProfile.banner_url }} style={s.bannerImg} />
+          </View>
+        )}
 
         {/* ═══ Odaları ═══ */}
         {recentRooms.length > 0 && (
           <View style={s.listContainer}>
-            <Text style={s.sectionInnerTitle}>🎙️ Odaları ({recentRooms.length})</Text>
+            <Text style={s.sectionInnerTitle}>🎩️ Odaları ({recentRooms.length})</Text>
             {recentRooms.map((room: any, idx: number) => {
               const isLive = (room.listener_count || 0) > 0 || room.is_live;
               return (
@@ -486,12 +534,22 @@ export default function UserProfileScreen() {
           </Pressable>
         )}
 
-        {/* ═══ Banner (Pro+) ═══ */}
-        {isTierAtLeast(tier, 'Pro') && (userProfile as any)?.banner_url && (
-          <View style={s.bannerWrap}>
-            <Image source={{ uri: (userProfile as any).banner_url }} style={s.bannerImg} />
+        {/* ═══ Rapor / Engelle — inline butonlar ═══ */}
+        {!isOwnProfile && firebaseUser && (
+          <View style={s.actionRow}>
+            <Pressable style={s.actionBtn} onPress={() => setShowReportModal(true)}>
+              <Ionicons name="flag-outline" size={16} color="#94A3B8" />
+              <Text style={s.actionBtnText}>Rapor Et</Text>
+            </Pressable>
+            <View style={{ width: 1, height: 20, backgroundColor: 'rgba(255,255,255,0.06)' }} />
+            <Pressable style={s.actionBtn} onPress={handleBlock}>
+              <Ionicons name={isUserBlocked ? 'checkmark-circle' : 'ban'} size={16} color={isUserBlocked ? '#22C55E' : '#EF4444'} />
+              <Text style={[s.actionBtnText, { color: isUserBlocked ? '#22C55E' : '#EF4444' }]}>{isUserBlocked ? 'Engeli Kaldır' : 'Engelle'}</Text>
+            </Pressable>
           </View>
         )}
+
+
         </>
         )}
       </ScrollView>
@@ -552,7 +610,7 @@ const s = StyleSheet.create({
     marginHorizontal: 16, marginBottom: 10,
     borderRadius: 16, overflow: 'hidden',
     backgroundColor: '#414e5f',
-    borderWidth: 1, borderColor: '#5b9a8b',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
     ..._cardShadow,
   },
   cardGlow: {
@@ -560,31 +618,39 @@ const s = StyleSheet.create({
     borderTopLeftRadius: 16, borderTopRightRadius: 16,
   },
   identityRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    paddingHorizontal: 16, paddingTop: 18, paddingBottom: 12,
+    flexDirection: 'row', alignItems: 'flex-start', gap: 12,
+    paddingHorizontal: 16, paddingTop: 18, paddingBottom: 14,
   },
   avatarRing: {
-    width: 64, height: 64, borderRadius: 32,
+    width: 84, height: 84, borderRadius: 42,
     borderWidth: 2.5, padding: 2,
-    shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.5, shadowRadius: 10, elevation: 6,
+    shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.5, shadowRadius: 12, elevation: 6,
   },
-  avatarImg: { width: '100%', height: '100%', borderRadius: 30, backgroundColor: 'rgba(255,255,255,0.05)' },
+  avatarImg: { width: '100%', height: '100%', borderRadius: 40, backgroundColor: 'rgba(255,255,255,0.05)' },
   tierPill: {
-    position: 'absolute' as const, bottom: -3, right: -6,
-    flexDirection: 'row', alignItems: 'center', gap: 2,
-    paddingHorizontal: 5, paddingVertical: 2, borderRadius: 10,
+    position: 'absolute' as const, bottom: -2, right: -4,
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    paddingHorizontal: 7, paddingVertical: 2.5, borderRadius: 10,
     borderWidth: 2, borderColor: '#414e5f',
   },
-  tierPillText: { fontSize: 7, fontWeight: '800', color: '#fff', letterSpacing: 0.3, ..._textGlow },
-  displayName: { fontSize: 16, fontWeight: '800', color: '#F1F5F9', letterSpacing: 0.2, ..._textGlow },
-  username: { fontSize: 10, color: '#CBD5E1', marginTop: 1, ..._textGlow },
-  bio: { fontSize: 10, color: '#94A3B8', marginTop: 3, lineHeight: 14, ..._textGlow },
-  onlineBadge: {
-    width: 10, height: 10, borderRadius: 5,
-    backgroundColor: '#22C55E', borderWidth: 2, borderColor: '#414e5f',
-    marginLeft: 6,
+  tierPillText: { fontSize: 8, fontWeight: '800', color: '#fff', letterSpacing: 0.3, ..._textGlow },
+  displayName: { fontSize: 18, fontWeight: '800', color: '#F1F5F9', letterSpacing: 0.2, ..._textGlow },
+  username: { fontSize: 11, color: '#94A3B8', marginTop: 1, ..._textGlow },
+  titleBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    alignSelf: 'flex-start',
+    paddingHorizontal: 7, paddingVertical: 2.5,
+    borderRadius: 8, marginTop: 3,
   },
-  onlineDot: { display: 'none' as any },
+  titleText: { fontSize: 10, fontWeight: '700' },
+  bio: { fontSize: 12, color: '#94A3B8', marginTop: 4, lineHeight: 17, ..._textGlow },
+  onlineDot: {
+    position: 'absolute' as const, top: 2, right: 6,
+    width: 14, height: 14, borderRadius: 7,
+    backgroundColor: '#22C55E',
+    borderWidth: 2.5, borderColor: '#414e5f',
+    shadowColor: '#22C55E', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.5, shadowRadius: 4, elevation: 3,
+  },
 
   // Stats
   statsRow: {
@@ -594,8 +660,9 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
   },
   statItem: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  statNum: { fontSize: 15, fontWeight: '800', color: '#F1F5F9', marginBottom: 1, ..._textGlow },
+  statNum: { fontSize: 16, fontWeight: '800', color: '#F1F5F9', marginBottom: 1, ..._textGlow },
   statLabel: { fontSize: 9, fontWeight: '600', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 0.5 },
+  statLabelClickable: { fontSize: 9, fontWeight: '600', color: '#5CBFB5', textTransform: 'uppercase', letterSpacing: 0.5 },
   statDiv: { width: 1, height: 22, backgroundColor: 'rgba(255,255,255,0.08)' },
 
   // Interaction
@@ -605,14 +672,12 @@ const s = StyleSheet.create({
     paddingVertical: 12, borderRadius: 12, backgroundColor: Colors.teal,
     ..._cardShadow,
   },
-  followBtnActive: { backgroundColor: 'rgba(20,184,166,0.4)' },
-  // ★ X.com tarzı: Karşılıklı takip stili
-  followBtnMutual: { backgroundColor: 'rgba(20,184,166,0.15)', borderWidth: 1, borderColor: 'rgba(20,184,166,0.3)' },
+  followBtnActive: { backgroundColor: '#1e2d35', borderWidth: 1.5, borderColor: 'rgba(20,184,166,0.5)', elevation: 0 },
   followBtnText: { fontSize: 14, fontWeight: '700', color: '#fff', ..._textGlow },
   secondaryRow: { flexDirection: 'row', gap: 8 },
   secondaryBtn: {
     width: 44, height: 44, borderRadius: 14,
-    backgroundColor: '#414e5f', borderWidth: 1, borderColor: '#95a1ae',
+    backgroundColor: '#414e5f', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
     alignItems: 'center', justifyContent: 'center',
     ..._cardShadow,
   },
@@ -660,7 +725,7 @@ const s = StyleSheet.create({
   listContainer: {
     marginHorizontal: 16, marginBottom: 10,
     backgroundColor: '#414e5f',
-    borderRadius: 16, borderWidth: 1, borderColor: '#5b9a8b',
+    borderRadius: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
     padding: 14,
     ..._cardShadow,
   },
@@ -679,6 +744,48 @@ const s = StyleSheet.create({
   roomItemName: { fontSize: 13, fontWeight: '700', color: '#F1F5F9', ..._textGlow },
   roomItemMeta: { fontSize: 10, color: '#64748B', marginTop: 1 },
 
+  // Activity card
+  activityCard: {
+    marginHorizontal: 16, marginBottom: 10,
+    borderRadius: 16, overflow: 'hidden' as const,
+    backgroundColor: '#414e5f',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+    paddingVertical: 14, paddingHorizontal: 10,
+    ..._cardShadow,
+  },
+  activityGrid: {
+    flexDirection: 'row' as const, justifyContent: 'space-around' as const,
+  },
+  activityItem: {
+    alignItems: 'center' as const, gap: 4,
+  },
+  activityNum: {
+    fontSize: 15, fontWeight: '800' as const, color: '#F1F5F9', ..._textGlow,
+  },
+  activityLabel: {
+    fontSize: 8, fontWeight: '600' as const, color: '#94A3B8', textTransform: 'uppercase' as const, letterSpacing: 0.3,
+  },
+
+  // Tier card
+  tierCard: {
+    marginHorizontal: 16, marginBottom: 10,
+    padding: 14, borderRadius: 16,
+    backgroundColor: '#414e5f',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+    overflow: 'hidden' as const,
+    ..._cardShadow,
+  },
+  tierCardIcon: {
+    width: 34, height: 34, borderRadius: 12,
+    alignItems: 'center' as const, justifyContent: 'center' as const,
+  },
+  tierCardTitle: {
+    fontSize: 14, fontWeight: '800' as const, ..._textGlow,
+  },
+  tierCardDesc: {
+    fontSize: 10, color: '#94A3B8', marginTop: 1,
+  },
+
   // Donate card
   donateCard: {
     marginHorizontal: 16, marginBottom: 10,
@@ -689,7 +796,23 @@ const s = StyleSheet.create({
     flexDirection: 'row' as const, alignItems: 'center' as const, justifyContent: 'center' as const,
     gap: 8, paddingVertical: 14,
   },
-  donateText: { fontSize: 15, fontWeight: '700', color: '#FFF', ..._textGlow },
+  donateText: { fontSize: 15, fontWeight: '700' as const, color: '#FFF', ..._textGlow },
+
+  // Action row (report / block)
+  actionRow: {
+    flexDirection: 'row' as const, alignItems: 'center' as const, justifyContent: 'center' as const,
+    marginHorizontal: 16, marginBottom: 10,
+    paddingVertical: 10, borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
+  },
+  actionBtn: {
+    flex: 1, flexDirection: 'row' as const, alignItems: 'center' as const, justifyContent: 'center' as const,
+    gap: 6, paddingVertical: 4,
+  },
+  actionBtnText: {
+    fontSize: 12, fontWeight: '600' as const, color: '#94A3B8',
+  },
 
   // Banner
   bannerWrap: {

@@ -29,6 +29,7 @@ import { ReferralService } from '../services/referral';
 import * as ImagePicker from 'expo-image-picker';
 import * as ExpoClipboard from 'expo-clipboard';
 import { StorageService } from '../services/storage';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -41,6 +42,7 @@ const discovery = {
 export default function EditProfileScreen() {
   const router = useRouter();
   const { profile, firebaseUser, setProfile, setUser, refreshProfile } = useAuth();
+  const insets = useSafeAreaInsets();
 
   // === Profile fields ===
   const [displayName, setDisplayName] = useState(profile?.display_name || '');
@@ -139,9 +141,14 @@ export default function EditProfileScreen() {
     }
   };
 
+  // ★ SEC-EDIT: Unicode sanitizasyon — onboarding ile tutarlı
+  const sanitizeText = (text: string): string =>
+    text.replace(/[\u200B-\u200F\u202A-\u202E\u2066-\u2069\uFEFF\u00AD\u034F\u061C\u180E]/g, '').trim();
+
   // === SAVE PROFILE ===
   const handleSave = async () => {
-    if (!displayName.trim()) {
+    const cleanName = sanitizeText(displayName);
+    if (!cleanName) {
       showToast({ type: 'warning', title: 'Uyarı', message: 'Görünen ad boş olamaz.' });
       return;
     }
@@ -155,11 +162,13 @@ export default function EditProfileScreen() {
     try {
       // ★ B1 FIX: privacy_mode'dan is_private türet — tek kaynak
       const derivedIsPrivate = privacyMode !== 'public';
+      // ★ SEC-EDIT: Sanitize name + bio (Unicode junk removal)
+      const cleanBio = sanitizeText(bio);
 
       await ProfileService.update(userId, {
-        display_name: displayName.trim(),
+        display_name: cleanName,
         username: username.trim() || null,
-        bio: bio.trim(),
+        bio: cleanBio,
         avatar_url: avatarUrl,
         hide_owned_rooms: hideOwnedRooms,
         privacy_mode: privacyMode,
@@ -177,9 +186,9 @@ export default function EditProfileScreen() {
       // ★ B2 FIX: Lokal state — tüm güncellenen alanları kapsayan güncellenme
       const updatedProfile = {
         ...profile!,
-        display_name: displayName.trim(),
+        display_name: cleanName,
         username: username.trim() || null,
-        bio: bio.trim(),
+        bio: cleanBio,
         avatar_url: avatarUrl,
         hide_owned_rooms: hideOwnedRooms,
         privacy_mode: privacyMode,
@@ -345,7 +354,7 @@ export default function EditProfileScreen() {
     <AppBackground>
     <View style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <Pressable onPress={() => safeGoBack(router)} style={styles.backBtn}>
           <Ionicons name="close" size={24} color={Colors.text} />
         </Pressable>
@@ -730,7 +739,7 @@ const styles = StyleSheet.create({
   // Header
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingTop: 54, paddingBottom: 12,
+    paddingHorizontal: 16, paddingBottom: 12,
     borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)',
     backgroundColor: 'transparent', zIndex: 10,
   },

@@ -10,7 +10,7 @@ const firebaseConfig = {
   projectId: 'sopranochat-5738e',
   storageBucket: 'sopranochat-5738e.firebasestorage.app',
   messagingSenderId: '236660998634',
-  appId: '1:236660998634:android:f60b077a06869e1649f293',
+  appId: '1:236660998634:android:3254282bc9cedbfb49f293',
 };
 
 // Firebase'i sadece bir kez başlat

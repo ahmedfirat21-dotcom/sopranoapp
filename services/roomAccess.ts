@@ -7,8 +7,31 @@
 import { supabase } from '../constants/supabase';
 import { ModerationService } from './moderation';
 import { getRoomLimits, isTierAtLeast } from '../constants/tiers';
+import * as Crypto from 'expo-crypto';
 import type { Room, RoomSettings, SubscriptionTier, RoomLanguage, ParticipantRole } from '../types';
 import { migrateLegacyTier } from '../types';
+
+// ★ SEC-PWD: Oda şifre hash'leme yardımcıları
+const PWD_SALT = 'soprano_room_v1_'; // Sabit salt — oda şifreleri düşük güvenlik gerektiren alan
+
+/** Şifreyi SHA-256 ile hash'le — ★ Export: room.ts create() tarafından da kullanılır */
+export async function hashPassword(password: string): Promise<string> {
+  const digest = await Crypto.digestStringAsync(
+    Crypto.CryptoDigestAlgorithm.SHA256,
+    PWD_SALT + password.trim()
+  );
+  return digest;
+}
+
+/** Hash karşılaştırması — geriye uyumluluk: plaintext de kontrol eder */
+async function verifyPassword(entered: string, stored: string): Promise<boolean> {
+  // 1. Hash karşılaştırması (yeni format)
+  const enteredHash = await hashPassword(entered);
+  if (enteredHash === stored) return true;
+  // 2. Plaintext karşılaştırması (eski format — migration tamamlanana kadar)
+  if (entered.trim() === stored) return true;
+  return false;
+}
 
 export type AccessCheckResult = {
   allowed: boolean;
@@ -32,6 +55,14 @@ export const RoomAccessService = {
   ): Promise<AccessCheckResult> {
     const roomId = room.id!;
     const settings = (room.room_settings || {}) as RoomSettings;
+
+    // ── 0. Host & Admin bypass — oda sahibi ve adminler her zaman girebilir ──
+    const isHost = room.host_id === userId;
+    const isOriginalHost = settings.original_host_id === userId;
+    if (isHost || isOriginalHost) {
+      return { allowed: true };
+    }
+    // Admin bypass ayrı kontrol edilir (profiles tablosunda is_admin)
 
     // ── 1. Ban kontrolü ──
     const isBanned = await ModerationService.isRoomBanned(roomId, userId);
@@ -90,10 +121,18 @@ export const RoomAccessService = {
 
     if (roomType === 'closed') {
       // Şifreli oda — şifre gerekli
+      // ★ Şifre hem rooms.room_password hem de room_settings.room_password'da olabilir (fallback insert)
+      const storedPassword = room.room_password || (settings as any).room_password;
+      if (!storedPassword) {
+        // Şifre tanımlı değilse giriş serbest
+        return this._checkCapacity(room, userId);
+      }
       if (!enteredPassword) {
         return { allowed: false, reason: 'Bu oda şifre korumalı.', action: 'password_required' };
       }
-      if (enteredPassword !== room.room_password) {
+      // ★ SEC-PWD: Hash karşılaştırması (geriye uyumlu — plaintext de kontrol eder)
+      const passwordMatch = await verifyPassword(enteredPassword, storedPassword);
+      if (!passwordMatch) {
         return { allowed: false, reason: 'Yanlış şifre.' };
       }
       return this._checkCapacity(room, userId);
@@ -121,8 +160,20 @@ export const RoomAccessService = {
   /**
    * Hiyerarşik erişim isteği gönder.
    * Sıra: Owner → Moderator → Speaker (en yüksek online yetkili kişiye)
+   * ★ Broadcast + DB bildirim gönderir
    */
   async _sendAccessRequest(roomId: string, userId: string): Promise<void> {
+    // ★ SEC-FLOOD: Access request rate limit — max 10 istek/saat
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    const { count } = await supabase
+      .from('room_access_requests')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .gte('created_at', oneHourAgo);
+    if ((count || 0) >= 10) {
+      throw new Error('Çok fazla katılma isteği gönderdiniz. Lütfen 1 saat sonra tekrar deneyin.');
+    }
+
     // Odadaki yetkili kişileri bul (owner > moderator > speaker sırasıyla)
     const { data: authorizedUsers } = await supabase
       .from('room_participants')
@@ -141,12 +192,39 @@ export const RoomAccessService = {
       else targetRole = 'speaker';
     }
 
+    // DB'ye istek yaz
     await supabase.from('room_access_requests').upsert({
       room_id: roomId,
       user_id: userId,
       status: 'pending',
       target_role: targetRole,
     }, { onConflict: 'room_id,user_id' });
+
+    // ★ İstekçinin profil bilgisini çek
+    const { data: requesterProfile } = await supabase
+      .from('profiles')
+      .select('display_name, avatar_url')
+      .eq('id', userId)
+      .single();
+    const requesterName = requesterProfile?.display_name || 'Birisi';
+
+    // ★ Host ve moderatörlere inbox bildirimi gönder — tek seferde batch insert
+    const notifyTargets = (authorizedUsers || [])
+      .filter(u => u.role === 'owner' || u.role === 'moderator')
+      .map(u => u.user_id);
+
+    if (notifyTargets.length > 0) {
+      const rows = notifyTargets.map(targetId => ({
+        user_id: targetId,
+        sender_id: userId,
+        type: 'room_access_request',
+        reference_id: roomId,
+        body: `${requesterName} odaya katılmak istiyor`,
+      }));
+      try {
+        await supabase.from('notifications').insert(rows);
+      } catch { /* bildirim opsiyonel */ }
+    }
   },
 
   /** Erişim isteğini onayla */
@@ -188,19 +266,35 @@ export const RoomAccessService = {
         room_id: roomId,
         user_id: invitedUserId,
         invited_by: invitedBy,
+        status: 'pending', // ★ Tekrar davet edildiğinde 'declined' → 'pending' sıfırla
       }, { onConflict: 'room_id,user_id' });
       if (error) throw error;
 
-      // Bildirim gönder
+      // ★ Davet eden kişinin adını ve oda adını çek — bildirimde göster
+      const [inviterRes, roomRes] = await Promise.all([
+        supabase.from('profiles').select('display_name').eq('id', invitedBy).single(),
+        supabase.from('rooms').select('name').eq('id', roomId).single(),
+      ]);
+      const inviterName = inviterRes.data?.display_name || 'Birisi';
+      const roomName = roomRes.data?.name || 'bir oda';
+
+      // Bildirim gönder (zile düşsün)
       try {
-        await supabase.from('notifications').insert({
+        const { error: notifError } = await supabase.from('notifications').insert({
           user_id: invitedUserId,
           sender_id: invitedBy,
           type: 'room_invite',
           reference_id: roomId,
-          body: 'seni odaya davet etti',
+          body: `${inviterName} seni "${roomName}" odasına davet etti`,
         });
-      } catch { /* bildirim opsiyonel */ }
+        if (notifError) {
+          console.warn('[InviteUser] ⚠️ Bildirim insert HATASI:', notifError.message, notifError.details, notifError.hint);
+        } else {
+          console.log('[InviteUser] ✅ Bildirim başarıyla eklendi:', invitedUserId);
+        }
+      } catch (notifErr: any) {
+        console.warn('[InviteUser] ⚠️ Bildirim insert EXCEPTION:', notifErr?.message);
+      }
 
       return { success: true };
     } catch (e: any) {
@@ -208,15 +302,120 @@ export const RoomAccessService = {
     }
   },
 
-  /** Kullanıcının bu odaya daveti var mı? */
+  /** Kullanıcının bu odaya geçerli daveti var mı? (pending veya accepted) */
   async _hasInvite(roomId: string, userId: string): Promise<boolean> {
     const { data } = await supabase
       .from('room_invites')
       .select('id')
       .eq('room_id', roomId)
       .eq('user_id', userId)
+      .in('status', ['pending', 'accepted'])
       .maybeSingle();
     return !!data;
+  },
+
+  /**
+   * ★ Daveti kabul et — room_invites status güncelle + host'a bildirim gönder
+   * Kabul eden kişi otomatik olarak odaya yönlendirilir (frontend tarafında).
+   */
+  async acceptInvite(roomId: string, userId: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      // room_invites kaydını bul ve güncelle
+      const { data: invite, error: findErr } = await supabase
+        .from('room_invites')
+        .select('id, invited_by')
+        .eq('room_id', roomId)
+        .eq('user_id', userId)
+        .eq('status', 'pending')
+        .maybeSingle();
+      if (findErr || !invite) return { success: false, error: 'Davet bulunamadı' };
+
+      await supabase
+        .from('room_invites')
+        .update({ status: 'accepted' })
+        .eq('id', invite.id);
+
+      // ★ Kabul eden kişinin profilini çek — bildirimde isim göstermek için
+      const { data: acceptorProfile } = await supabase
+        .from('profiles')
+        .select('display_name')
+        .eq('id', userId)
+        .single();
+      const acceptorName = acceptorProfile?.display_name || 'Birisi';
+
+      // ★ Host'a bildirim gönder — "X daveti kabul etti"
+      if (invite.invited_by) {
+        try {
+          await supabase.from('notifications').insert({
+            user_id: invite.invited_by,
+            sender_id: userId,
+            type: 'room_invite_accepted',
+            reference_id: roomId,
+            body: `${acceptorName} oda davetini kabul etti 🎉`,
+          });
+        } catch { /* bildirim opsiyonel */ }
+      }
+
+      return { success: true };
+    } catch (e: any) {
+      return { success: false, error: e.message };
+    }
+  },
+
+  /**
+   * ★ Daveti reddet — room_invites status güncelle + host'a bildirim gönder
+   */
+  async rejectInvite(roomId: string, userId: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      // room_invites kaydını bul ve güncelle
+      const { data: invite, error: findErr } = await supabase
+        .from('room_invites')
+        .select('id, invited_by')
+        .eq('room_id', roomId)
+        .eq('user_id', userId)
+        .eq('status', 'pending')
+        .maybeSingle();
+      if (findErr || !invite) return { success: false, error: 'Davet bulunamadı' };
+
+      await supabase
+        .from('room_invites')
+        .update({ status: 'declined' })
+        .eq('id', invite.id);
+
+      // ★ Reddeden kişinin profilini çek
+      const { data: rejectorProfile } = await supabase
+        .from('profiles')
+        .select('display_name')
+        .eq('id', userId)
+        .single();
+      const rejectorName = rejectorProfile?.display_name || 'Birisi';
+
+      // ★ Host'a bildirim gönder — "X daveti reddetti"
+      if (invite.invited_by) {
+        try {
+          await supabase.from('notifications').insert({
+            user_id: invite.invited_by,
+            sender_id: userId,
+            type: 'room_invite_rejected',
+            reference_id: roomId,
+            body: `${rejectorName} oda davetini reddetti`,
+          });
+        } catch { /* bildirim opsiyonel */ }
+      }
+
+      // ★ İlgili bildirimi de sil (zilde kalmasın)
+      try {
+        await supabase.from('notifications')
+          .delete()
+          .eq('user_id', userId)
+          .eq('type', 'room_invite')
+          .eq('reference_id', roomId);
+      } catch { /* temizlik opsiyonel */ }
+
+      return { success: true };
+    } catch (e: any) {
+      return { success: false, error: e.message };
+    }
   },
 
   // ════════════════════════════════════════════════════════════

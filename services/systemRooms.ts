@@ -7,7 +7,6 @@
 import { supabase } from '../constants/supabase';
 import { SHOWCASE_ROOMS, MIN_ACTIVE_ROOMS, getShowcaseRoomInserts } from './showcaseRooms';
 import type { Room, ParticipantRole, SubscriptionTier } from '../types';
-import { normalizeRole } from '../types';
 
 // ════════════════════════════════════════════════════════════
 // SİSTEM ODA YÖNETİMİ

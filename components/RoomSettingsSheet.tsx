@@ -11,8 +11,9 @@
 import React from 'react';
 import {
   View, Text, StyleSheet, Pressable, Modal, Switch, ScrollView, TextInput,
-  PanResponder, Animated,
+  Animated,
 } from 'react-native';
+import { useSwipeToDismiss } from '../hooks/useSwipeToDismiss';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { isTierAtLeast, TIER_DEFINITIONS } from '../constants/tiers';
@@ -89,6 +90,9 @@ interface RoomSettingsProps {
   // Pro
   roomType?: 'open' | 'closed' | 'invite';
   onRoomTypeChange?: (type: 'open' | 'closed' | 'invite') => void;
+  // Oda Şifresi (closed tip için)
+  roomPassword?: string;
+  onPasswordChange?: (pw: string) => void;
   entryFeeSp?: number;
   onEntryFeeChange?: (fee: number) => void;
   donationsEnabled?: boolean;
@@ -127,7 +131,7 @@ function LockedRow({ icon, label, requiredTier }: { icon: string; label: string;
       style={[s.row, { opacity: 0.35 }]}
       onPress={() => showToast({ title: `🔒 ${requiredTier}+ ile açılır`, message: `"${label}" özelliği ${requiredTier} ve üzeri üyeliklerde kullanılabilir.`, type: 'info' })}
     >
-      <View style={[s.rowIcon, { backgroundColor: `${tierDef.color}15` }]}>
+      <View style={s.rowIcon}>
         <Ionicons name={icon as any} size={17} color={tierDef.color} />
       </View>
       <View style={s.rowInfo}>
@@ -144,12 +148,12 @@ function LockedRow({ icon, label, requiredTier }: { icon: string; label: string;
 // ═══════════════════════════════════════════════════
 // SETTING ROW — glassmorphic row component
 // ═══════════════════════════════════════════════════
-function SettingRow({ icon, iconBg, label, desc, right }: {
+function SettingRow({ icon, iconBg: _iconBg, label, desc, right }: {
   icon: string; iconBg: string; label: string; desc?: string; right: React.ReactNode;
 }) {
   return (
     <View style={s.row}>
-      <View style={[s.rowIcon, { backgroundColor: iconBg }]}>
+      <View style={s.rowIcon}>
         <Ionicons name={icon as any} size={17} color="#FFF" />
       </View>
       <View style={s.rowInfo}>
@@ -210,6 +214,7 @@ export default function RoomSettingsSheet(props: RoomSettingsProps) {
     welcomeMessage, onChangeWelcomeMessage,
     speakingMode, onSpeakingModeChange,
     roomType, onRoomTypeChange,
+    roomPassword, onPasswordChange,
     entryFeeSp, onEntryFeeChange,
     donationsEnabled, onDonationsToggle,
     roomRules, onRulesChange,
@@ -234,23 +239,7 @@ export default function RoomSettingsSheet(props: RoomSettingsProps) {
   const can = (req: SubscriptionTier) => isTierAtLeast(tier, req);
   const themeEntries = Object.entries(ROOM_THEME_MAP);
 
-  // ★ Swipe-to-dismiss
-  const swipeY = React.useRef(new Animated.Value(0)).current;
-  const panResponder = React.useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => false,
-      onMoveShouldSetPanResponder: (_, g) => g.dy > 10 && Math.abs(g.dy) > Math.abs(g.dx) * 1.5,
-      onPanResponderMove: (_, g) => { if (g.dy > 0) swipeY.setValue(g.dy); },
-      onPanResponderRelease: (_, g) => {
-        if (g.dy > 100 || g.vy > 0.5) {
-          onClose();
-          swipeY.setValue(0);
-        } else {
-          Animated.spring(swipeY, { toValue: 0, useNativeDriver: true, tension: 100, friction: 12 }).start();
-        }
-      },
-    })
-  ).current;
+
 
   // ── Tab bar (horizontal scrollable) ──
   const renderTabBar = () => (
@@ -282,7 +271,11 @@ export default function RoomSettingsSheet(props: RoomSettingsProps) {
               <Pressable onPress={() => { setEditingName(false); setNewName(roomName || ''); }}><Ionicons name="close" size={16} color="#64748B" /></Pressable>
             </View>
           ) : (
-            <SettingRow icon="create" iconBg="rgba(59,130,246,0.2)" label="Oda İsmi" desc={roomName || 'Oda ismi'} right={<Pressable onPress={() => setEditingName(true)}><Ionicons name="chevron-forward" size={16} color="#475569" /></Pressable>} />
+            <SettingRow icon="create" iconBg="rgba(59,130,246,0.2)" label="Oda İsmi" desc={roomName || 'Oda ismi'} right={
+              <Pressable onPress={() => setEditingName(true)} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: 'rgba(59,130,246,0.1)', borderWidth: 1, borderColor: 'rgba(59,130,246,0.25)' }}>
+                <Ionicons name="pencil" size={11} color="#3B82F6" /><Text style={{ fontSize: 10, fontWeight: '600', color: '#3B82F6' }}>Düzenle</Text>
+              </Pressable>
+            } />
           )}
         </View>
       )}
@@ -297,7 +290,11 @@ export default function RoomSettingsSheet(props: RoomSettingsProps) {
               <Pressable onPress={() => { setEditingWelcome(false); setNewWelcome(welcomeMessage || ''); }}><Ionicons name="close" size={16} color="#64748B" /></Pressable>
             </View>
           ) : (
-            <SettingRow icon="chatbubble-ellipses" iconBg="rgba(20,184,166,0.2)" label="Hoş Geldin Mesajı" desc={welcomeMessage || 'Ayarlanmadı'} right={<Pressable onPress={() => setEditingWelcome(true)}><Ionicons name="chevron-forward" size={16} color="#475569" /></Pressable>} />
+            <SettingRow icon="chatbubble-ellipses" iconBg="rgba(20,184,166,0.2)" label="Hoş Geldin Mesajı" desc={welcomeMessage || 'Ayarlanmadı'} right={
+              <Pressable onPress={() => setEditingWelcome(true)} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: 'rgba(20,184,166,0.1)', borderWidth: 1, borderColor: 'rgba(20,184,166,0.25)' }}>
+                <Ionicons name="pencil" size={11} color="#14B8A6" /><Text style={{ fontSize: 10, fontWeight: '600', color: '#14B8A6' }}>Düzenle</Text>
+              </Pressable>
+            } />
           )}
         </View>
       )}
@@ -312,7 +309,11 @@ export default function RoomSettingsSheet(props: RoomSettingsProps) {
               <Pressable onPress={() => { setEditingRules(false); setNewRules(roomRules || ''); }}><Ionicons name="close" size={16} color="#64748B" /></Pressable>
             </View>
           ) : (
-            <SettingRow icon="document-text" iconBg="rgba(245,158,11,0.2)" label="Oda Kuralları" desc={roomRules || 'Ayarlanmadı'} right={<Pressable onPress={() => setEditingRules(true)}><Ionicons name="chevron-forward" size={16} color="#475569" /></Pressable>} />
+            <SettingRow icon="document-text" iconBg="rgba(245,158,11,0.2)" label="Oda Kuralları" desc={roomRules || 'Ayarlanmadı'} right={
+              <Pressable onPress={() => setEditingRules(true)} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: 'rgba(245,158,11,0.1)', borderWidth: 1, borderColor: 'rgba(245,158,11,0.25)' }}>
+                <Ionicons name="pencil" size={11} color="#F59E0B" /><Text style={{ fontSize: 10, fontWeight: '600', color: '#F59E0B' }}>Düzenle</Text>
+              </Pressable>
+            } />
           )}
         </View>
       )}
@@ -320,17 +321,37 @@ export default function RoomSettingsSheet(props: RoomSettingsProps) {
       {/* Oda Tipi — Plus+ (şifreli oda) */}
       {isHost && (can('Plus') ? (
         onRoomTypeChange && (
+          <>
           <SettingRow icon="globe" iconBg="rgba(59,130,246,0.2)" label={roomType === 'open' ? 'Herkese Açık' : roomType === 'closed' ? 'Şifreli Oda' : 'Davetiye ile'} desc="Oda erişim tipini değiştir"
             right={
               <View style={{ flexDirection: 'row', gap: 4 }}>
                 {(['open', 'closed', 'invite'] as const).map(t => (
                   <Pressable key={t} style={[s.slowPill, roomType === t && s.slowPillActive]} onPress={() => onRoomTypeChange(t)}>
-                    <Text style={[s.slowPillText, roomType === t && s.slowPillTextActive]}>{t === 'open' ? 'Açık' : t === 'closed' ? 'Şifreli' : 'Davet'}</Text>
+                    <Text style={[s.slowPillText, roomType === t && s.slowPillTextActive]}>{t === 'open' ? 'Herkese Açık' : t === 'closed' ? 'Şifreli' : 'Davetli'}</Text>
                   </Pressable>
                 ))}
               </View>
             }
           />
+          {roomType === 'closed' && onPasswordChange && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4, marginBottom: 4, paddingHorizontal: 4 }}>
+              <Ionicons name="key-outline" size={14} color="#F59E0B" />
+              <TextInput
+                style={{
+                  flex: 1, fontSize: 13, fontWeight: '600', color: '#F1F5F9',
+                  backgroundColor: 'rgba(255,255,255,0.06)',
+                  paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10,
+                }}
+                placeholder="Oda şifresi (min 4 karakter)"
+                placeholderTextColor="#475569"
+                value={roomPassword || ''}
+                onChangeText={onPasswordChange}
+                maxLength={20}
+                secureTextEntry
+              />
+            </View>
+          )}
+          </>
         )
       ) : <LockedRow icon="key-outline" label="Şifreli Oda Oluşturma" requiredTier="Plus" />)}
 
@@ -436,20 +457,22 @@ export default function RoomSettingsSheet(props: RoomSettingsProps) {
   // ═══ MODERASYON ═══
   const renderModeration = () => (
     <View>
-      {/* Slow Mode — Free */}
-      {isHost && onSlowModeChange && (
-        <SettingRow icon="time" iconBg="rgba(59,130,246,0.2)" label={slowModeSeconds ? `Slow Mode: ${slowModeSeconds}sn` : 'Slow Mode Kapalı'} desc="Chat mesaj aralığını sınırla"
-          right={
-            <View style={{ flexDirection: 'row', gap: 4 }}>
-              {[0, 5, 15, 30].map(sec => (
-                <Pressable key={sec} style={[s.slowPill, slowModeSeconds === sec && s.slowPillActive]} onPress={() => onSlowModeChange(sec)}>
-                  <Text style={[s.slowPillText, slowModeSeconds === sec && s.slowPillTextActive]}>{sec === 0 ? 'Off' : `${sec}s`}</Text>
-                </Pressable>
-              ))}
-            </View>
-          }
-        />
-      )}
+      {/* Slow Mode — Plus+ */}
+      {isHost && (can('Plus') ? (
+        onSlowModeChange && (
+          <SettingRow icon="time" iconBg="rgba(59,130,246,0.2)" label={slowModeSeconds ? `Slow Mode: ${slowModeSeconds}sn` : 'Slow Mode Kapalı'} desc="Chat mesaj aralığını sınırla"
+            right={
+              <View style={{ flexDirection: 'row', gap: 4 }}>
+                {[0, 5, 15, 30].map(sec => (
+                  <Pressable key={sec} style={[s.slowPill, slowModeSeconds === sec && s.slowPillActive]} onPress={() => onSlowModeChange(sec)}>
+                    <Text style={[s.slowPillText, slowModeSeconds === sec && s.slowPillTextActive]}>{sec === 0 ? 'Off' : `${sec}s`}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            }
+          />
+        )
+      ) : <LockedRow icon="time-outline" label="Slow Mode (Chat Sınırlama)" requiredTier="Plus" />)}
 
       {/* Dil Filtresi — Plus+ */}
       {isHost && (can('Plus') ? (
@@ -563,10 +586,10 @@ export default function RoomSettingsSheet(props: RoomSettingsProps) {
         )
       ) : <LockedRow icon="albums-outline" label="Oda Kapak Görseli (Banner)" requiredTier="Pro" />)}
 
-      {/* Oda Müziiği — Pro+ */}
+      {/* Oda Müziği — Pro+ (henüz ses dosyaları entegre edilmedi) */}
       {can('Pro') ? (
         isHost && onMusicChange && (
-          <SettingRow icon="musical-notes" iconBg="rgba(255,215,0,0.2)" label={musicTrack ? `Müzik: ${({ 'lofi': 'Lofi', 'ambient': 'Ambient', 'jazz': 'Jazz' })[musicTrack] || musicTrack}` : 'Oda Müziği Kapalı'} desc="Arka planda ambient ses döngüsü"
+          <SettingRow icon="musical-notes" iconBg="rgba(255,215,0,0.2)" label={musicTrack ? `Müzik: ${({ 'lofi': 'Lofi Beats', 'ambient': 'Ambient Huzur', 'jazz': 'Jazz Cafe' })[musicTrack] || musicTrack}` : 'Oda Müziği Kapalı'} desc="Arka planda ortam müziği (yakında)"
             right={
               <View style={{ flexDirection: 'row', gap: 4 }}>
                 {([null, 'lofi', 'ambient', 'jazz'] as const).map(track => (
@@ -600,7 +623,7 @@ export default function RoomSettingsSheet(props: RoomSettingsProps) {
           <SettingRow icon="cash" iconBg="rgba(212,175,55,0.2)" label={entryFeeSp ? `Giriş: ${entryFeeSp} SP` : 'Giriş Ücretsiz'} desc="SP cinsinden oda giriş ücreti"
             right={
               <View style={{ flexDirection: 'row', gap: 4 }}>
-                {[0, 10, 50, 100].map(fee => (
+                {[0, 25, 50, 100, 250, 500].map(fee => (
                   <Pressable key={fee} style={[s.slowPill, entryFeeSp === fee && s.slowPillActive]} onPress={() => onEntryFeeChange(fee)}>
                     <Text style={[s.slowPillText, entryFeeSp === fee && s.slowPillTextActive]}>{fee === 0 ? 'Free' : `${fee}`}</Text>
                   </Pressable>
@@ -611,14 +634,14 @@ export default function RoomSettingsSheet(props: RoomSettingsProps) {
         )
       ) : <LockedRow icon="cash-outline" label="Giriş Ücreti Belirleme (SP)" requiredTier="Pro" />}
 
-      {/* Oda Boost — Pro (PlusMenu'dan yapılır) */}
-      {can('Pro') ? (
+      {/* Oda Boost — Plus+ */}
+      {can('Plus') ? (
         <Pressable onPress={() => { onClose(); showToast({ title: '🚀 Boost', message: '+ menüsünden "Odayı Öne Çıkar" ile boost aktifleştir.', type: 'info' }); }}>
-          <SettingRow icon="rocket" iconBg="rgba(255,107,53,0.2)" label="Odayı Öne Çıkar" desc="+ menüsünden boost aktifleştir"
+          <SettingRow icon="rocket" iconBg="rgba(255,107,53,0.2)" label="Odayı Öne Çıkar" desc="SP harcayarak keşfette üst sıralara çık"
             right={<View style={{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, backgroundColor: 'rgba(255,107,53,0.12)', borderWidth: 1, borderColor: 'rgba(255,107,53,0.2)' }}><Text style={{ fontSize: 9, fontWeight: '700', color: '#FF6B35' }}>+ Menü</Text></View>}
           />
         </Pressable>
-      ) : <LockedRow icon="rocket-outline" label="Odayı Öne Çıkarma / Boost" requiredTier="Pro" />}
+      ) : <LockedRow icon="rocket-outline" label="Odayı Öne Çıkarma / Boost" requiredTier="Plus" />}
     </View>
   );
 
@@ -646,19 +669,29 @@ export default function RoomSettingsSheet(props: RoomSettingsProps) {
     }
   };
 
+  // ★ Swipe-to-dismiss (sadece handle+header alanı)
+  const { translateValue: swipeY, panHandlers } = useSwipeToDismiss({
+    direction: 'down',
+    threshold: 80,
+    onDismiss: onClose,
+  });
+
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={s.overlay} onPress={onClose}>
-        <Animated.View style={[s.sheet, { transform: [{ translateY: swipeY }] }]} {...panResponder.panHandlers}>
-        <Pressable onPress={e => e.stopPropagation()} style={{ flex: 1 }}>
-          {/* Handle */}
-          <View style={s.handle} />
+      <View style={s.overlay}>
+        {/* Backdrop — arkaya dokunursa modal kapansın */}
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
 
-          {/* Header */}
-          <View style={s.header}>
-            <View style={s.headerLeft}>
-              <View style={s.headerIcon}><Ionicons name="settings-outline" size={18} color="#14B8A6" /></View>
-              <Text style={s.headerTitle}>Oda Ayarları</Text>
+        {/* Sheet — sürüklenebilir */}
+        <Animated.View style={[s.sheet, { transform: [{ translateY: swipeY }] }]}>
+          {/* Handle + Header — sürükleme alanı */}
+          <View {...panHandlers} collapsable={false} style={{ paddingTop: 8, paddingBottom: 4 }}>
+            <View style={s.handle} />
+            <View style={s.header}>
+              <View style={s.headerLeft}>
+                <View style={s.headerIcon}><Ionicons name="settings-outline" size={18} color="#14B8A6" /></View>
+                <Text style={s.headerTitle}>Oda Ayarları</Text>
+              </View>
             </View>
           </View>
 
@@ -669,9 +702,8 @@ export default function RoomSettingsSheet(props: RoomSettingsProps) {
           <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 420, marginTop: 12 }}>
             {renderContent()}
           </ScrollView>
-        </Pressable>
         </Animated.View>
-      </Pressable>
+      </View>
     </Modal>
   );
 }
@@ -720,7 +752,7 @@ const s = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.04)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
   },
   tabActive: {
-    backgroundColor: 'rgba(20,184,166,0.12)', borderColor: 'rgba(20,184,166,0.3)',
+    backgroundColor: 'rgba(20,184,166,0.12)', borderWidth: 1, borderColor: 'rgba(20,184,166,0.3)',
     shadowColor: '#14B8A6', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.15, shadowRadius: 6, elevation: 2,
   },
   tabText: {
@@ -742,8 +774,6 @@ const s = StyleSheet.create({
   },
   rowIcon: {
     width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 3,
   },
   rowInfo: { flex: 1 },
   rowLabel: {
@@ -808,25 +838,22 @@ const s = StyleSheet.create({
 
   // Action CTA — Premium Gradient (myrooms.tsx Oda Oluştur tarzı)
   actionCta: {
-    marginTop: 12, borderRadius: 16, overflow: 'hidden',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.3, shadowRadius: 6,
+    marginTop: 8, borderRadius: 12, overflow: 'hidden',
   },
   actionCtaGrad: {
     flexDirection: 'row', alignItems: 'center',
-    paddingVertical: 16, paddingHorizontal: 16, gap: 12,
+    paddingVertical: 10, paddingHorizontal: 12, gap: 10,
   },
   actionCtaIcon: {
-    width: 42, height: 42, borderRadius: 14,
+    width: 30, height: 30, borderRadius: 15,
     backgroundColor: 'rgba(255,255,255,0.15)',
     alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)',
   },
   actionCtaTitle: {
-    fontSize: 15, fontWeight: '800', color: '#FFF',
-    textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
+    fontSize: 13, fontWeight: '700', color: '#FFF',
   },
   actionCtaSub: {
-    fontSize: 11, color: 'rgba(255,255,255,0.75)', marginTop: 2,
+    fontSize: 9, color: 'rgba(255,255,255,0.6)', marginTop: 1,
   },
 
   // Name Edit

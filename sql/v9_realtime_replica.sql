@@ -7,8 +7,12 @@
 ALTER TABLE room_participants REPLICA IDENTITY FULL;
 ALTER TABLE sp_transactions REPLICA IDENTITY FULL;
 
+-- ★ room_follows — oda takipçi değişikliklerini realtime dinlemek için
+ALTER TABLE room_follows REPLICA IDENTITY FULL;
+
 -- ═══ Realtime Publication kontrolü ═══
 -- Supabase Dashboard'da bu tablolar zaten realtime publication'a ekliyse
 -- aşağıdaki komut hata verebilir — güvenle yok sayılabilir.
 -- ALTER PUBLICATION supabase_realtime ADD TABLE room_participants;
 -- ALTER PUBLICATION supabase_realtime ADD TABLE sp_transactions;
+-- ALTER PUBLICATION supabase_realtime ADD TABLE room_follows;

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Image, Pressable, ActivityIndicator, TextInput, KeyboardAvoidingView, Platform, Dimensions, ScrollView, Animated, Easing, Linking, ImageBackground } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import PremiumAlert from '../../components/PremiumAlert';
 import type { AlertButton } from '../../components/PremiumAlert';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -27,11 +28,34 @@ import { useAuth } from '../_layout';
 
 const { height: SCREEN_HEIGHT, width: SCREEN_W } = Dimensions.get('window');
 
-export default function LoginScreen() {
-  const { } = useAuth();
-  const [loading, setLoading] = useState(false);
+// ★ SEC-BF2: E-posta format doğrulama
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
-  // ★ SEC-BF1: Brute force koruması — başarısız giriş denemesi takibi
+// ★ SEC-PW: Şifre gücü kontrolü
+function getPasswordStrength(pw: string): { score: number; label: string; color: string } {
+  if (!pw) return { score: 0, label: '', color: 'transparent' };
+  let score = 0;
+  if (pw.length >= 8) score++;
+  if (/[A-ZÇĞİÖŞÜ]/.test(pw)) score++;
+  if (/[0-9]/.test(pw)) score++;
+  if (/[^a-zA-Z0-9çğıöşüÇĞİÖŞÜ]/.test(pw)) score++;
+  if (pw.length >= 12) score++;
+  if (score <= 1) return { score, label: 'Zayıf', color: '#EF4444' };
+  if (score <= 2) return { score, label: 'Orta', color: '#F59E0B' };
+  if (score <= 3) return { score, label: 'İyi', color: '#3B82F6' };
+  return { score, label: 'Güçlü', color: '#10B981' };
+}
+
+// ★ SEC-BF2: AsyncStorage tabanlı kalıcı cooldown anahtarları
+const BF_ATTEMPTS_KEY = '@soprano_bf_attempts';
+const BF_COOLDOWN_KEY = '@soprano_bf_cooldown';
+
+export default function LoginScreen() {
+  const { firebaseUser } = useAuth();
+  const [loading, setLoading] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
+
+  // ★ SEC-BF2: Brute force koruması — kalıcı (AsyncStorage tabanlı)
   const failedAttemptsRef = useRef(0);
   const cooldownUntilRef = useRef(0);
 
@@ -41,6 +65,7 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
+  const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
 
   // Live stats
   const [onlineCount, setOnlineCount] = useState(0);
@@ -61,6 +86,18 @@ export default function LoginScreen() {
 
   useEffect(() => {
     GoogleSignin.configure({ webClientId: GOOGLE_WEB_CLIENT_ID });
+
+    // ★ SEC-BF2: Kalıcı cooldown/attempt değerlerini AsyncStorage'dan yükle
+    (async () => {
+      try {
+        const [storedAttempts, storedCooldown] = await Promise.all([
+          AsyncStorage.getItem(BF_ATTEMPTS_KEY),
+          AsyncStorage.getItem(BF_COOLDOWN_KEY),
+        ]);
+        if (storedAttempts) failedAttemptsRef.current = parseInt(storedAttempts, 10) || 0;
+        if (storedCooldown) cooldownUntilRef.current = parseInt(storedCooldown, 10) || 0;
+      } catch {}
+    })();
 
     (async () => {
       try {
@@ -114,8 +151,17 @@ export default function LoginScreen() {
   };
 
   const handleEmailLogin = async () => {
-    if (!email || !password) return;
-    // ★ SEC-BF1: Cooldown kontrolü — 5 başarısız denemeden sonra 30sn bekleme
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail || !password) {
+      showToast({ title: 'Eksik Bilgi', message: 'E-posta ve şifre alanlarını doldurun.', type: 'warning' });
+      return;
+    }
+    // ★ SEC-BF2: Email format kontrolü
+    if (!EMAIL_REGEX.test(trimmedEmail)) {
+      showToast({ title: 'Hata', message: 'Geçerli bir e-posta adresi girin.', type: 'error' });
+      return;
+    }
+    // ★ SEC-BF2: Kalıcı cooldown kontrolü — 5 başarısız denemeden sonra 60sn bekleme
     if (Date.now() < cooldownUntilRef.current) {
       const remainSec = Math.ceil((cooldownUntilRef.current - Date.now()) / 1000);
       showToast({ title: 'Çok fazla deneme', message: `Lütfen ${remainSec} saniye bekleyin.`, type: 'warning' });
@@ -123,44 +169,67 @@ export default function LoginScreen() {
     }
     setLoading(true);
     try {
-      await signInWithEmailAndPassword(auth, email.trim(), password);
-      failedAttemptsRef.current = 0; // Başarılı — sayacı sıfırla
+      await signInWithEmailAndPassword(auth, trimmedEmail, password);
+      // Başarılı — sayacı sıfırla ve kalıcı depolamadan temizle
+      failedAttemptsRef.current = 0;
+      cooldownUntilRef.current = 0;
+      AsyncStorage.multiRemove([BF_ATTEMPTS_KEY, BF_COOLDOWN_KEY]).catch(() => {});
     } catch (error: any) {
       failedAttemptsRef.current++;
-      // ★ SEC-BF1: 5 başarısız denemeden sonra 30sn cooldown
+      // ★ SEC-BF2: Kalıcı cooldown — uygulama yeniden başlatılsa bile korunur
       if (failedAttemptsRef.current >= 5) {
-        cooldownUntilRef.current = Date.now() + 30_000;
-        showToast({ title: 'Çok fazla deneme', message: '30 saniye bekleyip tekrar deneyin.', type: 'error' });
+        const cooldownMs = Math.min(30_000 * Math.pow(2, Math.floor(failedAttemptsRef.current / 5) - 1), 300_000); // Kademeli: 30s→60s→120s→max 5dk
+        cooldownUntilRef.current = Date.now() + cooldownMs;
+        const cooldownSec = Math.ceil(cooldownMs / 1000);
+        showToast({ title: 'Çok fazla deneme', message: `${cooldownSec} saniye bekleyip tekrar deneyin.`, type: 'error' });
       } else if (error?.code === 'auth/too-many-requests') {
         cooldownUntilRef.current = Date.now() + 60_000;
         showToast({ title: 'Hesap geçici kilitli', message: 'Çok fazla başarısız deneme. 1 dakika bekleyin.', type: 'error' });
-      } else if (error?.code === 'auth/invalid-credential' || error?.code === 'auth/wrong-password') {
-        showToast({ title: 'Hata', message: 'Kullanıcı adı veya şifre yanlış.', type: 'error' });
-      } else if (error?.code === 'auth/user-not-found') {
-        showToast({ title: 'Hata', message: 'Böyle bir kullanıcı bulunamadı.', type: 'error' });
       } else {
-        showToast({ title: 'Hata', message: 'Giriş yapılamadı. Tekrar deneyin.', type: 'error' });
+        // ★ SEC-ENUM: Tüm kimlik doğrulama hatalarında aynı mesaj — e-posta enumeration engeli
+        showToast({ title: 'Hata', message: 'E-posta veya şifre hatalı.', type: 'error' });
       }
+      // ★ SEC-BF2: Kalıcı kayıt
+      AsyncStorage.setItem(BF_ATTEMPTS_KEY, String(failedAttemptsRef.current)).catch(() => {});
+      if (cooldownUntilRef.current > 0) {
+        AsyncStorage.setItem(BF_COOLDOWN_KEY, String(cooldownUntilRef.current)).catch(() => {});
+      }
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleEmailRegister = async () => {
-    if (!email || !password || !passwordConfirm) {
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail || !password || !passwordConfirm) {
       showToast({ title: 'Eksik Bilgi', message: 'Tüm alanları doldurun.', type: 'warning' });
+      return;
+    }
+    // ★ SEC-BF2: Email format kontrolü
+    if (!EMAIL_REGEX.test(trimmedEmail)) {
+      showToast({ title: 'Hata', message: 'Geçerli bir e-posta adresi girin.', type: 'error' });
       return;
     }
     if (password !== passwordConfirm) {
       showToast({ title: 'Hata', message: 'Şifreleriniz eşleşmiyor.', type: 'error' });
       return;
     }
-    if (password.length < 6) {
-      showToast({ title: 'Hata', message: 'Şifreniz en az 6 karakter olmalıdır.', type: 'error' });
+    // ★ SEC-PW: Güçlü şifre gereksinimleri — min 8 karakter, 1 büyük harf, 1 rakam
+    if (password.length < 8) {
+      showToast({ title: 'Hata', message: 'Şifreniz en az 8 karakter olmalıdır.', type: 'error' });
+      return;
+    }
+    if (!/[A-ZÇĞİÖŞÜ]/.test(password)) {
+      showToast({ title: 'Hata', message: 'Şifreniz en az 1 büyük harf içermelidir.', type: 'error' });
+      return;
+    }
+    if (!/[0-9]/.test(password)) {
+      showToast({ title: 'Hata', message: 'Şifreniz en az 1 rakam içermelidir.', type: 'error' });
       return;
     }
     setLoading(true);
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email.trim(), password);
+      const userCredential = await createUserWithEmailAndPassword(auth, trimmedEmail, password);
       // ★ E-posta doğrulama gönder — kayıt sonrası otomatik
       if (userCredential.user) {
         try {
@@ -168,19 +237,21 @@ export default function LoginScreen() {
             url: 'https://sopranochat.com/verified',
             handleCodeInApp: false,
           });
-          showToast({ title: '✉️ Doğrulama E-postası Gönderildi', message: 'Lütfen e-posta kutunuzu kontrol edin.', type: 'success' });
-        } catch { /* doğrulama gönderilemezse sessiz — kullanıcı yine de giriş yapabilir */ }
+          showToast({ title: '✉️ Doğrulama E-postası Gönderildi', message: 'Lütfen e-posta kutunuzu kontrol edip doğrulayın.', type: 'success' });
+        } catch { /* doğrulama gönderilemezse sessiz */ }
       }
     } catch (error: any) {
+      // ★ SEC-ENUM: Kayıt hatalarında spesifik bilgi verme — enumeration engeli
       if (error?.code === 'auth/email-already-in-use') {
-        showToast({ title: 'Hata', message: 'Bu e-posta zaten kullanılıyor.', type: 'error' });
+        showToast({ title: 'Hata', message: 'Bu e-posta ile işlem yapılamadı. Giriş yapmayı deneyin.', type: 'error' });
       } else if (error?.code === 'auth/invalid-email') {
         showToast({ title: 'Hata', message: 'Geçersiz e-posta adresi.', type: 'error' });
       } else {
-        showToast({ title: 'Hata', message: 'Kayıt olunamadı.', type: 'error' });
+        showToast({ title: 'Hata', message: 'Kayıt olunamadı. Lütfen tekrar deneyin.', type: 'error' });
       }
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleForgotPassword = async () => {
@@ -190,20 +261,62 @@ export default function LoginScreen() {
       showToast({ title: 'Eksik Bilgi', message: 'Lütfen e-posta adresinizi yazın.', type: 'warning' });
       return;
     }
+    if (!EMAIL_REGEX.test(trimmed)) {
+      showToast({ title: 'Hata', message: 'Geçerli bir e-posta adresi girin.', type: 'error' });
+      return;
+    }
     setResetLoading(true);
     try {
       await sendPasswordResetEmail(auth, trimmed);
-      showToast({ title: 'Başarılı', message: 'Şifre sıfırlama bağlantısı gönderildi.', type: 'success' });
+    } catch (error: any) {
+      // ★ SEC-ENUM: Hata olsa bile aynı mesajı göster — e-posta enumeration engeli
+      if (__DEV__) console.warn('[ForgotPassword] Error:', error?.code);
+    } finally {
+      // ★ SEC-ENUM: Her durumda aynı başarı mesajını göster
+      showToast({ title: 'İşlem Tamamlandı', message: 'Hesap varsa sıfırlama bağlantısı e-postanıza gönderildi.', type: 'success' });
       setShowForgotPassword(false);
       setResetEmail('');
+      setResetLoading(false);
+    }
+  };
+
+  // ★ SEC-EV: Doğrulama e-postasını yeniden gönder
+  const handleResendVerification = async () => {
+    if (resendLoading || !firebaseUser) return;
+    setResendLoading(true);
+    try {
+      await sendEmailVerification(firebaseUser, {
+        url: 'https://sopranochat.com/verified',
+        handleCodeInApp: false,
+      });
+      showToast({ title: '✉️ Gönderildi', message: 'Doğrulama e-postası tekrar gönderildi.', type: 'success' });
     } catch (error: any) {
-      if (error?.code === 'auth/user-not-found') {
-        showToast({ title: 'Hata', message: 'Bu e-posta ile hesap bulunamadı.', type: 'error' });
+      if (error?.code === 'auth/too-many-requests') {
+        showToast({ title: 'Bekleyin', message: 'Çok fazla istek. Lütfen birkaç dakika bekleyin.', type: 'warning' });
       } else {
-        showToast({ title: 'Hata', message: 'Bir sorun oluştu.', type: 'error' });
+        showToast({ title: 'Hata', message: 'E-posta gönderilemedi.', type: 'error' });
       }
     } finally {
-      setResetLoading(false);
+      setResendLoading(false);
+    }
+  };
+
+  // ★ SEC-EV: Doğrulamadan sonra Firebase token'ı yenile
+  const handleCheckVerification = async () => {
+    if (!firebaseUser) return;
+    setLoading(true);
+    try {
+      await firebaseUser.reload();
+      if (firebaseUser.emailVerified) {
+        showToast({ title: '✅ Doğrulandı', message: 'E-postanız doğrulandı! Giriş yapılıyor...', type: 'success' });
+        // AuthGuard otomatik yönlendirecek
+      } else {
+        showToast({ title: 'Henüz Doğrulanmadı', message: 'Lütfen e-posta kutunuzu kontrol edin.', type: 'warning' });
+      }
+    } catch {
+      showToast({ title: 'Hata', message: 'Durum kontrol edilemedi.', type: 'error' });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -260,12 +373,30 @@ export default function LoginScreen() {
 
             {/* ═══ FORMS & BUTTONS ═══ */}
             <Animated.View style={{ opacity: buttonsOpacity, transform: [{ translateY: buttonsTranslateY }] }}>
+              {/* ★ SEC-EV: Doğrulanmamış e-posta uyarı banner'ı */}
+              {firebaseUser && !firebaseUser.emailVerified && firebaseUser.providerData?.some(p => p.providerId === 'password') && (
+                <View style={s.verifyBanner}>
+                  <Ionicons name="mail-unread-outline" size={22} color="#F59E0B" />
+                  <View style={{ flex: 1, marginLeft: 12 }}>
+                    <Text style={s.verifyTitle}>E-posta Doğrulanmadı</Text>
+                    <Text style={s.verifyDesc}>Devam etmek için e-postanızı doğrulayın. Spam klasörünü de kontrol edin.</Text>
+                  </View>
+                  <View style={s.verifyActions}>
+                    <Pressable onPress={handleResendVerification} disabled={resendLoading} style={s.verifyBtn}>
+                      <Text style={s.verifyBtnText}>{resendLoading ? 'Gönderiliyor...' : 'Tekrar Gönder'}</Text>
+                    </Pressable>
+                    <Pressable onPress={handleCheckVerification} style={[s.verifyBtn, s.verifyBtnPrimary]}>
+                      <Text style={[s.verifyBtnText, { color: '#FFF' }]}>Doğruladım</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              )}
               {loading ? (
                 <ActivityIndicator size="large" color="#14B8A6" style={{ marginVertical: 36 }} />
               ) : showEmailForm ? (
                 <View style={s.formArea}>
                   <View style={s.formHeader}>
-                    <Pressable onPress={() => { setShowEmailForm(false); setIsRegisterMode(false); }} style={s.backBtn}>
+                    <Pressable onPress={() => { setShowEmailForm(false); setIsRegisterMode(false); setPassword(''); setPasswordConfirm(''); setShowPassword(false); setShowPasswordConfirm(false); }} style={s.backBtn}>
                       <Ionicons name="arrow-back" size={18} color="#F1F5F9" />
                     </Pressable>
                     <Text style={s.formTitle}>{isRegisterMode ? 'Yeni Hesap Oluştur' : 'E-posta ile Giriş'}</Text>
@@ -302,6 +433,16 @@ export default function LoginScreen() {
                     </Pressable>
                   </View>
 
+                  {/* ★ SEC-PW: Kayıt modunda şifre gücü göstergesi */}
+                  {isRegisterMode && password.length > 0 && (
+                    <View style={s.strengthRow}>
+                      <View style={s.strengthTrack}>
+                        <View style={[s.strengthFill, { width: `${Math.min(getPasswordStrength(password).score * 25, 100)}%`, backgroundColor: getPasswordStrength(password).color }]} />
+                      </View>
+                      <Text style={[s.strengthLabel, { color: getPasswordStrength(password).color }]}>{getPasswordStrength(password).label}</Text>
+                    </View>
+                  )}
+
                   {isRegisterMode && (
                     <View style={s.inputWrap}>
                       <Ionicons name="lock-closed-outline" size={18} color="#64748B" style={s.inputIcon} />
@@ -311,8 +452,11 @@ export default function LoginScreen() {
                         placeholderTextColor="#475569"
                         value={passwordConfirm}
                         onChangeText={setPasswordConfirm}
-                        secureTextEntry
+                        secureTextEntry={!showPasswordConfirm}
                       />
+                      <Pressable onPress={() => setShowPasswordConfirm(!showPasswordConfirm)} style={s.eyeBtn}>
+                        <Ionicons name={showPasswordConfirm ? "eye-off-outline" : "eye-outline"} size={18} color="#64748B" />
+                      </Pressable>
                     </View>
                   )}
 
@@ -542,6 +686,12 @@ const s = StyleSheet.create({
   linkText: { fontSize: 13, color: '#14B8A6', fontWeight: '600', letterSpacing: 0.3, ...Shadows.textLight },
   forgotText: { fontSize: 12, color: '#14B8A6', fontWeight: '500', letterSpacing: 0.3, ...Shadows.textLight },
 
+  // ★ SEC-PW: Şifre gücü göstergesi
+  strengthRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14, marginTop: -6, paddingHorizontal: 2 },
+  strengthTrack: { flex: 1, height: 3, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.08)', overflow: 'hidden' },
+  strengthFill: { height: '100%', borderRadius: 2 },
+  strengthLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.3, minWidth: 40, textAlign: 'right' },
+
   // Terms — pasif bilgilendirme
   terms: {
     fontSize: 12, color: 'rgba(255,255,255,0.35)',
@@ -549,4 +699,24 @@ const s = StyleSheet.create({
     paddingHorizontal: 16, marginTop: 28,
   },
   termsLink: { color: '#14B8A6', fontWeight: '600' },
+
+  // ★ SEC-EV: E-posta doğrulama banner'ı
+  verifyBanner: {
+    backgroundColor: 'rgba(245,158,11,0.1)',
+    borderWidth: 1.5, borderColor: 'rgba(245,158,11,0.25)',
+    borderRadius: Radius.default,
+    padding: 16,
+    marginBottom: 20,
+  },
+  verifyTitle: { color: '#F59E0B', fontSize: 14, fontWeight: '700', marginBottom: 4 },
+  verifyDesc: { color: 'rgba(255,255,255,0.6)', fontSize: 12, lineHeight: 18 },
+  verifyActions: { flexDirection: 'row', gap: 10, marginTop: 12 },
+  verifyBtn: {
+    flex: 1, height: 36, borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
+    justifyContent: 'center', alignItems: 'center',
+  },
+  verifyBtnPrimary: { backgroundColor: '#14B8A6', borderColor: '#14B8A6' },
+  verifyBtnText: { fontSize: 12, fontWeight: '700', color: '#F59E0B', letterSpacing: 0.3 },
 });

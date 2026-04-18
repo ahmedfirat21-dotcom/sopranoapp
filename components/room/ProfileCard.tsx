@@ -205,7 +205,7 @@ export default function ProfileCard({
               <Text style={[sty.pillText, { color: C.primary }]}>Profili Görüntüle</Text>
             </TouchableOpacity>
             {/* ★ M6 FIX: Kendi profil — sahneden in (sahnedeyse) */}
-            {onSelfDemote && (role === 'speaker' || role === 'moderator') && (
+            {onSelfDemote && (role === 'owner' || role === 'speaker' || role === 'moderator') && (
               <TouchableOpacity style={[sty.outlinePill, { borderColor: 'rgba(239,68,68,0.2)', backgroundColor: 'rgba(239,68,68,0.06)' }]} onPress={() => { handleClose(); setTimeout(() => onSelfDemote(), 200); }} activeOpacity={0.7}>
                 <Ionicons name="arrow-down-circle-outline" size={13} color={C.red} />
                 <Text style={[sty.pillText, { color: C.red }]}>Sahneden İn</Text>

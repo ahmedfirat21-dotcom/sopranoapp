@@ -91,8 +91,21 @@ export const ProfileService = {
     return data as Profile;
   },
 
-  /** Profili öne çıkar (Boost) — süre bazlı fiyatlandırma */
+  /** Profili öne çıkar (Boost) — süre bazlı fiyatlandırma — ★ SEC-BOOST: Tier kontrolü eklendi */
   async boostProfile(userId: string, spCost: number = 25, durationHours: number = 1) {
+    // ★ SEC-BOOST: Backend tier kontrolü — Free kullanıcılar boost yapamaz
+    const { data: userProfile } = await supabase
+      .from('profiles')
+      .select('subscription_tier')
+      .eq('id', userId)
+      .single();
+    const { isTierAtLeast } = require('../constants/tiers');
+    const { migrateLegacyTier } = require('../types');
+    const userTier = migrateLegacyTier(userProfile?.subscription_tier || 'Free');
+    if (!isTierAtLeast(userTier, 'Plus')) {
+      throw new Error('Profil boost özelliği Plus ve üzeri üyeliklerde kullanılabilir.');
+    }
+
     // ★ GamificationService üzerinden harca — tek kaynak
     const { GamificationService } = require('./gamification');
     const spResult = await GamificationService.spend(userId, spCost, 'profile_boost');
@@ -231,6 +244,7 @@ export const ProfileService = {
   /**
    * ★ SP Bağışı — Kullanıcıdan kullanıcıya SP transferi
    * GamificationService üzerinden geçer — atomik, cap kontrollü, transaction kayıtlı.
+   * ★ K6: Her bağış denemesine unique externalRef verilir. Network retry'da çift harcamayı engeller.
    */
   async donateToUser(fromUserId: string, toUserId: string, amount: number): Promise<{ success: boolean; error?: string }> {
     // Validasyon
@@ -252,20 +266,67 @@ export const ProfileService = {
       }
     } catch {}
 
+    // ★ Idempotency key: aynı kaynak→hedef→miktar için bu turda unique.
+    // Transaction çifti aynı kök'ü paylaşır — debit/credit/refund hep eşleşir.
+    const donationId = `${fromUserId}:${toUserId}:${amount}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
+
     // ★ GamificationService üzerinden harca
     const { GamificationService } = require('./gamification');
-    const spResult = await GamificationService.spend(fromUserId, amount, 'donation_sent');
+    const spResult = await GamificationService.spend(fromUserId, amount, 'donation_sent', `donation_send:${donationId}`);
     if (!spResult.success) {
       return { success: false, error: spResult.error || 'Yetersiz SP' };
     }
+    // Debit duplicate olarak algılandıysa — başka bir yerde zaten işlendi, credit'i de atla
+    if (spResult.duplicate) {
+      return { success: true };
+    }
 
-    // ★ Alıcıya ver — fail olursa refund
+    // ★ Alıcıya ver — fail olursa refund (Y20: çift-katmanlı retry)
     try {
-      await GamificationService.earn(toUserId, amount, 'donation_received');
-    } catch {
-      // Alıcıya verilemedi → göndericiye iade
-      await GamificationService.earn(fromUserId, amount, 'donation_refund');
-      return { success: false, error: 'Alıcıya ulaşılamadı — SP iade edildi.' };
+      await GamificationService.earn(toUserId, amount, 'donation_received', `donation_recv:${donationId}`);
+      // ★ D6: Offline alıcı için push notification — in-app animasyon görünmeyebilir,
+      // push her koşulda bağış haberini ulaştırır. Fire-and-forget.
+      try {
+        const { PushService } = require('./push');
+        const { data: senderProfile } = await supabase
+          .from('profiles').select('display_name').eq('id', fromUserId).single();
+        const senderName = senderProfile?.display_name || 'Biri';
+        PushService.sendToUser(
+          toUserId,
+          '💎 Bağış Aldın!',
+          `${senderName} sana ${amount} SP gönderdi`,
+          { type: 'donation' as any, route: '/sp-store' },
+        );
+      } catch { /* push başarısız olsa da bağış tamamlandı, sessiz geç */ }
+    } catch (recvErr: any) {
+      // Alıcıya verilemedi — göndericiye iade dene (2 deneme)
+      let refunded = 0;
+      for (let attempt = 0; attempt < 2 && refunded <= 0; attempt++) {
+        try {
+          refunded = await GamificationService.earn(
+            fromUserId, amount, 'donation_refund', `donation_refund:${donationId}`,
+          );
+          if (refunded > 0) break;
+        } catch { /* yeniden dene */ }
+        if (attempt === 0) await new Promise(r => setTimeout(r, 300));
+      }
+      if (refunded > 0) {
+        return { success: false, error: 'Alıcıya ulaşılamadı — SP iade edildi.' };
+      }
+      // Refund da başarısız — manuel destek için log bırak
+      try {
+        await supabase.from('sp_transactions').insert({
+          user_id: fromUserId,
+          amount: 0,
+          type: 'donation_stuck',
+          description: `DONATION STUCK to=${toUserId} amount=${amount} donation_id=${donationId} recv_err=${recvErr?.message || 'unknown'}`,
+          external_ref: `donation_stuck:${donationId}`,
+        });
+      } catch { /* log da başarısızsa sessiz */ }
+      return {
+        success: false,
+        error: 'Bağış işlemi tamamlanamadı. Destek kaydı oluşturuldu; SP iadesi için lütfen destek ile iletişime geçin.',
+      };
     }
 
     return { success: true };

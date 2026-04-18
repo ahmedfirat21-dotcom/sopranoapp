@@ -4,6 +4,7 @@
  * Takip edilen odalar "Odalarım" ve "Keşfet" sayfalarında görünür.
  */
 import { supabase } from '../constants/supabase';
+import { PushService } from './push';
 import type { Room } from './database';
 
 export interface RoomFollow {
@@ -14,7 +15,7 @@ export interface RoomFollow {
 }
 
 export const RoomFollowService = {
-  /** Odayı takip et */
+  /** Odayı takip et + oda sahibine bildirim gönder */
   async follow(roomId: string, userId: string): Promise<{ success: boolean; error?: string }> {
     try {
       const { error } = await supabase.from('room_follows').upsert({
@@ -22,9 +23,67 @@ export const RoomFollowService = {
         user_id: userId,
       }, { onConflict: 'room_id,user_id' });
       if (error) throw error;
+
+      // ★ Oda sahibine bildirim gönder (arka planda, follow'u bloklamaz)
+      this._notifyRoomOwner(roomId, userId).catch(() => {});
+
       return { success: true };
     } catch (e: any) {
       return { success: false, error: e.message };
+    }
+  },
+
+  /** @internal Oda sahibine takip bildirimi gönder */
+  async _notifyRoomOwner(roomId: string, followerId: string): Promise<void> {
+    try {
+      // Oda bilgilerini çek (host_id + name)
+      const { data: room } = await supabase
+        .from('rooms')
+        .select('host_id, name')
+        .eq('id', roomId)
+        .single();
+      if (!room || !room.host_id || room.host_id === followerId) return; // Kendi odanı takip ediyorsan bildirim gönderme
+
+      // Takipçi profil bilgisini çek
+      const { data: followerProfile } = await supabase
+        .from('profiles')
+        .select('display_name')
+        .eq('id', followerId)
+        .single();
+      const followerName = followerProfile?.display_name || 'Birisi';
+      const roomName = room.name || 'Oda';
+
+      // 1. In-app notification (notifications tablosu)
+      try {
+        await supabase.from('notifications').insert({
+          user_id: room.host_id,
+          sender_id: followerId,
+          type: 'room_follow',
+          reference_id: roomId,
+          body: `🏠 ${followerName} "${roomName}" odanızı takip etmeye başladı`,
+        });
+      } catch {
+        // body kolonu yoksa body olmadan tekrar dene
+        try {
+          await supabase.from('notifications').insert({
+            user_id: room.host_id,
+            sender_id: followerId,
+            type: 'room_follow',
+            reference_id: roomId,
+          });
+        } catch { /* sessiz */ }
+      }
+
+      // 2. Push notification
+      await PushService.sendRoomFollowNotification(
+        room.host_id,
+        followerName,
+        followerId,
+        roomId,
+        roomName
+      );
+    } catch (e) {
+      if (__DEV__) console.warn('[RoomFollowService] _notifyRoomOwner error:', e);
     }
   },
 

@@ -4,11 +4,11 @@
  * Hem oda hem kullanıcı sonuçlarını listeler
  */
 import { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, Modal, Pressable, TextInput, FlatList, Image, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Modal, Pressable, TextInput, FlatList, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Radius } from '../constants/theme';
 import { supabase } from '../constants/supabase';
-import { getAvatarSource } from '../constants/avatars';
+import StatusAvatar from './StatusAvatar';
 import type { Profile } from '../services/database';
 
 type UserSearchModalProps = {
@@ -97,10 +97,16 @@ export function UserSearchModal({ visible, onClose, currentUserId, onSelectUser,
     if (searchQuery.length < 2) { setResults([]); return; }
     setLoading(true);
     try {
+      // ★ SEC-SEARCH: ilike wildcard karakterlerini escape et — SQL injection önleme
+      const sanitized = searchQuery
+        .replace(/\\/g, '\\\\')  // Backslash
+        .replace(/%/g, '\\%')    // Wildcard %
+        .replace(/_/g, '\\_');   // Wildcard _
+
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
-        .or(`display_name.ilike.%${searchQuery}%,username.ilike.%${searchQuery}%`)
+        .or(`display_name.ilike.%${sanitized}%,username.ilike.%${sanitized}%`)
         .neq('id', currentUserId)
         .limit(20);
       if (error) throw error;
@@ -111,7 +117,7 @@ export function UserSearchModal({ visible, onClose, currentUserId, onSelectUser,
         const { data: rooms } = await supabase
           .from('rooms')
           .select('id, name, category, is_live, listener_count, host:profiles!host_id(display_name, avatar_url)')
-          .ilike('name', `%${searchQuery}%`)
+          .ilike('name', `%${sanitized}%`)
           .eq('is_live', true)
           .limit(10);
         setRoomResults(rooms || []);
@@ -144,10 +150,7 @@ export function UserSearchModal({ visible, onClose, currentUserId, onSelectUser,
         onClose();
       }}
     >
-      <View style={s.avatarWrap}>
-        <Image source={getAvatarSource(item.avatar_url)} style={s.avatar} />
-        {item.is_online && <View style={s.onlineDot} />}
-      </View>
+      <StatusAvatar uri={item.avatar_url} size={48} isOnline={item.is_online} tier={item.subscription_tier} />
       <View style={s.userInfo}>
         <Text style={s.displayName}>{item.display_name || 'Kullanıcı'}</Text>
         {item.username && <Text style={s.username}>@{item.username}</Text>}
@@ -267,10 +270,7 @@ export function UserSearchModal({ visible, onClose, currentUserId, onSelectUser,
                               style={({ pressed }) => [s.userRow, pressed && { opacity: 0.8, backgroundColor: 'rgba(92,225,230,0.06)' }]}
                               onPress={() => { onSelectUser(item.id, item.display_name || 'Kullanıcı'); onClose(); }}
                             >
-                              <View style={s.avatarWrap}>
-                                <Image source={getAvatarSource(item.avatar_url)} style={s.avatar} />
-                                {item.is_online && <View style={s.onlineDot} />}
-                              </View>
+                              <StatusAvatar uri={item.avatar_url} size={48} isOnline={item.is_online} tier={item.subscription_tier} />
                               <View style={s.userInfo}>
                                 <Text style={s.displayName}>{item.display_name || 'Kullanıcı'}</Text>
                                 {item.username && <Text style={s.username}>@{item.username}</Text>}
@@ -294,10 +294,7 @@ export function UserSearchModal({ visible, onClose, currentUserId, onSelectUser,
                               style={({ pressed }) => [s.userRow, pressed && { opacity: 0.8, backgroundColor: 'rgba(92,225,230,0.06)' }]}
                               onPress={() => { onSelectUser(item.id, item.display_name || 'Kullanıcı'); onClose(); }}
                             >
-                              <View style={s.avatarWrap}>
-                                <Image source={getAvatarSource(item.avatar_url)} style={s.avatar} />
-                                {item.is_online && <View style={s.onlineDot} />}
-                              </View>
+                              <StatusAvatar uri={item.avatar_url} size={48} isOnline={item.is_online} tier={item.subscription_tier} />
                               <View style={s.userInfo}>
                                 <Text style={s.displayName}>{item.display_name || 'Kullanıcı'}</Text>
                                 {item.username && <Text style={s.username}>@{item.username}</Text>}

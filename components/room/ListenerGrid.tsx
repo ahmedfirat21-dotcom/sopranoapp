@@ -1,14 +1,32 @@
 import React, { useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, Pressable, Image, Dimensions, Animated, Easing } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { getAvatarSource } from '../../constants/avatars';
+import AvatarPenaltyFlash, { type FlashType } from './AvatarPenaltyFlash';
 import type { RoomParticipant } from '../../services/database';
 
 const { width: W } = Dimensions.get('window');
-const COLS = 5;
-const AVATAR_GAP = 10;
-const CELL_W = Math.floor((W - 32 - AVATAR_GAP * (COLS - 1)) / COLS);
-const AVATAR_SIZE = CELL_W - 10;
+
+// ★ Dinamik boyutlandırma — modern platform grid sistemi (Clubhouse/Spaces pattern)
+// Sayı arttıkça avatar küçülür, sütun artar
+function getGridMetrics(listenerCount: number) {
+  let cols: number, avatarGap: number;
+  if (listenerCount <= 4) {
+    cols = 4; avatarGap = 12;
+  } else if (listenerCount <= 8) {
+    cols = 4; avatarGap = 10;
+  } else if (listenerCount <= 15) {
+    cols = 5; avatarGap = 8;
+  } else if (listenerCount <= 24) {
+    cols = 6; avatarGap = 6;
+  } else {
+    cols = 7; avatarGap = 4; // 25+ compact
+  }
+  const cellW = Math.floor((W - 32 - avatarGap * (cols - 1)) / cols);
+  const avatarSize = cellW - (listenerCount <= 8 ? 12 : listenerCount <= 15 ? 10 : 6);
+  return { cols, avatarGap, cellW, avatarSize };
+}
 
 interface Props {
   listeners: RoomParticipant[];
@@ -21,31 +39,110 @@ interface Props {
   spectatorCount?: number;
   /** Oda sahibi user_id — dinleyiciye indiğinde taç gösterilir */
   roomOwnerId?: string;
+  /** Per-user avatar flash state */
+  avatarFlashes?: Record<string, FlashType | null>;
+  onFlashDone?: (userId: string) => void;
+  /** Mikrofon isteği gönderen kullanıcı ID'leri */
+  micRequestUserIds?: string[];
 }
 
-export default function ListenerGrid({ listeners, onSelectUser, selectedUserId, onShowAllUsers, maxListeners = 20, spectatorCount = 0, roomOwnerId }: Props) {
+// ★ O10 FIX: Cell bileşeni React.memo ile sarıldı — 100+ listener'da stable props'lu
+// cell'ler re-render etmeyecek. Dependency'ler: avatar, role, is_muted, is_chat_muted,
+// selected, flash, hasHandRaised.
+type CellProps = {
+  u: RoomParticipant;
+  cellW: number;
+  avatarSize: number;
+  nameSize: number;
+  isSelected: boolean;
+  isOwner: boolean;
+  showMuteIndicator: boolean;
+  isChatMuted: boolean;
+  flash: FlashType | null;
+  hasHandRaised: boolean;
+  onSelectUser: (u: RoomParticipant) => void;
+  onFlashDone?: (userId: string) => void;
+};
+const ListenerCell = React.memo(function ListenerCell({
+  u, cellW, avatarSize, nameSize, isSelected, isOwner, showMuteIndicator,
+  isChatMuted, flash, hasHandRaised, onSelectUser, onFlashDone,
+}: CellProps) {
+  return (
+    <Pressable style={[s.cell, { width: cellW }]} onPress={() => onSelectUser(u)}>
+      {isOwner && <ListenerOwnerBadge />}
+      <View style={[s.avatarWrap, { width: avatarSize, height: avatarSize, borderRadius: avatarSize / 2 }, isSelected && s.avatarSelected, isOwner && s.avatarOwner, showMuteIndicator && s.avatarMuted]}>
+        <Image source={getAvatarSource((u as any).disguise?.avatar_url || u.user?.avatar_url)} style={s.avatar} />
+      </View>
+      {showMuteIndicator && (
+        <View style={[s.mutedBadge, { right: (cellW - avatarSize) / 2 - 6 }]}>
+          <Ionicons name="volume-mute" size={9} color="#FFF" />
+        </View>
+      )}
+      {isChatMuted && (
+        <View style={[s.chatMutedBadge, { left: (cellW - avatarSize) / 2 - 6 }]}>
+          <Ionicons name="chatbox-outline" size={8} color="#FFF" />
+        </View>
+      )}
+      {flash && <View style={[s.flashWrap, { height: avatarSize }]}><AvatarPenaltyFlash flashType={flash} size={avatarSize} onFlashDone={() => onFlashDone?.(u.user_id)} /></View>}
+      {hasHandRaised && <HandRaiseBadge />}
+      <Text style={[s.name, { fontSize: nameSize, maxWidth: cellW }, isOwner && { color: '#FFD700', fontWeight: '700' }, showMuteIndicator && { color: 'rgba(239,68,68,0.6)' }]} numberOfLines={1}>
+        {(u as any).disguise?.display_name || u.user?.display_name || 'Misafir'}
+      </Text>
+    </Pressable>
+  );
+});
+
+export default function ListenerGrid({ listeners, onSelectUser, selectedUserId, onShowAllUsers, maxListeners = 20, spectatorCount = 0, roomOwnerId, avatarFlashes, onFlashDone, micRequestUserIds = [] }: Props) {
   if (listeners.length === 0 && spectatorCount === 0) return null;
 
-  // ★ Owner'u en başa taşı
+  // ★ Hiyerarşik sıralama — modern platform pattern (Clubhouse/Spaces)
+  // 1. Oda sahibi (owner) en başta
+  // 2. El kaldıranlar (mic request) — aktif katılım göstergesi
+  // 3. Moderatörler — yetki sırası
+  // 4. Diğer dinleyiciler — katılış sırasına göre
   const sortedListeners = React.useMemo(() => {
-    if (!roomOwnerId) return listeners;
     return [...listeners].sort((a, b) => {
+      // Owner her zaman ilk
       if (a.user_id === roomOwnerId) return -1;
       if (b.user_id === roomOwnerId) return 1;
+      // El kaldıranlar ikinci
+      const aHand = micRequestUserIds.includes(a.user_id) ? 1 : 0;
+      const bHand = micRequestUserIds.includes(b.user_id) ? 1 : 0;
+      if (aHand !== bHand) return bHand - aHand;
+      // Moderatörler üçüncü
+      const aIsMod = a.role === 'moderator' ? 1 : 0;
+      const bIsMod = b.role === 'moderator' ? 1 : 0;
+      if (aIsMod !== bIsMod) return bIsMod - aIsMod;
+      // Diğerleri — katılış sırasına göre (stabil sort)
       return 0;
     });
-  }, [listeners, roomOwnerId]);
+  }, [listeners, roomOwnerId, micRequestUserIds]);
 
   // ★ Tier bazlı max grid kapasitesi — sadece listener'lar gösterilir
   const visibleListeners = sortedListeners.slice(0, maxListeners);
   const overflowListeners = listeners.length - maxListeners;
   const overflowCount = Math.max(0, overflowListeners) + spectatorCount;
 
+  // ★ Dinamik boyut hesapla
+  const { avatarGap, cellW, avatarSize } = getGridMetrics(visibleListeners.length);
+  const nameSize = visibleListeners.length > 12 ? 9 : visibleListeners.length > 8 ? 10 : 11;
+
   return (
     <View style={s.wrap}>
-      {/* Başlık — "Dinleyiciler (N)" + 👥 simge */}
+      {/* Başlık — SpeakerSection ile tutarlı pill format */}
       <View style={s.headerRow}>
-        <Text style={s.title}>Dinleyiciler ({listeners.length})</Text>
+        <View style={s.headerPill}>
+          <LinearGradient
+            colors={['rgba(20,184,166,0.08)', 'rgba(20,184,166,0.02)', 'transparent']}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+            style={StyleSheet.absoluteFill}
+          />
+          <Ionicons name="headset" size={11} color="#14B8A6" />
+          <Text style={s.headerTitle}>Dinleyiciler</Text>
+          <View style={s.headerCount}>
+            <Text style={s.headerCountText}>{listeners.length}</Text>
+          </View>
+        </View>
         {onShowAllUsers && (
           <Pressable style={s.allUsersBtn} onPress={onShowAllUsers} hitSlop={10}>
             <Ionicons name="people" size={14} color="#14B8A6" />
@@ -53,32 +150,39 @@ export default function ListenerGrid({ listeners, onSelectUser, selectedUserId, 
           </Pressable>
         )}
       </View>
-      <View style={s.grid}>
+      <View style={[s.grid, { gap: avatarGap }]}>
         {visibleListeners.map((u) => {
           const isSelected = selectedUserId === u.user_id;
           const isOwner = u.user_id === roomOwnerId;
+          const isMuted = (u as any).is_muted || false;
+          const isChatMuted = (u as any).is_chat_muted || false;
+          const flash = avatarFlashes?.[u.user_id] || null;
+          const showMuteIndicator = isMuted && u.role !== 'listener';
+          const hasHandRaised = micRequestUserIds.includes(u.user_id);
           return (
-            <Pressable key={u.id} style={s.cell} onPress={() => onSelectUser(u)}>
-              {/* ★ Owner taç — küçük versiyon */}
-              {isOwner && <ListenerCrown />}
-              <View style={[s.avatarWrap, isSelected && s.avatarSelected, isOwner && s.avatarOwner]}>
-                <Image
-                  source={getAvatarSource((u as any).disguise?.avatar_url || u.user?.avatar_url)}
-                  style={s.avatar}
-                />
-              </View>
-              <Text style={[s.name, isOwner && { color: '#FFD700', fontWeight: '700' }]} numberOfLines={1}>
-                {(u as any).disguise?.display_name || u.user?.display_name || 'Misafir'}
-              </Text>
-            </Pressable>
+            <ListenerCell
+              key={u.id}
+              u={u}
+              cellW={cellW}
+              avatarSize={avatarSize}
+              nameSize={nameSize}
+              isSelected={isSelected}
+              isOwner={isOwner}
+              showMuteIndicator={showMuteIndicator}
+              isChatMuted={isChatMuted}
+              flash={flash}
+              hasHandRaised={hasHandRaised}
+              onSelectUser={onSelectUser}
+              onFlashDone={onFlashDone}
+            />
           );
         })}
         {overflowCount > 0 && (
-          <Pressable style={s.cell} onPress={onShowAllUsers}>
-            <View style={[s.avatarWrap, { backgroundColor: 'rgba(20,184,166,0.1)', alignItems: 'center', justifyContent: 'center' }]}>
-              <Text style={{ color: '#14B8A6', fontSize: 14, fontWeight: '700' }}>+{overflowCount}</Text>
+          <Pressable style={[s.cell, { width: cellW }]} onPress={onShowAllUsers}>
+            <View style={[s.avatarWrap, { width: avatarSize, height: avatarSize, borderRadius: avatarSize / 2, backgroundColor: 'rgba(20,184,166,0.1)', alignItems: 'center', justifyContent: 'center' }]}>
+              <Text style={{ color: '#14B8A6', fontSize: avatarSize > 50 ? 14 : 11, fontWeight: '700' }}>+{overflowCount}</Text>
             </View>
-            <Text style={[s.name, { color: '#14B8A6' }]}>Seyirci</Text>
+            <Text style={[s.name, { color: '#14B8A6', fontSize: nameSize }]}>Seyirci</Text>
           </Pressable>
         )}
       </View>
@@ -97,11 +201,25 @@ const s = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 12,
   },
-  title: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#F1F5F9',
+  headerPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    alignSelf: 'flex-start',
+    paddingHorizontal: 10, paddingVertical: 5,
+    borderRadius: 10,
+    backgroundColor: 'rgba(20,184,166,0.06)',
+    borderWidth: 0.8,
+    borderColor: 'rgba(20,184,166,0.12)',
+    overflow: 'hidden',
   },
+  headerTitle: {
+    fontSize: 12, fontWeight: '700', color: '#CBD5E1', letterSpacing: 0.5,
+    textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
+  },
+  headerCount: {
+    backgroundColor: 'rgba(20,184,166,0.15)', borderRadius: 8,
+    paddingHorizontal: 6, paddingVertical: 1,
+  },
+  headerCountText: { fontSize: 10, fontWeight: '800', color: '#14B8A6' },
   allUsersBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -121,17 +239,14 @@ const s = StyleSheet.create({
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: AVATAR_GAP,
   },
   cell: {
-    width: CELL_W,
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: 6,
+    overflow: 'visible',
+    paddingTop: 8,
   },
   avatarWrap: {
-    width: AVATAR_SIZE,
-    height: AVATAR_SIZE,
-    borderRadius: AVATAR_SIZE / 2,
     overflow: 'hidden',
     borderWidth: 2,
     borderColor: 'rgba(20,184,166,0.25)',
@@ -146,54 +261,153 @@ const s = StyleSheet.create({
     shadowRadius: 8,
     elevation: 8,
   },
+  avatarMuted: {
+    borderColor: 'rgba(239,68,68,0.4)',
+    opacity: 0.7,
+  },
+  mutedBadge: {
+    position: 'absolute', top: 4,
+    width: 20, height: 20, borderRadius: 10,
+    backgroundColor: '#EF4444',
+    borderWidth: 2, borderColor: 'rgba(15,23,42,0.9)',
+    alignItems: 'center', justifyContent: 'center', zIndex: 15,
+    shadowColor: '#EF4444', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.6, shadowRadius: 4, elevation: 8,
+  },
+  chatMutedBadge: {
+    position: 'absolute', top: 4,
+    width: 20, height: 20, borderRadius: 10,
+    backgroundColor: '#F97316',
+    borderWidth: 2, borderColor: 'rgba(15,23,42,0.9)',
+    alignItems: 'center', justifyContent: 'center', zIndex: 15,
+    shadowColor: '#F97316', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.6, shadowRadius: 4, elevation: 8,
+  },
+  flashWrap: {
+    position: 'absolute', top: 8, left: 0, right: 0,
+    alignItems: 'center', justifyContent: 'center',
+    zIndex: 25,
+  },
   avatar: {
     width: '100%',
     height: '100%',
   },
   name: {
-    fontSize: 11,
     color: 'rgba(255,255,255,0.7)',
     fontWeight: '500',
-    marginTop: 5,
+    marginTop: 4,
     textAlign: 'center',
   },
   avatarOwner: {
     borderColor: 'rgba(255,215,0,0.45)',
   },
-  crownSmall: {
+  listenerBadgeContainer: {
     position: 'absolute',
-    top: -6, left: -2,
+    top: -4, left: -4,
     zIndex: 20,
-    shadowColor: '#FFD700',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.5,
-    shadowRadius: 4,
-    elevation: 6,
+    width: 20, height: 20,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  listenerGlowRing: {
+    position: 'absolute', width: 24, height: 24, borderRadius: 12,
+    backgroundColor: 'transparent',
+    borderWidth: 1, borderColor: 'rgba(255,215,0,0.45)',
+    shadowColor: '#FFD700', shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.7, shadowRadius: 6, elevation: 4,
+  },
+  listenerBadgeBody: {
+    width: 18, height: 18, borderRadius: 9,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)',
+    shadowColor: '#FFD700', shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.6, shadowRadius: 4, elevation: 6,
+  },
+  listenerSparkleOrbit: {
+    position: 'absolute', width: 20, height: 20,
+    alignItems: 'center', justifyContent: 'flex-start',
+  },
+  listenerSparkleDot: {
+    width: 3, height: 3, borderRadius: 1.5,
+    backgroundColor: '#FFFACD',
+    shadowColor: '#FFF', shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 1, shadowRadius: 2, elevation: 3,
+  },
+  handRaiseBadge: {
+    position: 'absolute',
+    top: 4, left: 2,
+    zIndex: 20,
   },
 });
 
-// ★ Küçük taç animasyonu — dinleyici avatarlarında
-function ListenerCrown() {
-  const rotateAnim = useRef(new Animated.Value(0)).current;
+function ListenerOwnerBadge() {
+  const glowAnim = useRef(new Animated.Value(0.5)).current;
+  const floatAnim = useRef(new Animated.Value(0)).current;
+  const orbitAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    // Golden glow pulse
+    Animated.loop(Animated.sequence([
+      Animated.timing(glowAnim, { toValue: 1, duration: 1800, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      Animated.timing(glowAnim, { toValue: 0.5, duration: 1800, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+    ])).start();
+    // Float
+    Animated.loop(Animated.sequence([
+      Animated.timing(floatAnim, { toValue: -1, duration: 1400, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      Animated.timing(floatAnim, { toValue: 1, duration: 1400, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+    ])).start();
+    // Orbit
+    Animated.loop(Animated.timing(orbitAnim, {
+      toValue: 1, duration: 4000, easing: Easing.linear, useNativeDriver: true,
+    })).start();
+  }, []);
+
+  const rotateSparkle = orbitAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
+
+  return (
+    <Animated.View style={[s.listenerBadgeContainer, { transform: [{ translateY: floatAnim }] }]}>
+      <Animated.View style={[s.listenerGlowRing, { opacity: glowAnim }]} />
+      <LinearGradient
+        colors={['#FFD700', '#F59E0B', '#D97706']}
+        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+        style={s.listenerBadgeBody}
+      >
+        <Ionicons name="star" size={10} color="#FFF" />
+      </LinearGradient>
+      <Animated.View style={[s.listenerSparkleOrbit, { transform: [{ rotate: rotateSparkle }] }]}>
+        <View style={s.listenerSparkleDot} />
+      </Animated.View>
+    </Animated.View>
+  );
+}
+
+// ★ El kaldırma animasyonlu badge — mikrofon isteği gönderen dinleyicilerde
+function HandRaiseBadge() {
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const bounceAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    // Pulse animasyonu — dikkat çekici
     Animated.loop(
       Animated.sequence([
-        Animated.timing(rotateAnim, { toValue: 1, duration: 1400, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-        Animated.timing(rotateAnim, { toValue: -1, duration: 1400, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-        Animated.timing(rotateAnim, { toValue: 0, duration: 1400, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1.25, duration: 600, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 600, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      ])
+    ).start();
+    // Yukarı-aşağı sallama
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(bounceAnim, { toValue: -3, duration: 400, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(bounceAnim, { toValue: 0, duration: 400, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
       ])
     ).start();
   }, []);
 
-  const rotate = rotateAnim.interpolate({
-    inputRange: [-1, 0, 1],
-    outputRange: ['-18deg', '-15deg', '-12deg'],
-  });
-
   return (
-    <Animated.View style={[s.crownSmall, { transform: [{ rotate }] }]}>
-      <MaterialCommunityIcons name="crown" size={18} color="#FFD700" />
+    <Animated.View style={[s.handRaiseBadge, { transform: [{ scale: pulseAnim }, { translateY: bounceAnim }] }]}>
+      <Text style={{ fontSize: 14 }}>✋</Text>
     </Animated.View>
   );
 }

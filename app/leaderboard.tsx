@@ -22,6 +22,7 @@ import { safeGoBack } from '../constants/navigation';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../constants/supabase';
 import { getAvatarSource, getLevelFromSP, getTierBadgeInfo } from '../constants/avatars';
+import StatusAvatar from '../components/StatusAvatar';
 import { Colors } from '../constants/theme';
 import AppBackground from '../components/AppBackground';
 
@@ -207,7 +208,7 @@ function LeaderListItem({ entry, rank, label }: { entry: LeaderEntry; rank: numb
         <View style={[liS.rankCircle, { borderColor: rankColor + '50' }]}>
           <Text style={[liS.rankText, { color: rankColor }]}>{rank}</Text>
         </View>
-        <Image source={getAvatarSource(entry.avatar_url)} style={liS.avatar} />
+        <StatusAvatar uri={entry.avatar_url} size={46} tier={entry.tier} />
         <View style={liS.info}>
           <Text style={liS.name} numberOfLines={1}>{entry.display_name}</Text>
           <Text style={liS.sub}>{label}: {entry.count.toLocaleString()}</Text>
@@ -261,7 +262,7 @@ function RoomListItem({ entry, rank }: { entry: RoomEntry; rank: number }) {
       <View style={[rlS.rankCircle, { borderColor: rankColor + '50' }]}>
         <Text style={[rlS.rankText, { color: rankColor }]}>{rank}</Text>
       </View>
-      <Image source={getAvatarSource(entry.host_avatar)} style={rlS.avatar} />
+      <StatusAvatar uri={entry.host_avatar} size={46} />
       <View style={rlS.info}>
         <Text style={rlS.name} numberOfLines={1}>{entry.room_name}</Text>
         <Text style={rlS.sub}>{entry.host_name} · {entry.count} katılımcı</Text>
@@ -330,11 +331,12 @@ export default function LeaderboardScreen() {
     try {
       const cutoff = getDateCutoff(period);
 
-      // ★ 1. En Zengin — SP sıralaması
+      // ★ 1. En Zengin — SP sıralaması (O8: GodMaster/admin hesaplar leaderboard'da görünmemeli)
       const { data: spData } = await supabase
         .from('profiles')
-        .select('id, display_name, avatar_url, subscription_tier, system_points')
+        .select('id, display_name, avatar_url, subscription_tier, system_points, is_admin')
         .gt('system_points', 0)
+        .neq('is_admin', true)
         .order('system_points', { ascending: false })
         .limit(10);
 
@@ -350,10 +352,10 @@ export default function LeaderboardScreen() {
         setTopReceivers([]);
       }
 
-      // ★ 2. En Popüler — En çok takipçisi olan
+      // ★ 2. En Popüler — En çok takipçisi olan (O8: admin'leri hariç tut)
       const { data: friendData } = await supabase
         .from('friendships')
-        .select('friend_id, friend:profiles!friendships_friend_id_fkey(display_name, avatar_url, subscription_tier)')
+        .select('friend_id, friend:profiles!friendships_friend_id_fkey(display_name, avatar_url, subscription_tier, is_admin)')
         .eq('status', 'accepted');
 
       if (friendData) {
@@ -361,6 +363,7 @@ export default function LeaderboardScreen() {
         friendData.forEach((f: any) => {
           const uid = f.friend_id;
           const profile = Array.isArray(f.friend) ? f.friend[0] : f.friend;
+          if (profile?.is_admin) return; // GodMaster filtre
           if (!followerMap[uid]) {
             followerMap[uid] = {
               user_id: uid,
@@ -408,10 +411,10 @@ export default function LeaderboardScreen() {
         setTopRooms([]);
       }
 
-      // ★ 4. En Aktif — en çok oda açanlar (host_id)
+      // ★ 4. En Aktif — en çok oda açanlar (O8: admin host hariç)
       let creatorQuery = supabase
         .from('rooms')
-        .select('host_id, host:profiles!host_id(display_name, avatar_url, subscription_tier)');
+        .select('host_id, host:profiles!host_id(display_name, avatar_url, subscription_tier, is_admin)');
       if (cutoff) creatorQuery = creatorQuery.gte('created_at', cutoff);
       const { data: roomsCreated } = await creatorQuery;
 
@@ -420,6 +423,7 @@ export default function LeaderboardScreen() {
         roomsCreated.forEach((r: any) => {
           const uid = r.host_id;
           const profile = Array.isArray(r.host) ? r.host[0] : r.host;
+          if (profile?.is_admin) return;
           if (!creatorMap[uid]) {
             creatorMap[uid] = {
               user_id: uid,
@@ -447,6 +451,22 @@ export default function LeaderboardScreen() {
   useEffect(() => {
     setLoading(true);
     loadData();
+  }, [loadData]);
+
+  // ★ O8 FIX: sp_transactions'ta yeni hareket olunca leaderboard'u tazele.
+  // Debounce 3sn — aşırı refresh önleme.
+  useEffect(() => {
+    let t: any;
+    const schedule = () => {
+      if (t) clearTimeout(t);
+      t = setTimeout(() => loadData(), 3000);
+    };
+    const channelName = `leaderboard_rt_${Date.now()}`;
+    const ch = supabase
+      .channel(channelName)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'sp_transactions' }, schedule)
+      .subscribe();
+    return () => { if (t) clearTimeout(t); supabase.removeChannel(ch); };
   }, [loadData]);
 
   const handleRefresh = useCallback(() => {

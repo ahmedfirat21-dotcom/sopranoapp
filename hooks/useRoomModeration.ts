@@ -8,13 +8,24 @@ import { RoomService, getRoomLimits } from '../services/database';
 import { migrateLegacyTier } from '../types';
 import { ModerationService } from '../services/moderation';
 import { supabase } from '../constants/supabase';
-// ★ TOAST KALDIRMA: Oda içinde toast bildirimi yok
-const showToast = (_opts: { title?: string; message?: string; type?: string }) => {};
+import { showToast as _globalToast } from '../components/Toast';
+// ★ BUG FIX: Tamamen bastırmak yerine akıllı filtre — sadece önemli olanları göster
+const showToast = (opts: { title?: string; message?: string; type?: string }) => {
+  if (opts.type === 'error' || opts.type === 'warning') {
+    _globalToast({ title: opts.title || '', message: opts.message, type: opts.type, duration: 2500 });
+    return;
+  }
+  const important = /silindi|donduruldu|sahne|ayrıl|host|boost|ban|sustur|takip|bağış|SP|kick|süre|engel|şikayet|moderatör/i;
+  if (opts.title && important.test(opts.title)) {
+    _globalToast({ title: opts.title, message: opts.message, type: (opts.type as any) || 'success', duration: 2000 });
+  }
+};
 import { UpsellService } from '../services/upsell';
 import type { RoomParticipant, Room } from '../services/database';
 import type { SubscriptionTier, ParticipantRole } from '../types';
 import type { AlertButton, AlertType } from '../components/PremiumAlert';
 import type { RoomMessage } from '../services/roomChat';
+import type { FlashType } from '../components/room/AvatarPenaltyFlash';
 
 type AlertConfig = {
   visible: boolean;
@@ -38,6 +49,8 @@ type UseRoomModerationParams = {
   setChatMessages: React.Dispatch<React.SetStateAction<RoomMessage[]>>;
   setAlertConfig: React.Dispatch<React.SetStateAction<AlertConfig>>;
   lk: { isMicrophoneEnabled?: boolean; toggleMic: () => Promise<any> };
+  /** ★ Avatar flash tetikleme — moderasyon yapan kişi hedefin avatarında flash görür */
+  setAvatarFlash?: (userId: string, flashType: FlashType) => void;
 };
 
 export function useRoomModeration({
@@ -53,6 +66,7 @@ export function useRoomModeration({
   setChatMessages,
   setAlertConfig,
   lk,
+  setAvatarFlash,
 }: UseRoomModerationParams) {
 
   // ========== SAHNEYE AL (Listener → Speaker) ==========
@@ -96,10 +110,10 @@ export function useRoomModeration({
               payload: { action: 'kick', targetUserId: userId, reason: `${displayName} odadan çıkarıldı.` },
             });
             await RoomService.leave(roomId, userId);
-            // BUG FIX: Kick sonrası yerel state'den de kaldır
-            setParticipants(prev => prev.filter(p => p.user_id !== userId));
+            // BUG FIX: Kick sonrası yerel state'den de kaldır — flash ile gecikme
+            setAvatarFlash?.(userId, 'kick');
             setSelectedUser(null);
-            showToast({ title: 'Çıkarıldı', message: `${displayName} odadan çıkarıldı`, type: 'success' });
+            setTimeout(() => setParticipants(prev => prev.filter(p => p.user_id !== userId)), 1500);
             const sysMsg = {
               id: `sys_kick_${userId}_${Date.now()}`,
               room_id: roomId,
@@ -111,7 +125,7 @@ export function useRoomModeration({
             } as any;
             setChatMessages(prev => [sysMsg, ...prev].slice(0, 100));
           } catch (e) {
-            showToast({ title: 'Hata', message: 'Kullanıcı çıkarılamadı', type: 'error' });
+            // silent — hata durumunda UI stale kalabilir
           }
         }}
       ]
@@ -120,21 +134,21 @@ export function useRoomModeration({
 
   // ========== METİN SUSTURMA (Chat Mute) ==========
   const handleToggleChatMute = useCallback(async (userId: string, displayName: string, currentMuted: boolean) => {
+    // ★ O12: Optimistic update — önce UI'ı güncelle, başarısızsa rollback.
+    // Action'ın hissi anında olsun; DB gecikmesinde mod kullanıcı bekletilmeyi yaşamasın.
+    setParticipants(prev => prev.map(p => p.user_id === userId ? { ...p, is_chat_muted: !currentMuted } : p));
+    setAvatarFlash?.(userId, !currentMuted ? 'chat_mute' : 'chat_unmute');
+    setSelectedUser(null);
     try {
       await RoomService.setChatMute(roomId, userId, !currentMuted);
       modChannelRef.current?.send({
         type: 'broadcast', event: 'mod_action',
         payload: { action: !currentMuted ? 'chat_mute' : 'chat_unmute', targetUserId: userId },
       });
-      setParticipants(prev => prev.map(p => p.user_id === userId ? { ...p, is_chat_muted: !currentMuted } : p));
-      setSelectedUser(null);
-      showToast({
-        title: !currentMuted ? 'Metin Susturuldu' : 'Metin Açıldı',
-        message: !currentMuted ? `${displayName} artık mesaj yazamaz` : `${displayName} artık mesaj yazabilir`,
-        type: 'success'
-      });
-    } catch (e) {
-      showToast({ title: 'Hata', message: 'İşlem başarısız', type: 'error' });
+    } catch (e: any) {
+      // Rollback + kullanıcıya bildir
+      setParticipants(prev => prev.map(p => p.user_id === userId ? { ...p, is_chat_muted: currentMuted } : p));
+      showToast({ title: 'İşlem Başarısız', message: e?.message || 'Sohbet susturma uygulanamadı.', type: 'error' });
     }
   }, [roomId, modChannelRef]);
 
@@ -162,6 +176,11 @@ export function useRoomModeration({
       buttons: [
         { text: 'İptal', style: 'cancel' },
         { text: isMod ? 'Kaldır' : 'Moderatör Yap', onPress: async () => {
+          // ★ O12: Optimistic update + rollback on failure
+          const prevRole = isMod ? 'moderator' : currentRole;
+          const nextRole = isMod ? 'speaker' : 'moderator';
+          setParticipants(prev => prev.map(p => p.user_id === userId ? { ...p, role: nextRole as any } : p));
+          setSelectedUser(null);
           try {
             if (isMod) {
               await RoomService.removeModerator(roomId, userId);
@@ -176,11 +195,10 @@ export function useRoomModeration({
                 payload: { action: 'make_moderator', targetUserId: userId },
               });
             }
-            setParticipants(prev => prev.map(p => p.user_id === userId ? { ...p, role: isMod ? 'speaker' as const : 'moderator' as const } : p));
-            setSelectedUser(null);
             showToast({ title: isMod ? 'Moderatörlük Kaldırıldı' : 'Moderatör Yapıldı', message: displayName, type: 'success' });
-          } catch (e) {
-            showToast({ title: 'Hata', message: 'İşlem başarısız', type: 'error' });
+          } catch (e: any) {
+            setParticipants(prev => prev.map(p => p.user_id === userId ? { ...p, role: prevRole as any } : p));
+            showToast({ title: 'Hata', message: e?.message || 'İşlem başarısız', type: 'error' });
           }
         }},
       ]
@@ -197,9 +215,9 @@ export function useRoomModeration({
         payload: { action: 'mute', targetUserId: userId, reason: `${durationMinutes ? durationMinutes + ' dakika' : 'Süresiz'} susturuldun.` },
       });
       setParticipants(prev => prev.map(p => p.user_id === userId ? { ...p, is_muted: true, role: 'listener' as const } : p));
+      setAvatarFlash?.(userId, 'mute');
       setSelectedUser(null);
       const durationText = durationMinutes ? `${durationMinutes} dakika` : 'süresiz';
-      showToast({ title: 'Susturuldu', message: `${displayName} ${durationText} susturuldu`, type: 'success' });
       const sysMsg = {
         id: `sys_mute_${userId}_${Date.now()}`,
         room_id: roomId,
@@ -211,7 +229,7 @@ export function useRoomModeration({
       } as any;
       setChatMessages(prev => [sysMsg, ...prev].slice(0, 100));
     } catch (e) {
-      showToast({ title: 'Hata', message: 'Susturulamadı', type: 'error' });
+      // silent
     }
   }, [roomId, firebaseUser, modChannelRef]);
 
@@ -235,10 +253,10 @@ export function useRoomModeration({
         payload: { action: 'unmute', targetUserId: userId },
       });
       setParticipants(prev => prev.map(p => p.user_id === userId ? { ...p, is_muted: false } : p));
+      setAvatarFlash?.(userId, 'unmute');
       setSelectedUser(null);
-      showToast({ title: 'Susturma Kaldırıldı', message: `${displayName} artık konuşabilir`, type: 'success' });
     } catch {
-      showToast({ title: 'Hata', message: 'İşlem başarısız', type: 'error' });
+      // silent
     }
   }, [roomId, modChannelRef]);
 
@@ -307,10 +325,10 @@ export function useRoomModeration({
         type: 'broadcast', event: 'mod_action',
         payload: { action: 'ban', targetUserId: userId, reason: `${mins >= 60 ? Math.floor(mins/60) + ' saat' : mins + ' dakika'} yasaklandın.` },
       });
-      setParticipants(prev => prev.filter(p => p.user_id !== userId));
+      setAvatarFlash?.(userId, 'ban');
       setSelectedUser(null);
-      showToast({ title: '⛔ Yasaklandı', message: `${displayName} ${mins >= 60 ? Math.floor(mins/60) + ' saat' : mins + ' dakika'} yasaklandı`, type: 'success' });
-    } catch { showToast({ title: 'Hata', message: 'Ban uygulanamadı', type: 'error' }); }
+      setTimeout(() => setParticipants(prev => prev.filter(p => p.user_id !== userId)), 1500);
+    } catch { /* silent */ }
   }, [roomId, modChannelRef]);
 
   const handleTempBan = useCallback((userId: string, displayName: string) => {
@@ -338,10 +356,10 @@ export function useRoomModeration({
               type: 'broadcast', event: 'mod_action',
               payload: { action: 'permban', targetUserId: userId, reason: 'Kalıcı olarak yasaklandın.' },
             });
-            setParticipants(prev => prev.filter(p => p.user_id !== userId));
+            setAvatarFlash?.(userId, 'ban');
             setSelectedUser(null);
-            showToast({ title: '⛔ Kalıcı Yasaklandı', message: `${displayName} bu odaya bir daha giremez`, type: 'success' });
-          } catch { showToast({ title: 'Hata', message: 'Ban uygulanamadı', type: 'error' }); }
+            setTimeout(() => setParticipants(prev => prev.filter(p => p.user_id !== userId)), 1500);
+          } catch { /* silent */ }
         }},
       ]
     });

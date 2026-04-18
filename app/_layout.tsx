@@ -14,7 +14,7 @@ import { Colors } from '../constants/theme';
 import { ProfileService, MessageService, type Profile } from '../services/database';
 import { FriendshipService } from '../services/friendship';
 import { GamificationService } from '../services/gamification';
-import { supabase } from '../constants/supabase';
+import { supabase, setSupabaseAuthToken } from '../constants/supabase';
 import { PushNotificationService } from '../services/pushNotifications';
 import { SettingsService } from '../services/settings';
 import { CallService, type CallSignal } from '../services/call';
@@ -25,6 +25,8 @@ import { IncomingCallOverlay } from '../components/IncomingCallOverlay';
 import MiniRoomCard, { type MinimizedRoom } from '../components/MiniRoomCard';
 import ErrorBoundary from '../components/ErrorBoundary';
 // SplashOverlay import kaldırıldı — ARCH-4 FIX (ölü kod temizliği)
+// PremiumIntro kaldırıldı — intro video ile değiştirildi
+// IntroVideo kaldırıldı — kullanıcı talebi ile splash intro devre dışı
 import NotificationDrawer from '../components/NotificationDrawer';
 
 import { OnlineFriendsProvider } from '../providers/OnlineFriendsProvider';
@@ -178,7 +180,7 @@ function RealtimeBadgeProvider({ userId, children }: { userId: string | null; ch
             .select('*', { count: 'exact', head: true })
             .eq('user_id', userId)
             .eq('is_read', false)
-            .in('type', ['room_live', 'room_invite', 'missed_call', 'incoming_call', 'gift', 'event_reminder']);
+            .in('type', ['room_live', 'room_invite', 'room_invite_accepted', 'room_invite_rejected', 'missed_call', 'incoming_call', 'gift', 'event_reminder']);
           return count || 0;
         })(),
       ]);
@@ -222,7 +224,7 @@ function RealtimeBadgeProvider({ userId, children }: { userId: string | null; ch
 
     // 3. Notifications realtime — yeni bildirim gelince sayıyı artır
     // ★ Zil badge'ine dahil olan bildirim tipleri (oda + arama + hediye)
-    const BELL_NOTIF_TYPES = ['room_live', 'room_invite', 'missed_call', 'incoming_call', 'gift', 'event_reminder'];
+    const BELL_NOTIF_TYPES = ['room_live', 'room_invite', 'room_invite_accepted', 'room_invite_rejected', 'missed_call', 'incoming_call', 'gift', 'event_reminder'];
     const notifSub = supabase
       .channel(`badge_notif:${userId}`)
       .on('postgres_changes', {
@@ -230,9 +232,9 @@ function RealtimeBadgeProvider({ userId, children }: { userId: string | null; ch
         schema: 'public',
         table: 'notifications',
         filter: `user_id=eq.${userId}`,
-      }, (payload: any) => {
-        const notifType = payload.new?.type;
-        if (!BELL_NOTIF_TYPES.includes(notifType)) return; // Sadece oda/arama/hediye bildirimlerini say
+      }, (payload) => {
+        const notifType = (payload.new as { type?: string })?.type;
+        if (!notifType || !BELL_NOTIF_TYPES.includes(notifType)) return;
         setUnreadNotifs(prev => prev + 1);
       })
       .subscribe();
@@ -255,7 +257,7 @@ function RealtimeBadgeProvider({ userId, children }: { userId: string | null; ch
 
 // ========== AUTH GUARD ==========
 function AuthGuard({ children }: { children: React.ReactNode }) {
-  const { isAuthReady, isLoggedIn, profile } = useAuth();
+  const { isAuthReady, isLoggedIn, profile, firebaseUser } = useAuth();
   const segments = useSegments();
   const router = useRouter();
 
@@ -270,23 +272,48 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
         router.replace('/(auth)/login');
       }
     } else {
-      // Giris yapmis, ama profil tam mi?
-      // display_name kontrol edilir, yoksa onboarding tamamlanmamistir.
-      const hasCompleteProfile = profile && profile.display_name;
+      // ★ SEC-EV: E-posta doğrulama kontrolü — Google Sign-In kullanıcıları otomatik doğrulanmış sayılır
+      const isEmailProvider = firebaseUser?.providerData?.some(p => p.providerId === 'password');
+      const needsVerification = isEmailProvider && firebaseUser && !firebaseUser.emailVerified;
 
-      if (!profile || !hasCompleteProfile) {
-        // Eksik profil -> Kesinlikle onboarding e girmeli
+      if (needsVerification) {
+        // Doğrulanmamış e-posta kullanıcısı — login'de kal veya login'e yönlendir
+        if (!inAuthGroup) {
+          router.replace('/(auth)/login');
+        }
+        return;
+      }
+
+      // Giriş yapmış, ama profil tam mı?
+      // ★ FIX: display_name + id + onboarding_completed kontrolü
+      // Onboarding Step 3'te preferences.onboarding_completed = true set edilir.
+      // Bu flag olmadan profil "tamamlanmış" sayılmaz — erken yönlendirme önlenir.
+      const prefs = (profile as any)?.preferences;
+      const profileInterests = (profile as any)?.interests;
+      // ★ Geriye uyumluluk: eski kullanıcılar flag olmadan onboarding'i bitirmiş olabilir
+      // → interests dizisi doluysa VEYA preferences.onboarding_completed = true ise tamamlanmış say
+      const onboardingDone = prefs?.onboarding_completed === true
+        || (Array.isArray(profileInterests) && profileInterests.length > 0);
+      const hasCompleteProfile = profile && profile.display_name && profile.id && onboardingDone;
+
+      if (!profile) {
+        // Profil hiç yok (ilk kez giriş yapan yeni kullanıcı)
         if (!isOnboarding) {
           router.replace('/(auth)/onboarding');
         }
-      } else {
-        // Tam Profil -> Artik (auth) sayfalarinda durmamali
+      } else if (hasCompleteProfile) {
+        // ★ FIX: Tam profili olan mevcut kullanıcı — auth group'taysa ana sayfaya yönlendir
         if (inAuthGroup) {
           router.replace('/(tabs)/home');
         }
+      } else {
+        // display_name veya onboarding_completed eksik — onboarding'e git
+        if (!isOnboarding) {
+          router.replace('/(auth)/onboarding');
+        }
       }
     }
-  }, [isAuthReady, isLoggedIn, profile, segments]);
+  }, [isAuthReady, isLoggedIn, profile, firebaseUser?.emailVerified, segments]);
 
   // ★ Auth hazır değilken loading göster — siyah ekranı önle
   if (!isAuthReady) {
@@ -308,12 +335,64 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
 const { width, height } = Dimensions.get('window');
 
 export default function RootLayout() {
-  // ★ ARCH-4 FIX: Splash logic temizlendi — showSplash her zaman false'tı (ölü kod)
-  // SplashScreen.hideAsync() artık tek yerde (auth ready sonrası) çağrılır
+  // Splash kaldırıldı — doğrudan login/home'a geçiş
+
+  // ★ Font yükleme durumunu takip et
+  const [fontsLoaded, fontError] = useFonts({
+    Inter_400Regular,
+    Inter_500Medium,
+    Inter_600SemiBold,
+    Inter_700Bold,
+  });
+
+  const [appIsReady, setAppIsReady] = useState(false);
+  // ★ Intro video kaldırıldı — doğrudan uygulama açılır
+
+  // Uygulama hazırlık süreci
   useEffect(() => {
-    // Native splash screen'i hemen gizle — auth guard kendi loading'ini gösterecek
-    SplashScreen.hideAsync().catch(() => {});
+    async function prepare() {
+      console.log('[RootLayout] Hazırlık süreci başlatıldı...');
+      try {
+        // ★ Intro kaldırıldı — doğrudan yükleme
+
+        // Ayarları ve i18n'i yükle
+        console.log('[RootLayout] Ayarlar yükleniyor...');
+        const s = await SettingsService.get();
+        console.log('[RootLayout] Ayarlar yüklendi, tema ayarlanıyor:', s.theme);
+        setActiveTheme(s.theme as ThemeKey);
+
+        console.log('[RootLayout] i18n başlatılıyor...');
+        await i18n.init();
+        console.log('[RootLayout] i18n hazır.');
+
+        setThemeVersion(v => v + 1);
+      } catch (e) {
+        console.error('[RootLayout] Hazırlık hatası:', e);
+      } finally {
+        console.log('[RootLayout] Hazırlık tamamlandı (appIsReady = true)');
+        setAppIsReady(true);
+      }
+    }
+    prepare();
   }, []);
+
+  // ★ CRITICAL: Her şey hazır olduğunda splash screen'i gizle
+  // Intro video ayrı overlay olarak üstde görünür — splash ile bağımsız
+  useEffect(() => {
+    console.log('[RootLayout] State kontrolü:', { appIsReady, fontsLoaded, fontError: !!fontError });
+    if (appIsReady && (fontsLoaded || fontError)) {
+      console.log('[RootLayout] Splash gizleniyor...');
+      const timer = setTimeout(async () => {
+        try {
+          await SplashScreen.hideAsync();
+          console.log('[RootLayout] Splash gizlendi.');
+        } catch (e) {
+          console.warn('[RootLayout] Splash gizleme hatası (muhtemelen zaten gizli):', e);
+        }
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [appIsReady, fontsLoaded, fontError]);
 
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -322,6 +401,7 @@ export default function RootLayout() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [minimizedRoom, setMinimizedRoom] = useState<MinimizedRoom | null>(null);
   const [showNotifDrawer, setShowNotifDrawer] = useState(false);
+  const router = useRouter(); // routerRef yerine doğrudan kullan
 
   // ★ Minimize heartbeat — oda küçültüldüğünde heartbeat global olarak devam eder
   const minimizedHeartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -398,7 +478,8 @@ export default function RootLayout() {
 
 
 
-  // ★ İzinleri uygulama başlangıcında bir kez iste (kamera, mikrofon)
+  // ★ Tüm izinleri uygulama başlangıcında BİR KEZ iste (kamera, mikrofon, bildirim)
+  // AsyncStorage flag ile korunur — bir kez onaylandıktan sonra bir daha sorulmaz
   useEffect(() => {
     if (!isAuthReady || !isLoggedIn) return;
     (async () => {
@@ -407,10 +488,16 @@ export default function RootLayout() {
         if (alreadyAsked === 'true') return;
 
         if (Platform.OS === 'android') {
-          await PermissionsAndroid.requestMultiple([
+          // ★ Android: Tüm izinleri tek seferde iste (POST_NOTIFICATIONS Android 13+ gerekli)
+          const permsToRequest: string[] = [
             PermissionsAndroid.PERMISSIONS.CAMERA,
             PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
-          ]);
+          ];
+          // Android 13+ (API 33) için bildirim izni
+          if (Number(Platform.Version) >= 33) {
+            permsToRequest.push('android.permission.POST_NOTIFICATIONS');
+          }
+          await PermissionsAndroid.requestMultiple(permsToRequest as any);
         } else {
           // iOS: Hem mikrofon hem kamera izni iste
           await Audio.requestPermissionsAsync();
@@ -421,8 +508,13 @@ export default function RootLayout() {
           } catch { /* expo-image-picker yoksa atla */ }
         }
 
+        // ★ Bildirim izni — platform bağımsız (expo-notifications üzerinden)
+        try {
+          await PushNotificationService.registerForPushNotifications();
+        } catch { /* bildirim izni başarısız olursa sessiz geç */ }
+
         await AsyncStorage.setItem('soprano_permissions_asked', 'true');
-        if (__DEV__) console.log('[Permissions] Kamera ve mikrofon izinleri istendi');
+        if (__DEV__) console.log('[Permissions] Tüm izinler (kamera, mikrofon, bildirim) istendi');
       } catch (e) {
         if (__DEV__) console.warn('[Permissions] İzin isteme hatası:', e);
       }
@@ -482,6 +574,16 @@ export default function RootLayout() {
           avatar: fbUser.photoURL || '',
         });
         setIsLoggedIn(true);
+
+        // ★ Firebase JWT → Supabase: Token'ı al ve Supabase'e enjekte et
+        try {
+          const idToken = await fbUser.getIdToken(false);
+          setSupabaseAuthToken(idToken);
+          if (__DEV__) console.log('[RootLayout] Firebase token Supabase\'e enjekte edildi');
+        } catch (e) {
+          if (__DEV__) console.warn('[RootLayout] Firebase token alınamadı:', e);
+        }
+
         // Supabase profilini bekle (isAuthReady'i burada true yapacak)
         await syncProfile(fbUser);
 
@@ -495,10 +597,13 @@ export default function RootLayout() {
         setProfile(null);
         setIsLoggedIn(false);
         setIsAuthReady(true);
+        // ★ Logout: Supabase token'ı temizle
+        setSupabaseAuthToken(null);
       }
     });
 
-    // ★ Güvenlik ağı: Firebase auth 8 saniyede yanıt vermezse login'e yönlendir
+    // ★ Güvenlik ağı: Firebase auth 8 saniyede yanıt vermezse hazır say
+    // ★ BUG FIX: unsubscribe() kaldırıldı — timeout sonrası auth gelirse yine işlensin
     const authTimeout = setTimeout(() => {
       if (!authResolved) {
         if (__DEV__) console.warn('[RootLayout] Firebase auth timeout (8s) — forcing auth ready');
@@ -510,6 +615,26 @@ export default function RootLayout() {
       unsubscribe();
       clearTimeout(authTimeout);
     };
+  }, []);
+
+  // ★ BUG FIX: Firebase JWT Token Sessiz Yenileme — 50dk interval
+  // Firebase token'ları 1 saat sonra expire olur. Mevcut auth akışına dokunmadan
+  // sadece Supabase REST header'ını güncelleriz. Crash-safe: hiç state değiştirmez.
+  useEffect(() => {
+    const TOKEN_REFRESH_MS = 50 * 60 * 1000; // 50 dakika
+    const refreshInterval = setInterval(async () => {
+      try {
+        const currentUser = auth.currentUser;
+        if (currentUser) {
+          const freshToken = await currentUser.getIdToken(true); // force refresh
+          setSupabaseAuthToken(freshToken);
+          if (__DEV__) console.log('[TokenRefresh] Supabase token yenilendi');
+        }
+      } catch {
+        // Sessiz — ağ hatası olabilir, sonraki interval'da tekrar dener
+      }
+    }, TOKEN_REFRESH_MS);
+    return () => clearInterval(refreshInterval);
   }, []);
 
   // ═══ Presence Yönetimi: Uygulama arka plana gidince offline, dönerken online ═══
@@ -549,7 +674,7 @@ export default function RootLayout() {
           callerId: data.callerId as string,
           callerName: data.callerName as string,
           callerAvatar: (data.callerAvatar as string) || undefined,
-          callType: (data.callType as 'audio' | 'video') || 'audio',
+          callType: 'audio' as const,
           tier: (data.tier as any) || 'Free',
         });
       } else if (data?.route) {
@@ -568,7 +693,7 @@ export default function RootLayout() {
           callerId: data.callerId as string,
           callerName: data.callerName as string,
           callerAvatar: (data.callerAvatar as string) || undefined,
-          callType: (data.callType as 'audio' | 'video') || 'audio',
+          callType: 'audio' as const,
           tier: (data.tier as any) || 'Free',
         });
       }
@@ -590,8 +715,8 @@ export default function RootLayout() {
         schema: 'public',
         table: 'profiles',
         filter: `id=eq.${firebaseUser.uid}`,
-      }, (payload: any) => {
-        const newSP = payload.new?.system_points;
+      }, (payload) => {
+        const newSP = (payload.new as { system_points?: number })?.system_points;
         // Sadece SP değiştiyse profili tazele (gereksiz re-render önleme)
         if (newSP !== undefined) {
           if (__DEV__) console.log(`[SPSync] Bakiye güncellendi: ${newSP} SP`);
@@ -658,8 +783,10 @@ export default function RootLayout() {
     };
   }, [firebaseUser]);
 
-  // ★ ARCH-8 FIX: router2 kaldırıldı — tek router ref ile yönetiliyor
-  const routerRef = useRef(useRouter());
+  // ★ ARCH-8 FIX: routerRef her render'da güncellenir — stale router önlenir
+  const router2 = useRouter();
+  const routerRef = useRef(router2);
+  routerRef.current = router2;
   useEffect(() => {
     function handleDeepLink(url: string) {
       try {
@@ -678,15 +805,18 @@ export default function RootLayout() {
     return () => sub?.remove();
   }, []);
 
-  // ★ Inter font yükleme (non-blocking — yüklenene kadar sistem fontu kullanılır)
-  const [fontsLoaded] = useFonts({
-    Inter_400Regular,
-    Inter_500Medium,
-    Inter_600SemiBold,
-    Inter_700Bold,
-  });
-
-  // ★ ARCH-4 FIX: SplashOverlay render bloğu kaldırıldı (ölü kod — showSplash her zaman false'tı)
+  // ★ Hazırlık bitene kadar minimal loading göster
+  if (!appIsReady || (!fontsLoaded && !fontError)) {
+    return (
+      <View style={{ flex: 1, backgroundColor: '#0F172A', alignItems: 'center', justifyContent: 'center' }}>
+        <View style={{
+          width: 40, height: 40, borderRadius: 20,
+          borderWidth: 3, borderColor: 'rgba(20,184,166,0.15)',
+          borderTopColor: '#14B8A6',
+        }} />
+      </View>
+    );
+  }
 
   return (
     <AuthContext.Provider value={{ isAuthReady, isLoggedIn, setIsLoggedIn, user, setUser, firebaseUser, profile, setProfile, refreshProfile, minimizedRoom, setMinimizedRoom, pendingCallSignals, consumeCallSignal, activeCallId, setActiveCallId: updateActiveCallId, showNotifDrawer, setShowNotifDrawer }}>
@@ -748,6 +878,7 @@ export default function RootLayout() {
         <Toast />
 
 
+
         {/* ★ BUG-4 FIX: NotificationDrawer artık global — tüm sayfalarda tek instance */}
         <NotificationDrawer
           visible={showNotifDrawer}
@@ -776,6 +907,8 @@ export default function RootLayout() {
             updateIncomingCall(null);
           }}
         />
+
+        {/* ★ Intro Video kaldırıldı */}
       </View>
     </OnlineFriendsProvider>
     </RealtimeBadgeProvider>
