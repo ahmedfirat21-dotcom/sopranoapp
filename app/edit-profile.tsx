@@ -146,7 +146,11 @@ export default function EditProfileScreen() {
     text.replace(/[\u200B-\u200F\u202A-\u202E\u2066-\u2069\uFEFF\u00AD\u034F\u061C\u180E]/g, '').trim();
 
   // === SAVE PROFILE ===
+  // ★ ORTA-B: Çift tıklama koruması — setSaving async, yetişmediği pencerede
+  // ikinci çağrı aynı anda gidiyordu. Ref sync, hemen bloke.
+  const savingLockRef = useRef(false);
   const handleSave = async () => {
+    if (savingLockRef.current) return;
     const cleanName = sanitizeText(displayName);
     if (!cleanName) {
       showToast({ type: 'warning', title: 'Uyarı', message: 'Görünen ad boş olamaz.' });
@@ -157,6 +161,7 @@ export default function EditProfileScreen() {
       return;
     }
 
+    savingLockRef.current = true;
     Keyboard.dismiss();
     setSaving(true);
     try {
@@ -210,6 +215,7 @@ export default function EditProfileScreen() {
       }
     } finally {
       setSaving(false);
+      savingLockRef.current = false;
     }
   };
 

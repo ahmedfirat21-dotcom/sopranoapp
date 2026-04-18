@@ -118,6 +118,15 @@ export const MessageService = {
 
   /** İki kişi arasındaki tüm konuşma geçmişini getir */
   async getConversation(user1Id: string, user2Id: string, limit = 200) {
+    // ★ ORTA-H: Engel kontrolü — blocker/blocked çifti sohbet açsa da mesaj görülmesin.
+    // Privacy: blocklanan kişi eski mesajları OKUYAMASIN.
+    try {
+      const blockedIds = await FriendshipService._getBlockedIds(user1Id);
+      if (blockedIds.has(user2Id)) return [];
+      const reverseBlock = await FriendshipService._getBlockedIds(user2Id);
+      if (reverseBlock.has(user1Id)) return [];
+    } catch { /* block check başarısızsa sohbeti göster */ }
+
     // ★ is_deleted sütunu varsa filtrele, yoksa filtresiz — getInbox ile aynı strateji
     const orFilter = `and(sender_id.eq.${user1Id},receiver_id.eq.${user2Id}),and(sender_id.eq.${user2Id},receiver_id.eq.${user1Id})`;
 
@@ -336,8 +345,17 @@ export const MessageService = {
 
   /** Yazıyor... (Typing Indicator) - Gönderici — ★ C2 FIX: Block kontrolü */
   _typingChannels: new Map<string, ReturnType<typeof supabase.channel>>(),
+  // ★ ORTA-K: Per-receiver throttle — her keystroke yerine 1sn'de max 1 broadcast
+  _typingLastSent: new Map<string, number>(),
 
   async sendTypingStatus(senderId: string, receiverId: string, isTyping: boolean) {
+    // ★ ORTA-K: Throttle — isTyping=true için 1000ms, isTyping=false her zaman gider (anında durdur)
+    if (isTyping) {
+      const last = (this as any)._typingLastSent.get(receiverId) || 0;
+      if (Date.now() - last < 1000) return;
+      (this as any)._typingLastSent.set(receiverId, Date.now());
+    }
+
     // ★ C2 FIX: Engellenen kişiye typing status gönderme
     const blockedIds = await FriendshipService._getBlockedIds(senderId);
     if (blockedIds.has(receiverId)) return;

@@ -248,27 +248,27 @@ export const CallService = {
     receiverId: string,
     callType: CallType
   ): Promise<void> {
-    try {
-      // 1. Notifications tablosuna kaydet
-      await supabase.from('notifications').insert({
+    // ★ ORTA-L: Push ÖNCE gönder, notif kaydı sonra. Eskiden: DB insert → push.
+    // Sorun: Insert başarılı olup push fail olursa kullanıcı bildirim almaz ama
+    // listede görür. Daha önemli olan kullanıcının haber alması → push first.
+    // DB insert push'tan bağımsız — her ikisi de başarısız olsa bile diğerinin çabası ziyan olmuyor.
+    const pushPromise = PushService.sendMissedCallNotification(
+      receiverId, callerName, callerId, callType,
+    ).catch((e) => {
+      if (__DEV__) console.warn('[CallService] Missed call push hatası:', e);
+    });
+    const dbPromise = Promise.resolve(
+      supabase.from('notifications').insert({
         user_id: receiverId,
         sender_id: callerId,
         type: 'missed_call',
         body: '📞 Cevapsız sesli arama',
-      });
-
-      // 2. Push bildirim gönder
-      await PushService.sendMissedCallNotification(
-        receiverId,
-        callerName,
-        callerId,
-        callType
-      );
-
-      if (__DEV__) console.log(`[CallService] Cevapsız arama kaydı oluşturuldu: ${callerId} → ${receiverId}`);
-    } catch (e) {
-      if (__DEV__) console.warn('[CallService] Cevapsız arama kaydetme hatası:', e);
-    }
+      })
+    ).then((res: any) => {
+      if (res?.error && __DEV__) console.warn('[CallService] Missed call DB kaydetme hatası:', res.error.message);
+    });
+    await Promise.all([pushPromise, dbPromise]);
+    if (__DEV__) console.log(`[CallService] Cevapsız arama: ${callerId} → ${receiverId}`);
   },
 
   /** Aramayı kabul et */

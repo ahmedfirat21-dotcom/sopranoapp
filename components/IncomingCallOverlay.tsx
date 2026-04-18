@@ -59,16 +59,23 @@ export function IncomingCallOverlay({ visible, callerName, callerAvatar, callTyp
     }
   }, []);
 
-  // ★ CALL-3 FIX: Kabul — ÖNCE sesi durdur, SONRA callback
+  // ★ ORTA-J: Zombie state engeli — handleAccept/Reject sadece bir kez çalışsın.
+  // Senaryo: 35sn timeout → handleReject + aynı anda user "Kabul Et" basıyor veya
+  // karşı taraf "arama sonlandır" sinyali geliyor → double-fire.
+  const actedRef = useRef(false);
+
   const handleAccept = useCallback(() => {
+    if (actedRef.current) return;
+    actedRef.current = true;
     Vibration.cancel();
     stopSoundImmediately();
     if (autoCloseTimerRef.current) { clearTimeout(autoCloseTimerRef.current); autoCloseTimerRef.current = null; }
     onAccept();
   }, [onAccept, stopSoundImmediately]);
 
-  // Red — ÖNCE sesi durdur, SONRA callback
   const handleReject = useCallback(() => {
+    if (actedRef.current) return;
+    actedRef.current = true;
     Vibration.cancel();
     stopSoundImmediately();
     if (autoCloseTimerRef.current) { clearTimeout(autoCloseTimerRef.current); autoCloseTimerRef.current = null; }
@@ -81,6 +88,8 @@ export function IncomingCallOverlay({ visible, callerName, callerAvatar, callTyp
 
     if (visible) {
       cleaningUpRef.current = false;
+      // ★ ORTA-J: Overlay yeniden görünürse acted flag'i sıfırla (yeni çağrı)
+      actedRef.current = false;
 
       // Titreşim pattern
       const vibratePattern = [0, 800, 400, 800, 400, 800];

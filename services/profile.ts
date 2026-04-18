@@ -36,9 +36,20 @@ export const ProfileService = {
   },
 
   async setOnline(userId: string, isOnline: boolean): Promise<void> {
+    // ★ ORTA-I: Privacy — show_online_status kapalıysa is_online=false + last_seen NULL.
+    // Kullanıcı görünmez modda "yaklaşık son aktiflik" sızdırmasın.
+    let settings: any = null;
+    try {
+      const { SettingsService } = require('./settings');
+      settings = await SettingsService.getForUser?.(userId) ?? await SettingsService.get?.();
+    } catch {}
+    const privacyOn = settings?.show_online_status === false;
     await supabase
       .from('profiles')
-      .update({ is_online: isOnline, last_seen: new Date().toISOString() })
+      .update({
+        is_online: privacyOn ? false : isOnline,
+        last_seen: privacyOn ? null : new Date().toISOString(),
+      })
       .eq('id', userId);
   },
 

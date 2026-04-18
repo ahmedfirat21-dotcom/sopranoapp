@@ -90,12 +90,15 @@ export default function NotificationDrawer({ visible, onClose, userId, anchorTop
     if (visible && userId) {
       setShowAll(false);
       loadNotifications();
-      // ★ Drawer açılınca sadece zil bildirimleri okundu olarak işaretle
+      // ★ ORTA-E: Mark-as-read sadece bu andan ÖNCEKİ unread'leri kapatır —
+      // drawer açıkken gelen yeni bildirim unread kalsın (race önleme).
+      const openedAt = new Date().toISOString();
       supabase.from('notifications')
         .update({ is_read: true })
         .eq('user_id', userId)
         .eq('is_read', false)
         .in('type', BELL_NOTIF_TYPES)
+        .lte('created_at', openedAt)
         .then(() => {});
     }
   }, [visible, userId]);

@@ -60,6 +60,25 @@ export default function UserProfileScreen() {
   const loadProfile = useCallback(async () => {
     if (!id) return;
     try {
+      // ★ ORTA-C: Engellenmiş kullanıcı profili yükleme — minimum bilgi.
+      // Blok kontrolü ilk, profil detayı sonra.
+      let blocked = false;
+      if (firebaseUser && !isOwnProfile) {
+        try {
+          const blockedIds = await ModerationService.getBlockedUsers(firebaseUser.uid);
+          blocked = blockedIds.includes(id);
+          setIsUserBlocked(blocked);
+        } catch {}
+      }
+      if (blocked) {
+        // Blocked user'a ait profil: sadece display_name + avatar göster (minimum).
+        // Bio, istatistik, post vs. yüklenmesin.
+        const { data } = await supabase.from('profiles').select('id, display_name, avatar_url').eq('id', id).single();
+        setUserProfile(data as any);
+        setStats({ followers: 0, following: 0, rooms: 0 });
+        return;
+      }
+
       const profile = await ProfileService.get(id);
       setUserProfile(profile);
 
@@ -68,12 +87,6 @@ export default function UserProfileScreen() {
         const detailed = await FriendshipService.getDetailedStatus(firebaseUser.uid, id);
         setFollowStatus(detailed.outgoing);   // Ben → Hedef
         setIncomingStatus(detailed.incoming);  // Hedef → Ben
-
-        // ★ BUG-10 FIX: Engel durumunu yükle
-        try {
-          const blocked = await ModerationService.getBlockedUsers(firebaseUser.uid);
-          setIsUserBlocked(blocked.includes(id));
-        } catch {}
       }
 
       // Istatistikler — Facebook tarzı arkadaşlık: tek "arkadaş" sayısı
