@@ -182,7 +182,10 @@ export default function NotificationDrawer({ visible, onClose, userId, anchorTop
         .eq('user_id', userId)
         .in('type', BELL_NOTIF_TYPES)
         .order('created_at', { ascending: false })
-        .limit(loadAll ? 100 : 20);
+        // ★ D-3: Pagination — ilk açılış 20, "Tümünü Gör" 500 (ağır kullanıcı
+        // 100'den fazla unread'te takılıyordu). 500'ün ötesinde mobile UX için
+        // manuel scroll pagination ekleyebilir ama %99 kullanıcı için yeterli.
+        .limit(loadAll ? 500 : 20);
       if (!error && data) {
         setItems(data as NotifItem[]);
       }

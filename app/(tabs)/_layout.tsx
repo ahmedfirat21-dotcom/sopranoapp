@@ -165,8 +165,8 @@ function Tab({ isFocused, cfg, badge, onPress }: {
         )}
       </Animated.View>
 
-      {/* ═══ LABEL ═══ */}
-      <Animated.Text style={[s.label, labelAnim]}>{cfg.label}</Animated.Text>
+      {/* ═══ LABEL ═══ (D-2: overflow koruması) */}
+      <Animated.Text style={[s.label, labelAnim]} numberOfLines={1} ellipsizeMode="tail">{cfg.label}</Animated.Text>
     </Pressable>
   );
 }
