@@ -1,7 +1,15 @@
 // LiveKit polyfill kaldırıldı — native modül yoksa Hermes'te 'Requiring unknown module' crash'ine sebep oluyordu
 import { useEffect, useState, useRef, useCallback, createContext, useContext } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { View, StyleSheet, Dimensions, AppState, Platform, PermissionsAndroid } from 'react-native';
+import { View, StyleSheet, Dimensions, AppState, Platform, PermissionsAndroid, LogBox } from 'react-native';
+
+// ★ Geliştirme sırasında beklenen yapılandırma hatalarını LogBox'tan gizle.
+// IAP ürünleri RevenueCat Dashboard'a eklenene kadar normal davranış.
+LogBox.ignoreLogs([
+  /\[RevenueCat\].*fetching offerings/,
+  /PurchasesError.*ConfigurationError/,
+  /You have configured the SDK with a Play Store API key, but there are no Play Store products/,
+]);
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
