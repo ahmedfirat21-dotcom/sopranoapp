@@ -655,13 +655,19 @@ export const RoomService = {
       }
     }
 
+    // ★ BUG FIX: is_muted default role'a göre.
+    // Eskiden hepsi is_muted=true → owner/mod/speaker rejoin sonrası mic görsel
+    // olarak "muted" görünüyordu (SpeakerSection dbMuted kontrolü UI'ı kapatıyor).
+    // is_muted sadece "moderatör tarafından susturuldu" anlamı taşımalı.
+    // Listener/spectator sahnede değil — mute badge gereksiz (ListenerGrid zaten
+    // listener için mute badge göstermiyor), false başlat.
     const { data, error } = await supabase
       .from('room_participants')
       .insert({
         room_id: roomId,
         user_id: userId,
         role,
-        is_muted: true,
+        is_muted: false,
       })
       .select('*, user:profiles!user_id(*)')
       .single();
