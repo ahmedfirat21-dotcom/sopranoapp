@@ -628,18 +628,32 @@ export default function RootLayout() {
   // ★ BUG FIX: Firebase JWT Token Sessiz Yenileme — 50dk interval
   // Firebase token'ları 1 saat sonra expire olur. Mevcut auth akışına dokunmadan
   // sadece Supabase REST header'ını güncelleriz. Crash-safe: hiç state değiştirmez.
+  // ★ Y1: Ardışık refresh başarısızlıklarında kullanıcıyı zorla çıkış yap (401 döngüsü engeli).
+  const tokenRefreshFailuresRef = useRef(0);
   useEffect(() => {
     const TOKEN_REFRESH_MS = 50 * 60 * 1000; // 50 dakika
+    const MAX_CONSECUTIVE_FAILURES = 3;
     const refreshInterval = setInterval(async () => {
       try {
         const currentUser = auth.currentUser;
-        if (currentUser) {
-          const freshToken = await currentUser.getIdToken(true); // force refresh
-          setSupabaseAuthToken(freshToken);
-          if (__DEV__) console.log('[TokenRefresh] Supabase token yenilendi');
+        if (!currentUser) {
+          tokenRefreshFailuresRef.current = 0;
+          return;
         }
-      } catch {
-        // Sessiz — ağ hatası olabilir, sonraki interval'da tekrar dener
+        const freshToken = await currentUser.getIdToken(true);
+        setSupabaseAuthToken(freshToken);
+        tokenRefreshFailuresRef.current = 0;
+        if (__DEV__) console.log('[TokenRefresh] Supabase token yenilendi');
+      } catch (e: any) {
+        tokenRefreshFailuresRef.current++;
+        if (__DEV__) console.warn(`[TokenRefresh] Hata (${tokenRefreshFailuresRef.current}/${MAX_CONSECUTIVE_FAILURES}):`, e?.message);
+        // Firebase Auth token revoke / user deleted / ardışık network hatası → zorla logout
+        const isAuthError = /token|auth|unauthorized|credential/i.test(String(e?.message || '') + String(e?.code || ''));
+        if (isAuthError || tokenRefreshFailuresRef.current >= MAX_CONSECUTIVE_FAILURES) {
+          try { await auth.signOut(); } catch {}
+          setSupabaseAuthToken(null);
+          tokenRefreshFailuresRef.current = 0;
+        }
       }
     }, TOKEN_REFRESH_MS);
     return () => clearInterval(refreshInterval);

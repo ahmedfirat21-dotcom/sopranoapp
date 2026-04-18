@@ -353,6 +353,25 @@ export default function SettingsScreen() {
                     await supabase.from('referral_codes').delete().eq('owner_id', uid);
                   } catch { /* tablo yoksa sessiz */ }
 
+                  // ★ Y2: Storage avatar/post-image orphan cleanup — user klasörünü sil.
+                  // RLS v26 sadece kendi klasörünü sildirir; cleanup başarısız olsa bile
+                  // profil silme devam eder (kritik olan DB).
+                  try {
+                    const { StorageService } = require('../services/storage');
+                    await StorageService.deleteUserFiles?.(uid).catch(() => {});
+                  } catch { /* modül yoksa atla */ }
+                  // Avatar + post-images bucket'larında user klasörünü paraleL temizle
+                  try {
+                    const buckets = ['avatars', 'post-images', 'voice-notes'] as const;
+                    await Promise.all(buckets.map(async (bucket) => {
+                      const { data: files } = await supabase.storage.from(bucket).list(uid, { limit: 1000 });
+                      if (files && files.length > 0) {
+                        const paths = files.map(f => `${uid}/${f.name}`);
+                        await supabase.storage.from(bucket).remove(paths);
+                      }
+                    }));
+                  } catch { /* orphan dosyalar için manuel admin cleanup RPC var */ }
+
                   // 8. Profili sil
                   await supabase.from('profiles').delete().eq('id', uid);
 

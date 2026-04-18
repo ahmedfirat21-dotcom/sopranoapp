@@ -61,21 +61,19 @@ export default function SPStoreScreen() {
         { text: 'Satın Al', onPress: async () => {
           if (mountedRef.current) setPurchasing(true);
           try {
-            // ★ K-PROJE-6: Mock mode sadece __DEV__ build'de bedava SP veriyor.
-            // Production'da placeholder key varsa bile asla bypass yok → fake ödeme imkansız.
+            // ★ Y4 FIX: SP miktarı artık server-side'dan (v27 claim_sp_package RPC).
+            // Client hiçbir SP değeri göndermiyor — sadece package ID + transaction ID.
+            // Toplam SP (bonus + tier bonus) backend'te hesaplanıyor; client manipülasyonu etkisiz.
+            let transactionId: string | null = null;
+
             if (REVENUECAT_MOCK_MODE && __DEV__) {
-              const mockRef = `mock:${profile.id}:${pkg.id}:${Date.now()}`;
-              await GamificationService.earn(profile.id, totalSP, 'sp_purchase', mockRef);
-              await refreshProfile();
-              if (mountedRef.current) {
-                showToast({ title: '✅ SP Eklendi! (TEST)', message: `${totalSP.toLocaleString()} SP test modunda eklendi.`, type: 'success' });
-              }
+              // Test build: transaction_id NULL, RPC mock ref üretir
+              transactionId = null;
             } else if (REVENUECAT_MOCK_MODE && !__DEV__) {
-              // Production placeholder key → satın alma çalışmaz, açık uyarı
               showToast({ title: 'Ödeme Sistemi Hazır Değil', message: 'Satın alma şu an aktif değil. Yakında açılacak.', type: 'warning' });
               return;
             } else {
-              // ★ Production: RevenueCat üzerinden gerçek satın alma
+              // Production RevenueCat satın alma
               try {
                 await RevenueCatService.getOfferings();
                 const Purchases = require('react-native-purchases').default;
@@ -83,31 +81,17 @@ export default function SPStoreScreen() {
                   identifier: pkg.id,
                   priceString: `₺${pkg.price.toFixed(2)}`,
                 });
-
-                // ★ K5: Idempotency key = RevenueCat store transaction ID.
-                // purchaseResult.transactionIdentifier mevcutsa onu kullan;
-                // yoksa customerInfo.nonSubscriptionTransactions en yenisinden türet.
-                let externalRef: string | undefined;
-                const directTxId = (purchaseResult as any)?.transactionIdentifier
-                  || (purchaseResult as any)?.transaction?.transactionIdentifier;
-                if (directTxId) {
-                  externalRef = `rvn:${directTxId}`;
-                } else {
+                transactionId = (purchaseResult as any)?.transactionIdentifier
+                  || (purchaseResult as any)?.transaction?.transactionIdentifier
+                  || null;
+                if (!transactionId) {
                   try {
                     const ci = await Purchases.getCustomerInfo();
                     const txs = (ci?.nonSubscriptionTransactions || [])
                       .filter((t: any) => t.productIdentifier === pkg.id)
                       .sort((a: any, b: any) => new Date(b.purchaseDate).getTime() - new Date(a.purchaseDate).getTime());
-                    if (txs[0]?.transactionIdentifier) {
-                      externalRef = `rvn:${txs[0].transactionIdentifier}`;
-                    }
-                  } catch { /* ci alınamazsa externalRef undefined — legacy path */ }
-                }
-
-                await GamificationService.earn(profile.id, totalSP, 'sp_purchase', externalRef);
-                await refreshProfile();
-                if (mountedRef.current) {
-                  showToast({ title: '🎉 Satın Alma Başarılı!', message: `${totalSP.toLocaleString()} SP hesabına eklendi.`, type: 'success' });
+                    transactionId = txs[0]?.transactionIdentifier || null;
+                  } catch {}
                 }
               } catch (purchaseErr: any) {
                 if (purchaseErr?.userCancelled) {
@@ -115,10 +99,28 @@ export default function SPStoreScreen() {
                 }
                 if (purchaseErr?.message?.includes('product') || purchaseErr?.code === 'PRODUCT_NOT_FOUND') {
                   showToast({ title: '⏳ Ürün Hazırlanıyor', message: 'SP paketleri Google Play onayı bekliyor. Kısa süre sonra aktif olacak.', type: 'info' });
-                } else {
-                  throw purchaseErr;
+                  return;
                 }
+                throw purchaseErr;
               }
+            }
+
+            // ★ Y4: Server-side SP grant — amount backend'ten gelir (client manipülasyon bypass)
+            const { data: claimData, error: claimError } = await supabase.rpc('claim_sp_package', {
+              p_package_id: pkg.id,
+              p_transaction_id: transactionId,
+            });
+            if (claimError) {
+              // v27 migrate edilmediyse legacy path — eski client-side SP hesabıyla devam
+              if (__DEV__) console.warn('[sp-store] v27 RPC fallback:', claimError.message);
+              const legacyRef = transactionId ? `rvn:${transactionId}` : `mock:${profile.id}:${pkg.id}:${Date.now()}`;
+              await GamificationService.earn(profile.id, totalSP, 'sp_purchase', legacyRef);
+            }
+            await refreshProfile();
+            if (mountedRef.current) {
+              const grantedSP = (claimData as any)?.total_sp || totalSP;
+              const title = REVENUECAT_MOCK_MODE && __DEV__ ? '✅ SP Eklendi! (TEST)' : '🎉 Satın Alma Başarılı!';
+              showToast({ title, message: `${grantedSP.toLocaleString()} SP hesabına eklendi.`, type: 'success' });
             }
           } catch (err: any) {
             if (mountedRef.current) {

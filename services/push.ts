@@ -1,6 +1,14 @@
 /**
- * SopranoChat — Push Bildirim Gönderim Servisi (Client-Side Helper)
- * Supabase Edge Function üzerinden push notification gönderir
+ * SopranoChat — Push SEND (outbound)
+ * ═══════════════════════════════════════════════════
+ * Bu servis: BAŞKA kullanıcılara push gönderir (Supabase Edge Function
+ * `send-push` üzerinden). Diğer kullanıcının device token'ını bulur ve
+ * Expo Push API'a forward eder.
+ *
+ * ★ pushNotifications.ts ile KARIŞTIRMA:
+ *   - services/push.ts (bu)          → OUTBOUND: başkalarına push gönder
+ *   - services/pushNotifications.ts  → INBOUND: kendi cihazın için token
+ *                                       register + local notification handler
  */
 import { logger } from '../utils/logger';
 import { supabase } from '../constants/supabase';

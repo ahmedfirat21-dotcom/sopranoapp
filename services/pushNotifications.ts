@@ -1,12 +1,15 @@
 /**
- * SopranoChat — Push Bildirim Servisi
- * Expo Notifications + Supabase entegrasyonu
- * 
- * Bu servis:
- * 1. Kullanıcıdan bildirim izni ister
- * 2. Expo Push Token'ı alır ve Supabase'e kaydeder
- * 3. Yerel (local) bildirimler planlar
- * 4. Gelen bildirimlere tepki verir (navigasyon vb.)
+ * SopranoChat — Push INBOUND (device-side)
+ * ═══════════════════════════════════════════════════
+ * Bu servis: KENDİ cihazın için push setup yapar.
+ *   1. İzin iste
+ *   2. Expo Push Token al → profiles.push_token'a yaz
+ *   3. Local notification scheduling
+ *   4. Gelen push tap handler (route navigation)
+ *
+ * ★ push.ts ile KARIŞTIRMA:
+ *   - services/push.ts                → OUTBOUND: başkalarına push gönder
+ *   - services/pushNotifications.ts (bu) → INBOUND: kendi device setup'ı
  */
 import * as Device from 'expo-device';
 import Constants, { ExecutionEnvironment } from 'expo-constants';

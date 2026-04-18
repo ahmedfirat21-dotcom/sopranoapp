@@ -10,6 +10,8 @@ import { PushService } from './push';
 import { FriendshipService } from './friendship';
 
 let globalCallChannel: ReturnType<typeof supabase.channel> | null = null;
+// ★ Y5: Per-caller call signal rate limit — spoofing/spam koruması (60sn içinde max 3)
+const _callRateLimit = new Map<string, number[]>();
 let globalCallUserId: string | null = null;
 
 // ★ Sinyal dedup — retry nedeniyle aynı sinyalin iki kez işlenmesini önle
@@ -331,18 +333,32 @@ export const CallService = {
           // ★ Dedup: Retry nedeniyle gelen tekrarlı sinyali filtrele
           if (isSignalDuplicate(signal)) return;
 
-          // ★ SEC-CALL-AUTH: incoming_call sinyalinde friendship doğrulaması
-          // Arkadaş olmayan birinden gelen sahte arama sinyalini engelle
+          // ★ Y5 FIX: incoming_call için KATI friendship doğrulaması.
+          // Friendship check fail olursa (network/RLS) sinyal REDDEDİLİR (fail-closed) —
+          // arkadaş olmayan bir user fake sinyal spoof edip aramaya zorlayamasın.
+          // Ayrıca per-caller rate limit: aynı caller'dan 60sn'de max 3 sinyal.
           if (signal.action === 'incoming_call' && signal.callerId) {
+            const rateLimitKey = `${signal.callerId}`;
+            const now = Date.now();
+            const bucket = _callRateLimit.get(rateLimitKey) || [];
+            const recent = bucket.filter(t => now - t < 60_000);
+            if (recent.length >= 3) {
+              if (__DEV__) console.warn('[CallService] Rate limit — aynı caller\'dan çok fazla sinyal:', signal.callerId);
+              return;
+            }
+            recent.push(now);
+            _callRateLimit.set(rateLimitKey, recent);
+
             try {
-              const status = await FriendshipService.getStatus(userId, signal.callerId);
-              const reverseStatus = status === 'accepted' ? 'accepted' : await FriendshipService.getStatus(signal.callerId, userId);
-              if (status !== 'accepted' && reverseStatus !== 'accepted') {
-                if (__DEV__) console.warn('[CallService] SEC-CALL-AUTH: Arkadaş olmayan arama sinyali yoksayıldı:', signal.callerId);
+              const isFriend = await FriendshipService.isFriend(userId, signal.callerId);
+              if (!isFriend) {
+                if (__DEV__) console.warn('[CallService] SEC-CALL-AUTH: Arkadaş olmayan arama sinyali reddedildi:', signal.callerId);
                 return;
               }
-            } catch {
-              // Friendship kontrolü başarısız olursa sinyali yine de işle (graceful degradation)
+            } catch (e) {
+              // Fail-closed: friendship check başarısız → sinyali reddet (eskiden graceful degrade vardı)
+              if (__DEV__) console.warn('[CallService] Friendship check başarısız, sinyal reddedildi:', e);
+              return;
             }
           }
 

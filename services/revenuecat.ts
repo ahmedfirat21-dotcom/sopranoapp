@@ -232,13 +232,18 @@ export const RevenueCatService = {
     try {
       const { customerInfo } = await this._Purchases.purchasePackage(pkg);
       const newTier = this._extractTierFromCustomerInfo(customerInfo);
-      
+
       // DB'yi güncelle (webhook'a yedek olarak)
       if (newTier) {
         await supabase
           .from('profiles')
           .update({ subscription_tier: newTier })
           .eq('id', userId);
+        // ★ Y3: Tier cache'i invalidate et — 5dk stale kalmasın, yeni tier hemen geçerli olsun
+        try {
+          const { invalidateTierCache } = require('./gamification');
+          invalidateTierCache(userId);
+        } catch { /* gamification import fail safe */ }
       }
 
       return { newTier };
@@ -263,13 +268,18 @@ export const RevenueCatService = {
     try {
       const { customerInfo } = await this._Purchases.restorePurchases();
       const tier = this._extractTierFromCustomerInfo(customerInfo);
-      
+
       if (tier) {
         await supabase
           .from('profiles')
           .update({ subscription_tier: tier })
           .eq('id', userId);
       }
+      // ★ Y3: Restore sonrası cache invalidate — tier değişmiş olabilir
+      try {
+        const { invalidateTierCache } = require('./gamification');
+        invalidateTierCache(userId);
+      } catch {}
 
       return { restoredTier: tier || 'Free' };
     } catch (e) {
@@ -312,6 +322,11 @@ export const RevenueCatService = {
         .from('profiles')
         .update({ subscription_tier: 'Free' })
         .eq('id', userId);
+      // ★ Y3: Downgrade sonrası tier cache temizle — premium feature'lar hemen kilitlensin
+      try {
+        const { invalidateTierCache } = require('./gamification');
+        invalidateTierCache(userId);
+      } catch {}
       return !error;
     }
 

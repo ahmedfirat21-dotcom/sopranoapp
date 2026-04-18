@@ -154,6 +154,16 @@ async function _getUserTier(userId: string): Promise<string> {
 }
 
 /**
+ * ★ Y3: Tier cache invalidate — subscription purchase/downgrade/webhook sonrası
+ * çağrılmalı. Çağrılmadığında user 5 dakika premium feature'lara erişmeye devam
+ * edebilir. userId verilmezse tüm cache temizlenir.
+ */
+export function invalidateTierCache(userId?: string) {
+  if (userId) _tierCache.delete(userId);
+  else _tierCache.clear();
+}
+
+/**
  * SP kazandır — cooldown ve cap kontrollü.
  * ★ Pro: 2× çarpan, Plus: 1.25× çarpan (aktivite bazlı kazanımlarda).
  * Başarılıysa kazandırılan miktarı döndürür, başarısızsa 0.
