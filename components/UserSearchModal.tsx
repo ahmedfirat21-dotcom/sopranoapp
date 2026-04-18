@@ -257,12 +257,12 @@ export function UserSearchModal({ visible, onClose, currentUserId, onSelectUser,
                   contentContainerStyle={{ paddingBottom: 40 }}
                   ListHeaderComponent={
                     <>
-                      {/* Takip Ettiklerin */}
+                      {/* Arkadaşların */}
                       {friends.length > 0 && (
                         <>
                           <View style={s.sectionHeader}>
                             <Ionicons name="people" size={13} color={Colors.text3} />
-                            <Text style={s.sectionTitle}>Takip Ettiklerin</Text>
+                            <Text style={s.sectionTitle}>Arkadaşların</Text>
                           </View>
                           {friends.map((item) => (
                             <Pressable
@@ -309,7 +309,7 @@ export function UserSearchModal({ visible, onClose, currentUserId, onSelectUser,
                       {friends.length === 0 && suggestedUsers.length === 0 && (
                         <View style={s.emptyState}>
                           <Ionicons name="people-outline" size={36} color="rgba(92,225,230,0.2)" />
-                          <Text style={s.emptyText}>Henüz kimseyi takip etmiyorsun</Text>
+                          <Text style={s.emptyText}>Henüz arkadaşın yok</Text>
                           <Text style={s.emptySubtext}>Yukarıdaki arama çubuğundan tüm üyeleri arayabilirsin!</Text>
                         </View>
                       )}

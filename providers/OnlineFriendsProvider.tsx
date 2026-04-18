@@ -47,30 +47,23 @@ export function OnlineFriendsProvider({ userId, children }: { userId: string | n
   const refreshFriends = useCallback(async () => {
     if (!userId) return;
     try {
-      const [following, followers, blocked] = await Promise.all([
-        FriendshipService.getFollowing(userId),
-        FriendshipService.getFollowers(userId),
+      // ★ Facebook tarzı arkadaşlık refactor: getFriends() bidirectional accepted
+      // union döner; eski getFollowing + getFollowers birleştirme silindi.
+      const [friends, blocked] = await Promise.all([
+        FriendshipService.getFriends(userId),
         ModerationService.getBlockedUsers(userId),
       ]);
       const blockedSet = new Set(blocked);
       setBlockedIds(blockedSet);
       blockedIdsRef.current = blockedSet;
 
-      // Birleştir + deduplicate (following + followers)
-      const seen = new Set<string>();
-      const merged: FollowUser[] = [];
-      for (const f of [...following, ...followers]) {
-        if (!seen.has(f.id) && f.id !== userId && !blockedSet.has(f.id)) {
-          seen.add(f.id);
-          merged.push(f);
-        }
-      }
+      const filtered: FollowUser[] = friends.filter((f: FollowUser) => f.id !== userId && !blockedSet.has(f.id));
       // Online olanlar en üste
-      merged.sort((a, b) => (b.is_online ? 1 : 0) - (a.is_online ? 1 : 0));
+      filtered.sort((a, b) => (b.is_online ? 1 : 0) - (a.is_online ? 1 : 0));
 
-      setAllFriends(merged);
-      setOnlineFriends(merged.filter((f: FollowUser) => f.is_online));
-      setFriendIds(new Set(merged.map((f: FollowUser) => f.id)));
+      setAllFriends(filtered);
+      setOnlineFriends(filtered.filter((f: FollowUser) => f.is_online));
+      setFriendIds(new Set(filtered.map((f: FollowUser) => f.id)));
     } catch (e) {
       if (__DEV__) console.warn('[OnlineFriends] Load error:', e);
     }

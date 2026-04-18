@@ -112,12 +112,12 @@ export const PushService = {
     );
   },
 
-  /** Takip bildirimi gönder */
+  /** Arkadaşlık bildirimi gönder — legacy follow fonksiyon ismi korundu. */
   async sendFollowNotification(targetUserId: string, followerName: string, followerId: string): Promise<void> {
     await this.sendToUser(
       targetUserId,
-      '👤 Yeni Takipçi',
-      `${followerName} seni takip etmeye başladı`,
+      '👥 Yeni Arkadaş',
+      `${followerName} seninle arkadaş oldu`,
       { type: 'follow', route: `/user/${followerId}` }
     );
   },

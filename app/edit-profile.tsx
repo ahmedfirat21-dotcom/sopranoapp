@@ -708,7 +708,7 @@ export default function EditProfileScreen() {
               </View>
             </View>
             <View style={{ flexDirection: 'row', gap: 8 }}>
-              {([['public', 'Herkes', 'globe-outline'], ['followers_only', 'Takipçiler', 'people-outline'], ['private', 'Gizli', 'lock-closed']] as const).map(([mode, label, icon]) => (
+              {([['public', 'Herkes', 'globe-outline'], ['followers_only', 'Arkadaşlar', 'people-outline'], ['private', 'Gizli', 'lock-closed']] as const).map(([mode, label, icon]) => (
                 <Pressable
                   key={mode}
                   style={[{

@@ -10,6 +10,7 @@ import { useAuth, useTheme } from '../_layout';
 import { supabase } from '../../constants/supabase';
 import { ReferralService } from '../../services/referral';
 import { ProfileService } from '../../services/database';
+import { FriendshipService } from '../../services/friendship';
 import { showToast } from '../../components/Toast';
 import FollowListModal from '../../components/FollowListModal';
 import AppBackground from '../../components/AppBackground';
@@ -63,18 +64,15 @@ export default function ProfileScreen() {
   const loadStats = useCallback(async () => {
     if (!userId) return;
     try {
-      const [followerRes, followingRes, roomRes] = await Promise.all([
-        supabase.from('friendships').select('*', { count: 'exact', head: true })
-          .eq('friend_id', userId).eq('status', 'accepted'),
-        supabase.from('friendships').select('*', { count: 'exact', head: true })
-          .eq('user_id', userId).eq('status', 'accepted'),
-        supabase.from('rooms').select('*', { count: 'exact', head: true })
-          .eq('host_id', userId),
+      // ★ Facebook tarzı: tek arkadaş count (bidirectional accepted union)
+      const [friendCount, roomRes] = await Promise.all([
+        FriendshipService.getFriendCount(userId),
+        supabase.from('rooms').select('*', { count: 'exact', head: true }).eq('host_id', userId),
       ]);
 
       setStats({
-        followers: followerRes.count ?? 0,
-        following: followingRes.count ?? 0,
+        followers: friendCount,
+        following: friendCount,
         rooms: roomRes.count ?? 0,
       });
 
@@ -177,16 +175,11 @@ export default function ProfileScreen() {
             </Pressable>
           </View>
 
-          {/* Stat Satırı */}
+          {/* ★ Facebook tarzı: tek Arkadaş sayısı */}
           <View style={p.statsRow}>
             <Pressable style={p.statItem} onPress={() => { setFollowModalTab('followers'); setFollowModalVisible(true); }}>
               <Text style={p.statNum}>{stats.followers}</Text>
-              <Text style={p.statLabelClickable}>Takipçi</Text>
-            </Pressable>
-            <View style={p.statDiv} />
-            <Pressable style={p.statItem} onPress={() => { setFollowModalTab('following'); setFollowModalVisible(true); }}>
-              <Text style={p.statNum}>{stats.following}</Text>
-              <Text style={p.statLabelClickable}>Takip</Text>
+              <Text style={p.statLabelClickable}>Arkadaş</Text>
             </Pressable>
             <View style={p.statDiv} />
             <Pressable style={p.statItem} onPress={() => router.push('/(tabs)/myrooms' as any)}>

@@ -674,24 +674,24 @@ export default function CreateRoomScreen() {
                 </Pressable>
               )}
 
-              {/* ── Takipçilere Özel — Pro+ ── */}
+              {/* ── Arkadaşlara Özel — Pro+ ── */}
               {isTierAtLeast(tier, 'Pro') ? (
                 <Pressable style={s.advRow} onPress={() => setFollowersOnly(!followersOnly)}>
                   <Ionicons name="people" size={16} color={followersOnly ? '#D4AF37' : '#64748B'} />
                   <View style={{ flex: 1 }}>
-                    <Text style={s.advLabel}>{followersOnly ? 'Takipçilere Özel' : 'Herkese Açık'}</Text>
-                    <Text style={s.advDesc}>{followersOnly ? 'Sadece takipçiler katılabilir' : 'Herkes odaya katılabilir'}</Text>
+                    <Text style={s.advLabel}>{followersOnly ? 'Arkadaşlara Özel' : 'Herkese Açık'}</Text>
+                    <Text style={s.advDesc}>{followersOnly ? 'Sadece arkadaşların katılabilir' : 'Herkes odaya katılabilir'}</Text>
                   </View>
                   <View style={[s.switchTrack, followersOnly && s.switchTrackActive]}>
                     <View style={[s.switchKnob, followersOnly && s.switchKnobActive]} />
                   </View>
                 </Pressable>
               ) : (
-                <Pressable style={[s.advRow, { opacity: 0.4 }]} onPress={() => showToast({ title: '🔒 Pro ile açılır', message: 'Takipçilere özel mod Pro ve üzeri üyeliklerde kullanılabilir.', type: 'info' })}>
+                <Pressable style={[s.advRow, { opacity: 0.4 }]} onPress={() => showToast({ title: '🔒 Pro ile açılır', message: 'Arkadaşlara özel mod Pro ve üzeri üyeliklerde kullanılabilir.', type: 'info' })}>
                   <Ionicons name="people-outline" size={16} color="#475569" />
                   <View style={{ flex: 1 }}>
-                    <Text style={[s.advLabel, { color: '#475569' }]}>Takipçilere Özel</Text>
-                    <Text style={s.advDesc}>Sadece takipçiler girebilir</Text>
+                    <Text style={[s.advLabel, { color: '#475569' }]}>Arkadaşlara Özel</Text>
+                    <Text style={s.advDesc}>Sadece arkadaşlar girebilir</Text>
                   </View>
                   <View style={s.lockBadge}><Ionicons name="lock-closed" size={9} color="#F59E0B" /><Text style={s.lockText}>Pro</Text></View>
                 </Pressable>

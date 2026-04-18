@@ -1,9 +1,15 @@
 /**
- * SopranoChat — Arkadaşlık / Takip Servis Katmanı
- * Instagram tarzı karşılıklı onay sistemi:
- *   follow()  → pending istek oluşturur
- *   approve() → kabul eder (accepted)
- *   reject()  → reddeder (siler)
+ * SopranoChat — Arkadaşlık Servis Katmanı
+ *
+ * ★ Facebook tarzı çift yönlü arkadaşlık (2026-04-18 refactor'ı):
+ *   sendFriendRequest() → pending istek oluşturur
+ *   acceptFriendRequest() → kabul eder (accepted, çift yönlü geçerli)
+ *   rejectFriendRequest() → reddeder (siler)
+ *   removeFriend() → arkadaşlığı kaldırır (iki yönlü silinir)
+ *   isFriend() → A ve B accepted mi (user_id/friend_id sırasından bağımsız)
+ *
+ * Legacy API aliases (follow/unfollow/approveRequest/rejectRequest/isFollowing)
+ * korunuyor; yeni kod yeni isimleri kullanmalı.
  */
 import { supabase } from '../constants/supabase';
 import { PushService } from './push';
@@ -20,6 +26,7 @@ export type Friendship = {
   created_at: string;
 };
 
+/** ★ Legacy ad — FriendUser ile aynı. Kod geçişi tamamlanınca kaldırılacak. */
 export type FollowUser = {
   id: string;
   display_name: string;
@@ -28,6 +35,7 @@ export type FollowUser = {
   subscription_tier: string;
   is_online: boolean;
 };
+export type FriendUser = FollowUser;
 
 export type PendingRequest = {
   id: string;
@@ -103,7 +111,7 @@ export const FriendshipService = {
       // Push bildirim gönder
       const { data: follower } = await supabase.from('profiles').select('display_name').eq('id', userId).single();
       const name = follower?.display_name || 'Birisi';
-      PushService.sendToUser(targetId, 'Takip İsteği', `${name} seni takip etmek istiyor`, {
+      PushService.sendToUser(targetId, 'Arkadaşlık İsteği', `${name} seninle arkadaş olmak istiyor`, {
         type: 'follow_request',
         route: `/notifications`,
       }).catch(() => {});
@@ -115,7 +123,7 @@ export const FriendshipService = {
           sender_id: userId,
           type: 'follow_request',
           reference_id: null,
-          body: 'seni takip etmek istiyor',
+          body: 'seninle arkadaş olmak istiyor',
         });
         if (nErr && __DEV__) console.warn('[Friendship] Bildirim insert hatası:', nErr.message);
       } catch (notifErr) {
@@ -349,7 +357,7 @@ export const FriendshipService = {
       // Onaylayan kullanıcıya bildirim gönder
       const { data: approver } = await supabase.from('profiles').select('display_name').eq('id', userId).single();
       const name = approver?.display_name || 'Birisi';
-      PushService.sendToUser(followerId, 'Takip Onaylandı', `${name} takip isteğini kabul etti`, {
+      PushService.sendToUser(followerId, 'Arkadaşlık Kabul Edildi', `${name} seninle arkadaş oldu`, {
         type: 'follow_accepted',
         route: `/user/${userId}`,
       }).catch(() => {});
@@ -361,7 +369,7 @@ export const FriendshipService = {
           sender_id: userId,
           type: 'follow_accepted',
           reference_id: null,
-          body: 'takip isteğini kabul etti',
+          body: 'arkadaşlık isteğini kabul etti',
         });
         if (nErr && __DEV__) console.warn('[Friendship] Onay bildirimi insert hatası:', nErr.message);
       } catch (notifErr) {
@@ -619,6 +627,8 @@ export const FriendshipService = {
 
   /**
    * A kullanıcısı B'yi takip ediyor mu? (accepted durumunda)
+   * ★ Legacy: Unidirectional check — yalnızca (userId→targetId, accepted) eşleşmesi.
+   * Yeni kod isFriend() kullanmalı (bidirectional).
    */
   async isFollowing(userId: string, targetId: string): Promise<boolean> {
     const { data } = await supabase
@@ -629,6 +639,112 @@ export const FriendshipService = {
       .eq('status', 'accepted')
       .maybeSingle();
     return !!data;
+  },
+
+  // ═════════════════════════════════════════════════════════
+  // ★ Facebook tarzı arkadaşlık API'ları (2026-04-18)
+  // ═════════════════════════════════════════════════════════
+
+  /**
+   * İki kullanıcı arasında accepted arkadaşlık var mı? (çift yönlü)
+   * (a,b,accepted) VEYA (b,a,accepted) doğruysa true.
+   */
+  async isFriend(userA: string, userB: string): Promise<boolean> {
+    if (userA === userB) return false;
+    const { data } = await supabase
+      .from('friendships')
+      .select('id, user_id, friend_id, status')
+      .or(`and(user_id.eq.${userA},friend_id.eq.${userB}),and(user_id.eq.${userB},friend_id.eq.${userA})`)
+      .eq('status', 'accepted')
+      .limit(1);
+    return !!(data && data.length > 0);
+  },
+
+  /** Arkadaşlık isteği gönder — follow() alias. */
+  async sendFriendRequest(fromUserId: string, targetUserId: string) {
+    return this.follow(fromUserId, targetUserId);
+  },
+
+  /** Arkadaşlık isteğini kabul et — approveRequest() alias. */
+  async acceptFriendRequest(userId: string, requesterId: string) {
+    return this.approveRequest(userId, requesterId);
+  },
+
+  /** Arkadaşlık isteğini reddet — rejectRequest() alias. */
+  async rejectFriendRequest(userId: string, requesterId: string) {
+    return this.rejectRequest(userId, requesterId);
+  },
+
+  /**
+   * Arkadaşlığı kaldır — unfollow() alias AMA bidirectional:
+   * hem (userId→friendId) hem (friendId→userId) satırlarını siler.
+   */
+  async removeFriend(userId: string, friendId: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      await supabase
+        .from('friendships')
+        .delete()
+        .or(`and(user_id.eq.${userId},friend_id.eq.${friendId}),and(user_id.eq.${friendId},friend_id.eq.${userId})`)
+        .eq('status', 'accepted');
+      return { success: true };
+    } catch (e: any) {
+      return { success: false, error: e?.message || 'Arkadaşlık kaldırılamadı' };
+    }
+  },
+
+  /**
+   * Kullanıcının tüm arkadaşları — çift yönlü accepted birleşik liste.
+   * Hem "beni takip eden accepted" hem "benim takip ettiğim accepted" kayıtlar.
+   */
+  async getFriends(userId: string): Promise<FriendUser[]> {
+    // Kullanıcı A olarak benim user_id'yim, partner friend_id olur
+    const [outRes, inRes] = await Promise.all([
+      supabase
+        .from('friendships')
+        .select('friend_id, friend:profiles!friend_id(id, display_name, avatar_url, username, subscription_tier, is_online)')
+        .eq('user_id', userId)
+        .eq('status', 'accepted'),
+      supabase
+        .from('friendships')
+        .select('user_id, user:profiles!user_id(id, display_name, avatar_url, username, subscription_tier, is_online)')
+        .eq('friend_id', userId)
+        .eq('status', 'accepted'),
+    ]);
+
+    const map = new Map<string, FriendUser>();
+    (outRes.data || []).forEach((r: any) => {
+      const p = Array.isArray(r.friend) ? r.friend[0] : r.friend;
+      if (p?.id) map.set(p.id, p);
+    });
+    (inRes.data || []).forEach((r: any) => {
+      const p = Array.isArray(r.user) ? r.user[0] : r.user;
+      if (p?.id) map.set(p.id, p);
+    });
+    return Array.from(map.values());
+  },
+
+  /** Arkadaş sayısı — çift yönlü tekil count. */
+  async getFriendCount(userId: string): Promise<number> {
+    const friends = await this.getFriends(userId);
+    return friends.length;
+  },
+
+  /**
+   * Bekleyen gelen istekler — getFollowRequests() alias.
+   * Legacy implementasyonu var, rename edilmez.
+   */
+  async getPendingFriendRequests(userId: string) {
+    // Dışarıda getFollowRequests varsa onu kullan, yoksa inline
+    if (typeof (this as any).getFollowRequests === 'function') {
+      return (this as any).getFollowRequests(userId);
+    }
+    const { data } = await supabase
+      .from('friendships')
+      .select('id, user_id, created_at, sender:profiles!user_id(id, display_name, avatar_url, username, subscription_tier)')
+      .eq('friend_id', userId)
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false });
+    return (data || []) as any;
   },
 
   // ============================================

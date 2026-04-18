@@ -36,9 +36,9 @@ const NOTIF_CONFIG: Record<string, { icon: string; color: string; verb: string }
   like: { icon: 'heart', color: '#EF4444', verb: 'gönderini beğendi' },
   comment: { icon: 'chatbubble', color: '#3B82F6', verb: 'gönderine yorum yaptı' },
   gift: { icon: 'gift', color: '#F59E0B', verb: 'sana hediye gönderdi' },
-  follow: { icon: 'person-add', color: '#14B8A6', verb: 'seni takip etmeye başladı' },
-  follow_request: { icon: 'person-add', color: '#F59E0B', verb: 'seni takip etmek istiyor' },
-  follow_accepted: { icon: 'checkmark-circle', color: '#10B981', verb: 'takip isteğini kabul etti' },
+  follow: { icon: 'person-add', color: '#14B8A6', verb: 'seninle arkadaş oldu' },
+  follow_request: { icon: 'person-add', color: '#F59E0B', verb: 'seninle arkadaş olmak istiyor' },
+  follow_accepted: { icon: 'checkmark-circle', color: '#10B981', verb: 'arkadaşlık isteğini kabul etti' },
   // ★ BUG-F8 FIX: follow_rejected config'i eklendi (cooldown mekanizması için internal kayıt)
   // Görüntülenmez — FlatList'te filtrelenir (BUG-F19)
   follow_rejected: { icon: 'close-circle-outline', color: '#94A3B8', verb: '' },
@@ -281,7 +281,7 @@ export default function NotificationsScreen() {
               <EmptyState
                 icon="notifications-outline"
                 title="Bildirim yok"
-                subtitle="Yeni takipçiler, hediyeler ve mesajlar burada görünecek"
+                subtitle="Arkadaşlık istekleri, hediyeler ve mesajlar burada görünecek"
               />
             ) : null
           }

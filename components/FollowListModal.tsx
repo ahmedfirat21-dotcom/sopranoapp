@@ -1,7 +1,9 @@
 /**
- * FollowListModal — X.com/Instagram tarzı Takipçi/Takip Edilen Listesi
- * Profil sayfasındaki Takipçi/Takip sayılarına tıklandığında açılır.
- * Her satırda: Unfollow, Çıkar (Remove), Engelle aksiyonları.
+ * FollowListModal — Facebook tarzı Arkadaş Listesi (2026-04-18 refactor)
+ * Profil sayfasındaki "Arkadaş" sayısına tıklandığında açılır.
+ * Tek liste: çift yönlü accepted (bidirectional) arkadaşlar.
+ * Her satırda: Arkadaşlıktan Çıkar, Engelle aksiyonları.
+ * NOT: initialTab prop'u legacy için tutulur, UI tek liste gösterir.
  */
 import React, { useState, useEffect, useCallback } from 'react';
 import {
@@ -39,14 +41,12 @@ export default function FollowListModal({
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [f1, f2] = await Promise.all([
-        FriendshipService.getFollowers(userId),
-        FriendshipService.getFollowing(userId),
-      ]);
-      setFollowers(f1);
-      setFollowing(f2);
+      // ★ Facebook tarzı: tek bidirectional arkadaş listesi
+      const friends = await FriendshipService.getFriends(userId);
+      setFollowers(friends);
+      setFollowing(friends);
     } catch (e) {
-      if (__DEV__) console.warn('[FollowList] Load error:', e);
+      if (__DEV__) console.warn('[FriendList] Load error:', e);
     } finally {
       setLoading(false);
     }
@@ -58,37 +58,28 @@ export default function FollowListModal({
 
   const list = tab === 'followers' ? followers : following;
 
-  // ★ Aksiyonlar
-  const handleRemoveFollower = (targetId: string, name: string) => {
+  // ★ Facebook tarzı: tek "Arkadaşlıktan Çıkar" aksiyonu (bidirectional remove)
+  const handleRemoveFriend = (targetId: string, name: string) => {
     setCAlert({
       visible: true,
-      title: 'Takipçiyi Çıkar',
-      message: `${name} artık seni takip etmesin mi?`,
+      title: 'Arkadaşlıktan Çıkar',
+      message: `${name} ile arkadaşlığın sona ersin mi?`,
       type: 'warning',
       buttons: [
         { text: 'Vazgeç', style: 'cancel' },
         {
           text: 'Çıkar', style: 'destructive', onPress: async () => {
             setActionLoading(targetId);
-            const result = await FriendshipService.removeFollower(userId, targetId);
+            const result = await FriendshipService.removeFriend(currentUserId, targetId);
             if (result.success) {
               setFollowers(prev => prev.filter(f => f.id !== targetId));
+              setFollowing(prev => prev.filter(f => f.id !== targetId));
             }
             setActionLoading(null);
           }
         },
       ],
     });
-  };
-
-  const handleUnfollow = async (targetId: string) => {
-    setActionLoading(targetId);
-    // ★ BUG-F3 FIX: currentUserId kullan (profil sahibi değil, giriş yapan kullanıcı)
-    const result = await FriendshipService.unfollow(currentUserId, targetId);
-    if (result.success) {
-      setFollowing(prev => prev.filter(f => f.id !== targetId));
-    }
-    setActionLoading(null);
   };
 
   const handleBlock = (targetId: string, name: string) => {
@@ -139,29 +130,13 @@ export default function FollowListModal({
           <View style={st.actions}>
             {isActioning ? (
               <ActivityIndicator size="small" color="#14B8A6" />
-            ) : tab === 'followers' ? (
-              <>
-                <Pressable
-                  style={st.removeBtn}
-                  onPress={() => handleRemoveFollower(item.id, item.display_name)}
-                >
-                  <Text style={st.removeBtnText}>Çıkar</Text>
-                </Pressable>
-                <Pressable
-                  style={st.blockBtn}
-                  onPress={() => handleBlock(item.id, item.display_name)}
-                  hitSlop={6}
-                >
-                  <Ionicons name="ban" size={14} color="#EF4444" />
-                </Pressable>
-              </>
             ) : (
               <>
                 <Pressable
-                  style={st.unfollowBtn}
-                  onPress={() => handleUnfollow(item.id)}
+                  style={st.removeBtn}
+                  onPress={() => handleRemoveFriend(item.id, item.display_name)}
                 >
-                  <Text style={st.unfollowBtnText}>Takipten Çık</Text>
+                  <Text style={st.removeBtnText}>Çıkar</Text>
                 </Pressable>
                 <Pressable
                   style={st.blockBtn}
@@ -182,26 +157,15 @@ export default function FollowListModal({
     <Modal visible={visible} animationType="slide" transparent statusBarTranslucent>
       <View style={st.overlay}>
         <View style={st.sheet}>
-          {/* Header */}
+          {/* ★ Facebook tarzı: tek "Arkadaşlar" başlığı */}
           <View style={st.header}>
             <View style={{ width: 28 }} />
             <View style={st.tabs}>
-              <Pressable
-                style={[st.tab, tab === 'followers' && st.tabActive]}
-                onPress={() => setTab('followers')}
-              >
-                <Text style={[st.tabText, tab === 'followers' && st.tabTextActive]}>
-                  Takipçiler ({followers.length})
+              <View style={[st.tab, st.tabActive]}>
+                <Text style={[st.tabText, st.tabTextActive]}>
+                  Arkadaşlar ({followers.length})
                 </Text>
-              </Pressable>
-              <Pressable
-                style={[st.tab, tab === 'following' && st.tabActive]}
-                onPress={() => setTab('following')}
-              >
-                <Text style={[st.tabText, tab === 'following' && st.tabTextActive]}>
-                  Takip ({following.length})
-                </Text>
-              </Pressable>
+              </View>
             </View>
             <Pressable onPress={onClose} hitSlop={12}>
               <Ionicons name="close" size={20} color="#94A3B8" />
@@ -216,9 +180,7 @@ export default function FollowListModal({
           ) : list.length === 0 ? (
             <View style={st.empty}>
               <Ionicons name="people-outline" size={36} color="rgba(255,255,255,0.1)" />
-              <Text style={st.emptyText}>
-                {tab === 'followers' ? 'Henüz takipçi yok' : 'Henüz kimse takip edilmiyor'}
-              </Text>
+              <Text style={st.emptyText}>Henüz arkadaş yok</Text>
             </View>
           ) : (
             <FlatList

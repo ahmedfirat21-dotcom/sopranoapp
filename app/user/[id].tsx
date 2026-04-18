@@ -76,20 +76,15 @@ export default function UserProfileScreen() {
         } catch {}
       }
 
-      // Istatistikler
-      const [followerCount, followingCount] = await Promise.all([
-        FriendshipService.getFollowerCount(id),
-        FriendshipService.getFollowingCount(id),
+      // Istatistikler — Facebook tarzı arkadaşlık: tek "arkadaş" sayısı
+      const [friendCount, { count: roomCount }] = await Promise.all([
+        FriendshipService.getFriendCount(id),
+        supabase.from('rooms').select('*', { count: 'exact', head: true }).eq('host_id', id),
       ]);
 
-      const { count: roomCount } = await supabase
-        .from('rooms')
-        .select('*', { count: 'exact', head: true })
-        .eq('host_id', id);
-
       setStats({
-        followers: followerCount,
-        following: followingCount,
+        followers: friendCount,  // legacy alan adı korundu; UI'da "Arkadaş" olarak render
+        following: friendCount,
         rooms: roomCount ?? 0,
       });
 
@@ -326,16 +321,11 @@ export default function UserProfileScreen() {
             </View>
           </View>
 
-          {/* Stat Satırı — Pressable: tıklayınca FollowListModal */}
+          {/* ★ Facebook tarzı: tek Arkadaş sayısı */}
           <View style={s.statsRow}>
             <Pressable style={s.statItem} onPress={() => { setFollowListTab('followers'); setShowFollowList(true); }}>
               <Text style={s.statNum}>{stats.followers}</Text>
-              <Text style={s.statLabelClickable}>Takipçi</Text>
-            </Pressable>
-            <View style={s.statDiv} />
-            <Pressable style={s.statItem} onPress={() => { setFollowListTab('following'); setShowFollowList(true); }}>
-              <Text style={s.statNum}>{stats.following}</Text>
-              <Text style={s.statLabelClickable}>Takip</Text>
+              <Text style={s.statLabelClickable}>Arkadaş</Text>
             </Pressable>
             <View style={s.statDiv} />
             <View style={s.statItem}>
@@ -355,7 +345,7 @@ export default function UserProfileScreen() {
                   <Ionicons name="person-add" size={16} color="#F59E0B" />
                   <Text style={s.incomingBannerText}>
                     <Text style={{ fontWeight: '800', color: '#F1F5F9' }}>{userProfile.display_name}</Text>
-                    {' '}seni takip etmek istiyor
+                    {' '}seninle arkadaş olmak istiyor
                   </Text>
                 </View>
                 <View style={s.incomingBannerActions}>
@@ -388,14 +378,13 @@ export default function UserProfileScreen() {
                   <ActivityIndicator size="small" color="#fff" />
                 ) : isBlocked ? (
                   <Text style={[s.followBtnText, { color: '#EF4444' }]}>Engellendi</Text>
-                ) : isMutual ? (
-                  <><Ionicons name="swap-horizontal" size={16} color="#F1F5F9" /><Text style={[s.followBtnText, { color: '#F1F5F9' }]}>Karşılıklı Takip</Text></>
-                ) : isFollowing ? (
-                  <Text style={[s.followBtnText, { color: 'rgba(255,255,255,0.8)' }]}>Takip Ediliyor</Text>
+                ) : (isMutual || isFollowing) ? (
+                  // ★ Facebook tarzı: herhangi bir yönde accepted = arkadaş
+                  <><Ionicons name="people" size={16} color="#F1F5F9" /><Text style={[s.followBtnText, { color: '#F1F5F9' }]}>Arkadaş</Text></>
                 ) : isPending ? (
-                  <Text style={[s.followBtnText, { color: '#FBBF24' }]}>Bekliyor</Text>
+                  <Text style={[s.followBtnText, { color: '#FBBF24' }]}>İstek Gönderildi</Text>
                 ) : (
-                  <Text style={s.followBtnText}>Takip Et</Text>
+                  <><Ionicons name="person-add-outline" size={16} color="#fff" /><Text style={s.followBtnText}>Arkadaş Ekle</Text></>
                 )}
               </Pressable>
               {/* ★ S1 FIX: Mesaj → herkese açık (DM-8 isteği yönetir), Arama → sadece karşılıklı takip */}
@@ -420,7 +409,7 @@ export default function UserProfileScreen() {
           <View style={{ marginHorizontal: 16, marginBottom: 10, padding: 20, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.04)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', alignItems: 'center' }}>
             <Ionicons name="lock-closed" size={28} color="#94A3B8" />
             <Text style={{ color: '#94A3B8', fontSize: 13, fontWeight: '600', marginTop: 8, textAlign: 'center' }}>Bu hesap gizli</Text>
-            <Text style={{ color: '#64748B', fontSize: 11, marginTop: 4, textAlign: 'center' }}>İçerikleri görmek için takip et</Text>
+            <Text style={{ color: '#64748B', fontSize: 11, marginTop: 4, textAlign: 'center' }}>İçerikleri görmek için arkadaş ol</Text>
           </View>
         )}
 
