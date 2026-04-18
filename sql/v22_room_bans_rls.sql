@@ -13,10 +13,16 @@
 -- ════════════════════════════════════════════════════════════════════
 
 DO $$ BEGIN
+  -- Eski (v13) adları
   EXECUTE 'DROP POLICY IF EXISTS "bans_select" ON room_bans';
   EXECUTE 'DROP POLICY IF EXISTS "bans_insert" ON room_bans';
   EXECUTE 'DROP POLICY IF EXISTS "bans_update" ON room_bans';
   EXECUTE 'DROP POLICY IF EXISTS "bans_delete" ON room_bans';
+  -- Yeni adlar (idempotent re-run — daha önce uygulandıysa temizle)
+  EXECUTE 'DROP POLICY IF EXISTS "bans_select_public" ON room_bans';
+  EXECUTE 'DROP POLICY IF EXISTS "bans_insert_mod_only" ON room_bans';
+  EXECUTE 'DROP POLICY IF EXISTS "bans_update_mod_only" ON room_bans';
+  EXECUTE 'DROP POLICY IF EXISTS "bans_delete_mod_only" ON room_bans';
 EXCEPTION WHEN undefined_table THEN NULL;
 END $$;
 
