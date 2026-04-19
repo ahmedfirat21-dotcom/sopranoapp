@@ -219,9 +219,10 @@ export const RevenueCatService = {
    * @returns Yeni tier veya null (iptal/hata)
    */
   async purchasePackage(
-    pkg: any,
+    _pkgOrOpts: any,
     userId: string,
     targetTier: SubscriptionTier,
+    billingCycle: 'monthly' | 'yearly' | 'annual' = 'monthly',
   ): Promise<{ newTier: SubscriptionTier | null; error?: string }> {
     // ★ Dev-only mock: geliştirme sırasında DB direct update ile test
     if (REVENUECAT_MOCK_MODE && __DEV__) {
@@ -252,7 +253,21 @@ export const RevenueCatService = {
     if (!this._Purchases) return { newTier: null, error: 'RevenueCat SDK hazır değil' };
 
     try {
-      const { customerInfo } = await this._Purchases.purchasePackage(pkg);
+      // ★ 2026-04-20: Doğru paketi RevenueCat offerings'ten çek.
+      // default offering = Plus, 'pro' offering = Pro. Kullanıcı tier + billingCycle
+      // kombinasyonuna göre monthly/annual paket seçilir.
+      const offerings = await this._Purchases.getOfferings();
+      const offeringId = targetTier === 'Pro' ? 'pro' : 'default';
+      const offering = offerings?.all?.[offeringId] || (offeringId === 'default' ? offerings?.current : null);
+      if (!offering) {
+        return { newTier: null, error: `${targetTier} paketi bulunamadı. Dashboard yapılandırmasını kontrol edin.` };
+      }
+      const isYearly = billingCycle === 'yearly' || billingCycle === 'annual';
+      const packageToUse = isYearly ? offering.annual : offering.monthly;
+      if (!packageToUse) {
+        return { newTier: null, error: `${isYearly ? 'Yıllık' : 'Aylık'} paket mevcut değil.` };
+      }
+      const { customerInfo } = await this._Purchases.purchasePackage(packageToUse);
       const newTier = this._extractTierFromCustomerInfo(customerInfo);
 
       // DB'yi güncelle (webhook'a yedek olarak)

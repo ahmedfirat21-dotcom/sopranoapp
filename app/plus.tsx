@@ -128,9 +128,10 @@ export default function PlusScreen() {
             if (mountedRef.current) setActivating(true);
             try {
               const result = await RevenueCatService.purchasePackage(
-                { identifier: `tier_${selectedPlan.id}`, billingCycle },
+                null,
                 profile.id,
                 selectedPlan.tier,
+                billingCycle,
               );
               if (!mountedRef.current) return;
               if (result.error) throw new Error(result.error);
