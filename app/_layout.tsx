@@ -582,6 +582,31 @@ export default function RootLayout() {
     })();
   }, [isAuthReady, isLoggedIn]);
 
+  // ★ 2026-04-19: Boost auto-expire cleanup — app startup'ta günde 1 kez
+  // v28'de tanımlı cleanup_expired_boosts() RPC'yi çağır. Expired profile/room
+  // boost'larını DB'den temizler. AsyncStorage throttle ile aynı gün içinde
+  // tekrar çağrılmaz.
+  useEffect(() => {
+    if (!isAuthReady || !isLoggedIn) return;
+    (async () => {
+      try {
+        const lastRunRaw = await AsyncStorage.getItem('soprano_boost_cleanup_last');
+        const lastRun = lastRunRaw ? parseInt(lastRunRaw, 10) : 0;
+        const DAY_MS = 24 * 60 * 60 * 1000;
+        if (Date.now() - lastRun < DAY_MS) return;
+        const { data, error } = await supabase.rpc('cleanup_expired_boosts');
+        if (error) {
+          if (__DEV__) console.warn('[BoostCleanup] RPC hatası:', error.message);
+          return;
+        }
+        await AsyncStorage.setItem('soprano_boost_cleanup_last', String(Date.now()));
+        if (__DEV__) console.log('[BoostCleanup] ok', data);
+      } catch (e) {
+        if (__DEV__) console.warn('[BoostCleanup] exception:', e);
+      }
+    })();
+  }, [isAuthReady, isLoggedIn]);
+
   // Profili Supabase'den yükle (Eskisi gibi yoksa hemen OLUŞTURMA! Onboarding ekranında oluşturulacak)
   // ★ 2026-04-18 FIX: Retry mekanizması — reload/token refresh sırasında network
   // kesintisinde ProfileService.get throw ediyor; 3 deneme ile 400ms aralıklarla retry.
