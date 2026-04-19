@@ -10,20 +10,15 @@ import type { RoomParticipant } from '../../services/database';
 const { width: W } = Dimensions.get('window');
 
 // ★ Dinamik sahne boyutlandırma — modern platform grid sistemi (Clubhouse/Spaces pattern)
-// 2026-04-19: Yüksek kullanıcı yoğunluğunda viewport'a sığması için 5-col compact mode
-// eklendi (10-13 speaker). cardHeight artık cardWidth'e eşit değil, high-density'de
-// isim için yer bırakılarak sabit tutuluyor.
 function getSpeakerMetrics(count: number) {
   const availableW = W - 32;
   let cols: number, gap: number;
   if (count <= 2) { cols = 2; gap = 12; }
-  else if (count <= 4) { cols = 2; gap = 10; }
   else if (count <= 6) { cols = 3; gap = 10; }
-  else if (count <= 9) { cols = 4; gap = 8; }
-  else { cols = 5; gap = 6; } // 10-13 compact: 5 kolon, 3 satır
+  else if (count <= 9) { cols = 3; gap = 8; }
+  else { cols = 4; gap = 6; } // 10-13 compact
   const cardWidth = Math.floor((availableW - gap * (cols - 1)) / cols);
-  // ★ High-density'de kare yerine daha kısa kart (avatar + isim için yeterli)
-  const cardHeight = count > 9 ? Math.floor(cardWidth * 0.95) : cardWidth;
+  const cardHeight = cardWidth;
   return { cols, cardWidth, cardHeight, gap };
 }
 

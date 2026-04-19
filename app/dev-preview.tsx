@@ -3,9 +3,6 @@
  * gözle görmek için. Mock data ile SpeakerSection + ListenerGrid render edilir.
  * Gerçek component'ler + fix'ler aktif, DB'ye yazmaz.
  * Route: /dev-preview
- *
- * 2026-04-19 update: ScrollView kaldırıldı — senaryolarda tek viewport fit
- * hedeflendi, scroll varsa UI'da bir sorun var demektir.
  */
 import React, { useMemo, useState } from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet, Dimensions } from 'react-native';
@@ -72,7 +69,9 @@ export default function DevPreview() {
   const { stageUsers, listeners } = useMemo(() => {
     let idx = 0;
     const stage: RoomParticipant[] = [];
+    // 1 host
     stage.push(makeParticipant(idx++, 'owner'));
+    // Speakers (speakers - 1 because host counts)
     for (let i = 1; i < scenario.speakers; i++) {
       const role = i === 1 && scenario.speakers > 3 ? 'moderator' : 'speaker';
       stage.push(makeParticipant(idx++, role, i % 4 === 0));
@@ -111,26 +110,28 @@ export default function DevPreview() {
       <View style={s.scenarioInfo}>
         <Text style={s.scenarioLabel}>{scenario.description}</Text>
         <Text style={s.scenarioStats}>
-          Stage: {scenario.speakers} | Listener: {scenario.listeners} | Seyirci: {scenario.spectators}
+          Stage: {scenario.speakers} | Listener: {scenario.listeners} | Seyirci: {scenario.spectators} | Max: {scenario.maxListeners}
         </Text>
       </View>
 
-      {/* ★ Odanın asıl gövdesi — flex:1 ile tek viewport içinde kalacak.
-          Eğer içerik sığmazsa bir senaryo bozuk demektir: UI'da fix gerekir. */}
-      <View style={s.roomBody}>
-        {/* Stage — shrinkable, gerektiği kadar yer alır */}
-        <View style={s.stageWrap}>
-          <SpeakerSection
-            stageUsers={stageUsers}
-            getMicStatus={mockMicStatus}
-            onSelectUser={() => {}}
-            currentUserId="mock_user_0"
-          />
+      <ScrollView style={s.content} contentContainerStyle={{ paddingBottom: 40 }}>
+        <View style={s.sectionLabel}>
+          <Text style={s.sectionLabelText}>🎤 Stage ({scenario.speakers})</Text>
         </View>
+        <SpeakerSection
+          stageUsers={stageUsers}
+          getMicStatus={mockMicStatus}
+          onSelectUser={() => {}}
+          currentUserId="mock_user_0"
+        />
 
-        {/* Listener grid — sabit yükseklik cap'i, aşarsa "Tümü" drawer'a düşer */}
-        {(scenario.listeners > 0 || scenario.spectators > 0) && (
-          <View style={s.listenerWrap}>
+        {scenario.listeners > 0 || scenario.spectators > 0 ? (
+          <>
+            <View style={[s.sectionLabel, { marginTop: 20 }]}>
+              <Text style={s.sectionLabelText}>
+                👥 Listener grid cap: {W < 360 ? 10 : W < 400 ? 14 : 18} (tier max: {scenario.maxListeners})
+              </Text>
+            </View>
             <ListenerGrid
               listeners={listeners}
               onSelectUser={() => {}}
@@ -139,18 +140,9 @@ export default function DevPreview() {
               roomOwnerId="mock_user_0"
               onShowAllUsers={() => {}}
             />
-          </View>
-        )}
-
-        {/* Sahte bottom control bar (gerçek odadaki gibi görsel ipucu) */}
-        <View style={[s.fakeControls, { paddingBottom: insets.bottom + 8 }]}>
-          <View style={s.fakeBtn}><Ionicons name="mic" size={18} color="#fff" /></View>
-          <View style={s.fakeBtn}><Ionicons name="chatbubble" size={18} color="#fff" /></View>
-          <View style={s.fakeBtn}><Ionicons name="hand-right" size={18} color="#fff" /></View>
-          <View style={s.fakeBtn}><Ionicons name="gift" size={18} color="#fff" /></View>
-          <View style={[s.fakeBtn, { backgroundColor: '#EF4444' }]}><Ionicons name="exit" size={18} color="#fff" /></View>
-        </View>
-      </View>
+          </>
+        ) : null}
+      </ScrollView>
     </View>
   );
 }
@@ -161,33 +153,16 @@ const s = StyleSheet.create({
   backBtn: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
   title: { flex: 1, fontSize: 16, fontWeight: '700', color: '#F1F5F9', textAlign: 'center' },
   screenInfo: { fontSize: 11, color: '#64748B', fontWeight: '600' },
-  tabs: { maxHeight: 44, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.04)' },
+  tabs: { maxHeight: 48, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.04)' },
   tabsInner: { paddingHorizontal: 12, alignItems: 'center', gap: 6 },
-  tab: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.04)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' },
+  tab: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.04)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' },
   tabActive: { backgroundColor: 'rgba(20,184,166,0.15)', borderColor: '#14B8A6' },
   tabText: { fontSize: 12, color: '#94A3B8', fontWeight: '600' },
   tabTextActive: { color: '#14B8A6', fontWeight: '700' },
-  scenarioInfo: { paddingHorizontal: 14, paddingVertical: 6, backgroundColor: 'rgba(20,184,166,0.04)' },
-  scenarioLabel: { fontSize: 12, color: '#E2E8F0', fontWeight: '600' },
-  scenarioStats: { fontSize: 10, color: '#64748B', marginTop: 1, fontFamily: 'monospace' },
-
-  roomBody: { flex: 1, overflow: 'hidden' },
-  stageWrap: { paddingTop: 8, paddingHorizontal: 4 },
-  listenerWrap: { flex: 1, marginTop: 4, paddingHorizontal: 4, overflow: 'hidden' },
-  fakeControls: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    paddingTop: 10,
-    paddingHorizontal: 12,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.06)',
-    backgroundColor: 'rgba(15,25,38,0.95)',
-  },
-  fakeBtn: {
-    width: 42, height: 42, borderRadius: 21,
-    backgroundColor: '#3E4E5F',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  scenarioInfo: { paddingHorizontal: 14, paddingVertical: 8, backgroundColor: 'rgba(20,184,166,0.04)' },
+  scenarioLabel: { fontSize: 13, color: '#E2E8F0', fontWeight: '600' },
+  scenarioStats: { fontSize: 11, color: '#64748B', marginTop: 2, fontFamily: 'monospace' },
+  content: { flex: 1 },
+  sectionLabel: { paddingHorizontal: 14, paddingTop: 12, paddingBottom: 6 },
+  sectionLabelText: { fontSize: 12, color: '#64748B', fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase' },
 });
