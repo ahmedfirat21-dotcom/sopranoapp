@@ -91,7 +91,7 @@ export default function InlineChat({ messages, maxLines = 6 }: Props) {
 
         return (
           <AnimatedMsg key={msg.id} delay={idx === 0 ? 0 : 30}>
-            <Text style={[s.msgLine, { opacity }]} numberOfLines={2}>
+            <Text style={[s.msgLine, { opacity }]} numberOfLines={3} ellipsizeMode="tail">
               <Text style={s.msgName}>{msg.profiles?.display_name || 'Kullanıcı'}  </Text>
               <Text style={s.msgText}>{msg.content}</Text>
             </Text>

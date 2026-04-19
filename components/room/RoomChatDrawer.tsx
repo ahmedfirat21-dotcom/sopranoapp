@@ -8,7 +8,8 @@ import { getAvatarSource } from '../../constants/avatars';
 import { useSwipeToDismiss } from '../../hooks/useSwipeToDismiss';
 
 const { width: W, height: H } = Dimensions.get('window');
-const PANEL_W = W * 0.72; // DM paneli ile aynı genişlik
+// ★ Responsive: küçük ekranlarda (320dp civarı) chat drawer daha geniş olmalı ki input kullanılabilir olsun
+const PANEL_W = W < 360 ? Math.floor(W * 0.9) : Math.floor(W * 0.72);
 
 interface ChatMsg {
   id: string;

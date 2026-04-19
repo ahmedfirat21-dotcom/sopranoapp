@@ -118,10 +118,15 @@ export default function ListenerGrid({ listeners, onSelectUser, selectedUserId, 
     });
   }, [listeners, roomOwnerId, micRequestUserIds]);
 
-  // ★ Tier bazlı max grid kapasitesi — sadece listener'lar gösterilir
-  const visibleListeners = sortedListeners.slice(0, maxListeners);
-  const overflowListeners = listeners.length - maxListeners;
-  const overflowCount = Math.max(0, overflowListeners) + spectatorCount;
+  // ★ 2026-04-19: Grid'de gösterilen dinleyici sayısı estetik cap — tier kapasitesi
+  // daha yüksek olsa da (Plus=25, Pro=999) belli bir sayıdan sonrası avatar/isim
+  // okunamaz hale geliyor. Cap ekran genişliğine göre: küçük cihazlarda daha az.
+  // Overflow "+N Seyirci" badge'e düşer, AudienceDrawer'dan tümüne erişilir.
+  const GRID_VISIBLE_CAP = W < 360 ? 10 : W < 400 ? 14 : 18;
+  const gridCap = Math.min(maxListeners, GRID_VISIBLE_CAP);
+  const visibleListeners = sortedListeners.slice(0, gridCap);
+  const overflowListeners = Math.max(0, listeners.length - gridCap);
+  const overflowCount = overflowListeners + spectatorCount;
 
   // ★ Dinamik boyut hesapla
   const { avatarGap, cellW, avatarSize } = getGridMetrics(visibleListeners.length);

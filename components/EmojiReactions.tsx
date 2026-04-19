@@ -231,6 +231,9 @@ export const FloatingReactionsView = forwardRef<FloatingReactionsRef, {}>((_prop
   // ★ D1: Unmount sırasında dangling animasyon setState yakalanmasın.
   const mountedRef = useRef(true);
   const activeAnimsRef = useRef<Animated.CompositeAnimation[]>([]);
+  // ★ 2026-04-19: Spawn rate limit — sliding window max 8 burst/1sn. Spam veya
+  // hızlı tıklamada gereksiz Animated.Value oluşturulmasını önler.
+  const spawnTimesRef = useRef<number[]>([]);
   useEffect(() => {
     mountedRef.current = true;
     return () => {
@@ -243,6 +246,10 @@ export const FloatingReactionsView = forwardRef<FloatingReactionsRef, {}>((_prop
   const spawn = useCallback((emoji: string) => {
     if (!mountedRef.current) return;
     if (emoji.startsWith('[gif:')) return;
+    const now = Date.now();
+    spawnTimesRef.current = spawnTimesRef.current.filter(t => now - t < 1000);
+    if (spawnTimesRef.current.length >= 8) return;
+    spawnTimesRef.current.push(now);
     const id = ++emojiCounter;
     const anim = new Animated.Value(0);
     const startX = W * 0.3 + Math.random() * W * 0.4;

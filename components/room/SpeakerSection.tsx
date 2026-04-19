@@ -249,7 +249,7 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, isMe, cardWidth, 
           <Ionicons name={mic ? 'mic' : 'mic-off'} size={14} color="#fff" />
         </View>
       </View>
-      <Text style={[s.speakerName, isHost && { color: '#FFD700' }, isMod && !isHost && { color: '#C4B5FD' }]} numberOfLines={1}>{displayName}</Text>
+      <Text style={[s.speakerName, { maxWidth: cardWidth - 8, fontSize: cardWidth < 95 ? 10 : 11 }, isHost && { color: '#FFD700' }, isMod && !isHost && { color: '#C4B5FD' }]} numberOfLines={1} ellipsizeMode="tail">{displayName}</Text>
       {isMe && (
         <Pressable style={({ pressed }) => [s.selfDemoteHint, pressed && { opacity: 0.6 }]} onPress={onSelfDemote}>
           <Ionicons name="arrow-down-circle-outline" size={11} color="rgba(251,191,36,0.7)" />
