@@ -134,6 +134,11 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       await GoogleSignin.hasPlayServices();
+      // ★ Hesap seçici her zaman görünsün — önceden signOut + revokeAccess yap.
+      // Aksi halde son giriş yapılan Google hesabı otomatik seçilir, kullanıcı başka
+      // hesap seçme şansı bulamaz.
+      try { await GoogleSignin.signOut(); } catch {}
+      try { await GoogleSignin.revokeAccess(); } catch {}
       const userInfo = await GoogleSignin.signIn() as any;
       const idToken = userInfo?.data?.idToken || userInfo?.idToken;
       if (idToken) {

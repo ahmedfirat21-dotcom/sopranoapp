@@ -172,10 +172,15 @@ export default function PlusScreen() {
     <AppBackground><View style={styles.container}>{/* Header */}
       <View style={[styles.header, { paddingTop: Math.max(insets.top, 20) + 8 }]}>
         <Pressable onPress={() => safeGoBack(router)} style={styles.backBtn}>
-          <Ionicons name="chevron-back" size={24} color={Colors.text} />
+          <Ionicons name="chevron-back" size={24} color={Colors.text} style={{
+            textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4,
+          }} />
         </Pressable>
         <Text style={styles.headerTitle}>Üyelik Planları</Text>
-        <Ionicons name="star" size={22} color={Colors.gold} />
+        <Ionicons name="star" size={22} color={Colors.gold} style={{
+          textShadowColor: `${Colors.gold}dd`,
+          textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 10,
+        }} />
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 16) + 20 }}>

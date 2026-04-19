@@ -7,7 +7,8 @@ import {
   View, Text, StyleSheet, ScrollView, Pressable, Switch,
   Linking,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { safeGoBack } from '../constants/navigation';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -41,66 +42,65 @@ try {
 // ═══════════════════════════════════════════════════════════
 type SettingItem = {
   key: string;
-  icon: keyof typeof Ionicons.glyphMap;
+  icon: string; // MCI name
   label: string;
   desc?: string;
   type: 'toggle' | 'select' | 'action' | 'link';
   color?: string;
-  bg?: string;
   danger?: boolean;
   /** Ana toggle kapalıyken bu satır disabled olsun */
   parentKey?: string;
 };
 
-const SETTING_GROUPS: { title: string; icon: keyof typeof Ionicons.glyphMap; items: SettingItem[] }[] = [
+const SETTING_GROUPS: { title: string; icon: string; color: string; items: SettingItem[] }[] = [
   {
-    title: 'Bildirimler', icon: 'notifications-outline',
+    title: 'Bildirimler', icon: 'bell-ring', color: '#14B8A6',
     items: [
-      { key: 'notifications_enabled', icon: 'notifications', label: 'Bildirimler', desc: 'Push bildirimleri aç/kapat', type: 'toggle', color: '#14B8A6', bg: 'rgba(20,184,166,0.18)' },
-      { key: 'notification_sound', icon: 'musical-notes', label: 'Bildirim Sesi', desc: 'Bildirim gelince ses çal', type: 'toggle', parentKey: 'notifications_enabled', color: '#A78BFA', bg: 'rgba(167,139,250,0.18)' },
-      { key: 'notification_vibration', icon: 'phone-portrait', label: 'Titreşim', desc: 'Bildirimde titreşim', type: 'toggle', parentKey: 'notifications_enabled', color: '#60A5FA', bg: 'rgba(96,165,250,0.18)' },
+      { key: 'notifications_enabled', icon: 'bell', label: 'Bildirimler', desc: 'Push bildirimleri aç/kapat', type: 'toggle', color: '#14B8A6' },
+      { key: 'notification_sound', icon: 'music-note', label: 'Bildirim Sesi', desc: 'Bildirim gelince ses çal', type: 'toggle', parentKey: 'notifications_enabled', color: '#A78BFA' },
+      { key: 'notification_vibration', icon: 'vibrate', label: 'Titreşim', desc: 'Bildirimde titreşim', type: 'toggle', parentKey: 'notifications_enabled', color: '#60A5FA' },
     ],
   },
   {
-    title: 'Görünüm', icon: 'color-palette-outline',
+    title: 'Görünüm', icon: 'palette', color: '#FBBF24',
     items: [
-      { key: 'theme', icon: 'color-fill', label: 'Tema', desc: 'Uygulama teması seç', type: 'select', color: '#FBBF24', bg: 'rgba(251,191,36,0.18)' },
-      { key: 'language', icon: 'language', label: 'Dil', desc: 'Türkçe (Yakında: English)', type: 'action', color: '#34D399', bg: 'rgba(52,211,153,0.18)' },
+      { key: 'theme', icon: 'palette-swatch', label: 'Tema', desc: 'Uygulama teması seç', type: 'select', color: '#FBBF24' },
+      { key: 'language', icon: 'translate', label: 'Dil', desc: 'Türkçe (Yakında: English)', type: 'action', color: '#34D399' },
     ],
   },
   {
-    title: 'Gizlilik', icon: 'shield-checkmark-outline',
+    title: 'Gizlilik', icon: 'shield-check', color: '#22C55E',
     items: [
-      { key: 'show_online_status', icon: 'logo-designernews', label: 'Çevrimiçi Durumu', desc: 'Diğerleri seni çevrimiçi görsün', type: 'toggle', color: '#22C55E', bg: 'rgba(34,197,94,0.18)' },
-      { key: 'profile_private', icon: 'lock-closed', label: 'Gizli Profil', desc: 'Sadece takipçiler', type: 'toggle', color: '#F59E0B', bg: 'rgba(245,158,11,0.18)' },
+      { key: 'show_online_status', icon: 'eye', label: 'Çevrimiçi Durumu', desc: 'Diğerleri seni çevrimiçi görsün', type: 'toggle', color: '#22C55E' },
+      { key: 'profile_private', icon: 'lock', label: 'Gizli Profil', desc: 'Sadece takipçiler', type: 'toggle', color: '#F59E0B' },
     ],
   },
   {
-    title: 'Hesap', icon: 'person-circle-outline',
+    title: 'Hesap', icon: 'account-circle', color: '#38BDF8',
     items: [
-      { key: 'edit_profile', icon: 'create', label: 'Profili Düzenle', type: 'action', color: '#38BDF8', bg: 'rgba(56,189,248,0.18)' },
-      { key: 'blocked_users', icon: 'ban', label: 'Engellenen Kullanıcılar', desc: 'Engellediğin kişileri yönet', type: 'action', color: '#FB923C', bg: 'rgba(251,146,60,0.18)' },
+      { key: 'edit_profile', icon: 'account-edit', label: 'Profili Düzenle', type: 'action', color: '#38BDF8' },
+      { key: 'blocked_users', icon: 'account-cancel', label: 'Engellenen Kullanıcılar', desc: 'Engellediğin kişileri yönet', type: 'action', color: '#FB923C' },
     ],
   },
   {
-    title: 'Hakkında', icon: 'information-circle-outline',
+    title: 'Hakkında', icon: 'information', color: '#818CF8',
     items: [
-      { key: 'terms', icon: 'document-text', label: 'Kullanım Koşulları', type: 'link', color: '#94A3B8', bg: 'rgba(148,163,184,0.15)' },
-      { key: 'privacy', icon: 'shield-checkmark', label: 'Gizlilik Politikası', type: 'link', color: '#14B8A6', bg: 'rgba(20,184,166,0.18)' },
-      { key: 'version', icon: 'code-slash', label: 'Versiyon', desc: 'v2.0.0', type: 'action', color: '#818CF8', bg: 'rgba(129,140,248,0.18)' },
+      { key: 'terms', icon: 'file-document', label: 'Kullanım Koşulları', type: 'link', color: '#94A3B8' },
+      { key: 'privacy', icon: 'shield-lock', label: 'Gizlilik Politikası', type: 'link', color: '#14B8A6' },
+      { key: 'version', icon: 'code-tags', label: 'Versiyon', desc: 'v2.0.0', type: 'action', color: '#818CF8' },
     ],
   },
   {
-    title: 'Abonelik', icon: 'card-outline',
+    title: 'Abonelik', icon: 'credit-card', color: '#D4AF37',
     items: [
-      { key: 'restore_purchases', icon: 'refresh-circle', label: 'Satın Almaları Geri Yükle', desc: 'Cihaz değişikliği sonrası premium\'u geri yükle', type: 'action', color: '#D4AF37', bg: 'rgba(212,175,55,0.18)' },
+      { key: 'restore_purchases', icon: 'refresh', label: 'Satın Almaları Geri Yükle', desc: 'Cihaz değişikliği sonrası premium\'u geri yükle', type: 'action', color: '#D4AF37' },
     ],
   },
   {
-    title: 'Oturum', icon: 'log-out-outline',
+    title: 'Oturum', icon: 'logout-variant', color: '#EF4444',
     items: [
-      { key: 'logout', icon: 'log-out', label: 'Çıkış Yap', type: 'action', danger: true, color: '#EF4444', bg: 'rgba(239,68,68,0.15)' },
-      { key: 'delete_account', icon: 'trash', label: 'Hesabı Sil', desc: 'Tüm veriler kalıcı olarak silinir', type: 'action', danger: true, color: '#EF4444', bg: 'rgba(239,68,68,0.15)' },
+      { key: 'logout', icon: 'logout-variant', label: 'Çıkış Yap', type: 'action', danger: true, color: '#FBBF24' },
+      { key: 'delete_account', icon: 'trash-can', label: 'Hesabı Sil', desc: 'Tüm veriler kalıcı olarak silinir', type: 'action', danger: true, color: '#EF4444' },
     ],
   },
 ];
@@ -422,26 +422,49 @@ export default function SettingsScreen() {
       >
         {SETTING_GROUPS.map((group, gi) => (
           <View key={gi} style={s.group}>
-            {/* Group Header */}
+            {/* Group Header — teal accent + MCI icon */}
             <View style={s.groupHeader}>
-              <Ionicons name={group.icon} size={16} color={Colors.accentTeal} />
+              <View style={[s.groupAccent, { backgroundColor: group.color }]} />
+              <MaterialCommunityIcons name={group.icon as any} size={14} color={group.color} style={{
+                textShadowColor: `${group.color}cc`,
+                textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 8,
+              }} />
               <Text style={s.groupTitle}>{group.title}</Text>
             </View>
 
-            {/* Items */}
+            {/* Items card — wallet ile aynı 3 katmanlı derinlik */}
             <View style={s.groupCard}>
+              <LinearGradient
+                colors={['#1a2334', '#0D1220', '#050912']}
+                start={{ x: 0, y: 0 }} end={{ x: 0.7, y: 1 }}
+                style={StyleSheet.absoluteFillObject}
+              />
+              <LinearGradient
+                colors={[`${group.color}33`, `${group.color}0d`, 'transparent']}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                style={StyleSheet.absoluteFillObject}
+              />
+              <LinearGradient
+                colors={['transparent', `${group.color}dd`, 'transparent']}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                style={s.groupTopEdge}
+              />
+
               {group.items.map((item, ii) => {
                 const isLast = ii === group.items.length - 1;
                 const settingValue = (settings as any)[item.key];
-                // Parent toggle kontrolü — parent kapalıysa bu satır disabled
                 const isDisabledByParent = item.parentKey ? !(settings as any)[item.parentKey] : false;
 
                 return (
                   <Pressable
                     key={item.key}
-                    style={[s.row, !isLast && s.rowBorder, isDisabledByParent && { opacity: 0.4 }]}
+                    style={({ pressed }) => [
+                      s.row,
+                      !isLast && s.rowBorder,
+                      isDisabledByParent && { opacity: 0.4 },
+                      pressed && { backgroundColor: 'rgba(255,255,255,0.04)' },
+                    ]}
                     disabled={isDisabledByParent}
-                    android_ripple={{ color: 'rgba(255,255,255,0.05)' }}
                     onPress={() => {
                       if (isDisabledByParent) return;
                       if (item.type === 'action' || item.type === 'link') {
@@ -457,17 +480,17 @@ export default function SettingsScreen() {
                       }
                     }}
                   >
-                    {/* Sol: ikon + label */}
-                    <View style={[s.rowIcon, item.bg && { backgroundColor: item.bg, borderRadius: 9 }]}>
-                      <Ionicons
-                        name={item.icon}
-                        size={17}
-                        color={item.color || '#94A3B8'}
-                        style={{ textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }}
-                      />
-                    </View>
+                    <MaterialCommunityIcons
+                      name={item.icon as any}
+                      size={22}
+                      color={item.color || '#94A3B8'}
+                      style={[s.rowIcon, {
+                        textShadowColor: `${item.color || '#94A3B8'}cc`,
+                        textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 9,
+                      }]}
+                    />
                     <View style={s.rowText}>
-                      <Text style={[s.rowLabel, item.danger && { color: '#EF4444' }]}>
+                      <Text style={[s.rowLabel, item.danger && { color: item.color || '#EF4444' }]}>
                         {item.label}
                       </Text>
                       {item.desc && (
@@ -475,7 +498,6 @@ export default function SettingsScreen() {
                       )}
                     </View>
 
-                    {/* Sağ: toggle / select value / chevron */}
                     {item.type === 'toggle' && (
                       <Switch
                         value={!!settingValue}
@@ -483,9 +505,9 @@ export default function SettingsScreen() {
                           if (isDisabledByParent) return;
                           updateSetting(item.key as keyof UserSettings, v);
                         }}
-                        trackColor={{ false: '#475569', true: '#14B8A6' }}
+                        trackColor={{ false: '#1E293B', true: item.color || '#14B8A6' }}
                         thumbColor="#FFFFFF"
-                        ios_backgroundColor="#475569"
+                        ios_backgroundColor="#1E293B"
                         disabled={isDisabledByParent}
                         style={{ transform: [{ scaleX: 0.9 }, { scaleY: 0.9 }] }}
                       />
@@ -493,24 +515,31 @@ export default function SettingsScreen() {
                     {item.type === 'select' && (
                       <View style={s.selectRow}>
                         {item.key === 'theme' ? (
-                          <Ionicons 
-                            name={settingValue === 'light' ? 'sunny' : 'moon'} 
-                            size={22} 
-                            color={settingValue === 'light' ? '#FBBF24' : '#94A3B8'} 
-                            style={{ textShadowColor: settingValue === 'light' ? 'rgba(251,191,36,0.4)' : 'rgba(148,163,184,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 }}
+                          <MaterialCommunityIcons
+                            name={settingValue === 'light' ? 'weather-sunny' : 'weather-night'}
+                            size={22}
+                            color={settingValue === 'light' ? '#FBBF24' : '#94A3B8'}
+                            style={{
+                              textShadowColor: settingValue === 'light' ? 'rgba(251,191,36,0.7)' : 'rgba(148,163,184,0.4)',
+                              textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 8,
+                            }}
                           />
                         ) : item.key === 'language' ? (
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(255,255,255,0.06)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 }}>
+                          <View style={s.langPill}>
                             <Text style={{ fontSize: 13 }}>{settingValue === 'en' ? '🇬🇧' : '🇹🇷'}</Text>
-                            <Text style={[s.selectValue, { color: '#E2E8F0', letterSpacing: 1 }]}>
+                            <Text style={s.selectValue}>
                               {settingValue === 'en' ? 'EN' : 'TR'}
                             </Text>
                           </View>
                         ) : null}
                       </View>
                     )}
-                    {(item.type === 'action' || item.type === 'link') && !item.danger && (
-                      <Ionicons name="chevron-forward" size={16} color="#475569" />
+                    {(item.type === 'action' || item.type === 'link') && (
+                      <Ionicons
+                        name="chevron-forward"
+                        size={14}
+                        color={item.danger ? `${item.color || '#EF4444'}80` : 'rgba(255,255,255,0.22)'}
+                      />
                     )}
                   </Pressable>
                 );
@@ -540,8 +569,9 @@ const s = StyleSheet.create({
     paddingBottom: 12,
   },
   headerTitle: {
-    fontSize: 18, fontWeight: '700', color: '#F1F5F9',
+    fontSize: 20, fontWeight: '800', color: '#F1F5F9',
     letterSpacing: 0.3,
+    ...Shadows.text,
   },
 
   // Groups
@@ -552,51 +582,61 @@ const s = StyleSheet.create({
   groupHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginBottom: 6,
+    gap: 8,
+    marginBottom: 8,
     paddingLeft: 4,
   },
+  groupAccent: {
+    width: 3, height: 14, borderRadius: 2,
+  },
   groupTitle: {
-    fontSize: 11, fontWeight: '800', color: '#94A3B8',
-    letterSpacing: 1, textTransform: 'uppercase',
-    ...Shadows.textLight,
+    fontSize: 11, fontWeight: '900', color: '#CBD5E1',
+    letterSpacing: 1.2, textTransform: 'uppercase',
+    ...Shadows.text,
   },
 
-  // Card container
+  // Card container — premium 3 katmanlı (wallet ile tutarlı)
   groupCard: {
-    backgroundColor: '#414e5f',
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#95a1ae',
+    borderColor: 'rgba(255,255,255,0.06)',
     overflow: 'hidden',
-    ...Shadows.card,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.5,
+    shadowRadius: 14,
+    elevation: 8,
+  },
+  groupTopEdge: {
+    position: 'absolute', top: 0, left: 0, right: 0, height: 1,
   },
 
   // Row
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    gap: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    gap: 14,
   },
   rowBorder: {
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.06)',
+    borderBottomWidth: 0.5,
+    borderBottomColor: 'rgba(255,255,255,0.05)',
   },
   rowIcon: {
-    width: 32, height: 32, alignItems: 'center', justifyContent: 'center',
+    width: 26, textAlign: 'center',
   },
   rowText: {
     flex: 1,
   },
   rowLabel: {
-    fontSize: 14, fontWeight: '600', color: '#F1F5F9',
-    ...Shadows.textLight,
+    fontSize: 14, fontWeight: '600', color: '#E2E8F0',
+    letterSpacing: 0.15,
+    textShadowColor: 'rgba(0,0,0,0.45)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
   rowDesc: {
-    fontSize: 11, color: '#64748B', marginTop: 1,
-    ...Shadows.textLight,
+    fontSize: 11, color: 'rgba(148,163,184,0.75)', marginTop: 2, fontWeight: '500',
+    textShadowColor: 'rgba(0,0,0,0.35)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
   },
 
   // Select
@@ -606,6 +646,13 @@ const s = StyleSheet.create({
     gap: 4,
   },
   selectValue: {
-    fontSize: 13, fontWeight: '600', color: Colors.accentTeal,
+    fontSize: 13, fontWeight: '700', color: '#E2E8F0', letterSpacing: 1,
+    textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
+  },
+  langPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: 'rgba(52,211,153,0.1)',
+    borderWidth: 1, borderColor: 'rgba(52,211,153,0.25)',
+    paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8,
   },
 });

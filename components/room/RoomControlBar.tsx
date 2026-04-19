@@ -7,9 +7,9 @@ const BTN_SIZE = 34;
 const TEAL_BTN_SIZE = 40;
 
 // ★ Premium 3D cam butonlar — SolidCircleBtn ile aynı gradient stili, daha küçük boyut
-function BarBtn({ children, onPress, badge, active, accent }: {
+function BarBtn({ children, onPress, badge, active, accent, label }: {
   children: React.ReactNode; onPress: () => void; badge?: number;
-  active?: boolean; accent?: string;
+  active?: boolean; accent?: string; label?: string;
 }) {
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const handleIn = () => Animated.spring(scaleAnim, { toValue: 1.12, useNativeDriver: true, damping: 8, stiffness: 300 }).start();
@@ -26,7 +26,8 @@ function BarBtn({ children, onPress, badge, active, accent }: {
   const darken = (hex: string, pct: number) => lighten(hex, -pct);
 
   return (
-    <Pressable onPress={onPress} onPressIn={handleIn} onPressOut={handleOut} style={{ position: 'relative' }}>
+    <Pressable onPress={onPress} onPressIn={handleIn} onPressOut={handleOut} style={{ position: 'relative' }}
+      accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ selected: !!active }}>
       <Animated.View style={[
         s.btn, s.solidBtn3d,
         { transform: [{ scale: scaleAnim }] },
@@ -49,7 +50,7 @@ function BarBtn({ children, onPress, badge, active, accent }: {
 }
 
 // ★ Premium 3D Solid butonlar (Mic / Cam / Volume / Hand) — gradient + glossy
-function SolidCircleBtn({ children, onPress, active, activeColor, inactiveColor }: { children: React.ReactNode; onPress: () => void; active?: boolean; activeColor: string; inactiveColor: string }) {
+function SolidCircleBtn({ children, onPress, active, activeColor, inactiveColor, label }: { children: React.ReactNode; onPress: () => void; active?: boolean; activeColor: string; inactiveColor: string; label?: string }) {
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const handleIn = () => Animated.spring(scaleAnim, { toValue: 1.1, useNativeDriver: true, damping: 8, stiffness: 300 }).start();
   const handleOut = () => Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true, damping: 12, stiffness: 200 }).start();
@@ -66,7 +67,8 @@ function SolidCircleBtn({ children, onPress, active, activeColor, inactiveColor 
   const darken = (hex: string, pct: number) => lighten(hex, -pct);
 
   return (
-    <Pressable onPress={onPress} onPressIn={handleIn} onPressOut={handleOut}>
+    <Pressable onPress={onPress} onPressIn={handleIn} onPressOut={handleOut}
+      accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ selected: !!active }}>
       <Animated.View style={[s.solidBtn, s.solidBtn3d, { transform: [{ scale: scaleAnim }] }]}>
         <LinearGradient
           colors={[lighten(baseColor, 20), baseColor, darken(baseColor, 30)] as any}
@@ -129,7 +131,10 @@ function MicRequestBtn({ onPress, isActive }: { onPress: () => void; isActive: b
   const shimmerOpacity = shimmerAnim.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0.08, 0.35, 0.08] });
 
   return (
-    <Pressable onPress={onPress} onPressIn={handleIn} onPressOut={handleOut}>
+    <Pressable onPress={onPress} onPressIn={handleIn} onPressOut={handleOut}
+      accessibilityRole="button"
+      accessibilityLabel={isActive ? 'El indirilsin (istek iptal)' : 'Mikrofon iste (el kaldır)'}
+      accessibilityState={{ selected: isActive }}>
       <View style={micS.wrap}>
         {/* Pulse ring — aktifken dışa yayılan halka */}
         {isActive && (
@@ -169,7 +174,7 @@ function ModQueueBtn({ onPress, count }: { onPress: () => void; count: number })
   const hasItems = count > 0;
 
   return (
-    <BarBtn onPress={onPress} badge={count} active={hasItems} accent="#FBBF24">
+    <BarBtn onPress={onPress} badge={count} active={hasItems} accent="#FBBF24" label={`Mikrofon istek kuyruğu${count > 0 ? `, ${count} bekleyen` : ''}`}>
       <Ionicons name="hand-right" size={17} color="#C8D6E0" style={s.iconDrop} />
     </BarBtn>
   );
@@ -258,7 +263,7 @@ export default function RoomControlBar({
               )}
             </View>
           ) : (
-            <BarBtn onPress={onChatPress} badge={chatBadgeCount} active={isChatOpen} accent="#3B82F6">
+            <BarBtn onPress={onChatPress} badge={chatBadgeCount} active={isChatOpen} accent="#3B82F6" label="Sohbet">
               <Ionicons name={isChatOpen ? 'chatbubble' : 'chatbubble-outline'} size={16} color={isChatOpen ? '#FFF' : '#C8D6E0'} style={s.iconDrop} />
             </BarBtn>
           )}
@@ -268,20 +273,20 @@ export default function RoomControlBar({
         <View style={s.centerGroup}>
           {isListener ? (
             <>
-              <SolidCircleBtn onPress={onMuteRoomPress || (() => { })} active={!isRoomMuted} activeColor="#14B8A6" inactiveColor="#3E4E5F">
+              <SolidCircleBtn onPress={onMuteRoomPress || (() => { })} active={!isRoomMuted} activeColor="#14B8A6" inactiveColor="#3E4E5F" label={isRoomMuted ? 'Oda sesini aç' : 'Oda sesini kapat'}>
                 <Ionicons name={isRoomMuted ? 'volume-mute' : 'volume-high'} size={18} color="#FFF" />
               </SolidCircleBtn>
 
-              <SolidCircleBtn onPress={onChatPress} active={isChatOpen} activeColor="#3B82F6" inactiveColor="#3E4E5F">
+              <SolidCircleBtn onPress={onChatPress} active={isChatOpen} activeColor="#3B82F6" inactiveColor="#3E4E5F" label="Sohbet">
                 <Ionicons name={isChatOpen ? 'chatbubble' : 'chatbubble-outline'} size={17} color="#FFF" />
               </SolidCircleBtn>
 
               {isOwnerInListenerMode ? (
-                <SolidCircleBtn onPress={onJoinStagePress || (() => { })} active activeColor="#D4AF37" inactiveColor="#3E4E5F">
+                <SolidCircleBtn onPress={onJoinStagePress || (() => { })} active activeColor="#D4AF37" inactiveColor="#3E4E5F" label="Sahneye geri dön">
                   <Ionicons name="mic" size={18} color="#FFF" />
                 </SolidCircleBtn>
               ) : isModInListenerMode ? (
-                <SolidCircleBtn onPress={onJoinStagePress || (() => { })} active activeColor="#A78BFA" inactiveColor="#3E4E5F">
+                <SolidCircleBtn onPress={onJoinStagePress || (() => { })} active activeColor="#A78BFA" inactiveColor="#3E4E5F" label="Sahneye geri dön">
                   <Ionicons name="shield-checkmark" size={17} color="#FFF" />
                 </SolidCircleBtn>
               ) : (
@@ -291,12 +296,12 @@ export default function RoomControlBar({
             </>
           ) : (
             <>
-              <SolidCircleBtn onPress={handleMicPress} active={isMicOn && !isForcedMuted} activeColor="#14B8A6" inactiveColor={isForcedMuted ? '#7F1D1D' : '#3E4E5F'}>
+              <SolidCircleBtn onPress={handleMicPress} active={isMicOn && !isForcedMuted} activeColor="#14B8A6" inactiveColor={isForcedMuted ? '#7F1D1D' : '#3E4E5F'} label={isForcedMuted ? 'Mikrofon kapalı (susturuldun)' : (isMicOn ? 'Mikrofonu kapat' : 'Mikrofonu aç')}>
                 <Ionicons name={isForcedMuted ? 'mic-off' : (isMicOn ? 'mic' : 'mic-off')} size={20} color={isForcedMuted ? '#FCA5A5' : '#FFF'} />
               </SolidCircleBtn>
 
               {showCamera && (
-                <SolidCircleBtn onPress={onCameraPress} active={isCameraOn} activeColor="#14B8A6" inactiveColor="#3E4E5F">
+                <SolidCircleBtn onPress={onCameraPress} active={isCameraOn} activeColor="#14B8A6" inactiveColor="#3E4E5F" label={isCameraOn ? 'Kamerayı kapat' : 'Kamerayı aç'}>
                   <Ionicons name={isCameraOn ? 'videocam' : 'videocam-off'} size={18} color="#FFF" />
                 </SolidCircleBtn>
               )}
@@ -306,7 +311,7 @@ export default function RoomControlBar({
 
         {/* ======================= SAĞ: UTILITY ======================= */}
         <View style={s.rightGroup}>
-          <BarBtn onPress={onEmojiPress} active={isEmojiOpen} accent="#D4A853">
+          <BarBtn onPress={onEmojiPress} active={isEmojiOpen} accent="#D4A853" label="Emoji/reaksiyon">
             <Ionicons name="happy-outline" size={18} color="#C8D6E0" style={s.iconDrop} />
           </BarBtn>
 
@@ -316,12 +321,12 @@ export default function RoomControlBar({
 
           {/* DM */}
           {onDmPress && (
-            <BarBtn onPress={onDmPress} badge={dmBadgeCount} active={isDmOpen || (dmBadgeCount !== undefined && dmBadgeCount > 0)} accent="#8B5CF6">
+            <BarBtn onPress={onDmPress} badge={dmBadgeCount} active={isDmOpen || (dmBadgeCount !== undefined && dmBadgeCount > 0)} accent="#8B5CF6" label="Mesajlar">
               <Ionicons name="mail-outline" size={16} color="#C8D6E0" style={s.iconDrop} />
             </BarBtn>
           )}
 
-          <BarBtn onPress={onPlusPress} active={isPlusOpen} accent="#14B8A6">
+          <BarBtn onPress={onPlusPress} active={isPlusOpen} accent="#14B8A6" label="Daha fazla seçenek">
             <Ionicons name="add-circle-outline" size={18} color="#C8D6E0" style={s.iconDrop} />
           </BarBtn>
         </View>

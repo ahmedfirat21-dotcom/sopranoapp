@@ -133,14 +133,25 @@ export function UserSearchModal({ visible, onClose, currentUserId, onSelectUser,
 
   const handleQueryChange = (text: string) => {
     setQuery(text);
-    // Debounce arama
-    const timeout = setTimeout(() => searchUsers(text), 400);
-    return () => clearTimeout(timeout);
+    // ★ Compose modunda DB araması yapmıyoruz — sadece arkadaşlar arasında filtre.
+    // Reason: MessageService arkadaş olmayan kullanıcılara mesaj engelliyor, UI
+    // bu kısıtlamayı yansıtmalı. Discover modunda tüm kullanıcılar aranır.
+    if (isDiscover) {
+      const timeout = setTimeout(() => searchUsers(text), 400);
+      return () => clearTimeout(timeout);
+    }
   };
 
   const isSearchMode = query.length >= 2;
-  // Keşfet modunda boş durumda: arkadaşlar + önerilen üyeler
-  const displayList = isSearchMode ? results : friends;
+  // ★ Compose modunda arama = arkadaşlar arasında client-side filter
+  const filteredFriends = isSearchMode && !isDiscover
+    ? friends.filter(f => {
+        const q = query.toLowerCase();
+        return (f.display_name || '').toLowerCase().includes(q) ||
+               (f.username || '').toLowerCase().includes(q);
+      })
+    : friends;
+  const displayList = isDiscover ? (isSearchMode ? results : friends) : filteredFriends;
 
   const renderUser = ({ item }: { item: Profile }) => (
     <Pressable

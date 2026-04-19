@@ -38,6 +38,25 @@ async function _requireRole(
 // ODA İŞLEMLERİ
 // ============================================
 export const RoomService = {
+  /**
+   * ★ Günlük oda açma limiti kontrolü — kullanıcı bugün limitini doldurmuş mu?
+   * Pro/admin için 999 = limitsiz, hiç kontrol yapmadan true döner.
+   * Create-room sayfasına navigate etmeden önce çağrılır.
+   */
+  async canCreateToday(userId: string, tier: SubscriptionTier): Promise<{ ok: boolean; count: number; limit: number }> {
+    const limits = getRoomLimits(tier);
+    if (limits.dailyRooms >= 999) return { ok: true, count: 0, limit: 999 };
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const { count } = await supabase
+      .from('rooms')
+      .select('id', { count: 'exact', head: true })
+      .eq('host_id', userId)
+      .gte('created_at', todayStart.toISOString());
+    const today = count || 0;
+    return { ok: today < limits.dailyRooms, count: today, limit: limits.dailyRooms };
+  },
+
   /** Tekil oda getir */
   async get(roomId: string): Promise<Room> {
     const { data, error } = await supabase
@@ -331,14 +350,20 @@ export const RoomService = {
 
     if (error) throw new Error('Oda uyandırılamadı: ' + error.message);
 
-    // Host'u katılımcı olarak ekle
+    // Host'u katılımcı olarak ekle — eski session'dan kalan mute/ban flag'leri temizle.
+    // ★ BUG FIX: upsert sadece belirtilen alanları günceller; is_muted/role öncesi
+    // sessiondan stale=true kalabiliyordu ve owner uyandığında sahnede sessize alınmış
+    // görünüyordu. Owner için tüm kısıtlayıcı flag'leri açıkça reset'liyoruz.
     try {
       await supabase.from('room_participants').upsert({
         room_id: roomId,
         user_id: hostId,
         role: 'owner',
+        is_muted: false,
         joined_at: now.toISOString(),
       }, { onConflict: 'room_id,user_id' });
+      // Eski room_mutes kaydı varsa sil (owner asla muted olmamalı)
+      await supabase.from('room_mutes').delete().eq('room_id', roomId).eq('user_id', hostId);
     } catch { /* upsert hatası sessiz */ }
 
     return data as Room;
@@ -809,7 +834,24 @@ export const RoomService = {
     // room_settings JSONB merge
     if (updates.room_settings) {
       const existingSettings = (room.room_settings || {}) as RoomSettings;
-      dbUpdates.room_settings = { ...existingSettings, ...updates.room_settings };
+      const incoming = { ...updates.room_settings } as any;
+
+      // ★ SEC-PWD: Şifre güncellendiyse hash'le (create'te olduğu gibi) — plaintext DB'ye yazma
+      // Tersten erişim: aynı hash tekrar update edilmesin diye, incoming.room_password
+      // zaten 64-char hex ise (SHA-256 hash) atla.
+      if (typeof incoming.room_password === 'string' && incoming.room_password.length > 0) {
+        const alreadyHashed = /^[a-f0-9]{64}$/i.test(incoming.room_password);
+        if (!alreadyHashed) {
+          incoming.room_password = await hashRoomPassword(incoming.room_password.trim().slice(0, 50));
+        }
+        // ★ Şifre ayarlandı → oda tipini 'closed' olarak normalize et (UI tutarlılığı)
+        if (updates.type === undefined) dbUpdates.type = 'closed';
+      } else if (incoming.room_password === '') {
+        // Boş string → şifre kaldırılıyor
+        incoming.room_password = null;
+      }
+
+      dbUpdates.room_settings = { ...existingSettings, ...incoming };
     }
 
     const { error } = await supabase.from('rooms').update(dbUpdates).eq('id', roomId);
@@ -1016,6 +1058,31 @@ export const RoomService = {
    * Host: Kullanıcıyı konuşmacıya yükselt.
    * Y9/Y11: v21 atomic RPC — slot kontrolü + rol update + listener_count tek transaction.
    */
+  /**
+   * ★ v32 Caretaker Stage — Sahipsiz odada süreli sahneye çıkma.
+   * Owner+moderator yoksa listener 5 dk süreyle speaker olur, 60sn cooldown.
+   * Returns: { expires_at, duration_sec } başarılıysa.
+   */
+  async claimStageSeat(roomId: string, userId: string): Promise<{ expires_at: string; duration_sec: number }> {
+    const { data, error } = await supabase.rpc('claim_stage_seat', {
+      p_room_id: roomId,
+      p_user_id: userId,
+    });
+    if (error) throw new Error(error.message || 'Sahneye çıkılamadı');
+    const result = data as any;
+    return {
+      expires_at: result.expires_at,
+      duration_sec: result.duration_sec,
+    };
+  },
+
+  /** Süresi dolmuş caretaker'ları otomatik listener'a indir (cleanup). */
+  async releaseExpiredCaretakers(): Promise<number> {
+    const { data, error } = await supabase.rpc('release_expired_caretakers');
+    if (error) return 0;
+    return (data as number) || 0;
+  },
+
   async promoteSpeaker(roomId: string, userId: string): Promise<void> {
     try {
       const { error } = await supabase.rpc('promote_speaker_atomic', {

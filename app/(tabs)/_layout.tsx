@@ -222,12 +222,12 @@ const s = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.07)',
     overflow: 'visible',
-    // ★ Güçlendirilmiş gölge — çerçeve arkasında derin blur gölge
+    // ★ Yumuşak blur gölge — çerçeve değil, hafif zemin ayrımı
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: -8 },
-    shadowOpacity: 0.65,
-    shadowRadius: 24,
-    elevation: 24,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 18,
+    elevation: 12,
   },
   tab: {
     flex: 1,

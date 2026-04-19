@@ -151,38 +151,47 @@ export const RoomChatService = {
         .single();
 
       // ★ O4 FIX: chat_muted kontrolü — moderatör tarafından susturulan kullanıcı mesaj gönderemez
+      // ★ 2026-04-18: Chat_mute artık FAIL-CLOSED — DB query fail olursa bile engelle.
+      // Önceki versiyonda tüm try/catch içindeydi → herhangi bir hata bypass sağlıyordu.
       if (roomData?.host_id !== userId) {
-        const { data: partData } = await supabase
+        const { data: partData, error: chatMuteErr } = await supabase
           .from('room_participants')
           .select('is_chat_muted')
           .eq('room_id', roomId)
           .eq('user_id', userId)
           .maybeSingle();
+        if (chatMuteErr) {
+          // Fail-closed: DB okunamadıysa güvenli taraf — mesajı gönderme
+          if (__DEV__) console.warn('[roomChat] chat_mute kontrolü başarısız, mesaj reddedildi:', chatMuteErr.message);
+          return null;
+        }
         if (partData?.is_chat_muted) {
           return null; // Chat mute — sessizce engelle
         }
       }
 
-      const rs = (roomData?.room_settings || {}) as any;
-      const slowModeSec = rs.slow_mode_seconds || 0;
-      // Host ve moderatörler slow mode'dan muaf
-      if (slowModeSec > 0 && roomData?.host_id !== userId) {
-        const { data: lastMsg } = await supabase
-          .from('messages')
-          .select('created_at')
-          .eq('room_id', roomId)
-          .eq('sender_id', userId)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        if (lastMsg) {
-          const elapsed = Date.now() - new Date(lastMsg.created_at).getTime();
-          if (elapsed < slowModeSec * 1000) {
-            return null; // Slow mode — sessizce engelle
+      // Slow mode — fail-open (DB hatası mesajı geçirir, spam riskli ama chat kesintisiz)
+      try {
+        const rs = (roomData?.room_settings || {}) as any;
+        const slowModeSec = rs.slow_mode_seconds || 0;
+        if (slowModeSec > 0 && roomData?.host_id !== userId) {
+          const { data: lastMsg } = await supabase
+            .from('messages')
+            .select('created_at')
+            .eq('room_id', roomId)
+            .eq('sender_id', userId)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if (lastMsg) {
+            const elapsed = Date.now() - new Date(lastMsg.created_at).getTime();
+            if (elapsed < slowModeSec * 1000) {
+              return null; // Slow mode — sessizce engelle
+            }
           }
         }
-      }
-    } catch { /* slow mode / chat mute kontrolü başarısız olursa mesajı engelleme */ }
+      } catch { /* slow mode kontrolü fail-open — mesaj geçer */ }
+    } catch { /* roomData fetch hatası — mesaj engellenmez, diğer DB katmanı koruyacak */ }
 
     const filteredContent = filterBadWords(sanitized);
     const { data, error } = await supabase

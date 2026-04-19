@@ -17,9 +17,12 @@ interface Props {
   userId: string;
   onClose: () => void;
   onInvite: (selectedUsers: FollowUser[]) => void;
+  /** ★ 2026-04-19: Oda içinden çağrıldığında verilirse, zaten odada/davet edilmiş
+   *  kullanıcılar listeden filtrelenir. create-room'da verilmez (oda henüz yok). */
+  roomId?: string;
 }
 
-export default function InviteFriendsModal({ visible, userId, onClose, onInvite }: Props) {
+export default function InviteFriendsModal({ visible, userId, onClose, onInvite, roomId }: Props) {
   const [friends, setFriends] = useState<FollowUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -42,8 +45,32 @@ export default function InviteFriendsModal({ visible, userId, onClose, onInvite 
       const ids = new Set<string>();
       (res1.data || []).forEach((r: any) => ids.add(r.user_id));
       (res2.data || []).forEach((r: any) => ids.add(r.friend_id));
-      
+
       if (ids.size === 0) {
+        setFriends([]);
+        setLoading(false);
+        return;
+      }
+
+      // ★ 2026-04-19: Zaten odada / pending davet edilenleri çıkar (roomId varsa)
+      let excludeIds = new Set<string>();
+      if (roomId) {
+        const [partRes, inviteRes] = await Promise.all([
+          supabase.from('room_participants').select('user_id').eq('room_id', roomId),
+          supabase.from('room_invites').select('user_id').eq('room_id', roomId).in('status', ['pending', 'accepted']),
+        ]);
+        (partRes.data || []).forEach((r: any) => excludeIds.add(r.user_id));
+        (inviteRes.data || []).forEach((r: any) => excludeIds.add(r.user_id));
+      }
+
+      // ★ Block edilmiş kullanıcıları filtrele (blocked_users — iki yönlü)
+      const { data: blockedOut } = await supabase.from('blocked_users').select('blocked_id').eq('blocker_id', userId);
+      const { data: blockedIn } = await supabase.from('blocked_users').select('blocker_id').eq('blocked_id', userId);
+      (blockedOut || []).forEach((r: any) => excludeIds.add(r.blocked_id));
+      (blockedIn || []).forEach((r: any) => excludeIds.add(r.blocker_id));
+
+      const filteredIds = Array.from(ids).filter(id => !excludeIds.has(id));
+      if (filteredIds.length === 0) {
         setFriends([]);
         setLoading(false);
         return;
@@ -53,7 +80,7 @@ export default function InviteFriendsModal({ visible, userId, onClose, onInvite 
       const { data: profiles } = await supabase
         .from('profiles')
         .select('id, display_name, avatar_url, username, subscription_tier, is_online')
-        .in('id', Array.from(ids));
+        .in('id', filteredIds);
 
       setFriends((profiles || []) as FollowUser[]);
     } catch (err: any) {
@@ -63,7 +90,7 @@ export default function InviteFriendsModal({ visible, userId, onClose, onInvite 
     } finally {
       setLoading(false);
     }
-  }, [userId]);
+  }, [userId, roomId]);
 
   useEffect(() => {
     if (visible && userId) {

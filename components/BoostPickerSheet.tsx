@@ -113,17 +113,37 @@ export default function BoostPickerSheet({ visible, onClose, onBoost, currentSP 
         <Pressable style={StyleSheet.absoluteFill} onPress={dismiss} />
       </Animated.View>
 
-      {/* Sheet */}
+      {/* Sheet — 3 katmanlı premium zemin */}
       <Animated.View
         style={[s.sheet, { transform: [{ translateY }] }]}
         {...panResponder.panHandlers}
       >
+        {/* Katman 1: koyu + pembe warmth */}
+        <LinearGradient
+          colors={['#2a1525', '#170b14', '#0a0508']}
+          start={{ x: 0, y: 0 }} end={{ x: 0.7, y: 1 }}
+          style={StyleSheet.absoluteFillObject}
+        />
+        <LinearGradient
+          colors={['rgba(244,114,182,0.28)', 'rgba(244,114,182,0.08)', 'transparent']}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFillObject}
+        />
+        <LinearGradient
+          colors={['transparent', 'rgba(244,114,182,0.9)', 'transparent']}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+          style={s.topEdge}
+        />
+
         {/* Handle bar */}
         <View style={s.handle} />
 
         {/* Header */}
         <View style={s.header}>
-          <Ionicons name="rocket-outline" size={18} color="#14B8A6" />
+          <Ionicons name="rocket" size={18} color="#F472B6" style={{
+            textShadowColor: 'rgba(244,114,182,0.8)',
+            textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 8,
+          }} />
           <Text style={s.title}>Profili Öne Çıkar</Text>
         </View>
         <Text style={s.subtitle}>Profilin ve odaların Keşfet'te öne çıkar. Tıklayan kullanıcılar odalarına ulaşır.</Text>
@@ -211,16 +231,17 @@ const s = StyleSheet.create({
   },
   sheet: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
-    backgroundColor: '#2D3740',
     borderTopLeftRadius: 28, borderTopRightRadius: 28,
     paddingHorizontal: 20, paddingBottom: 36,
-    borderWidth: 1, borderColor: 'rgba(20,184,166,0.15)', borderBottomWidth: 0,
+    borderWidth: 1.5, borderColor: 'rgba(244,114,182,0.3)', borderBottomWidth: 0,
+    overflow: 'hidden',
     shadowColor: '#000', shadowOffset: { width: 0, height: -8 },
-    shadowOpacity: 0.5, shadowRadius: 24, elevation: 20,
+    shadowOpacity: 0.6, shadowRadius: 24, elevation: 20,
   },
+  topEdge: { position: 'absolute', top: 0, left: 0, right: 0, height: 1.5 },
   handle: {
     width: 40, height: 4, borderRadius: 2,
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: 'rgba(244,114,182,0.4)',
     alignSelf: 'center', marginTop: 12, marginBottom: 14,
   },
 

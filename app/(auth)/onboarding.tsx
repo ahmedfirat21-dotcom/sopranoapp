@@ -75,53 +75,46 @@ export default function OnboardingScreen() {
   };
 
   const finalizeOnboarding = async () => {
-    // ★ FIX-OB: Onboarding tamamlama — DB'ye flag yaz, profili güncelle, SONRA yönlendir.
-    // Eski sorun: Profile fetch başarısız olursa AuthGuard profili null/incomplete görüp
-    // tekrar onboarding'e yönlendiriyordu → sonsuz döngü.
+    // ★ FIX-OB 2026-04-18: Race condition fix — önceki versiyonda setProfile sonrası
+    // hemen router.replace('/(tabs)/home') çağrılıyordu; AuthGuard useEffect segments
+    // yeni (tabs) ama profile eski (onboarding_completed=false) görüp "Atla" sonrası
+    // kullanıcıyı onboarding'e geri sarıyordu. Düzeltme: profile güncellenmeden önce
+    // DB write'ı garantile, sonra setProfile'ı YENİ onboarding_completed=true ile
+    // yap, SONRA router.replace. Race'i kapatmak için setTimeout süresi 300ms'e çıkardı.
     if (firebaseUser) {
       try {
-        // 1. Önce DB'de onboarding_completed = true olduğundan emin ol
-        //    (Step 3'te zaten yazılmış olmalı ama garanti olsun)
+        // 1. Güncel profili çek
         const { data: currentProfile } = await supabase
-          .from('profiles')
-          .select('preferences, interests, display_name, avatar_url')
-          .eq('id', firebaseUser.uid)
-          .single();
-
-        const currentPrefs = (currentProfile as any)?.preferences || {};
-        if (!currentPrefs.onboarding_completed) {
-          // Flag eksik — şimdi yaz
-          await supabase.from('profiles').update({
-            preferences: {
-              ...currentPrefs,
-              onboarding_completed: true,
-              onboarding_date: new Date().toISOString(),
-            },
-          }).eq('id', firebaseUser.uid);
-        }
-
-        // 2. Güncel profili çek ve context'e set et
-        const { data: freshProfile } = await supabase
           .from('profiles')
           .select('*')
           .eq('id', firebaseUser.uid)
           .single();
 
-        if (freshProfile) {
-          setProfile(freshProfile as any);
-          setUser({ name: freshProfile.display_name, avatar: freshProfile.avatar_url });
-        } else if (tempProfile) {
-          // ★ Profil çekilemezse tempProfile'a onboarding flag ekleyerek kullan
-          const fallbackProfile = {
-            ...tempProfile,
-            preferences: { ...(tempProfile.preferences || {}), onboarding_completed: true },
-          };
-          setProfile(fallbackProfile);
-          setUser({ name: fallbackProfile.display_name, avatar: fallbackProfile.avatar_url });
+        const currentPrefs = (currentProfile as any)?.preferences || {};
+        const needsFlagWrite = !currentPrefs.onboarding_completed;
+        const mergedPrefs = {
+          ...currentPrefs,
+          onboarding_completed: true,
+          onboarding_date: currentPrefs.onboarding_date || new Date().toISOString(),
+        };
+
+        if (needsFlagWrite) {
+          await supabase.from('profiles').update({ preferences: mergedPrefs }).eq('id', firebaseUser.uid);
+        }
+
+        // 2. Context'e set et — hem freshProfile'ı hem de guaranteed onboarding flag'i
+        const profileToSet = {
+          ...(currentProfile || tempProfile || {}),
+          preferences: mergedPrefs,
+        } as any;
+
+        if (profileToSet.id && profileToSet.display_name) {
+          setProfile(profileToSet);
+          setUser({ name: profileToSet.display_name, avatar: profileToSet.avatar_url });
         }
       } catch (err) {
         if (__DEV__) console.warn('[Onboarding] finalizeOnboarding hata:', err);
-        // ★ Hata durumunda bile tempProfile ile devam et — kullanıcıyı sıkıştırma
+        // Hata durumunda tempProfile ile devam et
         if (tempProfile) {
           const fallbackProfile = {
             ...tempProfile,
@@ -132,11 +125,12 @@ export default function OnboardingScreen() {
         }
       }
     }
-    // 3. Küçük gecikme — state güncellemelerinin React batch'e girmesini bekle
-    //    AuthGuard'ın profili güncel görmesi için
+    // 3. AuthGuard zaten profile değişimini yakalayıp hasCompleteProfile=true → home'a
+    //    yönlendirir. Yine de manuel replace ekliyoruz ki yavaş dep propagate olsa da
+    //    geçiş anında takılma olmasın. 300ms = React render + Supabase fetch tamponu.
     setTimeout(() => {
       router.replace('/(tabs)/home');
-    }, 100);
+    }, 300);
   };
 
   const handeApplyCode = async () => {
@@ -229,7 +223,10 @@ export default function OnboardingScreen() {
         subscription_tier: 'Free',
         system_points: 0,
         gender: 'unspecified' as const,
-        birth_date: '2000-01-01',
+        // ★ 2026-04-18 FIX: birth_date null — Step 2'de zorunlu olarak girilir.
+        // Önceki default '2000-01-01' idi ve Step 2 tamamlanmasa bile user 26
+        // yaşında görünüyordu → +18 oda filtresi hiç tetiklenmiyordu.
+        birth_date: null,
       };
 
       // Step 1 isim + avatar + varsayılan cinsiyet/yaş kaydeder

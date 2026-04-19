@@ -70,19 +70,34 @@ export const MessageService = {
     // Partner profil bilgilerini toplu çek
     const partnerIds = Array.from(partnerMap.keys()).filter(id => !blockedIds.has(id));
     if (partnerIds.length === 0) return [] as InboxItem[];
-    const { data: profiles } = await supabase
-      .from('profiles')
-      .select('id, display_name, avatar_url, is_online, subscription_tier')
-      .in('id', partnerIds);
-    const profileMap = new Map((profiles || []).map(p => [p.id, p]));
+
+    // ★ Paralel çek: profiller + conversation_state (pin/archive/mute)
+    const [profRes, stateRes] = await Promise.all([
+      supabase
+        .from('profiles')
+        .select('id, display_name, avatar_url, is_online, subscription_tier, last_seen')
+        .in('id', partnerIds),
+      supabase
+        .from('conversation_state')
+        .select('partner_id, pinned_at, archived_at, muted_at')
+        .eq('user_id', userId)
+        .in('partner_id', partnerIds),
+    ]);
+    const profileMap = new Map((profRes.data || []).map(p => [p.id, p]));
+    const stateMap = new Map<string, { pinned: boolean; archived: boolean; muted: boolean }>(
+      (stateRes.data || []).map((s: any) => [
+        s.partner_id,
+        { pinned: !!s.pinned_at, archived: !!s.archived_at, muted: !!s.muted_at },
+      ])
+    );
 
     // InboxItem formatına dönüştür
     const inbox: InboxItem[] = [];
     for (const [partnerId, { lastMsg, unread }] of partnerMap) {
       const prof = profileMap.get(partnerId);
+      const state = stateMap.get(partnerId);
       const isSentByMe = lastMsg.sender_id === userId;
       let preview = lastMsg.content || '';
-      // Media tespiti content'ten (sütun yok)
       if (preview.startsWith('🎤') || preview.includes('voice_messages/')) preview = '🎤 Sesli mesaj';
       else if (preview.startsWith('📷') || preview.match(/^https?.*\.(jpg|png|webp)/i)) preview = '📷 Fotoğraf';
       if (isSentByMe && !preview.startsWith('Sen:')) preview = `Sen: ${preview}`;
@@ -93,27 +108,46 @@ export const MessageService = {
         partner_avatar: prof?.avatar_url || '',
         partner_is_online: prof?.is_online || false,
         partner_tier: (prof as any)?.subscription_tier || 'Free',
+        partner_last_seen: (prof as any)?.last_seen,
         last_message_content: preview,
         last_message_time: lastMsg.created_at,
         unread_count: unread,
-        // ★ WhatsApp tik göstergesi verileri
         is_last_msg_mine: isSentByMe,
         is_last_msg_read: isSentByMe ? !!lastMsg.is_read : undefined,
+        is_pinned: state?.pinned || false,
+        is_archived: state?.archived || false,
+        is_muted: state?.muted || false,
       });
     }
 
-    // ★ FIX: Gizlenmiş sohbetleri filtrele — deleteConversation ile gizlenenler
+    // ★ Gizlenmiş sohbetleri filtrele — deleteConversation ile gizlenenler
     const hiddenMap = await this.getHiddenConversations(userId);
     const filteredInbox = inbox.filter(item => {
       const hiddenAt = hiddenMap[item.partner_id];
-      if (!hiddenAt) return true; // gizlenmemiş
-      // Son mesaj gizleme tarihinden sonra geldiyse tekrar göster
+      if (!hiddenAt) return true;
       return new Date(item.last_message_time).getTime() > new Date(hiddenAt).getTime();
     });
 
-    // Son mesaja göre sırala (en yeni üste)
-    filteredInbox.sort((a, b) => new Date(b.last_message_time).getTime() - new Date(a.last_message_time).getTime());
+    // ★ Sıralama: pinli olanlar ÜSTTE, sonra zaman bazlı (en yeni üste)
+    filteredInbox.sort((a, b) => {
+      if (a.is_pinned !== b.is_pinned) return a.is_pinned ? -1 : 1;
+      return new Date(b.last_message_time).getTime() - new Date(a.last_message_time).getTime();
+    });
     return filteredInbox;
+  },
+
+  /** ★ Sohbeti sabitle / sabitlemeyi kaldır (toggle) — v33 */
+  async togglePin(partnerId: string): Promise<boolean> {
+    const { data, error } = await supabase.rpc('toggle_conversation_pin', { p_partner_id: partnerId });
+    if (error) throw error;
+    return !!data;
+  },
+
+  /** ★ Sohbeti arşivle / arşivden çıkar (toggle) — v33 */
+  async toggleArchive(partnerId: string): Promise<boolean> {
+    const { data, error } = await supabase.rpc('toggle_conversation_archive', { p_partner_id: partnerId });
+    if (error) throw error;
+    return !!data;
   },
 
   /** İki kişi arasındaki tüm konuşma geçmişini getir */

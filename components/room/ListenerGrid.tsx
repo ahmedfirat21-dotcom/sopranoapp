@@ -129,27 +129,17 @@ export default function ListenerGrid({ listeners, onSelectUser, selectedUserId, 
 
   return (
     <View style={s.wrap}>
-      {/* Başlık — SpeakerSection ile tutarlı pill format */}
-      <View style={s.headerRow}>
-        <View style={s.headerPill}>
-          <LinearGradient
-            colors={['rgba(20,184,166,0.08)', 'rgba(20,184,166,0.02)', 'transparent']}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-            style={StyleSheet.absoluteFill}
-          />
-          <Ionicons name="headset" size={11} color="#14B8A6" />
-          <Text style={s.headerTitle}>Dinleyiciler</Text>
-          <View style={s.headerCount}>
-            <Text style={s.headerCountText}>{listeners.length}</Text>
-          </View>
-        </View>
-        {onShowAllUsers && (
+      {/* ★ 2026-04-19: "Dinleyiciler" pill başlığı kaldırıldı (SpeakerSection ile tutarlı).
+          Sadece "Tümü" butonu sağda — gereksiz durumunda. Sayım avatarlar zaten gösterir. */}
+      {onShowAllUsers && listeners.length > 0 && (
+        <View style={s.headerRowMinimal}>
+          <Text style={s.listenerCountText}>{listeners.length} dinleyici</Text>
           <Pressable style={s.allUsersBtn} onPress={onShowAllUsers} hitSlop={10}>
             <Ionicons name="people" size={14} color="#14B8A6" />
             <Text style={s.allUsersText}>Tümü</Text>
           </Pressable>
-        )}
-      </View>
+        </View>
+      )}
       <View style={[s.grid, { gap: avatarGap }]}>
         {visibleListeners.map((u) => {
           const isSelected = selectedUserId === u.user_id;
@@ -200,6 +190,18 @@ const s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 12,
+  },
+  // ★ 2026-04-19: Minimal header — sadece sayı + "Tümü" butonu
+  headerRowMinimal: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+    paddingHorizontal: 4,
+  },
+  listenerCountText: {
+    fontSize: 11, fontWeight: '600', color: '#64748B',
+    letterSpacing: 0.3,
   },
   headerPill: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
@@ -275,12 +277,15 @@ const s = StyleSheet.create({
     shadowOpacity: 0.6, shadowRadius: 4, elevation: 8,
   },
   chatMutedBadge: {
+    // ★ 2026-04-19: Aynı rengi kullanıyoruz (kırmızı). Mute = mute, ikon ayırt ediyor.
+    // Önceden turuncu (#F97316) idi — kullanıcılar "kırmızı mı turuncu mu, hangisi
+    // daha kötü?" diye düşünüyordu. Semantik farkı ikon (mic vs chat) taşıyor.
     position: 'absolute', top: 4,
     width: 20, height: 20, borderRadius: 10,
-    backgroundColor: '#F97316',
+    backgroundColor: '#EF4444',
     borderWidth: 2, borderColor: 'rgba(15,23,42,0.9)',
     alignItems: 'center', justifyContent: 'center', zIndex: 15,
-    shadowColor: '#F97316', shadowOffset: { width: 0, height: 2 },
+    shadowColor: '#EF4444', shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.6, shadowRadius: 4, elevation: 8,
   },
   flashWrap: {
@@ -340,31 +345,21 @@ const s = StyleSheet.create({
 });
 
 function ListenerOwnerBadge() {
+  // ★ 2026-04-19 sadeleştirme: orbit sparkle kaldırıldı. Glow + float yeterli
+  // premium his verir; 3 concurrent anim (glow+float+orbit) görsel gürültüydü.
   const glowAnim = useRef(new Animated.Value(0.5)).current;
   const floatAnim = useRef(new Animated.Value(0)).current;
-  const orbitAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // Golden glow pulse
     Animated.loop(Animated.sequence([
       Animated.timing(glowAnim, { toValue: 1, duration: 1800, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
       Animated.timing(glowAnim, { toValue: 0.5, duration: 1800, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
     ])).start();
-    // Float
     Animated.loop(Animated.sequence([
       Animated.timing(floatAnim, { toValue: -1, duration: 1400, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
       Animated.timing(floatAnim, { toValue: 1, duration: 1400, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
     ])).start();
-    // Orbit
-    Animated.loop(Animated.timing(orbitAnim, {
-      toValue: 1, duration: 4000, easing: Easing.linear, useNativeDriver: true,
-    })).start();
   }, []);
-
-  const rotateSparkle = orbitAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0deg', '360deg'],
-  });
 
   return (
     <Animated.View style={[s.listenerBadgeContainer, { transform: [{ translateY: floatAnim }] }]}>
@@ -376,9 +371,6 @@ function ListenerOwnerBadge() {
       >
         <Ionicons name="star" size={10} color="#FFF" />
       </LinearGradient>
-      <Animated.View style={[s.listenerSparkleOrbit, { transform: [{ rotate: rotateSparkle }] }]}>
-        <View style={s.listenerSparkleDot} />
-      </Animated.View>
     </Animated.View>
   );
 }

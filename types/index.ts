@@ -138,6 +138,9 @@ export type Room = {
   host_id: string;
   is_live: boolean;
   listener_count: number;
+  /** Runtime alan — room_participants tablosundan türetilen gerçek katılımcı sayısı.
+   *  DB'de tutulmaz; myrooms/home yükleme sırasında doldurur. */
+  participant_count?: number;
   max_speakers: number;
   created_at: string;
   expires_at?: string | null;
@@ -316,6 +319,11 @@ export type RoomParticipant = {
   joined_at: string;
   /** El kaldırma zamanı (sahneye çıkma isteği sıralaması için) */
   hand_raised_at?: string | null;
+  /** ★ v32 Caretaker: Sahipsiz odada süreli sahne bitiş zamanı.
+   *  Aktif caretaker: rol='speaker' AND stage_expires_at > now()
+   *  Cooldown: rol='listener' AND stage_expires_at < now() + 60sn
+   *  Normal speaker: stage_expires_at = NULL (owner tarafından davet edilmiş) */
+  stage_expires_at?: string | null;
   user?: Profile;
 };
 
@@ -467,6 +475,8 @@ export type Message = {
   voice_url?: string | null;
   voice_duration?: number | null;
   is_read: boolean;
+  /** Soft-delete flag — true ise gönderen tarafça silinmiş (UI'da gösterme). */
+  is_deleted?: boolean;
   created_at: string;
   sender?: Profile;
   receiver?: Profile;
@@ -479,6 +489,8 @@ export type InboxItem = {
   partner_is_online: boolean;
   /** ★ Tier ring tutarlılığı — mesajlar sayfasında doğru çerçeve rengi */
   partner_tier?: string;
+  /** Karşı tarafın son görülme zamanı (ISO) — offline iken "2s önce" göstermek için */
+  partner_last_seen?: string;
   last_message_content: string;
   last_message_time: string;
   unread_count: number;
@@ -486,6 +498,10 @@ export type InboxItem = {
   is_last_msg_mine?: boolean;
   /** ★ WhatsApp tik göstergesi: son mesaj okundu mu? */
   is_last_msg_read?: boolean;
+  /** ★ v33: conversation_state entegrasyonu */
+  is_pinned?: boolean;
+  is_archived?: boolean;
+  is_muted?: boolean;
 };
 
 // ============================================

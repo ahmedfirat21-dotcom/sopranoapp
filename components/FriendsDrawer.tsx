@@ -5,9 +5,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { FriendshipService, type FollowUser } from '../services/friendship';
 import { supabase } from '../constants/supabase';
 import StatusAvatar from './StatusAvatar';
+import { Colors } from '../constants/theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+// Tab bar height + gap — alt navigasyon barının üstünde bitsin
+const TAB_BAR_SPACE = 60 + 8 + 6; // BAR_H (60) + min paddingBottom (8) + extra gap
 
 const { width: W } = Dimensions.get('window');
-const DRAWER_W = W * 0.72;
+const DRAWER_W = Math.min(W * 0.55, 280);
 
 export default function FriendsDrawer({ visible, friends, onClose, onSelect, currentUserId }: {
   visible: boolean;
@@ -16,6 +21,11 @@ export default function FriendsDrawer({ visible, friends, onClose, onSelect, cur
   onSelect: (userId: string) => void;
   currentUserId?: string;
 }) {
+  const insets = useSafeAreaInsets();
+  // Alt barın üstünde bitsin: BAR_H + safe area + ufak boşluk
+  const bottomGap = Math.max(insets.bottom, 8) + TAB_BAR_SPACE;
+  // Üst safe area + ekstra kısaltma
+  const topGap = insets.top + 12;
   const slideAnim = React.useRef(new Animated.Value(DRAWER_W)).current;
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
   const [pendingRequests, setPendingRequests] = React.useState<any[]>([]);
@@ -86,32 +96,41 @@ export default function FriendsDrawer({ visible, friends, onClose, onSelect, cur
     }
   }, [visible]);
 
-  // ★ Sürükleyerek kapatma (sağa swipe)
+  // ★ Sürükleyerek kapatma (sağa swipe) — sıkı eşik, tap güvenliği
   const panResponder = React.useRef(
     React.useMemo(() => {
       let startX = 0;
       return require('react-native').PanResponder.create({
+        // Dokunma başlangıcında asla responder olma — tap'lar child'a ulaşsın
         onStartShouldSetPanResponder: () => false,
-        onMoveShouldSetPanResponder: (_: any, g: any) => g.dx > 10 && Math.abs(g.dy) < g.dx,
+        onStartShouldSetPanResponderCapture: () => false,
+        // Hareket baskın yatay + minimum 25px olunca responder ol
+        onMoveShouldSetPanResponder: (_: any, g: any) => {
+          return g.dx > 25 && Math.abs(g.dx) > Math.abs(g.dy) * 2;
+        },
+        onMoveShouldSetPanResponderCapture: () => false,
+        // Child'lar responder'ı asla kaybetmesin
+        onPanResponderTerminationRequest: () => false,
         onPanResponderGrant: () => { startX = (slideAnim as any)._value || 0; },
         onPanResponderMove: (_: any, g: any) => {
+          // Parmağın konumunu aynen takip et (sadece sağa 0+)
           const newX = Math.max(0, startX + g.dx);
           slideAnim.setValue(newX);
-          // Backdrop opaklığını sürükleme mesafesiyle eşitle
-          fadeAnim.setValue(1 - (newX / DRAWER_W) * 0.8);
+          fadeAnim.setValue(Math.max(0, 1 - (newX / DRAWER_W) * 0.8));
         },
         onPanResponderRelease: (_: any, g: any) => {
-          if (g.dx > 60 || g.vx > 0.5) {
-            // Eşik aşıldı — kapat
+          // Kapanma eşiği: drawer genişliğinin 1/3'ü veya hız > 0.5
+          const closeThreshold = DRAWER_W / 3;
+          if (g.dx > closeThreshold || g.vx > 0.5) {
             Animated.parallel([
-              Animated.spring(slideAnim, { toValue: DRAWER_W, useNativeDriver: true, damping: 20, stiffness: 220 }),
-              Animated.timing(fadeAnim, { toValue: 0, duration: 150, useNativeDriver: true }),
+              Animated.timing(slideAnim, { toValue: DRAWER_W, duration: 220, useNativeDriver: true }),
+              Animated.timing(fadeAnim, { toValue: 0, duration: 180, useNativeDriver: true }),
             ]).start(() => onClose());
           } else {
             // Geri yay — açık kal
             Animated.parallel([
-              Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true, damping: 20, stiffness: 200 }),
-              Animated.timing(fadeAnim, { toValue: 1, duration: 100, useNativeDriver: true }),
+              Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true, damping: 22, stiffness: 240 }),
+              Animated.timing(fadeAnim, { toValue: 1, duration: 120, useNativeDriver: true }),
             ]).start();
           }
         },
@@ -132,12 +151,13 @@ export default function FriendsDrawer({ visible, friends, onClose, onSelect, cur
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
       </Animated.View>
 
-      {/* Panel — sağdan süzülür + sürüklenebilir */}
-      <Animated.View {...panResponder.panHandlers} style={[fd.panel, { transform: [{ translateX: slideAnim }] }]}>
-        {/* Üst parlak gradient efekti */}
+      {/* Panel — sağdan süzülür + sürüklenebilir, alt barın üstünde biter */}
+      <Animated.View {...panResponder.panHandlers} style={[fd.panel, { top: topGap, bottom: bottomGap, transform: [{ translateX: slideAnim }] }]}>
+        {/* ★ Odalarım kart paleti: diagonal gradient (parlak üst-sol → koyu alt-sağ) */}
         <LinearGradient
-          colors={['rgba(34,197,94,0.12)', 'rgba(34,197,94,0.03)', 'transparent']}
-          style={fd.topGlow}
+          colors={['#4a5668', '#37414f', '#232a35']}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFillObject}
         />
 
         {/* Başlık */}
@@ -177,7 +197,7 @@ export default function FriendsDrawer({ visible, friends, onClose, onSelect, cur
                   <View key={req.user_id} style={[fd.requestRow, handled && fd.requestRowHandled]}>
                     <Pressable
                       style={fd.requestAvatarWrap}
-                      onPress={() => { onClose(); setTimeout(() => onSelect(req.user_id), 200); }}
+                      onPress={() => { onSelect(req.user_id); onClose(); }}
                     >
                       <StatusAvatar uri={sender?.avatar_url} size={34} tier={sender?.subscription_tier} />
                     </Pressable>
@@ -227,7 +247,7 @@ export default function FriendsDrawer({ visible, friends, onClose, onSelect, cur
               <Pressable
                 key={friend.id}
                 style={({ pressed }) => [fd.row, pressed && { opacity: 0.8, backgroundColor: 'rgba(255,255,255,0.04)' }]}
-                onPress={() => { onClose(); setTimeout(() => onSelect(friend.id), 200); }}
+                onPress={() => { onSelect(friend.id); onClose(); }}
               >
                   <StatusAvatar uri={friend.avatar_url} size={33} isOnline={true} tier={(friend as any).subscription_tier} />
                 <View style={{ flex: 1 }}>
@@ -246,21 +266,21 @@ export default function FriendsDrawer({ visible, friends, onClose, onSelect, cur
 const fd = StyleSheet.create({
   backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.3)' },
   panel: {
-    position: 'absolute', right: 0, top: 0, bottom: 0,
+    position: 'absolute', right: 0,
     width: DRAWER_W,
-    backgroundColor: 'rgba(15,23,42,0.96)',
     borderTopLeftRadius: 22, borderBottomLeftRadius: 22,
     borderWidth: 1, borderRightWidth: 0,
-    borderColor: 'rgba(20,184,166,0.08)',
+    borderColor: Colors.cardBorder,
     overflow: 'hidden',
-  },
-  topGlow: {
-    position: 'absolute', top: 0, left: 0, right: 0, height: 120,
-    borderTopLeftRadius: 22,
+    shadowColor: '#000',
+    shadowOffset: { width: -6, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 16,
+    elevation: 16,
   },
   header: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
-    paddingHorizontal: 14, paddingTop: 56, paddingBottom: 10,
+    paddingHorizontal: 14, paddingTop: 14, paddingBottom: 10,
     borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.04)',
   },
   headerTitle: {

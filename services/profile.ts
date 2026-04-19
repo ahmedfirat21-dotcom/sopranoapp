@@ -13,15 +13,30 @@ import { migrateLegacyTier } from '../types';
 // PROFİL İŞLEMLERİ
 // ============================================
 export const ProfileService = {
+  /**
+   * Profili getir.
+   * - Profile YOK (PGRST116 / no rows) → null döner (onboarding akışı için)
+   * - Network / RLS / geçici hata → throw eder (caller retry/fallback yapabilir)
+   *
+   * ★ 2026-04-18 FIX: Önceki versiyon tüm error'ları null'a eşitliyordu. Reload
+   * sırasında kısa network kesintisinde sistem kullanıcıyı "kayıtsız" sanıp
+   * onboarding'e yolluyordu. Şimdi "yok" vs "hata" ayrıştırılıyor.
+   */
   async get(userId: string): Promise<Profile | null> {
     const { data, error } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', userId)
-      .single();
-    if (error) return null;
+      .maybeSingle();
+    if (error) {
+      // PostgREST "no rows" hatası genelde maybeSingle ile gelmez — güvenlik için check
+      const code = (error as any).code;
+      if (code === 'PGRST116') return null; // gerçekten yok
+      throw error; // network / RLS / diğer
+    }
+    if (!data) return null; // gerçekten yok
     // Legacy tier normalizasyonu
-    if (data && data.tier && !data.subscription_tier) {
+    if (data.tier && !data.subscription_tier) {
       (data as any).subscription_tier = migrateLegacyTier(data.tier);
     }
     return data as Profile;
@@ -263,19 +278,20 @@ export const ProfileService = {
     if (!Number.isInteger(amount) || amount < 1) return { success: false, error: 'Geçersiz miktar' };
     if (amount > 1000) return { success: false, error: 'Tek seferde en fazla 1000 SP gönderilebilir' };
 
-    // Rate limiting — max 10 bağış/saat
+    // ★ B4: Atomic rate limit — v34 RPC `FOR UPDATE` lock ile race condition'ı engeller.
+    // Client-side count check eşzamanlı isteklerde bypass edilebiliyordu.
     try {
-      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-      const { count } = await supabase
-        .from('sp_transactions')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', fromUserId)
-        .eq('type', 'donation_sent')
-        .gte('created_at', oneHourAgo);
-      if ((count || 0) >= 10) {
-        return { success: false, error: 'Çok fazla bağış yaptınız. Lütfen 1 saat sonra tekrar deneyin.' };
+      const { data: rl, error: rlErr } = await supabase.rpc('check_donation_rate_limit', {
+        p_user_id: fromUserId,
+      });
+      if (rlErr) {
+        if (__DEV__) console.warn('[Donation] Rate limit RPC error:', rlErr.message);
+      } else if (rl && (rl as any).ok === false) {
+        return { success: false, error: (rl as any).error || 'Çok fazla bağış yaptınız. Lütfen 1 saat sonra tekrar deneyin.' };
       }
-    } catch {}
+    } catch (e) {
+      if (__DEV__) console.warn('[Donation] Rate limit exception:', e);
+    }
 
     // ★ Idempotency key: aynı kaynak→hedef→miktar için bu turda unique.
     // Transaction çifti aynı kök'ü paylaşır — debit/credit/refund hep eşleşir.
@@ -295,6 +311,23 @@ export const ProfileService = {
     // ★ Alıcıya ver — fail olursa refund (Y20: çift-katmanlı retry)
     try {
       await GamificationService.earn(toUserId, amount, 'donation_received', `donation_recv:${donationId}`);
+      // ★ NEW: In-app notification row — receiver popup ve NotificationDrawer için
+      try {
+        const { error: notifErr } = await supabase.from('notifications').insert({
+          user_id: toUserId,
+          sender_id: fromUserId,
+          type: 'gift',
+          body: `${amount} SP gönderdi`,
+          reference_id: null,
+        });
+        if (notifErr && __DEV__) {
+          console.warn('[Donation] Notification insert error:', notifErr.message, notifErr.code, notifErr.details);
+        } else if (__DEV__) {
+          console.log('[Donation] Notification inserted for', toUserId, amount, 'SP');
+        }
+      } catch (e) {
+        if (__DEV__) console.warn('[Donation] Notification catch:', e);
+      }
       // ★ D6: Offline alıcı için push notification — in-app animasyon görünmeyebilir,
       // push her koşulda bağış haberini ulaştırır. Fire-and-forget.
       try {

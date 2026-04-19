@@ -28,7 +28,7 @@ import { SettingsService } from '../services/settings';
 import { CallService, type CallSignal } from '../services/call';
 import { RevenueCatService } from '../services/revenuecat';
 import { i18n } from '../services/i18n';
-import { Toast } from '../components/Toast';
+import { Toast, showToast } from '../components/Toast';
 import { IncomingCallOverlay } from '../components/IncomingCallOverlay';
 import MiniRoomCard, { type MinimizedRoom } from '../components/MiniRoomCard';
 import ErrorBoundary from '../components/ErrorBoundary';
@@ -36,6 +36,7 @@ import ErrorBoundary from '../components/ErrorBoundary';
 // PremiumIntro kaldırıldı — intro video ile değiştirildi
 // IntroVideo kaldırıldı — kullanıcı talebi ile splash intro devre dışı
 import NotificationDrawer from '../components/NotificationDrawer';
+import SPReceivedModal from '../components/profile/SPReceivedModal';
 
 import { OnlineFriendsProvider } from '../providers/OnlineFriendsProvider';
 export { useOnlineFriends } from '../providers/OnlineFriendsProvider';
@@ -230,7 +231,7 @@ function RealtimeBadgeProvider({ userId, children }: { userId: string | null; ch
       setPendingFollows(requests.length);
     });
 
-    // 3. Notifications realtime — yeni bildirim gelince sayıyı artır
+    // 3. Notifications realtime — yeni bildirim gelince sayıyı artır + anlık toast
     // ★ Zil badge'ine dahil olan bildirim tipleri (oda + arama + hediye)
     const BELL_NOTIF_TYPES = ['room_live', 'room_invite', 'room_invite_accepted', 'room_invite_rejected', 'missed_call', 'incoming_call', 'gift', 'event_reminder'];
     const notifSub = supabase
@@ -241,9 +242,31 @@ function RealtimeBadgeProvider({ userId, children }: { userId: string | null; ch
         table: 'notifications',
         filter: `user_id=eq.${userId}`,
       }, (payload) => {
-        const notifType = (payload.new as { type?: string })?.type;
+        const n = payload.new as { type?: string; body?: string; id?: string };
+        const notifType = n?.type;
         if (!notifType || !BELL_NOTIF_TYPES.includes(notifType)) return;
         setUnreadNotifs(prev => prev + 1);
+
+        // ★ 2026-04-19: Anlık toast — kullanıcı hangi ekranda olursa olsun bildirim görsün.
+        // Örn. başka bir odadayken arkadaşı davet ederse, zil'i açmadan haberdar olur.
+        // Aynı bildirim id'si için tekrar göstermeme: id pass edilerek Toast cache'i kullanılır.
+        const body = n?.body || '';
+        const id = `notif_${n?.id}`;
+        if (notifType === 'room_invite') {
+          showToast({ title: '📨 Oda Daveti', message: body, type: 'info', id });
+        } else if (notifType === 'room_invite_accepted') {
+          showToast({ title: '🎉 Davet Kabul Edildi', message: body, type: 'success', id });
+        } else if (notifType === 'room_invite_rejected') {
+          showToast({ title: 'Davet Reddedildi', message: body, type: 'warning', id });
+        } else if (notifType === 'room_live') {
+          showToast({ title: '🔴 Canlı Yayın', message: body, type: 'info', id });
+        } else if (notifType === 'gift') {
+          showToast({ title: '🎁 Hediye Aldın', message: body, type: 'success', id });
+        } else if (notifType === 'missed_call') {
+          showToast({ title: '📞 Cevapsız Arama', message: body, type: 'warning', id });
+        } else if (notifType === 'event_reminder') {
+          showToast({ title: '⏰ Etkinlik Hatırlatıcı', message: body, type: 'info', id });
+        }
       })
       .subscribe();
 
@@ -293,21 +316,21 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
       }
 
       // Giriş yapmış, ama profil tam mı?
-      // ★ FIX: display_name + id + onboarding_completed kontrolü
-      // Onboarding Step 3'te preferences.onboarding_completed = true set edilir.
-      // Bu flag olmadan profil "tamamlanmış" sayılmaz — erken yönlendirme önlenir.
-      const prefs = (profile as any)?.preferences;
-      const profileInterests = (profile as any)?.interests;
-      // ★ Geriye uyumluluk: eski kullanıcılar flag olmadan onboarding'i bitirmiş olabilir
-      // → interests dizisi doluysa VEYA preferences.onboarding_completed = true ise tamamlanmış say
-      const onboardingDone = prefs?.onboarding_completed === true
-        || (Array.isArray(profileInterests) && profileInterests.length > 0);
-      const hasCompleteProfile = profile && profile.display_name && profile.id && onboardingDone;
+      // ★ FIX: display_name + id kontrolü yeterli — preferences kolonu DB'de yok,
+      // interests çoğu kullanıcıda null. display_name doluysa kullanıcı kayıtlı demektir.
+      const hasCompleteProfile = profile && profile.display_name && profile.id;
 
       if (!profile) {
-        // Profil hiç yok (ilk kez giriş yapan yeni kullanıcı)
+        // ★ 2026-04-18 FIX: Profil null — giriş yapılmış ama profile henüz yüklenmemiş
+        // olabilir (retry inflight). Hemen onboarding'e atmak yerine 2 saniye bekle;
+        // bu sürede profile gelirse effect yeniden çalışır ve bu branch'e düşmez.
+        // Gelmediyse gerçekten yeni kullanıcı — onboarding'e yolla.
         if (!isOnboarding) {
-          router.replace('/(auth)/onboarding');
+          const timer = setTimeout(() => {
+            // Timer tetiklendiğinde profile hâlâ yoksa ve auth halen geçerliyse yolla
+            router.replace('/(auth)/onboarding');
+          }, 2000);
+          return () => clearTimeout(timer);
         }
       } else if (hasCompleteProfile) {
         // ★ FIX: Tam profili olan mevcut kullanıcı — auth group'taysa ana sayfaya yönlendir
@@ -409,6 +432,10 @@ export default function RootLayout() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [minimizedRoom, setMinimizedRoom] = useState<MinimizedRoom | null>(null);
   const [showNotifDrawer, setShowNotifDrawer] = useState(false);
+  // ★ Gelen SP bağışı için global popup state
+  const [incomingGift, setIncomingGift] = useState<{
+    amount: number; senderId: string; senderName: string; senderAvatar?: string;
+  } | null>(null);
   const router = useRouter(); // routerRef yerine doğrudan kullan
 
   // ★ Minimize heartbeat — oda küçültüldüğünde heartbeat global olarak devam eder
@@ -434,6 +461,32 @@ export default function RootLayout() {
       }
     };
   }, [minimizedRoom?.id, firebaseUser?.uid]);
+
+  // ★ 2026-04-18 FIX: Minimize bar stale — oda host tarafından kapatıldığında
+  // (is_live=false) veya silindiğinde minimizedRoom otomatik temizlensin.
+  // Aksi halde kullanıcı bar'a tıklayıp ölü odaya girmeye çalışır → hata.
+  useEffect(() => {
+    if (!minimizedRoom?.id) return;
+    const ch = supabase
+      .channel(`minimized_room:${minimizedRoom.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'rooms', filter: `id=eq.${minimizedRoom.id}` },
+        (payload: any) => {
+          // DELETE → row silindi, minimized bar'ı kaldır
+          if (payload.eventType === 'DELETE') {
+            setMinimizedRoom(null);
+            return;
+          }
+          // UPDATE → is_live false olduysa (oda kapatıldı / donduruldu)
+          if (payload.new && payload.new.is_live === false) {
+            setMinimizedRoom(null);
+          }
+        }
+      )
+      .subscribe();
+    return () => { try { supabase.removeChannel(ch); } catch {} };
+  }, [minimizedRoom?.id]);
 
   // Gelen arama state
   const [incomingCall, setIncomingCall] = useState<CallSignal | null>(null);
@@ -530,9 +583,25 @@ export default function RootLayout() {
   }, [isAuthReady, isLoggedIn]);
 
   // Profili Supabase'den yükle (Eskisi gibi yoksa hemen OLUŞTURMA! Onboarding ekranında oluşturulacak)
+  // ★ 2026-04-18 FIX: Retry mekanizması — reload/token refresh sırasında network
+  // kesintisinde ProfileService.get throw ediyor; 3 deneme ile 400ms aralıklarla retry.
   const syncProfile = async (fbUser: User) => {
+    let existingProfile: Profile | null = null;
+    let fetchErr: any = null;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        existingProfile = await ProfileService.get(fbUser.uid);
+        fetchErr = null;
+        break; // başarılı (null veya değerli)
+      } catch (err) {
+        fetchErr = err;
+        if (attempt < 3) {
+          await new Promise(r => setTimeout(r, 400));
+        }
+      }
+    }
+
     try {
-      const existingProfile = await ProfileService.get(fbUser.uid);
       if (existingProfile) {
         // Çevrimiçi durumu ayarlardan kontrol et
         const settings = await SettingsService.get();
@@ -549,12 +618,14 @@ export default function RootLayout() {
 
         // ★ RevenueCat: SDK başlat + kullanıcı kimliğini bağla
         RevenueCatService.init(fbUser.uid).catch(() => {});
+      } else if (fetchErr) {
+        // 3 denemede de başarısız — network sorunu muhtemelen. Mevcut profili koru.
+        // AuthGuard için profile null ise onboarding'e gitmesin.
+        if (__DEV__) console.warn('[syncProfile] 3 denemede profile yüklenemedi, mevcut state korunuyor:', fetchErr);
       } else {
+        // Gerçekten yok — yeni kullanıcı, onboarding akışına gidecek
         setProfile(null);
       }
-    } catch (err) {
-      if (__DEV__) console.warn('Profil kontrolü başarısız:', err);
-      setProfile(null);
     } finally {
       setIsAuthReady(true);
     }
@@ -572,9 +643,27 @@ export default function RootLayout() {
     if (__DEV__) console.log('[RootLayout] Firebase auth listener başlatılıyor...');
     let authResolved = false;
 
+    // ★ 2026-04-18 FIX: Oturum geçişinde oda/LiveKit temizliği
+    // Logout veya hesap değişiminde eski session'ın LiveKit bağlantısı kapatılmalı,
+    // minimized room state sıfırlanmalı. Aksi halde yeni kullanıcı login olduğunda
+    // "Received leave request while trying to (re)connect" hatası alınıyordu —
+    // eski participant hâlâ odada aktif görünüyor ve yeni sessionla çakışıyordu.
+    const prevUidRef = { current: null as string | null };
+
     const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
       authResolved = true;
       if (__DEV__) console.log('[RootLayout] Firebase auth state:', fbUser ? 'LOGGED_IN' : 'LOGGED_OUT');
+
+      // Hesap değişti mi? (logout → login veya user A → user B)
+      const newUid = fbUser?.uid || null;
+      const uidChanged = prevUidRef.current !== newUid;
+      if (uidChanged && prevUidRef.current !== null) {
+        // Eski oturum LiveKit bağlantısını kapat ve minimized room'u sıfırla
+        try { await liveKitService.disconnect(); } catch {}
+        setMinimizedRoom(null);
+      }
+      prevUidRef.current = newUid;
+
       if (fbUser) {
         setFirebaseUser(fbUser);
         setUser({
@@ -605,8 +694,10 @@ export default function RootLayout() {
         setProfile(null);
         setIsLoggedIn(false);
         setIsAuthReady(true);
-        // ★ Logout: Supabase token'ı temizle
+        // ★ Logout: Supabase token'ı temizle + minimized room sıfırla + LiveKit kapat
         setSupabaseAuthToken(null);
+        setMinimizedRoom(null);
+        try { await liveKitService.disconnect(); } catch {}
       }
     });
 
@@ -750,6 +841,50 @@ export default function RootLayout() {
     return () => {
       supabase.removeChannel(spSub);
     };
+  }, [firebaseUser]);
+
+  // ═══ SP Bağış Alındı — realtime popup tetikleyici ═══
+  useEffect(() => {
+    if (!firebaseUser) return;
+    const giftSub = supabase
+      .channel(`gift_recv:${firebaseUser.uid}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'notifications',
+        filter: `user_id=eq.${firebaseUser.uid}`,
+      }, async (payload) => {
+        const notif = payload.new as any;
+        if (__DEV__) console.log('[GiftRT] notif received:', notif?.type, notif?.body);
+        if (notif?.type !== 'gift') return;
+        // Miktarı body'den parse et ("XX SP gönderdi" pattern'i)
+        const amountMatch = /(\d+)\s*SP/.exec(notif.body || '');
+        const amount = amountMatch ? parseInt(amountMatch[1], 10) : 0;
+        if (amount <= 0 || !notif.sender_id) {
+          if (__DEV__) console.warn('[GiftRT] Amount parse failed or no sender:', notif.body);
+          return;
+        }
+        // Sender profile bilgisini çek
+        try {
+          const { data: senderProfile } = await supabase
+            .from('profiles')
+            .select('display_name, avatar_url')
+            .eq('id', notif.sender_id)
+            .single();
+          setIncomingGift({
+            amount,
+            senderId: notif.sender_id,
+            senderName: senderProfile?.display_name || 'Birisi',
+            senderAvatar: senderProfile?.avatar_url,
+          });
+        } catch (e) {
+          if (__DEV__) console.warn('[GiftRT] Sender profile fetch failed:', e);
+        }
+      })
+      .subscribe((status) => {
+        if (__DEV__) console.log(`[GiftRT] channel status: ${status} for user ${firebaseUser.uid}`);
+      });
+    return () => { supabase.removeChannel(giftSub); };
   }, [firebaseUser]);
 
   // Gelen arama dinleyicisi (global) — Tüm sinyalleri yakala + AppState reconnect
@@ -907,6 +1042,19 @@ export default function RootLayout() {
           onClose={() => setShowNotifDrawer(false)}
           userId={firebaseUser?.uid}
         />
+
+        {/* ★ SP Bağış Alındı global popup — realtime tetiklenir */}
+        {incomingGift && firebaseUser && (
+          <SPReceivedModal
+            visible={!!incomingGift}
+            amount={incomingGift.amount}
+            senderId={incomingGift.senderId}
+            senderName={incomingGift.senderName}
+            senderAvatar={incomingGift.senderAvatar}
+            recipientId={firebaseUser.uid}
+            onClose={() => setIncomingGift(null)}
+          />
+        )}
 
         {/* Gelen Arama Overlay — ★ CALL-6: Tam ekran WhatsApp tarzı */}
         <IncomingCallOverlay

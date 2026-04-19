@@ -49,15 +49,23 @@ function ConnectionHeartbeat({ state, viewerCount }: { state: string, viewerCoun
     return () => { if (timerRef.current) clearTimeout(timerRef.current); };
   }, [state]);
 
+  // ★ 2026-04-19: Pulse sadece reconnecting/disconnected durumlarda.
+  // Connected iken sabit yeşil — sürekli nabız atması görsel gürültüydü.
   useEffect(() => {
-    Animated.loop(
+    if (displayState === 'connected') {
+      pulseAnim.setValue(1);
+      return;
+    }
+    const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, { toValue: 1.4, duration: 300, easing: Easing.out(Easing.ease), useNativeDriver: true }),
         Animated.timing(pulseAnim, { toValue: 1, duration: 400, easing: Easing.in(Easing.ease), useNativeDriver: true }),
         Animated.delay(800),
       ])
-    ).start();
-  }, []);
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [displayState]);
 
   const isOk = displayState === 'connected';
   const dotColor = isOk ? '#22C55E' : (displayState === 'reconnecting' ? '#FBBF24' : '#EF4444');
@@ -138,9 +146,14 @@ export default function RoomInfoHeader({
               <Text style={s.followerText}>{followerCount}</Text>
             </View>
           )}
-          {roomRules ? (
+          {/* ★ 2026-04-19: Kurallar VEYA açıklama varsa info butonu göster */}
+          {(roomRules || roomDescription) ? (
             <Pressable style={[s.actionBtn, showRules && s.followBtnActive]} onPress={() => setShowRules(!showRules)} hitSlop={6}>
-              <Ionicons name="document-text-outline" size={14} color={showRules ? '#F59E0B' : '#E2E8F0'} />
+              <Ionicons
+                name={roomRules ? 'document-text-outline' : 'information-circle-outline'}
+                size={14}
+                color={showRules ? '#F59E0B' : '#E2E8F0'}
+              />
             </Pressable>
           ) : null}
           {onToggleFollow && (
@@ -170,13 +183,24 @@ export default function RoomInfoHeader({
         </View>
       )}
 
-      {/* ★ Kurallar balonu — sadece tıklanınca görünür */}
-      {showRules && roomRules ? (
+      {/* ★ Oda bilgi balonu — açıklama + kurallar birlikte, tıklayarak kapanır */}
+      {showRules && (roomRules || roomDescription) ? (
         <Pressable onPress={() => setShowRules(false)}>
           <View style={s.rulesTooltip}>
             <View style={s.rulesTooltipArrow} />
-            <Ionicons name="document-text" size={12} color="#F59E0B" />
-            <Text style={s.rulesTooltipText} numberOfLines={4}>{roomRules}</Text>
+            {roomDescription ? (
+              <View style={{ flexDirection: 'row', gap: 6, alignItems: 'flex-start' }}>
+                <Ionicons name="information-circle" size={12} color="#60A5FA" style={{ marginTop: 1 }} />
+                <Text style={s.rulesTooltipText} numberOfLines={3}>{roomDescription}</Text>
+              </View>
+            ) : null}
+            {roomDescription && roomRules ? <View style={{ height: 1, backgroundColor: 'rgba(255,255,255,0.08)', marginVertical: 6 }} /> : null}
+            {roomRules ? (
+              <View style={{ flexDirection: 'row', gap: 6, alignItems: 'flex-start' }}>
+                <Ionicons name="document-text" size={12} color="#F59E0B" style={{ marginTop: 1 }} />
+                <Text style={s.rulesTooltipText} numberOfLines={4}>{roomRules}</Text>
+              </View>
+            ) : null}
           </View>
         </Pressable>
       ) : null}

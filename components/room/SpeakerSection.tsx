@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Pressable, Image, Dimensions, Animated, Easing,
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { getAvatarSource } from '../../constants/avatars';
+import { RoleColors } from '../../constants/theme';
 import AvatarPenaltyFlash, { type FlashType } from './AvatarPenaltyFlash';
 import type { RoomParticipant } from '../../services/database';
 
@@ -146,6 +147,51 @@ function OwnerBadge() {
   );
 }
 
+// ★ v32 Caretaker timer badge — süreli sahnedeki konuşmacıların kalan süresini gösterir
+function CaretakerTimerBadge({ expiresAt }: { expiresAt: string }) {
+  const [remaining, setRemaining] = React.useState(() => {
+    const ms = new Date(expiresAt).getTime() - Date.now();
+    return Math.max(0, Math.floor(ms / 1000));
+  });
+  React.useEffect(() => {
+    const interval = setInterval(() => {
+      const ms = new Date(expiresAt).getTime() - Date.now();
+      const sec = Math.max(0, Math.floor(ms / 1000));
+      setRemaining(sec);
+      if (sec <= 0) clearInterval(interval);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [expiresAt]);
+
+  const min = Math.floor(remaining / 60);
+  const sec = remaining % 60;
+  const label = `${min}:${sec.toString().padStart(2, '0')}`;
+  const isUrgent = remaining <= 30; // Son 30 saniyede kırmızı/pulsing
+  const pulseAnim = React.useRef(new Animated.Value(1)).current;
+
+  React.useEffect(() => {
+    if (isUrgent) {
+      Animated.loop(Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1.15, duration: 500, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1.0, duration: 500, useNativeDriver: true }),
+      ])).start();
+    } else {
+      pulseAnim.setValue(1);
+    }
+  }, [isUrgent]);
+
+  return (
+    <Animated.View style={[
+      s.caretakerTimer,
+      isUrgent && s.caretakerTimerUrgent,
+      { transform: [{ scale: pulseAnim }] },
+    ]}>
+      <Ionicons name="time" size={8} color={isUrgent ? '#FEE2E2' : '#CFFAFE'} />
+      <Text style={[s.caretakerTimerText, isUrgent && { color: '#FEE2E2' }]}>{label}</Text>
+    </Animated.View>
+  );
+}
+
 function SpeakerCard({ user, micStatus, onPress, onSelfDemote, isMe, cardWidth, cardHeight, VideoView }: {
   user: RoomParticipant; micStatus: MicStatus; onPress: () => void;
   onSelfDemote?: () => void;
@@ -161,10 +207,28 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, isMe, cardWidth, 
   // track state'i gecikmeli olabilir; DB kaydı mod aksiyonunu yansıtır.
   const dbMuted = (user as any).is_muted === true && user.role !== 'listener';
   const mic = rawMic && !dbMuted;
+  // ★ v32 Caretaker: speaker + stage_expires_at varsa geçici caretaker
+  const caretakerExpiresAt = user.role === 'speaker' && (user as any).stage_expires_at
+    ? (user as any).stage_expires_at as string
+    : null;
+  const isCaretakerActive = caretakerExpiresAt && new Date(caretakerExpiresAt).getTime() > Date.now();
+
+  // ★ 2026-04-19 EKSİLTME ŞABLONu — rol rengiyle ring, badge minimal
+  // Her rol için ayrı badge yerine tek sistem: avatar ring'in rengi rol'ü belirtir.
+  // Owner: altın / Moderator: mor / Speaker (+caretaker): teal / Caretaker urgent: amber
+  // ★ Tek ring sistemi: RoleColors constant (tüm projede tutarlı — constants/theme.ts)
+  const ringColor = isHost
+    ? RoleColors.owner
+    : isMod
+    ? RoleColors.moderator
+    : RoleColors.speaker;
+
   return (
     <Pressable style={({ pressed }) => [s.speakerCard, { width: cardWidth }, pressed && { opacity: 0.9, transform: [{ scale: 0.97 }] }]} onPress={onPress}>
-      {isHost && <OwnerBadge />}
-      <View style={[s.speakerCardInner, { height: cardHeight }]}>
+      <View style={[
+        s.speakerCardInner,
+        { height: cardHeight, borderColor: ringColor, borderWidth: isHost || isMod ? 2 : 1.5 },
+      ]}>
         <LinearGradient colors={['rgba(30,41,59,0.7)', 'rgba(15,23,42,0.85)']} style={[StyleSheet.absoluteFill, { borderRadius: 16 }]} />
         {cameraOn && videoTrack && VideoView ? (
           <VideoView videoTrack={videoTrack} style={StyleSheet.absoluteFill} objectFit="cover" mirror={isMe} />
@@ -172,14 +236,20 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, isMe, cardWidth, 
           <Image source={getAvatarSource(avatarUrl)} style={s.speakerAvatar} />
         )}
         <SpeakingGlow speaking={speaking && mic} borderRadius={16} />
-        {isMod && !isHost && (<View style={[s.roleBadge, s.roleBadgeMod]}><Ionicons name="shield-checkmark" size={10} color="#A78BFA" /></View>)}
-        {isGhost && (<View style={[s.roleBadge, { top: isHost || isMod ? 30 : 8, backgroundColor: 'rgba(168,85,247,0.4)' }]}><Ionicons name="eye-off" size={10} color="#A855F7" /></View>)}
-        <AudioWaveBars speaking={speaking} mic={mic} />
+        {isGhost && (
+          <View style={s.ghostOverlay}>
+            <Ionicons name="eye-off" size={18} color="rgba(255,255,255,0.55)" />
+          </View>
+        )}
+        {isCaretakerActive && <CaretakerTimerBadge expiresAt={caretakerExpiresAt!} />}
+        {/* ★ 2026-04-19: Caretaker aktifken wave bars gizli — timer zaten urgency
+            sinyalidir, wave bars ek görsel yük yaratıyor. Normal speaker'larda görünür. */}
+        {!isCaretakerActive && <AudioWaveBars speaking={speaking} mic={mic} />}
         <View style={[s.micBadge, mic ? s.micBadgeOn : s.micBadgeOff]}>
           <Ionicons name={mic ? 'mic' : 'mic-off'} size={14} color="#fff" />
         </View>
       </View>
-      <Text style={[s.speakerName, isHost && s.speakerNameHost]} numberOfLines={1}>{displayName}</Text>
+      <Text style={[s.speakerName, isHost && { color: '#FFD700' }, isMod && !isHost && { color: '#C4B5FD' }]} numberOfLines={1}>{displayName}</Text>
       {isMe && (
         <Pressable style={({ pressed }) => [s.selfDemoteHint, pressed && { opacity: 0.6 }]} onPress={onSelfDemote}>
           <Ionicons name="arrow-down-circle-outline" size={11} color="rgba(251,191,36,0.7)" />
@@ -223,17 +293,12 @@ export default function SpeakerSection({ stageUsers, getMicStatus, onSelectUser,
   }, [showSeatTooltip]);
 
   if (sortedUsers.length === 0) {
+    // ★ 2026-04-19 EKSİLTME — 3 aynı mesaj yerine tek koltuk + küçük etiket.
+    // Eskiden: tooltip "Sahne seni bekliyor!" + koltuk "Sahneye Çık" + subtitle
+    //           "Koltuğa dokun ve sahneye katıl" — üç satır aynı şeyi söylüyordu.
+    // Şimdi: sadece koltuk + "Sahneye Çık" label. Sessizlik güçtür.
     return (
       <View style={s.empty}>
-        {showSeatTooltip && (
-          <Animated.View style={[s.tooltipWrap, { opacity: tooltipFade, transform: [{ translateY: tooltipSlide }] }]}>
-            <View style={s.tooltipBubble}>
-              <Ionicons name="sparkles" size={13} color="#14B8A6" style={{ marginRight: 5 }} />
-              <Text style={s.tooltipText}>Sahne seni bekliyor!</Text>
-            </View>
-            <View style={s.tooltipArrow} />
-          </Animated.View>
-        )}
         <Pressable onPress={onGhostSeatPress} style={({ pressed }) => [s.ghostSeat, pressed && { transform: [{ scale: 0.93 }] }]}>
           <Animated.View style={[s.ghostSeatInner, { opacity: ghostPulse }]}>
             <View style={s.ghostSeatIcon}>
@@ -242,7 +307,6 @@ export default function SpeakerSection({ stageUsers, getMicStatus, onSelectUser,
           </Animated.View>
           <Text style={s.ghostSeatLabel}>Sahneye Çık</Text>
         </Pressable>
-        <Text style={s.emptyText}>Koltuğa dokun ve sahneye katıl</Text>
       </View>
     );
   }
@@ -267,20 +331,8 @@ export default function SpeakerSection({ stageUsers, getMicStatus, onSelectUser,
 
   return (
     <View style={s.wrap}>
-      <View style={s.headerRow}>
-        <View style={s.headerPill}>
-          <LinearGradient
-            colors={['rgba(20,184,166,0.08)', 'rgba(20,184,166,0.02)', 'transparent']}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-            style={StyleSheet.absoluteFill}
-          />
-          <Ionicons name="mic" size={11} color="#14B8A6" />
-          <Text style={s.headerTitle}>Sahnedekiler</Text>
-          <View style={s.headerCount}>
-            <Text style={s.headerCountText}>{count}</Text>
-          </View>
-        </View>
-      </View>
+      {/* ★ 2026-04-19: "Sahnedekiler" başlık pill'i kaldırıldı — kartlar zaten sahneyi gösterir,
+          başlık semantik tekrar. Görsel gürültü azaltıldı. */}
 
       {/* ★ SPOTLIGHT — Kamera açık kullanıcılar üstte geniş gösterim */}
       {showSpotlight && (
@@ -392,6 +444,32 @@ const s = StyleSheet.create({
   micBadge: { position: 'absolute', bottom: 6, right: 6, width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'rgba(15,23,42,0.8)', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 4 },
   micBadgeOn: { backgroundColor: '#14B8A6' },
   micBadgeOff: { backgroundColor: 'rgba(239,68,68,0.85)' },
+  // ★ Ghost overlay — "gizli" modunda hafif bir tonda üstüne bindirilir (badge yerine)
+  ghostOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(15,23,42,0.55)',
+    alignItems: 'center', justifyContent: 'center',
+    borderRadius: 16,
+  },
+  // ★ v32 Caretaker timer — avatar sol-üst köşede
+  caretakerTimer: {
+    position: 'absolute', top: 6, left: 6,
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    paddingHorizontal: 6, paddingVertical: 2,
+    borderRadius: 8, backgroundColor: 'rgba(20,184,166,0.85)',
+    borderWidth: 1, borderColor: 'rgba(20,184,166,0.35)',
+    shadowColor: '#14B8A6', shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.3, shadowRadius: 3, elevation: 3,
+  },
+  caretakerTimerUrgent: {
+    backgroundColor: 'rgba(239,68,68,0.9)',
+    borderColor: 'rgba(239,68,68,0.5)',
+    shadowColor: '#EF4444',
+  },
+  caretakerTimerText: {
+    fontSize: 9, fontWeight: '800', color: '#CFFAFE',
+    letterSpacing: 0.3, fontVariant: ['tabular-nums'],
+  },
   speakerName: { fontSize: 11, fontWeight: '700', color: '#F1F5F9', marginTop: 5, textAlign: 'center', maxWidth: 140, textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
   speakerNameHost: { color: '#FFD700' },
   selfDemoteHint: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 4, backgroundColor: 'rgba(251,191,36,0.08)', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: 'rgba(251,191,36,0.15)' },

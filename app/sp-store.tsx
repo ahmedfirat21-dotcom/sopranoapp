@@ -21,16 +21,16 @@ const SP_PACKAGES = [
   { id: 'soprano_sp_100',  sp: 100,  price: 14.99,  icon: 'flash-outline' as const,     accent: '#60A5FA', gradient: ['#1E3A5F', '#0F2744'] as [string, string], bonus: 0,    popular: false },
   { id: 'soprano_sp_250',  sp: 250,  price: 34.99,  icon: 'diamond-outline' as const,   accent: '#A78BFA', gradient: ['#3B1F5E', '#2D1648'] as [string, string], bonus: 25,   popular: false },
   { id: 'soprano_sp_600',  sp: 600,  price: 99.99,  icon: 'trophy-outline' as const,    accent: '#FBBF24', gradient: ['#3D2E10', '#2E2108'] as [string, string], bonus: 75,   popular: true },
-  { id: 'sp_1500', sp: 1500, price: 199.99, icon: 'star-outline' as const,      accent: '#14B8A6', gradient: ['#0F2E4A', '#0A2038'] as [string, string], bonus: 250,  popular: false },
-  { id: 'sp_4000', sp: 4000, price: 449.99, icon: 'shield-checkmark-outline' as const, accent: '#F472B6', gradient: ['#3B1042', '#2D0C34'] as [string, string], bonus: 800,  popular: false },
-  { id: 'sp_10000', sp: 10000, price: 999.99, icon: 'rocket-outline' as const,  accent: '#FB923C', gradient: ['#4A1525', '#3A0F1E'] as [string, string], bonus: 2500, popular: false },
+  { id: 'soprano_sp_1500', sp: 1500, price: 199.99, icon: 'star-outline' as const,      accent: '#14B8A6', gradient: ['#0F2E4A', '#0A2038'] as [string, string], bonus: 250,  popular: false },
+  { id: 'soprano_sp_4000', sp: 4000, price: 449.99, icon: 'shield-checkmark-outline' as const, accent: '#F472B6', gradient: ['#3B1042', '#2D0C34'] as [string, string], bonus: 800,  popular: false },
+  { id: 'soprano_sp_10000', sp: 10000, price: 999.99, icon: 'rocket-outline' as const,  accent: '#FB923C', gradient: ['#4A1525', '#3A0F1E'] as [string, string], bonus: 2500, popular: false },
 ];
 
 export default function SPStoreScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { profile, refreshProfile } = useAuth();
-  const spBalance = profile?.system_points ?? (profile as any)?.sp ?? 0;
+  const spBalance = profile?.system_points ?? 0;
   const userTier = migrateLegacyTier(profile?.subscription_tier);
   // ★ Pro: %20, Plus: %10 ekstra SP bonusu (mağaza indirimi)
   const storeBonusPct = userTier === 'Pro' ? 0.20 : userTier === 'Plus' ? 0.10 : 0;
@@ -140,11 +140,16 @@ export default function SPStoreScreen() {
         {/* Header */}
         <View style={[s.header, { paddingTop: insets.top + 8 }]}>
           <Pressable onPress={() => safeGoBack(router)} style={s.backBtn}>
-            <Ionicons name="chevron-back" size={22} color="#F1F5F9" />
+            <Ionicons name="chevron-back" size={22} color="#F1F5F9" style={{
+              textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4,
+            }} />
           </Pressable>
           <Text style={s.headerTitle}>SP Mağaza</Text>
           <View style={s.balancePill}>
-            <Ionicons name="diamond" size={12} color="#FBBF24" />
+            <Ionicons name="diamond" size={12} color="#FBBF24" style={{
+              textShadowColor: '#FBBF24dd',
+              textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 8,
+            }} />
             <Text style={s.balanceText}>{spBalance.toLocaleString()}</Text>
           </View>
         </View>
@@ -192,10 +197,17 @@ export default function SPStoreScreen() {
                   </View>
                 )}
 
-                {/* İkon */}
-                <View style={[s.pkgIconWrap, { backgroundColor: `${pkg.accent}15`, borderColor: `${pkg.accent}30` }]}>
-                  <Ionicons name={pkg.icon} size={20} color={pkg.accent} />
-                </View>
+                {/* İkon — halo glow */}
+                <Ionicons
+                  name={pkg.icon}
+                  size={28}
+                  color={pkg.accent}
+                  style={{
+                    textShadowColor: `${pkg.accent}dd`,
+                    textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 12,
+                    marginBottom: 8, marginTop: 4,
+                  }}
+                />
 
                 {/* SP Miktarı */}
                 <Text style={s.pkgSP}>{pkg.sp.toLocaleString()}</Text>

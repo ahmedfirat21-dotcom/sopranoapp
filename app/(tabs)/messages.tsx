@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { View, Text, StyleSheet, FlatList, Image, Pressable, ActivityIndicator, TextInput, ScrollView, Animated as RNAnimated, PanResponder, RefreshControl } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -7,7 +7,6 @@ import { useRouter } from 'expo-router';
 import { Colors, Shadows } from '../../constants/theme';
 import { MessageService, ProfileService, type InboxItem, type Message } from '../../services/database';
 import { supabase } from '../../constants/supabase';
-import EmptyState from '../../components/EmptyState';
 import { useAuth, useBadges, useTheme, useOnlineFriends } from '../_layout';
 import { useFocusEffect } from 'expo-router';
 import { useCallback } from 'react';
@@ -16,14 +15,175 @@ import StatusAvatar from '../../components/StatusAvatar';
 import { UserSearchModal } from '../../components/UserSearchModal';
 import AppBackground from '../../components/AppBackground';
 import { showToast } from '../../components/Toast';
+import NotificationBell from '../../components/NotificationBell';
 import { getRelativeTime } from '../../constants/time';
 import PremiumAlert, { type AlertButton } from '../../components/PremiumAlert';
 import { ModerationService } from '../../services/moderation';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+// ═══ Skeleton Card — Initial load'da iskelet gösterimi ═══
+function SkeletonCard() {
+  const pulseAnim = useRef(new RNAnimated.Value(0.3)).current;
+  useEffect(() => {
+    const loop = RNAnimated.loop(
+      RNAnimated.sequence([
+        RNAnimated.timing(pulseAnim, { toValue: 0.7, duration: 900, useNativeDriver: true }),
+        RNAnimated.timing(pulseAnim, { toValue: 0.3, duration: 900, useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, []);
+  return (
+    <RNAnimated.View style={[skStyles.card, { opacity: pulseAnim }]}>
+      <View style={skStyles.avatar} />
+      <View style={skStyles.lines}>
+        <View style={skStyles.lineLong} />
+        <View style={skStyles.lineShort} />
+      </View>
+      <View style={skStyles.timePill} />
+    </RNAnimated.View>
+  );
+}
+function SkeletonList() {
+  return (
+    <View style={{ paddingTop: 6 }}>
+      {Array.from({ length: 5 }).map((_, i) => <SkeletonCard key={i} />)}
+    </View>
+  );
+}
+const skStyles = StyleSheet.create({
+  card: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    marginHorizontal: 14, marginVertical: 5,
+    padding: 14, borderRadius: 20,
+    backgroundColor: 'rgba(6,10,18,0.58)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
+  },
+  avatar: { width: 52, height: 52, borderRadius: 26, backgroundColor: 'rgba(255,255,255,0.08)' },
+  lines: { flex: 1, gap: 8 },
+  lineLong: { height: 12, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.1)', width: '60%' },
+  lineShort: { height: 10, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.06)', width: '85%' },
+  timePill: { width: 36, height: 10, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.08)' },
+});
+
+// ═══ Memoized Conversation Card — FlatList re-render'ı izole ═══
+const ConversationCard = React.memo(function ConversationCard({
+  item, isSelected, selectionMode, isFriend, isTyping,
+  onOpenChat, onToggleSelection, onLongPress, onDelete, onAvatarPress, onCallPress,
+}: {
+  item: InboxItem;
+  isSelected: boolean;
+  selectionMode: boolean;
+  isFriend: boolean;
+  isTyping: boolean;
+  onOpenChat: (partnerId: string) => void;
+  onToggleSelection: (partnerId: string) => void;
+  onLongPress: (item: InboxItem) => void;
+  onDelete: (partnerId: string) => void;
+  onAvatarPress: (partnerId: string) => void;
+  onCallPress: (partnerId: string) => void;
+}) {
+  const unread = item.unread_count > 0;
+  const cardGradient = isSelected
+    ? ['rgba(10,15,28,0.98)', 'rgba(20,184,166,0.10)', 'rgba(45,212,191,0.16)', 'rgba(20,184,166,0.08)', 'rgba(10,15,28,0.98)']
+    : unread
+      ? ['rgba(11,18,32,0.98)', 'rgba(56,189,248,0.09)', 'rgba(147,197,253,0.15)', 'rgba(56,189,248,0.07)', 'rgba(11,18,32,0.98)']
+      : ['rgba(10,15,28,0.97)', 'rgba(37,99,235,0.08)', 'rgba(255,255,255,0.09)', 'rgba(37,99,235,0.07)', 'rgba(10,15,28,0.97)'];
+  return (
+    <SwipeableRow
+      containerStyle={[styles.msgCard, isSelected && styles.msgCardSelected, unread && styles.msgCardUnread]}
+      onDelete={() => onDelete(item.partner_id)}
+    >
+      <Pressable
+        style={styles.msgPressable}
+        android_ripple={{ color: 'rgba(255,255,255,0.04)' }}
+        onPress={() => selectionMode ? onToggleSelection(item.partner_id) : onOpenChat(item.partner_id)}
+        onLongPress={() => onLongPress(item)}
+        delayLongPress={500}
+      >
+        <LinearGradient
+          colors={cardGradient as [string, string, string, string, string]}
+          locations={[0, 0.28, 0.5, 0.72, 1]}
+          start={{ x: 0, y: 0.5 }}
+          end={{ x: 1, y: 0.5 }}
+          style={styles.msgRow}
+        >
+          {unread && <View style={styles.unreadStripe} />}
+          {selectionMode && (
+            <View style={styles.checkWrap}>
+              <Ionicons name={isSelected ? 'checkbox' : 'square-outline'} size={22} color={isSelected ? Colors.teal : 'rgba(255,255,255,0.3)'} />
+            </View>
+          )}
+          <Pressable style={styles.avatarWrap} onPress={() => onAvatarPress(item.partner_id)}>
+            <StatusAvatar uri={item.partner_avatar} size={52} isOnline={item.partner_is_online} tier={item.partner_tier} />
+          </Pressable>
+          <View style={styles.msgInfo}>
+            <View style={styles.msgTop}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, flex: 1, marginRight: 8 }}>
+                {item.is_pinned && (
+                  <Ionicons name="pin" size={11} color={Colors.teal} />
+                )}
+                <Text style={[styles.msgName, unread && styles.msgNameUnread]} numberOfLines={1}>
+                  {item.partner_name}
+                </Text>
+                {item.is_muted && (
+                  <Ionicons name="notifications-off" size={11} color="rgba(255,255,255,0.35)" />
+                )}
+              </View>
+              <Text style={[styles.msgTime, unread && styles.msgTimeUnread]}>
+                {getRelativeTime(item.last_message_time)}
+              </Text>
+            </View>
+            <View style={styles.msgPreviewRow}>
+              {isTyping ? (
+                <Text style={[styles.msgText, { color: Colors.teal, fontWeight: '700' }]} numberOfLines={1}>
+                  yazıyor...
+                </Text>
+              ) : (
+                <>
+                  {item.is_last_msg_mine && (
+                    <Ionicons
+                      name="checkmark-done"
+                      size={14}
+                      color={item.is_last_msg_read ? Colors.teal : 'rgba(255,255,255,0.3)'}
+                      style={{ marginRight: 2 }}
+                    />
+                  )}
+                  <Text style={[styles.msgText, unread && styles.msgTextUnread]} numberOfLines={1}>
+                    {item.is_last_msg_mine
+                      ? item.last_message_content?.replace(/^Sen:\s*/, '')
+                      : item.last_message_content}
+                  </Text>
+                </>
+              )}
+            </View>
+          </View>
+          <View style={styles.msgRight}>
+            {isFriend && !selectionMode && (
+              <Pressable
+                style={styles.msgCallBtn}
+                onPress={(e) => { e.stopPropagation?.(); onCallPress(item.partner_id); }}
+              >
+                <Ionicons name="call" size={14} color="#4ADE80" />
+              </Pressable>
+            )}
+            {unread && (
+              <View style={styles.unreadBadge}>
+                <Text style={styles.unreadCountText}>{item.unread_count > 99 ? '99+' : item.unread_count}</Text>
+              </View>
+            )}
+          </View>
+        </LinearGradient>
+      </Pressable>
+    </SwipeableRow>
+  );
+});
+
 // ═══ Pure-RN Swipe-to-Delete Row ═══
 function SwipeableRow({ children, onDelete, containerStyle }: { children: React.ReactNode; onDelete: () => void; containerStyle?: any }) {
   const translateX = useRef(new RNAnimated.Value(0)).current;
+  const [isOpen, setIsOpen] = useState(false);
   const deleteOpacity = translateX.interpolate({ inputRange: [-80, -20, 0], outputRange: [1, 0.6, 0], extrapolate: 'clamp' });
   const panResponder = useRef(
     PanResponder.create({
@@ -34,12 +194,19 @@ function SwipeableRow({ children, onDelete, containerStyle }: { children: React.
       onPanResponderRelease: (_, gs) => {
         if (gs.dx < -60) {
           RNAnimated.spring(translateX, { toValue: -80, useNativeDriver: true, tension: 100, friction: 10 }).start();
+          setIsOpen(true);
         } else {
           RNAnimated.spring(translateX, { toValue: 0, useNativeDriver: true, tension: 100, friction: 10 }).start();
+          setIsOpen(false);
         }
       },
     })
   ).current;
+
+  const closeSwipe = () => {
+    RNAnimated.spring(translateX, { toValue: 0, useNativeDriver: true, tension: 100, friction: 10 }).start();
+    setIsOpen(false);
+  };
 
   return (
     <View style={containerStyle}>
@@ -53,6 +220,13 @@ function SwipeableRow({ children, onDelete, containerStyle }: { children: React.
         <RNAnimated.View style={{ transform: [{ translateX }] }} {...panResponder.panHandlers}>
           {children}
         </RNAnimated.View>
+        {/* ★ Açık swipe üzerinde overlay — herhangi bir tap snap-back yapar (iOS Mail/WhatsApp pattern) */}
+        {isOpen && (
+          <Pressable
+            style={[StyleSheet.absoluteFillObject, { right: 80 }]}
+            onPress={closeSwipe}
+          />
+        )}
       </View>
     </View>
   );
@@ -68,18 +242,45 @@ export default function MessagesScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [showComposeModal, setShowComposeModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  // ★ Debounced sorgu — her karakter 100+ yeniden render yapıyordu
+  const [debouncedQuery, setDebouncedQuery] = useState('');
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQuery(searchQuery), 250);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
 
   const { onlineFriends, friendIds, blockedIdsRef, refreshFriends } = useOnlineFriends();
   const { unreadNotifs: unreadCount } = useBadges();
-  const [cAlert, setCAlert] = useState<{ visible: boolean; title: string; message: string; type?: 'info' | 'warning' | 'error' | 'success'; buttons?: AlertButton[] }>({ visible: false, title: '', message: '' });
+  type AlertState = {
+    visible: boolean;
+    title: string;
+    message: string;
+    type?: 'info' | 'warning' | 'error' | 'success';
+    buttons?: AlertButton[];
+  };
+  const [cAlert, setCAlert] = useState<AlertState>({ visible: false, title: '', message: '' });
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  // ★ Yazıyor... — listedeki konuşmalarda canlı typing indicator
+  const [typingPartners, setTypingPartners] = useState<Set<string>>(new Set());
+  const typingTimeoutsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
+  // ★ Arşiv görünümü — varsayılan: normal (arşivsiz), toggle ile arşivlenenleri göster
+  const [showArchived, setShowArchived] = useState(false);
 
+  // ★ Görünür liste: arşiv modu açık → sadece arşivlenmiş, kapalı → arşivsiz
+  // Arama tüm alanlarda çalışır (arşiv içinde arama için archived view açık olmalı)
   const filteredConversations = useMemo(() => {
-    if (!searchQuery.trim()) return conversations;
-    const q = searchQuery.toLowerCase();
-    return conversations.filter(c => c.partner_name.toLowerCase().includes(q));
-  }, [conversations, searchQuery]);
+    const base = conversations.filter(c => showArchived ? c.is_archived : !c.is_archived);
+    if (!debouncedQuery.trim()) return base;
+    const q = debouncedQuery.toLowerCase();
+    return base.filter(c => c.partner_name.toLowerCase().includes(q));
+  }, [conversations, debouncedQuery, showArchived]);
+
+  // Arşivlenmiş sohbet sayısı — toggle chip için
+  const archivedCount = useMemo(
+    () => conversations.filter(c => c.is_archived).length,
+    [conversations]
+  );
 
   const loadInbox = useCallback(async () => {
     if (!firebaseUser) return;
@@ -95,6 +296,8 @@ export default function MessagesScreen() {
       setConversations(filtered);
     } catch (err) {
       if (__DEV__) console.warn('Mesajlar yüklenemedi:', err);
+      // ★ Kullanıcıya bildir — sessiz blank state yerine toast
+      showToast({ title: 'Mesajlar yüklenemedi', message: 'İnternet bağlantını kontrol et.', type: 'error' });
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -106,7 +309,7 @@ export default function MessagesScreen() {
       loadInbox();
       refreshFriends();
       refreshBadges();
-    }, [firebaseUser])
+    }, [loadInbox, refreshFriends, refreshBadges])
   );
 
   useEffect(() => {
@@ -217,7 +420,21 @@ export default function MessagesScreen() {
           .select('*, sender:profiles!sender_id(*), receiver:profiles!receiver_id(*)')
           .eq('id', payload.new.id)
           .single();
-        if (data && !(data as any).is_deleted) updateInbox(data as Message);
+        if (data && !(data as Message).is_deleted) updateInbox(data as Message);
+      })
+      // ★ UPDATE: Karşı taraf okuduğunda is_read flip olur → ✓ → ✓✓ (teal) anında
+      .on('postgres_changes', {
+        event: 'UPDATE', schema: 'public', table: 'messages',
+        filter: `sender_id=eq.${firebaseUser.uid}`,
+      }, (payload) => {
+        const updated = payload.new as any;
+        if (!updated.is_read) return; // sadece read=true geçişlerini yakala
+        setConversations(prev => prev.map(c => {
+          if (c.partner_id !== updated.receiver_id) return c;
+          if (!c.is_last_msg_mine) return c;
+          if (c.is_last_msg_read === true) return c;
+          return { ...c, is_last_msg_read: true };
+        }));
       })
       .subscribe();
 
@@ -225,9 +442,162 @@ export default function MessagesScreen() {
       incomingChannel.unsubscribe();
       supabase.removeChannel(sentChannel);
     };
-  }, [firebaseUser]);
+  }, [firebaseUser, refreshBadges, blockedIdsRef]);
+
+  // ★ Typing broadcast dinleyicisi — listede "yazıyor..." göstergesi
+  useEffect(() => {
+    if (!firebaseUser) return;
+    const timeouts = typingTimeoutsRef.current;
+    const typingChannel = MessageService.onTypingStatus(firebaseUser.uid, (payload) => {
+      if (payload.conversation_partner_id !== firebaseUser.uid) return;
+      const senderId = payload.user_id;
+      // Engellenmişse görmezden gel
+      if (blockedIdsRef.current.has(senderId)) return;
+
+      if (payload.is_typing) {
+        setTypingPartners(prev => {
+          if (prev.has(senderId)) return prev;
+          const next = new Set(prev); next.add(senderId); return next;
+        });
+        // 3s auto-clear — karşı taraf durduğunda is_typing=false gelmezse
+        const existing = timeouts.get(senderId);
+        if (existing) clearTimeout(existing);
+        timeouts.set(senderId, setTimeout(() => {
+          setTypingPartners(prev => { const n = new Set(prev); n.delete(senderId); return n; });
+          timeouts.delete(senderId);
+        }, 3000));
+      } else {
+        setTypingPartners(prev => { const n = new Set(prev); n.delete(senderId); return n; });
+        const existing = timeouts.get(senderId);
+        if (existing) { clearTimeout(existing); timeouts.delete(senderId); }
+      }
+    });
+    return () => {
+      typingChannel.unsubscribe();
+      timeouts.forEach(t => clearTimeout(t));
+      timeouts.clear();
+    };
+  }, [firebaseUser, blockedIdsRef]);
 
   const insets = useSafeAreaInsets();
+
+  // ═══ Stable card callbacks — React.memo ile birlikte FlatList perf'i sağlar ═══
+  const handleOpenChat = useCallback((partnerId: string) => {
+    router.push(`/chat/${partnerId}` as any);
+  }, [router]);
+
+  const handleToggleSelection = useCallback((partnerId: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(partnerId)) next.delete(partnerId);
+      else next.add(partnerId);
+      return next;
+    });
+  }, []);
+
+  const handleDeleteConversation = useCallback(async (partnerId: string) => {
+    if (!firebaseUser) return;
+    try {
+      await MessageService.markAsRead(firebaseUser.uid, partnerId);
+      await MessageService.deleteConversation(firebaseUser.uid, partnerId);
+      setConversations(prev => prev.filter(c => c.partner_id !== partnerId));
+      refreshBadges();
+    } catch {
+      showToast({ title: 'Silinemedi', message: 'Sohbet silinemedi, tekrar dene.', type: 'error' });
+    }
+  }, [firebaseUser, refreshBadges]);
+
+  const handleAvatarPress = useCallback((partnerId: string) => {
+    router.push(`/user/${partnerId}` as any);
+  }, [router]);
+
+  const handleCallPress = useCallback((partnerId: string) => {
+    router.push(`/call/${partnerId}?callType=audio` as any);
+  }, [router]);
+
+  // ★ Pin toggle — optimistic update + RPC, hata durumunda geri al
+  const handleTogglePin = useCallback(async (partnerId: string) => {
+    const current = conversations.find(c => c.partner_id === partnerId);
+    if (!current) return;
+    const newPinned = !current.is_pinned;
+    // Optimistic update + resort
+    setConversations(prev => {
+      const updated = prev.map(c => c.partner_id === partnerId ? { ...c, is_pinned: newPinned } : c);
+      return [...updated].sort((a, b) => {
+        if (a.is_pinned !== b.is_pinned) return a.is_pinned ? -1 : 1;
+        return new Date(b.last_message_time).getTime() - new Date(a.last_message_time).getTime();
+      });
+    });
+    try {
+      await MessageService.togglePin(partnerId);
+      showToast({
+        title: newPinned ? '📌 Sabitlendi' : 'Sabitleme kaldırıldı',
+        type: 'success',
+      });
+    } catch {
+      // Rollback
+      setConversations(prev => prev.map(c =>
+        c.partner_id === partnerId ? { ...c, is_pinned: current.is_pinned } : c));
+      showToast({ title: 'Hata', message: 'İşlem tamamlanamadı.', type: 'error' });
+    }
+  }, [conversations]);
+
+  // ★ Archive toggle — optimistic update + RPC
+  const handleToggleArchive = useCallback(async (partnerId: string, partnerName: string) => {
+    const current = conversations.find(c => c.partner_id === partnerId);
+    if (!current) return;
+    const newArchived = !current.is_archived;
+    setConversations(prev => prev.map(c =>
+      c.partner_id === partnerId ? { ...c, is_archived: newArchived } : c));
+    try {
+      await MessageService.toggleArchive(partnerId);
+      showToast({
+        title: newArchived ? `🗄️ ${partnerName} arşivlendi` : `↩️ Arşivden çıkarıldı`,
+        message: newArchived ? 'Yeni mesaj gelince otomatik geri çıkacak.' : undefined,
+        type: 'success',
+      });
+    } catch {
+      setConversations(prev => prev.map(c =>
+        c.partner_id === partnerId ? { ...c, is_archived: current.is_archived } : c));
+      showToast({ title: 'Hata', message: 'İşlem tamamlanamadı.', type: 'error' });
+    }
+  }, [conversations]);
+
+  const handleBlockUser = useCallback(async (partnerId: string, partnerName: string) => {
+    if (!firebaseUser) return;
+    try {
+      await ModerationService.blockUser(firebaseUser.uid, partnerId);
+      setConversations(prev => prev.filter(c => c.partner_id !== partnerId));
+      showToast({ title: '⛔ Engellendi', message: `${partnerName} engellendi.`, type: 'success' });
+    } catch {
+      showToast({ title: 'Hata', message: 'Engellenemedi.', type: 'error' });
+    }
+  }, [firebaseUser]);
+
+  const handleLongPress = useCallback((item: InboxItem) => {
+    setCAlert({
+      visible: true,
+      title: item.partner_name,
+      message: 'Bu sohbet için ne yapmak istersin?',
+      type: 'info',
+      buttons: [
+        ...(friendIds.has(item.partner_id) ? [
+          { text: '📞 Sesli Ara', onPress: () => handleCallPress(item.partner_id) },
+        ] : []),
+        {
+          text: item.is_pinned ? '📌 Sabitlemeyi Kaldır' : '📌 Sabitle',
+          onPress: () => handleTogglePin(item.partner_id),
+        },
+        {
+          text: item.is_archived ? '↩️ Arşivden Çıkar' : '🗄️ Arşivle',
+          onPress: () => handleToggleArchive(item.partner_id, item.partner_name),
+        },
+        { text: '🗑️ Sohbeti Sil', style: 'destructive' as const, onPress: () => handleDeleteConversation(item.partner_id) },
+        { text: '🚫 Engelle', style: 'destructive' as const, onPress: () => handleBlockUser(item.partner_id, item.partner_name) },
+        { text: 'Vazgeç', style: 'cancel' as const },
+      ],
+    });
+  }, [friendIds, handleCallPress, handleDeleteConversation, handleBlockUser, handleTogglePin, handleToggleArchive]);
 
   return (
     <AppBackground variant="messages">
@@ -237,14 +607,7 @@ export default function MessagesScreen() {
       <View style={[styles.topBar, { paddingTop: insets.top + 4 }]}>
         <Image source={require('../../assets/logo.png')} style={styles.logo} resizeMode="contain" />
         <View style={styles.headerRight}>
-          <Pressable style={styles.headerIconBtn} onPress={() => setShowNotifDrawer(true)}>
-            <Ionicons name="notifications-outline" size={20} color="#F1F5F9" />
-            {unreadCount > 0 && (
-              <View style={styles.notifBadge}>
-                <Text style={styles.notifBadgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
-              </View>
-            )}
-          </Pressable>
+          <NotificationBell unreadCount={unreadCount} onPress={() => setShowNotifDrawer(true)} />
           <Pressable style={[styles.headerIconBtn, styles.composeBtn]} onPress={() => setShowComposeModal(true)}>
             <Ionicons name="create-outline" size={19} color="#F1F5F9" />
           </Pressable>
@@ -327,9 +690,23 @@ export default function MessagesScreen() {
         </View>
       )}
 
+      {/* ═══ Arşiv chip — arşiv modu toggle ═══ */}
+      {(archivedCount > 0 || showArchived) && (
+        <Pressable
+          style={styles.archiveChip}
+          onPress={() => setShowArchived(v => !v)}
+        >
+          <Ionicons name={showArchived ? 'arrow-back' : 'archive'} size={16} color={Colors.teal} />
+          <Text style={styles.archiveChipText}>
+            {showArchived ? `Arşivden Çık` : `Arşivlenmiş (${archivedCount})`}
+          </Text>
+          <Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.3)" />
+        </Pressable>
+      )}
+
       {/* ═══ Sohbet Listesi ═══ */}
       {loading ? (
-        <ActivityIndicator size="large" color={Colors.teal} style={{ marginTop: 50 }} />
+        <SkeletonList />
       ) : (
         <FlatList
           data={filteredConversations}
@@ -355,158 +732,48 @@ export default function MessagesScreen() {
             />
           }
           ListEmptyComponent={
-            <EmptyState
-              icon="chatbubbles-outline"
-              title="Henüz mesajın yok"
-              subtitle="Birinin profiline git ve sohbet başlat!"
-              actionLabel="Keşfet"
-              onAction={() => router.push('/(tabs)/home')}
-            />
-          }
-          renderItem={({ item }) => {
-            const unread = item.unread_count > 0;
-            const isSelected = selectedIds.has(item.partner_id);
-            const cardGradient = isSelected
-              ? ['rgba(10,15,28,0.98)', 'rgba(20,184,166,0.10)', 'rgba(45,212,191,0.16)', 'rgba(20,184,166,0.08)', 'rgba(10,15,28,0.98)']
-              : unread
-                ? ['rgba(11,18,32,0.98)', 'rgba(56,189,248,0.09)', 'rgba(147,197,253,0.15)', 'rgba(56,189,248,0.07)', 'rgba(11,18,32,0.98)']
-                : ['rgba(10,15,28,0.97)', 'rgba(37,99,235,0.08)', 'rgba(255,255,255,0.09)', 'rgba(37,99,235,0.07)', 'rgba(10,15,28,0.97)'];
-            return (
-              <SwipeableRow
-                containerStyle={[styles.msgCard, isSelected && styles.msgCardSelected, unread && styles.msgCardUnread]}
-                onDelete={async () => {
-                  if (!firebaseUser) return;
-                  try {
-                    await MessageService.markAsRead(firebaseUser.uid, item.partner_id);
-                    await MessageService.deleteConversation(firebaseUser.uid, item.partner_id);
-                    setConversations(prev => prev.filter(c => c.partner_id !== item.partner_id));
-                    refreshBadges();
-                  } catch {
-                    showToast({ title: 'Silinemedi', type: 'error' });
-                  }
-                }}
-              >
+            <View style={styles.emptyWrap}>
+              {/* ★ Sade ikon — sadece altta yumuşak gölge */}
+              <Ionicons
+                name="chatbubbles"
+                size={72}
+                color={Colors.teal}
+                style={styles.emptyIcon}
+              />
+              <Text style={styles.emptyTitle}>Henüz mesajın yok</Text>
+              <Text style={styles.emptySubtitle}>
+                Keşfet sayfasından birine git,{'\n'}sohbet başlat!
+              </Text>
               <Pressable
-                style={styles.msgPressable}
-                android_ripple={{ color: 'rgba(255,255,255,0.04)' }}
-                onPress={() => {
-                  if (selectionMode) {
-                    setSelectedIds(prev => {
-                      const next = new Set(prev);
-                      if (next.has(item.partner_id)) next.delete(item.partner_id);
-                      else next.add(item.partner_id);
-                      return next;
-                    });
-                  } else {
-                    router.push(`/chat/${item.partner_id}`);
-                  }
-                }}
-                onLongPress={() => {
-                  setCAlert({
-                    visible: true,
-                    title: item.partner_name,
-                    message: 'Bu sohbet için ne yapmak istersin?',
-                    type: 'info',
-                    buttons: [
-                      ...(friendIds.has(item.partner_id) ? [
-                        { text: '📞 Sesli Ara', onPress: () => router.push(`/call/${item.partner_id}?callType=audio` as any) },
-                      ] : []),
-                      { text: '🗑️ Sohbeti Sil', style: 'destructive', onPress: async () => {
-                        if (!firebaseUser) return;
-                        try {
-                          await MessageService.markAsRead(firebaseUser.uid, item.partner_id);
-                          await MessageService.deleteConversation(firebaseUser.uid, item.partner_id);
-                          setConversations(prev => prev.filter(c => c.partner_id !== item.partner_id));
-                          refreshBadges();
-                        } catch {}
-                      }},
-                      { text: '🚫 Engelle', style: 'destructive', onPress: async () => {
-                        if (!firebaseUser) return;
-                        try {
-                          await ModerationService.blockUser(firebaseUser.uid, item.partner_id);
-                          setConversations(prev => prev.filter(c => c.partner_id !== item.partner_id));
-                          showToast({ title: '⛔ Engellendi', message: `${item.partner_name} engellendi.`, type: 'success' });
-                        } catch {
-                          showToast({ title: 'Hata', message: 'Engellenemedi.', type: 'error' });
-                        }
-                      }},
-                      { text: 'Vazgeç', style: 'cancel' },
-                    ],
-                  });
-                }}
-                delayLongPress={500}
+                style={styles.emptyActionBtn}
+                onPress={() => router.push('/(tabs)/home')}
               >
                 <LinearGradient
-                  colors={cardGradient as [string, string, string, string, string]}
-                  locations={[0, 0.28, 0.5, 0.72, 1]}
-                  start={{ x: 0, y: 0.5 }}
-                  end={{ x: 1, y: 0.5 }}
-                  style={styles.msgRow}
+                  colors={['#14B8A6', '#0D9488']}
+                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                  style={styles.emptyActionGrad}
                 >
-                  {unread && <View style={styles.unreadStripe} />}
-
-                  {selectionMode && (
-                    <View style={styles.checkWrap}>
-                      <Ionicons name={isSelected ? 'checkbox' : 'square-outline'} size={22} color={isSelected ? Colors.teal : 'rgba(255,255,255,0.3)'} />
-                    </View>
-                  )}
-
-                  <Pressable
-                    style={styles.avatarWrap}
-                    onPress={() => router.push(`/user/${item.partner_id}` as any)}
-                  >
-                    <StatusAvatar uri={item.partner_avatar} size={52} isOnline={item.partner_is_online} tier={item.partner_tier} />
-                  </Pressable>
-
-                  <View style={styles.msgInfo}>
-                    <View style={styles.msgTop}>
-                      <Text style={[styles.msgName, unread && styles.msgNameUnread]} numberOfLines={1}>
-                        {item.partner_name}
-                      </Text>
-                      <Text style={[styles.msgTime, unread && styles.msgTimeUnread]}>
-                        {getRelativeTime(item.last_message_time)}
-                      </Text>
-                    </View>
-                    <View style={styles.msgPreviewRow}>
-                      {item.is_last_msg_mine && (
-                        <Ionicons
-                          name="checkmark-done"
-                          size={14}
-                          color={item.is_last_msg_read ? Colors.teal : 'rgba(255,255,255,0.3)'}
-                          style={{ marginRight: 2 }}
-                        />
-                      )}
-                      <Text style={[styles.msgText, unread && styles.msgTextUnread]} numberOfLines={1}>
-                        {item.is_last_msg_mine
-                          ? item.last_message_content?.replace(/^Sen:\s*/, '')
-                          : item.last_message_content}
-                      </Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.msgRight}>
-                    {friendIds.has(item.partner_id) && !selectionMode && (
-                      <Pressable
-                        style={styles.msgCallBtn}
-                        onPress={(e) => {
-                          e.stopPropagation?.();
-                          router.push(`/call/${item.partner_id}?callType=audio` as any);
-                        }}
-                      >
-                        <Ionicons name="call" size={14} color="#4ADE80" />
-                      </Pressable>
-                    )}
-                    {unread && (
-                      <View style={styles.unreadBadge}>
-                        <Text style={styles.unreadCountText}>{item.unread_count > 99 ? '99+' : item.unread_count}</Text>
-                      </View>
-                    )}
-                  </View>
+                  <Ionicons name="compass" size={16} color="#FFF" />
+                  <Text style={styles.emptyActionText}>Keşfet</Text>
                 </LinearGradient>
               </Pressable>
-              </SwipeableRow>
-            );
-          }}
+            </View>
+          }
+          renderItem={({ item }) => (
+            <ConversationCard
+              item={item}
+              isSelected={selectedIds.has(item.partner_id)}
+              selectionMode={selectionMode}
+              isFriend={friendIds.has(item.partner_id)}
+              isTyping={typingPartners.has(item.partner_id)}
+              onOpenChat={handleOpenChat}
+              onToggleSelection={handleToggleSelection}
+              onLongPress={handleLongPress}
+              onDelete={handleDeleteConversation}
+              onAvatarPress={handleAvatarPress}
+              onCallPress={handleCallPress}
+            />
+          )}
         />
       )}
 
@@ -539,16 +806,19 @@ export default function MessagesScreen() {
                     onPress: async () => {
                       if (!firebaseUser) return;
                       const ids = [...selectedIds];
-                      await Promise.all(ids.map(async (pid) => {
-                        try {
-                          await MessageService.markAsRead(firebaseUser.uid, pid);
-                          await MessageService.deleteConversation(firebaseUser.uid, pid);
-                        } catch {}
+                      const results = await Promise.allSettled(ids.map(async (pid) => {
+                        await MessageService.markAsRead(firebaseUser.uid, pid);
+                        await MessageService.deleteConversation(firebaseUser.uid, pid);
                       }));
-                      setConversations(prev => prev.filter(c => !selectedIds.has(c.partner_id)));
+                      const failed = results.filter(r => r.status === 'rejected').length;
+                      const succeededIds = ids.filter((_, i) => results[i].status === 'fulfilled');
+                      setConversations(prev => prev.filter(c => !succeededIds.includes(c.partner_id)));
                       setSelectedIds(new Set());
                       setSelectionMode(false);
                       refreshBadges();
+                      if (failed > 0) {
+                        showToast({ title: 'Kısmen silindi', message: `${failed} sohbet silinemedi, tekrar dene.`, type: 'warning' });
+                      }
                     },
                   },
                   { text: 'Vazgeç', style: 'cancel' },
@@ -614,7 +884,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
   },
   headerTitle: { fontSize: 24, fontWeight: '800', color: '#F1F5F9', letterSpacing: -0.5, ...Shadows.text },
-  headerSub: { fontSize: 11, color: '#64748B', marginTop: 2, ...Shadows.textLight },
+  headerSub: { fontSize: 11, fontWeight: '600', color: '#94A3B8', marginTop: 3, ...Shadows.text },
   editBtn: {
     paddingHorizontal: 14, paddingVertical: 7,
     borderRadius: 20,
@@ -627,19 +897,20 @@ const styles = StyleSheet.create({
   },
   editBtnText: { fontSize: 13, fontWeight: '600', color: Colors.teal, ...Shadows.textLight },
 
-  // ─── Arama ───
+  // ─── Arama ─── Solid koyu zemin + teal aksent border + derin gölge
   searchWrap: {
     flexDirection: 'row', alignItems: 'center',
     marginHorizontal: 16, marginBottom: 12,
-    paddingHorizontal: 14, paddingVertical: 10,
+    paddingHorizontal: 14, paddingVertical: 11,
     borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
-    shadowColor: '#020617',
+    backgroundColor: '#0E1626',
+    borderWidth: 1,
+    borderColor: 'rgba(20,184,166,0.22)',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.2,
-    shadowRadius: 12,
-    elevation: 5,
+    shadowOpacity: 0.45,
+    shadowRadius: 14,
+    elevation: 8,
     gap: 10,
   },
   searchInputWrap: {
@@ -647,11 +918,20 @@ const styles = StyleSheet.create({
     position: 'relative',
     justifyContent: 'center',
   },
-  searchInput: { fontSize: 13, color: '#CBD5E1', padding: 0, ...Shadows.textLight },
+  searchInput: {
+    fontSize: 14, fontWeight: '600',
+    color: '#F1F5F9',
+    padding: 0,
+    textShadowColor: 'rgba(0,0,0,0.6)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
   searchPlaceholder: {
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.22)',
-    ...Shadows.textLight,
+    fontSize: 14, fontWeight: '500',
+    color: 'rgba(203,213,225,0.55)',
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   searchPlaceholderWrap: {
     position: 'absolute',
@@ -671,8 +951,8 @@ const styles = StyleSheet.create({
     shadowColor: '#22C55E', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.9, shadowRadius: 4, elevation: 2,
   },
   friendSectionTitle: {
-    fontSize: 12, fontWeight: '700', color: '#94A3B8',
-    letterSpacing: 0.8, textTransform: 'uppercase', ...Shadows.textLight,
+    fontSize: 12, fontWeight: '800', color: '#CBD5E1',
+    letterSpacing: 0.8, textTransform: 'uppercase', ...Shadows.text,
   },
   friendCountBadge: {
     minWidth: 20, height: 20, borderRadius: 10,
@@ -684,8 +964,47 @@ const styles = StyleSheet.create({
   friendStrip: { paddingHorizontal: 16, paddingVertical: 4, gap: 16 },
   friendChip: { alignItems: 'center', width: 60 },
   friendName: {
-    fontSize: 10, color: 'rgba(255,255,255,0.6)',
-    marginTop: 5, textAlign: 'center', fontWeight: '500', ...Shadows.textLight,
+    fontSize: 10, fontWeight: '700', color: '#E2E8F0',
+    marginTop: 5, textAlign: 'center', ...Shadows.text,
+  },
+
+  // ─── Empty State (custom, premium hissi) ───
+  emptyWrap: {
+    alignItems: 'center', justifyContent: 'center',
+    paddingTop: 48, paddingHorizontal: 32, gap: 12,
+  },
+  emptyIcon: {
+    marginBottom: 12,
+    textShadowColor: 'rgba(0,0,0,0.55)',
+    textShadowOffset: { width: 0, height: 5 },
+    textShadowRadius: 14,
+  },
+  emptyTitle: {
+    fontSize: 18, fontWeight: '800', color: '#F1F5F9',
+    letterSpacing: 0.2, textAlign: 'center',
+    ...Shadows.text,
+  },
+  emptySubtitle: {
+    fontSize: 13, fontWeight: '500',
+    color: 'rgba(203,213,225,0.75)',
+    textAlign: 'center', lineHeight: 19,
+    marginBottom: 8,
+    ...Shadows.textLight,
+  },
+  emptyActionBtn: {
+    marginTop: 4,
+    borderRadius: 14, overflow: 'hidden',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35, shadowRadius: 10, elevation: 6,
+  },
+  emptyActionGrad: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingHorizontal: 22, paddingVertical: 12,
+  },
+  emptyActionText: {
+    fontSize: 14, fontWeight: '800', color: '#FFF',
+    letterSpacing: 0.3,
+    textShadowColor: 'rgba(0,0,0,0.35)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
   },
 
   // ─── Sohbet Kartı (SwipeableRow container) ───
@@ -731,13 +1050,27 @@ const styles = StyleSheet.create({
   avatarWrap: { marginRight: 12 },
   msgInfo: { flex: 1, justifyContent: 'center', gap: 4 },
   msgTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  msgName: { fontSize: 15, fontWeight: '500', color: '#94A3B8', flex: 1, marginRight: 8, ...Shadows.textLight },
-  msgNameUnread: { fontWeight: '700', color: '#F1F5F9' },
-  msgTime: { fontSize: 11, color: '#475569', ...Shadows.textLight },
-  msgTimeUnread: { color: Colors.teal, fontWeight: '600' },
+  msgName: { fontSize: 15, fontWeight: '600', color: '#E2E8F0', flexShrink: 1, ...Shadows.text },
+  // ─── Arşiv chip ───
+  archiveChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    marginHorizontal: 14, marginTop: 4, marginBottom: 8,
+    paddingHorizontal: 14, paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: 'rgba(20,184,166,0.08)',
+    borderWidth: 1, borderColor: 'rgba(20,184,166,0.2)',
+  },
+  archiveChipText: {
+    flex: 1, fontSize: 13, fontWeight: '700',
+    color: Colors.teal, letterSpacing: 0.2,
+    ...Shadows.textLight,
+  },
+  msgNameUnread: { fontWeight: '800', color: '#FFFFFF' },
+  msgTime: { fontSize: 11, fontWeight: '600', color: '#94A3B8', ...Shadows.text },
+  msgTimeUnread: { color: Colors.teal, fontWeight: '700' },
   msgPreviewRow: { flexDirection: 'row', alignItems: 'center' },
-  msgText: { fontSize: 13, color: 'rgba(255,255,255,0.35)', flex: 1, ...Shadows.textLight },
-  msgTextUnread: { color: '#94A3B8', fontWeight: '500' },
+  msgText: { fontSize: 13, fontWeight: '500', color: 'rgba(203,213,225,0.75)', flex: 1, ...Shadows.text },
+  msgTextUnread: { color: '#E2E8F0', fontWeight: '600' },
 
   // ─── Sağ aksiyonlar ───
   msgRight: { flexDirection: 'row', alignItems: 'center', gap: 6, marginLeft: 6 },

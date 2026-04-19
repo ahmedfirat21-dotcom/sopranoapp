@@ -33,6 +33,22 @@ const BRAND_COLORS = {
 } as const;
 
 // Colors — her erişimde aktif temadan çeker
+// ═══════════════════════════════════════════════════════════════
+// ★ 2026-04-19: Rol renkleri — tek kaynaklı. UI tutarlılığı için
+// her componentte import edilip kullanılmalı (owner altın, mod mor vs).
+// Önce #FFD700 bir yerde, #D4AF37 başka yerdeydi — karışıklık giderildi.
+// ═══════════════════════════════════════════════════════════════
+export const RoleColors = {
+  owner: '#FFD700',       // altın
+  moderator: '#A78BFA',   // mor
+  speaker: '#14B8A6',     // teal
+  listener: '#94A3B8',    // gri (nötr)
+  banned: '#EF4444',      // kırmızı
+  pending: '#FBBF24',     // amber (el kaldırmış, beklemede)
+} as const;
+
+export type RoleColorKey = keyof typeof RoleColors;
+
 export const Colors = {
   ...BRAND_COLORS,
 

@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   View, Text, StyleSheet, Image, Pressable, ScrollView,
-  RefreshControl, Animated,
+  RefreshControl, Animated, FlatList,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import AppBackground from '../../components/AppBackground';
@@ -27,37 +27,102 @@ import InviteFriendsModal from '../../components/room/InviteFriendsModal';
 import { RoomAccessService } from '../../services/roomAccess';
 import { PushService } from '../../services/push';
 import type { FollowUser } from '../../services/friendship';
+import { UpsellService } from '../../services/upsell';
+import type { SubscriptionTier } from '../../types';
+import { getCategoryTheme, ROOM_THEME_GRADIENTS } from '../../constants/categoryTheme';
+import NotificationBell from '../../components/NotificationBell';
 
 // ════════════════════════════════════════════════════════════
-// YÖNETİLEN ODA KARTI — Yönet/Başlat butonları
+// YÖNETİLEN ODA KARTI — Yönet/Başlat butonları (React.memo ile re-render izole)
 // ════════════════════════════════════════════════════════════
-function ManagedRoomCard({ room, onManage, onStart, onSettings }: {
-  room: Room; onManage: () => void; onStart: () => void; onSettings: () => void;
+const ManagedRoomCard = React.memo(function ManagedRoomCard({ room, onManage, onStart, onSettings }: {
+  room: Room;
+  onManage: (room: Room) => void;
+  onStart: (room: Room) => void;
+  onSettings: (room: Room) => void;
 }) {
-  const listeners = (room as any).participant_count || (room as any).listener_count || 0;
+  const listeners = room.participant_count || room.listener_count || 0;
   const isLive = room.is_live;
-  const isPersistent = (room as any).is_persistent;
+  const isPersistent = !!room.is_persistent;
   const settings = (room.room_settings || {}) as any;
+  const theme = getCategoryTheme(room.category);
+  const cardImage = settings.card_image_url;
+  const themeGrad = room.theme_id ? ROOM_THEME_GRADIENTS[room.theme_id] : null;
+
+  // ★ CANLI badge pulse — keşfetteki ile aynı animasyon
+  const livePulse = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    if (!isLive) return;
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(livePulse, { toValue: 0.3, duration: 800, useNativeDriver: true }),
+        Animated.timing(livePulse, { toValue: 1, duration: 800, useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [isLive]);
+
+  // ★ Kart gövdesi tıklanınca primary aksiyon: canlıysa odaya gir, değilse uyandır
+  const handleCardPress = () => { isLive ? onManage(room) : onStart(room); };
 
   return (
-    <View style={[mS.card, isPersistent && { borderColor: Colors.premiumGold, borderWidth: 1.5 }]}>
-      {/* Sol accent çizgisi — canlı: yeşil, dondurulmuş: gri */}
-      <View style={[mS.accentStripe, isLive ? { backgroundColor: '#14B8A6' } : { backgroundColor: '#475569' }]} />
+    <Pressable
+      onPress={handleCardPress}
+      style={({ pressed }) => [
+        mS.card,
+        isPersistent && mS.cardPersistent,
+        pressed && { opacity: 0.92, transform: [{ scale: 0.985 }] },
+      ]}
+    >
+      {/* Katman 1: premium diagonal (parlak üst-sol → koyu alt-sağ) */}
+      <LinearGradient
+        colors={['#4a5668', '#37414f', '#232a35']}
+        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+        style={StyleSheet.absoluteFillObject}
+      />
+      {/* Katman 2: kategori warmth (canlı: belirgin, pasif: yumuşak) */}
+      <LinearGradient
+        colors={themeGrad ? [themeGrad[0], themeGrad[1]] as any : theme.colors}
+        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+        style={[StyleSheet.absoluteFillObject, { opacity: isLive ? 0.18 : 0.09, borderRadius: 16 }]}
+      />
+      <View style={[mS.accentStripe, { backgroundColor: isLive ? '#14B8A6' : theme.accent, opacity: isLive ? 1 : 0.6 }]} />
       <View style={mS.cardLeft}>
-        <StatusAvatar uri={room.host?.avatar_url} size={40} tier={(room.host as any)?.subscription_tier} />
+        {/* Thumbnail veya avatar — card_image_url varsa önceliklendir */}
+        {cardImage ? (
+          <View style={mS.thumbWrap}>
+            <Image source={{ uri: cardImage }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
+            <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.25)' }]} />
+            <Ionicons name={theme.icon as any} size={16} color="rgba(255,255,255,0.85)" />
+          </View>
+        ) : (
+          <StatusAvatar uri={room.host?.avatar_url} size={40} tier={(room.host as any)?.subscription_tier} />
+        )}
         <View style={mS.cardInfo}>
           <Text style={mS.roomName} numberOfLines={1}>{room.name}</Text>
           <View style={mS.metaRow}>
             {isLive ? (
               <View style={mS.liveBadge}>
-                <View style={mS.liveDot} />
-                <Text style={mS.liveText}>Canlı</Text>
+                <Animated.View style={[mS.liveDot, { opacity: livePulse }]} />
+                <Text style={mS.liveText}>CANLI</Text>
                 {listeners > 0 && <Text style={mS.listenerCount}>· {listeners}</Text>}
+              </View>
+            ) : isPersistent ? (
+              <View style={mS.sleepBadge}>
+                <Ionicons name="moon" size={9} color="#A78BFA" />
+                <Text style={mS.sleepText}>Uyuyor</Text>
               </View>
             ) : (
               <Text style={mS.offlineText}>❄️ Dondurulmuş</Text>
             )}
-            {/* Oda tipi badge'leri */}
+            {/* ★ Premium rozeti — keşfetteki "Premium" trophy'siyle aynı */}
+            {isPersistent && (
+              <View style={mS.premiumBadge}>
+                <Ionicons name="trophy" size={9} color={Colors.premiumGold} />
+                <Text style={mS.premiumText}>Premium</Text>
+              </View>
+            )}
             {room.type === 'closed' && (
               <View style={mS.typeBadge}>
                 <Ionicons name="lock-closed" size={8} color="#F59E0B" />
@@ -72,6 +137,7 @@ function ManagedRoomCard({ room, onManage, onStart, onSettings }: {
             )}
             {settings.entry_fee_sp > 0 && (
               <View style={[mS.typeBadge, { backgroundColor: 'rgba(212,175,55,0.12)', borderColor: 'rgba(212,175,55,0.25)' }]}>
+                <Ionicons name="cash" size={8} color="#D4AF37" />
                 <Text style={[mS.typeBadgeText, { color: '#D4AF37' }]}>{settings.entry_fee_sp} SP</Text>
               </View>
             )}
@@ -85,25 +151,153 @@ function ManagedRoomCard({ room, onManage, onStart, onSettings }: {
         </View>
       </View>
       <View style={mS.cardRight}>
-        {/* ⚙️ Yönet butonu — her zaman göster */}
-        <Pressable style={mS.settingsBtn} onPress={onSettings}>
+        {/* Inner butonlar: kendi onPress'leri kart onPress'ine baloncuk etmesin */}
+        <Pressable style={mS.settingsBtn} onPress={(e) => { e.stopPropagation(); onSettings(room); }}>
           <Ionicons name="settings-outline" size={18} color="#94A3B8" />
         </Pressable>
-        {isLive ? (
-          <Pressable style={({ pressed }) => [mS.manageBtn, pressed && { opacity: 0.8 }]} onPress={onManage}>
-            <Ionicons name="enter-outline" size={14} color={Colors.accentTeal} />
-            <Text style={mS.manageBtnText}>Odaya Git</Text>
-          </Pressable>
-        ) : (
-          <Pressable style={({ pressed }) => [mS.startBtn, pressed && { opacity: 0.8 }]} onPress={onStart}>
-            <Ionicons name="sunny" size={14} color="#FBBF24" />
-            <Text style={mS.startBtnText}>Uyandır</Text>
-          </Pressable>
-        )}
+        <Pressable
+          onPress={(e) => { e.stopPropagation(); isLive ? onManage(room) : onStart(room); }}
+          style={({ pressed }) => [{ opacity: pressed ? 0.85 : 1 }]}
+        >
+          <LinearGradient
+            colors={['#14B8A6', '#0D9488']}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+            style={mS.gradBtn}
+          >
+            <Ionicons name={isLive ? 'enter' : 'sunny'} size={14} color="#FFF" />
+            <Text style={mS.gradBtnText}>{isLive ? 'Odaya Git' : 'Uyandır'}</Text>
+          </LinearGradient>
+        </Pressable>
       </View>
-    </View>
+    </Pressable>
+  );
+});
+
+// ════════════════════════════════════════════════════════════
+// ★ ManagedRoomsSection — temporal gruplu yöneten odalar
+//   Canlı → Uyuyan (kalıcı) → Dondurulmuş (kapalı) sırası
+// ════════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════
+// ★ SkeletonCard — Initial load sırasında kart iskeleti
+//   Kullanıcı blank screen yerine "yükleniyor" hissi alır
+// ════════════════════════════════════════════════════════════
+function SkeletonCard() {
+  const pulseAnim = useRef(new Animated.Value(0.3)).current;
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 0.7, duration: 900, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 0.3, duration: 900, useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, []);
+
+  return (
+    <Animated.View style={[skS.card, { opacity: pulseAnim }]}>
+      <View style={skS.stripe} />
+      <View style={skS.avatar} />
+      <View style={skS.lines}>
+        <View style={skS.lineLong} />
+        <View style={skS.lineShort} />
+      </View>
+      <View style={skS.btn} />
+    </Animated.View>
   );
 }
+
+function SkeletonList({ count = 3 }: { count?: number }) {
+  return (
+    <>
+      <View style={skS.sectionHead}>
+        <View style={[skS.lineShort, { width: 100, height: 12, marginLeft: 16 }]} />
+      </View>
+      {Array.from({ length: count }).map((_, i) => <SkeletonCard key={i} />)}
+    </>
+  );
+}
+
+const skS = StyleSheet.create({
+  card: {
+    flexDirection: 'row', alignItems: 'center',
+    marginHorizontal: 16, marginBottom: 8,
+    padding: 12, paddingLeft: 16, borderRadius: 16,
+    backgroundColor: Colors.cardBg,
+    borderWidth: 1, borderColor: Colors.cardBorder,
+    gap: 10,
+  },
+  stripe: {
+    position: 'absolute', left: 0, top: 8, bottom: 8,
+    width: 3, borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+  },
+  avatar: {
+    width: 40, height: 40, borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  lines: { flex: 1, gap: 6 },
+  lineLong: { height: 12, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.1)', width: '70%' },
+  lineShort: { height: 10, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.06)', width: '40%' },
+  btn: {
+    width: 80, height: 30, borderRadius: 12,
+    backgroundColor: 'rgba(20,184,166,0.2)',
+  },
+  sectionHead: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingVertical: 14,
+  },
+});
+
+// ★ Sadece boş durumu temsil eder — non-empty render'ı FlatList yapıyor
+function ManagedRoomsEmptyCard() {
+  return (
+    <>
+      <View style={mrS.sectionRow}>
+        <View style={[mrS.sectionAccent, { backgroundColor: '#14B8A6' }]} />
+        <Ionicons name="headset" size={14} color="#14B8A6" style={{ opacity: 0.7 }} />
+        <Text style={mrS.sectionTitle}>Yönettiğim Odalar</Text>
+      </View>
+      <View style={mrS.emptyCard}>
+        <LinearGradient
+          colors={['#4a5668', '#37414f', '#232a35']}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFillObject}
+        />
+        <Text style={mrS.emptyTitle}>Henüz bir odanız yok.{'\n'}İlk odanızı oluşturun!</Text>
+        <View style={mrS.emptyImageWrap}>
+          <Image source={require('../../assets/images/mock/empty_room_mic.png')} style={mrS.emptyImage} resizeMode="contain" />
+        </View>
+        <Text style={mrS.emptySub}>Sesli sohbet, müzik, oyun ve daha fazlası...</Text>
+      </View>
+    </>
+  );
+}
+
+const mrS = StyleSheet.create({
+  sectionRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingHorizontal: 16, marginTop: 18, marginBottom: 10,
+  },
+  sectionAccent: { width: 3, height: 16, borderRadius: 2 },
+  sectionTitle: { fontSize: 13, fontWeight: '700', color: '#F1F5F9', letterSpacing: 0.3, flex: 1 },
+  groupCount: {
+    fontSize: 10, fontWeight: '800', color: '#94A3B8',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8,
+  },
+  emptyCard: {
+    marginHorizontal: 16, padding: 20, borderRadius: 18,
+    borderWidth: 1, borderColor: Colors.cardBorder,
+    overflow: 'hidden',
+    alignItems: 'center', gap: 10,
+    ...Shadows.card,
+  },
+  emptyTitle: { fontSize: 14, fontWeight: '700', color: '#F1F5F9', textAlign: 'center', lineHeight: 20 },
+  emptyImageWrap: { width: 120, height: 120, alignItems: 'center', justifyContent: 'center' },
+  emptyImage: { width: '100%', height: '100%' },
+  emptySub: { fontSize: 12, color: '#94A3B8', textAlign: 'center' },
+});
 
 const mS = StyleSheet.create({
   card: {
@@ -115,16 +309,45 @@ const mS = StyleSheet.create({
     padding: 12,
     paddingLeft: 16,
     borderRadius: 16,
-    backgroundColor: Colors.cardBg,
     borderWidth: 1,
     borderColor: Colors.cardBorder,
     overflow: 'hidden',
     ...Shadows.card,
   },
+  cardPersistent: {
+    borderColor: Colors.premiumGold,
+    borderWidth: 1.5,
+    shadowColor: Colors.premiumGold,
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 8,
+  },
   accentStripe: {
     position: 'absolute', left: 0, top: 8, bottom: 8,
     width: 3, borderRadius: 2,
   },
+  thumbWrap: {
+    width: 40, height: 40, borderRadius: 12,
+    overflow: 'hidden',
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
+  },
+  gradBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 14, paddingVertical: 7, borderRadius: 12,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3, shadowRadius: 4, elevation: 3,
+  },
+  gradBtnText: { fontSize: 11, fontWeight: '800', color: '#FFF', letterSpacing: 0.3 },
+  premiumBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    backgroundColor: 'rgba(212,175,55,0.15)',
+    paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6,
+    borderWidth: 1, borderColor: 'rgba(212,175,55,0.3)',
+  },
+  premiumText: { fontSize: 8, fontWeight: '800', color: Colors.premiumGold, letterSpacing: 0.3 },
   cardLeft: { flexDirection: 'row', alignItems: 'center', flex: 1, gap: 10 },
   avatar: { width: 44, height: 44, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.06)' },
   cardInfo: { flex: 1 },
@@ -138,6 +361,18 @@ const mS = StyleSheet.create({
   liveText: { fontSize: 10, fontWeight: '700', color: '#EF4444' },
   listenerCount: { fontSize: 10, fontWeight: '600', color: '#94A3B8', marginLeft: 2 },
   offlineText: { fontSize: 11, color: '#94A3B8' },
+  sleepBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    backgroundColor: 'rgba(167,139,250,0.12)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8,
+    borderWidth: 1, borderColor: 'rgba(167,139,250,0.25)',
+  },
+  sleepText: { fontSize: 10, fontWeight: '700', color: '#A78BFA' },
+  persistentBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    backgroundColor: 'rgba(201,185,129,0.12)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6,
+    borderWidth: 1, borderColor: 'rgba(201,185,129,0.28)',
+  },
+  persistentText: { fontSize: 8, fontWeight: '700', color: '#C9B981', letterSpacing: 0.2 },
   typeBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 3,
     backgroundColor: 'rgba(245,158,11,0.12)', paddingHorizontal: 6, paddingVertical: 2,
@@ -159,23 +394,37 @@ const mS = StyleSheet.create({
   startBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     paddingHorizontal: 14, paddingVertical: 7, borderRadius: 12,
-    backgroundColor: 'rgba(251,191,36,0.12)', borderWidth: 1, borderColor: 'rgba(251,191,36,0.3)',
+    backgroundColor: 'rgba(20,184,166,0.12)', borderWidth: 1, borderColor: 'rgba(20,184,166,0.3)',
   },
-  startBtnText: { fontSize: 11, fontWeight: '700', color: '#FBBF24' },
+  startBtnText: { fontSize: 11, fontWeight: '700', color: Colors.accentTeal },
 });
 
 // ════════════════════════════════════════════════════════════
 // SON GİRDİĞİN ODALAR — Kısayol Kartı
 // ════════════════════════════════════════════════════════════
-function RecentRoomCard({ item, onPress }: { item: RoomHistoryItem; onPress: () => void }) {
+function RecentRoomCard({ item, onPress }: { item: RoomHistoryItem & { _isLive?: boolean }; onPress: () => void }) {
+  const isLive = item._isLive !== false; // undefined = backward-compat (canlı varsay)
   return (
     <Pressable
-      style={({ pressed }) => [rcS.card, pressed && { opacity: 0.85, transform: [{ scale: 0.97 }] }]}
+      style={({ pressed }) => [rcS.card, !isLive && rcS.cardDim, pressed && { opacity: 0.85, transform: [{ scale: 0.97 }] }]}
       onPress={onPress}
     >
-      <StatusAvatar uri={item.hostAvatar} size={44} />
-      <Text style={rcS.name} numberOfLines={1}>{item.name}</Text>
-      <Text style={rcS.host} numberOfLines={1}>{item.hostName}</Text>
+      {isLive && (
+        <LinearGradient
+          colors={['#4a5668', '#37414f', '#232a35']}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFillObject}
+        />
+      )}
+      <View style={{ opacity: isLive ? 1 : 0.55 }}>
+        <StatusAvatar uri={item.hostAvatar} size={44} />
+      </View>
+      <Text style={[rcS.name, !isLive && { color: '#94A3B8' }]} numberOfLines={1}>{item.name}</Text>
+      {isLive ? (
+        <Text style={rcS.host} numberOfLines={1}>{item.hostName}</Text>
+      ) : (
+        <Text style={rcS.closedBadge} numberOfLines={1}>Kapalı</Text>
+      )}
     </Pressable>
   );
 }
@@ -184,15 +433,20 @@ const rcS = StyleSheet.create({
   card: {
     width: 80, alignItems: 'center', marginRight: 12,
     paddingVertical: 10, paddingHorizontal: 6, borderRadius: 14,
-    backgroundColor: Colors.cardBg, borderWidth: 1, borderColor: Colors.cardBorder,
+    borderWidth: 1, borderColor: Colors.cardBorder,
+    overflow: 'hidden',
     ...Shadows.card,
   },
-
+  cardDim: {
+    backgroundColor: 'rgba(65,78,95,0.5)',
+    borderColor: 'rgba(149,161,174,0.15)',
+  },
   name: {
     fontSize: 10, fontWeight: '700', color: '#F1F5F9', textAlign: 'center',
     ...Shadows.text,
   },
   host: { fontSize: 9, color: '#94A3B8', textAlign: 'center', marginTop: 1 },
+  closedBadge: { fontSize: 9, fontWeight: '700', color: '#64748B', textAlign: 'center', marginTop: 1, letterSpacing: 0.3 },
 });
 
 // ════════════════════════════════════════════════════════════
@@ -212,6 +466,11 @@ function FriendLiveCard({ item, onPress }: { item: FriendInRoom; onPress: () => 
       style={({ pressed }) => [flcS.card, pressed && { opacity: 0.85, transform: [{ scale: 0.97 }] }]}
       onPress={onPress}
     >
+      <LinearGradient
+        colors={['#4a5668', '#37414f', '#232a35']}
+        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+        style={StyleSheet.absoluteFillObject}
+      />
       <StatusAvatar uri={item.friendAvatar} size={36} isOnline={true} />
       <Text style={flcS.friendName} numberOfLines={1}>{item.friendName}</Text>
       <Text style={flcS.roomName} numberOfLines={1}>{item.roomName}</Text>
@@ -227,7 +486,8 @@ const flcS = StyleSheet.create({
   card: {
     width: 88, alignItems: 'center', marginRight: 12,
     paddingVertical: 10, paddingHorizontal: 6, borderRadius: 14,
-    backgroundColor: Colors.cardBg, borderWidth: 1, borderColor: Colors.cardBorder,
+    borderWidth: 1, borderColor: Colors.cardBorder,
+    overflow: 'hidden',
     ...Shadows.card, position: 'relative',
   },
 
@@ -246,88 +506,6 @@ const flcS = StyleSheet.create({
     borderWidth: 1, borderColor: 'rgba(34,197,94,0.25)',
   },
   joinText: { fontSize: 9, fontWeight: '800', color: '#22C55E' },
-});
-
-// ════════════════════════════════════════════════════════════
-// SP KAZANÇ ÖZETİ — Motivasyon Banner
-// ════════════════════════════════════════════════════════════
-function SPBanner({ weeklySP }: { weeklySP: number }) {
-  // ★ BUG FIX: Pulsing glow animasyonu — cleanup eklendi (memory leak fix)
-  const pulseAnim = React.useRef(new Animated.Value(1)).current;
-  const pulseRef = React.useRef<Animated.CompositeAnimation | null>(null);
-  React.useEffect(() => {
-    if (weeklySP > 0) {
-      pulseRef.current = Animated.loop(
-        Animated.sequence([
-          Animated.timing(pulseAnim, { toValue: 1.05, duration: 1500, useNativeDriver: true }),
-          Animated.timing(pulseAnim, { toValue: 1, duration: 1500, useNativeDriver: true }),
-        ])
-      );
-      pulseRef.current.start();
-    }
-    return () => { pulseRef.current?.stop(); };
-  }, [weeklySP]);
-
-  const motivationText = weeklySP === 0
-    ? 'Bu hafta henüz SP kazanmadın. Oda aç ve kazan!'
-    : weeklySP < 50
-      ? 'İyi başlangıç! Daha fazla kazanmak için devam et 💪'
-      : weeklySP < 200
-        ? 'Harika gidiyorsun! Rakamlar yükseliyor 📈'
-        : 'Efsane bir hafta! Sen bir SP makinesisin 🔥';
-
-  return (
-    <View style={spS.wrap}>
-      <LinearGradient
-        colors={['#7C3AED', '#6D28D9', '#4C1D95']}
-        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-        style={spS.gradient}
-      >
-        <Animated.View style={[spS.iconWrap, { transform: [{ scale: pulseAnim }] }]}>
-          <Text style={spS.iconText}>💎</Text>
-        </Animated.View>
-        <View style={spS.textCol}>
-          <Text style={spS.title}>Bu Hafta</Text>
-          <Text style={spS.amount}>{weeklySP.toLocaleString('tr-TR')} SP</Text>
-        </View>
-        <Text style={spS.motivation} numberOfLines={1}>{motivationText}</Text>
-      </LinearGradient>
-    </View>
-  );
-}
-
-const spS = StyleSheet.create({
-  wrap: {
-    marginHorizontal: 16, marginTop: 6, marginBottom: 12,
-    borderRadius: 14, overflow: 'hidden',
-    // Opak gradient — elevation güvenli
-    shadowColor: '#000', shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3, shadowRadius: 6, elevation: 4,
-  },
-  gradient: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingVertical: 10, paddingHorizontal: 14, gap: 10,
-  },
-  iconWrap: {
-    width: 36, height: 36, borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)',
-  },
-  iconText: { fontSize: 18 },
-  textCol: {},
-  title: {
-    fontSize: 10, fontWeight: '600', color: 'rgba(255,255,255,0.7)',
-    letterSpacing: 0.3,
-  },
-  amount: {
-    fontSize: 16, fontWeight: '900', color: '#FFF',
-    textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
-  },
-  motivation: {
-    flex: 1, fontSize: 10, color: 'rgba(255,255,255,0.55)',
-    textAlign: 'right', fontWeight: '500',
-  },
 });
 
 // ════════════════════════════════════════════════════════════
@@ -439,6 +617,8 @@ export default function MyRoomsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
   const [showInviteFriends, setShowInviteFriends] = useState(false);
+  // ★ Günlük oda açma kotası — CTA altında "2/3 bugün" gösterimi için
+  const [dailyQuota, setDailyQuota] = useState<{ count: number; limit: number } | null>(null);
 
   const { unreadNotifs: unreadCount } = useBadges();
   const { allFriends } = useOnlineFriends();
@@ -447,117 +627,124 @@ export default function MyRoomsScreen() {
   const loadDataRef = useRef<() => Promise<void>>();
   const refreshFriendsLiveRef = useRef<() => Promise<void>>();
 
+  // ★ Profile bağımlılığını daralt — sadece ihtiyaç duyulan alanlar
+  const subscriptionTier = (profile?.subscription_tier || 'Free') as SubscriptionTier;
+  const isAdmin = (profile as any)?.is_admin === true;
+
   const loadData = useCallback(async () => {
     if (!firebaseUser) return;
+    const uid = firebaseUser.uid;
     try {
-      const managed = await RoomService.getMyRooms(firebaseUser.uid);
-
-      // ★ STATS FIX: Gerçek katılımcı sayısını room_participants'tan hesapla
-      // listener_count DB'de güncel olmayabilir (RPC yoksa)
+      // 1) Yönetilen odalar (diğer hesaplamalar için gerekli) — sıralı
+      const managed = await RoomService.getMyRooms(uid);
       const liveRoomIds = managed.filter(r => r.is_live).map(r => r.id);
+
+      // 2) Geri kalan 4 işi PARALEL çalıştır — toplam süre 4× azalır
+      const friendIds = allFriends.map(f => f.id).slice(0, 50);
+      const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7);
+      const userTier: SubscriptionTier = isAdmin ? 'Pro' : subscriptionTier;
+
+      const [participantsRes, historyRes, friendsRes, spRes, quotaRes] = await Promise.allSettled([
+        // 2a) Gerçek katılımcı sayıları
+        liveRoomIds.length > 0
+          ? supabase.from('room_participants').select('room_id').in('room_id', liveRoomIds)
+          : Promise.resolve({ data: [] as any[] }),
+        // 2b) Geçmiş + canlı durum
+        (async () => {
+          const history = await RoomHistoryService.getRecent(6);
+          if (history.length === 0) return { history, liveMap: new Map<string, boolean>() };
+          const { data: liveCheck } = await supabase
+            .from('rooms').select('id, is_live').in('id', history.map(h => h.id));
+          const liveMap = new Map<string, boolean>(
+            (liveCheck || []).map((r: any) => [r.id, !!r.is_live])
+          );
+          return { history, liveMap };
+        })(),
+        // 2c) Arkadaşların canlı
+        friendIds.length > 0
+          ? supabase.from('room_participants')
+              .select('user_id, room_id, rooms:rooms!room_id(id, name, is_live), profiles:profiles!user_id(display_name, avatar_url)')
+              .in('user_id', friendIds)
+          : Promise.resolve({ data: [] as any[] }),
+        // 2d) Haftalık SP
+        supabase.from('sp_transactions')
+          .select('amount')
+          .eq('user_id', uid).gt('amount', 0).gte('created_at', weekAgo.toISOString()),
+        // 2e) Günlük kota
+        RoomService.canCreateToday(uid, userTier),
+      ]);
+
+      // 2a) Katılımcı sayılarını odalara yaz
       let totalListeners = 0;
-      if (liveRoomIds.length > 0) {
-        try {
-          const { data: participantRows } = await supabase
-            .from('room_participants')
-            .select('room_id')
-            .in('room_id', liveRoomIds);
-          // Room bazlı sayım
-          const countMap = new Map<string, number>();
-          (participantRows || []).forEach((row: any) => {
-            countMap.set(row.room_id, (countMap.get(row.room_id) || 0) + 1);
-          });
-          // Her odaya gerçek katılımcı sayısını ata
-          managed.forEach(r => {
-            if (countMap.has(r.id)) {
-              (r as any).participant_count = countMap.get(r.id) || 0;
-            }
-          });
-          totalListeners = Array.from(countMap.values()).reduce((sum, c) => sum + c, 0);
-        } catch {
-          // Fallback: listener_count'u kullan
-          totalListeners = managed.reduce((sum, r) => sum + ((r as any).listener_count || 0), 0);
-        }
+      if (participantsRes.status === 'fulfilled') {
+        const rows = (participantsRes.value as any)?.data || [];
+        const countMap = new Map<string, number>();
+        rows.forEach((row: any) => countMap.set(row.room_id, (countMap.get(row.room_id) || 0) + 1));
+        managed.forEach(r => {
+          if (countMap.has(r.id)) r.participant_count = countMap.get(r.id) || 0;
+        });
+        totalListeners = Array.from(countMap.values()).reduce((sum, c) => sum + c, 0);
+      } else {
+        totalListeners = managed.reduce((sum, r) => sum + (r.listener_count || 0), 0);
       }
       setMyRooms(managed);
-      const liveRooms = liveRoomIds.length;
-      setRoomStats(prev => ({ ...prev, totalRooms: managed.length, liveRooms, totalListeners }));
 
-      // ★ OPT-M1 FIX: getLive() kaldırıldı — history ID'leriyle toplu kontrol
-      const history = await RoomHistoryService.getRecent(6);
-      if (history.length > 0) {
-        const historyIds = history.map(h => h.id);
-        const { data: liveCheck } = await supabase
-          .from('rooms')
-          .select('id')
-          .in('id', historyIds)
-          .eq('is_live', true);
-        const liveSet = new Set((liveCheck || []).map((r: any) => r.id));
-        setRecentRooms(history.filter(h => liveSet.has(h.id)));
+      // 2b) Recent rooms
+      if (historyRes.status === 'fulfilled') {
+        const { history, liveMap } = historyRes.value as { history: RoomHistoryItem[]; liveMap: Map<string, boolean> };
+        const enriched = history
+          .filter(h => liveMap.has(h.id))
+          .map(h => ({ ...h, _isLive: liveMap.get(h.id) === true }));
+        setRecentRooms(enriched as any);
       } else {
         setRecentRooms([]);
       }
 
-      // ★ Faz 1: Arkadaşlarının canlı olduğu odalar
-      try {
-        const friendIds = allFriends.map(f => f.id);
-        if (friendIds.length > 0) {
-          const { data: participantData } = await supabase
-            .from('room_participants')
-            .select('user_id, room_id, rooms:rooms!room_id(id, name, is_live), profiles:profiles!user_id(display_name, avatar_url)')
-            .in('user_id', friendIds.slice(0, 50));
-
-          const liveItems: FriendInRoom[] = (participantData || [])
-            .filter((p: any) => p.rooms?.is_live)
-            .map((p: any) => ({
-              friendId: p.user_id,
-              friendName: p.profiles?.display_name || 'Arkadaş',
-              friendAvatar: p.profiles?.avatar_url || '',
-              roomId: p.rooms?.id || p.room_id,
-              roomName: p.rooms?.name || 'Oda',
-            }));
-          // Aynı arkadaşı tekrar gösterme (birden fazla oda katılımı olabilir)
-          const seen = new Set<string>();
-          const unique = liveItems.filter(item => {
-            if (seen.has(item.friendId)) return false;
-            seen.add(item.friendId);
-            return true;
-          });
-          setFriendsLive(unique.slice(0, 10));
-        } else {
-          setFriendsLive([]);
-        }
-      } catch (flErr) {
-        if (__DEV__) console.warn('[MyRooms] Friends live error:', flErr);
+      // 2c) Friends live
+      if (friendsRes.status === 'fulfilled') {
+        const liveItems: FriendInRoom[] = (((friendsRes.value as any)?.data) || [])
+          .filter((p: any) => p.rooms?.is_live)
+          .map((p: any) => ({
+            friendId: p.user_id,
+            friendName: p.profiles?.display_name || 'Arkadaş',
+            friendAvatar: p.profiles?.avatar_url || '',
+            roomId: p.rooms?.id || p.room_id,
+            roomName: p.rooms?.name || 'Oda',
+          }));
+        const seen = new Set<string>();
+        const unique = liveItems.filter(i => { if (seen.has(i.friendId)) return false; seen.add(i.friendId); return true; });
+        setFriendsLive(unique.slice(0, 10));
+      } else {
         setFriendsLive([]);
       }
 
-      // ★ Faz 1: Haftalık SP kazancı
-      try {
-        const weekAgo = new Date();
-        weekAgo.setDate(weekAgo.getDate() - 7);
-        const { data: spData } = await supabase
-          .from('sp_transactions')
-          .select('amount')
-          .eq('user_id', firebaseUser.uid)
-          .gt('amount', 0)
-          .gte('created_at', weekAgo.toISOString());
-        const total = (spData || []).reduce((sum: number, t: any) => sum + (t.amount || 0), 0);
-        setWeeklySP(total);
-        // ★ Faz 2: Stats dashboard güncelle (SP dahil)
-        setRoomStats(prev => ({ ...prev, weeklySP: total }));
-      } catch (spErr) {
-        if (__DEV__) console.warn('[MyRooms] SP load error:', spErr);
+      // 2d) Haftalık SP
+      let weeklyTotal = 0;
+      if (spRes.status === 'fulfilled') {
+        weeklyTotal = (((spRes.value as any)?.data) || []).reduce((sum: number, t: any) => sum + (t.amount || 0), 0);
+        setWeeklySP(weeklyTotal);
       }
 
+      // 2e) Kota
+      if (quotaRes.status === 'fulfilled') {
+        const gate = quotaRes.value;
+        setDailyQuota(gate.limit >= 999 ? null : { count: gate.count, limit: gate.limit });
+      }
 
+      // Stats — tek yerden hesapla (3 yerde dağılmıştı)
+      setRoomStats({
+        totalRooms: managed.length,
+        liveRooms: liveRoomIds.length,
+        totalListeners,
+        weeklySP: weeklyTotal,
+      });
     } catch (err) {
       if (__DEV__) console.warn('[MyRooms] Load error:', err);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [firebaseUser, allFriends]);
+  }, [firebaseUser, allFriends, subscriptionTier, isAdmin]);
 
   // ★ Ref'leri güncel tut — realtime handler'ları için
   useEffect(() => { loadDataRef.current = loadData; }, [loadData]);
@@ -615,7 +802,13 @@ export default function MyRoomsScreen() {
         if (payload.eventType !== 'UPDATE') { loadDataRef.current?.(); return; }
         const updated = payload.new as any;
         const old = payload.old as any;
-        if (updated.is_live !== old?.is_live || updated.name !== old?.name || updated.type !== old?.type) {
+        // ★ Yapısal değişiklikler (Uyandır↔Canlı geçişi, kalıcılık, isim, tip) → tam reload
+        if (
+          updated.is_live !== old?.is_live ||
+          updated.is_persistent !== old?.is_persistent ||
+          updated.name !== old?.name ||
+          updated.type !== old?.type
+        ) {
           loadDataRef.current?.();
         } else {
           // ★ Kozmetik değişiklik (listener_count, room_settings vb.) → inline güncelle + stats barı
@@ -632,14 +825,18 @@ export default function MyRoomsScreen() {
             );
             // Stats barını da güncelle
             const liveCount = next.filter(r => r.is_live).length;
-            const totalListeners = next.reduce((sum, r) => sum + ((r as any).listener_count || (r as any).participant_count || 0), 0);
+            const totalListeners = next.reduce((sum, r) => sum + (r.participant_count || r.listener_count || 0), 0);
             setRoomStats(prev2 => ({ ...prev2, totalRooms: next.length, liveRooms: liveCount, totalListeners }));
             return next;
           });
-          // ★ SYNC FIX: Açık olan RoomManageSheet'i de güncelle
-          setSelectedRoom(prev =>
-            prev && prev.id === updated.id ? { ...prev, ...mergedFields } : prev
-          );
+          // ★ SYNC FIX: Açık olan RoomManageSheet'i güncelle — ama kullanıcının
+          // düzenlediği alanlar (name/type/room_settings) için sadece ilk açılışta
+          // init edilen rm* state'leri bozulmasın diye sadece kozmetik alanları yansıt.
+          setSelectedRoom(prev => {
+            if (!prev || prev.id !== updated.id) return prev;
+            // Sheet açıkken sadece pasif alanları patch'le (listener_count vb.)
+            return { ...prev, listener_count: updated.listener_count };
+          });
         }
       })
       .subscribe();
@@ -688,26 +885,73 @@ export default function MyRoomsScreen() {
   }, [loadData]);
 
   // Uyuyan odayı uyandır — DB'de is_live=true yap, süre sıfırla, sonra odaya git
-  const handleWakeUp = async (room: Room) => {
+  // ★ useCallback ile memoize + doğru deps — stale profile/firebaseUser yakalama engellendi
+  const handleWakeUp = useCallback(async (room: Room) => {
     if (!firebaseUser) return;
     try {
       const tier = (profile?.subscription_tier || 'Free') as any;
       await RoomService.wakeUpRoom(room.id, firebaseUser.uid, tier);
-      // Başarı toast gereksiz — kullanıcı direkt odaya yönlendiriliyor
       router.push(`/room/${room.id}`);
     } catch (err: any) {
       showToast({ title: 'Uyandırma Başarısız', message: err.message || 'Oda uyandırılamadı.', type: 'error' });
     }
-  };
+  }, [firebaseUser, profile, router]);
 
-  // Canlı odayı yönet — direkt odaya git
-  const handleManage = (room: Room) => {
-    if (room.is_live) {
-      router.push(`/room/${room.id}`);
-    } else {
-      handleWakeUp(room);
+  // Canlı odayı yönet — direkt odaya git, değilse uyandır
+  const handleManage = useCallback((room: Room) => {
+    if (room.is_live) router.push(`/room/${room.id}`);
+    else handleWakeUp(room);
+  }, [router, handleWakeUp]);
+
+  // ═══════════════════════════════════════════════════════════
+  // ★ FlatList data + renderItem — flattened group headers + rooms
+  // ═══════════════════════════════════════════════════════════
+  type ListItem =
+    | { type: 'group'; id: string; title: string; icon: string; color: string; count: number }
+    | { type: 'room'; id: string; room: Room };
+
+  const listData = useMemo<ListItem[]>(() => {
+    if (myRooms.length === 0) return []; // ListEmptyComponent devreye girer
+    const live = myRooms.filter(r => r.is_live);
+    const sleeping = myRooms.filter(r => !r.is_live && !!r.is_persistent);
+    const frozen = myRooms.filter(r => !r.is_live && !r.is_persistent);
+    const items: ListItem[] = [];
+    const groups = [
+      { title: 'Canlı', icon: 'radio', color: '#EF4444', data: live },
+      { title: 'Uyuyan Kalıcı Odalar', icon: 'moon', color: '#A78BFA', data: sleeping },
+      { title: 'Dondurulmuş', icon: 'snow', color: '#64748B', data: frozen },
+    ];
+    for (const g of groups) {
+      if (g.data.length === 0) continue;
+      items.push({ type: 'group', id: `g-${g.title}`, title: g.title, icon: g.icon, color: g.color, count: g.data.length });
+      g.data.forEach(room => items.push({ type: 'room', id: `r-${room.id}`, room }));
     }
-  };
+    return items;
+  }, [myRooms]);
+
+  // ★ Stable callback refs — React.memo bozulmasın diye inline sarmalama yok
+  const handleOpenSettings = useCallback((room: Room) => setSelectedRoom(room), []);
+
+  const renderListItem = useCallback(({ item }: { item: ListItem }) => {
+    if (item.type === 'group') {
+      return (
+        <View style={mrS.sectionRow}>
+          <View style={[mrS.sectionAccent, { backgroundColor: item.color }]} />
+          <Ionicons name={item.icon as any} size={14} color={item.color} style={{ opacity: 0.85 }} />
+          <Text style={mrS.sectionTitle}>{item.title}</Text>
+          <Text style={mrS.groupCount}>{item.count}</Text>
+        </View>
+      );
+    }
+    return (
+      <ManagedRoomCard
+        room={item.room}
+        onManage={handleManage}
+        onStart={handleWakeUp}
+        onSettings={handleOpenSettings}
+      />
+    );
+  }, [handleManage, handleWakeUp, handleOpenSettings]);
 
   // ★ PlusMenu için settings state + DB handlers
   const [rmName, setRmName] = useState('');
@@ -744,9 +988,9 @@ export default function MyRoomsScreen() {
     setRmLang(rs.room_language || 'tr');
     setRmWelcome(rs.welcome_message || '');
     setRmRules(typeof rs.rules === 'string' ? rs.rules : Array.isArray(rs.rules) ? rs.rules.join('\n') : '');
-    setRmThemeId((selectedRoom as any).theme_id || null);
+    setRmThemeId(selectedRoom.theme_id || null);
     setRmMusicTrack(rs.music_track || null);
-    setRmBgImage(rs.room_image_url || (selectedRoom as any).room_image_url || null);
+    setRmBgImage(rs.room_image_url || selectedRoom.room_image_url || null);
     setRmCoverImage(rs.cover_image_url || null);
     setRmPassword(rs.password || '');
     setRmIsLocked(rs.is_locked || false);
@@ -868,20 +1112,26 @@ export default function MyRoomsScreen() {
       <View style={[s.header, { paddingTop: insets.top + 4 }]}>
         <Image source={require('../../assets/logo.png')} style={s.logo} resizeMode="contain" />
         <View style={s.headerRight}>
-          <Pressable style={s.headerIconBtn} onPress={() => setShowNotifDrawer(true)}>
-            <Ionicons name="notifications-outline" size={20} color="#F1F5F9" />
-            {unreadCount > 0 && (
-              <View style={s.notifBadge}>
-                <Text style={s.notifBadgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
-              </View>
-            )}
-          </Pressable>
+          <NotificationBell unreadCount={unreadCount} onPress={() => setShowNotifDrawer(true)} />
         </View>
       </View>
 
 
       {/* Yeni Oda Oluştur — Premium Gradient */}
-      <Pressable style={s.ctaWrap} onPress={() => router.push('/create-room')}>
+      <Pressable style={s.ctaWrap} onPress={async () => {
+        if (!firebaseUser) return;
+        const isAdmin = (profile as any)?.is_admin === true;
+        const userTier = (isAdmin ? 'Pro' : (profile?.subscription_tier || 'Free')) as SubscriptionTier;
+        try {
+          const gate = await RoomService.canCreateToday(firebaseUser.uid, userTier);
+          if (!gate.ok) {
+            showToast({ title: 'Günlük Limit Doldu', message: `Bugün ${gate.count}/${gate.limit} oda açtın. Yarın tekrar dene veya üyeliğini yükselt.`, type: 'warning' });
+            UpsellService.onDailyRoomLimit(userTier);
+            return;
+          }
+        } catch {}
+        router.push('/create-room');
+      }}>
         <LinearGradient
           colors={['#14B8A6', '#0D9488', '#065F56']}
           start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
@@ -892,116 +1142,104 @@ export default function MyRoomsScreen() {
           </View>
           <View style={{ flex: 1 }}>
             <Text style={s.ctaTitle}>Yeni Oda Oluştur</Text>
-            <Text style={s.ctaSub}>Sesli veya görüntülü oda aç</Text>
+            <Text style={s.ctaSub}>
+              {dailyQuota
+                ? `Bugün ${dailyQuota.count}/${dailyQuota.limit} kullandın · Sesli oda aç`
+                : 'Sesli veya görüntülü oda aç'}
+            </Text>
           </View>
           <Ionicons name="arrow-forward" size={20} color="rgba(255,255,255,0.7)" />
         </LinearGradient>
       </Pressable>
 
 
-      <ScrollView
+      <FlatList
+        data={listData}
+        keyExtractor={(item) => item.id}
+        renderItem={renderListItem}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={Colors.accentTeal} colors={[Colors.accentTeal]} />
         }
-      >
-        {/* 📊 Kompakt İstatistik Barı */}
-        {myRooms.length > 0 && <StatsBar stats={roomStats} />}
-
-        {/* Yönettiğim Odalar */}
-        {/* Section title — gradient accent çizgisi (home ile tutarlı) */}
-        <View style={s.sectionRow}>
-          <View style={[s.sectionAccent, { backgroundColor: '#14B8A6' }]} />
-          <Ionicons name="headset" size={14} color="#14B8A6" style={{ opacity: 0.7 }} />
-          <Text style={s.sectionTitle}>Yönettiğim Odalar</Text>
-        </View>
-        {myRooms.length > 0 ? (
-          myRooms.map((room) => (
-            <ManagedRoomCard
-              key={room.id}
-              room={room}
-              onManage={() => handleManage(room)}
-              onStart={() => handleWakeUp(room)}
-              onSettings={() => setSelectedRoom(room)}
-            />
-          ))
-        ) : (
-          <View style={s.emptyCard}>
-            <Text style={s.emptyTitle}>Henüz bir odanız yok.{'\n'}İlk odanızı oluşturun!</Text>
-            <View style={s.emptyImageWrap}>
-              <Image source={require('../../assets/images/mock/empty_room_mic.png')} style={s.emptyImage} resizeMode="contain" />
+        removeClippedSubviews
+        initialNumToRender={8}
+        windowSize={10}
+        ListHeaderComponent={
+          <>
+            {/* 👥 Arkadaşların Canlı — sosyal FOMO üstte */}
+            <View style={s.sectionRow}>
+              <View style={[s.sectionAccent, { backgroundColor: '#22C55E' }]} />
+              <Ionicons name="people" size={14} color="#22C55E" style={{ opacity: 0.7 }} />
+              <Text style={s.sectionTitle}>Arkadaşların Canlı</Text>
             </View>
-            <Text style={s.emptySub}>Sesli sohbet, müzik, oyun ve daha fazlası...</Text>
-          </View>
-        )}
+            {friendsLive.length > 0 ? (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ paddingHorizontal: 16 }}
+                style={{ marginBottom: 4 }}
+              >
+                {friendsLive.map((item) => (
+                  <FriendLiveCard
+                    key={item.friendId}
+                    item={item}
+                    onPress={() => router.push(`/room/${item.roomId}`)}
+                  />
+                ))}
+              </ScrollView>
+            ) : (
+              <View style={s.emptyFollowed}>
+                <Text style={s.emptyFollowedText}>
+                  👥 Arkadaşların şu an bir odada değil.{`\n`}Takip ettiğin kişiler odaya girdiğinde burada görünür!
+                </Text>
+              </View>
+            )}
+          </>
+        }
+        ListEmptyComponent={loading ? <SkeletonList count={3} /> : <ManagedRoomsEmptyCard />}
+        ListFooterComponent={
+          <>
+            {/* Son Girdiğin Odalar */}
+            <View style={s.sectionRow}>
+              <View style={[s.sectionAccent, { backgroundColor: '#3B82F6' }]} />
+              <Ionicons name="time" size={14} color="#3B82F6" style={{ opacity: 0.7 }} />
+              <Text style={s.sectionTitle}>Son Girdiğin Odalar</Text>
+            </View>
+            {recentRooms.length > 0 ? (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ paddingHorizontal: 16 }}
+                style={{ marginBottom: 4 }}
+              >
+                {recentRooms.map((item) => (
+                  <RecentRoomCard
+                    key={item.id}
+                    item={item}
+                    onPress={() => {
+                      if ((item as any)._isLive === false) {
+                        showToast({ title: 'Oda Kapalı', message: 'Bu oda şu an canlı değil.', type: 'info' });
+                        return;
+                      }
+                      router.push(`/room/${item.id}`);
+                    }}
+                  />
+                ))}
+              </ScrollView>
+            ) : (
+              <View style={s.emptyFollowed}>
+                <Text style={s.emptyFollowedText}>
+                  🔇 Şu an canlı oda yok.{`\n`}Daha önce girdiğin odalar canlı olduğunda burada görünür!
+                </Text>
+              </View>
+            )}
 
-        {/* Son Girdiğin Odalar */}
-        <View style={s.sectionRow}>
-          <View style={[s.sectionAccent, { backgroundColor: '#3B82F6' }]} />
-          <Ionicons name="time" size={14} color="#3B82F6" style={{ opacity: 0.7 }} />
-          <Text style={s.sectionTitle}>Son Girdiğin Odalar</Text>
-        </View>
-        {recentRooms.length > 0 ? (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingHorizontal: 16 }}
-            style={{ marginBottom: 4 }}
-          >
-            {recentRooms.map((item) => (
-              <RecentRoomCard
-                key={item.id}
-                item={item}
-                onPress={() => router.push(`/room/${item.id}`)}
-              />
-            ))}
-          </ScrollView>
-        ) : (
-          <View style={s.emptyFollowed}>
-            <Text style={s.emptyFollowedText}>
-              🔇 Şu an canlı oda yok.{`\n`}Daha önce girdiğin odalar canlı olduğunda burada görünür!
-            </Text>
-          </View>
-        )}
-
-        {/* 👥 Arkadaşların Canlı */}
-        <View style={s.sectionRow}>
-          <View style={[s.sectionAccent, { backgroundColor: '#22C55E' }]} />
-          <Ionicons name="people" size={14} color="#22C55E" style={{ opacity: 0.7 }} />
-          <Text style={s.sectionTitle}>Arkadaşların Canlı</Text>
-        </View>
-        {friendsLive.length > 0 ? (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingHorizontal: 16 }}
-            style={{ marginBottom: 4 }}
-          >
-            {friendsLive.map((item) => (
-              <FriendLiveCard
-                key={item.friendId}
-                item={item}
-                onPress={() => router.push(`/room/${item.roomId}`)}
-              />
-            ))}
-          </ScrollView>
-        ) : (
-          <View style={s.emptyFollowed}>
-            <Text style={s.emptyFollowedText}>
-              👥 Arkadaşların şu an bir odada değil.{`\n`}Takip ettiğin kişiler odaya girdiğinde burada görünür!
-            </Text>
-          </View>
-        )}
-
-        {/* 💰 SP Kazanç Özeti */}
-        <View style={s.sectionRow}>
-          <View style={[s.sectionAccent, { backgroundColor: '#A78BFA' }]} />
-          <Ionicons name="diamond" size={14} color="#A78BFA" style={{ opacity: 0.7 }} />
-          <Text style={s.sectionTitle}>SP Kazanç Özeti</Text>
-        </View>
-        <SPBanner weeklySP={weeklySP} />
-      </ScrollView>
+            {/* 📊 Kompakt İstatistik Barı */}
+            {myRooms.length > 0 && <StatsBar stats={roomStats} />}
+          </>
+        }
+      />
 
       {/* ★ PlusMenu — Oda Yönetim Paneli (sağdan slide) */}
       <PlusMenu

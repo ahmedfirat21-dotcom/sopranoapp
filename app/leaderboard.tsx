@@ -100,15 +100,28 @@ function PodiumCard({ entry, rank, label }: { entry: LeaderEntry; rank: 1 | 2 | 
     <Animated.View style={[{ flex: 1, opacity: opacityAnim, transform: [{ scale: scaleAnim }] }, isFirst && { marginTop: -14, zIndex: 2 }]}>
       <Pressable
         style={({ pressed }) => [pS.card, pressed && { opacity: 0.85, transform: [{ scale: 0.97 }] },
-          { shadowColor: medal.bg[0], shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.45, shadowRadius: 16, elevation: 10 }]}
+          { shadowColor: medal.bg[0], shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.5, shadowRadius: 16, elevation: 10,
+            borderColor: medal.bg[0] + '40' }]}
         onPress={() => router.push(`/user/${entry.user_id}` as any)}
       >
+        {/* Katman 1: derin koyu zemin */}
         <LinearGradient
-          colors={[medal.bg[0] + '25', medal.bg[1] + '12', 'rgba(15,23,42,0.7)']}
+          colors={['#1a2334', '#0D1220', '#050912']}
+          start={{ x: 0, y: 0 }} end={{ x: 0.7, y: 1 }}
           style={StyleSheet.absoluteFillObject}
-          start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
         />
-        <View style={[pS.shineLine, { backgroundColor: medal.bg[0] + '40' }]} />
+        {/* Katman 2: medal warmth */}
+        <LinearGradient
+          colors={[medal.bg[0] + '40', medal.bg[1] + '15', 'transparent']}
+          style={StyleSheet.absoluteFillObject}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+        />
+        {/* Üst medal kenar highlight */}
+        <LinearGradient
+          colors={['transparent', medal.bg[0] + 'ee', 'transparent']}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+          style={pS.shineLine}
+        />
 
         <LinearGradient colors={medal.bg} style={pS.rankBadge} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
           <Text style={pS.rankText}>{rank}</Text>
@@ -154,11 +167,11 @@ function PodiumCard({ entry, rank, label }: { entry: LeaderEntry; rank: 1 | 2 | 
 const pS = StyleSheet.create({
   card: {
     alignItems: 'center', paddingVertical: 18, paddingHorizontal: 6,
-    borderRadius: 22, backgroundColor: 'rgba(30,41,59,0.65)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 22,
+    borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.1)',
     overflow: 'hidden',
   },
-  shineLine: { position: 'absolute', top: 0, left: 0, right: 0, height: 1.5 },
+  shineLine: { position: 'absolute', top: 0, left: 0, right: 0, height: 2 },
   rankBadge: {
     position: 'absolute', top: 8, right: 8,
     width: 26, height: 26, borderRadius: 13,
@@ -197,13 +210,25 @@ function LeaderListItem({ entry, rank, label }: { entry: LeaderEntry; rank: numb
   return (
     <Animated.View style={{ opacity: enterAnim, transform: [{ translateY: enterAnim.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }] }}>
       <Pressable
-        style={({ pressed }) => [liS.card, pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] }]}
+        style={({ pressed }) => [liS.card, pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] },
+          { borderColor: rankColor + '30' }]}
         onPress={() => router.push(`/user/${entry.user_id}` as any)}
       >
+        {/* 3 katman: deep dark + rank warmth + top edge */}
         <LinearGradient
-          colors={['rgba(50,65,85,0.8)', 'rgba(30,41,59,0.6)']}
+          colors={['#1a2334', '#0D1220', '#050912']}
+          start={{ x: 0, y: 0 }} end={{ x: 0.7, y: 1 }}
           style={StyleSheet.absoluteFillObject}
-          start={{ x: 0, y: 0 }} end={{ x: 1, y: 0.5 }}
+        />
+        <LinearGradient
+          colors={[rankColor + '22', rankColor + '08', 'transparent']}
+          style={StyleSheet.absoluteFillObject}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+        />
+        <LinearGradient
+          colors={['transparent', rankColor + 'aa', 'transparent']}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+          style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1 }}
         />
         <View style={[liS.rankCircle, { borderColor: rankColor + '50' }]}>
           <Text style={[liS.rankText, { color: rankColor }]}>{rank}</Text>
@@ -229,6 +254,9 @@ const liS = StyleSheet.create({
     marginHorizontal: 16, marginBottom: 8,
     paddingVertical: 14, paddingHorizontal: 14, paddingLeft: 10,
     borderRadius: 16, overflow: 'hidden',
+    borderWidth: 1,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4, shadowRadius: 10, elevation: 6,
   },
   rankCircle: {
     width: 32, height: 32, borderRadius: 16,
@@ -251,13 +279,24 @@ function RoomListItem({ entry, rank }: { entry: RoomEntry; rank: number }) {
   const rankColor = rank <= 3 ? '#14B8A6' : '#94A3B8';
   return (
     <Pressable
-      style={({ pressed }) => [rlS.card, pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] }]}
+      style={({ pressed }) => [rlS.card, pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] },
+        { borderColor: rankColor + '30' }]}
       onPress={() => router.push(`/room/${entry.room_id}` as any)}
     >
       <LinearGradient
-        colors={['rgba(50,65,85,0.8)', 'rgba(30,41,59,0.6)']}
+        colors={['#1a2334', '#0D1220', '#050912']}
+        start={{ x: 0, y: 0 }} end={{ x: 0.7, y: 1 }}
         style={StyleSheet.absoluteFillObject}
-        start={{ x: 0, y: 0 }} end={{ x: 1, y: 0.5 }}
+      />
+      <LinearGradient
+        colors={[rankColor + '22', rankColor + '08', 'transparent']}
+        style={StyleSheet.absoluteFillObject}
+        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+      />
+      <LinearGradient
+        colors={['transparent', rankColor + 'aa', 'transparent']}
+        start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+        style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1 }}
       />
       <View style={[rlS.rankCircle, { borderColor: rankColor + '50' }]}>
         <Text style={[rlS.rankText, { color: rankColor }]}>{rank}</Text>
@@ -277,6 +316,9 @@ const rlS = StyleSheet.create({
     marginHorizontal: 16, marginBottom: 8,
     paddingVertical: 14, paddingHorizontal: 14, paddingLeft: 10,
     borderRadius: 16, overflow: 'hidden',
+    borderWidth: 1,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4, shadowRadius: 10, elevation: 6,
   },
   rankCircle: {
     width: 32, height: 32, borderRadius: 16,
@@ -296,18 +338,23 @@ const rlS = StyleSheet.create({
 function SectionHeader({ icon, iconColor, title }: { icon: string; iconColor: string; title: string }) {
   return (
     <View style={shS.wrap}>
-      <View style={[shS.iconWrap, { backgroundColor: iconColor + '18', borderColor: iconColor + '25' }]}>
-        <Ionicons name={icon as any} size={18} color={iconColor} />
-      </View>
+      <View style={[shS.accent, { backgroundColor: iconColor }]} />
+      <Ionicons name={icon as any} size={16} color={iconColor} style={{
+        textShadowColor: iconColor + 'dd',
+        textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 9,
+      }} />
       <Text style={shS.title}>{title}</Text>
     </View>
   );
 }
 
 const shS = StyleSheet.create({
-  wrap: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingTop: 24, paddingBottom: 10 },
-  iconWrap: { width: 36, height: 36, borderRadius: 12, justifyContent: 'center', alignItems: 'center', borderWidth: 1 },
-  title: { fontSize: 17, fontWeight: '800', color: '#F1F5F9', letterSpacing: 0.3 },
+  wrap: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingTop: 22, paddingBottom: 12 },
+  accent: { width: 3, height: 16, borderRadius: 2 },
+  title: {
+    fontSize: 15, fontWeight: '900', color: '#F1F5F9', letterSpacing: 0.5,
+    textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
+  },
 });
 
 // ═══════════════════════════════════════════════════════════

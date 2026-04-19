@@ -10,8 +10,11 @@ import {
   ActivityIndicator, Dimensions, Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../constants/supabase';
+import { Colors } from '../constants/theme';
 import { RoomAccessService } from '../services/roomAccess';
 import StatusAvatar from './StatusAvatar';
 import { showToast } from './Toast';
@@ -78,7 +81,11 @@ function timeAgo(date: string): string {
   return `${Math.floor(hours / 24)}g`;
 }
 
-export default function NotificationDrawer({ visible, onClose, userId, anchorTop = 90 }: Props) {
+export default function NotificationDrawer({ visible, onClose, userId, anchorTop }: Props) {
+  const insets = useSafeAreaInsets();
+  // Header: paddingTop(insets.top+4) + logo(~32) + padding = bell merkezi ≈ insets.top+22
+  // Bell buton alt kenarı ≈ insets.top + 40. Drawer okuyla arasına 6px boşluk.
+  const resolvedAnchor = anchorTop ?? (insets.top + 46);
   const router = useRouter();
   const [items, setItems] = useState<NotifItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -219,7 +226,15 @@ export default function NotificationDrawer({ visible, onClose, userId, anchorTop
     if (!userId || !item.reference_id) return;
     setProcessingInvites(prev => new Set(prev).add(item.id));
     try {
-      await RoomAccessService.acceptInvite(item.reference_id, userId);
+      const result = await RoomAccessService.acceptInvite(item.reference_id, userId);
+      // ★ 2026-04-19: Oda kapalı/silinmiş ise graceful mesaj göster (hata fırlatma)
+      if (!result.success) {
+        showToast({ title: 'Davet Geçersiz', message: result.error || 'Davet kabul edilemedi', type: 'warning' });
+        // Bildirimi yine de listeden kaldır (artık geçerli değil)
+        setItems(prev => prev.filter(n => n.id !== item.id));
+        try { await supabase.from('notifications').delete().eq('id', item.id); } catch {}
+        return;
+      }
       // Bildirimi listeden kaldır
       setItems(prev => prev.filter(n => n.id !== item.id));
       // Bildirimi DB'den sil
@@ -264,6 +279,21 @@ export default function NotificationDrawer({ visible, onClose, userId, anchorTop
     }
   }, [userId, items.length]);
 
+  // ★ Uzun bas: tümünü okundu işaretle (silmez, sadece is_read=true yapar)
+  const handleMarkAllRead = useCallback(async () => {
+    if (!userId) return;
+    const unread = items.filter(n => !n.is_read);
+    if (unread.length === 0) return;
+    try {
+      await supabase.from('notifications').update({ is_read: true })
+        .eq('user_id', userId).eq('is_read', false).in('type', BELL_NOTIF_TYPES);
+      setItems(prev => prev.map(n => ({ ...n, is_read: true })));
+      showToast({ title: `${unread.length} bildirim okundu ✓`, type: 'success' });
+    } catch {
+      showToast({ title: 'Hata', type: 'error' });
+    }
+  }, [userId, items]);
+
   const unreadCount = items.filter(n => !n.is_read).length;
 
   if (!visible) return null;
@@ -272,13 +302,30 @@ export default function NotificationDrawer({ visible, onClose, userId, anchorTop
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={s.backdrop} onPress={onClose} />
 
-      <View style={[s.dropdown, { top: anchorTop }]}>
-        {/* Üçgen ok — zile hizalı */}
-        <View style={s.arrow} />
+      {/* ★ Arrow — rotated square, çerçevesi drawer border'ının doğal uzantısı */}
+      <View style={[s.arrow, { top: resolvedAnchor - 7 }]} pointerEvents="none" />
 
-        {/* Başlık */}
-        <View style={s.header}>
-          <Ionicons name="notifications" size={18} color="#14B8A6" />
+      <View style={[s.dropdown, { top: resolvedAnchor }]}>
+        {/* ★ Odalarım paleti: diagonal gradient (parlak üst-sol → koyu alt-sağ) */}
+        <LinearGradient
+          colors={['#4a5668', '#37414f', '#232a35']}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFillObject}
+          pointerEvents="none"
+        />
+
+        {/* Başlık — uzun basınca tümünü okundu işaretle */}
+        <Pressable
+          style={s.header}
+          onLongPress={handleMarkAllRead}
+          delayLongPress={500}
+          accessibilityHint="Uzun bas: tümünü okundu işaretle"
+        >
+          <Ionicons name="notifications" size={18} color="#14B8A6" style={{
+            textShadowColor: 'rgba(0,0,0,0.6)',
+            textShadowOffset: { width: 0, height: 2 },
+            textShadowRadius: 4,
+          }} />
           <Text style={s.title}>Bildirimler</Text>
           {unreadCount > 0 && (
             <View style={s.badgePill}>
@@ -301,7 +348,7 @@ export default function NotificationDrawer({ visible, onClose, userId, anchorTop
               <Text style={s.clearBtnText}>Temizle</Text>
             </Pressable>
           )}
-        </View>
+        </Pressable>
 
         {loading ? (
           <ActivityIndicator color="#14B8A6" style={{ marginVertical: 24 }} />
@@ -400,34 +447,35 @@ export default function NotificationDrawer({ visible, onClose, userId, anchorTop
 const s = StyleSheet.create({
   backdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: 'transparent',
   },
   dropdown: {
     position: 'absolute',
     right: 10,
-    width: W * 0.88,
-    maxWidth: 380,
-    backgroundColor: '#2f404f',
+    width: W * 0.86,
+    maxWidth: 360,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: 'rgba(20,184,166,0.15)',
+    borderColor: Colors.cardBorder,
     paddingBottom: 4,
+    overflow: 'hidden',
     elevation: 25,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.5,
     shadowRadius: 16,
   },
+  // ★ Rotated square — üst ve sol kenarlar Colors.cardBorder ile, drawer border'ı
+  // doğal şekilde okun iki kenarına uzar. Alt yarısı drawer arkasına gizlenir.
   arrow: {
     position: 'absolute',
-    top: -7,
-    right: 58,
+    right: 60,
     width: 14,
     height: 14,
-    backgroundColor: '#2f404f',
+    backgroundColor: '#404b5c',
     borderTopWidth: 1,
     borderLeftWidth: 1,
-    borderColor: 'rgba(20,184,166,0.15)',
+    borderColor: Colors.cardBorder,
     transform: [{ rotate: '45deg' }],
   },
   header: {
@@ -435,7 +483,12 @@ const s = StyleSheet.create({
     paddingHorizontal: 14, paddingTop: 14, paddingBottom: 10,
     borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)',
   },
-  title: { fontSize: 16, fontWeight: '800', color: '#F1F5F9', flex: 1 },
+  title: {
+    fontSize: 16, fontWeight: '800', color: '#F1F5F9', flex: 1,
+    textShadowColor: 'rgba(0,0,0,0.6)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
+  },
   badgePill: {
     backgroundColor: '#EF4444',
     paddingHorizontal: 8, paddingVertical: 2,

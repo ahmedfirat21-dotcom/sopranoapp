@@ -4,6 +4,7 @@ import {
   Dimensions, LayoutAnimation, Platform, UIManager, Switch, TextInput, PanResponder,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { isTierAtLeast } from '../../constants/tiers';
 import { useSwipeToDismiss } from '../../hooks/useSwipeToDismiss';
 
@@ -114,6 +115,7 @@ type PlusMenuProps = {
   userRole?: 'owner' | 'moderator' | 'speaker' | 'listener';
   ownerTier?: string;
   onMuteAll?: () => void;
+  onUnmuteAll?: () => void;
   onRoomStats?: () => void;
   onDeleteRoom?: () => void;
   onBoostRoom?: () => void;
@@ -124,6 +126,17 @@ type PlusMenuProps = {
   onDonate?: () => void;
   isDonationsEnabled?: boolean;
   bottomInset?: number;
+  // ★ Odadan ayrıl — tüm rollerde erişilebilir; owner'da host transfer uyarısı backend'de
+  onLeaveRoom?: () => void;
+  // ★ 2026-04-18: Cihaz ayarları inline — ayrı modal yerine "Konuşma & Ses" accordion içinde
+  deviceConfig?: {
+    micMode: 'normal' | 'music';
+    onMicModeChange: (m: 'normal' | 'music') => void;
+    noiseCancellation: boolean;
+    onNoiseCancellationChange: (v: boolean) => void;
+    useSpeaker: boolean;
+    onSpeakerChange: (v: boolean) => void;
+  };
 };
 
 const ROLE_META: Record<string, { label: string; color: string; icon: string }> = {
@@ -196,35 +209,49 @@ function SettingChips({ icon, label, options, value, onSelect, locked, lockTier 
   );
 }
 
-function InlineTextEditor({ icon, label, value, onSave, placeholder, multiline, accent = '#14B8A6' }: {
+function InlineTextEditor({ icon, label, value, onSave, placeholder, multiline, accent = '#14B8A6', secureTextEntry, maxLength }: {
   icon: string; label: string; value: string; onSave: (v: string) => void;
   placeholder?: string; multiline?: boolean; accent?: string;
+  secureTextEntry?: boolean; maxLength?: number;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
+  const [reveal, setReveal] = useState(false);
   useEffect(() => { setDraft(value); }, [value]);
+
+  // ★ Şifre alanı: değer varsa görsel olarak • ile maskele
+  const displayValue = secureTextEntry && value ? '•'.repeat(Math.min(value.length, 8)) : (value || '—');
 
   if (!editing) {
     return (
       <Pressable style={st.editorRow} onPress={() => setEditing(true)}>
         <Ionicons name={icon as any} size={12} color={accent} />
         <Text style={st.editorLabel} numberOfLines={1}>{label}</Text>
-        <Text style={[st.editorValue, { flex: 1 }]} numberOfLines={1}>{value || '—'}</Text>
+        <Text style={[st.editorValue, { flex: 1 }]} numberOfLines={1}>{displayValue}</Text>
         <Ionicons name="pencil-outline" size={10} color="rgba(255,255,255,0.15)" />
       </Pressable>
     );
   }
+  const effectiveMax = maxLength ?? (multiline ? 500 : 60);
   return (
     <View style={st.editorExpanded}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 4 }}>
         <Ionicons name={icon as any} size={12} color={accent} />
         <Text style={[st.editorLabel, { flex: 0 }]}>{label}</Text>
+        {secureTextEntry && (
+          <Pressable onPress={() => setReveal(r => !r)} hitSlop={6} style={{ marginLeft: 'auto' }}>
+            <Ionicons name={reveal ? 'eye-off-outline' : 'eye-outline'} size={12} color="#94A3B8" />
+          </Pressable>
+        )}
       </View>
       <TextInput
         style={[st.editorInput, multiline && { height: 50, textAlignVertical: 'top' }]}
         value={draft} onChangeText={setDraft}
         placeholder={placeholder} placeholderTextColor="rgba(255,255,255,0.15)"
-        multiline={multiline} maxLength={multiline ? 500 : 60} autoFocus
+        multiline={multiline} maxLength={effectiveMax} autoFocus
+        secureTextEntry={secureTextEntry && !reveal}
+        autoCapitalize={secureTextEntry ? 'none' : 'sentences'}
+        autoCorrect={!secureTextEntry}
       />
       <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 4 }}>
         <Pressable onPress={() => { setDraft(value); setEditing(false); }} hitSlop={6}>
@@ -248,12 +275,13 @@ export function PlusMenu({
   isRoomLocked, micRequestCount,
   userRole = 'listener',
   ownerTier = 'Free',
-  onMuteAll, onRoomStats, onDeleteRoom,
+  onMuteAll, onUnmuteAll, onRoomStats, onDeleteRoom,
   onBoostRoom, onToggleFollow, isFollowingRoom,
   settingsConfig,
   followerCount = 0,
   onDonate, isDonationsEnabled,
   bottomInset = 14,
+  onLeaveRoom, deviceConfig,
 }: PlusMenuProps) {
   const slideAnim = useRef(new Animated.Value(PANEL_W)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -332,28 +360,102 @@ export function PlusMenu({
         {sc.roomType === 'closed' && can('Plus') && (
           <>
             <View style={st.sep} />
-            <InlineTextEditor icon="key-outline" label="Şifre" value={sc.roomPassword || ''} onSave={sc.onPasswordChange || (() => {})} placeholder="Oda şifresi..." accent="#F59E0B" />
+            <InlineTextEditor icon="key-outline" label="Şifre" value={sc.roomPassword || ''} onSave={sc.onPasswordChange || (() => {})} placeholder="Min 4 karakter" accent="#F59E0B" secureTextEntry maxLength={20} />
           </>
         )}
       </View>
     );
   };
 
-  // 2️⃣ KONUŞMA & SES
+  // 2️⃣ KONUŞMA & SES — Owner/mod yetkileri + inline cihaz ayarları (role bazlı filter)
   const renderSpeaking = () => {
-    if (!sc) return null;
+    const showOwnerControls = isOwner && sc;
+    const showModControls = (isOwner || isMod) && sc;
+    const showDeviceMic = isOnStage && deviceConfig; // mic mode/noise: sadece sahnedekiler için anlamlı
+    const showDeviceSpeaker = !!deviceConfig; // hoparlör/kulaklık: herkese lazım
+
     return (
       <View style={st.subWrap}>
-        <SettingChips icon="mic-outline" label="Konuşma Modu" options={SPEAKING_MODES.map(m => ({ id: m.id, label: m.label }))} value={sc.speakingMode} onSelect={sc.onSpeakingModeChange} />
-        <View style={st.sep} />
-        <SettingChips icon="timer-outline" label="Slow Mode" options={SLOW_MODES.map(s => ({ id: s, label: s === 0 ? 'Yok' : `${s}s` }))} value={sc.slowModeSeconds} onSelect={can('Plus') ? sc.onSlowModeChange : undefined} locked={!can('Plus')} lockTier="Plus" />
-        {onMuteAll && can('Pro') && (
+        {/* ── Owner Kontrolleri ── */}
+        {showOwnerControls && (
           <>
+            <SettingChips icon="mic-outline" label="Konuşma Modu" options={SPEAKING_MODES.map(m => ({ id: m.id, label: m.label }))} value={sc!.speakingMode} onSelect={sc!.onSpeakingModeChange} />
             <View style={st.sep} />
-            <Pressable style={({ pressed }) => [st.actionBtn, pressed && { opacity: 0.7 }]} onPress={() => { onMuteAll(); onClose(); }}>
-              <Ionicons name="volume-mute-outline" size={13} color="#EF4444" />
-              <Text style={st.actionBtnText}>Tümünü Sustur</Text>
-            </Pressable>
+          </>
+        )}
+
+        {/* ── Mod Kontrolleri (owner+mod) ── */}
+        {showModControls && (
+          <>
+            <SettingChips icon="timer-outline" label="Slow Mode" options={SLOW_MODES.map(s => ({ id: s, label: s === 0 ? 'Yok' : `${s}s` }))} value={sc!.slowModeSeconds} onSelect={can('Plus') ? sc!.onSlowModeChange : undefined} locked={!can('Plus')} lockTier="Plus" />
+            {onMuteAll && can('Pro') && (
+              <>
+                <View style={st.sep} />
+                <Pressable style={({ pressed }) => [st.actionBtn, pressed && { opacity: 0.7 }]} onPress={() => { onMuteAll(); onClose(); }}>
+                  <Ionicons name="volume-mute-outline" size={13} color="#EF4444" />
+                  <Text style={st.actionBtnText}>Tümünü Sustur</Text>
+                </Pressable>
+              </>
+            )}
+            {onUnmuteAll && can('Pro') && (
+              <>
+                <View style={st.sep} />
+                <Pressable style={({ pressed }) => [st.actionBtn, pressed && { opacity: 0.7 }]} onPress={() => { onUnmuteAll(); onClose(); }}>
+                  <Ionicons name="volume-high-outline" size={13} color="#14B8A6" />
+                  <Text style={[st.actionBtnText, { color: '#14B8A6' }]}>Tümünü Aç</Text>
+                </Pressable>
+              </>
+            )}
+          </>
+        )}
+
+        {/* ── Cihaz Ayarları (inline) ── */}
+        {showDeviceMic && (
+          <>
+            {showModControls && <View style={st.sep} />}
+            <View style={st.toggleRow}>
+              <Ionicons name="mic" size={13} color="#14B8A6" />
+              <Text style={st.toggleLabel}>Mikrofon Modu</Text>
+              <View style={{ flexDirection: 'row', gap: 3 }}>
+                {([
+                  { id: 'normal' as const, label: 'Konuşma' },
+                  { id: 'music' as const, label: 'Müzik' },
+                ]).map(opt => {
+                  const active = deviceConfig!.micMode === opt.id;
+                  return (
+                    <Pressable key={opt.id} onPress={() => deviceConfig!.onMicModeChange(opt.id)} style={[st.chip, active && st.chipActive]}>
+                      <Text style={[st.chipText, active && st.chipTextActive]}>{opt.label}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+            <View style={st.sep} />
+            <SettingToggle
+              icon="ear-outline"
+              label="Gürültü Engelleme"
+              value={deviceConfig!.micMode === 'music' ? false : deviceConfig!.noiseCancellation}
+              onValueChange={deviceConfig!.micMode === 'music' ? undefined : deviceConfig!.onNoiseCancellationChange}
+              accent="#4ADE80"
+            />
+          </>
+        )}
+
+        {showDeviceSpeaker && (
+          <>
+            {(showModControls || showDeviceMic) && <View style={st.sep} />}
+            <View style={st.toggleRow}>
+              <Ionicons name={deviceConfig!.useSpeaker ? 'volume-high' : 'headset'} size={13} color={deviceConfig!.useSpeaker ? '#F59E0B' : '#A78BFA'} />
+              <Text style={st.toggleLabel}>{deviceConfig!.useSpeaker ? 'Hoparlör' : 'Kulaklık'}</Text>
+              <Pressable
+                onPress={() => deviceConfig!.onSpeakerChange(!deviceConfig!.useSpeaker)}
+                style={[st.chip, deviceConfig!.useSpeaker && st.chipActive]}
+              >
+                <Text style={[st.chipText, deviceConfig!.useSpeaker && st.chipTextActive]}>
+                  {deviceConfig!.useSpeaker ? 'Hoparlör' : 'Kulaklık'}
+                </Text>
+              </Pressable>
+            </View>
           </>
         )}
       </View>
@@ -372,7 +474,7 @@ export function PlusMenu({
             <View style={st.sep} />
             <SettingToggle icon="warning-outline" label="+18 İçerik" value={sc.ageRestricted} onValueChange={can('Plus') ? sc.onAgeRestrictedChange : undefined} accent="#EF4444" locked={!can('Plus')} lockTier="Plus" />
             <View style={st.sep} />
-            <SettingToggle icon="people-outline" label="Sadece Takipçiler" value={sc.followersOnly} onValueChange={can('Pro') ? sc.onToggleFollowersOnly : undefined} accent="#D4AF37" locked={!can('Pro')} lockTier="Pro" />
+            <SettingToggle icon="people-outline" label="Sadece Arkadaşlar" value={sc.followersOnly} onValueChange={can('Pro') ? sc.onToggleFollowersOnly : undefined} accent="#D4AF37" locked={!can('Pro')} lockTier="Pro" />
             <View style={st.sep} />
           </>
         )}
@@ -545,7 +647,7 @@ export function PlusMenu({
   if (isOwner && sc) {
     // 1. Oda Bilgileri
     items.push({ id: 'room_info', icon: 'information-circle-outline', label: 'Oda Bilgileri', accent: '#D4AF37', onPress: () => toggle('room_info'), expandable: true, renderContent: renderRoomInfo });
-    // 2. Konuşma & Ses
+    // 2. Konuşma & Ses (owner: konuşma modu + slow mode + cihaz ayarları)
     items.push({ id: 'speaking', icon: 'mic-outline', label: 'Konuşma & Ses', accent: '#14B8A6', onPress: () => toggle('speaking'), expandable: true, renderContent: renderSpeaking });
     // 3. Moderasyon
     items.push({ id: 'moderation', icon: 'shield-checkmark-outline', label: 'Moderasyon', accent: '#A78BFA', onPress: () => toggle('moderation'), expandable: true, badge: micRequestCount, renderContent: renderModeration });
@@ -554,8 +656,12 @@ export function PlusMenu({
     // 5. Görsel & Tema
     items.push({ id: 'visual', icon: 'color-palette-outline', label: 'Görsel & Tema', accent: '#F59E0B', onPress: () => toggle('visual'), expandable: true, renderContent: renderVisual });
   } else if (isMod) {
-    // Moderatör: Sadece moderasyon
+    // ★ Moderatör: Konuşma & Ses (slow mode + cihaz) + Moderasyon
+    items.push({ id: 'speaking', icon: 'mic-outline', label: 'Konuşma & Ses', accent: '#14B8A6', onPress: () => toggle('speaking'), expandable: true, renderContent: renderSpeaking });
     items.push({ id: 'moderation', icon: 'shield-checkmark-outline', label: 'Moderasyon', accent: '#A78BFA', onPress: () => toggle('moderation'), expandable: true, badge: micRequestCount, renderContent: renderModeration });
+  } else if (deviceConfig) {
+    // ★ Speaker/Listener: Sadece cihaz ayarları (hoparlör + sahnedeyse mic/noise)
+    items.push({ id: 'speaking', icon: 'headset-outline', label: 'Konuşma & Ses', accent: '#3B82F6', onPress: () => toggle('speaking'), expandable: true, renderContent: renderSpeaking });
   }
 
   // 6. Davet & Paylaş (sahnedekiler)
@@ -588,10 +694,23 @@ export function PlusMenu({
 
   // Dondur & Sil (owner, direkt aksiyon)
   if (isOwner && sc?.onFreezeRoom) {
-    items.push({ id: 'freeze', icon: 'snow-outline', label: 'Odayı Dondur', desc: 'Sonra tekrar aktifleştir', accent: '#3B82F6', onPress: () => { onClose(); sc.onFreezeRoom?.(); } });
+    items.push({ id: 'freeze', icon: 'snow-outline', label: 'Odayı Dondur', desc: 'Katılımcılar çıkar, sonra tekrar aç', accent: '#3B82F6', onPress: () => { onClose(); sc.onFreezeRoom?.(); } });
   }
+
+  // ★ Odadan Ayrıl — tüm roller için (owner'da host transfer / moderator/speaker/listener normal çıkış)
+  if (onLeaveRoom) {
+    items.push({
+      id: 'leave',
+      icon: 'exit-outline',
+      label: 'Odadan Ayrıl',
+      desc: isOwner ? 'Oda açık kalır, sahiplik devri yapılır' : 'Odayı terk et',
+      accent: '#F59E0B',
+      onPress: () => { onClose(); onLeaveRoom(); },
+    });
+  }
+
   if (isOwner && onDeleteRoom) {
-    items.push({ id: 'delete', icon: 'trash-outline', label: 'Odayı Sil', desc: 'Kalıcı olarak siler', accent: '#EF4444', onPress: () => { onDeleteRoom(); onClose(); }, destructive: true });
+    items.push({ id: 'delete', icon: 'trash-outline', label: 'Odayı Sil', desc: 'Kalıcı olarak siler, geri alınamaz', accent: '#EF4444', onPress: () => { onDeleteRoom(); onClose(); }, destructive: true });
   }
 
   const isCompact = !isOwner && !isMod && !isOnStage;
@@ -608,6 +727,13 @@ export function PlusMenu({
           {...compactPan.panHandlers}
           style={[s.compactPanel, { bottom: bottomInset + 58, transform: [{ translateY: compactSlideY }] }]}
         >
+          {/* ★ Opak gradient zemin */}
+          <LinearGradient
+            colors={['#1E293B', '#0F172A', '#0B1220']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 0, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
           <View style={s.compactHandle}>
             <View style={s.compactHandleBar} />
           </View>
@@ -641,6 +767,13 @@ export function PlusMenu({
       </Animated.View>
 
       <Animated.View {...panHandlers} style={[s.panel, { transform: [{ translateX: Animated.add(slideAnim, swipeX) }] }]}>
+        {/* ★ Opak gradient zemin — okunabilirlik için şeffaflık kaldırıldı */}
+        <LinearGradient
+          colors={['#1E293B', '#0F172A', '#0B1220']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
         {/* Header */}
         <View style={s.header}>
           <View style={[s.headerDot, { backgroundColor: role.color }]} />
@@ -649,6 +782,10 @@ export function PlusMenu({
             <Ionicons name={role.icon as any} size={10} color={role.color} />
             <Text style={[s.roleLabel, { color: role.color }]}>{role.label}</Text>
           </View>
+          {/* ★ Kapatma butonu — swipe-to-dismiss yerine ek olarak */}
+          <Pressable onPress={onClose} hitSlop={10} style={s.closeBtn}>
+            <Ionicons name="close" size={16} color="rgba(255,255,255,0.5)" />
+          </Pressable>
         </View>
 
         <ScrollView bounces={false} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingVertical: 4 }} nestedScrollEnabled>
@@ -699,28 +836,31 @@ export function AdvancedSettingsPanel({ visible }: { visible: boolean;[key: stri
 // STİLLER
 // ═══════════════════════════════════════════════════════
 const s = StyleSheet.create({
-  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.25)' },
+  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.55)' },
   panel: {
     position: 'absolute', right: 0, top: 70, bottom: 80,
-    width: PANEL_W, backgroundColor: 'rgba(45,55,64,0.95)',
+    width: PANEL_W, backgroundColor: '#0F172A',
     borderTopLeftRadius: 18, borderBottomLeftRadius: 18,
-    borderWidth: 1, borderRightWidth: 0, borderColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1, borderRightWidth: 0, borderColor: 'rgba(255,255,255,0.1)',
     overflow: 'hidden',
+    shadowColor: '#000', shadowOffset: { width: -4, height: 0 },
+    shadowOpacity: 0.4, shadowRadius: 12, elevation: 20,
   },
   compactPanel: {
     position: 'absolute',
     left: 0, right: 0,
     zIndex: 50,
-    backgroundColor: 'rgba(45,55,64,0.95)',
+    backgroundColor: '#0F172A',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     borderWidth: 1,
     borderBottomWidth: 0,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: 'rgba(255,255,255,0.1)',
     paddingBottom: 8,
+    overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.4,
     shadowRadius: 12,
     elevation: 20,
   },
@@ -741,6 +881,12 @@ const s = StyleSheet.create({
     paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6, borderWidth: 1,
   },
   roleLabel: { fontSize: 9, fontWeight: '700', letterSpacing: 0.3 },
+  closeBtn: {
+    width: 26, height: 26, borderRadius: 13,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+  },
   row: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
     paddingVertical: 11, paddingHorizontal: 12,

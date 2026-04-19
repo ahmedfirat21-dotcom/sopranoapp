@@ -53,6 +53,27 @@ export default function EditProfileScreen() {
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  // ★ Username uniqueness check — debounced, inline feedback
+  const [usernameStatus, setUsernameStatus] = useState<'idle' | 'checking' | 'available' | 'taken' | 'current'>('idle');
+  useEffect(() => {
+    const u = username.trim();
+    const originalUsername = profile?.username || '';
+    // Kendi mevcut kullanıcı adı — check yok
+    if (u === originalUsername) { setUsernameStatus('current'); return; }
+    if (u.length === 0) { setUsernameStatus('idle'); return; }
+    if (u.length < 3) { setUsernameStatus('idle'); return; }
+    setUsernameStatus('checking');
+    const t = setTimeout(async () => {
+      try {
+        const available = await ProfileService.isUsernameAvailable(u);
+        setUsernameStatus(available ? 'available' : 'taken');
+      } catch {
+        setUsernameStatus('idle');
+      }
+    }, 450);
+    return () => clearTimeout(t);
+  }, [username, profile?.username]);
+
   // === Privacy toggles ===
   const [hideOwnedRooms, setHideOwnedRooms] = useState((profile as any)?.hide_owned_rooms || false);
   const [privacyMode, setPrivacyMode] = useState<'public' | 'followers_only' | 'private'>((profile as any)?.privacy_mode || 'public');
@@ -158,6 +179,15 @@ export default function EditProfileScreen() {
     }
     if (!userId) {
       showToast({ type: 'error', title: 'Hata', message: 'Kullanıcı bulunamadı.' });
+      return;
+    }
+    // ★ Username taken — kaydetmeye izin verme
+    if (usernameStatus === 'taken') {
+      showToast({ type: 'warning', title: 'Kullanıcı adı alınmış', message: 'Başka bir kullanıcı adı dene.' });
+      return;
+    }
+    if (usernameStatus === 'checking') {
+      showToast({ type: 'info', title: 'Kontrol ediliyor', message: 'Kullanıcı adı müsaitliği kontrol ediliyor...' });
       return;
     }
 
@@ -479,8 +509,24 @@ export default function EditProfileScreen() {
                 returnKeyType="next"
                 onFocus={() => scrollToField('username')}
               />
+              {/* ★ Inline availability feedback — debounced */}
+              {usernameStatus === 'checking' && (
+                <ActivityIndicator size="small" color="#94A3B8" style={{ marginLeft: 8 }} />
+              )}
+              {usernameStatus === 'available' && (
+                <Ionicons name="checkmark-circle" size={18} color="#22C55E" style={{ marginLeft: 8 }} />
+              )}
+              {usernameStatus === 'taken' && (
+                <Ionicons name="close-circle" size={18} color="#EF4444" style={{ marginLeft: 8 }} />
+              )}
             </View>
-            <Text style={styles.fieldHint}>Sadece küçük harfler, rakamlar ve alt çizgi</Text>
+            {usernameStatus === 'taken' ? (
+              <Text style={[styles.fieldHint, { color: '#EF4444' }]}>Bu kullanıcı adı zaten alınmış.</Text>
+            ) : usernameStatus === 'available' ? (
+              <Text style={[styles.fieldHint, { color: '#22C55E' }]}>Müsait ✓</Text>
+            ) : (
+              <Text style={styles.fieldHint}>Sadece küçük harfler, rakamlar ve alt çizgi</Text>
+            )}
           </View>
 
           <View

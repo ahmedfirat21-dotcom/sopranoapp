@@ -22,6 +22,8 @@ import { supabase } from '../../constants/supabase';
 import { isTierAtLeast } from '../../constants/tiers';
 import PremiumAlert, { type AlertButton } from '../../components/PremiumAlert';
 import AppBackground from '../../components/AppBackground';
+import ProfileHero from '../../components/profile/ProfileHero';
+import SPDonateSheet from '../../components/profile/SPDonateSheet';
 import FollowListModal from '../../components/FollowListModal';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -54,6 +56,7 @@ export default function UserProfileScreen() {
 
   const [showFollowList, setShowFollowList] = useState(false);
   const [followListTab, setFollowListTab] = useState<'followers' | 'following'>('followers');
+  const [showSPSheet, setShowSPSheet] = useState(false);
 
   const isOwnProfile = firebaseUser?.uid === id;
 
@@ -296,57 +299,33 @@ export default function UserProfileScreen() {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
-        {/* ═══ Profil Kartı ═══ */}
-        <View style={s.card}>
-          <LinearGradient
-            colors={[tierDef.color + '15', 'transparent']}
-            style={s.cardGlow}
-          />
-          <View style={s.identityRow}>
-            <View style={{ position: 'relative' as const }}>
-              <View style={[s.avatarRing, { borderColor: tierBorderColor, shadowColor: tierBorderColor }]}>
-                <Image source={getAvatarSource(userProfile.avatar_url)} style={s.avatarImg} />
-              </View>
-              <LinearGradient colors={tierDef.gradient as [string, string]} style={s.tierPill}>
-                <Ionicons name={tierDef.icon as any} size={8} color="#fff" />
-                <Text style={s.tierPillText}>{tierDef.label}</Text>
-              </LinearGradient>
-              {/* Online durumu — avatar köşesinde */}
-              {userProfile.is_online && (
-                <View style={s.onlineDot} />
-              )}
-            </View>
-            <View style={{ flex: 1 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Text style={[s.displayName, userProfile.is_admin && { color: '#F87171' }]} numberOfLines={1}>{userProfile.display_name}</Text>
-                {userProfile.is_admin && (
-                  <Ionicons name="shield-checkmark" size={14} color="#DC2626" style={{ marginLeft: 4 }} />
-                )}
-              </View>
-              {userProfile.username && <Text style={s.username}>@{userProfile.username}</Text>}
-              {userTitle && (
-                <View style={[s.titleBadge, { backgroundColor: userTitle.bgColor }]}>
-                  <Text style={{ fontSize: 10 }}>{userTitle.emoji}</Text>
-                  <Text style={[s.titleText, { color: userTitle.color }]}>{userTitle.name}</Text>
-                </View>
-              )}
-              <Text style={s.bio} numberOfLines={3}>{userProfile.bio || 'Henüz bir şey yazmadı ☕'}</Text>
-            </View>
+        {/* ★ Engellenen kullanıcı banner'ı — neden kısıtlı gösterim olduğunu açıkla */}
+        {isUserBlocked && (
+          <View style={s.blockedBanner}>
+            <Ionicons name="ban" size={16} color="#EF4444" />
+            <Text style={s.blockedBannerText}>
+              Bu kullanıcıyı engelledin. Profil içeriği gizli — engeli kaldırmak için aşağıdaki butonu kullan.
+            </Text>
           </View>
+        )}
 
-          {/* ★ Facebook tarzı: tek Arkadaş sayısı */}
-          <View style={s.statsRow}>
-            <Pressable style={s.statItem} onPress={() => { setFollowListTab('followers'); setShowFollowList(true); }}>
-              <Text style={s.statNum}>{stats.followers}</Text>
-              <Text style={s.statLabelClickable}>Arkadaş</Text>
-            </Pressable>
-            <View style={s.statDiv} />
-            <View style={s.statItem}>
-              <Text style={s.statNum}>{stats.rooms}</Text>
-              <Text style={s.statLabel}>Oda</Text>
-            </View>
-          </View>
-        </View>
+        {/* ═══ Profil Kartı ═══ */}
+        {/* ★ Varsayılan profil sayfasıyla aynı ProfileHero — edit butonu yok (başkasının profili) */}
+        <ProfileHero
+          displayName={userProfile.display_name}
+          username={userProfile.username}
+          bio={userProfile.bio || 'Henüz bir şey yazmadı ☕'}
+          avatarUrl={userProfile.avatar_url || ''}
+          subscriptionTier={tier as any}
+          isAdmin={!!userProfile.is_admin}
+          userTitle={userTitle}
+          stats={{ followers: stats.followers, rooms: stats.rooms }}
+          onFollowersPress={() => { setFollowListTab('followers'); setShowFollowList(true); }}
+          onRoomsPress={() => { /* Kullanıcının odaları — aşağıda liste mevcut */ }}
+          memberSince={userProfile.created_at}
+          boostExpiresAt={(userProfile as any)?.profile_boost_expires_at}
+          isOnline={userProfile.is_online}
+        />
 
         {/* ═══ Etkileşim Butonları ═══ */}
         {!isOwnProfile && (
@@ -457,16 +436,21 @@ export default function UserProfileScreen() {
           </View>
         )}
 
-        {/* ═══ Tier Bilgi Kartı ═══ */}
+        {/* ═══ Tier Bilgi Kartı — diagonal premium ═══ */}
         <View style={s.tierCard}>
           <LinearGradient
-            colors={[tierDef.color + '18', 'transparent']}
+            colors={['#4a5668', '#37414f', '#232a35']}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFillObject}
+          />
+          <LinearGradient
+            colors={[tierDef.color + '28', tierDef.color + '08', 'transparent']}
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
             style={StyleSheet.absoluteFillObject}
           />
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 }}>
             <LinearGradient colors={tierDef.gradient as [string, string]} style={s.tierCardIcon}>
-              <Ionicons name={tierDef.icon as any} size={16} color="#fff" />
+              <Ionicons name={tierDef.icon as any} size={16} color="#fff" style={iconShadowInline} />
             </LinearGradient>
             <View style={{ flex: 1 }}>
               <Text style={[s.tierCardTitle, { color: tierDef.color }]}>{tierDef.label} Üye</Text>
@@ -510,42 +494,34 @@ export default function UserProfileScreen() {
           </View>
         )}
 
-        {/* ═══ SP Gönder Butonu ═══ */}
+        {/* ═══ SP Gönder Butonu — premium bottom sheet açar ═══ */}
         {!isOwnProfile && !isBlocked && firebaseUser && (
           <Pressable
             style={s.donateCard}
-            onPress={() => {
-              setCAlert({
-                visible: true,
-                title: '💎 SP Gönder',
-                message: `${userProfile.display_name || 'Bu kullanıcı'} adlı kişiye kaç SP göndermek istiyorsun?\n\nBakiyen: ${currentUserProfile?.system_points || 0} SP`,
-                type: 'info',
-                buttons: [
-                  { text: '10 SP', onPress: () => handleDonate(10) },
-                  { text: '50 SP', onPress: () => handleDonate(50) },
-                  { text: '100 SP', onPress: () => handleDonate(100) },
-                  { text: 'Vazgeç', style: 'cancel' },
-                ],
-              });
-            }}
+            onPress={() => setShowSPSheet(true)}
           >
-            <LinearGradient colors={['#F59E0B', '#EF4444']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.donateGradient}>
-              <Ionicons name="gift-outline" size={18} color="#FFF" />
+            <LinearGradient colors={['#FFE082', '#FBBF24', '#D97706']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.donateGradient}>
+              <Ionicons name="diamond" size={16} color="#FFF" style={iconShadowInline} />
               <Text style={s.donateText}>SP Gönder</Text>
             </LinearGradient>
           </Pressable>
         )}
 
-        {/* ═══ Rapor / Engelle — inline butonlar ═══ */}
+        {/* ═══ Rapor / Engelle — diagonal gradient kart ═══ */}
         {!isOwnProfile && firebaseUser && (
           <View style={s.actionRow}>
+            <LinearGradient
+              colors={['#4a5668', '#37414f', '#232a35']}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+              style={StyleSheet.absoluteFillObject}
+            />
             <Pressable style={s.actionBtn} onPress={() => setShowReportModal(true)}>
-              <Ionicons name="flag-outline" size={16} color="#94A3B8" />
+              <Ionicons name="flag-outline" size={16} color="#94A3B8" style={iconShadowInline} />
               <Text style={s.actionBtnText}>Rapor Et</Text>
             </Pressable>
-            <View style={{ width: 1, height: 20, backgroundColor: 'rgba(255,255,255,0.06)' }} />
+            <View style={{ width: 1, height: 20, backgroundColor: 'rgba(255,255,255,0.08)' }} />
             <Pressable style={s.actionBtn} onPress={handleBlock}>
-              <Ionicons name={isUserBlocked ? 'checkmark-circle' : 'ban'} size={16} color={isUserBlocked ? '#22C55E' : '#EF4444'} />
+              <Ionicons name={isUserBlocked ? 'checkmark-circle' : 'ban'} size={16} color={isUserBlocked ? '#22C55E' : '#EF4444'} style={iconShadowInline} />
               <Text style={[s.actionBtnText, { color: isUserBlocked ? '#22C55E' : '#EF4444' }]}>{isUserBlocked ? 'Engeli Kaldır' : 'Engelle'}</Text>
             </Pressable>
           </View>
@@ -577,6 +553,18 @@ export default function UserProfileScreen() {
           isOwnProfile={isOwnProfile}
         />
       )}
+
+      {/* ★ SP Donate Sheet — premium bottom sheet (slider + preset) */}
+      {firebaseUser && id && userProfile && (
+        <SPDonateSheet
+          visible={showSPSheet}
+          onClose={() => setShowSPSheet(false)}
+          senderId={firebaseUser.uid}
+          recipientId={id}
+          recipientName={userProfile.display_name || 'Kullanıcı'}
+        />
+      )}
+
       <PremiumAlert {...cAlert} onDismiss={() => setCAlert(prev => ({ ...prev, visible: false }))} />
     </View>
     </AppBackground>
@@ -587,8 +575,40 @@ export default function UserProfileScreen() {
 const _cardShadow = Shadows.card;
 const _textGlow = Shadows.text;
 
+// ★ Inline icon shadow (tabs/profile ile uyumlu)
+const iconShadowInline = {
+  textShadowColor: 'rgba(0,0,0,0.5)',
+  textShadowOffset: { width: 0, height: 2 },
+  textShadowRadius: 4,
+} as const;
+
+// ★ Üyelik süresi formatter — tabs/profile ile aynı
+function formatMemberSince(iso: string): string {
+  try {
+    const now = new Date();
+    const then = new Date(iso);
+    const days = Math.floor((now.getTime() - then.getTime()) / 86400000);
+    if (days < 1) return 'Yeni üye';
+    if (days < 30) return `${days} gündür`;
+    const months = Math.floor(days / 30);
+    if (months < 12) return `${months} aydır`;
+    return `${Math.floor(months / 12)} yıldır`;
+  } catch { return ''; }
+}
+
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: 'transparent' },
+
+  // ★ Engellenen kullanıcı banner'ı
+  blockedBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    marginHorizontal: 16, marginTop: 8, marginBottom: 4,
+    paddingHorizontal: 14, paddingVertical: 10,
+    backgroundColor: 'rgba(239,68,68,0.12)',
+    borderWidth: 1, borderColor: 'rgba(239,68,68,0.28)',
+    borderRadius: 12,
+  },
+  blockedBannerText: { flex: 1, fontSize: 12, fontWeight: '600', color: '#FCA5A5', lineHeight: 16 },
 
   // Header
   header: {
@@ -611,14 +631,28 @@ const s = StyleSheet.create({
   card: {
     marginHorizontal: 16, marginBottom: 10,
     borderRadius: 16, overflow: 'hidden',
-    backgroundColor: '#414e5f',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1, borderColor: Colors.cardBorder,
     ..._cardShadow,
   },
   cardGlow: {
     position: 'absolute', top: 0, left: 0, right: 0, height: 80,
     borderTopLeftRadius: 16, borderTopRightRadius: 16,
   },
+  badgeRow: {
+    flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 5,
+    marginTop: 5,
+  },
+  boostBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    backgroundColor: 'rgba(244,114,182,0.15)',
+    paddingHorizontal: 7, paddingVertical: 2.5, borderRadius: 8,
+    borderWidth: 1, borderColor: 'rgba(244,114,182,0.3)',
+  },
+  boostText: {
+    fontSize: 9, fontWeight: '900', color: '#F472B6', letterSpacing: 0.6,
+    textShadowColor: 'rgba(244,114,182,0.5)', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 4,
+  },
+  memberSince: { fontSize: 10, color: 'rgba(148,163,184,0.7)', fontWeight: '500' },
   identityRow: {
     flexDirection: 'row', alignItems: 'flex-start', gap: 12,
     paddingHorizontal: 16, paddingTop: 18, paddingBottom: 14,
@@ -640,9 +674,8 @@ const s = StyleSheet.create({
   username: { fontSize: 11, color: '#94A3B8', marginTop: 1, ..._textGlow },
   titleBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 3,
-    alignSelf: 'flex-start',
     paddingHorizontal: 7, paddingVertical: 2.5,
-    borderRadius: 8, marginTop: 3,
+    borderRadius: 8,
   },
   titleText: { fontSize: 10, fontWeight: '700' },
   bio: { fontSize: 12, color: '#94A3B8', marginTop: 4, lineHeight: 17, ..._textGlow },
@@ -772,8 +805,7 @@ const s = StyleSheet.create({
   tierCard: {
     marginHorizontal: 16, marginBottom: 10,
     padding: 14, borderRadius: 16,
-    backgroundColor: '#414e5f',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1, borderColor: Colors.cardBorder,
     overflow: 'hidden' as const,
     ..._cardShadow,
   },
@@ -788,25 +820,31 @@ const s = StyleSheet.create({
     fontSize: 10, color: '#94A3B8', marginTop: 1,
   },
 
-  // Donate card
+  // Donate card — altın premium
   donateCard: {
     marginHorizontal: 16, marginBottom: 10,
     borderRadius: 14, overflow: 'hidden' as const,
-    ..._cardShadow,
+    borderWidth: 1, borderColor: 'rgba(255,224,130,0.4)',
+    shadowColor: '#FBBF24', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35, shadowRadius: 10, elevation: 6,
   },
   donateGradient: {
     flexDirection: 'row' as const, alignItems: 'center' as const, justifyContent: 'center' as const,
     gap: 8, paddingVertical: 14,
   },
-  donateText: { fontSize: 15, fontWeight: '700' as const, color: '#FFF', ..._textGlow },
+  donateText: {
+    fontSize: 15, fontWeight: '900' as const, color: '#FFF', letterSpacing: 0.3,
+    textShadowColor: 'rgba(0,0,0,0.45)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
+  },
 
-  // Action row (report / block)
+  // Action row (report / block) — diagonal gradient kart
   actionRow: {
     flexDirection: 'row' as const, alignItems: 'center' as const, justifyContent: 'center' as const,
     marginHorizontal: 16, marginBottom: 10,
     paddingVertical: 10, borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.03)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
+    overflow: 'hidden' as const,
+    borderWidth: 1, borderColor: Colors.cardBorder,
+    ..._cardShadow,
   },
   actionBtn: {
     flex: 1, flexDirection: 'row' as const, alignItems: 'center' as const, justifyContent: 'center' as const,

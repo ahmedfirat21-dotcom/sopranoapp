@@ -68,6 +68,7 @@ import { useMicMeter } from '../../hooks/useMicMeter';
 import { liveKitService } from '../../services/livekit';
 import { isSystemRoom, getSystemRooms } from '../../services/showcaseRooms';
 import RoomSettingsSheet, { type MicMode, type CameraFacing } from '../../components/RoomSettingsSheet';
+import { PasswordPromptSheet, AccessRequestSheet, AccessGate } from '../../components/room/RoomAccessPrompts';
 import PremiumAlert, { type AlertButton, type AlertType } from '../../components/PremiumAlert';
 import { EmojiReactionBar, FloatingReactionsView, type FloatingReactionsRef } from '../../components/EmojiReactions';
 
@@ -730,10 +731,14 @@ export default function RoomScreen() {
 
   // ★ Şifre Modal — closed (şifreli) odalar için
   const [showPasswordModal, setShowPasswordModal] = useState(false);
-  const [passwordInput, setPasswordInput] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const [pendingRoomData, setPendingRoomData] = useState<{ room: Room; participants: RoomParticipant[] } | null>(null);
   const [accessPending, setAccessPending] = useState(false);
+  // ★ Davetli oda erişim isteği bottom-sheet (realtime onay/red)
+  const [showAccessRequest, setShowAccessRequest] = useState(false);
+  // ★ 2026-04-18: Access gate — onaylanmadan oda içi render edilmez
+  // null: henüz bilinmiyor (loading), true: erişim tam, false: engellendi (sheet/alert aktif)
+  const [accessGranted, setAccessGranted] = useState<boolean | null>(null);
   // ★ Kullanıcıların takip durumu (oda içi ProfileCard için)
   const [userFollowStatus, setUserFollowStatus] = useState<Record<string, 'pending' | 'accepted' | 'blocked' | null>>({});
 
@@ -871,7 +876,7 @@ export default function RoomScreen() {
   // ★ SEC-DOUBLE-CHARGE FIX: Giriş ücreti SADECE bakiye kontrolü yapar — SP harcama backend'de (RoomService.join)
   // ÖNCEKİ BUG: Bu fonksiyon GamificationService.spend() çağırıyordu VE backend de ayrıca SP düşüyordu → 2x tahsilat
   const processEntryFee = useCallback(async (roomData: Room, userId: string): Promise<boolean> => {
-    const fee = (roomData.room_settings as any)?.entry_fee_sp || 0;
+    const fee = roomData.room_settings?.entry_fee_sp || 0;
     const isOwner = roomData.host_id === userId;
     if (fee <= 0 || isOwner) return true; // Ücret yok veya owner — devam
     try {
@@ -902,6 +907,9 @@ export default function RoomScreen() {
 
   // ★ ARCH-1 FIX: Broadcast kanalları hook'a taşındı (~200 satır kaldırıldı)
   const roomHostRef = useRef<string | null>(null);
+  // ★ B6 FIX: firebaseUser ref — uzun ömürlü subscription callback'lerinde stale closure önleme
+  const firebaseUserRef = useRef(firebaseUser);
+  useEffect(() => { firebaseUserRef.current = firebaseUser; }, [firebaseUser]);
   // ★ BUG-1 FIX: LiveKit ref — useRoomBroadcast callback'leri güncel lk kullanır (stale closure önleme)
   const lkRef = useRef<any>({ isMicrophoneEnabled: false, toggleMic: async () => {}, enableMic: async () => {}, disableMic: async () => {} });
   // ★ Bağış bildirimi ref
@@ -1040,7 +1048,7 @@ export default function RoomScreen() {
       if (!roomData) { setLoading(false); return; }
       setRoom(roomData); setParticipants(p); participantsRef.current = new Set(p.map(x => x.user_id)); setLoading(false);
       // ★ Speaking mode — room_settings'ten oku (oda oluşturma ayarı yansısın)
-      const savedMode = (roomData.room_settings as any)?.speaking_mode;
+      const savedMode = roomData.room_settings?.speaking_mode;
       if (savedMode && ['free_for_all', 'permission_only', 'selected_only'].includes(savedMode)) {
         setSpeakingMode(savedMode);
       }
@@ -1062,11 +1070,21 @@ export default function RoomScreen() {
       const isHost = roomData.host_id === firebaseUser.uid;
       const isAdmin = profile?.is_admin;
 
-      if (!existing && profile) {
+      // ★ 2026-04-18 FIX: Zombie participant bypass — existing row varsa bile
+      // şifreli/davetli/ban/kilitli odalarda re-verify gerekiyor. Owner/admin/
+      // sahneye yükseltilmiş roller (owner/moderator/speaker) tekrar kontrol edilmez.
+      const trustedExistingRole = existing && ['owner', 'moderator', 'speaker'].includes(existing.role);
+
+      // ★ 2026-04-18: Host/admin/trusted-role → access direkt granted (UI render edilir)
+      if (isHost || isAdmin || trustedExistingRole) {
+        setAccessGranted(true);
+      }
+
+      if ((!existing || !trustedExistingRole) && profile) {
         // Sistem odalarında DB join yapma — lokal katılımcı zaten eklendi
         if (isSystemRoom(id as string)) {
           // Sistem odasında sadece hoş geldin mesajı göster
-          // Hoş geldin bilgisi gereksiz — kullanıcı zaten odada
+          setAccessGranted(true);
           return;
         }
         // ★ ODA GİRİŞ KONTROLÜ — RoomAccessService.checkAccess() ile merkezi kontrol
@@ -1097,24 +1115,19 @@ export default function RoomScreen() {
           );
 
           if (!accessResult.allowed) {
-            // ★ password_required → Şifre modal göster (kapatmadıkça giremesin)
+            // ★ Access denied — oda içi gizlenir (AccessGate overlay render edilir)
+            setAccessGranted(false);
+            // ★ password_required → Şifre bottom-sheet göster (kapatmadıkça giremesin)
             if (accessResult.action === 'password_required') {
               setPendingRoomData({ room: roomData, participants: p });
-              setPasswordInput('');
               setPasswordError('');
               setShowPasswordModal(true);
               return;
             }
-            // ★ request_sent → Erişim isteği gönderildi (davetli oda)
+            // ★ request_sent → Davetli oda erişim isteği bottom-sheet (realtime onay/red)
             if (accessResult.action === 'request_sent') {
-              setAlertConfig({
-                visible: true,
-                title: '📨 İstek Gönderildi',
-                message: 'Katılma isteğiniz oda yöneticisine iletildi. Onay bekleniyor...',
-                type: 'info',
-                icon: 'mail',
-                buttons: [{ text: 'Tamam', onPress: () => safeGoBack(router) }],
-              });
+              setPendingRoomData({ room: roomData, participants: p });
+              setShowAccessRequest(true);
               return;
             }
 
@@ -1122,7 +1135,7 @@ export default function RoomScreen() {
             const ACTION_ALERTS: Record<string, { title: string; icon: string; type: 'error' | 'warning' }> = {
               banned: { title: '⛔ Erişim Engellendi', icon: 'ban', type: 'error' },
               room_locked: { title: '🔒 Oda Kilitli', icon: 'lock-closed', type: 'warning' },
-              followers_only: { title: '👥 Takipçilere Özel', icon: 'people', type: 'warning' },
+              followers_only: { title: '👥 Arkadaşlara Özel', icon: 'people', type: 'warning' },
               age_restricted: { title: '🔞 Yaş Sınırı', icon: 'warning-outline', type: 'warning' },
               language_restricted: { title: '🌐 Dil Filtresi', icon: 'globe-outline', type: 'warning' },
               room_full: { title: '🚫 Oda Dolu', icon: 'people', type: 'warning' },
@@ -1141,7 +1154,7 @@ export default function RoomScreen() {
 
           // ★ DRY: Merkezi giriş ücreti kontrolü
           const feeOk = await processEntryFee(roomData, firebaseUser.uid);
-          if (!feeOk) return;
+          if (!feeOk) { setAccessGranted(false); return; }
         }
         // Açık oda veya host/admin — direkt giriş
         const isOriginalHost = roomData.room_settings?.original_host_id === firebaseUser.uid;
@@ -1157,9 +1170,14 @@ export default function RoomScreen() {
             joinRole = 'spectator';
           }
         }
+        // ★ 2026-04-18 FIX: setAccessGranted(true) SADECE join DB insert başarılı
+        // olduktan sonra. LiveKit token edge function participant row'u kontrol
+        // ediyor (v31); accessGranted→useLiveKit tetiklenirse ve row yoksa 403
+        // "Ses sunucusuna bağlanılamadı" hatası çıkıyordu.
         RoomService.join(id, firebaseUser.uid, joinRole).then(() => {
+          setAccessGranted(true); // ★ DB'de participant row var artık — LiveKit token alınabilir
           // ★ K3 FIX: SP Toast timing — backend'de SP tahsilatı (eğer varsa) başarılı olduktan SONRA toast gösterilir
-          const fee = (roomData.room_settings as any)?.entry_fee_sp || 0;
+          const fee = roomData.room_settings?.entry_fee_sp || 0;
           if (fee > 0 && joinRole !== 'owner') {
              spToastRef.current?.show(-fee, 'Giriş Ücreti');
           }
@@ -1200,6 +1218,8 @@ export default function RoomScreen() {
           }
           // ★ Kurallar artık header'da gösteriliyor — chat'e enjekte edilmez
         }).catch((err: any) => {
+          // ★ Join DB insert fail olursa access'i geri al — LiveKit bağlantı denemesin
+          setAccessGranted(false);
           // ★ BUG FIX: Ban/kilit/erişim hatalarını kullanıcıya göster
           const msg = err?.message || 'Bu odaya katılınamadı.';
           setAlertConfig({
@@ -1312,16 +1332,20 @@ export default function RoomScreen() {
         return;
       }
 
-      // BUG-7 FIX: roomHostRef kullan (stale closure önleme)
-      const isHost = roomHostRef.current === firebaseUser?.uid;
+      // ★ B6/BUG-7 FIX: firebaseUserRef + roomHostRef — stale closure önleme
+      const currentUid = firebaseUserRef.current?.uid;
+      if (!currentUid) {
+        liveKitService.disconnect().catch(() => {});
+        return;
+      }
+      const isHost = roomHostRef.current === currentUid;
       if (isHost) {
         // BUG-RD2 FIX: Host çıkışında transferHost çağır — oda sahipsiz kalmasın
-        RoomService.transferHost(id as string, firebaseUser!.uid).catch(() => {
-          // transferHost başarısız olursa en azından leave yap
-          RoomService.leave(id as string, firebaseUser!.uid).catch(() => {});
+        RoomService.transferHost(id as string, currentUid).catch(() => {
+          RoomService.leave(id as string, currentUid).catch(() => {});
         });
       } else {
-        RoomService.leave(id as string, firebaseUser!.uid).catch(() => {});
+        RoomService.leave(id as string, currentUid).catch(() => {});
       }
       // BUG-17 FIX: LiveKit bağlantısını da kes
       liveKitService.disconnect().catch(() => {});
@@ -1937,6 +1961,89 @@ export default function RoomScreen() {
     return 'listener';
   }, [amIHost, amIModerator, participants, firebaseUser?.uid]);
 
+  // ★ v32 Caretaker modu — owner/mod yokken listener sahneye kendi çıkabilir (süreli)
+  const isCaretakerMode = useMemo(() => {
+    const hasAuthority = participants.some(p =>
+      (p.role === 'owner' || p.role === 'moderator') && !(p as any).is_ghost
+    );
+    return !hasAuthority;
+  }, [participants]);
+
+  // Sahnedeki slot sayısı (caretaker buton disable kararı için)
+  const stageLimits = useMemo(() => {
+    const tier = migrateLegacyTier((room as any)?.owner_tier || room?.host?.subscription_tier || 'Free');
+    const limits = getRoomLimits(tier);
+    const current = participants.filter(p => ['owner', 'moderator', 'speaker'].includes(p.role)).length;
+    return { current, max: limits.maxSpeakers };
+  }, [participants, room]);
+
+  // Kendi participant kaydım — cooldown kontrol için stage_expires_at kullanılır
+  const myParticipant = useMemo(
+    () => participants.find(p => p.user_id === firebaseUser?.uid),
+    [participants, firebaseUser?.uid]
+  );
+
+  // ★ v32 Caretaker timer — kendi sahnemden otomatik in'erim
+  // Owner/mod gelince trigger zaten stage_expires_at'i NULL yapar, o zaman bu effect
+  // unmount olur (myStageExpiresAt değişir).
+  const myStageExpiresAt = (myParticipant as any)?.stage_expires_at as string | undefined;
+  useEffect(() => {
+    if (!myStageExpiresAt || myParticipant?.role !== 'speaker') return;
+    const msUntilExpire = new Date(myStageExpiresAt).getTime() - Date.now();
+    if (msUntilExpire <= 0) return;
+
+    // Son 30 saniye uyarısı
+    const warnMs = msUntilExpire - 30_000;
+    const warnTimer = warnMs > 0 ? setTimeout(() => {
+      showToast({ title: '⏳ 30 saniye kaldı', message: 'Sahne süren bitiyor', type: 'warning' });
+    }, warnMs) : null;
+
+    // Süre bittiğinde server cleanup çağır; realtime row update ile rol 'listener'a geçer
+    const expireTimer = setTimeout(() => {
+      RoomService.releaseExpiredCaretakers().catch(() => {});
+      showToast({ title: '🎧 Sahneden İndin', message: 'Sahne süren doldu — 60sn sonra tekrar çıkabilirsin', type: 'info' });
+      // Local optimistic
+      setParticipants(prev => prev.map(p =>
+        p.user_id === firebaseUser?.uid
+          ? { ...p, role: 'listener' as const, is_muted: false }
+          : p
+      ));
+    }, msUntilExpire);
+
+    return () => {
+      if (warnTimer) clearTimeout(warnTimer);
+      clearTimeout(expireTimer);
+    };
+  }, [myStageExpiresAt, myParticipant?.role, firebaseUser?.uid]);
+
+  // Caretaker claim handler — 5 dk sahne, 60sn cooldown
+  const handleClaimStage = useCallback(async () => {
+    if (!firebaseUser?.uid || !id) return;
+    try {
+      const result = await RoomService.claimStageSeat(id as string, firebaseUser.uid);
+      showToast({
+        title: '🎙️ Sahnedesiniz',
+        message: `${Math.floor(result.duration_sec / 60)} dakika süreyle konuşabilirsin`,
+        type: 'success',
+      });
+      // Local optimistic — realtime row update zaten gelecek ama hızlı olsun
+      setParticipants(prev => prev.map(p =>
+        p.user_id === firebaseUser.uid
+          ? { ...p, role: 'speaker' as const, stage_expires_at: result.expires_at, is_muted: false }
+          : p
+      ));
+    } catch (err: any) {
+      const msg = err?.message || 'Sahneye çıkılamadı';
+      const isCooldown = /bekleme|cooldown|\d+\s*saniye/i.test(msg);
+      const isFull = /dolu/i.test(msg);
+      showToast({
+        title: isFull ? '🚫 Sahne Dolu' : isCooldown ? '⏳ Bekle' : 'Hata',
+        message: msg,
+        type: 'warning',
+      });
+    }
+  }, [firebaseUser?.uid, id, setParticipants]);
+
   // ★ Owner tier'ı — oda yönetim özelliklerinin tier kilidini belirler
   const ownerTier = useMemo(() => {
     // ★ Admin (GodMaster) her zaman Pro gibi davranır
@@ -2022,6 +2129,35 @@ export default function RoomScreen() {
     });
   }, [room, firebaseUser, participants]);
 
+  // ★ 2026-04-19 Pro: Tümünü Aç — mute_all'un tersi
+  const handleUnmuteAll = useCallback(async () => {
+    if (!room || !firebaseUser) return;
+    setAlertConfig({
+      visible: true, title: '🔊 Tümünü Aç', message: 'Sahnedeki tüm konuşmacıların mikrofonları tekrar açılacak.',
+      type: 'info', icon: 'volume-high',
+      buttons: [
+        { text: 'İptal', style: 'cancel' },
+        { text: 'Aç', onPress: async () => {
+          const stagePeople = participants.filter(p => (p.role === 'speaker' || p.role === 'moderator') && p.user_id !== firebaseUser.uid);
+          await Promise.all(stagePeople.map(async (p) => {
+            try {
+              await supabase.from('room_participants').update({ is_muted: false }).eq('room_id', room.id).eq('user_id', p.user_id);
+              // ★ 2026-04-19: room_mutes temizle — moderatörün önceden mute ettiği
+              // kullanıcılar için pending mute kayıtları kalmasın (tutarsızlık önleme)
+              await ModerationService.unmuteInRoom(room.id, p.user_id).catch(() => {});
+            } catch {}
+          }));
+          setParticipants(prev => prev.map(p =>
+            (p.role === 'speaker' || p.role === 'moderator') && p.user_id !== firebaseUser.uid
+              ? { ...p, is_muted: false } : p
+          ));
+          modChannelRef.current?.send({ type: 'broadcast', event: 'mod_action', payload: { action: 'unmute_all' } });
+          showToast({ title: '🔊 Tümü Açıldı', message: `${stagePeople.length} konuşmacı serbest bırakıldı`, type: 'success' });
+        }},
+      ],
+    });
+  }, [room, firebaseUser, participants]);
+
   // ★ Boş sahne teklifi — inline tooltip + ghost koltuk yaklaşımı (modal yerine)
   const [showSeatTooltip, setShowSeatTooltip] = React.useState(false);
   useEffect(() => {
@@ -2042,6 +2178,16 @@ export default function RoomScreen() {
     const isHost = room.host_id === firebaseUser.uid;
     const myPart = participants.find(p => p.user_id === firebaseUser.uid);
     const isMod = myPart?.role === 'moderator';
+
+    // ★ v32 Caretaker modu — owner+mod yoksa direkt sahneye (5 dk süreli)
+    if (isCaretakerMode && !isHost && !isMod) {
+      if (stageLimits.current >= stageLimits.max) {
+        showToast({ title: '🚫 Sahne Dolu', message: `${stageLimits.current}/${stageLimits.max} dolu`, type: 'warning' });
+        return;
+      }
+      await handleClaimStage();
+      return;
+    }
 
     if (!isHost && !isMod) {
       // ★ K5 FIX: Speaking mode kontrolü — sadece normal kullanıcılar için
@@ -2416,13 +2562,15 @@ export default function RoomScreen() {
         </View>
       )}
 
-      <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 180 }}>
+      <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 200, paddingTop: 8 }}>
         <SpeakerSection stageUsers={stageUsers} getMicStatus={getMicStatus}
           onSelectUser={(u) => setSelectedUser(u)}
           onSelfDemote={handleSelfDemote}
           currentUserId={firebaseUser?.uid} VideoView={LKVideoView}
           onGhostSeatPress={handleGhostSeatPress} showSeatTooltip={showSeatTooltip}
           avatarFlashes={avatarFlashes} onFlashDone={clearAvatarFlash} />
+        {/* ★ Sahne ↔ Listener arası nefes — 24px */}
+        <View style={{ height: 24 }} />
         <ListenerGrid listeners={listenerUsers} onSelectUser={(u) => setSelectedUser(u)} selectedUserId={selectedUser?.user_id} onShowAllUsers={() => openOverlay(() => setShowAudienceDrawer(true))} maxListeners={getRoomLimits(ownerTier as any).maxListeners} spectatorCount={spectatorUsers.length} roomOwnerId={room?.host_id}
           avatarFlashes={avatarFlashes} onFlashDone={clearAvatarFlash} micRequestUserIds={micRequests} />
       </ScrollView>
@@ -2491,7 +2639,7 @@ export default function RoomScreen() {
           chatInput={chatInput} onChatInputChange={setChatInput} onChatSend={handleSendChat} chatInputRef={chatInputRef}
           showCamera={(amIHost || amIModerator || stageUsers.some(u => u.user_id === firebaseUser?.uid)) && getRoomLimits(((room as any)?.owner_tier || 'Free') as any).maxCameras > 0}
           isHandRaised={myMicRequested} handBadgeCount={micRequests.length} canModerate={canModerate}
-          isForcedMuted={!!participants.find(p => p.user_id === firebaseUser?.uid)?.is_muted}
+          isForcedMuted={!amIHost && !!participants.find(p => p.user_id === firebaseUser?.uid)?.is_muted}
           isChatInputDisabled={!!participants.find(p => p.user_id === firebaseUser?.uid)?.is_chat_muted}
           isListener={!stageUsers.some(u => u.user_id === firebaseUser?.uid)}
           isOwnerInListenerMode={!stageUsers.some(u => u.user_id === firebaseUser?.uid) && amIHost}
@@ -2698,18 +2846,8 @@ export default function RoomScreen() {
 
 
 
-      {/* ★ RoomSettingsSheet — SADECE cihaz ayarları (mic, kamera, hoparlör)
-           Oda yönetim ayarları artık PlusMenu'den yönetiliyor */}
-      <RoomSettingsSheet visible={showSettings} onClose={() => setShowSettings(false)}
-        micMode={micMode} onMicModeChange={handleMicModeChange}
-        noiseCancellation={noiseCancellation} onNoiseCancellationChange={handleNoiseCancellation}
-        cameraFacing={cameraFacing} onCameraFacingChange={(facing) => { setCameraFacing(facing); lk.flipCamera().catch(() => {}); }}
-        useSpeaker={useSpeaker} onSpeakerChange={handleSpeakerToggle}
-        isMicEnabled={lk.isMicrophoneEnabled || false} isCameraEnabled={lk.isCameraEnabled || false}
-        onLeaveRoom={handleSettingsLeave}
-        canDeleteRoom={false} isHost={amIHost}
-        ownerTier={ownerTier}
-      />
+      {/* ★ 2026-04-18: RoomSettingsSheet kaldırıldı. Cihaz ayarları artık PlusMenu
+           "Konuşma & Ses" accordion'u içinde inline. Ayrı modal açılmıyor. */}
 
       <PremiumAlert visible={alertConfig.visible} title={alertConfig.title} message={alertConfig.message} type={alertConfig.type} buttons={alertConfig.buttons} icon={alertConfig.icon} onDismiss={() => setAlertConfig(prev => ({ ...prev, visible: false }))} />
 
@@ -2718,6 +2856,15 @@ export default function RoomScreen() {
       <PlusMenu visible={showPlusMenu} onClose={() => setShowPlusMenu(false)} bottomInset={Math.max(insets.bottom, 14)}
         onInviteFriends={() => openOverlay(() => setShowInviteFriends(true))}
         onShareLink={() => { closeAllOverlays(); handleShareRoom(); }}
+        onLeaveRoom={handleSettingsLeave}
+        deviceConfig={{
+          micMode,
+          onMicModeChange: handleMicModeChange,
+          noiseCancellation,
+          onNoiseCancellationChange: handleNoiseCancellation,
+          useSpeaker,
+          onSpeakerChange: handleSpeakerToggle,
+        }}
         onModeration={() => openOverlay(() => setShowAccessPanel(true))}
         onReportRoom={() => { closeAllOverlays();
           if (!firebaseUser?.uid || !room?.id) return;
@@ -2739,6 +2886,7 @@ export default function RoomScreen() {
         userRole={myCurrentRole}
         ownerTier={ownerTier}
         onMuteAll={handleMuteAll}
+        onUnmuteAll={handleUnmuteAll}
         onRoomStats={() => openOverlay(() => setShowRoomStats(true))}
         onDeleteRoom={() => { closeAllOverlays(); handleDeleteRoom(); }}
         onBoostRoom={() => { closeAllOverlays(); handleBoostRoom(); }}
@@ -2805,7 +2953,7 @@ export default function RoomScreen() {
               await RoomService.updateSettings(room.id, firebaseUser.uid, { room_settings: { followers_only: enabled } });
               setRoom(prev => prev ? { ...prev, room_settings: { ...(prev.room_settings || {}), followers_only: enabled } } : prev);
               modChannelRef.current?.send({ type: 'broadcast', event: 'settings_changed', payload: { room_settings: { followers_only: enabled } } });
-              showToast({ title: enabled ? 'Takipçilere Özel' : 'Herkese Açık', type: 'success' });
+              showToast({ title: enabled ? 'Arkadaşlara Özel' : 'Herkese Açık', type: 'success' });
             } catch { showToast({ title: 'Hata', type: 'error' }); }
           },
           donationsEnabled: (room?.room_settings as any)?.donations_enabled || false,
@@ -2956,6 +3104,8 @@ export default function RoomScreen() {
               const url = await StorageService.uploadFile('post-images', fileName, result.assets[0].uri);
               await RoomService.updateSettings(room.id, firebaseUser.uid, { room_settings: { room_image_url: url } });
               setRoom(prev => prev ? { ...prev, room_settings: { ...(prev.room_settings || {}), room_image_url: url } } as any : prev);
+              // ★ 2026-04-19: Broadcast — diğer client'lara arka plan değişimini yay
+              modChannelRef.current?.send({ type: 'broadcast', event: 'settings_changed', payload: { room_settings: { room_image_url: url } } });
               showToast({ title: '🖼 Arka Plan Güncellendi', type: 'success' });
             } catch (e: any) { showToast({ title: 'Hata', message: e.message || '', type: 'error' }); }
           },
@@ -2964,6 +3114,8 @@ export default function RoomScreen() {
             try {
               await RoomService.updateSettings(room.id, firebaseUser.uid, { room_settings: { room_image_url: null } });
               setRoom(prev => prev ? { ...prev, room_settings: { ...(prev.room_settings || {}), room_image_url: null } } as any : prev);
+              // ★ 2026-04-19: Broadcast — diğer client'lara kaldırıldığını yay
+              modChannelRef.current?.send({ type: 'broadcast', event: 'settings_changed', payload: { room_settings: { room_image_url: null } } });
               showToast({ title: 'Arka Plan Kaldırıldı', type: 'success' });
             } catch { showToast({ title: 'Hata', type: 'error' }); }
           },
@@ -2982,6 +3134,8 @@ export default function RoomScreen() {
               const url = await StorageService.uploadFile('post-images', fileName, result.assets[0].uri);
               await RoomService.updateSettings(room.id, firebaseUser.uid, { room_settings: { cover_image_url: url } });
               setRoom(prev => prev ? { ...prev, room_settings: { ...(prev.room_settings || {}), cover_image_url: url } } as any : prev);
+              // ★ 2026-04-19: Broadcast — diğer client'lara kapak görseli güncellemesini yay
+              modChannelRef.current?.send({ type: 'broadcast', event: 'settings_changed', payload: { room_settings: { cover_image_url: url } } });
               showToast({ title: '🖼 Kapak Görseli Güncellendi', type: 'success' });
             } catch (e: any) { showToast({ title: 'Hata', message: e.message || '', type: 'error' }); }
           },
@@ -2990,6 +3144,8 @@ export default function RoomScreen() {
             try {
               await RoomService.updateSettings(room.id, firebaseUser.uid, { room_settings: { cover_image_url: null } });
               setRoom(prev => prev ? { ...prev, room_settings: { ...(prev.room_settings || {}), cover_image_url: null } } as any : prev);
+              // ★ 2026-04-19: Broadcast — diğer client'lara kaldırıldığını yay
+              modChannelRef.current?.send({ type: 'broadcast', event: 'settings_changed', payload: { room_settings: { cover_image_url: null } } });
               showToast({ title: 'Kapak Görseli Kaldırıldı', type: 'success' });
             } catch { showToast({ title: 'Hata', type: 'error' }); }
           },
@@ -3031,6 +3187,7 @@ export default function RoomScreen() {
         <InviteFriendsModal
           visible={showInviteFriends}
           userId={firebaseUser.uid}
+          roomId={id as string}
           onClose={() => setShowInviteFriends(false)}
           onInvite={async (selectedUsers) => {
             // ★ INVITE-FIX: Broadcast yerine RoomAccessService.inviteUser() kullan
@@ -3058,99 +3215,105 @@ export default function RoomScreen() {
         />
       )}
 
-      {/* 🔒 Şifre Giriş Modalı — closed (şifreli) odalar için */}
-      {showPasswordModal && (
-        <View style={{ ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center', zIndex: 999 }}>
-          <View style={{ width: W * 0.85, backgroundColor: 'rgba(15,23,42,0.98)', borderRadius: 20, padding: 24, borderWidth: 1, borderColor: 'rgba(20,184,166,0.15)' }}>
-            {/* Header */}
-            <View style={{ alignItems: 'center', marginBottom: 20 }}>
-              <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: 'rgba(20,184,166,0.12)', justifyContent: 'center', alignItems: 'center', marginBottom: 12 }}>
-                <Ionicons name="lock-closed" size={26} color="#14B8A6" />
-              </View>
-              <Text style={{ fontSize: 18, fontWeight: '800', color: '#F1F5F9', marginBottom: 4 }}>Şifreli Oda</Text>
-              <Text style={{ fontSize: 12, color: '#94A3B8', textAlign: 'center' }}>Bu odaya girmek için şifre gerekiyor</Text>
-            </View>
-            {/* Şifre Input */}
-            <TextInput
-              style={{
-                backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 1,
-                borderColor: passwordError ? 'rgba(239,68,68,0.5)' : 'rgba(255,255,255,0.1)',
-                borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12,
-                fontSize: 16, color: '#F1F5F9', fontWeight: '600', textAlign: 'center',
-                letterSpacing: 2,
-              }}
-              placeholder="Şifreyi girin..."
-              placeholderTextColor="#475569"
-              value={passwordInput}
-              onChangeText={(t) => { setPasswordInput(t); setPasswordError(''); }}
-              secureTextEntry
-              autoFocus
-              maxLength={20}
-            />
-            {passwordError ? (
-              <Text style={{ color: '#EF4444', fontSize: 11, fontWeight: '600', textAlign: 'center', marginTop: 6 }}>{passwordError}</Text>
-            ) : null}
-            {/* Butonlar */}
-            <View style={{ flexDirection: 'row', gap: 10, marginTop: 18 }}>
-              <Pressable
-                style={{ flex: 1, paddingVertical: 12, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.06)', alignItems: 'center' }}
-                onPress={() => { setShowPasswordModal(false); setPendingRoomData(null); safeGoBack(router); }}
-              >
-                <Text style={{ fontSize: 13, fontWeight: '700', color: '#94A3B8' }}>Vazgeç</Text>
-              </Pressable>
-              <Pressable
-                style={{ flex: 1, paddingVertical: 12, borderRadius: 12, backgroundColor: accessPending ? 'rgba(20,184,166,0.3)' : '#14B8A6', alignItems: 'center' }}
-                disabled={accessPending || passwordInput.length < 1}
-                onPress={async () => {
-                  if (!pendingRoomData || !firebaseUser || !profile) return;
-                  setAccessPending(true);
-                  try {
-                    const result = await RoomAccessService.checkAccess(
-                      pendingRoomData.room,
-                      firebaseUser.uid,
-                      (profile?.subscription_tier || 'Free') as any,
-                      null, null,
-                      passwordInput.trim(),
-                    );
-                    if (result.allowed) {
-                      setShowPasswordModal(false);
-                      // ★ DRY: Merkezi giriş ücreti kontrolü
-                      const feeOk = await processEntryFee(pendingRoomData.room, firebaseUser.uid);
-                      if (!feeOk) { setPendingRoomData(null); return; }
-                      // Odaya katıl
-                      const isOriginalHost = pendingRoomData.room.room_settings?.original_host_id === firebaseUser.uid;
-                      let joinRole: 'owner' | 'listener' | 'spectator' = 'listener';
-                      if (isOriginalHost) joinRole = 'owner';
-                      RoomService.join(id as string, firebaseUser.uid, joinRole).then(() => {
-                        showToast({ title: '🎧 Odaya Katıldın!', message: 'Şifre doğrulandı — hoş geldin!', type: 'success' });
-                      }).catch((err: any) => {
-                        const msg = err?.message || 'Odaya katılınamadı.';
-                        setAlertConfig({
-                          visible: true,
-                          title: msg.includes('yasaklan') ? '⛔ Erişim Engellendi' : '⚠️ Giriş Hatası',
-                          message: msg,
-                          type: 'error',
-                          icon: msg.includes('yasaklan') ? 'ban' : 'alert-circle',
-                          buttons: [{ text: 'Geri Dön', onPress: () => safeGoBack(router) }],
-                        });
-                      });
-                      setPendingRoomData(null);
-                    } else {
-                      setPasswordError(result.reason || 'Yanlış şifre.');
-                    }
-                  } catch {
-                    setPasswordError('Bir hata oluştu.');
-                  } finally {
-                    setAccessPending(false);
-                  }
-                }}
-              >
-                <Text style={{ fontSize: 13, fontWeight: '700', color: '#FFF' }}>{accessPending ? 'Kontrol...' : 'Giriş'}</Text>
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      )}
+      {/* 🛡️ Access Gate — erişim onaylanmadan oda içeriği (speaker grid, chat, katılımcılar) gizli */}
+      <AccessGate
+        visible={accessGranted !== true}
+        roomName={room?.name || pendingRoomData?.room?.name}
+        hostName={room?.host?.display_name}
+        hostAvatarUrl={room?.host?.avatar_url || pendingRoomData?.room?.host?.avatar_url}
+        onCancel={() => safeGoBack(router)}
+      />
+
+      {/* 🔒 Şifreli Oda — aşağıdan yukarı bottom sheet */}
+      <PasswordPromptSheet
+        visible={showPasswordModal}
+        roomName={pendingRoomData?.room?.name || room?.name}
+        submitting={accessPending}
+        error={passwordError}
+        onDismiss={() => { setShowPasswordModal(false); setPendingRoomData(null); safeGoBack(router); }}
+        onSubmit={async (pw) => {
+          if (!pendingRoomData || !firebaseUser || !profile) return;
+          setAccessPending(true);
+          setPasswordError('');
+          try {
+            const result = await RoomAccessService.checkAccess(
+              pendingRoomData.room,
+              firebaseUser.uid,
+              (profile?.subscription_tier || 'Free') as any,
+              null, null,
+              pw,
+            );
+            if (result.allowed) {
+              setShowPasswordModal(false);
+              const feeOk = await processEntryFee(pendingRoomData.room, firebaseUser.uid);
+              if (!feeOk) { setPendingRoomData(null); return; }
+              const isOriginalHost = pendingRoomData.room.room_settings?.original_host_id === firebaseUser.uid;
+              const joinRole: 'owner' | 'listener' | 'spectator' = isOriginalHost ? 'owner' : 'listener';
+              // ★ Access granted join DB insert başarısından SONRA (LiveKit token için participant row gerek)
+              RoomService.join(id as string, firebaseUser.uid, joinRole).then(() => {
+                setAccessGranted(true);
+                showToast({ title: '🎧 Odaya Katıldın!', message: 'Şifre doğrulandı — hoş geldin!', type: 'success' });
+              }).catch((err: any) => {
+                const msg = err?.message || 'Odaya katılınamadı.';
+                setAlertConfig({
+                  visible: true,
+                  title: msg.includes('yasaklan') ? '⛔ Erişim Engellendi' : '⚠️ Giriş Hatası',
+                  message: msg, type: 'error',
+                  icon: msg.includes('yasaklan') ? 'ban' : 'alert-circle',
+                  buttons: [{ text: 'Geri Dön', onPress: () => safeGoBack(router) }],
+                });
+              });
+              setPendingRoomData(null);
+            } else {
+              setPasswordError(result.reason || 'Yanlış şifre.');
+            }
+          } catch {
+            setPasswordError('Bir hata oluştu. Tekrar deneyin.');
+          } finally {
+            setAccessPending(false);
+          }
+        }}
+      />
+
+      {/* 📨 Davetli Oda Erişim İsteği — aşağıdan yukarı bottom sheet + realtime */}
+      <AccessRequestSheet
+        visible={showAccessRequest}
+        roomId={pendingRoomData?.room?.id || (id as string) || null}
+        userId={firebaseUser?.uid || null}
+        roomName={pendingRoomData?.room?.name || room?.name}
+        onApproved={() => {
+          setShowAccessRequest(false);
+          if (!pendingRoomData || !firebaseUser) { safeGoBack(router); return; }
+          // Onaylandı → direkt join
+          (async () => {
+            const feeOk = await processEntryFee(pendingRoomData.room, firebaseUser.uid);
+            if (!feeOk) { setPendingRoomData(null); safeGoBack(router); return; }
+            const isOriginalHost = pendingRoomData.room.room_settings?.original_host_id === firebaseUser.uid;
+            const joinRole: 'owner' | 'listener' | 'spectator' = isOriginalHost ? 'owner' : 'listener';
+            // ★ Access granted join DB insert başarısından SONRA (LiveKit token için participant row gerek)
+            RoomService.join(id as string, firebaseUser.uid, joinRole).then(() => {
+              setAccessGranted(true);
+              showToast({ title: '🎧 Odaya Katıldın!', message: 'İsteğin onaylandı — hoş geldin!', type: 'success' });
+            }).catch(() => {
+              showToast({ title: 'Giriş Hatası', type: 'error' });
+              safeGoBack(router);
+            });
+            setPendingRoomData(null);
+          })();
+        }}
+        onRejected={(reason) => {
+          setShowAccessRequest(false);
+          setPendingRoomData(null);
+          showToast({ title: '❌ Reddedildi', message: reason || 'İstek reddedildi', type: 'warning' });
+          safeGoBack(router);
+        }}
+        onCancelled={() => {
+          setShowAccessRequest(false);
+          setPendingRoomData(null);
+          safeGoBack(router);
+        }}
+      />
+
 
       {/* 📊 Pro: Oda İstatistikleri Paneli */}
       <RoomStatsPanel

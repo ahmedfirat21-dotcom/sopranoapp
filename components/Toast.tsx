@@ -6,6 +6,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
+import { usePathname } from 'expo-router';
 
 export type ToastType = 'success' | 'error' | 'info' | 'warning' | 'upsell';
 
@@ -38,7 +40,12 @@ const TOAST_MAX_W = Math.min(SCREEN_W - 32, 420);
 export function Toast() {
   const [queue, setQueue] = useState<ToastMessage[]>([]);
   const [current, setCurrent] = useState<ToastMessage | null>(null);
-  const translateY = useRef(new Animated.Value(-120)).current;
+  const pathname = usePathname();
+  // ★ 2026-04-18: Oda içindeyken Toast alttan kayar (dinleyici grid altında,
+  // chat input'un hemen üstünde). Diğer sayfalarda üstten kayar — eskisi gibi.
+  const isInRoom = pathname?.startsWith('/room/');
+  const initialOffset = isInRoom ? 120 : -120;
+  const translateY = useRef(new Animated.Value(initialOffset)).current;
   const opacity = useRef(new Animated.Value(0)).current;
   const progress = useRef(new Animated.Value(0)).current;
   const insets = useSafeAreaInsets();
@@ -46,15 +53,16 @@ export function Toast() {
   const shownIdsRef = useRef(new Set<string>());
   const isAnimatingRef = useRef(false);
 
-  // ★ Swipe-to-dismiss
+  // ★ Swipe-to-dismiss — oda içinde aşağı, diğer yerde yukarı
   const panResponder = useRef(
     PanResponder.create({
-      onMoveShouldSetPanResponder: (_, gs) => Math.abs(gs.dy) > 8 && gs.dy < 0,
+      onMoveShouldSetPanResponder: (_, gs) => Math.abs(gs.dy) > 8,
       onPanResponderMove: (_, gs) => {
-        if (gs.dy < 0) translateY.setValue(gs.dy);
+        // Oda içinde: aşağı kaydır (gs.dy > 0), normalde: yukarı kaydır (gs.dy < 0)
+        if ((isInRoom && gs.dy > 0) || (!isInRoom && gs.dy < 0)) translateY.setValue(gs.dy);
       },
       onPanResponderRelease: (_, gs) => {
-        if (gs.dy < -40) {
+        if ((isInRoom && gs.dy > 40) || (!isInRoom && gs.dy < -40)) {
           dismiss();
         } else {
           Animated.spring(translateY, {
@@ -70,14 +78,15 @@ export function Toast() {
 
   const dismiss = useCallback(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
+    const exitValue = isInRoom ? 120 : -120;
     Animated.parallel([
-      Animated.timing(translateY, { toValue: -120, duration: 200, useNativeDriver: true }),
+      Animated.timing(translateY, { toValue: exitValue, duration: 200, useNativeDriver: true }),
       Animated.timing(opacity, { toValue: 0, duration: 150, useNativeDriver: true }),
     ]).start(() => {
       setCurrent(null);
       isAnimatingRef.current = false;
     });
-  }, []);
+  }, [isInRoom]);
 
   // Kuyruktan sonraki toast'u göster
   useEffect(() => {
@@ -87,8 +96,8 @@ export function Toast() {
     setQueue(q => q.slice(1));
     setCurrent(next);
 
-    // Reset
-    translateY.setValue(-120);
+    // Reset — oda içinde alttan, diğer yerde üstten
+    translateY.setValue(isInRoom ? 120 : -120);
     opacity.setValue(0);
     progress.setValue(0);
 
@@ -118,15 +127,16 @@ export function Toast() {
 
     // Otomatik gizle
     timerRef.current = setTimeout(() => {
+      const exitValue = isInRoom ? 120 : -120;
       Animated.parallel([
-        Animated.timing(translateY, { toValue: -120, duration: 250, useNativeDriver: true }),
+        Animated.timing(translateY, { toValue: exitValue, duration: 250, useNativeDriver: true }),
         Animated.timing(opacity, { toValue: 0, duration: 200, useNativeDriver: true }),
       ]).start(() => {
         setCurrent(null);
         isAnimatingRef.current = false;
       });
     }, duration);
-  }, [queue, current]);
+  }, [queue, current, isInRoom]);
 
   // Event listener
   useEffect(() => {
@@ -194,58 +204,81 @@ export function Toast() {
     outputRange: ['100%', '0%'],
   });
 
+  // ★ Konum: oda içinde chat input'un hemen üstü (kontrol barı + input ≈ 170px).
+  // Diğer sayfalarda ekranın üst kısmı — safe area'nın hemen altı.
+  const positionStyle = isInRoom
+    ? { bottom: Math.max(insets.bottom, 0) + 170 }
+    : { top: Math.max(insets.top, 12) + 8 };
+
   return (
     <Animated.View
       style={[
         styles.container,
-        { top: Math.max(insets.top, 12) + 8, transform: [{ translateY }], opacity },
+        positionStyle,
+        // ★ X-tarzı shadow — nötr siyah, yumuşak, minimal
+        {
+          transform: [{ translateY }],
+          opacity,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 6 },
+          shadowOpacity: 0.25,
+          shadowRadius: 16,
+          elevation: 10,
+        },
       ]}
       {...panResponder.panHandlers}
     >
-      <View style={[styles.toast, { borderColor: theme.border }]}>
-        <LinearGradient
-          colors={theme.gradient}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={StyleSheet.absoluteFillObject}
+      <View style={[
+        isInRoom ? styles.toastCompact : styles.toast,
+      ]}>
+        {/* ★ X/Twitter tarzı — koyu gri blur arkaplan, renk sadece ikonda.
+            Zemin nötr, aksiyona göre göze sokmuyor. */}
+        <BlurView
+          intensity={isInRoom ? 45 : 60}
+          tint="dark"
+          style={[StyleSheet.absoluteFillObject, { borderRadius: 100 }]}
         />
-        {/* Sol renkli çizgi */}
-        <View style={[styles.accentBar, { backgroundColor: theme.color }]} />
+        {/* Koyu cam tint — her temada aynı nötr görünüm */}
+        <View style={[StyleSheet.absoluteFillObject, {
+          backgroundColor: 'rgba(18,24,38,0.72)',
+          borderRadius: 100,
+          borderWidth: 0.5,
+          borderColor: 'rgba(255,255,255,0.06)',
+        }]} />
 
-        {/* İkon */}
-        <View style={[styles.iconWrap, { backgroundColor: `${theme.color}18` }]}>
-          <Ionicons name={theme.icon} size={20} color={theme.color} />
+        {/* İkon — tek renkli vurgu */}
+        <View style={[
+          isInRoom ? styles.iconWrapCompact : styles.iconWrap,
+          { backgroundColor: `${theme.color}20` },
+        ]}>
+          <Ionicons name={theme.icon} size={isInRoom ? 13 : 16} color={theme.color} />
         </View>
 
-        {/* İçerik */}
+        {/* İçerik — tek satır odak */}
         <View style={styles.textWrap}>
-          <Text style={styles.title} numberOfLines={1}>{current.title}</Text>
+          <Text style={[styles.title, isInRoom && styles.titleCompact]} numberOfLines={1}>{current.title}</Text>
           {current.message ? (
-            <Text style={styles.message} numberOfLines={2}>{current.message}</Text>
+            <Text style={[styles.message, isInRoom && styles.messageCompact]} numberOfLines={1}>{current.message}</Text>
           ) : null}
         </View>
 
         {/* Aksiyon butonu */}
         {current.action && (
           <Pressable
-            style={[styles.actionBtn, { backgroundColor: `${theme.color}20`, borderColor: `${theme.color}40` }]}
+            style={[styles.actionBtn, { backgroundColor: `${theme.color}20`, borderColor: 'transparent' }]}
             onPress={() => { dismiss(); current.action?.onPress(); }}
           >
             <Text style={[styles.actionText, { color: theme.color }]}>{current.action.label}</Text>
           </Pressable>
         )}
 
-        {/* Kapatma butonu */}
-        <Pressable style={styles.closeBtn} onPress={dismiss} hitSlop={8}>
-          <Ionicons name="close" size={14} color="rgba(255,255,255,0.4)" />
-        </Pressable>
-
-        {/* ★ Progress bar — kalan süre göstergesi */}
-        <Animated.View style={[styles.progressBar, { width: progressWidth, backgroundColor: theme.progressColor }]} />
+        {/* ★ Progress bar — alt ince çizgi, tema renginde */}
+        <Animated.View style={[styles.progressBar, { width: progressWidth, backgroundColor: theme.color, opacity: 0.5 }]} />
       </View>
     </Animated.View>
   );
 }
+
 
 const styles = StyleSheet.create({
   container: {
@@ -256,23 +289,28 @@ const styles = StyleSheet.create({
     elevation: 99999,
     alignItems: 'center',
   },
+  // ★ 2026-04-19 X-tarzı pill — nötr koyu, tek satır, minimal
   toast: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
+    gap: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    paddingRight: 16,
+    borderRadius: 100, // pill
+    backgroundColor: 'transparent',
+    overflow: 'hidden',
+  },
+  toastCompact: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    paddingVertical: 6,
     paddingHorizontal: 10,
-    paddingLeft: 0,
-    borderRadius: 14,
-    borderWidth: 0.5,
-    maxWidth: TOAST_MAX_W,
-    width: '100%',
-    backgroundColor: 'rgba(15,23,42,0.92)',
-    // Glassmorphism gölge
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.45,
-    shadowRadius: 16,
-    elevation: 20,
+    paddingRight: 14,
+    borderRadius: 100, // pill
+    maxWidth: Math.min(SCREEN_W - 80, 280),
+    backgroundColor: 'transparent',
     overflow: 'hidden',
   },
   accentBar: {
@@ -283,16 +321,22 @@ const styles = StyleSheet.create({
     marginLeft: 0,
   },
   iconWrap: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
+    width: 30,
+    height: 30,
+    borderRadius: 9,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 10,
+  },
+  // ★ Compact icon — oda içi (küçük)
+  iconWrapCompact: {
+    width: 22,
+    height: 22,
+    borderRadius: 7,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   textWrap: {
-    flex: 1,
-    marginRight: 4,
+    flexShrink: 1,
   },
   title: {
     fontSize: 13,
@@ -300,11 +344,18 @@ const styles = StyleSheet.create({
     color: '#F1F5F9',
     letterSpacing: 0.1,
   },
+  titleCompact: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
   message: {
     fontSize: 11,
-    color: 'rgba(148,163,184,0.9)',
-    marginTop: 2,
-    lineHeight: 15,
+    color: 'rgba(203,213,225,0.75)',
+    marginTop: 1,
+  },
+  messageCompact: {
+    fontSize: 10,
+    marginTop: 0,
   },
   actionBtn: {
     paddingHorizontal: 10,

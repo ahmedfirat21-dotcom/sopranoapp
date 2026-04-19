@@ -3,6 +3,7 @@ dist/
 .expo/
 android/
 ios/
+supabase/.temp/
 *.jks
 *.p8
 *.p12

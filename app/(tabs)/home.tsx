@@ -18,6 +18,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { UserSearchModal } from '../../components/UserSearchModal';
 import FriendsDrawer from '../../components/FriendsDrawer';
+import NotificationBell from '../../components/NotificationBell';
+import { CATEGORY_THEME } from '../../constants/categoryTheme';
 import AppBackground from '../../components/AppBackground';
 import StatusAvatar from '../../components/StatusAvatar';
 import { getAvatarSource } from '../../constants/avatars';
@@ -25,21 +27,24 @@ import { getAvatarSource } from '../../constants/avatars';
 import { showToast } from '../../components/Toast';
 import { isSystemRoom } from '../../services/showcaseRooms';
 import { TIER_DEFINITIONS } from '../../constants/tiers';
+import { UpsellService } from '../../services/upsell';
+import type { SubscriptionTier } from '../../types';
 
 
 
 // ════════════════════════════════════════════════════════════
 // BİRLEŞİK AKILLI FİLTRE (Kategori + Etiket → Tek Bar)
 // ════════════════════════════════════════════════════════════
-const SMART_FILTERS = [
-  { id: 'chat', label: 'Sohbet', icon: 'chatbubbles', type: 'category' as const, accent: '#3B82F6' },
-  { id: 'music', label: 'Müzik', icon: 'musical-notes', type: 'category' as const, accent: '#8B5CF6' },
-  { id: 'game', label: 'Oyun', icon: 'game-controller', type: 'category' as const, accent: '#EF4444' },
-  { id: 'tech', label: 'Teknoloji', icon: 'code-slash', type: 'category' as const, accent: '#06B6D4' },
-  { id: 'book', label: 'Kitap', icon: 'book', type: 'category' as const, accent: '#D97706' },
-  { id: 'film', label: 'Film', icon: 'film', type: 'category' as const, accent: '#EC4899' },
-  { id: 'all', label: 'Tümü', icon: 'apps', type: 'category' as const, accent: '#14B8A6' },
-] as const;
+// ★ SMART_FILTERS artık CATEGORY_THEME'den accent alır — tek kaynak
+const SMART_FILTERS: Array<{ id: string; label: string; icon: string; type: 'category'; accent: string }> = [
+  { id: 'chat',  label: 'Sohbet',    icon: 'chatbubbles',     type: 'category', accent: CATEGORY_THEME.chat.accent },
+  { id: 'music', label: 'Müzik',     icon: 'musical-notes',   type: 'category', accent: CATEGORY_THEME.music.accent },
+  { id: 'game',  label: 'Oyun',      icon: 'game-controller', type: 'category', accent: CATEGORY_THEME.game.accent },
+  { id: 'tech',  label: 'Teknoloji', icon: 'code-slash',      type: 'category', accent: CATEGORY_THEME.tech.accent },
+  { id: 'book',  label: 'Kitap',     icon: 'book',            type: 'category', accent: CATEGORY_THEME.book.accent },
+  { id: 'film',  label: 'Film',      icon: 'film',            type: 'category', accent: CATEGORY_THEME.film.accent },
+  { id: 'all',   label: 'Tümü',      icon: 'apps',            type: 'category', accent: '#14B8A6' },
+];
 
 // ═══ Gelişmiş Filtre Seçenekleri ═══
 const ADVANCED_FILTER_OPTIONS = [
@@ -319,19 +324,16 @@ function FollowedRoomCard({ room, index }: { room: Room; index: number }) {
 // ŞU AN CANLI — Büyük Dikey Oda Kartı
 // ════════════════════════════════════════════════════════════
 
-// Kategori bazlı gradient renkleri + ikon
-const CATEGORY_THEME: Record<string, { colors: [string, string, string]; icon: string }> = {
-  chat: { colors: ['#1E4170', '#13365A', '#0D2642'], icon: 'chatbubbles' },
-  music: { colors: ['#4A2575', '#381B5A', '#251040'], icon: 'musical-notes' },
-  game: { colors: ['#5C1A30', '#461426', '#30101C'], icon: 'game-controller' },
-  tech: { colors: ['#123B5C', '#0D2C48', '#081D32'], icon: 'code-slash' },
-  book: { colors: ['#4D3A14', '#3A2B0C', '#2A1E08'], icon: 'book' },
-  film: { colors: ['#4C1452', '#39103E', '#280B2C'], icon: 'film' },
-  other: { colors: ['#1E293B', '#151E2E', '#0F172A'], icon: 'ellipsis-horizontal' },
-};
+// ★ CATEGORY_THEME artık constants/categoryTheme.ts'den geliyor (tek kaynak).
+// Home + myrooms + create-room + leaderboard aynı paleti paylaşır.
 
 
-function BigLiveRoomCard({ room, onJoin, isFollowed, onToggleFollow }: { room: Room; onJoin: () => void; isFollowed?: boolean; onToggleFollow?: () => void }) {
+const BigLiveRoomCard = React.memo(function BigLiveRoomCard({ room, onJoin, isFollowed, onToggleFollow }: {
+  room: Room;
+  onJoin: (roomId: string) => void;
+  isFollowed?: boolean;
+  onToggleFollow?: (roomId: string, currentlyFollowed: boolean) => void;
+}) {
   const isPersistent = (room as any).is_persistent;
   const hostName = room.host?.display_name || 'Anonim';
   const listenerCount = room.listener_count || 0;
@@ -369,10 +371,10 @@ function BigLiveRoomCard({ room, onJoin, isFollowed, onToggleFollow }: { room: R
         s.bigCard,
         isSystem && { borderColor: '#14B8A6', borderWidth: 1.5 },
         isPersistent && { borderColor: Colors.premiumGold, borderWidth: 1.5, shadowColor: Colors.premiumGold, shadowOpacity: 0.15, shadowRadius: 8 },
-        isBoosted && !isPersistent && { borderColor: '#FB923C', borderWidth: 1.5 },
+        isBoosted && !isPersistent && { borderColor: '#F472B6', borderWidth: 1.5, shadowColor: '#F472B6', shadowOpacity: 0.2, shadowRadius: 10 },
         pressed && { opacity: 0.92, transform: [{ scale: 0.98 }] },
       ]}
-      onPress={onJoin}
+      onPress={() => onJoin(room.id)}
     >
       {/* Kategori bazlı gradient arka plan */}
       {(room.room_settings as any)?.card_image_url ? (
@@ -432,9 +434,13 @@ function BigLiveRoomCard({ room, onJoin, isFollowed, onToggleFollow }: { room: R
             </View>
           )}
           {isBoosted && (
-            <View style={[s.bigTagBadge, { backgroundColor: 'rgba(251,146,60,0.2)', borderColor: 'rgba(251,146,60,0.4)' }]}>
-              <Ionicons name="flame" size={10} color="#FB923C" />
-              <Text style={[s.bigTagText, { color: '#FB923C', fontWeight: '800' }]}>ÖNE ÇIKAN</Text>
+            <View style={[s.bigTagBadge, { backgroundColor: 'rgba(244,114,182,0.18)', borderColor: 'rgba(244,114,182,0.35)' }]}>
+              <Ionicons name="rocket" size={10} color="#F472B6" style={{
+                textShadowColor: 'rgba(244,114,182,0.6)',
+                textShadowOffset: { width: 0, height: 0 },
+                textShadowRadius: 5,
+              }} />
+              <Text style={[s.bigTagText, { color: '#F472B6', fontWeight: '900', letterSpacing: 0.5 }]}>BOOST</Text>
             </View>
           )}
           {!isBoosted && !isSystem && listenerCount >= 5 && (
@@ -485,11 +491,11 @@ function BigLiveRoomCard({ room, onJoin, isFollowed, onToggleFollow }: { room: R
         <Ionicons name="mic" size={12} color="#94A3B8" />
         <Text style={s.bigStatText}>{room.max_speakers || 4}</Text>
         {onToggleFollow && (
-          <Pressable onPress={(e) => { e.stopPropagation(); onToggleFollow(); }} hitSlop={8} style={{ marginLeft: 'auto', padding: 2 }}>
+          <Pressable onPress={(e) => { e.stopPropagation(); onToggleFollow(room.id, !!isFollowed); }} hitSlop={8} style={{ marginLeft: 'auto', padding: 2 }}>
             <Ionicons name={isFollowed ? 'bookmark' : 'bookmark-outline'} size={14} color={isFollowed ? '#14B8A6' : '#64748B'} />
           </Pressable>
         )}
-        <Pressable onPress={onJoin} style={{ marginLeft: onToggleFollow ? 6 : 'auto' }}>
+        <Pressable onPress={() => onJoin(room.id)} style={{ marginLeft: onToggleFollow ? 6 : 'auto' }}>
           <LinearGradient
             colors={['#14B8A6', '#0D9488', '#065F56']}
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
@@ -502,7 +508,7 @@ function BigLiveRoomCard({ room, onJoin, isFollowed, onToggleFollow }: { room: R
       </View>
     </Pressable>
   );
-}
+});
 
 // ════════════════════════════════════════════════════════════
 // ANA EKRAN — KEŞFET (SopranoChat v2)
@@ -568,6 +574,8 @@ export default function HomeScreen() {
       } catch { }
     } catch (err) {
       if (__DEV__) console.warn('[Home] Load error:', err);
+      // ★ Kullanıcıya görünür hata — sessiz blank state yerine
+      showToast({ title: 'Odalar yüklenemedi', message: 'İnternet bağlantını kontrol et.', type: 'error' });
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -701,7 +709,7 @@ export default function HomeScreen() {
     loadData();
   }, [loadData]);
 
-  const handleJoinRoom = (roomId: string) => {
+  const handleJoinRoom = useCallback((roomId: string) => {
     if (!firebaseUser) {
       showToast({ title: 'Giriş Gerekli', message: 'Odaya katılmak için giriş yapmalısınız.', type: 'warning' });
       return;
@@ -721,7 +729,29 @@ export default function HomeScreen() {
       });
     }
     router.push(`/room/${roomId}`);
-  };
+  }, [firebaseUser, rooms, router, addRecentRoom]);
+
+  // ★ Stable follow toggle — BigLiveRoomCard memo'sunu koruyor (inline callback yerine)
+  const handleToggleFollow = useCallback(async (roomId: string, currentlyFollowed: boolean) => {
+    if (!firebaseUser) return;
+    try {
+      if (currentlyFollowed) {
+        setFollowedRoomIds(prev => { const n = { ...prev }; delete n[roomId]; return n; });
+        await RoomFollowService.unfollow(roomId, firebaseUser.uid);
+      } else {
+        setFollowedRoomIds(prev => ({ ...prev, [roomId]: true }));
+        await RoomFollowService.follow(roomId, firebaseUser.uid);
+      }
+    } catch {
+      // Rollback
+      if (currentlyFollowed) {
+        setFollowedRoomIds(prev => ({ ...prev, [roomId]: true }));
+      } else {
+        setFollowedRoomIds(prev => { const n = { ...prev }; delete n[roomId]; return n; });
+      }
+      showToast({ title: 'İşlem başarısız', type: 'error' });
+    }
+  }, [firebaseUser]);
 
   if (loading) {
     return (
@@ -743,14 +773,7 @@ export default function HomeScreen() {
             <Pressable style={s.headerIconBtn} onPress={() => setShowSearch(true)}>
               <Ionicons name="search-outline" size={20} color="#F1F5F9" />
             </Pressable>
-            <Pressable style={s.headerIconBtn} onPress={() => setShowNotifDrawer(true)}>
-              <Ionicons name="notifications-outline" size={20} color="#F1F5F9" />
-              {unreadCount > 0 && (
-                <View style={s.notifBadge}>
-                  <Text style={s.notifBadgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
-                </View>
-              )}
-            </Pressable>
+            <NotificationBell unreadCount={unreadCount} onPress={() => setShowNotifDrawer(true)} />
             <Pressable style={s.headerIconBtn} onPress={() => { setShowFriends(true); }}>
               <Ionicons name="people-outline" size={20} color="#F1F5F9" />
               {pendingFollowCount > 0 && (
@@ -954,31 +977,13 @@ export default function HomeScreen() {
             </>
           }
 
-          // ═══ Oda Kartları — Virtualized renderItem ═══
+          // ═══ Oda Kartları — stable callbacks, React.memo korunur ═══
           renderItem={({ item: room }) => (
             <BigLiveRoomCard
               room={room}
-              onJoin={() => handleJoinRoom(room.id)}
+              onJoin={handleJoinRoom}
               isFollowed={!!followedRoomIds[room.id]}
-              onToggleFollow={firebaseUser ? async () => {
-                const isNow = !!followedRoomIds[room.id];
-                try {
-                  if (isNow) {
-                    setFollowedRoomIds(prev => { const n = { ...prev }; delete n[room.id]; return n; });
-                    await RoomFollowService.unfollow(room.id, firebaseUser.uid);
-                  } else {
-                    setFollowedRoomIds(prev => ({ ...prev, [room.id]: true }));
-                    await RoomFollowService.follow(room.id, firebaseUser.uid);
-                  }
-                } catch {
-                  if (isNow) {
-                    setFollowedRoomIds(prev => ({ ...prev, [room.id]: true }));
-                  } else {
-                    setFollowedRoomIds(prev => { const n = { ...prev }; delete n[room.id]; return n; });
-                  }
-                  showToast({ title: 'İşlem başarısız', type: 'error' });
-                }
-              } : undefined}
+              onToggleFollow={firebaseUser ? handleToggleFollow : undefined}
             />
           )}
 
@@ -986,7 +991,20 @@ export default function HomeScreen() {
           ListEmptyComponent={
             <Pressable
               style={s.heroEmptyCard}
-              onPress={() => router.push('/create-room')}
+              onPress={async () => {
+                if (!firebaseUser) { router.push('/create-room'); return; }
+                const isAdmin = (profile as any)?.is_admin === true;
+                const userTier = (isAdmin ? 'Pro' : (profile?.subscription_tier || 'Free')) as SubscriptionTier;
+                try {
+                  const gate = await RoomService.canCreateToday(firebaseUser.uid, userTier);
+                  if (!gate.ok) {
+                    showToast({ title: 'Günlük Limit Doldu', message: `Bugün ${gate.count}/${gate.limit} oda açtın. Yarın tekrar dene veya üyeliğini yükselt.`, type: 'warning' });
+                    UpsellService.onDailyRoomLimit(userTier);
+                    return;
+                  }
+                } catch {}
+                router.push('/create-room');
+              }}
             >
               <LinearGradient
                 colors={['rgba(20,184,166,0.15)', 'rgba(13,148,136,0.08)', 'rgba(6,95,86,0.05)']}

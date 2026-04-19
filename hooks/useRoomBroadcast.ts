@@ -275,6 +275,17 @@ export function useRoomBroadcast(params: UseRoomBroadcastParams) {
         return;
       }
 
+      // ── unmute_all ── ★ 2026-04-19: mute_all'un tersi
+      if (data.action === 'unmute_all') {
+        // Sadece bilgilendirme — mikrofonu zorla açmıyoruz (kullanıcı tercihine saygı).
+        // DB'deki is_muted=false realtime row update ile zaten geliyor.
+        setParticipants(prev => prev.map(p =>
+          (p.role === 'speaker' || p.role === 'moderator') ? { ...p, is_muted: false } : p
+        ));
+        penaltyRef.current?.show({ type: 'unmute', reason: 'Oda sahibi tüm konuşmacıları serbest bıraktı.' });
+        return;
+      }
+
       // ── Kullanıcı hedefli eventlar ──
       const isTargetMe = data.targetUserId === firebaseUser.uid;
 
@@ -299,6 +310,9 @@ export function useRoomBroadcast(params: UseRoomBroadcastParams) {
       } else if (data.action === 'demote' && !isTargetMe) {
         setParticipants(prev => prev.map(p => p.user_id === data.targetUserId ? { ...p, role: 'listener' as const } : p));
         setAvatarFlash(data.targetUserId, 'demote');
+        // ★ 2026-04-18: Demote edilen kişi varsa hand raise kuyruğundan da düşür
+        // (el kaldırmış olabilir — demote sonrası queue'da stale entry kalmasın)
+        setMicRequests(prev => prev.filter(u => u !== data.targetUserId));
         return;
       } else if (data.action === 'make_moderator' && !isTargetMe) {
         setParticipants(prev => prev.map(p => p.user_id === data.targetUserId ? { ...p, role: 'moderator' as const } : p));
@@ -309,13 +323,35 @@ export function useRoomBroadcast(params: UseRoomBroadcastParams) {
       } else if ((data.action === 'kick' || data.action === 'ban' || data.action === 'permban') && !isTargetMe) {
         // ★ Flash: kick/ban animasyonu avatarda göster, sonra listeden kaldır
         setAvatarFlash(data.targetUserId, data.action === 'kick' ? 'kick' : 'ban');
+        // ★ Kick/ban edilen kişinin mic kuyruğu entry'sini de temizle
+        setMicRequests(prev => prev.filter(u => u !== data.targetUserId));
         setTimeout(() => {
           setParticipants(prev => prev.filter(p => p.user_id !== data.targetUserId));
         }, 1500);
         return;
-      } else if (data.action === 'mute' && !isTargetMe) {
-        setParticipants(prev => prev.map(p => p.user_id === data.targetUserId ? { ...p, is_muted: true, role: 'listener' as const } : p));
-        setAvatarFlash(data.targetUserId, 'mute');
+      } else if (data.action === 'mute') {
+        if (isTargetMe) {
+          // ★ Owner bypass — oda sahibi asla moderatör tarafından susturulamaz.
+          // Stale mute broadcast'ları owner sahneye girdiğinde yanlışlıkla
+          // tetikleniyordu (is_muted=true kalmış eski participant row'undan).
+          const amHost = roomHostRef.current === firebaseUser.uid;
+          if (amHost) return;
+
+          // ★ 2026-04-18: Client-side mute enforcement — moderator hedefli
+          // mute ettiğinde, kullanıcının kendi mic'i zorla kapatılır. LiveKit
+          // track seviyesinde server-side disable ayrı bir iş; bu client-side
+          // + edge function canPublish kontrolü ile defense-in-depth sağlar.
+          if (lkRef.current.isMicrophoneEnabled) {
+            lkRef.current.toggleMic().catch(() => {});
+          }
+          penaltyRef.current?.show({
+            type: 'mute',
+            reason: data.reason || 'Moderatör tarafından susturuldun.',
+          });
+        } else {
+          setParticipants(prev => prev.map(p => p.user_id === data.targetUserId ? { ...p, is_muted: true, role: 'listener' as const } : p));
+          setAvatarFlash(data.targetUserId, 'mute');
+        }
         return;
       } else if (data.action === 'unmute' && !isTargetMe) {
         setParticipants(prev => prev.map(p => p.user_id === data.targetUserId ? { ...p, is_muted: false } : p));
@@ -416,16 +452,33 @@ export function useRoomBroadcast(params: UseRoomBroadcastParams) {
         setParticipants(prev => prev.map(p => p.user_id === firebaseUser.uid ? { ...p, role: 'speaker' as const, is_muted: false } : p));
         setTimeout(() => { lkRef.current.enableMic?.().catch(() => {}); }, 500);
       } else if (data.action === 'stage_invite') {
-        // ★ Sahneye davet — kabul/red modalı. O1: açık durumu ref ile takip et.
+        // ★ 2026-04-19 FIX: Sadece hedeflenen kullanıcıya modal aç. Önceki versiyonda
+        // isTargetMe kontrolü yoktu, broadcast alan HERKES modal görüyordu.
+        if (!isTargetMe) return;
+        // ★ Zaten açıksa yeniden açma (çift broadcast koruması)
+        if (stageInviteOpenRef.current) return;
         stageInviteOpenRef.current = true;
+        // ★ 30sn auto-timeout: davet süresi dolunca modal kendi kendine kapanır,
+        // davet eden tarafa sessiz "declined" broadcast'i gider.
+        const autoDeclineTimer = setTimeout(() => {
+          if (stageInviteOpenRef.current) {
+            stageInviteOpenRef.current = false;
+            setAlertConfig((prev: any) => ({ ...prev, visible: false }));
+            modChannelRef.current?.send({
+              type: 'broadcast', event: 'mod_action',
+              payload: { action: 'stage_invite_declined', targetUserId: firebaseUser.uid, displayName: profile?.display_name || 'Kullanıcı', reason: 'timeout' },
+            });
+          }
+        }, 30_000);
         setAlertConfig({
           visible: true,
           title: '🎤 Sahneye Davet',
-          message: `${data.inviterName || 'Moderatör'} seni sahneye davet ediyor. Kabul edersen konuşmaya başlayabilirsin.`,
+          message: `${data.inviterName || 'Moderatör'} seni sahneye davet ediyor. 30 saniye içinde karar ver, yoksa davet iptal olur.`,
           type: 'info',
           icon: 'mic',
           buttons: [
             { text: 'Reddet', style: 'cancel', onPress: () => {
+              clearTimeout(autoDeclineTimer);
               stageInviteOpenRef.current = false;
               modChannelRef.current?.send({
                 type: 'broadcast', event: 'mod_action',
@@ -433,6 +486,7 @@ export function useRoomBroadcast(params: UseRoomBroadcastParams) {
               });
             }},
             { text: 'Kabul Et', style: 'default', onPress: async () => {
+              clearTimeout(autoDeclineTimer);
               stageInviteOpenRef.current = false;
               try {
                 await RoomService.promoteSpeaker(roomId as string, firebaseUser.uid);

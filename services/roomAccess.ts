@@ -75,13 +75,14 @@ export const RoomAccessService = {
       return { allowed: false, reason: 'Oda şu anda kilitli. Yeni katılımcı kabul edilmiyor.', action: 'room_locked' };
     }
 
-    // ── 3. Followers-only modu kontrolü (Pro+) ──
+    // ── 3. Sadece arkadaşlar modu kontrolü (Pro+) ──
+    // ★ 2026-04-18: friendship çift yönlü — (A,B) veya (B,A) accepted ise erişim verilir
     if (settings.followers_only) {
-      const isFollowing = await this._isFollowingHost(userId, room.host_id!);
-      if (!isFollowing) {
+      const isFriend = await this._isFollowingHost(userId, room.host_id!);
+      if (!isFriend) {
         return {
           allowed: false,
-          reason: 'Bu oda yalnızca oda sahibinin takipçilerine açık.',
+          reason: 'Bu oda yalnızca oda sahibinin arkadaşlarına açık.',
           action: 'followers_only',
         };
       }
@@ -101,8 +102,11 @@ export const RoomAccessService = {
     }
 
     // ── 5. Dil filtresi kontrolü (Plus+) ──
+    // ★ 2026-04-18 FIX: Fail-closed — userLanguage yoksa da bloklanır.
+    // Öncesi: `userLanguage && !filter.includes(...)` → language null ise kontrol
+    // komple atlanıyor ve filtre devre dışı kalıyordu.
     if (settings.language_filter && settings.language_filter.length > 0) {
-      if (userLanguage && !settings.language_filter.includes(userLanguage as RoomLanguage)) {
+      if (!userLanguage || !settings.language_filter.includes(userLanguage as RoomLanguage)) {
         return {
           allowed: false,
           reason: 'Bu odanın dil filtresi sizi engelledi.',
@@ -114,27 +118,38 @@ export const RoomAccessService = {
     // ── 6. Oda tipi kontrolü ──
     const roomType = room.type || 'open';
 
+    // ★ 2026-04-18 FIX: Password fallback — type ne olursa olsun (open/closed) şifre
+    // varsa her zaman sor. Eski odalarda `type='open'` + `room_password` set edilmiş
+    // vakalar vardı ve checkAccess 'open' branch'ine düşüp şifreyi atlıyordu. Güvenlik
+    // açığı: artık şifre saklıysa MUTLAKA doğrulama istenir.
+    //
+    // ★ 2026-04-19: Davet kabul edilmişse (hasInvite=accepted) şifre bypass edilir.
+    // Mantık: Davet = owner'ın güveni. Owner davet ederken kullanıcıya ekstra şifre
+    // paylaşmak zorunda kalmasın. Davetsiz girişler hâlâ şifre gerektirir.
+    const storedPassword = room.room_password || (settings as any).room_password;
+    if (storedPassword && (roomType === 'open' || roomType === 'closed')) {
+      // Önce davet kontrolü — kabul edilmişse şifre atlanır
+      const hasAcceptedInvite = await this._hasInvite(roomId, userId);
+      if (!hasAcceptedInvite) {
+        if (!enteredPassword) {
+          return { allowed: false, reason: 'Bu oda şifre korumalı.', action: 'password_required' };
+        }
+        const passwordMatch = await verifyPassword(enteredPassword, storedPassword);
+        if (!passwordMatch) {
+          return { allowed: false, reason: 'Yanlış şifre.' };
+        }
+      }
+      // Şifre doğru veya davet geçerli → kapasite kontrolüne devam
+      return this._checkCapacity(room, userId);
+    }
+
     if (roomType === 'open') {
-      // Herkese açık — dinleyici kapasitesini kontrol et
+      // Herkese açık + şifresiz — dinleyici kapasitesini kontrol et
       return this._checkCapacity(room, userId);
     }
 
     if (roomType === 'closed') {
-      // Şifreli oda — şifre gerekli
-      // ★ Şifre hem rooms.room_password hem de room_settings.room_password'da olabilir (fallback insert)
-      const storedPassword = room.room_password || (settings as any).room_password;
-      if (!storedPassword) {
-        // Şifre tanımlı değilse giriş serbest
-        return this._checkCapacity(room, userId);
-      }
-      if (!enteredPassword) {
-        return { allowed: false, reason: 'Bu oda şifre korumalı.', action: 'password_required' };
-      }
-      // ★ SEC-PWD: Hash karşılaştırması (geriye uyumlu — plaintext de kontrol eder)
-      const passwordMatch = await verifyPassword(enteredPassword, storedPassword);
-      if (!passwordMatch) {
-        return { allowed: false, reason: 'Yanlış şifre.' };
-      }
+      // Şifre tanımlı değilse (edge case) giriş serbest — kapasiteye bak
       return this._checkCapacity(room, userId);
     }
 
@@ -320,6 +335,19 @@ export const RoomAccessService = {
    */
   async acceptInvite(roomId: string, userId: string): Promise<{ success: boolean; error?: string }> {
     try {
+      // ★ 2026-04-19: Oda hâlâ aktif mi kontrol et — kapalı veya silinmiş odaya gitme
+      const { data: roomRow } = await supabase
+        .from('rooms')
+        .select('id, is_live')
+        .eq('id', roomId)
+        .maybeSingle();
+      if (!roomRow) {
+        return { success: false, error: 'Bu oda artık mevcut değil' };
+      }
+      if (roomRow.is_live === false) {
+        return { success: false, error: 'Bu oda şu anda aktif değil' };
+      }
+
       // room_invites kaydını bul ve güncelle
       const { data: invite, error: findErr } = await supabase
         .from('room_invites')
@@ -422,17 +450,16 @@ export const RoomAccessService = {
   // YARDIMCI FONKSİYONLAR
   // ════════════════════════════════════════════════════════════
 
-  /** Kullanıcı, oda sahibini takip ediyor mu? */
+  /** Kullanıcı, oda sahibiyle arkadaş mı? (çift yönlü — Facebook tarzı friendship) */
   async _isFollowingHost(userId: string, hostId: string): Promise<boolean> {
     if (userId === hostId) return true; // Sahibin kendi odası
     const { data } = await supabase
       .from('friendships')
-      .select('status')
-      .eq('user_id', userId)
-      .eq('friend_id', hostId)
+      .select('id')
+      .or(`and(user_id.eq.${userId},friend_id.eq.${hostId}),and(user_id.eq.${hostId},friend_id.eq.${userId})`)
       .eq('status', 'accepted')
-      .maybeSingle();
-    return !!data;
+      .limit(1);
+    return !!(data && data.length > 0);
   },
 
   /** Kapasite kontrolü — dinleyici grid + seyirci */
