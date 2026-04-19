@@ -78,7 +78,7 @@ export const RoomAccessService = {
     // ── 3. Sadece arkadaşlar modu kontrolü (Pro+) ──
     // ★ 2026-04-18: friendship çift yönlü — (A,B) veya (B,A) accepted ise erişim verilir
     if (settings.followers_only) {
-      const isFriend = await this._isFollowingHost(userId, room.host_id!);
+      const isFriend = await this._isFriendWithHost(userId, room.host_id!);
       if (!isFriend) {
         return {
           allowed: false,
@@ -451,7 +451,7 @@ export const RoomAccessService = {
   // ════════════════════════════════════════════════════════════
 
   /** Kullanıcı, oda sahibiyle arkadaş mı? (çift yönlü — Facebook tarzı friendship) */
-  async _isFollowingHost(userId: string, hostId: string): Promise<boolean> {
+  async _isFriendWithHost(userId: string, hostId: string): Promise<boolean> {
     if (userId === hostId) return true; // Sahibin kendi odası
     const { data } = await supabase
       .from('friendships')

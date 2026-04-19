@@ -76,7 +76,7 @@ type ProfileCardProps = {
   onTip?: () => void;
   donationsEnabled?: boolean;
   // ★ M5 FIX: Takip durumu
-  isFollowing?: boolean;
+  isFriend?: boolean;
   isPending?: boolean;
   // ★ M6 FIX: Kendi profil — sahneden in
   onSelfDemote?: () => void;
@@ -90,7 +90,7 @@ export default function ProfileCard({
   onGhostMode, isGhost, onDisguise, onBanTemp, onBanPerm,
   onPersonalMute, isPersonallyMuted,
   onTip, donationsEnabled,
-  isFollowing, isPending, onSelfDemote,
+  isFriend, isPending, onSelfDemote,
 }: ProfileCardProps) {
   // Slide-up animasyonu
   const slideY = useRef(new Animated.Value(H * 0.3)).current;
@@ -216,9 +216,9 @@ export default function ProfileCard({
           <>
           <View style={sty.socialRow}>
             {/* ★ M5 FIX: Takip durumuna göre buton metni değişir */}
-            <TouchableOpacity style={[sty.primaryPill, (isFollowing || isPending) && { backgroundColor: 'rgba(20,184,166,0.1)', borderColor: 'rgba(20,184,166,0.25)' }]} onPress={onFollow} activeOpacity={0.7}>
-              <Ionicons name={isFollowing ? 'checkmark-circle' : isPending ? 'time-outline' : 'person-add'} size={13} color={isFollowing ? '#14B8A6' : isPending ? '#FBBF24' : C.primary} />
-              <Text style={[sty.pillText, { color: isFollowing ? '#14B8A6' : isPending ? '#FBBF24' : C.primary }]}>{isFollowing ? 'Takip Ediliyor' : isPending ? 'Bekliyor' : 'Takip Et'}</Text>
+            <TouchableOpacity style={[sty.primaryPill, (isFriend || isPending) && { backgroundColor: 'rgba(20,184,166,0.1)', borderColor: 'rgba(20,184,166,0.25)' }]} onPress={onFollow} activeOpacity={0.7}>
+              <Ionicons name={isFriend ? 'checkmark-circle' : isPending ? 'time-outline' : 'person-add'} size={13} color={isFriend ? '#14B8A6' : isPending ? '#FBBF24' : C.primary} />
+              <Text style={[sty.pillText, { color: isFriend ? '#14B8A6' : isPending ? '#FBBF24' : C.primary }]}>{isFriend ? 'Arkadaş' : isPending ? 'İstek Gönderildi' : 'Arkadaş Ekle'}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={sty.outlinePill} onPress={onDM} activeOpacity={0.7}>
               <Ionicons name="chatbubble-ellipses" size={13} color={C.white60} />

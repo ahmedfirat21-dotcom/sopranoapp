@@ -2729,7 +2729,7 @@ export default function RoomScreen() {
           isMuted={_selectedUser.is_muted || false} mutedUntil={_selectedUser.muted_until || null}
           onClose={() => setSelectedUser(null)}
           onViewProfile={() => { setSelectedUser(null); router.push(`/user/${selectedUser.user_id}` as any); }}
-          isFollowing={userFollowStatus[selectedUser.user_id] === 'accepted'}
+          isFriend={userFollowStatus[selectedUser.user_id] === 'accepted'}
           isPending={userFollowStatus[selectedUser.user_id] === 'pending'}
           onFollow={async () => {
             if (!firebaseUser) return;
