@@ -14,6 +14,7 @@ import { RevenueCatService, REVENUECAT_MOCK_MODE } from '../services/revenuecat'
 import { GamificationService } from '../services/gamification';
 import { supabase } from '../constants/supabase';
 import { migrateLegacyTier } from '../types';
+import PurchaseSuccessModal from '../components/PurchaseSuccessModal';
 
 // ═══ SP Paketleri — Premium Ionicons ═══
 // ★ id alanları Google Play Console'daki In-App Product ID'leriyle eşleşmeli
@@ -36,6 +37,8 @@ export default function SPStoreScreen() {
   const storeBonusPct = userTier === 'Pro' ? 0.20 : userTier === 'Plus' ? 0.10 : 0;
   const [cAlert, setCAlert] = useState<{ visible: boolean; title: string; message: string; type?: 'info' | 'warning' | 'error' | 'success'; buttons?: AlertButton[] }>({ visible: false, title: '', message: '' });
   const [purchasing, setPurchasing] = useState(false);
+  // ★ Şık animasyonlu başarı modalı
+  const [successModal, setSuccessModal] = useState<{ visible: boolean; title: string; subtitle: string; accent?: readonly [string, string] }>({ visible: false, title: '', subtitle: '' });
   const mountedRef = useRef(true);
   useEffect(() => () => { mountedRef.current = false; }, []);
 
@@ -119,8 +122,13 @@ export default function SPStoreScreen() {
             await refreshProfile();
             if (mountedRef.current) {
               const grantedSP = (claimData as any)?.total_sp || totalSP;
-              const title = REVENUECAT_MOCK_MODE && __DEV__ ? '✅ SP Eklendi! (TEST)' : '🎉 Satın Alma Başarılı!';
-              showToast({ title, message: `${grantedSP.toLocaleString()} SP hesabına eklendi.`, type: 'success' });
+              const title = REVENUECAT_MOCK_MODE && __DEV__ ? 'Satın Alma Başarılı (TEST)' : 'Satın Alma Başarılı';
+              setSuccessModal({
+                visible: true,
+                title,
+                subtitle: `${grantedSP.toLocaleString()} SP hesabına eklendi.`,
+                accent: [pkg.accent, pkg.gradient[1]] as const,
+              });
             }
           } catch (err: any) {
             if (mountedRef.current) {
@@ -239,6 +247,13 @@ export default function SPStoreScreen() {
         </ScrollView>
       </View>
       <PremiumAlert {...cAlert} onDismiss={() => setCAlert(prev => ({ ...prev, visible: false }))} />
+      <PurchaseSuccessModal
+        visible={successModal.visible}
+        title={successModal.title}
+        subtitle={successModal.subtitle}
+        accent={successModal.accent}
+        onClose={() => setSuccessModal(prev => ({ ...prev, visible: false }))}
+      />
     </AppBackground>
   );
 }

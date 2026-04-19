@@ -126,6 +126,18 @@ export const RevenueCatService = {
   _dashboardEmpty: false, // ★ Dashboard'da ürün yoksa true — mock offerings kullanılır
 
   /**
+   * ★ 2026-04-20: Abonelik satın alma şu an mümkün mü?
+   * Dev'de her zaman true (mock ile test edilir).
+   * Prod'da: gerçek key + Dashboard'da offering varsa true.
+   * UI bu flag ile satın al butonunu enable/disable etmeli ve
+   * "sistem hazır değil" uyarısı göstermeli.
+   */
+  isSubscriptionAvailable(): boolean {
+    if (__DEV__) return true;
+    return _hasRealKey && !this._dashboardEmpty;
+  },
+
+  /**
    * SDK'yı başlat — app mount'ta bir kez çağrılır.
    * Mock mode'da no-op. Promise kaydedilir, purchasePackage await eder.
    */
@@ -211,8 +223,8 @@ export const RevenueCatService = {
     userId: string,
     targetTier: SubscriptionTier,
   ): Promise<{ newTier: SubscriptionTier | null; error?: string }> {
-    if (REVENUECAT_MOCK_MODE || this._dashboardEmpty) {
-      // Mock: direkt DB güncelle
+    // ★ Dev-only mock: geliştirme sırasında DB direct update ile test
+    if (REVENUECAT_MOCK_MODE && __DEV__) {
       try {
         const { error } = await supabase
           .from('profiles')
@@ -223,6 +235,16 @@ export const RevenueCatService = {
       } catch (e: any) {
         return { newTier: null, error: e.message };
       }
+    }
+
+    // ★ 2026-04-20 KRİTİK GUARD: Production'da RevenueCat yapılandırılmamışsa
+    // (placeholder key veya Dashboard'da offering yok) SATIN ALMA ENGELLE.
+    // Aksi halde kullanıcı ödeme yapmadan Plus/Pro tier alırdı.
+    if (!__DEV__ && (REVENUECAT_MOCK_MODE || this._dashboardEmpty)) {
+      return {
+        newTier: null,
+        error: 'Abonelik sistemi henüz aktif değil. Lütfen uygulamayı güncelleyin veya daha sonra tekrar deneyin.',
+      };
     }
 
     // SDK init tamamlanana kadar bekle
@@ -262,6 +284,10 @@ export const RevenueCatService = {
    */
   async restorePurchases(userId: string): Promise<{ restoredTier: SubscriptionTier }> {
     if (REVENUECAT_MOCK_MODE) {
+      return { restoredTier: 'Free' };
+    }
+    // ★ 2026-04-20 GUARD: Dashboard yapılandırılmamışsa restore yapılamaz
+    if (this._dashboardEmpty) {
       return { restoredTier: 'Free' };
     }
 

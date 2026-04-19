@@ -14,6 +14,7 @@ import { migrateLegacyTier } from '../types';
 import { supabase } from '../constants/supabase';
 import { RevenueCatService, REVENUECAT_MOCK_MODE } from '../services/revenuecat';
 import AppBackground from '../components/AppBackground';
+import PurchaseSuccessModal from '../components/PurchaseSuccessModal';
 
 type AlertConfig = { visible: boolean; title: string; message: string; type?: any; buttons?: AlertButton[] };
 
@@ -78,9 +79,26 @@ export default function PlusScreen() {
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('yearly');
   const [activating, setActivating] = useState(false);
   const [alertCfg, setAlertCfg] = useState<AlertConfig>({ visible: false, title: '', message: '' });
+  // ★ 2026-04-20: Abonelik sistemi prod'da kuruldu mu? RevenueCat Dashboard
+  // yapılandırılmadıysa "sistem hazır değil" uyarısı göster + CTA disable.
+  const [subReady, setSubReady] = useState<boolean>(RevenueCatService.isSubscriptionAvailable());
+  // ★ Şık animasyonlu başarı modalı (toast yerine)
+  const [successModal, setSuccessModal] = useState<{ visible: boolean; title: string; subtitle: string; accent?: readonly [string, string] }>({ visible: false, title: '', subtitle: '' });
 
   const mountedRef = useRef(true);
   useEffect(() => () => { mountedRef.current = false; }, []);
+
+  // Init sonrası Dashboard durumu netleşir — tekrar kontrol et
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try { await RevenueCatService.init(profile?.id); } catch {}
+      if (!cancelled && mountedRef.current) {
+        setSubReady(RevenueCatService.isSubscriptionAvailable());
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [profile?.id]);
 
   const currentTier = migrateLegacyTier(profile?.subscription_tier);
   const selectedPlan = PLANS.find(p => p.id === selectedTier)!;
@@ -119,7 +137,12 @@ export default function PlusScreen() {
               if (result.newTier) {
                 await refreshProfile();
                 if (mountedRef.current) {
-                  showToast({ title: `${selectedPlan.name} Aktif! 🎉`, message: `Tebrikler! Artık ${selectedPlan.name} üyesisiniz.`, type: 'success' });
+                  setSuccessModal({
+                    visible: true,
+                    title: `${selectedPlan.name} Üyelik Aktif!`,
+                    subtitle: `Artık ${selectedPlan.name} üyesisiniz — tüm premium özellikler açıldı.`,
+                    accent: [selectedPlan.gradient[0], selectedPlan.gradient[1]] as const,
+                  });
                 }
               }
             } catch (err: any) {
@@ -338,10 +361,24 @@ export default function PlusScreen() {
           ))}
         </LinearGradient>
 
+        {/* ★ Abonelik sistemi kurulum uyarısı (prod'da Dashboard boşsa) */}
+        {!subReady && !__DEV__ && (
+          <View style={styles.subUnavailWrap}>
+            <Ionicons name="time-outline" size={18} color="#FBBF24" />
+            <Text style={styles.subUnavailText}>
+              Abonelik sistemi bakım modunda. Çok yakında satın almaya açılacak.
+            </Text>
+          </View>
+        )}
+
         {/* CTA */}
         {currentTier !== selectedPlan.tier && (
           <View style={styles.ctaWrap}>
-            <Pressable onPress={handleActivate} disabled={activating} style={styles.ctaOuter}>
+            <Pressable
+              onPress={handleActivate}
+              disabled={activating || (!subReady && !__DEV__)}
+              style={[styles.ctaOuter, (!subReady && !__DEV__) && { opacity: 0.45 }]}
+            >
               <LinearGradient
                 colors={selectedPlan.gradient}
                 start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
@@ -382,6 +419,14 @@ export default function PlusScreen() {
         type={alertCfg.type || 'info'}
         buttons={alertCfg.buttons}
         onDismiss={() => setAlertCfg(prev => ({ ...prev, visible: false }))}
+      />
+
+      <PurchaseSuccessModal
+        visible={successModal.visible}
+        title={successModal.title}
+        subtitle={successModal.subtitle}
+        accent={successModal.accent}
+        onClose={() => setSuccessModal(prev => ({ ...prev, visible: false }))}
       />
     </View></AppBackground>
   );
@@ -500,6 +545,25 @@ const styles = StyleSheet.create({
   compareCell: { flex: 1, textAlign: 'center', fontSize: 11, fontWeight: '600', color: Colors.text2 },
 
   ctaWrap: { paddingHorizontal: 20, marginTop: 26 },
+  subUnavailWrap: {
+    marginTop: 24,
+    marginHorizontal: 20,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: 'rgba(251,191,36,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(251,191,36,0.25)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  subUnavailText: {
+    flex: 1,
+    fontSize: 12,
+    color: '#FBBF24',
+    fontWeight: '600',
+    lineHeight: 17,
+  },
   ctaOuter: {
     borderRadius: 14, overflow: 'hidden',
     ...Shadows.button,
