@@ -23,6 +23,7 @@
   "submit": {
     "production": {
       "android": {
+        "serviceAccountKeyPath": "C:/Users/yogun/secrets/pc-api-key.json",
         "track": "internal"
       }
     }

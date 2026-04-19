@@ -95,3 +95,4 @@ pc-api-key.json
 _aab_check/
 
 .vercel
+.playwright-mcp/
