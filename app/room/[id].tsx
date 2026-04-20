@@ -2468,9 +2468,16 @@ export default function RoomScreen() {
       }
       // Gerçek veriyi yenile (profil listesi için)
       loadFollowerData(room.id);
+      // ★ 2026-04-20: Kullanıcıya gerçek zamanlı feedback
+      showToast({
+        title: newState ? '❤️ Takip ediliyor' : '💔 Takipten çıkıldı',
+        message: newState ? 'Oda güncellemelerinden haberdar olacaksın.' : 'Artık bu odanın bildirimlerini almayacaksın.',
+        type: newState ? 'success' : 'info',
+      });
     } catch {
       setIsFollowingRoom(!newState); // rollback
       setFollowerCount(prev => Math.max(0, prev + (newState ? -1 : 1)));
+      showToast({ title: 'Hata', message: 'İşlem başarısız. Tekrar dene.', type: 'error' });
     }
   }, [room?.id, firebaseUser?.uid, isFollowingRoom, loadFollowerData]);
 
