@@ -9,22 +9,22 @@ import type { RoomParticipant } from '../../services/database';
 const { width: W } = Dimensions.get('window');
 
 // ★ Dinamik boyutlandırma — modern platform grid sistemi (Clubhouse/Spaces pattern)
-// Sayı arttıkça avatar küçülür, sütun artar
+// 2026-04-20: Sayı arttıkça avatar daha agresif küçülür, sütun artar ki oda içi
+// scroll kuralını kırmadan kompakt yerleşsin. Chat overlay için alt alan kalsın.
 function getGridMetrics(listenerCount: number) {
   let cols: number, avatarGap: number;
   if (listenerCount <= 4) {
     cols = 4; avatarGap = 12;
   } else if (listenerCount <= 8) {
-    cols = 4; avatarGap = 10;
+    cols = 5; avatarGap = 10;   // 4 col → 5 (daha kompakt)
   } else if (listenerCount <= 15) {
-    cols = 5; avatarGap = 8;
-  } else if (listenerCount <= 24) {
-    cols = 6; avatarGap = 6;
+    cols = 6; avatarGap = 7;    // 5 col → 6
   } else {
-    cols = 7; avatarGap = 4; // 25+ compact
+    cols = 7; avatarGap = 5;    // 16+ (gerekirse "+N Seyirci" badge'de)
   }
   const cellW = Math.floor((W - 32 - avatarGap * (cols - 1)) / cols);
-  const avatarSize = cellW - (listenerCount <= 8 ? 12 : listenerCount <= 15 ? 10 : 6);
+  // Avatar size agresif shrink: ufak hücrelerde padding büyümesin
+  const avatarSize = Math.max(32, cellW - (listenerCount <= 8 ? 10 : listenerCount <= 15 ? 8 : 5));
   return { cols, avatarGap, cellW, avatarSize };
 }
 
@@ -134,11 +134,10 @@ export default function ListenerGrid({ listeners, onSelectUser, selectedUserId, 
 
   return (
     <View style={s.wrap}>
-      {/* ★ 2026-04-19: "Dinleyiciler" pill başlığı kaldırıldı (SpeakerSection ile tutarlı).
-          Sadece "Tümü" butonu sağda — gereksiz durumunda. Sayım avatarlar zaten gösterir. */}
-      {onShowAllUsers && listeners.length > 0 && (
+      {/* ★ 2026-04-20: Dinleyici sayısı artık StageDivider'da — burada sadece "Tümü" butonu */}
+      {onShowAllUsers && listeners.length > 4 && (
         <View style={s.headerRowMinimal}>
-          <Text style={s.listenerCountText}>{listeners.length} dinleyici</Text>
+          <View />
           <Pressable style={s.allUsersBtn} onPress={onShowAllUsers} hitSlop={10}>
             <Ionicons name="people" size={14} color="#14B8A6" />
             <Text style={s.allUsersText}>Tümü</Text>
@@ -188,7 +187,7 @@ export default function ListenerGrid({ listeners, onSelectUser, selectedUserId, 
 const s = StyleSheet.create({
   wrap: {
     paddingHorizontal: 16,
-    marginTop: 16,
+    marginTop: 4,
   },
   headerRow: {
     flexDirection: 'row',

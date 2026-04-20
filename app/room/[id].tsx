@@ -2592,23 +2592,22 @@ export default function RoomScreen() {
         </View>
       )}
 
-      {/* ★ 2026-04-20: Oda içinde SCROLL YOK. Dinleyici grid flex:1 overflow:hidden
-          ile kalan alanı doldurur. Listener cap GRID_VISIBLE_CAP ile ekrana göre
-          adapte olur — taşan avatarlar "+N Seyirci" badge + AudienceDrawer'a düşer.
-          InlineChat alt sabit overlay olarak control bar'ın hemen üstünde. */}
+      {/* ★ 2026-04-20: Oda içinde SCROLL YOK. Listener flex:1 overflow:hidden
+          (taşanlar "+N Seyirci" badge). InlineChat flex item (absolute değil) —
+          listener altında sabit bant, üzerini kapatmaz. */}
       <View style={{ flex: 1, overflow: 'hidden' }}>
         <ListenerGrid listeners={listenerUsers} onSelectUser={(u) => setSelectedUser(u)} selectedUserId={selectedUser?.user_id} onShowAllUsers={() => openOverlay(() => setShowAudienceDrawer(true))} maxListeners={getRoomLimits(ownerTier as any).maxListeners} spectatorCount={spectatorUsers.length} roomOwnerId={room?.host_id}
           avatarFlashes={avatarFlashes} onFlashDone={clearAvatarFlash} micRequestUserIds={micRequests} />
-
-        {/* ★ InlineChat — alt sabit pozisyon, control bar'ın üstünde bant */}
-        {!showChatDrawer && !showDmPanel && !showPlusMenu && !showAccessPanel && !showRoomStats && chatMessages.length > 0 && (
-          <Pressable onPress={() => openOverlay(() => setShowChatDrawer(true))} style={{ position: 'absolute', bottom: 4, left: 4, right: 4 }}>
-            <View style={{ borderRadius: 14, overflow: 'hidden', backgroundColor: 'rgba(15,23,42,0.55)', borderWidth: 0.5, borderColor: 'rgba(20,184,166,0.1)', paddingVertical: 6 }}>
-              <InlineChat messages={chatMessages as any[]} maxLines={6} />
-            </View>
-          </Pressable>
-        )}
       </View>
+
+      {/* ★ InlineChat — flex item, listener ile control bar arasında sabit bant */}
+      {!showChatDrawer && !showDmPanel && !showPlusMenu && !showAccessPanel && !showRoomStats && chatMessages.length > 0 && (
+        <Pressable onPress={() => openOverlay(() => setShowChatDrawer(true))} style={{ marginHorizontal: 4, marginBottom: 4 }}>
+          <View style={{ borderRadius: 14, overflow: 'hidden', backgroundColor: 'rgba(15,23,42,0.55)', borderWidth: 0.5, borderColor: 'rgba(20,184,166,0.1)', paddingVertical: 6 }}>
+            <InlineChat messages={chatMessages as any[]} maxLines={5} />
+          </View>
+        </Pressable>
+      )}
 
       {!!entryEffectName && <PremiumEntryBanner name={entryEffectName} onDone={() => setEntryEffectName(null)} />}
       <SPToast ref={spToastRef} />
