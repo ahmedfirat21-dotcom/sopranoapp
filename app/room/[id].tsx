@@ -70,6 +70,7 @@ import { isSystemRoom, getSystemRooms } from '../../services/showcaseRooms';
 import RoomSettingsSheet, { type MicMode, type CameraFacing } from '../../components/RoomSettingsSheet';
 import { PasswordPromptSheet, AccessRequestSheet, AccessGate } from '../../components/room/RoomAccessPrompts';
 import PremiumAlert, { type AlertButton, type AlertType } from '../../components/PremiumAlert';
+import { ReportModal } from '../../components/ReportModal';
 import { EmojiReactionBar, FloatingReactionsView, type FloatingReactionsRef } from '../../components/EmojiReactions';
 
 // Extracted Room Sub-Components
@@ -731,6 +732,7 @@ export default function RoomScreen() {
   const [showAccessPanel, setShowAccessPanel] = useState(false);
   const [showDonationDrawer, setShowDonationDrawer] = useState(false);
   const [showInviteFriends, setShowInviteFriends] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
   const [isFollowingRoom, setIsFollowingRoom] = useState(false);
   const [followerCount, setFollowerCount] = useState(0);
   const [followers, setFollowers] = useState<{ id: string; display_name: string; avatar_url: string }[]>([]);
@@ -2905,6 +2907,14 @@ export default function RoomScreen() {
            "Konuşma & Ses" accordion'u içinde inline. Ayrı modal açılmıyor. */}
 
       <PremiumAlert visible={alertConfig.visible} title={alertConfig.title} message={alertConfig.message} type={alertConfig.type} buttons={alertConfig.buttons} icon={alertConfig.icon} onDismiss={() => setAlertConfig(prev => ({ ...prev, visible: false }))} />
+      {firebaseUser?.uid && room?.id && (
+        <ReportModal
+          visible={showReportModal}
+          onClose={() => setShowReportModal(false)}
+          reporterId={firebaseUser.uid}
+          target={{ type: 'room', id: room.id }}
+        />
+      )}
 
 
 
@@ -2924,32 +2934,7 @@ export default function RoomScreen() {
         onReportRoom={() => {
           closeAllOverlays();
           if (!firebaseUser?.uid || !room?.id) return;
-          setAlertConfig({
-            visible: true,
-            title: 'Odayı bildir',
-            message: 'Bu oda uygunsuz içerik nedeniyle incelemeye gönderilecek. Emin misin?',
-            type: 'warning',
-            icon: 'flag',
-            buttons: [
-              { text: 'Vazgeç', style: 'cancel' },
-              {
-                text: 'Bildir',
-                style: 'destructive',
-                onPress: async () => {
-                  try {
-                    await ModerationService.reportRoom(firebaseUser.uid, room.id, 'inappropriate_content', 'Oda içeriği uygunsuz');
-                    showToast({ title: '🚩 Bildirildi', message: 'Oda incelenmek üzere bildirildi', type: 'info' });
-                  } catch (e: any) {
-                    if (e?.message?.includes('fazla')) {
-                      showToast({ title: '⏳ Limit', message: e.message, type: 'warning' });
-                    } else {
-                      showToast({ title: '🚩 Bildirildi', message: 'Oda incelenmek üzere bildirildi', type: 'info' });
-                    }
-                  }
-                },
-              },
-            ],
-          });
+          setShowReportModal(true);
         }}
         micRequestCount={micRequests.length}
         userRole={myCurrentRole}
