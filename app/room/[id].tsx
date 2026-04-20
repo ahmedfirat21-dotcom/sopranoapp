@@ -2539,6 +2539,7 @@ export default function RoomScreen() {
           roomRules={typeof (room?.room_settings as any)?.rules === 'string' ? (room?.room_settings as any).rules : Array.isArray((room?.room_settings as any)?.rules) ? (room?.room_settings as any).rules.join(' · ') : undefined}
           onBack={() => { if (amIHost) { setAlertConfig({ visible: true, title: 'Odadan Ayrıl', message: 'Ayrılmak istiyor musun?', type: 'warning', icon: 'exit-outline', buttons: [{ text: 'İptal', style: 'cancel' }, { text: 'Ayrıl', style: 'destructive', onPress: handleHostLeave }] }); } else { handleUserLeave(); } }}
           onMinimize={() => { isMinimizingRef.current = true; setMinimizedRoom({ id: id as string, name: room?.name || 'Oda', hostName: hostUser?.user?.display_name || 'Host', viewerCount, isMicOn: lk.isMicrophoneEnabled || false }); safeGoBack(router); }}
+          onScenarios={() => router.push('/dev-preview')}
         />
       </View>
 
@@ -2562,25 +2563,52 @@ export default function RoomScreen() {
         </View>
       )}
 
-      <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 200, paddingTop: 8 }}>
+      {/* ★ SAHNE — ScrollView dışında sabit, konuşmacılar her zaman görünür (Clubhouse/Spaces pattern) */}
+      <View style={{ maxHeight: H * 0.38, paddingTop: 8 }}>
         <SpeakerSection stageUsers={stageUsers} getMicStatus={getMicStatus}
           onSelectUser={(u) => setSelectedUser(u)}
           onSelfDemote={handleSelfDemote}
           currentUserId={firebaseUser?.uid} VideoView={LKVideoView}
           onGhostSeatPress={handleGhostSeatPress} showSeatTooltip={showSeatTooltip}
           avatarFlashes={avatarFlashes} onFlashDone={clearAvatarFlash} />
-        {/* ★ Sahne ↔ Listener arası nefes — 24px */}
-        <View style={{ height: 24 }} />
+      </View>
+
+      {/* ★ SAHNE ↔ DİNLEYİCİ AYIRICI — Clubhouse tarzı ince gradient çizgi + dinleyici sayısı */}
+      {(listenerUsers.length > 0 || spectatorUsers.length > 0) && (
+        <View style={{ paddingVertical: 6, paddingHorizontal: 16 }}>
+          <LinearGradient
+            colors={['transparent', 'rgba(20,184,166,0.15)', 'transparent']}
+            start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }}
+            style={{ height: 1 }}
+          />
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 6 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(20,184,166,0.06)', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 10, borderWidth: 0.5, borderColor: 'rgba(20,184,166,0.12)' }}>
+              <Ionicons name="headset-outline" size={10} color="rgba(20,184,166,0.5)" />
+              <Text style={{ fontSize: 10, fontWeight: '600', color: 'rgba(20,184,166,0.5)', letterSpacing: 0.3 }}>
+                {listenerUsers.length + spectatorUsers.length} Dinleyici
+              </Text>
+            </View>
+          </View>
+        </View>
+      )}
+
+      {/* ★ 2026-04-20: Oda içinde SCROLL YOK. Dinleyici grid flex:1 overflow:hidden
+          ile kalan alanı doldurur. Listener cap GRID_VISIBLE_CAP ile ekrana göre
+          adapte olur — taşan avatarlar "+N Seyirci" badge + AudienceDrawer'a düşer.
+          InlineChat alt sabit overlay olarak control bar'ın hemen üstünde. */}
+      <View style={{ flex: 1, overflow: 'hidden' }}>
         <ListenerGrid listeners={listenerUsers} onSelectUser={(u) => setSelectedUser(u)} selectedUserId={selectedUser?.user_id} onShowAllUsers={() => openOverlay(() => setShowAudienceDrawer(true))} maxListeners={getRoomLimits(ownerTier as any).maxListeners} spectatorCount={spectatorUsers.length} roomOwnerId={room?.host_id}
           avatarFlashes={avatarFlashes} onFlashDone={clearAvatarFlash} micRequestUserIds={micRequests} />
-      </ScrollView>
 
-      {/* ★ Inline Chat — mesaj yaz kutusunun hemen üstünde, şeffaf metin */}
-      {!showChatDrawer && !showDmPanel && !showPlusMenu && !showAccessPanel && !showRoomStats && (
-        <Pressable onPress={() => openOverlay(() => setShowChatDrawer(true))} style={{ position: 'absolute', bottom: Math.max(insets.bottom, 14) + 58, left: 0, right: 0, zIndex: 2 }}>
-          <InlineChat messages={chatMessages as any[]} maxLines={5} />
-        </Pressable>
-      )}
+        {/* ★ InlineChat — alt sabit pozisyon, control bar'ın üstünde bant */}
+        {!showChatDrawer && !showDmPanel && !showPlusMenu && !showAccessPanel && !showRoomStats && chatMessages.length > 0 && (
+          <Pressable onPress={() => openOverlay(() => setShowChatDrawer(true))} style={{ position: 'absolute', bottom: 4, left: 4, right: 4 }}>
+            <View style={{ borderRadius: 14, overflow: 'hidden', backgroundColor: 'rgba(15,23,42,0.55)', borderWidth: 0.5, borderColor: 'rgba(20,184,166,0.1)', paddingVertical: 6 }}>
+              <InlineChat messages={chatMessages as any[]} maxLines={6} />
+            </View>
+          </Pressable>
+        )}
+      </View>
 
       {!!entryEffectName && <PremiumEntryBanner name={entryEffectName} onDone={() => setEntryEffectName(null)} />}
       <SPToast ref={spToastRef} />

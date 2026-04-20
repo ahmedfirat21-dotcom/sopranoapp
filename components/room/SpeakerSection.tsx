@@ -10,15 +10,18 @@ import type { RoomParticipant } from '../../services/database';
 const { width: W } = Dimensions.get('window');
 
 // ★ Dinamik sahne boyutlandırma — modern platform grid sistemi (Clubhouse/Spaces pattern)
+// 2026-04-20: Oda içi SCROLL YOK kuralı — yüksek yoğunlukta daha kompakt grid,
+// yüksek satır sayısını azaltıyoruz ki stage viewport'un 0.38'ine sığsın.
 function getSpeakerMetrics(count: number) {
   const availableW = W - 32;
   let cols: number, gap: number;
   if (count <= 2) { cols = 2; gap = 12; }
   else if (count <= 6) { cols = 3; gap = 10; }
-  else if (count <= 9) { cols = 3; gap = 8; }
-  else { cols = 4; gap = 6; } // 10-13 compact
+  else if (count <= 9) { cols = 4; gap = 8; }   // 7-9: 3 col yerine 4 (~2 satır)
+  else { cols = 5; gap = 6; }                   // 10-13: 4 col yerine 5 (3 satır)
   const cardWidth = Math.floor((availableW - gap * (cols - 1)) / cols);
-  const cardHeight = cardWidth;
+  // High-density'de kart boyu shrink — avatar + isim için yeter, yükseklik tasarrufu
+  const cardHeight = count > 9 ? Math.floor(cardWidth * 0.95) : cardWidth;
   return { cols, cardWidth, cardHeight, gap };
 }
 
@@ -371,7 +374,7 @@ export default function SpeakerSection({ stageUsers, getMicStatus, onSelectUser,
 }
 
 const s = StyleSheet.create({
-  wrap: { paddingHorizontal: 16, marginTop: -4 },
+  wrap: { paddingHorizontal: 16, paddingTop: 4 },
   headerRow: {
     flexDirection: 'row', alignItems: 'center',
     justifyContent: 'space-between', marginBottom: 8,
