@@ -549,6 +549,12 @@ export class LiveKitService {
     return this.room?.localParticipant?.isMicrophoneEnabled ?? false;
   }
 
+  // ★ 2026-04-20: Minimize-restore state seed için — yeni mount'ta "disconnected"
+  // başlamaması için useLiveKit bunu kullanır.
+  isConnectedTo(roomId: string): boolean {
+    return this.currentRoomId === roomId && this.room?.state === 'connected';
+  }
+
   // --- Ekran Paylasimi -----------------------------------------------
   async toggleScreenShare(): Promise<boolean> {
     if (!this.room?.localParticipant) {

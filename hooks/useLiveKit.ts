@@ -14,11 +14,16 @@ interface UseLiveKitOptions {
 }
 
 export default function useLiveKit({ roomId, enabled = true, userId, displayName, qualityPreset, shouldDisconnectOnUnmount, onPermissionDenied }: UseLiveKitOptions) {
-  const [connectionState, setConnectionState] = useState<RoomConnectionState>('disconnected');
+  // ★ 2026-04-20 Minimize-restore: Eğer servis zaten aynı odaya bağlıysa
+  // initial state 'connected' — "bağlanıyor" flash'ı önlenir.
+  const isAlreadyConnected = !!roomId && liveKitService.isConnectedTo(roomId);
+  const [connectionState, setConnectionState] = useState<RoomConnectionState>(
+    isAlreadyConnected ? 'connected' : 'disconnected',
+  );
   const [participants, setParticipants] = useState<ParticipantUpdate[]>([]);
   // ★ BUG-2 FIX: Mic/Cam durumunu React state olarak takip et
-  const [isMicEnabled, setIsMicEnabled] = useState(false);
-  const [isCamEnabled, setIsCamEnabled] = useState(false);
+  const [isMicEnabled, setIsMicEnabled] = useState(isAlreadyConnected ? liveKitService.isMicrophoneEnabled : false);
+  const [isCamEnabled, setIsCamEnabled] = useState(isAlreadyConnected ? liveKitService.isCameraEnabled : false);
   const [connectFailed, setConnectFailed] = useState(false);
   const connectingRef = useRef(false); // Aktif bağlantı denemesi var mı
   const mountedRef = useRef(true);
