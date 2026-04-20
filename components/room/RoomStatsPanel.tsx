@@ -1,6 +1,7 @@
 import React, { useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, Pressable, Animated, Dimensions, ScrollView, PanResponder, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 
 const { width: W, height: H } = Dimensions.get('window');
 
@@ -91,6 +92,7 @@ export default function RoomStatsPanel({
       </Animated.View>
 
       <Animated.View style={[st.panel, { transform: [{ translateY: slideAnim }] }]} {...panResponder.panHandlers}>
+        <LinearGradient colors={['#4a5668', '#37414f', '#232a35']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[StyleSheet.absoluteFillObject, { borderTopLeftRadius: 20, borderTopRightRadius: 20 }]} />
         {/* Handle */}
         <View style={st.handle} />
 
@@ -178,7 +180,6 @@ const st = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: '#2D3740',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     borderWidth: 1,
@@ -186,6 +187,7 @@ const st = StyleSheet.create({
     paddingHorizontal: 14,
     paddingBottom: 28,
     elevation: 50,
+    overflow: 'hidden',
   },
   handle: {
     width: 36,

@@ -8,6 +8,7 @@ import {
   Animated, Dimensions, Pressable, ScrollView, PanResponder,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { getAvatarSource } from '../../constants/avatars';
 
 const { height: H } = Dimensions.get('window');
@@ -148,6 +149,7 @@ export default function ProfileCard({
 
       {/* Card */}
       <Animated.View style={[sty.card, { transform: [{ translateY: slideY }] }]} {...panResponder.panHandlers}>
+        <LinearGradient colors={['#4a5668', '#37414f', '#232a35']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[StyleSheet.absoluteFillObject, { borderRadius: 20 }]} />
         {/* ──── Handle bar (sürükle) ──── */}
         <View style={sty.handle} />
         <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
@@ -395,8 +397,8 @@ const sty = StyleSheet.create({
   card: {
     marginHorizontal: 10,
     marginBottom: 90,
-    backgroundColor: C.glass,
     borderRadius: 20,
+    overflow: 'hidden',
     borderWidth: 1,
     borderColor: C.border,
     padding: 18,

@@ -6,6 +6,7 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, ScrollView, Pressable, Image, Animated, StyleSheet, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { getAvatarSource } from '../../constants/avatars';
 import { useSwipeToDismiss } from '../../hooks/useSwipeToDismiss';
 
@@ -81,6 +82,7 @@ export default function AudienceDrawer({ visible, users, onClose, onSelectUser, 
           transform: [{ translateX: Animated.add(slideAnim, swipeX) }],
         }]}
       >
+        <LinearGradient colors={['#4a5668', '#37414f', '#232a35']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFillObject} />
         {/* ★ Sürükleme tutacağı — sol kenar çizgisi */}
         <View style={s.dragHandle}>
           <View style={s.dragHandleBar} />
@@ -147,7 +149,6 @@ const s = StyleSheet.create({
     position: 'absolute',
     right: 0, top: 70, bottom: 80,
     width: PANEL_W,
-    backgroundColor: 'rgba(45,55,64,0.96)',
     borderTopLeftRadius: 18,
     borderBottomLeftRadius: 18,
     borderWidth: 1,

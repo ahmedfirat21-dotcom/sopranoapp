@@ -351,10 +351,10 @@ export default function RoomQuickSettings({ visible, room, hostId, ownerTier, on
       </Animated.View>
 
       <Animated.View style={[sty.sheet, { transform: [{ translateY: slideAnim }] }]}>
-        {/* Gradient zemin */}
+        {/* ★ FriendsDrawer paleti — warm/neutral diagonal gradient */}
         <LinearGradient
-          colors={['#2A3E50', '#1E3040', '#152530']}
-          start={{ x: 0.1, y: 0 }} end={{ x: 0.9, y: 1 }}
+          colors={['#4a5668', '#37414f', '#232a35']}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
           style={StyleSheet.absoluteFill}
         />
 

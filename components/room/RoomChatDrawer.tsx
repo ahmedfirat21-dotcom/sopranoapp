@@ -4,6 +4,7 @@ import {
   TextInput, FlatList, Image, Dimensions, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { getAvatarSource } from '../../constants/avatars';
 import { useSwipeToDismiss } from '../../hooks/useSwipeToDismiss';
 
@@ -129,6 +130,7 @@ export default function RoomChatDrawer({ visible, messages, chatInput, onChangeI
 
       {/* Panel — sağdan kayar + tüm alandan sürüklenebilir */}
       <Animated.View {...panHandlers} style={[s.panel, { transform: [{ translateX: Animated.add(slideAnim, swipeX) }] }]}>
+        <LinearGradient colors={['#4a5668', '#37414f', '#232a35']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFillObject} />
         {/* Başlık */}
         <View collapsable={false} style={s.header}>
           <View style={s.headerDot} />
@@ -198,7 +200,6 @@ const s = StyleSheet.create({
     top: 70,
     bottom: 80,
     width: PANEL_W,
-    backgroundColor: 'rgba(45,55,64,0.95)',
     borderTopLeftRadius: 18,
     borderBottomLeftRadius: 18,
     borderWidth: 1,

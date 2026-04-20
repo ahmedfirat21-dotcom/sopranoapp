@@ -9,6 +9,7 @@ import {
   Image, Animated, Dimensions, PanResponder,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Colors } from '../../constants/theme';
 import { getAvatarSource } from '../../constants/avatars';
 import { type RoomParticipant } from '../../services/database';
@@ -159,6 +160,7 @@ export default function HandRaiseQueuePanel({
         {...panResponder.panHandlers}
         style={[s.panel, { bottom: BAR_OFFSET, transform: [{ translateY }] }]}
       >
+        <LinearGradient colors={['#4a5668', '#37414f', '#232a35']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[StyleSheet.absoluteFillObject, { borderTopLeftRadius: 20, borderTopRightRadius: 20 }]} />
         {/* Sürükleme tutamağı */}
         <View style={s.handle}>
           <View style={s.handleBar} />
@@ -231,7 +233,6 @@ const s = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 50,
-    backgroundColor: 'rgba(45,55,64,0.95)',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     borderWidth: 1,

@@ -6,6 +6,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, Pressable, Image, FlatList, ActivityIndicator, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { FriendshipService, FollowUser } from '../../services/friendship';
 import { getAvatarSource } from '../../constants/avatars';
 import { supabase } from '../../constants/supabase';
@@ -195,6 +196,7 @@ export default function InviteFriendsModal({ visible, userId, onClose, onInvite,
     <View style={s.overlay}>
       <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
       <View style={s.modal}>
+        <LinearGradient colors={['#4a5668', '#37414f', '#232a35']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[StyleSheet.absoluteFillObject, { borderRadius: 20 }]} />
         {/* Header */}
         <View style={s.header}>
           <Ionicons name="people" size={16} color="#14B8A6" />
@@ -230,7 +232,6 @@ const s = StyleSheet.create({
     width: W * 0.88,
     maxHeight: 460,
     minHeight: 200,
-    backgroundColor: 'rgba(30,41,59,0.97)',
     borderRadius: 20,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.08)',

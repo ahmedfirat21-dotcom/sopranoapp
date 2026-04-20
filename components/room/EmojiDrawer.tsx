@@ -5,6 +5,7 @@
  */
 import React, { useRef, useEffect } from 'react';
 import { View, StyleSheet, Animated, PanResponder, Dimensions, Pressable } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { EmojiReactionBar } from '../EmojiReactions';
 
 const { height: SCREEN_H } = Dimensions.get('window');
@@ -83,6 +84,7 @@ export default function EmojiDrawer({ visible, onClose, onReaction, bottomInset 
           },
         ]}
       >
+        <LinearGradient colors={['#4a5668', '#37414f', '#232a35']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[StyleSheet.absoluteFillObject, { borderTopLeftRadius: 20, borderTopRightRadius: 20 }]} />
         {/* Sürükleme tutamağı */}
         <View style={styles.handle}>
           <View style={styles.handleBar} />
@@ -106,9 +108,9 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 50,
-    backgroundColor: 'rgba(45,55,64,0.95)',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
+    overflow: 'hidden',
     borderWidth: 1,
     borderBottomWidth: 0,
     borderColor: 'rgba(255,255,255,0.08)',
