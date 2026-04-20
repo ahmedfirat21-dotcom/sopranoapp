@@ -569,21 +569,16 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
             {/* Header */}
             <View collapsable={false} style={{
               flexDirection: 'row', alignItems: 'center', gap: 8,
-              paddingHorizontal: 14, paddingVertical: 12,
+              paddingHorizontal: 12, paddingVertical: 8,
               borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)',
               backgroundColor: 'rgba(20,184,166,0.06)',
             }}>
-              <View style={{
-                width: 28, height: 28,
-                alignItems: 'center', justifyContent: 'center',
-              }}>
-                <Ionicons
-                  name="chatbubbles"
-                  size={14}
-                  color="#14B8A6"
-                  style={{ textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 3 }}
-                />
-              </View>
+              <Ionicons
+                name="chatbubbles"
+                size={20}
+                color="#14B8A6"
+                style={{ textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 3 }}
+              />
               <Text style={{
                 color: '#F1F5F9', fontSize: 14, fontWeight: '700', flex: 1, letterSpacing: -0.2,
                 textShadowColor: 'rgba(0,0,0,0.45)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
