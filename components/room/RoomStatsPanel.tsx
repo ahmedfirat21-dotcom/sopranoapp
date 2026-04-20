@@ -92,7 +92,7 @@ export default function RoomStatsPanel({
       </Animated.View>
 
       <Animated.View style={[st.panel, { transform: [{ translateY: slideAnim }] }]} {...panResponder.panHandlers}>
-        <LinearGradient colors={['#4a5668', '#37414f', '#232a35']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[StyleSheet.absoluteFillObject, { borderTopLeftRadius: 20, borderTopRightRadius: 20 }]} />
+        <LinearGradient colors={['#4a5668', '#37414f', '#232a35']} locations={[0, 0.35, 1]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[StyleSheet.absoluteFillObject, { borderTopLeftRadius: 20, borderTopRightRadius: 20 }]} />
         {/* Handle */}
         <View style={st.handle} />
 
@@ -183,7 +183,7 @@ const st = StyleSheet.create({
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
+    borderColor: '#95a1ae',
     paddingHorizontal: 14,
     paddingBottom: 28,
     elevation: 50,

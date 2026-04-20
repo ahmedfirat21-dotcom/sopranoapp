@@ -160,7 +160,7 @@ export default function HandRaiseQueuePanel({
         {...panResponder.panHandlers}
         style={[s.panel, { bottom: BAR_OFFSET, transform: [{ translateY }] }]}
       >
-        <LinearGradient colors={['#4a5668', '#37414f', '#232a35']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[StyleSheet.absoluteFillObject, { borderTopLeftRadius: 20, borderTopRightRadius: 20 }]} />
+        <LinearGradient colors={['#4a5668', '#37414f', '#232a35']} locations={[0, 0.35, 1]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[StyleSheet.absoluteFillObject, { borderTopLeftRadius: 20, borderTopRightRadius: 20 }]} />
         {/* Sürükleme tutamağı */}
         <View style={s.handle}>
           <View style={s.handleBar} />
@@ -237,7 +237,7 @@ const s = StyleSheet.create({
     borderTopRightRadius: 20,
     borderWidth: 1,
     borderBottomWidth: 0,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: '#95a1ae',
     overflow: 'hidden',
     paddingBottom: 8,
     elevation: 20,

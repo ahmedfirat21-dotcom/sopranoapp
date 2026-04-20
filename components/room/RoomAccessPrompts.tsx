@@ -76,7 +76,7 @@ function BaseSheet({ visible, onDismiss, children, maxHeight = H * 0.55 }: {
 
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'flex-end' }} pointerEvents="box-none">
         <Animated.View style={[st.sheet, { transform: [{ translateY: slideY }], maxHeight }]}>
-          <LinearGradient colors={['#4a5668', '#37414f', '#232a35']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+          <LinearGradient colors={['#4a5668', '#37414f', '#232a35']} locations={[0, 0.35, 1]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
           <View {...panResponder.panHandlers} style={st.handleWrap}>
             <View style={st.handle} />
           </View>
@@ -346,6 +346,7 @@ export function AccessGate({
     <View style={gate.overlay} pointerEvents="auto">
       <LinearGradient
         colors={['#4a5668', '#37414f', '#232a35']}
+        locations={[0, 0.35, 1]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={StyleSheet.absoluteFill}

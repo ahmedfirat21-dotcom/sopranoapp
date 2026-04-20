@@ -176,7 +176,7 @@ export default function DonationDrawer({ visible, onClose, senderId, hostId, hos
       <Animated.View
         style={[styles.panel, { bottom: BAR_OFFSET, transform: [{ translateY }] }]}
       >
-        <LinearGradient colors={['#4a5668', '#37414f', '#232a35']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[StyleSheet.absoluteFillObject, { borderTopLeftRadius: 20, borderTopRightRadius: 20 }]} />
+        <LinearGradient colors={['#4a5668', '#37414f', '#232a35']} locations={[0, 0.35, 1]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[StyleSheet.absoluteFillObject, { borderTopLeftRadius: 20, borderTopRightRadius: 20 }]} />
         {/* Sürükleme tutamağı — panHandlers SADECE buraya bağlı */}
         <View style={styles.handle} {...panResponder.panHandlers}>
           <View style={styles.handleBar} />
@@ -274,7 +274,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: 1,
     borderBottomWidth: 0,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: '#95a1ae',
     paddingBottom: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },

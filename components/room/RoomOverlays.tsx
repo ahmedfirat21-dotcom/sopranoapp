@@ -727,6 +727,7 @@ export function PlusMenu({
         {/* ★ FriendsDrawer paleti — diagonal warm-neutral gradient */}
         <LinearGradient
           colors={['#4a5668', '#37414f', '#232a35']}
+          locations={[0, 0.35, 1]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={StyleSheet.absoluteFill}

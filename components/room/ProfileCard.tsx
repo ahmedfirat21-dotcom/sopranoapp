@@ -149,7 +149,7 @@ export default function ProfileCard({
 
       {/* Card */}
       <Animated.View style={[sty.card, { transform: [{ translateY: slideY }] }]} {...panResponder.panHandlers}>
-        <LinearGradient colors={['#4a5668', '#37414f', '#232a35']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[StyleSheet.absoluteFillObject, { borderRadius: 20 }]} />
+        <LinearGradient colors={['#4a5668', '#37414f', '#232a35']} locations={[0, 0.35, 1]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[StyleSheet.absoluteFillObject, { borderRadius: 20 }]} />
         {/* ──── Handle bar (sürükle) ──── */}
         <View style={sty.handle} />
         <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
@@ -400,7 +400,7 @@ const sty = StyleSheet.create({
     borderRadius: 20,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: C.border,
+    borderColor: '#95a1ae',
     padding: 18,
     maxHeight: H * 0.72,
     shadowColor: '#000',

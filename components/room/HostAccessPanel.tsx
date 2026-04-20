@@ -170,7 +170,7 @@ export default function HostAccessPanel({ visible, onClose, roomId, roomType, ho
 
       {/* Panel — sağdan süzülür + sağa sürükle kapat */}
       <Animated.View style={[s.panel, { transform: [{ translateX: Animated.add(slideAnim, swipeX) }] }]} {...panHandlers}>
-        <LinearGradient colors={['#4a5668', '#37414f', '#232a35']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFillObject} />
+        <LinearGradient colors={['#4a5668', '#37414f', '#232a35']} locations={[0, 0.35, 1]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFillObject} />
         {/* Üst parlak mor accent — palette üzerine hafif ışık */}
         <LinearGradient
           colors={['rgba(167,139,250,0.12)', 'rgba(167,139,250,0.03)', 'transparent']}
@@ -375,7 +375,7 @@ const s = StyleSheet.create({
     width: DRAWER_W,
     borderTopLeftRadius: 18, borderBottomLeftRadius: 18,
     borderWidth: 1, borderRightWidth: 0,
-    borderColor: 'rgba(167,139,250,0.08)',
+    borderColor: '#95a1ae',
     overflow: 'hidden',
     shadowColor: '#000', shadowOffset: { width: -2, height: 0 }, shadowOpacity: 0.2, shadowRadius: 8,
     elevation: 8,

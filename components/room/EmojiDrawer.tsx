@@ -84,7 +84,7 @@ export default function EmojiDrawer({ visible, onClose, onReaction, bottomInset 
           },
         ]}
       >
-        <LinearGradient colors={['#4a5668', '#37414f', '#232a35']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[StyleSheet.absoluteFillObject, { borderTopLeftRadius: 20, borderTopRightRadius: 20 }]} />
+        <LinearGradient colors={['#4a5668', '#37414f', '#232a35']} locations={[0, 0.35, 1]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[StyleSheet.absoluteFillObject, { borderTopLeftRadius: 20, borderTopRightRadius: 20 }]} />
         {/* Sürükleme tutamağı */}
         <View style={styles.handle}>
           <View style={styles.handleBar} />
@@ -113,7 +113,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: 1,
     borderBottomWidth: 0,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: '#95a1ae',
     paddingBottom: 8,
     // Gölge
     shadowColor: '#000',

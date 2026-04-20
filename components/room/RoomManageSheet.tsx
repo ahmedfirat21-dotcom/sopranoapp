@@ -813,7 +813,7 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
 
       {/* Panel â€” sağdan kayar */}
       <Animated.View style={[p.panel, { transform: [{ translateX: slideAnim }] }]}>
-        <LinearGradient colors={['#4a5668', '#37414f', '#232a35']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFillObject} />
+        <LinearGradient colors={['#4a5668', '#37414f', '#232a35']} locations={[0, 0.35, 1]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFillObject} />
         {/* Drag Handle - sadece buradan surukle */}
         <View {...panResponder.panHandlers} style={p.dragHandle}>
           <View style={p.dragPill} />

@@ -354,6 +354,7 @@ export default function RoomQuickSettings({ visible, room, hostId, ownerTier, on
         {/* ★ FriendsDrawer paleti — warm/neutral diagonal gradient */}
         <LinearGradient
           colors={['#4a5668', '#37414f', '#232a35']}
+          locations={[0, 0.35, 1]}
           start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
           style={StyleSheet.absoluteFill}
         />
@@ -936,7 +937,7 @@ const sty = StyleSheet.create({
   sheet: {
     position: 'absolute', bottom: 0, left: 0, right: 0, height: SHEET_H,
     borderTopLeftRadius: 24, borderTopRightRadius: 24,
-    borderWidth: 1, borderBottomWidth: 0, borderColor: 'rgba(255,255,255,0.06)', overflow: 'hidden',
+    borderWidth: 1, borderBottomWidth: 0, borderColor: '#95a1ae', overflow: 'hidden',
   },
   handleWrap: { alignItems: 'center', paddingTop: 10, paddingBottom: 2 },
   handle: { width: 36, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.15)' },

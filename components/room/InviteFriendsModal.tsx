@@ -196,7 +196,7 @@ export default function InviteFriendsModal({ visible, userId, onClose, onInvite,
     <View style={s.overlay}>
       <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
       <View style={s.modal}>
-        <LinearGradient colors={['#4a5668', '#37414f', '#232a35']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[StyleSheet.absoluteFillObject, { borderRadius: 20 }]} />
+        <LinearGradient colors={['#4a5668', '#37414f', '#232a35']} locations={[0, 0.35, 1]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[StyleSheet.absoluteFillObject, { borderRadius: 20 }]} />
         {/* Header */}
         <View style={s.header}>
           <Ionicons name="people" size={16} color="#14B8A6" />
@@ -234,7 +234,7 @@ const s = StyleSheet.create({
     minHeight: 200,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: '#95a1ae',
     overflow: 'hidden',
   },
   header: {

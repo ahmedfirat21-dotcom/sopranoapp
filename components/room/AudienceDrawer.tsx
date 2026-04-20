@@ -82,7 +82,7 @@ export default function AudienceDrawer({ visible, users, onClose, onSelectUser, 
           transform: [{ translateX: Animated.add(slideAnim, swipeX) }],
         }]}
       >
-        <LinearGradient colors={['#4a5668', '#37414f', '#232a35']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFillObject} />
+        <LinearGradient colors={['#4a5668', '#37414f', '#232a35']} locations={[0, 0.35, 1]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFillObject} />
         {/* ★ Sürükleme tutacağı — sol kenar çizgisi */}
         <View style={s.dragHandle}>
           <View style={s.dragHandleBar} />
@@ -153,7 +153,7 @@ const s = StyleSheet.create({
     borderBottomLeftRadius: 18,
     borderWidth: 1,
     borderRightWidth: 0,
-    borderColor: 'rgba(20,184,166,0.1)',
+    borderColor: '#95a1ae',
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: -4, height: 0 },
