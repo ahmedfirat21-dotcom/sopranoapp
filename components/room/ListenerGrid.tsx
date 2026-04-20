@@ -118,11 +118,9 @@ export default function ListenerGrid({ listeners, onSelectUser, selectedUserId, 
     });
   }, [listeners, roomOwnerId, micRequestUserIds]);
 
-  // ★ 2026-04-19: Grid'de gösterilen dinleyici sayısı estetik cap — tier kapasitesi
-  // daha yüksek olsa da (Plus=25, Pro=999) belli bir sayıdan sonrası avatar/isim
-  // okunamaz hale geliyor. Cap ekran genişliğine göre: küçük cihazlarda daha az.
-  // Overflow "+N Seyirci" badge'e düşer, AudienceDrawer'dan tümüne erişilir.
-  const GRID_VISIBLE_CAP = W < 360 ? 10 : W < 400 ? 14 : 18;
+  // ★ 2026-04-20: Grid'de maks 14 dinleyici. Daha fazlası "+N Seyirci" badge
+  // olarak overflow'a düşer — tıkla → AudienceDrawer. Küçük ekranlarda daha az.
+  const GRID_VISIBLE_CAP = W < 360 ? 10 : 14;
   const gridCap = Math.min(maxListeners, GRID_VISIBLE_CAP);
   const visibleListeners = sortedListeners.slice(0, gridCap);
   const overflowListeners = Math.max(0, listeners.length - gridCap);
@@ -134,16 +132,8 @@ export default function ListenerGrid({ listeners, onSelectUser, selectedUserId, 
 
   return (
     <View style={s.wrap}>
-      {/* ★ 2026-04-20: Dinleyici sayısı artık StageDivider'da — burada sadece "Tümü" butonu */}
-      {onShowAllUsers && listeners.length > 4 && (
-        <View style={s.headerRowMinimal}>
-          <View />
-          <Pressable style={s.allUsersBtn} onPress={onShowAllUsers} hitSlop={10}>
-            <Ionicons name="people" size={14} color="#14B8A6" />
-            <Text style={s.allUsersText}>Tümü</Text>
-          </Pressable>
-        </View>
-      )}
+      {/* ★ 2026-04-20: "Tümü" butonu kaldırıldı — divider pill (oda sayfasında)
+          ve overflow "+N Seyirci" badge tek giriş noktası (AudienceDrawer). */}
       <View style={[s.grid, { gap: avatarGap }]}>
         {visibleListeners.map((u) => {
           const isSelected = selectedUserId === u.user_id;

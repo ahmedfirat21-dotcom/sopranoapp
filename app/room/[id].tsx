@@ -2573,7 +2573,8 @@ export default function RoomScreen() {
           avatarFlashes={avatarFlashes} onFlashDone={clearAvatarFlash} />
       </View>
 
-      {/* ★ SAHNE ↔ DİNLEYİCİ AYIRICI — Clubhouse tarzı ince gradient çizgi + dinleyici sayısı */}
+      {/* ★ SAHNE ↔ DİNLEYİCİ AYIRICI — 2026-04-20: Pill artık tıklanabilir,
+          tek giriş noktası AudienceDrawer'a. */}
       {(listenerUsers.length > 0 || spectatorUsers.length > 0) && (
         <View style={{ paddingVertical: 6, paddingHorizontal: 16 }}>
           <LinearGradient
@@ -2582,12 +2583,14 @@ export default function RoomScreen() {
             style={{ height: 1 }}
           />
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 6 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(20,184,166,0.06)', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 10, borderWidth: 0.5, borderColor: 'rgba(20,184,166,0.12)' }}>
-              <Ionicons name="headset-outline" size={10} color="rgba(20,184,166,0.5)" />
-              <Text style={{ fontSize: 10, fontWeight: '600', color: 'rgba(20,184,166,0.5)', letterSpacing: 0.3 }}>
+            <Pressable onPress={() => openOverlay(() => setShowAudienceDrawer(true))} hitSlop={8}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(20,184,166,0.08)', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 10, borderWidth: 0.5, borderColor: 'rgba(20,184,166,0.2)' }}>
+              <Ionicons name="headset-outline" size={11} color="rgba(20,184,166,0.7)" />
+              <Text style={{ fontSize: 11, fontWeight: '600', color: 'rgba(20,184,166,0.7)', letterSpacing: 0.3 }}>
                 {listenerUsers.length + spectatorUsers.length} Dinleyici
               </Text>
-            </View>
+              <Ionicons name="chevron-forward" size={11} color="rgba(20,184,166,0.6)" />
+            </Pressable>
           </View>
         </View>
       )}
