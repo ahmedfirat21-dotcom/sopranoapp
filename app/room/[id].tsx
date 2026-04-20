@@ -574,13 +574,20 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
               backgroundColor: 'rgba(20,184,166,0.06)',
             }}>
               <View style={{
-                width: 28, height: 28, borderRadius: 9,
-                backgroundColor: 'rgba(20,184,166,0.15)', borderWidth: 1, borderColor: 'rgba(20,184,166,0.25)',
+                width: 28, height: 28,
                 alignItems: 'center', justifyContent: 'center',
               }}>
-                <Ionicons name="chatbubbles" size={13} color="#14B8A6" />
+                <Ionicons
+                  name="chatbubbles"
+                  size={14}
+                  color="#14B8A6"
+                  style={{ textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 3 }}
+                />
               </View>
-              <Text style={{ color: '#F1F5F9', fontSize: 14, fontWeight: '700', flex: 1, letterSpacing: -0.2 }}>Mesajlar</Text>
+              <Text style={{
+                color: '#F1F5F9', fontSize: 14, fontWeight: '700', flex: 1, letterSpacing: -0.2,
+                textShadowColor: 'rgba(0,0,0,0.45)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
+              }}>Mesajlar</Text>
               {dmUnreadCount > 0 && (
                 <View style={{
                   minWidth: 20, height: 20, borderRadius: 10,
