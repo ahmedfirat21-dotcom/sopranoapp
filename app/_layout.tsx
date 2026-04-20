@@ -1041,8 +1041,10 @@ export default function RootLayout() {
           <MiniRoomCard
             room={minimizedRoom}
             onExpand={() => {
+              // ★ 2026-04-20: setMinimizedRoom(null) burada YAPILMAZ — room/[id]
+              // mount edildiğinde isRestoringFromMinimize kontrolü gerek; state'i
+              // room/[id] kendisi temizliyor (useEffect ile, mount sonrası).
               const roomId = minimizedRoom.id;
-              setMinimizedRoom(null);
               routerRef.current.push(`/room/${roomId}`);
             }}
             onClose={() => {
