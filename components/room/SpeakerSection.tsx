@@ -45,6 +45,8 @@ interface Props {
   /** Per-user avatar flash state */
   avatarFlashes?: Record<string, FlashType | null>;
   onFlashDone?: (userId: string) => void;
+  /** Kamera rozeti tap — user'ın kamerasını fullscreen aç */
+  onCameraExpand?: (user: RoomParticipant) => void;
 }
 
 function SpeakingGlow({ speaking, borderRadius = 16 }: { speaking: boolean; borderRadius?: number }) {
@@ -195,9 +197,10 @@ function CaretakerTimerBadge({ expiresAt }: { expiresAt: string }) {
   );
 }
 
-function SpeakerCard({ user, micStatus, onPress, onSelfDemote, isMe, cardWidth, cardHeight, VideoView }: {
+function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, isMe, cardWidth, cardHeight, VideoView }: {
   user: RoomParticipant; micStatus: MicStatus; onPress: () => void;
   onSelfDemote?: () => void;
+  onCameraExpand?: (user: RoomParticipant) => void;
   isMe: boolean; cardWidth: number; cardHeight: number; VideoView?: any;
 }) {
   const isHost = user.role === 'owner';
@@ -251,6 +254,17 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, isMe, cardWidth, 
         <View style={[s.micBadge, mic ? s.micBadgeOn : s.micBadgeOff]}>
           <Ionicons name={mic ? 'mic' : 'mic-off'} size={14} color="#fff" />
         </View>
+        {/* ★ 2026-04-20: Kamera rozeti — açık ise sol üstte, TAP → fullscreen video.
+            Avatar onPress (profile card) ile çakışmaz (nested Pressable) */}
+        {cameraOn && videoTrack && onCameraExpand && (
+          <Pressable
+            onPress={(e) => { e.stopPropagation?.(); onCameraExpand(user); }}
+            hitSlop={6}
+            style={({ pressed }) => [s.cameraBadge, pressed && { opacity: 0.7, transform: [{ scale: 0.92 }] }]}
+          >
+            <Ionicons name="videocam" size={13} color="#fff" />
+          </Pressable>
+        )}
       </View>
       <Text style={[s.speakerName, { maxWidth: cardWidth - 8, fontSize: cardWidth < 95 ? 10 : 11 }, isHost && { color: '#FFD700' }, isMod && !isHost && { color: '#C4B5FD' }]} numberOfLines={1} ellipsizeMode="tail">{displayName}</Text>
       {isMe && (
@@ -263,7 +277,7 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, isMe, cardWidth, 
   );
 }
 
-export default function SpeakerSection({ stageUsers, getMicStatus, onSelectUser, onSelfDemote, currentUserId, VideoView, onGhostSeatPress, showSeatTooltip, avatarFlashes, onFlashDone }: Props) {
+export default function SpeakerSection({ stageUsers, getMicStatus, onSelectUser, onSelfDemote, currentUserId, VideoView, onGhostSeatPress, showSeatTooltip, avatarFlashes, onFlashDone, onCameraExpand }: Props) {
   const sortedUsers = useMemo(() => {
     if (stageUsers.length === 0) return [];
     const roleOrder: Record<string, number> = { owner: 0, host: 0, moderator: 1, speaker: 2 };
@@ -346,6 +360,7 @@ export default function SpeakerSection({ stageUsers, getMicStatus, onSelectUser,
             return (
               <SpeakerCard key={u.id} user={u} micStatus={st} onPress={() => onSelectUser(u)}
                 onSelfDemote={onSelfDemote}
+                onCameraExpand={onCameraExpand}
                 isMe={isMe} cardWidth={spotlightW} cardHeight={spotlightH} VideoView={VideoView} />
             );
           })}
@@ -365,6 +380,7 @@ export default function SpeakerSection({ stageUsers, getMicStatus, onSelectUser,
           return (
             <SpeakerCard key={u.id} user={u} micStatus={st} onPress={() => onSelectUser(u)}
               onSelfDemote={onSelfDemote}
+              onCameraExpand={onCameraExpand}
               isMe={isMe} cardWidth={w} cardHeight={h} VideoView={VideoView} />
           );
         })}
@@ -447,6 +463,7 @@ const s = StyleSheet.create({
   micBadge: { position: 'absolute', bottom: 6, right: 6, width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'rgba(15,23,42,0.8)', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 4 },
   micBadgeOn: { backgroundColor: '#14B8A6' },
   micBadgeOff: { backgroundColor: 'rgba(239,68,68,0.85)' },
+  cameraBadge: { position: 'absolute', top: 6, right: 6, width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'rgba(15,23,42,0.8)', backgroundColor: '#0EA5A3', shadowColor: '#0EA5A3', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.6, shadowRadius: 6, elevation: 5 },
   // ★ Ghost overlay — "gizli" modunda hafif bir tonda üstüne bindirilir (badge yerine)
   ghostOverlay: {
     ...StyleSheet.absoluteFillObject,

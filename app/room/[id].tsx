@@ -84,6 +84,7 @@ import HandRaiseQueuePanel from '../../components/room/HandRaiseQueuePanel';
 import InviteFriendsModal from '../../components/room/InviteFriendsModal';
 import RoomInfoHeader from '../../components/room/RoomInfoHeader';
 import SpeakerSection from '../../components/room/SpeakerSection';
+import CameraFullscreenModal from '../../components/room/CameraFullscreenModal';
 import ListenerGrid from '../../components/room/ListenerGrid';
 import RoomControlBar from '../../components/room/RoomControlBar';
 import RoomChatDrawer from '../../components/room/RoomChatDrawer';
@@ -702,6 +703,8 @@ export default function RoomScreen() {
   const [chatInput, setChatInput] = useState('');
 
   const [selectedUser, setSelectedUser] = useState<RoomParticipant | null>(null);
+  // ★ 2026-04-20: Kamera fullscreen için seçili kullanıcı (rozete tap ile set edilir)
+  const [cameraExpandUser, setCameraExpandUser] = useState<RoomParticipant | null>(null);
   const [entryEffectName, setEntryEffectName] = useState<string | null>(null);
   // Mic permission system (local)
   const [micRequests, setMicRequests] = useState<string[]>([]); // user_id'ler
@@ -2570,7 +2573,8 @@ export default function RoomScreen() {
           onSelfDemote={handleSelfDemote}
           currentUserId={firebaseUser?.uid} VideoView={LKVideoView}
           onGhostSeatPress={handleGhostSeatPress} showSeatTooltip={showSeatTooltip}
-          avatarFlashes={avatarFlashes} onFlashDone={clearAvatarFlash} />
+          avatarFlashes={avatarFlashes} onFlashDone={clearAvatarFlash}
+          onCameraExpand={(u) => setCameraExpandUser(u)} />
       </View>
 
       {/* ★ SAHNE ↔ DİNLEYİCİ AYIRICI — 2026-04-20: Pill artık tıklanabilir,
@@ -2662,6 +2666,16 @@ export default function RoomScreen() {
 
       {/* ★ Bağış Animasyonu — tüm odaya görünür premium bildirim */}
       <DonationAlert ref={donationAlertRef} />
+
+      {/* ★ 2026-04-20: Kamera fullscreen — speaker rozetine tap ile açılır */}
+      <CameraFullscreenModal
+        visible={!!cameraExpandUser}
+        user={cameraExpandUser}
+        videoTrack={cameraExpandUser ? getMicStatus(cameraExpandUser.user_id)?.videoTrack : null}
+        VideoView={LKVideoView}
+        isMe={cameraExpandUser?.user_id === firebaseUser?.uid}
+        onClose={() => setCameraExpandUser(null)}
+      />
 
 
       <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, paddingBottom: Math.max(insets.bottom, 14) + 2 }}>
