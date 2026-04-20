@@ -152,18 +152,12 @@ export function EmojiReactionBar({ onReaction, onClose }: { onReaction: (emoji: 
 
   return (
     <View style={sty.picker}>
-      {/* ★ Banner — DM/Oda Sohbeti ile tutarlı */}
-      <View style={sty.banner}>
-        <Ionicons name="happy" size={20} color="#14B8A6" style={sty.bannerIconShadow} />
-        <Text style={sty.bannerTitle}>Tepki & GIF</Text>
-      </View>
-
-      {/* Tab Header */}
+      {/* Tab Header — çerçevesiz, sadece gölgeli metin */}
       <View style={sty.tabHeader}>
-        <TouchableOpacity style={[sty.tabBtn, tab === 'emoji' && sty.tabActive]} onPress={() => setTab('emoji')}>
+        <TouchableOpacity style={sty.tabBtn} onPress={() => setTab('emoji')}>
           <Text style={[sty.tabText, tab === 'emoji' && sty.tabTextActive]}>😊 Emoji</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[sty.tabBtn, tab === 'gif' && sty.tabActive]} onPress={() => setTab('gif')}>
+        <TouchableOpacity style={sty.tabBtn} onPress={() => setTab('gif')}>
           <Text style={[sty.tabText, tab === 'gif' && sty.tabTextActive]}>GIF</Text>
         </TouchableOpacity>
       </View>
@@ -324,41 +318,22 @@ const sty = StyleSheet.create({
     width: '100%',
     overflow: 'hidden',
   },
-  banner: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    paddingHorizontal: 12, paddingVertical: 8,
-    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)',
-    backgroundColor: 'rgba(20,184,166,0.06)',
-  },
-  bannerIconShadow: {
-    textShadowColor: 'rgba(0,0,0,0.6)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 3,
-  },
-  bannerTitle: {
-    flex: 1, fontSize: 14, fontWeight: '700', color: '#F1F5F9', letterSpacing: -0.2,
-    textShadowColor: 'rgba(0,0,0,0.45)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
-  },
   tabHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 10,
     paddingTop: 10,
     paddingBottom: 6,
-    gap: 6,
+    gap: 14,
   },
   tabBtn: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 4,
     paddingVertical: 6,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.05)',
   },
-  tabActive: {
-    backgroundColor: 'rgba(92,225,230,0.15)',
-    borderWidth: 1,
-    borderColor: 'rgba(92,225,230,0.3)',
+  tabText: {
+    fontSize: 14, fontWeight: '700', color: 'rgba(255,255,255,0.45)',
+    textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
   },
-  tabText: { fontSize: 13, fontWeight: '600', color: 'rgba(255,255,255,0.35)' },
   tabTextActive: { color: '#5CE1E6' },
   // Kategori
   catBtn: {
