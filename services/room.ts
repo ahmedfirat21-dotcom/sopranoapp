@@ -81,16 +81,19 @@ export const RoomService = {
    * @param userId Kategori tercihi sorgulamak için (optional)
    */
   async getLive(userId?: string): Promise<Room[]> {
+    const now = new Date().toISOString();
+    // ★ 2026-04-20: expires_at filtresi — süresi dolmuş odalar keşfette görünmesin
+    // (autoCloseExpired henüz çalışmamış olabilir; query seviyesinde de filtre)
     const { data, error } = await supabase
       .from('rooms')
       .select('*, host:profiles!host_id(*)')
       .eq('is_live', true)
+      .or(`expires_at.is.null,expires_at.gt.${now}`)
       .order('listener_count', { ascending: false })
       .order('created_at', { ascending: false });
     if (error) throw error;
     let rooms = (data || []) as Room[];
 
-    const now = new Date().toISOString();
     const TRENDING_THRESHOLD = 5; // 5+ dinleyici = trending
 
     // ★ Model A: 3 katmanlı sıralama
