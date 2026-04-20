@@ -713,64 +713,8 @@ export function PlusMenu({
     items.push({ id: 'delete', icon: 'trash-outline', label: 'Odayı Sil', desc: 'Kalıcı olarak siler, geri alınamaz', accent: '#EF4444', onPress: () => { onDeleteRoom(); onClose(); }, destructive: true });
   }
 
-  const isCompact = !isOwner && !isMod && !isOnStage;
-
-  if (isCompact) {
-    // ★ Listener için kompakt bottom sheet
-    return (
-      <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
-        <Animated.View style={[s.backdrop, { opacity: fadeAnim }]}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-        </Animated.View>
-
-        <Animated.View
-          {...compactPan.panHandlers}
-          style={[s.compactPanel, { bottom: bottomInset + 58, transform: [{ translateY: compactSlideY }] }]}
-        >
-          {/* ★ 2026-04-20: FriendsDrawer ile eş renk paleti — daha warm/neutral */}
-          <LinearGradient
-            colors={['#4a5668', '#37414f', '#232a35']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={StyleSheet.absoluteFill}
-          />
-          <View style={s.compactHandle}>
-            <View style={s.compactHandleBar} />
-          </View>
-          {items.map((item, i) => {
-            const isExpanded = expandedId === item.id;
-            return (
-              <View key={item.id}>
-                <Pressable
-                  onPress={item.onPress}
-                  style={({ pressed }) => [
-                    s.row, pressed && s.rowPressed,
-                    isExpanded && s.rowExpanded,
-                    i < items.length - 1 && !isExpanded && s.rowBorder,
-                  ]}
-                >
-                  <View style={[s.iconCircle, { backgroundColor: (item.destructive ? '#EF4444' : item.accent) + '12' }]}>
-                    <Ionicons name={item.icon as any} size={16} color={item.destructive ? '#EF4444' : item.accent} />
-                  </View>
-                  <View style={s.rowText}>
-                    <Text style={[s.rowLabel, item.destructive && { color: '#EF4444' }]}>{item.label}</Text>
-                    {item.desc && <Text style={s.rowDesc}>{item.desc}</Text>}
-                  </View>
-                  {item.expandable && (
-                    <Ionicons name={isExpanded ? 'chevron-up' : 'chevron-down'} size={14} color="rgba(255,255,255,0.35)" />
-                  )}
-                </Pressable>
-
-                {/* Accordion içerik — compact modda da inline render */}
-                {item.expandable && isExpanded && item.renderContent?.()}
-              </View>
-            );
-          })}
-        </Animated.View>
-      </View>
-    );
-  }
-
+  // ★ 2026-04-20: Tüm roller aynı sağdan-kayan drawer kullanır (compact bottom-sheet
+  // kaldırıldı — kullanıcı talebi: "listener modal owner gibi yanal açılır olsun")
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
       <Animated.View style={[s.backdrop, { opacity: fadeAnim }]}>
