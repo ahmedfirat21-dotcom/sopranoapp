@@ -2595,18 +2595,19 @@ export default function RoomScreen() {
         </View>
       )}
 
-      {/* ★ 2026-04-20: Oda içinde SCROLL YOK. Listener flex:1 overflow:hidden
-          (taşanlar "+N Seyirci" badge). InlineChat flex item (absolute değil) —
-          listener altında sabit bant, üzerini kapatmaz. */}
+      {/* ★ 2026-04-20: Oda içinde SCROLL YOK. Listener flex:1 overflow:hidden.
+          InlineChat ABSOLUTE overlay — control bar'ın hemen üstünde, semi-transparent,
+          avatarlar arkasında hafifçe görünür (Yalla/IMO pattern). */}
       <View style={{ flex: 1, overflow: 'hidden' }}>
         <ListenerGrid listeners={listenerUsers} onSelectUser={(u) => setSelectedUser(u)} selectedUserId={selectedUser?.user_id} onShowAllUsers={() => openOverlay(() => setShowAudienceDrawer(true))} maxListeners={getRoomLimits(ownerTier as any).maxListeners} spectatorCount={spectatorUsers.length} roomOwnerId={room?.host_id}
           avatarFlashes={avatarFlashes} onFlashDone={clearAvatarFlash} micRequestUserIds={micRequests} />
       </View>
 
-      {/* ★ InlineChat — flex item, listener ile control bar arasında sabit bant */}
+      {/* ★ InlineChat — absolute overlay, control bar'ın hemen üstünde */}
       {!showChatDrawer && !showDmPanel && !showPlusMenu && !showAccessPanel && !showRoomStats && chatMessages.length > 0 && (
-        <Pressable onPress={() => openOverlay(() => setShowChatDrawer(true))} style={{ marginHorizontal: 4, marginBottom: 4 }}>
-          <View style={{ borderRadius: 14, overflow: 'hidden', backgroundColor: 'rgba(15,23,42,0.55)', borderWidth: 0.5, borderColor: 'rgba(20,184,166,0.1)', paddingVertical: 6 }}>
+        <Pressable onPress={() => openOverlay(() => setShowChatDrawer(true))}
+          style={{ position: 'absolute', left: 4, right: 4, bottom: Math.max(insets.bottom, 14) + 76 }}>
+          <View style={{ borderRadius: 14, overflow: 'hidden', backgroundColor: 'rgba(10,16,28,0.55)', borderWidth: 0.5, borderColor: 'rgba(20,184,166,0.1)', paddingVertical: 6 }}>
             <InlineChat messages={chatMessages as any[]} maxLines={5} />
           </View>
         </Pressable>

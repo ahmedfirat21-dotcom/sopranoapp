@@ -152,24 +152,22 @@ export default function DevPreview() {
         </View>
       )}
 
-      {/* ★ 2026-04-20: SCROLL YOK — flex column: listener flex:1, chat sabit
-          altta (absolute değil — flex item olarak), control bar ayrı.
-          Sığmayan listener'lar GRID_VISIBLE_CAP (10/14/18) + "+N Seyirci" badge. */}
+      {/* ★ 2026-04-20: SCROLL YOK — Listener flex:1 overflow:hidden.
+          Chat ABSOLUTE overlay — control bar üstünde semi-transparent, avatarlar
+          arkada hafifçe görünür (Yalla/IMO pattern). */}
       {scenario.listeners > 0 || scenario.spectators > 0 ? (
-        <>
-          <View style={{ flex: 1, overflow: 'hidden' }}>
-            <ListenerGrid
-              listeners={listeners}
-              onSelectUser={() => {}}
-              maxListeners={scenario.maxListeners}
-              spectatorCount={scenario.spectators}
-              roomOwnerId="mock_user_0"
-              onShowAllUsers={() => {}}
-            />
-          </View>
+        <View style={{ flex: 1, overflow: 'hidden' }}>
+          <ListenerGrid
+            listeners={listeners}
+            onSelectUser={() => {}}
+            maxListeners={scenario.maxListeners}
+            spectatorCount={scenario.spectators}
+            roomOwnerId="mock_user_0"
+            onShowAllUsers={() => {}}
+          />
 
-          {/* ★ Mock InlineChat — flex item (absolute değil), listener altı sabit bant */}
-          <View style={[s.mockChatArea, { marginHorizontal: 8, marginBottom: 4 }]}>
+          {/* ★ Mock InlineChat — absolute overlay, control bar'ın üstünde */}
+          <View style={[s.mockChatArea, { position: 'absolute', left: 8, right: 8, bottom: 8, backgroundColor: 'rgba(10,16,28,0.55)' }]}>
             <View style={s.mockChatHeader}>
               <Ionicons name="chatbubble-outline" size={12} color="rgba(20,184,166,0.4)" />
               <Text style={s.mockChatHeaderText}>Chat (tap → drawer)</Text>
@@ -185,7 +183,7 @@ export default function DevPreview() {
               </Text>
             ))}
           </View>
-        </>
+        </View>
       ) : (
         <View style={s.emptyAudience}>
           <Ionicons name="people-outline" size={32} color="rgba(255,255,255,0.1)" />
