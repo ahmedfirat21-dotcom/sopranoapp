@@ -143,38 +143,33 @@ export default function RoomInfoHeader({
 
         <View style={s.topActions}>
           <ConnectionHeartbeat state={connectionState} viewerCount={viewerCount} />
-          {(followerCount ?? 0) > 0 && (
-            <View style={s.followerPill}>
-              <Ionicons name="heart" size={10} color="#EF4444" />
-              <Text style={s.followerText}>{followerCount}</Text>
-            </View>
-          )}
           {/* ★ Senaryolar butonu — tüm UI senaryolarını gösterir (dev-preview) */}
           {onScenarios && (
-            <Pressable style={[s.actionBtn, { backgroundColor: 'rgba(139,92,246,0.15)', borderWidth: 1, borderColor: 'rgba(139,92,246,0.3)' }]} onPress={onScenarios} hitSlop={6}>
-              <Ionicons name="flask-outline" size={14} color="#A78BFA" />
+            <Pressable style={s.actionBtn} onPress={onScenarios} hitSlop={6}>
+              <Ionicons name="flask-outline" size={16} color="#A78BFA" style={s.iconShadow} />
             </Pressable>
           )}
           {/* ★ 2026-04-19: Kurallar VEYA açıklama varsa info butonu göster */}
           {(roomRules || roomDescription) ? (
-            <Pressable style={[s.actionBtn, showRules && s.followBtnActive]} onPress={() => setShowRules(!showRules)} hitSlop={6}>
+            <Pressable style={s.actionBtn} onPress={() => setShowRules(!showRules)} hitSlop={6}>
               <Ionicons
                 name={roomRules ? 'document-text-outline' : 'information-circle-outline'}
-                size={14}
+                size={16}
                 color={showRules ? '#F59E0B' : '#E2E8F0'}
+                style={s.iconShadow}
               />
             </Pressable>
           ) : null}
           {onToggleFollow && (
-            <Pressable style={[s.actionBtn, isFollowing && s.followBtnActive]} onPress={onToggleFollow} hitSlop={6}>
-              <Ionicons name={isFollowing ? 'bookmark' : 'bookmark-outline'} size={14} color={isFollowing ? '#14B8A6' : '#E2E8F0'} />
+            <Pressable style={s.actionBtn} onPress={onToggleFollow} hitSlop={6}>
+              <Ionicons name={isFollowing ? 'bookmark' : 'bookmark-outline'} size={16} color={isFollowing ? '#14B8A6' : '#E2E8F0'} style={s.iconShadow} />
             </Pressable>
           )}
           <Pressable style={s.actionBtn} onPress={onMinimize}>
-            <Ionicons name="chevron-down-outline" size={16} color="#E2E8F0" />
+            <Ionicons name="chevron-down-outline" size={18} color="#E2E8F0" style={s.iconShadow} />
           </Pressable>
           <Pressable style={s.actionBtn} onPress={onBack}>
-            <Ionicons name="close" size={16} color="#E2E8F0" />
+            <Ionicons name="close" size={18} color="#E2E8F0" style={s.iconShadow} />
           </Pressable>
         </View>
       </View>
@@ -348,35 +343,18 @@ const s = StyleSheet.create({
     fontWeight: '700',
     color: '#14B8A6',
   },
-  followerPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    backgroundColor: 'rgba(239,68,68,0.1)',
-    paddingHorizontal: 7,
-    paddingVertical: 4,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(239,68,68,0.2)',
-  },
-  followerText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#EF4444',
-  },
   actionBtn: {
     width: 28,
     height: 28,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.06)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  followBtnActive: {
-    backgroundColor: 'rgba(20,184,166,0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(20,184,166,0.3)',
+  iconShadow: {
+    textShadowColor: 'rgba(0,0,0,0.6)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 3,
   },
+  followBtnActive: {},
   infoRow: {
     flexDirection: 'row',
     justifyContent: 'flex-start',

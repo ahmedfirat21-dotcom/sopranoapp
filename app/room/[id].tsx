@@ -2921,21 +2921,35 @@ export default function RoomScreen() {
           onSpeakerChange: handleSpeakerToggle,
         }}
         onModeration={() => openOverlay(() => setShowAccessPanel(true))}
-        onReportRoom={() => { closeAllOverlays();
+        onReportRoom={() => {
+          closeAllOverlays();
           if (!firebaseUser?.uid || !room?.id) return;
-          (async () => {
-            try {
-              // ★ D2 FIX: ModerationService kullan — rate limit + admin bildirimi dahil
-              await ModerationService.reportRoom(firebaseUser.uid, room.id, 'inappropriate_content', 'Oda içeriği uygunsuz');
-              showToast({ title: '🚩 Bildirildi', message: 'Bu oda incelenmek üzere bildirildi', type: 'info' });
-            } catch (e: any) {
-              if (e?.message?.includes('fazla')) {
-                showToast({ title: '⏳ Limit', message: e.message, type: 'warning' });
-              } else {
-                showToast({ title: '🚩 Bildirildi', message: 'Bu oda incelenmek üzere bildirildi', type: 'info' });
-              }
-            }
-          })();
+          setAlertConfig({
+            visible: true,
+            title: 'Odayı bildir',
+            message: 'Bu oda uygunsuz içerik nedeniyle incelemeye gönderilecek. Emin misin?',
+            type: 'warning',
+            icon: 'flag',
+            buttons: [
+              { text: 'Vazgeç', style: 'cancel' },
+              {
+                text: 'Bildir',
+                style: 'destructive',
+                onPress: async () => {
+                  try {
+                    await ModerationService.reportRoom(firebaseUser.uid, room.id, 'inappropriate_content', 'Oda içeriği uygunsuz');
+                    showToast({ title: '🚩 Bildirildi', message: 'Oda incelenmek üzere bildirildi', type: 'info' });
+                  } catch (e: any) {
+                    if (e?.message?.includes('fazla')) {
+                      showToast({ title: '⏳ Limit', message: e.message, type: 'warning' });
+                    } else {
+                      showToast({ title: '🚩 Bildirildi', message: 'Oda incelenmek üzere bildirildi', type: 'info' });
+                    }
+                  }
+                },
+              },
+            ],
+          });
         }}
         micRequestCount={micRequests.length}
         userRole={myCurrentRole}

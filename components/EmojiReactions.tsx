@@ -158,7 +158,7 @@ export function EmojiReactionBar({ onReaction, onClose }: { onReaction: (emoji: 
           <Text style={[sty.tabText, tab === 'emoji' && sty.tabTextActive]}>😊 Emoji</Text>
         </TouchableOpacity>
         <TouchableOpacity style={sty.tabBtn} onPress={() => setTab('gif')}>
-          <Text style={[sty.tabText, tab === 'gif' && sty.tabTextActive]}>GIF</Text>
+          <Text style={[sty.tabText, tab === 'gif' && sty.tabTextActive]}>🎬 GIF</Text>
         </TouchableOpacity>
       </View>
 
