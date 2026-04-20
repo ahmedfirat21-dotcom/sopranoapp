@@ -35,8 +35,8 @@ DELETE FROM rooms r
   WHERE r.host_id IN (
     SELECT p.id FROM profiles p
     WHERE p.display_name IN ('Zeynep Aksoy', 'VEX', 'Vex')
-      -- auth.users'da kayıt YOKSA → fake profil, odayı sil
-      AND NOT EXISTS (SELECT 1 FROM auth.users u WHERE u.id = p.id)
+      -- auth.users.id UUID, profiles.id TEXT — her iki tarafı da text'e cast et
+      AND NOT EXISTS (SELECT 1 FROM auth.users u WHERE u.id::text = p.id::text)
   );
 
 
