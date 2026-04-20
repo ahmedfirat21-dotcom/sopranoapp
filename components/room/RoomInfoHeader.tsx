@@ -28,8 +28,6 @@ interface Props {
   hostAvatarUrl?: string;
   roomRules?: string;
   followerCount?: number;
-  // ★ Senaryolar butonu — dev preview
-  onScenarios?: () => void;
 }
 
 // Kalp atışı (Heartbeat) göstergesi
@@ -94,7 +92,6 @@ export default function RoomInfoHeader({
   roomLanguage, ageRestricted, entryFeeSp, isLocked, followersOnly,
   donationsEnabled, speakingMode, roomType,
   hostAvatarUrl, roomRules, followerCount,
-  onScenarios,
 }: Props) {
   const langFlags: Record<string,string> = { tr: '🇹🇷', en: '🇬🇧', de: '🇩🇪', ar: '🇸🇦' };
   const [showRules, setShowRules] = useState(false);
@@ -150,12 +147,6 @@ export default function RoomInfoHeader({
 
         <View style={s.topActions}>
           <ConnectionHeartbeat state={connectionState} viewerCount={viewerCount} />
-          {/* ★ Senaryolar butonu — tüm UI senaryolarını gösterir (dev-preview) */}
-          {onScenarios && (
-            <Pressable style={s.actionBtn} onPress={onScenarios} hitSlop={6}>
-              <Ionicons name="flask-outline" size={16} color="#A78BFA" style={s.iconShadow} />
-            </Pressable>
-          )}
           {/* ★ 2026-04-19: Kurallar VEYA açıklama varsa info butonu göster */}
           {(roomRules || roomDescription) ? (
             <Pressable style={s.actionBtn} onPress={() => setShowRules(!showRules)} hitSlop={6}>
