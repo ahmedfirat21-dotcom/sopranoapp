@@ -446,13 +446,14 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
       <Animated.View {...dmPanHandlers} style={{
         position: 'absolute', right: 0, top: 70, bottom: 80,
         width: DM_PANEL_W,
-        backgroundColor: 'rgba(45,55,64,0.95)',
         borderTopLeftRadius: 18, borderBottomLeftRadius: 18,
         borderWidth: 1, borderRightWidth: 0, borderColor: 'rgba(20,184,166,0.12)',
         overflow: 'hidden',
         shadowColor: '#000', shadowOffset: { width: -4, height: 0 }, shadowOpacity: 0.4, shadowRadius: 16, elevation: 20,
         transform: [{ translateX: Animated.add(slideAnim, dmSwipeX) }],
       }}>
+        {/* ★ FriendsDrawer paleti */}
+        <LinearGradient colors={['#4a5668', '#37414f', '#232a35']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFillObject} />
 
         {/* ═══ SOHBET GÖRÜNÜMÜ ═══ */}
         {chatTarget ? (
