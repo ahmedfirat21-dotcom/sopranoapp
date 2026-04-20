@@ -135,12 +135,14 @@ export default function UserProfileScreen() {
 
   const handleFollow = async () => {
     if (!firebaseUser || !id || isOwnProfile) return;
+    const alreadyFriend = followStatus === 'accepted' || incomingStatus === 'accepted';
     setFollowLoading(true);
     try {
-      if (followStatus === 'accepted') {
-        const result = await FriendshipService.unfollow(firebaseUser.uid, id);
+      if (alreadyFriend) {
+        const result = await FriendshipService.removeFriend(firebaseUser.uid, id);
         if (result.success) {
           setFollowStatus(null);
+          setIncomingStatus(null);
           setStats(prev => ({ ...prev, followers: Math.max(0, prev.followers - 1) }));
         }
       } else if (followStatus === 'pending') {
@@ -218,8 +220,12 @@ export default function UserProfileScreen() {
               try {
                 await ModerationService.blockUser(firebaseUser.uid, id);
                 setIsUserBlocked(true);
-                // ★ EX-4 FIX: Engelleme sonrası takipten de çıkar
-                if (followStatus === 'accepted' || followStatus === 'pending') {
+                // ★ Engelleme sonrası arkadaşlık çift yönlü temizlenir
+                if (followStatus === 'accepted' || incomingStatus === 'accepted') {
+                  await FriendshipService.removeFriend(firebaseUser.uid, id).catch(() => {});
+                  setFollowStatus(null);
+                  setIncomingStatus(null);
+                } else if (followStatus === 'pending') {
                   await FriendshipService.unfollow(firebaseUser.uid, id).catch(() => {});
                   setFollowStatus(null);
                 }
@@ -270,21 +276,19 @@ export default function UserProfileScreen() {
   const tierDef = TIER_DEFINITIONS[tier] || TIER_DEFINITIONS.Free;
   const tierBorderColor = tierDef.color;
 
-  const isFollowing = followStatus === 'accepted';
+  // ★ Facebook-style bidirectional: tek yönde bile accepted olması arkadaş demek
+  // (approveRequest sadece requester row'unu günceller; approver'ın outgoing'i null kalır)
+  const isFriend = followStatus === 'accepted' || incomingStatus === 'accepted';
   const isPending = followStatus === 'pending';
-  // ★ BUG-11 FIX: isBlocked artık block_list'ten gelen isUserBlocked state'ini kullanıyor
   const isBlocked = isUserBlocked;
-  // ★ X.com tarzı: Karşılıklı takip kontrolü
-  const isMutual = isFollowing && incomingStatus === 'accepted';
   const hasIncomingPending = incomingStatus === 'pending';
 
-  // ★ ECO-7 FIX: Gizli profil kontrolü — takipçi değilse detaylar gizlenir
   const isPrivateProfile = !isOwnProfile && (
     userProfile?.privacy_mode === 'private' ||
     userProfile?.privacy_mode === 'followers_only' ||
     userProfile?.is_private === true
   );
-  const canSeeFullProfile = isOwnProfile || isFollowing || !isPrivateProfile;
+  const canSeeFullProfile = isOwnProfile || isFriend || !isPrivateProfile;
 
   return (
     <AppBackground variant="profile">
@@ -361,7 +365,7 @@ export default function UserProfileScreen() {
 
             <View style={s.interactionRow}>
               <Pressable
-                style={[s.followBtn, (isFollowing || isPending || isMutual) && s.followBtnActive]}
+                style={[s.followBtn, (isFriend || isPending) && s.followBtnActive]}
                 onPress={handleFollow}
                 disabled={followLoading || isBlocked}
                 android_ripple={{ color: 'rgba(255,255,255,0.1)', borderless: false }}
@@ -370,8 +374,7 @@ export default function UserProfileScreen() {
                   <ActivityIndicator size="small" color="#fff" />
                 ) : isBlocked ? (
                   <Text style={[s.followBtnText, { color: '#EF4444' }]}>Engellendi</Text>
-                ) : (isMutual || isFollowing) ? (
-                  // ★ Facebook tarzı: herhangi bir yönde accepted = arkadaş
+                ) : isFriend ? (
                   <><Ionicons name="people" size={16} color="#F1F5F9" /><Text style={[s.followBtnText, { color: '#F1F5F9' }]}>Arkadaş</Text></>
                 ) : isPending ? (
                   <Text style={[s.followBtnText, { color: '#FBBF24' }]}>İstek Gönderildi</Text>
@@ -385,7 +388,7 @@ export default function UserProfileScreen() {
                   <Pressable style={s.secondaryBtn} onPress={() => router.push(`/chat/${id}`)}>
                     <Ionicons name="chatbubble-outline" size={18} color="#E2E8F0" />
                   </Pressable>
-                  {isMutual && (
+                  {isFriend && (
                     <Pressable style={s.secondaryBtn} onPress={() => router.push(`/call/${id}?callType=audio` as any)}>
                       <Ionicons name="call-outline" size={18} color="#E2E8F0" />
                     </Pressable>
