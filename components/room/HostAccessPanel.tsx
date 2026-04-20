@@ -180,7 +180,7 @@ export default function HostAccessPanel({ visible, onClose, roomId, roomType, ho
         {/* Başlık */}
         <View style={s.header}>
           <View style={s.headerIcon}>
-            <Ionicons name="shield-checkmark" size={14} color="#A78BFA" />
+            <Ionicons name="shield-checkmark" size={14} color="#A78BFA" style={s.iconShadow} />
           </View>
           <Text style={s.headerTitle}>Moderasyon</Text>
           <View style={{ flex: 1 }} />
@@ -390,11 +390,10 @@ const s = StyleSheet.create({
     borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.04)',
   },
   headerIcon: {
-    width: 28, height: 28, borderRadius: 9,
-    backgroundColor: 'rgba(167,139,250,0.12)',
-    borderWidth: 1, borderColor: 'rgba(167,139,250,0.2)',
+    width: 28, height: 28,
     alignItems: 'center', justifyContent: 'center',
   },
+  iconShadow: { textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 3 },
   headerTitle: {
     fontSize: 15, fontWeight: '700', color: '#F1F5F9',
     textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,

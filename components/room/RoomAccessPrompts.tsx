@@ -123,8 +123,8 @@ export function PasswordPromptSheet({
     <BaseSheet visible={visible} onDismiss={onDismiss} maxHeight={H * 0.5}>
       <View style={st.body}>
         <View style={st.headerRow}>
-          <View style={[st.iconBig, { backgroundColor: 'rgba(20,184,166,0.12)', borderColor: 'rgba(20,184,166,0.3)' }]}>
-            <Ionicons name="lock-closed" size={22} color="#14B8A6" />
+          <View style={st.iconBig}>
+            <Ionicons name="lock-closed" size={22} color="#14B8A6" style={st.iconShadow} />
           </View>
           <View style={{ flex: 1 }}>
             <Text style={st.title}>Şifreli Oda</Text>
@@ -263,17 +263,14 @@ export function AccessRequestSheet({
           <Animated.View
             style={[
               st.iconBig,
-              {
-                backgroundColor: status === 'accepted' ? 'rgba(34,197,94,0.12)' : status === 'rejected' ? 'rgba(239,68,68,0.12)' : 'rgba(59,130,246,0.12)',
-                borderColor: status === 'accepted' ? 'rgba(34,197,94,0.3)' : status === 'rejected' ? 'rgba(239,68,68,0.3)' : 'rgba(59,130,246,0.3)',
-                transform: [{ scale: status === 'pending' ? pulse : 1 }],
-              },
+              { transform: [{ scale: status === 'pending' ? pulse : 1 }] },
             ]}
           >
             <Ionicons
               name={status === 'accepted' ? 'checkmark-circle' : status === 'rejected' ? 'close-circle' : 'mail-outline'}
               size={24}
               color={status === 'accepted' ? '#22C55E' : status === 'rejected' ? '#EF4444' : '#3B82F6'}
+              style={st.iconShadow}
             />
           </Animated.View>
           <View style={{ flex: 1 }}>
@@ -450,10 +447,10 @@ const st = StyleSheet.create({
   body: { paddingHorizontal: 20, paddingTop: 6, paddingBottom: 16 },
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 18 },
   iconBig: {
-    width: 48, height: 48, borderRadius: 24,
+    width: 48, height: 48,
     alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1,
   },
+  iconShadow: { textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 3 },
   title: { fontSize: 17, fontWeight: '800', color: '#F1F5F9', letterSpacing: 0.2 },
   subtitle: { fontSize: 11, color: '#94A3B8', marginTop: 2, lineHeight: 15 },
   inputWrap: {

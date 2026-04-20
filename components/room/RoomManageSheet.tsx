@@ -866,7 +866,7 @@ function Row({ icon, bg, label, desc, right, onPress }: { icon: string; bg: stri
   const Container = onPress ? Pressable : View;
   return (
     <Container style={p.row} onPress={onPress as any}>
-      <View style={[p.rowIcon, { backgroundColor: bg }]}><Ionicons name={icon as any} size={14} color="#FFF" /></View>
+      <View style={p.rowIcon}><Ionicons name={icon as any} size={14} color={bg} style={p.iconShadow} /></View>
       <View style={{ flex: 1 }}><Text style={p.rowLabel}>{label}</Text>{desc ? <Text style={p.rowDesc} numberOfLines={1}>{desc}</Text> : null}</View>
       {right}
     </Container>
@@ -877,7 +877,7 @@ function LockedRow({ label, tier }: { label: string; tier: string }) {
   const tierDef = TIER_DEFINITIONS[tier as SubscriptionTier];
   return (
     <Pressable style={[p.row, { opacity: 0.35 }]} onPress={() => showToast({ title: `${tier}+ ile açılır`, message: `"${label}" özelliği ${tier} ve üzeri üyeliklerde kullanılabilir.`, type: 'info' })}>
-      <View style={[p.rowIcon, { backgroundColor: tierDef ? `${tierDef.color}15` : 'rgba(148,163,184,0.15)' }]}><Ionicons name="lock-closed" size={14} color={tierDef?.color || '#94A3B8'} /></View>
+      <View style={p.rowIcon}><Ionicons name="lock-closed" size={14} color={tierDef?.color || '#94A3B8'} style={p.iconShadow} /></View>
       <View style={{ flex: 1 }}><Text style={p.rowLabel}>{label}</Text><Text style={p.rowDesc}>{tier}+ ile açılır</Text></View>
       {tierDef && (
         <View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: `${tierDef.color}12`, borderWidth: 1, borderColor: `${tierDef.color}30` }}>
@@ -932,7 +932,8 @@ const p = StyleSheet.create({
 
   // Row
   row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: 'rgba(149,161,174,0.06)' },
-  rowIcon: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  rowIcon: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center' },
+  iconShadow: { textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 3 },
   rowLabel: { fontSize: 12, fontWeight: '700', color: '#F1F5F9', ...Shadows.textLight },
   rowDesc: { fontSize: 9, color: '#94A3B8', marginTop: 1 },
 

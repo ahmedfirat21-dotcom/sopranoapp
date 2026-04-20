@@ -100,7 +100,7 @@ export default function RoomStatsPanel({
         <View style={st.header}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <View style={st.headerIcon}>
-              <Ionicons name="stats-chart" size={16} color="#3B82F6" />
+              <Ionicons name="stats-chart" size={16} color="#3B82F6" style={st.iconShadow} />
             </View>
             <Text style={st.headerTitle}>Oda İstatistikleri</Text>
             {isRecording && (
@@ -210,11 +210,10 @@ const st = StyleSheet.create({
   headerIcon: {
     width: 24,
     height: 24,
-    borderRadius: 8,
-    backgroundColor: 'rgba(59,130,246,0.12)',
     justifyContent: 'center',
     alignItems: 'center',
   },
+  iconShadow: { textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 3 },
   headerTitle: {
     fontSize: 13,
     fontWeight: '700',
