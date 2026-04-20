@@ -695,7 +695,7 @@ export default function RoomScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { firebaseUser, profile, setMinimizedRoom } = useAuth();
+  const { firebaseUser, profile, setMinimizedRoom, minimizedRoom } = useAuth();
   
   // Real DB States
   const [room, setRoom] = useState<Room | null>(null);
@@ -746,7 +746,17 @@ export default function RoomScreen() {
   const [showAccessRequest, setShowAccessRequest] = useState(false);
   // ★ 2026-04-18: Access gate — onaylanmadan oda içi render edilmez
   // null: henüz bilinmiyor (loading), true: erişim tam, false: engellendi (sheet/alert aktif)
-  const [accessGranted, setAccessGranted] = useState<boolean | null>(null);
+  // ★ 2026-04-20: Minimize'dan dönüş → access check skip (kullanıcı zaten odada)
+  const isRestoringFromMinimize = minimizedRoom?.id === id;
+  const [accessGranted, setAccessGranted] = useState<boolean | null>(
+    () => (isRestoringFromMinimize ? true : null),
+  );
+
+  // ★ Minimize'dan döndüysek MiniRoomCard'ı temizle (tam oda açıldı)
+  useEffect(() => {
+    if (isRestoringFromMinimize) setMinimizedRoom(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   // ★ Kullanıcıların takip durumu (oda içi ProfileCard için)
   const [userFollowStatus, setUserFollowStatus] = useState<Record<string, 'pending' | 'accepted' | 'blocked' | null>>({});
 
