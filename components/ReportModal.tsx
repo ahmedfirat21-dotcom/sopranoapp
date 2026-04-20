@@ -2,16 +2,18 @@
  * SopranoChat — Premium Raporlama Modal
  * Glassmorphism + Pill buttons + Slide-up
  */
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, Pressable, Modal, TextInput,
   ScrollView, ActivityIndicator, Dimensions, TouchableOpacity,
+  Animated, PanResponder,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { ModerationService, ReportReason } from '../services/moderation';
 import { showToast } from './Toast';
 
 const { height: H } = Dimensions.get('window');
+const DISMISS_THRESHOLD = 120;
 
 const C = {
   glass: 'rgba(45,55,64,0.95)',
@@ -55,6 +57,31 @@ export function ReportModal({ visible, onClose, reporterId, target }: ReportModa
   const [description, setDescription] = useState('');
   const [sending, setSending] = useState(false);
 
+  // ★ Swipe-down-to-dismiss
+  const translateY = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (visible) translateY.setValue(0);
+  }, [visible, translateY]);
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_e, g) => Math.abs(g.dy) > 8 && Math.abs(g.dy) > Math.abs(g.dx),
+      onPanResponderMove: (_e, g) => {
+        if (g.dy > 0) translateY.setValue(g.dy);
+      },
+      onPanResponderRelease: (_e, g) => {
+        if (g.dy > DISMISS_THRESHOLD) {
+          Animated.timing(translateY, { toValue: H, duration: 180, useNativeDriver: true }).start(() => {
+            translateY.setValue(0);
+            onClose();
+          });
+        } else {
+          Animated.spring(translateY, { toValue: 0, useNativeDriver: true, tension: 80, friction: 8 }).start();
+        }
+      },
+    }),
+  ).current;
+
   const handleSubmit = async () => {
     if (!selectedReason) {
       showToast({ title: 'Bir sebep seçin', type: 'info' });
@@ -88,9 +115,11 @@ export function ReportModal({ visible, onClose, reporterId, target }: ReportModa
     <Modal transparent animationType="slide" visible={visible} onRequestClose={onClose}>
       <View style={sty.overlay}>
         <Pressable style={sty.backdrop} onPress={onClose} />
-        <View style={sty.sheet}>
-          {/* Handle */}
-          <View style={sty.handle} />
+        <Animated.View style={[sty.sheet, { transform: [{ translateY }] }]}>
+          {/* Handle — drag ile kapatma */}
+          <View {...panResponder.panHandlers} style={sty.handleWrap}>
+            <View style={sty.handle} />
+          </View>
 
           {/* Header */}
           <View style={sty.header}>
@@ -155,7 +184,7 @@ export function ReportModal({ visible, onClose, reporterId, target }: ReportModa
 
             <View style={{ height: 40 }} />
           </ScrollView>
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );
@@ -174,10 +203,10 @@ const sty = StyleSheet.create({
     borderBottomWidth: 0,
     borderColor: C.border,
   },
+  handleWrap: { alignItems: 'center', paddingTop: 10, paddingBottom: 8 },
   handle: {
-    width: 36, height: 4, borderRadius: 2,
+    width: 44, height: 5, borderRadius: 3,
     backgroundColor: C.white08,
-    alignSelf: 'center', marginTop: 10, marginBottom: 8,
   },
   header: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
