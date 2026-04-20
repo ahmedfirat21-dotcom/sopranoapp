@@ -77,6 +77,7 @@ export type RoomConnectionState = 'disconnected' | 'connecting' | 'connected' | 
 // ─── Ana Sınıf ──────────────────────────────────────────────
 export class LiveKitService {
   private room: any = null; // livekit-client Room instance
+  private currentRoomId: string | null = null; // Hangi oda bağlı, minimize-restore için
   private onParticipantUpdate?: (participants: ParticipantUpdate[]) => void;
   private onConnectionStateChange?: (state: RoomConnectionState) => void;
   private onSpeakingChange?: (identity: string, isSpeaking: boolean) => void;
@@ -145,6 +146,24 @@ export class LiveKitService {
       if (__DEV__) logger.warn('[LiveKit] Modül yok, sahte (mock) moda geçiliyor.');
       callbacks.onConnectionStateChange?.('connected'); // Mock devrede
       return false; // Gerçek bağlantı kurulamadı
+    }
+
+    // ★ 2026-04-20 Minimize-restore: aynı odaya zaten bağlıysak yeniden bağlanma,
+    // callbacks'i overwrite et + mevcut state'i yeni dinleyiciye yay.
+    if (this.room && this.currentRoomId === roomId && this.room.state === 'connected') {
+      this.onParticipantUpdate = callbacks.onParticipantUpdate;
+      this.onConnectionStateChange = callbacks.onConnectionStateChange;
+      this.onSpeakingChange = callbacks.onSpeakingChange;
+      this.onMicStateChange = callbacks.onMicStateChange;
+      this.onParticipantDisconnected = callbacks.onParticipantDisconnected;
+      this.onPermissionDenied = callbacks.onPermissionDenied;
+      try {
+        callbacks.onConnectionStateChange?.('connected');
+        callbacks.onMicStateChange?.(this.isMicrophoneEnabled, this.isCameraEnabled);
+        this._doEmitParticipantUpdate(lk);
+      } catch (e) { if (__DEV__) logger.warn('[LiveKit] reattach state emit error', e); }
+      if (__DEV__) logger.log(`[LiveKit] Reattach — ${roomId} için mevcut bağlantı kullanıldı`);
+      return true;
     }
 
     if (this.room) {
@@ -218,6 +237,7 @@ export class LiveKitService {
           new Promise((_, reject) => setTimeout(() => reject(new Error('Connect timeout (15s)')), 15000)),
         ]);
 
+        this.currentRoomId = roomId;
         this.onConnectionStateChange?.('connected');
         this.emitParticipantUpdate(lk);
         if (__DEV__) logger.log(`[LiveKit] Bağlantı başarılı (deneme ${attempt}/${MAX_RETRIES})`);
@@ -240,6 +260,7 @@ export class LiveKitService {
           try { if (this.room.state === 'connected' || this.room.state === 'reconnecting') this.room.disconnect(); } catch(_) {}
         }
         this.room = null;
+        this.currentRoomId = null;
         this.onConnectionStateChange?.('disconnected');
         return false;
       }
@@ -274,6 +295,7 @@ export class LiveKitService {
         if (__DEV__) logger.log('[LiveKit] Disconnect sırasında beklenen hata:', (e as any)?.message);
       }
       this.room = null;
+      this.currentRoomId = null;
     }
     // ★ AudioSession ı kapat — kaynakları serbest bırak
     if (_audioSessionModule) {
