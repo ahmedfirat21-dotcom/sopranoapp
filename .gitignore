@@ -94,5 +94,8 @@ pc-api-key.json
 # Native build artifacts
 _aab_check/
 
+# Browser automation screenshots (root-level, ad-hoc)
+/*.png
+
 .vercel
 .playwright-mcp/
