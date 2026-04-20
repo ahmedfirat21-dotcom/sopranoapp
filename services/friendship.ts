@@ -599,30 +599,23 @@ export const FriendshipService = {
 
   /**
    * Gizli profili görüntüleme yetkisi kontrolü
-   * ★ BUG-F14 FIX: Yorum netleştirildi.
    * - is_private = false → herkes görebilir
-   * - is_private = true → sadece takipçiler (accepted) görebilir
+   * - is_private = true → sadece arkadaşlar (bidirectional accepted) görebilir
    * - Kendi profilin → her zaman görebilirsin
-   *
-   * isFollowing(A, B) = "A, B'yi takip ediyor" = "A, B'nin takipçisi"
-   * Gizli profili görmek için viewer, target'ın takipçisi olmalıdır → isFollowing(viewer, target) ✓
    */
   async canViewProfile(viewerId: string, targetId: string): Promise<boolean> {
-    // Kendi profilim — her zaman görebilirim
     if (viewerId === targetId) return true;
 
-    // Hedef profilin gizlilik durumunu kontrol et
     const { data: target } = await supabase
       .from('profiles')
       .select('is_private')
       .eq('id', targetId)
       .single();
 
-    // Profil bulunamadı veya açık profil — görebilir
     if (!target || !target.is_private) return true;
 
-    // Gizli profil — viewer, target'ı takip ediyor mu? (yani viewer, target'ın takipçisi mi?)
-    return this.isFollowing(viewerId, targetId);
+    // Facebook modeli — herhangi bir yönde accepted yeterli
+    return this.isFriend(viewerId, targetId);
   },
 
   /**
@@ -754,25 +747,22 @@ export const FriendshipService = {
   /**
    * Kullanıcının sahip olduğu odaları görebilir miyim?
    * - hide_owned_rooms = false → herkes görebilir
-   * - hide_owned_rooms = true → sadece takipçiler görebilir
+   * - hide_owned_rooms = true → sadece arkadaşlar görebilir (bidirectional)
    * - Kendi profilin → her zaman görebilirsin
    */
   async canViewOwnedRooms(viewerId: string, targetId: string): Promise<boolean> {
-    // Kendi profilim — her zaman görebilirim
     if (viewerId === targetId) return true;
 
-    // Hedef profilin hide_owned_rooms durumunu kontrol et
     const { data: target } = await supabase
       .from('profiles')
       .select('hide_owned_rooms')
       .eq('id', targetId)
       .single();
 
-    // Profil bulunamadı veya gizleme kapalı — görebilir
     if (!target || !target.hide_owned_rooms) return true;
 
-    // Gizleme açık — takipçi miyim?
-    return this.isFollowing(viewerId, targetId);
+    // Facebook modeli — herhangi bir yönde accepted yeterli
+    return this.isFriend(viewerId, targetId);
   },
 
   /**
