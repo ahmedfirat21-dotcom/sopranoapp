@@ -7,13 +7,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { isTierAtLeast } from '../../constants/tiers';
 import { useSwipeToDismiss } from '../../hooks/useSwipeToDismiss';
+import { Colors } from '../../constants/theme';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-const { width: W } = Dimensions.get('window');
-const PANEL_W = W * 0.72;
+const { width: W, height: H } = Dimensions.get('window');
+// ★ 2026-04-20: FriendsDrawer ile uyumlu genişlik
+const PANEL_W = Math.min(W * 0.6, 300);
 
 const layoutAnim = () => LayoutAnimation.configureNext({
   duration: 220,
@@ -721,7 +723,7 @@ export function PlusMenu({
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
       </Animated.View>
 
-      <Animated.View {...panHandlers} style={[s.panel, { transform: [{ translateX: Animated.add(slideAnim, swipeX) }] }]}>
+      <Animated.View {...panHandlers} style={[s.panel, { bottom: bottomInset + 70, transform: [{ translateX: Animated.add(slideAnim, swipeX) }] }]}>
         {/* ★ Opak gradient zemin — okunabilirlik için şeffaflık kaldırıldı */}
         <LinearGradient
           colors={['#1E293B', '#0F172A', '#0B1220']}
@@ -793,13 +795,21 @@ export function AdvancedSettingsPanel({ visible }: { visible: boolean;[key: stri
 const s = StyleSheet.create({
   backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.55)' },
   panel: {
-    position: 'absolute', right: 0, top: 70, bottom: 80,
-    width: PANEL_W, backgroundColor: '#0F172A',
-    borderTopLeftRadius: 18, borderBottomLeftRadius: 18,
-    borderWidth: 1, borderRightWidth: 0, borderColor: 'rgba(255,255,255,0.1)',
+    // ★ 2026-04-20: FriendsDrawer tema uyumu — warm/neutral gradient zaten LinearGradient'te.
+    // Height artık content-driven (top yok), alt control bar üstünde duracak şekilde konumlanır.
+    // maxHeight ile taşma engellenir, ScrollView ile içerik scroll eder.
+    position: 'absolute', right: 0,
+    width: PANEL_W,
+    maxHeight: H * 0.78,
+    borderTopLeftRadius: 22, borderBottomLeftRadius: 22,
+    borderWidth: 1, borderRightWidth: 0,
+    borderColor: Colors.cardBorder,
     overflow: 'hidden',
-    shadowColor: '#000', shadowOffset: { width: -4, height: 0 },
-    shadowOpacity: 0.4, shadowRadius: 12, elevation: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: -6, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 16,
+    elevation: 16,
   },
   compactPanel: {
     position: 'absolute',
