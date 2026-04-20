@@ -311,7 +311,7 @@ export default function RoomControlBar({
 
         {/* ======================= SAĞ: UTILITY ======================= */}
         <View style={s.rightGroup}>
-          <BarBtn onPress={onEmojiPress} active={isEmojiOpen} accent="#D4A853" label="Emoji/reaksiyon">
+          <BarBtn onPress={onEmojiPress} active={isEmojiOpen} accent="#D4A853" label="Reaksiyon gönder (emoji + GIF)">
             <Ionicons name="happy-outline" size={18} color="#C8D6E0" style={s.iconDrop} />
           </BarBtn>
 
