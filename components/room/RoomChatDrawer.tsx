@@ -131,9 +131,9 @@ export default function RoomChatDrawer({ visible, messages, chatInput, onChangeI
       {/* Panel — sağdan kayar + tüm alandan sürüklenebilir */}
       <Animated.View {...panHandlers} style={[s.panel, { transform: [{ translateX: Animated.add(slideAnim, swipeX) }] }]}>
         <LinearGradient colors={['#4a5668', '#37414f', '#232a35']} locations={[0, 0.35, 1]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFillObject} />
-        {/* Başlık */}
+        {/* Başlık — DM banner ile tutarlı: ikon + başlık, arka plan teal tint */}
         <View collapsable={false} style={s.header}>
-          <View style={s.headerDot} />
+          <Ionicons name="chatbubble-ellipses" size={20} color="#14B8A6" style={s.headerIconShadow} />
           <Text style={s.headerTitle}>Oda Sohbeti</Text>
         </View>
 
@@ -210,15 +210,17 @@ const s = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingVertical: 8,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: 'rgba(20,184,166,0.06)',
   },
-  headerDot: {
-    width: 6, height: 6, borderRadius: 3,
-    backgroundColor: '#14B8A6',
+  headerIconShadow: {
+    textShadowColor: 'rgba(0,0,0,0.6)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 3,
   },
   headerTitle: {
     flex: 1,
