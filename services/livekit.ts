@@ -150,7 +150,8 @@ export class LiveKitService {
 
     // ★ 2026-04-20 Minimize-restore: aynı odaya zaten bağlıysak yeniden bağlanma,
     // callbacks'i overwrite et + mevcut state'i yeni dinleyiciye yay.
-    if (this.room && this.currentRoomId === roomId && this.room.state === 'connected') {
+    // Room state transient olabilir; currentRoomId + room instance varsa reattach yeterli.
+    if (this.room && this.currentRoomId === roomId) {
       this.onParticipantUpdate = callbacks.onParticipantUpdate;
       this.onConnectionStateChange = callbacks.onConnectionStateChange;
       this.onSpeakingChange = callbacks.onSpeakingChange;
@@ -158,7 +159,13 @@ export class LiveKitService {
       this.onParticipantDisconnected = callbacks.onParticipantDisconnected;
       this.onPermissionDenied = callbacks.onPermissionDenied;
       try {
-        callbacks.onConnectionStateChange?.('connected');
+        // Gerçek state'i yay — reconnecting/connected arasında doğru gösterim
+        const rs = this.room.state;
+        const mappedState: RoomConnectionState =
+          rs === 'reconnecting' ? 'reconnecting' :
+          rs === 'disconnected' ? 'disconnected' :
+          'connected';
+        callbacks.onConnectionStateChange?.(mappedState);
         callbacks.onMicStateChange?.(this.isMicrophoneEnabled, this.isCameraEnabled);
         this._doEmitParticipantUpdate(lk);
       } catch (e) { if (__DEV__) logger.warn('[LiveKit] reattach state emit error', e); }
@@ -550,9 +557,11 @@ export class LiveKitService {
   }
 
   // ★ 2026-04-20: Minimize-restore state seed için — yeni mount'ta "disconnected"
-  // başlamaması için useLiveKit bunu kullanır.
+  // başlamaması için useLiveKit bunu kullanır. currentRoomId aynı VE room instance
+  // varsa bağlı kabul edilir (LiveKit native state transient olabilir; bizim
+  // bilinçli disconnect çağrımız olmadığı sürece bağlıyız).
   isConnectedTo(roomId: string): boolean {
-    return this.currentRoomId === roomId && this.room?.state === 'connected';
+    return this.currentRoomId === roomId && !!this.room;
   }
 
   // --- Ekran Paylasimi -----------------------------------------------
