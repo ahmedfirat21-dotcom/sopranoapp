@@ -35,8 +35,13 @@ interface Props {
 // Kalp atışı (Heartbeat) göstergesi
 function ConnectionHeartbeat({ state, viewerCount }: { state: string, viewerCount: number }) {
   const pulseAnim = useRef(new Animated.Value(1)).current;
-  const [displayState, setDisplayState] = React.useState(state);
+  // ★ 2026-04-20: Mount sırasında 'disconnected' ise bile ilk 2sn yeşil varsay —
+  // minimize-restore veya kısa bağlantı geçişlerinde kırmızı flash'ı önle.
+  const [displayState, setDisplayState] = React.useState(
+    state === 'reconnecting' ? 'reconnecting' : 'connected',
+  );
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mountedAtRef = useRef(Date.now());
 
   useEffect(() => {
     if (state === 'connected') {
@@ -44,9 +49,11 @@ function ConnectionHeartbeat({ state, viewerCount }: { state: string, viewerCoun
       if (timerRef.current) clearTimeout(timerRef.current);
       setDisplayState('connected');
     } else {
-      // Kopma — 5sn bekle, hâlâ kopuksa kırmızıya dön (kısa kesintilerde yanıp sönmez)
+      // ★ Mount sonrası 2sn grace — kısa geçişler UI'da flash yaratmasın.
+      const since = Date.now() - mountedAtRef.current;
+      const delay = since < 2000 ? 2000 - since + 3000 : 5000;
       if (timerRef.current) clearTimeout(timerRef.current);
-      timerRef.current = setTimeout(() => setDisplayState(state), 5000);
+      timerRef.current = setTimeout(() => setDisplayState(state), delay);
     }
     return () => { if (timerRef.current) clearTimeout(timerRef.current); };
   }, [state]);
