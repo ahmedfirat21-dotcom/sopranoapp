@@ -351,7 +351,7 @@ const sty = StyleSheet.create({
     padding: 6, gap: 2,
   },
   emojiBtn: {
-    width: (W - 48) / 8, height: 40,
+    width: (W - 28) / 9, height: 40,
     alignItems: 'center', justifyContent: 'center',
     borderRadius: 8,
   },
