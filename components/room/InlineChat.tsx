@@ -40,13 +40,13 @@ function AnimatedMsg({ children, delay = 0 }: { children: React.ReactNode; delay
   );
 }
 
-export default function InlineChat({ messages, maxLines = 6 }: Props) {
+export default function InlineChat({ messages, maxLines = 10 }: Props) {
   if (messages.length === 0) return null;
   // ★ UX-2 FIX: En yeni mesaj en altta, en parlak — eski mesajlar üstte, solgun
   const visible = messages.slice(0, maxLines);
 
   return (
-    <View style={s.wrap} pointerEvents="none">
+    <View style={s.wrap}>
       {visible.map((msg, idx) => {
         // idx=0 en yeni, idx=last en eski → eski mesajlar daha soluk
         const opacity = 1 - (idx / (visible.length || 1)) * 0.7;

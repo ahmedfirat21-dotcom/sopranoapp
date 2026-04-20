@@ -257,10 +257,10 @@ function InlineTextEditor({ icon, label, value, onSave, placeholder, multiline, 
       />
       <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 4 }}>
         <Pressable onPress={() => { setDraft(value); setEditing(false); }} hitSlop={6}>
-          <Text style={{ fontSize: 10, color: '#64748B', fontWeight: '600' }}>İptal</Text>
+          <Text style={{ fontSize: 10, color: '#64748B', fontWeight: '600', textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 }}>İptal</Text>
         </Pressable>
         <Pressable onPress={() => { onSave(draft.trim()); setEditing(false); }} hitSlop={6}>
-          <Text style={{ fontSize: 10, color: '#14B8A6', fontWeight: '700' }}>Kaydet</Text>
+          <Text style={{ fontSize: 10, color: '#14B8A6', fontWeight: '700', textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 }}>Kaydet</Text>
         </Pressable>
       </View>
     </View>
@@ -482,7 +482,7 @@ export function PlusMenu({
         )}
         {onModeration && (
           <Pressable style={({ pressed }) => [s.subRow, pressed && s.subRowPressed]} onPress={() => { onModeration(); onClose(); }}>
-            <View style={[s.subIconCircle, { backgroundColor: '#A78BFA15' }]}><Ionicons name="people-outline" size={13} color="#A78BFA" /></View>
+            <View style={s.subIconCircle}><Ionicons name="people-outline" size={13} color="#A78BFA" style={s.iconShadow} /></View>
             <Text style={s.subLabel}>Moderasyon Paneli</Text>
             <Ionicons name="chevron-forward" size={12} color="rgba(255,255,255,0.15)" />
           </Pressable>
@@ -595,13 +595,13 @@ export function PlusMenu({
   const renderInvite = () => (
     <View style={st.subWrap}>
       <Pressable style={({ pressed }) => [s.subRow, pressed && s.subRowPressed]} onPress={() => { onInviteFriends(); onClose(); }}>
-        <View style={[s.subIconCircle, { backgroundColor: '#14B8A615' }]}><Ionicons name="people-outline" size={13} color="#14B8A6" /></View>
+        <View style={s.subIconCircle}><Ionicons name="people-outline" size={13} color="#14B8A6" style={s.iconShadow} /></View>
         <Text style={s.subLabel}>Arkadaşlarını Davet Et</Text>
         <Ionicons name="chevron-forward" size={12} color="rgba(255,255,255,0.15)" />
       </Pressable>
       <View style={{ height: 1, backgroundColor: 'rgba(255,255,255,0.03)' }} />
       <Pressable style={({ pressed }) => [s.subRow, pressed && s.subRowPressed]} onPress={() => { onShareLink(); onClose(); }}>
-        <View style={[s.subIconCircle, { backgroundColor: '#3B82F615' }]}><Ionicons name="link-outline" size={13} color="#3B82F6" /></View>
+        <View style={s.subIconCircle}><Ionicons name="link-outline" size={13} color="#3B82F6" style={s.iconShadow} /></View>
         <Text style={s.subLabel}>Oda Linkini Paylaş</Text>
         <Ionicons name="chevron-forward" size={12} color="rgba(255,255,255,0.15)" />
       </Pressable>
@@ -616,12 +616,12 @@ export function PlusMenu({
         <Ionicons name="people-circle-outline" size={13} color="#EC4899" />
         <Text style={st.toggleLabel}>Oda Takipçileri</Text>
         <View style={{ backgroundColor: 'rgba(236,72,153,0.12)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8, borderWidth: 0.5, borderColor: 'rgba(236,72,153,0.25)' }}>
-          <Text style={{ fontSize: 11, fontWeight: '800', color: '#EC4899' }}>{followerCount}</Text>
+          <Text style={{ fontSize: 11, fontWeight: '800', color: '#EC4899', textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 }}>{followerCount}</Text>
         </View>
       </View>
       <View style={st.sep} />
       <Pressable style={({ pressed }) => [s.subRow, pressed && s.subRowPressed]} onPress={() => { onRoomStats?.(); onClose(); }}>
-        <View style={[s.subIconCircle, { backgroundColor: '#3B82F615' }]}><Ionicons name="analytics-outline" size={13} color="#3B82F6" /></View>
+        <View style={s.subIconCircle}><Ionicons name="analytics-outline" size={13} color="#3B82F6" style={s.iconShadow} /></View>
         <Text style={s.subLabel}>Oda İstatistikleri</Text>
         <Ionicons name="chevron-forward" size={12} color="rgba(255,255,255,0.15)" />
       </Pressable>
@@ -629,7 +629,7 @@ export function PlusMenu({
         <>
           <View style={{ height: 1, backgroundColor: 'rgba(255,255,255,0.03)' }} />
           <Pressable style={({ pressed }) => [s.subRow, pressed && s.subRowPressed]} onPress={() => { onBoostRoom(); onClose(); }}>
-            <View style={[s.subIconCircle, { backgroundColor: '#F59E0B15' }]}><Ionicons name="rocket-outline" size={13} color="#F59E0B" /></View>
+            <View style={s.subIconCircle}><Ionicons name="rocket-outline" size={13} color="#F59E0B" style={s.iconShadow} /></View>
             <Text style={s.subLabel}>Keşfette Öne Çıkar</Text>
             <Ionicons name="chevron-forward" size={12} color="rgba(255,255,255,0.15)" />
           </Pressable>
@@ -758,8 +758,8 @@ export function PlusMenu({
                     i < items.length - 1 && !isExpanded && s.rowBorder,
                   ]}
                 >
-                  <View style={[s.iconCircle, { backgroundColor: (item.destructive ? '#EF4444' : item.accent) + '12' }]}>
-                    <Ionicons name={item.icon as any} size={16} color={item.destructive ? '#EF4444' : item.accent} />
+                  <View style={s.iconCircle}>
+                    <Ionicons name={item.icon as any} size={16} color={item.destructive ? '#EF4444' : item.accent} style={s.iconShadow} />
                   </View>
                   <View style={s.rowText}>
                     <Text style={[s.rowLabel, item.destructive && { color: '#EF4444' }]}>{item.label}</Text>
@@ -845,7 +845,7 @@ const s = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 4,
     paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6, borderWidth: 1,
   },
-  roleLabel: { fontSize: 9, fontWeight: '700', letterSpacing: 0.3 },
+  roleLabel: { fontSize: 9, fontWeight: '700', letterSpacing: 0.3, textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
   closeBtn: {
     width: 26, height: 26, borderRadius: 13,
     backgroundColor: 'rgba(255,255,255,0.06)',
@@ -859,16 +859,17 @@ const s = StyleSheet.create({
   rowPressed: { backgroundColor: 'rgba(20,184,166,0.08)' },
   rowExpanded: { backgroundColor: 'rgba(255,255,255,0.03)' },
   rowBorder: { borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.04)' },
-  iconCircle: { width: 30, height: 30, borderRadius: 15, justifyContent: 'center', alignItems: 'center' },
+  iconCircle: { width: 30, height: 30, justifyContent: 'center', alignItems: 'center' },
+  iconShadow: { textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 3 },
   rowText: { flex: 1 },
-  rowLabel: { fontSize: 12, fontWeight: '600', color: '#F1F5F9', letterSpacing: 0.1 },
-  rowDesc: { fontSize: 9, color: '#64748B', marginTop: 1 },
+  rowLabel: { fontSize: 12, fontWeight: '600', color: '#F1F5F9', letterSpacing: 0.1, textShadowColor: 'rgba(0,0,0,0.45)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
+  rowDesc: { fontSize: 9, color: '#64748B', marginTop: 1, textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
   badge: { minWidth: 18, height: 18, borderRadius: 9, backgroundColor: '#14B8A6', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 5 },
-  badgeText: { fontSize: 9, fontWeight: '800', color: '#FFF' },
+  badgeText: { fontSize: 9, fontWeight: '800', color: '#FFF', textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 1 },
   subRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 9, paddingHorizontal: 10 },
   subRowPressed: { backgroundColor: 'rgba(20,184,166,0.1)' },
-  subIconCircle: { width: 24, height: 24, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
-  subLabel: { flex: 1, fontSize: 11, fontWeight: '600', color: '#CBD5E1', letterSpacing: 0.1 },
+  subIconCircle: { width: 24, height: 24, justifyContent: 'center', alignItems: 'center' },
+  subLabel: { flex: 1, fontSize: 11, fontWeight: '600', color: '#CBD5E1', letterSpacing: 0.1, textShadowColor: 'rgba(0,0,0,0.45)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
 });
 
 const st = StyleSheet.create({
@@ -883,24 +884,24 @@ const st = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 6,
     paddingHorizontal: 10, paddingVertical: 5,
   },
-  toggleLabel: { flex: 1, fontSize: 11, fontWeight: '600', color: '#CBD5E1' },
+  toggleLabel: { flex: 1, fontSize: 11, fontWeight: '600', color: '#CBD5E1', textShadowColor: 'rgba(0,0,0,0.45)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
   chipRow: { paddingHorizontal: 10, paddingVertical: 5 },
-  chipLabel: { fontSize: 10, fontWeight: '600', color: '#64748B' },
+  chipLabel: { fontSize: 10, fontWeight: '600', color: '#64748B', textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
   chipGroup: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 2 },
   chip: {
     paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6,
     backgroundColor: 'rgba(255,255,255,0.04)', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.06)',
   },
   chipActive: { backgroundColor: 'rgba(20,184,166,0.15)', borderColor: 'rgba(20,184,166,0.35)' },
-  chipText: { fontSize: 9, fontWeight: '600', color: '#64748B' },
+  chipText: { fontSize: 9, fontWeight: '600', color: '#64748B', textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
   chipTextActive: { color: '#14B8A6', fontWeight: '700' },
   tierPill: {
     paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4,
     backgroundColor: 'rgba(212,175,55,0.1)', borderWidth: 0.5, borderColor: 'rgba(212,175,55,0.2)',
   },
-  tierPillText: { fontSize: 7, fontWeight: '800', color: '#D4AF37' },
+  tierPillText: { fontSize: 7, fontWeight: '800', color: '#D4AF37', textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 1 },
   actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 7 },
-  actionBtnText: { fontSize: 11, fontWeight: '600', color: '#EF4444' },
+  actionBtnText: { fontSize: 11, fontWeight: '600', color: '#EF4444', textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
   themeChip: {
     flexDirection: 'row', alignItems: 'center', gap: 3,
     paddingHorizontal: 6, paddingVertical: 3, borderRadius: 6,
@@ -912,8 +913,8 @@ const st = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 5,
     paddingHorizontal: 10, paddingVertical: 6,
   },
-  editorLabel: { fontSize: 10, fontWeight: '600', color: '#64748B', width: 60 },
-  editorValue: { flex: 1, fontSize: 10, color: '#CBD5E1', fontWeight: '500' },
+  editorLabel: { fontSize: 10, fontWeight: '600', color: '#64748B', width: 60, textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
+  editorValue: { flex: 1, fontSize: 10, color: '#CBD5E1', fontWeight: '500', textShadowColor: 'rgba(0,0,0,0.45)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
   editorExpanded: { paddingHorizontal: 10, paddingVertical: 5 },
   editorInput: {
     backgroundColor: 'rgba(255,255,255,0.05)',
