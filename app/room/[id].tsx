@@ -2668,7 +2668,7 @@ export default function RoomScreen() {
           hostId={room.host_id}
           hostName={hostUser?.user?.display_name || room?.host?.display_name || 'Host'}
           bottomInset={Math.max(insets.bottom, 14)}
-          onSuccess={(amt: number) => {
+          onSuccess={(amt: number, error?: string) => {
             if (amt > 0) {
               // ★ Tüm odaya animasyonlu bağış bildirimi gönder (merkez animasyon yeterli — üst toast kaldırıldı)
               sendDonationAlert(
@@ -2676,7 +2676,16 @@ export default function RoomScreen() {
                 amt,
               );
             } else {
-              showToast({ title: 'Yetersiz SP', message: 'Bağış için yeterli SP puanın yok.', type: 'error' });
+              // ★ 2026-04-20: Gerçek hata mesajı gösterilir — rate limit, self-donation,
+              // yetersiz bakiye, RPC hatası vb. ayrı ayrı belirir.
+              const msg = error || 'Bağış gönderilemedi. Tekrar dene.';
+              const isInsufficient = msg.toLowerCase().includes('yetersiz');
+              showToast({
+                title: isInsufficient ? 'Yetersiz SP' : 'Bağış Hatası',
+                message: msg,
+                type: 'error',
+              });
+              if (__DEV__) console.warn('[Donation] Failed:', msg);
             }
           }}
         />

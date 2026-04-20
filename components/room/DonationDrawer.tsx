@@ -23,7 +23,7 @@ interface Props {
   hostId: string;
   hostName: string;
   bottomInset: number;
-  onSuccess?: (amount: number) => void;
+  onSuccess?: (amount: number, error?: string) => void;
 }
 
 export default function DonationDrawer({ visible, onClose, senderId, hostId, hostName, bottomInset, onSuccess }: Props) {
@@ -143,15 +143,15 @@ export default function DonationDrawer({ visible, onClose, senderId, hostId, hos
       const result = await ProfileService.donateToUser(senderId, hostId, amount);
       if (!mountedRef.current) return;
       if (!result.success) {
-        onSuccess?.(-1);
+        onSuccess?.(-1, result.error);
         setLoading(false);
         return;
       }
       setBalance(prev => (prev ?? 0) - amount);
       onSuccess?.(amount);
       onClose();
-    } catch {
-      if (mountedRef.current) onSuccess?.(-1);
+    } catch (e: any) {
+      if (mountedRef.current) onSuccess?.(-1, e?.message);
     } finally {
       if (mountedRef.current) setLoading(false);
     }
