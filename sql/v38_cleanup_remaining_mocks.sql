@@ -26,15 +26,17 @@ DELETE FROM rooms
 
 -- 2. Fake host display_name patternleri — mock kullanıcı hostları
 -- (Zeynep Aksoy, VEX gibi test isimleriyle açılmış odalar)
+-- DİKKAT: Eğer bu display_name'lerden biri gerçek bir kullanıcı ise
+-- onu silmeden önce IN listesinden çıkar. Auth kontrolü için:
+--   SELECT u.id, p.display_name FROM auth.users u
+--   JOIN profiles p ON p.id = u.id
+--   WHERE p.display_name IN ('Zeynep Aksoy', 'VEX', 'Vex');
 DELETE FROM rooms r
-  WHERE EXISTS (
-    SELECT 1 FROM profiles p
-    WHERE p.id = r.host_id
-      AND p.display_name IN ('Zeynep Aksoy', 'VEX', 'Vex')
-      AND p.id NOT IN (
-        -- Eğer bu isim gerçek bir user ise korumaya al — auth.users'da kaydı varsa
-        SELECT id FROM profiles WHERE email IS NOT NULL AND email != ''
-      )
+  WHERE r.host_id IN (
+    SELECT p.id FROM profiles p
+    WHERE p.display_name IN ('Zeynep Aksoy', 'VEX', 'Vex')
+      -- auth.users'da kayıt YOKSA → fake profil, odayı sil
+      AND NOT EXISTS (SELECT 1 FROM auth.users u WHERE u.id = p.id)
   );
 
 
