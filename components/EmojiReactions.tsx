@@ -152,6 +152,12 @@ export function EmojiReactionBar({ onReaction, onClose }: { onReaction: (emoji: 
 
   return (
     <View style={sty.picker}>
+      {/* ★ Banner — DM/Oda Sohbeti ile tutarlı */}
+      <View style={sty.banner}>
+        <Ionicons name="happy" size={20} color="#14B8A6" style={sty.bannerIconShadow} />
+        <Text style={sty.bannerTitle}>Tepki & GIF</Text>
+      </View>
+
       {/* Tab Header */}
       <View style={sty.tabHeader}>
         <TouchableOpacity style={[sty.tabBtn, tab === 'emoji' && sty.tabActive]} onPress={() => setTab('emoji')}>
@@ -203,7 +209,12 @@ export function EmojiReactionBar({ onReaction, onClose }: { onReaction: (emoji: 
                 if (!gifUrl) return null;
                 return (
                   <TouchableOpacity key={item.id || idx} activeOpacity={0.7} onPress={() => onReaction(`[gif:${gifUrl}]`)} style={sty.gifItem}>
-                    <Image source={{ uri: gifUrl }} style={sty.gifImage} resizeMode="cover" />
+                    <Image
+                      source={{ uri: gifUrl }}
+                      style={sty.gifImage}
+                      resizeMode="cover"
+                      onError={(e) => { if (__DEV__) console.warn('[GIF] load failed:', gifUrl, e.nativeEvent?.error); }}
+                    />
                   </TouchableOpacity>
                 );
               })}
@@ -305,13 +316,28 @@ let emojiCounter = 0;
 // ═══════════════════════════════════════════════════
 // STYLES — Koyu transparan cam efekti (lacivert değil)
 // ═══════════════════════════════════════════════════
-const GIF_ITEM_SIZE = (W - 48) / 3;
+const GIF_ITEM_SIZE = (W - 20) / 3;
 
 const sty = StyleSheet.create({
   picker: {
     backgroundColor: 'transparent',
     width: '100%',
     overflow: 'hidden',
+  },
+  banner: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingHorizontal: 12, paddingVertical: 8,
+    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: 'rgba(20,184,166,0.06)',
+  },
+  bannerIconShadow: {
+    textShadowColor: 'rgba(0,0,0,0.6)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 3,
+  },
+  bannerTitle: {
+    flex: 1, fontSize: 14, fontWeight: '700', color: '#F1F5F9', letterSpacing: -0.2,
+    textShadowColor: 'rgba(0,0,0,0.45)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
   },
   tabHeader: {
     flexDirection: 'row',
