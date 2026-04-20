@@ -724,11 +724,11 @@ export function PlusMenu({
       </Animated.View>
 
       <Animated.View {...panHandlers} style={[s.panel, { bottom: bottomInset + 70, transform: [{ translateX: Animated.add(slideAnim, swipeX) }] }]}>
-        {/* ★ Opak gradient zemin — okunabilirlik için şeffaflık kaldırıldı */}
+        {/* ★ FriendsDrawer paleti — diagonal warm-neutral gradient */}
         <LinearGradient
-          colors={['#1E293B', '#0F172A', '#0B1220']}
+          colors={['#4a5668', '#37414f', '#232a35']}
           start={{ x: 0, y: 0 }}
-          end={{ x: 0, y: 1 }}
+          end={{ x: 1, y: 1 }}
           style={StyleSheet.absoluteFill}
         />
         {/* Header */}
