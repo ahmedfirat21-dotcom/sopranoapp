@@ -65,7 +65,8 @@ export function ReportModal({ visible, onClose, reporterId, target }: ReportModa
 
   const panResponder = useRef(
     PanResponder.create({
-      onMoveShouldSetPanResponder: (_e, g) => Math.abs(g.dy) > 8 && Math.abs(g.dy) > Math.abs(g.dx),
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_e, g) => Math.abs(g.dy) > 4 && Math.abs(g.dy) > Math.abs(g.dx),
       onPanResponderMove: (_e, g) => {
         if (g.dy > 0) translateY.setValue(g.dy);
       },
@@ -116,17 +117,17 @@ export function ReportModal({ visible, onClose, reporterId, target }: ReportModa
       <View style={sty.overlay}>
         <Pressable style={sty.backdrop} onPress={onClose} />
         <Animated.View style={[sty.sheet, { transform: [{ translateY }] }]}>
-          {/* Handle — drag ile kapatma */}
-          <View {...panResponder.panHandlers} style={sty.handleWrap}>
-            <View style={sty.handle} />
-          </View>
-
-          {/* Header */}
-          <View style={sty.header}>
-            <View style={sty.headerIcon}>
-              <Ionicons name="flag" size={16} color={C.red} />
+          {/* ★ Drag zone — handle + header birlikte, daha büyük yakalama alanı */}
+          <View {...panResponder.panHandlers}>
+            <View style={sty.handleWrap}>
+              <View style={sty.handle} />
             </View>
-            <Text style={sty.title}>{targetLabel} Rapor Et</Text>
+            <View style={sty.header}>
+              <View style={sty.headerIcon}>
+                <Ionicons name="flag" size={16} color={C.red} />
+              </View>
+              <Text style={sty.title}>{targetLabel} Rapor Et</Text>
+            </View>
           </View>
 
           <ScrollView style={sty.scrollContent} showsVerticalScrollIndicator={false}>
