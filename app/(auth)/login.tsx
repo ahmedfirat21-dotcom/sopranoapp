@@ -360,10 +360,9 @@ export default function LoginScreen() {
           <View style={s.content}>
             {/* ═══ LOGO ═══ */}
             <Animated.View style={[s.logoSection, { opacity: logoOpacity, transform: [{ scale: logoScale }] }]}>
-              {/* logo.png içinde "Senin Sesin" var — overflow:hidden ile kırpıyoruz */}
-              <View style={s.logoClip}>
-                <Image source={require('../../assets/logo.png')} style={s.logoImage} resizeMode="contain" />
-              </View>
+              {/* ★ 2026-04-23: Eski logo.png'de "Senin Sesin" tagline'ı vardı, clip ile kırpılıyordu.
+                   Yeni logo sadece "SopranoChat" wordmark — clip kaldırıldı, tam görünür. */}
+              <Image source={require('../../assets/logo.png')} style={s.logoImage} resizeMode="contain" />
             </Animated.View>
 
             {/* ═══ STAT PILLS ═══ */}
@@ -600,7 +599,7 @@ const s = StyleSheet.create({
 
   // ═══ LOGO ═══
   logoSection: { alignItems: 'center', marginBottom: 32, marginTop: SCREEN_HEIGHT * 0.02 },
-  logoClip: { width: 260, height: 40, overflow: 'hidden' },
+  // ★ Logo oranı ~4.5:1 — genişliği 260 olunca doğal yüksekliği ~58. resizeMode:contain ile fit.
   logoImage: { width: 260, height: 60 },
 
   // ═══ STAT PILLS ═══
