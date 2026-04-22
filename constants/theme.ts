@@ -23,7 +23,7 @@ const BRAND_COLORS = {
   neonPink: '#FF1493',
   neonGold: '#FFD700',
   neonGoldLight: '#FFA500',
-  vipGold: '#D4AF37',
+  accentGold: '#D4AF37',
 
   // Semantic Card Colors
   cardBg: '#414e5f',

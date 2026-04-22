@@ -87,7 +87,7 @@ export default function NotificationBell({ unreadCount, onPress, style }: Props)
 
 const s = StyleSheet.create({
   btn: {
-    width: 36, height: 36, borderRadius: 18,
+    width: 44, height: 44, borderRadius: 22,
     backgroundColor: 'rgba(255,255,255,0.06)',
     justifyContent: 'center', alignItems: 'center',
     position: 'relative',

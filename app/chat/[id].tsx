@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { View, Text, StyleSheet, Image, Pressable, TextInput, FlatList, KeyboardAvoidingView, Platform, ActivityIndicator, Animated, Easing, NativeScrollEvent, NativeSyntheticEvent, Modal } from 'react-native';
+import { View, Text, StyleSheet, Image, Pressable, TextInput, FlatList, KeyboardAvoidingView, Platform, ActivityIndicator, Animated, Easing, NativeScrollEvent, NativeSyntheticEvent, Modal, Keyboard } from 'react-native';
 import PremiumAlert, { type AlertButton } from '../../components/PremiumAlert';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -133,6 +133,15 @@ function MessageBubble({ message, isMe, senderAvatar, senderName, myAvatar, onDe
   const hasImage = !!message.image_url || !!imageUrlFromContent;
   const imageUri = message.image_url || imageUrlFromContent;
 
+  // ★ 2026-04-21: WhatsApp-tarzı emoji-only render — sadece emojilerden oluşan kısa mesajlar
+  //   balonsuz ve büyük tipoda görünür. 1 emoji → 60px, 2-3 → 46px, 4+ → normal balon.
+  const emojiOnlyMatch = !hasImage && !hasVoice && message.content
+    ? message.content.trim().match(/^(?:[\p{Emoji_Presentation}\p{Extended_Pictographic}\u200d\uFE0F\u20E3]){1,6}$/u)
+    : null;
+  const emojiCount = emojiOnlyMatch ? Array.from(message.content.trim()).filter(c => /[\p{Emoji_Presentation}\p{Extended_Pictographic}]/u.test(c)).length : 0;
+  const isEmojiOnly = !!emojiOnlyMatch && emojiCount >= 1 && emojiCount <= 3;
+  const emojiFontSize = emojiCount === 1 ? 60 : emojiCount === 2 ? 50 : 42;
+
   // ★ Emoji tepkileri parse et
   const reactions: Record<string, string[]> = (message as any).reactions ? JSON.parse((message as any).reactions) : {};
   const QUICK_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
@@ -220,19 +229,28 @@ function MessageBubble({ message, isMe, senderAvatar, senderName, myAvatar, onDe
           <StatusAvatar uri={senderAvatar} size={28} />
         </View>
       )}
-      <View style={[styles.bubble, isMe ? styles.bubbleMe : styles.bubbleOther, customStyle]}>
-        {hasImage && !hasVoice ? (
-          <Pressable onPress={() => onImagePress?.(imageUri!)}>
-            <Image source={{ uri: imageUri! }} style={styles.chatImage} resizeMode="cover" />
-          </Pressable>
-        ) : null}
-        {/* ★ MSG-6: Ses mesajı oynatıcı */}
-        {hasVoice ? (
-          <VoiceMessagePlayer voiceUrl={message.voice_url!} duration={message.voice_duration || undefined} isMe={isMe} />
-        ) : !hasImage && message.content ? (
-          <Text style={styles.bubbleText}>{message.content}</Text>
-        ) : null}
-      </View>
+      {isEmojiOnly ? (
+        // ★ 2026-04-21: WhatsApp-tarzı — balonsuz büyük emoji, hafif shadow
+        <View style={{ paddingHorizontal: 6, paddingVertical: 2 }}>
+          <Text style={{ fontSize: emojiFontSize, lineHeight: emojiFontSize * 1.1, textShadowColor: 'rgba(0,0,0,0.25)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4 }}>
+            {message.content}
+          </Text>
+        </View>
+      ) : (
+        <View style={[styles.bubble, isMe ? styles.bubbleMe : styles.bubbleOther, customStyle]}>
+          {hasImage && !hasVoice ? (
+            <Pressable onPress={() => onImagePress?.(imageUri!)}>
+              <Image source={{ uri: imageUri! }} style={styles.chatImage} resizeMode="cover" />
+            </Pressable>
+          ) : null}
+          {/* ★ MSG-6: Ses mesajı oynatıcı */}
+          {hasVoice ? (
+            <VoiceMessagePlayer voiceUrl={message.voice_url!} duration={message.voice_duration || undefined} isMe={isMe} />
+          ) : !hasImage && message.content ? (
+            <Text style={styles.bubbleText}>{message.content}</Text>
+          ) : null}
+        </View>
+      )}
       {/* ★ Gönderenin avatarı (sağ taraf) */}
       {isMe && (
         <View style={styles.bubbleAvatarRow}>
@@ -291,6 +309,9 @@ export default function ChatScreen() {
   const [isFriend, setIsFriend] = useState(false); // ★ CALL-1: Takipçi kontrolü
   const [isMutualFollow, setIsMutualFollow] = useState(false); // ★ DM-8: Karşılıklı takip kontrolü
   const [isMessageRequest, setIsMessageRequest] = useState(false); // ★ DM-8: Mesaj isteği modu
+  // ★ 2026-04-22: Instagram-style message request durumu (friendship accepted DEĞİLKEN kullanılır)
+  const [msgRequestInfo, setMsgRequestInfo] = useState<{ status: 'none' | 'pending_incoming' | 'pending_outgoing' | 'accepted' | 'rejected' }>({ status: 'none' });
+  const [respondingRequest, setRespondingRequest] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const flatListRef = useRef<FlatList>(null);
@@ -492,14 +513,30 @@ export default function ChatScreen() {
           setIsMessageRequest(!meFollowsThem || !theyFollowMe);
         } catch { setIsFriend(false); setIsMutualFollow(false); setIsMessageRequest(true); }
 
+        // ★ 2026-04-22: message_requests durumu (Instagram flow)
+        try {
+          const req = await MessageService.getMessageRequest(firebaseUser.uid, id);
+          if (!req) {
+            setMsgRequestInfo({ status: 'none' });
+          } else if (req.status === 'accepted') {
+            setMsgRequestInfo({ status: 'accepted' });
+          } else if (req.status === 'rejected') {
+            setMsgRequestInfo({ status: 'rejected' });
+          } else if (req.status === 'pending') {
+            setMsgRequestInfo({ status: req.receiver_id === firebaseUser.uid ? 'pending_incoming' : 'pending_outgoing' });
+          }
+        } catch { setMsgRequestInfo({ status: 'none' }); }
+
         // Mesaj geçmişini yükle
         try {
           let history = await MessageService.getConversation(firebaseUser.uid, id);
-          // ★ Gizlenmiş sohbet timestamp'ini kontrol et — eski mesajları filtrele
-          const hiddenMap = await MessageService.getHiddenConversations(firebaseUser.uid);
-          const hiddenBefore = hiddenMap[id];
-          if (hiddenBefore) {
-            history = history.filter(m => new Date(m.created_at) > new Date(hiddenBefore));
+          // ★ 2026-04-22: Eski mesajlar için KALICI filter — cleared_before timestamp'i
+          //   deleteConversation'da yazılır, bir daha asla temizlenmez (sadece yeni
+          //   silmede üst üste yazılır). Hidden timestamp ise inbox gizleme için ayrı.
+          const clearedMap = await MessageService.getClearedBefore(firebaseUser.uid);
+          const clearedBefore = clearedMap[id];
+          if (clearedBefore) {
+            history = history.filter(m => new Date(m.created_at) > new Date(clearedBefore));
           }
           if (__DEV__) console.log(`[Chat] getConversation: ${history.length} mesaj yüklendi (user: ${firebaseUser.uid}, partner: ${id})`);
           setMessages(history);
@@ -510,6 +547,17 @@ export default function ChatScreen() {
 
         // Mesajları okundu olarak işaretle + badge güncelle
         await MessageService.markAsRead(firebaseUser.uid, id);
+        // ★ 2026-04-21: Cevapsız arama bildirimlerini de okundu işaretle — chat açıldığında
+        //   kullanıcı bu sohbete bakıyor demektir, badge'te sayılmamalı.
+        try {
+          await supabase
+            .from('notifications')
+            .update({ is_read: true })
+            .eq('user_id', firebaseUser.uid)
+            .eq('sender_id', id)
+            .eq('type', 'missed_call')
+            .eq('is_read', false);
+        } catch {}
         refreshBadges();
 
         // ★ Cevapsız aramaları yükle (bu sohbet partneri ile)
@@ -669,11 +717,30 @@ export default function ChatScreen() {
       const newMsg = await MessageService.send(firebaseUser.uid, id, content);
       // Geçici mesajı gerçek veritabanı ID'li mesaj ile değiştir
       setMessages(prev => prev.map(m => m.id === tempId ? newMsg : m));
-    } catch (err) {
+      // ★ 2026-04-22: İlk mesaj atılınca request pending_outgoing olur (mutual follow yoksa)
+      if (!isMutualFollow && msgRequestInfo.status === 'none') {
+        setMsgRequestInfo({ status: 'pending_outgoing' });
+      }
+      // ★ 2026-04-22 FIX: Kullanıcı yeni mesaj gönderdi → hidden entry temizle (inbox'ta
+      //   sohbet tekrar görünür olsun). Sadece ekran açılırken temizleme YOK — oraya girmek
+      //   silinmişi geri getirmemeli.
+      try {
+        const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+        const key = `hidden_conversations_${firebaseUser.uid}`;
+        const raw = await AsyncStorage.getItem(key);
+        const map: Record<string, string> = raw ? JSON.parse(raw) : {};
+        if (map[id]) {
+          delete map[id];
+          await AsyncStorage.setItem(key, JSON.stringify(map));
+        }
+      } catch {}
+    } catch (err: any) {
       if (__DEV__) console.error('Mesaj gönderilemedi:', err);
       // Hata durumunda mesajı listeden çıkar ve geri metin kutusuna koy
       setMessages(prev => prev.filter(m => m.id !== tempId));
       setInputText(content);
+      const msg = err?.message || 'Mesaj gönderilemedi';
+      showToast({ title: 'Gönderilemedi', message: msg, type: 'warning' });
     } finally {
       setSending(false);
     }
@@ -734,12 +801,12 @@ export default function ChatScreen() {
         {!loading && otherUser && (
           <View style={styles.headerActions}>
             <Pressable
-              style={[styles.headerAction, (isCallingInProgress || !isMutualFollow) && { opacity: 0.35 }]}
-              disabled={isCallingInProgress || !isMutualFollow}
+              style={[styles.headerAction, (isCallingInProgress || !isFriend) && { opacity: 0.35 }]}
+              disabled={isCallingInProgress || !isFriend}
               onPress={async () => {
                 if (!firebaseUser || !id || isCallingInProgress) return;
-                if (!isMutualFollow) {
-                  showToast({ title: 'Arama Yapılamaz', message: 'Karşılıklı takip gerekli', type: 'error' });
+                if (!isFriend) {
+                  showToast({ title: 'Arama Yapılamaz', message: 'Önce arkadaş olmalısın', type: 'error' });
                   return;
                 }
                 setIsCallingInProgress(true);
@@ -759,7 +826,7 @@ export default function ChatScreen() {
                 }
               }}
             >
-              <Ionicons name="call" size={20} color={isMutualFollow ? Colors.teal : '#475569'} />
+              <Ionicons name="call" size={20} color={isFriend ? Colors.teal : '#475569'} />
             </Pressable>
             {/* ★ Kebab menü butonu */}
             <Pressable
@@ -773,17 +840,94 @@ export default function ChatScreen() {
         )}
       </View>
 
-      {/* ★ DM-8: Mesaj İsteği Banner'ı — header altında, koyu tema */}
-      {isMessageRequest && !loading && (
+      {/* ★ 2026-04-22: Mesaj isteği banner — 3 farklı durum için */}
+      {!loading && msgRequestInfo.status === 'pending_incoming' && (
+        <View style={[styles.msgRequestBanner, { backgroundColor: 'rgba(59,130,246,0.08)', borderBottomColor: 'rgba(59,130,246,0.2)' }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10, paddingVertical: 10, paddingHorizontal: 14 }}>
+            <Ionicons name="mail-unread-outline" size={18} color="#60A5FA" style={{ marginTop: 2 }} />
+            <View style={{ flex: 1, gap: 8 }}>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: '#E2E8F0' }}>
+                {otherUser?.display_name || 'Kullanıcı'} sizinle mesajlaşmak istiyor
+              </Text>
+              <Text style={{ fontSize: 11, color: '#94A3B8', lineHeight: 15 }}>
+                Kabul ederseniz mesajlaşmaya başlayabilirsiniz. Reddederseniz yeni mesaj atamaz.
+              </Text>
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
+                <Pressable
+                  disabled={respondingRequest}
+                  onPress={async () => {
+                    if (!firebaseUser || respondingRequest) return;
+                    setRespondingRequest(true);
+                    try {
+                      await MessageService.acceptMessageRequest(firebaseUser.uid, id as string);
+                      setMsgRequestInfo({ status: 'accepted' });
+                      showToast({ title: '✅ Kabul Edildi', message: 'Artık mesajlaşabilirsiniz.', type: 'success' });
+                    } catch (e: any) {
+                      showToast({ title: 'Hata', message: e?.message || 'İşlem başarısız', type: 'error' });
+                    } finally { setRespondingRequest(false); }
+                  }}
+                  style={({ pressed }) => [{
+                    flex: 1, paddingVertical: 8, borderRadius: 10, alignItems: 'center',
+                    backgroundColor: '#14B8A6',
+                  }, pressed && { opacity: 0.7 }, respondingRequest && { opacity: 0.5 }]}>
+                  <Text style={{ fontSize: 12, fontWeight: '800', color: '#FFF' }}>Kabul Et</Text>
+                </Pressable>
+                <Pressable
+                  disabled={respondingRequest}
+                  onPress={async () => {
+                    if (!firebaseUser || respondingRequest) return;
+                    setRespondingRequest(true);
+                    try {
+                      await MessageService.rejectMessageRequest(firebaseUser.uid, id as string);
+                      setMsgRequestInfo({ status: 'rejected' });
+                      showToast({ title: 'Reddedildi', message: 'Bu kullanıcı size mesaj atamaz.', type: 'info' });
+                      router.back();
+                    } catch (e: any) {
+                      showToast({ title: 'Hata', message: e?.message || 'İşlem başarısız', type: 'error' });
+                    } finally { setRespondingRequest(false); }
+                  }}
+                  style={({ pressed }) => [{
+                    flex: 1, paddingVertical: 8, borderRadius: 10, alignItems: 'center',
+                    backgroundColor: 'rgba(239,68,68,0.15)',
+                    borderWidth: 1, borderColor: 'rgba(239,68,68,0.4)',
+                  }, pressed && { opacity: 0.7 }, respondingRequest && { opacity: 0.5 }]}>
+                  <Text style={{ fontSize: 12, fontWeight: '800', color: '#F87171' }}>Reddet</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </View>
+      )}
+
+      {!loading && msgRequestInfo.status === 'pending_outgoing' && (
+        <View style={styles.msgRequestBanner}>
+          <View style={styles.msgRequestBannerInner}>
+            <Ionicons name="time-outline" size={16} color="#FBBF24" />
+            <Text style={styles.msgRequestDesc}>
+              İsteğiniz onay bekliyor. {otherUser?.display_name || 'Kullanıcı'} kabul edene kadar yeni mesaj gönderemezsiniz.
+            </Text>
+          </View>
+        </View>
+      )}
+
+      {!loading && msgRequestInfo.status === 'rejected' && (
+        <View style={[styles.msgRequestBanner, { backgroundColor: 'rgba(239,68,68,0.08)' }]}>
+          <View style={styles.msgRequestBannerInner}>
+            <Ionicons name="close-circle-outline" size={16} color="#F87171" />
+            <Text style={[styles.msgRequestDesc, { color: '#FCA5A5' }]}>
+              İsteğiniz reddedildi — bu kullanıcıya mesaj gönderemezsiniz.
+            </Text>
+          </View>
+        </View>
+      )}
+
+      {/* ★ 2026-04-22: İlk mesaj bilgi banner — mutual follow yoksa + request henüz yok */}
+      {!loading && msgRequestInfo.status === 'none' && !isMutualFollow && (
         <View style={styles.msgRequestBanner}>
           <View style={styles.msgRequestBannerInner}>
             <Ionicons name="information-circle-outline" size={16} color="#94A3B8" />
             <Text style={styles.msgRequestDesc}>
-              {isMutualFollow
-                ? ''
-                : isFriend
-                  ? 'Karşılıklı takip yok. Mesajın "Mesaj İsteği" olarak gönderilecek.'
-                  : `${otherUser?.display_name || 'Bu kul.'} ile takipleşmiyorsunuz. Mesajın İstek olarak gönderilecek.`}
+              {otherUser?.display_name || 'Bu kul.'} ile karşılıklı takipleşmiyorsunuz. İlk mesajın "istek" olarak gönderilir, onay beklenir.
             </Text>
           </View>
         </View>
@@ -848,6 +992,8 @@ export default function ChatScreen() {
         style={styles.messageList}
         contentContainerStyle={styles.messageContent}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="interactive"
         onContentSizeChange={() => {
           if (isAtBottomRef.current) {
             flatListRef.current?.scrollToEnd({ animated: false });
@@ -936,7 +1082,7 @@ export default function ChatScreen() {
 
       {/* ★ Input Bar — WhatsApp tarzı: kayıt sırasında inline dönüşüm */}
       {isRecording ? (
-        <View style={styles.inputBar}>
+        <View style={[styles.inputBar, { paddingBottom: Math.max(insets.bottom, 10) }]}>
           {/* Kayıt modunda: inline waveform bar */}
           <Pressable style={styles.recCancelBtn} onPress={cancelRecording}>
             <Ionicons name="trash-outline" size={20} color="#EF4444" />
@@ -975,19 +1121,20 @@ export default function ChatScreen() {
           </Pressable>
         </View>
       ) : (
-        <View style={styles.inputBar}>
+        <View style={[styles.inputBar, { paddingBottom: Math.max(insets.bottom, 10) }, (msgRequestInfo.status === 'pending_outgoing' || msgRequestInfo.status === 'rejected') && { opacity: 0.4 }]} pointerEvents={(msgRequestInfo.status === 'pending_outgoing' || msgRequestInfo.status === 'rejected') ? 'none' : 'auto'}>
           <Pressable style={styles.inputAction} onPress={() => setShowEmojiPicker(v => !v)}>
             <Ionicons name={showEmojiPicker ? 'close-circle' : 'happy-outline'} size={22} color={Colors.teal} />
           </Pressable>
           <TextInput
             style={styles.textInput}
-            placeholder="Mesaj yaz..."
+            placeholder={msgRequestInfo.status === 'pending_outgoing' ? 'Onay bekleniyor...' : msgRequestInfo.status === 'rejected' ? 'Mesaj atamazsın' : 'Mesaj yaz...'}
             placeholderTextColor={Colors.text3}
             value={inputText}
             onChangeText={handleInputChange}
             multiline
             maxLength={MSG_MAX_LENGTH}
             onFocus={() => setShowEmojiPicker(false)}
+            editable={msgRequestInfo.status !== 'pending_outgoing' && msgRequestInfo.status !== 'rejected'}
           />
           <Pressable style={styles.inputAction} onPress={async () => {
             try {
@@ -1381,7 +1528,6 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     paddingHorizontal: 12,
     paddingVertical: 10,
-    paddingBottom: 28,
     borderTopWidth: 1,
     borderTopColor: Colors.glassBorder,
     backgroundColor: Colors.bg2,

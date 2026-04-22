@@ -55,7 +55,7 @@ export function getAvatarSource(sourceUrl?: string | null): ImageSourcePropType 
  */
 export function getLevelFromSP(sp: number, tier?: string): number {
   const rawLevel = Math.min(99, Math.floor(sp / 100) + 1);
-  // ★ Legacy temizlik: migrateLegacyTier ile normalize et (Gold/VIP/Bronze/Silver → Free/Plus/Pro)
+  // Tier normalize (geçersiz değerler Free'ye düşer)
   const normalized = migrateLegacyTier(tier);
   if (normalized === 'Pro') return Math.max(40, rawLevel);
   if (normalized === 'Plus') return Math.max(15, rawLevel);

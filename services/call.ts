@@ -167,14 +167,10 @@ export const CallService = {
   ): Promise<{ callId: string; receiverIsOnline: boolean }> {
     // Tüm tier'lar sesli arama yapabilir (kalite tier'a göre değişir)
 
-    // ★ CALL-1 FIX: Sadece karşılıklı takipçiler arayabilir
-    const friendshipStatus = await FriendshipService.getStatus(callerId, receiverId);
-    if (friendshipStatus !== 'accepted') {
-      // Ters yönü de kontrol et (B→A accepted olabilir)
-      const reverseStatus = await FriendshipService.getStatus(receiverId, callerId);
-      if (reverseStatus !== 'accepted') {
-        throw new Error('Sadece arkadaşlarınızı arayabilirsiniz. Önce takip isteği gönderin.');
-      }
+    // ★ CALL-1 FIX: En az bir yönde accepted arkadaşlık gerek (mutual gerekmiyor)
+    const isFriend = await FriendshipService.isFriend(callerId, receiverId);
+    if (!isFriend) {
+      throw new Error('Sadece arkadaşlarınızı arayabilirsiniz. Önce arkadaş olun.');
     }
 
     const callId = this.generateCallId(callerId, receiverId);
@@ -207,7 +203,9 @@ export const CallService = {
       callType,
       tier: tier || 'Free',
       route: `/call/${callerId}?callId=${callId}&callType=${callType}&isIncoming=true&receiverOnline=true`,
-    }).catch(() => {});
+    }).catch((e: any) => {
+      if (__DEV__) console.warn('[CallService] push gönderim hatası (sessizce yut):', e?.message);
+    });
 
     return { callId, receiverIsOnline };
   },
@@ -240,7 +238,7 @@ export const CallService = {
     }
   },
 
-  /** Cevapsız arama kaydı oluştur (notifications + push) */
+  /** Cevapsız arama kaydı oluştur (notifications + push + calls table) */
   async saveMissedCall(
     callerId: string,
     callerName: string,
@@ -267,8 +265,76 @@ export const CallService = {
     ).then((res: any) => {
       if (res?.error && __DEV__) console.warn('[CallService] Missed call DB kaydetme hatası:', res.error.message);
     });
-    await Promise.all([pushPromise, dbPromise]);
+    // ★ 2026-04-21: calls tablosuna da kayıt — uzun vadeli arama geçmişi için.
+    //   v47 migration'ı ile gelen dedicated history tablosu.
+    const callsHistoryPromise = Promise.resolve(
+      supabase.from('calls').insert({
+        caller_id: callerId,
+        receiver_id: receiverId,
+        call_type: callType,
+        status: 'missed',
+        duration_seconds: 0,
+      })
+    ).then((res: any) => {
+      if (res?.error && __DEV__) console.warn('[CallService] calls tablosu insert hatası:', res.error.message);
+    });
+    await Promise.all([pushPromise, dbPromise, callsHistoryPromise]);
     if (__DEV__) console.log(`[CallService] Cevapsız arama: ${callerId} → ${receiverId}`);
+  },
+
+  /**
+   * ★ 2026-04-21: Yeni arama kaydı oluştur (calls tablosuna 'initiated' ile).
+   *   initiateCall sonrası çağrılır; sonradan status güncellenir (accepted/ended/declined).
+   */
+  async recordCallStart(
+    callerId: string,
+    receiverId: string,
+    callType: CallType
+  ): Promise<string | null> {
+    try {
+      const { data, error } = await supabase
+        .from('calls')
+        .insert({
+          caller_id: callerId,
+          receiver_id: receiverId,
+          call_type: callType,
+          status: 'initiated',
+          duration_seconds: 0,
+        })
+        .select('id')
+        .single();
+      if (error) {
+        if (__DEV__) console.warn('[CallService] recordCallStart hatası:', error.message);
+        return null;
+      }
+      return data?.id || null;
+    } catch (e: any) {
+      if (__DEV__) console.warn('[CallService] recordCallStart exception:', e?.message);
+      return null;
+    }
+  },
+
+  /**
+   * ★ 2026-04-21: Arama kaydını güncelle (status + duration).
+   *   Çağrı bittiğinde call/[id].tsx çağırır.
+   */
+  async recordCallEnd(
+    callRecordId: string,
+    status: 'accepted' | 'declined' | 'ended' | 'failed' | 'busy',
+    durationSeconds: number = 0
+  ): Promise<void> {
+    try {
+      await supabase
+        .from('calls')
+        .update({
+          status,
+          duration_seconds: durationSeconds,
+          ended_at: new Date().toISOString(),
+        })
+        .eq('id', callRecordId);
+    } catch (e: any) {
+      if (__DEV__) console.warn('[CallService] recordCallEnd exception:', e?.message);
+    }
   },
 
   /** Aramayı kabul et */

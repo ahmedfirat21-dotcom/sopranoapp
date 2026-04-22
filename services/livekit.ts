@@ -246,6 +246,48 @@ export class LiveKitService {
 
         this.currentRoomId = roomId;
         this.onConnectionStateChange?.('connected');
+
+        // ★ 2026-04-20 LATE-JOINER FIX: Connect sonrası mevcut remoteParticipant'ların
+        //   track'lerini explicit subscribe et. LiveKit default olarak autoSubscribe=true
+        //   olsa da bazı sürümlerde connect öncesi publish edilmiş kamera track'leri
+        //   late-joiner'a setSubscribed(true) çağrılmadan ulaşmıyor — video "açık" görünür
+        //   ama karşı taraf boş avatar görür.
+        try {
+          const iter = (c: any, cb: (v: any) => void) => {
+            if (!c) return;
+            if (typeof c.forEach === 'function') c.forEach((v: any) => cb(v));
+            else if (Array.isArray(c)) c.forEach(cb);
+          };
+          iter(this.room.remoteParticipants, (participant: any) => {
+            // ★ 2026-04-20 FIX: Participant disconnect olmuş olabilir (identity yok veya
+            //   connectionState 'disconnected'). setSubscribed çağrısı SDK'da "Tried to
+            //   add a track for a participant, that's not present" hatası atıyor.
+            if (!participant?.identity) return;
+            const state = participant?.connectionState || participant?.state;
+            if (state === 'disconnected') return;
+            iter(participant?.videoTrackPublications, (pub: any) => {
+              if (pub && pub.isSubscribed === false && typeof pub.setSubscribed === 'function') {
+                try { pub.setSubscribed(true).catch(() => {}); } catch {}
+              }
+            });
+            iter(participant?.audioTrackPublications, (pub: any) => {
+              if (pub && pub.isSubscribed === false && typeof pub.setSubscribed === 'function') {
+                try { pub.setSubscribed(true).catch(() => {}); } catch {}
+              }
+              // Zaten subscribed ise de audio playback'i garantile
+              if (pub?.track?.mediaStreamTrack) {
+                try {
+                  pub.track.mediaStreamTrack.enabled = true;
+                  pub.track.attach?.();
+                  pub.track.start?.();
+                } catch {}
+              }
+            });
+          });
+        } catch (e) {
+          if (__DEV__) logger.warn('[LiveKit] late-joiner subscribe error:', e);
+        }
+
         this.emitParticipantUpdate(lk);
         if (__DEV__) logger.log(`[LiveKit] Bağlantı başarılı (deneme ${attempt}/${MAX_RETRIES})`);
         return true;
@@ -276,11 +318,22 @@ export class LiveKitService {
   }
 
   // ─── Oda Sesini Kapat/Aç ──────────────────────────────────
+  // ★ 2026-04-20: remoteParticipants + trackPublications LiveKit v2'de Map.
+  //   Map.forEach(value, key) tarafı OK ama audioTrackPublications bazı
+  //   sürümlerde getter (array) olabilir. İkisini de safe iterate et.
   muteRoomAudio(mute: boolean) {
     if (!this.room) return;
-    this.room.remoteParticipants.forEach((p: any) => {
-      p.audioTrackPublications.forEach((pub: any) => {
-        if (pub.track && pub.track.mediaStreamTrack) {
+    const iterate = (collection: any, cb: (v: any) => void) => {
+      if (!collection) return;
+      if (typeof collection.forEach === 'function') {
+        collection.forEach((v: any) => cb(v));
+      } else if (Array.isArray(collection)) {
+        collection.forEach(cb);
+      }
+    };
+    iterate(this.room.remoteParticipants, (p: any) => {
+      iterate(p?.audioTrackPublications, (pub: any) => {
+        if (pub?.track?.mediaStreamTrack) {
           pub.track.mediaStreamTrack.enabled = !mute;
         }
       });
@@ -755,13 +808,28 @@ export class LiveKitService {
           this.onParticipantDisconnected?.(identity);
         }
 
-        // ★ TrackSubscribed — video track geldiğinde hemen log ve update
+        // ★ TrackSubscribed — video/audio track geldiğinde
         if (evt === lk.RoomEvent.TrackSubscribed) {
           const track = args[0];
           const publication = args[1];
           const participant = args[2];
-          if (track?.kind === 'video' || publication?.kind === 'video') {
-            if (__DEV__) logger.log(`[LiveKit] ★ TrackSubscribed: VIDEO track from ${participant?.identity || 'unknown'}, source: ${publication?.source || 'n/a'}`);
+          const kind = track?.kind || publication?.kind;
+          if (kind === 'video') {
+            if (__DEV__) logger.log(`[LiveKit] ★ TrackSubscribed: VIDEO from ${participant?.identity || 'unknown'}`);
+          } else if (kind === 'audio') {
+            // ★ 2026-04-20 AUDIO FIX: Uzak audio track'i explicit playback'e al.
+            //   React Native LiveKit'te bazı cihazlarda (özellikle Android)
+            //   subscribe edilen audio track otomatik play olmuyor; mic UI "açık"
+            //   görünüyor ama karşı taraf ses duymuyordu. attach() ve mediaStreamTrack.enabled=true
+            //   bunu garanti eder.
+            try {
+              track?.mediaStreamTrack && (track.mediaStreamTrack.enabled = true);
+              if (typeof track?.attach === 'function') track.attach();
+              if (typeof track?.start === 'function') track.start();
+            } catch (e) {
+              if (__DEV__) logger.warn('[LiveKit] audio track attach failed:', e);
+            }
+            if (__DEV__) logger.log(`[LiveKit] ★ TrackSubscribed: AUDIO attached from ${participant?.identity || 'unknown'}`);
           }
         }
 

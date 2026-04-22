@@ -6,6 +6,7 @@ import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Pressable, Animated, Easing, Modal, Dimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { useSwipeToDismiss } from '../hooks/useSwipeToDismiss';
 
 const { width: W } = Dimensions.get('window');
 
@@ -139,6 +140,12 @@ export default function PurchaseSuccessModal({
     return () => clearTimeout(t);
   }, [visible]);
 
+  const { translateValue: swipeTranslate, panHandlers } = useSwipeToDismiss({
+    direction: 'down',
+    threshold: 70,
+    onDismiss: onClose,
+  });
+
   if (!visible) return null;
 
   const badgeRot = badgeRotate.interpolate({ inputRange: [0, 1], outputRange: ['-8deg', '8deg'] });
@@ -146,6 +153,7 @@ export default function PurchaseSuccessModal({
   return (
     <Modal transparent visible={visible} animationType="fade" statusBarTranslucent onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
+        <Animated.View style={[styles.content, { transform: [{ translateY: swipeTranslate }] }]} {...panHandlers}>
         {/* Pulse ring */}
         <Animated.View style={[styles.glowRing, {
           borderColor: accent[0],
@@ -190,6 +198,7 @@ export default function PurchaseSuccessModal({
           <Text style={styles.title}>{title}</Text>
           {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
         </Animated.View>
+        </Animated.View>
       </Pressable>
     </Modal>
   );
@@ -201,6 +210,10 @@ const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(5,10,18,0.82)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  content: {
     alignItems: 'center',
     justifyContent: 'center',
   },

@@ -1,17 +1,16 @@
 import React, { useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, Pressable, Image, Dimensions, Animated, Easing } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Image, useWindowDimensions, Animated, Easing } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { getAvatarSource } from '../../constants/avatars';
 import AvatarPenaltyFlash, { type FlashType } from './AvatarPenaltyFlash';
 import type { RoomParticipant } from '../../services/database';
 
-const { width: W } = Dimensions.get('window');
-
 // ★ Dinamik boyutlandırma — modern platform grid sistemi (Clubhouse/Spaces pattern)
-// 2026-04-20: Sayı arttıkça avatar daha agresif küçülür, sütun artar ki oda içi
-// scroll kuralını kırmadan kompakt yerleşsin. Chat overlay için alt alan kalsın.
-function getGridMetrics(listenerCount: number) {
+// 2026-04-20: Sayı arttıkça avatar daha agresif küçülür.
+// 2026-04-22: window width runtime'dan alınıyor (useWindowDimensions) — fiziksel
+// Android'de gesture-nav/rotation ile değişen ekran boyutuna adapte olsun.
+function getGridMetrics(listenerCount: number, W: number) {
   let cols: number, avatarGap: number;
   if (listenerCount <= 4) {
     cols = 4; avatarGap = 12;
@@ -67,25 +66,28 @@ const ListenerCell = React.memo(function ListenerCell({
   u, cellW, avatarSize, nameSize, isSelected, isOwner, showMuteIndicator,
   isChatMuted, flash, hasHandRaised, onSelectUser, onFlashDone,
 }: CellProps) {
+  // ★ 2026-04-20: Owner avatarı %10 büyük — sade ama belirgin
+  const ownerScale = isOwner ? 1.10 : 1;
+  const ownerAvatarSize = Math.floor(avatarSize * ownerScale);
   return (
     <Pressable style={[s.cell, { width: cellW }]} onPress={() => onSelectUser(u)}>
       {isOwner && <ListenerOwnerBadge />}
-      <View style={[s.avatarWrap, { width: avatarSize, height: avatarSize, borderRadius: avatarSize / 2 }, isSelected && s.avatarSelected, isOwner && s.avatarOwner, showMuteIndicator && s.avatarMuted]}>
+      <View style={[s.avatarWrap, { width: ownerAvatarSize, height: ownerAvatarSize, borderRadius: ownerAvatarSize / 2 }, isSelected && s.avatarSelected, isOwner && s.avatarOwner, showMuteIndicator && s.avatarMuted]}>
         <Image source={getAvatarSource((u as any).disguise?.avatar_url || u.user?.avatar_url)} style={s.avatar} />
       </View>
       {showMuteIndicator && (
-        <View style={[s.mutedBadge, { right: (cellW - avatarSize) / 2 - 6 }]}>
+        <View style={[s.mutedBadge, { right: (cellW - ownerAvatarSize) / 2 - 6 }]}>
           <Ionicons name="volume-mute" size={9} color="#FFF" />
         </View>
       )}
       {isChatMuted && (
-        <View style={[s.chatMutedBadge, { left: (cellW - avatarSize) / 2 - 6 }]}>
+        <View style={[s.chatMutedBadge, { left: (cellW - ownerAvatarSize) / 2 - 6 }]}>
           <Ionicons name="chatbox-outline" size={8} color="#FFF" />
         </View>
       )}
-      {flash && <View style={[s.flashWrap, { height: avatarSize }]}><AvatarPenaltyFlash flashType={flash} size={avatarSize} onFlashDone={() => onFlashDone?.(u.user_id)} /></View>}
+      {flash && <View style={[s.flashWrap, { height: ownerAvatarSize }]}><AvatarPenaltyFlash flashType={flash} size={ownerAvatarSize} onFlashDone={() => onFlashDone?.(u.user_id)} /></View>}
       {hasHandRaised && <HandRaiseBadge />}
-      <Text style={[s.name, { fontSize: nameSize, maxWidth: cellW }, isOwner && { color: '#FFD700', fontWeight: '700' }, showMuteIndicator && { color: 'rgba(239,68,68,0.6)' }]} numberOfLines={1}>
+      <Text style={[s.name, { fontSize: nameSize, maxWidth: cellW }, isOwner && s.nameOwner, showMuteIndicator && { color: 'rgba(239,68,68,0.6)' }]} numberOfLines={1}>
         {(u as any).disguise?.display_name || u.user?.display_name || 'Misafir'}
       </Text>
     </Pressable>
@@ -93,7 +95,12 @@ const ListenerCell = React.memo(function ListenerCell({
 });
 
 export default function ListenerGrid({ listeners, onSelectUser, selectedUserId, onShowAllUsers, maxListeners = 20, spectatorCount = 0, roomOwnerId, avatarFlashes, onFlashDone, micRequestUserIds = [] }: Props) {
-  if (listeners.length === 0 && spectatorCount === 0) return null;
+  // ★ 2026-04-22: Runtime window width (useWindowDimensions) — fiziksel cihazda
+  //   gesture-nav/rotation durumuna adapte olur.
+  // ★ HOOK ORDER FIX: TÜM hook'lar erken return'den ÖNCE çağrılmalı (React rules of hooks).
+  //   Eskiden W module-level idi, erken return sonrası useMemo sorunsuzdu; şimdi
+  //   useWindowDimensions hook olduğu için useMemo'dan ayrılmamalı.
+  const { width: W } = useWindowDimensions();
 
   // ★ Hiyerarşik sıralama — modern platform pattern (Clubhouse/Spaces)
   // 1. Oda sahibi (owner) en başta
@@ -118,6 +125,9 @@ export default function ListenerGrid({ listeners, onSelectUser, selectedUserId, 
     });
   }, [listeners, roomOwnerId, micRequestUserIds]);
 
+  // ★ Tüm hook'lar tamamlandıktan SONRA erken return yapılabilir.
+  if (listeners.length === 0 && spectatorCount === 0) return null;
+
   // ★ 2026-04-20: Grid'de maks 14 dinleyici. Daha fazlası "+N Seyirci" badge
   // olarak overflow'a düşer — tıkla → AudienceDrawer. Küçük ekranlarda daha az.
   const GRID_VISIBLE_CAP = W < 360 ? 10 : 14;
@@ -127,7 +137,7 @@ export default function ListenerGrid({ listeners, onSelectUser, selectedUserId, 
   const overflowCount = overflowListeners + spectatorCount;
 
   // ★ Dinamik boyut hesapla
-  const { avatarGap, cellW, avatarSize } = getGridMetrics(visibleListeners.length);
+  const { avatarGap, cellW, avatarSize } = getGridMetrics(visibleListeners.length, W);
   const nameSize = visibleListeners.length > 12 ? 9 : visibleListeners.length > 8 ? 10 : 11;
 
   return (
@@ -297,8 +307,13 @@ const s = StyleSheet.create({
     marginTop: 4,
     textAlign: 'center',
   },
+  nameOwner: {
+    color: '#FFD700',
+    fontWeight: '700',
+  },
   avatarOwner: {
-    borderColor: 'rgba(255,215,0,0.45)',
+    borderColor: 'rgba(255,215,0,0.7)',
+    borderWidth: 2,
   },
   listenerBadgeContainer: {
     position: 'absolute',
@@ -310,26 +325,16 @@ const s = StyleSheet.create({
   listenerGlowRing: {
     position: 'absolute', width: 24, height: 24, borderRadius: 12,
     backgroundColor: 'transparent',
-    borderWidth: 1, borderColor: 'rgba(255,215,0,0.45)',
+    borderWidth: 1, borderColor: 'rgba(255,215,0,0.5)',
     shadowColor: '#FFD700', shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.7, shadowRadius: 6, elevation: 4,
   },
   listenerBadgeBody: {
     width: 18, height: 18, borderRadius: 9,
     alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)',
     shadowColor: '#FFD700', shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.6, shadowRadius: 4, elevation: 6,
-  },
-  listenerSparkleOrbit: {
-    position: 'absolute', width: 20, height: 20,
-    alignItems: 'center', justifyContent: 'flex-start',
-  },
-  listenerSparkleDot: {
-    width: 3, height: 3, borderRadius: 1.5,
-    backgroundColor: '#FFFACD',
-    shadowColor: '#FFF', shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 1, shadowRadius: 2, elevation: 3,
   },
   handRaiseBadge: {
     position: 'absolute',
@@ -339,24 +344,19 @@ const s = StyleSheet.create({
 });
 
 function ListenerOwnerBadge() {
-  // ★ 2026-04-19 sadeleştirme: orbit sparkle kaldırıldı. Glow + float yeterli
-  // premium his verir; 3 concurrent anim (glow+float+orbit) görsel gürültüydü.
+  // ★ 2026-04-20: Sade — küçük altın star + yumuşak pulse. Kullanıcı "sadece biraz
+  //   daha büyük olsun" dedi, aşırı animasyonlar kaldırıldı.
   const glowAnim = useRef(new Animated.Value(0.5)).current;
-  const floatAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.loop(Animated.sequence([
-      Animated.timing(glowAnim, { toValue: 1, duration: 1800, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-      Animated.timing(glowAnim, { toValue: 0.5, duration: 1800, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-    ])).start();
-    Animated.loop(Animated.sequence([
-      Animated.timing(floatAnim, { toValue: -1, duration: 1400, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-      Animated.timing(floatAnim, { toValue: 1, duration: 1400, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      Animated.timing(glowAnim, { toValue: 1, duration: 1600, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      Animated.timing(glowAnim, { toValue: 0.5, duration: 1600, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
     ])).start();
   }, []);
 
   return (
-    <Animated.View style={[s.listenerBadgeContainer, { transform: [{ translateY: floatAnim }] }]}>
+    <View style={s.listenerBadgeContainer}>
       <Animated.View style={[s.listenerGlowRing, { opacity: glowAnim }]} />
       <LinearGradient
         colors={['#FFD700', '#F59E0B', '#D97706']}
@@ -365,7 +365,7 @@ function ListenerOwnerBadge() {
       >
         <Ionicons name="star" size={10} color="#FFF" />
       </LinearGradient>
-    </Animated.View>
+    </View>
   );
 }
 

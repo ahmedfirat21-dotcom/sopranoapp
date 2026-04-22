@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, Animated, Easing, Image } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { getAvatarSource } from '../../constants/avatars';
+import StatusAvatar from '../StatusAvatar';
 
 interface Props {
   roomName: string;
@@ -26,8 +27,14 @@ interface Props {
   roomType?: string;
   // ★ Host avatarı ve oda kuralları
   hostAvatarUrl?: string;
+  hostTier?: string;
   roomRules?: string;
   followerCount?: number;
+  // ★ 2026-04-20: Bildirim zili — oda içinden NotificationDrawer açma
+  onBellPress?: () => void;
+  notifBadgeCount?: number;
+  /** Zil drawer'ı açık mı — açıkken ikon teal renklenir */
+  isBellActive?: boolean;
 }
 
 // Kalp atışı (Heartbeat) göstergesi
@@ -91,9 +98,10 @@ export default function RoomInfoHeader({
   isFollowing, onBack, onMinimize, onToggleFollow,
   roomLanguage, ageRestricted, entryFeeSp, isLocked, followersOnly,
   donationsEnabled, speakingMode, roomType,
-  hostAvatarUrl, roomRules, followerCount,
+  hostAvatarUrl, hostTier, roomRules, followerCount,
+  onBellPress, notifBadgeCount, isBellActive,
 }: Props) {
-  const langFlags: Record<string,string> = { tr: '🇹🇷', en: '🇬🇧', de: '🇩🇪', ar: '🇸🇦' };
+  const langFlags: Record<string, string> = { tr: '🇹🇷', en: '🇬🇧', de: '🇩🇪', ar: '🇸🇦' };
   const [showRules, setShowRules] = useState(false);
 
   // Gösterilecek badge'ler — sadece önemli olanlar
@@ -105,7 +113,10 @@ export default function RoomInfoHeader({
   if ((entryFeeSp ?? 0) > 0) badges.push({ text: `${entryFeeSp} SP`, color: '#D4AF37', bg: 'rgba(212,175,55,0.12)', border: 'rgba(212,175,55,0.25)' });
   if (followersOnly) badges.push({ icon: 'people', color: '#A78BFA', bg: 'rgba(139,92,246,0.12)', border: 'rgba(139,92,246,0.25)' });
   if (roomLanguage && roomLanguage !== 'tr') badges.push({ emoji: langFlags[roomLanguage] || roomLanguage, color: '#3B82F6', bg: 'rgba(59,130,246,0.12)', border: 'rgba(59,130,246,0.25)' });
+  // ★ 2026-04-20: 3 mod için ayrı badge — kullanıcı oda kurallarını anında görsün
   if (speakingMode === 'free_for_all') badges.push({ icon: 'chatbubbles', text: 'Serbest', color: '#22C55E', bg: 'rgba(34,197,94,0.12)', border: 'rgba(34,197,94,0.25)' });
+  if (speakingMode === 'permission_only') badges.push({ icon: 'hand-left', text: 'İzinli', color: '#F59E0B', bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.25)' });
+  if (speakingMode === 'selected_only') badges.push({ icon: 'shield-checkmark', text: 'Seçilmiş', color: '#A78BFA', bg: 'rgba(167,139,250,0.12)', border: 'rgba(167,139,250,0.3)' });
 
   return (
     <View style={s.wrap}>
@@ -114,7 +125,7 @@ export default function RoomInfoHeader({
         <View style={s.topLeft}>
           {/* ★ Host avatar + süre göstergesi grubu */}
           <View style={s.hostAvatarGroup}>
-            <Image source={getAvatarSource(hostAvatarUrl)} style={s.hostMiniAvatar} />
+            <StatusAvatar uri={hostAvatarUrl} size={36} tier={hostTier} borderWidth={1.5} />
             {/* ★ Kalan süre — avatar altında kum saati */}
             {roomExpiry ? (
               <View style={[s.expiryBadge, roomExpiry.includes('doldu') && s.expiryBadgeExpired]}>
@@ -161,6 +172,22 @@ export default function RoomInfoHeader({
           {onToggleFollow && (
             <Pressable style={s.actionBtn} onPress={onToggleFollow} hitSlop={6}>
               <Ionicons name={isFollowing ? 'bookmark' : 'bookmark-outline'} size={16} color={isFollowing ? '#14B8A6' : '#E2E8F0'} style={s.iconShadow} />
+            </Pressable>
+          )}
+          {/* ★ 2026-04-20: Bildirim zili — oda içindeyken de arkadaşlık / hediye / davet bildirimleri açılabilsin */}
+          {onBellPress && (
+            <Pressable style={[s.actionBtn, isBellActive && s.bellActive]} onPress={onBellPress} hitSlop={6}>
+              <Ionicons
+                name={isBellActive || (notifBadgeCount && notifBadgeCount > 0) ? 'notifications' : 'notifications-outline'}
+                size={16}
+                color={isBellActive ? '#14B8A6' : (notifBadgeCount && notifBadgeCount > 0 ? '#FBBF24' : '#E2E8F0')}
+                style={s.iconShadow}
+              />
+              {!!notifBadgeCount && notifBadgeCount > 0 && !isBellActive && (
+                <View style={s.bellBadge}>
+                  <Text style={s.bellBadgeText}>{notifBadgeCount > 9 ? '9+' : notifBadgeCount}</Text>
+                </View>
+              )}
             </Pressable>
           )}
           <Pressable style={s.actionBtn} onPress={onMinimize}>
@@ -269,9 +296,9 @@ const s = StyleSheet.create({
     marginBottom: 2,
   },
   hostMiniAvatar: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     borderWidth: 1.5,
     borderColor: 'rgba(20,184,166,0.35)',
     shadowColor: '#000',
@@ -281,7 +308,7 @@ const s = StyleSheet.create({
     elevation: 3,
   },
   roomName: {
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: '700',
     color: '#F8FAFC',
     letterSpacing: -0.3,
@@ -347,6 +374,20 @@ const s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  bellBadge: {
+    position: 'absolute',
+    top: 0, right: 0,
+    minWidth: 14, height: 14,
+    paddingHorizontal: 3,
+    borderRadius: 7,
+    backgroundColor: '#EF4444',
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: '#0A0F1E',
+  },
+  bellBadgeText: {
+    fontSize: 8, fontWeight: '900', color: '#FFF', letterSpacing: -0.3,
+  },
+  bellActive: {},
   iconShadow: {
     textShadowColor: 'rgba(0,0,0,0.6)',
     textShadowOffset: { width: 0, height: 2 },

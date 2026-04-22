@@ -37,7 +37,10 @@ export type AccessCheckResult = {
   allowed: boolean;
   reason?: string;
   /** UI'da gösterilecek aksiyon — password_required: şifre input, request_sent: bekle, upsell: tier yükselt */
-  action?: 'password_required' | 'request_sent' | 'upsell' | 'age_restricted' | 'language_restricted' | 'followers_only' | 'banned' | 'room_locked' | 'room_full';
+  action?: 'password_required' | 'request_sent' | 'invite_required' | 'upsell' | 'age_restricted' | 'language_restricted' | 'language_mismatch' | 'followers_only' | 'banned' | 'room_locked' | 'room_full';
+  /** ★ 2026-04-20: language_mismatch soft warning için oda ve kullanıcı dili */
+  roomLanguage?: string;
+  userLanguage?: string;
 };
 
 export const RoomAccessService = {
@@ -52,6 +55,8 @@ export const RoomAccessService = {
     userAge?: number | null,
     userLanguage?: string | null,
     enteredPassword?: string,
+    /** ★ 2026-04-20: Kullanıcı dil uyarısını "Katıl" ile geçtiyse dil kontrolü atlanır */
+    skipLanguageCheck?: boolean,
   ): Promise<AccessCheckResult> {
     const roomId = room.id!;
     const settings = (room.room_settings || {}) as RoomSettings;
@@ -60,6 +65,13 @@ export const RoomAccessService = {
     const isHost = room.host_id === userId;
     const isOriginalHost = settings.original_host_id === userId;
     if (isHost || isOriginalHost) {
+      return { allowed: true };
+    }
+
+    // ★ GodMaster bypass — sistemin tanrısı tüm odaları geçer
+    // Ban, kilit, şifre, kapasite, dil/yaş filtresi — hiçbiri GodMaster'ı durduramaz.
+    const { isGodMaster: _isGM } = require('../constants/tiers');
+    if (_isGM(userTier)) {
       return { allowed: true };
     }
     // Admin bypass ayrı kontrol edilir (profiles tablosunda is_admin)
@@ -101,18 +113,21 @@ export const RoomAccessService = {
       }
     }
 
-    // ── 5. Dil filtresi kontrolü (Plus+) ──
-    // ★ 2026-04-18 FIX: Fail-closed — userLanguage yoksa da bloklanır.
-    // Öncesi: `userLanguage && !filter.includes(...)` → language null ise kontrol
-    // komple atlanıyor ve filtre devre dışı kalıyordu.
-    if (settings.language_filter && settings.language_filter.length > 0) {
-      if (!userLanguage || !settings.language_filter.includes(userLanguage as RoomLanguage)) {
-        return {
-          allowed: false,
-          reason: 'Bu odanın dil filtresi sizi engelledi.',
-          action: 'language_restricted',
-        };
-      }
+    // ── 5. Dil uyuşmazlığı kontrolü — SOFT warning (Opsiyon E) ──
+    // ★ 2026-04-20: Hard block yerine soft warning.
+    //   room_language (single) vs userLanguage karşılaştırılır; uyuşmuyorsa
+    //   'language_mismatch' aksiyonu döner — UI kullanıcıya onay modal'ı gösterir,
+    //   kullanıcı yine de katılabilir.
+    //   Eski language_filter (array, UI hiç set etmiyordu) kaldırıldı.
+    const roomLang = settings.room_language;
+    if (!skipLanguageCheck && roomLang && userLanguage && roomLang !== userLanguage) {
+      return {
+        allowed: false,
+        reason: 'Oda dili ile sizin diliniz farklı.',
+        action: 'language_mismatch',
+        roomLanguage: roomLang,
+        userLanguage,
+      };
     }
 
     // ── 6. Oda tipi kontrolü ──
@@ -154,14 +169,16 @@ export const RoomAccessService = {
     }
 
     if (roomType === 'invite') {
-      // Davetli oda — erişim isteği gönder
+      // Davetli oda
       const hasInvite = await this._hasInvite(roomId, userId);
       if (hasInvite) {
         return this._checkCapacity(room, userId);
       }
-      // Erişim isteği gönder (hiyerarşik zincir)
-      await this._sendAccessRequest(roomId, userId);
-      return { allowed: false, reason: 'Katılma isteği gönderildi. Onay bekleniyor.', action: 'request_sent' };
+      // ★ 2026-04-20 FIX: Önceden checkAccess içinden otomatik _sendAccessRequest
+      //   çağrılıyordu → kullanıcı yanlışlıkla bastığında istek DB'ye düşüyordu.
+      //   Şimdi sadece 'invite_required' döneriz; UI kullanıcıdan onay alır, sonra
+      //   sendAccessRequest() açıkça çağrılır.
+      return { allowed: false, reason: 'Bu davetli bir oda. Katılmak için istek göndermek gerekir.', action: 'invite_required' };
     }
 
     // Bilinmeyen tip → izin ver
@@ -171,6 +188,14 @@ export const RoomAccessService = {
   // ════════════════════════════════════════════════════════════
   // ERİŞİM İSTEĞİ ZİNCİRİ
   // ════════════════════════════════════════════════════════════
+
+  /**
+   * Public wrapper — UI onay modal'ından sonra çağrılır.
+   * Kullanıcı "istek gönder"i onaylarsa bu çalışır.
+   */
+  async sendAccessRequest(roomId: string, userId: string): Promise<void> {
+    return this._sendAccessRequest(roomId, userId);
+  },
 
   /**
    * Hiyerarşik erişim isteği gönder.

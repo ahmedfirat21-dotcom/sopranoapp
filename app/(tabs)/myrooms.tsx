@@ -1,16 +1,17 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   View, Text, StyleSheet, Image, Pressable, ScrollView,
-  RefreshControl, Animated, FlatList,
+  RefreshControl, Animated, FlatList, TextInput,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import AppBackground from '../../components/AppBackground';
+import TabBarFadeOut from '../../components/TabBarFadeOut';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Colors, Shadows } from '../../constants/theme';
 import { RoomService, type Room } from '../../services/database';
 import { supabase } from '../../constants/supabase';
-import { useAuth, useTheme, useBadges } from '../_layout';
+import { useAuth, useTheme, useBadges, useOnlineFriends as useOnlineFriendsLayout } from '../_layout';
 
 import StatusAvatar from '../../components/StatusAvatar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -20,6 +21,7 @@ import { RoomHistoryService, type RoomHistoryItem } from '../../services/roomHis
 import { useOnlineFriends } from '../../providers/OnlineFriendsProvider';
 import { SPService } from '../../services/sp';
 import { PlusMenu } from '../../components/room/RoomOverlays';
+import HostAccessPanel from '../../components/room/HostAccessPanel';
 import { RoomFollowService } from '../../services/roomFollow';
 import { ModerationService } from '../../services/moderation';
 import { isTierAtLeast } from '../../constants/tiers';
@@ -31,16 +33,22 @@ import { UpsellService } from '../../services/upsell';
 import type { SubscriptionTier } from '../../types';
 import { getCategoryTheme, ROOM_THEME_GRADIENTS } from '../../constants/categoryTheme';
 import NotificationBell from '../../components/NotificationBell';
+import FriendsDrawer from '../../components/FriendsDrawer';
 
 // ════════════════════════════════════════════════════════════
 // YÖNETİLEN ODA KARTI — Yönet/Başlat butonları (React.memo ile re-render izole)
 // ════════════════════════════════════════════════════════════
-const ManagedRoomCard = React.memo(function ManagedRoomCard({ room, onManage, onStart, onSettings }: {
+const ManagedRoomCard = React.memo(function ManagedRoomCard({ room, onManage, onStart, onSettings, currentUserId }: {
   room: Room;
   onManage: (room: Room) => void;
   onStart: (room: Room) => void;
   onSettings: (room: Room) => void;
+  currentUserId?: string;
 }) {
+  // ★ 2026-04-21: Defansif kontrol — sadece oda sahibi ayarlar düğmesini görür.
+  //   Şu an Odalarım listData'sı zaten yalnızca sahip olunan odaları filtreliyor;
+  //   yine de prop bazında enforce etmek gelecekte regression'a karşı güvence.
+  const isOwner = !!currentUserId && room.host_id === currentUserId;
   const listeners = room.participant_count || room.listener_count || 0;
   const isLive = room.is_live;
   const isPersistent = !!room.is_persistent;
@@ -147,14 +155,37 @@ const ManagedRoomCard = React.memo(function ManagedRoomCard({ room, onManage, on
             {settings.donations_enabled && (
               <Ionicons name="heart" size={9} color="#EF4444" style={{ marginLeft: 2 }} />
             )}
+            {/* ★ 2026-04-22: Kalan süre badge (canlı/pasif fark etmez).
+                Canlı: expires_at - now (saat akıyor)
+                Pasif: room_settings.remaining_ms (saat durdu, kalan aynı) */}
+            {isOwner && (() => {
+              let remainMs: number | null = null;
+              if (isLive && (room as any).expires_at) {
+                remainMs = new Date((room as any).expires_at).getTime() - Date.now();
+              } else if (!isLive && typeof settings.remaining_ms === 'number') {
+                remainMs = settings.remaining_ms;
+              }
+              if (remainMs === null || remainMs <= 0) return null;
+              const h = Math.floor(remainMs / 3600000);
+              const m = Math.floor((remainMs % 3600000) / 60000);
+              const label = h > 0 ? `${h} sa ${m} dk` : `${m} dk`;
+              return (
+                <View style={[mS.typeBadge, { backgroundColor: 'rgba(20,184,166,0.12)', borderColor: 'rgba(20,184,166,0.25)' }]}>
+                  <Ionicons name="hourglass-outline" size={8} color="#5EEAD4" />
+                  <Text style={[mS.typeBadgeText, { color: '#5EEAD4' }]}>{label} kaldı</Text>
+                </View>
+              );
+            })()}
           </View>
         </View>
       </View>
       <View style={mS.cardRight}>
         {/* Inner butonlar: kendi onPress'leri kart onPress'ine baloncuk etmesin */}
-        <Pressable style={mS.settingsBtn} onPress={(e) => { e.stopPropagation(); onSettings(room); }}>
-          <Ionicons name="settings-outline" size={18} color="#94A3B8" />
-        </Pressable>
+        {isOwner && (
+          <Pressable style={mS.settingsBtn} onPress={(e) => { e.stopPropagation(); onSettings(room); }}>
+            <Ionicons name="settings-outline" size={18} color="#94A3B8" />
+          </Pressable>
+        )}
         <Pressable
           onPress={(e) => { e.stopPropagation(); isLive ? onManage(room) : onStart(room); }}
           style={({ pressed }) => [{ opacity: pressed ? 0.85 : 1 }]}
@@ -445,7 +476,7 @@ const rcS = StyleSheet.create({
     fontSize: 10, fontWeight: '700', color: '#F1F5F9', textAlign: 'center',
     ...Shadows.text,
   },
-  host: { fontSize: 9, color: '#94A3B8', textAlign: 'center', marginTop: 1 },
+  host: { fontSize: 9, color: '#FFFFFF', textAlign: 'center', marginTop: 1, textShadowColor: 'rgba(0,0,0,0.7)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
   closedBadge: { fontSize: 9, fontWeight: '700', color: '#64748B', textAlign: 'center', marginTop: 1, letterSpacing: 0.3 },
 });
 
@@ -604,24 +635,31 @@ const tplS = StyleSheet.create({
 // ════════════════════════════════════════════════════════════
 export default function MyRoomsScreen() {
   const router = useRouter();
-  const { firebaseUser, profile, setShowNotifDrawer } = useAuth();
+  const { firebaseUser, profile, setShowNotifDrawer, setNotifDrawerAnchorRight } = useAuth();
   const insets = useSafeAreaInsets();
   useTheme();
 
   const [myRooms, setMyRooms] = useState<Room[]>([]);
   const [recentRooms, setRecentRooms] = useState<RoomHistoryItem[]>([]);
   const [friendsLive, setFriendsLive] = useState<FriendInRoom[]>([]);
+  // ★ 2026-04-21: followedRooms state kaldırıldı — Takip Ettiğin Odalar bölümü
+  //   Odalarım'dan kaldırıldığı için gereksiz. Keşfet footer'ında zaten gösteriliyor.
   const [weeklySP, setWeeklySP] = useState(0);
   const [roomStats, setRoomStats] = useState<RoomStats>({ totalRooms: 0, liveRooms: 0, totalListeners: 0, weeklySP: 0 });
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
+  const [showAccessPanel, setShowAccessPanel] = useState(false);
   const [showInviteFriends, setShowInviteFriends] = useState(false);
   // ★ Günlük oda açma kotası — CTA altında "2/3 bugün" gösterimi için
   const [dailyQuota, setDailyQuota] = useState<{ count: number; limit: number } | null>(null);
 
-  const { unreadNotifs: unreadCount } = useBadges();
+  const { unreadNotifs: unreadCount, pendingFollows: pendingFollowCount } = useBadges();
   const { allFriends } = useOnlineFriends();
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showFriends, setShowFriends] = useState(false);
+  const searchInputRef = useRef<TextInput>(null);
 
   // ★ Realtime kanal bağımlılık fix: ref pattern
   const loadDataRef = useRef<() => Promise<void>>();
@@ -630,6 +668,8 @@ export default function MyRoomsScreen() {
   // ★ Profile bağımlılığını daralt — sadece ihtiyaç duyulan alanlar
   const subscriptionTier = (profile?.subscription_tier || 'Free') as SubscriptionTier;
   const isAdmin = (profile as any)?.is_admin === true;
+  // ★ GodMaster FIX: GodMaster tier'ı Pro'ya düşürme — isTierAtLeast zaten GodMaster > Pro destekliyor
+  const effectiveTier: SubscriptionTier = subscriptionTier === 'GodMaster' ? 'GodMaster' : (isAdmin ? 'Pro' : subscriptionTier);
 
   const loadData = useCallback(async () => {
     if (!firebaseUser) return;
@@ -642,7 +682,7 @@ export default function MyRoomsScreen() {
       // 2) Geri kalan 4 işi PARALEL çalıştır — toplam süre 4× azalır
       const friendIds = allFriends.map(f => f.id).slice(0, 50);
       const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7);
-      const userTier: SubscriptionTier = isAdmin ? 'Pro' : subscriptionTier;
+      const userTier: SubscriptionTier = effectiveTier;
 
       const [participantsRes, historyRes, friendsRes, spRes, quotaRes] = await Promise.allSettled([
         // 2a) Gerçek katılımcı sayıları
@@ -672,6 +712,7 @@ export default function MyRoomsScreen() {
           .eq('user_id', uid).gt('amount', 0).gte('created_at', weekAgo.toISOString()),
         // 2e) Günlük kota
         RoomService.canCreateToday(uid, userTier),
+        // ★ 2026-04-21: Takip edilen odalar fetch'i kaldırıldı — bölüm Keşfet'e taşındı.
       ]);
 
       // 2a) Katılımcı sayılarını odalara yaz
@@ -690,11 +731,16 @@ export default function MyRoomsScreen() {
       setMyRooms(managed);
 
       // 2b) Recent rooms
+      // ★ 2026-04-21: İki filtre:
+      //   (a) Sadece CANLI (is_live=true) olanlar göster (kapalı odaların moralsiz görünmemesi için)
+      //   (b) Kullanıcının KENDİ odaları "Son Girdiğin Odalar"da gösterilmesin —
+      //       yukarıdaki "Canlı Odalarım" bölümünde zaten var, duplike olmasın.
       if (historyRes.status === 'fulfilled') {
         const { history, liveMap } = historyRes.value as { history: RoomHistoryItem[]; liveMap: Map<string, boolean> };
+        const ownIds = new Set(managed.map(r => r.id));
         const enriched = history
-          .filter(h => liveMap.has(h.id))
-          .map(h => ({ ...h, _isLive: liveMap.get(h.id) === true }));
+          .filter(h => liveMap.get(h.id) === true && !ownIds.has(h.id))
+          .map(h => ({ ...h, _isLive: true }));
         setRecentRooms(enriched as any);
       } else {
         setRecentRooms([]);
@@ -730,6 +776,9 @@ export default function MyRoomsScreen() {
         const gate = quotaRes.value;
         setDailyQuota(gate.limit >= 999 ? null : { count: gate.count, limit: gate.limit });
       }
+
+      // ★ 2026-04-21: Takip edilen odalar burada artık fetch/sync edilmiyor —
+      //   bölüm Odalarım'dan kaldırıldı, Keşfet footer'ı aynı veriyi gösteriyor.
 
       // Stats — tek yerden hesapla (3 yerde dağılmıştı)
       setRoomStats({
@@ -829,13 +878,34 @@ export default function MyRoomsScreen() {
             setRoomStats(prev2 => ({ ...prev2, totalRooms: next.length, liveRooms: liveCount, totalListeners }));
             return next;
           });
-          // ★ SYNC FIX: Açık olan RoomManageSheet'i güncelle — ama kullanıcının
-          // düzenlediği alanlar (name/type/room_settings) için sadece ilk açılışta
-          // init edilen rm* state'leri bozulmasın diye sadece kozmetik alanları yansıt.
+          // ★ SYNC FIX v2: Açık olan RoomManageSheet'i güncelle — room_settings
+          // değiştiğinde rm* state'lerini de senkronize et (oda içinden gelen değişiklikler)
           setSelectedRoom(prev => {
             if (!prev || prev.id !== updated.id) return prev;
-            // Sheet açıkken sadece pasif alanları patch'le (listener_count vb.)
-            return { ...prev, listener_count: updated.listener_count };
+            const merged = { ...prev, listener_count: updated.listener_count };
+            if (updated.room_settings) merged.room_settings = updated.room_settings;
+            if (updated.theme_id !== undefined) merged.theme_id = updated.theme_id;
+            if (updated.name) merged.name = updated.name;
+            if (updated.type) merged.type = updated.type;
+            // ★ rm* state'lerini de güncelle (sheet açıkken stale kalmasın)
+            if (updated.room_settings) {
+              const rs = updated.room_settings as any;
+              if (rs.speaking_mode !== undefined) setRmSpeakingMode(rs.speaking_mode);
+              if (rs.slow_mode_seconds !== undefined) setRmSlowMode(rs.slow_mode_seconds);
+              if (rs.age_restricted !== undefined) setRmAgeRestricted(rs.age_restricted);
+              if (rs.followers_only !== undefined) setRmFollowersOnly(rs.followers_only);
+              if (rs.donations_enabled !== undefined) setRmDonations(rs.donations_enabled);
+              if (rs.entry_fee_sp !== undefined) setRmEntryFee(rs.entry_fee_sp);
+              if (rs.room_language !== undefined) setRmLang(rs.room_language);
+              if (rs.welcome_message !== undefined) setRmWelcome(rs.welcome_message);
+              if (rs.music_link !== undefined) setRmMusicLink(rs.music_link || '');
+              if (rs.password !== undefined) setRmPassword(rs.password);
+              if (rs.is_locked !== undefined) setRmIsLocked(rs.is_locked);
+            }
+            if (updated.name) setRmName(updated.name);
+            if (updated.type) setRmType(updated.type);
+            if (updated.theme_id !== undefined) setRmThemeId(updated.theme_id);
+            return merged;
           });
         }
       })
@@ -889,7 +959,7 @@ export default function MyRoomsScreen() {
   const handleWakeUp = useCallback(async (room: Room) => {
     if (!firebaseUser) return;
     try {
-      const tier = (profile?.subscription_tier || 'Free') as any;
+      const tier = effectiveTier;
       await RoomService.wakeUpRoom(room.id, firebaseUser.uid, tier);
       router.push(`/room/${room.id}`);
     } catch (err: any) {
@@ -910,14 +980,23 @@ export default function MyRoomsScreen() {
     | { type: 'group'; id: string; title: string; icon: string; color: string; count: number }
     | { type: 'room'; id: string; room: Room };
 
+  // ★ Arama filtresi fonksiyonu
+  const matchesSearch = useCallback((name: string) => {
+    if (!searchQuery.trim()) return true;
+    return name.toLowerCase().includes(searchQuery.toLowerCase().trim());
+  }, [searchQuery]);
+
   const listData = useMemo<ListItem[]>(() => {
     if (myRooms.length === 0) return []; // ListEmptyComponent devreye girer
-    const live = myRooms.filter(r => r.is_live);
-    const sleeping = myRooms.filter(r => !r.is_live && !!r.is_persistent);
-    const frozen = myRooms.filter(r => !r.is_live && !r.is_persistent);
+    const q = searchQuery.toLowerCase().trim();
+    const filter = (rooms: Room[]) => q ? rooms.filter(r => r.name.toLowerCase().includes(q)) : rooms;
+
+    const live = filter(myRooms.filter(r => r.is_live));
+    const sleeping = filter(myRooms.filter(r => !r.is_live && !!r.is_persistent));
+    const frozen = filter(myRooms.filter(r => !r.is_live && !r.is_persistent));
     const items: ListItem[] = [];
     const groups = [
-      { title: 'Canlı', icon: 'radio', color: '#EF4444', data: live },
+      { title: 'Canlı Odalarım', icon: 'radio', color: '#EF4444', data: live },
       { title: 'Uyuyan Kalıcı Odalar', icon: 'moon', color: '#A78BFA', data: sleeping },
       { title: 'Dondurulmuş', icon: 'snow', color: '#64748B', data: frozen },
     ];
@@ -926,8 +1005,12 @@ export default function MyRoomsScreen() {
       items.push({ type: 'group', id: `g-${g.title}`, title: g.title, icon: g.icon, color: g.color, count: g.data.length });
       g.data.forEach(room => items.push({ type: 'room', id: `r-${room.id}`, room }));
     }
+
+    // ★ 2026-04-21: "Takip Ettiğin Odalar" Odalarım'dan kaldırıldı — Keşfet footer'ında
+    //   zaten var. Odalarım artık yalnızca kullanıcının kendi yönetim bağlamına odaklı.
+
     return items;
-  }, [myRooms]);
+  }, [myRooms, searchQuery]);
 
   // ★ Stable callback refs — React.memo bozulmasın diye inline sarmalama yok
   const handleOpenSettings = useCallback((room: Room) => setSelectedRoom(room), []);
@@ -949,9 +1032,10 @@ export default function MyRoomsScreen() {
         onManage={handleManage}
         onStart={handleWakeUp}
         onSettings={handleOpenSettings}
+        currentUserId={firebaseUser?.uid}
       />
     );
-  }, [handleManage, handleWakeUp, handleOpenSettings]);
+  }, [handleManage, handleWakeUp, handleOpenSettings, firebaseUser?.uid]);
 
   // ★ PlusMenu için settings state + DB handlers
   const [rmName, setRmName] = useState('');
@@ -966,7 +1050,7 @@ export default function MyRoomsScreen() {
   const [rmWelcome, setRmWelcome] = useState('');
   const [rmRules, setRmRules] = useState('');
   const [rmThemeId, setRmThemeId] = useState<string | null>(null);
-  const [rmMusicTrack, setRmMusicTrack] = useState<string | null>(null);
+  const [rmMusicLink, setRmMusicLink] = useState<string>('');
   const [rmBgImage, setRmBgImage] = useState<string | null>(null);
   const [rmCoverImage, setRmCoverImage] = useState<string | null>(null);
   const [rmPassword, setRmPassword] = useState('');
@@ -989,9 +1073,9 @@ export default function MyRoomsScreen() {
     setRmWelcome(rs.welcome_message || '');
     setRmRules(typeof rs.rules === 'string' ? rs.rules : Array.isArray(rs.rules) ? rs.rules.join('\n') : '');
     setRmThemeId(selectedRoom.theme_id || null);
-    setRmMusicTrack(rs.music_track || null);
+    setRmMusicLink(rs.music_link || '');
     setRmBgImage(rs.room_image_url || selectedRoom.room_image_url || null);
-    setRmCoverImage(rs.cover_image_url || null);
+    setRmCoverImage(rs.card_image_url || rs.cover_image_url || null);
     setRmPassword(rs.password || '');
     setRmIsLocked(rs.is_locked || false);
     // Takipçi sayısı
@@ -1086,6 +1170,9 @@ export default function MyRoomsScreen() {
     onWelcomeMessageChange: (msg: string) => { setRmWelcome(msg); updateRoomSetting('welcome_message', msg); },
     roomRules: rmRules,
     onRulesChange: (r: string) => { setRmRules(r); updateRoomSetting('rules', r); },
+    // ★ 2026-04-20: description edit parite
+    description: (selectedRoom as any)?.description || '',
+    onDescriptionChange: (d: string) => { updateRoomSetting('description', d); },
     roomType: rmType,
     onRoomTypeChange: handleRoomTypeChange,
     roomPassword: rmPassword,
@@ -1095,33 +1182,118 @@ export default function MyRoomsScreen() {
     onFreezeRoom: handleRoomFreeze,
     entryFee: rmEntryFee,
     onEntryFeeChange: (f: number) => { setRmEntryFee(f); updateRoomSetting('entry_fee_sp', f); },
-    musicTrack: rmMusicTrack,
-    onMusicTrackChange: (t: string | null) => { setRmMusicTrack(t); updateRoomSetting('music_track', t); },
+    musicLink: rmMusicLink || null,
+    onMusicLinkChange: (link: string | null) => { const v = link && link.trim() ? link.trim() : ''; setRmMusicLink(v); updateRoomSetting('music_link', v || null); },
     backgroundImage: rmBgImage,
-    onPickBackgroundImage: () => { /* TODO: image picker */ },
+    onPickBackgroundImage: async () => {
+      if (!selectedRoom || !firebaseUser) return;
+      try {
+        const ImagePicker = require('expo-image-picker');
+        const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!perm.granted) { showToast({ title: 'İzin Gerekli', message: 'Galeriye erişim izni verilmedi.', type: 'warning' }); return; }
+        // ★ 2026-04-21: Arka plan DİKEY (9:16) — oda içi dikey layout; kapak yatay kalır.
+        const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: 'images', allowsEditing: true, aspect: [9, 16], quality: 0.7 });
+        if (result.canceled) return;
+        const { StorageService } = require('../../services/storage');
+        const fileName = `room_bg/${selectedRoom.id}_${Date.now()}.jpg`;
+        const url = await StorageService.uploadFile('post-images', fileName, result.assets[0].uri);
+        setRmBgImage(url);
+        updateRoomSetting('room_image_url', url);
+        showToast({ title: '🖼 Arka Plan Güncellendi', type: 'success' });
+      } catch (e: any) { showToast({ title: 'Hata', message: e.message || 'Yükleme başarısız.', type: 'error' }); }
+    },
     onRemoveBackgroundImage: () => { setRmBgImage(null); updateRoomSetting('room_image_url', null); },
     coverImage: rmCoverImage,
-    onPickCoverImage: () => { /* TODO: image picker */ },
-    onRemoveCoverImage: () => { setRmCoverImage(null); updateRoomSetting('cover_image_url', null); },
+    onPickCoverImage: async () => {
+      if (!selectedRoom || !firebaseUser) return;
+      try {
+        const ImagePicker = require('expo-image-picker');
+        const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!perm.granted) { showToast({ title: 'İzin Gerekli', message: 'Galeriye erişim izni verilmedi.', type: 'warning' }); return; }
+        const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: 'images', allowsEditing: true, aspect: [16, 9], quality: 0.7 });
+        if (result.canceled) return;
+        const { StorageService } = require('../../services/storage');
+        const fileName = `room_card/${selectedRoom.id}_${Date.now()}.jpg`;
+        const url = await StorageService.uploadFile('post-images', fileName, result.assets[0].uri);
+        setRmCoverImage(url);
+        updateRoomSetting('card_image_url', url);
+        showToast({ title: '🖼 Kart Görseli Güncellendi', type: 'success' });
+      } catch (e: any) { showToast({ title: 'Hata', message: e.message || 'Yükleme başarısız.', type: 'error' }); }
+    },
+    onRemoveCoverImage: () => { setRmCoverImage(null); updateRoomSetting('card_image_url', null); },
   } : undefined;
 
   return (
     <AppBackground variant="myrooms">
     <View style={s.container}>
-      {/* Header */}
-      <View style={[s.header, { paddingTop: insets.top + 4 }]}>
-        <Image source={require('../../assets/logo.png')} style={s.logo} resizeMode="contain" />
-        <View style={s.headerRight}>
-          <NotificationBell unreadCount={unreadCount} onPress={() => setShowNotifDrawer(true)} />
+      {/* ═══ Premium Header — Keşfet ile aynı Glassmorphic topBar ═══ */}
+      <View style={[s.topBarWrap, { paddingTop: insets.top + 4 }]}>
+        {/* Frosted blur layer — bg'den hafif ayrılır */}
+        <View style={s.topBarGlass} pointerEvents="none" />
+        <View style={s.topBar}>
+          <Image source={require('../../assets/logo.png')} style={s.logo} resizeMode="contain" />
+          <View style={s.headerRight}>
+            {/* ★ 2026-04-21: SP pill Odalarım header'ından kaldırıldı — Keşfet ile tutarlı.
+               SP cüzdanı artık Profil sayfasında ve SP store sayfasında prominent. */}
+            <Pressable
+              style={[s.headerIconBtn, showSearch && { backgroundColor: 'rgba(20,184,166,0.15)', borderColor: 'rgba(20,184,166,0.35)' }]}
+              onPress={() => {
+                const next = !showSearch;
+                setShowSearch(next);
+                if (!next) setSearchQuery('');
+                else setTimeout(() => searchInputRef.current?.focus(), 100);
+              }}
+            >
+              <Ionicons name={showSearch ? 'close' : 'search-outline'} size={20} color={showSearch ? '#14B8A6' : '#F1F5F9'} />
+            </Pressable>
+            <NotificationBell unreadCount={unreadCount} onPress={() => { setNotifDrawerAnchorRight(60); setShowNotifDrawer(true); }} />
+            <Pressable style={s.headerIconBtn} onPress={() => setShowFriends(true)}>
+              <Ionicons name="people-outline" size={20} color="#F1F5F9" />
+              {pendingFollowCount > 0 && (
+                <View style={s.notifBadge}>
+                  <Text style={s.notifBadgeText}>{pendingFollowCount > 99 ? '99+' : pendingFollowCount}</Text>
+                </View>
+              )}
+            </Pressable>
+          </View>
         </View>
+        {/* ★ Premium separator — teal→transparent hairline */}
+        <LinearGradient
+          colors={['transparent', 'rgba(20,184,166,0.5)', 'rgba(20,184,166,0.5)', 'transparent']}
+          locations={[0, 0.3, 0.7, 1]}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+          style={s.topBarSeparator}
+        />
       </View>
 
+
+      {/* ★ Arama Barı — toggle ile açılır/kapanır */}
+      {showSearch && (
+        <View style={s.searchBarWrap}>
+          <Ionicons name="search" size={16} color="#64748B" />
+          <TextInput
+            ref={searchInputRef}
+            style={s.searchInput}
+            placeholder="Oda ara..."
+            placeholderTextColor="#64748B"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            autoCorrect={false}
+            returnKeyType="search"
+          />
+          {searchQuery.length > 0 && (
+            <Pressable onPress={() => setSearchQuery('')} hitSlop={8}>
+              <Ionicons name="close-circle" size={16} color="#64748B" />
+            </Pressable>
+          )}
+        </View>
+      )}
 
       {/* Yeni Oda Oluştur — Premium Gradient */}
       <Pressable style={s.ctaWrap} onPress={async () => {
         if (!firebaseUser) return;
         const isAdmin = (profile as any)?.is_admin === true;
-        const userTier = (isAdmin ? 'Pro' : (profile?.subscription_tier || 'Free')) as SubscriptionTier;
+        const userTier = effectiveTier;
         try {
           const gate = await RoomService.canCreateToday(firebaseUser.uid, userTier);
           if (!gate.ok) {
@@ -1143,9 +1315,12 @@ export default function MyRoomsScreen() {
           <View style={{ flex: 1 }}>
             <Text style={s.ctaTitle}>Yeni Oda Oluştur</Text>
             <Text style={s.ctaSub}>
+              {/* ★ 2026-04-21: GodMaster/admin için ∞ açık gösterimi — tier gücünü hissetsin. */}
               {dailyQuota
                 ? `Bugün ${dailyQuota.count}/${dailyQuota.limit} kullandın · Sesli oda aç`
-                : 'Sesli veya görüntülü oda aç'}
+                : (isAdmin || subscriptionTier === 'GodMaster')
+                  ? 'Sınırsız oda hakkı · ∞ oda aç'
+                  : 'Sesli veya görüntülü oda aç'}
             </Text>
           </View>
           <Ionicons name="arrow-forward" size={20} color="rgba(255,255,255,0.7)" />
@@ -1167,6 +1342,10 @@ export default function MyRoomsScreen() {
         windowSize={10}
         ListHeaderComponent={
           <>
+            {/* ★ 2026-04-21: Stats bar üste taşındı — CTA'nın hemen altı, oda listelerinin üstü.
+               Önceden en altta yer alıyor ve altta boşluk bırakıyordu. */}
+            {myRooms.length > 0 && <StatsBar stats={roomStats} />}
+
             {/* 👥 Arkadaşların Canlı — sosyal FOMO üstte */}
             <View style={s.sectionRow}>
               <View style={[s.sectionAccent, { backgroundColor: '#22C55E' }]} />
@@ -1234,9 +1413,7 @@ export default function MyRoomsScreen() {
                 </Text>
               </View>
             )}
-
-            {/* 📊 Kompakt İstatistik Barı */}
-            {myRooms.length > 0 && <StatsBar stats={roomStats} />}
+            {/* ★ 2026-04-21: StatsBar ListHeaderComponent'e taşındı — burada yer almıyor. */}
           </>
         }
       />
@@ -1257,11 +1434,11 @@ export default function MyRoomsScreen() {
           } catch {}
         }}
         userRole="owner"
-        ownerTier={profile?.subscription_tier || 'Free'}
+        ownerTier={effectiveTier}
         onDeleteRoom={handleRoomDelete}
         isFollowingRoom={false}
         isRoomLocked={rmIsLocked}
-        onRoomLock={isTierAtLeast((profile?.subscription_tier || 'Free') as any, 'Plus') ? () => {
+        onRoomLock={isTierAtLeast(effectiveTier, 'Plus') ? () => {
           const newLocked = !rmIsLocked;
           setRmIsLocked(newLocked);
           updateRoomSetting('is_locked', newLocked);
@@ -1269,6 +1446,10 @@ export default function MyRoomsScreen() {
         settingsConfig={settingsConfig}
         followerCount={rmFollowerCount}
         micRequestCount={0}
+        // ★ 2026-04-20: Inline Banlılar & İstekler — ayrı modal kaldırıldı
+        roomId={selectedRoom?.id}
+        hostId={firebaseUser?.uid}
+        roomType={selectedRoom?.type || 'open'}
       />
 
       {/* ★ Arkadaş Davet Modalı — Odalarım sayfası */}
@@ -1299,6 +1480,16 @@ export default function MyRoomsScreen() {
         />
       )}
 
+      {/* ★ Arkadaş Listesi Drawer */}
+      <FriendsDrawer
+        visible={showFriends}
+        friends={allFriends}
+        onClose={() => setShowFriends(false)}
+        onSelect={(userId) => { setShowFriends(false); router.push(`/user/${userId}` as any); }}
+        currentUserId={firebaseUser?.uid}
+      />
+      {/* ★ 2026-04-21: Tab bar scroll fade — tüm tab sayfalarında tutarlı */}
+      <TabBarFadeOut />
     </View></AppBackground>
   );
 }
@@ -1309,17 +1500,54 @@ export default function MyRoomsScreen() {
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: 'transparent' },
 
-  /* Header */
-  header: {
+  /* ★ Premium Header — Keşfet ile aynı Glassmorphic topBar */
+  topBarWrap: {
+    position: 'relative',
+    paddingBottom: 8,
+  },
+  topBarGlass: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(15, 25, 41, 0.55)',
+    borderBottomWidth: 0,
+  },
+  topBar: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 14, paddingBottom: 6,
+    paddingHorizontal: 14, paddingBottom: 4,
+  },
+  topBarSeparator: {
+    height: 1,
+    marginHorizontal: 20,
   },
   logo: { height: 32, width: 150 },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   headerIconBtn: {
-    width: 36, height: 36, borderRadius: 18,
-    backgroundColor: 'rgba(255,255,255,0.06)', justifyContent: 'center', alignItems: 'center',
-    overflow: 'visible',
+    width: 44, height: 44, borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 0.5, borderColor: 'rgba(125,170,229,0.12)',
+    justifyContent: 'center', alignItems: 'center', overflow: 'visible',
+  },
+  /* ★ SP Wallet Pill — premium altın gradient */
+  spPill: {
+    borderRadius: 14,
+    overflow: 'hidden',
+    shadowColor: '#F59E0B',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  spPillGrad: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 10, paddingVertical: 7,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.25)',
+  },
+  spPillText: {
+    fontSize: 12, fontWeight: '900', color: '#FFF',
+    letterSpacing: 0.3,
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   notifBadge: {
     position: 'absolute', top: -2, right: -2, backgroundColor: '#EF4444', minWidth: 16, height: 16, borderRadius: 8, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3, borderWidth: 1.5, borderColor: Colors.bg
@@ -1329,6 +1557,33 @@ const s = StyleSheet.create({
 
 
   /* CTA — Premium Gradient */
+  // ★ 2026-04-21: Arama barı — eksik stil eklendi (input görünmüyordu, placeholder da soluk siyahtı)
+  searchBarWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginHorizontal: 16,
+    marginTop: 4,
+    marginBottom: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: 'rgba(30,41,59,0.85)',
+    borderWidth: 1,
+    borderColor: 'rgba(20,184,166,0.25)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  searchInput: {
+    flex: 1,
+    color: '#E5E7EB',
+    fontSize: 13,
+    fontWeight: '500',
+    paddingVertical: 0,
+  },
   ctaWrap: {
     marginHorizontal: 16, marginBottom: 10,
     borderRadius: 14, overflow: 'hidden',

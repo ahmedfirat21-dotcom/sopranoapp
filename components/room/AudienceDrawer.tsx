@@ -4,14 +4,14 @@
  * ★ Sağa sürükleyerek kapatma özelliği (DM panel ile aynı useSwipeToDismiss pattern)
  */
 import React, { useEffect, useRef } from 'react';
-import { View, Text, ScrollView, Pressable, Image, Animated, StyleSheet, Dimensions } from 'react-native';
+import { View, Text, ScrollView, Pressable, Image, Animated, StyleSheet, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { getAvatarSource } from '../../constants/avatars';
 import { useSwipeToDismiss } from '../../hooks/useSwipeToDismiss';
 
-const { width: W } = Dimensions.get('window');
-const PANEL_W = W * 0.58;
+// ★ 2026-04-22: Module-level Dimensions kaldırıldı — fiziksel Android'de gesture-nav
+// sırasında stale kalıyor, panel genişliği ekran dışına kayıyordu. Runtime hesap.
 
 interface UserItem {
   id: string;
@@ -29,8 +29,16 @@ interface Props {
 }
 
 export default function AudienceDrawer({ visible, users, onClose, onSelectUser, micRequests = [] }: Props) {
-  const slideAnim = useRef(new Animated.Value(PANEL_W)).current;
+  // ★ Runtime window width — cihazın gerçek ekran genişliği
+  const { width: W } = useWindowDimensions();
+  const PANEL_W = Math.round(W * 0.72); // 0.58 → 0.72 biraz daha geniş (isim truncate olmasın)
+  const slideAnim = useRef(new Animated.Value(W)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  // W değişirse (rotate vb.) slideAnim'i kapalı konuma sıfırla
+  useEffect(() => {
+    if (!visible) slideAnim.setValue(PANEL_W);
+  }, [PANEL_W, visible, slideAnim]);
 
   // ★ Sağa sürükleyerek kapatma — DM panel ile aynı pattern
   const { translateValue: swipeX, panHandlers } = useSwipeToDismiss({
@@ -79,6 +87,7 @@ export default function AudienceDrawer({ visible, users, onClose, onSelectUser, 
       <Animated.View
         {...panHandlers}
         style={[s.panel, {
+          width: PANEL_W,
           transform: [{ translateX: Animated.add(slideAnim, swipeX) }],
         }]}
       >
@@ -148,7 +157,7 @@ const s = StyleSheet.create({
   panel: {
     position: 'absolute',
     right: 0, top: 70, bottom: 80,
-    width: PANEL_W,
+    // width inline olarak component içinde atanır (useWindowDimensions runtime).
     borderTopLeftRadius: 18,
     borderBottomLeftRadius: 18,
     borderWidth: 1,

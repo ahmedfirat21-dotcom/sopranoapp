@@ -121,14 +121,14 @@ export function useRoomBroadcast(params: UseRoomBroadcastParams) {
   }, [isChatMutedRef, firebaseUser?.uid]);
 
   // ── Bağış Bildirim Broadcast ──────────────────
-  const sendDonationAlert = useCallback((senderName: string, amount: number) => {
+  const sendDonationAlert = useCallback((senderName: string, amount: number, recipientName?: string) => {
     // Kendi ekranında göster
-    donationAlertRef?.current?.show({ senderName, amount });
+    donationAlertRef?.current?.show({ senderName, amount, recipientName });
     // Tüm odaya broadcast
     modChannelRef.current?.send({
       type: 'broadcast',
       event: 'donation_alert',
-      payload: { senderName, amount },
+      payload: { senderName, amount, recipientName },
     });
   }, [donationAlertRef]);
 
@@ -239,7 +239,13 @@ export function useRoomBroadcast(params: UseRoomBroadcastParams) {
       if (data.action === 'room_closing_countdown') {
         const seconds = data.seconds || 60;
         setClosingCountdown(seconds);
-        penaltyRef.current?.show({ type: 'mute_all', reason: `Oda ${seconds} saniye içinde kapanacak.` });
+        // ★ 2026-04-22: Banner UI (room/[id].tsx) closingCountdown state'i ile zaten
+        //   görünür. Toast ayrıca gönderilir — native ek bildirim.
+        showToast({
+          title: '⚠️ Oda Kapanıyor',
+          message: `Oda sahibi çıktı — ${seconds} saniye içinde oda kapanacak.`,
+          type: 'warning',
+        });
         return;
       } else if (data.action === 'original_host_returned') {
         setClosingCountdown(null);
@@ -321,13 +327,15 @@ export function useRoomBroadcast(params: UseRoomBroadcastParams) {
         setParticipants(prev => prev.map(p => p.user_id === data.targetUserId ? { ...p, role: 'speaker' as const } : p));
         return;
       } else if ((data.action === 'kick' || data.action === 'ban' || data.action === 'permban') && !isTargetMe) {
-        // ★ Flash: kick/ban animasyonu avatarda göster, sonra listeden kaldır
-        setAvatarFlash(data.targetUserId, data.action === 'kick' ? 'kick' : 'ban');
-        // ★ Kick/ban edilen kişinin mic kuyruğu entry'sini de temizle
+        // ★ 2026-04-20: Dramatik animasyon — 4.5sn oynar, 5sn sonra avatar kaybolur.
+        //   Ban/permban'da tam avatar kırmızı overlay + shake + "BANLANDI" label.
+        //   Kullanıcı: "yaptığı ayıbın bedelini vermesi lazım, animasyon güçlü olsun".
+        const flashType = data.action === 'kick' ? 'kick' : data.action === 'permban' ? 'permban' : 'ban';
+        setAvatarFlash(data.targetUserId, flashType);
         setMicRequests(prev => prev.filter(u => u !== data.targetUserId));
         setTimeout(() => {
           setParticipants(prev => prev.filter(p => p.user_id !== data.targetUserId));
-        }, 1500);
+        }, 5000);
         return;
       } else if (data.action === 'mute') {
         if (isTargetMe) {
@@ -531,6 +539,7 @@ export function useRoomBroadcast(params: UseRoomBroadcastParams) {
       donationAlertRef?.current?.show({
         senderName: alertData.senderName,
         amount: alertData.amount,
+        recipientName: alertData.recipientName,
       });
     });
 

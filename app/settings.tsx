@@ -290,103 +290,11 @@ export default function SettingsScreen() {
               onPress: async () => {
                 if (!firebaseUser) return;
                 try {
-                  const uid = firebaseUser.uid;
-
-                  // 1. Kullanıcının odalarını kapat ve katılımcılarını temizle
-                  const { data: ownedRooms } = await supabase
-                    .from('rooms')
-                    .select('id')
-                    .eq('host_id', uid);
-                  if (ownedRooms && ownedRooms.length > 0) {
-                    const roomIds = ownedRooms.map(r => r.id);
-                    await supabase.from('room_participants').delete().in('room_id', roomIds);
-                    await supabase.from('rooms').delete().in('id', roomIds);
-                  }
-
-                  // 2. Katılımcı olduğu odalardan çık
-                  await supabase.from('room_participants').delete().eq('user_id', uid);
-
-                  // 3. Friendships ve banları temizle
-                  await supabase.from('friendships').delete().or(`user_id.eq.${uid},friend_id.eq.${uid}`);
-                  await supabase.from('room_bans').delete().eq('user_id', uid);
-
-                  // 4. Mesajları sil
-                  await supabase.from('messages').delete().or(`sender_id.eq.${uid},receiver_id.eq.${uid}`);
-
-                  // 5. SP transaction geçmişini sil
-                  try {
-                    await supabase.from('sp_transactions').delete().eq('user_id', uid);
-                  } catch { /* tablo yoksa sessiz */ }
-
-                  // 6. Raporları sil
-                  try {
-                    await supabase.from('reports').delete().eq('reporter_id', uid);
-                  } catch { /* tablo yoksa sessiz */ }
-
-                  // 7. Block listesini sil
-                  try {
-                    await supabase.from('blocked_users').delete().or(`blocker_id.eq.${uid},blocked_id.eq.${uid}`);
-                  } catch { /* tablo yoksa sessiz */ }
-
-                  // 7b. Bildirimleri sil
-                  try {
-                    await supabase.from('notifications').delete().or(`user_id.eq.${uid},sender_id.eq.${uid}`);
-                  } catch { /* tablo yoksa sessiz */ }
-
-                  // 7c. Oda takiplerini sil
-                  try {
-                    await supabase.from('room_follows').delete().eq('user_id', uid);
-                  } catch { /* tablo yoksa sessiz */ }
-
-                  // 7d. Oda sohbet mesajlarını sil
-                  try {
-                    await supabase.from('room_chat_messages').delete().eq('user_id', uid);
-                  } catch { /* tablo yoksa sessiz */ }
-
-                  // 7e. Rozetleri sil
-                  try {
-                    await supabase.from('user_badges').delete().eq('user_id', uid);
-                  } catch { /* tablo yoksa sessiz */ }
-
-                  // 7f. Davet kodlarını sil
-                  try {
-                    await supabase.from('referral_codes').delete().eq('owner_id', uid);
-                  } catch { /* tablo yoksa sessiz */ }
-
-                  // ★ Y2: Storage avatar/post-image orphan cleanup — user klasörünü sil.
-                  // RLS v26 sadece kendi klasörünü sildirir; cleanup başarısız olsa bile
-                  // profil silme devam eder (kritik olan DB).
-                  try {
-                    const { StorageService } = require('../services/storage');
-                    await StorageService.deleteUserFiles?.(uid).catch(() => {});
-                  } catch { /* modül yoksa atla */ }
-                  // Avatar + post-images bucket'larında user klasörünü paraleL temizle
-                  try {
-                    const buckets = ['avatars', 'post-images', 'voice-notes'] as const;
-                    await Promise.all(buckets.map(async (bucket) => {
-                      const { data: files } = await supabase.storage.from(bucket).list(uid, { limit: 1000 });
-                      if (files && files.length > 0) {
-                        const paths = files.map(f => `${uid}/${f.name}`);
-                        await supabase.storage.from(bucket).remove(paths);
-                      }
-                    }));
-                  } catch { /* orphan dosyalar için manuel admin cleanup RPC var */ }
-
-                  // 8. Profili sil
-                  await supabase.from('profiles').delete().eq('id', uid);
-
-                  // 9. Firebase hesabını sil
-                  try {
-                    await firebaseUser.delete();
-                  } catch (e: any) {
-                    // Re-auth gerekebilir — en azından DB verileri silindi
-                    if (__DEV__) console.warn('[DeleteAccount] Firebase delete error (may need re-auth):', e.message);
-                  }
-
-                  // 10. Çıkış yap
-                  try { await GoogleSignin.revokeAccess(); } catch {}
-                  try { await GoogleSignin.signOut(); } catch {}
-                  await RevenueCatService.logout().catch(() => {});
+                  // ★ 2026-04-21: Atomic cascade — v49 RPC tek transaction'da siler.
+                  //   Önceden 9 ayrı DELETE query vardı → partial deletion risk.
+                  //   Storage + Firebase auth client'ta (SQL'de yapılamaz).
+                  const { performDeleteAccount } = require('../services/account');
+                  await performDeleteAccount(firebaseUser);
                   setIsLoggedIn(false);
                   setUser(null);
                   router.replace('/(auth)/login');

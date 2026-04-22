@@ -22,6 +22,70 @@ const SLIDER_WIDTH = Math.max(1, W - 80);
 const QUICK_AMOUNTS = [5, 10, 25, 50, 100];
 const MAX_SLIDER = 500;
 
+// ★ 2026-04-21: SP miktarına göre modal tier paleti (success ekranıyla tutarlı)
+type Tier = 'basic' | 'premium' | 'elite' | 'legendary';
+const getTier = (amt: number): Tier =>
+  amt >= 1000 ? 'legendary' : amt >= 250 ? 'elite' : amt >= 50 ? 'premium' : 'basic';
+
+interface SheetPalette {
+  border: string;
+  topEdge: string;
+  tintColor: string;       // iç katman ek tint
+  amountColor: string;
+  accentSolid: string;     // balance pill, active chip
+  fillGrad: [string, string, string];
+  thumbColor: string;
+  sendBtnGrad: [string, string, string];
+  labelText: string | null;
+}
+
+const SHEET_PALETTES: Record<Tier, SheetPalette> = {
+  basic: {
+    border: 'rgba(148,163,184,0.35)',
+    topEdge: 'rgba(148,163,184,0.65)',
+    tintColor: 'rgba(148,163,184,0.18)',
+    amountColor: '#E2E8F0',
+    accentSolid: '#94A3B8',
+    fillGrad: ['#E2E8F0', '#94A3B8', '#64748B'],
+    thumbColor: '#E2E8F0',
+    sendBtnGrad: ['#94A3B8', '#64748B', '#475569'],
+    labelText: null,
+  },
+  premium: {
+    border: 'rgba(251,191,36,0.45)',
+    topEdge: 'rgba(251,191,36,0.85)',
+    tintColor: 'rgba(251,191,36,0.22)',
+    amountColor: '#FFD700',
+    accentSolid: '#FBBF24',
+    fillGrad: ['#FFE082', '#FBBF24', '#D97706'],
+    thumbColor: '#FFE082',
+    sendBtnGrad: ['#FFE082', '#FBBF24', '#D97706'],
+    labelText: 'PREMIUM',
+  },
+  elite: {
+    border: 'rgba(244,114,182,0.55)',
+    topEdge: 'rgba(244,114,182,0.9)',
+    tintColor: 'rgba(244,114,182,0.22)',
+    amountColor: '#FFE4E6',
+    accentSolid: '#F472B6',
+    fillGrad: ['#FCE7F3', '#F472B6', '#BE185D'],
+    thumbColor: '#FCE7F3',
+    sendBtnGrad: ['#FBCFE8', '#F472B6', '#BE185D'],
+    labelText: 'ELITE',
+  },
+  legendary: {
+    border: 'rgba(167,139,250,0.65)',
+    topEdge: 'rgba(167,139,250,0.95)',
+    tintColor: 'rgba(167,139,250,0.24)',
+    amountColor: '#F5F3FF',
+    accentSolid: '#A78BFA',
+    fillGrad: ['#DDD6FE', '#A78BFA', '#7C3AED'],
+    thumbColor: '#DDD6FE',
+    sendBtnGrad: ['#DDD6FE', '#A78BFA', '#7C3AED'],
+    labelText: 'LEGENDARY',
+  },
+};
+
 interface Props {
   visible: boolean;
   onClose: () => void;
@@ -165,6 +229,9 @@ export default function SPDonateSheet({
 
   const canDonate = amount > 0 && balance !== null && balance >= amount && senderId !== recipientId;
   const fillRatio = (amount - 1) / (MAX_SLIDER - 1);
+  // ★ 2026-04-21: Miktar arttıkça modal paleti değişir
+  const tier = getTier(amount);
+  const palette = SHEET_PALETTES[tier];
 
   if (!visible && !showSuccess) return null;
 
@@ -187,50 +254,56 @@ export default function SPDonateSheet({
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
       </Animated.View>
 
-      {/* Panel */}
-      <Animated.View style={[styles.panel, { transform: [{ translateY }] }]}>
-        {/* ★ Premium altın zemin — wallet kartı formülüyle tutarlı */}
+      {/* Panel — border/tint/edge tier paletinden gelir */}
+      <Animated.View style={[styles.panel, { borderColor: palette.border, transform: [{ translateY }] }]}>
+        {/* Koyu zemin */}
         <LinearGradient
           colors={['#2a1e14', '#17100a', '#0a0604']}
           start={{ x: 0, y: 0 }} end={{ x: 0.7, y: 1 }}
           style={StyleSheet.absoluteFillObject}
         />
+        {/* Tier tint — amount değiştikçe renk geçişi */}
         <LinearGradient
-          colors={['rgba(251,191,36,0.28)', 'rgba(251,191,36,0.08)', 'transparent']}
+          colors={[palette.tintColor, palette.tintColor.replace(/[\d.]+\)$/, '0.06)'), 'transparent']}
           start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
           style={StyleSheet.absoluteFillObject}
         />
         <LinearGradient
-          colors={['transparent', 'rgba(251,191,36,0.85)', 'transparent']}
+          colors={['transparent', palette.topEdge, 'transparent']}
           start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
           style={styles.topEdge}
         />
 
         {/* Handle */}
         <View style={styles.handle} {...panResponder.panHandlers}>
-          <View style={styles.handleBar} />
+          <View style={[styles.handleBar, { backgroundColor: palette.accentSolid + '73' }]} />
         </View>
 
         {/* Header */}
         <View style={styles.header}>
-          <Ionicons name="diamond" size={18} color="#FBBF24" style={iconShadow} />
+          <Ionicons name="diamond" size={18} color={palette.accentSolid} style={iconShadow} />
           <Text style={styles.headerTitle}>SP BAĞIŞLA</Text>
-          <View style={styles.balancePill}>
-            <Ionicons name="wallet" size={10} color="#FBBF24" />
-            <Text style={styles.balanceText}>{balance !== null ? balance.toLocaleString('tr-TR') : '...'}</Text>
+          {palette.labelText && (
+            <View style={{ paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6, backgroundColor: palette.accentSolid + '22', borderWidth: 0.7, borderColor: palette.accentSolid + '60' }}>
+              <Text style={{ fontSize: 8, fontWeight: '900', color: palette.accentSolid, letterSpacing: 1.2 }}>{palette.labelText}</Text>
+            </View>
+          )}
+          <View style={[styles.balancePill, { backgroundColor: palette.accentSolid + '1A', borderColor: palette.accentSolid + '33' }]}>
+            <Ionicons name="wallet" size={10} color={palette.accentSolid} />
+            <Text style={[styles.balanceText, { color: palette.accentSolid }]}>{balance !== null ? balance.toLocaleString('tr-TR') : '...'}</Text>
           </View>
         </View>
 
         {/* Alıcı */}
         <Text style={styles.recipientText}>
-          <Text style={{ color: '#FBBF24', fontWeight: '800' }}>{recipientName}</Text>
+          <Text style={{ color: palette.accentSolid, fontWeight: '800' }}>{recipientName}</Text>
           <Text> adlı kullanıcıya</Text>
         </Text>
 
         {/* Miktar göstergesi */}
         <View style={styles.amountWrap}>
-          <Text style={styles.amountValue}>{amount.toLocaleString('tr-TR')}</Text>
-          <Text style={styles.amountLabel}>SP</Text>
+          <Text style={[styles.amountValue, { color: palette.amountColor }]}>{amount.toLocaleString('tr-TR')}</Text>
+          <Text style={[styles.amountLabel, { color: palette.amountColor + 'BF' }]}>SP</Text>
         </View>
 
         {/* Slider */}
@@ -248,36 +321,44 @@ export default function SPDonateSheet({
             onResponderTerminationRequest={() => false}
           >
             <LinearGradient
-              colors={['#FFE082', '#FBBF24', '#D97706']}
+              colors={palette.fillGrad}
               start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
               style={[styles.sliderFill, { width: `${fillRatio * 100}%` }]}
             />
-            <View style={[styles.sliderThumb, { left: Math.max(0, Math.min(fillRatio * SLIDER_WIDTH - 10, SLIDER_WIDTH - 20)) }]} />
+            <View style={[styles.sliderThumb, { backgroundColor: palette.thumbColor, borderColor: palette.accentSolid, left: Math.max(0, Math.min(fillRatio * SLIDER_WIDTH - 10, SLIDER_WIDTH - 20)) }]} />
           </View>
           <Text style={styles.sliderMax}>{MAX_SLIDER}</Text>
         </View>
 
         {/* Quick presets */}
         <View style={styles.quickRow}>
-          {QUICK_AMOUNTS.map(q => (
-            <Pressable
-              key={q}
-              style={[styles.quickBtn, amount === q && styles.quickBtnActive]}
-              onPress={() => setAmount(q)}
-            >
-              <Text style={[styles.quickText, amount === q && styles.quickTextActive]}>{q}</Text>
-            </Pressable>
-          ))}
+          {QUICK_AMOUNTS.map(q => {
+            const active = amount === q;
+            const qTier = getTier(q);
+            const qAccent = SHEET_PALETTES[qTier].accentSolid;
+            return (
+              <Pressable
+                key={q}
+                style={[
+                  styles.quickBtn,
+                  active && { backgroundColor: qAccent + '26', borderColor: qAccent },
+                ]}
+                onPress={() => setAmount(q)}
+              >
+                <Text style={[styles.quickText, active && { color: qAccent }]}>{q}</Text>
+              </Pressable>
+            );
+          })}
         </View>
 
-        {/* Gönder butonu */}
+        {/* Gönder butonu — tier gradient */}
         <Pressable
           style={[styles.sendBtn, !canDonate && { opacity: 0.4 }]}
           onPress={handleDonate}
           disabled={!canDonate || loading}
         >
           <LinearGradient
-            colors={['#FFE082', '#FBBF24', '#D97706']}
+            colors={palette.sendBtnGrad}
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
             style={styles.sendBtnGrad}
           >

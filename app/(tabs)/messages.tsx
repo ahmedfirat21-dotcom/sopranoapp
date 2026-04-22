@@ -14,10 +14,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import StatusAvatar from '../../components/StatusAvatar';
 import { UserSearchModal } from '../../components/UserSearchModal';
 import AppBackground from '../../components/AppBackground';
+import TabBarFadeOut from '../../components/TabBarFadeOut';
 import { showToast } from '../../components/Toast';
 import NotificationBell from '../../components/NotificationBell';
 import { getRelativeTime } from '../../constants/time';
+import { getAvatarSource } from '../../constants/avatars';
 import PremiumAlert, { type AlertButton } from '../../components/PremiumAlert';
+import ConversationActionSheet, { type SheetAction } from '../../components/ConversationActionSheet';
 import { ModerationService } from '../../services/moderation';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -68,6 +71,37 @@ const skStyles = StyleSheet.create({
 });
 
 // ═══ Memoized Conversation Card — FlatList re-render'ı izole ═══
+// ★ 2026-04-21: TypingDots — "yazıyor" metninin sağında 3 animasyonlu nokta,
+//   teker teker parlar (typing indicator). Typing state aktifken loop eder, kapanınca durur.
+function TypingDots() {
+  const d1 = useRef(new RNAnimated.Value(0.3)).current;
+  const d2 = useRef(new RNAnimated.Value(0.3)).current;
+  const d3 = useRef(new RNAnimated.Value(0.3)).current;
+  useEffect(() => {
+    const make = (v: RNAnimated.Value, delay: number) => RNAnimated.loop(
+      RNAnimated.sequence([
+        RNAnimated.delay(delay),
+        RNAnimated.timing(v, { toValue: 1, duration: 250, useNativeDriver: true }),
+        RNAnimated.timing(v, { toValue: 0.3, duration: 250, useNativeDriver: true }),
+        RNAnimated.delay(Math.max(0, 450 - delay)),
+      ])
+    );
+    const a1 = make(d1, 0);
+    const a2 = make(d2, 150);
+    const a3 = make(d3, 300);
+    a1.start(); a2.start(); a3.start();
+    return () => { a1.stop(); a2.stop(); a3.stop(); };
+  }, []);
+  const dot = (v: RNAnimated.Value) => (
+    <RNAnimated.View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: Colors.teal, opacity: v, marginLeft: 2 }} />
+  );
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 4 }}>
+      {dot(d1)}{dot(d2)}{dot(d3)}
+    </View>
+  );
+}
+
 const ConversationCard = React.memo(function ConversationCard({
   item, isSelected, selectionMode, isFriend, isTyping,
   onOpenChat, onToggleSelection, onLongPress, onDelete, onAvatarPress, onCallPress,
@@ -100,7 +134,7 @@ const ConversationCard = React.memo(function ConversationCard({
         android_ripple={{ color: 'rgba(255,255,255,0.04)' }}
         onPress={() => selectionMode ? onToggleSelection(item.partner_id) : onOpenChat(item.partner_id)}
         onLongPress={() => onLongPress(item)}
-        delayLongPress={500}
+        delayLongPress={400}
       >
         <LinearGradient
           colors={cardGradient as [string, string, string, string, string]}
@@ -137,9 +171,12 @@ const ConversationCard = React.memo(function ConversationCard({
             </View>
             <View style={styles.msgPreviewRow}>
               {isTyping ? (
-                <Text style={[styles.msgText, { color: Colors.teal, fontWeight: '700' }]} numberOfLines={1}>
-                  yazıyor...
-                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Text style={[styles.msgText, { color: Colors.teal, fontWeight: '700' }]} numberOfLines={1}>
+                    yazıyor
+                  </Text>
+                  <TypingDots />
+                </View>
               ) : (
                 <>
                   {item.is_last_msg_mine && (
@@ -184,12 +221,26 @@ const ConversationCard = React.memo(function ConversationCard({
 function SwipeableRow({ children, onDelete, containerStyle }: { children: React.ReactNode; onDelete: () => void; containerStyle?: any }) {
   const translateX = useRef(new RNAnimated.Value(0)).current;
   const [isOpen, setIsOpen] = useState(false);
+  const hapticTriggeredRef = useRef(false); // Threshold geçişinde sadece 1 kere
   const deleteOpacity = translateX.interpolate({ inputRange: [-80, -20, 0], outputRange: [1, 0.6, 0], extrapolate: 'clamp' });
   const panResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, gs) => Math.abs(gs.dx) > 15 && Math.abs(gs.dy) < 15,
+      onPanResponderGrant: () => { hapticTriggeredRef.current = false; },
       onPanResponderMove: (_, gs) => {
-        if (gs.dx < 0) translateX.setValue(Math.max(gs.dx, -90));
+        if (gs.dx < 0) {
+          translateX.setValue(Math.max(gs.dx, -90));
+          // ★ 2026-04-21: Swipe threshold geçişinde tek sefer haptic feedback
+          if (gs.dx < -60 && !hapticTriggeredRef.current) {
+            hapticTriggeredRef.current = true;
+            try {
+              const Haptics = require('expo-haptics');
+              Haptics.impactAsync?.(Haptics.ImpactFeedbackStyle?.Medium);
+            } catch {}
+          } else if (gs.dx > -60) {
+            hapticTriggeredRef.current = false; // Geri çekerse sıfırla
+          }
+        }
       },
       onPanResponderRelease: (_, gs) => {
         if (gs.dx < -60) {
@@ -234,12 +285,14 @@ function SwipeableRow({ children, onDelete, containerStyle }: { children: React.
 
 export default function MessagesScreen() {
   const router = useRouter();
-  const { firebaseUser, setShowNotifDrawer } = useAuth();
+  const { firebaseUser, profile, setShowNotifDrawer, setNotifDrawerAnchorRight } = useAuth();
   const { refreshBadges } = useBadges();
   useTheme();
   const [conversations, setConversations] = useState<InboxItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  // ★ 2026-04-21: Error state — empty state'ten ayır, retry butonu göster.
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [showComposeModal, setShowComposeModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   // ★ Debounced sorgu — her karakter 100+ yeniden render yapıyordu
@@ -259,6 +312,8 @@ export default function MessagesScreen() {
     buttons?: AlertButton[];
   };
   const [cAlert, setCAlert] = useState<AlertState>({ visible: false, title: '', message: '' });
+  // ★ 2026-04-21: Long-press action sheet state — PremiumAlert yerine modern bottom sheet.
+  const [sheetItem, setSheetItem] = useState<InboxItem | null>(null);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   // ★ Yazıyor... — listedeki konuşmalarda canlı typing indicator
@@ -266,14 +321,20 @@ export default function MessagesScreen() {
   const typingTimeoutsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
   // ★ Arşiv görünümü — varsayılan: normal (arşivsiz), toggle ile arşivlenenleri göster
   const [showArchived, setShowArchived] = useState(false);
+  // ★ 2026-04-22: Mesaj istekleri görünümü — Instagram-style "İstekler" bölümü
+  const [showRequests, setShowRequests] = useState(false);
+  const [pendingRequests, setPendingRequests] = useState<any[]>([]);
 
   // ★ Görünür liste: arşiv modu açık → sadece arşivlenmiş, kapalı → arşivsiz
-  // Arama tüm alanlarda çalışır (arşiv içinde arama için archived view açık olmalı)
+  // ★ 2026-04-21: Arama artık son mesaj içeriğinde de çalışıyor (partner_name + last_message_content).
   const filteredConversations = useMemo(() => {
     const base = conversations.filter(c => showArchived ? c.is_archived : !c.is_archived);
     if (!debouncedQuery.trim()) return base;
     const q = debouncedQuery.toLowerCase();
-    return base.filter(c => c.partner_name.toLowerCase().includes(q));
+    return base.filter(c =>
+      c.partner_name.toLowerCase().includes(q) ||
+      (c.last_message_content || '').toLowerCase().includes(q)
+    );
   }, [conversations, debouncedQuery, showArchived]);
 
   // Arşivlenmiş sohbet sayısı — toggle chip için
@@ -285,19 +346,26 @@ export default function MessagesScreen() {
   const loadInbox = useCallback(async () => {
     if (!firebaseUser) return;
     try {
+      setLoadError(null);
       const inbox = await MessageService.getInbox(firebaseUser.uid);
       const hiddenMap = await MessageService.getHiddenConversations(firebaseUser.uid);
       const filtered = inbox.filter(c => {
         if (blockedIdsRef.current.has(c.partner_id)) return false;
-        const hiddenBefore = hiddenMap[c.partner_id];
-        if (hiddenBefore && new Date(c.last_message_time) <= new Date(hiddenBefore)) return false;
+        // ★ 2026-04-21: Hidden entry varsa filtrele (auto-unhide kaldırıldı)
+        if (hiddenMap[c.partner_id]) return false;
         return true;
       });
       setConversations(filtered);
-    } catch (err) {
+      // ★ 2026-04-22: Pending mesaj isteklerini paralel çek
+      try {
+        const reqs = await MessageService.getPendingRequests(firebaseUser.uid);
+        setPendingRequests(reqs || []);
+      } catch {}
+    } catch (err: any) {
       if (__DEV__) console.warn('Mesajlar yüklenemedi:', err);
-      // ★ Kullanıcıya bildir — sessiz blank state yerine toast
-      showToast({ title: 'Mesajlar yüklenemedi', message: 'İnternet bağlantını kontrol et.', type: 'error' });
+      const msg = err?.message || 'İnternet bağlantını kontrol et.';
+      setLoadError(msg);
+      showToast({ title: 'Mesajlar yüklenemedi', message: msg, type: 'error' });
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -375,14 +443,12 @@ export default function MessagesScreen() {
         } catch {}
       }
 
+      // ★ 2026-04-21: Silinen sohbet artık auto-unhide OLMAZ.
+      //   Kullanıcı sildiğinde kalıcı olarak gizli kalır. Sadece explicit olarak (push/profile/search
+      //   üzerinden) chat ekranına geçerse chat screen hidden entry'yi temizler ve görünür hale gelir.
       const hiddenMap = await MessageService.getHiddenConversations(firebaseUser.uid);
-      const hiddenBefore = hiddenMap[otherId];
-      if (hiddenBefore && new Date(newMsg.created_at) > new Date(hiddenBefore)) {
-        delete hiddenMap[otherId];
-        const key = `hidden_conversations_${firebaseUser.uid}`;
-        await AsyncStorage.setItem(key, JSON.stringify(hiddenMap));
-      } else if (hiddenBefore) {
-        return;
+      if (hiddenMap[otherId]) {
+        return; // Hidden kalıyor — inbox'a eklenmez
       }
 
       setConversations(prev => {
@@ -473,7 +539,10 @@ export default function MessagesScreen() {
       }
     });
     return () => {
+      // ★ 2026-04-20 FIX: unsubscribe() kanalı siler ama Supabase client cache'inde
+      //   referans kalabilir. removeChannel() ile bellek sızıntısını önle.
       typingChannel.unsubscribe();
+      supabase.removeChannel(typingChannel);
       timeouts.forEach(t => clearTimeout(t));
       timeouts.clear();
     };
@@ -511,9 +580,24 @@ export default function MessagesScreen() {
     router.push(`/user/${partnerId}` as any);
   }, [router]);
 
-  const handleCallPress = useCallback((partnerId: string) => {
-    router.push(`/call/${partnerId}?callType=audio` as any);
-  }, [router]);
+  // ★ 2026-04-21: initiateCall çağrılıyor — eskiden sadece navigate vardı,
+  //   friendship check ve callId tetiklenmiyordu → arama sessizce bağlanamıyordu.
+  const handleCallPress = useCallback(async (partnerId: string) => {
+    if (!firebaseUser || !profile) return;
+    try {
+      const { CallService } = require('../../services/call');
+      const tier = (profile as any)?.subscription_tier || 'Free';
+      const { callId, receiverIsOnline } = await CallService.initiateCall(
+        firebaseUser.uid,
+        profile.display_name || 'Kullanıcı',
+        profile.avatar_url || undefined,
+        partnerId, 'audio', tier
+      );
+      router.push(`/call/${partnerId}?callId=${callId}&callType=audio&isIncoming=false&receiverOnline=${receiverIsOnline}` as any);
+    } catch (err: any) {
+      showToast({ title: 'Arama Hatası', message: err?.message || 'Arama başlatılamadı.', type: 'error' });
+    }
+  }, [firebaseUser, profile, router]);
 
   // ★ Pin toggle — optimistic update + RPC, hata durumunda geri al
   const handleTogglePin = useCallback(async (partnerId: string) => {
@@ -529,7 +613,7 @@ export default function MessagesScreen() {
       });
     });
     try {
-      await MessageService.togglePin(partnerId);
+      await MessageService.togglePin(partnerId, firebaseUser?.uid);
       showToast({
         title: newPinned ? '📌 Sabitlendi' : 'Sabitleme kaldırıldı',
         type: 'success',
@@ -550,7 +634,7 @@ export default function MessagesScreen() {
     setConversations(prev => prev.map(c =>
       c.partner_id === partnerId ? { ...c, is_archived: newArchived } : c));
     try {
-      await MessageService.toggleArchive(partnerId);
+      await MessageService.toggleArchive(partnerId, firebaseUser?.uid);
       showToast({
         title: newArchived ? `🗄️ ${partnerName} arşivlendi` : `↩️ Arşivden çıkarıldı`,
         message: newArchived ? 'Yeni mesaj gelince otomatik geri çıkacak.' : undefined,
@@ -574,30 +658,48 @@ export default function MessagesScreen() {
     }
   }, [firebaseUser]);
 
+  // ★ 2026-04-21: Long-press → bottom sheet (eski PremiumAlert modal'ı yerine).
+  //   Sheet daha modern, native hissi, swipe-to-dismiss + haptic.
   const handleLongPress = useCallback((item: InboxItem) => {
-    setCAlert({
-      visible: true,
-      title: item.partner_name,
-      message: 'Bu sohbet için ne yapmak istersin?',
-      type: 'info',
-      buttons: [
-        ...(friendIds.has(item.partner_id) ? [
-          { text: '📞 Sesli Ara', onPress: () => handleCallPress(item.partner_id) },
-        ] : []),
-        {
-          text: item.is_pinned ? '📌 Sabitlemeyi Kaldır' : '📌 Sabitle',
-          onPress: () => handleTogglePin(item.partner_id),
-        },
-        {
-          text: item.is_archived ? '↩️ Arşivden Çıkar' : '🗄️ Arşivle',
-          onPress: () => handleToggleArchive(item.partner_id, item.partner_name),
-        },
-        { text: '🗑️ Sohbeti Sil', style: 'destructive' as const, onPress: () => handleDeleteConversation(item.partner_id) },
-        { text: '🚫 Engelle', style: 'destructive' as const, onPress: () => handleBlockUser(item.partner_id, item.partner_name) },
-        { text: 'Vazgeç', style: 'cancel' as const },
-      ],
-    });
-  }, [friendIds, handleCallPress, handleDeleteConversation, handleBlockUser, handleTogglePin, handleToggleArchive]);
+    setSheetItem(item);
+  }, []);
+
+  // Sheet action'ları dinamik olarak builder fonksiyonla üret (partner durumuna göre).
+  const sheetActions: SheetAction[] = sheetItem ? [
+    ...(friendIds.has(sheetItem.partner_id) ? [{
+      id: 'call',
+      label: 'Sesli Ara',
+      icon: 'call' as const,
+      style: 'primary' as const,
+      onPress: () => handleCallPress(sheetItem.partner_id),
+    }] : []),
+    {
+      id: 'pin',
+      label: sheetItem.is_pinned ? 'Sabitlemeyi Kaldır' : 'Sabitle',
+      icon: (sheetItem.is_pinned ? 'pin-outline' : 'pin') as any,
+      onPress: () => handleTogglePin(sheetItem.partner_id),
+    },
+    {
+      id: 'archive',
+      label: sheetItem.is_archived ? 'Arşivden Çıkar' : 'Arşivle',
+      icon: (sheetItem.is_archived ? 'arrow-undo' : 'archive') as any,
+      onPress: () => handleToggleArchive(sheetItem.partner_id, sheetItem.partner_name),
+    },
+    {
+      id: 'delete',
+      label: 'Sohbeti Sil',
+      icon: 'trash' as const,
+      style: 'destructive' as const,
+      onPress: () => handleDeleteConversation(sheetItem.partner_id),
+    },
+    {
+      id: 'block',
+      label: 'Engelle',
+      icon: 'ban' as const,
+      style: 'destructive' as const,
+      onPress: () => handleBlockUser(sheetItem.partner_id, sheetItem.partner_name),
+    },
+  ] : [];
 
   return (
     <AppBackground variant="messages">
@@ -607,7 +709,7 @@ export default function MessagesScreen() {
       <View style={[styles.topBar, { paddingTop: insets.top + 4 }]}>
         <Image source={require('../../assets/logo.png')} style={styles.logo} resizeMode="contain" />
         <View style={styles.headerRight}>
-          <NotificationBell unreadCount={unreadCount} onPress={() => setShowNotifDrawer(true)} />
+          <NotificationBell unreadCount={unreadCount} onPress={() => { setNotifDrawerAnchorRight(60); setShowNotifDrawer(true); }} />
           <Pressable style={[styles.headerIconBtn, styles.composeBtn]} onPress={() => setShowComposeModal(true)}>
             <Ionicons name="create-outline" size={19} color="#F1F5F9" />
           </Pressable>
@@ -661,7 +763,9 @@ export default function MessagesScreen() {
         )}
       </View>
 
-      {/* ═══ Online Arkadaşlar ═══ */}
+      {/* ═══ Online Arkadaşlar — horizontal FlatList (nested ScrollView'den dönüştürüldü) ═══
+         ★ 2026-04-21: ScrollView içinde FlatList = Android momentum glitch + warning.
+         FlatList ile virtualization + keyExtractor. */}
       {onlineFriends.length > 0 && (
         <View style={styles.friendSection}>
           <View style={styles.friendSectionHeader}>
@@ -671,41 +775,116 @@ export default function MessagesScreen() {
               <Text style={styles.friendCountText}>{onlineFriends.length}</Text>
             </View>
           </View>
-          <ScrollView
+          <FlatList
             horizontal
+            data={onlineFriends}
+            keyExtractor={(f) => f.id}
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.friendStrip}
-          >
-            {onlineFriends.map((friend) => (
+            removeClippedSubviews
+            initialNumToRender={8}
+            renderItem={({ item: friend }) => (
               <Pressable
-                key={friend.id}
                 style={styles.friendChip}
                 onPress={() => router.push(`/chat/${friend.id}`)}
               >
                 <StatusAvatar uri={friend.avatar_url} size={52} isOnline={true} tier={(friend as any).subscription_tier} />
                 <Text style={styles.friendName} numberOfLines={1}>{friend.display_name?.split(' ')[0] || 'Kullanıcı'}</Text>
               </Pressable>
-            ))}
-          </ScrollView>
+            )}
+          />
         </View>
       )}
 
-      {/* ═══ Arşiv chip — arşiv modu toggle ═══ */}
-      {(archivedCount > 0 || showArchived) && (
+      {/* ═══ 2026-04-22: Mesaj İstekleri + Arşiv chip — yan yana */}
+      <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 14, marginTop: 2 }}>
+        {/* İstekler chip — pending request varsa belirginleşir */}
         <Pressable
-          style={styles.archiveChip}
-          onPress={() => setShowArchived(v => !v)}
+          style={[styles.archiveChip, { flex: 1, marginHorizontal: 0 }, pendingRequests.length === 0 && !showRequests && { opacity: 0.5 }]}
+          onPress={() => {
+            if (pendingRequests.length === 0 && !showRequests) {
+              showToast({ title: 'İstek yok', message: 'Bekleyen mesaj isteğin yok.', type: 'info' });
+              return;
+            }
+            setShowRequests(v => !v);
+            if (!showRequests) setShowArchived(false); // tek mod aktif
+          }}
         >
-          <Ionicons name={showArchived ? 'arrow-back' : 'archive'} size={16} color={Colors.teal} />
-          <Text style={styles.archiveChipText}>
-            {showArchived ? `Arşivden Çık` : `Arşivlenmiş (${archivedCount})`}
+          <Ionicons
+            name={showRequests ? 'arrow-back' : 'mail-unread-outline'}
+            size={16}
+            color={pendingRequests.length === 0 && !showRequests ? 'rgba(94,234,212,0.5)' : '#60A5FA'}
+          />
+          <Text style={[styles.archiveChipText, { color: '#93C5FD' }]}>
+            {showRequests ? `Geri` : `İstekler (${pendingRequests.length})`}
           </Text>
           <Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.3)" />
         </Pressable>
-      )}
 
-      {/* ═══ Sohbet Listesi ═══ */}
-      {loading ? (
+        <Pressable
+          style={[styles.archiveChip, { flex: 1, marginHorizontal: 0 }, archivedCount === 0 && !showArchived && { opacity: 0.5 }]}
+          onPress={() => {
+            if (archivedCount === 0 && !showArchived) {
+              showToast({ title: 'Arşiv boş', message: 'Henüz arşivlenmiş sohbetin yok.', type: 'info' });
+              return;
+            }
+            setShowArchived(v => !v);
+            if (!showArchived) setShowRequests(false); // tek mod aktif
+          }}
+        >
+          <Ionicons
+            name={showArchived ? 'arrow-back' : 'archive'}
+            size={16}
+            color={archivedCount === 0 && !showArchived ? 'rgba(94,234,212,0.5)' : Colors.teal}
+          />
+          <Text style={[styles.archiveChipText, archivedCount === 0 && !showArchived && { color: 'rgba(255,255,255,0.5)' }]}>
+            {showArchived ? `Geri` : `Arşiv (${archivedCount})`}
+          </Text>
+          <Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.3)" />
+        </Pressable>
+      </View>
+
+      {/* ═══ 2026-04-22: Mesaj İstekleri Listesi (showRequests=true iken) ═══ */}
+      {showRequests ? (
+        pendingRequests.length === 0 ? (
+          <View style={{ alignItems: 'center', paddingVertical: 40 }}>
+            <Ionicons name="mail-open-outline" size={40} color="rgba(148,163,184,0.4)" />
+            <Text style={{ marginTop: 10, fontSize: 13, color: '#94A3B8' }}>Bekleyen mesaj isteği yok</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={pendingRequests}
+            keyExtractor={(item) => item.id}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingTop: 6, paddingBottom: 20 }}
+            renderItem={({ item }: any) => {
+              const sender = item.sender || {};
+              return (
+                <Pressable
+                  onPress={() => router.push({ pathname: '/chat/[id]', params: { id: item.sender_id } } as any)}
+                  style={({ pressed }) => [{
+                    flexDirection: 'row', alignItems: 'center', gap: 10,
+                    paddingHorizontal: 14, paddingVertical: 10,
+                    backgroundColor: pressed ? 'rgba(96,165,250,0.08)' : 'transparent',
+                  }]}>
+                  <Image source={getAvatarSource(sender.avatar_url)} style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: '#1E293B' }} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 14, fontWeight: '700', color: '#F1F5F9' }} numberOfLines={1}>
+                      {sender.display_name || 'Kullanıcı'}
+                    </Text>
+                    <Text style={{ fontSize: 11, color: '#94A3B8', marginTop: 2 }} numberOfLines={1}>
+                      Sizinle mesajlaşmak istiyor — dokun ve cevap ver
+                    </Text>
+                  </View>
+                  <View style={{ backgroundColor: 'rgba(59,130,246,0.15)', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }}>
+                    <Text style={{ fontSize: 10, fontWeight: '700', color: '#60A5FA' }}>İstek</Text>
+                  </View>
+                </Pressable>
+              );
+            }}
+          />
+        )
+      ) : loading ? (
         <SkeletonList />
       ) : (
         <FlatList
@@ -732,32 +911,42 @@ export default function MessagesScreen() {
             />
           }
           ListEmptyComponent={
-            <View style={styles.emptyWrap}>
-              {/* ★ Sade ikon — sadece altta yumuşak gölge */}
-              <Ionicons
-                name="chatbubbles"
-                size={72}
-                color={Colors.teal}
-                style={styles.emptyIcon}
-              />
-              <Text style={styles.emptyTitle}>Henüz mesajın yok</Text>
-              <Text style={styles.emptySubtitle}>
-                Keşfet sayfasından birine git,{'\n'}sohbet başlat!
-              </Text>
-              <Pressable
-                style={styles.emptyActionBtn}
-                onPress={() => router.push('/(tabs)/home')}
-              >
-                <LinearGradient
-                  colors={['#14B8A6', '#0D9488']}
-                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                  style={styles.emptyActionGrad}
-                >
-                  <Ionicons name="compass" size={16} color="#FFF" />
-                  <Text style={styles.emptyActionText}>Keşfet</Text>
-                </LinearGradient>
-              </Pressable>
-            </View>
+            loadError ? (
+              // ★ 2026-04-21: Hata state — empty'den ayrı, retry butonu
+              <View style={styles.emptyWrap}>
+                <Ionicons name="cloud-offline-outline" size={64} color="#EF4444" style={styles.emptyIcon} />
+                <Text style={styles.emptyTitle}>Bağlantı sorunu</Text>
+                <Text style={styles.emptySubtitle}>{loadError}</Text>
+                <Pressable style={styles.emptyActionBtn} onPress={() => { setLoading(true); loadInbox(); }}>
+                  <LinearGradient
+                    colors={['#EF4444', '#DC2626']}
+                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                    style={styles.emptyActionGrad}
+                  >
+                    <Ionicons name="refresh" size={16} color="#FFF" />
+                    <Text style={styles.emptyActionText}>Tekrar Dene</Text>
+                  </LinearGradient>
+                </Pressable>
+              </View>
+            ) : (
+              <View style={styles.emptyWrap}>
+                <Ionicons name="chatbubbles" size={72} color={Colors.teal} style={styles.emptyIcon} />
+                <Text style={styles.emptyTitle}>Henüz mesajın yok</Text>
+                <Text style={styles.emptySubtitle}>
+                  Keşfet sayfasından birine git,{'\n'}sohbet başlat!
+                </Text>
+                <Pressable style={styles.emptyActionBtn} onPress={() => router.push('/(tabs)/home')}>
+                  <LinearGradient
+                    colors={['#14B8A6', '#0D9488']}
+                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                    style={styles.emptyActionGrad}
+                  >
+                    <Ionicons name="compass" size={16} color="#FFF" />
+                    <Text style={styles.emptyActionText}>Keşfet</Text>
+                  </LinearGradient>
+                </Pressable>
+              </View>
+            )
           }
           renderItem={({ item }) => (
             <ConversationCard
@@ -845,6 +1034,21 @@ export default function MessagesScreen() {
       )}
 
       <PremiumAlert {...cAlert} onDismiss={() => setCAlert(prev => ({ ...prev, visible: false }))} />
+
+      {/* ★ 2026-04-21: Modern bottom sheet — DM uzun bas aksiyonları */}
+      <ConversationActionSheet
+        visible={!!sheetItem}
+        onClose={() => setSheetItem(null)}
+        partnerName={sheetItem?.partner_name || ''}
+        partnerAvatar={sheetItem?.partner_avatar}
+        partnerOnline={sheetItem?.partner_is_online}
+        subtitle={sheetItem?.unread_count
+          ? `${sheetItem.unread_count} yeni mesaj`
+          : sheetItem?.is_muted ? 'Sessize alındı' : undefined}
+        actions={sheetActions}
+      />
+      {/* ★ 2026-04-21: Tab bar scroll fade — tüm tab sayfalarında tutarlı */}
+      <TabBarFadeOut />
     </View>
     </AppBackground>
   );
@@ -861,7 +1065,7 @@ const styles = StyleSheet.create({
   logo: { height: 30, width: 140 },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   headerIconBtn: {
-    width: 36, height: 36, borderRadius: 18,
+    width: 44, height: 44, borderRadius: 22,
     backgroundColor: 'rgba(255,255,255,0.06)',
     justifyContent: 'center', alignItems: 'center',
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)',

@@ -6,7 +6,7 @@ import { useRouter } from 'expo-router';
 import { safeGoBack } from '../constants/navigation';
 import { RoomService, getRoomLimits, type TierName } from '../services/database';
 import { GamificationService } from '../services/gamification';
-import { Colors } from '../constants/theme';
+import { Colors, Shadows } from '../constants/theme';
 import { showToast } from '../components/Toast';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from './_layout';
@@ -18,6 +18,22 @@ import { PushService } from '../services/push';
 import { RoomAccessService } from '../services/roomAccess';
 import type { FollowUser } from '../services/friendship';
 import * as ImagePicker from 'expo-image-picker';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { containsBadWords } from '../constants/badwords';
+
+// ★ 2026-04-21: Oda adı sanitization — whitespace normalize, HTML strip, length cap.
+//   Küfür kontrolü ayrı (canProceed'de çalışıyor).
+function sanitizeRoomName(raw: string): string {
+  return raw
+    .replace(/<[^>]*>/g, '')         // HTML taglarını kaldır
+    .replace(/\s+/g, ' ')            // Ardışık whitespace'i tek boşluğa indir
+    .trim()
+    .slice(0, 60);                   // Max 60 karakter
+}
+
+// ★ 2026-04-21: Draft save/restore — kullanıcı geri gidip kayboldu ya da crash olduysa
+//   form kaybolmasın. Başarılı oluşturmadan sonra draft temizlenir.
+const DRAFT_KEY = 'soprano_create_room_draft_v1';
 
 // ═══════════════════════════════════════════════════════════════════
 // Tema & Kategori sabitleri
@@ -45,8 +61,8 @@ const CATEGORIES = [
 
 const ROOM_TYPES = [
   { id: 'open',   label: 'Açık',    icon: 'globe-outline',      desc: 'Herkes serbestçe katılabilir',   minTier: 'Free' },
-  { id: 'closed', label: 'Şifreli', icon: 'lock-closed-outline', desc: 'Sadece şifreyi bilenler girer',  minTier: 'Plus' },
-  { id: 'invite', label: 'Davetli', icon: 'mail-outline',        desc: 'Sadece senin davet ettiklerin', minTier: 'Pro' },
+  { id: 'closed', label: 'Şifreli', icon: 'lock-closed-outline', desc: 'Sadece şifreyi bilenler girer',  minTier: 'Free' },
+  { id: 'invite', label: 'Davetli', icon: 'mail-outline',        desc: 'Sadece senin davet ettiklerin', minTier: 'Plus' },
 ] as const;
 
 const SPEAKING_MODES = [
@@ -93,21 +109,26 @@ const STEPS: StepMeta[] = [
 ];
 
 async function uploadRoomImage(userId: string, localUri: string, prefix: 'card' | 'bg'): Promise<string> {
-  try {
-    const ext = localUri.split('.').pop()?.toLowerCase() || 'jpg';
-    const fileName = `room-images/${userId}/${prefix}_${Date.now()}.${ext}`;
-    const response = await fetch(localUri);
-    const blob = await response.blob();
-    const { error } = await supabase.storage.from('public').upload(fileName, blob, { contentType: `image/${ext === 'png' ? 'png' : 'jpeg'}`, upsert: true });
-    if (error) return '';
-    const { data: urlData } = supabase.storage.from('public').getPublicUrl(fileName);
-    return urlData?.publicUrl || '';
-  } catch { return ''; }
+  // ★ 2026-04-21: fetch(file://) Android'de "Network request failed" veriyordu.
+  //   StorageService.uploadFile doğru yöntemi kullanır: ImageManipulator resize +
+  //   FileSystem base64 read + ArrayBuffer decode + supabase upload.
+  const { StorageService } = require('../services/storage');
+  const path = `room-images/${userId}/${prefix}_${Date.now()}.jpg`;
+  return await StorageService.uploadFile('post-images', path, localUri);
 }
 
 function isTierEnough(userTier: TierName, required: string): boolean {
-  const order = ['Free', 'Plus', 'Pro'];
+  const order = ['Free', 'Plus', 'Pro', 'GodMaster'];
   return order.indexOf(userTier) >= order.indexOf(required);
+}
+
+// ★ 2026-04-21: Müzik linki validation — yalnızca YouTube/Spotify/SoundCloud/YouTube Music.
+//   Diğer URL'ler DB'ye yazılmasın, hatalı yapıştırmalar erkende yakalansın.
+const MUSIC_URL_REGEX = /^https?:\/\/(www\.)?(youtube\.com|youtu\.be|music\.youtube\.com|open\.spotify\.com|spotify\.com|soundcloud\.com|m\.soundcloud\.com)\//i;
+function isValidMusicUrl(url: string): boolean {
+  const trimmed = url.trim();
+  if (!trimmed) return true; // Boş OK — opsiyonel alan
+  return MUSIC_URL_REGEX.test(trimmed);
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -118,7 +139,8 @@ export default function CreateRoomScreen() {
   const insets = useSafeAreaInsets();
   const { firebaseUser, profile } = useAuth();
   const isAdmin = profile?.is_admin === true;
-  const tier = (isAdmin ? 'Pro' : (profile?.subscription_tier || 'Free')) as TierName;
+  // ★ GodMaster FIX: GodMaster tier'ı koruyarak kullan, admin ise Pro'ya yükselt
+  const tier = (profile?.subscription_tier === 'GodMaster' ? 'GodMaster' : (isAdmin ? 'Pro' : (profile?.subscription_tier || 'Free'))) as TierName;
   const limits = useMemo(() => getRoomLimits(tier), [tier]);
 
   // ── Form state ──
@@ -132,7 +154,15 @@ export default function CreateRoomScreen() {
   const [entryFee, setEntryFee] = useState(0);
   const [donationsEnabled, setDonationsEnabled] = useState(false);
   const [followersOnly, setFollowersOnly] = useState(false);
+  // ★ 2026-04-20: +18 oda kurulumda set edilebilsin (eskiden sonradan PlusMenu'den yapmak gerekiyordu)
+  const [ageRestricted, setAgeRestricted] = useState(false);
+  // ★ 2026-04-20: Dil filtresi — Plus+ (PlusMenu ile parite)
+  const [roomLanguage, setRoomLanguage] = useState<string>('tr');
+  // ★ 2026-04-20: Yavaş mod — Plus+ moderasyon aracı (saniye cinsinden, 0 = kapalı)
+  const [slowModeSeconds, setSlowModeSeconds] = useState(0);
   const [selectedTheme, setSelectedTheme] = useState<string | null>(null);
+  // ★ 2026-04-20: Müzik linki (Pro) — YouTube/Spotify/SoundCloud; herkes kendi platformunda dinler
+  const [musicLink, setMusicLink] = useState<string>('');
   const [backgroundImage, setBackgroundImage] = useState('');
   const [cardImage, setCardImage] = useState('');
   // ★ YENİ: welcome_message + rules (agent raporu eksik tespit etti)
@@ -149,6 +179,54 @@ export default function CreateRoomScreen() {
   const stepIndex = STEPS.findIndex(s => s.id === step);
   const currentStepMeta = STEPS[stepIndex];
   const totalSteps = STEPS.length;
+
+  // ★ 2026-04-21: Draft restore — wizard açılışında önceki state varsa yükle.
+  //   file:// uri'leri AsyncStorage'a kaydetmiyoruz (cihaz-spesifik, crash olmuş olabilir).
+  //   Yalnızca form değerleri.
+  const draftRestoredRef = useRef(false);
+  useEffect(() => {
+    if (draftRestoredRef.current) return;
+    (async () => {
+      try {
+        const raw = await AsyncStorage.getItem(DRAFT_KEY);
+        if (!raw) { draftRestoredRef.current = true; return; }
+        const d = JSON.parse(raw);
+        if (d?.name) setName(d.name);
+        if (d?.category) setCategory(d.category);
+        if (d?.type) setType(d.type);
+        if (d?.description) setDescription(d.description);
+        if (d?.speakingMode) setSpeakingMode(d.speakingMode);
+        if (typeof d?.entryFee === 'number') setEntryFee(d.entryFee);
+        if (typeof d?.donationsEnabled === 'boolean') setDonationsEnabled(d.donationsEnabled);
+        if (typeof d?.followersOnly === 'boolean') setFollowersOnly(d.followersOnly);
+        if (typeof d?.ageRestricted === 'boolean') setAgeRestricted(d.ageRestricted);
+        if (d?.roomLanguage) setRoomLanguage(d.roomLanguage);
+        if (typeof d?.slowModeSeconds === 'number') setSlowModeSeconds(d.slowModeSeconds);
+        if (d?.selectedTheme) setSelectedTheme(d.selectedTheme);
+        if (d?.musicLink) setMusicLink(d.musicLink);
+        if (d?.welcomeMessage) setWelcomeMessage(d.welcomeMessage);
+        if (d?.rules) setRules(d.rules);
+        // Şifre güvenlik sebebiyle restore edilmiyor
+      } catch {}
+      draftRestoredRef.current = true;
+    })();
+  }, []);
+
+  // ★ Draft save — form değiştikçe (restore sonrası) yaz. Debounce ile spam önlenir.
+  useEffect(() => {
+    if (!draftRestoredRef.current) return;
+    const t = setTimeout(() => {
+      const draft = {
+        name, category, type, description, speakingMode, entryFee,
+        donationsEnabled, followersOnly, ageRestricted, roomLanguage,
+        slowModeSeconds, selectedTheme, musicLink, welcomeMessage, rules,
+      };
+      AsyncStorage.setItem(DRAFT_KEY, JSON.stringify(draft)).catch(() => {});
+    }, 500);
+    return () => clearTimeout(t);
+  }, [name, category, type, description, speakingMode, entryFee, donationsEnabled,
+      followersOnly, ageRestricted, roomLanguage, slowModeSeconds, selectedTheme,
+      musicLink, welcomeMessage, rules]);
 
   // ── Slide animasyonu (step geçişi) ──
   const slideAnim = useRef(new Animated.Value(0)).current;
@@ -176,20 +254,29 @@ export default function CreateRoomScreen() {
     else safeGoBack(router);
   };
 
+  // ★ 2026-04-21: Oda adı canlı validation — küfür + uzunluk check'i.
+  const nameValidation = useMemo(() => {
+    const sanitized = sanitizeRoomName(name);
+    if (sanitized.length < 2) return { ok: false, reason: 'En az 2 karakter' };
+    if (sanitized.length > 60) return { ok: false, reason: 'En fazla 60 karakter' };
+    if (containsBadWords(sanitized)) return { ok: false, reason: 'Uygunsuz kelime içeriyor' };
+    return { ok: true, reason: null as string | null };
+  }, [name]);
+
   // ── Adım geçerlilik kontrolü (next butonu aktif mi?) ──
   const canProceed = useMemo(() => {
     switch (step) {
-      case 'basics': return name.trim().length >= 2;
+      case 'basics': return nameValidation.ok;
       case 'category': return !!category;
       case 'access': return type !== 'closed' || password.trim().length >= 4;
       case 'speaking': return !!speakingMode;
-      case 'welcome': return true; // opsiyonel
-      case 'visual': return true; // opsiyonel
+      case 'welcome': return !containsBadWords(welcomeMessage) && !containsBadWords(rules);
+      case 'visual': return isValidMusicUrl(musicLink);
       case 'monetization': return true; // opsiyonel
       case 'review': return true;
       default: return true;
     }
-  }, [step, name, category, type, password, speakingMode]);
+  }, [step, nameValidation.ok, category, type, password, speakingMode, welcomeMessage, rules, musicLink]);
 
   // ── Bugünkü oda açma sayısı (göster özet ekranında) ──
   const [todayRoomCount, setTodayRoomCount] = useState(0);
@@ -224,17 +311,43 @@ export default function CreateRoomScreen() {
       return;
     }
 
+    // ★ 2026-04-21: Müzik linki son bir kontrol — canProceed'te yakalanıyor ama
+    //   submit'e kadar geldiyse bir daha doğrula.
+    if (musicLink.trim() && !isValidMusicUrl(musicLink)) {
+      showToast({ title: 'Geçersiz Müzik Linki', message: 'Sadece YouTube, Spotify veya SoundCloud linki kabul edilir.', type: 'error' });
+      return;
+    }
+
     setCreating(true);
     try {
       let uploadedCardUrl = '';
       let uploadedBgUrl = '';
-      if (cardImage && cardImage.startsWith('file://')) uploadedCardUrl = await uploadRoomImage(firebaseUser.uid, cardImage, 'card');
-      if (backgroundImage && backgroundImage.startsWith('file://')) uploadedBgUrl = await uploadRoomImage(firebaseUser.uid, backgroundImage, 'bg');
+      // ★ 2026-04-21: Image upload error'ları ayrı ayrı yakala → user net hata görsün
+      if (cardImage && cardImage.startsWith('file://')) {
+        try {
+          uploadedCardUrl = await uploadRoomImage(firebaseUser.uid, cardImage, 'card');
+        } catch (e: any) {
+          throw new Error(`Kart görseli yüklenemedi: ${e?.message || 'İnternet bağlantını kontrol et'}`);
+        }
+      }
+      if (backgroundImage && backgroundImage.startsWith('file://')) {
+        try {
+          uploadedBgUrl = await uploadRoomImage(firebaseUser.uid, backgroundImage, 'bg');
+        } catch (e: any) {
+          throw new Error(`Arka plan görseli yüklenemedi: ${e?.message || 'İnternet bağlantını kontrol et'}`);
+        }
+      }
+
+      // ★ 2026-04-21: Sanitize + küfür kontrolü son bir defa
+      const cleanName = sanitizeRoomName(name);
+      if (cleanName.length < 2 || containsBadWords(cleanName)) {
+        throw new Error('Oda adı uygun değil — 2-60 karakter ve uygunsuz kelime içermemeli.');
+      }
 
       const room = await RoomService.create(
         firebaseUser.uid,
         {
-          name: name.trim(), category, type,
+          name: cleanName, category, type,
           description: description.trim() || undefined,
           mode,
           speaking_mode: speakingMode,
@@ -242,7 +355,11 @@ export default function CreateRoomScreen() {
           entry_fee_sp: entryFee > 0 ? entryFee : undefined,
           donations_enabled: donationsEnabled || undefined,
           followers_only: followersOnly || undefined,
+          age_restricted: ageRestricted || undefined,
+          room_language: roomLanguage !== 'tr' ? roomLanguage : undefined,
+          slow_mode_seconds: slowModeSeconds > 0 ? slowModeSeconds : undefined,
           theme_id: selectedTheme || undefined,
+          music_link: musicLink.trim() || undefined,
           room_image_url: uploadedBgUrl || undefined,
           card_image_url: uploadedCardUrl || undefined,
           welcome_message: welcomeMessage.trim() || undefined,
@@ -250,13 +367,22 @@ export default function CreateRoomScreen() {
         },
         tier
       );
-      showToast({ title: '🎉 Oda Hazır!', message: `"${name.trim()}" odası açıldı.`, type: 'success' });
+      showToast({ title: '🎉 Oda Hazır!', message: `"${cleanName}" odası açıldı.`, type: 'success' });
       try { await GamificationService.onRoomCreate(firebaseUser.uid); } catch {}
+      // ★ 2026-04-21: Başarılı oluşturma → draft temizle (tekrar açılışta eski state gelmesin)
+      AsyncStorage.removeItem(DRAFT_KEY).catch(() => {});
       setCreatedRoomId(room.id);
-      setCreatedRoomName(name.trim());
+      setCreatedRoomName(cleanName);
       setShowInviteModal(true);
     } catch (err: any) {
-      showToast({ title: 'Hata', message: err.message || 'Oda oluşturulamadı.', type: 'error' });
+      // ★ 2026-04-21: Detaylı hata gösterimi — "Hata" yerine kullanıcıya net neden bildir.
+      const rawMsg = err?.message || 'Oda oluşturulamadı.';
+      const friendly =
+        /network|fetch|timeout/i.test(rawMsg) ? 'İnternet bağlantın yavaş veya yok. Tekrar dene.' :
+        /permission|denied|rls/i.test(rawMsg) ? 'Yetki hatası. Lütfen tekrar giriş yap.' :
+        /storage|bucket/i.test(rawMsg) ? 'Görsel yüklenemedi. Farklı bir resim seç veya internetini kontrol et.' :
+        rawMsg;
+      showToast({ title: 'Oda Açılamadı', message: friendly, type: 'error' });
     } finally {
       setCreating(false);
     }
@@ -283,24 +409,37 @@ export default function CreateRoomScreen() {
   // 1. ODANIN ADI
   const renderBasics = () => (
     <View>
-      <TextInput
-        style={w.bigInput}
-        placeholder="Mesela: Gece Geyik Sohbeti"
-        placeholderTextColor="rgba(255,255,255,0.25)"
-        value={name}
-        onChangeText={setName}
-        maxLength={50}
-        autoFocus
-      />
-      <Text style={w.charCount}>{name.length}/50</Text>
+      {/* ★ Oda adı — büyük, minimal, underline-only */}
+      <View style={w.heroInputWrap}>
+        <TextInput
+          style={w.bigInput}
+          placeholder="Odanın adını yaz..."
+          placeholderTextColor="rgba(148,163,184,0.5)"
+          value={name}
+          onChangeText={setName}
+          maxLength={60}
+          autoFocus
+        />
+        <View style={[w.heroInputLine, name.length > 0 && !nameValidation.ok && { backgroundColor: 'rgba(239,68,68,0.5)' }]} />
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          {/* ★ 2026-04-21: Canlı hata geri bildirimi — küfür/uzunluk uyarısı */}
+          {name.length > 0 && !nameValidation.ok && nameValidation.reason ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <Ionicons name="alert-circle" size={11} color="#EF4444" />
+              <Text style={{ fontSize: 11, color: '#EF4444' }}>{nameValidation.reason}</Text>
+            </View>
+          ) : <View />}
+          <Text style={w.charCount}>{name.length}/60</Text>
+        </View>
+      </View>
 
-      {/* Opsiyonel kısa açıklama */}
-      <View style={{ marginTop: 24 }}>
+      {/* ★ Açıklama — ince kenarlıklı, şeffaf */}
+      <View style={{ marginTop: 32 }}>
         <Text style={w.sublabel}>Açıklama (opsiyonel)</Text>
         <TextInput
           style={w.mediumInput}
           placeholder="Bu oda neden var? Kısa bir özet..."
-          placeholderTextColor="rgba(255,255,255,0.2)"
+          placeholderTextColor="rgba(148,163,184,0.35)"
           value={description}
           onChangeText={setDescription}
           maxLength={200}
@@ -318,16 +457,11 @@ export default function CreateRoomScreen() {
         {CATEGORIES.map(c => {
           const active = category === c.id;
           return (
-            <Pressable key={c.id} onPress={() => setCategory(c.id)} style={[w.catCard, active && { borderColor: c.color, backgroundColor: `${c.color}15` }]}>
-              <View style={[w.catIcon, { backgroundColor: `${c.color}22` }]}>
-                <Ionicons name={c.icon as any} size={22} color={c.color} />
+            <Pressable key={c.id} onPress={() => setCategory(c.id)} style={w.catCardWrap} android_ripple={{ color: 'transparent' }}>
+              <View style={[w.catCard, active && { borderColor: c.color, borderWidth: 2 }]}>
+                <Ionicons name={c.icon as any} size={30} color={c.color} style={{ textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 6 }} />
               </View>
               <Text style={[w.catName, active && { color: '#FFF' }]}>{c.label}</Text>
-              {active && (
-                <View style={[w.catCheck, { backgroundColor: c.color }]}>
-                  <Ionicons name="checkmark" size={10} color="#FFF" />
-                </View>
-              )}
             </Pressable>
           );
         })}
@@ -349,10 +483,16 @@ export default function CreateRoomScreen() {
             key={rt.id}
             onPress={() => { if (!locked) setType(rt.id as any); else UpsellService.onRoomTypeLocked(tier, rt.minTier as any); }}
             style={[w.accessRow, active && w.accessRowActive, locked && { opacity: 0.5 }]}
+            android_ripple={{ color: 'transparent' }}
           >
-            <View style={[w.accessIcon, active && { backgroundColor: 'rgba(20,184,166,0.2)' }]}>
-              <Ionicons name={rt.icon as any} size={22} color={active ? Colors.teal : '#94A3B8'} />
-            </View>
+            {active && (
+              <LinearGradient
+                colors={['rgba(20,184,166,0.18)', 'rgba(6,95,86,0.08)']}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                style={StyleSheet.absoluteFillObject}
+              />
+            )}
+            <Ionicons name={rt.icon as any} size={22} color={active ? Colors.teal : '#94A3B8'} style={{ marginRight: 2 }} />
             <View style={{ flex: 1 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                 <Text style={[w.accessLabel, active && { color: Colors.teal }]}>{rt.label}</Text>
@@ -385,42 +525,156 @@ export default function CreateRoomScreen() {
           />
         </View>
       )}
+
+      {/* ★ 2026-04-20: Dil filtresi (Plus+) — PlusMenu ile parite */}
+      <View style={{ marginTop: 14 }}>
+        <Text style={w.sublabel}>Dil filtresi</Text>
+        <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
+          {[
+            { id: 'tr', label: '🇹🇷 TR' },
+            { id: 'en', label: '🇬🇧 EN' },
+            { id: 'ar', label: '🇸🇦 AR' },
+            { id: 'de', label: '🇩🇪 DE' },
+          ].map(lang => {
+            const active = roomLanguage === lang.id;
+            const locked = lang.id !== 'tr' && !isTierEnough(tier, 'Plus');
+            return (
+              <Pressable
+                key={lang.id}
+                onPress={() => { if (!locked) setRoomLanguage(lang.id); else UpsellService.onFeatureLocked(tier, 'Plus'); }}
+                style={[{ borderRadius: 20, overflow: 'hidden', borderWidth: 1, borderColor: active ? 'rgba(20,184,166,0.5)' : 'rgba(255,255,255,0.08)', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 3, elevation: 2 }, locked && { opacity: 0.5 }]}
+              >
+                {active ? (
+                  <LinearGradient
+                    colors={['#14B8A6', '#0D9488', '#065F56']}
+                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14, paddingVertical: 8 }}
+                  >
+                    <Text style={{ fontSize: 12, fontWeight: '600', color: '#FFF' }}>{lang.label}</Text>
+                  </LinearGradient>
+                ) : (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14, paddingVertical: 8, backgroundColor: 'rgba(255,255,255,0.05)' }}>
+                    <Text style={{ fontSize: 12, fontWeight: '600', color: '#94A3B8' }}>{lang.label}</Text>
+                    {locked && <Ionicons name="lock-closed" size={9} color="#F59E0B" />}
+                  </View>
+                )}
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
+
+      {/* ★ 2026-04-20: Yavaş Mod (Plus+) — mesajlar arası minimum saniye */}
+      <View style={{ marginTop: 14 }}>
+        <Text style={w.sublabel}>Yavaş mod (Plus+)</Text>
+        <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
+          {[0, 5, 15, 30, 60].map(s => {
+            const active = slowModeSeconds === s;
+            const locked = s > 0 && !isTierEnough(tier, 'Plus');
+            return (
+              <Pressable
+                key={s}
+                onPress={() => { if (!locked) setSlowModeSeconds(s); else UpsellService.onFeatureLocked(tier, 'Plus'); }}
+                style={[{ borderRadius: 20, overflow: 'hidden', borderWidth: 1, borderColor: active ? 'rgba(20,184,166,0.5)' : 'rgba(255,255,255,0.08)', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 3, elevation: 2 }, locked && { opacity: 0.5 }]}
+              >
+                {active ? (
+                  <LinearGradient
+                    colors={['#14B8A6', '#0D9488', '#065F56']}
+                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                    style={{ paddingHorizontal: 14, paddingVertical: 8 }}
+                  >
+                    <Text style={{ fontSize: 12, fontWeight: '600', color: '#FFF' }}>{s === 0 ? 'Kapalı' : `${s}s`}</Text>
+                  </LinearGradient>
+                ) : (
+                  <View style={{ paddingHorizontal: 14, paddingVertical: 8, backgroundColor: 'rgba(255,255,255,0.05)' }}>
+                    <Text style={{ fontSize: 12, fontWeight: '600', color: '#94A3B8' }}>{s === 0 ? 'Kapalı' : `${s}s`}</Text>
+                  </View>
+                )}
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
     </View>
   );
 
   // 4. KONUŞMA MODU
-  const renderSpeaking = () => (
-    <View>
-      {SPEAKING_MODES.map(sm => {
-        const locked = !isTierEnough(tier, sm.minTier);
-        const active = speakingMode === sm.id;
-        return (
-          <Pressable
-            key={sm.id}
-            onPress={() => { if (!locked) setSpeakingMode(sm.id as any); else UpsellService.onFeatureLocked(tier, sm.minTier as any); }}
-            style={[w.accessRow, active && w.accessRowActive, locked && { opacity: 0.5 }]}
-          >
-            <View style={[w.accessIcon, active && { backgroundColor: 'rgba(20,184,166,0.2)' }]}>
-              <Ionicons name={sm.icon as any} size={22} color={active ? Colors.teal : '#94A3B8'} />
+  const renderSpeaking = () => {
+    // Seçilen moda göre "dinleyicinin ekranda ne göreceği" preview'u
+    const preview = (() => {
+      switch (speakingMode) {
+        case 'free_for_all':
+          return {
+            icon: 'mic' as const, color: '#14B8A6',
+            title: 'Dinleyici: 🎙️ Sahneye Çık butonu görür',
+            body: 'Tek tıkla mikrofonu açar, onay gerekmez. Sen veya bir moderatör sahnedeyken otomatik olarak "el kaldırma" akışına döner — hiyerarşi korunur.',
+          };
+        case 'permission_only':
+          return {
+            icon: 'hand-left' as const, color: '#F59E0B',
+            title: 'Dinleyici: ✋ El Kaldır butonu görür',
+            body: 'İstek kuyruğa düşer, sen veya moderatörlerin onayıyla sahneye çıkar. Dinleyici sırasını ve kaç kişi olduğunu görebilir.',
+          };
+        case 'selected_only':
+          return {
+            icon: 'lock-closed' as const, color: '#64748B',
+            title: 'Dinleyici: 🔒 Kilitli buton görür',
+            body: 'Sadece sen "Sahneye Davet Et"le konuşmacı ekleyebilirsin. Dinleyiciler el kaldıramaz, "sahne kilitli" uyarısı görürler.',
+          };
+      }
+    })();
+
+    return (
+      <View>
+        {SPEAKING_MODES.map(sm => {
+          const locked = !isTierEnough(tier, sm.minTier);
+          const active = speakingMode === sm.id;
+          return (
+            <Pressable
+              key={sm.id}
+              onPress={() => { if (!locked) setSpeakingMode(sm.id as any); else UpsellService.onFeatureLocked(tier, sm.minTier as any); }}
+              style={[w.accessRow, active && w.accessRowActive, locked && { opacity: 0.5 }]}
+              android_ripple={{ color: 'transparent' }}
+            >
+              <Ionicons name={sm.icon as any} size={22} color={active ? Colors.teal : '#94A3B8'} style={{ marginRight: 2 }} />
+              <View style={{ flex: 1 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text style={[w.accessLabel, active && { color: Colors.teal }]}>{sm.label}</Text>
+                  {locked && (
+                    <View style={w.lockBadge}>
+                      <Ionicons name="lock-closed" size={9} color="#F59E0B" />
+                      <Text style={w.lockText}>{sm.minTier}+</Text>
+                    </View>
+                  )}
+                </View>
+                <Text style={w.accessDesc}>{sm.desc}</Text>
+              </View>
+              {active && <Ionicons name="checkmark-circle" size={22} color={Colors.teal} />}
+            </Pressable>
+          );
+        })}
+        {/* ★ Seçilen moda göre "gelen kullanıcı ne görür?" preview — UX boşluğunu kapatır */}
+        {preview && (
+          <View style={{
+            marginTop: 12, paddingVertical: 12, paddingHorizontal: 14, borderRadius: 12,
+            backgroundColor: `${preview.color}15`, borderWidth: 1, borderColor: `${preview.color}35`,
+            flexDirection: 'row', alignItems: 'flex-start', gap: 10,
+          }}>
+            <View style={{
+              width: 32, height: 32, borderRadius: 16, backgroundColor: `${preview.color}25`,
+              alignItems: 'center', justifyContent: 'center',
+            }}>
+              <Ionicons name={preview.icon} size={16} color={preview.color} />
             </View>
             <View style={{ flex: 1 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Text style={[w.accessLabel, active && { color: Colors.teal }]}>{sm.label}</Text>
-                {locked && (
-                  <View style={w.lockBadge}>
-                    <Ionicons name="lock-closed" size={9} color="#F59E0B" />
-                    <Text style={w.lockText}>{sm.minTier}+</Text>
-                  </View>
-                )}
-              </View>
-              <Text style={w.accessDesc}>{sm.desc}</Text>
+              <Text style={{ fontSize: 12, fontWeight: '800', color: preview.color, marginBottom: 3 }}>{preview.title}</Text>
+              <Text style={{ fontSize: 11.5, color: 'rgba(226,232,240,0.75)', lineHeight: 16 }}>{preview.body}</Text>
             </View>
-            {active && <Ionicons name="checkmark-circle" size={22} color={Colors.teal} />}
-          </Pressable>
-        );
-      })}
-    </View>
-  );
+          </View>
+        )}
+      </View>
+    );
+  };
 
   // 5. KARŞILAMA (welcome + rules — opsiyonel)
   const renderWelcome = () => (
@@ -456,15 +710,23 @@ export default function CreateRoomScreen() {
   // 6. GÖRSEL
   const renderVisual = () => (
     <View>
-      {/* Kapak görseli */}
-      <Text style={w.sublabel}>Kapak görseli (opsiyonel)</Text>
+      {/* Kapak görseli (Kart) — 16:9 yatay, keşfet kartında gösterilir */}
+      <Text style={w.sublabel}>Kart görseli (opsiyonel)</Text>
+      <Text style={w.hint}>Keşfet akışında oda kartında görünür · 16:9 yatay</Text>
       <Pressable
         style={[w.cardImageBox, cardImage ? { borderColor: Colors.teal, borderStyle: 'solid' } : {}]}
         onPress={async () => {
           try {
+            const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (!perm.granted) {
+              showToast({ title: 'İzin Gerekli', message: 'Galeriye erişim izni verilmedi. Ayarlardan izin verebilirsin.', type: 'warning' });
+              return;
+            }
             const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: 'images', allowsEditing: true, aspect: [16, 9], quality: 0.8 });
             if (!result.canceled && result.assets?.[0]) setCardImage(result.assets[0].uri);
-          } catch { showToast({ title: 'Hata', type: 'error' }); }
+          } catch (e: any) {
+            showToast({ title: 'Görsel seçilemedi', message: e?.message || 'Lütfen tekrar dene.', type: 'error' });
+          }
         }}
       >
         {cardImage ? (
@@ -481,6 +743,52 @@ export default function CreateRoomScreen() {
           </View>
         )}
       </Pressable>
+
+      {/* ★ 2026-04-21: Oda içi ARKA PLAN görseli — 9:16 dikey, Plus+ üyelere açık.
+         Önceden sadece state vardı UI yoktu → arka plan görseli hiç kayıt edilemiyordu.
+         Oda içinde (SeatCard/ListenerGrid arkasında) gösterilir. */}
+      <View style={{ marginTop: 24 }}>
+        <Text style={w.sublabel}>Oda içi arka plan (opsiyonel · Plus)</Text>
+        <Text style={w.hint}>Oda içinde dikey arka plan · 9:16 portrait</Text>
+        {(() => {
+          const locked = !isTierEnough(tier, 'Plus');
+          return (
+            <Pressable
+              style={[w.cardImageBox, backgroundImage ? { borderColor: Colors.teal, borderStyle: 'solid' } : {}, locked && { opacity: 0.5 }]}
+              onPress={async () => {
+                if (locked) { UpsellService.onFeatureLocked(tier, 'Plus'); return; }
+                try {
+                  const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+                  if (!perm.granted) {
+                    showToast({ title: 'İzin Gerekli', message: 'Galeriye erişim izni verilmedi.', type: 'warning' });
+                    return;
+                  }
+                  const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: 'images', allowsEditing: true, aspect: [9, 16], quality: 0.8 });
+                  if (!result.canceled && result.assets?.[0]) setBackgroundImage(result.assets[0].uri);
+                } catch (e: any) {
+                  showToast({ title: 'Görsel seçilemedi', message: e?.message || 'Lütfen tekrar dene.', type: 'error' });
+                }
+              }}
+            >
+              {backgroundImage ? (
+                <>
+                  <Image source={{ uri: backgroundImage }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
+                  <Pressable onPress={() => setBackgroundImage('')} style={w.removeBtn}>
+                    <Ionicons name="trash" size={14} color="#FFF" />
+                  </Pressable>
+                </>
+              ) : (
+                <View style={w.cardImagePlaceholder}>
+                  <Ionicons name={locked ? 'lock-closed' : 'image-outline'} size={32} color={locked ? '#F59E0B' : 'rgba(255,255,255,0.3)'} />
+                  <Text style={{ color: locked ? '#F59E0B' : 'rgba(255,255,255,0.4)', fontSize: 12, marginTop: 6 }}>
+                    {locked ? 'Plus üyelik gerekli' : 'Oda içinde arkada gösterilir'}
+                  </Text>
+                </View>
+              )}
+            </Pressable>
+          );
+        })()}
+      </View>
 
       {/* Tema */}
       <View style={{ marginTop: 24 }}>
@@ -499,6 +807,53 @@ export default function CreateRoomScreen() {
             </Pressable>
           ))}
         </View>
+      </View>
+
+      {/* ★ 2026-04-20: Müzik linki (Pro) — YouTube/Spotify/SoundCloud
+         ★ 2026-04-21: URL regex validation eklendi; geçersiz linkte uyarı. */}
+      <View style={{ marginTop: 24 }}>
+        <Text style={w.sublabel}>Oda müzik linki (Pro)</Text>
+        <Text style={{ fontSize: 11, color: '#64748B', marginBottom: 8 }}>
+          YouTube / Spotify / SoundCloud linki yapıştır — odadakiler kendi platformlarında dinler.
+        </Text>
+        {(() => {
+          const locked = !isTierEnough(tier, 'Pro');
+          const musicInvalid = !!musicLink.trim() && !isValidMusicUrl(musicLink);
+          return (
+            <Pressable
+              onPress={() => { if (locked) UpsellService.onFeatureLocked(tier, 'Pro'); }}
+              style={{ opacity: locked ? 0.6 : 1 }}
+            >
+              <TextInput
+                value={musicLink}
+                onChangeText={(v) => { if (!locked) setMusicLink(v); }}
+                editable={!locked}
+                placeholder="https://youtube.com/... veya https://open.spotify.com/..."
+                placeholderTextColor="#475569"
+                style={{
+                  backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 10, borderWidth: 1,
+                  borderColor: musicInvalid ? 'rgba(239,68,68,0.5)' : 'rgba(255,255,255,0.08)',
+                  paddingHorizontal: 12, paddingVertical: 10, color: '#E5E7EB', fontSize: 13,
+                }}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="url"
+              />
+              {locked && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 }}>
+                  <Ionicons name="lock-closed" size={11} color="#F59E0B" />
+                  <Text style={{ fontSize: 11, color: '#F59E0B' }}>Pro üyelik gerekli</Text>
+                </View>
+              )}
+              {!locked && musicInvalid && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 }}>
+                  <Ionicons name="alert-circle" size={11} color="#EF4444" />
+                  <Text style={{ fontSize: 11, color: '#EF4444' }}>Sadece YouTube, Spotify veya SoundCloud linki</Text>
+                </View>
+              )}
+            </Pressable>
+          );
+        })()}
       </View>
     </View>
   );
@@ -519,6 +874,7 @@ export default function CreateRoomScreen() {
                 key={fee}
                 onPress={() => { if (!locked) setEntryFee(fee); }}
                 style={[w.feePill, active && w.feePillActive, locked && { opacity: 0.4 }]}
+                android_ripple={{ color: 'transparent' }}
               >
                 <Text style={[w.feePillText, active && { color: '#FFF' }]}>{fee === 0 ? 'Ücretsiz' : `${fee} SP`}</Text>
               </Pressable>
@@ -531,6 +887,7 @@ export default function CreateRoomScreen() {
       <Pressable
         onPress={() => { if (isTierEnough(tier, 'Pro')) setDonationsEnabled(!donationsEnabled); else UpsellService.onFeatureLocked(tier, 'Pro'); }}
         style={[w.toggleRow, { marginTop: 24 }]}
+        android_ripple={{ color: 'transparent' }}
       >
         <Ionicons name="heart" size={20} color={donationsEnabled ? '#EC4899' : '#94A3B8'} />
         <View style={{ flex: 1 }}>
@@ -550,6 +907,7 @@ export default function CreateRoomScreen() {
       <Pressable
         onPress={() => { if (isTierEnough(tier, 'Pro')) setFollowersOnly(!followersOnly); else UpsellService.onFeatureLocked(tier, 'Pro'); }}
         style={w.toggleRow}
+        android_ripple={{ color: 'transparent' }}
       >
         <Ionicons name="people" size={20} color={followersOnly ? Colors.teal : '#94A3B8'} />
         <View style={{ flex: 1 }}>
@@ -561,6 +919,26 @@ export default function CreateRoomScreen() {
         ) : (
           <View style={[w.switchTrack, followersOnly && w.switchTrackActive]}>
             <View style={[w.switchKnob, followersOnly && w.switchKnobActive]} />
+          </View>
+        )}
+      </Pressable>
+
+      {/* ★ 2026-04-20: +18 İçerik (Plus+) */}
+      <Pressable
+        onPress={() => { if (isTierEnough(tier, 'Plus')) setAgeRestricted(!ageRestricted); else UpsellService.onFeatureLocked(tier, 'Plus'); }}
+        style={w.toggleRow}
+        android_ripple={{ color: 'transparent' }}
+      >
+        <Ionicons name="warning" size={20} color={ageRestricted ? '#EF4444' : '#94A3B8'} />
+        <View style={{ flex: 1 }}>
+          <Text style={w.toggleLabel}>+18 İçerik</Text>
+          <Text style={w.toggleDesc}>Yetişkinlere özel oda — 18 yaş altı giremez</Text>
+        </View>
+        {!isTierEnough(tier, 'Plus') ? (
+          <View style={w.lockBadge}><Ionicons name="lock-closed" size={9} color="#F59E0B" /><Text style={w.lockText}>Plus+</Text></View>
+        ) : (
+          <View style={[w.switchTrack, ageRestricted && w.switchTrackActive]}>
+            <View style={[w.switchKnob, ageRestricted && w.switchKnobActive]} />
           </View>
         )}
       </Pressable>
@@ -612,15 +990,41 @@ export default function CreateRoomScreen() {
           </View>
         </View>
 
-        {/* Özet satırları */}
+        {/* ★ 2026-04-21: Oda içi arka plan preview — Plus+ kullanıcıların yüklediği görsel
+           review ekranında da görünsün (önceden hiç render edilmiyordu). */}
+        {backgroundImage ? (
+          <View style={{ marginTop: 12, borderRadius: 14, overflow: 'hidden', height: 120, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' }}>
+            <Image source={{ uri: backgroundImage }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
+            <LinearGradient
+              colors={['transparent', 'rgba(0,0,0,0.6)']}
+              style={StyleSheet.absoluteFillObject}
+            />
+            <View style={{ position: 'absolute', left: 10, bottom: 8, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Ionicons name="image" size={13} color="#FFF" />
+              <Text style={{ fontSize: 11, fontWeight: '700', color: '#FFF' }}>Oda içi arka plan</Text>
+            </View>
+          </View>
+        ) : null}
+
+        {/* Özet satırları — profil arkadaşlar kartı ile aynı diagonal gradient stil */}
         <View style={w.summaryBlock}>
+          <LinearGradient
+            colors={['#4a5668', '#37414f', '#232a35']}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFillObject}
+          />
           <SummaryRow icon="mic" label="Konuşma" value={smObj?.label || ''} />
           {welcomeMessage && <SummaryRow icon="chatbubble-ellipses" label="Karşılama" value={welcomeMessage} />}
           {rules && <SummaryRow icon="document-text" label="Kurallar" value="Tanımlandı" />}
           {entryFee > 0 && <SummaryRow icon="diamond" label="Giriş" value={`${entryFee} SP`} />}
           {donationsEnabled && <SummaryRow icon="heart" label="Bağış" value="Aktif" />}
           {followersOnly && <SummaryRow icon="people" label="Erişim" value="Sadece arkadaşlar" />}
+          {ageRestricted && <SummaryRow icon="warning" label="Yaş Sınırı" value="+18" />}
+          {roomLanguage !== 'tr' && <SummaryRow icon="language" label="Dil" value={roomLanguage.toUpperCase()} />}
+          {slowModeSeconds > 0 && <SummaryRow icon="timer" label="Yavaş Mod" value={`${slowModeSeconds}s`} />}
           {selectedTheme && <SummaryRow icon="color-palette" label="Tema" value={themeObj?.name || ''} />}
+          {musicLink.trim() !== '' && <SummaryRow icon="musical-notes" label="Müzik Linki" value="Ekli" />}
+          {backgroundImage && <SummaryRow icon="image" label="Arka Plan" value="Yüklendi" />}
         </View>
 
         <View style={w.capInfo}>
@@ -648,6 +1052,57 @@ export default function CreateRoomScreen() {
   // ═══════════════════════════════════════════════════════════════════
   // MAIN RENDER
   // ═══════════════════════════════════════════════════════════════════
+
+  // ★ 2026-04-21: Günlük limit dolu ise wizard'ı hiç açma — kullanıcıyı 8 adım sonra
+  //   "limit doldu" ile hayal kırıklığına uğratmayalım. Başta net upsell ekranı göster.
+  if (dailyLimitReached) {
+    return (
+      <AppBackground>
+        <View style={{ flex: 1, paddingTop: insets.top + 8 }}>
+          <View style={[w.header, { paddingTop: 0 }]}>
+            <Pressable onPress={() => safeGoBack(router)} style={w.iconBtn} hitSlop={8}>
+              <Ionicons name="close" size={22} color="#F1F5F9" />
+            </Pressable>
+            <Text style={w.stepCounter}>Limit</Text>
+            <View style={w.tierChip}><Text style={w.tierChipText}>{tier}</Text></View>
+          </View>
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32 }}>
+            <View style={{
+              width: 100, height: 100, borderRadius: 50,
+              backgroundColor: 'rgba(245,158,11,0.12)',
+              borderWidth: 2, borderColor: 'rgba(245,158,11,0.35)',
+              alignItems: 'center', justifyContent: 'center', marginBottom: 20,
+            }}>
+              <Ionicons name="hourglass" size={44} color="#F59E0B" />
+            </View>
+            <Text style={{ fontSize: 22, fontWeight: '800', color: '#F1F5F9', marginBottom: 8, textAlign: 'center' }}>
+              Günlük Oda Limitin Doldu
+            </Text>
+            <Text style={{ fontSize: 14, color: '#94A3B8', textAlign: 'center', lineHeight: 20, marginBottom: 24 }}>
+              Bugün {limits.dailyRooms}/{limits.dailyRooms} oda açtın. Yarın sıfırlanacak — ya da üyeliğini yükselterek daha fazla oda aç.
+            </Text>
+            <Pressable
+              onPress={() => { UpsellService.onDailyRoomLimit(tier); }}
+              style={({ pressed }) => [{ width: '100%', borderRadius: 14, overflow: 'hidden' }, pressed && { opacity: 0.85 }]}
+            >
+              <LinearGradient
+                colors={['#D4AF37', '#B45309']}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                style={{ paddingVertical: 14, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 }}
+              >
+                <Ionicons name="rocket" size={18} color="#FFF" />
+                <Text style={{ color: '#FFF', fontWeight: '800', fontSize: 15 }}>Üyeliğimi Yükselt</Text>
+              </LinearGradient>
+            </Pressable>
+            <Pressable onPress={() => safeGoBack(router)} style={{ marginTop: 12, paddingVertical: 12 }}>
+              <Text style={{ color: '#94A3B8', fontSize: 14, fontWeight: '600' }}>Geri Dön</Text>
+            </Pressable>
+          </View>
+        </View>
+      </AppBackground>
+    );
+  }
+
   return (
     <AppBackground>
       <View style={{ flex: 1 }}>
@@ -796,7 +1251,10 @@ export default function CreateRoomScreen() {
 function SummaryRow({ icon, label, value }: { icon: string; label: string; value: string }) {
   return (
     <View style={w.summaryRow}>
-      <Ionicons name={icon as any} size={14} color="#94A3B8" />
+      <Ionicons
+        name={icon as any} size={14} color="#94A3B8"
+        style={{ textShadowColor: 'rgba(0,0,0,0.55)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4 }}
+      />
       <Text style={w.summaryLabel}>{label}</Text>
       <Text style={w.summaryValue} numberOfLines={1}>{value}</Text>
     </View>
@@ -818,12 +1276,12 @@ const w = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
     borderWidth: 1, borderColor: 'rgba(149,161,174,0.18)',
   },
-  stepCounter: { fontSize: 12, fontWeight: '700', color: '#94A3B8', letterSpacing: 0.5 },
+  stepCounter: { fontSize: 12, fontWeight: '700', color: '#94A3B8', letterSpacing: 0.5, textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
   tierChip: {
     paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8,
     backgroundColor: 'rgba(20,184,166,0.12)', borderWidth: 1, borderColor: 'rgba(20,184,166,0.25)',
   },
-  tierChipText: { fontSize: 11, fontWeight: '800', color: Colors.teal },
+  tierChipText: { fontSize: 11, fontWeight: '800', color: Colors.teal, textShadowColor: 'rgba(0,0,0,0.3)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
 
   // Progress dots — aktif olan tema rengiyle glow
   progressRow: {
@@ -854,6 +1312,8 @@ const w = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
     overflow: 'hidden',
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
+    // ★ Ionicons optik kaymasını telafi — ikon tam merkeze oturur
+    paddingLeft: 2, paddingTop: 1,
     // ★ KOYU yumuşak dağılmış gölge — renkli değil
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 12 },
@@ -870,65 +1330,84 @@ const w = StyleSheet.create({
   heroTitle: {
     fontSize: 26, fontWeight: '800', color: '#F1F5F9',
     textAlign: 'center', letterSpacing: -0.4, lineHeight: 32,
-    // Shadow kaldırıldı — temiz, keskin tipografi
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 6,
   },
   heroSubtitle: {
-    fontSize: 14, color: 'rgba(203,213,225,0.75)', // #CBD5E1 %75 — daha okunur
+    fontSize: 14, color: 'rgba(203,213,225,0.75)',
     textAlign: 'center', marginTop: 10, lineHeight: 21,
     paddingHorizontal: 8,
     fontWeight: '500',
+    textShadowColor: 'rgba(0,0,0,0.4)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
 
-  // ★ Big input — step 1 oda adı (premium underline)
-  bigInput: {
-    fontSize: 26, fontWeight: '700', color: '#F1F5F9',
-    paddingVertical: 16, paddingHorizontal: 8,
-    borderBottomWidth: 2, borderBottomColor: 'rgba(20,184,166,0.4)',
-    textAlign: 'center',
-    letterSpacing: 0.2,
+  // ★ Hero input wrapper — oda adı alanı
+  heroInputWrap: {
+    alignItems: 'center',
   },
+  // ★ Big input — step 1 oda adı (minimal underline, premium)
+  bigInput: {
+    fontSize: 22, fontWeight: '700', color: '#F1F5F9',
+    paddingVertical: 14, paddingHorizontal: 4,
+    textAlign: 'center',
+    letterSpacing: 0.3,
+    width: '100%',
+  } as any,
+  // ★ Gradient underline efekti — teal glow
+  heroInputLine: {
+    width: '80%', height: 2, borderRadius: 1,
+    backgroundColor: 'rgba(20,184,166,0.45)',
+    marginTop: 2,
+    shadowColor: '#14B8A6',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 6,
+    elevation: 2,
+  } as any,
   mediumInput: {
-    fontSize: 15, color: '#F1F5F9',
-    backgroundColor: '#414E5F', borderWidth: 1, borderColor: 'rgba(149,161,174,0.2)',
-    borderRadius: 16, paddingHorizontal: 16, paddingVertical: 14,
+    fontSize: 14, color: '#E2E8F0',
+    backgroundColor: 'rgba(30,41,59,0.5)',
+    borderWidth: 1, borderColor: 'rgba(148,163,184,0.12)',
+    borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14,
     minHeight: 52, textAlignVertical: 'top',
     fontWeight: '500', lineHeight: 20,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2, shadowRadius: 4, elevation: 2,
   },
-  charCount: { fontSize: 10, color: 'rgba(148,163,184,0.7)', textAlign: 'right', marginTop: 6, fontWeight: '500' },
-  sublabel: { fontSize: 11, fontWeight: '800', color: 'rgba(203,213,225,0.85)', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 10 },
-  hint: { fontSize: 12, color: 'rgba(148,163,184,0.75)', marginBottom: 12, lineHeight: 17 },
+  charCount: { fontSize: 10, color: 'rgba(148,163,184,0.5)', textAlign: 'right', marginTop: 6, fontWeight: '500', textShadowColor: 'rgba(0,0,0,0.3)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
+  sublabel: { fontSize: 11, fontWeight: '800', color: 'rgba(203,213,225,0.85)', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 10, textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
+  hint: { fontSize: 12, color: 'rgba(148,163,184,0.75)', marginBottom: 12, lineHeight: 17, textShadowColor: 'rgba(0,0,0,0.3)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
 
   // Kategori grid — koyu yumuşak dağılmış gölge
   categoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'center' },
+  catCardWrap: {
+    width: '26%',
+    alignItems: 'center',
+  },
   catCard: {
-    width: '30%', aspectRatio: 1,
+    width: '100%', aspectRatio: 1,
     backgroundColor: '#414E5F', borderRadius: 18,
     borderWidth: 1.5, borderColor: 'rgba(149,161,174,0.2)',
-    alignItems: 'center', justifyContent: 'center', gap: 8,
-    position: 'relative',
+    alignItems: 'center', justifyContent: 'center',
     shadowColor: '#000', shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.4, shadowRadius: 14, elevation: 6,
   },
-  catIcon: {
-    width: 44, height: 44, borderRadius: 14,
-    alignItems: 'center', justifyContent: 'center',
-    // İkon arka dairesi — koyu hafif dağılmış gölge
-    shadowColor: '#000', shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3, shadowRadius: 6,
-  },
-  catName: { fontSize: 12, fontWeight: '700', color: '#CBD5E1', letterSpacing: 0.2 },
-  catCheck: {
-    position: 'absolute', top: 6, right: 6,
-    width: 20, height: 20, borderRadius: 10,
-    alignItems: 'center', justifyContent: 'center',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.4, shadowRadius: 3, elevation: 4,
+  catName: {
+    fontSize: 12, fontWeight: '700', color: '#CBD5E1', letterSpacing: 0.2,
+    marginTop: 8,
+    textShadowColor: 'rgba(0,0,0,0.6)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+    textAlign: 'center',
   },
   categoryHint: {
     textAlign: 'center', fontSize: 12, color: 'rgba(203,213,225,0.65)',
     marginTop: 18, lineHeight: 18,
     fontWeight: '500',
+    textShadowColor: 'rgba(0,0,0,0.4)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
 
   // Erişim / speaking row — kart hissi derinlik
@@ -936,14 +1415,13 @@ const w = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 14,
     backgroundColor: '#414E5F', borderRadius: 18,
     borderWidth: 1.5, borderColor: 'rgba(149,161,174,0.2)',
-    paddingVertical: 16, paddingHorizontal: 16,
-    marginBottom: 10,
+    paddingVertical: 14, paddingHorizontal: 16,
+    marginBottom: 8, overflow: 'hidden',
     shadowColor: '#000', shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.25, shadowRadius: 6, elevation: 3,
   },
   accessRowActive: {
     borderColor: Colors.teal,
-    backgroundColor: 'rgba(20,184,166,0.12)',
     shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.4, shadowRadius: 14, elevation: 6,
   },
   accessIcon: {
@@ -1052,16 +1530,23 @@ const w = StyleSheet.create({
   },
   chipMiniText: { fontSize: 10, fontWeight: '700', color: '#E2E8F0' },
 
+  // ★ 2026-04-21: Profil arkadaşlar kartı ile aynı diagonal gradient stil.
+  //   backgroundColor kaldırıldı — LinearGradient absoluteFill ile zemin veriyor.
   summaryBlock: {
-    backgroundColor: '#414E5F', borderRadius: 18,
-    borderWidth: 1, borderColor: 'rgba(149,161,174,0.2)',
+    borderRadius: 16, overflow: 'hidden',
+    borderWidth: 1, borderColor: Colors.cardBorder,
     padding: 16, gap: 12,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25, shadowRadius: 8, elevation: 3,
+    ...Shadows.card,
   },
   summaryRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  summaryLabel: { fontSize: 12, color: 'rgba(203,213,225,0.7)', width: 90, fontWeight: '500' },
-  summaryValue: { flex: 1, fontSize: 13, fontWeight: '700', color: '#F1F5F9' },
+  summaryLabel: {
+    fontSize: 12, color: 'rgba(203,213,225,0.75)', width: 90, fontWeight: '500',
+    ...Shadows.text,
+  },
+  summaryValue: {
+    flex: 1, fontSize: 13, fontWeight: '700', color: '#F1F5F9',
+    ...Shadows.text,
+  },
 
   capInfo: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,

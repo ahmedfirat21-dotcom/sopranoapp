@@ -61,11 +61,6 @@ const TIER_COLORS: Record<string, string> = {
   Free: '#64748B',
   Plus: '#A855F7',
   Pro: '#F59E0B',
-  // Legacy DB uyumluluk — eski tier isimleri için renk eşlemesi
-  Bronze: '#A855F7',
-  Silver: '#A855F7',
-  Gold: '#F59E0B',
-  VIP: '#F59E0B',
 };
 
 const CATEGORY_TR: Record<string, string> = {

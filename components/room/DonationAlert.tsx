@@ -21,6 +21,7 @@ const { width: W, height: H } = Dimensions.get('window');
 export interface DonationAlertData {
   senderName: string;
   amount: number;
+  recipientName?: string;
   senderAvatar?: string;
 }
 
@@ -80,7 +81,7 @@ const DonationAlert = forwardRef<DonationAlertRef>((_, ref) => {
         id,
         anim,
         x: Math.random() * (W - 60) + 30,
-        y: Math.random() * 80,
+        y: Math.random() * 40,
         emoji: EMOJIS[Math.floor(Math.random() * EMOJIS.length)],
         delay: Math.random() * 600,
       });
@@ -197,7 +198,7 @@ const DonationAlert = forwardRef<DonationAlertRef>((_, ref) => {
       {particles.map(p => {
         const translateY = p.anim.interpolate({
           inputRange: [0, 1],
-          outputRange: [40, -120 - p.y],
+          outputRange: [20, -80 - p.y],
         });
         const opacity = p.anim.interpolate({
           inputRange: [0, 0.1, 0.6, 1],
@@ -282,13 +283,20 @@ const DonationAlert = forwardRef<DonationAlertRef>((_, ref) => {
             <View style={s.textWrap}>
               <View style={s.nameRow}>
                 <Text style={s.senderName} numberOfLines={1}>{data.senderName}</Text>
-                <Ionicons name="sparkles" size={12} color={amountColor} style={{ marginLeft: 4 }} />
+                {data.recipientName ? (
+                  <>
+                    <Ionicons name="arrow-forward" size={11} color="rgba(255,255,255,0.4)" style={{ marginHorizontal: 4 }} />
+                    <Text style={s.recipientName} numberOfLines={1}>{data.recipientName}</Text>
+                  </>
+                ) : (
+                  <Ionicons name="sparkles" size={12} color={amountColor} style={{ marginLeft: 4 }} />
+                )}
               </View>
               <View style={s.amountRow}>
-                <Text style={s.donationText}>bağış yaptı </Text>
+                <Text style={s.donationText}>{data.recipientName ? '' : 'bağış yaptı '}</Text>
                 <View style={[s.amountPill, { backgroundColor: `${amountColor}20`, borderColor: `${amountColor}40` }]}>
                   <Ionicons name="diamond" size={11} color={amountColor} />
-                  <Text style={[s.amountText, { color: amountColor }]}>{data.amount} SP</Text>
+                  <Text style={[s.amountText, { color: amountColor }]}>{data.amount} SP bağış</Text>
                 </View>
               </View>
             </View>
@@ -329,8 +337,9 @@ const s = StyleSheet.create({
     bottom: 0,
     zIndex: 9998,
     elevation: 9998,
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
     alignItems: 'center',
+    paddingTop: H * 0.45,
   },
   banner: {
     width: W - 32,
@@ -391,7 +400,14 @@ const s = StyleSheet.create({
     fontSize: 15,
     fontWeight: '800',
     color: '#F1F5F9',
-    maxWidth: '75%',
+    maxWidth: '45%',
+    letterSpacing: -0.3,
+  },
+  recipientName: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#14B8A6',
+    maxWidth: '40%',
     letterSpacing: -0.3,
   },
   amountRow: {

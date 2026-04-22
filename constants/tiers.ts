@@ -6,7 +6,7 @@
  *   Altyapı Pro (maksimum) kapasiteye göre tasarlanır,
  *   alt paketler bundan kısıtlanarak (filtrelenerek) oluşturulur.
  *
- * 3 Tier: Free / Plus / Pro
+ * 4 Tier: Free / Plus / Pro / GodMaster
  * SP tek ekonomi birimi.
  */
 import type { SubscriptionTier, StageLayout, RoomMusicConfig } from '../types';
@@ -14,7 +14,7 @@ import type { SubscriptionTier, StageLayout, RoomMusicConfig } from '../types';
 export type TierName = SubscriptionTier;
 
 // ════════════════════════════════════════════════════════════
-// ABONELİK TIER TANIMLARI (3 Tier: Free / Plus / Pro)
+// ABONELİK TIER TANIMLARI (4 Tier: Free / Plus / Pro / GodMaster)
 // ════════════════════════════════════════════════════════════
 
 export interface TierDefinition {
@@ -66,10 +66,44 @@ export const TIER_DEFINITIONS: Record<SubscriptionTier, TierDefinition> = {
     yearlyPrice: 899.99,
     tagline: 'Sınırsız güç, maksimum prestij',
   },
+  GodMaster: {
+    name: 'GodMaster',
+    label: 'GodMaster',
+    emoji: '⚡',
+    icon: 'flash',
+    color: '#EF4444',
+    gradient: ['#EF4444', '#B91C1C'],
+    monthlyPrice: 0,
+    yearlyPrice: 0,
+    tagline: 'Sistemin mutlak hâkimi — sınırsız yetki',
+  },
 } as const;
 
 /** Sıralı tier listesi (düşükten yükseğe) */
-export const TIER_ORDER: SubscriptionTier[] = ['Free', 'Plus', 'Pro'];
+export const TIER_ORDER: SubscriptionTier[] = ['Free', 'Plus', 'Pro', 'GodMaster'];
+
+/** ★ GodMaster kontrolü — tek helper */
+export function isGodMaster(tier: SubscriptionTier | string): boolean {
+  return tier === 'GodMaster';
+}
+
+/**
+ * ★ 2026-04-21: Profile'dan efektif tier hesapla — tüm keşfet/oda/SP kontrollerinde
+ *   aynı mantık kullanılsın diye merkezi util.
+ *
+ *   Öncelik: subscription_tier === 'GodMaster' → GodMaster
+ *            is_admin === true                → Pro (admin = yüksek yetki)
+ *            subscription_tier set            → kendisi
+ *            default                          → Free
+ */
+export function getEffectiveTier(profile: { subscription_tier?: string | null; is_admin?: boolean | null } | null | undefined): SubscriptionTier {
+  if (!profile) return 'Free';
+  if (profile.subscription_tier === 'GodMaster') return 'GodMaster';
+  if (profile.is_admin) return 'Pro';
+  const t = profile.subscription_tier;
+  if (t === 'Plus' || t === 'Pro' || t === 'Free') return t;
+  return 'Free';
+}
 
 /** Tier karşılaştırma: userTier >= requiredTier mi? */
 export function isTierAtLeast(userTier: SubscriptionTier, requiredTier: SubscriptionTier): boolean {
@@ -82,7 +116,7 @@ export function getTierLevel(tier: SubscriptionTier): number {
 }
 
 // ════════════════════════════════════════════════════════════
-// ODA LİMİTLERİ (3-Tier Matrisi)
+// ODA LİMİTLERİ (4-Tier Matrisi)
 // ════════════════════════════════════════════════════════════
 
 export interface RoomLimits {
@@ -138,12 +172,15 @@ export const ROOM_TIER_LIMITS: Record<SubscriptionTier, RoomLimits> = {
     maxListeners: 10,
     maxSpectators: 50,
     maxCameras: 2,
-    maxModerators: 0,
-    durationHours: 2,
-    dailyRooms: 3,
+    // ★ 2026-04-22: Clubhouse/X Spaces referansı — Free tier rekabetçi kılındı.
+    //   maxModerators 0→1 (1 asistan), durationHours 2→4, dailyRooms 3→10,
+    //   allowedTypes'a 'closed' eklendi (davetli hala Plus+ kilit).
+    maxModerators: 1,
+    durationHours: 4,
+    dailyRooms: 10,
     persistent: false,
     maxPersistentRooms: 0,
-    allowedTypes: ['open'] as readonly string[],
+    allowedTypes: ['open', 'closed'] as readonly string[],
     audioSampleRate: 16000,
     audioChannels: 1,
     videoMaxRes: 480,
@@ -202,6 +239,30 @@ export const ROOM_TIER_LIMITS: Record<SubscriptionTier, RoomLimits> = {
     canUseFollowersOnly: true,
     ownerLeavePolicy: 'keep_alive',
   },
+  // ★ GodMaster — Mutlak güç, sınırsız her şey
+  GodMaster: {
+    maxSpeakers: 999,
+    maxListeners: 999,
+    maxSpectators: 999,
+    maxCameras: 999,
+    maxModerators: 999,
+    durationHours: 0,           // ★ 7/24 — süresiz
+    dailyRooms: 999,
+    persistent: true,
+    maxPersistentRooms: 999,
+    allowedTypes: ['open', 'closed', 'invite'] as readonly string[],
+    audioSampleRate: 48000,
+    audioChannels: 2,
+    videoMaxRes: 1080,
+    canCustomizeImage: true,
+    canCustomizeTheme: true,
+    canUseAvatarFrame: true,
+    allowedStageLayouts: ['grid', 'spotlight', 'theater'] as readonly StageLayout[],
+    canUseRoomMusic: true,
+    canUseFilters: true,
+    canUseFollowersOnly: true,
+    ownerLeavePolicy: 'keep_alive',
+  },
 } as const;
 
 export const getRoomLimits = (tier: SubscriptionTier = 'Free'): RoomLimits =>
@@ -222,9 +283,10 @@ export interface BroadcastLimits {
 }
 
 export const BROADCAST_TIER_LIMITS: Record<SubscriptionTier, BroadcastLimits> = {
-  Free:   { canBroadcast: false, durationMinutes: 0,   dailyBroadcasts: 0,   camera: false, screenShare: false, maxCoHosts: 0, canReceiveGifts: false },
-  Plus:   { canBroadcast: true,  durationMinutes: 60,  dailyBroadcasts: 3,   camera: true,  screenShare: false, maxCoHosts: 1, canReceiveGifts: true },
-  Pro:    { canBroadcast: true,  durationMinutes: 0,   dailyBroadcasts: 999, camera: true,  screenShare: true,  maxCoHosts: 4, canReceiveGifts: true },
+  Free:      { canBroadcast: false, durationMinutes: 0,   dailyBroadcasts: 0,   camera: false, screenShare: false, maxCoHosts: 0, canReceiveGifts: false },
+  Plus:      { canBroadcast: true,  durationMinutes: 60,  dailyBroadcasts: 3,   camera: true,  screenShare: false, maxCoHosts: 1, canReceiveGifts: true },
+  Pro:       { canBroadcast: true,  durationMinutes: 0,   dailyBroadcasts: 999, camera: true,  screenShare: true,  maxCoHosts: 4, canReceiveGifts: true },
+  GodMaster: { canBroadcast: true,  durationMinutes: 0,   dailyBroadcasts: 999, camera: true,  screenShare: true,  maxCoHosts: 999, canReceiveGifts: true },
 } as const;
 
 export const getBroadcastLimits = (tier: SubscriptionTier = 'Free'): BroadcastLimits =>
@@ -269,6 +331,7 @@ export const SUBSCRIPTION_SP_BONUS: Record<SubscriptionTier, number> = {
   Free: 0,
   Plus: 300,
   Pro: 800,
+  GodMaster: 999999,
 };
 
 /**
@@ -303,9 +366,10 @@ export const DAILY_BASE_REWARDS = [2, 4, 6, 8, 10, 15, 25];
 
 /** Tier bazlı check-in çarpanı */
 export const CHECKIN_MULTIPLIER: Record<SubscriptionTier, number> = {
-  Free:   1,
-  Plus:   1.25,
-  Pro:    2,
+  Free:      1,
+  Plus:      1.25,
+  Pro:       2,
+  GodMaster: 10,
 };
 
 /** Check-in ödülünü hesapla
@@ -325,15 +389,17 @@ export function getCheckinReward(streak: number, tier: SubscriptionTier): number
 // ════════════════════════════════════════════════════════════
 
 export const ENTRY_EFFECT_ACCESS: Record<SubscriptionTier, 'none' | 'basic' | 'plus' | 'pro'> = {
-  Free:   'none',
-  Plus:   'plus',
-  Pro:    'pro',
+  Free:      'none',
+  Plus:      'plus',
+  Pro:       'pro',
+  GodMaster: 'pro',
 };
 
 export const CHAT_COLOR_LIMITS: Record<SubscriptionTier, number> = {
-  Free:   0,   // Sadece beyaz
-  Plus:   5,
-  Pro:    999, // Özel renk dahil tümü
+  Free:      0,
+  Plus:      5,
+  Pro:       999,
+  GodMaster: 999,
 };
 
 // ════════════════════════════════════════════════════════════
@@ -379,9 +445,10 @@ export function getTierBadgeInfo(tier: SubscriptionTier | string) {
 
 /** Arama/keşfet önceliği */
 export const SEARCH_PRIORITY: Record<SubscriptionTier, number> = {
-  Free:   0,
-  Plus:   200,
-  Pro:    600,
+  Free:      0,
+  Plus:      200,
+  Pro:       600,
+  GodMaster: 9999,
 };
 
 /**

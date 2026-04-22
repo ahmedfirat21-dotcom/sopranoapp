@@ -7,17 +7,18 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, Pressable, FlatList,
-  ActivityIndicator, Dimensions, Modal,
+  ActivityIndicator, Dimensions, Modal, Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
+import { useRouter, usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../constants/supabase';
 import { Colors } from '../constants/theme';
 import { RoomAccessService } from '../services/roomAccess';
 import StatusAvatar from './StatusAvatar';
 import { showToast } from './Toast';
+import { useSwipeToDismiss } from '../hooks/useSwipeToDismiss';
 
 const { width: W, height: H } = Dimensions.get('window');
 
@@ -32,27 +33,54 @@ type NotifItem = {
   sender?: { display_name: string; avatar_url: string };
 };
 
+export type GiftModalPayload = {
+  senderId: string;
+  senderName: string;
+  senderAvatar?: string;
+  amount: number;
+};
+
 interface Props {
   visible: boolean;
   onClose: () => void;
   userId?: string;
   anchorTop?: number;
+  /** Zil ikonu sağdan kaç px uzakta (ok konumu için). Default 30. */
+  anchorRight?: number;
+  /** Drawer'ın kendisi sağdan kaç px. Default 8 (screen right edge'ten offset). */
+  drawerRight?: number;
+  /** Gift bildirimi tıklanınca SPReceivedModal'ı yeniden göster (global state _layout'ta) */
+  onShowGiftModal?: (payload: GiftModalPayload) => void;
 }
 
 // Bildirim tipi → simge eşleşmesi
-// ★ Zil drawer'ında gösterilecek bildirim tipleri (oda + arama + hediye)
-const BELL_NOTIF_TYPES = ['room_live', 'room_invite', 'room_invite_accepted', 'room_invite_rejected', 'missed_call', 'incoming_call', 'gift', 'event_reminder'];
+// ★ Zil drawer'ında gösterilecek bildirim tipleri (oda + arama + hediye + arkadaşlık yanıtları)
+// ★ 2026-04-21: follow_pending context-aware — oda içinde zil gösterir, oda dışında arkadaş simgesi gösterir.
+const BELL_NOTIF_TYPES_BASE = [
+  'room_live', 'room_invite', 'room_invite_accepted', 'room_invite_rejected',
+  'room_access_request',
+  'missed_call', 'incoming_call',
+  'gift', 'thank_you',
+  'event_reminder',
+  'follow_accepted', 'follow_rejected',
+];
+const BELL_NOTIF_TYPES_IN_ROOM = [...BELL_NOTIF_TYPES_BASE, 'follow_pending'];
 
 function getNotifIcon(type: string): { name: string; color: string } {
   switch (type) {
     case 'gift': return { name: 'gift', color: '#F59E0B' };
+    case 'thank_you': return { name: 'heart', color: '#EC4899' };
     case 'room_live': return { name: 'mic', color: '#EF4444' };
     case 'room_invite': return { name: 'mail-open', color: '#14B8A6' };
     case 'room_invite_accepted': return { name: 'checkmark-circle', color: '#22C55E' };
     case 'room_invite_rejected': return { name: 'close-circle', color: '#EF4444' };
+    case 'room_access_request': return { name: 'enter-outline', color: '#14B8A6' };
     case 'missed_call': return { name: 'call', color: '#EF4444' };
     case 'incoming_call': return { name: 'videocam', color: '#60A5FA' };
     case 'event_reminder': return { name: 'calendar', color: '#A78BFA' };
+    case 'follow_pending': return { name: 'person-add', color: '#F59E0B' };
+    case 'follow_accepted': return { name: 'person-add', color: '#22C55E' };
+    case 'follow_rejected': return { name: 'person-remove', color: '#94A3B8' };
     default: return { name: 'notifications', color: '#94A3B8' };
   }
 }
@@ -60,13 +88,18 @@ function getNotifIcon(type: string): { name: string; color: string } {
 function getDefaultBody(type: string): string {
   switch (type) {
     case 'gift': return 'sana hediye gönderdi';
+    case 'thank_you': return 'sana teşekkür etti';
     case 'room_live': return 'odası canlıya geçti';
     case 'room_invite': return 'seni odaya davet etti';
     case 'room_invite_accepted': return 'oda davetini kabul etti 🎉';
     case 'room_invite_rejected': return 'oda davetini reddetti';
+    case 'room_access_request': return 'odaya katılmak istiyor';
     case 'missed_call': return 'Cevapsız sesli arama';
     case 'incoming_call': return 'Cevapsız görüntülü arama';
     case 'event_reminder': return 'Etkinlik hatırlatması';
+    case 'follow_pending': return 'sana arkadaşlık isteği gönderdi';
+    case 'follow_accepted': return 'arkadaşlık isteğini kabul etti 🎉';
+    case 'follow_rejected': return 'arkadaşlık isteğini reddetti';
     default: return '';
   }
 }
@@ -81,12 +114,16 @@ function timeAgo(date: string): string {
   return `${Math.floor(hours / 24)}g`;
 }
 
-export default function NotificationDrawer({ visible, onClose, userId, anchorTop }: Props) {
+export default function NotificationDrawer({ visible, onClose, userId, anchorTop, anchorRight, drawerRight, onShowGiftModal }: Props) {
   const insets = useSafeAreaInsets();
   // Header: paddingTop(insets.top+4) + logo(~32) + padding = bell merkezi ≈ insets.top+22
   // Bell buton alt kenarı ≈ insets.top + 40. Drawer okuyla arasına 6px boşluk.
   const resolvedAnchor = anchorTop ?? (insets.top + 46);
   const router = useRouter();
+  const pathname = usePathname();
+  // ★ 2026-04-21: Oda içindeyken arkadaşlık istekleri zile düşer; oda dışında arkadaş simgesi gösterir.
+  const inRoom = pathname?.startsWith('/room') ?? false;
+  const BELL_NOTIF_TYPES = inRoom ? BELL_NOTIF_TYPES_IN_ROOM : BELL_NOTIF_TYPES_BASE;
   const [items, setItems] = useState<NotifItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [showAll, setShowAll] = useState(false); // ★ Tümünü Gör — modal içinde genişlet
@@ -106,7 +143,14 @@ export default function NotificationDrawer({ visible, onClose, userId, anchorTop
         .eq('is_read', false)
         .in('type', BELL_NOTIF_TYPES)
         .lte('created_at', openedAt)
-        .then(() => {});
+        .then(() => {
+          // ★ 2026-04-20 FIX: Badge anında 0'a düşsün. Realtime UPDATE listener
+          //   toplu update'te gecikmeli gelir; hemen bildirimi ilet ki UI yansısın.
+          try {
+            const ev = (global as any).__sopranoBadgeRefresh;
+            if (typeof ev === 'function') ev();
+          } catch {}
+        });
     }
   }, [visible, userId]);
 
@@ -214,10 +258,30 @@ export default function NotificationDrawer({ visible, onClose, userId, anchorTop
       router.push(`/room/${item.reference_id}` as any);
     } else if ((item.type === 'room_invite_accepted' || item.type === 'room_invite_rejected') && item.reference_id) {
       router.push(`/room/${item.reference_id}` as any);
+    } else if (item.type === 'room_access_request' && item.reference_id) {
+      // Host'u odasına yönlendir, moderasyon panelinden istekleri görsün
+      router.push(`/room/${item.reference_id}` as any);
     } else if (item.type === 'missed_call' && item.sender_id) {
       router.push(`/user/${item.sender_id}` as any);
-    } else if (item.type === 'gift') {
-      router.push(`/wallet` as any);
+    } else if (item.type === 'gift' && item.sender_id && onShowGiftModal) {
+      // ★ SP hediye: bildirim zilinden tıklayınca SPReceivedModal'ı yeniden aç
+      //   Miktar body'den parse edilir ("XX SP gönderdi" pattern'i — _layout RT ile aynı)
+      const amountMatch = /(\d+)\s*SP/.exec(item.body || '');
+      const amount = amountMatch ? parseInt(amountMatch[1], 10) : 0;
+      if (amount > 0) {
+        onShowGiftModal({
+          senderId: item.sender_id,
+          senderName: item.sender?.display_name || 'Birisi',
+          senderAvatar: item.sender?.avatar_url,
+          amount,
+        });
+      }
+    } else if (item.type === 'thank_you' && item.sender_id) {
+      // ★ Teşekkür: modala gerek yok — zilde görünmesi yeterli. Tıklayınca
+      //   teşekkür edenin profiline git (kim olduğunu görmek için).
+      router.push(`/user/${item.sender_id}` as any);
+    } else if (item.type === 'follow_accepted' || item.type === 'follow_rejected' || item.type === 'follow_pending') {
+      if (item.sender_id) router.push(`/user/${item.sender_id}` as any);
     }
   };
 
@@ -296,6 +360,12 @@ export default function NotificationDrawer({ visible, onClose, userId, anchorTop
 
   const unreadCount = items.filter(n => !n.is_read).length;
 
+  const { translateValue, panHandlers } = useSwipeToDismiss({
+    direction: 'up',
+    threshold: 60,
+    onDismiss: onClose,
+  });
+
   if (!visible) return null;
 
   return (
@@ -303,9 +373,9 @@ export default function NotificationDrawer({ visible, onClose, userId, anchorTop
       <Pressable style={s.backdrop} onPress={onClose} />
 
       {/* ★ Arrow — rotated square, çerçevesi drawer border'ının doğal uzantısı */}
-      <View style={[s.arrow, { top: resolvedAnchor - 7 }]} pointerEvents="none" />
+      <View style={[s.arrow, { top: resolvedAnchor - 7, right: anchorRight ?? 30 }]} pointerEvents="none" />
 
-      <View style={[s.dropdown, { top: resolvedAnchor }]}>
+      <Animated.View style={[s.dropdown, { top: resolvedAnchor, right: drawerRight ?? 8, transform: [{ translateY: translateValue }] }]}>
         {/* ★ Odalarım paleti: diagonal gradient (parlak üst-sol → koyu alt-sağ) */}
         <LinearGradient
           colors={['#4a5668', '#37414f', '#232a35']}
@@ -314,12 +384,13 @@ export default function NotificationDrawer({ visible, onClose, userId, anchorTop
           pointerEvents="none"
         />
 
-        {/* Başlık — uzun basınca tümünü okundu işaretle */}
+        {/* Başlık — uzun basınca tümünü okundu işaretle; panHandlers burada swipe-up */}
         <Pressable
           style={s.header}
           onLongPress={handleMarkAllRead}
           delayLongPress={500}
           accessibilityHint="Uzun bas: tümünü okundu işaretle"
+          {...panHandlers}
         >
           <Ionicons name="notifications" size={18} color="#14B8A6" style={{
             textShadowColor: 'rgba(0,0,0,0.6)',
@@ -439,7 +510,7 @@ export default function NotificationDrawer({ visible, onClose, userId, anchorTop
             <Ionicons name="chevron-up" size={14} color="#14B8A6" />
           </Pressable>
         )}
-      </View>
+      </Animated.View>
     </Modal>
   );
 }
@@ -450,11 +521,12 @@ const s = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   dropdown: {
+    // ★ 2026-04-20: Kompaktlaştı — W*0.86 → W*0.72, maxWidth 360 → 300
     position: 'absolute',
-    right: 10,
-    width: W * 0.86,
-    maxWidth: 360,
-    borderRadius: 16,
+    right: 8,
+    width: W * 0.72,
+    maxWidth: 300,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: Colors.cardBorder,
     paddingBottom: 4,
@@ -465,13 +537,12 @@ const s = StyleSheet.create({
     shadowOpacity: 0.5,
     shadowRadius: 16,
   },
-  // ★ Rotated square — üst ve sol kenarlar Colors.cardBorder ile, drawer border'ı
-  // doğal şekilde okun iki kenarına uzar. Alt yarısı drawer arkasına gizlenir.
   arrow: {
+    // ★ 2026-04-20: Zil ikon tam üstünde (right:60 → right:30, bell btn ~right:40 merkezinde)
     position: 'absolute',
-    right: 60,
-    width: 14,
-    height: 14,
+    right: 30,
+    width: 12,
+    height: 12,
     backgroundColor: '#404b5c',
     borderTopWidth: 1,
     borderLeftWidth: 1,
@@ -479,22 +550,22 @@ const s = StyleSheet.create({
     transform: [{ rotate: '45deg' }],
   },
   header: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    paddingHorizontal: 14, paddingTop: 14, paddingBottom: 10,
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: 12, paddingTop: 10, paddingBottom: 8,
     borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)',
   },
   title: {
-    fontSize: 16, fontWeight: '800', color: '#F1F5F9', flex: 1,
+    fontSize: 14, fontWeight: '800', color: '#F1F5F9', flex: 1,
     textShadowColor: 'rgba(0,0,0,0.6)',
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 4,
   },
   badgePill: {
     backgroundColor: '#EF4444',
-    paddingHorizontal: 8, paddingVertical: 2,
-    borderRadius: 10, minWidth: 22, alignItems: 'center',
+    paddingHorizontal: 6, paddingVertical: 1,
+    borderRadius: 9, minWidth: 18, alignItems: 'center',
   },
-  badgeText: { fontSize: 11, fontWeight: '800', color: '#FFF' },
+  badgeText: { fontSize: 10, fontWeight: '800', color: '#FFF' },
   emptyState: {
     alignItems: 'center', paddingVertical: 30, gap: 8,
   },
@@ -505,8 +576,8 @@ const s = StyleSheet.create({
   },
   notifItem: {
     flexDirection: 'row', alignItems: 'center',
-    paddingVertical: 10, paddingHorizontal: 14,
-    gap: 10,
+    paddingVertical: 8, paddingHorizontal: 12,
+    gap: 8,
   },
   notifUnread: {
     backgroundColor: 'rgba(20,184,166,0.06)',
@@ -514,16 +585,16 @@ const s = StyleSheet.create({
   avatarWrap: {
     position: 'relative',
   },
-  notifAvatar: { width: 38, height: 38, borderRadius: 19 },
+  notifAvatar: { width: 32, height: 32, borderRadius: 16 },
   typeIconBadge: {
     position: 'absolute', bottom: -2, right: -2,
-    width: 18, height: 18, borderRadius: 9,
+    width: 15, height: 15, borderRadius: 7.5,
     alignItems: 'center', justifyContent: 'center',
-    borderWidth: 2, borderColor: '#2f404f',
+    borderWidth: 1.5, borderColor: '#2f404f',
   },
-  notifText: { fontSize: 13, color: '#CBD5E1', lineHeight: 17 },
+  notifText: { fontSize: 12, color: '#CBD5E1', lineHeight: 16 },
   notifSender: { fontWeight: '700', color: '#F1F5F9' },
-  notifTime: { fontSize: 10, color: 'rgba(255,255,255,0.25)', marginTop: 2 },
+  notifTime: { fontSize: 9, color: 'rgba(255,255,255,0.25)', marginTop: 1 },
   unreadDot: {
     width: 8, height: 8, borderRadius: 4,
     backgroundColor: '#14B8A6',

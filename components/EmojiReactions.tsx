@@ -5,12 +5,15 @@
  */
 import React, { useState, useCallback, useImperativeHandle, forwardRef, useEffect, useRef } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, Animated, Easing, Dimensions,
+  View, Text, StyleSheet, TouchableOpacity, Animated, Easing, Dimensions, useWindowDimensions,
   ScrollView, TextInput, Image, FlatList, ActivityIndicator,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../constants/supabase';
 
+// ★ Module-level snapshot — picker/emoji keyboard için statik değerler yeterli.
+// FloatingReactionsView içinde useWindowDimensions + useSafeAreaInsets ile runtime alınır.
 const { height: H, width: W } = Dimensions.get('window');
 
 // ═══════════════════════════════════════════════════
@@ -233,6 +236,12 @@ export interface FloatingReactionsRef {
 
 export const FloatingReactionsView = forwardRef<FloatingReactionsRef, {}>((_props, ref) => {
   const [emojis, setEmojis] = useState<FloatingEmoji[]>([]);
+  // ★ 2026-04-22: Runtime boyut + safe-area — gesture nav bar varken bottom: 100
+  //   yetmiyor, control bar üstüne floating emoji'ler control bar'ın ÜSTÜNE uçsun.
+  const { width: winW, height: winH } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const floatingBottom = Math.max(insets.bottom, 14) + 80; // ~RoomControlBar yüksekliği
+  const floatingHeight = winH * 0.45;
   // ★ D1: Unmount sırasında dangling animasyon setState yakalanmasın.
   const mountedRef = useRef(true);
   const activeAnimsRef = useRef<Animated.CompositeAnimation[]>([]);
@@ -257,7 +266,7 @@ export const FloatingReactionsView = forwardRef<FloatingReactionsRef, {}>((_prop
     spawnTimesRef.current.push(now);
     const id = ++emojiCounter;
     const anim = new Animated.Value(0);
-    const startX = W * 0.3 + Math.random() * W * 0.4;
+    const startX = winW * 0.3 + Math.random() * winW * 0.4;
     const drift = -30 + Math.random() * 60;
 
     setEmojis(prev => [...prev.slice(-8), { id, emoji, startX, anim, drift }]);
@@ -280,7 +289,7 @@ export const FloatingReactionsView = forwardRef<FloatingReactionsRef, {}>((_prop
   useImperativeHandle(ref, () => ({ spawn }), [spawn]);
 
   return (
-    <View style={sty.floatingContainer} pointerEvents="none">
+    <View style={[sty.floatingContainer, { bottom: floatingBottom, height: floatingHeight }]} pointerEvents="none">
       {emojis.map(e => (
         <Animated.Text
           key={e.id}
@@ -290,7 +299,7 @@ export const FloatingReactionsView = forwardRef<FloatingReactionsRef, {}>((_prop
               left: e.startX,
               opacity: e.anim.interpolate({ inputRange: [0, 0.08, 0.65, 1], outputRange: [0, 1, 1, 0] }),
               transform: [
-                { translateY: e.anim.interpolate({ inputRange: [0, 1], outputRange: [0, -H * 0.45] }) },
+                { translateY: e.anim.interpolate({ inputRange: [0, 1], outputRange: [0, -floatingHeight] }) },
                 { translateX: e.anim.interpolate({ inputRange: [0, 1], outputRange: [0, e.drift] }) },
                 { scale: e.anim.interpolate({ inputRange: [0, 0.15, 0.4, 1], outputRange: [0.4, 1.2, 1, 0.5] }) },
               ],
@@ -371,8 +380,9 @@ const sty = StyleSheet.create({
   gifImage: { width: '100%', height: '100%' },
   // Floating
   floatingContainer: {
-    position: 'absolute', bottom: 100, left: 0, right: 0,
-    height: H * 0.45, zIndex: 999, elevation: 999,
+    // ★ 2026-04-22: bottom & height artık inline (FloatingReactionsView içinde hesaplanıyor).
+    position: 'absolute', left: 0, right: 0,
+    zIndex: 999, elevation: 999,
   },
   floatingEmoji: { position: 'absolute', bottom: 0, fontSize: 28 },
 });

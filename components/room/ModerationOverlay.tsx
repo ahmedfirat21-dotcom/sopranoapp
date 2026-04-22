@@ -7,6 +7,7 @@
 import React, { useEffect, useRef, useImperativeHandle, forwardRef, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, Animated, Easing, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { showToast } from '../Toast';
 
 const { width: W, height: H } = Dimensions.get('window');
 
@@ -145,6 +146,26 @@ const PENALTY_MAP: Record<PenaltyType, PenaltyConfig> = {
   },
 };
 
+// ★ 2026-04-20: Tüm penalty'ler artık kompakt Toast ile gösterilir. Fullscreen
+//   overlay kaldırıldı (kullanıcı isteği: "modal değil success olarak görsün, şiddete
+//   göre farklı"). Kick/ban/permban Toast'ta şiddet tonu ile ayırt edilir.
+const FULLSCREEN_TYPES: PenaltyType[] = []; // boş bırakıldı — artık hiçbiri fullscreen değil
+const TOAST_CONFIG: Record<string, { emoji: string; toastType: 'success' | 'warning' | 'info' | 'error' }> = {
+  mute: { emoji: '🔇', toastType: 'warning' },
+  unmute: { emoji: '🔊', toastType: 'success' },
+  chat_mute: { emoji: '💬', toastType: 'warning' },
+  chat_unmute: { emoji: '💬', toastType: 'success' },
+  demote: { emoji: '⬇️', toastType: 'info' },
+  promote: { emoji: '🎤', toastType: 'success' },
+  make_moderator: { emoji: '🛡️', toastType: 'success' },
+  remove_moderator: { emoji: '🛡️', toastType: 'info' },
+  mute_all: { emoji: '🔇', toastType: 'warning' },
+  // Ban ailesi — şiddete göre farklılaşan görünüm
+  kick: { emoji: '⛔', toastType: 'warning' },       // en hafif — geri gelebilir
+  ban: { emoji: '🚫', toastType: 'error' },          // orta — süre sınırlı, error kırmızı
+  permban: { emoji: '☠️', toastType: 'error' },     // en ağır — kalıcı, ölüm kafası
+};
+
 const ModerationOverlay = forwardRef<ModerationOverlayRef>((_, ref) => {
   const [visible, setVisible] = useState(false);
   const [penalty, setPenalty] = useState<PenaltyPayload | null>(null);
@@ -169,6 +190,28 @@ const ModerationOverlay = forwardRef<ModerationOverlayRef>((_, ref) => {
 
   useImperativeHandle(ref, () => ({
     show: (payload: PenaltyPayload) => {
+      // ★ 2026-04-20: Non-destructive penaltyler artık kompakt Toast olarak çıkar.
+      //   Full-screen overlay sadece kick/ban/permban için — yıkıcı, geri dönüşü yok.
+      if (!FULLSCREEN_TYPES.includes(payload.type)) {
+        const config = PENALTY_MAP[payload.type];
+        const toastCfg = TOAST_CONFIG[payload.type];
+        if (config && toastCfg) {
+          // ★ 2026-04-20: Ban/kick şiddetine göre toast süresi — permban en uzun.
+          const severityDuration: Record<string, number> = {
+            kick: 3500,
+            ban: 4500,
+            permban: 6000,
+          };
+          showToast({
+            title: `${toastCfg.emoji} ${config.title}`,
+            message: payload.reason || payload.duration || '',
+            type: toastCfg.toastType,
+            duration: severityDuration[payload.type] || config.autoDismissMs || 2500,
+          });
+        }
+        return;
+      }
+      // Yıkıcı: full-screen overlay
       if (dismissTimer.current) clearTimeout(dismissTimer.current);
       setPenalty(payload);
       setVisible(true);

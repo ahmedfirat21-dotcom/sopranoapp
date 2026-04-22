@@ -121,12 +121,12 @@ export const MessageService = {
     }
 
     // ★ Gizlenmiş sohbetleri filtrele — deleteConversation ile gizlenenler
+    // ★ 2026-04-21: Auto-unhide kaldırıldı. Silinen sohbet yeni mesaj gelse bile gizli kalır.
+    //   Kullanıcı chat ekranına girdiğinde hidden entry temizlenir (explicit restore).
+    //   Hem DM inbox (/messages tab) hem oda içi DM panel aynı servisi kullandığı için
+    //   bu değişiklik ikisinde de senkron çalışır.
     const hiddenMap = await this.getHiddenConversations(userId);
-    const filteredInbox = inbox.filter(item => {
-      const hiddenAt = hiddenMap[item.partner_id];
-      if (!hiddenAt) return true;
-      return new Date(item.last_message_time).getTime() > new Date(hiddenAt).getTime();
-    });
+    const filteredInbox = inbox.filter(item => !hiddenMap[item.partner_id]);
 
     // ★ Sıralama: pinli olanlar ÜSTTE, sonra zaman bazlı (en yeni üste)
     filteredInbox.sort((a, b) => {
@@ -136,16 +136,22 @@ export const MessageService = {
     return filteredInbox;
   },
 
-  /** ★ Sohbeti sabitle / sabitlemeyi kaldır (toggle) — v33 */
-  async togglePin(partnerId: string): Promise<boolean> {
-    const { data, error } = await supabase.rpc('toggle_conversation_pin', { p_partner_id: partnerId });
+  /** ★ Sohbeti sabitle / sabitlemeyi kaldır (toggle) — v33 + v48 Firebase JWT fallback */
+  async togglePin(partnerId: string, executorId?: string): Promise<boolean> {
+    const { data, error } = await supabase.rpc('toggle_conversation_pin', {
+      p_partner_id: partnerId,
+      p_executor_id: executorId || null,
+    });
     if (error) throw error;
     return !!data;
   },
 
-  /** ★ Sohbeti arşivle / arşivden çıkar (toggle) — v33 */
-  async toggleArchive(partnerId: string): Promise<boolean> {
-    const { data, error } = await supabase.rpc('toggle_conversation_archive', { p_partner_id: partnerId });
+  /** ★ Sohbeti arşivle / arşivden çıkar (toggle) — v33 + v48 Firebase JWT fallback */
+  async toggleArchive(partnerId: string, executorId?: string): Promise<boolean> {
+    const { data, error } = await supabase.rpc('toggle_conversation_archive', {
+      p_partner_id: partnerId,
+      p_executor_id: executorId || null,
+    });
     if (error) throw error;
     return !!data;
   },
@@ -208,15 +214,61 @@ export const MessageService = {
       throw new Error('Bu kullanıcıyla mesajlaşamazsınız.');
     }
 
-    // ★ A3 FIX: Arkadaşlık kontrolü — sadece accepted arkadaşlar mesajlaşabilir
-    const { data: friendship } = await supabase
+    // ★ A3 FIX: Arkadaşlık kontrolü — MUTUAL follow accepted olanlar direkt mesajlaşır.
+    // ★ 2026-04-22: Instagram-style request flow. Mutual değilse (tek yön veya hiç):
+    //   - Mevcut request yoksa: yeni message_request (pending) + 1 mesaj atılabilir
+    //   - Request pending: aynı gönderen ekstra mesaj atamaz (onay bekliyor)
+    //   - Request accepted: normal mesajlaşma serbest
+    //   - Request rejected: mesaj engellenir
+    const { data: friendshipRows } = await supabase
       .from('friendships')
-      .select('status')
-      .or(`and(user_id.eq.${senderId},friend_id.eq.${receiverId}),and(user_id.eq.${receiverId},friend_id.eq.${senderId})`)
+      .select('user_id, friend_id')
       .eq('status', 'accepted')
-      .maybeSingle();
-    if (!friendship) {
-      throw new Error('Mesaj göndermek için önce arkadaşlık isteği göndermelisiniz.');
+      .or(`and(user_id.eq.${senderId},friend_id.eq.${receiverId}),and(user_id.eq.${receiverId},friend_id.eq.${senderId})`);
+    const hasOutgoing = (friendshipRows || []).some((f: any) => f.user_id === senderId && f.friend_id === receiverId);
+    const hasIncoming = (friendshipRows || []).some((f: any) => f.user_id === receiverId && f.friend_id === senderId);
+    const isFriend = hasOutgoing && hasIncoming; // mutual follow accepted
+
+    let isFirstRequestMessage = false;
+    if (!isFriend) {
+      const { data: req } = await supabase
+        .from('message_requests')
+        .select('status')
+        .or(`and(sender_id.eq.${senderId},receiver_id.eq.${receiverId}),and(sender_id.eq.${receiverId},receiver_id.eq.${senderId})`)
+        .maybeSingle();
+
+      if (req?.status === 'rejected') {
+        throw new Error('Bu kullanıcıya mesaj gönderemezsiniz.');
+      }
+
+      if (!req) {
+        // İlk mesaj → request oluştur, bu mesaj geçebilir
+        const { error: reqErr } = await supabase
+          .from('message_requests')
+          .insert({ sender_id: senderId, receiver_id: receiverId, status: 'pending' });
+        if (reqErr && reqErr.code !== '23505') throw reqErr; // unique conflict ignore
+        isFirstRequestMessage = true;
+      } else if (req.status === 'pending') {
+        // Pending → receiver kim? Eğer ben sender isem: ekstra mesaj atamam (Instagram davranışı)
+        // Eğer receiver bensem: ben gönderebilirim (karşı onayım sayılır ama direkt accept etmeyelim)
+        // Bu edge-case: receiver henüz accept etmeden cevap yazıyor → accept'e çevir
+        const { data: reqRow } = await supabase
+          .from('message_requests')
+          .select('sender_id, receiver_id')
+          .or(`and(sender_id.eq.${senderId},receiver_id.eq.${receiverId}),and(sender_id.eq.${receiverId},receiver_id.eq.${senderId})`)
+          .maybeSingle();
+        if (reqRow && reqRow.receiver_id === senderId) {
+          // Receiver cevap veriyor → accept
+          await supabase
+            .from('message_requests')
+            .update({ status: 'accepted', responded_at: new Date().toISOString() })
+            .eq('sender_id', reqRow.sender_id)
+            .eq('receiver_id', reqRow.receiver_id);
+        } else {
+          throw new Error('İsteğiniz henüz onaylanmadı. Karşı tarafın cevabını bekleyin.');
+        }
+      }
+      // accepted → serbest
     }
 
     // ★ A4 FIX: Rate limiting — son 1 dakikada max 30 mesaj
@@ -247,13 +299,65 @@ export const MessageService = {
     // Push bildirim gönder (arka planda, hata yutulur)
     const senderName = (msg as any).sender?.display_name || 'Birisi';
     const preview = voiceUrl ? '🎙️ Sesli mesaj' : imageUrl ? '📷 Fotoğraf' : (content.length > 50 ? content.substring(0, 50) + '...' : content);
-    const pushTitle = 'Yeni Mesaj';
+    const pushTitle = isFirstRequestMessage ? '📨 Mesaj İsteği' : 'Yeni Mesaj';
     PushService.sendToUser(receiverId, pushTitle, `${senderName}: ${preview}`, {
-      type: 'dm',
+      type: isFirstRequestMessage ? 'message_request' : 'dm',
       route: `/chat/${senderId}`,
     }).catch(() => {});
 
     return msg as Message;
+  },
+
+  /** ★ 2026-04-22: Receiver mesaj isteğini kabul eder → normal chat açılır. */
+  async acceptMessageRequest(receiverId: string, senderId: string): Promise<void> {
+    const { error } = await supabase
+      .from('message_requests')
+      .update({ status: 'accepted', responded_at: new Date().toISOString() })
+      .eq('sender_id', senderId)
+      .eq('receiver_id', receiverId)
+      .eq('status', 'pending');
+    if (error) throw error;
+  },
+
+  /** ★ 2026-04-22: Receiver mesaj isteğini reddeder → mesajlar gizlenir, sender engellenemez ama yazı atamaz. */
+  async rejectMessageRequest(receiverId: string, senderId: string): Promise<void> {
+    const { error } = await supabase
+      .from('message_requests')
+      .update({ status: 'rejected', responded_at: new Date().toISOString() })
+      .eq('sender_id', senderId)
+      .eq('receiver_id', receiverId)
+      .eq('status', 'pending');
+    if (error) throw error;
+    // İsteğe bağlı: mevcut request mesajlarını is_deleted=true yaparak gizle
+    await supabase
+      .from('messages')
+      .update({ is_deleted: true })
+      .eq('sender_id', senderId)
+      .eq('receiver_id', receiverId);
+  },
+
+  /** İki kullanıcı arasındaki message_request durumunu çekip döner (null = yok). */
+  async getMessageRequest(userA: string, userB: string): Promise<{ sender_id: string; receiver_id: string; status: 'pending' | 'accepted' | 'rejected' } | null> {
+    const { data } = await supabase
+      .from('message_requests')
+      .select('sender_id, receiver_id, status')
+      .or(`and(sender_id.eq.${userA},receiver_id.eq.${userB}),and(sender_id.eq.${userB},receiver_id.eq.${userA})`)
+      .maybeSingle();
+    return (data as any) || null;
+  },
+
+  /** Kullanıcıya gelen pending mesaj istekleri — Messages tab "İstekler" bölümü. */
+  async getPendingRequests(userId: string) {
+    const { data, error } = await supabase
+      .from('message_requests')
+      .select('*, sender:profiles!sender_id(id, display_name, avatar_url, subscription_tier, is_online)')
+      .eq('receiver_id', userId)
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    // İlk mesajı da çek (preview için)
+    const list = data || [];
+    return list;
   },
 
   /** Karşı tarafın gönderdiği mesajları okundu olarak işaretle — silinmişler hariç */
@@ -305,40 +409,78 @@ export const MessageService = {
 
   /**
    * ★ Sohbeti gizle — tek taraflı (WhatsApp modeli)
+   * ★ 2026-04-22: İki ayrı timestamp yazılır:
+   *   - hidden_conversations_{uid}: inbox'tan gizleme — yeni mesaj gelirse/gönderilirse temizlenir
+   *   - cleared_before_{uid}: mesaj filtresi — ASLA temizlenmez, silme her tekrar edildiğinde üst üste yazılır
    */
   async deleteConversation(userId: string, partnerId: string) {
     await this.markAsRead(userId, partnerId);
+    const now = new Date().toISOString();
 
-    const key = `hidden_conversations_${userId}`;
-    const raw = await AsyncStorage.getItem(key);
-    const map: Record<string, string> = raw ? JSON.parse(raw) : {};
-    map[partnerId] = new Date().toISOString();
-    await AsyncStorage.setItem(key, JSON.stringify(map));
+    const hiddenKey = `hidden_conversations_${userId}`;
+    const hiddenRaw = await AsyncStorage.getItem(hiddenKey);
+    const hiddenMap: Record<string, string> = hiddenRaw ? JSON.parse(hiddenRaw) : {};
+    hiddenMap[partnerId] = now;
+    await AsyncStorage.setItem(hiddenKey, JSON.stringify(hiddenMap));
+
+    const clearKey = `cleared_before_${userId}`;
+    const clearRaw = await AsyncStorage.getItem(clearKey);
+    const clearMap: Record<string, string> = clearRaw ? JSON.parse(clearRaw) : {};
+    clearMap[partnerId] = now;
+    await AsyncStorage.setItem(clearKey, JSON.stringify(clearMap));
   },
 
-  /** Gizlenmiş sohbet timestamp'lerini oku */
+  /** Gizlenmiş sohbet timestamp'lerini oku (inbox için) */
   async getHiddenConversations(userId: string): Promise<Record<string, string>> {
     const key = `hidden_conversations_${userId}`;
     const raw = await AsyncStorage.getItem(key);
     return raw ? JSON.parse(raw) : {};
   },
 
-  /** Okunmamış toplam mesaj sayısı (genel) — is_deleted filtreli + engellenenler hariç */
+  /** Temizlenme timestamp'lerini oku (mesaj filtresi için — kalıcı).
+   *  Backward-compat: eski `hidden_conversations_` kayıtlarını da fallback olarak kullanır
+   *  — önceki APK sadece onu yazıyordu, yeni sürümde cleared_before boş kalmasın.
+   */
+  async getClearedBefore(userId: string): Promise<Record<string, string>> {
+    const clearKey = `cleared_before_${userId}`;
+    const clearRaw = await AsyncStorage.getItem(clearKey);
+    const clearMap: Record<string, string> = clearRaw ? JSON.parse(clearRaw) : {};
+
+    const hiddenKey = `hidden_conversations_${userId}`;
+    const hiddenRaw = await AsyncStorage.getItem(hiddenKey);
+    const hiddenMap: Record<string, string> = hiddenRaw ? JSON.parse(hiddenRaw) : {};
+    for (const partnerId of Object.keys(hiddenMap)) {
+      if (!clearMap[partnerId]) {
+        clearMap[partnerId] = hiddenMap[partnerId];
+      }
+    }
+    return clearMap;
+  },
+
+  /** Okunmamış toplam mesaj sayısı (genel) — is_deleted filtreli + engellenenler + gizlenenler hariç */
   async getUnreadCount(userId: string) {
     const blockedIds = await FriendshipService._getBlockedIds(userId);
-    
+    // ★ 2026-04-21: Kalıcı silinen (hidden) sohbetlerden gelen mesajlar unread sayılmaz.
+    //   Kullanıcı silmiş bir sohbet için bildirim badge'i kafa karıştırıcı olur.
+    const hiddenMap = await this.getHiddenConversations(userId);
+    const hiddenPartnerIds = Object.keys(hiddenMap);
+
     let query = supabase
       .from('messages')
       .select('*', { count: 'exact', head: true })
       .eq('receiver_id', userId)
       .eq('is_read', false)
       .not('is_deleted', 'is', true);
-    
+
     if (blockedIds.size > 0) {
       const blockedArr = Array.from(blockedIds);
       query = query.not('sender_id', 'in', `(${blockedArr.map(id => `"${id}"`).join(',')})`);
     }
-    
+    if (hiddenPartnerIds.length > 0) {
+      // Hidden partnerlerden gelen mesajlar sayılmaz
+      query = query.not('sender_id', 'in', `(${hiddenPartnerIds.map(id => `"${id}"`).join(',')})`);
+    }
+
     const { count, error } = await query;
     if (error) throw error;
     return count || 0;
@@ -372,9 +514,7 @@ export const MessageService = {
       )
       .subscribe();
 
-    return {
-      unsubscribe: () => { supabase.removeChannel(channel); },
-    };
+    return channel;
   },
 
   /** Yazıyor... (Typing Indicator) - Gönderici — ★ C2 FIX: Block kontrolü */
@@ -436,6 +576,6 @@ export const MessageService = {
         callback(payload.payload as any);
       })
       .subscribe();
-    return { unsubscribe: () => { supabase.removeChannel(channel); } };
+    return channel;
   }
 };

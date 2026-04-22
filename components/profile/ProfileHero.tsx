@@ -30,6 +30,8 @@ interface Props {
   stats: { followers: number; rooms: number };
   /** Varsa edit butonunu göster; yoksa başka bir kullanıcının profili */
   onEdit?: () => void;
+  /** ★ 2026-04-21: Bio'ya tap ile inline edit — kendi profilde (callback varsa) */
+  onBioPress?: () => void;
   onFollowersPress: () => void;
   onRoomsPress: () => void;
   onAvatarPress?: () => void; // ★ Avatar preview modal
@@ -43,7 +45,7 @@ interface Props {
 
 export default function ProfileHero({
   displayName, username, bio, avatarUrl, subscriptionTier, isAdmin, userTitle,
-  stats, onEdit, onFollowersPress, onRoomsPress, onAvatarPress,
+  stats, onEdit, onBioPress, onFollowersPress, onRoomsPress, onAvatarPress,
   memberSince, boostExpiresAt, isOnline,
 }: Props) {
   // ★ Uzun isimde fontSize otomatik küçülsün (adjustsFontSizeToFit)
@@ -64,7 +66,7 @@ export default function ProfileHero({
           hitSlop={4}
           accessibilityLabel="Avatarı büyüt"
         >
-          <StatusAvatar uri={avatarUrl} size={84} tier={subscriptionTier} isAdmin={isAdmin} isOnline={isOnline} showTierBadge />
+          <StatusAvatar uri={avatarUrl} size={84} tier={subscriptionTier} isAdmin={isAdmin} isOnline={isOnline} isSelf={!!onEdit} showTierBadge />
         </Pressable>
         <View style={{ flex: 1, minWidth: 0 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -99,7 +101,19 @@ export default function ProfileHero({
               <Text style={s.memberSince}>📅 {memberSinceText}</Text>
             )}
           </View>
-          <Text style={s.bio} numberOfLines={3}>{bio}</Text>
+          {onBioPress ? (
+            <Pressable onPress={onBioPress} hitSlop={6} style={{ marginTop: 4 }}>
+              <Text style={[s.bio, { marginTop: 0 }]} numberOfLines={3}>
+                {bio || (
+                  <Text style={{ color: 'rgba(20,184,166,0.7)', fontStyle: 'italic' }}>
+                    + Bio ekle
+                  </Text>
+                )}
+              </Text>
+            </Pressable>
+          ) : (
+            <Text style={s.bio} numberOfLines={3}>{bio}</Text>
+          )}
         </View>
         {onEdit && (
           <Pressable

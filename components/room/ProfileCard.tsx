@@ -81,6 +81,8 @@ type ProfileCardProps = {
   isPending?: boolean;
   // ★ M6 FIX: Kendi profil — sahneden in
   onSelfDemote?: () => void;
+  // ★ 2026-04-20 FIX: Kendi profil — sahneye çık (owner/mod dinleyicideyken)
+  onSelfPromote?: () => void;
 };
 
 export default function ProfileCard({
@@ -91,7 +93,7 @@ export default function ProfileCard({
   onGhostMode, isGhost, onDisguise, onBanTemp, onBanPerm,
   onPersonalMute, isPersonallyMuted,
   onTip, donationsEnabled,
-  isFriend, isPending, onSelfDemote,
+  isFriend, isPending, onSelfDemote, onSelfPromote,
 }: ProfileCardProps) {
   // Slide-up animasyonu
   const slideY = useRef(new Animated.Value(H * 0.3)).current;
@@ -211,6 +213,13 @@ export default function ProfileCard({
               <TouchableOpacity style={[sty.outlinePill, { borderColor: 'rgba(239,68,68,0.2)', backgroundColor: 'rgba(239,68,68,0.06)' }]} onPress={() => { handleClose(); setTimeout(() => onSelfDemote(), 200); }} activeOpacity={0.7}>
                 <Ionicons name="arrow-down-circle-outline" size={13} color={C.red} />
                 <Text style={[sty.pillText, { color: C.red }]}>Sahneden İn</Text>
+              </TouchableOpacity>
+            )}
+            {/* ★ 2026-04-20 FIX: Owner/mod dinleyicide — sahneye çık */}
+            {onSelfPromote && role === 'listener' && (
+              <TouchableOpacity style={[sty.outlinePill, { borderColor: 'rgba(20,184,166,0.3)', backgroundColor: 'rgba(20,184,166,0.08)' }]} onPress={() => { handleClose(); setTimeout(() => onSelfPromote(), 200); }} activeOpacity={0.7}>
+                <Ionicons name="arrow-up-circle-outline" size={13} color={C.emerald} />
+                <Text style={[sty.pillText, { color: C.emerald }]}>Sahneye Çık</Text>
               </TouchableOpacity>
             )}
           </View>

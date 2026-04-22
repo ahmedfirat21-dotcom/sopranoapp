@@ -115,13 +115,29 @@ export const ReferralService = {
 
       if (insertErr) {
         if (__DEV__) logger.warn('Referral insert error:', insertErr.message);
+        if ((insertErr as any).code === '23505') {
+          return { success: false, message: 'Zaten bir davet kodu kullanmışsınız.' };
+        }
         return { success: false, message: 'İşlem sırasında hata oluştu.' };
       }
 
-      // 4. ★ SP-1 FIX: GamificationService üzerinden git — cooldown, cap, transaction kaydı otomatik
-      // Referral bonus özel action: cooldown yok, günlük cap GamificationService'te yönetilir
-      await GamificationService.earn(owner.id, 50, 'referral_bonus');       // Davet eden
-      await GamificationService.earn(referredUserId, 50, 'referral_bonus');  // Davet edilen
+      // 4. ★ 2026-04-21: Atomic SP bonus — v50 RPC tek transaction'da iki tarafa da verir.
+      //   Önceden 2 ayrı earn() çağrısıydı → ikincisi fail'se birincisi commit kalıyordu (asimetrik ödül).
+      const { data: bonusResult, error: bonusErr } = await supabase.rpc('award_referral_bonus_atomic', {
+        p_owner_id: owner.id,
+        p_referred_id: referredUserId,
+        p_sp_amount: 50,
+      });
+      if (bonusErr) {
+        if (__DEV__) logger.warn('[Referral] SP bonus RPC hatası, fallback earn denenir:', bonusErr.message);
+        // Fallback — RPC fail olursa eski yol (idempotency için earn cooldown'ı olmadığından güvenli)
+        try {
+          await GamificationService.earn(owner.id, 50, 'referral_bonus');
+          await GamificationService.earn(referredUserId, 50, 'referral_bonus');
+        } catch (fallbackErr: any) {
+          logger.error('[Referral] Fallback earn de başarısız:', fallbackErr?.message);
+        }
+      }
 
       return { success: true, message: 'Tebrikler! Her ikiniz de 50 SP kazandınız.' };
     } catch (e: any) {
@@ -130,6 +146,20 @@ export const ReferralService = {
     }
   },
   
+  // Bu kullanıcı daha önce bir davet kodu kullandı mı?
+  hasUsedReferral: async (userId: string): Promise<{ used: boolean; code?: string; usedAt?: string }> => {
+    try {
+      const { data, error } = await supabase
+        .from('referrals')
+        .select('referral_code, created_at')
+        .eq('referred_id', userId)
+        .maybeSingle();
+      if (error) return { used: false };
+      if (!data) return { used: false };
+      return { used: true, code: (data as any).referral_code, usedAt: (data as any).created_at };
+    } catch { return { used: false }; }
+  },
+
   // Kaç kişi davet ettiğini getir
   getReferralCount: async (userId: string): Promise<number> => {
     try {

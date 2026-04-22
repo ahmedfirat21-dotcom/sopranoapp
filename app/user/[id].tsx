@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, Image, Pressable, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Image, Pressable, ScrollView, ActivityIndicator, Dimensions } from 'react-native';
+
+const { width: W } = Dimensions.get('window');
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -328,7 +330,7 @@ export default function UserProfileScreen() {
           onRoomsPress={() => { /* Kullanıcının odaları — aşağıda liste mevcut */ }}
           memberSince={userProfile.created_at}
           boostExpiresAt={(userProfile as any)?.profile_boost_expires_at}
-          isOnline={userProfile.is_online}
+          isOnline={isFriend || isOwnProfile ? userProfile.is_online : undefined}
         />
 
         {/* ═══ Etkileşim Butonları ═══ */}
@@ -469,32 +471,172 @@ export default function UserProfileScreen() {
           </View>
         )}
 
-        {/* ═══ Odaları ═══ */}
+        {/* ═══ Odaları — Kompakt liste kartı (Odalarım tarzı) ═══ */}
         {recentRooms.length > 0 && (
-          <View style={s.listContainer}>
-            <Text style={s.sectionInnerTitle}>🎩️ Odaları ({recentRooms.length})</Text>
-            {recentRooms.map((room: any, idx: number) => {
-              const isLive = (room.listener_count || 0) > 0 || room.is_live;
-              return (
-                <Pressable
-                  key={room.id}
-                  style={[s.roomItem, idx === recentRooms.length - 1 && { borderBottomWidth: 0 }]}
-                  onPress={() => router.push(`/room/${room.id}` as any)}
-                >
-                  <View style={[s.roomIconWrap, isLive && { backgroundColor: 'rgba(34,197,94,0.15)' }]}>
-                    <Ionicons name={isLive ? 'radio' : 'mic'} size={14} color={isLive ? '#22C55E' : Colors.accentTeal} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={s.roomItemName} numberOfLines={1}>{room.name}</Text>
-                    <Text style={s.roomItemMeta}>
-                      {isLive ? `🔴 Canlı · ${room.listener_count || 0} dinleyici` : room.category || 'Oda'}
-                    </Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.15)" />
-                </Pressable>
-              );
-            })}
-          </View>
+          <>
+            {/* Premium section header */}
+            <View style={s.roomsSectionHeader}>
+              <View style={s.roomsSectionAccent} />
+              <Ionicons name="headset" size={13} color={Colors.accentTeal} style={s.roomsSectionIcon} />
+              <Text style={s.roomsSectionText}>ODALARI</Text>
+              <View style={s.roomsCountBadge}>
+                <Text style={s.roomsCountText}>{recentRooms.length}</Text>
+              </View>
+            </View>
+
+            <View style={{ marginHorizontal: 16, marginBottom: 14, gap: 8 }}>
+              {recentRooms.map((room: any) => {
+                const listeners = room.listener_count || 0;
+                const isLive = !!room.is_live;
+                const hasListeners = isLive && listeners > 0;
+                const isOpen = isLive && listeners === 0;
+                const isPersistent = !!room.is_persistent;
+                const isSleeping = !isLive && isPersistent;
+                const isClosed = !isLive && !isPersistent;
+                const cardImage = room.room_settings?.card_image_url;
+                const themeId = room.theme_id || room.room_settings?.theme_id;
+                const settings = room.room_settings || {};
+                const fee = settings.entry_fee_sp || 0;
+                const THEME_GRADS: Record<string, [string, string]> = {
+                  ocean: ['#0E4D6F', '#083344'], sunset: ['#7F1D1D', '#4C0519'],
+                  forest: ['#14532D', '#052E16'], galaxy: ['#312E81', '#1E1B4B'],
+                  aurora: ['#134E4A', '#042F2E'], cherry: ['#831843', '#500724'],
+                  cyber: ['#1E3A8A', '#172554'], volcano: ['#7C2D12', '#431407'],
+                  midnight: ['#0C0A3E', '#1B1464'], rose: ['#9F1239', '#881337'],
+                  arctic: ['#164E63', '#0E7490'], amber: ['#78350F', '#92400E'],
+                  slate: ['#1E293B', '#334155'],
+                };
+                const grad = (themeId && THEME_GRADS[themeId]) || null;
+
+                // Accent stripe rengi
+                const accentColor = hasListeners ? '#22C55E' : isOpen ? '#14B8A6' : isSleeping ? '#A78BFA' : '#64748B';
+
+                return (
+                  <Pressable
+                    key={room.id}
+                    onPress={() => router.push(`/room/${room.id}` as any)}
+                    style={({ pressed }) => ({
+                      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+                      padding: 12, paddingLeft: 16, borderRadius: 16, overflow: 'hidden',
+                      borderWidth: 1,
+                      borderColor: hasListeners ? 'rgba(34,197,94,0.35)' : isPersistent ? 'rgba(212,175,55,0.25)' : 'rgba(255,255,255,0.06)',
+                      backgroundColor: Colors.cardBg,
+                      shadowColor: hasListeners ? '#22C55E' : '#000',
+                      shadowOffset: { width: 0, height: 3 },
+                      shadowOpacity: hasListeners ? 0.3 : 0.2, shadowRadius: 8, elevation: 4,
+                      opacity: pressed ? 0.92 : isClosed ? 0.7 : 1,
+                      transform: [{ scale: pressed ? 0.985 : 1 }],
+                    })}
+                  >
+                    {/* Arka plan gradient katmanları */}
+                    <LinearGradient
+                      colors={['#4a5668', '#37414f', '#232a35']}
+                      start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                      style={StyleSheet.absoluteFillObject}
+                    />
+                    {grad && (
+                      <LinearGradient
+                        colors={[grad[0], grad[1]]}
+                        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                        style={[StyleSheet.absoluteFillObject, { opacity: isLive ? 0.18 : 0.09, borderRadius: 16 }]}
+                      />
+                    )}
+                    {/* Sol accent stripe */}
+                    <View style={{ position: 'absolute', left: 0, top: 8, bottom: 8, width: 3, borderRadius: 2, backgroundColor: accentColor, opacity: isLive ? 1 : 0.5 }} />
+
+                    {/* Sol: Thumbnail + Bilgi */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 10, minWidth: 0 }}>
+                      {/* Thumbnail — card image veya kategori ikonu */}
+                      {cardImage ? (
+                        <View style={{ width: 40, height: 40, borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }}>
+                          <Image source={{ uri: cardImage }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
+                          <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.2)' }]} />
+                        </View>
+                      ) : (
+                        <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center' }}>
+                          <Ionicons
+                            name={room.category === 'music' ? 'musical-notes' : room.category === 'game' ? 'game-controller' : room.category === 'tech' ? 'code-slash' : 'chatbubbles'}
+                            size={18} color="rgba(255,255,255,0.4)"
+                          />
+                        </View>
+                      )}
+
+                      <View style={{ flex: 1, minWidth: 0 }}>
+                        {/* Oda adı */}
+                        <Text style={{ fontSize: 14, fontWeight: '700', color: isClosed ? '#94A3B8' : '#F1F5F9' }} numberOfLines={1}>
+                          {room.name}
+                        </Text>
+                        {/* Meta satırı — durum + rozetler */}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
+                          {/* Durum badge */}
+                          {hasListeners ? (
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(34,197,94,0.15)', paddingHorizontal: 7, paddingVertical: 2.5, borderRadius: 7 }}>
+                              <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: '#22C55E' }} />
+                              <Text style={{ fontSize: 9, fontWeight: '800', color: '#86EFAC', letterSpacing: 0.4 }}>CANLI</Text>
+                              <Text style={{ fontSize: 9, fontWeight: '600', color: '#94A3B8', marginLeft: 1 }}>· {listeners}</Text>
+                            </View>
+                          ) : isOpen ? (
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(20,184,166,0.12)', paddingHorizontal: 7, paddingVertical: 2.5, borderRadius: 7 }}>
+                              <Ionicons name="radio-outline" size={9} color="#14B8A6" />
+                              <Text style={{ fontSize: 9, fontWeight: '800', color: '#5EEAD4', letterSpacing: 0.3 }}>Açık</Text>
+                            </View>
+                          ) : isSleeping ? (
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(167,139,250,0.12)', paddingHorizontal: 7, paddingVertical: 2.5, borderRadius: 7, borderWidth: 0.5, borderColor: 'rgba(167,139,250,0.25)' }}>
+                              <Ionicons name="moon" size={8} color="#A78BFA" />
+                              <Text style={{ fontSize: 9, fontWeight: '700', color: '#A78BFA' }}>Uyuyor</Text>
+                            </View>
+                          ) : (
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(100,116,139,0.12)', paddingHorizontal: 7, paddingVertical: 2.5, borderRadius: 7 }}>
+                              <Ionicons name="close-circle" size={8} color="#64748B" />
+                              <Text style={{ fontSize: 9, fontWeight: '700', color: '#64748B' }}>Kapalı</Text>
+                            </View>
+                          )}
+                          {/* Premium */}
+                          {isPersistent && (
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(212,175,55,0.15)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, borderWidth: 0.5, borderColor: 'rgba(212,175,55,0.3)' }}>
+                              <Ionicons name="trophy" size={8} color="#D4AF37" />
+                              <Text style={{ fontSize: 7, fontWeight: '800', color: '#D4AF37', letterSpacing: 0.3 }}>Premium</Text>
+                            </View>
+                          )}
+                          {/* Tip rozetleri */}
+                          {room.type === 'closed' && (
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(245,158,11,0.12)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, borderWidth: 0.5, borderColor: 'rgba(245,158,11,0.25)' }}>
+                              <Ionicons name="lock-closed" size={7} color="#F59E0B" />
+                              <Text style={{ fontSize: 7, fontWeight: '700', color: '#F59E0B' }}>Şifreli</Text>
+                            </View>
+                          )}
+                          {room.type === 'invite' && (
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(139,92,246,0.12)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, borderWidth: 0.5, borderColor: 'rgba(139,92,246,0.25)' }}>
+                              <Ionicons name="mail" size={7} color="#8B5CF6" />
+                              <Text style={{ fontSize: 7, fontWeight: '700', color: '#8B5CF6' }}>Davetli</Text>
+                            </View>
+                          )}
+                          {fee > 0 && (
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, backgroundColor: 'rgba(212,175,55,0.12)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, borderWidth: 0.5, borderColor: 'rgba(212,175,55,0.25)' }}>
+                              <Ionicons name="cash" size={7} color="#D4AF37" />
+                              <Text style={{ fontSize: 7, fontWeight: '800', color: '#D4AF37' }}>{fee} SP</Text>
+                            </View>
+                          )}
+                        </View>
+                      </View>
+                    </View>
+
+                    {/* Sağ: Katıl butonu */}
+                    <LinearGradient
+                      colors={hasListeners ? ['#14B8A6', '#0D9488'] : isOpen ? ['#14B8A6', '#0D9488'] : ['#475569', '#334155']}
+                      start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                      style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 12, marginLeft: 10 }}
+                    >
+                      <Ionicons name={isLive ? 'headset' : 'eye-outline'} size={12} color="#FFF" />
+                      <Text style={{ fontSize: 10, fontWeight: '800', color: '#FFF', letterSpacing: 0.3 }}>
+                        {isLive ? 'Katıl' : 'Gör'}
+                      </Text>
+                    </LinearGradient>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </>
         )}
 
         {/* ═══ SP Gönder Butonu — premium bottom sheet açar ═══ */}
@@ -760,6 +902,25 @@ const s = StyleSheet.create({
   // Section
   sectionTitle: { fontSize: 11, fontWeight: '700', color: '#64748B', letterSpacing: 1, ..._textGlow },
   sectionInnerTitle: { fontSize: 12, fontWeight: '700', color: '#CBD5E1', marginBottom: 8, textTransform: 'uppercase' as const, letterSpacing: 0.5 },
+  // ★ 2026-04-21: Premium "Odaları" section header — ProfileFriendsList ile aynı
+  roomsSectionHeader: {
+    flexDirection: 'row' as const, alignItems: 'center' as const, gap: 8,
+    marginHorizontal: 16, marginTop: 14, marginBottom: 10,
+  },
+  roomsSectionAccent: { width: 3, height: 14, borderRadius: 2, backgroundColor: Colors.accentTeal },
+  roomsSectionIcon: {
+    textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4,
+  },
+  roomsSectionText: {
+    flex: 1, fontSize: 11, fontWeight: '800', color: '#94A3B8', letterSpacing: 1,
+    ..._textGlow,
+  },
+  roomsCountBadge: {
+    backgroundColor: 'rgba(20,184,166,0.12)', borderRadius: 10,
+    paddingHorizontal: 8, paddingVertical: 3,
+    borderWidth: 1, borderColor: 'rgba(20,184,166,0.25)',
+  },
+  roomsCountText: { fontSize: 10, fontWeight: '800', color: '#14B8A6' },
   listContainer: {
     marginHorizontal: 16, marginBottom: 10,
     backgroundColor: '#414e5f',

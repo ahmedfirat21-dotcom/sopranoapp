@@ -19,8 +19,15 @@ interface Props {
 }
 
 export default function EmojiDrawer({ visible, onClose, onReaction, bottomInset }: Props) {
-  const translateY = useRef(new Animated.Value(PANEL_HEIGHT)).current;
+  const BAR_OFFSET = bottomInset + 56;
+  const CLOSED_Y = PANEL_HEIGHT + BAR_OFFSET;
+
+  const translateY = useRef(new Animated.Value(PANEL_HEIGHT + 200)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (!visible) translateY.setValue(CLOSED_Y);
+  }, [CLOSED_Y, visible]);
 
   useEffect(() => {
     if (visible) {
@@ -30,7 +37,7 @@ export default function EmojiDrawer({ visible, onClose, onReaction, bottomInset 
       ]).start();
     } else {
       Animated.parallel([
-        Animated.timing(translateY, { toValue: PANEL_HEIGHT, duration: 200, useNativeDriver: true }),
+        Animated.timing(translateY, { toValue: CLOSED_Y, duration: 200, useNativeDriver: true }),
         Animated.timing(backdropOpacity, { toValue: 0, duration: 200, useNativeDriver: true }),
       ]).start();
     }
@@ -47,12 +54,10 @@ export default function EmojiDrawer({ visible, onClose, onReaction, bottomInset 
       },
       onPanResponderRelease: (_, gs) => {
         if (gs.dy > 60 || gs.vy > 0.5) {
-          // Yeterince aşağı sürüklendi — kapat
-          Animated.timing(translateY, { toValue: PANEL_HEIGHT, duration: 200, useNativeDriver: true }).start(() => {
+          Animated.timing(translateY, { toValue: CLOSED_Y, duration: 200, useNativeDriver: true }).start(() => {
             onClose();
           });
         } else {
-          // Geri snap
           Animated.spring(translateY, { toValue: 0, useNativeDriver: true, damping: 20, stiffness: 200 }).start();
         }
       },
@@ -61,25 +66,22 @@ export default function EmojiDrawer({ visible, onClose, onReaction, bottomInset 
 
   if (!visible) return null;
 
-  // Kontrol barı yüksekliği (capsule + padding)
-  const BAR_OFFSET = bottomInset + 56;
-
   return (
     <>
-      {/* Backdrop */}
       <Animated.View style={[StyleSheet.absoluteFill, { zIndex: 48 }]}>
         <Pressable style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.25)' }]} onPress={onClose}>
           <Animated.View style={[StyleSheet.absoluteFill, { opacity: backdropOpacity }]} />
         </Pressable>
       </Animated.View>
 
-      {/* Panel — alt barın hemen üstünde, arkasından kayar */}
+      {/* Panel — control bar'ın ARKASINA kadar uzayan tek sürekli yüzey (RoomChatDrawer ile aynı pattern) */}
       <Animated.View
         {...panResponder.panHandlers}
         style={[
           styles.panel,
           {
-            bottom: BAR_OFFSET,
+            height: PANEL_HEIGHT + BAR_OFFSET,
+            paddingBottom: BAR_OFFSET,
             transform: [{ translateY }],
           },
         ]}
@@ -107,20 +109,14 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     right: 0,
+    bottom: 0,
     zIndex: 50,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     overflow: 'hidden',
     borderWidth: 1,
     borderBottomWidth: 0,
-    borderColor: '#95a1ae',
-    paddingBottom: 8,
-    // Gölge
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 20,
+    borderColor: 'rgba(255,255,255,0.08)',
   },
   handle: {
     alignItems: 'center',

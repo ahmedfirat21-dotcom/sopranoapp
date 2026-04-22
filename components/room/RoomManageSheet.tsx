@@ -105,7 +105,8 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
 
   // Settings â€” Görsellik
   const [themeId, setThemeId] = useState<string | null>(null);
-  const [musicTrack, setMusicTrack] = useState<string | null>(null);
+  const [musicLink, setMusicLink] = useState<string>('');
+  const [editingMusicLink, setEditingMusicLink] = useState(false);
   const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
   const [coverImage, setCoverImage] = useState<string | null>(null);
 
@@ -182,9 +183,9 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
     setRoomLang(rs.room_language || 'tr');
     setAgeRestricted(rs.age_restricted || false);
     setThemeId((room as any).theme_id || null);
-    setMusicTrack(rs.music_track || null);
+    setMusicLink(rs.music_link || '');
     setBackgroundImage(rs.room_image_url || (room as any).room_image_url || null);
-    setCoverImage(rs.cover_image_url || null);
+    setCoverImage(rs.card_image_url || rs.cover_image_url || null);
     setWelcomeMsg(rs.welcome_message || '');
     setRules(typeof rs.rules === 'string' ? rs.rules : Array.isArray(rs.rules) ? rs.rules.join('\n') : '');
     setActiveTab('general');
@@ -239,9 +240,9 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
     setRoomLang(rs.room_language || 'tr');
     setAgeRestricted(rs.age_restricted || false);
     setThemeId((room as any).theme_id || null);
-    setMusicTrack(rs.music_track || null);
+    setMusicLink(rs.music_link || '');
     setBackgroundImage(rs.room_image_url || (room as any).room_image_url || null);
-    setCoverImage(rs.cover_image_url || null);
+    setCoverImage(rs.card_image_url || rs.cover_image_url || null);
     setWelcomeMsg(rs.welcome_message || '');
     setRules(typeof rs.rules === 'string' ? rs.rules : Array.isArray(rs.rules) ? rs.rules.join('\n') : '');
   }, [room?.room_settings, room?.name, room?.type, (room as any)?.theme_id]);
@@ -303,7 +304,8 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
         const ImagePicker = require('expo-image-picker');
         const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (!perm.granted) { showToast({ title: 'İzin Gerekli', type: 'warning' }); return; }
-        const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: 'images', allowsEditing: true, aspect: [16, 9], quality: 0.7 });
+        // ★ 2026-04-21: Oda arka planı DİKEY (9:16) — oda UI dikey
+        const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: 'images', allowsEditing: true, aspect: [9, 16], quality: 0.7 });
         if (result.canceled) return;
         const { StorageService } = require('../../services/storage');
         const fileName = `room_bg/${room.id}_${Date.now()}.jpg`;
@@ -327,13 +329,13 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
         const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.8 });
         if (result.canceled) return;
         const { StorageService } = require('../../services/storage');
-        const fileName = `room_cover/${room.id}_${Date.now()}.jpg`;
+        const fileName = `room_card/${room.id}_${Date.now()}.jpg`;
         const url = await StorageService.uploadFile('post-images', fileName, result.assets[0].uri);
-        await RoomService.updateSettings(room.id, hostId, { room_settings: { cover_image_url: url } });
+        await RoomService.updateSettings(room.id, hostId, { room_settings: { card_image_url: url } });
         setCoverImage(url);
         showToast({ title: 'Banner Yüklendi', type: 'success' });
       } else {
-        await RoomService.updateSettings(room.id, hostId, { room_settings: { cover_image_url: null } });
+        await RoomService.updateSettings(room.id, hostId, { room_settings: { card_image_url: null } });
         setCoverImage(null);
         showToast({ title: 'Banner Kaldırıldı', type: 'success' });
       }
@@ -513,7 +515,7 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
       <Row icon="time" bg="rgba(59,130,246,0.2)" label={slowMode ? `Slow Mode: ${slowMode}sn` : 'Slow Mode Kapalı'} desc="Chat mesaj aralığını sınırla"
         right={
           <View style={{ flexDirection: 'row', gap: 3 }}>
-            {[0, 5, 15, 30].map(sec => (
+            {[0, 5, 15, 30, 60].map(sec => (
               <Pressable key={sec} style={[p.pill, slowMode === sec && p.pillActive]} onPress={() => { setSlowMode(sec); updateRS('slow_mode_seconds', sec); }}>
                 <Text style={[p.pillText, slowMode === sec && p.pillTextActive]}>{sec === 0 ? 'Off' : `${sec}s`}</Text>
               </Pressable>
@@ -677,39 +679,56 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
         />
       ) : <LockedRow label="Arka Plan Resmi" tier="Plus" />}
 
-      {/* Oda Kapak Görseli â€” Pro+ */}
-      {can('Pro') ? (
-        <Row icon="albums" bg="rgba(255,215,0,0.2)" label="Oda Kapak Görseli" desc={coverImage ? 'Banner ayarlandı' : 'Keşfet akışında görünen banner'}
-          right={
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              {coverImage ? (
-                <Pressable onPress={() => handleCoverImage(null)} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8, backgroundColor: 'rgba(239,68,68,0.1)', borderWidth: 1, borderColor: 'rgba(239,68,68,0.2)' }}>
-                  <Ionicons name="trash-outline" size={12} color="#EF4444" /><Text style={{ fontSize: 10, fontWeight: '600', color: '#EF4444' }}>Kaldır</Text>
-                </Pressable>
-              ) : (
-                <Pressable onPress={() => handleCoverImage('pick')} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8, backgroundColor: 'rgba(255,215,0,0.1)', borderWidth: 1, borderColor: 'rgba(255,215,0,0.2)' }}>
-                  <Ionicons name="add" size={12} color="#FFD700" /><Text style={{ fontSize: 10, fontWeight: '600', color: '#FFD700' }}>Seç</Text>
-                </Pressable>
-              )}
-            </View>
-          }
-        />
-      ) : <LockedRow label="Oda Kapak Görseli (Banner)" tier="Pro" />}
+      {/* ★ 2026-04-21: Kart Görseli — herkes (oluşturma ile aynı kural). */}
+      <Row icon="albums" bg="rgba(255,215,0,0.2)" label="Kart Görseli" desc={coverImage ? 'Kart görseli ayarlandı' : 'Keşfet akışında görünen banner'}
+        right={
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            {coverImage ? (
+              <Pressable onPress={() => handleCoverImage(null)} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8, backgroundColor: 'rgba(239,68,68,0.1)', borderWidth: 1, borderColor: 'rgba(239,68,68,0.2)' }}>
+                <Ionicons name="trash-outline" size={12} color="#EF4444" /><Text style={{ fontSize: 10, fontWeight: '600', color: '#EF4444' }}>Kaldır</Text>
+              </Pressable>
+            ) : (
+              <Pressable onPress={() => handleCoverImage('pick')} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8, backgroundColor: 'rgba(255,215,0,0.1)', borderWidth: 1, borderColor: 'rgba(255,215,0,0.2)' }}>
+                <Ionicons name="add" size={12} color="#FFD700" /><Text style={{ fontSize: 10, fontWeight: '600', color: '#FFD700' }}>Seç</Text>
+              </Pressable>
+            )}
+          </View>
+        }
+      />
 
-      {/* Müzik â€” Pro+ */}
+      {/* Müzik Linki â€” Pro+ (YouTube/Spotify/SoundCloud) */}
       {can('Pro') ? (
-        <Row icon="musical-notes" bg="rgba(255,215,0,0.2)" label={musicTrack ? `Müzik: ${({ lofi: 'Lofi', ambient: 'Ambient', jazz: 'Jazz' } as any)[musicTrack] || musicTrack}` : 'Oda Müziği Kapalı'} desc="Arka planda ambient ses döngüsü"
+        <Row icon="musical-notes" bg="rgba(255,215,0,0.2)"
+          label={musicLink ? `Müzik: ${(/youtu/i.test(musicLink) ? 'YouTube' : /spotify/i.test(musicLink) ? 'Spotify' : /soundcloud/i.test(musicLink) ? 'SoundCloud' : 'Link')}` : 'Oda Müzik Linki'}
+          desc="YouTube / Spotify / SoundCloud — herkes kendi platformunda dinler"
           right={
-            <View style={{ flexDirection: 'row', gap: 3 }}>
-              {([null, 'lofi', 'ambient', 'jazz'] as const).map(t => (
-                <Pressable key={t || 'off'} style={[p.pill, musicTrack === t && p.pillActive]} onPress={() => { setMusicTrack(t); updateRS('music_track', t); }}>
-                  <Text style={[p.pillText, musicTrack === t && p.pillTextActive]}>{t === null ? 'Off' : t === 'lofi' ? 'Lo' : t === 'ambient' ? 'Am' : 'Jz'}</Text>
+            editingMusicLink ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, maxWidth: 220 }}>
+                <TextInput
+                  value={musicLink} onChangeText={setMusicLink}
+                  placeholder="https://..." placeholderTextColor="#475569"
+                  style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4, color: '#E5E7EB', fontSize: 11, borderWidth: 1, borderColor: 'rgba(255,215,0,0.2)', minWidth: 120 }}
+                  autoCapitalize="none" autoCorrect={false} autoFocus
+                />
+                <Pressable onPress={() => { const v = musicLink.trim(); updateRS('music_link', v || null); setEditingMusicLink(false); }} style={{ backgroundColor: 'rgba(255,215,0,0.25)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
+                  <Text style={{ fontSize: 10, color: '#FFD700', fontWeight: '700' }}>OK</Text>
                 </Pressable>
-              ))}
-            </View>
+              </View>
+            ) : (
+              <View style={{ flexDirection: 'row', gap: 4 }}>
+                <Pressable onPress={() => setEditingMusicLink(true)} style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6, backgroundColor: 'rgba(255,255,255,0.06)' }}>
+                  <Text style={{ fontSize: 10, color: '#E5E7EB', fontWeight: '600' }}>{musicLink ? 'Düzenle' : 'Ekle'}</Text>
+                </Pressable>
+                {!!musicLink && (
+                  <Pressable onPress={() => { setMusicLink(''); updateRS('music_link', null); }} style={{ paddingHorizontal: 8, paddingVertical: 5, borderRadius: 6, backgroundColor: 'rgba(239,68,68,0.15)' }}>
+                    <Ionicons name="close" size={12} color="#F87171" />
+                  </Pressable>
+                )}
+              </View>
+            )
           }
         />
-      ) : <LockedRow label="Oda Arka Plan Müziği" tier="Pro" />}
+      ) : <LockedRow label="Oda Müzik Linki" tier="Pro" />}
     </View>
   );
 

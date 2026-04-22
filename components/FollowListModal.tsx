@@ -8,13 +8,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, Modal, Pressable, FlatList,
-  Image, ActivityIndicator,
+  Image, ActivityIndicator, Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { FriendshipService, type FollowUser } from '../services/friendship';
 import { getAvatarSource } from '../constants/avatars';
 import PremiumAlert, { type AlertButton } from './PremiumAlert';
 import { useRouter } from 'expo-router';
+import { useSwipeToDismiss } from '../hooks/useSwipeToDismiss';
 
 interface Props {
   visible: boolean;
@@ -57,6 +58,12 @@ export default function FollowListModal({
   }, [visible, loadData]);
 
   const list = tab === 'followers' ? followers : following;
+
+  const { translateValue, panHandlers } = useSwipeToDismiss({
+    direction: 'down',
+    threshold: 80,
+    onDismiss: onClose,
+  });
 
   // ★ Facebook tarzı: tek "Arkadaşlıktan Çıkar" aksiyonu (bidirectional remove)
   const handleRemoveFriend = (targetId: string, name: string) => {
@@ -156,7 +163,11 @@ export default function FollowListModal({
   return (
     <Modal visible={visible} animationType="slide" transparent statusBarTranslucent>
       <View style={st.overlay}>
-        <View style={st.sheet}>
+        <Animated.View style={[st.sheet, { transform: [{ translateY: translateValue }] }]}>
+          {/* ★ Swipe handle */}
+          <View style={st.handleWrap} {...panHandlers}>
+            <View style={st.handle} />
+          </View>
           {/* ★ Facebook tarzı: tek "Arkadaşlar" başlığı */}
           <View style={st.header}>
             <View style={{ width: 28 }} />
@@ -191,7 +202,7 @@ export default function FollowListModal({
               showsVerticalScrollIndicator={false}
             />
           )}
-        </View>
+        </Animated.View>
       </View>
       <PremiumAlert {...cAlert} onDismiss={() => setCAlert(prev => ({ ...prev, visible: false }))} />
     </Modal>
@@ -213,6 +224,17 @@ const st = StyleSheet.create({
     borderWidth: 1,
     borderBottomWidth: 0,
     borderColor: 'rgba(255,255,255,0.06)',
+  },
+  handleWrap: {
+    alignItems: 'center',
+    paddingTop: 8,
+    paddingBottom: 4,
+  },
+  handle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(20,184,166,0.4)',
   },
   header: {
     flexDirection: 'row',

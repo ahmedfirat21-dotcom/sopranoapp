@@ -17,6 +17,7 @@ export interface AlertButton {
   text: string;
   onPress?: () => void;
   style?: 'default' | 'cancel' | 'destructive';
+  icon?: keyof typeof Ionicons.glyphMap; // ★ 2026-04-21: Ionicons ikonu (emoji yerine vektör)
 }
 
 interface PremiumAlertProps {
@@ -127,8 +128,17 @@ export default function PremiumAlert({ visible, title, message, type = 'info', b
                     isDestructive && { backgroundColor: 'rgba(239,68,68,0.1)', borderColor: 'rgba(239,68,68,0.25)' },
                     isCancel && { backgroundColor: 'rgba(255,255,255,0.04)', borderColor: 'rgba(255,255,255,0.08)' },
                     defaultButtons.length === 1 && { flex: 1 },
+                    // ★ 2026-04-21: Icon varsa flex row hizalama — icon + text
+                    btn.icon && { flexDirection: 'row', gap: 8 },
                   ]}
                 >
+                  {btn.icon && (
+                    <Ionicons
+                      name={btn.icon}
+                      size={17}
+                      color={isDestructive ? '#F87171' : isCancel ? 'rgba(255,255,255,0.45)' : isPrimary ? config.accentColor : 'rgba(255,255,255,0.85)'}
+                    />
+                  )}
                   <Text style={[
                     sty.buttonText,
                     isPrimary && { color: config.accentColor },

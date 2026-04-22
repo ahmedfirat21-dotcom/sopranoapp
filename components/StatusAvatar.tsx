@@ -24,6 +24,8 @@ interface StatusAvatarProps {
   borderWidth?: number;
   /** Tier pill badge'i göster (avatarın altında küçük etiket) */
   showTierBadge?: boolean;
+  /** Kullanıcının kendi avatarı mı? Evetse online dot gizlenir (kendi online durumunu görmek anlamsız). */
+  isSelf?: boolean;
 }
 
 /**
@@ -47,27 +49,32 @@ export default function StatusAvatar({
   borderColor,
   borderWidth = 2,
   showTierBadge = false,
+  isSelf = false,
 }: StatusAvatarProps) {
   const radius = size / 2;
-  const dotSize = Math.max(10, size * 0.26);
+  // ★ 2026-04-21: Daha zarif nokta — %26 yerine %22, çerçeve 0.3x → 0.18x
+  const dotSize = Math.max(8, size * 0.22);
   const dotRadius = dotSize / 2;
-  const dotBorder = Math.max(2, dotSize * 0.3);
+  const dotBorder = Math.max(1, dotSize * 0.18);
 
   // Tier renk çözümleme
   const normalizedTier = tier ? migrateLegacyTier(tier as string) : 'Free';
   const tierDef = TIER_DEFINITIONS[normalizedTier as SubscriptionTier];
   
-  // Çerçeve rengi: Admin > tier prop > fallback
-  const ringColor = isAdmin
+  // ★ GodMaster: tier='GodMaster' VEYA isAdmin=true → aynı premium görünüm
+  const isGM = isAdmin || normalizedTier === 'GodMaster';
+
+  // Çerçeve rengi: GodMaster > tier > fallback
+  const ringColor = isGM
     ? '#DC2626'
     : tierDef
       ? tierDef.color
       : borderColor || 'rgba(255,255,255,0.12)';
 
   // Gradient ve ikon (tier pill için)
-  const tierGradient = isAdmin ? ['#DC2626', '#7F1D1D'] : tierDef ? tierDef.gradient : ['#94A3B8', '#64748B'];
-  const tierIcon = isAdmin ? 'shield-checkmark' : tierDef?.icon || 'person-outline';
-  const tierLabel = isAdmin ? 'GM' : normalizedTier;
+  const tierGradient = isGM ? ['#DC2626', '#7F1D1D'] : tierDef ? tierDef.gradient : ['#94A3B8', '#64748B'];
+  const tierIcon = isGM ? 'flash' : tierDef?.icon || 'person-outline';
+  const tierLabel = isGM ? '⚡GM' : normalizedTier;
 
   // Avatar source  
   const source: ImageSourcePropType =
@@ -99,13 +106,15 @@ export default function StatusAvatar({
             width: size - borderWidth * 2 - 2,
             height: size - borderWidth * 2 - 2,
             borderRadius: (size - borderWidth * 2 - 2) / 2,
-            backgroundColor: 'rgba(255,255,255,0.05)',
+            // ★ 2026-04-20: backgroundColor kaldırıldı — Android'de borderRadius
+            //   image background'ı her zaman yuvarlak kırpamıyor; dim kartlarda
+            //   (opacity 0.55) alpha'lı avatar arkasında kare gri kutu görünüyordu.
           }}
         />
       </View>
 
-      {/* Online durum dot */}
-      {isOnline && (
+      {/* Online durum dot — kendi avatarında gizle (self-view'da online işareti anlamsız) */}
+      {isOnline && !isSelf && (
         <View
           style={[
             styles.dot,
@@ -149,8 +158,15 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 2,
     right: 2,
-    backgroundColor: '#4ADE80',
-    borderColor: '#0F1923',
+    backgroundColor: '#22C55E',
+    // ★ 2026-04-21: Sert siyah çerçeve yerine hafif şeffaf beyaz kenar — zarif durur
+    borderColor: 'rgba(255,255,255,0.6)',
+    // Hafif glow efekti — online rengi daha canlı hissettirir
+    shadowColor: '#22C55E',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.7,
+    shadowRadius: 3,
+    elevation: 3,
   },
   tierPill: {
     position: 'absolute',

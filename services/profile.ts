@@ -221,11 +221,11 @@ export const ProfileService = {
   },
 
   /** ★ Son oluşturulan odalar (profilde gösterilir) */
-  async getRecentRooms(userId: string, limit = 10): Promise<{ id: string; name: string; created_at: string; listener_count: number; category: string; is_live: boolean }[]> {
+  async getRecentRooms(userId: string, limit = 10) {
     try {
       const { data, error } = await supabase
         .from('rooms')
-        .select('id, name, created_at, listener_count, category, is_live')
+        .select('id, name, created_at, listener_count, category, is_live, type, is_persistent, max_speakers, theme_id, room_settings')
         .eq('host_id', userId)
         .order('is_live', { ascending: false })
         .order('created_at', { ascending: false })
@@ -298,19 +298,33 @@ export const ProfileService = {
     const donationId = `${fromUserId}:${toUserId}:${amount}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
 
     // ★ GamificationService üzerinden harca
+    // ★ 2026-04-21: counterparty_id ile — SP history'de "kime gönderdin" / "kimden aldın" görünsün
     const { GamificationService } = require('./gamification');
-    const spResult = await GamificationService.spend(fromUserId, amount, 'donation_sent', `donation_send:${donationId}`);
+    // Taraf isimlerini önceden çek — description için
+    let fromName = '', toName = '';
+    try {
+      const { data: profiles } = await supabase
+        .from('profiles').select('id, display_name')
+        .in('id', [fromUserId, toUserId]);
+      profiles?.forEach((p: any) => {
+        if (p.id === fromUserId) fromName = p.display_name || '';
+        if (p.id === toUserId) toName = p.display_name || '';
+      });
+    } catch {}
+    const spendDesc = toName ? `${toName} adlı kişiye gönderdin` : undefined;
+    const earnDesc = fromName ? `${fromName} adlı kişiden aldın` : undefined;
+
+    const spResult = await GamificationService.spend(fromUserId, amount, 'donation_sent', `donation_send:${donationId}`, toUserId, spendDesc);
     if (!spResult.success) {
       return { success: false, error: spResult.error || 'Yetersiz SP' };
     }
-    // Debit duplicate olarak algılandıysa — başka bir yerde zaten işlendi, credit'i de atla
     if (spResult.duplicate) {
       return { success: true };
     }
 
     // ★ Alıcıya ver — fail olursa refund (Y20: çift-katmanlı retry)
     try {
-      await GamificationService.earn(toUserId, amount, 'donation_received', `donation_recv:${donationId}`);
+      await GamificationService.earn(toUserId, amount, 'donation_received', `donation_recv:${donationId}`, fromUserId, earnDesc);
       // ★ NEW: In-app notification row — receiver popup ve NotificationDrawer için
       try {
         const { error: notifErr } = await supabase.from('notifications').insert({

@@ -10,7 +10,7 @@
 import { useRef, useCallback } from 'react';
 import { Animated, PanResponder, PanResponderInstance } from 'react-native';
 
-type Direction = 'down' | 'right' | 'left';
+type Direction = 'down' | 'up' | 'right' | 'left';
 
 interface SwipeConfig {
   direction: Direction;
@@ -36,7 +36,7 @@ export function useSwipeToDismiss({
   onDismissRef.current = onDismiss;
 
   const isHorizontal = direction === 'left' || direction === 'right';
-  const sign = direction === 'left' ? -1 : 1;
+  const sign = (direction === 'left' || direction === 'up') ? -1 : 1;
 
   const panResponder = useRef(
     PanResponder.create({
@@ -47,15 +47,25 @@ export function useSwipeToDismiss({
       onMoveShouldSetPanResponder: (_, g) => {
         // Eşik: eksenin diğer eksene göre baskın olması gerekir (scroll ile çakışmasın).
         if (isHorizontal) {
-          const moved = direction === 'right' ? g.dx > 12 : g.dx < -12;
-          return moved && Math.abs(g.dx) > Math.abs(g.dy) * 1.5;
+          const moved = direction === 'right' ? g.dx > 8 : g.dx < -8;
+          return moved && Math.abs(g.dx) > Math.abs(g.dy) * 1.2;
         } else {
-          // Dikey swipe (bottom sheet): yukarı scroll'u bozmamak için yalnızca aşağı swipe'ta claim
-          return g.dy > 12 && Math.abs(g.dy) > Math.abs(g.dx) * 1.5;
+          // Dikey swipe: aşağı/yukarı yöne göre eşik
+          const moved = direction === 'up' ? g.dy < -8 : g.dy > 8;
+          return moved && Math.abs(g.dy) > Math.abs(g.dx) * 1.2;
         }
       },
-      // Capture'da NEGATIVE tutarak iç bileşenlerin (scroll/buton) gesture'ını engelleme.
-      onMoveShouldSetPanResponderCapture: () => false,
+      // ★ Move Capture — güçlü swipe'ta ScrollView'dan responder çal (iOS Sheet tarzı).
+      // Küçük hareketler scroll'a gider; belirgin swipe parent'a geçer.
+      onMoveShouldSetPanResponderCapture: (_, g) => {
+        if (isHorizontal) {
+          const moved = direction === 'right' ? g.dx > 25 : g.dx < -25;
+          return moved && Math.abs(g.dx) > Math.abs(g.dy) * 2;
+        } else {
+          const moved = direction === 'up' ? g.dy < -25 : g.dy > 25;
+          return moved && Math.abs(g.dy) > Math.abs(g.dx) * 2;
+        }
+      },
       onPanResponderTerminationRequest: () => false,
       onPanResponderMove: (_, g) => {
         const delta = isHorizontal ? g.dx : g.dy;

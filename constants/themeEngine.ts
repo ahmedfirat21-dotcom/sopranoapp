@@ -19,20 +19,22 @@ type ThemeColors = {
   glassBorder2: string;
 };
 
+// ★ 2026-04-20: Midnight Sapphire — pürüzsüz royal navy zemin, kart yüzeyleri
+//   hafif lift ile ayırt edilir. Solid renk, glow yok.
 const DARK_COLORS: ThemeColors = {
-  bg:  '#2f404f',
-  bg2: '#111720',
-  bg3: '#1A2030',
-  bg4: '#1F2840',
-  bg5: '#263250',
+  bg:  '#0F1929',   // Royal navy — ana uygulama zemini
+  bg2: '#070D17',   // En derin katman — modal backdrop
+  bg3: '#162236',   // Raised surface — kart içi fon
+  bg4: '#1F2E48',   // Elevated — modal/panel arka plan
+  bg5: '#2A3C5C',   // Highlighted — active/selected state
   text: '#F1F5F9',
-  text2: '#94A3B8',
-  text3: '#64748B',
-  glass: '#333b45',
-  glass2: '#3a424d',
-  glass3: '#414955',
-  glassBorder: 'rgba(255,255,255,0.10)',
-  glassBorder2: 'rgba(255,255,255,0.14)',
+  text2: '#A8B4C7',
+  text3: '#6B7A93',
+  glass: '#1C2840',
+  glass2: '#243350',
+  glass3: '#2C3E62',
+  glassBorder: 'rgba(125, 170, 229, 0.14)',
+  glassBorder2: 'rgba(125, 170, 229, 0.22)',
 };
 
 export const THEME_PALETTES: Record<ThemeKey, ThemeColors> = {

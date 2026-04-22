@@ -30,6 +30,14 @@
           }
         },
         {
+          "client_id": "236660998634-ioopeh7u6hqj026o0nnrpo2l1esctpqh.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.sopranochat",
+            "certificate_hash": "557e32e92dd5cf04533016f5ad8364f47bc0211c"
+          }
+        },
+        {
           "client_id": "236660998634-l35bppem9s6a2nfu7498pg2dt590tn8o.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
@@ -38,40 +46,11 @@
           }
         },
         {
-          "client_id": "236660998634-rk3hae9hu4a75sem79ep4l773ekd9rt2.apps.googleusercontent.com",
-          "client_type": 3
-        }
-      ],
-      "api_key": [
-        {
-          "current_key": "AIzaSyDOwS7wZV3B-MAT87JERtVSVKftpr-Wy-c"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": [
-            {
-              "client_id": "236660998634-rk3hae9hu4a75sem79ep4l773ekd9rt2.apps.googleusercontent.com",
-              "client_type": 3
-            }
-          ]
-        }
-      }
-    },
-    {
-      "client_info": {
-        "mobilesdk_app_id": "1:236660998634:android:f60b077a06869e1649f293",
-        "android_client_info": {
-          "package_name": "com.sopranochat.mobil2"
-        }
-      },
-      "oauth_client": [
-        {
-          "client_id": "236660998634-b7r1de9mnjmslnjttf80a56tha98ehk5.apps.googleusercontent.com",
+          "client_id": "236660998634-qmk4dr5kjjbeg84m8aumf08kl06na2p1.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
-            "package_name": "com.sopranochat.mobil2",
-            "certificate_hash": "9ad7e02db8a2c254179a086efcc401bb50600c9a"
+            "package_name": "com.sopranochat",
+            "certificate_hash": "c53dd127a49d5b842531c1ed72f01ca4b5b49cba"
           }
         },
         {

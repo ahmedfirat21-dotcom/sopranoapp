@@ -8,9 +8,19 @@ import { View, StyleSheet, Dimensions, AppState, Platform, PermissionsAndroid, L
 LogBox.ignoreLogs([
   /\[RevenueCat\].*fetching offerings/,
   /PurchasesError.*ConfigurationError/,
+  /You have configured the SDK with a Play Store API for Play Store products/,
   /You have configured the SDK with a Play Store API key, but there are no Play Store products/,
+  // ★ LiveKit race: katılımcı disconnect olurken track subscribe ediliyor.
+  //   SDK internal log, zararsız — fonksiyonel hata yok.
+  /Tried to add a track for a participant, that's not present/,
+  /Tried to remove a track for a participant, that's not present/,
+  // ★ 2026-04-21: LiveKit duplicate identity — kullanıcı hızlı arka arkaya odaya
+  //   girip çıktığında server eski oturumu leave ediyor, client otomatik reconnect
+  //   yapıyor. LogBox'a düşmesi gereksiz.
+  /Received leave request while trying to \(re\)connect/,
+  /ConnectionError.*LeaveRequest/,
 ]);
-import { Stack, useRouter, useSegments } from 'expo-router';
+import { Stack, useRouter, useSegments, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import * as Linking from 'expo-linking';
@@ -92,6 +102,16 @@ type AuthContextType = {
   user: { name: string; avatar: string } | null;
   setUser: (u: { name: string; avatar: string } | null) => void;
   firebaseUser: User | null;
+  /** ★ BUG-EV 2026-04-21: Firebase User objesi in-place mutate olduğunda (ör. reload() sonrası
+   *  emailVerified=true olduğunda) React re-render tetiklenmez. authVersion'ı bump'layarak
+   *  AuthGuard effect'ini zorla çalıştırıyoruz. login.tsx'te refreshAuth() çağrılır. */
+  authVersion: number;
+  refreshAuth: () => void;
+  /** ★ 2026-04-22: Onboarding'i yeni tamamlayan kullanıcı için intro'yu garantili
+   *  tetiklemek. finalizeOnboarding() true yapar, home.tsx'te intro gösterilir
+   *  ve flag false'a çekilir. AsyncStorage'a bağımlı değil → re-install sorunsuz. */
+  justCompletedOnboarding: boolean;
+  setJustCompletedOnboarding: (v: boolean) => void;
   profile: Profile | null;
   setProfile: (p: Profile | null) => void;
   refreshProfile: () => Promise<void>;
@@ -106,6 +126,12 @@ type AuthContextType = {
   /** ★ BUG-4: Global bildirim drawer kontrolü */
   showNotifDrawer: boolean;
   setShowNotifDrawer: (v: boolean) => void;
+  /** ★ 2026-04-20: Zil ikonunun sağdan offseti — her ekran farklı (home: 60, room: 80) */
+  setNotifDrawerAnchorRight: (px: number) => void;
+  /** ★ Drawer kutusunun sağdan offseti (default 8) */
+  setNotifDrawerRight: (px: number) => void;
+  /** ★ Drawer kutusunun üstten offseti (anchorTop) */
+  setNotifDrawerTop: (px: number | undefined) => void;
 };
 
 export const AuthContext = createContext<AuthContextType>({
@@ -115,6 +141,10 @@ export const AuthContext = createContext<AuthContextType>({
   user: null,
   setUser: () => {},
   firebaseUser: null,
+  authVersion: 0,
+  refreshAuth: () => {},
+  justCompletedOnboarding: false,
+  setJustCompletedOnboarding: () => {},
   profile: null,
   setProfile: () => {},
   refreshProfile: async () => {},
@@ -126,6 +156,9 @@ export const AuthContext = createContext<AuthContextType>({
   setActiveCallId: () => {},
   showNotifDrawer: false,
   setShowNotifDrawer: () => {},
+  setNotifDrawerAnchorRight: () => {},
+  setNotifDrawerRight: () => {},
+  setNotifDrawerTop: () => {},
 });
 
 export function useAuth() {
@@ -174,6 +207,10 @@ function RealtimeBadgeProvider({ userId, children }: { userId: string | null; ch
   const [unreadDMs, setUnreadDMs] = useState(0);
   const [pendingFollows, setPendingFollows] = useState(0);
   const [unreadNotifs, setUnreadNotifs] = useState(0);
+  // ★ 2026-04-21: Route context — oda içindeyken follow_pending zile yansısın, dışında arkadaş simgesinde.
+  const pathname = usePathname();
+  const inRoomRef = useRef(false);
+  useEffect(() => { inRoomRef.current = pathname?.startsWith('/room') ?? false; }, [pathname]);
 
   const refreshBadges = async () => {
     if (!userId) return;
@@ -189,7 +226,7 @@ function RealtimeBadgeProvider({ userId, children }: { userId: string | null; ch
             .select('*', { count: 'exact', head: true })
             .eq('user_id', userId)
             .eq('is_read', false)
-            .in('type', ['room_live', 'room_invite', 'room_invite_accepted', 'room_invite_rejected', 'missed_call', 'incoming_call', 'gift', 'event_reminder']);
+            .in('type', ['room_live', 'room_invite', 'room_invite_accepted', 'room_invite_rejected', 'room_access_request', 'missed_call', 'incoming_call', 'gift', 'thank_you', 'event_reminder', 'follow_accepted', 'follow_rejected']);
           return count || 0;
         })(),
       ]);
@@ -213,6 +250,10 @@ function RealtimeBadgeProvider({ userId, children }: { userId: string | null; ch
     // İlk sayıları çek
     refreshBadges();
 
+    // ★ Global refresh hook — NotificationDrawer bildirimi toplu okudunda
+    //   çağrılır, realtime UPDATE event'ini beklemeden badge sıfırlanır.
+    (global as any).__sopranoBadgeRefresh = () => { refreshBadges(); };
+
     // 1. DM realtime — yeni mesaj gelince unread artır
     const dmSub = supabase
       .channel(`badge_dm:${userId}`)
@@ -232,8 +273,9 @@ function RealtimeBadgeProvider({ userId, children }: { userId: string | null; ch
     });
 
     // 3. Notifications realtime — yeni bildirim gelince sayıyı artır + anlık toast
-    // ★ Zil badge'ine dahil olan bildirim tipleri (oda + arama + hediye)
-    const BELL_NOTIF_TYPES = ['room_live', 'room_invite', 'room_invite_accepted', 'room_invite_rejected', 'missed_call', 'incoming_call', 'gift', 'event_reminder'];
+    // ★ Zil badge'ine dahil olan bildirim tipleri (oda + arama + hediye + teşekkür + arkadaşlık yanıtları)
+    // ★ 2026-04-21: follow_pending context-aware — oda içindeyken bell badge'e eklenir, dışında arkadaş simgesi ile yetinir.
+    const BELL_NOTIF_TYPES_BASE = ['room_live', 'room_invite', 'room_invite_accepted', 'room_invite_rejected', 'room_access_request', 'missed_call', 'incoming_call', 'gift', 'thank_you', 'event_reminder', 'follow_accepted', 'follow_rejected'];
     const notifSub = supabase
       .channel(`badge_notif:${userId}`)
       .on('postgres_changes', {
@@ -244,7 +286,22 @@ function RealtimeBadgeProvider({ userId, children }: { userId: string | null; ch
       }, (payload) => {
         const n = payload.new as { type?: string; body?: string; id?: string };
         const notifType = n?.type;
-        if (!notifType || !BELL_NOTIF_TYPES.includes(notifType)) return;
+        // ★ 2026-04-20: follow_request bell'e sayılmaz (Friends drawer'da zaten
+        //   pendingFollows var) ama her ekranda toast göster ki oda içindeki
+        //   kullanıcı da bilsin.
+        if (notifType === 'follow_request') {
+          showToast({ title: '👋 Arkadaşlık İsteği', message: n?.body || 'Yeni arkadaşlık isteği', type: 'info', id: `notif_${n?.id}` });
+          return;
+        }
+        // ★ 2026-04-21: follow_pending — oda içindeyken bell badge; dışında sadece friend icon (pendingFollows)
+        if (notifType === 'follow_pending') {
+          if (inRoomRef.current) {
+            setUnreadNotifs(prev => prev + 1);
+            showToast({ title: '👋 Arkadaşlık İsteği', message: n?.body || 'Yeni arkadaşlık isteği', type: 'info', id: `notif_${n?.id}` });
+          }
+          return;
+        }
+        if (!notifType || !BELL_NOTIF_TYPES_BASE.includes(notifType)) return;
         setUnreadNotifs(prev => prev + 1);
 
         // ★ 2026-04-19: Anlık toast — kullanıcı hangi ekranda olursa olsun bildirim görsün.
@@ -262,10 +319,47 @@ function RealtimeBadgeProvider({ userId, children }: { userId: string | null; ch
           showToast({ title: '🔴 Canlı Yayın', message: body, type: 'info', id });
         } else if (notifType === 'gift') {
           showToast({ title: '🎁 Hediye Aldın', message: body, type: 'success', id });
+        } else if (notifType === 'thank_you') {
+          showToast({ title: '💖 Teşekkür Aldın', message: body, type: 'success', id });
         } else if (notifType === 'missed_call') {
           showToast({ title: '📞 Cevapsız Arama', message: body, type: 'warning', id });
         } else if (notifType === 'event_reminder') {
           showToast({ title: '⏰ Etkinlik Hatırlatıcı', message: body, type: 'info', id });
+        } else if (notifType === 'follow_accepted') {
+          showToast({ title: '🎉 Arkadaşlık Kabul', message: body, type: 'success', id });
+        } else if (notifType === 'room_access_request') {
+          showToast({ title: '🚪 Odana Katılma İsteği', message: body, type: 'info', id });
+        }
+      })
+      // ★ 2026-04-20 FIX: UPDATE listener — drawer bildirimi is_read=true yapınca
+      //   badge sayısı otomatik düşsün. Daha önce INSERT'le artıyordu ama
+      //   "okunmuş" bilgisi badge'e yansımıyordu → zil hep dolu görünüyordu.
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'notifications',
+        filter: `user_id=eq.${userId}`,
+      }, (payload) => {
+        const oldN = payload.old as { is_read?: boolean; type?: string };
+        const newN = payload.new as { is_read?: boolean; type?: string };
+        if (!newN?.type || !BELL_NOTIF_TYPES_BASE.includes(newN.type)) return;
+        // unread → read geçişi: decrement
+        if (oldN?.is_read === false && newN?.is_read === true) {
+          setUnreadNotifs(prev => Math.max(0, prev - 1));
+        } else if (oldN?.is_read === true && newN?.is_read === false) {
+          setUnreadNotifs(prev => prev + 1);
+        }
+      })
+      .on('postgres_changes', {
+        event: 'DELETE',
+        schema: 'public',
+        table: 'notifications',
+      }, (payload) => {
+        const del = payload.old as { user_id?: string; is_read?: boolean; type?: string };
+        if (del?.user_id !== userId) return;
+        if (!del?.type || !BELL_NOTIF_TYPES_BASE.includes(del.type)) return;
+        if (del?.is_read === false) {
+          setUnreadNotifs(prev => Math.max(0, prev - 1));
         }
       })
       .subscribe();
@@ -274,6 +368,7 @@ function RealtimeBadgeProvider({ userId, children }: { userId: string | null; ch
       supabase.removeChannel(dmSub);
       FriendshipService.unsubscribe(friendSub);
       supabase.removeChannel(notifSub);
+      (global as any).__sopranoBadgeRefresh = undefined;
     };
   }, [userId]);
 
@@ -288,7 +383,7 @@ function RealtimeBadgeProvider({ userId, children }: { userId: string | null; ch
 
 // ========== AUTH GUARD ==========
 function AuthGuard({ children }: { children: React.ReactNode }) {
-  const { isAuthReady, isLoggedIn, profile, firebaseUser } = useAuth();
+  const { isAuthReady, isLoggedIn, profile, firebaseUser, authVersion } = useAuth();
   const segments = useSegments();
   const router = useRouter();
 
@@ -316,9 +411,21 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
       }
 
       // Giriş yapmış, ama profil tam mı?
-      // ★ FIX: display_name + id kontrolü yeterli — preferences kolonu DB'de yok,
-      // interests çoğu kullanıcıda null. display_name doluysa kullanıcı kayıtlı demektir.
-      const hasCompleteProfile = profile && profile.display_name && profile.id;
+      // ★ 2026-04-21 FIX: Eski kontrol sadece display_name + id bakıyordu —
+      //   Step 1'de display_name kaydedilince AuthGuard profili "tam" sayıp
+      //   kullanıcıyı hemen home'a atıyordu → Step 2 (cinsiyet/yaş), Step 3
+      //   (ilgi alanları), Step 4 (davet kodu) hiç gösterilmiyordu.
+      //   Şimdi: preferences.onboarding_completed flag'i de kontrol ediliyor.
+      //   Bu flag yalnızca finalizeOnboarding() içinde (Step 4 tamamlanınca
+      //   veya "Atla"ya basılınca) true yapılır.
+      const profilePrefs = (profile as any)?.preferences;
+      // ★ 2026-04-21 FIX v3: SADECE preferences.onboarding_completed flag'i kontrol edilir.
+      //   Eski "birth_date veya interests varsa" fallback'i kaldırıldı — bu Step 2'de
+      //   birth_date set edilir edilmez AuthGuard "onboarding done" zannedip kullanıcıyı
+      //   home'a yolluyordu, Step 3/4 hiç gösterilmiyordu. Launch öncesi test döneminde
+      //   olduğumuz için legacy user endişesi yok; flag Step 4 (veya "Atla") ile yazılır.
+      const onboardingDone = profilePrefs?.onboarding_completed === true;
+      const hasCompleteProfile = profile && profile.display_name && profile.id && onboardingDone;
 
       if (!profile) {
         // ★ 2026-04-18 FIX: Profil null — giriş yapılmış ama profile henüz yüklenmemiş
@@ -333,18 +440,25 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
           return () => clearTimeout(timer);
         }
       } else if (hasCompleteProfile) {
-        // ★ FIX: Tam profili olan mevcut kullanıcı — auth group'taysa ana sayfaya yönlendir
+        // ★ FIX: Tam profili olan + onboarding'i bitirmiş mevcut kullanıcı — ana sayfaya yönlendir
         if (inAuthGroup) {
           router.replace('/(tabs)/home');
         }
+      } else if (profile.display_name && profile.id && !onboardingDone) {
+        // ★ 2026-04-21 FIX: Profil var ama onboarding tamamlanmamış — onboarding'e yönlendir.
+        //   Bu durum: Step 1 tamamlanmış (display_name var) ama Step 2-4 atlanmış.
+        //   Mevcut kullanıcı tekrar giriş yapınca bu branch'e düşer.
+        if (!isOnboarding) {
+          router.replace('/(auth)/onboarding');
+        }
       } else {
-        // display_name veya onboarding_completed eksik — onboarding'e git
+        // display_name eksik — ilk kayıt, onboarding'e git
         if (!isOnboarding) {
           router.replace('/(auth)/onboarding');
         }
       }
     }
-  }, [isAuthReady, isLoggedIn, profile, firebaseUser?.emailVerified, segments]);
+  }, [isAuthReady, isLoggedIn, profile, firebaseUser?.emailVerified, segments, authVersion]);
 
   // ★ Auth hazır değilken loading göster — siyah ekranı önle
   if (!isAuthReady) {
@@ -429,9 +543,21 @@ export default function RootLayout() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [user, setUser] = useState<{ name: string; avatar: string } | null>(null);
   const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
+  // ★ BUG-EV 2026-04-21: AuthGuard'ı zorla re-trigger etmek için counter
+  const [authVersion, setAuthVersion] = useState(0);
+  const refreshAuth = useCallback(() => setAuthVersion(v => v + 1), []);
+  // ★ 2026-04-22: Onboarding freshly completed flag — intro'yu garantili göster
+  const [justCompletedOnboarding, setJustCompletedOnboarding] = useState(false);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [minimizedRoom, setMinimizedRoom] = useState<MinimizedRoom | null>(null);
+  // ★ 2026-04-21: Ref — call signal handler closure'da stale değer kullanmasın
+  const minimizedRoomRef = useRef<MinimizedRoom | null>(null);
+  useEffect(() => { minimizedRoomRef.current = minimizedRoom; }, [minimizedRoom]);
   const [showNotifDrawer, setShowNotifDrawer] = useState(false);
+  // ★ 2026-04-20: Zil ikon offseti (sağdan px). Her ekran farklı; default 60 (home pattern).
+  const [notifDrawerAnchorRight, setNotifDrawerAnchorRight] = useState(60);
+  const [notifDrawerRight, setNotifDrawerRight] = useState<number>(8);
+  const [notifDrawerTop, setNotifDrawerTop] = useState<number | undefined>(undefined);
   // ★ Gelen SP bağışı için global popup state
   const [incomingGift, setIncomingGift] = useState<{
     amount: number; senderId: string; senderName: string; senderAvatar?: string;
@@ -896,6 +1022,13 @@ export default function RootLayout() {
             .select('display_name, avatar_url')
             .eq('id', notif.sender_id)
             .single();
+          // ★ 2026-04-20: Oda içindeyken büyük gold SPReceivedModal'ı bastır —
+          //   oda içi DonationAlert zaten tüm katılımcılara aynı animasyonu
+          //   gösteriyor. Dışarıdayken (chat/home/profile vs) modal açılır.
+          if ((global as any).__sopranoInRoom) {
+            if (__DEV__) console.log('[GiftRT] Suppressed — user in room, DonationAlert handles it');
+            return;
+          }
           setIncomingGift({
             amount,
             senderId: notif.sender_id,
@@ -921,6 +1054,22 @@ export default function RootLayout() {
         // ★ MEŞGUL KONTROLÜ: Aktif arama varsa otomatik busy gönder
         if (activeCallIdRef.current) {
           if (__DEV__) console.log('[Layout] ★ MEŞGUL — aktif arama var, busy gönderiliyor:', signal.callerName);
+          CallService.sendBusy(signal.callerId, firebaseUser.uid, signal.callId).catch(() => {});
+          return;
+        }
+        // ★ 2026-04-21: Oda içinde aktif yayındayken (LiveKit bağlı) arama gelirse busy gönder.
+        //   WhatsApp benzeri davranış: kullanıcı canlı yayını kaçırmaz.
+        try {
+          const { liveKitService } = require('../services/livekit');
+          if (liveKitService?.currentRoom) {
+            if (__DEV__) console.log('[Layout] ★ MEŞGUL — kullanıcı odada yayında, busy gönderiliyor:', signal.callerName);
+            CallService.sendBusy(signal.callerId, firebaseUser.uid, signal.callId).catch(() => {});
+            return;
+          }
+        } catch {}
+        // ★ Minimize edilmiş odada da busy
+        if (minimizedRoomRef.current) {
+          if (__DEV__) console.log('[Layout] ★ MEŞGUL — minimize odada, busy gönderiliyor:', signal.callerName);
           CallService.sendBusy(signal.callerId, firebaseUser.uid, signal.callId).catch(() => {});
           return;
         }
@@ -1001,7 +1150,7 @@ export default function RootLayout() {
   }
 
   return (
-    <AuthContext.Provider value={{ isAuthReady, isLoggedIn, setIsLoggedIn, user, setUser, firebaseUser, profile, setProfile, refreshProfile, minimizedRoom, setMinimizedRoom, pendingCallSignals, consumeCallSignal, activeCallId, setActiveCallId: updateActiveCallId, showNotifDrawer, setShowNotifDrawer }}>
+    <AuthContext.Provider value={{ isAuthReady, isLoggedIn, setIsLoggedIn, user, setUser, firebaseUser, authVersion, refreshAuth, justCompletedOnboarding, setJustCompletedOnboarding, profile, setProfile, refreshProfile, minimizedRoom, setMinimizedRoom, pendingCallSignals, consumeCallSignal, activeCallId, setActiveCallId: updateActiveCallId, showNotifDrawer, setShowNotifDrawer, setNotifDrawerAnchorRight, setNotifDrawerRight, setNotifDrawerTop }}>
       <ThemeContext.Provider value={{ themeVersion, applyTheme }}>
       <RealtimeBadgeProvider userId={firebaseUser?.uid || null}>
       <OnlineFriendsProvider userId={firebaseUser?.uid || null}>
@@ -1068,6 +1217,10 @@ export default function RootLayout() {
           visible={showNotifDrawer}
           onClose={() => setShowNotifDrawer(false)}
           userId={firebaseUser?.uid}
+          anchorRight={notifDrawerAnchorRight}
+          drawerRight={notifDrawerRight}
+          anchorTop={notifDrawerTop}
+          onShowGiftModal={(p) => setIncomingGift({ amount: p.amount, senderId: p.senderId, senderName: p.senderName, senderAvatar: p.senderAvatar })}
         />
 
         {/* ★ SP Bağış Alındı global popup — realtime tetiklenir */}

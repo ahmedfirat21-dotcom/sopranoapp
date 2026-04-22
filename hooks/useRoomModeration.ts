@@ -113,7 +113,6 @@ export function useRoomModeration({
             // BUG FIX: Kick sonrası yerel state'den de kaldır — flash ile gecikme
             setAvatarFlash?.(userId, 'kick');
             setSelectedUser(null);
-            setTimeout(() => setParticipants(prev => prev.filter(p => p.user_id !== userId)), 1500);
             const sysMsg = {
               id: `sys_kick_${userId}_${Date.now()}`,
               room_id: roomId,
@@ -124,6 +123,8 @@ export function useRoomModeration({
               isSystem: true,
             } as any;
             setChatMessages(prev => [sysMsg, ...prev].slice(0, 100));
+            // ★ 5sn (flash animasyonu oynar)
+            setTimeout(() => setParticipants(prev => prev.filter(p => p.user_id !== userId)), 5000);
           } catch (e) {
             // silent — hata durumunda UI stale kalabilir
           }
@@ -320,16 +321,33 @@ export function useRoomModeration({
   // ========== GEÇİCİ BAN ==========
   const executeTempBan = useCallback(async (userId: string, displayName: string, mins: number) => {
     try {
-      await RoomService.banTemporary(roomId, userId, mins);
+      // ★ v44: executorId ile gönder — Supabase JWKS yoksa RPC fallback olarak kullanır
+      await RoomService.banTemporary(roomId, userId, mins, firebaseUser?.uid);
       modChannelRef.current?.send({
         type: 'broadcast', event: 'mod_action',
         payload: { action: 'ban', targetUserId: userId, reason: `${mins >= 60 ? Math.floor(mins/60) + ' saat' : mins + ' dakika'} yasaklandın.` },
       });
       setAvatarFlash?.(userId, 'ban');
       setSelectedUser(null);
-      setTimeout(() => setParticipants(prev => prev.filter(p => p.user_id !== userId)), 1500);
-    } catch { /* silent */ }
-  }, [roomId, modChannelRef]);
+      // ★ Sistem mesajı — herkes kimin banlandığını görsün
+      const sysMsg = {
+        id: `sys_ban_${userId}_${Date.now()}`,
+        room_id: roomId,
+        user_id: userId,
+        content: `⛔ ${mins >= 60 ? Math.floor(mins/60) + ' saat' : mins + ' dakika'} banlandı`,
+        created_at: new Date().toISOString(),
+        profiles: { display_name: displayName },
+        isSystem: true,
+      } as any;
+      setChatMessages(prev => [sysMsg, ...prev].slice(0, 100));
+      // ★ 5sn sonra avatar kaybolur (animasyon oynar)
+      setTimeout(() => setParticipants(prev => prev.filter(p => p.user_id !== userId)), 5000);
+    } catch (e: any) {
+      // ★ 2026-04-20: Ban INSERT fail olursa kullanıcı hata alsın — eskiden silent,
+      //   release'de hiç görünmüyordu. RLS/JWT vb sorun varsa mod tekrar deneyebilir.
+      showToast({ title: 'Ban Başarısız', message: e?.message || 'Ban kaydedilemedi, tekrar dene.', type: 'error' });
+    }
+  }, [roomId, modChannelRef, firebaseUser?.uid]);
 
   const handleTempBan = useCallback((userId: string, displayName: string) => {
     setAlertConfig({
@@ -351,19 +369,33 @@ export function useRoomModeration({
         { text: 'İptal', style: 'cancel' },
         { text: 'Kalıcı Yasakla', style: 'destructive', onPress: async () => {
           try {
-            await RoomService.banPermanent(roomId, userId);
+            // ★ v44: executorId ile gönder
+            await RoomService.banPermanent(roomId, userId, firebaseUser?.uid);
             modChannelRef.current?.send({
               type: 'broadcast', event: 'mod_action',
               payload: { action: 'permban', targetUserId: userId, reason: 'Kalıcı olarak yasaklandın.' },
             });
-            setAvatarFlash?.(userId, 'ban');
+            setAvatarFlash?.(userId, 'permban');
             setSelectedUser(null);
-            setTimeout(() => setParticipants(prev => prev.filter(p => p.user_id !== userId)), 1500);
-          } catch { /* silent */ }
+            // ★ Sistem mesajı
+            const sysMsg = {
+              id: `sys_permban_${userId}_${Date.now()}`,
+              room_id: roomId,
+              user_id: userId,
+              content: '☠️ KALICI olarak yasaklandı',
+              created_at: new Date().toISOString(),
+              profiles: { display_name: displayName },
+              isSystem: true,
+            } as any;
+            setChatMessages(prev => [sysMsg, ...prev].slice(0, 100));
+            setTimeout(() => setParticipants(prev => prev.filter(p => p.user_id !== userId)), 5000);
+          } catch (e: any) {
+            showToast({ title: 'Kalıcı Ban Başarısız', message: e?.message || 'Ban kaydedilemedi, tekrar dene.', type: 'error' });
+          }
         }},
       ]
     });
-  }, [roomId, modChannelRef]);
+  }, [roomId, modChannelRef, firebaseUser?.uid]);
 
   // ========== ŞİKAYET ==========
   const submitReport = useCallback(async (userId: string, reason: string) => {

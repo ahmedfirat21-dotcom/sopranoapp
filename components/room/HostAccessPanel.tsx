@@ -17,6 +17,7 @@ import { ModerationService } from '../../services/moderation';
 import { getAvatarSource } from '../../constants/avatars';
 import { showToast } from '../Toast';
 import { useSwipeToDismiss } from '../../hooks/useSwipeToDismiss';
+import { supabase } from '../../constants/supabase';
 
 const { width: W } = Dimensions.get('window');
 const DRAWER_W = W * 0.72;
@@ -40,7 +41,9 @@ export default function HostAccessPanel({ visible, onClose, roomId, roomType, ho
     onDismiss: onClose,
   });
 
-  const [tab, setTab] = useState<'requests' | 'invite' | 'bans'>(roomType === 'closed' ? 'requests' : roomType === 'invite' ? 'requests' : 'bans');
+  // ★ 2026-04-20: 'invite' tab kaldırıldı — davet PlusMenu'de tek merkezde.
+  //   HostAccessPanel artık sadece moderasyon (istekler + banlar).
+  const [tab, setTab] = useState<'requests' | 'bans'>(roomType === 'closed' || roomType === 'invite' ? 'requests' : 'bans');
   const [requests, setRequests] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Profile[]>([]);
@@ -75,6 +78,21 @@ export default function HostAccessPanel({ visible, onClose, roomId, roomType, ho
       setSearchResults([]);
     }
   }, [visible]);
+
+  // ★ 2026-04-20: Banlılar listesi realtime — yeni ban eklenince anında yansır
+  useEffect(() => {
+    if (!visible || !roomId) return;
+    const banChannel = supabase
+      .channel(`room_bans:${roomId}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'room_bans',
+        filter: `room_id=eq.${roomId}`,
+      }, () => { loadBans(); })
+      .subscribe();
+    return () => { supabase.removeChannel(banChannel); };
+  }, [visible, roomId]);
 
   const loadRequests = async () => {
     setLoadingRequests(true);
@@ -119,7 +137,7 @@ export default function HostAccessPanel({ visible, onClose, roomId, roomType, ho
   const handleUnban = async (ban: any) => {
     setProcessingIds(prev => new Set(prev).add(ban.id));
     try {
-      await ModerationService.unbanFromRoom(roomId, ban.user_id);
+      await ModerationService.unbanFromRoom(roomId, ban.user_id, hostId);
       setBannedUsers(prev => prev.filter(b => b.id !== ban.id));
       showToast({ title: '✅ Ban Kaldırıldı', message: `${ban.user?.display_name || 'Kullanıcı'} artık odaya girebilir.`, type: 'success' });
     } catch {
@@ -156,10 +174,9 @@ export default function HostAccessPanel({ visible, onClose, roomId, roomType, ho
     }
   };
 
-  // Tab tanımları
+  // Tab tanımları — 'invite' KALDIRILDI (duplikasyon; PlusMenu > Davet akışı tek yer).
   const tabs = [
     ...((roomType === 'closed' || roomType === 'invite') ? [{ id: 'requests' as const, label: 'İstekler', icon: 'hourglass-outline' as const, count: requests.length }] : []),
-    { id: 'invite' as const, label: 'Davet Et', icon: 'person-add-outline' as const, count: 0 },
     { id: 'bans' as const, label: 'Banlılar', icon: 'ban-outline' as const, count: bannedUsers.length },
   ];
 
@@ -252,65 +269,7 @@ export default function HostAccessPanel({ visible, onClose, roomId, roomType, ho
             </>
           )}
 
-          {/* ═══ DAVET TAB ═══ */}
-          {tab === 'invite' && (
-            <>
-              <View style={s.searchWrap}>
-                <Ionicons name="search" size={14} color="rgba(255,255,255,0.3)" />
-                <TextInput
-                  style={s.searchInput}
-                  placeholder="Kullanıcı ara..."
-                  placeholderTextColor="rgba(255,255,255,0.2)"
-                  value={searchQuery}
-                  onChangeText={handleSearch}
-                  autoCapitalize="none"
-                />
-                {searchQuery.length > 0 && (
-                  <Pressable onPress={() => { setSearchQuery(''); setSearchResults([]); }} hitSlop={8}>
-                    <Ionicons name="close-circle" size={16} color="rgba(255,255,255,0.2)" />
-                  </Pressable>
-                )}
-              </View>
-
-              {searching ? (
-                <ActivityIndicator color="#A78BFA" style={{ marginTop: 30 }} />
-              ) : searchResults.length === 0 && searchQuery.length >= 2 ? (
-                <View style={s.empty}>
-                  <Ionicons name="search-outline" size={28} color="rgba(255,255,255,0.15)" />
-                  <Text style={s.emptyTitle}>Sonuç bulunamadı</Text>
-                </View>
-              ) : searchResults.length === 0 && searchQuery.length < 2 ? (
-                <View style={s.empty}>
-                  <View style={s.emptyIcon}>
-                    <Ionicons name="person-add-outline" size={28} color="rgba(167,139,250,0.25)" />
-                  </View>
-                  <Text style={s.emptyTitle}>Kullanıcı Davet Et</Text>
-                  <Text style={s.emptySub}>Kullanıcı adını arayarak odana davet gönder</Text>
-                </View>
-              ) : (
-                searchResults.map((user) => {
-                  const isProcessing = processingIds.has(user.id);
-                  return (
-                    <View key={user.id} style={s.row}>
-                      <Image source={getAvatarSource(user.avatar_url)} style={s.avatar} />
-                      <View style={{ flex: 1 }}>
-                        <Text style={s.name} numberOfLines={1}>{user.display_name}</Text>
-                        {user.username && <Text style={s.username}>@{user.username}</Text>}
-                      </View>
-                      {isProcessing ? (
-                        <ActivityIndicator size="small" color="#A78BFA" />
-                      ) : (
-                        <Pressable style={s.inviteBtn} onPress={() => handleInvite(user)}>
-                          <Ionicons name="person-add" size={12} color="#A78BFA" />
-                          <Text style={s.inviteBtnText}>Davet</Text>
-                        </Pressable>
-                      )}
-                    </View>
-                  );
-                })
-              )}
-            </>
-          )}
+          {/* Davet tab kaldırıldı — PlusMenu > Davet tek merkezde */}
 
           {/* ═══ BANLILAR TAB ═══ */}
           {tab === 'bans' && (
@@ -347,6 +306,12 @@ export default function HostAccessPanel({ visible, onClose, roomId, roomType, ho
                           </View>
                           <Text style={s.banTime}>{timeLabel}</Text>
                         </View>
+                        {/* ★ 2026-04-20: Banı kim attı — hesap verebilirlik için */}
+                        {(ban as any).banned_by_user && (
+                          <Text style={s.bannedBy} numberOfLines={1}>
+                            🛡️ {(ban as any).banned_by_user.display_name} tarafından
+                          </Text>
+                        )}
                       </View>
                       {isProcessing ? (
                         <ActivityIndicator size="small" color="#14B8A6" />
@@ -480,6 +445,7 @@ const s = StyleSheet.create({
   banTemp: { backgroundColor: 'rgba(245,158,11,0.12)' },
   banTypeText: { fontSize: 8, fontWeight: '700' },
   banTime: { fontSize: 9, color: 'rgba(255,255,255,0.25)' },
+  bannedBy: { fontSize: 9, color: 'rgba(167,139,250,0.65)', marginTop: 2, letterSpacing: 0.2 },
 
   unbanBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 4,

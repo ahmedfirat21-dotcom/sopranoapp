@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, Pressable, ScrollView, Modal, TextInput, Activi
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Colors, Shadows } from '../../constants/theme';
 import { getLevelFromSP, getLevelColors, getAvatarSource } from '../../constants/avatars';
 import { useAuth, useTheme } from '../_layout';
@@ -14,7 +14,9 @@ import { FriendshipService } from '../../services/friendship';
 import { showToast } from '../../components/Toast';
 import FollowListModal from '../../components/FollowListModal';
 import AppBackground from '../../components/AppBackground';
+import TabBarFadeOut from '../../components/TabBarFadeOut';
 import ProfileHero from '../../components/profile/ProfileHero';
+import BioEditorSheet from '../../components/profile/BioEditorSheet';
 import ProfileFriendsList from '../../components/profile/ProfileFriendsList';
 import SPHistorySheet from '../../components/profile/SPHistorySheet';
 import { useOnlineFriends } from '../../providers/OnlineFriendsProvider';
@@ -159,7 +161,8 @@ function spReasonIcon(reason: string | undefined, isPositive: boolean): { name: 
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const { profile, user, firebaseUser, refreshProfile } = useAuth();
+  const params = useLocalSearchParams<{ openSP?: string }>();
+  const { profile, user, firebaseUser, refreshProfile, setIsLoggedIn, setUser } = useAuth();
   const insets = useSafeAreaInsets();
   useTheme();
 
@@ -182,11 +185,14 @@ export default function ProfileScreen() {
   const [referralCodeText, setReferralCodeText] = useState('');
   const [submittingReferral, setSubmittingReferral] = useState(false);
   const [myReferralCode, setMyReferralCode] = useState<string | null>(null);
+  const [usedReferral, setUsedReferral] = useState<{ used: boolean; code?: string; usedAt?: string }>({ used: false });
   const [showBoostPicker, setShowBoostPicker] = useState(false);
   const [userTitle, setUserTitle] = useState<UserTitle | null>(null);
 
   // ★ Avatar preview modal + SP transaction modal
   const [showAvatarPreview, setShowAvatarPreview] = useState(false);
+  // ★ 2026-04-21: Bio inline edit — bio'ya tap ile hafif modal
+  const [showBioEditor, setShowBioEditor] = useState(false);
   const [showSPHistory, setShowSPHistory] = useState(false);
   const [spHistory, setSPHistory] = useState<any[]>([]);
 
@@ -225,7 +231,9 @@ export default function ProfileScreen() {
     if (titleRes.status === 'fulfilled') setUserTitle(titleRes.value);
   }, [userId]);
 
-  // ★ Oturum kapat — confirm + Firebase signOut + home'a yönlendir
+  // ★ 2026-04-21: Logout flow — settings.tsx pattern'ine eşit.
+  //   Önceden: signOut sonrası state clear/navigation yoktu → user UI'da "logged in" kalabiliyordu.
+  //   Şimdi: Google revoke + RevenueCat logout + Firebase signOut + state clear + router.replace.
   const handleLogout = useCallback(() => {
     setDeleteAlert({
       visible: true,
@@ -237,13 +245,24 @@ export default function ProfileScreen() {
         {
           text: 'Çıkış Yap', style: 'destructive', onPress: async () => {
             try {
-              // ★ Google hesap cache'ini de temizle — tekrar girişte hesap seçici açılsın
+              // 1) Google hesap cache — tekrar girişte hesap seçici açılsın
               try {
                 const gsignin = require('@react-native-google-signin/google-signin');
                 await gsignin.GoogleSignin.revokeAccess();
                 await gsignin.GoogleSignin.signOut();
               } catch { /* Google sign-in yoksa sessiz geç */ }
+              // 2) RevenueCat logout — subscription entitlement cache temizlensin
+              try {
+                const { RevenueCatService } = require('../../services/revenuecat');
+                await RevenueCatService.logout?.();
+              } catch { /* opsiyonel */ }
+              // 3) Firebase signOut
               await signOut(auth);
+              // 4) Context state clear — router redirect için kritik
+              setIsLoggedIn(false);
+              setUser(null);
+              // 5) Login ekranına replace — back stack temiz
+              router.replace('/(auth)/login' as any);
               showToast({ title: 'Oturum kapatıldı', type: 'success' });
             } catch (err: any) {
               showToast({ title: 'Çıkış yapılamadı', message: err.message || 'Tekrar dene.', type: 'error' });
@@ -252,16 +271,39 @@ export default function ProfileScreen() {
         },
       ],
     });
-  }, []);
+  }, [setIsLoggedIn, setUser, router]);
 
-  // ★ Hesap silme — ayarlar sayfasına git, toast navigation tamamlandıktan sonra gösterilir
+  // ★ 2026-04-21: Hesap silme — doğrudan modal (settings redirect kaldırıldı).
+  //   Tek atomik RPC (v49) + storage cleanup + Firebase delete + logout.
+  //   Kullanıcı profilden ayrılmak zorunda kalmadan hesabını silebilir.
   const handleGoToDeleteAccount = useCallback(() => {
-    router.push('/settings' as any);
-    // Küçük gecikme yerine requestAnimationFrame — daha güvenilir timing
-    requestAnimationFrame(() => {
-      showToast({ title: 'Hesap Silme', message: 'Ayarlar → Oturum → Hesabı Sil seçeneğini kullan.', type: 'info' });
+    setDeleteAlert({
+      visible: true,
+      title: '⚠️ Hesabını Sil',
+      message: 'Bu işlem GERİ ALINAMAZ. Tüm verilerin, mesajların, odaların ve rozetlerin kalıcı olarak silinecek.',
+      type: 'error',
+      buttons: [
+        { text: 'İptal', style: 'cancel' },
+        {
+          text: 'Hesabımı Kalıcı Olarak Sil',
+          style: 'destructive',
+          onPress: async () => {
+            if (!firebaseUser) return;
+            try {
+              const { performDeleteAccount } = require('../../services/account');
+              await performDeleteAccount(firebaseUser);
+              setIsLoggedIn(false);
+              setUser(null);
+              router.replace('/(auth)/login' as any);
+              showToast({ title: 'Hesap Silindi', message: 'Tüm verileriniz silindi.', type: 'info' });
+            } catch (e: any) {
+              showToast({ title: 'Hata', message: e?.message || 'Hesap silinemedi', type: 'error' });
+            }
+          },
+        },
+      ],
     });
-  }, [router]);
+  }, [firebaseUser, setIsLoggedIn, setUser, router]);
 
   const handleClaimReferral = async () => {
     if (!userId || !referralCodeText.trim()) return;
@@ -272,6 +314,7 @@ export default function ProfileScreen() {
         showToast({ title: 'Tebrikler! 50 SP kazandınız.', type: 'success' });
         setShowReferral(false);
         setReferralCodeText('');
+        setUsedReferral({ used: true, code: referralCodeText.trim().toUpperCase(), usedAt: new Date().toISOString() });
       } else {
         showToast({ title: 'Geçersiz veya kullanılmış davet kodu', message: res.message, type: 'error' });
       }
@@ -282,13 +325,17 @@ export default function ProfileScreen() {
     }
   };
 
-  // ★ Referral modal açıldığında kendi kodunu yükle
+  // ★ Referral modal açıldığında kendi kodunu + kullanım durumunu yükle
   const openReferralModal = useCallback(async () => {
     setShowReferral(true);
-    if (myReferralCode || !userId) return;
+    if (!userId) return;
     try {
-      const code = await ReferralService.getMyCode(userId);
-      setMyReferralCode(code);
+      const [code, used] = await Promise.all([
+        myReferralCode ? Promise.resolve(myReferralCode) : ReferralService.getMyCode(userId),
+        ReferralService.hasUsedReferral(userId),
+      ]);
+      if (!myReferralCode) setMyReferralCode(code);
+      setUsedReferral(used);
     } catch {}
   }, [myReferralCode, userId]);
 
@@ -316,6 +363,15 @@ export default function ProfileScreen() {
     }
   }, [spHistory.length, userId]);
 
+  // ★ Gift bildiriminden gelince SP history sheet'ini otomatik aç (param 'openSP=1')
+  //   Param'ı tükettikten sonra URL'den temizle ki tekrar odaklanmada yeniden açılmasın.
+  useEffect(() => {
+    if (params?.openSP === '1' && userId) {
+      openSPHistory();
+      router.setParams({ openSP: undefined } as any);
+    }
+  }, [params?.openSP, userId, openSPHistory, router]);
+
   // ★ useFocusEffect: Sayfa her odaklandığında SP + istatistikleri yenile.
   //   Cleanup signal'ı ile sayfa kapanırken async stale setState'ler önlenir.
   useFocusEffect(
@@ -327,31 +383,24 @@ export default function ProfileScreen() {
     }, [loadStats, refreshProfile])
   );
 
-  // ★ Realtime: Biri beni takip eder/takipten çıkarsa arkadaş sayısı anında güncellenir
+  // ★ 2026-04-21: Realtime dual subscription kaldırıldı.
+  //   Önceden profile_friends kanalı + OnlineFriendsProvider kanalı ikisi de friendships
+  //   table'ına subscribe ediyordu (redundant). Şimdi context'in allFriends değişiminde
+  //   loadStats çağrılır — tek kaynak, tek subscription (provider).
   useEffect(() => {
     if (!userId) return;
-    const channel = supabase
-      .channel(`profile_friends:${userId}`)
-      // Ben → birine (user_id=me) veya biri → bana (friend_id=me) değişimi
-      .on('postgres_changes', {
-        event: '*', schema: 'public', table: 'friendships',
-        filter: `user_id=eq.${userId}`,
-      }, () => { loadStats(); })
-      .on('postgres_changes', {
-        event: '*', schema: 'public', table: 'friendships',
-        filter: `friend_id=eq.${userId}`,
-      }, () => { loadStats(); })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [userId, loadStats]);
+    // allFriends referansı değiştikçe stats'ı yenile (yeni arkadaş eklendiyse vs.)
+    loadStats();
+  }, [userId, allFriends.length, loadStats]);
 
-  // Admin (GodMaster) özel tier
+  // GodMaster özel tier: tier='GodMaster' VEYA is_admin=true
   const isAdmin = profile?.is_admin || false;
-  const displayTier = isAdmin ? 'GodMaster' : subscriptionTier;
+  const isGM = isAdmin || subscriptionTier === 'GodMaster';
+  const displayTier = isGM ? 'GodMaster' : subscriptionTier;
   const tierDef = TIER_DEFINITIONS[subscriptionTier as keyof typeof TIER_DEFINITIONS];
-  const tierGradient = isAdmin ? ['#DC2626', '#7F1D1D'] : tierDef ? tierDef.gradient : ['#94A3B8', '#64748B'];
-  const tierIcon = isAdmin ? 'shield-checkmark' : tierDef?.icon || 'person-outline';
-  const tierBorderColor = isAdmin ? '#DC2626' : tierDef?.color || '#94A3B8';
+  const tierGradient = isGM ? ['#DC2626', '#7F1D1D'] : tierDef ? tierDef.gradient : ['#94A3B8', '#64748B'];
+  const tierIcon = isGM ? 'flash' : tierDef?.icon || 'person-outline';
+  const tierBorderColor = isGM ? '#DC2626' : tierDef?.color || '#94A3B8';
 
   const spBalance = profile?.system_points ?? 0;
   const userLevel = getLevelFromSP(spBalance, subscriptionTier);
@@ -373,6 +422,7 @@ export default function ProfileScreen() {
           userTitle={userTitle}
           stats={{ followers: stats.followers, rooms: stats.rooms }}
           onEdit={() => router.push('/edit-profile')}
+          onBioPress={() => setShowBioEditor(true)}
           onFollowersPress={() => { setFollowModalTab('followers'); setFollowModalVisible(true); }}
           onRoomsPress={() => router.push('/(tabs)/myrooms' as any)}
           onAvatarPress={() => setShowAvatarPreview(true)}
@@ -455,10 +505,10 @@ export default function ProfileScreen() {
           <View style={p.walletBody}>
             <View style={{ flex: 1 }}>
               <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
-                <Text style={p.walletAmount}>{spBalance.toLocaleString('tr-TR')}</Text>
+                <Text style={p.walletAmount}>{isGM ? '∞' : spBalance.toLocaleString('tr-TR')}</Text>
                 <Text style={p.walletCurrency}>SP</Text>
               </View>
-              <Text style={p.walletSub}>Soprano Points</Text>
+              <Text style={p.walletSub}>{isGM ? 'Sınırsız · GodMaster' : 'Soprano Points'}</Text>
             </View>
             <Pressable style={p.storeWrap} onPress={() => router.push('/sp-store' as any)}>
               <LinearGradient
@@ -476,7 +526,7 @@ export default function ProfileScreen() {
           </View>
 
           {/* ★ Level progress bar — sonraki level'e ne kadar kaldı */}
-          {userLevel < 99 && (
+          {userLevel < 99 && !isGM && (
             <View style={p.levelProgressWrap}>
               <View style={p.levelProgressTrack}>
                 <LinearGradient
@@ -644,24 +694,39 @@ export default function ProfileScreen() {
               </View>
               <Text style={styles.modalDesc}>Bir arkadaşın kodunu kullanırsa, ikiniz de 50 SP kazanırsınız.</Text>
 
-              {/* Bölüm 2: Arkadaş kodu gir */}
+              {/* Bölüm 2: Arkadaş kodu gir — zaten kullanıldıysa kilit göster */}
               <Text style={[styles.modalSubtitle, { marginTop: 16 }]}>Arkadaş Kodu Gir</Text>
-              <TextInput
-                style={styles.modalInput}
-                placeholder="Örn: XHFDK9"
-                placeholderTextColor={Colors.text3}
-                value={referralCodeText}
-                onChangeText={setReferralCodeText}
-                autoCapitalize="characters"
-                maxLength={10}
-              />
-              <Pressable
-                style={[styles.modalBtn, (!referralCodeText || submittingReferral) && { opacity: 0.5 }]}
-                onPress={handleClaimReferral}
-                disabled={!referralCodeText || submittingReferral}
-              >
-                {submittingReferral ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.modalBtnText}>Kodu Kullan (+50 SP)</Text>}
-              </Pressable>
+              {usedReferral.used ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, paddingHorizontal: 14, borderRadius: 12, backgroundColor: 'rgba(20,184,166,0.1)', borderWidth: 1, borderColor: 'rgba(20,184,166,0.3)' }}>
+                  <Ionicons name="checkmark-circle" size={20} color={Colors.teal} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: Colors.teal, fontSize: 12, fontWeight: '700' }}>Davet kodu kullanıldı</Text>
+                    <Text style={{ color: Colors.text3, fontSize: 11, marginTop: 2 }}>
+                      {usedReferral.code ? `Kod: ${usedReferral.code}` : 'Bir kod zaten uygulandı'}
+                      {usedReferral.usedAt ? ` · ${new Date(usedReferral.usedAt).toLocaleDateString('tr-TR')}` : ''}
+                    </Text>
+                  </View>
+                </View>
+              ) : (
+                <>
+                  <TextInput
+                    style={styles.modalInput}
+                    placeholder="Örn: XHFDK9"
+                    placeholderTextColor={Colors.text3}
+                    value={referralCodeText}
+                    onChangeText={setReferralCodeText}
+                    autoCapitalize="characters"
+                    maxLength={10}
+                  />
+                  <Pressable
+                    style={[styles.modalBtn, (!referralCodeText || submittingReferral) && { opacity: 0.5 }]}
+                    onPress={handleClaimReferral}
+                    disabled={!referralCodeText || submittingReferral}
+                  >
+                    {submittingReferral ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.modalBtnText}>Kodu Kullan (+50 SP)</Text>}
+                  </Pressable>
+                </>
+              )}
             </Pressable>
           </Pressable>
         </Modal>
@@ -732,6 +797,25 @@ export default function ProfileScreen() {
 
       {/* ★ SEC-DEL: Hesap silme onay modalı */}
       <PremiumAlert {...deleteAlert} onDismiss={() => setDeleteAlert(prev => ({ ...prev, visible: false }))} />
+      {/* ★ 2026-04-21: Bio inline editor — edit-profile sayfasına gitmeden hızlı düzenleme */}
+      <BioEditorSheet
+        visible={showBioEditor}
+        initialBio={bio || ''}
+        onClose={() => setShowBioEditor(false)}
+        onSave={async (newBio) => {
+          if (!userId) return;
+          try {
+            await supabase.from('profiles').update({ bio: newBio }).eq('id', userId);
+            await refreshProfile();
+            showToast({ title: 'Bio güncellendi', type: 'success' });
+          } catch (err: any) {
+            showToast({ title: 'Güncellenemedi', message: err?.message || 'Tekrar dene.', type: 'error' });
+            throw err;
+          }
+        }}
+      />
+      {/* ★ 2026-04-21: Tab bar scroll fade — tüm tab sayfalarında tutarlı */}
+      <TabBarFadeOut />
     </View>
     </AppBackground>
   );

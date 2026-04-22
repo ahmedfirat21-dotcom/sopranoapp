@@ -368,15 +368,27 @@ export const ModerationService = {
   },
 
   /** Oda banını kaldır */
-  async unbanFromRoom(roomId: string, targetUserId: string): Promise<{ success: boolean; error?: string }> {
+  async unbanFromRoom(roomId: string, targetUserId: string, executorId?: string): Promise<{ success: boolean; error?: string }> {
     try {
-      const { error } = await supabase
-        .from('room_bans')
-        .delete()
-        .eq('room_id', roomId)
-        .eq('user_id', targetUserId);
-      if (error) throw error;
-      return { success: true };
+      // ★ v45 (2026-04-20): Atomic RPC — DELETE RLS auth'a bağlı, header override
+      //   yeterli değil. RPC SECURITY DEFINER + executor_id fallback ile çalışır.
+      const { error } = await supabase.rpc('unban_user_atomic', {
+        p_room_id: roomId,
+        p_user_id: targetUserId,
+        p_executor_id: executorId || null,
+      });
+      if (!error) return { success: true };
+      // RPC yoksa legacy fallback
+      if (/function .* does not exist|42883/i.test(error.message || '')) {
+        const { error: delErr } = await supabase
+          .from('room_bans')
+          .delete()
+          .eq('room_id', roomId)
+          .eq('user_id', targetUserId);
+        if (delErr) throw delErr;
+        return { success: true };
+      }
+      return { success: false, error: error.message };
     } catch (e: any) {
       return { success: false, error: e.message };
     }
@@ -401,7 +413,7 @@ export const ModerationService = {
     return true;
   },
 
-  /** Odanın banlı kullanıcı listesi */
+  /** Odanın banlı kullanıcı listesi — banlanan kullanıcı + banı atan kişi */
   async getRoomBans(roomId: string) {
     const { data, error } = await supabase
       .from('room_bans')
@@ -410,17 +422,23 @@ export const ModerationService = {
       .order('created_at', { ascending: false });
     if (error || !data || data.length === 0) return [];
 
-    // Profilleri ayrı çek (FK bağımlılığı olmadan)
-    const userIds = [...new Set(data.map((b: any) => b.user_id))];
+    // ★ 2026-04-20: Banlanan + banı atan profilleri birlikte çek — UI'da "X tarafından"
+    const allIds = [
+      ...new Set([
+        ...data.map((b: any) => b.user_id),
+        ...data.map((b: any) => b.banned_by).filter(Boolean),
+      ]),
+    ];
     const { data: profiles } = await supabase
       .from('profiles')
       .select('id, display_name, avatar_url')
-      .in('id', userIds);
+      .in('id', allIds);
     const profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
 
     return data.map((ban: any) => ({
       ...ban,
       user: profileMap.get(ban.user_id) || { id: ban.user_id, display_name: 'Kullanıcı', avatar_url: null },
+      banned_by_user: ban.banned_by ? profileMap.get(ban.banned_by) || { id: ban.banned_by, display_name: 'Yetkili', avatar_url: null } : null,
     }));
   },
 

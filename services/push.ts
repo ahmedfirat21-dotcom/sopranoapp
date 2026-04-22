@@ -13,7 +13,7 @@
 import { logger } from '../utils/logger';
 import { supabase } from '../constants/supabase';
 
-export type PushType = 'dm' | 'follow' | 'follow_request' | 'follow_accepted' | 'gift' | 'room_invite' | 'room_live' | 'room_follow' | 'event_reminder' | 'missed_call' | 'incoming_call';
+export type PushType = 'dm' | 'message_request' | 'follow' | 'follow_request' | 'follow_accepted' | 'gift' | 'room_invite' | 'room_live' | 'room_follow' | 'event_reminder' | 'missed_call' | 'incoming_call';
 
 // ★ SEC-PUSH: Per-user debounce — bildirim spam engeli
 const _lastPushTime = new Map<string, number>();
@@ -51,6 +51,9 @@ export const PushService = {
 
       if (profileErr || !profile?.push_token) return;
 
+      // ★ 2026-04-21: Incoming call payload — WhatsApp tarzı kilitliyken çağrı için
+      //   TTL=0, priority=high, channelId='calls', sticky, iOS interruptionLevel=critical
+      const isCall = data?.type === 'incoming_call';
       const response = await fetch('https://exp.host/--/api/v2/push/send', {
         method: 'POST',
         headers: {
@@ -63,11 +66,18 @@ export const PushService = {
           body,
           sound: 'default',
           data: data || {},
-          // ★ Arama bildirimi için yüksek öncelik — uygulama kapalıyken heads-up gösterir
-          ...(data?.type === 'incoming_call' ? {
-            priority: 'high',
-            channelId: 'calls',
-            _contentAvailable: true,
+          ...(isCall ? {
+            priority: 'high',           // Expo/FCM yüksek öncelik
+            channelId: 'calls',         // Android: MAX importance channel
+            ttl: 0,                     // 0 = anında, beklemez
+            _contentAvailable: true,    // iOS: arka plan wake
+            // ★ iOS 15+ critical interruption — rahatsız etme modunu delerek çağrı çalar
+            //   (Requires Apple approval; fallback to timeSensitive)
+            interruptionLevel: 'timeSensitive',
+            // ★ Android: sticky notification — kullanıcı swipe ile kapatamaz (arama boyunca)
+            sticky: true,
+            // ★ Full-screen intent için categoryId — kilit ekranında tam ekran gelir
+            categoryId: 'incoming_call',
           } : {}),
         }),
       });
@@ -136,7 +146,7 @@ export const PushService = {
       targetUserId,
       '🎁 Hediye Aldın!',
       `${senderName} sana ${giftName} gönderdi`,
-      { type: 'gift', route: '/wallet' }
+      { type: 'gift', route: '/(tabs)/profile?openSP=1' }
     );
   },
 

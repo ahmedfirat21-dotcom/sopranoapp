@@ -4,12 +4,13 @@
  * Hem oda hem kullanıcı sonuçlarını listeler
  */
 import { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, Modal, Pressable, TextInput, FlatList, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Modal, Pressable, TextInput, FlatList, ActivityIndicator, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Radius } from '../constants/theme';
 import { supabase } from '../constants/supabase';
 import StatusAvatar from './StatusAvatar';
 import type { Profile } from '../services/database';
+import { useSwipeToDismiss } from '../hooks/useSwipeToDismiss';
 
 type UserSearchModalProps = {
   visible: boolean;
@@ -142,6 +143,12 @@ export function UserSearchModal({ visible, onClose, currentUserId, onSelectUser,
     }
   };
 
+  const { translateValue, panHandlers } = useSwipeToDismiss({
+    direction: 'down',
+    threshold: 80,
+    onDismiss: onClose,
+  });
+
   const isSearchMode = query.length >= 2;
   // ★ Compose modunda arama = arkadaşlar arasında client-side filter
   const filteredFriends = isSearchMode && !isDiscover
@@ -174,7 +181,11 @@ export function UserSearchModal({ visible, onClose, currentUserId, onSelectUser,
     <Modal transparent animationType="slide" visible={visible} onRequestClose={onClose}>
       <View style={s.overlay}>
         <Pressable style={s.overlayBg} onPress={onClose} />
-        <View style={s.container}>
+        <Animated.View style={[s.container, { transform: [{ translateY: translateValue }] }]}>
+          {/* ★ Swipe handle */}
+          <View style={s.handleWrap} {...panHandlers}>
+            <View style={s.handle} />
+          </View>
           {/* Header */}
           <View style={s.header}>
             <View style={s.headerLeft}>
@@ -330,7 +341,7 @@ export function UserSearchModal({ visible, onClose, currentUserId, onSelectUser,
               )}
             </>
           )}
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );
@@ -345,6 +356,17 @@ const s = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     overflow: 'hidden',
+  },
+  handleWrap: {
+    alignItems: 'center',
+    paddingTop: 8,
+    paddingBottom: 4,
+  },
+  handle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(20,184,166,0.4)',
   },
   header: {
     flexDirection: 'row',

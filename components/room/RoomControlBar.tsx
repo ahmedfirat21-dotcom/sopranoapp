@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, Pressable, Animated, TextInput } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -85,7 +85,19 @@ function SolidCircleBtn({ children, onPress, active, activeColor, inactiveColor,
 }
 
 // ★ Premium 3D El Kaldırma Butonu — Listener mikrofon isteme
-function MicRequestBtn({ onPress, isActive }: { onPress: () => void; isActive: boolean }) {
+// stageAction:
+//   'direct_join'  → Serbest mod, sahne boş → doğrudan sahneye çık (mic ikonu, teal)
+//   'raise_hand'   → İzinli mod / yetkili sahnede / sahne dolu → el kaldır (amber, hand)
+//   'waiting'      → Talep gönderilmiş, sıra bekleniyor (pulse + sıra no badge)
+//   'locked'       → Seçilmişler modu → host'un seçmesi gerek (gri + kilit)
+export type StageAction = 'direct_join' | 'raise_hand' | 'waiting' | 'locked';
+
+function MicRequestBtn({ onPress, stageAction, queuePosition }: {
+  onPress: () => void;
+  stageAction: StageAction;
+  queuePosition?: number;
+}) {
+  const isActive = stageAction === 'waiting';
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const glowAnim = useRef(new Animated.Value(0)).current;
@@ -130,15 +142,56 @@ function MicRequestBtn({ onPress, isActive }: { onPress: () => void; isActive: b
   const pulseOpacity = pulseAnim.interpolate({ inputRange: [1, 1.35], outputRange: [0.6, 0] });
   const shimmerOpacity = shimmerAnim.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0.08, 0.35, 0.08] });
 
+  // Variant → ikon / renk / label eşleşmesi
+  const variant = (() => {
+    switch (stageAction) {
+      case 'direct_join':
+        // Serbest mod, sahne müsait → doğrudan sahneye CTA
+        return {
+          icon: 'mic' as const,
+          colors: ['#34D399', '#14B8A6', '#0F766E'] as [string, string, string],
+          label: 'Sahneye çık (serbest mod)',
+          ringColor: '#14B8A6',
+        };
+      case 'waiting':
+        // Talep gönderildi, onay/sıra bekleniyor
+        return {
+          icon: 'hand-left' as const,
+          colors: ['#FBBF24', '#F59E0B', '#D97706'] as [string, string, string],
+          label: queuePosition && queuePosition > 0
+            ? `Sıradasın (${queuePosition}. sıra) — dokun ve iptal et`
+            : 'Onay bekleniyor — dokun ve iptal et',
+          ringColor: '#FBBF24',
+        };
+      case 'locked':
+        // Seçilmişler modu — host seçer
+        return {
+          icon: 'lock-closed' as const,
+          colors: ['#475569', '#334155', '#1E293B'] as [string, string, string],
+          label: 'Sahne kilitli — sadece oda sahibi konuşmacı seçer',
+          ringColor: '#475569',
+        };
+      case 'raise_hand':
+      default:
+        return {
+          icon: 'hand-left' as const,
+          colors: ['#64748B', '#475569', '#334155'] as [string, string, string],
+          label: 'El kaldır (sahne talebi gönder)',
+          ringColor: '#64748B',
+        };
+    }
+  })();
+
   return (
     <Pressable onPress={onPress} onPressIn={handleIn} onPressOut={handleOut}
       accessibilityRole="button"
-      accessibilityLabel={isActive ? 'El indirilsin (istek iptal)' : 'Mikrofon iste (el kaldır)'}
-      accessibilityState={{ selected: isActive }}>
+      accessibilityLabel={variant.label}
+      accessibilityState={{ selected: isActive, disabled: stageAction === 'locked' }}>
       <View style={micS.wrap}>
-        {/* Pulse ring — aktifken dışa yayılan halka */}
+        {/* Pulse ring — waiting durumunda dışa yayılan halka */}
         {isActive && (
           <Animated.View style={[micS.pulseRing, {
+            borderColor: variant.ringColor,
             transform: [{ scale: pulseAnim }],
             opacity: pulseOpacity,
           }]} />
@@ -146,24 +199,29 @@ function MicRequestBtn({ onPress, isActive }: { onPress: () => void; isActive: b
         {/* ★ Dış gölge katmanı — 3D derinlik */}
         <Animated.View style={[micS.btn, micS.btnShadow, { transform: [{ scale: scaleAnim }] }]}>
           <LinearGradient
-            colors={isActive ? ['#FBBF24', '#F59E0B', '#D97706'] : ['#64748B', '#475569', '#334155']}
+            colors={variant.colors as any}
             start={{ x: 0.2, y: 0 }} end={{ x: 0.8, y: 1 }}
             style={micS.gradient}
           >
-            {/* ★ Modern hand-left ikonu — vektör, temiz, premium */}
-            <Ionicons name="hand-left" size={20} color="#FFF" style={micS.handIcon} />
+            <Ionicons name={variant.icon} size={20} color="#FFF" style={micS.handIcon} />
           </LinearGradient>
           {/* ★ Glossy highlight — üst yarıda beyaz parlaklık (cam efekti) */}
           <View style={micS.glossyHighlight} />
-          {/* ★ Shimmer katmanı — aktifken kayan ışık */}
+          {/* ★ Shimmer katmanı — waiting durumunda kayan ışık */}
           {isActive && (
             <Animated.View style={[micS.shimmerOverlay, { opacity: shimmerOpacity }]} />
           )}
-          {/* İç glow efekti — aktifken pulsing */}
+          {/* İç glow efekti — waiting durumunda pulsing */}
           {isActive && (
-            <Animated.View style={[micS.innerGlow, { opacity: glowAnim }]} />
+            <Animated.View style={[micS.innerGlow, { opacity: glowAnim, backgroundColor: `${variant.ringColor}40` }]} />
           )}
         </Animated.View>
+        {/* Sıra numarası rozeti */}
+        {isActive && queuePosition && queuePosition > 0 && (
+          <View style={micS.queueBadge}>
+            <Text style={micS.queueBadgeText}>{queuePosition}</Text>
+          </View>
+        )}
       </View>
     </Pressable>
   );
@@ -186,25 +244,23 @@ interface Props {
   chatBadgeCount: number; isChatOpen: boolean;
   isListener?: boolean;
   isRoomMuted?: boolean;
-  isEmojiOpen?: boolean;
   isOwnerInListenerMode?: boolean;
   isModInListenerMode?: boolean;
+  /** Listener'ın sahne butonunun davranışı — parent hesaplar (speaking_mode × authorityOnStage × stageFull). */
+  stageAction?: StageAction;
+  /** waiting durumunda kullanıcının kuyruktaki 1-tabanlı sırası. */
+  stageQueuePosition?: number;
   /** O6: Server-tarafı mute — mic toggle edilemez, kullanıcıya bildir. */
   isForcedMuted?: boolean;
   /** O6: Chat mute edilmişse input disabled. */
   isChatInputDisabled?: boolean;
   onJoinStagePress?: () => void;
   onMicPress: () => void; onCameraPress: () => void;
-  onEmojiPress: () => void; onHandPress: () => void;
+  onHandPress: () => void;
   onChatPress: () => void; onPlusPress: () => void;
   onMuteRoomPress?: () => void;
   // ★ Odadan ayrıl butonu
   onLeavePress?: () => void;
-  // ★ Gömülü chat input
-  chatInput?: string;
-  onChatInputChange?: (t: string) => void;
-  onChatSend?: () => void;
-  chatInputRef?: React.RefObject<TextInput>;
   // ★ DM bildirimi
   dmBadgeCount?: number;
   onDmPress?: () => void;
@@ -215,14 +271,16 @@ interface Props {
 export default function RoomControlBar({
   isMicOn, isCameraOn, showCamera, isHandRaised, isRoomMuted,
   handBadgeCount, canModerate, chatBadgeCount, isChatOpen,
-  isListener, isOwnerInListenerMode, isModInListenerMode, isEmojiOpen,
+  isListener, isOwnerInListenerMode, isModInListenerMode,
   isForcedMuted, isChatInputDisabled,
-  onMicPress, onCameraPress, onEmojiPress,
+  stageAction, stageQueuePosition,
+  onMicPress, onCameraPress,
   onHandPress, onChatPress, onPlusPress, onMuteRoomPress,
   onLeavePress, onJoinStagePress,
-  chatInput, onChatInputChange, onChatSend, chatInputRef,
   dmBadgeCount, onDmPress, isDmOpen, isPlusOpen,
 }: Props) {
+  // Geriye uyum: parent stageAction geçmezse isHandRaised'ten türet.
+  const resolvedStageAction: StageAction = stageAction ?? (isHandRaised ? 'waiting' : 'raise_hand');
   // ★ O6: Server-tarafı mute iken mic butonu pressed olsa da bilgilendir
   const handleMicPress = () => {
     if (isForcedMuted) {
@@ -236,37 +294,11 @@ export default function RoomControlBar({
       {/* ★ KONTROL BARI — tek satır: [Chat Input] [Mic/Cam] [Utility] */}
       <View style={s.capsule}>
 
-        {/* ======================= SOL: MESAJ INPUT ======================= */}
+        {/* ======================= SOL: SOHBET BUTONU ======================= */}
         <View style={s.leftGroup}>
-          {onChatInputChange ? (
-            <View style={[s.chatInputWrap, isChatInputDisabled && { opacity: 0.4 }]}>
-              <TextInput
-                ref={chatInputRef}
-                style={s.chatInput}
-                placeholder={isChatInputDisabled ? '🔇 Metin sohbeti susturuldu' : 'Mesaj yaz...'}
-                placeholderTextColor="rgba(255,255,255,0.18)"
-                value={chatInput}
-                onChangeText={onChatInputChange}
-                maxLength={300}
-                returnKeyType="send"
-                onSubmitEditing={onChatSend}
-                editable={!isChatInputDisabled}
-              />
-              {chatInput && chatInput.trim() ? (
-                <Pressable onPress={onChatSend} hitSlop={6}>
-                  <Ionicons name="send" size={11} color="#14B8A6" />
-                </Pressable>
-              ) : (
-                <Pressable onPress={onChatPress} hitSlop={6}>
-                  <Ionicons name="expand-outline" size={11} color="rgba(255,255,255,0.18)" />
-                </Pressable>
-              )}
-            </View>
-          ) : (
-            <BarBtn onPress={onChatPress} badge={chatBadgeCount} active={isChatOpen} accent="#3B82F6" label="Sohbet">
-              <Ionicons name={isChatOpen ? 'chatbubble' : 'chatbubble-outline'} size={16} color={isChatOpen ? '#FFF' : '#C8D6E0'} style={s.iconDrop} />
-            </BarBtn>
-          )}
+          <BarBtn onPress={onChatPress} badge={chatBadgeCount} active={isChatOpen} accent="#3B82F6" label="Sohbet">
+            <Ionicons name={isChatOpen ? 'chatbubble' : 'chatbubble-outline'} size={16} color={isChatOpen ? '#FFF' : '#C8D6E0'} style={s.iconDrop} />
+          </BarBtn>
         </View>
 
         {/* ======================= MERKEZ: MIC / CAM ======================= */}
@@ -275,10 +307,6 @@ export default function RoomControlBar({
             <>
               <SolidCircleBtn onPress={onMuteRoomPress || (() => { })} active={!isRoomMuted} activeColor="#14B8A6" inactiveColor="#3E4E5F" label={isRoomMuted ? 'Oda sesini aç' : 'Oda sesini kapat'}>
                 <Ionicons name={isRoomMuted ? 'volume-mute' : 'volume-high'} size={18} color="#FFF" />
-              </SolidCircleBtn>
-
-              <SolidCircleBtn onPress={onChatPress} active={isChatOpen} activeColor="#3B82F6" inactiveColor="#3E4E5F" label="Sohbet">
-                <Ionicons name={isChatOpen ? 'chatbubble' : 'chatbubble-outline'} size={17} color="#FFF" />
               </SolidCircleBtn>
 
               {isOwnerInListenerMode ? (
@@ -290,8 +318,8 @@ export default function RoomControlBar({
                   <Ionicons name="shield-checkmark" size={17} color="#FFF" />
                 </SolidCircleBtn>
               ) : (
-                /* ★ Premium Mikrofon İsteme Butonu */
-                <MicRequestBtn onPress={onHandPress} isActive={isHandRaised} />
+                /* ★ Premium Mikrofon İsteme Butonu — speaking_mode'a göre ikon/renk/label değişir */
+                <MicRequestBtn onPress={onHandPress} stageAction={resolvedStageAction} queuePosition={stageQueuePosition} />
               )}
             </>
           ) : (
@@ -310,12 +338,10 @@ export default function RoomControlBar({
         </View>
 
         {/* ======================= SAĞ: UTILITY ======================= */}
+        {/* ★ 2026-04-22: Emoji/GIF butonu chat drawer'ın içine taşındı (WhatsApp pattern).
+             Sağ grup artık sadece mod-queue + DM + plus. */}
         <View style={s.rightGroup}>
-          <BarBtn onPress={onEmojiPress} active={isEmojiOpen} accent="#D4A853" label="Reaksiyon gönder (emoji + GIF)">
-            <Ionicons name="happy-outline" size={18} color="#C8D6E0" style={s.iconDrop} />
-          </BarBtn>
-
-          {canModerate && !isListener && (
+          {canModerate && (
             <ModQueueBtn onPress={onHandPress} count={handBadgeCount} />
           )}
 
@@ -397,6 +423,16 @@ const micS = StyleSheet.create({
     borderRadius: TEAL_BTN_SIZE / 2,
     backgroundColor: 'rgba(251,191,36,0.25)',
   },
+  queueBadge: {
+    position: 'absolute', top: -4, right: -4,
+    minWidth: 18, height: 18, borderRadius: 9,
+    backgroundColor: '#F59E0B',
+    alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4,
+    borderWidth: 1.5, borderColor: '#1E293B',
+  },
+  queueBadgeText: {
+    color: '#FFF', fontSize: 10, fontWeight: '800',
+  },
 });
 
 // ═══════════════════════════════════════════════════
@@ -432,66 +468,42 @@ const modS = StyleSheet.create({
 
 const s = StyleSheet.create({
   wrap: {
-    paddingHorizontal: 8,
+    paddingHorizontal: 10,
     paddingBottom: 4,
     alignItems: 'center',
   },
-  // ★ Chat input — capsule içinde sol tarafta, kompakt pill
-  chatInputWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(0,0,0,0.2)',
-    borderWidth: 0.5,
-    borderColor: 'rgba(255,255,255,0.06)',
-    paddingHorizontal: 12,
-    gap: 6,
-  },
-  chatInput: {
-    flex: 1,
-    fontSize: 13,
-    color: '#F1F5F9',
-    paddingVertical: 0,
-  },
-  // Pill bar
+  // ★ 2026-04-22: Modernize — cam efektli capsule, daha okunur padding,
+  //   sağ grupta nefes (gap: 6), merkez ayrışsın diye margin.
   capsule: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     width: '100%',
-    paddingHorizontal: 4,
-    paddingVertical: 2,
-    borderRadius: 30,
-    backgroundColor: 'rgba(45, 55, 64, 0.95)',
-    borderWidth: 0.8,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 28,
+    backgroundColor: 'rgba(30, 41, 59, 0.88)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.07)',
   },
   leftGroup: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingLeft: 2,
-    flex: 1,
-    marginRight: 4,
+    flexShrink: 0,
+    marginRight: 10,
   },
   centerGroup: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 2,
+    gap: 8,
     flexShrink: 0,
   },
   rightGroup: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 0,
-    paddingRight: 1,
+    gap: 6,
     flexShrink: 0,
+    marginLeft: 10,
   },
   // ★ 3D Solid buton — gradient arka plan ile kullanılır
   solidBtn: {

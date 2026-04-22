@@ -16,7 +16,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, Pressable, TextInput, Animated,
   Dimensions, Platform, KeyboardAvoidingView, ActivityIndicator,
-  PanResponder, Image,
+  PanResponder, Image, ImageBackground,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -91,7 +91,7 @@ function BaseSheet({ visible, onDismiss, children, maxHeight = H * 0.55 }: {
 // PASSWORD PROMPT SHEET
 // ═══════════════════════════════════════════════════════
 export function PasswordPromptSheet({
-  visible, onDismiss, onSubmit, submitting, error, roomName,
+  visible, onDismiss, onSubmit, submitting, error, roomName, hostName, onViewHost,
 }: {
   visible: boolean;
   onDismiss: () => void;
@@ -99,12 +99,17 @@ export function PasswordPromptSheet({
   submitting?: boolean;
   error?: string;
   roomName?: string;
+  hostName?: string;
+  /** Host profiline yönlendir — error durumunda "Oda sahibi ile iletişime geç" CTA'sı gösterilir. */
+  onViewHost?: () => void;
 }) {
   const [pw, setPw] = useState('');
   const [reveal, setReveal] = useState(false);
+  const [attemptCount, setAttemptCount] = useState(0);
   const shake = useRef(new Animated.Value(0)).current;
 
-  useEffect(() => { if (visible) { setPw(''); setReveal(false); } }, [visible]);
+  useEffect(() => { if (visible) { setPw(''); setReveal(false); setAttemptCount(0); } }, [visible]);
+  useEffect(() => { if (error) setAttemptCount(c => c + 1); }, [error]);
 
   useEffect(() => {
     if (error) {
@@ -155,7 +160,25 @@ export function PasswordPromptSheet({
           </View>
         </Animated.View>
 
-        {error ? <Text style={st.error}>{error}</Text> : <View style={{ height: 14 }} />}
+        {error ? (
+          <View style={{ marginTop: 6, marginBottom: 8 }}>
+            <Text style={st.error}>{error}</Text>
+            {/* 2+ yanlış denemeden sonra host ile iletişim önerisi */}
+            {attemptCount >= 2 && onViewHost && (
+              <Pressable onPress={onViewHost} style={st.inlineHint} hitSlop={6}>
+                <Ionicons name="person-circle-outline" size={13} color="#5EEAD4" />
+                <Text style={st.inlineHintText}>
+                  Şifreyi {hostName ? `${hostName}'dan` : 'oda sahibinden'} iste — profile git
+                </Text>
+                <Ionicons name="chevron-forward" size={11} color="#5EEAD4" />
+              </Pressable>
+            )}
+          </View>
+        ) : (
+          <Text style={[st.hint, { marginTop: 2, marginBottom: 8 }]}>
+            {hostName ? `${hostName}` : 'Oda sahibi'} odayı şifre ile korudu. Doğru şifreyi girersen direkt dinleyici olarak katılırsın.
+          </Text>
+        )}
 
         <View style={st.btnRow}>
           <Pressable style={st.btnSecondary} onPress={onDismiss} disabled={submitting}>
@@ -185,15 +208,20 @@ export function PasswordPromptSheet({
 // ACCESS REQUEST SHEET — Davetli oda için bekleme + realtime
 // ═══════════════════════════════════════════════════════
 export function AccessRequestSheet({
-  visible, roomId, userId, roomName, onApproved, onRejected, onCancelled,
+  visible, roomId, userId, roomName, hostName, onApproved, onRejected, onCancelled, onViewHost, onDiscoverRooms,
 }: {
   visible: boolean;
   roomId: string | null;
   userId: string | null;
   roomName?: string;
+  hostName?: string;
   onApproved: () => void;
   onRejected: (reason?: string) => void;
   onCancelled: () => void;
+  /** Rejected durumunda "Host'u Gör" CTA'sı — verilirse sheet içinde buton gösterilir. */
+  onViewHost?: () => void;
+  /** Rejected durumunda "Başka Odalar" CTA'sı — verilirse sheet içinde buton gösterilir. */
+  onDiscoverRooms?: () => void;
 }) {
   const [status, setStatus] = useState<'pending' | 'accepted' | 'rejected'>('pending');
   const [cancelling, setCancelling] = useState(false);
@@ -230,7 +258,11 @@ export function AccessRequestSheet({
               setTimeout(() => onApproved(), 600); // kısa gecikme — kullanıcı onayı görsün
             } else if (row.status === 'rejected') {
               setStatus('rejected');
-              setTimeout(() => onRejected('Erişim isteğiniz reddedildi'), 1200);
+              // Sheet'i KAPATMA — kullanıcı CTA butonuna (Host'u Gör / Başka Odalar / Kapat) bassın.
+              // CTA yoksa birkaç saniye sonra geri dön.
+              if (!onViewHost && !onDiscoverRooms) {
+                setTimeout(() => onRejected('Erişim isteğiniz reddedildi'), 1500);
+              }
             }
           }
         }
@@ -238,7 +270,7 @@ export function AccessRequestSheet({
       .subscribe();
 
     return () => { try { supabase.removeChannel(ch); } catch {} };
-  }, [visible, roomId, userId, onApproved, onRejected]);
+  }, [visible, roomId, userId, onApproved, onRejected, onViewHost, onDiscoverRooms]);
 
   const handleCancel = useCallback(async () => {
     if (!roomId || !userId) { onCancelled(); return; }
@@ -305,6 +337,27 @@ export function AccessRequestSheet({
           )}
         </View>
 
+        {status === 'rejected' && (
+          <View style={{ gap: 8, marginBottom: 6 }}>
+            {onViewHost && (
+              <Pressable style={st.ctaRow} onPress={onViewHost}>
+                <Ionicons name="person-circle-outline" size={16} color="#5EEAD4" />
+                <Text style={st.ctaRowText}>
+                  {hostName ? `${hostName}'ı incele` : "Oda sahibini incele"}
+                </Text>
+                <Ionicons name="chevron-forward" size={13} color="#5EEAD4" />
+              </Pressable>
+            )}
+            {onDiscoverRooms && (
+              <Pressable style={st.ctaRow} onPress={onDiscoverRooms}>
+                <Ionicons name="compass-outline" size={16} color="#5EEAD4" />
+                <Text style={st.ctaRowText}>Benzer odaları keşfet</Text>
+                <Ionicons name="chevron-forward" size={13} color="#5EEAD4" />
+              </Pressable>
+            )}
+          </View>
+        )}
+
         <View style={st.btnRow}>
           {status === 'pending' ? (
             <Pressable style={[st.btnSecondary, { flex: 1 }]} onPress={handleCancel} disabled={cancelling}>
@@ -329,25 +382,58 @@ export function AccessRequestSheet({
 // Kullanım: şifreli/davetli/banlı/kilitli/yaş-filtreli odalarda access check
 // tamamlanmadan oda içeriği (speaker, listener, chat) gösterilmesin diye
 // opak overlay. Sheet/Alert'ler bu katmanın üstüne mount edilir.
+// ★ 2026-04-20: Oda tema renk paleti — access gate oda sahibinin seçtiği BG'yi gösterir
+const GATE_THEME_COLORS: Record<string, [string, string]> = {
+  ocean: ['#0E4D6F', '#083344'], sunset: ['#7F1D1D', '#4C0519'],
+  forest: ['#14532D', '#052E16'], galaxy: ['#312E81', '#1E1B4B'],
+  aurora: ['#134E4A', '#042F2E'], cherry: ['#831843', '#500724'],
+  cyber: ['#1E3A8A', '#172554'], volcano: ['#7C2D12', '#431407'],
+  midnight: ['#0C0A3E', '#1B1464'], rose: ['#9F1239', '#881337'],
+  arctic: ['#164E63', '#0E7490'], amber: ['#78350F', '#92400E'],
+  slate: ['#1E293B', '#334155'],
+};
+
 export function AccessGate({
   visible, roomName, hostName, hostAvatarUrl, onCancel,
+  themeId, bgImageUrl,
 }: {
   visible: boolean;
   roomName?: string;
   hostName?: string;
   hostAvatarUrl?: string | null;
   onCancel?: () => void;
+  /** ★ 2026-04-20: Oda sahibinin seçtiği tema (theme_id) */
+  themeId?: string | null;
+  /** ★ Oda sahibinin yüklediği BG görseli (room_image_url) */
+  bgImageUrl?: string | null;
 }) {
   if (!visible) return null;
+  const themeColors = themeId && GATE_THEME_COLORS[themeId];
   return (
     <View style={gate.overlay} pointerEvents="auto">
-      <LinearGradient
-        colors={['#4a5668', '#37414f', '#232a35']}
-        locations={[0, 0.35, 1]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={StyleSheet.absoluteFill}
-      />
+      {/* ★ Oda sahibinin seçtiği BG: custom image > tema gradient > default */}
+      {bgImageUrl ? (
+        <ImageBackground source={{ uri: bgImageUrl }} style={StyleSheet.absoluteFill} resizeMode="cover">
+          <LinearGradient
+            colors={['rgba(0,0,0,0.35)', 'rgba(0,0,0,0.55)', 'rgba(0,0,0,0.75)']}
+            style={StyleSheet.absoluteFill}
+            pointerEvents="none"
+          />
+        </ImageBackground>
+      ) : themeColors ? (
+        <LinearGradient
+          colors={[themeColors[0], themeColors[1], '#070B14']}
+          start={{ x: 0, y: 0 }} end={{ x: 0.5, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
+      ) : (
+        <LinearGradient
+          colors={['#4a5668', '#37414f', '#232a35']}
+          locations={[0, 0.35, 1]}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
+      )}
 
       {/* Üst bar — geri dönüş */}
       {onCancel && (
@@ -462,7 +548,22 @@ const st = StyleSheet.create({
   input: {
     flex: 1, fontSize: 15, color: '#F1F5F9', fontWeight: '600', letterSpacing: 1,
   },
-  error: { color: '#EF4444', fontSize: 11, fontWeight: '600', marginTop: 6, marginBottom: 8 },
+  error: { color: '#EF4444', fontSize: 11, fontWeight: '600' },
+  hint: { color: 'rgba(203,213,225,0.65)', fontSize: 11, fontWeight: '500', lineHeight: 15 },
+  inlineHint: {
+    flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8,
+    paddingVertical: 8, paddingHorizontal: 10, borderRadius: 10,
+    backgroundColor: 'rgba(20,184,166,0.08)',
+    borderWidth: 1, borderColor: 'rgba(20,184,166,0.18)',
+  },
+  inlineHintText: { flex: 1, color: '#5EEAD4', fontSize: 11.5, fontWeight: '600' },
+  ctaRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingVertical: 12, paddingHorizontal: 14, borderRadius: 12,
+    backgroundColor: 'rgba(20,184,166,0.08)',
+    borderWidth: 1, borderColor: 'rgba(20,184,166,0.2)',
+  },
+  ctaRowText: { flex: 1, color: '#E5E7EB', fontSize: 13, fontWeight: '700' },
   statusCard: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
     backgroundColor: 'rgba(255,255,255,0.04)',

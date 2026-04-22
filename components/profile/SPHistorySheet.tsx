@@ -3,15 +3,16 @@
 // - Realtime: sp_transactions INSERT dinleyicisi açık iken canlı güncelleme
 // - Altın premium tema (wallet ile tutarlı)
 
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, Pressable, Modal, ScrollView, Animated, Dimensions,
+  View, Text, StyleSheet, Pressable, Modal, ScrollView, Dimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSpring, runOnJS } from 'react-native-reanimated';
 import { supabase } from '../../constants/supabase';
 import { useAuth } from '../../app/_layout';
-import { useSwipeToDismiss } from '../../hooks/useSwipeToDismiss';
 
 const iconShadow = {
   textShadowColor: 'rgba(0,0,0,0.5)',
@@ -20,6 +21,7 @@ const iconShadow = {
 } as const;
 
 // Reason → Türkçe etiket
+// ★ 2026-04-21: donation_sent/received, referral_bonus_* eklendi (gerçek DB type'ları).
 function spReasonLabel(reason: string | undefined): string {
   const map: Record<string, string> = {
     daily_login: 'Günlük giriş',
@@ -27,8 +29,14 @@ function spReasonLabel(reason: string | undefined): string {
     stage_time: 'Sahne süresi',
     room_create: 'Oda oluşturma',
     referral_reward: 'Davet ödülü',
+    referral_bonus: 'Davet bonusu',
+    referral_bonus_owner: 'Davet bonusu (sen davet ettin)',
+    referral_bonus_referred: 'Davet bonusu (seni davet eden)',
     gift_received: 'Hediye alındı',
     gift_sent: 'Hediye gönderildi',
+    donation_sent: 'SP gönderdin',
+    donation_received: 'SP aldın',
+    donation_refund: 'SP iadesi (alıcı alamadı)',
     room_boost: 'Oda boost',
     profile_boost: 'Profil boost',
     store_purchase: 'Mağaza alışverişi',
@@ -37,7 +45,10 @@ function spReasonLabel(reason: string | undefined): string {
     admin_grant: 'Admin ödülü',
     refund: 'İade',
   };
-  return map[reason || ''] || reason || 'SP işlemi';
+  if (!reason) return 'SP işlemi';
+  // Admin bypass etiketleri (örn. "store_purchase [ADMIN]")
+  const clean = reason.replace(/\s*\[ADMIN.*\]\s*/, '').trim();
+  return map[clean] || clean || 'SP işlemi';
 }
 
 function spReasonIcon(reason: string | undefined, isPositive: boolean): { name: any; color: string } {
@@ -47,8 +58,14 @@ function spReasonIcon(reason: string | undefined, isPositive: boolean): { name: 
     stage_time:         { name: 'mic',          color: '#14B8A6' },
     room_create:        { name: 'radio',        color: '#A855F7' },
     referral_reward:    { name: 'people',       color: '#A78BFA' },
+    referral_bonus:          { name: 'people', color: '#A78BFA' },
+    referral_bonus_owner:    { name: 'people', color: '#A78BFA' },
+    referral_bonus_referred: { name: 'people', color: '#A78BFA' },
     gift_received:      { name: 'gift',         color: '#22C55E' },
     gift_sent:          { name: 'gift-outline', color: '#EF4444' },
+    donation_received:  { name: 'diamond',      color: '#22C55E' },
+    donation_sent:      { name: 'diamond-outline', color: '#EF4444' },
+    donation_refund:    { name: 'arrow-undo',   color: '#3B82F6' },
     room_boost:         { name: 'rocket',       color: '#F472B6' },
     profile_boost:      { name: 'rocket',       color: '#F472B6' },
     store_purchase:     { name: 'cart',         color: '#F59E0B' },
@@ -57,7 +74,9 @@ function spReasonIcon(reason: string | undefined, isPositive: boolean): { name: 
     admin_grant:        { name: 'shield-checkmark', color: '#DC2626' },
     refund:             { name: 'arrow-undo',   color: '#3B82F6' },
   };
-  const entry = map[reason || ''];
+  if (!reason) return isPositive ? { name: 'trending-up', color: '#22C55E' } : { name: 'trending-down', color: '#EF4444' };
+  const clean = reason.replace(/\s*\[ADMIN.*\]\s*/, '').trim();
+  const entry = map[clean];
   if (entry) return entry;
   return isPositive
     ? { name: 'trending-up',   color: '#22C55E' }
@@ -100,19 +119,51 @@ export default function SPHistorySheet({ visible, onClose, balance, history: ini
     return () => { supabase.removeChannel(channel); };
   }, [visible, firebaseUser]);
 
-  // ★ Swipe-to-dismiss
-  const { translateValue, panHandlers } = useSwipeToDismiss({
-    direction: 'down',
-    threshold: 90,
-    onDismiss: onClose,
-  });
+  // ★ Swipe-to-dismiss — Reanimated useSharedValue + GestureDetector
+  const translateY = useSharedValue(0);
+
+  // Modal açılınca pozisyonu sıfırla
+  useEffect(() => {
+    if (visible) translateY.value = 0;
+  }, [visible]);
+
+  const handleDismiss = useCallback(() => {
+    onClose();
+  }, [onClose]);
+
+  const panGesture = Gesture.Pan()
+    .activeOffsetY(10)           // aşağı 10px+ hareket edince aktif olur
+    .failOffsetX([-30, 30])      // yatay hareket 30px+ ise gesture iptal
+    .onUpdate((e) => {
+      if (e.translationY > 0) {
+        translateY.value = e.translationY;
+      }
+    })
+    .onEnd((e) => {
+      const shouldDismiss = e.translationY > 80 || e.velocityY > 800;
+      if (shouldDismiss) {
+        translateY.value = withTiming(600, { duration: 200 }, () => {
+          runOnJS(handleDismiss)();
+          translateY.value = 0;
+        });
+      } else {
+        translateY.value = withSpring(0, { damping: 14, stiffness: 120 });
+      }
+    });
+
+  const animatedCardStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: translateY.value }],
+  }));
 
   return (
     <Modal visible={visible} transparent animationType="slide" statusBarTranslucent onRequestClose={onClose}>
-      <Pressable style={s.overlay} onPress={onClose}>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+      <View style={s.overlay}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+        <GestureDetector gesture={panGesture}>
         <Animated.View
-          style={[s.card, { transform: [{ translateY: translateValue }] }]}
-          onStartShouldSetResponder={() => true}
+          style={[s.card, animatedCardStyle]}
+          collapsable={false}
         >
           {/* Arkaplan katmanları — parlak taraf belirgin */}
           <LinearGradient
@@ -131,9 +182,11 @@ export default function SPHistorySheet({ visible, onClose, balance, history: ini
             style={s.topEdge}
           />
 
-          {/* ★ Swipe-able başlık alanı — handle + header panHandlers aldığı alanda aşağı çekilince kapanır */}
-          <View {...panHandlers}>
-            <View style={s.dragHandle} />
+          {/* ★ Gesture tüm kartta aktif — GestureDetector parent'te */}
+          <View>
+            <View style={s.handleWrap}>
+              <View style={s.handle} />
+            </View>
             <View style={s.header}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                 <Ionicons name="diamond" size={16} color="#FBBF24" style={iconShadow} />
@@ -142,9 +195,6 @@ export default function SPHistorySheet({ visible, onClose, balance, history: ini
                   <Text style={s.subtitle}>Son 30 işlem · Canlı</Text>
                 </View>
               </View>
-              <Pressable onPress={onClose} hitSlop={12} style={s.closeBtn}>
-                <Ionicons name="close" size={18} color="rgba(251,191,36,0.8)" style={iconShadow} />
-              </Pressable>
             </View>
 
             <View style={s.balanceStrip}>
@@ -170,15 +220,30 @@ export default function SPHistorySheet({ visible, onClose, balance, history: ini
               </View>
             ) : history.map((tx: any, i: number) => {
               const isPositive = (tx.amount || 0) > 0;
-              const iconDef = spReasonIcon(tx.reason, isPositive);
+              // ★ 2026-04-21: DB column'u `type` (önceden `tx.reason` yazılıyordu → undefined → kategoriler kırıktı)
+              const txType = tx.type || tx.reason; // backward compat
+              const iconDef = spReasonIcon(txType, isPositive);
               const isFresh = flashId === tx.id;
+              // Description enrichment — örn. "Mağaza: 100 SP Paketi" veya "Ayşe'den" (v51 counterparty)
+              const rawDesc = typeof tx.description === 'string' ? tx.description.trim() : '';
+              // "SP kazanıldı: xxx" / "SP harcandı: xxx" prefix'ini ayıkla (generic log)
+              const cleanDesc = rawDesc.replace(/^SP (kazan[ıi]ld[ıi]|harcand[ıi]|):\s*/i, '').replace(/^SP:\s*/i, '').trim();
+              const isGenericDesc = !cleanDesc || cleanDesc === txType || cleanDesc === 'donation_sent' || cleanDesc === 'donation_received';
+              // Counterparty adı (v51 sonrası tx.counterparty_name dolabilir)
+              const counterpartyName = tx.counterparty_name || tx.partner?.display_name;
+              const subline = isGenericDesc
+                ? (counterpartyName ? (isPositive ? `${counterpartyName} gönderdi` : `${counterpartyName}'e gönderdin`) : '')
+                : cleanDesc;
               return (
                 <View key={tx.id || i} style={[s.row, isFresh && s.rowFresh]}>
                   <View style={[s.iconWrap, { backgroundColor: `${iconDef.color}18`, borderColor: `${iconDef.color}33` }]}>
                     <Ionicons name={iconDef.name} size={16} color={iconDef.color} style={iconShadow} />
                   </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={s.reason} numberOfLines={1}>{spReasonLabel(tx.reason)}</Text>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={s.reason} numberOfLines={1}>{spReasonLabel(txType)}</Text>
+                    {!!subline && (
+                      <Text style={s.subline} numberOfLines={1}>{subline}</Text>
+                    )}
                     <Text style={s.date}>
                       {new Date(tx.created_at).toLocaleDateString('tr-TR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
                     </Text>
@@ -191,7 +256,9 @@ export default function SPHistorySheet({ visible, onClose, balance, history: ini
             })}
           </ScrollView>
         </Animated.View>
-      </Pressable>
+        </GestureDetector>
+      </View>
+      </GestureHandlerRootView>
     </Modal>
   );
 }
@@ -218,12 +285,6 @@ const s = StyleSheet.create({
   topEdge: {
     position: 'absolute', top: 0, left: 0, right: 0, height: 1.5,
   },
-  dragHandle: {
-    alignSelf: 'center',
-    width: 40, height: 4, borderRadius: 2,
-    backgroundColor: 'rgba(251,191,36,0.35)',
-    marginBottom: 10,
-  },
   header: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     paddingBottom: 14,
@@ -236,11 +297,18 @@ const s = StyleSheet.create({
     fontSize: 10, fontWeight: '600', color: 'rgba(251,191,36,0.55)',
     marginTop: 1, letterSpacing: 0.3,
   },
-  closeBtn: {
-    width: 32, height: 32, borderRadius: 11,
-    backgroundColor: 'rgba(251,191,36,0.1)',
-    borderWidth: 1, borderColor: 'rgba(251,191,36,0.25)',
-    alignItems: 'center', justifyContent: 'center',
+  // ★ Swipe handle — kapatma için üst çubuk (geniş dokunma alanı)
+  handleWrap: {
+    alignItems: 'center',
+    paddingVertical: 14,
+    marginTop: -4,
+    marginBottom: -6,
+  },
+  handle: {
+    width: 44,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: 'rgba(251,191,36,0.5)',
   },
   balanceStrip: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
@@ -280,6 +348,7 @@ const s = StyleSheet.create({
     fontSize: 13, fontWeight: '700', color: '#F1F5F9',
     textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
   },
+  subline: { fontSize: 11, color: 'rgba(226,232,240,0.75)', marginTop: 2, fontWeight: '500' },
   date: { fontSize: 10, color: 'rgba(148,163,184,0.65)', marginTop: 1, fontWeight: '500' },
   amount: {
     fontSize: 15, fontWeight: '900', letterSpacing: 0.2,

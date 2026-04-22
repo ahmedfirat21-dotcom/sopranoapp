@@ -674,12 +674,21 @@ export const FriendshipService = {
    */
   async removeFriend(userId: string, friendId: string): Promise<{ success: boolean; error?: string }> {
     try {
-      await supabase
-        .from('friendships')
-        .delete()
-        .or(`and(user_id.eq.${userId},friend_id.eq.${friendId}),and(user_id.eq.${friendId},friend_id.eq.${userId})`)
-        .eq('status', 'accepted');
-      return { success: true };
+      // ★ v41 (2026-04-20): Atomic RPC — race condition önler.
+      //   Eski: iki yön DELETE client-tarafında. Eşzamanlı unfriend duplicate
+      //   çağrıda inconsistent sonuç veriyordu. RPC tek transaction.
+      const { error } = await supabase.rpc('unfriend_atomic', { p_friend_id: friendId });
+      if (!error) return { success: true };
+      // RPC yoksa (henüz deploy edilmedi) fallback
+      if (/function .* does not exist|42883/i.test(error.message || '')) {
+        await supabase
+          .from('friendships')
+          .delete()
+          .or(`and(user_id.eq.${userId},friend_id.eq.${friendId}),and(user_id.eq.${friendId},friend_id.eq.${userId})`)
+          .eq('status', 'accepted');
+        return { success: true };
+      }
+      return { success: false, error: error.message };
     } catch (e: any) {
       return { success: false, error: e?.message || 'Arkadaşlık kaldırılamadı' };
     }

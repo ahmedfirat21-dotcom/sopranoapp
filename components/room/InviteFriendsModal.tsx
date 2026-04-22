@@ -4,12 +4,13 @@
  * Kullanıcının arkadaş listesini gösterir, seçilenleri davet eder.
  */
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, Pressable, Image, FlatList, ActivityIndicator, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Image, FlatList, ActivityIndicator, Dimensions, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FriendshipService, FollowUser } from '../../services/friendship';
 import { getAvatarSource } from '../../constants/avatars';
 import { supabase } from '../../constants/supabase';
+import { useSwipeToDismiss } from '../../hooks/useSwipeToDismiss';
 
 const { width: W } = Dimensions.get('window');
 
@@ -128,6 +129,12 @@ export default function InviteFriendsModal({ visible, userId, onClose, onInvite,
     onInvite(selectedUsers);
   };
 
+  const { translateValue, panHandlers } = useSwipeToDismiss({
+    direction: 'down',
+    threshold: 80,
+    onDismiss: onClose,
+  });
+
   if (!visible) return null;
 
   // ── İçerik render'ı ──
@@ -195,8 +202,12 @@ export default function InviteFriendsModal({ visible, userId, onClose, onInvite,
   return (
     <View style={s.overlay}>
       <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-      <View style={s.modal}>
+      <Animated.View style={[s.modal, { transform: [{ translateY: translateValue }] }]}>
         <LinearGradient colors={['#4a5668', '#37414f', '#232a35']} locations={[0, 0.35, 1]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[StyleSheet.absoluteFillObject, { borderRadius: 20 }]} />
+        {/* ★ Swipe handle */}
+        <View style={s.handleWrap} {...panHandlers}>
+          <View style={s.handle} />
+        </View>
         {/* Header */}
         <View style={s.header}>
           <Ionicons name="people" size={16} color="#14B8A6" />
@@ -215,7 +226,7 @@ export default function InviteFriendsModal({ visible, userId, onClose, onInvite,
             <Text style={s.inviteBtnText}>{selected.size} Kişiyi Davet Et</Text>
           </Pressable>
         )}
-      </View>
+      </Animated.View>
     </View>
   );
 }
@@ -236,6 +247,17 @@ const s = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#95a1ae',
     overflow: 'hidden',
+  },
+  handleWrap: {
+    alignItems: 'center',
+    paddingTop: 8,
+    paddingBottom: 2,
+  },
+  handle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(20,184,166,0.4)',
   },
   header: {
     flexDirection: 'row',

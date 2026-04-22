@@ -132,6 +132,7 @@ const SP_TIER_MULTIPLIER: Record<string, number> = {
   Free: 1,
   Plus: 1.25,
   Pro: 2,
+  GodMaster: 10,
 };
 
 /** Kullanıcının tier'ını hızlıca çek (cache'li) */
@@ -168,7 +169,7 @@ export function invalidateTierCache(userId?: string) {
  * ★ Pro: 2× çarpan, Plus: 1.25× çarpan (aktivite bazlı kazanımlarda).
  * Başarılıysa kazandırılan miktarı döndürür, başarısızsa 0.
  */
-async function grantSP(userId: string, action: string, overrideAmount?: number, externalRef?: string): Promise<number> {
+async function grantSP(userId: string, action: string, overrideAmount?: number, externalRef?: string, counterpartyId?: string | null, descriptionOverride?: string): Promise<number> {
   const config = SP_REWARDS[action];
   if (!config && !overrideAmount) return 0;
 
@@ -200,7 +201,7 @@ async function grantSP(userId: string, action: string, overrideAmount?: number, 
   }
 
   // DB'ye yaz (atomik + transaction kaydı)
-  const persisted = await _persistSP(userId, amount, action, externalRef);
+  const persisted = await _persistSP(userId, amount, action, externalRef, counterpartyId, descriptionOverride);
   if (persisted) {
     _markGranted(userId, action, amount);
     return amount;
@@ -213,7 +214,7 @@ async function grantSP(userId: string, action: string, overrideAmount?: number, 
  * ★ Atomik persist + zorunlu transaction kaydı.
  * ★ externalRef: idempotency key (satın alma / retry dedup için). v20 RPC kullanılır.
  */
-async function _persistSP(userId: string, amount: number, action: string, externalRef?: string): Promise<boolean> {
+async function _persistSP(userId: string, amount: number, action: string, externalRef?: string, counterpartyId?: string | null, descriptionOverride?: string): Promise<boolean> {
   try {
     // Yöntem 1: RPC (tercih edilen — atomic + idempotent).
     // v20 migrasyonu sonrası external_ref varsa çifte harcama/verme engellenir.
@@ -249,7 +250,7 @@ async function _persistSP(userId: string, amount: number, action: string, extern
       p_action: action,
     });
     if (!legacyRpcError) {
-      _logTransaction(userId, amount, action, externalRef);
+      _logTransaction(userId, amount, action, externalRef, counterpartyId, descriptionOverride);
       return true;
     }
 
@@ -276,7 +277,7 @@ async function _persistSP(userId: string, amount: number, action: string, extern
         .select('id');
 
       if (!lockErr && data && data.length > 0) {
-        _logTransaction(userId, amount, action, externalRef);
+        _logTransaction(userId, amount, action, externalRef, counterpartyId, descriptionOverride);
         return true;
       }
       if (attempt < MAX_RETRIES - 1) {
@@ -297,14 +298,15 @@ async function _persistSP(userId: string, amount: number, action: string, extern
  * Fire-and-forget (başarısızlık SP verilmesini engellemez).
  * externalRef: v20 öncesi fallback yollarında idempotency key saklamak için.
  */
-function _logTransaction(userId: string, amount: number, action: string, externalRef?: string) {
+function _logTransaction(userId: string, amount: number, action: string, externalRef?: string, counterpartyId?: string | null, descriptionOverride?: string) {
   const payload: any = {
     user_id: userId,
     amount,
     type: action,
-    description: amount > 0 ? `SP kazanıldı: ${action}` : `SP harcandı: ${action}`,
+    description: descriptionOverride || (amount > 0 ? `SP kazanıldı: ${action}` : `SP harcandı: ${action}`),
   };
   if (externalRef) payload.external_ref = externalRef;
+  if (counterpartyId) payload.counterparty_id = counterpartyId;
   Promise.resolve(supabase.from('sp_transactions').insert(payload)).catch(() => {});
 }
 
@@ -313,7 +315,7 @@ function _logTransaction(userId: string, amount: number, action: string, externa
  * ★ GodMaster (is_admin) kullanıcılar için SP düşürülmez — sınırsız.
  * ★ externalRef: idempotency key — çift tıklama / retry'da çift düşmeyi engeller.
  */
-async function spendSP(userId: string, amount: number, reason: string, externalRef?: string): Promise<{ success: boolean; remaining?: number; error?: string; duplicate?: boolean }> {
+async function spendSP(userId: string, amount: number, reason: string, externalRef?: string, counterpartyId?: string | null, descriptionOverride?: string): Promise<{ success: boolean; remaining?: number; error?: string; duplicate?: boolean }> {
   try {
     // ★ GodMaster bypass — admin kullanıcılar sınırsız SP'ye sahip
     const { data: adminCheck } = await supabase
@@ -322,7 +324,7 @@ async function spendSP(userId: string, amount: number, reason: string, externalR
       .eq('id', userId)
       .single();
     if (adminCheck?.is_admin) {
-      _logTransaction(userId, 0, `${reason} [ADMIN BYPASS]`, externalRef);
+      _logTransaction(userId, 0, `${reason} [ADMIN BYPASS]`, externalRef, counterpartyId, descriptionOverride);
       return { success: true, remaining: adminCheck.system_points || 999999 };
     }
 
@@ -364,7 +366,7 @@ async function spendSP(userId: string, amount: number, reason: string, externalR
         .eq('id', userId)
         .single();
       const remaining = profile?.system_points ?? 0;
-      _logTransaction(userId, -amount, reason, externalRef);
+      _logTransaction(userId, -amount, reason, externalRef, counterpartyId, descriptionOverride);
       return { success: true, remaining };
     }
 
@@ -392,7 +394,7 @@ async function spendSP(userId: string, amount: number, reason: string, externalR
         .select('id');
 
       if (!error && data && data.length > 0) {
-        _logTransaction(userId, -amount, reason, externalRef);
+        _logTransaction(userId, -amount, reason, externalRef, counterpartyId, descriptionOverride);
         return { success: true, remaining: newTotal };
       }
       if (attempt < MAX_RETRIES - 1) {
@@ -542,8 +544,8 @@ export const GamificationService = {
   },
 
   /** Genel SP harcama */
-  async spend(userId: string, amount: number, reason: string, externalRef?: string): Promise<{ success: boolean; remaining?: number; error?: string; duplicate?: boolean }> {
-    return spendSP(userId, amount, reason, externalRef);
+  async spend(userId: string, amount: number, reason: string, externalRef?: string, counterpartyId?: string | null, descriptionOverride?: string): Promise<{ success: boolean; remaining?: number; error?: string; duplicate?: boolean }> {
+    return spendSP(userId, amount, reason, externalRef, counterpartyId, descriptionOverride);
   },
 
   /**
@@ -551,8 +553,8 @@ export const GamificationService = {
    * externalRef: idempotency key — RevenueCat transactionId veya dahili UUID.
    * Aynı externalRef ile ikinci çağrı no-op döner (K5/K6 koruması).
    */
-  async earn(userId: string, amount: number, reason: string, externalRef?: string): Promise<number> {
-    return grantSP(userId, reason, amount, externalRef);
+  async earn(userId: string, amount: number, reason: string, externalRef?: string, counterpartyId?: string | null, descriptionOverride?: string): Promise<number> {
+    return grantSP(userId, reason, amount, externalRef, counterpartyId, descriptionOverride);
   },
 
   // ── Yardımcılar ──
@@ -567,14 +569,37 @@ export const GamificationService = {
     return data?.system_points || 0;
   },
 
-  /** SP işlem geçmişi */
+  /** SP işlem geçmişi — counterparty profilini de ekle (kim gönderdi/aldı göstermek için) */
   async getTransactionHistory(userId: string, limit = 20) {
-    const { data } = await supabase
+    // ★ Iki aşamalı sorgu — embedded select FK schema cache'e bağlı olduğundan,
+    //   counterparty join'i ayrı query ile çekip manuel merge ediyoruz (resilient).
+    const { data: txData, error } = await supabase
       .from('sp_transactions')
       .select('*')
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
       .limit(limit);
-    return data || [];
+    if (error || !txData) return [];
+
+    // Benzersiz counterparty ID'lerini topla
+    const cpIds = Array.from(
+      new Set(txData.map((t: any) => t.counterparty_id).filter(Boolean))
+    );
+    let cpMap: Record<string, { display_name: string; avatar_url: string }> = {};
+    if (cpIds.length > 0) {
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, display_name, avatar_url')
+        .in('id', cpIds);
+      (profiles || []).forEach((p: any) => {
+        cpMap[p.id] = { display_name: p.display_name, avatar_url: p.avatar_url };
+      });
+    }
+
+    return txData.map((tx: any) => ({
+      ...tx,
+      counterparty_name: tx.counterparty_id ? cpMap[tx.counterparty_id]?.display_name || null : null,
+      counterparty_avatar: tx.counterparty_id ? cpMap[tx.counterparty_id]?.avatar_url || null : null,
+    }));
   },
 };

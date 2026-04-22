@@ -18,15 +18,26 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   },
 });
 
-// ★ Firebase JWT → Supabase Third-Party Auth entegrasyonu
-// Token'ı dinamik olarak Supabase REST client header'ına enjekte eder.
-// _layout.tsx'ten çağrılır (Firebase auth state değiştiğinde).
+// ★ 2026-04-20 NOT: Firebase Third-Party Auth ile `accessToken` factory denendi
+//   ama Supabase'in native `auth.uid()` fonksiyonu hardcoded UUID cast yapıyor
+//   (sub'ı UUID'ye çevirmeye çalışır). Firebase UID (ör. "1GwzWKsxWwhpKpMrd...")
+//   UUID formatında değil → "invalid input syntax for type uuid" hatası → tüm
+//   RLS policy'ler ve sorgu RLS-bağımlı her şey FAİL.
+//
+//   Çözüm: anon key ile REST header gönder. auth.uid() NULL kalır, RLS policy'ler
+//   hata vermez ama auth yok. Yazma işlemleri (ban/promote/unfriend) için v44
+//   atomic RPC'lerin p_executor_id fallback'i devreye girer — client kim olduğunu
+//   söyler, RPC içinde yetki kontrolü yapılır, SECURITY DEFINER ile RLS bypass.
+//
+//   TODO: SQL migration v45 — tüm RLS policy'lerdeki auth.uid()::text çağrılarını
+//   (auth.jwt()->>'sub') ile değiştir. O zaman accessToken factory yeniden
+//   aktifleştirilebilir ve RLS server-side Firebase UID ile çalışır.
+
 export function setSupabaseAuthToken(token: string | null) {
   if (token) {
-    // @ts-ignore — internal API, supabase-js v2 için çalışır
+    // @ts-ignore — internal API, REST header override
     supabase['rest']['headers']['Authorization'] = `Bearer ${token}`;
   } else {
-    // Token yoksa anon key'e geri dön
     // @ts-ignore
     supabase['rest']['headers']['Authorization'] = `Bearer ${SUPABASE_ANON_KEY}`;
   }

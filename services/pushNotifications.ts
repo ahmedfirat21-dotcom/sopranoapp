@@ -109,6 +109,41 @@ export const PushNotificationService = {
         importance: Notifications.AndroidImportance.DEFAULT,
         lightColor: '#3B82F6',
       });
+
+      // ★ 2026-04-21: "calls" kanalı — WhatsApp tarzı telefon kilitliyken bile çalar.
+      //   MAX importance + bypass DnD + uzun titreşim + varsayılan zil sesi.
+      //   Full-screen intent için channel importance MAX olması gerekir.
+      await Notifications.setNotificationChannelAsync('calls', {
+        name: 'Sesli/Görüntülü Arama',
+        description: 'Gelen aramalar — telefon kilitliyken de çalar',
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 800, 400, 800, 400, 800, 400, 800],
+        lightColor: '#14B8A6',
+        sound: 'default', // Sistem zil sesini kullan
+        bypassDnd: true,  // Rahatsız Etme modunu bypass et
+        lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+        showBadge: true,
+        enableLights: true,
+        enableVibrate: true,
+      });
+    }
+
+    // ★ 2026-04-21: iOS + Android notification category — Kabul/Ret action butonları push'ta
+    try {
+      await Notifications.setNotificationCategoryAsync('incoming_call', [
+        {
+          identifier: 'accept_call',
+          buttonTitle: '✓ Kabul Et',
+          options: { opensAppToForeground: true },
+        },
+        {
+          identifier: 'reject_call',
+          buttonTitle: '✕ Reddet',
+          options: { opensAppToForeground: false, isDestructive: true },
+        },
+      ]);
+    } catch (catErr) {
+      if (__DEV__) logger.warn('[Push] Notification category set hatası:', catErr);
     }
 
     // Expo Push Token al

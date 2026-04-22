@@ -173,11 +173,11 @@ export function IncomingCallOverlay({ visible, callerName, callerAvatar, callTyp
         Animated.spring(acceptBtnAnim, { toValue: 1, useNativeDriver: true, tension: 50, friction: 8 }),
       ]).start();
 
-      // ★ CALL-2 FIX: 35sn otomatik kapanma — arayan taraftan 5sn sonra
+      // ★ CALL-2 FIX: 45sn otomatik kapanma — WhatsApp standardı (önceden 35sn, çok kısaydı)
       autoCloseTimerRef.current = setTimeout(() => {
-        if (__DEV__) console.log('[IncomingCall] 35sn timeout — overlay otomatik kapanıyor');
+        if (__DEV__) console.log('[IncomingCall] 45sn timeout — overlay otomatik kapanıyor');
         handleReject();
-      }, 35000);
+      }, 45000);
     } else {
       // Kapanış
       Vibration.cancel();

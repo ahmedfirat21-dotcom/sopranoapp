@@ -4,7 +4,7 @@
  * Tüm uygulama genelinde kullanılan tipler burada tanımlanır.
  *
  * Mimari:
- *   - Tier sistemi: Free/Plus/Pro (3 katman)
+ *   - Tier sistemi: Free/Plus/Pro/GodMaster (4 katman; GodMaster dahili admin rolü)
  *   - Rol hiyerarşisi: owner/moderator/speaker/listener/spectator/guest/banned (7 katman)
  *   - 3 katmanlı katılımcı modeli: Sahne / Dinleyici Grid / Seyirci
  *   - 35 owner permission tanımı
@@ -12,49 +12,33 @@
  */
 
 // ============================================
-// ABONELİK TIER SİSTEMİ (3 Katman)
+// ABONELİK TIER SİSTEMİ (4 Katman)
 // ============================================
 
 /**
- * Abonelik bazlı 3 katmanlı tier sistemi.
+ * Abonelik bazlı 4 katmanlı tier sistemi.
  * Oda limitleri, yetki hiyerarşisi ve kişiselleştirme
  * tamamen bu tier'a bağlıdır.
  *
- * Free → Ücretsiz temel deneyim
- * Plus → Gelişmiş özellikler, daha yüksek limitler
- * Pro  → Sınırsız güç, maksimum prestij
+ * Free      → Ücretsiz temel deneyim
+ * Plus      → Gelişmiş özellikler, daha yüksek limitler
+ * Pro       → Sınırsız güç, maksimum prestij
+ * GodMaster → Admin/geliştirici — tüm limitler sonsuz, tüm tier izinleri
  */
-export type SubscriptionTier = 'Free' | 'Plus' | 'Pro';
+export type SubscriptionTier = 'Free' | 'Plus' | 'Pro' | 'GodMaster';
 
 /** Alias — tüm kod tabanında uyumluluk */
 export type TierName = SubscriptionTier;
 
 /**
- * Bilinmeyen veya eski tier isimlerini güncel sisteme map eder.
- * Legacy 5-tier → 3-tier dönüşümü:
- *   Bronze/Silver → Plus
- *   Gold/VIP      → Pro
- * Bilinmeyen tier → Free.
+ * Tier string'ini doğrular — sadece 'Free' | 'Plus' | 'Pro' kabul eder.
+ * Bilinmeyen/geçersiz değerler → 'Free'.
+ *
+ * ★ 2026-04-20: Tier sistemi Free/Plus/Pro. Bilinmeyen string'ler Free'ye düşer.
  */
 export function migrateLegacyTier(oldTier: string | null | undefined): SubscriptionTier {
-  if (!oldTier) return 'Free';
-  const mapping: Record<string, SubscriptionTier> = {
-    // Yeni sistem
-    'Free': 'Free',
-    'Plus': 'Plus',
-    'Pro': 'Pro',
-    // Legacy 5-tier → 3-tier
-    'Bronze': 'Plus',
-    'Silver': 'Plus',
-    'Gold': 'Pro',
-    'VIP': 'Pro',
-    // Çok eski eşleşmeler
-    'Premium': 'Pro',
-    'Newcomer': 'Free',
-    'Plat': 'Pro',
-    'Diamond': 'Pro',
-  };
-  return mapping[oldTier] || 'Free';
+  if (oldTier === 'Plus' || oldTier === 'Pro' || oldTier === 'GodMaster') return oldTier;
+  return 'Free';
 }
 
 // ============================================
@@ -149,7 +133,7 @@ export type Room = {
 
   // ── Kalıcılık & Kapasite ──
   is_persistent?: boolean;
-  /** Dinleyici grid kapasitesi (her tier'da max 20) */
+  /** Dinleyici kapasitesi — tier'a göre değişir (Free: ~20, Plus/Pro: yüksek, bkz. constants/tiers). */
   max_listeners?: number;
   /** Seyirci kapasitesi (grid'de görünmez). 999 = sınırsız */
   max_spectators?: number;
@@ -170,7 +154,7 @@ export type Room = {
   total_gifts?: number;
 
   // ── Kişiselleştirme ──
-  /** Oda kart resmi (Pro+) */
+  /** Oda içi dikey arka plan resmi (top-level kolon — RoomSettings içinde de benzer alan var). */
   room_image_url?: string | null;
   /** Oda iç renk teması (Plus+) — JSON { primary, secondary, accent } */
   room_color_theme?: RoomColorTheme | null;
@@ -233,18 +217,21 @@ export type RoomSettings = {
   donations_enabled?: boolean;
 
   // ── Kart & Görsel Alanlar ──
-  /** Oda kart resmi (keşfet ekranı) */
+  /** Oda kart resmi — keşfet ekranında gösterilir ve banner görevi görür. */
   card_image_url?: string | null;
-  /** Oda kapak resmi (oda içi) */
+  /** Oda içi dikey arka plan resmi (9:16 aspect). */
   room_image_url?: string | null;
-  /** Oda kapak resmi (alternatif alan) */
+  /** @deprecated cover_image_url → card_image_url'ye birleştirildi. Yeni kodda kullanmayın.
+   *  Eski veriler için read-side fallback hâlâ RoomSettingsSheet/RoomQuickSettings/RoomManageSheet'te mevcut. */
   cover_image_url?: string | null;
   /** Oda dili (tek dil seçimi) */
   room_language?: RoomLanguage;
   /** Yaş kısıtlaması (+18) */
   age_restricted?: boolean;
-  /** Oda müzik parçası URL'si (basit mod) */
+  /** @deprecated Bundled MP3 parça kimliği — kullanımdan kaldırıldı, music_link kullanın */
   music_track?: string | null;
+  /** Oda müzik linki (YouTube / Spotify / SoundCloud) — kullanıcı kendi platformunda açar */
+  music_link?: string | null;
 };
 
 /** Oda içi önemli an işareti (Pro) */

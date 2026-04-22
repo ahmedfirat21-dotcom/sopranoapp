@@ -2,20 +2,26 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, Pressable, ScrollView, Animated,
   Dimensions, LayoutAnimation, Platform, UIManager, Switch, TextInput, PanResponder,
+  Image, ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { isTierAtLeast } from '../../constants/tiers';
 import { useSwipeToDismiss } from '../../hooks/useSwipeToDismiss';
 import { Colors } from '../../constants/theme';
+import { RoomAccessService } from '../../services/roomAccess';
+import { ModerationService } from '../../services/moderation';
+import { getAvatarSource } from '../../constants/avatars';
+import { showToast } from '../Toast';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
 const { width: W, height: H } = Dimensions.get('window');
-// ★ 2026-04-20: FriendsDrawer ile uyumlu genişlik
-const PANEL_W = Math.min(W * 0.6, 300);
+// ★ 2026-04-20: Responsive panel genişlik — küçük telefonlarda daha geniş oran
+const IS_SMALL_SCREEN = W <= 375;
+const PANEL_W = IS_SMALL_SCREEN ? Math.min(W * 0.78, 310) : Math.min(W * 0.68, 320);
 
 const layoutAnim = () => LayoutAnimation.configureNext({
   duration: 220,
@@ -35,12 +41,6 @@ const ENTRY_FEES = [0, 25, 50, 100, 250, 500]; // ★ Genişletildi: host'ların
 const LANGUAGES = [
   { id: 'tr', label: 'TR' }, { id: 'en', label: 'EN' },
   { id: 'ar', label: 'AR' }, { id: 'de', label: 'DE' },
-];
-const MUSIC_TRACKS = [
-  { id: null, label: 'Kapalı' },
-  { id: 'lofi', label: 'Lofi' },
-  { id: 'ambient', label: 'Ambient' },
-  { id: 'jazz', label: 'Jazz' },
 ];
 const ROOM_THEMES: Record<string, { name: string; colors: [string, string] }> = {
   ocean: { name: 'Okyanus', colors: ['#0E4D6F', '#083344'] },
@@ -83,6 +83,9 @@ type SettingsConfig = {
   onWelcomeMessageChange: (msg: string) => void;
   roomRules: string;
   onRulesChange: (rules: string) => void;
+  /** ★ 2026-04-20: Oda açıklaması — create-room'da set, PlusMenu'de de edit edilebilir */
+  description?: string;
+  onDescriptionChange?: (desc: string) => void;
   roomType: string;
   onRoomTypeChange: (type: string) => void;
   roomPassword?: string;
@@ -93,8 +96,8 @@ type SettingsConfig = {
   // ★ Eksik 4 ayar
   entryFee: number;
   onEntryFeeChange: (fee: number) => void;
-  musicTrack: string | null;
-  onMusicTrackChange: (track: string | null) => void;
+  musicLink: string | null;
+  onMusicLinkChange: (link: string | null) => void;
   backgroundImage: string | null;
   onPickBackgroundImage: () => void;
   onRemoveBackgroundImage: () => void;
@@ -139,6 +142,10 @@ type PlusMenuProps = {
     useSpeaker: boolean;
     onSpeakerChange: (v: boolean) => void;
   };
+  // ★ 2026-04-20: Inline Banlılar & İstekler — ayrı modal yerine accordion
+  roomId?: string;
+  hostId?: string;
+  roomType?: string;
 };
 
 const ROLE_META: Record<string, { label: string; color: string; icon: string }> = {
@@ -284,11 +291,66 @@ export function PlusMenu({
   onDonate, isDonationsEnabled,
   bottomInset = 14,
   onLeaveRoom, deviceConfig,
+  roomId: _roomId, hostId: _hostId, roomType: _roomType,
 }: PlusMenuProps) {
   const slideAnim = useRef(new Animated.Value(PANEL_W)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const compactSlideY = useRef(new Animated.Value(300)).current;
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const scrollRef = useRef<ScrollView>(null);
+  const rowRefs = useRef<Record<string, number>>({});
+
+  // ★ 2026-04-20: Inline ban/request state
+  const [inlineBans, setInlineBans] = useState<any[]>([]);
+  const [inlineRequests, setInlineRequests] = useState<any[]>([]);
+  const [bansLoading, setBansLoading] = useState(false);
+  const [requestsLoading, setRequestsLoading] = useState(false);
+  const [processingIds, setProcessingIds] = useState<Set<string>>(new Set());
+
+  const loadBans = useCallback(async () => {
+    if (!_roomId) return;
+    setBansLoading(true);
+    try { setInlineBans(await ModerationService.getRoomBans(_roomId)); } catch {}
+    setBansLoading(false);
+  }, [_roomId]);
+
+  const loadRequests = useCallback(async () => {
+    if (!_roomId) return;
+    setRequestsLoading(true);
+    try { setInlineRequests(await RoomAccessService.getPendingRequests(_roomId)); } catch {}
+    setRequestsLoading(false);
+  }, [_roomId]);
+
+  const handleAcceptReq = useCallback(async (req: any) => {
+    if (!_hostId) return;
+    setProcessingIds(p => new Set(p).add(req.id));
+    try {
+      await RoomAccessService.approveRequest(req.id, _hostId);
+      setInlineRequests(prev => prev.filter(r => r.id !== req.id));
+      showToast({ title: '✅ Kabul Edildi', type: 'success' });
+    } catch {} finally { setProcessingIds(p => { const n = new Set(p); n.delete(req.id); return n; }); }
+  }, [_hostId]);
+
+  const handleRejectReq = useCallback(async (req: any) => {
+    if (!_hostId) return;
+    setProcessingIds(p => new Set(p).add(req.id));
+    try {
+      await RoomAccessService.rejectRequest(req.id, _hostId);
+      setInlineRequests(prev => prev.filter(r => r.id !== req.id));
+      showToast({ title: '❌ Reddedildi', type: 'info' });
+    } catch {} finally { setProcessingIds(p => { const n = new Set(p); n.delete(req.id); return n; }); }
+  }, [_hostId]);
+
+  const handleUnban = useCallback(async (ban: any) => {
+    if (!_roomId || !_hostId) return;
+    setProcessingIds(p => new Set(p).add(ban.id));
+    try {
+      await ModerationService.unbanFromRoom(_roomId, ban.user_id, _hostId);
+      setInlineBans(prev => prev.filter(b => b.id !== ban.id));
+      showToast({ title: '✅ Ban Kaldırıldı', type: 'success' });
+    } catch { showToast({ title: 'Hata', type: 'error' }); }
+    finally { setProcessingIds(p => { const n = new Set(p); n.delete(ban.id); return n; }); }
+  }, [_roomId, _hostId]);
 
   const { translateValue: swipeX, panHandlers } = useSwipeToDismiss({
     direction: 'right', threshold: 60, onDismiss: onClose,
@@ -331,7 +393,16 @@ export function PlusMenu({
 
   const toggle = useCallback((id: string) => {
     layoutAnim();
-    setExpandedId(prev => prev === id ? null : id);
+    setExpandedId(prev => {
+      const next = prev === id ? null : id;
+      // ★ Accordion açıldığında o satırı görünür alana kaydır
+      if (next && scrollRef.current && rowRefs.current[id] !== undefined) {
+        setTimeout(() => {
+          scrollRef.current?.scrollTo({ y: Math.max(0, rowRefs.current[id] - 40), animated: true });
+        }, 260);
+      }
+      return next;
+    });
   }, []);
 
   if (!visible) return null;
@@ -346,25 +417,49 @@ export function PlusMenu({
 
   // ═══ Accordion İçerik Renderları ═══
 
-  // 1️⃣ ODA BİLGİLERİ
+  // 1️⃣ ODA BİLGİLERİ — SADECE isim/metin alanları (Erişim Tipi ve Şifre yeni "Giriş & Erişim" menüsüne taşındı)
   const renderRoomInfo = () => {
     if (!sc) return null;
     return (
       <View style={st.subWrap}>
         <InlineTextEditor icon="create-outline" label="Oda Adı" value={sc.roomName} onSave={sc.onRenameRoom} placeholder="Oda adı..." accent="#D4AF37" />
         <View style={st.sep} />
+        {sc.onDescriptionChange && (
+          <>
+            <InlineTextEditor icon="information-circle-outline" label="Açıklama" value={sc.description || ''} onSave={sc.onDescriptionChange} placeholder="Odanın kısa açıklaması..." multiline accent="#14B8A6" />
+            <View style={st.sep} />
+          </>
+        )}
         <InlineTextEditor icon="chatbubble-outline" label="Hoş Geldin" value={sc.welcomeMessage} onSave={sc.onWelcomeMessageChange} placeholder="Hoş geldin mesajı..." multiline accent="#3B82F6" />
         <View style={st.sep} />
         <InlineTextEditor icon="document-text-outline" label="Kurallar" value={sc.roomRules} onSave={sc.onRulesChange} placeholder="Oda kuralları..." multiline accent="#A78BFA" />
-        <View style={st.sep} />
-        <SettingChips icon="globe-outline" label="Erişim Tipi" options={ROOM_TYPES.map(t => ({ id: t.id, label: t.label }))} value={sc.roomType} onSelect={can('Plus') ? sc.onRoomTypeChange : undefined} locked={!can('Plus')} lockTier="Plus" />
-        {/* Şifreli oda seçildiğinde şifre girişi */}
+      </View>
+    );
+  };
+
+  // 🔐 GİRİŞ & ERİŞİM (yeni) — "kime açık?" sorusunun TÜM cevabı burada
+  // Önceden 3 farklı menüde dağılmıştı (Oda Bilgileri: tip/şifre + Moderasyon: kilit/yaş/dil/arkadaş + Monetizasyon: ücret)
+  const renderAccess = () => {
+    if (!sc) return null;
+    return (
+      <View style={st.subWrap}>
+        <SettingChips icon="globe-outline" label="Oda Tipi" options={ROOM_TYPES.map(t => ({ id: t.id, label: t.label }))} value={sc.roomType} onSelect={can('Plus') ? sc.onRoomTypeChange : undefined} locked={!can('Plus')} lockTier="Plus" />
         {sc.roomType === 'closed' && can('Plus') && (
           <>
             <View style={st.sep} />
             <InlineTextEditor icon="key-outline" label="Şifre" value={sc.roomPassword || ''} onSave={sc.onPasswordChange || (() => {})} placeholder="Min 4 karakter" accent="#F59E0B" secureTextEntry maxLength={20} />
           </>
         )}
+        <View style={st.sep} />
+        <SettingChips icon="diamond-outline" label="Giriş Ücreti (SP)" options={ENTRY_FEES.map(f => ({ id: f, label: f === 0 ? 'Ücretsiz' : `${f}` }))} value={sc.entryFee} onSelect={can('Pro') ? sc.onEntryFeeChange : undefined} locked={!can('Pro')} lockTier="Pro" />
+        <View style={st.sep} />
+        <SettingToggle icon={isRoomLocked ? 'lock-closed' : 'lock-open-outline'} label="Odayı Kilitle (yeni giriş yok)" value={!!isRoomLocked} onValueChange={onRoomLock ? () => onRoomLock() : undefined} accent="#F59E0B" locked={!can('Plus')} lockTier="Plus" />
+        <View style={st.sep} />
+        <SettingToggle icon="warning-outline" label="+18 İçerik" value={sc.ageRestricted} onValueChange={can('Plus') ? sc.onAgeRestrictedChange : undefined} accent="#EF4444" locked={!can('Plus')} lockTier="Plus" />
+        <View style={st.sep} />
+        <SettingChips icon="language-outline" label="Dil Filtresi" options={LANGUAGES.map(l => ({ id: l.id, label: l.label }))} value={sc.roomLanguage} onSelect={can('Plus') ? sc.onLanguageChange : undefined} locked={!can('Plus')} lockTier="Plus" />
+        <View style={st.sep} />
+        <SettingToggle icon="people-outline" label="Sadece Arkadaşlar" value={sc.followersOnly} onValueChange={can('Pro') ? sc.onToggleFollowersOnly : undefined} accent="#D4AF37" locked={!can('Pro')} lockTier="Pro" />
       </View>
     );
   };
@@ -381,7 +476,7 @@ export function PlusMenu({
         {/* ── Owner Kontrolleri ── */}
         {showOwnerControls && (
           <>
-            <SettingChips icon="mic-outline" label="Konuşma Modu" options={SPEAKING_MODES.map(m => ({ id: m.id, label: m.label }))} value={sc!.speakingMode} onSelect={sc!.onSpeakingModeChange} />
+            <SettingChips icon="mic-outline" label="Konuşma Modu" options={SPEAKING_MODES.map(m => ({ id: m.id, label: m.label }))} value={sc!.speakingMode} onSelect={(v: any) => { if (v === 'selected_only' && !can('Pro')) return; sc!.onSpeakingModeChange(v); }} />
             <View style={st.sep} />
           </>
         )}
@@ -464,44 +559,78 @@ export function PlusMenu({
     );
   };
 
-  // 3️⃣ MODERASYON
-  const renderModeration = () => {
-    return (
-      <View style={st.subWrap}>
-        {sc && (
-          <>
-            <SettingToggle icon={isRoomLocked ? 'lock-closed' : 'lock-open-outline'} label="Odayı Kilitle" value={!!isRoomLocked} onValueChange={onRoomLock ? () => onRoomLock() : undefined} accent="#F59E0B" locked={!can('Plus')} lockTier="Plus" />
-            <View style={st.sep} />
-            <SettingChips icon="language-outline" label="Dil" options={LANGUAGES.map(l => ({ id: l.id, label: l.label }))} value={sc.roomLanguage} onSelect={can('Plus') ? sc.onLanguageChange : undefined} locked={!can('Plus')} lockTier="Plus" />
-            <View style={st.sep} />
-            <SettingToggle icon="warning-outline" label="+18 İçerik" value={sc.ageRestricted} onValueChange={can('Plus') ? sc.onAgeRestrictedChange : undefined} accent="#EF4444" locked={!can('Plus')} lockTier="Plus" />
-            <View style={st.sep} />
-            <SettingToggle icon="people-outline" label="Sadece Arkadaşlar" value={sc.followersOnly} onValueChange={can('Pro') ? sc.onToggleFollowersOnly : undefined} accent="#D4AF37" locked={!can('Pro')} lockTier="Pro" />
-            <View style={st.sep} />
-          </>
-        )}
-        {onModeration && (
-          <Pressable style={({ pressed }) => [s.subRow, pressed && s.subRowPressed]} onPress={() => { onModeration(); onClose(); }}>
-            <View style={s.subIconCircle}><Ionicons name="people-outline" size={13} color="#A78BFA" style={s.iconShadow} /></View>
-            <Text style={s.subLabel}>Moderasyon Paneli</Text>
-            <Ionicons name="chevron-forward" size={12} color="rgba(255,255,255,0.15)" />
-          </Pressable>
-        )}
-      </View>
-    );
-  };
+  // ~~3️⃣ MODERASYON~~ KALDIRILDI — tüm toggle'lar "Giriş & Erişim" menüsüne taşındı.
+  // Banlılar & İstekler zaten ayrı top-level item.
 
-  // 4️⃣ MONETİZASYON
+  // 4️⃣ MONETİZASYON — Giriş Ücreti "Giriş & Erişim"e taşındı, burada sadece Bağış
   const renderMonetization = () => {
     if (!sc) return null;
     return (
       <View style={st.subWrap}>
         <SettingToggle icon="heart-outline" label="Bağış" value={sc.donationsEnabled} onValueChange={can('Pro') ? sc.onDonationsToggle : undefined} accent="#EC4899" locked={!can('Pro')} lockTier="Pro" />
-        <View style={st.sep} />
-        <SettingChips icon="diamond-outline" label="Giriş Ücreti (SP)" options={ENTRY_FEES.map(f => ({ id: f, label: f === 0 ? 'Free' : `${f}` }))} value={sc.entryFee} onSelect={can('Pro') ? sc.onEntryFeeChange : undefined} locked={!can('Pro')} lockTier="Pro" />
       </View>
     );
   };
+
+  // ★ 2026-04-20: İnline Banlılar
+  const renderBans = () => (
+    <View style={st.subWrap}>
+      {bansLoading ? <ActivityIndicator color="#EF4444" style={{ marginVertical: 12 }} /> :
+       inlineBans.length === 0 ? (
+        <View style={{ alignItems: 'center', paddingVertical: 16 }}>
+          <Ionicons name="shield-checkmark" size={20} color="rgba(34,197,94,0.3)" />
+          <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)', marginTop: 4 }}>Banlı kullanıcı yok 🎉</Text>
+        </View>
+      ) : inlineBans.map(ban => {
+        const isPermanent = ban.ban_type === 'permanent';
+        const expiresAt = ban.expires_at ? new Date(ban.expires_at) : null;
+        const remainingMin = expiresAt ? Math.max(0, Math.floor((expiresAt.getTime() - Date.now()) / 60000)) : 0;
+        const timeLabel = isPermanent ? 'Kalıcı' : remainingMin > 60 ? `${Math.floor(remainingMin / 60)}sa` : `${remainingMin}dk`;
+        return (
+          <View key={ban.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.03)' }}>
+            <Image source={getAvatarSource(ban.user?.avatar_url)} style={{ width: 28, height: 28, borderRadius: 14 }} />
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 11, fontWeight: '600', color: '#F1F5F9' }} numberOfLines={1}>{ban.user?.display_name || 'Kullanıcı'}</Text>
+              <Text style={{ fontSize: 8, color: isPermanent ? '#EF4444' : '#F59E0B', fontWeight: '700' }}>{isPermanent ? '⛔ KALICI' : `⏳ ${timeLabel}`}</Text>
+            </View>
+            {processingIds.has(ban.id) ? <ActivityIndicator size="small" color="#14B8A6" /> : (
+              <Pressable onPress={() => handleUnban(ban)} style={{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, backgroundColor: 'rgba(20,184,166,0.08)', borderWidth: 1, borderColor: 'rgba(20,184,166,0.18)' }}>
+                <Text style={{ fontSize: 9, fontWeight: '700', color: '#14B8A6' }}>Kaldır</Text>
+              </Pressable>
+            )}
+          </View>
+        );
+      })}
+    </View>
+  );
+
+  // ★ 2026-04-20: İnline İstekler
+  const renderRequestsInline = () => (
+    <View style={st.subWrap}>
+      {requestsLoading ? <ActivityIndicator color="#A78BFA" style={{ marginVertical: 12 }} /> :
+       inlineRequests.length === 0 ? (
+        <View style={{ alignItems: 'center', paddingVertical: 16 }}>
+          <Ionicons name="checkmark-circle" size={20} color="rgba(167,139,250,0.25)" />
+          <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)', marginTop: 4 }}>Bekleyen istek yok</Text>
+        </View>
+      ) : inlineRequests.map(req => (
+        <View key={req.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.03)' }}>
+          <Image source={getAvatarSource(req.user?.avatar_url)} style={{ width: 28, height: 28, borderRadius: 14 }} />
+          <Text style={{ flex: 1, fontSize: 11, fontWeight: '600', color: '#F1F5F9' }} numberOfLines={1}>{req.user?.display_name || 'Kullanıcı'}</Text>
+          {processingIds.has(req.id) ? <ActivityIndicator size="small" color="#A78BFA" /> : (
+            <View style={{ flexDirection: 'row', gap: 4 }}>
+              <Pressable onPress={() => handleAcceptReq(req)} style={{ width: 26, height: 26, borderRadius: 8, backgroundColor: '#14B8A6', alignItems: 'center', justifyContent: 'center' }}>
+                <Ionicons name="checkmark" size={14} color="#FFF" />
+              </Pressable>
+              <Pressable onPress={() => handleRejectReq(req)} style={{ width: 26, height: 26, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.04)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' }}>
+                <Ionicons name="close" size={14} color="#94A3B8" />
+              </Pressable>
+            </View>
+          )}
+        </View>
+      ))}
+    </View>
+  );
 
   // 5️⃣ GÖRSEL & TEMA
   const renderVisual = () => {
@@ -560,33 +689,37 @@ export function PlusMenu({
         </View>
         <View style={st.sep} />
 
-        {/* Kapak Görseli — Pro+ */}
+        {/* ★ 2026-04-21: Kart Görseli — artık herkes (oluşturma ile aynı kural). */}
         <View style={st.toggleRow}>
-          <Ionicons name="albums-outline" size={13} color={can('Pro') ? '#D4AF37' : '#475569'} />
-          <Text style={[st.toggleLabel, !can('Pro') && { color: '#475569' }]}>Kapak Görseli</Text>
-          {can('Pro') ? (
-            sc.coverImage ? (
-              <Pressable hitSlop={6} onPress={sc.onRemoveCoverImage}>
-                <Ionicons name="close-circle" size={16} color="#EF4444" />
-              </Pressable>
-            ) : (
-              <Pressable hitSlop={6} onPress={sc.onPickCoverImage}>
-                <Ionicons name="cloud-upload-outline" size={14} color="#D4AF37" />
-              </Pressable>
-            )
+          <Ionicons name="albums-outline" size={13} color="#D4AF37" />
+          <Text style={st.toggleLabel}>Kart Görseli</Text>
+          {sc.coverImage ? (
+            <Pressable hitSlop={6} onPress={sc.onRemoveCoverImage}>
+              <Ionicons name="close-circle" size={16} color="#EF4444" />
+            </Pressable>
           ) : (
-            <View style={st.tierPill}><Text style={st.tierPillText}>Pro+</Text></View>
+            <Pressable hitSlop={6} onPress={sc.onPickCoverImage}>
+              <Ionicons name="cloud-upload-outline" size={14} color="#D4AF37" />
+            </Pressable>
           )}
         </View>
         <View style={st.sep} />
 
-        {/* Müzik — Pro+ */}
-        <SettingChips icon="musical-notes-outline" label="Müzik"
-          options={MUSIC_TRACKS.map(t => ({ id: t.id ?? '__off__', label: t.label }))}
-          value={sc.musicTrack ?? '__off__'}
-          onSelect={can('Pro') ? (v: any) => sc.onMusicTrackChange(v === '__off__' ? null : v) : undefined}
-          locked={!can('Pro')} lockTier="Pro"
-        />
+        {/* Müzik Linki — Pro+ (YouTube/Spotify/SoundCloud) */}
+        {can('Pro') ? (
+          <InlineTextEditor icon="musical-notes-outline" label="Müzik Linki"
+            value={sc.musicLink || ''}
+            onSave={(v) => sc.onMusicLinkChange(v.trim() || null)}
+            placeholder="https://youtube.com/... veya https://spotify.com/..."
+            accent="#FFD700"
+          />
+        ) : (
+          <View style={st.chipRow}>
+            <Ionicons name="lock-closed" size={12} color="#475569" />
+            <Text style={[st.chipLabel, { color: '#475569' }]}>Oda Müzik Linki</Text>
+            <View style={st.tierPill}><Text style={st.tierPillText}>Pro+</Text></View>
+          </View>
+        )}
       </View>
     );
   };
@@ -647,20 +780,34 @@ export function PlusMenu({
   const items: MenuItem[] = [];
 
   if (isOwner && sc) {
-    // 1. Oda Bilgileri
+    // 1. Oda Bilgileri (yalnız isim/kurallar/hoş geldin)
     items.push({ id: 'room_info', icon: 'information-circle-outline', label: 'Oda Bilgileri', accent: '#D4AF37', onPress: () => toggle('room_info'), expandable: true, renderContent: renderRoomInfo });
-    // 2. Konuşma & Ses (owner: konuşma modu + slow mode + cihaz ayarları)
+    // 2. Konuşma & Ses
     items.push({ id: 'speaking', icon: 'mic-outline', label: 'Konuşma & Ses', accent: '#14B8A6', onPress: () => toggle('speaking'), expandable: true, renderContent: renderSpeaking });
-    // 3. Moderasyon
-    items.push({ id: 'moderation', icon: 'shield-checkmark-outline', label: 'Moderasyon', accent: '#A78BFA', onPress: () => toggle('moderation'), expandable: true, badge: micRequestCount, renderContent: renderModeration });
-    // 4. Monetizasyon
-    items.push({ id: 'monetization', icon: 'wallet-outline', label: 'Monetizasyon', accent: '#EC4899', onPress: () => toggle('monetization'), expandable: true, renderContent: renderMonetization });
+    // ★ 2026-04-20: Giriş & Erişim — "kime açık?" sorusunun tek merkezi.
+    //   Önceden 3 farklı menüde dağılmış (tip, şifre, ücret, kilit, yaş, dil, arkadaş).
+    items.push({ id: 'access', icon: 'key-outline', label: 'Giriş & Erişim', accent: '#F59E0B', onPress: () => toggle('access'), expandable: true, renderContent: renderAccess });
+    // ★ 2026-04-20: Banlılar & İstekler — ayrı inline accordion (modal kaldırıldı)
+    if ((_roomType === 'closed' || _roomType === 'invite') && _roomId) {
+      items.push({ id: 'requests', icon: 'hourglass-outline', label: 'Katılım İstekleri', accent: '#A78BFA', badge: micRequestCount, onPress: () => { if (expandedId !== 'requests') loadRequests(); toggle('requests'); }, expandable: true, renderContent: renderRequestsInline });
+    }
+    if (_roomId) {
+      items.push({ id: 'bans', icon: 'ban-outline', label: 'Banlılar', accent: '#EF4444', onPress: () => { if (expandedId !== 'bans') loadBans(); toggle('bans'); }, expandable: true, renderContent: renderBans });
+    }
+    // 4. Bağış Ayarları (sadece Bağış toggle kaldı)
+    items.push({ id: 'monetization', icon: 'heart-outline', label: 'Bağış Ayarları', accent: '#EC4899', onPress: () => toggle('monetization'), expandable: true, renderContent: renderMonetization });
     // 5. Görsel & Tema
     items.push({ id: 'visual', icon: 'color-palette-outline', label: 'Görsel & Tema', accent: '#F59E0B', onPress: () => toggle('visual'), expandable: true, renderContent: renderVisual });
   } else if (isMod) {
-    // ★ Moderatör: Konuşma & Ses (slow mode + cihaz) + Moderasyon
+    // Moderatör: Konuşma & Ses (slow mode + cihaz) + Banlılar & İstekler
     items.push({ id: 'speaking', icon: 'mic-outline', label: 'Konuşma & Ses', accent: '#14B8A6', onPress: () => toggle('speaking'), expandable: true, renderContent: renderSpeaking });
-    items.push({ id: 'moderation', icon: 'shield-checkmark-outline', label: 'Moderasyon', accent: '#A78BFA', onPress: () => toggle('moderation'), expandable: true, badge: micRequestCount, renderContent: renderModeration });
+    // ★ İstekler + Banlılar inline (moderatör)
+    if ((_roomType === 'closed' || _roomType === 'invite') && _roomId) {
+      items.push({ id: 'requests', icon: 'hourglass-outline', label: 'Katılım İstekleri', accent: '#A78BFA', badge: micRequestCount, onPress: () => { if (expandedId !== 'requests') loadRequests(); toggle('requests'); }, expandable: true, renderContent: renderRequestsInline });
+    }
+    if (_roomId) {
+      items.push({ id: 'bans', icon: 'ban-outline', label: 'Banlılar', accent: '#EF4444', onPress: () => { if (expandedId !== 'bans') loadBans(); toggle('bans'); }, expandable: true, renderContent: renderBans });
+    }
   } else if (deviceConfig) {
     // ★ Speaker/Listener: Sadece cihaz ayarları (hoparlör + sahnedeyse mic/noise)
     items.push({ id: 'speaking', icon: 'headset-outline', label: 'Konuşma & Ses', accent: '#3B82F6', onPress: () => toggle('speaking'), expandable: true, renderContent: renderSpeaking });
@@ -723,7 +870,7 @@ export function PlusMenu({
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
       </Animated.View>
 
-      <Animated.View {...panHandlers} style={[s.panel, { bottom: bottomInset + 70, transform: [{ translateX: Animated.add(slideAnim, swipeX) }] }]}>
+      <Animated.View {...panHandlers} style={[s.panel, { bottom: bottomInset + 70, top: IS_SMALL_SCREEN ? 40 : 60, transform: [{ translateX: Animated.add(slideAnim, swipeX) }] }]}>
         {/* ★ FriendsDrawer paleti — diagonal warm-neutral gradient */}
         <LinearGradient
           colors={['#4a5668', '#37414f', '#232a35']}
@@ -746,13 +893,16 @@ export function PlusMenu({
           </Pressable>
         </View>
 
-        <ScrollView bounces={false} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingVertical: 4 }} nestedScrollEnabled>
+        <ScrollView ref={scrollRef} bounces={false} showsVerticalScrollIndicator={true} scrollIndicatorInsets={{ right: 1 }} contentContainerStyle={{ paddingVertical: 4, paddingBottom: 12 }} nestedScrollEnabled>
           {items.map((item, i) => {
             const isExpanded = expandedId === item.id;
             return (
-              <View key={item.id}>
+              <View key={item.id}
+                onLayout={(e) => { rowRefs.current[item.id] = e.nativeEvent.layout.y; }}
+              >
                 <Pressable
-                  onPress={item.expandable ? item.onPress : item.onPress}
+                  onPress={item.onPress}
+                  android_ripple={{ color: 'transparent' }}
                   style={({ pressed }) => [
                     s.row, pressed && s.rowPressed,
                     isExpanded && s.rowExpanded,
@@ -760,11 +910,11 @@ export function PlusMenu({
                   ]}
                 >
                   <View style={s.iconCircle}>
-                    <Ionicons name={item.icon as any} size={16} color={item.destructive ? '#EF4444' : item.accent} style={s.iconShadow} />
+                    <Ionicons name={item.icon as any} size={IS_SMALL_SCREEN ? 14 : 16} color={item.destructive ? '#EF4444' : item.accent} style={s.iconShadow} />
                   </View>
                   <View style={s.rowText}>
-                    <Text style={[s.rowLabel, item.destructive && { color: '#EF4444' }]}>{item.label}</Text>
-                    {item.desc && <Text style={s.rowDesc}>{item.desc}</Text>}
+                    <Text style={[s.rowLabel, item.destructive && { color: '#EF4444' }]} numberOfLines={1}>{item.label}</Text>
+                    {item.desc && <Text style={s.rowDesc} numberOfLines={1}>{item.desc}</Text>}
                   </View>
                   {item.badge && item.badge > 0 ? (
                     <View style={s.badge}><Text style={s.badgeText}>{item.badge > 9 ? '9+' : item.badge}</Text></View>
@@ -774,7 +924,7 @@ export function PlusMenu({
                   )}
                 </Pressable>
 
-                {/* Accordion içerik */}
+                {/* Accordion içerik — lazy render */}
                 {item.expandable && isExpanded && item.renderContent?.()}
               </View>
             );
@@ -796,12 +946,10 @@ export function AdvancedSettingsPanel({ visible }: { visible: boolean;[key: stri
 const s = StyleSheet.create({
   backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.55)' },
   panel: {
-    // ★ 2026-04-20: FriendsDrawer tema uyumu — warm/neutral gradient zaten LinearGradient'te.
-    // Height artık content-driven (top yok), alt control bar üstünde duracak şekilde konumlanır.
-    // maxHeight ile taşma engellenir, ScrollView ile içerik scroll eder.
+    // ★ 2026-04-20: Full-height responsive panel — küçük ekranlarda daha fazla alan kullanır.
+    // top + bottom ile esnek yükseklik — maxHeight kaldırıldı, absolute pozisyonla hesaplanır.
     position: 'absolute', right: 0,
     width: PANEL_W,
-    maxHeight: H * 0.78,
     borderTopLeftRadius: 22, borderBottomLeftRadius: 22,
     borderWidth: 1, borderRightWidth: 0,
     borderColor: Colors.cardBorder,
@@ -854,13 +1002,13 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
   },
   row: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    paddingVertical: 11, paddingHorizontal: 12,
+    flexDirection: 'row', alignItems: 'center', gap: IS_SMALL_SCREEN ? 7 : 10,
+    paddingVertical: IS_SMALL_SCREEN ? 9 : 11, paddingHorizontal: IS_SMALL_SCREEN ? 10 : 12,
   },
   rowPressed: { backgroundColor: 'rgba(20,184,166,0.08)' },
   rowExpanded: { backgroundColor: 'rgba(255,255,255,0.03)' },
   rowBorder: { borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.04)' },
-  iconCircle: { width: 30, height: 30, justifyContent: 'center', alignItems: 'center' },
+  iconCircle: { width: IS_SMALL_SCREEN ? 26 : 30, height: IS_SMALL_SCREEN ? 26 : 30, justifyContent: 'center', alignItems: 'center' },
   iconShadow: { textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 3 },
   rowText: { flex: 1 },
   rowLabel: { fontSize: 12, fontWeight: '600', color: '#F1F5F9', letterSpacing: 0.1, textShadowColor: 'rgba(0,0,0,0.45)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },

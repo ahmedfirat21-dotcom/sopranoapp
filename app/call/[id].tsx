@@ -253,7 +253,7 @@ export default function CallScreen() {
     // ★ Aktif arama olarak işaretle (meşgul kontrolü için)
     setActiveCallId(callId);
 
-    // ★ WhatsApp tarzı: 30 saniye timeout (45'ten düşürüldü)
+    // ★ 2026-04-21: WhatsApp standardı 45sn (önceden 30sn, karşı tarafın cevaplamasına dardı)
     if (callStatusRef.current === 'calling') {
       ringTimerRef.current = setTimeout(async () => {
         if (callStatusRef.current === 'calling') {
@@ -275,7 +275,7 @@ export default function CallScreen() {
 
           setTimeout(() => { if (mountedRef.current) safeGoBack(router); }, 3000); // ★ CALL-5: 3sn özet
         }
-      }, 30000); // ★ 30sn timeout
+      }, 45000); // ★ 2026-04-21: 45sn (WhatsApp standardı) — 30 çok kısaydı
     }
 
     return () => {
@@ -708,30 +708,47 @@ export default function CallScreen() {
               <Text style={st.endUserName}>{otherUser?.display_name || 'Kullanıcı'}</Text>
             </View>
 
-            {/* ★ Geri Ara butonu */}
-            <TouchableOpacity
-              style={st.callBackBtn}
-              onPress={async () => {
-                if (!firebaseUser || !id) return;
-                const tier = profile?.subscription_tier || 'Free';
-                try {
-                  const { callId: newCallId, receiverIsOnline } = await CallService.initiateCall(
-                    firebaseUser.uid,
-                    profile?.display_name || 'Kullanıcı',
-                    profile?.avatar_url || undefined,
-                    id, 'audio', tier as any
-                  );
-                  router.replace(`/call/${id}?callId=${newCallId}&callType=audio&isIncoming=false&receiverOnline=${receiverIsOnline}` as any);
-                } catch (err: any) {
-                  showToast({ title: 'Arama Hatası', message: err.message || 'Arama başlatılamadı', type: 'error' });
-                }
-              }}
-            >
-              <Ionicons name="call" size={18} color="#FFF" />
-              <Text style={st.callBackBtnText}>Geri Ara</Text>
-            </TouchableOpacity>
+            {/* ★ Aksiyonlar: Geri Ara + Kapat (yan yana) */}
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 8 }}>
+              <TouchableOpacity
+                style={[st.callBackBtn, { flex: 1 }]}
+                onPress={async () => {
+                  if (!firebaseUser || !id) return;
+                  const tier = profile?.subscription_tier || 'Free';
+                  try {
+                    const { callId: newCallId, receiverIsOnline } = await CallService.initiateCall(
+                      firebaseUser.uid,
+                      profile?.display_name || 'Kullanıcı',
+                      profile?.avatar_url || undefined,
+                      id, 'audio', tier as any
+                    );
+                    router.replace(`/call/${id}?callId=${newCallId}&callType=audio&isIncoming=false&receiverOnline=${receiverIsOnline}` as any);
+                  } catch (err: any) {
+                    showToast({ title: 'Arama Hatası', message: err.message || 'Arama başlatılamadı', type: 'error' });
+                  }
+                }}
+              >
+                <Ionicons name="call" size={18} color="#FFF" />
+                <Text style={st.callBackBtnText}>Geri Ara</Text>
+              </TouchableOpacity>
+              {/* ★ 2026-04-21: "Kapat" butonu — kullanıcı otomatik geri sayımı beklemeden çıkabilsin */}
+              <TouchableOpacity
+                style={[st.callBackBtn, {
+                  flex: 1,
+                  backgroundColor: 'rgba(148,163,184,0.15)',
+                  borderColor: 'rgba(148,163,184,0.25)',
+                }]}
+                onPress={() => {
+                  if (ringTimerRef.current) { clearTimeout(ringTimerRef.current); ringTimerRef.current = null; }
+                  if (mountedRef.current) safeGoBack(router);
+                }}
+              >
+                <Ionicons name="close" size={18} color="#CBD5E1" />
+                <Text style={[st.callBackBtnText, { color: '#CBD5E1' }]}>Kapat</Text>
+              </TouchableOpacity>
+            </View>
 
-            {/* Geri sayım göstergesi */}
+            {/* Geri sayım göstergesi — kullanıcı istemezse 3sn sonra kendi kapanır */}
             <Text style={st.endAutoClose}>Otomatik kapanıyor...</Text>
           </View>
         </View>

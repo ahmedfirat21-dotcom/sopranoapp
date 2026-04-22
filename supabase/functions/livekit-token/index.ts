@@ -133,12 +133,17 @@ serve(async (req: Request) => {
       );
     }
 
-    // ── 4. Rol'e göre publish yetkisi belirle ──
-    // Row yok ise default listener (canPublish=false). Row varsa gerçek rol.
-    // Owner/moderator/speaker + is_muted=false → canPublish=true.
+    // ── 4. Publish yetkisi belirle ──
+    // ★ 2026-04-20 FIX: canPublish HER ZAMAN true — token odaya girişte bir kez
+    // üretilir ve rol değiştiğinde (listener→speaker promote) yenilenMEZ.
+    // Bu yüzden listener olarak giren birisi sahneye çıktığında canPublish=false
+    // olan eski token yüzünden mikrofon açamıyordu.
+    // Uygulama katmanı zaten mic erişimini kontrol eder:
+    //   - UI: listener'da mic butonu görünmez
+    //   - Moderatör: broadcast ile force-mute yapabilir
+    //   - Demote: client-side mic kapatılır
     const effectiveRole = partRow?.role || "listener";
-    const isMuted = partRow?.is_muted === true;
-    const canPublish = PUBLISH_ROLES.has(effectiveRole) && !isMuted;
+    const canPublish = true;
 
     // ── 5. Token oluştur ──
     const token = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET, {

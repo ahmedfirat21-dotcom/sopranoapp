@@ -11,6 +11,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../constants/supabase';
 import { getAvatarSource } from '../../constants/avatars';
 import { Image } from 'react-native';
+import { showToast } from '../Toast';
+import { useSwipeToDismiss } from '../../hooks/useSwipeToDismiss';
 
 const { width: W, height: H } = Dimensions.get('window');
 
@@ -136,21 +138,39 @@ export default function SPReceivedModal({
   const handleThankYou = async (reply: { emoji: string; label: string }) => {
     if (sending || thanked) return;
     setSending(true);
-    setThanked(reply.emoji);
     try {
-      // Ücretsiz: sadece notification insert — SP harcanmaz
-      await supabase.from('notifications').insert({
+      // ★ 2026-04-21: Ücretsiz notification insert + realtime broadcast.
+      //   Göndericiye gerçek zamanlı görünür hale getirmek için insert + log.
+      const { error } = await supabase.from('notifications').insert({
         user_id: senderId,
         sender_id: recipientId,
         type: 'thank_you',
         body: `${reply.emoji} ${reply.label}`,
         reference_id: null,
       });
-    } catch {}
+      if (error) {
+        if (__DEV__) console.warn('[ThankYou] Notification insert error:', error.message, error.code);
+        showToast({ title: 'İletilemedi', message: error.message || 'Teşekkür gönderilemedi, tekrar dene.', type: 'error' });
+        setSending(false);
+        return;
+      }
+      setThanked(reply.emoji);
+    } catch (e: any) {
+      if (__DEV__) console.warn('[ThankYou] Catch:', e);
+      showToast({ title: 'Hata', message: e?.message || 'Teşekkür gönderilemedi', type: 'error' });
+      setSending(false);
+      return;
+    }
     setSending(false);
     // 1.2s sonra kapanır
     setTimeout(onClose, 1200);
   };
+
+  const { translateValue: swipeTranslate, panHandlers } = useSwipeToDismiss({
+    direction: 'down',
+    threshold: 80,
+    onDismiss: onClose,
+  });
 
   if (!visible) return null;
 
@@ -186,9 +206,14 @@ export default function SPReceivedModal({
 
         {/* Card */}
         <Animated.View
-          style={[s.card, { opacity: cardOpacity, transform: [{ scale: cardScale }] }]}
+          style={[s.card, { opacity: cardOpacity, transform: [{ scale: cardScale }, { translateY: swipeTranslate }] }]}
           pointerEvents="auto"
+          {...panHandlers}
         >
+          {/* ★ Swipe handle — görsel tutamak (pan tüm kartta aktif) */}
+          <View style={s.handleWrap}>
+            <View style={s.handle} />
+          </View>
           {/* Altın zemin katmanları */}
           <LinearGradient
             colors={['#2a1e14', '#17100a', '#0a0604']}
@@ -302,6 +327,17 @@ const s = StyleSheet.create({
     elevation: 24,
   },
   topEdge: { position: 'absolute', top: 0, left: 0, right: 0, height: 1.5 },
+  handleWrap: {
+    alignItems: 'center',
+    paddingTop: 2,
+    paddingBottom: 8,
+  },
+  handle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(251,191,36,0.5)',
+  },
   headerText: {
     fontSize: 13, fontWeight: '900', color: '#FBBF24',
     letterSpacing: 2, textAlign: 'center',

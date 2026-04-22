@@ -71,12 +71,6 @@ const LANGUAGES = [
   { id: 'tr', label: 'TR' }, { id: 'en', label: 'EN' },
   { id: 'ar', label: 'AR' }, { id: 'de', label: 'DE' },
 ];
-const MUSIC_TRACKS = [
-  { id: null, label: 'Kapalı' },
-  { id: 'lofi', label: 'Lofi' },
-  { id: 'ambient', label: 'Ambient' },
-  { id: 'jazz', label: 'Jazz' },
-];
 
 type Follower = { id: string; display_name: string; avatar_url: string };
 
@@ -122,7 +116,8 @@ export default function RoomQuickSettings({ visible, room, hostId, ownerTier, on
   const [roomLang, setRoomLang] = useState('tr');
   const [ageRestricted, setAgeRestricted] = useState(false);
   const [themeId, setThemeId] = useState<string | null>(null);
-  const [musicTrack, setMusicTrack] = useState<string | null>(null);
+  const [musicLink, setMusicLink] = useState<string>('');
+  const [editingMusicLink, setEditingMusicLink] = useState(false);
   const [donationsEnabled, setDonationsEnabled] = useState(false);
   const [entryFee, setEntryFee] = useState(0);
   const [welcomeMsg, setWelcomeMsg] = useState('');
@@ -176,15 +171,15 @@ export default function RoomQuickSettings({ visible, room, hostId, ownerTier, on
     setSlowMode(rs.slow_mode_seconds || 0);
     setRoomLang(rs.room_language || 'tr');
     setAgeRestricted(rs.age_restricted || false);
-    setStageCapacity(rs.max_stage_speakers || 0);
+    setStageCapacity(rs.max_stage_capacity || 0);
     setThemeId((room as any).theme_id || null);
-    setMusicTrack(rs.music_track || null);
+    setMusicLink(rs.music_link || '');
     setDonationsEnabled(rs.donations_enabled || false);
     setEntryFee(rs.entry_fee_sp || 0);
     setWelcomeMsg(rs.welcome_message || '');
     setRules(typeof rs.rules === 'string' ? rs.rules : Array.isArray(rs.rules) ? rs.rules.join('\n') : '');
     setBackgroundImage(rs.room_image_url || (room as any).room_image_url || null);
-    setCoverImage(rs.cover_image_url || null);
+    setCoverImage(rs.card_image_url || rs.cover_image_url || null);
     setEditingName(false); setEditingWelcome(false); setEditingRules(false); setConfirmDelete(false);
 
     // Followers
@@ -217,10 +212,10 @@ export default function RoomQuickSettings({ visible, room, hostId, ownerTier, on
     setRoomLang(rs.room_language || 'tr');
     setAgeRestricted(rs.age_restricted || false);
     setThemeId((room as any).theme_id || null);
-    setMusicTrack(rs.music_track || null);
+    setMusicLink(rs.music_link || '');
     setWelcomeMsg(rs.welcome_message || '');
     setBackgroundImage(rs.room_image_url || (room as any).room_image_url || null);
-    setCoverImage(rs.cover_image_url || null);
+    setCoverImage(rs.card_image_url || rs.cover_image_url || null);
   }, [room?.room_settings, room?.name, room?.type, (room as any)?.theme_id]);
 
   // ★ Broadcast
@@ -292,13 +287,15 @@ export default function RoomQuickSettings({ visible, room, hostId, ownerTier, on
   }, [room, hostId, broadcast]);
 
   // ★ Görsel yükleme
-  const pickImage = useCallback(async (field: 'room_image_url' | 'cover_image_url', folder: string) => {
+  const pickImage = useCallback(async (field: 'room_image_url' | 'card_image_url', folder: string) => {
     if (!room || !hostId) return;
     try {
       const ImagePicker = require('expo-image-picker');
       const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!perm.granted) { showToast({ title: 'İzin Gerekli', type: 'warning' }); return; }
-      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: 'images', allowsEditing: true, aspect: [16, 9], quality: 0.7 });
+      // ★ 2026-04-21: BG dikey [9,16], kapak yatay [16,9]
+      const aspectRatio: [number, number] = field === 'room_image_url' ? [9, 16] : [16, 9];
+      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: 'images', allowsEditing: true, aspect: aspectRatio, quality: 0.7 });
       if (result.canceled) return;
       const { StorageService } = require('../../services/storage');
       const fileName = `${folder}/${room.id}_${Date.now()}.jpg`;
@@ -309,7 +306,7 @@ export default function RoomQuickSettings({ visible, room, hostId, ownerTier, on
     } catch (e: any) { showToast({ title: 'Hata', message: e.message || '', type: 'error' }); }
   }, [room, hostId]);
 
-  const removeImage = useCallback(async (field: 'room_image_url' | 'cover_image_url') => {
+  const removeImage = useCallback(async (field: 'room_image_url' | 'card_image_url') => {
     if (!room || !hostId) return;
     try {
       await RoomService.updateSettings(room.id, hostId, { room_settings: { [field]: null } });
@@ -669,41 +666,57 @@ export default function RoomQuickSettings({ visible, room, hostId, ownerTier, on
             ) : <LockedRow label="Arka Plan Resmi" tier="Plus" />}
             <View style={sty.sep} />
 
-            {/* Kapak Görseli — Pro+ */}
-            {can('Pro') ? (
-              <View style={sty.row}>
-                <Ionicons name="albums-outline" size={16} color="#94A3B8" />
-                <Text style={sty.rowLabel}>Kapak Görseli</Text>
-                {coverImage ? (
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Image source={{ uri: coverImage }} style={{ width: 32, height: 20, borderRadius: 4 }} />
-                    <Pressable onPress={() => removeImage('cover_image_url')}><Ionicons name="close-circle" size={16} color="#EF4444" /></Pressable>
-                  </View>
-                ) : (
-                  <Pressable style={sty.chip} onPress={() => pickImage('cover_image_url', 'room_cover')}>
-                    <Ionicons name="add" size={12} color="#FFD700" />
-                    <Text style={sty.chipT}>Seç</Text>
-                  </Pressable>
-                )}
-              </View>
-            ) : <LockedRow label="Oda Kapak Görseli (Banner)" tier="Pro" />}
+            {/* Keşfet Kart Görseli — herkes (oluşturma ile aynı kural) */}
+            {/* ★ 2026-04-21: cover_image_url ölü field'tı; card_image_url'ye birleştirildi.
+               Keşfet akışında zaten card_image_url render ediliyor — tek alan oldu. */}
+            <View style={sty.row}>
+              <Ionicons name="albums-outline" size={16} color="#94A3B8" />
+              <Text style={sty.rowLabel}>Kart Görseli</Text>
+              {coverImage ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Image source={{ uri: coverImage }} style={{ width: 32, height: 20, borderRadius: 4 }} />
+                  <Pressable onPress={() => removeImage('card_image_url')}><Ionicons name="close-circle" size={16} color="#EF4444" /></Pressable>
+                </View>
+              ) : (
+                <Pressable style={sty.chip} onPress={() => pickImage('card_image_url', 'room_card')}>
+                  <Ionicons name="add" size={12} color="#FFD700" />
+                  <Text style={sty.chipT}>Seç</Text>
+                </Pressable>
+              )}
+            </View>
             <View style={sty.sep} />
 
-            {/* Müzik — Pro+ */}
+            {/* Müzik Linki — Pro+ (YouTube/Spotify/SoundCloud) */}
             {can('Pro') ? (
               <View style={sty.row}>
                 <Ionicons name="musical-notes-outline" size={16} color="#94A3B8" />
-                <Text style={sty.rowLabel}>Müzik</Text>
-                <View style={sty.chipRow}>
-                  {MUSIC_TRACKS.map(t => (
-                    <Pressable key={t.id || 'off'} style={[sty.chipSm, musicTrack === t.id && sty.chipOn]}
-                      onPress={() => { setMusicTrack(t.id); updateRS('music_track', t.id); }}>
-                      <Text style={[sty.chipT, musicTrack === t.id && sty.chipTOn]}>{t.label}</Text>
+                <Text style={sty.rowLabel}>{musicLink ? (/youtu/i.test(musicLink) ? 'YouTube' : /spotify/i.test(musicLink) ? 'Spotify' : /soundcloud/i.test(musicLink) ? 'SoundCloud' : 'Müzik Linki') : 'Müzik Linki'}</Text>
+                {editingMusicLink ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, flex: 1, marginLeft: 8 }}>
+                    <TextInput
+                      value={musicLink} onChangeText={setMusicLink}
+                      placeholder="https://..." placeholderTextColor="#475569"
+                      style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4, color: '#E5E7EB', fontSize: 11, borderWidth: 1, borderColor: 'rgba(255,215,0,0.2)' }}
+                      autoCapitalize="none" autoCorrect={false} autoFocus
+                    />
+                    <Pressable onPress={() => { const v = musicLink.trim(); updateRS('music_link', v || null); setEditingMusicLink(false); }} style={{ backgroundColor: 'rgba(255,215,0,0.25)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
+                      <Text style={{ fontSize: 10, color: '#FFD700', fontWeight: '700' }}>OK</Text>
                     </Pressable>
-                  ))}
-                </View>
+                  </View>
+                ) : (
+                  <View style={{ flexDirection: 'row', gap: 4, marginLeft: 'auto' }}>
+                    <Pressable onPress={() => setEditingMusicLink(true)} style={[sty.chipSm, !!musicLink && sty.chipOn]}>
+                      <Text style={[sty.chipT, !!musicLink && sty.chipTOn]}>{musicLink ? 'Düzenle' : 'Ekle'}</Text>
+                    </Pressable>
+                    {!!musicLink && (
+                      <Pressable onPress={() => { setMusicLink(''); updateRS('music_link', null); }} style={[sty.chipSm, { backgroundColor: 'rgba(239,68,68,0.15)' }]}>
+                        <Ionicons name="close" size={11} color="#F87171" />
+                      </Pressable>
+                    )}
+                  </View>
+                )}
               </View>
-            ) : <LockedRow label="Oda Arka Plan Müziği" tier="Pro" />}
+            ) : <LockedRow label="Oda Müzik Linki" tier="Pro" />}
           </View>
 
           </View>
@@ -841,7 +854,7 @@ export default function RoomQuickSettings({ visible, room, hostId, ownerTier, on
                       onPress={() => {
                         if (!allowed) { showToast({ title: `${opt.minTier}+ gerekli`, type: 'info' }); return; }
                         setStageCapacity(opt.v);
-                        updateRS('max_stage_speakers', opt.v);
+                        updateRS('max_stage_capacity', opt.v);
                       }}
                     >
                       <Text style={[sty.chipT, isActive && sty.chipTOn]}>{opt.label}</Text>

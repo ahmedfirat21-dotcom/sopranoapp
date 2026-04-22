@@ -111,9 +111,9 @@ interface RoomSettingsProps {
   // Oda Kapak Görseli (Pro+)
   onChangeCoverImage?: (imageUri: string | null) => void;
   coverImage?: string | null;
-  // Oda Müziği (Pro+)
-  musicTrack?: string | null;
-  onMusicChange?: (track: string | null) => void;
+  // Oda Müzik Linki (Pro+) — YouTube/Spotify/SoundCloud
+  musicLink?: string | null;
+  onMusicLinkChange?: (link: string | null) => void;
   // ★ Odadan Ayrıl (Settings üzerinden)
   onLeaveRoom?: () => void;
   // ★ Oda Silme (Owner-only)
@@ -161,6 +161,59 @@ function SettingRow({ icon, iconBg: _iconBg, label, desc, right }: {
         {desc && <Text style={s.rowDesc}>{desc}</Text>}
       </View>
       {right}
+    </View>
+  );
+}
+
+// ═══════════════════════════════════════════════════
+// MUSIC LINK ROW — YouTube/Spotify/SoundCloud URL input
+// ═══════════════════════════════════════════════════
+function MusicLinkRow({ value, onChange }: { value: string; onChange: (v: string | null) => void }) {
+  const [editing, setEditing] = React.useState(false);
+  const [draft, setDraft] = React.useState(value);
+  React.useEffect(() => { setDraft(value); }, [value]);
+  const platform = /youtu/i.test(value) ? 'YouTube' : /spotify/i.test(value) ? 'Spotify' : /soundcloud/i.test(value) ? 'SoundCloud' : value ? 'Link' : null;
+  const save = () => {
+    const trimmed = draft.trim();
+    onChange(trimmed || null);
+    setEditing(false);
+  };
+  return (
+    <View style={s.row}>
+      <View style={s.rowIcon}><Ionicons name="musical-notes" size={17} color="#FFF" /></View>
+      <View style={s.rowInfo}>
+        <Text style={s.rowLabel}>{platform ? `Oda Müziği · ${platform}` : 'Oda Müzik Linki'}</Text>
+        <Text style={s.rowDesc}>YouTube/Spotify/SoundCloud linki — herkes kendi platformunda dinler</Text>
+        {editing ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 }}>
+            <TextInput
+              value={draft}
+              onChangeText={setDraft}
+              placeholder="https://..."
+              placeholderTextColor="#475569"
+              style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, color: '#E5E7EB', fontSize: 12, borderWidth: 1, borderColor: 'rgba(255,215,0,0.2)' }}
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoFocus
+            />
+            <Pressable onPress={save} style={{ backgroundColor: 'rgba(255,215,0,0.25)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 }}>
+              <Text style={{ fontSize: 11, color: '#FFD700', fontWeight: '700' }}>Kaydet</Text>
+            </Pressable>
+          </View>
+        ) : value ? (
+          <Text numberOfLines={1} style={{ fontSize: 11, color: 'rgba(255,215,0,0.7)', marginTop: 2 }}>{value}</Text>
+        ) : null}
+      </View>
+      {!editing && (
+        <Pressable onPress={() => setEditing(true)} style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.06)' }}>
+          <Text style={{ fontSize: 11, color: '#E5E7EB', fontWeight: '600' }}>{value ? 'Düzenle' : 'Ekle'}</Text>
+        </Pressable>
+      )}
+      {!editing && value && (
+        <Pressable onPress={() => onChange(null)} style={{ marginLeft: 6, paddingHorizontal: 8, paddingVertical: 6, borderRadius: 8, backgroundColor: 'rgba(239,68,68,0.15)' }}>
+          <Ionicons name="close" size={14} color="#F87171" />
+        </Pressable>
+      )}
     </View>
   );
 }
@@ -222,7 +275,7 @@ export default function RoomSettingsSheet(props: RoomSettingsProps) {
     roomLanguage, onLanguageChange,
     ageRestricted, onAgeRestrictedChange,
     onChangeCoverImage, coverImage,
-    musicTrack, onMusicChange,
+    musicLink, onMusicLinkChange,
     onLeaveRoom,
     canDeleteRoom, onDeleteRoom,
   } = props;
@@ -565,43 +618,31 @@ export default function RoomSettingsSheet(props: RoomSettingsProps) {
         )
       ) : <LockedRow icon="image-outline" label="Arka Plan Resmi" requiredTier="Plus" />}
 
-      {/* Oda Kapak Görseli — Pro+ */}
-      {isHost && (can('Pro') ? (
-        onChangeCoverImage && (
-          <SettingRow icon="albums" iconBg="rgba(255,215,0,0.2)" label="Oda Kapak Görseli" desc={coverImage ? 'Banner ayarlandı' : 'Keşfet akışında görünen banner'}
-            right={
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                {coverImage ? (
-                  <Pressable onPress={() => onChangeCoverImage(null)} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8, backgroundColor: 'rgba(239,68,68,0.1)', borderWidth: 1, borderColor: 'rgba(239,68,68,0.2)' }}>
-                    <Ionicons name="trash-outline" size={12} color="#EF4444" /><Text style={{ fontSize: 10, fontWeight: '600', color: '#EF4444' }}>Kaldır</Text>
-                  </Pressable>
-                ) : (
-                  <Pressable onPress={() => onChangeCoverImage('pick')} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8, backgroundColor: 'rgba(255,215,0,0.1)', borderWidth: 1, borderColor: 'rgba(255,215,0,0.2)' }}>
-                    <Ionicons name="add" size={12} color="#FFD700" /><Text style={{ fontSize: 10, fontWeight: '600', color: '#FFD700' }}>Seç</Text>
-                  </Pressable>
-                )}
-              </View>
-            }
-          />
-        )
-      ) : <LockedRow icon="albums-outline" label="Oda Kapak Görseli (Banner)" requiredTier="Pro" />)}
+      {/* ★ 2026-04-21: Kart Görseli — herkes (oluşturma ile aynı kural). */}
+      {isHost && onChangeCoverImage && (
+        <SettingRow icon="albums" iconBg="rgba(255,215,0,0.2)" label="Kart Görseli" desc={coverImage ? 'Kart görseli ayarlandı' : 'Keşfet akışında görünen banner'}
+          right={
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              {coverImage ? (
+                <Pressable onPress={() => onChangeCoverImage(null)} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8, backgroundColor: 'rgba(239,68,68,0.1)', borderWidth: 1, borderColor: 'rgba(239,68,68,0.2)' }}>
+                  <Ionicons name="trash-outline" size={12} color="#EF4444" /><Text style={{ fontSize: 10, fontWeight: '600', color: '#EF4444' }}>Kaldır</Text>
+                </Pressable>
+              ) : (
+                <Pressable onPress={() => onChangeCoverImage('pick')} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8, backgroundColor: 'rgba(255,215,0,0.1)', borderWidth: 1, borderColor: 'rgba(255,215,0,0.2)' }}>
+                  <Ionicons name="add" size={12} color="#FFD700" /><Text style={{ fontSize: 10, fontWeight: '600', color: '#FFD700' }}>Seç</Text>
+                </Pressable>
+              )}
+            </View>
+          }
+        />
+      )}
 
-      {/* Oda Müziği — Pro+ (henüz ses dosyaları entegre edilmedi) */}
+      {/* Oda Müzik Linki — Pro+ (YouTube/Spotify/SoundCloud) */}
       {can('Pro') ? (
-        isHost && onMusicChange && (
-          <SettingRow icon="musical-notes" iconBg="rgba(255,215,0,0.2)" label={musicTrack ? `Müzik: ${({ 'lofi': 'Lofi Beats', 'ambient': 'Ambient Huzur', 'jazz': 'Jazz Cafe' })[musicTrack] || musicTrack}` : 'Oda Müziği Kapalı'} desc="Arka planda ortam müziği (yakında)"
-            right={
-              <View style={{ flexDirection: 'row', gap: 4 }}>
-                {([null, 'lofi', 'ambient', 'jazz'] as const).map(track => (
-                  <Pressable key={track || 'off'} style={[s.slowPill, musicTrack === track && s.slowPillActive]} onPress={() => onMusicChange(track)}>
-                    <Text style={[s.slowPillText, musicTrack === track && s.slowPillTextActive]}>{track === null ? '🔇' : track === 'lofi' ? '🎵' : track === 'ambient' ? '🌊' : '🎷'}</Text>
-                  </Pressable>
-                ))}
-              </View>
-            }
-          />
+        isHost && onMusicLinkChange && (
+          <MusicLinkRow value={musicLink || ''} onChange={onMusicLinkChange} />
         )
-      ) : <LockedRow icon="musical-notes-outline" label="Oda Arka Plan Müziği" requiredTier="Pro" />}
+      ) : <LockedRow icon="musical-notes-outline" label="Oda Müzik Linki" requiredTier="Pro" />}
     </View>
   );
 

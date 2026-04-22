@@ -21,7 +21,7 @@ const TOTAL_STEPS = 4;
 
 export default function OnboardingScreen() {
   const router = useRouter();
-  const { firebaseUser, setProfile, setUser, refreshProfile } = useAuth();
+  const { firebaseUser, setProfile, setUser, refreshProfile, setJustCompletedOnboarding } = useAuth();
   
   // ═══ Step 1: Avatar+İsim  |  Step 2: Cinsiyet+Yaş  |  Step 3: İlgi Alanları  |  Step 4: Davet Kodu ═══
   const [step, setStep] = useState(1);
@@ -59,7 +59,35 @@ export default function OnboardingScreen() {
   useEffect(() => {
     if (!firebaseUser) {
       router.replace('/(auth)/login');
+      return;
     }
+    // ★ 2026-04-21 FIX v2: Auto-skip mantığı KALDIRILDI. Eski profile verisi
+    // (silinmiş hesap kalıntısı vs.) yüzünden Step 3/4 atlanıyordu. Artık form
+    // alanları pre-fill edilir ama Step 1'den başlanır — kullanıcı tüm 4 adımı görür.
+    (async () => {
+      try {
+        const { data: existing } = await supabase
+          .from('profiles')
+          .select('display_name, avatar_url, gender, birth_date, interests, preferences')
+          .eq('id', firebaseUser.uid)
+          .maybeSingle();
+        if (!existing) return;
+
+        // Pre-fill form state'leri — her adımda hızlı tamamlama için
+        setTempProfile(existing);
+        if (existing.display_name) setDisplayName(existing.display_name);
+        if (existing.avatar_url) setAvatarUrl(existing.avatar_url);
+        if (existing.gender && existing.gender !== 'unspecified') setGender(existing.gender);
+        if (existing.birth_date) {
+          const year = existing.birth_date.split('-')[0];
+          if (year) setBirthYear(year);
+        }
+        if (existing.interests?.length) setInterests(existing.interests);
+        // Step her zaman 1'den başlar — auto-jump yok
+      } catch {
+        // Sessizce geç — Step 1'den başla
+      }
+    })();
   }, [firebaseUser]);
 
   const animateStep = (nextStep: number) => {
@@ -99,7 +127,23 @@ export default function OnboardingScreen() {
         };
 
         if (needsFlagWrite) {
-          await supabase.from('profiles').update({ preferences: mergedPrefs }).eq('id', firebaseUser.uid);
+          // ★ 2026-04-22 FIX: Error check — preferences kolonu eksikse veya başka
+          //   DB hatası olursa kullanıcıya bildir, home'a yönlendirme YAPMA.
+          //   Eski versiyon error'u sessizce yutuyordu → uygulamadan çıkınca
+          //   flag olmadığı için tekrar onboarding açılıyordu.
+          const { error: updErr } = await supabase
+            .from('profiles')
+            .update({ preferences: mergedPrefs })
+            .eq('id', firebaseUser.uid);
+          if (updErr) {
+            if (__DEV__) console.warn('[Onboarding] preferences update hata:', updErr.message);
+            showToast({
+              title: 'Kaydedilemedi',
+              message: 'Onboarding tamamlanamadı — DB hatası. Tekrar deneyin.',
+              type: 'error',
+            });
+            return; // router.replace tetiklenmesin → kullanıcı onboarding'de kalsın
+          }
         }
 
         // 2. Context'e set et — hem freshProfile'ı hem de guaranteed onboarding flag'i
@@ -114,17 +158,21 @@ export default function OnboardingScreen() {
         }
       } catch (err) {
         if (__DEV__) console.warn('[Onboarding] finalizeOnboarding hata:', err);
-        // Hata durumunda tempProfile ile devam et
-        if (tempProfile) {
-          const fallbackProfile = {
-            ...tempProfile,
-            preferences: { ...(tempProfile.preferences || {}), onboarding_completed: true },
-          };
-          setProfile(fallbackProfile);
-          setUser({ name: fallbackProfile.display_name, avatar: fallbackProfile.avatar_url });
-        }
+        // ★ 2026-04-22 FIX: Hata durumunda artık sessizce devam etmiyoruz — flag DB'ye
+        //   yazılmadığı için home'a atsak bile AuthGuard bir sonraki açılışta
+        //   tekrar onboarding'e yollayacak. Kullanıcıyı uyar, onboarding'de tut.
+        showToast({
+          title: 'Bağlantı Hatası',
+          message: 'Onboarding kaydedilemedi. İnternet bağlantınızı kontrol edip tekrar deneyin.',
+          type: 'error',
+        });
+        return;
       }
     }
+    // ★ 2026-04-22: Intro sheet'i garantili tetikle — home.tsx bu flag'i izliyor.
+    //   AsyncStorage'a bağımlı değil → ilk home mount'unda kesin görünür.
+    setJustCompletedOnboarding(true);
+
     // 3. AuthGuard zaten profile değişimini yakalayıp hasCompleteProfile=true → home'a
     //    yönlendirir. Yine de manuel replace ekliyoruz ki yavaş dep propagate olsa da
     //    geçiş anında takılma olmasın. 300ms = React render + Supabase fetch tamponu.
@@ -275,19 +323,27 @@ export default function OnboardingScreen() {
       return;
     }
     if (tempProfile && firebaseUser) {
-      // ★ İlgi alanlarını hem interests hem preferences alanına kaydet
+      // ★ FIX-OB3 2026-04-21: onboarding_completed flag'ini burada YAZMA — Step 4 (davet kodu)
+      // henüz gelmedi. Flag yalnızca finalizeOnboarding() içinde yazılır.
       const preferences = {
         ...(tempProfile as any).preferences,
         interests,
-        onboarding_completed: true,
-        onboarding_date: new Date().toISOString(),
       };
       const { error } = await supabase.from('profiles').update({ interests, preferences }).eq('id', firebaseUser.uid);
       if (error) {
-        // Fallback: interests sütunu yoksa sadece preferences'a yaz
-        try {
-          await supabase.from('profiles').update({ preferences }).eq('id', firebaseUser.uid);
-        } catch {}
+        // ★ 2026-04-22 FIX: Fallback + error surfacing. Eski kod fallback hatası sessizce
+        //   yutuyordu → kullanıcı Step 4'e geçiyor, sonra finalizeOnboarding da başarısız
+        //   olunca bug görünmez kalıyordu.
+        const { error: prefErr } = await supabase.from('profiles').update({ preferences }).eq('id', firebaseUser.uid);
+        if (prefErr) {
+          if (__DEV__) console.warn('[Onboarding] Step 3 interests update hata:', error.message, prefErr.message);
+          showToast({
+            title: 'Kaydedilemedi',
+            message: 'İlgi alanları yazılamadı. İnternet / DB sorunu olabilir.',
+            type: 'error',
+          });
+          return; // Step 4'e geçme — kullanıcı tekrar denesin
+        }
       }
     }
     animateStep(4);
@@ -308,7 +364,7 @@ export default function OnboardingScreen() {
         pointerEvents="none"
       />
 
-      <KeyboardAvoidingView style={s.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={s.flex} behavior={'padding'}>
         {/* ═══ Top: Progress Bar + Geri Butonu ═══ */}
         <View style={s.topBar}>
           {step > 1 ? (

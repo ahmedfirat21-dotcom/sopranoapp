@@ -1,16 +1,19 @@
-import React, { useRef, useEffect } from 'react';
+/**
+ * SopranoChat — Room Chat Drawer (bottom sheet)
+ * Clubhouse backchannel pattern: alt barın arkasından yukarı kayar,
+ * swipe-down ile kapanır. Sadece mesajlar — emoji/GIF ayrı EmojiDrawer'da.
+ */
+import React, { useRef, useEffect, useState } from 'react';
 import {
-  View, Text, StyleSheet, Animated, Pressable,
-  TextInput, FlatList, Image, Dimensions, KeyboardAvoidingView, Platform,
+  View, Text, StyleSheet, Animated, PanResponder, Pressable,
+  TextInput, FlatList, Image, Dimensions, KeyboardAvoidingView, Platform, Keyboard,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { getAvatarSource } from '../../constants/avatars';
-import { useSwipeToDismiss } from '../../hooks/useSwipeToDismiss';
+import { EmojiReactionBar } from '../EmojiReactions';
 
-const { width: W, height: H } = Dimensions.get('window');
-// ★ Responsive: küçük ekranlarda (320dp civarı) chat drawer daha geniş olmalı ki input kullanılabilir olsun
-const PANEL_W = W < 360 ? Math.floor(W * 0.9) : Math.floor(W * 0.72);
+const { height: SCREEN_H } = Dimensions.get('window');
+const PANEL_HEIGHT = Math.min(520, Math.floor(SCREEN_H * 0.72));
 
 interface ChatMsg {
   id: string;
@@ -19,28 +22,20 @@ interface ChatMsg {
   created_at: string;
   profiles?: { display_name: string; avatar_url?: string; subscription_tier?: string };
   isSystem?: boolean;
-  role?: string; // owner | moderator | speaker | listener
+  role?: string;
 }
 
-// ★ Kullanıcı isim renkleri — rol/tier tabanlı + fallback hash renkleri
 const ROLE_NAME_COLORS: Record<string, string> = {
-  owner: '#D4AF37',      // Altın
-  host: '#D4AF37',
-  moderator: '#A78BFA',  // Mor
-  admin: '#EF4444',      // Kırmızı
+  owner: '#D4AF37', host: '#D4AF37',
+  moderator: '#A78BFA', admin: '#EF4444',
 };
-
 const TIER_NAME_COLORS: Record<string, string> = {
-  Pro: '#FBBF24',        // Amber
-  Plus: '#14B8A6',       // Teal
+  Pro: '#FBBF24', Plus: '#14B8A6',
 };
-
-// Hash tabanlı rastgele ama tutarlı renk (aynı kullanıcı hep aynı renk alır)
 const HASH_COLORS = ['#38BDF8', '#FB923C', '#A78BFA', '#34D399', '#F472B6', '#FBBF24', '#818CF8', '#22D3EE', '#F87171', '#4ADE80'];
 function getUserColor(userId: string, role?: string, tier?: string): string {
   if (role && ROLE_NAME_COLORS[role]) return ROLE_NAME_COLORS[role];
   if (tier && TIER_NAME_COLORS[tier]) return TIER_NAME_COLORS[tier];
-  // Hash-based color
   let hash = 0;
   for (let i = 0; i < userId.length; i++) hash = ((hash << 5) - hash) + userId.charCodeAt(i);
   return HASH_COLORS[Math.abs(hash) % HASH_COLORS.length];
@@ -54,33 +49,64 @@ interface Props {
   onSend: () => void;
   onClose: () => void;
   bottomInset: number;
+  /** Raw içerik gönder (input'u bypass). GIF'ler ve emoji reaksiyonlar için. */
+  onSendRaw?: (content: string) => void;
 }
 
-export default function RoomChatDrawer({ visible, messages, chatInput, onChangeInput, onSend, onClose, bottomInset }: Props) {
-  const slideAnim = useRef(new Animated.Value(PANEL_W)).current;
-  const fadeAnim = useRef(new Animated.Value(0)).current;
+export default function RoomChatDrawer({
+  visible, messages, chatInput, onChangeInput, onSend, onClose, bottomInset, onSendRaw,
+}: Props) {
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  // Panel control bar'ın arkasına kadar uzanır — tek sürekli yüzey.
+  // Control bar room/[id].tsx tarafında zIndex: 60 ile panel'in önünde kalır.
+  const BAR_OFFSET = bottomInset + 56;
+  const CLOSED_Y = PANEL_HEIGHT + BAR_OFFSET;
+
+  const translateY = useRef(new Animated.Value(PANEL_HEIGHT + 200)).current;
+  const backdropOpacity = useRef(new Animated.Value(0)).current;
   const inputRef = useRef<TextInput>(null);
 
-  // ★ Swipe-to-dismiss — sağa sürükle
-  const { translateValue: swipeX, panHandlers } = useSwipeToDismiss({
-    direction: 'right',
-    threshold: 60,
-    onDismiss: onClose,
-  });
+  useEffect(() => {
+    if (!visible) translateY.setValue(CLOSED_Y);
+  }, [CLOSED_Y, visible]);
+
+  // Drawer kapanınca emoji picker'ı da sıfırla
+  useEffect(() => {
+    if (!visible) setShowEmojiPicker(false);
+  }, [visible]);
 
   useEffect(() => {
     if (visible) {
       Animated.parallel([
-        Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true, damping: 18, stiffness: 180 }),
-        Animated.timing(fadeAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
+        Animated.spring(translateY, { toValue: 0, useNativeDriver: true, damping: 20, stiffness: 200 }),
+        Animated.timing(backdropOpacity, { toValue: 1, duration: 200, useNativeDriver: true }),
       ]).start();
     } else {
       Animated.parallel([
-        Animated.spring(slideAnim, { toValue: PANEL_W, useNativeDriver: true, damping: 18, stiffness: 200 }),
-        Animated.timing(fadeAnim, { toValue: 0, duration: 150, useNativeDriver: true }),
+        Animated.timing(translateY, { toValue: CLOSED_Y, duration: 200, useNativeDriver: true }),
+        Animated.timing(backdropOpacity, { toValue: 0, duration: 200, useNativeDriver: true }),
       ]).start();
     }
   }, [visible]);
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_, gs) => gs.dy > 6 && Math.abs(gs.dy) > Math.abs(gs.dx),
+      onPanResponderMove: (_, gs) => {
+        if (gs.dy > 0) translateY.setValue(gs.dy);
+      },
+      onPanResponderRelease: (_, gs) => {
+        if (gs.dy > 80 || gs.vy > 0.5) {
+          Animated.timing(translateY, { toValue: CLOSED_Y, duration: 200, useNativeDriver: true }).start(() => {
+            onClose();
+          });
+        } else {
+          Animated.spring(translateY, { toValue: 0, useNativeDriver: true, damping: 20, stiffness: 200 }).start();
+        }
+      },
+    })
+  ).current;
 
   if (!visible) return null;
 
@@ -93,15 +119,10 @@ export default function RoomChatDrawer({ visible, messages, chatInput, onChangeI
         </View>
       );
     }
-
     const content = item.content || '';
-    // GIF mesajı kontrolü — ★ SEC: URL whitelist doğrulaması
     const gifMatch = content.match(/^\[gif:(.*)\]$/);
-    // ★ GIF URL whitelist — sadece güvenilir kaynaklar kabul edilir
     const isGifSafe = gifMatch?.[1] && /^https:\/\/(media\.tenor\.com|media[0-9]*\.giphy\.com|i\.giphy\.com)\//i.test(gifMatch[1]);
-    // Tek emoji kontrolü (1-2 emoji karakter — büyük göster)
-    const emojiOnly = /^[\p{Emoji_Presentation}\p{Extended_Pictographic}\u200d\uFE0F\u20E3]{1,6}$/u.test(content) && content.length <= 14;
-    // user_id undefined olabilir (malformed mesaj) — getUserColor'a boş string geç
+    const emojiOnly = /^[\p{Emoji_Presentation}\p{Extended_Pictographic}‍️⃣]{1,6}$/u.test(content) && content.length <= 14;
     const nameColor = getUserColor(item.user_id || '', item.role, item.profiles?.subscription_tier);
 
     return (
@@ -122,22 +143,35 @@ export default function RoomChatDrawer({ visible, messages, chatInput, onChangeI
   };
 
   return (
-    <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
-      {/* Backdrop — dokunulunca kapat */}
-      <Animated.View style={[s.backdrop, { opacity: fadeAnim }]}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+    <>
+      <Animated.View style={[StyleSheet.absoluteFill, { zIndex: 48 }]}>
+        <Pressable style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.25)' }]} onPress={onClose}>
+          <Animated.View style={[StyleSheet.absoluteFill, { opacity: backdropOpacity }]} />
+        </Pressable>
       </Animated.View>
 
-      {/* Panel — sağdan kayar + tüm alandan sürüklenebilir */}
-      <Animated.View {...panHandlers} style={[s.panel, { transform: [{ translateX: Animated.add(slideAnim, swipeX) }] }]}>
-        <LinearGradient colors={['#4a5668', '#37414f', '#232a35']} locations={[0, 0.35, 1]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFillObject} />
-        {/* Başlık — DM banner ile tutarlı: ikon + başlık, arka plan teal tint */}
-        <View collapsable={false} style={s.header}>
-          <Ionicons name="chatbubble-ellipses" size={20} color="#14B8A6" style={s.headerIconShadow} />
-          <Text style={s.headerTitle}>Oda Sohbeti</Text>
+      <Animated.View
+        style={[
+          s.panel,
+          {
+            height: PANEL_HEIGHT + BAR_OFFSET,
+            paddingBottom: BAR_OFFSET,
+            transform: [{ translateY }],
+          },
+        ]}
+      >
+
+        <View {...panResponder.panHandlers}>
+          <View style={s.handle}>
+            <View style={s.handleBar} />
+          </View>
+
+          <View style={s.header}>
+            <Ionicons name="chatbubble-ellipses" size={18} color="#14B8A6" style={s.headerIconShadow} />
+            <Text style={s.headerTitle}>Oda Sohbeti</Text>
+          </View>
         </View>
 
-        {/* Mesajlar — ★ UX-6 FIX: inverted FlatList ile en yeni mesaj altta */}
         <FlatList
           data={messages}
           keyExtractor={(m, i) => m?.id || `msg_${i}`}
@@ -150,12 +184,44 @@ export default function RoomChatDrawer({ visible, messages, chatInput, onChangeI
           keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
         />
 
-        {/* Alt input — Y15 FIX: Android Expo adjustResize ile native çalışır; sadece iOS'ta padding */}
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           keyboardVerticalOffset={Platform.OS === 'ios' ? bottomInset + 10 : 0}
         >
+          {/* ★ Emoji & GIF picker — toggle ile input'un üstünde açılır (WhatsApp/Telegram pattern) */}
+          {showEmojiPicker && (
+            <View style={s.pickerWrap}>
+              <EmojiReactionBar
+                onReaction={(content: string) => {
+                  // GIF ([gif:...]) direkt gönderilir; normal emoji input'a eklenir
+                  if (content.startsWith('[gif:')) {
+                    onSendRaw?.(content);
+                    setShowEmojiPicker(false);
+                  } else {
+                    onChangeInput((chatInput || '') + content);
+                  }
+                }}
+                onClose={() => setShowEmojiPicker(false)}
+              />
+            </View>
+          )}
+
           <View style={s.inputWrap}>
+            <Pressable
+              onPress={() => {
+                if (!showEmojiPicker) Keyboard.dismiss();
+                setShowEmojiPicker(v => !v);
+              }}
+              style={s.emojiToggle}
+              hitSlop={6}
+              accessibilityLabel="Emoji ve GIF"
+            >
+              <Ionicons
+                name={showEmojiPicker ? 'close-outline' : 'happy-outline'}
+                size={22}
+                color={showEmojiPicker ? '#5CE1E6' : 'rgba(255,255,255,0.55)'}
+              />
+            </Pressable>
             <TextInput
               ref={inputRef}
               style={s.input}
@@ -163,12 +229,12 @@ export default function RoomChatDrawer({ visible, messages, chatInput, onChangeI
               placeholderTextColor="rgba(255,255,255,0.3)"
               value={chatInput}
               onChangeText={onChangeInput}
+              onFocus={() => setShowEmojiPicker(false)}
               maxLength={300}
               returnKeyType="send"
               blurOnSubmit={false}
               onSubmitEditing={() => {
                 onSend();
-                // Klavyeyi kapat/aç döngüsünü önle — focus'u koru
                 inputRef.current?.focus();
               }}
             />
@@ -185,55 +251,53 @@ export default function RoomChatDrawer({ visible, messages, chatInput, onChangeI
           </View>
         </KeyboardAvoidingView>
       </Animated.View>
-    </View>
+    </>
   );
 }
 
 const s = StyleSheet.create({
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.25)',
-  },
   panel: {
     position: 'absolute',
+    left: 0,
     right: 0,
-    top: 70,
-    bottom: 80,
-    width: PANEL_W,
-    borderTopLeftRadius: 18,
-    borderBottomLeftRadius: 18,
-    borderWidth: 1,
-    borderRightWidth: 0,
-    borderColor: '#95a1ae',
+    bottom: 0,
+    zIndex: 50,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
     overflow: 'hidden',
+    borderWidth: 1,
+    borderBottomWidth: 0,
+    borderColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: '#0F1929',
+  },
+  handle: {
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  handleBar: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.2)',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingHorizontal: 14,
+    paddingBottom: 10,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.06)',
-    backgroundColor: 'rgba(20,184,166,0.06)',
   },
-  headerIconShadow: {
-    textShadowColor: 'rgba(0,0,0,0.6)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 3,
-  },
+  headerIconShadow: {},
   headerTitle: {
     flex: 1,
     fontSize: 14,
     fontWeight: '700',
     color: '#F1F5F9',
-    textShadowColor: 'rgba(0,0,0,0.4)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
   },
   list: { flex: 1 },
 
-  // Mesaj satırı — premium tasarım
   msgRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -243,38 +307,27 @@ const s = StyleSheet.create({
     width: 26, height: 26, borderRadius: 13,
     borderWidth: 1.5, borderColor: 'rgba(20,184,166,0.3)',
     marginTop: 2,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.3, shadowRadius: 3, elevation: 2,
   },
   msgBubble: {
     flex: 1,
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: 'rgba(255,255,255,0.04)',
     borderRadius: 14,
     borderTopLeftRadius: 4,
     paddingHorizontal: 11,
     paddingVertical: 8,
-    borderWidth: 0.5,
-    borderColor: 'rgba(255,255,255,0.06)',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.15, shadowRadius: 3, elevation: 1,
   },
   msgName: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#14B8A6', // fallback — overridden per-render
+    color: '#14B8A6',
     marginBottom: 2,
-    textShadowColor: 'rgba(0,0,0,0.3)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
   },
   msgText: {
     fontSize: 13,
     color: '#E2E8F0',
     lineHeight: 18,
-    textShadowColor: 'rgba(0,0,0,0.25)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
   },
 
-  // Sistem mesajı
   sysMsg: {
     alignSelf: 'center',
     paddingHorizontal: 10,
@@ -286,7 +339,17 @@ const s = StyleSheet.create({
     fontStyle: 'italic',
   },
 
-  // Alt input
+  pickerWrap: {
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: 'rgba(0,0,0,0.15)',
+  },
+  emojiToggle: {
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   inputWrap: {
     flexDirection: 'row',
     alignItems: 'center',

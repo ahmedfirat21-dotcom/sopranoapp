@@ -51,7 +51,7 @@ const BF_ATTEMPTS_KEY = '@soprano_bf_attempts';
 const BF_COOLDOWN_KEY = '@soprano_bf_cooldown';
 
 export default function LoginScreen() {
-  const { firebaseUser } = useAuth();
+  const { firebaseUser, refreshAuth } = useAuth();
   const [loading, setLoading] = useState(false);
   const [resendLoading, setResendLoading] = useState(false);
 
@@ -307,6 +307,10 @@ export default function LoginScreen() {
   };
 
   // ★ SEC-EV: Doğrulamadan sonra Firebase token'ı yenile
+  // ★ BUG-EV 2026-04-21: reload() Firebase User objesini in-place mutate eder ama React
+  // re-render tetiklenmez (aynı referans). AuthGuard effect'i yeniden çalışmaz → kullanıcı
+  // "✅ Doğrulandı" toast'unu görür ama home'a yönlendirilmez. refreshAuth() counter bump'layarak
+  // AuthGuard'ı zorla tetikliyor.
   const handleCheckVerification = async () => {
     if (!firebaseUser) return;
     setLoading(true);
@@ -314,7 +318,7 @@ export default function LoginScreen() {
       await firebaseUser.reload();
       if (firebaseUser.emailVerified) {
         showToast({ title: '✅ Doğrulandı', message: 'E-postanız doğrulandı! Giriş yapılıyor...', type: 'success' });
-        // AuthGuard otomatik yönlendirecek
+        refreshAuth(); // AuthGuard'ı tetikle → otomatik yönlendirme
       } else {
         showToast({ title: 'Henüz Doğrulanmadı', message: 'Lütfen e-posta kutunuzu kontrol edin.', type: 'warning' });
       }
@@ -336,7 +340,7 @@ export default function LoginScreen() {
       style={s.root}
       resizeMode="cover"
     >
-      <KeyboardAvoidingView style={s.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={s.container} behavior={'padding'}>
         {/* Vignette overlay for depth */}
         <LinearGradient
           colors={['rgba(15,25,38,0.6)', 'transparent', 'transparent', 'rgba(15,25,38,0.7)']}

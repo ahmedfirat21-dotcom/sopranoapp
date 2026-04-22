@@ -5,6 +5,7 @@
  * açıyordu. Artık tek kanal burada açılır, her iki sayfa context'ten okur.
  */
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import { AppState } from 'react-native';
 import { FriendshipService, type FollowUser } from '../services/friendship';
 import { ModerationService } from '../services/moderation';
 import { supabase } from '../constants/supabase';
@@ -88,50 +89,118 @@ export function OnlineFriendsProvider({ userId, children }: { userId: string | n
     currentFriendIdsRef.current = allFriends.map(f => f.id);
   }, [allFriends]);
 
-  // ★ Realtime: Arkadaşların online/offline durumu — TEK KANAL
-  // Dep: sadece userId — allFriends değişince subscription yeniden kurulmaz (loop riski yok)
+  // ★ 2026-04-20 FIX: Bidirectional friendship realtime — karşı taraf unfriend
+  //   yaptığında (veya kabul ettiğinde) senin listende de anında yansısın.
+  //   Iki ayrı subscription: user_id=me ve friend_id=me. Herhangi bir değişim
+  //   refreshFriends'i tetikler → liste yeniden DB'den çekilir.
+  useEffect(() => {
+    if (!userId) return;
+    const outSub = supabase
+      .channel(`friendships-out:${userId}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'friendships',
+        filter: `user_id=eq.${userId}`,
+      }, () => { refreshFriends().catch(() => {}); })
+      .subscribe();
+    const inSub = supabase
+      .channel(`friendships-in:${userId}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'friendships',
+        filter: `friend_id=eq.${userId}`,
+      }, () => { refreshFriends().catch(() => {}); })
+      .subscribe();
+    return () => {
+      supabase.removeChannel(outSub);
+      supabase.removeChannel(inSub);
+    };
+  }, [userId, refreshFriends]);
+
+  // ★ Supabase Presence: Gerçek zamanlı online durumu.
+  //   profiles.is_online kolonu casual browsing'de güncellenmiyordu (yalnızca
+  //   oda/arama event'lerinde). Presence her app foreground olan kullanıcıyı
+  //   anında online işaretler; arkadaş listesiyle kesişim online listesini verir.
+  //   postgres_changes fallback olarak kalıyor (is_online=true'nun DB'de kalıcı
+  //   olarak işaretli olduğu durumlar için — ör. başka cihazda hâlâ açık).
+  const onlinePresenceIdsRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     if (!userId) return;
 
-    const channel = supabase
-      .channel(`friends-online-status:${userId}`)
+    // Global shared presence channel — tüm kullanıcılar burada kendilerini track eder.
+    // Kanal anahtarı userId; presence event'leri join/leave'de tetiklenir.
+    const presenceChannel = supabase.channel('online-users', {
+      config: { presence: { key: userId } },
+    });
+
+    const recomputeOnline = () => {
+      const state = presenceChannel.presenceState();
+      const ids = new Set<string>();
+      Object.keys(state).forEach(k => ids.add(k));
+      onlinePresenceIdsRef.current = ids;
+
+      setAllFriends(prev => {
+        const next = prev.map(f => {
+          const isLiveOnline = ids.has(f.id) || f.is_online;
+          return f.is_online === isLiveOnline ? f : { ...f, is_online: isLiveOnline };
+        });
+        // Online friends listesi — tıklı olan sona, online olan başa
+        const onlines = next.filter(f => ids.has(f.id) || f.is_online);
+        onlines.sort((a, b) => (ids.has(b.id) ? 1 : 0) - (ids.has(a.id) ? 1 : 0));
+        setOnlineFriends(onlines);
+        return next;
+      });
+    };
+
+    presenceChannel
+      .on('presence', { event: 'sync' }, recomputeOnline)
+      .on('presence', { event: 'join' }, recomputeOnline)
+      .on('presence', { event: 'leave' }, recomputeOnline)
       .on('postgres_changes', {
         event: 'UPDATE',
         schema: 'public',
         table: 'profiles',
       }, (payload) => {
         const updated = payload.new as any;
+        const old = payload.old as any;
         if (!updated?.id || !currentFriendIdsRef.current.includes(updated.id)) return;
         if (blockedIdsRef.current.has(updated.id)) return;
-
+        // ★ 2026-04-20 OPT: is_online gerçekten değişmedi ise render atla — avatar_url vb.
+        //   update'leri boşuna friend list re-render tetiklemesin.
+        if (old && old.is_online === updated.is_online && old.avatar_url === updated.avatar_url && old.display_name === updated.display_name) return;
         setAllFriends(prev => prev.map(f =>
-          f.id === updated.id ? { ...f, is_online: updated.is_online } : f
+          f.id === updated.id ? { ...f, is_online: updated.is_online || onlinePresenceIdsRef.current.has(f.id), avatar_url: updated.avatar_url ?? f.avatar_url, display_name: updated.display_name ?? f.display_name } : f
         ));
-
-        setOnlineFriends(prev => {
-          const wasOnline = prev.some(f => f.id === updated.id);
-          if (updated.is_online && !wasOnline) {
-            setAllFriends(currentFriends => {
-              const friend = currentFriends.find(f => f.id === updated.id);
-              if (friend) {
-                setOnlineFriends(op =>
-                  op.some(o => o.id === updated.id)
-                    ? op
-                    : [{ ...friend, is_online: true }, ...op]
-                );
-              }
-              return currentFriends;
-            });
-            return prev;
-          } else if (!updated.is_online && wasOnline) {
-            return prev.filter(f => f.id !== updated.id);
-          }
-          return prev;
-        });
+        recomputeOnline();
       })
-      .subscribe();
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          try {
+            await presenceChannel.track({ userId, online_at: new Date().toISOString() });
+          } catch (e) {
+            if (__DEV__) console.warn('[Presence] track error:', e);
+          }
+        }
+      });
 
-    return () => { supabase.removeChannel(channel); };
+    // AppState: uygulama background'a gidince untrack, foreground olunca tekrar track.
+    const appStateSub = AppState.addEventListener('change', async (next) => {
+      try {
+        if (next === 'active') {
+          await presenceChannel.track({ userId, online_at: new Date().toISOString() });
+        } else if (next === 'background' || next === 'inactive') {
+          await presenceChannel.untrack();
+        }
+      } catch {/* silent */}
+    });
+
+    return () => {
+      appStateSub.remove();
+      try { presenceChannel.untrack(); } catch {}
+      supabase.removeChannel(presenceChannel);
+    };
   }, [userId]);
 
   return (

@@ -1,5 +1,5 @@
 import React, { useMemo, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Pressable, Image, Dimensions, Animated, Easing, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Image, useWindowDimensions, Animated, Easing, ScrollView } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { getAvatarSource } from '../../constants/avatars';
@@ -7,12 +7,11 @@ import { RoleColors } from '../../constants/theme';
 import AvatarPenaltyFlash, { type FlashType } from './AvatarPenaltyFlash';
 import type { RoomParticipant } from '../../services/database';
 
-const { width: W } = Dimensions.get('window');
-
 // ★ Dinamik sahne boyutlandırma — modern platform grid sistemi (Clubhouse/Spaces pattern)
-// 2026-04-20: Oda içi SCROLL YOK kuralı — yüksek yoğunlukta daha kompakt grid,
-// yüksek satır sayısını azaltıyoruz ki stage viewport'un 0.38'ine sığsın.
-function getSpeakerMetrics(count: number) {
+// 2026-04-20: Oda içi SCROLL YOK kuralı — yüksek yoğunlukta daha kompakt grid.
+// 2026-04-22: window width runtime'dan alınıyor (useWindowDimensions) — module-level
+// Dimensions.get cihaz gesture-nav/rotation durumunda stale kalıyordu.
+function getSpeakerMetrics(count: number, W: number) {
   const availableW = W - 32;
   let cols: number, gap: number;
   if (count <= 2) { cols = 2; gap = 12; }
@@ -136,13 +135,13 @@ function OwnerBadge() {
     <Animated.View style={[s.ownerBadgeContainer, { transform: [{ translateY: floatAnim }] }]}>
       {/* ★ Outer glow ring */}
       <Animated.View style={[s.ownerGlowRing, { opacity: glowAnim }]} />
-      {/* ★ Badge body */}
+      {/* ★ Badge body — 4-stop gradient (parlak taç efekti) */}
       <LinearGradient
-        colors={['#FFD700', '#F59E0B', '#D97706']}
+        colors={['#FFF1A8', '#FFD700', '#F59E0B', '#B45309']}
         start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
         style={s.ownerBadgeBody}
       >
-        <Ionicons name="star" size={14} color="#FFF" />
+        <Ionicons name="star" size={17} color="#FFF" style={{ textShadowColor: 'rgba(180,83,9,0.9)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }} />
       </LinearGradient>
       {/* ★ Orbiting sparkle particle */}
       <Animated.View style={[s.ownerSparkleOrbit, { transform: [{ rotate: rotateSparkle }] }]}>
@@ -230,7 +229,12 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, i
     : RoleColors.speaker;
 
   return (
-    <Pressable style={({ pressed }) => [s.speakerCard, { width: cardWidth }, pressed && { opacity: 0.9, transform: [{ scale: 0.97 }] }]} onPress={onPress}>
+    // ★ 2026-04-21 FIX: Outer element View (eski: Pressable) — nested Pressable touch çakışması
+    //   düzeltildi. "Sahneden İn" butonu dış Pressable içindeyken touch event'i dış kart
+    //   yakalıyordu → profil kartı açılıyordu, onSelfDemote çalışmıyordu.
+    //   Şimdi: kart tıklaması Pressable (card inner), demote butonu bağımsız sibling Pressable.
+    <View style={[s.speakerCard, { width: cardWidth }]}>
+      <Pressable style={({ pressed }) => [{ width: '100%' }, pressed && { opacity: 0.9, transform: [{ scale: 0.97 }] }]} onPress={onPress}>
       <View style={[
         s.speakerCardInner,
         { height: cardHeight, borderColor: ringColor, borderWidth: isHost || isMod ? 2 : 1.5 },
@@ -265,19 +269,23 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, i
             <Ionicons name="videocam" size={13} color="#fff" />
           </Pressable>
         )}
+        {/* ★ Owner sadece altın border + biraz büyük kart ile belli. Crown badge + label
+            KALDIRILDI (kullanıcı "kötü oldu" dedi, sade olmasını istiyor). */}
       </View>
       <Text style={[s.speakerName, { maxWidth: cardWidth - 8, fontSize: cardWidth < 95 ? 10 : 11 }, isHost && { color: '#FFD700' }, isMod && !isHost && { color: '#C4B5FD' }]} numberOfLines={1} ellipsizeMode="tail">{displayName}</Text>
-      {isMe && (
-        <Pressable style={({ pressed }) => [s.selfDemoteHint, pressed && { opacity: 0.6 }]} onPress={onSelfDemote}>
-          <Ionicons name="arrow-down-circle-outline" size={11} color="rgba(251,191,36,0.7)" />
-          <Text style={s.selfDemoteText}>Sahneden İn</Text>
-        </Pressable>
-      )}
-    </Pressable>
+      </Pressable>
+      {/* ★ 2026-04-22: "Sahneden İn" butonu kart içinden KALDIRILDI — parent container'ın
+          maxHeight'ı Android'de touch event'i çocuk dışına bırakmıyordu (RN bug).
+          Artık room/[id].tsx'te ayırıcı pill bölgesinde ("Sahneye Dön"ün simetriği) render ediliyor. */}
+    </View>
   );
 }
 
+
 export default function SpeakerSection({ stageUsers, getMicStatus, onSelectUser, onSelfDemote, currentUserId, VideoView, onGhostSeatPress, showSeatTooltip, avatarFlashes, onFlashDone, onCameraExpand }: Props) {
+  // ★ 2026-04-22: Runtime window width — fiziksel Android cihazda gesture-nav/
+  //   rotation ile değişen dimensions'a adapte olur.
+  const { width: W } = useWindowDimensions();
   const sortedUsers = useMemo(() => {
     if (stageUsers.length === 0) return [];
     const roleOrder: Record<string, number> = { owner: 0, host: 0, moderator: 1, speaker: 2 };
@@ -329,7 +337,7 @@ export default function SpeakerSection({ stageUsers, getMicStatus, onSelectUser,
   }
 
   const count = sortedUsers.length;
-  const { cardWidth, cardHeight, gap } = getSpeakerMetrics(count);
+  const { cardWidth, cardHeight, gap } = getSpeakerMetrics(count, W);
 
   // ★ Kamera açık kullanıcıları ayır — spotlight bölümü
   const cameraUsers = sortedUsers.filter(u => {
@@ -368,23 +376,39 @@ export default function SpeakerSection({ stageUsers, getMicStatus, onSelectUser,
       )}
 
       {/* ★ Normal grid — kamera kapalılar veya spotlight yoksa herkes */}
-      <View style={[s.mainSpeakerGrid, { gap }]}>
-        {(showSpotlight ? audioOnlyUsers : sortedUsers).map((u) => {
-          const st = getMicStatus(u.user_id);
-          const isMe = u.user_id === currentUserId;
-          const isHost = u.role === 'owner';
-          // ★ Owner %15 büyük kart
-          const ownerScale = isHost ? 1.15 : 1;
-          const w = Math.floor(cardWidth * ownerScale);
-          const h = Math.floor(cardHeight * ownerScale);
-          return (
-            <SpeakerCard key={u.id} user={u} micStatus={st} onPress={() => onSelectUser(u)}
-              onSelfDemote={onSelfDemote}
-              onCameraExpand={onCameraExpand}
-              isMe={isMe} cardWidth={w} cardHeight={h} VideoView={VideoView} />
-          );
-        })}
-      </View>
+      {(() => {
+        // ★ 2026-04-20 FIX: Owner her zaman %10 büyük. Satıra sığsın diye diğer kartlar
+        //   hafifçe daraltılır (owner fazlası diğerlerinden eşit şekilde düşülür).
+        //   Böylece 2-3 kişilik sahnede de wrap olmaz, owner net belli olur.
+        const renderUsers = showSpotlight ? audioOnlyUsers : sortedUsers;
+        const ownerInGroup = renderUsers.some(u => u.role === 'owner');
+        const OWNER_SCALE = 1.10;
+        const ownerExtra = ownerInGroup ? cardWidth * (OWNER_SCALE - 1) : 0;
+        const perSiblingReduction = ownerInGroup && renderUsers.length > 1
+          ? ownerExtra / (renderUsers.length - 1)
+          : 0;
+        return (
+          <View style={[s.mainSpeakerGrid, { gap, marginBottom: showSpotlight ? 18 : 4 }]}>
+            {renderUsers.map((u) => {
+              const st = getMicStatus(u.user_id);
+              const isMe = u.user_id === currentUserId;
+              const isHost = u.role === 'owner';
+              const w = isHost
+                ? Math.floor(cardWidth * OWNER_SCALE)
+                : Math.floor(cardWidth - perSiblingReduction);
+              const h = isHost
+                ? Math.floor(cardHeight * OWNER_SCALE)
+                : Math.floor(cardHeight - perSiblingReduction);
+              return (
+                <SpeakerCard key={u.id} user={u} micStatus={st} onPress={() => onSelectUser(u)}
+                  onSelfDemote={onSelfDemote}
+                  onCameraExpand={onCameraExpand}
+                  isMe={isMe} cardWidth={w} cardHeight={h} VideoView={VideoView} />
+              );
+            })}
+          </View>
+        );
+      })()}
     </View>
   );
 }
@@ -433,22 +457,22 @@ const s = StyleSheet.create({
   roleBadge: { position: 'absolute', top: 8, left: 8, width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: 'rgba(15,23,42,0.8)' },
   roleBadgeMod: { backgroundColor: 'rgba(139,92,246,0.35)' },
   ownerBadgeContainer: {
-    position: 'absolute', top: -10, left: -8, zIndex: 20,
-    width: 28, height: 28, alignItems: 'center', justifyContent: 'center',
+    position: 'absolute', top: -12, left: -10, zIndex: 20,
+    width: 34, height: 34, alignItems: 'center', justifyContent: 'center',
   },
   ownerGlowRing: {
-    position: 'absolute', width: 32, height: 32, borderRadius: 16,
+    position: 'absolute', width: 44, height: 44, borderRadius: 22,
     backgroundColor: 'transparent',
-    borderWidth: 1.5, borderColor: 'rgba(255,215,0,0.5)',
+    borderWidth: 2, borderColor: 'rgba(255,215,0,0.75)',
     shadowColor: '#FFD700', shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8, shadowRadius: 8, elevation: 6,
+    shadowOpacity: 1, shadowRadius: 14, elevation: 8,
   },
   ownerBadgeBody: {
-    width: 24, height: 24, borderRadius: 12,
+    width: 30, height: 30, borderRadius: 15,
     alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.4)',
+    borderWidth: 2, borderColor: 'rgba(255,255,255,0.65)',
     shadowColor: '#FFD700', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.7, shadowRadius: 6, elevation: 8,
+    shadowOpacity: 1, shadowRadius: 10, elevation: 10,
   },
   ownerSparkleOrbit: {
     position: 'absolute', width: 28, height: 28,
@@ -492,6 +516,32 @@ const s = StyleSheet.create({
   },
   speakerName: { fontSize: 11, fontWeight: '700', color: '#F1F5F9', marginTop: 5, textAlign: 'center', maxWidth: 140, textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
   speakerNameHost: { color: '#FFD700' },
-  selfDemoteHint: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 4, backgroundColor: 'rgba(251,191,36,0.08)', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: 'rgba(251,191,36,0.15)' },
-  selfDemoteText: { fontSize: 9, fontWeight: '700', color: 'rgba(251,191,36,0.7)', letterSpacing: 0.3 },
+  speakerNameHostBig: {
+    color: '#FFD700',
+    fontWeight: '900',
+    textShadowColor: 'rgba(180,83,9,0.9)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+  },
+  ownerLabelStage: {
+    fontSize: 9,
+    fontWeight: '900',
+    color: '#F59E0B',
+    letterSpacing: 1.2,
+    marginTop: 2,
+    textAlign: 'center',
+    textShadowColor: 'rgba(0,0,0,0.6)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  // ★ 2026-04-22: button belirginleştirildi — text gibi durmayıp kırmızı ton + belirgin border ile
+  //   "tıklanabilir" olduğu net anlaşılsın. zIndex kaldırıldı (menü/modal üstüne çıkmasın).
+  selfDemoteHint: {
+    flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4, marginBottom: 2,
+    backgroundColor: 'rgba(239,68,68,0.15)',
+    borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4,
+    borderWidth: 1, borderColor: 'rgba(239,68,68,0.35)',
+    alignSelf: 'center',
+  },
+  selfDemoteText: { fontSize: 10, fontWeight: '700', color: '#FCA5A5', letterSpacing: 0.2 },
 });
