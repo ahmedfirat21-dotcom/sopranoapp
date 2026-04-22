@@ -375,6 +375,15 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
   const [msgReq, setMsgReq] = useState<{ status: 'none' | 'pending_incoming' | 'pending_outgoing' | 'accepted' | 'rejected' }>({ status: 'none' });
   const [reqResponding, setReqResponding] = useState(false);
 
+  // ★ 2026-04-23: Klavye görünürlüğü — açıkken panel bottom'ını sıfırla ki
+  //   input alt bar arkasında kalmasın (chat drawer ile aynı fix).
+  const [dmKbVisible, setDmKbVisible] = useState(false);
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardDidShow', () => setDmKbVisible(true));
+    const hide = Keyboard.addListener('keyboardDidHide', () => setDmKbVisible(false));
+    return () => { show.remove(); hide.remove(); };
+  }, []);
+
   // ★ Swipe-to-dismiss — sağa sürükle
   const { translateValue: dmSwipeX, panHandlers: dmPanHandlers } = useSwipeToDismiss({
     direction: 'right',
@@ -633,9 +642,10 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
       </Animated.View>
 
-      {/* Panel — sağdan kayar + sürüklenebilir (tüm alandan sürüklenebilir) */}
+      {/* Panel — sağdan kayar + sürüklenebilir (tüm alandan sürüklenebilir)
+          ★ 2026-04-23: Klavye açıkken bottom=0 — input kontrol barı arkasında kalmasın */}
       <Animated.View {...dmPanHandlers} style={{
-        position: 'absolute', right: 0, top: 70, bottom: 80,
+        position: 'absolute', right: 0, top: 70, bottom: dmKbVisible ? 0 : 80,
         width: DM_PANEL_W,
         borderTopLeftRadius: 18, borderBottomLeftRadius: 18,
         borderWidth: 1, borderRightWidth: 0, borderColor: '#95a1ae',
@@ -1725,6 +1735,34 @@ export default function RoomScreen() {
     isMinimizingRef,
     setMinimizedRoom,
   });
+
+  // ★ 2026-04-23: Arka planda kaçırılan eylemleri yakala — uygulama foreground'a
+  //   dönünce room + participants + mic requests full refetch. Aksi halde stage
+  //   talepleri, rol değişiklikleri, ban vb. "geçmişte kalıyor" gibi görünür.
+  useEffect(() => {
+    if (!id || !firebaseUser) return;
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state !== 'active') return;
+      // Minimize'dan dönüşte zaten active olur — race olmaması için next tick
+      setTimeout(async () => {
+        if (isMinimizingRef.current || !id || isSystemRoom(id as string)) return;
+        try {
+          const [roomData, freshParticipants] = await Promise.all([
+            RoomService.get(id as string).catch(() => null),
+            RoomService.getParticipants(id as string).catch(() => []),
+          ]);
+          if (roomData) setRoom(roomData);
+          if (freshParticipants && freshParticipants.length > 0) {
+            setParticipants(freshParticipants);
+            participantsRef.current = new Set(freshParticipants.map((x: any) => x.user_id));
+          }
+          // Heartbeat tetikle — participants.last_seen_at güncellensin
+          RoomService.heartbeat(id as string, firebaseUser.uid).catch(() => {});
+        } catch { /* sessiz */ }
+      }, 300);
+    });
+    return () => sub.remove();
+  }, [id, firebaseUser]);
 
   // ★ Host tier'ına göre ses/video kalite ayarları
   const hostTierForQuality = (room?.host?.subscription_tier as any) || 'Free';
