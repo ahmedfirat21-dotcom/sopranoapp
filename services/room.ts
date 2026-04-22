@@ -39,6 +39,79 @@ async function _requireRole(
 // ============================================
 export const RoomService = {
   /**
+   * ★ 2026-04-23: Host'un diğer canlı odalarını dondur — tek anda tek aktif oda kuralı.
+   * wakeUpRoom ve create'in başında çağrılır. Excluded roomId dışındaki tüm is_live=true
+   * odaları bulur, her birinin kalan süresini remaining_ms'e yazar, is_live=false yapar,
+   * katılımcıları temizler. freezeRoom'un toplu versiyonu — ama tek tek update atmak
+   * yerine tek sorguda filter + update.
+   */
+  async _freezeOtherLiveRooms(hostId: string, exceptRoomId?: string): Promise<void> {
+    let q = supabase
+      .from('rooms')
+      .select('id, expires_at, room_settings')
+      .eq('host_id', hostId)
+      .eq('is_live', true);
+    if (exceptRoomId) q = q.neq('id', exceptRoomId);
+    const { data: others } = await q;
+    if (!others || others.length === 0) return;
+
+    const nowIso = new Date().toISOString();
+    const nowMs = Date.now();
+
+    // Her oda için kalan süreyi hesaplayıp settings'e yaz + is_live=false
+    for (const other of others) {
+      const remainMs = (other as any).expires_at
+        ? Math.max(0, new Date((other as any).expires_at).getTime() - nowMs)
+        : undefined;
+      const mergedSettings: any = { ...((other as any).room_settings || {}) };
+      mergedSettings.original_host_id = hostId;
+      mergedSettings.frozen_at = nowIso;
+      if (remainMs !== undefined) mergedSettings.remaining_ms = remainMs;
+
+      await supabase
+        .from('rooms')
+        .update({ is_live: false, listener_count: 0, expires_at: null, room_settings: mergedSettings })
+        .eq('id', (other as any).id);
+
+      // Katılımcıları temizle — eski session'dan stale user'lar kalmasın
+      await supabase
+        .from('room_participants')
+        .delete()
+        .eq('room_id', (other as any).id);
+    }
+  },
+
+
+  /**
+   * ★ 2026-04-22: Hızlı oda oluşturma — FAB action sheet + empty state chip'ler için.
+   * Varsayılan isim + category + type='open' ile tek adımda açar.
+   * İsim şablonu: kategori varsa "{displayName} — {kategoriEtiket}", yoksa "{displayName}'in Odası".
+   */
+  async quickCreate(
+    hostId: string,
+    displayName: string,
+    category: string | undefined,
+    tier: SubscriptionTier = 'Free'
+  ): Promise<Room> {
+    const catLabel = (() => {
+      switch (category) {
+        case 'chat': return 'Sohbet Odası';
+        case 'music': return 'Müzik Odası';
+        case 'game': return 'Oyun Odası';
+        case 'tech': return 'Teknik Oda';
+        case 'book': return 'Kitap Kulübü';
+        case 'film': return 'Film Odası';
+        default: return null;
+      }
+    })();
+    const cleanName = (displayName || 'Kullanıcı').trim().split(/\s+/)[0] || 'Kullanıcı';
+    const name = catLabel
+      ? `${cleanName} — ${catLabel}`
+      : `${cleanName}'in Odası`;
+    return this.create(hostId, { name, category: category || 'chat', type: 'open' }, tier);
+  },
+
+  /**
    * ★ Günlük oda açma limiti kontrolü — kullanıcı bugün limitini doldurmuş mu?
    * Pro/admin için 999 = limitsiz, hiç kontrol yapmadan true döner.
    * Create-room sayfasına navigate etmeden önce çağrılır.
@@ -374,6 +447,11 @@ export const RoomService = {
     const limits = getRoomLimits(tier);
     const now = new Date();
 
+    // ★ 2026-04-23 KRİTİK FIX: Host'un diğer canlı odalarını dondur — aynı anda birden
+    //   fazla odada host olamaz. Kullanıcı birden çok odayı uyandırdığında hepsinde
+    //   "CANLI • 1 (host)" görünüyordu; önce diğerlerini pasife çek.
+    await this._freezeOtherLiveRooms(hostId, roomId);
+
     const { data: existing } = await supabase
       .from('rooms')
       .select('room_settings')
@@ -463,6 +541,10 @@ export const RoomService = {
     },
     tier: SubscriptionTier = 'Free'
   ): Promise<Room> {
+    // ★ 2026-04-23 KRİTİK: Yeni oda açmadan önce host'un diğer canlı odalarını dondur —
+    //   tek anda tek aktif oda kuralı. Yeni roomId henüz yok; tüm canlı odaları dondur.
+    await this._freezeOtherLiveRooms(hostId);
+
     // ★ SEC-8b: Input sanitization — room name/description/settings
     const stripHtml = (s: string) => s.replace(/<[^>]*>/g, '');
     options.name = stripHtml((options.name || '').trim()).slice(0, 60);

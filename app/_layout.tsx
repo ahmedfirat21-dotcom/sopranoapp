@@ -1178,7 +1178,13 @@ export default function RootLayout() {
             <Stack.Screen name="notifications" options={{ animation: 'fade_from_bottom', animationDuration: 250 }} />
             <Stack.Screen name="admin" options={{ animation: 'fade_from_bottom', animationDuration: 250 }} />
             <Stack.Screen name="call/[id]" options={{ animation: 'fade_from_bottom', animationDuration: 200, gestureEnabled: false }} />
-            <Stack.Screen name="create-room" options={{ animation: 'fade_from_bottom', animationDuration: 250 }} />
+            {/* ★ 2026-04-23: create-room artık bottom-sheet modal — arkadaki ekran görünür kalır,
+                 kendi animasyonunu içinde yapıyor (translateY + backdrop fade), native transition yok. */}
+            <Stack.Screen name="create-room" options={{
+              presentation: 'transparentModal',
+              animation: 'none',
+              contentStyle: { backgroundColor: 'transparent' },
+            }} />
             <Stack.Screen name="settings" options={{ animation: 'fade_from_bottom', animationDuration: 250 }} />
             <Stack.Screen name="leaderboard" options={{ animation: 'fade_from_bottom', animationDuration: 250 }} />
 

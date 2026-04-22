@@ -3,7 +3,7 @@
  * ★ Alt barın üstünde, kompakt bottom sheet.
  * Host/Moderatör için: Bekleyen konuşmacı isteklerini yönetir.
  */
-import React, { useRef, useEffect, useMemo } from 'react';
+import React, { useRef, useEffect, useMemo, useState } from 'react';
 import {
   View, Text, StyleSheet, Pressable, FlatList,
   Image, Animated, Dimensions, PanResponder,
@@ -96,7 +96,10 @@ export default function HandRaiseQueuePanel({
   maxStageSlots, currentStageCount,
   bottomInset = 14,
 }: Props) {
-  const translateY = useRef(new Animated.Value(PANEL_H)).current;
+  // ★ 2026-04-23: CLOSED_Y artık panel + paddingBottom'u kapsıyor — panel bottom:0'da
+  //   paddingBottom BAR_OFFSET kadar eklendiği için translate off-screen mesafesi de büyümeli.
+  const CLOSED_Y = PANEL_H + bottomInset + 76 + 20;
+  const translateY = useRef(new Animated.Value(CLOSED_Y)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const stageSlotsFull = currentStageCount >= maxStageSlots;
 
@@ -116,7 +119,7 @@ export default function HandRaiseQueuePanel({
       },
       onPanResponderRelease: (_, gs) => {
         if (gs.dy > 50 || gs.vy > 0.5) {
-          Animated.timing(translateY, { toValue: PANEL_H, duration: 200, useNativeDriver: true }).start(() => onClose());
+          Animated.timing(translateY, { toValue: CLOSED_Y, duration: 200, useNativeDriver: true }).start(() => onClose());
         } else {
           Animated.spring(translateY, { toValue: 0, useNativeDriver: true, damping: 20, stiffness: 200 }).start();
         }
@@ -124,17 +127,23 @@ export default function HandRaiseQueuePanel({
     })
   ).current;
 
+  // ★ 2026-04-23: Internal mount — kapanış animasyonu bitince unmount (RoomChatDrawer ile aynı pattern)
+  const [mounted, setMounted] = useState(visible);
+
   useEffect(() => {
     if (visible) {
+      setMounted(true);
       Animated.parallel([
         Animated.spring(translateY, { toValue: 0, useNativeDriver: true, damping: 20, stiffness: 200 }),
         Animated.timing(fadeAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
       ]).start();
-    } else {
+    } else if (mounted) {
       Animated.parallel([
-        Animated.timing(translateY, { toValue: PANEL_H, duration: 200, useNativeDriver: true }),
-        Animated.timing(fadeAnim, { toValue: 0, duration: 150, useNativeDriver: true }),
-      ]).start();
+        Animated.timing(translateY, { toValue: CLOSED_Y, duration: 220, useNativeDriver: true }),
+        Animated.timing(fadeAnim, { toValue: 0, duration: 220, useNativeDriver: true }),
+      ]).start(({ finished }) => {
+        if (finished) setMounted(false);
+      });
     }
   }, [visible]);
 
@@ -144,9 +153,11 @@ export default function HandRaiseQueuePanel({
     onApprove(first.user_id, first.user?.display_name || 'Kullanıcı');
   };
 
-  if (!visible) return null;
+  if (!mounted) return null;
 
-  const BAR_OFFSET = bottomInset + 56;
+  // ★ 2026-04-23: RoomChatDrawer ile aynı pattern — panel bottom:0'da, paddingBottom ile
+  // content control bar üstünde durur, gradient bar arkasında akar → tek sürekli yüzey.
+  const BAR_OFFSET = bottomInset + 76;
 
   return (
     <View style={[StyleSheet.absoluteFill, { zIndex: 100 }]} pointerEvents="box-none">
@@ -155,10 +166,10 @@ export default function HandRaiseQueuePanel({
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
       </Animated.View>
 
-      {/* Panel — alt barın üstünde, alttan kayar */}
+      {/* Panel — bottom:0 continuous surface; control bar üstünde floats, gradient arkasına akar */}
       <Animated.View
         {...panResponder.panHandlers}
-        style={[s.panel, { bottom: BAR_OFFSET, transform: [{ translateY }] }]}
+        style={[s.panel, { bottom: 0, paddingBottom: BAR_OFFSET, transform: [{ translateY }] }]}
       >
         <LinearGradient colors={['#4a5668', '#37414f', '#232a35']} locations={[0, 0.35, 1]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[StyleSheet.absoluteFillObject, { borderTopLeftRadius: 20, borderTopRightRadius: 20 }]} />
         {/* Sürükleme tutamağı */}

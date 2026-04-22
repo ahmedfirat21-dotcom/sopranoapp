@@ -34,6 +34,7 @@ import type { SubscriptionTier } from '../../types';
 import { getCategoryTheme, ROOM_THEME_GRADIENTS } from '../../constants/categoryTheme';
 import NotificationBell from '../../components/NotificationBell';
 import FriendsDrawer from '../../components/FriendsDrawer';
+import QuickCreateSheet from '../../components/QuickCreateSheet';
 
 // ════════════════════════════════════════════════════════════
 // YÖNETİLEN ODA KARTI — Yönet/Başlat butonları (React.memo ile re-render izole)
@@ -280,8 +281,15 @@ const skS = StyleSheet.create({
   },
 });
 
-// ★ Sadece boş durumu temsil eder — non-empty render'ı FlatList yapıyor
-function ManagedRoomsEmptyCard() {
+// ★ 2026-04-23: Empty state artık quick-create chip'li — home'daki unified pattern.
+//   Statik resim + "odanız yok" metni → aksiyona yönlendiren 2x2 kategori grid'i.
+//   Chip tap → direkt ilgili kategoride oda aç; "detaylı ayarla" link ise full flow.
+function ManagedRoomsEmptyCard({ onQuickCreate, onDetailed, creating, showChips }: {
+  onQuickCreate: (category: string) => void;
+  onDetailed: () => void;
+  creating: boolean;
+  showChips: boolean;
+}) {
   return (
     <>
       <View style={mrS.sectionRow}>
@@ -291,15 +299,57 @@ function ManagedRoomsEmptyCard() {
       </View>
       <View style={mrS.emptyCard}>
         <LinearGradient
-          colors={['#4a5668', '#37414f', '#232a35']}
-          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+          colors={['rgba(20,184,166,0.12)', 'rgba(13,148,136,0.06)', 'rgba(15,23,42,0.02)']}
+          start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
           style={StyleSheet.absoluteFillObject}
         />
-        <Text style={mrS.emptyTitle}>Henüz bir odanız yok.{'\n'}İlk odanızı oluşturun!</Text>
-        <View style={mrS.emptyImageWrap}>
-          <Image source={require('../../assets/images/mock/empty_room_mic.png')} style={mrS.emptyImage} resizeMode="contain" />
+
+        <View style={mrS.emptyIconGlow}>
+          <LinearGradient
+            colors={['rgba(20,184,166,0.25)', 'rgba(13,148,136,0.10)']}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFillObject}
+          />
+          <Ionicons name="mic" size={36} color="#14B8A6" />
         </View>
-        <Text style={mrS.emptySub}>Sesli sohbet, müzik, oyun ve daha fazlası...</Text>
+
+        <Text style={mrS.emptyTitle}>İlk odanı aç, sahneye çık</Text>
+        <Text style={mrS.emptySub}>Konu seç, tek tıkla yayına başla</Text>
+
+        {showChips && (
+          <View style={mrS.emptyChipsGrid}>
+            {[
+              { id: 'chat',  label: 'Sohbet', icon: 'chatbubbles' as const,     color: '#3B82F6' },
+              { id: 'music', label: 'Müzik',  icon: 'musical-notes' as const,   color: '#EC4899' },
+              { id: 'game',  label: 'Oyun',   icon: 'game-controller' as const, color: '#A78BFA' },
+              { id: 'tech',  label: 'Teknik', icon: 'code-slash' as const,      color: '#14B8A6' },
+            ].map((chip) => (
+              <Pressable
+                key={chip.id}
+                onPress={() => onQuickCreate(chip.id)}
+                disabled={creating}
+                style={({ pressed }) => [
+                  mrS.emptyChip,
+                  { borderColor: chip.color + '55', backgroundColor: chip.color + '14' },
+                  pressed && { transform: [{ scale: 0.96 }], backgroundColor: chip.color + '22' },
+                  creating && { opacity: 0.5 },
+                ]}
+              >
+                <Ionicons name={chip.icon} size={20} color={chip.color} />
+                <Text style={[mrS.emptyChipText, { color: chip.color }]}>{chip.label}</Text>
+              </Pressable>
+            ))}
+          </View>
+        )}
+
+        <Pressable
+          onPress={onDetailed}
+          style={({ pressed }) => [mrS.emptyDetailLink, pressed && { opacity: 0.6 }]}
+          hitSlop={8}
+        >
+          <Text style={mrS.emptyDetailLinkText}>veya detaylı ayarla</Text>
+          <Ionicons name="chevron-forward" size={13} color="#94A3B8" />
+        </Pressable>
       </View>
     </>
   );
@@ -318,16 +368,45 @@ const mrS = StyleSheet.create({
     paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8,
   },
   emptyCard: {
-    marginHorizontal: 16, padding: 20, borderRadius: 18,
-    borderWidth: 1, borderColor: Colors.cardBorder,
+    marginHorizontal: 16, paddingVertical: 26, paddingHorizontal: 18, borderRadius: 20,
+    borderWidth: 1, borderColor: 'rgba(20,184,166,0.18)',
     overflow: 'hidden',
-    alignItems: 'center', gap: 10,
+    alignItems: 'center',
     ...Shadows.card,
   },
-  emptyTitle: { fontSize: 14, fontWeight: '700', color: '#F1F5F9', textAlign: 'center', lineHeight: 20 },
-  emptyImageWrap: { width: 120, height: 120, alignItems: 'center', justifyContent: 'center' },
-  emptyImage: { width: '100%', height: '100%' },
-  emptySub: { fontSize: 12, color: '#94A3B8', textAlign: 'center' },
+  emptyIconGlow: {
+    width: 80, height: 80, borderRadius: 40,
+    justifyContent: 'center', alignItems: 'center',
+    overflow: 'hidden',
+    borderWidth: 1, borderColor: 'rgba(20,184,166,0.25)',
+    marginBottom: 14,
+  },
+  emptyTitle: {
+    fontSize: 18, fontWeight: '800', color: '#F1F5F9', textAlign: 'center',
+    letterSpacing: 0.2, marginBottom: 4,
+    textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
+  },
+  emptySub: {
+    fontSize: 12.5, color: '#94A3B8', textAlign: 'center',
+    lineHeight: 18, marginBottom: 16, paddingHorizontal: 8,
+  },
+  emptyChipsGrid: {
+    flexDirection: 'row', flexWrap: 'wrap', gap: 10,
+    width: '100%', justifyContent: 'center',
+  },
+  emptyChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 9,
+    paddingHorizontal: 14, paddingVertical: 12, borderRadius: 14,
+    borderWidth: 1.2,
+    flexGrow: 1, flexBasis: '45%',
+    justifyContent: 'center', minHeight: 50,
+  },
+  emptyChipText: { fontSize: 13.5, fontWeight: '800', letterSpacing: 0.2 },
+  emptyDetailLink: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    marginTop: 14, paddingVertical: 6, paddingHorizontal: 10,
+  },
+  emptyDetailLinkText: { fontSize: 12, fontWeight: '600', color: '#94A3B8', letterSpacing: 0.2 },
 });
 
 const mS = StyleSheet.create({
@@ -653,6 +732,9 @@ export default function MyRoomsScreen() {
   const [showInviteFriends, setShowInviteFriends] = useState(false);
   // ★ Günlük oda açma kotası — CTA altında "2/3 bugün" gösterimi için
   const [dailyQuota, setDailyQuota] = useState<{ count: number; limit: number } | null>(null);
+  // ★ 2026-04-23: Quick-create — Keşfet'teki ile aynı pattern, CTA ve empty state'te kullanılır
+  const [showQuickCreate, setShowQuickCreate] = useState(false);
+  const [creatingRoom, setCreatingRoom] = useState(false);
 
   const { unreadNotifs: unreadCount, pendingFollows: pendingFollowCount } = useBadges();
   const { allFriends } = useOnlineFriends();
@@ -1140,6 +1222,29 @@ export default function MyRoomsScreen() {
     } catch (e: any) { showToast({ title: 'Hata', message: e.message || '', type: 'error' }); }
   }, [selectedRoom, firebaseUser, loadData]);
 
+  // ★ 2026-04-23: Hızlı oda oluşturma — CTA ve empty state chip'lerinden tetiklenir.
+  //   Limit dolu → toast + direkt /plus (satın alma). Detaylı akıştan farklı kısa yol.
+  const handleQuickCreate = useCallback(async (category?: string) => {
+    if (!firebaseUser || creatingRoom) return;
+    setCreatingRoom(true);
+    try {
+      const userTier = effectiveTier;
+      const gate = await RoomService.canCreateToday(firebaseUser.uid, userTier);
+      if (!gate.ok) {
+        showToast({ title: 'Günlük Limit Doldu', message: 'Üyeliğini yükselterek limitsiz oda aç.', type: 'warning' });
+        setTimeout(() => router.push('/plus' as any), 400);
+        return;
+      }
+      const displayName = profile?.display_name || firebaseUser.displayName || 'Kullanıcı';
+      const room = await RoomService.quickCreate(firebaseUser.uid, displayName, category, userTier);
+      router.push(`/room/${room.id}` as any);
+    } catch (err: any) {
+      showToast({ title: 'Oda Açılamadı', message: err?.message || 'Beklenmedik hata', type: 'error' });
+    } finally {
+      setCreatingRoom(false);
+    }
+  }, [firebaseUser, creatingRoom, effectiveTier, profile, router]);
+
   const handleRoomFreeze = useCallback(async () => {
     if (!selectedRoom || !firebaseUser) return;
     try {
@@ -1289,21 +1394,19 @@ export default function MyRoomsScreen() {
         </View>
       )}
 
-      {/* Yeni Oda Oluştur — Premium Gradient */}
-      <Pressable style={s.ctaWrap} onPress={async () => {
-        if (!firebaseUser) return;
-        const isAdmin = (profile as any)?.is_admin === true;
-        const userTier = effectiveTier;
-        try {
-          const gate = await RoomService.canCreateToday(firebaseUser.uid, userTier);
-          if (!gate.ok) {
-            showToast({ title: 'Günlük Limit Doldu', message: `Bugün ${gate.count}/${gate.limit} oda açtın. Yarın tekrar dene veya üyeliğini yükselt.`, type: 'warning' });
-            UpsellService.onDailyRoomLimit(userTier);
-            return;
-          }
-        } catch {}
-        router.push('/create-room');
-      }}>
+      {/* Yeni Oda Oluştur — Premium Gradient
+          ★ 2026-04-23: Artık sheet açılır (Hızlı/Detaylı/Planla); long-press → direkt detaylı. */}
+      <Pressable
+        style={s.ctaWrap}
+        onPress={() => {
+          if (!firebaseUser) return;
+          setShowQuickCreate(true);
+        }}
+        onLongPress={() => {
+          if (!firebaseUser) return;
+          router.push('/create-room');
+        }}
+      >
         <LinearGradient
           colors={['#14B8A6', '#0D9488', '#065F56']}
           start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
@@ -1376,7 +1479,17 @@ export default function MyRoomsScreen() {
             )}
           </>
         }
-        ListEmptyComponent={loading ? <SkeletonList count={3} /> : <ManagedRoomsEmptyCard />}
+        ListEmptyComponent={loading ? <SkeletonList count={3} /> : (
+          <ManagedRoomsEmptyCard
+            showChips={!!firebaseUser}
+            creating={creatingRoom}
+            onQuickCreate={(cat) => handleQuickCreate(cat)}
+            onDetailed={() => {
+              if (!firebaseUser) return;
+              router.push('/create-room');
+            }}
+          />
+        )}
         ListFooterComponent={
           <>
             {/* Son Girdiğin Odalar */}
@@ -1488,6 +1601,18 @@ export default function MyRoomsScreen() {
         onSelect={(userId) => { setShowFriends(false); router.push(`/user/${userId}` as any); }}
         currentUserId={firebaseUser?.uid}
       />
+
+      {/* ★ 2026-04-23: Quick-create sheet — CTA press ve empty state'teki detay linki aynı sheet'i açar
+           bottomOffset=84: CurvedTabBar yüksekliğine denk — panel tab bar'ın üstünde durur, son seçenek kırpılmaz. */}
+      <QuickCreateSheet
+        visible={showQuickCreate}
+        onClose={() => setShowQuickCreate(false)}
+        onQuickCreate={() => handleQuickCreate()}
+        onDetailedCreate={() => router.push('/create-room')}
+        bottomInset={insets.bottom}
+        bottomOffset={84}
+      />
+
       {/* ★ 2026-04-21: Tab bar scroll fade — tüm tab sayfalarında tutarlı */}
       <TabBarFadeOut />
     </View></AppBackground>

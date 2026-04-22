@@ -1,5 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TextInput, Pressable, ScrollView, ActivityIndicator, Image, Animated, Easing } from 'react-native';
+import { View, Text, StyleSheet, TextInput, Pressable, ScrollView, ActivityIndicator, Image, Animated, Easing, Dimensions, PanResponder } from 'react-native';
+
+const { height: SCREEN_H } = Dimensions.get('window');
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -10,7 +12,6 @@ import { Colors, Shadows } from '../constants/theme';
 import { showToast } from '../components/Toast';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from './_layout';
-import AppBackground from '../components/AppBackground';
 import { UpsellService } from '../services/upsell';
 import { supabase } from '../constants/supabase';
 import InviteFriendsModal from '../components/room/InviteFriendsModal';
@@ -180,6 +181,49 @@ export default function CreateRoomScreen() {
   const currentStepMeta = STEPS[stepIndex];
   const totalSteps = STEPS.length;
 
+  // ════════════════════════════════════════════════════════════
+  // ★ 2026-04-23: SHEET presentation — RoomChatDrawer pattern
+  //   - Mount: translateY SCREEN_H → 0 (alt'tan yukarı kayar) + backdrop fade-in
+  //   - Unmount: reverse, bitince router.back()
+  //   - Handle drag: yukarıdaki handle barından aşağı sürükle → kapat
+  //   - Minimize btn: header'daki chevron-down → kapat
+  // ════════════════════════════════════════════════════════════
+  const translateY = useRef(new Animated.Value(SCREEN_H)).current;
+  const backdropOpacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.spring(translateY, { toValue: 0, useNativeDriver: true, damping: 24, stiffness: 220 }),
+      Animated.timing(backdropOpacity, { toValue: 1, duration: 260, useNativeDriver: true }),
+    ]).start();
+  }, []);
+
+  // Router'a bağımlı closeSheet — ref pattern ile panResponder stable kalır
+  const closeSheetRef = useRef<() => void>(() => {});
+  closeSheetRef.current = () => {
+    Animated.parallel([
+      Animated.timing(translateY, { toValue: SCREEN_H, duration: 220, useNativeDriver: true }),
+      Animated.timing(backdropOpacity, { toValue: 0, duration: 200, useNativeDriver: true }),
+    ]).start(() => safeGoBack(router));
+  };
+
+  const panResponder = useRef(PanResponder.create({
+    onStartShouldSetPanResponder: () => false,
+    // ★ 2026-04-23: Yalnızca aşağı yönde drag — yukarı rubber-band panel altında
+    //   boş alan açıyordu (panel top:insets.top+30'da zaten olabildiğince yukarıda).
+    onMoveShouldSetPanResponder: (_, gs) => gs.dy > 6 && Math.abs(gs.dy) > Math.abs(gs.dx),
+    onPanResponderMove: (_, gs) => {
+      translateY.setValue(Math.max(0, gs.dy));
+    },
+    onPanResponderRelease: (_, gs) => {
+      if (gs.dy > 90 || gs.vy > 0.5) {
+        closeSheetRef.current();
+      } else {
+        Animated.spring(translateY, { toValue: 0, useNativeDriver: true, damping: 24, stiffness: 220 }).start();
+      }
+    },
+  })).current;
+
   // ★ 2026-04-21: Draft restore — wizard açılışında önceki state varsa yükle.
   //   file:// uri'leri AsyncStorage'a kaydetmiyoruz (cihaz-spesifik, crash olmuş olabilir).
   //   Yalnızca form değerleri.
@@ -251,7 +295,7 @@ export default function CreateRoomScreen() {
   };
   const prevStep = () => {
     if (stepIndex > 0) goToStep(STEPS[stepIndex - 1].id, 'back');
-    else safeGoBack(router);
+    else closeSheetRef.current(); // ★ 2026-04-23: İlk step'te animasyonlu kapanış
   };
 
   // ★ 2026-04-21: Oda adı canlı validation — küfür + uzunluk check'i.
@@ -1057,65 +1101,113 @@ export default function CreateRoomScreen() {
   //   "limit doldu" ile hayal kırıklığına uğratmayalım. Başta net upsell ekranı göster.
   if (dailyLimitReached) {
     return (
-      <AppBackground>
-        <View style={{ flex: 1, paddingTop: insets.top + 8 }}>
-          <View style={[w.header, { paddingTop: 0 }]}>
-            <Pressable onPress={() => safeGoBack(router)} style={w.iconBtn} hitSlop={8}>
-              <Ionicons name="close" size={22} color="#F1F5F9" />
-            </Pressable>
-            <Text style={w.stepCounter}>Limit</Text>
-            <View style={w.tierChip}><Text style={w.tierChipText}>{tier}</Text></View>
-          </View>
-          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32 }}>
-            <View style={{
-              width: 100, height: 100, borderRadius: 50,
-              backgroundColor: 'rgba(245,158,11,0.12)',
-              borderWidth: 2, borderColor: 'rgba(245,158,11,0.35)',
-              alignItems: 'center', justifyContent: 'center', marginBottom: 20,
-            }}>
-              <Ionicons name="hourglass" size={44} color="#F59E0B" />
+      <View style={{ flex: 1, backgroundColor: 'transparent' }}>
+        <Animated.View
+          style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.55)', opacity: backdropOpacity }]}
+          pointerEvents="box-none"
+        >
+          <Pressable style={{ flex: 1 }} onPress={() => closeSheetRef.current()} />
+        </Animated.View>
+        <Animated.View style={[w.sheetPanel, { top: Math.max(insets.top, 20) + 10, transform: [{ translateY }] }]}>
+          <LinearGradient
+            colors={['#4a5668', '#37414f', '#232a35']}
+            locations={[0, 0.35, 1]}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFillObject}
+          />
+          <View style={{ flex: 1 }}>
+              <View {...panResponder.panHandlers} style={w.sheetHandleWrap}>
+                <View style={w.sheetHandleBar} />
+              </View>
+              <View style={[w.header, w.sheetHeader]}>
+                <Pressable onPress={() => closeSheetRef.current()} style={w.iconBtn} hitSlop={8}>
+                  <Ionicons name="chevron-down" size={22} color="#F1F5F9" />
+                </Pressable>
+                <Text style={w.stepCounter}>Limit</Text>
+                <View style={w.tierChip}><Text style={w.tierChipText}>{tier}</Text></View>
+              </View>
+              <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32 }}>
+                <View style={{
+                  width: 100, height: 100, borderRadius: 50,
+                  backgroundColor: 'rgba(245,158,11,0.12)',
+                  borderWidth: 2, borderColor: 'rgba(245,158,11,0.35)',
+                  alignItems: 'center', justifyContent: 'center', marginBottom: 20,
+                }}>
+                  <Ionicons name="hourglass" size={44} color="#F59E0B" />
+                </View>
+                <Text style={{ fontSize: 22, fontWeight: '800', color: '#F1F5F9', marginBottom: 8, textAlign: 'center' }}>
+                  Günlük Oda Limitin Doldu
+                </Text>
+                <Text style={{ fontSize: 14, color: '#94A3B8', textAlign: 'center', lineHeight: 20, marginBottom: 24 }}>
+                  Bugün {limits.dailyRooms}/{limits.dailyRooms} oda açtın. Yarın sıfırlanacak — ya da üyeliğini yükselterek daha fazla oda aç.
+                </Text>
+                <Pressable
+                  onPress={() => {
+                    // ★ 2026-04-23: Önce sheet'i kapat, sonra /plus'a yönlendir.
+                    //   UpsellService tetiklemeye gerek yok — kullanıcı zaten upgrade sayfasına gidiyor.
+                    Animated.parallel([
+                      Animated.timing(translateY, { toValue: SCREEN_H, duration: 220, useNativeDriver: true }),
+                      Animated.timing(backdropOpacity, { toValue: 0, duration: 200, useNativeDriver: true }),
+                    ]).start(() => {
+                      router.replace('/plus' as any);
+                    });
+                  }}
+                  style={({ pressed }) => [{ width: '100%', borderRadius: 14, overflow: 'hidden' }, pressed && { opacity: 0.85 }]}
+                >
+                  <LinearGradient
+                    colors={['#D4AF37', '#B45309']}
+                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                    style={{ paddingVertical: 14, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 }}
+                  >
+                    <Ionicons name="rocket" size={18} color="#FFF" />
+                    <Text style={{ color: '#FFF', fontWeight: '800', fontSize: 15 }}>Üyeliğimi Yükselt</Text>
+                  </LinearGradient>
+                </Pressable>
+                <Pressable onPress={() => closeSheetRef.current()} style={{ marginTop: 12, paddingVertical: 12 }}>
+                  <Text style={{ color: '#94A3B8', fontSize: 14, fontWeight: '600' }}>Geri Dön</Text>
+                </Pressable>
+              </View>
             </View>
-            <Text style={{ fontSize: 22, fontWeight: '800', color: '#F1F5F9', marginBottom: 8, textAlign: 'center' }}>
-              Günlük Oda Limitin Doldu
-            </Text>
-            <Text style={{ fontSize: 14, color: '#94A3B8', textAlign: 'center', lineHeight: 20, marginBottom: 24 }}>
-              Bugün {limits.dailyRooms}/{limits.dailyRooms} oda açtın. Yarın sıfırlanacak — ya da üyeliğini yükselterek daha fazla oda aç.
-            </Text>
-            <Pressable
-              onPress={() => { UpsellService.onDailyRoomLimit(tier); }}
-              style={({ pressed }) => [{ width: '100%', borderRadius: 14, overflow: 'hidden' }, pressed && { opacity: 0.85 }]}
-            >
-              <LinearGradient
-                colors={['#D4AF37', '#B45309']}
-                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                style={{ paddingVertical: 14, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 }}
-              >
-                <Ionicons name="rocket" size={18} color="#FFF" />
-                <Text style={{ color: '#FFF', fontWeight: '800', fontSize: 15 }}>Üyeliğimi Yükselt</Text>
-              </LinearGradient>
-            </Pressable>
-            <Pressable onPress={() => safeGoBack(router)} style={{ marginTop: 12, paddingVertical: 12 }}>
-              <Text style={{ color: '#94A3B8', fontSize: 14, fontWeight: '600' }}>Geri Dön</Text>
-            </Pressable>
-          </View>
-        </View>
-      </AppBackground>
+        </Animated.View>
+      </View>
     );
   }
 
   return (
-    <AppBackground>
-      <View style={{ flex: 1 }}>
-        {/* ── HEADER ── */}
-        <View style={[w.header, { paddingTop: insets.top + 8 }]}>
-          <Pressable onPress={prevStep} style={w.iconBtn} hitSlop={8}>
-            <Ionicons name={stepIndex === 0 ? 'close' : 'chevron-back'} size={22} color="#F1F5F9" />
-          </Pressable>
-          <Text style={w.stepCounter}>{stepIndex + 1} / {totalSteps}</Text>
-          <View style={[w.tierChip, isAdmin && { backgroundColor: 'rgba(239,68,68,0.12)', borderColor: 'rgba(239,68,68,0.25)' }]}>
-            <Text style={[w.tierChipText, isAdmin && { color: '#EF4444' }]}>{isAdmin ? '⚡' : tier}</Text>
+    <View style={{ flex: 1, backgroundColor: 'transparent' }}>
+      {/* ★ Backdrop — tap to close, fade animation */}
+      <Animated.View
+        style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.55)', opacity: backdropOpacity }]}
+        pointerEvents="box-none"
+      >
+        <Pressable style={{ flex: 1 }} onPress={() => closeSheetRef.current()} />
+      </Animated.View>
+
+      {/* ★ Sheet panel — slides up, drag-to-close
+           Tema: RoomChatDrawer ile bire bir — gri-gradient + #95a1ae border + subtle top shadow */}
+      <Animated.View style={[w.sheetPanel, { top: Math.max(insets.top, 20) + 10, transform: [{ translateY }] }]}>
+        <LinearGradient
+          colors={['#4a5668', '#37414f', '#232a35']}
+          locations={[0, 0.35, 1]}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFillObject}
+        />
+        <View style={{ flex: 1 }}>
+          {/* ★ Drag handle — RoomChatDrawer stili (36x4, rgba(255,255,255,0.2)) */}
+          <View {...panResponder.panHandlers} style={w.sheetHandleWrap}>
+            <View style={w.sheetHandleBar} />
           </View>
-        </View>
+
+          {/* ── HEADER ── subtle teal tint (DM drawer ile aynı) */}
+          <View style={[w.header, w.sheetHeader]}>
+            <Pressable onPress={prevStep} style={w.iconBtn} hitSlop={8}>
+              <Ionicons name={stepIndex === 0 ? 'chevron-down' : 'chevron-back'} size={22} color="#F1F5F9" />
+            </Pressable>
+            <Text style={w.stepCounter}>{stepIndex + 1} / {totalSteps}</Text>
+            <View style={[w.tierChip, isAdmin && { backgroundColor: 'rgba(239,68,68,0.12)', borderColor: 'rgba(239,68,68,0.25)' }]}>
+              <Text style={[w.tierChipText, isAdmin && { color: '#EF4444' }]}>{isAdmin ? '⚡' : tier}</Text>
+            </View>
+          </View>
 
         {/* ── PROGRESS DOTS ── */}
         <View style={w.progressRow}>
@@ -1183,7 +1275,17 @@ export default function CreateRoomScreen() {
 
           {step === 'review' ? (
             <Pressable
-              onPress={() => { if (dailyLimitReached) UpsellService.onDailyRoomLimit(tier); else handleCreate(); }}
+              onPress={() => {
+                if (dailyLimitReached) {
+                  // ★ 2026-04-23: Limit dolu → sheet kapan + /plus'a git
+                  Animated.parallel([
+                    Animated.timing(translateY, { toValue: SCREEN_H, duration: 220, useNativeDriver: true }),
+                    Animated.timing(backdropOpacity, { toValue: 0, duration: 200, useNativeDriver: true }),
+                  ]).start(() => router.replace('/plus' as any));
+                } else {
+                  handleCreate();
+                }
+              }}
               disabled={creating}
               style={[w.primaryBtn, (creating || dailyLimitReached) && { opacity: 0.55 }]}
             >
@@ -1240,8 +1342,9 @@ export default function CreateRoomScreen() {
             if (createdRoomId) router.replace(`/room/${createdRoomId}` as any);
           }}
         />
-      </View>
-    </AppBackground>
+        </View>
+      </Animated.View>
+    </View>
   );
 }
 
@@ -1265,6 +1368,38 @@ function SummaryRow({ icon, label, value }: { icon: string; label: string; value
 // STYLES — Apple-like wizard
 // ═══════════════════════════════════════════════════════════════════
 const w = StyleSheet.create({
+  // ★ 2026-04-23: Sheet panel — RoomChatDrawer ile birebir görsel dil
+  //   gri gradient LinearGradient dışarıdan; panel container'ı border/radius/shadow taşır.
+  sheetPanel: {
+    position: 'absolute',
+    left: 0, right: 0, bottom: 0,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderBottomWidth: 0,
+    borderColor: '#95a1ae',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    elevation: 20,
+  },
+  sheetHandleWrap: {
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  sheetHandleBar: {
+    width: 36, height: 4, borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+  },
+  // Drawer header — subtle teal tint + bottom border (chat drawer ile aynı)
+  sheetHeader: {
+    paddingTop: 4, paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: 'rgba(20,184,166,0.06)',
+  },
   // Header
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',

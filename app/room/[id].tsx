@@ -411,23 +411,27 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
     });
   }, [firebaseUser?.uid]);
 
+  // ★ 2026-04-23: Internal mount — kapanış animasyonu bitince unmount (kesik önleme)
+  const [mounted, setMounted] = useState(visible);
+
   useEffect(() => {
     if (visible) {
+      setMounted(true);
       Animated.parallel([
         Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true, damping: 18, stiffness: 180 }),
         Animated.timing(fadeAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
       ]).start();
-      // ★ FIX: Panel açılınca inbox'ı yükle (toggleDmPanel dışından açılsa bile)
       if (firebaseUser?.uid) {
         MessageService.getInbox(firebaseUser.uid).then(msgs => setDmInboxMessages(msgs)).catch(() => {});
       }
-    } else {
+    } else if (mounted) {
       Animated.parallel([
-        Animated.spring(slideAnim, { toValue: DM_PANEL_W, useNativeDriver: true, damping: 18, stiffness: 200 }),
-        Animated.timing(fadeAnim, { toValue: 0, duration: 150, useNativeDriver: true }),
-      ]).start();
-      // Panel kapanırken sohbet görünümünü sıfırla
-      setTimeout(() => { setChatTarget(null); setChatMessages([]); }, 300);
+        Animated.timing(slideAnim, { toValue: DM_PANEL_W, duration: 220, useNativeDriver: true }),
+        Animated.timing(fadeAnim, { toValue: 0, duration: 220, useNativeDriver: true }),
+      ]).start(({ finished }) => {
+        if (finished) setMounted(false);
+        setChatTarget(null); setChatMessages([]);
+      });
     }
   }, [visible]);
 
@@ -620,7 +624,7 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
     } catch {}
   };
 
-  if (!visible) return null;
+  if (!mounted) return null;
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
@@ -3380,11 +3384,8 @@ export default function RoomScreen() {
 
 
       <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, paddingBottom: Math.max(insets.bottom, 14) + 8, zIndex: 60, elevation: 60 }}>
-        {/* ★ 2026-04-22: Fade-out gradient sadece drawer KAPALI iken görünür — açıkken
-             panel'in üstüne gölge olarak düşmesin. */}
-        {!showChatDrawer && (
-          <LinearGradient colors={['transparent', 'rgba(5,10,20,0.85)', 'rgba(5,10,20,0.98)']} locations={[0, 0.35, 1]} style={[StyleSheet.absoluteFill, { top: -140 }]} pointerEvents="none" />
-        )}
+        {/* ★ 2026-04-22: Zeminde control bar üstüne düşen fade-out tamamen kaldırıldı —
+             mesajların aktığı alan temiz, gölgesiz kalıyor. */}
         <RoomControlBar isMicOn={lk.isMicrophoneEnabled || false} isCameraOn={lk.isCameraEnabled || false}
           showCamera={(amIHost || amIModerator || stageUsers.some(u => u.user_id === firebaseUser?.uid)) && getRoomLimits(((room as any)?.owner_tier || 'Free') as any).maxCameras > 0}
           isHandRaised={myMicRequested} handBadgeCount={micRequests.length} canModerate={canModerate}
@@ -3417,7 +3418,7 @@ export default function RoomScreen() {
             }
             try { lk.toggleCamera?.(); } catch {}
           }}
-          onHandPress={handleMicRequest} onChatPress={() => { if (showChatDrawer) setShowChatDrawer(false); else openOverlay(() => setShowChatDrawer(true)); }} onPlusPress={() => openOverlay(() => setShowPlusMenu(true))}
+          onHandPress={handleMicRequest} onChatPress={() => { if (showChatDrawer) setShowChatDrawer(false); else openOverlay(() => setShowChatDrawer(true)); }} onPlusPress={() => { if (showPlusMenu) setShowPlusMenu(false); else openOverlay(() => setShowPlusMenu(true)); }}
           onLeavePress={() => {
             setAlertConfig({
               visible: true, title: 'Odadan Ayrıl', message: 'Odadan ayrılmak istediğinize emin misiniz?', type: 'warning', icon: 'exit-outline',

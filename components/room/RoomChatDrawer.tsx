@@ -9,11 +9,16 @@ import {
   TextInput, FlatList, Image, Dimensions, KeyboardAvoidingView, Platform, Keyboard,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { getAvatarSource } from '../../constants/avatars';
 import { EmojiReactionBar } from '../EmojiReactions';
 
 const { height: SCREEN_H } = Dimensions.get('window');
-const PANEL_HEIGHT = Math.min(520, Math.floor(SCREEN_H * 0.72));
+// ★ 2026-04-22: Instagram yorumları pattern'i — iki snap point.
+//   HALF: varsayılan açılış, ekranın yarısından biraz fazlası.
+//   FULL: yukarı swipe ile ekrana yayılır (status bar'a yakın).
+const PANEL_HEIGHT_HALF = Math.min(520, Math.floor(SCREEN_H * 0.72));
+const PANEL_HEIGHT_FULL = Math.floor(SCREEN_H * 0.92);
 
 interface ChatMsg {
   id: string;
@@ -59,16 +64,41 @@ export default function RoomChatDrawer({
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   // Panel control bar'ın arkasına kadar uzanır — tek sürekli yüzey.
   // Control bar room/[id].tsx tarafında zIndex: 60 ile panel'in önünde kalır.
-  const BAR_OFFSET = bottomInset + 56;
-  const CLOSED_Y = PANEL_HEIGHT + BAR_OFFSET;
+  // ★ 2026-04-23: 56→76 — input ile control bar arasına 20px nefes. Eskiden input
+  //   control bar'a yapışıktı, kötü görünüyordu.
+  const BAR_OFFSET = bottomInset + 76;
+  const HALF_TOTAL = PANEL_HEIGHT_HALF + BAR_OFFSET;
+  const FULL_TOTAL = PANEL_HEIGHT_FULL + BAR_OFFSET;
+  const CLOSED_Y = FULL_TOTAL;
 
-  const translateY = useRef(new Animated.Value(PANEL_HEIGHT + 200)).current;
+  // ★ Snap point state — 'half' varsayılan, 'full' yukarı swipe ile
+  const [expanded, setExpanded] = useState(false);
+  const expandedRef = useRef(false);
+  useEffect(() => { expandedRef.current = expanded; }, [expanded]);
+
+  // ★ Animate height — Instagram yorumları tarzı smooth transition
+  const heightAnim = useRef(new Animated.Value(HALF_TOTAL)).current;
+  useEffect(() => {
+    Animated.spring(heightAnim, {
+      toValue: expanded ? FULL_TOTAL : HALF_TOTAL,
+      useNativeDriver: false,
+      damping: 22,
+      stiffness: 220,
+    }).start();
+  }, [expanded, HALF_TOTAL, FULL_TOTAL]);
+
+  const translateY = useRef(new Animated.Value(FULL_TOTAL + 200)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
   const inputRef = useRef<TextInput>(null);
 
+  // ★ 2026-04-23: Internal mount state — parent visible=false olunca hemen unmount
+  //   yerine, kapanış animasyonu bitince unmount. Aksi halde modal kesik görünür.
+  const [mounted, setMounted] = useState(visible);
+
+  // Drawer kapanırken snap'i half'e sıfırla ki tekrar açılışta half başlasın
   useEffect(() => {
-    if (!visible) translateY.setValue(CLOSED_Y);
-  }, [CLOSED_Y, visible]);
+    if (!visible) setExpanded(false);
+  }, [visible]);
 
   // Drawer kapanınca emoji picker'ı da sıfırla
   useEffect(() => {
@@ -77,38 +107,59 @@ export default function RoomChatDrawer({
 
   useEffect(() => {
     if (visible) {
+      setMounted(true);
       Animated.parallel([
-        Animated.spring(translateY, { toValue: 0, useNativeDriver: true, damping: 20, stiffness: 200 }),
+        Animated.spring(translateY, { toValue: 0, useNativeDriver: false, damping: 20, stiffness: 200 }),
         Animated.timing(backdropOpacity, { toValue: 1, duration: 200, useNativeDriver: true }),
       ]).start();
-    } else {
+    } else if (mounted) {
       Animated.parallel([
-        Animated.timing(translateY, { toValue: CLOSED_Y, duration: 200, useNativeDriver: true }),
-        Animated.timing(backdropOpacity, { toValue: 0, duration: 200, useNativeDriver: true }),
-      ]).start();
+        Animated.timing(translateY, { toValue: CLOSED_Y, duration: 220, useNativeDriver: false }),
+        Animated.timing(backdropOpacity, { toValue: 0, duration: 220, useNativeDriver: true }),
+      ]).start(({ finished }) => {
+        if (finished) setMounted(false);
+      });
     }
   }, [visible]);
 
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => false,
-      onMoveShouldSetPanResponder: (_, gs) => gs.dy > 6 && Math.abs(gs.dy) > Math.abs(gs.dx),
+      // Hem yukarı hem aşağı swipe'ı yakala
+      onMoveShouldSetPanResponder: (_, gs) => Math.abs(gs.dy) > 6 && Math.abs(gs.dy) > Math.abs(gs.dx),
       onPanResponderMove: (_, gs) => {
-        if (gs.dy > 0) translateY.setValue(gs.dy);
+        // Sadece aşağı drag sırasında translateY ile görsel feedback (kapatma önizlemesi);
+        // yukarı drag'de state/height animasyonu release'te karar verir, drag sırasında hareketsiz.
+        if (gs.dy > 0 && !expandedRef.current) {
+          translateY.setValue(gs.dy);
+        }
       },
       onPanResponderRelease: (_, gs) => {
-        if (gs.dy > 80 || gs.vy > 0.5) {
-          Animated.timing(translateY, { toValue: CLOSED_Y, duration: 200, useNativeDriver: true }).start(() => {
+        const isUp = gs.dy < -30 || gs.vy < -0.5;
+        const isDown = gs.dy > 60 || gs.vy > 0.5;
+
+        if (isUp && !expandedRef.current) {
+          // Yukarı swipe + half → full
+          setExpanded(true);
+          Animated.spring(translateY, { toValue: 0, useNativeDriver: false, damping: 20, stiffness: 200 }).start();
+        } else if (isDown && expandedRef.current) {
+          // Aşağı swipe + full → half
+          setExpanded(false);
+          Animated.spring(translateY, { toValue: 0, useNativeDriver: false, damping: 20, stiffness: 200 }).start();
+        } else if (isDown && !expandedRef.current) {
+          // Aşağı swipe + half → kapat
+          Animated.timing(translateY, { toValue: CLOSED_Y, duration: 200, useNativeDriver: false }).start(() => {
             onClose();
           });
         } else {
-          Animated.spring(translateY, { toValue: 0, useNativeDriver: true, damping: 20, stiffness: 200 }).start();
+          // Eşik altı — mevcut state'e snap
+          Animated.spring(translateY, { toValue: 0, useNativeDriver: false, damping: 20, stiffness: 200 }).start();
         }
       },
     })
   ).current;
 
-  if (!visible) return null;
+  if (!mounted) return null;
 
   const renderMessage = ({ item }: { item: ChatMsg }) => {
     if (!item) return null;
@@ -154,12 +205,14 @@ export default function RoomChatDrawer({
         style={[
           s.panel,
           {
-            height: PANEL_HEIGHT + BAR_OFFSET,
+            height: heightAnim,
             paddingBottom: BAR_OFFSET,
             transform: [{ translateY }],
           },
         ]}
       >
+        {/* ★ DM panel paleti — aynı görsel dil */}
+        <LinearGradient colors={['#4a5668', '#37414f', '#232a35']} locations={[0, 0.35, 1]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[StyleSheet.absoluteFillObject, { borderTopLeftRadius: 20, borderTopRightRadius: 20 }]} />
 
         <View {...panResponder.panHandlers}>
           <View style={s.handle}>
@@ -267,8 +320,12 @@ const s = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: 1,
     borderBottomWidth: 0,
-    borderColor: 'rgba(255,255,255,0.08)',
-    backgroundColor: '#0F1929',
+    borderColor: '#95a1ae',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    elevation: 20,
   },
   handle: {
     alignItems: 'center',
@@ -285,9 +342,10 @@ const s = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     paddingHorizontal: 14,
-    paddingBottom: 10,
+    paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: 'rgba(20,184,166,0.06)',
   },
   headerIconShadow: {},
   headerTitle: {

@@ -168,19 +168,18 @@ export interface RoomLimits {
 
 export const ROOM_TIER_LIMITS: Record<SubscriptionTier, RoomLimits> = {
   Free: {
-    maxSpeakers: 4,
-    maxListeners: 10,
-    maxSpectators: 50,
-    maxCameras: 2,
-    // ★ 2026-04-22: Clubhouse/X Spaces referansı — Free tier rekabetçi kılındı.
-    //   maxModerators 0→1 (1 asistan), durationHours 2→4, dailyRooms 3→10,
-    //   allowedTypes'a 'closed' eklendi (davetli hala Plus+ kilit).
-    maxModerators: 1,
-    durationHours: 4,
-    dailyRooms: 10,
+    // ★ 2026-04-22 (v2): Free daraltıldı — tat-al-geç stratejisi, Plus'a belirgin teşvik.
+    //   Günlük 3 oda, oda başına 3 saat, tek kamera, moderatör yok, sadece 'open' tip.
+    maxSpeakers: 3,
+    maxListeners: 8,
+    maxSpectators: 20,
+    maxCameras: 1,
+    maxModerators: 0,
+    durationHours: 3,
+    dailyRooms: 3,
     persistent: false,
     maxPersistentRooms: 0,
-    allowedTypes: ['open', 'closed'] as readonly string[],
+    allowedTypes: ['open'] as readonly string[],
     audioSampleRate: 16000,
     audioChannels: 1,
     videoMaxRes: 480,

@@ -21,6 +21,7 @@ import FriendsDrawer from '../../components/FriendsDrawer';
 import NotificationBell from '../../components/NotificationBell';
 import DiscoverWelcomeSheet, { hasSeenDiscoverWelcome } from '../../components/DiscoverWelcomeSheet';
 import FABHintOverlay, { hasSeenFABHint } from '../../components/FABHintOverlay';
+import QuickCreateSheet from '../../components/QuickCreateSheet';
 import { ReportModal } from '../../components/ReportModal';
 import TabBarFadeOut from '../../components/TabBarFadeOut';
 import { CATEGORY_THEME } from '../../constants/categoryTheme';
@@ -842,6 +843,35 @@ export default function HomeScreen() {
   // ★ 2026-04-21: İlk kez keşfet açanlar için welcome sheet (3 slide tanıtım).
   const [showWelcome, setShowWelcome] = useState(false);
   const [showFABHint, setShowFABHint] = useState(false);
+  // ★ 2026-04-22: Quick-create sheet — FAB ve empty state chip'lerinden tetiklenir.
+  const [showQuickCreate, setShowQuickCreate] = useState(false);
+  const [creatingRoom, setCreatingRoom] = useState(false);
+
+  // Hızlı oda açma: limit check → RoomService.quickCreate → navigate.
+  // category null ise generic "{ad}'in Odası", kategori varsa o tipte isim üretilir.
+  // ★ 2026-04-23: Hızlı akışta limit dolu → kısa toast + direkt /plus (satın alma).
+  //   Detaylı akışla FARKLI: kullanıcı "hızlı" başlatıyor, ara limit ekranı yerine
+  //   doğrudan çözüm sayfasına gitsin.
+  const handleQuickCreate = async (category?: string) => {
+    if (!firebaseUser || creatingRoom) return;
+    setCreatingRoom(true);
+    try {
+      const userTier = getEffectiveTier(profile);
+      const gate = await RoomService.canCreateToday(firebaseUser.uid, userTier);
+      if (!gate.ok) {
+        showToast({ title: 'Günlük Limit Doldu', message: `Üyeliğini yükselterek limitsiz oda aç.`, type: 'warning' });
+        setTimeout(() => router.push('/plus' as any), 400);
+        return;
+      }
+      const displayName = profile?.display_name || firebaseUser.displayName || 'Kullanıcı';
+      const room = await RoomService.quickCreate(firebaseUser.uid, displayName, category, userTier);
+      router.push(`/room/${room.id}` as any);
+    } catch (err: any) {
+      showToast({ title: 'Oda Açılamadı', message: err?.message || 'Beklenmedik hata', type: 'error' });
+    } finally {
+      setCreatingRoom(false);
+    }
+  };
   // ★ 2026-04-22 FIX v3: İki tetikleyici
   //   (a) justCompletedOnboarding → onboarding'i yeni bitirdi, intro GARANTILI aç
   //       (AsyncStorage bağımsız; re-install/new device sorunsuz)
@@ -1152,6 +1182,15 @@ export default function HomeScreen() {
     );
   }
 
+  // ★ 2026-04-22: "Gerçekten boş" durumu — filtreler ve FAB'ı gizlemek için.
+  //   Boşken pill/filtre/FAB üçlüsü kullanıcıya değer katmıyor; unified empty
+  //   kartındaki chip'ler zaten hem seçim hem aksiyon rolünü üstleniyor.
+  const isFullyEmpty =
+    !loadError &&
+    filteredRooms.length === 0 &&
+    activeFilter === 'all' &&
+    advancedFilters.length === 0;
+
   return (
     <AppBackground variant="explore">
       <View style={s.container}>
@@ -1239,7 +1278,9 @@ export default function HomeScreen() {
                         if (realRooms.length > 0) {
                           return `🎙️ ${realRooms.length} oda seni bekliyor — ilk katılan sen ol`;
                         }
-                        return `✨ Bugün ilk odayı sen aç`;
+                        // ★ 2026-04-22: Empty state kartı zaten "ilk sen çık" diyor;
+                        //   banner'da CTA tekrarı yerine nötr/bilgi tonu.
+                        return `🕯️ Sessiz bir an — yakında yeni yayınlar başlar`;
                       })()}
                     </Text>
                   </View>
@@ -1379,7 +1420,11 @@ export default function HomeScreen() {
                 />
               </View>
 
-              {/* ═══ Birleşik Filtre Satırı: Kategori chips + Filtre butonu ═══ */}
+              {/* ═══ Birleşik Filtre Satırı: Kategori chips + Filtre butonu
+                   ★ 2026-04-22: Ekran "gerçekten boş" ise filtrelemek mantıksız —
+                   pill tıklayınca sadece başka bir empty state açılır. Unified empty
+                   kartının chip'leri zaten kategori seçimi + oda oluşturmayı tek tapla yapıyor. */}
+              {!isFullyEmpty && (
               <View style={s.filterRow}>
                 <ScrollView
                   horizontal
@@ -1454,9 +1499,10 @@ export default function HomeScreen() {
                   )}
                 </Pressable>
               </View>
+              )}
 
               {/* ═══ Gelişmiş Filtre Paneli (açılır/kapanır) ═══ */}
-              {showAdvFilterPanel && (
+              {!isFullyEmpty && showAdvFilterPanel && (
                 <View style={s.advFilterPanel}>
                   <ScrollView
                     horizontal
@@ -1497,16 +1543,20 @@ export default function HomeScreen() {
                 </View>
               )}
 
-              {/* ═══ Şu An Canlı — Section Title + Gradient Accent ═══ */}
-              <View style={s.sectionTitleRow}>
-                <View style={s.sectionAccent} />
-                <Ionicons name="radio" size={16} color="#EF4444" />
-                <Text style={s.sectionTitle}>
-                  {activeFilter === 'all'
-                    ? 'Şu An Canlı'
-                    : `${SMART_FILTERS.find(f => f.id === activeFilter)?.label || ''} Odaları`}
-                </Text>
-              </View>
+              {/* ═══ Şu An Canlı — Section Title + Gradient Accent
+                   ★ 2026-04-22: Liste boşken başlığı gizle — "Şu An Canlı" + 0 oda
+                   yanıltıcı duruyordu. Empty state kendi başına anlatsın. */}
+              {(filteredRooms.length > 0 || loadError) && (
+                <View style={s.sectionTitleRow}>
+                  <View style={s.sectionAccent} />
+                  <Ionicons name="radio" size={16} color="#EF4444" />
+                  <Text style={s.sectionTitle}>
+                    {activeFilter === 'all'
+                      ? 'Şu An Canlı'
+                      : `${SMART_FILTERS.find(f => f.id === activeFilter)?.label || ''} Odaları`}
+                  </Text>
+                </View>
+              )}
             </>
           }
 
@@ -1553,22 +1603,32 @@ export default function HomeScreen() {
                 </Pressable>
               </LinearGradient>
             </View>
-          ) : (
+          ) : advancedFilters.length > 0 ? (
+            // ═══ Advanced filtre sonucu boş — kısa ve net mesaj ═══
+            <View style={s.heroEmptyCard}>
+              <LinearGradient
+                colors={['rgba(148,163,184,0.10)', 'rgba(100,116,139,0.05)']}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                style={s.heroEmptyGradient}
+              >
+                <View style={s.heroEmptyIconWrap}>
+                  <Ionicons name="filter" size={28} color="#94A3B8" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.heroEmptyTitle}>Filtre Sonucu Boş</Text>
+                  <Text style={s.heroEmptySub}>Seçili filtrelere uyan oda yok. Filtreleri değiştirmeyi dene.</Text>
+                </View>
+              </LinearGradient>
+            </View>
+          ) : activeFilter !== 'all' ? (
+            // ═══ Kategori seçili + boş → tek tap o kategoride quick-create ═══
             <Pressable
               style={s.heroEmptyCard}
-              onPress={async () => {
+              onPress={() => {
                 if (!firebaseUser) { router.push('/create-room'); return; }
-                const userTier = getEffectiveTier(profile);
-                try {
-                  const gate = await RoomService.canCreateToday(firebaseUser.uid, userTier);
-                  if (!gate.ok) {
-                    showToast({ title: 'Günlük Limit Doldu', message: `Bugün ${gate.count}/${gate.limit} oda açtın. Yarın tekrar dene veya üyeliğini yükselt.`, type: 'warning' });
-                    UpsellService.onDailyRoomLimit(userTier);
-                    return;
-                  }
-                } catch {}
-                router.push('/create-room');
+                handleQuickCreate(activeFilter);
               }}
+              disabled={creatingRoom}
             >
               <LinearGradient
                 colors={['rgba(20,184,166,0.15)', 'rgba(13,148,136,0.08)', 'rgba(6,95,86,0.05)']}
@@ -1579,24 +1639,77 @@ export default function HomeScreen() {
                   <Ionicons name="mic" size={32} color="#14B8A6" />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={s.heroEmptyTitle}>
-                    {advancedFilters.length > 0
-                      ? 'Filtre Sonucu Boş'
-                      : activeFilter === 'all'
-                        ? '✨ Sahne Seni Bekliyor'
-                        : 'Bu Kategoride İlk Ol'}
-                  </Text>
+                  <Text style={s.heroEmptyTitle}>Bu Kategoride İlk Ol</Text>
                   <Text style={s.heroEmptySub}>
-                    {advancedFilters.length > 0
-                      ? 'Seçili filtrelere uyan oda bulunamadı. Filtreleri değiştirmeyi deneyin.'
-                      : activeFilter === 'all'
-                        ? 'Günün ilk locasını kur ve sahnede yerini al. Herkes seni dinlesin!'
-                        : `İlk ${SMART_FILTERS.find(f => f.id === activeFilter)?.label || ''} odasını açarak öncü ol!`}
+                    {`İlk ${SMART_FILTERS.find(f => f.id === activeFilter)?.label || ''} odasını açarak öncü ol!`}
                   </Text>
                 </View>
                 <Ionicons name="add-circle" size={24} color="rgba(255,255,255,0.8)" />
               </LinearGradient>
             </Pressable>
+          ) : (
+            // ═══ 'all' + gerçekten boş → UNIFIED empty state
+            //     Tek büyük kart: başlık + 4 kategori chip (2x2 grid) + detay linki.
+            //     ★ 2026-04-22: önceki üç parçalı tasarım (hero kart + HIZLI BAŞLA başlık + chips)
+            //     aynı mesajı 3 kez tekrarlıyordu; artık tek bütünleşik blok. ═══
+            <View style={s.unifiedEmpty}>
+              <LinearGradient
+                colors={['rgba(20,184,166,0.12)', 'rgba(13,148,136,0.06)', 'rgba(15,23,42,0.02)']}
+                start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
+                style={s.unifiedEmptyGradient}
+              >
+                <View style={s.unifiedEmptyIconWrap}>
+                  <LinearGradient
+                    colors={['rgba(20,184,166,0.25)', 'rgba(13,148,136,0.10)']}
+                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                    style={s.unifiedEmptyIconGlow}
+                  >
+                    <Ionicons name="mic" size={40} color="#14B8A6" />
+                  </LinearGradient>
+                </View>
+
+                <Text style={s.unifiedEmptyTitle}>Sahne boş, ilk sen çık</Text>
+                <Text style={s.unifiedEmptySub}>Bir konu seç, tek tıkla yayına başla</Text>
+
+                {firebaseUser && (
+                  <View style={s.unifiedChipsGrid}>
+                    {[
+                      { id: 'chat',  label: 'Sohbet', icon: 'chatbubbles' as const,     color: '#3B82F6' },
+                      { id: 'music', label: 'Müzik',  icon: 'musical-notes' as const,   color: '#EC4899' },
+                      { id: 'game',  label: 'Oyun',   icon: 'game-controller' as const, color: '#A78BFA' },
+                      { id: 'tech',  label: 'Teknik', icon: 'code-slash' as const,      color: '#14B8A6' },
+                    ].map((chip) => (
+                      <Pressable
+                        key={chip.id}
+                        onPress={() => handleQuickCreate(chip.id)}
+                        disabled={creatingRoom}
+                        style={({ pressed }) => [
+                          s.unifiedChip,
+                          { borderColor: chip.color + '55', backgroundColor: chip.color + '14' },
+                          pressed && { transform: [{ scale: 0.96 }], backgroundColor: chip.color + '22' },
+                          creatingRoom && { opacity: 0.5 },
+                        ]}
+                      >
+                        <Ionicons name={chip.icon} size={22} color={chip.color} />
+                        <Text style={[s.unifiedChipText, { color: chip.color }]}>{chip.label}</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                )}
+
+                <Pressable
+                  onPress={() => {
+                    if (!firebaseUser) { router.push('/create-room'); return; }
+                    router.push('/create-room');
+                  }}
+                  style={({ pressed }) => [s.unifiedDetailLink, pressed && { opacity: 0.6 }]}
+                  hitSlop={8}
+                >
+                  <Text style={s.unifiedDetailLinkText}>veya detaylı ayarla</Text>
+                  <Ionicons name="chevron-forward" size={14} color="#94A3B8" />
+                </Pressable>
+              </LinearGradient>
+            </View>
           )}
 
           // ═══ Takip Ettiğin Odalar — Footer ═══
@@ -1664,10 +1777,23 @@ export default function HomeScreen() {
             });
           }}
         />
+        {/* ★ 2026-04-22: FAB gizliyken hint overlay'ini de göstermeyelim — boşlukta okla işaret eder. */}
         <FABHintOverlay
-          visible={showFABHint}
+          visible={showFABHint && !isFullyEmpty}
           bottomOffset={insets.bottom + BAR_BOTTOM_OFFSET}
           onDismiss={() => setShowFABHint(false)}
+        />
+
+        {/* ═══ Quick Create Sheet — FAB'dan açılır, 3 seçenekli
+             ★ 2026-04-23: bottomOffset=BAR_BOTTOM_OFFSET (84) — panel CurvedTabBar'ın üstünde kalır,
+             son seçenek ("Planla") kırpılmaz. Tabs dışında kullanılırsa 0 verilmeli. */}
+        <QuickCreateSheet
+          visible={showQuickCreate}
+          onClose={() => setShowQuickCreate(false)}
+          onQuickCreate={() => handleQuickCreate()}
+          onDetailedCreate={() => router.push('/create-room')}
+          bottomInset={insets.bottom}
+          bottomOffset={BAR_BOTTOM_OFFSET}
         />
 
         {/* ═══ Oda Bildirme Modal — swipe'dan tetiklenir ═══ */}
@@ -1686,31 +1812,31 @@ export default function HomeScreen() {
         {/* ═══ Floating Action Button — Yeni Oda Aç ═══
             ★ 2026-04-21: Ke\u015ffette prominent CTA yoktu; kullan\u0131c\u0131 ancak bo\u015f durumda
             oluştur butonunu görebiliyordu. FAB artık hep sağ-altta (tab bar üstünde). */}
-        <Pressable
-          style={({ pressed }) => [s.fab, { bottom: insets.bottom + BAR_BOTTOM_OFFSET }, pressed && { transform: [{ scale: 0.94 }] }]}
-          onPress={async () => {
-            if (!firebaseUser) { router.push('/create-room'); return; }
-            const userTier = getEffectiveTier(profile);
-            try {
-              const gate = await RoomService.canCreateToday(firebaseUser.uid, userTier);
-              if (!gate.ok) {
-                showToast({ title: 'Günlük Limit Doldu', message: `Bugün ${gate.count}/${gate.limit} oda açtın. Yarın tekrar dene veya üyeliğini yükselt.`, type: 'warning' });
-                UpsellService.onDailyRoomLimit(userTier);
-                return;
-              }
-            } catch {}
-            router.push('/create-room');
-          }}
-          hitSlop={8}
-        >
-          <LinearGradient
-            colors={['#14B8A6', '#0D9488', '#065F56']}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-            style={s.fabGradient}
+        {/* ★ 2026-04-22: Ekran "gerçekten boş" ise FAB gizlenir — unified empty
+             kartının chip'leri zaten öne çıkan büyük CTA. İçerik geldiğinde geri gelir. */}
+        {!isFullyEmpty && (
+          <Pressable
+            style={({ pressed }) => [s.fab, { bottom: insets.bottom + BAR_BOTTOM_OFFSET }, pressed && { transform: [{ scale: 0.94 }] }]}
+            onPress={() => {
+              if (!firebaseUser) { router.push('/create-room'); return; }
+              setShowQuickCreate(true);
+            }}
+            onLongPress={() => {
+              // ★ Uzun bas = direkt detaylı ayarla (klavyesiz power-user kısayolu)
+              if (!firebaseUser) { router.push('/create-room'); return; }
+              router.push('/create-room');
+            }}
+            hitSlop={8}
           >
-            <Ionicons name="add" size={30} color="#FFF" />
-          </LinearGradient>
-        </Pressable>
+            <LinearGradient
+              colors={['#14B8A6', '#0D9488', '#065F56']}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+              style={s.fabGradient}
+            >
+              <Ionicons name="add" size={30} color="#FFF" />
+            </LinearGradient>
+          </Pressable>
+        )}
       </View>
     </AppBackground>
   );
@@ -2212,6 +2338,92 @@ const s = StyleSheet.create({
     color: 'rgba(255,255,255,0.5)',
     marginTop: 3,
     lineHeight: 17,
+  },
+
+  // ═══ Unified Empty State — tek kart: başlık + 2x2 kategori chip grid + detay link ═══
+  unifiedEmpty: {
+    marginHorizontal: 16,
+    marginTop: 4,
+    marginBottom: 8,
+    borderRadius: 20,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(20,184,166,0.18)',
+  },
+  unifiedEmptyGradient: {
+    paddingVertical: 28,
+    paddingHorizontal: 18,
+    alignItems: 'center',
+  },
+  unifiedEmptyIconWrap: {
+    marginBottom: 14,
+  },
+  unifiedEmptyIconGlow: {
+    width: 84,
+    height: 84,
+    borderRadius: 42,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(20,184,166,0.25)',
+  },
+  unifiedEmptyTitle: {
+    fontSize: 19,
+    fontWeight: '800',
+    color: '#F1F5F9',
+    letterSpacing: 0.2,
+    textAlign: 'center',
+    marginBottom: 6,
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  unifiedEmptySub: {
+    fontSize: 13,
+    color: '#94A3B8',
+    textAlign: 'center',
+    lineHeight: 18,
+    marginBottom: 18,
+    paddingHorizontal: 8,
+  },
+  unifiedChipsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    width: '100%',
+    justifyContent: 'center',
+  },
+  unifiedChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    borderRadius: 14,
+    borderWidth: 1.2,
+    flexGrow: 1,
+    flexBasis: '45%',
+    justifyContent: 'center',
+    minHeight: 52,
+  },
+  unifiedChipText: {
+    fontSize: 14,
+    fontWeight: '800',
+    letterSpacing: 0.2,
+  },
+  unifiedDetailLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 18,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+  },
+  unifiedDetailLinkText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#94A3B8',
+    letterSpacing: 0.2,
   },
 
   // ═══ Takip Edilen Oda — Premium Horizontal Card ═══

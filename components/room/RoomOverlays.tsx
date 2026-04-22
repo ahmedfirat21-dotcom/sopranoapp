@@ -374,19 +374,25 @@ export function PlusMenu({
     })
   ).current;
 
+  // ★ 2026-04-23: Internal mount — kapanış animasyonu bitince unmount, aksi halde kesik görünür
+  const [mounted, setMounted] = useState(visible);
+
   useEffect(() => {
     if (visible) {
+      setMounted(true);
       Animated.parallel([
         Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true, damping: 18, stiffness: 180 }),
         Animated.spring(compactSlideY, { toValue: 0, useNativeDriver: true, damping: 20, stiffness: 200 }),
         Animated.timing(fadeAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
       ]).start();
-    } else {
+    } else if (mounted) {
       Animated.parallel([
-        Animated.spring(slideAnim, { toValue: PANEL_W, useNativeDriver: true, damping: 18, stiffness: 200 }),
-        Animated.timing(compactSlideY, { toValue: 300, duration: 200, useNativeDriver: true }),
-        Animated.timing(fadeAnim, { toValue: 0, duration: 150, useNativeDriver: true }),
-      ]).start();
+        Animated.timing(slideAnim, { toValue: PANEL_W, duration: 220, useNativeDriver: true }),
+        Animated.timing(compactSlideY, { toValue: 300, duration: 220, useNativeDriver: true }),
+        Animated.timing(fadeAnim, { toValue: 0, duration: 220, useNativeDriver: true }),
+      ]).start(({ finished }) => {
+        if (finished) setMounted(false);
+      });
       setExpandedId(null);
     }
   }, [visible]);
@@ -405,7 +411,7 @@ export function PlusMenu({
     });
   }, []);
 
-  if (!visible) return null;
+  if (!mounted) return null;
 
   const isOwner = userRole === 'owner';
   const isMod = userRole === 'moderator';
@@ -910,7 +916,7 @@ export function PlusMenu({
                   ]}
                 >
                   <View style={s.iconCircle}>
-                    <Ionicons name={item.icon as any} size={IS_SMALL_SCREEN ? 14 : 16} color={item.destructive ? '#EF4444' : item.accent} style={s.iconShadow} />
+                    <Ionicons name={item.icon as any} size={IS_SMALL_SCREEN ? 18 : 20} color={item.destructive ? '#EF4444' : item.accent} style={s.iconShadow} />
                   </View>
                   <View style={s.rowText}>
                     <Text style={[s.rowLabel, item.destructive && { color: '#EF4444' }]} numberOfLines={1}>{item.label}</Text>
@@ -1002,17 +1008,21 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
   },
   row: {
-    flexDirection: 'row', alignItems: 'center', gap: IS_SMALL_SCREEN ? 7 : 10,
-    paddingVertical: IS_SMALL_SCREEN ? 9 : 11, paddingHorizontal: IS_SMALL_SCREEN ? 10 : 12,
+    flexDirection: 'row', alignItems: 'center', gap: IS_SMALL_SCREEN ? 10 : 12,
+    paddingVertical: IS_SMALL_SCREEN ? 13 : 15, paddingHorizontal: IS_SMALL_SCREEN ? 12 : 14,
   },
   rowPressed: { backgroundColor: 'rgba(20,184,166,0.08)' },
   rowExpanded: { backgroundColor: 'rgba(255,255,255,0.03)' },
   rowBorder: { borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.04)' },
-  iconCircle: { width: IS_SMALL_SCREEN ? 26 : 30, height: IS_SMALL_SCREEN ? 26 : 30, justifyContent: 'center', alignItems: 'center' },
+  iconCircle: {
+    width: IS_SMALL_SCREEN ? 34 : 38, height: IS_SMALL_SCREEN ? 34 : 38,
+    borderRadius: IS_SMALL_SCREEN ? 17 : 19,
+    justifyContent: 'center', alignItems: 'center',
+  },
   iconShadow: { textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 3 },
   rowText: { flex: 1 },
-  rowLabel: { fontSize: 12, fontWeight: '600', color: '#F1F5F9', letterSpacing: 0.1, textShadowColor: 'rgba(0,0,0,0.45)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
-  rowDesc: { fontSize: 9, color: '#64748B', marginTop: 1, textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
+  rowLabel: { fontSize: 14, fontWeight: '600', color: '#F1F5F9', letterSpacing: 0.1, textShadowColor: 'rgba(0,0,0,0.45)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
+  rowDesc: { fontSize: 11, color: '#64748B', marginTop: 2, textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
   badge: { minWidth: 18, height: 18, borderRadius: 9, backgroundColor: '#14B8A6', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 5 },
   badgeText: { fontSize: 9, fontWeight: '800', color: '#FFF', textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 1 },
   subRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 9, paddingHorizontal: 10 },

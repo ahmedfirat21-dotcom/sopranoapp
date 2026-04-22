@@ -3,7 +3,7 @@
  * Sağdan açılan sohbet-drawer tarzı panel — tüm oda kullanıcıları
  * ★ Sağa sürükleyerek kapatma özelliği (DM panel ile aynı useSwipeToDismiss pattern)
  */
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, ScrollView, Pressable, Image, Animated, StyleSheet, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -35,10 +35,8 @@ export default function AudienceDrawer({ visible, users, onClose, onSelectUser, 
   const slideAnim = useRef(new Animated.Value(W)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
-  // W değişirse (rotate vb.) slideAnim'i kapalı konuma sıfırla
-  useEffect(() => {
-    if (!visible) slideAnim.setValue(PANEL_W);
-  }, [PANEL_W, visible, slideAnim]);
+  // ★ 2026-04-23: Internal mount — kapanış animasyonu bitince unmount, aksi halde kesik görünür
+  const [mounted, setMounted] = useState(visible);
 
   // ★ Sağa sürükleyerek kapatma — DM panel ile aynı pattern
   const { translateValue: swipeX, panHandlers } = useSwipeToDismiss({
@@ -49,19 +47,22 @@ export default function AudienceDrawer({ visible, users, onClose, onSelectUser, 
 
   useEffect(() => {
     if (visible) {
+      setMounted(true);
       Animated.parallel([
         Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true, damping: 18, stiffness: 180 }),
         Animated.timing(fadeAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
       ]).start();
-    } else {
+    } else if (mounted) {
       Animated.parallel([
-        Animated.spring(slideAnim, { toValue: PANEL_W, useNativeDriver: true, damping: 18, stiffness: 200 }),
-        Animated.timing(fadeAnim, { toValue: 0, duration: 150, useNativeDriver: true }),
-      ]).start();
+        Animated.timing(slideAnim, { toValue: PANEL_W, duration: 220, useNativeDriver: true }),
+        Animated.timing(fadeAnim, { toValue: 0, duration: 220, useNativeDriver: true }),
+      ]).start(({ finished }) => {
+        if (finished) setMounted(false);
+      });
     }
   }, [visible]);
 
-  if (!visible) return null;
+  if (!mounted) return null;
 
   // Rol sıralaması
   const roleOrder: Record<string, number> = { owner: 0, moderator: 1, speaker: 2, listener: 3 };
