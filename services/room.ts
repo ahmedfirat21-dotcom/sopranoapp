@@ -509,6 +509,10 @@ export const RoomService = {
       await supabase.from('room_mutes').delete().eq('room_id', roomId).eq('user_id', hostId);
     } catch { /* upsert hatası sessiz */ }
 
+    // ★ 2026-04-23: listener_count'u hemen senkronize et — aksi halde DB'de 0 kalır,
+    //   2 dakikalık zombie filter exemption sona erdiğinde keşfet odayı gizler.
+    await this.syncListenerCount(roomId);
+
     return data as Room;
   },
 
@@ -692,12 +696,17 @@ export const RoomService = {
     if (error) throw error;
 
     // Host'u owner olarak katılımcıya ekle
+    // NOT: insert'ten hemen sonra syncListenerCount çağırarak listener_count'u 1'e çekiyoruz —
+    // aksi halde keşfetteki zombie filter 2dk sonra odayı "0 kişili zombie" sanıp gizler.
     await supabase.from('room_participants').insert({
       room_id: (data as Room).id,
       user_id: hostId,
       role: 'owner',
       is_muted: false,
     });
+
+    // ★ 2026-04-23: listener_count = 1 (host) garantile
+    await this.syncListenerCount((data as Room).id);
 
     return data as Room;
   },
