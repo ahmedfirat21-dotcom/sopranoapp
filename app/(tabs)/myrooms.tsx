@@ -281,15 +281,10 @@ const skS = StyleSheet.create({
   },
 });
 
-// ★ 2026-04-23: Empty state artık quick-create chip'li — home'daki unified pattern.
-//   Statik resim + "odanız yok" metni → aksiyona yönlendiren 2x2 kategori grid'i.
-//   Chip tap → direkt ilgili kategoride oda aç; "detaylı ayarla" link ise full flow.
-function ManagedRoomsEmptyCard({ onQuickCreate, onDetailed, creating, showChips }: {
-  onQuickCreate: (category: string) => void;
-  onDetailed: () => void;
-  creating: boolean;
-  showChips: boolean;
-}) {
+// ★ Sadece boş durumu temsil eder — non-empty render'ı FlatList yapıyor.
+//   Üst CTA "Yeni Oda Oluştur" zaten quick-create sheet açıyor, bu kart sadece
+//   bilgilendirici statik empty state (mic resmi + "Henüz odanız yok" mesajı).
+function ManagedRoomsEmptyCard() {
   return (
     <>
       <View style={mrS.sectionRow}>
@@ -299,57 +294,15 @@ function ManagedRoomsEmptyCard({ onQuickCreate, onDetailed, creating, showChips 
       </View>
       <View style={mrS.emptyCard}>
         <LinearGradient
-          colors={['rgba(20,184,166,0.12)', 'rgba(13,148,136,0.06)', 'rgba(15,23,42,0.02)']}
-          start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
+          colors={['#4a5668', '#37414f', '#232a35']}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
           style={StyleSheet.absoluteFillObject}
         />
-
-        <View style={mrS.emptyIconGlow}>
-          <LinearGradient
-            colors={['rgba(20,184,166,0.25)', 'rgba(13,148,136,0.10)']}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-            style={StyleSheet.absoluteFillObject}
-          />
-          <Ionicons name="mic" size={36} color="#14B8A6" />
+        <Text style={mrS.emptyTitle}>Henüz bir odanız yok.{'\n'}İlk odanızı oluşturun!</Text>
+        <View style={mrS.emptyImageWrap}>
+          <Image source={require('../../assets/images/mock/empty_room_mic.png')} style={mrS.emptyImage} resizeMode="contain" />
         </View>
-
-        <Text style={mrS.emptyTitle}>İlk odanı aç, sahneye çık</Text>
-        <Text style={mrS.emptySub}>Konu seç, tek tıkla yayına başla</Text>
-
-        {showChips && (
-          <View style={mrS.emptyChipsGrid}>
-            {[
-              { id: 'chat',  label: 'Sohbet', icon: 'chatbubbles' as const,     color: '#3B82F6' },
-              { id: 'music', label: 'Müzik',  icon: 'musical-notes' as const,   color: '#EC4899' },
-              { id: 'game',  label: 'Oyun',   icon: 'game-controller' as const, color: '#A78BFA' },
-              { id: 'tech',  label: 'Teknik', icon: 'code-slash' as const,      color: '#14B8A6' },
-            ].map((chip) => (
-              <Pressable
-                key={chip.id}
-                onPress={() => onQuickCreate(chip.id)}
-                disabled={creating}
-                style={({ pressed }) => [
-                  mrS.emptyChip,
-                  { borderColor: chip.color + '55', backgroundColor: chip.color + '14' },
-                  pressed && { transform: [{ scale: 0.96 }], backgroundColor: chip.color + '22' },
-                  creating && { opacity: 0.5 },
-                ]}
-              >
-                <Ionicons name={chip.icon} size={20} color={chip.color} />
-                <Text style={[mrS.emptyChipText, { color: chip.color }]}>{chip.label}</Text>
-              </Pressable>
-            ))}
-          </View>
-        )}
-
-        <Pressable
-          onPress={onDetailed}
-          style={({ pressed }) => [mrS.emptyDetailLink, pressed && { opacity: 0.6 }]}
-          hitSlop={8}
-        >
-          <Text style={mrS.emptyDetailLinkText}>veya detaylı ayarla</Text>
-          <Ionicons name="chevron-forward" size={13} color="#94A3B8" />
-        </Pressable>
+        <Text style={mrS.emptySub}>Sesli sohbet, müzik, oyun ve daha fazlası...</Text>
       </View>
     </>
   );
@@ -368,45 +321,16 @@ const mrS = StyleSheet.create({
     paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8,
   },
   emptyCard: {
-    marginHorizontal: 16, paddingVertical: 26, paddingHorizontal: 18, borderRadius: 20,
-    borderWidth: 1, borderColor: 'rgba(20,184,166,0.18)',
+    marginHorizontal: 16, padding: 20, borderRadius: 18,
+    borderWidth: 1, borderColor: Colors.cardBorder,
     overflow: 'hidden',
-    alignItems: 'center',
+    alignItems: 'center', gap: 10,
     ...Shadows.card,
   },
-  emptyIconGlow: {
-    width: 80, height: 80, borderRadius: 40,
-    justifyContent: 'center', alignItems: 'center',
-    overflow: 'hidden',
-    borderWidth: 1, borderColor: 'rgba(20,184,166,0.25)',
-    marginBottom: 14,
-  },
-  emptyTitle: {
-    fontSize: 18, fontWeight: '800', color: '#F1F5F9', textAlign: 'center',
-    letterSpacing: 0.2, marginBottom: 4,
-    textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
-  },
-  emptySub: {
-    fontSize: 12.5, color: '#94A3B8', textAlign: 'center',
-    lineHeight: 18, marginBottom: 16, paddingHorizontal: 8,
-  },
-  emptyChipsGrid: {
-    flexDirection: 'row', flexWrap: 'wrap', gap: 10,
-    width: '100%', justifyContent: 'center',
-  },
-  emptyChip: {
-    flexDirection: 'row', alignItems: 'center', gap: 9,
-    paddingHorizontal: 14, paddingVertical: 12, borderRadius: 14,
-    borderWidth: 1.2,
-    flexGrow: 1, flexBasis: '45%',
-    justifyContent: 'center', minHeight: 50,
-  },
-  emptyChipText: { fontSize: 13.5, fontWeight: '800', letterSpacing: 0.2 },
-  emptyDetailLink: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    marginTop: 14, paddingVertical: 6, paddingHorizontal: 10,
-  },
-  emptyDetailLinkText: { fontSize: 12, fontWeight: '600', color: '#94A3B8', letterSpacing: 0.2 },
+  emptyTitle: { fontSize: 14, fontWeight: '700', color: '#F1F5F9', textAlign: 'center', lineHeight: 20 },
+  emptyImageWrap: { width: 120, height: 120, alignItems: 'center', justifyContent: 'center' },
+  emptyImage: { width: '100%', height: '100%' },
+  emptySub: { fontSize: 12, color: '#94A3B8', textAlign: 'center' },
 });
 
 const mS = StyleSheet.create({
@@ -1479,17 +1403,7 @@ export default function MyRoomsScreen() {
             )}
           </>
         }
-        ListEmptyComponent={loading ? <SkeletonList count={3} /> : (
-          <ManagedRoomsEmptyCard
-            showChips={!!firebaseUser}
-            creating={creatingRoom}
-            onQuickCreate={(cat) => handleQuickCreate(cat)}
-            onDetailed={() => {
-              if (!firebaseUser) return;
-              router.push('/create-room');
-            }}
-          />
-        )}
+        ListEmptyComponent={loading ? <SkeletonList count={3} /> : <ManagedRoomsEmptyCard />}
         ListFooterComponent={
           <>
             {/* Son Girdiğin Odalar */}
