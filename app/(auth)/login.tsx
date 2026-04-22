@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import PremiumAlert from '../../components/PremiumAlert';
 import type { AlertButton } from '../../components/PremiumAlert';
 import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Shadows, Gradients, Radius } from '../../constants/theme';
 import { supabase } from '../../constants/supabase';
@@ -80,6 +81,8 @@ export default function LoginScreen() {
   // Animations
   const logoScale = useRef(new Animated.Value(0.85)).current;
   const logoOpacity = useRef(new Animated.Value(0)).current;
+  // ★ 2026-04-23: Blur-in animasyonu — BlurView overlay opacity 1→0 ile unblur efekti
+  const logoBlurOpacity = useRef(new Animated.Value(1)).current;
   const buttonsTranslateY = useRef(new Animated.Value(30)).current;
   const buttonsOpacity = useRef(new Animated.Value(0)).current;
   const statsOpacity = useRef(new Animated.Value(0)).current;
@@ -113,9 +116,17 @@ export default function LoginScreen() {
     })();
 
     // Staggered entrance animations
+    // ★ Logo: fade-in + scale-in (0.85→1) + blur-out (overlay opacity 1→0) paralel.
+    //   Blur kaybolurken logo "odaklanıyormuş" hissi — premium reveal.
     Animated.parallel([
-      Animated.timing(logoOpacity, { toValue: 1, duration: 600, useNativeDriver: true }),
+      Animated.timing(logoOpacity, { toValue: 1, duration: 700, useNativeDriver: true }),
       Animated.spring(logoScale, { toValue: 1, friction: 8, tension: 50, useNativeDriver: true }),
+      Animated.timing(logoBlurOpacity, {
+        toValue: 0,
+        duration: 900,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
     ]).start();
 
     setTimeout(() => {
@@ -360,9 +371,19 @@ export default function LoginScreen() {
           <View style={s.content}>
             {/* ═══ LOGO ═══ */}
             <Animated.View style={[s.logoSection, { opacity: logoOpacity, transform: [{ scale: logoScale }] }]}>
-              {/* ★ 2026-04-23: Eski logo.png'de "Senin Sesin" tagline'ı vardı, clip ile kırpılıyordu.
-                   Yeni logo sadece "SopranoChat" wordmark — clip kaldırıldı, tam görünür. */}
-              <Image source={require('../../assets/logo.png')} style={s.logoImage} resizeMode="contain" />
+              {/* ★ 2026-04-23: Logo reveal — BlurView overlay opacity 1→0 ile unblur animasyonu.
+                   Logo açılırken odak dışından odağa geliyormuş hissi. */}
+              <View style={s.logoWrap}>
+                <Image source={require('../../assets/logo.png')} style={s.logoImage} resizeMode="contain" />
+                <Animated.View style={[StyleSheet.absoluteFillObject, { opacity: logoBlurOpacity }]} pointerEvents="none">
+                  <BlurView
+                    intensity={35}
+                    tint="dark"
+                    experimentalBlurMethod="dimezisBlurView"
+                    style={StyleSheet.absoluteFillObject}
+                  />
+                </Animated.View>
+              </View>
             </Animated.View>
 
             {/* ═══ STAT PILLS ═══ */}
@@ -599,8 +620,10 @@ const s = StyleSheet.create({
 
   // ═══ LOGO ═══
   logoSection: { alignItems: 'center', marginBottom: 32, marginTop: SCREEN_HEIGHT * 0.02 },
-  // ★ Logo oranı ~4.5:1 — genişliği 260 olunca doğal yüksekliği ~58. resizeMode:contain ile fit.
-  logoImage: { width: 260, height: 60 },
+  // ★ 2026-04-23: Logo 260→320 büyütüldü, ~4.5:1 oranla yüksekliği 72.
+  //   logoWrap image boyutuyla eşit → BlurView overlay tam logo üstüne oturur, kenardan taşmaz.
+  logoWrap: { width: 320, height: 72 },
+  logoImage: { width: 320, height: 72 },
 
   // ═══ STAT PILLS ═══
   statsContainer: { alignItems: 'center', marginBottom: 40 },
