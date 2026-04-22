@@ -384,10 +384,6 @@ export default function LoginScreen() {
                   />
                 </Animated.View>
               </View>
-
-              {/* ★ Tagline — yeni logo.png'de yok, brand kimliği için alt başlık olarak eklendi.
-                   Aynı blur-in reveal'a dahil (logoSection opacity zaten kapsıyor). */}
-              <Text style={s.logoTagline}>SENİN SESİN</Text>
             </Animated.View>
 
             {/* ═══ STAT PILLS ═══ */}
@@ -628,17 +624,6 @@ const s = StyleSheet.create({
   //   logoWrap image boyutuyla eşit → BlurView overlay tam logo üstüne oturur, kenardan taşmaz.
   logoWrap: { width: 320, height: 72 },
   logoImage: { width: 320, height: 72 },
-  // ★ Tagline — wordmark'ın altında ince, letter-spaced, teal aksan (brand rengi)
-  logoTagline: {
-    marginTop: 8,
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 4,
-    color: '#5EEAD4',
-    textShadowColor: 'rgba(20,184,166,0.4)',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 6,
-  },
 
   // ═══ STAT PILLS ═══
   statsContainer: { alignItems: 'center', marginBottom: 40 },
