@@ -62,11 +62,21 @@ export default function RoomChatDrawer({
   visible, messages, chatInput, onChangeInput, onSend, onClose, bottomInset, onSendRaw,
 }: Props) {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  // ★ 2026-04-23 (v2): Klavye açıkken paddingBottom'ı sıfırla — aksi halde input,
+  //   control bar için ayrılan ~90px'in üstünde kalıp Samsung keyboard toolbar'ıyla
+  //   örtüşüyor ve kullanıcı yazamıyor. Klavye zaten control bar'ı örtüyor.
+  const [kbVisible, setKbVisible] = useState(false);
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardDidShow', () => setKbVisible(true));
+    const hide = Keyboard.addListener('keyboardDidHide', () => setKbVisible(false));
+    return () => { show.remove(); hide.remove(); };
+  }, []);
+
   // Panel control bar'ın arkasına kadar uzanır — tek sürekli yüzey.
   // Control bar room/[id].tsx tarafında zIndex: 60 ile panel'in önünde kalır.
-  // ★ 2026-04-23: 56→76 — input ile control bar arasına 20px nefes. Eskiden input
-  //   control bar'a yapışıktı, kötü görünüyordu.
-  const BAR_OFFSET = bottomInset + 76;
+  // Klavye açıkken: paddingBottom=0, input panel dibine (= klavye üstüne) tam otursun.
+  const BAR_OFFSET_DEFAULT = bottomInset + 76;
+  const BAR_OFFSET = kbVisible ? 0 : BAR_OFFSET_DEFAULT;
   const HALF_TOTAL = PANEL_HEIGHT_HALF + BAR_OFFSET;
   const FULL_TOTAL = PANEL_HEIGHT_FULL + BAR_OFFSET;
   const CLOSED_Y = FULL_TOTAL;
