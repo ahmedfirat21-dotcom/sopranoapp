@@ -1,10 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Image, Pressable, ActivityIndicator, TextInput, KeyboardAvoidingView, Platform, Dimensions, ScrollView, Animated, Easing, Linking, ImageBackground } from 'react-native';
+import { View, Text, StyleSheet, Image, Pressable, ActivityIndicator, TextInput, KeyboardAvoidingView, Platform, Dimensions, ScrollView, Animated, Easing, Linking } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import PremiumAlert from '../../components/PremiumAlert';
 import type { AlertButton } from '../../components/PremiumAlert';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Shadows, Gradients, Radius } from '../../constants/theme';
 import { supabase } from '../../constants/supabase';
@@ -81,8 +80,8 @@ export default function LoginScreen() {
   // Animations
   const logoScale = useRef(new Animated.Value(0.85)).current;
   const logoOpacity = useRef(new Animated.Value(0)).current;
-  // ★ 2026-04-23: Blur-in animasyonu — BlurView overlay opacity 1→0 ile unblur efekti
-  const logoBlurOpacity = useRef(new Animated.Value(1)).current;
+  // ★ 2026-04-23: Arka plan spotlight nefes — 0.55 ↔ 1.0 arasında yavaşça salınır (6s)
+  const glowOpacity = useRef(new Animated.Value(0.75)).current;
   const buttonsTranslateY = useRef(new Animated.Value(30)).current;
   const buttonsOpacity = useRef(new Animated.Value(0)).current;
   const statsOpacity = useRef(new Animated.Value(0)).current;
@@ -115,30 +114,38 @@ export default function LoginScreen() {
       }
     })();
 
-    // Staggered entrance animations
-    // ★ Logo: fade-in + scale-in (0.85→1) + blur-out (overlay opacity 1→0) paralel.
-    //   Blur kaybolurken logo "odaklanıyormuş" hissi — premium reveal.
+    // Staggered entrance animations — logo fade+scale
     Animated.parallel([
       Animated.timing(logoOpacity, { toValue: 1, duration: 700, useNativeDriver: true }),
       Animated.spring(logoScale, { toValue: 1, friction: 8, tension: 50, useNativeDriver: true }),
-      Animated.timing(logoBlurOpacity, {
-        toValue: 0,
-        duration: 900,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }),
     ]).start();
 
-    setTimeout(() => {
+    // ★ Arka plan spotlight — yavaşça nefes alan glow loop (6s döngü, 0.55 ↔ 1.0)
+    const glowLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(glowOpacity, { toValue: 1, duration: 3000, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+        Animated.timing(glowOpacity, { toValue: 0.55, duration: 3000, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+      ])
+    );
+    glowLoop.start();
+
+    const statsTimer = setTimeout(() => {
       Animated.timing(statsOpacity, { toValue: 1, duration: 400, useNativeDriver: true }).start();
     }, 300);
 
-    setTimeout(() => {
+    const buttonsTimer = setTimeout(() => {
       Animated.parallel([
         Animated.timing(buttonsOpacity, { toValue: 1, duration: 500, useNativeDriver: true }),
         Animated.timing(buttonsTranslateY, { toValue: 0, duration: 500, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
       ]).start();
     }, 500);
+
+    // ★ Cleanup — unmount'ta loop'u durdur, timer'ları iptal et
+    return () => {
+      glowLoop.stop();
+      clearTimeout(statsTimer);
+      clearTimeout(buttonsTimer);
+    };
   }, []);
 
   const handleGoogleLogin = async () => {
@@ -346,21 +353,45 @@ export default function LoginScreen() {
   };
 
   return (
-    <ImageBackground
-      source={require('../../assets/images/app_bg.jpg')}
-      style={s.root}
-      resizeMode="cover"
-    >
-      <KeyboardAvoidingView style={s.container} behavior={'padding'}>
-        {/* Vignette overlay for depth */}
+    <View style={s.root}>
+      {/* ═══ ARKA PLAN (PURE CODE — pürüssüz) ═══
+           Stacked LinearGradients: dikey base + sol-üst spotlight + köşe vignetting.
+           Spotlight Animated opacity/translate ile yavaşça dalgalanır. */}
+      <LinearGradient
+        colors={['#162844', '#1A2F4D', '#18294B', '#0F1D33', '#07101C']}
+        locations={[0, 0.28, 0.5, 0.78, 1]}
+        start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }}
+        style={StyleSheet.absoluteFillObject}
+        pointerEvents="none"
+      />
+      {/* Spotlight — sol-üst merkezli, animated opacity ile yavaşça nefes alır */}
+      <Animated.View
+        style={[StyleSheet.absoluteFillObject, { opacity: glowOpacity }]}
+        pointerEvents="none"
+      >
         <LinearGradient
-          colors={['rgba(15,25,38,0.6)', 'transparent', 'transparent', 'rgba(15,25,38,0.7)']}
-          locations={[0, 0.25, 0.7, 1]}
-          style={StyleSheet.absoluteFill}
-          pointerEvents="none"
+          colors={['rgba(180,200,225,0.12)', 'rgba(140,165,195,0.04)', 'transparent']}
+          locations={[0, 0.35, 0.75]}
+          start={{ x: 0.2, y: 0.2 }} end={{ x: 0.8, y: 0.9 }}
+          style={StyleSheet.absoluteFillObject}
         />
+      </Animated.View>
+      {/* Vignettes — 4 köşe */}
+      <LinearGradient
+        colors={['rgba(0,8,16,0.5)', 'transparent']}
+        start={{ x: 0, y: 0 }} end={{ x: 0.6, y: 0.6 }}
+        style={StyleSheet.absoluteFillObject}
+        pointerEvents="none"
+      />
+      <LinearGradient
+        colors={['transparent', 'rgba(0,8,16,0.6)']}
+        start={{ x: 0.4, y: 0.4 }} end={{ x: 1, y: 1 }}
+        style={StyleSheet.absoluteFillObject}
+        pointerEvents="none"
+      />
 
-        {/* Ambient teal glow — top */}
+      <KeyboardAvoidingView style={s.container} behavior={'padding'}>
+        {/* Ambient teal glow — top (brand aksan) */}
         <LinearGradient
           colors={['rgba(20,184,166,0.08)', 'rgba(20,184,166,0.03)', 'transparent']}
           style={s.ambientTop}
@@ -371,19 +402,9 @@ export default function LoginScreen() {
           <View style={s.content}>
             {/* ═══ LOGO ═══ */}
             <Animated.View style={[s.logoSection, { opacity: logoOpacity, transform: [{ scale: logoScale }] }]}>
-              {/* ★ 2026-04-23: Logo reveal — BlurView overlay opacity 1→0 ile unblur animasyonu.
-                   Logo açılırken odak dışından odağa geliyormuş hissi. */}
-              <View style={s.logoWrap}>
-                <Image source={require('../../assets/logo.png')} style={s.logoImage} resizeMode="contain" />
-                <Animated.View style={[StyleSheet.absoluteFillObject, { opacity: logoBlurOpacity }]} pointerEvents="none">
-                  <BlurView
-                    intensity={35}
-                    tint="dark"
-                    experimentalBlurMethod="dimezisBlurView"
-                    style={StyleSheet.absoluteFillObject}
-                  />
-                </Animated.View>
-              </View>
+              {/* Logo — fade+scale reveal ile sade açılır. (BlurView kaldırıldı: release'de bazı
+                   cihazlarda experimentalBlurMethod crash yapıyordu.) */}
+              <Image source={require('../../assets/logo.png')} style={s.logoImage} resizeMode="contain" />
             </Animated.View>
 
             {/* ═══ STAT PILLS ═══ */}
@@ -606,12 +627,12 @@ export default function LoginScreen() {
           ]}
         />
       </KeyboardAvoidingView>
-    </ImageBackground>
+    </View>
   );
 }
 
 const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#0F1926' },
+  root: { flex: 1, backgroundColor: '#0A1524' },
   container: { flex: 1 },
   contentContainer: { flexGrow: 1, justifyContent: 'center' },
   content: { paddingHorizontal: 30, paddingVertical: 40 },
@@ -620,9 +641,7 @@ const s = StyleSheet.create({
 
   // ═══ LOGO ═══
   logoSection: { alignItems: 'center', marginBottom: 32, marginTop: SCREEN_HEIGHT * 0.02 },
-  // ★ 2026-04-23: Logo 260→320 büyütüldü, ~4.5:1 oranla yüksekliği 72.
-  //   logoWrap image boyutuyla eşit → BlurView overlay tam logo üstüne oturur, kenardan taşmaz.
-  logoWrap: { width: 320, height: 72 },
+  // ★ 2026-04-23: Logo 320x72 — ~4.5:1 wordmark oranı, resizeMode:contain
   logoImage: { width: 320, height: 72 },
 
   // ═══ STAT PILLS ═══
