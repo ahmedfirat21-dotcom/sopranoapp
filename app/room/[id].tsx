@@ -1721,8 +1721,10 @@ export default function RoomScreen() {
       clearInterval(syncInterval);
 
       // ★ FEAT-3/4: Küçültme (minimize) sırasında odadan ÇIKMA, ses devam etsin
+      if (__DEV__) console.log(`[Room] CLEANUP — isMinimizing=${isMinimizingRef.current}`);
       if (isMinimizingRef.current) {
         isMinimizingRef.current = false;
+        if (__DEV__) console.log('[Room] CLEANUP — minimize mode, LiveKit korunuyor');
         return; // LiveKit bağlantısı + sahne korunur
       }
 

@@ -146,6 +146,7 @@ export default function useLiveKit({ roomId, enabled = true, userId, displayName
         reconnectTimerRef.current = null;
       }
       const shouldDisconnect = shouldDisconnectOnUnmount ? shouldDisconnectOnUnmount() : true;
+      if (__DEV__) console.log(`[useLiveKit] CLEANUP — shouldDisconnect=${shouldDisconnect}, roomId=${roomId}, enabled=${enabled}`);
       if (shouldDisconnect) {
         intentionalLeaveRef.current = true;
         liveKitService.disconnect();
@@ -153,6 +154,8 @@ export default function useLiveKit({ roomId, enabled = true, userId, displayName
         setParticipants([]);
         setIsMicEnabled(false);
         setIsCamEnabled(false);
+      } else {
+        if (__DEV__) console.log('[useLiveKit] CLEANUP SKIPPED — minimize modda, LiveKit korunuyor');
       }
     };
   }, [roomId, enabled, userId, displayName, shouldDisconnectOnUnmount]);

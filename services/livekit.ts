@@ -342,6 +342,10 @@ export class LiveKitService {
 
   // ─── Bağlantıyı Kes ──────────────────────────────────────
   async disconnect(): Promise<void> {
+    if (__DEV__) {
+      console.log('[LiveKit] ⚠️ DISCONNECT ÇAĞRILDI');
+      console.log('[LiveKit] Stack:', new Error().stack?.split('\n').slice(1, 5).join('\n'));
+    }
     // ★ Ekran paylaşımı açıksa önce temizle — referans sızıntısı önleme
     if (this.screenShareTrack || this.screenShareStream) {
       try { await this.stopScreenShare(); } catch { /* silent */ }
