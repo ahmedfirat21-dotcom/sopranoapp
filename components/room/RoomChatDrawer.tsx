@@ -90,18 +90,22 @@ export default function RoomChatDrawer({
   const expandedRef = useRef(false);
   useEffect(() => { expandedRef.current = expanded; }, [expanded]);
 
-  // ★ 2026-04-23 (v6): height yerine top pozisyonu — panel bottom:kbHeight'tan top'a uzar.
-  //   Bu sayede keyboard açılınca (bottom yukarı shift) panel otomatik shrink olur,
-  //   içerik flex ile yeniden dağıtılır. Input her zaman bottom'da görünür kalır.
+  // ★ 2026-04-23 (v7 — CLUBHOUSE): Panel WHOLE shift-up.
+  //   Klavye açılınca hem bottom (kbHeight) hem top (SCREEN_H - HALF - kbHeight)
+  //   YUKARI kayar. Böylece panel boyutu korunur, bir bütün olarak klavye üstüne
+  //   taşınır. Aksi halde top sabitken bottom yukarı giderse panel sıkışıyor.
+  const SAFE_TOP = Platform.OS === 'ios' ? 44 : 24;
   const topAnim = useRef(new Animated.Value(SCREEN_H - HALF_TOTAL)).current;
   useEffect(() => {
+    const baseTotal = expanded ? FULL_TOTAL : HALF_TOTAL;
+    const rawTop = SCREEN_H - baseTotal - kbHeight;
     Animated.spring(topAnim, {
-      toValue: expanded ? SCREEN_H - FULL_TOTAL : SCREEN_H - HALF_TOTAL,
+      toValue: Math.max(SAFE_TOP, rawTop),  // status bar'a yapışmasın
       useNativeDriver: false,
       damping: 22,
       stiffness: 220,
     }).start();
-  }, [expanded, HALF_TOTAL, FULL_TOTAL]);
+  }, [expanded, HALF_TOTAL, FULL_TOTAL, kbHeight]);
 
   const translateY = useRef(new Animated.Value(FULL_TOTAL + 200)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
