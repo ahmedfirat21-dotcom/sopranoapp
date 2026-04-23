@@ -130,6 +130,12 @@ export default function useLiveKit({ roomId, enabled = true, userId, displayName
     }
   }, [roomId, userId, displayName, qualityPreset, onPermissionDenied]);
 
+  // ★ 2026-04-24: Connect/reconnect — enabled/roomId/userId değişince bağlan.
+  //   Cleanup'ta disconnect YOK — disconnect sadece unmount'ta yapılır.
+  //   Bu, enabled değişikliğinin minimize sırasında disconnect tetiklemesini önler.
+  const enabledRef = useRef(enabled);
+  enabledRef.current = enabled;
+
   useEffect(() => {
     mountedRef.current = true;
     reconnectCountRef.current = 0;
@@ -139,6 +145,17 @@ export default function useLiveKit({ roomId, enabled = true, userId, displayName
     doConnect();
 
     return () => {
+      // Sadece reconnect timer'ı temizle, disconnect YAPMA
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = null;
+      }
+    };
+  }, [roomId, enabled, userId, displayName]);
+
+  // ★ Unmount-only cleanup — component tamamen kaldırıldığında disconnect
+  useEffect(() => {
+    return () => {
       mountedRef.current = false;
       connectingRef.current = false;
       if (reconnectTimerRef.current) {
@@ -146,7 +163,7 @@ export default function useLiveKit({ roomId, enabled = true, userId, displayName
         reconnectTimerRef.current = null;
       }
       const shouldDisconnect = shouldDisconnectOnUnmount ? shouldDisconnectOnUnmount() : true;
-      if (__DEV__) console.log(`[useLiveKit] CLEANUP — shouldDisconnect=${shouldDisconnect}, roomId=${roomId}, enabled=${enabled}`);
+      if (__DEV__) console.log(`[useLiveKit] UNMOUNT CLEANUP — shouldDisconnect=${shouldDisconnect}`);
       if (shouldDisconnect) {
         intentionalLeaveRef.current = true;
         liveKitService.disconnect();
@@ -155,10 +172,10 @@ export default function useLiveKit({ roomId, enabled = true, userId, displayName
         setIsMicEnabled(false);
         setIsCamEnabled(false);
       } else {
-        if (__DEV__) console.log('[useLiveKit] CLEANUP SKIPPED — minimize modda, LiveKit korunuyor');
+        if (__DEV__) console.log('[useLiveKit] UNMOUNT SKIPPED — minimize, LiveKit korunuyor');
       }
     };
-  }, [roomId, enabled, userId, displayName, shouldDisconnectOnUnmount]);
+  }, [shouldDisconnectOnUnmount]);
   
   // App Background/Foreground state handling
   useEffect(() => {
