@@ -222,10 +222,9 @@ export default function RoomChatDrawer({
         style={[
           s.panel,
           {
-            // ★ 2026-04-23 (v8 SIMPLE): bottom:kbHeight (klavye üstü) + fixed height.
-            // Panel her zaman aynı yükseklik, sadece aşağıdan yukarıya shift olur.
-            // Input panel dibinde sabit → klavye açılınca klavye üstünde görünür.
-            bottom: kbHeight,
+            // ★ 2026-04-23 (v9 — CLEAN): adjustResize'a güven. bottom:0, height:heightAnim.
+            // Input KAV ile klavye üstünde sabitlenir (absolute overlay).
+            bottom: 0,
             height: heightAnim,
             paddingBottom: BAR_OFFSET,
             transform: [{ translateY }],
@@ -258,70 +257,80 @@ export default function RoomChatDrawer({
           keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
         />
 
-        {/* ★ 2026-04-23 (v5): KAV kaldırıldı — panel translateY ile klavye üstüne
-             taşınıyor, KAV double-shift yaratıyordu. */}
-        <View>
-          {/* ★ Emoji & GIF picker — toggle ile input'un üstünde açılır (WhatsApp/Telegram pattern) */}
-          {showEmojiPicker && (
-            <View style={s.pickerWrap}>
-              <EmojiReactionBar
-                onReaction={(content: string) => {
-                  // GIF ([gif:...]) direkt gönderilir; normal emoji input'a eklenir
-                  if (content.startsWith('[gif:')) {
-                    onSendRaw?.(content);
-                    setShowEmojiPicker(false);
-                  } else {
-                    onChangeInput((chatInput || '') + content);
-                  }
-                }}
-                onClose={() => setShowEmojiPicker(false)}
-              />
-            </View>
-          )}
+      </Animated.View>
 
-          <View style={s.inputWrap}>
-            <Pressable
-              onPress={() => {
-                if (!showEmojiPicker) Keyboard.dismiss();
-                setShowEmojiPicker(v => !v);
+      {/* ★ 2026-04-23 (v9): Input ayrı bir absolute overlay — panel flex layout'una bağımlı değil.
+           bottom: kbHeight → her zaman klavyenin ÜSTÜNDE. Klavye kapalıyken BAR_OFFSET_DEFAULT (control bar üstü).
+           Panel height = heightAnim; content (header + FlatList) input'un arkasında akar. */}
+      <Animated.View
+        style={[
+          s.inputOverlay,
+          {
+            bottom: kbVisible ? kbHeight : BAR_OFFSET_DEFAULT,
+            // visible değilken off-screen gizle
+            opacity: visible ? 1 : 0,
+            transform: [{ translateY: visible ? 0 : 200 }],
+          },
+        ]}
+        pointerEvents={visible && mounted ? 'auto' : 'none'}
+      >
+        {showEmojiPicker && (
+          <View style={s.pickerWrap}>
+            <EmojiReactionBar
+              onReaction={(content: string) => {
+                if (content.startsWith('[gif:')) {
+                  onSendRaw?.(content);
+                  setShowEmojiPicker(false);
+                } else {
+                  onChangeInput((chatInput || '') + content);
+                }
               }}
-              style={s.emojiToggle}
-              hitSlop={6}
-              accessibilityLabel="Emoji ve GIF"
-            >
-              <Ionicons
-                name={showEmojiPicker ? 'close-outline' : 'happy-outline'}
-                size={22}
-                color={showEmojiPicker ? '#5CE1E6' : 'rgba(255,255,255,0.55)'}
-              />
-            </Pressable>
-            <TextInput
-              ref={inputRef}
-              style={s.input}
-              placeholder="Bir mesaj yaz..."
-              placeholderTextColor="rgba(255,255,255,0.3)"
-              value={chatInput}
-              onChangeText={onChangeInput}
-              onFocus={() => setShowEmojiPicker(false)}
-              maxLength={300}
-              returnKeyType="send"
-              blurOnSubmit={false}
-              onSubmitEditing={() => {
-                onSend();
-                inputRef.current?.focus();
-              }}
+              onClose={() => setShowEmojiPicker(false)}
             />
-            <Pressable
-              style={[s.sendBtn, !chatInput.trim() && { opacity: 0.35 }]}
-              onPress={() => {
-                onSend();
-                inputRef.current?.focus();
-              }}
-              disabled={!chatInput.trim()}
-            >
-              <Ionicons name="send" size={14} color="#FFF" />
-            </Pressable>
           </View>
+        )}
+        <View style={s.inputWrap}>
+          <Pressable
+            onPress={() => {
+              if (!showEmojiPicker) Keyboard.dismiss();
+              setShowEmojiPicker(v => !v);
+            }}
+            style={s.emojiToggle}
+            hitSlop={6}
+            accessibilityLabel="Emoji ve GIF"
+          >
+            <Ionicons
+              name={showEmojiPicker ? 'close-outline' : 'happy-outline'}
+              size={22}
+              color={showEmojiPicker ? '#5CE1E6' : 'rgba(255,255,255,0.55)'}
+            />
+          </Pressable>
+          <TextInput
+            ref={inputRef}
+            style={s.input}
+            placeholder="Bir mesaj yaz..."
+            placeholderTextColor="rgba(255,255,255,0.3)"
+            value={chatInput}
+            onChangeText={onChangeInput}
+            onFocus={() => setShowEmojiPicker(false)}
+            maxLength={300}
+            returnKeyType="send"
+            blurOnSubmit={false}
+            onSubmitEditing={() => {
+              onSend();
+              inputRef.current?.focus();
+            }}
+          />
+          <Pressable
+            style={[s.sendBtn, !chatInput.trim() && { opacity: 0.35 }]}
+            onPress={() => {
+              onSend();
+              inputRef.current?.focus();
+            }}
+            disabled={!chatInput.trim()}
+          >
+            <Ionicons name="send" size={14} color="#FFF" />
+          </Pressable>
         </View>
       </Animated.View>
     </>
@@ -329,6 +338,17 @@ export default function RoomChatDrawer({
 }
 
 const s = StyleSheet.create({
+  // ★ 2026-04-23 (v9): Input overlay — panel layout'undan bağımsız, absolute positioned,
+  //   `bottom: kbHeight|BAR_OFFSET_DEFAULT` ile klavye veya control bar üstünde sabitlenir.
+  inputOverlay: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    zIndex: 55,  // panel (50) üstünde ama backdrop altında
+    backgroundColor: '#232a35',  // panel gradient son tonu
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.08)',
+  },
   panel: {
     position: 'absolute',
     left: 0,
@@ -432,22 +452,18 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 10,
-    minHeight: 62,
-    // ★ Input barını belirgin hale getir — panel bg'ye karışmasın
-    backgroundColor: 'rgba(0,0,0,0.25)',
+    paddingHorizontal: 8,
+    paddingVertical: 8,
     borderTopWidth: 1,
     borderTopColor: 'rgba(255,255,255,0.06)',
   },
   input: {
     flex: 1,
-    height: 38,
-    borderRadius: 19,
-    // ★ 2026-04-23: Daha belirgin bg — eski rgba(0.06) pratik olarak invisible'dı
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: 'rgba(255,255,255,0.06)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.22)',
+    borderColor: 'rgba(255,255,255,0.08)',
     paddingHorizontal: 12,
     fontSize: 12,
     color: '#F1F5F9',
