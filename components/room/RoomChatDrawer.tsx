@@ -1,25 +1,19 @@
 /**
- * SopranoChat — Room Chat Drawer (bottom sheet)
- * Clubhouse backchannel pattern: alt barın arkasından yukarı kayar,
- * swipe-down ile kapanır. Sadece mesajlar — emoji/GIF ayrı EmojiDrawer'da.
+ * SopranoChat — Room Chat Drawer
+ * Clubhouse-style chat overlay. Full-screen modal, native keyboard handling.
+ * react-native-keyboard-controller KeyboardAvoidingView used for input lift.
  */
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, Animated, PanResponder, Pressable,
-  TextInput, FlatList, Image, Dimensions, Platform,
+  View, Text, StyleSheet, Animated, Pressable, TextInput,
+  FlatList, Image, Platform, PanResponder,
 } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getAvatarSource } from '../../constants/avatars';
 import { EmojiReactionBar } from '../EmojiReactions';
-
-const { height: SCREEN_H } = Dimensions.get('window');
-// ★ 2026-04-22: Instagram yorumları pattern'i — iki snap point.
-//   HALF: varsayılan açılış, ekranın yarısından biraz fazlası.
-//   FULL: yukarı swipe ile ekrana yayılır (status bar'a yakın).
-const PANEL_HEIGHT_HALF = Math.min(520, Math.floor(SCREEN_H * 0.72));
-const PANEL_HEIGHT_FULL = Math.floor(SCREEN_H * 0.92);
 
 interface ChatMsg {
   id: string;
@@ -55,116 +49,58 @@ interface Props {
   onSend: () => void;
   onClose: () => void;
   bottomInset: number;
-  /** Raw içerik gönder (input'u bypass). GIF'ler ve emoji reaksiyonlar için. */
   onSendRaw?: (content: string) => void;
 }
 
 export default function RoomChatDrawer({
-  visible, messages, chatInput, onChangeInput, onSend, onClose, bottomInset, onSendRaw,
+  visible, messages, chatInput, onChangeInput, onSend, onClose, onSendRaw,
 }: Props) {
-  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  // ★ 2026-04-23 (v11): react-native-keyboard-controller entegre edildi.
-  //   Tüm kendi hack'lerim (kbHeight state, auto-expand, Keyboard.addListener)
-  //   kaldırıldı. Library'nin KeyboardAvoidingView'ı input'u klavye üstüne kaldırır.
-  const BAR_OFFSET = bottomInset + 76;
-  const HALF_TOTAL = PANEL_HEIGHT_HALF + BAR_OFFSET;
-  const FULL_TOTAL = PANEL_HEIGHT_FULL + BAR_OFFSET;
-  const CLOSED_Y = FULL_TOTAL;
-
-  // ★ Snap point state — 'half' varsayılan, 'full' yukarı swipe ile
-  const [expanded, setExpanded] = useState(false);
-  const expandedRef = useRef(false);
-  useEffect(() => { expandedRef.current = expanded; }, [expanded]);
-
-  // ★ 2026-04-23 (v8 — SIMPLE): bottom + height, position:absolute.
-  //   Klavye shift'i `bottom: kbHeight` ile. topAnim yok — height fixed.
-  //   Input'un pozisyonu artık sadece bottom:kbHeight'e bağlı, layout hesabı
-  //   otomatik: panel bottom klavye üstünde, height sabit, input panel dibinde.
-  const heightAnim = useRef(new Animated.Value(HALF_TOTAL)).current;
-  useEffect(() => {
-    Animated.spring(heightAnim, {
-      toValue: expanded ? FULL_TOTAL : HALF_TOTAL,
-      useNativeDriver: false,
-      damping: 22,
-      stiffness: 220,
-    }).start();
-  }, [expanded, HALF_TOTAL, FULL_TOTAL]);
-
-  const translateY = useRef(new Animated.Value(FULL_TOTAL + 200)).current;
-  const backdropOpacity = useRef(new Animated.Value(0)).current;
+  const insets = useSafeAreaInsets();
   const inputRef = useRef<TextInput>(null);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
-  // ★ 2026-04-23: Internal mount state — parent visible=false olunca hemen unmount
-  //   yerine, kapanış animasyonu bitince unmount. Aksi halde modal kesik görünür.
+  // ── Mount + slide-in animation ──────────────────────────────
   const [mounted, setMounted] = useState(visible);
-
-  // Drawer kapanırken snap'i half'e sıfırla ki tekrar açılışta half başlasın
-  useEffect(() => {
-    if (!visible) setExpanded(false);
-  }, [visible]);
-
-  // Drawer kapanınca emoji picker'ı da sıfırla
-  useEffect(() => {
-    if (!visible) setShowEmojiPicker(false);
-  }, [visible]);
+  const slideY = useRef(new Animated.Value(1000)).current;
+  const backdropOpacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (visible) {
       setMounted(true);
       Animated.parallel([
-        Animated.spring(translateY, { toValue: 0, useNativeDriver: false, damping: 20, stiffness: 200 }),
+        Animated.spring(slideY, { toValue: 0, useNativeDriver: true, damping: 22, stiffness: 220 }),
         Animated.timing(backdropOpacity, { toValue: 1, duration: 200, useNativeDriver: true }),
       ]).start();
     } else if (mounted) {
       Animated.parallel([
-        Animated.timing(translateY, { toValue: CLOSED_Y, duration: 220, useNativeDriver: false }),
+        Animated.timing(slideY, { toValue: 1000, duration: 220, useNativeDriver: true }),
         Animated.timing(backdropOpacity, { toValue: 0, duration: 220, useNativeDriver: true }),
-      ]).start(({ finished }) => {
-        if (finished) setMounted(false);
-      });
+      ]).start(({ finished }) => { if (finished) setMounted(false); });
     }
   }, [visible]);
 
+  useEffect(() => { if (!visible) setShowEmojiPicker(false); }, [visible]);
+
+  // ── Swipe down to close (only from header area) ────────────
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => false,
-      // Hem yukarı hem aşağı swipe'ı yakala
-      onMoveShouldSetPanResponder: (_, gs) => Math.abs(gs.dy) > 6 && Math.abs(gs.dy) > Math.abs(gs.dx),
+      onMoveShouldSetPanResponder: (_, gs) => gs.dy > 10 && Math.abs(gs.dy) > Math.abs(gs.dx),
       onPanResponderMove: (_, gs) => {
-        // Sadece aşağı drag sırasında translateY ile görsel feedback (kapatma önizlemesi);
-        // yukarı drag'de state/height animasyonu release'te karar verir, drag sırasında hareketsiz.
-        if (gs.dy > 0 && !expandedRef.current) {
-          translateY.setValue(gs.dy);
-        }
+        if (gs.dy > 0) slideY.setValue(gs.dy);
       },
       onPanResponderRelease: (_, gs) => {
-        const isUp = gs.dy < -30 || gs.vy < -0.5;
-        const isDown = gs.dy > 60 || gs.vy > 0.5;
-
-        if (isUp && !expandedRef.current) {
-          // Yukarı swipe + half → full
-          setExpanded(true);
-          Animated.spring(translateY, { toValue: 0, useNativeDriver: false, damping: 20, stiffness: 200 }).start();
-        } else if (isDown && expandedRef.current) {
-          // Aşağı swipe + full → half
-          setExpanded(false);
-          Animated.spring(translateY, { toValue: 0, useNativeDriver: false, damping: 20, stiffness: 200 }).start();
-        } else if (isDown && !expandedRef.current) {
-          // Aşağı swipe + half → kapat
-          Animated.timing(translateY, { toValue: CLOSED_Y, duration: 200, useNativeDriver: false }).start(() => {
-            onClose();
-          });
+        if (gs.dy > 100 || gs.vy > 0.5) {
+          Animated.timing(slideY, { toValue: 1000, duration: 200, useNativeDriver: true })
+            .start(() => onClose());
         } else {
-          // Eşik altı — mevcut state'e snap
-          Animated.spring(translateY, { toValue: 0, useNativeDriver: false, damping: 20, stiffness: 200 }).start();
+          Animated.spring(slideY, { toValue: 0, useNativeDriver: true, damping: 22, stiffness: 220 }).start();
         }
       },
     })
   ).current;
 
-  if (!mounted) return null;
-
-  const renderMessage = ({ item }: { item: ChatMsg }) => {
+  const renderMessage = useCallback(({ item }: { item: ChatMsg }) => {
     if (!item) return null;
     if (item.isSystem) {
       return (
@@ -194,117 +130,129 @@ export default function RoomChatDrawer({
         </View>
       </View>
     );
-  };
+  }, []);
+
+  if (!mounted) return null;
 
   return (
     <>
-      <Animated.View style={[StyleSheet.absoluteFill, { zIndex: 48 }]}>
-        <Pressable style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.25)' }]} onPress={onClose}>
-          <Animated.View style={[StyleSheet.absoluteFill, { opacity: backdropOpacity }]} />
-        </Pressable>
+      {/* Backdrop */}
+      <Animated.View
+        style={[StyleSheet.absoluteFill, { zIndex: 48, opacity: backdropOpacity }]}
+        pointerEvents="box-none"
+      >
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
       </Animated.View>
 
+      {/* Full-screen chat panel — Clubhouse pattern */}
       <Animated.View
         style={[
           s.panel,
           {
-            // ★ 2026-04-23 (v9 — CLEAN): adjustResize'a güven. bottom:0, height:heightAnim.
-            // Input KAV ile klavye üstünde sabitlenir (absolute overlay).
-            bottom: 0,
-            height: heightAnim,
-            paddingBottom: BAR_OFFSET,
-            transform: [{ translateY }],
+            paddingTop: insets.top,
+            transform: [{ translateY: slideY }],
           },
         ]}
       >
-        {/* ★ DM panel paleti — aynı görsel dil */}
-        <LinearGradient colors={['#4a5668', '#37414f', '#232a35']} locations={[0, 0.35, 1]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[StyleSheet.absoluteFillObject, { borderTopLeftRadius: 20, borderTopRightRadius: 20 }]} />
-
-        <View {...panResponder.panHandlers}>
-          <View style={s.handle}>
-            <View style={s.handleBar} />
-          </View>
-
-          <View style={s.header}>
-            <Ionicons name="chatbubble-ellipses" size={18} color="#14B8A6" style={s.headerIconShadow} />
-            <Text style={s.headerTitle}>Oda Sohbeti</Text>
-          </View>
-        </View>
-
-        <FlatList
-          data={messages}
-          keyExtractor={(m, i) => m?.id || `msg_${i}`}
-          renderItem={renderMessage}
-          style={s.list}
-          inverted
-          contentContainerStyle={{ paddingVertical: 8, paddingHorizontal: 8, gap: 10 }}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-          keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+        <LinearGradient
+          colors={['#1a2332', '#0f1824', '#0a111c']}
+          locations={[0, 0.5, 1]}
+          start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }}
+          style={StyleSheet.absoluteFillObject}
         />
 
-        {/* ★ 2026-04-23 (v11 — KEYBOARD-CONTROLLER): react-native-keyboard-controller'ın
-             KeyboardAvoidingView'ı ile input klavye üstüne otomatik taşınır.
-             Native IME animation tracking, Samsung quirks handled. */}
-        <KeyboardAvoidingView behavior="padding" keyboardVerticalOffset={bottomInset}>
-        {showEmojiPicker && (
-          <View style={s.pickerWrap}>
-            <EmojiReactionBar
-              onReaction={(content: string) => {
-                if (content.startsWith('[gif:')) {
-                  onSendRaw?.(content);
-                  setShowEmojiPicker(false);
-                } else {
-                  onChangeInput((chatInput || '') + content);
-                }
-              }}
-              onClose={() => setShowEmojiPicker(false)}
-            />
+        {/* KAV — library, handles IME animation natively */}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1 }}
+        >
+          {/* Header with swipe-to-close — fixed at top */}
+          <View {...panResponder.panHandlers} collapsable={false}>
+            <View style={s.handle}>
+              <View style={s.handleBar} />
+            </View>
+            <View style={s.header}>
+              <Pressable onPress={onClose} style={s.headerBtn} hitSlop={12}>
+                <Ionicons name="chevron-down" size={22} color="#F1F5F9" />
+              </Pressable>
+              <View style={s.headerTitleWrap}>
+                <Ionicons name="chatbubble-ellipses" size={16} color="#14B8A6" />
+                <Text style={s.headerTitle}>Oda Sohbeti</Text>
+              </View>
+              <View style={s.headerBtn} />
+            </View>
           </View>
-        )}
-        <View style={s.inputWrap}>
-          <Pressable
-            onPress={() => {
-              if (!showEmojiPicker) Keyboard.dismiss();
-              setShowEmojiPicker(v => !v);
-            }}
-            style={s.emojiToggle}
-            hitSlop={6}
-            accessibilityLabel="Emoji ve GIF"
-          >
-            <Ionicons
-              name={showEmojiPicker ? 'close-outline' : 'happy-outline'}
-              size={22}
-              color={showEmojiPicker ? '#5CE1E6' : 'rgba(255,255,255,0.55)'}
-            />
-          </Pressable>
-          <TextInput
-            ref={inputRef}
-            style={s.input}
-            placeholder="Bir mesaj yaz..."
-            placeholderTextColor="rgba(255,255,255,0.3)"
-            value={chatInput}
-            onChangeText={onChangeInput}
-            onFocus={() => setShowEmojiPicker(false)}
-            maxLength={300}
-            returnKeyType="send"
-            blurOnSubmit={false}
-            onSubmitEditing={() => {
-              onSend();
-              inputRef.current?.focus();
-            }}
+
+          {/* Messages — inverted so new at bottom */}
+          <FlatList
+            data={messages}
+            keyExtractor={(m, i) => m?.id || `msg_${i}`}
+            renderItem={renderMessage}
+            style={s.list}
+            inverted
+            contentContainerStyle={s.listContent}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
           />
-          <Pressable
-            style={[s.sendBtn, !chatInput.trim() && { opacity: 0.35 }]}
-            onPress={() => {
-              onSend();
-              inputRef.current?.focus();
-            }}
-            disabled={!chatInput.trim()}
-          >
-            <Ionicons name="send" size={14} color="#FFF" />
-          </Pressable>
-        </View>
+
+          {/* Emoji picker (conditional) */}
+          {showEmojiPicker && (
+            <View style={s.pickerWrap}>
+              <EmojiReactionBar
+                onReaction={(content: string) => {
+                  if (content.startsWith('[gif:')) {
+                    onSendRaw?.(content);
+                    setShowEmojiPicker(false);
+                  } else {
+                    onChangeInput((chatInput || '') + content);
+                  }
+                }}
+                onClose={() => setShowEmojiPicker(false)}
+              />
+            </View>
+          )}
+
+          {/* Input bar — bottom, keyboard-aware via KAV */}
+          <View style={[s.inputBar, { paddingBottom: Math.max(insets.bottom, 8) }]}>
+            <Pressable
+              onPress={() => {
+                if (!showEmojiPicker) {
+                  inputRef.current?.blur();
+                }
+                setShowEmojiPicker(v => !v);
+              }}
+              style={s.iconBtn}
+              hitSlop={6}
+            >
+              <Ionicons
+                name={showEmojiPicker ? 'close-outline' : 'happy-outline'}
+                size={24}
+                color={showEmojiPicker ? '#5CE1E6' : 'rgba(255,255,255,0.55)'}
+              />
+            </Pressable>
+            <TextInput
+              ref={inputRef}
+              style={s.input}
+              placeholder="Bir mesaj yaz..."
+              placeholderTextColor="rgba(255,255,255,0.35)"
+              value={chatInput}
+              onChangeText={onChangeInput}
+              onFocus={() => setShowEmojiPicker(false)}
+              maxLength={300}
+              returnKeyType="send"
+              blurOnSubmit={false}
+              onSubmitEditing={() => { onSend(); inputRef.current?.focus(); }}
+            />
+            <Pressable
+              style={[s.sendBtn, !chatInput.trim() && { opacity: 0.35 }]}
+              onPress={() => { onSend(); inputRef.current?.focus(); }}
+              disabled={!chatInput.trim()}
+              hitSlop={6}
+            >
+              <Ionicons name="send" size={18} color="#FFF" />
+            </Pressable>
+          </View>
         </KeyboardAvoidingView>
       </Animated.View>
     </>
@@ -314,126 +262,95 @@ export default function RoomChatDrawer({
 const s = StyleSheet.create({
   panel: {
     position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
+    top: 0, left: 0, right: 0, bottom: 0,
     zIndex: 50,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderBottomWidth: 0,
-    borderColor: '#95a1ae',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 16,
-    elevation: 20,
   },
-  handle: {
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-  handleBar: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-  },
+
+  handle: { alignItems: 'center', paddingTop: 8, paddingBottom: 4 },
+  handleBar: { width: 40, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.2)' },
+
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingHorizontal: 12,
+    paddingBottom: 10,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.06)',
-    backgroundColor: 'rgba(20,184,166,0.06)',
   },
-  headerIconShadow: {},
-  headerTitle: {
+  headerBtn: {
+    width: 36, height: 36, borderRadius: 18,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  headerTitleWrap: {
     flex: 1,
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#F1F5F9',
-  },
-  list: { flex: 1 },
-
-  msgRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
+    justifyContent: 'center',
     gap: 8,
   },
-  msgAvatar: {
-    width: 26, height: 26, borderRadius: 13,
-    borderWidth: 1.5, borderColor: 'rgba(20,184,166,0.3)',
-    marginTop: 2,
-  },
-  msgBubble: {
-    flex: 1,
-    backgroundColor: 'rgba(255,255,255,0.04)',
-    borderRadius: 14,
-    borderTopLeftRadius: 4,
-    paddingHorizontal: 11,
-    paddingVertical: 8,
-  },
-  msgName: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#14B8A6',
-    marginBottom: 2,
-  },
-  msgText: {
-    fontSize: 13,
-    color: '#E2E8F0',
-    lineHeight: 18,
-  },
+  headerTitle: { fontSize: 15, fontWeight: '700', color: '#F1F5F9', letterSpacing: 0.2 },
 
-  sysMsg: {
-    alignSelf: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  sysMsgText: {
-    fontSize: 9,
-    color: 'rgba(255,255,255,0.3)',
-    fontStyle: 'italic',
-  },
+  list: { flex: 1 },
+  listContent: { paddingVertical: 12, paddingHorizontal: 12, gap: 10 },
 
   pickerWrap: {
     borderTopWidth: 1,
     borderTopColor: 'rgba(255,255,255,0.06)',
-    backgroundColor: 'rgba(0,0,0,0.15)',
   },
-  emojiToggle: {
-    width: 32,
-    height: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  inputWrap: {
+
+  inputBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 8,
+    gap: 8,
+    paddingHorizontal: 10,
+    paddingTop: 10,
     borderTopWidth: 1,
     borderTopColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: 'rgba(0,0,0,0.2)',
+  },
+  iconBtn: {
+    width: 36, height: 36, borderRadius: 18,
+    alignItems: 'center', justifyContent: 'center',
   },
   input: {
     flex: 1,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    minHeight: 40,
+    maxHeight: 100,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.08)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    paddingHorizontal: 12,
-    fontSize: 12,
+    borderColor: 'rgba(255,255,255,0.12)',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 14,
     color: '#F1F5F9',
   },
   sendBtn: {
-    width: 30, height: 30, borderRadius: 15,
+    width: 40, height: 40, borderRadius: 20,
     backgroundColor: '#14B8A6',
     alignItems: 'center', justifyContent: 'center',
   },
+
+  // ── Messages ──
+  msgRow: { flexDirection: 'row', gap: 8, alignItems: 'flex-start' },
+  msgAvatar: { width: 32, height: 32, borderRadius: 16, borderWidth: 1.5 },
+  msgBubble: {
+    flex: 1,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  msgName: { fontSize: 12, fontWeight: '700', marginBottom: 2 },
+  msgText: { fontSize: 14, color: '#E2E8F0', lineHeight: 19 },
+  sysMsg: {
+    alignSelf: 'center',
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    paddingHorizontal: 12, paddingVertical: 6,
+    borderRadius: 12,
+  },
+  sysMsgText: { fontSize: 11, color: '#94A3B8', textAlign: 'center' },
 });
