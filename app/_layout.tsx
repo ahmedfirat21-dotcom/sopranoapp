@@ -1170,15 +1170,13 @@ export default function RootLayout() {
           >
             <Stack.Screen name="(auth)" options={{ animation: 'fade' }} />
             <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
-            {/* ★ 2026-04-24: Clubhouse-style modal — aşağıdan yukarıya açılır,
-                 aşağı çekme ile kapatılabilir (native gesture). fullScreenModal
-                 tam ekran açar ama swipe-down ile dismiss edilir. */}
+            {/* ★ 2026-04-24: Expand-from-card → room. MiniRoomCard'ın expand animasyonu
+                 görsel geçişi yapıyor, stack transition sadece kesintisiz bağlantı sağlar.
+                 fade + kısa süre → expand bitince room hemen hazır. */}
             <Stack.Screen name="room/[id]" options={{
-              presentation: 'fullScreenModal',
-              animation: 'slide_from_bottom',
-              animationDuration: 300,
-              gestureEnabled: true,
-              gestureDirection: 'vertical',
+              animation: 'fade',
+              animationDuration: 200,
+              gestureEnabled: false,
             }} />
             {/* broadcast/[id] kaldırıldı — Room'a "Yayın Modu" toggle eklendi */}
             <Stack.Screen name="chat/[id]" options={{ animation: 'fade_from_bottom', animationDuration: 250 }} />

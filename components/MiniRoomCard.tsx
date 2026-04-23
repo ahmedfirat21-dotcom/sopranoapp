@@ -1,12 +1,11 @@
 /**
  * SopranoChat — Mini Oda Kartı (Floating PiP)
- * ★ 2026-04-24 v4: Drag + snap + audio glow + mute toggle.
- *   - Sürükle → dikey eksende serbest hareket (translateY offset)
- *   - Bırak → en yakın snap pozisyonuna spring animasyonuyla yapış
- *   - Ses aktifken: kenar glow pulse + parlaklık dalgası (audio feedback)
- *   - Mic badge + Room mute toggle (speaker ikonu)
+ * ★ 2026-04-24 v5: Expand-from-card animation.
+ *   - Tıklanınca kart ekranı kaplayarak genişler → oda açılır
+ *   - Sürükle + snap-to-edge (dikey hareket)
+ *   - Ses aktifken: iç glow pulse + border teal
  */
-import React, { useEffect, useRef, useMemo } from 'react';
+import React, { useEffect, useRef, useMemo, useState } from 'react';
 import {
   View, Text, StyleSheet, Pressable, Animated,
   useWindowDimensions, PanResponder, Dimensions,
@@ -34,11 +33,13 @@ interface MiniRoomCardProps {
 const BAR_MARGIN = 6;
 const BAR_H = 60;
 const CARD_H = 52;
+const SCREEN_W = Dimensions.get('window').width;
 const SCREEN_H = Dimensions.get('window').height;
 
 export default function MiniRoomCard({ room, onExpand, onClose, onMuteToggle }: MiniRoomCardProps) {
   const insets = useSafeAreaInsets();
   const { width: winW } = useWindowDimensions();
+  const [isExpanding, setIsExpanding] = useState(false);
 
   // ═══ Animasyon değerleri ═══
   const slideIn = useRef(new Animated.Value(80)).current;
@@ -49,20 +50,23 @@ export default function MiniRoomCard({ room, onExpand, onClose, onMuteToggle }: 
   const dragOffsetY = useRef(new Animated.Value(0)).current;
   const currentOffsetY = useRef(0);
 
-  // ★ Audio glow — ses aktifken kenar parlaklık dalgası
+  // ★ Audio glow
   const audioGlow = useRef(new Animated.Value(0)).current;
   const audioGlowRef = useRef<Animated.CompositeAnimation | null>(null);
+
+  // ★ Expand animation — karttan odaya geçiş
+  const expandProgress = useRef(new Animated.Value(0)).current;
 
   const cardWidth = Math.max(0, winW - BAR_MARGIN * 2 - (insets.left + insets.right));
   const bottomBase = Math.max(insets.bottom, 8) + BAR_H + 8;
 
-  // ★ Snap noktaları (translateY offset)
+  // Snap noktaları
   const snapOffsetBottom = 0;
   const snapOffsetMid = -(SCREEN_H * 0.4 - bottomBase);
   const snapOffsetTop = -(SCREEN_H - insets.top - 60 - CARD_H - bottomBase);
   const snapOffsets = [snapOffsetBottom, snapOffsetMid, snapOffsetTop];
 
-  // ★ Audio glow animasyonu — muted değilken aktif
+  // Audio glow animasyonu
   useEffect(() => {
     if (!room.isRoomMuted) {
       const glow = Animated.loop(
@@ -80,12 +84,12 @@ export default function MiniRoomCard({ room, onExpand, onClose, onMuteToggle }: 
     }
   }, [room.isRoomMuted]);
 
-  // ★ PanResponder — dikey sürükleme
+  // PanResponder
   const panResponder = useMemo(() => {
     let startOffsetY = 0;
     return PanResponder.create({
       onStartShouldSetPanResponder: () => false,
-      onMoveShouldSetPanResponder: (_, gs) => Math.abs(gs.dy) > 8,
+      onMoveShouldSetPanResponder: (_, gs) => !isExpanding && Math.abs(gs.dy) > 8,
       onPanResponderGrant: () => {
         startOffsetY = currentOffsetY.current;
         Animated.spring(dragScale, { toValue: 0.96, friction: 12, useNativeDriver: true }).start();
@@ -118,7 +122,7 @@ export default function MiniRoomCard({ room, onExpand, onClose, onMuteToggle }: 
         Animated.spring(dragOffsetY, { toValue: target, friction: 10, tension: 100, useNativeDriver: true }).start();
       },
     });
-  }, [snapOffsetBottom, snapOffsetMid, snapOffsetTop]);
+  }, [snapOffsetBottom, snapOffsetMid, snapOffsetTop, isExpanding]);
 
   useEffect(() => {
     Animated.spring(slideIn, { toValue: 0, friction: 10, tension: 80, useNativeDriver: true }).start();
@@ -151,18 +155,115 @@ export default function MiniRoomCard({ room, onExpand, onClose, onMuteToggle }: 
     Animated.timing(slideIn, { toValue: 120, duration: 200, useNativeDriver: true }).start(() => onClose());
   };
 
+  // ★ Expand — karttan oda doğuyor
+  const handleExpand = () => {
+    if (isExpanding) return;
+    setIsExpanding(true);
+
+    Animated.timing(expandProgress, {
+      toValue: 1,
+      duration: 350,
+      useNativeDriver: false, // layout props (width, height, position) animate ediyor
+    }).start(() => {
+      // Animasyon bitince navigate
+      onExpand();
+    });
+  };
+
   const rippleScaleFn = (anim: Animated.Value) =>
     anim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.08] });
   const rippleOpacityFn = (anim: Animated.Value) =>
     anim.interpolate({ inputRange: [0, 0.3, 1], outputRange: [0.3, 0.12, 0] });
 
-  // ★ Audio glow interpolation
   const audioGlowOpacity = audioGlow.interpolate({
     inputRange: [0, 1],
     outputRange: [0, 0.7],
   });
 
   const isAudioActive = !room.isRoomMuted;
+
+  // ★ Expand interpolations — karttan tam ekrana
+  const expandWidth = expandProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [cardWidth, SCREEN_W],
+  });
+  const expandHeight = expandProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [CARD_H, SCREEN_H],
+  });
+  const expandBottom = expandProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [bottomBase, 0],
+  });
+  const expandBorderRadius = expandProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [22, 0],
+  });
+  const expandContentOpacity = expandProgress.interpolate({
+    inputRange: [0, 0.3],
+    outputRange: [1, 0],
+    extrapolate: 'clamp',
+  });
+  const expandAlignSelf = expandProgress.interpolate({
+    inputRange: [0, 0.01],
+    outputRange: [0, 0], // dummy — alignSelf handled differently
+  });
+
+  // Expanding modunda container farklı style kullanır
+  if (isExpanding) {
+    return (
+      <Animated.View
+        style={[
+          styles.expandingContainer,
+          {
+            bottom: expandBottom,
+            width: expandWidth,
+            height: expandHeight,
+            borderRadius: expandBorderRadius,
+            left: expandProgress.interpolate({
+              inputRange: [0, 1],
+              outputRange: [(SCREEN_W - cardWidth) / 2, 0],
+            }),
+          },
+        ]}
+      >
+        {/* Genişleme sırasında oda arka plan gradienti */}
+        <LinearGradient
+          colors={['#0F1929', '#162236', '#0F1929']}
+          style={StyleSheet.absoluteFillObject}
+        />
+        {/* İçerik fade-out */}
+        <Animated.View style={[styles.expandingContent, { opacity: expandContentOpacity }]}>
+          <View style={styles.liveIndicator}>
+            <View style={[styles.liveDot, { backgroundColor: '#EF4444' }]} />
+            <Text style={styles.liveText}>CANLI</Text>
+          </View>
+          <View style={styles.info}>
+            <Text style={styles.roomName} numberOfLines={1}>{room.name}</Text>
+            <View style={styles.metaRow}>
+              <Text style={styles.metaText}>{room.hostName}</Text>
+            </View>
+          </View>
+        </Animated.View>
+        {/* Oda adı expand sırasında görünür kalır */}
+        <Animated.View style={{
+          position: 'absolute',
+          top: expandProgress.interpolate({
+            inputRange: [0, 1],
+            outputRange: [CARD_H / 2 - 8, 40],
+          }),
+          left: 20,
+          opacity: expandProgress.interpolate({
+            inputRange: [0, 0.4, 0.8],
+            outputRange: [0, 0, 1],
+          }),
+        }}>
+          <Text style={{ fontSize: 18, fontWeight: '800', color: '#F1F5F9' }}>{room.name}</Text>
+          <Text style={{ fontSize: 12, color: '#94A3B8', marginTop: 2 }}>{room.hostName}</Text>
+        </Animated.View>
+      </Animated.View>
+    );
+  }
 
   return (
     <Animated.View
@@ -191,7 +292,7 @@ export default function MiniRoomCard({ room, onExpand, onClose, onMuteToggle }: 
       ]} />
 
       {/* Ana kart */}
-      <Pressable onPress={onExpand} style={[
+      <Pressable onPress={handleExpand} style={[
         styles.card,
         isAudioActive && styles.cardAudioActive,
       ]}>
@@ -206,7 +307,7 @@ export default function MiniRoomCard({ room, onExpand, onClose, onMuteToggle }: 
           start={{ x: 0, y: 0 }} end={{ x: 0.6, y: 1 }}
           style={StyleSheet.absoluteFillObject}
         />
-        {/* ★ İç glow overlay — ses aktifken kartın iç kenarlarında teal ışık nefes alır */}
+        {/* İç glow overlay */}
         {isAudioActive && (
           <Animated.View style={[
             styles.innerGlow,
@@ -232,9 +333,8 @@ export default function MiniRoomCard({ room, onExpand, onClose, onMuteToggle }: 
           </View>
         </View>
 
-        {/* ★ Ses kontrol butonları: Room Mute + Mic + Kapat */}
+        {/* Ses kontrol butonları */}
         <View style={styles.actions}>
-          {/* Room ses toggle (speaker) */}
           {onMuteToggle && (
             <Pressable
               onPress={onMuteToggle}
@@ -247,7 +347,6 @@ export default function MiniRoomCard({ room, onExpand, onClose, onMuteToggle }: 
                 color={isAudioActive ? '#14B8A6' : '#EF4444'}
                 style={styles.iconShadow}
               />
-              {/* ★ Ses dalga çizgileri — ses aktifken */}
               {isAudioActive && (
                 <View style={styles.soundWaves}>
                   <Animated.View style={[styles.wave, styles.wave1, { opacity: audioGlow }]} />
@@ -262,7 +361,6 @@ export default function MiniRoomCard({ room, onExpand, onClose, onMuteToggle }: 
             </Pressable>
           )}
 
-          {/* Mic durumu */}
           <View style={[styles.actionBadge, room.isMicOn && styles.micOn]}>
             <Ionicons
               name={room.isMicOn ? 'mic' : 'mic-off'}
@@ -272,7 +370,6 @@ export default function MiniRoomCard({ room, onExpand, onClose, onMuteToggle }: 
             />
           </View>
 
-          {/* Kapat */}
           <Pressable onPress={handleClose} style={styles.closeBtn} hitSlop={12}>
             <Ionicons name="close" size={14} color="#EF4444" />
           </Pressable>
@@ -290,7 +387,21 @@ const styles = StyleSheet.create({
     elevation: 999,
     alignItems: 'center',
   },
-  // ★ Ses aktifken card border teal’e döner + iç shadow glow
+  // ★ Expand modunda — tam ekrana genişleyen container
+  expandingContainer: {
+    position: 'absolute',
+    zIndex: 9999,
+    elevation: 9999,
+    overflow: 'hidden',
+  },
+  expandingContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 10,
+  },
+  // Ses aktifken card border teal
   cardAudioActive: {
     borderColor: 'rgba(20,184,166,0.6)',
     shadowColor: '#14B8A6',
@@ -298,7 +409,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.5,
     shadowRadius: 14,
   },
-  // ★ İç glow — kartın içinde kenar boyunca teal ışık nefes alır
   innerGlow: {
     ...StyleSheet.absoluteFillObject,
     borderRadius: 21,
@@ -330,7 +440,6 @@ const styles = StyleSheet.create({
     shadowRadius: 20,
     elevation: 14,
   },
-
   liveIndicator: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     backgroundColor: 'rgba(239,68,68,0.12)',
@@ -354,7 +463,6 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
   actions: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  // ★ Ortak buton stili (mic + speaker)
   actionBadge: {
     width: 28, height: 28, borderRadius: 14,
     backgroundColor: 'rgba(255,255,255,0.06)',
@@ -374,7 +482,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(239,68,68,0.1)',
     borderColor: 'rgba(239,68,68,0.25)',
   },
-  // ★ Ses dalgası çizgileri (speaker ikonunun yanında)
   soundWaves: {
     position: 'absolute',
     right: -3, top: 2, bottom: 2,
