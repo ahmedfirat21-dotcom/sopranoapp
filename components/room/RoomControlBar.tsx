@@ -1,5 +1,6 @@
 import React, { useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, Pressable, Animated } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Animated, useWindowDimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -7,7 +8,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 //   Bar: gradient (#2A3A58→#243250→#1A2540) + teal spotlight + parlak beyaz border + radius 22.
 //   Active buton: tab bubble gibi 3D gradient + gloss (accent-based).
 //   Inactive buton: bg yok, sadece ikon + drop shadow (tab'daki pasif ikon gibi).
-const BAR_H = 56;
+const BAR_H = 60;
+const BAR_MARGIN = 6;
 const BTN_SIZE = 42;
 const BUBBLE_SIZE = 42; // active button bubble size
 // ★ 2026-04-23: İkon boyutları büyütüldü — zemin aynı, sadece ikonlar iri.
@@ -236,9 +238,13 @@ export default function RoomControlBar({
     onMicPress();
   };
 
+  const insets = useSafeAreaInsets();
+  const { width: winW } = useWindowDimensions();
+  const barWidth = Math.max(0, winW - BAR_MARGIN * 2 - (insets.left + insets.right));
+
   return (
     <View style={s.wrap}>
-      <View style={s.bar}>
+      <View style={[s.bar, { width: barWidth }]}>
         {/* ★ Gradient zemin — tab bar ile birebir */}
         <LinearGradient
           colors={['#2A3A58', '#243250', '#1A2540']}
@@ -377,8 +383,7 @@ const micS = StyleSheet.create({
 // ═══════════════════════════════════════════════════
 const s = StyleSheet.create({
   wrap: {
-    paddingHorizontal: 6,
-    paddingBottom: 4,
+    paddingHorizontal: BAR_MARGIN,
     alignItems: 'center',
   },
   // ★ Bar — tab bar dimensionları (h 56, radius 22, parlak border, deep shadow)

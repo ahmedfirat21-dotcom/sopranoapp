@@ -250,7 +250,7 @@ async function _persistSP(userId: string, amount: number, action: string, extern
       p_action: action,
     });
     if (!legacyRpcError) {
-      _logTransaction(userId, amount, action, externalRef, counterpartyId, descriptionOverride);
+      // ★ RPC zaten sp_transactions'a yazıyor — _logTransaction çağırma (çift kayıt önleme)
       return true;
     }
 
@@ -366,7 +366,7 @@ async function spendSP(userId: string, amount: number, reason: string, externalR
         .eq('id', userId)
         .single();
       const remaining = profile?.system_points ?? 0;
-      _logTransaction(userId, -amount, reason, externalRef, counterpartyId, descriptionOverride);
+      // ★ RPC zaten sp_transactions'a yazıyor — _logTransaction çağırma (çift kayıt önleme)
       return { success: true, remaining };
     }
 

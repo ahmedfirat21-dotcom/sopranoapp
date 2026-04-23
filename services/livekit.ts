@@ -258,7 +258,7 @@ export class LiveKitService {
             if (typeof c.forEach === 'function') c.forEach((v: any) => cb(v));
             else if (Array.isArray(c)) c.forEach(cb);
           };
-          iter(this.room.remoteParticipants, (participant: any) => {
+          iter(this.room?.remoteParticipants, (participant: any) => {
             // ★ 2026-04-20 FIX: Participant disconnect olmuş olabilir (identity yok veya
             //   connectionState 'disconnected'). setSubscribed çağrısı SDK'da "Tried to
             //   add a track for a participant, that's not present" hatası atıyor.

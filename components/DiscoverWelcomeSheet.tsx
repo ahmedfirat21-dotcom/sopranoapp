@@ -288,7 +288,7 @@ export default function DiscoverWelcomeSheet({ visible, onClose, uid }: Props) {
   const rotate = iconRotate.interpolate({ inputRange: [0, 1], outputRange: ['-15deg', '0deg'] });
 
   return (
-    <Modal visible={visible} animationType="fade" statusBarTranslucent onRequestClose={skip}>
+    <Modal visible={visible} animationType="none" statusBarTranslucent onRequestClose={skip}>
       <View style={styles.root} {...panResponder.panHandlers}>
         {/* Dinamik arkaplan — slide accent'e göre */}
         <LinearGradient

@@ -840,8 +840,9 @@ export default function HomeScreen() {
   const [showFriends, setShowFriends] = useState(false);
   // ★ 2026-04-21: Oda bildirme — swipe ile tetiklenir, ReportModal açar.
   const [reportRoom, setReportRoom] = useState<{ id: string; name: string } | null>(null);
-  // ★ 2026-04-21: İlk kez keşfet açanlar için welcome sheet (3 slide tanıtım).
-  const [showWelcome, setShowWelcome] = useState(false);
+  // ★ 2026-04-23: null = kontrol ediliyor, true = göster, false = gösterme
+  //   null durumunda tam ekran örtü render edilir → tab bar flash önlenir
+  const [showWelcome, setShowWelcome] = useState<boolean | null>(justCompletedOnboarding ? true : null);
   const [showFABHint, setShowFABHint] = useState(false);
   // ★ 2026-04-22: Quick-create sheet — FAB ve empty state chip'lerinden tetiklenir.
   const [showQuickCreate, setShowQuickCreate] = useState(false);
@@ -883,8 +884,10 @@ export default function HomeScreen() {
       setJustCompletedOnboarding(false); // tek seferlik — consume
       return;
     }
-    if (!firebaseUser?.uid) return;
-    hasSeenDiscoverWelcome(firebaseUser.uid).then(seen => { if (!seen) setShowWelcome(true); });
+    if (!firebaseUser?.uid) { setShowWelcome(false); return; }
+    hasSeenDiscoverWelcome(firebaseUser.uid).then(seen => {
+      setShowWelcome(seen ? false : true);
+    }).catch(() => setShowWelcome(false));
   }, [firebaseUser?.uid, justCompletedOnboarding]);
   const [showAdvFilterPanel, setShowAdvFilterPanel] = useState(false);
 
@@ -1765,9 +1768,15 @@ export default function HomeScreen() {
           currentUserId={firebaseUser?.uid}
         />
 
+        {/* ★ 2026-04-23: Welcome kontrol edilirken veya gösterilecekken tam ekran örtü
+             — tab bar dahil her şeyi kaplar, flash önlenir */}
+        {showWelcome !== false && (
+          <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: -100, backgroundColor: '#0A0F1A', zIndex: 9998 }} />
+        )}
+
         {/* ═══ Welcome Sheet — İlk kez keşfet ekranını açanlar için ═══ */}
         <DiscoverWelcomeSheet
-          visible={showWelcome}
+          visible={!!showWelcome}
           uid={firebaseUser?.uid}
           onClose={() => {
             setShowWelcome(false);

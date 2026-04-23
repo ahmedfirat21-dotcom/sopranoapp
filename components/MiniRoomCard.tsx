@@ -1,16 +1,18 @@
 /**
  * SopranoChat — Mini Oda Kartı (Floating PiP)
- * Oda küçültüldüğünde tüm ekranlarda altta görünen kompakt canlı kart.
- * ★ Yayılma (ripple) animasyonu ile "aktif oda" hissi.
+ * ★ 2026-04-23 REDESIGN: Glassmorphic premium tasarım.
+ *   - Tab bar ile aynı genişlik & margin (BAR_MARGIN=6, insets-aware)
+ *   - Control bar ile birebir border radius (22) ve gradient dili
+ *   - Canlı gösterge + ripple animasyonu
+ *   - Tab bar'ın hemen üstünde konumlanır
  */
 import React, { useEffect, useRef } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, Animated, Dimensions,
+  View, Text, StyleSheet, Pressable, Animated, useWindowDimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
-const { width: W } = Dimensions.get('window');
 
 export interface MinimizedRoom {
   id: string;
@@ -26,18 +28,26 @@ interface MiniRoomCardProps {
   onClose: () => void;
 }
 
+// ★ Tab bar ile aynı ölçüler
+const BAR_MARGIN = 6;
+const BAR_H = 60;  // CurvedTabBar height
+
 export default function MiniRoomCard({ room, onExpand, onClose }: MiniRoomCardProps) {
   const insets = useSafeAreaInsets();
+  const { width: winW } = useWindowDimensions();
   const slideIn = useRef(new Animated.Value(80)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const ripple1 = useRef(new Animated.Value(0)).current;
   const ripple2 = useRef(new Animated.Value(0)).current;
 
+  // Tab bar ile aynı genişlik hesabı
+  const cardWidth = Math.max(0, winW - BAR_MARGIN * 2 - (insets.left + insets.right));
+  // Tab bar'ın hemen üstüne konumlan
+  const bottomPos = Math.max(insets.bottom, 8) + BAR_H + 8;
+
   useEffect(() => {
-    // Giriş animasyonu
     Animated.spring(slideIn, { toValue: 0, friction: 10, tension: 80, useNativeDriver: true }).start();
 
-    // Canlı gösterge nabız
     const pulse = Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, { toValue: 1.4, duration: 700, useNativeDriver: true }),
@@ -46,7 +56,6 @@ export default function MiniRoomCard({ room, onExpand, onClose }: MiniRoomCardPr
     );
     pulse.start();
 
-    // Yayılma (ripple) animasyonları — canlı olduğunu gösterir
     const makeRipple = (anim: Animated.Value, delay: number) =>
       Animated.loop(
         Animated.sequence([
@@ -70,52 +79,62 @@ export default function MiniRoomCard({ room, onExpand, onClose }: MiniRoomCardPr
     });
   };
 
-  // Ripple interpolations
   const rippleScale = (anim: Animated.Value) =>
-    anim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.15] });
+    anim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.08] });
   const rippleOpacity = (anim: Animated.Value) =>
-    anim.interpolate({ inputRange: [0, 0.3, 1], outputRange: [0.4, 0.15, 0] });
+    anim.interpolate({ inputRange: [0, 0.3, 1], outputRange: [0.3, 0.12, 0] });
 
   return (
     <Animated.View style={[
       s.container,
       {
-        bottom: Math.max(insets.bottom, 8) + 72, // Tab bar üstünde
+        bottom: bottomPos,
+        width: cardWidth,
         transform: [{ translateY: slideIn }],
       },
     ]}>
-      {/* Yayılma (ripple) halkaları — canlı oda efekti */}
+      {/* Ripple halkaları */}
       <Animated.View style={[
         s.ripple,
-        {
-          transform: [{ scale: rippleScale(ripple1) }],
-          opacity: rippleOpacity(ripple1),
-        },
+        { transform: [{ scale: rippleScale(ripple1) }], opacity: rippleOpacity(ripple1) },
       ]} />
       <Animated.View style={[
         s.ripple,
-        {
-          transform: [{ scale: rippleScale(ripple2) }],
-          opacity: rippleOpacity(ripple2),
-        },
+        { transform: [{ scale: rippleScale(ripple2) }], opacity: rippleOpacity(ripple2) },
       ]} />
 
       {/* Ana kart */}
-      <TouchableOpacity activeOpacity={0.85} onPress={onExpand} style={s.card}>
+      <Pressable onPress={onExpand} style={s.card}>
+        {/* Gradient zemin — control bar ile aynı palet */}
+        <LinearGradient
+          colors={['#2A3A58', '#243250', '#1A2540']}
+          locations={[0, 0.5, 1]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0, y: 1 }}
+          style={StyleSheet.absoluteFillObject}
+        />
+        {/* Teal spotlight aksan */}
+        <LinearGradient
+          colors={['rgba(20,184,166,0.10)', 'transparent']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0.6, y: 1 }}
+          style={StyleSheet.absoluteFillObject}
+        />
+
         {/* Canlı gösterge */}
         <View style={s.liveIndicator}>
           <Animated.View style={[s.liveDot, { transform: [{ scale: pulseAnim }] }]} />
           <Text style={s.liveText}>CANLI</Text>
         </View>
 
-        {/* Oda bilgisi — tek satır */}
+        {/* Oda bilgisi */}
         <View style={s.info}>
           <Text style={s.roomName} numberOfLines={1}>{room.name}</Text>
           <View style={s.metaRow}>
-            <Ionicons name="person" size={9} color="#94A3B8" />
+            <Ionicons name="person" size={9} color="#94A3B8" style={s.iconShadow} />
             <Text style={s.metaText}>{room.hostName}</Text>
             <Text style={s.metaDot}>·</Text>
-            <Ionicons name="people" size={9} color="#94A3B8" />
+            <Ionicons name="people" size={9} color="#94A3B8" style={s.iconShadow} />
             <Text style={s.metaText}>{room.viewerCount}</Text>
           </View>
         </View>
@@ -125,58 +144,62 @@ export default function MiniRoomCard({ room, onExpand, onClose }: MiniRoomCardPr
           <View style={[s.micBadge, room.isMicOn && s.micOn]}>
             <Ionicons
               name={room.isMicOn ? 'mic' : 'mic-off'}
-              size={12}
+              size={13}
               color={room.isMicOn ? '#14B8A6' : '#64748B'}
+              style={s.iconShadow}
             />
           </View>
-          <TouchableOpacity onPress={handleClose} style={s.closeBtn} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+          <Pressable onPress={handleClose} style={s.closeBtn} hitSlop={12}>
             <Ionicons name="close" size={14} color="#EF4444" />
-          </TouchableOpacity>
+          </Pressable>
         </View>
-      </TouchableOpacity>
+      </Pressable>
     </Animated.View>
   );
 }
 
-const CARD_BG = '#1a2636'; // Tema uyumlu koyu ton (lacivert değil)
-
 const s = StyleSheet.create({
   container: {
     position: 'absolute',
-    left: 20, right: 20,
+    alignSelf: 'center',
     zIndex: 999,
+    elevation: 999,
     alignItems: 'center',
-    justifyContent: 'center',
   },
-  // Ripple halkaları
   ripple: {
     position: 'absolute',
-    left: 0, right: 0,
-    top: 0, bottom: 0,
-    borderRadius: 14,
+    left: 0, right: 0, top: 0, bottom: 0,
+    borderRadius: 22,
     borderWidth: 1.5,
-    borderColor: 'rgba(20,184,166,0.4)',
+    borderColor: 'rgba(20,184,166,0.3)',
   },
   card: {
     flexDirection: 'row',
     alignItems: 'center',
     width: '100%',
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderRadius: 14,
-    backgroundColor: CARD_BG,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 22,
+    overflow: 'hidden',
+    // ★ Control bar ile aynı border
     borderWidth: 1,
-    borderColor: 'rgba(20,184,166,0.15)',
+    borderColor: 'rgba(255,255,255,0.5)',
     gap: 8,
+    // ★ Shadow — premium floating his
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 20,
+    elevation: 14,
   },
   liveIndicator: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
+    gap: 4,
     backgroundColor: 'rgba(239,68,68,0.12)',
-    paddingHorizontal: 6,
+    paddingHorizontal: 7,
     paddingVertical: 3,
-    borderRadius: 6,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: 'rgba(239,68,68,0.25)',
   },
@@ -186,7 +209,7 @@ const s = StyleSheet.create({
   },
   liveText: {
     fontSize: 8, fontWeight: '800', color: '#EF4444',
-    letterSpacing: 0.5,
+    letterSpacing: 0.6,
   },
   info: {
     flex: 1,
@@ -194,33 +217,41 @@ const s = StyleSheet.create({
   roomName: {
     fontSize: 12, fontWeight: '700', color: '#F1F5F9',
     letterSpacing: 0.2,
+    textShadowColor: 'rgba(0,0,0,0.4)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   metaRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 2, marginTop: 1,
+    flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 2,
   },
   metaText: {
-    fontSize: 9, color: '#94A3B8',
+    fontSize: 9, color: '#94A3B8', fontWeight: '600',
   },
   metaDot: {
     fontSize: 9, color: '#64748B', marginHorizontal: 1,
+  },
+  iconShadow: {
+    textShadowColor: 'rgba(0,0,0,0.4)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
   actions: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
   },
   micBadge: {
-    width: 26, height: 26, borderRadius: 13,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+    width: 28, height: 28, borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)',
     alignItems: 'center', justifyContent: 'center',
   },
   micOn: {
-    backgroundColor: 'rgba(20,184,166,0.1)',
-    borderColor: 'rgba(20,184,166,0.25)',
+    backgroundColor: 'rgba(20,184,166,0.12)',
+    borderColor: 'rgba(20,184,166,0.3)',
   },
   closeBtn: {
-    width: 24, height: 24, borderRadius: 12,
+    width: 26, height: 26, borderRadius: 13,
     backgroundColor: 'rgba(239,68,68,0.1)',
-    borderWidth: 1, borderColor: 'rgba(239,68,68,0.2)',
+    borderWidth: 1, borderColor: 'rgba(239,68,68,0.25)',
     alignItems: 'center', justifyContent: 'center',
   },
 });

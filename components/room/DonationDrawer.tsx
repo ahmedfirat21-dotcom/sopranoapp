@@ -159,7 +159,7 @@ export default function DonationDrawer({ visible, onClose, senderId, hostId, hos
 
   if (!visible) return null;
 
-  const BAR_OFFSET = bottomInset + 56;
+  const BAR_OFFSET = bottomInset + 60;
   const canDonate = amount > 0 && balance !== null && balance >= amount && senderId !== hostId;
   const fillRatio = (amount - 1) / 99;
 
@@ -176,7 +176,7 @@ export default function DonationDrawer({ visible, onClose, senderId, hostId, hos
       <Animated.View
         style={[styles.panel, { bottom: BAR_OFFSET, transform: [{ translateY }] }]}
       >
-        <LinearGradient colors={['#4a5668', '#37414f', '#232a35']} locations={[0, 0.35, 1]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[StyleSheet.absoluteFillObject, { borderTopLeftRadius: 20, borderTopRightRadius: 20 }]} />
+        <LinearGradient colors={['#4a5668', '#37414f', '#232a35']} locations={[0, 0.35, 1]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[StyleSheet.absoluteFillObject, { borderRadius: 18 }]} />
         {/* Sürükleme tutamağı — panHandlers SADECE buraya bağlı */}
         <View style={styles.handle} {...panResponder.panHandlers}>
           <View style={styles.handleBar} />
@@ -267,14 +267,10 @@ export default function DonationDrawer({ visible, onClose, senderId, hostId, hos
 const styles = StyleSheet.create({
   panel: {
     position: 'absolute',
-    left: 0, right: 0,
+    left: 6, right: 6,
     zIndex: 50,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    borderRadius: 18,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderBottomWidth: 0,
-    borderColor: '#95a1ae',
     paddingBottom: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
@@ -289,7 +285,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 8,
     paddingHorizontal: 16, paddingBottom: 6,
   },
-  headerTitle: { flex: 1, fontSize: 16, fontWeight: '800', color: '#F1F5F9' },
+  headerTitle: {
+    flex: 1, fontSize: 16, fontWeight: '800', color: '#F1F5F9',
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
   balancePill: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12,

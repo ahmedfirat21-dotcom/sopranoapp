@@ -877,7 +877,7 @@ export function PlusMenu({
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
       </Animated.View>
 
-      <Animated.View {...panHandlers} style={[s.panel, { bottom: bottomInset + 80, top: 60, transform: [{ translateX: Animated.add(slideAnim, swipeX) }] }]}>
+      <Animated.View {...panHandlers} style={[s.panel, { bottom: 120, top: 120, transform: [{ translateX: Animated.add(slideAnim, swipeX) }] }]}>
         {/* ★ FriendsDrawer paleti — diagonal warm-neutral gradient */}
         <LinearGradient
           colors={['#4a5668', '#37414f', '#232a35']}
@@ -888,7 +888,7 @@ export function PlusMenu({
         />
         {/* Header */}
         <View style={s.header}>
-          <View style={[s.headerDot, { backgroundColor: role.color }]} />
+          <Ionicons name="grid" size={16} color={role.color} style={s.iconShadow} />
           <Text style={s.headerTitle}>Menü</Text>
           <View style={[s.rolePill, { backgroundColor: role.color + '22', borderColor: role.color + '35' }]}>
             <Ionicons name={role.icon as any} size={10} color={role.color} />
@@ -958,8 +958,6 @@ const s = StyleSheet.create({
     position: 'absolute', right: 0,
     width: PANEL_W,
     borderTopLeftRadius: 22, borderBottomLeftRadius: 22,
-    borderWidth: 1, borderRightWidth: 0,
-    borderColor: Colors.cardBorder,
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: -6, height: 0 },
@@ -1009,15 +1007,15 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
   },
   row: {
-    flexDirection: 'row', alignItems: 'center', gap: IS_SMALL_SCREEN ? 10 : 12,
-    paddingVertical: IS_SMALL_SCREEN ? 13 : 15, paddingHorizontal: IS_SMALL_SCREEN ? 12 : 14,
+    flexDirection: 'row', alignItems: 'center', gap: IS_SMALL_SCREEN ? 8 : 10,
+    paddingVertical: IS_SMALL_SCREEN ? 10 : 11, paddingHorizontal: IS_SMALL_SCREEN ? 12 : 14,
   },
   rowPressed: { backgroundColor: 'rgba(20,184,166,0.08)' },
   rowExpanded: { backgroundColor: 'rgba(255,255,255,0.03)' },
   rowBorder: { borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.04)' },
   iconCircle: {
-    width: IS_SMALL_SCREEN ? 34 : 38, height: IS_SMALL_SCREEN ? 34 : 38,
-    borderRadius: IS_SMALL_SCREEN ? 17 : 19,
+    width: IS_SMALL_SCREEN ? 30 : 32, height: IS_SMALL_SCREEN ? 30 : 32,
+    borderRadius: IS_SMALL_SCREEN ? 15 : 16,
     justifyContent: 'center', alignItems: 'center',
   },
   iconShadow: { textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 3 },

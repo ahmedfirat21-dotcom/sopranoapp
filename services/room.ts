@@ -385,7 +385,7 @@ export const RoomService = {
     try {
       const { error } = await supabase.rpc('cleanup_room_zombies_atomic', { p_room_id: roomId });
       if (!error) return;
-      if (__DEV__) console.warn('[cleanupZombies] RPC fallback:', error.message);
+      // ★ RPC yoksa sessiz fallback — konsol kirliliği önlenir
     } catch { /* fall through */ }
 
     // Fallback — v21 migrate edilmediyse eski yol
@@ -1112,6 +1112,62 @@ export const RoomService = {
       .from('room_participants')
       .delete()
       .eq('room_id', roomId);
+  },
+
+  /**
+   * ★ 2026-04-23: Gün Sonu Temizliği — Gece yarısı donmuş odaların sayaçlarını sıfırla.
+   *   - Free (persistent:false) → oda silinir (kalıcı oda hakkı yok)
+   *   - Plus/Pro (persistent:true) → remaining_ms sıfırlanır, oda kalır ama süre biter
+   *
+   * Bu fonksiyon app açılışında veya periyodik olarak çağrılmalıdır.
+   * Günlük oda açma hakkı zaten created_at >= todayStart ile sıfırlanıyor;
+   * bu fonksiyon donmuş odaların süre sayaçlarını da aynı şekilde sıfırlar.
+   */
+  async cleanupFrozenRooms(): Promise<{ deleted: number; reset: number }> {
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayIso = todayStart.toISOString();
+
+    let deleted = 0;
+    let reset = 0;
+
+    // 1) Dün veya daha önce donmuş, persistent olmayan (Free) odaları bul ve sil
+    const { data: nonPersistent } = await supabase
+      .from('rooms')
+      .select('id, owner_tier')
+      .eq('is_live', false)
+      .not('room_settings->frozen_at', 'is', null)
+      .lt('room_settings->frozen_at', todayIso);
+
+    if (nonPersistent && nonPersistent.length > 0) {
+      for (const room of nonPersistent) {
+        const tier = migrateLegacyTier((room as any).owner_tier);
+        const limits = getRoomLimits(tier);
+        if (!limits.persistent) {
+          // Free tier — oda silinir
+          await supabase.from('room_participants').delete().eq('room_id', room.id);
+          await supabase.from('rooms').delete().eq('id', room.id);
+          deleted++;
+        } else {
+          // Plus/Pro — remaining_ms sıfırlanır (süre biter ama oda kalır)
+          const { data: r } = await supabase
+            .from('rooms')
+            .select('room_settings')
+            .eq('id', room.id)
+            .single();
+          if (r) {
+            const settings = { ...((r.room_settings as any) || {}) };
+            settings.remaining_ms = 0;
+            delete settings.frozen_at;
+            await supabase.from('rooms').update({ room_settings: settings }).eq('id', room.id);
+            reset++;
+          }
+        }
+      }
+    }
+
+    if (__DEV__) console.log(`[cleanupFrozenRooms] Deleted: ${deleted}, Reset: ${reset}`);
+    return { deleted, reset };
   },
 
   /**

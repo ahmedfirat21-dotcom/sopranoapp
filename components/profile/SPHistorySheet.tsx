@@ -144,7 +144,6 @@ export default function SPHistorySheet({ visible, onClose, balance, history: ini
       if (shouldDismiss) {
         translateY.value = withTiming(600, { duration: 200 }, () => {
           runOnJS(handleDismiss)();
-          translateY.value = 0;
         });
       } else {
         translateY.value = withSpring(0, { damping: 14, stiffness: 120 });

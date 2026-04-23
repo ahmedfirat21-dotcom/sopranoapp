@@ -6,7 +6,7 @@
 import React, { useRef, useEffect, useMemo, useState } from 'react';
 import {
   View, Text, StyleSheet, Pressable, FlatList,
-  Image, Animated, Dimensions, PanResponder,
+  Image, Animated, PanResponder, useWindowDimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -14,8 +14,6 @@ import { Colors } from '../../constants/theme';
 import { getAvatarSource } from '../../constants/avatars';
 import { type RoomParticipant } from '../../services/database';
 
-const { width: W } = Dimensions.get('window');
-const PANEL_H = 300;
 
 interface Props {
   visible: boolean;
@@ -96,9 +94,12 @@ export default function HandRaiseQueuePanel({
   maxStageSlots, currentStageCount,
   bottomInset = 14,
 }: Props) {
-  // ★ 2026-04-23: CLOSED_Y artık panel + paddingBottom'u kapsıyor — panel bottom:0'da
-  //   paddingBottom BAR_OFFSET kadar eklendiği için translate off-screen mesafesi de büyümeli.
-  const CLOSED_Y = PANEL_H + bottomInset + 76 + 20;
+  const { height: windowH } = useWindowDimensions();
+  // Panelin maksimum yüksekliği: ekranın %60'ı
+  const BAR_OFFSET_INNER = bottomInset + 80; // bar(60) + padding(20)
+  const maxPanelH = (windowH - Math.max(bottomInset, 14) - 80 - 40) * 0.7;
+  // Kapanış animasyonu için ekranın tamamını kapsıyor
+  const CLOSED_Y = windowH;
   const translateY = useRef(new Animated.Value(CLOSED_Y)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const stageSlotsFull = currentStageCount >= maxStageSlots;
@@ -155,29 +156,25 @@ export default function HandRaiseQueuePanel({
 
   if (!mounted) return null;
 
-  // ★ 2026-04-23: RoomChatDrawer ile aynı pattern — panel bottom:0'da, paddingBottom ile
-  // content control bar üstünde durur, gradient bar arkasında akar → tek sürekli yüzey.
-  const BAR_OFFSET = bottomInset + 76;
-
   return (
-    <View style={[StyleSheet.absoluteFill, { zIndex: 100 }]} pointerEvents="box-none">
+    <View style={[StyleSheet.absoluteFill, { zIndex: 45 }]} pointerEvents="box-none">
       {/* Backdrop */}
       <Animated.View style={[s.backdrop, { opacity: fadeAnim }]}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
       </Animated.View>
 
-      {/* Panel — bottom:0 continuous surface; control bar üstünde floats, gradient arkasına akar */}
+      {/* Panel — control barın arkasından çıkar, üstüne konumlanır */}
       <Animated.View
         {...panResponder.panHandlers}
-        style={[s.panel, { bottom: 0, paddingBottom: BAR_OFFSET, transform: [{ translateY }] }]}
+        style={[s.panel, { bottom: BAR_OFFSET_INNER, maxHeight: maxPanelH, transform: [{ translateY }] }]}
       >
-        <LinearGradient colors={['#4a5668', '#37414f', '#232a35']} locations={[0, 0.35, 1]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[StyleSheet.absoluteFillObject, { borderTopLeftRadius: 20, borderTopRightRadius: 20 }]} />
+        <LinearGradient colors={['#4a5668', '#37414f', '#232a35']} locations={[0, 0.35, 1]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[StyleSheet.absoluteFillObject, { borderRadius: 18 }]} />
         {/* Sürükleme tutamağı */}
         <View style={s.handle}>
           <View style={s.handleBar} />
         </View>
 
-        {/* Header */}
+        {/* Header + Sahne Durumu */}
         <View style={s.header}>
           <View style={s.headerDot} />
           <Text style={s.headerTitle}>El Kaldıranlar</Text>
@@ -186,14 +183,11 @@ export default function HandRaiseQueuePanel({
               <Text style={s.countText}>{queueList.length}</Text>
             </View>
           )}
-        </View>
-
-        {/* Sahne Durumu + Sıradaki */}
-        <View style={s.stageInfo}>
-          <View style={[s.stageBar, stageSlotsFull && { borderColor: '#EF4444' }]}>
-            <Ionicons name="people" size={11} color={stageSlotsFull ? '#EF4444' : '#14B8A6'} />
+          {/* Sahne Slot — gölgeli */}
+          <View style={s.stageInline}>
+            <Ionicons name="people" size={11} color={stageSlotsFull ? '#EF4444' : '#14B8A6'} style={s.stageIcon} />
             <Text style={[s.stageText, stageSlotsFull && { color: '#EF4444' }]}>
-              {currentStageCount}/{maxStageSlots}{stageSlotsFull ? ' Dolu' : ''}
+              {currentStageCount}/{maxStageSlots}
             </Text>
           </View>
           {queueList.length > 0 && !stageSlotsFull && (
@@ -209,7 +203,7 @@ export default function HandRaiseQueuePanel({
           <FlatList
             data={queueList}
             keyExtractor={(item) => item.user_id}
-            style={{ maxHeight: 160 }}
+            style={{ flexShrink: 1 }}
             showsVerticalScrollIndicator={false}
             renderItem={({ item, index }) => (
               <QueueItem
@@ -238,27 +232,26 @@ const s = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.25)',
   },
-  // ★ Panel — alt barın üstünde, kompakt bottom sheet
+  // ★ Panel — chat drawer ile aynı tasarım dili
   panel: {
     position: 'absolute',
-    left: 0,
-    right: 0,
+    left: 6,
+    right: 6,
     zIndex: 50,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    borderWidth: 1,
-    borderBottomWidth: 0,
-    borderColor: '#95a1ae',
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+    borderBottomLeftRadius: 18,
+    borderBottomRightRadius: 18,
     overflow: 'hidden',
     paddingBottom: 8,
     elevation: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
   },
-  handle: { alignItems: 'center', paddingVertical: 8 },
-  handleBar: { width: 36, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.2)' },
+  handle: { alignItems: 'center', paddingTop: 8, paddingBottom: 2 },
+  handleBar: { width: 36, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.25)' },
   // Header
   header: {
     flexDirection: 'row',
@@ -296,30 +289,24 @@ const s = StyleSheet.create({
     fontWeight: '800',
     color: '#1E1B12',
   },
-  stageInfo: {
+  stageInline: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.04)',
+    gap: 3,
+    marginLeft: 6,
   },
-  stageBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(20,184,166,0.2)',
-    backgroundColor: 'rgba(20,184,166,0.06)',
+  stageIcon: {
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
   stageText: {
-    fontSize: 10,
-    fontWeight: '600',
+    fontSize: 11,
+    fontWeight: '700',
     color: '#14B8A6',
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
   nextBtn: {
     flexDirection: 'row',

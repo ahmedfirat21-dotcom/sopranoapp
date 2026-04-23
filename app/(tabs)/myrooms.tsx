@@ -804,7 +804,11 @@ export default function MyRoomsScreen() {
   // ★ Ref'leri güncel tut — realtime handler'ları için
   useEffect(() => { loadDataRef.current = loadData; }, [loadData]);
 
-  useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
+  useFocusEffect(useCallback(() => {
+    loadData();
+    // ★ 2026-04-23: Tab'dan çıkınca açık modalı kapat
+    return () => { setSelectedRoom(null); };
+  }, [loadData]));
 
   // ★ Yardımcı: Sadece arkadaşların canlı olduğu odaları yenile (hafif sorgu)
   const refreshFriendsLive = useCallback(async () => {

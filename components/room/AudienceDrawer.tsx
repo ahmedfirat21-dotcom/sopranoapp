@@ -4,7 +4,7 @@
  * ★ Sağa sürükleyerek kapatma özelliği (DM panel ile aynı useSwipeToDismiss pattern)
  */
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, ScrollView, Pressable, Image, Animated, StyleSheet, useWindowDimensions } from 'react-native';
+import { View, Text, ScrollView, Pressable, Image, Animated, StyleSheet, useWindowDimensions, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { getAvatarSource } from '../../constants/avatars';
@@ -31,7 +31,8 @@ interface Props {
 export default function AudienceDrawer({ visible, users, onClose, onSelectUser, micRequests = [] }: Props) {
   // ★ Runtime window width — cihazın gerçek ekran genişliği
   const { width: W } = useWindowDimensions();
-  const PANEL_W = Math.round(W * 0.72); // 0.58 → 0.72 biraz daha geniş (isim truncate olmasın)
+  const IS_SMALL = W <= 375;
+  const PANEL_W = IS_SMALL ? Math.min(W * 0.78, 310) : Math.min(W * 0.68, 320);
   const slideAnim = useRef(new Animated.Value(W)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
@@ -159,19 +160,15 @@ const s = StyleSheet.create({
   panel: {
     position: 'absolute',
     // ★ 2026-04-23: Yan modaller eşit boyut — DM, Plus, Audience aynı top/bottom
-    right: 0, top: 60, bottom: 100,
+    right: 0, top: 120, bottom: 120,
     // width inline olarak component içinde atanır (useWindowDimensions runtime).
-    borderTopLeftRadius: 18,
-    borderBottomLeftRadius: 18,
-    borderWidth: 1,
-    borderRightWidth: 0,
-    borderColor: '#95a1ae',
+    borderTopLeftRadius: 22, borderBottomLeftRadius: 22,
     overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: { width: -4, height: 0 },
-    shadowOpacity: 0.4,
+    shadowOffset: { width: -6, height: 0 },
+    shadowOpacity: 0.5,
     shadowRadius: 16,
-    elevation: 20,
+    elevation: 16,
   },
   dragHandle: {
     position: 'absolute',

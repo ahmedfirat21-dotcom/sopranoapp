@@ -120,7 +120,8 @@ try { LKVideoView = require('@livekit/react-native').VideoView; } catch {}
 
 
 const { width: W, height: H } = Dimensions.get('window');
-const DM_PANEL_W = W * 0.72;
+const IS_SMALL_DM = W <= 375;
+const DM_PANEL_W = IS_SMALL_DM ? Math.min(W * 0.78, 310) : Math.min(W * 0.68, 320);
 const DM_SWIPE_ACTION_W = 180; // 3 buton × 60px
 
 // ★ 2026-04-20: Bundled MP3 oynatma kaldırıldı — YouTube/Spotify/SoundCloud linki
@@ -653,12 +654,11 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
           ★ 2026-04-23: Yan modaller aynı top/bottom — DM/Plus/Audience hepsi eşit
           Klavye açıkken bottom=0, input kontrol barı arkasında kalmasın */}
       <Animated.View {...dmPanHandlers} style={{
-        position: 'absolute', right: 0, top: 60, bottom: dmKbVisible ? 0 : (bottomInset + 80),
+        position: 'absolute', right: 0, top: 120, bottom: dmKbVisible ? 0 : 120,
         width: DM_PANEL_W,
-        borderTopLeftRadius: 18, borderBottomLeftRadius: 18,
-        borderWidth: 1, borderRightWidth: 0, borderColor: '#95a1ae',
+        borderTopLeftRadius: 22, borderBottomLeftRadius: 22,
         overflow: 'hidden',
-        shadowColor: '#000', shadowOffset: { width: -4, height: 0 }, shadowOpacity: 0.4, shadowRadius: 16, elevation: 20,
+        shadowColor: '#000', shadowOffset: { width: -6, height: 0 }, shadowOpacity: 0.5, shadowRadius: 16, elevation: 16,
         transform: [{ translateX: Animated.add(slideAnim, dmSwipeX) }],
       }}>
         {/* ★ FriendsDrawer paleti */}
@@ -2586,6 +2586,8 @@ export default function RoomScreen() {
   //   30sn'de bir çağırır, race-safe (DELETE idempotent). 45sn heartbeat'siz olanlar silinir.
   useEffect(() => {
     if (!id) return;
+    // ★ 2026-04-23: Gün sonu donmuş oda temizliği — oda açılışında 1 kez çalışır
+    RoomService.cleanupFrozenRooms().catch(() => {});
     const cu = setInterval(() => {
       RoomService.cleanupStaleParticipants(id as string).catch(() => {});
     }, 30000);

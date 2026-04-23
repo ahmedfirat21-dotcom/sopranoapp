@@ -123,20 +123,32 @@ export const RoomFollowService = {
     return count || 0;
   },
 
-  /** Odanın takipçi profillerini getir (avatar + isim) */
+  /** Odanın takipçi profillerini getir (avatar + isim)
+   *  ★ 2026-04-23: Embedded join yerine 2-step query — PGRST200 FK hint hatası önlenir */
   async getRoomFollowers(roomId: string, limit = 20): Promise<{ id: string; display_name: string; avatar_url: string }[]> {
     try {
-      const { data, error } = await supabase
+      // Adım 1: Takipçi user_id'lerini çek
+      const { data: follows, error: fErr } = await supabase
         .from('room_follows')
-        .select('user_id, profiles:profiles!user_id(id, display_name, avatar_url)')
+        .select('user_id')
         .eq('room_id', roomId)
         .order('created_at', { ascending: false })
         .limit(limit);
-      if (error) throw error;
-      return (data || [])
-        .map((d: any) => d.profiles)
-        .filter(Boolean)
-        .map((p: any) => ({ id: p.id, display_name: p.display_name || 'Kullanıcı', avatar_url: p.avatar_url || '' }));
+      if (fErr) throw fErr;
+      const userIds = (follows || []).map((f: any) => f.user_id).filter(Boolean);
+      if (userIds.length === 0) return [];
+
+      // Adım 2: Profilleri toplu çek
+      const { data: profiles, error: pErr } = await supabase
+        .from('profiles')
+        .select('id, display_name, avatar_url')
+        .in('id', userIds);
+      if (pErr) throw pErr;
+      return (profiles || []).map((p: any) => ({
+        id: p.id,
+        display_name: p.display_name || 'Kullanıcı',
+        avatar_url: p.avatar_url || '',
+      }));
     } catch (e) {
       if (__DEV__) console.warn('[RoomFollowService] getRoomFollowers error:', e);
       return [];
