@@ -42,6 +42,7 @@ import { Toast, showToast } from '../components/Toast';
 import { IncomingCallOverlay } from '../components/IncomingCallOverlay';
 import MiniRoomCard, { type MinimizedRoom } from '../components/MiniRoomCard';
 import ErrorBoundary from '../components/ErrorBoundary';
+import { KeyboardProvider } from 'react-native-keyboard-controller';
 // SplashOverlay import kaldırıldı — ARCH-4 FIX (ölü kod temizliği)
 // PremiumIntro kaldırıldı — intro video ile değiştirildi
 // IntroVideo kaldırıldı — kullanıcı talebi ile splash intro devre dışı
@@ -1150,6 +1151,7 @@ export default function RootLayout() {
   }
 
   return (
+    <KeyboardProvider>
     <AuthContext.Provider value={{ isAuthReady, isLoggedIn, setIsLoggedIn, user, setUser, firebaseUser, authVersion, refreshAuth, justCompletedOnboarding, setJustCompletedOnboarding, profile, setProfile, refreshProfile, minimizedRoom, setMinimizedRoom, pendingCallSignals, consumeCallSignal, activeCallId, setActiveCallId: updateActiveCallId, showNotifDrawer, setShowNotifDrawer, setNotifDrawerAnchorRight, setNotifDrawerRight, setNotifDrawerTop }}>
       <ThemeContext.Provider value={{ themeVersion, applyTheme }}>
       <RealtimeBadgeProvider userId={firebaseUser?.uid || null}>
@@ -1270,6 +1272,7 @@ export default function RootLayout() {
     </RealtimeBadgeProvider>
     </ThemeContext.Provider>
     </AuthContext.Provider>
+    </KeyboardProvider>
   );
 }
 

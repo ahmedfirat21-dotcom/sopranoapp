@@ -6,8 +6,9 @@
 import React, { useRef, useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, Animated, PanResponder, Pressable,
-  TextInput, FlatList, Image, Dimensions, Platform, Keyboard,
+  TextInput, FlatList, Image, Dimensions, Platform,
 } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { getAvatarSource } from '../../constants/avatars';
@@ -62,16 +63,10 @@ export default function RoomChatDrawer({
   visible, messages, chatInput, onChangeInput, onSend, onClose, bottomInset, onSendRaw,
 }: Props) {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  // ★ 2026-04-23 (v6 — LAYOUT): transform.translateY çalışmadı, doğrudan `bottom`
-  //   property'sini animate ediyoruz — layout prop, Android'de %100 güvenilir.
-  //   Klavye açıkken panel.bottom = kbHeight → panel'in alt kenarı klavye üstünde.
-  const [kbHeight, setKbHeight] = useState(0);
-  const kbVisible = kbHeight > 0;
-
-  // Klavye açıkken panel translateY ile yukarı taşınır; paddingBottom sıfırlanır
-  // (control bar zaten klavye altında kalıyor, ek boşluk gereksiz).
-  const BAR_OFFSET_DEFAULT = bottomInset + 76;
-  const BAR_OFFSET = kbVisible ? 0 : BAR_OFFSET_DEFAULT;
+  // ★ 2026-04-23 (v11): react-native-keyboard-controller entegre edildi.
+  //   Tüm kendi hack'lerim (kbHeight state, auto-expand, Keyboard.addListener)
+  //   kaldırıldı. Library'nin KeyboardAvoidingView'ı input'u klavye üstüne kaldırır.
+  const BAR_OFFSET = bottomInset + 76;
   const HALF_TOTAL = PANEL_HEIGHT_HALF + BAR_OFFSET;
   const FULL_TOTAL = PANEL_HEIGHT_FULL + BAR_OFFSET;
   const CLOSED_Y = FULL_TOTAL;
@@ -98,24 +93,6 @@ export default function RoomChatDrawer({
   const translateY = useRef(new Animated.Value(FULL_TOTAL + 200)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
   const inputRef = useRef<TextInput>(null);
-
-  // ★ 2026-04-23 (v10 — CLUBHOUSE): Klavye listener + auto-expand.
-  //   Klavye açılınca drawer otomatik FULL mode'a geçer — panel neredeyse tam ekran olur,
-  //   içinde flex layout ile input doğal olarak klavye üstünde kalır.
-  //   Klavye kapanınca HALF mode'a döner.
-  useEffect(() => {
-    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
-    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-    const show = Keyboard.addListener(showEvent, (e) => {
-      setKbHeight(e.endCoordinates?.height || 0);
-      setExpanded(true);  // auto-expand
-    });
-    const hide = Keyboard.addListener(hideEvent, () => {
-      setKbHeight(0);
-      setExpanded(false);  // auto-collapse
-    });
-    return () => { show.remove(); hide.remove(); };
-  }, []);
 
   // ★ 2026-04-23: Internal mount state — parent visible=false olunca hemen unmount
   //   yerine, kapanış animasyonu bitince unmount. Aksi halde modal kesik görünür.
@@ -266,9 +243,10 @@ export default function RoomChatDrawer({
           keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
         />
 
-        {/* ★ 2026-04-23 (v10 — CLUBHOUSE PATTERN): Input panel içinde flex bottom'da.
-             Klavye açılınca drawer auto-expand FULL mode → panel neredeyse tam ekran
-             olur, flex layout ile input doğal olarak klavye üstünde kalır. */}
+        {/* ★ 2026-04-23 (v11 — KEYBOARD-CONTROLLER): react-native-keyboard-controller'ın
+             KeyboardAvoidingView'ı ile input klavye üstüne otomatik taşınır.
+             Native IME animation tracking, Samsung quirks handled. */}
+        <KeyboardAvoidingView behavior="padding" keyboardVerticalOffset={bottomInset}>
         {showEmojiPicker && (
           <View style={s.pickerWrap}>
             <EmojiReactionBar
@@ -327,6 +305,7 @@ export default function RoomChatDrawer({
             <Ionicons name="send" size={14} color="#FFF" />
           </Pressable>
         </View>
+        </KeyboardAvoidingView>
       </Animated.View>
     </>
   );
