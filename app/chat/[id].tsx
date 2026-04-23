@@ -297,7 +297,8 @@ function MessageBubble({ message, isMe, senderAvatar, senderName, myAvatar, onDe
 export default function ChatScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { firebaseUser, profile, refreshProfile } = useAuth();
+  const { firebaseUser, profile, refreshProfile, minimizedRoom } = useAuth();
+  const insets = useSafeAreaInsets();
   const { refreshBadges } = useBadges();
   const [inputText, setInputText] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
@@ -314,7 +315,13 @@ export default function ChatScreen() {
   const [respondingRequest, setRespondingRequest] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   // ★ 2026-04-23: RoomChatDrawer pattern — input bar'ı klavyenin üstüne sabitle (Clubhouse).
-  const inputBottomAnim = useRef(new Animated.Value(0)).current;
+  // MiniRoomCard global overlay (z:999) DM üstünde durduğu için, oda minimize iken
+  // input bar'ı MiniRoomCard'ın da üstüne çıkar (aksi halde oda çubuğu input'u örter).
+  const miniRoomOffset = minimizedRoom ? Math.max(insets.bottom, 8) + 144 : 0;
+  const inputBottomAnim = useRef(new Animated.Value(miniRoomOffset)).current;
+  useEffect(() => {
+    inputBottomAnim.setValue(miniRoomOffset);
+  }, [miniRoomOffset]);
   useEffect(() => {
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
     const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
@@ -324,10 +331,10 @@ export default function ChatScreen() {
       Animated.timing(inputBottomAnim, { toValue: kbHeight, duration: 250, useNativeDriver: false }).start();
     });
     const hideSub = Keyboard.addListener(hideEvent, () => {
-      Animated.timing(inputBottomAnim, { toValue: 0, duration: 200, useNativeDriver: false }).start();
+      Animated.timing(inputBottomAnim, { toValue: miniRoomOffset, duration: 200, useNativeDriver: false }).start();
     });
     return () => { showSub.remove(); hideSub.remove(); };
-  }, []);
+  }, [miniRoomOffset]);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const flatListRef = useRef<FlatList>(null);
   const isAtBottomRef = useRef(true); // ★ BUG-6 FIX: Kullanıcı en altta mı?
@@ -761,8 +768,6 @@ export default function ChatScreen() {
     }
   };
 
-  const insets = useSafeAreaInsets(); // ★ Hook’lar koşullu return’den ÖNCE olmalı (Rules of Hooks)
-
   if (loading) {
     return (
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
@@ -1001,7 +1006,7 @@ export default function ChatScreen() {
           />
         )}
         style={styles.messageList}
-        contentContainerStyle={[styles.messageContent, { paddingBottom: 90 + Math.max(insets.bottom, 10) }]}
+        contentContainerStyle={[styles.messageContent, { paddingBottom: 90 + Math.max(insets.bottom, 10) + miniRoomOffset }]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="interactive"
