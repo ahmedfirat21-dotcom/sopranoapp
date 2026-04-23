@@ -1,10 +1,10 @@
 /**
  * SopranoChat — Mini Oda Kartı (Floating PiP)
- * ★ 2026-04-24 v3: Drag-to-reposition + snap-to-edge.
+ * ★ 2026-04-24 v4: Drag + snap + audio glow + mute toggle.
  *   - Sürükle → dikey eksende serbest hareket (translateY offset)
  *   - Bırak → en yakın snap pozisyonuna spring animasyonuyla yapış
- *   - Tüm animasyonlar useNativeDriver: true (60fps garantisi)
- *   - Tab bar ile aynı genişlik & margin
+ *   - Ses aktifken: kenar glow pulse + parlaklık dalgası (audio feedback)
+ *   - Mic badge + Room mute toggle (speaker ikonu)
  */
 import React, { useEffect, useRef, useMemo } from 'react';
 import {
@@ -21,12 +21,14 @@ export interface MinimizedRoom {
   hostName: string;
   viewerCount: number;
   isMicOn: boolean;
+  isRoomMuted?: boolean;
 }
 
 interface MiniRoomCardProps {
   room: MinimizedRoom;
   onExpand: () => void;
   onClose: () => void;
+  onMuteToggle?: () => void;
 }
 
 const BAR_MARGIN = 6;
@@ -34,78 +36,77 @@ const BAR_H = 60;
 const CARD_H = 52;
 const SCREEN_H = Dimensions.get('window').height;
 
-export default function MiniRoomCard({ room, onExpand, onClose }: MiniRoomCardProps) {
+export default function MiniRoomCard({ room, onExpand, onClose, onMuteToggle }: MiniRoomCardProps) {
   const insets = useSafeAreaInsets();
   const { width: winW } = useWindowDimensions();
 
-  // ═══ Animasyon değerleri (hepsi native driver uyumlu) ═══
+  // ═══ Animasyon değerleri ═══
   const slideIn = useRef(new Animated.Value(80)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const ripple1 = useRef(new Animated.Value(0)).current;
   const ripple2 = useRef(new Animated.Value(0)).current;
   const dragScale = useRef(new Animated.Value(1)).current;
-
-  // ★ Drag offset — translateY olarak (yukarı = negatif)
-  //   bottom sabit kalır, sadece translateY ile pozisyon değişir
-  //   → useNativeDriver: true kullanılabilir (layout prop animasyonu yok)
   const dragOffsetY = useRef(new Animated.Value(0)).current;
   const currentOffsetY = useRef(0);
 
-  const cardWidth = Math.max(0, winW - BAR_MARGIN * 2 - (insets.left + insets.right));
-  const bottomBase = Math.max(insets.bottom, 8) + BAR_H + 8; // Tab bar üstü (statik)
+  // ★ Audio glow — ses aktifken kenar parlaklık dalgası
+  const audioGlow = useRef(new Animated.Value(0)).current;
+  const audioGlowRef = useRef<Animated.CompositeAnimation | null>(null);
 
-  // ★ Snap noktaları — translateY offset olarak (0 = tab bar üstü, negatif = yukarı)
-  const snapOffsetBottom = 0;                                            // Default: tab bar üstü
-  const snapOffsetMid = -(SCREEN_H * 0.4 - bottomBase);                 // Ekran ortası
-  const snapOffsetTop = -(SCREEN_H - insets.top - 60 - CARD_H - bottomBase); // Header altı
+  const cardWidth = Math.max(0, winW - BAR_MARGIN * 2 - (insets.left + insets.right));
+  const bottomBase = Math.max(insets.bottom, 8) + BAR_H + 8;
+
+  // ★ Snap noktaları (translateY offset)
+  const snapOffsetBottom = 0;
+  const snapOffsetMid = -(SCREEN_H * 0.4 - bottomBase);
+  const snapOffsetTop = -(SCREEN_H - insets.top - 60 - CARD_H - bottomBase);
   const snapOffsets = [snapOffsetBottom, snapOffsetMid, snapOffsetTop];
+
+  // ★ Audio glow animasyonu — muted değilken aktif
+  useEffect(() => {
+    if (!room.isRoomMuted) {
+      const glow = Animated.loop(
+        Animated.sequence([
+          Animated.timing(audioGlow, { toValue: 1, duration: 1200, useNativeDriver: true }),
+          Animated.timing(audioGlow, { toValue: 0, duration: 1200, useNativeDriver: true }),
+        ])
+      );
+      audioGlowRef.current = glow;
+      glow.start();
+      return () => { glow.stop(); };
+    } else {
+      audioGlowRef.current?.stop();
+      audioGlow.setValue(0);
+    }
+  }, [room.isRoomMuted]);
 
   // ★ PanResponder — dikey sürükleme
   const panResponder = useMemo(() => {
     let startOffsetY = 0;
-
     return PanResponder.create({
       onStartShouldSetPanResponder: () => false,
       onMoveShouldSetPanResponder: (_, gs) => Math.abs(gs.dy) > 8,
       onPanResponderGrant: () => {
         startOffsetY = currentOffsetY.current;
-        Animated.spring(dragScale, {
-          toValue: 0.96, friction: 12, useNativeDriver: true,
-        }).start();
+        Animated.spring(dragScale, { toValue: 0.96, friction: 12, useNativeDriver: true }).start();
       },
       onPanResponderMove: (_, gs) => {
-        // dy pozitif = parmak aşağı → kart aşağı (translateY artar)
-        const raw = startOffsetY + gs.dy;
-        // Sınırla: tab bar üstünden aşağı inemesin, header üstüne çıkamasın
-        const clamped = Math.max(snapOffsetTop, Math.min(snapOffsetBottom, raw));
+        const clamped = Math.max(snapOffsetTop, Math.min(snapOffsetBottom, startOffsetY + gs.dy));
         dragOffsetY.setValue(clamped);
       },
       onPanResponderRelease: (_, gs) => {
-        Animated.spring(dragScale, {
-          toValue: 1, friction: 8, tension: 120, useNativeDriver: true,
-        }).start();
-
-        const releaseOffset = Math.max(
-          snapOffsetTop,
-          Math.min(snapOffsetBottom, startOffsetY + gs.dy)
-        );
-
-        // ★ Velocity-based snap — hızlı fırlatma yöne göre atlar
+        Animated.spring(dragScale, { toValue: 1, friction: 8, tension: 120, useNativeDriver: true }).start();
+        const releaseOffset = Math.max(snapOffsetTop, Math.min(snapOffsetBottom, startOffsetY + gs.dy));
         const vy = gs.vy;
         let target = releaseOffset;
 
         if (Math.abs(vy) > 0.5) {
           if (vy < 0) {
-            // Yukarı fırlatma → bir üst snap (daha negatif offset)
-            target = snapOffsets.filter(sp => sp < releaseOffset).sort((a, b) => b - a)[0]
-              ?? snapOffsets[snapOffsets.length - 1];
+            target = snapOffsets.filter(sp => sp < releaseOffset).sort((a, b) => b - a)[0] ?? snapOffsets[snapOffsets.length - 1];
           } else {
-            // Aşağı fırlatma → bir alt snap (daha pozitif offset)
-            target = snapOffsets.filter(sp => sp > releaseOffset).sort((a, b) => a - b)[0]
-              ?? snapOffsets[0];
+            target = snapOffsets.filter(sp => sp > releaseOffset).sort((a, b) => a - b)[0] ?? snapOffsets[0];
           }
         } else {
-          // Yavaş bırakma → en yakın snap
           let minDist = Infinity;
           for (const sp of snapOffsets) {
             const dist = Math.abs(releaseOffset - sp);
@@ -114,9 +115,7 @@ export default function MiniRoomCard({ room, onExpand, onClose }: MiniRoomCardPr
         }
 
         currentOffsetY.current = target;
-        Animated.spring(dragOffsetY, {
-          toValue: target, friction: 10, tension: 100, useNativeDriver: true,
-        }).start();
+        Animated.spring(dragOffsetY, { toValue: target, friction: 10, tension: 100, useNativeDriver: true }).start();
       },
     });
   }, [snapOffsetBottom, snapOffsetMid, snapOffsetTop]);
@@ -149,15 +148,25 @@ export default function MiniRoomCard({ room, onExpand, onClose }: MiniRoomCardPr
   }, []);
 
   const handleClose = () => {
-    Animated.timing(slideIn, { toValue: 120, duration: 200, useNativeDriver: true }).start(() => {
-      onClose();
-    });
+    Animated.timing(slideIn, { toValue: 120, duration: 200, useNativeDriver: true }).start(() => onClose());
   };
 
   const rippleScaleFn = (anim: Animated.Value) =>
     anim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.08] });
   const rippleOpacityFn = (anim: Animated.Value) =>
     anim.interpolate({ inputRange: [0, 0.3, 1], outputRange: [0.3, 0.12, 0] });
+
+  // ★ Audio glow interpolation
+  const audioGlowOpacity = audioGlow.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 0.6],
+  });
+  const audioGlowScale = audioGlow.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 1.03],
+  });
+
+  const isAudioActive = !room.isRoomMuted;
 
   return (
     <Animated.View
@@ -175,6 +184,17 @@ export default function MiniRoomCard({ room, onExpand, onClose }: MiniRoomCardPr
       ]}
       {...panResponder.panHandlers}
     >
+      {/* ★ Audio glow ring — ses aktifken teal parlaklık dalgası */}
+      {isAudioActive && (
+        <Animated.View style={[
+          styles.audioGlowRing,
+          {
+            opacity: audioGlowOpacity,
+            transform: [{ scale: audioGlowScale }],
+          },
+        ]} />
+      )}
+
       {/* Ripple halkaları */}
       <Animated.View style={[
         styles.ripple,
@@ -217,9 +237,38 @@ export default function MiniRoomCard({ room, onExpand, onClose }: MiniRoomCardPr
           </View>
         </View>
 
-        {/* Mic + Kapat */}
+        {/* ★ Ses kontrol butonları: Room Mute + Mic + Kapat */}
         <View style={styles.actions}>
-          <View style={[styles.micBadge, room.isMicOn && styles.micOn]}>
+          {/* Room ses toggle (speaker) */}
+          {onMuteToggle && (
+            <Pressable
+              onPress={onMuteToggle}
+              style={[styles.actionBadge, isAudioActive ? styles.speakerOn : styles.speakerOff]}
+              hitSlop={8}
+            >
+              <Ionicons
+                name={isAudioActive ? 'volume-high' : 'volume-mute'}
+                size={13}
+                color={isAudioActive ? '#14B8A6' : '#EF4444'}
+                style={styles.iconShadow}
+              />
+              {/* ★ Ses dalga çizgileri — ses aktifken */}
+              {isAudioActive && (
+                <View style={styles.soundWaves}>
+                  <Animated.View style={[styles.wave, styles.wave1, { opacity: audioGlow }]} />
+                  <Animated.View style={[styles.wave, styles.wave2, {
+                    opacity: audioGlow.interpolate({
+                      inputRange: [0, 0.5, 1],
+                      outputRange: [0, 0.8, 0.3],
+                    }),
+                  }]} />
+                </View>
+              )}
+            </Pressable>
+          )}
+
+          {/* Mic durumu */}
+          <View style={[styles.actionBadge, room.isMicOn && styles.micOn]}>
             <Ionicons
               name={room.isMicOn ? 'mic' : 'mic-off'}
               size={13}
@@ -227,6 +276,8 @@ export default function MiniRoomCard({ room, onExpand, onClose }: MiniRoomCardPr
               style={styles.iconShadow}
             />
           </View>
+
+          {/* Kapat */}
           <Pressable onPress={handleClose} style={styles.closeBtn} hitSlop={12}>
             <Ionicons name="close" size={14} color="#EF4444" />
           </Pressable>
@@ -246,6 +297,19 @@ const styles = StyleSheet.create({
     zIndex: 999,
     elevation: 999,
     alignItems: 'center',
+  },
+  // ★ Audio glow ring — ses aktifken teal nefes alan kenar parlaklığı
+  audioGlowRing: {
+    position: 'absolute',
+    left: -2, right: -2, top: -2, bottom: -2,
+    borderRadius: 24,
+    borderWidth: 2,
+    borderColor: '#14B8A6',
+    shadowColor: '#14B8A6',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 12,
+    elevation: 8,
   },
   ripple: {
     position: 'absolute',
@@ -272,58 +336,67 @@ const styles = StyleSheet.create({
     elevation: 14,
   },
   dragHandle: {
-    width: 32,
-    height: 3,
-    borderRadius: 1.5,
+    width: 32, height: 3, borderRadius: 1.5,
     backgroundColor: 'rgba(255,255,255,0.15)',
     marginTop: 4,
   },
   liveIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
+    flexDirection: 'row', alignItems: 'center', gap: 4,
     backgroundColor: 'rgba(239,68,68,0.12)',
-    paddingHorizontal: 7,
-    paddingVertical: 3,
+    paddingHorizontal: 7, paddingVertical: 3,
     borderRadius: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(239,68,68,0.25)',
+    borderWidth: 1, borderColor: 'rgba(239,68,68,0.25)',
   },
-  liveDot: {
-    width: 5, height: 5, borderRadius: 2.5,
-    backgroundColor: '#EF4444',
-  },
-  liveText: {
-    fontSize: 8, fontWeight: '800', color: '#EF4444',
-    letterSpacing: 0.6,
-  },
+  liveDot: { width: 5, height: 5, borderRadius: 2.5, backgroundColor: '#EF4444' },
+  liveText: { fontSize: 8, fontWeight: '800', color: '#EF4444', letterSpacing: 0.6 },
   info: { flex: 1 },
   roomName: {
-    fontSize: 12, fontWeight: '700', color: '#F1F5F9',
-    letterSpacing: 0.2,
+    fontSize: 12, fontWeight: '700', color: '#F1F5F9', letterSpacing: 0.2,
     textShadowColor: 'rgba(0,0,0,0.4)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
+    textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
   },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 2 },
   metaText: { fontSize: 9, color: '#94A3B8', fontWeight: '600' },
   metaDot: { fontSize: 9, color: '#64748B', marginHorizontal: 1 },
   iconShadow: {
     textShadowColor: 'rgba(0,0,0,0.4)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
+    textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
   actions: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  micBadge: {
+  // ★ Ortak buton stili (mic + speaker)
+  actionBadge: {
     width: 28, height: 28, borderRadius: 14,
     backgroundColor: 'rgba(255,255,255,0.06)',
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)',
     alignItems: 'center', justifyContent: 'center',
+    position: 'relative',
   },
   micOn: {
     backgroundColor: 'rgba(20,184,166,0.12)',
     borderColor: 'rgba(20,184,166,0.3)',
   },
+  speakerOn: {
+    backgroundColor: 'rgba(20,184,166,0.12)',
+    borderColor: 'rgba(20,184,166,0.3)',
+  },
+  speakerOff: {
+    backgroundColor: 'rgba(239,68,68,0.1)',
+    borderColor: 'rgba(239,68,68,0.25)',
+  },
+  // ★ Ses dalgası çizgileri (speaker ikonunun yanında)
+  soundWaves: {
+    position: 'absolute',
+    right: -3, top: 2, bottom: 2,
+    width: 6,
+    justifyContent: 'center',
+    gap: 2,
+  },
+  wave: {
+    width: 2, borderRadius: 1,
+    backgroundColor: '#14B8A6',
+  },
+  wave1: { height: 6 },
+  wave2: { height: 4 },
   closeBtn: {
     width: 26, height: 26, borderRadius: 13,
     backgroundColor: 'rgba(239,68,68,0.1)',

@@ -1222,6 +1222,28 @@ export default function RootLayout() {
               }
               liveKitService.disconnect().catch(() => {});
             }}
+            onMuteToggle={() => {
+              // ★ 2026-04-24: Minimize'da oda sesini aç/kapat
+              //   LiveKit remote audio track'leri toggle et
+              const newMuted = !minimizedRoom.isRoomMuted;
+              try {
+                const room = liveKitService.currentRoom;
+                if (room) {
+                  room.remoteParticipants.forEach((p: any) => {
+                    p.audioTrackPublications?.forEach((pub: any) => {
+                      if (pub.track) {
+                        if (newMuted) {
+                          pub.track.stop();
+                        } else {
+                          pub.track.start();
+                        }
+                      }
+                    });
+                  });
+                }
+              } catch {}
+              setMinimizedRoom({ ...minimizedRoom, isRoomMuted: newMuted });
+            }}
           />
         )}
         <Toast />
