@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { View, Text, StyleSheet, Image, Pressable, TextInput, FlatList, KeyboardAvoidingView, Platform, ActivityIndicator, Animated, Easing, NativeScrollEvent, NativeSyntheticEvent, Modal, Keyboard } from 'react-native';
+import { View, Text, StyleSheet, Image, Pressable, TextInput, FlatList, Platform, ActivityIndicator, Animated, Easing, NativeScrollEvent, NativeSyntheticEvent, Modal, Keyboard, Dimensions } from 'react-native';
 import PremiumAlert, { type AlertButton } from '../../components/PremiumAlert';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -313,6 +313,21 @@ export default function ChatScreen() {
   const [msgRequestInfo, setMsgRequestInfo] = useState<{ status: 'none' | 'pending_incoming' | 'pending_outgoing' | 'accepted' | 'rejected' }>({ status: 'none' });
   const [respondingRequest, setRespondingRequest] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  // ★ 2026-04-23: RoomChatDrawer pattern — input bar'ı klavyenin üstüne sabitle (Clubhouse).
+  const inputBottomAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSub = Keyboard.addListener(showEvent, (e) => {
+      const screenH = Dimensions.get('screen').height;
+      const kbHeight = Math.max(0, screenH - e.endCoordinates.screenY);
+      Animated.timing(inputBottomAnim, { toValue: kbHeight, duration: 250, useNativeDriver: false }).start();
+    });
+    const hideSub = Keyboard.addListener(hideEvent, () => {
+      Animated.timing(inputBottomAnim, { toValue: 0, duration: 200, useNativeDriver: false }).start();
+    });
+    return () => { showSub.remove(); hideSub.remove(); };
+  }, []);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const flatListRef = useRef<FlatList>(null);
   const isAtBottomRef = useRef(true); // ★ BUG-6 FIX: Kullanıcı en altta mı?
@@ -760,11 +775,7 @@ export default function ChatScreen() {
 
   return (
     <AppBackground>
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={0}
-    >
+    <View style={styles.container}>
 
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + 6 }]}>
@@ -990,7 +1001,7 @@ export default function ChatScreen() {
           />
         )}
         style={styles.messageList}
-        contentContainerStyle={styles.messageContent}
+        contentContainerStyle={[styles.messageContent, { paddingBottom: 90 + Math.max(insets.bottom, 10) }]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="interactive"
@@ -1080,7 +1091,9 @@ export default function ChatScreen() {
         }
       />
 
-      {/* ★ Input Bar — WhatsApp tarzı: kayıt sırasında inline dönüşüm */}
+      {/* ★ 2026-04-23: Input Bar — absolute + Animated bottom (RoomChatDrawer Clubhouse pattern).
+          Klavye açıldığında bar klavyenin ÜSTÜNE sabitlenir; emoji picker da wrapper içinde bar'ın ALTINA yerleşir. */}
+      <Animated.View style={{ position: 'absolute', left: 0, right: 0, bottom: inputBottomAnim, zIndex: 10 }}>
       {isRecording ? (
         <View style={[styles.inputBar, { paddingBottom: Math.max(insets.bottom, 10) }]}>
           {/* Kayıt modunda: inline waveform bar */}
@@ -1199,7 +1212,7 @@ export default function ChatScreen() {
         </View>
       )}
 
-      {/* ★ Emoji Picker — inline keyboard-height panel */}
+      {/* ★ Emoji Picker — input bar wrapper'ının içinde (bar'ın altında) inline panel */}
       <EmojiPicker
         visible={showEmojiPicker}
         onClose={() => setShowEmojiPicker(false)}
@@ -1207,6 +1220,7 @@ export default function ChatScreen() {
           setInputText(prev => prev + emoji);
         }}
       />
+      </Animated.View>
 
       {/* Report Modal */}
       {firebaseUser && reportMessageId && (
@@ -1366,7 +1380,7 @@ export default function ChatScreen() {
           )}
         </View>
       </Modal>
-    </KeyboardAvoidingView>
+    </View>
     </AppBackground>
   );
 }
