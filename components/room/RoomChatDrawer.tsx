@@ -6,7 +6,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, Animated, PanResponder, Pressable,
-  TextInput, FlatList, Image, Dimensions, KeyboardAvoidingView, Platform, Keyboard,
+  TextInput, FlatList, Image, Dimensions, Platform, Keyboard,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -62,44 +62,38 @@ export default function RoomChatDrawer({
   visible, messages, chatInput, onChangeInput, onSend, onClose, bottomInset, onSendRaw,
 }: Props) {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  // ★ 2026-04-23 (v4 — FINAL): Clubhouse pattern.
-  //   Sorun: adjustResize windowu keys yüksekliği kadar kısaltıyor ama Samsung'un
-  //   üstteki "akıllı toolbar"ı (emoji/AI/çeviri) keys ÜSTÜNDE overlay çiziyor,
-  //   window'un bottom'undan daha yukarıdan başlıyor — input toolbar'ın arkasında kalıyor.
-  //   Fix: Window shrink olup olmadığını tespit et. Olmadıysa manuel lift; olduysa
-  //   sadece toolbar kadar ekstra padding ekle.
-  const { height: initialWindowH } = Dimensions.get('window');
+  // ★ 2026-04-23 (v5 — ROBUST): Klavye açıkken panel'i yukarı kaydır.
+  //   Basit ve pragmatik: sadece translateY animasyonuyla panel'i klavye yüksekliği
+  //   kadar yukarı kaldır. adjustResize quirk'leriyle uğraşma — transform her zaman
+  //   screen coordinate'te çalışır, cihazdan bağımsız tutarlı.
+  //   KAV'ı da kaldırdık, input panel'in doğal flex layout'unda bottom'da kalıyor.
   const [kbHeight, setKbHeight] = useState(0);
-  const [resizeWorked, setResizeWorked] = useState(false);
   useEffect(() => {
-    const show = Keyboard.addListener('keyboardDidShow', (e) => {
-      const kh = e.endCoordinates?.height || 0;
-      setKbHeight(kh);
-      // 80ms bekle: adjustResize'ın window'u kısaltıp kısaltmadığını ölç
-      setTimeout(() => {
-        const nowH = Dimensions.get('window').height;
-        setResizeWorked(nowH < initialWindowH - 50);
-      }, 80);
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const show = Keyboard.addListener(showEvent, (e) => {
+      setKbHeight(e.endCoordinates?.height || 0);
     });
-    const hide = Keyboard.addListener('keyboardDidHide', () => {
-      setKbHeight(0);
-      setResizeWorked(false);
-    });
+    const hide = Keyboard.addListener(hideEvent, () => setKbHeight(0));
     return () => { show.remove(); hide.remove(); };
-  }, [initialWindowH]);
+  }, []);
   const kbVisible = kbHeight > 0;
-  // Panel'i yukarı kaydırma miktarı:
-  //   - Resize çalıştıysa: 0 (window zaten kısalmış, bottom:0 klavye üstünde)
-  //   - Çalışmadıysa (eski cihaz / custom keyboard): kbHeight kadar manuel lift
-  const manualLift = resizeWorked ? 0 : kbHeight;
-  // Samsung "akıllı toolbar" telafisi — resize çalışsa bile toolbar keys üstünde
-  // ekstra ~55px kaplar, sadece Android'de padding ekle
-  const SAMSUNG_TOOLBAR_BUFFER = Platform.OS === 'android' && kbVisible && resizeWorked ? 55 : 0;
 
-  // Panel control bar'ın arkasına kadar uzanır — tek sürekli yüzey.
-  // Control bar room/[id].tsx tarafında zIndex: 60 ile panel'in önünde kalır.
+  // Klavye açıkken panel translateY ile yukarı taşınır; paddingBottom sıfırlanır
+  // (control bar zaten klavye altında kalıyor, ek boşluk gereksiz).
   const BAR_OFFSET_DEFAULT = bottomInset + 76;
-  const BAR_OFFSET = kbVisible ? SAMSUNG_TOOLBAR_BUFFER : BAR_OFFSET_DEFAULT;
+  const BAR_OFFSET = kbVisible ? 0 : BAR_OFFSET_DEFAULT;
+  // Panel'i klavye yüksekliği kadar yukarı shift et (negative translateY).
+  // useNativeDriver:false — translateY (drag anim) de JS-driver kullanıyor, Animated.add
+  // driver uyumu için aynı olmalı. Height anim de JS-driver, tutarlı.
+  const kbShiftY = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(kbShiftY, {
+      toValue: -kbHeight,
+      duration: Platform.OS === 'ios' ? 250 : 200,
+      useNativeDriver: false,
+    }).start();
+  }, [kbHeight]);
   const HALF_TOTAL = PANEL_HEIGHT_HALF + BAR_OFFSET;
   const FULL_TOTAL = PANEL_HEIGHT_FULL + BAR_OFFSET;
   const CLOSED_Y = FULL_TOTAL;
@@ -238,11 +232,12 @@ export default function RoomChatDrawer({
         style={[
           s.panel,
           {
-            // ★ 2026-04-23 (v4 FINAL): bottom = manualLift (0 ise resize çalıştı, kbHeight ise fallback)
-            bottom: manualLift,
+            // ★ 2026-04-23 (v5): bottom:0 sabit; klavye yüksekliği kadar translateY ile kaldırılır
+            bottom: 0,
             height: heightAnim,
             paddingBottom: BAR_OFFSET,
-            transform: [{ translateY }],
+            // translateY (drag/open-close) + kbShiftY (klavye kompanzasyonu) kombine
+            transform: [{ translateY: Animated.add(translateY, kbShiftY) }],
           },
         ]}
       >
@@ -272,10 +267,9 @@ export default function RoomChatDrawer({
           keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
         />
 
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? bottomInset + 10 : 0}
-        >
+        {/* ★ 2026-04-23 (v5): KAV kaldırıldı — panel translateY ile klavye üstüne
+             taşınıyor, KAV double-shift yaratıyordu. */}
+        <View>
           {/* ★ Emoji & GIF picker — toggle ile input'un üstünde açılır (WhatsApp/Telegram pattern) */}
           {showEmojiPicker && (
             <View style={s.pickerWrap}>
@@ -337,7 +331,7 @@ export default function RoomChatDrawer({
               <Ionicons name="send" size={14} color="#FFF" />
             </Pressable>
           </View>
-        </KeyboardAvoidingView>
+        </View>
       </Animated.View>
     </>
   );
