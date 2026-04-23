@@ -62,15 +62,18 @@ export default function RoomChatDrawer({
   visible, messages, chatInput, onChangeInput, onSend, onClose, bottomInset, onSendRaw,
 }: Props) {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  // ★ 2026-04-23 (v2): Klavye açıkken paddingBottom'ı sıfırla — aksi halde input,
-  //   control bar için ayrılan ~90px'in üstünde kalıp Samsung keyboard toolbar'ıyla
-  //   örtüşüyor ve kullanıcı yazamıyor. Klavye zaten control bar'ı örtüyor.
-  const [kbVisible, setKbVisible] = useState(false);
+  // ★ 2026-04-23 (v3): Klavye yüksekliğini doğrudan oku, panel'in bottom'unu o kadar
+  //   yukarı kaydır. AdjustResize'a güvenmiyoruz — Samsung'un keyboard toolbar'ı
+  //   genelde resize'a dahil edilmiyor, input onun altında kalıyordu.
+  const [kbHeight, setKbHeight] = useState(0);
   useEffect(() => {
-    const show = Keyboard.addListener('keyboardDidShow', () => setKbVisible(true));
-    const hide = Keyboard.addListener('keyboardDidHide', () => setKbVisible(false));
+    const show = Keyboard.addListener('keyboardDidShow', (e) => {
+      setKbHeight(e.endCoordinates?.height || 0);
+    });
+    const hide = Keyboard.addListener('keyboardDidHide', () => setKbHeight(0));
     return () => { show.remove(); hide.remove(); };
   }, []);
+  const kbVisible = kbHeight > 0;
 
   // Panel control bar'ın arkasına kadar uzanır — tek sürekli yüzey.
   // Control bar room/[id].tsx tarafında zIndex: 60 ile panel'in önünde kalır.
@@ -215,6 +218,9 @@ export default function RoomChatDrawer({
         style={[
           s.panel,
           {
+            // ★ 2026-04-23 (v3): bottom=kbHeight → panel klavye üstünde; adjustResize
+            //   quirk'ine karşı bağımsız çalışır, Samsung toolbar kesmiyor
+            bottom: kbHeight,
             height: heightAnim,
             paddingBottom: BAR_OFFSET,
             transform: [{ translateY }],
