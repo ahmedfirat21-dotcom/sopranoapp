@@ -119,11 +119,12 @@ const ConversationCard = React.memo(function ConversationCard({
   onCallPress: (partnerId: string) => void;
 }) {
   const unread = item.unread_count > 0;
+  // ★ 2026-04-24: Midnight Sapphire + Teal temasıyla uyumlu gradient paletleri
   const cardGradient = isSelected
-    ? ['rgba(10,15,28,0.98)', 'rgba(20,184,166,0.10)', 'rgba(45,212,191,0.16)', 'rgba(20,184,166,0.08)', 'rgba(10,15,28,0.98)']
+    ? ['rgba(10,15,28,0.98)', 'rgba(20,184,166,0.10)', 'rgba(45,212,191,0.14)', 'rgba(20,184,166,0.08)', 'rgba(10,15,28,0.98)']
     : unread
-      ? ['rgba(11,18,32,0.98)', 'rgba(56,189,248,0.09)', 'rgba(147,197,253,0.15)', 'rgba(56,189,248,0.07)', 'rgba(11,18,32,0.98)']
-      : ['rgba(10,15,28,0.97)', 'rgba(37,99,235,0.08)', 'rgba(255,255,255,0.09)', 'rgba(37,99,235,0.07)', 'rgba(10,15,28,0.97)'];
+      ? ['rgba(11,18,32,0.98)', 'rgba(20,184,166,0.08)', 'rgba(45,212,191,0.13)', 'rgba(20,184,166,0.06)', 'rgba(11,18,32,0.98)']
+      : ['rgba(10,15,28,0.97)', 'rgba(22,34,54,0.6)', 'rgba(255,255,255,0.05)', 'rgba(22,34,54,0.5)', 'rgba(10,15,28,0.97)'];
   return (
     <SwipeableRow
       containerStyle={[styles.msgCard, isSelected && styles.msgCardSelected, unread && styles.msgCardUnread]}
@@ -800,7 +801,7 @@ export default function MessagesScreen() {
       <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 14, marginTop: 2 }}>
         {/* İstekler chip — pending request varsa belirginleşir */}
         <Pressable
-          style={[styles.archiveChip, { flex: 1, marginHorizontal: 0 }, pendingRequests.length === 0 && !showRequests && { opacity: 0.5 }]}
+          style={[styles.archiveChip, styles.requestChip, { flex: 1, marginHorizontal: 0 }, pendingRequests.length === 0 && !showRequests && { opacity: 0.5 }]}
           onPress={() => {
             if (pendingRequests.length === 0 && !showRequests) {
               showToast({ title: 'İstek yok', message: 'Bekleyen mesaj isteğin yok.', type: 'info' });
@@ -813,9 +814,9 @@ export default function MessagesScreen() {
           <Ionicons
             name={showRequests ? 'arrow-back' : 'mail-unread-outline'}
             size={16}
-            color={pendingRequests.length === 0 && !showRequests ? 'rgba(94,234,212,0.5)' : '#60A5FA'}
+            color={pendingRequests.length === 0 && !showRequests ? 'rgba(94,234,212,0.5)' : '#F59E0B'}
           />
-          <Text style={[styles.archiveChipText, { color: '#93C5FD' }]}>
+          <Text style={[styles.archiveChipText, { color: '#FBBF24' }]}>
             {showRequests ? `Geri` : `İstekler (${pendingRequests.length})`}
           </Text>
           <Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.3)" />
@@ -865,9 +866,9 @@ export default function MessagesScreen() {
                   style={({ pressed }) => [{
                     flexDirection: 'row', alignItems: 'center', gap: 10,
                     paddingHorizontal: 14, paddingVertical: 10,
-                    backgroundColor: pressed ? 'rgba(96,165,250,0.08)' : 'transparent',
+                    backgroundColor: pressed ? 'rgba(20,184,166,0.08)' : 'transparent',
                   }]}>
-                  <Image source={getAvatarSource(sender.avatar_url)} style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: '#1E293B' }} />
+                  <Image source={getAvatarSource(sender.avatar_url)} style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: '#162236' }} />
                   <View style={{ flex: 1 }}>
                     <Text style={{ fontSize: 14, fontWeight: '700', color: '#F1F5F9' }} numberOfLines={1}>
                       {sender.display_name || 'Kullanıcı'}
@@ -876,8 +877,8 @@ export default function MessagesScreen() {
                       Sizinle mesajlaşmak istiyor — dokun ve cevap ver
                     </Text>
                   </View>
-                  <View style={{ backgroundColor: 'rgba(59,130,246,0.15)', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }}>
-                    <Text style={{ fontSize: 10, fontWeight: '700', color: '#60A5FA' }}>İstek</Text>
+                  <View style={{ backgroundColor: 'rgba(251,191,36,0.12)', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: 'rgba(251,191,36,0.25)' }}>
+                    <Text style={{ fontSize: 10, fontWeight: '700', color: '#FBBF24' }}>İstek</Text>
                   </View>
                 </Pressable>
               );
@@ -1227,7 +1228,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(45,212,191,0.22)',
   },
   msgCardUnread: {
-    borderColor: 'rgba(56,189,248,0.18)',
+    borderColor: 'rgba(20,184,166,0.18)',
   },
 
   swipeClip: {
@@ -1255,7 +1256,7 @@ const styles = StyleSheet.create({
   msgInfo: { flex: 1, justifyContent: 'center', gap: 4 },
   msgTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   msgName: { fontSize: 15, fontWeight: '600', color: '#E2E8F0', flexShrink: 1, ...Shadows.text },
-  // ─── Arşiv chip ───
+  // ─── Arşiv & İstek chip ───
   archiveChip: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
     marginHorizontal: 14, marginTop: 4, marginBottom: 8,
@@ -1263,6 +1264,10 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     backgroundColor: 'rgba(20,184,166,0.08)',
     borderWidth: 1, borderColor: 'rgba(20,184,166,0.2)',
+  },
+  requestChip: {
+    backgroundColor: 'rgba(251,191,36,0.06)',
+    borderColor: 'rgba(251,191,36,0.18)',
   },
   archiveChipText: {
     flex: 1, fontSize: 13, fontWeight: '700',

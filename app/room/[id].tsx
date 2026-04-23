@@ -378,13 +378,32 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
   const [msgReq, setMsgReq] = useState<{ status: 'none' | 'pending_incoming' | 'pending_outgoing' | 'accepted' | 'rejected' }>({ status: 'none' });
   const [reqResponding, setReqResponding] = useState(false);
 
-  // ★ 2026-04-23: Klavye görünürlüğü — açıkken panel bottom'ını sıfırla ki
-  //   input alt bar arkasında kalmasın (chat drawer ile aynı fix).
-  const [dmKbVisible, setDmKbVisible] = useState(false);
+  // ★ 2026-04-23 FIX: Animated keyboard-aware bottom — RoomChatDrawer patterniyle aynı.
+  //   Boolean yerine Animated.Value ile klavye yüksekliği takip edilir, panel
+  //   tam olarak klavyenin üstüne konumlanır. Her platform için doğru event kullanılır.
+  const dmPanelBottomAnim = useRef(new Animated.Value(120)).current;
   useEffect(() => {
-    const show = Keyboard.addListener('keyboardDidShow', () => setDmKbVisible(true));
-    const hide = Keyboard.addListener('keyboardDidHide', () => setDmKbVisible(false));
-    return () => { show.remove(); hide.remove(); };
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSub = Keyboard.addListener(showEvent, (e) => {
+      const screenH = Dimensions.get('screen').height;
+      const kbHeight = Math.max(0, screenH - e.endCoordinates.screenY);
+      // ★ Varsayılan 120'den küçük olmamalı — emülatörde veya fiziksel klavyede
+      //   kbHeight≈0 olabilir, panel aşağı kaymasın.
+      Animated.timing(dmPanelBottomAnim, {
+        toValue: Math.max(kbHeight, 120),
+        duration: Platform.OS === 'ios' ? 250 : 150,
+        useNativeDriver: false,
+      }).start();
+    });
+    const hideSub = Keyboard.addListener(hideEvent, () => {
+      Animated.timing(dmPanelBottomAnim, {
+        toValue: 120,
+        duration: 200,
+        useNativeDriver: false,
+      }).start();
+    });
+    return () => { showSub.remove(); hideSub.remove(); };
   }, []);
 
   // ★ Swipe-to-dismiss — sağa sürükle
@@ -650,12 +669,15 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
       </Animated.View>
 
-      {/* Panel — sağdan kayar + sürüklenebilir (tüm alandan sürüklenebilir)
-          ★ 2026-04-23: Yan modaller aynı top/bottom — DM/Plus/Audience hepsi eşit
-          Klavye açıkken bottom=0, input kontrol barı arkasında kalmasın */}
-      <Animated.View {...dmPanHandlers} style={{
-        position: 'absolute', right: 0, top: 120, bottom: dmKbVisible ? 0 : 120,
+      {/* Panel — iki katmanlı yapı: native/JS driver çakışmasını önler.
+          ★ Dış katman: bottom konumlandırma (JS driver, useNativeDriver:false)
+          ★ İç katman: translateX slide animasyonu (native driver, useNativeDriver:true) */}
+      <Animated.View style={{
+        position: 'absolute', right: 0, top: 120, bottom: dmPanelBottomAnim,
         width: DM_PANEL_W,
+      }}>
+      <Animated.View {...dmPanHandlers} style={{
+        flex: 1,
         borderTopLeftRadius: 22, borderBottomLeftRadius: 22,
         overflow: 'hidden',
         shadowColor: '#000', shadowOffset: { width: -6, height: 0 }, shadowOpacity: 0.5, shadowRadius: 16, elevation: 16,
@@ -942,6 +964,7 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
             </ScrollView>
           </>
         )}
+      </Animated.View>
       </Animated.View>
     </View>
   );

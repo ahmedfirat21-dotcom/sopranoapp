@@ -299,8 +299,49 @@ function CurvedTabBar({ state, navigation }: BottomTabBarProps) {
   const { width: winW } = useWindowDimensions();
   const barWidth = Math.max(0, winW - BAR_MARGIN * 2 - (insets.left + insets.right));
 
+  // ★ 2026-04-24: Entry + re-entry animation — tab bar aşağıdan yukarıya akıcı gelir.
+  //   İlk açılış: 200ms gecikme + 450ms slide-up (premium launch hissi).
+  //   Oda/chat'ten geri dönüş: parent Stack focus event ile 300ms hızlı slide-up.
+  //   Tab bar unmount olmaz (stack altında kalır), bu yüzden parent focus ile tetiklenir.
+  const entryY = useSharedValue(100);
+  const entryOpacity = useSharedValue(0);
+  const isFirstMount = useRef(true);
+
+  // ★ İlk açılış animasyonu
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      entryY.value = withTiming(0, { duration: 450, easing: Easing.out(Easing.exp) });
+      entryOpacity.value = withTiming(1, { duration: 350, easing: Easing.out(Easing.quad) });
+      // İlk mount flag'ini biraz sonra kapat — parent focus ilk render'da da tetiklenir
+      setTimeout(() => { isFirstMount.current = false; }, 500);
+    }, 200);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // ★ Re-entry: Oda/chat/profil'den geri dönünce parent Stack focus verir → slide-up
+  useEffect(() => {
+    const parent = navigation.getParent();
+    if (!parent) return;
+
+    const unsubscribe = parent.addListener('focus', () => {
+      if (isFirstMount.current) return; // İlk mount'u atla (zaten yukarıda animasyon var)
+      // Hızlı re-entry — 300ms, kısa mesafe
+      entryY.value = 50;
+      entryOpacity.value = 0.4;
+      entryY.value = withTiming(0, { duration: 300, easing: Easing.out(Easing.exp) });
+      entryOpacity.value = withTiming(1, { duration: 200, easing: Easing.out(Easing.quad) });
+    });
+
+    return unsubscribe;
+  }, [navigation]);
+
+  const entryStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: entryY.value }],
+    opacity: entryOpacity.value,
+  }));
+
   return (
-    <View style={[s.outer, { paddingBottom: Math.max(insets.bottom, 8), paddingLeft: insets.left, paddingRight: insets.right }]}>
+    <Animated.View style={[s.outer, { paddingBottom: Math.max(insets.bottom, 8), paddingLeft: insets.left, paddingRight: insets.right }, entryStyle]}>
       <View style={[s.bar, { width: barWidth }]}>
         {/* ★ 2026-04-20: Gradient zemin — bar kendi rengi içinde tonlanır, bg'ye kaynaşmaz */}
         <LinearGradient
@@ -338,7 +379,7 @@ function CurvedTabBar({ state, navigation }: BottomTabBarProps) {
           );
         })}
       </View>
-    </View>
+    </Animated.View>
   );
 }
 

@@ -1,0 +1,111 @@
+- generic [ref=e1]:
+  - generic:
+    - generic:
+      - img
+      - progressbar
+      - generic: Google Play Console yükleniyor
+  - generic [ref=e3]:
+    - banner [ref=e4]:
+      - generic [ref=e6]:
+        - link "Google Play Console logosu" [ref=e7] [cursor=pointer]:
+          - /url: /console/u/0/developers/8158019782975444733/app-list
+          - button "Google Play Console logosu" [ref=e8]
+        - generic [ref=e9]:
+          - button "Okunmamış bildirimler Bildirim merkezini aç" [ref=e15]:
+            - img [ref=e19]: notifications_unread
+            - generic [ref=e21]: Okunmamış bildirimler
+          - generic [ref=e22]:
+            - button "SopranoChat" [ref=e30] [cursor=pointer]:
+              - generic [ref=e34]:
+                - img [ref=e36]
+                - generic [ref=e40]: SopranoChat
+            - button "Geliştirici hesapları arasında geçiş yapın" [ref=e45] [cursor=pointer]:
+              - img "Geliştirici hesapları arasında geçiş yapın" [ref=e47]
+    - navigation [ref=e53]:
+      - link "Tüm uygulamalar" [ref=e54] [cursor=pointer]:
+        - /url: /console/u/0/developers/8158019782975444733/app-list
+        - img [ref=e56]: keyboard_backspace
+        - generic [ref=e57]: Tüm uygulamalar
+      - list [ref=e58]:
+        - listitem "Kontrol paneli" [ref=e61]:
+          - button "Kontrol paneli" [ref=e62] [cursor=pointer]:
+            - img [ref=e65]: dashboard
+            - generic [ref=e66]: Kontrol paneli
+        - listitem "İstatistikler" [ref=e69]:
+          - button "İstatistikler" [ref=e70] [cursor=pointer]:
+            - img [ref=e73]: bar_chart
+            - generic [ref=e74]: İstatistikler
+        - listitem "Yayın özeti" [ref=e77]:
+          - button "Yayın özeti" [ref=e78] [cursor=pointer]:
+            - img [ref=e81]: overview
+            - generic [ref=e82]: Yayın özeti
+        - listitem "Test edin ve yayınlayın" [ref=e85]:
+          - button "Test edin ve yayınlayın" [ref=e86] [cursor=pointer]:
+            - img [ref=e89]: rocket_launch
+            - generic [ref=e90]: Test edin ve yayınlayın
+        - listitem "İzleyin ve geliştirin" [ref=e93]:
+          - button "İzleyin ve geliştirin" [ref=e94] [cursor=pointer]:
+            - img [ref=e97]: vital_signs
+            - generic [ref=e98]: İzleyin ve geliştirin
+        - listitem "Kullanıcı sayısını artırın" [ref=e101]:
+          - button "Kullanıcı sayısını artırın" [ref=e102] [cursor=pointer]:
+            - img [ref=e105]: finance_mode
+            - generic [ref=e106]: Kullanıcı sayısını artırın
+        - listitem "Google Play ile para kazanın" [ref=e109]:
+          - button "Google Play ile para kazanın" [ref=e110] [cursor=pointer]:
+            - img [ref=e113]: sell
+            - generic [ref=e114]: Google Play ile para kazanın
+    - generic [ref=e116]:
+      - generic [ref=e123]:
+        - generic [ref=e127]:
+          - link "Uygulama içeriği uygulamasına geri dön" [ref=e130] [cursor=pointer]:
+            - /url: /console/u/0/developers/8158019782975444733/app/4975744367147799859/app-content/overview
+            - img [ref=e134]: keyboard_backspace
+            - generic [ref=e135]: Uygulama içeriği
+          - heading "Ön plan hizmeti izinleri" [level=1] [ref=e144]
+        - generic [ref=e147]:
+          - generic [ref=e148]:
+            - paragraph [ref=e149]: Uygulamanızda aşağıdaki beyan edilmemiş ön plan hizmeti izinleri kullanılıyor
+            - generic "Uygulamanızda aşağıdaki beyan edilmemiş ön plan hizmeti izinleri kullanılıyor" [ref=e152]
+            - paragraph [ref=e153]: Ön plan hizmetlerini yalnızca uygulamanız, kullanıcının uygulamanızla doğrudan etkileşimde olmadığı zaman fark edebileceği görevleri gerçekleştiriyorsa kullanabilirsiniz
+          - generic [ref=e155]:
+            - button "Uygulama paketlerini ve APK'ları görüntüle" [ref=e156]:
+              - generic [ref=e159]: Uygulama paketlerini ve APK'ları görüntüle
+            - button "Daha fazla bilgi" [ref=e160] [cursor=pointer]:
+              - generic [ref=e163]: Daha fazla bilgi
+        - generic [ref=e171]:
+          - button "Sil" [disabled] [ref=e173]:
+            - generic [ref=e176]: Sil
+          - button "Kaydet" [disabled] [ref=e178]:
+            - generic [ref=e181]: Kaydet
+      - generic [ref=e188]:
+        - generic [ref=e189]:
+          - link "Ürün güncellemeleri" [ref=e190] [cursor=pointer]:
+            - /url: https://play.google.com/console/about/whats-new/
+          - link "Durum kontrol paneli" [ref=e191] [cursor=pointer]:
+            - /url: https://status.play.google.com/
+          - link "Yardım" [ref=e192] [cursor=pointer]:
+            - /url: /console/u/0/developers/8158019782975444733/help-and-support?app=4975744367147799859
+        - generic [ref=e193]:
+          - generic [ref=e194]: © 2026 Google
+          - link "Gizlilik" [ref=e195] [cursor=pointer]:
+            - /url: https://www.google.com/policies/privacy/
+          - link "Geliştirici Dağıtım Sözleşmesi" [ref=e196] [cursor=pointer]:
+            - /url: https://play.google.com/about/developer-distribution-agreement.html
+          - link "Hizmet Şartları" [ref=e197] [cursor=pointer]:
+            - /url: https://play.google.com/about/console/terms-of-service/
+  - dialog "Hassas izinler kullanan uygulama paketleri ve APK'lar" [ref=e201]:
+    - generic [ref=e202]:
+      - generic [ref=e203]:
+        - heading "Hassas izinler kullanan uygulama paketleri ve APK'lar" [level=2] [ref=e204]
+        - button "Kapat" [active] [ref=e205] [cursor=pointer]:
+          - img [ref=e208]: close
+      - generic [ref=e213]:
+        - text: Uygulamanızda bulunan aşağıdaki uygulama paketleri ve APK'lar hassas izinlere erişiyor.
+        - link "Uygulamanız için izin bildirme hakkında daha fazla bilgi edinin, Yeni bir sekmede açılır" [ref=e215] [cursor=pointer]:
+          - /url: https://support.google.com/googleplay/android-developer/answer/13392821?hl=tr
+          - text: Daha fazla bilgi
+    - region [ref=e216]:
+      - generic [ref=e223]:
+        - img [ref=e227]: privacy_tip
+        - paragraph [ref=e229]: Uygulamanızda hassas izinlere erişen uygulama paketleri veya APK'lar yok

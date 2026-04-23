@@ -631,7 +631,7 @@ export default function ChatScreen() {
         });
         // ★ BUG-6 FIX: Yeni mesaj geldiğinde sadece en alttaysa scroll yap
         if (isAtBottomRef.current) {
-          setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+          setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 150);
         }
         // Gelen mesajı okundu olarak işaretle + badge güncelle
         MessageService.markAsRead(firebaseUser.uid, id).then(() => refreshBadges()).catch(() => {});
@@ -673,10 +673,40 @@ export default function ChatScreen() {
       )
       .subscribe();
 
+    // ★ 2026-04-24 FIX: message_requests realtime — karşı taraf accept/reject ettiğinde
+    //   sayfa yenilenmeden anında banner güncellensin.
+    const msgReqChannelName = `msg_req_${firebaseUser.uid}_${id}`;
+    const msgReqChannel = supabase
+      .channel(msgReqChannelName)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'message_requests',
+        },
+        (payload: any) => {
+          const row = payload.new;
+          // Bu sohbet ile ilgili mi kontrol et
+          const isRelevant =
+            (row.sender_id === firebaseUser.uid && row.receiver_id === id) ||
+            (row.sender_id === id && row.receiver_id === firebaseUser.uid);
+          if (!isRelevant) return;
+
+          if (row.status === 'accepted') {
+            setMsgRequestInfo({ status: 'accepted' });
+          } else if (row.status === 'rejected') {
+            setMsgRequestInfo({ status: 'rejected' });
+          }
+        }
+      )
+      .subscribe();
+
     return () => {
       channel.unsubscribe();
       typingChannel.unsubscribe();
       supabase.removeChannel(readChannel); // ★ BUG-8 FIX: removeChannel ile tam temizlik
+      supabase.removeChannel(msgReqChannel); // ★ message_requests realtime cleanup
       if (typingResetTimer) clearTimeout(typingResetTimer);
       // ★ BUG-2 FIX: Typing kanalını temizle
       MessageService.cleanupTypingChannel(id);
@@ -730,6 +760,8 @@ export default function ChatScreen() {
       created_at: new Date().toISOString(),
     };
     setMessages(prev => [...prev, optimisticMsg]);
+    // ★ 2026-04-24 FIX: Kendi mesajımızı gönderdikten sonra scroll to bottom
+    setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
     
     // Yazıyor... bilgisini kapat
     MessageService.sendTypingStatus(firebaseUser.uid, id, false);
@@ -1012,10 +1044,10 @@ export default function ChatScreen() {
         keyboardDismissMode="interactive"
         onContentSizeChange={() => {
           if (isAtBottomRef.current) {
-            flatListRef.current?.scrollToEnd({ animated: false });
+            setTimeout(() => flatListRef.current?.scrollToEnd({ animated: false }), 50);
           }
         }}
-        onLayout={() => flatListRef.current?.scrollToEnd({ animated: false })}
+        onLayout={() => setTimeout(() => flatListRef.current?.scrollToEnd({ animated: false }), 100)}
         onScroll={(e: NativeSyntheticEvent<NativeScrollEvent>) => {
           const { layoutMeasurement, contentOffset, contentSize } = e.nativeEvent;
           const isBottom = layoutMeasurement.height + contentOffset.y >= contentSize.height - 40;

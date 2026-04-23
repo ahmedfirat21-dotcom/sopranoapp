@@ -1,0 +1,96 @@
+- generic [active] [ref=e1]:
+  - generic:
+    - generic:
+      - img
+      - progressbar
+      - generic: Google Play Console yükleniyor
+  - generic [ref=e3]:
+    - banner [ref=e4]:
+      - generic [ref=e6]:
+        - link "Google Play Console logosu" [ref=e7] [cursor=pointer]:
+          - /url: /console/u/0/developers/8158019782975444733/app-list
+          - button "Google Play Console logosu" [ref=e8]
+        - generic [ref=e9]:
+          - button "Okunmamış bildirimler Bildirim merkezini aç" [ref=e45]:
+            - img [ref=e49]: notifications_unread
+            - generic [ref=e51]: Okunmamış bildirimler
+          - generic [ref=e10]:
+            - button "SopranoChat" [ref=e59] [cursor=pointer]:
+              - generic [ref=e63]:
+                - img [ref=e65]
+                - generic [ref=e69]: SopranoChat
+            - button "Geliştirici hesapları arasında geçiş yapın" [ref=e14] [cursor=pointer]:
+              - img "Geliştirici hesapları arasında geçiş yapın" [ref=e16]
+    - navigation [ref=e72]:
+      - link "Tüm uygulamalar" [ref=e73] [cursor=pointer]:
+        - /url: /console/u/0/developers/8158019782975444733/app-list
+        - img [ref=e75]: keyboard_backspace
+        - generic [ref=e76]: Tüm uygulamalar
+      - list [ref=e77]:
+        - listitem "Kontrol paneli" [ref=e80]:
+          - button "Kontrol paneli" [ref=e81] [cursor=pointer]:
+            - img [ref=e84]: dashboard
+            - generic [ref=e85]: Kontrol paneli
+        - listitem "İstatistikler" [ref=e88]:
+          - button "İstatistikler" [ref=e89] [cursor=pointer]:
+            - img [ref=e92]: bar_chart
+            - generic [ref=e93]: İstatistikler
+        - listitem "Yayın özeti" [ref=e96]:
+          - button "Yayın özeti" [ref=e97] [cursor=pointer]:
+            - img [ref=e100]: overview
+            - generic [ref=e101]: Yayın özeti
+        - listitem "Test edin ve yayınlayın" [ref=e104]:
+          - button "Test edin ve yayınlayın" [ref=e105] [cursor=pointer]:
+            - img [ref=e108]: rocket_launch
+            - generic [ref=e109]: Test edin ve yayınlayın
+        - listitem "İzleyin ve geliştirin" [ref=e112]:
+          - button "İzleyin ve geliştirin" [ref=e113] [cursor=pointer]:
+            - img [ref=e116]: vital_signs
+            - generic [ref=e117]: İzleyin ve geliştirin
+        - listitem "Kullanıcı sayısını artırın" [ref=e120]:
+          - button "Kullanıcı sayısını artırın" [ref=e121] [cursor=pointer]:
+            - img [ref=e124]: finance_mode
+            - generic [ref=e125]: Kullanıcı sayısını artırın
+        - listitem "Google Play ile para kazanın" [ref=e128]:
+          - button "Google Play ile para kazanın" [ref=e129] [cursor=pointer]:
+            - img [ref=e132]: sell
+            - generic [ref=e133]: Google Play ile para kazanın
+    - generic [ref=e22]:
+      - generic [ref=e137]:
+        - generic [ref=e141]:
+          - link "Uygulama içeriği uygulamasına geri dön" [ref=e144] [cursor=pointer]:
+            - /url: /console/u/0/developers/8158019782975444733/app/4975744367147799859/app-content/overview
+            - img [ref=e148]: keyboard_backspace
+            - generic [ref=e149]: Uygulama içeriği
+          - heading "Ön plan hizmeti izinleri" [level=1] [ref=e158]
+        - generic [ref=e161]:
+          - generic [ref=e162]:
+            - paragraph [ref=e163]: Uygulamanızda aşağıdaki beyan edilmemiş ön plan hizmeti izinleri kullanılıyor
+            - generic "Uygulamanızda aşağıdaki beyan edilmemiş ön plan hizmeti izinleri kullanılıyor" [ref=e166]
+            - paragraph [ref=e167]: Ön plan hizmetlerini yalnızca uygulamanız, kullanıcının uygulamanızla doğrudan etkileşimde olmadığı zaman fark edebileceği görevleri gerçekleştiriyorsa kullanabilirsiniz
+          - generic [ref=e169]:
+            - button "Uygulama paketlerini ve APK'ları görüntüle" [ref=e170]:
+              - generic [ref=e173]: Uygulama paketlerini ve APK'ları görüntüle
+            - button "Daha fazla bilgi" [ref=e174] [cursor=pointer]:
+              - generic [ref=e177]: Daha fazla bilgi
+        - generic [ref=e185]:
+          - button "Sil" [disabled] [ref=e187]:
+            - generic [ref=e190]: Sil
+          - button "Kaydet" [disabled] [ref=e192]:
+            - generic [ref=e195]: Kaydet
+      - generic [ref=e30]:
+        - generic [ref=e198]:
+          - link "Ürün güncellemeleri" [ref=e199] [cursor=pointer]:
+            - /url: https://play.google.com/console/about/whats-new/
+          - link "Durum kontrol paneli" [ref=e200] [cursor=pointer]:
+            - /url: https://status.play.google.com/
+          - link "Yardım" [ref=e201] [cursor=pointer]:
+            - /url: /console/u/0/developers/8158019782975444733/help-and-support?app=4975744367147799859
+        - generic [ref=e202]:
+          - generic [ref=e203]: © 2026 Google
+          - link "Gizlilik" [ref=e204] [cursor=pointer]:
+            - /url: https://www.google.com/policies/privacy/
+          - link "Geliştirici Dağıtım Sözleşmesi" [ref=e205] [cursor=pointer]:
+            - /url: https://play.google.com/about/developer-distribution-agreement.html
+          - link "Hizmet Şartları" [ref=e206] [cursor=pointer]:
+            - /url: https://play.google.com/about/console/terms-of-service/

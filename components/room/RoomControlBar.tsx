@@ -1,5 +1,14 @@
 import React, { useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, Pressable, Animated, useWindowDimensions } from 'react-native';
+// ★ 2026-04-24: Hook isimlerini alias'lamadan import et — Reanimated Babel plugin
+//   useAnimatedStyle/useSharedValue isimlerini tanıyarak worklet directive ekler.
+//   Alias kullanılırsa plugin tanıyamaz → "non-worklet function on UI thread" crash.
+import ReAnimated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  Easing as REasing,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -242,8 +251,36 @@ export default function RoomControlBar({
   const { width: winW } = useWindowDimensions();
   const barWidth = Math.max(0, winW - BAR_MARGIN * 2 - (insets.left + insets.right));
 
+  // ★ 2026-04-24: Entry animation — oda açılınca control bar aşağıdan slide-up.
+  //   Tab bar'la simetrik: ikisi de aşağıdan yukarıya gelir.
+  const entryY = useSharedValue(80);
+  const entryOpacity = useSharedValue(0);
+  const hasAnimatedRef = useRef(false);
+
+  useEffect(() => {
+    if (!hasAnimatedRef.current) {
+      hasAnimatedRef.current = true;
+      const timer = setTimeout(() => {
+        entryY.value = withTiming(0, {
+          duration: 400,
+          easing: REasing.out(REasing.exp),
+        });
+        entryOpacity.value = withTiming(1, {
+          duration: 300,
+          easing: REasing.out(REasing.quad),
+        });
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, []);
+
+  const entryStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: entryY.value }],
+    opacity: entryOpacity.value,
+  }));
+
   return (
-    <View style={s.wrap}>
+    <ReAnimated.View style={[s.wrap, entryStyle]}>
       <View style={[s.bar, { width: barWidth }]}>
         {/* ★ Gradient zemin — tab bar ile birebir */}
         <LinearGradient
@@ -352,7 +389,7 @@ export default function RoomControlBar({
           label="Daha fazla seçenek"
         />
       </View>
-    </View>
+    </ReAnimated.View>
   );
 }
 

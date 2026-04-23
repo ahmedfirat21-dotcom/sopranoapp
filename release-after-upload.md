@@ -1,0 +1,234 @@
+- generic [active] [ref=e1]:
+  - generic:
+    - generic:
+      - img
+      - progressbar
+      - generic: Google Play Console yükleniyor
+  - generic [ref=e3]:
+    - banner [ref=e4]:
+      - generic [ref=e6]:
+        - link "Google Play Console logosu" [ref=e7] [cursor=pointer]:
+          - /url: /console/u/0/developers/8158019782975444733/app-list
+          - button "Google Play Console logosu" [ref=e8]
+        - generic [ref=e9]:
+          - button "Okunmamış bildirimler Bildirim merkezini aç" [ref=e45]:
+            - img [ref=e49]: notifications_unread
+            - generic [ref=e51]: Okunmamış bildirimler
+          - generic [ref=e10]:
+            - button "SopranoChat" [ref=e59] [cursor=pointer]:
+              - generic [ref=e63]:
+                - img [ref=e65]
+                - generic [ref=e69]: SopranoChat
+            - button "Geliştirici hesapları arasında geçiş yapın" [ref=e14] [cursor=pointer]:
+              - img "Geliştirici hesapları arasında geçiş yapın" [ref=e16]
+    - navigation [ref=e72]:
+      - link "Tüm uygulamalar" [ref=e73] [cursor=pointer]:
+        - /url: /console/u/0/developers/8158019782975444733/app-list
+        - img [ref=e75]: keyboard_backspace
+        - generic [ref=e76]: Tüm uygulamalar
+      - list [ref=e77]:
+        - listitem "Kontrol paneli" [ref=e80]:
+          - button "Kontrol paneli" [ref=e81] [cursor=pointer]:
+            - img [ref=e84]: dashboard
+            - generic [ref=e85]: Kontrol paneli
+        - listitem "İstatistikler" [ref=e88]:
+          - button "İstatistikler" [ref=e89] [cursor=pointer]:
+            - img [ref=e92]: bar_chart
+            - generic [ref=e93]: İstatistikler
+        - listitem "Yayın özeti" [ref=e96]:
+          - button "Yayın özeti" [ref=e97] [cursor=pointer]:
+            - img [ref=e100]: overview
+            - generic [ref=e101]: Yayın özeti
+        - listitem "Test edin ve yayınlayın" [ref=e104]:
+          - button "Test edin ve yayınlayın" [ref=e105] [cursor=pointer]:
+            - img [ref=e108]: rocket_launch
+            - generic [ref=e109]: Test edin ve yayınlayın
+          - list [ref=e110]:
+            - generic [ref=e112]:
+              - listitem "En yeni sürümler ve paketler" [ref=e114]:
+                - button "En yeni sürümler ve paketler" [ref=e115] [cursor=pointer]:
+                  - generic [ref=e116]: En yeni sürümler ve paketler
+              - listitem "Üretim" [ref=e118]:
+                - button "Üretim" [ref=e119] [cursor=pointer]:
+                  - generic [ref=e120]: Üretim
+              - listitem "Test etme" [ref=e122]:
+                - button "Test etme" [ref=e123] [cursor=pointer]:
+                  - generic [ref=e124]: Test etme
+                  - img [ref=e126]: expand_less
+                - list [ref=e127]:
+                  - generic [ref=e129]:
+                    - listitem "Açık test" [ref=e131]:
+                      - button "Açık test" [ref=e132] [cursor=pointer]:
+                        - generic [ref=e133]: Açık test
+                    - listitem "Kapalı test" [ref=e135]:
+                      - button "Kapalı test" [ref=e136] [cursor=pointer]:
+                        - generic [ref=e137]: Kapalı test
+                    - listitem "Dahili test" [ref=e139]:
+                      - button "Dahili test" [ref=e140] [cursor=pointer]:
+                        - generic [ref=e141]: Dahili test
+                    - listitem "Lansman öncesi rapor" [ref=e143]:
+                      - button "Lansman öncesi rapor" [ref=e144] [cursor=pointer]:
+                        - generic [ref=e145]: Lansman öncesi rapor
+                        - img [ref=e147]: expand_more
+                    - listitem "Dahili uygulama paylaşımı" [ref=e149]:
+                      - button "Dahili uygulama paylaşımı" [ref=e150] [cursor=pointer]:
+                        - generic [ref=e151]: Dahili uygulama paylaşımı
+              - listitem "Ön kayıt" [ref=e153]:
+                - button "Ön kayıt" [ref=e154] [cursor=pointer]:
+                  - generic [ref=e155]: Ön kayıt
+              - listitem "Uygulama bütünlüğü" [ref=e157]:
+                - button "Uygulama bütünlüğü" [ref=e158] [cursor=pointer]:
+                  - generic [ref=e159]: Uygulama bütünlüğü
+              - listitem "Gelişmiş ayarlar" [ref=e161]:
+                - button "Gelişmiş ayarlar" [ref=e162] [cursor=pointer]:
+                  - generic [ref=e163]: Gelişmiş ayarlar
+        - listitem "İzleyin ve geliştirin" [ref=e166]:
+          - button "İzleyin ve geliştirin" [ref=e167] [cursor=pointer]:
+            - img [ref=e170]: vital_signs
+            - generic [ref=e171]: İzleyin ve geliştirin
+        - listitem "Kullanıcı sayısını artırın" [ref=e174]:
+          - button "Kullanıcı sayısını artırın" [ref=e175] [cursor=pointer]:
+            - img [ref=e178]: finance_mode
+            - generic [ref=e179]: Kullanıcı sayısını artırın
+        - listitem "Google Play ile para kazanın" [ref=e182]:
+          - button "Google Play ile para kazanın" [ref=e183] [cursor=pointer]:
+            - img [ref=e186]: sell
+            - generic [ref=e187]: Google Play ile para kazanın
+    - generic [ref=e22]:
+      - generic [ref=e407]:
+        - generic [ref=e414]:
+          - heading "Dahili test sürümü oluşturma" [level=1] [ref=e420]
+          - generic [ref=e425]: Dahili test sürümleri 100 kişiye kadar test kullanıcısına sunulur
+        - generic [ref=e426]:
+          - generic [ref=e430]:
+            - tablist [ref=e431]:
+              - tab "1 / 2, Sürüm oluştur" [selected] [ref=e432]:
+                - generic [ref=e435]: "1"
+                - generic [ref=e437]: Sürüm oluştur
+              - tab "2 / 2, Önizle ve onayla" [disabled] [ref=e439]:
+                - generic [ref=e442]: "2"
+                - generic [ref=e444]: Önizle ve onayla
+            - generic:
+              - tabpanel
+          - button "Taslak sürümü sil" [ref=e449]:
+            - generic [ref=e451]: Taslak sürümü sil
+        - generic [ref=e454]:
+          - heading "Uygulama bütünlüğü" [level=2] [ref=e463]
+          - generic [ref=e468]:
+            - list [ref=e470]:
+              - listitem [ref=e471]:
+                - generic [ref=e472]:
+                  - img [ref=e476]: check_circle
+                  - generic [ref=e478]: Otomatik koruma etkin
+              - listitem [ref=e479]:
+                - generic [ref=e480]:
+                  - img [ref=e484]: check_circle
+                  - generic [ref=e486]: Google Play tarafından imzalanan sürümler
+            - paragraph [ref=e487]: Uygulama bütünlüğü araçları, kullanıcıların uygulama ve oyunlarınızda istediğiniz deneyimi yaşamalarını sağlamanıza yardımcı olur
+            - generic [ref=e490]:
+              - button "Bütünlük korumasını yönetin" [ref=e492]:
+                - generic [ref=e495]: Bütünlük korumasını yönetin
+              - button "İmzalama anahtarını değiştir" [ref=e497]:
+                - generic [ref=e500]: İmzalama anahtarını değiştir
+        - generic [ref=e502]:
+          - heading "Uygulama paketleri" [level=2] [ref=e511]
+          - alert [ref=e763]:
+            - generic [ref=e764]:
+              - strong [ref=e765]: sopranochat-v1.2.2-26.aab
+              - text: yüklemeniz dağıtım için optimize edilirken bu sayfadan ayrılabilirsiniz.
+        - generic [ref=e554]:
+          - heading "Önceki sürüm" [level=3] [ref=e563]
+          - generic [ref=e564]:
+            - generic [ref=e565]: Önceki sürümünüzden olan uygulama sürümlerini dahil edin
+            - heading "Dahil" [level=4] [ref=e577]
+            - generic [ref=e584]:
+              - img [ref=e588]: slow_motion_video
+              - paragraph [ref=e590]: Önceki sürümünüzden hiçbir uygulama paketi bu sürüme dahil edilmeyecek
+            - generic [ref=e596]:
+              - heading "Dahil olmayanlar" [level=4] [ref=e602]
+              - generic [ref=e604]: Önceki sürümünüzden olan bu sürümler, bu sürüme dahil edilmeyecek
+            - grid "Yapılar" [ref=e614]:
+              - row "Dosya türü Sürüm API düzeyleri Hedef SDK Ekran düzenleri ABI'lar Gerekli özellikler" [ref=e615]:
+                - columnheader "Dosya türü" [ref=e616] [cursor=pointer]
+                - columnheader "Sürüm" [ref=e617] [cursor=pointer]
+                - columnheader "API düzeyleri" [ref=e618] [cursor=pointer]
+                - columnheader "Hedef SDK" [ref=e619] [cursor=pointer]
+                - columnheader "Ekran düzenleri" [ref=e620] [cursor=pointer]
+                - columnheader "ABI'lar" [ref=e621] [cursor=pointer]
+                - columnheader "Gerekli özellikler" [ref=e622] [cursor=pointer]
+                - cell [ref=e623]
+                - cell [ref=e624]
+              - 'row "Pop-up ile görüntülenen tablo hücresi 4 (1.0.0) 24+ 35 4 4 6 Dahil et Uygulama paketi: 4 (1.0.0) ayrıntısını göster" [ref=e625]':
+                - gridcell "Pop-up ile görüntülenen tablo hücresi" [ref=e626]:
+                  - generic "Pop-up ile görüntülenen tablo hücresi" [ref=e629]:
+                    - generic [ref=e630]:
+                      - generic [ref=e631]: App bundle
+                      - 'img "Bu app bundle, şu ekli dosyaya sahip: Yerel hata ayıklama sembolleri" [ref=e635]': attachment
+                - gridcell "4 (1.0.0)" [ref=e636]:
+                  - generic [ref=e637]: 4 (1.0.0)
+                - gridcell "24+" [ref=e638]:
+                  - generic [ref=e639]: 24+
+                - gridcell "35" [ref=e640]:
+                  - generic [ref=e641]: "35"
+                - gridcell "4" [ref=e642]:
+                  - generic [ref=e643]: "4"
+                - gridcell "4" [ref=e644]:
+                  - generic [ref=e645]: "4"
+                - gridcell "6" [ref=e646]:
+                  - generic [ref=e647]: "6"
+                - gridcell "Dahil et" [ref=e648]:
+                  - button "Dahil et" [ref=e651]:
+                    - button "Dahil et" [ref=e652]:
+                      - generic [ref=e654]: Dahil et
+                - 'gridcell "Uygulama paketi: 4 (1.0.0) ayrıntısını göster" [ref=e655]':
+                  - 'button "Uygulama paketi: 4 (1.0.0) ayrıntısını göster" [ref=e657] [cursor=pointer]':
+                    - img [ref=e660]: arrow_right_alt
+        - generic [ref=e662]:
+          - heading "Sürüm bilgileri" [level=2] [ref=e671]
+          - generic [ref=e675]:
+            - generic [ref=e676]:
+              - group "Sürüm adı" [ref=e678]:
+                - generic [ref=e681]: Sürüm adı *
+                - generic [ref=e684]:
+                  - textbox "Sürüm adı" [ref=e686]: 1.0.0 (5)
+                  - generic [ref=e687]:
+                    - paragraph [ref=e688]
+                    - generic [ref=e689]:
+                      - generic [ref=e690]: 9 / 50
+                      - generic [ref=e691]: Metin 9 karakter uzunluğunda / 50
+              - group "Sürüm notları" [ref=e693]:
+                - generic [ref=e696]: Sürüm notları
+                - generic [ref=e698]:
+                  - button "Önceki bir sürümden kopyala" [ref=e702]:
+                    - generic [ref=e704]: Önceki bir sürümden kopyala
+                  - generic [ref=e705]:
+                    - textbox "Sürüm notları" [ref=e708]: <en-US> SopranoChat v1.0.0 (5) - Ilk dahili test surumu </en-US>
+                    - paragraph [ref=e710]
+                  - generic [ref=e711]: 1 dil için sürüm notları sağlandı
+                  - generic [ref=e712]: Kullanıcıların sürümünüzde ne olduğunu bilmelerine izin verin. Dil etiketleri içine her dil içim sürüm notlarını girin.
+            - generic [ref=e720]:
+              - generic:
+                - button "Değişiklikleri sil" [disabled]:
+                  - generic: Değişiklikleri sil
+              - generic:
+                - button "Taslak olarak kaydet" [disabled]:
+                  - generic: Taslak olarak kaydet
+              - generic:
+                - button "İleri" [disabled]:
+                  - generic: İleri
+      - generic [ref=e30]:
+        - generic [ref=e396]:
+          - link "Ürün güncellemeleri" [ref=e397] [cursor=pointer]:
+            - /url: https://play.google.com/console/about/whats-new/
+          - link "Durum kontrol paneli" [ref=e398] [cursor=pointer]:
+            - /url: https://status.play.google.com/
+          - link "Yardım" [ref=e399] [cursor=pointer]:
+            - /url: /console/u/0/developers/8158019782975444733/help-and-support?app=4975744367147799859
+        - generic [ref=e400]:
+          - generic [ref=e401]: © 2026 Google
+          - link "Gizlilik" [ref=e402] [cursor=pointer]:
+            - /url: https://www.google.com/policies/privacy/
+          - link "Geliştirici Dağıtım Sözleşmesi" [ref=e403] [cursor=pointer]:
+            - /url: https://play.google.com/about/developer-distribution-agreement.html
+          - link "Hizmet Şartları" [ref=e404] [cursor=pointer]:
+            - /url: https://play.google.com/about/console/terms-of-service/

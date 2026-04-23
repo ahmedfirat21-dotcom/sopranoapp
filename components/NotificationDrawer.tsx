@@ -4,11 +4,17 @@
  * ★ Sadece oda + arama + hediye bildirimleri gösterilir
  * Takip istekleri → FriendsDrawer, DM → Mesajlar tab'ında
  */
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, Pressable, FlatList,
-  ActivityIndicator, Dimensions, Modal, Animated,
+  ActivityIndicator, Dimensions, Modal,
 } from 'react-native';
+import ReAnimated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  Easing,
+} from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter, usePathname } from 'expo-router';
@@ -18,7 +24,6 @@ import { Colors } from '../constants/theme';
 import { RoomAccessService } from '../services/roomAccess';
 import StatusAvatar from './StatusAvatar';
 import { showToast } from './Toast';
-import { useSwipeToDismiss } from '../hooks/useSwipeToDismiss';
 
 const { width: W, height: H } = Dimensions.get('window');
 
@@ -360,11 +365,37 @@ export default function NotificationDrawer({ visible, onClose, userId, anchorTop
 
   const unreadCount = items.filter(n => !n.is_read).length;
 
-  const { translateValue, panHandlers } = useSwipeToDismiss({
-    direction: 'up',
-    threshold: 60,
-    onDismiss: onClose,
-  });
+  // ★ 2026-04-24: Slide-down entry animation — headerın altından doğuyor hissi.
+  //   Reanimated native driver (60fps). Arrow ve beyaz çerçeve kaldırıldı.
+  const slideY = useSharedValue(-20);
+  const slideOpacity = useSharedValue(0);
+  const slideScale = useSharedValue(0.96);
+  const hasAnimatedEntry = useRef(false);
+
+  useEffect(() => {
+    if (visible) {
+      hasAnimatedEntry.current = false;
+      slideY.value = -20;
+      slideOpacity.value = 0;
+      slideScale.value = 0.96;
+      // Kısa gecikme — Modal render olduktan sonra animasyon başlat
+      const timer = setTimeout(() => {
+        slideY.value = withTiming(0, { duration: 280, easing: Easing.out(Easing.exp) });
+        slideOpacity.value = withTiming(1, { duration: 220, easing: Easing.out(Easing.quad) });
+        slideScale.value = withTiming(1, { duration: 280, easing: Easing.out(Easing.exp) });
+        hasAnimatedEntry.current = true;
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [visible]);
+
+  const dropdownAnimStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateY: slideY.value },
+      { scaleY: slideScale.value },
+    ],
+    opacity: slideOpacity.value,
+  }));
 
   if (!visible) return null;
 
@@ -372,10 +403,7 @@ export default function NotificationDrawer({ visible, onClose, userId, anchorTop
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={s.backdrop} onPress={onClose} />
 
-      {/* ★ Arrow — rotated square, çerçevesi drawer border'ının doğal uzantısı */}
-      <View style={[s.arrow, { top: resolvedAnchor - 7, right: anchorRight ?? 30 }]} pointerEvents="none" />
-
-      <Animated.View style={[s.dropdown, { top: resolvedAnchor, right: drawerRight ?? 8, transform: [{ translateY: translateValue }] }]}>
+      <ReAnimated.View style={[s.dropdown, { top: resolvedAnchor, right: drawerRight ?? 8 }, dropdownAnimStyle]}>
         {/* ★ Odalarım paleti: diagonal gradient (parlak üst-sol → koyu alt-sağ) */}
         <LinearGradient
           colors={['#4a5668', '#37414f', '#232a35']}
@@ -390,7 +418,6 @@ export default function NotificationDrawer({ visible, onClose, userId, anchorTop
           onLongPress={handleMarkAllRead}
           delayLongPress={500}
           accessibilityHint="Uzun bas: tümünü okundu işaretle"
-          {...panHandlers}
         >
           <Ionicons name="notifications" size={18} color="#14B8A6" style={{
             textShadowColor: 'rgba(0,0,0,0.6)',
@@ -510,7 +537,7 @@ export default function NotificationDrawer({ visible, onClose, userId, anchorTop
             <Ionicons name="chevron-up" size={14} color="#14B8A6" />
           </Pressable>
         )}
-      </Animated.View>
+      </ReAnimated.View>
     </Modal>
   );
 }
@@ -521,14 +548,12 @@ const s = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   dropdown: {
-    // ★ 2026-04-20: Kompaktlaştı — W*0.86 → W*0.72, maxWidth 360 → 300
+    // ★ 2026-04-24: Border/arrow kaldırıldı — header altından doğan temiz görünüm
     position: 'absolute',
     right: 8,
     width: W * 0.72,
     maxWidth: 300,
     borderRadius: 14,
-    borderWidth: 1,
-    borderColor: Colors.cardBorder,
     paddingBottom: 4,
     overflow: 'hidden',
     elevation: 25,
@@ -536,18 +561,7 @@ const s = StyleSheet.create({
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.5,
     shadowRadius: 16,
-  },
-  arrow: {
-    // ★ 2026-04-20: Zil ikon tam üstünde (right:60 → right:30, bell btn ~right:40 merkezinde)
-    position: 'absolute',
-    right: 30,
-    width: 12,
-    height: 12,
-    backgroundColor: '#404b5c',
-    borderTopWidth: 1,
-    borderLeftWidth: 1,
-    borderColor: Colors.cardBorder,
-    transform: [{ rotate: '45deg' }],
+    // ★ Transform origin: üst-sağ (headerın altından doğma hissi)
   },
   header: {
     flexDirection: 'row', alignItems: 'center', gap: 6,

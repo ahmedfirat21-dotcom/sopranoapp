@@ -7,6 +7,8 @@ import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, Pressable, Modal, ScrollView, Dimensions,
 } from 'react-native';
+
+const SCREEN_HEIGHT = Dimensions.get('window').height;
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -119,21 +121,33 @@ export default function SPHistorySheet({ visible, onClose, balance, history: ini
     return () => { supabase.removeChannel(channel); };
   }, [visible, firebaseUser]);
 
-  // ★ Swipe-to-dismiss — Reanimated useSharedValue + GestureDetector
-  const translateY = useSharedValue(0);
+  // ★ Swipe-to-dismiss + entry animation — Reanimated useSharedValue + GestureDetector
+  const translateY = useSharedValue(SCREEN_HEIGHT);
 
-  // Modal açılınca pozisyonu sıfırla
+  // ★ 2026-04-24 FIX: Giriş animasyonu — kart ekran dışından spring ile yukarı kayar.
+  //   Önceden translateY=0 başlatılıyordu, animasyonsuz beliriyordu. İlk tıklamada
+  //   sadece gölge görünüp ikincide aniden belirme bug'ı bu eksiklikten kaynaklıydı.
   useEffect(() => {
-    if (visible) translateY.value = 0;
+    if (visible) {
+      // Kısa gecikme — Modal mount olmasını bekle, sonra animasyonu başlat
+      translateY.value = SCREEN_HEIGHT;
+      // requestAnimationFrame dengi: 1 frame bekle ki Modal DOM'a eklensin
+      const timer = setTimeout(() => {
+        translateY.value = withSpring(0, { damping: 18, stiffness: 140 });
+      }, 50);
+      return () => clearTimeout(timer);
+    }
   }, [visible]);
 
   const handleDismiss = useCallback(() => {
-    onClose();
+    translateY.value = withTiming(SCREEN_HEIGHT, { duration: 220 }, () => {
+      runOnJS(onClose)();
+    });
   }, [onClose]);
 
   const panGesture = Gesture.Pan()
-    .activeOffsetY(10)           // aşağı 10px+ hareket edince aktif olur
-    .failOffsetX([-30, 30])      // yatay hareket 30px+ ise gesture iptal
+    .activeOffsetY(10)
+    .failOffsetX([-30, 30])
     .onUpdate((e) => {
       if (e.translationY > 0) {
         translateY.value = e.translationY;
@@ -142,7 +156,7 @@ export default function SPHistorySheet({ visible, onClose, balance, history: ini
     .onEnd((e) => {
       const shouldDismiss = e.translationY > 80 || e.velocityY > 800;
       if (shouldDismiss) {
-        translateY.value = withTiming(600, { duration: 200 }, () => {
+        translateY.value = withTiming(SCREEN_HEIGHT, { duration: 200 }, () => {
           runOnJS(handleDismiss)();
         });
       } else {
@@ -158,7 +172,7 @@ export default function SPHistorySheet({ visible, onClose, balance, history: ini
     <Modal visible={visible} transparent animationType="none" statusBarTranslucent onRequestClose={onClose}>
       <GestureHandlerRootView style={{ flex: 1 }}>
       <View style={s.overlay}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+        <Pressable style={StyleSheet.absoluteFill} onPress={handleDismiss} />
         <GestureDetector gesture={panGesture}>
         <Animated.View
           style={[s.card, animatedCardStyle]}
@@ -262,7 +276,6 @@ export default function SPHistorySheet({ visible, onClose, balance, history: ini
   );
 }
 
-const SCREEN_HEIGHT = Dimensions.get('window').height;
 
 const s = StyleSheet.create({
   overlay: {

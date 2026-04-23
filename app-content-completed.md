@@ -1,0 +1,285 @@
+- generic [ref=e1]:
+  - generic:
+    - generic:
+      - img
+      - progressbar
+      - generic: Google Play Console yükleniyor
+  - generic [ref=e3]:
+    - banner [ref=e4]:
+      - generic [ref=e6]:
+        - link "Google Play Console logosu" [ref=e7] [cursor=pointer]:
+          - /url: /console/u/0/developers/8158019782975444733/app-list
+          - button "Google Play Console logosu" [ref=e8]
+        - generic [ref=e9]:
+          - button "Okunmamış bildirimler Bildirim merkezini aç" [ref=e45]:
+            - img [ref=e49]: notifications_unread
+            - generic [ref=e51]: Okunmamış bildirimler
+          - generic [ref=e10]:
+            - button "SopranoChat" [ref=e59] [cursor=pointer]:
+              - generic [ref=e63]:
+                - img [ref=e65]
+                - generic [ref=e69]: SopranoChat
+            - button "Geliştirici hesapları arasında geçiş yapın" [ref=e14] [cursor=pointer]:
+              - img "Geliştirici hesapları arasında geçiş yapın" [ref=e16]
+    - navigation [ref=e72]:
+      - link "Tüm uygulamalar" [ref=e73] [cursor=pointer]:
+        - /url: /console/u/0/developers/8158019782975444733/app-list
+        - img [ref=e75]: keyboard_backspace
+        - generic [ref=e76]: Tüm uygulamalar
+      - list [ref=e77]:
+        - listitem "Kontrol paneli" [ref=e80]:
+          - button "Kontrol paneli" [ref=e81] [cursor=pointer]:
+            - img [ref=e84]: dashboard
+            - generic [ref=e85]: Kontrol paneli
+        - listitem "İstatistikler" [ref=e88]:
+          - button "İstatistikler" [ref=e89] [cursor=pointer]:
+            - img [ref=e92]: bar_chart
+            - generic [ref=e93]: İstatistikler
+        - listitem "Yayın özeti" [ref=e96]:
+          - button "Yayın özeti" [ref=e97] [cursor=pointer]:
+            - img [ref=e100]: overview
+            - generic [ref=e101]: Yayın özeti
+        - listitem "Test edin ve yayınlayın" [ref=e104]:
+          - button "Test edin ve yayınlayın" [ref=e105] [cursor=pointer]:
+            - img [ref=e108]: rocket_launch
+            - generic [ref=e109]: Test edin ve yayınlayın
+        - listitem "İzleyin ve geliştirin" [ref=e112]:
+          - button "İzleyin ve geliştirin" [ref=e113] [cursor=pointer]:
+            - img [ref=e116]: vital_signs
+            - generic [ref=e117]: İzleyin ve geliştirin
+          - list [ref=e1105]:
+            - generic [ref=e1107]:
+              - listitem "Erişim ve Cihazlar" [ref=e1109]:
+                - button "Erişim ve Cihazlar" [ref=e1110] [cursor=pointer]:
+                  - generic [ref=e1111]: Erişim ve Cihazlar
+                  - img [ref=e1113]: expand_more
+              - listitem "Kullanıcı puanları ve yorumlar" [ref=e1115]:
+                - button "Kullanıcı puanları ve yorumlar" [ref=e1116] [cursor=pointer]:
+                  - generic [ref=e1117]: Kullanıcı puanları ve yorumlar
+                  - img [ref=e1119]: expand_more
+              - listitem "Android vitals" [ref=e1121]:
+                - button "Android vitals" [ref=e1122] [cursor=pointer]:
+                  - generic [ref=e1123]: Android vitals
+                  - img [ref=e1125]: expand_more
+              - listitem "Politika ve programlar" [ref=e1127]:
+                - button "Politika ve programlar" [ref=e1128] [cursor=pointer]:
+                  - generic [ref=e1129]: Politika ve programlar
+                  - img [ref=e1131]: expand_less
+                - list [ref=e1132]:
+                  - generic [ref=e1134]:
+                    - listitem "Politika durumu" [ref=e1136]:
+                      - button "Politika durumu" [ref=e1137] [cursor=pointer]:
+                        - generic [ref=e1138]: Politika durumu
+                    - listitem "Uygulama içeriği" [ref=e1140]:
+                      - button "Uygulama içeriği" [ref=e1141] [cursor=pointer]:
+                        - generic [ref=e1142]: Uygulama içeriği
+                    - listitem "Öğretmen Onaylı" [ref=e1144]:
+                      - button "Öğretmen Onaylı" [ref=e1145] [cursor=pointer]:
+                        - generic [ref=e1146]: Öğretmen Onaylı
+        - listitem "Kullanıcı sayısını artırın" [ref=e120]:
+          - button "Kullanıcı sayısını artırın" [ref=e121] [cursor=pointer]:
+            - img [ref=e124]: finance_mode
+            - generic [ref=e125]: Kullanıcı sayısını artırın
+        - listitem "Google Play ile para kazanın" [ref=e128]:
+          - button "Google Play ile para kazanın" [ref=e129] [cursor=pointer]:
+            - img [ref=e132]: sell
+            - generic [ref=e133]: Google Play ile para kazanın
+    - generic [ref=e22]:
+      - generic [ref=e1149]:
+        - generic [ref=e1156]:
+          - heading "Uygulama içeriği" [level=1] [ref=e1162]
+          - generic [ref=e1169]:
+            - text: Bize uygulamanızın içeriği hakkında bilgi verin. Bu bilgiyi, uygulamanızın Google Play politikalarına uyduğundan emin olmak için kullanırız.
+            - link "Uygulama içeriğiyle ilgili daha fazla bilgi edinin, Yeni bir sekmede açılır" [ref=e1171] [cursor=pointer]:
+              - /url: https://play.google.com/about/developer-content-policy/
+              - text: Daha fazla bilgi
+        - generic [ref=e1174]:
+          - tablist [ref=e1178]:
+            - tab "Tamamlanması gerekenler" [ref=e1179] [cursor=pointer]:
+              - generic [ref=e1180]: Tamamlanması gerekenler
+            - tab "Tamamlananlar" [active] [selected] [ref=e1182] [cursor=pointer]:
+              - generic [ref=e1183]: Tamamlananlar
+          - generic [ref=e1199]:
+            - generic [ref=e1202]:
+              - heading "10 beyan tamamlandı" [level=2] [ref=e1208]
+              - generic [ref=e1211]: Tamamladığınız politika beyanları burada gösterilir. Herhangi bir sorun tespit edersek sizi bilgilendiririz. Google Play politikasına uymak için, sağladığınız bilgileri düzenli olarak gözden geçirmeniz ve güncel tutmanız gerekir.
+            - generic [ref=e1214]:
+              - generic [ref=e1216]:
+                - generic [ref=e1221]: Bildirim
+                - generic [ref=e1230]: Son düzenleme
+              - generic [ref=e1235]:
+                - generic [ref=e1240]:
+                  - button "Gizlilik politikası ayrıntılarını göster" [ref=e1241] [cursor=pointer]:
+                    - img [ref=e1244]: arrow_right
+                    - generic [ref=e1246]: Gizlilik politikası
+                  - button "Gizlilik politikası politikasının açıklamasını görüntülemeyle ilgili ipucu" [ref=e1250] [cursor=pointer]:
+                    - img [ref=e1251]: help
+                - generic [ref=e1254]:
+                  - button "Gizlilik politikası ayrıntılarını göster" [ref=e1256] [cursor=pointer]:
+                    - generic [ref=e1260]:
+                      - img [ref=e1263]: info
+                      - generic [ref=e1264]: İncelenmek üzere göndermeye hazır
+                  - button "Gizlilik politikası ayrıntılarını göster" [ref=e1266] [cursor=pointer]:
+                    - generic [ref=e1269]: 19 Nis 2026
+                  - button "Gizlilik politikasını yönet" [ref=e1272]:
+                    - generic [ref=e1275]: Yönet
+              - generic [ref=e1278]:
+                - generic [ref=e1283]:
+                  - button "Reklam Kimliği ayrıntılarını göster" [ref=e1284] [cursor=pointer]:
+                    - img [ref=e1287]: arrow_right
+                    - generic [ref=e1289]: Reklam Kimliği
+                  - button "Reklam Kimliği politikasının açıklamasını görüntülemeyle ilgili ipucu" [ref=e1293] [cursor=pointer]:
+                    - img [ref=e1294]: help
+                - generic [ref=e1297]:
+                  - button "Reklam Kimliği ayrıntılarını göster" [ref=e1299] [cursor=pointer]:
+                    - generic [ref=e1303]:
+                      - img [ref=e1306]: info
+                      - generic [ref=e1307]: İncelenmek üzere göndermeye hazır
+                  - button "Reklam Kimliği ayrıntılarını göster" [ref=e1309] [cursor=pointer]:
+                    - generic [ref=e1312]: 16 Nis 2026
+                  - button "Reklam kimliği beyanını yönet" [ref=e1315]:
+                    - generic [ref=e1318]: Yönet
+              - generic [ref=e1321]:
+                - generic [ref=e1326]:
+                  - button "Veri güvenliği ayrıntılarını göster" [ref=e1327] [cursor=pointer]:
+                    - img [ref=e1330]: arrow_right
+                    - generic [ref=e1332]: Veri güvenliği
+                  - button "Veri güvenliği politikasının açıklamasını görüntülemeyle ilgili ipucu" [ref=e1336] [cursor=pointer]:
+                    - img [ref=e1337]: help
+                - generic [ref=e1340]:
+                  - button "Veri güvenliği ayrıntılarını göster" [ref=e1342] [cursor=pointer]:
+                    - generic [ref=e1346]:
+                      - img [ref=e1349]: info
+                      - generic [ref=e1350]: İncelenmek üzere göndermeye hazır
+                  - button "Veri güvenliği ayrıntılarını göster" [ref=e1352] [cursor=pointer]:
+                    - generic [ref=e1355]: 16 Nis 2026
+                  - button "Veri güvenliği uygulama beyanını yönet" [ref=e1358]:
+                    - generic [ref=e1361]: Yönet
+              - generic [ref=e1364]:
+                - generic [ref=e1369]:
+                  - button "Sağlık uygulamaları ayrıntılarını göster" [ref=e1370] [cursor=pointer]:
+                    - img [ref=e1373]: arrow_right
+                    - generic [ref=e1375]: Sağlık uygulamaları
+                  - button "Sağlık uygulamaları politikasının açıklamasını görüntülemeyle ilgili ipucu" [ref=e1379] [cursor=pointer]:
+                    - img [ref=e1380]: help
+                - generic [ref=e1383]:
+                  - button "Sağlık uygulamaları ayrıntılarını göster" [ref=e1385] [cursor=pointer]:
+                    - generic [ref=e1389]:
+                      - img [ref=e1392]: info
+                      - generic [ref=e1393]: İncelenmek üzere göndermeye hazır
+                  - button "Sağlık uygulamaları ayrıntılarını göster" [ref=e1395] [cursor=pointer]:
+                    - generic [ref=e1398]: 16 Nis 2026
+                  - button "Sağlık beyanını yönet" [ref=e1401]:
+                    - generic [ref=e1404]: Yönet
+              - generic [ref=e1407]:
+                - generic [ref=e1412]:
+                  - button "Finans ile ilgili özellikler ayrıntılarını göster" [ref=e1413] [cursor=pointer]:
+                    - img [ref=e1416]: arrow_right
+                    - generic [ref=e1418]: Finans ile ilgili özellikler
+                  - button "Finans ile ilgili özellikler politikasının açıklamasını görüntülemeyle ilgili ipucu" [ref=e1422] [cursor=pointer]:
+                    - img [ref=e1423]: help
+                - generic [ref=e1426]:
+                  - button "Finans ile ilgili özellikler ayrıntılarını göster" [ref=e1428] [cursor=pointer]:
+                    - generic [ref=e1432]:
+                      - img [ref=e1435]: info
+                      - generic [ref=e1436]: İncelenmek üzere göndermeye hazır
+                  - button "Finans ile ilgili özellikler ayrıntılarını göster" [ref=e1438] [cursor=pointer]:
+                    - generic [ref=e1441]: 16 Nis 2026
+                  - button "Finans ile ilgili özellikler beyanını yönet" [ref=e1444]:
+                    - generic [ref=e1447]: Yönet
+              - generic [ref=e1450]:
+                - generic [ref=e1455]:
+                  - button "Resmi kurum uygulamaları ayrıntılarını göster" [ref=e1456] [cursor=pointer]:
+                    - img [ref=e1459]: arrow_right
+                    - generic [ref=e1461]: Resmi kurum uygulamaları
+                  - button "Resmi kurum uygulamaları politikasının açıklamasını görüntülemeyle ilgili ipucu" [ref=e1465] [cursor=pointer]:
+                    - img [ref=e1466]: help
+                - generic [ref=e1469]:
+                  - button "Resmi kurum uygulamaları ayrıntılarını göster" [ref=e1471] [cursor=pointer]:
+                    - generic [ref=e1475]:
+                      - img [ref=e1478]: info
+                      - generic [ref=e1479]: İncelenmek üzere göndermeye hazır
+                  - button "Resmi kurum uygulamaları ayrıntılarını göster" [ref=e1481] [cursor=pointer]:
+                    - generic [ref=e1484]: 16 Nis 2026
+                  - button "Resmi kurum uygulaması beyanını yönetin" [ref=e1487]:
+                    - generic [ref=e1490]: Yönet
+              - generic [ref=e1493]:
+                - generic [ref=e1498]:
+                  - button "Hedef kitle ve içerik ayrıntılarını göster" [ref=e1499] [cursor=pointer]:
+                    - img [ref=e1502]: arrow_right
+                    - generic [ref=e1504]: Hedef kitle ve içerik
+                  - button "Hedef kitle ve içerik politikasının açıklamasını görüntülemeyle ilgili ipucu" [ref=e1508] [cursor=pointer]:
+                    - img [ref=e1509]: help
+                - generic [ref=e1512]:
+                  - button "Hedef kitle ve içerik ayrıntılarını göster" [ref=e1514] [cursor=pointer]:
+                    - generic [ref=e1518]:
+                      - img [ref=e1521]: info
+                      - generic [ref=e1522]: İncelenmek üzere göndermeye hazır
+                  - button "Hedef kitle ve içerik ayrıntılarını göster" [ref=e1524] [cursor=pointer]:
+                    - generic [ref=e1527]: 16 Nis 2026
+                  - button "Hedef kitleyi ve içeriği yönet" [ref=e1530]:
+                    - generic [ref=e1533]: Yönet
+              - generic [ref=e1536]:
+                - generic [ref=e1541]:
+                  - button "Uygulama erişimi ayrıntılarını göster" [ref=e1542] [cursor=pointer]:
+                    - img [ref=e1545]: arrow_right
+                    - generic [ref=e1547]: Uygulama erişimi
+                  - button "Uygulama erişimi politikasının açıklamasını görüntülemeyle ilgili ipucu" [ref=e1551] [cursor=pointer]:
+                    - img [ref=e1552]: help
+                - generic [ref=e1555]:
+                  - button "Uygulama erişimi ayrıntılarını göster" [ref=e1557] [cursor=pointer]:
+                    - generic [ref=e1561]:
+                      - img [ref=e1564]: info
+                      - generic [ref=e1565]: İncelenmek üzere göndermeye hazır
+                  - button "Uygulama erişimi ayrıntılarını göster" [ref=e1567] [cursor=pointer]:
+                    - generic [ref=e1570]: 16 Nis 2026
+                  - button "Uygulama erişimi için talimatları yönet" [ref=e1573]:
+                    - generic [ref=e1576]: Yönet
+              - generic [ref=e1579]:
+                - generic [ref=e1584]:
+                  - button "İçerik derecelendirmeleri ayrıntılarını göster" [ref=e1585] [cursor=pointer]:
+                    - img [ref=e1588]: arrow_right
+                    - generic [ref=e1590]: İçerik derecelendirmeleri
+                  - button "İçerik derecelendirmeleri politikasının açıklamasını görüntülemeyle ilgili ipucu" [ref=e1594] [cursor=pointer]:
+                    - img [ref=e1595]: help
+                - generic [ref=e1598]:
+                  - button "İçerik derecelendirmeleri ayrıntılarını göster" [ref=e1600] [cursor=pointer]:
+                    - generic [ref=e1604]:
+                      - img [ref=e1607]: info
+                      - generic [ref=e1608]: İncelenmek üzere göndermeye hazır
+                  - button "İçerik derecelendirmeleri ayrıntılarını göster" [ref=e1610] [cursor=pointer]:
+                    - generic [ref=e1613]: 16 Nis 2026
+                  - button "Uygulamalar ve oyunlar için içerik derecelendirmelerini yönet" [ref=e1616]:
+                    - generic [ref=e1619]: Yönet
+              - generic [ref=e1622]:
+                - generic [ref=e1627]:
+                  - button "Reklam ayrıntılarını göster" [ref=e1628] [cursor=pointer]:
+                    - img [ref=e1631]: arrow_right
+                    - generic [ref=e1633]: Reklam
+                  - button "Reklam politikasının açıklamasını görüntülemeyle ilgili ipucu" [ref=e1637] [cursor=pointer]:
+                    - img [ref=e1638]: help
+                - generic [ref=e1641]:
+                  - button "Reklam ayrıntılarını göster" [ref=e1643] [cursor=pointer]:
+                    - generic [ref=e1647]:
+                      - img [ref=e1650]: info
+                      - generic [ref=e1651]: İncelenmek üzere göndermeye hazır
+                  - button "Reklam ayrıntılarını göster" [ref=e1653] [cursor=pointer]:
+                    - generic [ref=e1656]: 16 Nis 2026
+                  - button "Reklam beyanını yönet" [ref=e1659]:
+                    - generic [ref=e1662]: Yönet
+      - generic [ref=e30]:
+        - generic [ref=e426]:
+          - link "Ürün güncellemeleri" [ref=e427] [cursor=pointer]:
+            - /url: https://play.google.com/console/about/whats-new/
+          - link "Durum kontrol paneli" [ref=e428] [cursor=pointer]:
+            - /url: https://status.play.google.com/
+          - link "Yardım" [ref=e429] [cursor=pointer]:
+            - /url: /console/u/0/developers/8158019782975444733/help-and-support?app=4975744367147799859
+        - generic [ref=e430]:
+          - generic [ref=e431]: © 2026 Google
+          - link "Gizlilik" [ref=e432] [cursor=pointer]:
+            - /url: https://www.google.com/policies/privacy/
+          - link "Geliştirici Dağıtım Sözleşmesi" [ref=e433] [cursor=pointer]:
+            - /url: https://play.google.com/about/developer-distribution-agreement.html
+          - link "Hizmet Şartları" [ref=e434] [cursor=pointer]:
+            - /url: https://play.google.com/about/console/terms-of-service/
