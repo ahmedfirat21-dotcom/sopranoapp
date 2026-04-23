@@ -138,7 +138,7 @@ export default function RoomChatDrawer({
     <>
       {/* Backdrop */}
       <Animated.View
-        style={[StyleSheet.absoluteFill, { zIndex: 48, opacity: backdropOpacity }]}
+        style={[StyleSheet.absoluteFill, { zIndex: 99, elevation: 99, opacity: backdropOpacity }]}
         pointerEvents="box-none"
       >
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
@@ -263,7 +263,8 @@ const s = StyleSheet.create({
   panel: {
     position: 'absolute',
     top: 0, left: 0, right: 0, bottom: 0,
-    zIndex: 50,
+    zIndex: 100,
+    elevation: 100,
     overflow: 'hidden',
   },
 
