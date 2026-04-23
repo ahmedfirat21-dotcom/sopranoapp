@@ -3152,8 +3152,23 @@ export default function RoomScreen() {
       })
       .catch(() => {});
   }, [selectedUser?.user_id, firebaseUser?.uid]);
-
-  if (loading) return <View style={sty.root} />;
+  // ★ 2026-04-24: Loading → premium skeleton (boş beyaz ekran yerine oda temasıyla uyumlu)
+  //   Clubhouse modeli: modal açılır, arka plan hemen görünür, içerik yüklenir
+  if (loading) return (
+    <View style={[sty.root, { alignItems: 'center', justifyContent: 'center' }]}>
+      <StatusBar hidden />
+      <LinearGradient
+        colors={['#0F1929', '#162236', '#0F1929']}
+        style={StyleSheet.absoluteFillObject}
+      />
+      <View style={{ alignItems: 'center', gap: 12 }}>
+        <ActivityIndicator size="small" color="#14B8A6" />
+        <Text style={{ fontSize: 12, color: 'rgba(148,163,184,0.6)', fontWeight: '600' }}>
+          Odaya bağlanılıyor...
+        </Text>
+      </View>
+    </View>
+  );
 
   return (
     <Animated.View style={[sty.root, { opacity: fadeIn }]}>

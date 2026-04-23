@@ -1170,7 +1170,16 @@ export default function RootLayout() {
           >
             <Stack.Screen name="(auth)" options={{ animation: 'fade' }} />
             <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
-            <Stack.Screen name="room/[id]" options={{ animation: 'fade_from_bottom', animationDuration: 300 }} />
+            {/* ★ 2026-04-24: Clubhouse-style modal — aşağıdan yukarıya açılır,
+                 aşağı çekme ile kapatılabilir (native gesture). fullScreenModal
+                 tam ekran açar ama swipe-down ile dismiss edilir. */}
+            <Stack.Screen name="room/[id]" options={{
+              presentation: 'fullScreenModal',
+              animation: 'slide_from_bottom',
+              animationDuration: 300,
+              gestureEnabled: true,
+              gestureDirection: 'vertical',
+            }} />
             {/* broadcast/[id] kaldırıldı — Room'a "Yayın Modu" toggle eklendi */}
             <Stack.Screen name="chat/[id]" options={{ animation: 'fade_from_bottom', animationDuration: 250 }} />
             <Stack.Screen name="user/[id]" options={{ animation: 'fade_from_bottom', animationDuration: 250 }} />
