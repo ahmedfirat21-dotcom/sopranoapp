@@ -90,22 +90,19 @@ export default function RoomChatDrawer({
   const expandedRef = useRef(false);
   useEffect(() => { expandedRef.current = expanded; }, [expanded]);
 
-  // ★ 2026-04-23 (v7 — CLUBHOUSE): Panel WHOLE shift-up.
-  //   Klavye açılınca hem bottom (kbHeight) hem top (SCREEN_H - HALF - kbHeight)
-  //   YUKARI kayar. Böylece panel boyutu korunur, bir bütün olarak klavye üstüne
-  //   taşınır. Aksi halde top sabitken bottom yukarı giderse panel sıkışıyor.
-  const SAFE_TOP = Platform.OS === 'ios' ? 44 : 24;
-  const topAnim = useRef(new Animated.Value(SCREEN_H - HALF_TOTAL)).current;
+  // ★ 2026-04-23 (v8 — SIMPLE): bottom + height, position:absolute.
+  //   Klavye shift'i `bottom: kbHeight` ile. topAnim yok — height fixed.
+  //   Input'un pozisyonu artık sadece bottom:kbHeight'e bağlı, layout hesabı
+  //   otomatik: panel bottom klavye üstünde, height sabit, input panel dibinde.
+  const heightAnim = useRef(new Animated.Value(HALF_TOTAL)).current;
   useEffect(() => {
-    const baseTotal = expanded ? FULL_TOTAL : HALF_TOTAL;
-    const rawTop = SCREEN_H - baseTotal - kbHeight;
-    Animated.spring(topAnim, {
-      toValue: Math.max(SAFE_TOP, rawTop),  // status bar'a yapışmasın
+    Animated.spring(heightAnim, {
+      toValue: expanded ? FULL_TOTAL : HALF_TOTAL,
       useNativeDriver: false,
       damping: 22,
       stiffness: 220,
     }).start();
-  }, [expanded, HALF_TOTAL, FULL_TOTAL, kbHeight]);
+  }, [expanded, HALF_TOTAL, FULL_TOTAL]);
 
   const translateY = useRef(new Animated.Value(FULL_TOTAL + 200)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
@@ -225,12 +222,11 @@ export default function RoomChatDrawer({
         style={[
           s.panel,
           {
-            // ★ 2026-04-23 (v6 FINAL): top + bottom layout, height fluid.
-            // bottom=kbHeight → panel klavye üstünde; top=topAnim → snap point (half/full).
-            // Bu yapıda klavye açıldığında panel bottom lifts, height auto-shrinks;
-            // içerik flex ile kendini yeniden düzenliyor, input bottom'da kalıyor.
-            top: topAnim,
+            // ★ 2026-04-23 (v8 SIMPLE): bottom:kbHeight (klavye üstü) + fixed height.
+            // Panel her zaman aynı yükseklik, sadece aşağıdan yukarıya shift olur.
+            // Input panel dibinde sabit → klavye açılınca klavye üstünde görünür.
             bottom: kbHeight,
+            height: heightAnim,
             paddingBottom: BAR_OFFSET,
             transform: [{ translateY }],
           },
@@ -436,18 +432,22 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    minHeight: 62,
+    // ★ Input barını belirgin hale getir — panel bg'ye karışmasın
+    backgroundColor: 'rgba(0,0,0,0.25)',
     borderTopWidth: 1,
     borderTopColor: 'rgba(255,255,255,0.06)',
   },
   input: {
     flex: 1,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    height: 38,
+    borderRadius: 19,
+    // ★ 2026-04-23: Daha belirgin bg — eski rgba(0.06) pratik olarak invisible'dı
+    backgroundColor: 'rgba(255,255,255,0.12)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: 'rgba(255,255,255,0.22)',
     paddingHorizontal: 12,
     fontSize: 12,
     color: '#F1F5F9',
