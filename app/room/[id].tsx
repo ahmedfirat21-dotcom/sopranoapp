@@ -2426,8 +2426,12 @@ export default function RoomScreen() {
   }, [room?.created_at, room?.expires_at]);
   const fadeIn = useRef(new Animated.Value(0)).current;
   useEffect(() => {
-    Animated.timing(fadeIn, { toValue: 1, duration: 400, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
-  }, []);
+    // ★ 2026-04-24: fadeIn room data gelene kadar bekler — boş oda flash'ını önler
+    //   Minimize restore'da room null iken opacity 0 kalır, data gelince smooth fade-in
+    if (room) {
+      Animated.timing(fadeIn, { toValue: 1, duration: 350, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
+    }
+  }, [!!room]);
   // Rol Dağılımları — useMemo ile cache'le (performans)
   const { stageUsers, listenerUsers, spectatorUsers, viewerCount, amIHost, amIModerator, amIGodMaster, canModerate, isGodOrHost, hostUser, amIActingHost, isOriginalHost } = useMemo(() => {
     // Banned kullanıcıları filtrele
@@ -3156,9 +3160,10 @@ export default function RoomScreen() {
       })
       .catch(() => {});
   }, [selectedUser?.user_id, firebaseUser?.uid]);
-  // ★ 2026-04-24: Loading → premium skeleton (boş beyaz ekran yerine oda temasıyla uyumlu)
-  //   Clubhouse modeli: modal açılır, arka plan hemen görünür, içerik yüklenir
-  if (loading) return (
+  // ★ 2026-04-24: Loading VEYA room null → premium skeleton
+  //   Minimize restore'da loading=false ama room null olabilir (data henüz gelmedi)
+  //   Her iki durumda da gradient bg + spinner göster → boş oda flash'ını önle
+  if (loading || !room) return (
     <View style={[sty.root, { alignItems: 'center', justifyContent: 'center' }]}>
       <StatusBar hidden />
       <LinearGradient
@@ -3168,7 +3173,7 @@ export default function RoomScreen() {
       <View style={{ alignItems: 'center', gap: 12 }}>
         <ActivityIndicator size="small" color="#14B8A6" />
         <Text style={{ fontSize: 12, color: 'rgba(148,163,184,0.6)', fontWeight: '600' }}>
-          Odaya bağlanılıyor...
+          {loading ? 'Odaya bağlanılıyor...' : 'Oda hazırlanıyor...'}
         </Text>
       </View>
     </View>
