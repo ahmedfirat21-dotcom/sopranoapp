@@ -278,9 +278,6 @@ export default function MiniRoomCard({ room, onExpand, onClose, onMuteToggle }: 
           </Pressable>
         </View>
       </Pressable>
-
-      {/* Drag indicator */}
-      <View style={styles.dragHandle} />
     </Animated.View>
   );
 }
@@ -297,6 +294,7 @@ const styles = StyleSheet.create({
   cardAudioActive: {
     borderColor: 'rgba(20,184,166,0.6)',
     shadowColor: '#14B8A6',
+    shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.5,
     shadowRadius: 14,
   },
@@ -327,16 +325,12 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.5)',
     gap: 8,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
+    shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.4,
     shadowRadius: 20,
     elevation: 14,
   },
-  dragHandle: {
-    width: 32, height: 3, borderRadius: 1.5,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    marginTop: 4,
-  },
+
   liveIndicator: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     backgroundColor: 'rgba(239,68,68,0.12)',

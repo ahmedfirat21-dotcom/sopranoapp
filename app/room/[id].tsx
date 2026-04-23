@@ -980,10 +980,11 @@ export default function RoomScreen() {
   const { firebaseUser, profile, setMinimizedRoom, minimizedRoom, showNotifDrawer, setShowNotifDrawer, setNotifDrawerAnchorRight, setNotifDrawerRight, setNotifDrawerTop } = useAuth();
   const { unreadNotifs } = useBadges();
   
-  // Real DB States
   const [room, setRoom] = useState<Room | null>(null);
   const [participants, setParticipants] = useState<RoomParticipant[]>([]);
-  const [loading, setLoading] = useState(true);
+  // ★ 2026-04-24: Minimize'dan dönüşte loading false ile başlar — oda zaten açık,
+  //   yükleniyor ekranı gösterilmez. Data arka planda güncellenir.
+  const [loading, setLoading] = useState(() => !(minimizedRoom?.id === id));
   
   // UX States
   const [chatMessages, setChatMessages] = useState<RoomMessage[]>([]);
@@ -1319,6 +1320,9 @@ export default function RoomScreen() {
     if (!id || !firebaseUser) return;
     // Tam ekran odaya girildi — mini kartı kaldır
     setMinimizedRoom(null);
+
+    // ★ 2026-04-24: Minimize restore → loading ekranı atla, data arka planda güncelle
+    const skipLoading = isRestoringFromMinimize;
 
     // System Room fallback — veritabanında yok, local data kullan
     const roomPromise = isSystemRoom(id) 
