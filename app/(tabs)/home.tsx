@@ -1786,12 +1786,7 @@ export default function HomeScreen() {
             });
           }}
         />
-        {/* ★ 2026-04-22: FAB gizliyken hint overlay'ini de göstermeyelim — boşlukta okla işaret eder. */}
-        <FABHintOverlay
-          visible={showFABHint && !isFullyEmpty}
-          bottomOffset={insets.bottom + BAR_BOTTOM_OFFSET}
-          onDismiss={() => setShowFABHint(false)}
-        />
+
 
         {/* ═══ Quick Create Sheet — FAB'dan açılır, 3 seçenekli
              ★ 2026-04-23: bottomOffset=BAR_BOTTOM_OFFSET (84) — panel CurvedTabBar'ın üstünde kalır,
@@ -1818,34 +1813,7 @@ export default function HomeScreen() {
         {/* ★ 2026-04-21: Scroll fade-out — reusable component (tüm tab sayfalarında kullanılıyor) */}
         <TabBarFadeOut />
 
-        {/* ═══ Floating Action Button — Yeni Oda Aç ═══
-            ★ 2026-04-21: Ke\u015ffette prominent CTA yoktu; kullan\u0131c\u0131 ancak bo\u015f durumda
-            oluştur butonunu görebiliyordu. FAB artık hep sağ-altta (tab bar üstünde). */}
-        {/* ★ 2026-04-22: Ekran "gerçekten boş" ise FAB gizlenir — unified empty
-             kartının chip'leri zaten öne çıkan büyük CTA. İçerik geldiğinde geri gelir. */}
-        {!isFullyEmpty && (
-          <Pressable
-            style={({ pressed }) => [s.fab, { bottom: insets.bottom + BAR_BOTTOM_OFFSET }, pressed && { transform: [{ scale: 0.94 }] }]}
-            onPress={() => {
-              if (!firebaseUser) { router.push('/create-room'); return; }
-              setShowQuickCreate(true);
-            }}
-            onLongPress={() => {
-              // ★ Uzun bas = direkt detaylı ayarla (klavyesiz power-user kısayolu)
-              if (!firebaseUser) { router.push('/create-room'); return; }
-              router.push('/create-room');
-            }}
-            hitSlop={8}
-          >
-            <LinearGradient
-              colors={['#14B8A6', '#0D9488', '#065F56']}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-              style={s.fabGradient}
-            >
-              <Ionicons name="add" size={30} color="#FFF" />
-            </LinearGradient>
-          </Pressable>
-        )}
+
       </View>
     </AppBackground>
   );

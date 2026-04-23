@@ -159,11 +159,7 @@ export default function MiniRoomCard({ room, onExpand, onClose, onMuteToggle }: 
   // ★ Audio glow interpolation
   const audioGlowOpacity = audioGlow.interpolate({
     inputRange: [0, 1],
-    outputRange: [0, 0.6],
-  });
-  const audioGlowScale = audioGlow.interpolate({
-    inputRange: [0, 1],
-    outputRange: [1, 1.03],
+    outputRange: [0, 0.7],
   });
 
   const isAudioActive = !room.isRoomMuted;
@@ -184,17 +180,6 @@ export default function MiniRoomCard({ room, onExpand, onClose, onMuteToggle }: 
       ]}
       {...panResponder.panHandlers}
     >
-      {/* ★ Audio glow ring — ses aktifken teal parlaklık dalgası */}
-      {isAudioActive && (
-        <Animated.View style={[
-          styles.audioGlowRing,
-          {
-            opacity: audioGlowOpacity,
-            transform: [{ scale: audioGlowScale }],
-          },
-        ]} />
-      )}
-
       {/* Ripple halkaları */}
       <Animated.View style={[
         styles.ripple,
@@ -206,7 +191,10 @@ export default function MiniRoomCard({ room, onExpand, onClose, onMuteToggle }: 
       ]} />
 
       {/* Ana kart */}
-      <Pressable onPress={onExpand} style={styles.card}>
+      <Pressable onPress={onExpand} style={[
+        styles.card,
+        isAudioActive && styles.cardAudioActive,
+      ]}>
         <LinearGradient
           colors={['#2A3A58', '#243250', '#1A2540']}
           locations={[0, 0.5, 1]}
@@ -218,6 +206,13 @@ export default function MiniRoomCard({ room, onExpand, onClose, onMuteToggle }: 
           start={{ x: 0, y: 0 }} end={{ x: 0.6, y: 1 }}
           style={StyleSheet.absoluteFillObject}
         />
+        {/* ★ İç glow overlay — ses aktifken kartın iç kenarlarında teal ışık nefes alır */}
+        {isAudioActive && (
+          <Animated.View style={[
+            styles.innerGlow,
+            { opacity: audioGlowOpacity },
+          ]} pointerEvents="none" />
+        )}
 
         {/* Canlı gösterge */}
         <View style={styles.liveIndicator}>
@@ -298,18 +293,20 @@ const styles = StyleSheet.create({
     elevation: 999,
     alignItems: 'center',
   },
-  // ★ Audio glow ring — ses aktifken teal nefes alan kenar parlaklığı
-  audioGlowRing: {
-    position: 'absolute',
-    left: -2, right: -2, top: -2, bottom: -2,
-    borderRadius: 24,
-    borderWidth: 2,
-    borderColor: '#14B8A6',
+  // ★ Ses aktifken card border teal’e döner + iç shadow glow
+  cardAudioActive: {
+    borderColor: 'rgba(20,184,166,0.6)',
     shadowColor: '#14B8A6',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 12,
-    elevation: 8,
+    shadowOpacity: 0.5,
+    shadowRadius: 14,
+  },
+  // ★ İç glow — kartın içinde kenar boyunca teal ışık nefes alır
+  innerGlow: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 21,
+    borderWidth: 2,
+    borderColor: 'rgba(20,184,166,0.5)',
+    backgroundColor: 'rgba(20,184,166,0.04)',
   },
   ripple: {
     position: 'absolute',
