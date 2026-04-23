@@ -1170,12 +1170,12 @@ export default function RootLayout() {
           >
             <Stack.Screen name="(auth)" options={{ animation: 'fade' }} />
             <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
-            {/* ★ 2026-04-24: Expand-from-card → room. MiniRoomCard'ın expand animasyonu
-                 görsel geçişi yapıyor, stack transition sadece kesintisiz bağlantı sağlar.
-                 fade + kısa süre → expand bitince room hemen hazır. */}
+            {/* ★ 2026-04-24: slide_from_bottom — home'dan odaya doğal giriş.
+                 Minimize restore'da expand-from-card animasyonu görsel geçişi yapar,
+                 slide_from_bottom altında kalır ve görünmez. */}
             <Stack.Screen name="room/[id]" options={{
-              animation: 'fade',
-              animationDuration: 200,
+              animation: 'slide_from_bottom',
+              animationDuration: 280,
               gestureEnabled: false,
             }} />
             {/* broadcast/[id] kaldırıldı — Room'a "Yayın Modu" toggle eklendi */}

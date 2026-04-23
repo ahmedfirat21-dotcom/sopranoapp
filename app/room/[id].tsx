@@ -1321,9 +1321,6 @@ export default function RoomScreen() {
     // Tam ekran odaya girildi — mini kartı kaldır
     setMinimizedRoom(null);
 
-    // ★ 2026-04-24: Minimize restore → loading ekranı atla, data arka planda güncelle
-    const skipLoading = isRestoringFromMinimize;
-
     // System Room fallback — veritabanında yok, local data kullan
     const roomPromise = isSystemRoom(id) 
       ? Promise.resolve(getSystemRooms().find(r => r.id === id) as unknown as Room) 
@@ -2424,11 +2421,14 @@ export default function RoomScreen() {
     const timer = setInterval(updateDuration, interval);
     return () => clearInterval(timer);
   }, [room?.created_at, room?.expires_at]);
-  const fadeIn = useRef(new Animated.Value(0)).current;
+  // ★ 2026-04-24: Minimize restore'da expand animasyonu zaten geçişi yaptı →
+  //   fadeIn 1 ile başlar (tekrar fade yok). İlk girişte 0 ile başlar.
+  //   wasRestoringFromMinimize: mount anındaki isRestoringFromMinimize değerini saklar
+  const wasRestoringRef = useRef(isRestoringFromMinimize);
+  const fadeIn = useRef(new Animated.Value(wasRestoringRef.current ? 1 : 0)).current;
   useEffect(() => {
-    // ★ 2026-04-24: fadeIn room data gelene kadar bekler — boş oda flash'ını önler
-    //   Minimize restore'da room null iken opacity 0 kalır, data gelince smooth fade-in
-    if (room) {
+    // Sadece ilk girişte (minimize dışı) fade-in uygula
+    if (room && !wasRestoringRef.current) {
       Animated.timing(fadeIn, { toValue: 1, duration: 350, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
     }
   }, [!!room]);
