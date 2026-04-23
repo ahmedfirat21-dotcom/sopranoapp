@@ -48,6 +48,7 @@ import ErrorBoundary from '../components/ErrorBoundary';
 // IntroVideo kaldırıldı — kullanıcı talebi ile splash intro devre dışı
 import NotificationDrawer from '../components/NotificationDrawer';
 import SPReceivedModal from '../components/profile/SPReceivedModal';
+import ThankYouReceivedModal from '../components/profile/ThankYouReceivedModal';
 
 import { OnlineFriendsProvider } from '../providers/OnlineFriendsProvider';
 export { useOnlineFriends } from '../providers/OnlineFriendsProvider';
@@ -561,7 +562,11 @@ export default function RootLayout() {
   const [notifDrawerTop, setNotifDrawerTop] = useState<number | undefined>(undefined);
   // ★ Gelen SP bağışı için global popup state
   const [incomingGift, setIncomingGift] = useState<{
-    amount: number; senderId: string; senderName: string; senderAvatar?: string;
+    amount: number; senderId: string; senderName: string; senderAvatar?: string; notificationId?: string;
+  } | null>(null);
+  // ★ Gelen teşekkür bildirimi için global popup state
+  const [incomingThankYou, setIncomingThankYou] = useState<{
+    senderName: string; senderAvatar?: string; emoji?: string; message?: string;
   } | null>(null);
   const router = useRouter(); // routerRef yerine doğrudan kullan
 
@@ -1008,6 +1013,27 @@ export default function RootLayout() {
       }, async (payload) => {
         const notif = payload.new as any;
         if (__DEV__) console.log('[GiftRT] notif received:', notif?.type, notif?.body);
+        // ★ 2026-04-24: thank_you tipini de yakala → ThankYouReceivedModal tetikle
+        if (notif?.type === 'thank_you' && notif?.sender_id) {
+          try {
+            const { data: thankSender } = await supabase
+              .from('profiles')
+              .select('display_name, avatar_url')
+              .eq('id', notif.sender_id)
+              .single();
+            // Body'den emoji + label parse: "🙏 Teşekkürler" pattern
+            const bodyParts = (notif.body || '').split(' ');
+            const thankEmoji = bodyParts[0] || '🙏';
+            const thankMessage = bodyParts.slice(1).join(' ') || undefined;
+            setIncomingThankYou({
+              senderName: thankSender?.display_name || 'Birisi',
+              senderAvatar: thankSender?.avatar_url,
+              emoji: thankEmoji,
+              message: thankMessage,
+            });
+          } catch {}
+          return;
+        }
         if (notif?.type !== 'gift') return;
         // Miktarı body'den parse et ("XX SP gönderdi" pattern'i)
         const amountMatch = /(\d+)\s*SP/.exec(notif.body || '');
@@ -1035,6 +1061,7 @@ export default function RootLayout() {
             senderId: notif.sender_id,
             senderName: senderProfile?.display_name || 'Birisi',
             senderAvatar: senderProfile?.avatar_url,
+            notificationId: notif.id,
           });
         } catch (e) {
           if (__DEV__) console.warn('[GiftRT] Sender profile fetch failed:', e);
@@ -1268,7 +1295,20 @@ export default function RootLayout() {
             senderName={incomingGift.senderName}
             senderAvatar={incomingGift.senderAvatar}
             recipientId={firebaseUser.uid}
+            giftNotificationId={incomingGift.notificationId}
             onClose={() => setIncomingGift(null)}
+          />
+        )}
+
+        {/* ★ Teşekkür Alındı global popup — realtime tetiklenir */}
+        {incomingThankYou && (
+          <ThankYouReceivedModal
+            visible={!!incomingThankYou}
+            senderName={incomingThankYou.senderName}
+            senderAvatar={incomingThankYou.senderAvatar}
+            emoji={incomingThankYou.emoji}
+            message={incomingThankYou.message}
+            onClose={() => setIncomingThankYou(null)}
           />
         )}
 

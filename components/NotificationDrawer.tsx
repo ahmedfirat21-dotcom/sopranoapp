@@ -134,6 +134,10 @@ export default function NotificationDrawer({ visible, onClose, userId, anchorTop
   const [showAll, setShowAll] = useState(false); // ★ Tümünü Gör — modal içinde genişlet
   const [clearing, setClearing] = useState(false); // ★ Tümünü Temizle loading state
   const [processingInvites, setProcessingInvites] = useState<Set<string>>(new Set()); // ★ İşlenmekte olan davet ID'leri
+  // ★ 2026-04-24: Teşekkür info modal state
+  const [thankYouInfo, setThankYouInfo] = useState<{
+    senderName: string; senderAvatar?: string; body?: string; senderId?: string;
+  } | null>(null);
 
   useEffect(() => {
     if (visible && userId) {
@@ -282,9 +286,15 @@ export default function NotificationDrawer({ visible, onClose, userId, anchorTop
         });
       }
     } else if (item.type === 'thank_you' && item.sender_id) {
-      // ★ Teşekkür: modala gerek yok — zilde görünmesi yeterli. Tıklayınca
-      //   teşekkür edenin profiline git (kim olduğunu görmek için).
-      router.push(`/user/${item.sender_id}` as any);
+      // ★ 2026-04-24: Teşekkür bildirimi → info modal (profil yerine)
+      setThankYouInfo({
+        senderName: item.sender?.display_name || 'Birisi',
+        senderAvatar: item.sender?.avatar_url,
+        body: item.body,
+        senderId: item.sender_id,
+      });
+      // Drawer'dan çıkma — modal zaten içinde görünecek
+      return;
     } else if (item.type === 'follow_accepted' || item.type === 'follow_rejected' || item.type === 'follow_pending') {
       if (item.sender_id) router.push(`/user/${item.sender_id}` as any);
     }
@@ -365,26 +375,26 @@ export default function NotificationDrawer({ visible, onClose, userId, anchorTop
 
   const unreadCount = items.filter(n => !n.is_read).length;
 
-  // ★ 2026-04-24: Slide-down entry animation — headerın altından doğuyor hissi.
-  //   Reanimated native driver (60fps). Arrow ve beyaz çerçeve kaldırıldı.
-  const slideY = useSharedValue(-20);
+  // ★ 2026-04-24 v2: Premium entry animation — uniform scale + slide (no squish).
+  //   Reanimated native driver (60fps).
+  const slideY = useSharedValue(-30);
   const slideOpacity = useSharedValue(0);
-  const slideScale = useSharedValue(0.96);
+  const slideScale = useSharedValue(0.92);
   const hasAnimatedEntry = useRef(false);
 
   useEffect(() => {
     if (visible) {
       hasAnimatedEntry.current = false;
-      slideY.value = -20;
+      slideY.value = -30;
       slideOpacity.value = 0;
-      slideScale.value = 0.96;
+      slideScale.value = 0.92;
       // Kısa gecikme — Modal render olduktan sonra animasyon başlat
       const timer = setTimeout(() => {
-        slideY.value = withTiming(0, { duration: 280, easing: Easing.out(Easing.exp) });
-        slideOpacity.value = withTiming(1, { duration: 220, easing: Easing.out(Easing.quad) });
-        slideScale.value = withTiming(1, { duration: 280, easing: Easing.out(Easing.exp) });
+        slideY.value = withTiming(0, { duration: 350, easing: Easing.out(Easing.exp) });
+        slideOpacity.value = withTiming(1, { duration: 250, easing: Easing.out(Easing.quad) });
+        slideScale.value = withTiming(1, { duration: 350, easing: Easing.out(Easing.exp) });
         hasAnimatedEntry.current = true;
-      }, 50);
+      }, 30);
       return () => clearTimeout(timer);
     }
   }, [visible]);
@@ -392,7 +402,7 @@ export default function NotificationDrawer({ visible, onClose, userId, anchorTop
   const dropdownAnimStyle = useAnimatedStyle(() => ({
     transform: [
       { translateY: slideY.value },
-      { scaleY: slideScale.value },
+      { scale: slideScale.value },
     ],
     opacity: slideOpacity.value,
   }));
@@ -403,11 +413,18 @@ export default function NotificationDrawer({ visible, onClose, userId, anchorTop
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={s.backdrop} onPress={onClose} />
 
-      <ReAnimated.View style={[s.dropdown, { top: resolvedAnchor, right: drawerRight ?? 8 }, dropdownAnimStyle]}>
+      <ReAnimated.View style={[s.dropdown, { top: resolvedAnchor }, dropdownAnimStyle]}>
         {/* ★ Odalarım paleti: diagonal gradient (parlak üst-sol → koyu alt-sağ) */}
         <LinearGradient
           colors={['#4a5668', '#37414f', '#232a35']}
           start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFillObject}
+          pointerEvents="none"
+        />
+        {/* Teal accent üst-sol parıltı */}
+        <LinearGradient
+          colors={['rgba(20,184,166,0.08)', 'transparent']}
+          start={{ x: 0, y: 0 }} end={{ x: 0.6, y: 0.8 }}
           style={StyleSheet.absoluteFillObject}
           pointerEvents="none"
         />
@@ -459,8 +476,9 @@ export default function NotificationDrawer({ visible, onClose, userId, anchorTop
           <FlatList
             data={items}
             keyExtractor={(item) => item.id}
-            showsVerticalScrollIndicator={true}
-            style={{ maxHeight: showAll ? H * 0.7 : H * 0.45 }}
+            showsVerticalScrollIndicator={false}
+            style={{ maxHeight: showAll ? H * 0.75 : H * 0.55 }}
+            contentContainerStyle={{ paddingVertical: 4 }}
             ItemSeparatorComponent={() => <View style={s.separator} />}
             renderItem={({ item }) => {
               const icon = getNotifIcon(item.type);
@@ -473,9 +491,9 @@ export default function NotificationDrawer({ visible, onClose, userId, anchorTop
                   >
                     {/* Avatar + tip ikonu overlay */}
                     <View style={s.avatarWrap}>
-                      <StatusAvatar uri={item.sender?.avatar_url} size={38} />
+                      <StatusAvatar uri={item.sender?.avatar_url} size={44} />
                       <View style={[s.typeIconBadge, { backgroundColor: icon.color }]}>
-                        <Ionicons name={icon.name as any} size={10} color="#FFF" />
+                        <Ionicons name={icon.name as any} size={11} color="#FFF" />
                       </View>
                     </View>
 
@@ -538,6 +556,75 @@ export default function NotificationDrawer({ visible, onClose, userId, anchorTop
           </Pressable>
         )}
       </ReAnimated.View>
+
+      {/* ★ 2026-04-24: Teşekkür Info Modal — bildirime tıklanınca açılır */}
+      {thankYouInfo && (
+        <View style={s.thankOverlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setThankYouInfo(null)} />
+          <View style={s.thankCard}>
+            <LinearGradient
+              colors={['#1a2e2a', '#0f1f1c', '#091412']}
+              start={{ x: 0, y: 0 }} end={{ x: 0.7, y: 1 }}
+              style={StyleSheet.absoluteFillObject}
+            />
+            <LinearGradient
+              colors={['rgba(20,184,166,0.15)', 'transparent']}
+              start={{ x: 0, y: 0 }} end={{ x: 0.6, y: 0.8 }}
+              style={StyleSheet.absoluteFillObject}
+            />
+            <LinearGradient
+              colors={['transparent', 'rgba(34,197,94,0.7)', 'transparent']}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+              style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1.5 }}
+            />
+
+            <Text style={s.thankHeader}>🙏 TEŞEKKÜR</Text>
+
+            {/* Avatar + sender info */}
+            <View style={s.thankSenderRow}>
+              {thankYouInfo.senderAvatar && (
+                <StatusAvatar uri={thankYouInfo.senderAvatar} size={44} />
+              )}
+              <View style={{ flex: 1 }}>
+                <Text style={s.thankSenderName} numberOfLines={1}>{thankYouInfo.senderName}</Text>
+                <Text style={s.thankSenderLabel}>sana teşekkür etti</Text>
+              </View>
+            </View>
+
+            {/* Emoji + message */}
+            {thankYouInfo.body && (
+              <View style={s.thankMsgBox}>
+                <Text style={s.thankMsgText}>{thankYouInfo.body}</Text>
+              </View>
+            )}
+
+            {/* Actions */}
+            <View style={s.thankActions}>
+              <Pressable
+                style={({ pressed }) => [s.thankProfileBtn, pressed && { opacity: 0.7 }]}
+                onPress={() => {
+                  setThankYouInfo(null);
+                  onClose();
+                  if (thankYouInfo.senderId) router.push(`/user/${thankYouInfo.senderId}` as any);
+                }}
+              >
+                <Ionicons name="person" size={14} color="#14B8A6" />
+                <Text style={s.thankProfileText}>Profiline Git</Text>
+              </Pressable>
+              <Pressable
+                style={({ pressed }) => [s.thankCloseBtn2, pressed && { opacity: 0.7 }]}
+                onPress={() => setThankYouInfo(null)}
+              >
+                <Text style={s.thankCloseText}>Tamam</Text>
+              </Pressable>
+            </View>
+
+            <Pressable style={s.thankCloseX} onPress={() => setThankYouInfo(null)} hitSlop={8}>
+              <Ionicons name="close" size={16} color="rgba(20,184,166,0.6)" />
+            </Pressable>
+          </View>
+        </View>
+      )}
     </Modal>
   );
 }
@@ -545,31 +632,31 @@ export default function NotificationDrawer({ visible, onClose, userId, anchorTop
 const s = StyleSheet.create({
   backdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'transparent',
+    backgroundColor: 'rgba(0,0,0,0.3)',
   },
   dropdown: {
-    // ★ 2026-04-24: Border/arrow kaldırıldı — header altından doğan temiz görünüm
+    // ★ 2026-04-24 v2: Geniş, premium boyut — neredeyse tam genişlik
     position: 'absolute',
-    right: 8,
-    width: W * 0.72,
-    maxWidth: 300,
-    borderRadius: 14,
-    paddingBottom: 4,
+    left: W * 0.04,
+    right: W * 0.04,
+    borderRadius: 20,
+    paddingBottom: 6,
     overflow: 'hidden',
-    elevation: 25,
+    elevation: 30,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.5,
-    shadowRadius: 16,
-    // ★ Transform origin: üst-sağ (headerın altından doğma hissi)
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.7,
+    shadowRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
   },
   header: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    paddingHorizontal: 12, paddingTop: 10, paddingBottom: 8,
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingHorizontal: 16, paddingTop: 14, paddingBottom: 10,
     borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)',
   },
   title: {
-    fontSize: 14, fontWeight: '800', color: '#F1F5F9', flex: 1,
+    fontSize: 16, fontWeight: '800', color: '#F1F5F9', flex: 1,
     textShadowColor: 'rgba(0,0,0,0.6)',
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 4,
@@ -581,17 +668,17 @@ const s = StyleSheet.create({
   },
   badgeText: { fontSize: 10, fontWeight: '800', color: '#FFF' },
   emptyState: {
-    alignItems: 'center', paddingVertical: 30, gap: 8,
+    alignItems: 'center', paddingVertical: 40, gap: 10,
   },
-  emptyText: { fontSize: 12, color: 'rgba(255,255,255,0.25)' },
+  emptyText: { fontSize: 13, color: 'rgba(255,255,255,0.25)', fontWeight: '500' },
   separator: {
-    height: 1, backgroundColor: 'rgba(255,255,255,0.03)',
-    marginHorizontal: 14,
+    height: 1, backgroundColor: 'rgba(255,255,255,0.04)',
+    marginHorizontal: 16,
   },
   notifItem: {
     flexDirection: 'row', alignItems: 'center',
-    paddingVertical: 8, paddingHorizontal: 12,
-    gap: 8,
+    paddingVertical: 12, paddingHorizontal: 16,
+    gap: 12,
   },
   notifUnread: {
     backgroundColor: 'rgba(20,184,166,0.06)',
@@ -599,16 +686,16 @@ const s = StyleSheet.create({
   avatarWrap: {
     position: 'relative',
   },
-  notifAvatar: { width: 32, height: 32, borderRadius: 16 },
+  notifAvatar: { width: 44, height: 44, borderRadius: 22 },
   typeIconBadge: {
     position: 'absolute', bottom: -2, right: -2,
-    width: 15, height: 15, borderRadius: 7.5,
+    width: 18, height: 18, borderRadius: 9,
     alignItems: 'center', justifyContent: 'center',
     borderWidth: 1.5, borderColor: '#2f404f',
   },
-  notifText: { fontSize: 12, color: '#CBD5E1', lineHeight: 16 },
+  notifText: { fontSize: 13, color: '#CBD5E1', lineHeight: 18 },
   notifSender: { fontWeight: '700', color: '#F1F5F9' },
-  notifTime: { fontSize: 9, color: 'rgba(255,255,255,0.25)', marginTop: 1 },
+  notifTime: { fontSize: 10, color: 'rgba(255,255,255,0.3)', marginTop: 2, fontWeight: '500' },
   unreadDot: {
     width: 8, height: 8, borderRadius: 4,
     backgroundColor: '#14B8A6',
@@ -617,12 +704,12 @@ const s = StyleSheet.create({
   seeAllBtn: {
     flexDirection: 'row',
     alignItems: 'center', justifyContent: 'center',
-    gap: 4,
-    paddingVertical: 10,
+    gap: 5,
+    paddingVertical: 12,
     borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.06)',
     marginTop: 2,
   },
-  seeAllText: { fontSize: 13, fontWeight: '600', color: '#14B8A6' },
+  seeAllText: { fontSize: 14, fontWeight: '700', color: '#14B8A6' },
 
   // ★ Tümünü Temizle butonu
   clearBtn: {
@@ -678,5 +765,85 @@ const s = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: '#94A3B8',
+  },
+
+  // ★ 2026-04-24: Teşekkür Info Modal stilleri
+  thankOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    alignItems: 'center', justifyContent: 'center',
+    zIndex: 100,
+  },
+  thankCard: {
+    width: W * 0.85, maxWidth: 340,
+    borderRadius: 20,
+    borderWidth: 1.5, borderColor: 'rgba(20,184,166,0.3)',
+    overflow: 'hidden',
+    paddingVertical: 20, paddingHorizontal: 18,
+    shadowColor: '#14B8A6',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.4, shadowRadius: 16,
+    elevation: 20,
+  },
+  thankHeader: {
+    fontSize: 12, fontWeight: '900', color: '#14B8A6',
+    letterSpacing: 2, textAlign: 'center', marginBottom: 14,
+    textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4,
+  },
+  thankSenderRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingHorizontal: 10, paddingVertical: 10,
+    backgroundColor: 'rgba(20,184,166,0.06)',
+    borderRadius: 12,
+    borderWidth: 1, borderColor: 'rgba(20,184,166,0.15)',
+  },
+  thankSenderName: {
+    fontSize: 14, fontWeight: '800', color: '#F1F5F9',
+    textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
+  },
+  thankSenderLabel: {
+    fontSize: 11, fontWeight: '600', color: 'rgba(20,184,166,0.65)', marginTop: 1,
+  },
+  thankMsgBox: {
+    marginTop: 10,
+    paddingHorizontal: 14, paddingVertical: 10,
+    backgroundColor: 'rgba(34,197,94,0.08)',
+    borderRadius: 10,
+    borderWidth: 1, borderColor: 'rgba(34,197,94,0.18)',
+    alignItems: 'center',
+  },
+  thankMsgText: {
+    fontSize: 16, color: 'rgba(255,255,255,0.85)', fontWeight: '600',
+  },
+  thankActions: {
+    flexDirection: 'row', gap: 10, marginTop: 16,
+    justifyContent: 'center',
+  },
+  thankProfileBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: 16, paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: 'rgba(20,184,166,0.1)',
+    borderWidth: 1, borderColor: 'rgba(20,184,166,0.25)',
+  },
+  thankProfileText: {
+    fontSize: 13, fontWeight: '700', color: '#14B8A6',
+  },
+  thankCloseBtn2: {
+    paddingHorizontal: 20, paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  thankCloseText: {
+    fontSize: 13, fontWeight: '700', color: '#94A3B8',
+  },
+  thankCloseX: {
+    position: 'absolute', top: 10, right: 10,
+    width: 28, height: 28, borderRadius: 8,
+    backgroundColor: 'rgba(20,184,166,0.08)',
+    borderWidth: 1, borderColor: 'rgba(20,184,166,0.15)',
+    alignItems: 'center', justifyContent: 'center',
   },
 });

@@ -38,22 +38,22 @@ interface TierPalette {
 
 const TIER_PALETTES: Record<Tier, TierPalette> = {
   basic: {
-    ringColor: 'rgba(203,213,225,0.55)',
-    ringGlow: '#CBD5E1',
-    amountColor: '#F1F5F9',
+    ringColor: 'rgba(20,184,166,0.55)',
+    ringGlow: '#14B8A6',
+    amountColor: '#5EEAD4',
     amountShadow: 'rgba(0,0,0,0.7)',
-    diamondGrad: ['#F1F5F9', '#CBD5E1', '#64748B'],
-    sparkleColors: ['#CBD5E1', '#E2E8F0'],
-    sparkleCount: 6,
-    extraRings: 0,
-    bgGrad: ['#3a4452', '#1e2535', '#05080f'],  // silver warmth → koyu
+    diamondGrad: ['#99F6E4', '#14B8A6', '#0D9488'],
+    sparkleColors: ['#14B8A6', '#5EEAD4', '#FBBF24'],
+    sparkleCount: 12,
+    extraRings: 1,
+    bgGrad: ['#1a3a38', '#0f2420', '#040d0c'],  // teal warmth → koyu
     amountFont: 54,
     checkColor: '#22C55E',
     checkGlow: 'rgba(34,197,94,0.85)',
     label: null,
-    labelColor: '#CBD5E1',
-    hasGoldShower: false,
-    hasShimmerSweep: false,
+    labelColor: '#14B8A6',
+    hasGoldShower: true,
+    hasShimmerSweep: true,
   },
   premium: {
     ringColor: 'rgba(251,191,36,0.7)',

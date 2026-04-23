@@ -33,14 +33,17 @@ interface Props {
   senderName: string;
   senderAvatar?: string;
   recipientId: string;
+  /** Bağış bildirim ID — teşekkür limitini takip etmek için */
+  giftNotificationId?: string;
   onClose: () => void;
 }
 
 export default function SPReceivedModal({
-  visible, amount, senderId, senderName, senderAvatar, recipientId, onClose,
+  visible, amount, senderId, senderName, senderAvatar, recipientId, giftNotificationId, onClose,
 }: Props) {
   const [thanked, setThanked] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  const [alreadyThanked, setAlreadyThanked] = useState(false);
 
   // Animasyonlar
   const backdropOpacity = useRef(new Animated.Value(0)).current;
@@ -79,6 +82,24 @@ export default function SPReceivedModal({
     setDisplay(0);
     setThanked(null);
     setSending(false);
+    setAlreadyThanked(false);
+    // ★ 2026-04-24: Daha önce teşekkür edilmiş mi kontrol et (1 hak/bağış)
+    (async () => {
+      try {
+        const { count } = await supabase
+          .from('notifications')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', senderId)
+          .eq('sender_id', recipientId)
+          .eq('type', 'thank_you')
+          .eq('reference_id', giftNotificationId || '')
+          .limit(1);
+        if ((count ?? 0) > 0) {
+          setAlreadyThanked(true);
+          setThanked('✓');
+        }
+      } catch {}
+    })();
     confetti.forEach(c => {
       c.x.setValue(0);
       c.y.setValue(-20);
@@ -146,7 +167,7 @@ export default function SPReceivedModal({
         sender_id: recipientId,
         type: 'thank_you',
         body: `${reply.emoji} ${reply.label}`,
-        reference_id: null,
+        reference_id: giftNotificationId || null,
       });
       if (error) {
         if (__DEV__) console.warn('[ThankYou] Notification insert error:', error.message, error.code);
