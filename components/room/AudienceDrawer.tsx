@@ -48,6 +48,7 @@ export default function AudienceDrawer({ visible, users, onClose, onSelectUser, 
   useEffect(() => {
     if (visible) {
       setMounted(true);
+      swipeX.setValue(0); // ★ double-drag fix: önceki swipe offset'ini sıfırla
       Animated.parallel([
         Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true, damping: 18, stiffness: 180 }),
         Animated.timing(fadeAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
@@ -157,7 +158,8 @@ const s = StyleSheet.create({
   },
   panel: {
     position: 'absolute',
-    right: 0, top: 70, bottom: 80,
+    // ★ 2026-04-23: Yan modaller eşit boyut — DM, Plus, Audience aynı top/bottom
+    right: 0, top: 60, bottom: 100,
     // width inline olarak component içinde atanır (useWindowDimensions runtime).
     borderTopLeftRadius: 18,
     borderBottomLeftRadius: 18,

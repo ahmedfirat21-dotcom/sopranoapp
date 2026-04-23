@@ -156,7 +156,7 @@ export default function SPHistorySheet({ visible, onClose, balance, history: ini
   }));
 
   return (
-    <Modal visible={visible} transparent animationType="slide" statusBarTranslucent onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="none" statusBarTranslucent onRequestClose={onClose}>
       <GestureHandlerRootView style={{ flex: 1 }}>
       <View style={s.overlay}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />

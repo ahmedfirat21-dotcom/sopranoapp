@@ -428,6 +428,9 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
   useEffect(() => {
     if (visible) {
       setMounted(true);
+      // ★ 2026-04-23 double-drag fix: swipe offset'ini sıfırla ki önceki swipe pozisyonundan
+      //   başlamasın (hook artık dismiss'te translateValue'u sıfırlamıyor, parent reset eder)
+      dmSwipeX.setValue(0);
       Animated.parallel([
         Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true, damping: 18, stiffness: 180 }),
         Animated.timing(fadeAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
@@ -437,6 +440,8 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
       }
     } else if (mounted) {
       Animated.parallel([
+        // ★ slideAnim hedefi = DM_PANEL_W; swipe pozisyonu kompoze olarak eklenir
+        // (Animated.add(slideAnim, dmSwipeX)) → tek pürüzsüz hareketle off-screen çıkar
         Animated.timing(slideAnim, { toValue: DM_PANEL_W, duration: 220, useNativeDriver: true }),
         Animated.timing(fadeAnim, { toValue: 0, duration: 220, useNativeDriver: true }),
       ]).start(({ finished }) => {
@@ -645,9 +650,10 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
       </Animated.View>
 
       {/* Panel — sağdan kayar + sürüklenebilir (tüm alandan sürüklenebilir)
-          ★ 2026-04-23: Klavye açıkken bottom=0 — input kontrol barı arkasında kalmasın */}
+          ★ 2026-04-23: Yan modaller aynı top/bottom — DM/Plus/Audience hepsi eşit
+          Klavye açıkken bottom=0, input kontrol barı arkasında kalmasın */}
       <Animated.View {...dmPanHandlers} style={{
-        position: 'absolute', right: 0, top: 70, bottom: dmKbVisible ? 0 : 80,
+        position: 'absolute', right: 0, top: 60, bottom: dmKbVisible ? 0 : (bottomInset + 80),
         width: DM_PANEL_W,
         borderTopLeftRadius: 18, borderBottomLeftRadius: 18,
         borderWidth: 1, borderRightWidth: 0, borderColor: '#95a1ae',

@@ -83,14 +83,14 @@ export function useSwipeToDismiss({
           (sign < 0 && (delta < -threshold || velocity < -velocityThreshold));
 
         if (shouldDismiss) {
-          Animated.timing(translateValue, {
-            toValue: sign * 500,
-            duration: 200,
-            useNativeDriver: true,
-          }).start(() => {
-            onDismissRef.current();
-            translateValue.setValue(0);
-          });
+          // ★ 2026-04-23 DOUBLE-DRAG FIX: Eskiden önce translateValue'u sign*500'e
+          //   animate ediyor, SONRA onDismiss çağırıyorduk. Parent'ın close animation'ı
+          //   (slideAnim vs) SONRADAN başlıyordu → iki ayrı hareket = "çift sürüklenme".
+          //   Artık onDismiss ANINDA çağrılıyor, translateValue swipe pozisyonunda kalıyor,
+          //   parent'ın close anim'i o pozisyondan devralıp tek pürüzsüz hareketle kapatıyor.
+          onDismissRef.current();
+          // translateValue RESET ETMİYORUZ — parent'ın close anim'i compose edecek.
+          // Sonraki open'da resetPosition() veya consumer kendi visible useEffect'inde sıfırlar.
         } else {
           Animated.spring(translateValue, {
             toValue: 0,

@@ -178,7 +178,7 @@ export function UserSearchModal({ visible, onClose, currentUserId, onSelectUser,
   );
 
   return (
-    <Modal transparent animationType="slide" visible={visible} onRequestClose={onClose}>
+    <Modal transparent animationType="none" visible={visible} onRequestClose={onClose}>
       <View style={s.overlay}>
         <Pressable style={s.overlayBg} onPress={onClose} />
         <Animated.View style={[s.container, { transform: [{ translateY: translateValue }] }]}>

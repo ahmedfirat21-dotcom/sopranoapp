@@ -161,7 +161,7 @@ export default function FollowListModal({
   };
 
   return (
-    <Modal visible={visible} animationType="slide" transparent statusBarTranslucent>
+    <Modal visible={visible} animationType="none" transparent statusBarTranslucent>
       <View style={st.overlay}>
         <Animated.View style={[st.sheet, { transform: [{ translateY: translateValue }] }]}>
           {/* ★ Swipe handle */}

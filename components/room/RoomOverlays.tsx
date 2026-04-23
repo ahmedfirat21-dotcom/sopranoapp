@@ -380,6 +380,7 @@ export function PlusMenu({
   useEffect(() => {
     if (visible) {
       setMounted(true);
+      swipeX.setValue(0); // ★ double-drag fix: önceki swipe offset'ini sıfırla
       Animated.parallel([
         Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true, damping: 18, stiffness: 180 }),
         Animated.spring(compactSlideY, { toValue: 0, useNativeDriver: true, damping: 20, stiffness: 200 }),
@@ -876,7 +877,7 @@ export function PlusMenu({
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
       </Animated.View>
 
-      <Animated.View {...panHandlers} style={[s.panel, { bottom: bottomInset + 70, top: IS_SMALL_SCREEN ? 40 : 60, transform: [{ translateX: Animated.add(slideAnim, swipeX) }] }]}>
+      <Animated.View {...panHandlers} style={[s.panel, { bottom: bottomInset + 80, top: 60, transform: [{ translateX: Animated.add(slideAnim, swipeX) }] }]}>
         {/* ★ FriendsDrawer paleti — diagonal warm-neutral gradient */}
         <LinearGradient
           colors={['#4a5668', '#37414f', '#232a35']}

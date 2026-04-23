@@ -718,7 +718,7 @@ export default function RoomSettingsSheet(props: RoomSettingsProps) {
   });
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
       <View style={s.overlay}>
         {/* Backdrop — arkaya dokunursa modal kapansın */}
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
