@@ -62,11 +62,9 @@ export default function RoomChatDrawer({
   visible, messages, chatInput, onChangeInput, onSend, onClose, bottomInset, onSendRaw,
 }: Props) {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  // ★ 2026-04-23 (v5 — ROBUST): Klavye açıkken panel'i yukarı kaydır.
-  //   Basit ve pragmatik: sadece translateY animasyonuyla panel'i klavye yüksekliği
-  //   kadar yukarı kaldır. adjustResize quirk'leriyle uğraşma — transform her zaman
-  //   screen coordinate'te çalışır, cihazdan bağımsız tutarlı.
-  //   KAV'ı da kaldırdık, input panel'in doğal flex layout'unda bottom'da kalıyor.
+  // ★ 2026-04-23 (v6 — LAYOUT): transform.translateY çalışmadı, doğrudan `bottom`
+  //   property'sini animate ediyoruz — layout prop, Android'de %100 güvenilir.
+  //   Klavye açıkken panel.bottom = kbHeight → panel'in alt kenarı klavye üstünde.
   const [kbHeight, setKbHeight] = useState(0);
   useEffect(() => {
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
@@ -83,17 +81,6 @@ export default function RoomChatDrawer({
   // (control bar zaten klavye altında kalıyor, ek boşluk gereksiz).
   const BAR_OFFSET_DEFAULT = bottomInset + 76;
   const BAR_OFFSET = kbVisible ? 0 : BAR_OFFSET_DEFAULT;
-  // Panel'i klavye yüksekliği kadar yukarı shift et (negative translateY).
-  // useNativeDriver:false — translateY (drag anim) de JS-driver kullanıyor, Animated.add
-  // driver uyumu için aynı olmalı. Height anim de JS-driver, tutarlı.
-  const kbShiftY = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    Animated.timing(kbShiftY, {
-      toValue: -kbHeight,
-      duration: Platform.OS === 'ios' ? 250 : 200,
-      useNativeDriver: false,
-    }).start();
-  }, [kbHeight]);
   const HALF_TOTAL = PANEL_HEIGHT_HALF + BAR_OFFSET;
   const FULL_TOTAL = PANEL_HEIGHT_FULL + BAR_OFFSET;
   const CLOSED_Y = FULL_TOTAL;
@@ -103,11 +90,13 @@ export default function RoomChatDrawer({
   const expandedRef = useRef(false);
   useEffect(() => { expandedRef.current = expanded; }, [expanded]);
 
-  // ★ Animate height — Instagram yorumları tarzı smooth transition
-  const heightAnim = useRef(new Animated.Value(HALF_TOTAL)).current;
+  // ★ 2026-04-23 (v6): height yerine top pozisyonu — panel bottom:kbHeight'tan top'a uzar.
+  //   Bu sayede keyboard açılınca (bottom yukarı shift) panel otomatik shrink olur,
+  //   içerik flex ile yeniden dağıtılır. Input her zaman bottom'da görünür kalır.
+  const topAnim = useRef(new Animated.Value(SCREEN_H - HALF_TOTAL)).current;
   useEffect(() => {
-    Animated.spring(heightAnim, {
-      toValue: expanded ? FULL_TOTAL : HALF_TOTAL,
+    Animated.spring(topAnim, {
+      toValue: expanded ? SCREEN_H - FULL_TOTAL : SCREEN_H - HALF_TOTAL,
       useNativeDriver: false,
       damping: 22,
       stiffness: 220,
@@ -232,12 +221,14 @@ export default function RoomChatDrawer({
         style={[
           s.panel,
           {
-            // ★ 2026-04-23 (v5): bottom:0 sabit; klavye yüksekliği kadar translateY ile kaldırılır
-            bottom: 0,
-            height: heightAnim,
+            // ★ 2026-04-23 (v6 FINAL): top + bottom layout, height fluid.
+            // bottom=kbHeight → panel klavye üstünde; top=topAnim → snap point (half/full).
+            // Bu yapıda klavye açıldığında panel bottom lifts, height auto-shrinks;
+            // içerik flex ile kendini yeniden düzenliyor, input bottom'da kalıyor.
+            top: topAnim,
+            bottom: kbHeight,
             paddingBottom: BAR_OFFSET,
-            // translateY (drag/open-close) + kbShiftY (klavye kompanzasyonu) kombine
-            transform: [{ translateY: Animated.add(translateY, kbShiftY) }],
+            transform: [{ translateY }],
           },
         ]}
       >
