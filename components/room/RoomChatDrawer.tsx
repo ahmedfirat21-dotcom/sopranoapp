@@ -66,15 +66,6 @@ export default function RoomChatDrawer({
   //   property'sini animate ediyoruz — layout prop, Android'de %100 güvenilir.
   //   Klavye açıkken panel.bottom = kbHeight → panel'in alt kenarı klavye üstünde.
   const [kbHeight, setKbHeight] = useState(0);
-  useEffect(() => {
-    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
-    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-    const show = Keyboard.addListener(showEvent, (e) => {
-      setKbHeight(e.endCoordinates?.height || 0);
-    });
-    const hide = Keyboard.addListener(hideEvent, () => setKbHeight(0));
-    return () => { show.remove(); hide.remove(); };
-  }, []);
   const kbVisible = kbHeight > 0;
 
   // Klavye açıkken panel translateY ile yukarı taşınır; paddingBottom sıfırlanır
@@ -107,6 +98,24 @@ export default function RoomChatDrawer({
   const translateY = useRef(new Animated.Value(FULL_TOTAL + 200)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
   const inputRef = useRef<TextInput>(null);
+
+  // ★ 2026-04-23 (v10 — CLUBHOUSE): Klavye listener + auto-expand.
+  //   Klavye açılınca drawer otomatik FULL mode'a geçer — panel neredeyse tam ekran olur,
+  //   içinde flex layout ile input doğal olarak klavye üstünde kalır.
+  //   Klavye kapanınca HALF mode'a döner.
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const show = Keyboard.addListener(showEvent, (e) => {
+      setKbHeight(e.endCoordinates?.height || 0);
+      setExpanded(true);  // auto-expand
+    });
+    const hide = Keyboard.addListener(hideEvent, () => {
+      setKbHeight(0);
+      setExpanded(false);  // auto-collapse
+    });
+    return () => { show.remove(); hide.remove(); };
+  }, []);
 
   // ★ 2026-04-23: Internal mount state — parent visible=false olunca hemen unmount
   //   yerine, kapanış animasyonu bitince unmount. Aksi halde modal kesik görünür.
@@ -257,23 +266,9 @@ export default function RoomChatDrawer({
           keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
         />
 
-      </Animated.View>
-
-      {/* ★ 2026-04-23 (v9): Input ayrı bir absolute overlay — panel flex layout'una bağımlı değil.
-           bottom: kbHeight → her zaman klavyenin ÜSTÜNDE. Klavye kapalıyken BAR_OFFSET_DEFAULT (control bar üstü).
-           Panel height = heightAnim; content (header + FlatList) input'un arkasında akar. */}
-      <Animated.View
-        style={[
-          s.inputOverlay,
-          {
-            bottom: kbVisible ? kbHeight : BAR_OFFSET_DEFAULT,
-            // visible değilken off-screen gizle
-            opacity: visible ? 1 : 0,
-            transform: [{ translateY: visible ? 0 : 200 }],
-          },
-        ]}
-        pointerEvents={visible && mounted ? 'auto' : 'none'}
-      >
+        {/* ★ 2026-04-23 (v10 — CLUBHOUSE PATTERN): Input panel içinde flex bottom'da.
+             Klavye açılınca drawer auto-expand FULL mode → panel neredeyse tam ekran
+             olur, flex layout ile input doğal olarak klavye üstünde kalır. */}
         {showEmojiPicker && (
           <View style={s.pickerWrap}>
             <EmojiReactionBar
@@ -338,17 +333,6 @@ export default function RoomChatDrawer({
 }
 
 const s = StyleSheet.create({
-  // ★ 2026-04-23 (v9): Input overlay — panel layout'undan bağımsız, absolute positioned,
-  //   `bottom: kbHeight|BAR_OFFSET_DEFAULT` ile klavye veya control bar üstünde sabitlenir.
-  inputOverlay: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    zIndex: 55,  // panel (50) üstünde ama backdrop altında
-    backgroundColor: '#232a35',  // panel gradient son tonu
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.08)',
-  },
   panel: {
     position: 'absolute',
     left: 0,
