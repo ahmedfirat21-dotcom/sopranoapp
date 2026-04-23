@@ -62,24 +62,44 @@ export default function RoomChatDrawer({
   visible, messages, chatInput, onChangeInput, onSend, onClose, bottomInset, onSendRaw,
 }: Props) {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  // ★ 2026-04-23 (v3): Klavye yüksekliğini doğrudan oku, panel'in bottom'unu o kadar
-  //   yukarı kaydır. AdjustResize'a güvenmiyoruz — Samsung'un keyboard toolbar'ı
-  //   genelde resize'a dahil edilmiyor, input onun altında kalıyordu.
+  // ★ 2026-04-23 (v4 — FINAL): Clubhouse pattern.
+  //   Sorun: adjustResize windowu keys yüksekliği kadar kısaltıyor ama Samsung'un
+  //   üstteki "akıllı toolbar"ı (emoji/AI/çeviri) keys ÜSTÜNDE overlay çiziyor,
+  //   window'un bottom'undan daha yukarıdan başlıyor — input toolbar'ın arkasında kalıyor.
+  //   Fix: Window shrink olup olmadığını tespit et. Olmadıysa manuel lift; olduysa
+  //   sadece toolbar kadar ekstra padding ekle.
+  const { height: initialWindowH } = Dimensions.get('window');
   const [kbHeight, setKbHeight] = useState(0);
+  const [resizeWorked, setResizeWorked] = useState(false);
   useEffect(() => {
     const show = Keyboard.addListener('keyboardDidShow', (e) => {
-      setKbHeight(e.endCoordinates?.height || 0);
+      const kh = e.endCoordinates?.height || 0;
+      setKbHeight(kh);
+      // 80ms bekle: adjustResize'ın window'u kısaltıp kısaltmadığını ölç
+      setTimeout(() => {
+        const nowH = Dimensions.get('window').height;
+        setResizeWorked(nowH < initialWindowH - 50);
+      }, 80);
     });
-    const hide = Keyboard.addListener('keyboardDidHide', () => setKbHeight(0));
+    const hide = Keyboard.addListener('keyboardDidHide', () => {
+      setKbHeight(0);
+      setResizeWorked(false);
+    });
     return () => { show.remove(); hide.remove(); };
-  }, []);
+  }, [initialWindowH]);
   const kbVisible = kbHeight > 0;
+  // Panel'i yukarı kaydırma miktarı:
+  //   - Resize çalıştıysa: 0 (window zaten kısalmış, bottom:0 klavye üstünde)
+  //   - Çalışmadıysa (eski cihaz / custom keyboard): kbHeight kadar manuel lift
+  const manualLift = resizeWorked ? 0 : kbHeight;
+  // Samsung "akıllı toolbar" telafisi — resize çalışsa bile toolbar keys üstünde
+  // ekstra ~55px kaplar, sadece Android'de padding ekle
+  const SAMSUNG_TOOLBAR_BUFFER = Platform.OS === 'android' && kbVisible && resizeWorked ? 55 : 0;
 
   // Panel control bar'ın arkasına kadar uzanır — tek sürekli yüzey.
   // Control bar room/[id].tsx tarafında zIndex: 60 ile panel'in önünde kalır.
-  // Klavye açıkken: paddingBottom=0, input panel dibine (= klavye üstüne) tam otursun.
   const BAR_OFFSET_DEFAULT = bottomInset + 76;
-  const BAR_OFFSET = kbVisible ? 0 : BAR_OFFSET_DEFAULT;
+  const BAR_OFFSET = kbVisible ? SAMSUNG_TOOLBAR_BUFFER : BAR_OFFSET_DEFAULT;
   const HALF_TOTAL = PANEL_HEIGHT_HALF + BAR_OFFSET;
   const FULL_TOTAL = PANEL_HEIGHT_FULL + BAR_OFFSET;
   const CLOSED_Y = FULL_TOTAL;
@@ -218,9 +238,8 @@ export default function RoomChatDrawer({
         style={[
           s.panel,
           {
-            // ★ 2026-04-23 (v3): bottom=kbHeight → panel klavye üstünde; adjustResize
-            //   quirk'ine karşı bağımsız çalışır, Samsung toolbar kesmiyor
-            bottom: kbHeight,
+            // ★ 2026-04-23 (v4 FINAL): bottom = manualLift (0 ise resize çalıştı, kbHeight ise fallback)
+            bottom: manualLift,
             height: heightAnim,
             paddingBottom: BAR_OFFSET,
             transform: [{ translateY }],
