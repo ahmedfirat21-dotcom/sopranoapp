@@ -17,16 +17,20 @@ import { signOut } from 'firebase/auth';
 import { RevenueCatService } from '../services/revenuecat';
 
 import { Colors, Shadows } from '../constants/theme';
-import { SettingsService, type UserSettings, THEME_OPTIONS, LANGUAGE_OPTIONS } from '../services/settings';
+import { SettingsService, type UserSettings } from '../services/settings';
 import { auth } from '../constants/firebase';
 import { useAuth, useTheme } from './_layout';
 import { ProfileService } from '../services/database';
 import { ModerationService } from '../services/moderation';
+import { supabase } from '../constants/supabase';
 import { setActiveTheme, type ThemeKey } from '../constants/themeEngine';
 import { showToast } from '../components/Toast';
 import AppBackground from '../components/AppBackground';
 import PremiumAlert, { type AlertButton } from '../components/PremiumAlert';
-import { supabase } from '../constants/supabase';
+import BlockedUsersSheet from '../components/BlockedUsersSheet';
+import NotifPreferencesSheet from '../components/NotifPreferencesSheet';
+// ★ Version — app.json ile senkron tek kaynak
+const APP_VERSION = 'v1.2.4';
 
 // Google Sign-In — sign out sırasında cache temizleme için
 let GoogleSignin: any;
@@ -52,55 +56,71 @@ type SettingItem = {
   parentKey?: string;
 };
 
+// ★ 2026-04-24: Unified theme — tüm gruplar teal aksan, sadece Oturum grubu kırmızı (danger semantik).
+//   Renk kaldırılan yerler slate palette + teal vurgu; proje DNA'sı ile tutarlı.
+const ACCENT = '#14B8A6';
+const ACCENT_DANGER = '#EF4444';
+const ICON_COLOR = '#94A3B8';
+
 const SETTING_GROUPS: { title: string; icon: string; color: string; items: SettingItem[] }[] = [
   {
-    title: 'Bildirimler', icon: 'bell-ring', color: '#14B8A6',
+    title: 'Bildirimler', icon: 'bell-ring', color: ACCENT,
     items: [
-      { key: 'notifications_enabled', icon: 'bell', label: 'Bildirimler', desc: 'Push bildirimleri aç/kapat', type: 'toggle', color: '#14B8A6' },
-      { key: 'notification_sound', icon: 'music-note', label: 'Bildirim Sesi', desc: 'Bildirim gelince ses çal', type: 'toggle', parentKey: 'notifications_enabled', color: '#A78BFA' },
-      { key: 'notification_vibration', icon: 'vibrate', label: 'Titreşim', desc: 'Bildirimde titreşim', type: 'toggle', parentKey: 'notifications_enabled', color: '#60A5FA' },
+      { key: 'notifications_enabled', icon: 'bell', label: 'Bildirimler', desc: 'Push bildirimleri aç/kapat', type: 'toggle' },
+      { key: 'notification_sound', icon: 'music-note', label: 'Bildirim Sesi', desc: 'Bildirim gelince ses çal', type: 'toggle', parentKey: 'notifications_enabled' },
+      { key: 'notification_vibration', icon: 'vibrate', label: 'Titreşim', desc: 'Bildirimde titreşim', type: 'toggle', parentKey: 'notifications_enabled' },
+      { key: 'notification_prefs', icon: 'tune-vertical', label: 'Bildirim Tercihleri', desc: 'DND saati, kategori filtreleme, sadece arkadaşlar', type: 'action' },
     ],
   },
   {
-    title: 'Görünüm', icon: 'palette', color: '#FBBF24',
+    title: 'Görünüm', icon: 'palette', color: ACCENT,
     items: [
-      { key: 'theme', icon: 'palette-swatch', label: 'Tema', desc: 'Uygulama teması seç', type: 'select', color: '#FBBF24' },
-      { key: 'language', icon: 'translate', label: 'Dil', desc: 'Türkçe (Yakında: English)', type: 'action', color: '#34D399' },
+      { key: 'theme', icon: 'palette-swatch', label: 'Tema', desc: 'Koyu tema (aydınlık yakında)', type: 'action' },
+      { key: 'language', icon: 'translate', label: 'Dil', desc: 'Türkçe (İngilizce yakında)', type: 'action' },
+    ],
+  },
+  // ★ 2026-04-25: Faz 3.4 — Ses & Mikrofon ayarları (LiveKit publish options)
+  {
+    title: 'Ses & Mikrofon', icon: 'microphone', color: ACCENT,
+    items: [
+      { key: 'echo_cancellation', icon: 'volume-off', label: 'Yankı Engelleme', desc: 'Yansıyan sesleri filtrele (önerilen)', type: 'toggle' },
+      { key: 'noise_suppression', icon: 'waveform', label: 'Gürültü Bastırma', desc: 'Arka plan gürültüsünü azalt', type: 'toggle' },
+      { key: 'auto_gain', icon: 'tune-vertical', label: 'Otomatik Ses Seviyesi', desc: 'Mikrofonu otomatik dengele', type: 'toggle' },
     ],
   },
   {
-    title: 'Gizlilik', icon: 'shield-check', color: '#22C55E',
+    title: 'Gizlilik', icon: 'shield-check', color: ACCENT,
     items: [
-      { key: 'show_online_status', icon: 'eye', label: 'Çevrimiçi Durumu', desc: 'Diğerleri seni çevrimiçi görsün', type: 'toggle', color: '#22C55E' },
-      { key: 'profile_private', icon: 'lock', label: 'Gizli Profil', desc: 'Sadece takipçiler', type: 'toggle', color: '#F59E0B' },
+      { key: 'show_online_status', icon: 'eye', label: 'Çevrimiçi Durumu', desc: 'Diğerleri seni çevrimiçi görsün', type: 'toggle' },
+      { key: 'profile_private', icon: 'lock', label: 'Gizli Profil', desc: 'Sadece takipçiler', type: 'toggle' },
     ],
   },
   {
-    title: 'Hesap', icon: 'account-circle', color: '#38BDF8',
+    title: 'Hesap', icon: 'account-circle', color: ACCENT,
     items: [
-      { key: 'edit_profile', icon: 'account-edit', label: 'Profili Düzenle', type: 'action', color: '#38BDF8' },
-      { key: 'blocked_users', icon: 'account-cancel', label: 'Engellenen Kullanıcılar', desc: 'Engellediğin kişileri yönet', type: 'action', color: '#FB923C' },
+      { key: 'edit_profile', icon: 'account-edit', label: 'Profili Düzenle', type: 'action' },
+      { key: 'blocked_users', icon: 'account-cancel', label: 'Engellenen Kullanıcılar', desc: 'Engellediğin kişileri yönet', type: 'action' },
     ],
   },
   {
-    title: 'Hakkında', icon: 'information', color: '#818CF8',
+    title: 'Hakkında', icon: 'information', color: ACCENT,
     items: [
-      { key: 'terms', icon: 'file-document', label: 'Kullanım Koşulları', type: 'link', color: '#94A3B8' },
-      { key: 'privacy', icon: 'shield-lock', label: 'Gizlilik Politikası', type: 'link', color: '#14B8A6' },
-      { key: 'version', icon: 'code-tags', label: 'Versiyon', desc: 'v2.0.0', type: 'action', color: '#818CF8' },
+      { key: 'terms', icon: 'file-document', label: 'Kullanım Koşulları', type: 'link' },
+      { key: 'privacy', icon: 'shield-lock', label: 'Gizlilik Politikası', type: 'link' },
+      { key: 'version', icon: 'code-tags', label: 'Versiyon', desc: APP_VERSION, type: 'action' },
     ],
   },
   {
-    title: 'Abonelik', icon: 'credit-card', color: '#D4AF37',
+    title: 'Abonelik', icon: 'credit-card', color: ACCENT,
     items: [
-      { key: 'restore_purchases', icon: 'refresh', label: 'Satın Almaları Geri Yükle', desc: 'Cihaz değişikliği sonrası premium\'u geri yükle', type: 'action', color: '#D4AF37' },
+      { key: 'restore_purchases', icon: 'refresh', label: 'Satın Almaları Geri Yükle', desc: 'Cihaz değişikliği sonrası premium\'u geri yükle', type: 'action' },
     ],
   },
   {
-    title: 'Oturum', icon: 'logout-variant', color: '#EF4444',
+    title: 'Oturum', icon: 'logout-variant', color: ACCENT_DANGER,
     items: [
-      { key: 'logout', icon: 'logout-variant', label: 'Çıkış Yap', type: 'action', danger: true, color: '#FBBF24' },
-      { key: 'delete_account', icon: 'trash-can', label: 'Hesabı Sil', desc: 'Tüm veriler kalıcı olarak silinir', type: 'action', danger: true, color: '#EF4444' },
+      { key: 'logout', icon: 'logout-variant', label: 'Çıkış Yap', type: 'action', danger: true },
+      { key: 'delete_account', icon: 'trash-can', label: 'Hesabı Sil', desc: 'Tüm veriler kalıcı olarak silinir', type: 'action', danger: true },
     ],
   },
 ];
@@ -115,6 +135,8 @@ export default function SettingsScreen() {
   const { applyTheme } = useTheme();
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [cAlert, setCAlert] = useState<{ visible: boolean; title: string; message: string; type?: 'info' | 'warning' | 'error' | 'success'; buttons?: AlertButton[] }>({ visible: false, title: '', message: '' });
+  const [showBlockedSheet, setShowBlockedSheet] = useState(false);
+  const [showNotifPrefs, setShowNotifPrefs] = useState(false);
 
   // Ayarları yükle + DB'den gizlilik ayarlarını senkronize et
   useEffect(() => {
@@ -150,6 +172,18 @@ export default function SettingsScreen() {
     (async () => {
       await SettingsService.update({ [key]: value });
 
+      // ★ Faz 3.4 — Mic ayarları değişirse LiveKit'e anında geçir (sonraki publish için aktif)
+      if (key === 'echo_cancellation' || key === 'noise_suppression' || key === 'auto_gain') {
+        try {
+          const { liveKitService } = await import('../services/livekit');
+          const opts: any = {};
+          if (key === 'echo_cancellation') opts.echoCancellation = value;
+          if (key === 'noise_suppression') opts.noiseSuppression = value;
+          if (key === 'auto_gain') opts.autoGainControl = value;
+          liveKitService.setAudioProcessing(opts);
+        } catch {}
+      }
+
       // Özel aksiyonlar
       if (key === 'theme') {
         setActiveTheme(value as ThemeKey);
@@ -158,12 +192,9 @@ export default function SettingsScreen() {
       if (key === 'show_online_status' && firebaseUser) {
         ProfileService.setOnline(firebaseUser.uid, value).catch(() => {});
       }
-      // ★ Gizli profil toggle
+      // ★ Gizli profil toggle — 2026-04-26: 'private' kaldırıldı, sadece followers_only
       if (key === 'profile_private' && firebaseUser) {
-        const currentMode = (profile as any)?.privacy_mode || 'public';
-        const newPrivacyMode = value
-          ? (currentMode === 'followers_only' ? 'followers_only' : 'private')
-          : 'public';
+        const newPrivacyMode = value ? 'followers_only' : 'public';
         ProfileService.update(firebaseUser.uid, {
           is_private: value,
           privacy_mode: newPrivacyMode,
@@ -209,7 +240,7 @@ export default function SettingsScreen() {
                   setUser(null);
                   router.replace('/(auth)/login');
                 } catch (e) {
-                  showToast({ title: 'Hata', message: 'Çıkış yapılamadı', type: 'error' });
+                  showToast({ title: 'Çıkış Yapılamadı', message: 'Oturum kapatılamadı, tekrar dene.', type: 'error' });
                 }
               },
             },
@@ -228,53 +259,64 @@ export default function SettingsScreen() {
               showToast({ title: 'Bulunamadı', message: 'Bu hesaba ait aktif abonelik yok', type: 'info' });
             }
           } catch {
-            showToast({ title: 'Hata', message: 'Geri yükleme başarısız', type: 'error' });
+            showToast({ title: 'Geri Yükleme Başarısız', message: 'Satın almalar kontrol edilemedi.', type: 'error' });
           }
         })();
         break;
       case 'version':
-        showToast({ title: 'SopranoChat', message: 'v2.0.0', type: 'info' });
+        // ★ 2026-04-27 GEÇİCİ: Versiyon + JWT teşhisi (Firebase Third-Party Auth doğrulama)
+        (async () => {
+          try {
+            // ★ Önce Firebase tarafından bilgi al
+            const fbUser = auth.currentUser;
+            const fbUid = fbUser?.uid || '(currentUser NULL)';
+            let tokenPreview = '(token alınamadı)';
+            try {
+              const tk = fbUser ? await fbUser.getIdToken(true) : null;
+              tokenPreview = tk ? `${tk.slice(0, 20)}...${tk.slice(-10)}` : '(null)';
+            } catch (te: any) {
+              tokenPreview = `(hata: ${te?.message?.slice(0, 30)})`;
+            }
+
+            // ★ Sonra whoami RPC
+            const { data, error } = await supabase.rpc('whoami');
+            const r = data?.[0] || {};
+            // ★ Firebase 3PA: role daima 'anon' — önemli olan app_uid() çalışması
+            const ok = !!r.jwt_present && !!r.app_uid_result && r.app_uid_result !== '(NULL)';
+
+            setCAlert({
+              visible: true,
+              title: ok ? '✅ JWT Doğrulanıyor' : '❌ JWT Sorunu',
+              message:
+                `Versiyon: ${APP_VERSION}\n\n` +
+                `--- FIREBASE ---\n` +
+                `currentUser.uid: ${fbUid}\n` +
+                `Token: ${tokenPreview}\n\n` +
+                `--- SUPABASE whoami ---\n` +
+                `app_uid: ${r.app_uid_result || '(NULL)'}\n` +
+                `jwt.sub: ${r.jwt_sub || '(NULL)'}\n` +
+                `role: ${r.jwt_role || '(NULL)'}\n` +
+                `JWT var: ${r.jwt_present ? 'EVET' : 'HAYIR'}` +
+                (error ? `\n\nRPC HATA: ${error.message?.slice(0, 60)}` : ''),
+              type: ok ? 'success' : 'warning',
+              buttons: [{ text: 'Tamam' }],
+            });
+          } catch (e: any) {
+            showToast({ title: 'Teşhis hatası', message: e?.message || 'whoami() çağrılamadı', type: 'error' });
+          }
+        })();
+        break;
+      case 'theme':
+        showToast({ title: 'Çok Yakında', message: 'Aydınlık tema üzerinde çalışıyoruz.', type: 'info' });
         break;
       case 'language':
         showToast({ title: 'Çok Yakında', message: 'İngilizce dil desteği üzerinde çalışıyoruz.', type: 'info' });
         break;
       case 'blocked_users':
-        (async () => {
-          if (!firebaseUser) return;
-          try {
-            const blocked = await ModerationService.getBlockedUsers(firebaseUser.uid);
-            if (blocked.length === 0) {
-              showToast({ title: 'Engellenen Yok', message: 'Hiç engellediğin kullanıcı yok.', type: 'info' });
-              return;
-            }
-            // Profilleri çek
-            const { data: profiles } = await supabase
-              .from('profiles')
-              .select('id, display_name')
-              .in('id', blocked);
-            const buttons: AlertButton[] = (profiles || []).map((p: any) => ({
-              text: `❌ ${p.display_name || 'Kullanıcı'}`,
-              onPress: async () => {
-                try {
-                  await ModerationService.unblockUser(firebaseUser.uid, p.id);
-                  showToast({ title: 'Engel Kaldırıldı', message: `${p.display_name} artık engelli değil.`, type: 'success' });
-                } catch {
-                  showToast({ title: 'Hata', type: 'error' });
-                }
-              },
-            }));
-            buttons.push({ text: 'Kapat', style: 'cancel' });
-            setCAlert({
-              visible: true,
-              title: `Engellenen Kullanıcılar (${blocked.length})`,
-              message: 'Engeli kaldırmak için isme dokun:',
-              type: 'info',
-              buttons,
-            });
-          } catch {
-            showToast({ title: 'Hata', message: 'Liste yüklenemedi', type: 'error' });
-          }
-        })();
+        setShowBlockedSheet(true);
+        break;
+      case 'notification_prefs':
+        setShowNotifPrefs(true);
         break;
       case 'delete_account':
         setCAlert({
@@ -300,7 +342,7 @@ export default function SettingsScreen() {
                   router.replace('/(auth)/login');
                   showToast({ title: 'Hesap Silindi', message: 'Tüm verileriniz silindi.', type: 'info' });
                 } catch (e: any) {
-                  showToast({ title: 'Hata', message: e?.message || 'Hesap silinemedi', type: 'error' });
+                  showToast({ title: 'Hesap Silinemedi', message: e?.message || 'İşlem tamamlanamadı.', type: 'error' });
                 }
               },
             },
@@ -313,7 +355,7 @@ export default function SettingsScreen() {
   if (!settings) return <View style={{ flex: 1, backgroundColor: Colors.bg }} />;
 
   return (
-    <AppBackground>
+    <AppBackground radialGlow>
     <View style={s.container}>
       {/* Header */}
       <View style={[s.header, { paddingTop: insets.top + 8 }]}>
@@ -340,20 +382,18 @@ export default function SettingsScreen() {
               <Text style={s.groupTitle}>{group.title}</Text>
             </View>
 
-            {/* Items card — wallet ile aynı 3 katmanlı derinlik */}
+            {/* ★ 2026-04-24: Unified bombe gradient — proje DNA'sı ile tutarlı, renkli overlay kaldırıldı */}
             <View style={s.groupCard}>
               <LinearGradient
-                colors={['#1a2334', '#0D1220', '#050912']}
-                start={{ x: 0, y: 0 }} end={{ x: 0.7, y: 1 }}
+                colors={['rgba(48,65,94,0.85)', 'rgba(26,40,64,0.75)', 'rgba(12,22,40,0.55)']}
+                locations={[0, 0.55, 1]}
+                start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
                 style={StyleSheet.absoluteFillObject}
               />
+              {/* Üst teal hairline — ince aksan */}
               <LinearGradient
-                colors={[`${group.color}33`, `${group.color}0d`, 'transparent']}
-                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                style={StyleSheet.absoluteFillObject}
-              />
-              <LinearGradient
-                colors={['transparent', `${group.color}dd`, 'transparent']}
+                colors={['transparent', `${group.color}99`, 'transparent']}
+                locations={[0, 0.5, 1]}
                 start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
                 style={s.groupTopEdge}
               />
@@ -391,14 +431,14 @@ export default function SettingsScreen() {
                     <MaterialCommunityIcons
                       name={item.icon as any}
                       size={22}
-                      color={item.color || '#94A3B8'}
+                      color={item.danger ? ACCENT_DANGER : ICON_COLOR}
                       style={[s.rowIcon, {
-                        textShadowColor: `${item.color || '#94A3B8'}cc`,
-                        textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 9,
+                        textShadowColor: 'rgba(0,0,0,0.55)',
+                        textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4,
                       }]}
                     />
                     <View style={s.rowText}>
-                      <Text style={[s.rowLabel, item.danger && { color: item.color || '#EF4444' }]}>
+                      <Text style={[s.rowLabel, item.danger && { color: ACCENT_DANGER }]}>
                         {item.label}
                       </Text>
                       {item.desc && (
@@ -413,7 +453,7 @@ export default function SettingsScreen() {
                           if (isDisabledByParent) return;
                           updateSetting(item.key as keyof UserSettings, v);
                         }}
-                        trackColor={{ false: '#1E293B', true: item.color || '#14B8A6' }}
+                        trackColor={{ false: '#1E293B', true: ACCENT }}
                         thumbColor="#FFFFFF"
                         ios_backgroundColor="#1E293B"
                         disabled={isDisabledByParent}
@@ -446,7 +486,7 @@ export default function SettingsScreen() {
                       <Ionicons
                         name="chevron-forward"
                         size={14}
-                        color={item.danger ? `${item.color || '#EF4444'}80` : 'rgba(255,255,255,0.22)'}
+                        color={item.danger ? `${ACCENT_DANGER}80` : 'rgba(255,255,255,0.3)'}
                       />
                     )}
                   </Pressable>
@@ -458,6 +498,20 @@ export default function SettingsScreen() {
       </ScrollView>
       <PremiumAlert {...cAlert} onDismiss={() => setCAlert(prev => ({ ...prev, visible: false }))} />
     </View>
+    {firebaseUser && (
+      <BlockedUsersSheet
+        visible={showBlockedSheet}
+        onClose={() => setShowBlockedSheet(false)}
+        currentUserId={firebaseUser.uid}
+      />
+    )}
+    {firebaseUser && (
+      <NotifPreferencesSheet
+        visible={showNotifPrefs}
+        onClose={() => setShowNotifPrefs(false)}
+        userId={firebaseUser.uid}
+      />
+    )}
     </AppBackground>
   );
 }
