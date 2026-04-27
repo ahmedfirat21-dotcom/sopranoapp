@@ -206,7 +206,13 @@ export const MessageService = {
     if (sanitized.length > 2000) {
       throw new Error('Mesaj çok uzun (max 2000 karakter).');
     }
-    content = sanitized;
+    // ★ 2026-04-25: Profanity filter — DM'de de aktif. Soft mask, gönderim engellenmez.
+    let filtered = sanitized;
+    try {
+      const { filterBadWords } = require('../constants/badwords');
+      filtered = filterBadWords(sanitized);
+    } catch { /* badwords yoksa sessiz */ }
+    content = filtered;
 
     // ★ Engel kontrolü: Her iki yönde de mesaj engellenir
     const blockedIds = await FriendshipService._getBlockedIds(senderId);
@@ -214,61 +220,20 @@ export const MessageService = {
       throw new Error('Bu kullanıcıyla mesajlaşamazsınız.');
     }
 
-    // ★ A3 FIX: Arkadaşlık kontrolü — MUTUAL follow accepted olanlar direkt mesajlaşır.
-    // ★ 2026-04-22: Instagram-style request flow. Mutual değilse (tek yön veya hiç):
-    //   - Mevcut request yoksa: yeni message_request (pending) + 1 mesaj atılabilir
-    //   - Request pending: aynı gönderen ekstra mesaj atamaz (onay bekliyor)
-    //   - Request accepted: normal mesajlaşma serbest
-    //   - Request rejected: mesaj engellenir
+    // ★ 2026-04-27 STRICT POLICY: "Sade özgün sosyal iletişim" vizyonu —
+    //   Yalnız arkadaşlar mesajlaşabilir. Eski Instagram-style "mesaj isteği" akışı kaldırıldı.
+    //   Yabancılara mesaj atmak için önce arkadaş olunmalı (FriendshipService.follow ile).
+    //   friendships tablosu tek yönlü accepted satır kayıt eder; resmi isFriend() OR kullanıyor.
     const { data: friendshipRows } = await supabase
       .from('friendships')
       .select('user_id, friend_id')
       .eq('status', 'accepted')
       .or(`and(user_id.eq.${senderId},friend_id.eq.${receiverId}),and(user_id.eq.${receiverId},friend_id.eq.${senderId})`);
-    const hasOutgoing = (friendshipRows || []).some((f: any) => f.user_id === senderId && f.friend_id === receiverId);
-    const hasIncoming = (friendshipRows || []).some((f: any) => f.user_id === receiverId && f.friend_id === senderId);
-    const isFriend = hasOutgoing && hasIncoming; // mutual follow accepted
+    const isFriend = (friendshipRows || []).length > 0;
 
-    let isFirstRequestMessage = false;
+    // ★ 2026-04-27 STRICT: Yabancılara mesaj atılamaz. Önce arkadaş olunması zorunlu.
     if (!isFriend) {
-      const { data: req } = await supabase
-        .from('message_requests')
-        .select('status')
-        .or(`and(sender_id.eq.${senderId},receiver_id.eq.${receiverId}),and(sender_id.eq.${receiverId},receiver_id.eq.${senderId})`)
-        .maybeSingle();
-
-      if (req?.status === 'rejected') {
-        throw new Error('Bu kullanıcıya mesaj gönderemezsiniz.');
-      }
-
-      if (!req) {
-        // İlk mesaj → request oluştur, bu mesaj geçebilir
-        const { error: reqErr } = await supabase
-          .from('message_requests')
-          .insert({ sender_id: senderId, receiver_id: receiverId, status: 'pending' });
-        if (reqErr && reqErr.code !== '23505') throw reqErr; // unique conflict ignore
-        isFirstRequestMessage = true;
-      } else if (req.status === 'pending') {
-        // Pending → receiver kim? Eğer ben sender isem: ekstra mesaj atamam (Instagram davranışı)
-        // Eğer receiver bensem: ben gönderebilirim (karşı onayım sayılır ama direkt accept etmeyelim)
-        // Bu edge-case: receiver henüz accept etmeden cevap yazıyor → accept'e çevir
-        const { data: reqRow } = await supabase
-          .from('message_requests')
-          .select('sender_id, receiver_id')
-          .or(`and(sender_id.eq.${senderId},receiver_id.eq.${receiverId}),and(sender_id.eq.${receiverId},receiver_id.eq.${senderId})`)
-          .maybeSingle();
-        if (reqRow && reqRow.receiver_id === senderId) {
-          // Receiver cevap veriyor → accept
-          await supabase
-            .from('message_requests')
-            .update({ status: 'accepted', responded_at: new Date().toISOString() })
-            .eq('sender_id', reqRow.sender_id)
-            .eq('receiver_id', reqRow.receiver_id);
-        } else {
-          throw new Error('İsteğiniz henüz onaylanmadı. Karşı tarafın cevabını bekleyin.');
-        }
-      }
-      // accepted → serbest
+      throw new Error('Yalnız arkadaşlarla mesajlaşabilirsiniz. Önce arkadaş olun.');
     }
 
     // ★ A4 FIX: Rate limiting — son 1 dakikada max 30 mesaj
@@ -299,9 +264,8 @@ export const MessageService = {
     // Push bildirim gönder (arka planda, hata yutulur)
     const senderName = (msg as any).sender?.display_name || 'Birisi';
     const preview = voiceUrl ? '🎙️ Sesli mesaj' : imageUrl ? '📷 Fotoğraf' : (content.length > 50 ? content.substring(0, 50) + '...' : content);
-    const pushTitle = isFirstRequestMessage ? '📨 Mesaj İsteği' : 'Yeni Mesaj';
-    PushService.sendToUser(receiverId, pushTitle, `${senderName}: ${preview}`, {
-      type: isFirstRequestMessage ? 'message_request' : 'dm',
+    PushService.sendToUser(receiverId, 'Yeni Mesaj', `${senderName}: ${preview}`, {
+      type: 'dm',
       route: `/chat/${senderId}`,
     }).catch(() => {});
 
@@ -486,11 +450,13 @@ export const MessageService = {
     return count || 0;
   },
 
-  /** Realtime Yeni Mesaj Dinleyici */
-  onNewMessage(userId: string, callback: (msg: Message) => void) {
-    const channelName = `user_messages_${userId}`;
-    // ★ FIX: supabase.channel() her çağrıda YENİ kanal oluşturur.
-    // Mevcut kanalı bulmak için getChannels() kullanılmalı.
+  /** Realtime Yeni Mesaj Dinleyici
+   *  ★ 2026-04-24 FIX: Aynı channel adı (user_messages_${uid}) farklı ekranlardan
+   *  (messages listesi + chat ekranı) çağrılınca sonraki öncekini siliyor ve realtime
+   *  kopuyordu. callerId ile benzersiz channel adı üret.
+   */
+  onNewMessage(userId: string, callerId: string, callback: (msg: Message) => void) {
+    const channelName = `user_messages_${userId}_${callerId}`;
     try {
       const existingChannels = supabase.getChannels();
       const existing = existingChannels.find((ch: any) => ch.topic === `realtime:${channelName}`);

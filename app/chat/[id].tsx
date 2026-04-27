@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { View, Text, StyleSheet, Image, Pressable, TextInput, FlatList, Platform, ActivityIndicator, Animated, Easing, NativeScrollEvent, NativeSyntheticEvent, Modal, Keyboard, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Image, Pressable, TextInput, FlatList, Platform, ActivityIndicator, Animated, Easing, NativeScrollEvent, NativeSyntheticEvent, Modal, Keyboard, Dimensions, KeyboardAvoidingView } from 'react-native';
 import PremiumAlert, { type AlertButton } from '../../components/PremiumAlert';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -13,12 +13,14 @@ import { ModerationService } from '../../services/moderation';
 import { EmojiPicker } from '../../components/EmojiPicker';
 import { ReportModal } from '../../components/ReportModal';
 import { showToast } from '../../components/Toast';
-import { useAuth, useBadges } from '../_layout';
+import { useAuth, useBadges, useUserProfileSheet } from '../_layout';
 import StatusAvatar from '../../components/StatusAvatar';
 import { StorageService } from '../../services/storage';
 import * as ImagePicker from 'expo-image-picker';
 import { Audio, type AVPlaybackStatus } from 'expo-av';
 import AppBackground from '../../components/AppBackground';
+import PremiumLoader from '../../components/PremiumLoader';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -51,19 +53,30 @@ function VoiceMessagePlayer({ voiceUrl, duration, isMe }: { voiceUrl: string; du
 
   const togglePlay = async () => {
     try {
+      // ★ 2026-04-24 FIX: Playback öncesi audio session'ı playback moduna al.
+      //   Kayıt (recording) modundan kaldığında cızırtı/statik ses çıkabiliyor.
+      //   playThroughEarpieceAndroid:false → hoparlörden çıkar (earpiece tinny sound fix).
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: false,
+        playThroughEarpieceAndroid: false,
+        shouldDuckAndroid: true,
+      }).catch(() => {});
+
       if (isPlaying && soundRef.current) {
         await soundRef.current.pauseAsync();
         setIsPlaying(false);
         return;
       }
       if (soundRef.current) {
-        await soundRef.current.playAsync();
+        await soundRef.current.playFromPositionAsync(0);
         setIsPlaying(true);
         return;
       }
       const { sound } = await Audio.Sound.createAsync(
         { uri: voiceUrl },
-        { shouldPlay: true },
+        { shouldPlay: true, isLooping: false },
         (status: AVPlaybackStatus) => {
           if (!status.isLoaded) return;
           if (status.durationMillis) setTotalDur(Math.round(status.durationMillis / 1000));
@@ -71,9 +84,13 @@ function VoiceMessagePlayer({ voiceUrl, duration, isMe }: { voiceUrl: string; du
             setProgress(status.positionMillis / status.durationMillis);
           }
           if (status.didJustFinish) {
+            // ★ 2026-04-24 FIX: Önce explicit pause + position reset — aksi halde bazı
+            //   Android cihazlarda tekrar baştan playback tetikleniyor ("reels gibi loop").
             setIsPlaying(false);
             setProgress(0);
-            soundRef.current?.setPositionAsync(0).catch(() => {});
+            soundRef.current?.pauseAsync()
+              .then(() => soundRef.current?.setPositionAsync(0))
+              .catch(() => {});
           }
         }
       );
@@ -119,7 +136,132 @@ function VoiceMessagePlayer({ voiceUrl, duration, isMe }: { voiceUrl: string; du
   );
 }
 
-function MessageBubble({ message, isMe, senderAvatar, senderName, myAvatar, onDelete, onReport, onAction, onReaction, isReactionActive, onToggleReaction, onImagePress }: { message: Message; isMe: boolean; senderAvatar?: string; senderName?: string; myAvatar?: string; onDelete?: (msgId: string) => void; onReport?: (msgId: string) => void; onAction?: (buttons: any[]) => void; onReaction?: (msgId: string, emoji: string) => void; isReactionActive?: boolean; onToggleReaction?: (msgId: string | null) => void; onImagePress?: (uri: string) => void }) {
+// ★ 2026-04-24: Medya + bağlantılar modalı — mesajlardan çıkarılan görsel/ses/URL listesi
+function MediaLinksModal({ visible, messages, onClose, onImagePress }: {
+  visible: boolean; messages: any[]; onClose: () => void; onImagePress: (uri: string) => void;
+}) {
+  const [tab, setTab] = useState<'media' | 'voice' | 'links'>('media');
+  const URL_RE = /https?:\/\/[^\s]+/g;
+  const images = messages.flatMap(m => {
+    const arr: string[] = [];
+    if (m.image_url) arr.push(m.image_url);
+    if (m.content) {
+      const match = m.content.match(/^📷\s+(https?:\/\/\S+)$/);
+      if (match) arr.push(match[1]);
+    }
+    return arr;
+  });
+  const voices = messages.filter(m => m.voice_url).map(m => ({ url: m.voice_url!, duration: m.voice_duration, time: m.created_at }));
+  const links: string[] = [];
+  messages.forEach(m => {
+    if (!m.content || m.voice_url || m.image_url) return;
+    const matches = m.content.match(URL_RE);
+    if (matches) links.push(...matches);
+  });
+  if (!visible) return null;
+  return (
+    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable style={styles.mediaOverlay} onPress={onClose}>
+        <Pressable style={styles.mediaSheet} onPress={(e) => e.stopPropagation()}>
+          <View style={styles.mediaHeader}>
+            <Text style={styles.mediaTitle}>Medya ve Bağlantılar</Text>
+            <Pressable onPress={onClose} hitSlop={8}>
+              <Ionicons name="close" size={20} color={Colors.text3} />
+            </Pressable>
+          </View>
+          <View style={styles.mediaTabRow}>
+            <Pressable style={[styles.mediaTab, tab === 'media' && styles.mediaTabActive]} onPress={() => setTab('media')}>
+              <Text style={[styles.mediaTabText, tab === 'media' && styles.mediaTabTextActive]}>Medya ({images.length})</Text>
+            </Pressable>
+            <Pressable style={[styles.mediaTab, tab === 'voice' && styles.mediaTabActive]} onPress={() => setTab('voice')}>
+              <Text style={[styles.mediaTabText, tab === 'voice' && styles.mediaTabTextActive]}>Ses ({voices.length})</Text>
+            </Pressable>
+            <Pressable style={[styles.mediaTab, tab === 'links' && styles.mediaTabActive]} onPress={() => setTab('links')}>
+              <Text style={[styles.mediaTabText, tab === 'links' && styles.mediaTabTextActive]}>Linkler ({links.length})</Text>
+            </Pressable>
+          </View>
+          {tab === 'media' && (
+            images.length === 0 ? (
+              <View style={styles.mediaEmpty}><Ionicons name="images-outline" size={32} color={Colors.text3} /><Text style={styles.mediaEmptyText}>Görsel yok</Text></View>
+            ) : (
+              <FlatList
+                data={images}
+                keyExtractor={(u, i) => `${i}-${u}`}
+                numColumns={3}
+                contentContainerStyle={styles.mediaGrid}
+                renderItem={({ item }) => (
+                  <Pressable onPress={() => onImagePress(item)}>
+                    <Image source={{ uri: item }} style={styles.mediaGridImage} resizeMode="cover" />
+                  </Pressable>
+                )}
+              />
+            )
+          )}
+          {tab === 'voice' && (
+            voices.length === 0 ? (
+              <View style={styles.mediaEmpty}><Ionicons name="mic-outline" size={32} color={Colors.text3} /><Text style={styles.mediaEmptyText}>Ses kaydı yok</Text></View>
+            ) : (
+              <FlatList
+                data={voices}
+                keyExtractor={(v, i) => `${i}-${v.url}`}
+                renderItem={({ item }) => (
+                  <View style={styles.mediaListItem}>
+                    <Ionicons name="mic" size={18} color={Colors.teal} />
+                    <Text style={styles.mediaListText} numberOfLines={1}>{new Date(item.time).toLocaleString('tr-TR')}</Text>
+                    <Text style={{ fontSize: 11, color: Colors.text3 }}>{item.duration ? `${item.duration}s` : ''}</Text>
+                  </View>
+                )}
+              />
+            )
+          )}
+          {tab === 'links' && (
+            links.length === 0 ? (
+              <View style={styles.mediaEmpty}><Ionicons name="link-outline" size={32} color={Colors.text3} /><Text style={styles.mediaEmptyText}>Bağlantı yok</Text></View>
+            ) : (
+              <FlatList
+                data={links}
+                keyExtractor={(u, i) => `${i}-${u}`}
+                renderItem={({ item }) => (
+                  <Pressable style={styles.mediaListItem} onPress={() => { try { require('expo-linking').openURL(item); } catch {} }}>
+                    <Ionicons name="link" size={18} color={Colors.teal} />
+                    <Text style={styles.mediaListText} numberOfLines={1}>{item}</Text>
+                  </Pressable>
+                )}
+              />
+            )
+          )}
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
+// ★ 2026-04-24 v2: Kebab dropdown — üstten aşağıya akıcı slide-down.
+//   translateY -32 → 0 + opacity 0 → 1. setValue + requestAnimationFrame ile
+//   ilk paint'te offscreen garanti edilir.
+function KebabDropdown({ visible, children }: { visible: boolean; children: React.ReactNode }) {
+  const translateY = useRef(new Animated.Value(-32)).current;
+  const opacity = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (visible) {
+      translateY.setValue(-32);
+      opacity.setValue(0);
+      requestAnimationFrame(() => {
+        Animated.parallel([
+          Animated.timing(translateY, { toValue: 0, duration: 260, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+          Animated.timing(opacity, { toValue: 1, duration: 220, useNativeDriver: true }),
+        ]).start();
+      });
+    }
+  }, [visible]);
+  return (
+    <Animated.View style={[styles.kebabDropdown, { transform: [{ translateY }], opacity }]}>
+      {children}
+    </Animated.View>
+  );
+}
+
+function MessageBubble({ message, isMe, senderAvatar, senderName, myAvatar, onDelete, onReport, onAction, onReaction, isReactionActive, onToggleReaction, onImagePress, onAvatarPress }: { message: Message; isMe: boolean; senderAvatar?: string; senderName?: string; myAvatar?: string; onDelete?: (msgId: string) => void; onReport?: (msgId: string) => void; onAction?: (buttons: any[]) => void; onReaction?: (msgId: string, emoji: string) => void; isReactionActive?: boolean; onToggleReaction?: (msgId: string | null) => void; onImagePress?: (uri: string) => void; onAvatarPress?: () => void }) {
   const time = new Date(message.created_at).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
   const customStyle = getChatColorStyle(message.sender?.active_chat_color);
   const isTemp = message.id.startsWith('temp_');
@@ -146,37 +288,23 @@ function MessageBubble({ message, isMe, senderAvatar, senderName, myAvatar, onDe
   const reactions: Record<string, string[]> = (message as any).reactions ? JSON.parse((message as any).reactions) : {};
   const QUICK_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
 
-  // ★ Pop-in animasyon
+  // ★ 2026-04-24: Daha kibar pop-in — overshoot yok, timing cubic ease-out.
   const scaleAnim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     if (isReactionActive) {
       scaleAnim.setValue(0);
-      Animated.spring(scaleAnim, { toValue: 1, friction: 5, tension: 200, useNativeDriver: true }).start();
+      Animated.timing(scaleAnim, { toValue: 1, duration: 160, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
     }
   }, [isReactionActive]);
 
+  // ★ 2026-04-24: Tap → sadece açık reaction barını kapat; long-press → reaction barını aç
   const handleTap = () => {
-    if (isTemp || isDeleted) return;
-    onToggleReaction?.(isReactionActive ? null : message.id);
+    if (isReactionActive) onToggleReaction?.(null);
   };
 
   const handleLongPress = () => {
     if (isTemp || isDeleted) return;
-    onToggleReaction?.(null);
-    const buttons: any[] = [];
-    if (message.content && !hasVoice && !hasImage) {
-      buttons.push({ text: '📋 Kopyala', onPress: () => {
-        try { require('expo-clipboard').setStringAsync(message.content); } catch {}
-      }});
-    }
-    if (isMe) {
-      buttons.push({ text: '🗑️ Mesajı Sil', style: 'destructive', onPress: () => onDelete?.(message.id) });
-    }
-    if (!isMe) {
-      buttons.push({ text: '🚩 Rapor Et', style: 'destructive', onPress: () => onReport?.(message.id) });
-    }
-    buttons.push({ text: 'Vazgeç', style: 'cancel' });
-    onAction?.(buttons);
+    onToggleReaction?.(message.id);
   };
 
   if (isDeleted) {
@@ -211,28 +339,22 @@ function MessageBubble({ message, isMe, senderAvatar, senderName, myAvatar, onDe
                 onToggleReaction?.(null);
               }}
             >
-              <Animated.Text style={[styles.reactionEmojiText, {
-                transform: [{
-                  scale: scaleAnim.interpolate({
-                    inputRange: [0, 0.5, 1],
-                    outputRange: [0.3, 1.2, 1],
-                  })
-                }],
-              }]}>{emoji}</Animated.Text>
+              <Text style={styles.reactionEmojiText}>{emoji}</Text>
             </Pressable>
           ))}
         </Animated.View>
       )}
-      {/* ★ Karşı tarafın avatarı */}
-      {!isMe && (
-        <View style={styles.bubbleAvatarRow}>
-          <StatusAvatar uri={senderAvatar} size={28} />
-        </View>
-      )}
+      {/* ★ 2026-04-26: Avatar tıklanınca profil sheet — diğer platformlardaki gibi standart davranış. */}
+      <Pressable
+        style={styles.bubbleAvatarRow}
+        onPress={() => { if (!isMe && onAvatarPress) onAvatarPress(); }}
+        hitSlop={6}
+      >
+        <StatusAvatar uri={isMe ? myAvatar : senderAvatar} size={34} />
+      </Pressable>
       {isEmojiOnly ? (
-        // ★ 2026-04-21: WhatsApp-tarzı — balonsuz büyük emoji, hafif shadow
         <View style={{ paddingHorizontal: 6, paddingVertical: 2 }}>
-          <Text style={{ fontSize: emojiFontSize, lineHeight: emojiFontSize * 1.1, textShadowColor: 'rgba(0,0,0,0.25)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4 }}>
+          <Text style={{ fontSize: emojiFontSize, lineHeight: emojiFontSize * 1.1, textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 5 }}>
             {message.content}
           </Text>
         </View>
@@ -243,18 +365,11 @@ function MessageBubble({ message, isMe, senderAvatar, senderName, myAvatar, onDe
               <Image source={{ uri: imageUri! }} style={styles.chatImage} resizeMode="cover" />
             </Pressable>
           ) : null}
-          {/* ★ MSG-6: Ses mesajı oynatıcı */}
           {hasVoice ? (
             <VoiceMessagePlayer voiceUrl={message.voice_url!} duration={message.voice_duration || undefined} isMe={isMe} />
           ) : !hasImage && message.content ? (
             <Text style={styles.bubbleText}>{message.content}</Text>
           ) : null}
-        </View>
-      )}
-      {/* ★ Gönderenin avatarı (sağ taraf) */}
-      {isMe && (
-        <View style={styles.bubbleAvatarRow}>
-          <StatusAvatar uri={myAvatar} size={28} />
         </View>
       )}
       {/* ★ Emoji tepkileri göster — balon stilinde */}
@@ -277,14 +392,14 @@ function MessageBubble({ message, isMe, senderAvatar, senderName, myAvatar, onDe
         {isMe && (
           <View style={styles.tickWrap}>
             {isTemp ? (
-              <Ionicons name="time-outline" size={12} color="rgba(255,255,255,0.3)" />
+              <Ionicons name="time-outline" size={12} color="rgba(255,255,255,0.3)" style={styles.iconShadow} />
             ) : message.is_read ? (
               <View style={styles.doubleTick}>
-                <Ionicons name="checkmark" size={13} color="#34B7F1" style={{ marginRight: -6 }} />
-                <Ionicons name="checkmark" size={13} color="#34B7F1" />
+                <Ionicons name="checkmark" size={13} color="#34B7F1" style={[styles.iconShadow, { marginRight: -6 }]} />
+                <Ionicons name="checkmark" size={13} color="#34B7F1" style={styles.iconShadow} />
               </View>
             ) : (
-              <Ionicons name="checkmark" size={13} color="rgba(255,255,255,0.45)" />
+              <Ionicons name="checkmark" size={13} color="rgba(255,255,255,0.45)" style={styles.iconShadow} />
             )}
           </View>
         )}
@@ -298,7 +413,11 @@ export default function ChatScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { firebaseUser, profile, refreshProfile, minimizedRoom } = useAuth();
+  const { openUserProfile } = useUserProfileSheet();
   const insets = useSafeAreaInsets();
+  // ★ 2026-04-24 v2: Chat mount+loaded slide-down — loading bitince içerik üstten akarak iner.
+  const contentTranslateY = useRef(new Animated.Value(-80)).current;
+  const contentOpacity = useRef(new Animated.Value(0)).current;
   const { refreshBadges } = useBadges();
   const [inputText, setInputText] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
@@ -307,30 +426,67 @@ export default function ChatScreen() {
   const [sending, setSending] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [isCallingInProgress, setIsCallingInProgress] = useState(false); // ★ CALL-4: Çift tıklama koruması
-  const [isFriend, setIsFriend] = useState(false); // ★ CALL-1: Takipçi kontrolü
+  // ★ 2026-04-27: isFriend (one-way takip) kaldırıldı — call button artık isMutualFollow kullanıyor.
   const [isMutualFollow, setIsMutualFollow] = useState(false); // ★ DM-8: Karşılıklı takip kontrolü
   const [isMessageRequest, setIsMessageRequest] = useState(false); // ★ DM-8: Mesaj isteği modu
   // ★ 2026-04-22: Instagram-style message request durumu (friendship accepted DEĞİLKEN kullanılır)
-  const [msgRequestInfo, setMsgRequestInfo] = useState<{ status: 'none' | 'pending_incoming' | 'pending_outgoing' | 'accepted' | 'rejected' }>({ status: 'none' });
+  const [msgRequestInfoRaw, setMsgRequestInfoRaw] = useState<{ status: 'none' | 'pending_incoming' | 'pending_outgoing' | 'accepted' | 'rejected' }>({ status: 'none' });
+  // ★ 2026-04-27: Effective status — mutual arkadaşsa eski pending/rejected kayıt UI'da yok sayılır.
+  //   Service tarafı zaten mutual'da request akışını atlıyor (services/messages.ts), ama eskiden
+  //   pending kalmış bir kayıt UI'da hâlâ "Onay bekleniyor" banner'ı çıkartıyordu — tutarsızlık.
+  const msgRequestInfo = isMutualFollow ? { status: 'accepted' as const } : msgRequestInfoRaw;
+  const setMsgRequestInfo = setMsgRequestInfoRaw;
   const [respondingRequest, setRespondingRequest] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   // ★ 2026-04-23: RoomChatDrawer pattern — input bar'ı klavyenin üstüne sabitle (Clubhouse).
   // MiniRoomCard global overlay (z:999) DM üstünde durduğu için, oda minimize iken
   // input bar'ı MiniRoomCard'ın da üstüne çıkar (aksi halde oda çubuğu input'u örter).
-  const miniRoomOffset = minimizedRoom ? Math.max(insets.bottom, 8) + 144 : 0;
+  // ★ 2026-04-24: Mini card chat UI'sini etkilemez — sadece overlay pop olarak durur.
+  //   Input bar her zaman ekranın altında kalır; mini card gerekirse üstüne biner.
+  const miniRoomOffset = 0;
   const inputBottomAnim = useRef(new Animated.Value(miniRoomOffset)).current;
+  // ★ 2026-04-24: kbHeight state — FlatList paddingBottom klavyeye göre artar → scroll alanı açılır.
+  const [kbHeight, setKbHeight] = useState(0);
+  // ★ 2026-04-27: FlatList marginBottom yaklaşımına geçildi (input bar ile çakışma yok).
+  //   Default 90 — gerçek input bar'a yakın (gesture nav telefonda ~80-100px). onLayout ile güncellenir.
+  //   İlk render'da çok büyük (150) → re-layout sırasında scroll pozisyonu kaymasına yol açıyordu.
+  const [inputBarHeight, setInputBarHeight] = useState(90);
   useEffect(() => {
     inputBottomAnim.setValue(miniRoomOffset);
   }, [miniRoomOffset]);
+  // ★ 2026-04-27: inputBar yüksekliği değişince (multi-line yazma vb.) en alttaysa scroll'u eşitle.
   useEffect(() => {
-    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
-    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-    const showSub = Keyboard.addListener(showEvent, (e) => {
-      const screenH = Dimensions.get('screen').height;
-      const kbHeight = Math.max(0, screenH - e.endCoordinates.screenY);
-      Animated.timing(inputBottomAnim, { toValue: kbHeight, duration: 250, useNativeDriver: false }).start();
+    if (isAtBottomRef.current) {
+      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: false }), 30);
+    }
+  }, [inputBarHeight]);
+  useEffect(() => {
+    // ★ 2026-04-27 FIX: Android'de AndroidManifest.xml'de windowSoftInputMode="adjustResize"
+    //   zaten aktif — sistem klavye açılınca pencereyi küçültür, input bar otomatik kayar.
+    //   Manuel offset uygulamak ÇİFT kayma yapar (klavyeden uzak gap görünür).
+    // ★ 2026-04-28 FIX: Android'de keyboardDidShow listener ile sadece scrollToEnd tetikleniyor —
+    //   adjustResize FlatList viewport'unu küçültüyor ama scroll pozisyonu eski kalıyor,
+    //   son mesaj input bar'ın altında gizli kalıyordu. Manuel paddingBottom yine yok (adjustResize hallediyor).
+    if (Platform.OS === 'android') {
+      const showAndroid = Keyboard.addListener('keyboardDidShow', () => {
+        // Viewport küçüldü, en alta kay — son mesaj input bar üstünde görünür
+        setTimeout(() => flatListRef.current?.scrollToEnd({ animated: false }), 50);
+      });
+      const hideAndroid = Keyboard.addListener('keyboardDidHide', () => {
+        // Klavye kapandı, viewport büyüdü — yine en alta kay (kullanıcı isAtBottom ise)
+        if (isAtBottomRef.current) {
+          setTimeout(() => flatListRef.current?.scrollToEnd({ animated: false }), 50);
+        }
+      });
+      return () => { showAndroid.remove(); hideAndroid.remove(); };
+    }
+    // iOS: Sistem resize yapmaz, manuel offset gerekli.
+    const showSub = Keyboard.addListener('keyboardWillShow', (e) => {
+      setKbHeight(e.endCoordinates.height);
+      Animated.timing(inputBottomAnim, { toValue: e.endCoordinates.height, duration: 250, useNativeDriver: false }).start();
     });
-    const hideSub = Keyboard.addListener(hideEvent, () => {
+    const hideSub = Keyboard.addListener('keyboardWillHide', () => {
+      setKbHeight(0);
       Animated.timing(inputBottomAnim, { toValue: miniRoomOffset, duration: 200, useNativeDriver: false }).start();
     });
     return () => { showSub.remove(); hideSub.remove(); };
@@ -338,12 +494,20 @@ export default function ChatScreen() {
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const flatListRef = useRef<FlatList>(null);
   const isAtBottomRef = useRef(true); // ★ BUG-6 FIX: Kullanıcı en altta mı?
+  // ★ 2026-04-26: İlk açılışta otomatik en alta scroll (son mesaj görünür) — bir kez tetiklenir.
+  const initialScrolledRef = useRef(false);
+  // ★ 2026-04-24: Kendi gönderdiğim mesajdan sonra onContentSizeChange'de
+  //   isAtBottomRef'i bypass edip daima en alta kayacağını işaret eder.
+  const justSentRef = useRef(false);
   const [showReportModal, setShowReportModal] = useState(false);
   const [reportMessageId, setReportMessageId] = useState<string | null>(null);
   const [cAlert, setCAlert] = useState<{visible:boolean;title:string;message:string;type?:any;buttons?:AlertButton[]}>({visible:false,title:'',message:''});
   const [activeRoom, setActiveRoom] = useState<{id: string; name: string} | null>(null);
   const [activeReactionMsgId, setActiveReactionMsgId] = useState<string | null>(null); // ★ Tek seferde tek emoji bar
   const [showKebabMenu, setShowKebabMenu] = useState(false); // ★ Kebab menü
+  const [showMessageSearch, setShowMessageSearch] = useState(false); // ★ Sohbet içi arama
+  const [messageSearchQuery, setMessageSearchQuery] = useState('');
+  const [showMediaDrawer, setShowMediaDrawer] = useState(false); // ★ Medya + bağlantılar
   const [isMuted, setIsMuted] = useState(false); // ★ Sessize al
   const [isBlocked, setIsBlocked] = useState(false); // ★ Engel durumu
   const [viewerImage, setViewerImage] = useState<string | null>(null); // ★ Tam ekran görsel
@@ -497,120 +661,120 @@ export default function ChatScreen() {
     if (!id || !firebaseUser) return;
 
     const loadChat = async () => {
+      // ★ 2026-04-28: 2 aşamalı yükleme — kritik (blok+profil+mesajlar+cleared) ÖNCE paralel,
+      //   spinner kalkar. Detaylar (oda/takip/istek/markRead/missed/mute) arka planda paralel.
+      //   Eski sıralı 11 await ~1-3sn sürerken artık ~300-500ms (en yavaş kritik sorgunun süresi).
       try {
-        // ★ S5 FIX: Engel kontrolü — engellenmiş kullanıcıyla chat açılamaz
-        const isBlocked = await ModerationService.isBlocked(firebaseUser.uid, id);
-        const blockedByThem = await ModerationService.isBlocked(id, firebaseUser.uid);
-        if (isBlocked || blockedByThem) {
+        // ── Aşama 1: KRİTİK paralel — UI gözükmeden zorunlu ──
+        const [isBlockedByMe, isBlockedByThem, profile, history, clearedMap] = await Promise.all([
+          ModerationService.isBlocked(firebaseUser.uid, id).catch(() => false),
+          ModerationService.isBlocked(id, firebaseUser.uid).catch(() => false),
+          ProfileService.get(id).catch(() => null),
+          MessageService.getConversation(firebaseUser.uid, id, 50).catch(() => [] as Message[]),
+          MessageService.getClearedBefore(firebaseUser.uid).catch(() => ({} as Record<string, string>)),
+        ]);
+
+        if (isBlockedByMe || isBlockedByThem) {
           showToast({ title: '⛔ Erişim Engellendi', message: 'Bu kullanıcıyla mesajlaşamazsınız.', type: 'error' });
           router.back();
           return;
         }
 
-        // Karşı kullanıcı profilini yükle
-        const profile = await ProfileService.get(id);
         setOtherUser(profile);
 
-        // Aktif odadaysa davet butonu göster
-        try {
-          const { data: activeP } = await supabase
+        const clearedBefore = clearedMap[id];
+        const filteredHistory = clearedBefore
+          ? history.filter(m => new Date(m.created_at) > new Date(clearedBefore))
+          : history;
+        setMessages(filteredHistory);
+
+        // İlk yüklemede en alta scroll — multiple attempts (FlatList content size birden fazla kez değişir)
+        if (!initialScrolledRef.current) {
+          initialScrolledRef.current = true;
+          requestAnimationFrame(() => flatListRef.current?.scrollToEnd({ animated: false }));
+          setTimeout(() => flatListRef.current?.scrollToEnd({ animated: false }), 50);
+          setTimeout(() => flatListRef.current?.scrollToEnd({ animated: false }), 200);
+          setTimeout(() => flatListRef.current?.scrollToEnd({ animated: false }), 500);
+          setTimeout(() => flatListRef.current?.scrollToEnd({ animated: false }), 900);
+        }
+
+        setLoading(false); // ★ Spinner KAPANIR — UI dolar, detaylar arka planda gelir.
+
+        // ── Aşama 2: DETAYLAR paralel arka plan — UI zaten render ──
+        Promise.all([
+          // Aktif odadaysa davet butonu göster
+          supabase
             .from('room_participants')
             .select('room_id, rooms!inner(id, name)')
             .eq('user_id', firebaseUser.uid)
             .limit(1)
-            .single();
-          if (activeP?.rooms) {
-            setActiveRoom({ id: (activeP.rooms as any).id, name: (activeP.rooms as any).name });
-          }
-        } catch { setActiveRoom(null); }
+            .single()
+            .then(({ data }) => {
+              if (data?.rooms) setActiveRoom({ id: (data.rooms as any).id, name: (data.rooms as any).name });
+            })
+            .catch(() => {}),
 
-        // ★ CALL-1 + DM-8: Takipçi kontrolü — arama butonları ve DM izni
-        try {
-          const detailed = await FriendshipService.getDetailedStatus(firebaseUser.uid, id);
-          const meFollowsThem = detailed.outgoing === 'accepted';
-          const theyFollowMe = detailed.incoming === 'accepted';
-          setIsFriend(meFollowsThem || theyFollowMe);
-          setIsMutualFollow(meFollowsThem && theyFollowMe);
-          // Karşılıklı takip yoksa → mesaj isteği modu
-          setIsMessageRequest(!meFollowsThem || !theyFollowMe);
-        } catch { setIsFriend(false); setIsMutualFollow(false); setIsMessageRequest(true); }
+          // CALL-1 + DM-8: Takipçi kontrolü
+          FriendshipService.getDetailedStatus(firebaseUser.uid, id)
+            .then(detailed => {
+              const meFollowsThem = detailed.outgoing === 'accepted';
+              const theyFollowMe = detailed.incoming === 'accepted';
+              // ★ 2026-04-27 KRİTİK FIX: friendships TEK YÖNLÜ kayıt — A→B accepted yeterli (resmi
+              // FriendshipService.isFriend() OR kullanıyor). Eski AND her gerçek arkadaşı "değil"
+              // sayıp mesaj request bariyerine takıyordu. Şimdi: ikisinden biri accepted → arkadaş.
+              const friend = meFollowsThem || theyFollowMe;
+              setIsMutualFollow(friend);
+              setIsMessageRequest(!friend);
+            })
+            .catch(() => { setIsMutualFollow(false); setIsMessageRequest(true); }),
 
-        // ★ 2026-04-22: message_requests durumu (Instagram flow)
-        try {
-          const req = await MessageService.getMessageRequest(firebaseUser.uid, id);
-          if (!req) {
-            setMsgRequestInfo({ status: 'none' });
-          } else if (req.status === 'accepted') {
-            setMsgRequestInfo({ status: 'accepted' });
-          } else if (req.status === 'rejected') {
-            setMsgRequestInfo({ status: 'rejected' });
-          } else if (req.status === 'pending') {
-            setMsgRequestInfo({ status: req.receiver_id === firebaseUser.uid ? 'pending_incoming' : 'pending_outgoing' });
-          }
-        } catch { setMsgRequestInfo({ status: 'none' }); }
+          // message_requests durumu (Instagram flow)
+          MessageService.getMessageRequest(firebaseUser.uid, id)
+            .then(req => {
+              if (!req) setMsgRequestInfo({ status: 'none' });
+              else if (req.status === 'accepted') setMsgRequestInfo({ status: 'accepted' });
+              else if (req.status === 'rejected') setMsgRequestInfo({ status: 'rejected' });
+              else if (req.status === 'pending') setMsgRequestInfo({ status: req.receiver_id === firebaseUser.uid ? 'pending_incoming' : 'pending_outgoing' });
+            })
+            .catch(() => setMsgRequestInfo({ status: 'none' })),
 
-        // Mesaj geçmişini yükle
-        try {
-          let history = await MessageService.getConversation(firebaseUser.uid, id);
-          // ★ 2026-04-22: Eski mesajlar için KALICI filter — cleared_before timestamp'i
-          //   deleteConversation'da yazılır, bir daha asla temizlenmez (sadece yeni
-          //   silmede üst üste yazılır). Hidden timestamp ise inbox gizleme için ayrı.
-          const clearedMap = await MessageService.getClearedBefore(firebaseUser.uid);
-          const clearedBefore = clearedMap[id];
-          if (clearedBefore) {
-            history = history.filter(m => new Date(m.created_at) > new Date(clearedBefore));
-          }
-          if (__DEV__) console.log(`[Chat] getConversation: ${history.length} mesaj yüklendi (user: ${firebaseUser.uid}, partner: ${id})`);
-          setMessages(history);
-        } catch (convErr: any) {
-          if (__DEV__) console.error('[Chat] getConversation HATA:', convErr?.message, convErr?.code, JSON.stringify(convErr));
-          setMessages([]);
-        }
+          // markAsRead + cevapsız arama notifications okundu + missed calls list
+          (async () => {
+            await MessageService.markAsRead(firebaseUser.uid, id).catch(() => {});
+            await supabase
+              .from('notifications')
+              .update({ is_read: true })
+              .eq('user_id', firebaseUser.uid)
+              .eq('sender_id', id)
+              .eq('type', 'missed_call')
+              .eq('is_read', false)
+              .then(() => {}, () => {});
+            refreshBadges();
+            const { data: missedData } = await supabase
+              .from('notifications')
+              .select('id, type, body, created_at, sender_id, sender:profiles!sender_id(display_name)')
+              .eq('user_id', firebaseUser.uid)
+              .eq('sender_id', id)
+              .eq('type', 'missed_call')
+              .order('created_at', { ascending: false })
+              .limit(5);
+            if (missedData && missedData.length > 0) {
+              setMissedCalls(missedData.map((mc: any) => ({
+                id: mc.id,
+                callType: 'audio' as const,
+                time: mc.created_at,
+                callerName: mc.sender?.display_name || 'Kullanıcı',
+              })));
+            }
+          })().catch(() => {}),
 
-        // Mesajları okundu olarak işaretle + badge güncelle
-        await MessageService.markAsRead(firebaseUser.uid, id);
-        // ★ 2026-04-21: Cevapsız arama bildirimlerini de okundu işaretle — chat açıldığında
-        //   kullanıcı bu sohbete bakıyor demektir, badge'te sayılmamalı.
-        try {
-          await supabase
-            .from('notifications')
-            .update({ is_read: true })
-            .eq('user_id', firebaseUser.uid)
-            .eq('sender_id', id)
-            .eq('type', 'missed_call')
-            .eq('is_read', false);
-        } catch {}
-        refreshBadges();
-
-        // ★ Cevapsız aramaları yükle (bu sohbet partneri ile)
-        try {
-          const { data: missedData } = await supabase
-            .from('notifications')
-            .select('id, type, body, created_at, sender_id, sender:profiles!sender_id(display_name)')
-            .eq('user_id', firebaseUser.uid)
-            .eq('sender_id', id)
-            .eq('type', 'missed_call')
-            .order('created_at', { ascending: false })
-            .limit(5);
-          if (missedData && missedData.length > 0) {
-            setMissedCalls(missedData.map((mc: any) => ({
-              id: mc.id,
-              callType: 'audio' as const,
-              time: mc.created_at,
-              callerName: mc.sender?.display_name || 'Kullanıcı',
-            })));
-          }
-        } catch { /* silent */ }
-
-        // ★ Mute durumunu yükle (engel kontrolü zaten L449-456'da yapılıyor)
-        try {
-          const muteKey = `mute_chat_${firebaseUser.uid}_${id}`;
-          const muteVal = await AsyncStorage.getItem(muteKey);
-          setIsMuted(muteVal === 'true');
-        } catch {}
+          // Mute durumu
+          AsyncStorage.getItem(`mute_chat_${firebaseUser.uid}_${id}`)
+            .then(val => setIsMuted(val === 'true'))
+            .catch(() => {}),
+        ]);
       } catch (err) {
         if (__DEV__) console.warn('Sohbet yüklenemedi:', err);
-      } finally {
         setLoading(false);
       }
     };
@@ -618,7 +782,7 @@ export default function ChatScreen() {
     loadChat();
 
     // Realtime yeni mesaj dinleyici
-    const channel = MessageService.onNewMessage(firebaseUser.uid, (newMsg) => {
+    const channel = MessageService.onNewMessage(firebaseUser.uid, `chat_${id}`, (newMsg) => {
       if (newMsg.sender_id === id) {
         // Yeni mesaj gelince HEMEN yazıyor bilgisini kapat
         setIsTyping(false);
@@ -760,8 +924,12 @@ export default function ChatScreen() {
       created_at: new Date().toISOString(),
     };
     setMessages(prev => [...prev, optimisticMsg]);
-    // ★ 2026-04-24 FIX: Kendi mesajımızı gönderdikten sonra scroll to bottom
-    setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+    // ★ 2026-04-24: Gönderdikten sonra daima en alta kay — onContentSizeChange
+    //   tick'inde justSent flag'ı isAtBottomRef'i bypass ediyor, böylece kullanıcı
+    //   üste kaydırmış olsa bile kendi mesajı görünür.
+    justSentRef.current = true;
+    isAtBottomRef.current = true;
+    requestAnimationFrame(() => flatListRef.current?.scrollToEnd({ animated: true }));
     
     // Yazıyor... bilgisini kapat
     MessageService.sendTypingStatus(firebaseUser.uid, id, false);
@@ -800,27 +968,54 @@ export default function ChatScreen() {
     }
   };
 
+  // ★ 2026-04-24 v2: Loading bitince slide-down tetikle
+  useEffect(() => {
+    if (!loading) {
+      contentTranslateY.setValue(-80);
+      contentOpacity.setValue(0);
+      Animated.parallel([
+        Animated.timing(contentTranslateY, { toValue: 0, duration: 320, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+        Animated.timing(contentOpacity, { toValue: 1, duration: 260, useNativeDriver: true }),
+      ]).start();
+    }
+  }, [loading]);
+
   if (loading) {
     return (
-      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-
-        <ActivityIndicator size="large" color={Colors.teal} />
-      </View>
+      <AppBackground radialGlow>
+        <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+          <PremiumLoader size={56} />
+        </View>
+      </AppBackground>
     );
   }
 
 
   return (
-    <AppBackground>
-    <View style={styles.container}>
+    <AppBackground radialGlow>
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={0}
+    >
+    <Animated.View style={[styles.container, { opacity: contentOpacity, transform: [{ translateY: contentTranslateY }] }]}>
 
-      {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + 6 }]}>
+      {/* Header — Ana sayfadaki banner ile aynı (bombe gradient + teal separator) */}
+      <View style={[styles.headerWrap, { paddingTop: insets.top }]}>
+        <LinearGradient
+          colors={['rgba(48,65,94,0.92)', 'rgba(26,40,64,0.82)', 'rgba(12,22,40,0.6)']}
+          locations={[0, 0.55, 1]}
+          start={{ x: 0.5, y: 0 }}
+          end={{ x: 0.5, y: 1 }}
+          style={StyleSheet.absoluteFillObject}
+          pointerEvents="none"
+        />
+      <View style={styles.header}>
         <Pressable onPress={() => safeGoBack(router)} style={styles.backBtn}>
-          <Ionicons name="chevron-back" size={24} color={Colors.text} />
+          <Ionicons name="chevron-back" size={24} color={Colors.text} style={styles.iconShadow} />
         </Pressable>
         {/* ★ UX-NAV: Avatar + isim alanına basınca profil sayfasına git */}
-        <Pressable onPress={() => router.push(`/user/${id}` as any)} style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+        <Pressable onPress={() => openUserProfile(id as string)} style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
           <StatusAvatar uri={otherUser?.avatar_url} size={36} isOnline={otherUser?.is_online} tier={otherUser?.subscription_tier} />
           <View style={styles.headerInfo}>
             <Text style={styles.headerName}>{otherUser?.display_name || 'Kullanıcı'}</Text>
@@ -845,18 +1040,21 @@ export default function ChatScreen() {
           </View>
           </View>
         </Pressable>
-        {/* ★ Arama butonu + Kebab menü — aynı row'da */}
-        {!loading && otherUser && (
+        {/* ★ 2026-04-27: Arama butonu yeniden kurgulandı.
+              Eski: isFriend (tek yönlü takip yeterliydi → mesaj request pending iken bile arama açılıyordu, BUG)
+              Yeni: canCall = karşılıklı takip + mesajlaşma kabul/none. Şartlar yoksa BUTON GİZLİ (sadece dim değil).
+              Mantık: Yazı için onay/red akışı varken sesli/görüntülü arama açık olamaz — tezat yaratıyor. */}
+        {!loading && otherUser && (() => {
+          const canCall = isMutualFollow
+            && (msgRequestInfo.status === 'accepted' || msgRequestInfo.status === 'none');
+          return (
           <View style={styles.headerActions}>
+            {canCall && (
             <Pressable
-              style={[styles.headerAction, (isCallingInProgress || !isFriend) && { opacity: 0.35 }]}
-              disabled={isCallingInProgress || !isFriend}
+              style={[styles.headerAction, isCallingInProgress && { opacity: 0.35 }]}
+              disabled={isCallingInProgress}
               onPress={async () => {
                 if (!firebaseUser || !id || isCallingInProgress) return;
-                if (!isFriend) {
-                  showToast({ title: 'Arama Yapılamaz', message: 'Önce arkadaş olmalısın', type: 'error' });
-                  return;
-                }
                 setIsCallingInProgress(true);
                 const tier = profile?.subscription_tier || 'Free';
                 try {
@@ -874,108 +1072,57 @@ export default function ChatScreen() {
                 }
               }}
             >
-              <Ionicons name="call" size={20} color={isFriend ? Colors.teal : '#475569'} />
+              <Ionicons name="call" size={20} color={Colors.teal} style={styles.iconShadow} />
             </Pressable>
-            {/* ★ Kebab menü butonu */}
+            )}
+            {/* ★ Kebab menü butonu — her zaman görünür */}
             <Pressable
               style={styles.kebabBtn}
               onPress={() => setShowKebabMenu(true)}
               hitSlop={{ top: 16, bottom: 16, left: 12, right: 12 }}
             >
-              <Ionicons name="ellipsis-vertical" size={22} color={Colors.text} />
+              <Ionicons name="ellipsis-vertical" size={22} color={Colors.text} style={styles.iconShadow} />
             </Pressable>
           </View>
-        )}
+          );
+        })()}
+      </View>
+        <LinearGradient
+          colors={['transparent', 'rgba(20,184,166,0.55)', 'rgba(20,184,166,0.55)', 'transparent']}
+          locations={[0, 0.25, 0.75, 1]}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+          style={styles.headerSeparator}
+        />
       </View>
 
-      {/* ★ 2026-04-22: Mesaj isteği banner — 3 farklı durum için */}
-      {!loading && msgRequestInfo.status === 'pending_incoming' && (
-        <View style={[styles.msgRequestBanner, { backgroundColor: 'rgba(59,130,246,0.08)', borderBottomColor: 'rgba(59,130,246,0.2)' }]}>
-          <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10, paddingVertical: 10, paddingHorizontal: 14 }}>
-            <Ionicons name="mail-unread-outline" size={18} color="#60A5FA" style={{ marginTop: 2 }} />
-            <View style={{ flex: 1, gap: 8 }}>
-              <Text style={{ fontSize: 13, fontWeight: '700', color: '#E2E8F0' }}>
-                {otherUser?.display_name || 'Kullanıcı'} sizinle mesajlaşmak istiyor
-              </Text>
-              <Text style={{ fontSize: 11, color: '#94A3B8', lineHeight: 15 }}>
-                Kabul ederseniz mesajlaşmaya başlayabilirsiniz. Reddederseniz yeni mesaj atamaz.
-              </Text>
-              <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
-                <Pressable
-                  disabled={respondingRequest}
-                  onPress={async () => {
-                    if (!firebaseUser || respondingRequest) return;
-                    setRespondingRequest(true);
-                    try {
-                      await MessageService.acceptMessageRequest(firebaseUser.uid, id as string);
-                      setMsgRequestInfo({ status: 'accepted' });
-                      showToast({ title: '✅ Kabul Edildi', message: 'Artık mesajlaşabilirsiniz.', type: 'success' });
-                    } catch (e: any) {
-                      showToast({ title: 'Hata', message: e?.message || 'İşlem başarısız', type: 'error' });
-                    } finally { setRespondingRequest(false); }
-                  }}
-                  style={({ pressed }) => [{
-                    flex: 1, paddingVertical: 8, borderRadius: 10, alignItems: 'center',
-                    backgroundColor: '#14B8A6',
-                  }, pressed && { opacity: 0.7 }, respondingRequest && { opacity: 0.5 }]}>
-                  <Text style={{ fontSize: 12, fontWeight: '800', color: '#FFF' }}>Kabul Et</Text>
-                </Pressable>
-                <Pressable
-                  disabled={respondingRequest}
-                  onPress={async () => {
-                    if (!firebaseUser || respondingRequest) return;
-                    setRespondingRequest(true);
-                    try {
-                      await MessageService.rejectMessageRequest(firebaseUser.uid, id as string);
-                      setMsgRequestInfo({ status: 'rejected' });
-                      showToast({ title: 'Reddedildi', message: 'Bu kullanıcı size mesaj atamaz.', type: 'info' });
-                      router.back();
-                    } catch (e: any) {
-                      showToast({ title: 'Hata', message: e?.message || 'İşlem başarısız', type: 'error' });
-                    } finally { setRespondingRequest(false); }
-                  }}
-                  style={({ pressed }) => [{
-                    flex: 1, paddingVertical: 8, borderRadius: 10, alignItems: 'center',
-                    backgroundColor: 'rgba(239,68,68,0.15)',
-                    borderWidth: 1, borderColor: 'rgba(239,68,68,0.4)',
-                  }, pressed && { opacity: 0.7 }, respondingRequest && { opacity: 0.5 }]}>
-                  <Text style={{ fontSize: 12, fontWeight: '800', color: '#F87171' }}>Reddet</Text>
-                </Pressable>
-              </View>
-            </View>
-          </View>
+      {/* ★ 2026-04-24: Sohbet içi arama bar */}
+      {showMessageSearch && (
+        <View style={styles.searchBar}>
+          <Ionicons name="search" size={16} color={Colors.text3} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Mesajlarda ara..."
+            placeholderTextColor={Colors.text3}
+            value={messageSearchQuery}
+            onChangeText={setMessageSearchQuery}
+            autoFocus
+          />
+          <Pressable onPress={() => { setShowMessageSearch(false); setMessageSearchQuery(''); }} hitSlop={8}>
+            <Ionicons name="close-circle" size={18} color={Colors.text3} />
+          </Pressable>
         </View>
       )}
 
-      {!loading && msgRequestInfo.status === 'pending_outgoing' && (
-        <View style={styles.msgRequestBanner}>
-          <View style={styles.msgRequestBannerInner}>
-            <Ionicons name="time-outline" size={16} color="#FBBF24" />
-            <Text style={styles.msgRequestDesc}>
-              İsteğiniz onay bekliyor. {otherUser?.display_name || 'Kullanıcı'} kabul edene kadar yeni mesaj gönderemezsiniz.
-            </Text>
-          </View>
-        </View>
-      )}
+      {/* ★ 2026-04-27: Strict policy — eski mesaj isteği banner'ları (pending_incoming/outgoing/rejected)
+            kaldırıldı. Yabancılara mesajlaşma kapalı; tek banner var: "Önce arkadaş ol" (aşağıda). */}
 
-      {!loading && msgRequestInfo.status === 'rejected' && (
-        <View style={[styles.msgRequestBanner, { backgroundColor: 'rgba(239,68,68,0.08)' }]}>
+      {/* ★ 2026-04-27 STRICT: Arkadaş değilse mesajlaşma kapalı — net uyarı banner */}
+      {!loading && !isMutualFollow && (
+        <View style={[styles.msgRequestBanner, { backgroundColor: 'rgba(251,191,36,0.10)' }]}>
           <View style={styles.msgRequestBannerInner}>
-            <Ionicons name="close-circle-outline" size={16} color="#F87171" />
-            <Text style={[styles.msgRequestDesc, { color: '#FCA5A5' }]}>
-              İsteğiniz reddedildi — bu kullanıcıya mesaj gönderemezsiniz.
-            </Text>
-          </View>
-        </View>
-      )}
-
-      {/* ★ 2026-04-22: İlk mesaj bilgi banner — mutual follow yoksa + request henüz yok */}
-      {!loading && msgRequestInfo.status === 'none' && !isMutualFollow && (
-        <View style={styles.msgRequestBanner}>
-          <View style={styles.msgRequestBannerInner}>
-            <Ionicons name="information-circle-outline" size={16} color="#94A3B8" />
-            <Text style={styles.msgRequestDesc}>
-              {otherUser?.display_name || 'Bu kul.'} ile karşılıklı takipleşmiyorsunuz. İlk mesajın "istek" olarak gönderilir, onay beklenir.
+            <Ionicons name="lock-closed-outline" size={16} color="#FBBF24" />
+            <Text style={[styles.msgRequestDesc, { color: '#FCD34D' }]}>
+              {otherUser?.display_name || 'Bu kullanıcı'} ile arkadaş olmadığın için mesajlaşamazsın. Profilinden arkadaş ekle.
             </Text>
           </View>
         </View>
@@ -984,7 +1131,7 @@ export default function ChatScreen() {
       {/* Messages */}
       <FlatList
         ref={flatListRef}
-        data={messages}
+        data={showMessageSearch && messageSearchQuery.trim() ? messages.filter(m => (m.content || '').toLowerCase().includes(messageSearchQuery.trim().toLowerCase())) : messages}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <MessageBubble
@@ -995,6 +1142,7 @@ export default function ChatScreen() {
             myAvatar={profile?.avatar_url || ''}
             isReactionActive={activeReactionMsgId === item.id}
             onToggleReaction={setActiveReactionMsgId}
+            onAvatarPress={() => { if (id) openUserProfile(id as string); }}
             onDelete={async (msgId) => {
               try {
                 await MessageService.deleteMessage(msgId, firebaseUser!.uid);
@@ -1038,19 +1186,22 @@ export default function ChatScreen() {
           />
         )}
         style={styles.messageList}
-        contentContainerStyle={[styles.messageContent, { paddingBottom: 90 + Math.max(insets.bottom, 10) + miniRoomOffset }]}
+        contentContainerStyle={styles.messageContent}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="interactive"
         onContentSizeChange={() => {
-          if (isAtBottomRef.current) {
-            setTimeout(() => flatListRef.current?.scrollToEnd({ animated: false }), 50);
+          // ★ Kendi gönderdiğimde (justSent) daima en alta — aksi halde sadece zaten altta iken.
+          if (justSentRef.current || isAtBottomRef.current) {
+            justSentRef.current = false;
+            setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
           }
         }}
         onLayout={() => setTimeout(() => flatListRef.current?.scrollToEnd({ animated: false }), 100)}
         onScroll={(e: NativeSyntheticEvent<NativeScrollEvent>) => {
           const { layoutMeasurement, contentOffset, contentSize } = e.nativeEvent;
-          const isBottom = layoutMeasurement.height + contentOffset.y >= contentSize.height - 40;
+          // ★ 2026-04-26: Eşik 40 → 200 (yumuşak otomatik scroll). Kullanıcı son ~3 mesaj görece altta ise yeni mesajda alta kayar.
+          const isBottom = layoutMeasurement.height + contentOffset.y >= contentSize.height - 200;
           isAtBottomRef.current = isBottom;
           // ★ Scroll edince emoji bar'ı kapat
           if (activeReactionMsgId) setActiveReactionMsgId(null);
@@ -1128,11 +1279,36 @@ export default function ChatScreen() {
         }
       />
 
-      {/* ★ 2026-04-23: Input Bar — absolute + Animated bottom (RoomChatDrawer Clubhouse pattern).
-          Klavye açıldığında bar klavyenin ÜSTÜNE sabitlenir; emoji picker da wrapper içinde bar'ın ALTINA yerleşir. */}
-      <Animated.View style={{ position: 'absolute', left: 0, right: 0, bottom: inputBottomAnim, zIndex: 10 }}>
+      {/* ★ 2026-04-27: Input Bar artık normal flex flow'da (absolute KALDIRILDI).
+          Eski absolute + paddingBottom hack yaklaşımı son mesajın altta kalmasına sebep oluyordu.
+          Yeni: container column flex, input bar doğal yüksekliği kadar yer kaplar; FlatList flex:1 ile
+          KENDİLİĞİNDEN üstünde kalır. Android adjustResize klavye için yeterli. iOS için Animated bottom
+          gerekiyor ama Android'de kullanıcı, iOS sonra. */}
+      <Animated.View
+        style={{ backgroundColor: '#0F172A', zIndex: 10 }}
+        onLayout={(e) => {
+          const h = e.nativeEvent.layout.height;
+          if (h > 0 && Math.abs(h - inputBarHeight) > 2) setInputBarHeight(h);
+        }}
+      >
+      {/* ★ 2026-04-24: Input bar banner — üst headar ile tutarlı (teal separator üstte, bombe gradient) */}
+      <LinearGradient
+        colors={['rgba(12,22,40,0.95)', 'rgba(26,40,64,0.98)', 'rgba(48,65,94,1)']}
+        locations={[0, 0.45, 1]}
+        start={{ x: 0.5, y: 0 }}
+        end={{ x: 0.5, y: 1 }}
+        style={StyleSheet.absoluteFillObject}
+        pointerEvents="none"
+      />
+      <LinearGradient
+        colors={['transparent', 'rgba(20,184,166,0.55)', 'rgba(20,184,166,0.55)', 'transparent']}
+        locations={[0, 0.25, 0.75, 1]}
+        start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+        style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1.5 }}
+        pointerEvents="none"
+      />
       {isRecording ? (
-        <View style={[styles.inputBar, { paddingBottom: Math.max(insets.bottom, 10) }]}>
+        <View style={[styles.inputBar, { paddingBottom: Math.max(insets.bottom + 6, 20)}]}>
           {/* Kayıt modunda: inline waveform bar */}
           <Pressable style={styles.recCancelBtn} onPress={cancelRecording}>
             <Ionicons name="trash-outline" size={20} color="#EF4444" />
@@ -1171,20 +1347,20 @@ export default function ChatScreen() {
           </Pressable>
         </View>
       ) : (
-        <View style={[styles.inputBar, { paddingBottom: Math.max(insets.bottom, 10) }, (msgRequestInfo.status === 'pending_outgoing' || msgRequestInfo.status === 'rejected') && { opacity: 0.4 }]} pointerEvents={(msgRequestInfo.status === 'pending_outgoing' || msgRequestInfo.status === 'rejected') ? 'none' : 'auto'}>
+        <View style={[styles.inputBar, { paddingBottom: Math.max(insets.bottom + 6, 20)}, !isMutualFollow && { opacity: 0.4 }]} pointerEvents={!isMutualFollow ? 'none' : 'auto'}>
           <Pressable style={styles.inputAction} onPress={() => setShowEmojiPicker(v => !v)}>
-            <Ionicons name={showEmojiPicker ? 'close-circle' : 'happy-outline'} size={22} color={Colors.teal} />
+            <Ionicons name={showEmojiPicker ? 'close-circle' : 'happy-outline'} size={22} color={Colors.teal} style={styles.iconShadow} />
           </Pressable>
           <TextInput
             style={styles.textInput}
-            placeholder={msgRequestInfo.status === 'pending_outgoing' ? 'Onay bekleniyor...' : msgRequestInfo.status === 'rejected' ? 'Mesaj atamazsın' : 'Mesaj yaz...'}
+            placeholder={!isMutualFollow ? 'Önce arkadaş olmalısın' : 'Mesaj yaz...'}
             placeholderTextColor={Colors.text3}
             value={inputText}
             onChangeText={handleInputChange}
             multiline
             maxLength={MSG_MAX_LENGTH}
             onFocus={() => setShowEmojiPicker(false)}
-            editable={msgRequestInfo.status !== 'pending_outgoing' && msgRequestInfo.status !== 'rejected'}
+            editable={isMutualFollow}
           />
           <Pressable style={styles.inputAction} onPress={async () => {
             try {
@@ -1212,7 +1388,7 @@ export default function ChatScreen() {
               showToast({ title: 'Fotoğraf gönderilemedi', message: err.message || '', type: 'error' });
             }
           }}>
-            <Ionicons name="attach" size={22} color={Colors.text3} />
+            <Ionicons name="attach" size={22} color={Colors.text3} style={styles.iconShadow} />
           </Pressable>
           {/* 🎙️ Gel Odama Daveti */}
           {activeRoom && (
@@ -1226,7 +1402,7 @@ export default function ChatScreen() {
                 showToast({ title: 'Davet gönderilemedi', type: 'error' });
               }
             }}>
-              <Ionicons name="radio" size={20} color={Colors.teal} />
+              <Ionicons name="radio" size={20} color={Colors.teal} style={styles.iconShadow} />
             </Pressable>
           )}
           {inputText.trim() ? (
@@ -1242,7 +1418,7 @@ export default function ChatScreen() {
               {sendingVoice ? (
                 <ActivityIndicator size="small" color={Colors.teal} />
               ) : (
-                <Ionicons name="mic" size={22} color={Colors.teal} />
+                <Ionicons name="mic" size={22} color={Colors.teal} style={styles.iconShadow} />
               )}
             </Pressable>
           )}
@@ -1274,11 +1450,44 @@ export default function ChatScreen() {
       <Modal
         visible={showKebabMenu}
         transparent
-        animationType="fade"
+        animationType="none"
         onRequestClose={() => setShowKebabMenu(false)}
       >
-        <Pressable style={styles.kebabOverlay} onPress={() => setShowKebabMenu(false)}>
-          <View style={styles.kebabDropdown}>
+        <Pressable style={[styles.kebabOverlay, { paddingTop: insets.top + 44 }]} onPress={() => setShowKebabMenu(false)}>
+          <KebabDropdown visible={showKebabMenu}>
+            {/* ★ 2026-04-24: Kişiyi görüntüle */}
+            <Pressable
+              style={styles.kebabItem}
+              onPress={() => {
+                setShowKebabMenu(false);
+                openUserProfile(id as string);
+              }}
+            >
+              <Ionicons name="person-outline" size={20} color={Colors.text2} />
+              <Text style={styles.kebabItemText}>Kişiyi Görüntüle</Text>
+            </Pressable>
+            {/* ★ Ara */}
+            <Pressable
+              style={styles.kebabItem}
+              onPress={() => {
+                setShowKebabMenu(false);
+                setShowMessageSearch(true);
+              }}
+            >
+              <Ionicons name="search-outline" size={20} color={Colors.text2} />
+              <Text style={styles.kebabItemText}>Ara</Text>
+            </Pressable>
+            {/* ★ Medya ve bağlantılar */}
+            <Pressable
+              style={styles.kebabItem}
+              onPress={() => {
+                setShowKebabMenu(false);
+                setShowMediaDrawer(true);
+              }}
+            >
+              <Ionicons name="images-outline" size={20} color={Colors.text2} />
+              <Text style={styles.kebabItemText}>Medya ve Bağlantılar</Text>
+            </Pressable>
             {/* Sohbeti Sil */}
             <Pressable
               style={styles.kebabItem}
@@ -1393,9 +1602,18 @@ export default function ChatScreen() {
               <Ionicons name="flag-outline" size={20} color={Colors.text3} />
               <Text style={[styles.kebabItemText, { color: Colors.text3 }]}>Bildir</Text>
             </Pressable>
-          </View>
+          </KebabDropdown>
         </Pressable>
       </Modal>
+
+      {/* ★ 2026-04-24: Medya ve Bağlantılar Modal */}
+      <MediaLinksModal
+        visible={showMediaDrawer}
+        messages={messages}
+        onClose={() => setShowMediaDrawer(false)}
+        onImagePress={(uri) => { setShowMediaDrawer(false); setViewerImage(uri); }}
+      />
+
 
       {/* ★ Tam Ekran Görsel Görüntüleyici */}
       <Modal
@@ -1417,7 +1635,8 @@ export default function ChatScreen() {
           )}
         </View>
       </Modal>
-    </View>
+    </Animated.View>
+    </KeyboardAvoidingView>
     </AppBackground>
   );
 }
@@ -1426,25 +1645,36 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: 'transparent' },
 
   // Header
+  headerWrap: {
+    position: 'relative',
+    marginBottom: 14,
+    zIndex: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.22,
+    shadowRadius: 12,
+    elevation: 8,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.06)',
-    backgroundColor: 'rgba(15,23,42,0.85)',
+    paddingHorizontal: 14,
+    paddingBottom: 10,
+  },
+  headerSeparator: {
+    height: 1.5,
+    width: '100%',
   },
   backBtn: { width: 36, height: 36, justifyContent: 'center', alignItems: 'center' },
   headerAvatar: { width: 38, height: 38, borderRadius: 19, marginLeft: 4 },
   headerInfo: { flex: 1, marginLeft: 10 },
-  headerName: { fontSize: 15, fontWeight: '700', color: Colors.text },
+  headerName: { fontSize: 15, fontWeight: '700', color: Colors.text, textShadowColor: 'rgba(0,0,0,0.55)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4 },
   onlineRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
-  onlineDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: Colors.emerald },
-  onlineText: { fontSize: 11, color: Colors.emerald },
-  offlineText: { fontSize: 11, color: Colors.text3 },
-  typingHeaderText: { fontSize: 11, color: Colors.teal, fontWeight: '600' as const },
-  typingDots: { fontSize: 11, color: Colors.teal, fontWeight: '600' as const, marginLeft: 1 },
+  onlineDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: Colors.emerald, shadowColor: Colors.emerald, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.6, shadowRadius: 3, elevation: 3 },
+  onlineText: { fontSize: 11, color: Colors.emerald, textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
+  offlineText: { fontSize: 11, color: Colors.text3, textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
+  typingHeaderText: { fontSize: 11, color: Colors.teal, fontWeight: '600' as const, textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
+  typingDots: { fontSize: 11, color: Colors.teal, fontWeight: '600' as const, marginLeft: 1, textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
   headerActions: { flexDirection: 'row', gap: 8 },
   headerAction: {
     width: 36,
@@ -1461,12 +1691,87 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginLeft: 2,
   },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginHorizontal: 12,
+    marginTop: 6,
+    marginBottom: 4,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(20,184,166,0.25)',
+    zIndex: 5,
+    elevation: 5,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: Colors.text,
+  },
+  mediaOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  mediaSheet: {
+    width: '90%',
+    maxHeight: '75%',
+    backgroundColor: '#17202E',
+    borderRadius: 16,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.08)',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.45,
+    shadowRadius: 16,
+    elevation: 14,
+  },
+  mediaHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(255,255,255,0.06)',
+  },
+  mediaTitle: { fontSize: 15, fontWeight: '700', color: Colors.text, textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
+  mediaTabRow: { flexDirection: 'row', gap: 4, paddingHorizontal: 10, paddingVertical: 8 },
+  mediaTab: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: 10,
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.04)',
+  },
+  mediaTabActive: { backgroundColor: 'rgba(20,184,166,0.15)', borderWidth: 1, borderColor: 'rgba(20,184,166,0.35)' },
+  mediaTabText: { fontSize: 12, fontWeight: '600', color: Colors.text3 },
+  mediaTabTextActive: { color: Colors.teal },
+  mediaEmpty: { padding: 30, alignItems: 'center', gap: 8 },
+  mediaEmptyText: { fontSize: 13, color: Colors.text3 },
+  mediaGrid: { flexDirection: 'row', flexWrap: 'wrap', padding: 8, gap: 6 },
+  mediaGridImage: { width: 80, height: 80, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.05)' },
+  mediaListItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(255,255,255,0.04)',
+  },
+  mediaListText: { fontSize: 13, color: Colors.text2, flex: 1 },
   kebabOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'transparent',
     justifyContent: 'flex-start',
     alignItems: 'flex-end',
-    paddingTop: 80,
     paddingRight: 12,
   },
   kebabDropdown: {
@@ -1526,13 +1831,25 @@ const styles = StyleSheet.create({
   bubbleWrap: { marginBottom: 4 },
   bubbleLeft: { alignItems: 'flex-start', flexDirection: 'row', gap: 8 },
   bubbleRight: { alignItems: 'flex-end', flexDirection: 'row-reverse', gap: 8 },
-  bubbleAvatarRow: { paddingTop: 4 },
+  bubbleAvatarRow: {
+    paddingTop: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.35,
+    shadowRadius: 5,
+    elevation: 4,
+  },
 
   bubble: {
     maxWidth: '78%',
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: Radius.default,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.28,
+    shadowRadius: 6,
+    elevation: 4,
   },
   bubbleMe: {
     backgroundColor: Colors.teal,
@@ -1542,9 +1859,10 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.bg4,
     borderBottomLeftRadius: 4,
   },
-  bubbleText: { fontSize: 14, color: Colors.text, lineHeight: 20 },
+  bubbleText: { fontSize: 14, color: Colors.text, lineHeight: 20, textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
   chatImage: { width: 200, height: 200, borderRadius: 12, marginBottom: 4 },
-  bubbleTime: { fontSize: 9, color: Colors.text3 },
+  bubbleTime: { fontSize: 9, color: Colors.text3, textShadowColor: 'rgba(0,0,0,0.45)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
+  iconShadow: { textShadowColor: 'rgba(0,0,0,0.55)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4 },
   bubbleTimeRight: { textAlign: 'right' },
   timeRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 },
   timeRowRight: { justifyContent: 'flex-end' },
@@ -1578,11 +1896,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-end',
     paddingHorizontal: 12,
+    paddingTop: 12,
     paddingVertical: 10,
-    borderTopWidth: 1,
-    borderTopColor: Colors.glassBorder,
-    backgroundColor: Colors.bg2,
-    gap: 6,
+    backgroundColor: 'transparent',
+    gap: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.22,
+    shadowRadius: 12,
+    elevation: 10,
   },
   inputAction: {
     width: 36,
@@ -1592,14 +1914,14 @@ const styles = StyleSheet.create({
   },
   textInput: {
     flex: 1,
-    minHeight: 36,
-    maxHeight: 100,
-    borderRadius: Radius.default,
-    backgroundColor: Colors.bg3,
-    borderWidth: 1,
-    borderColor: Colors.glassBorder,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    minHeight: 40,
+    maxHeight: 120,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.14)',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
     fontSize: 14,
     color: Colors.text,
   },
@@ -1721,14 +2043,14 @@ const styles = StyleSheet.create({
     right: 0,
   },
   reactionEmoji: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
   },
   reactionEmojiText: {
-    fontSize: 24,
+    fontSize: 17,
   },
   reactionDisplay: {
     position: 'absolute',
@@ -1769,6 +2091,11 @@ const voiceStyles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
     minWidth: 200,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 4,
   },
   playBtn: {
     width: 36,

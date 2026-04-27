@@ -33,10 +33,14 @@ export function useRoomDM(params: UseRoomDMParams) {
   const [dmSending, setDmSending] = useState(false);
   const [showDmPanel, setShowDmPanel] = useState(false);
 
-  // ── DM Okunmamış Sayacı ───────────────────────
+  // ── DM Okunmamış Sayacı + Inbox Preload ───────
+  // ★ 2026-04-26: Inbox'ı sayaç ile aynı anda preload — DM panel açıldığında anında dolu görünür.
+  //   Eski: panel açılınca getInbox çağrılıyor → 2sn boş gözüküyordu.
   useEffect(() => {
     if (!firebaseUser?.uid) return;
     MessageService.getUnreadCount(firebaseUser.uid).then(setDmUnreadCount).catch(() => {});
+    // ★ Preload: panel henüz açılmasa bile inbox'ı arka planda hazırla.
+    MessageService.getInbox(firebaseUser.uid).then(setDmInboxMessages).catch(() => {});
     const ch = supabase.channel(`dm_badge_${firebaseUser.uid}`)
       .on('postgres_changes', {
         event: 'INSERT',
@@ -45,6 +49,10 @@ export function useRoomDM(params: UseRoomDMParams) {
         filter: `receiver_id=eq.${firebaseUser.uid}`,
       }, () => {
         setDmUnreadCount(prev => prev + 1);
+        // Yeni mesaj geldikçe inbox listesini de tazele
+        if (firebaseUser?.uid) {
+          MessageService.getInbox(firebaseUser.uid).then(setDmInboxMessages).catch(() => {});
+        }
       })
       .subscribe();
     return () => { supabase.removeChannel(ch); };
@@ -69,12 +77,12 @@ export function useRoomDM(params: UseRoomDMParams) {
         }
       } catch {}
 
-      // Takip kontrolü
+      // Takip kontrolü — ★ 2026-04-27 FIX: tek yönlü accepted = arkadaş (OR)
       let isMessageRequest = false;
       try {
         const { outgoing, incoming } = await FriendshipService.getDetailedStatus(firebaseUser.uid, dmTarget.userId);
-        const isMutual = outgoing === 'accepted' && incoming === 'accepted';
-        if (!isMutual) isMessageRequest = true;
+        const isFriend = outgoing === 'accepted' || incoming === 'accepted';
+        if (!isFriend) isMessageRequest = true;
       } catch {}
 
       await MessageService.send(firebaseUser.uid, dmTarget.userId, dmText.trim(), isMessageRequest);
