@@ -534,14 +534,13 @@ export default function ProfileScreen() {
 
 
 
-        {/* ═══ AYARLAR VE YÖNETİM — premium list card ═══ */}
+        {/* ═══ HESAP grubu ═══ */}
         <View style={p.premiumSectionHeader}>
           <View style={p.sectionAccent} />
-          <Ionicons name="options" size={13} color={Colors.teal} style={iconShadow} />
-          <Text style={p.premiumSectionText}>AYARLAR VE YÖNETİM</Text>
+          <Ionicons name="person-circle-outline" size={13} color={Colors.teal} style={iconShadow} />
+          <Text style={p.premiumSectionText}>HESAP</Text>
         </View>
         <View style={p.premiumListCard}>
-          {/* ★ Diagonal gradient: parlak sol üst → koyu sağ alt */}
           <LinearGradient
             colors={['rgba(48,65,94,0.85)', 'rgba(26,40,64,0.75)', 'rgba(12,22,40,0.55)']}
             locations={[0, 0.55, 1]}
@@ -562,11 +561,33 @@ export default function ProfileScreen() {
           />
           <PremiumListItem
             icon="crown"
-            iconColor="#94A3B8"
+            iconColor={subscriptionTier === 'Free' ? '#FBBF24' : '#94A3B8'}
             label="Soprano Premium"
-            badge={subscriptionTier}
-            badgeColor={Colors.gold}
+            badge={subscriptionTier === 'Free' ? 'Yükselt →' : subscriptionTier}
+            badgeColor={subscriptionTier === 'Free' ? '#FBBF24' : Colors.gold}
             onPress={() => router.push('/plus' as any)}
+            isLast
+          />
+        </View>
+
+        {/* ═══ SOSYAL grubu ═══ */}
+        <View style={p.premiumSectionHeader}>
+          <View style={p.sectionAccent} />
+          <Ionicons name="people-outline" size={13} color={Colors.teal} style={iconShadow} />
+          <Text style={p.premiumSectionText}>SOSYAL</Text>
+        </View>
+        <View style={p.premiumListCard}>
+          <LinearGradient
+            colors={['rgba(48,65,94,0.85)', 'rgba(26,40,64,0.75)', 'rgba(12,22,40,0.55)']}
+            locations={[0, 0.55, 1]}
+            start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
+            style={StyleSheet.absoluteFillObject}
+          />
+          <LinearGradient
+            colors={['transparent', 'rgba(20,184,166,0.6)', 'transparent']}
+            locations={[0, 0.5, 1]}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+            style={p.cardTopEdge}
           />
           <PremiumListItem
             icon="trophy"
@@ -587,6 +608,28 @@ export default function ProfileScreen() {
             badge="+50 SP"
             badgeColor="#A78BFA"
             onPress={openReferralModal}
+            isLast
+          />
+        </View>
+
+        {/* ═══ BÜYÜME grubu ═══ */}
+        <View style={p.premiumSectionHeader}>
+          <View style={p.sectionAccent} />
+          <Ionicons name="trending-up" size={13} color={Colors.teal} style={iconShadow} />
+          <Text style={p.premiumSectionText}>BÜYÜME</Text>
+        </View>
+        <View style={p.premiumListCard}>
+          <LinearGradient
+            colors={['rgba(48,65,94,0.85)', 'rgba(26,40,64,0.75)', 'rgba(12,22,40,0.55)']}
+            locations={[0, 0.55, 1]}
+            start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
+            style={StyleSheet.absoluteFillObject}
+          />
+          <LinearGradient
+            colors={['transparent', 'rgba(20,184,166,0.6)', 'transparent']}
+            locations={[0, 0.5, 1]}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+            style={p.cardTopEdge}
           />
           <PremiumListItem
             icon="rocket-launch"
@@ -597,11 +640,32 @@ export default function ProfileScreen() {
               if (isTierAtLeast(subscriptionTier, 'Plus')) {
                 setShowBoostPicker(true);
               } else {
-                // ★ 2026-04-27: Free → /plus satın al sayfasına yönlendir (revenue kaybını önle)
                 showToast({ title: 'Plus Üyelik Gerekli', message: 'Profili öne çıkarma Plus üyelikle açılır. Yükselt sayfasına yönlendiriliyorsun.', type: 'info' });
                 setTimeout(() => router.push('/plus' as any), 800);
               }
             }}
+            isLast
+          />
+        </View>
+
+        {/* ═══ OTURUM grubu (destructive) ═══ */}
+        <View style={p.premiumSectionHeader}>
+          <View style={[p.sectionAccent, { backgroundColor: '#EF4444' }]} />
+          <Ionicons name="log-out-outline" size={13} color="#F87171" style={iconShadow} />
+          <Text style={[p.premiumSectionText, { color: '#FCA5A5' }]}>OTURUM</Text>
+        </View>
+        <View style={[p.premiumListCard, { borderColor: 'rgba(239,68,68,0.18)' }]}>
+          <LinearGradient
+            colors={['rgba(48,65,94,0.85)', 'rgba(26,40,64,0.75)', 'rgba(12,22,40,0.55)']}
+            locations={[0, 0.55, 1]}
+            start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
+            style={StyleSheet.absoluteFillObject}
+          />
+          <LinearGradient
+            colors={['transparent', 'rgba(239,68,68,0.4)', 'transparent']}
+            locations={[0, 0.5, 1]}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+            style={p.cardTopEdge}
           />
           <PremiumListItem
             icon="logout-variant"
