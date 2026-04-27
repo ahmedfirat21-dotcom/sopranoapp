@@ -679,7 +679,7 @@ export function PlusMenu({
           <View style={st.chipRow}>
             <Ionicons name="lock-closed" size={12} color="#475569" />
             <Text style={[st.chipLabel, { color: '#475569', marginLeft: 4 }]}>Tema</Text>
-            <View style={st.tierPill}><Text style={st.tierPillText}>Plus+</Text></View>
+            <View style={st.tierPill}><Text style={st.tierPillText}>Plus</Text></View>
           </View>
         )}
 
@@ -698,7 +698,7 @@ export function PlusMenu({
               </Pressable>
             )
           ) : (
-            <View style={st.tierPill}><Text style={st.tierPillText}>Plus+</Text></View>
+            <View style={st.tierPill}><Text style={st.tierPillText}>Plus</Text></View>
           )}
         </View>
         <View style={st.sep} />

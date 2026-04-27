@@ -1,12 +1,14 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TextInput, Pressable, ScrollView, ActivityIndicator, Image, Animated, Easing, Dimensions, PanResponder } from 'react-native';
+import { View, Text, StyleSheet, TextInput, Pressable, ScrollView, ActivityIndicator, Image, Animated, Easing, Dimensions, PanResponder, InteractionManager } from 'react-native';
 
 const { height: SCREEN_H } = Dimensions.get('window');
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { safeGoBack } from '../constants/navigation';
-import { RoomService, getRoomLimits, type TierName } from '../services/database';
+import { RoomService } from '../services/database';
+import { getRoomLimits } from '../constants/tiers';
+import type { TierName } from '../types';
 import { GamificationService } from '../services/gamification';
 import { Colors, Shadows } from '../constants/theme';
 import { showToast } from '../components/Toast';
@@ -21,6 +23,9 @@ import type { FollowUser } from '../services/friendship';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { containsBadWords } from '../constants/badwords';
+import { AUDIENCE_OPTIONS, audienceModeToFields, getAudienceMode, type AudienceMode } from '../constants/audience';
+import { TagService, normalizeTag, MAX_TAGS_PER_ROOM, SUGGESTED_TAGS } from '../services/tags';
+import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
 
 // ★ 2026-04-21: Oda adı sanitization — whitespace normalize, HTML strip, length cap.
 //   Küfür kontrolü ayrı (canProceed'de çalışıyor).
@@ -60,11 +65,7 @@ const CATEGORIES = [
   { id: 'other', label: 'Diğer',      icon: 'ellipsis-horizontal',  color: '#64748B', desc: 'Kategorilere sığmayan her şey' },
 ];
 
-const ROOM_TYPES = [
-  { id: 'open',   label: 'Açık',    icon: 'globe-outline',      desc: 'Herkes serbestçe katılabilir',   minTier: 'Free' },
-  { id: 'closed', label: 'Şifreli', icon: 'lock-closed-outline', desc: 'Sadece şifreyi bilenler girer',  minTier: 'Free' },
-  { id: 'invite', label: 'Davetli', icon: 'mail-outline',        desc: 'Sadece senin davet ettiklerin', minTier: 'Plus' },
-] as const;
+// ★ 2026-04-25: ROOM_TYPES kaldırıldı → constants/audience.ts AUDIENCE_OPTIONS
 
 const SPEAKING_MODES = [
   { id: 'free_for_all',    label: 'Serbest',     icon: 'people',            desc: 'Herkes istediğinde konuşur',       minTier: 'Free' as const },
@@ -147,14 +148,19 @@ export default function CreateRoomScreen() {
   // ── Form state ──
   const [name, setName] = useState('');
   const [category, setCategory] = useState('chat');
-  const [type, setType] = useState<'open' | 'closed' | 'invite'>('open');
+  // ★ 2026-04-25: Faz 4.3 — kategori altı serbest etiketler (max 3, optional)
+  const [tags, setTags] = useState<string[]>([]);
+  const [tagDraft, setTagDraft] = useState('');
+  // ★ 2026-04-25: Unified audience mode (public/followers/password/invite).
+  //   Eski type + followersOnly state'leri tek select'e indi. Submit'te
+  //   audienceModeToFields() ile backend kolonlarına dönüştürülür.
+  const [audienceMode, setAudienceMode] = useState<AudienceMode>('public');
   const [mode, setMode] = useState<'audio' | 'video'>('audio');
   const [description, setDescription] = useState('');
   const [password, setPassword] = useState('');
   const [speakingMode, setSpeakingMode] = useState<'free_for_all' | 'permission_only' | 'selected_only'>('permission_only');
   const [entryFee, setEntryFee] = useState(0);
   const [donationsEnabled, setDonationsEnabled] = useState(false);
-  const [followersOnly, setFollowersOnly] = useState(false);
   // ★ 2026-04-20: +18 oda kurulumda set edilebilsin (eskiden sonradan PlusMenu'den yapmak gerekiyordu)
   const [ageRestricted, setAgeRestricted] = useState(false);
   // ★ 2026-04-20: Dil filtresi — Plus+ (PlusMenu ile parite)
@@ -169,6 +175,21 @@ export default function CreateRoomScreen() {
   // ★ YENİ: welcome_message + rules (agent raporu eksik tespit etti)
   const [welcomeMessage, setWelcomeMessage] = useState('');
   const [rules, setRules] = useState('');
+
+  // ★ 2026-04-26: Planlı oda — opsiyonel başlangıç zamanı.
+  //   null = hemen başlat (default). Date = belirtilen zamanda canlıya çık.
+  //   ?schedule=1 query param'i varsa default 1 saat sonra setlenir (QuickCreateSheet "Planla" akışı).
+  const searchParams = useLocalSearchParams<{ schedule?: string }>();
+  const [scheduledAt, setScheduledAt] = useState<Date | null>(() => {
+    if (searchParams?.schedule === '1') {
+      const t = new Date();
+      t.setHours(t.getHours() + 1, 0, 0, 0);
+      return t;
+    }
+    return null;
+  });
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
 
   const [creating, setCreating] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
@@ -207,11 +228,15 @@ export default function CreateRoomScreen() {
     ]).start(() => safeGoBack(router));
   };
 
+  // ★ 2026-04-28: Clubhouse pattern — pan tüm wizard sheet'e bağlı.
+  //   Wizard içeriği değişken (ScrollView/TextInput/...); capture eşiği yüksek (>25)
+  //   tutularak küçük scroll/tap'ler engellenmez, belirgin aşağı swipe sheet'i kapatır.
   const panResponder = useRef(PanResponder.create({
     onStartShouldSetPanResponder: () => false,
-    // ★ 2026-04-23: Yalnızca aşağı yönde drag — yukarı rubber-band panel altında
-    //   boş alan açıyordu (panel top:insets.top+30'da zaten olabildiğince yukarıda).
-    onMoveShouldSetPanResponder: (_, gs) => gs.dy > 6 && Math.abs(gs.dy) > Math.abs(gs.dx),
+    onStartShouldSetPanResponderCapture: () => false,
+    onMoveShouldSetPanResponder: (_, gs) => gs.dy > 8 && Math.abs(gs.dy) > Math.abs(gs.dx),
+    onMoveShouldSetPanResponderCapture: (_, gs) => gs.dy > 25 && Math.abs(gs.dy) > Math.abs(gs.dx) * 2,
+    onPanResponderTerminationRequest: () => false,
     onPanResponderMove: (_, gs) => {
       translateY.setValue(Math.max(0, gs.dy));
     },
@@ -237,12 +262,18 @@ export default function CreateRoomScreen() {
         const d = JSON.parse(raw);
         if (d?.name) setName(d.name);
         if (d?.category) setCategory(d.category);
-        if (d?.type) setType(d.type);
+        if (Array.isArray(d?.tags)) setTags(d.tags.slice(0, MAX_TAGS_PER_ROOM));
+        // ★ 2026-04-25: Unified audience — yeni draft `audienceMode`, eski draft `type+followersOnly`
+        if (d?.audienceMode) {
+          setAudienceMode(d.audienceMode);
+        } else if (d?.type || typeof d?.followersOnly === 'boolean') {
+          // Eski draft → unified mode'a dönüştür
+          setAudienceMode(getAudienceMode({ type: d.type, followers_only: d.followersOnly, has_password: !!d.password }));
+        }
         if (d?.description) setDescription(d.description);
         if (d?.speakingMode) setSpeakingMode(d.speakingMode);
         if (typeof d?.entryFee === 'number') setEntryFee(d.entryFee);
         if (typeof d?.donationsEnabled === 'boolean') setDonationsEnabled(d.donationsEnabled);
-        if (typeof d?.followersOnly === 'boolean') setFollowersOnly(d.followersOnly);
         if (typeof d?.ageRestricted === 'boolean') setAgeRestricted(d.ageRestricted);
         if (d?.roomLanguage) setRoomLanguage(d.roomLanguage);
         if (typeof d?.slowModeSeconds === 'number') setSlowModeSeconds(d.slowModeSeconds);
@@ -261,15 +292,15 @@ export default function CreateRoomScreen() {
     if (!draftRestoredRef.current) return;
     const t = setTimeout(() => {
       const draft = {
-        name, category, type, description, speakingMode, entryFee,
-        donationsEnabled, followersOnly, ageRestricted, roomLanguage,
+        name, category, tags, audienceMode, description, speakingMode, entryFee,
+        donationsEnabled, ageRestricted, roomLanguage,
         slowModeSeconds, selectedTheme, musicLink, welcomeMessage, rules,
       };
       AsyncStorage.setItem(DRAFT_KEY, JSON.stringify(draft)).catch(() => {});
     }, 500);
     return () => clearTimeout(t);
-  }, [name, category, type, description, speakingMode, entryFee, donationsEnabled,
-      followersOnly, ageRestricted, roomLanguage, slowModeSeconds, selectedTheme,
+  }, [name, category, tags, audienceMode, description, speakingMode, entryFee, donationsEnabled,
+      ageRestricted, roomLanguage, slowModeSeconds, selectedTheme,
       musicLink, welcomeMessage, rules]);
 
   // ── Slide animasyonu (step geçişi) ──
@@ -312,7 +343,7 @@ export default function CreateRoomScreen() {
     switch (step) {
       case 'basics': return nameValidation.ok;
       case 'category': return !!category;
-      case 'access': return type !== 'closed' || password.trim().length >= 4;
+      case 'access': return audienceMode !== 'password' || password.trim().length >= 4;
       case 'speaking': return !!speakingMode;
       case 'welcome': return !containsBadWords(welcomeMessage) && !containsBadWords(rules);
       case 'visual': return isValidMusicUrl(musicLink);
@@ -320,7 +351,7 @@ export default function CreateRoomScreen() {
       case 'review': return true;
       default: return true;
     }
-  }, [step, nameValidation.ok, category, type, password, speakingMode, welcomeMessage, rules, musicLink]);
+  }, [step, nameValidation.ok, category, audienceMode, password, speakingMode, welcomeMessage, rules, musicLink]);
 
   // ── Bugünkü oda açma sayısı (göster özet ekranında) ──
   const [todayRoomCount, setTodayRoomCount] = useState(0);
@@ -345,8 +376,10 @@ export default function CreateRoomScreen() {
   const handleCreate = async () => {
     if (!firebaseUser || creating) return;
 
-    if (!limits.allowedTypes.includes(type)) {
-      showToast({ title: 'Yetersiz Üyelik', message: 'Bu oda tipini açmak için üyeliğini yükselt.', type: 'warning' });
+    // ★ 2026-04-25: audienceMode → backend type ile tier limit kontrolü
+    const _audienceFields = audienceModeToFields(audienceMode, password);
+    if (!limits.allowedTypes.includes(_audienceFields.type)) {
+      showToast({ title: 'Yetersiz Üyelik', message: 'Bu erişim modunu kullanmak için üyeliğini yükselt.', type: 'warning' });
       return;
     }
     if (limits.dailyRooms < 999 && todayRoomCount >= limits.dailyRooms) {
@@ -388,17 +421,21 @@ export default function CreateRoomScreen() {
         throw new Error('Oda adı uygun değil — 2-60 karakter ve uygunsuz kelime içermemeli.');
       }
 
+      // ★ 2026-04-25: Unified audience → backend kolonlarına dönüştür
+      const audienceFields = audienceModeToFields(audienceMode, password);
+
       const room = await RoomService.create(
         firebaseUser.uid,
         {
-          name: cleanName, category, type,
+          name: cleanName, category,
+          type: audienceFields.type,
           description: description.trim() || undefined,
           mode,
           speaking_mode: speakingMode,
-          room_password: type === 'closed' ? password.trim() : undefined,
+          room_password: audienceFields.room_password || undefined,
           entry_fee_sp: entryFee > 0 ? entryFee : undefined,
           donations_enabled: donationsEnabled || undefined,
-          followers_only: followersOnly || undefined,
+          followers_only: audienceFields.followers_only || undefined,
           age_restricted: ageRestricted || undefined,
           room_language: roomLanguage !== 'tr' ? roomLanguage : undefined,
           slow_mode_seconds: slowModeSeconds > 0 ? slowModeSeconds : undefined,
@@ -408,16 +445,34 @@ export default function CreateRoomScreen() {
           card_image_url: uploadedCardUrl || undefined,
           welcome_message: welcomeMessage.trim() || undefined,
           rules: rules.trim() || undefined,
+          scheduled_at: scheduledAt ? scheduledAt.toISOString() : undefined,
         },
         tier
       );
-      showToast({ title: '🎉 Oda Hazır!', message: `"${cleanName}" odası açıldı.`, type: 'success' });
-      try { await GamificationService.onRoomCreate(firebaseUser.uid); } catch {}
+      // ★ Faz 4.3 — etiketleri ayrı tabloda kaydet (best-effort, fire-and-forget)
+      if (tags.length > 0) {
+        TagService.setRoomTags(room.id, tags).catch(() => {});
+      }
+      const isScheduled = !!(scheduledAt && scheduledAt.getTime() > Date.now());
+      const scheduledLabel = isScheduled && scheduledAt
+        ? scheduledAt.toLocaleString('tr-TR', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })
+        : '';
+      showToast({
+        title: isScheduled ? '📅 Oda Planlandı!' : '🎉 Oda Hazır!',
+        message: isScheduled
+          ? `"${cleanName}" odası ${scheduledLabel} tarihinde başlayacak. "Odalarım"dan başlatabilirsin.`
+          : `"${cleanName}" odası açıldı.`,
+        type: 'success',
+      });
+      // ★ PERF FIX: fire-and-forget — SP hesaplama navigasyonu bloklamamalı
+      GamificationService.onRoomCreate(firebaseUser.uid).catch(() => {});
       // ★ 2026-04-21: Başarılı oluşturma → draft temizle (tekrar açılışta eski state gelmesin)
       AsyncStorage.removeItem(DRAFT_KEY).catch(() => {});
       setCreatedRoomId(room.id);
       setCreatedRoomName(cleanName);
-      setShowInviteModal(true);
+      // ★ PERF FIX: Modal açılışını bir sonraki frame'e erte — oda oluşturma state
+      // güncellemeleri (setCreating(false) vs.) ile modal mount'u çakışmasın.
+      requestAnimationFrame(() => setShowInviteModal(true));
     } catch (err: any) {
       // ★ 2026-04-21: Detaylı hata gösterimi — "Hata" yerine kullanıcıya net neden bildir.
       const rawMsg = err?.message || 'Oda oluşturulamadı.';
@@ -435,14 +490,20 @@ export default function CreateRoomScreen() {
   const handleInviteFriends = async (selectedUsers: FollowUser[]) => {
     if (!createdRoomId || !firebaseUser || !profile) return;
     const hostName = profile.display_name || 'Birisi';
-    let successCount = 0;
-    for (const user of selectedUsers) {
-      try {
-        const result = await RoomAccessService.inviteUser(createdRoomId, user.id, firebaseUser.uid);
-        if (result.success) successCount++;
+    // ★ PERF FIX: Sıralı (sequential) yerine paralel davet gönderimi.
+    // Eski kod: for-of + await → N kişi × 4 DB sorgusu = sıralı bekleme, FPS drop.
+    // Yeni kod: Promise.allSettled ile tümünü aynı anda gönder.
+    // ★ Cache: inviterName + roomName bir kez hesaplanıp tüm çağrılara geçirilir.
+    const inviteCache = { inviterName: hostName, roomName: createdRoomName };
+    const results = await Promise.allSettled(
+      selectedUsers.map(async (user) => {
+        const result = await RoomAccessService.inviteUser(createdRoomId, user.id, firebaseUser.uid, inviteCache);
+        // Push notification fire-and-forget — sonucunu beklemeye gerek yok
         PushService.sendRoomInvite(user.id, hostName, createdRoomName, createdRoomId).catch(() => {});
-      } catch {}
-    }
+        return result.success;
+      })
+    );
+    const successCount = results.filter(r => r.status === 'fulfilled' && r.value).length;
     showToast({ title: 'Davetler Gönderildi!', message: `${successCount} arkadaşına davet gönderildi.`, type: 'success' });
   };
 
@@ -494,7 +555,20 @@ export default function CreateRoomScreen() {
     </View>
   );
 
-  // 2. KATEGORİ
+  // 2. KATEGORİ + ETİKETLER (Faz 4.3)
+  const addTag = (raw: string) => {
+    const norm = normalizeTag(raw);
+    if (!norm) return;
+    if (tags.includes(norm)) return;
+    if (tags.length >= MAX_TAGS_PER_ROOM) {
+      showToast({ title: `En fazla ${MAX_TAGS_PER_ROOM} etiket`, type: 'warning' });
+      return;
+    }
+    setTags(prev => [...prev, norm]);
+    setTagDraft('');
+  };
+  const removeTag = (t: string) => setTags(prev => prev.filter(x => x !== t));
+
   const renderCategory = () => (
     <View>
       <View style={w.categoryGrid}>
@@ -513,19 +587,79 @@ export default function CreateRoomScreen() {
       {category && (
         <Text style={w.categoryHint}>{CATEGORIES.find(c => c.id === category)?.desc}</Text>
       )}
+
+      {/* ★ Faz 4.3 — Etiket chip input (max 3) */}
+      <View style={w.tagSection}>
+        <Text style={w.tagSectionLabel}>ETİKETLER (opsiyonel)</Text>
+        <Text style={w.tagSectionHint}>
+          Odanı 2-30 karakterlik en fazla {MAX_TAGS_PER_ROOM} etiketle tarif et — keşfette aramayı kolaylaştırır.
+        </Text>
+        <View style={w.tagChipsRow}>
+          {tags.map(t => (
+            <Pressable key={t} onPress={() => removeTag(t)} style={w.tagChipActive}>
+              <Text style={w.tagChipActiveText}>#{t}</Text>
+              <Ionicons name="close" size={12} color="#F1F5F9" style={{ marginLeft: 4 }} />
+            </Pressable>
+          ))}
+          {tags.length < MAX_TAGS_PER_ROOM && (
+            <View style={w.tagInputWrap}>
+              <Text style={w.tagInputHash}>#</Text>
+              <TextInput
+                value={tagDraft}
+                onChangeText={setTagDraft}
+                onSubmitEditing={() => addTag(tagDraft)}
+                placeholder="örn. anime"
+                placeholderTextColor="rgba(148,163,184,0.5)"
+                autoCapitalize="none"
+                autoCorrect={false}
+                maxLength={30}
+                style={w.tagInput}
+                returnKeyType="done"
+              />
+            </View>
+          )}
+        </View>
+        {/* Suggestion chips */}
+        {tags.length < MAX_TAGS_PER_ROOM && (
+          <View style={w.tagSuggestRow}>
+            {SUGGESTED_TAGS.filter(s => !tags.includes(s)).slice(0, 8).map(s => (
+              <Pressable key={s} onPress={() => addTag(s)} style={w.tagChipSuggest}>
+                <Text style={w.tagChipSuggestText}>+ {s}</Text>
+              </Pressable>
+            ))}
+          </View>
+        )}
+      </View>
     </View>
   );
 
-  // 3. ERİŞİM (tip + şifre)
+  // 3. ERİŞİM — unified audience select
+  // ★ 2026-04-25: 3 mod (open/closed/invite) + ayrı followers_only toggle yerine
+  //   tek 4-modlu select. invite Plus+, diğerleri Free.
   const renderAccess = () => (
     <View>
-      {ROOM_TYPES.map(rt => {
-        const locked = !isTierEnough(tier, rt.minTier);
-        const active = type === rt.id;
+      {AUDIENCE_OPTIONS.map(opt => {
+        // ★ 2026-04-27: 'invite' VE 'followers' modu Plus+ tier gerektiriyor.
+        //   followers = "Sadece Arkadaşlar" — premium oda yönetim aracı.
+        const requiredTier: TierName | null = (opt.mode === 'invite' || opt.mode === 'followers') ? 'Plus' : null;
+        const locked = requiredTier ? !isTierEnough(tier, requiredTier) : false;
+        const active = audienceMode === opt.mode;
         return (
           <Pressable
-            key={rt.id}
-            onPress={() => { if (!locked) setType(rt.id as any); else UpsellService.onRoomTypeLocked(tier, rt.minTier as any); }}
+            key={opt.mode}
+            onPress={() => {
+              if (locked) {
+                if (requiredTier) UpsellService.onRoomTypeLocked(tier, requiredTier as any);
+                return;
+              }
+              setAudienceMode(opt.mode);
+              // ★ 2026-04-27: Audience moduna göre yavaş mod öner — sadece kullanıcı default'taysa.
+              //   Şifreli oda: 5sn (spam koruması). Diğer modlar: 0sn (gerek yok).
+              if (slowModeSeconds === 0 && opt.mode === 'password') {
+                setSlowModeSeconds(5);
+                showToast({ title: '⏱️ Yavaş Mod Önerildi', message: 'Şifreli odada 5sn yavaş mod açıldı (spam koruması). Aşağıdan kapatabilirsin.', type: 'info' });
+              }
+            }}
             style={[w.accessRow, active && w.accessRowActive, locked && { opacity: 0.5 }]}
             android_ripple={{ color: 'transparent' }}
           >
@@ -536,25 +670,25 @@ export default function CreateRoomScreen() {
                 style={StyleSheet.absoluteFillObject}
               />
             )}
-            <Ionicons name={rt.icon as any} size={22} color={active ? Colors.teal : '#94A3B8'} style={{ marginRight: 2 }} />
+            <Ionicons name={opt.icon} size={22} color={active ? Colors.teal : '#94A3B8'} style={{ marginRight: 2 }} />
             <View style={{ flex: 1 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Text style={[w.accessLabel, active && { color: Colors.teal }]}>{rt.label}</Text>
-                {locked && (
+                <Text style={[w.accessLabel, active && { color: Colors.teal }]}>{opt.label}</Text>
+                {locked && requiredTier && (
                   <View style={w.lockBadge}>
                     <Ionicons name="lock-closed" size={9} color="#F59E0B" />
-                    <Text style={w.lockText}>{rt.minTier}+</Text>
+                    <Text style={w.lockText}>{requiredTier}+</Text>
                   </View>
                 )}
               </View>
-              <Text style={w.accessDesc}>{rt.desc}</Text>
+              <Text style={w.accessDesc}>{opt.description}</Text>
             </View>
             {active && <Ionicons name="checkmark-circle" size={22} color={Colors.teal} />}
           </Pressable>
         );
       })}
 
-      {type === 'closed' && (
+      {audienceMode === 'password' && (
         <View style={{ marginTop: 20 }}>
           <Text style={w.sublabel}>Şifre (min 4 karakter)</Text>
           <TextInput
@@ -581,7 +715,8 @@ export default function CreateRoomScreen() {
             { id: 'de', label: '🇩🇪 DE' },
           ].map(lang => {
             const active = roomLanguage === lang.id;
-            const locked = lang.id !== 'tr' && !isTierEnough(tier, 'Plus');
+            // ★ 2026-04-24: Dil filtresi Free'ye açıldı — temel demografik tercih, tier-lock olmamalı
+            const locked = false;
             return (
               <Pressable
                 key={lang.id}
@@ -608,13 +743,13 @@ export default function CreateRoomScreen() {
         </View>
       </View>
 
-      {/* ★ 2026-04-20: Yavaş Mod (Plus+) — mesajlar arası minimum saniye */}
+      {/* ★ 2026-04-24: Yavaş Mod — Free'ye açıldı (moderasyon herkese lazım, spam'den korur) */}
       <View style={{ marginTop: 14 }}>
-        <Text style={w.sublabel}>Yavaş mod (Plus+)</Text>
+        <Text style={w.sublabel}>Yavaş mod</Text>
         <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
           {[0, 5, 15, 30, 60].map(s => {
             const active = slowModeSeconds === s;
-            const locked = s > 0 && !isTierEnough(tier, 'Plus');
+            const locked = false;
             return (
               <Pressable
                 key={s}
@@ -947,25 +1082,8 @@ export default function CreateRoomScreen() {
         )}
       </Pressable>
 
-      {/* Sadece arkadaşlar */}
-      <Pressable
-        onPress={() => { if (isTierEnough(tier, 'Pro')) setFollowersOnly(!followersOnly); else UpsellService.onFeatureLocked(tier, 'Pro'); }}
-        style={w.toggleRow}
-        android_ripple={{ color: 'transparent' }}
-      >
-        <Ionicons name="people" size={20} color={followersOnly ? Colors.teal : '#94A3B8'} />
-        <View style={{ flex: 1 }}>
-          <Text style={w.toggleLabel}>Sadece arkadaşlarım</Text>
-          <Text style={w.toggleDesc}>Sadece arkadaş listendekiler girebilir</Text>
-        </View>
-        {!isTierEnough(tier, 'Pro') ? (
-          <View style={w.lockBadge}><Ionicons name="lock-closed" size={9} color="#F59E0B" /><Text style={w.lockText}>Pro+</Text></View>
-        ) : (
-          <View style={[w.switchTrack, followersOnly && w.switchTrackActive]}>
-            <View style={[w.switchKnob, followersOnly && w.switchKnobActive]} />
-          </View>
-        )}
-      </Pressable>
+      {/* ★ 2026-04-25: "Sadece arkadaşlarım" toggle'ı kaldırıldı —
+           audienceMode='followers' ile birleştirildi (Erişim adımında). */}
 
       {/* ★ 2026-04-20: +18 İçerik (Plus+) */}
       <Pressable
@@ -979,7 +1097,7 @@ export default function CreateRoomScreen() {
           <Text style={w.toggleDesc}>Yetişkinlere özel oda — 18 yaş altı giremez</Text>
         </View>
         {!isTierEnough(tier, 'Plus') ? (
-          <View style={w.lockBadge}><Ionicons name="lock-closed" size={9} color="#F59E0B" /><Text style={w.lockText}>Plus+</Text></View>
+          <View style={w.lockBadge}><Ionicons name="lock-closed" size={9} color="#F59E0B" /><Text style={w.lockText}>Plus</Text></View>
         ) : (
           <View style={[w.switchTrack, ageRestricted && w.switchTrackActive]}>
             <View style={[w.switchKnob, ageRestricted && w.switchKnobActive]} />
@@ -993,7 +1111,8 @@ export default function CreateRoomScreen() {
   const renderReview = () => {
     const themeObj = ROOM_THEMES.find(t => t.id === selectedTheme);
     const catObj = CATEGORIES.find(c => c.id === category);
-    const typeObj = ROOM_TYPES.find(rt => rt.id === type);
+    // ★ 2026-04-25: typeObj → audienceObj (unified mode'dan label/icon)
+    const audienceObj = AUDIENCE_OPTIONS.find(o => o.mode === audienceMode);
     const smObj = SPEAKING_MODES.find(s => s.id === speakingMode);
 
     return (
@@ -1025,10 +1144,10 @@ export default function CreateRoomScreen() {
                 <Text style={[w.chipMiniText, { color: catObj.color }]}>{catObj.label}</Text>
               </View>
             )}
-            {typeObj && (
+            {audienceObj && audienceObj.mode !== 'public' && (
               <View style={w.chipMini}>
-                <Ionicons name={typeObj.icon as any} size={9} color="#94A3B8" />
-                <Text style={w.chipMiniText}>{typeObj.label}</Text>
+                <Ionicons name={audienceObj.icon} size={9} color="#94A3B8" />
+                <Text style={w.chipMiniText}>{audienceObj.label}</Text>
               </View>
             )}
           </View>
@@ -1057,18 +1176,103 @@ export default function CreateRoomScreen() {
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
             style={StyleSheet.absoluteFillObject}
           />
+          {/* ★ 2026-04-25: Audience özeti — public dışı modlar göster */}
+          {audienceMode !== 'public' && (
+            <SummaryRow
+              icon="lock-closed"
+              label="Erişim"
+              value={AUDIENCE_OPTIONS.find(o => o.mode === audienceMode)?.label || ''}
+            />
+          )}
           <SummaryRow icon="mic" label="Konuşma" value={smObj?.label || ''} />
           {welcomeMessage && <SummaryRow icon="chatbubble-ellipses" label="Karşılama" value={welcomeMessage} />}
           {rules && <SummaryRow icon="document-text" label="Kurallar" value="Tanımlandı" />}
           {entryFee > 0 && <SummaryRow icon="diamond" label="Giriş" value={`${entryFee} SP`} />}
           {donationsEnabled && <SummaryRow icon="heart" label="Bağış" value="Aktif" />}
-          {followersOnly && <SummaryRow icon="people" label="Erişim" value="Sadece arkadaşlar" />}
           {ageRestricted && <SummaryRow icon="warning" label="Yaş Sınırı" value="+18" />}
           {roomLanguage !== 'tr' && <SummaryRow icon="language" label="Dil" value={roomLanguage.toUpperCase()} />}
           {slowModeSeconds > 0 && <SummaryRow icon="timer" label="Yavaş Mod" value={`${slowModeSeconds}s`} />}
           {selectedTheme && <SummaryRow icon="color-palette" label="Tema" value={themeObj?.name || ''} />}
           {musicLink.trim() !== '' && <SummaryRow icon="musical-notes" label="Müzik Linki" value="Ekli" />}
           {backgroundImage && <SummaryRow icon="image" label="Arka Plan" value="Yüklendi" />}
+        </View>
+
+        {/* ★ 2026-04-26: Planlı oda — hemen vs sonra başlat */}
+        <View style={w.scheduleBlock}>
+          <Text style={w.scheduleTitle}>Ne Zaman Başlasın?</Text>
+          <View style={w.scheduleToggleRow}>
+            <Pressable
+              onPress={() => setScheduledAt(null)}
+              style={[w.scheduleToggle, !scheduledAt && w.scheduleToggleActive]}
+            >
+              <Ionicons name="flash" size={14} color={!scheduledAt ? Colors.teal : '#94A3B8'} />
+              <Text style={[w.scheduleToggleText, !scheduledAt && { color: Colors.teal }]}>Hemen</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => {
+                if (!scheduledAt) {
+                  // Default: 1 saat sonra
+                  const t = new Date();
+                  t.setHours(t.getHours() + 1, 0, 0, 0);
+                  setScheduledAt(t);
+                }
+              }}
+              style={[w.scheduleToggle, !!scheduledAt && w.scheduleToggleActive]}
+            >
+              <Ionicons name="calendar" size={14} color={scheduledAt ? Colors.teal : '#94A3B8'} />
+              <Text style={[w.scheduleToggleText, !!scheduledAt && { color: Colors.teal }]}>Sonra</Text>
+            </Pressable>
+          </View>
+          {scheduledAt && (
+            <View style={w.scheduleDateRow}>
+              <Pressable onPress={() => setShowDatePicker(true)} style={w.scheduleDateBtn}>
+                <Ionicons name="calendar-outline" size={14} color="#F1F5F9" />
+                <Text style={w.scheduleDateText}>
+                  {scheduledAt.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', weekday: 'short' })}
+                </Text>
+              </Pressable>
+              <Pressable onPress={() => setShowTimePicker(true)} style={w.scheduleDateBtn}>
+                <Ionicons name="time-outline" size={14} color="#F1F5F9" />
+                <Text style={w.scheduleDateText}>
+                  {scheduledAt.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
+                </Text>
+              </Pressable>
+            </View>
+          )}
+          {scheduledAt && (
+            <Text style={w.scheduleHint}>
+              ℹ️ Oda planlanan zamana kadar kapalı kalacak. "Odalarım" ekranından manuel başlatabilirsin.
+            </Text>
+          )}
+          {showDatePicker && (
+            <DateTimePicker
+              value={scheduledAt || new Date()}
+              mode="date"
+              minimumDate={new Date()}
+              onChange={(event: DateTimePickerEvent, date?: Date) => {
+                setShowDatePicker(false);
+                if (event.type === 'set' && date && scheduledAt) {
+                  const merged = new Date(scheduledAt);
+                  merged.setFullYear(date.getFullYear(), date.getMonth(), date.getDate());
+                  setScheduledAt(merged);
+                }
+              }}
+            />
+          )}
+          {showTimePicker && (
+            <DateTimePicker
+              value={scheduledAt || new Date()}
+              mode="time"
+              onChange={(event: DateTimePickerEvent, date?: Date) => {
+                setShowTimePicker(false);
+                if (event.type === 'set' && date && scheduledAt) {
+                  const merged = new Date(scheduledAt);
+                  merged.setHours(date.getHours(), date.getMinutes(), 0, 0);
+                  setScheduledAt(merged);
+                }
+              }}
+            />
+          )}
         </View>
 
         <View style={w.capInfo}>
@@ -1108,7 +1312,10 @@ export default function CreateRoomScreen() {
         >
           <Pressable style={{ flex: 1 }} onPress={() => closeSheetRef.current()} />
         </Animated.View>
-        <Animated.View style={[w.sheetPanel, { top: Math.max(insets.top, 20) + 10, transform: [{ translateY }] }]}>
+        <Animated.View
+          style={[w.sheetPanel, { top: Math.max(insets.top, 20) + 10, transform: [{ translateY }] }]}
+          {...panResponder.panHandlers}
+        >
           <LinearGradient
             colors={['#4a5668', '#37414f', '#232a35']}
             locations={[0, 0.35, 1]}
@@ -1116,7 +1323,8 @@ export default function CreateRoomScreen() {
             style={StyleSheet.absoluteFillObject}
           />
           <View style={{ flex: 1 }}>
-              <View {...panResponder.panHandlers} style={w.sheetHandleWrap}>
+              {/* ★ 2026-04-28: Handle artık görsel — pan tüm sheet'te (Clubhouse). */}
+              <View style={w.sheetHandleWrap}>
                 <View style={w.sheetHandleBar} />
               </View>
               <View style={[w.header, w.sheetHeader]}>
@@ -1185,7 +1393,10 @@ export default function CreateRoomScreen() {
 
       {/* ★ Sheet panel — slides up, drag-to-close
            Tema: RoomChatDrawer ile bire bir — gri-gradient + #95a1ae border + subtle top shadow */}
-      <Animated.View style={[w.sheetPanel, { top: Math.max(insets.top, 20) + 10, transform: [{ translateY }] }]}>
+      <Animated.View
+        style={[w.sheetPanel, { top: Math.max(insets.top, 20) + 10, transform: [{ translateY }] }]}
+        {...panResponder.panHandlers}
+      >
         <LinearGradient
           colors={['#4a5668', '#37414f', '#232a35']}
           locations={[0, 0.35, 1]}
@@ -1193,8 +1404,8 @@ export default function CreateRoomScreen() {
           style={StyleSheet.absoluteFillObject}
         />
         <View style={{ flex: 1 }}>
-          {/* ★ Drag handle — RoomChatDrawer stili (36x4, rgba(255,255,255,0.2)) */}
-          <View {...panResponder.panHandlers} style={w.sheetHandleWrap}>
+          {/* ★ 2026-04-28: Handle artık görsel — pan tüm sheet'te (Clubhouse). */}
+          <View style={w.sheetHandleWrap}>
             <View style={w.sheetHandleBar} />
           </View>
 
@@ -1334,12 +1545,22 @@ export default function CreateRoomScreen() {
           roomId={createdRoomId || undefined}
           onClose={() => {
             setShowInviteModal(false);
-            if (createdRoomId) router.replace(`/room/${createdRoomId}` as any);
+            // ★ PERF FIX: Modal kapanış animasyonu bitene kadar navigasyonu ertele
+            // Aksi halde room ekranı mount olurken modal fade-out çakışır → FPS drop
+            if (createdRoomId) {
+              InteractionManager.runAfterInteractions(() => {
+                router.replace(`/room/${createdRoomId}` as any);
+              });
+            }
           }}
           onInvite={async (selectedUsers) => {
             await handleInviteFriends(selectedUsers);
             setShowInviteModal(false);
-            if (createdRoomId) router.replace(`/room/${createdRoomId}` as any);
+            if (createdRoomId) {
+              InteractionManager.runAfterInteractions(() => {
+                router.replace(`/room/${createdRoomId}` as any);
+              });
+            }
           }}
         />
         </View>
@@ -1544,6 +1765,53 @@ const w = StyleSheet.create({
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
   },
+  // ★ Faz 4.3 tag input
+  tagSection: { marginTop: 22, paddingHorizontal: 8 },
+  tagSectionLabel: {
+    fontSize: 10, fontWeight: '900', color: '#5CBFB5',
+    letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 6,
+  },
+  tagSectionHint: {
+    fontSize: 11, color: 'rgba(148,163,184,0.7)',
+    lineHeight: 15, marginBottom: 10,
+  },
+  tagChipsRow: {
+    flexDirection: 'row', flexWrap: 'wrap', gap: 8, alignItems: 'center',
+  },
+  tagChipActive: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 10, paddingVertical: 6,
+    borderRadius: 12,
+    backgroundColor: 'rgba(20,184,166,0.18)',
+    borderWidth: 1, borderColor: 'rgba(20,184,166,0.4)',
+  },
+  tagChipActiveText: {
+    fontSize: 12, fontWeight: '700', color: '#F1F5F9',
+  },
+  tagInputWrap: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 10, paddingVertical: 4,
+    borderRadius: 12, minWidth: 110,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
+  },
+  tagInputHash: { fontSize: 13, color: 'rgba(148,163,184,0.7)', marginRight: 2 },
+  tagInput: {
+    flex: 1, color: '#F1F5F9', fontSize: 12.5, fontWeight: '600',
+    paddingVertical: 4, minHeight: 28,
+  },
+  tagSuggestRow: {
+    flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10,
+  },
+  tagChipSuggest: {
+    paddingHorizontal: 8, paddingVertical: 4,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderWidth: 0.8, borderColor: 'rgba(255,255,255,0.1)',
+  },
+  tagChipSuggestText: {
+    fontSize: 10.5, fontWeight: '600', color: 'rgba(203,213,225,0.7)',
+  },
 
   // Erişim / speaking row — kart hissi derinlik
   accessRow: {
@@ -1690,6 +1958,38 @@ const w = StyleSheet.create({
     borderWidth: 1, borderColor: 'rgba(20,184,166,0.25)',
   },
   capText: { fontSize: 12, fontWeight: '700', color: Colors.teal, letterSpacing: 0.2 },
+
+  // ★ 2026-04-26: Planlı oda — Hemen / Sonra başlat
+  scheduleBlock: {
+    marginTop: 14, padding: 14, borderRadius: 14,
+    backgroundColor: 'rgba(15,23,42,0.5)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
+  },
+  scheduleTitle: {
+    fontSize: 12, fontWeight: '900', letterSpacing: 1.2, textTransform: 'uppercase',
+    color: '#94A3B8', marginBottom: 10,
+  },
+  scheduleToggleRow: { flexDirection: 'row', gap: 8 },
+  scheduleToggle: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    paddingVertical: 10, paddingHorizontal: 12, borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+  },
+  scheduleToggleActive: {
+    backgroundColor: 'rgba(20,184,166,0.12)',
+    borderColor: 'rgba(20,184,166,0.45)',
+  },
+  scheduleToggleText: { fontSize: 12, fontWeight: '700', color: '#94A3B8' },
+  scheduleDateRow: { flexDirection: 'row', gap: 8, marginTop: 10 },
+  scheduleDateBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    paddingVertical: 10, borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
+  },
+  scheduleDateText: { fontSize: 13, fontWeight: '700', color: '#F1F5F9' },
+  scheduleHint: { fontSize: 11, color: '#94A3B8', marginTop: 8, lineHeight: 16 },
 
   // Footer
   footer: {

@@ -684,7 +684,7 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
                   key={opt.mode}
                   style={[p.pill, active && p.pillActive, (locked || blockedByLock) && { opacity: 0.45 }]}
                   onPress={() => {
-                    if (locked) { showToast({ title: 'Plus+ Gerekli', message: opt.mode === 'invite' ? 'Davetli oda Plus üyelikle açılır.' : 'Sadece arkadaşlar modu Plus üyelikle açılır.', type: 'warning' }); return; }
+                    if (locked) { showToast({ title: 'Plus Üyelik Gerekli', message: opt.mode === 'invite' ? 'Davetli oda Plus üyelikle açılır.' : 'Sadece arkadaşlar modu Plus üyelikle açılır.', type: 'warning' }); return; }
                     if (blockedByLock) { showToast({ title: '🔒 Oda Kilitli', message: 'Erişim modunu değiştirmek için önce kilidi kapat.', type: 'warning' }); return; }
                     // ★ 2026-04-27 FIX: 'password' modu seçildiyse şifre olmadan kaydetme.
                     //   Önceki bug: type='closed' + password=null → checkAccess'te public davranıyordu.
