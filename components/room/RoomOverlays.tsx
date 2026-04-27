@@ -146,6 +146,9 @@ type PlusMenuProps = {
   roomId?: string;
   hostId?: string;
   roomType?: string;
+  // ★ 2026-04-27: Asıl sahip dışarda iken devralan geçici host. Kritik aksiyonlar
+  // (silme, dondurma, boost, oda ayarları) gizlenir; moderasyon erişimi açık.
+  isTempHost?: boolean;
 };
 
 const ROLE_META: Record<string, { label: string; color: string; icon: string }> = {
@@ -292,6 +295,7 @@ export function PlusMenu({
   bottomInset = 14,
   onLeaveRoom, deviceConfig,
   roomId: _roomId, hostId: _hostId, roomType: _roomType,
+  isTempHost = false,
 }: PlusMenuProps) {
   const slideAnim = useRef(new Animated.Value(PANEL_W)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -348,7 +352,7 @@ export function PlusMenu({
       await ModerationService.unbanFromRoom(_roomId, ban.user_id, _hostId);
       setInlineBans(prev => prev.filter(b => b.id !== ban.id));
       showToast({ title: '✅ Ban Kaldırıldı', type: 'success' });
-    } catch { showToast({ title: 'Hata', type: 'error' }); }
+    } catch { showToast({ title: 'Ban Kaldırılamadı', message: 'Bu kullanıcının banı kaldırılamadı.', type: 'error' }); }
     finally { setProcessingIds(p => { const n = new Set(p); n.delete(ban.id); return n; }); }
   }, [_roomId, _hostId]);
 
@@ -458,15 +462,14 @@ export function PlusMenu({
           </>
         )}
         <View style={st.sep} />
-        <SettingChips icon="diamond-outline" label="Giriş Ücreti (SP)" options={ENTRY_FEES.map(f => ({ id: f, label: f === 0 ? 'Ücretsiz' : `${f}` }))} value={sc.entryFee} onSelect={can('Pro') ? sc.onEntryFeeChange : undefined} locked={!can('Pro')} lockTier="Pro" />
-        <View style={st.sep} />
         <SettingToggle icon={isRoomLocked ? 'lock-closed' : 'lock-open-outline'} label="Odayı Kilitle (yeni giriş yok)" value={!!isRoomLocked} onValueChange={onRoomLock ? () => onRoomLock() : undefined} accent="#F59E0B" locked={!can('Plus')} lockTier="Plus" />
         <View style={st.sep} />
         <SettingToggle icon="warning-outline" label="+18 İçerik" value={sc.ageRestricted} onValueChange={can('Plus') ? sc.onAgeRestrictedChange : undefined} accent="#EF4444" locked={!can('Plus')} lockTier="Plus" />
         <View style={st.sep} />
         <SettingChips icon="language-outline" label="Dil Filtresi" options={LANGUAGES.map(l => ({ id: l.id, label: l.label }))} value={sc.roomLanguage} onSelect={can('Plus') ? sc.onLanguageChange : undefined} locked={!can('Plus')} lockTier="Plus" />
         <View style={st.sep} />
-        <SettingToggle icon="people-outline" label="Sadece Arkadaşlar" value={sc.followersOnly} onValueChange={can('Pro') ? sc.onToggleFollowersOnly : undefined} accent="#D4AF37" locked={!can('Pro')} lockTier="Pro" />
+        {/* ★ 2026-04-27: Pro → Plus indirildi — oda yönetim aracı (kim girebilir engeli). */}
+        <SettingToggle icon="people-outline" label="Sadece Arkadaşlar" value={sc.followersOnly} onValueChange={can('Plus') ? sc.onToggleFollowersOnly : undefined} accent="#A78BFA" locked={!can('Plus')} lockTier="Plus" />
       </View>
     );
   };
@@ -569,12 +572,16 @@ export function PlusMenu({
   // ~~3️⃣ MODERASYON~~ KALDIRILDI — tüm toggle'lar "Giriş & Erişim" menüsüne taşındı.
   // Banlılar & İstekler zaten ayrı top-level item.
 
-  // 4️⃣ MONETİZASYON — Giriş Ücreti "Giriş & Erişim"e taşındı, burada sadece Bağış
+  // 4️⃣ MONETİZASYON — Giriş Ücreti + Bağış toggle (2026-04-27: tek kategoride birleşti).
   const renderMonetization = () => {
     if (!sc) return null;
     return (
       <View style={st.subWrap}>
-        <SettingToggle icon="heart-outline" label="Bağış" value={sc.donationsEnabled} onValueChange={can('Pro') ? sc.onDonationsToggle : undefined} accent="#EC4899" locked={!can('Pro')} lockTier="Pro" />
+        {/* Giriş Ücreti — odaya girmek için ödenen SP (Pro+) */}
+        <SettingChips icon="diamond-outline" label="Giriş Ücreti (SP)" options={ENTRY_FEES.map(f => ({ id: f, label: f === 0 ? 'Ücretsiz' : `${f}` }))} value={sc.entryFee} onSelect={can('Pro') ? sc.onEntryFeeChange : undefined} locked={!can('Pro')} lockTier="Pro" />
+        <View style={st.sep} />
+        {/* Bağış kabul etme — host'a SP bağışı (Pro+) */}
+        <SettingToggle icon="heart-outline" label="Bağış Kabul Et" value={sc.donationsEnabled} onValueChange={can('Pro') ? sc.onDonationsToggle : undefined} accent="#EC4899" locked={!can('Pro')} lockTier="Pro" />
       </View>
     );
   };
@@ -801,8 +808,8 @@ export function PlusMenu({
     if (_roomId) {
       items.push({ id: 'bans', icon: 'ban-outline', label: 'Banlılar', accent: '#EF4444', onPress: () => { if (expandedId !== 'bans') loadBans(); toggle('bans'); }, expandable: true, renderContent: renderBans });
     }
-    // 4. Bağış Ayarları (sadece Bağış toggle kaldı)
-    items.push({ id: 'monetization', icon: 'heart-outline', label: 'Bağış Ayarları', accent: '#EC4899', onPress: () => toggle('monetization'), expandable: true, renderContent: renderMonetization });
+    // 4. Para Kazanma — Giriş Ücreti + Bağış (2026-04-27: Giriş Ücreti buraya taşındı)
+    items.push({ id: 'monetization', icon: 'cash-outline', label: 'Para Kazanma', accent: '#EC4899', onPress: () => toggle('monetization'), expandable: true, renderContent: renderMonetization });
     // 5. Görsel & Tema
     items.push({ id: 'visual', icon: 'color-palette-outline', label: 'Görsel & Tema', accent: '#F59E0B', onPress: () => toggle('visual'), expandable: true, renderContent: renderVisual });
   } else if (isMod) {
@@ -827,10 +834,10 @@ export function PlusMenu({
     items.push({ id: 'share', icon: 'share-social-outline', label: 'Oda Linkini Paylaş', accent: '#3B82F6', onPress: () => { onShareLink(); onClose(); } });
   }
 
-  // 7. İstatistikler & Boost
-  if (isOwner && onRoomStats && can('Pro')) {
+  // 7. İstatistikler & Boost — geçici host göremez (asıl sahibin yetkisi)
+  if (isOwner && !isTempHost && onRoomStats && can('Pro')) {
     items.push({ id: 'stats', icon: 'stats-chart-outline', label: 'İstatistikler & Boost', accent: '#3B82F6', onPress: () => toggle('stats'), expandable: true, renderContent: renderStats });
-  } else if (isOwner && onBoostRoom && can('Plus')) {
+  } else if (isOwner && !isTempHost && onBoostRoom && can('Plus')) {
     items.push({ id: 'boost', icon: 'rocket-outline', label: 'Keşfette Öne Çıkar', accent: '#F59E0B', onPress: () => { onBoostRoom(); onClose(); } });
   }
 
@@ -848,8 +855,8 @@ export function PlusMenu({
     items.push({ id: 'donate', icon: 'heart', label: 'Bağış Yap', desc: 'Host\'a SP bağışla', accent: '#EF4444', onPress: () => { onDonate(); onClose(); } });
   }
 
-  // Dondur & Sil (owner, direkt aksiyon)
-  if (isOwner && sc?.onFreezeRoom) {
+  // Dondur & Sil (owner, direkt aksiyon) — geçici host yapamaz
+  if (isOwner && !isTempHost && sc?.onFreezeRoom) {
     items.push({ id: 'freeze', icon: 'snow-outline', label: 'Odayı Dondur', desc: 'Katılımcılar çıkar, sonra tekrar aç', accent: '#3B82F6', onPress: () => { onClose(); sc.onFreezeRoom?.(); } });
   }
 
@@ -865,7 +872,8 @@ export function PlusMenu({
     });
   }
 
-  if (isOwner && onDeleteRoom) {
+  // Odayı Sil — yalnız asıl sahip; geçici host göremez
+  if (isOwner && !isTempHost && onDeleteRoom) {
     items.push({ id: 'delete', icon: 'trash-outline', label: 'Odayı Sil', desc: 'Kalıcı olarak siler, geri alınamaz', accent: '#EF4444', onPress: () => { onDeleteRoom(); onClose(); }, destructive: true });
   }
 

@@ -10,12 +10,38 @@ import { PushService } from './push';
 // ★ ARCH-3 FIX: Circular dependency kırıldı — shared utility import
 import { getBlockedUserIds } from './blocklist';
 import { hashPassword as hashRoomPassword } from './roomAccess';
+import { RateLimitService } from './rateLimit';
 import { getRoomLimits, isTierAtLeast, getTierLevel } from '../constants/tiers';
 import type {
   Profile, Room, RoomParticipant, RoomSettings,
   SubscriptionTier,
 } from '../types';
 import { migrateLegacyTier, normalizeRole } from '../types';
+
+/**
+ * ★ 2026-04-27: Geçici host tespiti.
+ *   Oda asıl sahibi room_settings.original_host_id'de saklanır (yaratılışta set edilir).
+ *   Asıl sahip çıkıp transfer_host_atomic devraldığında rooms.host_id = yeni temp host olur.
+ *   Geçici host: aktif host_id'yi taşıyor ama asıl sahip değil.
+ *
+ * Bu helper UI'da kritik ayarları gizlemek + service guard'ları için kullanılır.
+ */
+export function isTempHostUser(
+  room: { host_id: string; room_settings?: any } | null | undefined,
+  userId: string | null | undefined,
+): boolean {
+  if (!room || !userId) return false;
+  const orig = (room.room_settings || {}).original_host_id as string | undefined;
+  if (!orig) return false;
+  return room.host_id === userId && orig !== userId;
+}
+
+/** Asıl sahip dışarıda mı? (geçici host devir aldı) */
+export function isOriginalHostAway(room: { host_id: string; room_settings?: any } | null | undefined): boolean {
+  if (!room) return false;
+  const orig = (room.room_settings || {}).original_host_id as string | undefined;
+  return !!orig && orig !== room.host_id;
+}
 
 // ★ D2 FIX: Yetki kontrol yardımcısı — owner veya moderator olmalı
 async function _requireRole(
@@ -35,9 +61,72 @@ async function _requireRole(
 }
 
 // ============================================
+// FAZ 4.3 — Tag enrichment helper
+// ============================================
+// Listelenen odalara tek sorguyla `tags?: string[]` enjekte et.
+async function enrichRoomsWithTags<T extends { id: string }>(rooms: T[]): Promise<T[]> {
+  if (rooms.length === 0) return rooms;
+  try {
+    const ids = rooms.map(r => r.id);
+    const { data, error } = await supabase
+      .from('room_tags')
+      .select('room_id, tag, created_at')
+      .in('room_id', ids)
+      .order('created_at', { ascending: true });
+    if (error || !data) return rooms;
+    const map: Record<string, string[]> = {};
+    for (const row of data as any[]) {
+      if (!map[row.room_id]) map[row.room_id] = [];
+      if (map[row.room_id].length < 3) map[row.room_id].push(row.tag);
+    }
+    return rooms.map(r => ({ ...r, tags: map[r.id] || [] }));
+  } catch {
+    return rooms;
+  }
+}
+
+// ============================================
+// FAZ 4.2 — TRENDING SKOR (pure, IMMUTABLE)
+// ============================================
+// SQL tarafındaki public.room_trending_score(...) fonksiyonunun TS karşılığı.
+// İki taraf tutarlı kalsın diye formül ortak: (listener*10 + gifts*5) / ln(age+2) * boost_mul.
+const TRENDING_BOOST_MULT = 1.5;
+function trendingScoreOf(r: Room): number {
+  const listeners = r.listener_count || 0;
+  const gifts = (r as any).total_gifts || 0;
+  const createdAt = r.created_at ? new Date(r.created_at).getTime() : Date.now();
+  const ageMin = Math.max((Date.now() - createdAt) / 60_000, 0);
+  const boostExp = (r as any).boost_expires_at;
+  const boostActive = !!(boostExp && new Date(boostExp).getTime() > Date.now());
+  const denom = Math.max(Math.log(ageMin + 2), 1);
+  const base = (listeners * 10 + gifts * 5) / denom;
+  return base * (boostActive ? TRENDING_BOOST_MULT : 1);
+}
+
+// ============================================
 // ODA İŞLEMLERİ
 // ============================================
 export const RoomService = {
+  /**
+   * ★ 2026-04-26: Tier yükseltilince mevcut odaların expires_at'ı yeni tier'a göre yeniden hesaplanır.
+   *   Pro/GodMaster (durationHours=0) → expires_at NULL (sınırsız).
+   *   Plus → şu andan 12 saat sonrasına ayarlanır (yeni süre).
+   *   Free'e düşürmede expires_at değiştirmez (kullanıcı mağdur olmasın, mevcut odalar süreli kalır).
+   */
+  async refreshExpiresForTierChange(hostId: string, newTier: SubscriptionTier): Promise<void> {
+    const limits = getRoomLimits(newTier);
+    // Free'e düşürmede dokunma — kullanıcı mevcut süreyi kullanmaya devam etsin
+    if (newTier === 'Free') return;
+    const newExpiresAt = limits.durationHours > 0
+      ? new Date(Date.now() + limits.durationHours * 60 * 60 * 1000).toISOString()
+      : null;
+    await supabase
+      .from('rooms')
+      .update({ expires_at: newExpiresAt })
+      .eq('host_id', hostId)
+      .eq('is_live', true);
+  },
+
   /**
    * ★ 2026-04-23: Host'un diğer canlı odalarını dondur — tek anda tek aktif oda kuralı.
    * wakeUpRoom ve create'in başında çağrılır. Excluded roomId dışındaki tüm is_live=true
@@ -167,14 +256,19 @@ export const RoomService = {
     if (error) throw error;
     let rooms = (data || []) as Room[];
 
-    const TRENDING_THRESHOLD = 5; // 5+ dinleyici = trending
+    const TRENDING_THRESHOLD = 5; // 5+ dinleyici = trending tier eşiği
 
     // ★ Model A: 3 katmanlı sıralama
     const isBoosted = (r: Room) => (r as any).boost_expires_at && (r as any).boost_expires_at > now;
     const isTrending = (r: Room) => (r.listener_count || 0) >= TRENDING_THRESHOLD || ((r as any).total_gifts || 0) > 0;
 
-    // Katman içi sıralama: boost_score → listener_count → created_at
-    const sortWithin = (a: Room, b: Room) => {
+    // ★ 2026-04-25: Faz 4.2 — Trending tier içinde gerçek skor sıralaması.
+    //   Eski: listener_count DESC + boost_score → durağan; saatlik 8 dinleyici 5 dakikalık 7 dinleyiciyi yenerdi.
+    //   Yeni: room_trending_score (SQL pure fonksiyonun TS karşılığı) — taze + popüler kombinasyon.
+    const trendingScore = trendingScoreOf;
+
+    // Boosted/Others için eski katman içi sıralama (boost_score → listener → created_at)
+    const sortLegacy = (a: Room, b: Room) => {
       const aBoost = (a as any).boost_score || 0;
       const bBoost = (b as any).boost_score || 0;
       if (aBoost !== bBoost) return bBoost - aBoost;
@@ -184,9 +278,17 @@ export const RoomService = {
       return (b.created_at || '').localeCompare(a.created_at || '');
     };
 
-    const boosted = rooms.filter(isBoosted).sort(sortWithin);
-    let trending = rooms.filter(r => !isBoosted(r) && isTrending(r)).sort(sortWithin);
-    let others = rooms.filter(r => !isBoosted(r) && !isTrending(r)).sort(sortWithin);
+    // Trending katmanı: skor DESC → tie-break'te boost_score → created_at
+    const sortByScore = (a: Room, b: Room) => {
+      const aScore = trendingScore(a);
+      const bScore = trendingScore(b);
+      if (aScore !== bScore) return bScore - aScore;
+      return (b.created_at || '').localeCompare(a.created_at || '');
+    };
+
+    const boosted = rooms.filter(isBoosted).sort(sortLegacy);
+    let trending = rooms.filter(r => !isBoosted(r) && isTrending(r)).sort(sortByScore);
+    let others = rooms.filter(r => !isBoosted(r) && !isTrending(r)).sort(sortLegacy);
 
     // Kullanıcı kategori tercihi: trending ve others içinde tercih edilen kategorileri öne al
     if (userId && (trending.length + others.length) > 1) {
@@ -236,7 +338,63 @@ export const RoomService = {
       } catch { /* blocklist servisi yoksa sessiz devam */ }
     }
 
+    // ★ Faz 4.3 — etiketleri enjekte et (tek toplu sorgu)
+    rooms = await enrichRoomsWithTags(rooms);
+
     return rooms;
+  },
+
+  /**
+   * ★ 2026-04-25: Faz 4.2 — Top-N trending odalar.
+   * "🔥 Trend" carousel widget'ı için. RPC önce dener, başarısızsa
+   * client-side getLive() + skor sıralaması fallback'i.
+   * Block + private filtreleme client-side yapılır (RPC saf veri döner).
+   *
+   * @param userId  Block/private filtreleme için (optional)
+   * @param limit   Dönecek oda sayısı (default 10, max 50)
+   */
+  async getTrending(userId?: string, limit: number = 10): Promise<Room[]> {
+    const safeLimit = Math.max(1, Math.min(limit, 50));
+
+    // Önce RPC dene — sıralama DB tarafında, hızlı
+    try {
+      const { data: scoreRows, error: rpcErr } = await supabase
+        .rpc('get_trending_rooms', { p_limit: safeLimit * 3 }); // block sonrası filtreyle azalsa diye 3x al
+      if (!rpcErr && Array.isArray(scoreRows) && scoreRows.length > 0) {
+        const ids = scoreRows.map((r: any) => r.room_id).filter(Boolean);
+        if (ids.length > 0) {
+          const { data: roomsData } = await supabase
+            .from('rooms')
+            .select('*, host:profiles!host_id(*)')
+            .in('id', ids);
+          if (roomsData) {
+            // RPC sıra korunsun — id → score map ile yeniden sırala
+            const scoreMap = new Map<string, number>(scoreRows.map((r: any) => [r.room_id, Number(r.trending_score) || 0]));
+            let result = (roomsData as Room[])
+              .sort((a, b) => (scoreMap.get(b.id) || 0) - (scoreMap.get(a.id) || 0));
+
+            // Block + private filtreleri
+            if (userId) {
+              result = await this._filterPrivateRooms(result, userId);
+              try {
+                const blocked = await getBlockedUserIds(userId);
+                if (blocked.size > 0) result = result.filter(r => !blocked.has(r.host_id));
+              } catch {}
+            }
+            // ★ Faz 4.3 — etiketleri enjekte et
+            result = await enrichRoomsWithTags(result);
+            return result.slice(0, safeLimit);
+          }
+        }
+      }
+    } catch { /* RPC yoksa fallback'e düş */ }
+
+    // Fallback — getLive (zaten skor sıralı) ilk N
+    const live = await this.getLive(userId);
+    return live
+      .filter(r => (r.listener_count || 0) > 0 || ((r as any).total_gifts || 0) > 0)
+      .sort((a, b) => trendingScoreOf(b) - trendingScoreOf(a))
+      .slice(0, safeLimit);
   },
 
   /** Kullanıcının kategori tercihlerini getir */
@@ -307,23 +465,30 @@ export const RoomService = {
 
     const uniqueHostIds = [...new Set(privateHostIds)];
 
-    // Tek sorguda tüm takip durumlarını al
+    // ★ 2026-04-26 FIX: Bidirectional friendship — herhangi bir yönde accepted yeterli
+    //   Önceki sorgu sadece viewer→host yönüne bakıyordu; host→viewer accepted'larda
+    //   gizli profil odası gözükmüyordu. Facebook tarzı: iki yönde de tara.
+    const filter = uniqueHostIds.map(h => `and(user_id.eq.${viewerId},friend_id.eq.${h}),and(user_id.eq.${h},friend_id.eq.${viewerId})`).join(',');
     const { data: followData } = await supabase
       .from('friendships')
-      .select('friend_id')
-      .eq('user_id', viewerId)
-      .in('friend_id', uniqueHostIds)
+      .select('user_id, friend_id')
+      .or(filter)
       .eq('status', 'accepted');
 
-    const followedHostIds = new Set((followData || []).map((r: any) => r.friend_id));
+    const friendHostIds = new Set<string>();
+    (followData || []).forEach((r: any) => {
+      // Hangi yöndeyse, viewer olmayan tarafı arkadaş kabul et
+      if (r.user_id === viewerId) friendHostIds.add(r.friend_id);
+      else if (r.friend_id === viewerId) friendHostIds.add(r.user_id);
+    });
 
     return rooms.filter(room => {
       // Public oda → göster
       if (!room.host || !(room.host as any).is_private) return true;
       // Kendi odam → göster
       if (room.host_id === viewerId) return true;
-      // Gizli profil oda → takip ediyorsam göster
-      return followedHostIds.has(room.host_id);
+      // Gizli profil oda → arkadaşımsa göster (çift yönlü)
+      return friendHostIds.has(room.host_id);
     });
   },
 
@@ -545,6 +710,13 @@ export const RoomService = {
     },
     tier: SubscriptionTier = 'Free'
   ): Promise<Room> {
+    // ★ Faz 2.2 — Server-side rate limit (5 oda / 1 saat). Fail-open if RPC missing.
+    const rl = await RateLimitService.checkAndIncrement('room_create', hostId);
+    if (!rl.allowed) {
+      const wait = rl.resetAt ? Math.max(1, Math.ceil((rl.resetAt.getTime() - Date.now()) / 60000)) : 60;
+      throw new Error(`${rl.message || 'Çok hızlı oda kuruyorsun.'} (${wait} dk sonra tekrar dene)`);
+    }
+
     // ★ 2026-04-23 KRİTİK: Yeni oda açmadan önce host'un diğer canlı odalarını dondur —
     //   tek anda tek aktif oda kuralı. Yeni roomId henüz yok; tüm canlı odaları dondur.
     await this._freezeOtherLiveRooms(hostId);
@@ -602,6 +774,10 @@ export const RoomService = {
       : null; // Sınırsız süre
 
     const roomSettings: RoomSettings = {};
+    // ★ 2026-04-24 KRİTİK FIX: Oda oluşturulurken original_host_id kaydet —
+    //   host çıkıp birisi claim ettiğinde, asıl sahibin geri dönüşte
+    //   otomatik olarak rolünü geri alabilmesi için gerekli.
+    (roomSettings as any).original_host_id = hostId;
     if (options.welcome_message) roomSettings.welcome_message = options.welcome_message;
     if (options.rules) roomSettings.rules = options.rules;
     if (options.speaking_mode) roomSettings.speaking_mode = options.speaking_mode;
@@ -627,6 +803,11 @@ export const RoomService = {
       }
     }
 
+    // ★ Planlı oda kontrolü — scheduled_at gelecek bir zamansa is_live=false
+    //   Sahibi manuel olarak goLive() ile başlatana kadar oda canlıya çıkmaz.
+    const isScheduledFuture = !!(options.scheduled_at && new Date(options.scheduled_at).getTime() > Date.now());
+    const initialIsLive = !isScheduledFuture;
+
     // Tüm kolonlarla dene, eksik kolon varsa minimal fallback
     let data: any;
     let error: any;
@@ -638,7 +819,7 @@ export const RoomService = {
       category: options.category || 'chat',
       type: options.type || 'open',
       host_id: hostId,
-      is_live: true,
+      is_live: initialIsLive,
       listener_count: 0,
       max_speakers: limits.maxSpeakers,
       max_listeners: limits.maxListeners,
@@ -683,7 +864,7 @@ export const RoomService = {
           category: options.category || 'chat',
           type: options.type || 'open',
           host_id: hostId,
-          is_live: true,
+          is_live: initialIsLive,
           listener_count: 0,
           max_speakers: limits.maxSpeakers,
           max_listeners: limits.maxListeners,
@@ -705,10 +886,65 @@ export const RoomService = {
       is_muted: false,
     });
 
-    // ★ 2026-04-23: listener_count = 1 (host) garantile
-    await this.syncListenerCount((data as Room).id);
+    // ★ 2026-04-23: listener_count = 1 (host) garantile (sadece canlı odalarda)
+    if (initialIsLive) {
+      await this.syncListenerCount((data as Room).id);
+    }
 
     return data as Room;
+  },
+
+  /**
+   * Planlı odayı canlıya al — sahibi manuel başlattığında çağrılır.
+   * Diğer canlı odaları otomatik dondurur (single host kuralı).
+   */
+  async goLive(roomId: string, hostId: string): Promise<Room> {
+    // Odayı çek
+    const { data: room, error: fetchErr } = await supabase
+      .from('rooms')
+      .select('*, host:profiles!host_id(*)')
+      .eq('id', roomId)
+      .single();
+    if (fetchErr || !room) throw new Error('Oda bulunamadı');
+    if ((room as any).host_id !== hostId) throw new Error('Bu odayı sadece sahibi başlatabilir');
+    if ((room as any).is_live) return room as Room; // Zaten canlı — no-op
+
+    // Tek anda tek canlı oda kuralı
+    await this._freezeOtherLiveRooms(hostId, roomId);
+
+    // is_live=true + scheduled_at temizle (history için kalsın istiyorsa room_settings.scheduled_at silinmesin)
+    const { data: updated, error: updErr } = await supabase
+      .from('rooms')
+      .update({ is_live: true })
+      .eq('id', roomId)
+      .select('*, host:profiles!host_id(*)')
+      .single();
+    if (updErr) throw updErr;
+
+    // listener_count senkronize et
+    await this.syncListenerCount(roomId);
+
+    return updated as Room;
+  },
+
+  /**
+   * Sahibinin planlı odalarını listele (henüz canlıya çıkmamış, scheduled_at gelecekte).
+   * myrooms ekranında "Planlı Odalarım" bölümü için.
+   */
+  async listScheduledByHost(hostId: string): Promise<Room[]> {
+    const nowIso = new Date().toISOString();
+    const { data, error } = await supabase
+      .from('rooms')
+      .select('*, host:profiles!host_id(*)')
+      .eq('host_id', hostId)
+      .eq('is_live', false)
+      .gt('room_settings->>scheduled_at', nowIso)
+      .order('room_settings->>scheduled_at', { ascending: true });
+    if (error) {
+      if (__DEV__) console.warn('[Room] listScheduledByHost hata:', error.message);
+      return [];
+    }
+    return (data || []) as Room[];
   },
 
   /** Odaya katıl */
@@ -998,6 +1234,14 @@ export const RoomService = {
     const { data: room } = await supabase.from('rooms').select('host_id, room_settings').eq('id', roomId).single();
     if (!room || room.host_id !== hostId) throw new Error('Bu odanın sahibi değilsiniz');
 
+    // ★ 2026-04-27: Geçici host koruması — devir olmuşsa (asıl sahip ≠ aktif host) ve
+    // çağıran kişi asıl sahip değilse, kritik ayarları değiştiremez. DB trigger
+    // (v58) backstop sağlar; burada ön-kontrol net hata mesajı için.
+    const origHost = (room.room_settings as any)?.original_host_id as string | undefined;
+    if (origHost && origHost !== room.host_id && hostId !== origHost) {
+      throw new Error('Geçici host kritik oda ayarlarını değiştiremez. Bu yetki yalnız odanın asıl sahibine aittir.');
+    }
+
     const stripHtml = (s: string) => s.replace(/<[^>]*>/g, '');
     const dbUpdates: any = {};
     if (updates.name !== undefined) {
@@ -1044,8 +1288,14 @@ export const RoomService = {
 
   /** Odayı sil (kalıcı oda) */
   async deleteRoom(roomId: string, hostId: string): Promise<void> {
-    const { data: room } = await supabase.from('rooms').select('host_id').eq('id', roomId).single();
+    const { data: room } = await supabase.from('rooms').select('host_id, room_settings').eq('id', roomId).single();
     if (!room || room.host_id !== hostId) throw new Error('Bu odanın sahibi değilsiniz');
+
+    // ★ 2026-04-27: Geçici host odayı silemez. Asıl sahip dönüp claim etmeli.
+    const origHost = (room.room_settings as any)?.original_host_id as string | undefined;
+    if (origHost && origHost !== room.host_id && hostId !== origHost) {
+      throw new Error('Geçici host odayı silemez. Bu yetki yalnız odanın asıl sahibine aittir.');
+    }
 
     // Katılımcıları temizle
     await supabase.from('room_participants').delete().eq('room_id', roomId);
@@ -1386,9 +1636,10 @@ export const RoomService = {
       .eq('room_id', roomId)
       .eq('user_id', userId)
       .maybeSingle();
+    // ★ v67 FIX: last_seen_at da güncelle — sahneye çıkınca stale cleanup'a yakalanmasın
     await supabase
       .from('room_participants')
-      .update({ role: 'speaker', is_muted: false })
+      .update({ role: 'speaker', is_muted: false, last_seen_at: new Date().toISOString() })
       .eq('room_id', roomId)
       .eq('user_id', userId);
     if (currentPart && (currentPart.role === 'listener' || currentPart.role === 'spectator')) {
@@ -1690,7 +1941,18 @@ export const RoomService = {
       throw new Error('Bu odanın zaten bir sahibi var. Host değiştirme yapılamaz.');
     }
 
-    // 4. Güvenli: Atomic RPC (v19). UPDATE + host_id tek transaction'da,
+    // 4. ★ 2026-04-24 KRİTİK FIX: Claim öncesinde original_host_id'yi kaydet —
+    //   asıl sahibin geri dönüşünde otomatik reclaim yapabilmesi için.
+    const currentSettings = (roomInfo.room_settings || {}) as any;
+    if (!currentSettings.original_host_id) {
+      currentSettings.original_host_id = roomInfo.host_id;
+      await supabase
+        .from('rooms')
+        .update({ room_settings: currentSettings })
+        .eq('id', roomId);
+    }
+
+    // 5. Güvenli: Atomic RPC (v19). UPDATE + host_id tek transaction'da,
     //    role escalation trigger'ı set_config ile yetkilendirilmiş şekilde geçer.
     const { error: rpcErr } = await supabase.rpc('claim_host', {
       p_room_id: roomId,

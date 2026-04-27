@@ -15,15 +15,22 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Shadows } from '../../constants/theme';
-import { RoomService, getRoomLimits, type Room } from '../../services/database';
+import { RoomService, type Room } from '../../services/database';
+import { isTempHostUser } from '../../services/room';
+import { getRoomLimits } from '../../constants/tiers';
 import { RoomFollowService } from '../../services/roomFollow';
 import { ModerationService } from '../../services/moderation';
 import { isTierAtLeast, TIER_DEFINITIONS } from '../../constants/tiers';
+import { AUDIENCE_OPTIONS, audienceModeToFields, getAudienceMode, type AudienceMode } from '../../constants/audience';
+import { TagService, normalizeTag, MAX_TAGS_PER_ROOM, SUGGESTED_TAGS } from '../../services/tags';
 import StatusAvatar from '../StatusAvatar';
+import AttachRoomToClubButton from './AttachRoomToClubButton';
 import { showToast } from '../Toast';
+import PremiumAlert, { type AlertButton } from '../PremiumAlert';
 import { supabase } from '../../constants/supabase';
 import { useRouter } from 'expo-router';
 import type { SubscriptionTier } from '../../types';
+import RoomRecordingsSheet from './RoomRecordingsSheet';
 
 const { width: W } = Dimensions.get('window');
 const PANEL_W = W * 0.88;
@@ -42,6 +49,11 @@ const TABS: { id: TabId; label: string; icon: string }[] = [
   { id: 'advanced', label: 'Gelişmiş', icon: 'rocket-outline' },
   { id: 'followers', label: 'Takipçiler', icon: 'heart-outline' },
 ];
+
+// ★ 2026-04-27: Geçici host (asıl sahip dışarda iken devralan) yalnız moderasyon
+// + takipçiler tab'larını görür. Genel/Görsellik/Monetizasyon/Gelişmiş/Konuşma
+// tab'larında oda adı/temasi/ücreti/silme gibi kritik alanlar var.
+const TEMP_HOST_ALLOWED_TABS: TabId[] = ['moderation', 'followers'];
 
 // Tema tanımları â€” RoomSettingsSheet ile birebir aynı
 const ROOM_THEMES: Record<string, { name: string; colors: [string, string] }> = {
@@ -90,6 +102,8 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
   const [roomType, setRoomType] = useState<string>('open');
   const [roomPassword, setRoomPassword] = useState('');
   const [editingPassword, setEditingPassword] = useState(false);
+  // ★ 2026-04-25: Unified audience mode — UI'da tek select, backend'e dönüştürülür
+  const [audienceMode, setAudienceMode] = useState<AudienceMode>('public');
 
   // Settings â€” Konuşma
   const [speakingMode, setSpeakingMode] = useState<string>('permission_only');
@@ -119,8 +133,28 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
   const [followerCount, setFollowerCount] = useState(0);
   const [loadingFollowers, setLoadingFollowers] = useState(false);
 
+  // ★ Faz 4.3 — etiketler
+  const [tags, setTags] = useState<string[]>([]);
+  const [tagDraft, setTagDraft] = useState('');
+  const [tagSaving, setTagSaving] = useState(false);
+
+  // ★ Faz 6.2 — Kayıtları dinle sheet
+  const [showRecordingsSheet, setShowRecordingsSheet] = useState(false);
+
   const tier = (ownerTier || 'Free') as SubscriptionTier;
   const can = (req: SubscriptionTier) => isTierAtLeast(tier, req);
+
+  // ★ 2026-04-27: Geçici host'sa filtrelenmiş tab listesi + aktif tab koruması.
+  const isTempHost = isTempHostUser(room, hostId);
+  const visibleTabs = isTempHost
+    ? TABS.filter(t => TEMP_HOST_ALLOWED_TABS.includes(t.id))
+    : TABS;
+  // Geçici host yasaklı tab'a düşerse moderasyona zorla
+  useEffect(() => {
+    if (isTempHost && !TEMP_HOST_ALLOWED_TABS.includes(activeTab)) {
+      setActiveTab('moderation');
+    }
+  }, [isTempHost, activeTab]);
 
   // â˜… Slide animasyonu â€” RoomChatDrawer ile aynı pattern
   useEffect(() => {
@@ -180,6 +214,11 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
     setRoomType(room.type || 'open');
     setRoomPassword(rs.room_password || '');
     setEditingPassword(false);
+    setAudienceMode(getAudienceMode({
+      type: room.type,
+      followers_only: rs.followers_only,
+      has_password: !!rs.room_password,
+    }));
     setRoomLang(rs.room_language || 'tr');
     setAgeRestricted(rs.age_restricted || false);
     setThemeId((room as any).theme_id || null);
@@ -200,6 +239,9 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
       RoomFollowService.getFollowerCount(room.id),
     ]).then(([f, c]) => { setFollowers(f); setFollowerCount(c); })
       .finally(() => setLoadingFollowers(false));
+
+    // ★ Faz 4.3 — etiketleri yükle
+    TagService.getRoomTags(room.id).then(setTags).catch(() => setTags([]));
 
     // â˜… Moderasyon verilerini de yükle (ilk açılışta)
     loadModerationData();
@@ -237,6 +279,11 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
     setSpeakingMode(rs.speaking_mode || 'permission_only');
     setRoomType(room.type || 'open');
     setRoomPassword(rs.room_password || '');
+    setAudienceMode(getAudienceMode({
+      type: room.type,
+      followers_only: rs.followers_only,
+      has_password: !!rs.room_password,
+    }));
     setRoomLang(rs.room_language || 'tr');
     setAgeRestricted(rs.age_restricted || false);
     setThemeId((room as any).theme_id || null);
@@ -268,24 +315,183 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
       await RoomService.updateSettings(room.id, hostId, { room_settings: { [field]: value } });
       // â˜… Oda-içi kullanıcılara anında yansıt
       broadcastSettingsChange({ room_settings: { [field]: value } });
-    } catch (e: any) { showToast({ title: 'Hata', message: e.message || '', type: 'error' }); }
+    } catch (e: any) { showToast({ title: 'Ayar Güncellenemedi', message: e.message || 'Sunucuya ulaşılamadı.', type: 'error' }); }
   }, [room, hostId, broadcastSettingsChange]);
+
+  // ★ 2026-04-25: Unified audience değiştirici — type + followers_only + password
+  //   atomic: önce type, sonra room_settings (önceki tutarsız kombinasyonları temizler)
+  const handleAudienceChange = useCallback(async (newMode: AudienceMode, passwordValue?: string) => {
+    if (!room || !hostId) return;
+    const fields = audienceModeToFields(newMode, passwordValue ?? roomPassword);
+    // Optimistic UI
+    setAudienceMode(newMode);
+    setRoomType(fields.type);
+    setFollowersOnly(fields.followers_only);
+    if (newMode !== 'password') setRoomPassword('');
+
+    // ★ 2026-04-27: Audience moduna göre yavaş mod öner — sadece kullanıcı default'taysa (slowMode=0).
+    //   Kullanıcı manuel set ettiyse override etme.
+    //   Şifreli oda: 5sn (spam koruması — şifreyi bilen rastgele kişi spam atabilir)
+    //   Public/davetli/takipçi: 0sn (güvenli/küçük çevre, gerek yok)
+    if (slowMode === 0 && newMode === 'password') {
+      setSlowMode(5);
+      try {
+        await RoomService.updateSettings(room.id, hostId, { room_settings: { slow_mode_seconds: 5 } as any });
+        broadcastSettingsChange({ room_settings: { slow_mode_seconds: 5 } });
+        showToast({ title: '⏱️ Yavaş Mod Önerildi', message: 'Şifreli odada 5sn yavaş mod açıldı (spam koruması). Aşağıdan kapatabilirsin.', type: 'info' });
+      } catch { /* slowMode UI'sı zaten güncellendi, başarısızsa next save'de düzelir */ }
+    }
+    try {
+      // 1) rooms.type + rooms.room_password ATOMIC güncelle (column miras bug fix)
+      //    ★ 2026-04-27: Önceden sadece settings güncelleniyordu; column'da eski hash
+      //    kalıyordu → checkAccess column'u öncelikli okuyup yanlışlıkla şifre soruyordu.
+      await supabase.from('rooms').update({
+        type: fields.type,
+        room_password: fields.room_password || null,  // ★ Audience 'password' değilse null
+      }).eq('id', room.id);
+      // 2) room_settings içindeki followers_only + room_password atomic
+      await RoomService.updateSettings(room.id, hostId, {
+        room_settings: {
+          followers_only: fields.followers_only,
+          room_password: fields.room_password,
+        } as any,
+      });
+      broadcastSettingsChange({
+        type: fields.type,
+        room_settings: {
+          followers_only: fields.followers_only,
+          room_password: fields.room_password,
+        },
+      });
+    } catch (e: any) {
+      // Rollback
+      setAudienceMode(getAudienceMode({
+        type: room.type,
+        followers_only: (room.room_settings as any)?.followers_only,
+        has_password: !!(room.room_settings as any)?.room_password,
+      }));
+      showToast({ title: 'Erişim Değiştirilemedi', message: e.message || 'Sunucuya ulaşılamadı.', type: 'error' });
+    }
+  }, [room, hostId, roomPassword, slowMode, broadcastSettingsChange]);
 
   const handleRename = useCallback(async () => {
     if (!room || !roomName.trim() || roomName.trim() === room.name) { setEditingName(false); return; }
     try {
       await ModerationService.editRoomName(room.id, roomName.trim());
       broadcastSettingsChange({ name: roomName.trim() });
-      showToast({ title: 'âœ…', type: 'success' });
-    } catch { showToast({ title: 'Hata', type: 'error' }); setRoomName(room.name || ''); }
+      showToast({ title: '✏️ Oda Adı Güncellendi', type: 'success' });
+    } catch { showToast({ title: 'Ad Değiştirilemedi', message: 'Oda adı güncellenemedi.', type: 'error' }); setRoomName(room.name || ''); }
     setEditingName(false);
   }, [room, roomName, broadcastSettingsChange]);
+
+  // ★ Faz 4.3 — etiket ekle/çıkar; setRoomTags toplu replace yapar
+  const persistTags = useCallback(async (next: string[]) => {
+    if (!room) return;
+    setTagSaving(true);
+    try {
+      const r = await TagService.setRoomTags(room.id, next);
+      if (!r.success) showToast({ title: 'Etiket kaydedilemedi', message: r.error || '', type: 'error' });
+    } finally { setTagSaving(false); }
+  }, [room?.id]);
+
+  const handleAddTag = useCallback((raw: string) => {
+    const norm = normalizeTag(raw);
+    if (!norm) return;
+    if (tags.includes(norm)) { setTagDraft(''); return; }
+    if (tags.length >= MAX_TAGS_PER_ROOM) {
+      showToast({ title: `En fazla ${MAX_TAGS_PER_ROOM} etiket`, type: 'warning' });
+      return;
+    }
+    const next = [...tags, norm];
+    setTags(next);
+    setTagDraft('');
+    persistTags(next);
+  }, [tags, persistTags]);
+
+  const handleRemoveTag = useCallback((t: string) => {
+    const next = tags.filter(x => x !== t);
+    setTags(next);
+    persistTags(next);
+  }, [tags, persistTags]);
 
   const handleDelete = useCallback(async () => {
     if (!room || !hostId) return;
     try { await RoomService.deleteRoom(room.id, hostId); showToast({ title: 'Oda Silindi', type: 'success' }); onDeleted(); onClose(); }
     catch (e: any) { showToast({ title: 'Hata', message: e.message || '', type: 'error' }); }
   }, [room, hostId, onDeleted, onClose]);
+
+  // ★ Faz 6.2 — Oda kaydı (LiveKit Egress)
+  const [recordingId, setRecordingId] = useState<string | null>(null);
+  const [recordingLoading, setRecordingLoading] = useState(false);
+  const [recAlert, setRecAlert] = useState<{ visible: boolean; title: string; message: string; type?: 'info' | 'warning' | 'error' | 'success'; buttons?: AlertButton[] }>({ visible: false, title: '', message: '' });
+
+  // Asıl kayıt başlatma (consent sonrası)
+  const performStartRecording = useCallback(async () => {
+    if (!room || !hostId) return;
+    setRecordingLoading(true);
+    try {
+      const { RecordingService } = await import('../../services/recordings');
+      const r = await RecordingService.startEgress(room.id, hostId);
+      if (r.success && r.egressId) {
+        setRecordingId(r.egressId);
+        showToast({ title: '🔴 Kayıt Başladı', message: 'Tüm katılımcılar bildirildi.', type: 'success' });
+      } else {
+        showToast({ title: 'Kayıt başlatılamadı', message: r.error || '', type: 'error' });
+      }
+    } finally {
+      setRecordingLoading(false);
+    }
+  }, [room, hostId]);
+
+  // Asıl kayıt durdurma
+  const performStopRecording = useCallback(async () => {
+    if (!room || !hostId || !recordingId) return;
+    setRecordingLoading(true);
+    try {
+      const { RecordingService } = await import('../../services/recordings');
+      const r = await RecordingService.stopEgress(room.id, hostId, recordingId);
+      if (r.success) {
+        setRecordingId(null);
+        showToast({ title: '⏹ Kayıt Durduruldu', message: 'Kayıt birkaç dakika içinde işlenip listeye eklenir.', type: 'success' });
+      } else {
+        showToast({ title: 'Kayıt durdurulamadı', message: r.error || '', type: 'error' });
+      }
+    } finally {
+      setRecordingLoading(false);
+    }
+  }, [room, hostId, recordingId]);
+
+  // ★ KVKK consent — kayda başlamadan önce host'tan açık rıza al
+  const handleToggleRecording = useCallback(() => {
+    if (!room || !hostId) return;
+    if (recordingId) {
+      // Durdurma — onay dialog'u gerekmez
+      performStopRecording();
+      return;
+    }
+    // Başlatma — KVKK consent dialog
+    setRecAlert({
+      visible: true,
+      title: '🔴 Oda Kaydı Başlat',
+      type: 'warning',
+      message:
+        'Bu odadaki tüm konuşmaların ses kaydı alınacak.\n\n' +
+        '⚠️ KVKK gereği:\n' +
+        '• Konuşmacıların açık rızası senin sorumluluğundadır.\n' +
+        '• Kayıt başlayınca tüm katılımcılar görsel olarak bilgilendirilir.\n' +
+        '• Kayıt 7 gün boyunca saklanır, sonra otomatik silinir.\n' +
+        '• Konuşmacı talebi halinde kayıt silinmelidir.\n\n' +
+        'Bu sorumluluğu kabul ediyor musun?',
+      buttons: [
+        { text: 'Vazgeç', style: 'cancel' },
+        {
+          text: 'Kabul Ediyorum',
+          style: 'destructive',
+          onPress: () => performStartRecording(),
+        },
+      ],
+    });
+  }, [room, hostId, recordingId, performStartRecording, performStopRecording]);
 
   const handleFreeze = useCallback(async () => {
     if (!room || !hostId) return;
@@ -294,7 +500,7 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
       showToast({ title: 'Oda Donduruldu', message: 'Odalarım sekmesinden tekrar aktifleştirebilirsin.', type: 'success' });
       onDeleted(); // refresh list
       onClose();
-    } catch (e: any) { showToast({ title: 'Hata', message: e.message || '', type: 'error' }); }
+    } catch (e: any) { showToast({ title: 'Ayar Güncellenemedi', message: e.message || 'Sunucuya ulaşılamadı.', type: 'error' }); }
   }, [room, hostId, onDeleted, onClose]);
 
   const handleBgImage = useCallback(async (imageUri: string | null) => {
@@ -318,7 +524,7 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
         setBackgroundImage(null);
         showToast({ title: 'Arka Plan Kaldırıldı', type: 'success' });
       }
-    } catch (e: any) { showToast({ title: 'Hata', message: e.message || '', type: 'error' }); }
+    } catch (e: any) { showToast({ title: 'Ayar Güncellenemedi', message: e.message || 'Sunucuya ulaşılamadı.', type: 'error' }); }
   }, [room, hostId]);
 
   const handleCoverImage = useCallback(async (imageUri: string | null) => {
@@ -339,7 +545,7 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
         setCoverImage(null);
         showToast({ title: 'Banner Kaldırıldı', type: 'success' });
       }
-    } catch (e: any) { showToast({ title: 'Hata', message: e.message || '', type: 'error' }); }
+    } catch (e: any) { showToast({ title: 'Ayar Güncellenemedi', message: e.message || 'Sunucuya ulaşılamadı.', type: 'error' }); }
   }, [room, hostId]);
 
   if (!visible || !room) return null;
@@ -385,38 +591,162 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
         <Row icon="document-text" bg="rgba(245,158,11,0.2)" label="Oda Kuralları" desc={rules || 'Ayarlanmadı'} onPress={() => setEditingRules(true)} right={<Ionicons name="pencil-outline" size={10} color="rgba(255,255,255,0.15)" />} />
       )}
 
-      {/* Oda Tipi â€” Plus+ */}
-      {can('Plus') ? (
-        <Row icon="globe" bg="rgba(59,130,246,0.2)" label={roomType === 'open' ? 'Herkese Açık' : roomType === 'closed' ? 'Şifreli Oda' : 'Davetiye ile'} desc="Oda erişim tipini değiştir"
-          right={
-            <View style={{ flexDirection: 'row', gap: 3 }}>
-              {(['open', 'closed', 'invite'] as const).map(t => (
-                <Pressable key={t} style={[p.pill, roomType === t && p.pillActive]} onPress={async () => {
-                  setRoomType(t);
-                  try {
-                    await supabase.from('rooms').update({ type: t }).eq('id', room.id);
-                    broadcastSettingsChange({ type: t });
-                  } catch { showToast({ title: 'Hata', type: 'error' }); }
-                }}>
-                  <Text style={[p.pillText, roomType === t && p.pillTextActive]}>{t === 'open' ? 'Açık' : t === 'closed' ? 'Şifreli' : 'Davet'}</Text>
-                </Pressable>
-              ))}
+      {/* ★ Faz 4.3 — Etiketler (max 3) */}
+      <View style={p.tagBlock}>
+        <View style={p.tagBlockHeader}>
+          <View style={p.rowIcon}><Ionicons name="pricetags" size={14} color="rgba(20,184,166,0.8)" style={p.iconShadow} /></View>
+          <View style={{ flex: 1 }}>
+            <Text style={p.rowLabel}>Etiketler</Text>
+            <Text style={p.rowDesc}>Keşfet için en fazla {MAX_TAGS_PER_ROOM} etiket</Text>
+          </View>
+          {tagSaving && <ActivityIndicator size="small" color="#14B8A6" />}
+        </View>
+        <View style={p.tagChipsRow}>
+          {tags.map(t => (
+            <Pressable key={t} onPress={() => handleRemoveTag(t)} style={p.tagChipActive}>
+              <Text style={p.tagChipActiveText}>#{t}</Text>
+              <Ionicons name="close" size={11} color="#F1F5F9" style={{ marginLeft: 3 }} />
+            </Pressable>
+          ))}
+          {tags.length < MAX_TAGS_PER_ROOM && (
+            <View style={p.tagInputWrap}>
+              <Text style={p.tagInputHash}>#</Text>
+              <TextInput
+                value={tagDraft}
+                onChangeText={setTagDraft}
+                onSubmitEditing={() => handleAddTag(tagDraft)}
+                placeholder="örn. anime"
+                placeholderTextColor="rgba(148,163,184,0.5)"
+                autoCapitalize="none"
+                autoCorrect={false}
+                maxLength={30}
+                style={p.tagInput}
+                returnKeyType="done"
+              />
             </View>
-          }
-        />
-      ) : <LockedRow label="Şifreli Oda Oluşturma" tier="Plus" />}
+          )}
+        </View>
+        {tags.length < MAX_TAGS_PER_ROOM && (
+          <View style={p.tagSuggestRow}>
+            {SUGGESTED_TAGS.filter(s => !tags.includes(s)).slice(0, 6).map(s => (
+              <Pressable key={s} onPress={() => handleAddTag(s)} style={p.tagChipSuggest}>
+                <Text style={p.tagChipSuggestText}>+ {s}</Text>
+              </Pressable>
+            ))}
+          </View>
+        )}
+      </View>
 
-      {/* Şifre — Plus+ (sadece roomType === 'closed') */}
-      {roomType === 'closed' && can('Plus') && (
+      {/* ★ Faz 6.2 — Oda Kaydı (LiveKit Egress) */}
+      {isLive && (
+        <Row
+          icon={recordingId ? 'stop-circle' : 'radio-button-on'}
+          bg={recordingId ? 'rgba(239,68,68,0.25)' : 'rgba(20,184,166,0.2)'}
+          label={recordingId ? 'Kaydı Durdur' : 'Kaydı Başlat'}
+          desc={recordingId ? '🔴 Şu an kaydediliyor' : 'Sesli sohbet kaydedilir, sonra dinlenebilir (KVKK)'}
+          onPress={recordingLoading ? undefined : handleToggleRecording}
+          right={recordingLoading
+            ? <ActivityIndicator size="small" color="#14B8A6" />
+            : <Ionicons name="chevron-forward" size={10} color="rgba(255,255,255,0.15)" />}
+        />
+      )}
+
+      {/* ★ Faz 6.2 — Kayıtları dinle (Replay UI) */}
+      <Row
+        icon="headset"
+        bg="rgba(139,92,246,0.2)"
+        label="Kayıtları Dinle"
+        desc="Geçmiş oda kayıtlarını dinle"
+        onPress={() => setShowRecordingsSheet(true)}
+        right={<Ionicons name="chevron-forward" size={10} color="rgba(255,255,255,0.15)" />}
+      />
+
+      {/* ★ 2026-04-25: Unified Audience — tek select 4 modu kapsar
+           (Eski: oda tipi + şifre + followers_only ayrı kontroller idi) */}
+      <Row
+        icon={(AUDIENCE_OPTIONS.find(o => o.mode === audienceMode)?.icon || 'globe') as any}
+        bg="rgba(59,130,246,0.2)"
+        label={AUDIENCE_OPTIONS.find(o => o.mode === audienceMode)?.label || 'Erişim'}
+        desc={AUDIENCE_OPTIONS.find(o => o.mode === audienceMode)?.description || ''}
+        right={
+          <View style={{ flexDirection: 'row', gap: 3, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+            {AUDIENCE_OPTIONS.map(opt => {
+              // ★ 2026-04-27: 'invite' ve 'followers' Plus+ tier — oda yönetim araçları.
+              const requiresPlus = opt.mode === 'invite' || opt.mode === 'followers';
+              const locked = requiresPlus && !can('Plus');
+              const active = audienceMode === opt.mode;
+              // ★ 2026-04-27: Kilit açıkken audience seçenekleri grileşir + tıklanamaz.
+              //   "Önce kilidi kapat" mantığı — yoksa kullanıcı audience değiştirip "neden hala
+              //   kimse giremiyor" hayal kırıklığı yaşıyor.
+              const blockedByLock = isLocked && !active;
+              return (
+                <Pressable
+                  key={opt.mode}
+                  style={[p.pill, active && p.pillActive, (locked || blockedByLock) && { opacity: 0.45 }]}
+                  onPress={() => {
+                    if (locked) { showToast({ title: 'Plus+ Gerekli', message: opt.mode === 'invite' ? 'Davetli oda Plus üyelikle açılır.' : 'Sadece arkadaşlar modu Plus üyelikle açılır.', type: 'warning' }); return; }
+                    if (blockedByLock) { showToast({ title: '🔒 Oda Kilitli', message: 'Erişim modunu değiştirmek için önce kilidi kapat.', type: 'warning' }); return; }
+                    // ★ 2026-04-27 FIX: 'password' modu seçildiyse şifre olmadan kaydetme.
+                    //   Önceki bug: type='closed' + password=null → checkAccess'te public davranıyordu.
+                    //   Yeni: şifre yoksa input'u aç, kullanıcı şifre girene kadar audience değişmesin.
+                    if (opt.mode === 'password' && (!roomPassword || roomPassword.trim().length < 4)) {
+                      setEditingPassword(true);
+                      return;
+                    }
+                    handleAudienceChange(opt.mode);
+                  }}
+                >
+                  <Text style={[p.pillText, active && p.pillTextActive]}>
+                    {opt.mode === 'public' ? 'Açık'
+                      : opt.mode === 'followers' ? 'Takipçi'
+                      : opt.mode === 'password' ? 'Şifreli'
+                      : 'Davet'}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        }
+      />
+
+      {/* ★ 2026-04-27: Kilit aktif → audience seçenekleri grileşmiş, kullanıcıya neden olduğunu açıkla */}
+      {isLocked && (
+        <View style={{
+          flexDirection: 'row', alignItems: 'center', gap: 8,
+          paddingHorizontal: 12, paddingVertical: 8, marginBottom: 8,
+          backgroundColor: 'rgba(245,158,11,0.08)',
+          borderWidth: 1, borderColor: 'rgba(245,158,11,0.25)',
+          borderRadius: 10,
+        }}>
+          <Ionicons name="lock-closed" size={14} color="#F59E0B" />
+          <Text style={{ flex: 1, fontSize: 11, color: '#FCD34D', fontWeight: '600' }}>
+            Oda kilitli — kimse giremiyor. Erişim modunu değiştirmek için kilidi kapat.
+          </Text>
+        </View>
+      )}
+
+      {/* Şifre input — audience 'password' iken VEYA pill tıklamasıyla input açıksa.
+          ★ 2026-04-27: Şifre hiç girilmeden 'password' pill aktive edilemiyor; bu yüzden
+          input editingPassword=true ile audience switch olmadan da açılabilir. Submit edince
+          handleAudienceChange çağrılır ve audience switch olur. */}
+      {(audienceMode === 'password' || editingPassword) && (
         editingPassword ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-            <TextInput style={[p.nameInput, { fontSize: 11 }]} value={roomPassword} onChangeText={setRoomPassword} autoFocus maxLength={20} returnKeyType="done" placeholder="Oda şifresi..." placeholderTextColor="#475569"
-              onSubmitEditing={() => { updateRS('room_password', roomPassword.trim()); setEditingPassword(false); }} />
-            <Pressable style={p.saveBtn} onPress={() => { updateRS('room_password', roomPassword.trim()); setEditingPassword(false); }}><Ionicons name="checkmark" size={14} color="#FFF" /></Pressable>
-            <Pressable onPress={() => setEditingPassword(false)}><Ionicons name="close" size={14} color="#64748B" /></Pressable>
+            <TextInput style={[p.nameInput, { fontSize: 11 }]} value={roomPassword} onChangeText={setRoomPassword} autoFocus maxLength={20} returnKeyType="done" placeholder="Oda şifresi (min 4 karakter)..." placeholderTextColor="#475569"
+              onSubmitEditing={() => {
+                if (roomPassword.trim().length < 4) { showToast({ title: 'Şifre Çok Kısa', message: 'En az 4 karakter olmalı.', type: 'warning' }); return; }
+                handleAudienceChange('password', roomPassword.trim());
+                setEditingPassword(false);
+              }} />
+            <Pressable style={p.saveBtn} onPress={() => {
+              if (roomPassword.trim().length < 4) { showToast({ title: 'Şifre Çok Kısa', message: 'En az 4 karakter olmalı.', type: 'warning' }); return; }
+              handleAudienceChange('password', roomPassword.trim());
+              setEditingPassword(false);
+            }}><Ionicons name="checkmark" size={14} color="#FFF" /></Pressable>
+            <Pressable onPress={() => { setEditingPassword(false); setRoomPassword((room?.room_settings as any)?.room_password || ''); }}><Ionicons name="close" size={14} color="#64748B" /></Pressable>
           </View>
         ) : (
-          <Row icon="key" bg="rgba(245,158,11,0.2)" label="Oda Şifresi" desc={roomPassword || 'Ayarlanmadı'} onPress={() => setEditingPassword(true)} right={<Ionicons name="pencil-outline" size={10} color="rgba(255,255,255,0.15)" />} />
+          <Row icon="key" bg="rgba(245,158,11,0.2)" label="Oda Şifresi" desc={roomPassword || 'Ayarlanmadı (en az 4 karakter)'} onPress={() => setEditingPassword(true)} right={<Ionicons name="pencil-outline" size={10} color="rgba(255,255,255,0.15)" />} />
         )
       )}
 
@@ -463,6 +793,9 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
             </LinearGradient>
           </Pressable>
         )}
+
+        {/* ★ 2026-04-26: Kulübe Ekle/Çıkar — sadece kullanıcının owner/mod olduğu kulüpler varsa render eder */}
+        <AttachRoomToClubButton roomId={room.id} userId={hostId} />
 
         {/* Odayı Sil */}
         <Pressable style={p.actionCta} onPress={handleDelete}>
@@ -545,11 +878,8 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
           right={<Switch value={ageRestricted} onValueChange={(v) => { setAgeRestricted(v); updateRS('age_restricted', v); }} trackColor={{ false: 'rgba(255,255,255,0.08)', true: 'rgba(239,68,68,0.4)' }} thumbColor={ageRestricted ? '#EF4444' : '#475569'} />} />
       ) : <LockedRow label="Yaş Filtresi (+18)" tier="Plus" />}
 
-      {/* Takipçilere Özel â€” Pro+ */}
-      {can('Pro') ? (
-        <Row icon="people" bg="rgba(212,175,55,0.2)" label={followersOnly ? 'Takipçilere Özel' : 'Herkese Açık'} desc={followersOnly ? 'Sadece takipçiler katılabilir' : 'Herkes odaya katılabilir'}
-          right={<Switch value={followersOnly} onValueChange={(v) => { setFollowersOnly(v); updateRS('followers_only', v); }} trackColor={{ false: 'rgba(255,255,255,0.08)', true: 'rgba(212,175,55,0.4)' }} thumbColor={followersOnly ? '#D4AF37' : '#475569'} />} />
-      ) : <LockedRow label="Sadece Takipçiler Girebilir" tier="Pro" />}
+      {/* ★ 2026-04-25: "Takipçilere Özel" switch kaldırıldı —
+           audienceMode='followers' ile birleştirildi (Genel sekme, Erişim seçeneği). */}
 
       {/* Tümünü Sustur â€” Pro locked */}
       {!can('Pro') && <LockedRow label="Tümünü Sustur (Cooldown ile)" tier="Pro" />}
@@ -590,7 +920,7 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
                   setBannedUsers(prev => prev.filter(b => b.id !== ban.id));
                   try {
                     await ModerationService.unbanFromRoom(room.id, ban.user_id || ban.user?.id);
-                  } catch { setBannedUsers(prev => [...prev, ban]); showToast({ title: 'Hata', type: 'error' }); }
+                  } catch { setBannedUsers(prev => [...prev, ban]); showToast({ title: 'Ban Kaldırılamadı', message: 'Kullanıcının banı kaldırılamadı.', type: 'error' }); }
                 }}>
                   <Ionicons name="lock-open-outline" size={10} color="#14B8A6" />
                   <Text style={{ fontSize: 9, fontWeight: '700', color: '#14B8A6' }}>Kaldır</Text>
@@ -625,7 +955,7 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
                   setMutedUsers(prev => prev.filter(m => m.id !== mute.id));
                   try {
                     await ModerationService.unmuteInRoom(room.id, mute.muted_user_id || mute.user?.id);
-                  } catch { setMutedUsers(prev => [...prev, mute]); showToast({ title: 'Hata', type: 'error' }); }
+                  } catch { setMutedUsers(prev => [...prev, mute]); showToast({ title: 'Susturma Kalkmadı', message: 'Kullanıcının susturması kaldırılamadı.', type: 'error' }); }
                 }}>
                   <Ionicons name="volume-high-outline" size={10} color="#14B8A6" />
                   <Text style={{ fontSize: 9, fontWeight: '700', color: '#14B8A6' }}>Aç</Text>
@@ -854,9 +1184,24 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
           </View>
         </View>
 
+        {/* ★ Geçici host bilgi banner'ı — kritik ayarların neden gizli olduğunu açıkla */}
+        {isTempHost && (
+          <View style={{
+            marginHorizontal: 12, marginBottom: 6, paddingVertical: 8, paddingHorizontal: 12,
+            borderRadius: 10, flexDirection: 'row', alignItems: 'center', gap: 8,
+            backgroundColor: 'rgba(251,191,36,0.10)',
+            borderWidth: 1, borderColor: 'rgba(251,191,36,0.35)',
+          }}>
+            <Ionicons name="information-circle" size={16} color="#FBBF24" />
+            <Text style={{ flex: 1, fontSize: 11, fontWeight: '600', color: '#FCD34D', lineHeight: 15 }}>
+              Geçici host moddasın. Yalnız moderasyon ve takipçi görüntüleme açık. Oda adı, teması, ücreti gibi ayarlar yalnız asıl sahibinde.
+            </Text>
+          </View>
+        )}
+
         {/* Tab Bar */}
         <ScrollView horizontal nestedScrollEnabled showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 4, paddingHorizontal: 10 }} style={{ maxHeight: 34, marginBottom: 6 }}>
-          {TABS.map(tab => {
+          {visibleTabs.map(tab => {
             const active = activeTab === tab.id;
             return (
               <Pressable key={tab.id} style={[p.tab, active && p.tabActive]} onPress={() => {
@@ -876,6 +1221,21 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
           {renderContent()}
         </ScrollView>
       </Animated.View>
+      {/* ★ Faz 6.2 — Recordings Replay Sheet */}
+      {room && (
+        <RoomRecordingsSheet
+          visible={showRecordingsSheet}
+          roomId={room.id}
+          hostId={hostId || undefined}
+          onClose={() => setShowRecordingsSheet(false)}
+        />
+      )}
+
+      {/* ★ Faz 6.2 — KVKK consent dialog (kayıt başlamadan önce) */}
+      <PremiumAlert
+        {...recAlert}
+        onDismiss={() => setRecAlert(prev => ({ ...prev, visible: false }))}
+      />
     </View>
   );
 }
@@ -955,6 +1315,36 @@ const p = StyleSheet.create({
   iconShadow: { textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 3 },
   rowLabel: { fontSize: 12, fontWeight: '700', color: '#F1F5F9', ...Shadows.textLight },
   rowDesc: { fontSize: 9, color: '#94A3B8', marginTop: 1 },
+
+  // ★ Faz 4.3 — Tag block
+  tagBlock: { paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: 'rgba(149,161,174,0.06)' },
+  tagBlockHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 6 },
+  tagChipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, alignItems: 'center', marginTop: 4 },
+  tagChipActive: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 9, paddingVertical: 4,
+    borderRadius: 10,
+    backgroundColor: 'rgba(20,184,166,0.18)',
+    borderWidth: 1, borderColor: 'rgba(20,184,166,0.4)',
+  },
+  tagChipActiveText: { fontSize: 11, fontWeight: '700', color: '#F1F5F9' },
+  tagInputWrap: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 8, paddingVertical: 2,
+    borderRadius: 10, minWidth: 90,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
+  },
+  tagInputHash: { fontSize: 11, color: 'rgba(148,163,184,0.7)' },
+  tagInput: { flex: 1, color: '#F1F5F9', fontSize: 11, fontWeight: '600', paddingVertical: 2, minHeight: 24 },
+  tagSuggestRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginTop: 8 },
+  tagChipSuggest: {
+    paddingHorizontal: 7, paddingVertical: 3,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderWidth: 0.8, borderColor: 'rgba(255,255,255,0.1)',
+  },
+  tagChipSuggestText: { fontSize: 10, fontWeight: '600', color: 'rgba(203,213,225,0.7)' },
 
   // Pill
   pill: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(149,161,174,0.12)' },

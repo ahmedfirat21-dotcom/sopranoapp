@@ -1,6 +1,7 @@
 // LiveKit Sesli/Görüntülü Sohbet Servisi
 // Lazy-load (getLK) mekanizması ile WebRTC uyumsuz cihazlarda çökme önlenir
 
+import { NativeModules, Platform } from 'react-native';
 import { supabase, SUPABASE_ANON_KEY } from '../constants/supabase';
 import { LIVEKIT_URL, LIVEKIT_TOKEN_ENDPOINT } from '../constants/livekit';
 import { logger } from '../utils/logger';
@@ -8,6 +9,24 @@ import { logger } from '../utils/logger';
 let _lk: any = null;
 let _globalsRegistered = false;
 let _audioSessionModule: any = null;
+
+// ★ 2026-04-27: Android foreground service köprüsü.
+// Uygulama arka plana atıldığında WebRTC bağlantısı OS tarafından kesilmesin diye
+// odadayken bildirim olarak çalışır. JS'ten start/stop edilir.
+const LiveKitFgService: { start: () => Promise<boolean>; stop: () => Promise<boolean> } | null =
+  Platform.OS === 'android' ? (NativeModules as any).LiveKitForegroundService ?? null : null;
+
+async function startBgService(): Promise<void> {
+  if (!LiveKitFgService) return;
+  try { await LiveKitFgService.start(); }
+  catch (e) { if (__DEV__) logger.warn('[LiveKit] FG service start failed:', (e as any)?.message); }
+}
+
+async function stopBgService(): Promise<void> {
+  if (!LiveKitFgService) return;
+  try { await LiveKitFgService.stop(); }
+  catch { /* sessizce geç */ }
+}
 
 function getLK(): any {
   if (!_lk) {
@@ -41,7 +60,9 @@ function getLK(): any {
 
 // ─── Token Servisi ──────────────────────────────────────────
 async function fetchToken(roomId: string, userId: string, displayName: string): Promise<string> {
-  const response = await fetch(LIVEKIT_TOKEN_ENDPOINT, {
+  // ★ Audit fix: 10s timeout — kötü ağda hung request UI'ı dondurmuyor
+  const { fetchWithTimeout } = await import('../utils/fetchTimeout');
+  const response = await fetchWithTimeout(LIVEKIT_TOKEN_ENDPOINT, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -49,7 +70,7 @@ async function fetchToken(roomId: string, userId: string, displayName: string): 
       'apikey': SUPABASE_ANON_KEY,
     },
     body: JSON.stringify({ roomId, displayName, userId }),
-  });
+  }, 10_000);
 
   if (!response.ok) {
     const err = await response.json().catch(() => ({ error: 'Token request failed' }));
@@ -81,10 +102,12 @@ export class LiveKitService {
   private onParticipantUpdate?: (participants: ParticipantUpdate[]) => void;
   private onConnectionStateChange?: (state: RoomConnectionState) => void;
   private onSpeakingChange?: (identity: string, isSpeaking: boolean) => void;
-  private onMicStateChange?: (micEnabled: boolean, camEnabled: boolean) => void;
+  private onTrackStateChange?: (micEnabled: boolean, camEnabled: boolean) => void;
   private onParticipantDisconnected?: (identity: string) => void; // ★ Karşı taraf ayrıldığında
   // ★ K7: Mic/cam permission denied callback — UI "Open Settings" alert'ı gösterebilsin.
   private onPermissionDenied?: (device: 'microphone' | 'camera') => void;
+  // ★ 2026-04-25: Bağlantı kalitesi callback — 'excellent' | 'good' | 'poor' | 'unknown'
+  private onConnectionQualityChange?: (quality: 'excellent' | 'good' | 'poor' | 'unknown') => void;
   // ★ Tier bazlı kalite ayarları
   private audioPreset: { sampleRate: number; channelCount: number } = { sampleRate: 48000, channelCount: 1 };
   private videoMaxRes: number = 720;
@@ -111,15 +134,30 @@ export class LiveKitService {
     );
   }
 
+  // ★ Faz 3.4 — Mic processing toggles (kullanıcı ayarlardan değiştirebilir)
+  // Default'lar `true`; SettingsService'ten okunup `setAudioProcessing()` ile güncellenir.
+  private audioProcessing: { echoCancellation: boolean; noiseSuppression: boolean; autoGainControl: boolean } = {
+    echoCancellation: true,
+    noiseSuppression: true,
+    autoGainControl: true,
+  };
+
+  /** Settings ekranından mic ayarları değişince çağrılır. Sonraki publish için aktif. */
+  setAudioProcessing(opts: { echoCancellation?: boolean; noiseSuppression?: boolean; autoGainControl?: boolean }): void {
+    if (opts.echoCancellation !== undefined) this.audioProcessing.echoCancellation = opts.echoCancellation;
+    if (opts.noiseSuppression !== undefined) this.audioProcessing.noiseSuppression = opts.noiseSuppression;
+    if (opts.autoGainControl !== undefined) this.audioProcessing.autoGainControl = opts.autoGainControl;
+  }
+
   /** Tier bazlı mikrofon ses ayarlarını döndür */
   private getAudioConstraints() {
     return {
       sampleRate: this.audioPreset.sampleRate,
       channelCount: this.audioPreset.channelCount,
       sampleSize: 16,
-      noiseSuppression: true,
-      echoCancellation: true,
-      autoGainControl: true,
+      noiseSuppression: this.audioProcessing.noiseSuppression,
+      echoCancellation: this.audioProcessing.echoCancellation,
+      autoGainControl: this.audioProcessing.autoGainControl,
     };
   }
 
@@ -135,9 +173,11 @@ export class LiveKitService {
       onParticipantUpdate?: (participants: ParticipantUpdate[]) => void;
       onConnectionStateChange?: (state: RoomConnectionState) => void;
       onSpeakingChange?: (identity: string, isSpeaking: boolean) => void;
-      onMicStateChange?: (micEnabled: boolean, camEnabled: boolean) => void;
+      onTrackStateChange?: (micEnabled: boolean, camEnabled: boolean) => void;
       onParticipantDisconnected?: (identity: string) => void; // ★ Karşı taraf ayrıldığında
       onPermissionDenied?: (device: 'microphone' | 'camera') => void;
+      // ★ 2026-04-25: Local participant connection quality
+      onConnectionQualityChange?: (quality: 'excellent' | 'good' | 'poor' | 'unknown') => void;
     },
     qualityPreset?: { audioSampleRate?: number; audioChannels?: number; videoMaxRes?: number }
   ): Promise<boolean> {
@@ -150,39 +190,46 @@ export class LiveKitService {
 
     // ★ 2026-04-20 Minimize-restore: aynı odaya zaten bağlıysak yeniden bağlanma,
     // callbacks'i overwrite et + mevcut state'i yeni dinleyiciye yay.
-    // Room state transient olabilir; currentRoomId + room instance varsa reattach yeterli.
+    // ★ 2026-04-27: Sadece 'connected' veya 'reconnecting' iken reattach et;
+    // 'disconnected' kaldıysa (Doze/arka plan kopması) mevcut room nesnesi kullanılamaz —
+    // tam bağlantıya düş ki "Bağlantı kurulamadı" ekranı yerine yeniden bağlanabilelim.
     if (this.room && this.currentRoomId === roomId) {
-      this.onParticipantUpdate = callbacks.onParticipantUpdate;
-      this.onConnectionStateChange = callbacks.onConnectionStateChange;
-      this.onSpeakingChange = callbacks.onSpeakingChange;
-      this.onMicStateChange = callbacks.onMicStateChange;
-      this.onParticipantDisconnected = callbacks.onParticipantDisconnected;
-      this.onPermissionDenied = callbacks.onPermissionDenied;
-      try {
-        // Gerçek state'i yay — reconnecting/connected arasında doğru gösterim
-        const rs = this.room.state;
-        const mappedState: RoomConnectionState =
-          rs === 'reconnecting' ? 'reconnecting' :
-          rs === 'disconnected' ? 'disconnected' :
-          'connected';
-        callbacks.onConnectionStateChange?.(mappedState);
-        callbacks.onMicStateChange?.(this.isMicrophoneEnabled, this.isCameraEnabled);
-        this._doEmitParticipantUpdate(lk);
-      } catch (e) { if (__DEV__) logger.warn('[LiveKit] reattach state emit error', e); }
-      if (__DEV__) logger.log(`[LiveKit] Reattach — ${roomId} için mevcut bağlantı kullanıldı`);
-      return true;
+      const rs = this.room.state;
+      if (rs === 'connected' || rs === 'reconnecting') {
+        this.onParticipantUpdate = callbacks.onParticipantUpdate;
+        this.onConnectionStateChange = callbacks.onConnectionStateChange;
+        this.onSpeakingChange = callbacks.onSpeakingChange;
+        this.onTrackStateChange = callbacks.onTrackStateChange;
+        this.onParticipantDisconnected = callbacks.onParticipantDisconnected;
+        this.onPermissionDenied = callbacks.onPermissionDenied;
+        this.onConnectionQualityChange = callbacks.onConnectionQualityChange;
+        try {
+          const mappedState: RoomConnectionState = rs === 'reconnecting' ? 'reconnecting' : 'connected';
+          callbacks.onConnectionStateChange?.(mappedState);
+          callbacks.onTrackStateChange?.(this.isMicrophoneEnabled, this.isCameraEnabled);
+          this._doEmitParticipantUpdate(lk);
+        } catch (e) { if (__DEV__) logger.warn('[LiveKit] reattach state emit error', e); }
+        if (__DEV__) logger.log(`[LiveKit] Reattach — ${roomId} için mevcut bağlantı kullanıldı (state=${rs})`);
+        return true;
+      }
+      if (__DEV__) logger.log(`[LiveKit] Stale room (state=${rs}) — full reconnect zorlanıyor`);
     }
 
     if (this.room) {
       await this.disconnect();
     }
 
+    // ★ 2026-04-27: Arka plan ön plan servisi — odaya bağlanmadan ÖNCE başlat
+    // (Android 12+ FOREGROUND_SERVICE_MICROPHONE foreground'da iken başlatılmalı).
+    await startBgService();
+
     this.onParticipantUpdate = callbacks.onParticipantUpdate;
     this.onConnectionStateChange = callbacks.onConnectionStateChange;
     this.onSpeakingChange = callbacks.onSpeakingChange;
-    this.onMicStateChange = callbacks.onMicStateChange;
+    this.onTrackStateChange = callbacks.onTrackStateChange;
     this.onParticipantDisconnected = callbacks.onParticipantDisconnected;
     this.onPermissionDenied = callbacks.onPermissionDenied;
+    this.onConnectionQualityChange = callbacks.onConnectionQualityChange;
 
     // ★ Tier bazlı kalite ayarları uygula
     if (qualityPreset) {
@@ -289,6 +336,11 @@ export class LiveKitService {
         }
 
         this.emitParticipantUpdate(lk);
+        // ★ 2026-04-24 FIX: Late-joiner video — ilk emit'te track'ler henüz subscribe
+        //   olmamış olabilir. 500ms ve 1500ms sonra tekrar emit ederek subscribe tamamlanmış
+        //   track'lerin UI'a yansımasını garanti ediyoruz.
+        setTimeout(() => this.emitParticipantUpdate(lk), 500);
+        setTimeout(() => this.emitParticipantUpdate(lk), 1500);
         if (__DEV__) logger.log(`[LiveKit] Bağlantı başarılı (deneme ${attempt}/${MAX_RETRIES})`);
         return true;
       } catch (err: any) {
@@ -341,6 +393,38 @@ export class LiveKitService {
   }
 
   // ─── Bağlantıyı Kes ──────────────────────────────────────
+  /**
+   * ★ Faz 3.2 — Voice reaction / lightweight data broadcast.
+   * Bu metod mevcut audio publish/subscribe akışına TEMAS ETMEZ.
+   * LiveKit data channel'ı her room connection'da otomatik açıktır,
+   * burada sadece JSON payload göndeririz.
+   *
+   * NOT: room null/disconnected ise sessiz fail — voice reaction
+   * kritik akış değil, ses iletimini engellememeli.
+   */
+  async publishData(payload: Record<string, any>): Promise<void> {
+    if (!this.room || this.room.state !== 'connected') return;
+    try {
+      const lk = getLK();
+      const reliable = lk?.DataPacket_Kind?.RELIABLE ?? 0;
+      const json = JSON.stringify(payload);
+      const bytes = new TextEncoder().encode(json);
+      await this.room.localParticipant.publishData(bytes, reliable);
+    } catch (e) {
+      if (__DEV__) logger.log('[LiveKit] publishData failed:', (e as any)?.message);
+    }
+  }
+
+  /**
+   * ★ Faz 3.2 — Data event subscriber. Bir kez kayıt edilir, bağlantı
+   * yaşam döngüsü boyunca aktif. unsubscribe için connect tarafındaki
+   * room.removeAllListeners patterni kullanılır (mevcut akış).
+   */
+  setOnDataReceived(cb?: (payload: Record<string, any>, fromIdentity: string) => void): void {
+    this.onDataReceivedCb = cb;
+  }
+  private onDataReceivedCb?: (payload: Record<string, any>, fromIdentity: string) => void;
+
   async disconnect(): Promise<void> {
     if (__DEV__) {
       console.log('[LiveKit] ⚠️ DISCONNECT ÇAĞRILDI');
@@ -368,8 +452,10 @@ export class LiveKitService {
         if (__DEV__) logger.log('[LiveKit] AudioSession durduruldu');
       } catch (e) { /* sessizce geç */ }
     }
+    // ★ 2026-04-27: Arka plan servisi durdur — bildirim kaybolsun, batarya tüketmesin.
+    await stopBgService();
     this.onConnectionStateChange?.('disconnected');
-    this.onMicStateChange?.(false, false);
+    this.onTrackStateChange?.(false, false);
     this.emitParticipantUpdate(getLK());
   }
 
@@ -399,7 +485,7 @@ export class LiveKitService {
       return enabled;
     }
     const newMicState = !enabled;
-    this.onMicStateChange?.(newMicState, this.isCameraEnabled);
+    this.onTrackStateChange?.(newMicState, this.isCameraEnabled);
     this.emitParticipantUpdate(getLK());
     return newMicState;
   }
@@ -421,7 +507,7 @@ export class LiveKitService {
       }
       return false;
     }
-    this.onMicStateChange?.(true, this.isCameraEnabled);
+    this.onTrackStateChange?.(true, this.isCameraEnabled);
     this.emitParticipantUpdate(getLK());
     return true;
   }
@@ -431,7 +517,7 @@ export class LiveKitService {
     if (!this.room?.localParticipant) return;
     if (!this.room.localParticipant.isMicrophoneEnabled) {
       // Zaten kapalı — sadece state güncelle
-      this.onMicStateChange?.(false, this.isCameraEnabled);
+      this.onTrackStateChange?.(false, this.isCameraEnabled);
       return;
     }
     try {
@@ -443,7 +529,7 @@ export class LiveKitService {
     } catch (e) {
       if (__DEV__) logger.warn('[LiveKit] Mikrofon zorla kapatma hatası:', (e as any)?.message);
     }
-    this.onMicStateChange?.(false, this.isCameraEnabled);
+    this.onTrackStateChange?.(false, this.isCameraEnabled);
     this.emitParticipantUpdate(getLK());
   }
 
@@ -451,7 +537,7 @@ export class LiveKitService {
   async disableCamera(): Promise<void> {
     if (!this.room?.localParticipant) return;
     if (!this.room.localParticipant.isCameraEnabled) {
-      this.onMicStateChange?.(this.isMicrophoneEnabled, false);
+      this.onTrackStateChange?.(this.isMicrophoneEnabled, false);
       return;
     }
     try {
@@ -463,7 +549,7 @@ export class LiveKitService {
     } catch (e) {
       if (__DEV__) logger.warn('[LiveKit] Kamera zorla kapatma hatası:', (e as any)?.message);
     }
-    this.onMicStateChange?.(this.isMicrophoneEnabled, false);
+    this.onTrackStateChange?.(this.isMicrophoneEnabled, false);
     this.emitParticipantUpdate(getLK());
   }
 
@@ -483,7 +569,7 @@ export class LiveKitService {
         this.onPermissionDenied?.('camera');
       }
     }
-    this.onMicStateChange?.(this.isMicrophoneEnabled, true);
+    this.onTrackStateChange?.(this.isMicrophoneEnabled, true);
     this.emitParticipantUpdate(getLK());
   }
 
@@ -499,8 +585,9 @@ export class LiveKitService {
       await this.room.localParticipant.setMicrophoneEnabled(false);
     }
 
-    const audioOptions = mode === 'music' 
+    const audioOptions = mode === 'music'
       ? {
+          // Music modunda processing kapalı kalır — müzik kalitesi için zorunlu
           noiseSuppression: false,
           echoCancellation: false,
           autoGainControl: false,
@@ -509,9 +596,10 @@ export class LiveKitService {
           sampleSize: 16,
         }
       : {
-          noiseSuppression: true,
-          echoCancellation: true,
-          autoGainControl: true,
+          // Voice modunda kullanıcının settings'teki tercihi geçerli
+          noiseSuppression: this.audioProcessing.noiseSuppression,
+          echoCancellation: this.audioProcessing.echoCancellation,
+          autoGainControl: this.audioProcessing.autoGainControl,
           channelCount: 1,
           sampleRate: 48000,
           sampleSize: 16,
@@ -548,7 +636,7 @@ export class LiveKitService {
       return enabled;
     }
     const newCamState = !enabled;
-    this.onMicStateChange?.(this.isMicrophoneEnabled, newCamState);
+    this.onTrackStateChange?.(this.isMicrophoneEnabled, newCamState);
     this.emitParticipantUpdate(getLK());
     return newCamState;
   }
@@ -598,7 +686,7 @@ export class LiveKitService {
       await lp.setCameraEnabled(true, { facingMode: newFacing });
       
       if (__DEV__) logger.log('[LiveKit] flipCamera başarılı (republish) →', this._isFrontCamera ? 'ön' : 'arka');
-      this.onMicStateChange?.(this.isMicrophoneEnabled, true);
+      this.onTrackStateChange?.(this.isMicrophoneEnabled, true);
       this.emitParticipantUpdate(getLK());
     } catch (e) {
       if (__DEV__) logger.warn('[LiveKit] Kamera çevirme hatası:', (e as any)?.message);
@@ -785,10 +873,42 @@ export class LiveKitService {
       lk.RoomEvent.TrackUnmuted,
       lk.RoomEvent.TrackSubscribed,
       lk.RoomEvent.TrackUnsubscribed,
+      lk.RoomEvent.TrackPublished,       // ★ 2026-04-24 FIX: Remote participant track publish — late-joiner video fix
+      lk.RoomEvent.TrackUnpublished,     // ★ Remote participant track unpublish
       lk.RoomEvent.LocalTrackPublished,
       lk.RoomEvent.LocalTrackUnpublished,
       lk.RoomEvent.ConnectionStateChanged,
+      lk.RoomEvent.ConnectionQualityChanged, // ★ 2026-04-25: Bağlantı kalitesi göstergesi
+      lk.RoomEvent.DataReceived,             // ★ Faz 3.2: Voice reaction data channel
     ];
+
+    // ★ Faz 3.2 — Voice reaction listener (data channel; audio publish bozulmaz)
+    this.room.on(lk.RoomEvent.DataReceived, (payload: Uint8Array, participant: any) => {
+      try {
+        if (!this.onDataReceivedCb) return;
+        const json = new TextDecoder().decode(payload);
+        const obj = JSON.parse(json);
+        const identity = participant?.identity || '';
+        this.onDataReceivedCb(obj, identity);
+      } catch { /* malformed payload sessizce atılır */ }
+    });
+
+    // ★ 2026-04-25: Connection quality — sadece LOCAL participant için
+    this.room.on(lk.RoomEvent.ConnectionQualityChanged, (quality: any, participant: any) => {
+      try {
+        if (!participant || !this.room?.localParticipant) return;
+        if (participant.identity !== this.room.localParticipant.identity) return;
+        // LiveKit ConnectionQuality enum: 0=Unknown, 1=Excellent, 2=Good, 3=Poor, 4=Lost
+        // Yeni SDK: 'excellent' | 'good' | 'poor' | 'unknown' (string)
+        const map: Record<string, 'excellent' | 'good' | 'poor' | 'unknown'> = {
+          excellent: 'excellent', good: 'good', poor: 'poor', lost: 'poor', unknown: 'unknown',
+          '1': 'excellent', '2': 'good', '3': 'poor', '4': 'poor', '0': 'unknown',
+        };
+        const key = String(quality).toLowerCase();
+        const mapped = map[key] || 'unknown';
+        this.onConnectionQualityChange?.(mapped);
+      } catch { /* ignore */ }
+    });
 
     events.forEach((evt) => {
       this.room.on(evt, (...args: any[]) => {
@@ -848,7 +968,7 @@ export class LiveKitService {
         // Mic/Cam state change callback
         if (evt === lk.RoomEvent.LocalTrackPublished || evt === lk.RoomEvent.LocalTrackUnpublished ||
             evt === lk.RoomEvent.TrackMuted || evt === lk.RoomEvent.TrackUnmuted) {
-          this.onMicStateChange?.(this.isMicrophoneEnabled, this.isCameraEnabled);
+          this.onTrackStateChange?.(this.isMicrophoneEnabled, this.isCameraEnabled);
         }
 
         this.emitParticipantUpdate(lk);
@@ -896,16 +1016,27 @@ export class LiveKitService {
     const extractVideoTrack = (participant: any) => {
       try {
         if (!participant) return undefined;
+        // ★ Yöntem 1: getTrackPublication API'si (lk v2 önerilen)
         const pub = participant.getTrackPublication?.(lk.Track.Source.Camera);
         if (pub && pub.track) return pub.track;
         if (pub && pub.videoTrack) return pub.videoTrack;
         
+        // ★ Yöntem 2: videoTrackPublications (camera source filtreli)
         if (participant.videoTrackPublications) {
            const publications = Array.from(participant.videoTrackPublications.values()) as any[];
            for (const p of publications) {
              if (p.track) return p.track;
              if (p.videoTrack) return p.videoTrack;
            }
+        }
+        // ★ 2026-04-24 FIX: Yöntem 3: Tüm trackPublications'ı tara — bazı LK sürümlerinde
+        //   videoTrackPublications getter'ı boş dönebilir ama trackPublications Map'inde
+        //   video track bulunur. Source === Camera olmayanları (ScreenShare vb.) atla.
+        if (participant.trackPublications) {
+          for (const [, p] of participant.trackPublications) {
+            if (p?.source === lk.Track.Source.Camera && p?.track) return p.track;
+            if (p?.kind === 'video' && p?.source !== lk.Track.Source.ScreenShare && p?.track) return p.track;
+          }
         }
       } catch(e) { logger.warn('extractVideoTrack error', e); }
       return undefined;
