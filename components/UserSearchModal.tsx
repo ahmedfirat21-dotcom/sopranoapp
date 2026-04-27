@@ -3,14 +3,22 @@
  * Oda ve kişi araması — keşfet ekranındaki arama ikonuna bağlı
  * Hem oda hem kullanıcı sonuçlarını listeler
  */
-import { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, Modal, Pressable, TextInput, FlatList, ActivityIndicator, Animated } from 'react-native';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { View, Text, StyleSheet, Pressable, TextInput, FlatList, ActivityIndicator, Animated, PanResponder, Dimensions, Keyboard } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Radius } from '../constants/theme';
+import { Colors, Shadows } from '../constants/theme';
 import { supabase } from '../constants/supabase';
 import StatusAvatar from './StatusAvatar';
 import type { Profile } from '../services/database';
-import { useSwipeToDismiss } from '../hooks/useSwipeToDismiss';
+
+// ★ 2026-04-27: FollowListModal/InRoomUserProfile ile aynı 2-snap mekanik.
+//   Modal sarmalı YOK (Modal native dialog Pressable backdrop'u yutuyor + pan responder Capture
+//   ile çakışıyor → sadece handle çekilebilir oluyor). View overlay zIndex:300 kullanılıyor.
+const SCREEN_H = Dimensions.get('window').height;
+const SNAP_HALF = SCREEN_H * 0.45;   // başlangıç: ekranın yarısından biraz yukarı
+const SNAP_FULL = 60;                // tam ekran: üstten 60px boşluk
+const SNAP_DISMISS = SCREEN_H + 50;  // ekran dışı
 
 type UserSearchModalProps = {
   visible: boolean;
@@ -87,8 +95,16 @@ export function UserSearchModal({ visible, onClose, currentUserId, onSelectUser,
         .not('id', 'in', `(${followingIds.join(',')})`)
         .order('is_online', { ascending: false })
         .order('created_at', { ascending: false })
-        .limit(20);
-      setSuggestedUsers(suggested as Profile[] || []);
+        .limit(40); // Block filter sonrası 20'ye düşürülecek
+
+      // ★ Block-aware: engellediğin + seni engelleyen kullanıcıları çıkar
+      let filtered = (suggested as Profile[]) || [];
+      try {
+        const { getBlockedUserIds } = await import('../services/blocklist');
+        const blockedSet = await getBlockedUserIds(currentUserId);
+        if (blockedSet.size > 0) filtered = filtered.filter(p => !blockedSet.has(p.id));
+      } catch {}
+      setSuggestedUsers(filtered.slice(0, 20));
     } catch (e) {
       if (__DEV__) console.warn('[UserSearch] Önerilen kullanıcı hatası:', e);
     }
@@ -109,9 +125,17 @@ export function UserSearchModal({ visible, onClose, currentUserId, onSelectUser,
         .select('*')
         .or(`display_name.ilike.%${sanitized}%,username.ilike.%${sanitized}%`)
         .neq('id', currentUserId)
-        .limit(20);
+        .limit(40); // Block filter sonrası 20'ye düşürüleceği için 40 al
       if (error) throw error;
-      setResults(data as Profile[] || []);
+
+      // ★ Block-aware: engellediğin + seni engelleyen kullanıcıları sonuçtan çıkar
+      let filtered = (data as Profile[]) || [];
+      try {
+        const { getBlockedUserIds } = await import('../services/blocklist');
+        const blockedSet = await getBlockedUserIds(currentUserId);
+        if (blockedSet.size > 0) filtered = filtered.filter(p => !blockedSet.has(p.id));
+      } catch { /* blocklist yoksa devam */ }
+      setResults(filtered.slice(0, 20));
 
       // Keşfet modunda odaları da ara
       if (isDiscover && searchQuery.length >= 2) {
@@ -143,11 +167,138 @@ export function UserSearchModal({ visible, onClose, currentUserId, onSelectUser,
     }
   };
 
-  const { translateValue, panHandlers } = useSwipeToDismiss({
-    direction: 'down',
-    threshold: 80,
-    onDismiss: onClose,
-  });
+  // ★ 2026-04-27: 2-snap pan sistemi (FollowListModal pattern).
+  const translateY = useRef(new Animated.Value(SNAP_DISMISS)).current;
+  const backdropOpacity = useRef(new Animated.Value(0)).current;
+  const currentSnap = useRef(SNAP_HALF);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  const scrollOffsetRef = useRef(0);
+  const handleScroll = useCallback((e: any) => {
+    scrollOffsetRef.current = e?.nativeEvent?.contentOffset?.y ?? 0;
+  }, []);
+
+  const isHalfState = () => currentSnap.current !== SNAP_FULL;
+
+  // Header pan — handle + başlık alanı, scroll-aware DEĞİL, her zaman drag yakalar.
+  const headerPanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onStartShouldSetPanResponderCapture: () => false,
+      onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dy) > 8 && Math.abs(g.dy) > Math.abs(g.dx),
+      onMoveShouldSetPanResponderCapture: (_, g) => Math.abs(g.dy) > 8 && Math.abs(g.dy) > Math.abs(g.dx),
+      onPanResponderTerminationRequest: () => false,
+      onPanResponderMove: (_, g) => {
+        const newY = currentSnap.current + g.dy;
+        translateY.setValue(Math.max(SNAP_FULL - 20, newY));
+      },
+      onPanResponderRelease: (_, g) => {
+        const finalPos = currentSnap.current + g.dy;
+        if (finalPos > SCREEN_H * 0.65 || g.vy > 0.8) {
+          currentSnap.current = SNAP_DISMISS;
+          Animated.parallel([
+            Animated.timing(translateY, { toValue: SNAP_DISMISS, duration: 200, useNativeDriver: true }),
+            Animated.timing(backdropOpacity, { toValue: 0, duration: 180, useNativeDriver: true }),
+          ]).start(() => onCloseRef.current());
+          return;
+        }
+        if (finalPos < SCREEN_H * 0.35 || g.vy < -0.5) {
+          currentSnap.current = SNAP_FULL;
+          Animated.spring(translateY, { toValue: SNAP_FULL, useNativeDriver: true, damping: 22, stiffness: 200 }).start();
+          return;
+        }
+        currentSnap.current = SNAP_HALF;
+        Animated.spring(translateY, { toValue: SNAP_HALF, useNativeDriver: true, damping: 22, stiffness: 200 }).start();
+      },
+    })
+  ).current;
+
+  // Body pan — half state'te her drag, full state'te sadece scroll-top'taki aşağı drag.
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onStartShouldSetPanResponderCapture: () => false,
+      onMoveShouldSetPanResponder: (_, g) => {
+        if (Math.abs(g.dy) < 8) return false;
+        if (Math.abs(g.dy) <= Math.abs(g.dx)) return false;
+        if (isHalfState()) return true;
+        return g.dy > 0 && scrollOffsetRef.current <= 0;
+      },
+      onMoveShouldSetPanResponderCapture: (_, g) => {
+        if (Math.abs(g.dy) < 25) return false;
+        if (Math.abs(g.dy) <= Math.abs(g.dx) * 2) return false;
+        if (isHalfState()) return true;
+        return g.dy > 0 && scrollOffsetRef.current <= 0;
+      },
+      onPanResponderTerminationRequest: () => false,
+      onPanResponderMove: (_, g) => {
+        const newY = currentSnap.current + g.dy;
+        translateY.setValue(Math.max(SNAP_FULL - 20, newY));
+      },
+      onPanResponderRelease: (_, g) => {
+        const finalPos = currentSnap.current + g.dy;
+        if (finalPos > SCREEN_H * 0.65 || g.vy > 0.8) {
+          currentSnap.current = SNAP_DISMISS;
+          Animated.parallel([
+            Animated.timing(translateY, { toValue: SNAP_DISMISS, duration: 200, useNativeDriver: true }),
+            Animated.timing(backdropOpacity, { toValue: 0, duration: 180, useNativeDriver: true }),
+          ]).start(() => onCloseRef.current());
+          return;
+        }
+        if (finalPos < SCREEN_H * 0.35 || g.vy < -0.5) {
+          currentSnap.current = SNAP_FULL;
+          Animated.spring(translateY, { toValue: SNAP_FULL, useNativeDriver: true, damping: 22, stiffness: 200 }).start();
+          return;
+        }
+        currentSnap.current = SNAP_HALF;
+        Animated.spring(translateY, { toValue: SNAP_HALF, useNativeDriver: true, damping: 22, stiffness: 200 }).start();
+      },
+    })
+  ).current;
+
+  const dismiss = useCallback(() => {
+    currentSnap.current = SNAP_DISMISS;
+    Animated.parallel([
+      Animated.timing(translateY, { toValue: SNAP_DISMISS, duration: 200, useNativeDriver: true }),
+      Animated.timing(backdropOpacity, { toValue: 0, duration: 180, useNativeDriver: true }),
+    ]).start(() => onClose());
+  }, [onClose, translateY, backdropOpacity]);
+
+  // Açılış animasyonu — dismiss konumundan SNAP_HALF'a yay
+  useEffect(() => {
+    if (visible) {
+      translateY.setValue(SNAP_DISMISS);
+      backdropOpacity.setValue(0);
+      currentSnap.current = SNAP_HALF;
+      Animated.parallel([
+        Animated.spring(translateY, { toValue: SNAP_HALF, useNativeDriver: true, damping: 22, stiffness: 200 }),
+        Animated.timing(backdropOpacity, { toValue: 1, duration: 250, useNativeDriver: true }),
+      ]).start();
+    }
+  }, [visible]);
+
+  // ★ 2026-04-27: TextInput autoFocus ile klavye açılınca yarım snap'te modal ezilip
+  //   sadece header görünüyordu. Klavye açılınca otomatik FULL snap'e çıkar; klavye
+  //   kapanınca HALF'a geri döner. Listeyi görmek için ekstra tıklama yok.
+  useEffect(() => {
+    if (!visible) return;
+    const showSub = Keyboard.addListener('keyboardDidShow', () => {
+      if (currentSnap.current !== SNAP_FULL) {
+        currentSnap.current = SNAP_FULL;
+        Animated.spring(translateY, { toValue: SNAP_FULL, useNativeDriver: true, damping: 22, stiffness: 220 }).start();
+      }
+    });
+    const hideSub = Keyboard.addListener('keyboardDidHide', () => {
+      if (currentSnap.current === SNAP_FULL && !query) {
+        // Klavye kapandıysa ve sorgu yoksa half'a geri dön (peek hissi için).
+        // Sorgu varsa kullanıcı listeye bakıyor, full'da bırak.
+        currentSnap.current = SNAP_HALF;
+        Animated.spring(translateY, { toValue: SNAP_HALF, useNativeDriver: true, damping: 22, stiffness: 200 }).start();
+      }
+    });
+    return () => { showSub.remove(); hideSub.remove(); };
+  }, [visible, query, translateY]);
 
   const isSearchMode = query.length >= 2;
   // ★ Compose modunda arama = arkadaşlar arasında client-side filter
@@ -177,24 +328,45 @@ export function UserSearchModal({ visible, onClose, currentUserId, onSelectUser,
     </Pressable>
   );
 
+  if (!visible) return null;
+
   return (
-    <Modal transparent animationType="none" visible={visible} onRequestClose={onClose}>
-      <View style={s.overlay}>
-        <Pressable style={s.overlayBg} onPress={onClose} />
-        <Animated.View style={[s.container, { transform: [{ translateY: translateValue }] }]}>
-          {/* ★ Swipe handle */}
-          <View style={s.handleWrap} {...panHandlers}>
-            <View style={s.handle} />
-          </View>
-          {/* Header */}
-          <View style={s.header}>
-            <View style={s.headerLeft}>
-              <Ionicons name={isDiscover ? 'search' : 'create'} size={18} color={Colors.teal} />
-              <Text style={s.headerTitle}>{isDiscover ? 'Keşfet' : 'Yeni Mesaj'}</Text>
+    // ★ 2026-04-27: Modal sarmalı kaldırıldı — FollowListModal ile aynı pattern.
+    //   View overlay zIndex:300 ile sayfanın üstünde kalır.
+    <View style={s.overlay} pointerEvents="box-none">
+      <Animated.View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.55)', opacity: backdropOpacity }]}>
+        <Pressable style={StyleSheet.absoluteFillObject} onPress={dismiss} />
+      </Animated.View>
+
+      {/* Sheet — translateY-based positioning (useNativeDriver:true) */}
+      <Animated.View style={[s.sheet, { transform: [{ translateY }] }]} {...panResponder.panHandlers}>
+          {/* Diagonal gradient fon */}
+          <LinearGradient
+            colors={['#4a5668', '#37414f', '#232a35']}
+            locations={[0, 0.35, 1]}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFillObject}
+            pointerEvents="none"
+          />
+          {/* Üst teal hairline */}
+          <LinearGradient
+            colors={['transparent', 'rgba(20,184,166,0.55)', 'transparent']}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+            style={s.topEdge}
+            pointerEvents="none"
+          />
+
+          {/* ★ Header bölgesi her zaman drag yakalar (FULL state'te scroll-top değilken bile). */}
+          <View {...headerPanResponder.panHandlers}>
+            <View style={s.handleWrap}>
+              <View style={s.handle} />
             </View>
-            <Pressable style={s.closeBtn} onPress={onClose}>
-              <Ionicons name="close" size={20} color={Colors.text2} />
-            </Pressable>
+            <View style={s.header}>
+              <View style={s.headerLeft}>
+                <Ionicons name={isDiscover ? 'search' : 'create'} size={18} color={Colors.teal} />
+                <Text style={s.headerTitle}>{isDiscover ? 'Keşfet' : 'Yeni Mesaj'}</Text>
+              </View>
+            </View>
           </View>
 
           {/* Arama */}
@@ -256,6 +428,8 @@ export function UserSearchModal({ visible, onClose, currentUserId, onSelectUser,
                   renderItem={renderUser}
                   showsVerticalScrollIndicator={false}
                   contentContainerStyle={{ paddingBottom: 40 }}
+                  onScroll={handleScroll}
+                  scrollEventThrottle={16}
                   ListEmptyComponent={
                     <View style={s.emptyState}>
                       <Ionicons name="search-outline" size={36} color="rgba(92,225,230,0.2)" />
@@ -277,6 +451,8 @@ export function UserSearchModal({ visible, onClose, currentUserId, onSelectUser,
                   renderItem={() => null}
                   showsVerticalScrollIndicator={false}
                   contentContainerStyle={{ paddingBottom: 40 }}
+                  onScroll={handleScroll}
+                  scrollEventThrottle={16}
                   ListHeaderComponent={
                     <>
                       {/* Arkadaşların */}
@@ -341,50 +517,57 @@ export function UserSearchModal({ visible, onClose, currentUserId, onSelectUser,
               )}
             </>
           )}
-        </Animated.View>
-      </View>
-    </Modal>
+      </Animated.View>
+    </View>
   );
 }
 
 const s = StyleSheet.create({
-  overlay: { flex: 1, justifyContent: 'flex-end' },
-  overlayBg: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.6)' },
-  container: {
-    height: '85%',
-    backgroundColor: Colors.bg,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    overflow: 'hidden',
+  // ★ 2026-04-27: FollowListModal pattern — overlay tüm ekrana yayılır, sheet absolute.
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 300,
+    elevation: 24,
   },
+  sheet: {
+    position: 'absolute',
+    left: 0, right: 0,
+    top: 0, bottom: 0,
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderBottomWidth: 0,
+    borderColor: Colors.glassBorder,
+    ...Shadows.card,
+  },
+  topEdge: {
+    position: 'absolute', top: 0, left: 0, right: 0, height: 1.5, zIndex: 1,
+  },
+  // ★ 2026-04-27: Handle zone genişletildi — kullanıcı sürükleneceğini görsün
   handleWrap: {
     alignItems: 'center',
-    paddingTop: 8,
-    paddingBottom: 4,
+    paddingTop: 12,
+    paddingBottom: 8,
   },
   handle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: 'rgba(20,184,166,0.4)',
+    width: 56,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255,255,255,0.35)',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingTop: 20,
+    paddingTop: 16,
     paddingBottom: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.glassBorder,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(255,255,255,0.08)',
   },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   headerTitle: { fontSize: 17, fontWeight: '700', color: Colors.text, letterSpacing: 0.2 },
-  closeBtn: {
-    width: 32, height: 32, borderRadius: 16,
-    backgroundColor: Colors.glass2,
-    justifyContent: 'center', alignItems: 'center',
-  },
   searchWrap: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -394,10 +577,10 @@ const s = StyleSheet.create({
     marginBottom: 12,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    borderRadius: Radius.default,
-    backgroundColor: Colors.bg3,
-    borderWidth: 1,
-    borderColor: Colors.glassBorder,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.12)',
   },
   searchInput: {
     flex: 1,

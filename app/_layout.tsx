@@ -1,7 +1,15 @@
 // LiveKit polyfill kaldırıldı — native modül yoksa Hermes'te 'Requiring unknown module' crash'ine sebep oluyordu
-import { useEffect, useState, useRef, useCallback, createContext, useContext } from 'react';
+import { useEffect, useState, useRef, useCallback, useMemo, createContext, useContext } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { View, StyleSheet, Dimensions, AppState, Platform, PermissionsAndroid, LogBox } from 'react-native';
+
+// ★ 2026-04-25: Crashlytics — Firebase ile entegre crash izleme.
+//   @react-native-firebase/crashlytics native module; sadece dev-client/release build'de çalışır.
+//   Lazy load — Hermes'te modül yoksa crash etmesin.
+let crashlytics: any = null;
+try {
+  crashlytics = require('@react-native-firebase/crashlytics').default;
+} catch { /* native module yoksa sessiz */ }
 
 // ★ Geliştirme sırasında beklenen yapılandırma hatalarını LogBox'tan gizle.
 // IAP ürünleri RevenueCat Dashboard'a eklenene kadar normal davranış.
@@ -20,7 +28,7 @@ LogBox.ignoreLogs([
   /Received leave request while trying to \(re\)connect/,
   /ConnectionError.*LeaveRequest/,
 ]);
-import { Stack, useRouter, useSegments, usePathname } from 'expo-router';
+import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import * as Linking from 'expo-linking';
@@ -49,6 +57,12 @@ import ErrorBoundary from '../components/ErrorBoundary';
 import NotificationDrawer from '../components/NotificationDrawer';
 import SPReceivedModal from '../components/profile/SPReceivedModal';
 import ThankYouReceivedModal from '../components/profile/ThankYouReceivedModal';
+import IncomingFriendRequestCard from '../components/IncomingFriendRequestCard';
+import BadgeCelebration from '../components/profile/BadgeCelebration';
+import InRoomUserProfile from '../components/room/InRoomUserProfile';
+import { UserSearchModal } from '../components/UserSearchModal';
+import AppBackground from '../components/AppBackground';
+import PremiumLoader from '../components/PremiumLoader';
 
 import { OnlineFriendsProvider } from '../providers/OnlineFriendsProvider';
 export { useOnlineFriends } from '../providers/OnlineFriendsProvider';
@@ -64,13 +78,17 @@ SplashScreen.preventAutoHideAsync();
 // ═══════════════════════════════════════════════════════════
 if (!__DEV__) {
   try {
-    // ErrorUtils is a React Native internal global, not a named export.
-    // Access it from the global scope with defensive checks.
     const _ErrorUtils = (global as any).ErrorUtils;
     if (_ErrorUtils && typeof _ErrorUtils.getGlobalHandler === 'function') {
       const defaultHandler = _ErrorUtils.getGlobalHandler();
       _ErrorUtils.setGlobalHandler((error: Error, isFatal?: boolean) => {
-        // ★ Crash log'u AsyncStorage'a kaydet — Sentry/Crashlytics eklenince buradan okunabilir
+        // ★ 2026-04-25: Crashlytics'e gönder + AsyncStorage fallback (debug için)
+        try {
+          if (crashlytics) {
+            crashlytics().recordError(error, error?.message || 'Unknown error');
+            if (isFatal) crashlytics().log('FATAL crash detected');
+          }
+        } catch { /* crashlytics yoksa sessiz */ }
         try {
           const crashEntry = JSON.stringify({
             timestamp: new Date().toISOString(),
@@ -78,22 +96,33 @@ if (!__DEV__) {
             stack: error?.stack?.substring(0, 500),
             isFatal,
           });
-          // Asenkron ama await etmiyoruz — handler senkron olmalı
           AsyncStorage.getItem('soprano_crash_logs').then(raw => {
             const logs: string[] = raw ? JSON.parse(raw) : [];
             logs.unshift(crashEntry);
-            // Son 20 hatayı tut — bellek şişmesini önle
             if (logs.length > 20) logs.length = 20;
             AsyncStorage.setItem('soprano_crash_logs', JSON.stringify(logs)).catch(() => {});
           }).catch(() => {});
-        } catch { /* crash handler içinde hata olursa sessiz geç */ }
-        console.error(`[SopranoChat] ${isFatal ? 'FATAL' : 'NON-FATAL'} ERROR:`, error?.message);
+        } catch { /* sessiz */ }
         if (defaultHandler) defaultHandler(error, isFatal);
       });
     }
-  } catch (e) {
-    // ErrorUtils erişilemezse sessizce geç — uygulama çalışmaya devam etsin
-  }
+  } catch { /* ErrorUtils erişilemezse sessiz */ }
+
+  // ★ Audit fix: Unhandled Promise Rejection — sync error handler async'i yakalamıyor
+  try {
+    const g: any = global as any;
+    g.HermesInternal?.enablePromiseRejectionTracker?.({
+      allRejections: true,
+      onUnhandled: (id: number, reason: any) => {
+        try {
+          if (crashlytics) {
+            const err = reason instanceof Error ? reason : new Error(String(reason?.message || reason));
+            crashlytics().recordError(err, `[unhandled-rejection-${id}] ${err.message}`);
+          }
+        } catch {}
+      },
+    });
+  } catch {}
 }
 
 // ========== AUTH CONTEXT ==========
@@ -167,6 +196,40 @@ export function useAuth() {
   return useContext(AuthContext);
 }
 
+// ========== KULLANICI PROFİLİ SHEET CONTEXT ==========
+// ★ 2026-04-26: Clubhouse tarzı evrensel profil paneli — her yerden açılır,
+//   tam sayfa yerine alttan kayar, drag-to-expand. Tüm router.push('/user/X')
+//   çağrıları yerini bu hook'a bırakıyor: openUserProfile(id).
+type UserProfileSheetContextType = {
+  openUserProfile: (userId: string) => void;
+  closeUserProfile: () => void;
+};
+export const UserProfileSheetContext = createContext<UserProfileSheetContextType>({
+  openUserProfile: () => {},
+  closeUserProfile: () => {},
+});
+export function useUserProfileSheet() {
+  return useContext(UserProfileSheetContext);
+}
+
+// ★ 2026-04-27: Global Search Sheet — UserSearchModal Tab Navigator dışında
+// (app/_layout.tsx'te) mount edilir, böylece Tab Bar'ın altında kalmaz.
+type UserSearchSheetContextType = {
+  openSearch: (opts: {
+    mode: 'discover' | 'compose';
+    onSelectUser?: (userId: string, displayName: string) => void;
+    onSelectRoom?: (roomId: string) => void;
+  }) => void;
+  closeSearch: () => void;
+};
+export const UserSearchSheetContext = createContext<UserSearchSheetContextType>({
+  openSearch: () => {},
+  closeSearch: () => {},
+});
+export function useUserSearchSheet() {
+  return useContext(UserSearchSheetContext);
+}
+
 // ========== REALTIME BADGE CONTEXT ==========
 type BadgeContextType = {
   unreadDMs: number;
@@ -209,10 +272,19 @@ function RealtimeBadgeProvider({ userId, children }: { userId: string | null; ch
   const [unreadDMs, setUnreadDMs] = useState(0);
   const [pendingFollows, setPendingFollows] = useState(0);
   const [unreadNotifs, setUnreadNotifs] = useState(0);
-  // ★ 2026-04-21: Route context — oda içindeyken follow_pending zile yansısın, dışında arkadaş simgesinde.
-  const pathname = usePathname();
+  // ★ 2026-04-26 PERF: usePathname() KALDIRILDI — her navigasyon değişikliğinde
+  //   bu provider + tüm children (CurvedTabBar dahil) re-render oluyordu.
+  //   Oda içinde olup olmadığını global.__sopranoInRoom flag'inden okuyoruz
+  //   (room/[id] mount'ta true, unmount'ta false yapıyor).
   const inRoomRef = useRef(false);
-  useEffect(() => { inRoomRef.current = pathname?.startsWith('/room') ?? false; }, [pathname]);
+  useEffect(() => {
+    // Periyodik sync — global flag room/[id] tarafından yönetilir
+    const syncInRoom = () => { inRoomRef.current = !!(global as any).__sopranoInRoom; };
+    syncInRoom();
+    // AppState change'de de senkronize et
+    const sub = require('react-native').AppState.addEventListener('change', syncInRoom);
+    return () => sub?.remove();
+  }, []);
 
   const refreshBadges = async () => {
     if (!userId) return;
@@ -285,21 +357,32 @@ function RealtimeBadgeProvider({ userId, children }: { userId: string | null; ch
         schema: 'public',
         table: 'notifications',
         filter: `user_id=eq.${userId}`,
-      }, (payload) => {
-        const n = payload.new as { type?: string; body?: string; id?: string };
+      }, async (payload) => {
+        const n = payload.new as { type?: string; body?: string; id?: string; sender_id?: string };
         const notifType = n?.type;
         // ★ 2026-04-20: follow_request bell'e sayılmaz (Friends drawer'da zaten
         //   pendingFollows var) ama her ekranda toast göster ki oda içindeki
         //   kullanıcı da bilsin.
-        if (notifType === 'follow_request') {
-          showToast({ title: '👋 Arkadaşlık İsteği', message: n?.body || 'Yeni arkadaşlık isteği', type: 'info', id: `notif_${n?.id}` });
-          return;
-        }
-        // ★ 2026-04-21: follow_pending — oda içindeyken bell badge; dışında sadece friend icon (pendingFollows)
-        if (notifType === 'follow_pending') {
-          if (inRoomRef.current) {
-            setUnreadNotifs(prev => prev + 1);
-            showToast({ title: '👋 Arkadaşlık İsteği', message: n?.body || 'Yeni arkadaşlık isteği', type: 'info', id: `notif_${n?.id}` });
+        if (notifType === 'follow_request' || notifType === 'follow_pending') {
+          // ★ 2026-04-24: Actionable card tetikle — toast yerine onayla/reddet butonlu premium kart.
+          //   Oda içindeyken unread bell badge'e de ekle.
+          if (inRoomRef.current) setUnreadNotifs(prev => prev + 1);
+          try {
+            if (n?.sender_id && userId) {
+              const { data: sp } = await supabase.from('profiles').select('display_name, avatar_url').eq('id', n.sender_id).single();
+              if (__DEV__) console.log('[FriendRequest] Card tetikleniyor:', n.sender_id, sp?.display_name);
+              (global as any).__setIncomingFriendRequest?.({
+                senderId: n.sender_id,
+                senderName: sp?.display_name || 'Kullanıcı',
+                senderAvatar: sp?.avatar_url,
+                notificationId: n.id,
+                currentUserId: userId,
+              });
+            } else {
+              if (__DEV__) console.warn('[FriendRequest] sender_id veya userId eksik:', n);
+            }
+          } catch (e) {
+            if (__DEV__) console.warn('[FriendRequest] Profile fetch hatası:', e);
           }
           return;
         }
@@ -462,16 +545,14 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
     }
   }, [isAuthReady, isLoggedIn, profile, firebaseUser?.emailVerified, segments, authVersion]);
 
-  // ★ Auth hazır değilken loading göster — siyah ekranı önle
+  // ★ Auth hazır değilken loading göster — proje bg + animated spinner
   if (!isAuthReady) {
     return (
-      <View style={{ flex: 1, backgroundColor: Colors.bg, alignItems: 'center', justifyContent: 'center' }}>
-        <View style={{
-          width: 40, height: 40, borderRadius: 20,
-          borderWidth: 3, borderColor: 'rgba(20,184,166,0.15)',
-          borderTopColor: '#14B8A6',
-        }} />
-      </View>
+      <AppBackground radialGlow>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <PremiumLoader size={56} />
+        </View>
+      </AppBackground>
     );
   }
 
@@ -485,11 +566,16 @@ export default function RootLayout() {
   // Splash kaldırıldı — doğrudan login/home'a geçiş
 
   // ★ Font yükleme durumunu takip et
+  // ★ 2026-04-25: Ionicons font'u da pre-load — tab bar icon race condition fix.
+  //   İlk açılışta sol-altta radio icon görünmüyordu çünkü Ionicons font'u
+  //   splash gizlendikten sonra yükleniyordu. Artık splash, Ionicons dahil
+  //   tüm fontlar yüklenene kadar kalır.
   const [fontsLoaded, fontError] = useFonts({
     Inter_400Regular,
     Inter_500Medium,
     Inter_600SemiBold,
     Inter_700Bold,
+    Ionicons: require('@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Ionicons.ttf'),
   });
 
   const [appIsReady, setAppIsReady] = useState(false);
@@ -497,44 +583,54 @@ export default function RootLayout() {
 
   // Uygulama hazırlık süreci
   useEffect(() => {
+    // ★ Watchdog: prepare() içindeki herhangi bir await 8sn'i geçerse splash'i zorla kapat.
+    //   Cold start'ta sonsuz hang yerine boş/erişilebilir UI tercih edilir.
+    const watchdog = setTimeout(() => {
+      setAppIsReady((current) => {
+        if (!current && __DEV__) console.warn('[RootLayout] Splash watchdog tetiklendi (8sn).');
+        return true;
+      });
+    }, 8000);
     async function prepare() {
-      console.log('[RootLayout] Hazırlık süreci başlatıldı...');
+      if (__DEV__) console.log('[RootLayout] Hazırlık süreci başlatıldı...');
       try {
-        // ★ Intro kaldırıldı — doğrudan yükleme
-
-        // Ayarları ve i18n'i yükle
-        console.log('[RootLayout] Ayarlar yükleniyor...');
-        const s = await SettingsService.get();
-        console.log('[RootLayout] Ayarlar yüklendi, tema ayarlanıyor:', s.theme);
+        // ★ Audit fix: Settings + i18n + LiveKit init paralel.
+        //   Önceden 3 await ardışıktı (~150-300ms toplam); artık paralel.
+        const [s] = await Promise.all([
+          SettingsService.get(),
+          i18n.init(),
+        ]);
         setActiveTheme(s.theme as ThemeKey);
-
-        console.log('[RootLayout] i18n başlatılıyor...');
-        await i18n.init();
-        console.log('[RootLayout] i18n hazır.');
-
         setThemeVersion(v => v + 1);
+        // ★ Faz 3.4 — Mic processing tercihlerini LiveKit'e geçir (publish öncesi aktif).
+        //   Ayrı try/catch — LiveKit yüklemesi fail olursa app yine açılsın.
+        try {
+          const { liveKitService } = await import('../services/livekit');
+          liveKitService.setAudioProcessing({
+            echoCancellation: s.echo_cancellation,
+            noiseSuppression: s.noise_suppression,
+            autoGainControl: s.auto_gain,
+          });
+        } catch {}
       } catch (e) {
-        console.error('[RootLayout] Hazırlık hatası:', e);
+        if (__DEV__) console.error('[RootLayout] Hazırlık hatası:', e);
       } finally {
-        console.log('[RootLayout] Hazırlık tamamlandı (appIsReady = true)');
         setAppIsReady(true);
+        clearTimeout(watchdog);
       }
     }
     prepare();
+    return () => clearTimeout(watchdog);
   }, []);
 
   // ★ CRITICAL: Her şey hazır olduğunda splash screen'i gizle
-  // Intro video ayrı overlay olarak üstde görünür — splash ile bağımsız
   useEffect(() => {
-    console.log('[RootLayout] State kontrolü:', { appIsReady, fontsLoaded, fontError: !!fontError });
     if (appIsReady && (fontsLoaded || fontError)) {
-      console.log('[RootLayout] Splash gizleniyor...');
       const timer = setTimeout(async () => {
         try {
           await SplashScreen.hideAsync();
-          console.log('[RootLayout] Splash gizlendi.');
         } catch (e) {
-          console.warn('[RootLayout] Splash gizleme hatası (muhtemelen zaten gizli):', e);
+          if (__DEV__) console.warn('[RootLayout] Splash gizleme hatası:', e);
         }
       }, 300);
       return () => clearTimeout(timer);
@@ -556,6 +652,26 @@ export default function RootLayout() {
   const minimizedRoomRef = useRef<MinimizedRoom | null>(null);
   useEffect(() => { minimizedRoomRef.current = minimizedRoom; }, [minimizedRoom]);
   const [showNotifDrawer, setShowNotifDrawer] = useState(false);
+  // ★ 2026-04-26: Global kullanıcı profili sheet — her yerden açılır (clubhouse tarzı peek)
+  const [profileSheetUserId, setProfileSheetUserId] = useState<string | null>(null);
+  const userProfileSheetContextValue = useMemo(() => ({
+    openUserProfile: (userId: string) => setProfileSheetUserId(userId),
+    closeUserProfile: () => setProfileSheetUserId(null),
+  }), []);
+
+  // ★ 2026-04-27: Global search sheet — Tab bar'ın üzerinde render edebilmek için
+  //   app/_layout.tsx'te mount; home/messages pages'leri context üzerinden açar.
+  type SearchSheetState = {
+    visible: boolean;
+    mode: 'discover' | 'compose';
+    onSelectUser?: (userId: string, displayName: string) => void;
+    onSelectRoom?: (roomId: string) => void;
+  };
+  const [searchSheet, setSearchSheet] = useState<SearchSheetState>({ visible: false, mode: 'discover' });
+  const userSearchSheetContextValue = useMemo(() => ({
+    openSearch: (opts: Omit<SearchSheetState, 'visible'>) => setSearchSheet({ ...opts, visible: true }),
+    closeSearch: () => setSearchSheet(prev => ({ ...prev, visible: false })),
+  }), []);
   // ★ 2026-04-20: Zil ikon offseti (sağdan px). Her ekran farklı; default 60 (home pattern).
   const [notifDrawerAnchorRight, setNotifDrawerAnchorRight] = useState(60);
   const [notifDrawerRight, setNotifDrawerRight] = useState<number>(8);
@@ -568,7 +684,21 @@ export default function RootLayout() {
   const [incomingThankYou, setIncomingThankYou] = useState<{
     senderName: string; senderAvatar?: string; emoji?: string; message?: string;
   } | null>(null);
-  const router = useRouter(); // routerRef yerine doğrudan kullan
+  // ★ 2026-04-24: Arkadaşlık isteği actionable card state
+  const [incomingFriendRequest, setIncomingFriendRequest] = useState<{
+    senderId: string; senderName: string; senderAvatar?: string; notificationId?: string; currentUserId: string;
+  } | null>(null);
+  // Child provider (RealtimeBadgeProvider) bunu çağırsın diye global setter register et
+  useEffect(() => {
+    (global as any).__setIncomingFriendRequest = setIncomingFriendRequest;
+    return () => { delete (global as any).__setIncomingFriendRequest; };
+  }, []);
+  const router = useRouter();
+  // ★ 2026-04-26 PERF: usePathname() ve useSegments() ROOT LAYOUT'TAN KALDIRILDI.
+  //   Bu hook'lar her navigasyon değişikliğinde (tab switch, push, back) tüm
+  //   1466 satırlık RootLayout bileşenini re-render ettiriyordu — context provider'lar,
+  //   overlay'ler, children hepsi yeniden oluşturuluyordu. isTabBarVisible artık
+  //   MiniRoomCard'in kendi içinde useSegments() ile hesaplanıyor.
 
   // ★ Minimize heartbeat — oda küçültüldüğünde heartbeat global olarak devam eder
   const minimizedHeartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -660,14 +790,9 @@ export default function RootLayout() {
     setActiveTheme(key);
     setThemeVersion(v => v + 1);
   }, []);
-  useEffect(() => {
-    (async () => {
-      const s = await SettingsService.get();
-      setActiveTheme(s.theme as ThemeKey);
-      await i18n.init();
-      setThemeVersion(v => v + 1); // force re-render with loaded theme
-    })();
-  }, []);
+  // ★ 2026-04-26 PERF: Duplicate SettingsService.get() + i18n.init() kaldırıldı.
+  //   prepare() fonksiyonu (satır ~554) zaten aynı işi yapıyor. İki paralel async
+  //   çağrı → double network request + double setThemeVersion re-render.
 
 
 
@@ -829,6 +954,18 @@ export default function RootLayout() {
         });
         setIsLoggedIn(true);
 
+        // ★ 2026-04-25: Analytics user identification + Crashlytics binding
+        //   Crashlytics setUserId crash report'larını user'a bağlar (KVKK: sadece UID, PII yok).
+        try {
+          const { Analytics } = require('../services/analytics');
+          Analytics.setUserId(fbUser.uid);
+          Analytics.track('login_success');
+        } catch {}
+        try {
+          const cl = require('@react-native-firebase/crashlytics').default;
+          cl().setUserId(fbUser.uid);
+        } catch {}
+
         // ★ Firebase JWT → Supabase: Token'ı al ve Supabase'e enjekte et
         try {
           const idToken = await fbUser.getIdToken(false);
@@ -851,6 +988,15 @@ export default function RootLayout() {
         setProfile(null);
         setIsLoggedIn(false);
         setIsAuthReady(true);
+        // ★ Logout: Crashlytics + Analytics user'ı sıfırla (KVKK: PII bağı kopsun)
+        try {
+          const { Analytics } = require('../services/analytics');
+          Analytics.setUserId(null);
+        } catch {}
+        try {
+          const cl = require('@react-native-firebase/crashlytics').default;
+          cl().setUserId('');
+        } catch {}
         // ★ Logout: Supabase token'ı temizle + minimized room sıfırla + LiveKit kapat
         setSupabaseAuthToken(null);
         setMinimizedRoom(null);
@@ -924,7 +1070,7 @@ export default function RootLayout() {
       } catch { /* silent */ }
     });
     return () => subscription.remove();
-  }, [firebaseUser]);
+  }, [firebaseUser?.uid]); // ★ Audit fix: obj ref yerine uid
 
   // Push bildirim: Tıklanınca doğru sayfaya yönlendir (deep link)
   // ★ NOT: Yerel bildirim tetikleme KALDIRILDI — Uygulama içindeyken popup çıkmamalı.
@@ -973,24 +1119,28 @@ export default function RootLayout() {
       if (responseListener) responseListener.remove();
       if (receivedListener) receivedListener.remove();
     };
-  }, [firebaseUser]);
+  }, [firebaseUser?.uid]); // ★ Audit fix: obj ref yerine uid
 
   // ═══ P2: SP Bakiye Realtime — SP değiştiğinde profil anında güncellenir ═══
+  // ★ 2026-04-26 PERF: refreshProfile() tam DB fetch + tüm context tree re-render'ı tetikliyordu.
+  //   Şimdi sadece system_points field'ını in-place güncelliyoruz — O(1) + tek setState.
   useEffect(() => {
-    if (!firebaseUser) return;
+    const uid = firebaseUser?.uid;
+    if (!uid) return;
     const spSub = supabase
-      .channel(`sp_sync:${firebaseUser.uid}`)
+      .channel(`sp_sync:${uid}`)
       .on('postgres_changes', {
         event: 'UPDATE',
         schema: 'public',
         table: 'profiles',
-        filter: `id=eq.${firebaseUser.uid}`,
+        filter: `id=eq.${uid}`,
       }, (payload) => {
         const newSP = (payload.new as { system_points?: number })?.system_points;
         // Sadece SP değiştiyse profili tazele (gereksiz re-render önleme)
         if (newSP !== undefined) {
           if (__DEV__) console.log(`[SPSync] Bakiye güncellendi: ${newSP} SP`);
-          refreshProfile();
+          // ★ PERF: Tam refreshProfile() yerine sadece SP field'ını güncelle
+          setProfile(prev => prev ? { ...prev, system_points: newSP } : prev);
         }
       })
       .subscribe();
@@ -998,18 +1148,19 @@ export default function RootLayout() {
     return () => {
       supabase.removeChannel(spSub);
     };
-  }, [firebaseUser]);
+  }, [firebaseUser?.uid]); // ★ Audit fix: obj ref yerine uid string (her render leak önle)
 
   // ═══ SP Bağış Alındı — realtime popup tetikleyici ═══
   useEffect(() => {
-    if (!firebaseUser) return;
+    const uid = firebaseUser?.uid;
+    if (!uid) return;
     const giftSub = supabase
-      .channel(`gift_recv:${firebaseUser.uid}`)
+      .channel(`gift_recv:${uid}`)
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
         table: 'notifications',
-        filter: `user_id=eq.${firebaseUser.uid}`,
+        filter: `user_id=eq.${uid}`,
       }, async (payload) => {
         const notif = payload.new as any;
         if (__DEV__) console.log('[GiftRT] notif received:', notif?.type, notif?.body);
@@ -1068,10 +1219,10 @@ export default function RootLayout() {
         }
       })
       .subscribe((status) => {
-        if (__DEV__) console.log(`[GiftRT] channel status: ${status} for user ${firebaseUser.uid}`);
+        if (__DEV__) console.log(`[GiftRT] channel status: ${status} for user ${uid}`);
       });
     return () => { supabase.removeChannel(giftSub); };
-  }, [firebaseUser]);
+  }, [firebaseUser?.uid]); // ★ Audit fix: obj ref yerine uid string
 
   // Gelen arama dinleyicisi (global) — Tüm sinyalleri yakala + AppState reconnect
   const callChannelRef = useRef<{ unsubscribe: () => void; reconnect?: () => void } | null>(null);
@@ -1137,23 +1288,33 @@ export default function RootLayout() {
 
     return () => {
       callChannel.unsubscribe();
+      // ★ Audit fix: removeChannel() — unsubscribe Supabase registry'den silmiyor.
+      //   call.ts'den gelen wrapper, internal channel'ı kapamak için cast.
+      try { supabase.removeChannel(callChannel as any); } catch {}
       callChannelRef.current = null;
       appStateSub.remove();
     };
-  }, [firebaseUser]);
+  }, [firebaseUser?.uid]); // ★ Audit fix: obj ref yerine uid string
 
   // ★ ARCH-8 FIX: routerRef her render'da güncellenir — stale router önlenir
   const router2 = useRouter();
   const routerRef = useRef(router2);
   routerRef.current = router2;
   useEffect(() => {
+    // ★ SEC: Deep link path traversal koruması — sadece geçerli ID formatları kabul edilir.
+    //   rooms.id = UUID v4 (36 char), profiles.id = Firebase UID (20–40 alphanumeric).
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const FUID_RE = /^[A-Za-z0-9]{20,40}$/;
     function handleDeepLink(url: string) {
       try {
         const parsed = Linking.parse(url);
-        if (parsed.path?.startsWith('room/')) {
-          routerRef.current.push(`/room/${parsed.path.replace('room/', '')}`);
-        } else if (parsed.path?.startsWith('user/')) {
-          routerRef.current.push(`/user/${parsed.path.replace('user/', '')}`);
+        const path = parsed.path || '';
+        if (path.startsWith('room/')) {
+          const roomId = path.slice('room/'.length).split('/')[0].split('?')[0].trim();
+          if (UUID_RE.test(roomId)) routerRef.current.push(`/room/${roomId}`);
+        } else if (path.startsWith('user/')) {
+          const userId = path.slice('user/'.length).split('/')[0].split('?')[0].trim();
+          if (FUID_RE.test(userId)) routerRef.current.push(`/user/${userId}`);
         }
       } catch (e) { /* ignore */ }
     }
@@ -1164,7 +1325,28 @@ export default function RootLayout() {
     return () => sub?.remove();
   }, []);
 
+  // ★ 2026-04-26 PERF: Context value'lar memoize — her render'da yeni obje oluşması
+  //   tüm useAuth() / useTheme() consumer'larını gereksiz re-render ettiriyordu.
+  const authContextValue = useMemo(() => ({
+    isAuthReady, isLoggedIn, setIsLoggedIn, user, setUser, firebaseUser,
+    authVersion, refreshAuth, justCompletedOnboarding, setJustCompletedOnboarding,
+    profile, setProfile, refreshProfile, minimizedRoom, setMinimizedRoom,
+    pendingCallSignals, consumeCallSignal, activeCallId,
+    setActiveCallId: updateActiveCallId, showNotifDrawer, setShowNotifDrawer,
+    setNotifDrawerAnchorRight, setNotifDrawerRight, setNotifDrawerTop,
+  }), [
+    isAuthReady, isLoggedIn, user, firebaseUser, authVersion,
+    justCompletedOnboarding, profile, minimizedRoom,
+    pendingCallSignals, activeCallId, showNotifDrawer,
+  ]);
+
+  const themeContextValue = useMemo(() => ({
+    themeVersion, applyTheme,
+  }), [themeVersion, applyTheme]);
+
   // ★ Hazırlık bitene kadar minimal loading göster
+  // ★ 2026-04-26 FIX: Hook kuralları — tüm hook'lardan SONRA early return.
+  //   Önceki konumda useMemo'lar koşullu çağrılıyordu → "Rendered more hooks" crash.
   if (!appIsReady || (!fontsLoaded && !fontError)) {
     return (
       <View style={{ flex: 1, backgroundColor: '#0F172A', alignItems: 'center', justifyContent: 'center' }}>
@@ -1178,8 +1360,10 @@ export default function RootLayout() {
   }
 
   return (
-    <AuthContext.Provider value={{ isAuthReady, isLoggedIn, setIsLoggedIn, user, setUser, firebaseUser, authVersion, refreshAuth, justCompletedOnboarding, setJustCompletedOnboarding, profile, setProfile, refreshProfile, minimizedRoom, setMinimizedRoom, pendingCallSignals, consumeCallSignal, activeCallId, setActiveCallId: updateActiveCallId, showNotifDrawer, setShowNotifDrawer, setNotifDrawerAnchorRight, setNotifDrawerRight, setNotifDrawerTop }}>
-      <ThemeContext.Provider value={{ themeVersion, applyTheme }}>
+    <AuthContext.Provider value={authContextValue}>
+      <UserProfileSheetContext.Provider value={userProfileSheetContextValue}>
+      <UserSearchSheetContext.Provider value={userSearchSheetContextValue}>
+      <ThemeContext.Provider value={themeContextValue}>
       <RealtimeBadgeProvider userId={firebaseUser?.uid || null}>
       <OnlineFriendsProvider userId={firebaseUser?.uid || null}>
       <View style={styles.container}>
@@ -1192,7 +1376,7 @@ export default function RootLayout() {
               headerShown: false,
               contentStyle: { backgroundColor: Colors.bg },
               animation: 'fade',
-              animationDuration: 250,
+              animationDuration: 180,
             }}
           >
             <Stack.Screen name="(auth)" options={{ animation: 'fade' }} />
@@ -1206,12 +1390,41 @@ export default function RootLayout() {
               gestureEnabled: false,
             }} />
             {/* broadcast/[id] kaldırıldı — Room'a "Yayın Modu" toggle eklendi */}
-            <Stack.Screen name="chat/[id]" options={{ animation: 'fade_from_bottom', animationDuration: 250 }} />
-            <Stack.Screen name="user/[id]" options={{ animation: 'fade_from_bottom', animationDuration: 250 }} />
-            <Stack.Screen name="plus" options={{ animation: 'fade_from_bottom', animationDuration: 250 }} />
-            <Stack.Screen name="edit-profile" options={{ animation: 'fade_from_bottom', animationDuration: 250 }} />
-            <Stack.Screen name="notifications" options={{ animation: 'fade_from_bottom', animationDuration: 250 }} />
-            <Stack.Screen name="admin" options={{ animation: 'fade_from_bottom', animationDuration: 250 }} />
+            {/* ★ 2026-04-26 (v2): Mesajlar sayfası ISTISNA — sürükleme yerine yanal animasyon.
+                 Diğer modal'lar (user/[id], club/[id]) alttan kayar; bu sayfa klasik sayfa geçişi pattern'i. */}
+            <Stack.Screen
+              name="chat/[id]"
+              options={{
+                animation: 'slide_from_right',
+                animationDuration: 280,
+              }}
+            />
+            {/* ★ 2026-04-26: user/[id] modal — başka kullanıcının tam profili sayfası, bağlam-içi açılışlar modal olsun (Clubhouse/Telegram pattern) */}
+            <Stack.Screen
+              name="user/[id]"
+              options={{
+                presentation: 'modal',
+                animation: 'slide_from_bottom',
+                animationDuration: 280,
+                gestureEnabled: true,
+                gestureDirection: 'vertical',
+              }}
+            />
+            {/* ★ 2026-04-26: club/[id] modal — kulüpler listesinden açılan kulüp detayı */}
+            <Stack.Screen
+              name="club/[id]"
+              options={{
+                presentation: 'modal',
+                animation: 'slide_from_bottom',
+                animationDuration: 280,
+                gestureEnabled: true,
+                gestureDirection: 'vertical',
+              }}
+            />
+            <Stack.Screen name="plus" options={{ animation: 'slide_from_right', animationDuration: 280 }} />
+            <Stack.Screen name="edit-profile" options={{ animation: 'slide_from_right', animationDuration: 280 }} />
+            <Stack.Screen name="notifications" options={{ animation: 'slide_from_right', animationDuration: 280 }} />
+            <Stack.Screen name="admin" options={{ animation: 'slide_from_right', animationDuration: 280 }} />
             <Stack.Screen name="call/[id]" options={{ animation: 'fade_from_bottom', animationDuration: 200, gestureEnabled: false }} />
             {/* ★ 2026-04-23: create-room artık bottom-sheet modal — arkadaki ekran görünür kalır,
                  kendi animasyonunu içinde yapıyor (translateY + backdrop fade), native transition yok. */}
@@ -1220,13 +1433,13 @@ export default function RootLayout() {
               animation: 'none',
               contentStyle: { backgroundColor: 'transparent' },
             }} />
-            <Stack.Screen name="settings" options={{ animation: 'fade_from_bottom', animationDuration: 250 }} />
-            <Stack.Screen name="leaderboard" options={{ animation: 'fade_from_bottom', animationDuration: 250 }} />
+            <Stack.Screen name="settings" options={{ animation: 'slide_from_right', animationDuration: 280 }} />
+            <Stack.Screen name="leaderboard" options={{ animation: 'slide_from_right', animationDuration: 280 }} />
 
           </Stack>
         </AuthGuard>
         </ErrorBoundary>
-        {/* Küçültülmüş Oda Kartı — Tüm sayfalarda görünür */}
+        {/* Küçültülmüş Oda Kartı — Tüm sayfalarda görünür; tab bar yoksa tab bar offset'i sıfırla */}
         {minimizedRoom && (
           <MiniRoomCard
             room={minimizedRoom}
@@ -1269,6 +1482,14 @@ export default function RootLayout() {
               } catch {}
               setMinimizedRoom({ ...minimizedRoom, isRoomMuted: newMuted });
             }}
+            onMicToggle={async () => {
+              // ★ 2026-04-24: Minimize'da mic aç/kapat — LiveKit toggle
+              try {
+                await liveKitService.toggleMicrophone();
+                const newMicOn = liveKitService.isMicrophoneEnabled;
+                setMinimizedRoom({ ...minimizedRoom, isMicOn: newMicOn });
+              } catch {}
+            }}
           />
         )}
         <Toast />
@@ -1283,7 +1504,8 @@ export default function RootLayout() {
           anchorRight={notifDrawerAnchorRight}
           drawerRight={notifDrawerRight}
           anchorTop={notifDrawerTop}
-          onShowGiftModal={(p) => setIncomingGift({ amount: p.amount, senderId: p.senderId, senderName: p.senderName, senderAvatar: p.senderAvatar })}
+          onShowGiftModal={(p) => setIncomingGift({ amount: p.amount, senderId: p.senderId, senderName: p.senderName, senderAvatar: p.senderAvatar, notificationId: p.notificationId })}
+          onShowThankYou={(p) => setIncomingThankYou({ senderName: p.senderName, senderAvatar: p.senderAvatar, emoji: p.emoji || '🙏', message: p.message })}
         />
 
         {/* ★ SP Bağış Alındı global popup — realtime tetiklenir */}
@@ -1301,6 +1523,16 @@ export default function RootLayout() {
         )}
 
         {/* ★ Teşekkür Alındı global popup — realtime tetiklenir */}
+        {/* ★ 2026-04-24: Arkadaşlık isteği actionable card — hem oda içi hem dışarıda */}
+        <IncomingFriendRequestCard
+          request={incomingFriendRequest}
+          onDismiss={() => setIncomingFriendRequest(null)}
+          onHandled={() => {
+            // Keşfet arkadaş simgesi + oda zil badge'i senkron — DB'den fresh count çek
+            try { (global as any).__sopranoBadgeRefresh?.(); } catch {}
+          }}
+        />
+
         {incomingThankYou && (
           <ThankYouReceivedModal
             visible={!!incomingThankYou}
@@ -1334,11 +1566,54 @@ export default function RootLayout() {
           }}
         />
 
+        {/* ★ Rozet kutlama overlay — en üst z-index */}
+        <BadgeCelebration />
+
+        {/* ★ 2026-04-26: Global kullanıcı profili sheet — oda dışı tüm bağlamlarda kullanılır.
+             onViewFullProfile: oda DIŞI'nda "Tam Profili Aç" linki render ediliyor — kullanıcı arkadaşının odalarına gitmek için tam sayfaya geçebilir.
+             Oda İÇİ mount'unda (app/room/[id].tsx) bu prop verilmiyor → sheet'ten escape yasak (Clubhouse no-exit). */}
+        <InRoomUserProfile
+          visible={!!profileSheetUserId}
+          userId={profileSheetUserId}
+          currentUserId={firebaseUser?.uid || null}
+          onClose={() => setProfileSheetUserId(null)}
+          onSelectUser={(uid) => setProfileSheetUserId(uid)}
+          closeOnBackdropTap
+          onViewFullProfile={() => {
+            const targetId = profileSheetUserId;
+            if (!targetId) return;
+            setProfileSheetUserId(null);
+            const isOwn = targetId === firebaseUser?.uid;
+            routerRef.current.push((isOwn ? '/(tabs)/profile' : `/user/${targetId}`) as any);
+          }}
+        />
+
+        {/* ★ 2026-04-27: Global Search/Discover sheet — Tab navigator dışında mount,
+              böylece Tab Bar'ın altında kalmaz, full-screen kapsar. */}
+        {firebaseUser && searchSheet.visible && (
+          <UserSearchModal
+            visible={searchSheet.visible}
+            onClose={() => setSearchSheet(prev => ({ ...prev, visible: false }))}
+            currentUserId={firebaseUser.uid}
+            mode={searchSheet.mode}
+            onSelectUser={(uid, name) => {
+              searchSheet.onSelectUser?.(uid, name);
+              setSearchSheet(prev => ({ ...prev, visible: false }));
+            }}
+            onSelectRoom={searchSheet.onSelectRoom ? (rid) => {
+              searchSheet.onSelectRoom?.(rid);
+              setSearchSheet(prev => ({ ...prev, visible: false }));
+            } : undefined}
+          />
+        )}
+
         {/* ★ Intro Video kaldırıldı */}
       </View>
     </OnlineFriendsProvider>
     </RealtimeBadgeProvider>
     </ThemeContext.Provider>
+      </UserSearchSheetContext.Provider>
+      </UserProfileSheetContext.Provider>
     </AuthContext.Provider>
   );
 }

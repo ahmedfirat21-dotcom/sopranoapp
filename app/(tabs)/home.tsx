@@ -1,22 +1,24 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, Image, Pressable, FlatList,
-  ActivityIndicator, ScrollView, RefreshControl, Dimensions, Animated, Easing, PanResponder,
+  ActivityIndicator, ScrollView, RefreshControl, Dimensions, Animated, Easing, PanResponder, InteractionManager,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Colors, Shadows } from '../../constants/theme';
+import { bannerIntroPlayed, markBannerIntroPlayed } from '../../utils/bannerIntro';
 import { RoomService, type Room } from '../../services/database';
 import { RoomFollowService } from '../../services/roomFollow';
 import { ProfileService } from '../../services/profile';
 import { supabase } from '../../constants/supabase';
-import { useAuth, useTheme, useBadges, useOnlineFriends } from '../_layout';
+import { useAuth, useTheme, useBadges, useOnlineFriends, useUserProfileSheet } from '../_layout';
 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { UserSearchModal } from '../../components/UserSearchModal';
+// ★ 2026-04-27: UserSearchModal artık global (app/_layout.tsx) — useUserSearchSheet ile açılır.
+import { useUserSearchSheet } from '../_layout';
 import FriendsDrawer from '../../components/FriendsDrawer';
 import NotificationBell from '../../components/NotificationBell';
 import DiscoverWelcomeSheet, { hasSeenDiscoverWelcome } from '../../components/DiscoverWelcomeSheet';
@@ -96,6 +98,7 @@ const TIER_RING: Record<string, { ring: string; glow: string }> = {
 //   (kalan süreye göre bronze/silver/gold). "BOOST" etiketi kaldırıldı çünkü bölüm başlığı
 //   "Popüler" zaten bunu iletiyor; sadece ELITE seviye için 💎 pill görünür.
 function BoostedProfileCard({ profile: bp, index, friendIds }: { profile: any; index: number; friendIds?: Set<string> }) {
+  const { openUserProfile } = useUserProfileSheet();
   // ★ Gizlilik: Online durumu sadece arkadaşlara göster
   const showOnline = bp.is_online && friendIds?.has(bp.id);
   const router = useRouter();
@@ -166,7 +169,7 @@ function BoostedProfileCard({ profile: bp, index, friendIds }: { profile: any; i
         opacity: pressed ? 0.85 : 1,
         transform: [{ scale: pressed ? 0.96 : 1 }],
       })}
-      onPress={() => router.push(`/user/${bp.id}` as any)}
+      onPress={() => openUserProfile(bp.id)}
     >
       {/* Kart zemini — border + glow boost tier'a göre, shadow boost tier'a göre */}
       <View style={{
@@ -377,6 +380,16 @@ function FollowedRoomCard({ room, index }: { room: Room; index: number }) {
           <Text style={s.fRoomName} numberOfLines={2}>{room.name}</Text>
           {!!room.description && (
             <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.65)', marginTop: 2 }} numberOfLines={1}>{room.description}</Text>
+          )}
+          {/* ★ Faz 4.3 — Tag chips (max 3) */}
+          {Array.isArray(room.tags) && room.tags.length > 0 && (
+            <View style={s.fTagRow}>
+              {room.tags.slice(0, 3).map((t: string) => (
+                <View key={t} style={s.fTagChip}>
+                  <Text style={s.fTagText}>#{t}</Text>
+                </View>
+              ))}
+            </View>
           )}
           <View style={s.fHostRow}>
             <StatusAvatar uri={room.host?.avatar_url} size={28} tier={(room.host as any)?.subscription_tier} />
@@ -715,6 +728,17 @@ const BigLiveRoomCard = React.memo(function BigLiveRoomCard({ room, onJoin, isFo
          açıklamalı/açıklamasız diye kart yükseklikleri tutmuyordu. Tüm kartlar aynı
          yükseklikte kalsın, açıklama odaya katıl'da/detay panelinde görünür. */}
 
+      {/* ★ Faz 4.3 — Tag chips (max 3) — BigLiveRoomCard'da da göster */}
+      {Array.isArray((room as any).tags) && (room as any).tags.length > 0 && (
+        <View style={[s.fTagRow, { paddingHorizontal: 14 }]}>
+          {(room as any).tags.slice(0, 3).map((t: string) => (
+            <View key={t} style={s.fTagChip}>
+              <Text style={s.fTagText}>#{t}</Text>
+            </View>
+          ))}
+        </View>
+      )}
+
       {/* === Host + Stats + Katıl — tek satır === */}
       <View style={s.bigHostStatsRow}>
         <StatusAvatar uri={room.host?.avatar_url} size={36} tier={(room.host as any)?.subscription_tier} />
@@ -782,7 +806,16 @@ const BigLiveRoomCard = React.memo(function BigLiveRoomCard({ room, onJoin, isFo
 export default function HomeScreen() {
   const router = useRouter();
   const { firebaseUser, profile, setShowNotifDrawer, setNotifDrawerAnchorRight, minimizedRoom, justCompletedOnboarding, setJustCompletedOnboarding } = useAuth();
+  const { openUserProfile } = useUserProfileSheet();
   const insets = useSafeAreaInsets();
+  // ★ 2026-04-24: Banner slide-down — sadece uygulama ilk açılışında
+  const bannerTranslateY = useRef(new Animated.Value(bannerIntroPlayed() ? 0 : -140)).current;
+  useEffect(() => {
+    if (!bannerIntroPlayed()) {
+      Animated.timing(bannerTranslateY, { toValue: 0, duration: 520, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
+      markBannerIntroPlayed();
+    }
+  }, []);
   const { unreadNotifs: unreadCount, pendingFollows: pendingFollowCount, refreshBadges } = useBadges();
   useTheme();
 
@@ -790,6 +823,8 @@ export default function HomeScreen() {
   const [filteredRooms, setFilteredRooms] = useState<Room[]>([]);
   const [followedRooms, setFollowedRooms] = useState<Room[]>([]);
   const [boostedProfiles, setBoostedProfiles] = useState<any[]>([]);
+  // ★ 2026-04-26: Popüler kulüpler carousel — keşif noktası (önceden sadece Profile > Kulüpler'den ulaşılıyordu)
+  const [featuredClubs, setFeaturedClubs] = useState<any[]>([]);
   // ★ 2026-04-21: Her oda için top N katılımcı avatarı — keşfet kartında stack gösterilir.
   const [participantAvatars, setParticipantAvatars] = useState<Record<string, { avatar_url: string | null; display_name: string | null }[]>>({});
   // ★ 2026-04-21: recentRooms state kaldırıldı — Keşfet'te hiçbir yerde render
@@ -797,7 +832,7 @@ export default function HomeScreen() {
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [showSearch, setShowSearch] = useState(false);
+  const { openSearch } = useUserSearchSheet();
   // ★ 2026-04-21: API hatasını empty state'ten ayır — kullanıcı retry görebilsin.
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -892,7 +927,7 @@ export default function HomeScreen() {
   const [showAdvFilterPanel, setShowAdvFilterPanel] = useState(false);
 
   // ★ DUP-3 FIX: Online friends artık merkezî provider'dan geliyor
-  const { allFriends, friendIds: friendIdSet } = useOnlineFriends();
+  const { allFriends, onlineFriends, friendIds: friendIdSet } = useOnlineFriends();
 
   // ★ Realtime kanal bağımlılık fix: loadData'yı ref ile sar
   const loadDataRef = useRef<() => Promise<void>>();
@@ -936,6 +971,13 @@ export default function HomeScreen() {
         const bp = await ProfileService.getBoostedProfiles(8);
         setBoostedProfiles(bp);
       } catch { }
+
+      // ★ 2026-04-26: Popüler Kulüpler — keşif feed'ine giriş noktası
+      try {
+        const { ClubService } = await import('../../services/clubs');
+        const clubs = await ClubService.listPublicClubs(10);
+        setFeaturedClubs(clubs);
+      } catch { }
     } catch (err: any) {
       if (__DEV__) console.warn('[Home] Load error:', err);
       // ★ Kullanıcıya görünür hata — hem toast hem persistent error state
@@ -951,10 +993,18 @@ export default function HomeScreen() {
   // ★ loadData ref'ini güncel tut
   useEffect(() => { loadDataRef.current = loadData; }, [loadData]);
 
+  // ★ 2026-04-26 PERF: InteractionManager ile ağır DB sorguları tab geçiş
+  //   animasyonu bittikten SONRA çalışır — JS thread animasyon sırasında bloke olmaz.
   useFocusEffect(useCallback(() => {
-    loadData();
-    // ★ 2026-04-21: Ekran odaktan çıkınca audio preview kapat (başka tab'a geçişte mi kalmalı).
-    return () => { roomPreviewService.stop().catch(() => {}); };
+    const task = InteractionManager.runAfterInteractions(() => {
+      loadData();
+    });
+    // ★ Ekran odaktan çıkınca: overlay'leri kapat + audio preview durdur
+    return () => {
+      task.cancel();
+      roomPreviewService.stop().catch(() => {});
+      setShowFriends(false);
+    };
   }, [loadData]));
 
   // ★ Periyodik: Free tier boş/süresi dolmuş odaları otomatik kapat
@@ -1169,7 +1219,7 @@ export default function HomeScreen() {
       } else {
         setFollowedRoomIds(prev => { const n = { ...prev }; delete n[roomId]; return n; });
       }
-      showToast({ title: 'İşlem başarısız', type: 'error' });
+      showToast({ title: 'Takip Güncellenmedi', message: currentlyFollowed ? 'Takipten çıkılamadı.' : 'Oda takip edilemedi.', type: 'error' });
     }
   }, [firebaseUser]);
 
@@ -1177,7 +1227,7 @@ export default function HomeScreen() {
   //   (ProfileService gecikmeli), getEffectiveTier/avatar undefined olmasın diye loading göster.
   if (loading || (firebaseUser && !profile)) {
     return (
-      <AppBackground variant="explore">
+      <AppBackground variant="explore" radialGlow>
         <View style={[s.container, { justifyContent: 'center', alignItems: 'center' }]}>
           <ActivityIndicator size="large" color={Colors.accentTeal} />
         </View>
@@ -1195,24 +1245,44 @@ export default function HomeScreen() {
     advancedFilters.length === 0;
 
   return (
-    <AppBackground variant="explore">
+    <AppBackground variant="explore" radialGlow>
       <View style={s.container}>
         {/* ═══ Premium Header — Glassmorphic topBar + SP Wallet Hero ═══ */}
-        <View style={[s.topBarWrap, { paddingTop: insets.top + 4 }]}>
-          {/* Frosted blur layer — bg'den hafif ayrılır */}
-          <View style={s.topBarGlass} pointerEvents="none" />
+        <Animated.View style={[s.topBarWrap, { paddingTop: insets.top, transform: [{ translateY: bannerTranslateY }] }]}>
+          <LinearGradient
+            colors={['rgba(48,65,94,0.92)', 'rgba(26,40,64,0.82)', 'rgba(12,22,40,0.6)']}
+            locations={[0, 0.55, 1]}
+            start={{ x: 0.5, y: 0 }}
+            end={{ x: 0.5, y: 1 }}
+            style={s.topBarGlass}
+            pointerEvents="none"
+          />
           <View style={s.topBar}>
             <Image source={require('../../assets/logo.png')} style={s.logo} resizeMode="contain" />
             <View style={s.headerRight}>
-              <Pressable style={s.headerIconBtn} onPress={() => setShowSearch(true)}>
-                <Ionicons name="search-outline" size={20} color="#F1F5F9" />
+              <Pressable style={s.headerIconBtn} onPress={() => openSearch({
+                mode: 'discover',
+                onSelectUser: (userId) => openUserProfile(userId),
+                onSelectRoom: (roomId) => handleJoinRoom(roomId),
+              })}>
+                <Ionicons name="search-outline" size={22} color="#F1F5F9" style={s.headerIcon} />
+              </Pressable>
+              {/* ★ 2026-04-26: Kulüpler header'a taşındı — ana sayfadan POPÜLER KULÜPLER kartı kaldırıldı. */}
+              <Pressable style={s.headerIconBtn} onPress={() => router.push('/clubs' as any)} accessibilityLabel="Kulüpler">
+                <Ionicons name="planet-outline" size={22} color="#F1F5F9" style={s.headerIcon} />
               </Pressable>
               <NotificationBell unreadCount={unreadCount} onPress={() => {
                 setNotifDrawerAnchorRight(60);
                 setShowNotifDrawer(true);
               }} />
-              <Pressable style={s.headerIconBtn} onPress={() => { setShowFriends(true); }}>
-                <Ionicons name="people-outline" size={20} color="#F1F5F9" />
+              <Pressable
+                style={s.headerIconBtn}
+                onPress={() => { setShowFriends(true); }}
+                accessibilityRole="button"
+                accessibilityLabel={pendingFollowCount > 0 ? `Arkadaşlar, ${pendingFollowCount} bekleyen istek` : 'Arkadaşlar'}
+                hitSlop={8}
+              >
+                <Ionicons name="people-outline" size={22} color="#F1F5F9" style={s.headerIcon} />
                 {pendingFollowCount > 0 && (
                   <View style={[s.notifBadge, { backgroundColor: '#60A5FA' }]}>
                     <Text style={s.notifBadgeText}>{pendingFollowCount > 99 ? '99+' : pendingFollowCount}</Text>
@@ -1221,14 +1291,13 @@ export default function HomeScreen() {
               </Pressable>
             </View>
           </View>
-          {/* ★ Premium separator — teal→transparent hairline */}
           <LinearGradient
-            colors={['transparent', 'rgba(20,184,166,0.5)', 'rgba(20,184,166,0.5)', 'transparent']}
-            locations={[0, 0.3, 0.7, 1]}
+            colors={['transparent', 'rgba(20,184,166,0.55)', 'rgba(20,184,166,0.55)', 'transparent']}
+            locations={[0, 0.25, 0.75, 1]}
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
             style={s.topBarSeparator}
           />
-        </View>
+        </Animated.View>
 
         <FlatList
           data={filteredRooms}
@@ -1271,8 +1340,6 @@ export default function HomeScreen() {
                     </Text>
                     <Text style={s.welcomeSub}>
                       {(() => {
-                        // ★ 2026-04-21: "0 kişi aktif" negatif enerjiyi kaldırıldı.
-                        //   Aktif kişi varsa sayıyı göster; yoksa motivasyonel copy kullan.
                         const realRooms = rooms.filter(r => !isSystemRoom(r.id));
                         const totalListeners = realRooms.reduce((sum, r) => sum + (r.listener_count || 0), 0);
                         if (totalListeners > 0) {
@@ -1281,12 +1348,17 @@ export default function HomeScreen() {
                         if (realRooms.length > 0) {
                           return `🎙️ ${realRooms.length} oda seni bekliyor — ilk katılan sen ol`;
                         }
-                        // ★ 2026-04-22: Empty state kartı zaten "ilk sen çık" diyor;
-                        //   banner'da CTA tekrarı yerine nötr/bilgi tonu.
                         return `🕯️ Sessiz bir an — yakında yeni yayınlar başlar`;
                       })()}
                     </Text>
                   </View>
+                  {/* ★ 2026-04-24: Online arkadaş sayısı — subtle pill */}
+                  {onlineFriends.length > 0 && (
+                    <Pressable onPress={() => router.push('/(tabs)/messages' as any)} style={s.welcomeOnlinePill} hitSlop={6}>
+                      <View style={s.welcomeOnlineDot} />
+                      <Text style={s.welcomeOnlinePillText}>{onlineFriends.length}</Text>
+                    </Pressable>
+                  )}
                 </View>
               </View>
 
@@ -1311,7 +1383,7 @@ export default function HomeScreen() {
                       shadowOpacity: 0.3, shadowRadius: 8, elevation: 5,
                       opacity: pressed ? 0.9 : 1, transform: [{ scale: pressed ? 0.985 : 1 }],
                     })}
-                    onPress={() => router.push(`/user/${bp.id}` as any)}
+                    onPress={() => openUserProfile(bp.id)}
                   >
                     <LinearGradient
                       colors={[bpGrad[0], bpGrad[1]]}
@@ -1371,7 +1443,7 @@ export default function HomeScreen() {
                             shadowOpacity: 0.35, shadowRadius: 8, elevation: 5,
                             opacity: pressed ? 0.88 : 1, transform: [{ scale: pressed ? 0.96 : 1 }],
                           })}
-                          onPress={() => router.push(`/user/${bp.id}` as any)}
+                          onPress={() => openUserProfile(bp.id)}
                         >
                           <LinearGradient
                             colors={gr}
@@ -1422,6 +1494,74 @@ export default function HomeScreen() {
                   style={{ height: 1.5 }}
                 />
               </View>
+
+              {/* ★ 2026-04-26: Popüler Kulüpler carousel ana sayfadan KALDIRILDI — sağ üst header'a kulüp ikonu (planet) eklendi.
+                   Renk paleti karışıyordu, kullanıcı ayrı bir alan istedi. /clubs sayfası tüm kulüp keşfini yapıyor. */}
+              {false && featuredClubs.length > 0 && (
+                <View style={{ marginBottom: 14 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, marginBottom: 10 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Ionicons name="planet" size={14} color="#14B8A6" style={{ textShadowColor: '#14B8A6aa', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 8 }} />
+                      <Text style={{ fontSize: 12, fontWeight: '900', color: '#CBD5E1', letterSpacing: 1.0, textTransform: 'uppercase', ...Shadows.text }}>Popüler Kulüpler</Text>
+                    </View>
+                    <Pressable onPress={() => router.push('/clubs' as any)} hitSlop={8}>
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: '#14B8A6' }}>Tümünü Gör →</Text>
+                    </Pressable>
+                  </View>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={{ paddingHorizontal: 16, gap: 10 }}
+                  >
+                    {featuredClubs.map(c => (
+                      <Pressable
+                        key={c.id}
+                        onPress={() => router.push(`/club/${c.id}` as any)}
+                        style={({ pressed }) => ({
+                          width: 110,
+                          opacity: pressed ? 0.85 : 1,
+                          transform: [{ scale: pressed ? 0.97 : 1 }],
+                        })}
+                      >
+                        <View style={{ width: 110, height: 110, borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(168,85,247,0.3)' }}>
+                          {c.banner_url ? (
+                            <Image source={{ uri: c.banner_url }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
+                          ) : (
+                            // ★ 2026-04-26 (v2): Çoklu ton kulüp gradient — mor accent + slate (eski tek-ton yeşilimsi/slate yerine).
+                            <LinearGradient
+                              colors={['#3B2A4F', '#1E1B3A', '#0F0F1F']}
+                              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                              style={StyleSheet.absoluteFillObject}
+                            />
+                          )}
+                          <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.4)' }]} />
+                          <View style={{ position: 'absolute', top: 8, left: 8 }}>
+                            {c.avatar_url ? (
+                              <Image source={{ uri: c.avatar_url }} style={{ width: 32, height: 32, borderRadius: 10, borderWidth: 1.5, borderColor: 'rgba(20,184,166,0.6)' }} />
+                            ) : (
+                              <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: 'rgba(20,184,166,0.25)', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: 'rgba(20,184,166,0.6)' }}>
+                                <Ionicons name="planet" size={16} color="#5EEAD4" />
+                              </View>
+                            )}
+                          </View>
+                          {c.is_premium && (
+                            <View style={{ position: 'absolute', top: 8, right: 8, backgroundColor: 'rgba(251,191,36,0.2)', borderRadius: 10, padding: 3, borderWidth: 1, borderColor: 'rgba(251,191,36,0.5)' }}>
+                              <Ionicons name="star" size={10} color="#FBBF24" />
+                            </View>
+                          )}
+                          <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: 8 }}>
+                            <Text numberOfLines={1} style={{ fontSize: 12, fontWeight: '900', color: '#FFF', ...Shadows.text }}>{c.name}</Text>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 2 }}>
+                              <Ionicons name="people" size={9} color="#5EEAD4" />
+                              <Text style={{ fontSize: 9.5, fontWeight: '700', color: '#5EEAD4', ...Shadows.textLight }}>{c.member_count}</Text>
+                            </View>
+                          </View>
+                        </View>
+                      </Pressable>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
 
               {/* ═══ Birleşik Filtre Satırı: Kategori chips + Filtre butonu
                    ★ 2026-04-22: Ekran "gerçekten boş" ise filtrelemek mantıksız —
@@ -1568,7 +1708,7 @@ export default function HomeScreen() {
             <SwipeToHideRow
               onHide={() => ignoreRoom(room.id)}
               onReport={() => {
-                if (!firebaseUser) { showToast({ title: 'Giriş gerekli', type: 'warning' }); return; }
+                if (!firebaseUser) { showToast({ title: 'Giriş Gerekli', message: 'Şikayet için giriş yapmalısın.', type: 'warning' }); return; }
                 setReportRoom({ id: room.id, name: room.name });
               }}
             >
@@ -1674,6 +1814,18 @@ export default function HomeScreen() {
                 <Text style={s.unifiedEmptyTitle}>Sahne boş, ilk sen çık</Text>
                 <Text style={s.unifiedEmptySub}>Bir konu seç, tek tıkla yayına başla</Text>
 
+                {/* ★ 2026-04-24: Sosyal ipucu — online arkadaş varsa motivasyonel satır */}
+                {onlineFriends.length > 0 && (
+                  <Pressable onPress={() => router.push('/(tabs)/messages' as any)} style={s.unifiedSocialHint} hitSlop={6}>
+                    <View style={s.welcomeOnlineDot} />
+                    <Text style={s.unifiedSocialHintText}>
+                      {onlineFriends.length === 1
+                        ? `1 arkadaşın online — ilk sen yayına geç`
+                        : `${onlineFriends.length} arkadaşın online — ilk sen yayına geç`}
+                    </Text>
+                  </Pressable>
+                )}
+
                 {firebaseUser && (
                   <View style={s.unifiedChipsGrid}>
                     {[
@@ -1741,30 +1893,14 @@ export default function HomeScreen() {
           }
         />
 
-        {/* ═══ Arama Modalı ═══ */}
-        {firebaseUser && (
-          <UserSearchModal
-            visible={showSearch}
-            onClose={() => setShowSearch(false)}
-            currentUserId={firebaseUser.uid}
-            mode="discover"
-            onSelectUser={(userId) => {
-              setShowSearch(false);
-              router.push(`/user/${userId}` as any);
-            }}
-            onSelectRoom={(roomId) => {
-              setShowSearch(false);
-              handleJoinRoom(roomId);
-            }}
-          />
-        )}
+        {/* ★ 2026-04-27: Arama modalı global mount'a taşındı (app/_layout.tsx) — Tab Bar üst katman sorunu çözüldü. */}
 
         {/* ═══ Arkadaş Listesi — Sağdan Süzülen Drawer ═══ */}
         <FriendsDrawer
           visible={showFriends}
           friends={allFriends}
           onClose={() => setShowFriends(false)}
-          onSelect={(userId) => { setShowFriends(false); router.push(`/user/${userId}` as any); }}
+          onSelect={(userId) => { setShowFriends(false); openUserProfile(userId); }}
           currentUserId={firebaseUser?.uid}
         />
 
@@ -1788,9 +1924,9 @@ export default function HomeScreen() {
         />
 
 
-        {/* ═══ Quick Create Sheet — FAB'dan açılır, 3 seçenekli
-             ★ 2026-04-23: bottomOffset=BAR_BOTTOM_OFFSET (84) — panel CurvedTabBar'ın üstünde kalır,
-             son seçenek ("Planla") kırpılmaz. Tabs dışında kullanılırsa 0 verilmeli. */}
+        {/* ═══ Quick Create Sheet — FAB'dan açılır, 2 seçenekli (Hızlı / Detaylı)
+             ★ 2026-04-23: bottomOffset=BAR_BOTTOM_OFFSET (84) — panel CurvedTabBar'ın üstünde kalır.
+             ★ 2026-04-26: 3. seçenek "Planla" kaldırıldı — Detaylı Ayarla'nın son adımında zaten Hemen/Sonra toggle var. */}
         <QuickCreateSheet
           visible={showQuickCreate}
           onClose={() => setShowQuickCreate(false)}
@@ -1855,28 +1991,48 @@ const s = StyleSheet.create({
   // ★ Premium Header — Glassmorphic wrap + SP pill + teal hairline separator
   topBarWrap: {
     position: 'relative',
-    paddingBottom: 8,
+    marginBottom: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.22,
+    shadowRadius: 12,
+    elevation: 8,
   },
   topBarGlass: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(15, 25, 41, 0.55)', // Midnight Sapphire tint, hafif frosted
-    borderBottomWidth: 0,
+  },
+  topBarTopHighlight: {
+    position: 'absolute',
+    top: 0, left: 18, right: 18,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  topBarLampGlow: {
+    position: 'absolute',
+    bottom: -40,
+    left: -8, right: -8,
+    height: 58,
   },
   topBar: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 14, paddingBottom: 4,
+    paddingHorizontal: 14, paddingBottom: 10,
   },
   topBarSeparator: {
-    height: 1,
-    marginHorizontal: 20,
+    height: 1.5,
+    width: '100%',
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
   },
-  logo: { height: 32, width: 150 },
+  logo: { height: 32, width: 150, marginTop: -6 },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   headerIconBtn: {
-    width: 44, height: 44, borderRadius: 22,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderWidth: 0.5, borderColor: 'rgba(125,170,229,0.12)',
+    width: 44, height: 44,
     justifyContent: 'center', alignItems: 'center', overflow: 'visible',
+  },
+  headerIcon: {
+    textShadowColor: 'rgba(0,0,0,0.55)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 5,
   },
   // ★ SP Wallet Pill — premium altın gradient
   spPill: {
@@ -1906,7 +2062,7 @@ const s = StyleSheet.create({
 
   // Welcome — Glassmorphism konteyner
   welcomeCard: {
-    marginHorizontal: 14, marginBottom: 4,
+    marginHorizontal: 14, marginTop: 0, marginBottom: 4,
     borderRadius: 14, overflow: 'hidden',
     backgroundColor: 'rgba(255,255,255,0.04)',
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
@@ -1921,6 +2077,42 @@ const s = StyleSheet.create({
   },
   welcomeTitle: { fontSize: 15, fontWeight: '700', color: '#F1F5F9', ...Shadows.text },
   welcomeSub: { fontSize: 11, color: '#94A3B8', marginTop: 2, ...Shadows.textLight },
+  // ★ 2026-04-24: Online friends pill — welcome card sağında
+  welcomeOnlinePill: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    paddingHorizontal: 9, paddingVertical: 5,
+    borderRadius: 12,
+    backgroundColor: 'rgba(34,197,94,0.12)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(34,197,94,0.35)',
+  },
+  welcomeOnlineDot: {
+    width: 7, height: 7, borderRadius: 3.5,
+    backgroundColor: '#22C55E',
+    shadowColor: '#22C55E',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.7, shadowRadius: 4,
+    elevation: 2,
+  },
+  welcomeOnlinePillText: {
+    fontSize: 12, fontWeight: '800', color: '#86EFAC',
+    ...Shadows.text,
+  },
+  // ★ 2026-04-24: Empty state sosyal ipucu satırı
+  unifiedSocialHint: {
+    flexDirection: 'row', alignItems: 'center', gap: 7,
+    paddingHorizontal: 12, paddingVertical: 7,
+    marginTop: 8,
+    borderRadius: 14,
+    backgroundColor: 'rgba(34,197,94,0.08)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(34,197,94,0.25)',
+    alignSelf: 'center',
+  },
+  unifiedSocialHintText: {
+    fontSize: 12, fontWeight: '600', color: '#86EFAC', letterSpacing: 0.15,
+    ...Shadows.textLight,
+  },
 
 
   // ═══ Son Girdiğin Odalar ═══
@@ -2501,6 +2693,20 @@ const s = StyleSheet.create({
   },
   fListenerText: {
     fontSize: 9, fontWeight: '700', color: 'rgba(255,255,255,0.6)',
+  },
+  // ★ Faz 4.3 — Tag chip strip on room card
+  fTagRow: {
+    flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 5,
+  },
+  fTagChip: {
+    paddingHorizontal: 6, paddingVertical: 1.5,
+    borderRadius: 6,
+    backgroundColor: 'rgba(20,184,166,0.18)',
+    borderWidth: 0.5, borderColor: 'rgba(20,184,166,0.35)',
+  },
+  fTagText: {
+    fontSize: 9, fontWeight: '700', color: '#5EEAD4',
+    letterSpacing: 0.2,
   },
   fCatIconWrap: {
     opacity: 0.4,

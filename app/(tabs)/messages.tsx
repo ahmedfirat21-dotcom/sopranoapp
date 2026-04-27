@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { View, Text, StyleSheet, FlatList, Image, Pressable, ActivityIndicator, TextInput, ScrollView, Animated as RNAnimated, PanResponder, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, FlatList, Image, Pressable, ActivityIndicator, TextInput, ScrollView, Animated as RNAnimated, PanResponder, RefreshControl, Easing } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -7,13 +7,15 @@ import { useRouter } from 'expo-router';
 import { Colors, Shadows } from '../../constants/theme';
 import { MessageService, ProfileService, type InboxItem, type Message } from '../../services/database';
 import { supabase } from '../../constants/supabase';
-import { useAuth, useBadges, useTheme, useOnlineFriends } from '../_layout';
+import { useAuth, useBadges, useTheme, useOnlineFriends, useUserProfileSheet } from '../_layout';
 import { useFocusEffect } from 'expo-router';
 import { useCallback } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import StatusAvatar from '../../components/StatusAvatar';
-import { UserSearchModal } from '../../components/UserSearchModal';
+// ★ 2026-04-27: UserSearchModal artık global (app/_layout.tsx) — useUserSearchSheet ile açılır.
+import { useUserSearchSheet } from '../_layout';
 import AppBackground from '../../components/AppBackground';
+import { bannerIntroPlayed, markBannerIntroPlayed } from '../../utils/bannerIntro';
 import TabBarFadeOut from '../../components/TabBarFadeOut';
 import { showToast } from '../../components/Toast';
 import NotificationBell from '../../components/NotificationBell';
@@ -119,12 +121,7 @@ const ConversationCard = React.memo(function ConversationCard({
   onCallPress: (partnerId: string) => void;
 }) {
   const unread = item.unread_count > 0;
-  // ★ 2026-04-24: Midnight Sapphire + Teal temasıyla uyumlu gradient paletleri
-  const cardGradient = isSelected
-    ? ['rgba(10,15,28,0.98)', 'rgba(20,184,166,0.10)', 'rgba(45,212,191,0.14)', 'rgba(20,184,166,0.08)', 'rgba(10,15,28,0.98)']
-    : unread
-      ? ['rgba(11,18,32,0.98)', 'rgba(20,184,166,0.08)', 'rgba(45,212,191,0.13)', 'rgba(20,184,166,0.06)', 'rgba(11,18,32,0.98)']
-      : ['rgba(10,15,28,0.97)', 'rgba(22,34,54,0.6)', 'rgba(255,255,255,0.05)', 'rgba(22,34,54,0.5)', 'rgba(10,15,28,0.97)'];
+  // ★ 2026-04-24: Settings kartı ile birleşik — bombe gradient (üst aydınlık → alt koyu)
   return (
     <SwipeableRow
       containerStyle={[styles.msgCard, isSelected && styles.msgCardSelected, unread && styles.msgCardUnread]}
@@ -138,12 +135,21 @@ const ConversationCard = React.memo(function ConversationCard({
         delayLongPress={400}
       >
         <LinearGradient
-          colors={cardGradient as [string, string, string, string, string]}
-          locations={[0, 0.28, 0.5, 0.72, 1]}
-          start={{ x: 0, y: 0.5 }}
-          end={{ x: 1, y: 0.5 }}
-          style={styles.msgRow}
-        >
+          colors={['rgba(48,65,94,0.85)', 'rgba(26,40,64,0.75)', 'rgba(12,22,40,0.55)']}
+          locations={[0, 0.55, 1]}
+          start={{ x: 0.5, y: 0 }}
+          end={{ x: 0.5, y: 1 }}
+          style={StyleSheet.absoluteFillObject}
+          pointerEvents="none"
+        />
+        <LinearGradient
+          colors={['transparent', unread ? 'rgba(20,184,166,0.75)' : 'rgba(20,184,166,0.45)', 'transparent']}
+          locations={[0, 0.5, 1]}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+          style={styles.msgTopEdge}
+          pointerEvents="none"
+        />
+        <View style={styles.msgRow}>
           {unread && <View style={styles.unreadStripe} />}
           {selectionMode && (
             <View style={styles.checkWrap}>
@@ -212,7 +218,7 @@ const ConversationCard = React.memo(function ConversationCard({
               </View>
             )}
           </View>
-        </LinearGradient>
+        </View>
       </Pressable>
     </SwipeableRow>
   );
@@ -294,7 +300,7 @@ export default function MessagesScreen() {
   const [refreshing, setRefreshing] = useState(false);
   // ★ 2026-04-21: Error state — empty state'ten ayır, retry butonu göster.
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [showComposeModal, setShowComposeModal] = useState(false);
+  const { openSearch } = useUserSearchSheet();
   const [searchQuery, setSearchQuery] = useState('');
   // ★ Debounced sorgu — her karakter 100+ yeniden render yapıyordu
   const [debouncedQuery, setDebouncedQuery] = useState('');
@@ -373,6 +379,9 @@ export default function MessagesScreen() {
     }
   }, [firebaseUser]);
 
+  // ★ 2026-04-28: InteractionManager kaldırıldı — 250-400ms boş bekleme yapıyordu.
+  //   Supabase network async, tab animasyonunu blokelemez. DB sorgusunu hemen başlat,
+  //   cevap geldiğinde tab animasyonu zaten bitmiş olur.
   useFocusEffect(
     useCallback(() => {
       loadInbox();
@@ -474,7 +483,7 @@ export default function MessagesScreen() {
       if (!isSentByMe) refreshBadges();
     };
 
-    const incomingChannel = MessageService.onNewMessage(firebaseUser.uid, updateInbox);
+    const incomingChannel = MessageService.onNewMessage(firebaseUser.uid, 'inbox', updateInbox);
     const sentChannelName = `user_sent_${firebaseUser.uid}`;
     const sentChannel = supabase
       .channel(sentChannelName)
@@ -550,6 +559,14 @@ export default function MessagesScreen() {
   }, [firebaseUser, blockedIdsRef]);
 
   const insets = useSafeAreaInsets();
+  // ★ 2026-04-24: Banner slide-down — sadece uygulama ilk açılışında
+  const bannerTranslateY = useRef(new RNAnimated.Value(bannerIntroPlayed() ? 0 : -140)).current;
+  useEffect(() => {
+    if (!bannerIntroPlayed()) {
+      RNAnimated.timing(bannerTranslateY, { toValue: 0, duration: 520, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
+      markBannerIntroPlayed();
+    }
+  }, []);
 
   // ═══ Stable card callbacks — React.memo ile birlikte FlatList perf'i sağlar ═══
   const handleOpenChat = useCallback((partnerId: string) => {
@@ -577,9 +594,10 @@ export default function MessagesScreen() {
     }
   }, [firebaseUser, refreshBadges]);
 
+  const { openUserProfile } = useUserProfileSheet();
   const handleAvatarPress = useCallback((partnerId: string) => {
-    router.push(`/user/${partnerId}` as any);
-  }, [router]);
+    openUserProfile(partnerId);
+  }, [openUserProfile]);
 
   // ★ 2026-04-21: initiateCall çağrılıyor — eskiden sadece navigate vardı,
   //   friendship check ve callId tetiklenmiyordu → arama sessizce bağlanamıyordu.
@@ -623,7 +641,7 @@ export default function MessagesScreen() {
       // Rollback
       setConversations(prev => prev.map(c =>
         c.partner_id === partnerId ? { ...c, is_pinned: current.is_pinned } : c));
-      showToast({ title: 'Hata', message: 'İşlem tamamlanamadı.', type: 'error' });
+      showToast({ title: 'Sabitleme Güncellenmedi', message: 'Sohbet sabitleme durumu değişemedi.', type: 'error' });
     }
   }, [conversations]);
 
@@ -644,7 +662,7 @@ export default function MessagesScreen() {
     } catch {
       setConversations(prev => prev.map(c =>
         c.partner_id === partnerId ? { ...c, is_archived: current.is_archived } : c));
-      showToast({ title: 'Hata', message: 'İşlem tamamlanamadı.', type: 'error' });
+      showToast({ title: 'Arşiv Güncellenmedi', message: 'Sohbet arşiv durumu değişemedi.', type: 'error' });
     }
   }, [conversations]);
 
@@ -655,7 +673,7 @@ export default function MessagesScreen() {
       setConversations(prev => prev.filter(c => c.partner_id !== partnerId));
       showToast({ title: '⛔ Engellendi', message: `${partnerName} engellendi.`, type: 'success' });
     } catch {
-      showToast({ title: 'Hata', message: 'Engellenemedi.', type: 'error' });
+      showToast({ title: 'Engellenemedi', message: `${partnerName} engellenirken hata oluştu.`, type: 'error' });
     }
   }, [firebaseUser]);
 
@@ -703,19 +721,38 @@ export default function MessagesScreen() {
   ] : [];
 
   return (
-    <AppBackground variant="messages">
+    <AppBackground variant="messages" radialGlow>
     <View style={[styles.container, { backgroundColor: 'transparent' }]}>
 
-      {/* ═══ Header ═══ */}
-      <View style={[styles.topBar, { paddingTop: insets.top + 4 }]}>
-        <Image source={require('../../assets/logo.png')} style={styles.logo} resizeMode="contain" />
-        <View style={styles.headerRight}>
-          <NotificationBell unreadCount={unreadCount} onPress={() => { setNotifDrawerAnchorRight(60); setShowNotifDrawer(true); }} />
-          <Pressable style={[styles.headerIconBtn, styles.composeBtn]} onPress={() => setShowComposeModal(true)}>
-            <Ionicons name="create-outline" size={19} color="#F1F5F9" />
-          </Pressable>
+      {/* ═══ Header — Premium Glassmorphic banner (myrooms/home ile tutarlı) ═══ */}
+      <RNAnimated.View style={[styles.topBarWrap, { paddingTop: insets.top, transform: [{ translateY: bannerTranslateY }] }]}>
+        <LinearGradient
+          colors={['rgba(48,65,94,0.92)', 'rgba(26,40,64,0.82)', 'rgba(12,22,40,0.6)']}
+          locations={[0, 0.55, 1]}
+          start={{ x: 0.5, y: 0 }}
+          end={{ x: 0.5, y: 1 }}
+          style={styles.topBarGlass}
+          pointerEvents="none"
+        />
+        <View style={styles.topBar}>
+          <Image source={require('../../assets/logo.png')} style={styles.logo} resizeMode="contain" />
+          <View style={styles.headerRight}>
+            <NotificationBell unreadCount={unreadCount} onPress={() => { setNotifDrawerAnchorRight(60); setShowNotifDrawer(true); }} />
+            <Pressable style={styles.headerIconBtn} onPress={() => openSearch({
+              mode: 'compose',
+              onSelectUser: (userId) => router.push(`/chat/${userId}` as any),
+            })}>
+              <Ionicons name="create-outline" size={22} color="#F1F5F9" style={styles.headerIcon} />
+            </Pressable>
+          </View>
         </View>
-      </View>
+        <LinearGradient
+          colors={['transparent', 'rgba(20,184,166,0.55)', 'rgba(20,184,166,0.55)', 'transparent']}
+          locations={[0, 0.25, 0.75, 1]}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+          style={styles.topBarSeparator}
+        />
+      </RNAnimated.View>
 
       {/* ═══ Sayfa Başlığı ═══ */}
       <View style={styles.pageTitleRow}>
@@ -1022,17 +1059,7 @@ export default function MessagesScreen() {
         </View>
       )}
 
-      {firebaseUser && (
-        <UserSearchModal
-          visible={showComposeModal}
-          onClose={() => setShowComposeModal(false)}
-          currentUserId={firebaseUser.uid}
-          onSelectUser={(userId) => {
-            setShowComposeModal(false);
-            router.push(`/chat/${userId}`);
-          }}
-        />
-      )}
+      {/* ★ 2026-04-27: UserSearchModal global mount'a taşındı (app/_layout.tsx) */}
 
       <PremiumAlert {...cAlert} onDismiss={() => setCAlert(prev => ({ ...prev, visible: false }))} />
 
@@ -1058,22 +1085,53 @@ export default function MessagesScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
 
-  // ─── Header ───
+  // ─── Header — Premium Glassmorphic banner ───
+  topBarWrap: {
+    position: 'relative',
+    marginBottom: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.22,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  topBarGlass: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  topBarTopHighlight: {
+    position: 'absolute',
+    top: 0, left: 18, right: 18,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  topBarLampGlow: {
+    position: 'absolute',
+    bottom: -40,
+    left: -8, right: -8,
+    height: 58,
+  },
   topBar: {
+    // ★ 2026-04-26: paddingHorizontal 16→14 — keşfet/odalarım ile uyumlu, logo aynı pozisyonda kalır.
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingBottom: 4,
+    paddingHorizontal: 14, paddingBottom: 10,
   },
-  logo: { height: 30, width: 140 },
-  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  topBarSeparator: {
+    height: 1.5,
+    width: '100%',
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+  },
+  logo: { height: 32, width: 150, marginTop: -6 },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   headerIconBtn: {
-    width: 44, height: 44, borderRadius: 22,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    width: 44, height: 44,
     justifyContent: 'center', alignItems: 'center',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)',
   },
-  composeBtn: {
-    backgroundColor: 'rgba(20,184,166,0.15)',
-    borderColor: 'rgba(20,184,166,0.3)',
+  composeBtn: {},
+  headerIcon: {
+    textShadowColor: 'rgba(0,0,0,0.55)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 5,
   },
   notifBadge: {
     position: 'absolute', top: -2, right: -2,
@@ -1244,6 +1302,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: 14, paddingVertical: 12,
     position: 'relative',
+  },
+  msgTopEdge: {
+    position: 'absolute', top: 0, left: 0, right: 0, height: 1,
+    zIndex: 1,
   },
   unreadStripe: {
     position: 'absolute', left: 0, top: 8, bottom: 8,

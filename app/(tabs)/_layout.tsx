@@ -1,10 +1,9 @@
 import { Tabs } from 'expo-router';
-import { View, Text, StyleSheet, Pressable, Dimensions, Platform, useWindowDimensions } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Dimensions, Platform, useWindowDimensions, Keyboard } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { Colors } from '../../constants/theme';
-import { useTheme } from '../_layout';
 import React, { useEffect, useRef } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -55,12 +54,14 @@ const TAB_CFG: Record<string, {
 };
 
 const TABS = ['home', 'myrooms', 'messages', 'profile'];
-const INACTIVE = '#7B8D9F';
+// ★ A11Y: pasif tab text rengi WCAG AA için 4.5:1 contrast gerek (#0F172A bg üzeri).
+//   Eski #7B8D9F = 3.99:1 (fail). #B0BDCC = 6.87:1 (pass).
+const INACTIVE = '#B0BDCC';
 
 // Ölçüler
 // ★ 2026-04-21 (geç): Bar yanal olarak genişletildi, dikey olarak kısaltıldı.
 //   İkon/bubble boyutları değişmedi — sadece bar çerçevesi ince-uzun oldu.
-const BAR_MARGIN = 6;
+const BAR_MARGIN = 0;
 const BAR_H = 60;
 const BUBBLE = 58;
 // ★ 2026-04-20: Alt bar kendi renk ailesi içinde gradient — bg'ye karışmaz.
@@ -131,11 +132,12 @@ function Tab({ isFocused, cfg, badge, onPress, routeName }: {
     progress.value = withTiming(isFocused ? 1 : 0, TIMING);
   }, [isFocused]);
 
-  // 3D buton stili — yukarı çıkma
+  // 3D buton stili — aktifte hafif yukarı (separator çizgisinin altında kalacak şekilde)
+  // ★ 2026-04-27: translateY [8,-4] → [10, 2] — aktif baloncuk artık üst teal çizgiye dokunmaz
   const bubbleAnim = useAnimatedStyle(() => ({
     opacity: progress.value,
     transform: [
-      { translateY: interpolate(progress.value, [0, 1], [8, -4]) },
+      { translateY: interpolate(progress.value, [0, 1], [10, 2]) },
       { scale: interpolate(progress.value, [0, 1], [0.4, 1]) },
     ],
   }));
@@ -257,7 +259,7 @@ function Tab({ isFocused, cfg, badge, onPress, routeName }: {
           style={s.gradient}
         >
           <Animated.View style={iconAnim}>
-            <Ionicons name={cfg.activeIcon} size={24} color="#FFF" style={s.iconDrop} />
+            <Ionicons name={cfg.activeIcon} size={28} color="#FFF" style={s.iconDrop} />
           </Animated.View>
         </LinearGradient>
         {/* ★ 2026-04-21: Glossy parlaklık — üstten aşağı fade out, sert çizgi yok */}
@@ -323,7 +325,7 @@ function CurvedTabBar({ state, navigation }: BottomTabBarProps) {
     const parent = navigation.getParent();
     if (!parent) return;
 
-    const unsubscribe = parent.addListener('focus', () => {
+    const unsubscribe = (parent as any).addListener('focus', () => {
       if (isFirstMount.current) return; // İlk mount'u atla (zaten yukarıda animasyon var)
       // Hızlı re-entry — 300ms, kısa mesafe
       entryY.value = 50;
@@ -335,14 +337,31 @@ function CurvedTabBar({ state, navigation }: BottomTabBarProps) {
     return unsubscribe;
   }, [navigation]);
 
+  // ★ 2026-04-27: Klavye açılınca tab bar gizlenir — adjustResize'da tab bar
+  //   klavye üstüne sıkışıp ekranı bozuyor (özellikle messages'ta arama input fokuslandığında).
+  //   Klavye kapanınca geri girer.
+  useEffect(() => {
+    const showSub = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow', () => {
+      entryY.value = withTiming(120, { duration: 200, easing: Easing.out(Easing.quad) });
+      entryOpacity.value = withTiming(0, { duration: 150 });
+    });
+    const hideSub = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide', () => {
+      entryY.value = withTiming(0, { duration: 220, easing: Easing.out(Easing.exp) });
+      entryOpacity.value = withTiming(1, { duration: 200 });
+    });
+    return () => { showSub.remove(); hideSub.remove(); };
+  }, []);
+
   const entryStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: entryY.value }],
     opacity: entryOpacity.value,
   }));
 
   return (
-    <Animated.View style={[s.outer, { paddingBottom: Math.max(insets.bottom, 8), paddingLeft: insets.left, paddingRight: insets.right }, entryStyle]}>
-      <View style={[s.bar, { width: barWidth }]}>
+    <Animated.View style={[s.outer, entryStyle]}>
+      {/* ★ 2026-04-25: Bar ekran dibine yapışır, safe-area'yı kendi içinde absorbe eder
+           (üst banner mantığı). Gesture-nav'lı telefonlarda bar çok yukarıda kalıyordu. */}
+      <View style={[s.bar, { width: winW, height: BAR_H + Math.max(insets.bottom, 6), paddingBottom: Math.max(insets.bottom, 6) }]}>
         {/* ★ 2026-04-20: Gradient zemin — bar kendi rengi içinde tonlanır, bg'ye kaynaşmaz */}
         <LinearGradient
           colors={[BAR_GRADIENT_TOP, BAR_GRADIENT_MID, BAR_GRADIENT_BOTTOM]}
@@ -358,6 +377,22 @@ function CurvedTabBar({ state, navigation }: BottomTabBarProps) {
           start={{ x: 0, y: 0 }}
           end={{ x: 0.5, y: 1 }}
           style={s.barGradient}
+          pointerEvents="none"
+        />
+        {/* ★ 2026-04-27: Üst teal separator — üst header ile simetrik kavis (uçları yumuşak). */}
+        <LinearGradient
+          colors={['transparent', 'rgba(20,184,166,0.55)', 'rgba(20,184,166,0.55)', 'transparent']}
+          locations={[0, 0.25, 0.75, 1]}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+          style={s.barTopSeparator}
+          pointerEvents="none"
+        />
+        {/* ★ Alt teal separator — ekran dibi ayrım */}
+        <LinearGradient
+          colors={['transparent', 'rgba(20,184,166,0.4)', 'rgba(20,184,166,0.4)', 'transparent']}
+          locations={[0, 0.25, 0.75, 1]}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+          style={s.barBottomSeparator}
           pointerEvents="none"
         />
         {state.routes.map((route, i) => {
@@ -396,26 +431,40 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     // width inline olarak CurvedTabBar içinde atanır (runtime useWindowDimensions).
     height: BAR_H,
-    borderRadius: 22,
+    borderRadius: 0,
     backgroundColor: BAR_BG,
     alignItems: 'flex-end',
-    // ★ 2026-04-20: Parlak ince çerçeve — premium metalik his
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.5)',
+    // ★ 2026-04-24: Beyaz çerçeve kaldırıldı — bar tam kenara yayılsın
     overflow: 'visible',
     position: 'relative',
-    // Drop shadow (alt zemin ayrımı) + parlak glow (üst aydınlık hale)
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.4,
     shadowRadius: 20,
     elevation: 14,
   },
-  // ★ 2026-04-20: Gradient zemin — bar borderRadius ile kırpılır
+  // ★ 2026-04-20: Gradient zemin
   barGradient: {
     position: 'absolute',
     top: 0, left: 0, right: 0, bottom: 0,
-    borderRadius: 22,
+    borderRadius: 0,
+  },
+  // ★ 2026-04-27: Üst/alt teal hairline separator — üst header tarzı kavisli uçlar.
+  barTopSeparator: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0,
+    height: 1.5,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    zIndex: 1,
+  },
+  barBottomSeparator: {
+    position: 'absolute',
+    bottom: 0, left: 0, right: 0,
+    height: 1.5,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+    zIndex: 1,
   },
   tab: {
     flex: 1,
@@ -509,11 +558,26 @@ const s = StyleSheet.create({
   badgeTxt: { fontSize: 9, fontWeight: '800', color: '#FFF' },
 });
 
-// ════════════════════════════════════════════════════════════
+// ★ 2026-04-26 PERF: Stable tabBar callback — inline arrow fonksiyon her render'da
+//   yeni referans oluşturuyordu → React Navigation tab bar'ı gereksiz re-mount ediyordu.
+const renderTabBar = (p: BottomTabBarProps) => <CurvedTabBar {...p} />;
+
+// ★ PERF: screenOptions sabit obje — her render'da yeni obje oluşmasını önle.
+// ★ 2026-04-26: animation kaldırıldı — 'shift' tüm scene'i (header dahil) kaydırıyordu, header'da flash.
+//   Native bottom-tabs'ta header sabit + sadece content kayma yapmak için custom animation gerek (büyük iş).
+//   Şimdilik instant geçiş: flash yok, sade.
+const TAB_SCREEN_OPTIONS = {
+  headerShown: false,
+  sceneStyle: { backgroundColor: Colors.bg },
+  lazy: true,
+  freezeOnBlur: true,
+} as const;
+
 export default function TabLayout() {
-  const { themeVersion: _tv } = useTheme();
+  // ★ 2026-04-26 PERF: useTheme() KALDIRILDI — TabLayout tema rengi kullanmıyor.
+  //   Bu hook her tema değişikliğinde tüm tab ağacını re-render ettiriyordu.
   return (
-    <Tabs tabBar={(p) => <CurvedTabBar {...p} />} screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: Colors.bg } }}>
+    <Tabs tabBar={renderTabBar} screenOptions={TAB_SCREEN_OPTIONS}>
       <Tabs.Screen name="home" />
       <Tabs.Screen name="myrooms" />
       <Tabs.Screen name="messages" />
