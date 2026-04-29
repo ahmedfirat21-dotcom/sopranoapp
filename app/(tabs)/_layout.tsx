@@ -1,6 +1,6 @@
 import { Tabs } from 'expo-router';
-import { View, Text, StyleSheet, Pressable, Dimensions, Platform, useWindowDimensions, Keyboard } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { View, Text, StyleSheet, Pressable, Dimensions, Platform, useWindowDimensions, Keyboard, Image } from 'react-native';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { Colors } from '../../constants/theme';
@@ -42,17 +42,22 @@ const darken = (hex: string, pct: number) => lighten(hex, -pct);
 // Tab konfigürasyonu
 // ════════════════════════════════════════════════════════════
 const TAB_CFG: Record<string, {
-  activeIcon: keyof typeof Ionicons.glyphMap;
-  inactiveIcon: keyof typeof Ionicons.glyphMap;
+  activeIcon: any;
+  inactiveIcon: any;
+  /** ★ 2026-04-28: ikon kütüphanesi — varsayılan Ionicons, 'mci' = MaterialCommunityIcons.
+   *  Korolar için sol anahtarı (music-clef-treble) gerekiyor (uygulama ikonu hissi). */
+  iconLib?: 'ion' | 'mci';
   label: string;
   accent: string;
 }> = {
   home:     { activeIcon: 'radio',               inactiveIcon: 'radio-outline',               label: 'Keşfet',   accent: '#14B8A6' },
+  clubs:    { activeIcon: 'mic',                 inactiveIcon: 'mic-outline',                 label: 'Korolar',  accent: '#9F1239' },
   myrooms:  { activeIcon: 'home',                inactiveIcon: 'home-outline',                label: 'Odalarım', accent: '#3B82F6' },
   messages: { activeIcon: 'chatbubble-ellipses', inactiveIcon: 'chatbubble-ellipses-outline', label: 'Mesajlar', accent: '#8B5CF6' },
   profile:  { activeIcon: 'person',              inactiveIcon: 'person-outline',              label: 'Profil',   accent: '#F59E0B' },
 };
 
+// ★ 2026-04-29: Korolar tab'ı public sürüm sonrasına ertelendi — tab bar'dan gizli, route korunuyor.
 const TABS = ['home', 'myrooms', 'messages', 'profile'];
 // ★ A11Y: pasif tab text rengi WCAG AA için 4.5:1 contrast gerek (#0F172A bg üzeri).
 //   Eski #7B8D9F = 3.99:1 (fail). #B0BDCC = 6.87:1 (pass).
@@ -219,6 +224,19 @@ function Tab({ isFocused, cfg, badge, onPress, routeName }: {
         withTiming(-4, { duration: 100, easing: Easing.inOut(Easing.quad) }),
         withTiming(0, { duration: 120, easing: Easing.in(Easing.quad) }),
       );
+    } else if (routeName === 'clubs') {
+      // 🎵 Korolar — Notalar dans ediyor: scale pulse + hafif sallanma rotate
+      iconScale.value = withSequence(
+        withTiming(1.18, { duration: 180, easing: Easing.out(Easing.quad) }),
+        withTiming(0.94, { duration: 160, easing: Easing.inOut(Easing.quad) }),
+        withTiming(1, { duration: 200, easing: Easing.inOut(Easing.quad) }),
+      );
+      iconRotate.value = withSequence(
+        withTiming(-8, { duration: 120, easing: Easing.out(Easing.quad) }),
+        withTiming(8, { duration: 200, easing: Easing.inOut(Easing.quad) }),
+        withTiming(-4, { duration: 140, easing: Easing.inOut(Easing.quad) }),
+        withTiming(0, { duration: 160, easing: Easing.in(Easing.quad) }),
+      );
     } else if (routeName === 'messages') {
       defaultWiggle(); // 💬 Mesajlar — eski translateX wiggle
     } else if (routeName === 'profile') {
@@ -242,7 +260,7 @@ function Tab({ isFocused, cfg, badge, onPress, routeName }: {
   return (
     <Pressable style={s.tab} onPress={handlePress}>
 
-      {/* ═══ AKTİF: 3D Glossy Gradient Buton (oda içi gibi) ═══ */}
+      {/* ═══ AKTİF DURUM: Tüm tablar aynı 3D Glossy Gradient Buton ═══ */}
       <Animated.View style={[s.bubble, bubbleAnim]}>
         {/* ★ Keşfet — 3 dalga teker teker, bubble arkasından yayılır */}
         {routeName === 'home' && (
@@ -259,7 +277,13 @@ function Tab({ isFocused, cfg, badge, onPress, routeName }: {
           style={s.gradient}
         >
           <Animated.View style={iconAnim}>
-            <Ionicons name={cfg.activeIcon} size={28} color="#FFF" style={s.iconDrop} />
+            {routeName === 'clubs' ? (
+              <Image source={require('../../assets/koro_icon_inactive.png')} style={{ width: 30, height: 30, tintColor: '#FFF' }} resizeMode="contain" />
+            ) : cfg.iconLib === 'mci' ? (
+              <MaterialCommunityIcons name={cfg.activeIcon} size={28} color="#FFF" style={s.iconDrop} />
+            ) : (
+              <Ionicons name={cfg.activeIcon} size={28} color="#FFF" style={s.iconDrop} />
+            )}
           </Animated.View>
         </LinearGradient>
         {/* ★ 2026-04-21: Glossy parlaklık — üstten aşağı fade out, sert çizgi yok */}
@@ -275,7 +299,13 @@ function Tab({ isFocused, cfg, badge, onPress, routeName }: {
       {/* ═══ PASİF İKON ═══ */}
       <Animated.View style={[s.passiveIcon, passiveAnim]}>
         <Animated.View style={iconAnim}>
-          <Ionicons name={cfg.inactiveIcon} size={28} color={INACTIVE} style={s.inactiveShadow} />
+          {routeName === 'clubs' ? (
+            <Image source={require('../../assets/koro_icon_inactive.png')} style={{ width: 28, height: 28, tintColor: INACTIVE }} resizeMode="contain" />
+          ) : cfg.iconLib === 'mci' ? (
+            <MaterialCommunityIcons name={cfg.inactiveIcon} size={28} color={INACTIVE} style={s.inactiveShadow} />
+          ) : (
+            <Ionicons name={cfg.inactiveIcon} size={28} color={INACTIVE} style={s.inactiveShadow} />
+          )}
         </Animated.View>
         {badge > 0 && (
           <View style={s.badge}>
@@ -284,8 +314,8 @@ function Tab({ isFocused, cfg, badge, onPress, routeName }: {
         )}
       </Animated.View>
 
-      {/* ═══ LABEL ═══ (D-2: overflow koruması) */}
-      <Animated.Text style={[s.label, labelAnim]} numberOfLines={1} ellipsizeMode="tail">{cfg.label}</Animated.Text>
+      {/* ★ 2026-04-29: Label geri eklendi — pasif ikon altında tab ismi */}
+      <Animated.Text style={[s.label, labelAnim]}>{cfg.label}</Animated.Text>
     </Pressable>
   );
 }
@@ -571,6 +601,9 @@ const TAB_SCREEN_OPTIONS = {
   sceneStyle: { backgroundColor: Colors.bg },
   lazy: true,
   freezeOnBlur: true,
+  // ★ 2026-04-29: Tab geçişi anlık — fade kapalı çünkü iki sayfanın gradient header'ı
+  //   üst üste binince koyuluk artıyordu. Anlık geçişte gradient sabit görünür.
+  animation: 'none',
 } as const;
 
 export default function TabLayout() {
@@ -579,6 +612,8 @@ export default function TabLayout() {
   return (
     <Tabs tabBar={renderTabBar} screenOptions={TAB_SCREEN_OPTIONS}>
       <Tabs.Screen name="home" />
+      {/* ★ 2026-04-29: Korolar tab gizli — public sonrası tekrar açılacak */}
+      <Tabs.Screen name="clubs" options={{ href: null }} />
       <Tabs.Screen name="myrooms" />
       <Tabs.Screen name="messages" />
       <Tabs.Screen name="profile" />

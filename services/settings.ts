@@ -22,6 +22,11 @@ export type UserSettings = {
   // Gizlilik
   profile_private: boolean;
   show_online_status: boolean;
+
+  // ★ 2026-04-25: Faz 3.4 — Ses & Mikrofon (LiveKit publish options'a bağlı)
+  echo_cancellation: boolean;
+  noise_suppression: boolean;
+  auto_gain: boolean;
 };
 
 export const DEFAULT_SETTINGS: UserSettings = {
@@ -32,6 +37,9 @@ export const DEFAULT_SETTINGS: UserSettings = {
   language: 'tr',
   profile_private: false,
   show_online_status: true,
+  echo_cancellation: true,
+  noise_suppression: true,
+  auto_gain: true,
 };
 
 export const THEME_OPTIONS = [

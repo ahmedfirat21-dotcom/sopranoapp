@@ -162,6 +162,10 @@ export function useRoomBroadcast(params: UseRoomBroadcastParams) {
     return () => {
       supabase.removeChannel(ch);
       perSenderRecvRef.current.clear();
+      // ★ Cleanup: rate-limit accounting buffer'ları sıfırla
+      recentEmojiTimesRef.current = [];
+      lastEmojiTimeRef.current = 0;
+      emojiCooldownUntilRef.current = 0;
     };
   }, [roomId]);
 
@@ -211,7 +215,7 @@ export function useRoomBroadcast(params: UseRoomBroadcastParams) {
     }).subscribe();
     micReqChannelRef.current = ch;
     return () => { supabase.removeChannel(ch); };
-  }, [roomId, firebaseUser]);
+  }, [roomId, firebaseUser?.uid]); // ★ Audit fix: uid dep — obj ref yerine
 
   // ── 3. Moderasyon Broadcast Kanalı ────────────
   useEffect(() => {
@@ -249,7 +253,17 @@ export function useRoomBroadcast(params: UseRoomBroadcastParams) {
         return;
       } else if (data.action === 'original_host_returned') {
         setClosingCountdown(null);
-        RoomService.get(roomId as string).then(setRoom).catch(() => {});
+        // ★ 2026-04-24 FIX: Asıl sahip geri döndü — oda verisi + katılımcı listesini güncelle.
+        //   Geçici host speaker'a düşürüldü (backend'de zaten yapıldı), client-side de yansıtılmalı.
+        RoomService.get(roomId as string).then(newRoom => {
+          setRoom(newRoom);
+          // Yeni host_id ile participant rollerini güncelle
+          setParticipants(prev => prev.map(p => {
+            if (p.user_id === newRoom.host_id) return { ...p, role: 'owner' as const };
+            if (p.role === 'owner' && p.user_id !== newRoom.host_id) return { ...p, role: 'speaker' as const };
+            return p;
+          }));
+        }).catch(() => {});
         return;
       } else if (data.action === 'host_claimed') {
         setClosingCountdown(null);
@@ -451,6 +465,8 @@ export function useRoomBroadcast(params: UseRoomBroadcastParams) {
       } else if (data.action === 'demote') {
         penaltyRef.current?.show({ type: 'demote', reason: 'Moderatör seni dinleyiciye düşürdü.' });
         setParticipants(prev => prev.map(p => p.user_id === firebaseUser.uid ? { ...p, role: 'listener' as const } : p));
+        // ★ 2026-04-24 FIX: Demote'da hem mic HEM kamera kapatılmalı — kamera limiti koruması
+        liveKitService.disableCamera().catch(() => {});
         (lkRef.current.disableMic?.() ?? (lkRef.current.isMicrophoneEnabled ? lkRef.current.toggleMic() : Promise.resolve())).catch(() => {});
         // ★ BUG FIX: Demote sonrası el kaldırma durumunu sıfırla — aksi halde sırada kalır
         setMyMicRequested(false);
@@ -573,7 +589,7 @@ export function useRoomBroadcast(params: UseRoomBroadcastParams) {
     ch.subscribe();
     modChannelRef.current = ch;
     return () => { supabase.removeChannel(ch); };
-  }, [roomId, firebaseUser]);
+  }, [roomId, firebaseUser?.uid]); // ★ Audit fix: uid dep — obj ref yerine
 
   return {
     // Channel refs — diğer handler'lar tarafından kullanılır

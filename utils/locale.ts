@@ -1,39 +1,51 @@
 /**
- * SopranoChat — Locale / Language Utilities
- * ★ 2026-04-20: Kullanıcı cihaz dilini tespit eder. Expo-localization yerine
- *   Intl API kullanılır (Hermes'te çalışır, extra package gerektirmez).
+ * SopranoChat — Cihaz Dili / Lokal Yardımcıları
+ * Device locale tespiti — odaları kullanıcının diline göre filtrelemek için.
  */
-
-import type { RoomLanguage } from '../types';
-
-const SUPPORTED: RoomLanguage[] = ['tr', 'en', 'ar', 'de'];
+import { Platform, NativeModules } from 'react-native';
 
 /**
- * Kullanıcının cihaz dilini al (örn: 'tr-TR' → 'tr').
- * Desteklenmeyen diller 'tr' (default) olarak düşer.
+ * Cihaz dilini 2 harfli kod olarak döndürür ('tr', 'en', 'de'...).
+ * Tespit edilemezse 'en' fallback.
  */
-export function getDeviceLanguage(): RoomLanguage {
+export function getDeviceLanguage(): string {
   try {
-    const locale = Intl.DateTimeFormat().resolvedOptions().locale || 'tr';
-    const lang = locale.split('-')[0].toLowerCase() as RoomLanguage;
-    return SUPPORTED.includes(lang) ? lang : 'tr';
+    let locale: string | undefined;
+    if (Platform.OS === 'ios') {
+      locale =
+        NativeModules.SettingsManager?.settings?.AppleLocale ||
+        NativeModules.SettingsManager?.settings?.AppleLanguages?.[0];
+    } else {
+      locale = NativeModules.I18nManager?.localeIdentifier;
+    }
+    if (!locale) return 'en';
+    // tr_TR, tr-TR, tr → tr
+    return locale.split(/[-_]/)[0].toLowerCase();
   } catch {
-    return 'tr';
+    return 'en';
   }
 }
 
-/** Dil kodundan TR etiketi */
-export function getLanguageLabel(lang: string | null | undefined): string {
-  const labels: Record<string, string> = {
-    tr: 'Türkçe', en: 'English', ar: 'العربية', de: 'Deutsch',
-  };
-  return labels[lang || ''] || '—';
+// ★ 2026-04-27: Dil etiket ve bayrak yardımcıları — info toast/banner için.
+const LANGUAGE_META: Record<string, { label: string; flag: string }> = {
+  tr: { label: 'Türkçe',     flag: '🇹🇷' },
+  en: { label: 'English',    flag: '🇬🇧' },
+  de: { label: 'Deutsch',    flag: '🇩🇪' },
+  ar: { label: 'العربية',    flag: '🇸🇦' },
+  fr: { label: 'Français',   flag: '🇫🇷' },
+  es: { label: 'Español',    flag: '🇪🇸' },
+  it: { label: 'Italiano',   flag: '🇮🇹' },
+  ru: { label: 'Русский',    flag: '🇷🇺' },
+  pt: { label: 'Português',  flag: '🇵🇹' },
+  ja: { label: '日本語',      flag: '🇯🇵' },
+};
+
+export function getLanguageLabel(code?: string | null): string {
+  if (!code) return '';
+  return LANGUAGE_META[code.toLowerCase()]?.label || code.toUpperCase();
 }
 
-/** Dil kodundan bayrak emojisi */
-export function getLanguageFlag(lang: string | null | undefined): string {
-  const flags: Record<string, string> = {
-    tr: '🇹🇷', en: '🇬🇧', ar: '🇸🇦', de: '🇩🇪',
-  };
-  return flags[lang || ''] || '🌐';
+export function getLanguageFlag(code?: string | null): string {
+  if (!code) return '🌐';
+  return LANGUAGE_META[code.toLowerCase()]?.flag || '🌐';
 }

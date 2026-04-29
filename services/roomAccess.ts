@@ -87,7 +87,7 @@ export const RoomAccessService = {
       return { allowed: false, reason: 'Oda şu anda kilitli. Yeni katılımcı kabul edilmiyor.', action: 'room_locked' };
     }
 
-    // ── 3. Sadece arkadaşlar modu kontrolü (Pro+) ──
+    // ── 3. Sadece arkadaşlar modu kontrolü (Plus+) ──
     // ★ 2026-04-18: friendship çift yönlü — (A,B) veya (B,A) accepted ise erişim verilir
     if (settings.followers_only) {
       const isFriend = await this._isFriendWithHost(userId, room.host_id!);
@@ -104,12 +104,34 @@ export const RoomAccessService = {
     // age_restricted boolean desteği: true ise age_filter_min yoksa 18 olarak kabul et
     const ageFilterMin = settings.age_filter_min || ((settings as any).age_restricted === true ? 18 : 0);
     if (ageFilterMin > 0) {
-      if (!userAge || userAge < ageFilterMin) {
+      // ★ Faz 2.3 — Server-side day-precise yaş kontrolü.
+      //   Önceki client-side hesap (userAge prop) bypass'lanabilir; RPC
+      //   profiles.birth_date'i SECURITY DEFINER ile direkt sorar.
+      let serverAllowed: boolean | null = null;
+      try {
+        const { data, error } = await supabase.rpc('user_meets_age_requirement', {
+          p_user_id: userId,
+          p_min_age: ageFilterMin,
+        });
+        if (!error) serverAllowed = !!data;
+      } catch { /* RPC yoksa client-side fallback */ }
+
+      if (serverAllowed === false) {
         return {
           allowed: false,
           reason: `Bu odaya katılmak için en az ${ageFilterMin} yaşında olmalısınız.`,
           action: 'age_restricted',
         };
+      }
+      // RPC yoksa veya sunucuya ulaşılamadıysa — client-side fallback (mevcut davranış)
+      if (serverAllowed === null) {
+        if (!userAge || userAge < ageFilterMin) {
+          return {
+            allowed: false,
+            reason: `Bu odaya katılmak için en az ${ageFilterMin} yaşında olmalısınız.`,
+            action: 'age_restricted',
+          };
+        }
       }
     }
 
@@ -141,7 +163,15 @@ export const RoomAccessService = {
     // ★ 2026-04-19: Davet kabul edilmişse (hasInvite=accepted) şifre bypass edilir.
     // Mantık: Davet = owner'ın güveni. Owner davet ederken kullanıcıya ekstra şifre
     // paylaşmak zorunda kalmasın. Davetsiz girişler hâlâ şifre gerektirir.
-    const storedPassword = room.room_password || (settings as any).room_password;
+    //
+    // ★ 2026-04-27 FIX: Audience 'password' DEĞİLSE şifreyi yoksay.
+    //   Eski rooms.room_password column'unda hash kalmış olabilir; sahibi UI'dan
+    //   "Şifreli" modunu kapatınca şifresiz oda olmalı. Daha önce column öncelikli
+    //   okunuyordu → +18 yaş filtresi koyan kullanıcı şifre soruyor görüyordu.
+    //   Şimdi: settings.room_password explicit null ise column'u yoksay.
+    const settingsPwd = (settings as any).room_password;
+    const settingsHasExplicitNull = settingsPwd === null || settingsPwd === '';
+    const storedPassword = settingsHasExplicitNull ? null : (settingsPwd || room.room_password);
     if (storedPassword && (roomType === 'open' || roomType === 'closed')) {
       // Önce davet kontrolü — kabul edilmişse şifre atlanır
       const hasAcceptedInvite = await this._hasInvite(roomId, userId);
@@ -183,6 +213,65 @@ export const RoomAccessService = {
 
     // Bilinmeyen tip → izin ver
     return { allowed: true };
+  },
+
+  /**
+   * ★ 2026-04-26: Tüm "hard-block"ları (geçilemez engelleri) topla.
+   *   checkAccess sadece ilk fail eden engeli döner; UI multi-reason göstermek için
+   *   bu yardımcı kullanır. Soft-block'lar (password/invite) — kullanıcı geçebilir,
+   *   bunları topu içermez.
+   *
+   *   Hard-block'lar: banned, room_locked, age_restricted, followers_only.
+   */
+  async getHardBlockers(
+    room: Partial<Room>,
+    userId: string,
+    userTier: SubscriptionTier = 'Free',
+    userAge?: number | null,
+  ): Promise<{ action: string; reason: string }[]> {
+    const blockers: { action: string; reason: string }[] = [];
+    const settings = (room.room_settings || {}) as RoomSettings;
+
+    // Host/admin/GodMaster bypass — engel yok
+    if (room.host_id === userId || (settings as any).original_host_id === userId) return [];
+    const { isGodMaster: _isGM } = require('../constants/tiers');
+    if (_isGM(userTier)) return [];
+
+    // Banned
+    try {
+      const isBanned = await ModerationService.isRoomBanned(room.id!, userId);
+      if (isBanned) blockers.push({ action: 'banned', reason: 'Bu odadan yasaklanmışsın.' });
+    } catch {}
+
+    // Locked
+    if (settings.is_locked) {
+      blockers.push({ action: 'room_locked', reason: 'Oda yeni katılımcı kabul etmiyor.' });
+    }
+
+    // Followers-only
+    if (settings.followers_only && room.host_id) {
+      try {
+        const isFriend = await this._isFriendWithHost(userId, room.host_id);
+        if (!isFriend) blockers.push({ action: 'followers_only', reason: 'Sadece sahibin arkadaşları.' });
+      } catch {}
+    }
+
+    // Age
+    const ageFilterMin = settings.age_filter_min || ((settings as any).age_restricted === true ? 18 : 0);
+    if (ageFilterMin > 0) {
+      let serverAllowed: boolean | null = null;
+      try {
+        const { data, error } = await supabase.rpc('user_meets_age_requirement', {
+          p_user_id: userId,
+          p_min_age: ageFilterMin,
+        });
+        if (!error) serverAllowed = !!data;
+      } catch {}
+      const allowed = serverAllowed !== null ? serverAllowed : (userAge != null && userAge >= ageFilterMin);
+      if (!allowed) blockers.push({ action: 'age_restricted', reason: `En az ${ageFilterMin} yaşında olmalısın.` });
+    }
+
+    return blockers;
   },
 
   // ════════════════════════════════════════════════════════════
@@ -299,8 +388,19 @@ export const RoomAccessService = {
   // DAVET SİSTEMİ
   // ════════════════════════════════════════════════════════════
 
-  /** Kullanıcıyı odaya davet et */
-  async inviteUser(roomId: string, invitedUserId: string, invitedBy: string): Promise<{ success: boolean; error?: string }> {
+  /**
+   * Kullanıcıyı odaya davet et.
+   * @param _cache — Opsiyonel: Toplu davet sırasında her çağrıda profil/oda adı
+   *   tekrar DB'den çekmemek için dışarıdan verilir. İlk çağrıda fetch edilip
+   *   sonraki çağrılara geçirilir. ★ PERF FIX: 5 kişi × 2 sorgu = 10 gereksiz
+   *   DB round-trip eliminasyonu.
+   */
+  async inviteUser(
+    roomId: string,
+    invitedUserId: string,
+    invitedBy: string,
+    _cache?: { inviterName?: string; roomName?: string },
+  ): Promise<{ success: boolean; error?: string }> {
     try {
       const { error } = await supabase.from('room_invites').upsert({
         room_id: roomId,
@@ -310,13 +410,17 @@ export const RoomAccessService = {
       }, { onConflict: 'room_id,user_id' });
       if (error) throw error;
 
-      // ★ Davet eden kişinin adını ve oda adını çek — bildirimde göster
-      const [inviterRes, roomRes] = await Promise.all([
-        supabase.from('profiles').select('display_name').eq('id', invitedBy).single(),
-        supabase.from('rooms').select('name').eq('id', roomId).single(),
-      ]);
-      const inviterName = inviterRes.data?.display_name || 'Birisi';
-      const roomName = roomRes.data?.name || 'bir oda';
+      // ★ PERF FIX: Cache varsa DB sorgusu atla — toplu davette dramatik hız kazanımı
+      let inviterName = _cache?.inviterName;
+      let roomName = _cache?.roomName;
+      if (!inviterName || !roomName) {
+        const [inviterRes, roomRes] = await Promise.all([
+          !inviterName ? supabase.from('profiles').select('display_name').eq('id', invitedBy).single() : null,
+          !roomName ? supabase.from('rooms').select('name').eq('id', roomId).single() : null,
+        ]);
+        if (!inviterName) inviterName = inviterRes?.data?.display_name || 'Birisi';
+        if (!roomName) roomName = roomRes?.data?.name || 'bir oda';
+      }
 
       // Bildirim gönder (zile düşsün)
       try {
@@ -327,13 +431,11 @@ export const RoomAccessService = {
           reference_id: roomId,
           body: `${inviterName} seni "${roomName}" odasına davet etti`,
         });
-        if (notifError) {
-          console.warn('[InviteUser] ⚠️ Bildirim insert HATASI:', notifError.message, notifError.details, notifError.hint);
-        } else {
-          console.log('[InviteUser] ✅ Bildirim başarıyla eklendi:', invitedUserId);
+        if (notifError && __DEV__) {
+          console.warn('[InviteUser] Bildirim insert hatası:', notifError.message, notifError.details);
         }
       } catch (notifErr: any) {
-        console.warn('[InviteUser] ⚠️ Bildirim insert EXCEPTION:', notifErr?.message);
+        if (__DEV__) console.warn('[InviteUser] Bildirim insert exception:', notifErr?.message);
       }
 
       return { success: true };
@@ -547,6 +649,7 @@ export const RoomAccessService = {
 
   /**
    * Arkadaş listesinden toplu davet gönder.
+   * ★ PERF FIX: Sıralı → paralel, profil/oda adı cache ile tek seferlik fetch.
    * @param friendIds - Davet edilecek kullanıcı ID'leri
    * @returns Başarılı davet sayısı
    */
@@ -555,16 +658,25 @@ export const RoomAccessService = {
     friendIds: string[],
     invitedBy: string,
   ): Promise<{ successCount: number; failedCount: number }> {
+    // Önce inviter adı ve oda adını tek seferde çek — tüm çağrılara cache olarak geçir
+    const [inviterRes, roomRes] = await Promise.all([
+      supabase.from('profiles').select('display_name').eq('id', invitedBy).single(),
+      supabase.from('rooms').select('name').eq('id', roomId).single(),
+    ]);
+    const cache = {
+      inviterName: inviterRes.data?.display_name || 'Birisi',
+      roomName: roomRes.data?.name || 'bir oda',
+    };
+
+    const results = await Promise.allSettled(
+      friendIds.map(friendId => this.inviteUser(roomId, friendId, invitedBy, cache))
+    );
+
     let successCount = 0;
     let failedCount = 0;
-
-    for (const friendId of friendIds) {
-      const result = await this.inviteUser(roomId, friendId, invitedBy);
-      if (result.success) {
-        successCount++;
-      } else {
-        failedCount++;
-      }
+    for (const r of results) {
+      if (r.status === 'fulfilled' && r.value.success) successCount++;
+      else failedCount++;
     }
 
     return { successCount, failedCount };

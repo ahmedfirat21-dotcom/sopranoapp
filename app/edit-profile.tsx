@@ -25,13 +25,19 @@ import { auth, GOOGLE_WEB_CLIENT_ID } from '../constants/firebase';
 import { AVATAR_OPTIONS, getAvatarSource } from '../constants/avatars';
 import { useAuth } from './_layout';
 import { showToast } from '../components/Toast';
-import { ReferralService } from '../services/referral';
+// ★ 2026-04-28: ReferralService + ExpoClipboard kaldırıldı — davet kodu profile.tsx'te
 import * as ImagePicker from 'expo-image-picker';
-import * as ExpoClipboard from 'expo-clipboard';
 import { StorageService } from '../services/storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+
+// ★ 2026-04-29: Header ikonlarına derinlik veren ortak shadow (Keşfet/Odalarım pattern).
+const iconShadow = {
+  textShadowColor: 'rgba(0,0,0,0.55)',
+  textShadowOffset: { width: 0, height: 2 },
+  textShadowRadius: 5,
+} as const;
 
 const discovery = {
   authorizationEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
@@ -76,7 +82,11 @@ export default function EditProfileScreen() {
 
   // === Privacy toggles ===
   const [hideOwnedRooms, setHideOwnedRooms] = useState((profile as any)?.hide_owned_rooms || false);
-  const [privacyMode, setPrivacyMode] = useState<'public' | 'followers_only' | 'private'>((profile as any)?.privacy_mode || 'public');
+  // ★ 2026-04-26: "Gizli" kaldırıldı — Instagram private account "followers_only" ile zaten karşılanıyor.
+  //   Eski DB'de 'private' kayıtlıysa otomatik 'followers_only' say.
+  const [privacyMode, setPrivacyMode] = useState<'public' | 'followers_only'>(
+    (profile as any)?.privacy_mode === 'private' ? 'followers_only' : ((profile as any)?.privacy_mode || 'public')
+  );
 
   // === Account linking (anonymous upgrade) ===
   const [showEmailRegister, setShowEmailRegister] = useState(false);
@@ -92,10 +102,7 @@ export default function EditProfileScreen() {
   const [newPasswordConfirm, setNewPasswordConfirm] = useState('');
   const [changingPassword, setChangingPassword] = useState(false);
 
-  // === Referral System ===
-  const [myReferralCode, setMyReferralCode] = useState<string | null>(null);
-  const [referralCount, setReferralCount] = useState(0);
-
+  // ★ 2026-04-28: Referral state'leri kaldırıldı — davet kodu profile.tsx'te
   // === Keyboard ===
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const scrollRef = useRef<ScrollView>(null);
@@ -117,13 +124,7 @@ export default function EditProfileScreen() {
     return () => { showSub.remove(); hideSub.remove(); };
   }, []);
 
-  // Fetch Referral Data
-  useEffect(() => {
-    if (userId) {
-      ReferralService.getMyCode(userId).then(setMyReferralCode);
-      ReferralService.getReferralCount(userId).then(setReferralCount);
-    }
-  }, [userId]);
+  // ★ 2026-04-28: Referral fetch effect kaldırıldı — davet kodu profile.tsx'te
 
   const scrollToField = useCallback((fieldName: string) => {
     const fieldY = fieldPositions.current[fieldName];
@@ -151,12 +152,12 @@ export default function EditProfileScreen() {
       if (!result.canceled && result.assets && result.assets.length > 0) {
         setShowAvatarPicker(false);
         setUploadingAvatar(true);
-        const uploadUrl = await StorageService.uploadAvatar(firebaseUser.uid, result.assets[0].uri);
+        const uploadUrl = await StorageService.uploadAvatar(firebaseUser.uid, result.assets[0].uri, avatarUrl);
         setAvatarUrl(uploadUrl);
-        showToast({ title: 'Başarılı', message: 'Profil fotoğrafınız yüklendi.', type: 'success' });
+        showToast({ title: '📸 Fotoğraf Yüklendi', message: 'Profil fotoğrafın güncellendi.', type: 'success' });
       }
     } catch (err: any) {
-      showToast({ title: 'Hata', message: err.message || 'Fotoğraf yüklenemedi.', type: 'error' });
+      showToast({ title: 'Fotoğraf Yüklenemedi', message: err.message || 'Görsel yüklenirken sorun oluştu.', type: 'error' });
     } finally {
       setUploadingAvatar(false);
     }
@@ -178,7 +179,7 @@ export default function EditProfileScreen() {
       return;
     }
     if (!userId) {
-      showToast({ type: 'error', title: 'Hata', message: 'Kullanıcı bulunamadı.' });
+      showToast({ type: 'error', title: 'Oturum Kapalı', message: 'Giriş bilgin bulunamadı, yeniden giriş yap.' });
       return;
     }
     // ★ Username taken — kaydetmeye izin verme
@@ -239,9 +240,9 @@ export default function EditProfileScreen() {
       safeGoBack(router);
     } catch (error: any) {
       if (error?.message?.includes('duplicate') || error?.code === '23505') {
-        showToast({ type: 'error', title: 'Hata', message: 'Bu kullanıcı adı zaten alınmış.' });
+        showToast({ type: 'warning', title: 'Kullanıcı Adı Alınmış', message: 'Bu kullanıcı adı başkası tarafından kullanılıyor.' });
       } else {
-        showToast({ type: 'error', title: 'Hata', message: 'Profil güncellenirken sorun oluştu.' });
+        showToast({ type: 'error', title: 'Profil Güncellenmedi', message: 'Değişiklikler kaydedilemedi. Tekrar dene.' });
       }
     } finally {
       setSaving(false);
@@ -276,7 +277,7 @@ export default function EditProfileScreen() {
       } else if (error?.code === 'auth/provider-already-linked') {
         showToast({ type: 'info', title: 'Bilgi', message: 'Google hesabınız zaten bağlı.' });
       } else {
-        showToast({ type: 'error', title: 'Hata', message: 'Google bağlantısı kurulamadı. Lütfen tekrar deneyin.' });
+        showToast({ type: 'error', title: 'Google Bağlanamadı', message: 'Google hesabı eklenemedi, tekrar dene.' });
       }
     } finally {
       setLinking(false);
@@ -288,15 +289,15 @@ export default function EditProfileScreen() {
     if (!firebaseUser) return;
 
     if (!regEmail.trim()) {
-      showToast({ type: 'warning', title: 'Hata', message: 'E-posta adresi gerekli.' });
+      showToast({ type: 'warning', title: 'E-posta Gerekli', message: 'Lütfen e-posta adresini gir.' });
       return;
     }
     if (regPassword.length < 6) {
-      showToast({ type: 'warning', title: 'Hata', message: 'Şifre en az 6 karakter olmalıdır.' });
+      showToast({ type: 'warning', title: 'Şifre Çok Kısa', message: 'Şifre en az 6 karakter olmalı.' });
       return;
     }
     if (regPassword !== regPasswordConfirm) {
-      showToast({ type: 'warning', title: 'Hata', message: 'Şifreler uyuşmuyor.' });
+      showToast({ type: 'warning', title: 'Şifreler Eşleşmiyor', message: 'İki şifre alanı aynı olmalı.' });
       return;
     }
 
@@ -313,13 +314,13 @@ export default function EditProfileScreen() {
     } catch (error: any) {
       if (__DEV__) console.error('Email link error:', error);
       if (error?.code === 'auth/email-already-in-use') {
-        showToast({ type: 'error', title: 'Hata', message: 'Bu e-posta adresi zaten kullanılıyor.' });
+        showToast({ type: 'warning', title: 'E-posta Kullanımda', message: 'Bu e-posta başka bir hesaba bağlı.' });
       } else if (error?.code === 'auth/invalid-email') {
-        showToast({ type: 'error', title: 'Hata', message: 'Geçersiz e-posta adresi.' });
+        showToast({ type: 'warning', title: 'Geçersiz E-posta', message: 'Geçerli bir e-posta adresi gir.' });
       } else if (error?.code === 'auth/provider-already-linked') {
         showToast({ type: 'info', title: 'Bilgi', message: 'E-posta hesabı zaten bağlı.' });
       } else {
-        showToast({ type: 'error', title: 'Hata', message: 'Kayıt oluşturulamadı. Lütfen tekrar deneyin.' });
+        showToast({ type: 'error', title: 'E-posta Eklenemedi', message: 'E-posta hesabın güncellenemedi, tekrar dene.' });
       }
     } finally {
       setLinking(false);
@@ -359,11 +360,11 @@ export default function EditProfileScreen() {
     } catch (error: any) {
       if (__DEV__) console.error('Password change error:', error);
       if (error?.code === 'auth/wrong-password') {
-        showToast({ type: 'error', title: 'Hata', message: 'Mevcut şifreniz yanlış.' });
+        showToast({ type: 'error', title: 'Şifre Yanlış', message: 'Mevcut şifren doğru değil.' });
       } else if (error?.code === 'auth/requires-recent-login') {
-        showToast({ type: 'error', title: 'Hata', message: 'Bu işlem için yeniden giriş yapmanız gerekiyor.' });
+        showToast({ type: 'warning', title: 'Yeniden Giriş Gerekli', message: 'Güvenlik için çıkış yapıp tekrar gir.' });
       } else {
-        showToast({ type: 'error', title: 'Hata', message: 'Şifre değiştirilemedi. Lütfen tekrar deneyin.' });
+        showToast({ type: 'error', title: 'Şifre Değiştirilemedi', message: 'İşlem tamamlanamadı, tekrar dene.' });
       }
     } finally {
       setChangingPassword(false);
@@ -387,25 +388,41 @@ export default function EditProfileScreen() {
   const authInfo = getAuthTypeInfo();
 
   return (
-    <AppBackground>
+    <AppBackground variant="profile" radialGlow>
     <View style={styles.container}>
-      {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-        <Pressable onPress={() => safeGoBack(router)} style={styles.backBtn}>
-          <Ionicons name="close" size={24} color={Colors.text} />
-        </Pressable>
-        <Text style={styles.headerTitle}>Profili Düzenle</Text>
-        <Pressable
-          onPress={handleSave}
-          disabled={saving || !hasChanges}
-          style={[styles.saveBtn, (!hasChanges || saving) && styles.saveBtnDisabled]}
-        >
-          {saving ? (
-            <ActivityIndicator size="small" color="#fff" />
-          ) : (
-            <Text style={[styles.saveBtnText, !hasChanges && styles.saveBtnTextDisabled]}>Kaydet</Text>
-          )}
-        </Pressable>
+      {/* ★ 2026-04-29: Glassmorphic header — Keşfet/Odalarım/Profil pattern */}
+      <View style={[styles.headerBar, { paddingTop: insets.top }]}>
+        <LinearGradient
+          colors={['rgba(48,65,94,0.92)', 'rgba(26,40,64,0.82)', 'rgba(12,22,40,0.6)']}
+          locations={[0, 0.55, 1]}
+          start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
+          style={StyleSheet.absoluteFillObject}
+          pointerEvents="none"
+        />
+        <View style={styles.headerContent}>
+          <Pressable onPress={() => safeGoBack(router)} style={styles.backBtn} hitSlop={8}>
+            <Ionicons name="close" size={22} color="#F1F5F9" style={iconShadow} />
+          </Pressable>
+          <Text style={styles.headerTitle}>Profili Düzenle</Text>
+          <Pressable
+            onPress={handleSave}
+            disabled={saving || !hasChanges}
+            style={[styles.saveBtn, (!hasChanges || saving) && styles.saveBtnDisabled]}
+          >
+            {saving ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Text style={[styles.saveBtnText, !hasChanges && styles.saveBtnTextDisabled]}>Kaydet</Text>
+            )}
+          </Pressable>
+        </View>
+        {/* Alt amber separator — profil tab accent ile uyumlu */}
+        <LinearGradient
+          colors={['transparent', 'rgba(245,158,11,0.55)', 'rgba(245,158,11,0.55)', 'transparent']}
+          locations={[0, 0.25, 0.75, 1]}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+          style={styles.headerSeparator}
+        />
       </View>
 
       <ScrollView
@@ -551,55 +568,13 @@ export default function EditProfileScreen() {
           </View>
         </View>
 
-        {/* ===== DAVET SİSTEMİ ===== */}
-        <View style={styles.sectionDivider}>
-          <Text style={styles.sectionLabel}>DAVET KAZANÇLARI</Text>
-        </View>
-
-        <View style={styles.accountInfoCard}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.fieldLabel}>Davet Kodun</Text>
-              <Text style={styles.fieldHint}>Paylaş, kayıt olunca 50'şer SP kazanın.</Text>
-            </View>
-            <View style={styles.verifiedBadge}>
-              <Ionicons name="people" size={14} color={Colors.teal} />
-              <Text style={{ fontSize: 11, fontWeight: '700', color: Colors.teal }}>{referralCount} Kişi</Text>
-            </View>
-          </View>
-
-          {myReferralCode ? (
-            <View style={styles.referralBox}>
-              <Text style={styles.referralCodeText}>{myReferralCode}</Text>
-              <Pressable 
-                style={styles.copyBtn} 
-                onPress={async () => {
-                  // ★ B4 FIX: Deprecated RN Clipboard → expo-clipboard
-                  await ExpoClipboard.setStringAsync(myReferralCode);
-                  showToast({ title: 'Kopyalandı', type: 'success' });
-                }}
-              >
-                <Ionicons name="copy-outline" size={20} color={Colors.teal} />
-              </Pressable>
-            </View>
-          ) : (
-            <ActivityIndicator size="small" color={Colors.teal} style={{ marginVertical: 10 }} />
-          )}
-
-          <Pressable style={styles.ctaWrap} onPress={async () => {
-              if (!myReferralCode) return;
-              try { await Share.share({ message: `SopranoChat'e katıl!\nDavet kodum: ${myReferralCode}\nhttps://sopranochat.com/`, title: 'Ödüllü Davet Kodu' }); } catch (e) { if (__DEV__) console.error('[EditProfile] İşlem hatası:', e); }
-            }}>
-            <LinearGradient colors={['#14B8A6', '#0D9488', '#065F56']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.ctaGradient}>
-              <View style={styles.ctaIconWrap}><Ionicons name="share-social" size={16} color="#FFF" /></View>
-              <Text style={styles.ctaTitle}>Kodu Paylaş</Text>
-              <Ionicons name="arrow-forward" size={16} color="rgba(255,255,255,0.6)" />
-            </LinearGradient>
-          </Pressable>
-        </View>
+        {/* ★ 2026-04-28: DAVET KAZANÇLARI bölümü KALDIRILDI — Davet kodu profil sayfasında zaten var.
+             Edit-profile = veri düzenleme; davet = paylaşım/sosyal — profile'da kalsın. */}
 
         {/* ===== HESAP BİLGİLERİ ===== */}
         <View style={styles.sectionDivider}>
+          <View style={styles.sectionAccent} />
+          <Ionicons name="person-circle-outline" size={13} color={Colors.teal} />
           <Text style={styles.sectionLabel}>HESAP BİLGİLERİ</Text>
         </View>
 
@@ -725,6 +700,8 @@ export default function EditProfileScreen() {
 
         {/* ===== GİZLİLİK AYARLARI ===== */}
         <View style={styles.sectionDivider}>
+          <View style={styles.sectionAccent} />
+          <Ionicons name="shield-checkmark-outline" size={13} color={Colors.teal} />
           <Text style={styles.sectionLabel}>GİZLİLİK</Text>
         </View>
 
@@ -737,7 +714,7 @@ export default function EditProfileScreen() {
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.accountLabel}>Odalarımı Gizle</Text>
-                <Text style={styles.fieldHint}>Profilinde odaların görünmez</Text>
+                <Text style={styles.fieldHint}>Yabancılar odalarını göremez (arkadaşların görür)</Text>
               </View>
             </View>
             <Switch
@@ -756,24 +733,24 @@ export default function EditProfileScreen() {
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.accountLabel}>Profil Gizliliği</Text>
-                <Text style={styles.fieldHint}>Profilini kimler görebilir?</Text>
+                <Text style={styles.fieldHint}>{privacyMode === 'public' ? 'Profilini herkes görebilir' : 'Profilini sadece arkadaşların görebilir'}</Text>
               </View>
             </View>
             <View style={{ flexDirection: 'row', gap: 8 }}>
-              {([['public', 'Herkes', 'globe-outline'], ['followers_only', 'Arkadaşlar', 'people-outline'], ['private', 'Gizli', 'lock-closed']] as const).map(([mode, label, icon]) => (
+              {([['public', 'Herkes', 'globe-outline'], ['followers_only', 'Arkadaşlar', 'people-outline']] as const).map(([mode, label, icon]) => (
                 <Pressable
                   key={mode}
                   style={[{
-                    flex: 1, paddingVertical: 10, borderRadius: 10,
+                    flex: 1, paddingVertical: 12, borderRadius: 10,
                     backgroundColor: privacyMode === mode ? 'rgba(20,184,166,0.15)' : 'rgba(255,255,255,0.04)',
                     borderWidth: 1,
                     borderColor: privacyMode === mode ? 'rgba(20,184,166,0.4)' : 'rgba(255,255,255,0.08)',
-                    alignItems: 'center', gap: 4,
+                    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
                   }]}
                   onPress={() => setPrivacyMode(mode)}
                 >
                   <Ionicons name={icon as any} size={16} color={privacyMode === mode ? Colors.teal : 'rgba(255,255,255,0.4)'} />
-                  <Text style={{ fontSize: 11, fontWeight: '600', color: privacyMode === mode ? Colors.teal : 'rgba(255,255,255,0.5)' }}>{label}</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '600', color: privacyMode === mode ? Colors.teal : 'rgba(255,255,255,0.5)' }}>{label}</Text>
                 </Pressable>
               ))}
             </View>
@@ -788,18 +765,41 @@ export default function EditProfileScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: 'transparent' },
 
-  // Header
-  header: {
+  // ★ 2026-04-29: Glassmorphic header — Keşfet/Odalarım pattern.
+  headerBar: {
+    position: 'relative',
+    marginBottom: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.22,
+    shadowRadius: 12,
+    elevation: 8,
+    zIndex: 10,
+  },
+  headerContent: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingBottom: 12,
-    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)',
-    backgroundColor: 'transparent', zIndex: 10,
+    paddingHorizontal: 14, paddingBottom: 8,
+  },
+  headerSeparator: {
+    height: 1.5,
+    width: '100%',
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
   },
   backBtn: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
-  headerTitle: { fontSize: 17, fontWeight: '700', color: Colors.text, ...Shadows.textLight },
-  saveBtn: { paddingHorizontal: 18, paddingVertical: 8, borderRadius: Radius.full, backgroundColor: '#14B8A6', ...Shadows.icon },
-  saveBtnDisabled: { backgroundColor: 'rgba(255,255,255,0.1)', shadowOpacity: 0 },
-  saveBtnText: { fontSize: 13, fontWeight: '700', color: '#fff', ...Shadows.textLight },
+  headerTitle: {
+    fontSize: 15, fontWeight: '800', color: '#F1F5F9',
+    letterSpacing: 0.3, ...Shadows.textLight,
+  },
+  saveBtn: {
+    paddingHorizontal: 16, paddingVertical: 7,
+    borderRadius: Radius.full,
+    backgroundColor: '#F59E0B',
+    borderWidth: 1, borderColor: 'rgba(245,158,11,0.55)',
+    shadowColor: '#F59E0B', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.4, shadowRadius: 6, elevation: 4,
+  },
+  saveBtnDisabled: { backgroundColor: 'rgba(255,255,255,0.08)', borderColor: 'rgba(255,255,255,0.12)', shadowOpacity: 0 },
+  saveBtnText: { fontSize: 12, fontWeight: '800', color: '#FFF', letterSpacing: 0.4, ...Shadows.textLight },
   saveBtnTextDisabled: { color: 'rgba(255,255,255,0.4)' },
 
   // CTA
@@ -822,18 +822,29 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
   },
 
-  // Avatar
-  avatarSection: { alignItems: 'center', paddingTop: 10, paddingBottom: 4 },
-  avatarWrap: { position: 'relative', marginBottom: 6 },
-  avatarImage: { width: 64, height: 64, borderRadius: 32, borderWidth: 2, borderColor: Colors.teal },
+  // ★ 2026-04-29: Avatar — premium amber ring (profil tab accent ile uyumlu)
+  avatarSection: { alignItems: 'center', paddingTop: 14, paddingBottom: 6 },
+  avatarWrap: {
+    position: 'relative', marginBottom: 8,
+    shadowColor: '#F59E0B', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 12, elevation: 8,
+  },
+  avatarImage: {
+    width: 80, height: 80, borderRadius: 40,
+    borderWidth: 2.5, borderColor: 'rgba(245,158,11,0.65)',
+  },
   cameraBtn: {
     position: 'absolute', bottom: -2, right: -4,
-    width: 24, height: 24, borderRadius: 12,
-    backgroundColor: Colors.teal, justifyContent: 'center', alignItems: 'center',
-    borderWidth: 2, borderColor: Colors.bg,
+    width: 28, height: 28, borderRadius: 14,
+    backgroundColor: '#F59E0B', justifyContent: 'center', alignItems: 'center',
+    borderWidth: 2, borderColor: '#0E1A2E',
+    shadowColor: '#F59E0B', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.5, shadowRadius: 4, elevation: 4,
   },
-  changeAvatarText: { fontSize: 11, fontWeight: '600', color: Colors.teal },
-  avatarPicker: { marginHorizontal: 16, marginTop: 6, padding: 10, backgroundColor: '#414e5f', borderRadius: 12, borderWidth: 1, borderColor: '#95a1ae' },
+  changeAvatarText: { fontSize: 12, fontWeight: '700', color: '#F59E0B', letterSpacing: 0.3 },
+  avatarPicker: {
+    marginHorizontal: 16, marginTop: 8, padding: 12,
+    backgroundColor: 'rgba(15,23,42,0.55)', borderRadius: 14,
+    borderWidth: 1, borderColor: 'rgba(20,184,166,0.18)',
+  },
   pickerTitle: { fontSize: 12, fontWeight: '700', color: Colors.text, marginBottom: 8, ...Shadows.textLight },
   uploadBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: Colors.teal, paddingVertical: 8, borderRadius: Radius.full, marginBottom: 8 },
   uploadBtnText: { color: '#fff', fontSize: 12, fontWeight: '600' },
@@ -848,12 +859,12 @@ const styles = StyleSheet.create({
     borderWidth: 2, borderColor: Colors.bg3,
   },
 
-  // Form
+  // ★ 2026-04-29: Form kartı — glassmorphic dark navy (Keşfet/Odalarım kart pattern)
   form: {
-    marginHorizontal: 16, padding: 10, paddingTop: 12,
-    backgroundColor: '#414e5f', borderRadius: 12,
-    borderWidth: 1, borderColor: '#95a1ae',
-    ...Shadows.card, marginBottom: 4,
+    marginHorizontal: 16, padding: 14, paddingTop: 14,
+    backgroundColor: 'rgba(15,23,42,0.55)', borderRadius: 14,
+    borderWidth: 1, borderColor: 'rgba(20,184,166,0.18)',
+    ...Shadows.card, marginBottom: 8,
   },
   field: { marginBottom: 8 },
   fieldLabel: { fontSize: 10, fontWeight: '700', color: '#F1F5F9', marginBottom: 3, ...Shadows.textLight },
@@ -874,20 +885,27 @@ const styles = StyleSheet.create({
   charCount: { fontSize: 9, color: '#94A3B8', textAlign: 'right', marginTop: 2 },
   fieldHint: { fontSize: 9, color: '#94A3B8', marginTop: 1 },
 
-  // Section divider
+  // ★ 2026-04-28: Section header — profile.tsx premium pattern ile birleştirildi.
+  //   Eskiden flat sectionDivider + sectionLabel idi; tutarsızdı.
+  //   Yeni: 3px teal accent bar + Ionicons + uppercase metin (profile/clubs/settings ile aynı).
   sectionDivider: {
-    paddingHorizontal: 20, marginTop: 4, marginBottom: 6,
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    marginHorizontal: 16, marginTop: 14, marginBottom: 8,
+  },
+  sectionAccent: {
+    width: 3, height: 14, borderRadius: 2,
+    backgroundColor: Colors.teal,
   },
   sectionLabel: {
-    fontSize: 10, fontWeight: '800', color: '#94A3B8',
+    fontSize: 11, fontWeight: '800', color: '#94A3B8',
     textTransform: 'uppercase', letterSpacing: 1, ...Shadows.textLight,
   },
 
-  // Account info
+  // ★ 2026-04-29: Account info kartı — glassmorphic dark navy
   accountInfoCard: {
-    marginHorizontal: 16, padding: 10,
-    borderRadius: 12, backgroundColor: '#414e5f',
-    borderWidth: 1, borderColor: '#95a1ae', marginBottom: 4,
+    marginHorizontal: 16, padding: 14,
+    borderRadius: 14, backgroundColor: 'rgba(15,23,42,0.55)',
+    borderWidth: 1, borderColor: 'rgba(20,184,166,0.18)', marginBottom: 8,
     ...Shadows.card,
   },
   accountRow: { flexDirection: 'row', alignItems: 'center' },
@@ -923,16 +941,17 @@ const styles = StyleSheet.create({
   registerBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, borderRadius: Radius.default, backgroundColor: Colors.teal, marginTop: 4 },
   registerBtnText: { fontSize: 15, fontWeight: '700', color: '#fff' },
 
-  // Password section
-  passwordSection: { marginHorizontal: 16, marginBottom: 6 },
+  // ★ 2026-04-29: Password section — glassmorphic dark navy
+  passwordSection: { marginHorizontal: 16, marginBottom: 8 },
   passwordToggle: {
-    flexDirection: 'row', alignItems: 'center', padding: 10,
-    borderRadius: 12, backgroundColor: '#414e5f',
-    borderWidth: 1, borderColor: '#95a1ae', ...Shadows.card,
+    flexDirection: 'row', alignItems: 'center', padding: 12, gap: 10,
+    borderRadius: 14, backgroundColor: 'rgba(15,23,42,0.55)',
+    borderWidth: 1, borderColor: 'rgba(20,184,166,0.18)', ...Shadows.card,
   },
   passwordForm: {
-    marginTop: 4, padding: 10, borderRadius: 12,
-    backgroundColor: '#414e5f', borderWidth: 1, borderColor: '#95a1ae', ...Shadows.card,
+    marginTop: 6, padding: 14, borderRadius: 14,
+    backgroundColor: 'rgba(15,23,42,0.55)',
+    borderWidth: 1, borderColor: 'rgba(20,184,166,0.18)', ...Shadows.card,
   },
   menuLabel: { fontSize: 12, fontWeight: '600', color: '#F1F5F9', ...Shadows.textLight },
 

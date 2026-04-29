@@ -91,13 +91,17 @@ android {
         applicationId 'com.sopranochat'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 63
-        versionName "1.2.4"
+        versionCode 88
+        versionName "1.2.5"
         // ★ 2026-04-27: APK boyutu küçültme — modern Android (2017+) sadece arm64-v8a kullanır.
         //   Bu sayede 4 ayrı mimari yerine 1 mimari APK'ya dahil olur, ~%40-50 boyut tasarrufu.
         //   Eski 32-bit cihazlar (~2017 öncesi <1% pazar payı) düşer.
+        // ★ 2026-04-28: x86_64 GERİ EKLENDİ — Android Studio emülatörü x86_64,
+        //   APK arm64-only olunca emülatörde "SopranoChat sürekli olarak duruyor" crash.
+        //   Production AAB Play Console'da otomatik device-split yapar (her cihaz
+        //   sadece kendi ABI'sını indirir), boyut sorunu yok.
         ndk {
-            abiFilters 'arm64-v8a'
+            abiFilters 'arm64-v8a', 'x86_64'
         }
     }
     signingConfigs {
@@ -107,15 +111,24 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        // ★ 2026-04-28: Play Store upload keystore — gradle.properties'teki SOPRANOCHAT_UPLOAD_* keyleri
+        //   varsa release imzasında kullanılır. Yoksa debug ile (geliştirme).
+        release {
+            if (project.hasProperty('SOPRANOCHAT_UPLOAD_STORE_FILE')) {
+                storeFile file(SOPRANOCHAT_UPLOAD_STORE_FILE)
+                storePassword SOPRANOCHAT_UPLOAD_STORE_PASSWORD
+                keyAlias SOPRANOCHAT_UPLOAD_KEY_ALIAS
+                keyPassword SOPRANOCHAT_UPLOAD_KEY_PASSWORD
+            }
+        }
     }
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
         }
         release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
+            // ★ 2026-04-28: Play Store için upload key. gradle.properties'te key yoksa debug fallback.
+            signingConfig project.hasProperty('SOPRANOCHAT_UPLOAD_STORE_FILE') ? signingConfigs.release : signingConfigs.debug
             shrinkResources (findProperty('android.enableShrinkResourcesInReleaseBuilds')?.toBoolean() ?: false)
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"

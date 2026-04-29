@@ -46,6 +46,10 @@ interface Props {
   onFlashDone?: (userId: string) => void;
   /** Kamera rozeti tap — user'ın kamerasını fullscreen aç */
   onCameraExpand?: (user: RoomParticipant) => void;
+  /** ★ 2026-04-26: Inline moderasyon — kart sağ-altında mute toggle butonu (Clubhouse pattern).
+   *  canModerate: bu user'da mute yetkisi var mı? onQuickMute: tıklayınca toggle. */
+  canModerate?: (user: RoomParticipant) => boolean;
+  onQuickMute?: (user: RoomParticipant) => void;
 }
 
 function SpeakingGlow({ speaking, borderRadius = 16 }: { speaking: boolean; borderRadius?: number }) {
@@ -196,7 +200,9 @@ function CaretakerTimerBadge({ expiresAt }: { expiresAt: string }) {
   );
 }
 
-function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, isMe, cardWidth, cardHeight, VideoView }: {
+function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, isMe, cardWidth, cardHeight, VideoView, canModerate, onQuickMute }: {
+  canModerate?: boolean;
+  onQuickMute?: () => void;
   user: RoomParticipant; micStatus: MicStatus; onPress: () => void;
   onSelfDemote?: () => void;
   onCameraExpand?: (user: RoomParticipant) => void;
@@ -235,17 +241,38 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, i
     //   Şimdi: kart tıklaması Pressable (card inner), demote butonu bağımsız sibling Pressable.
     <View style={[s.speakerCard, { width: cardWidth }]}>
       <Pressable style={({ pressed }) => [{ width: '100%' }, pressed && { opacity: 0.9, transform: [{ scale: 0.97 }] }]} onPress={onPress}>
+      {/* ★ 2026-04-26: Audio-only kartlarda squircle (cardWidth * 0.32), video açıkken KARE köşe (10) —
+           video kenarları yuvarlak köşeyle kesilip okunmaz hale gelmesin. */}
+      {(() => null)()}
       <View style={[
         s.speakerCardInner,
-        { height: cardHeight, borderColor: ringColor, borderWidth: isHost || isMod ? 2 : 1.5 },
+        { height: cardHeight, borderColor: ringColor, borderWidth: isHost || isMod ? 2 : 1.5, borderRadius: cameraOn && videoTrack && VideoView ? 10 : cardWidth * 0.32, overflow: 'visible' },
       ]}>
-        <LinearGradient colors={['rgba(30,41,59,0.7)', 'rgba(15,23,42,0.85)']} style={[StyleSheet.absoluteFill, { borderRadius: 16 }]} />
-        {cameraOn && videoTrack && VideoView ? (
-          <VideoView videoTrack={videoTrack} style={StyleSheet.absoluteFill} objectFit="cover" mirror={isMe} />
-        ) : (
-          <Image source={getAvatarSource(avatarUrl)} style={s.speakerAvatar} />
-        )}
-        <SpeakingGlow speaking={speaking && mic} borderRadius={16} />
+        {/* ★ Clip wrapper — sadece görseller içinde, overflow:'hidden' köşelere kestirir. Badge'ler bu wrapper'ın DIŞINDA. */}
+        <View style={[StyleSheet.absoluteFill, { borderRadius: cameraOn && videoTrack && VideoView ? 10 : cardWidth * 0.32, overflow: 'hidden' }]}>
+          <LinearGradient colors={['rgba(30,41,59,0.7)', 'rgba(15,23,42,0.85)']} style={StyleSheet.absoluteFill} />
+          {cameraOn && videoTrack && VideoView ? (
+            <VideoView videoTrack={videoTrack} style={StyleSheet.absoluteFill} objectFit="cover" mirror={isMe} />
+          ) : (
+            <Image source={getAvatarSource(avatarUrl)} style={s.speakerAvatar} />
+          )}
+          {/* ★ 2026-04-24: Kamera açıkken alt + üst gradient overlay — badge'ler video üzerinde okunur kalır. */}
+          {cameraOn && videoTrack && VideoView && (
+            <>
+              <LinearGradient
+                colors={['rgba(0,0,0,0.55)', 'transparent']}
+                style={s.videoGradientTop}
+                pointerEvents="none"
+              />
+              <LinearGradient
+                colors={['transparent', 'rgba(0,0,0,0.6)']}
+                style={s.videoGradientBottom}
+                pointerEvents="none"
+              />
+            </>
+          )}
+        </View>
+        <SpeakingGlow speaking={speaking && mic} borderRadius={cameraOn && videoTrack && VideoView ? 10 : cardWidth * 0.32} />
         {isGhost && (
           <View style={s.ghostOverlay}>
             <Ionicons name="eye-off" size={18} color="rgba(255,255,255,0.55)" />
@@ -258,7 +285,7 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, i
         <View style={[s.micBadge, mic ? s.micBadgeOn : s.micBadgeOff]}>
           <Ionicons name={mic ? 'mic' : 'mic-off'} size={14} color="#fff" />
         </View>
-        {/* ★ 2026-04-20: Kamera rozeti — açık ise sol üstte, TAP → fullscreen video.
+        {/* ★ 2026-04-20: Kamera rozeti — açık ise sağ üstte, TAP → fullscreen video.
             Avatar onPress (profile card) ile çakışmaz (nested Pressable) */}
         {cameraOn && videoTrack && onCameraExpand && (
           <Pressable
@@ -267,6 +294,21 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, i
             style={({ pressed }) => [s.cameraBadge, pressed && { opacity: 0.7, transform: [{ scale: 0.92 }] }]}
           >
             <Ionicons name="videocam" size={13} color="#fff" />
+          </Pressable>
+        )}
+        {/* ★ 2026-04-26: Inline mute toggle — moderatör kart üzerinde direkt sustur/aç (kullanıcı kartı açmadan).
+             Sadece moderatöre görünür (canModerate). isMuted'a göre renk değişir. */}
+        {canModerate && onQuickMute && (
+          <Pressable
+            onPress={(e) => { e.stopPropagation?.(); onQuickMute(); }}
+            hitSlop={8}
+            style={({ pressed }) => [
+              s.quickMuteBadge,
+              dbMuted && { backgroundColor: 'rgba(16,185,129,0.85)', borderColor: 'rgba(16,185,129,0.55)' },
+              pressed && { opacity: 0.7, transform: [{ scale: 0.9 }] },
+            ]}
+          >
+            <Ionicons name={dbMuted ? 'volume-high' : 'volume-mute'} size={12} color="#fff" />
           </Pressable>
         )}
         {/* ★ Owner sadece altın border + biraz büyük kart ile belli. Crown badge + label
@@ -282,7 +324,7 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, i
 }
 
 
-export default function SpeakerSection({ stageUsers, getMicStatus, onSelectUser, onSelfDemote, currentUserId, VideoView, onGhostSeatPress, showSeatTooltip, avatarFlashes, onFlashDone, onCameraExpand }: Props) {
+export default function SpeakerSection({ stageUsers, getMicStatus, onSelectUser, onSelfDemote, currentUserId, VideoView, onGhostSeatPress, showSeatTooltip, avatarFlashes, onFlashDone, onCameraExpand, canModerate, onQuickMute }: Props) {
   // ★ 2026-04-22: Runtime window width — fiziksel Android cihazda gesture-nav/
   //   rotation ile değişen dimensions'a adapte olur.
   const { width: W } = useWindowDimensions();
@@ -349,8 +391,11 @@ export default function SpeakerSection({ stageUsers, getMicStatus, onSelectUser,
     return !(st.cameraOn && st.videoTrack);
   });
 
-  // ★ Spotlight: 1-2 kamera açık → geniş üst alan, 3+ → normal grid'e düşür
-  const showSpotlight = cameraUsers.length > 0 && cameraUsers.length <= 2 && VideoView;
+  // ★ Spotlight: sadece TÜM sahne kamerada (1 tekli veya 2 çiftli) — karışık sahnede
+  //   spotlight, audio-only speaker'ları küçük dinleyici görünümüne düşürüyordu (2026-04-24 fix).
+  //   Karışık sahnede herkes normal grid'te; kamera video'su kendi normal speaker kartının içinde oynar.
+  const allHaveCamera = cameraUsers.length === sortedUsers.length;
+  const showSpotlight = VideoView && allHaveCamera && cameraUsers.length > 0 && cameraUsers.length <= 2;
   const spotlightW = cameraUsers.length === 1 ? W - 32 : (W - 32 - gap) / 2;
   const spotlightH = Math.round(spotlightW * 0.75); // 4:3 aspect
 
@@ -369,6 +414,8 @@ export default function SpeakerSection({ stageUsers, getMicStatus, onSelectUser,
               <SpeakerCard key={u.id} user={u} micStatus={st} onPress={() => onSelectUser(u)}
                 onSelfDemote={onSelfDemote}
                 onCameraExpand={onCameraExpand}
+                canModerate={canModerate?.(u) ?? false}
+                onQuickMute={onQuickMute ? () => onQuickMute(u) : undefined}
                 isMe={isMe} cardWidth={spotlightW} cardHeight={spotlightH} VideoView={VideoView} />
             );
           })}
@@ -403,12 +450,16 @@ export default function SpeakerSection({ stageUsers, getMicStatus, onSelectUser,
                 <SpeakerCard key={u.id} user={u} micStatus={st} onPress={() => onSelectUser(u)}
                   onSelfDemote={onSelfDemote}
                   onCameraExpand={onCameraExpand}
+                  canModerate={canModerate?.(u) ?? false}
+                  onQuickMute={onQuickMute ? () => onQuickMute(u) : undefined}
                   isMe={isMe} cardWidth={w} cardHeight={h} VideoView={VideoView} />
               );
             })}
           </View>
         );
       })()}
+
+
     </View>
   );
 }
@@ -440,6 +491,16 @@ const s = StyleSheet.create({
   spotlightRow: {
     flexDirection: 'row', justifyContent: 'center', alignItems: 'flex-start',
   },
+  // ★ 2026-04-24: Spotlight modunda kontrol simgeleri — kart yanında dikey
+  spotlightSideControls: {
+    flexDirection: 'column', alignItems: 'center', gap: 10,
+    paddingLeft: 8, justifyContent: 'center',
+  },
+  // ★ 2026-04-24: Non-spotlight modunda kontrol simgeleri — grid altında yatay
+  bottomStageControls: {
+    flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center',
+    gap: 10, marginTop: 6, paddingHorizontal: 4,
+  },
   empty: { alignItems: 'center', justifyContent: 'center', paddingVertical: 32, gap: 6 },
   tooltipWrap: { alignItems: 'center', marginBottom: 4 },
   tooltipBubble: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(20,184,166,0.12)', borderWidth: 1, borderColor: 'rgba(20,184,166,0.25)', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 7 },
@@ -452,7 +513,7 @@ const s = StyleSheet.create({
   emptyText: { color: 'rgba(255,255,255,0.3)', fontSize: 11, marginTop: 2 },
   mainSpeakerGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center' },
   speakerCard: { alignItems: 'center', marginBottom: 4, overflow: 'visible' },
-  speakerCardInner: { width: '100%', borderRadius: 16, overflow: 'hidden', backgroundColor: 'rgba(30,41,59,0.6)', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.1)', position: 'relative', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 12, elevation: 6 },
+  speakerCardInner: { width: '100%', borderRadius: 22, overflow: 'hidden', backgroundColor: 'rgba(30,41,59,0.6)', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.1)', position: 'relative', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 12, elevation: 6 },
   speakerAvatar: { width: '100%', height: '100%', resizeMode: 'cover' },
   roleBadge: { position: 'absolute', top: 8, left: 8, width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: 'rgba(15,23,42,0.8)' },
   roleBadgeMod: { backgroundColor: 'rgba(139,92,246,0.35)' },
@@ -484,16 +545,49 @@ const s = StyleSheet.create({
     shadowColor: '#FFF', shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 1, shadowRadius: 3, elevation: 4,
   },
-  micBadge: { position: 'absolute', bottom: 6, right: 6, width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'rgba(15,23,42,0.8)', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 4 },
+  // ★ 2026-04-24: Video gradient overlays — kamera açıkken üst ve alt kontrast sağlar
+  videoGradientTop: {
+    position: 'absolute', top: 0, left: 0, right: 0, height: '35%',
+    borderTopLeftRadius: 16, borderTopRightRadius: 16, zIndex: 1,
+  },
+  videoGradientBottom: {
+    position: 'absolute', bottom: 0, left: 0, right: 0, height: '40%',
+    borderBottomLeftRadius: 16, borderBottomRightRadius: 16, zIndex: 1,
+  },
+  // ★ 2026-04-26: Squircle kart için pozisyon iç kenardan 10px (eski 6px köşe yuvarlağının dışında kalıyordu).
+  micBadge: {
+    position: 'absolute', bottom: 10, right: 10, width: 28, height: 28,
+    borderRadius: 14, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 2, borderColor: 'rgba(15,23,42,0.8)',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.5, shadowRadius: 6, elevation: 6, zIndex: 2,
+  },
   micBadgeOn: { backgroundColor: '#14B8A6' },
-  micBadgeOff: { backgroundColor: 'rgba(239,68,68,0.85)' },
-  cameraBadge: { position: 'absolute', top: 6, right: 6, width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'rgba(15,23,42,0.8)', backgroundColor: '#0EA5A3', shadowColor: '#0EA5A3', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.6, shadowRadius: 6, elevation: 5 },
+  micBadgeOff: { backgroundColor: 'rgba(239,68,68,0.9)' },
+  cameraBadge: {
+    position: 'absolute', top: 10, right: 10, width: 26, height: 26,
+    borderRadius: 13, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 2, borderColor: 'rgba(15,23,42,0.8)',
+    backgroundColor: '#0EA5A3',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.6, shadowRadius: 8, elevation: 6, zIndex: 2,
+  },
+  // ★ 2026-04-26: Inline mute butonu — moderatör için kart sağ-alt köşede
+  // ★ 2026-04-26: Sol-alt köşede — micBadge ile çakışmaz, kart sınırı içinde durur.
+  quickMuteBadge: {
+    position: 'absolute', bottom: 10, left: 10, width: 26, height: 26,
+    borderRadius: 13, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1.5, borderColor: 'rgba(245,158,11,0.55)',
+    backgroundColor: 'rgba(245,158,11,0.85)',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.6, shadowRadius: 8, elevation: 6, zIndex: 2,
+  },
   // ★ Ghost overlay — "gizli" modunda hafif bir tonda üstüne bindirilir (badge yerine)
   ghostOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(15,23,42,0.55)',
     alignItems: 'center', justifyContent: 'center',
-    borderRadius: 16,
+    borderRadius: 22,
   },
   // ★ v32 Caretaker timer — avatar sol-üst köşede
   caretakerTimer: {

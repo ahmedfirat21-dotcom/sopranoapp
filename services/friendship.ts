@@ -15,6 +15,7 @@ import { supabase } from '../constants/supabase';
 import { PushService } from './push';
 import { GamificationService } from './gamification';
 import { logger } from '../utils/logger';
+import { RateLimitService } from './rateLimit';
 
 export type FriendshipStatus = 'pending' | 'accepted' | 'blocked';
 
@@ -58,7 +59,16 @@ export const FriendshipService = {
    */
   async follow(userId: string, targetId: string): Promise<{ success: boolean; error?: string }> {
     try {
-      // ★ SEC-FOLLOW-RATE: Saatlik takip isteği limiti — bot spam engeli
+      // ★ Faz 2.2 — Server-side atomik rate limit (30 istek / 1 saat).
+      //   v62 öncesi yalnızca client-side friendships count'u vardı; race condition'lara
+      //   açıktı. RPC fail-open davranır (network hatasında geçer), kritik fallback
+      //   altta hâlâ duruyor.
+      const rl = await RateLimitService.checkAndIncrement('friend_request', userId);
+      if (!rl.allowed) {
+        return { success: false, error: rl.message || 'Çok fazla arkadaşlık isteği gönderdin. Bir saat sonra tekrar dene.' };
+      }
+
+      // ★ SEC-FOLLOW-RATE (defense-in-depth): friendships count fallback
       const oneHourAgoRL = new Date(Date.now() - 60 * 60 * 1000).toISOString();
       const { count: recentFollowCount, error: rateError } = await supabase
         .from('friendships')
@@ -67,7 +77,7 @@ export const FriendshipService = {
         .gte('created_at', oneHourAgoRL);
       if (rateError) throw rateError;
       if ((recentFollowCount || 0) >= 30) {
-        return { success: false, error: 'Çok fazla takip isteği gönderdiniz. Lütfen 1 saat sonra tekrar deneyin.' };
+        return { success: false, error: 'Çok fazla arkadaşlık isteği gönderdiniz. Lütfen 1 saat sonra tekrar deneyin.' };
       }
 
       // ★ Cooldown kontrolü: Bu kullanıcıya (userId) hedef (targetId) tarafından
@@ -378,7 +388,16 @@ export const FriendshipService = {
 
       // ★ BUG-F16 FIX: İsteği onaylayan (userId) yeni bir takipçi kazandı → SP ver
       // userId = B (onaylayan, takipçi kazanan), followerId = A (istek gönderen, takip eden)
-      try { await GamificationService.onFollowerGain(userId); } catch {}
+      try { await GamificationService.onFollowerGain(userId); } catch (e) {
+        if (__DEV__) console.warn('[Friendship] onFollowerGain failed:', e);
+      }
+
+      // ★ Badge Engine: social_butterfly (50+ arkadaş) kontrol — her iki taraf
+      try {
+        const { checkSocialBadges } = require('./badgeEngine');
+        checkSocialBadges(userId);
+        checkSocialBadges(followerId);
+      } catch {}
 
       return { success: true };
     } catch (e: any) {
@@ -418,7 +437,7 @@ export const FriendshipService = {
           user_id: followerId,
           sender_id: userId,
           type: 'follow_rejected',
-          body: 'takip isteğini reddetti',
+          body: 'arkadaşlık isteğini reddetti',
         });
       } catch { /* silent */ }
 
@@ -675,17 +694,31 @@ export const FriendshipService = {
   async removeFriend(userId: string, friendId: string): Promise<{ success: boolean; error?: string }> {
     try {
       // ★ v41 (2026-04-20): Atomic RPC — race condition önler.
-      //   Eski: iki yön DELETE client-tarafında. Eşzamanlı unfriend duplicate
-      //   çağrıda inconsistent sonuç veriyordu. RPC tek transaction.
+      // ★ 2026-04-24 FIX: RPC overload ambiguity ("Could not choose the best candidate function")
+      //   hatasında direk DELETE fallback'e düş — sadece "function does not exist" değil,
+      //   PGRST203 (ambiguous) + 42725 (overloaded) + PGRST202 + catch-all error kontrolü.
       const { error } = await supabase.rpc('unfriend_atomic', { p_friend_id: friendId });
       if (!error) return { success: true };
-      // RPC yoksa (henüz deploy edilmedi) fallback
-      if (/function .* does not exist|42883/i.test(error.message || '')) {
-        await supabase
+      const msg = (error.message || '').toLowerCase();
+      const code = (error.code || '').toString();
+      const shouldFallback =
+        msg.includes('does not exist') ||
+        msg.includes('could not choose the best candidate') ||
+        msg.includes('ambiguous') ||
+        msg.includes('overloaded') ||
+        code === '42883' || code === '42725' || code === 'PGRST202' || code === 'PGRST203';
+      if (shouldFallback) {
+        const { error: delErr } = await supabase
           .from('friendships')
           .delete()
-          .or(`and(user_id.eq.${userId},friend_id.eq.${friendId}),and(user_id.eq.${friendId},friend_id.eq.${userId})`)
-          .eq('status', 'accepted');
+          .or(`and(user_id.eq.${userId},friend_id.eq.${friendId}),and(user_id.eq.${friendId},friend_id.eq.${userId})`);
+        if (delErr) return { success: false, error: delErr.message };
+        // Bildirimleri de temizle — hayalet bildirim önleme
+        try {
+          await supabase.from('notifications').delete()
+            .or(`and(user_id.eq.${userId},sender_id.eq.${friendId}),and(user_id.eq.${friendId},sender_id.eq.${userId})`)
+            .in('type', ['follow_request', 'follow_accepted']);
+        } catch { /* silent */ }
         return { success: true };
       }
       return { success: false, error: error.message };

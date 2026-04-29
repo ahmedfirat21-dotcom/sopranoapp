@@ -78,8 +78,8 @@ export const ProfileService = {
     return (count || 0) === 0;
   },
 
-  /** Arama — ★ SEC-3 FIX: Input sanitization + max length */
-  async search(query: string, limit = 20): Promise<Profile[]> {
+  /** Arama — ★ SEC-3 FIX: Input sanitization + max length + block-aware */
+  async search(query: string, limit = 20, currentUserId?: string): Promise<Profile[]> {
     // ★ SEC-3: Boş, çok kısa veya çok uzun sorguları engelle
     const trimmed = (query || '').trim();
     if (trimmed.length < 2 || trimmed.length > 50) return [];
@@ -97,7 +97,29 @@ export const ProfileService = {
       .or(`display_name.ilike.%${sanitized}%,username.ilike.%${sanitized}%`)
       .limit(Math.min(limit, 50)); // ★ Max limit guard
     if (error) throw error;
-    return (data || []) as Profile[];
+    let results = (data || []) as Profile[];
+
+    // ★ 2026-04-25: Block-aware — engelli kullanıcıları + beni engelleyenleri çıkar
+    if (currentUserId && results.length > 0) {
+      try {
+        const { ModerationService } = require('./moderation');
+        const blockedByMe: string[] = await ModerationService.getBlockedUsers(currentUserId).catch(() => []);
+        const blockedSet = new Set(blockedByMe);
+        results = results.filter(p => p.id !== currentUserId && !blockedSet.has(p.id));
+        // Beni engelleyenler — reverse check (results üzerinde tek query)
+        if (results.length > 0) {
+          const ids = results.map(r => r.id);
+          const { data: reverseBlocks } = await supabase
+            .from('blocked_users')
+            .select('blocker_id')
+            .eq('blocked_id', currentUserId)
+            .in('blocker_id', ids);
+          const blockedMe = new Set((reverseBlocks || []).map((b: any) => b.blocker_id));
+          if (blockedMe.size > 0) results = results.filter(p => !blockedMe.has(p.id));
+        }
+      } catch { /* sessiz — block check fail olursa search yine sonuç döner */ }
+    }
+    return results;
   },
 
   /** Yeni profil oluştur (ilk giriş sonrası) */
@@ -220,18 +242,31 @@ export const ProfileService = {
     }
   },
 
-  /** ★ Son oluşturulan odalar (profilde gösterilir) */
+  /** ★ Son oluşturulan odalar (profilde gösterilir)
+   *  2026-04-24 FIX: Sadece kullanıcının ASIL oluşturduğu odalar listelensin.
+   *  Host transfer olunca host_id değişir; original_host_id room_settings'e yazılır.
+   *  Geçici host olduğu odalar gösterilmemeli.
+   */
   async getRecentRooms(userId: string, limit = 10) {
     try {
       const { data, error } = await supabase
         .from('rooms')
-        .select('id, name, created_at, listener_count, category, is_live, type, is_persistent, max_speakers, theme_id, room_settings')
-        .eq('host_id', userId)
+        .select('id, name, created_at, listener_count, category, is_live, type, is_persistent, max_speakers, theme_id, room_settings, host_id')
+        .or(`host_id.eq.${userId},room_settings->>original_host_id.eq.${userId}`)
         .order('is_live', { ascending: false })
         .order('created_at', { ascending: false })
-        .limit(limit);
+        .limit(limit * 2); // Fazla çek, filtre sonrası limit uygula
       if (error) return [];
-      return (data || []) as any[];
+      const filtered = (data || []).filter((r: any) => {
+        const originalHostId = r.room_settings?.original_host_id;
+        if (originalHostId) {
+          // Transfer olmuş: sadece original creator ise göster
+          return originalHostId === userId;
+        }
+        // Transfer yok: host_id = user → asıl creator
+        return r.host_id === userId;
+      }).slice(0, limit);
+      return filtered as any[];
     } catch {
       return [];
     }
@@ -386,6 +421,12 @@ export const ProfileService = {
         error: 'Bağış işlemi tamamlanamadı. Destek kaydı oluşturuldu; SP iadesi için lütfen destek ile iletişime geçin.',
       };
     }
+
+    // ★ Badge Engine: sp_donor / sp_whale kontrol (fire-and-forget)
+    try {
+      const { checkDonorBadges } = require('./badgeEngine');
+      checkDonorBadges(fromUserId);
+    } catch {}
 
     return { success: true };
   },

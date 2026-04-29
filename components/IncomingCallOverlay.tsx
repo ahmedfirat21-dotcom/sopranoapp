@@ -221,15 +221,20 @@ export function IncomingCallOverlay({ visible, callerName, callerAvatar, callTyp
 
         {/* Orta kısım — avatar + bilgi */}
         <View style={styles.centerSection}>
-          {/* Pulse halka efekti */}
-          <Animated.View style={[styles.pulseRing, { opacity: ringPulseAnim, transform: [{ scale: pulseAnim }] }]} />
-          <Animated.View style={[styles.pulseRing2, { opacity: ringPulseAnim }]} />
-          
-          <Animated.View style={[styles.avatarWrap, { transform: [{ scale: pulseAnim }] }]}>
-            <Image
-              source={getAvatarSource(callerAvatar)}
-              style={styles.avatar}
-            />
+          {/* ★ 2026-04-24 FIX: Ring + avatar'ı tek bir fixed-size container'da topla.
+              Böylece absolute ring'ler container'a göre tam merkezlenir ve
+              pulseAnim scale'i hepsine eşit uygulanır — desync yok. */}
+          <Animated.View style={[styles.avatarContainer, { transform: [{ scale: pulseAnim }] }]}>
+            {/* Pulse halka efekti — container ile aynı scale'de hareket eder */}
+            <Animated.View style={[styles.pulseRing, { opacity: ringPulseAnim }]} />
+            <Animated.View style={[styles.pulseRing2, { opacity: ringPulseAnim }]} />
+            
+            <View style={styles.avatarWrap}>
+              <Image
+                source={getAvatarSource(callerAvatar)}
+                style={styles.avatar}
+              />
+            </View>
           </Animated.View>
           
           <Text style={styles.callerName} numberOfLines={1}>{callerName}</Text>
@@ -299,17 +304,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // ★ 2026-04-24: Fixed-size container — ring + avatar hepsini barındırır.
+  //   Tüm absolute ring'ler bu container'ın merkezine oturur.
+  avatarContainer: {
+    width: 220, height: 220,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   pulseRing: {
     position: 'absolute',
     width: 180, height: 180, borderRadius: 90,
     borderWidth: 2,
     borderColor: 'rgba(92,225,230,0.3)',
+    // Container (220x220) içinde ortalama: (220-180)/2 = 20
+    top: 20, left: 20,
   },
   pulseRing2: {
     position: 'absolute',
     width: 220, height: 220, borderRadius: 110,
     borderWidth: 1,
     borderColor: 'rgba(92,225,230,0.15)',
+    // Container (220x220) ile aynı boyut — top:0, left:0
+    top: 0, left: 0,
   },
   avatarWrap: {
     width: 130, height: 130, borderRadius: 65,

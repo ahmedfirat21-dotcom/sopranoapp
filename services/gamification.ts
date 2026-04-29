@@ -443,13 +443,13 @@ export const GamificationService = {
 
   /** Oda oluşturma */
   async onRoomCreate(userId: string): Promise<number> {
-    return grantSP(userId, 'room_create');
+    const sp = await grantSP(userId, 'room_create');
+    // ★ Badge Engine: host_1 / host_10 / host_100 kontrol
+    try { const { checkHostBadges } = require('./badgeEngine'); checkHostBadges(userId); } catch {}
+    return sp;
   },
 
-  /** Duvar postu oluşturma */
-  async onWallPost(userId: string): Promise<number> {
-    return grantSP(userId, 'wall_post');
-  },
+  // ★ 2026-04-26: onWallPost kaldırıldı — oda duvarı/post sistemi kullanıcı kararıyla silindi.
 
   // ── Yeni Tetikleyiciler ──
 

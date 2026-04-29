@@ -38,9 +38,11 @@ const PLANS = [
       { text: `Günde ${ROOM_TIER_LIMITS.Plus.dailyRooms} oda`, included: true },
       { text: 'Tüm oda türleri', included: true },
       { text: 'HD ses + 720p video', included: true },
-      { text: 'Oda teması + çerçeve', included: true },
+      { text: 'Oda kart görseli + arka plan', included: true },
       { text: 'Yaş/Dil filtresi', included: true },
+      { text: 'Sadece Arkadaşlar modu', included: true },
       { text: 'Kalıcı oda (3 adet)', included: true },
+      { text: '300 SP karşılama bonusu', included: true },
     ],
   },
   {
@@ -64,9 +66,9 @@ const PLANS = [
       { text: 'Oda müziği + Arka plan', included: true },
       { text: 'Ghost mode + Kılık', included: true },
       { text: 'Takipçi-only mod', included: true },
-      { text: '2× SP kazanım çarpanı', included: true },
+      { text: 'Seçilmişler konuşma modu', included: true },
       { text: 'Keşfet boost erişimi', included: true },
-      { text: 'Mağaza %20 SP indirimi', included: true },
+      { text: '800 SP karşılama bonusu', included: true },
     ],
   },
 ];
@@ -99,6 +101,17 @@ export default function PlusScreen() {
     })();
     return () => { cancelled = true; };
   }, [profile?.id]);
+
+  // ★ 2026-04-25: Analytics — premium ekranı görüntülendi
+  useEffect(() => {
+    try {
+      const { Analytics, Events } = require('../services/analytics');
+      Analytics.track(Events.PREMIUM_VIEWED, {
+        current_tier: migrateLegacyTier(profile?.subscription_tier),
+      });
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const currentTier = migrateLegacyTier(profile?.subscription_tier);
   const selectedPlan = PLANS.find(p => p.id === selectedTier)!;
@@ -148,7 +161,7 @@ export default function PlusScreen() {
               }
             } catch (err: any) {
               if (mountedRef.current) {
-                showToast({ title: 'Hata', message: err.message || 'Yükseltme başarısız.', type: 'error' });
+                showToast({ title: 'Yükseltme Başarısız', message: err.message || 'Üyelik aktifleştirilemedi.', type: 'error' });
               }
             } finally {
               if (mountedRef.current) setActivating(false);
@@ -193,7 +206,7 @@ export default function PlusScreen() {
   };
 
   return (
-    <AppBackground><View style={styles.container}>{/* Header */}
+    <AppBackground radialGlow><View style={styles.container}>{/* Header */}
       <View style={[styles.header, { paddingTop: Math.max(insets.top, 20) + 8 }]}>
         <Pressable onPress={() => safeGoBack(router)} style={styles.backBtn}>
           <Ionicons name="chevron-back" size={24} color={Colors.text} style={{
@@ -342,14 +355,16 @@ export default function PlusScreen() {
             { label: 'Kamera', values: [`${ROOM_TIER_LIMITS.Free.maxCameras}`, `${ROOM_TIER_LIMITS.Plus.maxCameras}`, `${ROOM_TIER_LIMITS.Pro.maxCameras}`] },
             { label: 'Oda Süresi', values: [`${ROOM_TIER_LIMITS.Free.durationHours}sa`, `${ROOM_TIER_LIMITS.Plus.durationHours}sa`, '∞'] },
             { label: 'Günlük Oda', values: [`${ROOM_TIER_LIMITS.Free.dailyRooms}`, `${ROOM_TIER_LIMITS.Plus.dailyRooms}`, '∞'] },
-            { label: 'Oda Türü', values: ['Açık', 'Hepsi', 'Hepsi'] },
-            { label: 'Ses', values: ['Mono', 'HD', 'Stereo'] },
-            { label: 'Video', values: ['480p', '720p', '1080p'] },
+            { label: 'Oda Türü', values: ['Açık + Şifreli', 'Hepsi', 'Hepsi'] },
+            { label: 'Ses', values: ['HD Mono', 'HD', 'Stereo'] },
+            { label: 'Video', values: ['720p', '720p', '1080p'] },
+            { label: 'Avatar Çerçevesi', values: ['Temel', 'Tümü', 'Tümü'] },
+            { label: 'Yaş/Dil Filtresi', values: ['✓', '✓', '✓'] },
             { label: 'Tema', values: ['—', '✓', '✓'] },
-            { label: 'Çerçeve', values: ['—', '✓', 'Pro'] },
-            { label: 'Müzik', values: ['—', '—', '✓'] },
-            { label: 'Cashout', values: ['—', '%30', '%15'] },
-            { label: 'Reklam', values: ['Var', 'Yok', 'Yok'] },
+            { label: 'Moderatör', values: ['—', '2', '5'] },
+            { label: 'Takipçi-Only', values: ['—', '✓', '✓'] },
+            { label: 'Kalıcı Oda', values: ['—', '3', '∞'] },
+            { label: 'Oda Müziği', values: ['—', '—', '✓'] },
           ].map((row, i) => (
             <View key={i} style={[styles.compareRow, i % 2 === 0 && { backgroundColor: 'rgba(255,255,255,0.03)' }]}>
               <Text style={[styles.compareCell, { flex: 1.5, color: Colors.text2 }]}>{row.label}</Text>

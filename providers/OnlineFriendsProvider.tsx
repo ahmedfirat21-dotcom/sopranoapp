@@ -135,6 +135,9 @@ export function OnlineFriendsProvider({ userId, children }: { userId: string | n
       config: { presence: { key: userId } },
     });
 
+    // ★ 2026-04-29 v3: SADECE presence'a güven. profiles.is_online DB flag'i kullanıcı
+    //   app'i crash/uninstall ile kapatınca stale "true" kalıyordu → arkadaşlar yanlış
+    //   şekilde "online" görünüyordu. Presence canlı websocket — bağlı = online, değil = offline.
     const recomputeOnline = () => {
       const state = presenceChannel.presenceState();
       const ids = new Set<string>();
@@ -143,12 +146,10 @@ export function OnlineFriendsProvider({ userId, children }: { userId: string | n
 
       setAllFriends(prev => {
         const next = prev.map(f => {
-          const isLiveOnline = ids.has(f.id) || f.is_online;
+          const isLiveOnline = ids.has(f.id);
           return f.is_online === isLiveOnline ? f : { ...f, is_online: isLiveOnline };
         });
-        // Online friends listesi — tıklı olan sona, online olan başa
-        const onlines = next.filter(f => ids.has(f.id) || f.is_online);
-        onlines.sort((a, b) => (ids.has(b.id) ? 1 : 0) - (ids.has(a.id) ? 1 : 0));
+        const onlines = next.filter(f => ids.has(f.id));
         setOnlineFriends(onlines);
         return next;
       });
@@ -171,7 +172,8 @@ export function OnlineFriendsProvider({ userId, children }: { userId: string | n
         //   update'leri boşuna friend list re-render tetiklemesin.
         if (old && old.is_online === updated.is_online && old.avatar_url === updated.avatar_url && old.display_name === updated.display_name) return;
         setAllFriends(prev => prev.map(f =>
-          f.id === updated.id ? { ...f, is_online: updated.is_online || onlinePresenceIdsRef.current.has(f.id), avatar_url: updated.avatar_url ?? f.avatar_url, display_name: updated.display_name ?? f.display_name } : f
+          // ★ 2026-04-29 v3: is_online sadece presence — DB flag'i ignore.
+          f.id === updated.id ? { ...f, is_online: onlinePresenceIdsRef.current.has(f.id), avatar_url: updated.avatar_url ?? f.avatar_url, display_name: updated.display_name ?? f.display_name } : f
         ));
         recomputeOnline();
       })

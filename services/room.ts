@@ -188,7 +188,7 @@ export const RoomService = {
         case 'music': return 'Müzik Odası';
         case 'game': return 'Oyun Odası';
         case 'tech': return 'Teknik Oda';
-        case 'book': return 'Kitap Kulübü';
+        case 'book': return 'Kitap Odası';
         case 'film': return 'Film Odası';
         default: return null;
       }
@@ -658,19 +658,27 @@ export const RoomService = {
 
     if (error) throw new Error('Oda uyandırılamadı: ' + error.message);
 
-    // Host'u katılımcı olarak ekle — eski session'dan kalan mute/ban flag'leri temizle.
-    // ★ BUG FIX: upsert sadece belirtilen alanları günceller; is_muted/role öncesi
-    // sessiondan stale=true kalabiliyordu ve owner uyandığında sahnede sessize alınmış
-    // görünüyordu. Owner için tüm kısıtlayıcı flag'leri açıkça reset'liyoruz.
+    // ★ 2026-04-29 v85: Host'un MEVCUT role'unu koru — sahneden inmiş listener ise
+    //   wakeUp sonrası otomatik sahneye geri yükseltmeyelim. Sadece kayıt yoksa 'owner'.
+    //   Eskiden upsert role:'owner' override ediyor → host audience'a inip minimize+restore
+    //   sonrası kendini sahnede buluyordu. Şimdi mevcut role korunur.
     try {
+      const { data: existingPart } = await supabase
+        .from('room_participants')
+        .select('role')
+        .eq('room_id', roomId)
+        .eq('user_id', hostId)
+        .maybeSingle();
+      const finalRole = (existingPart?.role && ['owner', 'moderator', 'speaker', 'listener', 'spectator'].includes(existingPart.role))
+        ? existingPart.role
+        : 'owner'; // İlk wakeUp veya kayıt yoksa default owner
       await supabase.from('room_participants').upsert({
         room_id: roomId,
         user_id: hostId,
-        role: 'owner',
+        role: finalRole,
         is_muted: false,
         joined_at: now.toISOString(),
       }, { onConflict: 'room_id,user_id' });
-      // Eski room_mutes kaydı varsa sil (owner asla muted olmamalı)
       await supabase.from('room_mutes').delete().eq('room_id', roomId).eq('user_id', hostId);
     } catch { /* upsert hatası sessiz */ }
 
@@ -982,6 +990,41 @@ export const RoomService = {
       .maybeSingle();
 
     if (existing) {
+      // ★ 2026-04-30 FIX v2: Host minimize'dan dönünce mevcut rolü korunsun.
+      //   Önceki fix her durumda owner'a yükseltiyordu — sahneden inmiş host
+      //   minimize edip geri açınca zorla sahneye çıkıyordu.
+      //
+      //   Çözüm: last_seen_at son 2dk içindeyse kullanıcı "aktif" — minimize'dan
+      //   dönüyor, rolüne dokunma. last_seen_at stale (>2dk) ise gerçekten ayrılmış
+      //   ve geri geliyor → owner'a yükselt.
+      if ((isHost || isOriginalHost) && existing.role !== 'owner') {
+        const lastSeen = existing.last_seen_at ? new Date(existing.last_seen_at).getTime() : 0;
+        const isStale = Date.now() - lastSeen > 2 * 60 * 1000; // 2 dakikadan eski
+        
+        if (isStale) {
+          // Gerçek rejoin — host ayrılmış ve geri gelmiş → owner'a yükselt
+          const { data: updated } = await supabase
+            .from('room_participants')
+            .update({ role: 'owner', is_muted: false })
+            .eq('room_id', roomId)
+            .eq('user_id', userId)
+            .select('*')
+            .maybeSingle();
+          // rooms.host_id de güncelle
+          if (updated && roomData?.host_id !== userId) {
+            await supabase.from('rooms').update({ host_id: userId }).eq('id', roomId);
+            // Geçici host'u speaker'a düşür
+            await supabase
+              .from('room_participants')
+              .update({ role: 'speaker' })
+              .eq('room_id', roomId)
+              .eq('role', 'owner')
+              .neq('user_id', userId);
+          }
+          if (updated) return updated as RoomParticipant;
+        }
+        // Taze heartbeat — minimize'dan dönüş → mevcut rolü koru
+      }
       return existing as RoomParticipant;
     }
 
@@ -1596,55 +1639,26 @@ export const RoomService = {
   },
 
   async promoteSpeaker(roomId: string, userId: string): Promise<void> {
+    // ★ 2026-04-29: RPC ZORUNLU. Fallback direct UPDATE v19 trigger'a yakalanıyor
+    //   ("Role değişikliği reddedildi" hatası). RPC fail ederse net mesaj göster.
     try {
       const { error } = await supabase.rpc('promote_speaker_atomic', {
         p_room_id: roomId,
         p_user_id: userId,
       });
       if (!error) return;
-      if (__DEV__) console.warn('[promoteSpeaker] RPC fallback:', error.message);
-      // RPC tier dolu hata'sını da buradan fırlatsın (mesajdan anla)
-      if (/sahne dolu|slot|yetkiniz yok/i.test(error.message || '')) {
-        throw new Error(error.message);
+      if (__DEV__) console.warn('[promoteSpeaker] RPC error:', error.message);
+      // ★ Self-promote denied (free_for_all RPC değişikliği uygulanmadıysa) — anlamlı mesaj
+      if (/role değişikliği reddedildi|escalation|yetkiniz yok|prevent_role/i.test(error.message || '')) {
+        throw new Error('Sahneye çıkma yetkin yok. Bu modda host izni gerekiyor veya sunucu güncellemesi bekleniyor.');
       }
+      throw new Error(error.message || 'Sahneye çıkılamadı.');
     } catch (rpcErr: any) {
-      // Sadece RPC yoksa fallback yapılır; yetki/slot hataları üst katmana geçer
-      if (rpcErr?.message && /sahne dolu|yetkiniz yok/i.test(rpcErr.message)) throw rpcErr;
+      throw rpcErr;
     }
 
-    // Fallback — v21 migrate edilmediyse eski yol (non-atomic)
-    const { data: roomInfo } = await supabase
-      .from('rooms')
-      .select('owner_tier, host_id')
-      .eq('id', roomId)
-      .single();
-    const ownerTier = migrateLegacyTier(roomInfo?.owner_tier);
-    const limits = getRoomLimits(ownerTier);
-    if (roomInfo?.host_id !== userId) {
-      const { count } = await supabase
-        .from('room_participants')
-        .select('*', { count: 'exact', head: true })
-        .eq('room_id', roomId)
-        .in('role', ['owner', 'speaker', 'moderator']);
-      if ((count || 0) >= limits.maxSpeakers) {
-        throw new Error(`Sahne dolu (max ${limits.maxSpeakers}). Tier: ${ownerTier}`);
-      }
-    }
-    const { data: currentPart } = await supabase
-      .from('room_participants')
-      .select('role')
-      .eq('room_id', roomId)
-      .eq('user_id', userId)
-      .maybeSingle();
-    // ★ v67 FIX: last_seen_at da güncelle — sahneye çıkınca stale cleanup'a yakalanmasın
-    await supabase
-      .from('room_participants')
-      .update({ role: 'speaker', is_muted: false, last_seen_at: new Date().toISOString() })
-      .eq('room_id', roomId)
-      .eq('user_id', userId);
-    if (currentPart && (currentPart.role === 'listener' || currentPart.role === 'spectator')) {
-      try { await supabase.rpc('decrement_listener_count', { room_id_input: roomId }); } catch { /* RPC yoksa sessiz */ }
-    }
+    // ★ 2026-04-29: Direct UPDATE fallback kaldırıldı — v19 trigger blokluyor.
+    //   RPC yukarıda zorunlu hale getirildi.
   },
 
   /**

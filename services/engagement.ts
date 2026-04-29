@@ -70,8 +70,15 @@ export const DailyCheckInService = {
       try {
         // ★ GamificationService üzerinden git → transaction kaydı + cap kontrolü
         spEarned = await GamificationService.earn(userId, spReward, 'daily_checkin');
-      } catch {}
+      } catch (e) {
+        logger.error('Daily check-in SP grant failed:', e);
+      }
 
+      // ★ Badge Engine: streak_7 / streak_30 kontrol
+      try {
+        const { checkStreakBadges } = require('./badgeEngine');
+        checkStreakBadges(userId, newStreak);
+      } catch {}
 
       return { success: true, spEarned, streak: newStreak, alreadyCheckedIn: false };
     } catch (e: any) {

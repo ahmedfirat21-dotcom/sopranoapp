@@ -3,7 +3,7 @@
  * LiveKit üzerinden 1:1 sesli arama — tier bazlı kalite
  * 
  * WhatsApp-style UI + TÜM bug düzeltmeleri:
- *   BUG-4:  onMicStateChange callback düzeltildi (mic+cam)
+ *   BUG-4:  onTrackStateChange callback düzeltildi (mic+cam)
  *   BUG-9:  handleToggleMute optimistic update kaldırıldı (LiveKit callback ile senkron)
  *   BUG-10: Global liveKitService singleton kullanımı (çift instance yok)
  *   BUG-13: Hoparlör toggle gerçek AudioSession implementasyonu
@@ -395,7 +395,7 @@ export default function CallScreen() {
             }
           },
           // ★ BUG-4 FIX: Hem mic hem cam state'ini doğru al
-          onMicStateChange: (micEnabled, camEnabled) => {
+          onTrackStateChange: (micEnabled, camEnabled) => {
             if (!mountedRef.current) return;
             setIsMuted(!micEnabled);
             setIsCameraOn(camEnabled);
@@ -513,7 +513,7 @@ export default function CallScreen() {
     // ★ BUG-9 FIX: Optimistic update YAPMA — LiveKit callback ile güncellenir
     try {
       await liveKitService.toggleMicrophone();
-      // onMicStateChange callback otomatik olarak setIsMuted'u çağıracak
+      // onTrackStateChange callback otomatik olarak setIsMuted'u çağıracak
     } catch (e) {
       if (__DEV__) console.warn('[Call] Mikrofon toggle hatası:', e);
     }
@@ -523,7 +523,7 @@ export default function CallScreen() {
   const handleToggleCamera = async () => {
     try {
       await liveKitService.toggleCamera();
-      // onMicStateChange callback otomatik olarak setIsCameraOn'u çağıracak
+      // onTrackStateChange callback otomatik olarak setIsCameraOn'u çağıracak
     } catch (e) {
       if (__DEV__) console.warn('[Call] Kamera toggle hatası:', e);
     }

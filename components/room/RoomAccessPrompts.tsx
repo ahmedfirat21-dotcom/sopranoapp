@@ -74,7 +74,9 @@ function BaseSheet({ visible, onDismiss, children, maxHeight = H * 0.55 }: {
         <Pressable style={StyleSheet.absoluteFill} onPress={onDismiss} />
       </Animated.View>
 
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'flex-end' }} pointerEvents="box-none">
+      {/* ★ 2026-04-26 FIX: Android'de behavior=undefined NO-OP → klavye sheet'i kaplıyordu.
+            iOS: padding, Android: height — her iki platformda da sheet klavyenin üstüne kayar. */}
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1, justifyContent: 'flex-end' }} pointerEvents="box-none">
         <Animated.View style={[st.sheet, { transform: [{ translateY: slideY }], maxHeight }]}>
           <LinearGradient colors={['#4a5668', '#37414f', '#232a35']} locations={[0, 0.35, 1]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
           <View {...panResponder.panHandlers} style={st.handleWrap}>
@@ -195,6 +197,132 @@ export function PasswordPromptSheet({
               <>
                 <Ionicons name="log-in-outline" size={14} color="#FFF" />
                 <Text style={st.btnPrimaryText}>Giriş</Text>
+              </>
+            )}
+          </Pressable>
+        </View>
+      </View>
+    </BaseSheet>
+  );
+}
+
+// ═══════════════════════════════════════════════════════
+// ENTRY PREVIEW SHEET — Filtreli odaya girmeden önce şartları topu göster
+// ★ 2026-04-27: Şifre/davet/arkadaş/yaş gibi filtreleri kullanıcıya ÖNCEDEN
+//   bullet liste olarak gösterir. Devam et → normal access flow başlar.
+//   Kullanıcı bilinçli karar verir, "neden bu kadar engel" sürprizi yaşamaz.
+// ═══════════════════════════════════════════════════════
+export type EntryPreviewFilter = {
+  icon: keyof typeof Ionicons.glyphMap;
+  color: string;
+  title: string;
+  desc: string;
+};
+
+export function RoomEntryPreviewSheet({
+  visible, onContinue, onCancel, roomName, hostName, filters,
+}: {
+  visible: boolean;
+  onContinue: () => void;
+  onCancel: () => void;
+  roomName?: string;
+  hostName?: string;
+  filters: EntryPreviewFilter[];
+}) {
+  return (
+    <BaseSheet visible={visible} onDismiss={onCancel} maxHeight={H * 0.7}>
+      <View style={st.body}>
+        <View style={st.headerRow}>
+          <View style={st.iconBig}>
+            <Ionicons name="information-circle" size={22} color="#3B82F6" style={st.iconShadow} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={st.title}>{roomName || 'Bu Oda'}</Text>
+            <Text style={st.subtitle} numberOfLines={2}>
+              {hostName ? `${hostName} bu odaya bazı şartlar koymuş:` : 'Bu odaya girmek için şartlar var:'}
+            </Text>
+          </View>
+        </View>
+
+        <View style={{ gap: 8, marginBottom: 14 }}>
+          {filters.map((f, idx) => (
+            <View key={`${f.title}-${idx}`} style={st.filterRow}>
+              <View style={[st.filterIconWrap, { backgroundColor: `${f.color}1A`, borderColor: `${f.color}55` }]}>
+                <Ionicons name={f.icon} size={16} color={f.color} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={st.filterTitle}>{f.title}</Text>
+                <Text style={st.filterDesc} numberOfLines={2}>{f.desc}</Text>
+              </View>
+            </View>
+          ))}
+        </View>
+
+        <View style={st.btnRow}>
+          <Pressable style={st.btnSecondary} onPress={onCancel}>
+            <Text style={st.btnSecondaryText}>Vazgeç</Text>
+          </Pressable>
+          <Pressable style={st.btnPrimary} onPress={onContinue}>
+            <Ionicons name="arrow-forward" size={14} color="#FFF" />
+            <Text style={st.btnPrimaryText}>Devam Et</Text>
+          </Pressable>
+        </View>
+      </View>
+    </BaseSheet>
+  );
+}
+
+// ═══════════════════════════════════════════════════════
+// INVITE REQUEST PROMPT — Davetli odada "İstek gönder?" onayı
+// ★ 2026-04-26: Pop alert yerine bottom-sheet — şifre sheet'i ile tutarlı dil
+// ═══════════════════════════════════════════════════════
+export function InviteRequestPromptSheet({
+  visible, onDismiss, onConfirm, submitting, roomName, hostName,
+}: {
+  visible: boolean;
+  onDismiss: () => void;
+  onConfirm: () => void;
+  submitting?: boolean;
+  roomName?: string;
+  hostName?: string;
+}) {
+  return (
+    <BaseSheet visible={visible} onDismiss={onDismiss} maxHeight={H * 0.5}>
+      <View style={st.body}>
+        <View style={st.headerRow}>
+          <View style={st.iconBig}>
+            <Ionicons name="mail-open-outline" size={22} color="#3B82F6" style={st.iconShadow} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={st.title}>Davetli Oda</Text>
+            <Text style={st.subtitle} numberOfLines={2}>
+              {roomName ? `"${roomName}" davetli kişilere açık.` : 'Bu oda davetli kişilere açık.'} Katılmak için oda sahibine istek gönderebilirsin.
+            </Text>
+          </View>
+        </View>
+
+        <View style={st.statusCard}>
+          <Ionicons name="information-circle" size={16} color="#94A3B8" />
+          <Text style={st.statusText}>
+            {hostName ? `${hostName} isteğini değerlendirecek.` : 'Oda sahibi isteğini değerlendirecek.'} Onaylanırsa direkt odaya alınırsın.
+          </Text>
+        </View>
+
+        <View style={st.btnRow}>
+          <Pressable style={st.btnSecondary} onPress={onDismiss} disabled={submitting}>
+            <Text style={st.btnSecondaryText}>Vazgeç</Text>
+          </Pressable>
+          <Pressable
+            style={[st.btnPrimary, submitting && { opacity: 0.5 }]}
+            onPress={onConfirm}
+            disabled={submitting}
+          >
+            {submitting ? (
+              <ActivityIndicator color="#FFF" size="small" />
+            ) : (
+              <>
+                <Ionicons name="paper-plane" size={14} color="#FFF" />
+                <Text style={st.btnPrimaryText}>İstek Gönder</Text>
               </>
             )}
           </Pressable>
@@ -585,4 +713,24 @@ const st = StyleSheet.create({
     shadowColor: '#14B8A6', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4,
   },
   btnPrimaryText: { fontSize: 14, color: '#FFF', fontWeight: '800' },
+  // ★ 2026-04-27: Pre-check özet sheet için filtre satırları
+  filterRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingHorizontal: 12, paddingVertical: 10,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
+    borderRadius: 12,
+  },
+  filterIconWrap: {
+    width: 32, height: 32, borderRadius: 8,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1,
+  },
+  filterTitle: {
+    fontSize: 13, fontWeight: '800', color: '#F1F5F9',
+    marginBottom: 1,
+  },
+  filterDesc: {
+    fontSize: 11, color: '#94A3B8', fontWeight: '500',
+  },
 });

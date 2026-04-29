@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, Pressable, Animated, ScrollView, Dimensions, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Animated, Easing, ScrollView, Dimensions, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { FriendshipService, type FollowUser } from '../services/friendship';
@@ -11,8 +11,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 // Tab bar height + gap — alt navigasyon barının üstünde bitsin
 const TAB_BAR_SPACE = 60 + 8 + 6; // BAR_H (60) + min paddingBottom (8) + extra gap
 
-const { width: W } = Dimensions.get('window');
-const DRAWER_W = Math.min(W * 0.55, 280);
+const { width: W, height: H } = Dimensions.get('window');
+// ★ 2026-04-24: Yanal daraltma (2. iterasyon) — kompakt panel, Clubhouse side-drawer hissi.
+const DRAWER_W = Math.min(W * 0.48, 230);
+const DRAWER_H = Math.min(H * 0.72, 640);
 
 export default function FriendsDrawer({ visible, friends, onClose, onSelect, currentUserId }: {
   visible: boolean;
@@ -22,12 +24,11 @@ export default function FriendsDrawer({ visible, friends, onClose, onSelect, cur
   currentUserId?: string;
 }) {
   const insets = useSafeAreaInsets();
-  // Alt barın üstünde bitsin: BAR_H + safe area + ufak boşluk
-  const bottomGap = Math.max(insets.bottom, 8) + TAB_BAR_SPACE;
-  // Üst safe area + ekstra kısaltma
-  const topGap = insets.top + 12;
+  // ★ 2026-04-24: Dikey olarak ekran ortasına konumlandır.
+  const topGap = Math.max((H - DRAWER_H) / 2, insets.top + 12);
   const slideAnim = React.useRef(new Animated.Value(DRAWER_W)).current;
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
+  const isClosingRef = React.useRef(false);
   const [pendingRequests, setPendingRequests] = React.useState<any[]>([]);
   const [processingIds, setProcessingIds] = React.useState<Set<string>>(new Set());
   // ★ İşlenen isteklerin durumunu drawer kapanana kadar göster
@@ -84,15 +85,17 @@ export default function FriendsDrawer({ visible, friends, onClose, onSelect, cur
 
   React.useEffect(() => {
     if (visible) {
+      isClosingRef.current = false;
       Animated.parallel([
-        Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true, damping: 20, stiffness: 200 }),
-        Animated.timing(fadeAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
+        Animated.timing(slideAnim, { toValue: 0, duration: 260, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+        Animated.timing(fadeAnim, { toValue: 1, duration: 220, useNativeDriver: true }),
       ]).start();
     } else {
-      Animated.parallel([
-        Animated.spring(slideAnim, { toValue: DRAWER_W, useNativeDriver: true, damping: 20, stiffness: 220 }),
-        Animated.timing(fadeAnim, { toValue: 0, duration: 150, useNativeDriver: true }),
-      ]).start();
+      if (isClosingRef.current) return; // swipe-close zaten yönetiyor
+      // ★ 2026-04-25 FIX: Tab değişiminde anında kapat (animasyonsuz) —
+      //   sayfa artık görünmediği için yavaş animasyon gereksiz, ghost overlay riski var.
+      slideAnim.setValue(DRAWER_W);
+      fadeAnim.setValue(0);
     }
   }, [visible]);
 
@@ -122,15 +125,16 @@ export default function FriendsDrawer({ visible, friends, onClose, onSelect, cur
           // Kapanma eşiği: drawer genişliğinin 1/3'ü veya hız > 0.5
           const closeThreshold = DRAWER_W / 3;
           if (g.dx > closeThreshold || g.vx > 0.5) {
+            isClosingRef.current = true; // ★ Duplikasyon önleyici flag
             Animated.parallel([
-              Animated.timing(slideAnim, { toValue: DRAWER_W, duration: 220, useNativeDriver: true }),
-              Animated.timing(fadeAnim, { toValue: 0, duration: 180, useNativeDriver: true }),
+              Animated.timing(slideAnim, { toValue: DRAWER_W, duration: 220, easing: Easing.in(Easing.cubic), useNativeDriver: true }),
+              Animated.timing(fadeAnim, { toValue: 0, duration: 220, useNativeDriver: true }),
             ]).start(() => onClose());
           } else {
             // Geri yay — açık kal
             Animated.parallel([
-              Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true, damping: 22, stiffness: 240 }),
-              Animated.timing(fadeAnim, { toValue: 1, duration: 120, useNativeDriver: true }),
+              Animated.timing(slideAnim, { toValue: 0, duration: 200, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+              Animated.timing(fadeAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
             ]).start();
           }
         },
@@ -152,7 +156,7 @@ export default function FriendsDrawer({ visible, friends, onClose, onSelect, cur
       </Animated.View>
 
       {/* Panel — sağdan süzülür + sürüklenebilir, alt barın üstünde biter */}
-      <Animated.View {...panResponder.panHandlers} style={[fd.panel, { top: topGap, bottom: bottomGap, transform: [{ translateX: slideAnim }] }]}>
+      <Animated.View {...panResponder.panHandlers} style={[fd.panel, { top: topGap, height: DRAWER_H, transform: [{ translateX: slideAnim }] }]}>
         {/* ★ Odalarım kart paleti: diagonal gradient (parlak üst-sol → koyu alt-sağ) */}
         <LinearGradient
           colors={['#4a5668', '#37414f', '#232a35']}
@@ -168,20 +172,21 @@ export default function FriendsDrawer({ visible, friends, onClose, onSelect, cur
             <Text style={fd.countText}>{onlineCount} aktif</Text>
           </View>
           <View style={{ flex: 1 }} />
-          <Pressable onPress={onClose} hitSlop={12}>
-            <Ionicons name="close" size={16} color="rgba(255,255,255,0.4)" />
-          </Pressable>
         </View>
 
         {/* Liste */}
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 8, paddingBottom: 40 }}>
+        <ScrollView
+          showsVerticalScrollIndicator
+          indicatorStyle="white"
+          contentContainerStyle={{ paddingHorizontal: 8, paddingBottom: 40 }}
+        >
 
           {/* ★ TAKİP İSTEKLERİ — Instagram/X tarzı */}
           {pendingRequests.length > 0 && (
             <View style={fd.requestSection}>
               <View style={fd.requestHeader}>
                 <Ionicons name="person-add" size={13} color="#60A5FA" />
-                <Text style={fd.requestTitle}>Takip İstekleri</Text>
+                <Text style={fd.requestTitle}>Arkadaşlık İstekleri</Text>
                 {activePendingCount > 0 && (
                   <View style={fd.requestCountPill}>
                     <Text style={fd.requestCountText}>{activePendingCount}</Text>

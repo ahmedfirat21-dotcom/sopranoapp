@@ -23,6 +23,7 @@ try {
 import { GoogleAuthProvider, signInWithCredential, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, sendEmailVerification } from 'firebase/auth';
 
 import { showToast } from '../../components/Toast';
+import AppBackground from '../../components/AppBackground';
 import { auth, GOOGLE_WEB_CLIENT_ID } from '../../constants/firebase';
 import { useAuth } from '../_layout';
 
@@ -78,10 +79,11 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
 
   // Animations
-  const logoScale = useRef(new Animated.Value(0.85)).current;
-  const logoOpacity = useRef(new Animated.Value(0)).current;
-  // ★ 2026-04-23: Arka plan spotlight nefes — 0.55 ↔ 1.0 arasında yavaşça salınır (6s)
-  const glowOpacity = useRef(new Animated.Value(0.75)).current;
+  // ★ İki parçalı logo animasyonu: Soprano soldan ← Chat sağdan → ortada buluşur
+  const sopranoOpacity = useRef(new Animated.Value(0)).current;
+  const sopranoTranslateX = useRef(new Animated.Value(-120)).current;  // Çok soldan gelir
+  const chatOpacity = useRef(new Animated.Value(0)).current;
+  const chatTranslateX = useRef(new Animated.Value(120)).current;     // Çok sağdan gelir
   const buttonsTranslateY = useRef(new Animated.Value(30)).current;
   const buttonsOpacity = useRef(new Animated.Value(0)).current;
   const statsOpacity = useRef(new Animated.Value(0)).current;
@@ -114,35 +116,40 @@ export default function LoginScreen() {
       }
     })();
 
-    // Staggered entrance animations — logo fade+scale
-    Animated.parallel([
-      Animated.timing(logoOpacity, { toValue: 1, duration: 700, useNativeDriver: true }),
-      Animated.spring(logoScale, { toValue: 1, friction: 8, tension: 50, useNativeDriver: true }),
-    ]).start();
-
-    // ★ Arka plan spotlight — yavaşça nefes alan glow loop (6s döngü, 0.55 ↔ 1.0)
-    const glowLoop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(glowOpacity, { toValue: 1, duration: 3000, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
-        Animated.timing(glowOpacity, { toValue: 0.55, duration: 3000, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
-      ])
-    );
-    glowLoop.start();
-
-    const statsTimer = setTimeout(() => {
-      Animated.timing(statsOpacity, { toValue: 1, duration: 400, useNativeDriver: true }).start();
+    // ★ Staggered entrance: Soprano ← … → Chat (coming together efekti)
+    // Adım 1: "Soprano" soldan süzülerek gelir (300ms bekleme sonrası)
+    const sopranoTimer = setTimeout(() => {
+      Animated.parallel([
+        Animated.timing(sopranoOpacity, { toValue: 1, duration: 800, useNativeDriver: true }),
+        Animated.spring(sopranoTranslateX, { toValue: 0, friction: 7, tension: 40, useNativeDriver: true }),
+      ]).start();
     }, 300);
 
+    // Adım 2: "Chat" sağdan bounce ederek gelir (900ms bekleme — Soprano yarıda iken)
+    const chatTimer = setTimeout(() => {
+      Animated.parallel([
+        Animated.timing(chatOpacity, { toValue: 1, duration: 700, useNativeDriver: true }),
+        Animated.spring(chatTranslateX, { toValue: 0, friction: 6, tension: 50, useNativeDriver: true }),
+      ]).start();
+    }, 900);
+
+    // Adım 3: Stats (1600ms — logo yerleştikten sonra)
+    const statsTimer = setTimeout(() => {
+      Animated.timing(statsOpacity, { toValue: 1, duration: 400, useNativeDriver: true }).start();
+    }, 1600);
+
+    // Adım 4: Buttons (2000ms — her şey hazır)
     const buttonsTimer = setTimeout(() => {
       Animated.parallel([
         Animated.timing(buttonsOpacity, { toValue: 1, duration: 500, useNativeDriver: true }),
         Animated.timing(buttonsTranslateY, { toValue: 0, duration: 500, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
       ]).start();
-    }, 500);
+    }, 1000);
 
-    // ★ Cleanup — unmount'ta loop'u durdur, timer'ları iptal et
+    // ★ Cleanup — unmount'ta timer'ları iptal et
     return () => {
-      glowLoop.stop();
+      clearTimeout(sopranoTimer);
+      clearTimeout(chatTimer);
       clearTimeout(statsTimer);
       clearTimeout(buttonsTimer);
     };
@@ -181,13 +188,13 @@ export default function LoginScreen() {
     }
     // ★ SEC-BF2: Email format kontrolü
     if (!EMAIL_REGEX.test(trimmedEmail)) {
-      showToast({ title: 'Hata', message: 'Geçerli bir e-posta adresi girin.', type: 'error' });
+      showToast({ title: 'Geçersiz E-posta', message: 'Geçerli bir e-posta adresi gir.', type: 'error' });
       return;
     }
     // ★ SEC-BF2: Kalıcı cooldown kontrolü — 5 başarısız denemeden sonra 60sn bekleme
     if (Date.now() < cooldownUntilRef.current) {
       const remainSec = Math.ceil((cooldownUntilRef.current - Date.now()) / 1000);
-      showToast({ title: 'Çok fazla deneme', message: `Lütfen ${remainSec} saniye bekleyin.`, type: 'warning' });
+      showToast({ title: 'Çok Fazla Deneme', message: `${remainSec} saniye bekleyip tekrar dene.`, type: 'warning' });
       return;
     }
     setLoading(true);
@@ -204,13 +211,13 @@ export default function LoginScreen() {
         const cooldownMs = Math.min(30_000 * Math.pow(2, Math.floor(failedAttemptsRef.current / 5) - 1), 300_000); // Kademeli: 30s→60s→120s→max 5dk
         cooldownUntilRef.current = Date.now() + cooldownMs;
         const cooldownSec = Math.ceil(cooldownMs / 1000);
-        showToast({ title: 'Çok fazla deneme', message: `${cooldownSec} saniye bekleyip tekrar deneyin.`, type: 'error' });
+        showToast({ title: 'Hesap Geçici Kilitli', message: `${cooldownSec} saniye bekleyip tekrar dene.`, type: 'warning' });
       } else if (error?.code === 'auth/too-many-requests') {
         cooldownUntilRef.current = Date.now() + 60_000;
-        showToast({ title: 'Hesap geçici kilitli', message: 'Çok fazla başarısız deneme. 1 dakika bekleyin.', type: 'error' });
+        showToast({ title: 'Hesap Geçici Kilitli', message: '1 dakika sonra tekrar dene.', type: 'warning' });
       } else {
         // ★ SEC-ENUM: Tüm kimlik doğrulama hatalarında aynı mesaj — e-posta enumeration engeli
-        showToast({ title: 'Hata', message: 'E-posta veya şifre hatalı.', type: 'error' });
+        showToast({ title: 'Giriş Başarısız', message: 'E-posta veya şifre hatalı.', type: 'error' });
       }
       // ★ SEC-BF2: Kalıcı kayıt
       AsyncStorage.setItem(BF_ATTEMPTS_KEY, String(failedAttemptsRef.current)).catch(() => {});
@@ -230,24 +237,24 @@ export default function LoginScreen() {
     }
     // ★ SEC-BF2: Email format kontrolü
     if (!EMAIL_REGEX.test(trimmedEmail)) {
-      showToast({ title: 'Hata', message: 'Geçerli bir e-posta adresi girin.', type: 'error' });
+      showToast({ title: 'Geçersiz E-posta', message: 'Geçerli bir e-posta adresi gir.', type: 'error' });
       return;
     }
     if (password !== passwordConfirm) {
-      showToast({ title: 'Hata', message: 'Şifreleriniz eşleşmiyor.', type: 'error' });
+      showToast({ title: 'Şifreler Eşleşmiyor', message: 'İki şifre alanı aynı olmalı.', type: 'error' });
       return;
     }
     // ★ SEC-PW: Güçlü şifre gereksinimleri — min 8 karakter, 1 büyük harf, 1 rakam
     if (password.length < 8) {
-      showToast({ title: 'Hata', message: 'Şifreniz en az 8 karakter olmalıdır.', type: 'error' });
+      showToast({ title: 'Şifre Çok Kısa', message: 'En az 8 karakter olmalı.', type: 'warning' });
       return;
     }
     if (!/[A-ZÇĞİÖŞÜ]/.test(password)) {
-      showToast({ title: 'Hata', message: 'Şifreniz en az 1 büyük harf içermelidir.', type: 'error' });
+      showToast({ title: 'Büyük Harf Eksik', message: 'Şifrede en az 1 büyük harf olmalı.', type: 'warning' });
       return;
     }
     if (!/[0-9]/.test(password)) {
-      showToast({ title: 'Hata', message: 'Şifreniz en az 1 rakam içermelidir.', type: 'error' });
+      showToast({ title: 'Rakam Eksik', message: 'Şifrede en az 1 rakam olmalı.', type: 'warning' });
       return;
     }
     setLoading(true);
@@ -266,11 +273,11 @@ export default function LoginScreen() {
     } catch (error: any) {
       // ★ SEC-ENUM: Kayıt hatalarında spesifik bilgi verme — enumeration engeli
       if (error?.code === 'auth/email-already-in-use') {
-        showToast({ title: 'Hata', message: 'Bu e-posta ile işlem yapılamadı. Giriş yapmayı deneyin.', type: 'error' });
+        showToast({ title: 'Kayıt Olunamadı', message: 'Bu e-posta ile işlem yapılamadı. Giriş yapmayı dene.', type: 'error' });
       } else if (error?.code === 'auth/invalid-email') {
-        showToast({ title: 'Hata', message: 'Geçersiz e-posta adresi.', type: 'error' });
+        showToast({ title: 'Geçersiz E-posta', message: 'Lütfen geçerli bir e-posta gir.', type: 'error' });
       } else {
-        showToast({ title: 'Hata', message: 'Kayıt olunamadı. Lütfen tekrar deneyin.', type: 'error' });
+        showToast({ title: 'Kayıt Olunamadı', message: 'Bir sorun oluştu, tekrar dene.', type: 'error' });
       }
     } finally {
       setLoading(false);
@@ -285,7 +292,7 @@ export default function LoginScreen() {
       return;
     }
     if (!EMAIL_REGEX.test(trimmed)) {
-      showToast({ title: 'Hata', message: 'Geçerli bir e-posta adresi girin.', type: 'error' });
+      showToast({ title: 'Geçersiz E-posta', message: 'Geçerli bir e-posta adresi gir.', type: 'error' });
       return;
     }
     setResetLoading(true);
@@ -315,9 +322,9 @@ export default function LoginScreen() {
       showToast({ title: '✉️ Gönderildi', message: 'Doğrulama e-postası tekrar gönderildi.', type: 'success' });
     } catch (error: any) {
       if (error?.code === 'auth/too-many-requests') {
-        showToast({ title: 'Bekleyin', message: 'Çok fazla istek. Lütfen birkaç dakika bekleyin.', type: 'warning' });
+        showToast({ title: 'Çok Fazla İstek', message: 'Birkaç dakika bekleyip tekrar dene.', type: 'warning' });
       } else {
-        showToast({ title: 'Hata', message: 'E-posta gönderilemedi.', type: 'error' });
+        showToast({ title: 'E-posta Gönderilemedi', message: 'Doğrulama e-postası iletilemedi.', type: 'error' });
       }
     } finally {
       setResendLoading(false);
@@ -341,7 +348,7 @@ export default function LoginScreen() {
         showToast({ title: 'Henüz Doğrulanmadı', message: 'Lütfen e-posta kutunuzu kontrol edin.', type: 'warning' });
       }
     } catch {
-      showToast({ title: 'Hata', message: 'Durum kontrol edilemedi.', type: 'error' });
+      showToast({ title: 'Kontrol Edilemedi', message: 'Doğrulama durumu alınamadı. Tekrar dene.', type: 'error' });
     } finally {
       setLoading(false);
     }
@@ -353,59 +360,42 @@ export default function LoginScreen() {
   };
 
   return (
-    <View style={s.root}>
-      {/* ═══ ARKA PLAN (PURE CODE — pürüssüz) ═══
-           Stacked LinearGradients: dikey base + sol-üst spotlight + köşe vignetting.
-           Spotlight Animated opacity/translate ile yavaşça dalgalanır. */}
-      <LinearGradient
-        colors={['#162844', '#1A2F4D', '#18294B', '#0F1D33', '#07101C']}
-        locations={[0, 0.28, 0.5, 0.78, 1]}
-        start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }}
-        style={StyleSheet.absoluteFillObject}
-        pointerEvents="none"
-      />
-      {/* Spotlight — sol-üst merkezli, animated opacity ile yavaşça nefes alır */}
-      <Animated.View
-        style={[StyleSheet.absoluteFillObject, { opacity: glowOpacity }]}
-        pointerEvents="none"
-      >
-        <LinearGradient
-          colors={['rgba(180,200,225,0.12)', 'rgba(140,165,195,0.04)', 'transparent']}
-          locations={[0, 0.35, 0.75]}
-          start={{ x: 0.2, y: 0.2 }} end={{ x: 0.8, y: 0.9 }}
-          style={StyleSheet.absoluteFillObject}
-        />
-      </Animated.View>
-      {/* Vignettes — 4 köşe */}
-      <LinearGradient
-        colors={['rgba(0,8,16,0.5)', 'transparent']}
-        start={{ x: 0, y: 0 }} end={{ x: 0.6, y: 0.6 }}
-        style={StyleSheet.absoluteFillObject}
-        pointerEvents="none"
-      />
-      <LinearGradient
-        colors={['transparent', 'rgba(0,8,16,0.6)']}
-        start={{ x: 0.4, y: 0.4 }} end={{ x: 1, y: 1 }}
-        style={StyleSheet.absoluteFillObject}
-        pointerEvents="none"
-      />
-
+    <AppBackground radialGlow>
       <KeyboardAvoidingView style={s.container} behavior={'padding'}>
-        {/* Ambient teal glow — top (brand aksan) */}
-        <LinearGradient
-          colors={['rgba(20,184,166,0.08)', 'rgba(20,184,166,0.03)', 'transparent']}
-          style={s.ambientTop}
-          pointerEvents="none"
-        />
 
         <ScrollView contentContainerStyle={s.contentContainer} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           <View style={s.content}>
-            {/* ═══ LOGO ═══ */}
-            <Animated.View style={[s.logoSection, { opacity: logoOpacity, transform: [{ scale: logoScale }] }]}>
-              {/* Logo — fade+scale reveal ile sade açılır. (BlurView kaldırıldı: release'de bazı
-                   cihazlarda experimentalBlurMethod crash yapıyordu.) */}
-              <Image source={require('../../assets/logo.png')} style={s.logoImage} resizeMode="contain" />
-            </Animated.View>
+            {/* ═══ LOGO — İki parçalı animasyonlu giriş ═══ */}
+            <View style={s.logoSection}>
+              <View style={s.logoRow}>
+                {/* Soprano — soldan süzülerek gelir */}
+                <Animated.Image
+                  source={require('../../assets/soprano_part.png')}
+                  style={[
+                    s.logoPart,
+                    s.sopranoImg,
+                    {
+                      opacity: sopranoOpacity,
+                      transform: [{ translateX: sopranoTranslateX }],
+                    },
+                  ]}
+                  resizeMode="contain"
+                />
+                {/* Chat — sağdan bounce ederek gelir */}
+                <Animated.Image
+                  source={require('../../assets/chat_part.png')}
+                  style={[
+                    s.logoPart,
+                    s.chatImg,
+                    {
+                      opacity: chatOpacity,
+                      transform: [{ translateX: chatTranslateX }],
+                    },
+                  ]}
+                  resizeMode="contain"
+                />
+              </View>
+            </View>
 
             {/* ═══ STAT PILLS ═══ */}
             <Animated.View style={[s.statsContainer, { opacity: statsOpacity }]}>
@@ -454,7 +444,7 @@ export default function LoginScreen() {
 
                   {/* Email input */}
                   <View style={s.inputWrap}>
-                    <Ionicons name="mail-outline" size={18} color="#64748B" style={s.inputIcon} />
+                    <Ionicons name="mail-outline" size={18} color="#64748B" style={s.inputIcon} accessibilityElementsHidden importantForAccessibility="no" />
                     <TextInput
                       style={s.glassInput}
                       placeholder="E-posta adresiniz"
@@ -464,12 +454,13 @@ export default function LoginScreen() {
                       keyboardType="email-address"
                       autoCapitalize="none"
                       autoComplete="email"
+                      accessibilityLabel="E-posta adresi"
                     />
                   </View>
 
                   {/* Password input */}
                   <View style={s.inputWrap}>
-                    <Ionicons name="lock-closed-outline" size={18} color="#64748B" style={s.inputIcon} />
+                    <Ionicons name="lock-closed-outline" size={18} color="#64748B" style={s.inputIcon} accessibilityElementsHidden importantForAccessibility="no" />
                     <TextInput
                       style={s.glassInput}
                       placeholder="Şifreniz"
@@ -477,8 +468,16 @@ export default function LoginScreen() {
                       value={password}
                       onChangeText={setPassword}
                       secureTextEntry={!showPassword}
+                      accessibilityLabel="Şifre"
                     />
-                    <Pressable onPress={() => setShowPassword(!showPassword)} style={s.eyeBtn}>
+                    <Pressable
+                      onPress={() => setShowPassword(!showPassword)}
+                      style={s.eyeBtn}
+                      accessibilityRole="button"
+                      accessibilityLabel={showPassword ? 'Şifreyi gizle' : 'Şifreyi göster'}
+                      accessibilityState={{ checked: showPassword }}
+                      hitSlop={8}
+                    >
                       <Ionicons name={showPassword ? "eye-off-outline" : "eye-outline"} size={18} color="#64748B" />
                     </Pressable>
                   </View>
@@ -546,13 +545,13 @@ export default function LoginScreen() {
                 </View>
               ) : (
                 <View style={s.buttonsContainer}>
-                  {/* Google Button — Blue gradient */}
+                  {/* Google Button — Odalarım CTA benzeri glassmorphic */}
                   <Pressable
                     style={({ pressed }) => [pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] }]}
                     onPress={handleGoogleLogin}
                   >
                     <LinearGradient
-                      colors={['#4285F4', '#3367D6']}
+                      colors={['#2E5A8F', '#254A78', '#1C3A60']}
                       start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                       style={s.socialGradient}
                     >
@@ -560,16 +559,17 @@ export default function LoginScreen() {
                         <Ionicons name="logo-google" size={20} color="#FFF" />
                       </View>
                       <Text style={s.socialBtnText}>Google ile Devam Et</Text>
+                      <Ionicons name="arrow-forward" size={18} color="rgba(255,255,255,0.5)" style={{ position: 'absolute', right: 16 }} />
                     </LinearGradient>
                   </Pressable>
 
-                  {/* E-posta Button — Teal gradient */}
+                  {/* E-posta Button — Odalarım "Oda Oluştur" CTA ile aynı teal gradient */}
                   <Pressable
                     style={({ pressed }) => [pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] }]}
                     onPress={() => setShowEmailForm(true)}
                   >
                     <LinearGradient
-                      colors={Gradients.teal as [string, string]}
+                      colors={['#14B8A6', '#0D9488', '#065F56']}
                       start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                       style={s.socialGradient}
                     >
@@ -577,6 +577,7 @@ export default function LoginScreen() {
                         <Ionicons name="mail-outline" size={20} color="#FFF" />
                       </View>
                       <Text style={s.socialBtnText}>E-posta ile Giriş</Text>
+                      <Ionicons name="arrow-forward" size={18} color="rgba(255,255,255,0.5)" style={{ position: 'absolute', right: 16 }} />
                     </LinearGradient>
                   </Pressable>
                 </View>
@@ -627,7 +628,7 @@ export default function LoginScreen() {
           ]}
         />
       </KeyboardAvoidingView>
-    </View>
+    </AppBackground>
   );
 }
 
@@ -639,10 +640,16 @@ const s = StyleSheet.create({
 
   ambientTop: { position: 'absolute', top: 0, left: 0, right: 0, height: SCREEN_HEIGHT * 0.4 },
 
-  // ═══ LOGO ═══
+  // ═══ LOGO — İki parçalı ═══
   logoSection: { alignItems: 'center', marginBottom: 32, marginTop: SCREEN_HEIGHT * 0.02 },
-  // ★ 2026-04-23: Logo 320x72 — ~4.5:1 wordmark oranı, resizeMode:contain
-  logoImage: { width: 320, height: 72 },
+  logoRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', alignSelf: 'center' },
+  logoPart: { },
+  // ★ 2026-04-29 v4: chat_part.png ölçümü — 1422x570, content 0..1192,
+  //   yani sağ taraf **229 px transparent padding** içeriyor (~%16).
+  //   126 dp render'da bu ~20 dp saydam alan → Chat'e marginRight: -20
+  //   ile absorb edip container'ı daraltıyoruz → centered.
+  sopranoImg: { width: 220, height: 60 },
+  chatImg: { width: 126, height: 60, marginRight: -20 },
 
   // ═══ STAT PILLS ═══
   statsContainer: { alignItems: 'center', marginBottom: 40 },
@@ -664,7 +671,7 @@ const s = StyleSheet.create({
   statDotLive: { backgroundColor: '#F43F5E', shadowColor: '#F43F5E' },
   statText: { color: 'rgba(255,255,255,0.7)', fontSize: 13, fontWeight: '600', letterSpacing: 0.3, ...Shadows.textLight },
 
-  // ═══ BUTTONS ═══
+  // ═══ BUTTONS — Odalarım CTA benzeri ═══
   buttonsContainer: { width: '100%', gap: 14 },
 
   socialGradient: {
@@ -672,17 +679,27 @@ const s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     height: 56,
-    borderRadius: Radius.default,
-    overflow: 'hidden', // ★ FIX: Android'de elevation gölge dikdörtgenini önler
+    borderRadius: 14,
+    overflow: 'hidden',
+    // ★ Odalarım CTA shadow pattern
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 5,
   },
   socialIconWrap: {
     position: 'absolute',
-    left: 20,
-    width: 32, height: 32, borderRadius: 16,
+    left: 14,
+    width: 36, height: 36, borderRadius: 12,
     backgroundColor: 'rgba(255,255,255,0.15)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)',
     justifyContent: 'center', alignItems: 'center',
   },
-  socialBtnText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700', letterSpacing: 0.5, ...Shadows.text },
+  socialBtnText: {
+    color: '#FFFFFF', fontSize: 15, fontWeight: '800', letterSpacing: 0.4,
+    textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
+  },
 
   // ═══ FORM ═══
   formArea: { width: '100%' },

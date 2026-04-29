@@ -25,6 +25,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { containsBadWords } from '../constants/badwords';
 import { AUDIENCE_OPTIONS, audienceModeToFields, getAudienceMode, type AudienceMode } from '../constants/audience';
 import { TagService, normalizeTag, MAX_TAGS_PER_ROOM, SUGGESTED_TAGS } from '../services/tags';
+import { ClubService } from '../services/clubs';
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
 
 // ★ 2026-04-21: Oda adı sanitization — whitespace normalize, HTML strip, length cap.
@@ -179,7 +180,8 @@ export default function CreateRoomScreen() {
   // ★ 2026-04-26: Planlı oda — opsiyonel başlangıç zamanı.
   //   null = hemen başlat (default). Date = belirtilen zamanda canlıya çık.
   //   ?schedule=1 query param'i varsa default 1 saat sonra setlenir (QuickCreateSheet "Planla" akışı).
-  const searchParams = useLocalSearchParams<{ schedule?: string }>();
+  const searchParams = useLocalSearchParams<{ schedule?: string; clubId?: string }>();
+  const attachToClubId = searchParams?.clubId || null;
   const [scheduledAt, setScheduledAt] = useState<Date | null>(() => {
     if (searchParams?.schedule === '1') {
       const t = new Date();
@@ -452,6 +454,12 @@ export default function CreateRoomScreen() {
       // ★ Faz 4.3 — etiketleri ayrı tabloda kaydet (best-effort, fire-and-forget)
       if (tags.length > 0) {
         TagService.setRoomTags(room.id, tags).catch(() => {});
+      }
+      // ★ 2026-04-28: Eğer Koro detayından gelindiyse (?clubId=...), oda otomatik bağlansın
+      if (attachToClubId) {
+        ClubService.attachRoom(attachToClubId, room.id, firebaseUser.uid).catch((err) => {
+          if (__DEV__) console.warn('[CreateRoom] Auto-attach to Koro failed:', err);
+        });
       }
       const isScheduled = !!(scheduledAt && scheduledAt.getTime() > Date.now());
       const scheduledLabel = isScheduled && scheduledAt

@@ -86,7 +86,7 @@ export default function InviteFriendsModal({ visible, userId, onClose, onInvite,
 
       setFriends((profiles || []) as FollowUser[]);
     } catch (err: any) {
-      console.warn('[InviteFriendsModal] loadFriends error:', err?.message || err);
+      if (__DEV__) console.warn('[InviteFriendsModal] loadFriends error:', err?.message || err);
       setError('Arkadaş listesi yüklenemedi');
       setFriends([]);
     } finally {
@@ -202,10 +202,10 @@ export default function InviteFriendsModal({ visible, userId, onClose, onInvite,
   return (
     <View style={s.overlay}>
       <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-      <Animated.View style={[s.modal, { transform: [{ translateY: translateValue }] }]}>
+      <Animated.View style={[s.modal, { transform: [{ translateY: translateValue }] }]} {...panHandlers}>
         <LinearGradient colors={['#4a5668', '#37414f', '#232a35']} locations={[0, 0.35, 1]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[StyleSheet.absoluteFillObject, { borderRadius: 20 }]} />
-        {/* ★ Swipe handle */}
-        <View style={s.handleWrap} {...panHandlers}>
+        {/* ★ 2026-04-28: Swipe handle artık görsel — pan tüm modal'da (Clubhouse). */}
+        <View style={s.handleWrap}>
           <View style={s.handle} />
         </View>
         {/* Header */}

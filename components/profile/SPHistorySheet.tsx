@@ -11,6 +11,7 @@ import {
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import SPIcon from '../SPIcon';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSpring, runOnJS } from 'react-native-reanimated';
 import { supabase } from '../../constants/supabase';
@@ -65,8 +66,9 @@ function spReasonIcon(reason: string | undefined, isPositive: boolean): { name: 
     referral_bonus_referred: { name: 'people', color: '#A78BFA' },
     gift_received:      { name: 'gift',         color: '#22C55E' },
     gift_sent:          { name: 'gift-outline', color: '#EF4444' },
-    donation_received:  { name: 'diamond',      color: '#22C55E' },
-    donation_sent:      { name: 'diamond-outline', color: '#EF4444' },
+    // ★ 2026-04-29 v2: SP sembol artık hexagon — diamond yerine custom marker.
+    donation_received:  { name: '#sp_recv',     color: '#22C55E' },
+    donation_sent:      { name: '#sp_sent',     color: '#EF4444' },
     donation_refund:    { name: 'arrow-undo',   color: '#3B82F6' },
     room_boost:         { name: 'rocket',       color: '#F472B6' },
     profile_boost:      { name: 'rocket',       color: '#F472B6' },
@@ -202,7 +204,7 @@ export default function SPHistorySheet({ visible, onClose, balance, history: ini
             </View>
             <View style={s.header}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                <Ionicons name="diamond" size={16} color="#FBBF24" style={iconShadow} />
+                <SPIcon size={52} />
                 <View>
                   <Text style={s.title}>SP GEÇMİŞİM</Text>
                   <Text style={s.subtitle}>Son 30 işlem · Canlı</Text>
@@ -221,7 +223,7 @@ export default function SPHistorySheet({ visible, onClose, balance, history: ini
 
           {/* ★ Liste — kendi scroll alanı, swipe gesture pan area'yı geçmez */}
           <ScrollView
-            style={{ maxHeight: 380 }}
+            style={{ maxHeight: SCREEN_HEIGHT * 0.55 }}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={{ paddingBottom: 20 }}
           >
@@ -250,7 +252,12 @@ export default function SPHistorySheet({ visible, onClose, balance, history: ini
               return (
                 <View key={tx.id || i} style={[s.row, isFresh && s.rowFresh]}>
                   <View style={[s.iconWrap, { backgroundColor: `${iconDef.color}18`, borderColor: `${iconDef.color}33` }]}>
-                    <Ionicons name={iconDef.name} size={16} color={iconDef.color} style={iconShadow} />
+                    {/* ★ 2026-04-29 v2: SP gönderim/alım — diamond yerine hexagon (SPIcon) */}
+                    {iconDef.name === '#sp_recv' || iconDef.name === '#sp_sent' ? (
+                      <SPIcon size={20} />
+                    ) : (
+                      <Ionicons name={iconDef.name} size={16} color={iconDef.color} style={iconShadow} />
+                    )}
                   </View>
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <Text style={s.reason} numberOfLines={1}>{spReasonLabel(txType)}</Text>
@@ -289,7 +296,8 @@ const s = StyleSheet.create({
     borderWidth: 1.5, borderColor: 'rgba(251,191,36,0.3)',
     borderBottomWidth: 0,
     paddingHorizontal: 18, paddingTop: 10, paddingBottom: 24,
-    maxHeight: SCREEN_HEIGHT * 0.78,
+    maxHeight: SCREEN_HEIGHT * 0.85,
+    minHeight: SCREEN_HEIGHT * 0.55,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -8 },
     shadowOpacity: 0.6, shadowRadius: 20, elevation: 20,
@@ -302,12 +310,12 @@ const s = StyleSheet.create({
     paddingBottom: 14,
   },
   title: {
-    fontSize: 13, fontWeight: '900', color: '#FBBF24', letterSpacing: 1.2,
+    fontSize: 16, fontWeight: '900', color: '#FBBF24', letterSpacing: 1.4,
     textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
   subtitle: {
-    fontSize: 10, fontWeight: '600', color: 'rgba(251,191,36,0.55)',
-    marginTop: 1, letterSpacing: 0.3,
+    fontSize: 11, fontWeight: '600', color: 'rgba(251,191,36,0.6)',
+    marginTop: 2, letterSpacing: 0.3,
   },
   // ★ Swipe handle — kapatma için üst çubuk (geniş dokunma alanı)
   handleWrap: {

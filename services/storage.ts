@@ -2,11 +2,38 @@ import { logger } from '../utils/logger';
 import { supabase } from '../constants/supabase';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as FileSystem from 'expo-file-system';
+import * as Crypto from 'expo-crypto';
 import { decode } from 'base64-arraybuffer';
+
+// ★ SEC-STORAGE: URL tahmin saldırısı koruması.
+//   Bucket'lar şu an public (Firebase Third-Party Auth bekliyor — known gap).
+//   Path'lere yüksek entropi token ekleyerek brute-force imkansız hale getiriyoruz.
+//   122-bit UUID → ~5.3*10^36 olasılık, pratik olarak tahmin edilemez.
+function _randomToken(): string {
+  return Crypto.randomUUID().replace(/-/g, '');
+}
 
 // ★ SEC-STORAGE: Upload boyut limitleri
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024;  // 10MB
 const MAX_VOICE_SIZE = 5 * 1024 * 1024;   // 5MB
+
+// ★ Public URL → bucket-içi path çıkarımı. Sadece SAME userId klasöründeki
+//   path'leri kabul eder; başka kullanıcının dosyasını silme (path traversal) bloklanır.
+function _extractStoragePath(bucket: string, publicUrl: string, ownerUserId: string): string | null {
+  try {
+    const marker = `/storage/v1/object/public/${bucket}/`;
+    const idx = publicUrl.indexOf(marker);
+    if (idx < 0) return null;
+    const raw = publicUrl.slice(idx + marker.length).split('?')[0];
+    const decoded = decodeURIComponent(raw);
+    // Sadece "<ownerUserId>/..." prefix'i kabul (cross-user delete koruması)
+    if (!decoded.startsWith(`${ownerUserId}/`)) return null;
+    if (decoded.includes('..')) return null;
+    return decoded;
+  } catch {
+    return null;
+  }
+}
 
 async function _validateFileSize(uri: string, maxBytes: number, label: string): Promise<void> {
   try {
@@ -71,12 +98,26 @@ export const StorageService = {
   },
 
   /**
-   * Upload an avatar to the 'avatars' bucket
+   * Upload an avatar to the 'avatars' bucket. ★ Eski avatar varsa best-effort silinir
+   * (orphan birikmesi önler). oldAvatarUrl public URL olabilir; içinden bucket path'i
+   * çıkarılır. Silme hatası non-fatal.
    */
-  async uploadAvatar(userId: string, imageUri: string): Promise<string> {
+  async uploadAvatar(userId: string, imageUri: string, oldAvatarUrl?: string | null): Promise<string> {
     const timestamp = new Date().getTime();
-    const path = `${userId}/${timestamp}.jpg`;
-    return await this.uploadFile('avatars', path, imageUri);
+    const path = `${userId}/${timestamp}_${_randomToken()}.jpg`;
+    const newUrl = await this.uploadFile('avatars', path, imageUri);
+
+    if (oldAvatarUrl) {
+      const oldPath = _extractStoragePath('avatars', oldAvatarUrl, userId);
+      if (oldPath && oldPath !== path) {
+        try {
+          await supabase.storage.from('avatars').remove([oldPath]);
+        } catch {
+          // best-effort: orphan kalsın, yeni avatar zaten yüklendi
+        }
+      }
+    }
+    return newUrl;
   },
 
   /**
@@ -84,7 +125,7 @@ export const StorageService = {
    */
   async uploadPostImage(userId: string, imageUri: string): Promise<string> {
     const timestamp = new Date().getTime();
-    const path = `${userId}/${timestamp}.jpg`;
+    const path = `${userId}/${timestamp}_${_randomToken()}.jpg`;
     return await this.uploadFile('post-images', path, imageUri);
   },
 
@@ -93,7 +134,7 @@ export const StorageService = {
    */
   async uploadChatImage(userId: string, imageUri: string): Promise<string> {
     const timestamp = new Date().getTime();
-    const path = `chat/${userId}/${timestamp}.jpg`;
+    const path = `chat/${userId}/${timestamp}_${_randomToken()}.jpg`;
     return await this.uploadFile('post-images', path, imageUri);
   },
 
@@ -117,7 +158,7 @@ export const StorageService = {
       await _validateFileSize(audioUri, MAX_VOICE_SIZE, 'Ses dosyası');
 
       const timestamp = new Date().getTime();
-      const path = `${userId}/voice_${timestamp}.m4a`;
+      const path = `${userId}/voice_${timestamp}_${_randomToken()}.m4a`;
 
       // Ses dosyasını base64 olarak oku (resim işleme yok!)
       const base64 = await FileSystem.readAsStringAsync(audioUri, {

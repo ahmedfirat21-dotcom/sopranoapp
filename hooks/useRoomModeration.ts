@@ -4,7 +4,8 @@
  * room/[id].tsx dosyasından çıkarılmıştır (~600 satır azaltma).
  */
 import { useCallback } from 'react';
-import { RoomService, getRoomLimits } from '../services/database';
+import { RoomService } from '../services/database';
+import { getRoomLimits } from '../constants/tiers';
 import { migrateLegacyTier } from '../types';
 import { ModerationService } from '../services/moderation';
 import { supabase } from '../constants/supabase';
@@ -91,9 +92,9 @@ export function useRoomModeration({
         },
       });
       setSelectedUser(null);
-      showToast({ title: '📨 Sahne Daveti Gönderildi', message: `${displayName} sahneye davet edildi`, type: 'success' });
+      showToast({ title: '📨 Sahne Daveti Gönderildi', message: `${displayName} sahneye davet edildi.`, type: 'success' });
     } catch (e) {
-      showToast({ title: 'Hata', message: 'Davet gönderilemedi', type: 'error' });
+      showToast({ title: 'Davet Gönderilemedi', message: `${displayName} sahneye davet edilemedi.`, type: 'error' });
     }
   }, [roomId, room, participants, modChannelRef, profile, firebaseUser]);
 
@@ -199,7 +200,7 @@ export function useRoomModeration({
             showToast({ title: isMod ? 'Moderatörlük Kaldırıldı' : 'Moderatör Yapıldı', message: displayName, type: 'success' });
           } catch (e: any) {
             setParticipants(prev => prev.map(p => p.user_id === userId ? { ...p, role: prevRole as any } : p));
-            showToast({ title: 'Hata', message: e?.message || 'İşlem başarısız', type: 'error' });
+            showToast({ title: 'Rol Değiştirilemedi', message: e?.message || `${displayName} için moderatör rolü güncellenemedi.`, type: 'error' });
           }
         }},
       ]
@@ -279,44 +280,45 @@ export function useRoomModeration({
         message: !isCurrentlyGhost ? 'Diğer kullanıcılar seni göremez' : 'Artık herkes seni görebilir',
         type: 'info',
       });
-    } catch { showToast({ title: 'Hata', message: 'İşlem başarısız', type: 'error' }); }
+    } catch { showToast({ title: 'Ghost Mode Değişmedi', message: 'Görünmezlik durumu güncellenemedi.', type: 'error' }); }
   }, [roomId, firebaseUser, participants, modChannelRef]);
 
-  // ========== KILIK DEĞİŞTİRME ==========
-  const handleDisguiseUser = useCallback((userId: string, displayName: string) => {
-    setAlertConfig({
-      visible: true, title: '🎭 Kılık Değiştir', message: `${displayName} adlı kullanıcının görünümü geçici olarak değiştirilecek.`, type: 'info', icon: 'mask-outline' as any,
-      buttons: [
-        { text: 'İptal', style: 'cancel' },
-        { text: 'Anonim Yap', onPress: async () => {
-          try {
-            await RoomService.setDisguise(roomId, userId, {
-              display_name: 'Anonim Kullanıcı',
-              avatar_url: 'https://ui-avatars.com/api/?name=Anonim&background=1E293B&color=64748B',
-              applied_by: firebaseUser!.uid,
-            });
-            modChannelRef.current?.send({
-              type: 'broadcast', event: 'mod_action',
-              payload: { action: 'disguise', targetUserId: userId, newName: 'Anonim Kullanıcı', newAvatar: 'https://ui-avatars.com/api/?name=Anonim&background=1E293B&color=64748B' },
-            });
-            setSelectedUser(null);
-            showToast({ title: '🎭 Kılık Değiştirildi', message: `${displayName} artık "Anonim Kullanıcı" olarak görünüyor`, type: 'success' });
-          } catch { showToast({ title: 'Hata', message: 'İşlem başarısız', type: 'error' }); }
-        }},
-        { text: 'Kılığı Kaldır', onPress: async () => {
-          try {
-            await RoomService.setDisguise(roomId, userId, null);
-            modChannelRef.current?.send({
-              type: 'broadcast', event: 'mod_action',
-              payload: { action: 'undisguise', targetUserId: userId },
-            });
-            setSelectedUser(null);
-            showToast({ title: 'Kılık Kaldırıldı', message: `${displayName} normal görünümüne döndü`, type: 'info' });
-          } catch { showToast({ title: 'Hata', message: 'İşlem başarısız', type: 'error' }); }
-        }},
-      ]
-    });
-  }, [roomId, firebaseUser, modChannelRef]);
+  // ========== KILIK DEĞİŞTİRME (Host self-toggle, anlık) ==========
+  // ★ 2026-04-28: Mekanizma değişti — eski "başkasına kılık uygulama" kaldırıldı (yanlış tasarım).
+  //   Yenisi: HOST kendi profilini "Anonim Sahip" olarak gizler. Anlık toggle, modal yok.
+  //   Görünmez (ghost) ile fark: ghost = liste'de hiç görünmez. Disguise = görünür ama başka isim/avatar.
+  const handleSelfDisguiseToggle = useCallback(async () => {
+    if (!firebaseUser?.uid) return;
+    const me = participants.find(p => p.user_id === firebaseUser.uid);
+    const isCurrentlyDisguised = !!(me as any)?.disguise_data;
+    try {
+      if (isCurrentlyDisguised) {
+        // Kılığı kaldır
+        await RoomService.setDisguise(roomId, firebaseUser.uid, null);
+        modChannelRef.current?.send({
+          type: 'broadcast', event: 'mod_action',
+          payload: { action: 'undisguise', targetUserId: firebaseUser.uid },
+        });
+        showToast({ title: 'Kılık Kaldırıldı', message: 'Gerçek görünümüne döndün.', type: 'info' });
+      } else {
+        // Anonim Sahip kılığı tak
+        const newName = 'Anonim Sahip';
+        const newAvatar = 'https://ui-avatars.com/api/?name=Anonim+Sahip&background=1E293B&color=64748B';
+        await RoomService.setDisguise(roomId, firebaseUser.uid, {
+          display_name: newName,
+          avatar_url: newAvatar,
+          applied_by: firebaseUser.uid,
+        });
+        modChannelRef.current?.send({
+          type: 'broadcast', event: 'mod_action',
+          payload: { action: 'disguise', targetUserId: firebaseUser.uid, newName, newAvatar },
+        });
+        showToast({ title: '🎭 Kılık Aktif', message: 'Bu odada "Anonim Sahip" olarak görünüyorsun.', type: 'success' });
+      }
+    } catch {
+      showToast({ title: 'Kılık Değiştirilemedi', message: 'İşlem başarısız.', type: 'error' });
+    }
+  }, [roomId, firebaseUser, participants, modChannelRef]);
 
   // ========== GEÇİCİ BAN ==========
   const executeTempBan = useCallback(async (userId: string, displayName: string, mins: number) => {
@@ -402,9 +404,9 @@ export function useRoomModeration({
     try {
       await ModerationService.reportUser(firebaseUser!.uid, userId, reason as any);
       setSelectedUser(null);
-      showToast({ title: 'Şikayet Gönderildi', message: 'Şikayetiniz incelenecek. Teşekkürler.', type: 'success' });
+      showToast({ title: '📣 Şikayet Gönderildi', message: 'Şikayetin incelenecek, teşekkürler.', type: 'success' });
     } catch (e) {
-      showToast({ title: 'Hata', message: 'Şikayet gönderilemedi', type: 'error' });
+      showToast({ title: 'Şikayet Gönderilemedi', message: 'Raporun iletilirken hata oluştu.', type: 'error' });
     }
   }, [firebaseUser]);
 
@@ -430,9 +432,9 @@ export function useRoomModeration({
           try {
             await ModerationService.blockUser(firebaseUser!.uid, userId);
             setSelectedUser(null);
-            showToast({ title: 'Engellendi', message: `${displayName} engellendi`, type: 'success' });
+            showToast({ title: '⛔ Engellendi', message: `${displayName} engellendi.`, type: 'success' });
           } catch (e) {
-            showToast({ title: 'Hata', message: 'Engellenemedi', type: 'error' });
+            showToast({ title: 'Engellenemedi', message: `${displayName} engellenirken hata oluştu.`, type: 'error' });
           }
         }}
       ]
@@ -447,7 +449,7 @@ export function useRoomModeration({
     handleTimedMuteUser,
     executeUnmute,
     handleGhostToggle,
-    handleDisguiseUser,
+    handleSelfDisguiseToggle,
     handleTempBan,
     handlePermBan,
     handleReportUser,

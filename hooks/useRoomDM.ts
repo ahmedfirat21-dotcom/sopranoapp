@@ -36,26 +36,50 @@ export function useRoomDM(params: UseRoomDMParams) {
   // ── DM Okunmamış Sayacı + Inbox Preload ───────
   // ★ 2026-04-26: Inbox'ı sayaç ile aynı anda preload — DM panel açıldığında anında dolu görünür.
   //   Eski: panel açılınca getInbox çağrılıyor → 2sn boş gözüküyordu.
+  // ★ 2026-04-29 v85: +1/-1 yerine getUnreadCount() debounced — yabancı pending request
+  //   mesajları DM badge'inde sayılmaz, ayrıca markAsRead/delete sonrasında doğru sayım.
   useEffect(() => {
     if (!firebaseUser?.uid) return;
-    MessageService.getUnreadCount(firebaseUser.uid).then(setDmUnreadCount).catch(() => {});
-    // ★ Preload: panel henüz açılmasa bile inbox'ı arka planda hazırla.
-    MessageService.getInbox(firebaseUser.uid).then(setDmInboxMessages).catch(() => {});
-    const ch = supabase.channel(`dm_badge_${firebaseUser.uid}`)
+    const uid = firebaseUser.uid;
+    MessageService.getUnreadCount(uid).then(setDmUnreadCount).catch(() => {});
+    MessageService.getInbox(uid).then(setDmInboxMessages).catch(() => {});
+
+    let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+    const refreshDmBadge = () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      refreshTimer = setTimeout(() => {
+        MessageService.getUnreadCount(uid).then(setDmUnreadCount).catch(() => {});
+        MessageService.getInbox(uid).then(setDmInboxMessages).catch(() => {});
+      }, 250);
+    };
+
+    const ch = supabase.channel(`dm_badge_${uid}`)
       .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'messages',
-        filter: `receiver_id=eq.${firebaseUser.uid}`,
-      }, () => {
-        setDmUnreadCount(prev => prev + 1);
-        // Yeni mesaj geldikçe inbox listesini de tazele
-        if (firebaseUser?.uid) {
-          MessageService.getInbox(firebaseUser.uid).then(setDmInboxMessages).catch(() => {});
+        event: 'INSERT', schema: 'public', table: 'messages',
+        filter: `receiver_id=eq.${uid}`,
+      }, refreshDmBadge)
+      .on('postgres_changes', {
+        event: 'UPDATE', schema: 'public', table: 'messages',
+        filter: `receiver_id=eq.${uid}`,
+      }, (payload) => {
+        const oldM = payload.old as { is_read?: boolean };
+        const newM = payload.new as { is_read?: boolean };
+        if ((oldM?.is_read === false && newM?.is_read === true) ||
+            (oldM?.is_read === true && newM?.is_read === false)) {
+          refreshDmBadge();
         }
       })
+      // ★ message_requests durumu değişince DM badge yeniden hesaplansın (pending hariç)
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'message_requests',
+        filter: `receiver_id=eq.${uid}`,
+      }, refreshDmBadge)
       .subscribe();
-    return () => { supabase.removeChannel(ch); };
+
+    return () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      supabase.removeChannel(ch);
+    };
   }, [firebaseUser?.uid]);
 
   // ── DM Gönder ─────────────────────────────────

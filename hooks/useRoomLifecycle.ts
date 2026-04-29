@@ -14,7 +14,6 @@
 import { useEffect, useRef } from 'react';
 import { AppState } from 'react-native';
 import { RoomService } from '../services/database';
-import { getRoomLimits } from '../constants/tiers';
 import type { Room } from '../types';
 
 type UseRoomLifecycleParams = {
@@ -36,6 +35,8 @@ export function useRoomLifecycle(params: UseRoomLifecycleParams) {
   }, []);
 
   // ── Heartbeat + Zombie Cleanup ────────────────
+  // ★ 2026-04-26: Aggressive ayarlar (30sn/45sn) emülatörde ANR'ye sebep olduğu için 60sn/90sn'e geri alındı.
+  //   Zombi temizleme delay'i ~90sn — kabul edilebilir (kullanıcı odadan force-kill edince başkalarının ekranından silinmesi ~90sn sürer).
   useEffect(() => {
     if (!roomId || !firebaseUser) return;
     // İlk heartbeat
@@ -62,43 +63,30 @@ export function useRoomLifecycle(params: UseRoomLifecycleParams) {
   }, [roomId, firebaseUser, room?.host_id]);
 
   // ── AppState — Arka Plan Tespiti ──────────────
-  useEffect(() => {
-    if (!roomId || !firebaseUser) return;
-    const bgTimerRef = { current: null as ReturnType<typeof setTimeout> | null };
-    const subscription = AppState.addEventListener('change', (nextState) => {
-      if (nextState === 'background' || nextState === 'inactive') {
-        // ★ O9 FIX: iki aşamalı tolerans — minimize ref henüz set edilmemiş olabilir.
-        // 250ms fast-path check → eğer minimize aktifse timer'ı HİÇ kurma.
-        // Timer 60sn'de fire eder; o anda da minimize flag tekrar kontrol edilir.
-        const FAST_PATH_MS = 250;
-        const LEAVE_GRACE_MS = 60_000;
-        setTimeout(() => {
-          if (isMinimizingRef.current) return;
-          // Önceki timer varsa temizle (birden fazla background event)
-          if (bgTimerRef.current) clearTimeout(bgTimerRef.current);
-          bgTimerRef.current = setTimeout(() => {
-            // Kritik: timer fire ettiğinde minimize aktif olabilir (arada kullanıcı minimize'a bastı)
-            if (isMinimizingRef.current) return;
-            RoomService.leave(roomId, firebaseUser.uid).catch(() => {});
-          }, LEAVE_GRACE_MS);
-        }, FAST_PATH_MS);
-      } else if (nextState === 'active') {
-        if (bgTimerRef.current) {
-          clearTimeout(bgTimerRef.current);
-          bgTimerRef.current = null;
-        }
-      }
-    });
-    return () => {
-      subscription.remove();
-      if (bgTimerRef.current) clearTimeout(bgTimerRef.current);
-    };
-  }, [roomId, firebaseUser]);
+  // ★ 2026-04-26 FIX: Background'da otomatik leave KALDIRILDI.
+  //   Eski: 60sn arka planda kalırsa otomatik RoomService.leave çağrılıyordu — Clubhouse'a aykırı.
+  //   Clubhouse'da telefon ekranı kapansa, başka uygulamaya geçilse bile oda devam eder.
+  //   Force-kill durumu zaten heartbeat (60sn) + host cleanup (90sn) ile temizleniyor.
+  //   Listener'ı tamamen kaldırdık — kullanıcı "Ayrıl" demedikçe odada kalır.
 
   // ── Oda Süresi Zamanlayıcısı ──────────────────
   // ★ BUG FIX: Timer room/[id].tsx'de inline olarak çalışıyor (showToast + navigation erişimi var).
   // Hook'taki kopya kaldırıldı → çift RoomService.close() ve çift safeGoBack() race condition'ı önlendi.
   // Heartbeat, zombie, AppState → hook'ta kalıyor.
+
+  // ── Foreground Dönüş Heartbeat ────────────────
+  // ★ 2026-04-30 FIX: Android Doze mode setInterval'i durdurur → heartbeat gönderilmez
+  //   → host zombie cleanup ile kullanıcıyı 90sn sonra siler. Foreground'a dönünce
+  //   anında heartbeat göndererek zombie'ye düşmeyi önler.
+  useEffect(() => {
+    if (!roomId || !firebaseUser) return;
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active' && roomId && firebaseUser && !isMinimizingRef.current) {
+        RoomService.heartbeat(roomId, firebaseUser.uid).catch(() => {});
+      }
+    });
+    return () => sub.remove();
+  }, [roomId, firebaseUser]);
 
   return {};
 }

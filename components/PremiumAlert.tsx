@@ -5,11 +5,11 @@
  *   Butonlar pill shape + icon desteği, slide-up animasyon korundu.
  */
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated, Modal, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, Modal, Dimensions, PanResponder } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 
-const { width: W } = Dimensions.get('window');
+const { width: W, height: H } = Dimensions.get('window');
 
 export type AlertType = 'info' | 'warning' | 'error' | 'success';
 
@@ -71,6 +71,28 @@ export default function PremiumAlert({ visible, title, message, type = 'info', b
   const slideY = useRef(new Animated.Value(60)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
 
+  // ★ Swipe-to-dismiss — aşağı sürükle kapat
+  const panY = useRef(new Animated.Value(0)).current;
+  const onDismissRef = useRef(onDismiss);
+  onDismissRef.current = onDismiss;
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_, g) => g.dy > 10 && Math.abs(g.dy) > Math.abs(g.dx) * 1.3,
+      onPanResponderMove: (_, g) => { if (g.dy > 0) panY.setValue(g.dy); },
+      onPanResponderRelease: (_, g) => {
+        if (g.dy > 80 || g.vy > 0.5) {
+          Animated.timing(panY, { toValue: H, duration: 200, useNativeDriver: true }).start(() => {
+            panY.setValue(0);
+            onDismissRef.current?.();
+          });
+        } else {
+          Animated.spring(panY, { toValue: 0, useNativeDriver: true, tension: 100, friction: 10 }).start();
+        }
+      },
+    })
+  ).current;
+
   const config = ALERT_CONFIG[type];
   const alertIcon = icon || config.icon;
 
@@ -80,6 +102,7 @@ export default function PremiumAlert({ visible, title, message, type = 'info', b
         Animated.spring(slideY, { toValue: 0, useNativeDriver: true, tension: 80, friction: 12 }),
         Animated.timing(opacityAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
       ]).start();
+      panY.setValue(0);
     } else {
       slideY.setValue(60);
       opacityAnim.setValue(0);
@@ -97,10 +120,13 @@ export default function PremiumAlert({ visible, title, message, type = 'info', b
       <View style={sty.backdrop}>
         <Animated.View style={[sty.overlay, { opacity: opacityAnim }]} />
 
-        <Animated.View style={[sty.container, { transform: [{ translateY: slideY }], opacity: opacityAnim }]}>
+        <Animated.View
+          style={[sty.container, { transform: [{ translateY: slideY }, { translateY: panY }], opacity: opacityAnim }]}
+          {...panResponder.panHandlers}
+        >
           {/* ★ Koyu gradient zemin — proje bg'sine kaynaşır */}
           <LinearGradient
-            colors={config.bgGradient as unknown as string[]}
+            colors={config.bgGradient as readonly [string, string, ...string[]]}
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
             style={[StyleSheet.absoluteFillObject, { borderRadius: 20 }]}
           />

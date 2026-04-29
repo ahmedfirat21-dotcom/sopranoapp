@@ -13,7 +13,7 @@
  *  - Açılışta haptic feedback
  */
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Modal, Pressable, Image, Dimensions, Animated, PanResponder, Easing } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Image, Dimensions, Animated, PanResponder, Easing } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import StatusAvatar from './StatusAvatar';
@@ -70,15 +70,24 @@ export default function ConversationActionSheet({
     }
   }, [visible]);
 
-  // Swipe-down to dismiss
+  // ★ 2026-04-24: Swipe-down to dismiss — daha agresif hassasiyet,
+  //   Pressable child'lar tap'i alır; aşağı swipe PanResponder capture eder.
   const panResponder = useRef(
     PanResponder.create({
-      onMoveShouldSetPanResponder: (_, gs) => gs.dy > 8 && Math.abs(gs.dx) < 20,
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_, gs) => {
+        // Aşağı hareket baskın (dy > dx * 1.5) + minimum 6px → capture
+        return gs.dy > 6 && gs.dy > Math.abs(gs.dx) * 1.5;
+      },
+      onMoveShouldSetPanResponderCapture: (_, gs) => {
+        return gs.dy > 10 && gs.dy > Math.abs(gs.dx) * 1.5;
+      },
+      onPanResponderTerminationRequest: () => false,
       onPanResponderMove: (_, gs) => {
         if (gs.dy > 0) translateY.setValue(gs.dy);
       },
       onPanResponderRelease: (_, gs) => {
-        if (gs.dy > 90 || gs.vy > 0.6) {
+        if (gs.dy > 70 || gs.vy > 0.5) {
           Animated.timing(translateY, { toValue: SHEET_MAX_HEIGHT, duration: 200, useNativeDriver: true }).start(() => onClose());
         } else {
           Animated.spring(translateY, { toValue: 0, useNativeDriver: true, damping: 18, stiffness: 180 }).start();
@@ -105,36 +114,34 @@ export default function ConversationActionSheet({
   };
 
   return (
-    <Modal visible={visible} transparent animationType="none" statusBarTranslucent onRequestClose={onClose}>
-      {/* Backdrop */}
-      <Animated.View style={[StyleSheet.absoluteFillObject, { opacity: fadeAnim }]}>
+    <View style={s.root} pointerEvents={visible ? 'box-none' : 'none'}>
+      {/* Backdrop — tıklayınca kapat; animasyon ile fade */}
+      <Animated.View style={[StyleSheet.absoluteFillObject, { opacity: fadeAnim }]} pointerEvents={visible ? 'auto' : 'none'}>
         <Pressable style={StyleSheet.absoluteFillObject} onPress={onClose}>
           <View style={s.backdrop} />
         </Pressable>
       </Animated.View>
 
-      {/* Sheet — panResponder tüm sheet üzerinde (sadece handle değil) */}
+      {/* Sheet — panResponder tüm sheet üzerinde */}
       <Animated.View style={[s.sheet, { transform: [{ translateY }] }]} {...panResponder.panHandlers}>
         <LinearGradient
-          colors={['#1C2840', '#122036', '#0B1829']}
-          start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }}
+          colors={['#4a5668', '#37414f', '#232a35']}
+          locations={[0, 0.35, 1]}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
           style={s.sheetInner}
         >
-          {/* Handle bar (swipe indicator) */}
+          {/* Handle bar — beyaz şerit (RoomChatDrawer ile aynı) */}
           <View style={s.handleWrap}>
             <View style={s.handle} />
           </View>
 
-          {/* Partner header */}
+          {/* Partner header — X kaldırıldı, swipe-to-dismiss yeterli */}
           <View style={s.header}>
             <StatusAvatar uri={partnerAvatar || undefined} size={48} isOnline={partnerOnline} />
             <View style={{ flex: 1, marginLeft: 12 }}>
               <Text style={s.name} numberOfLines={1}>{partnerName}</Text>
               {!!subtitle && <Text style={s.subtitle} numberOfLines={1}>{subtitle}</Text>}
             </View>
-            <Pressable onPress={onClose} hitSlop={12} style={s.closeBtn}>
-              <Ionicons name="close" size={18} color="rgba(255,255,255,0.5)" />
-            </Pressable>
           </View>
 
           <View style={s.divider} />
@@ -167,8 +174,8 @@ export default function ConversationActionSheet({
                     i === 0 && { marginTop: 6 },
                   ]}
                 >
-                  <View style={[s.actionIconWrap, isDestructive && { backgroundColor: 'rgba(239,68,68,0.12)' }, isPrimary && { backgroundColor: 'rgba(20,184,166,0.14)' }]}>
-                    <Ionicons name={action.icon} size={19} color={iconColor} />
+                  <View style={s.actionIconWrap}>
+                    <Ionicons name={action.icon} size={22} color={iconColor} style={s.actionIconShadow} />
                   </View>
                   <Text style={[s.actionLabel, { color: textColor }]} numberOfLines={1}>{action.label}</Text>
                   {action.accessory && (
@@ -177,58 +184,65 @@ export default function ConversationActionSheet({
                   <Ionicons
                     name="chevron-forward"
                     size={15}
-                    color={action.disabled ? 'rgba(148,163,184,0.25)' : 'rgba(255,255,255,0.25)'}
-                    style={{ marginLeft: 4 }}
+                    color={action.disabled ? 'rgba(148,163,184,0.25)' : 'rgba(255,255,255,0.35)'}
+                    style={[{ marginLeft: 4 }, s.actionIconShadow]}
                   />
                 </Pressable>
               );
             })}
           </View>
 
-          {/* Safe bottom padding (home indicator) */}
-          <View style={{ height: 34 }} />
+          {/* Safe inner padding — floating card zaten tab bar üstünde, ekstra padding gerekmiyor */}
+          <View style={{ height: 10 }} />
         </LinearGradient>
       </Animated.View>
-    </Modal>
+    </View>
   );
 }
 
 const s = StyleSheet.create({
+  // ★ 2026-04-24 v2: HandRaiseQueuePanel stili — tab bar'ın ÜSTÜNDE floating card
+  root: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 45,
+    elevation: 45,
+    justifyContent: 'flex-end',
+  },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.55)',
   },
   sheet: {
     position: 'absolute',
-    left: 0, right: 0, bottom: 0,
+    left: 14, right: 14,
+    bottom: 96, // tab bar (~82) + 14px gap → panel tab bar'ın tam üstünde floats
     maxHeight: SHEET_MAX_HEIGHT,
     overflow: 'hidden',
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
+    borderRadius: 18,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
+    shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.45,
-    shadowRadius: 20,
-    elevation: 24,
+    shadowRadius: 18,
+    elevation: 20,
   },
   sheetInner: {
     paddingTop: 8,
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
-    borderTopWidth: 1,
-    borderLeftWidth: 1,
-    borderRightWidth: 1,
-    borderColor: 'rgba(115,194,189,0.12)', // ★ Teal accent border — odada kullanılan palet
+    borderRadius: 18,
   },
   handleWrap: {
     alignItems: 'center',
-    paddingVertical: 8,
+    paddingTop: 10,
+    paddingBottom: 4,
   },
   handle: {
-    width: 40,
+    width: 48,
     height: 4,
     borderRadius: 2,
-    backgroundColor: 'rgba(148,163,184,0.3)',
+    backgroundColor: 'rgba(255,255,255,0.3)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.4,
+    shadowRadius: 2,
   },
   header: {
     flexDirection: 'row',
@@ -242,23 +256,21 @@ const s = StyleSheet.create({
     fontWeight: '800',
     color: '#F1F5F9',
     letterSpacing: 0.2,
+    textShadowColor: 'rgba(0,0,0,0.55)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
   },
   subtitle: {
     fontSize: 12,
     color: 'rgba(148,163,184,0.8)',
     marginTop: 2,
-  },
-  closeBtn: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
   divider: {
-    height: 1,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: 'rgba(255,255,255,0.08)',
     marginHorizontal: 14,
   },
   actions: {
@@ -274,23 +286,33 @@ const s = StyleSheet.create({
     marginVertical: 2,
     gap: 12,
   },
+  // ★ 2026-04-24: İkon çerçevesi kaldırıldı — sadece ikonun kendi drop shadow'u
   actionIconWrap: {
     width: 36,
     height: 36,
-    borderRadius: 10,
-    backgroundColor: 'rgba(255,255,255,0.05)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  actionIconShadow: {
+    textShadowColor: 'rgba(0,0,0,0.6)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 5,
   },
   actionLabel: {
     flex: 1,
     fontSize: 15,
     fontWeight: '600',
     letterSpacing: 0.1,
+    textShadowColor: 'rgba(0,0,0,0.55)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
   },
   accessoryText: {
     fontSize: 12,
     color: 'rgba(148,163,184,0.7)',
     fontWeight: '500',
+    textShadowColor: 'rgba(0,0,0,0.45)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
 });

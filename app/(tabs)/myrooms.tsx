@@ -1,17 +1,20 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
-  View, Text, StyleSheet, Image, Pressable, ScrollView,
-  RefreshControl, Animated, FlatList, TextInput,
+  View, Text, StyleSheet, Image, ImageStyle, Pressable, ScrollView,
+  RefreshControl, Animated, Easing, FlatList, TextInput, InteractionManager,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import AppBackground from '../../components/AppBackground';
+import AnimatedHeaderIconBtn from '../../components/AnimatedHeaderIconBtn';
+// ★ 2026-04-28: AnimatedLogo kaldırıldı — SopranoHome branding için inline component.
+import { bannerIntroPlayed, markBannerIntroPlayed } from '../../utils/bannerIntro';
 import TabBarFadeOut from '../../components/TabBarFadeOut';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Colors, Shadows } from '../../constants/theme';
 import { RoomService, type Room } from '../../services/database';
 import { supabase } from '../../constants/supabase';
-import { useAuth, useTheme, useBadges, useOnlineFriends as useOnlineFriendsLayout } from '../_layout';
+import { useAuth, useTheme, useBadges, useOnlineFriends as useOnlineFriendsLayout, useUserProfileSheet } from '../_layout';
 
 import StatusAvatar from '../../components/StatusAvatar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -36,9 +39,73 @@ import NotificationBell from '../../components/NotificationBell';
 import FriendsDrawer from '../../components/FriendsDrawer';
 import QuickCreateSheet from '../../components/QuickCreateSheet';
 
-// ════════════════════════════════════════════════════════════
+// ★ 2026-04-28: Odalarım header logosu — SopranoHome (soprano_part + home_part mavi)
+const HOME_SOP_W = 110;
+const HOME_PART_W = 75;
+const HOME_H = 30;
+
+function AnimatedHomeLogo() {
+  const played = bannerIntroPlayed();
+  // ★ 2026-04-29: Soprano sabit (kullanıcı isteği) — sadece Home partner kelime animasyonlu
+  const homeX = useRef(new Animated.Value(played ? 0 : 120)).current;
+  const homeOp = useRef(new Animated.Value(played ? 1 : 0)).current;
+  const homeY = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (played) return;
+    const t2 = setTimeout(() => {
+      Animated.parallel([
+        Animated.timing(homeOp, { toValue: 1, duration: 600, useNativeDriver: true }),
+        Animated.spring(homeX, { toValue: 0, friction: 6, tension: 50, useNativeDriver: true }),
+      ]).start();
+    }, 650);
+    return () => { clearTimeout(t2); };
+  }, []);
+
+  // ★ 2026-04-29: Tab focus'ta — sadece Home çizgiden yukarı doğar (Soprano sabit)
+  useFocusEffect(
+    useCallback(() => {
+      if (!bannerIntroPlayed()) return;
+      homeY.setValue(HOME_H);
+      homeOp.setValue(0);
+      Animated.sequence([
+        Animated.delay(60),
+        Animated.parallel([
+          Animated.spring(homeY, { toValue: 0, friction: 7, tension: 60, useNativeDriver: true }),
+          Animated.timing(homeOp, { toValue: 1, duration: 320, useNativeDriver: true }),
+        ]),
+      ]).start();
+    }, [])
+  );
+
+  return (
+    <View style={homeLogoS.row}>
+      <Image
+        source={require('../../assets/soprano_part.png')}
+        style={homeLogoS.sop}
+        resizeMode="contain"
+      />
+      <View style={homeLogoS.partnerWrap}>
+        <Animated.Image
+          source={require('../../assets/home_part.png')}
+          style={[homeLogoS.home, { opacity: homeOp, transform: [{ translateX: homeX }, { translateY: homeY }] }]}
+          resizeMode="contain"
+        />
+      </View>
+    </View>
+  );
+}
+
+const homeLogoS = StyleSheet.create({
+  row: { flexDirection: 'row', alignItems: 'center', marginTop: -6 } as any,
+  sop: { width: HOME_SOP_W, height: HOME_H } as ImageStyle,
+  partnerWrap: { width: HOME_PART_W, height: HOME_H, marginLeft: -4, overflow: 'hidden' },
+  home: { width: HOME_PART_W, height: HOME_H } as ImageStyle,
+});
+
+// ════════════════════════════════════════════════════════════════
 // YÖNETİLEN ODA KARTI — Yönet/Başlat butonları (React.memo ile re-render izole)
-// ════════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════════
 const ManagedRoomCard = React.memo(function ManagedRoomCard({ room, onManage, onStart, onSettings, currentUserId }: {
   room: Room;
   onManage: (room: Room) => void;
@@ -120,10 +187,10 @@ const ManagedRoomCard = React.memo(function ManagedRoomCard({ room, onManage, on
             ) : isPersistent ? (
               <View style={mS.sleepBadge}>
                 <Ionicons name="moon" size={9} color="#A78BFA" />
-                <Text style={mS.sleepText}>Uyuyor</Text>
+                <Text style={mS.sleepText}>Pasif</Text>
               </View>
             ) : (
-              <Text style={mS.offlineText}>❄️ Dondurulmuş</Text>
+              <Text style={mS.offlineText}>❄️ Donuk</Text>
             )}
             {/* ★ Premium rozeti — keşfetteki "Premium" trophy'siyle aynı */}
             {isPersistent && (
@@ -196,8 +263,8 @@ const ManagedRoomCard = React.memo(function ManagedRoomCard({ room, onManage, on
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
             style={mS.gradBtn}
           >
-            <Ionicons name={isLive ? 'enter' : 'sunny'} size={14} color="#FFF" />
-            <Text style={mS.gradBtnText}>{isLive ? 'Odaya Git' : 'Uyandır'}</Text>
+            <Ionicons name={isLive ? 'enter' : isPersistent ? 'sunny' : 'flame'} size={14} color="#FFF" />
+            <Text style={mS.gradBtnText}>{isLive ? 'Odaya Git' : isPersistent ? 'Aktifleştir' : 'Çöz'}</Text>
           </LinearGradient>
         </Pressable>
       </View>
@@ -639,7 +706,16 @@ const tplS = StyleSheet.create({
 export default function MyRoomsScreen() {
   const router = useRouter();
   const { firebaseUser, profile, setShowNotifDrawer, setNotifDrawerAnchorRight } = useAuth();
+  const { openUserProfile } = useUserProfileSheet();
   const insets = useSafeAreaInsets();
+  // ★ 2026-04-24: Banner slide-down — sadece uygulama ilk açılışında
+  const bannerTranslateY = useRef(new Animated.Value(bannerIntroPlayed() ? 0 : -140)).current;
+  useEffect(() => {
+    if (!bannerIntroPlayed()) {
+      Animated.timing(bannerTranslateY, { toValue: 0, duration: 520, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
+      markBannerIntroPlayed();
+    }
+  }, []);
   useTheme();
 
   const [myRooms, setMyRooms] = useState<Room[]>([]);
@@ -804,10 +880,14 @@ export default function MyRoomsScreen() {
   // ★ Ref'leri güncel tut — realtime handler'ları için
   useEffect(() => { loadDataRef.current = loadData; }, [loadData]);
 
+  // ★ 2026-04-26 PERF: InteractionManager ile ağır DB sorguları tab geçiş
+  //   animasyonu bittikten SONRA çalışır — JS thread animasyon sırasında bloke olmaz.
   useFocusEffect(useCallback(() => {
-    loadData();
+    const task = InteractionManager.runAfterInteractions(() => {
+      loadData();
+    });
     // ★ 2026-04-23: Tab'dan çıkınca açık modalı kapat
-    return () => { setSelectedRoom(null); };
+    return () => { task.cancel(); setSelectedRoom(null); };
   }, [loadData]));
 
   // ★ Yardımcı: Sadece arkadaşların canlı olduğu odaları yenile (hafif sorgu)
@@ -964,16 +1044,33 @@ export default function MyRoomsScreen() {
     loadData();
   }, [loadData]);
 
-  // Uyuyan odayı uyandır — DB'de is_live=true yap, süre sıfırla, sonra odaya git
+  // Uyuyan odayı uyandır VEYA planlı odayı başlat — DB'de is_live=true yap, süre sıfırla, sonra odaya git
   // ★ useCallback ile memoize + doğru deps — stale profile/firebaseUser yakalama engellendi
   const handleWakeUp = useCallback(async (room: Room) => {
     if (!firebaseUser) return;
     try {
       const tier = effectiveTier;
+      // ★ 2026-04-26: Planlı oda mı kontrol et — eğer scheduled_at gelecekte ise
+      //   kullanıcıya "henüz erken" uyarısı, ama yine de manuel başlatmaya izin ver.
+      const scheduledIso = (room.room_settings as any)?.scheduled_at;
+      const scheduledTime = scheduledIso ? new Date(scheduledIso) : null;
+      const isScheduledFuture = !!(scheduledTime && scheduledTime.getTime() > Date.now());
+      if (isScheduledFuture && scheduledTime) {
+        const dateStr = scheduledTime.toLocaleString('tr-TR', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
+        showToast({
+          title: '📅 Planlı Oda Erken Başlatılıyor',
+          message: `Bu oda ${dateStr} için planlanmıştı, şimdi canlıya alınıyor.`,
+          type: 'info',
+        });
+      }
       await RoomService.wakeUpRoom(room.id, firebaseUser.uid, tier);
+      try {
+        const { Analytics, Events } = require('../../services/analytics');
+        Analytics.track(Events.ROOM_REACTIVATED, { tier });
+      } catch {}
       router.push(`/room/${room.id}`);
     } catch (err: any) {
-      showToast({ title: 'Uyandırma Başarısız', message: err.message || 'Oda uyandırılamadı.', type: 'error' });
+      showToast({ title: 'Başlatılamadı', message: err.message || 'Oda başlatılamadı.', type: 'error' });
     }
   }, [firebaseUser, profile, router]);
 
@@ -1007,8 +1104,8 @@ export default function MyRoomsScreen() {
     const items: ListItem[] = [];
     const groups = [
       { title: 'Canlı Odalarım', icon: 'radio', color: '#EF4444', data: live },
-      { title: 'Uyuyan Kalıcı Odalar', icon: 'moon', color: '#A78BFA', data: sleeping },
-      { title: 'Dondurulmuş', icon: 'snow', color: '#64748B', data: frozen },
+      { title: 'Pasif Kalıcı Odalar', icon: 'moon', color: '#A78BFA', data: sleeping },
+      { title: 'Donuk Odalar', icon: 'snow', color: '#64748B', data: frozen },
     ];
     for (const g of groups) {
       if (g.data.length === 0) continue;
@@ -1110,7 +1207,7 @@ export default function MyRoomsScreen() {
     try {
       await RoomService.updateSettings(selectedRoom.id, firebaseUser.uid, { room_settings: { [field]: value } });
       broadcast(selectedRoom.id, { room_settings: { [field]: value } });
-    } catch (e: any) { showToast({ title: 'Hata', message: e.message || '', type: 'error' }); }
+    } catch (e: any) { showToast({ title: 'Ayar Kaydedilemedi', message: e.message || 'Sunucuya ulaşılamadı.', type: 'error' }); }
   }, [selectedRoom, firebaseUser, broadcast]);
 
   const handleRoomRename = useCallback(async (name: string) => {
@@ -1119,7 +1216,7 @@ export default function MyRoomsScreen() {
     try {
       await ModerationService.editRoomName(selectedRoom.id, name.trim());
       broadcast(selectedRoom.id, { name: name.trim() });
-    } catch { showToast({ title: 'Hata', type: 'error' }); }
+    } catch { showToast({ title: 'Ad Değiştirilemedi', message: 'Oda adı güncellenemedi. Daha sonra tekrar dene.', type: 'error' }); }
   }, [selectedRoom, firebaseUser, broadcast]);
 
   const handleRoomTypeChange = useCallback(async (newType: string) => {
@@ -1128,7 +1225,7 @@ export default function MyRoomsScreen() {
     try {
       await RoomService.updateSettings(selectedRoom.id, firebaseUser.uid, { type: newType as any });
       broadcast(selectedRoom.id, { type: newType });
-    } catch { showToast({ title: 'Hata', type: 'error' }); setRmType(selectedRoom.type || 'open'); }
+    } catch { showToast({ title: 'Oda Tipi Değişmedi', message: 'Tip değişikliği uygulanamadı.', type: 'error' }); setRmType(selectedRoom.type || 'open'); }
   }, [selectedRoom, firebaseUser, broadcast]);
 
   const handleRoomThemeChange = useCallback(async (id: string | null) => {
@@ -1137,17 +1234,17 @@ export default function MyRoomsScreen() {
     try {
       await RoomService.updateSettings(selectedRoom.id, firebaseUser.uid, { theme_id: id });
       broadcast(selectedRoom.id, { theme_id: id });
-    } catch { showToast({ title: 'Hata', type: 'error' }); }
+    } catch { showToast({ title: 'Tema Uygulanamadı', message: 'Oda teması güncellenemedi.', type: 'error' }); }
   }, [selectedRoom, firebaseUser, broadcast]);
 
   const handleRoomDelete = useCallback(async () => {
     if (!selectedRoom || !firebaseUser) return;
     try {
       await RoomService.deleteRoom(selectedRoom.id, firebaseUser.uid);
-      showToast({ title: 'Oda silindi', type: 'success' });
+      showToast({ title: '🗑 Oda Silindi', message: 'Oda ve tüm mesajları kaldırıldı.', type: 'success' });
       setSelectedRoom(null);
       loadData();
-    } catch (e: any) { showToast({ title: 'Hata', message: e.message || '', type: 'error' }); }
+    } catch (e: any) { showToast({ title: 'Oda Silinemedi', message: e.message || 'İşlem tamamlanamadı.', type: 'error' }); }
   }, [selectedRoom, firebaseUser, loadData]);
 
   // ★ 2026-04-23: Hızlı oda oluşturma — CTA ve empty state chip'lerinden tetiklenir.
@@ -1165,6 +1262,10 @@ export default function MyRoomsScreen() {
       }
       const displayName = profile?.display_name || firebaseUser.displayName || 'Kullanıcı';
       const room = await RoomService.quickCreate(firebaseUser.uid, displayName, category, userTier);
+      try {
+        const { Analytics, Events } = require('../../services/analytics');
+        Analytics.track(Events.ROOM_CREATED, { tier: userTier, category, source: 'quick_create' });
+      } catch {}
       router.push(`/room/${room.id}` as any);
     } catch (err: any) {
       showToast({ title: 'Oda Açılamadı', message: err?.message || 'Beklenmedik hata', type: 'error' });
@@ -1177,10 +1278,10 @@ export default function MyRoomsScreen() {
     if (!selectedRoom || !firebaseUser) return;
     try {
       await RoomService.freezeRoom(selectedRoom.id, firebaseUser.uid);
-      showToast({ title: 'Oda donduruldu', type: 'success' });
+      showToast({ title: '❄️ Oda Donduruldu', message: 'Oda uyku moduna alındı.', type: 'success' });
       setSelectedRoom(null);
       loadData();
-    } catch (e: any) { showToast({ title: 'Hata', message: e.message || '', type: 'error' }); }
+    } catch (e: any) { showToast({ title: 'Dondurulamadı', message: e.message || 'Oda uyku moduna alınamadı.', type: 'error' }); }
   }, [selectedRoom, firebaseUser, loadData]);
 
   // settingsConfig objesi — PlusMenu'ye geçirilir
@@ -1212,7 +1313,8 @@ export default function MyRoomsScreen() {
     onPasswordChange: (pw: string) => { setRmPassword(pw); updateRoomSetting('password', pw); },
     themeId: rmThemeId,
     onThemeChange: handleRoomThemeChange,
-    onFreezeRoom: handleRoomFreeze,
+    // ★ Donuk oda için Dondur gösterme (zaten donuk). is_live=false & is_persistent=false → donuk.
+    onFreezeRoom: (selectedRoom.is_live || (selectedRoom as any).is_persistent) ? handleRoomFreeze : undefined,
     entryFee: rmEntryFee,
     onEntryFeeChange: (f: number) => { setRmEntryFee(f); updateRoomSetting('entry_fee_sp', f); },
     musicLink: rmMusicLink || null,
@@ -1233,7 +1335,7 @@ export default function MyRoomsScreen() {
         setRmBgImage(url);
         updateRoomSetting('room_image_url', url);
         showToast({ title: '🖼 Arka Plan Güncellendi', type: 'success' });
-      } catch (e: any) { showToast({ title: 'Hata', message: e.message || 'Yükleme başarısız.', type: 'error' }); }
+      } catch (e: any) { showToast({ title: 'Arka Plan Yüklenemedi', message: e.message || 'Görsel yüklenirken hata oluştu.', type: 'error' }); }
     },
     onRemoveBackgroundImage: () => { setRmBgImage(null); updateRoomSetting('room_image_url', null); },
     coverImage: rmCoverImage,
@@ -1251,53 +1353,70 @@ export default function MyRoomsScreen() {
         setRmCoverImage(url);
         updateRoomSetting('card_image_url', url);
         showToast({ title: '🖼 Kart Görseli Güncellendi', type: 'success' });
-      } catch (e: any) { showToast({ title: 'Hata', message: e.message || 'Yükleme başarısız.', type: 'error' }); }
+      } catch (e: any) { showToast({ title: 'Kart Görseli Yüklenemedi', message: e.message || 'Görsel yüklenirken hata oluştu.', type: 'error' }); }
     },
     onRemoveCoverImage: () => { setRmCoverImage(null); updateRoomSetting('card_image_url', null); },
   } : undefined;
 
   return (
-    <AppBackground variant="myrooms">
+    <AppBackground variant="myrooms" radialGlow>
     <View style={s.container}>
       {/* ═══ Premium Header — Keşfet ile aynı Glassmorphic topBar ═══ */}
-      <View style={[s.topBarWrap, { paddingTop: insets.top + 4 }]}>
-        {/* Frosted blur layer — bg'den hafif ayrılır */}
-        <View style={s.topBarGlass} pointerEvents="none" />
+      <Animated.View style={[s.topBarWrap, { paddingTop: insets.top, transform: [{ translateY: bannerTranslateY }] }]}>
+        {/* ★ 2026-04-24 v4: Bulutsu banner — çerçeve yok, kenarlar bg'ye feather ile karışır.
+            Merkez yoğun, kenarlar yumuşak geçiş. */}
+        <LinearGradient
+          colors={['rgba(48,65,94,0.92)', 'rgba(26,40,64,0.82)', 'rgba(12,22,40,0.6)']}
+          locations={[0, 0.55, 1]}
+          start={{ x: 0.5, y: 0 }}
+          end={{ x: 0.5, y: 1 }}
+          style={s.topBarGlass}
+          pointerEvents="none"
+        />
         <View style={s.topBar}>
-          <Image source={require('../../assets/logo.png')} style={s.logo} resizeMode="contain" />
+          <AnimatedHomeLogo />
           <View style={s.headerRight}>
             {/* ★ 2026-04-21: SP pill Odalarım header'ından kaldırıldı — Keşfet ile tutarlı.
                SP cüzdanı artık Profil sayfasında ve SP store sayfasında prominent. */}
-            <Pressable
-              style={[s.headerIconBtn, showSearch && { backgroundColor: 'rgba(20,184,166,0.15)', borderColor: 'rgba(20,184,166,0.35)' }]}
+            <AnimatedHeaderIconBtn
+              index={0}
+              style={s.headerIconBtn}
               onPress={() => {
                 const next = !showSearch;
                 setShowSearch(next);
                 if (!next) setSearchQuery('');
                 else setTimeout(() => searchInputRef.current?.focus(), 100);
               }}
+              accessibilityLabel={showSearch ? 'Aramayı kapat' : 'Ara'}
             >
-              <Ionicons name={showSearch ? 'close' : 'search-outline'} size={20} color={showSearch ? '#14B8A6' : '#F1F5F9'} />
-            </Pressable>
-            <NotificationBell unreadCount={unreadCount} onPress={() => { setNotifDrawerAnchorRight(60); setShowNotifDrawer(true); }} />
-            <Pressable style={s.headerIconBtn} onPress={() => setShowFriends(true)}>
-              <Ionicons name="people-outline" size={20} color="#F1F5F9" />
+              <Ionicons name={showSearch ? 'close' : 'search-outline'} size={22} color={showSearch ? '#14B8A6' : '#F1F5F9'} style={s.headerIcon} />
+            </AnimatedHeaderIconBtn>
+            <AnimatedHeaderIconBtn staticIcon>
+              <NotificationBell unreadCount={unreadCount} onPress={() => { setNotifDrawerAnchorRight(60); setShowNotifDrawer(true); }} />
+            </AnimatedHeaderIconBtn>
+            <AnimatedHeaderIconBtn
+              staticIcon
+              style={s.headerIconBtn}
+              onPress={() => setShowFriends(true)}
+              accessibilityLabel={pendingFollowCount > 0 ? `Arkadaşlar, ${pendingFollowCount} bekleyen istek` : 'Arkadaşlar'}
+            >
+              <Ionicons name="people-outline" size={22} color="#F1F5F9" style={s.headerIcon} />
               {pendingFollowCount > 0 && (
                 <View style={s.notifBadge}>
                   <Text style={s.notifBadgeText}>{pendingFollowCount > 99 ? '99+' : pendingFollowCount}</Text>
                 </View>
               )}
-            </Pressable>
+            </AnimatedHeaderIconBtn>
           </View>
         </View>
         {/* ★ Premium separator — teal→transparent hairline */}
         <LinearGradient
-          colors={['transparent', 'rgba(20,184,166,0.5)', 'rgba(20,184,166,0.5)', 'transparent']}
-          locations={[0, 0.3, 0.7, 1]}
+          colors={['transparent', 'rgba(59,130,246,0.55)', 'rgba(59,130,246,0.55)', 'transparent']}
+          locations={[0, 0.25, 0.75, 1]}
           start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
           style={s.topBarSeparator}
         />
-      </View>
+      </Animated.View>
 
 
       {/* ★ Arama Barı — toggle ile açılır/kapanır */}
@@ -1516,7 +1635,7 @@ export default function MyRoomsScreen() {
         visible={showFriends}
         friends={allFriends}
         onClose={() => setShowFriends(false)}
-        onSelect={(userId) => { setShowFriends(false); router.push(`/user/${userId}` as any); }}
+        onSelect={(userId) => { setShowFriends(false); openUserProfile(userId); }}
         currentUserId={firebaseUser?.uid}
       />
 
@@ -1546,28 +1665,48 @@ const s = StyleSheet.create({
   /* ★ Premium Header — Keşfet ile aynı Glassmorphic topBar */
   topBarWrap: {
     position: 'relative',
-    paddingBottom: 8,
+    marginBottom: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.22,
+    shadowRadius: 12,
+    elevation: 8,
   },
   topBarGlass: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(15, 25, 41, 0.55)',
-    borderBottomWidth: 0,
+  },
+  topBarTopHighlight: {
+    position: 'absolute',
+    top: 0, left: 18, right: 18,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  topBarLampGlow: {
+    position: 'absolute',
+    bottom: -40,
+    left: -8, right: -8,
+    height: 58,
   },
   topBar: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 14, paddingBottom: 4,
   },
   topBarSeparator: {
-    height: 1,
-    marginHorizontal: 20,
+    height: 1.5,
+    width: '100%',
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
   },
-  logo: { height: 32, width: 150 },
+  logo: { height: 32, width: 150, marginTop: -6 },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   headerIconBtn: {
-    width: 44, height: 44, borderRadius: 22,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderWidth: 0.5, borderColor: 'rgba(125,170,229,0.12)',
+    width: 44, height: 44,
     justifyContent: 'center', alignItems: 'center', overflow: 'visible',
+  },
+  headerIcon: {
+    textShadowColor: 'rgba(0,0,0,0.55)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 5,
   },
   /* ★ SP Wallet Pill — premium altın gradient */
   spPill: {

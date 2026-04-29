@@ -8,6 +8,12 @@ import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 
+// ★ 2026-04-25: Crashlytics — lazy load (native module yoksa import patlamasın)
+let crashlytics: any = null;
+try {
+  crashlytics = require('@react-native-firebase/crashlytics').default;
+} catch { /* sessiz */ }
+
 interface Props {
   children: ReactNode;
   fallbackTitle?: string;
@@ -30,8 +36,17 @@ export default class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error('[ErrorBoundary] Crash yakalandı:', error.message);
-    console.error('[ErrorBoundary] Component Stack:', errorInfo.componentStack);
+    if (__DEV__) {
+      console.error('[ErrorBoundary] Crash yakalandı:', error.message);
+      console.error('[ErrorBoundary] Component Stack:', errorInfo.componentStack);
+    }
+    // ★ 2026-04-25: Crashlytics'e gönder (sadece prod build'de aktif)
+    try {
+      if (crashlytics) {
+        crashlytics().log(`Component stack: ${errorInfo.componentStack?.substring(0, 300)}`);
+        crashlytics().recordError(error, 'ErrorBoundary');
+      }
+    } catch { /* native module yoksa sessiz */ }
   }
 
   handleReset = () => {

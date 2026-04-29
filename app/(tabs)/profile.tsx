@@ -1,5 +1,5 @@
-import { useState, useCallback, useEffect } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, Modal, TextInput, ActivityIndicator, Image, InteractionManager } from 'react-native';
+import { useState, useCallback, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, Pressable, ScrollView, Modal, TextInput, ActivityIndicator, Image, InteractionManager, Platform, Animated, Easing, type ImageStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -15,6 +15,9 @@ import { FollowService } from '../../services/follows';
 import { showToast } from '../../components/Toast';
 import FollowListModal from '../../components/FollowListModal';
 import AppBackground from '../../components/AppBackground';
+import SPHexagonIcon from '../../components/SPHexagonIcon';
+import PlusDiamondIcon from '../../components/PlusDiamondIcon';
+import AnimatedHeaderIconBtn from '../../components/AnimatedHeaderIconBtn';
 import TabBarFadeOut from '../../components/TabBarFadeOut';
 import ProfileHero from '../../components/profile/ProfileHero';
 import BadgeListModal from '../../components/profile/BadgeListModal';
@@ -32,6 +35,74 @@ import PremiumAlert, { type AlertButton } from '../../components/PremiumAlert';
 import ConversationActionSheet, { type SheetAction } from '../../components/ConversationActionSheet';
 import { auth } from '../../constants/firebase';
 import { signOut, deleteUser as firebaseDeleteUser } from 'firebase/auth';
+
+// ★ 2026-04-29: Profil header logosu — diğer tab logoları ile eşitlendi (110×30 / 75×30).
+const PROF_SOP_W = 110;
+const PROF_PROF_W = 75;
+const PROF_H = 30;
+
+let _profilIntroPlayed = false;
+function profilIntroPlayed() { return _profilIntroPlayed; }
+function markProfilIntroPlayed() { _profilIntroPlayed = true; }
+
+function AnimatedProfilLogo() {
+  const played = profilIntroPlayed();
+  // ★ 2026-04-29: Soprano sabit (kullanıcı isteği) — sadece Profil partner kelime animasyonlu
+  const profX = useRef(new Animated.Value(played ? 0 : 120)).current;
+  const profOp = useRef(new Animated.Value(played ? 1 : 0)).current;
+  const profY = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (played) return;
+    const t2 = setTimeout(() => {
+      Animated.parallel([
+        Animated.timing(profOp, { toValue: 1, duration: 600, useNativeDriver: true }),
+        Animated.spring(profX, { toValue: 0, friction: 6, tension: 50, useNativeDriver: true }),
+      ]).start(() => markProfilIntroPlayed());
+    }, 650);
+    return () => { clearTimeout(t2); };
+  }, []);
+
+  // ★ 2026-04-29: Tab focus'ta — sadece Profil çizgiden yukarı doğar (Soprano sabit)
+  useFocusEffect(
+    useCallback(() => {
+      if (!profilIntroPlayed()) return;
+      profY.setValue(PROF_H);
+      profOp.setValue(0);
+      Animated.sequence([
+        Animated.delay(60),
+        Animated.parallel([
+          Animated.spring(profY, { toValue: 0, friction: 7, tension: 60, useNativeDriver: true }),
+          Animated.timing(profOp, { toValue: 1, duration: 320, useNativeDriver: true }),
+        ]),
+      ]).start();
+    }, [])
+  );
+
+  return (
+    <View style={profLogoS.row}>
+      <Image
+        source={require('../../assets/soprano_part.png')}
+        style={profLogoS.sop}
+        resizeMode="contain"
+      />
+      <View style={profLogoS.partnerWrap}>
+        <Animated.Image
+          source={require('../../assets/profil_part.png')}
+          style={[profLogoS.prof, { opacity: profOp, transform: [{ translateX: profX }, { translateY: profY }] }]}
+          resizeMode="contain"
+        />
+      </View>
+    </View>
+  );
+}
+
+const profLogoS = StyleSheet.create({
+  row: { flexDirection: 'row', alignItems: 'center', marginTop: -6 } as any,
+  sop: { width: PROF_SOP_W, height: PROF_H } as ImageStyle,
+  partnerWrap: { width: PROF_PROF_W, height: PROF_H, marginLeft: -4, overflow: 'hidden' },
+  prof: { width: PROF_PROF_W, height: PROF_H } as ImageStyle,
+});
 
 // ★ Ortak ikon gölge stili — tüm sayfadaki Ionicons'lara uygulanır
 const iconShadow = {
@@ -139,25 +210,25 @@ function spReasonLabel(reason: string | undefined): string {
 // ★ Reason → premium ikon + renk
 function spReasonIcon(reason: string | undefined, isPositive: boolean): { name: any; color: string } {
   const map: Record<string, { name: string; color: string }> = {
-    daily_login:        { name: 'sunny',        color: '#FBBF24' },
-    prime_time_return:  { name: 'time',         color: '#F59E0B' },
-    stage_time:         { name: 'mic',          color: '#14B8A6' },
-    room_create:        { name: 'radio',        color: '#A855F7' },
-    referral_reward:    { name: 'people',       color: '#A78BFA' },
-    gift_received:      { name: 'gift',         color: '#22C55E' },
-    gift_sent:          { name: 'gift-outline', color: '#EF4444' },
-    room_boost:         { name: 'rocket',       color: '#F472B6' },
-    profile_boost:      { name: 'rocket',       color: '#F472B6' },
-    store_purchase:     { name: 'cart',         color: '#F59E0B' },
-    subscription_bonus: { name: 'star',         color: '#D4AF37' },
-    achievement:        { name: 'trophy',       color: '#FBBF24' },
-    admin_grant:        { name: 'shield-checkmark', color: '#DC2626' },
-    refund:             { name: 'arrow-undo',   color: '#3B82F6' },
+    daily_login: { name: 'sunny', color: '#FBBF24' },
+    prime_time_return: { name: 'time', color: '#F59E0B' },
+    stage_time: { name: 'mic', color: '#14B8A6' },
+    room_create: { name: 'radio', color: '#A855F7' },
+    referral_reward: { name: 'people', color: '#A78BFA' },
+    gift_received: { name: 'gift', color: '#22C55E' },
+    gift_sent: { name: 'gift-outline', color: '#EF4444' },
+    room_boost: { name: 'rocket', color: '#F472B6' },
+    profile_boost: { name: 'rocket', color: '#F472B6' },
+    store_purchase: { name: 'cart', color: '#F59E0B' },
+    subscription_bonus: { name: 'star', color: '#D4AF37' },
+    achievement: { name: 'trophy', color: '#FBBF24' },
+    admin_grant: { name: 'shield-checkmark', color: '#DC2626' },
+    refund: { name: 'arrow-undo', color: '#3B82F6' },
   };
   const entry = map[reason || ''];
   if (entry) return entry;
   return isPositive
-    ? { name: 'trending-up',   color: '#22C55E' }
+    ? { name: 'trending-up', color: '#22C55E' }
     : { name: 'trending-down', color: '#EF4444' };
 }
 
@@ -173,7 +244,7 @@ export default function ProfileScreen() {
   const avatarUrl = profile?.avatar_url || user?.avatar || '';
   // ★ 2026-04-26: Boş bio için "Henüz bir şey yazmadı" placeholder kaldırıldı — ProfileHero zaten "+ Bio ekle" link'i gösteriyor (onBioPress varsa).
   const bio = profile?.bio || '';
-  
+
   const subscriptionTier: SubscriptionTier = migrateLegacyTier(profile?.subscription_tier || 'Free');
   const userId = firebaseUser?.uid || profile?.id;
 
@@ -351,7 +422,7 @@ export default function ProfileScreen() {
       ]);
       if (!myReferralCode) setMyReferralCode(code);
       setUsedReferral(used);
-    } catch {}
+    } catch { }
   }, [myReferralCode, userId]);
 
   // ★ Kendi kodunu paylaş (native Share)
@@ -362,7 +433,7 @@ export default function ProfileScreen() {
       await Share.share({
         message: `SopranoChat'e katıl! Davet kodumu kullan, 50 SP hediye kazan: ${myReferralCode}\nhttps://sopranochat.com`,
       });
-    } catch {}
+    } catch { }
   }, [myReferralCode]);
 
   // ★ SP transaction history'i yükle + modal aç
@@ -430,540 +501,439 @@ export default function ProfileScreen() {
 
   return (
     <AppBackground variant="profile" radialGlow>
-    <View style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingTop: 18, paddingBottom: Math.max(insets.bottom, 16) + 70 }}>
-
-        {/* ═══ Profil Hero Kartı (extracted) ═══ */}
-        <ProfileHero
-          displayName={displayName}
-          username={profile?.username}
-          bio={bio}
-          avatarUrl={avatarUrl}
-          subscriptionTier={subscriptionTier}
-          isAdmin={isAdmin}
-          userTitle={userTitle}
-          stats={{ friends: stats.friends, followers: stats.followers, following: stats.following, rooms: stats.rooms, badges: stats.badges }}
-          activityStats={profileStats}
-          onEdit={() => router.push('/edit-profile')}
-          onBioPress={() => setShowBioEditor(true)}
-          onFriendsPress={() => { setFollowModalTab('friends'); setFollowModalVisible(true); }}
-          onFollowersPress={() => { setFollowModalTab('followers'); setFollowModalVisible(true); }}
-          onFollowingPress={() => { setFollowModalTab('following'); setFollowModalVisible(true); }}
-          onRoomsPress={() => router.push('/(tabs)/myrooms' as any)}
-          onBadgesPress={() => setShowBadgesModal(true)}
-          onAvatarPress={() => setShowAvatarPreview(true)}
-          memberSince={profile?.created_at}
-          boostExpiresAt={(profile as any)?.profile_boost_expires_at}
-        />
-
-
-
-        {/* ═══ SP Cüzdan Kartı — premium kıymetli kart hissi ═══ */}
-        <Pressable
-          style={p.walletCard}
-          onLongPress={openSPHistory}
-          delayLongPress={400}
-          accessibilityHint="Uzun bas: SP geçmişini gör"
-        >
-          {/* Zemin: derin koyu + gold warmth 3 stop */}
+      <View style={styles.container}>
+        {/* ═══ SopranoProfil Header ═══ */}
+        <View style={[styles.headerBar, { paddingTop: insets.top }]}>
           <LinearGradient
-            colors={['#2a1e14', '#17100a', '#0a0604']}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+            colors={['rgba(48,65,94,0.92)', 'rgba(26,40,64,0.82)', 'rgba(12,22,40,0.6)']}
+            locations={[0, 0.55, 1]}
+            start={{ x: 0.5, y: 0 }}
+            end={{ x: 0.5, y: 1 }}
             style={StyleSheet.absoluteFillObject}
+            pointerEvents="none"
           />
-          {/* Altın diagonal accent — parlak taraf artırıldı */}
-          <LinearGradient
-            colors={['rgba(251,191,36,0.35)', 'rgba(251,191,36,0.12)', 'rgba(251,191,36,0.02)']}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-            style={StyleSheet.absoluteFillObject}
-          />
-          {/* Üst altın kenar highlight */}
-          <LinearGradient
-            colors={['transparent', 'rgba(251,191,36,0.6)', 'transparent']}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-            style={p.walletTopEdge}
-          />
-          {/* Watermark büyük diamond — sağ köşede soluk */}
-          <Ionicons name="diamond" size={140} color="rgba(251,191,36,0.04)" style={p.walletWatermark} />
-
-          <View style={p.walletHeader}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Ionicons name="diamond" size={14} color="#FBBF24" style={iconShadow} />
-              <Text style={p.walletTitle}>SP CÜZDANIM</Text>
-            </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              {/* ★ Görünür geçmiş butonu — uzun-bas yerine net affordance */}
-              <Pressable onPress={openSPHistory} style={p.historyBtn} hitSlop={10} accessibilityLabel="SP geçmişi">
-                <MaterialCommunityIcons name="history" size={14} color="#FBBF24" style={iconShadow} />
-              </Pressable>
-              <LinearGradient colors={[levelColors.text, levelColors.text + 'CC']} style={p.levelBadge}>
-                <Text style={p.levelText}>Lv.{userLevel}</Text>
-              </LinearGradient>
+          <View style={styles.headerContent}>
+            <AnimatedProfilLogo />
+            <View style={styles.headerRight}>
+              {/* ★ 2026-04-29: Plus üyelik animasyonlu mavi elmas — kendi shine animation'ı var */}
+              <AnimatedHeaderIconBtn index={0} style={styles.headerIconBtn} onPress={() => router.push('/plus' as any)} accessibilityLabel="Soprano Premium">
+                <PlusDiamondIcon size={40} />
+              </AnimatedHeaderIconBtn>
+              <AnimatedHeaderIconBtn index={1} style={styles.headerIconBtn} onPress={() => router.push('/leaderboard' as any)} accessibilityLabel="Liderlik Tablosu">
+                <Ionicons name="trophy-outline" size={22} color="#F1F5F9" style={iconShadow} />
+              </AnimatedHeaderIconBtn>
+              <AnimatedHeaderIconBtn index={2} style={styles.headerIconBtn} onPress={() => router.push('/settings' as any)} accessibilityLabel="Ayarlar">
+                <Ionicons name="settings-outline" size={22} color="#F1F5F9" style={iconShadow} />
+              </AnimatedHeaderIconBtn>
             </View>
           </View>
+          <LinearGradient
+            colors={['transparent', 'rgba(245,158,11,0.55)', 'rgba(245,158,11,0.55)', 'transparent']}
+            locations={[0, 0.25, 0.75, 1]}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+            style={styles.headerSeparator}
+          />
+        </View>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingTop: 14, paddingBottom: Math.max(insets.bottom, 16) + 70 }}>
 
-          <View style={p.walletBody}>
-            <View style={{ flex: 1 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
+          {/* ═══ Profil Hero Kartı (kompakt v2) ═══ */}
+          <ProfileHero
+            displayName={displayName}
+            username={profile?.username}
+            bio={bio}
+            avatarUrl={avatarUrl}
+            subscriptionTier={subscriptionTier}
+            isAdmin={isAdmin}
+            userTitle={userTitle}
+            stats={{ followers: stats.followers, rooms: stats.rooms, badges: stats.badges }}
+            onEdit={() => router.push('/edit-profile')}
+            onBioPress={() => setShowBioEditor(true)}
+            onFollowersPress={() => { setFollowModalTab('followers'); setFollowModalVisible(true); }}
+            onRoomsPress={() => router.push('/(tabs)/myrooms' as any)}
+            onBadgesPress={() => setShowBadgesModal(true)}
+            onAvatarPress={() => setShowAvatarPreview(true)}
+            memberSince={profile?.created_at}
+            boostExpiresAt={(profile as any)?.profile_boost_expires_at}
+            userLevel={userLevel}
+          />
+
+
+
+          {/* ═══ SP Cüzdan — premium altın gradient ═══ */}
+          <Pressable
+            style={p.walletCard}
+            onPress={openSPHistory}
+            accessibilityLabel="SP geçmişi"
+          >
+            <LinearGradient
+              colors={['#2A1F12', '#1e160d', '#130d07']}
+              locations={[0, 0.5, 1]}
+              start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
+              style={StyleSheet.absoluteFillObject}
+            />
+            <LinearGradient
+              colors={['rgba(251,191,36,0.28)', 'rgba(251,191,36,0.04)']}
+              start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
+              style={StyleSheet.absoluteFillObject}
+            />
+            <View style={p.walletHeader}>
+              <Text style={p.walletTitle}>SP CÜZDANIM</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Pressable onPress={openSPHistory} style={p.historyBtn} hitSlop={10} accessibilityLabel="SP geçmişi">
+                  <MaterialCommunityIcons name="history" size={13} color="#FBBF24" style={iconShadow} />
+                </Pressable>
+                <LinearGradient colors={[levelColors.text, levelColors.text + 'CC']} style={p.levelBadge}>
+                  <Text style={p.levelText}>Lv.{userLevel}</Text>
+                </LinearGradient>
+              </View>
+            </View>
+
+            {/* ★ 2026-04-29: SP ana ikonu — DiscoverWelcome'taki hexagon mücevher animasyonu (büyütüldü 56→80) */}
+            <View style={p.walletBody}>
+              <SPHexagonIcon size={80} />
+              <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
                 <Text style={p.walletAmount}>{isGM ? '∞' : spBalance.toLocaleString('tr-TR')}</Text>
                 <Text style={p.walletCurrency}>SP</Text>
               </View>
-              <Text style={p.walletSub}>{isGM ? 'Sınırsız · GodMaster' : 'Soprano Points'}</Text>
             </View>
-            {/* ★ Alfa: SP Mağaza butonu gizli — Google Play Billing ürünleri onaylanmadan
-                erişim kapalı (Play Policy 2.3.1 ihlalini önlemek için). IAP aktif olduğunda
-                bu blok geri açılacak. */}
+
+            {/* Level progress bar — kompakt */}
+            {userLevel < 99 && !isGM && (
+              <View style={p.levelProgressWrap}>
+                <View style={p.levelProgressTrack}>
+                  <LinearGradient
+                    colors={['#FFE082', '#FBBF24', '#D97706']}
+                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                    style={[p.levelProgressFill, { width: `${((spBalance % 100))}%` }]}
+                  />
+                </View>
+                <Text style={p.levelProgressHint}>
+                  Lv.{userLevel + 1}'e {100 - (spBalance % 100)} SP
+                </Text>
+              </View>
+            )}
+          </Pressable>
+
+          {/* ═══ Tüm Arkadaşlar — SP cüzdanın hemen altında ═══ */}
+          <ProfileFriendsList
+            friends={allFriends as any}
+            onFriendPress={(friendId) => openUserProfile(friendId)}
+            onShowAll={() => { setFollowModalTab('followers'); setFollowModalVisible(true); }}
+          />
+
+          {/* ═══ Tek aksiyon kartı — vertical gradient (parlak → koyu) ═══ */}
+          <View style={p.unifiedCard}>
+            <LinearGradient
+              colors={['#2D3F5F', '#1E2D4A', '#152238', '#0E1A2E']}
+              locations={[0, 0.35, 0.7, 1]}
+              start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
+              style={StyleSheet.absoluteFillObject}
+            />
+            <LinearGradient
+              colors={['rgba(20,184,166,0.12)', 'transparent']}
+              start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 0.7 }}
+              style={StyleSheet.absoluteFillObject}
+              pointerEvents="none"
+            />
+            <PremiumListItem
+              icon="gift"
+              iconColor="#A78BFA"
+              label="Davet Kodu"
+              badge="+50 SP"
+              badgeColor="#A78BFA"
+              onPress={openReferralModal}
+            />
+            <PremiumListItem
+              icon="rocket-launch"
+              iconColor="#F472B6"
+              label="Profilimi Öne Çıkar"
+              lockedForFree={!isTierAtLeast(subscriptionTier, 'Plus')}
+              onPress={() => {
+                if (isTierAtLeast(subscriptionTier, 'Plus')) {
+                  setShowBoostPicker(true);
+                } else {
+                  showToast({ title: 'Plus Üyelik Gerekli', message: 'Profili öne çıkarma Plus üyelikle açılır.', type: 'info' });
+                  setTimeout(() => router.push('/plus' as any), 800);
+                }
+              }}
+            />
+            {/* Tehlikeli aksiyonlar — ince ayırıcı sonrası */}
+            <View style={p.sectionDivider} />
+            <PremiumListItem
+              icon="logout-variant"
+              iconColor="#EF4444"
+              label="Oturumu Kapat"
+              labelColor="#EF4444"
+              onPress={handleLogout}
+            />
+            <PremiumListItem
+              icon="trash-can"
+              iconColor="#EF4444"
+              label="Hesabımı Sil"
+              labelColor="#EF4444"
+              onPress={handleGoToDeleteAccount}
+              isLast
+            />
           </View>
 
-          {/* ★ Level progress bar — sonraki level'e ne kadar kaldı */}
-          {userLevel < 99 && !isGM && (
-            <View style={p.levelProgressWrap}>
-              <View style={p.levelProgressTrack}>
-                <LinearGradient
-                  colors={['#FFE082', '#FBBF24', '#D97706']}
-                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                  style={[p.levelProgressFill, { width: `${((spBalance % 100))}%` }]}
+          {/* GodMaster Admin Paneli — admin only */}
+          {profile?.is_admin && (
+            <>
+              <View style={p.premiumSectionHeader}>
+                <View style={[p.sectionAccent, { backgroundColor: '#EF4444' }]} />
+                <Ionicons name="shield-checkmark" size={13} color="#EF4444" style={iconShadow} />
+                <Text style={[p.premiumSectionText, { color: '#F87171' }]}>SİSTEM YÖNETİMİ</Text>
+              </View>
+              <View style={[p.unifiedCard, { borderColor: 'rgba(239,68,68,0.2)' }]}>
+                <PremiumListItem
+                  icon="shield-crown"
+                  iconColor="#EF4444"
+                  label="GodMaster Panel"
+                  labelColor="#F87171"
+                  onPress={() => router.push('/admin' as any)}
+                  isLast
                 />
               </View>
-              <Text style={p.levelProgressHint}>
-                Lv.{userLevel + 1}'e {100 - (spBalance % 100)} SP
-              </Text>
-            </View>
+            </>
           )}
-        </Pressable>
 
 
+          {/* Referans Modal — iki bölümlü: kendi kodum + arkadaş kodu gir (premium) */}
+          <Modal visible={showReferral} transparent animationType="fade">
+            <Pressable style={styles.modalOverlay} onPress={() => setShowReferral(false)}>
+              <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
+                {/* Zemin — odalarım sadeliği, sadece mor aksan */}
+                <View style={StyleSheet.absoluteFillObject as any} />
+                <LinearGradient
+                  colors={['transparent', 'rgba(167,139,250,0.6)', 'transparent']}
+                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                  style={styles.modalTopEdge}
+                />
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>🎁 Davet Kodu</Text>
+                  <Pressable onPress={() => setShowReferral(false)} hitSlop={12} style={styles.modalCloseBtn}>
+                    <Ionicons name="close" size={18} color="rgba(167,139,250,0.8)" style={iconShadow} />
+                  </Pressable>
+                </View>
 
-        {/* ═══ HESAP grubu ═══ */}
-        <View style={p.premiumSectionHeader}>
-          <View style={p.sectionAccent} />
-          <Ionicons name="person-circle-outline" size={13} color={Colors.teal} style={iconShadow} />
-          <Text style={p.premiumSectionText}>HESAP</Text>
-        </View>
-        <View style={p.premiumListCard}>
-          <LinearGradient
-            colors={['rgba(48,65,94,0.85)', 'rgba(26,40,64,0.75)', 'rgba(12,22,40,0.55)']}
-            locations={[0, 0.55, 1]}
-            start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
-            style={StyleSheet.absoluteFillObject}
-          />
-          <LinearGradient
-            colors={['transparent', 'rgba(20,184,166,0.6)', 'transparent']}
-            locations={[0, 0.5, 1]}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-            style={p.cardTopEdge}
-          />
-          <PremiumListItem
-            icon="cog"
-            iconColor="#94A3B8"
-            label="Ayarlar"
-            onPress={() => router.push('/settings' as any)}
-          />
-          <PremiumListItem
-            icon="crown"
-            iconColor={subscriptionTier === 'Free' ? '#FBBF24' : '#94A3B8'}
-            label="Soprano Premium"
-            badge={subscriptionTier === 'Free' ? 'Yükselt →' : subscriptionTier}
-            badgeColor={subscriptionTier === 'Free' ? '#FBBF24' : Colors.gold}
-            onPress={() => router.push('/plus' as any)}
-            isLast
-          />
-        </View>
+                {/* Bölüm 1: Kendi kodum */}
+                <Text style={[styles.modalSubtitle, { marginTop: 4 }]}>Kendi Kodun</Text>
+                <View style={styles.myCodeRow}>
+                  <Text style={styles.myCodeText}>{myReferralCode || '—'}</Text>
+                  <Pressable
+                    style={styles.myCodeBtn}
+                    onPress={async () => {
+                      if (!myReferralCode) return;
+                      try {
+                        const Clipboard = await import('expo-clipboard');
+                        await Clipboard.setStringAsync(myReferralCode);
+                        showToast({ title: 'Kopyalandı 📋', type: 'success' });
+                      } catch {
+                        showToast({ title: 'Kopyalanamadı', type: 'error' });
+                      }
+                    }}
+                  >
+                    <Ionicons name="copy-outline" size={14} color={Colors.teal} style={iconShadow} />
+                  </Pressable>
+                  <Pressable style={[styles.myCodeBtn, { backgroundColor: Colors.teal }]} onPress={handleShareMyCode}>
+                    <Ionicons name="share-social-outline" size={14} color="#FFF" style={iconShadow} />
+                  </Pressable>
+                </View>
+                <Text style={styles.modalDesc}>Bir arkadaşın kodunu kullanırsa, ikiniz de 50 SP kazanırsınız.</Text>
 
-        {/* ═══ SOSYAL grubu ═══ */}
-        <View style={p.premiumSectionHeader}>
-          <View style={p.sectionAccent} />
-          <Ionicons name="people-outline" size={13} color={Colors.teal} style={iconShadow} />
-          <Text style={p.premiumSectionText}>SOSYAL</Text>
-        </View>
-        <View style={p.premiumListCard}>
-          <LinearGradient
-            colors={['rgba(48,65,94,0.85)', 'rgba(26,40,64,0.75)', 'rgba(12,22,40,0.55)']}
-            locations={[0, 0.55, 1]}
-            start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
-            style={StyleSheet.absoluteFillObject}
-          />
-          <LinearGradient
-            colors={['transparent', 'rgba(20,184,166,0.6)', 'transparent']}
-            locations={[0, 0.5, 1]}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-            style={p.cardTopEdge}
-          />
-          <PremiumListItem
-            icon="trophy"
-            iconColor="#94A3B8"
-            label="Liderlik Tablosu"
-            onPress={() => router.push('/leaderboard' as any)}
-          />
-          <PremiumListItem
-            icon="account-group"
-            iconColor="#94A3B8"
-            label="Kulüpler"
-            onPress={() => router.push('/clubs' as any)}
-          />
-          <PremiumListItem
-            icon="gift"
-            iconColor="#94A3B8"
-            label="Davet Kodu"
-            badge="+50 SP"
-            badgeColor="#A78BFA"
-            onPress={openReferralModal}
-            isLast
-          />
-        </View>
+                {/* Bölüm 2: Arkadaş kodu gir — zaten kullanıldıysa kilit göster */}
+                <Text style={[styles.modalSubtitle, { marginTop: 16 }]}>Arkadaş Kodu Gir</Text>
+                {usedReferral.used ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, paddingHorizontal: 14, borderRadius: 12, backgroundColor: 'rgba(20,184,166,0.1)', borderWidth: 1, borderColor: 'rgba(20,184,166,0.3)' }}>
+                    <Ionicons name="checkmark-circle" size={20} color={Colors.teal} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: Colors.teal, fontSize: 12, fontWeight: '700' }}>Davet kodu kullanıldı</Text>
+                      <Text style={{ color: Colors.text3, fontSize: 11, marginTop: 2 }}>
+                        {usedReferral.code ? `Kod: ${usedReferral.code}` : 'Bir kod zaten uygulandı'}
+                        {usedReferral.usedAt ? ` · ${new Date(usedReferral.usedAt).toLocaleDateString('tr-TR')}` : ''}
+                      </Text>
+                    </View>
+                  </View>
+                ) : (
+                  <>
+                    <TextInput
+                      style={styles.modalInput}
+                      placeholder="Örn: XHFDK9"
+                      placeholderTextColor={Colors.text3}
+                      value={referralCodeText}
+                      onChangeText={setReferralCodeText}
+                      autoCapitalize="characters"
+                      maxLength={10}
+                    />
+                    <Pressable
+                      style={[styles.modalBtn, (!referralCodeText || submittingReferral) && { opacity: 0.5 }]}
+                      onPress={handleClaimReferral}
+                      disabled={!referralCodeText || submittingReferral}
+                    >
+                      {submittingReferral ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.modalBtnText}>Kodu Kullan (+50 SP)</Text>}
+                    </Pressable>
+                  </>
+                )}
+              </Pressable>
+            </Pressable>
+          </Modal>
 
-        {/* ═══ BÜYÜME grubu ═══ */}
-        <View style={p.premiumSectionHeader}>
-          <View style={p.sectionAccent} />
-          <Ionicons name="trending-up" size={13} color={Colors.teal} style={iconShadow} />
-          <Text style={p.premiumSectionText}>BÜYÜME</Text>
-        </View>
-        <View style={p.premiumListCard}>
-          <LinearGradient
-            colors={['rgba(48,65,94,0.85)', 'rgba(26,40,64,0.75)', 'rgba(12,22,40,0.55)']}
-            locations={[0, 0.55, 1]}
-            start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
-            style={StyleSheet.absoluteFillObject}
-          />
-          <LinearGradient
-            colors={['transparent', 'rgba(20,184,166,0.6)', 'transparent']}
-            locations={[0, 0.5, 1]}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-            style={p.cardTopEdge}
-          />
-          <PremiumListItem
-            icon="rocket-launch"
-            iconColor="#94A3B8"
-            label="Profilimi Öne Çıkar"
-            lockedForFree={!isTierAtLeast(subscriptionTier, 'Plus')}
-            onPress={() => {
-              if (isTierAtLeast(subscriptionTier, 'Plus')) {
-                setShowBoostPicker(true);
-              } else {
-                showToast({ title: 'Plus Üyelik Gerekli', message: 'Profili öne çıkarma Plus üyelikle açılır. Yükselt sayfasına yönlendiriliyorsun.', type: 'info' });
-                setTimeout(() => router.push('/plus' as any), 800);
-              }
-            }}
-            isLast
-          />
-        </View>
+          {/* ★ Avatar Preview Modal — Instagram tarzı yuvarlak + tier glow */}
+          <Modal visible={showAvatarPreview} transparent animationType="fade" statusBarTranslucent>
+            <Pressable style={styles.avatarPreviewOverlay} onPress={() => setShowAvatarPreview(false)}>
+              {/* Dış parıltı halkası */}
+              <View style={[styles.avatarPreviewGlow, { borderColor: tierBorderColor, shadowColor: tierBorderColor }]}>
+                <Image
+                  source={getAvatarSource(avatarUrl)}
+                  style={styles.avatarPreviewImage}
+                  resizeMode="cover"
+                />
+              </View>
+              {/* İsim + tier rozeti */}
+              <Text style={styles.avatarPreviewName}>{displayName}</Text>
+              <View style={styles.avatarPreviewHint}>
+                <Ionicons name="close-circle" size={18} color="rgba(255,255,255,0.8)" />
+                <Text style={styles.avatarPreviewHintText}>Kapatmak için dokun</Text>
+              </View>
+            </Pressable>
+          </Modal>
 
-        {/* ═══ OTURUM grubu (destructive) ═══ */}
-        <View style={p.premiumSectionHeader}>
-          <View style={[p.sectionAccent, { backgroundColor: '#EF4444' }]} />
-          <Ionicons name="log-out-outline" size={13} color="#F87171" style={iconShadow} />
-          <Text style={[p.premiumSectionText, { color: '#FCA5A5' }]}>OTURUM</Text>
-        </View>
-        <View style={[p.premiumListCard, { borderColor: 'rgba(239,68,68,0.18)' }]}>
-          <LinearGradient
-            colors={['rgba(48,65,94,0.85)', 'rgba(26,40,64,0.75)', 'rgba(12,22,40,0.55)']}
-            locations={[0, 0.55, 1]}
-            start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
-            style={StyleSheet.absoluteFillObject}
+          {/* ★ SP Geçmişi — swipe-to-dismiss + realtime altın bottom sheet */}
+          <SPHistorySheet
+            visible={showSPHistory}
+            onClose={() => setShowSPHistory(false)}
+            balance={spBalance}
+            history={spHistory}
           />
-          <LinearGradient
-            colors={['transparent', 'rgba(239,68,68,0.4)', 'transparent']}
-            locations={[0, 0.5, 1]}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-            style={p.cardTopEdge}
+
+        </ScrollView>
+
+        {/* Boost Picker — Premium Bottom Sheet */}
+        <BoostPickerSheet
+          visible={showBoostPicker}
+          onClose={() => setShowBoostPicker(false)}
+          currentSP={spBalance}
+          onBoost={async (tier: BoostTier) => {
+            if (!profile?.id) return;
+            try {
+              await ProfileService.boostProfile(profile.id, tier.cost, tier.duration);
+              await refreshProfile();
+              showToast({
+                title: `${tier.label} Aktif! 🚀`,
+                message: `Profilin ve odaların ${tier.duration} saat boyunca Keşfet'te öne çıkacak.`,
+                type: 'success',
+              });
+            } catch (err: any) {
+              showToast({ title: 'Boost başarısız', message: err.message || 'Hata oluştu', type: 'error' });
+              throw err; // BoostPickerSheet loading state'i kapatsın
+            }
+          }}
+        />
+
+        {/* Takipçi/Takip Listesi Modal */}
+        {userId && (
+          <FollowListModal
+            visible={followModalVisible}
+            onClose={() => setFollowModalVisible(false)}
+            userId={userId}
+            currentUserId={userId}
+            initialTab={followModalTab}
+            isOwnProfile={true}
           />
-          <PremiumListItem
-            icon="logout-variant"
-            iconColor="#EF4444"
-            label="Oturumu Kapat"
-            labelColor="#EF4444"
-            onPress={handleLogout}
-          />
-          <PremiumListItem
-            icon="trash-can"
-            iconColor="#EF4444"
-            label="Hesabımı Sil"
-            labelColor="#EF4444"
-            onPress={handleGoToDeleteAccount}
-            isLast
-          />
-        </View>
-
-
-
-
-        {/* GodMaster Admin Paneli — admin only */}
-        {profile?.is_admin && (
-          <>
-            <View style={p.premiumSectionHeader}>
-              <View style={[p.sectionAccent, { backgroundColor: '#EF4444' }]} />
-              <Ionicons name="shield-checkmark" size={13} color="#EF4444" style={iconShadow} />
-              <Text style={[p.premiumSectionText, { color: '#F87171' }]}>SİSTEM YÖNETİMİ</Text>
-            </View>
-            <View style={[p.premiumListCard, { borderColor: 'rgba(239,68,68,0.25)' }]}>
-              <LinearGradient
-                colors={['rgba(48,65,94,0.85)', 'rgba(26,40,64,0.75)', 'rgba(12,22,40,0.55)']}
-                locations={[0, 0.55, 1]}
-                start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
-                style={StyleSheet.absoluteFillObject}
-              />
-              <LinearGradient
-                colors={['transparent', 'rgba(239,68,68,0.65)', 'transparent']}
-                locations={[0, 0.5, 1]}
-                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                style={p.cardTopEdge}
-              />
-              <PremiumListItem
-                icon="shield-crown"
-                iconColor="#EF4444"
-                label="GodMaster Panel"
-                labelColor="#F87171"
-                onPress={() => router.push('/admin' as any)}
-                isLast
-              />
-            </View>
-          </>
         )}
 
-        {/* ═══ Tüm Arkadaşlar (extracted) ═══ */}
-        <ProfileFriendsList
-          friends={allFriends as any}
-          onFriendPress={(friendId) => openUserProfile(friendId)}
-          onShowAll={() => { setFollowModalTab('followers'); setFollowModalVisible(true); }}
-          onFriendLongPress={(friend) => setFriendActionSheet(friend)}
-        />
+        {/* ★ Faz 6.3 — Rozet Listesi Modal */}
+        {userId && (
+          <BadgeListModal
+            visible={showBadgesModal}
+            onClose={() => setShowBadgesModal(false)}
+            userId={userId}
+            displayName={displayName}
+          />
+        )}
 
-        {/* Referans Modal — iki bölümlü: kendi kodum + arkadaş kodu gir (premium) */}
-        <Modal visible={showReferral} transparent animationType="fade">
-          <Pressable style={styles.modalOverlay} onPress={() => setShowReferral(false)}>
-            <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
-              {/* Zemin — odalarım sadeliği, sadece mor aksan */}
-              <View style={StyleSheet.absoluteFillObject as any} />
-              <LinearGradient
-                colors={['transparent', 'rgba(167,139,250,0.6)', 'transparent']}
-                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                style={styles.modalTopEdge}
-              />
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>🎁 Davet Kodu</Text>
-                <Pressable onPress={() => setShowReferral(false)} hitSlop={12} style={styles.modalCloseBtn}>
-                  <Ionicons name="close" size={18} color="rgba(167,139,250,0.8)" style={iconShadow} />
-                </Pressable>
-              </View>
+        {/* ★ SEC-DEL: Hesap silme onay modalı */}
+        <PremiumAlert {...deleteAlert} onDismiss={() => setDeleteAlert(prev => ({ ...prev, visible: false }))} />
 
-              {/* Bölüm 1: Kendi kodum */}
-              <Text style={[styles.modalSubtitle, { marginTop: 4 }]}>Kendi Kodun</Text>
-              <View style={styles.myCodeRow}>
-                <Text style={styles.myCodeText}>{myReferralCode || '—'}</Text>
-                <Pressable
-                  style={styles.myCodeBtn}
-                  onPress={async () => {
-                    if (!myReferralCode) return;
-                    try {
-                      const Clipboard = await import('expo-clipboard');
-                      await Clipboard.setStringAsync(myReferralCode);
-                      showToast({ title: 'Kopyalandı 📋', type: 'success' });
-                    } catch {
-                      showToast({ title: 'Kopyalanamadı', type: 'error' });
-                    }
-                  }}
-                >
-                  <Ionicons name="copy-outline" size={14} color={Colors.teal} style={iconShadow} />
-                </Pressable>
-                <Pressable style={[styles.myCodeBtn, { backgroundColor: Colors.teal }]} onPress={handleShareMyCode}>
-                  <Ionicons name="share-social-outline" size={14} color="#FFF" style={iconShadow} />
-                </Pressable>
-              </View>
-              <Text style={styles.modalDesc}>Bir arkadaşın kodunu kullanırsa, ikiniz de 50 SP kazanırsınız.</Text>
-
-              {/* Bölüm 2: Arkadaş kodu gir — zaten kullanıldıysa kilit göster */}
-              <Text style={[styles.modalSubtitle, { marginTop: 16 }]}>Arkadaş Kodu Gir</Text>
-              {usedReferral.used ? (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, paddingHorizontal: 14, borderRadius: 12, backgroundColor: 'rgba(20,184,166,0.1)', borderWidth: 1, borderColor: 'rgba(20,184,166,0.3)' }}>
-                  <Ionicons name="checkmark-circle" size={20} color={Colors.teal} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ color: Colors.teal, fontSize: 12, fontWeight: '700' }}>Davet kodu kullanıldı</Text>
-                    <Text style={{ color: Colors.text3, fontSize: 11, marginTop: 2 }}>
-                      {usedReferral.code ? `Kod: ${usedReferral.code}` : 'Bir kod zaten uygulandı'}
-                      {usedReferral.usedAt ? ` · ${new Date(usedReferral.usedAt).toLocaleDateString('tr-TR')}` : ''}
-                    </Text>
-                  </View>
-                </View>
-              ) : (
-                <>
-                  <TextInput
-                    style={styles.modalInput}
-                    placeholder="Örn: XHFDK9"
-                    placeholderTextColor={Colors.text3}
-                    value={referralCodeText}
-                    onChangeText={setReferralCodeText}
-                    autoCapitalize="characters"
-                    maxLength={10}
-                  />
-                  <Pressable
-                    style={[styles.modalBtn, (!referralCodeText || submittingReferral) && { opacity: 0.5 }]}
-                    onPress={handleClaimReferral}
-                    disabled={!referralCodeText || submittingReferral}
-                  >
-                    {submittingReferral ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.modalBtnText}>Kodu Kullan (+50 SP)</Text>}
-                  </Pressable>
-                </>
-              )}
-            </Pressable>
-          </Pressable>
-        </Modal>
-
-        {/* ★ Avatar Preview Modal — Instagram tarzı yuvarlak + tier glow */}
-        <Modal visible={showAvatarPreview} transparent animationType="fade" statusBarTranslucent>
-          <Pressable style={styles.avatarPreviewOverlay} onPress={() => setShowAvatarPreview(false)}>
-            {/* Dış parıltı halkası */}
-            <View style={[styles.avatarPreviewGlow, { borderColor: tierBorderColor, shadowColor: tierBorderColor }]}>
-              <Image
-                source={getAvatarSource(avatarUrl)}
-                style={styles.avatarPreviewImage}
-                resizeMode="cover"
-              />
-            </View>
-            {/* İsim + tier rozeti */}
-            <Text style={styles.avatarPreviewName}>{displayName}</Text>
-            <View style={styles.avatarPreviewHint}>
-              <Ionicons name="close-circle" size={18} color="rgba(255,255,255,0.8)" />
-              <Text style={styles.avatarPreviewHintText}>Kapatmak için dokun</Text>
-            </View>
-          </Pressable>
-        </Modal>
-
-        {/* ★ SP Geçmişi — swipe-to-dismiss + realtime altın bottom sheet */}
-        <SPHistorySheet
-          visible={showSPHistory}
-          onClose={() => setShowSPHistory(false)}
-          balance={spBalance}
-          history={spHistory}
-        />
-
-      </ScrollView>
-
-      {/* Boost Picker — Premium Bottom Sheet */}
-      <BoostPickerSheet
-        visible={showBoostPicker}
-        onClose={() => setShowBoostPicker(false)}
-        currentSP={spBalance}
-        onBoost={async (tier: BoostTier) => {
-          if (!profile?.id) return;
-          try {
-            await ProfileService.boostProfile(profile.id, tier.cost, tier.duration);
-            await refreshProfile();
-            showToast({
-              title: `${tier.label} Aktif! 🚀`,
-              message: `Profilin ve odaların ${tier.duration} saat boyunca Keşfet'te öne çıkacak.`,
-              type: 'success',
-            });
-          } catch (err: any) {
-            showToast({ title: 'Boost başarısız', message: err.message || 'Hata oluştu', type: 'error' });
-            throw err; // BoostPickerSheet loading state'i kapatsın
-          }
-        }}
-      />
-
-      {/* Takipçi/Takip Listesi Modal */}
-      {userId && (
-        <FollowListModal
-          visible={followModalVisible}
-          onClose={() => setFollowModalVisible(false)}
-          userId={userId}
-          currentUserId={userId}
-          initialTab={followModalTab}
-          isOwnProfile={true}
-        />
-      )}
-
-      {/* ★ Faz 6.3 — Rozet Listesi Modal */}
-      {userId && (
-        <BadgeListModal
-          visible={showBadgesModal}
-          onClose={() => setShowBadgesModal(false)}
-          userId={userId}
-          displayName={displayName}
-        />
-      )}
-
-      {/* ★ SEC-DEL: Hesap silme onay modalı */}
-      <PremiumAlert {...deleteAlert} onDismiss={() => setDeleteAlert(prev => ({ ...prev, visible: false }))} />
-
-      {/* ★ 2026-04-24: Arkadaş aksiyonları bottom sheet (modern, sürüklenebilir) */}
-      <ConversationActionSheet
-        visible={!!friendActionSheet}
-        partnerName={friendActionSheet?.display_name || ''}
-        partnerAvatar={friendActionSheet?.avatar_url}
-        partnerOnline={friendActionSheet?.is_online}
-        onClose={() => setFriendActionSheet(null)}
-        actions={friendActionSheet ? [
-          {
-            id: 'view',
-            label: 'Profili Görüntüle',
-            icon: 'person-outline',
-            style: 'primary',
-            onPress: () => openUserProfile(friendActionSheet.id),
-          },
-          {
-            id: 'message',
-            label: 'Mesaj Gönder',
-            icon: 'chatbubble-outline',
-            onPress: () => router.push(`/chat/${friendActionSheet.id}` as any),
-          },
-          {
-            id: 'remove',
-            label: 'Arkadaşlıktan Çıkar',
-            icon: 'person-remove-outline',
-            style: 'destructive',
-            onPress: () => {
-              if (!firebaseUser || !friendActionSheet) return;
-              const target = friendActionSheet;
-              setDeleteAlert({
-                visible: true,
-                title: 'Arkadaşlıktan Çıkar',
-                message: `${target.display_name} artık arkadaş listenden kaldırılacak.`,
-                type: 'warning',
-                buttons: [
-                  { text: 'İptal', style: 'cancel' },
-                  {
-                    text: 'Çıkar',
-                    style: 'destructive',
-                    onPress: async () => {
-                      try {
-                        const res = await FriendshipService.removeFriend(firebaseUser.uid, target.id);
-                        if (res?.success) {
-                          showToast({ title: '👋 Arkadaş Kaldırıldı', message: `${target.display_name} listenden çıkarıldı.`, type: 'info' });
-                          try { (global as any).__sopranoBadgeRefresh?.(); } catch {}
-                        } else {
-                          showToast({ title: 'Kaldırılamadı', message: res?.error || 'Arkadaş listesinden çıkarılamadı.', type: 'error' });
-                        }
-                      } catch (e: any) {
-                        showToast({ title: 'Kaldırılamadı', message: e?.message || 'Bir sorun oluştu.', type: 'error' });
-                      }
-                    },
-                  },
-                ],
-              });
+        {/* ★ 2026-04-24: Arkadaş aksiyonları bottom sheet (modern, sürüklenebilir) */}
+        <ConversationActionSheet
+          visible={!!friendActionSheet}
+          partnerName={friendActionSheet?.display_name || ''}
+          partnerAvatar={friendActionSheet?.avatar_url}
+          partnerOnline={friendActionSheet?.is_online}
+          onClose={() => setFriendActionSheet(null)}
+          actions={friendActionSheet ? [
+            {
+              id: 'view',
+              label: 'Profili Görüntüle',
+              icon: 'person-outline',
+              style: 'primary',
+              onPress: () => openUserProfile(friendActionSheet.id),
             },
-          },
-        ] : []}
-      />
-      {/* ★ 2026-04-21: Bio inline editor — edit-profile sayfasına gitmeden hızlı düzenleme */}
-      <BioEditorSheet
-        visible={showBioEditor}
-        initialBio={bio || ''}
-        onClose={() => setShowBioEditor(false)}
-        onSave={async (newBio) => {
-          if (!userId) return;
-          try {
-            await supabase.from('profiles').update({ bio: newBio }).eq('id', userId);
-            await refreshProfile();
-            showToast({ title: 'Bio güncellendi', type: 'success' });
-          } catch (err: any) {
-            showToast({ title: 'Güncellenemedi', message: err?.message || 'Tekrar dene.', type: 'error' });
-            throw err;
-          }
-        }}
-      />
-      {/* ★ 2026-04-21: Tab bar scroll fade — tüm tab sayfalarında tutarlı */}
-      <TabBarFadeOut />
-    </View>
+            {
+              id: 'message',
+              label: 'Mesaj Gönder',
+              icon: 'chatbubble-outline',
+              onPress: () => router.push(`/chat/${friendActionSheet.id}` as any),
+            },
+            {
+              id: 'remove',
+              label: 'Arkadaşlıktan Çıkar',
+              icon: 'person-remove-outline',
+              style: 'destructive',
+              onPress: () => {
+                if (!firebaseUser || !friendActionSheet) return;
+                const target = friendActionSheet;
+                setDeleteAlert({
+                  visible: true,
+                  title: 'Arkadaşlıktan Çıkar',
+                  message: `${target.display_name} artık arkadaş listenden kaldırılacak.`,
+                  type: 'warning',
+                  buttons: [
+                    { text: 'İptal', style: 'cancel' },
+                    {
+                      text: 'Çıkar',
+                      style: 'destructive',
+                      onPress: async () => {
+                        try {
+                          const res = await FriendshipService.removeFriend(firebaseUser.uid, target.id);
+                          if (res?.success) {
+                            showToast({ title: '👋 Arkadaş Kaldırıldı', message: `${target.display_name} listenden çıkarıldı.`, type: 'info' });
+                            try { (global as any).__sopranoBadgeRefresh?.(); } catch { }
+                          } else {
+                            showToast({ title: 'Kaldırılamadı', message: res?.error || 'Arkadaş listesinden çıkarılamadı.', type: 'error' });
+                          }
+                        } catch (e: any) {
+                          showToast({ title: 'Kaldırılamadı', message: e?.message || 'Bir sorun oluştu.', type: 'error' });
+                        }
+                      },
+                    },
+                  ],
+                });
+              },
+            },
+          ] : []}
+        />
+        {/* ★ 2026-04-21: Bio inline editor — edit-profile sayfasına gitmeden hızlı düzenleme */}
+        <BioEditorSheet
+          visible={showBioEditor}
+          initialBio={bio || ''}
+          onClose={() => setShowBioEditor(false)}
+          onSave={async (newBio) => {
+            if (!userId) return;
+            try {
+              await supabase.from('profiles').update({ bio: newBio }).eq('id', userId);
+              await refreshProfile();
+              showToast({ title: 'Bio güncellendi', type: 'success' });
+            } catch (err: any) {
+              showToast({ title: 'Güncellenemedi', message: err?.message || 'Tekrar dene.', type: 'error' });
+              throw err;
+            }
+          }}
+        />
+        {/* ★ 2026-04-21: Tab bar scroll fade — tüm tab sayfalarında tutarlı */}
+        <TabBarFadeOut />
+      </View>
     </AppBackground>
   );
 }
@@ -987,7 +957,7 @@ const p = StyleSheet.create({
     fontSize: 11, fontWeight: '800', color: '#94A3B8',
     letterSpacing: 1, ..._textGlow,
   },
-  // ★ List card — diagonal gradient (parlak üst-sol → koyu alt-sağ)
+  // ★ List card — diagonal gradient (parlak üst-sol → koyu alt-sağ) — legacy, admin panelinde kullanılıyor
   premiumListCard: {
     marginHorizontal: 16, marginBottom: 10,
     borderRadius: 16,
@@ -998,16 +968,37 @@ const p = StyleSheet.create({
   cardTopEdge: {
     position: 'absolute', top: 0, left: 0, right: 0, height: 1,
   },
+  // ★ 2026-04-29: Unified kart — tek sade kart, flat transparan zemin
+  // ★ 2026-04-29: Premium gradient + teal hairline + derin shadow
+  unifiedCard: {
+    marginHorizontal: 16, marginBottom: 10,
+    borderRadius: 14,
+    borderWidth: 1, borderColor: 'rgba(20,184,166,0.22)',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  // ★ 2026-04-29: Section divider — tehlikeli aksiyonlar üstünde ince ayırıcı
+  sectionDivider: {
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    marginHorizontal: 14,
+    marginVertical: 4,
+  },
+  // ★ Premium altın gradient + amber hairline + derin shadow
   walletCard: {
     marginHorizontal: 16, marginBottom: 10,
-    borderRadius: 16, overflow: 'hidden',
-    borderWidth: 1.5, borderColor: 'rgba(251,191,36,0.3)',
-    padding: 14,
+    borderRadius: 14, overflow: 'hidden',
+    borderWidth: 1, borderColor: 'rgba(251,191,36,0.25)',
+    padding: 12,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.5,
-    shadowRadius: 12,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
   walletTopEdge: {
     position: 'absolute', top: 0, left: 0, right: 0, height: 1.5,
@@ -1019,7 +1010,7 @@ const p = StyleSheet.create({
   },
   walletHeader: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 6,
   },
   walletTitle: {
     fontSize: 10, fontWeight: '900', color: '#FBBF24',
@@ -1037,12 +1028,14 @@ const p = StyleSheet.create({
     shadowOpacity: 0.4, shadowRadius: 4, elevation: 3,
   },
   levelText: { fontSize: 11, fontWeight: '900', color: '#fff', letterSpacing: 0.3, ..._textGlow },
+  // ★ 2026-04-29: Sol tarafta SPHexagonIcon (mücevher) + sağ tarafta rakam
   walletBody: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end',
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    marginTop: 2, marginBottom: 4,
   },
   walletAmount: {
     fontSize: 28, fontWeight: '900', color: '#FFD700',
-    letterSpacing: -0.7,
+    letterSpacing: -0.5,
     textShadowColor: 'rgba(0,0,0,0.7)',
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 6,
@@ -1075,8 +1068,8 @@ const p = StyleSheet.create({
     fontSize: 12, fontWeight: '900', color: '#FFF', letterSpacing: 0.3,
     textShadowColor: 'rgba(0,0,0,0.45)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
-  // ★ Level progress bar
-  levelProgressWrap: { marginTop: 10 },
+  // ★ Level progress bar — kompakt
+  levelProgressWrap: { marginTop: 8 },
   levelProgressTrack: {
     height: 4, borderRadius: 2,
     backgroundColor: 'rgba(255,255,255,0.08)',
@@ -1098,6 +1091,40 @@ const p = StyleSheet.create({
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: 'transparent' },
+  // ★ 2026-04-29: Header ölçüleri diğer tab sayfalarıyla (home/myrooms/messages) eşitlendi.
+  headerBar: {
+    position: 'relative',
+    marginBottom: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.22,
+    shadowRadius: 12,
+    elevation: 8,
+    zIndex: 10,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingBottom: 4,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  headerIconBtn: {
+    width: 44, height: 44,
+    alignItems: 'center', justifyContent: 'center',
+    overflow: 'visible',
+  },
+  headerSeparator: {
+    height: 1.5,
+    width: '100%',
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+  },
   listContainer: {
     marginHorizontal: 16, marginBottom: 10,
     backgroundColor: '#414e5f',

@@ -1,8 +1,12 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, Animated, Easing, Image } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getAvatarSource } from '../../constants/avatars';
 import StatusAvatar from '../StatusAvatar';
+import ConnectionQualityIndicator from './ConnectionQualityIndicator';
+import { showToast } from '../Toast';
 
 interface Props {
   roomName: string;
@@ -10,6 +14,8 @@ interface Props {
   isPremium?: boolean;
   viewerCount: number;
   connectionState: string;
+  /** ★ 2026-04-25: LiveKit local connection quality */
+  connectionQuality?: 'excellent' | 'good' | 'poor' | 'unknown';
   roomDuration: string;
   roomExpiry?: string;
   isFollowing?: boolean;
@@ -35,10 +41,12 @@ interface Props {
   notifBadgeCount?: number;
   /** Zil drawer'ı açık mı — açıkken ikon teal renklenir */
   isBellActive?: boolean;
+  /** ★ 2026-04-24: Viewer pill tıklandığında dinleyiciler modalını aç */
+  onViewersPress?: () => void;
 }
 
 // Kalp atışı (Heartbeat) göstergesi
-function ConnectionHeartbeat({ state, viewerCount }: { state: string, viewerCount: number }) {
+function ConnectionHeartbeat({ state, viewerCount, onPress }: { state: string, viewerCount: number, onPress?: () => void }) {
   const pulseAnim = useRef(new Animated.Value(1)).current;
   // ★ 2026-04-20: Mount sırasında 'disconnected' ise bile ilk 2sn yeşil varsay —
   // minimize-restore veya kısa bağlantı geçişlerinde kırmızı flash'ı önle.
@@ -84,42 +92,76 @@ function ConnectionHeartbeat({ state, viewerCount }: { state: string, viewerCoun
   const isOk = displayState === 'connected';
   const dotColor = isOk ? '#22C55E' : (displayState === 'reconnecting' ? '#FBBF24' : '#EF4444');
 
-  return (
-    <View style={s.viewerPill}>
+  const content = (
+    <>
       <Animated.View style={[s.liveDot, { backgroundColor: dotColor, transform: [{ scale: pulseAnim }] }]} />
+      <Ionicons name="people" size={12} color="#14B8A6" style={s.iconShadow} />
       <Text style={s.viewerText}>{viewerCount}</Text>
-    </View>
+    </>
   );
+  if (onPress) {
+    return (
+      <Pressable style={s.viewerPill} onPress={onPress} hitSlop={8} accessibilityRole="button" accessibilityLabel="Dinleyicileri göster">
+        {content}
+      </Pressable>
+    );
+  }
+  return <View style={s.viewerPill}>{content}</View>;
 }
 
 export default function RoomInfoHeader({
   roomName, roomDescription, isPremium, viewerCount,
-  connectionState, roomDuration, roomExpiry,
+  connectionState, connectionQuality, roomDuration, roomExpiry,
   isFollowing, onBack, onMinimize, onToggleFollow,
   roomLanguage, ageRestricted, entryFeeSp, isLocked, followersOnly,
   donationsEnabled, speakingMode, roomType,
   hostAvatarUrl, hostTier, roomRules, followerCount,
   onBellPress, notifBadgeCount, isBellActive,
+  onViewersPress,
 }: Props) {
   const langFlags: Record<string, string> = { tr: '🇹🇷', en: '🇬🇧', de: '🇩🇪', ar: '🇸🇦' };
   const [showRules, setShowRules] = useState(false);
+  const insets = useSafeAreaInsets();
 
-  // Gösterilecek badge'ler — sadece önemli olanlar
-  const badges: { icon?: string; text?: string; emoji?: string; color: string; bg: string; border: string }[] = [];
-  if (ageRestricted) badges.push({ text: '+18', color: '#EF4444', bg: 'rgba(239,68,68,0.15)', border: 'rgba(239,68,68,0.3)' });
-  if (roomType === 'closed') badges.push({ icon: 'lock-closed', text: 'Şifreli', color: '#F59E0B', bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.25)' });
-  if (roomType === 'invite') badges.push({ icon: 'mail', text: 'Davetli', color: '#8B5CF6', bg: 'rgba(139,92,246,0.12)', border: 'rgba(139,92,246,0.25)' });
-  if (isLocked) badges.push({ icon: 'lock-closed', color: '#F59E0B', bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.25)' });
-  if ((entryFeeSp ?? 0) > 0) badges.push({ text: `${entryFeeSp} SP`, color: '#D4AF37', bg: 'rgba(212,175,55,0.12)', border: 'rgba(212,175,55,0.25)' });
-  if (followersOnly) badges.push({ icon: 'people', color: '#A78BFA', bg: 'rgba(139,92,246,0.12)', border: 'rgba(139,92,246,0.25)' });
-  if (roomLanguage && roomLanguage !== 'tr') badges.push({ emoji: langFlags[roomLanguage] || roomLanguage, color: '#3B82F6', bg: 'rgba(59,130,246,0.12)', border: 'rgba(59,130,246,0.25)' });
-  // ★ 2026-04-20: 3 mod için ayrı badge — kullanıcı oda kurallarını anında görsün
-  if (speakingMode === 'free_for_all') badges.push({ icon: 'chatbubbles', text: 'Serbest', color: '#22C55E', bg: 'rgba(34,197,94,0.12)', border: 'rgba(34,197,94,0.25)' });
-  if (speakingMode === 'permission_only') badges.push({ icon: 'hand-left', text: 'İzinli', color: '#F59E0B', bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.25)' });
-  if (speakingMode === 'selected_only') badges.push({ icon: 'shield-checkmark', text: 'Seçilmiş', color: '#A78BFA', bg: 'rgba(167,139,250,0.12)', border: 'rgba(167,139,250,0.3)' });
+  // ★ 2026-04-26: Header kompakt — yazılar kaldırıldı, sadece ikonlar (header kalabalıklığı çözüldü).
+  //   Sadece KRİTİK olanlar (yaş, ücret, dil) yazıyla görünür; oda tipi + konuşma modu sadece ikon olarak.
+  //   Default mod (free_for_all) icon dahi göstermez — gereksiz görsel yük.
+  // ★ 2026-04-27: Badge'ler bilgilendirici — tıklanınca toast ile detay açıklar.
+  const badges: { icon?: string; text?: string; emoji?: string; color: string; bg: string; border: string; info?: { title: string; message: string } }[] = [];
+  if (ageRestricted) badges.push({ text: '+18', color: '#EF4444', bg: 'rgba(239,68,68,0.15)', border: 'rgba(239,68,68,0.3)', info: { title: '🔞 Yaş Sınırı', message: 'Bu odaya yalnızca 18 yaş üzeri kullanıcılar girebilir.' } });
+  if (roomType === 'closed') badges.push({ icon: 'lock-closed', color: '#F59E0B', bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.25)', info: { title: '🔒 Şifreli Oda', message: 'Bu odaya girmek için şifre bilmek gerekir.' } });
+  if (roomType === 'invite') badges.push({ icon: 'mail', color: '#8B5CF6', bg: 'rgba(139,92,246,0.12)', border: 'rgba(139,92,246,0.25)', info: { title: '📨 Davetli Oda', message: 'Bu odaya yalnızca oda sahibinin davet ettikleri girebilir.' } });
+  if (isLocked) badges.push({ icon: 'lock-closed', color: '#F59E0B', bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.25)', info: { title: '🔒 Oda Kilitli', message: 'Oda sahibi yeni katılımcı kabulünü geçici olarak durdurdu.' } });
+  if ((entryFeeSp ?? 0) > 0) badges.push({ text: `${entryFeeSp} SP`, color: '#D4AF37', bg: 'rgba(212,175,55,0.12)', border: 'rgba(212,175,55,0.25)', info: { title: `💰 ${entryFeeSp} SP Giriş Ücreti`, message: `Bu odaya girmek için ${entryFeeSp} SP harcanır.` } });
+  if (followersOnly) badges.push({ icon: 'people', color: '#A78BFA', bg: 'rgba(139,92,246,0.12)', border: 'rgba(139,92,246,0.25)', info: { title: '👥 Arkadaşlara Özel', message: 'Bu oda yalnızca oda sahibinin arkadaşlarına açık.' } });
+  if (roomLanguage && roomLanguage !== 'tr') {
+    const _langLabels: Record<string, string> = { en: 'English', de: 'Deutsch', ar: 'العربية', fr: 'Français', es: 'Español', it: 'Italiano', ru: 'Русский', pt: 'Português', ja: '日本語' };
+    const _label = _langLabels[roomLanguage] || roomLanguage.toUpperCase();
+    badges.push({ emoji: langFlags[roomLanguage] || roomLanguage, color: '#3B82F6', bg: 'rgba(59,130,246,0.12)', border: 'rgba(59,130,246,0.25)', info: { title: `${langFlags[roomLanguage] || ''} ${_label}`, message: `Bu odada ${_label} konuşuluyor.` } });
+  }
+  // Konuşma modu — sadece varsayılandan farklıysa göster, sadece ikon
+  if (speakingMode === 'permission_only') badges.push({ icon: 'hand-left', color: '#F59E0B', bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.25)' });
+  if (speakingMode === 'selected_only') badges.push({ icon: 'shield-checkmark', color: '#A78BFA', bg: 'rgba(167,139,250,0.12)', border: 'rgba(167,139,250,0.3)' });
 
   return (
-    <View style={s.wrap}>
+    <View style={[s.wrap, { paddingTop: insets.top + 2 }]}>
+      {/* ★ 2026-04-24: Banner bombe gradient + teal separator (ana sayfa ile tutarlı).
+          Gradient absoluteFill sayesinde safe-area top'ı da kapsar — notch/status bar altında şeffaf boşluk kalmaz. */}
+      <LinearGradient
+        colors={['rgba(48,65,94,0.92)', 'rgba(26,40,64,0.82)', 'rgba(12,22,40,0.6)']}
+        locations={[0, 0.55, 1]}
+        start={{ x: 0.5, y: 0 }}
+        end={{ x: 0.5, y: 1 }}
+        style={StyleSheet.absoluteFillObject}
+        pointerEvents="none"
+      />
+      <LinearGradient
+        colors={['transparent', 'rgba(20,184,166,0.55)', 'rgba(20,184,166,0.55)', 'transparent']}
+        locations={[0, 0.25, 0.75, 1]}
+        start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+        style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 1.5 }}
+        pointerEvents="none"
+      />
       {/* Satır 1 — Avatar + Süre + Oda İsmi + Aksiyonlar */}
       <View style={s.topNav}>
         <View style={s.topLeft}>
@@ -157,7 +199,11 @@ export default function RoomInfoHeader({
         </View>
 
         <View style={s.topActions}>
-          <ConnectionHeartbeat state={connectionState} viewerCount={viewerCount} />
+          <ConnectionHeartbeat state={connectionState} viewerCount={viewerCount} onPress={onViewersPress} />
+          {/* ★ 2026-04-25: Bağlantı kalitesi (LiveKit) — sadece bağlıyken göster */}
+          {connectionState === 'connected' && (
+            <ConnectionQualityIndicator quality={connectionQuality || 'unknown'} size={12} />
+          )}
           {/* ★ 2026-04-19: Kurallar VEYA açıklama varsa info butonu göster */}
           {(roomRules || roomDescription) ? (
             <Pressable style={s.actionBtn} onPress={() => setShowRules(!showRules)} hitSlop={6}>
@@ -190,25 +236,41 @@ export default function RoomInfoHeader({
               )}
             </Pressable>
           )}
-          <Pressable style={s.actionBtn} onPress={onMinimize}>
-            <Ionicons name="chevron-down-outline" size={18} color="#E2E8F0" style={s.iconShadow} />
-          </Pressable>
-          <Pressable style={s.actionBtn} onPress={onBack}>
-            <Ionicons name="close" size={18} color="#E2E8F0" style={s.iconShadow} />
+          {/* ★ 2026-04-24: X (kapatma) kaldırıldı, minimize butonu yerine alındı ve büyütüldü */}
+          <Pressable style={s.actionBtnLarge} onPress={onMinimize} hitSlop={8}>
+            <Ionicons name="chevron-down-outline" size={24} color="#E2E8F0" style={s.iconShadow} />
           </Pressable>
         </View>
       </View>
 
       {/* Satır 2 — Özellik Badge'leri (süre buradan kaldırıldı) */}
+      {/* ★ 2026-04-27: Badge'ler bilgilendirici — tıklanınca kullanıcıya detay toast'u gösterir.
+          Dil bayrağı için özellikle önemli: kullanıcı oda dilini anlasın. */}
       {badges.length > 0 && (
         <View style={s.badgeRow}>
-          {badges.map((b, i) => (
-            <View key={i} style={[s.tagBadge, { backgroundColor: b.bg, borderColor: b.border }]}>
-              {b.emoji ? <Text style={{ fontSize: 10 }}>{b.emoji}</Text> : null}
-              {b.icon ? <Ionicons name={b.icon as any} size={8} color={b.color} /> : null}
-              {b.text ? <Text style={{ fontSize: 8, fontWeight: '700', color: b.color }}>{b.text}</Text> : null}
-            </View>
-          ))}
+          {badges.map((b, i) => {
+            const content = (
+              <>
+                {b.emoji ? <Text style={{ fontSize: 10 }}>{b.emoji}</Text> : null}
+                {b.icon ? <Ionicons name={b.icon as any} size={8} color={b.color} /> : null}
+                {b.text ? <Text style={{ fontSize: 8, fontWeight: '700', color: b.color }}>{b.text}</Text> : null}
+              </>
+            );
+            return b.info ? (
+              <Pressable
+                key={i}
+                style={[s.tagBadge, { backgroundColor: b.bg, borderColor: b.border }]}
+                onPress={() => showToast({ title: b.info!.title, message: b.info!.message, type: 'info', duration: 3500 })}
+                hitSlop={6}
+              >
+                {content}
+              </Pressable>
+            ) : (
+              <View key={i} style={[s.tagBadge, { backgroundColor: b.bg, borderColor: b.border }]}>
+                {content}
+              </View>
+            );
+          })}
         </View>
       )}
 
@@ -240,13 +302,18 @@ export default function RoomInfoHeader({
 const s = StyleSheet.create({
   wrap: {
     paddingHorizontal: 16,
-    paddingBottom: 2, // Boşluk azaltıldı
+    paddingBottom: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.22,
+    shadowRadius: 12,
+    elevation: 8,
   },
   topNav: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 4, // Boşluk azaltıldı
+    marginBottom: 2,
   },
   topLeft: {
     flex: 1,
@@ -345,7 +412,8 @@ const s = StyleSheet.create({
   topActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 4,
+    flexShrink: 0,
   },
   viewerPill: {
     flexDirection: 'row',
@@ -371,6 +439,12 @@ const s = StyleSheet.create({
   actionBtn: {
     width: 28,
     height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionBtnLarge: {
+    width: 38,
+    height: 38,
     alignItems: 'center',
     justifyContent: 'center',
   },

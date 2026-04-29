@@ -13,7 +13,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { getAvatarSource } from '../../constants/avatars';
 import { getFrameLottieSource, getFrameScale } from '../../constants/frames';
 import { COLORS } from './constants';
-import LottieView from 'lottie-react-native';
+// ★ 2026-04-25: lottie-react-native opsiyonel (Sentry kaldırılırken birlikte gitti).
+//   Yoksa frame animasyonu sessizce atla.
+let LottieView: any = null;
+try {
+  LottieView = require('lottie-react-native').default;
+} catch { /* native module yoksa fallback null */ }
 
 // VideoView — @livekit/react-native native modülü varsa gerçek VideoView kullan
 let VideoView: any;
@@ -63,7 +68,9 @@ const SeatCard = React.memo(function SeatCard({
   const isVideoMode = Boolean(cameraOn);
   const currentWidth = customWidth || size;
   const currentHeight = customHeight || ((isVideoMode && isLargeVideo) ? size * 1.4 : size);
-  const currentRadius = (customWidth || (isVideoMode && isLargeVideo)) ? 14 : size / 2;
+  // ★ 2026-04-26: Clubhouse pattern — sahnedekiler squircle (yuvarlak kare), frame'liler daire kalır.
+  //   Video/large modunda zaten 14px squircle. Normal modda size * 0.28 → Clubhouse iOS app icon hissi.
+  const currentRadius = (customWidth || (isVideoMode && isLargeVideo)) ? 14 : Math.round(size * 0.28);
 
   // ★ Lottie çerçeve
   const frameSrc = getFrameLottieSource(activeFrame);
@@ -120,7 +127,9 @@ const SeatCard = React.memo(function SeatCard({
             }}
             pointerEvents="none"
           >
-            <LottieView source={frameSrc} autoPlay loop style={{ width: '100%', height: '100%' }} />
+            {LottieView ? (
+              <LottieView source={frameSrc} autoPlay loop style={{ width: '100%', height: '100%' }} />
+            ) : null}
           </View>
         )}
 

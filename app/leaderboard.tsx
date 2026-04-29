@@ -25,6 +25,7 @@ import { getAvatarSource, getLevelFromSP, getTierBadgeInfo } from '../constants/
 import StatusAvatar from '../components/StatusAvatar';
 import { Colors } from '../constants/theme';
 import AppBackground from '../components/AppBackground';
+import { useUserProfileSheet } from './_layout';
 
 const { width: W } = Dimensions.get('window');
 
@@ -74,7 +75,7 @@ const MEDAL_COLORS = {
 // PODIUM — İlk 3 büyük kartlar
 // ═══════════════════════════════════════════════════════════
 function PodiumCard({ entry, rank, label }: { entry: LeaderEntry; rank: 1 | 2 | 3; label: string }) {
-  const router = useRouter();
+  const { openUserProfile } = useUserProfileSheet();
   const medal = MEDAL_COLORS[rank];
   const scaleAnim = useRef(new Animated.Value(0.85)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
@@ -102,7 +103,7 @@ function PodiumCard({ entry, rank, label }: { entry: LeaderEntry; rank: 1 | 2 | 
         style={({ pressed }) => [pS.card, pressed && { opacity: 0.85, transform: [{ scale: 0.97 }] },
           { shadowColor: medal.bg[0], shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.5, shadowRadius: 16, elevation: 10,
             borderColor: medal.bg[0] + '40' }]}
-        onPress={() => router.push(`/user/${entry.user_id}` as any)}
+        onPress={() => openUserProfile(entry.user_id)}
       >
         {/* Katman 1: derin koyu zemin */}
         <LinearGradient
@@ -198,7 +199,7 @@ const pS = StyleSheet.create({
 // LIST ITEM — 4-10 sıra
 // ═══════════════════════════════════════════════════════════
 function LeaderListItem({ entry, rank, label }: { entry: LeaderEntry; rank: number; label: string }) {
-  const router = useRouter();
+  const { openUserProfile } = useUserProfileSheet();
   const enterAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -212,7 +213,7 @@ function LeaderListItem({ entry, rank, label }: { entry: LeaderEntry; rank: numb
       <Pressable
         style={({ pressed }) => [liS.card, pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] },
           { borderColor: rankColor + '30' }]}
-        onPress={() => router.push(`/user/${entry.user_id}` as any)}
+        onPress={() => openUserProfile(entry.user_id)}
       >
         {/* 3 katman: deep dark + rank warmth + top edge */}
         <LinearGradient
@@ -508,7 +509,12 @@ export default function LeaderboardScreen() {
       if (t) clearTimeout(t);
       t = setTimeout(() => loadData(), 3000);
     };
-    const channelName = `leaderboard_rt_${Date.now()}`;
+    // ★ Audit fix: statik kanal adı + purge — Date.now() leak'iydi
+    const channelName = 'leaderboard_rt';
+    try {
+      const { purgeChannelByName } = require('../services/realtime');
+      purgeChannelByName(channelName);
+    } catch {}
     const ch = supabase
       .channel(channelName)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'sp_transactions' }, schedule)
@@ -523,7 +529,7 @@ export default function LeaderboardScreen() {
 
   // ─── RENDER ────────────────────────────────────────────
   return (
-    <AppBackground><View style={s.container}>{/* ─── Header ─── */}
+    <AppBackground radialGlow><View style={s.container}>{/* ─── Header ─── */}
       <View style={[s.header, { paddingTop: insets.top + 8 }]}>
         <Pressable style={[s.backBtn]} onPress={() => safeGoBack(router)}>
           <Ionicons name="chevron-back" size={22} color="#F1F5F9" />

@@ -43,7 +43,7 @@ import { supabase } from '../../constants/supabase';
 import { RoomChatService, type RoomMessage } from '../../services/roomChat';
 import { checkPermission } from '../../services/permissions';
 import { ROLE_LEVEL, migrateLegacyTier, type ParticipantRole, type SubscriptionTier } from '../../types';
-import { isTierAtLeast } from '../../constants/tiers';
+import { isTierAtLeast, getEffectiveTier } from '../../constants/tiers';
 
 import { ModerationService } from '../../services/moderation';
 import { RoomAccessService, type AccessCheckResult } from '../../services/roomAccess';
@@ -1453,7 +1453,26 @@ export default function RoomScreen() {
         setLoading(false);
         return;
       }
-      setRoom(roomData); setParticipants(p); participantsRef.current = new Set(p.map(x => x.user_id)); setLoading(false);
+      // ★ 2026-04-29 FIX: Host kendi uyuyan odasına direkt girerse (push, link, Keşfet'ten)
+      //   wakeUp otomatik tetiklensin — yoksa livekit-token "Oda aktif değil" 403 dönüyor.
+      //   Daha önce sadece Odalarım'daki "Başlat" tetikliyordu; bu seamless akış sağlar.
+      if (isRoomClosed && isRoomOwner && !isSystemRoom(id)) {
+        try {
+          const tier = profile ? getEffectiveTier(profile) : 'Free';
+          const wokeRoom = await RoomService.wakeUpRoom(roomData.id, firebaseUser.uid, tier as any);
+          setRoom(wokeRoom); setParticipants(p); participantsRef.current = new Set(p.map(x => x.user_id)); setLoading(false);
+          // Aşağıdaki settings/follower fetch'leri için wokeRoom kullanılsın
+          roomData = wokeRoom;
+        } catch (wakeErr: any) {
+          if (__DEV__) console.warn('[Room] Auto-wakeUp fail:', wakeErr?.message);
+          showToast({ title: 'Oda Başlatılamadı', message: wakeErr?.message || 'Tekrar dene.', type: 'error' });
+          setRoomBlock({ reason: 'connection_failed' });
+          setLoading(false);
+          return;
+        }
+      } else {
+        setRoom(roomData); setParticipants(p); participantsRef.current = new Set(p.map(x => x.user_id)); setLoading(false);
+      }
       // ★ Speaking mode — room_settings'ten oku (oda oluşturma ayarı yansısın)
       const savedMode = roomData.room_settings?.speaking_mode;
       if (savedMode && ['free_for_all', 'permission_only', 'selected_only'].includes(savedMode)) {
@@ -1667,8 +1686,16 @@ export default function RoomScreen() {
         // olduktan sonra. LiveKit token edge function participant row'u kontrol
         // ediyor (v31); accessGranted→useLiveKit tetiklenirse ve row yoksa 403
         // "Ses sunucusuna bağlanılamadı" hatası çıkıyordu.
-        RoomService.join(id, firebaseUser.uid, joinRole).then(() => {
+        RoomService.join(id, firebaseUser.uid, joinRole).then(async () => {
           setAccessGranted(true); // ★ DB'de participant row var artık — LiveKit token alınabilir
+          // ★ 2026-04-29 FIX: Join sonrası participant listesini fresh olarak çek.
+          //   Kullanıcı kendi odasına geri girdiğinde stage boş + katılımcı 0 görünüyordu —
+          //   realtime onRoomChange race ile mount'tan önce tetiklenmiş olabiliyor.
+          try {
+            const freshP = await RoomService.getParticipants(id as string);
+            setParticipants(freshP);
+            participantsRef.current = new Set(freshP.map(x => x.user_id));
+          } catch {}
           // ★ K3 FIX: SP Toast timing — backend'de SP tahsilatı (eğer varsa) başarılı olduktan SONRA toast gösterilir
           const fee = roomData.room_settings?.entry_fee_sp || 0;
           if (fee > 0 && joinRole !== 'owner') {
@@ -1891,6 +1918,37 @@ export default function RoomScreen() {
     return () => sub.remove();
   }, [id, firebaseUser]);
 
+  // ★ 2026-04-30 FIX: room_participants realtime — yeni kullanıcı girince/çıkınca
+  //   diğer kullanıcılar anında görsün. Daha önce sadece AppState foreground refetch
+  //   veya room UPDATE event'inde participant listesi güncelleniyordu — ama room_participants
+  //   tablosundaki INSERT/DELETE, rooms tablosunu tetiklemiyordu → kullanıcılar stale kalıyordu.
+  useEffect(() => {
+    if (!id || !firebaseUser || !accessGranted) return;
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    const channel = supabase
+      .channel(`room_parts_rt:${id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'room_participants', filter: `room_id=eq.${id}` },
+        () => {
+          // Debounce 300ms — birden fazla INSERT/DELETE/UPDATE birleşsin
+          if (debounceTimer) clearTimeout(debounceTimer);
+          debounceTimer = setTimeout(async () => {
+            try {
+              const freshP = await RoomService.getParticipants(id as string);
+              setParticipants(freshP);
+              participantsRef.current = new Set(freshP.map((x: any) => x.user_id));
+            } catch { /* sessiz */ }
+          }, 300);
+        }
+      )
+      .subscribe();
+    return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      try { supabase.removeChannel(channel); } catch {}
+    };
+  }, [id, firebaseUser?.uid, accessGranted]);
+
   // ★ Host tier'ına göre ses/video kalite ayarları
   const hostTierForQuality = (room?.host?.subscription_tier as any) || 'Free';
   const qualityLimits = getRoomLimits(hostTierForQuality);
@@ -1953,17 +2011,10 @@ export default function RoomScreen() {
     }
   }, [lk.connectFailed, loading, roomBlock]);
 
-  // ★ 2026-04-26: HIZLI FAIL — 3sn'de hâlâ connected değilse bağlantı yok say.
-  //   LiveKit'in 3-deneme reconnect (~21sn) çok uzun, kullanıcı boşuna bekliyor.
-  useEffect(() => {
-    if (loading || roomBlock || lk.connectionState === 'connected' || isSystemRoom(id as string)) return;
-    const timer = setTimeout(() => {
-      if (lk.connectionState !== 'connected') {
-        setRoomBlock({ reason: 'connection_failed' });
-      }
-    }, 3000);
-    return () => clearTimeout(timer);
-  }, [loading, roomBlock, lk.connectionState, id]);
+  // ★ 2026-04-29 v2: Manuel timeout tamamen kaldırıldı — LiveKit'in kendi
+  //   `connectFailed` event'i (3 retry exhausted = ~21sn sonra) gerçek failure
+  //   sinyalidir. Manuel 10sn timeout cold-start'ta false-positive yaratıyordu.
+  //   Ayrı useEffect (yukarıda lk.connectFailed → connection_failed) zaten block eder.
 
   // ★ 2026-04-27: Dil farkı bilgilendirme toast'u — odaya girince bayrak + dil bilgisi.
   //   Engel/onay yok, sadece bilgi (Clubhouse/Spaces tarzı). Tek seferlik, oda başına.
@@ -3827,7 +3878,7 @@ export default function RoomScreen() {
         </Animated.View>
       )}
       {/* ★ 2026-04-26: Host'a SP bağışı — eski DonationDrawer yerine premium SPDonateSheet
-           (tier renkleri, başarı animasyonu, kulüp desteği). Tutarlı bağış UX'i. */}
+           (tier renkleri, başarı animasyonu, Koro desteği). Tutarlı bağış UX'i. */}
       {firebaseUser && room?.host_id && (
         <SPDonateSheet
           visible={showDonationDrawer}

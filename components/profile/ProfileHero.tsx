@@ -27,13 +27,14 @@ interface Props {
   subscriptionTier: SubscriptionTier;
   isAdmin: boolean;
   userTitle: UserTitle | null;
-  stats: { followers: number; rooms: number };
+  stats: { followers: number; rooms: number; badges?: number };
   /** Varsa edit butonunu göster; yoksa başka bir kullanıcının profili */
   onEdit?: () => void;
   /** ★ 2026-04-21: Bio'ya tap ile inline edit — kendi profilde (callback varsa) */
   onBioPress?: () => void;
   onFollowersPress: () => void;
   onRoomsPress: () => void;
+  onBadgesPress?: () => void;
   onAvatarPress?: () => void; // ★ Avatar preview modal
   /** Üyelik başlangıç tarihi (ISO) */
   memberSince?: string;
@@ -41,6 +42,8 @@ interface Props {
   boostExpiresAt?: string | null;
   /** Çevrimiçi gösterimi (owner'a gerek yok — kendi sayfası) */
   isOnline?: boolean;
+  /** Kullanıcının seviyesi (level system) */
+  userLevel?: number;
 }
 
 export default function ProfileHero({
@@ -54,9 +57,18 @@ export default function ProfileHero({
 
   return (
     <View style={s.card}>
+      {/* ★ 2026-04-29: Vertical gradient — üst parlak slate → alt koyu navy */}
       <LinearGradient
-        colors={['rgba(20,184,166,0.08)', 'rgba(15,23,42,0.95)', 'rgba(15,23,42,0.98)']}
+        colors={['#2D3F5F', '#1E2D4A', '#152238', '#0E1A2E']}
+        locations={[0, 0.35, 0.7, 1]}
+        start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
         style={s.cardGlow}
+      />
+      <LinearGradient
+        colors={['rgba(245,158,11,0.12)', 'transparent']}
+        start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 0.7 }}
+        style={s.cardGlow}
+        pointerEvents="none"
       />
       <View style={s.identityRow}>
         {/* Avatar — tıklanınca preview modal */}
@@ -170,16 +182,20 @@ function formatMemberSince(iso: string): string {
 }
 
 const s = StyleSheet.create({
+  // ★ 2026-04-29: Premium gradient kart — dark navy diagonal + amber hairline + sol-üst amber accent
   card: {
-    marginHorizontal: 16, marginTop: 16, marginBottom: 10,
-    borderRadius: 16, overflow: 'hidden',
-    backgroundColor: '#414e5f',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
-    ..._cardShadow,
+    marginHorizontal: 16, marginTop: 14, marginBottom: 10,
+    borderRadius: 14, overflow: 'hidden',
+    borderWidth: 1, borderColor: 'rgba(245,158,11,0.22)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
   cardGlow: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-    borderRadius: 16,
+    borderRadius: 14,
   },
   identityRow: {
     flexDirection: 'row', alignItems: 'flex-start', gap: 12,
@@ -223,11 +239,11 @@ const s = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)',
     justifyContent: 'center', alignItems: 'center',
   },
+  // ★ 2026-04-29: Inline stat satırı — kart-içi-kart görünümü kaldırıldı, üstüne hairline divider eklendi
   statsRow: {
     flexDirection: 'row', alignItems: 'center',
-    marginHorizontal: 12, marginBottom: 14, paddingVertical: 10,
-    borderRadius: 12, backgroundColor: 'rgba(0,0,0,0.15)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
+    paddingVertical: 12, paddingHorizontal: 16,
+    borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.06)',
   },
   statItem: { flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 48 },
   statNum: { fontSize: 16, fontWeight: '800', color: '#F1F5F9', marginBottom: 1, ..._textGlow },

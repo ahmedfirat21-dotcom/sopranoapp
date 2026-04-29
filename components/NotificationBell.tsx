@@ -5,7 +5,7 @@
 // - Kendi stilini home/messages/myrooms'da tekrarlamayı bırakır
 
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Pressable, Animated } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Animated, AccessibilityInfo } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 
@@ -32,6 +32,11 @@ export default function NotificationBell({ unreadCount, onPress, style }: Props)
       ]).start();
       // Bildirim geldi — hafif haptic
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      // ★ A11Y: TalkBack/VoiceOver'a yeni bildirim sayısını duyur
+      try {
+        const delta = unreadCount - prevCountRef.current;
+        AccessibilityInfo.announceForAccessibility(`${delta} yeni bildirim, toplam ${unreadCount}`);
+      } catch {}
     }
     prevCountRef.current = unreadCount;
   }, [unreadCount]);
@@ -67,12 +72,12 @@ export default function NotificationBell({ unreadCount, onPress, style }: Props)
       <Animated.View style={{ transform: [{ rotate }] }}>
         <Ionicons
           name={unreadCount > 0 ? 'notifications' : 'notifications-outline'}
-          size={20}
+          size={22}
           color={unreadCount > 0 ? '#FBBF24' : '#F1F5F9'}
           style={{
-            textShadowColor: unreadCount > 0 ? 'rgba(251,191,36,0.5)' : 'rgba(0,0,0,0.5)',
+            textShadowColor: unreadCount > 0 ? 'rgba(251,191,36,0.5)' : 'rgba(0,0,0,0.55)',
             textShadowOffset: { width: 0, height: unreadCount > 0 ? 0 : 2 },
-            textShadowRadius: unreadCount > 0 ? 8 : 4,
+            textShadowRadius: unreadCount > 0 ? 8 : 5,
           }}
         />
       </Animated.View>
@@ -87,11 +92,9 @@ export default function NotificationBell({ unreadCount, onPress, style }: Props)
 
 const s = StyleSheet.create({
   btn: {
-    width: 44, height: 44, borderRadius: 22,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    width: 44, height: 44,
     justifyContent: 'center', alignItems: 'center',
     position: 'relative',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
   },
   badge: {
     position: 'absolute', top: -4, right: -4,

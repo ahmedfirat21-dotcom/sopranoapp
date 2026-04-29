@@ -1,5 +1,14 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { View, Text, StyleSheet, Image, Pressable, TextInput, FlatList, Platform, ActivityIndicator, Animated, Easing, NativeScrollEvent, NativeSyntheticEvent, Modal, Keyboard, Dimensions, KeyboardAvoidingView } from 'react-native';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { View, Text, StyleSheet, Image, Pressable, TextInput, FlatList, Platform, ActivityIndicator, Animated, Easing, NativeScrollEvent, NativeSyntheticEvent, Modal, Keyboard, Dimensions } from 'react-native';
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  ⛔ KRİTİK — DOKUNMA! ASLA DEĞİŞTİRME!                       ║
+// ║  Bu import react-native-keyboard-controller'dan gelir.         ║
+// ║  React Native'in built-in KeyboardAvoidingView'ı Samsung       ║
+// ║  cihazlarda çalışmaz (boşluk, kayma, input bar kaybolur).      ║
+// ║  Bu kütüphane native Android API kullanır, tüm cihazlarda      ║
+// ║  kusursuz çalışır. ASLA 'react-native' import'una çevirme!     ║
+// ╚══════════════════════════════════════════════════════════════════╝
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import PremiumAlert, { type AlertButton } from '../../components/PremiumAlert';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -14,6 +23,7 @@ import { EmojiPicker } from '../../components/EmojiPicker';
 import { ReportModal } from '../../components/ReportModal';
 import { showToast } from '../../components/Toast';
 import { useAuth, useBadges, useUserProfileSheet } from '../_layout';
+import { useOnlineFriends } from '../../providers/OnlineFriendsProvider';
 import StatusAvatar from '../../components/StatusAvatar';
 import { StorageService } from '../../services/storage';
 import * as ImagePicker from 'expo-image-picker';
@@ -414,6 +424,9 @@ export default function ChatScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { firebaseUser, profile, refreshProfile, minimizedRoom } = useAuth();
   const { openUserProfile } = useUserProfileSheet();
+  // ★ 2026-04-30 FIX: Presence-based online status — stale DB flag yerine canlı websocket durumu.
+  const { onlineFriends } = useOnlineFriends();
+  const onlinePresenceIds = useMemo(() => new Set(onlineFriends.map(f => f.id)), [onlineFriends]);
   const insets = useSafeAreaInsets();
   // ★ 2026-04-24 v2: Chat mount+loaded slide-down — loading bitince içerik üstten akarak iner.
   const contentTranslateY = useRef(new Animated.Value(-80)).current;
@@ -461,36 +474,22 @@ export default function ChatScreen() {
     }
   }, [inputBarHeight]);
   useEffect(() => {
-    // ★ 2026-04-27 FIX: Android'de AndroidManifest.xml'de windowSoftInputMode="adjustResize"
-    //   zaten aktif — sistem klavye açılınca pencereyi küçültür, input bar otomatik kayar.
-    //   Manuel offset uygulamak ÇİFT kayma yapar (klavyeden uzak gap görünür).
-    // ★ 2026-04-28 FIX: Android'de keyboardDidShow listener ile sadece scrollToEnd tetikleniyor —
-    //   adjustResize FlatList viewport'unu küçültüyor ama scroll pozisyonu eski kalıyor,
-    //   son mesaj input bar'ın altında gizli kalıyordu. Manuel paddingBottom yine yok (adjustResize hallediyor).
-    if (Platform.OS === 'android') {
-      const showAndroid = Keyboard.addListener('keyboardDidShow', () => {
-        // Viewport küçüldü, en alta kay — son mesaj input bar üstünde görünür
-        setTimeout(() => flatListRef.current?.scrollToEnd({ animated: false }), 50);
-      });
-      const hideAndroid = Keyboard.addListener('keyboardDidHide', () => {
-        // Klavye kapandı, viewport büyüdü — yine en alta kay (kullanıcı isAtBottom ise)
-        if (isAtBottomRef.current) {
-          setTimeout(() => flatListRef.current?.scrollToEnd({ animated: false }), 50);
-        }
-      });
-      return () => { showAndroid.remove(); hideAndroid.remove(); };
-    }
-    // iOS: Sistem resize yapmaz, manuel offset gerekli.
-    const showSub = Keyboard.addListener('keyboardWillShow', (e) => {
+    // ★ 2026-04-30 FIX v7: KeyboardAvoidingView pozisyonlamayı halleder.
+    //   Listener sadece scrollToEnd ve kbHeight flag için.
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSub = Keyboard.addListener(showEvent, (e) => {
       setKbHeight(e.endCoordinates.height);
-      Animated.timing(inputBottomAnim, { toValue: e.endCoordinates.height, duration: 250, useNativeDriver: false }).start();
+      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: false }), 80);
     });
-    const hideSub = Keyboard.addListener('keyboardWillHide', () => {
+    const hideSub = Keyboard.addListener(hideEvent, () => {
       setKbHeight(0);
-      Animated.timing(inputBottomAnim, { toValue: miniRoomOffset, duration: 200, useNativeDriver: false }).start();
+      if (isAtBottomRef.current) {
+        setTimeout(() => flatListRef.current?.scrollToEnd({ animated: false }), 80);
+      }
     });
     return () => { showSub.remove(); hideSub.remove(); };
-  }, [miniRoomOffset]);
+  }, []);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const flatListRef = useRef<FlatList>(null);
   const isAtBottomRef = useRef(true); // ★ BUG-6 FIX: Kullanıcı en altta mı?
@@ -666,13 +665,27 @@ export default function ChatScreen() {
       //   Eski sıralı 11 await ~1-3sn sürerken artık ~300-500ms (en yavaş kritik sorgunun süresi).
       try {
         // ── Aşama 1: KRİTİK paralel — UI gözükmeden zorunlu ──
-        const [isBlockedByMe, isBlockedByThem, profile, history, clearedMap] = await Promise.all([
+        const [isBlockedByMe, isBlockedByThem, profile, history, clearedMap, mreq] = await Promise.all([
           ModerationService.isBlocked(firebaseUser.uid, id).catch(() => false),
           ModerationService.isBlocked(id, firebaseUser.uid).catch(() => false),
           ProfileService.get(id).catch(() => null),
           MessageService.getConversation(firebaseUser.uid, id, 50).catch(() => [] as Message[]),
           MessageService.getClearedBefore(firebaseUser.uid).catch(() => ({} as Record<string, string>)),
+          MessageService.getMessageRequest(firebaseUser.uid, id).catch(() => null),
         ]);
+        // ★ v85: Mesaj İsteği durumu — mevcut msgRequestInfoRaw state'ine yansıt
+        if (mreq) {
+          if (mreq.status === 'pending') {
+            const isOutgoing = mreq.sender_id === firebaseUser.uid;
+            setMsgRequestInfo({ status: isOutgoing ? 'pending_outgoing' : 'pending_incoming' });
+          } else if (mreq.status === 'accepted') {
+            setMsgRequestInfo({ status: 'accepted' });
+          } else if (mreq.status === 'rejected') {
+            setMsgRequestInfo({ status: 'rejected' });
+          }
+        } else {
+          setMsgRequestInfo({ status: 'none' });
+        }
 
         if (isBlockedByMe || isBlockedByThem) {
           showToast({ title: '⛔ Erişim Engellendi', message: 'Bu kullanıcıyla mesajlaşamazsınız.', type: 'error' });
@@ -711,8 +724,7 @@ export default function ChatScreen() {
             .single()
             .then(({ data }) => {
               if (data?.rooms) setActiveRoom({ id: (data.rooms as any).id, name: (data.rooms as any).name });
-            })
-            .catch(() => {}),
+            }, () => {}),
 
           // CALL-1 + DM-8: Takipçi kontrolü
           FriendshipService.getDetailedStatus(firebaseUser.uid, id)
@@ -728,15 +740,7 @@ export default function ChatScreen() {
             })
             .catch(() => { setIsMutualFollow(false); setIsMessageRequest(true); }),
 
-          // message_requests durumu (Instagram flow)
-          MessageService.getMessageRequest(firebaseUser.uid, id)
-            .then(req => {
-              if (!req) setMsgRequestInfo({ status: 'none' });
-              else if (req.status === 'accepted') setMsgRequestInfo({ status: 'accepted' });
-              else if (req.status === 'rejected') setMsgRequestInfo({ status: 'rejected' });
-              else if (req.status === 'pending') setMsgRequestInfo({ status: req.receiver_id === firebaseUser.uid ? 'pending_incoming' : 'pending_outgoing' });
-            })
-            .catch(() => setMsgRequestInfo({ status: 'none' })),
+          // ★ v85: message_requests durumu Aşama 1'de yüklendi (mreq) — burada tekrar çağırma.
 
           // markAsRead + cevapsız arama notifications okundu + missed calls list
           (async () => {
@@ -839,18 +843,21 @@ export default function ChatScreen() {
 
     // ★ 2026-04-24 FIX: message_requests realtime — karşı taraf accept/reject ettiğinde
     //   sayfa yenilenmeden anında banner güncellensin.
+    // ★ 2026-04-29 v85: INSERT event de eklendi — yabancı chat'i açıkken karşı taraf
+    //   ilk mesajı atınca anında "Mesaj İsteği — Kabul/Red" banner görünsün.
     const msgReqChannelName = `msg_req_${firebaseUser.uid}_${id}`;
     const msgReqChannel = supabase
       .channel(msgReqChannelName)
       .on(
         'postgres_changes',
         {
-          event: 'UPDATE',
+          event: '*',
           schema: 'public',
           table: 'message_requests',
         },
         (payload: any) => {
-          const row = payload.new;
+          const row = payload.new || payload.old;
+          if (!row) return;
           // Bu sohbet ile ilgili mi kontrol et
           const isRelevant =
             (row.sender_id === firebaseUser.uid && row.receiver_id === id) ||
@@ -861,6 +868,10 @@ export default function ChatScreen() {
             setMsgRequestInfo({ status: 'accepted' });
           } else if (row.status === 'rejected') {
             setMsgRequestInfo({ status: 'rejected' });
+          } else if (row.status === 'pending') {
+            // ★ INSERT/UPDATE — pending durumda yön: ben sender mıyım, receiver mı?
+            const isOutgoing = row.sender_id === firebaseUser.uid;
+            setMsgRequestInfo({ status: isOutgoing ? 'pending_outgoing' : 'pending_incoming' });
           }
         }
       )
@@ -993,9 +1004,16 @@ export default function ChatScreen() {
 
   return (
     <AppBackground radialGlow>
+    {/* ╔══════════════════════════════════════════════════════════════╗
+        ║  ⛔ KRİTİK — DOKUNMA! ASLA DEĞİŞTİRME!                    ║
+        ║  Bu KAV react-native-keyboard-controller'dan gelir.        ║
+        ║  behavior="padding" + adjustResize manifest ile çalışır.   ║
+        ║  RN built-in KAV Samsung'da ÇALIŞMAZ.                      ║
+        ║  adjustPan/adjustNothing KULLANMA — farklı sorunlar çıkar. ║
+        ╚══════════════════════════════════════════════════════════════╝ */}
     <KeyboardAvoidingView
       style={{ flex: 1 }}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior="padding"
       keyboardVerticalOffset={0}
     >
     <Animated.View style={[styles.container, { opacity: contentOpacity, transform: [{ translateY: contentTranslateY }] }]}>
@@ -1025,7 +1043,7 @@ export default function ChatScreen() {
                 <Text style={styles.typingHeaderText}>yazıyor</Text>
                 <Text style={styles.typingDots}>…</Text>
               </>
-            ) : otherUser?.is_online ? (
+            ) : onlinePresenceIds.has(id as string) ? (
               <>
                 <View style={styles.onlineDot} />
                 <Text style={styles.onlineText}>Çevrimiçi</Text>
@@ -1113,16 +1131,104 @@ export default function ChatScreen() {
         </View>
       )}
 
-      {/* ★ 2026-04-27: Strict policy — eski mesaj isteği banner'ları (pending_incoming/outgoing/rejected)
-            kaldırıldı. Yabancılara mesajlaşma kapalı; tek banner var: "Önce arkadaş ol" (aşağıda). */}
+      {/* ★ 2026-04-29 v85: Yabancılar arası ilk mesaj artık "İstek" olarak gönderilir.
+          Eski "kapalı" banner'ı kaldırıldı; yerine v85 banner'ları (Kabul/Red, cevap bekleniyor, reddedildi). */}
 
-      {/* ★ 2026-04-27 STRICT: Arkadaş değilse mesajlaşma kapalı — net uyarı banner */}
-      {!loading && !isMutualFollow && (
-        <View style={[styles.msgRequestBanner, { backgroundColor: 'rgba(251,191,36,0.10)' }]}>
-          <View style={styles.msgRequestBannerInner}>
-            <Ionicons name="lock-closed-outline" size={16} color="#FBBF24" />
-            <Text style={[styles.msgRequestDesc, { color: '#FCD34D' }]}>
-              {otherUser?.display_name || 'Bu kullanıcı'} ile arkadaş olmadığın için mesajlaşamazsın. Profilinden arkadaş ekle.
+      {/* ★ Yabancıya ilk mesaj — istek modunda olduğunu bildiren info banner */}
+      {!loading && !isMutualFollow && msgRequestInfo.status === 'none' && (
+        <View style={[msgReqBannerStyles.banner, { backgroundColor: 'rgba(251,191,36,0.10)', borderColor: 'rgba(251,191,36,0.40)' }]}>
+          <View style={[msgReqBannerStyles.iconWrap, { backgroundColor: 'rgba(251,191,36,0.20)' }]}>
+            <Ionicons name="paper-plane-outline" size={22} color="#FBBF24" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[msgReqBannerStyles.title, { color: '#FCD34D' }]}>📨 Mesaj isteği</Text>
+            <Text style={msgReqBannerStyles.subtitle}>
+              İlk mesajın istek olarak gönderilir. Karşı taraf onaylarsa mesajlaşabilirsiniz.
+            </Text>
+          </View>
+        </View>
+      )}
+
+      {/* ★ Reddedilmiş istek — sender bilgi banner */}
+      {msgRequestInfo.status === 'rejected' && (
+        <View style={[msgReqBannerStyles.banner, { backgroundColor: 'rgba(239,68,68,0.12)', borderColor: 'rgba(239,68,68,0.45)' }]}>
+          <View style={[msgReqBannerStyles.iconWrap, { backgroundColor: 'rgba(239,68,68,0.22)' }]}>
+            <Ionicons name="ban-outline" size={22} color="#EF4444" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[msgReqBannerStyles.title, { color: '#F87171' }]}>İstek reddedildi</Text>
+            <Text style={msgReqBannerStyles.subtitle}>
+              Bu kullanıcı seninle mesajlaşmak istemiyor.
+            </Text>
+          </View>
+        </View>
+      )}
+
+      {/* ★ 2026-04-29 v85: Mesaj İsteği — receiver pending durumda Kabul/Red banner */}
+      {msgRequestInfo.status === 'pending_incoming' && (
+        <View style={[msgReqBannerStyles.banner, { flexDirection: 'column', alignItems: 'stretch' }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 10 }}>
+            <View style={msgReqBannerStyles.iconWrap}>
+              <Ionicons name="mail-unread" size={22} color="#FBBF24" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={msgReqBannerStyles.title}>📨 Mesaj İsteği</Text>
+              <Text style={msgReqBannerStyles.subtitle}>
+                {otherUser?.display_name || 'Bu kullanıcı'} sana ilk kez yazıyor. Kabul edersen mesajlaşabilirsiniz.
+              </Text>
+            </View>
+          </View>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <Pressable
+              style={[msgReqBannerStyles.btnFull, msgReqBannerStyles.btnRejectFull]}
+              disabled={respondingRequest}
+              onPress={async () => {
+                if (!firebaseUser?.uid || !id || respondingRequest) return;
+                setRespondingRequest(true);
+                try {
+                  await MessageService.rejectMessageRequest(firebaseUser.uid, id);
+                  showToast({ title: '✕ Reddedildi', message: 'Mesaj isteği reddedildi.', type: 'info' });
+                  router.back();
+                } catch (e: any) {
+                  showToast({ title: 'Hata', message: e?.message || 'İşlem başarısız', type: 'error' });
+                } finally { setRespondingRequest(false); }
+              }}
+            >
+              <Ionicons name="close-circle" size={18} color="#F87171" />
+              <Text style={msgReqBannerStyles.btnRejectText}>Sil</Text>
+            </Pressable>
+            <Pressable
+              style={[msgReqBannerStyles.btnFull, msgReqBannerStyles.btnAcceptFull]}
+              disabled={respondingRequest}
+              onPress={async () => {
+                if (!firebaseUser?.uid || !id || respondingRequest) return;
+                setRespondingRequest(true);
+                try {
+                  await MessageService.acceptMessageRequest(firebaseUser.uid, id);
+                  setMsgRequestInfo({ status: 'accepted' });
+                  showToast({ title: '✓ Kabul edildi', message: 'Artık mesajlaşabilirsiniz.', type: 'success' });
+                } catch (e: any) {
+                  showToast({ title: 'Hata', message: e?.message || 'İşlem başarısız', type: 'error' });
+                } finally { setRespondingRequest(false); }
+              }}
+            >
+              <Ionicons name="checkmark-circle" size={18} color="#FFF" />
+              <Text style={msgReqBannerStyles.btnAcceptText}>Kabul Et</Text>
+            </Pressable>
+          </View>
+        </View>
+      )}
+
+      {/* ★ Sender pending banner — cevap bekleniyor bilgilendirme */}
+      {msgRequestInfo.status === 'pending_outgoing' && (
+        <View style={[msgReqBannerStyles.banner, { backgroundColor: 'rgba(20,184,166,0.12)', borderColor: 'rgba(20,184,166,0.45)' }]}>
+          <View style={[msgReqBannerStyles.iconWrap, { backgroundColor: 'rgba(20,184,166,0.22)' }]}>
+            <Ionicons name="time-outline" size={22} color={Colors.teal} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[msgReqBannerStyles.title, { color: Colors.teal }]}>⏳ İstek gönderildi</Text>
+            <Text style={msgReqBannerStyles.subtitle}>
+              Karşı taraf onaylayana kadar yeni mesaj atamazsın.
             </Text>
           </View>
         </View>
@@ -1279,12 +1385,9 @@ export default function ChatScreen() {
         }
       />
 
-      {/* ★ 2026-04-27: Input Bar artık normal flex flow'da (absolute KALDIRILDI).
-          Eski absolute + paddingBottom hack yaklaşımı son mesajın altta kalmasına sebep oluyordu.
-          Yeni: container column flex, input bar doğal yüksekliği kadar yer kaplar; FlatList flex:1 ile
-          KENDİLİĞİNDEN üstünde kalır. Android adjustResize klavye için yeterli. iOS için Animated bottom
-          gerekiyor ama Android'de kullanıcı, iOS sonra. */}
-      <Animated.View
+      {/* ★ 2026-04-30 FIX v7: Normal flex flow — KAV container'ı küçültünce
+          FlatList flex:1 küçülür, input bar doğal yerinde kalır. */}
+      <View
         style={{ backgroundColor: '#0F172A', zIndex: 10 }}
         onLayout={(e) => {
           const h = e.nativeEvent.layout.height;
@@ -1308,7 +1411,7 @@ export default function ChatScreen() {
         pointerEvents="none"
       />
       {isRecording ? (
-        <View style={[styles.inputBar, { paddingBottom: Math.max(insets.bottom + 6, 20)}]}>
+        <View style={[styles.inputBar, { paddingBottom: kbHeight > 0 ? 6 : Math.max(insets.bottom + 6, 20)}]}>
           {/* Kayıt modunda: inline waveform bar */}
           <Pressable style={styles.recCancelBtn} onPress={cancelRecording}>
             <Ionicons name="trash-outline" size={20} color="#EF4444" />
@@ -1347,20 +1450,27 @@ export default function ChatScreen() {
           </Pressable>
         </View>
       ) : (
-        <View style={[styles.inputBar, { paddingBottom: Math.max(insets.bottom + 6, 20)}, !isMutualFollow && { opacity: 0.4 }]} pointerEvents={!isMutualFollow ? 'none' : 'auto'}>
+        // ★ v85: Input enable kuralı: arkadaş/accepted/none → açık; pending/rejected → kapalı
+        <View style={[styles.inputBar, { paddingBottom: kbHeight > 0 ? 6 : Math.max(insets.bottom + 6, 20)}, !(isMutualFollow || msgRequestInfo.status === 'accepted' || msgRequestInfo.status === 'none') && { opacity: 0.4 }]} pointerEvents={!(isMutualFollow || msgRequestInfo.status === 'accepted' || msgRequestInfo.status === 'none') ? 'none' : 'auto'}>
           <Pressable style={styles.inputAction} onPress={() => setShowEmojiPicker(v => !v)}>
             <Ionicons name={showEmojiPicker ? 'close-circle' : 'happy-outline'} size={22} color={Colors.teal} style={styles.iconShadow} />
           </Pressable>
           <TextInput
             style={styles.textInput}
-            placeholder={!isMutualFollow ? 'Önce arkadaş olmalısın' : 'Mesaj yaz...'}
+            placeholder={
+              msgRequestInfo.status === 'pending_outgoing' ? 'Cevap bekleniyor...'
+              : msgRequestInfo.status === 'pending_incoming' ? 'Önce isteği kabul et'
+              : msgRequestInfo.status === 'rejected' ? 'Mesaj atılamaz'
+              : (!isMutualFollow && msgRequestInfo.status === 'none') ? 'İlk mesajını yaz...'
+              : 'Mesaj yaz...'
+            }
             placeholderTextColor={Colors.text3}
             value={inputText}
             onChangeText={handleInputChange}
             multiline
             maxLength={MSG_MAX_LENGTH}
             onFocus={() => setShowEmojiPicker(false)}
-            editable={isMutualFollow}
+            editable={isMutualFollow || msgRequestInfo.status === 'accepted' || msgRequestInfo.status === 'none'}
           />
           <Pressable style={styles.inputAction} onPress={async () => {
             try {
@@ -1433,7 +1543,7 @@ export default function ChatScreen() {
           setInputText(prev => prev + emoji);
         }}
       />
-      </Animated.View>
+      </View>
 
       {/* Report Modal */}
       {firebaseUser && reportMessageId && (
@@ -1641,6 +1751,63 @@ export default function ChatScreen() {
   );
 }
 
+const msgReqBannerStyles = StyleSheet.create({
+  // ★ 2026-04-29 v3: elevation kaldırıldı — Android'de gri gölge oluşturuyordu.
+  //   shadow sadece iOS, Android'de border + bg yeterli.
+  banner: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    marginHorizontal: 12, marginTop: 10, marginBottom: 6,
+    paddingHorizontal: 14, paddingVertical: 14,
+    backgroundColor: 'rgba(251,191,36,0.12)',
+    borderWidth: 1.5, borderColor: 'rgba(251,191,36,0.45)',
+    borderRadius: 14,
+    ...Platform.select({
+      ios: { shadowColor: '#FBBF24', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 6 },
+      android: { elevation: 0 },
+    }),
+  },
+  iconWrap: {
+    width: 42, height: 42, borderRadius: 14,
+    backgroundColor: 'rgba(251,191,36,0.22)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  title: { fontSize: 15, fontWeight: '900', color: '#FBBF24', letterSpacing: 0.3 },
+  subtitle: { fontSize: 12.5, fontWeight: '500', color: '#E2E8F0', marginTop: 3, lineHeight: 16 },
+  actions: { flexDirection: 'row', gap: 8 },
+  btn: {
+    width: 42, height: 42, borderRadius: 21,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  btnReject: {
+    backgroundColor: 'rgba(239,68,68,0.15)',
+    borderWidth: 1.5, borderColor: 'rgba(239,68,68,0.50)',
+  },
+  btnAccept: {
+    backgroundColor: '#14B8A6',
+    shadowColor: '#14B8A6', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.55, shadowRadius: 8, elevation: 6,
+  },
+  // ★ 2026-04-29 v2: Instagram tarzı tam-genişlik buton (icon + label)
+  btnFull: {
+    flex: 1,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    paddingVertical: 11, paddingHorizontal: 14,
+    borderRadius: 12,
+  },
+  btnRejectFull: {
+    backgroundColor: 'rgba(239,68,68,0.12)',
+    borderWidth: 1.5, borderColor: 'rgba(239,68,68,0.45)',
+  },
+  btnAcceptFull: {
+    backgroundColor: '#14B8A6',
+    ...Platform.select({
+      ios: { shadowColor: '#14B8A6', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.55, shadowRadius: 8 },
+      android: {},
+    }),
+  },
+  btnRejectText: { fontSize: 14, fontWeight: '800', color: '#F87171', letterSpacing: 0.3 },
+  btnAcceptText: { fontSize: 14, fontWeight: '800', color: '#FFF', letterSpacing: 0.3 },
+});
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: 'transparent' },
 
@@ -1826,7 +1993,10 @@ const styles = StyleSheet.create({
   },
 
   // Messages
-  messageList: { flex: 1 },
+  // ★ 2026-04-30 FIX: flexShrink:1 — adjustResize pencereyi küçülttüğünde FlatList
+  //   tüm alanı alıp inputBar'ı ekran dışına itiyordu. flexShrink:1 ile FlatList
+  //   inputBar'a yer bırakır.
+  messageList: { flex: 1, flexShrink: 1 },
   messageContent: { padding: 16, gap: 8, flexGrow: 1 },
   bubbleWrap: { marginBottom: 4 },
   bubbleLeft: { alignItems: 'flex-start', flexDirection: 'row', gap: 8 },

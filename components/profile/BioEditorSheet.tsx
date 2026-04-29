@@ -6,6 +6,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Modal, TextInput, Pressable, Animated, Easing, KeyboardAvoidingView, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { useSwipeToDismiss } from '../../hooks/useSwipeToDismiss';
 
 interface Props {
   visible: boolean;
@@ -20,6 +21,11 @@ export default function BioEditorSheet({ visible, initialBio, maxLength = 150, o
   const [saving, setSaving] = useState(false);
   const fade = useRef(new Animated.Value(0)).current;
   const slide = useRef(new Animated.Value(30)).current;
+
+  // ★ Swipe-down dismiss
+  const { translateValue, panHandlers } = useSwipeToDismiss({
+    direction: 'down', threshold: 80, onDismiss: onClose,
+  });
 
   useEffect(() => {
     if (visible) {
@@ -51,14 +57,16 @@ export default function BioEditorSheet({ visible, initialBio, maxLength = 150, o
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Animated.View style={[s.backdrop, { opacity: fade }]}>
         <Pressable style={StyleSheet.absoluteFillObject} onPress={onClose} />
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={s.kav}>
-          <Animated.View style={[s.sheet, { transform: [{ translateY: slide }] }]}>
+        {/* ★ 2026-04-26 FIX: Android'de behavior=undefined → KeyboardAvoidingView NO-OP idi, sheet klavye altında kalıyordu.
+             Android için "height" davranışı ile sheet klavyenin üstüne çekilir. */}
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={s.kav}>
+          <Animated.View style={[s.sheet, { transform: [{ translateY: Animated.add(slide, translateValue) }] }]}>
             <LinearGradient
               colors={['#1C2840', '#122036', '#0B1829']}
               start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }}
               style={s.sheetInner}
             >
-              <View style={s.header}>
+              <View style={s.header} {...panHandlers}>
                 <View style={{ flex: 1 }}>
                   <Text style={s.title}>Bio</Text>
                   <Text style={s.subtitle}>Kendini kısaca tanıt — {maxLength} karakter</Text>

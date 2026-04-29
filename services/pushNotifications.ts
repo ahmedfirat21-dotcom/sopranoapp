@@ -24,15 +24,42 @@ let Notifications: any = null;
 if (!isExpoGo) {
   try {
     Notifications = require('expo-notifications');
-    // Bildirim geldiğinde uygulamanın nasıl davranacağını belirle
+    // ★ Bildirim ayarlarına saygı: kullanıcı Ayarlar > Bildirimler'den kapattıysa
+    //   ana toggle=false → sessize al; ses/titreşim alt-toggle'ları ayrı kontrol.
     Notifications.setNotificationHandler({
-      handleNotification: async () => ({
-        shouldShowAlert: true,
-        shouldPlaySound: true,
-        shouldSetBadge: true,
-        shouldShowBanner: true,
-        shouldShowList: true,
-      }),
+      handleNotification: async () => {
+        let enabled = true;
+        let sound = true;
+        let vibration = true;
+        try {
+          const { SettingsService } = require('./settings');
+          const s = await SettingsService.get();
+          enabled = s.notifications_enabled !== false;
+          sound = enabled && s.notification_sound !== false;
+          vibration = enabled && s.notification_vibration !== false;
+        } catch { /* ayarlar okunamazsa varsayılan: açık */ }
+
+        if (!enabled) {
+          return {
+            shouldShowAlert: false,
+            shouldPlaySound: false,
+            shouldSetBadge: false,
+            shouldShowBanner: false,
+            shouldShowList: false,
+          };
+        }
+        return {
+          shouldShowAlert: true,
+          shouldPlaySound: sound,
+          shouldSetBadge: true,
+          shouldShowBanner: true,
+          shouldShowList: true,
+          // vibration için iOS-Android farkı: iOS otomatik, Android channel-level.
+          // channel'da vibrationPattern zaten set edilmiyor → uygulama seviyesinde
+          // flag persist eder, native channel kontrolü ileride ayrı ele alınacak.
+          _vibration: vibration,
+        } as any;
+      },
     });
   } catch (e) {
     logger.warn('expo-notifications yüklenirken hata oluştu:', e);
@@ -147,9 +174,13 @@ export const PushNotificationService = {
     }
 
     // Expo Push Token al
+    // ★ CRITICAL FIX 2026-04-25: projectId Firebase project değil EAS project UUID olmalı.
+    //   Eski 'sopranochat-5738e' (Firebase) Expo'nun expected uuid format'ı geçmediği için
+    //   token getirme hep fail edip catch'lenmiş — push notifications hiç çalışmıyor olabilir.
+    //   app.json#extra.eas.projectId ile uyumlu.
     try {
       const tokenData = await Notifications.getExpoPushTokenAsync({
-        projectId: 'sopranochat-5738e',
+        projectId: 'bbd97aec-9d58-426f-8acc-215b24ff286a',
       });
       return tokenData.data;
     } catch (error) {
@@ -159,20 +190,48 @@ export const PushNotificationService = {
   },
 
   /**
-   * Push token'ı Supabase'deki profil tablosuna kaydet
+   * Push token'ı Supabase push_tokens tablosuna kaydet (multi-device destekli).
+   * ★ v78: profiles.push_token yerine ayrı push_tokens tablosu kullanılıyor.
+   *   Aynı (user_id, token) çifti varsa updated_at güncellenir (upsert).
    */
   async savePushToken(userId: string, token: string) {
     try {
+      const platform = Platform.OS === 'android' ? 'android'
+                     : Platform.OS === 'ios' ? 'ios'
+                     : 'unknown';
+
       const { error } = await supabase
-        .from('profiles')
-        .update({ push_token: token })
-        .eq('id', userId);
-      
+        .from('push_tokens')
+        .upsert(
+          { user_id: userId, token, platform },
+          { onConflict: 'user_id,token' }
+        );
+
       if (error) {
         logger.warn('Push token kayıt hatası:', error.message);
       }
     } catch (err) {
       logger.error('Push token kayıt hatası:', err);
+    }
+  },
+
+  /**
+   * Logout veya cihaz değişikliğinde mevcut token'ı sil.
+   * ★ v78: Stale token birikmesini önler.
+   */
+  async removePushToken(userId: string, token: string) {
+    try {
+      const { error } = await supabase
+        .from('push_tokens')
+        .delete()
+        .eq('user_id', userId)
+        .eq('token', token);
+
+      if (error && __DEV__) {
+        logger.warn('Push token silme hatası:', error.message);
+      }
+    } catch (err) {
+      if (__DEV__) logger.error('Push token silme hatası:', err);
     }
   },
 

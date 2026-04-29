@@ -281,6 +281,12 @@ export const RevenueCatService = {
           const { invalidateTierCache } = require('./gamification');
           invalidateTierCache(userId);
         } catch { /* gamification import fail safe */ }
+        // ★ 2026-04-26: Tier yükseltildiğinde mevcut odaların expires_at'ı yeni durationHours'a göre yenilensin.
+        //   Pro/GodMaster → expires_at = NULL (sınırsız). Plus → 12 saatlik yeni süre.
+        try {
+          const { RoomService } = require('./database');
+          await RoomService.refreshExpiresForTierChange(userId, newTier);
+        } catch { /* sessiz — tier upgrade başarılı, refresh ek bonus */ }
       }
 
       return { newTier };

@@ -5,13 +5,13 @@
 // ═══════════════════════════════════════════════════════════════════
 
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Pressable, Animated, Easing, Modal, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Animated, Easing, Modal, Dimensions, PanResponder } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'react-native';
 import { getAvatarSource } from '../../constants/avatars';
 
-const { width: W } = Dimensions.get('window');
+const { width: W, height: H } = Dimensions.get('window');
 
 interface Props {
   visible: boolean;
@@ -25,6 +25,30 @@ interface Props {
 export default function ThankYouReceivedModal({
   visible, senderName, senderAvatar, emoji = '🙏', message, onClose,
 }: Props) {
+  // ★ Swipe-to-dismiss — aşağı sürükle kapat
+  const panY = useRef(new Animated.Value(0)).current;
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_, g) => g.dy > 10 && Math.abs(g.dy) > Math.abs(g.dx) * 1.3,
+      onPanResponderMove: (_, g) => { if (g.dy > 0) panY.setValue(g.dy); },
+      onPanResponderRelease: (_, g) => {
+        if (g.dy > 80 || g.vy > 0.5) {
+          Animated.timing(panY, { toValue: H, duration: 200, useNativeDriver: true }).start(() => {
+            panY.setValue(0);
+            onClose();
+          });
+        } else {
+          Animated.spring(panY, { toValue: 0, useNativeDriver: true, tension: 100, friction: 10 }).start();
+        }
+      },
+    })
+  ).current;
+
+  useEffect(() => {
+    if (visible) panY.setValue(0);
+  }, [visible]);
+
   // Animasyonlar
   const backdropOpacity = useRef(new Animated.Value(0)).current;
   const cardScale = useRef(new Animated.Value(0.8)).current;
@@ -143,8 +167,11 @@ export default function ThankYouReceivedModal({
       </Animated.View>
 
       <View style={s.center} pointerEvents="box-none">
-        {/* Card */}
-        <Animated.View style={[s.card, { opacity: cardOpacity, transform: [{ scale: cardScale }] }]}>
+        {/* Card — swipe-to-dismiss + entry animation */}
+        <Animated.View
+          style={[s.card, { opacity: cardOpacity, transform: [{ scale: cardScale }, { translateY: panY }] }]}
+          {...panResponder.panHandlers}
+        >
           {/* Background layers */}
           <LinearGradient
             colors={['#1a2e2a', '#0f1f1c', '#091412']}

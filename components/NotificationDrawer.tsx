@@ -4,7 +4,7 @@
  * ★ Sadece oda + arama + hediye bildirimleri gösterilir
  * Takip istekleri → FriendsDrawer, DM → Mesajlar tab'ında
  */
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, Pressable, FlatList,
   ActivityIndicator, Dimensions, Modal,
@@ -13,6 +13,7 @@ import ReAnimated, {
   useSharedValue,
   useAnimatedStyle,
   withTiming,
+  withDelay,
   Easing,
 } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
@@ -24,6 +25,7 @@ import { Colors } from '../constants/theme';
 import { RoomAccessService } from '../services/roomAccess';
 import StatusAvatar from './StatusAvatar';
 import { showToast } from './Toast';
+import { useUserProfileSheet } from '../app/_layout';
 
 const { width: W, height: H } = Dimensions.get('window');
 
@@ -43,6 +45,7 @@ export type GiftModalPayload = {
   senderName: string;
   senderAvatar?: string;
   amount: number;
+  notificationId?: string;
 };
 
 interface Props {
@@ -56,6 +59,10 @@ interface Props {
   drawerRight?: number;
   /** Gift bildirimi tıklanınca SPReceivedModal'ı yeniden göster (global state _layout'ta) */
   onShowGiftModal?: (payload: GiftModalPayload) => void;
+  /** ★ 2026-04-26: Teşekkür bildirimi tıklanınca global ThankYouReceivedModal'ı tetikle.
+   *  Eski: drawer içinde local modal vardı → drawer kapanınca modal de kapanıyordu (race condition).
+   *  Şimdi: parent'taki global modal'a yönlendirir, drawer'dan bağımsız çalışır. */
+  onShowThankYou?: (payload: { senderId: string; senderName: string; senderAvatar?: string; emoji?: string; message?: string }) => void;
 }
 
 // Bildirim tipi → simge eşleşmesi
@@ -119,12 +126,13 @@ function timeAgo(date: string): string {
   return `${Math.floor(hours / 24)}g`;
 }
 
-export default function NotificationDrawer({ visible, onClose, userId, anchorTop, anchorRight, drawerRight, onShowGiftModal }: Props) {
+export default function NotificationDrawer({ visible, onClose, userId, anchorTop, anchorRight, drawerRight, onShowGiftModal, onShowThankYou }: Props) {
   const insets = useSafeAreaInsets();
   // Header: paddingTop(insets.top+4) + logo(~32) + padding = bell merkezi ≈ insets.top+22
   // Bell buton alt kenarı ≈ insets.top + 40. Drawer okuyla arasına 6px boşluk.
   const resolvedAnchor = anchorTop ?? (insets.top + 46);
   const router = useRouter();
+  const { openUserProfile } = useUserProfileSheet();
   const pathname = usePathname();
   // ★ 2026-04-21: Oda içindeyken arkadaşlık istekleri zile düşer; oda dışında arkadaş simgesi gösterir.
   const inRoom = pathname?.startsWith('/room') ?? false;
@@ -134,10 +142,8 @@ export default function NotificationDrawer({ visible, onClose, userId, anchorTop
   const [showAll, setShowAll] = useState(false); // ★ Tümünü Gör — modal içinde genişlet
   const [clearing, setClearing] = useState(false); // ★ Tümünü Temizle loading state
   const [processingInvites, setProcessingInvites] = useState<Set<string>>(new Set()); // ★ İşlenmekte olan davet ID'leri
-  // ★ 2026-04-24: Teşekkür info modal state
-  const [thankYouInfo, setThankYouInfo] = useState<{
-    senderName: string; senderAvatar?: string; body?: string; senderId?: string;
-  } | null>(null);
+  // ★ 2026-04-26: thankYouInfo state KALDIRILDI — drawer içinde modal mount ediliyordu, drawer kapanınca race condition oluyordu.
+  //   Artık parent'a onShowThankYou ile callback gönderir, global ThankYouReceivedModal mount edilir.
 
   useEffect(() => {
     if (visible && userId) {
@@ -271,7 +277,7 @@ export default function NotificationDrawer({ visible, onClose, userId, anchorTop
       // Host'u odasına yönlendir, moderasyon panelinden istekleri görsün
       router.push(`/room/${item.reference_id}` as any);
     } else if (item.type === 'missed_call' && item.sender_id) {
-      router.push(`/user/${item.sender_id}` as any);
+      openUserProfile(item.sender_id);
     } else if (item.type === 'gift' && item.sender_id && onShowGiftModal) {
       // ★ SP hediye: bildirim zilinden tıklayınca SPReceivedModal'ı yeniden aç
       //   Miktar body'den parse edilir ("XX SP gönderdi" pattern'i — _layout RT ile aynı)
@@ -283,20 +289,24 @@ export default function NotificationDrawer({ visible, onClose, userId, anchorTop
           senderName: item.sender?.display_name || 'Birisi',
           senderAvatar: item.sender?.avatar_url,
           amount,
+          notificationId: item.id,
         });
       }
-    } else if (item.type === 'thank_you' && item.sender_id) {
-      // ★ 2026-04-24: Teşekkür bildirimi → info modal (profil yerine)
-      setThankYouInfo({
+    } else if (item.type === 'thank_you' && item.sender_id && onShowThankYou) {
+      // ★ 2026-04-26 FIX: Teşekkür modal'ı parent'taki global ThankYouReceivedModal'a yönlendirildi.
+      //   Eski: drawer içinde local modal vardı → drawer kapanınca modal de kapanıyordu (race condition).
+      //   Şimdi: drawer kapanır + global modal açılır, bağımsız çalışır.
+      onShowThankYou({
+        senderId: item.sender_id,
         senderName: item.sender?.display_name || 'Birisi',
         senderAvatar: item.sender?.avatar_url,
-        body: item.body,
-        senderId: item.sender_id,
+        emoji: '🙏',
+        message: item.body,
       });
-      // Drawer'dan çıkma — modal zaten içinde görünecek
+      onClose();
       return;
     } else if (item.type === 'follow_accepted' || item.type === 'follow_rejected' || item.type === 'follow_pending') {
-      if (item.sender_id) router.push(`/user/${item.sender_id}` as any);
+      if (item.sender_id) openUserProfile(item.sender_id);
     }
   };
 
@@ -322,7 +332,7 @@ export default function NotificationDrawer({ visible, onClose, userId, anchorTop
       // Odaya yönlendir
       router.push(`/room/${item.reference_id}` as any);
     } catch {
-      showToast({ title: 'Hata', message: 'Davet kabul edilemedi', type: 'error' });
+      showToast({ title: 'Davet Kabul Edilemedi', message: 'Odaya katılım işlenemedi, tekrar dene.', type: 'error' });
     } finally {
       setProcessingInvites(prev => { const n = new Set(prev); n.delete(item.id); return n; });
     }
@@ -336,9 +346,9 @@ export default function NotificationDrawer({ visible, onClose, userId, anchorTop
       await RoomAccessService.rejectInvite(item.reference_id, userId);
       // Bildirimi listeden kaldır
       setItems(prev => prev.filter(n => n.id !== item.id));
-      showToast({ title: 'Davet Reddedildi', message: 'Oda daveti reddedildi', type: 'info' });
+      showToast({ title: '🚫 Davet Reddedildi', message: 'Oda daveti silindi.', type: 'info' });
     } catch {
-      showToast({ title: 'Hata', message: 'Davet reddedilemedi', type: 'error' });
+      showToast({ title: 'Davet Reddedilemedi', message: 'İşlem tamamlanamadı.', type: 'error' });
     } finally {
       setProcessingInvites(prev => { const n = new Set(prev); n.delete(item.id); return n; });
     }
@@ -352,7 +362,7 @@ export default function NotificationDrawer({ visible, onClose, userId, anchorTop
       await supabase.from('notifications').delete().eq('user_id', userId).in('type', BELL_NOTIF_TYPES);
       setItems([]);
     } catch {
-      showToast({ title: 'Hata', message: 'Bildirimler temizlenemedi', type: 'error' });
+      showToast({ title: 'Temizlenemedi', message: 'Bildirimler silinirken hata oluştu.', type: 'error' });
     } finally {
       setClearing(false);
     }
@@ -367,51 +377,49 @@ export default function NotificationDrawer({ visible, onClose, userId, anchorTop
       await supabase.from('notifications').update({ is_read: true })
         .eq('user_id', userId).eq('is_read', false).in('type', BELL_NOTIF_TYPES);
       setItems(prev => prev.map(n => ({ ...n, is_read: true })));
-      showToast({ title: `${unread.length} bildirim okundu ✓`, type: 'success' });
+      showToast({ title: `✓ ${unread.length} bildirim okundu`, type: 'success' });
     } catch {
-      showToast({ title: 'Hata', type: 'error' });
+      showToast({ title: 'İşaretlenemedi', message: 'Bildirimler okundu olarak işaretlenemedi.', type: 'error' });
     }
   }, [userId, items]);
 
   const unreadCount = items.filter(n => !n.is_read).length;
 
-  // ★ 2026-04-24 v2: Premium entry animation — uniform scale + slide (no squish).
-  //   Reanimated native driver (60fps).
-  const slideY = useSharedValue(-30);
-  const slideOpacity = useSharedValue(0);
-  const slideScale = useSharedValue(0.92);
-  const hasAnimatedEntry = useRef(false);
+  // ★ 2026-04-24 v5: Tamamen UI thread animasyonu — JS bridge yok, takılma yok.
+  //   withDelay kullanılarak tüm animasyon native tarafta çalışır.
+  const slideY = useSharedValue(-50);
+  const contentOpacity = useSharedValue(0);
+  const backdropOpacity = useSharedValue(0);
 
   useEffect(() => {
     if (visible) {
-      hasAnimatedEntry.current = false;
-      slideY.value = -30;
-      slideOpacity.value = 0;
-      slideScale.value = 0.92;
-      // Kısa gecikme — Modal render olduktan sonra animasyon başlat
-      const timer = setTimeout(() => {
-        slideY.value = withTiming(0, { duration: 350, easing: Easing.out(Easing.exp) });
-        slideOpacity.value = withTiming(1, { duration: 250, easing: Easing.out(Easing.quad) });
-        slideScale.value = withTiming(1, { duration: 350, easing: Easing.out(Easing.exp) });
-        hasAnimatedEntry.current = true;
-      }, 30);
-      return () => clearTimeout(timer);
+      // Reset — direkt atama (animasyon yok, anlık)
+      slideY.value = -50;
+      contentOpacity.value = 0;
+      backdropOpacity.value = 0;
+      // Giriş animasyonu — withDelay ile UI thread'de 16ms sonra başlat
+      slideY.value = withDelay(16, withTiming(0, { duration: 320, easing: Easing.out(Easing.cubic) }));
+      contentOpacity.value = withDelay(16, withTiming(1, { duration: 220, easing: Easing.out(Easing.quad) }));
+      backdropOpacity.value = withDelay(0, withTiming(1, { duration: 200 }));
     }
   }, [visible]);
 
   const dropdownAnimStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateY: slideY.value },
-      { scale: slideScale.value },
-    ],
-    opacity: slideOpacity.value,
+    transform: [{ translateY: slideY.value }],
+    opacity: contentOpacity.value,
+  }));
+
+  const backdropAnimStyle = useAnimatedStyle(() => ({
+    opacity: backdropOpacity.value,
   }));
 
   if (!visible) return null;
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={s.backdrop} onPress={onClose} />
+    <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
+      <ReAnimated.View style={[s.backdrop, backdropAnimStyle]}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+      </ReAnimated.View>
 
       <ReAnimated.View style={[s.dropdown, { top: resolvedAnchor }, dropdownAnimStyle]}>
         {/* ★ Odalarım paleti: diagonal gradient (parlak üst-sol → koyu alt-sağ) */}
@@ -557,74 +565,8 @@ export default function NotificationDrawer({ visible, onClose, userId, anchorTop
         )}
       </ReAnimated.View>
 
-      {/* ★ 2026-04-24: Teşekkür Info Modal — bildirime tıklanınca açılır */}
-      {thankYouInfo && (
-        <View style={s.thankOverlay}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={() => setThankYouInfo(null)} />
-          <View style={s.thankCard}>
-            <LinearGradient
-              colors={['#1a2e2a', '#0f1f1c', '#091412']}
-              start={{ x: 0, y: 0 }} end={{ x: 0.7, y: 1 }}
-              style={StyleSheet.absoluteFillObject}
-            />
-            <LinearGradient
-              colors={['rgba(20,184,166,0.15)', 'transparent']}
-              start={{ x: 0, y: 0 }} end={{ x: 0.6, y: 0.8 }}
-              style={StyleSheet.absoluteFillObject}
-            />
-            <LinearGradient
-              colors={['transparent', 'rgba(34,197,94,0.7)', 'transparent']}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-              style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1.5 }}
-            />
-
-            <Text style={s.thankHeader}>🙏 TEŞEKKÜR</Text>
-
-            {/* Avatar + sender info */}
-            <View style={s.thankSenderRow}>
-              {thankYouInfo.senderAvatar && (
-                <StatusAvatar uri={thankYouInfo.senderAvatar} size={44} />
-              )}
-              <View style={{ flex: 1 }}>
-                <Text style={s.thankSenderName} numberOfLines={1}>{thankYouInfo.senderName}</Text>
-                <Text style={s.thankSenderLabel}>sana teşekkür etti</Text>
-              </View>
-            </View>
-
-            {/* Emoji + message */}
-            {thankYouInfo.body && (
-              <View style={s.thankMsgBox}>
-                <Text style={s.thankMsgText}>{thankYouInfo.body}</Text>
-              </View>
-            )}
-
-            {/* Actions */}
-            <View style={s.thankActions}>
-              <Pressable
-                style={({ pressed }) => [s.thankProfileBtn, pressed && { opacity: 0.7 }]}
-                onPress={() => {
-                  setThankYouInfo(null);
-                  onClose();
-                  if (thankYouInfo.senderId) router.push(`/user/${thankYouInfo.senderId}` as any);
-                }}
-              >
-                <Ionicons name="person" size={14} color="#14B8A6" />
-                <Text style={s.thankProfileText}>Profiline Git</Text>
-              </Pressable>
-              <Pressable
-                style={({ pressed }) => [s.thankCloseBtn2, pressed && { opacity: 0.7 }]}
-                onPress={() => setThankYouInfo(null)}
-              >
-                <Text style={s.thankCloseText}>Tamam</Text>
-              </Pressable>
-            </View>
-
-            <Pressable style={s.thankCloseX} onPress={() => setThankYouInfo(null)} hitSlop={8}>
-              <Ionicons name="close" size={16} color="rgba(20,184,166,0.6)" />
-            </Pressable>
-          </View>
-        </View>
-      )}
+      {/* ★ 2026-04-26: Teşekkür modal'ı drawer içinden ÇIKARILDI — race condition çözüldü.
+           Artık parent'ta global ThankYouReceivedModal kullanılıyor (onShowThankYou prop). */}
     </Modal>
   );
 }
@@ -632,7 +574,7 @@ export default function NotificationDrawer({ visible, onClose, userId, anchorTop
 const s = StyleSheet.create({
   backdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.3)',
+    backgroundColor: 'transparent',
   },
   dropdown: {
     // ★ 2026-04-24 v2: Geniş, premium boyut — neredeyse tam genişlik
@@ -642,11 +584,11 @@ const s = StyleSheet.create({
     borderRadius: 20,
     paddingBottom: 6,
     overflow: 'hidden',
-    elevation: 30,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 12 },
     shadowOpacity: 0.7,
     shadowRadius: 24,
+    elevation: 24, // ★ 2026-04-24: Android shadow (elevation olmadan görünmez)
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.06)',
   },
@@ -828,6 +770,16 @@ const s = StyleSheet.create({
   },
   thankProfileText: {
     fontSize: 13, fontWeight: '700', color: '#14B8A6',
+  },
+  // ★ 2026-04-26: "Tamam" tek-buton, tam genişlik primary CTA (eski iki ufak buton yerine)
+  thankCloseBtnFull: {
+    marginTop: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: 'rgba(20,184,166,0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(20,184,166,0.4)',
+    alignItems: 'center',
   },
   thankCloseBtn2: {
     paddingHorizontal: 20, paddingVertical: 10,

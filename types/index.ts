@@ -30,6 +30,14 @@ export type SubscriptionTier = 'Free' | 'Plus' | 'Pro' | 'GodMaster';
 /** Alias — tüm kod tabanında uyumluluk */
 export type TierName = SubscriptionTier;
 
+// ============================================
+// LIVEKIT MEDIA AYARLARI
+// ============================================
+/** Mikrofon modu — normal (NC açık) veya music (HQ stereo) */
+export type MicMode = 'normal' | 'music';
+/** Kamera yönü */
+export type CameraFacing = 'front' | 'back';
+
 /**
  * Tier string'ini doğrular — sadece 'Free' | 'Plus' | 'Pro' kabul eder.
  * Bilinmeyen/geçersiz değerler → 'Free'.
@@ -443,7 +451,10 @@ export const ALL_PERMISSIONS: Record<OwnerPermission, PermissionDefinition> = {
   set_room_music:       { minRole: 'owner', requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false, minTier: 'Pro' },
   set_followers_only:   { minRole: 'owner', requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false, minTier: 'Pro' },
   ghost_mode:           { minRole: 'owner', requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false, minTier: 'Pro' },
-  disguise_user:        { minRole: 'owner', requiresTarget: true,  requiresLowerTarget: true,  hiddenOnSelf: true,  minTier: 'Pro' },
+  // ★ 2026-04-28: Self-toggle (host kendi kılığını değiştirir, başkasına uygulanmaz).
+  //   Eski "requiresTarget/hiddenOnSelf:true" başkasına uygula mantığıydı, kaldırıldı.
+  //   minTier Free — test için açık, tier kararı sonra verilebilir (Plus = yönetim aracı kategorisi).
+  disguise_user:        { minRole: 'owner', requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false, minTier: 'Free' },
   mute_all:             { minRole: 'owner', requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false, minTier: 'Pro' },
   record_room:          { minRole: 'owner', requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false, minTier: 'Pro' },
   set_entry_fee:        { minRole: 'owner', requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false, minTier: 'Pro' },

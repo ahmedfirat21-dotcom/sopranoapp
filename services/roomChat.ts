@@ -79,6 +79,9 @@ function _ensureCleanupInterval() {
 export const RoomChatService = {
   /**
    * Odadaki mesajlari getir (son 50)
+   * ★ 2026-04-26: Descending — limit ile son 50 yeni mesaj döner. Component'te [newest, ..., oldest] sıralı.
+   *   Eski ascending: ilk eklenen 50 mesaj dönüyordu (yanlış: kullanıcı son 50'yi ister) +
+   *   real-time [msg, ...prev] ile karışık sıralama oluşuyordu → son mesaj listede üstte gözüküyordu.
    */
   async getMessages(roomId: string, limit = 50): Promise<RoomMessage[]> {
     // Sistem odalarında DB sorgusu yapma (UUID değil)
@@ -87,7 +90,7 @@ export const RoomChatService = {
       .from('messages')
       .select('*, profiles!messages_sender_id_fkey(display_name, avatar_url)')
       .eq('room_id', roomId)
-      .order('created_at', { ascending: true })
+      .order('created_at', { ascending: false })
       .limit(limit);
     if (error) {
       if (__DEV__) logger.warn('Room messages yuklenemedi:', error);
@@ -109,8 +112,14 @@ export const RoomChatService = {
     // Sistem odalarında DB'ye yazma (UUID değil)
     if (isSystemRoom(roomId)) return null;
     // ★ SEC-8c: Input sanitization — max 500 char, HTML strip, boş mesaj engelleme
-    const sanitized = (content || '').trim().replace(/<[^>]*>/g, '').slice(0, 500);
+    let sanitized = (content || '').trim().replace(/<[^>]*>/g, '').slice(0, 500);
     if (sanitized.length < 1) return null;
+    // ★ 2026-04-25: Profanity filter — küfür/uygunsuz kelimeleri sansürle (mask).
+    //   Hard block yerine soft mask: gönderim çalışır ama kelime "s*****r" olur.
+    try {
+      const { filterBadWords } = require('../constants/badwords');
+      sanitized = filterBadWords(sanitized);
+    } catch { /* badwords yoksa sessiz */ }
 
     _ensureCleanupInterval();
     // ★ SEC-FLOOD: Per-user rate limit — emoji flood & genel spam koruması
@@ -275,5 +284,74 @@ export const RoomChatService = {
     return () => {
       supabase.removeChannel(channel);
     };
+  },
+
+  /**
+   * ★ v56: Mesaj reaksiyonu toggle (❤️ varsayılan). Return: { liked, count }.
+   * RPC: public.toggle_message_reaction — sql/v56_message_reactions.sql
+   */
+  async toggleReaction(messageId: string, userId: string, emoji = '❤️'): Promise<{ liked: boolean; count: number } | null> {
+    try {
+      const { data, error } = await supabase.rpc('toggle_message_reaction', {
+        p_message_id: messageId,
+        p_user_id: userId,
+        p_emoji: emoji,
+      });
+      if (error) {
+        if (__DEV__) logger.warn('[roomChat] toggleReaction failed:', error.message);
+        return null;
+      }
+      const d = data as any;
+      return { liked: !!d?.liked, count: Number(d?.count || 0) };
+    } catch (e: any) {
+      if (__DEV__) logger.warn('[roomChat] toggleReaction exception:', e?.message);
+      return null;
+    }
+  },
+
+  /**
+   * ★ v56: Oda açılınca son mesajlar için reaksiyon özetini çek.
+   * Dönüş: { [messageId]: { count, liked } } — UI tek tur render'da hazır.
+   */
+  async getReactions(messageIds: string[], userId: string): Promise<Record<string, { count: number; liked: boolean }>> {
+    if (!messageIds.length) return {};
+    try {
+      const { data, error } = await supabase.rpc('get_message_reactions', { p_message_ids: messageIds });
+      if (error || !Array.isArray(data)) return {};
+      const out: Record<string, { count: number; liked: boolean }> = {};
+      for (const row of data as any[]) {
+        const likedBy: string[] = Array.isArray(row.liked_by_users) ? row.liked_by_users : [];
+        out[row.message_id] = {
+          count: Number(row.count || 0),
+          liked: likedBy.includes(userId),
+        };
+      }
+      return out;
+    } catch {
+      return {};
+    }
+  },
+
+  /**
+   * ★ v56: Reaksiyon realtime — başka kullanıcı beğendiğinde UI anında güncellensin.
+   * Tek aboneden INSERT/DELETE yayın — callback ile messageId dönüyor.
+   */
+  subscribeReactions(
+    roomId: string,
+    onChange: (messageId: string) => void,
+  ) {
+    if (isSystemRoom(roomId)) return () => {};
+    const channel = supabase
+      .channel(`room_chat_reactions:${roomId}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'message_reactions' }, (p) => {
+        const id = (p.new as any)?.message_id;
+        if (id) onChange(id);
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'message_reactions' }, (p) => {
+        const id = (p.old as any)?.message_id;
+        if (id) onChange(id);
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
   },
 };

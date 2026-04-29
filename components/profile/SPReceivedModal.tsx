@@ -4,15 +4,18 @@
 // - Gönderenin adı + avatar
 // - Ücretsiz teşekkür butonları (emoji reaction — sadece notification, SP kosttaki)
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, Animated, Easing, Modal, Dimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import SPHexagonIcon from '../SPHexagonIcon';
 import { supabase } from '../../constants/supabase';
 import { getAvatarSource } from '../../constants/avatars';
 import { Image } from 'react-native';
 import { showToast } from '../Toast';
 import { useSwipeToDismiss } from '../../hooks/useSwipeToDismiss';
+// ★ 2026-04-29: SP miktarına göre tier paleti — SPSentSuccess/SPDonate ile tutarlı.
+import { getSPAmountTier, SP_TIER_VISUAL, SP_TIER_EMOJIS } from '../../constants/spAmountTier';
 
 const { width: W, height: H } = Dimensions.get('window');
 
@@ -45,6 +48,11 @@ export default function SPReceivedModal({
   const [sending, setSending] = useState(false);
   const [alreadyThanked, setAlreadyThanked] = useState(false);
 
+  // ★ 2026-04-29: Miktara göre tier — palet/partikül/sayı bunlardan türer.
+  const tier = useMemo(() => getSPAmountTier(amount), [amount]);
+  const tv = SP_TIER_VISUAL[tier];
+  const tierEmojis = SP_TIER_EMOJIS[tier];
+
   // Animasyonlar
   const backdropOpacity = useRef(new Animated.Value(0)).current;
   const cardScale = useRef(new Animated.Value(0.85)).current;
@@ -58,15 +66,17 @@ export default function SPReceivedModal({
   const [display, setDisplay] = useState(0);
   // Glow pulse
   const glowPulse = useRef(new Animated.Value(1)).current;
-  // Confetti
+  // Confetti — tier'a göre 8/12/16/22 partikül, max havuz 22
+  const MAX_CONFETTI = 22;
   const confetti = useRef(
-    Array.from({ length: 10 }, () => ({
+    Array.from({ length: MAX_CONFETTI }, () => ({
       x: new Animated.Value(0),
       y: new Animated.Value(0),
       rot: new Animated.Value(0),
       opacity: new Animated.Value(0),
     }))
   ).current;
+  const activeConfettiCount = tv.particleCount;
 
   useEffect(() => {
     if (!visible) return;
@@ -98,7 +108,9 @@ export default function SPReceivedModal({
           setAlreadyThanked(true);
           setThanked('✓');
         }
-      } catch {}
+      } catch (e) {
+        if (__DEV__) console.warn('[SPReceivedModal] thank-you check failed:', e);
+      }
     })();
     confetti.forEach(c => {
       c.x.setValue(0);
@@ -106,6 +118,7 @@ export default function SPReceivedModal({
       c.rot.setValue(0);
       c.opacity.setValue(0);
     });
+    // ★ tier'a göre fazlalıkları gizli tut (opacity 0 ve animate dışı)
 
     const listener = countAnim.addListener(({ value }) => setDisplay(Math.floor(value)));
 
@@ -122,8 +135,8 @@ export default function SPReceivedModal({
         Animated.timing(diamondRotate, { toValue: 1, duration: 700, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
         // Count-up
         Animated.timing(countAnim, { toValue: amount, duration: 1100, easing: Easing.out(Easing.cubic), useNativeDriver: false }),
-        // Confetti
-        Animated.stagger(60, confetti.map((c, i) => {
+        // Confetti — tier'a göre aktif sayı kadar partikül uçar
+        Animated.stagger(60, confetti.slice(0, activeConfettiCount).map((c, i) => {
           const dir = i % 2 === 0 ? 1 : -1;
           const distX = (40 + Math.random() * 60) * dir;
           const distY = 120 + Math.random() * 80;
@@ -178,7 +191,7 @@ export default function SPReceivedModal({
       setThanked(reply.emoji);
     } catch (e: any) {
       if (__DEV__) console.warn('[ThankYou] Catch:', e);
-      showToast({ title: 'Hata', message: e?.message || 'Teşekkür gönderilemedi', type: 'error' });
+      showToast({ title: 'Teşekkür Gönderilemedi', message: e?.message || 'Yanıtın iletilemedi.', type: 'error' });
       setSending(false);
       return;
     }
@@ -204,82 +217,70 @@ export default function SPReceivedModal({
       </Animated.View>
 
       <View style={s.center} pointerEvents="box-none">
-        {/* Confetti */}
-        {confetti.map((c, i) => (
-          <Animated.View
-            key={i}
-            pointerEvents="none"
-            style={[
-              s.confetti,
-              {
-                opacity: c.opacity,
-                transform: [
-                  { translateX: c.x },
-                  { translateY: c.y },
-                  { rotate: c.rot.interpolate({ inputRange: [-1, 1], outputRange: ['-180deg', '180deg'] }) },
-                ],
-              },
-            ]}
-          >
-            <Text style={{ fontSize: 20 }}>{['💎', '⭐', '✨', '🎉'][i % 4]}</Text>
-          </Animated.View>
-        ))}
+        {/* ★ 2026-04-29 v2: Confetti kaldırıldı — DiscoverWelcome temizliği, tek hexagon hakim. */}
 
         {/* Card */}
         <Animated.View
-          style={[s.card, { opacity: cardOpacity, transform: [{ scale: cardScale }, { translateY: swipeTranslate }] }]}
+          style={[
+            s.card,
+            { borderColor: tv.glow + '66', shadowColor: tv.glow },
+            { opacity: cardOpacity, transform: [{ scale: cardScale }, { translateY: swipeTranslate }] },
+          ]}
           pointerEvents="auto"
           {...panHandlers}
         >
           {/* ★ Swipe handle — görsel tutamak (pan tüm kartta aktif) */}
           <View style={s.handleWrap}>
-            <View style={s.handle} />
+            <View style={[s.handle, { backgroundColor: tv.glow + '80' }]} />
           </View>
-          {/* Altın zemin katmanları */}
+          {/* ★ Tier'a göre zemin katmanları (basic teal / premium altın / elite rose / legendary mor) */}
           <LinearGradient
-            colors={['#2a1e14', '#17100a', '#0a0604']}
+            colors={tv.bgGradient}
             start={{ x: 0, y: 0 }} end={{ x: 0.7, y: 1 }}
             style={StyleSheet.absoluteFillObject}
           />
           <LinearGradient
-            colors={['rgba(251,191,36,0.3)', 'rgba(251,191,36,0.08)', 'transparent']}
+            colors={[tv.glow + '4D', tv.glow + '14', 'transparent']}
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
             style={StyleSheet.absoluteFillObject}
           />
           <LinearGradient
-            colors={['transparent', 'rgba(251,191,36,0.9)', 'transparent']}
+            colors={['transparent', tv.topEdge, 'transparent']}
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
             style={s.topEdge}
           />
 
-          {/* Header — "SP Bağış Aldın!" */}
-          <Text style={s.headerText}>🎁 SP ALDIN!</Text>
+          {/* Header — Tier label varsa onu, yoksa "SP ALDIN!" */}
+          <Text style={[s.headerText, { color: tv.labelColor }]}>
+            {tv.label ? `${tv.label} · SP ALDIN!` : '🎁 SP ALDIN!'}
+          </Text>
 
           {/* Diamond + glow */}
           <View style={s.diamondSection}>
             <Animated.View
-              style={[s.glowRing, { transform: [{ scale: glowPulse }] }]}
+              style={[
+                s.glowRing,
+                { borderColor: tv.glow + '4D', shadowColor: tv.glow },
+                { transform: [{ scale: glowPulse }] },
+              ]}
               pointerEvents="none"
             />
             <Animated.View
-              style={[s.diamondWrap, {
-                transform: [{ translateY: diamondY }, { scale: diamondScale }, { rotate }],
-              }]}
+              style={[
+                s.diamondWrap,
+                { shadowColor: tv.glow },
+                { transform: [{ translateY: diamondY }, { scale: diamondScale }, { rotate }] },
+              ]}
             >
-              <LinearGradient
-                colors={['#FFE082', '#FBBF24', '#D97706']}
-                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                style={s.diamondGrad}
-              >
-                <Ionicons name="diamond" size={44} color="#FFF" style={s.diamondIcon} />
-              </LinearGradient>
+              {/* ★ 2026-04-29 v2: DiscoverWelcome kalitesinde — hexagon 200 px, hakim element. */}
+              <SPHexagonIcon size={200} />
             </Animated.View>
           </View>
 
-          {/* Amount */}
+          {/* Amount — tier rengi */}
           <View style={s.amountRow}>
-            <Text style={s.amountValue}>{display.toLocaleString('tr-TR')}</Text>
-            <Text style={s.amountLabel}>SP</Text>
+            <Text style={[s.amountValue, { color: tv.glow }]}>{display.toLocaleString('tr-TR')}</Text>
+            <Text style={[s.amountLabel, { color: tv.glow + 'CC' }]}>SP</Text>
           </View>
 
           {/* Sender info */}
@@ -320,7 +321,7 @@ export default function SPReceivedModal({
 
           {/* Close */}
           <Pressable style={s.closeBtn} onPress={onClose} hitSlop={8}>
-            <Ionicons name="close" size={16} color="rgba(251,191,36,0.8)" style={s.closeIcon} />
+            <Ionicons name="close" size={16} color={tv.glow + 'CC'} style={s.closeIcon} />
           </Pressable>
         </Animated.View>
       </View>
@@ -366,14 +367,14 @@ const s = StyleSheet.create({
   },
   diamondSection: {
     alignItems: 'center', justifyContent: 'center',
-    height: 130, marginVertical: 10,
+    height: 220, marginVertical: 14, // ★ hexagon 200 px, container 220
   },
   glowRing: {
     position: 'absolute',
-    width: 140, height: 140, borderRadius: 70,
+    width: 230, height: 230, borderRadius: 115, // ★ hexagon etrafı yumuşak halo
     borderWidth: 2, borderColor: 'rgba(251,191,36,0.3)',
     shadowColor: '#FBBF24',
-    shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.8, shadowRadius: 20,
+    shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.8, shadowRadius: 28,
   },
   diamondWrap: {
     shadowColor: '#FBBF24',

@@ -5,7 +5,8 @@
  */
 import { DeviceEventEmitter } from 'react-native';
 import { supabase } from '../constants/supabase';
-import { getRoomLimits, type TierName } from './database';
+import { getRoomLimits } from '../constants/tiers';
+import type { TierName } from '../types';
 import { PushService } from './push';
 import { FriendshipService } from './friendship';
 
@@ -430,10 +431,10 @@ export const CallService = {
 
           DeviceEventEmitter.emit('onCallSignal', signal);
         })
-        .subscribe((status) => {
-          if (__DEV__) console.log(`[CallService] Call signal kanal durumu: ${status} (user: ${userId.slice(0, 8)})`);
+        .subscribe((status, err) => {
+          if (__DEV__) console.log(`[CallService] Call signal kanal durumu: ${status} (user: ${userId.slice(0, 8)})`, err ? `err=${err?.message || JSON.stringify(err)}` : '');
           if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-            if (__DEV__) console.warn(`[CallService] Kanal hatası (${status}) — 3sn sonra yeniden bağlanıyor...`);
+            if (__DEV__) console.warn(`[CallService] Kanal hatası (${status}) — 3sn sonra yeniden bağlanıyor...`, err);
             setTimeout(() => {
               if (globalCallUserId === userId) {
                 setupChannel();

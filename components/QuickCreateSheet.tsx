@@ -1,10 +1,12 @@
 /**
  * SopranoChat — Quick Create Sheet
- * FAB tıklanınca açılan 3 seçenekli bottom sheet:
+ * FAB tıklanınca açılan 2 seçenekli bottom sheet:
  *  - Hızlı Aç: varsayılanlarla anında oda açar
- *  - Detaylı Ayarla: mevcut çok-adımlı create-room sayfasına gider
- *  - Planla: ileri tarihli oda (yakında)
+ *  - Detaylı Ayarla: çok-adımlı create-room sayfasına gider (planlama dahil son adımda)
  * Clubhouse backchannel pattern'ine uygun: aşağıdan yukarı kayar, swipe-down ile kapanır.
+ *
+ * ★ 2026-04-26: "Planla" seçeneği kaldırıldı — Detaylı Ayarla'nın son adımında zaten
+ *   Hemen/Sonra toggle var. İki ayrı buton aynı sayfaya gidiyordu → mantık zayıftı.
  */
 import React, { useRef, useEffect, useState } from 'react';
 import {
@@ -22,7 +24,6 @@ interface Props {
   onClose: () => void;
   onQuickCreate: () => void;
   onDetailedCreate: () => void;
-  onSchedule?: () => void;
   bottomInset: number;
   /**
    * ★ 2026-04-23: Tab bar / alt navigasyon yüksekliği — panel bu kadar yukarı kalkar,
@@ -32,7 +33,7 @@ interface Props {
 }
 
 export default function QuickCreateSheet({
-  visible, onClose, onQuickCreate, onDetailedCreate, onSchedule, bottomInset,
+  visible, onClose, onQuickCreate, onDetailedCreate, bottomInset,
   bottomOffset = 0,
 }: Props) {
   // ★ Panel artık bottom:0'da ve paddingBottom ile yüksekliği şişiyor;
@@ -66,9 +67,10 @@ export default function QuickCreateSheet({
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => false,
-      // ★ 2026-04-23: Sadece aşağı yönlü drag'i yakala — yukarı çekmek boş alan açıyordu
-      // (panel fixed-height, bottom:0; yukarı shift panelin altını ekran dibinden ayırıp kesik yaratıyor).
-      onMoveShouldSetPanResponder: (_, gs) => gs.dy > 4 && Math.abs(gs.dy) > Math.abs(gs.dx),
+      onStartShouldSetPanResponderCapture: () => false,
+      // ★ 2026-04-28: Pan tüm sheet'e bağlı (Clubhouse). Panel iç scroll yok, tap'ler buton'a gider.
+      onMoveShouldSetPanResponder: (_, gs) => gs.dy > 8 && Math.abs(gs.dy) > Math.abs(gs.dx),
+      onPanResponderTerminationRequest: () => false,
       onPanResponderMove: (_, gs) => {
         // Aşağı yönde 1-to-1 follow; yukarı hareket yok (clamp at 0).
         translateY.setValue(Math.max(0, gs.dy));
@@ -104,6 +106,7 @@ export default function QuickCreateSheet({
             transform: [{ translateY }],
           },
         ]}
+        {...panResponder.panHandlers}
       >
         <LinearGradient
           colors={['#4a5668', '#37414f', '#232a35']}
@@ -113,9 +116,8 @@ export default function QuickCreateSheet({
           style={[StyleSheet.absoluteFillObject, { borderTopLeftRadius: 20, borderTopRightRadius: 20 }]}
         />
 
-        {/* ★ 2026-04-23: Drag alanı artık tüm üst blok (handle + başlık) —
-             tap'lar Option'lara gider, yukarı/aşağı sürükleme kapatır. */}
-        <View {...panResponder.panHandlers}>
+        {/* ★ 2026-04-28: Drag handle/header artık görsel — pan tüm sheet'te (Clubhouse). */}
+        <View>
           <View style={s.handle}>
             <View style={s.handleBar} />
           </View>
@@ -138,16 +140,8 @@ export default function QuickCreateSheet({
             icon="options-outline"
             iconColor="#A78BFA"
             title="Detaylı Ayarla"
-            subtitle="Tip, şifre, hoş geldin mesajı, tema — tamamını belirle"
+            subtitle="Tema, izin, planlama — tüm seçenekleri elden tut"
             onPress={() => { onClose(); setTimeout(() => onDetailedCreate(), 160); }}
-          />
-          <Option
-            icon="calendar-outline"
-            iconColor="#F59E0B"
-            title="Planla"
-            subtitle="İleri tarihli oda — yakında"
-            onPress={() => onSchedule?.()}
-            disabled={!onSchedule}
           />
         </View>
       </Animated.View>

@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  @import url('https://fonts.cdnfonts.com/css/cooper-black');
+
+  body {
+    margin: 0;
+    padding: 40px;
+    background: #1e222e;
+    display: flex;
+    flex-direction: column;
+    gap: 40px;
+    align-items: flex-start;
+  }
+
+  .label {
+    color: #666;
+    font-family: monospace;
+    font-size: 12px;
+    margin-bottom: 4px;
+  }
+
+  .retro-logo-text {
+    font-family: 'Cooper Black', 'Arial Rounded MT Bold', serif;
+    font-weight: 900;
+    letter-spacing: 0.5px;
+    transform: scaleY(1.05);
+    display: inline-flex;
+    gap: 0px;
+    position: relative;
+    font-size: 72px;
+    line-height: 1;
+  }
+
+  .retro-logo-soprano {
+    background: linear-gradient(180deg, #ffffff 0%, #dde4ee 35%, #b8c2d4 70%, #ccd4e4 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.6)) drop-shadow(1px 1px 0 rgba(0,0,0,0.4));
+  }
+
+  .retro-logo-chat {
+    background: linear-gradient(180deg, #b8f0f0 0%, #5ec8c8 30%, #3a9e9e 65%, #4db0a8 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.6)) drop-shadow(1px 1px 0 rgba(20,80,70,0.5));
+  }
+
+  /* Birleşik versiyon */
+  .combined {
+    font-size: 72px;
+  }
+
+  /* Büyük versiyon (header için) */
+  .large {
+    font-size: 96px;
+  }
+
+  /* Küçük versiyon */
+  .small {
+    font-size: 44px;
+  }
+</style>
+</head>
+<body>
+
+<div>
+  <div class="label">Birleşik Logo (72px - Homepage boyutu):</div>
+  <div class="retro-logo-text combined">
+    <span class="retro-logo-soprano">Soprano</span><span class="retro-logo-chat">Chat</span>
+  </div>
+</div>
+
+<div>
+  <div class="label">Büyük Logo (96px):</div>
+  <div class="retro-logo-text large">
+    <span class="retro-logo-soprano">Soprano</span><span class="retro-logo-chat">Chat</span>
+  </div>
+</div>
+
+<div>
+  <div class="label">Küçük Logo (44px - Header boyutu):</div>
+  <div class="retro-logo-text small">
+    <span class="retro-logo-soprano">Soprano</span><span class="retro-logo-chat">Chat</span>
+  </div>
+</div>
+
+<div>
+  <div class="label">"Soprano" tek başına:</div>
+  <div class="retro-logo-text combined">
+    <span class="retro-logo-soprano">Soprano</span>
+  </div>
+</div>
+
+<div>
+  <div class="label">"Chat" tek başına:</div>
+  <div class="retro-logo-text combined">
+    <span class="retro-logo-chat">Chat</span>
+  </div>
+</div>
+
+</body>
+</html>

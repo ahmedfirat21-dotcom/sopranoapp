@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 620 90" width="620" height="90">
+  <defs>
+    <!-- Soprano: Beyaz-gri dikey gradient (homepage CSS'den alındı) -->
+    <linearGradient id="sopranoFill" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="35%" stop-color="#dde4ee"/>
+      <stop offset="70%" stop-color="#b8c2d4"/>
+      <stop offset="100%" stop-color="#ccd4e4"/>
+    </linearGradient>
+
+    <!-- Chat: Teal-cyan dikey gradient (homepage CSS'den alındı) -->
+    <linearGradient id="chatFill" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#b8f0f0"/>
+      <stop offset="30%" stop-color="#5ec8c8"/>
+      <stop offset="65%" stop-color="#3a9e9e"/>
+      <stop offset="100%" stop-color="#4db0a8"/>
+    </linearGradient>
+
+    <!-- 3D gölge filtresi -->
+    <filter id="textShadow" x="-5%" y="-10%" width="115%" height="140%">
+      <feDropShadow dx="1" dy="2" stdDeviation="1.5" flood-color="#000000" flood-opacity="0.6"/>
+      <feDropShadow dx="1" dy="1" stdDeviation="0" flood-color="#000000" flood-opacity="0.4"/>
+    </filter>
+
+    <!-- Chat glow animasyonu -->
+    <filter id="chatGlow" x="-10%" y="-10%" width="120%" height="140%">
+      <feDropShadow dx="1" dy="2" stdDeviation="1.5" flood-color="#000000" flood-opacity="0.6"/>
+      <feDropShadow dx="1" dy="1" stdDeviation="0" flood-color="rgba(20,80,70,1)" flood-opacity="0.5"/>
+      <feDropShadow dx="0" dy="0" stdDeviation="4" flood-color="#78c8c8" flood-opacity="0.15"/>
+    </filter>
+  </defs>
+
+  <style>
+    @import url('https://fonts.cdnfonts.com/css/cooper-black');
+
+    .logo-font {
+      font-family: 'Cooper Black', 'Arial Rounded MT Bold', serif;
+      font-weight: 900;
+      font-size: 72px;
+      letter-spacing: 0.5px;
+    }
+
+    @keyframes chatGlowPulse {
+      0%, 100% { filter: url(#textShadow); }
+      50% { filter: url(#chatGlow); }
+    }
+
+    #chat-group {
+      animation: chatGlowPulse 3s ease-in-out infinite;
+    }
+  </style>
+
+  <!-- ============================================ -->
+  <!-- GRUP 1: "Soprano" — Animasyon için ayrı grup -->
+  <!-- ============================================ -->
+  <g id="soprano-group" filter="url(#textShadow)">
+    <!-- Koyu dış outline -->
+    <text x="8" y="70" class="logo-font"
+          fill="none" stroke="#2a2e3a" stroke-width="6" stroke-linejoin="round"
+          paint-order="stroke">Soprano</text>
+
+    <!-- Ana gradient dolgu -->
+    <text x="8" y="70" class="logo-font"
+          fill="url(#sopranoFill)" stroke="#3d4452" stroke-width="1" stroke-linejoin="round"
+          paint-order="stroke">Soprano</text>
+  </g>
+
+  <!-- ======================================== -->
+  <!-- GRUP 2: "Chat" — Animasyon için ayrı grup -->
+  <!-- ======================================== -->
+  <g id="chat-group">
+    <!-- Koyu dış outline -->
+    <text x="398" y="70" class="logo-font"
+          fill="none" stroke="#1a3a3a" stroke-width="6" stroke-linejoin="round"
+          paint-order="stroke">Chat</text>
+
+    <!-- Ana gradient dolgu -->
+    <text x="398" y="70" class="logo-font"
+          fill="url(#chatFill)" stroke="#14504a" stroke-width="1" stroke-linejoin="round"
+          paint-order="stroke">Chat</text>
+  </g>
+</svg>

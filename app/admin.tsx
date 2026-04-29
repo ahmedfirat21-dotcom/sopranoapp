@@ -12,7 +12,8 @@ import { safeGoBack } from '../constants/navigation';
 import { Colors } from '../constants/theme';
 import { supabase } from '../constants/supabase';
 import { ModerationService } from '../services/moderation';
-import { RoomService, getRoomLimits } from '../services/database';
+import { RoomService } from '../services/database';
+import { getRoomLimits } from '../constants/tiers';
 import { getAvatarSource } from '../constants/avatars';
 import StatusAvatar from '../components/StatusAvatar';
 import { showToast } from '../components/Toast';
@@ -108,7 +109,7 @@ export default function AdminPanel() {
   // Admin kontrolü
   if (!profile?.is_admin) {
     return (
-      <AppBackground>
+      <AppBackground radialGlow>
         <View style={[s.container, { justifyContent: 'center', alignItems: 'center' }]}>
           <Ionicons name="shield-outline" size={64} color="#EF4444" />
           <Text style={{ color: '#EF4444', fontSize: 18, fontWeight: '700', marginTop: 16 }}>Erişim Reddedildi</Text>
@@ -264,10 +265,10 @@ export default function AdminPanel() {
           // ★ K-PROJE-1: v25 RPC — admin bypass + cascade cleanup
           const { error } = await supabase.rpc('admin_delete_room', { p_room_id: roomId });
           if (error) {
-            showToast({ title: 'Hata', message: error.message || 'Oda silinemedi', type: 'error' });
+            showToast({ title: 'Oda Silinemedi', message: error.message || 'İşlem tamamlanamadı.', type: 'error' });
             return;
           }
-          showToast({ title: 'Oda Silindi', message: roomName, type: 'success' });
+          showToast({ title: '🗑 Oda Silindi', message: roomName, type: 'success' });
           loadAll();
         }
       },
@@ -284,7 +285,7 @@ export default function AdminPanel() {
             showToast({ title: 'Oda Uyandırıldı', message: roomName, type: 'success' });
             loadAll();
           } catch {
-            showToast({ title: 'Hata', message: 'Oda uyandırılamadı', type: 'error' });
+            showToast({ title: 'Uyandırılamadı', message: `${roomName} uyandırılamadı.`, type: 'error' });
           }
         }
       },
@@ -311,7 +312,7 @@ export default function AdminPanel() {
             showToast({ title: `Tier: ${t}`, message: roomName, type: 'success' });
             loadAll();
           } catch {
-            showToast({ title: 'Hata', type: 'error' });
+            showToast({ title: 'Tier Güncellenemedi', message: `${roomName} tier değişikliği uygulanamadı.`, type: 'error' });
           }
         },
       }));
@@ -345,10 +346,10 @@ export default function AdminPanel() {
             p_make_admin: !currentAdmin,
           });
           if (error) {
-            showToast({ title: 'Hata', message: error.message || 'Yetki değişikliği başarısız', type: 'error' });
+            showToast({ title: 'Yetki Değiştirilemedi', message: error.message || 'İşlem tamamlanamadı.', type: 'error' });
             return;
           }
-          showToast({ title: currentAdmin ? 'Adminlik Kaldırıldı' : 'Admin Yapıldı', message: displayName, type: 'success' });
+          showToast({ title: currentAdmin ? '🔻 Adminlik Kaldırıldı' : '⭐ Admin Yapıldı', message: displayName, type: 'success' });
           loadAll();
         }
       },
@@ -373,16 +374,16 @@ export default function AdminPanel() {
       p_reason: `manual_grant_to_${displayName}`,
     });
     if (!error) {
-      showToast({ title: `${amount} SP Verildi`, message: displayName, type: 'success' });
+      showToast({ title: `💎 ${amount} SP Verildi`, message: `${displayName} hesabına eklendi.`, type: 'success' });
     } else {
-      showToast({ title: 'Hata', message: error.message || 'SP verilemedi', type: 'error' });
+      showToast({ title: 'SP Verilemedi', message: error.message || 'Transfer başarısız.', type: 'error' });
     }
   };
 
   const handleDeleteUser = (userId: string, displayName: string) => {
     // Kendi hesabını silemez
     if (userId === firebaseUser?.uid) {
-      showToast({ title: 'Hata', message: 'Kendi hesabını silemezsin!', type: 'error' });
+      showToast({ title: 'İzin Verilmedi', message: 'Kendi hesabını silemezsin.', type: 'warning' });
       return;
     }
     showAdAlert(
@@ -395,10 +396,10 @@ export default function AdminPanel() {
             // ★ K-PROJE-1: v25 RPC — cascade delete tek transaction, RLS bypass.
             const { error } = await supabase.rpc('admin_delete_user_cascade', { p_user_id: userId });
             if (error) {
-              showToast({ title: 'Hata', message: error.message || 'Kullanıcı silinemedi', type: 'error' });
+              showToast({ title: 'Kullanıcı Silinemedi', message: error.message || 'İşlem tamamlanamadı.', type: 'error' });
               return;
             }
-            showToast({ title: 'Kullanıcı Silindi', message: `${displayName} kalıcı olarak silindi`, type: 'success' });
+            showToast({ title: '🗑 Kullanıcı Silindi', message: `${displayName} kalıcı olarak silindi.`, type: 'success' });
             loadAll();
           }
         },
@@ -430,7 +431,7 @@ export default function AdminPanel() {
   // ========== UI ==========
   if (loading) {
     return (
-      <AppBackground>
+      <AppBackground radialGlow>
         <View style={[s.container, { justifyContent: 'center', alignItems: 'center' }]}>
           <ActivityIndicator size="large" color={Colors.teal} />
           <Text style={{ color: Colors.text2, marginTop: 12 }}>GodMaster yükleniyor...</Text>
@@ -447,7 +448,7 @@ export default function AdminPanel() {
   ] as const;
 
   return (
-    <AppBackground>
+    <AppBackground radialGlow>
       <View style={s.container}>
         {/* HEADER */}
         <LinearGradient

@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" width="400" height="300">
+  <defs>
+    <radialGradient id="glow1" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="rgba(20,184,166,0.25)"/>
+      <stop offset="100%" stop-color="rgba(20,184,166,0)"/>
+    </radialGradient>
+    <linearGradient id="avatar" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#334155"/>
+      <stop offset="100%" stop-color="#1E293B"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Ambient glow -->
+  <ellipse cx="200" cy="180" rx="170" ry="60" fill="url(#glow1)"/>
+
+  <!-- Left avatar (silhouette, missing) -->
+  <g transform="translate(110,150)">
+    <circle r="48" fill="url(#avatar)" stroke="rgba(94,234,212,0.25)" stroke-width="2" stroke-dasharray="4 4"/>
+    <circle cy="-12" r="16" fill="rgba(148,163,184,0.4)"/>
+    <path d="M -26 22 Q 0 -2 26 22 L 26 40 L -26 40 Z" fill="rgba(148,163,184,0.4)"/>
+  </g>
+
+  <!-- Right avatar (silhouette, missing) -->
+  <g transform="translate(290,150)">
+    <circle r="48" fill="url(#avatar)" stroke="rgba(94,234,212,0.25)" stroke-width="2" stroke-dasharray="4 4"/>
+    <circle cy="-12" r="16" fill="rgba(148,163,184,0.4)"/>
+    <path d="M -26 22 Q 0 -2 26 22 L 26 40 L -26 40 Z" fill="rgba(148,163,184,0.4)"/>
+  </g>
+
+  <!-- Connection line (disconnected dashes) -->
+  <line x1="160" y1="150" x2="240" y2="150"
+        stroke="rgba(94,234,212,0.4)" stroke-width="2.5"
+        stroke-dasharray="6 8" stroke-linecap="round"/>
+
+  <!-- Heart at center (broken/split hint) -->
+  <g transform="translate(200,150)">
+    <path d="M 0 -8 C -12 -20 -28 -14 -28 -2 C -28 10 0 28 0 28 C 0 28 28 10 28 -2 C 28 -14 12 -20 0 -8 Z"
+          fill="rgba(239,68,68,0.2)" stroke="rgba(239,68,68,0.6)" stroke-width="2"/>
+    <line x1="0" y1="-8" x2="0" y2="28" stroke="rgba(15,23,42,0.9)" stroke-width="3"/>
+  </g>
+
+  <!-- Floating plus icon for invite CTA hint -->
+  <g transform="translate(340,80)" opacity="0.7">
+    <circle r="18" fill="#14B8A6"/>
+    <line x1="-8" y1="0" x2="8" y2="0" stroke="white" stroke-width="3" stroke-linecap="round"/>
+    <line x1="0" y1="-8" x2="0" y2="8" stroke="white" stroke-width="3" stroke-linecap="round"/>
+  </g>
+</svg>

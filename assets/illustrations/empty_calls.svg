@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" width="400" height="300">
+  <defs>
+    <radialGradient id="cglow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="rgba(20,184,166,0.22)"/>
+      <stop offset="100%" stop-color="rgba(20,184,166,0)"/>
+    </radialGradient>
+    <linearGradient id="phone" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#334155"/>
+      <stop offset="100%" stop-color="#1E293B"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Ambient glow -->
+  <ellipse cx="200" cy="170" rx="170" ry="55" fill="url(#cglow)"/>
+
+  <!-- Phone handset (rotated 25deg, resting) -->
+  <g transform="translate(200,160) rotate(-25)">
+    <rect x="-70" y="-22" width="140" height="44" rx="22" fill="url(#phone)" stroke="rgba(94,234,212,0.25)" stroke-width="1.5"/>
+    <!-- Earpiece -->
+    <rect x="-62" y="-15" width="20" height="30" rx="6" fill="rgba(71,85,105,0.9)"/>
+    <circle cx="-52" cy="-7" r="3" fill="rgba(148,163,184,0.5)"/>
+    <circle cx="-52" cy="0" r="3" fill="rgba(148,163,184,0.5)"/>
+    <circle cx="-52" cy="7" r="3" fill="rgba(148,163,184,0.5)"/>
+    <!-- Mouthpiece -->
+    <rect x="42" y="-15" width="20" height="30" rx="6" fill="rgba(71,85,105,0.9)"/>
+    <circle cx="52" cy="-7" r="3" fill="rgba(148,163,184,0.5)"/>
+    <circle cx="52" cy="0" r="3" fill="rgba(148,163,184,0.5)"/>
+    <circle cx="52" cy="7" r="3" fill="rgba(148,163,184,0.5)"/>
+  </g>
+
+  <!-- Dashed silent waves (no ring) -->
+  <g stroke="rgba(94,234,212,0.3)" stroke-width="2" fill="none" stroke-dasharray="4 5" stroke-linecap="round">
+    <circle cx="120" cy="120" r="28" opacity="0.6"/>
+    <circle cx="120" cy="120" r="42" opacity="0.4"/>
+    <circle cx="280" cy="210" r="28" opacity="0.6"/>
+    <circle cx="280" cy="210" r="42" opacity="0.4"/>
+  </g>
+
+  <!-- Notification (missed call) bell icon dimmed -->
+  <g transform="translate(330,80)" opacity="0.7">
+    <path d="M 0 -10 C -10 -10 -15 -2 -15 8 L -15 18 L -20 22 L 20 22 L 15 18 L 15 8 C 15 -2 10 -10 0 -10 Z" fill="#475569"/>
+    <circle cx="0" cy="-10" r="2" fill="#EF4444"/>
+    <circle cy="26" r="4" fill="#475569"/>
+  </g>
+</svg>

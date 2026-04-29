@@ -13,6 +13,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSegments } from 'expo-router';
 
 export interface MinimizedRoom {
   id: string;
@@ -28,6 +29,8 @@ interface MiniRoomCardProps {
   onExpand: () => void;
   onClose: () => void;
   onMuteToggle?: () => void;
+  /** ★ 2026-04-24: Mic aç/kapat — minimize edilmiş kartta bile kullanıcı mic'i toggle edebilsin */
+  onMicToggle?: () => void;
 }
 
 const BAR_MARGIN = 6;
@@ -35,10 +38,16 @@ const BAR_H = 60;
 const CARD_H = 52;
 const SCREEN_H = Dimensions.get('window').height;
 
-export default function MiniRoomCard({ room, onExpand, onClose, onMuteToggle }: MiniRoomCardProps) {
+export default function MiniRoomCard({ room, onExpand, onClose, onMuteToggle, onMicToggle }: MiniRoomCardProps) {
   const insets = useSafeAreaInsets();
   const { width: winW } = useWindowDimensions();
   const expandingRef = useRef(false);
+  // ★ 2026-04-26 PERF: isTabBarVisible artık kendi içinde hesaplanıyor.
+  //   Root layout'tan prop olarak gelmesi, useSegments()'in root layout'u
+  //   her navigasyonda re-render etmesine yol açıyordu (1466 satırlık bileşen!).
+  //   Şimdi sadece bu küçük bileşen re-render oluyor.
+  const segments = useSegments();
+  const isTabBarVisible = segments[0] === '(tabs)';
 
   // ═══ Animasyon değerleri (tümü native driver) ═══
   const slideIn = useRef(new Animated.Value(80)).current;
@@ -58,7 +67,10 @@ export default function MiniRoomCard({ room, onExpand, onClose, onMuteToggle }: 
   const expandOpacity = useRef(new Animated.Value(1)).current;
 
   const cardWidth = Math.max(0, winW - BAR_MARGIN * 2 - (insets.left + insets.right));
-  const bottomBase = Math.max(insets.bottom, 8) + BAR_H + 8;
+  // ★ 2026-04-24: Tab bar varsa BAR_H+22 offset, yoksa (chat/user gibi stack'te) sadece safe area + 12px.
+  const bottomBase = isTabBarVisible
+    ? Math.max(insets.bottom, 14) + BAR_H + 22
+    : Math.max(insets.bottom, 14) + 12;
 
   // Snap noktaları
   const snapOffsetBottom = 0;
@@ -208,6 +220,22 @@ export default function MiniRoomCard({ room, onExpand, onClose, onMuteToggle }: 
         { transform: [{ scale: rippleScaleFn(ripple2) }], opacity: rippleOpacityFn(ripple2) },
       ]} />
 
+      {/* ★ 2026-04-24: Eşit dağılmış teal blur-glow — 3 katman decreasing opacity outward.
+          Card width/height kadar alan kaplar, kartın arkasına oturur; tüm kenarlara simetrik yayılır. */}
+      {isAudioActive && (
+        <>
+          <Animated.View
+            style={[styles.audioHalo1, { opacity: audioGlow.interpolate({ inputRange: [0, 1], outputRange: [0.35, 0.6] }) }]}
+            pointerEvents="none"
+          />
+          <Animated.View
+            style={[styles.audioHalo2, { opacity: audioGlow.interpolate({ inputRange: [0, 1], outputRange: [0.5, 0.8] }) }]}
+            pointerEvents="none"
+          />
+          <View style={styles.audioHalo3} pointerEvents="none" />
+        </>
+      )}
+
       {/* Ana kart */}
       <Pressable onPress={handleExpand} style={[
         styles.card,
@@ -264,28 +292,22 @@ export default function MiniRoomCard({ room, onExpand, onClose, onMuteToggle }: 
                 color={isAudioActive ? '#14B8A6' : '#EF4444'}
                 style={styles.iconShadow}
               />
-              {isAudioActive && (
-                <View style={styles.soundWaves}>
-                  <Animated.View style={[styles.wave, styles.wave1, { opacity: audioGlow }]} />
-                  <Animated.View style={[styles.wave, styles.wave2, {
-                    opacity: audioGlow.interpolate({
-                      inputRange: [0, 0.5, 1],
-                      outputRange: [0, 0.8, 0.3],
-                    }),
-                  }]} />
-                </View>
-              )}
             </Pressable>
           )}
 
-          <View style={[styles.actionBadge, room.isMicOn && styles.micOn]}>
+          <Pressable
+            onPress={onMicToggle}
+            disabled={!onMicToggle}
+            style={[styles.actionBadge, room.isMicOn && styles.micOn]}
+            hitSlop={8}
+          >
             <Ionicons
               name={room.isMicOn ? 'mic' : 'mic-off'}
               size={13}
-              color={room.isMicOn ? '#14B8A6' : '#64748B'}
+              color={room.isMicOn ? '#14B8A6' : '#EF4444'}
               style={styles.iconShadow}
             />
-          </View>
+          </Pressable>
 
           <Pressable onPress={handleClose} style={styles.closeBtn} hitSlop={12}>
             <Ionicons name="close" size={14} color="#EF4444" />
@@ -303,20 +325,45 @@ const styles = StyleSheet.create({
     zIndex: 999,
     elevation: 999,
     alignItems: 'center',
+    overflow: 'visible', // ★ halo dış kenarlara taşsın
   },
   cardAudioActive: {
-    borderColor: 'rgba(20,184,166,0.6)',
+    borderColor: 'rgba(20,184,166,0.85)',
+    borderWidth: 1.5,
+    // iOS için yumuşak symmetric glow — offset 0,0 orta yayılım
     shadowColor: '#14B8A6',
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 14,
+    shadowOpacity: 0.55,
+    shadowRadius: 18,
+    // ★ Android'de elevation aşağı gölge yaratıyor — aşağıdaki audioHalo layer'ı
+    //   tüm kenarlarda eşit blur-glow sağlar, elevation gerekmez.
+    elevation: 0,
+  },
+  // ★ 2026-04-24: Eşit dağılmış blur-glow halka (Android + iOS tüm platformlarda eşit)
+  audioHalo1: {
+    position: 'absolute',
+    top: -14, left: -14, right: -14, bottom: -14,
+    borderRadius: 36,
+    backgroundColor: 'rgba(20,184,166,0.08)',
+  },
+  audioHalo2: {
+    position: 'absolute',
+    top: -8, left: -8, right: -8, bottom: -8,
+    borderRadius: 30,
+    backgroundColor: 'rgba(20,184,166,0.14)',
+  },
+  audioHalo3: {
+    position: 'absolute',
+    top: -3, left: -3, right: -3, bottom: -3,
+    borderRadius: 25,
+    backgroundColor: 'rgba(20,184,166,0.22)',
   },
   innerGlow: {
     ...StyleSheet.absoluteFillObject,
     borderRadius: 21,
     borderWidth: 2,
-    borderColor: 'rgba(20,184,166,0.5)',
-    backgroundColor: 'rgba(20,184,166,0.04)',
+    borderColor: 'rgba(20,184,166,0.65)',
+    backgroundColor: 'rgba(20,184,166,0.06)',
   },
   ripple: {
     position: 'absolute',
@@ -338,9 +385,9 @@ const styles = StyleSheet.create({
     gap: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.4,
-    shadowRadius: 20,
-    elevation: 14,
+    shadowOpacity: 0.35,
+    shadowRadius: 16,
+    elevation: 6,
   },
   liveIndicator: {
     flexDirection: 'row', alignItems: 'center', gap: 4,

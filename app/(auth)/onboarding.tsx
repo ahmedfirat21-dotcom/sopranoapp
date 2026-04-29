@@ -9,6 +9,7 @@ import { ReferralService } from '../../services/referral';
 import { ProfileService } from '../../services/database';
 import { StorageService } from '../../services/storage';
 import { showToast } from '../../components/Toast';
+import AppBackground from '../../components/AppBackground';
 import { supabase } from '../../constants/supabase';
 import * as ImagePicker from 'expo-image-picker';
 import { containsBadWords } from '../../constants/badwords';
@@ -103,6 +104,20 @@ export default function OnboardingScreen() {
   };
 
   const finalizeOnboarding = async () => {
+    // ★ 2026-04-25: Analytics — kayıt tamamlandı event
+    try {
+      const { Analytics, Events, UserProperties } = require('../../services/analytics');
+      Analytics.track(Events.SIGNUP_COMPLETED);
+      Analytics.setUserProperty(UserProperties.SIGNUP_DATE, new Date().toISOString().slice(0, 10));
+      Analytics.setUserProperty(UserProperties.TIER, 'Free');
+      if (birthYear) {
+        Analytics.setUserProperty(
+          UserProperties.AGE_RANGE,
+          Analytics.ageRangeFrom(`${birthYear}-01-01`)
+        );
+      }
+    } catch {}
+
     // ★ FIX-OB 2026-04-18: Race condition fix — önceki versiyonda setProfile sonrası
     // hemen router.replace('/(tabs)/home') çağrılıyordu; AuthGuard useEffect segments
     // yeni (tabs) ama profile eski (onboarding_completed=false) görüp "Atla" sonrası
@@ -183,7 +198,7 @@ export default function OnboardingScreen() {
 
   const handeApplyCode = async () => {
     if (!inviteCode || inviteCode.length < 3) {
-      showToast({ title: 'Hata', message: 'Lütfen geçerli bir kod girin.', type: 'error' });
+      showToast({ title: 'Geçersiz Kod', message: 'Lütfen geçerli bir davet kodu gir.', type: 'warning' });
       return;
     }
     setSaving(true);
@@ -191,10 +206,10 @@ export default function OnboardingScreen() {
     const result = await ReferralService.applyCode(inviteCode, firebaseUser!.uid, true);
     setSaving(false);
     if (result.success) {
-      showToast({ title: 'Tebrikler!', message: 'Topluluğa hoş geldin! Hesabına 50 SP yüklendi.', type: 'success' });
+      showToast({ title: '🎉 Tebrikler!', message: 'Topluluğa hoş geldin! Hesabına 50 SP yüklendi.', type: 'success' });
       finalizeOnboarding();
     } else {
-      showToast({ title: 'Hata', message: result.message, type: 'error' });
+      showToast({ title: 'Kod Kabul Edilmedi', message: result.message, type: 'error' });
     }
   };
 
@@ -214,7 +229,7 @@ export default function OnboardingScreen() {
           const publicUrl = await StorageService.uploadAvatar(firebaseUser.uid, uri);
           setAvatarUrl(publicUrl);
           setIsCustomAvatar(true);
-          showToast({ title: 'Başarılı', message: 'Profil fotoğrafın yüklendi!', type: 'success' });
+          showToast({ title: '📸 Fotoğraf Yüklendi', message: 'Profil fotoğrafın hazır!', type: 'success' });
         } catch {
           setAvatarUrl(uri);
           setIsCustomAvatar(true);
@@ -229,12 +244,12 @@ export default function OnboardingScreen() {
     Keyboard.dismiss();
     const trimmedName = displayName.trim();
     if (!trimmedName) {
-      showToast({ title: 'Hata', message: 'Lütfen bir isim veya lakap gir.', type: 'error' });
+      showToast({ title: 'İsim Gerekli', message: 'Bir isim veya lakap gir.', type: 'warning' });
       return;
     }
     // ★ SEC-OB1: Min 2 karakter kontrolü
     if (trimmedName.length < 2) {
-      showToast({ title: 'Hata', message: 'İsim en az 2 karakter olmalıdır.', type: 'error' });
+      showToast({ title: 'İsim Çok Kısa', message: 'En az 2 karakter olmalı.', type: 'warning' });
       return;
     }
     // ★ SEC-OB2: Küfür / hakaret filtresi
@@ -247,13 +262,13 @@ export default function OnboardingScreen() {
       .replace(/[\u200B\u200C\u200D\uFEFF\u00AD]/g, '') // Zero-width chars
       .replace(/[\u202A-\u202E\u2066-\u2069]/g, '');    // RTL/LTR override
     if (sanitizedName.length < 2) {
-      showToast({ title: 'Hata', message: 'İsim geçerli karakterler içermelidir.', type: 'error' });
+      showToast({ title: 'Geçersiz Karakter', message: 'İsim görünür karakterler içermeli.', type: 'warning' });
       return;
     }
     // ★ SEC-OB5: Aşırı emoji kontrolü (10'dan fazla emoji = spam)
     const emojiCount = (sanitizedName.match(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu) || []).length;
     if (emojiCount > 10) {
-      showToast({ title: 'Hata', message: 'En fazla 10 emoji kullanabilirsiniz.', type: 'error' });
+      showToast({ title: 'Çok Fazla Emoji', message: 'En fazla 10 emoji kullanabilirsin.', type: 'warning' });
       return;
     }
     if (!firebaseUser) return;
@@ -269,7 +284,11 @@ export default function OnboardingScreen() {
         is_online: true,
         tier: 'free',
         subscription_tier: 'Free',
-        system_points: 0,
+        // ★ 2026-04-28 KRİTİK FIX: system_points UPSERT'ten ÇIKARILDI.
+        //   profiles.system_points sensitive column guard ile UPDATE'te koruma altında
+        //   (sadece grant_system_points RPC üzerinden değişebilir).
+        //   UPSERT mevcut kayda UPDATE düşünce trigger reddediyordu → "Profil Oluşturulamadı".
+        //   Yeni kayıtta DB default zaten 0; mevcut kullanıcının değeri korunur.
         gender: 'unspecified' as const,
         // ★ 2026-04-18 FIX: birth_date null — Step 2'de zorunlu olarak girilir.
         // Önceki default '2000-01-01' idi ve Step 2 tamamlanmasa bile user 26
@@ -287,7 +306,7 @@ export default function OnboardingScreen() {
       // ★ FIX: Fallback kaldırıldı — hata varsa kullanıcıya bildir
       throw new Error(error?.message || 'Profil oluşturulamadı.');
     } catch (error: any) {
-      showToast({ title: 'Hata', message: error?.message || 'Profil oluşturulurken sorun yaşandı.', type: 'error' });
+      showToast({ title: 'Profil Oluşturulamadı', message: error?.message || 'Daha sonra tekrar dene.', type: 'error' });
     } finally { setSaving(false); }
   };
 
@@ -300,7 +319,7 @@ export default function OnboardingScreen() {
     const y = parseInt(birthYear, 10);
     const cur = new Date().getFullYear();
     if (isNaN(y) || y < 1920 || y > cur - 13) {
-      showToast({ title: 'Hata', message: 'En az 13 yaşında olmalısınız.', type: 'error' });
+      showToast({ title: 'Yaş Sınırı', message: 'SopranoChat kullanımı için 13 yaşında olmalısın.', type: 'warning' });
       return;
     }
     // Gender + birth date güncelle
@@ -351,19 +370,7 @@ export default function OnboardingScreen() {
 
   // ═══════════════════════ RENDER ═══════════════════════
   return (
-    <ImageBackground
-      source={require('../../assets/images/app_bg.jpg')}
-      style={s.root}
-      resizeMode="cover"
-    >
-      {/* Vignette */}
-      <LinearGradient
-        colors={['rgba(15,25,38,0.55)', 'transparent', 'transparent', 'rgba(15,25,38,0.65)']}
-        locations={[0, 0.2, 0.75, 1]}
-        style={StyleSheet.absoluteFill}
-        pointerEvents="none"
-      />
-
+    <AppBackground radialGlow>
       <KeyboardAvoidingView style={s.flex} behavior={'padding'}>
         {/* ═══ Top: Progress Bar + Geri Butonu ═══ */}
         <View style={s.topBar}>
@@ -597,7 +604,7 @@ export default function OnboardingScreen() {
           )}
         </View>
       </KeyboardAvoidingView>
-    </ImageBackground>
+    </AppBackground>
   );
 }
 

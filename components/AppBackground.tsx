@@ -9,6 +9,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import NeonWaveBackground, { type BgVariant } from './NeonWaveBackground';
 
 export const APP_BG_COLOR = '#0F1929'; // Midnight Sapphire navy — pürüzsüz solid
+// ★ 2026-04-24: Radial glow mode — login/kayıt/ana sayfa/odalarım/mesajlar/profil.
+//   Merkez-üst aydınlık slate + kenar vignette (true radial taklidi).
+export const GLOW_BG_COLOR = '#2A3A55';
 
 interface Props {
   children: React.ReactNode;
@@ -18,9 +21,50 @@ interface Props {
   intensity?: number;
   /** Ekrana özel efekt varyantı */
   variant?: BgVariant;
+  /** Radial glow mode — merkez-üst aydınlık, kenar koyu vignette */
+  radialGlow?: boolean;
 }
 
-export default function AppBackground({ children, disableWave = false, intensity = 1, variant = 'default' }: Props) {
+export default function AppBackground({ children, disableWave = false, intensity = 1, variant = 'default', radialGlow = false }: Props) {
+  if (radialGlow) {
+    return (
+      <View style={[styles.root, { backgroundColor: '#050A14' }]}>
+        {/* ★ 2026-04-24 v3: Gece yarısı gökyüzü — saf dikey blur geçiş, ana katman.
+            Üst horizon parlaklığı → orta derin mavi → alt neredeyse siyah.
+            Çok sayıda yakın stop ile çizgi/band hissi engellenir. */}
+        <LinearGradient
+          colors={['#3A4B66', '#2B3A54', '#1E2A42', '#131D30', '#0A1322', '#050A14']}
+          locations={[0, 0.22, 0.42, 0.62, 0.82, 1]}
+          start={{ x: 0.5, y: 0 }}
+          end={{ x: 0.5, y: 1 }}
+          style={StyleSheet.absoluteFillObject}
+          pointerEvents="none"
+        />
+        {/* ★ Premium depth restore — eski default mode'daki accent'ler.
+            radialGlow mode'unda kaybolan glassmorphic hissi geri verir. */}
+        {/* Üst sağ köşe — çok hafif teal (marka aksanı, yalnızca hissedilir) */}
+        <LinearGradient
+          colors={['rgba(20,184,166,0.06)', 'transparent']}
+          start={{ x: 1, y: 0 }}
+          end={{ x: 0.4, y: 0.5 }}
+          style={StyleSheet.absoluteFillObject}
+          pointerEvents="none"
+        />
+        {/* Alt sol köşe — çok hafif altın (warmth) */}
+        <LinearGradient
+          colors={['transparent', 'rgba(251,191,36,0.04)']}
+          start={{ x: 0.6, y: 0.6 }}
+          end={{ x: 0, y: 1 }}
+          style={StyleSheet.absoluteFillObject}
+          pointerEvents="none"
+        />
+        {/* Animasyonlu wave layer — ana derinlik kaynağı */}
+        {!disableWave && <NeonWaveBackground intensity={intensity} variant={variant} />}
+        {children}
+      </View>
+    );
+  }
+
   return (
     <View style={styles.root}>
       {/* ★ 2026-04-20: Pürüzsüz Midnight Sapphire — solid navy base,

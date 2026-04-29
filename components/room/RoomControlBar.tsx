@@ -17,14 +17,12 @@ import { LinearGradient } from 'expo-linear-gradient';
 //   Bar: gradient (#2A3A58→#243250→#1A2540) + teal spotlight + parlak beyaz border + radius 22.
 //   Active buton: tab bubble gibi 3D gradient + gloss (accent-based).
 //   Inactive buton: bg yok, sadece ikon + drop shadow (tab'daki pasif ikon gibi).
-const BAR_H = 60;
-const BAR_MARGIN = 6;
-const BTN_SIZE = 42;
-const BUBBLE_SIZE = 42; // active button bubble size
-// ★ 2026-04-23: İkon boyutları büyütüldü — zemin aynı, sadece ikonlar iri.
-//   MIC_ICON diğerlerinden 4px büyük (primary vurgu). Default diğer tüm ikonlar için.
-const ICON_SIZE = 24;
-const MIC_ICON = 32;
+const BAR_H = 50;
+const BAR_MARGIN = 0;
+const BTN_SIZE = 36;
+const BUBBLE_SIZE = 36;
+const ICON_SIZE = 20;
+const MIC_ICON = 26;
 
 // ════════════════════════════════════════════════════════════
 // Renk tonlama helperları — tab bar ile aynı math
@@ -282,21 +280,21 @@ export default function RoomControlBar({
   return (
     <ReAnimated.View style={[s.wrap, entryStyle]}>
       <View style={[s.bar, { width: barWidth }]}>
-        {/* ★ Gradient zemin — tab bar ile birebir */}
+        {/* ★ 2026-04-24: Translucent bombe (ana sayfa ile tutarlı) */}
         <LinearGradient
-          colors={['#2A3A58', '#243250', '#1A2540']}
-          locations={[0, 0.5, 1]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 0, y: 1 }}
+          colors={['rgba(48,65,94,0.92)', 'rgba(26,40,64,0.82)', 'rgba(12,22,40,0.6)']}
+          locations={[0, 0.55, 1]}
+          start={{ x: 0.5, y: 0 }}
+          end={{ x: 0.5, y: 1 }}
           style={s.barGradient}
           pointerEvents="none"
         />
-        {/* ★ Teal spotlight — sol üstten hafif teal akıtma (premium aksan) */}
+        {/* ★ 2026-04-24: Üst teal separator — oda için üst header ile simetrik */}
         <LinearGradient
-          colors={['rgba(20,184,166,0.08)', 'transparent']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 0.5, y: 1 }}
-          style={s.barGradient}
+          colors={['transparent', 'rgba(20,184,166,0.55)', 'rgba(20,184,166,0.55)', 'transparent']}
+          locations={[0, 0.25, 0.75, 1]}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+          style={s.barTopSeparator}
           pointerEvents="none"
         />
 
@@ -431,21 +429,23 @@ const s = StyleSheet.create({
     width: '100%',
     height: BAR_H,
     paddingHorizontal: 6,
-    borderRadius: 22,
-    backgroundColor: '#1F2E48',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.5)',
     overflow: 'hidden',
     position: 'relative',
+
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.4,
-    shadowRadius: 20,
-    elevation: 14,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.22,
+    shadowRadius: 12,
+    elevation: 8,
   },
   barGradient: {
     position: 'absolute',
     top: 0, left: 0, right: 0, bottom: 0,
+  },
+  barTopSeparator: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0,
+    height: 1.5,
   },
   tab: {
     alignItems: 'center',

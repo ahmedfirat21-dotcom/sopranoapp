@@ -13,6 +13,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Colors } from '../../constants/theme';
 import { getAvatarSource } from '../../constants/avatars';
 import { type RoomParticipant } from '../../services/database';
+import { useUserProfileSheet } from '../../app/_layout';
 
 
 interface Props {
@@ -45,6 +46,7 @@ function QueueItem({
   const displayName = participant.user?.display_name || 'Kullanıcı';
   const userTier = (participant.user as any)?.subscription_tier || (participant.user as any)?.tier;
   const isPaidTier = userTier && userTier !== 'Free';
+  const { openUserProfile } = useUserProfileSheet();
 
   return (
     <View style={q.item}>
@@ -53,8 +55,10 @@ function QueueItem({
         <Text style={q.orderText}>#{index + 1}</Text>
       </View>
 
-      {/* Avatar */}
-      <Image source={getAvatarSource(participant.user?.avatar_url)} style={q.avatar} />
+      {/* ★ 2026-04-26: Avatar tıklanınca profil sheet — diğer platformlardaki gibi */}
+      <Pressable onPress={() => openUserProfile(participant.user_id)} hitSlop={6}>
+        <Image source={getAvatarSource(participant.user?.avatar_url)} style={q.avatar} />
+      </Pressable>
 
       {/* İsim + Badge */}
       <View style={q.nameWrap}>

@@ -2,7 +2,7 @@
  * SopranoChat — Premium Raporlama Modal
  * Glassmorphism + Pill buttons + Slide-up
  */
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, Pressable, Modal, TextInput,
   ScrollView, ActivityIndicator, Dimensions, TouchableOpacity,
@@ -63,10 +63,21 @@ export function ReportModal({ visible, onClose, reporterId, target }: ReportModa
     if (visible) translateY.setValue(0);
   }, [visible, translateY]);
 
+  // ★ 2026-04-28: Clubhouse pattern — pan tüm sheet'e bağlı, ScrollView ile koordineli.
+  const scrollOffsetRef = useRef(0);
+  const handleScroll = useCallback((e: any) => {
+    scrollOffsetRef.current = e?.nativeEvent?.contentOffset?.y ?? 0;
+  }, []);
+
   const panResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_e, g) => Math.abs(g.dy) > 4 && Math.abs(g.dy) > Math.abs(g.dx),
+      onStartShouldSetPanResponder: () => false,
+      onStartShouldSetPanResponderCapture: () => false,
+      onMoveShouldSetPanResponder: (_e, g) =>
+        g.dy > 8 && Math.abs(g.dy) > Math.abs(g.dx) && scrollOffsetRef.current <= 0,
+      onMoveShouldSetPanResponderCapture: (_e, g) =>
+        g.dy > 25 && Math.abs(g.dy) > Math.abs(g.dx) * 2 && scrollOffsetRef.current <= 0,
+      onPanResponderTerminationRequest: () => false,
       onPanResponderMove: (_e, g) => {
         if (g.dy > 0) translateY.setValue(g.dy);
       },
@@ -101,7 +112,7 @@ export function ReportModal({ visible, onClose, reporterId, target }: ReportModa
       setDescription('');
       onClose();
     } catch (err: any) {
-      showToast({ title: 'Hata', message: err.message || 'Rapor gönderilemedi.', type: 'error' });
+      showToast({ title: 'Rapor Gönderilemedi', message: err.message || 'Şikayetin iletilemedi.', type: 'error' });
     } finally {
       setSending(false);
     }
@@ -116,9 +127,9 @@ export function ReportModal({ visible, onClose, reporterId, target }: ReportModa
     <Modal transparent animationType="slide" visible={visible} onRequestClose={onClose}>
       <View style={sty.overlay}>
         <Pressable style={sty.backdrop} onPress={onClose} />
-        <Animated.View style={[sty.sheet, { transform: [{ translateY }] }]}>
-          {/* ★ Drag zone — handle + header birlikte, daha büyük yakalama alanı */}
-          <View {...panResponder.panHandlers}>
+        <Animated.View style={[sty.sheet, { transform: [{ translateY }] }]} {...panResponder.panHandlers}>
+          {/* ★ 2026-04-28: Drag handle/header artık görsel — pan tüm sheet'te (Clubhouse). */}
+          <View>
             <View style={sty.handleWrap}>
               <View style={sty.handle} />
             </View>
@@ -130,7 +141,12 @@ export function ReportModal({ visible, onClose, reporterId, target }: ReportModa
             </View>
           </View>
 
-          <ScrollView style={sty.scrollContent} showsVerticalScrollIndicator={false}>
+          <ScrollView
+            style={sty.scrollContent}
+            showsVerticalScrollIndicator={false}
+            onScroll={handleScroll}
+            scrollEventThrottle={16}
+          >
             <Text style={sty.sectionLabel}>RAPORLAMA SEBEBİ</Text>
 
             {REASONS.map((reason) => {

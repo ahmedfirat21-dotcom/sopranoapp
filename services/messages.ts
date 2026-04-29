@@ -67,8 +67,16 @@ export const MessageService = {
     // ★ Engellenen kişileri filtrele — inbox'ta görünmesinler
     const blockedIds = await FriendshipService._getBlockedIds(userId);
 
+    // ★ v85: Pending mesaj isteği gönderenleri filtrele — onlar "İstekler" sekmesinde görünür
+    const { data: pendingReqRows } = await supabase
+      .from('message_requests')
+      .select('sender_id')
+      .eq('receiver_id', userId)
+      .eq('status', 'pending');
+    const pendingRequestSenderIds = new Set((pendingReqRows || []).map((r: any) => r.sender_id));
+
     // Partner profil bilgilerini toplu çek
-    const partnerIds = Array.from(partnerMap.keys()).filter(id => !blockedIds.has(id));
+    const partnerIds = Array.from(partnerMap.keys()).filter(id => !blockedIds.has(id) && !pendingRequestSenderIds.has(id));
     if (partnerIds.length === 0) return [] as InboxItem[];
 
     // ★ Paralel çek: profiller + conversation_state (pin/archive/mute)
@@ -220,21 +228,11 @@ export const MessageService = {
       throw new Error('Bu kullanıcıyla mesajlaşamazsınız.');
     }
 
-    // ★ 2026-04-27 STRICT POLICY: "Sade özgün sosyal iletişim" vizyonu —
-    //   Yalnız arkadaşlar mesajlaşabilir. Eski Instagram-style "mesaj isteği" akışı kaldırıldı.
-    //   Yabancılara mesaj atmak için önce arkadaş olunmalı (FriendshipService.follow ile).
-    //   friendships tablosu tek yönlü accepted satır kayıt eder; resmi isFriend() OR kullanıyor.
-    const { data: friendshipRows } = await supabase
-      .from('friendships')
-      .select('user_id, friend_id')
-      .eq('status', 'accepted')
-      .or(`and(user_id.eq.${senderId},friend_id.eq.${receiverId}),and(user_id.eq.${receiverId},friend_id.eq.${senderId})`);
-    const isFriend = (friendshipRows || []).length > 0;
-
-    // ★ 2026-04-27 STRICT: Yabancılara mesaj atılamaz. Önce arkadaş olunması zorunlu.
-    if (!isFriend) {
-      throw new Error('Yalnız arkadaşlarla mesajlaşabilirsiniz. Önce arkadaş olun.');
-    }
+    // ★ 2026-04-29 v85: Mesaj İsteği akışı geri geldi (Instagram-style).
+    //   Arkadaşlar arası direct mesaj. Yabancılar arası: ilk mesaj request olarak
+    //   kaydedilir (status=pending), receiver "İstekler" tabında görür → Kabul/Red.
+    //   send_message_with_request RPC atomic olarak request lookup + create + msg insert
+    //   yapar; engel/duplicate/rejected hatalarını net mesajla fırlatır.
 
     // ★ A4 FIX: Rate limiting — son 1 dakikada max 30 mesaj
     const oneMinuteAgo = new Date(Date.now() - 60_000).toISOString();
@@ -249,24 +247,37 @@ export const MessageService = {
 
     const imageUrl = typeof imageUrlOrIsRequest === 'string' ? imageUrlOrIsRequest : undefined;
 
-    const insertData: any = { sender_id: senderId, receiver_id: receiverId, content };
-    if (imageUrl) insertData.image_url = imageUrl;
-    if (voiceUrl) insertData.voice_url = voiceUrl;
-    if (voiceDuration !== undefined) insertData.voice_duration = voiceDuration;
+    // ★ Atomic RPC: request lookup + create + message insert
+    const { data: rpcRes, error: rpcErr } = await supabase.rpc('send_message_with_request', {
+      p_sender_id: senderId,
+      p_receiver_id: receiverId,
+      p_content: content,
+      p_image_url: imageUrl ?? null,
+      p_voice_url: voiceUrl ?? null,
+      p_voice_duration: voiceDuration ?? null,
+    });
+    if (rpcErr) throw new Error(rpcErr.message || 'Mesaj gönderilemedi.');
+    const isRequest = !!(rpcRes as any)?.is_request;
+    const messageId = (rpcRes as any)?.message_id;
 
+    // Yeni eklenen mesajı tekrar çek (sender bilgisi ile)
     const { data: msg, error } = await supabase
       .from('messages')
-      .insert(insertData)
       .select('*, sender:profiles!sender_id(*)')
+      .eq('id', messageId)
       .single();
     if (error) throw error;
 
     // Push bildirim gönder (arka planda, hata yutulur)
     const senderName = (msg as any).sender?.display_name || 'Birisi';
     const preview = voiceUrl ? '🎙️ Sesli mesaj' : imageUrl ? '📷 Fotoğraf' : (content.length > 50 ? content.substring(0, 50) + '...' : content);
-    PushService.sendToUser(receiverId, 'Yeni Mesaj', `${senderName}: ${preview}`, {
-      type: 'dm',
-      route: `/chat/${senderId}`,
+    // ★ v85: request ise farklı push tipi → receiver "Mesaj İsteği" görür
+    const pushTitle = isRequest ? 'Mesaj İsteği' : 'Yeni Mesaj';
+    const pushType = isRequest ? 'message_request' as const : 'dm' as const;
+    const pushRoute = isRequest ? `/chat/${senderId}?request=1` : `/chat/${senderId}`;
+    PushService.sendToUser(receiverId, pushTitle, `${senderName}: ${preview}`, {
+      type: pushType,
+      route: pushRoute,
     }).catch(() => {});
 
     return msg as Message;
@@ -421,13 +432,17 @@ export const MessageService = {
     return clearMap;
   },
 
-  /** Okunmamış toplam mesaj sayısı (genel) — is_deleted filtreli + engellenenler + gizlenenler hariç */
+  /** Okunmamış toplam mesaj sayısı (genel) — is_deleted + engellenenler + gizlenenler + pending istekler hariç */
   async getUnreadCount(userId: string) {
-    const blockedIds = await FriendshipService._getBlockedIds(userId);
-    // ★ 2026-04-21: Kalıcı silinen (hidden) sohbetlerden gelen mesajlar unread sayılmaz.
-    //   Kullanıcı silmiş bir sohbet için bildirim badge'i kafa karıştırıcı olur.
-    const hiddenMap = await this.getHiddenConversations(userId);
+    // ★ 2026-04-29 v85: Yabancıdan pending request mesajları DM badge'inde sayılmaz —
+    //   "İstekler (N)" chip'i ayrı sayaç tutuyor. Çift sayım engellenir.
+    const [blockedIds, hiddenMap, pendingReqRows] = await Promise.all([
+      FriendshipService._getBlockedIds(userId),
+      this.getHiddenConversations(userId),
+      supabase.from('message_requests').select('sender_id').eq('receiver_id', userId).eq('status', 'pending'),
+    ]);
     const hiddenPartnerIds = Object.keys(hiddenMap);
+    const pendingSenderIds = ((pendingReqRows as any).data || []).map((r: any) => r.sender_id).filter(Boolean);
 
     let query = supabase
       .from('messages')
@@ -441,8 +456,10 @@ export const MessageService = {
       query = query.not('sender_id', 'in', `(${blockedArr.map(id => `"${id}"`).join(',')})`);
     }
     if (hiddenPartnerIds.length > 0) {
-      // Hidden partnerlerden gelen mesajlar sayılmaz
       query = query.not('sender_id', 'in', `(${hiddenPartnerIds.map(id => `"${id}"`).join(',')})`);
+    }
+    if (pendingSenderIds.length > 0) {
+      query = query.not('sender_id', 'in', `(${pendingSenderIds.map((id: string) => `"${id}"`).join(',')})`);
     }
 
     const { count, error } = await query;

@@ -22,12 +22,15 @@ import { useUserSearchSheet } from '../_layout';
 import FriendsDrawer from '../../components/FriendsDrawer';
 import NotificationBell from '../../components/NotificationBell';
 import DiscoverWelcomeSheet, { hasSeenDiscoverWelcome } from '../../components/DiscoverWelcomeSheet';
+import RoomCreateHintSheet, { hasSeenRoomCreateHint, markRoomCreateHintSeen } from '../../components/RoomCreateHintSheet';
 import FABHintOverlay, { hasSeenFABHint } from '../../components/FABHintOverlay';
 import QuickCreateSheet from '../../components/QuickCreateSheet';
 import { ReportModal } from '../../components/ReportModal';
 import TabBarFadeOut from '../../components/TabBarFadeOut';
 import { CATEGORY_THEME } from '../../constants/categoryTheme';
 import AppBackground from '../../components/AppBackground';
+import AnimatedLogo from '../../components/AnimatedLogo';
+import AnimatedHeaderIconBtn from '../../components/AnimatedHeaderIconBtn';
 import StatusAvatar from '../../components/StatusAvatar';
 import { getAvatarSource } from '../../constants/avatars';
 
@@ -823,7 +826,7 @@ export default function HomeScreen() {
   const [filteredRooms, setFilteredRooms] = useState<Room[]>([]);
   const [followedRooms, setFollowedRooms] = useState<Room[]>([]);
   const [boostedProfiles, setBoostedProfiles] = useState<any[]>([]);
-  // ★ 2026-04-26: Popüler kulüpler carousel — keşif noktası (önceden sadece Profile > Kulüpler'den ulaşılıyordu)
+  // ★ 2026-04-26: Popüler korolar carousel — keşif noktası (önceden sadece Profile > Korolar'dan ulaşılıyordu)
   const [featuredClubs, setFeaturedClubs] = useState<any[]>([]);
   // ★ 2026-04-21: Her oda için top N katılımcı avatarı — keşfet kartında stack gösterilir.
   const [participantAvatars, setParticipantAvatars] = useState<Record<string, { avatar_url: string | null; display_name: string | null }[]>>({});
@@ -879,6 +882,8 @@ export default function HomeScreen() {
   //   null durumunda tam ekran örtü render edilir → tab bar flash önlenir
   const [showWelcome, setShowWelcome] = useState<boolean | null>(justCompletedOnboarding ? true : null);
   const [showFABHint, setShowFABHint] = useState(false);
+  // ★ 2026-04-29: First-time user "Oda oluştur!" yönlendirmesi — DiscoverWelcome bittikten sonra Keşfet'e düşünce
+  const [showRoomHint, setShowRoomHint] = useState(false);
   // ★ 2026-04-22: Quick-create sheet — FAB ve empty state chip'lerinden tetiklenir.
   const [showQuickCreate, setShowQuickCreate] = useState(false);
   const [creatingRoom, setCreatingRoom] = useState(false);
@@ -924,6 +929,30 @@ export default function HomeScreen() {
       setShowWelcome(seen ? false : true);
     }).catch(() => setShowWelcome(false));
   }, [firebaseUser?.uid, justCompletedOnboarding]);
+
+  // ★ 2026-04-29: DiscoverWelcome bittikten sonra (showWelcome=false) Keşfet'e düşen
+  //   YENİ + odası olmayan kullanıcıya "Oda oluştur!" yönlendirmesi. UID-bazlı bir kez
+  //   (room_hint flag). Odası olan kullanıcıya gösterilmez (zaten biliyor).
+  useEffect(() => {
+    if (showWelcome !== false || !firebaseUser?.uid) return;
+    let cancelled = false;
+    (async () => {
+      const seen = await hasSeenRoomCreateHint(firebaseUser.uid).catch(() => true);
+      if (seen || cancelled) return;
+      // Kullanıcının zaten odası varsa hint gerekmez — sessizce mark + skip
+      try {
+        const myRooms = await RoomService.getMyRooms(firebaseUser.uid);
+        if (cancelled) return;
+        if (myRooms && myRooms.length > 0) {
+          await markRoomCreateHintSeen(firebaseUser.uid);
+          return;
+        }
+      } catch { /* fetch fail — hint'i yine de göstermek mantıklı (yeni kullanıcı varsayım) */ }
+      if (cancelled) return;
+      setTimeout(() => { if (!cancelled) setShowRoomHint(true); }, 1500);
+    })();
+    return () => { cancelled = true; };
+  }, [showWelcome, firebaseUser?.uid]);
   const [showAdvFilterPanel, setShowAdvFilterPanel] = useState(false);
 
   // ★ DUP-3 FIX: Online friends artık merkezî provider'dan geliyor
@@ -972,7 +1001,7 @@ export default function HomeScreen() {
         setBoostedProfiles(bp);
       } catch { }
 
-      // ★ 2026-04-26: Popüler Kulüpler — keşif feed'ine giriş noktası
+      // ★ 2026-04-26: Popüler Korolar — keşif feed'ine giriş noktası
       try {
         const { ClubService } = await import('../../services/clubs');
         const clubs = await ClubService.listPublicClubs(10);
@@ -1258,29 +1287,26 @@ export default function HomeScreen() {
             pointerEvents="none"
           />
           <View style={s.topBar}>
-            <Image source={require('../../assets/logo.png')} style={s.logo} resizeMode="contain" />
+            <AnimatedLogo />
             <View style={s.headerRight}>
-              <Pressable style={s.headerIconBtn} onPress={() => openSearch({
+              <AnimatedHeaderIconBtn index={0} style={s.headerIconBtn} onPress={() => openSearch({
                 mode: 'discover',
                 onSelectUser: (userId) => openUserProfile(userId),
                 onSelectRoom: (roomId) => handleJoinRoom(roomId),
-              })}>
+              })} accessibilityLabel="Ara">
                 <Ionicons name="search-outline" size={22} color="#F1F5F9" style={s.headerIcon} />
-              </Pressable>
-              {/* ★ 2026-04-26: Kulüpler header'a taşındı — ana sayfadan POPÜLER KULÜPLER kartı kaldırıldı. */}
-              <Pressable style={s.headerIconBtn} onPress={() => router.push('/clubs' as any)} accessibilityLabel="Kulüpler">
-                <Ionicons name="planet-outline" size={22} color="#F1F5F9" style={s.headerIcon} />
-              </Pressable>
-              <NotificationBell unreadCount={unreadCount} onPress={() => {
-                setNotifDrawerAnchorRight(60);
-                setShowNotifDrawer(true);
-              }} />
-              <Pressable
+              </AnimatedHeaderIconBtn>
+              <AnimatedHeaderIconBtn staticIcon>
+                <NotificationBell unreadCount={unreadCount} onPress={() => {
+                  setNotifDrawerAnchorRight(60);
+                  setShowNotifDrawer(true);
+                }} />
+              </AnimatedHeaderIconBtn>
+              <AnimatedHeaderIconBtn
+                staticIcon
                 style={s.headerIconBtn}
                 onPress={() => { setShowFriends(true); }}
-                accessibilityRole="button"
                 accessibilityLabel={pendingFollowCount > 0 ? `Arkadaşlar, ${pendingFollowCount} bekleyen istek` : 'Arkadaşlar'}
-                hitSlop={8}
               >
                 <Ionicons name="people-outline" size={22} color="#F1F5F9" style={s.headerIcon} />
                 {pendingFollowCount > 0 && (
@@ -1288,7 +1314,7 @@ export default function HomeScreen() {
                     <Text style={s.notifBadgeText}>{pendingFollowCount > 99 ? '99+' : pendingFollowCount}</Text>
                   </View>
                 )}
-              </Pressable>
+              </AnimatedHeaderIconBtn>
             </View>
           </View>
           <LinearGradient
@@ -1495,14 +1521,14 @@ export default function HomeScreen() {
                 />
               </View>
 
-              {/* ★ 2026-04-26: Popüler Kulüpler carousel ana sayfadan KALDIRILDI — sağ üst header'a kulüp ikonu (planet) eklendi.
-                   Renk paleti karışıyordu, kullanıcı ayrı bir alan istedi. /clubs sayfası tüm kulüp keşfini yapıyor. */}
+              {/* ★ 2026-04-26: Popüler Korolar carousel ana sayfadan KALDIRILDI — sağ üst header'a Koro ikonu (planet) eklendi.
+                   Renk paleti karışıyordu, kullanıcı ayrı bir alan istedi. /clubs sayfası tüm Koro keşfini yapıyor. */}
               {false && featuredClubs.length > 0 && (
                 <View style={{ marginBottom: 14 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, marginBottom: 10 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                       <Ionicons name="planet" size={14} color="#14B8A6" style={{ textShadowColor: '#14B8A6aa', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 8 }} />
-                      <Text style={{ fontSize: 12, fontWeight: '900', color: '#CBD5E1', letterSpacing: 1.0, textTransform: 'uppercase', ...Shadows.text }}>Popüler Kulüpler</Text>
+                      <Text style={{ fontSize: 12, fontWeight: '900', color: '#CBD5E1', letterSpacing: 1.0, textTransform: 'uppercase', ...Shadows.text }}>Popüler Korolar</Text>
                     </View>
                     <Pressable onPress={() => router.push('/clubs' as any)} hitSlop={8}>
                       <Text style={{ fontSize: 11, fontWeight: '700', color: '#14B8A6' }}>Tümünü Gör →</Text>
@@ -1527,7 +1553,7 @@ export default function HomeScreen() {
                           {c.banner_url ? (
                             <Image source={{ uri: c.banner_url }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
                           ) : (
-                            // ★ 2026-04-26 (v2): Çoklu ton kulüp gradient — mor accent + slate (eski tek-ton yeşilimsi/slate yerine).
+                            // ★ 2026-04-26 (v2): Çoklu ton Koro gradient — mor accent + slate (eski tek-ton yeşilimsi/slate yerine).
                             <LinearGradient
                               colors={['#3B2A4F', '#1E1B3A', '#0F0F1F']}
                               start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
@@ -1923,6 +1949,20 @@ export default function HomeScreen() {
           }}
         />
 
+        {/* ★ 2026-04-29: First-time "Oda oluştur!" yönlendirmesi — gem hexagon + CTA */}
+        <RoomCreateHintSheet
+          visible={showRoomHint}
+          onGoToMyRooms={async () => {
+            setShowRoomHint(false);
+            await markRoomCreateHintSeen(firebaseUser?.uid);
+            router.push('/(tabs)/myrooms' as any);
+          }}
+          onClose={async () => {
+            setShowRoomHint(false);
+            await markRoomCreateHintSeen(firebaseUser?.uid);
+          }}
+        />
+
 
         {/* ═══ Quick Create Sheet — FAB'dan açılır, 2 seçenekli (Hızlı / Detaylı)
              ★ 2026-04-23: bottomOffset=BAR_BOTTOM_OFFSET (84) — panel CurvedTabBar'ın üstünde kalır.
@@ -1991,7 +2031,7 @@ const s = StyleSheet.create({
   // ★ Premium Header — Glassmorphic wrap + SP pill + teal hairline separator
   topBarWrap: {
     position: 'relative',
-    marginBottom: 14,
+    marginBottom: 6,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.22,
@@ -2015,7 +2055,7 @@ const s = StyleSheet.create({
   },
   topBar: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 14, paddingBottom: 10,
+    paddingHorizontal: 14, paddingBottom: 4,
   },
   topBarSeparator: {
     height: 1.5,

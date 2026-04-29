@@ -1,71 +1,220 @@
 /**
- * FollowListModal — Facebook tarzı Arkadaş Listesi (2026-04-18 refactor)
- * Profil sayfasındaki "Arkadaş" sayısına tıklandığında açılır.
- * Tek liste: çift yönlü accepted (bidirectional) arkadaşlar.
- * Her satırda: Arkadaşlıktan Çıkar, Engelle aksiyonları.
- * NOT: initialTab prop'u legacy için tutulur, UI tek liste gösterir.
+ * FollowListModal — Arkadaş / Takipçi / Takip Listesi
+ * ─────────────────────────────────────────────────────
+ * 2026-04-18: Bidirectional arkadaş listesi olarak başladı.
+ * 2026-04-25 (Faz 4.1): One-way follows entegrasyonu — 3 mod:
+ *   • friends    → mutual friendships (FriendshipService)
+ *   • followers  → bana takip eden (FollowService.getFollowers)
+ *   • following  → benim takip ettiğim (FollowService.getFollowing)
+ *
+ * Aksiyonlar moda göre değişir:
+ *   • friends  → "Çıkar" (removeFriend) + "Engelle"
+ *   • followers → "Engelle" (kendi takipçimi engelle)
+ *   • following → "Takipten Çık" (FollowService.removeFollow)
+ *
+ * 2026-04-25 (Drag Fix): useSwipeToDismiss kaldırıldı, doğrudan
+ *   PanResponder + top-based Animated.Value kullanılıyor.
+ *   Koro üyeler modalı (MembersSheet) ile aynı pattern.
+ *   Modal donma ve sürüklenememe sorunu çözüldü.
  */
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  View, Text, StyleSheet, Modal, Pressable, FlatList,
-  Image, ActivityIndicator, Animated,
+  View, Text, StyleSheet, Pressable, FlatList,
+  Image, ActivityIndicator, Animated, PanResponder, Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { FriendshipService, type FollowUser } from '../services/friendship';
+import { FollowService } from '../services/follows';
 import { getAvatarSource } from '../constants/avatars';
 import PremiumAlert, { type AlertButton } from './PremiumAlert';
 import { useRouter } from 'expo-router';
-import { useSwipeToDismiss } from '../hooks/useSwipeToDismiss';
+import { Colors, Shadows } from '../constants/theme';
+import { useUserProfileSheet } from '../app/_layout';
+
+const SCREEN_H = Dimensions.get('window').height;
+const SNAP_HALF = SCREEN_H * 0.45;   // başlangıç: ekranın yarısından biraz yukarı
+const SNAP_FULL = 60;                // tam ekran: üstten 60px boşluk
+const SNAP_DISMISS = SCREEN_H + 50;  // ekran dışı
+
+const iconShadow = {
+  textShadowColor: 'rgba(0,0,0,0.5)',
+  textShadowOffset: { width: 0, height: 2 },
+  textShadowRadius: 4,
+} as const;
+
+type ListMode = 'friends' | 'followers' | 'following';
 
 interface Props {
   visible: boolean;
   onClose: () => void;
   userId: string;          // Profili görüntülenen kullanıcı
   currentUserId: string;   // Giriş yapan kullanıcı
-  initialTab: 'followers' | 'following';
+  /** Açılış sekmesi — 'friends' (mutual) | 'followers' (one-way takipçi) | 'following' (one-way takip) */
+  initialTab: ListMode;
   isOwnProfile: boolean;
 }
+
+const MODE_META: Record<ListMode, { title: string; emptyText: string; icon: keyof typeof Ionicons.glyphMap }> = {
+  friends:   { title: 'ARKADAŞLAR', emptyText: 'Henüz arkadaş yok', icon: 'people' },
+  followers: { title: 'TAKİPÇİLER', emptyText: 'Henüz takipçi yok', icon: 'person-add' },
+  following: { title: 'TAKİP EDİLENLER', emptyText: 'Kimseyi takip etmiyor', icon: 'person' },
+};
 
 export default function FollowListModal({
   visible, onClose, userId, currentUserId, initialTab, isOwnProfile,
 }: Props) {
   const router = useRouter();
-  const [tab, setTab] = useState<'followers' | 'following'>(initialTab);
-  const [followers, setFollowers] = useState<FollowUser[]>([]);
-  const [following, setFollowing] = useState<FollowUser[]>([]);
+  const { openUserProfile } = useUserProfileSheet();
+  const [tab, setTab] = useState<ListMode>(initialTab);
+  const [items, setItems] = useState<FollowUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [cAlert, setCAlert] = useState<{ visible: boolean; title: string; message: string; type?: 'info' | 'warning' | 'error' | 'success'; buttons?: AlertButton[] }>({ visible: false, title: '', message: '' });
+
+  // ★ 2026-04-28: InRoomUserProfile ile aynı hibrit pattern — translateY-based + Modal YOK + büyük capture eşiği.
+  //   Eski top-based + useNativeDriver:false + Modal kombinasyonu pan gesture'ı boğuyordu (drag handle dışında ölü).
+  const translateY = useRef(new Animated.Value(SNAP_DISMISS)).current;
+  const backdropOpacity = useRef(new Animated.Value(0)).current;
+  const currentSnap = useRef(SNAP_HALF);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  const scrollOffsetRef = useRef(0);
+  const handleScroll = useCallback((e: any) => {
+    scrollOffsetRef.current = e?.nativeEvent?.contentOffset?.y ?? 0;
+  }, []);
+
+  const isHalfState = () => currentSnap.current !== SNAP_FULL;
+
+  // ★ 2026-04-28: Header pan — scroll-aware DEĞİL, FULL state'te de aşağı drag çalışsın.
+  const headerPanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onStartShouldSetPanResponderCapture: () => false,
+      onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dy) > 8 && Math.abs(g.dy) > Math.abs(g.dx),
+      onMoveShouldSetPanResponderCapture: (_, g) => Math.abs(g.dy) > 8 && Math.abs(g.dy) > Math.abs(g.dx),
+      onPanResponderTerminationRequest: () => false,
+      onPanResponderMove: (_, g) => {
+        const newY = currentSnap.current + g.dy;
+        translateY.setValue(Math.max(SNAP_FULL - 20, newY));
+      },
+      onPanResponderRelease: (_, g) => {
+        const finalPos = currentSnap.current + g.dy;
+        if (finalPos > SCREEN_H * 0.65 || g.vy > 0.8) {
+          currentSnap.current = SNAP_DISMISS;
+          Animated.parallel([
+            Animated.timing(translateY, { toValue: SNAP_DISMISS, duration: 200, useNativeDriver: true }),
+            Animated.timing(backdropOpacity, { toValue: 0, duration: 180, useNativeDriver: true }),
+          ]).start(() => onCloseRef.current());
+          return;
+        }
+        if (finalPos < SCREEN_H * 0.35 || g.vy < -0.5) {
+          currentSnap.current = SNAP_FULL;
+          Animated.spring(translateY, { toValue: SNAP_FULL, useNativeDriver: true, damping: 22, stiffness: 200 }).start();
+          return;
+        }
+        currentSnap.current = SNAP_HALF;
+        Animated.spring(translateY, { toValue: SNAP_HALF, useNativeDriver: true, damping: 22, stiffness: 200 }).start();
+      },
+    })
+  ).current;
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onStartShouldSetPanResponderCapture: () => false,
+      // Small threshold — child responder yokken (handle bar, başlık)
+      onMoveShouldSetPanResponder: (_, g) => {
+        if (Math.abs(g.dy) < 8) return false;
+        if (Math.abs(g.dy) <= Math.abs(g.dx)) return false;
+        if (isHalfState()) return true;
+        return g.dy > 0 && scrollOffsetRef.current <= 0;
+      },
+      // Large threshold — Pressable/FlatList'ten responder ÇAL
+      onMoveShouldSetPanResponderCapture: (_, g) => {
+        if (Math.abs(g.dy) < 25) return false;
+        if (Math.abs(g.dy) <= Math.abs(g.dx) * 2) return false;
+        if (isHalfState()) return true;
+        return g.dy > 0 && scrollOffsetRef.current <= 0;
+      },
+      onPanResponderTerminationRequest: () => false,
+      onPanResponderMove: (_, g) => {
+        const newY = currentSnap.current + g.dy;
+        translateY.setValue(Math.max(SNAP_FULL - 20, newY));
+      },
+      onPanResponderRelease: (_, g) => {
+        const finalPos = currentSnap.current + g.dy;
+
+        if (finalPos > SCREEN_H * 0.65 || g.vy > 0.8) {
+          currentSnap.current = SNAP_DISMISS;
+          Animated.parallel([
+            Animated.timing(translateY, { toValue: SNAP_DISMISS, duration: 200, useNativeDriver: true }),
+            Animated.timing(backdropOpacity, { toValue: 0, duration: 180, useNativeDriver: true }),
+          ]).start(() => onCloseRef.current());
+          return;
+        }
+
+        if (finalPos < SCREEN_H * 0.35 || g.vy < -0.5) {
+          currentSnap.current = SNAP_FULL;
+          Animated.spring(translateY, { toValue: SNAP_FULL, useNativeDriver: true, damping: 22, stiffness: 200 }).start();
+          return;
+        }
+
+        currentSnap.current = SNAP_HALF;
+        Animated.spring(translateY, { toValue: SNAP_HALF, useNativeDriver: true, damping: 22, stiffness: 200 }).start();
+      },
+    })
+  ).current;
+
+  const dismiss = useCallback(() => {
+    currentSnap.current = SNAP_DISMISS;
+    Animated.parallel([
+      Animated.timing(translateY, { toValue: SNAP_DISMISS, duration: 200, useNativeDriver: true }),
+      Animated.timing(backdropOpacity, { toValue: 0, duration: 180, useNativeDriver: true }),
+    ]).start(() => onClose());
+  }, [onClose, translateY, backdropOpacity]);
 
   useEffect(() => { setTab(initialTab); }, [initialTab]);
 
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      // ★ Facebook tarzı: tek bidirectional arkadaş listesi
-      const friends = await FriendshipService.getFriends(userId);
-      setFollowers(friends);
-      setFollowing(friends);
+      let data: FollowUser[] = [];
+      if (tab === 'friends') {
+        data = await FriendshipService.getFriends(userId);
+      } else if (tab === 'followers') {
+        data = await FollowService.getFollowers(userId);
+      } else {
+        data = await FollowService.getFollowing(userId);
+      }
+      setItems(data);
     } catch (e) {
-      if (__DEV__) console.warn('[FriendList] Load error:', e);
+      if (__DEV__) console.warn('[FollowListModal] Load error:', e);
+      setItems([]);
     } finally {
       setLoading(false);
     }
-  }, [userId]);
+  }, [userId, tab]);
 
+  // ── open / data load ────────────────────────────────────────
   useEffect(() => {
-    if (visible) loadData();
+    if (visible) {
+      translateY.setValue(SNAP_DISMISS);
+      backdropOpacity.setValue(0);
+      currentSnap.current = SNAP_HALF;
+      loadData();
+      Animated.parallel([
+        Animated.spring(translateY, { toValue: SNAP_HALF, useNativeDriver: true, damping: 22, stiffness: 200 }),
+        Animated.timing(backdropOpacity, { toValue: 1, duration: 250, useNativeDriver: true }),
+      ]).start();
+    }
   }, [visible, loadData]);
 
-  const list = tab === 'followers' ? followers : following;
+  const list = items;
+  const meta = MODE_META[tab];
 
-  const { translateValue, panHandlers } = useSwipeToDismiss({
-    direction: 'down',
-    threshold: 80,
-    onDismiss: onClose,
-  });
-
-  // ★ Facebook tarzı: tek "Arkadaşlıktan Çıkar" aksiyonu (bidirectional remove)
+  // ★ Friends mode — bidirectional friendship remove
   const handleRemoveFriend = (targetId: string, name: string) => {
     setCAlert({
       visible: true,
@@ -78,10 +227,7 @@ export default function FollowListModal({
           text: 'Çıkar', style: 'destructive', onPress: async () => {
             setActionLoading(targetId);
             const result = await FriendshipService.removeFriend(currentUserId, targetId);
-            if (result.success) {
-              setFollowers(prev => prev.filter(f => f.id !== targetId));
-              setFollowing(prev => prev.filter(f => f.id !== targetId));
-            }
+            if (result.success) setItems(prev => prev.filter(f => f.id !== targetId));
             setActionLoading(null);
           }
         },
@@ -101,10 +247,28 @@ export default function FollowListModal({
           text: 'Engelle', style: 'destructive', onPress: async () => {
             setActionLoading(targetId);
             const result = await FriendshipService.block(currentUserId, targetId);
-            if (result.success) {
-              setFollowers(prev => prev.filter(f => f.id !== targetId));
-              setFollowing(prev => prev.filter(f => f.id !== targetId));
-            }
+            if (result.success) setItems(prev => prev.filter(f => f.id !== targetId));
+            setActionLoading(null);
+          }
+        },
+      ],
+    });
+  };
+
+  // ★ Following mode — kendi profilim, takip ettiğim birinden çık
+  const handleUnfollow = (targetId: string, name: string) => {
+    setCAlert({
+      visible: true,
+      title: 'Takipten Çık',
+      message: `${name} kullanıcısını takipten çıkmak istiyor musun?`,
+      type: 'warning',
+      buttons: [
+        { text: 'Vazgeç', style: 'cancel' },
+        {
+          text: 'Takipten Çık', style: 'destructive', onPress: async () => {
+            setActionLoading(targetId);
+            const result = await FollowService.removeFollow(currentUserId, targetId);
+            if (result.success) setItems(prev => prev.filter(f => f.id !== targetId));
             setActionLoading(null);
           }
         },
@@ -113,8 +277,8 @@ export default function FollowListModal({
   };
 
   const navigateToProfile = (targetId: string) => {
-    onClose();
-    setTimeout(() => router.push(`/user/${targetId}` as any), 200);
+    dismiss();
+    setTimeout(() => openUserProfile(targetId), 200);
   };
 
   const renderItem = ({ item }: { item: FollowUser }) => {
@@ -132,12 +296,12 @@ export default function FollowListModal({
           {item.username && <Text style={st.username}>@{item.username}</Text>}
         </View>
 
-        {/* Aksiyonlar — sadece kendi profili ve kendisi değilse */}
+        {/* Aksiyonlar — moda göre değişir, sadece kendi profilinde */}
         {isOwnProfile && !isMe && (
           <View style={st.actions}>
             {isActioning ? (
               <ActivityIndicator size="small" color="#14B8A6" />
-            ) : (
+            ) : tab === 'friends' ? (
               <>
                 <Pressable
                   style={st.removeBtn}
@@ -153,6 +317,22 @@ export default function FollowListModal({
                   <Ionicons name="ban" size={14} color="#EF4444" />
                 </Pressable>
               </>
+            ) : tab === 'following' ? (
+              <Pressable
+                style={st.removeBtn}
+                onPress={() => handleUnfollow(item.id, item.display_name)}
+              >
+                <Text style={st.removeBtnText}>Takipten Çık</Text>
+              </Pressable>
+            ) : (
+              // followers — sadece engelle aksiyonu
+              <Pressable
+                style={st.blockBtn}
+                onPress={() => handleBlock(item.id, item.display_name)}
+                hitSlop={6}
+              >
+                <Ionicons name="ban" size={14} color="#EF4444" />
+              </Pressable>
             )}
           </View>
         )}
@@ -160,27 +340,47 @@ export default function FollowListModal({
     );
   };
 
+  if (!visible) return null;
+
   return (
-    <Modal visible={visible} animationType="none" transparent statusBarTranslucent>
-      <View style={st.overlay}>
-        <Animated.View style={[st.sheet, { transform: [{ translateY: translateValue }] }]}>
-          {/* ★ Swipe handle */}
-          <View style={st.handleWrap} {...panHandlers}>
-            <View style={st.handle} />
-          </View>
-          {/* ★ Facebook tarzı: tek "Arkadaşlar" başlığı */}
-          <View style={st.header}>
-            <View style={{ width: 28 }} />
-            <View style={st.tabs}>
-              <View style={[st.tab, st.tabActive]}>
-                <Text style={[st.tabText, st.tabTextActive]}>
-                  Arkadaşlar ({followers.length})
-                </Text>
+    // ★ 2026-04-28: Modal sarmalı kaldırıldı — Modal native dialog Pressable backdrop tap'i yutuyordu,
+    //   pan responder Capture phase'i de Pressable child'larla çakışıyordu (drag handle dışında ölü).
+    //   View overlay zIndex:300 ile sayfanın üstünde kalır (InRoomUserProfile/profile.tsx/user/[id].tsx).
+    <View style={st.overlay} pointerEvents="box-none">
+      <Animated.View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.55)', opacity: backdropOpacity }]}>
+        <Pressable style={StyleSheet.absoluteFillObject} onPress={dismiss} />
+      </Animated.View>
+
+      {/* Sheet — translateY-based animated positioning (useNativeDriver:true) */}
+      <Animated.View style={[st.sheet, { transform: [{ translateY }] }]} {...panResponder.panHandlers}>
+          {/* ★ Diagonal gradient fon — profil sayfası ile birebir */}
+          <LinearGradient
+            colors={['#4a5668', '#37414f', '#232a35']}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFillObject}
+            pointerEvents="none"
+          />
+          {/* Üst teal hairline — premium aksan */}
+          <LinearGradient
+            colors={['transparent', 'rgba(20,184,166,0.55)', 'transparent']}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+            style={st.topEdge}
+            pointerEvents="none"
+          />
+
+          {/* ★ 2026-04-28: Header bölgesi her zaman drag yakalar (FULL state'te scroll-top değilken bile). */}
+          <View {...headerPanResponder.panHandlers}>
+            <View style={st.handleWrap}>
+              <View style={st.handle} />
+            </View>
+            <View style={st.header}>
+              <View style={st.sectionAccent} />
+              <Ionicons name={meta.icon} size={14} color={Colors.teal} style={iconShadow} />
+              <Text style={st.headerTitle}>{meta.title}</Text>
+              <View style={st.countBadge}>
+                <Text style={st.countText}>{list.length}</Text>
               </View>
             </View>
-            <Pressable onPress={onClose} hitSlop={12}>
-              <Ionicons name="close" size={20} color="#94A3B8" />
-            </Pressable>
           </View>
 
           {/* Liste */}
@@ -190,8 +390,8 @@ export default function FollowListModal({
             </View>
           ) : list.length === 0 ? (
             <View style={st.empty}>
-              <Ionicons name="people-outline" size={36} color="rgba(255,255,255,0.1)" />
-              <Text style={st.emptyText}>Henüz arkadaş yok</Text>
+              <Ionicons name="people-outline" size={40} color="rgba(94,234,212,0.2)" style={iconShadow} />
+              <Text style={st.emptyText}>{meta.emptyText}</Text>
             </View>
           ) : (
             <FlatList
@@ -200,97 +400,100 @@ export default function FollowListModal({
               renderItem={renderItem}
               contentContainerStyle={{ paddingBottom: 40 }}
               showsVerticalScrollIndicator={false}
+              style={{ flex: 1 }}
+              onScroll={handleScroll}
+              scrollEventThrottle={16}
             />
           )}
-        </Animated.View>
-      </View>
+      </Animated.View>
       <PremiumAlert {...cAlert} onDismiss={() => setCAlert(prev => ({ ...prev, visible: false }))} />
-    </Modal>
+    </View>
   );
 }
 
 const st = StyleSheet.create({
   overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'flex-end',
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 400, // InRoomUserProfile (300) üstünde — profil sheet'inin üzerine açılır
+    elevation: 24, // Android için
   },
   sheet: {
-    backgroundColor: '#2D3740',
+    // ★ 2026-04-28: top:0+bottom:0 sabit, transform translateY ile snap (useNativeDriver:true).
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
     borderTopLeftRadius: 22,
     borderTopRightRadius: 22,
-    maxHeight: '75%',
-    minHeight: '50%',
+    overflow: 'hidden',
     borderWidth: 1,
     borderBottomWidth: 0,
-    borderColor: 'rgba(255,255,255,0.06)',
+    borderColor: Colors.cardBorder,
+    ...Shadows.card,
+  },
+  topEdge: {
+    position: 'absolute', top: 0, left: 0, right: 0, height: 1.5, zIndex: 1,
   },
   handleWrap: {
     alignItems: 'center',
-    paddingTop: 8,
-    paddingBottom: 4,
+    paddingTop: 14,
+    paddingBottom: 8,
   },
   handle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: 'rgba(20,184,166,0.4)',
+    width: 44,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255,255,255,0.22)',
   },
+  // ★ Premium section header — profil sayfası pattern
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: 8,
     paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 10,
+    paddingTop: 6,
+    paddingBottom: 12,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.06)',
   },
-  tabs: {
-    flexDirection: 'row',
-    gap: 4,
+  sectionAccent: {
+    width: 3, height: 16, borderRadius: 2, backgroundColor: Colors.teal,
+  },
+  headerTitle: {
     flex: 1,
-    justifyContent: 'center',
+    fontSize: 12, fontWeight: '900', color: '#CBD5E1',
+    letterSpacing: 1.2, textTransform: 'uppercase',
+    ...Shadows.text,
   },
-  tab: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
+  countBadge: {
+    backgroundColor: 'rgba(20,184,166,0.12)', borderRadius: 10,
+    paddingHorizontal: 8, paddingVertical: 3,
+    borderWidth: 1, borderColor: 'rgba(20,184,166,0.25)',
   },
-  tabActive: {
-    backgroundColor: 'rgba(20,184,166,0.15)',
-    borderWidth: 1,
-    borderColor: 'rgba(20,184,166,0.3)',
-  },
-  tabText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#94A3B8',
-  },
-  tabTextActive: {
-    color: '#14B8A6',
-  },
+  countText: { fontSize: 10, fontWeight: '800', color: '#14B8A6' },
   loading: {
     paddingVertical: 60,
     alignItems: 'center',
   },
   empty: {
-    paddingVertical: 60,
+    paddingVertical: 72,
     alignItems: 'center',
     gap: 10,
   },
   emptyText: {
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.25)',
+    fontSize: 13, color: '#94A3B8', fontWeight: '600',
+    ...Shadows.text,
   },
+  // ★ Row — ProfileFriendsList ile birebir
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 10,
-    gap: 10,
-    borderBottomWidth: 0.5,
-    borderBottomColor: 'rgba(255,255,255,0.04)',
+    paddingVertical: 11,
+    gap: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.06)',
   },
   avatar: {
     width: 40,
@@ -300,14 +503,12 @@ const st = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.08)',
   },
   name: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#F1F5F9',
+    fontSize: 14, fontWeight: '700', color: '#F1F5F9', letterSpacing: 0.15,
+    ...Shadows.text,
   },
   username: {
-    fontSize: 11,
-    color: '#94A3B8',
-    marginTop: 1,
+    fontSize: 11, color: '#94A3B8', marginTop: 2, fontWeight: '500',
+    ...Shadows.textLight,
   },
   actions: {
     flexDirection: 'row',
@@ -317,36 +518,34 @@ const st = StyleSheet.create({
   removeBtn: {
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 8,
+    borderRadius: 10,
     backgroundColor: 'rgba(255,255,255,0.06)',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.1)',
   },
   removeBtnText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#94A3B8',
+    fontSize: 12, fontWeight: '700', color: '#CBD5E1',
+    ...Shadows.textLight,
   },
   unfollowBtn: {
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 8,
+    borderRadius: 10,
     backgroundColor: 'rgba(20,184,166,0.1)',
     borderWidth: 1,
     borderColor: 'rgba(20,184,166,0.2)',
   },
   unfollowBtnText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#14B8A6',
+    fontSize: 12, fontWeight: '700', color: '#14B8A6',
+    ...Shadows.text,
   },
   blockBtn: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: 'rgba(239,68,68,0.08)',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(239,68,68,0.1)',
     borderWidth: 1,
-    borderColor: 'rgba(239,68,68,0.15)',
+    borderColor: 'rgba(239,68,68,0.22)',
     alignItems: 'center',
     justifyContent: 'center',
   },

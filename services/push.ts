@@ -12,8 +12,29 @@
  */
 import { logger } from '../utils/logger';
 import { supabase } from '../constants/supabase';
+import { NotifPrefsService, type NotificationCategory } from './notifPrefs';
 
 export type PushType = 'dm' | 'message_request' | 'follow' | 'follow_request' | 'follow_accepted' | 'gift' | 'room_invite' | 'room_live' | 'room_follow' | 'event_reminder' | 'missed_call' | 'incoming_call';
+
+// ★ Faz 5.1 — PushType → NotifPrefs kategori eşlemesi (gate kontrolü için)
+function _pushTypeToCategory(t?: PushType): NotificationCategory | null {
+  if (!t) return null;
+  switch (t) {
+    case 'dm':                return 'dm';
+    case 'message_request':   return 'message_request';
+    case 'follow':            return 'follow';
+    case 'follow_request':    return 'follow';
+    case 'follow_accepted':   return 'follow_accepted';
+    case 'gift':              return 'sp_received';
+    case 'room_invite':       return 'room_invite';
+    case 'room_live':         return 'friend_online'; // arkadaş canlıya çıktı
+    case 'room_follow':       return 'room_invite';
+    case 'event_reminder':    return 'room_invite';
+    case 'incoming_call':     return 'incoming_call';
+    case 'missed_call':       return 'incoming_call';
+    default:                  return null;
+  }
+}
 
 // ★ SEC-PUSH: Per-user debounce — bildirim spam engeli
 const _lastPushTime = new Map<string, number>();
@@ -43,47 +64,31 @@ export const PushService = {
       }
       _lastPushTime.set(targetUserId, Date.now());
 
-      const { data: profile, error: profileErr } = await supabase
-        .from('profiles')
-        .select('push_token')
-        .eq('id', targetUserId)
-        .single();
+      // ★ Faz 5.1 — Kullanıcı tercihleri gate (DND + kategori toggle + friends_only)
+      //   Fail-open: prefs okuma başarısızsa push yine gönderilir (NotifPrefsService).
+      const cat = _pushTypeToCategory(pushType);
+      if (cat) {
+        const senderId = (data as any)?.senderId || (data as any)?.fromUserId;
+        const allowed = await NotifPrefsService.shouldSendPush(targetUserId, cat, senderId);
+        if (!allowed) return; // Sessizce dropla
+      }
 
-      if (profileErr || !profile?.push_token) return;
-
-      // ★ 2026-04-21: Incoming call payload — WhatsApp tarzı kilitliyken çağrı için
-      //   TTL=0, priority=high, channelId='calls', sticky, iOS interruptionLevel=critical
+      // ★ v78: push_tokens tablosu — multi-device push desteği.
+      //   send-push edge function service_role ile push_tokens tablosundan
+      //   TÜM aktif cihaz token'larını alır + Expo'ya batch forward eder.
       const isCall = data?.type === 'incoming_call';
-      const response = await fetch('https://exp.host/--/api/v2/push/send', {
-        method: 'POST',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          to: profile.push_token,
+      const { error: invokeErr } = await supabase.functions.invoke('send-push', {
+        body: {
+          target_user_id: targetUserId,
           title,
           body,
-          sound: 'default',
           data: data || {},
-          ...(isCall ? {
-            priority: 'high',           // Expo/FCM yüksek öncelik
-            channelId: 'calls',         // Android: MAX importance channel
-            ttl: 0,                     // 0 = anında, beklemez
-            _contentAvailable: true,    // iOS: arka plan wake
-            // ★ iOS 15+ critical interruption — rahatsız etme modunu delerek çağrı çalar
-            //   (Requires Apple approval; fallback to timeSensitive)
-            interruptionLevel: 'timeSensitive',
-            // ★ Android: sticky notification — kullanıcı swipe ile kapatamaz (arama boyunca)
-            sticky: true,
-            // ★ Full-screen intent için categoryId — kilit ekranında tam ekran gelir
-            categoryId: 'incoming_call',
-          } : {}),
-        }),
+          is_call: isCall,
+        },
       });
 
-      if (!response.ok) {
-        if (__DEV__) logger.warn('[Push] Gönderim hatası:', response.status);
+      if (invokeErr && __DEV__) {
+        logger.warn('[Push] Edge function hata:', invokeErr.message);
       }
     } catch (err: any) {
       logger.error('[Push] Gönderilemedi:', err.message);

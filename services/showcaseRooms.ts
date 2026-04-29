@@ -1,52 +1,24 @@
 /**
- * SopranoChat — Vitrin / Sistem Odaları Veritabanı
+ * SopranoChat — Vitrin / Sistem Odaları
  * ═══════════════════════════════════════════════════
- * SopranoChat resmi odalarının statik tanımları.
+ * SHOWCASE_ROOMS mock listesi 2026-04-18'de kaldırıldı.
+ * Bu modülde kalan canlı API: isSystemRoom() ve getSystemRooms().
  */
 import type { Room } from '../types';
 
-// ════════════════════════════════════════════════════════════
-// SİSTEM ODA TANIMLARI
-// ════════════════════════════════════════════════════════════
-
 /**
- * Keşfet sayfasında aktif kullanıcı odası MIN_ACTIVE_ROOMS'un
- * altına düştüğünde bu sabit odalar gösterilir.
+ * Placeholder: gelecekte sistem odaları burada tanımlanır.
+ * Şu an boş — gerçek kullanıcı odaları dışında listelenmez.
  */
-export const MIN_ACTIVE_ROOMS = 3;
-
-/**
- * 4 sabit sistem odası — platform tarafından oluşturulur.
- * Sahip: "sopranochat_official" hesabı (slug ile çözümlenir).
- * Moderasyon: AI-lite moderatör (yapay zeka).
- */
-// ★ 2026-04-18: Mock/placeholder sistem odaları kaldırıldı.
-// Artık gerçek kullanıcı odaları dışında hiçbir sahte oda listelenmez.
-// isSystemRoom() hâlâ `system_` prefix'i arar — gelecekte gerçek sistem
-// odası isterseniz o şema ile eklenebilir.
-export const SHOWCASE_ROOMS: Partial<Room>[] = [];
-
-/**
- * Sistem odalarını seed verisi olarak DB'ye eklemek için kullanılır.
- * Zaten varsa upsert ile günceller.
- */
-export function getShowcaseRoomInserts(systemUserId: string): Partial<Room>[] {
-  return SHOWCASE_ROOMS.map(room => ({
-    ...room,
-    host_id: systemUserId,
-    listener_count: 0,
-    created_at: new Date().toISOString(),
-  }));
-}
+const SHOWCASE_ROOMS: Partial<Room>[] = [];
 
 /**
  * Keşfet sayfası için sistem odalarını Room[] formatında döndürür.
  * Kullanıcı odası yokken Keşfet'te gösterilir.
  */
 export function getSystemRooms(): Room[] {
-  // ★ BUG-K2 FIX: Sabit listener_count ve created_at — her çağrıda rastgele değişmesin
-  const STABLE_COUNTS = [8, 5, 3, 6]; // Her sistem odası için sabit değer
-  const STABLE_DATE = '2026-01-01T00:00:00.000Z'; // Sabit tarih — "yeni oda" bonusu almaz
+  const STABLE_COUNTS = [8, 5, 3, 6];
+  const STABLE_DATE = '2026-01-01T00:00:00.000Z';
   return SHOWCASE_ROOMS.map((room, idx) => ({
     ...room,
     host_id: 'system',
@@ -67,6 +39,3 @@ export function getSystemRooms(): Room[] {
 export function isSystemRoom(roomId: string): boolean {
   return roomId.startsWith('system_');
 }
-
-/** Sistem oda ID'leri listesi */
-export const SYSTEM_ROOMS = SHOWCASE_ROOMS.map(r => r.id!);

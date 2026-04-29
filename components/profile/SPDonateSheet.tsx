@@ -7,17 +7,19 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, Animated, PanResponder, Dimensions,
-  Pressable, ActivityIndicator, GestureResponderEvent, Modal,
+  Pressable, ActivityIndicator, GestureResponderEvent,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ProfileService } from '../../services/profile';
+import { ClubService } from '../../services/clubs';
 import { supabase } from '../../constants/supabase';
 import { showToast } from '../Toast';
 import SPSentSuccessModal from './SPSentSuccessModal';
 
 const { width: W, height: H } = Dimensions.get('window');
-const PANEL_HEIGHT = 340;
+const PANEL_CONTENT_HEIGHT = 340;
 const SLIDER_WIDTH = Math.max(1, W - 80);
 const QUICK_AMOUNTS = [5, 10, 25, 50, 100];
 const MAX_SLIDER = 500;
@@ -92,12 +94,18 @@ interface Props {
   senderId: string;
   recipientId: string;
   recipientName: string;
+  /** ★ 2026-04-26: clubId verilirse SP kullanıcıya değil Koro hazinesine gider. */
+  clubId?: string;
   onSuccess?: (amount: number) => void;
+  /** Koro bağışı sonrası yeni hazine bakiyesini bildirir (opsiyonel). */
+  onTreasuryUpdate?: (newBalance: number) => void;
 }
 
 export default function SPDonateSheet({
-  visible, onClose, senderId, recipientId, recipientName, onSuccess,
+  visible, onClose, senderId, recipientId, recipientName, clubId, onSuccess, onTreasuryUpdate,
 }: Props) {
+  const insets = useSafeAreaInsets();
+  const PANEL_HEIGHT = PANEL_CONTENT_HEIGHT + Math.max(insets.bottom, 0);
   const translateY = useRef(new Animated.Value(PANEL_HEIGHT)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
   const [amount, setAmount] = useState(10);
@@ -121,7 +129,9 @@ export default function SPDonateSheet({
         try {
           const { data } = await supabase.from('profiles').select('system_points').eq('id', senderId).single();
           setBalance(data?.system_points ?? 0);
-        } catch {}
+        } catch (e) {
+          if (__DEV__) console.warn('[SPDonateSheet] balance fetch failed:', e);
+        }
       })();
       Animated.parallel([
         Animated.spring(translateY, { toValue: 0, useNativeDriver: true, damping: 22, stiffness: 220 }),
@@ -140,9 +150,12 @@ export default function SPDonateSheet({
   onCloseRef.current = onClose;
   const panResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
+      // ★ 2026-04-28: Pan tüm sheet'e bağlı (Clubhouse). Slider yatay, dy küçük kalır → çakışma yok.
+      onStartShouldSetPanResponder: () => false,
+      onStartShouldSetPanResponderCapture: () => false,
       onMoveShouldSetPanResponder: (_, gs) => gs.dy > 8 && Math.abs(gs.dy) > Math.abs(gs.dx) * 1.5,
-      onMoveShouldSetPanResponderCapture: () => false,
+      onMoveShouldSetPanResponderCapture: (_, gs) => gs.dy > 25 && Math.abs(gs.dy) > Math.abs(gs.dx) * 2,
+      onPanResponderTerminationRequest: () => false,
       onPanResponderMove: (_, gs) => {
         if (gs.dy > 0) translateY.setValue(gs.dy);
       },
@@ -153,7 +166,6 @@ export default function SPDonateSheet({
           Animated.spring(translateY, { toValue: 0, useNativeDriver: true, damping: 22, stiffness: 220 }).start();
         }
       },
-      onPanResponderTerminationRequest: () => true,
     })
   ).current;
 
@@ -200,26 +212,43 @@ export default function SPDonateSheet({
 
   const handleDonate = async () => {
     if (amount <= 0 || loading) return;
-    if (senderId === recipientId) return;
+    if (!clubId && senderId === recipientId) return;
     if (balance !== null && balance < amount) {
       showToast({ title: 'Yetersiz bakiye', message: 'SP mağazadan yükleyebilirsin.', type: 'warning' });
       return;
     }
     setLoading(true);
     try {
-      const result = await ProfileService.donateToUser(senderId, recipientId, amount);
-      if (!mountedRef.current) return;
-      if (!result.success) {
-        showToast({ title: 'Bağış başarısız', type: 'error' });
-        setLoading(false);
-        return;
+      // ★ 2026-04-26: Koro hazinesi bağışı vs kullanıcıya bağış
+      if (clubId) {
+        const r = await ClubService.contributeTreasury(clubId, amount, senderId);
+        if (!mountedRef.current) return;
+        if (!r.success) {
+          showToast({ title: 'Bağış başarısız', message: r.error || '', type: 'error' });
+          setLoading(false);
+          return;
+        }
+        setBalance(prev => (prev ?? 0) - amount);
+        onTreasuryUpdate?.(r.newBalance ?? 0);
+        onSuccess?.(amount);
+        setSuccessAmount(amount);
+        setShowSuccess(true);
+        onClose();
+      } else {
+        const result = await ProfileService.donateToUser(senderId, recipientId, amount);
+        if (!mountedRef.current) return;
+        if (!result.success) {
+          showToast({ title: 'Bağış başarısız', type: 'error' });
+          setLoading(false);
+          return;
+        }
+        setBalance(prev => (prev ?? 0) - amount);
+        onSuccess?.(amount);
+        // ★ Premium success modal — toast yerine animasyonlu kutlama
+        setSuccessAmount(amount);
+        setShowSuccess(true);
+        onClose();
       }
-      setBalance(prev => (prev ?? 0) - amount);
-      onSuccess?.(amount);
-      // ★ Premium success modal — toast yerine animasyonlu kutlama
-      setSuccessAmount(amount);
-      setShowSuccess(true);
-      onClose();
     } catch {
       if (mountedRef.current) showToast({ title: 'Bağış başarısız', type: 'error' });
     } finally {
@@ -227,7 +256,7 @@ export default function SPDonateSheet({
     }
   };
 
-  const canDonate = amount > 0 && balance !== null && balance >= amount && senderId !== recipientId;
+  const canDonate = amount > 0 && balance !== null && balance >= amount && (!!clubId || senderId !== recipientId);
   const fillRatio = (amount - 1) / (MAX_SLIDER - 1);
   // ★ 2026-04-21: Miktar arttıkça modal paleti değişir
   const tier = getTier(amount);
@@ -248,14 +277,21 @@ export default function SPDonateSheet({
   }
 
   return (
-    <Modal visible transparent statusBarTranslucent animationType="none" onRequestClose={onClose}>
-      {/* Backdrop */}
+    // ★ 2026-04-28: Modal sarmalı kaldırıldı (InRoomUserProfile/FollowListModal ile aynı pattern).
+    //   Modal native dialog Pressable backdrop tap'i + pan responder Capture phase'i Pressable
+    //   child'larla çakışıyordu → drag çalışmıyor, sadece backdrop tap kapatabiliyordu.
+    //   View overlay zIndex:500 — InRoomUserProfile (300) ve FollowListModal (400) üstünde.
+    <View style={StyleSheet.absoluteFillObject as any} pointerEvents="box-none">
+      <View style={{ ...StyleSheet.absoluteFillObject, zIndex: 500 }} pointerEvents="box-none">
       <Animated.View style={[StyleSheet.absoluteFill, { opacity: backdropOpacity, backgroundColor: 'rgba(0,0,0,0.6)' }]}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
       </Animated.View>
 
       {/* Panel — border/tint/edge tier paletinden gelir */}
-      <Animated.View style={[styles.panel, { borderColor: palette.border, transform: [{ translateY }] }]}>
+      <Animated.View
+        style={[styles.panel, { borderColor: palette.border, paddingBottom: 28 + insets.bottom, transform: [{ translateY }] }]}
+        {...panResponder.panHandlers}
+      >
         {/* Koyu zemin */}
         <LinearGradient
           colors={['#2a1e14', '#17100a', '#0a0604']}
@@ -274,15 +310,16 @@ export default function SPDonateSheet({
           style={styles.topEdge}
         />
 
-        {/* Handle */}
-        <View style={styles.handle} {...panResponder.panHandlers}>
+        {/* ★ 2026-04-28: Handle artık görsel — pan tüm sheet'te (Clubhouse). */}
+        <View style={styles.handle}>
           <View style={[styles.handleBar, { backgroundColor: palette.accentSolid + '73' }]} />
         </View>
 
         {/* Header */}
         <View style={styles.header}>
-          <Ionicons name="diamond" size={18} color={palette.accentSolid} style={iconShadow} />
-          <Text style={styles.headerTitle}>SP BAĞIŞLA</Text>
+          {/* ★ 2026-04-30: diamond → gelecekte inline SVG hexagon ile değiştirilecek (SPHexagonIcon WebView ağır) */}
+          <Ionicons name={clubId ? 'planet' : 'diamond'} size={18} color={palette.accentSolid} style={iconShadow} />
+          <Text style={styles.headerTitle}>{clubId ? 'HAZİNEYE BAĞIŞ' : 'SP BAĞIŞLA'}</Text>
           {palette.labelText && (
             <View style={{ paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6, backgroundColor: palette.accentSolid + '22', borderWidth: 0.7, borderColor: palette.accentSolid + '60' }}>
               <Text style={{ fontSize: 8, fontWeight: '900', color: palette.accentSolid, letterSpacing: 1.2 }}>{palette.labelText}</Text>
@@ -297,7 +334,7 @@ export default function SPDonateSheet({
         {/* Alıcı */}
         <Text style={styles.recipientText}>
           <Text style={{ color: palette.accentSolid, fontWeight: '800' }}>{recipientName}</Text>
-          <Text> adlı kullanıcıya</Text>
+          <Text>{clubId ? ' Korosunun hazinesine' : ' adlı kullanıcıya'}</Text>
         </Text>
 
         {/* Miktar göstergesi */}
@@ -366,14 +403,15 @@ export default function SPDonateSheet({
               <ActivityIndicator color="#FFF" size="small" />
             ) : (
               <>
-                <Ionicons name="diamond" size={16} color="#FFF" style={iconShadow} />
-                <Text style={styles.sendBtnText}>{amount.toLocaleString('tr-TR')} SP Gönder</Text>
+                <Ionicons name={clubId ? 'planet' : 'diamond'} size={16} color="#FFF" style={iconShadow} />
+                <Text style={styles.sendBtnText}>{amount.toLocaleString('tr-TR')} SP {clubId ? 'Hazineye Ekle' : 'Gönder'}</Text>
               </>
             )}
           </LinearGradient>
         </Pressable>
       </Animated.View>
-    </Modal>
+      </View>
+    </View>
   );
 }
 
@@ -392,7 +430,6 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: 'rgba(251,191,36,0.35)',
     borderBottomWidth: 0,
-    paddingBottom: 28,
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -8 },

@@ -15,6 +15,8 @@ import StatusAvatar from '../../components/StatusAvatar';
 // ★ 2026-04-27: UserSearchModal artık global (app/_layout.tsx) — useUserSearchSheet ile açılır.
 import { useUserSearchSheet } from '../_layout';
 import AppBackground from '../../components/AppBackground';
+import AnimatedHeaderIconBtn from '../../components/AnimatedHeaderIconBtn';
+// ★ 2026-04-28: AnimatedLogo kaldırıldı — SopranoMesaj branding için inline component.
 import { bannerIntroPlayed, markBannerIntroPlayed } from '../../utils/bannerIntro';
 import TabBarFadeOut from '../../components/TabBarFadeOut';
 import { showToast } from '../../components/Toast';
@@ -25,6 +27,71 @@ import PremiumAlert, { type AlertButton } from '../../components/PremiumAlert';
 import ConversationActionSheet, { type SheetAction } from '../../components/ConversationActionSheet';
 import { ModerationService } from '../../services/moderation';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { ImageStyle } from 'react-native';
+
+// ★ 2026-04-28: Mesajlar header logosu — SopranoMesaj (soprano_part + mesaj_part)
+const MESAJ_SOP_W = 110;
+const MESAJ_MESAJ_W = 73;
+const MESAJ_H = 30;
+
+function AnimatedMesajLogo() {
+  const played = bannerIntroPlayed();
+  // ★ 2026-04-29: Soprano sabit (kullanıcı isteği) — sadece Mesaj partner kelime animasyonlu
+  const mesajX = useRef(new RNAnimated.Value(played ? 0 : 120)).current;
+  const mesajOp = useRef(new RNAnimated.Value(played ? 1 : 0)).current;
+  const mesajY = useRef(new RNAnimated.Value(0)).current;
+
+  React.useEffect(() => {
+    if (played) return;
+    const t2 = setTimeout(() => {
+      RNAnimated.parallel([
+        RNAnimated.timing(mesajOp, { toValue: 1, duration: 600, useNativeDriver: true }),
+        RNAnimated.spring(mesajX, { toValue: 0, friction: 6, tension: 50, useNativeDriver: true }),
+      ]).start();
+    }, 650);
+    return () => { clearTimeout(t2); };
+  }, []);
+
+  // ★ 2026-04-29: Tab focus'ta — sadece Mesaj çizgiden yukarı doğar (Soprano sabit)
+  useFocusEffect(
+    React.useCallback(() => {
+      if (!bannerIntroPlayed()) return;
+      mesajY.setValue(MESAJ_H);
+      mesajOp.setValue(0);
+      RNAnimated.sequence([
+        RNAnimated.delay(60),
+        RNAnimated.parallel([
+          RNAnimated.spring(mesajY, { toValue: 0, friction: 7, tension: 60, useNativeDriver: true }),
+          RNAnimated.timing(mesajOp, { toValue: 1, duration: 320, useNativeDriver: true }),
+        ]),
+      ]).start();
+    }, [])
+  );
+
+  return (
+    <View style={mesajLogoS.row}>
+      <Image
+        source={require('../../assets/soprano_part.png')}
+        style={mesajLogoS.sop}
+        resizeMode="contain"
+      />
+      <View style={mesajLogoS.partnerWrap}>
+        <RNAnimated.Image
+          source={require('../../assets/mesaj_part.png')}
+          style={[mesajLogoS.mesaj, { opacity: mesajOp, transform: [{ translateX: mesajX }, { translateY: mesajY }] }]}
+          resizeMode="contain"
+        />
+      </View>
+    </View>
+  );
+}
+
+const mesajLogoS = StyleSheet.create({
+  row: { flexDirection: 'row', alignItems: 'center', marginTop: -6 } as any,
+  sop: { width: MESAJ_SOP_W, height: MESAJ_H } as ImageStyle,
+  partnerWrap: { width: MESAJ_MESAJ_W, height: MESAJ_H, marginLeft: -4, overflow: 'hidden' },
+  mesaj: { width: MESAJ_MESAJ_W, height: MESAJ_H } as ImageStyle,
+});
 
 // ═══ Skeleton Card — Initial load'da iskelet gösterimi ═══
 function SkeletonCard() {
@@ -406,12 +473,50 @@ export default function MessagesScreen() {
     });
   }, [onlineFriends]);
 
+  // ★ 2026-04-29 v85: pending request sender'larını ref'te tut — her yeni mesajda
+  //   conversations'a eklemeden önce hızlı set kontrolü için (DB round-trip azaltır).
+  const pendingSenderIdsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    pendingSenderIdsRef.current = new Set(pendingRequests.map((r: any) => r.sender_id));
+  }, [pendingRequests]);
+
   useEffect(() => {
     if (!firebaseUser) return;
     const updateInbox = async (newMsg: Message) => {
       const otherId = newMsg.sender_id === firebaseUser.uid ? newMsg.receiver_id : newMsg.sender_id;
       if (blockedIdsRef.current.has(otherId)) return;
       const isSentByMe = newMsg.sender_id === firebaseUser.uid;
+
+      // ★ 2026-04-29 v85: Yabancıdan pending request mesajı → "Mesajlar" listesine
+      //   EKLEMEZ. "İstekler" sekmesinde görünmesi gerek. Hızlı path: ref'teki sender
+      //   set kontrol; cache'de yoksa DB'ye sor (yeni request olabilir, henüz state'e
+      //   yansımamış). Pending varsa pendingRequests yenilenir, refreshBadges tetiklenir.
+      if (!isSentByMe) {
+        if (pendingSenderIdsRef.current.has(otherId)) {
+          try {
+            const reqs = await MessageService.getPendingRequests(firebaseUser.uid);
+            setPendingRequests(reqs || []);
+          } catch {}
+          refreshBadges();
+          return;
+        }
+        // Cache'de yok ama yeni gelen ilk mesaj olabilir — DB'den teyit
+        try {
+          const { data: req } = await supabase
+            .from('message_requests')
+            .select('status')
+            .eq('sender_id', otherId)
+            .eq('receiver_id', firebaseUser.uid)
+            .eq('status', 'pending')
+            .maybeSingle();
+          if (req) {
+            const reqs = await MessageService.getPendingRequests(firebaseUser.uid);
+            setPendingRequests(reqs || []);
+            refreshBadges();
+            return;
+          }
+        } catch {}
+      }
 
       let partnerName = 'Kullanıcı';
       let partnerAvatar = '';
@@ -512,11 +617,47 @@ export default function MessagesScreen() {
           return { ...c, is_last_msg_read: true };
         }));
       })
+      // ★ 2026-04-29 FIX: Ben okuduğumda (markAsRead) UPDATE event yakalansın
+      //   → conversation kartının unread_count badge'i sıfırlansın. Eskiden bu
+      //   listener yoktu, badge "27" gibi takılı kalıyordu.
+      .on('postgres_changes', {
+        event: 'UPDATE', schema: 'public', table: 'messages',
+        filter: `receiver_id=eq.${firebaseUser.uid}`,
+      }, (payload) => {
+        const oldM = payload.old as any;
+        const newM = payload.new as any;
+        if (!(oldM?.is_read === false && newM?.is_read === true)) return;
+        const partnerId = newM.sender_id;
+        setConversations(prev => prev.map(c =>
+          c.partner_id === partnerId
+            ? { ...c, unread_count: Math.max(0, (c.unread_count || 0) - 1) }
+            : c
+        ));
+      })
+      .subscribe();
+
+    // ★ 2026-04-29 v85: message_requests realtime — INSERT/UPDATE'te "İstekler (N)"
+    //   sayacını anında güncelle. Eskiden sadece useFocusEffect ile yenileniyordu;
+    //   yabancı mesaj atınca sayfa fokuslanmadan badge takılı kalıyordu.
+    const reqChannelName = `msg_requests_${firebaseUser.uid}`;
+    const reqChannel = supabase
+      .channel(reqChannelName)
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'message_requests',
+        filter: `receiver_id=eq.${firebaseUser.uid}`,
+      }, async () => {
+        try {
+          const reqs = await MessageService.getPendingRequests(firebaseUser.uid);
+          setPendingRequests(reqs || []);
+          refreshBadges();
+        } catch {}
+      })
       .subscribe();
 
     return () => {
       incomingChannel.unsubscribe();
       supabase.removeChannel(sentChannel);
+      supabase.removeChannel(reqChannel);
     };
   }, [firebaseUser, refreshBadges, blockedIdsRef]);
 
@@ -735,29 +876,30 @@ export default function MessagesScreen() {
           pointerEvents="none"
         />
         <View style={styles.topBar}>
-          <Image source={require('../../assets/logo.png')} style={styles.logo} resizeMode="contain" />
+          <AnimatedMesajLogo />
           <View style={styles.headerRight}>
-            <NotificationBell unreadCount={unreadCount} onPress={() => { setNotifDrawerAnchorRight(60); setShowNotifDrawer(true); }} />
-            <Pressable style={styles.headerIconBtn} onPress={() => openSearch({
+            <AnimatedHeaderIconBtn staticIcon>
+              <NotificationBell unreadCount={unreadCount} onPress={() => { setNotifDrawerAnchorRight(60); setShowNotifDrawer(true); }} />
+            </AnimatedHeaderIconBtn>
+            <AnimatedHeaderIconBtn index={1} style={styles.headerIconBtn} onPress={() => openSearch({
               mode: 'compose',
               onSelectUser: (userId) => router.push(`/chat/${userId}` as any),
-            })}>
+            })} accessibilityLabel="Yeni mesaj">
               <Ionicons name="create-outline" size={22} color="#F1F5F9" style={styles.headerIcon} />
-            </Pressable>
+            </AnimatedHeaderIconBtn>
           </View>
         </View>
         <LinearGradient
-          colors={['transparent', 'rgba(20,184,166,0.55)', 'rgba(20,184,166,0.55)', 'transparent']}
+          colors={['transparent', 'rgba(139,92,246,0.55)', 'rgba(139,92,246,0.55)', 'transparent']}
           locations={[0, 0.25, 0.75, 1]}
           start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
           style={styles.topBarSeparator}
         />
       </RNAnimated.View>
 
-      {/* ═══ Sayfa Başlığı ═══ */}
+      {/* ═══ Sayfa Başlığı — "Mesajlar" başlığı kaldırıldı (header zaten SopranoMesaj diyor) ═══ */}
       <View style={styles.pageTitleRow}>
         <View>
-          <Text style={styles.headerTitle}>Mesajlar</Text>
           <Text style={styles.headerSub}>
             {conversations.length > 0 ? `${conversations.length} sohbet` : 'Sohbetlerin'}
           </Text>
@@ -1088,7 +1230,7 @@ const styles = StyleSheet.create({
   // ─── Header — Premium Glassmorphic banner ───
   topBarWrap: {
     position: 'relative',
-    marginBottom: 14,
+    marginBottom: 6,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.22,
@@ -1113,7 +1255,7 @@ const styles = StyleSheet.create({
   topBar: {
     // ★ 2026-04-26: paddingHorizontal 16→14 — keşfet/odalarım ile uyumlu, logo aynı pozisyonda kalır.
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 14, paddingBottom: 10,
+    paddingHorizontal: 14, paddingBottom: 4,
   },
   topBarSeparator: {
     height: 1.5,

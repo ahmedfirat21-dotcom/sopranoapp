@@ -17,11 +17,13 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getAvatarSource } from '../../constants/avatars';
 import { EmojiReactionBar } from '../EmojiReactions';
+import { RoomChatService } from '../../services/roomChat';
 
-// Snap points — CONTROL_BAR_AREA: bar + bottom inset alanı
-// Sheet yüksekliği bu alanın ÜSTÜNDEN başlar.
+// Snap points — CONTROL_BAR_AREA: bar + padding alanı (insets.bottom hariç).
+// RoomControlBar: BAR_H=50 + üstündeki wrapper paddingBottom(8) = 58.
+// insets.bottom ayrıca eklenir → sheet tam kontrol barın üstüne oturur.
 // ════════════════════════════════════════════════════════════
-const CONTROL_BAR_AREA = 94; // bar(60) + padding(~34)
+const CONTROL_BAR_AREA = 58;
 const HANDLE_H = 28;         // drag handle alanı
 
 interface ChatMsg {
@@ -59,10 +61,16 @@ interface Props {
   onClose: () => void;
   bottomInset: number;
   onSendRaw?: (content: string) => void;
+  /** ★ v56: reaksiyon için çağıran kullanıcının Firebase UID'si */
+  currentUserId?: string;
+  /** Oda id — reaction realtime kanalı için */
+  roomId?: string;
+  /** ★ 2026-04-26: Mesaj balonundaki avatar/isim tıklanınca profil sheet aç (parent yönlendirir). */
+  onAvatarPress?: (userId: string) => void;
 }
 
 export default function RoomChatDrawer({
-  visible, messages, chatInput, onChangeInput, onSend, onClose, onSendRaw,
+  visible, messages, chatInput, onChangeInput, onSend, onClose, onSendRaw, currentUserId, roomId, onAvatarPress,
 }: Props) {
   const insets = useSafeAreaInsets();
   const inputRef = useRef<TextInput>(null);
@@ -73,7 +81,9 @@ export default function RoomChatDrawer({
   // (adjustResize ile klavye açılınca küçülür) snap'ler otomatik güncellenir.
   // ════════════════════════════════════════════════════════════
   const { height: windowH } = useWindowDimensions();
-  const bottomOffset = CONTROL_BAR_AREA + Math.max(insets.bottom, 14) - 10;
+  // ★ 2026-04-24: Sheet bottom = control barın üst kenarıyla birebir hizalı.
+  //   Eski formül +26px gap bırakıyordu (S9 vs. küçük-ekran modellerde belirgin).
+  const bottomOffset = CONTROL_BAR_AREA + Math.max(insets.bottom, 14);
   const availableH = windowH - bottomOffset - Math.max(insets.top, 20);
   const SNAP_CLOSED = 0;
   const SNAP_HALF = Math.min(availableH * 0.55, windowH * 0.45);
@@ -294,6 +304,58 @@ export default function RoomChatDrawer({
   useEffect(() => { if (!visible) setShowEmojiPicker(false); }, [visible]);
 
   // ════════════════════════════════════════════════════════════
+  // ★ v56: Mesaj reaksiyonları (❤️) — state, fetch, realtime sync
+  // ════════════════════════════════════════════════════════════
+  const [reactions, setReactions] = useState<Record<string, { count: number; liked: boolean }>>({});
+  const reactionsRef = useRef(reactions);
+  useEffect(() => { reactionsRef.current = reactions; }, [reactions]);
+
+  // Açılışta / yeni mesaj geldiğinde toplu reaksiyon özeti çek
+  const fetchedIdsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!visible || !currentUserId) return;
+    const newIds = messages.map(m => m.id).filter(id => id && !fetchedIdsRef.current.has(id));
+    if (newIds.length === 0) return;
+    newIds.forEach(id => fetchedIdsRef.current.add(id));
+    let cancelled = false;
+    RoomChatService.getReactions(newIds, currentUserId).then(map => {
+      if (cancelled || !map) return;
+      setReactions(prev => ({ ...prev, ...map }));
+    });
+    return () => { cancelled = true; };
+  }, [visible, messages.length, currentUserId]);
+
+  // Realtime sync — başkası beğenince refetch bu mesaj için
+  useEffect(() => {
+    if (!visible || !currentUserId || !roomId) return;
+    const unsub = RoomChatService.subscribeReactions(roomId, async (messageId) => {
+      const map = await RoomChatService.getReactions([messageId], currentUserId);
+      if (map[messageId]) {
+        setReactions(prev => ({ ...prev, [messageId]: map[messageId] }));
+      } else {
+        // count düştü 0 — kaldır
+        setReactions(prev => { const n = { ...prev }; delete n[messageId]; return n; });
+      }
+    });
+    return unsub;
+  }, [visible, currentUserId, roomId]);
+
+  // Tap-to-like (optimistic)
+  const handleToggleReaction = useCallback(async (messageId: string) => {
+    if (!currentUserId || !messageId) return;
+    const prev = reactionsRef.current[messageId] || { count: 0, liked: false };
+    const optimistic = { liked: !prev.liked, count: prev.count + (prev.liked ? -1 : 1) };
+    setReactions(r => ({ ...r, [messageId]: optimistic }));
+    const result = await RoomChatService.toggleReaction(messageId, currentUserId);
+    if (result) {
+      setReactions(r => ({ ...r, [messageId]: { count: result.count, liked: result.liked } }));
+    } else {
+      // rollback
+      setReactions(r => ({ ...r, [messageId]: prev }));
+    }
+  }, [currentUserId]);
+
+  // ════════════════════════════════════════════════════════════
   // Message render
   // ════════════════════════════════════════════════════════════
   const renderMessage = useCallback(({ item }: { item: ChatMsg }) => {
@@ -310,12 +372,39 @@ export default function RoomChatDrawer({
     const isGifSafe = gifMatch?.[1] && /^https:\/\/(media\.tenor\.com|media[0-9]*\.giphy\.com|i\.giphy\.com)\//i.test(gifMatch[1]);
     const emojiOnly = /^[\p{Emoji_Presentation}\p{Extended_Pictographic}‍️⃣]{1,6}$/u.test(content) && content.length <= 14;
     const nameColor = getUserColor(item.user_id || '', item.role, item.profiles?.subscription_tier);
+    const reaction = reactions[item.id];
+    const isOwn = item.user_id === currentUserId;
+
+    // ★ 2026-04-26 FIX: Mesaj objesinde gönderen alanı `sender_id` (DB) — ChatMsg type'ında `user_id` adıyla
+    //   aliaslanıyordu ama bazı kayıtlarda yalnız `sender_id` geliyor. İkisini de OR ile al.
+    const senderUid = (item as any).user_id || (item as any).sender_id;
 
     return (
       <View style={st.msgRow}>
-        <Image source={getAvatarSource(item.profiles?.avatar_url)} style={[st.msgAvatar, { borderColor: nameColor + '40' }]} />
-        <View style={[st.msgBubble, isGifSafe && { backgroundColor: 'transparent', borderWidth: 0, paddingHorizontal: 4, paddingVertical: 2 }]}>
-          <Text style={[st.msgName, { color: nameColor }]}>{item.profiles?.display_name || 'Kullanıcı'}</Text>
+        {/* ★ 2026-04-26: Avatar tıklanınca profil sheet — diğer platformlardaki gibi standart davranış. */}
+        <Pressable
+          onPress={() => { if (senderUid && onAvatarPress) onAvatarPress(senderUid); }}
+          hitSlop={6}
+        >
+          <Image source={getAvatarSource(item.profiles?.avatar_url)} style={[st.msgAvatar, { borderColor: nameColor + '40' }]} />
+        </Pressable>
+        <Pressable
+          onLongPress={() => handleToggleReaction(item.id)}
+          onPress={() => { if (reaction?.liked || (reaction?.count || 0) > 0) handleToggleReaction(item.id); }}
+          delayLongPress={220}
+          style={({ pressed }) => [
+            st.msgBubble,
+            isGifSafe && { backgroundColor: 'transparent', borderWidth: 0, paddingHorizontal: 4, paddingVertical: 2 },
+            pressed && { opacity: 0.9 },
+          ]}
+        >
+          {/* İsim de tıklanır — avatar gibi profil sheet'i açar */}
+          <Pressable
+            onPress={() => { if (senderUid && onAvatarPress) onAvatarPress(senderUid); }}
+            hitSlop={4}
+          >
+            <Text style={[st.msgName, { color: nameColor }]}>{item.profiles?.display_name || 'Kullanıcı'}</Text>
+          </Pressable>
           {isGifSafe ? (
             <Image source={{ uri: gifMatch![1] }} style={{ width: 220, height: 165, borderRadius: 12 }} resizeMode="cover" />
           ) : emojiOnly ? (
@@ -323,10 +412,16 @@ export default function RoomChatDrawer({
           ) : (
             <Text style={st.msgText}>{content}</Text>
           )}
-        </View>
+          {reaction && reaction.count > 0 ? (
+            <View style={[st.reactionBadge, reaction.liked && st.reactionBadgeLiked]}>
+              <Text style={st.reactionEmoji}>{reaction.liked ? '❤️' : '🤍'}</Text>
+              <Text style={[st.reactionCount, reaction.liked && { color: '#FFE4E6' }]}>{reaction.count}</Text>
+            </View>
+          ) : null}
+        </Pressable>
       </View>
     );
-  }, []);
+  }, [reactions, currentUserId, handleToggleReaction, onAvatarPress]);
 
   // Sheet kapalıysa render etme
   const isOpen = visible || currentSnap.current > 0;
@@ -608,4 +703,26 @@ const st = StyleSheet.create({
     borderRadius: 12,
   },
   sysMsgText: { fontSize: 11, color: '#94A3B8', textAlign: 'center' },
+
+  // ★ v56: Reaction badge — balonun sağ-altında küçük ❤️+sayı pill
+  reactionBadge: {
+    position: 'absolute',
+    right: -6, bottom: -8,
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    paddingHorizontal: 7, paddingVertical: 2.5,
+    borderRadius: 11,
+    backgroundColor: 'rgba(15,23,42,0.92)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.35, shadowRadius: 3,
+    elevation: 3,
+  },
+  reactionBadgeLiked: {
+    backgroundColor: 'rgba(239,68,68,0.92)',
+    borderColor: 'rgba(254,205,211,0.35)',
+  },
+  reactionEmoji: { fontSize: 10 },
+  reactionCount: { fontSize: 10, fontWeight: '800', color: '#E2E8F0', letterSpacing: 0.2 },
 });

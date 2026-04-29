@@ -1,20 +1,15 @@
-import { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import SPIcon from '../components/SPIcon';
 import { useRouter } from 'expo-router';
 import { safeGoBack } from '../constants/navigation';
-import { Colors, Shadows } from '../constants/theme';
+import { Shadows } from '../constants/theme';
 import { useAuth } from './_layout';
 import AppBackground from '../components/AppBackground';
 import { showToast } from '../components/Toast';
-import PremiumAlert, { type AlertButton } from '../components/PremiumAlert';
-import { RevenueCatService, REVENUECAT_MOCK_MODE } from '../services/revenuecat';
-import { GamificationService } from '../services/gamification';
-import { supabase } from '../constants/supabase';
 import { migrateLegacyTier } from '../types';
-import PurchaseSuccessModal from '../components/PurchaseSuccessModal';
 
 // ═══ SP Paketleri — Premium Jewel-Tone Design ═══
 // ★ id alanları Google Play Console'daki In-App Product ID'leriyle eşleşmeli
@@ -32,120 +27,21 @@ const SP_PACKAGES = [
 export default function SPStoreScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { profile, refreshProfile } = useAuth();
+  const { profile } = useAuth();
   const spBalance = profile?.system_points ?? 0;
   const userTier = migrateLegacyTier(profile?.subscription_tier);
-  // ★ Pro: %20, Plus: %10 ekstra SP bonusu (mağaza indirimi)
   const storeBonusPct = userTier === 'Pro' ? 0.20 : userTier === 'Plus' ? 0.10 : 0;
-  const [cAlert, setCAlert] = useState<{ visible: boolean; title: string; message: string; type?: 'info' | 'warning' | 'error' | 'success'; buttons?: AlertButton[] }>({ visible: false, title: '', message: '' });
-  const [purchasing, setPurchasing] = useState(false);
-  // ★ Şık animasyonlu başarı modalı
-  const [successModal, setSuccessModal] = useState<{ visible: boolean; title: string; subtitle: string; accent?: readonly [string, string] }>({ visible: false, title: '', subtitle: '' });
-  const mountedRef = useRef(true);
-  useEffect(() => () => { mountedRef.current = false; }, []);
 
-  const handleBuy = (pkg: typeof SP_PACKAGES[0]) => {
-    if (!profile?.id) {
-      showToast({ title: 'Hata', message: 'Önce giriş yapmalısınız.', type: 'error' });
-      return;
-    }
-
-    // ★ Tier bonusu: Pro %20, Plus %10 ekstra SP
-    const tierBonus = Math.floor(pkg.sp * storeBonusPct);
-    const totalSP = pkg.sp + pkg.bonus + tierBonus;
-    const modeText = (REVENUECAT_MOCK_MODE && __DEV__) ? '\n\n⚠️ Test modunda — gerçek ödeme alınmaz.' : '';
-    const tierBonusText = tierBonus > 0 ? ` + ${tierBonus} ${userTier} bonus` : '';
-
-    setCAlert({
-      visible: true,
-      title: `${pkg.sp.toLocaleString()} SP`,
-      message: `${pkg.price.toFixed(2)} ₺ karşılığında ${pkg.sp.toLocaleString()} SP${pkg.bonus > 0 ? ` + ${pkg.bonus} bonus` : ''}${tierBonusText} satın almak istediğine emin misin?${modeText}`,
+  const handleBuy = () => {
+    showToast({
+      title: '🚧 Yakında',
+      message: 'SP mağazası alfa sürüm süresince kapalı. Yakında Google Play üzerinden aktif olacak!',
       type: 'info',
-      buttons: [
-        { text: 'Vazgeç', style: 'cancel' },
-        { text: 'Satın Al', onPress: async () => {
-          if (mountedRef.current) setPurchasing(true);
-          try {
-            // ★ Y4 FIX: SP miktarı artık server-side'dan (v27 claim_sp_package RPC).
-            // Client hiçbir SP değeri göndermiyor — sadece package ID + transaction ID.
-            // Toplam SP (bonus + tier bonus) backend'te hesaplanıyor; client manipülasyonu etkisiz.
-            let transactionId: string | null = null;
-
-            if (REVENUECAT_MOCK_MODE && __DEV__) {
-              // Test build: transaction_id NULL, RPC mock ref üretir
-              transactionId = null;
-            } else if (REVENUECAT_MOCK_MODE && !__DEV__) {
-              showToast({ title: 'Ödeme Sistemi Hazır Değil', message: 'Satın alma şu an aktif değil. Yakında açılacak.', type: 'warning' });
-              return;
-            } else {
-              // Production RevenueCat satın alma
-              try {
-                await RevenueCatService.getOfferings();
-                const Purchases = require('react-native-purchases').default;
-                const purchaseResult = await Purchases.purchaseStoreProduct({
-                  identifier: pkg.id,
-                  priceString: `₺${pkg.price.toFixed(2)}`,
-                });
-                transactionId = (purchaseResult as any)?.transactionIdentifier
-                  || (purchaseResult as any)?.transaction?.transactionIdentifier
-                  || null;
-                if (!transactionId) {
-                  try {
-                    const ci = await Purchases.getCustomerInfo();
-                    const txs = (ci?.nonSubscriptionTransactions || [])
-                      .filter((t: any) => t.productIdentifier === pkg.id)
-                      .sort((a: any, b: any) => new Date(b.purchaseDate).getTime() - new Date(a.purchaseDate).getTime());
-                    transactionId = txs[0]?.transactionIdentifier || null;
-                  } catch {}
-                }
-              } catch (purchaseErr: any) {
-                if (purchaseErr?.userCancelled) {
-                  return;
-                }
-                if (purchaseErr?.message?.includes('product') || purchaseErr?.code === 'PRODUCT_NOT_FOUND') {
-                  showToast({ title: '⏳ Ürün Hazırlanıyor', message: 'SP paketleri Google Play onayı bekliyor. Kısa süre sonra aktif olacak.', type: 'info' });
-                  return;
-                }
-                throw purchaseErr;
-              }
-            }
-
-            // ★ Y4: Server-side SP grant — amount backend'ten gelir (client manipülasyon bypass)
-            const { data: claimData, error: claimError } = await supabase.rpc('claim_sp_package', {
-              p_package_id: pkg.id,
-              p_transaction_id: transactionId,
-            });
-            if (claimError) {
-              // v27 migrate edilmediyse legacy path — eski client-side SP hesabıyla devam
-              if (__DEV__) console.warn('[sp-store] v27 RPC fallback:', claimError.message);
-              const legacyRef = transactionId ? `rvn:${transactionId}` : `mock:${profile.id}:${pkg.id}:${Date.now()}`;
-              await GamificationService.earn(profile.id, totalSP, 'sp_purchase', legacyRef);
-            }
-            await refreshProfile();
-            if (mountedRef.current) {
-              const grantedSP = (claimData as any)?.total_sp || totalSP;
-              const title = REVENUECAT_MOCK_MODE && __DEV__ ? 'Satın Alma Başarılı (TEST)' : 'Satın Alma Başarılı';
-              setSuccessModal({
-                visible: true,
-                title,
-                subtitle: `${grantedSP.toLocaleString()} SP hesabına eklendi.`,
-                accent: [pkg.accent, pkg.gradient[2]] as const,
-              });
-            }
-          } catch (err: any) {
-            if (mountedRef.current) {
-              showToast({ title: 'Hata', message: err.message || 'Satın alma başarısız.', type: 'error' });
-            }
-          } finally {
-            if (mountedRef.current) setPurchasing(false);
-          }
-        }},
-      ],
     });
   };
 
   return (
-    <AppBackground variant="profile">
+    <AppBackground variant="profile" radialGlow>
       <View style={{ flex: 1 }}>
         {/* Header */}
         <View style={[s.header, { paddingTop: insets.top + 8 }]}>
@@ -156,10 +52,7 @@ export default function SPStoreScreen() {
           </Pressable>
           <Text style={s.headerTitle}>SP Mağaza</Text>
           <View style={s.balancePill}>
-            <Ionicons name="diamond" size={12} color="#FBBF24" style={{
-              textShadowColor: '#FBBF24dd',
-              textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 8,
-            }} />
+            <SPIcon size={16} />
             <Text style={s.balanceText}>{spBalance.toLocaleString()}</Text>
           </View>
         </View>
@@ -200,7 +93,7 @@ export default function SPStoreScreen() {
                   pkg.popular && s.pkgCardPopular,
                   pressed && { opacity: 0.92, transform: [{ scale: 0.96 }] },
                 ]}
-                onPress={() => handleBuy(pkg)}
+                onPress={handleBuy}
               >
                 {/* ★ 3-stop gradient: parlak → zengin → derin (mücevher etkisi) */}
                 <LinearGradient
@@ -282,14 +175,6 @@ export default function SPStoreScreen() {
           </View>
         </ScrollView>
       </View>
-      <PremiumAlert {...cAlert} onDismiss={() => setCAlert(prev => ({ ...prev, visible: false }))} />
-      <PurchaseSuccessModal
-        visible={successModal.visible}
-        title={successModal.title}
-        subtitle={successModal.subtitle}
-        accent={successModal.accent}
-        onClose={() => setSuccessModal(prev => ({ ...prev, visible: false }))}
-      />
     </AppBackground>
   );
 }

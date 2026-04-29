@@ -29,6 +29,10 @@ LogBox.ignoreLogs([
   /ConnectionError.*LeaveRequest/,
 ]);
 import { Stack, useRouter, useSegments } from 'expo-router';
+// ⛔ KRİTİK — DOKUNMA! KeyboardProvider tüm uygulamayı sarar.
+// Samsung dahil tüm Android cihazlarda klavye sorununu çözer.
+// Bu import ve <KeyboardProvider> wrapper'ı ASLA kaldırma!
+import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import * as Linking from 'expo-linking';
@@ -40,7 +44,7 @@ import { Colors } from '../constants/theme';
 import { ProfileService, MessageService, type Profile } from '../services/database';
 import { FriendshipService } from '../services/friendship';
 import { GamificationService } from '../services/gamification';
-import { supabase, setSupabaseAuthToken } from '../constants/supabase';
+import { supabase, setSupabaseAuthToken, clearTokenCache, refreshTokenCache } from '../constants/supabase';
 import { PushNotificationService } from '../services/pushNotifications';
 import { SettingsService } from '../services/settings';
 import { CallService, type CallSignal } from '../services/call';
@@ -328,7 +332,15 @@ function RealtimeBadgeProvider({ userId, children }: { userId: string | null; ch
     //   çağrılır, realtime UPDATE event'ini beklemeden badge sıfırlanır.
     (global as any).__sopranoBadgeRefresh = () => { refreshBadges(); };
 
-    // 1. DM realtime — yeni mesaj gelince unread artır
+    // 1. DM realtime — yeni mesaj gelince badge'i güncelle.
+    // ★ 2026-04-29 v85: Optimistic +1 yerine refreshBadges() çağırıyoruz — yabancıdan gelen
+    //   pending request mesajları DM badge'inde sayılmamalı (getUnreadCount artık filtreliyor).
+    //   Debounce: 250ms — birden fazla INSERT/UPDATE birleşip tek DB sorgusu olur.
+    let dmRefreshTimer: ReturnType<typeof setTimeout> | null = null;
+    const dmRefreshDebounced = () => {
+      if (dmRefreshTimer) clearTimeout(dmRefreshTimer);
+      dmRefreshTimer = setTimeout(() => { refreshBadges(); }, 250);
+    };
     const dmSub = supabase
       .channel(`badge_dm:${userId}`)
       .on('postgres_changes', {
@@ -336,9 +348,38 @@ function RealtimeBadgeProvider({ userId, children }: { userId: string | null; ch
         schema: 'public',
         table: 'messages',
         filter: `receiver_id=eq.${userId}`,
-      }, () => {
-        setUnreadDMs(prev => prev + 1);
+      }, dmRefreshDebounced)
+      // mesaj is_read flip olunca badge anında güncellenir
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'messages',
+        filter: `receiver_id=eq.${userId}`,
+      }, (payload) => {
+        const oldM = payload.old as { is_read?: boolean };
+        const newM = payload.new as { is_read?: boolean };
+        if ((oldM?.is_read === false && newM?.is_read === true) ||
+            (oldM?.is_read === true && newM?.is_read === false)) {
+          dmRefreshDebounced();
+        }
       })
+      // DELETE — okunmamış mesaj silindiğinde decrement (refreshBadges zaten doğru sayar)
+      .on('postgres_changes', {
+        event: 'DELETE',
+        schema: 'public',
+        table: 'messages',
+      }, (payload) => {
+        const del = payload.old as { receiver_id?: string; is_read?: boolean };
+        if (del?.receiver_id === userId && del?.is_read === false) {
+          dmRefreshDebounced();
+        }
+      })
+      // ★ message_requests INSERT/UPDATE → istek statüsü değişince DM badge yeniden hesaplansın
+      //   (pending sender'lar DM badge'inden hariç tutuluyor)
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'message_requests',
+        filter: `receiver_id=eq.${userId}`,
+      }, dmRefreshDebounced)
       .subscribe();
 
     // 2. Friendship realtime — pending istek gelince sayıyı güncelle
@@ -947,6 +988,12 @@ export default function RootLayout() {
       prevUidRef.current = newUid;
 
       if (fbUser) {
+        // ★ 2026-04-28 v79: accessToken factory (supabase.ts) tüm auth'u yönetiyor.
+        //   Firebase JWT → Supabase JWKS doğrulama → REST + Realtime çalışıyor.
+        //   KRİTİK: Manual setAuth() ÇAĞIRMA! (InvalidJWTToken hatasına sebep olur)
+        if (__DEV__) console.log('[RootLayout] Firebase user ready, accessToken factory aktif.');
+
+        // Şimdi state'i set et — child useEffect'ler artık authed Realtime ile abone olur.
         setFirebaseUser(fbUser);
         setUser({
           name: fbUser.displayName || 'Kullanıcı',
@@ -966,19 +1013,10 @@ export default function RootLayout() {
           cl().setUserId(fbUser.uid);
         } catch {}
 
-        // ★ Firebase JWT → Supabase: Token'ı al ve Supabase'e enjekte et
-        try {
-          const idToken = await fbUser.getIdToken(false);
-          setSupabaseAuthToken(idToken);
-          if (__DEV__) console.log('[RootLayout] Firebase token Supabase\'e enjekte edildi');
-        } catch (e) {
-          if (__DEV__) console.warn('[RootLayout] Firebase token alınamadı:', e);
-        }
-
         // Supabase profilini bekle (isAuthReady'i burada true yapacak)
         await syncProfile(fbUser);
 
-        // Push bildirim token'ı al ve kaydet
+        // ★ v78: Push bildirim token'ı al ve push_tokens tablosuna kaydet (multi-device)
         const pushToken = await PushNotificationService.registerForPushNotifications();
         if (pushToken) {
           await PushNotificationService.savePushToken(fbUser.uid, pushToken);
@@ -997,8 +1035,9 @@ export default function RootLayout() {
           const cl = require('@react-native-firebase/crashlytics').default;
           cl().setUserId('');
         } catch {}
-        // ★ Logout: Supabase token'ı temizle + minimized room sıfırla + LiveKit kapat
+        // ★ Logout: Supabase token cache temizle + minimized room sıfırla + LiveKit kapat
         setSupabaseAuthToken(null);
+        clearTokenCache();
         setMinimizedRoom(null);
         try { await liveKitService.disconnect(); } catch {}
       }
@@ -1036,6 +1075,8 @@ export default function RootLayout() {
         }
         const freshToken = await currentUser.getIdToken(true);
         setSupabaseAuthToken(freshToken);
+        // ★ v79: Token cache yenileme (no-op — factory her çağrıda getIdToken yapıyor)
+        await refreshTokenCache();
         tokenRefreshFailuresRef.current = 0;
         if (__DEV__) console.log('[TokenRefresh] Supabase token yenilendi');
       } catch (e: any) {
@@ -1127,26 +1168,44 @@ export default function RootLayout() {
   useEffect(() => {
     const uid = firebaseUser?.uid;
     if (!uid) return;
-    const spSub = supabase
-      .channel(`sp_sync:${uid}`)
-      .on('postgres_changes', {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'profiles',
-        filter: `id=eq.${uid}`,
-      }, (payload) => {
-        const newSP = (payload.new as { system_points?: number })?.system_points;
-        // Sadece SP değiştiyse profili tazele (gereksiz re-render önleme)
-        if (newSP !== undefined) {
-          if (__DEV__) console.log(`[SPSync] Bakiye güncellendi: ${newSP} SP`);
-          // ★ PERF: Tam refreshProfile() yerine sadece SP field'ını güncelle
-          setProfile(prev => prev ? { ...prev, system_points: newSP } : prev);
-        }
-      })
-      .subscribe();
+    let currentChannel: ReturnType<typeof supabase.channel> | null = null;
+    let cancelled = false;
+
+    const setupSpChannel = () => {
+      if (cancelled) return;
+      if (currentChannel) {
+        try { supabase.removeChannel(currentChannel); } catch {}
+      }
+      currentChannel = supabase
+        .channel(`sp_sync:${uid}`)
+        .on('postgres_changes', {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'profiles',
+          filter: `id=eq.${uid}`,
+        }, (payload) => {
+          const newSP = (payload.new as { system_points?: number })?.system_points;
+          // Sadece SP değiştiyse profili tazele (gereksiz re-render önleme)
+          if (newSP !== undefined) {
+            if (__DEV__) console.log(`[SPSync] Bakiye güncellendi: ${newSP} SP`);
+            // ★ PERF: Tam refreshProfile() yerine sadece SP field'ını güncelle
+            setProfile(prev => prev ? { ...prev, system_points: newSP } : prev);
+          }
+        })
+        .subscribe((status, err) => {
+          if (__DEV__) console.log(`[SPSync] channel status: ${status}`, err ? `err=${err?.message || JSON.stringify(err)}` : '');
+          // ★ Reconnect on error — Firebase 3PA + Realtime bağlantı düşmesinde otomatik yeniden bağlan
+          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+            if (__DEV__) console.warn(`[SPSync] Kanal hatası (${status}) — 3sn sonra yeniden bağlanıyor...`, err);
+            setTimeout(() => { if (!cancelled) setupSpChannel(); }, 3000);
+          }
+        });
+    };
+    setupSpChannel();
 
     return () => {
-      supabase.removeChannel(spSub);
+      cancelled = true;
+      if (currentChannel) supabase.removeChannel(currentChannel);
     };
   }, [firebaseUser?.uid]); // ★ Audit fix: obj ref yerine uid string (her render leak önle)
 
@@ -1154,74 +1213,95 @@ export default function RootLayout() {
   useEffect(() => {
     const uid = firebaseUser?.uid;
     if (!uid) return;
-    const giftSub = supabase
-      .channel(`gift_recv:${uid}`)
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'notifications',
-        filter: `user_id=eq.${uid}`,
-      }, async (payload) => {
-        const notif = payload.new as any;
-        if (__DEV__) console.log('[GiftRT] notif received:', notif?.type, notif?.body);
-        // ★ 2026-04-24: thank_you tipini de yakala → ThankYouReceivedModal tetikle
-        if (notif?.type === 'thank_you' && notif?.sender_id) {
-          try {
-            const { data: thankSender } = await supabase
-              .from('profiles')
-              .select('display_name, avatar_url')
-              .eq('id', notif.sender_id)
-              .single();
-            // Body'den emoji + label parse: "🙏 Teşekkürler" pattern
-            const bodyParts = (notif.body || '').split(' ');
-            const thankEmoji = bodyParts[0] || '🙏';
-            const thankMessage = bodyParts.slice(1).join(' ') || undefined;
-            setIncomingThankYou({
-              senderName: thankSender?.display_name || 'Birisi',
-              senderAvatar: thankSender?.avatar_url,
-              emoji: thankEmoji,
-              message: thankMessage,
-            });
-          } catch {}
-          return;
-        }
-        if (notif?.type !== 'gift') return;
-        // Miktarı body'den parse et ("XX SP gönderdi" pattern'i)
-        const amountMatch = /(\d+)\s*SP/.exec(notif.body || '');
-        const amount = amountMatch ? parseInt(amountMatch[1], 10) : 0;
-        if (amount <= 0 || !notif.sender_id) {
-          if (__DEV__) console.warn('[GiftRT] Amount parse failed or no sender:', notif.body);
-          return;
-        }
-        // Sender profile bilgisini çek
+    let giftChannel: ReturnType<typeof supabase.channel> | null = null;
+    let giftCancelled = false;
+
+    const giftHandler = async (payload: any) => {
+      const notif = payload.new as any;
+      if (__DEV__) console.log('[GiftRT] notif received:', notif?.type, notif?.body);
+      // ★ 2026-04-24: thank_you tipini de yakala → ThankYouReceivedModal tetikle
+      if (notif?.type === 'thank_you' && notif?.sender_id) {
         try {
-          const { data: senderProfile } = await supabase
+          const { data: thankSender } = await supabase
             .from('profiles')
             .select('display_name, avatar_url')
             .eq('id', notif.sender_id)
             .single();
-          // ★ 2026-04-20: Oda içindeyken büyük gold SPReceivedModal'ı bastır —
-          //   oda içi DonationAlert zaten tüm katılımcılara aynı animasyonu
-          //   gösteriyor. Dışarıdayken (chat/home/profile vs) modal açılır.
-          if ((global as any).__sopranoInRoom) {
-            if (__DEV__) console.log('[GiftRT] Suppressed — user in room, DonationAlert handles it');
-            return;
-          }
-          setIncomingGift({
-            amount,
-            senderId: notif.sender_id,
-            senderName: senderProfile?.display_name || 'Birisi',
-            senderAvatar: senderProfile?.avatar_url,
-            notificationId: notif.id,
+          // Body'den emoji + label parse: "🙏 Teşekkürler" pattern
+          const bodyParts = (notif.body || '').split(' ');
+          const thankEmoji = bodyParts[0] || '🙏';
+          const thankMessage = bodyParts.slice(1).join(' ') || undefined;
+          setIncomingThankYou({
+            senderName: thankSender?.display_name || 'Birisi',
+            senderAvatar: thankSender?.avatar_url,
+            emoji: thankEmoji,
+            message: thankMessage,
           });
-        } catch (e) {
-          if (__DEV__) console.warn('[GiftRT] Sender profile fetch failed:', e);
+        } catch {}
+        return;
+      }
+      if (notif?.type !== 'gift') return;
+      // Miktarı body'den parse et ("XX SP gönderdi" pattern'i)
+      const amountMatch = /(\d+)\s*SP/.exec(notif.body || '');
+      const amount = amountMatch ? parseInt(amountMatch[1], 10) : 0;
+      if (amount <= 0 || !notif.sender_id) {
+        if (__DEV__) console.warn('[GiftRT] Amount parse failed or no sender:', notif.body);
+        return;
+      }
+      // Sender profile bilgisini çek
+      try {
+        const { data: senderProfile } = await supabase
+          .from('profiles')
+          .select('display_name, avatar_url')
+          .eq('id', notif.sender_id)
+          .single();
+        // ★ 2026-04-20: Oda içindeyken büyük gold SPReceivedModal'ı bastır —
+        //   oda içi DonationAlert zaten tüm katılımcılara aynı animasyonu
+        //   gösteriyor. Dışarıdayken (chat/home/profile vs) modal açılır.
+        if ((global as any).__sopranoInRoom) {
+          if (__DEV__) console.log('[GiftRT] Suppressed — user in room, DonationAlert handles it');
+          return;
         }
-      })
-      .subscribe((status) => {
-        if (__DEV__) console.log(`[GiftRT] channel status: ${status} for user ${uid}`);
-      });
-    return () => { supabase.removeChannel(giftSub); };
+        setIncomingGift({
+          amount,
+          senderId: notif.sender_id,
+          senderName: senderProfile?.display_name || 'Birisi',
+          senderAvatar: senderProfile?.avatar_url,
+          notificationId: notif.id,
+        });
+      } catch (e) {
+        if (__DEV__) console.warn('[GiftRT] Sender profile fetch failed:', e);
+      }
+    };
+
+    const setupGiftChannel = () => {
+      if (giftCancelled) return;
+      if (giftChannel) {
+        try { supabase.removeChannel(giftChannel); } catch {}
+      }
+      giftChannel = supabase
+        .channel(`gift_recv:${uid}`)
+        .on('postgres_changes', {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${uid}`,
+        }, giftHandler)
+        .subscribe((status, err) => {
+          if (__DEV__) console.log(`[GiftRT] channel status: ${status} for user ${uid}`, err ? `err=${err?.message || JSON.stringify(err)}` : '');
+          // ★ Reconnect on error — bağlantı düşerse 3sn sonra yeniden bağlan
+          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+            if (__DEV__) console.warn(`[GiftRT] Kanal hatası (${status}) — 3sn sonra yeniden bağlanıyor...`, err);
+            setTimeout(() => { if (!giftCancelled) setupGiftChannel(); }, 3000);
+          }
+        });
+    };
+    setupGiftChannel();
+
+    return () => {
+      giftCancelled = true;
+      if (giftChannel) supabase.removeChannel(giftChannel);
+    };
   }, [firebaseUser?.uid]); // ★ Audit fix: obj ref yerine uid string
 
   // Gelen arama dinleyicisi (global) — Tüm sinyalleri yakala + AppState reconnect
@@ -1366,6 +1446,7 @@ export default function RootLayout() {
       <ThemeContext.Provider value={themeContextValue}>
       <RealtimeBadgeProvider userId={firebaseUser?.uid || null}>
       <OnlineFriendsProvider userId={firebaseUser?.uid || null}>
+      <KeyboardProvider>
       <View style={styles.container}>
         {/* Status bar her zaman light (koyu tema) */}
         <StatusBar style="light" />
@@ -1410,7 +1491,7 @@ export default function RootLayout() {
                 gestureDirection: 'vertical',
               }}
             />
-            {/* ★ 2026-04-26: club/[id] modal — kulüpler listesinden açılan kulüp detayı */}
+            {/* ★ 2026-04-26: club/[id] modal — korolar listesinden açılan Koro detayı */}
             <Stack.Screen
               name="club/[id]"
               options={{
@@ -1609,6 +1690,7 @@ export default function RootLayout() {
 
         {/* ★ Intro Video kaldırıldı */}
       </View>
+    </KeyboardProvider>
     </OnlineFriendsProvider>
     </RealtimeBadgeProvider>
     </ThemeContext.Provider>

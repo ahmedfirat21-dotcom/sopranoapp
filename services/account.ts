@@ -56,13 +56,20 @@ export async function performDeleteAccount(firebaseUser: any): Promise<{ success
   }
 
   // 2) Storage cleanup — best effort (DB zaten silindi, orphan'lar admin cleanup ile)
+  //   ★ Pagination: heavy user 1000+ dosya yapabilir; offset ile tüm batch'leri tara.
   try {
     const buckets = ['avatars', 'post-images', 'voice-notes'] as const;
+    const PAGE = 1000;
     await Promise.all(buckets.map(async (bucket) => {
-      const { data: files } = await supabase.storage.from(bucket).list(uid, { limit: 1000 });
-      if (files && files.length > 0) {
+      let offset = 0;
+      // Maks 20 sayfa (20k dosya) — sonsuz döngü koruması
+      for (let page = 0; page < 20; page++) {
+        const { data: files } = await supabase.storage.from(bucket).list(uid, { limit: PAGE, offset });
+        if (!files || files.length === 0) break;
         const paths = files.map((f: any) => `${uid}/${f.name}`);
         await supabase.storage.from(bucket).remove(paths);
+        if (files.length < PAGE) break;
+        offset += PAGE;
       }
     }));
   } catch (e: any) {
@@ -79,7 +86,9 @@ export async function performDeleteAccount(firebaseUser: any): Promise<{ success
   }
 
   // 4) Logout (Google revoke + RevenueCat + Firebase signOut)
-  try { await performLogout(); } catch {}
+  try { await performLogout(); } catch (e: any) {
+    if (__DEV__) logger.warn('[Account] performLogout error after delete:', e?.message);
+  }
 
   return { success: true, stats };
 }

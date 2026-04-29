@@ -168,27 +168,27 @@ export interface RoomLimits {
 
 export const ROOM_TIER_LIMITS: Record<SubscriptionTier, RoomLimits> = {
   Free: {
-    // ★ 2026-04-22 (v2): Free daraltıldı — tat-al-geç stratejisi, Plus'a belirgin teşvik.
-    //   Günlük 3 oda, oda başına 3 saat, tek kamera, moderatör yok, sadece 'open' tip.
-    maxSpeakers: 3,
-    maxListeners: 8,
-    maxSpectators: 20,
-    maxCameras: 1,
+    // ★ 2026-04-24 (v3): Free esnetildi — "tap taze platform" stratejisi.
+    //   Kullanıcı ücretsiz planla rahat hissetmeli, Plus ekstra güç verir.
+    maxSpeakers: 5,
+    maxListeners: 15,
+    maxSpectators: 40,
+    maxCameras: 2,
     maxModerators: 0,
-    durationHours: 3,
-    dailyRooms: 3,
+    durationHours: 4,
+    dailyRooms: 5,
     persistent: false,
     maxPersistentRooms: 0,
-    allowedTypes: ['open'] as readonly string[],
-    audioSampleRate: 16000,
+    allowedTypes: ['open', 'closed'] as readonly string[], // ★ Şifreli (parola korumalı) Free'de açıldı
+    audioSampleRate: 24000,
     audioChannels: 1,
-    videoMaxRes: 480,
+    videoMaxRes: 720,
     canCustomizeImage: false,
     canCustomizeTheme: false,
-    canUseAvatarFrame: false,
+    canUseAvatarFrame: true,      // ★ Temel avatar çerçevesi Free'de
     allowedStageLayouts: ['grid'] as readonly StageLayout[],
     canUseRoomMusic: false,
-    canUseFilters: false,
+    canUseFilters: true,           // ★ Yaş/dil filtresi Free'de
     canUseFollowersOnly: false,
     ownerLeavePolicy: 'close',
   },
@@ -212,7 +212,9 @@ export const ROOM_TIER_LIMITS: Record<SubscriptionTier, RoomLimits> = {
     allowedStageLayouts: ['grid', 'spotlight'] as readonly StageLayout[],
     canUseRoomMusic: false,
     canUseFilters: true,
-    canUseFollowersOnly: false,
+    // ★ 2026-04-27: Plus'a açıldı — "Sadece Arkadaşlar" oda yönetim aracı (kim girebilir engeli),
+    //   monetizasyon değil. +18/kilit/dil ile aynı sınıfta. Pro tier ekstra olarak müzik/stereo ile ayrışır.
+    canUseFollowersOnly: true,
     ownerLeavePolicy: 'keep_alive',
   },
   Pro: {
@@ -314,7 +316,7 @@ export const SP_REWARDS: Record<string, SPRewardConfig> = {
   message_sent:          { amount: 1,    cooldownMs: 60 * 1000,        dailyCap: 10 },  // Max 10 mesaj ödülü/gün
   // ── Üretim & Büyüme ──
   room_create:           { amount: 5,    cooldownMs: 30 * 60 * 1000,   dailyCap: 10 },  // Max 2 oda/gün ödüllü
-  wall_post:             { amount: 3,    cooldownMs: 5 * 60 * 1000,    dailyCap: 9 },   // Max 3 post/gün ödüllü
+  // ★ 2026-04-26: wall_post kaldırıldı — oda duvarı/post sistemi kullanıcı kararıyla silindi
   follower_gain:         { amount: 2,    cooldownMs: 0,                dailyCap: 10 },  // Max 5 takipçi/gün ödüllü
   // ── Milestone (tek sefer / cooldown ile) ──
   ccu_milestone_10:      { amount: 10,   cooldownMs: 24 * 3600 * 1000, dailyCap: 10 },  // 1×/gün

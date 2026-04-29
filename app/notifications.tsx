@@ -15,7 +15,7 @@ import { getAvatarSource } from '../constants/avatars';
 import StatusAvatar from '../components/StatusAvatar';
 import EmptyState from '../components/EmptyState';
 import AppBackground from '../components/AppBackground';
-import { useAuth, useBadges } from './_layout';
+import { useAuth, useBadges, useUserProfileSheet } from './_layout';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type Notification = {
@@ -52,6 +52,7 @@ const NOTIF_CONFIG: Record<string, { icon: string; color: string; verb: string }
 export default function NotificationsScreen() {
   const router = useRouter();
   const { firebaseUser } = useAuth();
+  const { openUserProfile } = useUserProfileSheet();
   const { refreshBadges } = useBadges();
   const insets = useSafeAreaInsets();
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -156,7 +157,7 @@ export default function NotificationsScreen() {
               <Ionicons name="person-add" size={18} color="#F59E0B" />
             </View>
             <View>
-              <Text style={styles.pendingTitle}>Takip İstekleri</Text>
+              <Text style={styles.pendingTitle}>Arkadaşlık İstekleri</Text>
               <Text style={styles.pendingSubtitle}>
                 {pendingRequests.length} yeni istek
               </Text>
@@ -176,7 +177,7 @@ export default function NotificationsScreen() {
                 <View key={req.user_id} style={styles.pendingItem}>
                   <Pressable
                     style={styles.pendingUser}
-                    onPress={() => router.push(`/user/${req.sender?.id || req.user_id}`)}
+                    onPress={() => openUserProfile(req.sender?.id || req.user_id)}
                   >
                     <StatusAvatar uri={req.sender?.avatar_url} size={44} tier={(req.sender as any)?.subscription_tier} />
                     <View style={styles.pendingInfo}>
@@ -227,9 +228,9 @@ export default function NotificationsScreen() {
           if (item.type === 'like' || item.type === 'comment') {
             if (item.reference_id) router.push(`/post/${item.reference_id}` as any);
           } else if (item.type === 'gift') {
-            router.push(`/user/${item.sender_id}` as any);
+            openUserProfile(item.sender_id);
           } else if (item.type === 'follow' || item.type === 'follow_request' || item.type === 'follow_accepted') {
-            router.push(`/user/${item.sender_id}` as any);
+            openUserProfile(item.sender_id);
           } else if (item.type === 'room_follow' || item.type === 'room_live') {
             if (item.reference_id) router.push(`/room/${item.reference_id}` as any);
           }
@@ -251,7 +252,7 @@ export default function NotificationsScreen() {
   };
 
   return (
-    <AppBackground>
+    <AppBackground radialGlow>
     <View style={[styles.container, { backgroundColor: 'transparent' }]}>
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>

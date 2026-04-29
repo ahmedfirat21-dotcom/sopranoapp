@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, Image, Pressable, ScrollView, ActivityIndicator, Dimensions } from 'react-native';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { View, Text, StyleSheet, Image, Pressable, ScrollView, ActivityIndicator, Dimensions, Animated, Easing } from 'react-native';
 
 const { width: W } = Dimensions.get('window');
 import { LinearGradient } from 'expo-linear-gradient';
@@ -13,6 +13,7 @@ import type { TierName } from '../../types';
 import { getAvatarSource } from '../../constants/avatars';
 import { ProfileService, type Profile } from '../../services/database';
 import { FriendshipService, type FriendshipStatus } from '../../services/friendship';
+import { FollowService } from '../../services/follows';
 import { ModerationService } from '../../services/moderation';
 import { UserTitleService, type UserTitle } from '../../services/userTitles';
 
@@ -25,6 +26,7 @@ import { isTierAtLeast } from '../../constants/tiers';
 import PremiumAlert, { type AlertButton } from '../../components/PremiumAlert';
 import AppBackground from '../../components/AppBackground';
 import ProfileHero from '../../components/profile/ProfileHero';
+import BadgeListModal from '../../components/profile/BadgeListModal';
 import SPDonateSheet from '../../components/profile/SPDonateSheet';
 import FollowListModal from '../../components/FollowListModal';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -43,11 +45,28 @@ export default function UserProfileScreen() {
   const [incomingStatus, setIncomingStatus] = useState<FriendshipStatus | null>(null);
   const [followLoading, setFollowLoading] = useState(false);
   const [incomingLoading, setIncomingLoading] = useState(false);
-  const [stats, setStats] = useState({ followers: 0, following: 0, rooms: 0 });
+  const [stats, setStats] = useState({ followers: 0, following: 0, rooms: 0, badges: 0 });
+  const [showBadgesModal, setShowBadgesModal] = useState(false);
+  // ★ 2026-04-25: Faz 4.1 — One-way follow state (FriendshipService'ten ayrı)
+  const [isFollowingUser, setIsFollowingUser] = useState(false);
+  const [followerCount, setFollowerCount] = useState(0);
+  const [followingCount, setFollowingCount] = useState(0);
+  const [followToggleLoading, setFollowToggleLoading] = useState(false);
 
   const [showReportModal, setShowReportModal] = useState(false);
   const [isUserBlocked, setIsUserBlocked] = useState(false);
   const [cAlert, setCAlert] = useState<{ visible: boolean; title: string; message: string; type?: 'info' | 'warning' | 'error' | 'success'; buttons?: AlertButton[] }>({ visible: false, title: '', message: '' });
+  // ★ 2026-04-24: Slide-reveal unfriend UX — Arkadaş butonuna tıklayınca kırmızı kaldır ikonunu göster
+  const [unfriendRevealed, setUnfriendRevealed] = useState(false);
+  const unfriendSlide = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(unfriendSlide, {
+      toValue: unfriendRevealed ? 1 : 0,
+      duration: 260,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [unfriendRevealed]);
 
 
 
@@ -57,8 +76,11 @@ export default function UserProfileScreen() {
   const [userTitle, setUserTitle] = useState<UserTitle | null>(null);
 
   const [showFollowList, setShowFollowList] = useState(false);
-  const [followListTab, setFollowListTab] = useState<'followers' | 'following'>('followers');
+  const [followListTab, setFollowListTab] = useState<'friends' | 'followers' | 'following'>('friends');
   const [showSPSheet, setShowSPSheet] = useState(false);
+  // ★ 2026-04-26: Şu an hangi odada + ortak arkadaş
+  const [currentRoom, setCurrentRoom] = useState<{ id: string; name: string } | null>(null);
+  const [mutualFriendCount, setMutualFriendCount] = useState(0);
 
   const isOwnProfile = firebaseUser?.uid === id;
 
@@ -80,7 +102,7 @@ export default function UserProfileScreen() {
         // Bio, istatistik, post vs. yüklenmesin.
         const { data } = await supabase.from('profiles').select('id, display_name, avatar_url').eq('id', id).single();
         setUserProfile(data as any);
-        setStats({ followers: 0, following: 0, rooms: 0 });
+        setStats({ followers: 0, following: 0, rooms: 0, badges: 0 });
         return;
       }
 
@@ -94,16 +116,25 @@ export default function UserProfileScreen() {
         setIncomingStatus(detailed.incoming);  // Hedef → Ben
       }
 
-      // Istatistikler — Facebook tarzı arkadaşlık: tek "arkadaş" sayısı
-      const [friendCount, { count: roomCount }] = await Promise.all([
+      // ★ 2026-04-25: Tek paralel fetch — friend count + room count + follow stats + badge count
+      const [friendCount, { count: roomCount }, followerN, followingN, iAmFollowing, badgeRes] = await Promise.all([
         FriendshipService.getFriendCount(id),
         supabase.from('rooms').select('*', { count: 'exact', head: true }).eq('host_id', id),
+        FollowService.getFollowerCount(id),
+        FollowService.getFollowingCount(id),
+        firebaseUser && !isOwnProfile ? FollowService.isFollowing(firebaseUser.uid, id) : Promise.resolve(false),
+        supabase.from('user_badges').select('*', { count: 'exact', head: true }).eq('user_id', id),
       ]);
+
+      setFollowerCount(followerN);
+      setFollowingCount(followingN);
+      setIsFollowingUser(iAmFollowing);
 
       setStats({
         followers: friendCount,  // legacy alan adı korundu; UI'da "Arkadaş" olarak render
         following: friendCount,
         rooms: roomCount ?? 0,
+        badges: badgeRes.count ?? 0,
       });
 
 
@@ -124,6 +155,33 @@ export default function UserProfileScreen() {
           setUserTitle(title);
         } catch {}
       } catch {}
+
+      // ★ 2026-04-26: Currently-in-room + mutual friends (non-blocking)
+      if (!isOwnProfile) {
+        try {
+          const [roomRes, mutualRes] = await Promise.all([
+            Promise.resolve(
+              supabase.from('room_participants')
+                .select('room_id, rooms!inner(id, name, is_live)')
+                .eq('user_id', id)
+                .limit(1)
+            ).then(r => {
+              const row = r.data?.[0] as any;
+              if (row?.rooms?.is_live) return { id: row.rooms.id, name: row.rooms.name };
+              return null;
+            }).catch(() => null),
+            firebaseUser
+              ? FriendshipService.getFriends(firebaseUser.uid).then(async myFriends => {
+                  const targetFriends = await FriendshipService.getFriends(id);
+                  const myIds = new Set(myFriends.map((f: any) => f.id));
+                  return targetFriends.filter((f: any) => myIds.has(f.id)).length;
+                }).catch(() => 0)
+              : Promise.resolve(0),
+          ]);
+          setCurrentRoom(roomRes);
+          setMutualFriendCount(mutualRes);
+        } catch { /* non-critical */ }
+      }
     } catch (err) {
       if (__DEV__) console.warn('Profil yuklenemedi:', err);
     } finally {
@@ -135,19 +193,46 @@ export default function UserProfileScreen() {
     loadProfile();
   }, [loadProfile]);
 
+  const performRemoveFriend = async () => {
+    if (!firebaseUser || !id) {
+      if (__DEV__) console.warn('[Unfriend] firebaseUser veya id yok', { uid: firebaseUser?.uid, id });
+      return;
+    }
+    setFollowLoading(true);
+    try {
+      if (__DEV__) console.log('[Unfriend] removeFriend çağrılıyor', firebaseUser.uid, '→', id);
+      const result = await FriendshipService.removeFriend(firebaseUser.uid, id);
+      if (__DEV__) console.log('[Unfriend] sonuç:', result);
+      if (result.success) {
+        setFollowStatus(null);
+        setIncomingStatus(null);
+        setStats(prev => ({ ...prev, followers: Math.max(0, prev.followers - 1) }));
+        setUnfriendRevealed(false);
+        showToast({ title: 'Arkadaşlık sonlandırıldı', type: 'info' });
+      } else {
+        showToast({ title: 'İşlem başarısız', message: result.error || 'Bilinmeyen hata', type: 'error' });
+      }
+    } catch (e: any) {
+      if (__DEV__) console.warn('[Unfriend] catch:', e);
+      showToast({ title: 'İşlem başarısız', message: e?.message || 'Bağlantı sorunu', type: 'error' });
+    } finally {
+      setFollowLoading(false);
+    }
+  };
+
   const handleFollow = async () => {
     if (!firebaseUser || !id || isOwnProfile) return;
     const alreadyFriend = followStatus === 'accepted' || incomingStatus === 'accepted';
+    // ★ 2026-04-24: Arkadaşsa slide reveal UX — ilk tıklama butonu sola kaydırır,
+    //   yanına çıkan kırmızı kaldır ikonuna tıklayınca silme yapılır.
+    if (alreadyFriend) {
+      setUnfriendRevealed(v => !v);
+      return;
+    }
+    setUnfriendRevealed(false);
     setFollowLoading(true);
     try {
-      if (alreadyFriend) {
-        const result = await FriendshipService.removeFriend(firebaseUser.uid, id);
-        if (result.success) {
-          setFollowStatus(null);
-          setIncomingStatus(null);
-          setStats(prev => ({ ...prev, followers: Math.max(0, prev.followers - 1) }));
-        }
-      } else if (followStatus === 'pending') {
+      if (followStatus === 'pending') {
         const result = await FriendshipService.unfollow(firebaseUser.uid, id);
         if (result.success) {
           setFollowStatus(null);
@@ -164,6 +249,39 @@ export default function UserProfileScreen() {
       showToast({ title: 'Hata oluştu', type: 'error' });
     } finally {
       setFollowLoading(false);
+    }
+  };
+
+  // ★ 2026-04-25: Faz 4.1 — One-way follow toggle
+  const handleToggleFollow = async () => {
+    if (!firebaseUser || !id || isOwnProfile || followToggleLoading) return;
+    setFollowToggleLoading(true);
+    // Optimistic UI
+    const willFollow = !isFollowingUser;
+    setIsFollowingUser(willFollow);
+    setFollowerCount(c => Math.max(0, c + (willFollow ? 1 : -1)));
+    try {
+      const result = willFollow
+        ? await FollowService.addFollow(firebaseUser.uid, id)
+        : await FollowService.removeFollow(firebaseUser.uid, id);
+      if (!result.success) {
+        // Rollback
+        setIsFollowingUser(!willFollow);
+        setFollowerCount(c => Math.max(0, c + (willFollow ? -1 : 1)));
+        if (result.error) showToast({ title: 'Takip İşlemi Başarısız', message: result.error, type: 'error' });
+      } else {
+        // Analytics
+        try {
+          const { Analytics, Events } = require('../../services/analytics');
+          Analytics.track(willFollow ? Events.FOLLOW_ADDED : Events.FOLLOW_ADDED, { target_id: id, action: willFollow ? 'follow' : 'unfollow' });
+        } catch {}
+      }
+    } catch (err: any) {
+      setIsFollowingUser(!willFollow);
+      setFollowerCount(c => Math.max(0, c + (willFollow ? -1 : 1)));
+      showToast({ title: 'Takip İşlemi Başarısız', message: err?.message || 'Bağlantı sorunu.', type: 'error' });
+    } finally {
+      setFollowToggleLoading(false);
     }
   };
 
@@ -247,6 +365,10 @@ export default function UserProfileScreen() {
     try {
       const result = await ProfileService.donateToUser(firebaseUser.uid, id, amount);
       if (result.success) {
+        try {
+          const { Analytics, Events } = require('../../services/analytics');
+          Analytics.track(Events.SP_DONATED, { amount, recipient_id: id });
+        } catch {}
         showToast({ title: `${amount} SP gönderildi! 💎`, type: 'success' });
         refreshProfile(); // SP bakiyesini güncelle
       } else {
@@ -293,7 +415,7 @@ export default function UserProfileScreen() {
   const canSeeFullProfile = isOwnProfile || isFriend || !isPrivateProfile;
 
   return (
-    <AppBackground variant="profile">
+    <AppBackground variant="profile" radialGlow>
     <View style={s.container}>
       {/* Header */}
       <View style={[s.header, { paddingTop: insets.top + 8 }]}>
@@ -316,17 +438,31 @@ export default function UserProfileScreen() {
         )}
 
         {/* ═══ Profil Kartı ═══ */}
-        {/* ★ Varsayılan profil sayfasıyla aynı ProfileHero — edit butonu yok (başkasının profili) */}
+        {/* ★ 2026-04-26: Profil sayfaları arası uyum — activityStats + hideStats InRoomUserProfile/own profile ile aynı.
+             Boş bio fallback kaldırıldı (placeholder gösterme), gizli profilde stat sayıları otomatik gizli. */}
         <ProfileHero
           displayName={userProfile.display_name}
           username={userProfile.username}
-          bio={userProfile.bio || 'Henüz bir şey yazmadı ☕'}
+          bio={userProfile.bio || ''}
           avatarUrl={userProfile.avatar_url || ''}
           subscriptionTier={tier as any}
           isAdmin={!!userProfile.is_admin}
           userTitle={userTitle}
-          stats={{ followers: stats.followers, rooms: stats.rooms }}
-          onFollowersPress={() => { setFollowListTab('followers'); setShowFollowList(true); }}
+          stats={{ followers: followerCount, rooms: stats.rooms }}
+          onFollowersPress={() => {
+            // ★ 2026-04-29 PRIVACY: Arkadaş listesi sadece arkadaşlar için görünür.
+            //   Profil public bile olsa, X gibi büyük kullanıcılar dahil arkadaş
+            //   ilişkileri private — sadece isFriend ise modal aç.
+            if (!isFriend && !isOwnProfile) {
+              showToast({
+                title: '🔒 Gizli',
+                message: 'Arkadaş listesi sadece arkadaşlara açık.',
+                type: 'info',
+              });
+              return;
+            }
+            setFollowListTab('followers'); setShowFollowList(true);
+          }}
           onRoomsPress={() => { /* Kullanıcının odaları — aşağıda liste mevcut */ }}
           memberSince={userProfile.created_at}
           boostExpiresAt={(userProfile as any)?.profile_boost_expires_at}
@@ -365,25 +501,114 @@ export default function UserProfileScreen() {
               </View>
             )}
 
+            {/* ★ 2026-04-26: Şu an hangi odada — Clubhouse tarzı canlı gösterge */}
+            {currentRoom && (
+              <View style={s.currentRoomBanner}>
+                <View style={s.currentRoomDot} />
+                <Text style={s.currentRoomLabel}>Şu an dinliyor:</Text>
+                <Text style={s.currentRoomName} numberOfLines={1}>{currentRoom.name}</Text>
+              </View>
+            )}
+
+            {/* ★ 2026-04-26: Ortak arkadaş göstergesi */}
+            {mutualFriendCount > 0 && (
+              <View style={s.mutualBadge}>
+                <Ionicons name="people" size={13} color="#A78BFA" />
+                <Text style={s.mutualText}>{mutualFriendCount} ortak arkadaş</Text>
+              </View>
+            )}
+
             <View style={s.interactionRow}>
-              <Pressable
-                style={[s.followBtn, (isFriend || isPending) && s.followBtnActive]}
-                onPress={handleFollow}
-                disabled={followLoading || isBlocked}
-                android_ripple={{ color: 'rgba(255,255,255,0.1)', borderless: false }}
-              >
-                {followLoading ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : isBlocked ? (
-                  <Text style={[s.followBtnText, { color: '#EF4444' }]}>Engellendi</Text>
-                ) : isFriend ? (
-                  <><Ionicons name="people" size={16} color="#F1F5F9" /><Text style={[s.followBtnText, { color: '#F1F5F9' }]}>Arkadaş</Text></>
-                ) : isPending ? (
-                  <Text style={[s.followBtnText, { color: '#FBBF24' }]}>İstek Gönderildi</Text>
-                ) : (
-                  <><Ionicons name="person-add-outline" size={16} color="#fff" /><Text style={s.followBtnText}>Arkadaş Ekle</Text></>
+              {/* ★ 2026-04-25: Faz 4.1 — Takip Et butonu (one-way follow, friendship'ten ayrı) */}
+              {!isOwnProfile && !isBlocked && (
+                <Pressable
+                  onPress={handleToggleFollow}
+                  disabled={followToggleLoading}
+                  style={({ pressed }) => [{
+                    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4,
+                    paddingHorizontal: 10, paddingVertical: 9, borderRadius: 12,
+                    borderWidth: 1,
+                    backgroundColor: isFollowingUser ? 'rgba(20,184,166,0.18)' : 'rgba(255,255,255,0.06)',
+                    borderColor: isFollowingUser ? 'rgba(20,184,166,0.45)' : 'rgba(255,255,255,0.12)',
+                    opacity: pressed ? 0.7 : 1,
+                    minWidth: 80,
+                  }]}
+                >
+                  {followToggleLoading ? (
+                    <ActivityIndicator size="small" color={isFollowingUser ? '#14B8A6' : '#fff'} />
+                  ) : (
+                    <>
+                      <Ionicons name={isFollowingUser ? 'checkmark' : 'add'} size={14} color={isFollowingUser ? '#14B8A6' : '#fff'} />
+                      <Text style={{
+                        fontSize: 12, fontWeight: '800', letterSpacing: 0.2,
+                        color: isFollowingUser ? '#14B8A6' : '#fff',
+                        textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
+                      }}>
+                        {isFollowingUser ? 'Takipte' : 'Takip Et'}
+                      </Text>
+                    </>
+                  )}
+                </Pressable>
+              )}
+              {/* ★ 2026-04-24: Slide-reveal unfriend UX */}
+              <View style={{ flex: 1, flexDirection: 'row', gap: 8 }}>
+                <Animated.View style={{
+                  flex: 1,
+                  transform: [{
+                    translateX: unfriendSlide.interpolate({ inputRange: [0, 1], outputRange: [0, -52] }),
+                  }],
+                }}>
+                  <Pressable
+                    style={[s.followBtn, (isFriend || isPending) && s.followBtnActive]}
+                    onPress={handleFollow}
+                    disabled={followLoading || isBlocked}
+                    android_ripple={{ color: 'rgba(255,255,255,0.1)', borderless: false }}
+                  >
+                    {followLoading ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : isBlocked ? (
+                      <Text style={[s.followBtnText, { color: '#EF4444' }]}>Engellendi</Text>
+                    ) : isFriend ? (
+                      <><Ionicons name="people" size={16} color="#F1F5F9" /><Text style={[s.followBtnText, { color: '#F1F5F9' }]}>Arkadaş</Text></>
+                    ) : isPending ? (
+                      <Text style={[s.followBtnText, { color: '#FBBF24' }]}>İstek Gönderildi</Text>
+                    ) : (
+                      <><Ionicons name="person-add-outline" size={16} color="#fff" /><Text style={s.followBtnText}>Arkadaş Ekle</Text></>
+                    )}
+                  </Pressable>
+                </Animated.View>
+                {/* Unfriend reveal icon — absolute sağda, Arkadaş butonu sola kayınca açılır */}
+                {isFriend && (
+                  <Animated.View style={{
+                    position: 'absolute',
+                    right: 0, top: 0, bottom: 0,
+                    opacity: unfriendSlide,
+                    transform: [{
+                      translateX: unfriendSlide.interpolate({ inputRange: [0, 1], outputRange: [52, 0] }),
+                    }],
+                  }}>
+                    <Pressable
+                      onPress={performRemoveFriend}
+                      disabled={followLoading}
+                      style={{
+                        width: 44, height: '100%',
+                        borderRadius: 12,
+                        backgroundColor: 'rgba(239,68,68,0.18)',
+                        borderWidth: StyleSheet.hairlineWidth,
+                        borderColor: 'rgba(239,68,68,0.5)',
+                        alignItems: 'center', justifyContent: 'center',
+                      }}
+                      accessibilityLabel="Arkadaşlıktan çıkar"
+                    >
+                      {followLoading ? (
+                        <ActivityIndicator size="small" color="#F87171" />
+                      ) : (
+                        <Ionicons name="person-remove" size={18} color="#F87171" style={{ textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4 }} />
+                      )}
+                    </Pressable>
+                  </Animated.View>
                 )}
-              </Pressable>
+              </View>
               {/* ★ S1 FIX: Mesaj → herkese açık (DM-8 isteği yönetir), Arama → sadece karşılıklı takip */}
               {!isBlocked && (
                 <View style={s.secondaryRow}>
@@ -413,56 +638,35 @@ export default function UserProfileScreen() {
         {canSeeFullProfile && (
         <>
 
-        {/* ═══ Aktivite İstatistikleri ═══ */}
-        {(profileStats.stageMinutes > 0 || profileStats.roomsCreated > 0 || profileStats.totalListeners > 0) && (
-          <View style={s.activityCard}>
-            <View style={s.activityGrid}>
-              <View style={s.activityItem}>
-                <Ionicons name="mic" size={20} color={Colors.teal} style={{ textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }} />
-                <Text style={s.activityNum}>{profileStats.stageMinutes}</Text>
-                <Text style={s.activityLabel}>dk sahne</Text>
-              </View>
-              <View style={s.activityItem}>
-                <Ionicons name="radio" size={20} color="#A855F7" style={{ textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }} />
-                <Text style={s.activityNum}>{profileStats.roomsCreated}</Text>
-                <Text style={s.activityLabel}>oda</Text>
-              </View>
-              <View style={s.activityItem}>
-                <Ionicons name="people" size={20} color="#F59E0B" style={{ textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }} />
-                <Text style={s.activityNum}>{profileStats.totalListeners}</Text>
-                <Text style={s.activityLabel}>dinleyici</Text>
-              </View>
-              <View style={s.activityItem}>
-                <Ionicons name="heart" size={20} color="#EF4444" style={{ textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }} />
-                <Text style={s.activityNum}>{profileStats.totalReactions}</Text>
-                <Text style={s.activityLabel}>reaksiyon</Text>
+        {/* ★ 2026-04-26: Eski aktivite grid kaldırıldı — ProfileHero detay strip'inde aynı bilgiler zaten gösteriliyor (activityStats). */}
+
+        {/* ★ 2026-04-24: Free tier için tier kartı gizlendi — avatar'daki "Free" rozeti yeterli.
+             Plus/Pro/GodMaster için bilgi kartı bombe gradient + teal hairline ile gösterilir. */}
+        {tier !== 'Free' && (
+          <View style={s.tierCard}>
+            <LinearGradient
+              colors={['rgba(48,65,94,0.85)', 'rgba(26,40,64,0.75)', 'rgba(12,22,40,0.55)']}
+              locations={[0, 0.55, 1]}
+              start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
+              style={StyleSheet.absoluteFillObject}
+            />
+            <LinearGradient
+              colors={['transparent', tierDef.color + 'AA', 'transparent']}
+              locations={[0, 0.5, 1]}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+              style={s.cardTopEdge}
+            />
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+              <LinearGradient colors={tierDef.gradient as [string, string]} style={s.tierCardIcon}>
+                <Ionicons name={tierDef.icon as any} size={16} color="#fff" style={iconShadowInline} />
+              </LinearGradient>
+              <View style={{ flex: 1 }}>
+                <Text style={[s.tierCardTitle, { color: tierDef.color }]}>{tierDef.label} Üye</Text>
+                <Text style={s.tierCardDesc}>{tier === 'Pro' ? 'Sınırsız oda · 1080p · Stereo ses' : tier === 'Plus' ? 'HD ses · 720p video · Tüm oda türleri' : 'VIP · Mutlak yetki'}</Text>
               </View>
             </View>
           </View>
         )}
-
-        {/* ═══ Tier Bilgi Kartı — diagonal premium ═══ */}
-        <View style={s.tierCard}>
-          <LinearGradient
-            colors={['#4a5668', '#37414f', '#232a35']}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-            style={StyleSheet.absoluteFillObject}
-          />
-          <LinearGradient
-            colors={[tierDef.color + '28', tierDef.color + '08', 'transparent']}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-            style={StyleSheet.absoluteFillObject}
-          />
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-            <LinearGradient colors={tierDef.gradient as [string, string]} style={s.tierCardIcon}>
-              <Ionicons name={tierDef.icon as any} size={16} color="#fff" style={iconShadowInline} />
-            </LinearGradient>
-            <View style={{ flex: 1 }}>
-              <Text style={[s.tierCardTitle, { color: tierDef.color }]}>{tierDef.label} Üye</Text>
-              <Text style={s.tierCardDesc}>{tier === 'Pro' ? 'Sınırsız oda · 1080p · Stereo ses' : tier === 'Plus' ? 'HD ses · 720p video · Tüm oda türleri' : 'Ücretsiz plan · Temel özellikler'}</Text>
-            </View>
-          </View>
-        </View>
 
         {/* ═══ Banner (Pro+) — Tier kartının hemen altında ═══ */}
         {isTierAtLeast(tier, 'Pro') && userProfile?.banner_url && (
@@ -472,7 +676,8 @@ export default function UserProfileScreen() {
         )}
 
         {/* ═══ Odaları — Kompakt liste kartı (Odalarım tarzı) ═══ */}
-        {recentRooms.length > 0 && (
+        {/* ★ 2026-04-26: "Odalarımı Gizle" ayarı + canSeeFullProfile ile koruma — kendi profil hariç. */}
+        {recentRooms.length > 0 && (isOwnProfile || (canSeeFullProfile && !((userProfile as any)?.hide_owned_rooms))) && (
           <>
             {/* Premium section header */}
             <View style={s.roomsSectionHeader}>
@@ -699,6 +904,16 @@ export default function UserProfileScreen() {
         />
       )}
 
+      {/* ★ Faz 6.3 — Rozet Listesi Modal */}
+      {id && userProfile && (
+        <BadgeListModal
+          visible={showBadgesModal}
+          onClose={() => setShowBadgesModal(false)}
+          userId={id}
+          displayName={userProfile.display_name}
+        />
+      )}
+
       {/* ★ SP Donate Sheet — premium bottom sheet (slider + preset) */}
       {firebaseUser && id && userProfile && (
         <SPDonateSheet
@@ -900,7 +1115,8 @@ const s = StyleSheet.create({
   },
 
   // Section
-  sectionTitle: { fontSize: 11, fontWeight: '700', color: '#64748B', letterSpacing: 1, ..._textGlow },
+  // ★ 2026-04-29 v2: profile.tsx ile birebir aynı (fontWeight 800, color #94A3B8)
+  sectionTitle: { fontSize: 11, fontWeight: '800', color: '#94A3B8', letterSpacing: 1, ..._textGlow },
   sectionInnerTitle: { fontSize: 12, fontWeight: '700', color: '#CBD5E1', marginBottom: 8, textTransform: 'uppercase' as const, letterSpacing: 0.5 },
   // ★ 2026-04-21: Premium "Odaları" section header — ProfileFriendsList ile aynı
   roomsSectionHeader: {
@@ -943,14 +1159,16 @@ const s = StyleSheet.create({
   roomItemName: { fontSize: 13, fontWeight: '700', color: '#F1F5F9', ..._textGlow },
   roomItemMeta: { fontSize: 10, color: '#64748B', marginTop: 1 },
 
-  // Activity card
+  // Activity card — bombe gradient + teal hairline (profile page ile tutarlı)
   activityCard: {
     marginHorizontal: 16, marginBottom: 10,
     borderRadius: 16, overflow: 'hidden' as const,
-    backgroundColor: '#414e5f',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
     paddingVertical: 14, paddingHorizontal: 10,
     ..._cardShadow,
+  },
+  cardTopEdge: {
+    position: 'absolute' as const, top: 0, left: 0, right: 0, height: 1,
   },
   activityGrid: {
     flexDirection: 'row' as const, justifyContent: 'space-around' as const,
@@ -965,11 +1183,11 @@ const s = StyleSheet.create({
     fontSize: 8, fontWeight: '600' as const, color: '#94A3B8', textTransform: 'uppercase' as const, letterSpacing: 0.3,
   },
 
-  // Tier card
+  // Tier card — bombe gradient + tier-colored hairline
   tierCard: {
     marginHorizontal: 16, marginBottom: 10,
     padding: 14, borderRadius: 16,
-    borderWidth: 1, borderColor: Colors.cardBorder,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
     overflow: 'hidden' as const,
     ..._cardShadow,
   },
@@ -1025,5 +1243,42 @@ const s = StyleSheet.create({
     ..._cardShadow,
   },
   bannerImg: { width: '100%' as any, height: '100%' as any, borderRadius: 14 },
+
+  // ★ 2026-04-26: Şu an hangi odada
+  currentRoomBanner: {
+    flexDirection: 'row' as const, alignItems: 'center' as const, gap: 8,
+    marginHorizontal: 16, marginBottom: 10,
+    paddingHorizontal: 14, paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: 'rgba(34,197,94,0.08)',
+    borderWidth: 1, borderColor: 'rgba(34,197,94,0.2)',
+  },
+  currentRoomDot: {
+    width: 6, height: 6, borderRadius: 3,
+    backgroundColor: '#22C55E',
+    shadowColor: '#22C55E', shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6, shadowRadius: 4, elevation: 3,
+  },
+  currentRoomLabel: {
+    fontSize: 11, fontWeight: '600' as const, color: '#86EFAC',
+  },
+  currentRoomName: {
+    flex: 1, fontSize: 12, fontWeight: '800' as const, color: '#F1F5F9',
+    ...Shadows.text,
+  },
+
+  // ★ 2026-04-26: Ortak arkadaş badge
+  mutualBadge: {
+    flexDirection: 'row' as const, alignItems: 'center' as const, gap: 6,
+    marginHorizontal: 16, marginBottom: 10,
+    paddingHorizontal: 12, paddingVertical: 6,
+    borderRadius: 10,
+    backgroundColor: 'rgba(167,139,250,0.08)',
+    borderWidth: 1, borderColor: 'rgba(167,139,250,0.2)',
+  },
+  mutualText: {
+    fontSize: 11, fontWeight: '700' as const, color: '#C4B5FD',
+    ...Shadows.text,
+  },
 });
 

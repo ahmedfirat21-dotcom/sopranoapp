@@ -1,5 +1,6 @@
 // ★ 2026-04-21 (v2): Modern immersive onboarding — Duolingo/Spotify tarzı full-screen.
-//   3 slide: hero pulse rings + stagger text + animated progress bar + sparkles.
+//   4 slide: hero pulse rings + stagger text + animated progress bar + sparkles.
+//   Slide 4: SP Kazanç tanıtımı — WebView ile altın hexagon mücevher animasyonu.
 //   AsyncStorage ile bir kez gösterilir (`soprano_discover_welcome_seen=1`).
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
@@ -10,6 +11,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { WebView } from 'react-native-webview';
+// ★ 2026-04-29: PulseRing/Sparkle component'leri ve eski iconBadge artık kullanılmıyor —
+//   tüm slide'lar buildGemHtml ile WebView render'a geçti. Function tanımları lint
+//   noise yaratıyor ama post-launch temizlik için bekletildi (bundle impact minimal).
 
 const { width: W, height: H } = Dimensions.get('window');
 // ★ 2026-04-22 FIX: Storage key VERSION BUMP (v2). Eski buggy kayıtlar
@@ -19,54 +24,88 @@ const { width: W, height: H } = Dimensions.get('window');
 const STORAGE_KEY_PREFIX = 'swv2';
 const buildKey = (uid?: string | null) => uid ? `${STORAGE_KEY_PREFIX}_${uid}` : STORAGE_KEY_PREFIX;
 
+type GemColors = {
+  /** Üst parlaklık (highlight) — beyaza yakın */
+  lightest: string;
+  /** Açık ton (crown facet) */
+  light: string;
+  /** Ana ton (gem body) */
+  mid: string;
+  /** Koyu ton (pavilion shadow) */
+  deep: string;
+};
+
 type Slide = {
   icon: keyof typeof Ionicons.glyphMap;
-  /** ★ 2026-04-21: Her slide için tematik partikül — soyut sparkle yerine konu ile örtüşen sembol */
-  particleIcon: keyof typeof Ionicons.glyphMap;
-  particleSize: number;
   title: string;
   body: string;
   accent: string;
   accentDeep: string;
   bgFrom: string;
   bgTo: string;
+  /** ★ 2026-04-29: Hexagon gem renk paleti (tüm slide'lar için zorunlu — uyum) */
+  gemColors: GemColors;
+  /** ★ 2026-04-29: Hexagon içine yazılacak text (örn "SP"); yoksa <Ionicons> overlay gösterilir */
+  gemText?: string;
 };
 
 const SLIDES: Slide[] = [
   {
     icon: 'mic',
-    particleIcon: 'musical-note', // Sesli sohbet → nota
-    particleSize: 16,
     title: 'Sesle tanış',
     body: 'SopranoChat, anlık sesli sohbet odaları platformudur.\nKonuş, dinle, keşfet — hepsi gerçek zamanlı.',
     accent: '#14B8A6',
     accentDeep: '#0D9488',
     bgFrom: '#042F2E',
     bgTo: '#0A0F1A',
+    gemColors: { lightest: '#CCFBF1', light: '#5EEAD4', mid: '#14B8A6', deep: '#134E4A' },
   },
   {
     icon: 'add-circle',
-    particleIcon: 'people-circle', // Oda aç → küçük topluluk ikonları
-    particleSize: 18,
     title: 'Kendi odanı aç',
     body: 'Sağ alttaki + butonuyla istediğin konuda oda aç.\nArkadaşlarını davet et, topluluğunu kur.',
     accent: '#F59E0B',
     accentDeep: '#B45309',
     bgFrom: '#3B2507',
     bgTo: '#0A0F1A',
+    gemColors: { lightest: '#FFE4B5', light: '#FCD34D', mid: '#F59E0B', deep: '#78350F' },
   },
   {
-    icon: 'radio', // ★ 2026-04-21: Keşfet tab'ındaki radyo dalgası ikonu ile tutarlı
-    particleIcon: 'musical-notes', // Keşfet → müzik notaları kontrastı
-    particleSize: 16,
+    icon: 'radio',
     title: 'Keşfet ve katıl',
     body: 'Canlı odaları kategoriye göre gez, popüler kullanıcıları keşfet.\nKatıl butonuyla anında sohbete dahil ol.',
     accent: '#8B5CF6',
     accentDeep: '#6D28D9',
     bgFrom: '#2E1065',
     bgTo: '#0A0F1A',
+    gemColors: { lightest: '#EDE9FE', light: '#C4B5FD', mid: '#8B5CF6', deep: '#4C1D95' },
+  },
+  {
+    icon: 'diamond',
+    title: 'SP Kazan & Harca',
+    body: 'Soprano Points (SP) ile hediye gönder, profilini öne çıkar.\nOda aç, sohbet et, arkadaş edin — her etkileşim SP kazandırır.',
+    accent: '#F59E0B',
+    accentDeep: '#92400E',
+    bgFrom: '#451A03',
+    bgTo: '#0A0F1A',
+    gemColors: { lightest: '#FFE082', light: '#FAC775', mid: '#EF9F27', deep: '#854F0B' },
+    gemText: 'SP',
   },
 ];
+
+// ★ 2026-04-29: Generic gem hero HTML factory — tüm slide'lar için aynı animasyon
+//   paketi (gem-float, shine-march, halo-breathe, ring-expand, orbit, ray-rotate,
+//   star-twinkle, bg-shimmer, facet-bright). Slide-spesifik renkler ve içeriği
+//   parametre olarak alır. SP_HEXAGON_HTML ile birebir aynı yapı, sadece gradient
+//   ve içerik dinamik.
+function buildGemHtml(c: GemColors, gemText?: string): string {
+  const innerContent = gemText
+    ? `<text x="100" y="112" text-anchor="middle" font-family="Georgia,serif" font-size="32" font-weight="500" fill="#1A1A1A">${gemText}</text>`
+    : '';
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no"><style>*{margin:0;padding:0;box-sizing:border-box}html,body{width:100%;height:100%;background:transparent;overflow:hidden;display:flex;align-items:center;justify-content:center}svg{width:100%;height:100%}@keyframes gem-float{0%,100%{transform:translateY(0) rotate(-1.5deg)}50%{transform:translateY(-3px) rotate(1.5deg)}}@keyframes shine-march{0%{transform:translateX(-160px)}100%{transform:translateX(160px)}}@keyframes facet-bright{0%,100%{opacity:0.15}50%{opacity:0.55}}@keyframes facet-bright-2{0%,100%{opacity:0.4}50%{opacity:0.85}}@keyframes halo-breathe{0%,100%{opacity:0.25}50%{opacity:0.7}}@keyframes orbit-cw{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}@keyframes orbit-ccw{0%{transform:rotate(360deg)}100%{transform:rotate(0deg)}}@keyframes ray-rotate{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}@keyframes ring-expand{0%{opacity:0.9;transform:scale(0.85)}100%{opacity:0;transform:scale(1.45)}}@keyframes bg-shimmer{0%,100%{opacity:0.05}50%{opacity:0.18}}@keyframes star-twinkle-pop{0%,100%{opacity:0;transform:scale(0)}35%,65%{opacity:1;transform:scale(1)}}.gem-float{animation:gem-float 3s ease-in-out infinite;transform-origin:100px 100px;transform-box:view-box}.shine-band{animation:shine-march 3.2s ease-in-out infinite}.facet-1{animation:facet-bright 2.4s ease-in-out infinite}.facet-2{animation:facet-bright-2 2.8s ease-in-out infinite;animation-delay:0.4s}.facet-3{animation:facet-bright 3.2s ease-in-out infinite;animation-delay:0.8s}.facet-4{animation:facet-bright-2 2.6s ease-in-out infinite;animation-delay:1.2s}.star-1{animation:star-twinkle-pop 2.4s ease-in-out infinite;transform-origin:75px 60px;transform-box:view-box}.star-2{animation:star-twinkle-pop 2.8s ease-in-out infinite;animation-delay:0.6s;transform-origin:130px 80px;transform-box:view-box}.star-3{animation:star-twinkle-pop 2.2s ease-in-out infinite;animation-delay:1.1s;transform-origin:60px 100px;transform-box:view-box}.star-4{animation:star-twinkle-pop 3s ease-in-out infinite;animation-delay:1.6s;transform-origin:115px 120px;transform-box:view-box}.star-5{animation:star-twinkle-pop 2.6s ease-in-out infinite;animation-delay:0.3s;transform-origin:90px 55px;transform-box:view-box}.halo{animation:halo-breathe 3s ease-in-out infinite}.orbiter-cw{animation:orbit-cw 7s linear infinite;transform-origin:100px 100px;transform-box:view-box}.orbiter-ccw{animation:orbit-ccw 9s linear infinite;transform-origin:100px 100px;transform-box:view-box}.rays{animation:ray-rotate 18s linear infinite;transform-origin:100px 100px;transform-box:view-box}.ring-A{animation:ring-expand 2.6s ease-out infinite;transform-origin:100px 100px;transform-box:view-box}.ring-B{animation:ring-expand 2.6s ease-out infinite;animation-delay:1.3s;transform-origin:100px 100px;transform-box:view-box}.bg-glow{animation:bg-shimmer 4s ease-in-out infinite}</style></head><body><svg viewBox="0 0 200 200" preserveAspectRatio="xMidYMid meet"><defs><linearGradient id="g1" x1="20%" y1="0%" x2="80%" y2="100%"><stop offset="0%" stop-color="${c.lightest}"/><stop offset="35%" stop-color="${c.light}"/><stop offset="70%" stop-color="${c.mid}"/><stop offset="100%" stop-color="${c.deep}"/></linearGradient><linearGradient id="g2" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#FFF" stop-opacity="0.7"/><stop offset="100%" stop-color="#FFF" stop-opacity="0"/></linearGradient><linearGradient id="g3" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#000" stop-opacity="0.3"/><stop offset="100%" stop-color="#000" stop-opacity="0"/></linearGradient><radialGradient id="g4" cx="50%" cy="50%"><stop offset="0%" stop-color="${c.light}" stop-opacity="0.5"/><stop offset="100%" stop-color="${c.light}" stop-opacity="0"/></radialGradient><linearGradient id="g5" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#FFF" stop-opacity="0"/><stop offset="50%" stop-color="#FFF" stop-opacity="0.65"/><stop offset="100%" stop-color="#FFF" stop-opacity="0"/></linearGradient><clipPath id="c1"><polygon points="100,40 156,72 156,128 100,160 44,128 44,72"/></clipPath></defs><g class="bg-glow"><circle cx="100" cy="100" r="90" fill="url(#g4)"/></g><g class="rays" opacity="0.22"><line x1="100" y1="18" x2="100" y2="34" stroke="${c.light}" stroke-width="1.5" stroke-linecap="round"/><line x1="100" y1="166" x2="100" y2="182" stroke="${c.light}" stroke-width="1.5" stroke-linecap="round"/><line x1="18" y1="100" x2="34" y2="100" stroke="${c.light}" stroke-width="1.5" stroke-linecap="round"/><line x1="166" y1="100" x2="182" y2="100" stroke="${c.light}" stroke-width="1.5" stroke-linecap="round"/><line x1="42" y1="42" x2="54" y2="54" stroke="${c.light}" stroke-width="1.2" stroke-linecap="round"/><line x1="146" y1="54" x2="158" y2="42" stroke="${c.light}" stroke-width="1.2" stroke-linecap="round"/><line x1="42" y1="158" x2="54" y2="146" stroke="${c.light}" stroke-width="1.2" stroke-linecap="round"/><line x1="146" y1="146" x2="158" y2="158" stroke="${c.light}" stroke-width="1.2" stroke-linecap="round"/></g><g class="halo"><polygon points="100,28 168,68 168,132 100,172 32,132 32,68" fill="none" stroke="${c.light}" stroke-width="0.7"/></g><polygon class="ring-A" points="100,40 156,72 156,128 100,160 44,128 44,72" fill="none" stroke="${c.lightest}" stroke-width="1.5"/><polygon class="ring-B" points="100,40 156,72 156,128 100,160 44,128 44,72" fill="none" stroke="${c.mid}" stroke-width="1.5"/><g class="gem-float"><polygon points="100,40 156,72 156,128 100,160 44,128 44,72" fill="url(#g1)" stroke="${c.lightest}" stroke-width="1"/><g clip-path="url(#c1)"><polygon points="100,40 156,72 100,104 44,72" fill="url(#g2)" opacity="0.6"/><polygon points="156,72 156,128 130,100" fill="url(#g3)" opacity="0.7"/></g><polygon class="facet-1" points="100,40 130,57 100,74 70,57" fill="#FFF"/><polygon class="facet-2" points="100,40 70,57 44,72" fill="${c.lightest}"/><polygon class="facet-3" points="100,40 130,57 156,72" fill="${c.lightest}"/><polygon class="facet-4" points="44,72 70,90 70,110 44,128" fill="#000" opacity="0.25"/><g class="star-1"><path d="M75 60L76.2 63.8 80 65 76.2 66.2 75 70 73.8 66.2 70 65 73.8 63.8Z" fill="#FFF"/></g><g class="star-2"><path d="M130 80L131 83 134 84 131 85 130 88 129 85 126 84 129 83Z" fill="#FFF"/></g><g class="star-3"><circle cx="60" cy="100" r="1.5" fill="#FFF"/></g><g class="star-4"><circle cx="115" cy="120" r="1.2" fill="#FFF"/></g><g class="star-5"><circle cx="90" cy="55" r="1" fill="#FFF"/></g><g clip-path="url(#c1)"><rect class="shine-band" x="-30" y="20" width="50" height="160" fill="url(#g5)" transform="skewX(-15)"/></g>${innerContent}</g><g class="orbiter-cw"><circle cx="185" cy="100" r="2.5" fill="${c.lightest}"/></g><g class="orbiter-ccw"><circle cx="15" cy="100" r="2" fill="${c.light}" opacity="0.7"/></g></svg></body></html>`;
+}
+
+// ★ 2026-04-29: SP_HEXAGON_HTML SPHexagonIcon bileşenine taşındı (DRY).
 
 export async function hasSeenDiscoverWelcome(uid?: string | null): Promise<boolean> {
   // ★ 2026-04-22 FIX: Legacy global-key fallback KALDIRILDI. Önceki halinde eski
@@ -197,6 +236,8 @@ export default function DiscoverWelcomeSheet({ visible, onClose, uid }: Props) {
   const bodyAnim = useRef(new Animated.Value(0)).current;
   const iconScale = useRef(new Animated.Value(0)).current;
   const iconRotate = useRef(new Animated.Value(0)).current;
+  // ★ 2026-04-29: Hero gem'i her slide change'inde alttan-fade ile yeniden gelsin
+  const heroAnim = useRef(new Animated.Value(0)).current;
   const progressAnim = useRef(new Animated.Value(0)).current;
   const ctaPulse = useRef(new Animated.Value(1)).current;
 
@@ -205,8 +246,11 @@ export default function DiscoverWelcomeSheet({ visible, onClose, uid }: Props) {
     bodyAnim.setValue(0);
     iconScale.setValue(0);
     iconRotate.setValue(0);
+    heroAnim.setValue(0);
 
     Animated.parallel([
+      // Hero gem — alttan kayarak fade-in (her slide geçişinde)
+      Animated.timing(heroAnim, { toValue: 1, duration: 600, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
       Animated.spring(iconScale, { toValue: 1, tension: 80, friction: 6, useNativeDriver: true }),
       Animated.timing(iconRotate, { toValue: 1, duration: 700, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
       Animated.sequence([
@@ -225,6 +269,7 @@ export default function DiscoverWelcomeSheet({ visible, onClose, uid }: Props) {
       setIndex(0);
       animateSlideIn();
       Animated.timing(progressAnim, { toValue: 1 / SLIDES.length, duration: 400, useNativeDriver: false }).start();
+
 
       // CTA subtle pulse loop — ★ 2026-04-21: amplitude 1.05 → 1.025 azaltıldı
       // (yüksek scale'de button edge'i shadow ile birleşip "çizgi" etkisi yaratıyordu)
@@ -324,42 +369,43 @@ export default function DiscoverWelcomeSheet({ visible, onClose, uid }: Props) {
          *  Tüm içerik (animasyon + metin) ekranın ortasında hizalı, düğmeler altta. */}
         <View style={styles.centerBlock}>
 
-        {/* Hero alanı — pulse rings + icon + sparkles */}
+        {/* ★ 2026-04-29: Hero alanı — tüm slide'lar aynı gem dilinde (renk ve içerik tematik).
+            heroAnim ile her slide change'de alttan + fade-in yumuşak geçiş. */}
         <View style={styles.heroWrap}>
-          {/* Pulse rings */}
-          <PulseRing color={current.accent} delay={0} size={220} />
-          <PulseRing color={current.accent} delay={600} size={220} />
-          <PulseRing color={current.accent} delay={1200} size={220} />
-
-          {/* Sparkles — slide tematiği ile */}
-          {Array.from({ length: 6 }).map((_, i) => (
-            <Sparkle
-              key={`${index}-${i}`}
-              accent={current.accent}
-              index={i}
-              iconName={current.particleIcon}
-              iconSize={current.particleSize}
-            />
-          ))}
-
-          {/* Icon badge */}
           <Animated.View
             style={[
-              styles.iconBadge,
+              styles.spWebViewWrap,
               {
-                borderColor: current.accent + '55',
-                shadowColor: current.accent,
-                transform: [{ scale: iconScale }, { rotate }],
+                opacity: heroAnim,
+                transform: [
+                  { translateY: heroAnim.interpolate({ inputRange: [0, 1], outputRange: [30, 0] }) },
+                  { scale: heroAnim.interpolate({ inputRange: [0, 1], outputRange: [0.85, 1] }) },
+                ],
               },
             ]}
           >
-            <LinearGradient
-              colors={[current.accent, current.accentDeep]}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-              style={styles.iconGrad}
-            >
-              <Ionicons name={current.icon} size={52} color="#FFF" style={styles.iconShadow} />
-            </LinearGradient>
+            <WebView
+              source={{ html: buildGemHtml(current.gemColors, current.gemText) }}
+              style={styles.spWebView}
+              scrollEnabled={false}
+              overScrollMode="never"
+              showsHorizontalScrollIndicator={false}
+              showsVerticalScrollIndicator={false}
+              setBuiltInZoomControls={false}
+              javaScriptEnabled={true}
+              originWhitelist={['*']}
+              androidLayerType="hardware"
+            />
+            {/* SP slide'ında "SP" text'i HTML içinde; diğer slide'larda Ionicons overlay */}
+            {!current.gemText && (
+              <View pointerEvents="none" style={styles.gemIconOverlay}>
+                <Ionicons name={current.icon} size={56} color="#FFF" style={{
+                  textShadowColor: 'rgba(0,0,0,0.7)',
+                  textShadowOffset: { width: 0, height: 2 },
+                  textShadowRadius: 6,
+                }} />
+              </View>
+            )}
           </Animated.View>
         </View>
 
@@ -424,57 +470,62 @@ export default function DiscoverWelcomeSheet({ visible, onClose, uid }: Props) {
 
         </View>{/* /centerBlock */}
 
-        {/* CTA — full-width button + absolute prev button (her slide'da SABİT)
-         *  ★ 2026-04-21 v3: Prev her slide'da görünür — slide 1'de opacity 0.35 ile pasif.
-         *  İkisi de vertical gradient (parlak üst → gölge alt) → modern 3D buton hissi.
-         *  CTA tam genişlik; prev absolute floats solda, CTA'yı daraltmaz. */}
+        {/* CTA — Login sayfası buton stili (socialGradient pattern)
+         *  ★ 2026-04-29 v4: İki tam genişlik buton — Sonraki/Başlayalım + Geri.
+         *  Login'deki "Google ile Devam Et" ve "E-posta ile Giriş" yapısı. */}
         <View style={[styles.ctaRow, { paddingBottom: Math.max(16, insets.bottom + 10) }]}>
-          <Animated.View style={[styles.cta, { transform: [{ scale: ctaPulse }] }]}>
+          {/* Ana CTA — accent renkli gradient */}
+          <Animated.View style={styles.cta}>
             <Pressable
-              // ★ 2026-04-22 FIX: flex:1 kaldırıldı — parent Animated.View auto-height
-              //   olduğunda CTA yüksekliği 0'a düşüyor ve düğme görünmez oluyordu.
-              style={({ pressed }) => [pressed && { opacity: 0.88 }]}
+              style={({ pressed }) => [pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] }]}
               onPress={next}
             >
               <LinearGradient
-                // ★ Vertical: parlak üst → koyu alt (3D premium buton)
                 colors={[current.accent, current.accentDeep]}
-                start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
-                style={[styles.ctaGrad, { shadowColor: current.accent }]}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                style={styles.socialGradient}
               >
-                {/* Parlaklık highlight — üstte ince beyaz gradient overlay */}
-                <LinearGradient
-                  colors={['rgba(255,255,255,0.28)', 'rgba(255,255,255,0)']}
-                  start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 0.6 }}
-                  style={StyleSheet.absoluteFillObject}
-                  pointerEvents="none"
-                />
-                <Text style={styles.ctaText}>{isLast ? 'Başlayalım' : 'Sonraki'}</Text>
+                <View style={styles.socialIconWrap}>
+                  <Ionicons
+                    name={isLast ? 'checkmark-circle' : 'arrow-forward-circle'}
+                    size={20}
+                    color="#FFF"
+                  />
+                </View>
+                <Text style={styles.socialBtnText}>
+                  {isLast ? 'Başlayalım' : 'Sonraki'}
+                </Text>
                 <Ionicons
-                  name={isLast ? 'checkmark-circle' : 'arrow-forward'}
-                  size={20}
-                  color="#FFF"
+                  name={isLast ? 'sparkles' : 'arrow-forward'}
+                  size={18}
+                  color="rgba(255,255,255,0.5)"
+                  style={{ position: 'absolute', right: 16 }}
                 />
               </LinearGradient>
             </Pressable>
           </Animated.View>
 
-          {/* Prev — slide 2+ için absolute gradient buton; slide 1'de hiç görünmez
-              (CTA full-width olduğu için layout shift yok). */}
+          {/* Geri butonu — slide 2+ için glassmorphic secondary */}
           {index > 0 && (
             <Pressable
               onPress={prev}
-              // ★ bottom dinamik: CTA ile dikey hizalama — paddingBottom + CTA'nın
-              //   merkez ofseti (CTA ~52px, prev 44px → 4px offset)
-              style={[styles.prevBtnFloat, { bottom: Math.max(16, insets.bottom + 10) + 4 }]}
-              hitSlop={10}
+              style={({ pressed }) => [pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] }]}
             >
               <LinearGradient
-                colors={['rgba(255,255,255,0.22)', 'rgba(255,255,255,0.04)']}
-                start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
-                style={styles.prevBtnGrad}
+                colors={['rgba(255,255,255,0.12)', 'rgba(255,255,255,0.04)']}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                style={styles.socialGradientSecondary}
               >
-                <Ionicons name="chevron-back" size={20} color="rgba(255,255,255,0.85)" />
+                <View style={styles.socialIconWrapSecondary}>
+                  <Ionicons name="chevron-back" size={20} color="rgba(255,255,255,0.85)" />
+                </View>
+                <Text style={styles.socialBtnTextSecondary}>Geri Dön</Text>
+                <Ionicons
+                  name="return-down-back"
+                  size={18}
+                  color="rgba(255,255,255,0.25)"
+                  style={{ position: 'absolute', right: 16 }}
+                />
               </LinearGradient>
             </Pressable>
           )}
@@ -500,6 +551,11 @@ function getSlideChips(idx: number): { icon: keyof typeof Ionicons.glyphMap; lab
       { icon: 'trending-up', label: 'Popüler' },
       { icon: 'sparkles', label: 'Yeni' },
       { icon: 'flame', label: 'Canlı' },
+    ];
+    case 3: return [
+      { icon: 'gift', label: 'Hediye' },
+      { icon: 'trophy', label: 'Seviye' },
+      { icon: 'diamond', label: 'Ödül' },
     ];
     default: return [];
   }
@@ -646,54 +702,80 @@ const styles = StyleSheet.create({
   },
   ctaRow: {
     paddingHorizontal: 18,
-    position: 'relative',
-    // ★ 2026-04-22 v3: CTA ekran altında sabit — centerBlock flex:1 sayesinde
-    //   içerik ortada, CTA alt (varsayılan konum).
-  },
-  /** ★ 2026-04-21 v3: Prev absolute → CTA genişliğini değiştirmez. Her slide'da SABİT
-   *  konumda; gradient (parlak üst → gölge alt) ile 3D premium hissi. */
-  prevBtnFloat: {
-    position: 'absolute',
-    left: 26,
-    // bottom dinamik olarak JSX'te geçiliyor (insets.bottom'a bağlı)
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    overflow: 'hidden',
-    zIndex: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  prevBtnGrad: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 22,
+    gap: 10,
+    // ★ 2026-04-29 v4: Login sayfası buton stili — dikey gap ile iki buton
   },
   cta: {
     width: '100%',
-    borderRadius: 16,
+    borderRadius: 14,
     overflow: 'hidden',
   },
-  ctaGrad: {
+  // ★ 2026-04-29: Login sayfası "Google ile Devam Et" buton stili
+  socialGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 10,
-    paddingVertical: 16,
-    borderRadius: 16,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.5,
-    shadowRadius: 14,
-    elevation: 10,
+    height: 56,
+    borderRadius: 14,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 5,
   },
-  ctaText: {
-    color: '#FFF',
-    fontSize: 16,
-    fontWeight: '800',
-    letterSpacing: 0.4,
+  socialIconWrap: {
+    position: 'absolute',
+    left: 14,
+    width: 36, height: 36, borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center', alignItems: 'center',
+  },
+  socialBtnText: {
+    color: '#FFFFFF', fontSize: 15, fontWeight: '800', letterSpacing: 0.4,
+    textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
+  },
+  // Secondary (Geri) — glassmorphic
+  socialGradientSecondary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 50,
+    borderRadius: 14,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  socialIconWrapSecondary: {
+    position: 'absolute',
+    left: 14,
+    width: 32, height: 32, borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
+    justifyContent: 'center', alignItems: 'center',
+  },
+  socialBtnTextSecondary: {
+    color: 'rgba(255,255,255,0.7)', fontSize: 14, fontWeight: '600', letterSpacing: 0.3,
+  },
+  // ★ 2026-04-29: SP hexagon WebView container
+  spWebViewWrap: {
+    width: 240,
+    height: 240,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  spWebView: {
+    width: 240,
+    height: 240,
+    backgroundColor: 'transparent',
+  },
+  // ★ 2026-04-29: Gem hexagon üzerine slide tematik Ionicons overlay
+  gemIconOverlay: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0, bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

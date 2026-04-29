@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { RoomAccessService } from '../../services/roomAccess';
 import { ProfileService, type Profile } from '../../services/database';
+import { useUserProfileSheet } from '../../app/_layout';
 import { ModerationService } from '../../services/moderation';
 import { getAvatarSource } from '../../constants/avatars';
 import { showToast } from '../Toast';
@@ -33,6 +34,7 @@ interface Props {
 export default function HostAccessPanel({ visible, onClose, roomId, roomType, hostId }: Props) {
   const slideAnim = useRef(new Animated.Value(DRAWER_W)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const { openUserProfile } = useUserProfileSheet();
 
   // ★ Swipe-right-to-dismiss (ChatDrawer ile aynı kalıp)
   const { translateValue: swipeX, panHandlers } = useSwipeToDismiss({
@@ -141,7 +143,7 @@ export default function HostAccessPanel({ visible, onClose, roomId, roomType, ho
       setBannedUsers(prev => prev.filter(b => b.id !== ban.id));
       showToast({ title: '✅ Ban Kaldırıldı', message: `${ban.user?.display_name || 'Kullanıcı'} artık odaya girebilir.`, type: 'success' });
     } catch {
-      showToast({ title: 'Hata', message: 'Ban kaldırılamadı', type: 'error' });
+      showToast({ title: 'Ban Kaldırılamadı', message: `${ban.user?.display_name || 'Kullanıcı'} banı kaldırılamadı.`, type: 'error' });
     } finally {
       setProcessingIds(prev => { const n = new Set(prev); n.delete(ban.id); return n; });
     }
@@ -153,7 +155,7 @@ export default function HostAccessPanel({ visible, onClose, roomId, roomType, ho
     if (query.length < 2) { setSearchResults([]); return; }
     setSearching(true);
     try {
-      const results = await ProfileService.search(query, 15);
+      const results = await ProfileService.search(query, 15, hostId);
       setSearchResults(results);
     } catch {}
     setSearching(false);
@@ -167,7 +169,7 @@ export default function HostAccessPanel({ visible, onClose, roomId, roomType, ho
         showToast({ title: '📨 Davet Gönderildi', message: `${user.display_name} odaya davet edildi.`, type: 'success' });
         setSearchResults(prev => prev.filter(u => u.id !== user.id));
       } else {
-        showToast({ title: 'Hata', message: result.error || 'Davet gönderilemedi.', type: 'error' });
+        showToast({ title: 'Davet Gönderilemedi', message: result.error || `${user.display_name} davet edilemedi.`, type: 'error' });
       }
     } catch {} finally {
       setProcessingIds(prev => { const n = new Set(prev); n.delete(user.id); return n; });
@@ -246,10 +248,12 @@ export default function HostAccessPanel({ visible, onClose, roomId, roomType, ho
                   const isProcessing = processingIds.has(req.id);
                   return (
                     <View key={req.id} style={s.row}>
-                      <Image source={getAvatarSource(req.user?.avatar_url)} style={s.avatar} />
-                      <View style={{ flex: 1 }}>
+                      <Pressable onPress={() => openUserProfile(req.user_id)} hitSlop={6}>
+                        <Image source={getAvatarSource(req.user?.avatar_url)} style={s.avatar} />
+                      </Pressable>
+                      <Pressable style={{ flex: 1 }} onPress={() => openUserProfile(req.user_id)} hitSlop={4}>
                         <Text style={s.name} numberOfLines={1}>{req.user?.display_name || 'Kullanıcı'}</Text>
-                      </View>
+                      </Pressable>
                       {isProcessing ? (
                         <ActivityIndicator size="small" color="#A78BFA" />
                       ) : (
@@ -295,9 +299,13 @@ export default function HostAccessPanel({ visible, onClose, roomId, roomType, ho
 
                   return (
                     <View key={ban.id} style={s.row}>
-                      <Image source={getAvatarSource(ban.user?.avatar_url)} style={s.avatar} />
+                      <Pressable onPress={() => openUserProfile(ban.user_id)} hitSlop={6}>
+                        <Image source={getAvatarSource(ban.user?.avatar_url)} style={s.avatar} />
+                      </Pressable>
                       <View style={{ flex: 1 }}>
-                        <Text style={s.name} numberOfLines={1}>{ban.user?.display_name || 'Kullanıcı'}</Text>
+                        <Pressable onPress={() => openUserProfile(ban.user_id)} hitSlop={4}>
+                          <Text style={s.name} numberOfLines={1}>{ban.user?.display_name || 'Kullanıcı'}</Text>
+                        </Pressable>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 }}>
                           <View style={[s.banTypePill, isPermanent ? s.banPermanent : s.banTemp]}>
                             <Text style={[s.banTypeText, { color: isPermanent ? '#EF4444' : '#F59E0B' }]}>

@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import SPIcon from '../SPIcon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Colors, Shadows } from '../../constants/theme';
@@ -557,15 +558,9 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
               subscriptionTier={tier as any}
               isAdmin={!!userProfile.is_admin}
               userTitle={userTitle}
-              stats={{ friends: stats.friends, followers: stats.followers, following: stats.following, rooms: stats.rooms, badges: stats.badges }}
-              activityStats={profileStats}
-              hideStats={!canSeeFullProfile}
-              hideRoomsCount={!isOwnProfile && !!((userProfile as any)?.hide_owned_rooms)}
-              onFriendsPress={() => { setFollowListTab('friends'); setShowFollowList(true); }}
+              stats={{ followers: stats.followers, rooms: stats.rooms }}
               onFollowersPress={() => { setFollowListTab('followers'); setShowFollowList(true); }}
-              onFollowingPress={() => { setFollowListTab('following'); setShowFollowList(true); }}
               onRoomsPress={() => {}}
-              onBadgesPress={() => setShowBadgesModal(true)}
               memberSince={userProfile.created_at}
               boostExpiresAt={(userProfile as any)?.profile_boost_expires_at}
               isOnline={isFriend || isOwnProfile ? userProfile.is_online : undefined}
@@ -891,7 +886,7 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                   <>
                     <View style={sty.premiumSectionHeader}>
                       <View style={[sty.sectionAccent, { backgroundColor: '#FBBF24' }]} />
-                      <Ionicons name="diamond" size={13} color="#FBBF24" style={iconShadow} />
+                      <SPIcon size={18} />
                       <Text style={sty.premiumSectionText}>CÜZDANIM</Text>
                     </View>
                     <View style={sty.walletCard}>

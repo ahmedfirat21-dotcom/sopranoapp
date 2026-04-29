@@ -15,6 +15,8 @@ import React, { useRef, useState, useCallback, useImperativeHandle, forwardRef, 
 import { View, Text, StyleSheet, Animated, Easing, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+// ★ 2026-04-29: SP miktarına göre tier paleti — diğer SP ekranlarıyla tutarlı.
+import { getSPAmountTier, SP_TIER_VISUAL, SP_TIER_EMOJIS } from '../../constants/spAmountTier';
 
 const { width: W, height: H } = Dimensions.get('window');
 
@@ -71,10 +73,13 @@ const DonationAlert = forwardRef<DonationAlertRef>((_, ref) => {
 
   useEffect(() => () => stopAll(), []);
 
-  const spawnParticles = useCallback(() => {
-    const EMOJIS = ['✨', '💛', '⭐', '💎', '❤️', '🌟', '💖', '✨', '💫', '🔥'];
+  const spawnParticles = useCallback((amount: number) => {
+    // ★ Tier'a göre emoji havuzu + partikül sayısı (basic 8 → legendary 22)
+    const tier = getSPAmountTier(amount);
+    const tv = SP_TIER_VISUAL[tier];
+    const EMOJIS = SP_TIER_EMOJIS[tier];
     const newParticles: Particle[] = [];
-    for (let i = 0; i < 14; i++) {
+    for (let i = 0; i < tv.particleCount; i++) {
       const id = ++particleCounter;
       const anim = new Animated.Value(0);
       newParticles.push({
@@ -152,8 +157,8 @@ const DonationAlert = forwardRef<DonationAlertRef>((_, ref) => {
       heartBeatLoopRef.current.start();
     });
 
-    // Partiküller
-    spawnParticles();
+    // Partiküller — tier'a göre sayı/emoji havuzu
+    spawnParticles(alertData.amount);
 
     // ── 5. Çıkış animasyonu (4sn sonra) — ref ile takip et, üst üste çağrı güvenli ──
     dismissTimerRef.current = setTimeout(() => {
@@ -173,19 +178,19 @@ const DonationAlert = forwardRef<DonationAlertRef>((_, ref) => {
 
   if (!visible || !data) return null;
 
-  // ── Miktar bazlı tier renklendirmesi ──
-  const isLarge = data.amount >= 50;
-  const isMedium = data.amount >= 25;
-  const gradColors: [string, string, string] = isLarge
-    ? ['#FFD700', '#FFA500', '#FF6B35']   // Altın — büyük bağış
-    : isMedium
-    ? ['#E879F9', '#A855F7', '#7C3AED']   // Mor elmas — orta bağış
-    : ['#F472B6', '#EC4899', '#DB2777'];   // Pembe — küçük bağış
-
-  const borderColor = isLarge ? 'rgba(255,215,0,0.6)' : isMedium ? 'rgba(168,85,247,0.5)' : 'rgba(236,72,153,0.4)';
-  const shadowColor = isLarge ? '#FFD700' : isMedium ? '#A855F7' : '#EC4899';
-  const amountColor = isLarge ? '#FFD700' : isMedium ? '#E879F9' : '#F472B6';
-  const heartColor = isLarge ? '#FFD700' : '#EF4444';
+  // ── 2026-04-29: spAmountTier ile birleşik tier paleti (diğer SP ekranlarıyla aynı eşikler)
+  //    basic <50 / premium ≥50 / elite ≥250 / legendary ≥1000
+  const tier = getSPAmountTier(data.amount);
+  const tv = SP_TIER_VISUAL[tier];
+  const isPrestige = tier !== 'basic';   // Premium ve üstü için 👑 rozet
+  // Heart gradient — tier'a göre 3-stop (glow ana renk, partikül paletinden ek 2 stop)
+  const grad0 = tv.glow;
+  const grad1 = tv.particleColors[1] || tv.glow;
+  const grad2 = tv.particleColors[2] || tv.particleColors[0] || tv.glow;
+  const gradColors: [string, string, string] = [grad0, grad1, grad2];
+  const borderColor = tv.glow + '99';
+  const shadowColor = tv.glow;
+  const amountColor = tv.glow;
 
   const shimmerTranslateX = shimmerAnim.interpolate({
     inputRange: [0, 1],
@@ -301,10 +306,10 @@ const DonationAlert = forwardRef<DonationAlertRef>((_, ref) => {
               </View>
             </View>
 
-            {/* Büyük miktar rozeti (50+ SP) */}
-            {isLarge && (
+            {/* Premium ve üstü için 👑 rozet — tier 'basic' değilse görünür */}
+            {isPrestige && (
               <Animated.View style={[s.megaBadge, { opacity: glowAnim }]}>
-                <Text style={s.megaEmoji}>👑</Text>
+                <Text style={s.megaEmoji}>{tier === 'legendary' ? '👑' : tier === 'elite' ? '💎' : '⭐'}</Text>
               </Animated.View>
             )}
           </View>

@@ -794,7 +794,7 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
           </Pressable>
         )}
 
-        {/* ★ 2026-04-26: Kulübe Ekle/Çıkar — sadece kullanıcının owner/mod olduğu kulüpler varsa render eder */}
+        {/* ★ 2026-04-26: Koroya Ekle/Çıkar — sadece kullanıcının owner/mod olduğu korolar varsa render eder */}
         <AttachRoomToClubButton roomId={room.id} userId={hostId} />
 
         {/* Odayı Sil */}

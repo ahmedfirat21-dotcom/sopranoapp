@@ -5,9 +5,10 @@
 // ═══════════════════════════════════════════════════════════════════
 
 import React, { useEffect, useRef, useMemo } from 'react';
-import { View, Text, StyleSheet, Pressable, Animated, Easing, Modal, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Animated, Easing, Modal, Dimensions, PanResponder, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import SPHexagonIcon from '../SPHexagonIcon';
 
 const { width: W, height: H } = Dimensions.get('window');
 
@@ -149,6 +150,26 @@ export default function SPSentSuccessModal({ visible, amount, recipientName, onC
   const countAnim = useRef(new Animated.Value(0)).current;
   const [displayAmount, setDisplayAmount] = React.useState(0);
 
+  // ★ Swipe-to-dismiss — aşağı sürükle kapat
+  const panY = useRef(new Animated.Value(0)).current;
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_, g) => g.dy > 12 && Math.abs(g.dy) > Math.abs(g.dx) * 1.3,
+      onPanResponderMove: (_, g) => { if (g.dy > 0) panY.setValue(g.dy); },
+      onPanResponderRelease: (_, g) => {
+        if (g.dy > 80 || g.vy > 0.5) {
+          Animated.timing(panY, { toValue: H, duration: 200, useNativeDriver: true }).start(() => {
+            panY.setValue(0);
+            onClose();
+          });
+        } else {
+          Animated.spring(panY, { toValue: 0, useNativeDriver: true, tension: 100, friction: 10 }).start();
+        }
+      },
+    })
+  ).current;
+
   // Sparkle & gold drop pool — maksimum boyuta göre hazırla, fazlası gizlenir
   const MAX_SPARKLES = 20;
   const MAX_DROPS = 14;
@@ -190,6 +211,7 @@ export default function SPSentSuccessModal({ visible, amount, recipientName, onC
     shimmerX.setValue(-1.2);
     countAnim.setValue(0);
     setDisplayAmount(0);
+    panY.setValue(0);
     sparkles.forEach(s => {
       s.scale.setValue(0);
       s.translateX.setValue(0);
@@ -373,50 +395,13 @@ export default function SPSentSuccessModal({ visible, amount, recipientName, onC
         />
       </Animated.View>
 
-      {/* Gold shower (absolute layer) */}
-      {goldDrops.slice(0, activeDropCount).map((d, i) => (
-        <Animated.View
-          key={`drop-${i}`}
-          pointerEvents="none"
-          style={{
-            position: 'absolute',
-            left: d.x,
-            top: 0,
-            opacity: d.opacity,
-            transform: [{ translateY: d.fall }],
-          }}
-        >
-          <Ionicons name="diamond" size={d.size} color={p.ringGlow}
-            style={{ textShadowColor: p.ringGlow, textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 8 }}
-          />
-        </Animated.View>
-      ))}
+      {/* ★ 2026-04-29 v2: Gold shower kaldırıldı — DiscoverWelcome temizliği. Tek hexagon hakim. */}
 
-      <Pressable style={s.pressArea} onPress={onClose}>
-        {/* Stage — merkez ankraj noktası */}
-        <View style={s.stage}>
+      <Pressable style={s.pressArea} onPress={onClose} {...panResponder.panHandlers}>
+        {/* Stage — merkez ankraj noktası + swipe offset */}
+        <Animated.View style={[s.stage, { transform: [{ translateY: panY }] }]}>
 
-          {/* Extra rings (premium+) — rotate slow, ring'in etrafında koaxial */}
-          {Array.from({ length: p.extraRings }).map((_, i) => {
-            const extraSize = RING + (i + 1) * 32;
-            return (
-              <Animated.View
-                key={`xring-${i}`}
-                pointerEvents="none"
-                style={{
-                  position: 'absolute',
-                  width: extraSize,
-                  height: extraSize,
-                  borderRadius: extraSize / 2,
-                  borderWidth: 1,
-                  borderColor: p.ringColor.replace(/[\d.]+\)$/, `${0.3 - i * 0.08})`),
-                  borderStyle: i % 2 === 0 ? 'solid' : 'dashed',
-                  opacity: ringOpacity,
-                  transform: [{ scale: ringScale }, { rotate: ringRotateInterp }],
-                }}
-              />
-            );
-          })}
+          {/* ★ 2026-04-29 v2: Extra rings kaldırıldı — DiscoverWelcome stilinde tek halka. */}
 
           {/* Ana ring + iç içerik */}
           <Animated.View
@@ -430,24 +415,7 @@ export default function SPSentSuccessModal({ visible, amount, recipientName, onC
               },
             ]}
           >
-            {/* Shimmer sweep — premium+ için skewed beyaz parıltı */}
-            {p.hasShimmerSweep && (
-              <Animated.View
-                pointerEvents="none"
-                style={{
-                  position: 'absolute',
-                  top: 0, bottom: 0, width: 60,
-                  transform: [{ translateX: shimmerTranslate }, { skewX: '-20deg' }],
-                  overflow: 'hidden',
-                }}
-              >
-                <LinearGradient
-                  colors={['transparent', 'rgba(255,255,255,0.22)', 'transparent']}
-                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                  style={StyleSheet.absoluteFillObject}
-                />
-              </Animated.View>
-            )}
+            {/* ★ 2026-04-29 v2: Shimmer sweep kaldırıldı — sade hexagon hakim. */}
 
             {/* Flex content — 3 satır eşit aralık */}
             <View style={s.ringContent}>
@@ -482,69 +450,16 @@ export default function SPSentSuccessModal({ visible, amount, recipientName, onC
                   },
                 ]}
               >
-                <LinearGradient
-                  colors={p.diamondGrad}
-                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                  style={s.diamondGrad}
-                >
-                  <Ionicons name="diamond" size={54} color="#FFF" style={s.diamondIcon} />
-                </LinearGradient>
+                {/* ★ 2026-04-29 v2: DiscoverWelcome kalitesinde — hexagon 200 px, hakim element. */}
+                <SPHexagonIcon size={200} />
               </Animated.View>
 
-              {/* Alt: Animasyonlu parlak yeşil tik */}
-              <Animated.View
-                style={[
-                  s.checkWrap,
-                  { transform: [{ scale: Animated.multiply(checkScale, checkPulse) as any }] },
-                ]}
-              >
-                <Animated.View
-                  style={[
-                    s.checkGlow,
-                    { backgroundColor: p.checkColor, shadowColor: p.checkColor, opacity: checkGlowOpacity },
-                  ]}
-                />
-                <View style={[s.checkBg, { backgroundColor: p.checkColor }]}>
-                  <Ionicons name="checkmark" size={26} color="#FFF" style={s.checkIcon} />
-                </View>
-              </Animated.View>
+              {/* ★ 2026-04-29 v2: Yeşil check kaldırıldı — DiscoverWelcome'da yok, sade. */}
             </View>
           </Animated.View>
 
-          {/* Sparkles — stage center ankorlu, radial burst */}
-          {sparkles.slice(0, activeSparkleCount).map((sp, i) => {
-            const color = p.sparkleColors[i % p.sparkleColors.length];
-            const size = 13 + (i % 3) * 3;
-            const rotate = sp.rotate.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
-            return (
-              <Animated.View
-                key={`sp-${i}`}
-                pointerEvents="none"
-                style={{
-                  position: 'absolute',
-                  opacity: sp.opacity,
-                  transform: [
-                    { translateX: sp.translateX },
-                    { translateY: sp.translateY },
-                    { scale: sp.scale },
-                    { rotate },
-                  ],
-                }}
-              >
-                <Ionicons
-                  name="star"
-                  size={size}
-                  color={color}
-                  style={{
-                    textShadowColor: color,
-                    textShadowOffset: { width: 0, height: 0 },
-                    textShadowRadius: 10,
-                  }}
-                />
-              </Animated.View>
-            );
-          })}
-        </View>
+          {/* ★ 2026-04-29 v2: Sparkles kaldırıldı — tek hexagon hakim. */}
+        </Animated.View>
 
         {/* Ring altı: tier label (premium+) + alıcı */}
         <View style={s.belowRing}>
@@ -589,14 +504,17 @@ const s = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
 
-  // ★ 2026-04-21 v4: Ring — flex column, içerik üst üste binmez
+  // ★ 2026-04-29 v3: Ring shadow yumuşatıldı — çirkin gölge yerine subtle halo.
+  //   Android elevation tamamen kaldırıldı (gri leke yapıyordu).
   ring: {
     position: 'absolute',
     width: RING, height: RING, borderRadius: RING / 2,
     borderWidth: RING_BORDER,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.85, shadowRadius: 34, elevation: 12,
     overflow: 'hidden',
+    ...Platform.select({
+      ios: { shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.35, shadowRadius: 20 },
+      android: {},
+    }),
   },
   ringContent: {
     flex: 1,

@@ -129,19 +129,22 @@ export default function StatusAvatar({
         />
       )}
 
-      {/* Tier pill badge — opsiyonel, avatarın altında görünür */}
-      {showTierBadge && tierDef && (
+      {/* ★ 2026-04-29: Tier badge — Free'yi hiç gösterme (default), Plus/Pro/GM için
+          minimalist yuvarlak ikon (yazı kaldırıldı, daha zarif). */}
+      {showTierBadge && tierDef && normalizedTier !== 'Free' && (
         <LinearGradient
           colors={tierGradient as [string, string]}
           style={[
-            styles.tierPill,
+            styles.tierBadge,
             {
+              width: Math.max(18, size * 0.30),
+              height: Math.max(18, size * 0.30),
+              borderRadius: Math.max(9, size * 0.15),
               transform: [{ scale: pillScale }],
             },
           ]}
         >
-          <Ionicons name={tierIcon as any} size={7} color="#FFF" />
-          <Text style={styles.tierText}>{tierLabel}</Text>
+          <Ionicons name={tierIcon as any} size={Math.max(10, size * 0.18)} color="#FFF" />
         </LinearGradient>
       )}
     </View>
@@ -168,24 +171,19 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     elevation: 3,
   },
-  tierPill: {
+  // ★ 2026-04-29: Yuvarlak kompakt tier rozeti — yazı yok, sadece simge
+  tierBadge: {
     position: 'absolute',
-    bottom: -2,
-    alignSelf: 'center',
-    left: '15%',
-    flexDirection: 'row',
+    bottom: 0,
+    right: 0,
     alignItems: 'center',
-    gap: 2,
-    paddingHorizontal: 5,
-    paddingVertical: 1.5,
-    borderRadius: 8,
-    borderWidth: 1.5,
+    justifyContent: 'center',
+    borderWidth: 2,
     borderColor: '#0F1923',
-  },
-  tierText: {
-    fontSize: 7,
-    fontWeight: '800',
-    color: '#FFF',
-    letterSpacing: 0.3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.45,
+    shadowRadius: 2.5,
+    elevation: 3,
   },
 });

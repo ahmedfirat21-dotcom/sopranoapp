@@ -25,11 +25,15 @@ export default function useLiveKit({ roomId, enabled = true, userId, displayName
   const [isMicEnabled, setIsMicEnabled] = useState(isAlreadyConnected ? liveKitService.isMicrophoneEnabled : false);
   const [isCamEnabled, setIsCamEnabled] = useState(isAlreadyConnected ? liveKitService.isCameraEnabled : false);
   const [connectFailed, setConnectFailed] = useState(false);
+  // ★ 2026-04-25: Bağlantı kalitesi — local participant
+  const [connectionQuality, setConnectionQuality] = useState<'excellent' | 'good' | 'poor' | 'unknown'>('unknown');
   const connectingRef = useRef(false); // Aktif bağlantı denemesi var mı
   const mountedRef = useRef(true);
   const appStateRef = useRef(AppState.currentState);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reconnectCountRef = useRef(0);
+  // ★ 2026-04-28: connectionState ref — AppState handler closure'ında güncel değer için
+  const connectionStateRef = useRef<string>('disconnected');
   // ★ FIX: Reconnect sonrası mic/cam restore
   const prevMicRef = useRef(false);
   const prevCamRef = useRef(false);
@@ -49,6 +53,7 @@ export default function useLiveKit({ roomId, enabled = true, userId, displayName
       onConnectionStateChange: (state) => {
         if (!mountedRef.current) return;
         setConnectionState(state);
+        connectionStateRef.current = state;
         
         // ★ Normal (intentional) çıkışta reconnect döngüsünü başlatma
         if (state === 'disconnected' && intentionalLeaveRef.current) return;
@@ -79,7 +84,7 @@ export default function useLiveKit({ roomId, enabled = true, userId, displayName
               try {
                 if (prevMicRef.current) await liveKitService.enableMicrophone();
                 if (prevCamRef.current) await liveKitService.enableCamera();
-              } catch (e) { console.warn('[useLiveKit] Restore hatası:', e); }
+              } catch (e) { if (__DEV__) console.warn('[useLiveKit] Restore hatası:', e); }
             }, 1000);
           }
           setTimeout(() => {
@@ -105,13 +110,14 @@ export default function useLiveKit({ roomId, enabled = true, userId, displayName
             p.isSpeaking === parts[i].isSpeaking &&
             p.isCameraEnabled === parts[i].isCameraEnabled &&
             p.isScreenShareEnabled === parts[i].isScreenShareEnabled &&
+            p.videoTrack === parts[i].videoTrack &&  // ★ 2026-04-24 FIX: videoTrack ref değişimi (null→track) yakala
             Math.abs(p.audioLevel - parts[i].audioLevel) < 0.05
           )) return prev;
           return parts;
         });
       },
       // ★ BUG-2 FIX: State callback ile mic/cam durumu her zaman güncel
-      onMicStateChange: (mic, cam) => {
+      onTrackStateChange: (mic, cam) => {
         if (!mountedRef.current) return;
         setIsMicEnabled(mic);
         setIsCamEnabled(cam);
@@ -119,6 +125,11 @@ export default function useLiveKit({ roomId, enabled = true, userId, displayName
       onPermissionDenied: (device) => {
         if (!mountedRef.current) return;
         onPermissionDenied?.(device);
+      },
+      // ★ 2026-04-25: Connection quality
+      onConnectionQualityChange: (quality) => {
+        if (!mountedRef.current) return;
+        setConnectionQuality(quality);
       },
     }, qualityPreset);
 
@@ -177,19 +188,37 @@ export default function useLiveKit({ roomId, enabled = true, userId, displayName
     };
   }, [shouldDisconnectOnUnmount]);
   
-  // App Background/Foreground state handling
+  // ★ App Background/Foreground state handling
+  // ★ 2026-04-28: Foreground'a dönünce otomatik reconnect — Android Doze / WebRTC peer kesintisi
+  //   sonrası "Bağlantı kurulamadı" ekranını önler. Reconnect sayacı sıfırlanır, doConnect tetiklenir.
   useEffect(() => {
     const handleAppState = async (nextState: AppStateStatus) => {
-      if (appStateRef.current.match(/active/) && nextState.match(/inactive|background/)) {
-        // Arka plana geçerken mikrofonu KAPATMA — oda arka planda devam etmeli (FEAT-3)
-        // Sadece 60sn sonra otomatik çıkış tetiklenecek (room/[id].tsx'deki zombie mekanizması)
+      const wasBackground = appStateRef.current.match(/inactive|background/);
+      const nowActive = nextState === 'active';
+
+      if (wasBackground && nowActive && enabledRef.current && roomId && userId) {
+        // Bağlantı koptuysa veya kopuyor ise yeniden bağlanmayı dene
+        const currentState = connectionStateRef.current;
+        if (currentState !== 'connected') {
+          if (__DEV__) console.log('[useLiveKit] Foreground active — reconnect tetikleniyor (state:', currentState, ')');
+          reconnectCountRef.current = 0; // Sayacı sıfırla, yeni döngü
+          if (reconnectTimerRef.current) {
+            clearTimeout(reconnectTimerRef.current);
+            reconnectTimerRef.current = null;
+          }
+          connectingRef.current = false; // Kilidi aç
+          setConnectFailed(false); // Hata ekranını sakla
+          doConnect();
+        }
       }
+
+      // Background'a geçerken mikrofonu KAPATMA — oda arka planda devam etmeli (FEAT-3)
       appStateRef.current = nextState;
     };
 
     const sub = AppState.addEventListener('change', handleAppState);
     return () => sub.remove();
-  }, []);
+  }, [roomId, userId, doConnect]);
 
   const toggleCamera = useCallback(async () => {
     // ★ BUG-T5 FIX: maxCameras enforcement — kamera açarken limit kontrolü
@@ -265,5 +294,6 @@ export default function useLiveKit({ roomId, enabled = true, userId, displayName
     isMicrophoneEnabled: isMicEnabled,
     isScreenSharing,
     anyoneScreenSharing,
+    connectionQuality, // ★ 2026-04-25
   };
 }

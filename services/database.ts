@@ -11,8 +11,10 @@
  *   services/messages.ts  — MessageService
  *   services/sp.ts        — SPService
  *   services/realtime.ts  — RealtimeService
- *   services/store.ts     — StoreService
- *   services/status.ts    — StatusService + UserStatus
+ *
+ * ★ 2026-04-26: store.ts kaldırıldı — kozmetik mağaza Google Play kuralları gereği silindi
+ * ★ 2026-04-26: social.ts kaldırıldı — oda duvarı/post sistemi kullanıcı kararıyla silindi
+ * ★ 2026-04-28: status.ts kaldırıldı — StatusService hiçbir UI'da kullanılmıyordu (ölü kod)
  *
  * Yeni kod yazarken doğrudan modül dosyalarından import etmeyi
  * tercih edin. Bu hub, mevcut import'ları bozmamak için korunur.
@@ -24,15 +26,11 @@ export { RoomService } from './room';
 export { MessageService } from './messages';
 export { SPService } from './sp';
 export { RealtimeService } from './realtime';
-export { StoreService } from './store';
-export { StatusService } from './status';
-export type { UserStatus } from './status';
-
-// ── Tier sabitleri (constants'dan) ──────────────────
-export { TIER_DEFINITIONS, TIER_ORDER, getRoomLimits, getBroadcastLimits, isTierAtLeast } from '../constants/tiers';
 
 // ── Tipler — types/index.ts TEK KAYNAK ──────────────────
+//   ★ 2026-04-25: Tier sabitleri (TIER_DEFINITIONS, getRoomLimits vb.) ve
+//   migrateLegacyTier re-export'ları kaldırıldı. Artık doğrudan
+//   `constants/tiers` ve `types` importlanmalı. Kafa karışıklığı sonu.
 export type { Profile, Room, RoomParticipant, RoomSettings } from '../types';
 export type { Message, InboxItem } from '../types';
 export type { SubscriptionTier, TierName } from '../types';
-export { migrateLegacyTier } from '../types';
