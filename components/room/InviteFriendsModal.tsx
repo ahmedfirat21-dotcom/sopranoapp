@@ -11,6 +11,7 @@ import { FriendshipService, FollowUser } from '../../services/friendship';
 import { getAvatarSource } from '../../constants/avatars';
 import { supabase } from '../../constants/supabase';
 import { useSwipeToDismiss } from '../../hooks/useSwipeToDismiss';
+import { useOnlineFriends } from '../../providers/OnlineFriendsProvider';
 
 const { width: W } = Dimensions.get('window');
 
@@ -29,6 +30,9 @@ export default function InviteFriendsModal({ visible, userId, onClose, onInvite,
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  // ★ 2026-04-30: Presence-based online — stale DB flag yerine canlı websocket durumu.
+  const { onlineFriends: liveFriends } = useOnlineFriends();
+  const liveOnlineIds = new Set(liveFriends.map(f => f.id));
 
   const loadFriends = useCallback(async () => {
     if (!userId) {
@@ -187,7 +191,7 @@ export default function InviteFriendsModal({ visible, userId, onClose, onInvite,
               <Image source={getAvatarSource(item.avatar_url)} style={s.avatar} />
               <View style={{ flex: 1 }}>
                 <Text style={s.userName} numberOfLines={1}>{item.display_name}</Text>
-                {item.is_online && <Text style={s.onlineText}>Çevrimiçi</Text>}
+                {liveOnlineIds.has(item.id) && <Text style={s.onlineText}>Çevrimiçi</Text>}
               </View>
               <View style={[s.checkbox, isChecked && s.checkboxActive]}>
                 {isChecked && <Ionicons name="checkmark" size={14} color="#FFF" />}

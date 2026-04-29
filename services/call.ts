@@ -216,23 +216,17 @@ export const CallService = {
     try {
       const { data } = await supabase
         .from('profiles')
-        .select('is_online, last_seen')
+        .select('last_seen')
         .eq('id', userId)
         .single();
       if (!data) return false;
 
-      // ★ FIX: is_online=true ise DOĞRUDAN online kabul et
-      // last_seen kontrolü sadece is_online=false durumunda (son 2dk aktifse online say)
-      if (data.is_online) {
-        if (__DEV__) console.log(`[CallService] Receiver online: is_online=true ✓`);
-        return true;
-      }
-
-      // is_online=false ama son 2dk içinde aktifse yine online say
-      const TWO_MIN = 2 * 60 * 1000;
+      // ★ 2026-04-30: Sadece last_seen tabanlı — DB is_online flag'i stale kalabiliyor
+      //   (app crash/kill'de false set edilemiyor). last_seen her foreground'da güncellenir.
+      const FIVE_MIN = 5 * 60 * 1000;
       const lastSeen = data.last_seen ? new Date(data.last_seen).getTime() : 0;
-      const recentlyActive = lastSeen > 0 && (Date.now() - lastSeen < TWO_MIN);
-      if (__DEV__) console.log(`[CallService] Receiver online check: is_online=false, last_seen_ago=${Math.round((Date.now() - lastSeen)/1000)}s, recentlyActive=${recentlyActive}`);
+      const recentlyActive = lastSeen > 0 && (Date.now() - lastSeen < FIVE_MIN);
+      if (__DEV__) console.log(`[CallService] Receiver online check: last_seen_ago=${Math.round((Date.now() - lastSeen)/1000)}s, recentlyActive=${recentlyActive}`);
       return recentlyActive;
     } catch {
       return false;

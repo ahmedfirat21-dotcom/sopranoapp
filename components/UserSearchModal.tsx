@@ -11,6 +11,7 @@ import { Colors, Shadows } from '../constants/theme';
 import { supabase } from '../constants/supabase';
 import StatusAvatar from './StatusAvatar';
 import type { Profile } from '../services/database';
+import { useOnlineFriends } from '../providers/OnlineFriendsProvider';
 
 // ★ 2026-04-27: FollowListModal/InRoomUserProfile ile aynı 2-snap mekanik.
 //   Modal sarmalı YOK (Modal native dialog Pressable backdrop'u yutuyor + pan responder Capture
@@ -31,6 +32,9 @@ type UserSearchModalProps = {
 
 export function UserSearchModal({ visible, onClose, currentUserId, onSelectUser, onSelectRoom, mode = 'compose' }: UserSearchModalProps) {
   const isDiscover = mode === 'discover';
+  // ★ 2026-04-30: Presence-based online — stale DB flag yerine canlı websocket durumu.
+  const { onlineFriends: liveFriends } = useOnlineFriends();
+  const liveOnlineIds = new Set(liveFriends.map(f => f.id));
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<Profile[]>([]);
   const [roomResults, setRoomResults] = useState<any[]>([]);
@@ -93,7 +97,7 @@ export function UserSearchModal({ visible, onClose, currentUserId, onSelectUser,
         .from('profiles')
         .select('*')
         .not('id', 'in', `(${followingIds.join(',')})`)
-        .order('is_online', { ascending: false })
+        .order('last_seen', { ascending: false, nullsFirst: false })
         .order('created_at', { ascending: false })
         .limit(40); // Block filter sonrası 20'ye düşürülecek
 
@@ -319,7 +323,7 @@ export function UserSearchModal({ visible, onClose, currentUserId, onSelectUser,
         onClose();
       }}
     >
-      <StatusAvatar uri={item.avatar_url} size={48} isOnline={item.is_online} tier={item.subscription_tier} />
+      <StatusAvatar uri={item.avatar_url} size={48} isOnline={liveOnlineIds.has(item.id)} tier={item.subscription_tier} />
       <View style={s.userInfo}>
         <Text style={s.displayName}>{item.display_name || 'Kullanıcı'}</Text>
         {item.username && <Text style={s.username}>@{item.username}</Text>}
@@ -468,7 +472,7 @@ export function UserSearchModal({ visible, onClose, currentUserId, onSelectUser,
                               style={({ pressed }) => [s.userRow, pressed && { opacity: 0.8, backgroundColor: 'rgba(92,225,230,0.06)' }]}
                               onPress={() => { onSelectUser(item.id, item.display_name || 'Kullanıcı'); onClose(); }}
                             >
-                              <StatusAvatar uri={item.avatar_url} size={48} isOnline={item.is_online} tier={item.subscription_tier} />
+                              <StatusAvatar uri={item.avatar_url} size={48} isOnline={liveOnlineIds.has(item.id)} tier={item.subscription_tier} />
                               <View style={s.userInfo}>
                                 <Text style={s.displayName}>{item.display_name || 'Kullanıcı'}</Text>
                                 {item.username && <Text style={s.username}>@{item.username}</Text>}
@@ -492,7 +496,7 @@ export function UserSearchModal({ visible, onClose, currentUserId, onSelectUser,
                               style={({ pressed }) => [s.userRow, pressed && { opacity: 0.8, backgroundColor: 'rgba(92,225,230,0.06)' }]}
                               onPress={() => { onSelectUser(item.id, item.display_name || 'Kullanıcı'); onClose(); }}
                             >
-                              <StatusAvatar uri={item.avatar_url} size={48} isOnline={item.is_online} tier={item.subscription_tier} />
+                              <StatusAvatar uri={item.avatar_url} size={48} isOnline={liveOnlineIds.has(item.id)} tier={item.subscription_tier} />
                               <View style={s.userInfo}>
                                 <Text style={s.displayName}>{item.display_name || 'Kullanıcı'}</Text>
                                 {item.username && <Text style={s.username}>@{item.username}</Text>}

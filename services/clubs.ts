@@ -41,7 +41,7 @@ export interface ClubMember {
   user_id: string;
   role: ClubRole;
   joined_at: string;
-  profile?: Pick<Profile, 'id' | 'display_name' | 'avatar_url' | 'username' | 'subscription_tier' | 'is_online'>;
+  profile?: Pick<Profile, 'id' | 'display_name' | 'avatar_url' | 'username' | 'subscription_tier' | 'is_online'> & { last_seen?: string };
 }
 
 export interface CreateClubInput {
@@ -206,7 +206,7 @@ export const ClubService = {
       .from('club_members')
       .select(`
         club_id, user_id, role, joined_at,
-        profile:profiles!user_id(id, display_name, avatar_url, username, subscription_tier, is_online)
+        profile:profiles!user_id(id, display_name, avatar_url, username, subscription_tier, is_online, last_seen)
       `)
       .eq('club_id', clubId)
       .order('joined_at', { ascending: false })

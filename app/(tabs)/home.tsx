@@ -100,10 +100,10 @@ const TIER_RING: Record<string, { ring: string; glow: string }> = {
 //   Alt gradient = kullanıcının subscription tier'ı. Outer glow + shine = boost tier
 //   (kalan süreye göre bronze/silver/gold). "BOOST" etiketi kaldırıldı çünkü bölüm başlığı
 //   "Popüler" zaten bunu iletiyor; sadece ELITE seviye için 💎 pill görünür.
-function BoostedProfileCard({ profile: bp, index, friendIds }: { profile: any; index: number; friendIds?: Set<string> }) {
+function BoostedProfileCard({ profile: bp, index, friendIds, onlineIds }: { profile: any; index: number; friendIds?: Set<string>; onlineIds?: Set<string> }) {
   const { openUserProfile } = useUserProfileSheet();
-  // ★ Gizlilik: Online durumu sadece arkadaşlara göster
-  const showOnline = bp.is_online && friendIds?.has(bp.id);
+  // ★ 2026-04-30: Presence-based online — stale DB flag yerine canlı websocket durumu.
+  const showOnline = onlineIds?.has(bp.id) && friendIds?.has(bp.id);
   const router = useRouter();
   const pulseAnim = useRef(new Animated.Value(0.4)).current;
   const shineAnim = useRef(new Animated.Value(-1)).current;
@@ -957,6 +957,8 @@ export default function HomeScreen() {
 
   // ★ DUP-3 FIX: Online friends artık merkezî provider'dan geliyor
   const { allFriends, onlineFriends, friendIds: friendIdSet } = useOnlineFriends();
+  // ★ 2026-04-30: Presence-based online set — stale DB flag yerine.
+  const onlineIdSet = new Set(onlineFriends.map(f => f.id));
 
   // ★ Realtime kanal bağımlılık fix: loadData'yı ref ile sar
   const loadDataRef = useRef<() => Promise<void>>();
@@ -1351,7 +1353,7 @@ export default function HomeScreen() {
               <View style={s.welcomeCard}>
                 <View style={s.welcomeRow}>
                   <Pressable onPress={() => router.push('/(tabs)/profile')}>
-                    <StatusAvatar uri={profile?.avatar_url} size={42} isOnline={profile?.is_online} tier={profile?.subscription_tier} isSelf showTierBadge={false} />
+                    <StatusAvatar uri={profile?.avatar_url} size={42} isOnline={true} tier={profile?.subscription_tier} isSelf showTierBadge={false} />
                   </Pressable>
                   <View style={{ flex: 1 }}>
                     <Text style={s.welcomeTitle}>
@@ -1418,7 +1420,7 @@ export default function HomeScreen() {
                     >
                       {/* Sparkle + Başlık */}
                       <Ionicons name="sparkles" size={12} color="#FBBF24" style={{ position: 'absolute', top: 5, left: 10, opacity: 0.6 }} />
-                      <StatusAvatar uri={bp.avatar_url} size={42} tier={bpTier} isAdmin={bp.is_admin} isOnline={friendIdSet?.has(bp.id) ? bp.is_online : undefined} />
+                      <StatusAvatar uri={bp.avatar_url} size={42} tier={bpTier} isAdmin={bp.is_admin} isOnline={friendIdSet?.has(bp.id) ? onlineIdSet.has(bp.id) : undefined} />
                       <View style={{ flex: 1, minWidth: 0 }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                           <Text numberOfLines={1} style={{ fontSize: 14, fontWeight: '800', color: '#F1F5F9', flexShrink: 1, textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }}>
@@ -1476,7 +1478,7 @@ export default function HomeScreen() {
                             start={{ x: 0, y: 0 }} end={{ x: 0.7, y: 1 }}
                             style={{ alignItems: 'center', paddingVertical: 12, paddingHorizontal: 8 }}
                           >
-                            <StatusAvatar uri={bp.avatar_url} size={52} tier={t} isAdmin={bp.is_admin} isOnline={friendIdSet?.has(bp.id) ? bp.is_online : undefined} />
+                            <StatusAvatar uri={bp.avatar_url} size={52} tier={t} isAdmin={bp.is_admin} isOnline={friendIdSet?.has(bp.id) ? onlineIdSet.has(bp.id) : undefined} />
                             <Text numberOfLines={1} style={{ fontSize: 12, fontWeight: '800', color: '#F1F5F9', marginTop: 6, maxWidth: '90%', textAlign: 'center', textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }}>
                               {bp.display_name || 'Kullanıcı'}
                             </Text>
@@ -1506,7 +1508,7 @@ export default function HomeScreen() {
                     decelerationRate="fast"
                   >
                     {boostedProfiles.map((bp, idx) => (
-                      <BoostedProfileCard key={bp.id} profile={bp} index={idx} friendIds={friendIdSet} />
+                      <BoostedProfileCard key={bp.id} profile={bp} index={idx} friendIds={friendIdSet} onlineIds={onlineIdSet} />
                     ))}
                   </ScrollView>
                 </View>

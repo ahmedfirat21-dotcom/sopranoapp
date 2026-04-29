@@ -67,7 +67,13 @@ export default function ClubDetailScreen() {
     // ★ DB'deki stale member_count yerine gerçek count kullan
     if (c) c.member_count = realMembers.length;
     // ★ Canlı nabız: online üye sayısı
-    setOnlineMembers(realMembers.filter(m => m.profile?.is_online).length);
+    // ★ 2026-04-30: last_seen tabanlı online — stale DB is_online yerine.
+    //   last_seen son 5dk içindeyse online kabul et.
+    const fiveMinAgo = Date.now() - 5 * 60 * 1000;
+    setOnlineMembers(realMembers.filter(m => {
+      const ls = m.profile?.last_seen;
+      return ls && new Date(ls).getTime() > fiveMinAgo;
+    }).length);
     setClub(c);
     setMembership(m);
     setClubRooms(rooms);
@@ -725,7 +731,7 @@ function MembersSheet({ visible, onClose, clubId, onMemberCount, actorUserId, ac
                       uri={m.profile?.avatar_url || ''}
                       size={38}
                       tier={m.profile?.subscription_tier as any}
-                      isOnline={m.profile?.is_online}
+                      isOnline={(() => { const ls = (m.profile as any)?.last_seen; return ls && new Date(ls).getTime() > Date.now() - 5 * 60 * 1000; })()}
                     />
                     <View style={{ flex: 1 }}>
                       <Text style={ms.name} numberOfLines={1}>{m.profile?.display_name || 'Kullanıcı'}</Text>
