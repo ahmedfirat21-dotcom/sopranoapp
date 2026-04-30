@@ -650,9 +650,10 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                       <><Ionicons name="person-add-outline" size={16} color="#fff" /><Text style={sty.followBtnText}>Arkadaş Ekle</Text></>
                     )}
                   </Pressable>
-                  {/* DM butonu — sadece arkadaşlara açık (strict policy: yalnız arkadaşlar mesajlaşır).
-                      modActions.onDM yoksa /chat/[userId]'e direkt navigate ediyor (global mount). */}
-                  {isFriend && !isUserBlocked && !isOwnProfile && userId && (
+                  {/* ★ v85h: DM butonu Instagram modeli — herkese görünür (arkadaş+yabancı).
+                      Arkadaş olmayanlar gönderince mesaj isteği akışı (message_requests) tetiklenir,
+                      alıcı onay/red verir. Bloklanan ve kendi profili hariç. */}
+                  {!isUserBlocked && !isOwnProfile && userId && (
                     <Pressable
                       style={sty.dmBtn}
                       onPress={() => {
@@ -679,7 +680,7 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                         start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                         style={StyleSheet.absoluteFillObject}
                       />
-                      <Ionicons name="diamond" size={16} color="#FFF" style={iconShadow} />
+                      <SPIcon size={16} />
                     </Pressable>
                   )}
                 </View>
@@ -893,7 +894,9 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                       <LinearGradient colors={['#2a1e14', '#17100a', '#0a0604']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFillObject} />
                       <LinearGradient colors={['rgba(251,191,36,0.35)', 'rgba(251,191,36,0.1)', 'rgba(251,191,36,0.02)']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFillObject} />
                       <LinearGradient colors={['transparent', 'rgba(251,191,36,0.6)', 'transparent']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={sty.sectionTopEdge} />
-                      <Ionicons name="diamond" size={100} color="rgba(251,191,36,0.05)" style={sty.walletWatermark} />
+                      <View style={[sty.walletWatermark, { opacity: 0.08 }]} pointerEvents="none">
+                        <SPIcon size={100} />
+                      </View>
                       <View style={sty.walletRow}>
                         <Text style={sty.walletAmount}>{((userProfile as any)?.system_points ?? 0).toLocaleString('tr-TR')}</Text>
                         <Text style={sty.walletCurrency}>SP</Text>

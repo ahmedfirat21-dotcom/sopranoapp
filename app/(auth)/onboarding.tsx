@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, Image, Pressable, ScrollView, Dimensions, ActivityIndicator, TextInput, KeyboardAvoidingView, Platform, Keyboard, ImageBackground, Animated, Easing } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -22,6 +23,7 @@ const TOTAL_STEPS = 4;
 
 export default function OnboardingScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { firebaseUser, setProfile, setUser, refreshProfile, setJustCompletedOnboarding } = useAuth();
   
   // ═══ Step 1: Avatar+İsim  |  Step 2: Cinsiyet+Yaş  |  Step 3: İlgi Alanları  |  Step 4: Davet Kodu ═══
@@ -565,7 +567,7 @@ export default function OnboardingScreen() {
         </ScrollView>
 
         {/* ═══ Footer CTA ═══ */}
-        <View style={s.footer}>
+        <View style={[s.footer, { paddingBottom: Math.max(insets.bottom, Platform.OS === 'ios' ? 36 : 20) + 12 }]}>
           {step === 4 ? (
             <View style={s.footerRow}>
               <Pressable

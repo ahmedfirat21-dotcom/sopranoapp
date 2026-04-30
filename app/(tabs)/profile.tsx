@@ -5,7 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Colors, Shadows } from '../../constants/theme';
-import { getLevelFromSP, getLevelColors, getAvatarSource } from '../../constants/avatars';
+import { getLevelFromSP, getAvatarSource } from '../../constants/avatars';
 import { useAuth, useTheme, useUserProfileSheet } from '../_layout';
 import { supabase } from '../../constants/supabase';
 import { ReferralService } from '../../services/referral';
@@ -497,7 +497,6 @@ export default function ProfileScreen() {
 
   const spBalance = profile?.system_points ?? 0;
   const userLevel = getLevelFromSP(spBalance, subscriptionTier);
-  const levelColors = getLevelColors(userLevel);
 
   return (
     <AppBackground variant="profile" radialGlow>
@@ -576,21 +575,27 @@ export default function ProfileScreen() {
               start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
               style={StyleSheet.absoluteFillObject}
             />
+
+            {/* ★ 2026-04-30: Arka plan watermark — büyük SP jetonu silueti, sağ kenar */}
+            <View style={p.walletWatermark} pointerEvents="none">
+              <SPHexagonIcon size={140} />
+            </View>
+
             <View style={p.walletHeader}>
               <Text style={p.walletTitle}>SP CÜZDANIM</Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                 <Pressable onPress={openSPHistory} style={p.historyBtn} hitSlop={10} accessibilityLabel="SP geçmişi">
-                  <MaterialCommunityIcons name="history" size={13} color="#FBBF24" style={iconShadow} />
+                  <Ionicons name="time-outline" size={18} color="#FAC775" />
                 </Pressable>
-                <LinearGradient colors={[levelColors.text, levelColors.text + 'CC']} style={p.levelBadge}>
+                <View style={p.levelBadge}>
                   <Text style={p.levelText}>Lv.{userLevel}</Text>
-                </LinearGradient>
+                </View>
               </View>
             </View>
 
-            {/* ★ 2026-04-29: SP ana ikonu — DiscoverWelcome'taki hexagon mücevher animasyonu (büyütüldü 56→80) */}
+            {/* ★ 2026-04-30: SP ana ikonu — sabit, animasyon yok, sade View */}
             <View style={p.walletBody}>
-              <SPHexagonIcon size={80} />
+              <SPHexagonIcon size={96} />
               <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
                 <Text style={p.walletAmount}>{isGM ? '∞' : spBalance.toLocaleString('tr-TR')}</Text>
                 <Text style={p.walletCurrency}>SP</Text>
@@ -990,10 +995,10 @@ const p = StyleSheet.create({
   },
   // ★ Premium altın gradient + amber hairline + derin shadow
   walletCard: {
-    marginHorizontal: 16, marginBottom: 10,
+    marginHorizontal: 16, marginBottom: 6,
     borderRadius: 14, overflow: 'hidden',
     borderWidth: 1, borderColor: 'rgba(251,191,36,0.25)',
-    padding: 12,
+    paddingHorizontal: 12, paddingVertical: 6,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
@@ -1003,45 +1008,51 @@ const p = StyleSheet.create({
   walletTopEdge: {
     position: 'absolute', top: 0, left: 0, right: 0, height: 1.5,
   },
+  // ★ 2026-04-30: SP jetonu watermark — sağ kenarda hafif eğimli, soluk
   walletWatermark: {
     position: 'absolute',
-    right: -18, top: -14,
-    transform: [{ rotate: '15deg' }],
+    right: -28, top: '50%', marginTop: -70,
+    width: 140, height: 140,
+    opacity: 0.10,
+    transform: [{ rotate: '10deg' }],
   },
   walletHeader: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    marginBottom: 6,
+    marginBottom: 4,
   },
   walletTitle: {
     fontSize: 10, fontWeight: '900', color: '#FBBF24',
     letterSpacing: 1.5, ..._textGlow,
   },
   historyBtn: {
-    width: 28, height: 28, borderRadius: 9,
-    backgroundColor: 'rgba(251,191,36,0.12)',
-    borderWidth: 1, borderColor: 'rgba(251,191,36,0.3)',
+    width: 32, height: 32, borderRadius: 8,
+    backgroundColor: 'rgba(0,0,0,0.25)',
+    borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(250,199,117,0.2)',
     alignItems: 'center', justifyContent: 'center',
   },
   levelBadge: {
     paddingHorizontal: 11, paddingVertical: 5, borderRadius: 10,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,224,130,0.3)',
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.4, shadowRadius: 4, elevation: 3,
   },
-  levelText: { fontSize: 11, fontWeight: '900', color: '#fff', letterSpacing: 0.3, ..._textGlow },
-  // ★ 2026-04-29: Sol tarafta SPHexagonIcon (mücevher) + sağ tarafta rakam
+  levelText: { fontSize: 11, fontWeight: '900', color: '#FFE082', letterSpacing: 0.3, ..._textGlow },
+  // ★ 2026-04-30: Sol tarafta SPHexagonIcon (mücevher) + sağ tarafta rakam — kompakt
   walletBody: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    marginTop: 2, marginBottom: 4,
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    marginTop: 0, marginBottom: 2,
   },
   walletAmount: {
-    fontSize: 28, fontWeight: '900', color: '#FFD700',
+    fontSize: 24, fontWeight: '900', color: '#FFE082',
     letterSpacing: -0.5,
     textShadowColor: 'rgba(0,0,0,0.7)',
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 6,
   },
   walletCurrency: {
-    fontSize: 13, fontWeight: '800', color: 'rgba(251,191,36,0.7)',
+    fontSize: 13, fontWeight: '800', color: 'rgba(255,224,130,0.7)',
     letterSpacing: 0.3,
     textShadowColor: 'rgba(0,0,0,0.6)',
     textShadowOffset: { width: 0, height: 1 },
@@ -1069,9 +1080,9 @@ const p = StyleSheet.create({
     textShadowColor: 'rgba(0,0,0,0.45)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
   // ★ Level progress bar — kompakt
-  levelProgressWrap: { marginTop: 8 },
+  levelProgressWrap: { marginTop: 4 },
   levelProgressTrack: {
-    height: 4, borderRadius: 2,
+    height: 3, borderRadius: 2,
     backgroundColor: 'rgba(255,255,255,0.08)',
     overflow: 'hidden',
     borderWidth: 0.5, borderColor: 'rgba(251,191,36,0.2)',
@@ -1083,10 +1094,9 @@ const p = StyleSheet.create({
   },
   levelProgressHint: {
     fontSize: 9, fontWeight: '600', color: 'rgba(251,191,36,0.55)',
-    marginTop: 5, letterSpacing: 0.3,
+    marginTop: 3, letterSpacing: 0.3,
     ..._textGlow,
   },
-
 });
 
 const styles = StyleSheet.create({

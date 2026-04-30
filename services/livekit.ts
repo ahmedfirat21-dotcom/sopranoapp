@@ -62,22 +62,64 @@ function getLK(): any {
 async function fetchToken(roomId: string, userId: string, displayName: string): Promise<string> {
   // ★ Audit fix: 10s timeout — kötü ağda hung request UI'ı dondurmuyor
   const { fetchWithTimeout } = await import('../utils/fetchTimeout');
-  const response = await fetchWithTimeout(LIVEKIT_TOKEN_ENDPOINT, {
-    method: 'POST',
-    headers: {
+  
+  let response: Response;
+  try {
+    // ★ 2026-04-30 FIX: Firebase JWT'yi custom header'a taşı — Supabase API Gateway
+    //   asymmetric JWT (RS256) kabul ETMİYOR ve 401 UNAUTHORIZED_ASYMMETRIC_JWT dönüyor.
+    //   Authorization header'ında HER ZAMAN Supabase Anon Key gönder (Gateway'den geçsin),
+    //   Firebase JWT'yi X-Firebase-Auth header'ında gönder (Edge Function RLS context için kullanır).
+    let firebaseJwt: string | null = null;
+    try {
+      const { auth: firebaseAuth } = require('../constants/firebase');
+      const fbUser = firebaseAuth.currentUser;
+      if (fbUser) firebaseJwt = await fbUser.getIdToken(false);
+    } catch { /* Firebase unavailable — anon key ile devam */ }
+
+    const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
       'apikey': SUPABASE_ANON_KEY,
-    },
-    body: JSON.stringify({ roomId, displayName, userId }),
-  }, 10_000);
+    };
+    // Firebase JWT varsa custom header'da gönder — Edge Function bunu okuyup RLS context oluşturur
+    if (firebaseJwt) {
+      headers['X-Firebase-Auth'] = firebaseJwt;
+    }
+
+    response = await fetchWithTimeout(LIVEKIT_TOKEN_ENDPOINT, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ roomId, displayName, userId }),
+    }, 10_000);
+  } catch (networkErr: any) {
+    // ★ Network hatası (DNS, timeout, offline) — detaylı log
+    if (__DEV__) logger.warn('[LiveKit] Token fetch network error:', networkErr?.message);
+    throw new Error(`Ağ hatası: ${networkErr?.message || 'Sunucuya ulaşılamadı'}`);
+  }
 
   if (!response.ok) {
-    const err = await response.json().catch(() => ({ error: 'Token request failed' }));
-    throw new Error(err.error || 'Token alinamadi');
+    let errBody: any = {};
+    try { errBody = await response.json(); } catch { /* non-JSON response */ }
+    const errMsg = errBody?.error || `HTTP ${response.status}`;
+    
+    if (__DEV__) {
+      logger.warn(`[LiveKit] Token fetch FAILED — status=${response.status}, error="${errMsg}", roomId=${roomId}, userId=${userId}`);
+    }
+    
+    // ★ 2026-04-30: Detaylı hata mesajları — UI'da anlamlı feedback
+    if (response.status === 403) {
+      throw new Error(errMsg); // "Oda aktif değil", "Bu odadan yasaklandınız" vb.
+    } else if (response.status === 404) {
+      throw new Error('Oda bulunamadı');
+    } else if (response.status === 401) {
+      throw new Error('Oturum süresi dolmuş — tekrar giriş yap');
+    } else {
+      throw new Error(errMsg);
+    }
   }
 
   const data = await response.json();
+  if (__DEV__) logger.log(`[LiveKit] Token alındı — roomId=${roomId}, role=${data.role || 'unknown'}`);
   return data.token;
 }
 
@@ -1057,13 +1099,51 @@ export class LiveKitService {
       return undefined;
     };
 
+    // ★ 2026-04-30 v85f: Remote mute detection FIX.
+    //   LiveKit JS SDK'sında `isMicrophoneEnabled` SADECE localParticipant'ta var;
+    //   remote participant'ta `undefined` → `!undefined === true` → tüm remote'lar
+    //   her zaman "muted" görünüyordu (mute ikonu var ama ses geliyor — kullanıcı raporu).
+    //   Doğrusu: remote'larda audio track publication'ın `isMuted` veya track yokluğuna bak.
+    const getMuteState = (participant: any, isLocal: boolean): boolean => {
+      if (isLocal) {
+        return !participant.isMicrophoneEnabled;
+      }
+      try {
+        // Microphone source publication'ı bul
+        const micPub = participant.getTrackPublication?.(lk.Track.Source.Microphone);
+        if (micPub) {
+          // Publication seviyesinde mute (server-side mute)
+          if (micPub.isMuted === true) return true;
+          // Track seviyesinde mute (track yayınlanıyor ama susturulmuş)
+          if (micPub.track?.isMuted === true) return true;
+          // Track abone değilse de muted say (henüz subscribe olmadı veya kapalı)
+          if (!micPub.track && !micPub.isSubscribed) return true;
+          return false;
+        }
+        // Fallback: audioTrackPublications map'ini tara
+        if (participant.audioTrackPublications) {
+          const pubs = Array.from(participant.audioTrackPublications.values()) as any[];
+          if (pubs.length === 0) return true; // hiç audio track yok
+          for (const pub of pubs) {
+            if (pub?.source !== lk.Track.Source.Microphone) continue;
+            if (pub.isMuted === true) return true;
+            if (pub.track?.isMuted === true) return true;
+            return false;
+          }
+          return true; // microphone source'lu pub bulunamadı
+        }
+      } catch { /* silent */ }
+      // En son fallback — undefined ise muted KABUL ETME (false döndür) ki yanlış kırmızı icon olmasın.
+      return false;
+    };
+
     // Local
     if (this.room.localParticipant) {
       const screenTrack = extractScreenShareTrack(this.room.localParticipant) || this.screenShareTrack;
       participants.push({
         identity: this.room.localParticipant.identity,
         isSpeaking: this.room.localParticipant.isSpeaking,
-        isMuted: !this.room.localParticipant.isMicrophoneEnabled,
+        isMuted: getMuteState(this.room.localParticipant, true),
         audioLevel: this.room.localParticipant.audioLevel,
         isCameraEnabled: this.room.localParticipant.isCameraEnabled,
         videoTrack: extractVideoTrack(this.room.localParticipant),
@@ -1078,7 +1158,7 @@ export class LiveKitService {
       participants.push({
         identity: p.identity,
         isSpeaking: p.isSpeaking,
-        isMuted: !p.isMicrophoneEnabled,
+        isMuted: getMuteState(p, false),
         audioLevel: p.audioLevel,
         isCameraEnabled: p.isCameraEnabled,
         videoTrack: extractVideoTrack(p),

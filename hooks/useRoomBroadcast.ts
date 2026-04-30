@@ -157,8 +157,14 @@ export function useRoomBroadcast(params: UseRoomBroadcastParams) {
       }
       globalEmojiRecvRef.current = now;
       floatingRef.current?.spawn(emoji);
-    }).subscribe();
+    });
+    // ★ Ref'i synchronous ata — subscribe tamamlanmadan send yapılırsa
+    //   Supabase SDK internal queue'lar, SUBSCRIBED olunca gönderir.
+    //   SUBSCRIBED-only atama erken send'leri sessizce düşürüyordu.
     emojiBroadcastRef.current = ch;
+    ch.subscribe((status: string) => {
+      if (__DEV__) console.log(`[Broadcast] emoji:${roomId} → ${status}`);
+    });
     return () => {
       supabase.removeChannel(ch);
       perSenderRecvRef.current.clear();
@@ -212,8 +218,11 @@ export function useRoomBroadcast(params: UseRoomBroadcastParams) {
           penaltyRef.current?.show({ type: 'demote', reason: 'Mikrofon isteğiniz reddedildi.' });
         }
       }
-    }).subscribe();
+    });
     micReqChannelRef.current = ch;
+    ch.subscribe((status: string) => {
+      if (__DEV__) console.log(`[Broadcast] mic_req:${roomId} → ${status}`);
+    });
     return () => { supabase.removeChannel(ch); };
   }, [roomId, firebaseUser?.uid]); // ★ Audit fix: uid dep — obj ref yerine
 
@@ -586,8 +595,10 @@ export function useRoomBroadcast(params: UseRoomBroadcastParams) {
       });
     });
 
-    ch.subscribe();
     modChannelRef.current = ch;
+    ch.subscribe((status: string) => {
+      if (__DEV__) console.log(`[Broadcast] mod_action:${roomId} → ${status}`);
+    });
     return () => { supabase.removeChannel(ch); };
   }, [roomId, firebaseUser?.uid]); // ★ Audit fix: uid dep — obj ref yerine
 

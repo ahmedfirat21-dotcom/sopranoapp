@@ -17,7 +17,7 @@ import { AccessToken } from "npm:livekit-server-sdk@2.6.1";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+    "authorization, x-client-info, apikey, content-type, x-firebase-auth",
 };
 
 // Publish yetkisi olan roller
@@ -68,10 +68,17 @@ serve(async (req: Request) => {
       );
     }
 
-    // ★ Supabase client — kullanıcının Firebase JWT'si ile RLS context'inde çalışır.
-    // auth.uid() RLS politikalarında doğru değeri döndürür.
+    // ★ 2026-04-30 FIX: Firebase JWT artık X-Firebase-Auth header'ında geliyor.
+    //   Supabase API Gateway asymmetric JWT'yi reddediyor (401), bu yüzden
+    //   Authorization header'ında her zaman Anon Key gönderiliyor.
+    //   Edge Function Firebase JWT'yi custom header'dan okuyup Supabase client'a aktarır.
+    const firebaseAuthHeader = req.headers.get("x-firebase-auth");
+    const effectiveAuth = firebaseAuthHeader
+      ? `Bearer ${firebaseAuthHeader}`
+      : (authHeader || `Bearer ${SUPABASE_ANON_KEY}`);
+
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      global: { headers: { Authorization: authHeader || `Bearer ${SUPABASE_ANON_KEY}` } },
+      global: { headers: { Authorization: effectiveAuth } },
       auth: { persistSession: false, autoRefreshToken: false },
     });
 

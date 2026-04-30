@@ -25,6 +25,7 @@ import { supabase } from '../../constants/supabase';
 import { isTierAtLeast } from '../../constants/tiers';
 import PremiumAlert, { type AlertButton } from '../../components/PremiumAlert';
 import AppBackground from '../../components/AppBackground';
+import SPIcon from '../../components/SPIcon';
 import ProfileHero from '../../components/profile/ProfileHero';
 import BadgeListModal from '../../components/profile/BadgeListModal';
 import SPDonateSheet from '../../components/profile/SPDonateSheet';
@@ -851,7 +852,7 @@ export default function UserProfileScreen() {
             onPress={() => setShowSPSheet(true)}
           >
             <LinearGradient colors={['#FFE082', '#FBBF24', '#D97706']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.donateGradient}>
-              <Ionicons name="diamond" size={16} color="#FFF" style={iconShadowInline} />
+              <SPIcon size={16} />
               <Text style={s.donateText}>SP Gönder</Text>
             </LinearGradient>
           </Pressable>

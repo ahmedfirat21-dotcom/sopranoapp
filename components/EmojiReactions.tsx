@@ -199,10 +199,16 @@ export function EmojiReactionBar({ onReaction, onClose }: { onReaction: (emoji: 
           {loadingGifs ? (
             <ActivityIndicator color="#5CE1E6" style={{ marginTop: 20 }} />
           ) : (
-            <ScrollView style={{ height: 180 }} contentContainerStyle={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, padding: 4 }} showsVerticalScrollIndicator={false}>
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, padding: 4 }} showsVerticalScrollIndicator={false}>
               {displayGifs.map((item: any, idx: number) => {
-                // ★ Y18: Proxy trimmed payload (item.url) — legacy tenor raw fallback da destekleniyor.
-                const gifUrl = item.url || item.media_formats?.tinygif?.url || item.media?.[0]?.tinygif?.url;
+                // ★ v86 FIX: Tenor API v2 — `item.url` SHARE link (HTML page redirect), Image yüklemiyor.
+                //   Gerçek media URL `media_formats.tinygif/gif.url`'de. Proxy zaten doğru format döndürüyor;
+                //   legacy fallback için media_formats öncelikli, item.url sadece son çare.
+                const gifUrl = item.media_formats?.tinygif?.url
+                  || item.media_formats?.gif?.url
+                  || item.media?.[0]?.tinygif?.url
+                  || item.media?.[0]?.gif?.url
+                  || item.url;
                 if (!gifUrl) return null;
                 return (
                   <TouchableOpacity key={item.id || idx} activeOpacity={0.7} onPress={() => onReaction(`[gif:${gifUrl}]`)} style={sty.gifItem}>

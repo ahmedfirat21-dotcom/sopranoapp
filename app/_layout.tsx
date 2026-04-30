@@ -33,6 +33,10 @@ import { Stack, useRouter, useSegments } from 'expo-router';
 // Samsung dahil tüm Android cihazlarda klavye sorununu çözer.
 // Bu import ve <KeyboardProvider> wrapper'ı ASLA kaldırma!
 import { KeyboardProvider } from 'react-native-keyboard-controller';
+// ★ 2026-04-30: SafeAreaProvider eksikliği nedeniyle useSafeAreaInsets() tüm
+//   ekranlarda 0 dönüyordu → Samsung 3-button nav bar'da bottom CTA'lar eziliyordu.
+//   Bu wrapper TÜM uygulamayı sarmalı; aksi halde 53+ ekran broken.
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import * as Linking from 'expo-linking';
@@ -70,6 +74,8 @@ import PremiumLoader from '../components/PremiumLoader';
 
 import { OnlineFriendsProvider } from '../providers/OnlineFriendsProvider';
 export { useOnlineFriends } from '../providers/OnlineFriendsProvider';
+import { DMNotifProvider } from '../providers/DMNotifProvider';
+export { useDMNotif, useDMNotifOptional } from '../providers/DMNotifProvider';
 import { useFonts, Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
 import { RoomService } from '../services/database';
 import { liveKitService } from '../services/livekit';
@@ -1446,7 +1452,9 @@ export default function RootLayout() {
       <ThemeContext.Provider value={themeContextValue}>
       <RealtimeBadgeProvider userId={firebaseUser?.uid || null}>
       <OnlineFriendsProvider userId={firebaseUser?.uid || null}>
+      <DMNotifProvider userId={firebaseUser?.uid || null}>
       <KeyboardProvider>
+      <SafeAreaProvider>
       <View style={styles.container}>
         {/* Status bar her zaman light (koyu tema) */}
         <StatusBar style="light" />
@@ -1690,7 +1698,9 @@ export default function RootLayout() {
 
         {/* ★ Intro Video kaldırıldı */}
       </View>
+    </SafeAreaProvider>
     </KeyboardProvider>
+    </DMNotifProvider>
     </OnlineFriendsProvider>
     </RealtimeBadgeProvider>
     </ThemeContext.Provider>

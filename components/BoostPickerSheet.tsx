@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import SPIcon from './SPIcon';
 import { Colors, Shadows } from '../constants/theme';
 
 const { height: SCREEN_H } = Dimensions.get('window');
@@ -186,7 +187,7 @@ export default function BoostPickerSheet({ visible, onClose, onBoost, currentSP 
             <Text style={s.summaryDesc}>{selected.duration} saatlik görünürlük</Text>
           </View>
           <View style={s.balancePill}>
-            <Ionicons name="diamond-outline" size={12} color={canAfford ? '#14B8A6' : '#EF4444'} />
+            <SPIcon size={12} />
             <Text style={[s.balanceText, !canAfford && { color: '#EF4444' }]}>{currentSP.toLocaleString()}</Text>
           </View>
         </View>

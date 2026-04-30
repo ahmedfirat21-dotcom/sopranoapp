@@ -283,32 +283,53 @@ export const MessageService = {
     return msg as Message;
   },
 
-  /** ★ 2026-04-22: Receiver mesaj isteğini kabul eder → normal chat açılır. */
+  /** ★ 2026-04-22: Receiver mesaj isteğini kabul eder → normal chat açılır.
+   *  ★ v86: Atomic RPC + sender'a broadcast bildirim (realtime.send). */
   async acceptMessageRequest(receiverId: string, senderId: string): Promise<void> {
-    const { error } = await supabase
-      .from('message_requests')
-      .update({ status: 'accepted', responded_at: new Date().toISOString() })
-      .eq('sender_id', senderId)
-      .eq('receiver_id', receiverId)
-      .eq('status', 'pending');
-    if (error) throw error;
+    const { error } = await supabase.rpc('accept_message_request_atomic', {
+      p_sender_id: senderId,
+      p_receiver_id: receiverId,
+    });
+    if (!error) return;
+    // Fallback (eski sürüm DB'lerde RPC yoksa)
+    if (/function .* does not exist|42883/i.test(error.message || '')) {
+      const { error: legacyErr } = await supabase
+        .from('message_requests')
+        .update({ status: 'accepted', responded_at: new Date().toISOString() })
+        .eq('sender_id', senderId)
+        .eq('receiver_id', receiverId)
+        .eq('status', 'pending');
+      if (legacyErr) throw legacyErr;
+      return;
+    }
+    throw error;
   },
 
-  /** ★ 2026-04-22: Receiver mesaj isteğini reddeder → mesajlar gizlenir, sender engellenemez ama yazı atamaz. */
+  /** ★ 2026-04-22: Receiver mesaj isteğini reddeder → mesajlar gizlenir.
+   *  ★ v86: Atomic RPC + sender'a broadcast bildirim. */
   async rejectMessageRequest(receiverId: string, senderId: string): Promise<void> {
-    const { error } = await supabase
-      .from('message_requests')
-      .update({ status: 'rejected', responded_at: new Date().toISOString() })
-      .eq('sender_id', senderId)
-      .eq('receiver_id', receiverId)
-      .eq('status', 'pending');
-    if (error) throw error;
-    // İsteğe bağlı: mevcut request mesajlarını is_deleted=true yaparak gizle
-    await supabase
-      .from('messages')
-      .update({ is_deleted: true })
-      .eq('sender_id', senderId)
-      .eq('receiver_id', receiverId);
+    const { error } = await supabase.rpc('reject_message_request_atomic', {
+      p_sender_id: senderId,
+      p_receiver_id: receiverId,
+    });
+    if (!error) return;
+    // Fallback eski sürüm DB için
+    if (/function .* does not exist|42883/i.test(error.message || '')) {
+      const { error: legacyErr } = await supabase
+        .from('message_requests')
+        .update({ status: 'rejected', responded_at: new Date().toISOString() })
+        .eq('sender_id', senderId)
+        .eq('receiver_id', receiverId)
+        .eq('status', 'pending');
+      if (legacyErr) throw legacyErr;
+      await supabase
+        .from('messages')
+        .update({ is_deleted: true })
+        .eq('sender_id', senderId)
+        .eq('receiver_id', receiverId);
+      return;
+    }
+    throw error;
   },
 
   /** İki kullanıcı arasındaki message_request durumunu çekip döner (null = yok). */
@@ -550,15 +571,18 @@ export const MessageService = {
     }
   },
 
-  /** Yazıyor... (Typing Indicator) - Dinleyici */
+  /** Yazıyor... (Typing Indicator) - Dinleyici
+   *  ★ v86: Sender ve receiver tarafları aynı broadcast config kullansın diye self:false eklendi. */
   onTypingStatus(currentUserId: string, callback: (payload: { user_id: string, is_typing: boolean, conversation_partner_id: string }) => void) {
     const channelName = `typing_${currentUserId}`;
     const channel = supabase
-      .channel(channelName)
+      .channel(channelName, { config: { broadcast: { self: false } } })
       .on('broadcast', { event: 'typing' }, (payload) => {
         callback(payload.payload as any);
       })
-      .subscribe();
+      .subscribe((status: string) => {
+        if (__DEV__) console.log(`[Typing] ${channelName} → ${status}`);
+      });
     return channel;
   }
 };

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { View, Text, StyleSheet, Image, Pressable, TextInput, FlatList, Platform, ActivityIndicator, Animated, Easing, NativeScrollEvent, NativeSyntheticEvent, Modal, Keyboard, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Image, Pressable, TextInput, FlatList, Platform, ActivityIndicator, Animated, Easing, NativeScrollEvent, NativeSyntheticEvent, Modal, Keyboard, Dimensions, Alert } from 'react-native';
 // ╔══════════════════════════════════════════════════════════════════╗
 // ║  ⛔ KRİTİK — DOKUNMA! ASLA DEĞİŞTİRME!                       ║
 // ║  Bu import react-native-keyboard-controller'dan gelir.         ║
@@ -24,6 +24,7 @@ import { ReportModal } from '../../components/ReportModal';
 import { showToast } from '../../components/Toast';
 import { useAuth, useBadges, useUserProfileSheet } from '../_layout';
 import { useOnlineFriends } from '../../providers/OnlineFriendsProvider';
+import { useDMNotif } from '../../providers/DMNotifProvider';
 import StatusAvatar from '../../components/StatusAvatar';
 import { StorageService } from '../../services/storage';
 import * as ImagePicker from 'expo-image-picker';
@@ -427,6 +428,8 @@ export default function ChatScreen() {
   // ★ 2026-04-30 FIX: Presence-based online status — stale DB flag yerine canlı websocket durumu.
   const { onlineFriends } = useOnlineFriends();
   const onlinePresenceIds = useMemo(() => new Set(onlineFriends.map(f => f.id)), [onlineFriends]);
+  // ★ v86: DM broadcast — yeni mesaj/kabul/red anlık (postgres_changes anon'da çalışmıyor)
+  const dmNotif = useDMNotif();
   const insets = useSafeAreaInsets();
   // ★ 2026-04-24 v2: Chat mount+loaded slide-down — loading bitince içerik üstten akarak iner.
   const contentTranslateY = useRef(new Animated.Value(-80)).current;
@@ -877,16 +880,45 @@ export default function ChatScreen() {
       )
       .subscribe();
 
+    // ★ v86: DMNotifProvider broadcast subscribe — anon Realtime postgres_changes
+    //   DM tablolarını alamıyor, broadcast bunu kapatıyor.
+    const unsubDmSignal = dmNotif.onSignal((signal) => {
+      if (signal.event === 'dm_new' && signal.sender_id === id) {
+        // Karşı taraftan yeni mesaj geldi — listeyi tazele + okundu işaretle
+        MessageService.getConversation(firebaseUser.uid, id, 50)
+          .then(history => setMessages(history))
+          .catch(() => {});
+        MessageService.markAsRead(firebaseUser.uid, id).catch(() => {});
+        // Chat ekranı açık → unread sıfırla
+        dmNotif.markRead(id);
+      } else if (signal.event === 'dm_accepted') {
+        // Karşı taraf isteği kabul etti → input açılır
+        if (signal.sender_id === firebaseUser.uid && signal.receiver_id === id) {
+          setMsgRequestInfo({ status: 'accepted' });
+        } else if (signal.receiver_id === firebaseUser.uid && signal.sender_id === id) {
+          setMsgRequestInfo({ status: 'accepted' });
+        }
+      } else if (signal.event === 'dm_rejected') {
+        if (signal.sender_id === firebaseUser.uid && signal.receiver_id === id) {
+          setMsgRequestInfo({ status: 'rejected' });
+        }
+      }
+    });
+
+    // Chat ekranı açıldığında bu user için unread sıfırla
+    dmNotif.markRead(id);
+
     return () => {
       channel.unsubscribe();
       typingChannel.unsubscribe();
       supabase.removeChannel(readChannel); // ★ BUG-8 FIX: removeChannel ile tam temizlik
       supabase.removeChannel(msgReqChannel); // ★ message_requests realtime cleanup
+      unsubDmSignal();
       if (typingResetTimer) clearTimeout(typingResetTimer);
       // ★ BUG-2 FIX: Typing kanalını temizle
       MessageService.cleanupTypingChannel(id);
     };
-  }, [id, firebaseUser]);
+  }, [id, firebaseUser, dmNotif]);
 
   const handleInputChange = (text: string) => {
     setInputText(text);
@@ -972,8 +1004,15 @@ export default function ChatScreen() {
       // Hata durumunda mesajı listeden çıkar ve geri metin kutusuna koy
       setMessages(prev => prev.filter(m => m.id !== tempId));
       setInputText(content);
-      const msg = err?.message || 'Mesaj gönderilemedi';
-      showToast({ title: 'Gönderilemedi', message: msg, type: 'warning' });
+      const msg = err?.message || err?.error_description || err?.toString() || 'Mesaj gönderilemedi';
+      // ★ v85i: Toast yetersiz kaldığı durumlarda kullanıcı kaçırıyor;
+      //   Alert kullanıcı dismiss etmeden ekrandan çıkmaz → debug + UX hatası net.
+      Alert.alert(
+        'Mesaj Gönderilemedi',
+        msg.slice(0, 500),
+        [{ text: 'Tamam', style: 'default' }],
+        { cancelable: true },
+      );
     } finally {
       setSending(false);
     }

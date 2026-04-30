@@ -66,7 +66,7 @@ const showToast = (opts: Partial<ToastMessage> & { title: string }) => {
   // Diğer başarı toastları (ayar güncelleme) sessizce ignore — spam önleme
 };
 
-import { useAuth, useBadges } from '../_layout';
+import { useAuth, useBadges, useDMNotifOptional } from '../_layout';
 import useLiveKit from '../../hooks/useLiveKit';
 import { useMicMeter } from '../../hooks/useMicMeter';
 
@@ -442,30 +442,56 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
   const [msgReq, setMsgReq] = useState<{ status: 'none' | 'pending_incoming' | 'pending_outgoing' | 'accepted' | 'rejected' }>({ status: 'none' });
   const [reqResponding, setReqResponding] = useState(false);
 
-  // ★ 2026-04-23 FIX: Animated keyboard-aware bottom — RoomChatDrawer patterniyle aynı.
-  //   Boolean yerine Animated.Value ile klavye yüksekliği takip edilir, panel
-  //   tam olarak klavyenin üstüne konumlanır. Her platform için doğru event kullanılır.
-  const dmPanelBottomAnim = useRef(new Animated.Value(120)).current;
+  // ★ 2026-04-30 FIX: Klavye açıldığında panel boyutunu screen-based hesapla.
+  //   Android adjustResize parent view'ı küçültür → eski top+bottom yaklaşımı
+  //   çift küçülmeye yol açıyordu. Şimdi: screen height'tan bottom+height hesaplanır,
+  //   adjustResize etkisi bypass edilir. Input bar her zaman klavyenin tam üstünde.
+  //   Referans: chat/[id].tsx KeyboardAvoidingView pattern'ı.
+  const screenH = Dimensions.get('screen').height;
+  const REST_BOTTOM = 120; // control bar + safe area
+  const REST_TOP = 120;    // status bar + header alanı
+  const restHeight = screenH - REST_BOTTOM - REST_TOP;
+  const dmPanelBottomAnim = useRef(new Animated.Value(REST_BOTTOM)).current;
+  const dmPanelHeightAnim = useRef(new Animated.Value(restHeight)).current;
   useEffect(() => {
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
     const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
     const showSub = Keyboard.addListener(showEvent, (e) => {
-      const screenH = Dimensions.get('screen').height;
-      const kbHeight = Math.max(0, screenH - e.endCoordinates.screenY);
-      // ★ Varsayılan 120'den küçük olmamalı — emülatörde veya fiziksel klavyede
-      //   kbHeight≈0 olabilir, panel aşağı kaymasın.
-      Animated.timing(dmPanelBottomAnim, {
-        toValue: Math.max(kbHeight, 120),
-        duration: Platform.OS === 'ios' ? 250 : 150,
-        useNativeDriver: false,
-      }).start();
+      const fullScreenH = Dimensions.get('screen').height;
+      // ★ v86 FIX: Samsung uyumlu — height direkt al (screenY status/nav bar dahiliyetinde tutarsız).
+      const kbHeight = e.endCoordinates.height || (fullScreenH - e.endCoordinates.screenY);
+      // Panel bottom = klavye yüksekliği, height = klavye üstü - status bar arası
+      const newBottom = Math.max(kbHeight, REST_BOTTOM);
+      const statusBarH = 44; // yaklaşık status bar + header
+      const newHeight = fullScreenH - newBottom - statusBarH;
+      Animated.parallel([
+        Animated.timing(dmPanelBottomAnim, {
+          toValue: newBottom,
+          duration: Platform.OS === 'ios' ? 250 : 150,
+          useNativeDriver: false,
+        }),
+        Animated.timing(dmPanelHeightAnim, {
+          toValue: Math.max(newHeight, 200), // minimum 200px
+          duration: Platform.OS === 'ios' ? 250 : 150,
+          useNativeDriver: false,
+        }),
+      ]).start();
     });
     const hideSub = Keyboard.addListener(hideEvent, () => {
-      Animated.timing(dmPanelBottomAnim, {
-        toValue: 120,
-        duration: 200,
-        useNativeDriver: false,
-      }).start();
+      const fullScreenH = Dimensions.get('screen').height;
+      const rH = fullScreenH - REST_BOTTOM - REST_TOP;
+      Animated.parallel([
+        Animated.timing(dmPanelBottomAnim, {
+          toValue: REST_BOTTOM,
+          duration: 200,
+          useNativeDriver: false,
+        }),
+        Animated.timing(dmPanelHeightAnim, {
+          toValue: rH,
+          duration: 200,
+          useNativeDriver: false,
+        }),
+      ]).start();
     });
     return () => { showSub.remove(); hideSub.remove(); };
   }, []);
@@ -537,23 +563,24 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
 
   // ★ 2026-04-21: Oda içi DM panel inbox realtime güncellemesi.
   //   Önceden: Panel açıkken yeni mesaj gelirse liste güncellenmiyordu.
-  //   Şimdi: onNewMessage subscription → getInbox refresh (hidden filter servis'te uygulanır).
+  //   ★ v86 FIX: Postgres_changes anon Realtime'da DM tablolarını alamıyor — DMNotifProvider
+  //   broadcast event'lerine bağla.
+  const dmNotif = useDMNotifOptional();
   useEffect(() => {
-    if (!visible || !firebaseUser?.uid) return;
-    const channel = MessageService.onNewMessage(firebaseUser.uid, 'room_inbox_drawer', async (msg) => {
-      // Hidden check erken — servis zaten filtreliyor ama re-fetch gereksiz olsun diye burada da ön-kontrol
-      try {
-        const hiddenMap = await MessageService.getHiddenConversations(firebaseUser.uid);
-        const otherId = msg.sender_id === firebaseUser.uid ? msg.receiver_id : msg.sender_id;
-        if (hiddenMap[otherId]) return; // Silinen sohbet → liste değişmez
-      } catch {}
+    if (!visible || !firebaseUser?.uid || !dmNotif) return;
+    const refreshInbox = async () => {
       try {
         const msgs = await MessageService.getInbox(firebaseUser.uid);
         setDmInboxMessages(msgs);
       } catch {}
+    };
+    const unsub = dmNotif.onSignal((signal) => {
+      if (signal.event === 'dm_new' || signal.event === 'dm_accepted' || signal.event === 'dm_rejected') {
+        refreshInbox();
+      }
     });
-    return () => { try { channel?.unsubscribe?.(); supabase.removeChannel(channel); } catch {} };
-  }, [visible, firebaseUser?.uid]);
+    return unsub;
+  }, [visible, firebaseUser?.uid, dmNotif]);
 
   // ★ initialChatTarget ile panel açıldığında otomatik sohbet başlat
   useEffect(() => {
@@ -676,27 +703,45 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
     setChatSending(false);
   };
 
-  // ★ Realtime mesaj dinleme (sohbet açıkken)
+  // ★ v86 FIX: Postgres_changes anon Realtime'da çalışmıyor — DMNotifProvider broadcast'ı.
+  //   Chat açıkken target user'dan dm_new gelince mesajları yeniden fetch et + okundu işaretle.
   useEffect(() => {
-    if (!chatTarget || !firebaseUser) return;
-    const channel = supabase
-      .channel(`dm-panel-rt-${chatTarget.userId}`)
-      .on('postgres_changes', {
-        event: 'INSERT', schema: 'public', table: 'messages',
-        filter: `sender_id=eq.${chatTarget.userId}`,
-      }, (payload) => {
-        const msg = payload.new as any;
-        if (msg.receiver_id === firebaseUser.uid) {
-          setChatMessages(prev => {
-            if (prev.some(m => m.id === msg.id)) return prev;
-            return [{ ...msg, sender: { display_name: chatTarget.name, avatar_url: chatTarget.avatar || '' } }, ...prev];
-          });
-          MessageService.markAsRead(firebaseUser.uid, chatTarget.userId).catch(() => {});
-        }
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [chatTarget?.userId, firebaseUser?.uid]);
+    if (!chatTarget || !firebaseUser || !dmNotif) return;
+    const targetId = chatTarget.userId;
+    const refreshChat = async () => {
+      try {
+        const { data } = await supabase
+          .from('messages')
+          .select('*')
+          .or(`and(sender_id.eq.${firebaseUser.uid},receiver_id.eq.${targetId}),and(sender_id.eq.${targetId},receiver_id.eq.${firebaseUser.uid})`)
+          .not('is_deleted', 'is', true)
+          .order('created_at', { ascending: false })
+          .limit(50);
+        const msgs = (data || []).map((m: any) => ({
+          ...m,
+          sender: {
+            display_name: m.sender_id === firebaseUser.uid ? 'Sen' : chatTarget.name,
+            avatar_url: m.sender_id === firebaseUser.uid ? '' : (chatTarget.avatar || ''),
+          },
+        }));
+        setChatMessages(msgs);
+        MessageService.markAsRead(firebaseUser.uid, targetId).catch(() => {});
+        dmNotif.markRead(targetId);
+      } catch {}
+    };
+    const unsub = dmNotif.onSignal((signal) => {
+      if (signal.event === 'dm_new' && signal.sender_id === targetId) {
+        refreshChat();
+      } else if (signal.event === 'dm_accepted' && (signal.sender_id === targetId || signal.receiver_id === targetId)) {
+        setMsgReq({ status: 'accepted' });
+      } else if (signal.event === 'dm_rejected' && (signal.sender_id === targetId || signal.receiver_id === targetId)) {
+        setMsgReq({ status: 'rejected' });
+      }
+    });
+    // Chat açıldığında bu user için unread sıfırla
+    dmNotif.markRead(targetId);
+    return unsub;
+  }, [chatTarget?.userId, firebaseUser?.uid, dmNotif]);
 
   // ★ Engelle aksiyonu
   const handleBlock = async (userId: string) => {
@@ -735,10 +780,13 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
       </Animated.View>
 
       {/* Panel — iki katmanlı yapı: native/JS driver çakışmasını önler.
-          ★ Dış katman: bottom konumlandırma (JS driver, useNativeDriver:false)
+          ★ Dış katman: bottom+height konumlandırma (JS driver, useNativeDriver:false)
+          ★ 2026-04-30 FIX: top+bottom yerine bottom+height — adjustResize parent'ı
+          küçültünce top+bottom çift küçülmeye yol açıyordu. height screen-based sabit.
           ★ İç katman: translateX slide animasyonu (native driver, useNativeDriver:true) */}
       <Animated.View style={{
-        position: 'absolute', right: 0, top: 120, bottom: dmPanelBottomAnim,
+        position: 'absolute', right: 0, bottom: dmPanelBottomAnim,
+        height: dmPanelHeightAnim,
         width: DM_PANEL_W,
       }}>
       <Animated.View {...dmPanHandlers} style={{
@@ -1755,44 +1803,68 @@ export default function RoomScreen() {
       //   Host sahneye geri çıkmak isterse "Sahneye Dön" butonunu kullanır.
     });
 
-    const pSub = RealtimeService.onRoomChange(id as string, (newParticipants) => {
-      // Sadece ilk yükleme sonrası yeni katılanları bildir
-      if (initialLoadDone.current) {
-        newParticipants.forEach(np => {
-          if (!participantsRef.current.has(np.user_id) && np.user_id !== firebaseUser?.uid) {
-            const joinMsg: RoomMessage = {
-              id: `join_${np.user_id}_${Date.now()}`,
-              room_id: id as string,
-              user_id: np.user_id,
-              content: 'odaya katıldı',
-              created_at: new Date().toISOString(),
-              profiles: { display_name: np.user?.display_name || 'Misafir' },
-              isJoin: true,
-            } as any;
-            setChatMessages(prev => [joinMsg, ...prev].slice(0, 100));
-          }
-        });
-      } else {
-        initialLoadDone.current = true;
-      }
-      // Ref'i gncelle
-      participantsRef.current = new Set(newParticipants.map(p => p.user_id));
-      // BUG-R7 FIX: prevCount'u ref'ten al — stale closure önleme
-      const prevCount = prevParticipantCountRef.current;
-      prevParticipantCountRef.current = newParticipants.length;
-      setParticipants(newParticipants);
-
-      // ★ CCU Milestone SP — Oda sahibi milestone'a ulaştığında SP kazanır
-      if (roomHostRef.current === firebaseUser?.uid && newParticipants.length !== prevCount) {
-        GamificationService.onCCUMilestone(firebaseUser!.uid, newParticipants.length, prevCount)
-          .then(sp => {
-            if (sp > 0) {
-              spToastRef.current?.show(sp, 'Milestone');
+    // ★ 2026-04-30 v5: Çift kanal yapısına geri dönüldü (stabilite).
+    //   Birleşik kanal event delivery sorunlarına neden oluyordu.
+    //   room_participants → room:{id} kanalı
+    //   rooms → room_status:{id} kanalı
+    const prevIsLive = { current: room?.is_live ?? true };
+    const pSub = RealtimeService.onRoomChange(
+      id as string,
+      (newParticipants) => {
+        // Sadece ilk yükleme sonrası yeni katılanları bildir
+        if (initialLoadDone.current) {
+          newParticipants.forEach(np => {
+            if (!participantsRef.current.has(np.user_id) && np.user_id !== firebaseUser?.uid) {
+              const joinMsg: RoomMessage = {
+                id: `join_${np.user_id}_${Date.now()}`,
+                room_id: id as string,
+                user_id: np.user_id,
+                content: 'odaya katıldı',
+                created_at: new Date().toISOString(),
+                profiles: { display_name: np.user?.display_name || 'Misafir' },
+                isJoin: true,
+              } as any;
+              setChatMessages(prev => [joinMsg, ...prev].slice(0, 100));
             }
-          })
-          .catch(() => {});
-      }
-    });
+          });
+        } else {
+          initialLoadDone.current = true;
+        }
+        // Ref'i güncelle
+        participantsRef.current = new Set(newParticipants.map(p => p.user_id));
+        // BUG-R7 FIX: prevCount'u ref'ten al — stale closure önleme
+        const prevCount = prevParticipantCountRef.current;
+        prevParticipantCountRef.current = newParticipants.length;
+        setParticipants(newParticipants);
+
+        // ★ CCU Milestone SP — Oda sahibi milestone'a ulaştığında SP kazanır
+        if (roomHostRef.current === firebaseUser?.uid && newParticipants.length !== prevCount) {
+          GamificationService.onCCUMilestone(firebaseUser!.uid, newParticipants.length, prevCount)
+            .then(sp => {
+              if (sp > 0) {
+                spToastRef.current?.show(sp, 'Milestone');
+              }
+            })
+            .catch(() => {});
+        }
+      },
+    );
+
+    // ★ v5: Oda durumu ayrı kanal — rooms UPDATE dinler
+    const statusSub = RealtimeService.onRoomStatusChange(
+      id as string,
+      (updatedRoom) => {
+        if (prevIsLive.current && !updatedRoom.is_live) {
+          if (!isRoomClosingRef.current) {
+            liveKitService.disconnect().catch(() => {});
+            setMinimizedRoom(null);
+            setRoomBlock({ reason: 'closed' });
+          }
+        }
+        prevIsLive.current = updatedRoom.is_live;
+        setRoom(updatedRoom);
+      },
+    );
     // ★ 2026-04-26: Odaya giriş anında SON 50 mesaj yüklensin — kullanıcı bağlam kaybı yaşamasın.
     //   roomChat.getMessages descending döner (newest first), [msg, ...prev] zaten newest first → uyumlu.
     RoomChatService.getMessages(id as string, 50).then(history => {
@@ -1817,23 +1889,6 @@ export default function RoomScreen() {
       (messageId) => setChatMessages(prev => prev.filter(m => m.id !== messageId)),
     );
 
-    // ★ GERÇEK ZAMANLI ODA DURUM TAKİBİ — Supabase Realtime
-    // Sadece is_live true→false geçişinde tetiklenir (ilk yüklemede veya kendi kapatma aksiyonumuzda değil)
-    const prevIsLive = { current: room?.is_live ?? true };
-    const roomStatusSub = RealtimeService.onRoomStatusChange(id as string, (updatedRoom) => {
-      if (prevIsLive.current && !updatedRoom.is_live) {
-        // ★ 2026-04-26: Host oda kapatınca toast+geri-dönüş yerine RoomClosedScreen göster.
-        //   Kullanıcı net feedback alır, oda render edilmez.
-        if (!isRoomClosingRef.current) {
-          liveKitService.disconnect().catch(() => {});
-          setMinimizedRoom(null);
-          setRoomBlock({ reason: 'closed' });
-        }
-      }
-      prevIsLive.current = updatedRoom.is_live;
-      setRoom(updatedRoom);
-    });
-
     // Periyodik kontrol — listener_count sync (yedek mekanizma)
     const syncInterval = setInterval(async () => {
       try {
@@ -1843,7 +1898,7 @@ export default function RoomScreen() {
 
     return () => {
       RealtimeService.unsubscribe(pSub);
-      RealtimeService.unsubscribe(roomStatusSub);
+      RealtimeService.unsubscribe(statusSub);
       unsubscribeMsg();
       clearInterval(syncInterval);
 
@@ -1926,36 +1981,11 @@ export default function RoomScreen() {
     return () => sub.remove();
   }, [id, firebaseUser]);
 
-  // ★ 2026-04-30 FIX: room_participants realtime — yeni kullanıcı girince/çıkınca
-  //   diğer kullanıcılar anında görsün. Daha önce sadece AppState foreground refetch
-  //   veya room UPDATE event'inde participant listesi güncelleniyordu — ama room_participants
-  //   tablosundaki INSERT/DELETE, rooms tablosunu tetiklemiyordu → kullanıcılar stale kalıyordu.
-  useEffect(() => {
-    if (!id || !firebaseUser || !accessGranted) return;
-    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
-    const channel = supabase
-      .channel(`room_parts_rt:${id}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'room_participants', filter: `room_id=eq.${id}` },
-        () => {
-          // Debounce 300ms — birden fazla INSERT/DELETE/UPDATE birleşsin
-          if (debounceTimer) clearTimeout(debounceTimer);
-          debounceTimer = setTimeout(async () => {
-            try {
-              const freshP = await RoomService.getParticipants(id as string);
-              setParticipants(freshP);
-              participantsRef.current = new Set(freshP.map((x: any) => x.user_id));
-            } catch { /* sessiz */ }
-          }, 300);
-        }
-      )
-      .subscribe();
-    return () => {
-      if (debounceTimer) clearTimeout(debounceTimer);
-      try { supabase.removeChannel(channel); } catch {}
-    };
-  }, [id, firebaseUser?.uid, accessGranted]);
+  // ★ 2026-04-30 v2: Duplike room_parts_rt kanalı KALDIRILDI.
+  //   RealtimeService.onRoomChange (yukarıdaki pSub) zaten room_participants
+  //   INSERT/DELETE/UPDATE event'lerini dinliyor ve setParticipants güncelliyor.
+  //   İki kanal aynı state'i güncelleyince race condition oluşuyordu +
+  //   gereksiz bir Supabase channel slotu tüketiliyordu.
 
   // ★ Host tier'ına göre ses/video kalite ayarları
   const hostTierForQuality = (room?.host?.subscription_tier as any) || 'Free';
@@ -2325,12 +2355,22 @@ export default function RoomScreen() {
     }
     setApprovedSpeakers(prev => [...prev, uid]);
     setMicRequests(prev => prev.filter(u => u !== uid));
+    let dbWriteOk = false;
     try {
       await RoomService.promoteSpeaker(id as string, uid);
+      dbWriteOk = true;
       // ★ BUG FIX: Optimistik state güncelleme — listener → speaker (UI anında sahneye taşır)
       setParticipants(prev => prev.map(p => p.user_id === uid ? { ...p, role: 'speaker' as const, is_muted: false } : p));
-    } catch (e) {
-      if (__DEV__) console.warn('Speaker yükseltme hatası:', e);
+    } catch (e: any) {
+      // ★ v85c: RPC hatası release build'de de görünsün — debug için kritik
+      const msg = e?.message || e?.error_description || String(e);
+      showToast({ title: 'Sahneye Alma Hatası', message: msg.slice(0, 200), type: 'error' });
+      if (__DEV__) console.warn('[approveMic] Speaker yükseltme hatası:', e);
+    }
+    // ★ DB yazımı başarısızsa broadcast gönderme — diğer cihazlarda hayalet sahne yaratmasın
+    if (!dbWriteOk) {
+      setApprovedSpeakers(prev => prev.filter(u => u !== uid));
+      return;
     }
     // ★ Broadcast: promote bildir + sistem mesajı
     modChannelRef.current?.send({
@@ -3500,6 +3540,18 @@ export default function RoomScreen() {
   // ★ 2026-04-26: Oda kapalı/erişim engelli → asla oda render etme, full-screen ekran göster.
   //   FIX: lk.connectFailed da render-time kontrol ediliyor — useEffect tick gecikmesi flash yaratıyordu.
   //   connection_failed için "Tekrar Dene" butonu (router.replace ile sayfayı reset eder).
+  // ★ 2026-04-30 FIX: firebaseUser null ise (reinstall, session expired) hata ekranı gösterme —
+  //   AuthGuard login sayfasına yönlendirecek. Aksi halde "Bağlantı kurulamadı" stuck kalıyor.
+  if (!firebaseUser) {
+    return (
+      <AppBackground radialGlow>
+        <View style={[sty.root, { alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent' }]}>
+          <StatusBar hidden />
+          <PremiumLoader size={56} />
+        </View>
+      </AppBackground>
+    );
+  }
   if (roomBlock || lk.connectFailed) {
     const effectiveReason: RoomClosedReason = roomBlock?.reason || 'connection_failed';
     const isRecoverable = effectiveReason === 'connection_failed';
@@ -3508,7 +3560,7 @@ export default function RoomScreen() {
         reason={effectiveReason}
         customMessage={roomBlock?.message}
         additionalReasons={roomBlock?.additionalReasons}
-        onGoHome={() => safeGoBack(router)}
+        onGoHome={() => router.replace('/(tabs)/home' as any)}
         onRetry={isRecoverable ? () => router.replace({ pathname: '/room/[id]', params: { id: id as string } } as any) : undefined}
       />
     );

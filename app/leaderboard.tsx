@@ -25,6 +25,7 @@ import { getAvatarSource, getLevelFromSP, getTierBadgeInfo } from '../constants/
 import StatusAvatar from '../components/StatusAvatar';
 import { Colors } from '../constants/theme';
 import AppBackground from '../components/AppBackground';
+import SPIcon from '../components/SPIcon';
 import { useUserProfileSheet } from './_layout';
 
 const { width: W } = Dimensions.get('window');
@@ -603,7 +604,7 @@ export default function LeaderboardScreen() {
             </View>
           ) : (
             <View style={[s.emptySection]}>
-              <Ionicons name="diamond-outline" size={28} color="rgba(255,255,255,0.15)" />
+              <SPIcon size={28} style={{ opacity: 0.4 }} />
               <Text style={s.emptyText}>Henüz SP verisi yok</Text>
             </View>
           )}

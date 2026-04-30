@@ -919,8 +919,17 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
                 <Pressable style={p.unbanBtn} onPress={async () => {
                   setBannedUsers(prev => prev.filter(b => b.id !== ban.id));
                   try {
-                    await ModerationService.unbanFromRoom(room.id, ban.user_id || ban.user?.id);
-                  } catch { setBannedUsers(prev => [...prev, ban]); showToast({ title: 'Ban Kaldırılamadı', message: 'Kullanıcının banı kaldırılamadı.', type: 'error' }); }
+                    // ★ v85g: unbanFromRoom throw etmiyor, { success, error } döner;
+                    //   eski kod try/catch'e güveniyordu → silent fail → ban DB'de kalıyordu.
+                    const result = await ModerationService.unbanFromRoom(room.id, ban.user_id || ban.user?.id);
+                    if (!result?.success) {
+                      throw new Error(result?.error || 'Sunucu hatası');
+                    }
+                    showToast({ title: 'Ban Kaldırıldı', message: '', type: 'success' });
+                  } catch (e: any) {
+                    setBannedUsers(prev => [...prev, ban]);
+                    showToast({ title: 'Ban Kaldırılamadı', message: (e?.message || '').slice(0, 200), type: 'error' });
+                  }
                 }}>
                   <Ionicons name="lock-open-outline" size={10} color="#14B8A6" />
                   <Text style={{ fontSize: 9, fontWeight: '700', color: '#14B8A6' }}>Kaldır</Text>

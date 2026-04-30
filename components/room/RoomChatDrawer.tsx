@@ -109,8 +109,11 @@ export default function RoomChatDrawer({
     const showSub = Keyboard.addListener(showEvent, (e) => {
       if (!visible) return;
       const screenH = Dimensions.get('screen').height;
-      const kbTop = e.endCoordinates.screenY;
-      const kbHeight = screenH - kbTop;
+      // ★ v86 FIX: Samsung Android'de e.endCoordinates.screenY yanlış değer döndürebilir
+      //   (status bar / nav bar dahil/hariç tutarsızlığı). e.endCoordinates.height direkt
+      //   klavye yüksekliğini verir — keyboard-controller pattern'iyle aynı.
+      const kbHeight = e.endCoordinates.height || (screenH - e.endCoordinates.screenY);
+      const kbTop = screenH - kbHeight;
       // Klavye üstü ile status bar arasındaki kullanılabilir alan
       const visibleArea = kbTop - Math.max(insets.top, 20) - INPUT_BAR_H;
       // Sheet yüksekliğini görünür alana sınırla (header kaybolmasın)
@@ -369,7 +372,10 @@ export default function RoomChatDrawer({
     }
     const content = item.content || '';
     const gifMatch = content.match(/^\[gif:(.*)\]$/);
-    const isGifSafe = gifMatch?.[1] && /^https:\/\/(media\.tenor\.com|media[0-9]*\.giphy\.com|i\.giphy\.com)\//i.test(gifMatch[1]);
+    // ★ v86 FIX: Tenor v2 URL'leri media1.tenor.com / media-cdn.tenor.com gibi
+    //   subdomain'ler kullanıyor — eski regex sadece "media.tenor.com" matchliyor,
+    //   diğerlerini text olarak gösteriyordu (GIF kayıp). Tüm tenor/giphy subdomain'leri kabul.
+    const isGifSafe = !!gifMatch?.[1] && /^https:\/\/(?:[\w-]+\.)?(?:tenor|giphy)\.com\//i.test(gifMatch[1]);
     const emojiOnly = /^[\p{Emoji_Presentation}\p{Extended_Pictographic}‍️⃣]{1,6}$/u.test(content) && content.length <= 14;
     const nameColor = getUserColor(item.user_id || '', item.role, item.profiles?.subscription_tier);
     const reaction = reactions[item.id];

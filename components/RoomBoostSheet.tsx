@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import SPIcon from './SPIcon';
 
 const SHEET_H = 420;
 
@@ -149,7 +150,7 @@ export default function RoomBoostSheet({ visible, onClose, onBoost, currentSP, r
             <Text style={s.summaryDesc}>{selected.sublabel}</Text>
           </View>
           <View style={[s.balancePill, !canAfford && { borderColor: 'rgba(239,68,68,0.3)', backgroundColor: 'rgba(239,68,68,0.06)' }]}>
-            <Ionicons name="diamond-outline" size={12} color={canAfford ? '#FB923C' : '#EF4444'} />
+            <SPIcon size={12} />
             <Text style={[s.balanceText, !canAfford && { color: '#EF4444' }]}>{currentSP.toLocaleString()}</Text>
           </View>
         </View>

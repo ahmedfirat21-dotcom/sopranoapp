@@ -15,6 +15,7 @@ import React, { useRef, useState, useCallback, useImperativeHandle, forwardRef, 
 import { View, Text, StyleSheet, Animated, Easing, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import SPIcon from '../SPIcon';
 // ★ 2026-04-29: SP miktarına göre tier paleti — diğer SP ekranlarıyla tutarlı.
 import { getSPAmountTier, SP_TIER_VISUAL, SP_TIER_EMOJIS } from '../../constants/spAmountTier';
 
@@ -300,7 +301,7 @@ const DonationAlert = forwardRef<DonationAlertRef>((_, ref) => {
               <View style={s.amountRow}>
                 <Text style={s.donationText}>{data.recipientName ? '' : 'bağış yaptı '}</Text>
                 <View style={[s.amountPill, { backgroundColor: `${amountColor}20`, borderColor: `${amountColor}40` }]}>
-                  <Ionicons name="diamond" size={11} color={amountColor} />
+                  <SPIcon size={11} />
                   <Text style={[s.amountText, { color: amountColor }]}>{data.amount} SP bağış</Text>
                 </View>
               </View>

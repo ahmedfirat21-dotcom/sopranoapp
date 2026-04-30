@@ -7,7 +7,7 @@ import { useRouter } from 'expo-router';
 import { Colors, Shadows } from '../../constants/theme';
 import { MessageService, ProfileService, type InboxItem, type Message } from '../../services/database';
 import { supabase } from '../../constants/supabase';
-import { useAuth, useBadges, useTheme, useOnlineFriends, useUserProfileSheet } from '../_layout';
+import { useAuth, useBadges, useTheme, useOnlineFriends, useUserProfileSheet, useDMNotif } from '../_layout';
 import { useFocusEffect } from 'expo-router';
 import { useCallback } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -456,6 +456,19 @@ export default function MessagesScreen() {
       refreshBadges();
     }, [loadInbox, refreshFriends, refreshBadges])
   );
+
+  // ★ v86: DM broadcast — yeni mesaj/accept/reject geldiğinde inbox listesi
+  //   anlık tazelensin (postgres_changes anon Realtime'da çalışmıyor).
+  const dmNotif = useDMNotif();
+  useEffect(() => {
+    if (!firebaseUser) return;
+    const unsub = dmNotif.onSignal((signal) => {
+      if (signal.event === 'dm_new' || signal.event === 'dm_accepted' || signal.event === 'dm_rejected') {
+        loadInbox();
+      }
+    });
+    return unsub;
+  }, [firebaseUser, dmNotif, loadInbox]);
 
   useEffect(() => {
     const onlineIdSet = new Set(onlineFriends.map(f => f.id));
