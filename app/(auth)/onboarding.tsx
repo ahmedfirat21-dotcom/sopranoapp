@@ -567,7 +567,7 @@ export default function OnboardingScreen() {
         </ScrollView>
 
         {/* ═══ Footer CTA ═══ */}
-        <View style={[s.footer, { paddingBottom: Math.max(insets.bottom, Platform.OS === 'ios' ? 36 : 20) + 12 }]}>
+        <View style={[s.footer, { paddingBottom: Math.max(Platform.OS === 'android' ? 64 : 36, insets.bottom + 24) }]}>
           {step === 4 ? (
             <View style={s.footerRow}>
               <Pressable

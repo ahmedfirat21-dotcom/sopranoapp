@@ -474,7 +474,7 @@ export default function DiscoverWelcomeSheet({ visible, onClose, uid }: Props) {
          *  ★ 2026-04-29 v4: İki tam genişlik buton — Sonraki/Başlayalım + Geri.
          *  Login'deki "Google ile Devam Et" ve "E-posta ile Giriş" yapısı. */}
         {/* ★ 2026-04-30 FIX: paddingBottom artırıldı — Android nav bar'ın arkasında kalmıyordu */}
-        <View style={[styles.ctaRow, { paddingBottom: Math.max(24, insets.bottom + 24) }]}>
+        <View style={[styles.ctaRow, { paddingBottom: Math.max(Platform.OS === 'android' ? 64 : 24, insets.bottom + 24) }]}>
           {/* Ana CTA — accent renkli gradient */}
           <Animated.View style={styles.cta}>
             <Pressable

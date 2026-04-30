@@ -6,11 +6,11 @@
 import React, { useState, useCallback, useImperativeHandle, forwardRef, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Animated, Easing, Dimensions, useWindowDimensions,
-  ScrollView, TextInput, Image, FlatList, ActivityIndicator,
+  ScrollView, TextInput, Image, FlatList, ActivityIndicator, Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { supabase } from '../constants/supabase';
+import { supabase, SUPABASE_ANON_KEY } from '../constants/supabase';
 
 // ★ Module-level snapshot — picker/emoji keyboard için statik değerler yeterli.
 // FloatingReactionsView içinde useWindowDimensions + useSafeAreaInsets ile runtime alınır.
@@ -80,22 +80,33 @@ async function _callTenorProxy(params: { type: 'featured' | 'search'; q?: string
     return hit.results;
   }
 
-  // Proxy denemesi (daha önce başarısız olmadıysa)
-  if (_tenorProxyAvailable !== false) {
-    try {
-      const { data, error } = await supabase.functions.invoke('tenor-proxy', { body: params });
-      if (!error && data?.results) {
-        _tenorProxyAvailable = true;
+  // ★ v86 FIX: supabase.functions.invoke Firebase JWT eklediği için Gateway 401 dönebiliyordu.
+  //   Direkt fetch + Anon Key — sade, güvenilir. Edge Function --no-verify-jwt deploy edildi,
+  //   anon key her zaman kabul eder.
+  try {
+    const SUPABASE_URL_LOCAL = 'https://kpofiuczyjesjlqjxswh.supabase.co';
+    const res = await fetch(`${SUPABASE_URL_LOCAL}/functions/v1/tenor-proxy`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        'apikey': SUPABASE_ANON_KEY,
+      },
+      body: JSON.stringify(params),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data?.results && data.results.length > 0) {
         _gifCache.set(key, { at: Date.now(), results: data.results });
         return data.results;
       }
-      if (error) _tenorProxyAvailable = false;
-    } catch {
-      _tenorProxyAvailable = false;
     }
+    if (__DEV__) console.warn('[GIF] proxy non-200 or empty:', res.status);
+  } catch (e: any) {
+    if (__DEV__) console.warn('[GIF] proxy fetch error:', e?.message);
   }
 
-  // Legacy fallback
+  // Legacy fallback — Tenor public API direkt
   try {
     const limit = params.limit || 30;
     const url = params.type === 'featured'
@@ -104,9 +115,12 @@ async function _callTenorProxy(params: { type: 'featured' | 'search'; q?: string
     const res = await fetch(url);
     const data = await res.json();
     const results = data?.results || [];
-    _gifCache.set(key, { at: Date.now(), results });
+    if (results.length > 0) {
+      _gifCache.set(key, { at: Date.now(), results });
+    }
     return results;
-  } catch {
+  } catch (e: any) {
+    if (__DEV__) console.warn('[GIF] legacy fallback error:', e?.message);
     return [];
   }
 }
@@ -123,16 +137,27 @@ export function EmojiReactionBar({ onReaction, onClose }: { onReaction: (emoji: 
   const [trendingGifs, setTrendingGifs] = useState<any[]>([]);
   const searchTimerRef = useRef<any>(null);
 
-  useEffect(() => {
-    fetchTrendingGifs();
-  }, []);
+  // ★ v86: GIF özelliği geçici kaldırıldı — fetch hiç tetiklenmesin (gereksiz network).
+  //   useEffect(() => { fetchTrendingGifs(); }, []);
 
   const fetchTrendingGifs = async () => {
     try {
       setLoadingGifs(true);
       const results = await _callTenorProxy({ type: 'featured', limit: 30 });
       setTrendingGifs(results);
-    } catch { } finally { setLoadingGifs(false); }
+      // ★ v86 debug: kullanıcının cihazında neden boş geldiğini görmek için
+      if (results.length === 0) {
+        Alert.alert(
+          'GIF Yüklenemedi (Debug)',
+          'Tenor API boş döndü. Olası sebepler:\n• İnternet/firewall blok\n• Edge Function 401\n• Tenor erişim engelli\n\nLütfen bu mesajı geliştiriciye iletin.',
+          [{ text: 'Tamam' }],
+        );
+      }
+    } catch (e: any) {
+      Alert.alert('GIF Hatası (Debug)', (e?.message || String(e) || 'Bilinmeyen').slice(0, 300), [{ text: 'Tamam' }]);
+    } finally {
+      setLoadingGifs(false);
+    }
   };
 
   const searchGifs = async (q: string) => {
@@ -153,17 +178,24 @@ export function EmojiReactionBar({ onReaction, onClose }: { onReaction: (emoji: 
   const currentCategory = EMOJI_CATEGORIES.find(c => c.id === selectedCategory) || EMOJI_CATEGORIES[0];
   const displayGifs = gifSearch.length >= 2 ? gifs : trendingGifs;
 
+  // ★ v86: GIF özelliği geçici olarak kaldırıldı (post-launch'ta temiz yeniden eklenecek).
+  //   Tab header gizlendi, sadece emoji picker görünür. GIF state/fetch'leri kullanılmıyor ama
+  //   kod içinde duruyor — sonradan reaktive etmek kolay olsun.
+  const SHOW_GIF_TAB = false;
+
   return (
     <View style={sty.picker}>
-      {/* Tab Header — çerçevesiz, sadece gölgeli metin */}
-      <View style={sty.tabHeader}>
-        <TouchableOpacity style={sty.tabBtn} onPress={() => setTab('emoji')}>
-          <Text style={[sty.tabText, tab === 'emoji' && sty.tabTextActive]}>😊 Emoji</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={sty.tabBtn} onPress={() => setTab('gif')}>
-          <Text style={[sty.tabText, tab === 'gif' && sty.tabTextActive]}>🎬 GIF</Text>
-        </TouchableOpacity>
-      </View>
+      {/* Tab Header — sadece GIF tab aktifse göster */}
+      {SHOW_GIF_TAB && (
+        <View style={sty.tabHeader}>
+          <TouchableOpacity style={sty.tabBtn} onPress={() => setTab('emoji')}>
+            <Text style={[sty.tabText, tab === 'emoji' && sty.tabTextActive]}>😊 Emoji</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={sty.tabBtn} onPress={() => setTab('gif')}>
+            <Text style={[sty.tabText, tab === 'gif' && sty.tabTextActive]}>🎬 GIF</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* ════ Emoji Tab ════ */}
       {tab === 'emoji' && (

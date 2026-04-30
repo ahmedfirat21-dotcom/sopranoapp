@@ -29,8 +29,18 @@ import AppBackground from '../components/AppBackground';
 import PremiumAlert, { type AlertButton } from '../components/PremiumAlert';
 import BlockedUsersSheet from '../components/BlockedUsersSheet';
 import NotifPreferencesSheet from '../components/NotifPreferencesSheet';
-// ★ Version — app.json ile senkron tek kaynak
-const APP_VERSION = 'v1.2.4';
+// ★ Version — app.json'dan dinamik okunur, hardcode kaldırıldı (v86 fix)
+//   Eski hardcode "v1.2.4" yüzünden her APK'da aynı görünüyordu, kullanıcı güncellemediğini sanıyordu.
+let APP_VERSION = 'unknown';
+try {
+  const Constants = require('expo-constants').default;
+  APP_VERSION = `v${Constants?.expoConfig?.version || Constants?.manifest?.version || 'unknown'}`;
+} catch {
+  try {
+    const pkg = require('../app.json');
+    APP_VERSION = `v${pkg?.expo?.version || 'unknown'}`;
+  } catch { /* silent */ }
+}
 
 // Google Sign-In — sign out sırasında cache temizleme için
 let GoogleSignin: any;
