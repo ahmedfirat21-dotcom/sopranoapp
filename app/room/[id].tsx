@@ -1506,6 +1506,15 @@ export default function RoomScreen() {
         setAccessGranted(true);
       }
 
+      // ★ 2026-04-30: Minimize'dan dönüş — existing varsa mevcut rolü koru, join tekrar çağırma.
+      //   Host sahneden indikten sonra minimize edip geri dönünce zorla owner'a yükselmesini engeller.
+      if (isRestoringFromMinimize && existing) {
+        setAccessGranted(true);
+        // last_seen heartbeat güncelle — stale cleanup'a yakalanmasın
+        RoomService.updateLastSeen(id as string, firebaseUser.uid).catch(() => {});
+        return;
+      }
+
       if ((!existing || !trustedExistingRole) && profile) {
         // Sistem odalarında DB join yapma — lokal katılımcı zaten eklendi
         if (isSystemRoom(id as string)) {
@@ -1739,12 +1748,11 @@ export default function RoomScreen() {
           });
         });
         // ★ REMOVED: Sarı giriş banner'ı kaldırıldı — chat'te zaten "odaya katıldı" mesajı var
-      } else if (existing && isHost && existing.role !== 'owner') {
-        // Host zaten var ama rolü yanlış — düzelt
-        RoomService.join(id, firebaseUser.uid, 'owner').catch((err: any) => {
-          if (__DEV__) console.warn('[Join] Host rol düzeltme hatası:', err?.message);
-        });
       }
+      // ★ 2026-04-30: Eski "host rolü yanlış → düzelt" bloğu KALDIRILDI.
+      //   Host bilinçli olarak sahneden inebilir (listener rolü). Bu durumda rolünü
+      //   zorla owner'a çekmek kullanıcının kararını geçersiz kılıyordu.
+      //   Host sahneye geri çıkmak isterse "Sahneye Dön" butonunu kullanır.
     });
 
     const pSub = RealtimeService.onRoomChange(id as string, (newParticipants) => {
