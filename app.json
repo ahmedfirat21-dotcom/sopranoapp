@@ -72,6 +72,16 @@
               "pathPrefix": "/event"
             },
             {
+              "scheme": "https",
+              "host": "sopranochat.com",
+              "pathPrefix": "/auth"
+            },
+            {
+              "scheme": "https",
+              "host": "www.sopranochat.com",
+              "pathPrefix": "/auth"
+            },
+            {
               "scheme": "sopranochat"
             }
           ]

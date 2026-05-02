@@ -33,6 +33,30 @@ const { height: SCREEN_HEIGHT, width: SCREEN_W } = Dimensions.get('window');
 // ★ SEC-BF2: E-posta format doğrulama
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
+// ★ v107.45: Yaygın TLD whitelist — `asd@asd.x` gibi hatalı TLD'leri engelle, gerçek mail format'ı zorla.
+//   Tüm gerçek TLD'leri kapsamak imkansız ama yaygın olanlar büyük çoğunluğu kapsar.
+const VALID_TLD_REGEX = /\.(com|net|org|edu|gov|mil|info|biz|io|co|me|app|dev|tech|tr|com\.tr|net\.tr|org\.tr|de|fr|uk|co\.uk|it|es|nl|se|no|fi|dk|pl|ru|jp|cn|kr|in|br|mx|ar|ca|au|nz|za|sa|ae)$/i;
+
+// ★ v107.45: Disposable / temp mail blacklist — sahte hesap exploit'ini önler.
+//   Yaygın geçici mail sağlayıcıları (mailinator, tempmail, guerrillamail vs.).
+const DISPOSABLE_DOMAINS = new Set([
+  'mailinator.com', 'guerrillamail.com', 'guerrillamail.net', 'guerrillamail.biz',
+  'tempmail.com', 'temp-mail.com', 'temp-mail.org', 'tmpmail.com', 'tmpmail.org',
+  'throwawaymail.com', 'yopmail.com', 'yopmail.net', '10minutemail.com', '10minutemail.net',
+  'fakeinbox.com', 'trashmail.com', 'mailnesia.com', 'getnada.com', 'maildrop.cc',
+  'sharklasers.com', 'grr.la', 'spam4.me', 'bccto.me', 'chacuo.net',
+  'dispostable.com', 'mailcatch.com', 'mintemail.com', 'mt2014.com', 'mytrashmail.com',
+  'no-spam.ws', 'objectmail.com', 'opayq.com', 'proxymail.eu', 'rcpt.at',
+  'spamgourmet.com', 'spaml.com', 'tempemail.com', 'tempinbox.com', 'wegwerfmail.de',
+  'mohmal.com', 'mail-temporaire.fr', 'nada.email', 'fake-mail.net', 'bouncr.com',
+  'discard.email', 'mailtemp.info', 'getairmail.com', 'inboxbear.com',
+]);
+
+function isDisposableEmail(email: string): boolean {
+  const domain = email.split('@')[1]?.toLowerCase().trim();
+  return !!domain && DISPOSABLE_DOMAINS.has(domain);
+}
+
 // ★ SEC-PW: Şifre gücü kontrolü
 function getPasswordStrength(pw: string): { score: number; label: string; color: string } {
   if (!pw) return { score: 0, label: '', color: 'transparent' };
@@ -231,7 +255,7 @@ export default function LoginScreen() {
   };
 
   const handleEmailRegister = async () => {
-    const trimmedEmail = email.trim();
+    const trimmedEmail = email.trim().toLowerCase();
     if (!trimmedEmail || !password || !passwordConfirm) {
       showToast({ title: 'Eksik Bilgi', message: 'Tüm alanları doldurun.', type: 'warning' });
       return;
@@ -239,6 +263,16 @@ export default function LoginScreen() {
     // ★ SEC-BF2: Email format kontrolü
     if (!EMAIL_REGEX.test(trimmedEmail)) {
       showToast({ title: 'Geçersiz E-posta', message: 'Geçerli bir e-posta adresi gir.', type: 'error' });
+      return;
+    }
+    // ★ v107.45: Yaygın TLD kontrolü — `asd@asd.x` gibi hatalı TLD'leri engelle
+    if (!VALID_TLD_REGEX.test(trimmedEmail)) {
+      showToast({ title: 'Geçersiz E-posta', message: 'E-posta uzantısı geçerli değil. (.com, .net, .org gibi)', type: 'error' });
+      return;
+    }
+    // ★ v107.45: Disposable email blacklist — sahte hesap exploit'i engelle
+    if (isDisposableEmail(trimmedEmail)) {
+      showToast({ title: 'Geçici E-posta Kabul Edilmiyor', message: 'Mailinator/tempmail gibi geçici e-postalar kayıt için kullanılamaz. Gerçek bir e-posta gir.', type: 'error' });
       return;
     }
     if (password !== passwordConfirm) {
@@ -272,11 +306,22 @@ export default function LoginScreen() {
         } catch { /* doğrulama gönderilemezse sessiz */ }
       }
     } catch (error: any) {
-      // ★ SEC-ENUM: Kayıt hatalarında spesifik bilgi verme — enumeration engeli
       if (error?.code === 'auth/email-already-in-use') {
-        showToast({ title: 'Kayıt Olunamadı', message: 'Bu e-posta ile işlem yapılamadı. Giriş yapmayı dene.', type: 'error' });
+        // ★ v107.46: Net mesaj + otomatik giriş moduna geç (e-posta dolu kalır, kullanıcı sadece şifre girer)
+        showToast({
+          title: 'Bu E-posta Zaten Kayıtlı',
+          message: 'Daha önce bu e-postayla kayıt olmuşsun. Giriş ekranına geçildi.',
+          type: 'info',
+        });
+        setIsRegisterMode(false);
+        setPassword('');
+        setPasswordConfirm('');
       } else if (error?.code === 'auth/invalid-email') {
         showToast({ title: 'Geçersiz E-posta', message: 'Lütfen geçerli bir e-posta gir.', type: 'error' });
+      } else if (error?.code === 'auth/weak-password') {
+        showToast({ title: 'Şifre Zayıf', message: 'Daha güçlü bir şifre seç.', type: 'warning' });
+      } else if (error?.code === 'auth/network-request-failed') {
+        showToast({ title: 'Bağlantı Hatası', message: 'İnternet bağlantını kontrol et.', type: 'error' });
       } else {
         showToast({ title: 'Kayıt Olunamadı', message: 'Bir sorun oluştu, tekrar dene.', type: 'error' });
       }
@@ -298,7 +343,16 @@ export default function LoginScreen() {
     }
     setResetLoading(true);
     try {
-      await sendPasswordResetEmail(auth, trimmed);
+      // ★ v107.46: actionCodeSettings — mail linki Universal Link ile uygulamayı açar.
+      //   App Links autoVerify çalışırsa link doğrudan uygulamaya gelir, yoksa tarayıcı.
+      //   Her durumda kullanıcı reset-password ekranında oobCode ile yeni şifresini girer.
+      await sendPasswordResetEmail(auth, trimmed, {
+        // ★ v107.46: www subdomain ZORUNLU — Vercel sopranochat.com → www'a 307 redirect
+        //   yapıyor, Google App Links Validator redirect'leri kabul etmiyor.
+        //   www.sopranochat.com direkt 200 döner (assetlinks.json buradan servis edilir).
+        url: 'https://www.sopranochat.com/auth/reset-password',
+        handleCodeInApp: true,
+      });
     } catch (error: any) {
       // ★ SEC-ENUM: Hata olsa bile aynı mesajı göster — e-posta enumeration engeli
       if (__DEV__) console.warn('[ForgotPassword] Error:', error?.code);
