@@ -27,7 +27,58 @@ LogBox.ignoreLogs([
   //   yapıyor. LogBox'a düşmesi gereksiz.
   /Received leave request while trying to \(re\)connect/,
   /ConnectionError.*LeaveRequest/,
+  // ★ v107.34: Firebase v22 modular SDK migration deprecation uyarıları —
+  //   uygulama namespaced API kullanıyor (analytics, getApp, setUserId vs.).
+  //   v22'ye geçiş post-launch işi (memory'de kayıtlı). Şimdilik gizle, console kirletmesin.
+  /This method is deprecated.*React Native Firebase namespaced API/,
+  /Please use `getApp\(\)` instead/,
+  /Please use `setUserId\(\)` instead/,
 ]);
+
+// ★ v107.35: LogBox sadece RN yellow-box'ı etkiler; DevTools console ayrı.
+//   console.warn / console.error override ile pattern-eşleşen mesajları sustur.
+//   Hedef: Firebase v22 deprecation + RevenueCat ConfigurationError (her ikisi de
+//   bilinen, kritik olmayan, post-launch düzeltilecek mesajlar).
+const __SUPPRESS_PATTERNS = [
+  /React Native Firebase namespaced API/,
+  /Please use `getApp\(\)` instead/,
+  /Please use `setUserId\(\)` instead/,
+  /\[RevenueCat\].*Error fetching offerings/,
+  /PurchasesError\(code=ConfigurationError/,
+  // ★ v107.36: WebRTC debug log spam — LiveKit iç peer connection trace'leri
+  /rn-webrtc:pc:DEBUG/,
+  /addIceCandidate/,
+  /addTransceiver/,
+  /createOffer\b/,
+  /setLocalDescription/,
+  /setRemoteDescription/,
+  // ★ v107.43: LiveKit ping timeout — bağlantı kalitesi info, kritik değil
+  /ping timeout triggered/,
+  /last pong received/,
+  // ★ v107.44: Metro reload artifact — Firebase native module bir an erişilemez,
+  //   Metro yeni bundle'ı gönderirken oluşur, prod APK'da çıkmaz. APK içinde modül var.
+  /Native module RNFBAppModule not found/,
+  /RNFBNativeEventEmitter/,
+];
+const __origWarn = console.warn;
+const __origError = console.error;
+const __origLog = console.log;
+console.warn = (...args: any[]) => {
+  const msg = args.map(a => (typeof a === 'string' ? a : '')).join(' ');
+  if (__SUPPRESS_PATTERNS.some(p => p.test(msg))) return;
+  __origWarn(...args);
+};
+console.error = (...args: any[]) => {
+  const msg = args.map(a => (typeof a === 'string' ? a : '')).join(' ');
+  if (__SUPPRESS_PATTERNS.some(p => p.test(msg))) return;
+  __origError(...args);
+};
+// ★ v107.36: console.log de intercept — WebRTC debug spam'i için. Normal log'lar etkilenmez.
+console.log = (...args: any[]) => {
+  const msg = args.map(a => (typeof a === 'string' ? a : '')).join(' ');
+  if (__SUPPRESS_PATTERNS.some(p => p.test(msg))) return;
+  __origLog(...args);
+};
 import { Stack, useRouter, useSegments } from 'expo-router';
 // ★ v92.16: react-native-keyboard-controller kaldırıldı — native modül linked değildi,
 //   dev/build'de "doesn't seem to be linked" crash'e neden oluyordu.
@@ -206,20 +257,15 @@ export function useAuth() {
 }
 
 // ========== KULLANICI PROFİLİ SHEET CONTEXT ==========
-// ★ 2026-04-26: Clubhouse tarzı evrensel profil paneli — her yerden açılır,
-//   tam sayfa yerine alttan kayar, drag-to-expand. Tüm router.push('/user/X')
-//   çağrıları yerini bu hook'a bırakıyor: openUserProfile(id).
-type UserProfileSheetContextType = {
-  openUserProfile: (userId: string) => void;
-  closeUserProfile: () => void;
-};
-export const UserProfileSheetContext = createContext<UserProfileSheetContextType>({
-  openUserProfile: () => {},
-  closeUserProfile: () => {},
-});
-export function useUserProfileSheet() {
-  return useContext(UserProfileSheetContext);
-}
+// ★ v107.32: Context ve hook ayrı dosyada (providers/UserProfileSheetContext.tsx)
+//   Cycle dependency'yi kırmak için. _layout import + re-export yapar (geriye uyumluluk).
+import {
+  UserProfileSheetContext,
+  useUserProfileSheet,
+  type UserProfileSheetContextType,
+} from '../providers/UserProfileSheetContext';
+export { UserProfileSheetContext, useUserProfileSheet };
+export type { UserProfileSheetContextType };
 
 // ★ 2026-04-27: Global Search Sheet — UserSearchModal Tab Navigator dışında
 // (app/_layout.tsx'te) mount edilir, böylece Tab Bar'ın altında kalmaz.
@@ -524,6 +570,12 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
 
     const inAuthGroup = segments[0] === '(auth)';
     const isOnboarding = segments.length > 1 && segments[1] === 'onboarding';
+    // ★ v107.46: Şifre sıfırlama deep link bağlamında AuthGuard hiçbir yönlendirme yapmasın.
+    //   Email maili tıklayan kullanıcı zaten oobCode ile reset-password ekranına geliyor;
+    //   AuthGuard onu login'e ya da home'a sürüklerse mail linki kırılır.
+    //   app/auth/reset-password.tsx (grupsuz) → segments = ['auth', 'reset-password']
+    const isResetPassword = segments[0] === 'auth' && segments[1] === 'reset-password';
+    if (isResetPassword) return;
 
     if (!isLoggedIn) {
       if (!inAuthGroup) {
@@ -1394,7 +1446,10 @@ export default function RootLayout() {
     function handleDeepLink(url: string) {
       try {
         const parsed = Linking.parse(url);
-        const path = parsed.path || '';
+        const rawPath = parsed.path || '';
+        const path = rawPath.startsWith('/') ? rawPath.slice(1) : rawPath;
+        // ★ v107.46: /auth/reset-password expo-router otomatik route ediyor (app/auth/reset-password.tsx).
+        //   Bu handler sadece /room/* ve /user/* için manuel routing yapıyor.
         if (path.startsWith('room/')) {
           const roomId = path.slice('room/'.length).split('/')[0].split('?')[0].trim();
           if (UUID_RE.test(roomId)) routerRef.current.push(`/room/${roomId}`);

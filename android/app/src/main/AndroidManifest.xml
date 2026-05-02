@@ -51,9 +51,16 @@
       </intent-filter>
       <intent-filter android:autoVerify="true" data-generated="true">
         <action android:name="android.intent.action.VIEW"/>
+        <category android:name="android.intent.category.DEFAULT"/>
+        <category android:name="android.intent.category.BROWSABLE"/>
         <data android:scheme="https" android:host="sopranochat.com" android:pathPrefix="/room"/>
         <data android:scheme="https" android:host="sopranochat.com" android:pathPrefix="/user"/>
         <data android:scheme="https" android:host="sopranochat.com" android:pathPrefix="/event"/>
+        <data android:scheme="https" android:host="sopranochat.com" android:pathPrefix="/auth"/>
+        <data android:scheme="https" android:host="www.sopranochat.com" android:pathPrefix="/room"/>
+        <data android:scheme="https" android:host="www.sopranochat.com" android:pathPrefix="/user"/>
+        <data android:scheme="https" android:host="www.sopranochat.com" android:pathPrefix="/event"/>
+        <data android:scheme="https" android:host="www.sopranochat.com" android:pathPrefix="/auth"/>
         <data android:scheme="sopranochat"/>
       </intent-filter>
     </activity>
