@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SopranoChat — Şifre Sıfırlama</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-font-smoothing: antialiased; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(180deg, #0F1929 0%, #050A14 100%);
+      color: #F1F5F9;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .card {
+      max-width: 420px;
+      width: 100%;
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      border-radius: 16px;
+      padding: 32px 24px;
+      text-align: center;
+      -webkit-backdrop-filter: blur(8px);
+      backdrop-filter: blur(8px);
+    }
+    .icon {
+      width: 72px;
+      height: 72px;
+      border-radius: 36px;
+      background: linear-gradient(135deg, #14B8A6 0%, #0F766E 100%);
+      margin: 0 auto 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 6px 24px rgba(20, 184, 166, 0.4);
+    }
+    .icon svg { width: 32px; height: 32px; fill: #FFF; }
+    h1 {
+      font-size: 22px;
+      font-weight: 800;
+      margin-bottom: 8px;
+    }
+    p {
+      font-size: 14px;
+      color: #94A3B8;
+      margin-bottom: 24px;
+      line-height: 1.5;
+    }
+    .btn {
+      display: inline-block;
+      width: 100%;
+      padding: 14px 20px;
+      background: linear-gradient(135deg, #14B8A6 0%, #0F766E 100%);
+      color: #FFF;
+      text-decoration: none;
+      font-weight: 800;
+      border-radius: 12px;
+      font-size: 15px;
+      letter-spacing: 0.3px;
+      box-shadow: 0 4px 12px rgba(20, 184, 166, 0.3);
+      margin-bottom: 12px;
+      cursor: pointer;
+      border: none;
+    }
+    .btn-secondary {
+      background: rgba(148, 163, 184, 0.12);
+      border: 1px solid rgba(148, 163, 184, 0.25);
+      box-shadow: none;
+      color: #CBD5E1;
+    }
+    .small {
+      font-size: 12px;
+      color: #64748B;
+      margin-top: 16px;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">
+      <svg viewBox="0 0 24 24"><path d="M12 17a2 2 0 100-4 2 2 0 000 4zm6-9h-1V6a5 5 0 00-10 0v2H6a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V10a2 2 0 00-2-2zM9 6a3 3 0 016 0v2H9V6z"/></svg>
+    </div>
+    <h1 id="title">SopranoChat'e yönlendiriliyorsun…</h1>
+    <p id="desc">Uygulama otomatik açılmadıysa aşağıdaki butona dokun.</p>
+    <a id="appLink" class="btn" href="#">SopranoChat'i Aç</a>
+    <a id="storeLink" class="btn btn-secondary" href="https://play.google.com/store/apps/details?id=com.sopranochat" target="_blank" rel="noopener noreferrer">Uygulamayı İndir</a>
+    <p class="small">Bu bağlantı şifre sıfırlama içindir, 1 saat geçerlidir.</p>
+  </div>
+  <script>
+    (function () {
+      var qs = new URLSearchParams(window.location.search);
+      var oobCode = qs.get('oobCode') || '';
+      var mode = qs.get('mode') || 'resetPassword';
+      var apiKey = qs.get('apiKey') || '';
+      var lang = qs.get('lang') || 'tr';
+
+      var ua = navigator.userAgent || '';
+      var isAndroid = /android/i.test(ua);
+      var isIOS = /iphone|ipad|ipod/i.test(ua);
+
+      var query = 'oobCode=' + encodeURIComponent(oobCode) +
+                  '&mode=' + encodeURIComponent(mode) +
+                  '&apiKey=' + encodeURIComponent(apiKey) +
+                  '&lang=' + encodeURIComponent(lang);
+
+      // Plain custom scheme — iOS / fallback
+      var customScheme = 'sopranochat://auth/reset-password?' + query;
+
+      // Android Chrome intent:// format — Chrome custom scheme'leri bloke ediyor,
+      // intent:// güvenilir şekilde uygulamayı açar veya browser_fallback_url'e gider.
+      var playStoreUrl = 'https://play.google.com/store/apps/details?id=com.sopranochat';
+      var androidIntent = 'intent://auth/reset-password?' + query +
+                          '#Intent;scheme=sopranochat;package=com.sopranochat;' +
+                          'S.browser_fallback_url=' + encodeURIComponent(playStoreUrl) + ';end';
+
+      var openUrl = isAndroid ? androidIntent : customScheme;
+
+      document.getElementById('appLink').href = openUrl;
+
+      // 100ms gecikme ile otomatik dene (intent:// Chrome'da sessizce app açar)
+      setTimeout(function () {
+        window.location.href = openUrl;
+      }, 100);
+
+      // 2s sonra app açılmadıysa kullanıcıya manuel buton kalsın
+      setTimeout(function () {
+        document.getElementById('title').textContent = 'Uygulama açılmadı mı?';
+        document.getElementById('desc').textContent = 'Aşağıdaki butona dokunarak SopranoChat'i aç. Yüklü değilse Play Store'dan indir.';
+      }, 2000);
+    })();
+  </script>
+</body>
+</html>

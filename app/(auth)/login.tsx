@@ -343,24 +343,57 @@ export default function LoginScreen() {
     }
     setResetLoading(true);
     try {
-      // ★ v107.46: actionCodeSettings — mail linki Universal Link ile uygulamayı açar.
-      //   App Links autoVerify çalışırsa link doğrudan uygulamaya gelir, yoksa tarayıcı.
-      //   Her durumda kullanıcı reset-password ekranında oobCode ile yeni şifresini girer.
-      await sendPasswordResetEmail(auth, trimmed, {
-        // ★ v107.46: www subdomain ZORUNLU — Vercel sopranochat.com → www'a 307 redirect
-        //   yapıyor, Google App Links Validator redirect'leri kabul etmiyor.
-        //   www.sopranochat.com direkt 200 döner (assetlinks.json buradan servis edilir).
-        url: 'https://www.sopranochat.com/auth/reset-password',
-        handleCodeInApp: true,
+      // ★ v107.47: İdeal akış — actionCodeSettings ile App Link uygulamada açılır.
+      //   Eğer sopranochat.com domain Firebase Authorized Domains'te yoksa
+      //   auth/unauthorized-continue-uri hatası gelir, fallback bloğa düşeriz.
+      try {
+        await sendPasswordResetEmail(auth, trimmed, {
+          url: 'https://www.sopranochat.com/auth/reset-password',
+          handleCodeInApp: false,
+        });
+      } catch (innerErr: any) {
+        // ★ Fallback: Domain yetkili değilse veya başka URI sorunu varsa
+        //   actionCodeSettings'siz dene → Firebase default akışı (her zaman çalışır,
+        //   mail gelir, hosted sayfada reset edilir).
+        if (innerErr?.code === 'auth/unauthorized-continue-uri' ||
+            innerErr?.code === 'auth/invalid-continue-uri' ||
+            innerErr?.code === 'auth/missing-continue-uri') {
+          if (__DEV__) console.warn('[ForgotPassword] continue-uri sorunu, fallback:', innerErr?.code);
+          await sendPasswordResetEmail(auth, trimmed);
+        } else {
+          throw innerErr;
+        }
+      }
+      // ★ v107.47: Net başarı mesajı — kayıt'ta zaten "Bu E-posta Zaten Kayıtlı" dediğimiz
+      //   için forgot-password'da da net konuşmak tutarlı (UX > eski SEC-ENUM yarım önlemi).
+      showToast({
+        title: '✉️ Mail Gönderildi',
+        message: 'Sıfırlama bağlantısı e-postana gönderildi. Spam klasörünü de kontrol et.',
+        type: 'success',
       });
-    } catch (error: any) {
-      // ★ SEC-ENUM: Hata olsa bile aynı mesajı göster — e-posta enumeration engeli
-      if (__DEV__) console.warn('[ForgotPassword] Error:', error?.code);
-    } finally {
-      // ★ SEC-ENUM: Her durumda aynı başarı mesajını göster
-      showToast({ title: 'İşlem Tamamlandı', message: 'Hesap varsa sıfırlama bağlantısı e-postanıza gönderildi.', type: 'success' });
       setShowForgotPassword(false);
       setResetEmail('');
+    } catch (error: any) {
+      // ★ v107.47: Net hata mesajları — kullanıcı tahmin etmek zorunda kalmasın.
+      //   Firebase "Email enumeration protection" KAPALI ise user-not-found gelir,
+      //   AÇIK ise hiç hata gelmez (yukarıdaki başarı mesajı görünür).
+      if (error?.code === 'auth/user-not-found') {
+        showToast({
+          title: 'Hesap Bulunamadı',
+          message: 'Bu e-posta ile kayıtlı bir hesap yok. Önce kayıt ol.',
+          type: 'error',
+        });
+      } else if (error?.code === 'auth/invalid-email') {
+        showToast({ title: 'Geçersiz E-posta', message: 'Geçerli bir e-posta adresi gir.', type: 'error' });
+      } else if (error?.code === 'auth/too-many-requests') {
+        showToast({ title: 'Çok Fazla Deneme', message: 'Biraz bekle, sonra tekrar dene.', type: 'warning' });
+      } else if (error?.code === 'auth/network-request-failed') {
+        showToast({ title: 'Bağlantı Hatası', message: 'İnternet bağlantını kontrol et.', type: 'error' });
+      } else {
+        if (__DEV__) console.warn('[ForgotPassword] Error:', error?.code);
+        showToast({ title: 'Hata', message: 'Mail gönderilemedi, tekrar dene.', type: 'error' });
+      }
+    } finally {
       setResetLoading(false);
     }
   };
