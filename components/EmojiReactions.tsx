@@ -1,4 +1,4 @@
-/**
+﻿/**
  * SopranoChat — Emoji & GIF Reactions (Premium)
  * Kategorili emoji picker + Tenor GIF entegrasyonu
  * ref.current.spawn(emoji) ile floating emoji tetiklenir.
@@ -6,8 +6,9 @@
 import React, { useState, useCallback, useImperativeHandle, forwardRef, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Animated, Easing, Dimensions, useWindowDimensions,
-  ScrollView, TextInput, Image, FlatList, ActivityIndicator, Alert,
+  ScrollView, TextInput, Image, FlatList, Alert,
 } from 'react-native';
+import AppLoader from './AppLoader';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase, SUPABASE_ANON_KEY } from '../constants/supabase';
@@ -229,7 +230,7 @@ export function EmojiReactionBar({ onReaction, onClose }: { onReaction: (emoji: 
           </View>
           {/* GIF Grid */}
           {loadingGifs ? (
-            <ActivityIndicator color="#5CE1E6" style={{ marginTop: 20 }} />
+            <AppLoader color="#5CE1E6" style={{ marginTop: 20 }} />
           ) : (
             <ScrollView style={{ flex: 1 }} contentContainerStyle={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, padding: 4 }} showsVerticalScrollIndicator={false}>
               {displayGifs.map((item: any, idx: number) => {

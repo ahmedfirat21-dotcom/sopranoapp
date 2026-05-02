@@ -7,7 +7,8 @@ import { GamificationService } from './gamification';
 import { logger } from '../utils/logger';
 
 // ─── Günlük Check-in Ödülleri ─────────────────
-const DAILY_REWARDS = [2, 4, 6, 8, 10, 15, 25]; // 7 günlük seri (tiers.ts ile senkron)
+// ★ v86 (1 May 2026): SP ekonomi rebalance — toplam 70→40 (7 gün). tiers.ts DAILY_BASE_REWARDS ile senkron.
+const DAILY_REWARDS = [1, 2, 3, 5, 7, 10, 12]; // 7 günlük seri
 
 export interface CheckInResult {
   success: boolean;

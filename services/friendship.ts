@@ -27,7 +27,10 @@ export type Friendship = {
   created_at: string;
 };
 
-/** ★ Legacy ad — FriendUser ile aynı. Kod geçişi tamamlanınca kaldırılacak. */
+/** ★ Legacy ad — FriendUser ile aynı. Kod geçişi tamamlanınca kaldırılacak.
+ *  ★ v87 (1 May 2026): is_online stale flag → last_seen tabanlı online check'e
+ *  geçiş sürecinde ikisi de tipte tutuluyor. Yeni UI last_seen + 5dk eşiği kullanmalı;
+ *  OnlineFriendsProvider zaten presence ile is_online'ı override ediyor (geriye uyum). */
 export type FollowUser = {
   id: string;
   display_name: string;
@@ -35,6 +38,7 @@ export type FollowUser = {
   username: string | null;
   subscription_tier: string;
   is_online: boolean;
+  last_seen?: string | null;
 };
 export type FriendUser = FollowUser;
 
@@ -455,7 +459,7 @@ export const FriendshipService = {
     try {
       const { data, error } = await supabase
         .from('friendships')
-        .select('user_id, profiles!friendships_user_id_fkey(id, display_name, avatar_url, username, subscription_tier, is_online)')
+        .select('user_id, profiles!friendships_user_id_fkey(id, display_name, avatar_url, username, subscription_tier, is_online, last_seen)')
         .eq('friend_id', userId)
         .eq('status', 'accepted');
       if (error) throw error;
@@ -478,7 +482,7 @@ export const FriendshipService = {
     try {
       const { data, error } = await supabase
         .from('friendships')
-        .select('friend_id, profiles!friendships_friend_id_fkey(id, display_name, avatar_url, username, subscription_tier, is_online)')
+        .select('friend_id, profiles!friendships_friend_id_fkey(id, display_name, avatar_url, username, subscription_tier, is_online, last_seen)')
         .eq('user_id', userId)
         .eq('status', 'accepted');
       if (error) throw error;
@@ -525,7 +529,7 @@ export const FriendshipService = {
       // 3. Mutual friend profillerini toplu çek
       const { data: profiles, error: e3 } = await supabase
         .from('profiles')
-        .select('id, display_name, avatar_url, username, subscription_tier, is_online')
+        .select('id, display_name, avatar_url, username, subscription_tier, is_online, last_seen')
         .in('id', mutualIds);
       if (e3) throw e3;
       return (profiles || []) as FollowUser[];
@@ -736,12 +740,12 @@ export const FriendshipService = {
     const [outRes, inRes] = await Promise.all([
       supabase
         .from('friendships')
-        .select('friend_id, friend:profiles!friend_id(id, display_name, avatar_url, username, subscription_tier, is_online)')
+        .select('friend_id, friend:profiles!friend_id(id, display_name, avatar_url, username, subscription_tier, is_online, last_seen)')
         .eq('user_id', userId)
         .eq('status', 'accepted'),
       supabase
         .from('friendships')
-        .select('user_id, user:profiles!user_id(id, display_name, avatar_url, username, subscription_tier, is_online)')
+        .select('user_id, user:profiles!user_id(id, display_name, avatar_url, username, subscription_tier, is_online, last_seen)')
         .eq('friend_id', userId)
         .eq('status', 'accepted'),
     ]);

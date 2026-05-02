@@ -1,5 +1,5 @@
 import React, { useMemo, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Pressable, Image, useWindowDimensions, Animated, Easing, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Image, useWindowDimensions, Animated, Easing, ScrollView, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { getAvatarSource } from '../../constants/avatars';
@@ -11,16 +11,36 @@ import type { RoomParticipant } from '../../services/database';
 // 2026-04-20: Oda içi SCROLL YOK kuralı — yüksek yoğunlukta daha kompakt grid.
 // 2026-04-22: window width runtime'dan alınıyor (useWindowDimensions) — module-level
 // Dimensions.get cihaz gesture-nav/rotation durumunda stale kalıyordu.
+// ★ v92.18 (1 May 2026): Layout pragmatize — kullanıcı şikâyeti "üst alan boş ama
+//   kameralar küçücük". count=4 için 3 col yerine 2x2 grid → her tile %50 width.
+//   count=5,6 için 3x2 grid. Card height aspect 1.15 (biraz dikey) → kamera tile'ı
+//   sinematik görünüm. Owner scale 1.10 → 1.0 (wrap engelleme; border + altın çerçeve
+//   yeterli ayrım).
+// ★ v92.20 (1 May 2026): CLUBHOUSE PATTERN — kullanıcı talebi.
+//   Tüm sahnedekiler UNIFORM CIRCLE GRID. Kameralı/audio-only ayrımı yok.
+//   Spotlight yok. Owner scale yok. Sadelik = güç (Clubhouse felsefesi).
+//   Avatar + first name + opsiyonel pulse ring — daha fazlası gürültü.
+//   Kamera açan kişinin tile'ı yine circle, içinde video circle-clip oynar.
+//
+//   Boyutlandırma — Clubhouse'tan ilham (kompakt circle, max 110px):
+//     1 kişi  → tek merkez, 140px
+//     2-3     → 3 col, ~110px
+//     4-6     → 3 col, ~100px (2 satır)
+//     7-9     → 3 col, ~90px (3 satır)
+//     10+     → 4 col, ~80px
 function getSpeakerMetrics(count: number, W: number) {
   const availableW = W - 32;
-  let cols: number, gap: number;
-  if (count <= 2) { cols = 2; gap = 12; }
-  else if (count <= 6) { cols = 3; gap = 10; }
-  else if (count <= 9) { cols = 4; gap = 8; }   // 7-9: 3 col yerine 4 (~2 satır)
-  else { cols = 5; gap = 6; }                   // 10-13: 4 col yerine 5 (3 satır)
-  const cardWidth = Math.floor((availableW - gap * (cols - 1)) / cols);
-  // High-density'de kart boyu shrink — avatar + isim için yeter, yükseklik tasarrufu
-  const cardHeight = count > 9 ? Math.floor(cardWidth * 0.95) : cardWidth;
+  let cols: number, gap: number, maxSize: number;
+  if (count <= 1) { cols = 1; gap = 0; maxSize = 140; }
+  else if (count <= 3) { cols = 3; gap = 16; maxSize = 110; }
+  else if (count <= 6) { cols = 3; gap = 14; maxSize = 100; }
+  else if (count <= 9) { cols = 3; gap = 12; maxSize = 92; }
+  else if (count <= 12) { cols = 4; gap = 10; maxSize = 84; }
+  else { cols = 5; gap = 8; maxSize = 76; }
+  // cardWidth = ekran sığacak max; ama maxSize sınırını aşma (büyük cihazlarda overshoot olmasın)
+  const calculated = Math.floor((availableW - gap * (cols - 1)) / cols);
+  const cardWidth = Math.min(calculated, maxSize);
+  const cardHeight = cardWidth + 18; // alt isim alanı
   return { cols, cardWidth, cardHeight, gap };
 }
 
@@ -54,28 +74,175 @@ interface Props {
 
 function SpeakingGlow({ speaking, borderRadius = 16 }: { speaking: boolean; borderRadius?: number }) {
   const pulseAnim = React.useRef(new Animated.Value(1)).current;
+  // ★ v92.28 (2 May 2026) PERF FIX: Önceden Animated.loop stop edilmiyordu — speaker
+  //   konuşmayı bıraksa bile loop arkaplanda dönmeye devam ediyordu. 5+ kişilik odada
+  //   FPS drop. Şimdi loop ref'i tutuluyor, speaking=false / unmount'ta stop().
   React.useEffect(() => {
-    if (speaking) {
-      Animated.loop(Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 1.06, duration: 400, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 1.0, duration: 400, useNativeDriver: true }),
-      ])).start();
-    } else { pulseAnim.setValue(1); }
+    if (!speaking) { pulseAnim.setValue(1); return; }
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(pulseAnim, { toValue: 1.06, duration: 400, useNativeDriver: true }),
+      Animated.timing(pulseAnim, { toValue: 1.0, duration: 400, useNativeDriver: true }),
+    ]));
+    loop.start();
+    return () => loop.stop();
   }, [speaking]);
   if (!speaking) return null;
   return (
     <Animated.View style={[StyleSheet.absoluteFill, {
       borderRadius, borderWidth: 2, borderColor: '#14B8A6',
       transform: [{ scale: pulseAnim }],
+      // ★ v92.23 (1 May 2026): Android elevation eklendi — speaker pulse glow Android'de görünmüyordu
       shadowColor: '#14B8A6', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.6, shadowRadius: 16,
+      elevation: 8,
     }]} pointerEvents="none" />
   );
 }
 
-function AudioWaveBars({ speaking, mic }: { speaking: boolean; mic: boolean }) {
+// ★ v92.14 (1 May 2026): StageLightHalo — Sahne Işığı power-up'ına özel görsel.
+//   - LinearGradient halka (parlaktan koyuya, top-down) → "ışık tüllüsü" hissi.
+//   - 3 katmanlı altın expand-ring (light → mid → deep amber, gradient parite).
+//   - 8 partiküllü TOZ BULUTU (canlı yukarı süzülme, rastgele drift, twinkle scale).
+//   - Android shadow KALDIRILDI (RN Android'de glow render etmiyor, sadece çakışma yapıyor).
+//     Glow hissi gradient + opacity layering ile sağlanıyor.
+const DUST_COUNT = 8;
+const DUST_PARAMS = Array.from({ length: DUST_COUNT }, (_, i) => ({
+  // Avatar etrafına dağılmış başlangıç noktası (rastgele ama deterministik render-stable)
+  startX: Math.cos((i / DUST_COUNT) * Math.PI * 2 + 0.4) * (24 + (i % 3) * 8),
+  startY: Math.sin((i / DUST_COUNT) * Math.PI * 2 + 0.4) * (18 + (i % 3) * 6),
+  driftX: ((i * 37) % 60) - 30,         // -30..+30 yatay drift
+  endY: -85 - (i % 4) * 10,              // yukarı kayar
+  delay: (i * 280) % 2400,               // stagger
+  size: 3 + (i % 3) * 1.2,               // 3..5.4 px
+  color: ['#FFE082', '#FFD700', '#FFF1A8', '#FBBF24'][i % 4],
+  duration: 2400 + (i % 3) * 400,        // 2.4-3.2s
+}));
+
+function StageLightHalo({ active, borderRadius = 16 }: { active: boolean; borderRadius?: number }) {
+  const ringA = React.useRef(new Animated.Value(0)).current;
+  const ringB = React.useRef(new Animated.Value(0)).current;
+  const ringC = React.useRef(new Animated.Value(0)).current;
+  const innerPulse = React.useRef(new Animated.Value(0)).current;
+  const dust = React.useRef(DUST_PARAMS.map(() => new Animated.Value(0))).current;
+
+  React.useEffect(() => {
+    if (!active) {
+      ringA.setValue(0); ringB.setValue(0); ringC.setValue(0);
+      innerPulse.setValue(0);
+      dust.forEach((d) => d.setValue(0));
+      return;
+    }
+    const loopA = Animated.loop(Animated.timing(ringA, { toValue: 1, duration: 2400, useNativeDriver: true, easing: Easing.out(Easing.quad) }));
+    const loopB = Animated.loop(Animated.sequence([
+      Animated.delay(800),
+      Animated.timing(ringB, { toValue: 1, duration: 2400, useNativeDriver: true, easing: Easing.out(Easing.quad) }),
+    ]));
+    const loopC = Animated.loop(Animated.sequence([
+      Animated.delay(1600),
+      Animated.timing(ringC, { toValue: 1, duration: 2400, useNativeDriver: true, easing: Easing.out(Easing.quad) }),
+    ]));
+    const innerLoop = Animated.loop(Animated.sequence([
+      Animated.timing(innerPulse, { toValue: 1, duration: 1300, useNativeDriver: true, easing: Easing.inOut(Easing.sin) }),
+      Animated.timing(innerPulse, { toValue: 0, duration: 1300, useNativeDriver: true, easing: Easing.inOut(Easing.sin) }),
+    ]));
+
+    // Toz partikülleri — her biri kendi delay/duration'ı ile sürekli yukarı süzülür.
+    const dustLoops = dust.map((d, i) => Animated.loop(Animated.sequence([
+      Animated.delay(DUST_PARAMS[i].delay),
+      Animated.timing(d, { toValue: 1, duration: DUST_PARAMS[i].duration, useNativeDriver: true, easing: Easing.out(Easing.quad) }),
+      Animated.timing(d, { toValue: 0, duration: 0, useNativeDriver: true }),
+    ])));
+
+    loopA.start(); loopB.start(); loopC.start(); innerLoop.start();
+    dustLoops.forEach((l) => l.start());
+    return () => {
+      loopA.stop(); loopB.stop(); loopC.stop(); innerLoop.stop();
+      dustLoops.forEach((l) => l.stop());
+    };
+  }, [active]);
+
+  if (!active) return null;
+
+  const ringStyle = (anim: Animated.Value, opacityRange: [number, number, number], scaleRange: [number, number]) => ({
+    opacity: anim.interpolate({ inputRange: [0, 0.5, 1], outputRange: opacityRange }),
+    transform: [{ scale: anim.interpolate({ inputRange: [0, 1], outputRange: scaleRange }) }],
+  });
+
+  return (
+    <>
+      {/* ★ Parlaktan koyuya gradient halka — top-down vertical, sahte radial.
+          Avatar arkası ışıkla yıkanmış hissi; opacity breath ile canlı kalır. */}
+      <Animated.View
+        pointerEvents="none"
+        style={[StyleSheet.absoluteFill, {
+          borderRadius,
+          opacity: innerPulse.interpolate({ inputRange: [0, 1], outputRange: [0.55, 0.9] }),
+          transform: [{ scale: innerPulse.interpolate({ inputRange: [0, 1], outputRange: [1.02, 1.08] }) }],
+        }]}
+      >
+        <LinearGradient
+          colors={['rgba(255,241,168,0.55)', 'rgba(255,215,0,0.28)', 'rgba(180,83,9,0)']}
+          start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
+          style={[StyleSheet.absoluteFill, { borderRadius }]}
+        />
+      </Animated.View>
+
+      {/* Dış 3 expand-ring — parlaktan koyuya: light gold → gold → deep amber */}
+      <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, {
+        borderRadius, borderWidth: 2, borderColor: '#FFE082',
+        ...ringStyle(ringA, [0.95, 0.5, 0], [1.0, 1.25]),
+      }]} />
+      <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, {
+        borderRadius, borderWidth: 1.6, borderColor: '#FFD700',
+        ...ringStyle(ringB, [0.8, 0.35, 0], [1.0, 1.32]),
+      }]} />
+      <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, {
+        borderRadius, borderWidth: 1.4, borderColor: '#B45309',
+        ...ringStyle(ringC, [0.5, 0.18, 0], [1.0, 1.42]),
+      }]} />
+
+      {/* İç parlayan altın çerçeve — breath pulse, shadow YOK (Android uyumlu) */}
+      <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, {
+        borderRadius, borderWidth: 2.5, borderColor: '#FFD700',
+        opacity: innerPulse.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1] }),
+        transform: [{ scale: innerPulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.04] }) }],
+      }]} />
+
+      {/* ★ Toz bulutu — 8 partikül, kart merkezinden yukarı süzülür, hafif drift, twinkle. */}
+      {DUST_PARAMS.map((p, i) => (
+        <Animated.View
+          key={i}
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            left: '50%', top: '50%',
+            marginLeft: -p.size / 2, marginTop: -p.size / 2,
+            width: p.size, height: p.size,
+            borderRadius: p.size / 2,
+            backgroundColor: p.color,
+            opacity: dust[i].interpolate({
+              inputRange: [0, 0.12, 0.55, 1],
+              outputRange: [0, 0.95, 0.55, 0],
+            }),
+            transform: [
+              { translateX: dust[i].interpolate({ inputRange: [0, 1], outputRange: [p.startX, p.startX + p.driftX] }) },
+              { translateY: dust[i].interpolate({ inputRange: [0, 1], outputRange: [p.startY, p.endY] }) },
+              { scale: dust[i].interpolate({ inputRange: [0, 0.25, 0.7, 1], outputRange: [0, 1.1, 0.85, 0.3] }) },
+            ],
+          }}
+        />
+      ))}
+    </>
+  );
+}
+
+function AudioWaveBars({ speaking, mic, cardWidth = 140 }: { speaking: boolean; mic: boolean; cardWidth?: number }) {
+  // ★ v92.7.1 (1 May 2026): cardWidth'e oranla scale — avatar küçülünce wave de küçülür.
+  //   Konum: avatar ortasından hafif aşağı (alt-merkez). Boyut: kompakt 5 çubuklu pill.
   const bar1 = useRef(new Animated.Value(0.3)).current;
   const bar2 = useRef(new Animated.Value(0.5)).current;
   const bar3 = useRef(new Animated.Value(0.4)).current;
+  const bar4 = useRef(new Animated.Value(0.5)).current;
+  const bar5 = useRef(new Animated.Value(0.3)).current;
   useEffect(() => {
     if (speaking && mic) {
       const animate = (anim: Animated.Value, min: number, max: number, dur: number) =>
@@ -83,22 +250,58 @@ function AudioWaveBars({ speaking, mic }: { speaking: boolean; mic: boolean }) {
           Animated.timing(anim, { toValue: max, duration: dur, useNativeDriver: true }),
           Animated.timing(anim, { toValue: min, duration: dur * 0.8, useNativeDriver: true }),
         ]));
-      const a1 = animate(bar1, 0.3, 1, 300);
-      const a2 = animate(bar2, 0.2, 1, 450);
-      const a3 = animate(bar3, 0.35, 1, 350);
-      a1.start(); a2.start(); a3.start();
-      return () => { a1.stop(); a2.stop(); a3.stop(); };
-    } else { bar1.setValue(0.3); bar2.setValue(0.3); bar3.setValue(0.3); }
+      const a1 = animate(bar1, 0.3, 0.9, 320);
+      const a2 = animate(bar2, 0.4, 1, 380);
+      const a3 = animate(bar3, 0.5, 1, 280);
+      const a4 = animate(bar4, 0.4, 1, 360);
+      const a5 = animate(bar5, 0.3, 0.9, 340);
+      a1.start(); a2.start(); a3.start(); a4.start(); a5.start();
+      return () => { a1.stop(); a2.stop(); a3.stop(); a4.stop(); a5.stop(); };
+    } else {
+      bar1.setValue(0.3); bar2.setValue(0.3); bar3.setValue(0.3); bar4.setValue(0.3); bar5.setValue(0.3);
+    }
   }, [speaking, mic]);
   if (!speaking || !mic) return null;
+
+  // Boyut hesapları — cardWidth'e oranlı, küçük ve kompakt
+  const containerW = cardWidth * 0.42;
+  const containerH = cardWidth * 0.18;
+  const barW = Math.max(2, cardWidth * 0.022);
+  const barH1 = cardWidth * 0.06;
+  const barH2 = cardWidth * 0.085;
+  const barH3 = cardWidth * 0.105;
+  const gap = cardWidth * 0.025;
+
   const barStyle = (anim: Animated.Value, h: number) => ({
-    width: 3, height: h, borderRadius: 1.5, backgroundColor: '#14B8A6', transform: [{ scaleY: anim }],
+    width: barW, height: h, borderRadius: barW / 2, backgroundColor: '#14B8A6', transform: [{ scaleY: anim }],
   });
   return (
-    <View style={{ position: 'absolute', bottom: 10, left: 8, flexDirection: 'row', alignItems: 'flex-end', gap: 1.5 }}>
-      <Animated.View style={barStyle(bar1, 10)} />
-      <Animated.View style={barStyle(bar2, 14)} />
-      <Animated.View style={barStyle(bar3, 8)} />
+    <View
+      pointerEvents="none"
+      style={{
+        position: 'absolute',
+        // ★ Konum: alt-merkez (avatar ortasından hafif aşağı) — kullanıcı talebi.
+        top: '62%', left: '50%',
+        marginLeft: -containerW / 2,
+        width: containerW, height: containerH,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap,
+        backgroundColor: 'rgba(10,15,26,0.62)',
+        borderRadius: containerH / 2,
+        borderWidth: 1,
+        borderColor: 'rgba(20,184,166,0.5)',
+        ...(Platform.OS === 'ios'
+          ? { shadowColor: '#14B8A6', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.55, shadowRadius: 6 }
+          : { elevation: 3 }),
+      }}
+    >
+      <Animated.View style={barStyle(bar1, barH1)} />
+      <Animated.View style={barStyle(bar2, barH2)} />
+      <Animated.View style={barStyle(bar3, barH3)} />
+      <Animated.View style={barStyle(bar4, barH2)} />
+      <Animated.View style={barStyle(bar5, barH1)} />
     </View>
   );
 }
@@ -112,22 +315,20 @@ function OwnerBadge() {
   const orbitAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // Golden glow pulse — breathe effect
-    Animated.loop(Animated.sequence([
+    // ★ v92.28 PERF: Cleanup eklendi — 3 paralel loop unmount'ta stop edilmeli.
+    const glowLoop = Animated.loop(Animated.sequence([
       Animated.timing(glowAnim, { toValue: 1, duration: 1800, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
       Animated.timing(glowAnim, { toValue: 0.6, duration: 1800, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-    ])).start();
-
-    // Subtle float up/down
-    Animated.loop(Animated.sequence([
+    ]));
+    const floatLoop = Animated.loop(Animated.sequence([
       Animated.timing(floatAnim, { toValue: -1.5, duration: 1500, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
       Animated.timing(floatAnim, { toValue: 1.5, duration: 1500, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-    ])).start();
-
-    // Orbit rotation for sparkle
-    Animated.loop(Animated.timing(orbitAnim, {
+    ]));
+    const orbitLoop = Animated.loop(Animated.timing(orbitAnim, {
       toValue: 1, duration: 4000, easing: Easing.linear, useNativeDriver: true,
-    })).start();
+    }));
+    glowLoop.start(); floatLoop.start(); orbitLoop.start();
+    return () => { glowLoop.stop(); floatLoop.stop(); orbitLoop.stop(); };
   }, []);
 
   const rotateSparkle = orbitAnim.interpolate({
@@ -241,15 +442,29 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, i
     //   Şimdi: kart tıklaması Pressable (card inner), demote butonu bağımsız sibling Pressable.
     <View style={[s.speakerCard, { width: cardWidth }]}>
       <Pressable style={({ pressed }) => [{ width: '100%' }, pressed && { opacity: 0.9, transform: [{ scale: 0.97 }] }]} onPress={onPress}>
-      {/* ★ 2026-04-26: Audio-only kartlarda squircle (cardWidth * 0.32), video açıkken KARE köşe (10) —
-           video kenarları yuvarlak köşeyle kesilip okunmaz hale gelmesin. */}
+      {/* ★ v92.21 (1 May 2026): HİBRİT shape — kameralı kişi RECTANGULAR rounded
+          (video doğal aspect ratio'sıyla okunur), audio-only kişi CIRCLE (Clubhouse).
+          Bu Discord Stage / TikTok Live / Twitch ko-stream pattern'i. */}
+      {(() => null)()}
+      {/* hasVideo: bu tile kamerayla mı render edilecek */}
       {(() => null)()}
       <View style={[
         s.speakerCardInner,
-        { height: cardHeight, borderColor: ringColor, borderWidth: isHost || isMod ? 2 : 1.5, borderRadius: cameraOn && videoTrack && VideoView ? 10 : cardWidth * 0.32, overflow: 'visible' },
+        {
+          width: cardWidth,
+          height: cameraOn && videoTrack && VideoView ? cardHeight : cardWidth,
+          borderColor: ringColor,
+          borderWidth: isHost || isMod ? 2 : 1.5,
+          // Kameralı: rounded rectangle (cardWidth*0.08 ~ 8-12px corner)
+          // Audio-only: full circle (cardWidth/2)
+          borderRadius: cameraOn && videoTrack && VideoView ? Math.max(12, Math.floor(cardWidth * 0.08)) : cardWidth / 2,
+          overflow: 'visible',
+        },
       ]}>
-        {/* ★ Clip wrapper — sadece görseller içinde, overflow:'hidden' köşelere kestirir. Badge'ler bu wrapper'ın DIŞINDA. */}
-        <View style={[StyleSheet.absoluteFill, { borderRadius: cameraOn && videoTrack && VideoView ? 10 : cardWidth * 0.32, overflow: 'hidden' }]}>
+        <View style={[StyleSheet.absoluteFill, {
+          borderRadius: cameraOn && videoTrack && VideoView ? Math.max(12, Math.floor(cardWidth * 0.08)) : cardWidth / 2,
+          overflow: 'hidden',
+        }]}>
           <LinearGradient colors={['rgba(30,41,59,0.7)', 'rgba(15,23,42,0.85)']} style={StyleSheet.absoluteFill} />
           {cameraOn && videoTrack && VideoView ? (
             <VideoView videoTrack={videoTrack} style={StyleSheet.absoluteFill} objectFit="cover" mirror={isMe} />
@@ -272,7 +487,18 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, i
             </>
           )}
         </View>
-        <SpeakingGlow speaking={speaking && mic} borderRadius={cameraOn && videoTrack && VideoView ? 10 : cardWidth * 0.32} />
+        {/* ★ v92.13 (1 May 2026): SpeakingGlow yalnızca konuşma için (teal pulse).
+            Sahne Işığı power-up'ı ARTIK ayrı component (StageLightHalo) — 3 katmanlı
+            altın expand-pulse halka + iç parlayan border. Kullanıcı "vasat" dedi,
+            dramatic upgrade yapıldı. */}
+        <SpeakingGlow
+          speaking={speaking && mic}
+          borderRadius={cameraOn && videoTrack && VideoView ? Math.max(12, Math.floor(cardWidth * 0.08)) : cardWidth / 2}
+        />
+        <StageLightHalo
+          active={!!(user as any).stage_light_until && new Date((user as any).stage_light_until).getTime() > Date.now()}
+          borderRadius={cameraOn && videoTrack && VideoView ? Math.max(12, Math.floor(cardWidth * 0.08)) : cardWidth / 2}
+        />
         {isGhost && (
           <View style={s.ghostOverlay}>
             <Ionicons name="eye-off" size={18} color="rgba(255,255,255,0.55)" />
@@ -281,36 +507,75 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, i
         {isCaretakerActive && <CaretakerTimerBadge expiresAt={caretakerExpiresAt!} />}
         {/* ★ 2026-04-19: Caretaker aktifken wave bars gizli — timer zaten urgency
             sinyalidir, wave bars ek görsel yük yaratıyor. Normal speaker'larda görünür. */}
-        {!isCaretakerActive && <AudioWaveBars speaking={speaking} mic={mic} />}
-        <View style={[s.micBadge, mic ? s.micBadgeOn : s.micBadgeOff]}>
-          <Ionicons name={mic ? 'mic' : 'mic-off'} size={14} color="#fff" />
-        </View>
-        {/* ★ 2026-04-20: Kamera rozeti — açık ise sağ üstte, TAP → fullscreen video.
-            Avatar onPress (profile card) ile çakışmaz (nested Pressable) */}
-        {cameraOn && videoTrack && onCameraExpand && (
-          <Pressable
-            onPress={(e) => { e.stopPropagation?.(); onCameraExpand(user); }}
-            hitSlop={6}
-            style={({ pressed }) => [s.cameraBadge, pressed && { opacity: 0.7, transform: [{ scale: 0.92 }] }]}
-          >
-            <Ionicons name="videocam" size={13} color="#fff" />
-          </Pressable>
-        )}
-        {/* ★ 2026-04-26: Inline mute toggle — moderatör kart üzerinde direkt sustur/aç (kullanıcı kartı açmadan).
-             Sadece moderatöre görünür (canModerate). isMuted'a göre renk değişir. */}
-        {canModerate && onQuickMute && (
-          <Pressable
-            onPress={(e) => { e.stopPropagation?.(); onQuickMute(); }}
-            hitSlop={8}
-            style={({ pressed }) => [
-              s.quickMuteBadge,
-              dbMuted && { backgroundColor: 'rgba(16,185,129,0.85)', borderColor: 'rgba(16,185,129,0.55)' },
-              pressed && { opacity: 0.7, transform: [{ scale: 0.9 }] },
-            ]}
-          >
-            <Ionicons name={dbMuted ? 'volume-high' : 'volume-mute'} size={12} color="#fff" />
-          </Pressable>
-        )}
+        {/* ★ v92.7.2 (1 May 2026): AudioWaveBars KALDIRILDI (kullanıcı talebi).
+            Konuşma sinyali için çerçeve pulse (SpeakingGlow) yeterli — yukarıdaki
+            absoluteFill border 2px teal + scale 1→1.06 + glow shadow.
+            Component fonksiyonu kalıyor (geri ihtiyaç olursa); render'dan çıkarıldı. */}
+        {/* ★ v92.18 (1 May 2026): Compact badge mode — küçük tile'da (cardWidth<200)
+            ikonlar küçülür, kenarlık incelir, gölge azalır. Yüzü kaplamaz.
+            Kullanıcı şikâyeti: "ikonlar görüşü bozuyor". */}
+        {(() => {
+          const compact = cardWidth < 200;
+          const sz = compact ? 22 : 28;
+          const inner = compact ? 12 : 14;
+          const pos = compact ? 6 : 10;
+          const cameraSz = compact ? 20 : 26;
+          const cameraInner = compact ? 11 : 13;
+          const quickSz = compact ? 20 : 26;
+          const quickInner = compact ? 10 : 12;
+          return (
+            <>
+              <View style={[
+                {
+                  position: 'absolute', bottom: pos, right: pos, width: sz, height: sz,
+                  borderRadius: sz / 2, alignItems: 'center', justifyContent: 'center',
+                  borderWidth: compact ? 1 : 2, borderColor: 'rgba(15,23,42,0.7)',
+                  shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+                  shadowOpacity: compact ? 0.3 : 0.5, shadowRadius: compact ? 3 : 6,
+                  elevation: compact ? 3 : 6, zIndex: 2,
+                },
+                mic ? s.micBadgeOn : s.micBadgeOff,
+              ]}>
+                <Ionicons name={mic ? 'mic' : 'mic-off'} size={inner} color="#fff" />
+              </View>
+              {cameraOn && videoTrack && onCameraExpand && (
+                <Pressable
+                  onPress={(e) => { e.stopPropagation?.(); onCameraExpand(user); }}
+                  hitSlop={6}
+                  style={({ pressed }) => [{
+                    position: 'absolute', top: pos, right: pos, width: cameraSz, height: cameraSz,
+                    borderRadius: cameraSz / 2, alignItems: 'center', justifyContent: 'center',
+                    borderWidth: compact ? 1 : 2, borderColor: 'rgba(15,23,42,0.7)',
+                    backgroundColor: '#0EA5A3',
+                    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+                    shadowOpacity: compact ? 0.3 : 0.6, shadowRadius: compact ? 3 : 8,
+                    elevation: compact ? 3 : 6, zIndex: 2,
+                  }, pressed && { opacity: 0.7, transform: [{ scale: 0.92 }] }]}
+                >
+                  <Ionicons name="videocam" size={cameraInner} color="#fff" />
+                </Pressable>
+              )}
+              {canModerate && onQuickMute && (
+                <Pressable
+                  onPress={(e) => { e.stopPropagation?.(); onQuickMute(); }}
+                  hitSlop={8}
+                  style={({ pressed }) => [{
+                    position: 'absolute', bottom: pos, left: pos, width: quickSz, height: quickSz,
+                    borderRadius: quickSz / 2, alignItems: 'center', justifyContent: 'center',
+                    borderWidth: compact ? 1 : 1.5,
+                    borderColor: dbMuted ? 'rgba(16,185,129,0.5)' : 'rgba(245,158,11,0.5)',
+                    backgroundColor: dbMuted ? 'rgba(16,185,129,0.8)' : 'rgba(245,158,11,0.8)',
+                    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+                    shadowOpacity: compact ? 0.3 : 0.6, shadowRadius: compact ? 3 : 8,
+                    elevation: compact ? 3 : 6, zIndex: 2,
+                  }, pressed && { opacity: 0.7, transform: [{ scale: 0.9 }] }]}
+                >
+                  <Ionicons name={dbMuted ? 'volume-high' : 'volume-mute'} size={quickInner} color="#fff" />
+                </Pressable>
+              )}
+            </>
+          );
+        })()}
         {/* ★ Owner sadece altın border + biraz büyük kart ile belli. Crown badge + label
             KALDIRILDI (kullanıcı "kötü oldu" dedi, sade olmasını istiyor). */}
       </View>
@@ -381,7 +646,12 @@ export default function SpeakerSection({ stageUsers, getMicStatus, onSelectUser,
   const count = sortedUsers.length;
   const { cardWidth, cardHeight, gap } = getSpeakerMetrics(count, W);
 
-  // ★ Kamera açık kullanıcıları ayır — spotlight bölümü
+  // ★ v92.21 (1 May 2026): HİBRİT pattern — Discord Stage / TikTok Live / Twitch ko-stream.
+  //   - Audio-only kişi: Clubhouse circle avatar (yuvarlak)
+  //   - Kameralı kişi: Rectangular rounded tile (video doğal aspect ratio'yla okunur)
+  //   - Karışık sahnede: kameralılar üstte spotlight, audio-only altta küçük listener-stili
+  //   Clubhouse her şeyi circle yapsa da audio-only platform; kameralı sahne için
+  //   Discord/TikTok pattern doğru — kullanıcı talebi: "kamera açan uygulamalar nasıl ayarlıyor"
   const cameraUsers = sortedUsers.filter(u => {
     const st = getMicStatus(u.user_id);
     return st.cameraOn && st.videoTrack;
@@ -390,23 +660,42 @@ export default function SpeakerSection({ stageUsers, getMicStatus, onSelectUser,
     const st = getMicStatus(u.user_id);
     return !(st.cameraOn && st.videoTrack);
   });
+  const camCount = cameraUsers.length;
+  const showSpotlight = VideoView && camCount > 0;
 
-  // ★ Spotlight: sadece TÜM sahne kamerada (1 tekli veya 2 çiftli) — karışık sahnede
-  //   spotlight, audio-only speaker'ları küçük dinleyici görünümüne düşürüyordu (2026-04-24 fix).
-  //   Karışık sahnede herkes normal grid'te; kamera video'su kendi normal speaker kartının içinde oynar.
-  const allHaveCamera = cameraUsers.length === sortedUsers.length;
-  const showSpotlight = VideoView && allHaveCamera && cameraUsers.length > 0 && cameraUsers.length <= 2;
-  const spotlightW = cameraUsers.length === 1 ? W - 32 : (W - 32 - gap) / 2;
-  const spotlightH = Math.round(spotlightW * 0.75); // 4:3 aspect
+  // Spotlight tile boyutları — kamera sayısına göre referans pattern'leri
+  let spotlightW = 0, spotlightH = 0, spotlightGap = 12;
+  if (showSpotlight) {
+    if (camCount === 1) {
+      spotlightW = W - 32;
+      spotlightH = Math.round(spotlightW * 0.62);  // ~16:10 sinematik (Discord/Twitch)
+    } else if (camCount === 2) {
+      spotlightW = Math.floor((W - 32 - spotlightGap) / 2);
+      spotlightH = spotlightW;  // 1:1 kare yan yana (TikTok multi-guest)
+    } else if (camCount === 3) {
+      spotlightW = Math.floor((W - 32 - spotlightGap * 2) / 3);
+      spotlightH = spotlightW;  // 1:1 kare 3 col
+    } else if (camCount === 4) {
+      spotlightW = Math.floor((W - 32 - spotlightGap) / 2);
+      spotlightH = Math.floor(spotlightW * 1.05);  // 2x2 hafif dikey (WhatsApp)
+    } else {
+      // 5+ kamera: 3 col kompakt grid
+      spotlightW = Math.floor((W - 32 - spotlightGap * 2) / 3);
+      spotlightH = spotlightW;
+      spotlightGap = 8;
+    }
+  }
+  // Audio-only listener-stili boyut (spotlight aktifken kompakt circle)
+  const audioCompactSize = Math.min(76, Math.floor((W - 32 - 8 * 4) / 5));
 
   return (
     <View style={s.wrap}>
       {/* ★ 2026-04-19: "Sahnedekiler" başlık pill'i kaldırıldı — kartlar zaten sahneyi gösterir,
           başlık semantik tekrar. Görsel gürültü azaltıldı. */}
 
-      {/* ★ SPOTLIGHT — Kamera açık kullanıcılar üstte geniş gösterim */}
+      {/* ★ v92.21 SPOTLIGHT — Kameralılar üstte rectangular tile (Discord/Twitch pattern) */}
       {showSpotlight && (
-        <View style={[s.spotlightRow, { gap, marginBottom: gap }]}>
+        <View style={[s.mainSpeakerGrid, { gap: spotlightGap, marginBottom: gap }]}>
           {cameraUsers.map((u) => {
             const st = getMicStatus(u.user_id);
             const isMe = u.user_id === currentUserId;
@@ -422,42 +711,45 @@ export default function SpeakerSection({ stageUsers, getMicStatus, onSelectUser,
         </View>
       )}
 
-      {/* ★ Normal grid — kamera kapalılar veya spotlight yoksa herkes */}
-      {(() => {
-        // ★ 2026-04-20 FIX: Owner her zaman %10 büyük. Satıra sığsın diye diğer kartlar
-        //   hafifçe daraltılır (owner fazlası diğerlerinden eşit şekilde düşülür).
-        //   Böylece 2-3 kişilik sahnede de wrap olmaz, owner net belli olur.
-        const renderUsers = showSpotlight ? audioOnlyUsers : sortedUsers;
-        const ownerInGroup = renderUsers.some(u => u.role === 'owner');
-        const OWNER_SCALE = 1.10;
-        const ownerExtra = ownerInGroup ? cardWidth * (OWNER_SCALE - 1) : 0;
-        const perSiblingReduction = ownerInGroup && renderUsers.length > 1
-          ? ownerExtra / (renderUsers.length - 1)
-          : 0;
-        return (
-          <View style={[s.mainSpeakerGrid, { gap, marginBottom: showSpotlight ? 18 : 4 }]}>
-            {renderUsers.map((u) => {
-              const st = getMicStatus(u.user_id);
-              const isMe = u.user_id === currentUserId;
-              const isHost = u.role === 'owner';
-              const w = isHost
-                ? Math.floor(cardWidth * OWNER_SCALE)
-                : Math.floor(cardWidth - perSiblingReduction);
-              const h = isHost
-                ? Math.floor(cardHeight * OWNER_SCALE)
-                : Math.floor(cardHeight - perSiblingReduction);
-              return (
-                <SpeakerCard key={u.id} user={u} micStatus={st} onPress={() => onSelectUser(u)}
-                  onSelfDemote={onSelfDemote}
-                  onCameraExpand={onCameraExpand}
-                  canModerate={canModerate?.(u) ?? false}
-                  onQuickMute={onQuickMute ? () => onQuickMute(u) : undefined}
-                  isMe={isMe} cardWidth={w} cardHeight={h} VideoView={VideoView} />
-              );
-            })}
-          </View>
-        );
-      })()}
+      {/* ★ v92.21 — Audio-only kişiler:
+          • Spotlight aktif (kamera var): altta KOMPAKT circle satır (Clubhouse listener stili)
+          • Spotlight kapalı (kamera yok): UNIFORM circle grid (Clubhouse pure pattern) */}
+      {showSpotlight && audioOnlyUsers.length > 0 && (
+        <View style={[s.mainSpeakerGrid, { gap: 8, marginBottom: 4 }]}>
+          {audioOnlyUsers.map((u) => {
+            const st = getMicStatus(u.user_id);
+            const isMe = u.user_id === currentUserId;
+            return (
+              <SpeakerCard key={u.id} user={u} micStatus={st} onPress={() => onSelectUser(u)}
+                onSelfDemote={onSelfDemote}
+                onCameraExpand={onCameraExpand}
+                canModerate={canModerate?.(u) ?? false}
+                onQuickMute={onQuickMute ? () => onQuickMute(u) : undefined}
+                isMe={isMe}
+                cardWidth={audioCompactSize}
+                cardHeight={audioCompactSize}
+                VideoView={VideoView} />
+            );
+          })}
+        </View>
+      )}
+
+      {!showSpotlight && (
+        <View style={[s.mainSpeakerGrid, { gap, marginBottom: 4 }]}>
+          {sortedUsers.map((u) => {
+            const st = getMicStatus(u.user_id);
+            const isMe = u.user_id === currentUserId;
+            return (
+              <SpeakerCard key={u.id} user={u} micStatus={st} onPress={() => onSelectUser(u)}
+                onSelfDemote={onSelfDemote}
+                onCameraExpand={onCameraExpand}
+                canModerate={canModerate?.(u) ?? false}
+                onQuickMute={onQuickMute ? () => onQuickMute(u) : undefined}
+                isMe={isMe} cardWidth={cardWidth} cardHeight={cardHeight} VideoView={VideoView} />
+            );
+          })}
+        </View>
+      )}
 
 
     </View>

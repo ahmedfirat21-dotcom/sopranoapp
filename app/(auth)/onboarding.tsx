@@ -1,5 +1,6 @@
-import { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, Image, Pressable, ScrollView, Dimensions, ActivityIndicator, TextInput, KeyboardAvoidingView, Platform, Keyboard, ImageBackground, Animated, Easing } from 'react-native';
+﻿import { useState, useRef, useEffect } from 'react';
+import { View, Text, StyleSheet, Image, Pressable, ScrollView, Dimensions, TextInput, KeyboardAvoidingView, Platform, Keyboard, ImageBackground, Animated, Easing } from 'react-native';
+import AppLoader from '../../components/AppLoader';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,6 +15,7 @@ import AppBackground from '../../components/AppBackground';
 import { supabase } from '../../constants/supabase';
 import * as ImagePicker from 'expo-image-picker';
 import { containsBadWords } from '../../constants/badwords';
+import WelcomeBonusModal from '../../components/profile/WelcomeBonusModal';
 
 const { width: W, height: H } = Dimensions.get('window');
 
@@ -38,6 +40,9 @@ export default function OnboardingScreen() {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [tempProfile, setTempProfile] = useState<any>(null);
+  // ★ v89 (1 May 2026): Welcome bonus modal — onboarding tamamlanınca DB trigger
+  //   50 SP yatırır; modal görsel feedback'i verir, "Keşfetmeye Başla" → home.
+  const [showWelcomeBonus, setShowWelcomeBonus] = useState(false);
 
   // Animations
   const fadeAnim = useRef(new Animated.Value(1)).current;
@@ -190,12 +195,19 @@ export default function OnboardingScreen() {
     //   AsyncStorage'a bağımlı değil → ilk home mount'unda kesin görünür.
     setJustCompletedOnboarding(true);
 
-    // 3. AuthGuard zaten profile değişimini yakalayıp hasCompleteProfile=true → home'a
-    //    yönlendirir. Yine de manuel replace ekliyoruz ki yavaş dep propagate olsa da
-    //    geçiş anında takılma olmasın. 300ms = React render + Supabase fetch tamponu.
+    // ★ v89 (1 May 2026): Welcome bonus modal'ı tetikle — DB trigger 50 SP'yi
+    //   zaten yatırdı, modal görsel feedback verir. "Keşfetmeye Başla" home'a
+    //   yönlendirir (handleWelcomeBonusClose).
+    setShowWelcomeBonus(true);
+  };
+
+  const handleWelcomeBonusClose = () => {
+    setShowWelcomeBonus(false);
+    // Profile cache'i tazele ki home.tsx yeni 50 SP balance ile mount olsun.
+    refreshProfile?.().catch(() => {});
     setTimeout(() => {
       router.replace('/(tabs)/home');
-    }, 300);
+    }, 200);
   };
 
   const handeApplyCode = async () => {
@@ -408,7 +420,7 @@ export default function OnboardingScreen() {
                 <Pressable style={s.bigAvatarWrap} onPress={handlePickPhoto}>
                   {uploading ? (
                     <View style={[s.bigAvatar, { justifyContent: 'center', alignItems: 'center' }]}>
-                      <ActivityIndicator size="large" color={Colors.teal} />
+                      <AppLoader size="large" color={Colors.teal} />
                     </View>
                   ) : (
                     <Image
@@ -582,7 +594,7 @@ export default function OnboardingScreen() {
                 disabled={saving}
               >
                 <LinearGradient colors={Gradients.teal as [string, string]} start={{x:0,y:0}} end={{x:1,y:1}} style={s.primaryInner}>
-                  {saving ? <ActivityIndicator size="small" color="#fff" /> : <Text style={s.primaryText}>Kodu Uygula</Text>}
+                  {saving ? <AppLoader size="small" color="#fff" /> : <Text style={s.primaryText}>Kodu Uygula</Text>}
                 </LinearGradient>
               </Pressable>
             </View>
@@ -594,7 +606,7 @@ export default function OnboardingScreen() {
             >
               <LinearGradient colors={Gradients.teal as [string, string]} start={{x:0,y:0}} end={{x:1,y:1}} style={s.primaryInner}>
                 {saving ? (
-                  <ActivityIndicator size="small" color="#fff" />
+                  <AppLoader size="small" color="#fff" />
                 ) : (
                   <>
                     <Text style={s.primaryText}>{step === 1 ? 'Profili Kaydet' : step === 2 ? 'Devam Et' : 'Seçimleri Kaydet'}</Text>
@@ -606,6 +618,13 @@ export default function OnboardingScreen() {
           )}
         </View>
       </KeyboardAvoidingView>
+
+      {/* ★ v89: Welcome bonus modal — onboarding bittiğinde 50 SP görsel feedback */}
+      <WelcomeBonusModal
+        visible={showWelcomeBonus}
+        amount={50}
+        onClose={handleWelcomeBonusClose}
+      />
     </AppBackground>
   );
 }

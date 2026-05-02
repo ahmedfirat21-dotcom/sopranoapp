@@ -1,5 +1,6 @@
-import { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator } from 'react-native';
+﻿import { useState, useRef, useEffect } from 'react';
+import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
+import AppLoader from '../components/AppLoader';
 import PremiumAlert, { type AlertButton } from '../components/PremiumAlert';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -401,7 +402,7 @@ export default function PlusScreen() {
                 style={styles.ctaBtn}
               >
                 {activating ? (
-                  <ActivityIndicator size="small" color="#fff" />
+                  <AppLoader size="small" color="#fff" />
                 ) : (
                   <>
                     <Ionicons name={selectedPlan.icon as any} size={20} color="#fff" style={{ textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4 }} />

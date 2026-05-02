@@ -1,6 +1,6 @@
 /**
  * SopranoChat — Premium Loader
- * ★ 2026-04-24: ActivityIndicator yerine marka-uyumlu dönen halka +
+ * ★ 2026-04-24:  yerine marka-uyumlu dönen halka +
  *   nefes alan iç nokta. Teal paleti, native driver ile pürüzsüz 60fps.
  */
 import React, { useEffect, useRef } from 'react';
@@ -65,6 +65,7 @@ export default function PremiumLoader({ size = 56, color = '#14B8A6' }: Props) {
             shadowOffset: { width: 0, height: 0 },
             shadowOpacity: 0.6,
             shadowRadius: 10,
+            elevation: 6, // ★ v92.23 (1 May 2026): Android glow için elevation eksikti
           },
         ]}
       />

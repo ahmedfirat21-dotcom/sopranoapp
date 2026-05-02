@@ -1,4 +1,4 @@
-/**
+﻿/**
  * SopranoChat — Rozet Listesi Modal (Faz 6.3 — Premium Tier Design)
  * ═══════════════════════════════════════════════════════════════
  * Rarity tier'lara göre 4 farklı görsel dil:
@@ -14,8 +14,9 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, Modal, Pressable, ScrollView,
-  Animated, ActivityIndicator, PanResponder, Easing,
+  Animated, PanResponder, Easing,
 } from 'react-native';
+import AppLoader from '../AppLoader';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Shadows } from '../../constants/theme';
@@ -158,7 +159,7 @@ export default function BadgeListModal({ visible, onClose, userId, displayName }
 
           {loading ? (
             <View style={st.loading}>
-              <ActivityIndicator size="large" color="#FCD34D" />
+              <AppLoader size="large" color="#FCD34D" />
             </View>
           ) : badges.length === 0 ? (
             <View style={st.empty}>

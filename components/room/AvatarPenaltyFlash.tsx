@@ -215,9 +215,11 @@ const sty = StyleSheet.create({
   rootDramatic: {
     marginTop: -20,
     marginLeft: -20,
+    // ★ v92.23 (1 May 2026): Android elevation eklendi
     shadowColor: '#EF4444',
     shadowOpacity: 1,
     shadowRadius: 16,
+    elevation: 12,
     borderWidth: 2,
     borderColor: 'rgba(255,255,255,0.45)',
   },

@@ -38,6 +38,7 @@ import { getCategoryTheme, ROOM_THEME_GRADIENTS } from '../../constants/category
 import NotificationBell from '../../components/NotificationBell';
 import FriendsDrawer from '../../components/FriendsDrawer';
 import QuickCreateSheet from '../../components/QuickCreateSheet';
+import CreateRoomCoachmark, { shouldShowCreateRoomCoachmark, markCreateRoomCoachmarkSeen } from '../../components/CreateRoomCoachmark';
 
 // ★ 2026-04-28: Odalarım header logosu — SopranoHome (soprano_part + home_part mavi)
 const HOME_SOP_W = 110;
@@ -735,6 +736,11 @@ export default function MyRoomsScreen() {
   // ★ 2026-04-23: Quick-create — Keşfet'teki ile aynı pattern, CTA ve empty state'te kullanılır
   const [showQuickCreate, setShowQuickCreate] = useState(false);
   const [creatingRoom, setCreatingRoom] = useState(false);
+  // ★ v92 (1 May 2026): Yeni kullanıcı yönlendirmesi — RoomCreateHintSheet'ten
+  //   "Odalarım'a Git" tıklayınca AsyncStorage flag'lenir, myrooms mount'ta
+  //   bu state true olur ve "+ Yeni Oda" butonunu işaret eden premium
+  //   coachmark görünür. Buton tıklanırsa veya backdrop'a dokunulursa kapanır.
+  const [showCreateCoachmark, setShowCreateCoachmark] = useState(false);
 
   const { unreadNotifs: unreadCount, pendingFollows: pendingFollowCount } = useBadges();
   const { allFriends } = useOnlineFriends();
@@ -886,9 +892,18 @@ export default function MyRoomsScreen() {
     const task = InteractionManager.runAfterInteractions(() => {
       loadData();
     });
+    // ★ v92 (1 May 2026): RoomCreateHintSheet'ten yönlendirme bayrağı varsa
+    //   premium "+ Yeni Oda" coachmark'ını tetikle (bir kez gösterilir).
+    (async () => {
+      const should = await shouldShowCreateRoomCoachmark(firebaseUser?.uid);
+      if (should) {
+        // Animasyonların tab geçişiyle çakışmaması için kısa gecikme
+        setTimeout(() => setShowCreateCoachmark(true), 500);
+      }
+    })();
     // ★ 2026-04-23: Tab'dan çıkınca açık modalı kapat
     return () => { task.cancel(); setSelectedRoom(null); };
-  }, [loadData]));
+  }, [loadData, firebaseUser?.uid]));
 
   // ★ Yardımcı: Sadece arkadaşların canlı olduğu odaları yenile (hafif sorgu)
   const refreshFriendsLive = useCallback(async () => {
@@ -1447,10 +1462,19 @@ export default function MyRoomsScreen() {
         style={s.ctaWrap}
         onPress={() => {
           if (!firebaseUser) return;
+          // ★ v92: Coachmark görünüyorsa kapat + "seen" flag'i (CTA'ya basıldı = yönlendirme tamamlandı)
+          if (showCreateCoachmark) {
+            setShowCreateCoachmark(false);
+            markCreateRoomCoachmarkSeen(firebaseUser.uid).catch(() => {});
+          }
           setShowQuickCreate(true);
         }}
         onLongPress={() => {
           if (!firebaseUser) return;
+          if (showCreateCoachmark) {
+            setShowCreateCoachmark(false);
+            markCreateRoomCoachmarkSeen(firebaseUser.uid).catch(() => {});
+          }
           router.push('/create-room');
         }}
       >
@@ -1648,6 +1672,18 @@ export default function MyRoomsScreen() {
         onDetailedCreate={() => router.push('/create-room')}
         bottomInset={insets.bottom}
         bottomOffset={84}
+      />
+
+      {/* ★ v92 (1 May 2026): Yeni kullanıcı yönlendirici coachmark — "+ Yeni Oda Oluştur"
+           CTA butonunun ALTINA tooltip yerleşir, ok yukarı bakar (CTA üstte konumlanmış).
+           ctaTopOffset = insets.top + header (~56) + CTA marginTop + CTA height (~64) + 4 boşluk */}
+      <CreateRoomCoachmark
+        visible={showCreateCoachmark}
+        ctaTopOffset={insets.top + 56 + 70}
+        onDismiss={() => {
+          setShowCreateCoachmark(false);
+          if (firebaseUser?.uid) markCreateRoomCoachmarkSeen(firebaseUser.uid).catch(() => {});
+        }}
       />
 
       {/* ★ 2026-04-21: Tab bar scroll fade — tüm tab sayfalarında tutarlı */}

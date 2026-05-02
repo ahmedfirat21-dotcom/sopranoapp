@@ -37,7 +37,7 @@
     <path d="M 210 235 Q 225 220 240 235"/>
     <path d="M 195 235 Q 220 205 245 235"/>
   </g>
-
+                  
   <!-- Treble clef (stylized) -->
   <g transform="translate(280,175) scale(1.1)" fill="#0B7F78">
     <path d="M 0 0

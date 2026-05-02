@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Image, Pressable, ActivityIndicator, TextInput, KeyboardAvoidingView, Platform, Dimensions, ScrollView, Animated, Easing, Linking } from 'react-native';
+import { View, Text, StyleSheet, Image, Pressable, TextInput, KeyboardAvoidingView, Platform, Dimensions, ScrollView, Animated, Easing, Linking } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import PremiumAlert from '../../components/PremiumAlert';
+import AppLoader from '../../components/AppLoader';
 import type { AlertButton } from '../../components/PremiumAlert';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -432,7 +433,7 @@ export default function LoginScreen() {
                 </View>
               )}
               {loading ? (
-                <ActivityIndicator size="large" color="#14B8A6" style={{ marginVertical: 36 }} />
+                <View style={{ marginVertical: 36, alignItems: 'center' }}><AppLoader size="md" /></View>
               ) : showEmailForm ? (
                 <View style={s.formArea}>
                   <View style={s.formHeader}>
@@ -544,6 +545,7 @@ export default function LoginScreen() {
                   </Pressable>
                 </View>
               ) : (
+                <>
                 <View style={s.buttonsContainer}>
                   {/* Google Button — Odalarım CTA benzeri glassmorphic */}
                   <Pressable
@@ -581,6 +583,11 @@ export default function LoginScreen() {
                     </LinearGradient>
                   </Pressable>
                 </View>
+
+                  {/* ★ v92.28 (2 May 2026): "Dev Hızlı Giriş" butonu TAMAMEN KALDIRILDI.
+                      __DEV__ flag dev bundle'da true olduğu için Metro'ya bağlı release
+                      APK'da da görünüyordu — production credentials sızıntısı riski. */}
+                </>
               )}
             </Animated.View>
 
@@ -633,7 +640,7 @@ export default function LoginScreen() {
 }
 
 const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#0A1524' },
+  root: { flex: 1, backgroundColor: '#0A0F1A' },
   container: { flex: 1 },
   contentContainer: { flexGrow: 1, justifyContent: 'center' },
   content: { paddingHorizontal: 30, paddingVertical: 40 },

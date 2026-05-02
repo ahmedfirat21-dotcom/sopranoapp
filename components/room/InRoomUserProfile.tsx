@@ -1,17 +1,18 @@
-/**
+﻿/**
  * SopranoChat — User Profile Overlay (Clubhouse tarzı)
  * Avatar tıklamasında her yerden açılır (oda içi + dışı).
  * Oda içi: tek dokunuş = profil + moderasyon. Odadan çıkmaz, peek chain.
  */
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  View, Text, StyleSheet, Image, Pressable, ScrollView,
-  ActivityIndicator, Dimensions, Animated,
+  View, Text, StyleSheet, Image, Pressable, ScrollView, Dimensions, Animated,
   PanResponder,
 } from 'react-native';
+import AppLoader from '../AppLoader';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import SPIcon from '../SPIcon';
+import SPHexagonIcon from '../SPHexagonIcon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Colors, Shadows } from '../../constants/theme';
@@ -105,6 +106,10 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
   const [incomingStatus, setIncomingStatus] = useState<FriendshipStatus | null>(null);
   const [followLoading, setFollowLoading] = useState(false);
   const [incomingLoading, setIncomingLoading] = useState(false);
+  // ★ v92.1 (1 May 2026): Profil açıldığında follow/friend status fetch'i ~2sn sürebiliyor.
+  //   Buton içerikleri yanlış state'te flash etmesin diye fetch tamamlanana kadar
+  //   bu flag false → butonlar yerine spinner gösterilir, tamamlanınca true → gerçek state.
+  const [interactionsReady, setInteractionsReady] = useState(false);
   const [stats, setStats] = useState({ friends: 0, followers: 0, following: 0, rooms: 0, badges: 0 });
   const [friendsPreview, setFriendsPreview] = useState<FriendUser[]>([]);
   const [profileStats, setProfileStats] = useState({ stageMinutes: 0, roomsCreated: 0, totalListeners: 0, totalReactions: 0 });
@@ -154,6 +159,8 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
     setIncomingStatus(null);
     setIsUserBlocked(false);
     setCurrentRoom(null);
+    // ★ v92.1: Detail Promise.all bitene kadar buton'lar spinner gösterir
+    setInteractionsReady(false);
     setIsFollowingUser(false);
     setMutualFriendCount(0);
     setShowMoreActions(false);
@@ -220,8 +227,15 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
         setFollowStatus(detailed.outgoing);
         setIncomingStatus(detailed.incoming);
       }
-      setFriendsPreview(friendList);
+      // ★ v92.1 (1 May 2026): Mevcut kullanıcı kendi adını başkasının arkadaş listesinde görmesin
+      //   (anlamsız self-reference). Stat sayısı tam liste, preview'da filtrelenir.
+      const visibleFriends = currentUserId
+        ? friendList.filter((f: any) => f.id !== currentUserId)
+        : friendList;
+      setFriendsPreview(visibleFriends);
       setStats({ friends: friendList.length, followers: followerN, following: followingN, rooms: roomCountRes.count ?? 0, badges: badgeCount });
+      // ★ v92.1: Detail fetch tamam → butonlar gerçek state'e geçer
+      setInteractionsReady(true);
       setProfileStats(pStats);
       setUserTitle(title);
 
@@ -526,7 +540,7 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
 
         {loading ? (
           <View style={sty.loadingBox}>
-            <ActivityIndicator size="large" color={Colors.teal} />
+            <AppLoader size="large" color={Colors.teal} />
           </View>
         ) : !userProfile ? (
           <View style={sty.loadingBox}>
@@ -578,7 +592,7 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                       </Text>
                     </View>
                     <View style={sty.incomingActions}>
-                      {incomingLoading ? <ActivityIndicator size="small" color="#14B8A6" /> : (
+                      {incomingLoading ? <AppLoader size="small" color="#14B8A6" /> : (
                         <>
                           <Pressable style={sty.incomingApproveBtn} onPress={handleApproveIncoming}>
                             <Ionicons name="checkmark" size={16} color="#FFF" />
@@ -615,18 +629,18 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                     disabled={followToggleLoading || isUserBlocked}
                     style={({ pressed }) => [{
                       flex: 1,
-                      flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
-                      paddingHorizontal: 14, height: 42, borderRadius: 999,
+                      flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7,
+                      paddingHorizontal: 12, height: 56, borderRadius: 999,
                       backgroundColor: isFollowingUser ? 'rgba(20,184,166,0.15)' : 'rgba(255,255,255,0.06)',
                       borderWidth: 1,
                       borderColor: isFollowingUser ? 'rgba(20,184,166,0.4)' : 'rgba(255,255,255,0.1)',
                       opacity: pressed ? 0.7 : 1,
                     }]}
                   >
-                    {followToggleLoading ? <ActivityIndicator size="small" color="#14B8A6" /> : (
+                    {(followToggleLoading || !interactionsReady) ? <AppLoader size="small" color="#14B8A6" /> : (
                       <>
-                        <Ionicons name={isFollowingUser ? 'checkmark' : 'add'} size={14} color={isFollowingUser ? '#14B8A6' : '#fff'} />
-                        <Text style={{ fontSize: 12, fontWeight: '800', color: isFollowingUser ? '#14B8A6' : '#fff' }}>
+                        <Ionicons name={isFollowingUser ? 'checkmark' : 'add'} size={18} color={isFollowingUser ? '#14B8A6' : '#fff'} />
+                        <Text style={{ fontSize: 14, fontWeight: '800', color: isFollowingUser ? '#14B8A6' : '#fff' }}>
                           {isFollowingUser ? 'Takipte' : 'Takip Et'}
                         </Text>
                       </>
@@ -638,16 +652,16 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                     onPress={handleFollow}
                     disabled={followLoading || isUserBlocked}
                   >
-                    {followLoading ? (
-                      <ActivityIndicator size="small" color="#fff" />
+                    {(followLoading || !interactionsReady) ? (
+                      <AppLoader size="small" color="#fff" />
                     ) : isUserBlocked ? (
                       <Text style={[sty.followBtnText, { color: '#EF4444' }]}>Engellendi</Text>
                     ) : isFriend ? (
-                      <><Ionicons name="people" size={16} color="#F1F5F9" /><Text style={[sty.followBtnText, { color: '#F1F5F9' }]}>Arkadaş</Text></>
+                      <><Ionicons name="people" size={18} color="#F1F5F9" /><Text style={[sty.followBtnText, { color: '#F1F5F9' }]}>Arkadaş</Text></>
                     ) : isPending ? (
                       <Text style={[sty.followBtnText, { color: '#FBBF24' }]}>İstek Gönderildi</Text>
                     ) : (
-                      <><Ionicons name="person-add-outline" size={16} color="#fff" /><Text style={sty.followBtnText}>Arkadaş Ekle</Text></>
+                      <><Ionicons name="person-add-outline" size={18} color="#fff" /><Text style={sty.followBtnText}>Arkadaş Ekle</Text></>
                     )}
                   </Pressable>
                   {/* ★ v85h: DM butonu Instagram modeli — herkese görünür (arkadaş+yabancı).
@@ -666,21 +680,18 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                         }
                       }}
                     >
-                      <Ionicons name="chatbubble-outline" size={18} color="#E2E8F0" />
+                      <Ionicons name="chatbubble-outline" size={24} color="#E2E8F0" />
                     </Pressable>
                   )}
-                  {/* ★ 2026-04-26: SP Gönder yuvarlak altın chip — eski full-width karta göre çok daha kompakt */}
+                  {/* ★ v92.1 (1 May 2026): Daire ve koyu kahve zemin kaldırıldı (kullanıcı talebi).
+                      Sadece animasyonlu hexagon — kendi içindeki drop-shadow yeterli görsel ağırlık veriyor. */}
                   {!isOwnProfile && !isUserBlocked && currentUserId && (
                     <Pressable
                       style={sty.spChipBtn}
                       onPress={() => setShowSPSheet(true)}
+                      hitSlop={8}
                     >
-                      <LinearGradient
-                        colors={['#FFE082', '#FBBF24', '#D97706']}
-                        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                        style={StyleSheet.absoluteFillObject}
-                      />
-                      <SPIcon size={16} />
+                      <SPHexagonIcon size={60} />
                     </Pressable>
                   )}
                 </View>
@@ -780,7 +791,7 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                               end={{ x: 0, y: 1 }}
                               style={StyleSheet.absoluteFillObject}
                             />
-                            <Ionicons name={primary.icon} size={16} color="#fff" style={iconShadow} />
+                            <Ionicons name={primary.icon} size={18} color="#fff" style={iconShadow} />
                             <Text style={[sty.modPrimaryText, { color: '#fff' }]}>{primary.label}</Text>
                           </Pressable>
                         )}
@@ -869,7 +880,7 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                       <LinearGradient colors={['transparent', tierDef.color + '99', 'transparent']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={sty.sectionTopEdge} />
                       <View style={sty.tierRow}>
                         <LinearGradient colors={tierDef.gradient as [string, string]} style={sty.tierIcon}>
-                          <Ionicons name={tierDef.icon as any} size={16} color="#fff" style={iconShadow} />
+                          <Ionicons name={tierDef.icon as any} size={18} color="#fff" style={iconShadow} />
                         </LinearGradient>
                         <View style={{ flex: 1 }}>
                           <Text style={[sty.tierTitle, { color: tierDef.color }]}>{tierDef.label} Üye</Text>
@@ -941,7 +952,8 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                             <StatusAvatar
                               uri={f.avatar_url || undefined}
                               size={36}
-                              isOnline={(f as any).is_online}
+                              // ★ v87 (1 May 2026): stale is_online yerine last_seen 5dk eşiği (commit 6d3a467 paterni).
+                              isOnline={(() => { const ls = (f as any)?.last_seen; return ls ? new Date(ls).getTime() > Date.now() - 5 * 60 * 1000 : false; })()}
                               tier={(f as any).subscription_tier}
                             />
                             <Text style={sty.friendChipName} numberOfLines={1}>
@@ -1017,6 +1029,7 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
           senderId={currentUserId}
           recipientId={userId}
           recipientName={userProfile.display_name || 'Kullanıcı'}
+          recipientAvatar={userProfile.avatar_url || undefined}
         />
       )}
 
@@ -1141,18 +1154,21 @@ const sty = StyleSheet.create({
     marginHorizontal: 16,
     marginTop: 12,
   },
+  // ★ v92.1 (1 May 2026): Aksiyon row tutarlı yüksekliğe çekildi (42 → 56),
+  //   DM/SP chip boyutuyla hizalandı. Yazı font 13 → 14, padding artırıldı.
   followBtn: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    height: 42,
+    gap: 7,
+    height: 56,
     borderRadius: 999,
+    paddingHorizontal: 12,
     backgroundColor: '#14B8A6',
   },
   followBtnActive: { backgroundColor: 'rgba(20,184,166,0.15)', borderWidth: 1, borderColor: 'rgba(20,184,166,0.3)' },
-  followBtnText: { color: '#FFF', fontSize: 13, fontWeight: '700' },
+  followBtnText: { color: '#FFF', fontSize: 14, fontWeight: '700' },
   privateBox: {
     marginHorizontal: 16, marginTop: 10, padding: 20, borderRadius: 16,
     backgroundColor: 'rgba(255,255,255,0.04)',
@@ -1297,20 +1313,20 @@ const sty = StyleSheet.create({
     ...Shadows.text,
   },
 
-  // ★ 2026-04-26: DM butonu
+  // ★ v92.1 (1 May 2026): DM butonu — SP chip ile orantılı (56×56).
   dmBtn: {
-    width: 42, height: 42, borderRadius: 21,
+    width: 56, height: 56, borderRadius: 28,
     backgroundColor: 'rgba(255,255,255,0.06)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
     alignItems: 'center' as const, justifyContent: 'center' as const,
   },
-  // ★ 2026-04-26: SP Gönder yuvarlak altın chip — full-width karta göre çok daha kompakt
+  // ★ v92.1 (1 May 2026): SP Gönder — daire/border/zemin kaldırıldı (kullanıcı talebi).
+  //   Hexagon 60, wrapper 56 (overflow visible) → DM butonu ile aynı görsel boyut,
+  //   hexagon kendi glow'uyla biraz dışarı taşar (mücevher hissi).
   spChipBtn: {
-    width: 42, height: 42, borderRadius: 21,
-    overflow: 'hidden' as const,
+    width: 56, height: 56,
     alignItems: 'center' as const, justifyContent: 'center' as const,
-    borderWidth: 1, borderColor: 'rgba(251,191,36,0.45)',
-    ...Shadows.card,
+    overflow: 'visible' as const,
   },
 
   // ★ 2026-04-26: Şu an hangi odada

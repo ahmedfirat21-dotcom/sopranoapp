@@ -1,9 +1,10 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+﻿import { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, Image, Pressable, TextInput,
-  ScrollView, Alert, ActivityIndicator, Switch,
+  ScrollView, Alert, Switch,
   Platform, Keyboard, Dimensions, Share,
 } from 'react-native';
+import AppLoader from '../components/AppLoader';
 
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -410,7 +411,7 @@ export default function EditProfileScreen() {
             style={[styles.saveBtn, (!hasChanges || saving) && styles.saveBtnDisabled]}
           >
             {saving ? (
-              <ActivityIndicator size="small" color="#fff" />
+              <AppLoader size="small" color="#fff" />
             ) : (
               <Text style={[styles.saveBtnText, !hasChanges && styles.saveBtnTextDisabled]}>Kaydet</Text>
             )}
@@ -456,7 +457,7 @@ export default function EditProfileScreen() {
             <Pressable style={styles.ctaWrap} onPress={handlePickAvatar} disabled={uploadingAvatar}>
               <LinearGradient colors={['#14B8A6', '#0D9488', '#065F56']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.ctaGradient}>
                 {uploadingAvatar ? (
-                  <ActivityIndicator color="#fff" size="small" />
+                  <AppLoader color="#fff" size="small" />
                 ) : (
                   <>
                     <View style={styles.ctaIconWrap}><Ionicons name="images" size={16} color="#FFF" /></View>
@@ -528,7 +529,7 @@ export default function EditProfileScreen() {
               />
               {/* ★ Inline availability feedback — debounced */}
               {usernameStatus === 'checking' && (
-                <ActivityIndicator size="small" color="#94A3B8" style={{ marginLeft: 8 }} />
+                <AppLoader size="small" color="#94A3B8" style={{ marginLeft: 8 }} />
               )}
               {usernameStatus === 'available' && (
                 <Ionicons name="checkmark-circle" size={18} color="#22C55E" style={{ marginLeft: 8 }} />
@@ -675,7 +676,7 @@ export default function EditProfileScreen() {
                 <Pressable style={[styles.ctaWrap, changingPassword && { opacity: 0.6 }]} onPress={handleChangePassword} disabled={changingPassword}>
                   <LinearGradient colors={['#F59E0B', '#D97706', '#92400E']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.ctaGradient}>
                     {changingPassword ? (
-                      <ActivityIndicator size="small" color="#fff" />
+                      <AppLoader size="small" color="#fff" />
                     ) : (
                       <>
                         <View style={styles.ctaIconWrap}><Ionicons name="checkmark-circle" size={16} color="#FFF" /></View>

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * SopranoChat â€” Oda Yönetim Drawer
  * â˜… Sağdan kayan panel â€” RoomChatDrawer stili.
  * Oda-içi RoomSettingsSheet'teki TÃœM ayarları içerir + takipçi listesi.
@@ -10,8 +10,9 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, Pressable, ScrollView, TextInput,
-  Animated, Dimensions, ActivityIndicator, Switch,
+  Animated, Dimensions, Switch,
 } from 'react-native';
+import AppLoader from '../AppLoader';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Shadows } from '../../constants/theme';
@@ -322,6 +323,19 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
   //   atomic: önce type, sonra room_settings (önceki tutarsız kombinasyonları temizler)
   const handleAudienceChange = useCallback(async (newMode: AudienceMode, passwordValue?: string) => {
     if (!room || !hostId) return;
+    // ★ v92.11.2 (1 May 2026): Şifre boş uyarısı — kullanıcı talebi.
+    //   Şifreli mod seçtiğin halde şifre yazmadıysan kabul edilmiyor.
+    if (newMode === 'password') {
+      const pwTrim = (passwordValue ?? roomPassword ?? '').trim();
+      if (pwTrim.length < 1) {
+        showToast({ title: '🔐 Şifre Gerekli', message: 'Şifreli oda için en az 1 karakter şifre yaz.', type: 'warning' });
+        return;
+      }
+      if (pwTrim.length > 0 && pwTrim.length < 3) {
+        showToast({ title: '🔐 Çok Kısa', message: 'Şifre en az 3 karakter olmalı.', type: 'warning' });
+        return;
+      }
+    }
     const fields = audienceModeToFields(newMode, passwordValue ?? roomPassword);
     // Optimistic UI
     setAudienceMode(newMode);
@@ -599,7 +613,7 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
             <Text style={p.rowLabel}>Etiketler</Text>
             <Text style={p.rowDesc}>Keşfet için en fazla {MAX_TAGS_PER_ROOM} etiket</Text>
           </View>
-          {tagSaving && <ActivityIndicator size="small" color="#14B8A6" />}
+          {tagSaving && <AppLoader size="small" color="#14B8A6" />}
         </View>
         <View style={p.tagChipsRow}>
           {tags.map(t => (
@@ -646,7 +660,7 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
           desc={recordingId ? '🔴 Şu an kaydediliyor' : 'Sesli sohbet kaydedilir, sonra dinlenebilir (KVKK)'}
           onPress={recordingLoading ? undefined : handleToggleRecording}
           right={recordingLoading
-            ? <ActivityIndicator size="small" color="#14B8A6" />
+            ? <AppLoader size="small" color="#14B8A6" />
             : <Ionicons name="chevron-forward" size={10} color="rgba(255,255,255,0.15)" />}
         />
       )}
@@ -891,7 +905,7 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
       <View style={{ marginTop: 12 }}>
         <Text style={p.subTitle}>Banlı Kullanıcılar ({bannedUsers.length})</Text>
         {loadingModData ? (
-          <ActivityIndicator color="#EF4444" style={{ marginVertical: 12 }} />
+          <AppLoader color="#EF4444" style={{ marginVertical: 12 }} />
         ) : bannedUsers.length === 0 ? (
           <View style={p.emptyCard}>
             <Ionicons name="shield-checkmark" size={20} color="rgba(34,197,94,0.3)" />
@@ -1131,7 +1145,7 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
     <View>
       <Text style={p.subTitle}>{followerCount} Takipçi</Text>
       {loadingFollowers ? (
-        <ActivityIndicator color={Colors.accentTeal} style={{ marginVertical: 16 }} />
+        <AppLoader color={Colors.accentTeal} style={{ marginVertical: 16 }} />
       ) : followers.length > 0 ? (
         <View style={p.followerGrid}>
           {followers.map(f => (

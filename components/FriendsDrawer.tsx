@@ -1,5 +1,6 @@
-import React from 'react';
-import { View, Text, StyleSheet, Pressable, Animated, Easing, ScrollView, Dimensions, ActivityIndicator } from 'react-native';
+﻿import React from 'react';
+import { View, Text, StyleSheet, Pressable, Animated, Easing, ScrollView, Dimensions } from 'react-native';
+import AppLoader from './AppLoader';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { FriendshipService, type FollowUser } from '../services/friendship';
@@ -224,7 +225,7 @@ export default function FriendsDrawer({ visible, friends, onClose, onSelect, cur
                         </Text>
                       </View>
                     ) : isProcessing ? (
-                      <ActivityIndicator size="small" color="#14B8A6" />
+                      <AppLoader size="small" color="#14B8A6" />
                     ) : (
                       <View style={{ flexDirection: 'row', gap: 6 }}>
                         <Pressable style={fd.approveBtn} onPress={() => handleApprove(req.user_id)}>

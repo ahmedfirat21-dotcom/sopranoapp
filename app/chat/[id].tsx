@@ -1,14 +1,10 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { View, Text, StyleSheet, Image, Pressable, TextInput, FlatList, Platform, ActivityIndicator, Animated, Easing, NativeScrollEvent, NativeSyntheticEvent, Modal, Keyboard, Dimensions, Alert } from 'react-native';
-// ╔══════════════════════════════════════════════════════════════════╗
-// ║  ⛔ KRİTİK — DOKUNMA! ASLA DEĞİŞTİRME!                       ║
-// ║  Bu import react-native-keyboard-controller'dan gelir.         ║
-// ║  React Native'in built-in KeyboardAvoidingView'ı Samsung       ║
-// ║  cihazlarda çalışmaz (boşluk, kayma, input bar kaybolur).      ║
-// ║  Bu kütüphane native Android API kullanır, tüm cihazlarda      ║
-// ║  kusursuz çalışır. ASLA 'react-native' import'una çevirme!     ║
-// ╚══════════════════════════════════════════════════════════════════╝
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import { View, Text, StyleSheet, Image, Pressable, TextInput, FlatList, Platform, Animated, Easing, NativeScrollEvent, NativeSyntheticEvent, Modal, Keyboard, Dimensions, Alert, KeyboardAvoidingView } from 'react-native';
+
+// ★ v92.16: react-native-keyboard-controller kaldırıldı — native modül linked değildi.
+//   RN built-in KeyboardAvoidingView kullanılıyor (RN import'undaki mevcut).
+//   Samsung cihazlarda sorun olursa: behavior="height" + keyboardVerticalOffset ile ayarla.
+
 import PremiumAlert, { type AlertButton } from '../../components/PremiumAlert';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -30,7 +26,7 @@ import { StorageService } from '../../services/storage';
 import * as ImagePicker from 'expo-image-picker';
 import { Audio, type AVPlaybackStatus } from 'expo-av';
 import AppBackground from '../../components/AppBackground';
-import PremiumLoader from '../../components/PremiumLoader';
+import AppLoader from '../../components/AppLoader';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -1034,7 +1030,7 @@ export default function ChatScreen() {
     return (
       <AppBackground radialGlow>
         <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-          <PremiumLoader size={56} />
+          <AppLoader size="md" />
         </View>
       </AppBackground>
     );
@@ -1410,7 +1406,7 @@ export default function ChatScreen() {
           isTyping ? (
             <View style={styles.typingIndicatorWrap}>
               <View style={[styles.bubble, styles.bubbleOther, styles.typingBubble]}>
-                <ActivityIndicator size="small" color={Colors.text2} />
+                <AppLoader size="small" color={Colors.text2} />
                 <Text style={styles.typingText}>Yazıyor...</Text>
               </View>
             </View>
@@ -1482,7 +1478,7 @@ export default function ChatScreen() {
             disabled={sendingVoice}
           >
             {sendingVoice ? (
-              <ActivityIndicator size="small" color="#FFF" />
+              <AppLoader size="small" color="#FFF" />
             ) : (
               <Ionicons name="send" size={18} color="#FFF" />
             )}
@@ -1565,7 +1561,7 @@ export default function ChatScreen() {
               disabled={sendingVoice}
             >
               {sendingVoice ? (
-                <ActivityIndicator size="small" color={Colors.teal} />
+                <AppLoader size="small" color={Colors.teal} />
               ) : (
                 <Ionicons name="mic" size={22} color={Colors.teal} style={styles.iconShadow} />
               )}

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * SopranoChat — Liderlik Tablosu (Leaderboard)
  * ★ Premium glassmorphic dark UI
  *
@@ -12,9 +12,9 @@
  */
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  View, Text, StyleSheet, Image, Pressable, ScrollView,
-  ActivityIndicator, Animated, Dimensions, RefreshControl,
+  View, Text, StyleSheet, Image, Pressable, ScrollView, Animated, Dimensions, RefreshControl, Platform,
 } from 'react-native';
+import AppLoader from '../components/AppLoader';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -375,10 +375,42 @@ export default function LeaderboardScreen() {
   const [topSenders, setTopSenders] = useState<LeaderEntry[]>([]);
   const [topRooms, setTopRooms] = useState<RoomEntry[]>([]);
   const [topCreators, setTopCreators] = useState<LeaderEntry[]>([]);
+  // ★ v91 (1 May 2026): Haftalık SP Ligi — RPC'lerden anlık çekilir (cache yok, haftada bir bakılır)
+  const [weeklyDonors, setWeeklyDonors] = useState<LeaderEntry[]>([]);
+  const [weeklyEarners, setWeeklyEarners] = useState<LeaderEntry[]>([]);
+  const [weeklyHosts, setWeeklyHosts] = useState<LeaderEntry[]>([]);
 
   const loadData = useCallback(async () => {
     try {
       const cutoff = getDateCutoff(period);
+
+      // ★ v91: Haftalık SP Ligi — 3 RPC paralel (cari haftanın top 5'i her kategoride)
+      const [donorsRes, earnersRes, hostsRes] = await Promise.all([
+        supabase.rpc('weekly_top_donors', { p_limit: 5 }),
+        supabase.rpc('weekly_top_earners', { p_limit: 5 }),
+        supabase.rpc('weekly_top_hosts', { p_limit: 5 }),
+      ]);
+      setWeeklyDonors((donorsRes.data || []).map((r: any) => ({
+        user_id: r.user_id,
+        display_name: r.display_name || 'Kullanıcı',
+        avatar_url: r.avatar_url || '',
+        tier: r.subscription_tier || 'Free',
+        count: Number(r.total_sp) || 0,
+      })));
+      setWeeklyEarners((earnersRes.data || []).map((r: any) => ({
+        user_id: r.user_id,
+        display_name: r.display_name || 'Kullanıcı',
+        avatar_url: r.avatar_url || '',
+        tier: r.subscription_tier || 'Free',
+        count: Number(r.total_sp) || 0,
+      })));
+      setWeeklyHosts((hostsRes.data || []).map((r: any) => ({
+        user_id: r.user_id,
+        display_name: r.display_name || 'Kullanıcı',
+        avatar_url: r.avatar_url || '',
+        tier: r.subscription_tier || 'Free',
+        count: Number(r.room_count) || 0,
+      })));
 
       // ★ 1. En Zengin — SP sıralaması (O8: GodMaster/admin hesaplar leaderboard'da görünmemeli)
       const { data: spData } = await supabase
@@ -560,7 +592,7 @@ export default function LeaderboardScreen() {
       {/* ─── Content ─── */}
       {loading ? (
         <View style={s.loadingWrap}>
-          <ActivityIndicator size="large" color="#D4AF37" />
+          <AppLoader size="large" color="#D4AF37" />
           <Text style={s.loadingText}>Sıralama yükleniyor...</Text>
         </View>
       ) : (
@@ -577,6 +609,94 @@ export default function LeaderboardScreen() {
             />
           }
         >
+          {/* ════════════════════════════════════════════════════════
+              ★ v91: HAFTALIK SP LİGİ — sadece "Haftalık" tab seçildiğinde
+              görünür. Diğer tab'larda (Genel/Aylık) eski sıralamalar gösterilir
+              — hero kart çelişkisi (Aylık seçili ama "Haftalık SP Ligi"
+              başlığı görünmesi sorunu) bu şekilde kapatıldı.
+              ════════════════════════════════════════════════════════ */}
+          {period === 'weekly' && (
+            <>
+              <View style={ws.heroWrap}>
+                <LinearGradient
+                  colors={['#5a3a10', '#2a1a08', '#080403']}
+                  locations={[0, 0.55, 1]}
+                  start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
+                  style={StyleSheet.absoluteFillObject}
+                />
+                <LinearGradient
+                  colors={['transparent', 'rgba(255,215,130,0.95)', 'transparent']}
+                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                  style={ws.heroTopEdge}
+                />
+                <LinearGradient
+                  colors={['rgba(251,191,36,0.18)', 'transparent']}
+                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                  style={StyleSheet.absoluteFillObject}
+                />
+                <View style={ws.heroHeader}>
+                  <View style={ws.heroIconWrap}>
+                    <Ionicons name="trophy" size={20} color="#FFD700" style={{
+                      textShadowColor: 'rgba(255,215,0,0.85)', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 12,
+                    }} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={ws.heroTitle}>Haftalık SP Ligi</Text>
+                    <Text style={ws.heroSubtitle}>
+                      Pazartesi 09:00'da sıfırlanır. Her kategoride <Text style={ws.heroHighlight}>top 3</Text> ödülü:{' '}
+                      <Text style={ws.heroHighlight}>100 / 50 / 25 SP</Text>
+                    </Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* ── Top Cömert — bağış lideri ── */}
+              <SectionHeader icon="gift" iconColor="#22C55E" title="Top Cömert" />
+              {weeklyDonors.length > 0 ? (
+                <View style={[s.listCard]}>
+                  {weeklyDonors.map((entry, idx) => (
+                    <LeaderListItem key={`wd_${entry.user_id}`} entry={entry} rank={idx + 1} label="SP bağış" />
+                  ))}
+                </View>
+              ) : (
+                <View style={[s.emptySection]}>
+                  <Ionicons name="gift-outline" size={28} color="rgba(255,255,255,0.15)" />
+                  <Text style={s.emptyText}>Bu hafta henüz bağış yok</Text>
+                </View>
+              )}
+
+              {/* ── Top Kazanan — SP üretim lideri ── */}
+              <SectionHeader icon="flash" iconColor="#FBBF24" title="Top Kazanan" />
+              {weeklyEarners.length > 0 ? (
+                <View style={[s.listCard]}>
+                  {weeklyEarners.map((entry, idx) => (
+                    <LeaderListItem key={`we_${entry.user_id}`} entry={entry} rank={idx + 1} label="SP kazandı" />
+                  ))}
+                </View>
+              ) : (
+                <View style={[s.emptySection]}>
+                  <Ionicons name="flash-outline" size={28} color="rgba(255,255,255,0.15)" />
+                  <Text style={s.emptyText}>Bu hafta kazanım verisi yok</Text>
+                </View>
+              )}
+
+              {/* ── Top Host — en aktif oda sahibi ── */}
+              <SectionHeader icon="mic" iconColor="#A78BFA" title="Top Host" />
+              {weeklyHosts.length > 0 ? (
+                <View style={[s.listCard]}>
+                  {weeklyHosts.map((entry, idx) => (
+                    <LeaderListItem key={`wh_${entry.user_id}`} entry={entry} rank={idx + 1} label="oda açtı" />
+                  ))}
+                </View>
+              ) : (
+                <View style={[s.emptySection]}>
+                  <Ionicons name="mic-outline" size={28} color="rgba(255,255,255,0.15)" />
+                  <Text style={s.emptyText}>Bu hafta oda açılmamış</Text>
+                </View>
+              )}
+            </>
+          )}
+
           {/* ════ BÖLÜM 1: EN ÇOK HEDİYE ALAN ════ */}
           <SectionHeader icon="diamond" iconColor="#D4AF37" title="En Zengin" />
 
@@ -724,4 +844,67 @@ const s = StyleSheet.create({
   // Loading
   loadingWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 14 },
   loadingText: { fontSize: 14, color: '#64748B', fontWeight: '600' },
+});
+
+// ★ v91 (1 May 2026): Haftalık SP Ligi hero card stilleri.
+// Premium altın gradient + Android shadow uyumlu (border + elevation).
+const ws = StyleSheet.create({
+  heroWrap: {
+    marginHorizontal: 16,
+    marginTop: 16,
+    marginBottom: 6,
+    borderRadius: 18,
+    overflow: 'hidden',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderWidth: Platform.OS === 'android' ? 2 : 1.2,
+    borderColor: Platform.OS === 'android' ? 'rgba(255,224,130,0.85)' : 'rgba(255,224,130,0.55)',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#FBBF24',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.4,
+        shadowRadius: 16,
+      },
+      android: {
+        elevation: 10,
+      },
+    }),
+  },
+  heroTopEdge: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0,
+    height: 1.6,
+  },
+  heroHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  heroIconWrap: {
+    width: 44, height: 44, borderRadius: 22,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'rgba(251,191,36,0.18)',
+    borderWidth: 1, borderColor: 'rgba(255,224,130,0.55)',
+  },
+  heroTitle: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: '#FFE082',
+    letterSpacing: 0.4,
+    textShadowColor: 'rgba(0,0,0,0.6)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+    marginBottom: 3,
+  },
+  heroSubtitle: {
+    fontSize: 11.5,
+    color: 'rgba(255, 240, 200, 0.75)',
+    lineHeight: 16,
+    fontWeight: '600',
+  },
+  heroHighlight: {
+    color: '#FFD700',
+    fontWeight: '900',
+  },
 });

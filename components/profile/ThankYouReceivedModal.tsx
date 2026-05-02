@@ -288,8 +288,10 @@ const s = StyleSheet.create({
     position: 'absolute',
     width: 110, height: 110, borderRadius: 55,
     borderWidth: 2, borderColor: 'rgba(20,184,166,0.25)',
+    // ★ v92.23 (1 May 2026): Android elevation eklendi
     shadowColor: '#14B8A6',
     shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.6, shadowRadius: 16,
+    elevation: 10,
   },
   emojiWrap: {
     shadowColor: '#22C55E',

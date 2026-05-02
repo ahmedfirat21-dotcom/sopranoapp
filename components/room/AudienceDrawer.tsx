@@ -4,7 +4,7 @@
  * ★ Sağa sürükleyerek kapatma özelliği (DM panel ile aynı useSwipeToDismiss pattern)
  */
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, ScrollView, Pressable, Image, Animated, StyleSheet, useWindowDimensions, Dimensions } from 'react-native';
+import { View, Text, FlatList, Pressable, Image, Animated, StyleSheet, useWindowDimensions, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { getAvatarSource } from '../../constants/avatars';
@@ -113,14 +113,23 @@ export default function AudienceDrawer({ visible, users, onClose, onSelectUser, 
           </Pressable>
         </View>
 
-        {/* Kullanıcı listesi */}
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 8, paddingBottom: 40 }}>
-          {sorted.map((u) => {
+        {/* ★ v92.28 (2 May 2026) PERF: ScrollView + .map() → FlatList virtualization.
+            Önceden 100+ listener'da TÜM cell'ler render ediliyordu. FlatList ile
+            sadece görünen ~12 cell, scroll'da yenileri ekleniyor. 200 kişi rahat. */}
+        <FlatList
+          data={sorted}
+          keyExtractor={(u) => u.id}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: 8, paddingBottom: 40 }}
+          initialNumToRender={12}
+          maxToRenderPerBatch={10}
+          windowSize={5}
+          removeClippedSubviews={true}
+          renderItem={({ item: u }) => {
             const role = getRoleLabel(u.role);
             const hasMicReq = micRequests.includes(u.user_id);
             return (
               <Pressable
-                key={u.id}
                 style={({ pressed }) => [s.userRow, pressed && s.userRowPressed]}
                 onPress={() => { onClose(); setTimeout(() => onSelectUser(u), 200); }}
               >
@@ -145,8 +154,8 @@ export default function AudienceDrawer({ visible, users, onClose, onSelectUser, 
                 <Ionicons name="chevron-forward" size={12} color="rgba(255,255,255,0.1)" />
               </Pressable>
             );
-          })}
-        </ScrollView>
+          }}
+        />
       </Animated.View>
     </View>
   );

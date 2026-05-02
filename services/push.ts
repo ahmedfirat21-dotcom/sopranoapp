@@ -56,11 +56,14 @@ export const PushService = {
     data?: { type: PushType; route: string; [key: string]: any }
   ): Promise<void> {
     try {
-      // ★ SEC-PUSH: Per-user debounce (5sn) — incoming_call hariç (zaman kritik)
+      // ★ v92.29 (2 May 2026): Debounce 5sn → 1.5sn. Önceki 5sn'lik pencere
+      //   peş peşe DM/davet/friend req durumlarında ikinci push'u sessizce
+      //   düşürüyordu — kullanıcı şikâyeti: "push hiç gelmiyor". incoming_call
+      //   hala bypass.
       const pushType = data?.type;
       if (pushType !== 'incoming_call') {
         const lastSent = _lastPushTime.get(targetUserId) || 0;
-        if (Date.now() - lastSent < 5000) return; // 5sn debounce
+        if (Date.now() - lastSent < 1500) return;
       }
       _lastPushTime.set(targetUserId, Date.now());
 
@@ -77,7 +80,11 @@ export const PushService = {
       //   send-push edge function service_role ile push_tokens tablosundan
       //   TÜM aktif cihaz token'larını alır + Expo'ya batch forward eder.
       const isCall = data?.type === 'incoming_call';
-      const { error: invokeErr } = await supabase.functions.invoke('send-push', {
+      // ★ v92.29: invoke response'unu data ile yakala — Expo'dan gelen receipt'leri
+      //   logla. Önceden sadece supabase invokeErr bakılıyordu, ama Expo'nun
+      //   "DeviceNotRegistered / InvalidCredentials" gibi hataları response.data
+      //   içinde gizliydi — debug imkânı yoktu.
+      const { data: invokeData, error: invokeErr } = await supabase.functions.invoke('send-push', {
         body: {
           target_user_id: targetUserId,
           title,
@@ -87,11 +94,20 @@ export const PushService = {
         },
       });
 
-      if (invokeErr && __DEV__) {
-        logger.warn('[Push] Edge function hata:', invokeErr.message);
+      if (invokeErr) {
+        if (__DEV__) logger.warn('[Push] Edge function hata:', invokeErr.message);
+        return;
+      }
+      // Receipt analizi — herhangi bir cihazda fail varsa logla (DEV)
+      if (__DEV__ && invokeData?.result?.data && Array.isArray(invokeData.result.data)) {
+        const failures = invokeData.result.data.filter((t: any) => t?.status === 'error');
+        if (failures.length > 0) {
+          logger.warn(`[Push] ${failures.length}/${invokeData.devices} fail`,
+            failures.map((f: any) => f.details?.error || f.message).join(', '));
+        }
       }
     } catch (err: any) {
-      logger.error('[Push] Gönderilemedi:', err.message);
+      if (__DEV__) logger.error('[Push] Gönderilemedi:', err.message);
     }
   },
 

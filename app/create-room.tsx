@@ -1,5 +1,6 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TextInput, Pressable, ScrollView, ActivityIndicator, Image, Animated, Easing, Dimensions, PanResponder, InteractionManager } from 'react-native';
+﻿import { useState, useMemo, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, TextInput, Pressable, ScrollView, Image, Animated, Easing, Dimensions, PanResponder, InteractionManager } from 'react-native';
+import AppLoader from '../components/AppLoader';
 
 const { height: SCREEN_H } = Dimensions.get('window');
 import { LinearGradient } from 'expo-linear-gradient';
@@ -1514,7 +1515,7 @@ export default function CreateRoomScreen() {
                 style={w.primaryBtnGrad}
               >
                 {creating ? (
-                  <ActivityIndicator size="small" color="#FFF" />
+                  <AppLoader size="small" color="#FFF" />
                 ) : dailyLimitReached ? (
                   <>
                     <Ionicons name="lock-closed" size={16} color="#FFF" />

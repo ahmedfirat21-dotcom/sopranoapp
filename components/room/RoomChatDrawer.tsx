@@ -10,7 +10,7 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, Animated, Pressable, TextInput,
-  FlatList, Image, Platform, PanResponder, useWindowDimensions, Keyboard, Dimensions,
+  FlatList, Image, Platform, PanResponder, useWindowDimensions, Keyboard, Dimensions, Easing,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -50,6 +50,56 @@ function getUserColor(userId: string, role?: string, tier?: string): string {
   let hash = 0;
   for (let i = 0; i < userId.length; i++) hash = ((hash << 5) - hash) + userId.charCodeAt(i);
   return HASH_COLORS[Math.abs(hash) % HASH_COLORS.length];
+}
+
+// ★ v92.14 (1 May 2026): Mesaj Parlat power-up — Android-uyumlu gradient glow.
+//   - LinearGradient bg (parlaktan koyuya, top-down).
+//   - 3 katmanlı border (outer dark amber → mid gold → inner bright ivory) = sahte gradient outline.
+//   - Breath pulse opacity → "canlı parlama" hissi. Shadow YOK (Android'de glow render etmiyor).
+function GlowMessageOverlay() {
+  const breath = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(breath, { toValue: 1, duration: 1400, useNativeDriver: true, easing: Easing.inOut(Easing.sin) }),
+      Animated.timing(breath, { toValue: 0, duration: 1400, useNativeDriver: true, easing: Easing.inOut(Easing.sin) }),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, [breath]);
+  return (
+    <>
+      {/* Bg gradient — parlak ivory üst → koyu amber alt; ışıkla yıkanmış balon */}
+      <Animated.View
+        pointerEvents="none"
+        style={[StyleSheet.absoluteFillObject, {
+          borderRadius: 14,
+          overflow: 'hidden',
+          opacity: breath.interpolate({ inputRange: [0, 1], outputRange: [0.55, 0.92] }),
+        }]}
+      >
+        <LinearGradient
+          colors={['rgba(255,241,168,0.42)', 'rgba(255,215,0,0.22)', 'rgba(180,83,9,0.06)']}
+          start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
+          style={StyleSheet.absoluteFillObject}
+        />
+      </Animated.View>
+      {/* Outer ring — koyu amber (gradient'in koyu kenarı) */}
+      <View pointerEvents="none" style={[StyleSheet.absoluteFillObject, {
+        borderRadius: 14, borderWidth: 1.8, borderColor: '#B45309',
+      }]} />
+      {/* Mid ring — gold */}
+      <View pointerEvents="none" style={{
+        position: 'absolute', top: 1.4, left: 1.4, right: 1.4, bottom: 1.4,
+        borderRadius: 12.6, borderWidth: 1.1, borderColor: '#FFD700',
+      }} />
+      {/* Inner bright ring — breath ile parlaklık nefes alır */}
+      <Animated.View pointerEvents="none" style={{
+        position: 'absolute', top: 2.6, left: 2.6, right: 2.6, bottom: 2.6,
+        borderRadius: 11.4, borderWidth: 0.8, borderColor: '#FFF1A8',
+        opacity: breath.interpolate({ inputRange: [0, 1], outputRange: [0.65, 1] }),
+      }} />
+    </>
+  );
 }
 
 interface Props {
@@ -363,7 +413,18 @@ export default function RoomChatDrawer({
   // ════════════════════════════════════════════════════════════
   const renderMessage = useCallback(({ item }: { item: ChatMsg }) => {
     if (!item) return null;
-    if (item.isSystem) {
+    // ★ v92.10 (1 May 2026): DB type='system' mesajları (bağış vs.) — '✨' prefix ile
+    //   gelen donation mesajları altın çerçeveli, diğer sistem mesajları sade gri.
+    const isSystemMsg = item.isSystem || (item as any).type === 'system';
+    if (isSystemMsg) {
+      const isDonation = (item.content || '').trimStart().startsWith('✨');
+      if (isDonation) {
+        return (
+          <View style={st.donationSysMsg}>
+            <Text style={st.donationSysMsgText}>{item.content}</Text>
+          </View>
+        );
+      }
       return (
         <View style={st.sysMsg}>
           <Text style={st.sysMsgText}>{item.content}</Text>
@@ -384,6 +445,8 @@ export default function RoomChatDrawer({
     // ★ 2026-04-26 FIX: Mesaj objesinde gönderen alanı `sender_id` (DB) — ChatMsg type'ında `user_id` adıyla
     //   aliaslanıyordu ama bazı kayıtlarda yalnız `sender_id` geliyor. İkisini de OR ile al.
     const senderUid = (item as any).user_id || (item as any).sender_id;
+    // ★ v92.11 (1 May 2026): Mesaj Parlat power-up — metadata.glow=true ise altın bubble.
+    const isGlowMsg = !!(item as any).metadata?.glow;
 
     return (
       <View style={st.msgRow}>
@@ -401,9 +464,13 @@ export default function RoomChatDrawer({
           style={({ pressed }) => [
             st.msgBubble,
             isGifSafe && { backgroundColor: 'transparent', borderWidth: 0, paddingHorizontal: 4, paddingVertical: 2 },
+            isGlowMsg && st.glowMsgBubble,
             pressed && { opacity: 0.9 },
           ]}
         >
+          {/* ★ v92.14: Mesaj Parlat overlay — gradient bg + multi-layer border + breath pulse.
+              Arkada kalır, içerik üstüne biner (z-index doğal). */}
+          {isGlowMsg && <GlowMessageOverlay />}
           {/* İsim de tıklanır — avatar gibi profil sheet'i açar */}
           <Pressable
             onPress={() => { if (senderUid && onAvatarPress) onAvatarPress(senderUid); }}
@@ -593,10 +660,12 @@ const st = StyleSheet.create({
     borderBottomLeftRadius: 18,
     borderBottomRightRadius: 18,
     overflow: 'hidden',
+    // ★ v92.23 (1 May 2026): Android elevation eklendi (sheet drop shadow için)
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.4,
     shadowRadius: 16,
+    elevation: 12,
   },
 
   handle: { alignItems: 'center', paddingTop: 8, paddingBottom: 2 },
@@ -709,6 +778,39 @@ const st = StyleSheet.create({
     borderRadius: 12,
   },
   sysMsgText: { fontSize: 11, color: '#94A3B8', textAlign: 'center' },
+
+  // ★ v92.10 (1 May 2026): Bağış sistem mesajı — altın çerçeve + glow.
+  donationSysMsg: {
+    alignSelf: 'center',
+    backgroundColor: 'rgba(251,191,36,0.10)',
+    paddingHorizontal: 14, paddingVertical: 7,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(251,191,36,0.45)',
+    marginVertical: 4,
+    ...Platform.select({
+      ios: { shadowColor: '#FBBF24', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.4, shadowRadius: 8 },
+      android: { elevation: 3 },
+    }),
+  },
+  donationSysMsgText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#FFE082',
+    textAlign: 'center',
+    letterSpacing: 0.3,
+    textShadowColor: 'rgba(0,0,0,0.4)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+
+  // ★ v92.14 (1 May 2026): Mesaj Parlat — gerçek görsel <GlowMessageOverlay /> içinde.
+  //   Buradaki sadece BASE: bubble border/bg transparent — overlay tüm görseli yapıyor.
+  //   Eski versiyon flat altın border + iOS-only shadow idi (Android'de glow yok, kullanıcı şikâyet etti).
+  glowMsgBubble: {
+    borderWidth: 0,
+    backgroundColor: 'transparent',
+  },
 
   // ★ v56: Reaction badge — balonun sağ-altında küçük ❤️+sayı pill
   reactionBadge: {

@@ -5,17 +5,20 @@
  * partikül sayısı bunlara göre ayarlanır. SPSentSuccessModal/SPDonateSheet/
  * SPReceivedModal/DonationAlert ortak görsel dil için bu helper'ı kullanır.
  *
- * Tier eşikleri (mevcut UX deneyimine göre):
- *   basic     :  1 - 49 SP   (gümüş/teal)
- *   premium   : 50 - 249 SP  (altın)
- *   elite     : 250 - 999 SP (rose-gold/pembe)
- *   legendary : 1000+ SP     (mor)
+ * Tier eşikleri (★ v87 1 May 2026 — rebalance, SP üretim hızıyla denk):
+ *   basic     :  1 - 24 SP   (gümüş/teal)   — günlük üretimle hemen ulaşılır
+ *   premium   : 25 - 99 SP   (altın)        — 1 günlük birikim
+ *   elite     : 100 - 499 SP (rose-gold)    — 3-5 günlük birikim
+ *   legendary : 500+ SP      (mor)          — 2 haftalık birikim
+ *
+ * Eski eşikler (50/250/1000) free kullanıcı için legendary'i ~1 ay uzaktaydı
+ * — sinematik halo glow vaadi vs. ulaşılabilirlik uçurumu vardı, kapatıldı.
  */
 
 export type SPAmountTier = 'basic' | 'premium' | 'elite' | 'legendary';
 
 export const getSPAmountTier = (amount: number): SPAmountTier =>
-  amount >= 1000 ? 'legendary' : amount >= 250 ? 'elite' : amount >= 50 ? 'premium' : 'basic';
+  amount >= 500 ? 'legendary' : amount >= 100 ? 'elite' : amount >= 25 ? 'premium' : 'basic';
 
 // ── Tier palette (paylaşılan, üst seviye) ──
 export interface SPTierVisual {

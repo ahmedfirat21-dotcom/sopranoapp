@@ -313,6 +313,28 @@ export const ProfileService = {
     if (!Number.isInteger(amount) || amount < 1) return { success: false, error: 'Geçersiz miktar' };
     if (amount > 1000) return { success: false, error: 'Tek seferde en fazla 1000 SP gönderilebilir' };
 
+    // ★ v92.15 (1 May 2026): WELCOME BONUS EXPLOIT FIX
+    //   Yeni hesap → 250 SP welcome → ana hesaba transfer → hesabı sil → tekrar
+    //   döngüsünü kırmak için "donatable_sp" sayacı kullanılır. welcome_bonus tipi
+    //   trigger'da donatable artırmıyor, dolayısıyla yeni hesap o 250 SP'yi gönderemez.
+    //   Daily login + sahne süresi + mağaza alımı + bağış alma = donatable artar.
+    try {
+      const { data: prof } = await supabase
+        .from('profiles')
+        .select('donatable_sp')
+        .eq('id', fromUserId)
+        .single();
+      const donatable = (prof as any)?.donatable_sp ?? 0;
+      if (donatable < amount) {
+        return {
+          success: false,
+          error: `Bağışlanabilir SP yetersiz (${donatable} SP). Hoşgeldin bonusu bağışlanamaz; günlük girişler, sahne süresi ve mağaza alımıyla biriken SP gönderilebilir.`,
+        };
+      }
+    } catch {
+      // Profile sorgusu başarısızsa fail-open — alttaki spend RPC zaten system_points kontrolü yapacak
+    }
+
     // ★ B4: Atomic rate limit — v34 RPC `FOR UPDATE` lock ile race condition'ı engeller.
     // Client-side count check eşzamanlı isteklerde bypass edilebiliyordu.
     try {
@@ -388,7 +410,7 @@ export const ProfileService = {
           toUserId,
           '💎 Bağış Aldın!',
           `${senderName} sana ${amount} SP gönderdi`,
-          { type: 'donation' as any, route: '/sp-store' },
+          { type: 'gift', route: '/(tabs)/profile?openSP=1' },
         );
       } catch { /* push başarısız olsa da bağış tamamlandı, sessiz geç */ }
     } catch (recvErr: any) {

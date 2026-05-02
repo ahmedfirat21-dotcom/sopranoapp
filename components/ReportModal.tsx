@@ -1,13 +1,14 @@
-/**
+﻿/**
  * SopranoChat — Premium Raporlama Modal
  * Glassmorphism + Pill buttons + Slide-up
  */
 import { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, Pressable, Modal, TextInput,
-  ScrollView, ActivityIndicator, Dimensions, TouchableOpacity,
+  ScrollView, Dimensions, TouchableOpacity,
   Animated, PanResponder,
 } from 'react-native';
+import AppLoader from './AppLoader';
 import { Ionicons } from '@expo/vector-icons';
 import { ModerationService, ReportReason } from '../services/moderation';
 import { showToast } from './Toast';
@@ -190,7 +191,7 @@ export function ReportModal({ visible, onClose, reporterId, target }: ReportModa
               style={[sty.submitBtn, (!selectedReason || sending) && { opacity: 0.4 }]}
             >
               {sending ? (
-                <ActivityIndicator color="#fff" size="small" />
+                <AppLoader color="#fff" size="small" />
               ) : (
                 <>
                   <Ionicons name="send" size={14} color="#fff" />

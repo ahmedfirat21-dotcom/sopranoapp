@@ -80,16 +80,19 @@ export const RoomChatService = {
   /**
    * Odadaki mesajlari getir (son 50)
    * ★ 2026-04-26: Descending — limit ile son 50 yeni mesaj döner. Component'te [newest, ..., oldest] sıralı.
-   *   Eski ascending: ilk eklenen 50 mesaj dönüyordu (yanlış: kullanıcı son 50'yi ister) +
-   *   real-time [msg, ...prev] ile karışık sıralama oluşuyordu → son mesaj listede üstte gözüküyordu.
+   * ★ v87 (1 May 2026): sinceIso geçilirse sadece o tarihten sonraki mesajlar döner (Spaces/anlık modeli).
+   *   Oda canlı bile olsa, yeni katılan kullanıcı eski backlog'u görmez; sadece kendi katılımından
+   *   sonra konuşulanları görür. Eski mesajlar DB'de oda kapanana kadar yaşar (kapanınca trigger siler).
    */
-  async getMessages(roomId: string, limit = 50): Promise<RoomMessage[]> {
+  async getMessages(roomId: string, limit = 50, sinceIso?: string): Promise<RoomMessage[]> {
     // Sistem odalarında DB sorgusu yapma (UUID değil)
     if (isSystemRoom(roomId)) return [];
-    const { data, error } = await supabase
+    let query = supabase
       .from('messages')
       .select('*, profiles!messages_sender_id_fkey(display_name, avatar_url)')
-      .eq('room_id', roomId)
+      .eq('room_id', roomId);
+    if (sinceIso) query = query.gte('created_at', sinceIso);
+    const { data, error } = await query
       .order('created_at', { ascending: false })
       .limit(limit);
     if (error) {
@@ -203,9 +206,25 @@ export const RoomChatService = {
     } catch { /* roomData fetch hatası — mesaj engellenmez, diğer DB katmanı koruyacak */ }
 
     const filteredContent = filterBadWords(sanitized);
+
+    // ★ v92.11 (1 May 2026): Mesaj Parlat power-up — counter > 0 ise metadata.glow=true
+    //   ekle + atomic decrement (consume_message_glow RPC).
+    let glowApplied = false;
+    try {
+      const { data: consumed } = await supabase.rpc('consume_message_glow', { p_user_id: userId });
+      if (consumed === true) glowApplied = true;
+    } catch { /* sessiz — glow yoksa normal mesaj */ }
+
+    const insertData: any = {
+      room_id: roomId,
+      sender_id: userId,
+      content: filteredContent,
+    };
+    if (glowApplied) insertData.metadata = { glow: true };
+
     const { data, error } = await supabase
       .from('messages')
-      .insert({ room_id: roomId, sender_id: userId, content: filteredContent })
+      .insert(insertData)
       .select('*, profiles!messages_sender_id_fkey(display_name, avatar_url)')
       .single();
     if (error) {
@@ -214,6 +233,37 @@ export const RoomChatService = {
     }
 
     return data as RoomMessage;
+  },
+
+  /**
+   * ★ v92.10 (1 May 2026): Sistem mesajı — bağış bildirimleri gibi otomatik
+   * tetiklenen "X, Y'ye Z SP gönderdi" türü mesajlar için. Sender_id null,
+   * type='system'. Chat drawer altın çerçeveyle render eder.
+   */
+  async sendSystem(roomId: string, content: string, externalRef?: string): Promise<RoomMessage | null> {
+    if (isSystemRoom(roomId)) return null;
+    const sanitized = (content || '').trim().slice(0, 500);
+    if (sanitized.length < 1) return null;
+    try {
+      const { data, error } = await supabase
+        .from('messages')
+        .insert({
+          room_id: roomId,
+          sender_id: null as any,
+          content: sanitized,
+          type: 'system',
+        })
+        .select('*')
+        .single();
+      if (error) {
+        if (__DEV__) logger.warn('System message insert failed:', error);
+        return null;
+      }
+      return data as RoomMessage;
+    } catch (e) {
+      if (__DEV__) logger.warn('sendSystem exception:', e);
+      return null;
+    }
   },
 
   /**
@@ -235,13 +285,11 @@ export const RoomChatService = {
           const newMsg = payload.new as any;
           const cachedProfile = await _getCachedProfile(newMsg.sender_id);
           if (cachedProfile) {
+            // ★ v92.13 (1 May 2026): metadata + reactions + tüm yeni kolonlar spread ile
+            //   alınıyor. Önceden explicit field listesi vardı → metadata droplanıyordu →
+            //   "Mesaj Parlat" power-up render edilmiyordu (DB'de glow:true ama UI'da yok).
             const msg: RoomMessage = {
-              id: newMsg.id,
-              room_id: newMsg.room_id,
-              sender_id: newMsg.sender_id,
-              content: newMsg.content,
-              type: newMsg.type,
-              created_at: newMsg.created_at,
+              ...(newMsg as RoomMessage),
               profiles: {
                 display_name: cachedProfile.display_name,
                 avatar_url: cachedProfile.avatar_url,

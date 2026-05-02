@@ -306,32 +306,36 @@ export interface SPRewardConfig {
   dailyCap: number;
 }
 
+// ★ v86 (1 May 2026): SP üretimi yaklaşık %50 azaltıldı — kullanıcılar mağazadan SP
+//   satın almaya yönlendirilsin. Closed test sürerken mevcut bakiyeler dokunulmuyor,
+//   sadece yeni kazanımlar bu yeni hızda akar.
+//   Eski/yeni karşılaştırma yorumlarda parantez içinde.
 export const SP_REWARDS: Record<string, SPRewardConfig> = {
   // ── Günlük & Giriş ──
-  daily_login:           { amount: 5,    cooldownMs: 24 * 3600 * 1000, dailyCap: 5 },   // 1×/gün
-  prime_time_return:     { amount: 3,    cooldownMs: 4 * 3600 * 1000,  dailyCap: 3 },   // 1×/gün (19-22)
+  daily_login:           { amount: 3,    cooldownMs: 24 * 3600 * 1000, dailyCap: 3 },   // (eski 5/gün) 3 SP/gün
+  prime_time_return:     { amount: 2,    cooldownMs: 4 * 3600 * 1000,  dailyCap: 2 },   // (eski 3/gün)
   // ── Oda İçi Aktivite ──
-  stage_time:            { amount: 2,    cooldownMs: 15 * 60 * 1000,   dailyCap: 16 },  // Max 2sa sahne = 16 SP
-  camera_time:           { amount: 2,    cooldownMs: 15 * 60 * 1000,   dailyCap: 16 },  // Max 2sa kamera = 16 SP
-  message_sent:          { amount: 1,    cooldownMs: 60 * 1000,        dailyCap: 10 },  // Max 10 mesaj ödülü/gün
+  stage_time:            { amount: 1,    cooldownMs: 15 * 60 * 1000,   dailyCap: 8 },   // (eski 16) Max 2sa sahne = 8 SP
+  camera_time:           { amount: 1,    cooldownMs: 15 * 60 * 1000,   dailyCap: 8 },   // (eski 16) Max 2sa kamera = 8 SP
+  message_sent:          { amount: 1,    cooldownMs: 60 * 1000,        dailyCap: 5 },   // (eski 10) Max 5 mesaj ödülü/gün
   // ── Üretim & Büyüme ──
-  room_create:           { amount: 5,    cooldownMs: 30 * 60 * 1000,   dailyCap: 10 },  // Max 2 oda/gün ödüllü
-  // ★ 2026-04-26: wall_post kaldırıldı — oda duvarı/post sistemi kullanıcı kararıyla silindi
-  follower_gain:         { amount: 2,    cooldownMs: 0,                dailyCap: 10 },  // Max 5 takipçi/gün ödüllü
+  room_create:           { amount: 3,    cooldownMs: 30 * 60 * 1000,   dailyCap: 6 },   // (eski 5×2=10) Max 2 oda/gün
+  follower_gain:         { amount: 1,    cooldownMs: 0,                dailyCap: 5 },   // (eski 2×5=10) Max 5 takipçi/gün
   // ── Milestone (tek sefer / cooldown ile) ──
-  ccu_milestone_10:      { amount: 10,   cooldownMs: 24 * 3600 * 1000, dailyCap: 10 },  // 1×/gün
-  ccu_milestone_25:      { amount: 20,   cooldownMs: 24 * 3600 * 1000, dailyCap: 20 },  // 1×/gün
-  ccu_milestone_50:      { amount: 40,   cooldownMs: 24 * 3600 * 1000, dailyCap: 40 },  // 1×/gün
+  ccu_milestone_10:      { amount: 5,    cooldownMs: 24 * 3600 * 1000, dailyCap: 5 },   // (eski 10)
+  ccu_milestone_25:      { amount: 10,   cooldownMs: 24 * 3600 * 1000, dailyCap: 10 },  // (eski 20)
+  ccu_milestone_50:      { amount: 20,   cooldownMs: 24 * 3600 * 1000, dailyCap: 20 },  // (eski 40)
   // ── Mağaza & Referral ──
-  store_purchase:        { amount: 0,    cooldownMs: 0,                dailyCap: 0 },   // Dinamik: tutar × 1
-  referral:              { amount: 25,   cooldownMs: 0,                dailyCap: 50 },  // Max 2 referral/gün
+  store_purchase:        { amount: 0,    cooldownMs: 0,                dailyCap: 0 },   // Dinamik: tutar × 1 (değişmedi)
+  referral:              { amount: 15,   cooldownMs: 0,                dailyCap: 30 },  // (eski 25×2=50) Max 2 referral/gün
 };
 
-/** Üyelik satın alma SP bonusları */
+/** Üyelik satın alma SP bonusları
+ *  ★ v86 (1 May 2026): 2x arttırıldı — SP üretim hızı düşünce abonelik daha cazip olsun. */
 export const SUBSCRIPTION_SP_BONUS: Record<SubscriptionTier, number> = {
   Free: 0,
-  Plus: 300,
-  Pro: 800,
+  Plus: 600,        // (eski 300) +2x — 1 ay = 20 SP/gün ekstra
+  Pro: 1500,        // (eski 800) +1.9x — 1 ay = 50 SP/gün ekstra
   GodMaster: 999999,
 };
 
@@ -355,15 +359,17 @@ export function calculateOwnerBonus(followerCount: number, ccu: number, totalLis
   return Math.floor(followerScore + ccuScore + engagementScore);
 }
 
-/** Günlük oda sahibi bonus cap'i */
-export const OWNER_BONUS_DAILY_CAP = 80;
+/** Günlük oda sahibi bonus cap'i
+ *  ★ v86 (1 May 2026): 80→40 — host'lar günlük 80 SP biriktirip mağazaya hiç bakmıyordu. */
+export const OWNER_BONUS_DAILY_CAP = 40;
 
 // ════════════════════════════════════════════════════════════
 // GÜNLÜK CHECK-IN ÖDÜLLERİ (Tier çarpanlı)
 // ════════════════════════════════════════════════════════════
 
-/** 7 günlük seri baz ödülleri */
-export const DAILY_BASE_REWARDS = [2, 4, 6, 8, 10, 15, 25];
+/** 7 günlük seri baz ödülleri
+ *  ★ v86 (1 May 2026): toplam 70→40 (7 günde) — daha tasarruflu. */
+export const DAILY_BASE_REWARDS = [1, 2, 3, 5, 7, 10, 12];
 
 /** Tier bazlı check-in çarpanı */
 export const CHECKIN_MULTIPLIER: Record<SubscriptionTier, number> = {

@@ -25,12 +25,20 @@ const iconShadow = {
 
 // Reason → Türkçe etiket
 // ★ 2026-04-21: donation_sent/received, referral_bonus_* eklendi (gerçek DB type'ları).
-function spReasonLabel(reason: string | undefined): string {
+// ★ v92.15 (1 May 2026): welcome_bonus, powerup_*, message_sent, follower_gain,
+//   badge_reward eklendi — kullanıcı raw "powerup_stage_light" gibi kod isimleri
+//   görüyordu. Artık hepsi sade Türkçe.
+function spReasonLabel(reason: string | undefined, amount?: number): string {
   const map: Record<string, string> = {
     daily_login: 'Günlük giriş',
     prime_time_return: 'Prime-time dönüş',
     stage_time: 'Sahne süresi',
+    message_sent: 'Mesaj gönderdin',
+    follower_gain: 'Yeni takipçi',
     room_create: 'Oda oluşturma',
+    room_entry_fee: 'Oda giriş ücreti',
+    entry_fee_share: 'Oda gelir payı',
+    welcome_bonus: 'Hoşgeldin bonusu',
     referral_reward: 'Davet ödülü',
     referral_bonus: 'Davet bonusu',
     referral_bonus_owner: 'Davet bonusu (sen davet ettin)',
@@ -40,18 +48,28 @@ function spReasonLabel(reason: string | undefined): string {
     donation_sent: 'SP gönderdin',
     donation_received: 'SP aldın',
     donation_refund: 'SP iadesi (alıcı alamadı)',
+    donation_stuck: 'SP işlemi takılı',
     room_boost: 'Oda boost',
     profile_boost: 'Profil boost',
     store_purchase: 'Mağaza alışverişi',
     subscription_bonus: 'Abonelik bonusu',
     achievement: 'Başarım',
+    badge_reward: 'Rozet ödülü',
     admin_grant: 'Admin ödülü',
     refund: 'İade',
+    // ★ Power-up'lar — kullanıcıya "Sahne Işığı" gibi sade isim, kod adı değil
+    powerup_extend_room: 'Süre uzatma',
+    powerup_message_glow: 'Mesaj parlatma',
+    powerup_stage_light: 'Sahne ışığı',
+    powerup_gold_invite: 'Altın davet',
   };
-  if (!reason) return 'SP işlemi';
+  if (!reason) return amount && amount > 0 ? 'SP kazandın' : amount && amount < 0 ? 'SP harcadın' : 'SP işlemi';
   // Admin bypass etiketleri (örn. "store_purchase [ADMIN]")
   const clean = reason.replace(/\s*\[ADMIN.*\]\s*/, '').trim();
-  return map[clean] || clean || 'SP işlemi';
+  if (map[clean]) return map[clean];
+  // ★ v92.15 (1 May 2026): Fallback artık raw type döndürmüyor (kullanıcı şikâyet etti).
+  //   Yeni eklenen ama map'te olmayan tipler için amount işaretine göre sade etiket.
+  return amount && amount > 0 ? 'SP kazandın' : amount && amount < 0 ? 'SP harcadın' : 'SP işlemi';
 }
 
 function spReasonIcon(reason: string | undefined, isPositive: boolean): { name: any; color: string } {
@@ -59,7 +77,17 @@ function spReasonIcon(reason: string | undefined, isPositive: boolean): { name: 
     daily_login:        { name: 'sunny',        color: '#FBBF24' },
     prime_time_return:  { name: 'time',         color: '#F59E0B' },
     stage_time:         { name: 'mic',          color: '#14B8A6' },
+    message_sent:       { name: 'chatbubble',   color: '#60A5FA' },
+    follower_gain:      { name: 'person-add',   color: '#34D399' },
     room_create:        { name: 'radio',        color: '#A855F7' },
+    room_entry_fee:     { name: 'enter',        color: '#F59E0B' },
+    entry_fee_share:    { name: 'cash',         color: '#22C55E' },
+    welcome_bonus:      { name: 'gift',         color: '#FBBF24' },
+    badge_reward:       { name: 'medal',        color: '#FBBF24' },
+    powerup_extend_room: { name: 'timer',       color: '#14B8A6' },
+    powerup_message_glow:{ name: 'sparkles',    color: '#FBBF24' },
+    powerup_stage_light: { name: 'flashlight',  color: '#FFD700' },
+    powerup_gold_invite: { name: 'mail',        color: '#D4AF37' },
     referral_reward:    { name: 'people',       color: '#A78BFA' },
     referral_bonus:          { name: 'people', color: '#A78BFA' },
     referral_bonus_owner:    { name: 'people', color: '#A78BFA' },
@@ -239,11 +267,14 @@ export default function SPHistorySheet({ visible, onClose, balance, history: ini
               const txType = tx.type || tx.reason; // backward compat
               const iconDef = spReasonIcon(txType, isPositive);
               const isFresh = flashId === tx.id;
+              const titleLabel = spReasonLabel(txType, tx.amount);
               // Description enrichment — örn. "Mağaza: 100 SP Paketi" veya "Ayşe'den" (v51 counterparty)
               const rawDesc = typeof tx.description === 'string' ? tx.description.trim() : '';
               // "SP kazanıldı: xxx" / "SP harcandı: xxx" prefix'ini ayıkla (generic log)
               const cleanDesc = rawDesc.replace(/^SP (kazan[ıi]ld[ıi]|harcand[ıi]|):\s*/i, '').replace(/^SP:\s*/i, '').trim();
-              const isGenericDesc = !cleanDesc || cleanDesc === txType || cleanDesc === 'donation_sent' || cleanDesc === 'donation_received';
+              // ★ v92.15 (1 May 2026): cleanDesc title ile aynıysa subline gizle (çift gösterim engeli)
+              const isGenericDesc = !cleanDesc || cleanDesc === txType || cleanDesc === 'donation_sent' || cleanDesc === 'donation_received'
+                || cleanDesc.toLocaleLowerCase('tr') === titleLabel.toLocaleLowerCase('tr');
               // Counterparty adı (v51 sonrası tx.counterparty_name dolabilir)
               const counterpartyName = tx.counterparty_name || tx.partner?.display_name;
               const subline = isGenericDesc
@@ -260,7 +291,7 @@ export default function SPHistorySheet({ visible, onClose, balance, history: ini
                     )}
                   </View>
                   <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text style={s.reason} numberOfLines={1}>{spReasonLabel(txType)}</Text>
+                    <Text style={s.reason} numberOfLines={1}>{titleLabel}</Text>
                     {!!subline && (
                       <Text style={s.subline} numberOfLines={1}>{subline}</Text>
                     )}

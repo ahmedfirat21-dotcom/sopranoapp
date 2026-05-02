@@ -412,10 +412,16 @@ export class LiveKitService {
   }
 
   // ─── Oda Sesini Kapat/Aç ──────────────────────────────────
-  // ★ 2026-04-20: remoteParticipants + trackPublications LiveKit v2'de Map.
-  //   Map.forEach(value, key) tarafı OK ama audioTrackPublications bazı
-  //   sürümlerde getter (array) olabilir. İkisini de safe iterate et.
+  // ★ v92.17 (1 May 2026): mediaStreamTrack.enabled JS-side flag — RN native
+  //   audio player'ı durdurmuyor, ses kullanıcının kulağına geliyordu (sahnedeki
+  //   konuşmacı kendi mikrofonunu açık tutarken diğer sesleri kısamadığı şikâyeti).
+  //   ÇÖZÜM: setSubscribed(false) → sunucuya "bu track'i bana gönderme" mesajı,
+  //   audio akışı network seviyesinde durur. Yeni katılan participant'lar için
+  //   _roomAudioMuted flag tutulur, TrackSubscribed event'inde de uygulanır.
+  private _roomAudioMuted: boolean = false;
+
   muteRoomAudio(mute: boolean) {
+    this._roomAudioMuted = mute;
     if (!this.room) return;
     const iterate = (collection: any, cb: (v: any) => void) => {
       if (!collection) return;
@@ -427,11 +433,29 @@ export class LiveKitService {
     };
     iterate(this.room.remoteParticipants, (p: any) => {
       iterate(p?.audioTrackPublications, (pub: any) => {
+        // 1. setSubscribed — en kesin: sunucu tarafı unsubscribe, network'te ses akmaz
+        if (typeof pub?.setSubscribed === 'function') {
+          try { pub.setSubscribed(!mute); } catch {}
+        }
+        // 2. setEnabled fallback (bazı LiveKit RN versiyonları)
+        if (typeof pub?.track?.setEnabled === 'function') {
+          try { pub.track.setEnabled(!mute); } catch {}
+        }
+        // 3. Volume 0/1 (bazı SDK'larda var)
+        if (pub?.track && typeof (pub.track as any).setVolume === 'function') {
+          try { (pub.track as any).setVolume(mute ? 0 : 1); } catch {}
+        }
+        // 4. Last resort — mediaStreamTrack.enabled (etkisiz olabilir ama zarar vermez)
         if (pub?.track?.mediaStreamTrack) {
-          pub.track.mediaStreamTrack.enabled = !mute;
+          try { pub.track.mediaStreamTrack.enabled = !mute; } catch {}
         }
       });
     });
+  }
+
+  /** Mevcut roomAudioMuted state'ini döner — yeni track subscribe olunca kullanılır */
+  isRoomAudioMuted(): boolean {
+    return this._roomAudioMuted;
   }
 
   // ─── Bağlantıyı Kes ──────────────────────────────────────
@@ -923,6 +947,20 @@ export class LiveKitService {
       lk.RoomEvent.ConnectionQualityChanged, // ★ 2026-04-25: Bağlantı kalitesi göstergesi
       lk.RoomEvent.DataReceived,             // ★ Faz 3.2: Voice reaction data channel
     ];
+
+    // ★ v92.17 (1 May 2026): Oda ses mute aktifken yeni track subscribe olunca
+    //   onu da otomatik unsubscribe et (yeni katılan participant'ların sesini de kesmek için).
+    this.room.on(lk.RoomEvent.TrackSubscribed, (track: any, publication: any, _participant: any) => {
+      if (!this._roomAudioMuted) return;
+      // Sadece audio track'lere uygula
+      if (track?.kind !== 'audio' && track?.source !== 'microphone') return;
+      try {
+        if (typeof publication?.setSubscribed === 'function') publication.setSubscribed(false);
+        if (typeof track?.setEnabled === 'function') track.setEnabled(false);
+        if (typeof track?.setVolume === 'function') track.setVolume(0);
+        if (track?.mediaStreamTrack) track.mediaStreamTrack.enabled = false;
+      } catch { /* sessizce */ }
+    });
 
     // ★ Faz 3.2 — Voice reaction listener (data channel; audio publish bozulmaz)
     this.room.on(lk.RoomEvent.DataReceived, (payload: Uint8Array, participant: any) => {

@@ -1,9 +1,10 @@
-/**
+﻿/**
  * SopranoChat — Bildirimler Ekranı
  * Instagram tarzı: Üstte Takip İstekleri (Onayla/Reddet), altta bildirimler
  */
 import { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, Pressable, Image, ActivityIndicator, RefreshControl, Animated } from 'react-native';
+import { View, Text, StyleSheet, FlatList, Pressable, Image, RefreshControl, Animated } from 'react-native';
+import AppLoader from '../components/AppLoader';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { safeGoBack } from '../constants/navigation';
@@ -190,7 +191,7 @@ export default function NotificationsScreen() {
 
                   <View style={styles.pendingActions}>
                     {isProcessing ? (
-                      <ActivityIndicator size="small" color={Colors.teal} />
+                      <AppLoader size="small" color={Colors.teal} />
                     ) : (
                       <>
                         {/* Onayla */}
@@ -265,7 +266,7 @@ export default function NotificationsScreen() {
 
       {loading ? (
         <View style={styles.center}>
-          <ActivityIndicator size="large" color={Colors.teal} />
+          <AppLoader size="large" color={Colors.teal} />
         </View>
       ) : (
         <FlatList

@@ -321,13 +321,29 @@ export const RoomAccessService = {
       else targetRole = 'speaker';
     }
 
-    // DB'ye istek yaz
-    await supabase.from('room_access_requests').upsert({
-      room_id: roomId,
-      user_id: userId,
-      status: 'pending',
-      target_role: targetRole,
-    }, { onConflict: 'room_id,user_id' });
+    // ★ v92.16 (1 May 2026): Önceden upsert({onConflict: 'room_id,user_id'}) kullanılıyordu
+    //   ama tabloda o composite UNIQUE constraint yoktu → hata: "there is no unique or
+    //   exclusion constraint matching the ON CONFLICT specification". Constraint v92.16
+    //   migration ile eklendi, ama PostgREST schema cache geç güncellendiği için
+    //   yine de DELETE+INSERT pattern'ine geçtik — schema cache'e bağlı değil.
+    await supabase
+      .from('room_access_requests')
+      .delete()
+      .eq('room_id', roomId)
+      .eq('user_id', userId);
+
+    const { error: insertError } = await supabase
+      .from('room_access_requests')
+      .insert({
+        room_id: roomId,
+        user_id: userId,
+        status: 'pending',
+        target_role: targetRole,
+      });
+
+    if (insertError) {
+      throw new Error('İstek kaydedilemedi: ' + (insertError.message || 'bilinmeyen hata') + (insertError.code ? ` (${insertError.code})` : ''));
+    }
 
     // ★ İstekçinin profil bilgisini çek
     const { data: requesterProfile } = await supabase
@@ -337,23 +353,13 @@ export const RoomAccessService = {
       .single();
     const requesterName = requesterProfile?.display_name || 'Birisi';
 
-    // ★ Host ve moderatörlere inbox bildirimi gönder — tek seferde batch insert
-    const notifyTargets = (authorizedUsers || [])
-      .filter(u => u.role === 'owner' || u.role === 'moderator')
-      .map(u => u.user_id);
-
-    if (notifyTargets.length > 0) {
-      const rows = notifyTargets.map(targetId => ({
-        user_id: targetId,
-        sender_id: userId,
-        type: 'room_access_request',
-        reference_id: roomId,
-        body: `${requesterName} odaya katılmak istiyor`,
-      }));
-      try {
-        await supabase.from('notifications').insert(rows);
-      } catch { /* bildirim opsiyonel */ }
-    }
+    // ★ v92.12 (1 May 2026): notifications.insert KALDIRILDI (kullanıcı talebi).
+    //   Zil bildirimi + toast yerine PlusMenu içindeki "Katılım İstekleri" accordion
+    //   bu isteği room_access_requests tablosundan otomatik çeker. Tab bar + button
+    //   badge'i sayıyı gösterir. Sade, spam yok.
+    //   requesterName değişkeni kullanılmıyor artık ama upsert öncesinde profile
+    //   sorgusu future-proof — gelecekte broadcast event'i için lazım olabilir.
+    void requesterName;
   },
 
   /** Erişim isteğini onayla */
@@ -373,7 +379,35 @@ export const RoomAccessService = {
   },
 
   /** Odanın bekleyen erişim isteklerini getir */
-  async getPendingRequests(roomId: string) {
+  async getPendingRequests(roomId: string, callerId?: string) {
+    // ★ v92.20 (1 May 2026): SECURITY DEFINER RPC kullanılıyor — RLS app_uid()
+    //   Firebase JWT'sinden host_id eşleşmesi sağlayamıyordu, host "Bekleyen istek yok"
+    //   görüyor ama DB'de pending kayıt vardı. RPC içinde server-side host/mod kontrolü.
+    if (callerId) {
+      const { data, error } = await supabase.rpc('get_pending_access_requests', {
+        p_room_id: roomId,
+        p_caller_id: callerId,
+      });
+      if (error) {
+        if (__DEV__) console.warn('[Access] RPC error:', error.message);
+        return [];
+      }
+      // RPC dönüşünü mevcut shape'e adapte: user_display_name → user.display_name
+      return (data || []).map((row: any) => ({
+        id: row.id,
+        room_id: row.room_id,
+        user_id: row.user_id,
+        status: row.status,
+        target_role: row.target_role,
+        created_at: row.created_at,
+        user: {
+          id: row.user_id,
+          display_name: row.user_display_name,
+          avatar_url: row.user_avatar_url,
+        },
+      }));
+    }
+    // Backward compat (callerId yoksa eski yol)
     const { data, error } = await supabase
       .from('room_access_requests')
       .select('*, user:profiles!user_id(id, display_name, avatar_url, subscription_tier)')

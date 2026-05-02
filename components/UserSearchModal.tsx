@@ -1,10 +1,11 @@
-/**
+﻿/**
  * SopranoChat — Keşfet Arama Modalı
  * Oda ve kişi araması — keşfet ekranındaki arama ikonuna bağlı
  * Hem oda hem kullanıcı sonuçlarını listeler
  */
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { View, Text, StyleSheet, Pressable, TextInput, FlatList, ActivityIndicator, Animated, PanResponder, Dimensions, Keyboard } from 'react-native';
+import { View, Text, StyleSheet, Pressable, TextInput, FlatList, Animated, PanResponder, Dimensions, Keyboard } from 'react-native';
+import AppLoader from './AppLoader';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Shadows } from '../constants/theme';
@@ -424,7 +425,7 @@ export function UserSearchModal({ visible, onClose, currentUserId, onSelectUser,
                 <Text style={s.sectionTitle}>Kişiler</Text>
               </View>
               {loading ? (
-                <ActivityIndicator size="large" color={Colors.teal} style={{ marginTop: 40 }} />
+                <AppLoader size="large" color={Colors.teal} style={{ marginTop: 40 }} />
               ) : (
                 <FlatList
                   data={displayList}
@@ -447,7 +448,7 @@ export function UserSearchModal({ visible, onClose, currentUserId, onSelectUser,
             /* ═══ Boş Durum: Takip Ettiklerin + Önerilen Üyeler ═══ */
             <>
               {friendsLoading ? (
-                <ActivityIndicator size="large" color={Colors.teal} style={{ marginTop: 40 }} />
+                <AppLoader size="large" color={Colors.teal} style={{ marginTop: 40 }} />
               ) : (
                 <FlatList
                   data={[]} // Header-only — gerçek veriler ListHeader'da

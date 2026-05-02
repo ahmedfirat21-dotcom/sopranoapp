@@ -1,9 +1,10 @@
-import React, { useRef, useEffect, useState, useCallback } from 'react';
+﻿import React, { useRef, useEffect, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, Pressable, ScrollView, Animated,
   Dimensions, LayoutAnimation, Platform, UIManager, Switch, TextInput, PanResponder,
-  Image, ActivityIndicator,
+  Image,
 } from 'react-native';
+import AppLoader from '../AppLoader';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { isTierAtLeast } from '../../constants/tiers';
@@ -13,6 +14,7 @@ import { RoomAccessService } from '../../services/roomAccess';
 import { ModerationService } from '../../services/moderation';
 import { getAvatarSource } from '../../constants/avatars';
 import { showToast } from '../Toast';
+import { supabase } from '../../constants/supabase';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -117,6 +119,10 @@ type PlusMenuProps = {
   onReportRoom?: () => void;
   isRoomLocked?: boolean;
   micRequestCount?: number;
+  /** ★ v92.14 (1 May 2026): Bekleyen oda erişim isteği sayısı — "Katılım İstekleri"
+   *  accordion satırında badge olarak görünür. micRequestCount (sahneye çıkma)
+   *  ile karıştırılmamalı; bu kapalı odaya GİRMEK isteyen kullanıcı sayısıdır. */
+  accessRequestCount?: number;
   userRole?: 'owner' | 'moderator' | 'speaker' | 'listener';
   ownerTier?: string;
   onMuteAll?: () => void;
@@ -124,6 +130,10 @@ type PlusMenuProps = {
   onRoomStats?: () => void;
   onDeleteRoom?: () => void;
   onBoostRoom?: () => void;
+  /** ★ v92 (1 May 2026): Güçlendiriciler sheet'i açar — Süre Uzat, Altın Davet, vb. */
+  onPowerUps?: () => void;
+  /** ★ v92.11 (1 May 2026): Oda takipçi listesini sheet ile gösterir (host'a). */
+  onShowFollowers?: () => void;
   onToggleFollow?: () => void;
   isFollowingRoom?: boolean;
   settingsConfig?: SettingsConfig;
@@ -284,11 +294,11 @@ export function PlusMenu({
   visible, onClose,
   onInviteFriends, onShareLink, onRoomSettings,
   onModeration, onRoomLock, onReportRoom,
-  isRoomLocked, micRequestCount,
+  isRoomLocked, micRequestCount, accessRequestCount,
   userRole = 'listener',
   ownerTier = 'Free',
   onMuteAll, onUnmuteAll, onRoomStats, onDeleteRoom,
-  onBoostRoom, onToggleFollow, isFollowingRoom,
+  onBoostRoom, onPowerUps, onShowFollowers, onToggleFollow, isFollowingRoom,
   settingsConfig,
   followerCount = 0,
   onDonate, isDonationsEnabled,
@@ -321,9 +331,34 @@ export function PlusMenu({
   const loadRequests = useCallback(async () => {
     if (!_roomId) return;
     setRequestsLoading(true);
-    try { setInlineRequests(await RoomAccessService.getPendingRequests(_roomId)); } catch {}
+    try { setInlineRequests(await RoomAccessService.getPendingRequests(_roomId, _hostId)); } catch {}
     setRequestsLoading(false);
-  }, [_roomId]);
+  }, [_roomId, _hostId]);
+
+  // ★ v92.16 (1 May 2026): PlusMenu açıkken erişim isteklerini POLLING ile yenile.
+  //   Realtime postgres_changes Firebase JWT'siz çalışmıyordu (Realtime anon kullanıyor).
+  //   REST üzerinden 4 sn'de bir refetch — Firebase JWT factory ile RLS host_id eşleşir.
+  //   PlusMenu kapalıyken interval temizlenir (idle iken poll yok).
+  useEffect(() => {
+    if (!visible || !_roomId) return;
+    const isClosed = _roomType === 'closed' || _roomType === 'invite';
+    if (!isClosed) return;
+    loadRequests();
+    const interval = setInterval(loadRequests, 4000);
+    return () => { clearInterval(interval); };
+  }, [visible, _roomId, _roomType, loadRequests]);
+
+  // ★ v92.15 (1 May 2026): Bekleyen istek varsa PlusMenu açılır açılmaz "Katılım İstekleri"
+  //   accordion'unu OTOMATİK aç. Önceden host menüyü açıp kendisi tıklamak zorundaydı —
+  //   kullanıcı şikâyet etti ("onay/ret mekanizması yok"). Artık menü açıldığında
+  //   pending istek varsa direkt onay/ret butonları görünür.
+  useEffect(() => {
+    if (!visible) return;
+    const pending = (accessRequestCount ?? 0) > 0 || inlineRequests.length > 0;
+    if (pending && expandedId !== 'requests') {
+      setExpandedId('requests');
+    }
+  }, [visible, accessRequestCount, inlineRequests.length]);
 
   const handleAcceptReq = useCallback(async (req: any) => {
     if (!_hostId) return;
@@ -589,7 +624,7 @@ export function PlusMenu({
   // ★ 2026-04-20: İnline Banlılar
   const renderBans = () => (
     <View style={st.subWrap}>
-      {bansLoading ? <ActivityIndicator color="#EF4444" style={{ marginVertical: 12 }} /> :
+      {bansLoading ? <AppLoader color="#EF4444" style={{ marginVertical: 12 }} /> :
        inlineBans.length === 0 ? (
         <View style={{ alignItems: 'center', paddingVertical: 16 }}>
           <Ionicons name="shield-checkmark" size={20} color="rgba(34,197,94,0.3)" />
@@ -607,7 +642,7 @@ export function PlusMenu({
               <Text style={{ fontSize: 11, fontWeight: '600', color: '#F1F5F9' }} numberOfLines={1}>{ban.user?.display_name || 'Kullanıcı'}</Text>
               <Text style={{ fontSize: 8, color: isPermanent ? '#EF4444' : '#F59E0B', fontWeight: '700' }}>{isPermanent ? '⛔ KALICI' : `⏳ ${timeLabel}`}</Text>
             </View>
-            {processingIds.has(ban.id) ? <ActivityIndicator size="small" color="#14B8A6" /> : (
+            {processingIds.has(ban.id) ? <AppLoader size="small" color="#14B8A6" /> : (
               <Pressable onPress={() => handleUnban(ban)} style={{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, backgroundColor: 'rgba(20,184,166,0.08)', borderWidth: 1, borderColor: 'rgba(20,184,166,0.18)' }}>
                 <Text style={{ fontSize: 9, fontWeight: '700', color: '#14B8A6' }}>Kaldır</Text>
               </Pressable>
@@ -621,7 +656,7 @@ export function PlusMenu({
   // ★ 2026-04-20: İnline İstekler
   const renderRequestsInline = () => (
     <View style={st.subWrap}>
-      {requestsLoading ? <ActivityIndicator color="#A78BFA" style={{ marginVertical: 12 }} /> :
+      {requestsLoading ? <AppLoader color="#A78BFA" style={{ marginVertical: 12 }} /> :
        inlineRequests.length === 0 ? (
         <View style={{ alignItems: 'center', paddingVertical: 16 }}>
           <Ionicons name="checkmark-circle" size={20} color="rgba(167,139,250,0.25)" />
@@ -631,7 +666,7 @@ export function PlusMenu({
         <View key={req.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.03)' }}>
           <Image source={getAvatarSource(req.user?.avatar_url)} style={{ width: 28, height: 28, borderRadius: 14 }} />
           <Text style={{ flex: 1, fontSize: 11, fontWeight: '600', color: '#F1F5F9' }} numberOfLines={1}>{req.user?.display_name || 'Kullanıcı'}</Text>
-          {processingIds.has(req.id) ? <ActivityIndicator size="small" color="#A78BFA" /> : (
+          {processingIds.has(req.id) ? <AppLoader size="small" color="#A78BFA" /> : (
             <View style={{ flexDirection: 'row', gap: 4 }}>
               <Pressable onPress={() => handleAcceptReq(req)} style={{ width: 26, height: 26, borderRadius: 8, backgroundColor: '#14B8A6', alignItems: 'center', justifyContent: 'center' }}>
                 <Ionicons name="checkmark" size={14} color="#FFF" />
@@ -758,14 +793,18 @@ export function PlusMenu({
   // 7️⃣ İSTATİSTİKLER & BOOST
   const renderStats = () => (
     <View style={st.subWrap}>
-      {/* ★ Takipçi sayısı */}
-      <View style={st.toggleRow}>
+      {/* ★ Takipçi sayısı — tap'te liste sheet açılır (v92.11) */}
+      <Pressable
+        onPress={() => { if (onShowFollowers) { onShowFollowers(); onClose(); } }}
+        style={({ pressed }) => [st.toggleRow, pressed && { opacity: 0.6 }]}
+      >
         <Ionicons name="people-circle-outline" size={13} color="#EC4899" />
         <Text style={st.toggleLabel}>Oda Takipçileri</Text>
         <View style={{ backgroundColor: 'rgba(236,72,153,0.12)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8, borderWidth: 0.5, borderColor: 'rgba(236,72,153,0.25)' }}>
           <Text style={{ fontSize: 11, fontWeight: '800', color: '#EC4899', textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 }}>{followerCount}</Text>
         </View>
-      </View>
+        <Ionicons name="chevron-forward" size={11} color="rgba(255,255,255,0.25)" style={{ marginLeft: 4 }} />
+      </Pressable>
       <View style={st.sep} />
       <Pressable style={({ pressed }) => [s.subRow, pressed && s.subRowPressed]} onPress={() => { onRoomStats?.(); onClose(); }}>
         <View style={s.subIconCircle}><Ionicons name="analytics-outline" size={13} color="#3B82F6" style={s.iconShadow} /></View>
@@ -803,7 +842,7 @@ export function PlusMenu({
     items.push({ id: 'access', icon: 'key-outline', label: 'Giriş & Erişim', accent: '#F59E0B', onPress: () => toggle('access'), expandable: true, renderContent: renderAccess });
     // ★ 2026-04-20: Banlılar & İstekler — ayrı inline accordion (modal kaldırıldı)
     if ((_roomType === 'closed' || _roomType === 'invite') && _roomId) {
-      items.push({ id: 'requests', icon: 'hourglass-outline', label: 'Katılım İstekleri', accent: '#A78BFA', badge: micRequestCount, onPress: () => { if (expandedId !== 'requests') loadRequests(); toggle('requests'); }, expandable: true, renderContent: renderRequestsInline });
+      items.push({ id: 'requests', icon: 'hourglass-outline', label: 'Katılım İstekleri', accent: '#A78BFA', badge: accessRequestCount ?? inlineRequests.length, onPress: () => { if (expandedId !== 'requests') loadRequests(); toggle('requests'); }, expandable: true, renderContent: renderRequestsInline });
     }
     if (_roomId) {
       items.push({ id: 'bans', icon: 'ban-outline', label: 'Banlılar', accent: '#EF4444', onPress: () => { if (expandedId !== 'bans') loadBans(); toggle('bans'); }, expandable: true, renderContent: renderBans });
@@ -817,7 +856,7 @@ export function PlusMenu({
     items.push({ id: 'speaking', icon: 'mic-outline', label: 'Konuşma & Ses', accent: '#14B8A6', onPress: () => toggle('speaking'), expandable: true, renderContent: renderSpeaking });
     // ★ İstekler + Banlılar inline (moderatör)
     if ((_roomType === 'closed' || _roomType === 'invite') && _roomId) {
-      items.push({ id: 'requests', icon: 'hourglass-outline', label: 'Katılım İstekleri', accent: '#A78BFA', badge: micRequestCount, onPress: () => { if (expandedId !== 'requests') loadRequests(); toggle('requests'); }, expandable: true, renderContent: renderRequestsInline });
+      items.push({ id: 'requests', icon: 'hourglass-outline', label: 'Katılım İstekleri', accent: '#A78BFA', badge: accessRequestCount ?? inlineRequests.length, onPress: () => { if (expandedId !== 'requests') loadRequests(); toggle('requests'); }, expandable: true, renderContent: renderRequestsInline });
     }
     if (_roomId) {
       items.push({ id: 'bans', icon: 'ban-outline', label: 'Banlılar', accent: '#EF4444', onPress: () => { if (expandedId !== 'bans') loadBans(); toggle('bans'); }, expandable: true, renderContent: renderBans });
@@ -839,6 +878,12 @@ export function PlusMenu({
     items.push({ id: 'stats', icon: 'stats-chart-outline', label: 'İstatistikler & Boost', accent: '#3B82F6', onPress: () => toggle('stats'), expandable: true, renderContent: renderStats });
   } else if (isOwner && !isTempHost && onBoostRoom && can('Plus')) {
     items.push({ id: 'boost', icon: 'rocket-outline', label: 'Keşfette Öne Çıkar', accent: '#F59E0B', onPress: () => { onBoostRoom(); onClose(); } });
+  }
+
+  // ★ v92 (1 May 2026): Güçlendiriciler — herkese açık (Süre Uzat host-only,
+  //   Altın Davet herkese; sheet içinde rol kontrolü yapılır).
+  if (onPowerUps) {
+    items.push({ id: 'powerups', icon: 'flash-outline', label: 'Güçlendiriciler', desc: 'SP harca, an\'ı taçlandır', accent: '#FBBF24', onPress: () => { onPowerUps(); onClose(); } });
   }
 
   // Takip (listener)

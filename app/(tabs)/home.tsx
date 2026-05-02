@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, Image, Pressable, FlatList,
-  ActivityIndicator, ScrollView, RefreshControl, Dimensions, Animated, Easing, PanResponder, InteractionManager,
+  ScrollView, RefreshControl, Dimensions, Animated, Easing, PanResponder, InteractionManager,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -20,9 +20,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 // ★ 2026-04-27: UserSearchModal artık global (app/_layout.tsx) — useUserSearchSheet ile açılır.
 import { useUserSearchSheet } from '../_layout';
 import FriendsDrawer from '../../components/FriendsDrawer';
+import AppLoader from '../../components/AppLoader';
 import NotificationBell from '../../components/NotificationBell';
 import DiscoverWelcomeSheet, { hasSeenDiscoverWelcome } from '../../components/DiscoverWelcomeSheet';
 import RoomCreateHintSheet, { hasSeenRoomCreateHint, markRoomCreateHintSeen } from '../../components/RoomCreateHintSheet';
+import { markCreateRoomCoachmarkPending } from '../../components/CreateRoomCoachmark';
 import FABHintOverlay, { hasSeenFABHint } from '../../components/FABHintOverlay';
 import QuickCreateSheet from '../../components/QuickCreateSheet';
 import { ReportModal } from '../../components/ReportModal';
@@ -1260,7 +1262,7 @@ export default function HomeScreen() {
     return (
       <AppBackground variant="explore" radialGlow>
         <View style={[s.container, { justifyContent: 'center', alignItems: 'center' }]}>
-          <ActivityIndicator size="large" color={Colors.accentTeal} />
+          <AppLoader size="md" />
         </View>
       </AppBackground>
     );
@@ -1957,6 +1959,9 @@ export default function HomeScreen() {
           onGoToMyRooms={async () => {
             setShowRoomHint(false);
             await markRoomCreateHintSeen(firebaseUser?.uid);
+            // ★ v92 (1 May 2026): myrooms ekranında "+ Yeni Oda" butonunu işaret eden
+            //   premium coachmark için flag set et — myrooms mount'ta tetiklenir.
+            await markCreateRoomCoachmarkPending(firebaseUser?.uid);
             router.push('/(tabs)/myrooms' as any);
           }}
           onClose={async () => {

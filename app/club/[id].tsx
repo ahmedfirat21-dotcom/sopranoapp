@@ -7,9 +7,10 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Image, Pressable,
-  ActivityIndicator, Modal, Animated, PanResponder, Dimensions,
+  Modal, Animated, PanResponder, Dimensions,
   TextInput, Switch, Alert, Share,
 } from 'react-native';
+import AppLoader from '../../components/AppLoader';
 import * as ExpoClipboard from 'expo-clipboard';
 
 const SCREEN_H = Dimensions.get('window').height;
@@ -141,7 +142,7 @@ export default function ClubDetailScreen() {
     return (
       <AppBackground variant="profile">
         <View style={s.loading}>
-          <ActivityIndicator size="large" color="#14B8A6" />
+          <AppLoader size="large" color="#14B8A6" />
         </View>
       </AppBackground>
     );
@@ -239,7 +240,7 @@ export default function ClubDetailScreen() {
                 disabled={acting}
                 style={[s.actionBtn, { backgroundColor: 'rgba(255,255,255,0.06)', borderColor: 'rgba(255,255,255,0.15)' }]}
               >
-                {acting ? <ActivityIndicator size="small" color="#94A3B8" /> : (
+                {acting ? <AppLoader size="small" color="#94A3B8" /> : (
                   <>
                     <Ionicons name="checkmark" size={13} color="#94A3B8" />
                     <Text style={[s.actionText, { color: '#94A3B8' }]}>Üyesin</Text>
@@ -252,7 +253,7 @@ export default function ClubDetailScreen() {
                 disabled={acting || isPrivate}
                 style={[s.actionBtn, { backgroundColor: '#EC4899', borderColor: '#EC4899', opacity: isPrivate ? 0.5 : 1 }]}
               >
-                {acting ? <ActivityIndicator size="small" color="#FFF" /> : (
+                {acting ? <AppLoader size="small" color="#FFF" /> : (
                   <>
                     <Ionicons name="add" size={14} color="#FFF" />
                     <Text style={[s.actionText, { color: '#FFF' }]}>Katıl</Text>
@@ -400,7 +401,7 @@ export default function ClubDetailScreen() {
                 disabled={rotatingCode}
               >
                 {rotatingCode ? (
-                  <ActivityIndicator size="small" color="#A855F7" />
+                  <AppLoader size="small" color="#A855F7" />
                 ) : (
                   <>
                     <Ionicons name="refresh" size={13} color="#A855F7" />
@@ -705,7 +706,7 @@ function MembersSheet({ visible, onClose, clubId, onMemberCount, actorUserId, ac
           </View>
           {loading ? (
             <View style={ms.loading}>
-              <ActivityIndicator size="large" color="#14B8A6" />
+              <AppLoader size="large" color="#14B8A6" />
             </View>
           ) : (
             <ScrollView
@@ -948,7 +949,7 @@ function BoostSheet({ visible, onClose, clubId, treasuryBalance, byUserId, liveR
               <Text style={ds.cancelText}>İptal</Text>
             </Pressable>
             <Pressable onPress={submit} disabled={!canSubmit} style={[ds.submitBtn, !canSubmit && { opacity: 0.45 }, { backgroundColor: '#FBBF24' }]}>
-              {busy ? <ActivityIndicator size="small" color="#3B1F00" /> : (
+              {busy ? <AppLoader size="small" color="#3B1F00" /> : (
                 <>
                   <Ionicons name="rocket" size={13} color="#3B1F00" />
                   <Text style={[ds.submitText, { color: '#3B1F00' }]}>Boost Et</Text>
@@ -1149,7 +1150,7 @@ function EditClubSheet({ visible, onClose, club, ownerId, onUpdated, onDeleted }
               disabled={busy}
               style={[es.saveBtn, busy && { opacity: 0.6 }]}
             >
-              {busy ? <ActivityIndicator size="small" color="#FFF" /> : (
+              {busy ? <AppLoader size="small" color="#FFF" /> : (
                 <>
                   <Ionicons name="checkmark" size={14} color="#FFF" />
                   <Text style={es.saveText}>Kaydet</Text>

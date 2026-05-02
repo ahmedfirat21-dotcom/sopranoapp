@@ -1,5 +1,6 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, Modal, TextInput, ActivityIndicator, Image, InteractionManager, Platform, Animated, Easing, type ImageStyle } from 'react-native';
+﻿import { useState, useCallback, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, Pressable, ScrollView, Modal, TextInput, Image, InteractionManager, Platform, Animated, Easing, type ImageStyle } from 'react-native';
+import AppLoader from '../../components/AppLoader';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -331,6 +332,17 @@ export default function ProfileScreen() {
         {
           text: 'Çıkış Yap', style: 'destructive', onPress: async () => {
             try {
+              // ★ v92.16: Logout'ta push token'ı sil — eski cihaz bildirim almasın
+              if (firebaseUser) {
+                try {
+                  const { PushNotificationService } = require('../../services/pushNotifications');
+                  const Notifications = require('expo-notifications');
+                  const tokenData = await Notifications.getExpoPushTokenAsync({ projectId: 'bbd97aec-9d58-426f-8acc-215b24ff286a' });
+                  if (tokenData?.data) {
+                    await PushNotificationService.removePushToken(firebaseUser.uid, tokenData.data);
+                  }
+                } catch { /* token alınamazsa sessiz — signOut yine devam eder */ }
+              }
               // 1) Google hesap cache — tekrar girişte hesap seçici açılsın
               try {
                 const gsignin = require('@react-native-google-signin/google-signin');
@@ -775,7 +787,7 @@ export default function ProfileScreen() {
                       onPress={handleClaimReferral}
                       disabled={!referralCodeText || submittingReferral}
                     >
-                      {submittingReferral ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.modalBtnText}>Kodu Kullan (+50 SP)</Text>}
+                      {submittingReferral ? <AppLoader size="small" color="#fff" /> : <Text style={styles.modalBtnText}>Kodu Kullan (+50 SP)</Text>}
                     </Pressable>
                   </>
                 )}

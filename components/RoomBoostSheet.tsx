@@ -1,4 +1,4 @@
-/**
+﻿/**
  * SopranoChat — Oda Boost Sheet
  * ═══════════════════════════════════════════════════
  * Premium bottom sheet — BoostPickerSheet (profil) kalitesinde ama oda temalı (amber/orange).
@@ -6,9 +6,9 @@
  */
 import React, { useState, useRef, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, Pressable, Modal,
-  ActivityIndicator, Animated, PanResponder,
+  View, Text, StyleSheet, Pressable, Modal, Animated, PanResponder,
 } from 'react-native';
+import AppLoader from './AppLoader';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import SPIcon from './SPIcon';
@@ -163,7 +163,7 @@ export default function RoomBoostSheet({ visible, onClose, onBoost, currentSP, r
             style={s.ctaGradient}
           >
             {loading ? (
-              <ActivityIndicator size="small" color="#FFF" />
+              <AppLoader size="small" color="#FFF" />
             ) : (
               <>
                 <View style={s.ctaIconWrap}>

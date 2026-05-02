@@ -1,0 +1,1273 @@
+› Port 8081 is being used by another process
+Input is required, but 'npx expo' is in non-interactive mode.
+Required input:
+> Use port 8083 instead?
+› Skipping dev server
+› Building app...
+Configuration on demand is an incubating feature.
+> Task :gradle-plugin:settings-plugin:checkKotlinGradlePluginConfigurationErrors
+> Task :gradle-plugin:shared:checkKotlinGradlePluginConfigurationErrors
+> Task :gradle-plugin:shared:compileKotlin UP-TO-DATE
+> Task :gradle-plugin:shared:compileJava NO-SOURCE
+> Task :gradle-plugin:shared:processResources NO-SOURCE
+> Task :gradle-plugin:shared:classes UP-TO-DATE
+> Task :gradle-plugin:shared:jar UP-TO-DATE
+> Task :gradle-plugin:settings-plugin:compileKotlin UP-TO-DATE
+> Task :gradle-plugin:settings-plugin:compileJava NO-SOURCE
+> Task :gradle-plugin:settings-plugin:pluginDescriptors UP-TO-DATE
+> Task :gradle-plugin:settings-plugin:processResources UP-TO-DATE
+> Task :gradle-plugin:settings-plugin:classes UP-TO-DATE
+> Task :gradle-plugin:settings-plugin:jar UP-TO-DATE
+> Task :gradle-plugin:react-native-gradle-plugin:checkKotlinGradlePluginConfigurationErrors
+> Task :gradle-plugin:react-native-gradle-plugin:compileKotlin UP-TO-DATE
+> Task :gradle-plugin:react-native-gradle-plugin:compileJava NO-SOURCE
+> Task :gradle-plugin:react-native-gradle-plugin:pluginDescriptors UP-TO-DATE
+> Task :gradle-plugin:react-native-gradle-plugin:processResources UP-TO-DATE
+> Task :gradle-plugin:react-native-gradle-plugin:classes UP-TO-DATE
+> Task :gradle-plugin:react-native-gradle-plugin:jar UP-TO-DATE
+
+> Configure project :react-native-firebase_analytics
+:react-native-firebase_analytics package.json found at C:\SopranoChat\node_modules\@react-native-firebase\analytics\package.json
+:react-native-firebase_app package.json found at C:\SopranoChat\node_modules\@react-native-firebase\app\package.json
+:react-native-firebase_analytics:firebase.bom using default value: 33.12.0
+:react-native-firebase_analytics package.json found at C:\SopranoChat\node_modules\@react-native-firebase\analytics\package.json
+:react-native-firebase_analytics:version set from package.json: 21.14.0 (21,14,0 - 21014000)
+:react-native-firebase_analytics:android.compileSdk using custom value: 35
+:react-native-firebase_analytics:android.targetSdk using custom value: 35
+:react-native-firebase_analytics:android.minSdk using custom value: 24
+:react-native-firebase_analytics:reactNativeAndroidDir C:\SopranoChat\node_modules\react-native\android
+
+> Configure project :react-native-firebase_app
+:react-native-firebase_app package.json found at C:\SopranoChat\node_modules\@react-native-firebase\app\package.json
+:react-native-firebase_app:firebase.bom using default value: 33.12.0
+:react-native-firebase_app:play.play-services-auth using default value: 21.3.0
+:react-native-firebase_app package.json found at C:\SopranoChat\node_modules\@react-native-firebase\app\package.json
+:react-native-firebase_app:version set from package.json: 21.14.0 (21,14,0 - 21014000)
+:react-native-firebase_app:android.compileSdk using custom value: 35
+:react-native-firebase_app:android.targetSdk using custom value: 35
+:react-native-firebase_app:android.minSdk using custom value: 24
+:react-native-firebase_app:reactNativeAndroidDir C:\SopranoChat\node_modules\react-native\android
+
+> Configure project :react-native-firebase_crashlytics
+:react-native-firebase_crashlytics package.json found at C:\SopranoChat\node_modules\@react-native-firebase\crashlytics\package.json
+:react-native-firebase_app package.json found at C:\SopranoChat\node_modules\@react-native-firebase\app\package.json
+:react-native-firebase_crashlytics:firebase.bom using default value: 33.12.0
+:react-native-firebase_crashlytics package.json found at C:\SopranoChat\node_modules\@react-native-firebase\crashlytics\package.json
+:react-native-firebase_crashlytics:version set from package.json: 21.14.0 (21,14,0 - 21014000)
+:react-native-firebase_crashlytics:android.compileSdk using custom value: 35
+:react-native-firebase_crashlytics:android.targetSdk using custom value: 35
+:react-native-firebase_crashlytics:android.minSdk using custom value: 24
+:react-native-firebase_crashlytics:reactNativeAndroidDir C:\SopranoChat\node_modules\react-native\android
+
+> Configure project :expo
+
+Using expo modules
+  - [32mexpo-application[0m (6.0.2)
+  - [32mexpo-asset[0m (11.0.5)
+  - [32mexpo-av[0m (15.0.2)
+  - [32mexpo-blur[0m (14.0.3)
+  - [32mexpo-clipboard[0m (7.0.1)
+  - [32mexpo-constants[0m (17.0.8)
+  - [32mexpo-crypto[0m (14.0.2)
+  - [32mexpo-device[0m (7.0.3)
+  - [32mexpo-file-system[0m (18.0.12)
+  - [32mexpo-font[0m (13.0.4)
+  - [32mexpo-haptics[0m (14.0.1)
+  - [32mexpo-image-loader[0m (5.0.0)
+  - [32mexpo-image-manipulator[0m (13.0.6)
+  - [32mexpo-image-picker[0m (16.0.6)
+  - [32mexpo-keep-awake[0m (14.0.3)
+  - [32mexpo-linear-gradient[0m (14.0.2)
+  - [32mexpo-linking[0m (7.0.5)
+  - [32mexpo-modules-core[0m (2.0.0)
+  - [32mexpo-notifications[0m (0.29.14)
+  - [32mexpo-splash-screen[0m (0.29.24)
+  - [32mexpo-web-browser[0m (14.0.2)
+
+
+> Configure project :react-native-reanimated
+Android gradle plugin: 8.6.0
+Gradle: 8.10.2
+
+> Task :app:generateAutolinkingPackageList UP-TO-DATE
+> Task :app:generateCodegenSchemaFromJavaScript SKIPPED
+> Task :app:generateCodegenArtifactsFromSchema SKIPPED
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:mergeDebugNativeDebugMetadata NO-SOURCE
+> Task :app:checkKotlinGradlePluginConfigurationErrors
+> Task :app:generateDebugBuildConfig
+> Task :expo:generateExpoModulesPackageListTask UP-TO-DATE
+> Task :expo:preBuild UP-TO-DATE
+> Task :expo:preDebugBuild UP-TO-DATE
+> Task :expo:writeDebugAarMetadata UP-TO-DATE
+> Task :expo-application:preBuild UP-TO-DATE
+> Task :expo-application:preDebugBuild UP-TO-DATE
+> Task :expo-application:writeDebugAarMetadata UP-TO-DATE
+> Task :expo-asset:preBuild UP-TO-DATE
+> Task :expo-asset:preDebugBuild UP-TO-DATE
+> Task :expo-asset:writeDebugAarMetadata UP-TO-DATE
+> Task :expo-av:preBuild UP-TO-DATE
+> Task :expo-av:preDebugBuild UP-TO-DATE
+> Task :expo-av:writeDebugAarMetadata UP-TO-DATE
+> Task :expo-blur:preBuild UP-TO-DATE
+> Task :expo-blur:preDebugBuild UP-TO-DATE
+> Task :expo-blur:writeDebugAarMetadata UP-TO-DATE
+> Task :expo-clipboard:preBuild UP-TO-DATE
+> Task :expo-clipboard:preDebugBuild UP-TO-DATE
+> Task :expo-clipboard:writeDebugAarMetadata UP-TO-DATE
+> Task :expo-constants:createExpoConfig
+> Task :expo-constants:preBuild
+> Task :expo-constants:preDebugBuild
+> Task :expo-constants:writeDebugAarMetadata UP-TO-DATE
+> Task :expo-crypto:preBuild UP-TO-DATE
+> Task :expo-crypto:preDebugBuild UP-TO-DATE
+> Task :expo-crypto:writeDebugAarMetadata UP-TO-DATE
+> Task :expo-device:preBuild UP-TO-DATE
+> Task :expo-device:preDebugBuild UP-TO-DATE
+> Task :expo-device:writeDebugAarMetadata UP-TO-DATE
+> Task :expo-file-system:preBuild UP-TO-DATE
+> Task :expo-file-system:preDebugBuild UP-TO-DATE
+> Task :expo-file-system:writeDebugAarMetadata UP-TO-DATE
+> Task :expo-font:preBuild UP-TO-DATE
+> Task :expo-font:preDebugBuild UP-TO-DATE
+> Task :expo-font:writeDebugAarMetadata UP-TO-DATE
+> Task :expo-haptics:preBuild UP-TO-DATE
+> Task :expo-haptics:preDebugBuild UP-TO-DATE
+> Task :expo-haptics:writeDebugAarMetadata UP-TO-DATE
+> Task :expo-image-loader:preBuild UP-TO-DATE
+> Task :expo-image-loader:preDebugBuild UP-TO-DATE
+> Task :expo-image-loader:writeDebugAarMetadata UP-TO-DATE
+> Task :expo-image-manipulator:preBuild UP-TO-DATE
+> Task :expo-image-manipulator:preDebugBuild UP-TO-DATE
+> Task :expo-image-manipulator:writeDebugAarMetadata UP-TO-DATE
+> Task :expo-image-picker:preBuild UP-TO-DATE
+> Task :expo-image-picker:preDebugBuild UP-TO-DATE
+> Task :expo-image-picker:writeDebugAarMetadata UP-TO-DATE
+> Task :expo-keep-awake:preBuild UP-TO-DATE
+> Task :expo-keep-awake:preDebugBuild UP-TO-DATE
+> Task :expo-keep-awake:writeDebugAarMetadata UP-TO-DATE
+> Task :expo-linear-gradient:preBuild UP-TO-DATE
+> Task :expo-linear-gradient:preDebugBuild UP-TO-DATE
+> Task :expo-linear-gradient:writeDebugAarMetadata UP-TO-DATE
+> Task :expo-linking:preBuild UP-TO-DATE
+> Task :expo-linking:preDebugBuild UP-TO-DATE
+> Task :expo-linking:writeDebugAarMetadata UP-TO-DATE
+> Task :expo-modules-core:preBuild UP-TO-DATE
+> Task :expo-modules-core:preDebugBuild UP-TO-DATE
+> Task :expo-modules-core:writeDebugAarMetadata UP-TO-DATE
+> Task :expo-notifications:preBuild UP-TO-DATE
+> Task :expo-notifications:preDebugBuild UP-TO-DATE
+> Task :expo-notifications:writeDebugAarMetadata UP-TO-DATE
+> Task :expo-splash-screen:preBuild UP-TO-DATE
+> Task :expo-splash-screen:preDebugBuild UP-TO-DATE
+> Task :expo-splash-screen:writeDebugAarMetadata UP-TO-DATE
+> Task :expo-web-browser:preBuild UP-TO-DATE
+> Task :expo-web-browser:preDebugBuild UP-TO-DATE
+> Task :expo-web-browser:writeDebugAarMetadata UP-TO-DATE
+> Task :livekit_react-native:preBuild UP-TO-DATE
+> Task :livekit_react-native:preDebugBuild UP-TO-DATE
+> Task :livekit_react-native:writeDebugAarMetadata UP-TO-DATE
+> Task :livekit_react-native-webrtc:preBuild UP-TO-DATE
+> Task :livekit_react-native-webrtc:preDebugBuild UP-TO-DATE
+> Task :livekit_react-native-webrtc:writeDebugAarMetadata UP-TO-DATE
+> Task :lottie-react-native:preBuild UP-TO-DATE
+> Task :lottie-react-native:preDebugBuild UP-TO-DATE
+> Task :lottie-react-native:writeDebugAarMetadata UP-TO-DATE
+> Task :react-native-async-storage_async-storage:preBuild UP-TO-DATE
+> Task :react-native-async-storage_async-storage:preDebugBuild UP-TO-DATE
+> Task :react-native-async-storage_async-storage:writeDebugAarMetadata UP-TO-DATE
+> Task :react-native-community_datetimepicker:preBuild UP-TO-DATE
+> Task :react-native-community_datetimepicker:preDebugBuild UP-TO-DATE
+> Task :react-native-community_datetimepicker:writeDebugAarMetadata UP-TO-DATE
+> Task :react-native-firebase_analytics:preBuild UP-TO-DATE
+> Task :react-native-firebase_analytics:preDebugBuild UP-TO-DATE
+> Task :react-native-firebase_analytics:writeDebugAarMetadata UP-TO-DATE
+> Task :react-native-firebase_app:preBuild UP-TO-DATE
+> Task :react-native-firebase_app:preDebugBuild UP-TO-DATE
+> Task :react-native-firebase_app:writeDebugAarMetadata UP-TO-DATE
+> Task :react-native-firebase_crashlytics:preBuild UP-TO-DATE
+> Task :react-native-firebase_crashlytics:preDebugBuild UP-TO-DATE
+> Task :react-native-firebase_crashlytics:writeDebugAarMetadata UP-TO-DATE
+> Task :react-native-gesture-handler:preBuild UP-TO-DATE
+> Task :react-native-gesture-handler:preDebugBuild UP-TO-DATE
+> Task :react-native-gesture-handler:writeDebugAarMetadata UP-TO-DATE
+> Task :react-native-google-signin_google-signin:preBuild UP-TO-DATE
+> Task :react-native-google-signin_google-signin:preDebugBuild UP-TO-DATE
+> Task :react-native-google-signin_google-signin:writeDebugAarMetadata UP-TO-DATE
+> Task :react-native-keyboard-controller:preBuild UP-TO-DATE
+> Task :react-native-keyboard-controller:preDebugBuild UP-TO-DATE
+> Task :react-native-masked-view_masked-view:preBuild UP-TO-DATE
+> Task :react-native-masked-view_masked-view:preDebugBuild UP-TO-DATE
+> Task :react-native-masked-view_masked-view:writeDebugAarMetadata UP-TO-DATE
+> Task :react-native-purchases:preBuild UP-TO-DATE
+> Task :react-native-purchases:preDebugBuild UP-TO-DATE
+> Task :react-native-purchases:writeDebugAarMetadata UP-TO-DATE
+> Task :react-native-reanimated:assertLatestReactNativeWithNewArchitectureTask SKIPPED
+> Task :react-native-keyboard-controller:writeDebugAarMetadata
+> Task :react-native-reanimated:assertMinimalReactNativeVersionTask SKIPPED
+> Task :react-native-reanimated:prepareReanimatedHeadersForPrefabs UP-TO-DATE
+> Task :react-native-reanimated:prepareWorkletsHeadersForPrefabs UP-TO-DATE
+> Task :react-native-reanimated:preBuild UP-TO-DATE
+> Task :react-native-reanimated:preDebugBuild UP-TO-DATE
+> Task :react-native-reanimated:writeDebugAarMetadata UP-TO-DATE
+> Task :react-native-safe-area-context:preBuild UP-TO-DATE
+> Task :react-native-safe-area-context:preDebugBuild UP-TO-DATE
+> Task :react-native-safe-area-context:writeDebugAarMetadata UP-TO-DATE
+> Task :react-native-screens:preBuild UP-TO-DATE
+> Task :react-native-screens:preDebugBuild UP-TO-DATE
+> Task :react-native-screens:writeDebugAarMetadata UP-TO-DATE
+> Task :react-native-webview:preBuild UP-TO-DATE
+> Task :react-native-webview:preDebugBuild UP-TO-DATE
+> Task :react-native-webview:writeDebugAarMetadata UP-TO-DATE
+> Task :app:generateDebugResValues UP-TO-DATE
+> Task :app:injectCrashlyticsMappingFileIdDebug UP-TO-DATE
+> Task :app:processDebugGoogleServices UP-TO-DATE
+> Task :expo:generateDebugResValues UP-TO-DATE
+> Task :expo:generateDebugResources UP-TO-DATE
+> Task :expo:packageDebugResources UP-TO-DATE
+> Task :expo-application:generateDebugResValues UP-TO-DATE
+> Task :expo-application:generateDebugResources UP-TO-DATE
+> Task :expo-application:packageDebugResources UP-TO-DATE
+> Task :expo-asset:generateDebugResValues UP-TO-DATE
+> Task :expo-asset:generateDebugResources UP-TO-DATE
+> Task :expo-asset:packageDebugResources UP-TO-DATE
+> Task :expo-av:generateDebugResValues UP-TO-DATE
+> Task :expo-av:generateDebugResources UP-TO-DATE
+> Task :expo-av:packageDebugResources UP-TO-DATE
+> Task :expo-blur:generateDebugResValues UP-TO-DATE
+> Task :expo-blur:generateDebugResources UP-TO-DATE
+> Task :expo-blur:packageDebugResources UP-TO-DATE
+> Task :expo-clipboard:generateDebugResValues UP-TO-DATE
+> Task :expo-clipboard:generateDebugResources UP-TO-DATE
+> Task :app:checkDebugAarMetadata
+> Task :expo-clipboard:packageDebugResources UP-TO-DATE
+> Task :expo-constants:generateDebugResValues UP-TO-DATE
+> Task :expo-constants:generateDebugResources UP-TO-DATE
+> Task :expo-constants:packageDebugResources UP-TO-DATE
+> Task :expo-crypto:generateDebugResValues UP-TO-DATE
+> Task :expo-crypto:generateDebugResources UP-TO-DATE
+> Task :expo-crypto:packageDebugResources UP-TO-DATE
+> Task :expo-device:generateDebugResValues UP-TO-DATE
+> Task :expo-device:generateDebugResources UP-TO-DATE
+> Task :expo-device:packageDebugResources UP-TO-DATE
+> Task :expo-file-system:generateDebugResValues UP-TO-DATE
+> Task :expo-file-system:generateDebugResources UP-TO-DATE
+> Task :expo-file-system:packageDebugResources UP-TO-DATE
+> Task :expo-font:generateDebugResValues UP-TO-DATE
+> Task :expo-font:generateDebugResources UP-TO-DATE
+> Task :expo-font:packageDebugResources UP-TO-DATE
+> Task :expo-haptics:generateDebugResValues UP-TO-DATE
+> Task :expo-haptics:generateDebugResources UP-TO-DATE
+> Task :expo-haptics:packageDebugResources UP-TO-DATE
+> Task :expo-image-loader:generateDebugResValues UP-TO-DATE
+> Task :expo-image-loader:generateDebugResources UP-TO-DATE
+> Task :expo-image-loader:packageDebugResources UP-TO-DATE
+> Task :expo-image-manipulator:generateDebugResValues UP-TO-DATE
+> Task :expo-image-manipulator:generateDebugResources UP-TO-DATE
+> Task :expo-image-manipulator:packageDebugResources UP-TO-DATE
+> Task :expo-image-picker:generateDebugResValues UP-TO-DATE
+> Task :expo-image-picker:generateDebugResources UP-TO-DATE
+> Task :expo-image-picker:packageDebugResources UP-TO-DATE
+> Task :expo-keep-awake:generateDebugResValues UP-TO-DATE
+> Task :expo-keep-awake:generateDebugResources UP-TO-DATE
+> Task :expo-keep-awake:packageDebugResources UP-TO-DATE
+> Task :expo-linear-gradient:generateDebugResValues UP-TO-DATE
+> Task :expo-linear-gradient:generateDebugResources UP-TO-DATE
+> Task :expo-linear-gradient:packageDebugResources UP-TO-DATE
+> Task :expo-linking:generateDebugResValues UP-TO-DATE
+> Task :expo-linking:generateDebugResources UP-TO-DATE
+> Task :expo-linking:packageDebugResources UP-TO-DATE
+> Task :expo-modules-core:generateDebugResValues UP-TO-DATE
+> Task :expo-modules-core:generateDebugResources UP-TO-DATE
+> Task :expo-modules-core:packageDebugResources UP-TO-DATE
+> Task :expo-notifications:generateDebugResValues UP-TO-DATE
+> Task :expo-notifications:generateDebugResources UP-TO-DATE
+> Task :expo-notifications:packageDebugResources UP-TO-DATE
+> Task :expo-splash-screen:generateDebugResValues UP-TO-DATE
+> Task :expo-splash-screen:generateDebugResources UP-TO-DATE
+> Task :expo-splash-screen:packageDebugResources UP-TO-DATE
+> Task :expo-web-browser:generateDebugResValues UP-TO-DATE
+> Task :expo-web-browser:generateDebugResources UP-TO-DATE
+> Task :expo-web-browser:packageDebugResources UP-TO-DATE
+> Task :livekit_react-native:generateDebugResValues UP-TO-DATE
+> Task :livekit_react-native:generateDebugResources UP-TO-DATE
+> Task :livekit_react-native:packageDebugResources UP-TO-DATE
+> Task :livekit_react-native-webrtc:generateDebugResValues UP-TO-DATE
+> Task :livekit_react-native-webrtc:generateDebugResources UP-TO-DATE
+> Task :livekit_react-native-webrtc:packageDebugResources UP-TO-DATE
+> Task :lottie-react-native:generateDebugResValues UP-TO-DATE
+> Task :lottie-react-native:generateDebugResources UP-TO-DATE
+> Task :lottie-react-native:packageDebugResources UP-TO-DATE
+> Task :react-native-async-storage_async-storage:generateDebugResValues UP-TO-DATE
+> Task :react-native-async-storage_async-storage:generateDebugResources UP-TO-DATE
+> Task :react-native-async-storage_async-storage:packageDebugResources UP-TO-DATE
+> Task :react-native-community_datetimepicker:generateDebugResValues UP-TO-DATE
+> Task :react-native-community_datetimepicker:generateDebugResources UP-TO-DATE
+> Task :react-native-community_datetimepicker:packageDebugResources UP-TO-DATE
+> Task :react-native-firebase_analytics:generateDebugResValues UP-TO-DATE
+> Task :react-native-firebase_analytics:generateDebugResources UP-TO-DATE
+> Task :react-native-firebase_analytics:packageDebugResources UP-TO-DATE
+> Task :react-native-firebase_app:generateDebugResValues UP-TO-DATE
+> Task :react-native-firebase_app:generateDebugResources UP-TO-DATE
+> Task :react-native-firebase_app:packageDebugResources UP-TO-DATE
+> Task :react-native-firebase_crashlytics:generateDebugResValues UP-TO-DATE
+> Task :react-native-firebase_crashlytics:generateDebugResources UP-TO-DATE
+> Task :react-native-firebase_crashlytics:packageDebugResources UP-TO-DATE
+> Task :react-native-gesture-handler:generateDebugResValues UP-TO-DATE
+> Task :react-native-gesture-handler:generateDebugResources UP-TO-DATE
+> Task :react-native-gesture-handler:packageDebugResources UP-TO-DATE
+> Task :react-native-google-signin_google-signin:generateDebugResValues UP-TO-DATE
+> Task :react-native-google-signin_google-signin:generateDebugResources UP-TO-DATE
+> Task :react-native-google-signin_google-signin:packageDebugResources UP-TO-DATE
+> Task :react-native-keyboard-controller:generateDebugResValues FROM-CACHE
+> Task :react-native-keyboard-controller:generateDebugResources
+> Task :react-native-keyboard-controller:packageDebugResources
+> Task :react-native-masked-view_masked-view:generateDebugResValues UP-TO-DATE
+> Task :react-native-masked-view_masked-view:generateDebugResources UP-TO-DATE
+> Task :react-native-masked-view_masked-view:packageDebugResources UP-TO-DATE
+> Task :react-native-purchases:generateDebugResValues UP-TO-DATE
+> Task :react-native-purchases:generateDebugResources UP-TO-DATE
+> Task :react-native-purchases:packageDebugResources UP-TO-DATE
+> Task :react-native-reanimated:generateDebugResValues UP-TO-DATE
+> Task :react-native-reanimated:generateDebugResources UP-TO-DATE
+> Task :react-native-reanimated:packageDebugResources UP-TO-DATE
+> Task :react-native-safe-area-context:generateDebugResValues UP-TO-DATE
+> Task :react-native-safe-area-context:generateDebugResources UP-TO-DATE
+> Task :react-native-safe-area-context:packageDebugResources UP-TO-DATE
+> Task :react-native-screens:generateDebugResValues UP-TO-DATE
+> Task :react-native-screens:generateDebugResources UP-TO-DATE
+> Task :react-native-screens:packageDebugResources UP-TO-DATE
+> Task :react-native-webview:generateDebugResValues UP-TO-DATE
+> Task :react-native-webview:generateDebugResources UP-TO-DATE
+> Task :react-native-webview:packageDebugResources UP-TO-DATE
+> Task :app:mapDebugSourceSetPaths
+> Task :app:generateDebugResources
+> Task :app:packageDebugResources
+> Task :app:createDebugCompatibleScreenManifests
+> Task :app:extractDeepLinksDebug UP-TO-DATE
+> Task :expo:extractDeepLinksDebug UP-TO-DATE
+> Task :expo:processDebugManifest UP-TO-DATE
+> Task :expo-application:extractDeepLinksDebug UP-TO-DATE
+> Task :expo-application:processDebugManifest UP-TO-DATE
+> Task :expo-asset:extractDeepLinksDebug UP-TO-DATE
+> Task :expo-asset:processDebugManifest UP-TO-DATE
+> Task :expo-av:extractDeepLinksDebug UP-TO-DATE
+> Task :expo-av:processDebugManifest UP-TO-DATE
+> Task :expo-blur:extractDeepLinksDebug UP-TO-DATE
+> Task :expo-blur:processDebugManifest UP-TO-DATE
+> Task :expo-clipboard:extractDeepLinksDebug UP-TO-DATE
+> Task :expo-clipboard:processDebugManifest UP-TO-DATE
+> Task :expo-constants:extractDeepLinksDebug UP-TO-DATE
+> Task :expo-constants:processDebugManifest UP-TO-DATE
+> Task :expo-crypto:extractDeepLinksDebug UP-TO-DATE
+> Task :expo-crypto:processDebugManifest UP-TO-DATE
+> Task :expo-device:extractDeepLinksDebug UP-TO-DATE
+> Task :expo-device:processDebugManifest UP-TO-DATE
+> Task :expo-file-system:extractDeepLinksDebug UP-TO-DATE
+> Task :expo-file-system:processDebugManifest UP-TO-DATE
+> Task :expo-font:extractDeepLinksDebug UP-TO-DATE
+> Task :expo-font:processDebugManifest UP-TO-DATE
+> Task :expo-haptics:extractDeepLinksDebug UP-TO-DATE
+> Task :app:parseDebugLocalResources
+> Task :expo-haptics:processDebugManifest UP-TO-DATE
+> Task :expo-image-loader:extractDeepLinksDebug UP-TO-DATE
+> Task :expo-image-loader:processDebugManifest UP-TO-DATE
+> Task :expo-image-manipulator:extractDeepLinksDebug UP-TO-DATE
+> Task :expo-image-manipulator:processDebugManifest UP-TO-DATE
+> Task :expo-image-picker:extractDeepLinksDebug UP-TO-DATE
+> Task :expo-image-picker:processDebugManifest UP-TO-DATE
+> Task :expo-keep-awake:extractDeepLinksDebug UP-TO-DATE
+> Task :expo-keep-awake:processDebugManifest UP-TO-DATE
+> Task :expo-linear-gradient:extractDeepLinksDebug UP-TO-DATE
+> Task :expo-linear-gradient:processDebugManifest UP-TO-DATE
+> Task :expo-linking:extractDeepLinksDebug UP-TO-DATE
+> Task :expo-linking:processDebugManifest UP-TO-DATE
+> Task :expo-modules-core:extractDeepLinksDebug UP-TO-DATE
+> Task :expo-modules-core:processDebugManifest UP-TO-DATE
+> Task :expo-notifications:extractDeepLinksDebug UP-TO-DATE
+> Task :expo-notifications:processDebugManifest UP-TO-DATE
+> Task :expo-splash-screen:extractDeepLinksDebug UP-TO-DATE
+> Task :expo-splash-screen:processDebugManifest UP-TO-DATE
+> Task :expo-web-browser:extractDeepLinksDebug UP-TO-DATE
+> Task :expo-web-browser:processDebugManifest UP-TO-DATE
+> Task :livekit_react-native:extractDeepLinksDebug UP-TO-DATE
+> Task :livekit_react-native:processDebugManifest UP-TO-DATE
+> Task :livekit_react-native-webrtc:extractDeepLinksDebug UP-TO-DATE
+> Task :livekit_react-native-webrtc:processDebugManifest UP-TO-DATE
+> Task :lottie-react-native:extractDeepLinksDebug UP-TO-DATE
+> Task :lottie-react-native:processDebugManifest UP-TO-DATE
+> Task :react-native-async-storage_async-storage:extractDeepLinksDebug UP-TO-DATE
+> Task :react-native-async-storage_async-storage:processDebugManifest UP-TO-DATE
+> Task :react-native-community_datetimepicker:extractDeepLinksDebug UP-TO-DATE
+> Task :react-native-community_datetimepicker:processDebugManifest UP-TO-DATE
+> Task :react-native-firebase_analytics:extractDeepLinksDebug UP-TO-DATE
+> Task :react-native-firebase_analytics:processDebugManifest UP-TO-DATE
+> Task :react-native-firebase_app:extractDeepLinksDebug UP-TO-DATE
+> Task :react-native-firebase_app:processDebugManifest UP-TO-DATE
+> Task :react-native-firebase_crashlytics:extractDeepLinksDebug UP-TO-DATE
+> Task :react-native-firebase_crashlytics:processDebugManifest UP-TO-DATE
+> Task :react-native-gesture-handler:extractDeepLinksDebug UP-TO-DATE
+> Task :react-native-gesture-handler:processDebugManifest UP-TO-DATE
+> Task :react-native-google-signin_google-signin:extractDeepLinksDebug UP-TO-DATE
+> Task :react-native-google-signin_google-signin:processDebugManifest UP-TO-DATE
+> Task :react-native-keyboard-controller:extractDeepLinksDebug FROM-CACHE
+> Task :react-native-masked-view_masked-view:extractDeepLinksDebug UP-TO-DATE
+> Task :react-native-masked-view_masked-view:processDebugManifest UP-TO-DATE
+> Task :react-native-purchases:extractDeepLinksDebug UP-TO-DATE
+
+> Task :react-native-keyboard-controller:processDebugManifest
+package="com.reactnativekeyboardcontroller" found in source AndroidManifest.xml: C:\SopranoChat\node_modules\react-native-keyboard-controller\android\src\main\AndroidManifest.xml.
+Setting the namespace via the package attribute in the source AndroidManifest.xml is no longer supported, and the value is ignored.
+Recommendation: remove package="com.reactnativekeyboardcontroller" from the source AndroidManifest.xml: C:\SopranoChat\node_modules\react-native-keyboard-controller\android\src\main\AndroidManifest.xml.
+
+> Task :react-native-purchases:processDebugManifest UP-TO-DATE
+> Task :react-native-reanimated:extractDeepLinksDebug UP-TO-DATE
+> Task :react-native-reanimated:processDebugManifest UP-TO-DATE
+> Task :react-native-safe-area-context:extractDeepLinksDebug UP-TO-DATE
+> Task :react-native-safe-area-context:processDebugManifest UP-TO-DATE
+> Task :react-native-screens:extractDeepLinksDebug UP-TO-DATE
+> Task :react-native-screens:processDebugManifest UP-TO-DATE
+> Task :react-native-webview:extractDeepLinksDebug UP-TO-DATE
+> Task :react-native-webview:processDebugManifest UP-TO-DATE
+
+> Task :app:processDebugMainManifest
+C:\SopranoChat\android\app\src\debug\AndroidManifest.xml:6:5-162 Warning:
+	application@android:usesCleartextTraffic was tagged at AndroidManifest.xml:6 to replace other declarations but no other declaration present
+C:\SopranoChat\android\app\src\debug\AndroidManifest.xml Warning:
+	provider#expo.modules.filesystem.FileSystemFileProvider@android:authorities was tagged at AndroidManifest.xml:0 to replace other declarations but no other declaration present
+
+> Task :app:processDebugManifest
+> Task :expo:compileDebugLibraryResources UP-TO-DATE
+> Task :expo:parseDebugLocalResources UP-TO-DATE
+> Task :expo:generateDebugRFile UP-TO-DATE
+> Task :expo-application:compileDebugLibraryResources UP-TO-DATE
+> Task :expo-application:parseDebugLocalResources UP-TO-DATE
+> Task :expo-application:generateDebugRFile UP-TO-DATE
+> Task :expo-asset:compileDebugLibraryResources UP-TO-DATE
+> Task :expo-asset:parseDebugLocalResources UP-TO-DATE
+> Task :expo-asset:generateDebugRFile UP-TO-DATE
+> Task :expo-av:compileDebugLibraryResources UP-TO-DATE
+> Task :expo-av:parseDebugLocalResources UP-TO-DATE
+> Task :expo-av:generateDebugRFile UP-TO-DATE
+> Task :expo-blur:compileDebugLibraryResources UP-TO-DATE
+> Task :expo-blur:parseDebugLocalResources UP-TO-DATE
+> Task :expo-blur:generateDebugRFile UP-TO-DATE
+> Task :expo-clipboard:compileDebugLibraryResources UP-TO-DATE
+> Task :expo-clipboard:parseDebugLocalResources UP-TO-DATE
+> Task :expo-clipboard:generateDebugRFile UP-TO-DATE
+> Task :expo-constants:compileDebugLibraryResources UP-TO-DATE
+> Task :expo-constants:parseDebugLocalResources UP-TO-DATE
+> Task :expo-constants:generateDebugRFile UP-TO-DATE
+> Task :expo-crypto:compileDebugLibraryResources UP-TO-DATE
+> Task :expo-crypto:parseDebugLocalResources UP-TO-DATE
+> Task :expo-crypto:generateDebugRFile UP-TO-DATE
+> Task :expo-device:compileDebugLibraryResources UP-TO-DATE
+> Task :expo-device:parseDebugLocalResources UP-TO-DATE
+> Task :expo-device:generateDebugRFile UP-TO-DATE
+> Task :expo-file-system:compileDebugLibraryResources UP-TO-DATE
+> Task :expo-file-system:parseDebugLocalResources UP-TO-DATE
+> Task :expo-file-system:generateDebugRFile UP-TO-DATE
+> Task :expo-font:compileDebugLibraryResources UP-TO-DATE
+> Task :expo-font:parseDebugLocalResources UP-TO-DATE
+> Task :expo-font:generateDebugRFile UP-TO-DATE
+> Task :expo-haptics:compileDebugLibraryResources UP-TO-DATE
+> Task :expo-haptics:parseDebugLocalResources UP-TO-DATE
+> Task :expo-haptics:generateDebugRFile UP-TO-DATE
+> Task :expo-image-loader:compileDebugLibraryResources UP-TO-DATE
+> Task :expo-image-loader:parseDebugLocalResources UP-TO-DATE
+> Task :expo-image-loader:generateDebugRFile UP-TO-DATE
+> Task :expo-image-manipulator:compileDebugLibraryResources UP-TO-DATE
+> Task :expo-image-manipulator:parseDebugLocalResources UP-TO-DATE
+> Task :expo-image-manipulator:generateDebugRFile UP-TO-DATE
+> Task :expo-image-picker:compileDebugLibraryResources UP-TO-DATE
+> Task :expo-image-picker:parseDebugLocalResources UP-TO-DATE
+> Task :expo-image-picker:generateDebugRFile UP-TO-DATE
+> Task :expo-keep-awake:compileDebugLibraryResources UP-TO-DATE
+> Task :expo-keep-awake:parseDebugLocalResources UP-TO-DATE
+> Task :expo-keep-awake:generateDebugRFile UP-TO-DATE
+> Task :expo-linear-gradient:compileDebugLibraryResources UP-TO-DATE
+> Task :expo-linear-gradient:parseDebugLocalResources UP-TO-DATE
+> Task :expo-linear-gradient:generateDebugRFile UP-TO-DATE
+> Task :expo-linking:compileDebugLibraryResources UP-TO-DATE
+> Task :expo-linking:parseDebugLocalResources UP-TO-DATE
+> Task :expo-linking:generateDebugRFile UP-TO-DATE
+> Task :expo-modules-core:compileDebugLibraryResources UP-TO-DATE
+> Task :expo-modules-core:parseDebugLocalResources UP-TO-DATE
+> Task :expo-modules-core:generateDebugRFile UP-TO-DATE
+> Task :expo-notifications:compileDebugLibraryResources UP-TO-DATE
+> Task :expo-notifications:parseDebugLocalResources UP-TO-DATE
+> Task :expo-notifications:generateDebugRFile UP-TO-DATE
+> Task :expo-splash-screen:compileDebugLibraryResources UP-TO-DATE
+> Task :expo-splash-screen:parseDebugLocalResources UP-TO-DATE
+> Task :expo-splash-screen:generateDebugRFile UP-TO-DATE
+> Task :expo-web-browser:compileDebugLibraryResources UP-TO-DATE
+> Task :expo-web-browser:parseDebugLocalResources UP-TO-DATE
+> Task :expo-web-browser:generateDebugRFile UP-TO-DATE
+> Task :livekit_react-native:compileDebugLibraryResources UP-TO-DATE
+> Task :livekit_react-native:parseDebugLocalResources UP-TO-DATE
+> Task :livekit_react-native:generateDebugRFile UP-TO-DATE
+> Task :livekit_react-native-webrtc:compileDebugLibraryResources UP-TO-DATE
+> Task :livekit_react-native-webrtc:parseDebugLocalResources UP-TO-DATE
+> Task :livekit_react-native-webrtc:generateDebugRFile UP-TO-DATE
+> Task :lottie-react-native:compileDebugLibraryResources UP-TO-DATE
+> Task :lottie-react-native:parseDebugLocalResources UP-TO-DATE
+> Task :lottie-react-native:generateDebugRFile UP-TO-DATE
+> Task :react-native-async-storage_async-storage:compileDebugLibraryResources UP-TO-DATE
+> Task :react-native-async-storage_async-storage:parseDebugLocalResources UP-TO-DATE
+> Task :react-native-async-storage_async-storage:generateDebugRFile UP-TO-DATE
+> Task :react-native-community_datetimepicker:compileDebugLibraryResources UP-TO-DATE
+> Task :react-native-community_datetimepicker:parseDebugLocalResources UP-TO-DATE
+> Task :react-native-community_datetimepicker:generateDebugRFile UP-TO-DATE
+> Task :react-native-firebase_analytics:compileDebugLibraryResources UP-TO-DATE
+> Task :react-native-firebase_analytics:parseDebugLocalResources UP-TO-DATE
+> Task :react-native-firebase_analytics:generateDebugRFile UP-TO-DATE
+> Task :react-native-firebase_app:compileDebugLibraryResources UP-TO-DATE
+> Task :react-native-firebase_app:parseDebugLocalResources UP-TO-DATE
+> Task :react-native-firebase_app:generateDebugRFile UP-TO-DATE
+> Task :react-native-firebase_crashlytics:compileDebugLibraryResources UP-TO-DATE
+> Task :react-native-firebase_crashlytics:parseDebugLocalResources UP-TO-DATE
+> Task :react-native-firebase_crashlytics:generateDebugRFile UP-TO-DATE
+> Task :react-native-gesture-handler:compileDebugLibraryResources UP-TO-DATE
+> Task :react-native-gesture-handler:parseDebugLocalResources UP-TO-DATE
+> Task :react-native-gesture-handler:generateDebugRFile UP-TO-DATE
+> Task :react-native-google-signin_google-signin:compileDebugLibraryResources UP-TO-DATE
+> Task :react-native-google-signin_google-signin:parseDebugLocalResources UP-TO-DATE
+> Task :react-native-google-signin_google-signin:generateDebugRFile UP-TO-DATE
+> Task :react-native-keyboard-controller:compileDebugLibraryResources
+> Task :app:processDebugManifestForPackage
+> Task :react-native-masked-view_masked-view:compileDebugLibraryResources UP-TO-DATE
+> Task :react-native-masked-view_masked-view:parseDebugLocalResources UP-TO-DATE
+> Task :react-native-keyboard-controller:parseDebugLocalResources
+> Task :react-native-masked-view_masked-view:generateDebugRFile UP-TO-DATE
+> Task :react-native-purchases:compileDebugLibraryResources UP-TO-DATE
+> Task :react-native-purchases:parseDebugLocalResources UP-TO-DATE
+> Task :react-native-keyboard-controller:generateDebugRFile
+> Task :react-native-purchases:generateDebugRFile UP-TO-DATE
+> Task :react-native-reanimated:compileDebugLibraryResources UP-TO-DATE
+> Task :react-native-reanimated:parseDebugLocalResources UP-TO-DATE
+> Task :react-native-reanimated:generateDebugRFile UP-TO-DATE
+> Task :react-native-safe-area-context:compileDebugLibraryResources UP-TO-DATE
+> Task :react-native-safe-area-context:parseDebugLocalResources UP-TO-DATE
+> Task :react-native-safe-area-context:generateDebugRFile UP-TO-DATE
+> Task :react-native-screens:compileDebugLibraryResources UP-TO-DATE
+> Task :react-native-screens:parseDebugLocalResources UP-TO-DATE
+> Task :react-native-screens:generateDebugRFile UP-TO-DATE
+> Task :react-native-webview:compileDebugLibraryResources UP-TO-DATE
+> Task :react-native-webview:parseDebugLocalResources UP-TO-DATE
+> Task :react-native-webview:generateDebugRFile UP-TO-DATE
+> Task :expo:checkKotlinGradlePluginConfigurationErrors
+> Task :expo:generateDebugBuildConfig UP-TO-DATE
+> Task :expo-application:checkKotlinGradlePluginConfigurationErrors
+> Task :expo-application:generateDebugBuildConfig UP-TO-DATE
+> Task :expo-modules-core:checkKotlinGradlePluginConfigurationErrors
+> Task :expo-modules-core:generateDebugBuildConfig UP-TO-DATE
+> Task :app:mergeDebugResources
+> Task :expo-modules-core:compileDebugKotlin UP-TO-DATE
+> Task :expo-modules-core:javaPreCompileDebug UP-TO-DATE
+> Task :expo-modules-core:compileDebugJavaWithJavac UP-TO-DATE
+> Task :expo-modules-core:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :expo-application:compileDebugKotlin UP-TO-DATE
+> Task :expo-application:javaPreCompileDebug UP-TO-DATE
+> Task :expo-application:compileDebugJavaWithJavac UP-TO-DATE
+> Task :expo-application:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :expo-asset:checkKotlinGradlePluginConfigurationErrors
+> Task :expo-asset:generateDebugBuildConfig UP-TO-DATE
+> Task :expo-asset:compileDebugKotlin UP-TO-DATE
+> Task :expo-asset:javaPreCompileDebug UP-TO-DATE
+> Task :expo-asset:compileDebugJavaWithJavac UP-TO-DATE
+> Task :expo-asset:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :expo-av:checkKotlinGradlePluginConfigurationErrors
+> Task :expo-av:generateDebugBuildConfig UP-TO-DATE
+> Task :expo-av:compileDebugKotlin UP-TO-DATE
+> Task :expo-av:javaPreCompileDebug UP-TO-DATE
+> Task :expo-av:compileDebugJavaWithJavac UP-TO-DATE
+> Task :expo-av:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :expo-blur:checkKotlinGradlePluginConfigurationErrors
+> Task :expo-blur:generateDebugBuildConfig UP-TO-DATE
+> Task :expo-blur:compileDebugKotlin UP-TO-DATE
+> Task :expo-blur:javaPreCompileDebug UP-TO-DATE
+> Task :expo-blur:compileDebugJavaWithJavac UP-TO-DATE
+> Task :expo-blur:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :expo-clipboard:checkKotlinGradlePluginConfigurationErrors
+> Task :expo-clipboard:generateDebugBuildConfig UP-TO-DATE
+> Task :expo-clipboard:compileDebugKotlin UP-TO-DATE
+> Task :expo-clipboard:javaPreCompileDebug UP-TO-DATE
+> Task :expo-clipboard:compileDebugJavaWithJavac UP-TO-DATE
+> Task :expo-clipboard:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :expo-constants:checkKotlinGradlePluginConfigurationErrors
+> Task :expo-constants:generateDebugBuildConfig UP-TO-DATE
+> Task :expo-constants:compileDebugKotlin UP-TO-DATE
+> Task :expo-constants:javaPreCompileDebug UP-TO-DATE
+> Task :expo-constants:compileDebugJavaWithJavac UP-TO-DATE
+> Task :expo-constants:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :expo-crypto:checkKotlinGradlePluginConfigurationErrors
+> Task :expo-crypto:generateDebugBuildConfig UP-TO-DATE
+> Task :expo-crypto:compileDebugKotlin UP-TO-DATE
+> Task :expo-crypto:javaPreCompileDebug UP-TO-DATE
+> Task :expo-crypto:compileDebugJavaWithJavac UP-TO-DATE
+> Task :expo-crypto:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :expo-device:checkKotlinGradlePluginConfigurationErrors
+> Task :expo-device:generateDebugBuildConfig UP-TO-DATE
+> Task :expo-device:compileDebugKotlin UP-TO-DATE
+> Task :expo-device:javaPreCompileDebug UP-TO-DATE
+> Task :expo-device:compileDebugJavaWithJavac UP-TO-DATE
+> Task :expo-device:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :expo-file-system:checkKotlinGradlePluginConfigurationErrors
+> Task :expo-file-system:generateDebugBuildConfig UP-TO-DATE
+> Task :expo-file-system:compileDebugKotlin UP-TO-DATE
+> Task :expo-file-system:javaPreCompileDebug UP-TO-DATE
+> Task :expo-file-system:compileDebugJavaWithJavac UP-TO-DATE
+> Task :expo-file-system:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :expo-font:checkKotlinGradlePluginConfigurationErrors
+> Task :expo-font:generateDebugBuildConfig UP-TO-DATE
+> Task :expo-font:compileDebugKotlin UP-TO-DATE
+> Task :expo-font:javaPreCompileDebug UP-TO-DATE
+> Task :expo-font:compileDebugJavaWithJavac UP-TO-DATE
+> Task :expo-font:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :expo-haptics:checkKotlinGradlePluginConfigurationErrors
+> Task :expo-haptics:generateDebugBuildConfig UP-TO-DATE
+> Task :expo-haptics:compileDebugKotlin UP-TO-DATE
+> Task :expo-haptics:javaPreCompileDebug UP-TO-DATE
+> Task :expo-haptics:compileDebugJavaWithJavac UP-TO-DATE
+> Task :expo-haptics:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :expo-image-loader:checkKotlinGradlePluginConfigurationErrors
+> Task :expo-image-loader:generateDebugBuildConfig UP-TO-DATE
+> Task :expo-image-loader:compileDebugKotlin UP-TO-DATE
+> Task :expo-image-loader:javaPreCompileDebug UP-TO-DATE
+> Task :expo-image-loader:compileDebugJavaWithJavac UP-TO-DATE
+> Task :expo-image-loader:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :expo-image-manipulator:checkKotlinGradlePluginConfigurationErrors
+> Task :expo-image-manipulator:generateDebugBuildConfig UP-TO-DATE
+> Task :expo-image-manipulator:compileDebugKotlin UP-TO-DATE
+> Task :expo-image-manipulator:javaPreCompileDebug UP-TO-DATE
+> Task :expo-image-manipulator:compileDebugJavaWithJavac UP-TO-DATE
+> Task :expo-image-manipulator:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :expo-image-picker:checkKotlinGradlePluginConfigurationErrors
+> Task :expo-image-picker:generateDebugBuildConfig UP-TO-DATE
+> Task :expo-image-picker:compileDebugKotlin UP-TO-DATE
+> Task :expo-image-picker:javaPreCompileDebug UP-TO-DATE
+> Task :expo-image-picker:compileDebugJavaWithJavac UP-TO-DATE
+> Task :expo-image-picker:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :expo-keep-awake:checkKotlinGradlePluginConfigurationErrors
+> Task :expo-keep-awake:generateDebugBuildConfig UP-TO-DATE
+> Task :expo-keep-awake:compileDebugKotlin UP-TO-DATE
+> Task :expo-keep-awake:javaPreCompileDebug UP-TO-DATE
+> Task :expo-keep-awake:compileDebugJavaWithJavac UP-TO-DATE
+> Task :expo-keep-awake:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :expo-linear-gradient:checkKotlinGradlePluginConfigurationErrors
+> Task :expo-linear-gradient:generateDebugBuildConfig UP-TO-DATE
+> Task :expo-linear-gradient:compileDebugKotlin UP-TO-DATE
+> Task :expo-linear-gradient:javaPreCompileDebug UP-TO-DATE
+> Task :expo-linear-gradient:compileDebugJavaWithJavac UP-TO-DATE
+> Task :expo-linear-gradient:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :expo-linking:checkKotlinGradlePluginConfigurationErrors
+> Task :expo-linking:generateDebugBuildConfig UP-TO-DATE
+> Task :expo-linking:compileDebugKotlin UP-TO-DATE
+> Task :expo-linking:javaPreCompileDebug UP-TO-DATE
+> Task :expo-linking:compileDebugJavaWithJavac UP-TO-DATE
+> Task :expo-linking:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :expo-notifications:checkKotlinGradlePluginConfigurationErrors
+> Task :expo-notifications:generateDebugBuildConfig UP-TO-DATE
+> Task :expo-notifications:compileDebugKotlin UP-TO-DATE
+> Task :expo-notifications:javaPreCompileDebug UP-TO-DATE
+> Task :expo-notifications:compileDebugJavaWithJavac UP-TO-DATE
+> Task :expo-notifications:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :expo-splash-screen:checkKotlinGradlePluginConfigurationErrors
+> Task :expo-splash-screen:generateDebugBuildConfig UP-TO-DATE
+> Task :expo-splash-screen:compileDebugKotlin UP-TO-DATE
+> Task :expo-splash-screen:javaPreCompileDebug UP-TO-DATE
+> Task :expo-splash-screen:compileDebugJavaWithJavac UP-TO-DATE
+> Task :expo-splash-screen:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :expo-web-browser:checkKotlinGradlePluginConfigurationErrors
+> Task :expo-web-browser:generateDebugBuildConfig UP-TO-DATE
+> Task :expo-web-browser:compileDebugKotlin UP-TO-DATE
+> Task :expo-web-browser:javaPreCompileDebug UP-TO-DATE
+> Task :expo-web-browser:compileDebugJavaWithJavac UP-TO-DATE
+> Task :expo-web-browser:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :expo:compileDebugKotlin UP-TO-DATE
+> Task :expo:javaPreCompileDebug UP-TO-DATE
+> Task :expo:compileDebugJavaWithJavac UP-TO-DATE
+> Task :expo:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :livekit_react-native:checkKotlinGradlePluginConfigurationErrors
+> Task :livekit_react-native:generateDebugBuildConfig UP-TO-DATE
+> Task :livekit_react-native-webrtc:generateDebugBuildConfig UP-TO-DATE
+> Task :livekit_react-native-webrtc:javaPreCompileDebug UP-TO-DATE
+> Task :livekit_react-native-webrtc:compileDebugJavaWithJavac UP-TO-DATE
+> Task :livekit_react-native-webrtc:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :livekit_react-native:compileDebugKotlin UP-TO-DATE
+> Task :livekit_react-native:javaPreCompileDebug UP-TO-DATE
+> Task :livekit_react-native:compileDebugJavaWithJavac UP-TO-DATE
+> Task :livekit_react-native:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :lottie-react-native:checkKotlinGradlePluginConfigurationErrors
+> Task :lottie-react-native:generateDebugBuildConfig UP-TO-DATE
+> Task :lottie-react-native:compileDebugKotlin UP-TO-DATE
+> Task :lottie-react-native:javaPreCompileDebug UP-TO-DATE
+> Task :lottie-react-native:compileDebugJavaWithJavac UP-TO-DATE
+> Task :lottie-react-native:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :react-native-async-storage_async-storage:generateDebugBuildConfig UP-TO-DATE
+> Task :react-native-async-storage_async-storage:javaPreCompileDebug UP-TO-DATE
+> Task :react-native-async-storage_async-storage:compileDebugJavaWithJavac UP-TO-DATE
+> Task :react-native-async-storage_async-storage:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :react-native-community_datetimepicker:generateDebugBuildConfig UP-TO-DATE
+> Task :react-native-community_datetimepicker:javaPreCompileDebug UP-TO-DATE
+> Task :react-native-community_datetimepicker:compileDebugJavaWithJavac UP-TO-DATE
+> Task :react-native-community_datetimepicker:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :react-native-firebase_analytics:generateDebugBuildConfig UP-TO-DATE
+> Task :react-native-firebase_analytics:javaPreCompileDebug UP-TO-DATE
+> Task :react-native-firebase_app:generateDebugBuildConfig UP-TO-DATE
+> Task :react-native-firebase_app:javaPreCompileDebug UP-TO-DATE
+> Task :react-native-firebase_app:compileDebugJavaWithJavac UP-TO-DATE
+> Task :react-native-firebase_app:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :react-native-firebase_analytics:compileDebugJavaWithJavac UP-TO-DATE
+> Task :react-native-firebase_analytics:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :react-native-firebase_crashlytics:generateDebugBuildConfig UP-TO-DATE
+> Task :react-native-firebase_crashlytics:javaPreCompileDebug UP-TO-DATE
+> Task :react-native-firebase_crashlytics:compileDebugJavaWithJavac UP-TO-DATE
+> Task :react-native-firebase_crashlytics:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :react-native-gesture-handler:checkKotlinGradlePluginConfigurationErrors
+> Task :react-native-gesture-handler:generateDebugBuildConfig UP-TO-DATE
+> Task :react-native-reanimated:generateDebugBuildConfig UP-TO-DATE
+> Task :react-native-reanimated:javaPreCompileDebug UP-TO-DATE
+> Task :react-native-reanimated:packageNdkLibs NO-SOURCE
+> Task :react-native-reanimated:compileDebugJavaWithJavac UP-TO-DATE
+> Task :react-native-reanimated:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :react-native-gesture-handler:compileDebugKotlin UP-TO-DATE
+> Task :react-native-gesture-handler:javaPreCompileDebug UP-TO-DATE
+> Task :react-native-gesture-handler:compileDebugJavaWithJavac UP-TO-DATE
+> Task :react-native-gesture-handler:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :react-native-google-signin_google-signin:checkKotlinGradlePluginConfigurationErrors
+> Task :react-native-google-signin_google-signin:generateDebugBuildConfig UP-TO-DATE
+> Task :react-native-google-signin_google-signin:compileDebugKotlin UP-TO-DATE
+> Task :react-native-google-signin_google-signin:javaPreCompileDebug UP-TO-DATE
+> Task :react-native-google-signin_google-signin:compileDebugJavaWithJavac UP-TO-DATE
+> Task :react-native-google-signin_google-signin:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :react-native-keyboard-controller:checkKotlinGradlePluginConfigurationErrors
+> Task :react-native-keyboard-controller:generateDebugBuildConfig
+> Task :react-native-keyboard-controller:javaPreCompileDebug FROM-CACHE
+> Task :react-native-masked-view_masked-view:generateDebugBuildConfig UP-TO-DATE
+> Task :react-native-masked-view_masked-view:javaPreCompileDebug UP-TO-DATE
+> Task :react-native-masked-view_masked-view:compileDebugJavaWithJavac UP-TO-DATE
+> Task :react-native-masked-view_masked-view:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :react-native-purchases:checkKotlinGradlePluginConfigurationErrors
+> Task :react-native-purchases:generateDebugBuildConfig UP-TO-DATE
+> Task :react-native-purchases:compileDebugKotlin UP-TO-DATE
+> Task :react-native-purchases:javaPreCompileDebug UP-TO-DATE
+> Task :react-native-purchases:compileDebugJavaWithJavac UP-TO-DATE
+> Task :react-native-purchases:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :react-native-safe-area-context:checkKotlinGradlePluginConfigurationErrors
+> Task :react-native-safe-area-context:generateDebugBuildConfig UP-TO-DATE
+> Task :react-native-safe-area-context:compileDebugKotlin UP-TO-DATE
+> Task :react-native-safe-area-context:javaPreCompileDebug UP-TO-DATE
+> Task :react-native-safe-area-context:compileDebugJavaWithJavac UP-TO-DATE
+> Task :react-native-safe-area-context:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :react-native-screens:checkKotlinGradlePluginConfigurationErrors
+> Task :react-native-screens:generateDebugBuildConfig UP-TO-DATE
+> Task :react-native-screens:compileDebugKotlin UP-TO-DATE
+> Task :react-native-screens:javaPreCompileDebug UP-TO-DATE
+> Task :react-native-screens:compileDebugJavaWithJavac UP-TO-DATE
+> Task :react-native-screens:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :react-native-webview:checkKotlinGradlePluginConfigurationErrors
+> Task :react-native-webview:generateDebugBuildConfig UP-TO-DATE
+> Task :react-native-webview:compileDebugKotlin UP-TO-DATE
+> Task :react-native-webview:javaPreCompileDebug UP-TO-DATE
+> Task :react-native-webview:compileDebugJavaWithJavac UP-TO-DATE
+> Task :react-native-webview:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :app:javaPreCompileDebug UP-TO-DATE
+> Task :app:mergeDebugShaders UP-TO-DATE
+> Task :app:compileDebugShaders NO-SOURCE
+> Task :app:generateDebugAssets UP-TO-DATE
+> Task :expo:mergeDebugShaders UP-TO-DATE
+> Task :expo:compileDebugShaders NO-SOURCE
+> Task :expo:generateDebugAssets UP-TO-DATE
+> Task :expo:packageDebugAssets UP-TO-DATE
+> Task :expo-application:mergeDebugShaders UP-TO-DATE
+> Task :expo-application:compileDebugShaders NO-SOURCE
+> Task :expo-application:generateDebugAssets UP-TO-DATE
+> Task :expo-application:packageDebugAssets UP-TO-DATE
+> Task :expo-asset:mergeDebugShaders UP-TO-DATE
+> Task :expo-asset:compileDebugShaders NO-SOURCE
+> Task :expo-asset:generateDebugAssets UP-TO-DATE
+> Task :expo-asset:packageDebugAssets UP-TO-DATE
+> Task :expo-av:mergeDebugShaders UP-TO-DATE
+> Task :expo-av:compileDebugShaders NO-SOURCE
+> Task :expo-av:generateDebugAssets UP-TO-DATE
+> Task :expo-av:packageDebugAssets UP-TO-DATE
+> Task :expo-blur:mergeDebugShaders UP-TO-DATE
+> Task :expo-blur:compileDebugShaders NO-SOURCE
+> Task :expo-blur:generateDebugAssets UP-TO-DATE
+> Task :expo-blur:packageDebugAssets UP-TO-DATE
+> Task :expo-clipboard:mergeDebugShaders UP-TO-DATE
+> Task :expo-clipboard:compileDebugShaders NO-SOURCE
+> Task :expo-clipboard:generateDebugAssets UP-TO-DATE
+> Task :expo-clipboard:packageDebugAssets UP-TO-DATE
+> Task :expo-constants:mergeDebugShaders UP-TO-DATE
+> Task :expo-constants:compileDebugShaders NO-SOURCE
+> Task :expo-constants:generateDebugAssets UP-TO-DATE
+> Task :expo-constants:packageDebugAssets
+> Task :expo-crypto:mergeDebugShaders UP-TO-DATE
+> Task :expo-crypto:compileDebugShaders NO-SOURCE
+> Task :expo-crypto:generateDebugAssets UP-TO-DATE
+> Task :expo-crypto:packageDebugAssets UP-TO-DATE
+> Task :expo-device:mergeDebugShaders UP-TO-DATE
+> Task :expo-device:compileDebugShaders NO-SOURCE
+> Task :expo-device:generateDebugAssets UP-TO-DATE
+> Task :expo-device:packageDebugAssets UP-TO-DATE
+> Task :expo-file-system:mergeDebugShaders UP-TO-DATE
+> Task :expo-file-system:compileDebugShaders NO-SOURCE
+> Task :expo-file-system:generateDebugAssets UP-TO-DATE
+> Task :expo-file-system:packageDebugAssets UP-TO-DATE
+> Task :expo-font:mergeDebugShaders UP-TO-DATE
+> Task :expo-font:compileDebugShaders NO-SOURCE
+> Task :expo-font:generateDebugAssets UP-TO-DATE
+> Task :expo-font:packageDebugAssets UP-TO-DATE
+> Task :expo-haptics:mergeDebugShaders UP-TO-DATE
+> Task :expo-haptics:compileDebugShaders NO-SOURCE
+> Task :expo-haptics:generateDebugAssets UP-TO-DATE
+> Task :expo-haptics:packageDebugAssets UP-TO-DATE
+> Task :expo-image-loader:mergeDebugShaders UP-TO-DATE
+> Task :expo-image-loader:compileDebugShaders NO-SOURCE
+> Task :expo-image-loader:generateDebugAssets UP-TO-DATE
+> Task :expo-image-loader:packageDebugAssets UP-TO-DATE
+> Task :expo-image-manipulator:mergeDebugShaders UP-TO-DATE
+> Task :expo-image-manipulator:compileDebugShaders NO-SOURCE
+> Task :expo-image-manipulator:generateDebugAssets UP-TO-DATE
+> Task :expo-image-manipulator:packageDebugAssets UP-TO-DATE
+> Task :expo-image-picker:mergeDebugShaders UP-TO-DATE
+> Task :expo-image-picker:compileDebugShaders NO-SOURCE
+> Task :expo-image-picker:generateDebugAssets UP-TO-DATE
+> Task :expo-image-picker:packageDebugAssets UP-TO-DATE
+> Task :expo-keep-awake:mergeDebugShaders UP-TO-DATE
+> Task :expo-keep-awake:compileDebugShaders NO-SOURCE
+> Task :expo-keep-awake:generateDebugAssets UP-TO-DATE
+> Task :expo-keep-awake:packageDebugAssets UP-TO-DATE
+> Task :expo-linear-gradient:mergeDebugShaders UP-TO-DATE
+> Task :expo-linear-gradient:compileDebugShaders NO-SOURCE
+> Task :expo-linear-gradient:generateDebugAssets UP-TO-DATE
+> Task :expo-linear-gradient:packageDebugAssets UP-TO-DATE
+> Task :expo-linking:mergeDebugShaders UP-TO-DATE
+> Task :expo-linking:compileDebugShaders NO-SOURCE
+> Task :expo-linking:generateDebugAssets UP-TO-DATE
+> Task :expo-linking:packageDebugAssets UP-TO-DATE
+> Task :expo-modules-core:mergeDebugShaders UP-TO-DATE
+> Task :expo-modules-core:compileDebugShaders NO-SOURCE
+> Task :expo-modules-core:generateDebugAssets UP-TO-DATE
+> Task :expo-modules-core:packageDebugAssets UP-TO-DATE
+> Task :expo-notifications:mergeDebugShaders UP-TO-DATE
+> Task :expo-notifications:compileDebugShaders NO-SOURCE
+> Task :expo-notifications:generateDebugAssets UP-TO-DATE
+> Task :expo-notifications:packageDebugAssets UP-TO-DATE
+> Task :expo-splash-screen:mergeDebugShaders UP-TO-DATE
+> Task :expo-splash-screen:compileDebugShaders NO-SOURCE
+> Task :expo-splash-screen:generateDebugAssets UP-TO-DATE
+> Task :expo-splash-screen:packageDebugAssets UP-TO-DATE
+> Task :expo-web-browser:mergeDebugShaders UP-TO-DATE
+> Task :expo-web-browser:compileDebugShaders NO-SOURCE
+> Task :expo-web-browser:generateDebugAssets UP-TO-DATE
+> Task :expo-web-browser:packageDebugAssets UP-TO-DATE
+> Task :livekit_react-native:mergeDebugShaders UP-TO-DATE
+> Task :livekit_react-native:compileDebugShaders NO-SOURCE
+> Task :livekit_react-native:generateDebugAssets UP-TO-DATE
+> Task :livekit_react-native:packageDebugAssets UP-TO-DATE
+> Task :livekit_react-native-webrtc:mergeDebugShaders UP-TO-DATE
+> Task :livekit_react-native-webrtc:compileDebugShaders NO-SOURCE
+> Task :livekit_react-native-webrtc:generateDebugAssets UP-TO-DATE
+> Task :livekit_react-native-webrtc:packageDebugAssets UP-TO-DATE
+> Task :lottie-react-native:mergeDebugShaders UP-TO-DATE
+> Task :lottie-react-native:compileDebugShaders NO-SOURCE
+> Task :lottie-react-native:generateDebugAssets UP-TO-DATE
+> Task :lottie-react-native:packageDebugAssets UP-TO-DATE
+> Task :react-native-async-storage_async-storage:mergeDebugShaders UP-TO-DATE
+> Task :react-native-async-storage_async-storage:compileDebugShaders NO-SOURCE
+> Task :react-native-async-storage_async-storage:generateDebugAssets UP-TO-DATE
+> Task :react-native-async-storage_async-storage:packageDebugAssets UP-TO-DATE
+> Task :react-native-community_datetimepicker:mergeDebugShaders UP-TO-DATE
+> Task :react-native-community_datetimepicker:compileDebugShaders NO-SOURCE
+> Task :react-native-community_datetimepicker:generateDebugAssets UP-TO-DATE
+> Task :react-native-community_datetimepicker:packageDebugAssets UP-TO-DATE
+> Task :react-native-firebase_analytics:mergeDebugShaders UP-TO-DATE
+> Task :react-native-firebase_analytics:compileDebugShaders NO-SOURCE
+> Task :react-native-firebase_analytics:generateDebugAssets UP-TO-DATE
+> Task :react-native-firebase_analytics:packageDebugAssets UP-TO-DATE
+> Task :react-native-firebase_app:mergeDebugShaders UP-TO-DATE
+> Task :react-native-firebase_app:compileDebugShaders NO-SOURCE
+> Task :react-native-firebase_app:generateDebugAssets UP-TO-DATE
+> Task :react-native-firebase_app:packageDebugAssets UP-TO-DATE
+> Task :react-native-firebase_crashlytics:mergeDebugShaders UP-TO-DATE
+> Task :react-native-firebase_crashlytics:compileDebugShaders NO-SOURCE
+> Task :react-native-firebase_crashlytics:generateDebugAssets UP-TO-DATE
+> Task :react-native-firebase_crashlytics:packageDebugAssets UP-TO-DATE
+> Task :react-native-gesture-handler:mergeDebugShaders UP-TO-DATE
+> Task :react-native-gesture-handler:compileDebugShaders NO-SOURCE
+> Task :react-native-gesture-handler:generateDebugAssets UP-TO-DATE
+> Task :react-native-gesture-handler:packageDebugAssets UP-TO-DATE
+> Task :react-native-google-signin_google-signin:mergeDebugShaders UP-TO-DATE
+> Task :react-native-google-signin_google-signin:compileDebugShaders NO-SOURCE
+> Task :react-native-google-signin_google-signin:generateDebugAssets UP-TO-DATE
+> Task :react-native-google-signin_google-signin:packageDebugAssets UP-TO-DATE
+> Task :react-native-keyboard-controller:mergeDebugShaders
+> Task :react-native-keyboard-controller:compileDebugShaders NO-SOURCE
+> Task :react-native-keyboard-controller:generateDebugAssets UP-TO-DATE
+> Task :react-native-keyboard-controller:packageDebugAssets
+> Task :react-native-masked-view_masked-view:mergeDebugShaders UP-TO-DATE
+> Task :react-native-masked-view_masked-view:compileDebugShaders NO-SOURCE
+> Task :react-native-masked-view_masked-view:generateDebugAssets UP-TO-DATE
+> Task :react-native-masked-view_masked-view:packageDebugAssets UP-TO-DATE
+> Task :react-native-purchases:mergeDebugShaders UP-TO-DATE
+> Task :react-native-purchases:compileDebugShaders NO-SOURCE
+> Task :react-native-purchases:generateDebugAssets UP-TO-DATE
+> Task :react-native-purchases:packageDebugAssets UP-TO-DATE
+> Task :react-native-reanimated:mergeDebugShaders UP-TO-DATE
+> Task :react-native-reanimated:compileDebugShaders NO-SOURCE
+> Task :react-native-reanimated:generateDebugAssets UP-TO-DATE
+> Task :react-native-reanimated:packageDebugAssets UP-TO-DATE
+> Task :react-native-safe-area-context:mergeDebugShaders UP-TO-DATE
+> Task :react-native-safe-area-context:compileDebugShaders NO-SOURCE
+> Task :react-native-safe-area-context:generateDebugAssets UP-TO-DATE
+> Task :react-native-safe-area-context:packageDebugAssets UP-TO-DATE
+> Task :react-native-screens:mergeDebugShaders UP-TO-DATE
+> Task :react-native-screens:compileDebugShaders NO-SOURCE
+> Task :react-native-screens:generateDebugAssets UP-TO-DATE
+> Task :react-native-screens:packageDebugAssets UP-TO-DATE
+> Task :react-native-webview:mergeDebugShaders UP-TO-DATE
+> Task :react-native-webview:compileDebugShaders NO-SOURCE
+> Task :react-native-webview:generateDebugAssets UP-TO-DATE
+> Task :react-native-webview:packageDebugAssets UP-TO-DATE
+> Task :app:mergeDebugAssets
+> Task :livekit_react-native:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :react-native-google-signin_google-signin:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :expo:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :lottie-react-native:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :react-native-gesture-handler:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :react-native-safe-area-context:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :react-native-screens:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :react-native-webview:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :livekit_react-native-webrtc:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :react-native-async-storage_async-storage:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :react-native-community_datetimepicker:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :react-native-firebase_analytics:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :react-native-firebase_crashlytics:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :react-native-firebase_app:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :react-native-masked-view_masked-view:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :react-native-purchases:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :react-native-reanimated:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :expo-application:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :expo-asset:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :expo-av:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :expo-blur:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :expo-clipboard:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :expo-constants:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :expo-crypto:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :expo-device:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :expo-file-system:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :expo-font:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :expo-haptics:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :expo-image-loader:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :expo-image-manipulator:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :expo-image-picker:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :expo-keep-awake:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :expo-linear-gradient:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :expo-linking:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :expo-notifications:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :expo-splash-screen:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :expo-web-browser:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :expo-modules-core:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :app:desugarDebugFileDependencies UP-TO-DATE
+> Task :expo:processDebugJavaRes UP-TO-DATE
+> Task :expo-application:processDebugJavaRes UP-TO-DATE
+> Task :expo-asset:processDebugJavaRes UP-TO-DATE
+> Task :expo-av:processDebugJavaRes UP-TO-DATE
+> Task :expo-blur:processDebugJavaRes UP-TO-DATE
+> Task :expo-clipboard:processDebugJavaRes UP-TO-DATE
+> Task :expo-constants:processDebugJavaRes UP-TO-DATE
+> Task :expo-crypto:processDebugJavaRes UP-TO-DATE
+> Task :expo-device:processDebugJavaRes UP-TO-DATE
+> Task :expo-file-system:processDebugJavaRes UP-TO-DATE
+> Task :expo-font:processDebugJavaRes UP-TO-DATE
+> Task :expo-haptics:processDebugJavaRes UP-TO-DATE
+> Task :expo-image-loader:processDebugJavaRes UP-TO-DATE
+> Task :expo-image-manipulator:processDebugJavaRes UP-TO-DATE
+> Task :expo-image-picker:processDebugJavaRes UP-TO-DATE
+> Task :expo-keep-awake:processDebugJavaRes UP-TO-DATE
+> Task :expo-linear-gradient:processDebugJavaRes UP-TO-DATE
+> Task :expo-linking:processDebugJavaRes UP-TO-DATE
+> Task :expo-modules-core:processDebugJavaRes UP-TO-DATE
+> Task :expo-notifications:processDebugJavaRes UP-TO-DATE
+> Task :expo-splash-screen:processDebugJavaRes UP-TO-DATE
+> Task :expo-web-browser:processDebugJavaRes UP-TO-DATE
+> Task :livekit_react-native:processDebugJavaRes UP-TO-DATE
+> Task :livekit_react-native-webrtc:processDebugJavaRes NO-SOURCE
+> Task :lottie-react-native:processDebugJavaRes UP-TO-DATE
+> Task :react-native-async-storage_async-storage:processDebugJavaRes NO-SOURCE
+> Task :react-native-community_datetimepicker:processDebugJavaRes NO-SOURCE
+> Task :react-native-firebase_analytics:processDebugJavaRes NO-SOURCE
+> Task :react-native-firebase_app:processDebugJavaRes NO-SOURCE
+> Task :react-native-firebase_crashlytics:processDebugJavaRes NO-SOURCE
+> Task :react-native-gesture-handler:processDebugJavaRes UP-TO-DATE
+> Task :react-native-google-signin_google-signin:processDebugJavaRes UP-TO-DATE
+> Task :react-native-masked-view_masked-view:processDebugJavaRes NO-SOURCE
+> Task :react-native-purchases:processDebugJavaRes UP-TO-DATE
+> Task :react-native-reanimated:processDebugJavaRes NO-SOURCE
+> Task :react-native-safe-area-context:processDebugJavaRes UP-TO-DATE
+> Task :react-native-screens:processDebugJavaRes UP-TO-DATE
+> Task :react-native-webview:processDebugJavaRes UP-TO-DATE
+> Task :livekit_react-native:bundleLibRuntimeToDirDebug UP-TO-DATE
+> Task :react-native-google-signin_google-signin:bundleLibRuntimeToDirDebug UP-TO-DATE
+> Task :expo:bundleLibRuntimeToDirDebug UP-TO-DATE
+> Task :lottie-react-native:bundleLibRuntimeToDirDebug UP-TO-DATE
+> Task :react-native-gesture-handler:bundleLibRuntimeToDirDebug UP-TO-DATE
+> Task :react-native-safe-area-context:bundleLibRuntimeToDirDebug UP-TO-DATE
+> Task :react-native-screens:bundleLibRuntimeToDirDebug UP-TO-DATE
+> Task :react-native-webview:bundleLibRuntimeToDirDebug UP-TO-DATE
+> Task :livekit_react-native-webrtc:bundleLibRuntimeToDirDebug UP-TO-DATE
+> Task :react-native-async-storage_async-storage:bundleLibRuntimeToDirDebug UP-TO-DATE
+> Task :react-native-community_datetimepicker:bundleLibRuntimeToDirDebug UP-TO-DATE
+> Task :react-native-firebase_analytics:bundleLibRuntimeToDirDebug UP-TO-DATE
+> Task :react-native-firebase_crashlytics:bundleLibRuntimeToDirDebug UP-TO-DATE
+> Task :react-native-firebase_app:bundleLibRuntimeToDirDebug UP-TO-DATE
+> Task :react-native-masked-view_masked-view:bundleLibRuntimeToDirDebug UP-TO-DATE
+> Task :react-native-purchases:bundleLibRuntimeToDirDebug UP-TO-DATE
+> Task :react-native-reanimated:bundleLibRuntimeToDirDebug UP-TO-DATE
+> Task :app:compressDebugAssets
+> Task :expo-application:bundleLibRuntimeToDirDebug UP-TO-DATE
+> Task :expo-asset:bundleLibRuntimeToDirDebug UP-TO-DATE
+> Task :app:checkDebugDuplicateClasses
+> Task :expo-av:bundleLibRuntimeToDirDebug UP-TO-DATE
+> Task :app:processDebugResources
+> Task :expo-blur:bundleLibRuntimeToDirDebug UP-TO-DATE
+> Task :expo-clipboard:bundleLibRuntimeToDirDebug UP-TO-DATE
+> Task :expo-constants:bundleLibRuntimeToDirDebug UP-TO-DATE
+> Task :expo-crypto:bundleLibRuntimeToDirDebug UP-TO-DATE
+> Task :expo-device:bundleLibRuntimeToDirDebug UP-TO-DATE
+> Task :expo-file-system:bundleLibRuntimeToDirDebug UP-TO-DATE
+> Task :expo-font:bundleLibRuntimeToDirDebug UP-TO-DATE
+> Task :expo-haptics:bundleLibRuntimeToDirDebug UP-TO-DATE
+> Task :expo-image-loader:bundleLibRuntimeToDirDebug UP-TO-DATE
+> Task :expo-image-manipulator:bundleLibRuntimeToDirDebug UP-TO-DATE
+> Task :expo-image-picker:bundleLibRuntimeToDirDebug UP-TO-DATE
+> Task :expo-keep-awake:bundleLibRuntimeToDirDebug UP-TO-DATE
+> Task :expo-linear-gradient:bundleLibRuntimeToDirDebug UP-TO-DATE
+> Task :expo-linking:bundleLibRuntimeToDirDebug UP-TO-DATE
+> Task :expo-notifications:bundleLibRuntimeToDirDebug UP-TO-DATE
+> Task :expo-splash-screen:bundleLibRuntimeToDirDebug UP-TO-DATE
+> Task :expo-web-browser:bundleLibRuntimeToDirDebug UP-TO-DATE
+> Task :expo-modules-core:bundleLibRuntimeToDirDebug UP-TO-DATE
+> Task :app:mergeDebugJniLibFolders UP-TO-DATE
+> Task :expo:mergeDebugJniLibFolders UP-TO-DATE
+> Task :expo:mergeDebugNativeLibs NO-SOURCE
+> Task :expo:copyDebugJniLibsProjectOnly UP-TO-DATE
+> Task :expo-application:mergeDebugJniLibFolders UP-TO-DATE
+> Task :expo-application:mergeDebugNativeLibs NO-SOURCE
+> Task :expo-application:copyDebugJniLibsProjectOnly UP-TO-DATE
+> Task :expo-asset:mergeDebugJniLibFolders UP-TO-DATE
+> Task :expo-asset:mergeDebugNativeLibs NO-SOURCE
+> Task :expo-asset:copyDebugJniLibsProjectOnly UP-TO-DATE
+> Task :expo-av:configureCMakeDebug[arm64-v8a]
+> Task :expo-av:buildCMakeDebug[arm64-v8a]
+> Task :expo-av:configureCMakeDebug[x86_64]
+> Task :expo-av:buildCMakeDebug[x86_64]
+> Task :expo-av:mergeDebugJniLibFolders UP-TO-DATE
+> Task :expo-av:mergeDebugNativeLibs
+> Task :expo-blur:mergeDebugJniLibFolders UP-TO-DATE
+> Task :expo-blur:mergeDebugNativeLibs NO-SOURCE
+> Task :expo-blur:copyDebugJniLibsProjectOnly UP-TO-DATE
+> Task :expo-clipboard:mergeDebugJniLibFolders UP-TO-DATE
+> Task :expo-clipboard:mergeDebugNativeLibs NO-SOURCE
+> Task :expo-clipboard:copyDebugJniLibsProjectOnly UP-TO-DATE
+> Task :expo-constants:mergeDebugJniLibFolders UP-TO-DATE
+> Task :expo-constants:mergeDebugNativeLibs NO-SOURCE
+> Task :expo-constants:copyDebugJniLibsProjectOnly UP-TO-DATE
+> Task :expo-crypto:mergeDebugJniLibFolders UP-TO-DATE
+> Task :expo-crypto:mergeDebugNativeLibs NO-SOURCE
+> Task :expo-crypto:copyDebugJniLibsProjectOnly UP-TO-DATE
+> Task :expo-device:mergeDebugJniLibFolders UP-TO-DATE
+> Task :expo-device:mergeDebugNativeLibs NO-SOURCE
+> Task :expo-device:copyDebugJniLibsProjectOnly UP-TO-DATE
+> Task :expo-file-system:mergeDebugJniLibFolders UP-TO-DATE
+> Task :expo-file-system:mergeDebugNativeLibs NO-SOURCE
+> Task :expo-file-system:copyDebugJniLibsProjectOnly UP-TO-DATE
+> Task :expo-font:mergeDebugJniLibFolders UP-TO-DATE
+> Task :expo-font:mergeDebugNativeLibs NO-SOURCE
+> Task :expo-font:copyDebugJniLibsProjectOnly UP-TO-DATE
+> Task :expo-haptics:mergeDebugJniLibFolders UP-TO-DATE
+> Task :expo-haptics:mergeDebugNativeLibs NO-SOURCE
+> Task :expo-haptics:copyDebugJniLibsProjectOnly UP-TO-DATE
+> Task :expo-image-loader:mergeDebugJniLibFolders UP-TO-DATE
+> Task :expo-image-loader:mergeDebugNativeLibs NO-SOURCE
+> Task :expo-image-loader:copyDebugJniLibsProjectOnly UP-TO-DATE
+> Task :expo-image-manipulator:mergeDebugJniLibFolders UP-TO-DATE
+> Task :expo-image-manipulator:mergeDebugNativeLibs NO-SOURCE
+> Task :expo-av:copyDebugJniLibsProjectOnly
+> Task :expo-image-manipulator:copyDebugJniLibsProjectOnly UP-TO-DATE
+> Task :expo-image-picker:mergeDebugJniLibFolders UP-TO-DATE
+> Task :expo-image-picker:mergeDebugNativeLibs NO-SOURCE
+> Task :expo-image-picker:copyDebugJniLibsProjectOnly UP-TO-DATE
+> Task :expo-keep-awake:mergeDebugJniLibFolders UP-TO-DATE
+> Task :expo-keep-awake:mergeDebugNativeLibs NO-SOURCE
+> Task :expo-keep-awake:copyDebugJniLibsProjectOnly UP-TO-DATE
+> Task :expo-linear-gradient:mergeDebugJniLibFolders UP-TO-DATE
+> Task :expo-linear-gradient:mergeDebugNativeLibs NO-SOURCE
+> Task :expo-linear-gradient:copyDebugJniLibsProjectOnly UP-TO-DATE
+> Task :expo-linking:mergeDebugJniLibFolders UP-TO-DATE
+> Task :expo-linking:mergeDebugNativeLibs NO-SOURCE
+> Task :expo-linking:copyDebugJniLibsProjectOnly UP-TO-DATE
+> Task :expo-modules-core:configureCMakeDebug[arm64-v8a]
+> Task :expo-modules-core:buildCMakeDebug[arm64-v8a]
+> Task :expo-modules-core:configureCMakeDebug[x86_64]
+> Task :expo-modules-core:buildCMakeDebug[x86_64]
+> Task :expo-modules-core:mergeDebugJniLibFolders UP-TO-DATE
+> Task :expo-notifications:mergeDebugJniLibFolders UP-TO-DATE
+> Task :expo-notifications:mergeDebugNativeLibs NO-SOURCE
+> Task :expo-notifications:copyDebugJniLibsProjectOnly UP-TO-DATE
+> Task :expo-splash-screen:mergeDebugJniLibFolders UP-TO-DATE
+> Task :expo-splash-screen:mergeDebugNativeLibs NO-SOURCE
+> Task :expo-splash-screen:copyDebugJniLibsProjectOnly UP-TO-DATE
+> Task :expo-web-browser:mergeDebugJniLibFolders UP-TO-DATE
+> Task :expo-web-browser:mergeDebugNativeLibs NO-SOURCE
+> Task :expo-web-browser:copyDebugJniLibsProjectOnly UP-TO-DATE
+> Task :livekit_react-native:mergeDebugJniLibFolders UP-TO-DATE
+> Task :livekit_react-native:mergeDebugNativeLibs NO-SOURCE
+> Task :livekit_react-native:copyDebugJniLibsProjectOnly UP-TO-DATE
+> Task :livekit_react-native-webrtc:mergeDebugJniLibFolders UP-TO-DATE
+> Task :livekit_react-native-webrtc:mergeDebugNativeLibs NO-SOURCE
+> Task :livekit_react-native-webrtc:copyDebugJniLibsProjectOnly UP-TO-DATE
+> Task :lottie-react-native:mergeDebugJniLibFolders UP-TO-DATE
+> Task :lottie-react-native:mergeDebugNativeLibs NO-SOURCE
+> Task :lottie-react-native:copyDebugJniLibsProjectOnly UP-TO-DATE
+> Task :react-native-async-storage_async-storage:mergeDebugJniLibFolders UP-TO-DATE
+> Task :react-native-async-storage_async-storage:mergeDebugNativeLibs NO-SOURCE
+> Task :react-native-async-storage_async-storage:copyDebugJniLibsProjectOnly UP-TO-DATE
+> Task :react-native-community_datetimepicker:mergeDebugJniLibFolders UP-TO-DATE
+> Task :react-native-community_datetimepicker:mergeDebugNativeLibs NO-SOURCE
+> Task :react-native-community_datetimepicker:copyDebugJniLibsProjectOnly UP-TO-DATE
+> Task :react-native-firebase_analytics:mergeDebugJniLibFolders UP-TO-DATE
+> Task :react-native-firebase_analytics:mergeDebugNativeLibs NO-SOURCE
+> Task :react-native-firebase_analytics:copyDebugJniLibsProjectOnly UP-TO-DATE
+> Task :react-native-firebase_app:mergeDebugJniLibFolders UP-TO-DATE
+> Task :react-native-firebase_app:mergeDebugNativeLibs NO-SOURCE
+> Task :react-native-firebase_app:copyDebugJniLibsProjectOnly UP-TO-DATE
+> Task :react-native-firebase_crashlytics:mergeDebugJniLibFolders UP-TO-DATE
+> Task :react-native-firebase_crashlytics:mergeDebugNativeLibs NO-SOURCE
+> Task :react-native-firebase_crashlytics:copyDebugJniLibsProjectOnly UP-TO-DATE
+> Task :react-native-gesture-handler:mergeDebugJniLibFolders UP-TO-DATE
+> Task :react-native-gesture-handler:mergeDebugNativeLibs NO-SOURCE
+> Task :react-native-gesture-handler:copyDebugJniLibsProjectOnly UP-TO-DATE
+> Task :react-native-google-signin_google-signin:mergeDebugJniLibFolders UP-TO-DATE
+> Task :react-native-google-signin_google-signin:mergeDebugNativeLibs NO-SOURCE
+> Task :react-native-google-signin_google-signin:copyDebugJniLibsProjectOnly UP-TO-DATE
+> Task :react-native-keyboard-controller:mergeDebugJniLibFolders
+> Task :react-native-keyboard-controller:mergeDebugNativeLibs NO-SOURCE
+> Task :react-native-keyboard-controller:copyDebugJniLibsProjectOnly
+> Task :react-native-masked-view_masked-view:mergeDebugJniLibFolders UP-TO-DATE
+> Task :react-native-masked-view_masked-view:mergeDebugNativeLibs NO-SOURCE
+> Task :react-native-masked-view_masked-view:copyDebugJniLibsProjectOnly UP-TO-DATE
+> Task :react-native-purchases:mergeDebugJniLibFolders UP-TO-DATE
+> Task :react-native-purchases:mergeDebugNativeLibs NO-SOURCE
+> Task :react-native-purchases:copyDebugJniLibsProjectOnly UP-TO-DATE
+> Task :react-native-reanimated:configureCMakeDebug[arm64-v8a]
+> Task :expo-modules-core:mergeDebugNativeLibs
+> Task :react-native-reanimated:buildCMakeDebug[arm64-v8a]
+> Task :react-native-reanimated:configureCMakeDebug[x86_64]
+> Task :expo-modules-core:copyDebugJniLibsProjectOnly
+> Task :react-native-reanimated:buildCMakeDebug[x86_64]
+> Task :react-native-reanimated:mergeDebugJniLibFolders UP-TO-DATE
+> Task :react-native-safe-area-context:mergeDebugJniLibFolders UP-TO-DATE
+> Task :react-native-safe-area-context:mergeDebugNativeLibs NO-SOURCE
+> Task :react-native-safe-area-context:copyDebugJniLibsProjectOnly UP-TO-DATE
+> Task :react-native-screens:configureCMakeDebug[arm64-v8a]
+> Task :react-native-reanimated:mergeDebugNativeLibs
+> Task :react-native-screens:buildCMakeDebug[arm64-v8a]
+> Task :react-native-reanimated:copyDebugJniLibsProjectOnly
+> Task :react-native-screens:configureCMakeDebug[x86_64]
+> Task :react-native-screens:buildCMakeDebug[x86_64]
+> Task :react-native-screens:mergeDebugJniLibFolders UP-TO-DATE
+> Task :react-native-webview:mergeDebugJniLibFolders UP-TO-DATE
+> Task :react-native-webview:mergeDebugNativeLibs NO-SOURCE
+> Task :react-native-webview:copyDebugJniLibsProjectOnly UP-TO-DATE
+> Task :app:validateSigningDebug UP-TO-DATE
+> Task :app:writeDebugAppMetadata UP-TO-DATE
+> Task :app:writeDebugSigningConfigVersions UP-TO-DATE
+> Task :react-native-screens:mergeDebugNativeLibs
+> Task :react-native-screens:copyDebugJniLibsProjectOnly
+> Task :react-native-keyboard-controller:compileDebugKotlin
+> Task :app:mergeDebugNativeLibs
+> Task :app:stripDebugDebugSymbols
+> Task :app:mergeExtDexDebug
+
+> Task :react-native-keyboard-controller:compileDebugKotlin
+w: file:///C:/SopranoChat/node_modules/react-native-keyboard-controller/android/src/main/java/com/reactnativekeyboardcontroller/extensions/EditText.kt:69:42 Unchecked cast: kotlin.collections.ArrayList<*>? /* = java.util.ArrayList<*>? */ to kotlin.collections.ArrayList<TextWatcher> /* = java.util.ArrayList<TextWatcher> */
+w: file:///C:/SopranoChat/node_modules/react-native-keyboard-controller/android/src/main/java/com/reactnativekeyboardcontroller/interactive/KeyboardAnimationController.kt:89:16 'getWindowInsetsController(View): WindowInsetsControllerCompat?' is deprecated. Deprecated in Java
+w: file:///C:/SopranoChat/node_modules/react-native-keyboard-controller/android/src/main/java/com/reactnativekeyboardcontroller/listeners/FocusedInputObserver.kt:56:30 Parameter 'v' is never used, could be renamed to _
+w: file:///C:/SopranoChat/node_modules/react-native-keyboard-controller/android/src/main/java/com/reactnativekeyboardcontroller/listeners/FocusedInputObserver.kt:56:33 Parameter 'left' is never used, could be renamed to _
+w: file:///C:/SopranoChat/node_modules/react-native-keyboard-controller/android/src/main/java/com/reactnativekeyboardcontroller/listeners/FocusedInputObserver.kt:56:39 Parameter 'top' is never used, could be renamed to _
+w: file:///C:/SopranoChat/node_modules/react-native-keyboard-controller/android/src/main/java/com/reactnativekeyboardcontroller/listeners/FocusedInputObserver.kt:56:44 Parameter 'right' is never used, could be renamed to _
+w: file:///C:/SopranoChat/node_modules/react-native-keyboard-controller/android/src/main/java/com/reactnativekeyboardcontroller/listeners/FocusedInputObserver.kt:56:51 Parameter 'bottom' is never used, could be renamed to _
+w: file:///C:/SopranoChat/node_modules/react-native-keyboard-controller/android/src/main/java/com/reactnativekeyboardcontroller/listeners/FocusedInputObserver.kt:56:59 Parameter 'oldLeft' is never used, could be renamed to _
+w: file:///C:/SopranoChat/node_modules/react-native-keyboard-controller/android/src/main/java/com/reactnativekeyboardcontroller/listeners/FocusedInputObserver.kt:56:68 Parameter 'oldTop' is never used, could be renamed to _
+w: file:///C:/SopranoChat/node_modules/react-native-keyboard-controller/android/src/main/java/com/reactnativekeyboardcontroller/listeners/FocusedInputObserver.kt:56:76 Parameter 'oldRight' is never used, could be renamed to _
+w: file:///C:/SopranoChat/node_modules/react-native-keyboard-controller/android/src/main/java/com/reactnativekeyboardcontroller/listeners/FocusedInputObserver.kt:56:86 Parameter 'oldBottom' is never used, could be renamed to _
+w: file:///C:/SopranoChat/node_modules/react-native-keyboard-controller/android/src/main/java/com/reactnativekeyboardcontroller/managers/KeyboardControllerViewManagerImpl.kt:4:34 'MapBuilder' is deprecated. Deprecated in Java
+w: file:///C:/SopranoChat/node_modules/react-native-keyboard-controller/android/src/main/java/com/reactnativekeyboardcontroller/managers/KeyboardControllerViewManagerImpl.kt:73:7 'MapBuilder' is deprecated. Deprecated in Java
+w: file:///C:/SopranoChat/node_modules/react-native-keyboard-controller/android/src/main/java/com/reactnativekeyboardcontroller/managers/KeyboardControllerViewManagerImpl.kt:75:9 'MapBuilder' is deprecated. Deprecated in Java
+w: file:///C:/SopranoChat/node_modules/react-native-keyboard-controller/android/src/main/java/com/reactnativekeyboardcontroller/managers/KeyboardControllerViewManagerImpl.kt:77:9 'MapBuilder' is deprecated. Deprecated in Java
+w: file:///C:/SopranoChat/node_modules/react-native-keyboard-controller/android/src/main/java/com/reactnativekeyboardcontroller/managers/KeyboardControllerViewManagerImpl.kt:79:9 'MapBuilder' is deprecated. Deprecated in Java
+w: file:///C:/SopranoChat/node_modules/react-native-keyboard-controller/android/src/main/java/com/reactnativekeyboardcontroller/managers/KeyboardControllerViewManagerImpl.kt:81:9 'MapBuilder' is deprecated. Deprecated in Java
+w: file:///C:/SopranoChat/node_modules/react-native-keyboard-controller/android/src/main/java/com/reactnativekeyboardcontroller/managers/KeyboardControllerViewManagerImpl.kt:83:9 'MapBuilder' is deprecated. Deprecated in Java
+w: file:///C:/SopranoChat/node_modules/react-native-keyboard-controller/android/src/main/java/com/reactnativekeyboardcontroller/managers/KeyboardControllerViewManagerImpl.kt:85:9 'MapBuilder' is deprecated. Deprecated in Java
+w: file:///C:/SopranoChat/node_modules/react-native-keyboard-controller/android/src/main/java/com/reactnativekeyboardcontroller/managers/KeyboardControllerViewManagerImpl.kt:87:9 'MapBuilder' is deprecated. Deprecated in Java
+w: file:///C:/SopranoChat/node_modules/react-native-keyboard-controller/android/src/main/java/com/reactnativekeyboardcontroller/modules/statusbar/StatusBarManagerCompatModuleImpl.kt:70:38 'getter for statusBarColor: Int' is deprecated. Deprecated in Java
+w: file:///C:/SopranoChat/node_modules/react-native-keyboard-controller/android/src/main/java/com/reactnativekeyboardcontroller/modules/statusbar/StatusBarManagerCompatModuleImpl.kt:73:20 'setter for statusBarColor: Int' is deprecated. Deprecated in Java
+w: file:///C:/SopranoChat/node_modules/react-native-keyboard-controller/android/src/main/java/com/reactnativekeyboardcontroller/modules/statusbar/StatusBarManagerCompatModuleImpl.kt:78:18 'setter for statusBarColor: Int' is deprecated. Deprecated in Java
+w: file:///C:/SopranoChat/node_modules/react-native-keyboard-controller/android/src/main/java/com/reactnativekeyboardcontroller/views/ClippingScrollViewDecoratorView.kt:36:51 Parameter 'value' is never used
+w: file:///C:/SopranoChat/node_modules/react-native-keyboard-controller/android/src/main/java/com/reactnativekeyboardcontroller/views/EdgeToEdgeReactViewGroup.kt:115:58 'SOFT_INPUT_ADJUST_RESIZE: Int' is deprecated. Deprecated in Java
+w: file:///C:/SopranoChat/node_modules/react-native-keyboard-controller/android/src/main/java/com/reactnativekeyboardcontroller/views/EdgeToEdgeReactViewGroup.kt:150:81 'FLAG_FULLSCREEN: Int' is deprecated. Deprecated in Java
+w: file:///C:/SopranoChat/node_modules/react-native-keyboard-controller/android/src/main/java/com/reactnativekeyboardcontroller/views/overlay/OverKeyboardViewGroup.kt:13:34 'ReactFeatureFlags' is deprecated. Deprecated in Java
+w: file:///C:/SopranoChat/node_modules/react-native-keyboard-controller/android/src/main/java/com/reactnativekeyboardcontroller/views/overlay/OverKeyboardViewGroup.kt:132:9 'ReactFeatureFlags' is deprecated. Deprecated in Java
+w: file:///C:/SopranoChat/node_modules/react-native-keyboard-controller/android/src/paper/java/com/reactnativekeyboardcontroller/KeyboardControllerModule.kt:56:19 Parameter 'eventName' is never used
+w: file:///C:/SopranoChat/node_modules/react-native-keyboard-controller/android/src/paper/java/com/reactnativekeyboardcontroller/KeyboardControllerModule.kt:62:23 Parameter 'count' is never used
+w: file:///C:/SopranoChat/node_modules/react-native-keyboard-controller/android/src/paper/java/com/reactnativekeyboardcontroller/KeyboardGestureAreaViewManager.kt:52:5 Parameter 'view' is never used
+w: file:///C:/SopranoChat/node_modules/react-native-keyboard-controller/android/src/paper/java/com/reactnativekeyboardcontroller/KeyboardGestureAreaViewManager.kt:53:5 Parameter 'value' is never used
+
+> Task :react-native-keyboard-controller:compileDebugJavaWithJavac
+> Task :react-native-keyboard-controller:bundleLibRuntimeToJarDebug
+> Task :react-native-keyboard-controller:bundleLibCompileToJarDebug
+> Task :react-native-keyboard-controller:processDebugJavaRes
+> Task :app:compileDebugKotlin
+> Task :react-native-keyboard-controller:bundleLibRuntimeToDirDebug
+> Task :app:compileDebugJavaWithJavac
+> Task :app:dexBuilderDebug
+> Task :app:mergeDebugGlobalSynthetics UP-TO-DATE
+> Task :app:processDebugJavaRes UP-TO-DATE
+> Task :app:mergeProjectDexDebug
+> Task :app:mergeLibDexDebug
+> Task :app:mergeDebugJavaResource
+> Task :app:packageDebug
+> Task :app:createDebugApkListingFileRedirect
+> Task :app:assembleDebug
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/8.10.2/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUİLD SUCCESSFUL in 2m 22s
+912 actionable tasks: 105 executed, 3 from cache, 804 up-to-date
+Waiting on http://localhost:8081
+› Installing c:\SopranoChat\android\app\build\outputs\apk\debug\app-debug.apk
+Error: adb.exe: failed to install c:\SopranoChat\android\app\build\outputs\apk\debug\app-debug.apk: Failure [INSTALL_FAILED_UPDATE_INCOMPATIBLE: Existing package com.sopranochat signatures do not match newer version; ignoring!]
+Error: C:\Users\yogun\AppData\Local\Android\Sdk/platform-tools/adb -s emulator-5554 install -r -d --user 0 c:\SopranoChat\android\app\build\outputs\apk\debug\app-debug.apk exited with non-zero code: 1
+    at ChildProcess.completionListener (c:\SopranoChat\node_modules\@expo\spawn-async\src\spawnAsync.ts:67:13)
+    at Object.onceWrapper (node:events:623:26)
+    at ChildProcess.emit (node:events:508:28)
+    at ChildProcess.cp.emit (c:\SopranoChat\node_modules\cross-spawn\lib\enoent.js:34:29)
+    at maybeClose (node:internal/child_process:1101:16)
+    at Process.ChildProcess._handle.onexit (node:internal/child_process:305:5)
+    ...
+    at spawnAsync (c:\SopranoChat\node_modules\@expo\spawn-async\src\spawnAsync.ts:28:21)
+    at ADBServer.runAsync (c:\SopranoChat\node_modules\@expo\cli\src\start\platforms\android\ADBServer.ts:85:59)
+    at processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at Object.installAsync (c:\SopranoChat\node_modules\@expo\cli\src\start\platforms\android\adb.ts:223:10)
+    at AndroidDeviceManager.installAppAsync (c:\SopranoChat\node_modules\@expo\cli\src\start\platforms\android\AndroidDeviceManager.ts:85:5)
+    at installAppAsync (c:\SopranoChat\node_modules\@expo\cli\src\run\android\runAndroidAsync.ts:108:5)
+    at runAndroidAsync (c:\SopranoChat\node_modules\@expo\cli\src\run\android\runAndroidAsync.ts:80:5)

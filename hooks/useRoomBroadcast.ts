@@ -412,8 +412,14 @@ export function useRoomBroadcast(params: UseRoomBroadcastParams) {
         return;
       }
       // ── Erişim isteği — host ve moderatörler görür ──
+      // ★ v92.12 (1 May 2026): Pop-up alert KALDIRILDI (kullanıcı talebi).
+      //   Talep PlusMenu accordion'da listelenir; host + button badge'iyle
+      //   görür ve "Katılım İstekleri" listesinden onay/red verir.
       if (data.action === 'access_request') {
-        // Sadece host ve moderatörler görsün
+        return;
+      }
+      // ★ Eski alert kodu (devre dışı, referans için tutuluyor):
+      if (false && data.action === 'access_request') {
         setAlertConfig({
           visible: true,
           title: '🚪 Katılma İsteği',
@@ -424,7 +430,6 @@ export function useRoomBroadcast(params: UseRoomBroadcastParams) {
             { text: 'Reddet', style: 'cancel' },
             { text: 'Kabul Et', onPress: async () => {
               try {
-                // İsteği onayla
                 const { data: reqData } = await import('../constants/supabase').then(m => m.supabase
                   .from('room_access_requests')
                   .select('id')

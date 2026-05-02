@@ -1,10 +1,11 @@
-/**
+﻿/**
  * SopranoChat — Arkadaş Davet Modalı
  * Oda oluşturma sayfasında ve oda içinde arkadaş davet etmek için kullanılır.
  * Kullanıcının arkadaş listesini gösterir, seçilenleri davet eder.
  */
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, Pressable, Image, FlatList, ActivityIndicator, Dimensions, Animated } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Image, FlatList, Dimensions, Animated } from 'react-native';
+import AppLoader from '../AppLoader';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FriendshipService, FollowUser } from '../../services/friendship';
@@ -146,7 +147,7 @@ export default function InviteFriendsModal({ visible, userId, onClose, onInvite,
     if (loading) {
       return (
         <View style={s.centerWrap}>
-          <ActivityIndicator color="#14B8A6" size="large" />
+          <AppLoader color="#14B8A6" size="large" />
           <Text style={s.centerText}>Arkadaşlar yükleniyor...</Text>
         </View>
       );

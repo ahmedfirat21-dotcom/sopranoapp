@@ -373,8 +373,10 @@ const s = StyleSheet.create({
     position: 'absolute',
     width: 230, height: 230, borderRadius: 115, // ★ hexagon etrafı yumuşak halo
     borderWidth: 2, borderColor: 'rgba(251,191,36,0.3)',
+    // ★ v92.23 (1 May 2026): Android elevation eklendi
     shadowColor: '#FBBF24',
     shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.8, shadowRadius: 28,
+    elevation: 16,
   },
   diamondWrap: {
     shadowColor: '#FBBF24',

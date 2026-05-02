@@ -1,4 +1,4 @@
-/**
+﻿/**
  * SopranoChat — Host Erişim Paneli (v2)
  * ★ FriendsDrawer tarzı sağdan kayan animasyonlu drawer
  * Katılım istekleri + Davet + Banlı kullanıcılar
@@ -6,9 +6,10 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, Pressable, FlatList,
-  Image, TextInput, ActivityIndicator, Animated,
+  Image, TextInput, Animated,
   Dimensions, ScrollView,
 } from 'react-native';
+import AppLoader from '../AppLoader';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { RoomAccessService } from '../../services/roomAccess';
@@ -234,7 +235,7 @@ export default function HostAccessPanel({ visible, onClose, roomId, roomType, ho
           {tab === 'requests' && (roomType === 'closed' || roomType === 'invite') && (
             <>
               {loadingRequests ? (
-                <ActivityIndicator color="#A78BFA" style={{ marginTop: 40 }} />
+                <AppLoader color="#A78BFA" style={{ marginTop: 40 }} />
               ) : requests.length === 0 ? (
                 <View style={s.empty}>
                   <View style={s.emptyIcon}>
@@ -255,7 +256,7 @@ export default function HostAccessPanel({ visible, onClose, roomId, roomType, ho
                         <Text style={s.name} numberOfLines={1}>{req.user?.display_name || 'Kullanıcı'}</Text>
                       </Pressable>
                       {isProcessing ? (
-                        <ActivityIndicator size="small" color="#A78BFA" />
+                        <AppLoader size="small" color="#A78BFA" />
                       ) : (
                         <View style={{ flexDirection: 'row', gap: 6 }}>
                           <Pressable style={s.acceptBtn} onPress={() => handleAccept(req)}>
@@ -279,7 +280,7 @@ export default function HostAccessPanel({ visible, onClose, roomId, roomType, ho
           {tab === 'bans' && (
             <>
               {loadingBans ? (
-                <ActivityIndicator color="#EF4444" style={{ marginTop: 40 }} />
+                <AppLoader color="#EF4444" style={{ marginTop: 40 }} />
               ) : bannedUsers.length === 0 ? (
                 <View style={s.empty}>
                   <View style={[s.emptyIcon, { backgroundColor: 'rgba(34,197,94,0.08)' }]}>
@@ -322,7 +323,7 @@ export default function HostAccessPanel({ visible, onClose, roomId, roomType, ho
                         )}
                       </View>
                       {isProcessing ? (
-                        <ActivityIndicator size="small" color="#14B8A6" />
+                        <AppLoader size="small" color="#14B8A6" />
                       ) : (
                         <Pressable style={s.unbanBtn} onPress={() => handleUnban(ban)}>
                           <Ionicons name="lock-open-outline" size={12} color="#14B8A6" />

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * SopranoChat — Oda Kayıtları Sheet (Faz 6.2 — Replay UI)
  * ═══════════════════════════════════════════════════════════
  * RoomManageSheet veya profil sayfasından açılır.
@@ -13,9 +13,9 @@
  */
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  View, Text, StyleSheet, Pressable, FlatList,
-  ActivityIndicator, Animated, Modal,
+  View, Text, StyleSheet, Pressable, FlatList, Animated, Modal,
 } from 'react-native';
+import AppLoader from '../AppLoader';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../constants/theme';
@@ -241,7 +241,7 @@ export default function RoomRecordingsSheet({ visible, roomId, hostId, onClose }
 
           {/* List */}
           {loading ? (
-            <ActivityIndicator size="large" color="#14B8A6" style={{ marginTop: 60 }} />
+            <AppLoader size="large" color="#14B8A6" style={{ marginTop: 60 }} />
           ) : recordings.length === 0 ? (
             <View style={st.emptyState}>
               <Ionicons name="mic-off-outline" size={44} color="rgba(92,225,230,0.15)" />

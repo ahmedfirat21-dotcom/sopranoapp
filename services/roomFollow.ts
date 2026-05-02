@@ -214,6 +214,17 @@ export const RoomFollowService = {
       const followerIds = await RoomFollowService.getFollowerIds(hostUserId);
       if (followerIds.length === 0) return;
 
+      // Host ismini çek — push için
+      let hostName = 'Birisi';
+      try {
+        const { data: hostProfile } = await supabase
+          .from('profiles')
+          .select('display_name')
+          .eq('id', hostUserId)
+          .single();
+        hostName = hostProfile?.display_name || 'Birisi';
+      } catch { /* sessiz */ }
+
       // Toplu notification insert (max 50 kişi)
       const batch = followerIds.slice(0, 50).map(uid => ({
         user_id: uid,
@@ -230,6 +241,17 @@ export const RoomFollowService = {
         const batchNoBody = batch.map(({ body, ...rest }) => rest);
         await supabase.from('notifications').insert(batchNoBody);
       }
+
+      // ★ v92.16: Push notification — uygulama kapalı/arka plandayken takipçilere haber ver
+      //   Fire-and-forget, DB insert'ten bağımsız. Max 50 kişiye paralel gönderim.
+      Promise.allSettled(
+        followerIds.slice(0, 50).map(uid =>
+          PushService.sendToUser(uid, '🎤 Yeni Canlı Oda', `${hostName} yeni bir oda açtı: "${roomName}"`, {
+            type: 'room_live',
+            route: `/room/${roomId}`,
+          })
+        )
+      ).catch(() => { /* sessiz */ });
     } catch (e) {
       if (__DEV__) console.warn('[RoomFollowService] notifyFollowersRoomLive error:', e);
     }

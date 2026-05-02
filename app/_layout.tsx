@@ -29,10 +29,9 @@ LogBox.ignoreLogs([
   /ConnectionError.*LeaveRequest/,
 ]);
 import { Stack, useRouter, useSegments } from 'expo-router';
-// ⛔ KRİTİK — DOKUNMA! KeyboardProvider tüm uygulamayı sarar.
-// Samsung dahil tüm Android cihazlarda klavye sorununu çözer.
-// Bu import ve <KeyboardProvider> wrapper'ı ASLA kaldırma!
-import { KeyboardProvider } from 'react-native-keyboard-controller';
+// ★ v92.16: react-native-keyboard-controller kaldırıldı — native modül linked değildi,
+//   dev/build'de "doesn't seem to be linked" crash'e neden oluyordu.
+//   RN built-in KeyboardAvoidingView + Keyboard API yeterli.
 // ★ 2026-04-30: SafeAreaProvider eksikliği nedeniyle useSafeAreaInsets() tüm
 //   ekranlarda 0 dönüyordu → Samsung 3-button nav bar'da bottom CTA'lar eziliyordu.
 //   Bu wrapper TÜM uygulamayı sarmalı; aksi halde 53+ ekran broken.
@@ -55,6 +54,8 @@ import { CallService, type CallSignal } from '../services/call';
 import { RevenueCatService } from '../services/revenuecat';
 import { i18n } from '../services/i18n';
 import { Toast, showToast } from '../components/Toast';
+import AppLoader from '../components/AppLoader';
+import SplashSpinner from '../components/SplashSpinner';
 import { IncomingCallOverlay } from '../components/IncomingCallOverlay';
 import MiniRoomCard, { type MinimizedRoom } from '../components/MiniRoomCard';
 import ErrorBoundary from '../components/ErrorBoundary';
@@ -70,8 +71,6 @@ import BadgeCelebration from '../components/profile/BadgeCelebration';
 import InRoomUserProfile from '../components/room/InRoomUserProfile';
 import { UserSearchModal } from '../components/UserSearchModal';
 import AppBackground from '../components/AppBackground';
-import PremiumLoader from '../components/PremiumLoader';
-
 import { OnlineFriendsProvider } from '../providers/OnlineFriendsProvider';
 export { useOnlineFriends } from '../providers/OnlineFriendsProvider';
 import { DMNotifProvider } from '../providers/DMNotifProvider';
@@ -310,7 +309,7 @@ function RealtimeBadgeProvider({ userId, children }: { userId: string | null; ch
             .select('*', { count: 'exact', head: true })
             .eq('user_id', userId)
             .eq('is_read', false)
-            .in('type', ['room_live', 'room_invite', 'room_invite_accepted', 'room_invite_rejected', 'room_access_request', 'missed_call', 'incoming_call', 'gift', 'thank_you', 'event_reminder', 'follow_accepted', 'follow_rejected']);
+            .in('type', ['room_live', 'room_invite', 'room_invite_accepted', 'room_invite_rejected', 'missed_call', 'incoming_call', 'gift', 'thank_you', 'event_reminder', 'follow_accepted', 'follow_rejected']);
           return count || 0;
         })(),
       ]);
@@ -396,7 +395,7 @@ function RealtimeBadgeProvider({ userId, children }: { userId: string | null; ch
     // 3. Notifications realtime — yeni bildirim gelince sayıyı artır + anlık toast
     // ★ Zil badge'ine dahil olan bildirim tipleri (oda + arama + hediye + teşekkür + arkadaşlık yanıtları)
     // ★ 2026-04-21: follow_pending context-aware — oda içindeyken bell badge'e eklenir, dışında arkadaş simgesi ile yetinir.
-    const BELL_NOTIF_TYPES_BASE = ['room_live', 'room_invite', 'room_invite_accepted', 'room_invite_rejected', 'room_access_request', 'missed_call', 'incoming_call', 'gift', 'thank_you', 'event_reminder', 'follow_accepted', 'follow_rejected'];
+    const BELL_NOTIF_TYPES_BASE = ['room_live', 'room_invite', 'room_invite_accepted', 'room_invite_rejected', 'missed_call', 'incoming_call', 'gift', 'thank_you', 'event_reminder', 'follow_accepted', 'follow_rejected'];
     const notifSub = supabase
       .channel(`badge_notif:${userId}`)
       .on('postgres_changes', {
@@ -460,7 +459,8 @@ function RealtimeBadgeProvider({ userId, children }: { userId: string | null; ch
         } else if (notifType === 'follow_accepted') {
           showToast({ title: '🎉 Arkadaşlık Kabul', message: body, type: 'success', id });
         } else if (notifType === 'room_access_request') {
-          showToast({ title: '🚪 Odana Katılma İsteği', message: body, type: 'info', id });
+          // ★ v92.12 (1 May 2026): Toast kaldırıldı — talep PlusMenu accordion'a düşer.
+          //   Tab bar + butonunda badge sayı gösterir, host orada görüp onay/red verir.
         }
       })
       // ★ 2026-04-20 FIX: UPDATE listener — drawer bildirimi is_read=true yapınca
@@ -597,7 +597,7 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
     return (
       <AppBackground radialGlow>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <PremiumLoader size={56} />
+          <AppLoader size={56} />
         </View>
       </AppBackground>
     );
@@ -1434,15 +1434,7 @@ export default function RootLayout() {
   // ★ 2026-04-26 FIX: Hook kuralları — tüm hook'lardan SONRA early return.
   //   Önceki konumda useMemo'lar koşullu çağrılıyordu → "Rendered more hooks" crash.
   if (!appIsReady || (!fontsLoaded && !fontError)) {
-    return (
-      <View style={{ flex: 1, backgroundColor: '#0F172A', alignItems: 'center', justifyContent: 'center' }}>
-        <View style={{
-          width: 40, height: 40, borderRadius: 20,
-          borderWidth: 3, borderColor: 'rgba(20,184,166,0.15)',
-          borderTopColor: '#14B8A6',
-        }} />
-      </View>
-    );
+    return <SplashSpinner size={56} color="#14B8A6" />;
   }
 
   return (
@@ -1453,7 +1445,7 @@ export default function RootLayout() {
       <RealtimeBadgeProvider userId={firebaseUser?.uid || null}>
       <OnlineFriendsProvider userId={firebaseUser?.uid || null}>
       <DMNotifProvider userId={firebaseUser?.uid || null}>
-      <KeyboardProvider>
+
       <SafeAreaProvider>
       <View style={styles.container}>
         {/* Status bar her zaman light (koyu tema) */}
@@ -1699,7 +1691,7 @@ export default function RootLayout() {
         {/* ★ Intro Video kaldırıldı */}
       </View>
     </SafeAreaProvider>
-    </KeyboardProvider>
+
     </DMNotifProvider>
     </OnlineFriendsProvider>
     </RealtimeBadgeProvider>

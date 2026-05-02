@@ -1,4 +1,4 @@
-/**
+﻿/**
  * SopranoChat — Korolar Keşfet (Faz 6.1)
  * ═══════════════════════════════════════════════════
  * İki tab: Keşfet (public) | Üyeliklerim
@@ -6,9 +6,9 @@
  */
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
-  View, Text, StyleSheet, Pressable, ScrollView, Image, ImageStyle,
-  ActivityIndicator, RefreshControl, TextInput, Modal, Switch, Animated, PanResponder, Easing,
+  View, Text, StyleSheet, Pressable, ScrollView, Image, ImageStyle, RefreshControl, TextInput, Modal, Switch, Animated, PanResponder, Easing,
 } from 'react-native';
+import AppLoader from '../../components/AppLoader';
 import { bannerIntroPlayed, markBannerIntroPlayed } from '../../utils/bannerIntro';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -144,7 +144,7 @@ export default function ClubsScreen() {
 
       {loading ? (
         <View style={s.loading}>
-          <ActivityIndicator size="large" color="#FBBF24" />
+          <AppLoader size="large" color="#FBBF24" />
         </View>
       ) : list.length === 0 ? (
         <View style={s.empty}>
@@ -298,7 +298,7 @@ export default function ClubsScreen() {
                 disabled={joiningByCode || joinCodeInput.length < 4}
               >
                 {joiningByCode ? (
-                  <ActivityIndicator size="small" color="#FFF" />
+                  <AppLoader size="small" color="#FFF" />
                 ) : (
                   <>
                     <Ionicons name="enter-outline" size={14} color="#FFF" />
@@ -814,7 +814,7 @@ function CreateClubSheet({ visible, onClose, ownerId, onCreated }: CreateProps) 
               style={[cm.submitBtn, !canSubmit && { opacity: 0.45 }]}
             >
               {submitting ? (
-                <ActivityIndicator size="small" color="#FFF" />
+                <AppLoader size="small" color="#FFF" />
               ) : (
                 <>
                   <Ionicons name="rocket" size={14} color="#FFF" style={iconShadow} />

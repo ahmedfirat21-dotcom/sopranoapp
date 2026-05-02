@@ -1,4 +1,4 @@
-/**
+﻿/**
  * SopranoChat — Bildirim Tercihleri Sheet (Faz 5.1)
  * ═══════════════════════════════════════════════════
  * Settings'ten açılan sürüklenebilir bottom-sheet.
@@ -15,8 +15,9 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, Modal, Pressable, Switch, ScrollView,
-  Animated, ActivityIndicator, PanResponder,
+  Animated, PanResponder,
 } from 'react-native';
+import AppLoader from './AppLoader';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Shadows } from '../constants/theme';
@@ -139,13 +140,13 @@ export default function NotifPreferencesSheet({ visible, onClose, userId }: Prop
             <View style={st.sectionAccent} />
             <Ionicons name="notifications" size={14} color={Colors.teal} style={iconShadow} />
             <Text style={st.headerTitle}>BİLDİRİM TERCİHLERİ</Text>
-            {saving && <ActivityIndicator size="small" color="#14B8A6" />}
+            {saving && <AppLoader size="small" color="#14B8A6" />}
           </View>
           </View>
 
           {loading ? (
             <View style={st.loading}>
-              <ActivityIndicator size="large" color="#14B8A6" />
+              <AppLoader size="large" color="#14B8A6" />
             </View>
           ) : (
             <ScrollView

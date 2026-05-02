@@ -1,4 +1,4 @@
-/**
+﻿/**
  * SopranoChat — Bildirim Dropdown (X.com tarzı)
  * Zil ikonuna yapışık açılan kompakt dropdown panel
  * ★ Sadece oda + arama + hediye bildirimleri gösterilir
@@ -6,9 +6,9 @@
  */
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, Pressable, FlatList,
-  ActivityIndicator, Dimensions, Modal,
+  View, Text, StyleSheet, Pressable, FlatList, Dimensions, Modal,
 } from 'react-native';
+import AppLoader from './AppLoader';
 import ReAnimated, {
   useSharedValue,
   useAnimatedStyle,
@@ -68,9 +68,10 @@ interface Props {
 // Bildirim tipi → simge eşleşmesi
 // ★ Zil drawer'ında gösterilecek bildirim tipleri (oda + arama + hediye + arkadaşlık yanıtları)
 // ★ 2026-04-21: follow_pending context-aware — oda içinde zil gösterir, oda dışında arkadaş simgesi gösterir.
+// ★ v92.14 (1 May 2026): 'room_access_request' KALDIRILDI — bu istek artık host'un in-room
+//   PlusMenu > Katılım İstekleri accordion'unda gösteriliyor. Zilde duplikasyon istenmiyor.
 const BELL_NOTIF_TYPES_BASE = [
   'room_live', 'room_invite', 'room_invite_accepted', 'room_invite_rejected',
-  'room_access_request',
   'missed_call', 'incoming_call',
   'gift', 'thank_you',
   'event_reminder',
@@ -464,7 +465,7 @@ export default function NotificationDrawer({ visible, onClose, userId, anchorTop
               hitSlop={8}
             >
               {clearing ? (
-                <ActivityIndicator size={13} color="#94A3B8" />
+                <AppLoader size={13} color="#94A3B8" />
               ) : (
                 <Ionicons name="trash-outline" size={15} color="#94A3B8" />
               )}
@@ -474,7 +475,7 @@ export default function NotificationDrawer({ visible, onClose, userId, anchorTop
         </Pressable>
 
         {loading ? (
-          <ActivityIndicator color="#14B8A6" style={{ marginVertical: 24 }} />
+          <AppLoader color="#14B8A6" style={{ marginVertical: 24 }} />
         ) : items.length === 0 ? (
           <View style={s.emptyState}>
             <Ionicons name="notifications-off-outline" size={28} color="rgba(255,255,255,0.1)" />
@@ -526,7 +527,7 @@ export default function NotificationDrawer({ visible, onClose, userId, anchorTop
                         disabled={processingInvites.has(item.id)}
                       >
                         {processingInvites.has(item.id) ? (
-                          <ActivityIndicator size={12} color="#FFF" />
+                          <AppLoader size={12} color="#FFF" />
                         ) : (
                           <>
                             <Ionicons name="checkmark" size={13} color="#FFF" />

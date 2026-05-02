@@ -5,7 +5,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, Modal, Pressable, Dimensions, Animated, Easing,
-  PanResponder,
+  PanResponder, Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -232,6 +232,15 @@ function Sparkle({ accent, index, iconName, iconSize }: {
 export default function DiscoverWelcomeSheet({ visible, onClose, uid }: Props) {
   const insets = useSafeAreaInsets();
   const [index, setIndex] = useState(0);
+
+  // ★ v92.14 FLASH FIX: visible false→true geçişinde, ilk render eski index ile
+  //   çıkmasın diye SENKRON reset. Klasik React "props değişikliğinde state reset"
+  //   pattern'i — useEffect'tense erken; aksi halde 1 frame boyunca eski slide görünür.
+  const prevVisibleRef = useRef(visible);
+  if (visible && !prevVisibleRef.current && index !== 0) {
+    setIndex(0);
+  }
+  prevVisibleRef.current = visible;
   const titleAnim = useRef(new Animated.Value(0)).current;
   const bodyAnim = useRef(new Animated.Value(0)).current;
   const iconScale = useRef(new Animated.Value(0)).current;
@@ -264,12 +273,20 @@ export default function DiscoverWelcomeSheet({ visible, onClose, uid }: Props) {
     ]).start();
   }, []);
 
+  // ★ v92.14 (1 May 2026) FLASHBACK FIX:
+  //   - Önceki kodda iki useEffect ([visible] + [index]) ikisi de animateSlideIn() çağırıyordu.
+  //     visible=true olunca setIndex(0) + animateSlideIn() çalışıyor, sonra [index] effect'i
+  //     de tetiklenip aynı anda 2. animateSlideIn() patlatıyordu → ekran flash, çift animasyon.
+  //   - justOpenedRef ile [index] effect'i ilk açılışta atlanır; sadece kullanıcı next/prev
+  //     yapınca yeni slide animasyonunu çalıştırır.
+  const justOpenedRef = useRef(false);
+
   useEffect(() => {
     if (visible) {
+      justOpenedRef.current = true;
       setIndex(0);
       animateSlideIn();
       Animated.timing(progressAnim, { toValue: 1 / SLIDES.length, duration: 400, useNativeDriver: false }).start();
-
 
       // CTA subtle pulse loop — ★ 2026-04-21: amplitude 1.05 → 1.025 azaltıldı
       // (yüksek scale'de button edge'i shadow ile birleşip "çizgi" etkisi yaratıyordu)
@@ -286,6 +303,11 @@ export default function DiscoverWelcomeSheet({ visible, onClose, uid }: Props) {
 
   useEffect(() => {
     if (!visible) return;
+    if (justOpenedRef.current) {
+      // İlk açılış — visible effect'i animasyonu zaten başlattı, atla
+      justOpenedRef.current = false;
+      return;
+    }
     animateSlideIn();
     Animated.timing(progressAnim, {
       toValue: (index + 1) / SLIDES.length,
@@ -295,11 +317,14 @@ export default function DiscoverWelcomeSheet({ visible, onClose, uid }: Props) {
     }).start();
   }, [index]);
 
-  const next = () => {
+  // ★ v92.14: markSeen async — onClose'tan ÖNCE await edilmeli, yoksa parent'in
+  //   hasSeenDiscoverWelcome effect'i AsyncStorage write tamamlanmadan tekrar okur,
+  //   false döner ve sheet ANINDA tekrar açılır (kullanıcı şikâyet ettiği "flashback").
+  const next = async () => {
     if (index < SLIDES.length - 1) {
       setIndex(index + 1);
     } else {
-      markDiscoverWelcomeSeen(uid);
+      await markDiscoverWelcomeSeen(uid);
       onClose();
     }
   };
@@ -308,8 +333,8 @@ export default function DiscoverWelcomeSheet({ visible, onClose, uid }: Props) {
     if (index > 0) setIndex(index - 1);
   };
 
-  const skip = () => {
-    markDiscoverWelcomeSeen(uid);
+  const skip = async () => {
+    await markDiscoverWelcomeSeen(uid);
     onClose();
   };
 
@@ -585,9 +610,11 @@ const styles = StyleSheet.create({
   progressFill: {
     height: '100%',
     borderRadius: 2,
+    // ★ v92.23 (1 May 2026): Android elevation eklendi (progress bar glow için)
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.8,
     shadowRadius: 6,
+    elevation: 4,
   },
   skipBtn: {
     paddingHorizontal: 10,
@@ -700,6 +727,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.7,
     shadowRadius: 4,
+    elevation: 3, // ★ v92.23 (1 May 2026): Android pagination dot glow için
   },
   ctaRow: {
     paddingHorizontal: 18,

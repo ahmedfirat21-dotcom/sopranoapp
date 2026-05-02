@@ -219,6 +219,9 @@ interface Props {
   onMuteRoomPress?: () => void;
   onLeavePress?: () => void;
   dmBadgeCount?: number;
+  /** ★ v92.12 (1 May 2026): Plus butonu üzerinde bildirim badge'i — bekleyen
+   *  oda erişim talepleri (host/mod görür). Tıklayınca PlusMenu Katılım İstekleri açar. */
+  plusBadgeCount?: number;
   onDmPress?: () => void;
   isDmOpen?: boolean;
   isPlusOpen?: boolean;
@@ -233,7 +236,7 @@ export default function RoomControlBar({
   onMicPress, onCameraPress,
   onHandPress, onChatPress, onPlusPress, onMuteRoomPress,
   onJoinStagePress,
-  dmBadgeCount, onDmPress, isDmOpen, isPlusOpen,
+  dmBadgeCount, plusBadgeCount, onDmPress, isDmOpen, isPlusOpen,
 }: Props) {
   const resolvedStageAction: StageAction = stageAction ?? (isHandRaised ? 'waiting' : 'raise_hand');
 
@@ -378,12 +381,13 @@ export default function RoomControlBar({
           />
         )}
 
-        {/* Plus */}
+        {/* Plus — ★ v92.12: Badge ile bekleyen erişim talebi sayısı (host/mod). */}
         <CtrlBtn
           icon="add-circle-outline"
           onPress={onPlusPress}
           active={isPlusOpen}
           accent="#14B8A6"
+          badge={plusBadgeCount}
           label="Daha fazla seçenek"
         />
       </View>

@@ -1065,60 +1065,23 @@ export const RoomService = {
         }
       }
 
-      // ★ B1 FIX: Giriş ücreti backend kontrolü — client bypass koruması
+      // ★ v92.11 (1 May 2026): Giriş ücreti — atomik RPC ile (sensitive column guard
+      //   bypass'lı). Eski client-side UPDATE pattern'i guard tarafından engelleniyordu
+      //   → "SP işlemi başarısız" → giriş kapalı kalıyordu.
       const entryFee = (settings as any).entry_fee_sp || 0;
       if (entryFee > 0 && role !== 'owner') {
-        const { data: payerProfile } = await supabase
-          .from('profiles')
-          .select('system_points, is_admin')
-          .eq('id', userId)
-          .single();
-        if (payerProfile && !payerProfile.is_admin) {
-          const currentSP = payerProfile.system_points || 0;
-          if (currentSP < entryFee) {
-            throw new Error(`Giriş ücreti: ${entryFee} SP. Mevcut bakiyeniz: ${currentSP} SP.`);
+        try {
+          const { data: feeRes, error: feeErr } = await supabase.rpc('charge_room_entry_fee', {
+            p_room_id: roomId,
+            p_user_id: userId,
+          });
+          if (feeErr) throw new Error(feeErr.message || 'SP işlemi başarısız');
+          const r = feeRes as any;
+          if (r && r.success === false) {
+            throw new Error(r.error || `Giriş ücreti: ${entryFee} SP. Mevcut bakiyeniz: ${r.balance ?? 0} SP.`);
           }
-          // SP düş (atomik)
-          const { data: updated } = await supabase
-            .from('profiles')
-            .update({ system_points: currentSP - entryFee })
-            .eq('id', userId)
-            .eq('system_points', currentSP)
-            .select('id');
-          if (!updated || updated.length === 0) {
-            throw new Error('SP işlemi başarısız. Lütfen tekrar deneyin.');
-          }
-          // Host'a %90 pay, %10 platform komisyonu
-          const hostShare = Math.round(entryFee * 0.9);
-          if (hostShare > 0 && roomData.host_id) {
-            try {
-              await supabase.rpc('grant_system_points', {
-                p_user_id: roomData.host_id,
-                p_amount: hostShare,
-                p_action: 'entry_fee_share',
-              });
-            } catch {
-              // RPC yoksa manuel
-              const { data: hostProfile } = await supabase
-                .from('profiles')
-                .select('system_points')
-                .eq('id', roomData.host_id)
-                .single();
-              if (hostProfile) {
-                await supabase
-                  .from('profiles')
-                  .update({ system_points: (hostProfile.system_points || 0) + hostShare })
-                  .eq('id', roomData.host_id);
-              }
-            }
-          }
-          // Transaction kaydı
-          try {
-            await supabase.from('sp_transactions').insert([
-              { user_id: userId, amount: -entryFee, type: 'room_entry_fee', description: `Oda giriş ücreti` },
-              { user_id: roomData.host_id, amount: hostShare, type: 'entry_fee_share', description: `Giriş ücreti payı` },
-            ]);
-          } catch { /* sp_transactions yoksa sessiz */ }
+        } catch (e: any) {
+          throw new Error(e?.message || 'Oda giriş ücreti tahsil edilemedi');
         }
       }
     }
@@ -2293,11 +2256,11 @@ export const RoomService = {
       target_role: targetRole,
     });
 
-    if (target) {
-      try {
-        await PushService.sendToUser(target.user_id, 'Oda Giriş İsteği', 'Birisi odanıza katılmak istiyor', { type: 'room_request' as any, route: `/room/${roomId}` });
-      } catch { /* push başarısız olabilir */ }
-    }
+    // ★ v92.14 (1 May 2026): FCM push KALDIRILDI — host odadayken realtime
+    //   subscription zaten anlık güncelliyor (PlusMenu > Katılım İstekleri badge +
+    //   accordion). Off-room push isteği duplikasyon ve sistem tepsisi spam'i.
+    //   target değişkeni geriye uyumluluk için duruyor (ileride opt-in push için).
+    void target;
 
     return { sent: true, targetRole };
   },

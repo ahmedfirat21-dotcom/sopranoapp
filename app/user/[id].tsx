@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { View, Text, StyleSheet, Image, Pressable, ScrollView, ActivityIndicator, Dimensions, Animated, Easing } from 'react-native';
+import { View, Text, StyleSheet, Image, Pressable, ScrollView, Dimensions, Animated, Easing } from 'react-native';
+import AppLoader from '../../components/AppLoader';
 
 const { width: W } = Dimensions.get('window');
 import { LinearGradient } from 'expo-linear-gradient';
@@ -26,6 +27,7 @@ import { isTierAtLeast } from '../../constants/tiers';
 import PremiumAlert, { type AlertButton } from '../../components/PremiumAlert';
 import AppBackground from '../../components/AppBackground';
 import SPIcon from '../../components/SPIcon';
+import SPHexagonIcon from '../../components/SPHexagonIcon';
 import ProfileHero from '../../components/profile/ProfileHero';
 import BadgeListModal from '../../components/profile/BadgeListModal';
 import SPDonateSheet from '../../components/profile/SPDonateSheet';
@@ -383,7 +385,7 @@ export default function UserProfileScreen() {
   if (loading) {
     return (
       <View style={[s.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator size="large" color={Colors.teal} />
+        <AppLoader size="large" color={Colors.teal} />
       </View>
     );
   }
@@ -485,7 +487,7 @@ export default function UserProfileScreen() {
                 </View>
                 <View style={s.incomingBannerActions}>
                   {incomingLoading ? (
-                    <ActivityIndicator size="small" color="#14B8A6" />
+                    <AppLoader size="small" color="#14B8A6" />
                   ) : (
                     <>
                       <Pressable style={s.incomingApproveBtn} onPress={handleApproveIncoming}>
@@ -536,7 +538,7 @@ export default function UserProfileScreen() {
                   }]}
                 >
                   {followToggleLoading ? (
-                    <ActivityIndicator size="small" color={isFollowingUser ? '#14B8A6' : '#fff'} />
+                    <AppLoader size="small" color={isFollowingUser ? '#14B8A6' : '#fff'} />
                   ) : (
                     <>
                       <Ionicons name={isFollowingUser ? 'checkmark' : 'add'} size={14} color={isFollowingUser ? '#14B8A6' : '#fff'} />
@@ -566,7 +568,7 @@ export default function UserProfileScreen() {
                     android_ripple={{ color: 'rgba(255,255,255,0.1)', borderless: false }}
                   >
                     {followLoading ? (
-                      <ActivityIndicator size="small" color="#fff" />
+                      <AppLoader size="small" color="#fff" />
                     ) : isBlocked ? (
                       <Text style={[s.followBtnText, { color: '#EF4444' }]}>Engellendi</Text>
                     ) : isFriend ? (
@@ -602,7 +604,7 @@ export default function UserProfileScreen() {
                       accessibilityLabel="Arkadaşlıktan çıkar"
                     >
                       {followLoading ? (
-                        <ActivityIndicator size="small" color="#F87171" />
+                        <AppLoader size="small" color="#F87171" />
                       ) : (
                         <Ionicons name="person-remove" size={18} color="#F87171" style={{ textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4 }} />
                       )}
@@ -851,8 +853,15 @@ export default function UserProfileScreen() {
             style={s.donateCard}
             onPress={() => setShowSPSheet(true)}
           >
-            <LinearGradient colors={['#FFE082', '#FBBF24', '#D97706']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.donateGradient}>
-              <SPIcon size={16} />
+            {/* ★ 2026-05-01: SP cüzdan ile aynı dil — koyu kahve gradient + hafif amber hairline,
+                eski parlak altın zemin (FFE082→D97706) kullanıcı talebiyle kaldırıldı. */}
+            <LinearGradient
+              colors={['#2A1F12', '#1e160d', '#130d07']}
+              start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
+              style={s.donateGradient}
+            >
+              {/* ★ 2026-05-01: SP cüzdandaki animasyonlu hexagon — koyu zeminde glow ile öne çıkar (PNG yetersiz kalıyordu). */}
+              <SPHexagonIcon size={32} />
               <Text style={s.donateText}>SP Gönder</Text>
             </LinearGradient>
           </Pressable>
@@ -923,6 +932,7 @@ export default function UserProfileScreen() {
           senderId={firebaseUser.uid}
           recipientId={id}
           recipientName={userProfile.display_name || 'Kullanıcı'}
+          recipientAvatar={userProfile.avatar_url || undefined}
         />
       )}
 
@@ -1203,21 +1213,21 @@ const s = StyleSheet.create({
     fontSize: 10, color: '#94A3B8', marginTop: 1,
   },
 
-  // Donate card — altın premium
+  // ★ 2026-05-01: SP Gönder — SP cüzdan dilinde sade koyu kart (parlak altın zemin kaldırıldı)
   donateCard: {
     marginHorizontal: 16, marginBottom: 10,
     borderRadius: 14, overflow: 'hidden' as const,
-    borderWidth: 1, borderColor: 'rgba(255,224,130,0.4)',
-    shadowColor: '#FBBF24', shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35, shadowRadius: 10, elevation: 6,
+    borderWidth: 1, borderColor: 'rgba(251,191,36,0.25)',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3, shadowRadius: 8, elevation: 6,
   },
   donateGradient: {
     flexDirection: 'row' as const, alignItems: 'center' as const, justifyContent: 'center' as const,
     gap: 8, paddingVertical: 14,
   },
   donateText: {
-    fontSize: 15, fontWeight: '900' as const, color: '#FFF', letterSpacing: 0.3,
-    textShadowColor: 'rgba(0,0,0,0.45)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
+    fontSize: 15, fontWeight: '900' as const, color: '#FFE082', letterSpacing: 0.3,
+    textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
 
   // Action row (report / block) — diagonal gradient kart

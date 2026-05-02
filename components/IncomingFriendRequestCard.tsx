@@ -1,11 +1,12 @@
-/**
+﻿/**
  * SopranoChat — Inline Arkadaşlık İsteği Kartı
  * ★ 2026-04-24: Toast yerine actionable premium card.
  *   Ekranın üstünden slide-in + avatar + onayla/reddet butonları.
  *   Aynı FriendshipService API'sini kullandığı için keşfet arkadaş drawer ile senkron.
  */
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, Animated, Easing, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Animated, Easing } from 'react-native';
+import AppLoader from './AppLoader';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -127,7 +128,7 @@ export default function IncomingFriendRequestCard({ request, onDismiss, onHandle
               style={s.iconShadow}
             />
           ) : processing ? (
-            <ActivityIndicator size="small" color={Colors.teal} />
+            <AppLoader size="small" color={Colors.teal} />
           ) : (
             <View style={s.actions}>
               <Pressable style={[s.btn, s.btnReject]} onPress={() => handleAction('rejected')} hitSlop={6}>

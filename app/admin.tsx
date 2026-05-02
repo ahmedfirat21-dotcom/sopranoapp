@@ -1,9 +1,10 @@
-/**
+﻿/**
  * SopranoChat — GodMaster Admin Paneli
  * Platform sahibi için sınırsız yetki ile yönetim ekranı
  */
 import { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, Image, RefreshControl, TextInput, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, Image, RefreshControl, TextInput, Dimensions } from 'react-native';
+import AppLoader from '../components/AppLoader';
 import PremiumAlert, { type AlertButton } from '../components/PremiumAlert';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -433,7 +434,7 @@ export default function AdminPanel() {
     return (
       <AppBackground radialGlow>
         <View style={[s.container, { justifyContent: 'center', alignItems: 'center' }]}>
-          <ActivityIndicator size="large" color={Colors.teal} />
+          <AppLoader size="large" color={Colors.teal} />
           <Text style={{ color: Colors.text2, marginTop: 12 }}>GodMaster yükleniyor...</Text>
         </View>
       </AppBackground>

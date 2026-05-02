@@ -1,13 +1,13 @@
-/**
+﻿/**
  * SopranoChat — Boost Picker Sheet
  * ═══════════════════════════════════════════════════
  * Premium bottom sheet — swipe-to-dismiss, room modal tarzı.
  */
 import React, { useState, useRef, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, Pressable, Modal,
-  ActivityIndicator, Animated, PanResponder, Dimensions,
+  View, Text, StyleSheet, Pressable, Modal, Animated, PanResponder, Dimensions,
 } from 'react-native';
+import AppLoader from './AppLoader';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import SPIcon from './SPIcon';
@@ -204,7 +204,7 @@ export default function BoostPickerSheet({ visible, onClose, onBoost, currentSP 
             style={s.ctaGradient}
           >
             {loading ? (
-              <ActivityIndicator size="small" color="#FFF" />
+              <AppLoader size="small" color="#FFF" />
             ) : (
               <>
                 <View style={s.ctaIconWrap}>

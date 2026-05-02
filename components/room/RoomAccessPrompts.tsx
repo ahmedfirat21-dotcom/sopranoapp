@@ -1,4 +1,4 @@
-/**
+﻿/**
  * SopranoChat — Oda Erişim Prompt'ları
  * ═══════════════════════════════════════════════════════
  * Aşağıdan-yukarı bottom sheet ile oda girişi:
@@ -15,9 +15,10 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, Pressable, TextInput, Animated,
-  Dimensions, Platform, KeyboardAvoidingView, ActivityIndicator,
+  Dimensions, Platform, KeyboardAvoidingView,
   PanResponder, Image, ImageBackground,
 } from 'react-native';
+import AppLoader from '../AppLoader';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '../../constants/supabase';
@@ -192,7 +193,7 @@ export function PasswordPromptSheet({
             disabled={submitting || pw.length < 1}
           >
             {submitting ? (
-              <ActivityIndicator color="#FFF" size="small" />
+              <AppLoader color="#FFF" size="small" />
             ) : (
               <>
                 <Ionicons name="log-in-outline" size={14} color="#FFF" />
@@ -318,7 +319,7 @@ export function InviteRequestPromptSheet({
             disabled={submitting}
           >
             {submitting ? (
-              <ActivityIndicator color="#FFF" size="small" />
+              <AppLoader color="#FFF" size="small" />
             ) : (
               <>
                 <Ionicons name="paper-plane" size={14} color="#FFF" />
@@ -447,7 +448,7 @@ export function AccessRequestSheet({
         <View style={st.statusCard}>
           {status === 'pending' && (
             <>
-              <ActivityIndicator color="#3B82F6" size="small" />
+              <AppLoader color="#3B82F6" size="small" />
               <Text style={st.statusText}>Onay bekleniyor…</Text>
             </>
           )}
@@ -489,7 +490,7 @@ export function AccessRequestSheet({
         <View style={st.btnRow}>
           {status === 'pending' ? (
             <Pressable style={[st.btnSecondary, { flex: 1 }]} onPress={handleCancel} disabled={cancelling}>
-              {cancelling ? <ActivityIndicator color="#94A3B8" size="small" /> : (
+              {cancelling ? <AppLoader color="#94A3B8" size="small" /> : (
                 <><Ionicons name="close" size={14} color="#94A3B8" /><Text style={st.btnSecondaryText}>Vazgeç</Text></>
               )}
             </Pressable>
@@ -584,7 +585,7 @@ export function AccessGate({
         <Text style={gate.roomName} numberOfLines={2}>{roomName || 'Oda'}</Text>
 
         <View style={gate.statusPill}>
-          <ActivityIndicator size="small" color="#14B8A6" />
+          <AppLoader size="small" color="#14B8A6" />
           <Text style={gate.statusText}>Erişim kontrol ediliyor…</Text>
         </View>
       </View>

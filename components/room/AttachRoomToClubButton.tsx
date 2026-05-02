@@ -1,11 +1,12 @@
-/**
+﻿/**
  * SopranoChat — Odayı Korosuna Ekle Butonu
  * ═══════════════════════════════════════════════════
  * Kullanıcının owner/moderator olduğu korolardan birini seçip oda bağlar.
  * Eligible Koro yoksa hiç render etmez (sessiz). Tek tıkla picker modal açar.
  */
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, Pressable, Modal, ScrollView, ActivityIndicator, Image } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Modal, ScrollView, Image } from 'react-native';
+import AppLoader from '../AppLoader';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, Shadows } from '../../constants/theme';
@@ -135,7 +136,7 @@ export default function AttachRoomToClubButton({ roomId, userId }: Props) {
                       <Text style={s.slug}>@{c.slug} • {c.member_count} üye</Text>
                     </View>
                     {busy ? (
-                      <ActivityIndicator size="small" color="#14B8A6" />
+                      <AppLoader size="small" color="#14B8A6" />
                     ) : isAttached ? (
                       <View style={s.attachedBadge}>
                         <Ionicons name="checkmark" size={12} color="#14B8A6" />

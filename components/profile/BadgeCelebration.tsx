@@ -288,6 +288,8 @@ export default function BadgeCelebration() {
       </Animated.View>
 
       {/* ═══ Dış glow halo ═══ */}
+      {/* ★ v92.23 (1 May 2026): Android elevation eklendi — Android'de glow halo
+           hiç render olmuyordu, rozet animasyonu vasat görünüyordu. */}
       <Animated.View style={[st.glowOuter, {
         opacity: glowPulse,
         transform: [{ scale: glowScale }],
@@ -295,6 +297,7 @@ export default function BadgeCelebration() {
         shadowColor: badge.color,
         shadowOpacity: vis.glowIntensity,
         shadowRadius: 60,
+        elevation: 18,
       }]} />
 
       {/* ═══ İç glow ring ═══ */}
@@ -304,6 +307,7 @@ export default function BadgeCelebration() {
         shadowColor: badge.color,
         shadowOpacity: vis.glowIntensity * 0.7,
         shadowRadius: 30,
+        elevation: 12,
       }]} />
 
       {/* ═══ Parçacıklar ═══ */}
@@ -331,6 +335,7 @@ export default function BadgeCelebration() {
           shadowOpacity: 0.8,
           shadowRadius: 20,
           shadowOffset: { width: 0, height: 4 },
+          elevation: 14,
         }]}>
           <Ionicons name={badge.icon} size={56} color={badge.color} style={{
             textShadowColor: badge.glow,

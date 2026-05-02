@@ -238,6 +238,15 @@ export default function SettingsScreen() {
                 try {
                   if (firebaseUser) {
                     await ProfileService.setOnline(firebaseUser.uid, false).catch(() => {});
+                    // ★ v92.16: Logout'ta push token'ı sil — eski cihaz bildirim almasın
+                    try {
+                      const { PushNotificationService } = require('../services/pushNotifications');
+                      const Notifications = require('expo-notifications');
+                      const tokenData = await Notifications.getExpoPushTokenAsync({ projectId: 'bbd97aec-9d58-426f-8acc-215b24ff286a' });
+                      if (tokenData?.data) {
+                        await PushNotificationService.removePushToken(firebaseUser.uid, tokenData.data);
+                      }
+                    } catch { /* token alınamazsa sessiz — signOut yine devam eder */ }
                   }
                   try {
                     // ★ FIX: revokeAccess() hesap cache'ini temizler — tekrar girişte hesap seçici açılır

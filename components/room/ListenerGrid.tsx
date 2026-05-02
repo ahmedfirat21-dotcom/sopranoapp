@@ -349,10 +349,13 @@ function ListenerOwnerBadge() {
   const glowAnim = useRef(new Animated.Value(0.5)).current;
 
   useEffect(() => {
-    Animated.loop(Animated.sequence([
+    // ★ v92.28 PERF FIX: Cleanup eksikti, 14 listener × 2 loop = 28 orphan animation.
+    const loop = Animated.loop(Animated.sequence([
       Animated.timing(glowAnim, { toValue: 1, duration: 1600, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
       Animated.timing(glowAnim, { toValue: 0.5, duration: 1600, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-    ])).start();
+    ]));
+    loop.start();
+    return () => loop.stop();
   }, []);
 
   return (
@@ -375,20 +378,22 @@ function HandRaiseBadge() {
   const bounceAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // Pulse animasyonu — dikkat çekici
-    Animated.loop(
+    // ★ v92.28 PERF FIX: Cleanup eksikti, el kaldıran her listener için 2 paralel loop kaldıyordu.
+    const pulseLoop = Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, { toValue: 1.25, duration: 600, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
         Animated.timing(pulseAnim, { toValue: 1, duration: 600, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
       ])
-    ).start();
-    // Yukarı-aşağı sallama
-    Animated.loop(
+    );
+    const bounceLoop = Animated.loop(
       Animated.sequence([
         Animated.timing(bounceAnim, { toValue: -3, duration: 400, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
         Animated.timing(bounceAnim, { toValue: 0, duration: 400, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
       ])
-    ).start();
+    );
+    pulseLoop.start();
+    bounceLoop.start();
+    return () => { pulseLoop.stop(); bounceLoop.stop(); };
   }, []);
 
   return (

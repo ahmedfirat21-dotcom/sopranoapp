@@ -1,4 +1,4 @@
-/**
+﻿/**
  * SopranoChat — Blocked Users Bottom Sheet
  * Aşağıdan kayar, swipe-down ile kapanır. QuickCreateSheet pattern.
  * Engelli kullanıcı listesi + tek tek "Engeli Kaldır" aksiyonu.
@@ -6,8 +6,9 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, Animated, PanResponder, Pressable, Dimensions,
-  ScrollView, ActivityIndicator,
+  ScrollView,
 } from 'react-native';
+import AppLoader from './AppLoader';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -178,7 +179,7 @@ export default function BlockedUsersSheet({ visible, onClose, currentUserId }: P
 
         {loading ? (
           <View style={s.emptyWrap}>
-            <ActivityIndicator color="#14B8A6" />
+            <AppLoader color="#14B8A6" />
             <Text style={s.emptySub}>Liste yükleniyor...</Text>
           </View>
         ) : users.length === 0 ? (
@@ -223,7 +224,7 @@ export default function BlockedUsersSheet({ visible, onClose, currentUserId }: P
                     ]}
                   >
                     {isUnblocking ? (
-                      <ActivityIndicator color="#14B8A6" size="small" />
+                      <AppLoader color="#14B8A6" size="small" />
                     ) : (
                       <>
                         <Ionicons name="person-add-outline" size={14} color="#14B8A6" />

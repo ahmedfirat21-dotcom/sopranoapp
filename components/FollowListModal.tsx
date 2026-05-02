@@ -1,4 +1,4 @@
-/**
+﻿/**
  * FollowListModal — Arkadaş / Takipçi / Takip Listesi
  * ─────────────────────────────────────────────────────
  * 2026-04-18: Bidirectional arkadaş listesi olarak başladı.
@@ -20,8 +20,9 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, Pressable, FlatList,
-  Image, ActivityIndicator, Animated, PanResponder, Dimensions,
+  Image, Animated, PanResponder, Dimensions,
 } from 'react-native';
+import AppLoader from './AppLoader';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FriendshipService, type FollowUser } from '../services/friendship';
@@ -300,7 +301,7 @@ export default function FollowListModal({
         {isOwnProfile && !isMe && (
           <View style={st.actions}>
             {isActioning ? (
-              <ActivityIndicator size="small" color="#14B8A6" />
+              <AppLoader size="small" color="#14B8A6" />
             ) : tab === 'friends' ? (
               <>
                 <Pressable
@@ -386,7 +387,7 @@ export default function FollowListModal({
           {/* Liste */}
           {loading ? (
             <View style={st.loading}>
-              <ActivityIndicator size="large" color="#14B8A6" />
+              <AppLoader size="large" color="#14B8A6" />
             </View>
           ) : list.length === 0 ? (
             <View style={st.empty}>

@@ -191,10 +191,12 @@ const s = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#14B8A6',
     backgroundColor: 'rgba(20,184,166,0.06)',
+    // ★ v92.23 (1 May 2026): Android'de elevation eksikti, glow halka görünmüyordu
     shadowColor: '#14B8A6',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.8,
     shadowRadius: 24,
+    elevation: 12,
   },
   arrowWrap: {
     position: 'absolute',
