@@ -13,6 +13,7 @@ const iconShadow = {
   textShadowRadius: 4,
 } as const;
 import StatusAvatar from '../StatusAvatar';
+import AvatarFrame from './AvatarFrame';
 import type { UserTitle } from '../../services/userTitles';
 import type { SubscriptionTier } from '../../types';
 
@@ -44,12 +45,16 @@ interface Props {
   isOnline?: boolean;
   /** Kullanıcının seviyesi (level system) */
   userLevel?: number;
+  /** ★ v107: Mağazadan satın alınmış aktif çerçeve (atelier item id) — avatar etrafında render */
+  activeFrame?: string | null;
+  /** ★ v107: Çerçeve seç butonuna tıklayınca tetiklenir (kendi profilinde) */
+  onFramePress?: () => void;
 }
 
 export default function ProfileHero({
   displayName, username, bio, avatarUrl, subscriptionTier, isAdmin, userTitle,
   stats, onEdit, onBioPress, onFollowersPress, onRoomsPress, onAvatarPress,
-  memberSince, boostExpiresAt, isOnline,
+  memberSince, boostExpiresAt, isOnline, activeFrame, onFramePress,
 }: Props) {
   // ★ Uzun isimde fontSize otomatik küçülsün (adjustsFontSizeToFit)
   const isBoostActive = !!(boostExpiresAt && new Date(boostExpiresAt) > new Date());
@@ -71,7 +76,7 @@ export default function ProfileHero({
         pointerEvents="none"
       />
       <View style={s.identityRow}>
-        {/* Avatar — tıklanınca preview modal */}
+        {/* Avatar — tıklanınca preview modal; ★ v107: aktif çerçeve etrafında AvatarFrame */}
         <Pressable
           style={s.avatarBox}
           onPress={onAvatarPress}
@@ -79,6 +84,7 @@ export default function ProfileHero({
           accessibilityLabel="Avatarı büyüt"
         >
           <StatusAvatar uri={avatarUrl} size={84} tier={subscriptionTier} isAdmin={isAdmin} isOnline={isOnline} isSelf={!!onEdit} showTierBadge />
+          <AvatarFrame frameId={activeFrame} size={84} />
         </Pressable>
         <View style={{ flex: 1, minWidth: 0 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -127,16 +133,29 @@ export default function ProfileHero({
             <Text style={s.bio} numberOfLines={3}>{bio}</Text>
           )}
         </View>
-        {onEdit && (
-          <Pressable
-            style={s.editBtn}
-            onPress={onEdit}
-            hitSlop={10}
-            accessibilityLabel="Profili düzenle"
-          >
-            <Ionicons name="create-outline" size={16} color="#14B8A6" style={iconShadow} />
-          </Pressable>
-        )}
+        {/* ★ v107: Çerçeve seç — sadece kendi profilinde, edit butonunun üstünde */}
+        <View style={{ alignItems: 'center', gap: 6 }}>
+          {onFramePress && (
+            <Pressable
+              style={[s.editBtn, { backgroundColor: 'rgba(251,191,36,0.12)', borderColor: 'rgba(251,191,36,0.45)' }]}
+              onPress={onFramePress}
+              hitSlop={10}
+              accessibilityLabel="Çerçeve seç"
+            >
+              <Ionicons name="ribbon" size={16} color="#FBBF24" style={iconShadow} />
+            </Pressable>
+          )}
+          {onEdit && (
+            <Pressable
+              style={s.editBtn}
+              onPress={onEdit}
+              hitSlop={10}
+              accessibilityLabel="Profili düzenle"
+            >
+              <Ionicons name="create-outline" size={16} color="#14B8A6" style={iconShadow} />
+            </Pressable>
+          )}
+        </View>
       </View>
 
       {/* Stats satırı — touch target min 48px */}

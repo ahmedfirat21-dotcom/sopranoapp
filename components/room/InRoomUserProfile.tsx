@@ -29,6 +29,8 @@ import ProfileHero from '../profile/ProfileHero';
 import BadgeListModal from '../profile/BadgeListModal';
 // ★ v107: SPDonateSheet → GiftSheet (kişiye hediye akışı kendi sheet'inde)
 import GiftSheet from '../profile/GiftSheet';
+// ★ v107: Sembol Hediye — mağazadan satın alınmış gift item'ları arkadaşa gönder
+import SymbolGiftSheet from '../profile/SymbolGiftSheet';
 import FollowListModal from '../FollowListModal';
 import { ReportModal } from '../ReportModal';
 import PremiumAlert, { type AlertButton } from '../PremiumAlert';
@@ -122,6 +124,7 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
   const [showFollowList, setShowFollowList] = useState(false);
   const [followListTab, setFollowListTab] = useState<'friends' | 'followers' | 'following'>('friends');
   const [showSPSheet, setShowSPSheet] = useState(false);
+  const [showSymbolGift, setShowSymbolGift] = useState(false);
    const [showBadgesModal, setShowBadgesModal] = useState(false);
    const [cAlert, setCAlert] = useState<{ visible: boolean; title: string; message: string; type?: 'info' | 'warning' | 'error' | 'success'; buttons?: AlertButton[] }>({ visible: false, title: '', message: '' });
    // ★ 2026-04-26: Şu an hangi odada + ortak arkadaş + one-way follow
@@ -745,6 +748,17 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                       <SPHexagonIcon size={62} static />
                     </Pressable>
                   )}
+                  {/* ★ v107: Sembol Hediye — Mağazadan satın alınmış gift sembolünü arkadaşa gönder */}
+                  {!isOwnProfile && !isUserBlocked && currentUserId && (
+                    <Pressable
+                      style={sty.actionBtn}
+                      onPress={() => setShowSymbolGift(true)}
+                      hitSlop={6}
+                      accessibilityLabel="Sembol Hediye Gönder"
+                    >
+                      <Ionicons name="gift" size={20} color="#F472B6" />
+                    </Pressable>
+                  )}
                 </View>
 
                 {/* ★ 2026-04-26: Şu an hangi odada — aynı odadaysak gizle (gereksiz tekrar). */}
@@ -1084,6 +1098,17 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
           recipientUsername={(userProfile as any).username || undefined}
           recipientTier={(userProfile as any).subscription_tier || null}
           inRoom={true}
+        />
+      )}
+
+      {/* ★ v107: Sembol Hediye sheet — envanterden seç + RPC + receiver bildirim */}
+      {currentUserId && userId && userProfile && (
+        <SymbolGiftSheet
+          visible={showSymbolGift}
+          onClose={() => setShowSymbolGift(false)}
+          senderId={currentUserId}
+          recipientId={userId}
+          recipientName={userProfile.display_name || 'Kullanıcı'}
         />
       )}
 

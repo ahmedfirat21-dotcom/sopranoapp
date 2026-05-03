@@ -348,11 +348,15 @@ interface Props {
   currentSP?: number;
   /** ★ v107: Stil seçilmişken send tetiklenince burayı çağır — parent SP düşer + glow_style metadata ile gönderir */
   onSendGlow?: (content: string, glowStyle: GlowStyleId) => void;
+  /** ★ v107: Sahip olunan premium glow id'leri (cosmetic_items.message_art) — picker kilit kontrolü */
+  ownedPremiumGlowIds?: Set<string>;
+  /** ★ v107: Premium kilitli stil tıklandı → parent mağazaya yönlendirir */
+  onOpenStore?: () => void;
 }
 
 export default function RoomChatDrawer({
   visible, messages, chatInput, onChangeInput, onSend, onClose, onSendRaw, currentUserId, roomId, onAvatarPress,
-  currentSP = 0, onSendGlow,
+  currentSP = 0, onSendGlow, ownedPremiumGlowIds, onOpenStore,
 }: Props) {
   const insets = useSafeAreaInsets();
   const inputRef = useRef<TextInput>(null);
@@ -939,6 +943,8 @@ export default function RoomChatDrawer({
         onClose={() => setGlowPickerVisible(false)}
         currentSP={currentSP}
         onSelect={(id) => setPendingGlowStyle(id)}
+        ownedPremiumIds={ownedPremiumGlowIds}
+        onOpenStore={onOpenStore}
       />
     </>
   );

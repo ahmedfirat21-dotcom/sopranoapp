@@ -23,8 +23,9 @@ const COMMON_KEYFRAMES = `
 .fac-tw-3 { animation: facet-tw-3 3.2s ease-in-out infinite 0.8s; }
 .shine-band { animation: shine-march 3.5s ease-in-out infinite; }
 /* ★ v107 hotfix: ürün figürünün kendisi sallanmasın — sadece ışık/parıltı kalsın.
-   facet-tw / shine-band / tw-* (yıldız) parıltılar hariç tüm hareket animasyonları kapatıldı. */
-.crown-3d, .planet-3d, .bolt-3d, .snow-3d, .volcano-3d, .lava,
+   facet-tw / shine-band / tw-* (yıldız) parıltılar hariç tüm hareket animasyonları kapatıldı.
+   .snow-3d HARIÇ — buz tanesi yavaş dönüyor (kullanıcı isteği), kar kristali için doğal. */
+.crown-3d, .planet-3d, .bolt-3d, .volcano-3d, .lava,
 .const-3d, .star-3d, .flame-3d, .volt-3d, .heart-3d, .rose-3d,
 .anchor-3d, .flr-3d, .leaf-3d, .bg-rays,
 .bolt-pulse-ring, .bolt-pulse-ring-2 { animation: none !important; }
@@ -197,49 +198,86 @@ body{display:block;}
 </div>
 </body></html>`;
 
-// ─── Glacier Aura — premium 3D buz tanesi ──
+// ─── Glacier Aura — premium 3D buz tanesi (sopranochat_glacier_and_vesuvius_3d.html) ──
+//   v107 hotfix: 6 kol kristal kesim + her kolun üst yüzü açık / alt yüzü koyu (3D yüzey),
+//   beyaz omurga ışığı, 6 yan dal facet, merkez baklava (4 katman). Eski 3-line cross
+//   yapısı çıktı, yeni faceted hexagon yapı.
 const GLACIER_AURA_HTML = `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"><style>${STAGE_CSS}${COMMON_KEYFRAMES}
-@keyframes spin-slow { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-.snow-3d { animation: idle-3d 4s ease-in-out infinite, spin-slow 22s linear infinite; transform-origin: 50% 50%; filter: drop-shadow(0 0 18px rgba(125,211,252,0.85)) drop-shadow(0 0 36px rgba(34,211,238,0.45)) drop-shadow(0 8px 16px rgba(0,0,0,0.55)); }
+@keyframes spin-snow { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+.snow-3d { animation: spin-snow 18s linear infinite; transform-origin: 50% 50%; filter: drop-shadow(0 0 20px rgba(34,211,238,0.7)) drop-shadow(0 0 40px rgba(207,250,254,0.4)) drop-shadow(0 6px 12px rgba(0,0,0,0.5)); }
 </style></head><body>
 <svg class="snow-3d" width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet">
 <defs>
-<linearGradient id="ice-body" x1="20%" y1="0%" x2="80%" y2="100%"><stop offset="0%" stop-color="#FFFFFF"/><stop offset="20%" stop-color="#F0F9FF"/><stop offset="50%" stop-color="#BAE6FD"/><stop offset="78%" stop-color="#22D3EE"/><stop offset="100%" stop-color="#0E7490"/></linearGradient>
-<linearGradient id="ice-shine" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.95"/><stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/></linearGradient>
-<radialGradient id="ice-core" cx="50%" cy="50%" r="35%"><stop offset="0%" stop-color="#FFFFFF" stop-opacity="1"/><stop offset="60%" stop-color="#BAE6FD" stop-opacity="0.4"/><stop offset="100%" stop-color="#22D3EE" stop-opacity="0"/></radialGradient>
-<filter id="ice-bloom"><feGaussianBlur stdDeviation="0.7" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+<linearGradient id="g3d-arm-light" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#FFFFFF"/><stop offset="20%" stop-color="#F0F9FF"/><stop offset="50%" stop-color="#A5F3FC"/><stop offset="100%" stop-color="#67E8F9"/></linearGradient>
+<linearGradient id="g3d-arm-dark" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#67E8F9"/><stop offset="50%" stop-color="#22D3EE"/><stop offset="100%" stop-color="#0E7490"/></linearGradient>
+<linearGradient id="g3d-arm-side" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.95"/><stop offset="50%" stop-color="#A5F3FC" stop-opacity="0.4"/><stop offset="100%" stop-color="#0E7490" stop-opacity="0.6"/></linearGradient>
+<radialGradient id="g3d-core" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#FFFFFF"/><stop offset="40%" stop-color="#F0F9FF"/><stop offset="80%" stop-color="#A5F3FC"/><stop offset="100%" stop-color="#22D3EE"/></radialGradient>
+<radialGradient id="g3d-core-shine" cx="35%" cy="35%" r="50%"><stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.95"/><stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/></radialGradient>
+<filter id="g3d-bloom"><feGaussianBlur stdDeviation="0.6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
 </defs>
-<g filter="url(#ice-bloom)" opacity="0.5">
-<line x1="50" y1="14" x2="50" y2="86" stroke="#000" stroke-width="3" opacity="0.4"/>
-<line x1="19" y1="32" x2="81" y2="68" stroke="#000" stroke-width="3" opacity="0.4"/>
-<line x1="19" y1="68" x2="81" y2="32" stroke="#000" stroke-width="3" opacity="0.4"/>
+<g>
+<g transform="translate(50 50) rotate(0)">
+<polygon points="0,-36 -2.5,-8 0,-4 2.5,-8" fill="url(#g3d-arm-light)" stroke="#F0F9FF" stroke-width="0.5"/>
+<polygon points="0,-36 -2.5,-8 0,-8" fill="url(#g3d-arm-side)" opacity="0.7"/>
+<line x1="0" y1="-36" x2="0" y2="-8" stroke="#FFFFFF" stroke-width="0.5" opacity="0.95"/>
+<polygon points="0,-26 -5,-22 -3,-19 0,-22" fill="url(#g3d-arm-light)" stroke="#A5F3FC" stroke-width="0.4"/>
+<polygon points="0,-26 5,-22 3,-19 0,-22" fill="url(#g3d-arm-dark)" stroke="#A5F3FC" stroke-width="0.4"/>
+<line x1="0" y1="-26" x2="-5" y2="-22" stroke="#FFFFFF" stroke-width="0.3" opacity="0.6"/>
+<polygon points="0,-18 -3,-15 -2,-13 0,-15" fill="url(#g3d-arm-light)" opacity="0.85"/>
+<polygon points="0,-18 3,-15 2,-13 0,-15" fill="url(#g3d-arm-dark)" opacity="0.85"/>
 </g>
-<g stroke="url(#ice-body)" stroke-linecap="round">
-<line x1="50" y1="14" x2="50" y2="86" stroke-width="3.5"/>
-<line x1="19" y1="32" x2="81" y2="68" stroke-width="3.5"/>
-<line x1="19" y1="68" x2="81" y2="32" stroke-width="3.5"/>
+<g transform="translate(50 50) rotate(60)">
+<polygon points="0,-36 -2.5,-8 0,-4 2.5,-8" fill="url(#g3d-arm-light)" stroke="#F0F9FF" stroke-width="0.5"/>
+<polygon points="0,-36 -2.5,-8 0,-8" fill="url(#g3d-arm-side)" opacity="0.7"/>
+<line x1="0" y1="-36" x2="0" y2="-8" stroke="#FFFFFF" stroke-width="0.5" opacity="0.95"/>
+<polygon points="0,-26 -5,-22 -3,-19 0,-22" fill="url(#g3d-arm-light)" stroke="#A5F3FC" stroke-width="0.4"/>
+<polygon points="0,-26 5,-22 3,-19 0,-22" fill="url(#g3d-arm-dark)" stroke="#A5F3FC" stroke-width="0.4"/>
+<polygon points="0,-18 -3,-15 -2,-13 0,-15" fill="url(#g3d-arm-light)" opacity="0.85"/>
+<polygon points="0,-18 3,-15 2,-13 0,-15" fill="url(#g3d-arm-dark)" opacity="0.85"/>
 </g>
-<g stroke="#FFFFFF" stroke-linecap="round" opacity="0.85">
-<line x1="50" y1="14" x2="50" y2="86" stroke-width="1"/>
-<line x1="19" y1="32" x2="81" y2="68" stroke-width="1"/>
-<line x1="19" y1="68" x2="81" y2="32" stroke-width="1"/>
+<g transform="translate(50 50) rotate(120)">
+<polygon points="0,-36 -2.5,-8 0,-4 2.5,-8" fill="url(#g3d-arm-light)" stroke="#F0F9FF" stroke-width="0.5"/>
+<polygon points="0,-36 -2.5,-8 0,-8" fill="url(#g3d-arm-side)" opacity="0.7"/>
+<line x1="0" y1="-36" x2="0" y2="-8" stroke="#FFFFFF" stroke-width="0.5" opacity="0.95"/>
+<polygon points="0,-26 -5,-22 -3,-19 0,-22" fill="url(#g3d-arm-light)" stroke="#A5F3FC" stroke-width="0.4"/>
+<polygon points="0,-26 5,-22 3,-19 0,-22" fill="url(#g3d-arm-dark)" stroke="#A5F3FC" stroke-width="0.4"/>
+<polygon points="0,-18 -3,-15 -2,-13 0,-15" fill="url(#g3d-arm-light)" opacity="0.85"/>
+<polygon points="0,-18 3,-15 2,-13 0,-15" fill="url(#g3d-arm-dark)" opacity="0.85"/>
 </g>
-<g stroke="url(#ice-body)" stroke-linecap="round" stroke-width="2">
-<line x1="50" y1="22" x2="44" y2="16"/><line x1="50" y1="22" x2="56" y2="16"/>
-<line x1="50" y1="78" x2="44" y2="84"/><line x1="50" y1="78" x2="56" y2="84"/>
-<line x1="26" y1="36" x2="20" y2="30"/><line x1="26" y1="36" x2="32" y2="38"/>
-<line x1="74" y1="64" x2="80" y2="70"/><line x1="74" y1="64" x2="68" y2="62"/>
-<line x1="26" y1="64" x2="20" y2="70"/><line x1="26" y1="64" x2="32" y2="62"/>
-<line x1="74" y1="36" x2="80" y2="30"/><line x1="74" y1="36" x2="68" y2="38"/>
+<g transform="translate(50 50) rotate(180)">
+<polygon points="0,-36 -2.5,-8 0,-4 2.5,-8" fill="url(#g3d-arm-light)" stroke="#F0F9FF" stroke-width="0.5"/>
+<polygon points="0,-36 -2.5,-8 0,-8" fill="url(#g3d-arm-side)" opacity="0.7"/>
+<line x1="0" y1="-36" x2="0" y2="-8" stroke="#FFFFFF" stroke-width="0.5" opacity="0.95"/>
+<polygon points="0,-26 -5,-22 -3,-19 0,-22" fill="url(#g3d-arm-light)" stroke="#A5F3FC" stroke-width="0.4"/>
+<polygon points="0,-26 5,-22 3,-19 0,-22" fill="url(#g3d-arm-dark)" stroke="#A5F3FC" stroke-width="0.4"/>
+<polygon points="0,-18 -3,-15 -2,-13 0,-15" fill="url(#g3d-arm-light)" opacity="0.85"/>
+<polygon points="0,-18 3,-15 2,-13 0,-15" fill="url(#g3d-arm-dark)" opacity="0.85"/>
 </g>
-<circle cx="50" cy="50" r="14" fill="url(#ice-core)" filter="url(#ice-bloom)"/>
-<circle cx="50" cy="50" r="3.5" fill="#FFFFFF"/>
-<circle class="fac-tw-1" cx="50" cy="22" r="2" fill="#FFFFFF"/>
-<circle class="fac-tw-2" cx="74" cy="36" r="1.6" fill="#FFFFFF"/>
-<circle class="fac-tw-3" cx="26" cy="64" r="1.6" fill="#FFFFFF"/>
-<circle class="fac-tw-1" cx="50" cy="78" r="2" fill="#FFFFFF"/>
-<circle class="fac-tw-2" cx="26" cy="36" r="1.6" fill="#FFFFFF"/>
-<circle class="fac-tw-3" cx="74" cy="64" r="1.6" fill="#FFFFFF"/>
+<g transform="translate(50 50) rotate(240)">
+<polygon points="0,-36 -2.5,-8 0,-4 2.5,-8" fill="url(#g3d-arm-light)" stroke="#F0F9FF" stroke-width="0.5"/>
+<polygon points="0,-36 -2.5,-8 0,-8" fill="url(#g3d-arm-side)" opacity="0.7"/>
+<line x1="0" y1="-36" x2="0" y2="-8" stroke="#FFFFFF" stroke-width="0.5" opacity="0.95"/>
+<polygon points="0,-26 -5,-22 -3,-19 0,-22" fill="url(#g3d-arm-light)" stroke="#A5F3FC" stroke-width="0.4"/>
+<polygon points="0,-26 5,-22 3,-19 0,-22" fill="url(#g3d-arm-dark)" stroke="#A5F3FC" stroke-width="0.4"/>
+<polygon points="0,-18 -3,-15 -2,-13 0,-15" fill="url(#g3d-arm-light)" opacity="0.85"/>
+<polygon points="0,-18 3,-15 2,-13 0,-15" fill="url(#g3d-arm-dark)" opacity="0.85"/>
+</g>
+<g transform="translate(50 50) rotate(300)">
+<polygon points="0,-36 -2.5,-8 0,-4 2.5,-8" fill="url(#g3d-arm-light)" stroke="#F0F9FF" stroke-width="0.5"/>
+<polygon points="0,-36 -2.5,-8 0,-8" fill="url(#g3d-arm-side)" opacity="0.7"/>
+<line x1="0" y1="-36" x2="0" y2="-8" stroke="#FFFFFF" stroke-width="0.5" opacity="0.95"/>
+<polygon points="0,-26 -5,-22 -3,-19 0,-22" fill="url(#g3d-arm-light)" stroke="#A5F3FC" stroke-width="0.4"/>
+<polygon points="0,-26 5,-22 3,-19 0,-22" fill="url(#g3d-arm-dark)" stroke="#A5F3FC" stroke-width="0.4"/>
+<polygon points="0,-18 -3,-15 -2,-13 0,-15" fill="url(#g3d-arm-light)" opacity="0.85"/>
+<polygon points="0,-18 3,-15 2,-13 0,-15" fill="url(#g3d-arm-dark)" opacity="0.85"/>
+</g>
+</g>
+<polygon points="50,40 60,50 50,60 40,50" fill="url(#g3d-core)" stroke="#F0F9FF" stroke-width="0.6"/>
+<polygon points="50,40 55,50 50,52 45,50" fill="url(#g3d-core-shine)"/>
+<polygon points="50,40 55,45 50,50 45,45" fill="#FFFFFF" opacity="0.6"/>
+<line x1="50" y1="40" x2="50" y2="60" stroke="#FFFFFF" stroke-width="0.4" opacity="0.6"/>
+<line x1="40" y1="50" x2="60" y2="50" stroke="#FFFFFF" stroke-width="0.4" opacity="0.5"/>
+<circle cx="50" cy="50" r="2" fill="#FFFFFF" filter="url(#g3d-bloom)"/>
 </svg>
 </body></html>`;
 
@@ -352,131 +390,221 @@ const OR_ANCIEN_HTML = `<!doctype html><html><head><meta name="viewport" content
 </svg>
 </body></html>`;
 
-// ─── Inferno — 3D alev ──
+// ─── Inferno — premium 3D faceted alev (Or Ancien polygon stili) ──
+//   v107 hotfix #2: smooth curve yerine 8-köşeli geometric flame polygon — Or Ancien yıldız
+//   gibi keskin facet'lar 3D'yi net gösterir. Sol-light/sağ-dark zigzag yüzey + iç magma core.
 const INFERNO_HTML = `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"><style>${STAGE_CSS}${COMMON_KEYFRAMES}
-@keyframes flame-flicker { 0%,100% { transform: scaleY(1) translateY(0); } 33% { transform: scaleY(1.08) translateY(-2px); } 66% { transform: scaleY(0.96) translateY(1px); } }
-.flame-3d { animation: flame-flicker 1.4s ease-in-out infinite; transform-origin: 50% 90%; filter: drop-shadow(0 0 22px rgba(251,146,60,0.85)) drop-shadow(0 0 44px rgba(220,38,38,0.5)) drop-shadow(0 8px 16px rgba(0,0,0,0.6)); }
+.flame-3d { filter: drop-shadow(0 0 22px rgba(251,146,60,0.85)) drop-shadow(0 0 44px rgba(220,38,38,0.5)) drop-shadow(0 8px 16px rgba(0,0,0,0.6)); }
 </style></head><body>
 <svg class="flame-3d" width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet">
 <defs>
-<linearGradient id="if-body" x1="50%" y1="0%" x2="50%" y2="100%"><stop offset="0%" stop-color="#FFFFFF"/><stop offset="10%" stop-color="#FEF3C7"/><stop offset="30%" stop-color="#FBBF24"/><stop offset="55%" stop-color="#FB923C"/><stop offset="80%" stop-color="#DC2626"/><stop offset="100%" stop-color="#7F1D1D"/></linearGradient>
-<linearGradient id="if-shine" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.9"/><stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/></linearGradient>
-<radialGradient id="if-core" cx="50%" cy="60%" r="35%"><stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.95"/><stop offset="50%" stop-color="#FEF3C7" stop-opacity="0.6"/><stop offset="100%" stop-color="#FBBF24" stop-opacity="0"/></radialGradient>
-<linearGradient id="if-sweep" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#FFFFFF" stop-opacity="0"/><stop offset="50%" stop-color="#FFFFFF" stop-opacity="0.7"/><stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/></linearGradient>
-<clipPath id="if-mask"><path d="M 50 14 C 36 28 30 44 32 60 C 30 76 38 86 50 90 C 62 86 70 76 68 60 C 70 44 64 28 50 14 Z"/></clipPath>
-<filter id="if-bloom"><feGaussianBlur stdDeviation="1" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+<linearGradient id="if-body" x1="50%" y1="0%" x2="50%" y2="100%"><stop offset="0%" stop-color="#FFFFFF"/><stop offset="8%" stop-color="#FEF3C7"/><stop offset="22%" stop-color="#FDE047"/><stop offset="42%" stop-color="#FBBF24"/><stop offset="62%" stop-color="#FB923C"/><stop offset="82%" stop-color="#DC2626"/><stop offset="100%" stop-color="#7F1D1D"/></linearGradient>
+<linearGradient id="if-top-shine" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.95"/><stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/></linearGradient>
+<linearGradient id="if-left-dark" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#000" stop-opacity="0.5"/><stop offset="100%" stop-color="#000" stop-opacity="0"/></linearGradient>
+<radialGradient id="if-inner-glow" cx="50%" cy="62%" r="35%"><stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.95"/><stop offset="55%" stop-color="#FEF3C7" stop-opacity="0.5"/><stop offset="100%" stop-color="#FBBF24" stop-opacity="0"/></radialGradient>
+<linearGradient id="if-sweep" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#FFFFFF" stop-opacity="0"/><stop offset="50%" stop-color="#FFFFFF" stop-opacity="0.85"/><stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/></linearGradient>
+<clipPath id="if-mask"><polygon points="50,10 60,28 70,52 64,80 50,92 36,80 30,52 40,28"/></clipPath>
+<filter id="if-bloom"><feGaussianBlur stdDeviation="0.8" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+<filter id="if-strong-bloom"><feGaussianBlur stdDeviation="2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
 </defs>
-<path d="M 50 16 C 36 30 30 46 32 62 C 30 78 38 88 50 92 C 62 88 70 78 68 62 C 70 46 64 30 50 16 Z" fill="#000" opacity="0.5" filter="url(#if-bloom)"/>
-<path d="M 50 14 C 36 28 30 44 32 60 C 30 76 38 86 50 90 C 62 86 70 76 68 60 C 70 44 64 28 50 14 Z" fill="url(#if-body)" stroke="#FEF3C7" stroke-width="0.8"/>
+<polygon points="51,12 61,30 71,54 65,82 51,94 37,82 31,54 41,30" fill="#000" opacity="0.5" filter="url(#if-bloom)"/>
+<polygon points="50,10 60,28 70,52 64,80 50,92 36,80 30,52 40,28" fill="url(#if-body)" stroke="#FEF3C7" stroke-width="1"/>
 <g clip-path="url(#if-mask)">
-<path d="M 50 14 C 38 30 36 50 50 60 C 64 50 62 30 50 14 Z" fill="url(#if-shine)" opacity="0.7"/>
-<path d="M 50 30 C 42 40 38 56 50 64 C 62 56 58 40 50 30 Z" fill="url(#if-core)" filter="url(#if-bloom)"/>
-<path class="fac-tw-1" d="M 50 14 C 44 24 42 36 50 44 C 58 36 56 24 50 14 Z" fill="#FFFFFF" opacity="0.5"/>
-<line x1="50" y1="14" x2="50" y2="90" stroke="#FFFFFF" stroke-width="0.4" opacity="0.4"/>
-<line x1="40" y1="34" x2="42" y2="80" stroke="#FFFFFF" stroke-width="0.3" opacity="0.35"/>
-<line x1="60" y1="34" x2="58" y2="80" stroke="#000" stroke-width="0.3" opacity="0.35"/>
+<polygon points="50,10 60,28 50,42 40,28" fill="url(#if-top-shine)" opacity="0.85"/>
+<polygon points="50,10 40,28 30,52 36,80 50,92 50,42" fill="url(#if-left-dark)" opacity="0.55"/>
+<polygon class="fac-tw-1" points="50,10 60,28 50,42" fill="#FFFFFF" opacity="0.7"/>
+<polygon class="fac-tw-2" points="50,10 40,28 50,42" fill="#FEF3C7" opacity="0.55"/>
+<polygon class="fac-tw-3" points="50,42 64,80 50,92" fill="#000" opacity="0.3"/>
+<polygon points="50,42 36,80 50,92" fill="#000" opacity="0.22"/>
+<ellipse cx="50" cy="68" rx="11" ry="14" fill="url(#if-inner-glow)" filter="url(#if-bloom)"/>
+<line x1="50" y1="10" x2="50" y2="92" stroke="#FFFFFF" stroke-width="0.4" opacity="0.55"/>
+<line x1="50" y1="10" x2="30" y2="52" stroke="#FFFFFF" stroke-width="0.3" opacity="0.45"/>
+<line x1="50" y1="10" x2="70" y2="52" stroke="#000" stroke-width="0.3" opacity="0.35"/>
+<line x1="50" y1="42" x2="64" y2="80" stroke="#000" stroke-width="0.3" opacity="0.4"/>
+<line x1="50" y1="42" x2="36" y2="80" stroke="#FFFFFF" stroke-width="0.3" opacity="0.4"/>
 <rect class="shine-band" x="-30" y="0" width="22" height="100" fill="url(#if-sweep)"/>
 </g>
-<path d="M 50 14 C 36 28 30 44 32 60 C 30 76 38 86 50 90 C 62 86 70 76 68 60 C 70 44 64 28 50 14 Z" fill="none" stroke="#FFFFFF" stroke-width="0.5" opacity="0.7"/>
-<circle cx="50" cy="60" r="3" fill="#FFFFFF" opacity="0.9" filter="url(#if-bloom)"/>
-<circle class="fac-tw-2" cx="42" cy="74" r="1.5" fill="#FBBF24" opacity="0.85"/>
-<circle class="fac-tw-3" cx="58" cy="78" r="1.3" fill="#FB923C" opacity="0.8"/>
+<polygon points="50,10 60,28 70,52 64,80 50,92 36,80 30,52 40,28" fill="none" stroke="#FFFFFF" stroke-width="0.6" opacity="0.85"/>
+<circle cx="50" cy="10" r="1.6" fill="#FFFFFF" opacity="0.95" filter="url(#if-strong-bloom)"/>
+<circle cx="50" cy="68" r="3" fill="#FFFFFF" opacity="0.95" filter="url(#if-bloom)"/>
+<circle cx="50" cy="64" r="1.2" fill="#FFFFFF"/>
+<circle cx="42" cy="93" r="1.2" fill="#FBBF24" opacity="0.85" filter="url(#if-bloom)"/>
+<circle cx="50" cy="95" r="0.9" fill="#FB923C" opacity="0.85" filter="url(#if-bloom)"/>
+<circle cx="58" cy="93" r="1" fill="#FBBF24" opacity="0.85" filter="url(#if-bloom)"/>
 </svg>
 </body></html>`;
 
-// ─── Voltaire — neon cyan çift şimşek ──
+// ─── Voltaire — premium 3D neon cyan şimşek (Aurum Strike pattern, cyan renkleri) ──
+//   v107 hotfix #2: Aurum Strike şimşeği aynen + cyan/elektrik renk paleti.
+//   6 facet bölünmüş yüzey + iç beyaz core + cam çatlağı 7 line + 2 mikro spark.
 const VOLTAIRE_HTML = `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"><style>${STAGE_CSS}${COMMON_KEYFRAMES}
-.volt-3d { animation: pulse-soft 1.8s ease-in-out infinite; filter: drop-shadow(0 0 22px rgba(34,211,238,0.9)) drop-shadow(0 0 44px rgba(96,165,250,0.5)) drop-shadow(0 8px 16px rgba(0,0,0,0.55)); }
+.volt-3d { filter: drop-shadow(0 0 24px rgba(34,211,238,0.9)) drop-shadow(0 0 48px rgba(96,165,250,0.5)) drop-shadow(0 8px 16px rgba(0,0,0,0.55)); }
 </style></head><body>
 <svg class="volt-3d" width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet">
 <defs>
-<linearGradient id="vo-body" x1="20%" y1="0%" x2="80%" y2="100%"><stop offset="0%" stop-color="#FFFFFF"/><stop offset="10%" stop-color="#F0F9FF"/><stop offset="30%" stop-color="#7DD3FC"/><stop offset="60%" stop-color="#22D3EE"/><stop offset="90%" stop-color="#0E7490"/><stop offset="100%" stop-color="#082F49"/></linearGradient>
-<linearGradient id="vo-shine" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.95"/><stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/></linearGradient>
-<radialGradient id="vo-core" cx="50%" cy="50%" r="40%"><stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.95"/><stop offset="100%" stop-color="#7DD3FC" stop-opacity="0"/></radialGradient>
+<linearGradient id="vo-body" x1="20%" y1="0%" x2="80%" y2="100%"><stop offset="0%" stop-color="#FFFFFF"/><stop offset="8%" stop-color="#F0F9FF"/><stop offset="22%" stop-color="#A5F3FC"/><stop offset="48%" stop-color="#67E8F9"/><stop offset="72%" stop-color="#22D3EE"/><stop offset="92%" stop-color="#0E7490"/><stop offset="100%" stop-color="#082F49"/></linearGradient>
+<linearGradient id="vo-top-shine" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.95"/><stop offset="40%" stop-color="#FFFFFF" stop-opacity="0.5"/><stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/></linearGradient>
+<linearGradient id="vo-bottom-dark" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#000" stop-opacity="0"/><stop offset="100%" stop-color="#000" stop-opacity="0.65"/></linearGradient>
+<linearGradient id="vo-left-dark" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#000" stop-opacity="0.4"/><stop offset="100%" stop-color="#000" stop-opacity="0"/></linearGradient>
 <linearGradient id="vo-sweep" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#FFFFFF" stop-opacity="0"/><stop offset="50%" stop-color="#FFFFFF" stop-opacity="0.85"/><stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/></linearGradient>
-<clipPath id="vo-mask"><path d="M 38 12 L 22 50 L 36 50 L 30 88 L 62 50 L 48 50 L 56 12 Z"/></clipPath>
-<filter id="vo-bloom"><feGaussianBlur stdDeviation="1" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+<radialGradient id="vo-inner-glow" cx="50%" cy="50%" r="40%"><stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.9"/><stop offset="100%" stop-color="#A5F3FC" stop-opacity="0"/></radialGradient>
+<clipPath id="vo-mask"><polygon points="55,12 32,52 48,52 42,88 70,46 53,46 60,12"/></clipPath>
+<filter id="vo-bloom"><feGaussianBlur stdDeviation="1" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
 </defs>
-<path d="M 39 14 L 23 51 L 37 51 L 31 89 L 63 51 L 49 51 L 57 14 Z" fill="#000" opacity="0.5" filter="url(#vo-bloom)"/>
-<path d="M 38 12 L 22 50 L 36 50 L 30 88 L 62 50 L 48 50 L 56 12 Z" fill="url(#vo-body)" stroke="#F0F9FF" stroke-width="1.2"/>
+<polygon points="56,14 33,53 49,53 43,89 71,47 54,47 61,14" fill="#000" opacity="0.5" filter="url(#vo-bloom)"/>
+<polygon points="55,12 32,52 48,52 42,88 70,46 53,46 60,12" fill="url(#vo-body)" stroke="#F0F9FF" stroke-width="1.2"/>
 <g clip-path="url(#vo-mask)">
-<path d="M 38 12 L 22 50 L 36 50 L 30 88 L 62 50 L 48 50 L 56 12 Z" fill="url(#vo-shine)" opacity="0.55"/>
-<polygon class="fac-tw-1" points="38,12 56,12 50,30 44,30" fill="#FFFFFF" opacity="0.7"/>
-<polygon class="fac-tw-2" points="30,88 36,50 48,50" fill="#7DD3FC" opacity="0.55"/>
-<polygon class="fac-tw-3" points="36,50 48,50 62,50" fill="#FFFFFF" opacity="0.4"/>
-<polygon points="42,30 50,30 48,42 44,42" fill="url(#vo-core)" filter="url(#vo-bloom)"/>
-<line x1="38" y1="12" x2="44" y2="32" stroke="#FFFFFF" stroke-width="0.3" opacity="0.55"/>
-<line x1="56" y1="12" x2="50" y2="32" stroke="#FFFFFF" stroke-width="0.3" opacity="0.45"/>
-<line x1="36" y1="50" x2="48" y2="50" stroke="#FFFFFF" stroke-width="0.3" opacity="0.45"/>
+<polygon points="55,12 60,12 53,46 70,46 42,88 48,52 32,52" fill="url(#vo-top-shine)" opacity="0.55"/>
+<polygon points="55,12 32,52 48,52" fill="url(#vo-left-dark)" opacity="0.5"/>
+<polygon points="48,52 42,88 53,46" fill="url(#vo-left-dark)" opacity="0.4"/>
+<polygon points="60,12 70,46 53,46" fill="url(#vo-bottom-dark)" opacity="0.4"/>
+<polygon points="42,88 70,46 53,46" fill="url(#vo-bottom-dark)" opacity="0.5"/>
+<polygon class="fac-tw-1" points="55,12 60,12 56,28 50,28" fill="#FFFFFF" opacity="0.7"/>
+<polygon class="fac-tw-2" points="42,88 48,52 53,46" fill="#A5F3FC" opacity="0.6"/>
+<polygon class="fac-tw-3" points="48,52 53,46 70,46" fill="#FFFFFF" opacity="0.4"/>
+<polygon points="46,32 53,32 51,42 48,42" fill="url(#vo-inner-glow)" filter="url(#vo-bloom)"/>
+<polygon points="55,12 32,52 48,52" fill="none" stroke="#FFFFFF" stroke-width="0.5" opacity="0.6"/>
+<polygon points="60,12 70,46 53,46" fill="none" stroke="#FFFFFF" stroke-width="0.5" opacity="0.5"/>
+<line x1="48" y1="52" x2="42" y2="88" stroke="#FFFFFF" stroke-width="0.4" opacity="0.4"/>
+<line x1="53" y1="46" x2="42" y2="88" stroke="#000" stroke-width="0.4" opacity="0.4"/>
+<line x1="55" y1="12" x2="50" y2="32" stroke="#FFFFFF" stroke-width="0.3" opacity="0.65"/>
+<line x1="60" y1="12" x2="55" y2="32" stroke="#FFFFFF" stroke-width="0.3" opacity="0.45"/>
+<line x1="32" y1="52" x2="48" y2="52" stroke="#FFFFFF" stroke-width="0.3" opacity="0.45"/>
 <rect class="shine-band" x="-30" y="0" width="22" height="100" fill="url(#vo-sweep)"/>
 </g>
-<path d="M 38 12 L 22 50 L 36 50 L 30 88 L 62 50 L 48 50 L 56 12 Z" fill="none" stroke="#FFFFFF" stroke-width="0.6" opacity="0.85"/>
-<circle cx="30" cy="88" r="2.2" fill="#FFFFFF" opacity="0.95" filter="url(#vo-bloom)"/>
-<circle cx="62" cy="50" r="1.5" fill="#FFFFFF" opacity="0.85" filter="url(#vo-bloom)"/>
+<polygon points="55,12 32,52 48,52 42,88 70,46 53,46 60,12" fill="none" stroke="#FFFFFF" stroke-width="0.6" opacity="0.85"/>
+<circle cx="42" cy="88" r="2.5" fill="#FFFFFF" opacity="0.95" filter="url(#vo-bloom)"/>
+<circle cx="55" cy="12" r="1.8" fill="#FFFFFF" opacity="0.85" filter="url(#vo-bloom)"/>
+<circle cx="36" cy="92" r="0.8" fill="#A5F3FC" opacity="0.9" filter="url(#vo-bloom)"/>
+<circle cx="48" cy="92" r="0.6" fill="#A5F3FC" opacity="0.8" filter="url(#vo-bloom)"/>
 </svg>
 </body></html>`;
 
-// ─── Belle Époque — 3D pembe kalp ──
+// ─── Belle Époque — premium 3D faceted kalp (Or Ancien polygon stili) ──
+//   v107 hotfix #2: smooth curve yerine 10-köşeli geometric heart polygon. Yıldız gibi
+//   keskin facet'lar net 3D verir. 2 lobe top-shine + sol-light/sağ-dark zigzag yüzey.
 const BELLE_EPOQUE_HTML = `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"><style>${STAGE_CSS}${COMMON_KEYFRAMES}
-@keyframes heart-beat { 0%,100% { transform: scale(1); } 25% { transform: scale(1.08); } 50% { transform: scale(1); } 75% { transform: scale(1.04); } }
-.heart-3d { animation: heart-beat 1.4s ease-in-out infinite; filter: drop-shadow(0 0 22px rgba(244,114,182,0.85)) drop-shadow(0 0 44px rgba(190,24,93,0.45)) drop-shadow(0 8px 16px rgba(0,0,0,0.55)); }
+.heart-3d { filter: drop-shadow(0 0 22px rgba(244,114,182,0.9)) drop-shadow(0 0 44px rgba(190,24,93,0.5)) drop-shadow(0 8px 16px rgba(0,0,0,0.55)); }
 </style></head><body>
 <svg class="heart-3d" width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet">
 <defs>
-<linearGradient id="be-body" x1="20%" y1="0%" x2="80%" y2="100%"><stop offset="0%" stop-color="#FFFFFF"/><stop offset="10%" stop-color="#FCE7F3"/><stop offset="30%" stop-color="#F9A8D4"/><stop offset="60%" stop-color="#F472B6"/><stop offset="85%" stop-color="#BE185D"/><stop offset="100%" stop-color="#500724"/></linearGradient>
-<linearGradient id="be-shine" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.95"/><stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/></linearGradient>
-<radialGradient id="be-core" cx="35%" cy="30%" r="40%"><stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.95"/><stop offset="100%" stop-color="#FCE7F3" stop-opacity="0"/></radialGradient>
+<linearGradient id="be-body" x1="20%" y1="0%" x2="80%" y2="100%"><stop offset="0%" stop-color="#FFFFFF"/><stop offset="8%" stop-color="#FCE7F3"/><stop offset="22%" stop-color="#FBCFE8"/><stop offset="42%" stop-color="#F9A8D4"/><stop offset="62%" stop-color="#F472B6"/><stop offset="82%" stop-color="#BE185D"/><stop offset="100%" stop-color="#500724"/></linearGradient>
+<linearGradient id="be-top-shine" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.95"/><stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/></linearGradient>
+<linearGradient id="be-left-dark" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#000" stop-opacity="0.5"/><stop offset="100%" stop-color="#000" stop-opacity="0"/></linearGradient>
+<linearGradient id="be-bottom-dark" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#000" stop-opacity="0"/><stop offset="100%" stop-color="#000" stop-opacity="0.5"/></linearGradient>
+<radialGradient id="be-inner-glow" cx="50%" cy="50%" r="40%"><stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.9"/><stop offset="55%" stop-color="#FBCFE8" stop-opacity="0.5"/><stop offset="100%" stop-color="#F472B6" stop-opacity="0"/></radialGradient>
 <linearGradient id="be-sweep" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#FFFFFF" stop-opacity="0"/><stop offset="50%" stop-color="#FFFFFF" stop-opacity="0.85"/><stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/></linearGradient>
-<clipPath id="be-mask"><path d="M 50 86 C 30 70 14 56 14 38 C 14 26 24 18 34 18 C 42 18 48 22 50 30 C 52 22 58 18 66 18 C 76 18 86 26 86 38 C 86 56 70 70 50 86 Z"/></clipPath>
-<filter id="be-bloom"><feGaussianBlur stdDeviation="0.8" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+<clipPath id="be-mask"><polygon points="30,18 50,28 70,18 84,30 80,52 64,72 50,90 36,72 20,52 16,30"/></clipPath>
+<filter id="be-bloom"><feGaussianBlur stdDeviation="0.8" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+<filter id="be-strong-bloom"><feGaussianBlur stdDeviation="1.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
 </defs>
-<path d="M 50 88 C 30 72 14 58 14 40 C 14 28 24 20 34 20 C 42 20 48 24 50 32 C 52 24 58 20 66 20 C 76 20 86 28 86 40 C 86 58 70 72 50 88 Z" fill="#000" opacity="0.5" filter="url(#be-bloom)"/>
-<path d="M 50 86 C 30 70 14 56 14 38 C 14 26 24 18 34 18 C 42 18 48 22 50 30 C 52 22 58 18 66 18 C 76 18 86 26 86 38 C 86 56 70 70 50 86 Z" fill="url(#be-body)" stroke="#FCE7F3" stroke-width="1"/>
+<polygon points="31,20 51,30 71,20 85,32 81,54 65,74 51,92 37,74 21,54 17,32" fill="#000" opacity="0.5" filter="url(#be-bloom)"/>
+<polygon points="30,18 50,28 70,18 84,30 80,52 64,72 50,90 36,72 20,52 16,30" fill="url(#be-body)" stroke="#FCE7F3" stroke-width="1"/>
 <g clip-path="url(#be-mask)">
-<ellipse cx="36" cy="32" rx="18" ry="10" fill="url(#be-shine)" opacity="0.65"/>
-<ellipse cx="34" cy="30" rx="8" ry="4" fill="#FFFFFF" opacity="0.85" filter="url(#be-bloom)"/>
-<ellipse cx="56" cy="60" rx="20" ry="12" fill="#000" opacity="0.3"/>
-<line x1="50" y1="30" x2="50" y2="86" stroke="#FFFFFF" stroke-width="0.3" opacity="0.4"/>
-<path d="M 50 30 Q 30 50 50 86" fill="none" stroke="#FFFFFF" stroke-width="0.4" opacity="0.4"/>
-<path d="M 50 30 Q 70 50 50 86" fill="none" stroke="#000" stroke-width="0.4" opacity="0.3"/>
+<polygon points="30,18 50,28 16,30" fill="url(#be-top-shine)" opacity="0.85"/>
+<polygon points="70,18 84,30 50,28" fill="url(#be-top-shine)" opacity="0.8"/>
+<polygon points="16,30 20,52 50,28" fill="url(#be-top-shine)" opacity="0.45"/>
+<polygon points="50,28 80,52 84,30" fill="url(#be-top-shine)" opacity="0.4"/>
+<polygon points="16,30 20,52 36,72 50,90 50,28" fill="url(#be-left-dark)" opacity="0.55"/>
+<polygon points="50,28 50,90 64,72 80,52 84,30" fill="url(#be-bottom-dark)" opacity="0.45"/>
+<polygon class="fac-tw-1" points="30,18 50,28 16,30" fill="#FFFFFF" opacity="0.55"/>
+<polygon class="fac-tw-2" points="70,18 50,28 84,30" fill="#FBCFE8" opacity="0.55"/>
+<polygon class="fac-tw-3" points="50,28 50,90 36,72" fill="#000" opacity="0.25"/>
+<polygon points="50,28 50,90 64,72" fill="#000" opacity="0.22"/>
+<ellipse cx="50" cy="50" rx="14" ry="16" fill="url(#be-inner-glow)" filter="url(#be-bloom)"/>
+<line x1="50" y1="28" x2="50" y2="90" stroke="#FFFFFF" stroke-width="0.5" opacity="0.55"/>
+<line x1="30" y1="18" x2="50" y2="28" stroke="#FFFFFF" stroke-width="0.3" opacity="0.5"/>
+<line x1="70" y1="18" x2="50" y2="28" stroke="#FFFFFF" stroke-width="0.3" opacity="0.45"/>
+<line x1="16" y1="30" x2="50" y2="28" stroke="#FFFFFF" stroke-width="0.3" opacity="0.4"/>
+<line x1="84" y1="30" x2="50" y2="28" stroke="#000" stroke-width="0.3" opacity="0.35"/>
+<line x1="50" y1="28" x2="20" y2="52" stroke="#FFFFFF" stroke-width="0.3" opacity="0.4"/>
+<line x1="50" y1="28" x2="80" y2="52" stroke="#000" stroke-width="0.3" opacity="0.35"/>
 <rect class="shine-band" x="-30" y="0" width="22" height="100" fill="url(#be-sweep)"/>
 </g>
-<path d="M 50 86 C 30 70 14 56 14 38 C 14 26 24 18 34 18 C 42 18 48 22 50 30 C 52 22 58 18 66 18 C 76 18 86 26 86 38 C 86 56 70 70 50 86 Z" fill="none" stroke="#FFFFFF" stroke-width="0.5" opacity="0.7"/>
-<circle cx="34" cy="30" r="3" fill="url(#be-core)" filter="url(#be-bloom)"/>
+<polygon points="30,18 50,28 70,18 84,30 80,52 64,72 50,90 36,72 20,52 16,30" fill="none" stroke="#FFFFFF" stroke-width="0.6" opacity="0.85"/>
+<circle cx="30" cy="18" r="1.6" fill="#FFFFFF" opacity="0.95" filter="url(#be-strong-bloom)"/>
+<circle cx="70" cy="18" r="1.6" fill="#FFFFFF" opacity="0.9" filter="url(#be-strong-bloom)"/>
+<circle cx="50" cy="90" r="2" fill="#FFFFFF" opacity="0.95" filter="url(#be-strong-bloom)"/>
+<circle cx="50" cy="50" r="2" fill="#FFFFFF" opacity="0.85" filter="url(#be-bloom)"/>
+<circle cx="48" cy="48" r="1" fill="#FFFFFF"/>
 </svg>
 </body></html>`;
 
-// ─── La Rose Noir — 3D gül (siyah-pembe katmanlı petalleri) ──
+// ─── La Rose Noir — premium 3D gül (gerçek petal yapısı, Aurum Strike kalitesi) ──
+//   v107 hotfix: 8 dış petal (koyu), 6 orta petal (mid pink), 4 iç petal (light) +
+//   merkez bud · 4 petal-edge white highlight · 2 yaprak (yeşil) · drop-shadow halo ·
+//   bud üstünde shine spec + spark.
 const LA_ROSE_NOIR_HTML = `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"><style>${STAGE_CSS}${COMMON_KEYFRAMES}
-.rose-3d { animation: idle-3d 5s ease-in-out infinite; filter: drop-shadow(0 0 18px rgba(244,114,182,0.7)) drop-shadow(0 0 36px rgba(190,24,93,0.45)) drop-shadow(0 8px 16px rgba(0,0,0,0.6)); }
+.rose-3d { filter: drop-shadow(0 0 22px rgba(244,114,182,0.75)) drop-shadow(0 0 44px rgba(190,24,93,0.5)) drop-shadow(0 8px 16px rgba(0,0,0,0.6)); }
 </style></head><body>
 <svg class="rose-3d" width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet">
 <defs>
-<radialGradient id="rn-petal" cx="40%" cy="35%" r="65%"><stop offset="0%" stop-color="#FCE7F3"/><stop offset="30%" stop-color="#F472B6"/><stop offset="65%" stop-color="#BE185D"/><stop offset="100%" stop-color="#500724"/></radialGradient>
-<radialGradient id="rn-petal-dark" cx="40%" cy="35%" r="65%"><stop offset="0%" stop-color="#F9A8D4"/><stop offset="40%" stop-color="#BE185D"/><stop offset="100%" stop-color="#1A0508"/></radialGradient>
-<radialGradient id="rn-core" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.85"/><stop offset="60%" stop-color="#FCE7F3" stop-opacity="0.4"/><stop offset="100%" stop-color="#F472B6" stop-opacity="0"/></radialGradient>
-<filter id="rn-bloom"><feGaussianBlur stdDeviation="0.6" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+<radialGradient id="ro-petal-light" cx="40%" cy="35%" r="60%"><stop offset="0%" stop-color="#FFFFFF"/><stop offset="20%" stop-color="#FCE7F3"/><stop offset="50%" stop-color="#F9A8D4"/><stop offset="80%" stop-color="#F472B6"/><stop offset="100%" stop-color="#BE185D"/></radialGradient>
+<radialGradient id="ro-petal-mid" cx="40%" cy="35%" r="60%"><stop offset="0%" stop-color="#FBCFE8"/><stop offset="40%" stop-color="#F472B6"/><stop offset="80%" stop-color="#BE185D"/><stop offset="100%" stop-color="#831843"/></radialGradient>
+<radialGradient id="ro-petal-dark" cx="40%" cy="35%" r="60%"><stop offset="0%" stop-color="#F472B6"/><stop offset="50%" stop-color="#831843"/><stop offset="100%" stop-color="#1A0508"/></radialGradient>
+<radialGradient id="ro-bud" cx="50%" cy="40%" r="50%"><stop offset="0%" stop-color="#FFFFFF"/><stop offset="40%" stop-color="#FBCFE8"/><stop offset="80%" stop-color="#F472B6"/><stop offset="100%" stop-color="#BE185D"/></radialGradient>
+<radialGradient id="ro-bud-shine" cx="35%" cy="30%" r="40%"><stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.95"/><stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/></radialGradient>
+<linearGradient id="ro-leaf" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#86EFAC"/><stop offset="50%" stop-color="#16A34A"/><stop offset="100%" stop-color="#14532D"/></linearGradient>
+<filter id="ro-bloom"><feGaussianBlur stdDeviation="0.8" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
 </defs>
-<g filter="url(#rn-bloom)" opacity="0.5">
-<ellipse cx="51" cy="51" rx="36" ry="34" fill="#000" opacity="0.4"/>
-</g>
+<!-- Drop shadow halo -->
+<ellipse cx="51" cy="52" rx="36" ry="34" fill="#000" opacity="0.45" filter="url(#ro-bloom)"/>
+
+<!-- Yapraklar (alt sağ ve sol) -->
 <g>
-<path d="M 50 18 C 30 20 16 36 18 56 C 20 76 38 86 50 86 C 62 86 80 76 82 56 C 84 36 70 20 50 18 Z" fill="url(#rn-petal-dark)" stroke="#831843" stroke-width="0.6"/>
-<path d="M 50 26 C 36 28 26 38 26 52 C 26 66 38 78 50 78 C 62 78 74 66 74 52 C 74 38 64 28 50 26 Z" fill="url(#rn-petal)" stroke="#FCE7F3" stroke-width="0.4"/>
-<path d="M 50 32 C 40 34 34 42 34 50 C 34 60 42 70 50 70 C 58 70 66 60 66 50 C 66 42 60 34 50 32 Z" fill="url(#rn-petal-dark)" opacity="0.85"/>
-<path d="M 50 38 C 44 40 40 44 40 50 C 40 56 44 62 50 62 C 56 62 60 56 60 50 C 60 44 56 40 50 38 Z" fill="url(#rn-petal)" opacity="0.95"/>
-<circle cx="50" cy="50" r="5" fill="url(#rn-core)" filter="url(#rn-bloom)"/>
-<circle cx="48" cy="48" r="1.8" fill="#FFFFFF" opacity="0.85"/>
-<path d="M 50 18 Q 50 22 50 26" stroke="#FCE7F3" stroke-width="0.4" opacity="0.5"/>
-<path d="M 30 30 Q 36 36 42 40" stroke="#FCE7F3" stroke-width="0.3" opacity="0.45"/>
-<path d="M 70 30 Q 64 36 58 40" stroke="#000" stroke-width="0.3" opacity="0.4"/>
-<path d="M 22 60 Q 32 62 42 60" stroke="#FCE7F3" stroke-width="0.3" opacity="0.4"/>
-<path d="M 78 60 Q 68 62 58 60" stroke="#000" stroke-width="0.3" opacity="0.35"/>
+<path d="M 16 78 C 8 74 6 66 14 62 C 22 60 28 66 26 74 C 24 80 18 80 16 78 Z" fill="url(#ro-leaf)" stroke="#14532D" stroke-width="0.4" opacity="0.9"/>
+<path d="M 84 78 C 92 74 94 66 86 62 C 78 60 72 66 74 74 C 76 80 82 80 84 78 Z" fill="url(#ro-leaf)" stroke="#14532D" stroke-width="0.4" opacity="0.9"/>
+<line x1="16" y1="78" x2="22" y2="68" stroke="#FFFFFF" stroke-width="0.3" opacity="0.5"/>
+<line x1="84" y1="78" x2="78" y2="68" stroke="#FFFFFF" stroke-width="0.3" opacity="0.5"/>
 </g>
+
+<!-- ── 8 OUTER PETALS (en dış halka, koyu) ── -->
 <g>
-<ellipse cx="20" cy="80" rx="6" ry="3" fill="#10B981" opacity="0.85" transform="rotate(-30 20 80)"/>
-<ellipse cx="80" cy="80" rx="6" ry="3" fill="#10B981" opacity="0.85" transform="rotate(30 80 80)"/>
+<path d="M 50 50 C 40 28 28 22 22 30 C 18 40 30 48 50 50 Z" fill="url(#ro-petal-dark)" stroke="#1A0508" stroke-width="0.5"/>
+<path d="M 50 50 C 60 28 72 22 78 30 C 82 40 70 48 50 50 Z" fill="url(#ro-petal-dark)" stroke="#1A0508" stroke-width="0.5"/>
+<path d="M 50 50 C 30 42 18 46 16 56 C 18 66 32 64 50 50 Z" fill="url(#ro-petal-dark)" stroke="#1A0508" stroke-width="0.5"/>
+<path d="M 50 50 C 70 42 82 46 84 56 C 82 66 68 64 50 50 Z" fill="url(#ro-petal-dark)" stroke="#1A0508" stroke-width="0.5"/>
+<path d="M 50 50 C 36 60 28 70 36 78 C 46 78 50 66 50 50 Z" fill="url(#ro-petal-dark)" stroke="#1A0508" stroke-width="0.5"/>
+<path d="M 50 50 C 64 60 72 70 64 78 C 54 78 50 66 50 50 Z" fill="url(#ro-petal-dark)" stroke="#1A0508" stroke-width="0.5"/>
+<path d="M 50 50 C 44 70 44 80 50 80 C 56 80 56 70 50 50 Z" fill="url(#ro-petal-dark)" stroke="#1A0508" stroke-width="0.5"/>
+<path d="M 50 50 C 50 30 50 22 54 22 C 58 22 56 32 50 50 Z" fill="url(#ro-petal-dark)" stroke="#1A0508" stroke-width="0.5"/>
 </g>
+
+<!-- ── 6 MID PETALS (orta halka, mid pink) ── -->
+<g>
+<path d="M 50 50 C 42 36 36 32 34 40 C 38 48 46 48 50 50 Z" fill="url(#ro-petal-mid)" stroke="#831843" stroke-width="0.4"/>
+<path d="M 50 50 C 58 36 64 32 66 40 C 62 48 54 48 50 50 Z" fill="url(#ro-petal-mid)" stroke="#831843" stroke-width="0.4"/>
+<path d="M 50 50 C 34 48 26 54 32 60 C 40 60 46 56 50 50 Z" fill="url(#ro-petal-mid)" stroke="#831843" stroke-width="0.4"/>
+<path d="M 50 50 C 66 48 74 54 68 60 C 60 60 54 56 50 50 Z" fill="url(#ro-petal-mid)" stroke="#831843" stroke-width="0.4"/>
+<path d="M 50 50 C 40 60 38 68 46 70 C 50 64 50 56 50 50 Z" fill="url(#ro-petal-mid)" stroke="#831843" stroke-width="0.4"/>
+<path d="M 50 50 C 60 60 62 68 54 70 C 50 64 50 56 50 50 Z" fill="url(#ro-petal-mid)" stroke="#831843" stroke-width="0.4"/>
+</g>
+
+<!-- ── 4 INNER PETALS (iç halka, light) ── -->
+<g>
+<path d="M 50 50 C 44 42 40 44 42 50 C 46 52 50 52 50 50 Z" fill="url(#ro-petal-light)" stroke="#BE185D" stroke-width="0.3"/>
+<path d="M 50 50 C 56 42 60 44 58 50 C 54 52 50 52 50 50 Z" fill="url(#ro-petal-light)" stroke="#BE185D" stroke-width="0.3"/>
+<path d="M 50 50 C 44 56 46 60 50 58 C 52 56 52 52 50 50 Z" fill="url(#ro-petal-light)" stroke="#BE185D" stroke-width="0.3"/>
+<path d="M 50 50 C 56 56 54 60 50 58 C 48 56 48 52 50 50 Z" fill="url(#ro-petal-light)" stroke="#BE185D" stroke-width="0.3"/>
+</g>
+
+<!-- ── BUD (merkez tomurcuk) ── -->
+<circle cx="50" cy="50" r="5" fill="url(#ro-bud)" stroke="#831843" stroke-width="0.5"/>
+<ellipse cx="48" cy="48" rx="2.8" ry="2.5" fill="url(#ro-bud-shine)"/>
+<circle cx="48" cy="47" r="1" fill="#FFFFFF"/>
+
+<!-- ── Petal edge white highlights (üst petal'larda parıltı) ── -->
+<path d="M 28 30 C 32 26 38 24 44 26" stroke="#FFFFFF" stroke-width="0.4" opacity="0.55" fill="none"/>
+<path d="M 72 30 C 68 26 62 24 56 26" stroke="#FFFFFF" stroke-width="0.4" opacity="0.5" fill="none"/>
+<path d="M 18 50 C 20 44 24 42 28 44" stroke="#FFFFFF" stroke-width="0.3" opacity="0.45" fill="none"/>
+<path d="M 82 50 C 80 44 76 42 72 44" stroke="#FFFFFF" stroke-width="0.3" opacity="0.4" fill="none"/>
+
+<!-- ── Highlight specs (parıldayan noktalar) ── -->
+<circle cx="32" cy="32" r="1" fill="#FFFFFF" opacity="0.7" filter="url(#ro-bloom)"/>
+<circle cx="68" cy="32" r="1" fill="#FFFFFF" opacity="0.65" filter="url(#ro-bloom)"/>
+<circle cx="48" cy="46" r="0.8" fill="#FFFFFF" opacity="0.95"/>
+<circle class="fac-tw-1" cx="40" cy="46" r="0.6" fill="#FFFFFF" opacity="0.7"/>
+<circle class="fac-tw-2" cx="60" cy="46" r="0.6" fill="#FFFFFF" opacity="0.65"/>
 </svg>
 </body></html>`;
 
@@ -617,10 +745,11 @@ const FRAME = {
   emeraude: { bg: 'radial-gradient(circle at 50% 30%, rgba(94,234,212,0.45), transparent 55%), linear-gradient(135deg, #001A14 0%, #064E3B 50%, #047857 100%)', glow: 'rgba(94,234,212,0.18)', border: 'rgba(94,234,212,0.5)' },
 };
 
-export const ILLUSTRATIONS: Record<string, string> = {
+// ★ Wrapped illustrations — Aurum Strike kendi frame'iyle gelir, diğerleri helper'dan geçer.
+const WRAPPED: Record<string, string> = {
   'phoenix-diadem': wrapLuxuryFrame(PHOENIX_DIADEM_HTML, FRAME.phoenix),
   'galactique':     wrapLuxuryFrame(GALACTIQUE_HTML, FRAME.galactique),
-  'aurum-strike':   AURUM_STRIKE_HTML, // zaten kendi luxury frame'iyle gelir
+  'aurum-strike':   AURUM_STRIKE_HTML,
   'glacier-aura':   wrapLuxuryFrame(GLACIER_AURA_HTML, FRAME.glacier),
   'vesuvius':       wrapLuxuryFrame(VESUVIUS_HTML, FRAME.vesuvius),
   'constellation':  wrapLuxuryFrame(CONSTELLATION_HTML, FRAME.constellation),
@@ -632,6 +761,21 @@ export const ILLUSTRATIONS: Record<string, string> = {
   'marina-royale':  wrapLuxuryFrame(MARINA_ROYALE_HTML, FRAME.marinaRoyale),
   'versailles':     wrapLuxuryFrame(VERSAILLES_HTML, FRAME.versailles),
   'emeraude':       wrapLuxuryFrame(EMERAUDE_HTML, FRAME.emeraude),
+};
+
+// ★ v107 hotfix: Hediyeler kategorisi — aynı 3D illustration'ları paylaşır.
+//   Her hediye id'si bir base item'in görselini referans eder. Aynı kalite, farklı fiyat.
+export const ILLUSTRATIONS: Record<string, string> = {
+  ...WRAPPED,
+  'gift-bolt':    WRAPPED['aurum-strike'],
+  'gift-snow':    WRAPPED['glacier-aura'],
+  'gift-volcano': WRAPPED['vesuvius'],
+  'gift-star':    WRAPPED['or-ancien'],
+  'gift-sparkle': WRAPPED['constellation'],
+  'gift-fire':    WRAPPED['inferno'],
+  'gift-heart':   WRAPPED['belle-epoque'],
+  'gift-rose':    WRAPPED['la-rose-noir'],
+  'gift-anchor':  WRAPPED['marina-royale'],
 };
 
 export function getIllustrationHtml(itemId: string): string | null {
@@ -646,6 +790,9 @@ const FULL_CARD_ITEMS = new Set<string>([
   'phoenix-diadem', 'galactique', 'aurum-strike', 'glacier-aura', 'vesuvius',
   'constellation', 'or-ancien', 'inferno', 'voltaire', 'belle-epoque',
   'la-rose-noir', 'marina-royale', 'versailles', 'emeraude',
+  // Hediyeler — aynı luxury frame paylaşır
+  'gift-bolt', 'gift-snow', 'gift-volcano', 'gift-star', 'gift-sparkle',
+  'gift-fire', 'gift-heart', 'gift-rose', 'gift-anchor',
 ]);
 export function isFullCardItem(itemId: string): boolean {
   return FULL_CARD_ITEMS.has(itemId);

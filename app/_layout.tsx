@@ -356,7 +356,7 @@ function RealtimeBadgeProvider({ userId, children }: { userId: string | null; ch
             .select('*', { count: 'exact', head: true })
             .eq('user_id', userId)
             .eq('is_read', false)
-            .in('type', ['room_live', 'room_invite', 'room_invite_accepted', 'room_invite_rejected', 'missed_call', 'incoming_call', 'gift', 'thank_you', 'event_reminder', 'follow_accepted', 'follow_rejected']);
+            .in('type', ['room_live', 'room_invite', 'room_invite_accepted', 'room_invite_rejected', 'missed_call', 'incoming_call', 'gift', 'symbol_gift', 'thank_you', 'event_reminder', 'follow_accepted', 'follow_rejected']);
           return count || 0;
         })(),
       ]);
@@ -442,7 +442,7 @@ function RealtimeBadgeProvider({ userId, children }: { userId: string | null; ch
     // 3. Notifications realtime — yeni bildirim gelince sayıyı artır + anlık toast
     // ★ Zil badge'ine dahil olan bildirim tipleri (oda + arama + hediye + teşekkür + arkadaşlık yanıtları)
     // ★ 2026-04-21: follow_pending context-aware — oda içindeyken bell badge'e eklenir, dışında arkadaş simgesi ile yetinir.
-    const BELL_NOTIF_TYPES_BASE = ['room_live', 'room_invite', 'room_invite_accepted', 'room_invite_rejected', 'missed_call', 'incoming_call', 'gift', 'thank_you', 'event_reminder', 'follow_accepted', 'follow_rejected'];
+    const BELL_NOTIF_TYPES_BASE = ['room_live', 'room_invite', 'room_invite_accepted', 'room_invite_rejected', 'missed_call', 'incoming_call', 'gift', 'symbol_gift', 'thank_you', 'event_reminder', 'follow_accepted', 'follow_rejected'];
     const notifSub = supabase
       .channel(`badge_notif:${userId}`)
       .on('postgres_changes', {
@@ -497,6 +497,17 @@ function RealtimeBadgeProvider({ userId, children }: { userId: string | null; ch
           showToast({ title: '🔴 Canlı Yayın', message: body, type: 'info', id });
         } else if (notifType === 'gift') {
           showToast({ title: '🎁 Hediye Aldın', message: body, type: 'success', id });
+        } else if (notifType === 'symbol_gift') {
+          // ★ v107: Sembol hediye — body format "<item_id>|<item_name>|<art_emoji>"
+          const parts = body.split('|');
+          const emoji = parts[2] || '✨';
+          const itemName = parts[1] || 'sembol';
+          showToast({
+            title: `${emoji} Sembol Hediye`,
+            message: `${itemName} hediye aldın`,
+            type: 'success',
+            id,
+          });
         } else if (notifType === 'thank_you') {
           showToast({ title: '💖 Teşekkür Aldın', message: body, type: 'success', id });
         } else if (notifType === 'missed_call') {

@@ -12,10 +12,11 @@ import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import SPIcon from '../SPIcon';
-import { GLOW_STYLES, type GlowStyleId } from './glowStyles';
+import { GLOW_STYLES, PREMIUM_GLOW_IDS, type GlowStyleId } from './glowStyles';
 
 const { width: W } = Dimensions.get('window');
-const PANEL_HEIGHT_BASE = 460;
+// ★ v107: 6 sabit + 5 premium stil ekran sığması için panel yüksekliği +200
+const PANEL_HEIGHT_BASE = 660;
 
 interface Props {
   visible: boolean;
@@ -24,11 +25,15 @@ interface Props {
   currentSP: number;
   /** Stil seçildiğinde tetiklenir; parent state'te tutar, sonraki mesajda kullanır */
   onSelect: (style: GlowStyleId) => void;
+  /** ★ Mağazadan satın alınan premium stiller (cosmetic_items id'leri) — kilit kontrolü için */
+  ownedPremiumIds?: Set<string>;
+  /** ★ Premium stil tıklandı + sahip değil → mağazaya yönlendir */
+  onOpenStore?: () => void;
 }
 
 const STYLE_ORDER: GlowStyleId[] = ['gold', 'heart', 'fire', 'neon', 'celebration', 'galaxy'];
 
-export default function MessageGlowPickerSheet({ visible, onClose, currentSP, onSelect }: Props) {
+export default function MessageGlowPickerSheet({ visible, onClose, currentSP, onSelect, ownedPremiumIds, onOpenStore }: Props) {
   const insets = useSafeAreaInsets();
   const PANEL_HEIGHT = PANEL_HEIGHT_BASE + Math.max(insets.bottom, 0);
   const translateY = useRef(new Animated.Value(PANEL_HEIGHT)).current;
@@ -119,7 +124,8 @@ export default function MessageGlowPickerSheet({ visible, onClose, currentSP, on
             </View>
           </View>
 
-          {/* Grid */}
+          {/* ─── Standart 6 stil — pay-per-use ─── */}
+          <Text style={s.sectionLabel}>STANDART · MESAJ BAŞI ÜCRET</Text>
           <View style={s.grid}>
             {STYLE_ORDER.map((id) => {
               const cfg = GLOW_STYLES[id];
@@ -135,7 +141,6 @@ export default function MessageGlowPickerSheet({ visible, onClose, currentSP, on
                   }}
                   disabled={insufficient}
                 >
-                  {/* Mini önizleme — stilin gradient bg'si */}
                   <View style={s.preview}>
                     <LinearGradient
                       colors={cfg.bgGradient as any}
@@ -144,7 +149,6 @@ export default function MessageGlowPickerSheet({ visible, onClose, currentSP, on
                     />
                     <Text style={s.previewIcon}>{cfg.icon}</Text>
                   </View>
-                  {/* Label + cost */}
                   <Text style={s.cardLabel}>{cfg.label}</Text>
                   <View style={s.costRow}>
                     <SPIcon size={12} />
@@ -155,8 +159,62 @@ export default function MessageGlowPickerSheet({ visible, onClose, currentSP, on
             })}
           </View>
 
+          {/* ─── Premium 5 stil — Mağaza unlock ─── */}
+          <View style={s.premiumDivider}>
+            <View style={s.dividerLine} />
+            <Text style={s.premiumLabel}>★ PREMIUM · KOLEKSİYON ★</Text>
+            <View style={s.dividerLine} />
+          </View>
+          <View style={s.grid}>
+            {PREMIUM_GLOW_IDS.map((id) => {
+              const cfg = GLOW_STYLES[id];
+              const owned = !!ownedPremiumIds?.has(id);
+              return (
+                <Pressable
+                  key={id}
+                  style={[s.card, !owned && s.cardLocked]}
+                  onPress={() => {
+                    if (!owned) {
+                      onOpenStore?.();
+                      onClose();
+                      return;
+                    }
+                    onSelect(id);
+                    onClose();
+                  }}
+                >
+                  <View style={s.preview}>
+                    <LinearGradient
+                      colors={cfg.bgGradient as any}
+                      start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                      style={StyleSheet.absoluteFillObject}
+                    />
+                    <Text style={s.previewIcon}>{cfg.icon}</Text>
+                    {!owned && (
+                      <View style={s.lockOverlay}>
+                        <Ionicons name="lock-closed" size={20} color="#FBBF24" />
+                      </View>
+                    )}
+                  </View>
+                  <Text style={s.cardLabel}>{cfg.label}</Text>
+                  <View style={s.costRow}>
+                    {owned ? (
+                      <Text style={[s.costText, { color: '#5DCAA5' }]}>SAHİPSİN · FREE</Text>
+                    ) : (
+                      <>
+                        <SPIcon size={12} />
+                        <Text style={s.costText}>{cfg.unlockPrice} SP · KİLİTLİ</Text>
+                      </>
+                    )}
+                  </View>
+                </Pressable>
+              );
+            })}
+          </View>
+
           <Text style={s.footnote}>
-            Mesaj başına anlık tüketim. Stil sadece o mesajda görünür.
+            Standart stiller mesaj başı SP harcar. Premium stiller mağazadan tek seferlik
+            satın alınır, sonsuz kullanım.
           </Text>
         </Animated.View>
       </View>
@@ -216,6 +274,26 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: 'rgba(251,191,36,0.3)',
   },
   balanceText: { fontSize: 11, fontWeight: '800', color: '#FBBF24' },
+  sectionLabel: {
+    fontSize: 9.5, fontWeight: '900', color: 'rgba(251,191,36,0.7)',
+    letterSpacing: 2, textAlign: 'center',
+    marginTop: 4, marginBottom: 8,
+  },
+  premiumDivider: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingHorizontal: 16, marginTop: 12, marginBottom: 8,
+  },
+  dividerLine: { flex: 1, height: 0.5, backgroundColor: 'rgba(251,191,36,0.4)' },
+  premiumLabel: {
+    fontSize: 9.5, fontWeight: '900', color: '#FBBF24',
+    letterSpacing: 2,
+  },
+  cardLocked: { opacity: 0.7 },
+  lockOverlay: {
+    position: 'absolute', top: 0, right: 0, bottom: 0, left: 0,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.45)',
+  },
   grid: {
     flexDirection: 'row', flexWrap: 'wrap',
     paddingHorizontal: 14, justifyContent: 'space-between',

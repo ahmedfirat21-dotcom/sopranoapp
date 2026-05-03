@@ -28,7 +28,16 @@ import { getIllustrationHtml, isFullCardItem } from '../constants/storeIllustrat
 
 const { width: W } = Dimensions.get('window');
 
-const CATEGORIES = ['★ Atelier', 'Profil', 'Mesaj Sanatı', 'Hediyeler', 'Salonlar', 'Ünvanlar', 'Boost', 'SP'] as const;
+// ★ v107 hotfix: kategori pill'leri sadece dolu olan 4'üne indirildi.
+//   Profil/Salonlar/Ünvanlar/Boost post-launch'a ertelendi (memory: store_v107).
+//   key = scroll-to-section anchor; ana ScrollView ref'iyle eşleşir.
+type CategoryKey = 'atelier' | 'message_art' | 'gift' | 'sp';
+const CATEGORIES: { key: CategoryKey; label: string }[] = [
+  { key: 'atelier',     label: '★ Atelier' },
+  { key: 'message_art', label: 'Mesaj Sanatı' },
+  { key: 'gift',        label: 'Hediyeler' },
+  { key: 'sp',          label: 'SP' },
+];
 
 const RARITY_LABEL: Record<Rarity, string> = {
   divine: 'İLAHİ', mythic: 'EFSANEVİ', legendary: 'EFSANE', rare: 'NADİR', new: 'YENİ',
@@ -335,11 +344,21 @@ export default function StoreScreen() {
   const router = useRouter();
   const { profile, firebaseUser } = useAuth();
   const sp = (profile as any)?.system_points || 0;
-  const [activeCat, setActiveCat] = useState(0);
+  const [activeCat, setActiveCat] = useState<CategoryKey>('atelier');
   const [items, setItems] = useState<CosmeticItem[]>([]);
   const [collections, setCollections] = useState<Collection[]>([]);
   const [inventory, setInventory] = useState<Set<string>>(new Set());
   const [purchasing, setPurchasing] = useState<string | null>(null);
+  // ★ v107 hotfix: pill tıklama scroll-to-section anchor — ScrollView ref + her section'ın y offset'i
+  const scrollRef = useRef<ScrollView>(null);
+  const sectionOffsets = useRef<Record<CategoryKey, number>>({
+    atelier: 0, message_art: 0, gift: 0, sp: 0,
+  });
+  const scrollToSection = (key: CategoryKey) => {
+    setActiveCat(key);
+    const y = sectionOffsets.current[key];
+    scrollRef.current?.scrollTo({ y: Math.max(0, y - 8), animated: true });
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -359,6 +378,7 @@ export default function StoreScreen() {
 
   const showcaseItems = items.filter((i) => i.category === 'atelier');
   const galleryItems = items.filter((i) => i.category === 'message_art');
+  const giftItems = items.filter((i) => i.category === 'gift');
 
   const handlePurchase = (item: CosmeticItem) => {
     if (!firebaseUser?.uid) return;
@@ -466,15 +486,15 @@ export default function StoreScreen() {
           </View>
 
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-            {CATEGORIES.map((cat, idx) => {
-              const active = idx === activeCat;
+            {CATEGORIES.map((cat) => {
+              const active = cat.key === activeCat;
               return (
                 <Pressable
-                  key={cat}
-                  onPress={() => setActiveCat(idx)}
+                  key={cat.key}
+                  onPress={() => scrollToSection(cat.key)}
                   style={[s.catPill, active && s.catPillActive]}
                 >
-                  <Text style={[s.catPillText, active && s.catPillTextActive]}>{cat}</Text>
+                  <Text style={[s.catPillText, active && s.catPillTextActive]}>{cat.label}</Text>
                 </Pressable>
               );
             })}
@@ -483,6 +503,7 @@ export default function StoreScreen() {
 
         {/* BODY */}
         <ScrollView
+          ref={scrollRef}
           style={{ flex: 1 }}
           contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 100 + insets.bottom }}
           showsVerticalScrollIndicator={false}
@@ -515,6 +536,7 @@ export default function StoreScreen() {
           </View>
 
           {/* Atelier Vitrin */}
+          <View onLayout={(e) => { sectionOffsets.current.atelier = e.nativeEvent.layout.y; }} />
           <SectionDivider label="★ ATELIER · İMZA PARÇALARI ★" />
           <Text style={s.sectionTitle}>Vitrin</Text>
           <Text style={s.sectionSub}>El işçiliği · Sınırlı sayıda · Her biri tek</Text>
@@ -535,6 +557,7 @@ export default function StoreScreen() {
           </ScrollView>
 
           {/* Galeri */}
+          <View onLayout={(e) => { sectionOffsets.current.message_art = e.nativeEvent.layout.y; }} />
           <SectionDivider label="— GALERİ · MESAJ SANATI —" />
           <View style={s.galleryGrid}>
             {galleryItems.map((item) => (
@@ -547,8 +570,30 @@ export default function StoreScreen() {
             ))}
           </View>
 
+          {/* Hediyeler — arkadaşa atılan anlık sembol koleksiyonu */}
+          {giftItems.length > 0 && (
+            <>
+              <View onLayout={(e) => { sectionOffsets.current.gift = e.nativeEvent.layout.y; }} />
+              <SectionDivider label="— HEDİYELER · ARKADAŞA · GÖNDER —" />
+              <Text style={s.sectionSub}>Sembol seç · Sevdiğine bir parıltı bırak</Text>
+              <View style={s.galleryGrid}>
+                {giftItems.map((item) => (
+                  <GalleryCard
+                    key={item.id}
+                    item={item}
+                    owned={inventory.has(item.id)}
+                    onPress={() => handlePurchase(item)}
+                  />
+                ))}
+              </View>
+            </>
+          )}
+
           {/* Soprano Tezgâhı */}
-          <View style={s.tierSection}>
+          <View
+            onLayout={(e) => { sectionOffsets.current.sp = e.nativeEvent.layout.y; }}
+            style={s.tierSection}
+          >
             <View pointerEvents="none" style={s.tierTopLine} />
             <View style={s.tierHeaderBlock}>
               <Text style={s.tierHeaderSymbol}>⚜</Text>
@@ -565,7 +610,13 @@ export default function StoreScreen() {
             contentContainerStyle={{ gap: 10, paddingHorizontal: 4, paddingVertical: 8 }}
             style={{ marginHorizontal: -16 }}
           >
-            {collections.map((col) => <CollectionCard key={col.id} col={col} />)}
+            {collections.map((col) => (
+              <CollectionCard
+                key={col.id}
+                col={col}
+                onPress={() => router.push(`/store/collection/${col.id}` as any)}
+              />
+            ))}
           </ScrollView>
         </ScrollView>
 
@@ -578,8 +629,8 @@ export default function StoreScreen() {
             style={StyleSheet.absoluteFillObject}
           />
           <View>
-            <Text style={s.bottomLabel}>EKSİK SP MİKTARI</Text>
-            <Text style={s.bottomAction}>Hesabını yükle</Text>
+            <Text style={s.bottomLabel}>SP PAKETLERİ</Text>
+            <Text style={s.bottomAction}>Daha fazla SP edin</Text>
           </View>
           <Pressable style={s.bottomCta} onPress={() => router.push('/sp-store')}>
             <LinearGradient
@@ -694,8 +745,10 @@ function GalleryCard({ item, owned, onPress }: {
   const rarityColor = RARITY_COLOR[rarity];
   const featured = item.is_featured;
   const bgGradient = [item.bg_gradient_start, item.bg_gradient_end].filter(Boolean) as string[];
-  // ★ v107 hotfix: tüm illustration'lı ürünler luxury frame ile sarılı geliyor — kart kenarına yay.
-  const fullCard = isFullCardItem(item.id);
+  // ★ v107 hotfix: featured kartlarda fullCard kapalı — frame geniş ama art %60 sıkışıyordu,
+  //   kenarlarda boş alan oluşuyordu. Featured = sağda büyük art + solda info eski layout'una dön.
+  //   Normal kartlarda fullCard aktif (kart-kenarına yayılan luxury frame).
+  const fullCard = isFullCardItem(item.id) && !featured;
   return (
     <Pressable
       onPress={onPress}
@@ -746,14 +799,23 @@ function GalleryCard({ item, owned, onPress }: {
           <SoftHalo color={item.art_color || '#fff'} size={featured ? 110 : 80} opacity={0.28} />
         </View>
       )}
-      {!fullCard && !getIllustrationHtml(item.id) && (
+      {!fullCard && getIllustrationHtml(item.id) ? (
+        <View style={[
+          { position: 'absolute', alignItems: 'center', justifyContent: 'center' },
+          featured
+            ? { top: '15%', left: '55%', width: '40%', height: '70%' }
+            : { top: '15%', left: '15%', right: '15%', height: '60%' },
+        ]}>
+          <Item3DArt itemId={item.id} size={featured ? 110 : 70} />
+        </View>
+      ) : !fullCard ? (
         <Text style={[s.galleryArt, featured && s.galleryArtFeatured, {
           color: item.art_color || '#fff',
           textShadowColor: item.art_color || '#fff',
           textShadowOffset: { width: 0, height: 0 },
           textShadowRadius: 16,
         }]}>{item.art_emoji}</Text>
-      )}
+      ) : null}
       <View style={[s.galleryInfo, featured && s.galleryInfoFeatured]}>
         <LinearGradient
           colors={featured
@@ -849,14 +911,14 @@ function SPPackRow({ pack, onPress }: { pack: SPPack; onPress: () => void }) {
   );
 }
 
-function CollectionCard({ col }: { col: Collection }) {
+function CollectionCard({ col, onPress }: { col: Collection; onPress?: () => void }) {
   const bgGradient = [col.bg_gradient_start, col.bg_gradient_end].filter(Boolean) as string[];
   const nameLines = col.name.split(' ');
   const displayName = nameLines.length > 1
     ? nameLines[0] + '\n' + nameLines.slice(1).join(' ')
     : col.name;
   return (
-    <Pressable style={s.collectionCard}>
+    <Pressable style={s.collectionCard} onPress={onPress}>
       {/* ★ v107 hotfix: koleksiyonlar da luxury frame ile sarılı geliyor — kart kenarına yay. */}
       {isFullCardItem(col.id) ? (
         <Item3DArt itemId={col.id} fullSize />
@@ -929,9 +991,9 @@ const s = StyleSheet.create({
   catPillTextActive: { color: '#FBBF24' },
 
   hero: {
-    marginVertical: 16, paddingVertical: 24, paddingHorizontal: 20,
+    marginTop: 12, marginBottom: 8, paddingVertical: 20, paddingHorizontal: 20,
     borderRadius: 20, borderWidth: 0.5, borderColor: 'rgba(167,139,250,0.3)',
-    overflow: 'hidden', minHeight: 180, position: 'relative',
+    overflow: 'hidden', minHeight: 168, position: 'relative',
   },
   heroArt: { position: 'absolute', right: -10, top: '50%', transform: [{ translateY: -45 }] },
   heroTag: {
@@ -949,11 +1011,11 @@ const s = StyleSheet.create({
   },
   heroCtaText: { color: '#3D1F00', fontSize: 11, fontWeight: '800', letterSpacing: 0.5, textTransform: 'uppercase' },
 
-  divider: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 16, marginBottom: 14 },
+  divider: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 12, marginBottom: 10 },
   dividerLine: { flex: 1, height: 0.5, backgroundColor: 'rgba(251,191,36,0.3)' },
   dividerLabel: { color: '#FBBF24', fontSize: 9, fontWeight: '700', letterSpacing: 2.5, textTransform: 'uppercase' },
   sectionTitle: { color: '#fff', fontFamily: serif, fontSize: 18, fontWeight: '700', textAlign: 'center', marginBottom: 4 },
-  sectionSub: { color: 'rgba(255,255,255,0.5)', fontSize: 11, fontStyle: 'italic', textAlign: 'center', marginBottom: 14 },
+  sectionSub: { color: 'rgba(255,255,255,0.5)', fontSize: 11, fontStyle: 'italic', textAlign: 'center', marginBottom: 10 },
 
   showcaseCard: { width: 180, height: 240, borderRadius: 18, borderWidth: 0.5, overflow: 'hidden' },
   showcaseRadial: {
@@ -985,9 +1047,11 @@ const s = StyleSheet.create({
   showcasePriceNum: { color: '#FFE082', fontSize: 16, fontWeight: '800', fontFamily: serif },
   showcasePriceUnit: { color: 'rgba(251,191,36,0.7)', fontSize: 10, fontWeight: '600' },
 
-  galleryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 8 },
-  galleryCard: { width: (W - 16 * 2 - 10) / 2, aspectRatio: 1, borderRadius: 16, borderWidth: 0.5, overflow: 'hidden', position: 'relative' },
-  galleryCardFeatured: { width: '100%', aspectRatio: 2.2 },
+  galleryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 4 },
+  // ★ v107 hotfix: aspectRatio yerine fixed height — RN'de aspectRatio'lu container içindeki
+  //   absolute child WebView height hesaplamasını kaçırıyor, gallery'de boş render veriyordu.
+  galleryCard: { width: (W - 16 * 2 - 10) / 2, height: (W - 16 * 2 - 10) / 2, borderRadius: 16, borderWidth: 0.5, overflow: 'hidden', position: 'relative' },
+  galleryCardFeatured: { width: '100%', height: (W - 32) / 2.2 },
   galleryRadial: { position: 'absolute', top: '20%', left: '20%', right: '20%', height: '60%', borderRadius: 80, opacity: 0.7 },
   rareDot: { position: 'absolute', top: 8, right: 8, width: 8, height: 8, borderRadius: 4, zIndex: 3 },
   galleryArt: { position: 'absolute', top: '38%', left: '50%', fontSize: 56, transform: [{ translateX: -28 }, { translateY: -28 }] },
@@ -1002,12 +1066,12 @@ const s = StyleSheet.create({
   galleryPriceUnit: { fontSize: 9, color: 'rgba(251,191,36,0.6)', fontWeight: '600' },
 
   tierSection: {
-    marginTop: 20, marginBottom: 20, paddingHorizontal: 16, paddingTop: 24, paddingBottom: 16,
+    marginTop: 12, marginBottom: 12, paddingHorizontal: 16, paddingTop: 18, paddingBottom: 14,
     borderRadius: 24, borderWidth: 0.5, borderColor: 'rgba(251,191,36,0.15)',
     backgroundColor: 'rgba(255,255,255,0.02)', position: 'relative', overflow: 'hidden',
   },
   tierTopLine: { position: 'absolute', top: 0, left: '10%', right: '10%', height: 1, backgroundColor: 'rgba(251,191,36,0.5)' },
-  tierHeaderBlock: { alignItems: 'center', marginBottom: 18 },
+  tierHeaderBlock: { alignItems: 'center', marginBottom: 14 },
   tierHeaderSymbol: { fontSize: 24, marginBottom: 6, color: '#FBBF24' },
   tierHeaderTitle: { color: '#fff', fontFamily: serif, fontSize: 18, fontWeight: '700', letterSpacing: 1 },
   tierHeaderSub: { color: 'rgba(251,191,36,0.7)', fontSize: 9, letterSpacing: 2.5, marginTop: 4, fontWeight: '600' },

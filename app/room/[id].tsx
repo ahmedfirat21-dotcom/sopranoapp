@@ -105,6 +105,8 @@ import RoomDisconnectOverlay from '../../components/room/RoomDisconnectOverlay';
 import RoomClosedScreen, { type RoomClosedReason } from '../../components/room/RoomClosedScreen';
 import { VoiceReactionService } from '../../services/voiceReactions';
 import RoomChatDrawer from '../../components/room/RoomChatDrawer';
+import { StoreService } from '../../services/store';
+import { PREMIUM_GLOW_IDS } from '../../components/room/glowStyles';
 // ★ v107.3: Host bağışı StageSupportSheet'e taşındı (DonationAlert tüm odaya gösterilen bildirim)
 import DonationAlert, { type DonationAlertRef } from '../../components/room/DonationAlert';
 // ★ v107.3: Host bağışı SPDonateSheet → StageSupportSheet (sahne ışığı + host glow + "Sahneyi Destekle")
@@ -1148,6 +1150,21 @@ export default function RoomScreen() {
 
   const [showAudienceDrawer, setShowAudienceDrawer] = useState(false);
   const [showChatDrawer, setShowChatDrawer] = useState(false);
+  // ★ v107: Premium mesaj parlat stilleri — kullanıcının envanteri (cosmetic_items.message_art ürünleri)
+  const [ownedPremiumGlowIds, setOwnedPremiumGlowIds] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    if (!firebaseUser?.uid) return;
+    let cancelled = false;
+    StoreService.getUserInventory(firebaseUser.uid).then((inv) => {
+      if (cancelled) return;
+      const owned = new Set<string>();
+      for (const id of PREMIUM_GLOW_IDS) {
+        if (inv.has(id)) owned.add(id);
+      }
+      setOwnedPremiumGlowIds(owned);
+    });
+    return () => { cancelled = true; };
+  }, [firebaseUser?.uid]);
   // ★ 2026-04-26: Oda kapalı/erişim engelli durumda full-screen ekran. Reason + opsiyonel
   //   dinamik mesaj birlikte tek state'te tutulur — iki ayrı setter race condition açıyordu.
   //   additionalReasons: birden fazla hard-block varsa (örn yaş + arkadaş) bullet liste için.
@@ -4297,13 +4314,18 @@ export default function RoomScreen() {
         }}
         currentUserId={firebaseUser?.uid} roomId={id as string}
         currentSP={(profile as any)?.system_points || 0}
+        ownedPremiumGlowIds={ownedPremiumGlowIds}
+        onOpenStore={() => router.push('/store' as any)}
         onSendGlow={async (content, glowStyle) => {
           // ★ v107 (3 May 2026): Mesaj Parlat — atomic RPC, SP düş + insert + log
           if (!firebaseUser) return;
           const r = await RoomChatService.sendGlow(id as string, firebaseUser.uid, content, glowStyle);
           if (r.success) {
             setChatInput('');
-            showToast({ title: '✨ Parlatıldı', message: `${r.cost} SP harcandı`, type: 'success' });
+            const msg = r.cost && r.cost > 0
+              ? `${r.cost} SP harcandı`
+              : 'Premium stilin sonsuz kullanım hakkı var';
+            showToast({ title: '✨ Parlatıldı', message: msg, type: 'success' });
           } else {
             showToast({ title: 'Gönderilemedi', message: r.error || 'Bağlantı hatası', type: 'error' });
           }

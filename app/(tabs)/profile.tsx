@@ -21,6 +21,7 @@ import PlusDiamondIcon from '../../components/PlusDiamondIcon';
 import AnimatedHeaderIconBtn from '../../components/AnimatedHeaderIconBtn';
 import TabBarFadeOut from '../../components/TabBarFadeOut';
 import ProfileHero from '../../components/profile/ProfileHero';
+import FrameSelectSheet from '../../components/profile/FrameSelectSheet';
 import BadgeListModal from '../../components/profile/BadgeListModal';
 import BioEditorSheet from '../../components/profile/BioEditorSheet';
 import ProfileFriendsList from '../../components/profile/ProfileFriendsList';
@@ -269,6 +270,12 @@ export default function ProfileScreen() {
 
   // ★ Avatar preview modal + SP transaction modal
   const [showAvatarPreview, setShowAvatarPreview] = useState(false);
+  const [showFrameSheet, setShowFrameSheet] = useState(false);
+  const [activeFrame, setActiveFrame] = useState<string | null>(null);
+  // ★ v107: profil yüklenince active_frame'i state'e ata, FrameSelectSheet sonrası optimistic update
+  useEffect(() => {
+    setActiveFrame((profile as any)?.active_frame || null);
+  }, [(profile as any)?.active_frame]);
   // ★ 2026-04-21: Bio inline edit — bio'ya tap ile hafif modal
   const [showBioEditor, setShowBioEditor] = useState(false);
   const [showSPHistory, setShowSPHistory] = useState(false);
@@ -569,6 +576,8 @@ export default function ProfileScreen() {
             memberSince={profile?.created_at}
             boostExpiresAt={(profile as any)?.profile_boost_expires_at}
             userLevel={userLevel}
+            activeFrame={activeFrame}
+            onFramePress={() => setShowFrameSheet(true)}
           />
 
 
@@ -817,6 +826,17 @@ export default function ProfileScreen() {
               </View>
             </Pressable>
           </Modal>
+
+          {/* ★ v107: Çerçeve seçim sheet — envanterindeki atelier ürünlerini gösterir */}
+          {user?.uid && (
+            <FrameSelectSheet
+              visible={showFrameSheet}
+              onClose={() => setShowFrameSheet(false)}
+              userId={user.uid}
+              currentFrameId={activeFrame}
+              onFrameChange={(id) => setActiveFrame(id)}
+            />
+          )}
 
           {/* ★ SP Geçmişi — swipe-to-dismiss + realtime altın bottom sheet */}
           <SPHistorySheet
