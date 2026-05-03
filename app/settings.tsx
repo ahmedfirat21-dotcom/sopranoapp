@@ -110,6 +110,7 @@ const SETTING_GROUPS: { title: string; icon: string; color: string; items: Setti
     items: [
       { key: 'edit_profile', icon: 'account-edit', label: 'Profili Düzenle', type: 'action' },
       { key: 'blocked_users', icon: 'account-cancel', label: 'Engellenen Kullanıcılar', desc: 'Engellediğin kişileri yönet', type: 'action' },
+      { key: 'hidden_rooms', icon: 'eye-off', label: 'Gizlenen Odalar', desc: 'Gizlediğin odaları geri getir', type: 'action' },
     ],
   },
   {
@@ -333,6 +334,9 @@ export default function SettingsScreen() {
         break;
       case 'blocked_users':
         setShowBlockedSheet(true);
+        break;
+      case 'hidden_rooms':
+        router.push('/hidden-rooms' as any);
         break;
       case 'notification_prefs':
         setShowNotifPrefs(true);

@@ -311,18 +311,20 @@ export default function RoomControlBar({
           label="Sohbet"
         />
 
-        {/* Mic / Cam (speaker) — veya Volume / MicReq (listener)
+        {/* ★ v107.28: Oda sesi butonu HER ZAMAN görünür (kullanıcı talebi: speaker da diğerlerini
+             susturabilsin). Eskiden sadece listener iken görünüyordu, speaker yoksun bırakılmıştı. */}
+        <CtrlBtn
+          icon={isRoomMuted ? 'volume-mute' : 'volume-high'}
+          onPress={onMuteRoomPress || (() => {})}
+          active={!isRoomMuted}
+          accent="#14B8A6"
+          label={isRoomMuted ? 'Oda sesini aç' : 'Oda sesini kapat'}
+        />
+
+        {/* Mic / Cam (speaker) — veya MicReq (listener)
             ★ 2026-04-23: Speaker için sıra değişti: önce Kamera, sonra Mic (mic daha büyük = primary). */}
         {isListener ? (
           <>
-            <CtrlBtn
-              icon={isRoomMuted ? 'volume-mute' : 'volume-high'}
-              onPress={onMuteRoomPress || (() => {})}
-              active={!isRoomMuted}
-              accent="#14B8A6"
-              label={isRoomMuted ? 'Oda sesini aç' : 'Oda sesini kapat'}
-            />
-
             {isOwnerInListenerMode ? (
               <CtrlBtn icon="mic" onPress={onJoinStagePress || (() => {})} active accent="#D4AF37" label="Sahneye geri dön" iconSize={MIC_ICON} />
             ) : isModInListenerMode ? (

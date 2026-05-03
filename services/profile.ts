@@ -306,34 +306,35 @@ export const ProfileService = {
    * ★ SP Bağışı — Kullanıcıdan kullanıcıya SP transferi
    * GamificationService üzerinden geçer — atomik, cap kontrollü, transaction kayıtlı.
    * ★ K6: Her bağış denemesine unique externalRef verilir. Network retry'da çift harcamayı engeller.
+   * ★ v107 (2 May 2026): GIFT — opsiyonel kısa mesaj (max 60 char). Sanitize + bad-word
+   *   filter sonrası sp_transactions.description (her iki taraf history'de görür) ve
+   *   notifications.body'ye eklenir. Boş/whitespace ise hiç eklenmez. DB şeması değişmedi.
    */
-  async donateToUser(fromUserId: string, toUserId: string, amount: number): Promise<{ success: boolean; error?: string }> {
+  async donateToUser(
+    fromUserId: string,
+    toUserId: string,
+    amount: number,
+    message?: string,
+  ): Promise<{ success: boolean; error?: string }> {
     // Validasyon
     if (fromUserId === toUserId) return { success: false, error: 'Kendinize SP gönderemezsiniz' };
     if (!Number.isInteger(amount) || amount < 1) return { success: false, error: 'Geçersiz miktar' };
     if (amount > 1000) return { success: false, error: 'Tek seferde en fazla 1000 SP gönderilebilir' };
 
-    // ★ v92.15 (1 May 2026): WELCOME BONUS EXPLOIT FIX
-    //   Yeni hesap → 250 SP welcome → ana hesaba transfer → hesabı sil → tekrar
-    //   döngüsünü kırmak için "donatable_sp" sayacı kullanılır. welcome_bonus tipi
-    //   trigger'da donatable artırmıyor, dolayısıyla yeni hesap o 250 SP'yi gönderemez.
-    //   Daily login + sahne süresi + mağaza alımı + bağış alma = donatable artar.
-    try {
-      const { data: prof } = await supabase
-        .from('profiles')
-        .select('donatable_sp')
-        .eq('id', fromUserId)
-        .single();
-      const donatable = (prof as any)?.donatable_sp ?? 0;
-      if (donatable < amount) {
-        return {
-          success: false,
-          error: `Bağışlanabilir SP yetersiz (${donatable} SP). Hoşgeldin bonusu bağışlanamaz; günlük girişler, sahne süresi ve mağaza alımıyla biriken SP gönderilebilir.`,
-        };
-      }
-    } catch {
-      // Profile sorgusu başarısızsa fail-open — alttaki spend RPC zaten system_points kontrolü yapacak
-    }
+    // ★ v107: Hediye mesajı — sanitize, profanity filter, max 60 karakter.
+    //   Ek DB kolonu yok; mevcut description/body alanlarına eklenir.
+    const cleanMessage = (() => {
+      if (!message) return '';
+      const stripped = message.trim().replace(/<[^>]*>/g, '');
+      if (!stripped) return '';
+      const { filterBadWords } = require('../constants/badwords');
+      return filterBadWords(stripped).slice(0, 60);
+    })();
+
+    // ★ v107.11 (2 May 2026): donatable_sp ayrımı KALDIRILDI.
+    //   Welcome bonus exploit artık email-bazlı kapatılıyor (welcome_bonus_grants
+    //   tablosu, hesap silinse bile email log'da kalır). Tüm bakiye bağışlanabilir,
+    //   sadece system_points kontrolü yeterli (alttaki spend RPC bunu yapar).
 
     // ★ B4: Atomic rate limit — v34 RPC `FOR UPDATE` lock ile race condition'ı engeller.
     // Client-side count check eşzamanlı isteklerde bypass edilebiliyordu.
@@ -368,8 +369,10 @@ export const ProfileService = {
         if (p.id === toUserId) toName = p.display_name || '';
       });
     } catch {}
-    const spendDesc = toName ? `${toName} adlı kişiye gönderdin` : undefined;
-    const earnDesc = fromName ? `${fromName} adlı kişiden aldın` : undefined;
+    // ★ v107: Mesaj varsa description'a tırnak içinde eklenir — SP history'de görünür
+    const msgSuffix = cleanMessage ? `: "${cleanMessage}"` : '';
+    const spendDesc = toName ? `${toName} adlı kişiye gönderdin${msgSuffix}` : undefined;
+    const earnDesc = fromName ? `${fromName} adlı kişiden aldın${msgSuffix}` : undefined;
 
     const spResult = await GamificationService.spend(fromUserId, amount, 'donation_sent', `donation_send:${donationId}`, toUserId, spendDesc);
     if (!spResult.success) {
@@ -383,12 +386,16 @@ export const ProfileService = {
     try {
       await GamificationService.earn(toUserId, amount, 'donation_received', `donation_recv:${donationId}`, fromUserId, earnDesc);
       // ★ NEW: In-app notification row — receiver popup ve NotificationDrawer için
+      // ★ v107: Hediye mesajı varsa body'ye tırnak içinde eklenir (alıcı drawer'da görür)
       try {
+        const notifBody = cleanMessage
+          ? `${amount} SP gönderdi: "${cleanMessage}"`
+          : `${amount} SP gönderdi`;
         const { error: notifErr } = await supabase.from('notifications').insert({
           user_id: toUserId,
           sender_id: fromUserId,
           type: 'gift',
-          body: `${amount} SP gönderdi`,
+          body: notifBody,
           reference_id: null,
         });
         if (notifErr && __DEV__) {
@@ -406,10 +413,14 @@ export const ProfileService = {
         const { data: senderProfile } = await supabase
           .from('profiles').select('display_name').eq('id', fromUserId).single();
         const senderName = senderProfile?.display_name || 'Biri';
+        // ★ v107: Push body'sine de mesaj eklenir — telefon kilitli iken bile görünür
+        const pushBody = cleanMessage
+          ? `${senderName} sana ${amount} SP gönderdi: "${cleanMessage}"`
+          : `${senderName} sana ${amount} SP gönderdi`;
         PushService.sendToUser(
           toUserId,
           '💎 Bağış Aldın!',
-          `${senderName} sana ${amount} SP gönderdi`,
+          pushBody,
           { type: 'gift', route: '/(tabs)/profile?openSP=1' },
         );
       } catch { /* push başarısız olsa da bağış tamamlandı, sessiz geç */ }

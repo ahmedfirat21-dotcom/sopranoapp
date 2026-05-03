@@ -101,7 +101,14 @@ export function Toast() {
     opacity.setValue(0);
     progress.setValue(0);
 
-    const duration = next.duration || (next.message ? 3500 : 2500);
+    // ★ v107.10: Mesaj uzunluğuna göre okuma süresi uzatılır — uzun mesaj kesilmesin diye
+    //   numberOfLines artırıldı (1→3) ve duration mesaj karakter sayısına göre dinamik.
+    const msgLen = (next.message || '').length;
+    const baseDuration = next.duration ||
+      (next.message
+        ? (msgLen > 80 ? 6000 : msgLen > 40 ? 4500 : 3500)
+        : 2500);
+    const duration = baseDuration;
 
     // Giriş animasyonu
     Animated.parallel([
@@ -258,7 +265,7 @@ export function Toast() {
         <View style={styles.textWrap}>
           <Text style={[styles.title, isInRoom && styles.titleCompact]} numberOfLines={1}>{current.title}</Text>
           {current.message ? (
-            <Text style={[styles.message, isInRoom && styles.messageCompact]} numberOfLines={1}>{current.message}</Text>
+            <Text style={[styles.message, isInRoom && styles.messageCompact]} numberOfLines={3}>{current.message}</Text>
           ) : null}
         </View>
 

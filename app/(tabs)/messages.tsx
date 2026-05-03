@@ -1060,7 +1060,7 @@ export default function MessagesScreen() {
                     paddingHorizontal: 14, paddingVertical: 10,
                     backgroundColor: pressed ? 'rgba(20,184,166,0.08)' : 'transparent',
                   }]}>
-                  <Image source={getAvatarSource(sender.avatar_url)} style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: '#162236' }} />
+                  <StatusAvatar uri={sender.avatar_url} size={44} tier={(sender as any).subscription_tier} showTierBadge={false} />
                   <View style={{ flex: 1 }}>
                     <Text style={{ fontSize: 14, fontWeight: '700', color: '#F1F5F9' }} numberOfLines={1}>
                       {sender.display_name || 'Kullanıcı'}

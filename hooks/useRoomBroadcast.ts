@@ -121,16 +121,16 @@ export function useRoomBroadcast(params: UseRoomBroadcastParams) {
   }, [isChatMutedRef, firebaseUser?.uid]);
 
   // ── Bağış Bildirim Broadcast ──────────────────
+  // ★ v107.27: Gönderen kendi DonationAlert chip'ini GÖRMESİN — cinematic success
+  //   modal zaten gösteriyor; alttaki chip duplicate kirliliği oluşturuyordu.
+  //   Sadece broadcast yapılır → diğer dinleyiciler alıcı taraf chip'i görür.
   const sendDonationAlert = useCallback((senderName: string, amount: number, recipientName?: string) => {
-    // Kendi ekranında göster
-    donationAlertRef?.current?.show({ senderName, amount, recipientName });
-    // Tüm odaya broadcast
     modChannelRef.current?.send({
       type: 'broadcast',
       event: 'donation_alert',
       payload: { senderName, amount, recipientName },
     });
-  }, [donationAlertRef]);
+  }, []);
 
   // ── 1. Emoji Broadcast Kanalı ─────────────────
   // ★ SEC-EMOJI-RECV: Alıcı tarafta da rate limit — broadcast spoofing koruması.

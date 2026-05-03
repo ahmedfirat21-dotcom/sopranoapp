@@ -195,10 +195,35 @@ export default function OnboardingScreen() {
     //   AsyncStorage'a bağımlı değil → ilk home mount'unda kesin görünür.
     setJustCompletedOnboarding(true);
 
-    // ★ v89 (1 May 2026): Welcome bonus modal'ı tetikle — DB trigger 50 SP'yi
-    //   zaten yatırdı, modal görsel feedback verir. "Keşfetmeye Başla" home'a
-    //   yönlendirir (handleWelcomeBonusClose).
-    setShowWelcomeBonus(true);
+    // ★ v107.11 (2 May 2026): Welcome bonus artık email-bazlı RPC ile veriliyor.
+    //   Eski auto-trigger DROP edildi (welcome_bonus_grants tablosu PK email).
+    //   Aynı email'le hesap silinip yeniden açılırsa bonus VERİLMEZ (exploit kapalı).
+    //   RPC döner: { granted: true, amount: 50 } veya { granted: false, reason: 'already_granted'/'no_email' }
+    let bonusGranted = false;
+    if (firebaseUser?.uid && firebaseUser.email) {
+      try {
+        const { data, error } = await supabase.rpc('grant_welcome_bonus_email_check', {
+          p_user_id: firebaseUser.uid,
+          p_email: firebaseUser.email,
+        });
+        if (!error && (data as any)?.granted === true) {
+          bonusGranted = true;
+        } else if (__DEV__ && (data as any)?.reason) {
+          console.log('[WelcomeBonus]', (data as any).reason);
+        }
+      } catch (e) {
+        if (__DEV__) console.warn('[WelcomeBonus] RPC error:', e);
+      }
+    }
+
+    // Modal sadece bonus gerçekten verildiyse açılır — yeniden hesap açan kullanıcı görmez
+    if (bonusGranted) {
+      setShowWelcomeBonus(true);
+    } else {
+      // Bonus alamadı (zaten almış / email yok) — direkt home'a yönlendir
+      refreshProfile?.().catch(() => {});
+      setTimeout(() => router.replace('/(tabs)/home'), 100);
+    }
   };
 
   const handleWelcomeBonusClose = () => {

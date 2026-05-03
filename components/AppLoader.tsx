@@ -11,6 +11,7 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Animated, Easing, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 
 type Size = 'sm' | 'md' | 'lg' | 'small' | 'large';
 type LoaderState = 'default' | 'connecting' | 'reconnect' | 'error';
@@ -25,9 +26,11 @@ interface Props {
   style?: any;
 }
 
+// ★ v107.15: Boyutlar küçültüldü (kullanıcı talebi). Eski: sm 32 / md 56 / lg 80
+//   Yeni: sm 24 / md 40 / lg 60 — özellikle "Odaya bağlanılıyor" gibi tam-ekran loading'lerde ferah
 const SIZE_MAP: Record<Size, number> = {
-  sm: 32, md: 56, lg: 80,
-  small: 32, large: 56,
+  sm: 24, md: 40, lg: 60,
+  small: 24, large: 40,
 };
 const STATE_COLOR: Record<LoaderState, string> = {
   default:    '#14B8A6',
@@ -80,9 +83,12 @@ export default function AppLoader({
   const haloScale = halo.interpolate({ inputRange: [0, 1], outputRange: [0.92, 1.08] });
   const haloOpacity = halo.interpolate({ inputRange: [0, 1], outputRange: [0.35, 0.7] });
 
+  // ★ v107.15: Sert 3 katman backgroundColor yerine TEK yumuşak LinearGradient halo.
+  //   Eski: solid renkler 1A/26/33 → kenarlar belirgin, "halka" gibi görünüyordu.
+  //   Yeni: radial-tarzı gradient (merkez doygun → kenar transparan) + Android shadow kaldırıldı.
   const inner = (
     <View style={[{ width: dim * 1.5, height: dim * 1.5, alignItems: 'center', justifyContent: 'center' }, style]}>
-      {/* Halo katmanları — 3 daire opacity pulse + scale */}
+      {/* Yumuşak halo — LinearGradient ile merkezden kenara fade (Android'de de görünür) */}
       <Animated.View
         pointerEvents="none"
         style={{
@@ -90,50 +96,30 @@ export default function AppLoader({
           width: dim * 1.5,
           height: dim * 1.5,
           borderRadius: dim * 0.75,
-          backgroundColor: `${finalColor}1A`,
           opacity: haloOpacity,
           transform: [{ scale: haloScale }],
+          overflow: 'hidden',
         }}
-      />
-      <Animated.View
-        pointerEvents="none"
-        style={{
-          position: 'absolute',
-          width: dim * 1.2,
-          height: dim * 1.2,
-          borderRadius: dim * 0.6,
-          backgroundColor: `${finalColor}26`,
-          opacity: haloOpacity,
-          transform: [{ scale: haloScale }],
-        }}
-      />
-      <View
-        pointerEvents="none"
-        style={{
-          position: 'absolute',
-          width: dim * 0.95,
-          height: dim * 0.95,
-          borderRadius: dim * 0.475,
-          backgroundColor: `${finalColor}33`,
-        }}
-      />
-      {/* Sync ikonu — kendi etrafında döner, glow shadow ile */}
+      >
+        <LinearGradient
+          colors={[`${finalColor}40`, `${finalColor}20`, `${finalColor}08`, 'transparent']}
+          locations={[0, 0.4, 0.75, 1]}
+          start={{ x: 0.5, y: 0.5 }}
+          end={{ x: 1, y: 1 }}
+          style={{ width: '100%', height: '100%', borderRadius: dim * 0.75 }}
+        />
+      </Animated.View>
+      {/* Sync ikonu — kendi etrafında döner. Android shadow kaldırıldı (gri görünür, glow vermez) */}
       <Animated.View
         pointerEvents="none"
         style={{
           transform: [{ rotate: rotateDeg }],
-          ...Platform.select({
-            ios: {
-              shadowColor: finalColor,
-              shadowOffset: { width: 0, height: 0 },
-              shadowOpacity: 0.85,
-              shadowRadius: dim * 0.3,
-            },
-            android: {
-              shadowColor: finalColor,
-              elevation: Math.max(6, Math.floor(dim * 0.18)),
-            },
-          }),
+          ...(Platform.OS === 'ios' ? {
+            shadowColor: finalColor,
+            shadowOffset: { width: 0, height: 0 },
+            shadowOpacity: 0.6,
+            shadowRadius: dim * 0.25,
+          } : {}),
         }}
       >
         <Ionicons name="sync" size={dim * 0.85} color={finalColor} />

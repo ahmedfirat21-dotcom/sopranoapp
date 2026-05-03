@@ -1,25 +1,43 @@
-// SopranoChat — SP Alındı Modalı
-// Biri SP bağışladığında alıcıya gösterilir.
-// - Altın düşen diamond animasyonu
-// - Gönderenin adı + avatar
-// - Ücretsiz teşekkür butonları (emoji reaction — sadece notification, SP kosttaki)
+/**
+ * SopranoChat — SP Alındı Modalı (3 Tip × 3 Boyut)
+ * ═══════════════════════════════════════════════════════════════════
+ * v107.9 (2 May 2026) — HTML referans (sopranochat_sp_reward_animations_3types_3tiers).
+ *
+ * 3 TRANSFER TİPİ:
+ *   🎁 gift       — bireysel hediye (pembe-altın, kalp parçacıkları)
+ *   💝 donation   — sahne desteği bağışı (yeşil-altın, ring pulse + yıldız orbit)
+ *   🚪 room_entry — oda bilet ücreti (mor-altın, door-open + kullanıcı emoji)
+ *
+ * 3 BOYUT (amount bazlı):
+ *   mini   (1-99 SP)    : 1 partikül, 1.5sn — sade
+ *   normal (100-999 SP) : 4-5 orbit partikül, 2sn — zengin
+ *   big    (1000+ SP)   : yağmur + shake + halo katmanları, 2.5sn — sinematik
+ *
+ * Backend notu: Şu an notifications.type her zaman 'gift'. Bu modal'in
+ * transferType prop'u default 'gift'. Backend'de tip ayrımı (gift_stage,
+ * gift_room) ileride eklenince otomatik 3 tip kullanılabilir.
+ *
+ * Korunanlar:
+ *   - Thank-you replies (ücretsiz teşekkür sistemi) — kullanıcı için kritik
+ *   - giftNotificationId tracking
+ *   - Realtime gift handler (_layout) ile API geriye uyumlu
+ */
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, Animated, Easing, Modal, Dimensions } from 'react-native';
+import {
+  View, Text, StyleSheet, Pressable, Animated, Easing, Modal, Dimensions, Platform, Image,
+} from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import SPHexagonIcon from '../SPHexagonIcon';
 import { supabase } from '../../constants/supabase';
 import { getAvatarSource } from '../../constants/avatars';
-import { Image } from 'react-native';
 import { showToast } from '../Toast';
 import { useSwipeToDismiss } from '../../hooks/useSwipeToDismiss';
-// ★ 2026-04-29: SP miktarına göre tier paleti — SPSentSuccess/SPDonate ile tutarlı.
-import { getSPAmountTier, SP_TIER_VISUAL, SP_TIER_EMOJIS } from '../../constants/spAmountTier';
 
 const { width: W, height: H } = Dimensions.get('window');
 
-// Hızlı teşekkür seçenekleri — ücretsiz, sadece notification döner
+// ═══ Hızlı teşekkür seçenekleri (mevcut davranış korundu) ═══
 const THANK_YOU_REPLIES = [
   { emoji: '🙏', label: 'Teşekkürler' },
   { emoji: '❤️', label: 'Sağol' },
@@ -29,6 +47,91 @@ const THANK_YOU_REPLIES = [
   { emoji: '✨', label: 'İyisin' },
 ];
 
+// ═══ TRANSFER TİP PALETİ ═══
+type TransferType = 'gift' | 'donation' | 'room_entry';
+
+interface TypeVisual {
+  /** Header üst etiket */
+  label: string;
+  /** Ana tip rengi (pembe/yeşil/mor) */
+  primary: string;
+  /** İkincil altın rengi (vurgu) */
+  accent: string;
+  /** Halo rengi (rgba string) */
+  halo: string;
+  /** Kart zemin gradient */
+  bgGradient: [string, string, string];
+  /** Top edge highlight */
+  topEdge: string;
+  /** Tip-spesifik partikül emoji havuzu */
+  particles: string[];
+  /** Header üstündeki açıklama (sender adıyla) */
+  describe: (senderName: string) => string;
+  /** Header altındaki ikon */
+  icon: keyof typeof Ionicons.glyphMap;
+}
+
+const TYPE_VISUAL: Record<TransferType, TypeVisual> = {
+  gift: {
+    label: 'HEDİYE GELDİ',
+    primary: '#F8B4C0',          // pembe
+    accent: '#FAC775',           // altın
+    halo: 'rgba(248,180,192,0.7)',
+    bgGradient: ['#3a1825', '#1f0a14', '#0a0518'],
+    topEdge: 'rgba(248,180,192,0.85)',
+    particles: ['💗', '✨', '🎀', '💖', '⭐'],
+    describe: (s) => `${s} sana hediye gönderdi`,
+    icon: 'gift',
+  },
+  donation: {
+    label: 'BAĞIŞ ALDIN',
+    primary: '#5DCAA5',          // yeşil
+    accent: '#FAC775',           // altın
+    halo: 'rgba(93,202,165,0.7)',
+    bgGradient: ['#0e3025', '#051912', '#000a06'],
+    topEdge: 'rgba(93,202,165,0.85)',
+    particles: ['⭐', '✨', '🌟', '💫'],
+    describe: (s) => `${s} seni destekledi`,
+    icon: 'sparkles',
+  },
+  room_entry: {
+    label: 'ODANA KATILDI',
+    primary: '#B8A4F0',          // mor
+    accent: '#FAC775',           // altın
+    halo: 'rgba(184,164,240,0.7)',
+    bgGradient: ['#2a1d4a', '#15102a', '#080418'],
+    topEdge: 'rgba(184,164,240,0.85)',
+    particles: ['👤', '✨', '🎉', '⭐'],
+    describe: (s) => `${s} odana katıldı`,
+    icon: 'enter',
+  },
+};
+
+// ═══ BOYUT KONFİGÜRASYONU ═══
+type SizeTier = 'mini' | 'normal' | 'big';
+
+interface SizeConfig {
+  hexSize: number;
+  particleCount: number;
+  hasShake: boolean;
+  hasRain: boolean;     // büyük: üstten partikül yağmuru
+  hasOrbit: boolean;    // normal/büyük: yörünge partikül
+  ringCount: number;    // ring pulse sayısı (0-3)
+  duration: number;     // ms — toplam animasyon
+}
+
+const SIZE_CONFIG: Record<SizeTier, SizeConfig> = {
+  mini:   { hexSize: 130, particleCount: 1,  hasShake: false, hasRain: false, hasOrbit: false, ringCount: 1, duration: 1500 },
+  normal: { hexSize: 165, particleCount: 5,  hasShake: false, hasRain: false, hasOrbit: true,  ringCount: 2, duration: 2000 },
+  big:    { hexSize: 195, particleCount: 12, hasShake: true,  hasRain: true,  hasOrbit: true,  ringCount: 3, duration: 2500 },
+};
+
+function getReceiveSize(amount: number): SizeTier {
+  if (amount >= 1000) return 'big';
+  if (amount >= 100) return 'normal';
+  return 'mini';
+}
+
 interface Props {
   visible: boolean;
   amount: number;
@@ -36,47 +139,63 @@ interface Props {
   senderName: string;
   senderAvatar?: string;
   recipientId: string;
-  /** Bağış bildirim ID — teşekkür limitini takip etmek için */
+  /** ★ v107.9: Transfer tipi — 'gift' (default) | 'donation' | 'room_entry'.
+   *  Backend notifications.type genişletilince otomatik kullanılır. */
+  transferType?: TransferType;
   giftNotificationId?: string;
   onClose: () => void;
 }
 
 export default function SPReceivedModal({
-  visible, amount, senderId, senderName, senderAvatar, recipientId, giftNotificationId, onClose,
+  visible, amount, senderId, senderName, senderAvatar, recipientId,
+  transferType = 'gift', giftNotificationId, onClose,
 }: Props) {
+  const tv = TYPE_VISUAL[transferType];
+  const size = useMemo(() => getReceiveSize(amount), [amount]);
+  const cfg = SIZE_CONFIG[size];
+
   const [thanked, setThanked] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [alreadyThanked, setAlreadyThanked] = useState(false);
 
-  // ★ 2026-04-29: Miktara göre tier — palet/partikül/sayı bunlardan türer.
-  const tier = useMemo(() => getSPAmountTier(amount), [amount]);
-  const tv = SP_TIER_VISUAL[tier];
-  const tierEmojis = SP_TIER_EMOJIS[tier];
-
-  // Animasyonlar
+  // ── Animated values ──
   const backdropOpacity = useRef(new Animated.Value(0)).current;
   const cardScale = useRef(new Animated.Value(0.85)).current;
   const cardOpacity = useRef(new Animated.Value(0)).current;
-  // Diamond bounce
-  const diamondY = useRef(new Animated.Value(-80)).current;
-  const diamondRotate = useRef(new Animated.Value(0)).current;
-  const diamondScale = useRef(new Animated.Value(0)).current;
+  // Hexagon entrance — pop-in (0 → 1.2 → 1)
+  const gemPop = useRef(new Animated.Value(0)).current;
+  // room_entry için door-open (scaleX 1 → 0.1)
+  const doorAnim = useRef(new Animated.Value(0)).current;
+  // big için shake (3 kez sallanma)
+  const shakeAnim = useRef(new Animated.Value(0)).current;
+  // Halo pulse (sürekli loop)
+  const haloPulse = useRef(new Animated.Value(0)).current;
+  // Ring pulse'lar (1-3 ring, gecikmeli)
+  const ringAnims = useRef([
+    new Animated.Value(0),
+    new Animated.Value(0),
+    new Animated.Value(0),
+  ]).current;
   // Amount count-up
   const countAnim = useRef(new Animated.Value(0)).current;
   const [display, setDisplay] = useState(0);
-  // Glow pulse
-  const glowPulse = useRef(new Animated.Value(1)).current;
-  // Confetti — tier'a göre 8/12/16/22 partikül, max havuz 22
-  const MAX_CONFETTI = 22;
-  const confetti = useRef(
-    Array.from({ length: MAX_CONFETTI }, () => ({
-      x: new Animated.Value(0),
-      y: new Animated.Value(0),
-      rot: new Animated.Value(0),
-      opacity: new Animated.Value(0),
+
+  // Particles (orbit + rain)
+  const MAX_PARTICLES = 14;
+  const particles = useRef(
+    Array.from({ length: MAX_PARTICLES }, () => ({
+      anim: new Animated.Value(0),
+      angle: 0,
+      radius: 0,
+      emoji: '',
+      isRain: false,
+      x: 0,
     }))
   ).current;
-  const activeConfettiCount = tv.particleCount;
+
+  // Refs for cleanup
+  const haloLoopRef = useRef<Animated.CompositeAnimation | null>(null);
+  const ringLoopRefs = useRef<(Animated.CompositeAnimation | null)[]>([null, null, null]);
 
   useEffect(() => {
     if (!visible) return;
@@ -85,15 +204,19 @@ export default function SPReceivedModal({
     backdropOpacity.setValue(0);
     cardScale.setValue(0.85);
     cardOpacity.setValue(0);
-    diamondY.setValue(-80);
-    diamondRotate.setValue(0);
-    diamondScale.setValue(0);
+    gemPop.setValue(0);
+    doorAnim.setValue(0);
+    shakeAnim.setValue(0);
+    haloPulse.setValue(0);
+    ringAnims.forEach(a => a.setValue(0));
     countAnim.setValue(0);
     setDisplay(0);
     setThanked(null);
     setSending(false);
     setAlreadyThanked(false);
-    // ★ 2026-04-24: Daha önce teşekkür edilmiş mi kontrol et (1 hak/bağış)
+    particles.forEach(p => p.anim.setValue(0));
+
+    // Daha önce teşekkür edilmiş mi kontrol
     (async () => {
       try {
         const { count } = await supabase
@@ -112,69 +235,127 @@ export default function SPReceivedModal({
         if (__DEV__) console.warn('[SPReceivedModal] thank-you check failed:', e);
       }
     })();
-    confetti.forEach(c => {
-      c.x.setValue(0);
-      c.y.setValue(-20);
-      c.rot.setValue(0);
-      c.opacity.setValue(0);
-    });
-    // ★ tier'a göre fazlalıkları gizli tut (opacity 0 ve animate dışı)
+
+    // Partikül havuzunu hazırla
+    const isRain = cfg.hasRain;
+    for (let i = 0; i < cfg.particleCount; i++) {
+      const p = particles[i];
+      p.emoji = tv.particles[i % tv.particles.length];
+      if (isRain && i >= 5) {
+        // Yağmur: üstten düşer
+        p.isRain = true;
+        p.x = Math.random() * (W * 0.7);
+      } else {
+        // Orbit: yörüngede döner
+        p.isRain = false;
+        p.angle = (360 / Math.max(1, cfg.particleCount)) * i;
+        p.radius = 50 + Math.random() * 20;
+      }
+    }
 
     const listener = countAnim.addListener(({ value }) => setDisplay(Math.floor(value)));
 
-    Animated.sequence([
-      Animated.parallel([
-        Animated.timing(backdropOpacity, { toValue: 1, duration: 300, useNativeDriver: true }),
-        Animated.spring(cardScale, { toValue: 1, tension: 120, friction: 8, useNativeDriver: true }),
-        Animated.timing(cardOpacity, { toValue: 1, duration: 300, useNativeDriver: true }),
-      ]),
-      Animated.parallel([
-        // Diamond düşüyor + dönüyor
-        Animated.spring(diamondY, { toValue: 0, tension: 100, friction: 6, useNativeDriver: true }),
-        Animated.spring(diamondScale, { toValue: 1, tension: 120, friction: 5, useNativeDriver: true }),
-        Animated.timing(diamondRotate, { toValue: 1, duration: 700, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
-        // Count-up
-        Animated.timing(countAnim, { toValue: amount, duration: 1100, easing: Easing.out(Easing.cubic), useNativeDriver: false }),
-        // Confetti — tier'a göre aktif sayı kadar partikül uçar
-        Animated.stagger(60, confetti.slice(0, activeConfettiCount).map((c, i) => {
-          const dir = i % 2 === 0 ? 1 : -1;
-          const distX = (40 + Math.random() * 60) * dir;
-          const distY = 120 + Math.random() * 80;
-          return Animated.parallel([
-            Animated.timing(c.opacity, { toValue: 1, duration: 100, useNativeDriver: true }),
-            Animated.timing(c.x, { toValue: distX, duration: 1200, easing: Easing.out(Easing.quad), useNativeDriver: true }),
-            Animated.timing(c.y, { toValue: distY, duration: 1200, easing: Easing.in(Easing.quad), useNativeDriver: true }),
-            Animated.timing(c.rot, { toValue: (Math.random() * 4) - 2, duration: 1200, useNativeDriver: true }),
-            Animated.sequence([
-              Animated.delay(800),
-              Animated.timing(c.opacity, { toValue: 0, duration: 400, useNativeDriver: true }),
-            ]),
-          ]);
-        })),
-      ]),
+    // ★ ENTRANCE — Card + backdrop
+    Animated.parallel([
+      Animated.timing(backdropOpacity, { toValue: 1, duration: 280, useNativeDriver: true }),
+      Animated.spring(cardScale, { toValue: 1, tension: 110, friction: 9, useNativeDriver: true }),
+      Animated.timing(cardOpacity, { toValue: 1, duration: 280, useNativeDriver: true }),
     ]).start();
 
-    // Glow pulse loop
-    const glowLoop = Animated.loop(
+    // ★ DOOR — sadece room_entry için, gem'in önünde kapı açılır
+    if (transferType === 'room_entry') {
       Animated.sequence([
-        Animated.timing(glowPulse, { toValue: 1.15, duration: 1000, useNativeDriver: true }),
-        Animated.timing(glowPulse, { toValue: 1, duration: 1000, useNativeDriver: true }),
+        Animated.delay(200),
+        Animated.timing(doorAnim, {
+          toValue: 1, duration: 700,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+
+    // ★ GEM POP-IN — pop-in keyframe (0 → 1.2 → 1) cubic bounce
+    Animated.sequence([
+      Animated.delay(transferType === 'room_entry' ? 400 : 250),
+      Animated.timing(gemPop, {
+        toValue: 1, duration: 600,
+        easing: Easing.bezier(0.34, 1.56, 0.64, 1),
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      // Big için shake (3 kez sallanma)
+      if (cfg.hasShake) {
+        Animated.sequence([
+          Animated.timing(shakeAnim, { toValue: 1, duration: 80, useNativeDriver: true }),
+          Animated.timing(shakeAnim, { toValue: -1, duration: 80, useNativeDriver: true }),
+          Animated.timing(shakeAnim, { toValue: 1, duration: 80, useNativeDriver: true }),
+          Animated.timing(shakeAnim, { toValue: -1, duration: 80, useNativeDriver: true }),
+          Animated.timing(shakeAnim, { toValue: 1, duration: 80, useNativeDriver: true }),
+          Animated.timing(shakeAnim, { toValue: 0, duration: 80, useNativeDriver: true }),
+        ]).start();
+      }
+    });
+
+    // ★ HALO PULSE LOOP — sürekli yumuşak nabız
+    haloLoopRef.current = Animated.loop(
+      Animated.sequence([
+        Animated.timing(haloPulse, { toValue: 1, duration: 1300, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(haloPulse, { toValue: 0, duration: 1300, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
       ])
     );
-    glowLoop.start();
+    haloLoopRef.current.start();
+
+    // ★ RING PULSE LOOPS — gecikmeli, ringCount kadar
+    for (let i = 0; i < cfg.ringCount; i++) {
+      ringLoopRefs.current[i] = Animated.loop(
+        Animated.sequence([
+          Animated.delay(i * 400),
+          Animated.timing(ringAnims[i], {
+            toValue: 1, duration: 1400,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+          }),
+          Animated.timing(ringAnims[i], { toValue: 0, duration: 0, useNativeDriver: true }),
+        ])
+      );
+      ringLoopRefs.current[i]?.start();
+    }
+
+    // ★ COUNT-UP — amount sayacı 0 → final
+    Animated.sequence([
+      Animated.delay(500),
+      Animated.timing(countAnim, {
+        toValue: amount, duration: 900,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: false,
+      }),
+    ]).start();
+
+    // ★ PARTICLES — orbit (normal/big) + rain (sadece big)
+    for (let i = 0; i < cfg.particleCount; i++) {
+      const p = particles[i];
+      Animated.sequence([
+        Animated.delay(400 + i * 80),
+        Animated.timing(p.anim, {
+          toValue: 1,
+          duration: p.isRain ? 2200 : 1600,
+          easing: p.isRain ? Easing.in(Easing.quad) : Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
 
     return () => {
       countAnim.removeListener(listener);
-      glowLoop.stop();
+      haloLoopRef.current?.stop();
+      ringLoopRefs.current.forEach(r => r?.stop());
     };
-  }, [visible, amount]);
+  }, [visible, amount, transferType]);
 
   const handleThankYou = async (reply: { emoji: string; label: string }) => {
     if (sending || thanked) return;
     setSending(true);
     try {
-      // ★ 2026-04-21: Ücretsiz notification insert + realtime broadcast.
-      //   Göndericiye gerçek zamanlı görünür hale getirmek için insert + log.
       const { error } = await supabase.from('notifications').insert({
         user_id: senderId,
         sender_id: recipientId,
@@ -183,21 +364,20 @@ export default function SPReceivedModal({
         reference_id: giftNotificationId || null,
       });
       if (error) {
-        if (__DEV__) console.warn('[ThankYou] Notification insert error:', error.message, error.code);
-        showToast({ title: 'İletilemedi', message: error.message || 'Teşekkür gönderilemedi, tekrar dene.', type: 'error' });
+        if (__DEV__) console.warn('[ThankYou] insert error:', error.message);
+        showToast({ title: 'İletilemedi', message: error.message || 'Teşekkür gönderilemedi.', type: 'error' });
         setSending(false);
         return;
       }
       setThanked(reply.emoji);
     } catch (e: any) {
-      if (__DEV__) console.warn('[ThankYou] Catch:', e);
+      if (__DEV__) console.warn('[ThankYou] catch:', e);
       showToast({ title: 'Teşekkür Gönderilemedi', message: e?.message || 'Yanıtın iletilemedi.', type: 'error' });
       setSending(false);
       return;
     }
     setSending(false);
-    // 1.2s sonra kapanır
-    setTimeout(onClose, 1200);
+    setTimeout(onClose, 1100);
   };
 
   const { translateValue: swipeTranslate, panHandlers } = useSwipeToDismiss({
@@ -208,7 +388,24 @@ export default function SPReceivedModal({
 
   if (!visible) return null;
 
-  const rotate = diamondRotate.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
+  // Pop-in interpolations
+  const gemScale = gemPop.interpolate({
+    inputRange: [0, 0.5, 1],
+    outputRange: [0, 1.2, 1],
+  });
+  const gemOpacity = gemPop.interpolate({
+    inputRange: [0, 0.3, 1],
+    outputRange: [0, 1, 1],
+  });
+  const shakeX = shakeAnim.interpolate({ inputRange: [-1, 1], outputRange: [-4, 4] });
+
+  // Halo pulse (scale 1 → 1.15)
+  const haloScale = haloPulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.12] });
+  const haloOpacity = haloPulse.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0.3, 0.6, 0.3] });
+
+  // Door open (scaleX 1 → 0.1)
+  const doorScaleX = doorAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 0.05] });
+  const doorOpacity = doorAnim.interpolate({ inputRange: [0, 0.7, 1], outputRange: [1, 0.5, 0] });
 
   return (
     <Modal visible transparent statusBarTranslucent animationType="none" onRequestClose={onClose}>
@@ -217,76 +414,266 @@ export default function SPReceivedModal({
       </Animated.View>
 
       <View style={s.center} pointerEvents="box-none">
-        {/* ★ 2026-04-29 v2: Confetti kaldırıldı — DiscoverWelcome temizliği, tek hexagon hakim. */}
-
         {/* Card */}
         <Animated.View
           style={[
             s.card,
-            { borderColor: tv.glow + '66', shadowColor: tv.glow },
-            { opacity: cardOpacity, transform: [{ scale: cardScale }, { translateY: swipeTranslate }] },
+            Platform.OS === 'ios'
+              ? { shadowColor: tv.primary, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.5, shadowRadius: 24 }
+              : {},
+            {
+              borderColor: tv.primary + (Platform.OS === 'android' ? 'AA' : '66'),
+              opacity: cardOpacity,
+              transform: [
+                { scale: cardScale },
+                { translateY: swipeTranslate },
+              ],
+            },
           ]}
           pointerEvents="auto"
           {...panHandlers}
         >
-          {/* ★ Swipe handle — görsel tutamak (pan tüm kartta aktif) */}
+          {/* Swipe handle */}
           <View style={s.handleWrap}>
-            <View style={[s.handle, { backgroundColor: tv.glow + '80' }]} />
+            <View style={[s.handle, { backgroundColor: tv.primary + 'AA' }]} />
           </View>
-          {/* ★ Tier'a göre zemin katmanları (basic teal / premium altın / elite rose / legendary mor) */}
+
+          {/* Card zemin gradient */}
           <LinearGradient
             colors={tv.bgGradient}
             start={{ x: 0, y: 0 }} end={{ x: 0.7, y: 1 }}
             style={StyleSheet.absoluteFillObject}
           />
+          {/* Tip-rengi tint katmanı */}
           <LinearGradient
-            colors={[tv.glow + '4D', tv.glow + '14', 'transparent']}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+            colors={[tv.primary + '30', tv.primary + '0A', 'transparent']}
+            start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
             style={StyleSheet.absoluteFillObject}
           />
+          {/* Top edge highlight */}
           <LinearGradient
             colors={['transparent', tv.topEdge, 'transparent']}
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
             style={s.topEdge}
           />
 
-          {/* Header — Tier label varsa onu, yoksa "SP ALDIN!" */}
-          <Text style={[s.headerText, { color: tv.labelColor }]}>
-            {tv.label ? `${tv.label} · SP ALDIN!` : '🎁 SP ALDIN!'}
-          </Text>
+          {/* Header */}
+          <View style={s.headerRow}>
+            <Ionicons name={tv.icon} size={14} color={tv.primary} style={s.iconShadow} />
+            <Text style={[s.headerText, { color: tv.primary }]}>{tv.label}</Text>
+          </View>
 
-          {/* Diamond + glow */}
-          <View style={s.diamondSection}>
+          {/* ═══ HEXAGON SAHNESİ — Halo + Rings + Gem + Particles + Door ═══ */}
+          <View style={s.gemSection}>
+            {/* Halo (yumuşak nabız) */}
             <Animated.View
               style={[
-                s.glowRing,
-                { borderColor: tv.glow + '4D', shadowColor: tv.glow },
-                { transform: [{ scale: glowPulse }] },
+                s.halo,
+                {
+                  width: cfg.hexSize + 60,
+                  height: cfg.hexSize + 60,
+                  borderRadius: (cfg.hexSize + 60) / 2,
+                  opacity: haloOpacity,
+                  transform: [{ scale: haloScale }],
+                },
               ]}
               pointerEvents="none"
-            />
-            <Animated.View
-              style={[
-                s.diamondWrap,
-                { shadowColor: tv.glow },
-                { transform: [{ translateY: diamondY }, { scale: diamondScale }, { rotate }] },
-              ]}
             >
-              {/* ★ 2026-04-29 v2: DiscoverWelcome kalitesinde — hexagon 200 px, hakim element. */}
-              <SPHexagonIcon size={200} />
+              <LinearGradient
+                colors={[tv.primary + 'AA', tv.primary + '33', 'transparent']}
+                start={{ x: 0.5, y: 0.5 }} end={{ x: 1, y: 1 }}
+                style={[s.haloGrad, { borderRadius: (cfg.hexSize + 60) / 2 }]}
+              />
             </Animated.View>
+
+            {/* Ring pulse'lar (ringCount kadar, gecikmeli) */}
+            {Array.from({ length: cfg.ringCount }).map((_, i) => {
+              const ringScale = ringAnims[i].interpolate({
+                inputRange: [0, 1],
+                outputRange: [0.6, 2.2],
+              });
+              const ringOpacity = ringAnims[i].interpolate({
+                inputRange: [0, 0.3, 1],
+                outputRange: [0.9, 0.5, 0],
+              });
+              const ringColor = i === 0 ? tv.primary : (i === 1 ? tv.accent : tv.primary);
+              return (
+                <Animated.View
+                  key={i}
+                  style={[
+                    s.ring,
+                    {
+                      width: cfg.hexSize,
+                      height: cfg.hexSize,
+                      borderRadius: cfg.hexSize / 2,
+                      borderColor: ringColor,
+                      opacity: ringOpacity,
+                      transform: [{ scale: ringScale }],
+                    },
+                  ]}
+                  pointerEvents="none"
+                />
+              );
+            })}
+
+            {/* Hexagon — pop-in + (big için shake) */}
+            <Animated.View
+              style={{
+                opacity: gemOpacity,
+                transform: [
+                  { scale: gemScale },
+                  { translateX: shakeX },
+                ],
+              }}
+            >
+              <SPHexagonIcon size={cfg.hexSize} rich />
+            </Animated.View>
+
+            {/* Door (sadece room_entry) — kapı açılır animasyonu, gem'i kapatan iki dikdörtgen */}
+            {transferType === 'room_entry' && (
+              <Animated.View
+                style={[
+                  s.doorWrap,
+                  {
+                    width: cfg.hexSize,
+                    height: cfg.hexSize,
+                    opacity: doorOpacity,
+                  },
+                ]}
+                pointerEvents="none"
+              >
+                <Animated.View
+                  style={[
+                    s.doorPanel,
+                    {
+                      borderColor: tv.primary + 'AA',
+                      transform: [{ scaleX: doorScaleX }, { translateX: doorAnim.interpolate({ inputRange: [0, 1], outputRange: [0, -cfg.hexSize / 2] }) }],
+                    },
+                  ]}
+                />
+                <Animated.View
+                  style={[
+                    s.doorPanel,
+                    {
+                      borderColor: tv.primary + 'AA',
+                      transform: [{ scaleX: doorScaleX }, { translateX: doorAnim.interpolate({ inputRange: [0, 1], outputRange: [0, cfg.hexSize / 2] }) }],
+                    },
+                  ]}
+                />
+              </Animated.View>
+            )}
+
+            {/* Particles — orbit (normal/big) + rain (big) */}
+            {particles.slice(0, cfg.particleCount).map((p, i) => {
+              if (p.isRain) {
+                // Rain: üstten aşağı düşer
+                const ty = p.anim.interpolate({ inputRange: [0, 1], outputRange: [-30, 140] });
+                const rotate = p.anim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '540deg'] });
+                const opacity = p.anim.interpolate({ inputRange: [0, 0.15, 0.85, 1], outputRange: [0, 1, 1, 0] });
+                return (
+                  <Animated.Text
+                    key={`rain-${i}`}
+                    style={[
+                      s.rainParticle,
+                      {
+                        left: p.x,
+                        opacity,
+                        color: tv.primary,
+                        transform: [{ translateY: ty }, { rotate }],
+                      },
+                    ]}
+                    allowFontScaling={false}
+                  >
+                    {p.emoji}
+                  </Animated.Text>
+                );
+              }
+              // Orbit: yörüngede döner
+              const rotate = p.anim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [`${p.angle}deg`, `${p.angle + 360}deg`],
+              });
+              const scale = p.anim.interpolate({
+                inputRange: [0, 0.2, 0.8, 1],
+                outputRange: [0, 1, 1, 0],
+              });
+              const opacity = p.anim.interpolate({
+                inputRange: [0, 0.2, 0.8, 1],
+                outputRange: [0, 1, 1, 0],
+              });
+              return (
+                <Animated.View
+                  key={`orbit-${i}`}
+                  style={[
+                    s.orbitWrap,
+                    {
+                      transform: [{ rotate }],
+                      opacity,
+                    },
+                  ]}
+                  pointerEvents="none"
+                >
+                  <Animated.Text
+                    style={[
+                      s.orbitParticle,
+                      {
+                        color: tv.primary,
+                        transform: [{ translateX: p.radius }, { scale }],
+                      },
+                    ]}
+                    allowFontScaling={false}
+                  >
+                    {p.emoji}
+                  </Animated.Text>
+                </Animated.View>
+              );
+            })}
+
+            {/* Mini için tek kalp/yıldız float-up (cfg.hasOrbit=false ve cfg.particleCount=1) */}
+            {size === 'mini' && cfg.particleCount === 1 && (() => {
+              const p = particles[0];
+              const ty = p.anim.interpolate({ inputRange: [0, 1], outputRange: [0, -50] });
+              const opacity = p.anim.interpolate({ inputRange: [0, 0.3, 0.7, 1], outputRange: [0, 1, 1, 0] });
+              return (
+                <Animated.Text
+                  style={[
+                    s.miniParticle,
+                    {
+                      color: tv.primary,
+                      opacity,
+                      transform: [{ translateY: ty }],
+                    },
+                  ]}
+                  allowFontScaling={false}
+                >
+                  {tv.particles[0]}
+                </Animated.Text>
+              );
+            })()}
           </View>
 
-          {/* Amount — tier rengi */}
+          {/* Amount + SP */}
           <View style={s.amountRow}>
-            <Text style={[s.amountValue, { color: tv.glow }]}>{display.toLocaleString('tr-TR')}</Text>
-            <Text style={[s.amountLabel, { color: tv.glow + 'CC' }]}>SP</Text>
+            <Text style={[s.amountValue, { color: tv.primary, textShadowColor: tv.primary + '88' }]}>
+              {display.toLocaleString('tr-TR')}
+            </Text>
+            <Text style={[s.amountUnit, { color: tv.primary + 'CC' }]}>SP</Text>
           </View>
+
+          {/* Tip-spesifik açıklama */}
+          <Text style={[s.description, { color: 'rgba(255,255,255,0.75)' }]} numberOfLines={2}>
+            <Text style={[s.descriptionStrong, { color: tv.primary }]}>{senderName}</Text>
+            <Text>{tv.describe('').replace(senderName, '').trim() ? ` ${tv.describe('').replace(senderName, '').trim()}` : ''}</Text>
+            <Text>{tv.describe(senderName).replace(senderName, '').replace(/^\s+/, ' ')}</Text>
+          </Text>
 
           {/* Sender info */}
-          <View style={s.senderRow}>
+          <View style={[s.senderRow, { borderColor: tv.primary + '22' }]}>
             {senderAvatar && (
-              <Image source={getAvatarSource(senderAvatar)} style={s.senderAvatar} />
+              <Image
+                source={getAvatarSource(senderAvatar)}
+                style={[s.senderAvatar, { borderColor: tv.primary + 'AA' }]}
+              />
             )}
             <View style={{ flex: 1 }}>
               <Text style={s.senderLabel}>Gönderen</Text>
@@ -294,11 +681,13 @@ export default function SPReceivedModal({
             </View>
           </View>
 
-          {/* Thank-you replies */}
+          {/* Thank-you replies (mevcut özellik korundu) */}
           {thanked ? (
-            <View style={s.thankedBox}>
+            <View style={[s.thankedBox, { borderColor: tv.primary + '40' }]}>
               <Text style={s.thankedEmoji}>{thanked}</Text>
-              <Text style={s.thankedText}>Teşekkürün iletildi</Text>
+              <Text style={s.thankedText}>
+                {alreadyThanked ? 'Daha önce teşekkür ettin' : 'Teşekkürün iletildi'}
+              </Text>
             </View>
           ) : (
             <>
@@ -307,7 +696,11 @@ export default function SPReceivedModal({
                 {THANK_YOU_REPLIES.map(r => (
                   <Pressable
                     key={r.emoji}
-                    style={({ pressed }) => [s.replyBtn, pressed && s.replyBtnPressed]}
+                    style={({ pressed }) => [
+                      s.replyBtn,
+                      { borderColor: tv.primary + '33' },
+                      pressed && { backgroundColor: tv.primary + '20' },
+                    ]}
                     onPress={() => handleThankYou(r)}
                     disabled={sending}
                   >
@@ -319,9 +712,9 @@ export default function SPReceivedModal({
             </>
           )}
 
-          {/* Close */}
+          {/* Close X */}
           <Pressable style={s.closeBtn} onPress={onClose} hitSlop={8}>
-            <Ionicons name="close" size={16} color={tv.glow + 'CC'} style={s.closeIcon} />
+            <Ionicons name="close" size={16} color={tv.primary + 'CC'} />
           </Pressable>
         </Animated.View>
       </View>
@@ -330,149 +723,168 @@ export default function SPReceivedModal({
 }
 
 const s = StyleSheet.create({
-  center: {
-    flex: 1, alignItems: 'center', justifyContent: 'center',
-  },
-  confetti: {
-    position: 'absolute',
-    zIndex: 100,
-  },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   card: {
     width: W * 0.88, maxWidth: 380,
     borderRadius: 24,
-    borderWidth: 1.5, borderColor: 'rgba(251,191,36,0.4)',
+    borderWidth: Platform.OS === 'android' ? 2 : 1.5,
     overflow: 'hidden',
     paddingVertical: 22, paddingHorizontal: 20,
-    shadowColor: '#FBBF24',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.6, shadowRadius: 24,
-    elevation: 24,
   },
   topEdge: { position: 'absolute', top: 0, left: 0, right: 0, height: 1.5 },
-  handleWrap: {
-    alignItems: 'center',
-    paddingTop: 2,
-    paddingBottom: 8,
-  },
-  handle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: 'rgba(251,191,36,0.5)',
+  handleWrap: { alignItems: 'center', paddingTop: 2, paddingBottom: 8 },
+  handle: { width: 40, height: 4, borderRadius: 2 },
+  iconShadow: { textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
+
+  headerRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    paddingVertical: 4,
   },
   headerText: {
-    fontSize: 13, fontWeight: '900', color: '#FBBF24',
+    fontSize: 12, fontWeight: '900',
     letterSpacing: 2, textAlign: 'center',
-    textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4,
+    textShadowColor: 'rgba(0,0,0,0.55)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
-  diamondSection: {
+
+  // Hexagon sahnesi
+  gemSection: {
     alignItems: 'center', justifyContent: 'center',
-    height: 220, marginVertical: 14, // ★ hexagon 200 px, container 220
+    height: 240, marginVertical: 10,
+    overflow: 'hidden',
   },
-  glowRing: {
+  halo: {
     position: 'absolute',
-    width: 230, height: 230, borderRadius: 115, // ★ hexagon etrafı yumuşak halo
-    borderWidth: 2, borderColor: 'rgba(251,191,36,0.3)',
-    // ★ v92.23 (1 May 2026): Android elevation eklendi
-    shadowColor: '#FBBF24',
-    shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.8, shadowRadius: 28,
-    elevation: 16,
+    overflow: 'hidden',
   },
-  diamondWrap: {
-    shadowColor: '#FBBF24',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.9, shadowRadius: 16,
-    elevation: 20,
+  haloGrad: {
+    width: '100%', height: '100%',
   },
-  diamondGrad: {
-    width: 92, height: 92, borderRadius: 46,
+  ring: {
+    position: 'absolute',
+    borderWidth: 2,
+  },
+  // Door (sadece room_entry)
+  doorWrap: {
+    position: 'absolute',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  doorPanel: {
+    width: '50%', height: '100%',
+    borderWidth: 1.5,
+    backgroundColor: 'rgba(15,8,30,0.5)',
+  },
+
+  // Orbit/rain particles
+  orbitWrap: {
+    position: 'absolute',
+    width: 0, height: 0,
     alignItems: 'center', justifyContent: 'center',
-    borderWidth: 2, borderColor: 'rgba(255,255,255,0.25)',
   },
-  diamondIcon: {
-    textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 5,
+  orbitParticle: {
+    position: 'absolute',
+    fontSize: 14,
+    width: 30, height: 30,
+    textAlign: 'center',
+    lineHeight: 30,
+    marginLeft: -15, marginTop: -15,
   },
+  rainParticle: {
+    position: 'absolute',
+    top: 0,
+    fontSize: 14,
+    width: 24,
+    textAlign: 'center',
+  },
+  miniParticle: {
+    position: 'absolute',
+    top: '15%',
+    fontSize: 18,
+  },
+
+  // Amount
   amountRow: {
     flexDirection: 'row', alignItems: 'baseline', justifyContent: 'center', gap: 5,
-    marginTop: 4,
+    marginTop: 6,
   },
   amountValue: {
-    fontSize: 44, fontWeight: '900', color: '#FFD700',
-    letterSpacing: -1.5,
-    textShadowColor: 'rgba(0,0,0,0.7)',
-    textShadowOffset: { width: 0, height: 3 }, textShadowRadius: 8,
+    fontSize: 44, fontWeight: '900',
+    letterSpacing: -1.2,
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 16,
   },
-  amountLabel: {
-    fontSize: 18, fontWeight: '800', color: 'rgba(251,191,36,0.75)',
-    marginBottom: 6,
-    textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
+  amountUnit: {
+    fontSize: 16, fontWeight: '900', letterSpacing: 0.8,
   },
+
+  // Description (tip-spesifik mesaj)
+  description: {
+    fontSize: 13, fontWeight: '500',
+    textAlign: 'center',
+    marginTop: 10, marginHorizontal: 8,
+    lineHeight: 18,
+  },
+  descriptionStrong: { fontWeight: '800' },
+
+  // Sender row
   senderRow: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
-    marginTop: 14, marginBottom: 16,
-    paddingHorizontal: 12, paddingVertical: 10,
-    backgroundColor: 'rgba(251,191,36,0.06)',
-    borderRadius: 12,
-    borderWidth: 1, borderColor: 'rgba(251,191,36,0.2)',
+    marginTop: 14, paddingTop: 12,
+    borderTopWidth: 1,
   },
   senderAvatar: {
     width: 36, height: 36, borderRadius: 18,
-    borderWidth: 1, borderColor: 'rgba(251,191,36,0.4)',
-  },
+    borderWidth: 2,
+  } as any,
   senderLabel: {
-    fontSize: 9, fontWeight: '700', color: 'rgba(251,191,36,0.55)',
-    letterSpacing: 1, textTransform: 'uppercase',
+    fontSize: 9, color: 'rgba(255,255,255,0.45)',
+    fontWeight: '700', letterSpacing: 1,
   },
   senderName: {
-    fontSize: 14, fontWeight: '800', color: '#F1F5F9',
-    marginTop: 1,
-    textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
+    fontSize: 14, color: '#F1F5F9',
+    fontWeight: '800',
   },
+
+  // Thank-you (mevcut)
+  thankedBox: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderWidth: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    marginTop: 14,
+  },
+  thankedEmoji: { fontSize: 20 },
+  thankedText: { fontSize: 12, color: 'rgba(255,255,255,0.75)', fontWeight: '600' },
   repliesLabel: {
-    fontSize: 10, fontWeight: '700', color: 'rgba(251,191,36,0.65)',
-    letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8,
+    fontSize: 10, color: 'rgba(255,255,255,0.45)',
+    fontWeight: '700', letterSpacing: 1,
     textAlign: 'center',
+    marginTop: 14, marginBottom: 8,
   },
   repliesGrid: {
-    flexDirection: 'row', flexWrap: 'wrap', gap: 6,
-    justifyContent: 'center',
+    flexDirection: 'row', flexWrap: 'wrap',
+    gap: 6, justifyContent: 'center',
   },
   replyBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 5,
-    paddingHorizontal: 10, paddingVertical: 7,
-    borderRadius: 10,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderWidth: 1, borderColor: 'rgba(251,191,36,0.22)',
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 10, paddingVertical: 6,
+    borderRadius: 100,
+    borderWidth: 1,
+    backgroundColor: 'rgba(255,255,255,0.04)',
   },
-  replyBtnPressed: {
-    backgroundColor: 'rgba(251,191,36,0.18)',
-    borderColor: 'rgba(251,191,36,0.5)',
-    transform: [{ scale: 0.95 }],
-  },
-  replyEmoji: { fontSize: 14 },
-  replyLabel: {
-    fontSize: 11, fontWeight: '700', color: 'rgba(255,255,255,0.75)', letterSpacing: 0.2,
-  },
-  thankedBox: {
-    alignItems: 'center', justifyContent: 'center',
-    paddingVertical: 16, gap: 4,
-    backgroundColor: 'rgba(34,197,94,0.1)',
-    borderRadius: 12,
-    borderWidth: 1, borderColor: 'rgba(34,197,94,0.3)',
-  },
-  thankedEmoji: { fontSize: 32 },
-  thankedText: {
-    fontSize: 12, fontWeight: '700', color: '#22C55E',
-    textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
-  },
+  replyEmoji: { fontSize: 13 },
+  replyLabel: { fontSize: 10, color: 'rgba(255,255,255,0.78)', fontWeight: '600' },
+
+  // Close X
   closeBtn: {
-    position: 'absolute', top: 10, right: 10,
-    width: 30, height: 30, borderRadius: 10,
-    backgroundColor: 'rgba(251,191,36,0.12)',
-    borderWidth: 1, borderColor: 'rgba(251,191,36,0.25)',
+    position: 'absolute',
+    top: 12, right: 12,
+    width: 28, height: 28, borderRadius: 14,
     alignItems: 'center', justifyContent: 'center',
-  },
-  closeIcon: {
-    textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.06)',
   },
 });

@@ -1,89 +1,87 @@
 /**
- * SopranoChat — Badge Celebration Overlay (Faz 6.3)
- * ═══════════════════════════════════════════════════
- * Rozet kazanıldığında tam ekran animasyonlu kutlama.
- * Modal/toast DEĞİL — üstte yüzen overlay, otomatik kaybolur.
+ * SopranoChat — Badge Celebration Overlay
+ * ═══════════════════════════════════════════════════════════════════
+ * v107.5 (2 May 2026) — KART FORMUNA YENİDEN YAZILDI.
  *
- * İllüstrasyon kalitesinde görsel:
- *   - Çok katmanlı radyal glow (iç/dış/halo)
- *   - Dönen ışık çizgileri (shine rays)
- *   - Yüzen parçacıklar (sparkles)
- *   - 3D derinlik hissi (çoklu shadow katmanı)
- *   - Rarity'ye göre farklı renk paleti + yoğunluk
- *   - Scale+rotate+fade giriş/çıkış animasyonları
+ * Eski versiyon (v92.23): 4.5 saniye süre + 28 parçacık + 16 ray +
+ * shadowColor/elevation karışık (Android'de gri kare görünüyordu, glow
+ * halo render olmuyordu) = "berbat" hissi. Bağış sonrası başarı modalı
+ * (2.7s) + bu pop-up (4.5s) = 7.2s toplam ekran zamanı.
+ *
+ * Yeni versiyon (v107.5):
+ *   - Kart formu (CARD_WIDTH 320, ortada) — full-screen tier renkli BG YOK
+ *   - 2400ms toplam (entrance 700 + hold 1450 + exit 250) — %46 hızlı
+ *   - Android shadow: shadowColor/elevation TAMAMEN KALDIRILDI; glow için
+ *     LinearGradient katman + border highlight kullanıldı (cross-platform)
+ *   - Parçacık/ray sayıları yarıya indirildi (sade sahne)
+ *   - Backdrop: BlurView + dim (sade)
  */
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, Animated, Easing, Dimensions,
+  View, Text, StyleSheet, Animated, Easing, Dimensions, Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import type { BadgeDef, BadgeRarity } from '../../constants/badges';
 
 const { width: W, height: H } = Dimensions.get('window');
+const CARD_WIDTH = Math.min(W - 32, 340);
 
-// ═══ Rarity görsel ayarları ═══
+// ═══ Rarity görsel ayarları — sadeleştirildi ═══
 const RARITY_VISUALS: Record<BadgeRarity, {
   label: string;
   labelColor: string;
-  bgGrad: [string, string, string];
-  ringColors: [string, string];
   particleCount: number;
   rayCount: number;
-  glowIntensity: number;
+  glowOpacity: number; // tier glow yoğunluğu (LinearGradient opacity)
 }> = {
   common: {
     label: 'YAYGIN',
     labelColor: '#94A3B8',
-    bgGrad: ['rgba(15,23,42,0.97)', 'rgba(30,41,59,0.95)', 'rgba(15,23,42,0.97)'],
-    ringColors: ['rgba(148,163,184,0.3)', 'rgba(148,163,184,0.08)'],
-    particleCount: 8,
-    rayCount: 6,
-    glowIntensity: 0.4,
+    particleCount: 4,    // 8 → 4
+    rayCount: 4,         // 6 → 4
+    glowOpacity: 0.30,
   },
   rare: {
     label: 'NADİR',
     labelColor: '#60A5FA',
-    bgGrad: ['rgba(15,23,42,0.97)', 'rgba(23,37,84,0.95)', 'rgba(15,23,42,0.97)'],
-    ringColors: ['rgba(96,165,250,0.4)', 'rgba(96,165,250,0.1)'],
-    particleCount: 14,
-    rayCount: 8,
-    glowIntensity: 0.55,
+    particleCount: 8,    // 14 → 8
+    rayCount: 6,         // 8 → 6
+    glowOpacity: 0.40,
   },
   epic: {
     label: 'EPİK',
     labelColor: '#C084FC',
-    bgGrad: ['rgba(15,23,42,0.97)', 'rgba(49,29,97,0.95)', 'rgba(15,23,42,0.97)'],
-    ringColors: ['rgba(192,132,252,0.45)', 'rgba(192,132,252,0.12)'],
-    particleCount: 20,
-    rayCount: 12,
-    glowIntensity: 0.7,
+    particleCount: 12,   // 20 → 12
+    rayCount: 8,         // 12 → 8
+    glowOpacity: 0.50,
   },
   legendary: {
     label: 'EFSANEVİ',
     labelColor: '#FBBF24',
-    bgGrad: ['rgba(15,23,42,0.97)', 'rgba(78,53,12,0.92)', 'rgba(15,23,42,0.97)'],
-    ringColors: ['rgba(251,191,36,0.5)', 'rgba(251,191,36,0.15)'],
-    particleCount: 28,
-    rayCount: 16,
-    glowIntensity: 0.9,
+    particleCount: 16,   // 28 → 16
+    rayCount: 10,        // 16 → 10
+    glowOpacity: 0.60,
   },
 };
 
-// ═══ Parçacık bileşeni ═══
+// ═══ Parçacık — Animated.loop cleanup zorunlu (memory) ═══
 function Sparkle({ delay, color, intensity }: { delay: number; color: string; intensity: number }) {
   const anim = useRef(new Animated.Value(0)).current;
-  const angle = Math.random() * 360;
-  const distance = 60 + Math.random() * 80;
-  const size = 3 + Math.random() * 5;
+  const angle = useRef(Math.random() * 360).current;
+  const distance = useRef(50 + Math.random() * 60).current;
+  const size = useRef(3 + Math.random() * 4).current;
 
   useEffect(() => {
     const loop = Animated.loop(
       Animated.sequence([
         Animated.delay(delay),
-        Animated.timing(anim, { toValue: 1, duration: 1800 + Math.random() * 800, easing: Easing.out(Easing.quad), useNativeDriver: true }),
-        Animated.timing(anim, { toValue: 0, duration: 600, useNativeDriver: true }),
-        Animated.delay(200 + Math.random() * 400),
+        Animated.timing(anim, {
+          toValue: 1, duration: 1400 + Math.random() * 600,
+          easing: Easing.out(Easing.quad), useNativeDriver: true,
+        }),
+        Animated.timing(anim, { toValue: 0, duration: 400, useNativeDriver: true }),
       ])
     );
     loop.start();
@@ -103,22 +101,18 @@ function Sparkle({ delay, color, intensity }: { delay: number; color: string; in
       backgroundColor: color,
       opacity,
       transform: [{ translateX: tx }, { translateY: ty }, { scale }],
-      shadowColor: color,
-      shadowOffset: { width: 0, height: 0 },
-      shadowOpacity: 0.8,
-      shadowRadius: 4,
     }} />
   );
 }
 
-// ═══ Işık çizgisi bileşeni ═══
+// ═══ Işık çizgisi — sade ═══
 function Ray({ angle, color, length }: { angle: number; color: string; length: number }) {
   const anim = useRef(new Animated.Value(0.1)).current;
   useEffect(() => {
     const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(anim, { toValue: 0.35, duration: 1200 + Math.random() * 600, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-        Animated.timing(anim, { toValue: 0.1, duration: 1200 + Math.random() * 600, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(anim, { toValue: 0.30, duration: 1100 + Math.random() * 500, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(anim, { toValue: 0.10, duration: 1100 + Math.random() * 500, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
       ])
     );
     loop.start();
@@ -141,12 +135,10 @@ function Ray({ angle, color, length }: { angle: number; color: string; length: n
 type BadgeCelebrationListener = (badge: BadgeDef) => void;
 const _listeners = new Set<BadgeCelebrationListener>();
 
-/** Herhangi bir yerden kutlamayı tetikle */
 export function triggerBadgeCelebration(badge: BadgeDef) {
   _listeners.forEach(fn => fn(badge));
 }
 
-/** Kutlama event'ine subscribe ol */
 export function onBadgeCelebration(fn: BadgeCelebrationListener) {
   _listeners.add(fn);
   return () => { _listeners.delete(fn); };
@@ -159,14 +151,15 @@ export default function BadgeCelebration() {
 
   // Animasyon değerleri
   const overlayOpacity = useRef(new Animated.Value(0)).current;
+  const cardScale = useRef(new Animated.Value(0.92)).current;
+  const cardTranslateY = useRef(new Animated.Value(20)).current;
   const badgeScale = useRef(new Animated.Value(0)).current;
   const badgeRotate = useRef(new Animated.Value(0)).current;
-  const glowScale = useRef(new Animated.Value(0.3)).current;
   const glowPulse = useRef(new Animated.Value(0.5)).current;
   const textOpacity = useRef(new Animated.Value(0)).current;
-  const textTranslateY = useRef(new Animated.Value(20)).current;
+  const textTranslateY = useRef(new Animated.Value(12)).current;
   const spOpacity = useRef(new Animated.Value(0)).current;
-  const spScale = useRef(new Animated.Value(0.5)).current;
+  const spScale = useRef(new Animated.Value(0.7)).current;
   const shineRotate = useRef(new Animated.Value(0)).current;
 
   // Refs for cleanup
@@ -176,14 +169,15 @@ export default function BadgeCelebration() {
 
   const resetAnims = useCallback(() => {
     overlayOpacity.setValue(0);
+    cardScale.setValue(0.92);
+    cardTranslateY.setValue(20);
     badgeScale.setValue(0);
     badgeRotate.setValue(0);
-    glowScale.setValue(0.3);
     glowPulse.setValue(0.5);
     textOpacity.setValue(0);
-    textTranslateY.setValue(20);
+    textTranslateY.setValue(12);
     spOpacity.setValue(0);
-    spScale.setValue(0.5);
+    spScale.setValue(0.7);
     shineRotate.setValue(0);
   }, []);
 
@@ -194,184 +188,244 @@ export default function BadgeCelebration() {
       setBadge(b);
       setVisible(true);
     });
-    return () => { unsub(); pulseRef.current?.stop(); shineRef.current?.stop(); if (timerRef.current) clearTimeout(timerRef.current); };
+    return () => {
+      unsub();
+      pulseRef.current?.stop();
+      shineRef.current?.stop();
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
   }, []);
 
   // Animate in when visible
   useEffect(() => {
     if (!visible || !badge) return;
 
-    // 1. Overlay fade in
-    Animated.timing(overlayOpacity, { toValue: 1, duration: 300, useNativeDriver: true }).start();
-
-    // 2. Badge entrance — bouncy scale + slight rotate
-    Animated.sequence([
-      Animated.delay(200),
-      Animated.parallel([
-        Animated.spring(badgeScale, { toValue: 1, tension: 50, friction: 6, useNativeDriver: true }),
-        Animated.timing(badgeRotate, { toValue: 1, duration: 800, easing: Easing.out(Easing.back(1.2)), useNativeDriver: true }),
+    // ★ ENTRANCE — toplam ~700ms
+    Animated.parallel([
+      Animated.timing(overlayOpacity, { toValue: 1, duration: 220, useNativeDriver: true }),
+      // Card slide-up + scale spring
+      Animated.spring(cardScale, { toValue: 1, tension: 90, friction: 11, useNativeDriver: true }),
+      Animated.spring(cardTranslateY, { toValue: 0, tension: 90, friction: 11, useNativeDriver: true }),
+      // Badge entrance — bouncy scale + slight rotate
+      Animated.sequence([
+        Animated.delay(160),
+        Animated.parallel([
+          Animated.spring(badgeScale, { toValue: 1, tension: 60, friction: 7, useNativeDriver: true }),
+          Animated.timing(badgeRotate, { toValue: 1, duration: 600, easing: Easing.out(Easing.back(1.1)), useNativeDriver: true }),
+        ]),
+      ]),
+      // Text reveal
+      Animated.sequence([
+        Animated.delay(420),
+        Animated.parallel([
+          Animated.timing(textOpacity, { toValue: 1, duration: 280, useNativeDriver: true }),
+          Animated.timing(textTranslateY, { toValue: 0, duration: 280, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+        ]),
+      ]),
+      // SP reward pop (badge.spReward > 0 ise)
+      Animated.sequence([
+        Animated.delay(620),
+        Animated.parallel([
+          Animated.spring(spScale, { toValue: 1, tension: 80, friction: 6, useNativeDriver: true }),
+          Animated.timing(spOpacity, { toValue: 1, duration: 250, useNativeDriver: true }),
+        ]),
       ]),
     ]).start();
 
-    // 3. Glow expand
-    Animated.sequence([
-      Animated.delay(350),
-      Animated.spring(glowScale, { toValue: 1, tension: 30, friction: 8, useNativeDriver: true }),
-    ]).start();
-
-    // 4. Glow pulse loop
+    // Glow pulse loop — LinearGradient opacity dans
     pulseRef.current = Animated.loop(
       Animated.sequence([
-        Animated.timing(glowPulse, { toValue: 1, duration: 1200, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-        Animated.timing(glowPulse, { toValue: 0.5, duration: 1200, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(glowPulse, { toValue: 1, duration: 1100, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(glowPulse, { toValue: 0.5, duration: 1100, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
       ])
     );
     pulseRef.current.start();
 
-    // 5. Shine rotation loop
+    // Shine rotation loop — ışık çizgileri
     shineRef.current = Animated.loop(
-      Animated.timing(shineRotate, { toValue: 1, duration: 8000, easing: Easing.linear, useNativeDriver: true })
+      Animated.timing(shineRotate, { toValue: 1, duration: 7000, easing: Easing.linear, useNativeDriver: true })
     );
     shineRef.current.start();
 
-    // 6. Text reveal
-    Animated.sequence([
-      Animated.delay(600),
-      Animated.parallel([
-        Animated.timing(textOpacity, { toValue: 1, duration: 400, useNativeDriver: true }),
-        Animated.timing(textTranslateY, { toValue: 0, duration: 400, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
-      ]),
-    ]).start();
-
-    // 7. SP reward pop
-    Animated.sequence([
-      Animated.delay(900),
-      Animated.parallel([
-        Animated.spring(spScale, { toValue: 1, tension: 80, friction: 6, useNativeDriver: true }),
-        Animated.timing(spOpacity, { toValue: 1, duration: 300, useNativeDriver: true }),
-      ]),
-    ]).start();
-
-    // 8. Auto dismiss after 4.5 seconds
+    // ★ AUTO-DISMISS — 1450ms hold + 250ms fade-out (toplam 2400ms görünür)
+    //   Eski: 4500ms. Yeni: 700 + 1450 + 250 = 2400ms (%46 hızlı).
     timerRef.current = setTimeout(() => {
       Animated.parallel([
-        Animated.timing(overlayOpacity, { toValue: 0, duration: 500, useNativeDriver: true }),
-        Animated.timing(badgeScale, { toValue: 0.3, duration: 400, useNativeDriver: true }),
+        Animated.timing(overlayOpacity, { toValue: 0, duration: 250, useNativeDriver: true }),
+        Animated.timing(cardScale, { toValue: 0.95, duration: 250, useNativeDriver: true }),
+        Animated.timing(cardTranslateY, { toValue: -10, duration: 250, useNativeDriver: true }),
       ]).start(() => {
         pulseRef.current?.stop();
         shineRef.current?.stop();
         setVisible(false);
         setBadge(null);
       });
-    }, 4500);
+    }, 700 + 1450);
   }, [visible, badge]);
 
   if (!visible || !badge) return null;
 
   const vis = RARITY_VISUALS[badge.rarity];
-  const rotateInterp = badgeRotate.interpolate({ inputRange: [0, 1], outputRange: ['-15deg', '0deg'] });
+  const rotateInterp = badgeRotate.interpolate({ inputRange: [0, 1], outputRange: ['-12deg', '0deg'] });
   const shineRotateInterp = shineRotate.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
 
   return (
     <Animated.View style={[st.overlay, { opacity: overlayOpacity }]} pointerEvents="none">
-      <LinearGradient
-        colors={vis.bgGrad}
-        style={StyleSheet.absoluteFillObject}
-        start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
-      />
+      {/* Backdrop — BlurView + koyu dim (full-screen tier rengi YOK) */}
+      <BlurView intensity={32} tint="dark" style={StyleSheet.absoluteFillObject} />
+      <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.55)' }]} />
 
-      {/* ═══ Dönen ışık çizgileri ═══ */}
-      <Animated.View style={[st.rayContainer, { transform: [{ rotate: shineRotateInterp }] }]}>
-        {Array.from({ length: vis.rayCount }).map((_, i) => (
-          <Ray key={i} angle={(360 / vis.rayCount) * i} color={badge.color + '40'} length={120 + Math.random() * 60} />
-        ))}
-      </Animated.View>
-
-      {/* ═══ Dış glow halo ═══ */}
-      {/* ★ v92.23 (1 May 2026): Android elevation eklendi — Android'de glow halo
-           hiç render olmuyordu, rozet animasyonu vasat görünüyordu. */}
-      <Animated.View style={[st.glowOuter, {
-        opacity: glowPulse,
-        transform: [{ scale: glowScale }],
-        backgroundColor: badge.glow,
-        shadowColor: badge.color,
-        shadowOpacity: vis.glowIntensity,
-        shadowRadius: 60,
-        elevation: 18,
-      }]} />
-
-      {/* ═══ İç glow ring ═══ */}
-      <Animated.View style={[st.glowInner, {
-        transform: [{ scale: glowScale }],
-        borderColor: vis.ringColors[0],
-        shadowColor: badge.color,
-        shadowOpacity: vis.glowIntensity * 0.7,
-        shadowRadius: 30,
-        elevation: 12,
-      }]} />
-
-      {/* ═══ Parçacıklar ═══ */}
-      <View style={st.particleContainer}>
-        {Array.from({ length: vis.particleCount }).map((_, i) => (
-          <Sparkle key={i} delay={i * 120} color={badge.color} intensity={vis.glowIntensity} />
-        ))}
-      </View>
-
-      {/* ═══ Badge İkon — 3D derinlik ═══ */}
-      <Animated.View style={[st.badgeIconWrap, {
-        transform: [{ scale: badgeScale }, { rotate: rotateInterp }],
-      }]}>
-        {/* Arka plan katmanı — derinlik */}
-        <View style={[st.badgeBackLayer, { backgroundColor: badge.color + '15', borderColor: badge.color + '30' }]} />
-        {/* Orta katman — gradient */}
+      {/* ═══ Card — tier accent border + panel BG, ortada compact ═══ */}
+      <Animated.View
+        style={[
+          st.card,
+          {
+            borderColor: badge.color + (Platform.OS === 'android' ? 'AA' : '66'),
+            opacity: overlayOpacity,
+            transform: [
+              { translateY: cardTranslateY },
+              { scale: cardScale },
+            ],
+          },
+        ]}
+      >
+        {/* Card iç zemin */}
         <LinearGradient
-          colors={[badge.color + '25', badge.color + '08', 'transparent']}
-          style={st.badgeMidLayer}
-          start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
+          colors={['#1c2330', '#11151e', '#06080d']}
+          start={{ x: 0, y: 0 }} end={{ x: 0.7, y: 1 }}
+          style={StyleSheet.absoluteFillObject}
         />
-        {/* Ön katman — ikon */}
-        <View style={[st.badgeFrontLayer, {
-          shadowColor: badge.color,
-          shadowOpacity: 0.8,
-          shadowRadius: 20,
-          shadowOffset: { width: 0, height: 4 },
-          elevation: 14,
-        }]}>
-          <Ionicons name={badge.icon} size={56} color={badge.color} style={{
-            textShadowColor: badge.glow,
-            textShadowOffset: { width: 0, height: 0 },
-            textShadowRadius: 20,
-          }} />
-        </View>
-        {/* Üst parlama — cam efekti */}
-        <View style={st.badgeGlassHighlight} />
-      </Animated.View>
-
-      {/* ═══ Metin — isim + açıklama ═══ */}
-      <Animated.View style={[st.textContainer, { opacity: textOpacity, transform: [{ translateY: textTranslateY }] }]}>
-        {/* Rarity pill */}
-        <View style={[st.rarityPill, { borderColor: vis.labelColor + '40', backgroundColor: vis.labelColor + '12' }]}>
-          <Text style={[st.rarityText, { color: vis.labelColor }]}>{vis.label}</Text>
-        </View>
-        {/* Badge name */}
-        <Text style={[st.badgeName, { textShadowColor: badge.glow }]}>{badge.label}</Text>
-        {/* Description */}
-        <Text style={st.badgeDesc}>{badge.description}</Text>
-      </Animated.View>
-
-      {/* ═══ SP Ödül ═══ */}
-      {badge.spReward > 0 && (
-        <Animated.View style={[st.spReward, { opacity: spOpacity, transform: [{ scale: spScale }] }]}>
+        {/* Tier ışık huzmesi — kart üstünden yumuşak */}
+        <View style={st.spotlight} pointerEvents="none">
           <LinearGradient
-            colors={['rgba(251,191,36,0.15)', 'rgba(251,191,36,0.05)']}
-            style={st.spGrad}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+            colors={[
+              badge.color + 'AA',
+              badge.color + '44',
+              badge.color + '11',
+              'transparent',
+            ]}
+            locations={[0, 0.35, 0.7, 1]}
+            start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
+            style={StyleSheet.absoluteFillObject}
+          />
+        </View>
+        {/* Top edge highlight */}
+        <LinearGradient
+          colors={['transparent', badge.color + 'CC', 'transparent']}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+          style={st.topEdge}
+        />
+
+        {/* ═══ Badge bölgesi — ışık çizgileri + glow halo + ikon ═══ */}
+        <View style={st.badgeRegion} pointerEvents="none">
+          {/* Dönen ışık çizgileri (sayı yarıya indirildi) */}
+          <Animated.View style={[st.rayContainer, { transform: [{ rotate: shineRotateInterp }] }]}>
+            {Array.from({ length: vis.rayCount }).map((_, i) => (
+              <Ray
+                key={i}
+                angle={(360 / vis.rayCount) * i}
+                color={badge.color + '50'}
+                length={100 + Math.random() * 40}
+              />
+            ))}
+          </Animated.View>
+
+          {/* ★ Glow halo — LinearGradient circle (Android-safe, shadow YOK) */}
+          <Animated.View
+            style={[
+              st.glowHalo,
+              {
+                opacity: Animated.multiply(glowPulse, vis.glowOpacity),
+              },
+            ]}
+            pointerEvents="none"
           >
-            <Ionicons name="flash" size={16} color="#FBBF24" />
-            <Text style={st.spText}>+{badge.spReward} SP</Text>
-          </LinearGradient>
+            <LinearGradient
+              colors={[badge.color + 'AA', badge.color + '44', 'transparent']}
+              start={{ x: 0.5, y: 0.5 }} end={{ x: 1, y: 1 }}
+              style={st.glowGrad}
+            />
+          </Animated.View>
+
+          {/* Parçacıklar (yarıya indirildi) */}
+          <View style={st.particleContainer} pointerEvents="none">
+            {Array.from({ length: vis.particleCount }).map((_, i) => (
+              <Sparkle
+                key={i}
+                delay={i * 100}
+                color={badge.color}
+                intensity={vis.glowOpacity + 0.2}
+              />
+            ))}
+          </View>
+
+          {/* Badge icon — 2 katman (Android shadow yok, sade) */}
+          <Animated.View
+            style={[
+              st.badgeIconWrap,
+              { transform: [{ scale: badgeScale }, { rotate: rotateInterp }] },
+            ]}
+          >
+            {/* Arka katman — tier renkli circle (cam efekti) */}
+            <View style={[st.badgeBackLayer, { backgroundColor: badge.color + '18', borderColor: badge.color + '50' }]} />
+            {/* Ön katman — koyu zemin + ikon (shadow YOK, border highlight) */}
+            <View style={[st.badgeFrontLayer, { borderColor: badge.color + '88' }]}>
+              <Ionicons
+                name={badge.icon}
+                size={48}
+                color={badge.color}
+                style={{
+                  // Text shadow Android'de renkli glow olur
+                  textShadowColor: badge.color + 'CC',
+                  textShadowOffset: { width: 0, height: 0 },
+                  textShadowRadius: 14,
+                }}
+              />
+            </View>
+            {/* Cam efekti — üst parlatma */}
+            <View style={st.badgeGlassHighlight} />
+          </Animated.View>
+        </View>
+
+        {/* ═══ Metin — rarity pill + isim + açıklama ═══ */}
+        <Animated.View
+          style={[
+            st.textContainer,
+            { opacity: textOpacity, transform: [{ translateY: textTranslateY }] },
+          ]}
+        >
+          <View style={[st.rarityPill, { borderColor: vis.labelColor + '40', backgroundColor: vis.labelColor + '14' }]}>
+            <Text style={[st.rarityText, { color: vis.labelColor }]}>{vis.label}</Text>
+          </View>
+          <Text
+            style={[
+              st.badgeName,
+              {
+                textShadowColor: badge.color + '88',
+                textShadowOffset: { width: 0, height: 0 },
+                textShadowRadius: 12,
+              },
+            ]}
+          >
+            {badge.label}
+          </Text>
+          <Text style={st.badgeDesc}>{badge.description}</Text>
         </Animated.View>
-      )}
+
+        {/* ═══ SP Ödül ═══ */}
+        {badge.spReward > 0 && (
+          <Animated.View style={[st.spReward, { opacity: spOpacity, transform: [{ scale: spScale }] }]}>
+            <LinearGradient
+              colors={['rgba(251,191,36,0.18)', 'rgba(251,191,36,0.06)']}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+              style={st.spGrad}
+            >
+              <Ionicons name="flash" size={14} color="#FBBF24" />
+              <Text style={st.spText}>+{badge.spReward} SP</Text>
+            </LinearGradient>
+          </Animated.View>
+        )}
+      </Animated.View>
     </Animated.View>
   );
 }
@@ -383,96 +437,115 @@ const st = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  // ★ Card — ortada compact, tier accent border (Android shadow YOK)
+  card: {
+    width: CARD_WIDTH,
+    paddingTop: 26,
+    paddingBottom: 22,
+    paddingHorizontal: 24,
+    borderRadius: 24,
+    borderWidth: Platform.OS === 'android' ? 2 : 1.5,
+    overflow: 'hidden',
+    alignItems: 'center',
+  },
+  topEdge: {
+    position: 'absolute', top: 0, left: 0, right: 0, height: 1.5,
+  },
+  // Sahne ışığı — kart üst kısmı
+  spotlight: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0,
+    height: 180,
+    opacity: 0.30,
+  },
+  // Badge bölgesi — ray + halo + icon merkezleme
+  badgeRegion: {
+    width: 200, height: 200,
+    alignItems: 'center', justifyContent: 'center',
+    marginBottom: 6,
+  },
   rayContainer: {
     position: 'absolute',
-    width: 300, height: 300,
+    width: 220, height: 220,
     justifyContent: 'center', alignItems: 'center',
   },
-  glowOuter: {
+  // ★ Glow halo — LinearGradient circle (Android-safe, shadowColor YOK)
+  glowHalo: {
     position: 'absolute',
-    width: 200, height: 200, borderRadius: 100,
-    elevation: 20,
+    width: 180, height: 180,
+    borderRadius: 90,
+    overflow: 'hidden',
   },
-  glowInner: {
-    position: 'absolute',
-    width: 140, height: 140, borderRadius: 70,
-    borderWidth: 1.5,
-    backgroundColor: 'transparent',
-    elevation: 10,
+  glowGrad: {
+    width: '100%', height: '100%',
+    borderRadius: 90,
   },
   particleContainer: {
     position: 'absolute',
     width: 0, height: 0,
     justifyContent: 'center', alignItems: 'center',
   },
+  // Badge icon — sade 2 katman (eski 3D katman + 4 shadow yerine)
   badgeIconWrap: {
-    width: 120, height: 120,
+    width: 100, height: 100,
     justifyContent: 'center', alignItems: 'center',
-    marginBottom: 24,
   },
   badgeBackLayer: {
     ...StyleSheet.absoluteFillObject,
-    borderRadius: 60,
-    borderWidth: 1.5,
-    transform: [{ scale: 1.15 }],
-  },
-  badgeMidLayer: {
-    ...StyleSheet.absoluteFillObject,
-    borderRadius: 60,
-    transform: [{ scale: 1.05 }],
+    borderRadius: 50,
+    borderWidth: 1.2,
+    transform: [{ scale: 1.12 }],
   },
   badgeFrontLayer: {
-    width: 100, height: 100, borderRadius: 50,
+    width: 86, height: 86, borderRadius: 43,
     justifyContent: 'center', alignItems: 'center',
-    backgroundColor: 'rgba(15,23,42,0.8)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-    elevation: 15,
+    backgroundColor: 'rgba(15,23,42,0.85)',
+    borderWidth: 1.5,
   },
   badgeGlassHighlight: {
     position: 'absolute',
-    top: 8, left: 20, right: 20, height: 30,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    transform: [{ scaleX: 0.8 }],
+    top: 14, left: 24, right: 24, height: 22,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    transform: [{ scaleX: 0.85 }],
   },
   textContainer: {
     alignItems: 'center',
-    gap: 8,
-    marginTop: 8,
+    gap: 6,
+    marginTop: 4,
   },
   rarityPill: {
-    paddingHorizontal: 12, paddingVertical: 3,
-    borderRadius: 10, borderWidth: 1,
+    paddingHorizontal: 10, paddingVertical: 3,
+    borderRadius: 8, borderWidth: 1,
   },
   rarityText: {
-    fontSize: 10, fontWeight: '900', letterSpacing: 2,
+    fontSize: 9, fontWeight: '900', letterSpacing: 1.8,
   },
   badgeName: {
-    fontSize: 28, fontWeight: '900', color: '#F8FAFC',
-    letterSpacing: 0.5,
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 10,
+    fontSize: 22, fontWeight: '900', color: '#F8FAFC',
+    letterSpacing: 0.4,
+    marginTop: 2,
   },
   badgeDesc: {
-    fontSize: 14, color: 'rgba(148,163,184,0.8)',
+    fontSize: 12, color: 'rgba(148,163,184,0.78)',
     fontWeight: '500',
-    textAlign: 'center', maxWidth: 260,
+    textAlign: 'center', maxWidth: 240,
+    marginTop: 1,
   },
   spReward: {
-    marginTop: 20,
+    marginTop: 14,
   },
   spGrad: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    paddingHorizontal: 16, paddingVertical: 8,
-    borderRadius: 14,
-    borderWidth: 1, borderColor: 'rgba(251,191,36,0.25)',
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    paddingHorizontal: 12, paddingVertical: 6,
+    borderRadius: 12,
+    borderWidth: 1, borderColor: 'rgba(251,191,36,0.30)',
   },
   spText: {
-    fontSize: 18, fontWeight: '900', color: '#FBBF24',
-    letterSpacing: 0.5,
-    textShadowColor: 'rgba(251,191,36,0.5)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 6,
+    fontSize: 14, fontWeight: '900', color: '#FBBF24',
+    letterSpacing: 0.4,
+    textShadowColor: 'rgba(251,191,36,0.4)',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 4,
   },
 });

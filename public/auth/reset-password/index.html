@@ -118,10 +118,13 @@
                           'S.browser_fallback_url=' + encodeURIComponent(playStoreUrl) + ';end';
 
       var openUrl = isAndroid ? androidIntent : customScheme;
+      var appLink = document.getElementById('appLink');
+      // ★ Chrome native intent:// handler'ı en güvenilir yol — JS preventDefault YOK.
+      //   Buton href'ine intent:// koyduk; kullanıcı tıkladığında Chrome standart link
+      //   navigation'ını yapar, intent:// formatını parse edip uygulamayı açar.
+      appLink.href = openUrl;
 
-      document.getElementById('appLink').href = openUrl;
-
-      // 100ms gecikme ile otomatik dene (intent:// Chrome'da sessizce app açar)
+      // Otomatik redirect — sayfa yüklenir yüklenmez sessizce uygulamayı dene
       setTimeout(function () {
         window.location.href = openUrl;
       }, 100);

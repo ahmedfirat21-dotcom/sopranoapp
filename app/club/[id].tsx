@@ -28,7 +28,8 @@ import { useAuth, useUserProfileSheet } from '../_layout';
 import { ClubService, type Club, type ClubMember } from '../../services/clubs';
 import { StorageService } from '../../services/storage';
 import * as ImagePicker from 'expo-image-picker';
-import SPDonateSheet from '../../components/profile/SPDonateSheet';
+// ★ v107.6: Koro hazinesi bağışı SPDonateSheet → TreasurySheet (treasury bilgisi + 💰 watermark + "Hazineye Katkı")
+import TreasurySheet from '../../components/club/TreasurySheet';
 
 const iconShadow = {
   textShadowColor: 'rgba(0,0,0,0.5)',
@@ -525,15 +526,18 @@ export default function ClubDetailScreen() {
         }}
       />
 
-      {/* ★ 2026-04-26: SPDonateSheet — Koro hazinesine bağış (mevcut peer-to-peer modal'ın özgün halı) */}
+      {/* ★ v107.6: TreasurySheet — Koro hazinesine bağış (kendi sheet'i, 💰 watermark + treasury bilgisi) */}
       {userId && (
-        <SPDonateSheet
+        <TreasurySheet
           visible={showDonate}
           onClose={() => setShowDonate(false)}
           senderId={userId}
-          recipientId={club.id} /* dummy — clubId verildiği için kullanılmaz */
-          recipientName={club.name}
           clubId={club.id}
+          clubName={club.name}
+          clubAvatar={club.avatar_url}
+          treasuryBalance={club.treasury_balance}
+          memberCount={club.member_count}
+          isPremium={club.is_premium}
           onTreasuryUpdate={(newBalance) => setClub({ ...club, treasury_balance: newBalance })}
         />
       )}

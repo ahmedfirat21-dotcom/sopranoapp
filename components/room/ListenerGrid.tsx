@@ -70,6 +70,7 @@ const ListenerCell = React.memo(function ListenerCell({
   const ownerScale = isOwner ? 1.10 : 1;
   const ownerAvatarSize = Math.floor(avatarSize * ownerScale);
   return (
+    // ★ v107.41: Reanimated entering/exiting KALDIRILDI — zıplama hissi veriyordu.
     <Pressable style={[s.cell, { width: cellW }]} onPress={() => onSelectUser(u)}>
       {isOwner && <ListenerOwnerBadge />}
       <View style={[s.avatarWrap, { width: ownerAvatarSize, height: ownerAvatarSize, borderRadius: ownerAvatarSize / 2 }, isSelected && s.avatarSelected, isOwner && s.avatarOwner, showMuteIndicator && s.avatarMuted]}>

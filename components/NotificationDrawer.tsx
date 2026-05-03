@@ -9,6 +9,7 @@ import {
   View, Text, StyleSheet, Pressable, FlatList, Dimensions, Modal,
 } from 'react-native';
 import AppLoader from './AppLoader';
+import UserListSkeleton from './UserListSkeleton';
 import ReAnimated, {
   useSharedValue,
   useAnimatedStyle,
@@ -25,7 +26,8 @@ import { Colors } from '../constants/theme';
 import { RoomAccessService } from '../services/roomAccess';
 import StatusAvatar from './StatusAvatar';
 import { showToast } from './Toast';
-import { useUserProfileSheet } from '../app/_layout';
+// ★ v107.34: Cycle kırma — _layout yerine direkt context dosyasından
+import { useUserProfileSheet } from '../providers/UserProfileSheetContext';
 
 const { width: W, height: H } = Dimensions.get('window');
 
@@ -475,7 +477,8 @@ export default function NotificationDrawer({ visible, onClose, userId, anchorTop
         </Pressable>
 
         {loading ? (
-          <AppLoader color="#14B8A6" style={{ marginVertical: 24 }} />
+          /* ★ v107.25: AppLoader spinner kaldırıldı — odalarım pattern'i (skeleton kart) */
+          <UserListSkeleton count={3} showAction={false} />
         ) : items.length === 0 ? (
           <View style={s.emptyState}>
             <Ionicons name="notifications-off-outline" size={28} color="rgba(255,255,255,0.1)" />

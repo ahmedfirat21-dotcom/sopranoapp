@@ -9,6 +9,7 @@ import {
   ScrollView,
 } from 'react-native';
 import AppLoader from './AppLoader';
+import UserListSkeleton from './UserListSkeleton';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -178,10 +179,8 @@ export default function BlockedUsersSheet({ visible, onClose, currentUserId }: P
         </View>
 
         {loading ? (
-          <View style={s.emptyWrap}>
-            <AppLoader color="#14B8A6" />
-            <Text style={s.emptySub}>Liste yükleniyor...</Text>
-          </View>
+          /* ★ v107.27: AppLoader kaldırıldı — skeleton (myrooms pattern'i) */
+          <UserListSkeleton count={3} showAction />
         ) : users.length === 0 ? (
           <View style={s.emptyWrap}>
             <Ionicons name="shield-checkmark-outline" size={44} color="rgba(20,184,166,0.4)" />

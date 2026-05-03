@@ -22,7 +22,7 @@ import { useUserSearchSheet } from '../_layout';
 import FriendsDrawer from '../../components/FriendsDrawer';
 import AppLoader from '../../components/AppLoader';
 import NotificationBell from '../../components/NotificationBell';
-import DiscoverWelcomeSheet, { hasSeenDiscoverWelcome } from '../../components/DiscoverWelcomeSheet';
+import DiscoverWelcomeSheet, { hasSeenDiscoverWelcome, markDiscoverWelcomeSeen } from '../../components/DiscoverWelcomeSheet';
 import RoomCreateHintSheet, { hasSeenRoomCreateHint, markRoomCreateHintSeen } from '../../components/RoomCreateHintSheet';
 import { markCreateRoomCoachmarkPending } from '../../components/CreateRoomCoachmark';
 import FABHintOverlay, { hasSeenFABHint } from '../../components/FABHintOverlay';
@@ -437,29 +437,63 @@ const SWIPE_TOTAL_W = SWIPE_ACTION_W * 2; // toplam açılan alan
 function SwipeToHideRow({ children, onHide, onReport }: { children: React.ReactNode; onHide: () => void; onReport?: () => void }) {
   const translateX = useRef(new Animated.Value(0)).current;
   const [isOpen, setIsOpen] = useState(false);
+  // ★ v107.12: isOpen ref — panResponder closure'da güncel state
+  const isOpenRef = useRef(false);
+  isOpenRef.current = isOpen;
   const totalW = onReport ? SWIPE_TOTAL_W : SWIPE_ACTION_W;
   const actionOpacity = translateX.interpolate({ inputRange: [-totalW, -20, 0], outputRange: [1, 0.5, 0], extrapolate: 'clamp' });
-  const panResponder = useRef(
-    PanResponder.create({
-      onMoveShouldSetPanResponder: (_, gs) => Math.abs(gs.dx) > 15 && Math.abs(gs.dy) < 15,
-      onPanResponderMove: (_, gs) => {
-        if (gs.dx < 0) translateX.setValue(Math.max(gs.dx, -(totalW + 12)));
-      },
-      onPanResponderRelease: (_, gs) => {
-        if (gs.dx < -50) {
-          Animated.spring(translateX, { toValue: -totalW, useNativeDriver: true, tension: 100, friction: 10 }).start();
-          setIsOpen(true);
-        } else {
-          Animated.spring(translateX, { toValue: 0, useNativeDriver: true, tension: 100, friction: 10 }).start();
-          setIsOpen(false);
-        }
-      },
-    })
-  ).current;
+
   const closeSwipe = () => {
     Animated.spring(translateX, { toValue: 0, useNativeDriver: true, tension: 100, friction: 10 }).start();
     setIsOpen(false);
   };
+
+  const panResponder = useRef(
+    PanResponder.create({
+      // ★ v107.12 FIX: Açıkken kart üstüne tap → kapat (eski sürümde tap algılanmıyordu,
+      //   inner Pressable'lar oda'ya katıl çağırıyordu)
+      onStartShouldSetPanResponder: () => isOpenRef.current,
+      onStartShouldSetPanResponderCapture: () => isOpenRef.current,
+      onMoveShouldSetPanResponder: (_, gs) => Math.abs(gs.dx) > 15 && Math.abs(gs.dy) < 15,
+      onPanResponderGrant: () => {
+        // Açıkken tap = kapat
+        if (isOpenRef.current) {
+          Animated.spring(translateX, { toValue: 0, useNativeDriver: true, tension: 100, friction: 10 }).start();
+          setIsOpen(false);
+        }
+      },
+      onPanResponderMove: (_, gs) => {
+        // ★ v107.12: Açıkken sağa swipe (gs.dx > 0) ile kapatma desteği
+        if (isOpenRef.current) {
+          // Açık state: sağa kayma izinli (kapatmak için), sol bloke
+          if (gs.dx > 0) translateX.setValue(Math.min(gs.dx - totalW, 0));
+        } else {
+          // Kapalı state: sola kayma izinli (açmak için)
+          if (gs.dx < 0) translateX.setValue(Math.max(gs.dx, -(totalW + 12)));
+        }
+      },
+      onPanResponderRelease: (_, gs) => {
+        if (isOpenRef.current) {
+          // Açık state release: sağa 30+ → kapat, az → açık tut
+          if (gs.dx > 30) {
+            closeSwipe();
+          } else {
+            Animated.spring(translateX, { toValue: -totalW, useNativeDriver: true, tension: 100, friction: 10 }).start();
+          }
+        } else {
+          // Kapalı state release: sola 50+ → aç, az → kapat
+          if (gs.dx < -50) {
+            Animated.spring(translateX, { toValue: -totalW, useNativeDriver: true, tension: 100, friction: 10 }).start();
+            setIsOpen(true);
+          } else {
+            Animated.spring(translateX, { toValue: 0, useNativeDriver: true, tension: 100, friction: 10 }).start();
+            setIsOpen(false);
+          }
+        }
+      },
+    })
+  ).current;
+
   return (
     <View style={{ marginHorizontal: 16, marginBottom: 10 }}>
       {/* Actions — arkada, outer'a göre konumlanır (overflow yok, clip yok) */}
@@ -493,8 +527,16 @@ function SwipeToHideRow({ children, onHide, onReport }: { children: React.ReactN
       >
         {children}
       </Animated.View>
+      {/* ★ v107.12 FIX: Açıkken outside-tap overlay — Android'de zIndex güvenilir değil,
+           elevation lazım. Eski sürümde overlay kart'ın altında kalıyordu, tap closeSwipe yapamıyordu. */}
       {isOpen && (
-        <Pressable style={[StyleSheet.absoluteFillObject, { right: totalW }]} onPress={closeSwipe} />
+        <Pressable
+          style={[
+            StyleSheet.absoluteFillObject,
+            { right: totalW, zIndex: 10, elevation: 10 },
+          ]}
+          onPress={closeSwipe}
+        />
       )}
     </View>
   );
@@ -865,7 +907,16 @@ export default function HomeScreen() {
       if (val) { try { setIgnoredRoomIds(new Set(JSON.parse(val))); } catch {} }
     });
   }, []);
-  const ignoreRoom = useCallback((roomId: string) => {
+  const unignoreOne = useCallback((roomId: string) => {
+    setIgnoredRoomIds(prev => {
+      const next = new Set(prev); next.delete(roomId);
+      AsyncStorage.setItem('ignored_room_ids', JSON.stringify([...next])).catch(() => {});
+      return next;
+    });
+  }, []);
+  // ★ v107.14: Sessiz gizleme — toast YOK (kullanıcı talebi). Geri getirme yolu
+  //   empty state altındaki pill ve liste footer barı ile sağlanıyor.
+  const ignoreRoom = useCallback((roomId: string, _roomName?: string) => {
     setIgnoredRoomIds(prev => {
       const next = new Set(prev); next.add(roomId);
       AsyncStorage.setItem('ignored_room_ids', JSON.stringify([...next])).catch(() => {});
@@ -915,11 +966,13 @@ export default function HomeScreen() {
       setCreatingRoom(false);
     }
   };
-  // ★ 2026-04-22 FIX v3: İki tetikleyici
-  //   (a) justCompletedOnboarding → onboarding'i yeni bitirdi, intro GARANTILI aç
-  //       (AsyncStorage bağımsız; re-install/new device sorunsuz)
-  //   (b) AsyncStorage swv2 check → edge case: kullanıcı daha önce intro'yu hiç
-  //       görmemiş ama onboarding_completed true (legacy veri senaryosu)
+  // ★ v107.48 (3 May 2026): Discovery sheet sadece YENİ kullanıcılara gösterilir.
+  //   Kayıtlı (onboarding tamamlamış) kullanıcı çıkış yapıp tekrar girince Discovery
+  //   tekrar AÇILMAZ. Mantık:
+  //     (a) justCompletedOnboarding → onboarding'i yeni bitirdi → GÖSTER (ilk ve tek sefer)
+  //     (b) profile.preferences.onboarding_completed === true → kayıtlı kullanıcı → GÖSTERME
+  //         + AsyncStorage'a "seen" yaz (önceden swipe ile kapatmışsa kaybolan flag'i toparla)
+  //     (c) Profil yüklenmediyse / onboarding flag'i yoksa → AsyncStorage check (eski mantık)
   useEffect(() => {
     if (justCompletedOnboarding) {
       setShowWelcome(true);
@@ -927,10 +980,18 @@ export default function HomeScreen() {
       return;
     }
     if (!firebaseUser?.uid) { setShowWelcome(false); return; }
+    // ★ v107.48: Onboarding tamamlanmışsa hiç gösterme + AsyncStorage'ı senkronla
+    const onboardingDone = (profile as any)?.preferences?.onboarding_completed === true;
+    if (onboardingDone) {
+      setShowWelcome(false);
+      // Forward-compat: AsyncStorage'a "seen" yaz, sonraki kontroller hızlı dönsün
+      markDiscoverWelcomeSeen(firebaseUser.uid).catch(() => {});
+      return;
+    }
     hasSeenDiscoverWelcome(firebaseUser.uid).then(seen => {
       setShowWelcome(seen ? false : true);
     }).catch(() => setShowWelcome(false));
-  }, [firebaseUser?.uid, justCompletedOnboarding]);
+  }, [firebaseUser?.uid, justCompletedOnboarding, (profile as any)?.preferences?.onboarding_completed]);
 
   // ★ 2026-04-29: DiscoverWelcome bittikten sonra (showWelcome=false) Keşfet'e düşen
   //   YENİ + odası olmayan kullanıcıya "Oda oluştur!" yönlendirmesi. UID-bazlı bir kez
@@ -1392,6 +1453,51 @@ export default function HomeScreen() {
                 </View>
               </View>
 
+              {/* ★ v107.48 (3 May 2026): Online arkadaş yatay şerit — keşif ekranında
+                  tanıdığın arkadaşlar bir bakışta görünür, modal/drawer açmaya gerek yok.
+                  Kompakt: avatar 44 + status dot, isim yok (tanıdık yüzler için yeterli).
+                  Boost section'la kafa karıştırmasın diye gradient çerçeve yok, sadelik. */}
+              {onlineFriends.length > 0 && (
+                <View style={s.onlineStripWrap}>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={s.onlineStripContent}
+                    decelerationRate="fast"
+                  >
+                    {onlineFriends.slice(0, 30).map((f) => (
+                      <Pressable
+                        key={f.id}
+                        onPress={() => openUserProfile(f.id)}
+                        style={({ pressed }) => [
+                          s.onlineAvatarWrap,
+                          pressed && { opacity: 0.7, transform: [{ scale: 0.94 }] },
+                        ]}
+                        hitSlop={4}
+                      >
+                        <StatusAvatar
+                          uri={f.avatar_url}
+                          size={44}
+                          tier={(f as any).subscription_tier}
+                          isOnline={true}
+                          showTierBadge={false}
+                        />
+                      </Pressable>
+                    ))}
+                    {onlineFriends.length > 30 && (
+                      <Pressable
+                        onPress={() => setShowFriends(true)}
+                        style={({ pressed }) => [
+                          s.onlineMoreBtn,
+                          pressed && { opacity: 0.7 },
+                        ]}
+                      >
+                        <Text style={s.onlineMoreText}>+{onlineFriends.length - 30}</Text>
+                      </Pressable>
+                    )}
+                  </ScrollView>
+                </View>
+              )}
 
               {/* ★ 2026-04-21: Tek profilde kompakt strip, 2+ profilde carousel */}
               {boostedProfiles.length === 1 && (() => {
@@ -1736,7 +1842,7 @@ export default function HomeScreen() {
           // ═══ Oda Kartları — stable callbacks, React.memo korunur ═══
           renderItem={({ item: room }) => (
             <SwipeToHideRow
-              onHide={() => ignoreRoom(room.id)}
+              onHide={() => ignoreRoom(room.id, room.name)}
               onReport={() => {
                 if (!firebaseUser) { showToast({ title: 'Giriş Gerekli', message: 'Şikayet için giriş yapmalısın.', type: 'warning' }); return; }
                 setReportRoom({ id: room.id, name: room.name });
@@ -1893,13 +1999,44 @@ export default function HomeScreen() {
                   <Text style={s.unifiedDetailLinkText}>veya detaylı ayarla</Text>
                   <Ionicons name="chevron-forward" size={14} color="#94A3B8" />
                 </Pressable>
+
+                {/* ★ v107.13: Gizlenen odalar — empty state içinde geri getirme yolu */}
+                {ignoredRoomIds.size > 0 && (
+                  <Pressable
+                    onPress={unignoreAll}
+                    style={({ pressed }) => [s.hiddenRoomsHint, pressed && { opacity: 0.6 }]}
+                    hitSlop={8}
+                  >
+                    <Ionicons name="eye-outline" size={14} color="#FBBF24" />
+                    <Text style={s.hiddenRoomsHintText}>
+                      {ignoredRoomIds.size} gizli oda var — Geri Getir
+                    </Text>
+                    <Ionicons name="refresh" size={12} color="#FBBF24" />
+                  </Pressable>
+                )}
               </LinearGradient>
             </View>
           )}
 
-          // ═══ Takip Ettiğin Odalar — Footer ═══
+          // ═══ Footer: Gizlenen odalar (varsa) + Takip Ettiğin Odalar ═══
           ListFooterComponent={
-            followedRooms.length > 0 ? (
+            <>
+              {/* ★ v107.13: Gizlenen odalar barı — SADECE liste doluyken (empty state'te zaten içeride pill var, duplicate olmasın) */}
+              {ignoredRoomIds.size > 0 && filteredRooms.length > 0 && (
+                <Pressable
+                  onPress={unignoreAll}
+                  style={({ pressed }) => [s.hiddenRoomsBar, pressed && { opacity: 0.7 }]}
+                  hitSlop={6}
+                >
+                  <Ionicons name="eye-outline" size={14} color="#FBBF24" />
+                  <Text style={s.hiddenRoomsBarText}>
+                    {ignoredRoomIds.size} gizli oda var
+                  </Text>
+                  <Text style={s.hiddenRoomsBarAction}>Tümünü Geri Getir</Text>
+                  <Ionicons name="refresh" size={12} color="#FBBF24" />
+                </Pressable>
+              )}
+              {followedRooms.length > 0 ? (
               <View style={{ marginTop: 8 }}>
                 <View style={s.followedPanelHeader}>
                   <Ionicons name="bookmark" size={14} color={Colors.accentTeal} />
@@ -1919,7 +2056,8 @@ export default function HomeScreen() {
                   ))}
                 </ScrollView>
               </View>
-            ) : null
+            ) : null}
+            </>
           }
         />
 
@@ -2144,6 +2282,35 @@ const s = StyleSheet.create({
   welcomeOnlinePillText: {
     fontSize: 12, fontWeight: '800', color: '#86EFAC',
     ...Shadows.text,
+  },
+  // ★ v107.48: Online arkadaş yatay şerit — keşif ekranında her zaman görünür sosyal sinyal
+  onlineStripWrap: {
+    marginTop: 4,
+    marginBottom: 6,
+  },
+  onlineStripContent: {
+    paddingHorizontal: 16,
+    gap: 10,
+    alignItems: 'center',
+  },
+  onlineAvatarWrap: {
+    width: 44,
+    height: 44,
+  },
+  onlineMoreBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.14)',
+  },
+  onlineMoreText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#CBD5E1',
   },
   // ★ 2026-04-24: Empty state sosyal ipucu satırı
   unifiedSocialHint: {
@@ -2634,6 +2801,52 @@ const s = StyleSheet.create({
     marginTop: 18,
     paddingVertical: 6,
     paddingHorizontal: 10,
+  },
+  // ★ v107.13: Gizlenen odalar — empty state altında kompakt link
+  hiddenRoomsHint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 100,
+    backgroundColor: 'rgba(251,191,36,0.10)',
+    borderWidth: 1,
+    borderColor: 'rgba(251,191,36,0.30)',
+  },
+  hiddenRoomsHintText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#FBBF24',
+    letterSpacing: 0.2,
+  },
+  // ★ v107.13: Gizlenen odalar — liste altında bar (liste doluyken görünür)
+  hiddenRoomsBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginHorizontal: 16,
+    marginTop: 4,
+    marginBottom: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    backgroundColor: 'rgba(251,191,36,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(251,191,36,0.22)',
+  },
+  hiddenRoomsBarText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.75)',
+  },
+  hiddenRoomsBarAction: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#FBBF24',
+    letterSpacing: 0.3,
   },
   unifiedDetailLinkText: {
     fontSize: 12,

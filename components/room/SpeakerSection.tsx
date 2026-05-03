@@ -73,28 +73,81 @@ interface Props {
 }
 
 function SpeakingGlow({ speaking, borderRadius = 16 }: { speaking: boolean; borderRadius?: number }) {
-  const pulseAnim = React.useRef(new Animated.Value(1)).current;
-  // ★ v92.28 (2 May 2026) PERF FIX: Önceden Animated.loop stop edilmiyordu — speaker
-  //   konuşmayı bıraksa bile loop arkaplanda dönmeye devam ediyordu. 5+ kişilik odada
-  //   FPS drop. Şimdi loop ref'i tutuluyor, speaking=false / unmount'ta stop().
+  // ★ v107.16: 2 katmanlı DIŞA dalgalanma ringleri (lighthouse pattern) + sabit referans border.
+  //   Eski sürümde tek border 1.0↔1.06 pulse → görsel olarak içeri kalıyordu.
+  //   Yeni: avatar etrafından dışa doğru genişleyip kaybolan halkalar.
+  //   Android shadow KALDIRILDI (gri görünüyordu). Border opacity ile glow telafi.
+  const ringA = React.useRef(new Animated.Value(0)).current;
+  const ringB = React.useRef(new Animated.Value(0)).current;
+  const breath = React.useRef(new Animated.Value(0)).current;
+
   React.useEffect(() => {
-    if (!speaking) { pulseAnim.setValue(1); return; }
-    const loop = Animated.loop(Animated.sequence([
-      Animated.timing(pulseAnim, { toValue: 1.06, duration: 400, useNativeDriver: true }),
-      Animated.timing(pulseAnim, { toValue: 1.0, duration: 400, useNativeDriver: true }),
+    if (!speaking) {
+      ringA.setValue(0); ringB.setValue(0); breath.setValue(0);
+      return;
+    }
+    const loopA = Animated.loop(Animated.timing(ringA, {
+      toValue: 1, duration: 1400, easing: Easing.out(Easing.quad), useNativeDriver: true,
+    }));
+    const loopB = Animated.loop(Animated.sequence([
+      Animated.delay(700),
+      Animated.timing(ringB, { toValue: 1, duration: 1400, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+      Animated.timing(ringB, { toValue: 0, duration: 0, useNativeDriver: true }),
     ]));
-    loop.start();
-    return () => loop.stop();
+    const breathLoop = Animated.loop(Animated.sequence([
+      Animated.timing(breath, { toValue: 1, duration: 600, useNativeDriver: true }),
+      Animated.timing(breath, { toValue: 0, duration: 600, useNativeDriver: true }),
+    ]));
+    loopA.start(); loopB.start(); breathLoop.start();
+    return () => { loopA.stop(); loopB.stop(); breathLoop.stop(); };
   }, [speaking]);
+
   if (!speaking) return null;
+
+  // Ring A — sürekli dışa expand
+  const ringAScale = ringA.interpolate({ inputRange: [0, 1], outputRange: [1.0, 1.35] });
+  const ringAOpacity = ringA.interpolate({ inputRange: [0, 0.4, 1], outputRange: [0.85, 0.55, 0] });
+  // Ring B — gecikmeli, üst üste binmesin
+  const ringBScale = ringB.interpolate({ inputRange: [0, 1], outputRange: [1.0, 1.35] });
+  const ringBOpacity = ringB.interpolate({ inputRange: [0, 0.4, 1], outputRange: [0.85, 0.55, 0] });
+  // Sabit referans border — yumuşak nefes
+  const breathScale = breath.interpolate({ inputRange: [0, 1], outputRange: [1.0, 1.04] });
+
   return (
-    <Animated.View style={[StyleSheet.absoluteFill, {
-      borderRadius, borderWidth: 2, borderColor: '#14B8A6',
-      transform: [{ scale: pulseAnim }],
-      // ★ v92.23 (1 May 2026): Android elevation eklendi — speaker pulse glow Android'de görünmüyordu
-      shadowColor: '#14B8A6', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.6, shadowRadius: 16,
-      elevation: 8,
-    }]} pointerEvents="none" />
+    <>
+      {/* Ring A — dışa expand pulse */}
+      <Animated.View
+        pointerEvents="none"
+        style={[StyleSheet.absoluteFill, {
+          borderRadius, borderWidth: 2, borderColor: '#14B8A6',
+          transform: [{ scale: ringAScale }],
+          opacity: ringAOpacity,
+        }]}
+      />
+      {/* Ring B — gecikmeli ikinci dalga */}
+      <Animated.View
+        pointerEvents="none"
+        style={[StyleSheet.absoluteFill, {
+          borderRadius, borderWidth: 1.5, borderColor: '#5EEAD4',
+          transform: [{ scale: ringBScale }],
+          opacity: ringBOpacity,
+        }]}
+      />
+      {/* Sabit referans border — yumuşak nefes (parlak iç çizgi, iOS'ta glow shadow) */}
+      <Animated.View
+        pointerEvents="none"
+        style={[StyleSheet.absoluteFill, {
+          borderRadius, borderWidth: 2, borderColor: '#14B8A6',
+          transform: [{ scale: breathScale }],
+          ...(Platform.OS === 'ios' ? {
+            shadowColor: '#14B8A6',
+            shadowOffset: { width: 0, height: 0 },
+            shadowOpacity: 0.6,
+            shadowRadius: 12,
+          } : {}),
+        }]}
+      />
+    </>
   );
 }
 
@@ -440,6 +493,10 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, i
     //   düzeltildi. "Sahneden İn" butonu dış Pressable içindeyken touch event'i dış kart
     //   yakalıyordu → profil kartı açılıyordu, onSelfDemote çalışmıyordu.
     //   Şimdi: kart tıklaması Pressable (card inner), demote butonu bağımsız sibling Pressable.
+    // ★ v107.41: Reanimated entering/exiting KALDIRILDI — kullanıcı "zıplamalı yapma" dedi.
+    //   Slide-in/out yön mantığı doğruydu ama görsel olarak zıplama hissi veriyordu.
+    //   Gerçek "kendi konumundan kayma" için FLIP technique gerekir (shared element).
+    //   Şimdilik instant — kullanıcı pozisyon değişimini görür, zıplama yok.
     <View style={[s.speakerCard, { width: cardWidth }]}>
       <Pressable style={({ pressed }) => [{ width: '100%' }, pressed && { opacity: 0.9, transform: [{ scale: 0.97 }] }]} onPress={onPress}>
       {/* ★ v92.21 (1 May 2026): HİBRİT shape — kameralı kişi RECTANGULAR rounded
@@ -625,19 +682,17 @@ export default function SpeakerSection({ stageUsers, getMicStatus, onSelectUser,
   }, [showSeatTooltip]);
 
   if (sortedUsers.length === 0) {
-    // ★ 2026-04-19 EKSİLTME — 3 aynı mesaj yerine tek koltuk + küçük etiket.
-    // Eskiden: tooltip "Sahne seni bekliyor!" + koltuk "Sahneye Çık" + subtitle
-    //           "Koltuğa dokun ve sahneye katıl" — üç satır aynı şeyi söylüyordu.
-    // Şimdi: sadece koltuk + "Sahneye Çık" label. Sessizlik güçtür.
+    // ★ v107.28: "Sahneye Çık" CTA artık StageActionPill (kontrol bar üstü) — kullanıcı talebi.
+    //   Boş sahnede sadece silik bir simge + "Sahne boş" mesajı. Tıklama hâlâ aktif (geri dönüş).
     return (
       <View style={s.empty}>
-        <Pressable onPress={onGhostSeatPress} style={({ pressed }) => [s.ghostSeat, pressed && { transform: [{ scale: 0.93 }] }]}>
+        <Pressable onPress={onGhostSeatPress} style={({ pressed }) => [s.ghostSeat, pressed && { transform: [{ scale: 0.96 }] }]}>
           <Animated.View style={[s.ghostSeatInner, { opacity: ghostPulse }]}>
             <View style={s.ghostSeatIcon}>
-              <Ionicons name="person-add-outline" size={28} color="rgba(20,184,166,0.6)" />
+              <Ionicons name="mic-outline" size={22} color="rgba(20,184,166,0.35)" />
             </View>
           </Animated.View>
-          <Text style={s.ghostSeatLabel}>Sahneye Çık</Text>
+          <Text style={[s.ghostSeatLabel, { color: 'rgba(148,163,184,0.45)', fontSize: 11, fontWeight: '500' }]}>Sahne boş</Text>
         </Pressable>
       </View>
     );

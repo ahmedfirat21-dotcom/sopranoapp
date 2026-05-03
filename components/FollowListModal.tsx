@@ -23,15 +23,18 @@ import {
   Image, Animated, PanResponder, Dimensions,
 } from 'react-native';
 import AppLoader from './AppLoader';
+import UserListSkeleton from './UserListSkeleton';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FriendshipService, type FollowUser } from '../services/friendship';
 import { FollowService } from '../services/follows';
 import { getAvatarSource } from '../constants/avatars';
+import StatusAvatar from './StatusAvatar';
 import PremiumAlert, { type AlertButton } from './PremiumAlert';
 import { useRouter } from 'expo-router';
 import { Colors, Shadows } from '../constants/theme';
-import { useUserProfileSheet } from '../app/_layout';
+// ★ v107.32: Cycle kırma — _layout yerine direkt context dosyasından
+import { useUserProfileSheet } from '../providers/UserProfileSheetContext';
 
 const SCREEN_H = Dimensions.get('window').height;
 const SNAP_HALF = SCREEN_H * 0.45;   // başlangıç: ekranın yarısından biraz yukarı
@@ -291,7 +294,7 @@ export default function FollowListModal({
         style={({ pressed }) => [st.row, pressed && { backgroundColor: 'rgba(255,255,255,0.04)' }]}
         onPress={() => navigateToProfile(item.id)}
       >
-        <Image source={getAvatarSource(item.avatar_url)} style={st.avatar} />
+        <StatusAvatar uri={item.avatar_url} size={40} tier={(item as any).subscription_tier} showTierBadge={false} />
         <View style={{ flex: 1 }}>
           <Text style={st.name} numberOfLines={1}>{item.display_name}</Text>
           {item.username && <Text style={st.username}>@{item.username}</Text>}
@@ -384,11 +387,9 @@ export default function FollowListModal({
             </View>
           </View>
 
-          {/* Liste */}
+          {/* Liste — ★ v107.20: AppLoader yerine skeleton placeholder (kullanıcı talebi) */}
           {loading ? (
-            <View style={st.loading}>
-              <AppLoader size="large" color="#14B8A6" />
-            </View>
+            <UserListSkeleton count={4} showAction />
           ) : list.length === 0 ? (
             <View style={st.empty}>
               <Ionicons name="people-outline" size={40} color="rgba(94,234,212,0.2)" style={iconShadow} />

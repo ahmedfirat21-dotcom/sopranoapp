@@ -13,7 +13,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FriendshipService } from '../services/friendship';
 import StatusAvatar from './StatusAvatar';
 import { Colors } from '../constants/theme';
-import { useUserProfileSheet } from '../app/_layout';
+// ★ v107.32: Cycle kırma — _layout yerine direkt context dosyasından
+import { useUserProfileSheet } from '../providers/UserProfileSheetContext';
 
 export interface IncomingFriendRequest {
   senderId: string;

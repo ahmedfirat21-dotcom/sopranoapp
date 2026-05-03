@@ -30,7 +30,8 @@ import SPIcon from '../../components/SPIcon';
 import SPHexagonIcon from '../../components/SPHexagonIcon';
 import ProfileHero from '../../components/profile/ProfileHero';
 import BadgeListModal from '../../components/profile/BadgeListModal';
-import SPDonateSheet from '../../components/profile/SPDonateSheet';
+// ★ v107: SPDonateSheet → GiftSheet (kişiye hediye akışı kendi sheet'ine ayrıldı)
+import GiftSheet from '../../components/profile/GiftSheet';
 import FollowListModal from '../../components/FollowListModal';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -924,15 +925,17 @@ export default function UserProfileScreen() {
         />
       )}
 
-      {/* ★ SP Donate Sheet — premium bottom sheet (slider + preset) */}
+      {/* ★ v107: GiftSheet — hediye temalı sheet (paket watermark, alıcı kartı, mesaj input) */}
       {firebaseUser && id && userProfile && (
-        <SPDonateSheet
+        <GiftSheet
           visible={showSPSheet}
           onClose={() => setShowSPSheet(false)}
           senderId={firebaseUser.uid}
           recipientId={id}
           recipientName={userProfile.display_name || 'Kullanıcı'}
           recipientAvatar={userProfile.avatar_url || undefined}
+          recipientUsername={userProfile.username || undefined}
+          recipientTier={userProfile.subscription_tier || null}
         />
       )}
 

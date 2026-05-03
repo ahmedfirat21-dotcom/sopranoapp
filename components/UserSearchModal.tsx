@@ -6,6 +6,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, Pressable, TextInput, FlatList, Animated, PanResponder, Dimensions, Keyboard } from 'react-native';
 import AppLoader from './AppLoader';
+import UserListSkeleton from './UserListSkeleton';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Shadows } from '../constants/theme';
@@ -425,7 +426,7 @@ export function UserSearchModal({ visible, onClose, currentUserId, onSelectUser,
                 <Text style={s.sectionTitle}>Kişiler</Text>
               </View>
               {loading ? (
-                <AppLoader size="large" color={Colors.teal} style={{ marginTop: 40 }} />
+                <UserListSkeleton count={5} showAction />
               ) : (
                 <FlatList
                   data={displayList}
@@ -448,7 +449,7 @@ export function UserSearchModal({ visible, onClose, currentUserId, onSelectUser,
             /* ═══ Boş Durum: Takip Ettiklerin + Önerilen Üyeler ═══ */
             <>
               {friendsLoading ? (
-                <AppLoader size="large" color={Colors.teal} style={{ marginTop: 40 }} />
+                <UserListSkeleton count={4} showAction />
               ) : (
                 <FlatList
                   data={[]} // Header-only — gerçek veriler ListHeader'da

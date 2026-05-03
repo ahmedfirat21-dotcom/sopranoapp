@@ -27,7 +27,8 @@ import { UserTitleService, type UserTitle } from '../../services/userTitles';
 import { showToast } from '../Toast';
 import ProfileHero from '../profile/ProfileHero';
 import BadgeListModal from '../profile/BadgeListModal';
-import SPDonateSheet from '../profile/SPDonateSheet';
+// ★ v107: SPDonateSheet → GiftSheet (kişiye hediye akışı kendi sheet'inde)
+import GiftSheet from '../profile/GiftSheet';
 import FollowListModal from '../FollowListModal';
 import { ReportModal } from '../ReportModal';
 import PremiumAlert, { type AlertButton } from '../PremiumAlert';
@@ -106,10 +107,12 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
   const [incomingStatus, setIncomingStatus] = useState<FriendshipStatus | null>(null);
   const [followLoading, setFollowLoading] = useState(false);
   const [incomingLoading, setIncomingLoading] = useState(false);
-  // ★ v92.1 (1 May 2026): Profil açıldığında follow/friend status fetch'i ~2sn sürebiliyor.
-  //   Buton içerikleri yanlış state'te flash etmesin diye fetch tamamlanana kadar
-  //   bu flag false → butonlar yerine spinner gösterilir, tamamlanınca true → gerçek state.
-  const [interactionsReady, setInteractionsReady] = useState(false);
+  // ★ v107.23: interactionsReady flag KALDIRILDI (kullanıcı talebi).
+  //   Eski sürümde 2sn fetch tamamlanana kadar butonlar yerine spinner gösteriliyordu.
+  //   Yeni: butonlar default state ile (Takip değil / Arkadaş değil) instant açılır,
+  //   fetch arka planda gerçek state'e güncellenir. Yükleniyor sadece kullanıcının
+  //   tıkladığı sırada (followToggleLoading / followLoading) görünür — bu mantıklı.
+  const interactionsReady = true; // backward compat — diğer kullanım yerleri etkilenmesin
   const [stats, setStats] = useState({ friends: 0, followers: 0, following: 0, rooms: 0, badges: 0 });
   const [friendsPreview, setFriendsPreview] = useState<FriendUser[]>([]);
   const [profileStats, setProfileStats] = useState({ stageMinutes: 0, roomsCreated: 0, totalListeners: 0, totalReactions: 0 });
@@ -159,8 +162,7 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
     setIncomingStatus(null);
     setIsUserBlocked(false);
     setCurrentRoom(null);
-    // ★ v92.1: Detail Promise.all bitene kadar buton'lar spinner gösterir
-    setInteractionsReady(false);
+    // ★ v107.23: setInteractionsReady KALDIRILDI — butonlar instant görünür
     setIsFollowingUser(false);
     setMutualFriendCount(0);
     setShowMoreActions(false);
@@ -234,8 +236,7 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
         : friendList;
       setFriendsPreview(visibleFriends);
       setStats({ friends: friendList.length, followers: followerN, following: followingN, rooms: roomCountRes.count ?? 0, badges: badgeCount });
-      // ★ v92.1: Detail fetch tamam → butonlar gerçek state'e geçer
-      setInteractionsReady(true);
+      // ★ v107.23: setInteractionsReady KALDIRILDI — butonlar zaten instant
       setProfileStats(pStats);
       setUserTitle(title);
 
@@ -538,9 +539,31 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
             </View>
           </View>
 
+        {/* ★ v107.23: AppLoader spinner KALDIRILDI — kullanıcı talebi.
+             Yükleniyor sırasında minimal skeleton göster (avatar + isim + buton placeholder).
+             Spinner sadece OdaPage gibi gerçek bağlantı bekleme sayfalarında olmalı. */}
         {loading ? (
-          <View style={sty.loadingBox}>
-            <AppLoader size="large" color={Colors.teal} />
+          <View style={sty.skeletonWrap}>
+            {/* Avatar + isim placeholder */}
+            <View style={sty.skeletonHeaderRow}>
+              <View style={sty.skeletonAvatar} />
+              <View style={{ flex: 1, gap: 8 }}>
+                <View style={[sty.skeletonBar, { width: '55%', height: 14 }]} />
+                <View style={[sty.skeletonBar, { width: '35%', height: 10 }]} />
+              </View>
+            </View>
+            {/* Stat cards placeholder */}
+            <View style={sty.skeletonStatsRow}>
+              <View style={sty.skeletonStat} />
+              <View style={sty.skeletonStat} />
+            </View>
+            {/* Buton placeholder */}
+            <View style={sty.skeletonBtnRow}>
+              <View style={[sty.skeletonBtn, { flex: 1 }]} />
+              <View style={[sty.skeletonBtn, { flex: 1 }]} />
+              <View style={sty.skeletonBtnSmall} />
+              <View style={sty.skeletonBtnSmall} />
+            </View>
           </View>
         ) : !userProfile ? (
           <View style={sty.loadingBox}>
@@ -609,9 +632,15 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                 )}
 
 
-                {/* ★ 2026-04-26: Birleşik etkileşim satırı — Takip + Arkadaş + DM */}
+                {/* ★ v107.48 (3 May 2026): Etkileşim satırı YENİDEN YAZILDI.
+                    Önceki halinde yükseklikler 56/48/48/56 farklı, renk dili karışık,
+                    "çok gıcık" görünüyordu (kullanıcı geri bildirimi).
+                    Yeni: tüm elemanlar 52 yükseklik, ortak görsel dil:
+                      - Takip + Arkadaş: outline pill (default) → tier renk dolgu (active)
+                      - Chat: outline circle (aynı dil)
+                      - SP: hexagon biraz büyütüldü (62), zincirden kopmuyor */}
                 <View style={sty.interactionRow}>
-                  {/* One-way Takip butonu — Arkadaş Ekle ile eşit genişlik (flex 1) */}
+                  {/* Takip Et / Takipte */}
                   <Pressable
                     onPress={async () => {
                       if (!currentUserId || !userId || followToggleLoading) return;
@@ -627,49 +656,72 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                       finally { setFollowToggleLoading(false); }
                     }}
                     disabled={followToggleLoading || isUserBlocked}
-                    style={({ pressed }) => [{
-                      flex: 1,
-                      flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7,
-                      paddingHorizontal: 12, height: 56, borderRadius: 999,
-                      backgroundColor: isFollowingUser ? 'rgba(20,184,166,0.15)' : 'rgba(255,255,255,0.06)',
-                      borderWidth: 1,
-                      borderColor: isFollowingUser ? 'rgba(20,184,166,0.4)' : 'rgba(255,255,255,0.1)',
-                      opacity: pressed ? 0.7 : 1,
-                    }]}
+                    style={({ pressed }) => [
+                      sty.actionPill,
+                      isFollowingUser ? sty.actionPillActive : sty.actionPillIdle,
+                      pressed && { opacity: 0.7, transform: [{ scale: 0.97 }] },
+                    ]}
                   >
-                    {(followToggleLoading || !interactionsReady) ? <AppLoader size="small" color="#14B8A6" /> : (
+                    {followToggleLoading ? <AppLoader size="small" color="#14B8A6" /> : (
                       <>
-                        <Ionicons name={isFollowingUser ? 'checkmark' : 'add'} size={18} color={isFollowingUser ? '#14B8A6' : '#fff'} />
-                        <Text style={{ fontSize: 14, fontWeight: '800', color: isFollowingUser ? '#14B8A6' : '#fff' }}>
+                        <Ionicons
+                          name={isFollowingUser ? 'checkmark-circle' : 'person-add-outline'}
+                          size={17}
+                          color={isFollowingUser ? '#14B8A6' : '#F1F5F9'}
+                        />
+                        <Text style={[sty.actionPillText, { color: isFollowingUser ? '#14B8A6' : '#F1F5F9' }]}>
                           {isFollowingUser ? 'Takipte' : 'Takip Et'}
                         </Text>
                       </>
                     )}
                   </Pressable>
-                  {/* Arkadaş Ekle butonu */}
+                  {/* Arkadaş Ekle / Arkadaş / İstek Gönderildi / Engellendi */}
                   <Pressable
-                    style={[sty.followBtn, (isFriend || isPending) && sty.followBtnActive]}
                     onPress={handleFollow}
                     disabled={followLoading || isUserBlocked}
+                    style={({ pressed }) => [
+                      sty.actionPill,
+                      isUserBlocked
+                        ? sty.actionPillBlocked
+                        : isFriend
+                          ? sty.actionPillFriend
+                          : isPending
+                            ? sty.actionPillPending
+                            : sty.actionPillIdle,
+                      pressed && !followLoading && { opacity: 0.7, transform: [{ scale: 0.97 }] },
+                    ]}
                   >
-                    {(followLoading || !interactionsReady) ? (
+                    {followLoading ? (
                       <AppLoader size="small" color="#fff" />
                     ) : isUserBlocked ? (
-                      <Text style={[sty.followBtnText, { color: '#EF4444' }]}>Engellendi</Text>
+                      <>
+                        <Ionicons name="ban" size={16} color="#EF4444" />
+                        <Text style={[sty.actionPillText, { color: '#EF4444' }]}>Engellendi</Text>
+                      </>
                     ) : isFriend ? (
-                      <><Ionicons name="people" size={18} color="#F1F5F9" /><Text style={[sty.followBtnText, { color: '#F1F5F9' }]}>Arkadaş</Text></>
+                      <>
+                        <Ionicons name="people" size={17} color="#A78BFA" />
+                        <Text style={[sty.actionPillText, { color: '#A78BFA' }]}>Arkadaş</Text>
+                      </>
                     ) : isPending ? (
-                      <Text style={[sty.followBtnText, { color: '#FBBF24' }]}>İstek Gönderildi</Text>
+                      <>
+                        <Ionicons name="time-outline" size={16} color="#FBBF24" />
+                        <Text style={[sty.actionPillText, { color: '#FBBF24', fontSize: 12 }]}>İstek Gönderildi</Text>
+                      </>
                     ) : (
-                      <><Ionicons name="person-add-outline" size={18} color="#fff" /><Text style={sty.followBtnText}>Arkadaş Ekle</Text></>
+                      <>
+                        <Ionicons name="person-add" size={17} color="#F1F5F9" />
+                        <Text style={[sty.actionPillText, { color: '#F1F5F9' }]}>Arkadaş Ekle</Text>
+                      </>
                     )}
                   </Pressable>
-                  {/* ★ v85h: DM butonu Instagram modeli — herkese görünür (arkadaş+yabancı).
-                      Arkadaş olmayanlar gönderince mesaj isteği akışı (message_requests) tetiklenir,
-                      alıcı onay/red verir. Bloklanan ve kendi profili hariç. */}
+                  {/* DM circle — aynı outline dili */}
                   {!isUserBlocked && !isOwnProfile && userId && (
                     <Pressable
-                      style={sty.dmBtn}
+                      style={({ pressed }) => [
+                        sty.actionCircle,
+                        pressed && { opacity: 0.7, transform: [{ scale: 0.94 }] },
+                      ]}
                       onPress={() => {
                         handleClose();
                         const target = userId;
@@ -680,18 +732,17 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                         }
                       }}
                     >
-                      <Ionicons name="chatbubble-outline" size={24} color="#E2E8F0" />
+                      <Ionicons name="chatbubble-outline" size={20} color="#E2E8F0" />
                     </Pressable>
                   )}
-                  {/* ★ v92.1 (1 May 2026): Daire ve koyu kahve zemin kaldırıldı (kullanıcı talebi).
-                      Sadece animasyonlu hexagon — kendi içindeki drop-shadow yeterli görsel ağırlık veriyor. */}
+                  {/* SP hexagon — kendi animasyonu, hafif büyütüldü (62) */}
                   {!isOwnProfile && !isUserBlocked && currentUserId && (
                     <Pressable
-                      style={sty.spChipBtn}
+                      style={sty.actionHex}
                       onPress={() => setShowSPSheet(true)}
-                      hitSlop={8}
+                      hitSlop={6}
                     >
-                      <SPHexagonIcon size={60} />
+                      <SPHexagonIcon size={62} static />
                     </Pressable>
                   )}
                 </View>
@@ -1023,13 +1074,16 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
       )}
 
       {currentUserId && userId && userProfile && (
-        <SPDonateSheet
+        <GiftSheet
           visible={showSPSheet}
           onClose={() => setShowSPSheet(false)}
           senderId={currentUserId}
           recipientId={userId}
           recipientName={userProfile.display_name || 'Kullanıcı'}
           recipientAvatar={userProfile.avatar_url || undefined}
+          recipientUsername={(userProfile as any).username || undefined}
+          recipientTier={(userProfile as any).subscription_tier || null}
+          inRoom={true}
         />
       )}
 
@@ -1106,6 +1160,50 @@ const sty = StyleSheet.create({
     flex: 1, alignItems: 'center', justifyContent: 'center',
     paddingVertical: 60,
   },
+  // ★ v107.23: Profil yüklenirken spinner yerine minimal skeleton placeholder
+  skeletonWrap: {
+    paddingHorizontal: 18,
+    paddingTop: 14,
+    gap: 16,
+  },
+  skeletonHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 4,
+  },
+  skeletonAvatar: {
+    width: 64, height: 64, borderRadius: 32,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+  },
+  skeletonBar: {
+    height: 12, borderRadius: 6,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+  },
+  skeletonStatsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    paddingHorizontal: 4,
+  },
+  skeletonStat: {
+    flex: 1,
+    height: 64, borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+  },
+  skeletonBtnRow: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 4,
+    marginTop: 4,
+  },
+  skeletonBtn: {
+    height: 44, borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+  },
+  skeletonBtnSmall: {
+    width: 44, height: 44, borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+  },
   blockedBanner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1148,27 +1246,76 @@ const sty = StyleSheet.create({
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
   },
   incomingRejectText: { color: '#94A3B8', fontSize: 11, fontWeight: '600' },
+  // ★ v107.48: Yeniden tasarlanan etkileşim satırı.
+  //   Tüm elemanlar 52 yükseklik. Ortak görsel dil: outline + active state dolgu.
   interactionRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: 8,
     marginHorizontal: 16,
-    marginTop: 12,
+    marginTop: 10,
   },
-  // ★ v92.1 (1 May 2026): Aksiyon row tutarlı yüksekliğe çekildi (42 → 56),
-  //   DM/SP chip boyutuyla hizalandı. Yazı font 13 → 14, padding artırıldı.
-  followBtn: {
+  // ★ Pill base — Takip + Arkadaş için (flex 1, 52 height, rounded full)
+  actionPill: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 7,
-    height: 56,
+    gap: 6,
+    height: 52,
     borderRadius: 999,
     paddingHorizontal: 12,
-    backgroundColor: '#14B8A6',
+    borderWidth: 1.5,
   },
-  followBtnActive: { backgroundColor: 'rgba(20,184,166,0.15)', borderWidth: 1, borderColor: 'rgba(20,184,166,0.3)' },
-  followBtnText: { color: '#FFF', fontSize: 14, fontWeight: '700' },
+  // Default (idle) state — outline, neutral
+  actionPillIdle: {
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderColor: 'rgba(255,255,255,0.14)',
+  },
+  // Takipte — teal active
+  actionPillActive: {
+    backgroundColor: 'rgba(20,184,166,0.12)',
+    borderColor: 'rgba(20,184,166,0.45)',
+  },
+  // Arkadaş — purple active
+  actionPillFriend: {
+    backgroundColor: 'rgba(167,139,250,0.12)',
+    borderColor: 'rgba(167,139,250,0.45)',
+  },
+  // İstek Gönderildi — amber pending
+  actionPillPending: {
+    backgroundColor: 'rgba(251,191,36,0.10)',
+    borderColor: 'rgba(251,191,36,0.40)',
+  },
+  // Engellendi — red blocked
+  actionPillBlocked: {
+    backgroundColor: 'rgba(239,68,68,0.10)',
+    borderColor: 'rgba(239,68,68,0.35)',
+  },
+  actionPillText: {
+    fontSize: 13,
+    fontWeight: '800',
+    letterSpacing: 0.2,
+  },
+  // ★ DM circle — aynı outline dili, 52x52
+  actionCircle: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.14)',
+  },
+  // ★ SP hexagon container — overflow visible, hexagon kendi içinde 62 (büyütüldü)
+  actionHex: {
+    width: 60,
+    height: 60,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'visible',
+  },
   privateBox: {
     marginHorizontal: 16, marginTop: 10, padding: 20, borderRadius: 16,
     backgroundColor: 'rgba(255,255,255,0.04)',
@@ -1314,8 +1461,9 @@ const sty = StyleSheet.create({
   },
 
   // ★ v92.1 (1 May 2026): DM butonu — SP chip ile orantılı (56×56).
+  // ★ v107.26: Chat circle followBtn ile uyumlu (48x48)
   dmBtn: {
-    width: 56, height: 56, borderRadius: 28,
+    width: 48, height: 48, borderRadius: 24,
     backgroundColor: 'rgba(255,255,255,0.06)',
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
     alignItems: 'center' as const, justifyContent: 'center' as const,
@@ -1323,6 +1471,8 @@ const sty = StyleSheet.create({
   // ★ v92.1 (1 May 2026): SP Gönder — daire/border/zemin kaldırıldı (kullanıcı talebi).
   //   Hexagon 60, wrapper 56 (overflow visible) → DM butonu ile aynı görsel boyut,
   //   hexagon kendi glow'uyla biraz dışarı taşar (mücevher hissi).
+  // ★ v107.26: SP chip 88→56 — diğer butonlarla (48) uyumlu, hexagon biraz dışa taşıp
+  //   "mücevher hissi" versin (overflow visible). Yan yana orantı bozulmaz.
   spChipBtn: {
     width: 56, height: 56,
     alignItems: 'center' as const, justifyContent: 'center' as const,

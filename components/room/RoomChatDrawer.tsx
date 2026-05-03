@@ -660,12 +660,11 @@ const st = StyleSheet.create({
     borderBottomLeftRadius: 18,
     borderBottomRightRadius: 18,
     overflow: 'hidden',
-    // ★ v92.23 (1 May 2026): Android elevation eklendi (sheet drop shadow için)
+    // ★ v92.23 (1 May 2026): drop shadow — iOS shadowColor/Opacity, Android elevation: 58 (yukarıda)
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.4,
     shadowRadius: 16,
-    elevation: 12,
   },
 
   handle: { alignItems: 'center', paddingTop: 8, paddingBottom: 2 },

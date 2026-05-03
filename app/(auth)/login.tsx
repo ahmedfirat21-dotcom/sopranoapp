@@ -9,15 +9,25 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors, Shadows, Gradients, Radius } from '../../constants/theme';
 import { supabase } from '../../constants/supabase';
 
+// ★ v107.48: Google Sign-In v16 export uyumsuzluğu düzeltildi.
+//   Önceden: const gsignin = require(...); GoogleSignin = gsignin.GoogleSignin
+//   Bu v16'da bazen undefined dönüyor → fallback'e düşüp "Expo Go" hatası gösteriliyordu.
+//   Şimdi: hem named export hem default export'tan al, hangisi çalışırsa.
 let GoogleSignin: any;
 try {
   const gsignin = require('@react-native-google-signin/google-signin');
-  GoogleSignin = gsignin.GoogleSignin;
+  GoogleSignin = gsignin.GoogleSignin || gsignin.default?.GoogleSignin || gsignin.default || gsignin;
+  if (!GoogleSignin || typeof GoogleSignin.signIn !== 'function') {
+    throw new Error('GoogleSignin module yüklendi ama signIn fonksiyonu bulunamadı');
+  }
 } catch (e) {
+  if (__DEV__) console.warn('[GoogleSignin] modül yüklenemedi:', e);
   GoogleSignin = {
     configure: () => {},
     hasPlayServices: async () => true,
-    signIn: async () => { throw new Error('Google Girişi Expo Go sürümünde çalışmaz. Lütfen apk/dev derlemesi kullanın.'); }
+    signIn: async () => { throw new Error('Google ile giriş şu an kullanılamıyor. E-posta ile giriş yapabilirsin.'); },
+    signOut: async () => {},
+    revokeAccess: async () => {},
   };
 }
 
