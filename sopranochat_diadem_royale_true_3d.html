@@ -1,0 +1,287 @@
+<div style="padding: 1rem 0;">
+<h2 class="sr-only">SopranoChat — gerçek 3D faceted Diadem Royale (taç sembolü) test</h2>
+
+<style>
+.test-stage {
+  background: radial-gradient(ellipse at center, #1a1330 0%, #0a0518 60%, #000 100%);
+  border-radius: 24px;
+  padding: 40px 20px;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 32px;
+}
+
+.test-stage::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(1px 1px at 20% 25%, rgba(255, 224, 130, 0.5), transparent),
+    radial-gradient(1.5px 1.5px at 80% 30%, rgba(255, 255, 255, 0.4), transparent),
+    radial-gradient(1px 1px at 50% 70%, rgba(244, 114, 182, 0.5), transparent),
+    radial-gradient(1px 1px at 25% 85%, rgba(255, 224, 130, 0.4), transparent);
+  background-repeat: no-repeat;
+  pointer-events: none;
+  animation: stars-drift-test 30s linear infinite;
+}
+
+@keyframes stars-drift-test {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.9; }
+}
+
+.compare-row {
+  display: flex;
+  gap: 32px;
+  align-items: center;
+  position: relative;
+  z-index: 5;
+}
+
+.compare-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.cell-label {
+  color: rgba(255, 224, 130, 0.7);
+  font-size: 9px;
+  letter-spacing: 2.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+@keyframes idle-3d-crown {
+  0%, 100% { transform: translateY(0) rotateZ(-1.5deg) scale(1); }
+  50% { transform: translateY(-4px) rotateZ(1.5deg) scale(1.02); }
+}
+
+@keyframes facet-tw-1 { 0%, 100% { opacity: 0.3; } 30% { opacity: 1; } }
+@keyframes facet-tw-2 { 0%, 100% { opacity: 0.5; } 60% { opacity: 1; } }
+@keyframes facet-tw-3 { 0%, 100% { opacity: 0.4; } 45% { opacity: 0.95; } }
+@keyframes shine-march-test {
+  0% { transform: translateX(-100%) skewX(-15deg); opacity: 0; }
+  20% { opacity: 1; }
+  80% { opacity: 1; }
+  100% { transform: translateX(200%) skewX(-15deg); opacity: 0; }
+}
+
+.crown-3d {
+  animation: idle-3d-crown 4s ease-in-out infinite;
+  filter:
+    drop-shadow(0 0 16px rgba(244, 114, 182, 0.55))
+    drop-shadow(0 0 30px rgba(255, 224, 130, 0.35))
+    drop-shadow(0 8px 16px rgba(0, 0, 0, 0.6));
+}
+
+.crown-flat {
+  filter:
+    drop-shadow(0 0 12px rgba(244, 114, 182, 0.6))
+    drop-shadow(0 4px 8px rgba(0,0,0,0.5));
+  animation: idle-3d-crown 4s ease-in-out infinite;
+}
+
+.fac-tw-1 { animation: facet-tw-1 2.4s ease-in-out infinite; }
+.fac-tw-2 { animation: facet-tw-2 2.8s ease-in-out infinite 0.4s; }
+.fac-tw-3 { animation: facet-tw-3 3.2s ease-in-out infinite 0.8s; }
+.shine-band-test { animation: shine-march-test 3.5s ease-in-out infinite; }
+
+.note {
+  color: rgba(255,255,255,0.6);
+  font-size: 11px;
+  text-align: center;
+  max-width: 90%;
+  margin: 0 auto;
+  line-height: 1.6;
+  position: relative;
+  z-index: 5;
+}
+
+.note strong { color: #FFE082; font-weight: 700; }
+</style>
+
+<div class="test-stage">
+
+<div class="compare-row">
+
+<div class="compare-cell">
+
+<svg class="crown-flat" width="120" height="120" viewBox="0 0 100 100">
+<defs>
+<linearGradient id="old-crown-body" x1="0%" y1="0%" x2="0%" y2="100%">
+<stop offset="0%" stop-color="#FFF4D6"/>
+<stop offset="20%" stop-color="#FFE082"/>
+<stop offset="55%" stop-color="#FAC775"/>
+<stop offset="85%" stop-color="#EF9F27"/>
+<stop offset="100%" stop-color="#854F0B"/>
+</linearGradient>
+<radialGradient id="old-ruby" cx="50%" cy="40%" r="55%">
+<stop offset="0%" stop-color="#FCE7F3"/>
+<stop offset="40%" stop-color="#F472B6"/>
+<stop offset="100%" stop-color="#831843"/>
+</radialGradient>
+</defs>
+<path d="M 18 70 L 22 38 L 35 50 L 50 22 L 65 50 L 78 38 L 82 70 Z" fill="url(#old-crown-body)" stroke="#FFF4D6" stroke-width="1"/>
+<rect x="16" y="68" width="68" height="6" fill="url(#old-crown-body)" stroke="#FFF4D6" stroke-width="0.8" rx="1"/>
+<circle cx="50" cy="22" r="5" fill="url(#old-ruby)"/>
+</svg>
+<div class="cell-label">— ÖNCEKİ — Düz</div>
+</div>
+
+<div class="compare-cell">
+
+<svg class="crown-3d" width="160" height="160" viewBox="0 0 100 100">
+<defs>
+
+<linearGradient id="c3d-body" x1="20%" y1="0%" x2="80%" y2="100%">
+<stop offset="0%" stop-color="#FFFFFF"/>
+<stop offset="10%" stop-color="#FFF4D6"/>
+<stop offset="25%" stop-color="#FFE082"/>
+<stop offset="50%" stop-color="#FAC775"/>
+<stop offset="75%" stop-color="#EF9F27"/>
+<stop offset="92%" stop-color="#854F0B"/>
+<stop offset="100%" stop-color="#3D1F00"/>
+</linearGradient>
+
+<linearGradient id="c3d-top-shine" x1="0%" y1="0%" x2="0%" y2="100%">
+<stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.95"/>
+<stop offset="50%" stop-color="#FFFFFF" stop-opacity="0.4"/>
+<stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
+</linearGradient>
+
+<linearGradient id="c3d-bottom-dark" x1="0%" y1="0%" x2="0%" y2="100%">
+<stop offset="0%" stop-color="#000000" stop-opacity="0"/>
+<stop offset="100%" stop-color="#000000" stop-opacity="0.6"/>
+</linearGradient>
+
+<linearGradient id="c3d-left-dark" x1="0%" y1="0%" x2="100%" y2="0%">
+<stop offset="0%" stop-color="#000000" stop-opacity="0.4"/>
+<stop offset="100%" stop-color="#000000" stop-opacity="0"/>
+</linearGradient>
+
+<linearGradient id="c3d-sweep" x1="0%" y1="0%" x2="100%" y2="0%">
+<stop offset="0%" stop-color="#FFFFFF" stop-opacity="0"/>
+<stop offset="50%" stop-color="#FFFFFF" stop-opacity="0.85"/>
+<stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
+</linearGradient>
+
+<radialGradient id="c3d-ruby-faceted" cx="40%" cy="30%" r="65%">
+<stop offset="0%" stop-color="#FFFFFF"/>
+<stop offset="15%" stop-color="#FCE7F3"/>
+<stop offset="40%" stop-color="#F472B6"/>
+<stop offset="75%" stop-color="#BE185D"/>
+<stop offset="100%" stop-color="#500724"/>
+</radialGradient>
+
+<radialGradient id="c3d-ruby-shine" cx="35%" cy="25%" r="50%">
+<stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.95"/>
+<stop offset="60%" stop-color="#FFFFFF" stop-opacity="0"/>
+</radialGradient>
+
+<radialGradient id="c3d-sapph-faceted" cx="40%" cy="30%" r="65%">
+<stop offset="0%" stop-color="#FFFFFF"/>
+<stop offset="15%" stop-color="#DBEAFE"/>
+<stop offset="40%" stop-color="#60A5FA"/>
+<stop offset="75%" stop-color="#1E40AF"/>
+<stop offset="100%" stop-color="#1E1B4B"/>
+</radialGradient>
+
+<clipPath id="c3d-mask">
+<path d="M 18 70 L 22 38 L 35 50 L 50 22 L 65 50 L 78 38 L 82 70 Z"/>
+</clipPath>
+
+<filter id="c3d-bloom">
+<feGaussianBlur stdDeviation="0.8" result="blur"/>
+<feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+</filter>
+</defs>
+
+<path d="M 19 71 L 23 39 L 36 51 L 51 23 L 66 51 L 79 39 L 83 71 Z" fill="#000" opacity="0.5" filter="url(#c3d-bloom)"/>
+
+<path d="M 18 70 L 22 38 L 35 50 L 50 22 L 65 50 L 78 38 L 82 70 Z" fill="url(#c3d-body)" stroke="#FFF4D6" stroke-width="1"/>
+
+<g clip-path="url(#c3d-mask)">
+
+<polygon points="22,38 50,22 78,38 50,52" fill="url(#c3d-top-shine)" opacity="0.7"/>
+
+<polygon points="18,70 22,38 50,52 50,70" fill="url(#c3d-left-dark)" opacity="0.55"/>
+
+<polygon points="50,52 50,70 82,70 78,38" fill="url(#c3d-bottom-dark)" opacity="0.5"/>
+
+<polygon class="fac-tw-1" points="22,38 35,50 50,22" fill="#FFFFFF" opacity="0.55"/>
+<polygon class="fac-tw-2" points="78,38 65,50 50,22" fill="#FFE082" opacity="0.5"/>
+<polygon class="fac-tw-3" points="35,50 65,50 50,22" fill="#FFFFFF" opacity="0.45"/>
+
+<polygon points="22,38 35,50 50,22" fill="none" stroke="#FFFFFF" stroke-width="0.4" opacity="0.5"/>
+<polygon points="78,38 65,50 50,22" fill="none" stroke="#FFFFFF" stroke-width="0.4" opacity="0.5"/>
+<polygon points="35,50 65,50 50,22" fill="none" stroke="#FFFFFF" stroke-width="0.3" opacity="0.4"/>
+<line x1="50" y1="22" x2="50" y2="70" stroke="#FFFFFF" stroke-width="0.3" opacity="0.35"/>
+<line x1="22" y1="38" x2="50" y2="52" stroke="#FFFFFF" stroke-width="0.3" opacity="0.4"/>
+<line x1="78" y1="38" x2="50" y2="52" stroke="#FFFFFF" stroke-width="0.3" opacity="0.4"/>
+<line x1="50" y1="52" x2="18" y2="70" stroke="#000" stroke-width="0.3" opacity="0.4"/>
+<line x1="50" y1="52" x2="82" y2="70" stroke="#000" stroke-width="0.3" opacity="0.4"/>
+
+<rect class="shine-band-test" x="-30" y="0" width="25" height="100" fill="url(#c3d-sweep)"/>
+
+</g>
+
+<path d="M 18 70 L 22 38 L 35 50 L 50 22 L 65 50 L 78 38 L 82 70 Z" fill="none" stroke="#FFFFFF" stroke-width="0.5" opacity="0.7"/>
+
+<rect x="16" y="68" width="68" height="7" fill="url(#c3d-body)" stroke="#FFF4D6" stroke-width="0.8" rx="1.5"/>
+<rect x="16" y="68" width="68" height="3" fill="url(#c3d-top-shine)" rx="1.5"/>
+<rect x="16" y="73" width="68" height="2" fill="#000" opacity="0.3" rx="1.5"/>
+<line x1="22" y1="68" x2="22" y2="75" stroke="#FFFFFF" stroke-width="0.3" opacity="0.5"/>
+<line x1="50" y1="68" x2="50" y2="75" stroke="#FFFFFF" stroke-width="0.25" opacity="0.4"/>
+<line x1="78" y1="68" x2="78" y2="75" stroke="#000" stroke-width="0.3" opacity="0.4"/>
+
+<g filter="url(#c3d-bloom)">
+<polygon points="50,16 56,22 50,28 44,22" fill="url(#c3d-ruby-faceted)" stroke="#FCE7F3" stroke-width="0.4"/>
+<polygon points="50,16 53,22 50,24 47,22" fill="url(#c3d-ruby-shine)"/>
+<polygon points="50,16 56,22 50,24 44,22" fill="#FFFFFF" opacity="0.45"/>
+<line x1="50" y1="16" x2="50" y2="28" stroke="#FFFFFF" stroke-width="0.3" opacity="0.5"/>
+</g>
+
+<g>
+<polygon points="22,34 26,38 22,42 18,38" fill="url(#c3d-sapph-faceted)" stroke="#DBEAFE" stroke-width="0.4"/>
+<polygon points="22,34 24,38 22,40 20,38" fill="#FFFFFF" opacity="0.65"/>
+<polygon points="22,34 26,38 22,38 18,38" fill="#FFFFFF" opacity="0.3"/>
+</g>
+
+<g>
+<polygon points="78,34 82,38 78,42 74,38" fill="url(#c3d-sapph-faceted)" stroke="#DBEAFE" stroke-width="0.4"/>
+<polygon points="78,34 80,38 78,40 76,38" fill="#FFFFFF" opacity="0.65"/>
+<polygon points="78,34 82,38 78,38 74,38" fill="#FFFFFF" opacity="0.3"/>
+</g>
+
+<g>
+<polygon points="35,46 38,50 35,54 32,50" fill="url(#c3d-ruby-faceted)" stroke="#FCE7F3" stroke-width="0.3"/>
+<polygon points="35,46 36,50 35,52 34,50" fill="#FFFFFF" opacity="0.6"/>
+</g>
+
+<g>
+<polygon points="65,46 68,50 65,54 62,50" fill="url(#c3d-ruby-faceted)" stroke="#FCE7F3" stroke-width="0.3"/>
+<polygon points="65,46 66,50 65,52 64,50" fill="#FFFFFF" opacity="0.6"/>
+</g>
+
+</svg>
+
+<div class="cell-label">— YENİ — Gerçek 3D</div>
+</div>
+
+</div>
+
+<div class="note">
+Sol: Düz. Önceki yapıyordum bu — flat gradient, derinlik yok.<br/>
+Sağ: <strong>SP jetonu DNA'sı</strong>. Faceted yüzeyler · Beyaz üst yansıma · Karanlık alt gölge · Sol-koyu/sağ-aydınlık ışık yönü · Cam çatlağı çizgileri · 3 facet shimmer · Işık şeridi süpürmesi · Mücevherlerde ayrı facet + bloom.<br/>
+<br/>
+<strong>Bu yön doğru mu?</strong> Eğer evet, kalan 10 sembolü de bu kalitede yeniden çizeyim.
+</div>
+
+</div>
+
+</div>

@@ -276,6 +276,19 @@ export default function useLiveKit({ roomId, enabled = true, userId, displayName
   // Odada herhangi biri paylaşıyor mu? (video görüntüleme için)
   const anyoneScreenSharing = participants.some(p => p.isScreenShareEnabled);
 
+  // ★ Disconnect overlay "Tekrar Dene" — sayaç sıfırla, kilit aç, fresh connect tetikle.
+  const retry = useCallback(() => {
+    reconnectCountRef.current = 0;
+    if (reconnectTimerRef.current) {
+      clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = null;
+    }
+    connectingRef.current = false;
+    setConnectFailed(false);
+    setConnectionState('connecting');
+    doConnect();
+  }, [doConnect]);
+
   return {
     muteRoomAudio,
     connectionState,
@@ -295,5 +308,6 @@ export default function useLiveKit({ roomId, enabled = true, userId, displayName
     isScreenSharing,
     anyoneScreenSharing,
     connectionQuality, // ★ 2026-04-25
+    retry,
   };
 }

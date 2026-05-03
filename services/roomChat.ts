@@ -236,6 +236,65 @@ export const RoomChatService = {
   },
 
   /**
+   * ★ v107 (3 May 2026): Mesaj Parlat — 6 stilden biriyle mesaj gönder.
+   * Atomic RPC: SP yeterlilik + düş + insert metadata.glow_style + log → tek transaction.
+   * Başarılıysa { success, cost, new_balance, message_id } döner.
+   * Hata durumunda { success: false, error } — UI toast gösterir.
+   */
+  async sendGlow(
+    roomId: string,
+    userId: string,
+    content: string,
+    glowStyle: 'gold' | 'heart' | 'fire' | 'neon' | 'celebration' | 'galaxy',
+  ): Promise<{ success: boolean; error?: string; cost?: number; newBalance?: number; messageId?: string }> {
+    if (isSystemRoom(roomId)) return { success: false, error: 'Sistem odasında geçersiz' };
+    const cleaned = (content || '').trim().replace(/<[^>]*>/g, '').slice(0, 500);
+    if (cleaned.length < 1) return { success: false, error: 'Boş mesaj' };
+
+    // Client-side rate limit + emoji cooldown — server'a gereksiz RPC atılmasın
+    _ensureCleanupInterval();
+    const rateLimitKey = `${roomId}:${userId}`;
+    const now = Date.now();
+    let entry = _rateLimitMap.get(rateLimitKey);
+    if (!entry) { entry = { timestamps: [], lastEmoji: 0 }; _rateLimitMap.set(rateLimitKey, entry); }
+    entry.timestamps = entry.timestamps.filter(t => now - t < RATE_LIMIT_WINDOW);
+    if (entry.timestamps.length >= RATE_LIMIT_MAX) {
+      return { success: false, error: 'Çok hızlı mesaj gönderiyorsun' };
+    }
+    entry.timestamps.push(now);
+
+    // Profanity filter — server'a temizlenmiş içerik git
+    let filtered = cleaned;
+    try { filtered = filterBadWords(cleaned); } catch { /* badwords yoksa sessiz */ }
+
+    try {
+      const { data, error } = await supabase.rpc('powerup_send_glow_message', {
+        p_room_id: roomId,
+        p_user_id: userId,
+        p_content: filtered,
+        p_glow_style: glowStyle,
+      });
+      if (error) {
+        if (__DEV__) logger.warn('[RoomChat] sendGlow RPC hata:', error.message);
+        return { success: false, error: error.message };
+      }
+      const r = data as any;
+      if (!r?.success) {
+        return { success: false, error: r?.error || 'Bilinmeyen hata' };
+      }
+      return {
+        success: true,
+        cost: r.cost,
+        newBalance: r.new_balance,
+        messageId: r.message_id,
+      };
+    } catch (e: any) {
+      if (__DEV__) logger.warn('[RoomChat] sendGlow exception:', e?.message);
+      return { success: false, error: e?.message || 'Bağlantı hatası' };
+    }
+  },
+
+  /**
    * ★ v92.10 (1 May 2026): Sistem mesajı — bağış bildirimleri gibi otomatik
    * tetiklenen "X, Y'ye Z SP gönderdi" türü mesajlar için. Sender_id null,
    * type='system'. Chat drawer altın çerçeveyle render eder.

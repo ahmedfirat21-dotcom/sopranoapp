@@ -116,6 +116,10 @@ export default function PlusScreen() {
 
   const currentTier = migrateLegacyTier(profile?.subscription_tier);
   const selectedPlan = PLANS.find(p => p.id === selectedTier)!;
+  // ★ Tier hierarchy: Free(0) < Plus(1) < Pro(2). Yön'e göre "Yükselt" / "Düşür" metni.
+  const tierRank = (t: string) => (t === 'Pro' ? 2 : t === 'Plus' ? 1 : 0);
+  const isUpgrade = tierRank(selectedPlan.tier) > tierRank(currentTier);
+  const actionVerb = isUpgrade ? 'Yükselt' : 'Düşür';
 
   const handleActivate = async () => {
     if (!profile?.id) {
@@ -131,7 +135,7 @@ export default function PlusScreen() {
 
     setAlertCfg({
       visible: true,
-      title: `${selectedPlan.name}'a Yükselt`,
+      title: `${selectedPlan.name}'a ${actionVerb}`,
       message: `${selectedPlan.name} planına geçmek istediğinize emin misiniz?\n\nFiyat: ${price}${modeText}`,
       type: 'info',
       buttons: [
@@ -407,7 +411,7 @@ export default function PlusScreen() {
                   <>
                     <Ionicons name={selectedPlan.icon as any} size={20} color="#fff" style={{ textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4 }} />
                     <Text style={styles.ctaText}>
-                      {selectedPlan.name}'a Yükselt — {billingCycle === 'monthly' ? `${selectedPlan.monthly}₺/ay` : `${selectedPlan.yearly}₺/yıl`}
+                      {selectedPlan.name}'a {actionVerb} — {billingCycle === 'monthly' ? `${selectedPlan.monthly}₺/ay` : `${selectedPlan.yearly}₺/yıl`}
                     </Text>
                   </>
                 )}

@@ -62,17 +62,9 @@ const POWERUPS: PowerUp[] = [
   },
   // ★ v92.11.1 (1 May 2026): Altın Davet kaldırıldı — kullanıcı talebi.
   //   "Sahne daveti zaten ücretsiz, 10 SP'lik değer üretmiyor" prensibi.
-  {
-    id: 'message_glow',
-    icon: 'sparkles',
-    iconColor: '#F472B6',
-    bgGradient: ['rgba(244,114,182,0.18)', 'rgba(244,114,182,0.04)'],
-    borderColor: 'rgba(244,114,182,0.45)',
-    title: 'Mesaj Parlat',
-    subtitle: 'Sonraki 5 mesaja altın çerçeve',
-    cost: 25,
-    available: true,
-  },
+  // ★ v107 (3 May 2026): Mesaj Parlat KALDIRILDI — yeni 6 stilli sistem input bar'daki
+  //   ✨ butonuna taşındı. Anlık seçim, mesaj başına bağımsız stil/cost. PowerUpsSheet'te
+  //   kalması çift trigger karmaşası yaratıyordu.
   {
     id: 'stage_light',
     icon: 'flashlight',

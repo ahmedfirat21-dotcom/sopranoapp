@@ -5,7 +5,7 @@
  *   Butonlar pill shape + icon desteği, slide-up animasyon korundu.
  */
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated, Modal, Dimensions, PanResponder } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Pressable, Animated, Modal, Dimensions, PanResponder } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -78,7 +78,9 @@ export default function PremiumAlert({ visible, title, message, type = 'info', b
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => false,
-      onMoveShouldSetPanResponder: (_, g) => g.dy > 10 && Math.abs(g.dy) > Math.abs(g.dx) * 1.3,
+      onStartShouldSetPanResponderCapture: () => false,
+      onMoveShouldSetPanResponder: (_, g) => g.dy > 24 && Math.abs(g.dy) > Math.abs(g.dx) * 1.5 && Math.abs(g.vy) > 0.2,
+      onMoveShouldSetPanResponderCapture: () => false,
       onPanResponderMove: (_, g) => { if (g.dy > 0) panY.setValue(g.dy); },
       onPanResponderRelease: (_, g) => {
         if (g.dy > 80 || g.vy > 0.5) {
@@ -118,11 +120,13 @@ export default function PremiumAlert({ visible, title, message, type = 'info', b
   return (
     <Modal transparent visible={visible} animationType="none" statusBarTranslucent>
       <View style={sty.backdrop}>
-        <Animated.View style={[sty.overlay, { opacity: opacityAnim }]} />
+        {/* ★ Backdrop tap-to-dismiss — Pressable absolute fill */}
+        <Pressable style={StyleSheet.absoluteFillObject} onPress={onDismiss}>
+          <Animated.View style={[sty.overlay, { opacity: opacityAnim }]} />
+        </Pressable>
 
         <Animated.View
           style={[sty.container, { transform: [{ translateY: slideY }, { translateY: panY }], opacity: opacityAnim }]}
-          {...panResponder.panHandlers}
         >
           {/* ★ Koyu gradient zemin — proje bg'sine kaynaşır */}
           <LinearGradient
@@ -137,6 +141,11 @@ export default function PremiumAlert({ visible, title, message, type = 'info', b
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
             style={sty.accentLine}
           />
+
+          {/* ★ Drag handle area — sadece üst 32px panResponder yakalar; butonlar serbest. */}
+          <View style={sty.dragHandle} {...panResponder.panHandlers}>
+            <View style={sty.dragHandleBar} />
+          </View>
 
           {/* Icon — glow halka + koyu bg */}
           <View style={[sty.iconOuter, { shadowColor: config.accentColor }]}>
@@ -242,6 +251,23 @@ const sty = StyleSheet.create({
     left: 0,
     right: 0,
     height: 1.5,
+  },
+  // ★ Drag area: container'ın üstünde 32px; bar görünür kullanıcıya drag ipucu verir.
+  dragHandle: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dragHandleBar: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    marginTop: 8,
   },
   iconOuter: {
     marginTop: 4,

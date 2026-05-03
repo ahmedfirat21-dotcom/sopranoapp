@@ -1,0 +1,693 @@
+<div style="padding: 1rem 0;">
+<h2 class="sr-only">SopranoChat — emoji yerine 3D premium SVG sembolleri</h2>
+
+<style>
+.symbols-stage {
+  background: radial-gradient(ellipse at center, #1a1330 0%, #0a0518 60%, #000 100%);
+  border-radius: 24px;
+  padding: 28px 14px;
+  position: relative;
+  overflow: hidden;
+}
+
+.symbols-stage::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(1px 1px at 15% 20%, rgba(255, 224, 130, 0.5), transparent),
+    radial-gradient(1.5px 1.5px at 85% 30%, rgba(255, 255, 255, 0.4), transparent),
+    radial-gradient(1px 1px at 50% 70%, rgba(251, 191, 36, 0.5), transparent),
+    radial-gradient(1px 1px at 25% 85%, rgba(244, 114, 182, 0.4), transparent),
+    radial-gradient(1.5px 1.5px at 75% 60%, rgba(167, 139, 250, 0.5), transparent);
+  background-repeat: no-repeat;
+  pointer-events: none;
+  animation: stars-drift-sym 30s linear infinite;
+}
+
+@keyframes stars-drift-sym {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.9; }
+}
+
+.symbols-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  position: relative;
+  z-index: 5;
+}
+
+.sym-card {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 18px;
+  overflow: hidden;
+  border: 0.5px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 8px;
+}
+
+.sym-bg-rays {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 100%;
+  aspect-ratio: 1;
+  pointer-events: none;
+  background:
+    conic-gradient(from 0deg,
+      transparent 0deg, rgba(255, 255, 255, 0.06) 30deg, transparent 60deg,
+      transparent 120deg, rgba(255, 255, 255, 0.06) 150deg, transparent 180deg,
+      transparent 240deg, rgba(255, 255, 255, 0.06) 270deg, transparent 300deg);
+  animation: rays-rotate 22s linear infinite;
+}
+
+@keyframes rays-rotate {
+  from { transform: translate(-50%, -50%) rotate(0deg); }
+  to { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+.sym-svg-wrap {
+  position: relative;
+  z-index: 5;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@keyframes float-sym { 0%, 100% { transform: translateY(0) rotate(-1.5deg); } 50% { transform: translateY(-3px) rotate(1.5deg); } }
+@keyframes flicker-fire { 0%, 100% { transform: scaleY(1) rotate(-1deg); } 33% { transform: scaleY(1.08) rotate(1deg); } 66% { transform: scaleY(0.96) rotate(0deg); } }
+@keyframes pulse-soft { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+@keyframes spin-slow { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes drift { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(1.5px, -2px); } }
+@keyframes heartbeat { 0%, 100% { transform: scale(1); } 25% { transform: scale(1.08); } 50% { transform: scale(1); } 75% { transform: scale(1.04); } }
+
+.anim-float { animation: float-sym 4s ease-in-out infinite; }
+.anim-flicker { animation: flicker-fire 0.5s ease-in-out infinite; transform-origin: bottom center; }
+.anim-pulse { animation: pulse-soft 2.5s ease-in-out infinite; }
+.anim-spin { animation: spin-slow 16s linear infinite; }
+.anim-drift { animation: drift 5s ease-in-out infinite; }
+.anim-heartbeat { animation: heartbeat 1.4s ease-in-out infinite; }
+
+.sym-name {
+  color: white;
+  font-family: Georgia, serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-align: center;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.8);
+  position: relative;
+  z-index: 10;
+  line-height: 1.2;
+}
+
+.sym-bg-crown {
+  background: radial-gradient(circle at 50% 30%, rgba(244, 114, 182, 0.35), transparent 55%), linear-gradient(135deg, #1A0A1F 0%, #500724 60%, #831843 100%);
+  border-color: rgba(244, 114, 182, 0.4);
+  box-shadow: 0 0 24px rgba(244, 114, 182, 0.25), inset 0 0 30px rgba(244, 114, 182, 0.08);
+}
+
+.sym-bg-planet {
+  background: radial-gradient(circle at 50% 40%, rgba(167, 139, 250, 0.4), transparent 55%), linear-gradient(135deg, #1A1330 0%, #2D1B4E 50%, #4A2D7A 100%);
+  border-color: rgba(167, 139, 250, 0.45);
+  box-shadow: 0 0 24px rgba(167, 139, 250, 0.3), inset 0 0 30px rgba(167, 139, 250, 0.08);
+}
+
+.sym-bg-bolt {
+  background: radial-gradient(circle at 50% 30%, rgba(251, 191, 36, 0.4), transparent 55%), linear-gradient(135deg, #1A1500 0%, #5C4612 50%, #854F0B 100%);
+  border-color: rgba(251, 191, 36, 0.5);
+  box-shadow: 0 0 24px rgba(251, 191, 36, 0.3), inset 0 0 30px rgba(251, 191, 36, 0.08);
+}
+
+.sym-bg-snow {
+  background: radial-gradient(circle at 50% 30%, rgba(34, 211, 238, 0.35), transparent 55%), linear-gradient(135deg, #0A1A2A 0%, #155E75 50%, #0E7490 100%);
+  border-color: rgba(34, 211, 238, 0.4);
+  box-shadow: 0 0 24px rgba(34, 211, 238, 0.25), inset 0 0 30px rgba(34, 211, 238, 0.08);
+}
+
+.sym-bg-volcano {
+  background: radial-gradient(circle at 50% 60%, rgba(220, 38, 38, 0.4), transparent 55%), linear-gradient(135deg, #1A0A0A 0%, #7F1D1D 50%, #DC2626 100%);
+  border-color: rgba(251, 146, 60, 0.5);
+  box-shadow: 0 0 24px rgba(220, 38, 38, 0.3), inset 0 0 30px rgba(251, 146, 60, 0.08);
+}
+
+.sym-bg-star {
+  background: radial-gradient(circle at 50% 50%, rgba(255, 224, 130, 0.5), transparent 55%), linear-gradient(135deg, #0F0A1A 0%, #2D1B4E 50%, #1A1330 100%);
+  border-color: rgba(255, 224, 130, 0.5);
+  box-shadow: 0 0 24px rgba(255, 224, 130, 0.35), inset 0 0 30px rgba(255, 224, 130, 0.08);
+}
+
+.sym-bg-sparkle {
+  background: radial-gradient(circle at 50% 50%, rgba(251, 191, 36, 0.4), transparent 55%), linear-gradient(135deg, #2A1E0D 0%, #5C4612 50%, #854F0B 100%);
+  border-color: rgba(251, 191, 36, 0.45);
+  box-shadow: 0 0 24px rgba(251, 191, 36, 0.3), inset 0 0 30px rgba(251, 191, 36, 0.08);
+}
+
+.sym-bg-fire {
+  background:
+    radial-gradient(circle at 50% 70%, rgba(251, 146, 60, 0.5), transparent 55%),
+    radial-gradient(circle at 50% 40%, rgba(254, 215, 170, 0.2), transparent 60%),
+    linear-gradient(135deg, #1A0500 0%, #7F1D1D 40%, #DC2626 70%, #FB923C 100%);
+  border-color: rgba(251, 146, 60, 0.5);
+  box-shadow: 0 0 24px rgba(251, 146, 60, 0.35), inset 0 0 30px rgba(251, 146, 60, 0.1);
+}
+
+.sym-bg-heart {
+  background: radial-gradient(circle at 50% 50%, rgba(244, 114, 182, 0.45), transparent 55%), linear-gradient(135deg, #2A0A1F 0%, #831843 50%, #BE185D 100%);
+  border-color: rgba(244, 114, 182, 0.5);
+  box-shadow: 0 0 24px rgba(244, 114, 182, 0.3), inset 0 0 30px rgba(244, 114, 182, 0.08);
+}
+
+.sym-bg-rose {
+  background:
+    radial-gradient(circle at 50% 60%, rgba(190, 24, 93, 0.4), transparent 55%),
+    radial-gradient(circle at 30% 30%, rgba(220, 38, 38, 0.2), transparent 60%),
+    linear-gradient(135deg, #1A0508 0%, #500724 50%, #831843 100%);
+  border-color: rgba(190, 24, 93, 0.5);
+  box-shadow: 0 0 24px rgba(190, 24, 93, 0.3), inset 0 0 30px rgba(220, 38, 38, 0.08);
+}
+
+.sym-bg-anchor {
+  background: radial-gradient(circle at 50% 50%, rgba(34, 211, 238, 0.35), transparent 55%), linear-gradient(135deg, #0A1525 0%, #1E3A5F 50%, #1E40AF 100%);
+  border-color: rgba(34, 211, 238, 0.4);
+  box-shadow: 0 0 24px rgba(34, 211, 238, 0.25), inset 0 0 30px rgba(34, 211, 238, 0.08);
+}
+
+.section-header {
+  text-align: center;
+  margin-bottom: 18px;
+  position: relative;
+  z-index: 5;
+}
+
+.section-header-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.section-header-line .line {
+  flex: 1;
+  height: 0.5px;
+  background: linear-gradient(90deg, transparent, rgba(251, 191, 36, 0.4), transparent);
+}
+
+.section-header-line .label {
+  color: #FBBF24;
+  font-size: 9px;
+  letter-spacing: 3px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.section-title {
+  color: white;
+  font-family: Georgia, serif;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.section-sub {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 10px;
+  font-style: italic;
+  margin-top: 4px;
+}
+</style>
+
+<div class="symbols-stage">
+
+<div class="section-header">
+<div class="section-header-line">
+<span class="line"></span>
+<span class="label">— Maison Soprano · Sembol Atölyesi —</span>
+<span class="line"></span>
+</div>
+<div class="section-title">Premium Sembol Koleksiyonu</div>
+<div class="section-sub">11 işçilikli mücevher · Her biri tek</div>
+</div>
+
+<div class="symbols-grid">
+
+<div class="sym-card sym-bg-crown">
+<div class="sym-bg-rays"></div>
+<div class="sym-svg-wrap">
+<svg class="anim-float" width="68" height="68" viewBox="0 0 100 100" style="filter: drop-shadow(0 0 12px rgba(244, 114, 182, 0.6)) drop-shadow(0 4px 8px rgba(0,0,0,0.5));">
+<defs>
+<linearGradient id="crown-body" x1="0%" y1="0%" x2="0%" y2="100%">
+<stop offset="0%" stop-color="#FFF4D6"/>
+<stop offset="20%" stop-color="#FFE082"/>
+<stop offset="55%" stop-color="#FAC775"/>
+<stop offset="85%" stop-color="#EF9F27"/>
+<stop offset="100%" stop-color="#854F0B"/>
+</linearGradient>
+<linearGradient id="crown-shine" x1="0%" y1="0%" x2="0%" y2="100%">
+<stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.85"/>
+<stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
+</linearGradient>
+<radialGradient id="crown-ruby" cx="50%" cy="40%" r="55%">
+<stop offset="0%" stop-color="#FCE7F3"/>
+<stop offset="40%" stop-color="#F472B6"/>
+<stop offset="100%" stop-color="#831843"/>
+</radialGradient>
+<radialGradient id="crown-sapph" cx="50%" cy="40%" r="55%">
+<stop offset="0%" stop-color="#DBEAFE"/>
+<stop offset="40%" stop-color="#60A5FA"/>
+<stop offset="100%" stop-color="#1E3A8A"/>
+</radialGradient>
+</defs>
+<path d="M 18 70 L 22 38 L 35 50 L 50 22 L 65 50 L 78 38 L 82 70 Z" fill="url(#crown-body)" stroke="#FFF4D6" stroke-width="1"/>
+<path d="M 18 70 L 22 38 L 35 50 L 50 22 L 65 50 L 78 38 L 82 70 Z" fill="url(#crown-shine)" opacity="0.55"/>
+<rect x="16" y="68" width="68" height="6" fill="url(#crown-body)" stroke="#FFF4D6" stroke-width="0.8" rx="1"/>
+<rect x="16" y="68" width="68" height="2.5" fill="#FFFFFF" opacity="0.55"/>
+<circle cx="50" cy="22" r="5" fill="url(#crown-ruby)" stroke="#FCE7F3" stroke-width="0.5"/>
+<circle cx="48" cy="20" r="1.5" fill="#FFFFFF" opacity="0.7"/>
+<circle cx="22" cy="38" r="3" fill="url(#crown-sapph)"/>
+<circle cx="78" cy="38" r="3" fill="url(#crown-sapph)"/>
+<circle cx="35" cy="50" r="2.5" fill="url(#crown-ruby)"/>
+<circle cx="65" cy="50" r="2.5" fill="url(#crown-ruby)"/>
+<line x1="18" y1="70" x2="20" y2="46" stroke="#FFFFFF" stroke-width="0.4" opacity="0.45"/>
+<line x1="50" y1="22" x2="50" y2="68" stroke="#FFFFFF" stroke-width="0.3" opacity="0.35"/>
+<line x1="82" y1="70" x2="80" y2="46" stroke="#000000" stroke-width="0.4" opacity="0.4"/>
+</svg>
+</div>
+<div class="sym-name">Diadem Royale</div>
+</div>
+
+<div class="sym-card sym-bg-planet">
+<div class="sym-bg-rays"></div>
+<div class="sym-svg-wrap">
+<svg class="anim-drift" width="68" height="68" viewBox="0 0 100 100" style="filter: drop-shadow(0 0 14px rgba(167, 139, 250, 0.65)) drop-shadow(0 4px 8px rgba(0,0,0,0.5));">
+<defs>
+<radialGradient id="planet-body" cx="35%" cy="30%" r="80%">
+<stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.5"/>
+<stop offset="20%" stop-color="#DDD6FE"/>
+<stop offset="50%" stop-color="#A78BFA"/>
+<stop offset="80%" stop-color="#5B21B6"/>
+<stop offset="100%" stop-color="#1E0A47"/>
+</radialGradient>
+<linearGradient id="planet-ring" x1="0%" y1="0%" x2="100%" y2="0%">
+<stop offset="0%" stop-color="#FFE082" stop-opacity="0.3"/>
+<stop offset="50%" stop-color="#FFE082" stop-opacity="0.95"/>
+<stop offset="100%" stop-color="#FFE082" stop-opacity="0.3"/>
+</linearGradient>
+<linearGradient id="planet-ring-front" x1="0%" y1="0%" x2="100%" y2="0%">
+<stop offset="0%" stop-color="#FAC775" stop-opacity="0.4"/>
+<stop offset="50%" stop-color="#FFE082" stop-opacity="1"/>
+<stop offset="100%" stop-color="#FAC775" stop-opacity="0.4"/>
+</linearGradient>
+</defs>
+<ellipse cx="50" cy="55" rx="38" ry="9" fill="none" stroke="url(#planet-ring)" stroke-width="3"/>
+<ellipse cx="50" cy="55" rx="38" ry="9" fill="none" stroke="#FFFFFF" stroke-width="0.4" opacity="0.4"/>
+<circle cx="50" cy="50" r="22" fill="url(#planet-body)" stroke="#DDD6FE" stroke-width="0.5"/>
+<ellipse cx="44" cy="42" rx="8" ry="3" fill="#FFFFFF" opacity="0.35"/>
+<ellipse cx="55" cy="56" rx="6" ry="2" fill="#000000" opacity="0.25"/>
+<ellipse cx="40" cy="55" rx="3" ry="1.5" fill="#000000" opacity="0.2"/>
+<path d="M 12 55 Q 50 64 88 55" fill="none" stroke="url(#planet-ring-front)" stroke-width="3.5"/>
+<circle cx="80" cy="35" r="1" fill="#FFFFFF" opacity="0.7"/>
+<circle cx="22" cy="62" r="0.8" fill="#FFFFFF" opacity="0.6"/>
+</svg>
+</div>
+<div class="sym-name">Planète Astrale</div>
+</div>
+
+<div class="sym-card sym-bg-bolt">
+<div class="sym-bg-rays"></div>
+<div class="sym-svg-wrap">
+<svg class="anim-pulse" width="68" height="68" viewBox="0 0 100 100" style="filter: drop-shadow(0 0 16px rgba(255, 224, 130, 0.8)) drop-shadow(0 4px 8px rgba(0,0,0,0.5));">
+<defs>
+<linearGradient id="bolt-body" x1="0%" y1="0%" x2="0%" y2="100%">
+<stop offset="0%" stop-color="#FFFFFF"/>
+<stop offset="15%" stop-color="#FFF4D6"/>
+<stop offset="40%" stop-color="#FFE082"/>
+<stop offset="70%" stop-color="#FAC775"/>
+<stop offset="100%" stop-color="#854F0B"/>
+</linearGradient>
+<linearGradient id="bolt-shine" x1="0%" y1="0%" x2="100%" y2="0%">
+<stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.9"/>
+<stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
+</linearGradient>
+<filter id="bolt-glow" x="-50%" y="-50%" width="200%" height="200%">
+<feGaussianBlur stdDeviation="2"/>
+<feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+</filter>
+</defs>
+<polygon points="55,12 32,52 48,52 42,88 70,46 53,46 60,12" fill="url(#bolt-body)" stroke="#FFF4D6" stroke-width="1" filter="url(#bolt-glow)"/>
+<polygon points="55,12 35,50 47,50 41,82" fill="url(#bolt-shine)" opacity="0.55"/>
+<polygon points="55,12 32,52 48,52 42,88 70,46 53,46 60,12" fill="none" stroke="#FFFFFF" stroke-width="0.4" opacity="0.5"/>
+<line x1="55" y1="12" x2="48" y2="52" stroke="#FFFFFF" stroke-width="0.3" opacity="0.5"/>
+</svg>
+</div>
+<div class="sym-name">Aurum Strike</div>
+</div>
+
+<div class="sym-card sym-bg-snow">
+<div class="sym-bg-rays"></div>
+<div class="sym-svg-wrap">
+<svg class="anim-spin" width="68" height="68" viewBox="0 0 100 100" style="filter: drop-shadow(0 0 14px rgba(34, 211, 238, 0.6)) drop-shadow(0 4px 8px rgba(0,0,0,0.5));">
+<defs>
+<linearGradient id="snow-body" x1="0%" y1="0%" x2="0%" y2="100%">
+<stop offset="0%" stop-color="#FFFFFF"/>
+<stop offset="50%" stop-color="#CFFAFE"/>
+<stop offset="100%" stop-color="#22D3EE"/>
+</linearGradient>
+<radialGradient id="snow-core" cx="50%" cy="50%" r="50%">
+<stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.8"/>
+<stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
+</radialGradient>
+</defs>
+<g stroke="url(#snow-body)" stroke-width="3" stroke-linecap="round" fill="none">
+<line x1="50" y1="14" x2="50" y2="86"/>
+<line x1="14" y1="50" x2="86" y2="50"/>
+<line x1="22" y1="22" x2="78" y2="78"/>
+<line x1="78" y1="22" x2="22" y2="78"/>
+</g>
+<g stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" fill="none">
+<line x1="50" y1="20" x2="44" y2="28"/>
+<line x1="50" y1="20" x2="56" y2="28"/>
+<line x1="50" y1="80" x2="44" y2="72"/>
+<line x1="50" y1="80" x2="56" y2="72"/>
+<line x1="20" y1="50" x2="28" y2="44"/>
+<line x1="20" y1="50" x2="28" y2="56"/>
+<line x1="80" y1="50" x2="72" y2="44"/>
+<line x1="80" y1="50" x2="72" y2="56"/>
+<line x1="26" y1="26" x2="34" y2="28"/>
+<line x1="26" y1="26" x2="28" y2="34"/>
+<line x1="74" y1="74" x2="66" y2="72"/>
+<line x1="74" y1="74" x2="72" y2="66"/>
+<line x1="74" y1="26" x2="66" y2="28"/>
+<line x1="74" y1="26" x2="72" y2="34"/>
+<line x1="26" y1="74" x2="34" y2="72"/>
+<line x1="26" y1="74" x2="28" y2="66"/>
+</g>
+<circle cx="50" cy="50" r="8" fill="url(#snow-core)"/>
+<circle cx="50" cy="50" r="3" fill="#FFFFFF"/>
+</svg>
+</div>
+<div class="sym-name">Glacier Aura</div>
+</div>
+
+<div class="sym-card sym-bg-volcano">
+<div class="sym-bg-rays"></div>
+<div class="sym-svg-wrap">
+<svg class="anim-float" width="68" height="68" viewBox="0 0 100 100" style="filter: drop-shadow(0 0 14px rgba(251, 146, 60, 0.65)) drop-shadow(0 4px 8px rgba(0,0,0,0.5));">
+<defs>
+<linearGradient id="volc-body" x1="0%" y1="0%" x2="0%" y2="100%">
+<stop offset="0%" stop-color="#7F1D1D"/>
+<stop offset="50%" stop-color="#451A0F"/>
+<stop offset="100%" stop-color="#1A0500"/>
+</linearGradient>
+<linearGradient id="volc-lava" x1="0%" y1="0%" x2="0%" y2="100%">
+<stop offset="0%" stop-color="#FEF3C7"/>
+<stop offset="20%" stop-color="#FBBF24"/>
+<stop offset="50%" stop-color="#FB923C"/>
+<stop offset="80%" stop-color="#DC2626"/>
+<stop offset="100%" stop-color="#7F1D1D"/>
+</linearGradient>
+<linearGradient id="volc-glow" x1="0%" y1="0%" x2="0%" y2="100%">
+<stop offset="0%" stop-color="#FED7AA" stop-opacity="0.95"/>
+<stop offset="100%" stop-color="#FB923C" stop-opacity="0"/>
+</linearGradient>
+<filter id="volc-blur" x="-50%" y="-50%" width="200%" height="200%">
+<feGaussianBlur stdDeviation="1.5"/>
+</filter>
+</defs>
+<path d="M 22 82 L 35 38 Q 50 30 65 38 L 78 82 Z" fill="url(#volc-body)" stroke="#7F1D1D" stroke-width="0.8"/>
+<ellipse cx="50" cy="38" rx="16" ry="3" fill="#1A0500" stroke="#7F1D1D" stroke-width="0.5"/>
+<ellipse cx="50" cy="38" rx="13" ry="2" fill="url(#volc-lava)"/>
+<ellipse cx="50" cy="38" rx="13" ry="2" fill="url(#volc-glow)" filter="url(#volc-blur)"/>
+<path d="M 38 39 Q 36 30 33 22 Q 32 18 35 14" stroke="url(#volc-lava)" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+<path d="M 50 39 Q 50 28 48 18 Q 47 12 50 8" stroke="url(#volc-lava)" stroke-width="3" fill="none" stroke-linecap="round"/>
+<path d="M 62 39 Q 64 30 66 22 Q 68 18 65 14" stroke="url(#volc-lava)" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+<circle cx="35" cy="14" r="2" fill="#FEF3C7" filter="url(#volc-blur)"/>
+<circle cx="50" cy="8" r="2.5" fill="#FEF3C7" filter="url(#volc-blur)"/>
+<circle cx="65" cy="14" r="2" fill="#FEF3C7" filter="url(#volc-blur)"/>
+<path d="M 35 38 L 28 76 Q 35 78 38 82" stroke="#FB923C" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.85"/>
+<path d="M 65 38 L 72 76 Q 65 78 62 82" stroke="#FB923C" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.85"/>
+<line x1="22" y1="82" x2="35" y2="38" stroke="#FFFFFF" stroke-width="0.3" opacity="0.2"/>
+</svg>
+</div>
+<div class="sym-name">Vesuvius</div>
+</div>
+
+<div class="sym-card sym-bg-star">
+<div class="sym-bg-rays"></div>
+<div class="sym-svg-wrap">
+<svg class="anim-float" width="68" height="68" viewBox="0 0 100 100" style="filter: drop-shadow(0 0 16px rgba(255, 224, 130, 0.85)) drop-shadow(0 4px 8px rgba(0,0,0,0.5));">
+<defs>
+<linearGradient id="star4-body" x1="0%" y1="0%" x2="0%" y2="100%">
+<stop offset="0%" stop-color="#FFFFFF"/>
+<stop offset="20%" stop-color="#FFF4D6"/>
+<stop offset="50%" stop-color="#FFE082"/>
+<stop offset="80%" stop-color="#FAC775"/>
+<stop offset="100%" stop-color="#854F0B"/>
+</linearGradient>
+<radialGradient id="star4-core" cx="50%" cy="40%" r="40%">
+<stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.9"/>
+<stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
+</radialGradient>
+</defs>
+<polygon points="50,8 56,46 92,50 56,54 50,92 44,54 8,50 44,46" fill="url(#star4-body)" stroke="#FFF4D6" stroke-width="1"/>
+<polygon points="50,8 53,46 50,50 47,46" fill="#FFFFFF" opacity="0.6"/>
+<polygon points="50,8 56,46 50,50 44,46" fill="url(#star4-core)"/>
+<polygon points="92,50 56,54 50,50 56,46" fill="#FFE082" opacity="0.4"/>
+<polygon points="50,92 44,54 50,50 56,54" fill="#854F0B" opacity="0.3"/>
+<polygon points="8,50 44,46 50,50 44,54" fill="#FFE082" opacity="0.4"/>
+<line x1="50" y1="8" x2="50" y2="92" stroke="#FFFFFF" stroke-width="0.3" opacity="0.4"/>
+<line x1="8" y1="50" x2="92" y2="50" stroke="#FFFFFF" stroke-width="0.3" opacity="0.3"/>
+<circle cx="50" cy="50" r="3" fill="#FFFFFF" opacity="0.9"/>
+</svg>
+</div>
+<div class="sym-name">Étoile Nord</div>
+</div>
+
+<div class="sym-card sym-bg-sparkle">
+<div class="sym-bg-rays"></div>
+<div class="sym-svg-wrap">
+<svg class="anim-pulse" width="68" height="68" viewBox="0 0 100 100" style="filter: drop-shadow(0 0 14px rgba(251, 191, 36, 0.7)) drop-shadow(0 4px 8px rgba(0,0,0,0.5));">
+<defs>
+<linearGradient id="spark-main" x1="0%" y1="0%" x2="0%" y2="100%">
+<stop offset="0%" stop-color="#FFFFFF"/>
+<stop offset="40%" stop-color="#FFE082"/>
+<stop offset="100%" stop-color="#854F0B"/>
+</linearGradient>
+<linearGradient id="spark-mini" x1="0%" y1="0%" x2="0%" y2="100%">
+<stop offset="0%" stop-color="#FFF4D6"/>
+<stop offset="100%" stop-color="#EF9F27"/>
+</linearGradient>
+</defs>
+<polygon points="50,18 54,46 82,50 54,54 50,82 46,54 18,50 46,46" fill="url(#spark-main)" stroke="#FFF4D6" stroke-width="0.8"/>
+<polygon points="50,18 54,46 50,50 46,46" fill="#FFFFFF" opacity="0.7"/>
+<polygon points="78,28 80,38 90,40 80,42 78,52 76,42 66,40 76,38" fill="url(#spark-mini)" stroke="#FFF4D6" stroke-width="0.5"/>
+<polygon points="22,62 24,70 32,72 24,74 22,82 20,74 12,72 20,70" fill="url(#spark-mini)" stroke="#FFF4D6" stroke-width="0.5"/>
+<polygon points="22,28 24,34 30,36 24,38 22,44 20,38 14,36 20,34" fill="url(#spark-mini)" stroke="#FFF4D6" stroke-width="0.4" opacity="0.85"/>
+<circle cx="50" cy="50" r="2.5" fill="#FFFFFF"/>
+</svg>
+</div>
+<div class="sym-name">Constellation</div>
+</div>
+
+<div class="sym-card sym-bg-fire">
+<div class="sym-bg-rays"></div>
+<div class="sym-svg-wrap">
+<svg class="anim-flicker" width="68" height="68" viewBox="0 0 100 100" style="filter: drop-shadow(0 0 16px rgba(251, 146, 60, 0.85)) drop-shadow(0 4px 8px rgba(0,0,0,0.5));">
+<defs>
+<linearGradient id="fire-outer" x1="0%" y1="0%" x2="0%" y2="100%">
+<stop offset="0%" stop-color="#DC2626"/>
+<stop offset="40%" stop-color="#EA580C"/>
+<stop offset="80%" stop-color="#F59E0B"/>
+<stop offset="100%" stop-color="#FBBF24"/>
+</linearGradient>
+<linearGradient id="fire-mid" x1="0%" y1="0%" x2="0%" y2="100%">
+<stop offset="0%" stop-color="#FCA5A5"/>
+<stop offset="50%" stop-color="#FBBF24"/>
+<stop offset="100%" stop-color="#FEF3C7"/>
+</linearGradient>
+<linearGradient id="fire-core" x1="0%" y1="0%" x2="0%" y2="100%">
+<stop offset="0%" stop-color="#FFE082"/>
+<stop offset="60%" stop-color="#FEF3C7"/>
+<stop offset="100%" stop-color="#FFFFFF"/>
+</linearGradient>
+<filter id="fire-blur" x="-50%" y="-50%" width="200%" height="200%">
+<feGaussianBlur stdDeviation="0.8"/>
+</filter>
+</defs>
+<path d="M 50 90 Q 22 78 25 56 Q 22 40 32 28 Q 30 44 40 48 Q 35 28 50 12 Q 50 32 60 42 Q 65 34 68 28 Q 72 42 75 56 Q 78 78 50 90 Z" fill="url(#fire-outer)" stroke="#FBBF24" stroke-width="0.6" filter="url(#fire-blur)"/>
+<path d="M 50 84 Q 32 76 32 60 Q 32 46 42 36 Q 42 50 50 52 Q 46 38 52 24 Q 54 38 58 46 Q 64 40 64 32 Q 68 48 68 60 Q 68 76 50 84 Z" fill="url(#fire-mid)"/>
+<path d="M 50 76 Q 40 70 42 60 Q 44 52 50 46 Q 50 56 54 58 Q 52 48 56 38 Q 58 50 60 60 Q 60 70 50 76 Z" fill="url(#fire-core)"/>
+<circle cx="50" cy="62" r="5" fill="#FFFFFF" opacity="0.9" filter="url(#fire-blur)"/>
+<circle cx="32" cy="20" r="1.5" fill="#FBBF24" opacity="0.85" filter="url(#fire-blur)"/>
+<circle cx="68" cy="22" r="1.2" fill="#FBBF24" opacity="0.7" filter="url(#fire-blur)"/>
+<circle cx="78" cy="38" r="1" fill="#FBBF24" opacity="0.6" filter="url(#fire-blur)"/>
+</svg>
+</div>
+<div class="sym-name">Inferno</div>
+</div>
+
+<div class="sym-card sym-bg-heart">
+<div class="sym-bg-rays"></div>
+<div class="sym-svg-wrap">
+<svg class="anim-heartbeat" width="68" height="68" viewBox="0 0 100 100" style="filter: drop-shadow(0 0 14px rgba(244, 114, 182, 0.85)) drop-shadow(0 4px 8px rgba(0,0,0,0.5));">
+<defs>
+<linearGradient id="heart-body" x1="0%" y1="0%" x2="0%" y2="100%">
+<stop offset="0%" stop-color="#FCE7F3"/>
+<stop offset="20%" stop-color="#F9A8D4"/>
+<stop offset="50%" stop-color="#F472B6"/>
+<stop offset="85%" stop-color="#BE185D"/>
+<stop offset="100%" stop-color="#500724"/>
+</linearGradient>
+<radialGradient id="heart-shine" cx="35%" cy="25%" r="50%">
+<stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.85"/>
+<stop offset="50%" stop-color="#FFFFFF" stop-opacity="0.2"/>
+<stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
+</radialGradient>
+</defs>
+<path d="M 50 86 C 50 86 14 64 14 38 C 14 22 28 14 38 14 C 44 14 50 18 50 24 C 50 18 56 14 62 14 C 72 14 86 22 86 38 C 86 64 50 86 50 86 Z" fill="url(#heart-body)" stroke="#FCE7F3" stroke-width="1"/>
+<path d="M 50 86 C 50 86 14 64 14 38 C 14 22 28 14 38 14 C 44 14 50 18 50 24 C 50 18 56 14 62 14 C 72 14 86 22 86 38 C 86 64 50 86 50 86 Z" fill="url(#heart-shine)"/>
+<ellipse cx="35" cy="30" rx="10" ry="6" fill="#FFFFFF" opacity="0.55" transform="rotate(-30 35 30)"/>
+<ellipse cx="38" cy="28" rx="3" ry="1.5" fill="#FFFFFF" opacity="0.85" transform="rotate(-30 38 28)"/>
+<path d="M 50 86 C 50 86 14 64 14 38 C 14 22 28 14 38 14 C 44 14 50 18 50 24 C 50 18 56 14 62 14 C 72 14 86 22 86 38 C 86 64 50 86 50 86 Z" fill="none" stroke="#FFFFFF" stroke-width="0.5" opacity="0.55"/>
+</svg>
+</div>
+<div class="sym-name">Belle Coeur</div>
+</div>
+
+<div class="sym-card sym-bg-rose">
+<div class="sym-bg-rays"></div>
+<div class="sym-svg-wrap">
+<svg class="anim-float" width="68" height="68" viewBox="0 0 100 100" style="filter: drop-shadow(0 0 14px rgba(190, 24, 93, 0.7)) drop-shadow(0 4px 8px rgba(0,0,0,0.5));">
+<defs>
+<radialGradient id="rose-petal-1" cx="40%" cy="40%" r="60%">
+<stop offset="0%" stop-color="#FCE7F3"/>
+<stop offset="40%" stop-color="#F472B6"/>
+<stop offset="100%" stop-color="#831843"/>
+</radialGradient>
+<radialGradient id="rose-petal-2" cx="50%" cy="50%" r="50%">
+<stop offset="0%" stop-color="#F9A8D4"/>
+<stop offset="60%" stop-color="#BE185D"/>
+<stop offset="100%" stop-color="#500724"/>
+</radialGradient>
+<linearGradient id="rose-leaf" x1="0%" y1="0%" x2="100%" y2="100%">
+<stop offset="0%" stop-color="#86EFAC"/>
+<stop offset="50%" stop-color="#16A34A"/>
+<stop offset="100%" stop-color="#14532D"/>
+</linearGradient>
+<linearGradient id="rose-stem" x1="0%" y1="0%" x2="0%" y2="100%">
+<stop offset="0%" stop-color="#16A34A"/>
+<stop offset="100%" stop-color="#14532D"/>
+</linearGradient>
+</defs>
+<path d="M 50 60 Q 50 75 50 90" stroke="url(#rose-stem)" stroke-width="3" fill="none" stroke-linecap="round"/>
+<path d="M 50 78 Q 38 70 32 78 Q 36 84 50 80" fill="url(#rose-leaf)" stroke="#14532D" stroke-width="0.5"/>
+<path d="M 50 76 Q 60 68 72 76 Q 66 82 50 78" fill="url(#rose-leaf)" stroke="#14532D" stroke-width="0.5"/>
+<path d="M 50 18 Q 28 28 26 48 Q 28 65 50 65 Q 72 65 74 48 Q 72 28 50 18 Z" fill="url(#rose-petal-2)" stroke="#831843" stroke-width="0.5"/>
+<path d="M 50 24 Q 34 34 34 50 Q 38 60 50 60 Q 62 60 66 50 Q 66 34 50 24 Z" fill="url(#rose-petal-1)"/>
+<path d="M 50 30 Q 40 38 40 48 Q 42 56 50 56 Q 58 56 60 48 Q 60 38 50 30 Z" fill="url(#rose-petal-2)"/>
+<path d="M 50 36 Q 44 42 44 48 Q 46 52 50 52 Q 54 52 56 48 Q 56 42 50 36 Z" fill="url(#rose-petal-1)"/>
+<circle cx="50" cy="46" r="3" fill="url(#rose-petal-2)" stroke="#500724" stroke-width="0.4"/>
+<path d="M 50 30 Q 44 38 50 46" stroke="#FFFFFF" stroke-width="0.4" fill="none" opacity="0.6"/>
+<path d="M 50 30 Q 56 38 50 46" stroke="#FFFFFF" stroke-width="0.4" fill="none" opacity="0.6"/>
+<ellipse cx="42" cy="32" rx="4" ry="2" fill="#FFFFFF" opacity="0.4" transform="rotate(-30 42 32)"/>
+</svg>
+</div>
+<div class="sym-name">Rose Noire</div>
+</div>
+
+<div class="sym-card sym-bg-anchor">
+<div class="sym-bg-rays"></div>
+<div class="sym-svg-wrap">
+<svg class="anim-float" width="68" height="68" viewBox="0 0 100 100" style="filter: drop-shadow(0 0 14px rgba(34, 211, 238, 0.5)) drop-shadow(0 4px 8px rgba(0,0,0,0.5));">
+<defs>
+<linearGradient id="anchor-body" x1="0%" y1="0%" x2="0%" y2="100%">
+<stop offset="0%" stop-color="#FFFFFF"/>
+<stop offset="20%" stop-color="#FFE082"/>
+<stop offset="50%" stop-color="#FAC775"/>
+<stop offset="80%" stop-color="#EF9F27"/>
+<stop offset="100%" stop-color="#854F0B"/>
+</linearGradient>
+<linearGradient id="anchor-rope" x1="0%" y1="0%" x2="100%" y2="0%">
+<stop offset="0%" stop-color="#A78BFA"/>
+<stop offset="100%" stop-color="#7C3AED"/>
+</linearGradient>
+</defs>
+<circle cx="50" cy="22" r="9" fill="none" stroke="url(#anchor-body)" stroke-width="4"/>
+<circle cx="50" cy="22" r="9" fill="none" stroke="#FFFFFF" stroke-width="0.5" opacity="0.5"/>
+<rect x="46" y="30" width="8" height="48" fill="url(#anchor-body)" stroke="#FFF4D6" stroke-width="0.6"/>
+<rect x="46" y="30" width="3" height="48" fill="#FFFFFF" opacity="0.45"/>
+<rect x="34" y="36" width="32" height="5" fill="url(#anchor-body)" stroke="#FFF4D6" stroke-width="0.6" rx="1"/>
+<rect x="34" y="36" width="32" height="2" fill="#FFFFFF" opacity="0.5"/>
+<path d="M 50 78 Q 30 78 22 60 L 30 56 Q 36 70 50 70 Z" fill="url(#anchor-body)" stroke="#FFF4D6" stroke-width="0.8"/>
+<path d="M 50 78 Q 70 78 78 60 L 70 56 Q 64 70 50 70 Z" fill="url(#anchor-body)" stroke="#FFF4D6" stroke-width="0.8"/>
+<path d="M 22 60 L 18 54 L 26 56 Z" fill="url(#anchor-body)" stroke="#854F0B" stroke-width="0.5"/>
+<path d="M 78 60 L 82 54 L 74 56 Z" fill="url(#anchor-body)" stroke="#854F0B" stroke-width="0.5"/>
+<path d="M 50 78 L 50 90" stroke="url(#anchor-body)" stroke-width="3" stroke-linecap="round"/>
+<path d="M 12 16 Q 18 12 28 16 Q 38 20 42 18" fill="none" stroke="url(#anchor-rope)" stroke-width="2" stroke-linecap="round" opacity="0.85"/>
+<path d="M 14 18 Q 18 16 22 18" fill="none" stroke="#FFFFFF" stroke-width="0.5" stroke-linecap="round" opacity="0.5"/>
+<line x1="46" y1="30" x2="46" y2="78" stroke="#FFFFFF" stroke-width="0.3" opacity="0.4"/>
+</svg>
+</div>
+<div class="sym-name">Marina</div>
+</div>
+
+<div class="sym-card sym-bg-heart" style="background: radial-gradient(circle at 50% 50%, rgba(167, 139, 250, 0.4), transparent 55%), linear-gradient(135deg, #1A0A1F 0%, #2D1B4E 50%, #4A2D7A 100%); border-color: rgba(167, 139, 250, 0.45); box-shadow: 0 0 24px rgba(167, 139, 250, 0.3), inset 0 0 30px rgba(167, 139, 250, 0.08);">
+<div class="sym-bg-rays"></div>
+<div class="sym-svg-wrap">
+<svg class="anim-pulse" width="68" height="68" viewBox="0 0 100 100" style="filter: drop-shadow(0 0 16px rgba(255, 224, 130, 0.85)) drop-shadow(0 4px 8px rgba(0,0,0,0.5));">
+<defs>
+<linearGradient id="fleur-body" x1="0%" y1="0%" x2="0%" y2="100%">
+<stop offset="0%" stop-color="#FFFFFF"/>
+<stop offset="20%" stop-color="#FFE082"/>
+<stop offset="55%" stop-color="#FAC775"/>
+<stop offset="85%" stop-color="#EF9F27"/>
+<stop offset="100%" stop-color="#854F0B"/>
+</linearGradient>
+<linearGradient id="fleur-shine" x1="0%" y1="0%" x2="0%" y2="100%">
+<stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.8"/>
+<stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
+</linearGradient>
+</defs>
+<path d="M 50 8 Q 38 26 38 42 Q 38 50 46 50 Q 50 50 50 46 Q 50 50 54 50 Q 62 50 62 42 Q 62 26 50 8 Z" fill="url(#fleur-body)" stroke="#FFF4D6" stroke-width="0.8"/>
+<path d="M 30 50 Q 16 56 18 70 Q 20 78 32 76 Q 38 72 38 64 Q 38 60 36 58 Q 42 58 44 54 Q 38 50 30 50 Z" fill="url(#fleur-body)" stroke="#FFF4D6" stroke-width="0.8"/>
+<path d="M 70 50 Q 84 56 82 70 Q 80 78 68 76 Q 62 72 62 64 Q 62 60 64 58 Q 58 58 56 54 Q 62 50 70 50 Z" fill="url(#fleur-body)" stroke="#FFF4D6" stroke-width="0.8"/>
+<rect x="32" y="50" width="36" height="6" fill="url(#fleur-body)" stroke="#FFF4D6" stroke-width="0.5" rx="2"/>
+<rect x="32" y="50" width="36" height="2.5" fill="#FFFFFF" opacity="0.5"/>
+<path d="M 50 8 Q 44 22 44 38" stroke="url(#fleur-shine)" stroke-width="2" fill="none" opacity="0.65"/>
+<path d="M 50 92 L 50 56" stroke="url(#fleur-body)" stroke-width="2.5" stroke-linecap="round"/>
+<circle cx="50" cy="42" r="2.5" fill="#FCE7F3" stroke="#831843" stroke-width="0.4"/>
+</svg>
+</div>
+<div class="sym-name">Fleur de Lys</div>
+</div>
+
+</div>
+
+</div>
+
+<div style="margin-top: 16px; padding: 14px 16px; background: var(--color-background-secondary); border-radius: var(--border-radius-lg); font-size: 11px; color: var(--color-text-secondary); line-height: 1.7;">
+<div style="color: var(--color-text-primary); font-weight: 600; margin-bottom: 6px;">11 sembol — emoji yerine premium 3D SVG:</div>
+
+<strong>👑 → Diadem Royale</strong> · 7 köşeli kuyumcu tacı, ortada yakut + 4 köşede mavi safir<br/>
+<strong>🪐 → Planète Astrale</strong> · 3D küre + Satürn halkası + ön/arka derinlik<br/>
+<strong>⚡ → Aurum Strike</strong> · Bloom filter ile parlayan altın şimşek, beyaz core<br/>
+<strong>❄️ → Glacier Aura</strong> · 8 kollu kar tanesi, 16 detay + cyan core, 16sn döner<br/>
+<strong>🌋 → Vesuvius</strong> · Krater + 3 ayrı magma fıskiyesi + yan akan lavlar + buhar<br/>
+<strong>✦ → Étoile Nord</strong> · 4 köşeli kutup yıldızı, dikey beyaz + yatay altın<br/>
+<strong>✨ → Constellation</strong> · 1 büyük + 3 küçük yıldız, takımyıldız diziminde<br/>
+<strong>🔥 → Inferno</strong> · 3 katmanlı alev (dış kırmızı, orta turuncu, iç beyaz), gerçek titreşim<br/>
+<strong>💗 → Belle Coeur</strong> · Cilalı pembe kalp, 2 katmanlı highlight, kalp atışı<br/>
+<strong>🌹 → Rose Noire</strong> · 4 katmanlı petal + 2 yaprak + sap, müze gibi botanik detay<br/>
+<strong>⚓ → Marina</strong> · Altın çapa + halat, lüks tekne kulübü versiyonu<br/>
+<br/>
+<strong style="color: var(--color-text-primary);">Her birinde mevcut 3D efektler:</strong> 5+ stop'lu gradient, beyaz üst yansıma, koyu alt gölge, drop-shadow x3 katman (renk glow + neutral shadow), idle animasyon (her sembol için doğal hareket), arka plan conic ışın efekti, rarity-uyumlu glow renk paleti.<br/>
+<br/>
+<strong style="color: var(--color-text-primary);">Kullanım:</strong> Tüm bu semboller mağazada ürün ikonları olarak kullanılır. Emoji'ler tasarım dilini bozuyordu — bunlar SP jetonu ile aynı DNA'ya sahip, koleksiyon parçası gibi.
+</div>
+</div>

@@ -101,7 +101,12 @@ export default function MiniRoomCard({ room, onExpand, onClose, onMuteToggle, on
     let startOffsetY = 0;
     return PanResponder.create({
       onStartShouldSetPanResponder: () => false,
-      onMoveShouldSetPanResponder: (_, gs) => !expandingRef.current && Math.abs(gs.dy) > 8,
+      onStartShouldSetPanResponderCapture: () => false,
+      onMoveShouldSetPanResponder: (_, gs) =>
+        !expandingRef.current &&
+        Math.abs(gs.dy) > 14 &&
+        Math.abs(gs.dy) > Math.abs(gs.dx) * 1.3,
+      onMoveShouldSetPanResponderCapture: () => false,
       onPanResponderGrant: () => {
         startOffsetY = currentOffsetY.current;
         Animated.spring(dragScale, { toValue: 0.96, friction: 12, useNativeDriver: true }).start();
@@ -211,11 +216,11 @@ export default function MiniRoomCard({ room, onExpand, onClose, onMuteToggle, on
       {...panResponder.panHandlers}
     >
       {/* Ripple halkaları */}
-      <Animated.View style={[
+      <Animated.View pointerEvents="none" style={[
         styles.ripple,
         { transform: [{ scale: rippleScaleFn(ripple1) }], opacity: rippleOpacityFn(ripple1) },
       ]} />
-      <Animated.View style={[
+      <Animated.View pointerEvents="none" style={[
         styles.ripple,
         { transform: [{ scale: rippleScaleFn(ripple2) }], opacity: rippleOpacityFn(ripple2) },
       ]} />
@@ -236,8 +241,9 @@ export default function MiniRoomCard({ room, onExpand, onClose, onMuteToggle, on
         </>
       )}
 
-      {/* Ana kart */}
-      <Pressable onPress={handleExpand} style={[
+      {/* Ana kart — outer Pressable kaldırıldı; expand sadece sol+orta alana sınırlı.
+          Aksi halde inner Pressable (mute/mic/close) outer onPress yutuyordu. */}
+      <View style={[
         styles.card,
         isAudioActive && styles.cardAudioActive,
       ]}>
@@ -246,11 +252,13 @@ export default function MiniRoomCard({ room, onExpand, onClose, onMuteToggle, on
           locations={[0, 0.5, 1]}
           start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }}
           style={StyleSheet.absoluteFillObject}
+          pointerEvents="none"
         />
         <LinearGradient
           colors={['rgba(20,184,166,0.10)', 'transparent']}
           start={{ x: 0, y: 0 }} end={{ x: 0.6, y: 1 }}
           style={StyleSheet.absoluteFillObject}
+          pointerEvents="none"
         />
         {/* İç glow overlay */}
         {isAudioActive && (
@@ -260,25 +268,26 @@ export default function MiniRoomCard({ room, onExpand, onClose, onMuteToggle, on
           ]} pointerEvents="none" />
         )}
 
-        {/* Canlı gösterge */}
-        <View style={styles.liveIndicator}>
-          <Animated.View style={[styles.liveDot, { transform: [{ scale: pulseAnim }] }]} />
-          <Text style={styles.liveText}>CANLI</Text>
-        </View>
-
-        {/* Oda bilgisi */}
-        <View style={styles.info}>
-          <Text style={styles.roomName} numberOfLines={1}>{room.name}</Text>
-          <View style={styles.metaRow}>
-            <Ionicons name="person" size={9} color="#94A3B8" style={styles.iconShadow} />
-            <Text style={styles.metaText}>{room.hostName}</Text>
-            <Text style={styles.metaDot}>·</Text>
-            <Ionicons name="people" size={9} color="#94A3B8" style={styles.iconShadow} />
-            <Text style={styles.metaText}>{room.viewerCount}</Text>
+        {/* ★ Expand zone — CANLI badge + isim alanı; tap → odayı tam ekran aç */}
+        <Pressable onPress={handleExpand} style={styles.expandZone} hitSlop={4}>
+          <View style={styles.liveIndicator}>
+            <Animated.View style={[styles.liveDot, { transform: [{ scale: pulseAnim }] }]} />
+            <Text style={styles.liveText}>CANLI</Text>
           </View>
-        </View>
 
-        {/* Ses kontrol butonları */}
+          <View style={styles.info}>
+            <Text style={styles.roomName} numberOfLines={1}>{room.name}</Text>
+            <View style={styles.metaRow}>
+              <Ionicons name="person" size={9} color="#94A3B8" style={styles.iconShadow} />
+              <Text style={styles.metaText}>{room.hostName}</Text>
+              <Text style={styles.metaDot}>·</Text>
+              <Ionicons name="people" size={9} color="#94A3B8" style={styles.iconShadow} />
+              <Text style={styles.metaText}>{room.viewerCount}</Text>
+            </View>
+          </View>
+        </Pressable>
+
+        {/* Ses kontrol butonları — bağımsız Pressable'lar, outer onPress yok */}
         <View style={styles.actions}>
           {onMuteToggle && (
             <Pressable
@@ -313,7 +322,7 @@ export default function MiniRoomCard({ room, onExpand, onClose, onMuteToggle, on
             <Ionicons name="close" size={14} color="#EF4444" />
           </Pressable>
         </View>
-      </Pressable>
+      </View>
     </Animated.View>
   );
 }
@@ -388,6 +397,13 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.35,
     shadowRadius: 16,
     elevation: 6,
+  },
+  // ★ Expand zone — liveIndicator + info wrapper, sadece bu alan handleExpand tetikler
+  expandZone: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   liveIndicator: {
     flexDirection: 'row', alignItems: 'center', gap: 4,

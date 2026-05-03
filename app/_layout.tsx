@@ -109,6 +109,7 @@ import AppLoader from '../components/AppLoader';
 import SplashSpinner from '../components/SplashSpinner';
 import { IncomingCallOverlay } from '../components/IncomingCallOverlay';
 import MiniRoomCard, { type MinimizedRoom } from '../components/MiniRoomCard';
+import SessionConflictGuard from '../components/SessionConflictGuard';
 import ErrorBoundary from '../components/ErrorBoundary';
 // ★ react-native-keyboard-controller kaldırıldı — native modül linked değildi, app crash'e neden oluyordu.
 // SplashOverlay import kaldırıldı — ARCH-4 FIX (ölü kod temizliği)
@@ -1744,6 +1745,8 @@ export default function RootLayout() {
         )}
 
         {/* ★ Intro Video kaldırıldı */}
+        {/* ★ v107 (3 May 2026): Çift oturum uyarısı — başka cihaz takeover algılarsa modal */}
+        <SessionConflictGuard userId={firebaseUser?.uid || null} />
       </View>
     </SafeAreaProvider>
 

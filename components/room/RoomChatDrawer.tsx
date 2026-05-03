@@ -18,6 +18,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getAvatarSource } from '../../constants/avatars';
 import { EmojiReactionBar } from '../EmojiReactions';
 import { RoomChatService } from '../../services/roomChat';
+import MessageGlowPickerSheet from './MessageGlowPickerSheet';
+import SPIcon from '../SPIcon';
 
 // Snap points — CONTROL_BAR_AREA: bar + padding alanı (insets.bottom hariç).
 // RoomControlBar: BAR_H=50 + üstündeki wrapper paddingBottom(8) = 58.
@@ -52,53 +54,278 @@ function getUserColor(userId: string, role?: string, tier?: string): string {
   return HASH_COLORS[Math.abs(hash) % HASH_COLORS.length];
 }
 
-// ★ v92.14 (1 May 2026): Mesaj Parlat power-up — Android-uyumlu gradient glow.
-//   - LinearGradient bg (parlaktan koyuya, top-down).
-//   - 3 katmanlı border (outer dark amber → mid gold → inner bright ivory) = sahte gradient outline.
-//   - Breath pulse opacity → "canlı parlama" hissi. Shadow YOK (Android'de glow render etmiyor).
-function GlowMessageOverlay() {
-  const breath = useRef(new Animated.Value(0)).current;
+// ★ v107 (3 May 2026): Mesaj Parlat power-up — 6 stil mockup (HTML tasarımı).
+//   Her mesaj kendi stilini bağımsız seçer; mesajın metadata.glow_style alanından okunur.
+//   Backwards-compat: metadata.glow=true → 'gold' fallback (eski 5-mesaj birikim sistemi).
+//   GLOW_STYLES config ./glowStyles.ts'te (RoomChatDrawer ↔ MessageGlowPickerSheet circular önlemi).
+
+import { GLOW_STYLES, type GlowStyleId } from './glowStyles';
+export { GLOW_STYLES, type GlowStyleId };
+
+// ─── Particle component'leri ─────────────────────────────────
+// Hafif, NativeDriver-uyumlu animasyonlar. Her overlay sadece kendi particle'ını render eder.
+
+function ShineSweep() {
+  const x = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const loop = Animated.loop(Animated.timing(x, {
+      toValue: 1, duration: 2400, useNativeDriver: true, easing: Easing.inOut(Easing.cubic),
+    }));
+    loop.start();
+    return () => loop.stop();
+  }, [x]);
+  return (
+    <Animated.View pointerEvents="none" style={{
+      position: 'absolute', top: 0, bottom: 0,
+      width: 80,
+      transform: [
+        { translateX: x.interpolate({ inputRange: [0, 1], outputRange: [-100, 360] }) },
+        { skewX: '-20deg' },
+      ],
+    }}>
+      <LinearGradient
+        colors={['transparent', 'rgba(255,255,255,0.4)', 'transparent']}
+        start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }}
+        style={StyleSheet.absoluteFillObject}
+      />
+    </Animated.View>
+  );
+}
+
+function HeartParticles() {
+  return (
+    <>
+      {['💖', '💕', '❤️'].map((emoji, i) => (
+        <FloatParticle key={i} emoji={emoji} leftPercent={20 + i * 30} delay={i * 600} />
+      ))}
+    </>
+  );
+}
+
+function FloatParticle({ emoji, leftPercent, delay }: { emoji: string; leftPercent: number; delay: number }) {
+  const t = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     const loop = Animated.loop(Animated.sequence([
-      Animated.timing(breath, { toValue: 1, duration: 1400, useNativeDriver: true, easing: Easing.inOut(Easing.sin) }),
-      Animated.timing(breath, { toValue: 0, duration: 1400, useNativeDriver: true, easing: Easing.inOut(Easing.sin) }),
+      Animated.delay(delay),
+      Animated.timing(t, { toValue: 1, duration: 1800, useNativeDriver: true, easing: Easing.out(Easing.cubic) }),
+      Animated.timing(t, { toValue: 0, duration: 0, useNativeDriver: true }),
+      Animated.delay(200),
     ]));
     loop.start();
     return () => loop.stop();
-  }, [breath]);
+  }, [t, delay]);
+  return (
+    <Animated.Text pointerEvents="none" style={{
+      position: 'absolute', bottom: 0,
+      left: `${leftPercent}%`,
+      fontSize: 14,
+      transform: [
+        { translateY: t.interpolate({ inputRange: [0, 0.2, 1], outputRange: [0, -12, -42] }) },
+        { scale: t.interpolate({ inputRange: [0, 0.2, 1], outputRange: [0, 1, 0.5] }) },
+      ],
+      opacity: t.interpolate({ inputRange: [0, 0.2, 0.8, 1], outputRange: [0, 1, 1, 0] }),
+    }}>{emoji}</Animated.Text>
+  );
+}
+
+function NeonBorder() {
+  // ★ HTML border-snake — gradient renkleri 3sn'de bir döner. RN'de border-color
+  //   animatable değil; 3 katman crossfade ile fake (cyan → magenta → yellow → cyan).
+  const t = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const loop = Animated.loop(Animated.timing(t, {
+      toValue: 1, duration: 3000, useNativeDriver: true, easing: Easing.linear,
+    }));
+    loop.start();
+    return () => loop.stop();
+  }, [t]);
+  const cyan = t.interpolate({ inputRange: [0, 0.33, 0.66, 1], outputRange: [1, 0, 0, 1] });
+  const magenta = t.interpolate({ inputRange: [0, 0.33, 0.66, 1], outputRange: [0, 1, 0, 0] });
+  const yellow = t.interpolate({ inputRange: [0, 0.33, 0.66, 1], outputRange: [0, 0, 1, 0] });
   return (
     <>
-      {/* Bg gradient — parlak ivory üst → koyu amber alt; ışıkla yıkanmış balon */}
-      <Animated.View
-        pointerEvents="none"
-        style={[StyleSheet.absoluteFillObject, {
-          borderRadius: 14,
-          overflow: 'hidden',
-          opacity: breath.interpolate({ inputRange: [0, 1], outputRange: [0.55, 0.92] }),
-        }]}
-      >
-        <LinearGradient
-          colors={['rgba(255,241,168,0.42)', 'rgba(255,215,0,0.22)', 'rgba(180,83,9,0.06)']}
-          start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
-          style={StyleSheet.absoluteFillObject}
-        />
-      </Animated.View>
-      {/* Outer ring — koyu amber (gradient'in koyu kenarı) */}
-      <View pointerEvents="none" style={[StyleSheet.absoluteFillObject, {
-        borderRadius: 14, borderWidth: 1.8, borderColor: '#B45309',
+      <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFillObject, {
+        borderRadius: 14, borderWidth: 1.8, borderColor: '#00FFFF', opacity: cyan,
       }]} />
-      {/* Mid ring — gold */}
+      <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFillObject, {
+        borderRadius: 14, borderWidth: 1.8, borderColor: '#FF00FF', opacity: magenta,
+      }]} />
+      <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFillObject, {
+        borderRadius: 14, borderWidth: 1.8, borderColor: '#FFFF00', opacity: yellow,
+      }]} />
+    </>
+  );
+}
+
+// ★ HTML galaxy: radial-gradient(circle at 20% 20%, #FFE082, transparent 40%) +
+//   radial-gradient(circle at 80% 80%, #FBBF24, transparent 40%). RN'de radial-gradient
+//   yok; 2 absolute "blob" (border-radius büyük + opacity) ile yakın simülasyon.
+function GalaxyBlobs() {
+  return (
+    <>
       <View pointerEvents="none" style={{
-        position: 'absolute', top: 1.4, left: 1.4, right: 1.4, bottom: 1.4,
-        borderRadius: 12.6, borderWidth: 1.1, borderColor: '#FFD700',
+        position: 'absolute', top: -30, left: -30,
+        width: 120, height: 120, borderRadius: 60,
+        backgroundColor: '#FFE082',
+        opacity: 0.45,
       }} />
-      {/* Inner bright ring — breath ile parlaklık nefes alır */}
-      <Animated.View pointerEvents="none" style={{
-        position: 'absolute', top: 2.6, left: 2.6, right: 2.6, bottom: 2.6,
-        borderRadius: 11.4, borderWidth: 0.8, borderColor: '#FFF1A8',
-        opacity: breath.interpolate({ inputRange: [0, 1], outputRange: [0.65, 1] }),
+      <View pointerEvents="none" style={{
+        position: 'absolute', bottom: -30, right: -30,
+        width: 120, height: 120, borderRadius: 60,
+        backgroundColor: '#FBBF24',
+        opacity: 0.45,
       }} />
     </>
+  );
+}
+
+function FireIcon() {
+  const flick = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(flick, { toValue: 1, duration: 130, useNativeDriver: true }),
+      Animated.timing(flick, { toValue: 0.3, duration: 130, useNativeDriver: true }),
+      Animated.timing(flick, { toValue: 0.7, duration: 130, useNativeDriver: true }),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, [flick]);
+  return (
+    <Animated.Text pointerEvents="none" style={{
+      fontSize: 13,
+      transform: [
+        { scaleY: flick.interpolate({ inputRange: [0, 1], outputRange: [0.95, 1.1] }) },
+        { rotate: flick.interpolate({ inputRange: [0, 0.5, 1], outputRange: ['-2deg', '2deg', '-1deg'] }) },
+      ],
+    }}>🔥</Animated.Text>
+  );
+}
+
+function ConfettiRain() {
+  return (
+    <>
+      <ConfettiDrop emoji="🎉" leftPercent={10} duration={1800} delay={0} />
+      <ConfettiDrop emoji="✨" leftPercent={75} duration={2200} delay={600} />
+    </>
+  );
+}
+
+function ConfettiDrop({ emoji, leftPercent, duration, delay }: { emoji: string; leftPercent: number; duration: number; delay: number }) {
+  const t = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const loop = Animated.loop(Animated.sequence([
+      Animated.delay(delay),
+      Animated.timing(t, { toValue: 1, duration, useNativeDriver: true, easing: Easing.in(Easing.quad) }),
+      Animated.timing(t, { toValue: 0, duration: 0, useNativeDriver: true }),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, [t, duration, delay]);
+  return (
+    <Animated.Text pointerEvents="none" style={{
+      position: 'absolute', top: 0,
+      left: `${leftPercent}%`,
+      fontSize: 14,
+      transform: [
+        { translateY: t.interpolate({ inputRange: [0, 1], outputRange: [-20, 60] }) },
+        { rotate: t.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }) },
+      ],
+      opacity: t.interpolate({ inputRange: [0, 0.2, 1], outputRange: [0, 1, 0] }),
+    }}>{emoji}</Animated.Text>
+  );
+}
+
+function StarTwinkle({ topPercent, leftPercent, delay, emoji = '⭐' }: { topPercent: number; leftPercent: number; delay: number; emoji?: string }) {
+  const t = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const loop = Animated.loop(Animated.sequence([
+      Animated.delay(delay),
+      Animated.timing(t, { toValue: 1, duration: 750, useNativeDriver: true, easing: Easing.inOut(Easing.sin) }),
+      Animated.timing(t, { toValue: 0, duration: 750, useNativeDriver: true, easing: Easing.inOut(Easing.sin) }),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, [t, delay]);
+  return (
+    <Animated.Text pointerEvents="none" style={{
+      position: 'absolute', top: `${topPercent}%`, left: `${leftPercent}%`,
+      fontSize: 12,
+      transform: [{ scale: t.interpolate({ inputRange: [0, 1], outputRange: [0.8, 1.3] }) }],
+      opacity: t.interpolate({ inputRange: [0, 1], outputRange: [0.3, 1] }),
+    }}>{emoji}</Animated.Text>
+  );
+}
+
+function StarsField() {
+  return (
+    <>
+      <StarTwinkle topPercent={20} leftPercent={8} delay={0} emoji="⭐" />
+      <StarTwinkle topPercent={60} leftPercent={80} delay={500} emoji="✨" />
+      <StarTwinkle topPercent={40} leftPercent={55} delay={1000} emoji="⭐" />
+    </>
+  );
+}
+
+// ─── Ana overlay ─────────────────────────────────
+function GlowMessageOverlay({ style }: { style: GlowStyleId }) {
+  const cfg = GLOW_STYLES[style];
+  return (
+    <View pointerEvents="none" style={[StyleSheet.absoluteFillObject, { borderRadius: 14, borderBottomLeftRadius: 4, overflow: 'hidden' }]}>
+      {/* Bg gradient — stile özel */}
+      <LinearGradient
+        colors={cfg.bgGradient as any}
+        start={cfg.bgStart || { x: 0, y: 0 }} end={cfg.bgEnd || { x: 1, y: 1 }}
+        locations={cfg.bgLocations as any}
+        style={StyleSheet.absoluteFillObject}
+      />
+      {/* Body bg overlay — readability için yarı saydam koyuluk */}
+      <View style={[StyleSheet.absoluteFillObject, { backgroundColor: cfg.bodyBg, top: 24 }]} />
+      {/* Particles — stile göre */}
+      {cfg.particles === 'shine' && <ShineSweep />}
+      {cfg.particles === 'hearts' && <HeartParticles />}
+      {cfg.particles === 'neon-border' && <NeonBorder />}
+      {cfg.particles === 'confetti' && <ConfettiRain />}
+      {cfg.particles === 'stars' && (<><GalaxyBlobs /><StarsField /></>)}
+    </View>
+  );
+}
+
+// Header strip'i renderMessage içinde inline render edilecek, çünkü header text'i ve cost badge sabit kalmalı + tıklanabilir kalmalı.
+function GlowHeader({ style }: { style: GlowStyleId }) {
+  const cfg = GLOW_STYLES[style];
+  const showFireIcon = cfg.particles === 'fire-icon';
+  return (
+    <View style={{
+      position: 'absolute', top: 0, left: 0, right: 0, height: 24,
+      flexDirection: 'row', alignItems: 'center',
+      paddingHorizontal: 10, gap: 6,
+      borderTopLeftRadius: 14, borderTopRightRadius: 14,
+      overflow: 'hidden',
+    }} pointerEvents="none">
+      <LinearGradient
+        colors={cfg.headerBg as any}
+        start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }}
+        style={StyleSheet.absoluteFillObject}
+      />
+      {showFireIcon ? <FireIcon /> : <Text style={{ fontSize: 11 }}>{cfg.icon}</Text>}
+      <Text style={{
+        fontSize: 9.5, fontWeight: '800', letterSpacing: 1,
+        color: cfg.headerColor,
+        textShadowColor: cfg.particles === 'neon-border' ? '#00FFFF' : 'transparent',
+        textShadowRadius: cfg.particles === 'neon-border' ? 6 : 0,
+        textShadowOffset: { width: 0, height: 0 },
+      }}>{cfg.label}</Text>
+      <View style={{
+        marginLeft: 'auto',
+        flexDirection: 'row', alignItems: 'center', gap: 3,
+        backgroundColor: 'rgba(0,0,0,0.4)',
+        paddingHorizontal: 6, paddingVertical: 1,
+        borderRadius: 8,
+      }}>
+        <SPIcon size={9} />
+        <Text style={{ fontSize: 8.5, fontWeight: '800', color: '#FAC775' }}>{cfg.cost}</Text>
+      </View>
+    </View>
   );
 }
 
@@ -117,14 +344,22 @@ interface Props {
   roomId?: string;
   /** ★ 2026-04-26: Mesaj balonundaki avatar/isim tıklanınca profil sheet aç (parent yönlendirir). */
   onAvatarPress?: (userId: string) => void;
+  /** ★ v107 (3 May 2026): Mesaj Parlat — kullanıcının SP bakiyesi (picker yeterlilik kontrolü için) */
+  currentSP?: number;
+  /** ★ v107: Stil seçilmişken send tetiklenince burayı çağır — parent SP düşer + glow_style metadata ile gönderir */
+  onSendGlow?: (content: string, glowStyle: GlowStyleId) => void;
 }
 
 export default function RoomChatDrawer({
   visible, messages, chatInput, onChangeInput, onSend, onClose, onSendRaw, currentUserId, roomId, onAvatarPress,
+  currentSP = 0, onSendGlow,
 }: Props) {
   const insets = useSafeAreaInsets();
   const inputRef = useRef<TextInput>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  // ★ v107: Mesaj Parlat — picker visibility + seçilen stil (sonraki mesaja uygulanır)
+  const [glowPickerVisible, setGlowPickerVisible] = useState(false);
+  const [pendingGlowStyle, setPendingGlowStyle] = useState<GlowStyleId | null>(null);
 
   // ════════════════════════════════════════════════════════════
   // Dynamic snap points — useWindowDimensions window boyutu değişince
@@ -445,8 +680,13 @@ export default function RoomChatDrawer({
     // ★ 2026-04-26 FIX: Mesaj objesinde gönderen alanı `sender_id` (DB) — ChatMsg type'ında `user_id` adıyla
     //   aliaslanıyordu ama bazı kayıtlarda yalnız `sender_id` geliyor. İkisini de OR ile al.
     const senderUid = (item as any).user_id || (item as any).sender_id;
-    // ★ v92.11 (1 May 2026): Mesaj Parlat power-up — metadata.glow=true ise altın bubble.
-    const isGlowMsg = !!(item as any).metadata?.glow;
+    // ★ v107 (3 May 2026): 6 stilli mesaj parlat — metadata.glow_style: 'gold'|'heart'|'neon'|'fire'|'celebration'|'galaxy'
+    //   Backwards-compat: metadata.glow=true → 'gold' fallback.
+    const glowStyleId: GlowStyleId | null =
+      ((item as any).metadata?.glow_style as GlowStyleId) ||
+      ((item as any).metadata?.glow ? 'gold' : null);
+    const isGlowMsg = !!glowStyleId;
+    const glowCfg = glowStyleId ? GLOW_STYLES[glowStyleId] : null;
 
     return (
       <View style={st.msgRow}>
@@ -468,22 +708,26 @@ export default function RoomChatDrawer({
             pressed && { opacity: 0.9 },
           ]}
         >
-          {/* ★ v92.14: Mesaj Parlat overlay — gradient bg + multi-layer border + breath pulse.
-              Arkada kalır, içerik üstüne biner (z-index doğal). */}
-          {isGlowMsg && <GlowMessageOverlay />}
+          {/* ★ v107: 6 stilli Mesaj Parlat (HTML mockup) — overlay arka plan + üst header strip */}
+          {glowStyleId && (
+            <>
+              <GlowMessageOverlay style={glowStyleId} />
+              <GlowHeader style={glowStyleId} />
+            </>
+          )}
           {/* İsim de tıklanır — avatar gibi profil sheet'i açar */}
           <Pressable
             onPress={() => { if (senderUid && onAvatarPress) onAvatarPress(senderUid); }}
             hitSlop={4}
           >
-            <Text style={[st.msgName, { color: nameColor }]}>{item.profiles?.display_name || 'Kullanıcı'}</Text>
+            <Text style={[st.msgName, { color: glowCfg ? glowCfg.nameColor : nameColor }]}>{item.profiles?.display_name || 'Kullanıcı'}</Text>
           </Pressable>
           {isGifSafe ? (
             <Image source={{ uri: gifMatch![1] }} style={{ width: 220, height: 165, borderRadius: 12 }} resizeMode="cover" />
           ) : emojiOnly ? (
             <Text style={{ fontSize: 36, lineHeight: 44 }}>{content}</Text>
           ) : (
-            <Text style={st.msgText}>{content}</Text>
+            <Text style={[st.msgText, glowCfg && { color: glowCfg.textColor, fontWeight: '500' }]}>{content}</Text>
           )}
           {reaction && reaction.count > 0 ? (
             <View style={[st.reactionBadge, reaction.liked && st.reactionBadgeLiked]}>
@@ -598,6 +842,27 @@ export default function RoomChatDrawer({
           },
         ]}
       >
+        {/* ★ v107: Pending glow style banner — kullanıcı bir stil seçti, henüz mesaj göndermedi.
+            Cancel için X butonu. Mesaj gönderilince state otomatik temizlenir. */}
+        {pendingGlowStyle && (
+          <View style={st.glowBanner}>
+            <LinearGradient
+              colors={GLOW_STYLES[pendingGlowStyle].bgGradient as any}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+              style={StyleSheet.absoluteFillObject}
+            />
+            <Text style={st.glowBannerIcon}>{GLOW_STYLES[pendingGlowStyle].icon}</Text>
+            <Text style={st.glowBannerLabel}>{GLOW_STYLES[pendingGlowStyle].label}</Text>
+            <View style={st.glowBannerCost}>
+              <SPIcon size={11} />
+              <Text style={st.glowBannerCostText}>{GLOW_STYLES[pendingGlowStyle].cost} SP</Text>
+            </View>
+            <Pressable onPress={() => setPendingGlowStyle(null)} hitSlop={8} style={st.glowBannerClose}>
+              <Ionicons name="close" size={14} color="rgba(255,255,255,0.85)" />
+            </Pressable>
+          </View>
+        )}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 0 }}>
         <Pressable
           onPress={() => {
             if (!showEmojiPicker) {
@@ -613,6 +878,14 @@ export default function RoomChatDrawer({
             size={22}
             color={showEmojiPicker ? '#5CE1E6' : 'rgba(255,255,255,0.55)'}
           />
+        </Pressable>
+        {/* ★ v107: Mesaj Parlat — picker aç */}
+        <Pressable
+          onPress={() => { inputRef.current?.blur(); setShowEmojiPicker(false); setGlowPickerVisible(true); }}
+          style={st.iconBtn}
+          hitSlop={6}
+        >
+          <Ionicons name="sparkles" size={20} color={pendingGlowStyle ? '#FBBF24' : 'rgba(255,255,255,0.55)'} />
         </Pressable>
         <TextInput
           ref={inputRef}
@@ -631,17 +904,42 @@ export default function RoomChatDrawer({
           maxLength={300}
           returnKeyType="send"
           blurOnSubmit={false}
-          onSubmitEditing={() => { onSend(); inputRef.current?.focus(); }}
+          onSubmitEditing={() => {
+            if (pendingGlowStyle && onSendGlow && chatInput.trim()) {
+              onSendGlow(chatInput, pendingGlowStyle);
+              setPendingGlowStyle(null);
+            } else {
+              onSend();
+            }
+            inputRef.current?.focus();
+          }}
         />
         <Pressable
           style={[st.sendBtn, !chatInput.trim() && { opacity: 0.35 }]}
-          onPress={() => { onSend(); inputRef.current?.focus(); }}
+          onPress={() => {
+            if (pendingGlowStyle && onSendGlow && chatInput.trim()) {
+              onSendGlow(chatInput, pendingGlowStyle);
+              setPendingGlowStyle(null);
+            } else {
+              onSend();
+            }
+            inputRef.current?.focus();
+          }}
           disabled={!chatInput.trim()}
           hitSlop={6}
         >
           <Ionicons name="send" size={16} color="#FFF" />
         </Pressable>
+        </View>
       </Animated.View>
+
+      {/* ★ v107: Stil seçim sheet'i */}
+      <MessageGlowPickerSheet
+        visible={glowPickerVisible}
+        onClose={() => setGlowPickerVisible(false)}
+        currentSP={currentSP}
+        onSelect={(id) => setPendingGlowStyle(id)}
+      />
     </>
   );
 }
@@ -718,8 +1016,7 @@ const st = StyleSheet.create({
     left: 4, right: 4,
     zIndex: 59,
     elevation: 59,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: 'column',  // ★ v107: banner üstte + input row altta
     gap: 6,
     paddingHorizontal: 8,
     paddingTop: 8,
@@ -736,6 +1033,41 @@ const st = StyleSheet.create({
   iconBtn: {
     width: 34, height: 34, borderRadius: 17,
     alignItems: 'center', justifyContent: 'center',
+  },
+  // ★ v107: Mesaj Parlat — pending stil göstergesi (input bar üstünde mini banner)
+  glowBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10, paddingVertical: 6,
+    borderRadius: 10,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+  },
+  glowBannerIcon: { fontSize: 13 },
+  glowBannerLabel: {
+    fontSize: 10.5, fontWeight: '900',
+    color: '#FFF', letterSpacing: 1,
+    textShadowColor: 'rgba(0,0,0,0.6)',
+    textShadowRadius: 3,
+    textShadowOffset: { width: 0, height: 1 },
+  },
+  glowBannerCost: {
+    marginLeft: 'auto',
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 8, paddingVertical: 2,
+    borderRadius: 8,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  glowBannerCostText: {
+    fontSize: 10, fontWeight: '800',
+    color: '#FAC775',
+  },
+  glowBannerClose: {
+    width: 20, height: 20, borderRadius: 10,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.4)',
   },
   input: {
     flex: 1,
@@ -757,19 +1089,23 @@ const st = StyleSheet.create({
   },
 
   // ── Messages ──
-  msgRow: { flexDirection: 'row', gap: 8, alignItems: 'flex-start' },
-  msgAvatar: { width: 30, height: 30, borderRadius: 15, borderWidth: 1.5 },
+  // ★ v107: HTML mockup tasarımı — avatar alta hizalı (msg-row alignItems flex-end),
+  //   balon içeriğe göre büzülür ama parent'ın %80'ini geçmez (chat balonu doğal davranış).
+  msgRow: { flexDirection: 'row', gap: 8, alignItems: 'flex-end' },
+  msgAvatar: { width: 32, height: 32, borderRadius: 16, borderWidth: 1.5 },
   msgBubble: {
-    flex: 1,
-    backgroundColor: 'rgba(255,255,255,0.04)',
+    alignSelf: 'flex-start',
+    maxWidth: '80%',
+    backgroundColor: 'rgba(255,255,255,0.08)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
+    borderColor: 'rgba(255,255,255,0.05)',
     borderRadius: 14,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    borderBottomLeftRadius: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
   msgName: { fontSize: 11, fontWeight: '700', marginBottom: 2 },
-  msgText: { fontSize: 13, color: '#E2E8F0', lineHeight: 18 },
+  msgText: { fontSize: 13, color: '#FFFFFF', lineHeight: 18 },
   sysMsg: {
     alignSelf: 'center',
     backgroundColor: 'rgba(255,255,255,0.04)',
@@ -803,12 +1139,14 @@ const st = StyleSheet.create({
     textShadowRadius: 2,
   },
 
-  // ★ v92.14 (1 May 2026): Mesaj Parlat — gerçek görsel <GlowMessageOverlay /> içinde.
-  //   Buradaki sadece BASE: bubble border/bg transparent — overlay tüm görseli yapıyor.
-  //   Eski versiyon flat altın border + iOS-only shadow idi (Android'de glow yok, kullanıcı şikâyet etti).
+  // ★ v107 (3 May 2026): Mesaj Parlat — 6 stilli (HTML mockup).
+  //   Bg/border transparent (overlay hepsini çiziyor). paddingTop: 30 = 24px header + 6px nefes.
+  //   minWidth: 175 → üst header strip (icon + label + cost badge) kısa mesajda da sığsın.
   glowMsgBubble: {
-    borderWidth: 0,
     backgroundColor: 'transparent',
+    borderWidth: 0,
+    paddingTop: 30,
+    minWidth: 175,
   },
 
   // ★ v56: Reaction badge — balonun sağ-altında küçük ❤️+sayı pill

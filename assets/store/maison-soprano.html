@@ -1,0 +1,1484 @@
+<div style="padding: 1rem 0;">
+<h2 class="sr-only">SopranoChat Mağaza — lüks butik vitrin tasarımı</h2>
+
+<style>
+.lux-frame {
+  background: #050308;
+  border-radius: 28px;
+  border: 8px solid #0a0a0a;
+  overflow: hidden;
+  height: 880px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.lux-frame::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at 30% 0%, rgba(251, 191, 36, 0.15) 0%, transparent 40%),
+    radial-gradient(ellipse at 70% 100%, rgba(167, 139, 250, 0.12) 0%, transparent 40%),
+    radial-gradient(ellipse at 0% 50%, rgba(244, 114, 182, 0.08) 0%, transparent 30%);
+  pointer-events: none;
+  animation: ambient-luxury 8s ease-in-out infinite;
+}
+
+@keyframes ambient-luxury {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1; }
+}
+
+.lux-frame::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(1px 1px at 15% 20%, rgba(255, 224, 130, 0.6), transparent),
+    radial-gradient(1px 1px at 85% 30%, rgba(255, 255, 255, 0.4), transparent),
+    radial-gradient(1.5px 1.5px at 50% 50%, rgba(251, 191, 36, 0.5), transparent),
+    radial-gradient(1px 1px at 25% 80%, rgba(244, 114, 182, 0.4), transparent),
+    radial-gradient(1px 1px at 75% 70%, rgba(167, 139, 250, 0.5), transparent);
+  background-repeat: no-repeat;
+  pointer-events: none;
+  animation: stars-luxury 25s linear infinite;
+}
+
+@keyframes stars-luxury {
+  0% { background-position: 0 0, 0 0, 0 0, 0 0, 0 0; opacity: 0.3; }
+  50% { opacity: 0.8; }
+  100% { background-position: 20px 30px, -30px 40px, 40px -20px, -25px -35px, 35px 25px; opacity: 0.3; }
+}
+
+.lux-header {
+  position: relative;
+  z-index: 10;
+  padding: 18px 20px 14px;
+  border-bottom: 0.5px solid rgba(251, 191, 36, 0.12);
+  background: linear-gradient(180deg, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0.1) 100%);
+  backdrop-filter: blur(20px);
+}
+
+.lux-header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.lux-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.lux-brand-mark {
+  width: 36px;
+  height: 36px;
+  position: relative;
+}
+
+@keyframes brand-rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.lux-brand-orbit {
+  position: absolute;
+  inset: 0;
+  border: 0.5px solid rgba(251, 191, 36, 0.3);
+  border-radius: 50%;
+  animation: brand-rotate 12s linear infinite;
+}
+
+.lux-brand-orbit::before {
+  content: '';
+  position: absolute;
+  width: 4px; height: 4px;
+  background: #FBBF24;
+  border-radius: 50%;
+  top: -2px;
+  left: 50%;
+  transform: translateX(-50%);
+  box-shadow: 0 0 8px #FBBF24;
+}
+
+.lux-brand-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.lux-brand-name {
+  color: white;
+  font-family: Georgia, serif;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  line-height: 1;
+}
+
+.lux-brand-sub {
+  color: rgba(251, 191, 36, 0.7);
+  font-size: 8px;
+  letter-spacing: 3px;
+  font-weight: 600;
+  margin-top: 3px;
+}
+
+.lux-balance-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px 6px 6px;
+  background: linear-gradient(135deg, rgba(255, 224, 130, 0.1), rgba(0, 0, 0, 0.4));
+  border: 0.5px solid rgba(251, 191, 36, 0.4);
+  border-radius: 100px;
+  backdrop-filter: blur(10px);
+  position: relative;
+  overflow: hidden;
+}
+
+.lux-balance-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+  animation: balance-shine 4s ease-in-out infinite;
+}
+
+@keyframes balance-shine {
+  0%, 100% { transform: translateX(-100%); }
+  50% { transform: translateX(100%); }
+}
+
+.lux-balance-gem {
+  width: 26px; height: 26px;
+}
+
+.lux-balance-num {
+  color: #FFE082;
+  font-size: 13px;
+  font-weight: 800;
+  font-family: Georgia, serif;
+  letter-spacing: 0.5px;
+  text-shadow: 0 0 10px rgba(255, 224, 130, 0.5);
+}
+
+.lux-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(0,0,0,0.4);
+  border: 0.5px solid rgba(255, 255, 255, 0.08);
+  border-radius: 100px;
+  padding: 9px 16px;
+  margin-bottom: 12px;
+}
+
+.lux-search-icon { color: rgba(251, 191, 36, 0.5); font-size: 13px; }
+.lux-search-text { color: rgba(255, 255, 255, 0.4); font-size: 12px; flex: 1; }
+.lux-search-mic { color: rgba(255, 255, 255, 0.4); font-size: 13px; }
+
+.lux-cats {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.lux-cats::-webkit-scrollbar { display: none; }
+
+.lux-cat-pill {
+  flex-shrink: 0;
+  padding: 7px 16px;
+  border-radius: 100px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 0.5px solid rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  white-space: nowrap;
+  text-transform: uppercase;
+}
+
+.lux-cat-pill.active {
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.2), rgba(239, 159, 39, 0.1));
+  border-color: rgba(251, 191, 36, 0.5);
+  color: #FBBF24;
+  box-shadow: 0 0 12px rgba(251, 191, 36, 0.2);
+}
+
+.lux-body {
+  flex: 1;
+  overflow-y: auto;
+  position: relative;
+  z-index: 5;
+  padding: 0 16px 80px;
+}
+
+.lux-hero {
+  margin: 16px 0;
+  padding: 24px 20px;
+  background:
+    linear-gradient(135deg, rgba(124, 58, 237, 0.3) 0%, rgba(190, 24, 93, 0.2) 50%, rgba(0, 0, 0, 0.3) 100%);
+  border: 0.5px solid rgba(167, 139, 250, 0.3);
+  border-radius: 20px;
+  position: relative;
+  overflow: hidden;
+  min-height: 180px;
+}
+
+.lux-hero::before {
+  content: '';
+  position: absolute;
+  top: -50px;
+  right: -50px;
+  width: 200px;
+  height: 200px;
+  background: radial-gradient(circle, rgba(251, 191, 36, 0.4) 0%, transparent 60%);
+  filter: blur(30px);
+  animation: hero-glow 6s ease-in-out infinite;
+}
+
+@keyframes hero-glow {
+  0%, 100% { transform: scale(1) translate(0, 0); opacity: 0.6; }
+  50% { transform: scale(1.2) translate(-10px, 10px); opacity: 1; }
+}
+
+.lux-hero-art {
+  position: absolute;
+  right: -10px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 90px;
+  filter: drop-shadow(0 0 20px rgba(251, 191, 36, 0.6));
+  animation: hero-art-float 4s ease-in-out infinite;
+}
+
+@keyframes hero-art-float {
+  0%, 100% { transform: translateY(-50%) rotate(-3deg); }
+  50% { transform: translateY(calc(-50% - 10px)) rotate(3deg); }
+}
+
+.lux-hero-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 0.5px solid rgba(244, 114, 182, 0.4);
+  border-radius: 100px;
+  color: #F9A8D4;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  margin-bottom: 12px;
+}
+
+.lux-hero-tag::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  background: #F472B6;
+  border-radius: 50%;
+  animation: pulse-dot 1.5s ease-in-out infinite;
+  box-shadow: 0 0 6px #F472B6;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
+.lux-hero-title {
+  color: white;
+  font-family: Georgia, serif;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.2;
+  margin-bottom: 8px;
+  max-width: 75%;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.8);
+}
+
+.lux-hero-desc {
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 12px;
+  line-height: 1.5;
+  margin-bottom: 14px;
+  max-width: 70%;
+}
+
+.lux-hero-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 18px;
+  background: linear-gradient(135deg, #FFE082, #FAC775);
+  color: #3D1F00;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  border-radius: 100px;
+  text-transform: uppercase;
+  box-shadow: 0 4px 16px rgba(251, 191, 36, 0.4);
+}
+
+.lux-section {
+  margin-bottom: 28px;
+}
+
+.lux-section-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.lux-section-line {
+  flex: 1;
+  height: 0.5px;
+  background: linear-gradient(90deg, transparent, rgba(251, 191, 36, 0.3), transparent);
+}
+
+.lux-section-label {
+  color: #FBBF24;
+  font-size: 9px;
+  letter-spacing: 3px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.lux-section-title {
+  color: white;
+  font-family: Georgia, serif;
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.lux-section-sub {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 11px;
+  margin-bottom: 14px;
+  font-style: italic;
+}
+
+.lux-showcase-row {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding: 4px 4px 16px;
+  margin: 0 -4px;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.lux-showcase-row::-webkit-scrollbar { display: none; }
+
+.lux-showcase-card {
+  flex-shrink: 0;
+  width: 180px;
+  height: 240px;
+  border-radius: 18px;
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+  border: 0.5px solid rgba(255, 255, 255, 0.08);
+}
+
+.lux-showcase-card.legendary {
+  border-color: rgba(251, 191, 36, 0.4);
+  box-shadow: 0 0 20px rgba(251, 191, 36, 0.2);
+}
+
+.lux-showcase-card.mythic {
+  border-color: rgba(167, 139, 250, 0.5);
+  box-shadow: 0 0 24px rgba(167, 139, 250, 0.3);
+}
+
+.lux-showcase-card.divine {
+  border-color: rgba(244, 114, 182, 0.5);
+  box-shadow: 0 0 24px rgba(244, 114, 182, 0.3);
+}
+
+.showcase-bg-1 {
+  background:
+    radial-gradient(circle at 50% 30%, rgba(255, 215, 0, 0.4), transparent 50%),
+    linear-gradient(135deg, #1a1330 0%, #4A2D7A 50%, #2D1B4E 100%);
+}
+
+.showcase-bg-2 {
+  background:
+    radial-gradient(circle at 50% 40%, rgba(244, 114, 182, 0.4), transparent 50%),
+    linear-gradient(135deg, #1A0A1F 0%, #500724 50%, #831843 100%);
+}
+
+.showcase-bg-3 {
+  background:
+    radial-gradient(circle at 30% 30%, rgba(34, 211, 238, 0.3), transparent 50%),
+    linear-gradient(135deg, #0F1729 0%, #155E75 50%, #0E7490 100%);
+}
+
+.showcase-bg-4 {
+  background:
+    radial-gradient(circle at 60% 40%, rgba(220, 38, 38, 0.4), transparent 50%),
+    linear-gradient(135deg, #1A0A0A 0%, #7F1D1D 50%, #DC2626 100%);
+}
+
+.showcase-bg-5 {
+  background:
+    radial-gradient(circle at 50% 30%, rgba(251, 191, 36, 0.4), transparent 50%),
+    linear-gradient(135deg, #2A1E0D 0%, #854F0B 50%, #FBBF24 110%);
+}
+
+.lux-showcase-rare-tag {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  padding: 3px 8px;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(10px);
+  border-radius: 100px;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  border: 0.5px solid;
+  z-index: 5;
+}
+
+.tag-divine { color: #F472B6; border-color: rgba(244, 114, 182, 0.5); }
+.tag-mythic { color: #C4B5FD; border-color: rgba(167, 139, 250, 0.5); }
+.tag-legendary { color: #FBBF24; border-color: rgba(251, 191, 36, 0.5); }
+
+.lux-showcase-art {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 80px;
+  filter: drop-shadow(0 0 20px currentColor);
+  animation: showcase-float 4s ease-in-out infinite;
+}
+
+@keyframes showcase-float {
+  0%, 100% { transform: translate(-50%, -50%) rotate(-2deg) scale(1); }
+  50% { transform: translate(-50%, -55%) rotate(2deg) scale(1.05); }
+}
+
+.lux-showcase-rays {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 200px;
+  height: 200px;
+  background:
+    conic-gradient(from 0deg, 
+      transparent 0deg, rgba(255, 255, 255, 0.1) 30deg, transparent 60deg,
+      transparent 120deg, rgba(255, 255, 255, 0.1) 150deg, transparent 180deg,
+      transparent 240deg, rgba(255, 255, 255, 0.1) 270deg, transparent 300deg);
+  animation: rays-rotate 20s linear infinite;
+}
+
+@keyframes rays-rotate {
+  from { transform: translate(-50%, -50%) rotate(0deg); }
+  to { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+.lux-showcase-info {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 12px 14px;
+  background: linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.8) 50%, rgba(0, 0, 0, 0.95) 100%);
+  backdrop-filter: blur(10px);
+}
+
+.lux-showcase-name {
+  color: white;
+  font-family: Georgia, serif;
+  font-size: 14px;
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+
+.lux-showcase-meta {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 9px;
+  letter-spacing: 1px;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+
+.lux-showcase-price {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.lux-showcase-price-num {
+  color: #FFE082;
+  font-size: 16px;
+  font-weight: 800;
+  font-family: Georgia, serif;
+}
+
+.lux-showcase-price-unit {
+  color: rgba(251, 191, 36, 0.7);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.gallery-card {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 0.5px solid rgba(255, 255, 255, 0.06);
+}
+
+.gallery-card.featured {
+  border-color: rgba(251, 191, 36, 0.3);
+  grid-column: span 2;
+  aspect-ratio: 2.2;
+}
+
+.gallery-bg-1 {
+  background:
+    radial-gradient(circle at 30% 50%, rgba(251, 191, 36, 0.3), transparent 50%),
+    linear-gradient(135deg, #1A1330 0%, #2D1B4E 100%);
+}
+
+.gallery-bg-2 {
+  background:
+    radial-gradient(circle at 50% 30%, rgba(220, 38, 38, 0.3), transparent 50%),
+    linear-gradient(135deg, #0F0A0A 0%, #4A1818 100%);
+}
+
+.gallery-bg-3 {
+  background:
+    radial-gradient(circle at 50% 50%, rgba(34, 211, 238, 0.25), transparent 50%),
+    linear-gradient(135deg, #0F1729 0%, #1E3A5F 100%);
+}
+
+.gallery-bg-4 {
+  background:
+    radial-gradient(circle at 50% 50%, rgba(244, 114, 182, 0.3), transparent 50%),
+    linear-gradient(135deg, #2A0A1F 0%, #500724 100%);
+}
+
+.gallery-bg-featured {
+  background:
+    radial-gradient(circle at 70% 50%, rgba(251, 191, 36, 0.4), transparent 60%),
+    radial-gradient(circle at 30% 30%, rgba(167, 139, 250, 0.3), transparent 60%),
+    linear-gradient(135deg, #0F0A1A 0%, #2D1B4E 50%, #1A0A0A 100%);
+}
+
+.gallery-art {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -55%);
+  font-size: 56px;
+  filter: drop-shadow(0 0 16px currentColor);
+}
+
+.gallery-card.featured .gallery-art {
+  font-size: 72px;
+  left: 70%;
+}
+
+.gallery-info {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 10px 12px;
+  background: linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.85) 60%);
+}
+
+.gallery-card.featured .gallery-info {
+  left: 0;
+  width: 60%;
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.9) 30%, transparent);
+}
+
+.gallery-name {
+  color: white;
+  font-family: Georgia, serif;
+  font-size: 12px;
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+
+.gallery-card.featured .gallery-name {
+  font-size: 16px;
+  margin-bottom: 4px;
+}
+
+.gallery-card.featured .gallery-tagline {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 10px;
+  font-style: italic;
+  margin-bottom: 8px;
+  max-width: 90%;
+}
+
+.gallery-price {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #FFE082;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: Georgia, serif;
+}
+
+.gallery-card.featured .gallery-price { font-size: 16px; }
+
+.gallery-rare-dot {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  box-shadow: 0 0 8px currentColor;
+}
+
+.dot-divine { background: #F472B6; color: #F472B6; }
+.dot-mythic { background: #A78BFA; color: #A78BFA; }
+.dot-legendary { background: #FBBF24; color: #FBBF24; }
+.dot-rare { background: #22D3EE; color: #22D3EE; }
+
+.lux-tier-section {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent),
+    radial-gradient(ellipse at top, rgba(251, 191, 36, 0.08), transparent);
+  border: 0.5px solid rgba(251, 191, 36, 0.15);
+  border-radius: 24px;
+  padding: 24px 16px 16px;
+  margin-bottom: 24px;
+  position: relative;
+  overflow: hidden;
+}
+
+.lux-tier-section::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 80%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(251, 191, 36, 0.5), transparent);
+}
+
+.lux-tier-header-block {
+  text-align: center;
+  margin-bottom: 18px;
+}
+
+.lux-tier-header-symbol {
+  display: inline-block;
+  font-size: 24px;
+  margin-bottom: 6px;
+  filter: drop-shadow(0 0 8px rgba(251, 191, 36, 0.6));
+}
+
+.lux-tier-header-title {
+  color: white;
+  font-family: Georgia, serif;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.lux-tier-header-sub {
+  color: rgba(251, 191, 36, 0.7);
+  font-size: 9px;
+  letter-spacing: 3px;
+  margin-top: 4px;
+  font-weight: 600;
+}
+
+.sp-pack-row {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sp-pack-luxury {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.04) 0%, rgba(0, 0, 0, 0.3) 100%);
+  border: 0.5px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.sp-pack-luxury.tier-bronze {
+  border-color: rgba(184, 100, 50, 0.3);
+}
+
+.sp-pack-luxury.tier-silver {
+  border-color: rgba(192, 192, 192, 0.3);
+}
+
+.sp-pack-luxury.tier-gold {
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.12) 0%, rgba(0, 0, 0, 0.3) 100%);
+  border-color: rgba(251, 191, 36, 0.4);
+  box-shadow: 0 0 16px rgba(251, 191, 36, 0.15);
+}
+
+.sp-pack-luxury.tier-platinum {
+  background: linear-gradient(135deg, rgba(167, 139, 250, 0.15) 0%, rgba(0, 0, 0, 0.3) 100%);
+  border-color: rgba(167, 139, 250, 0.4);
+  box-shadow: 0 0 20px rgba(167, 139, 250, 0.2);
+}
+
+.sp-pack-luxury.tier-diamond {
+  background: linear-gradient(135deg, rgba(244, 114, 182, 0.15) 0%, rgba(167, 139, 250, 0.08) 50%, rgba(0, 0, 0, 0.3) 100%);
+  border-color: rgba(244, 114, 182, 0.4);
+  box-shadow: 0 0 24px rgba(244, 114, 182, 0.25);
+}
+
+.sp-pack-luxury::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.08) 50%, transparent 100%);
+  animation: pack-shimmer 5s ease-in-out infinite;
+}
+
+@keyframes pack-shimmer {
+  0%, 100% { transform: translateX(-100%); }
+  50% { transform: translateX(100%); }
+}
+
+.sp-pack-icon {
+  width: 60px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 2;
+}
+
+.sp-pack-info {
+  flex: 1;
+  position: relative;
+  z-index: 2;
+}
+
+.sp-pack-tier-name {
+  font-size: 9px;
+  letter-spacing: 2px;
+  font-weight: 700;
+  margin-bottom: 2px;
+  text-transform: uppercase;
+}
+
+.tier-bronze .sp-pack-tier-name { color: #D4A574; }
+.tier-silver .sp-pack-tier-name { color: #D1D5DB; }
+.tier-gold .sp-pack-tier-name { color: #FBBF24; }
+.tier-platinum .sp-pack-tier-name { color: #C4B5FD; }
+.tier-diamond .sp-pack-tier-name { color: #F9A8D4; }
+
+.sp-pack-amount-num {
+  color: white;
+  font-family: Georgia, serif;
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.sp-pack-amount-unit {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 11px;
+  font-weight: 600;
+  margin-left: 4px;
+}
+
+.sp-pack-bonus {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 2px 8px;
+  background: rgba(93, 202, 165, 0.15);
+  color: #5DCAA5;
+  font-size: 9px;
+  font-weight: 700;
+  border-radius: 100px;
+  letter-spacing: 0.5px;
+}
+
+.sp-pack-buy-area {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.sp-pack-fiat {
+  color: white;
+  font-size: 14px;
+  font-weight: 800;
+  font-family: Georgia, serif;
+}
+
+.sp-pack-buy-btn {
+  padding: 6px 14px;
+  border-radius: 100px;
+  background: linear-gradient(135deg, #FFE082, #FAC775);
+  color: #3D1F00;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  box-shadow: 0 2px 8px rgba(251, 191, 36, 0.3);
+}
+
+.tier-platinum .sp-pack-buy-btn {
+  background: linear-gradient(135deg, #C4B5FD, #A78BFA);
+  color: #2E1065;
+  box-shadow: 0 2px 8px rgba(167, 139, 250, 0.4);
+}
+
+.tier-diamond .sp-pack-buy-btn {
+  background: linear-gradient(135deg, #F9A8D4, #F472B6);
+  color: #500724;
+  box-shadow: 0 2px 12px rgba(244, 114, 182, 0.4);
+}
+
+.sp-pack-most-popular {
+  position: absolute;
+  top: -8px;
+  right: 16px;
+  padding: 3px 10px;
+  background: linear-gradient(135deg, #FFE082, #EF9F27);
+  color: #3D1F00;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  border-radius: 6px;
+  z-index: 3;
+}
+
+.collection-strip {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  margin: 0 -16px;
+  padding: 0 16px 16px;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.collection-strip::-webkit-scrollbar { display: none; }
+
+.collection-card {
+  flex-shrink: 0;
+  width: 140px;
+  height: 180px;
+  border-radius: 14px;
+  position: relative;
+  overflow: hidden;
+  border: 0.5px solid rgba(255, 255, 255, 0.08);
+}
+
+.collection-bg-1 { background: linear-gradient(135deg, #1A0A1F 0%, #500724 100%); }
+.collection-bg-2 { background: linear-gradient(135deg, #0A1A2A 0%, #1E3A8A 100%); }
+.collection-bg-3 { background: linear-gradient(135deg, #1A1A0A 0%, #5C4612 100%); }
+.collection-bg-4 { background: linear-gradient(135deg, #0A1A1A 0%, #134E4A 100%); }
+
+.collection-art {
+  position: absolute;
+  top: 30%;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 50px;
+  filter: drop-shadow(0 0 12px currentColor);
+}
+
+.collection-name {
+  position: absolute;
+  bottom: 36px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  color: white;
+  font-family: Georgia, serif;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 0 8px;
+}
+
+.collection-tag {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 2px 8px;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(10px);
+  border-radius: 100px;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.collection-cta {
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 5px 12px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 0.5px solid rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(10px);
+  border-radius: 100px;
+  color: white;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.lux-bottom-bar {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  right: 12px;
+  background: linear-gradient(135deg, rgba(0, 0, 0, 0.9), rgba(15, 23, 41, 0.95));
+  backdrop-filter: blur(20px);
+  border: 0.5px solid rgba(251, 191, 36, 0.3);
+  border-radius: 18px;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  z-index: 100;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6);
+}
+
+.lux-bottom-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.lux-bottom-text-label {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 9px;
+  letter-spacing: 1px;
+  font-weight: 600;
+}
+
+.lux-bottom-text-action {
+  color: #FBBF24;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+
+.lux-bottom-cta-btn {
+  padding: 10px 20px;
+  background: linear-gradient(135deg, #FFE082, #FAC775, #EF9F27);
+  color: #3D1F00;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  border-radius: 100px;
+  text-transform: uppercase;
+  box-shadow: 0 4px 14px rgba(251, 191, 36, 0.5);
+}
+</style>
+
+<div class="lux-frame">
+
+<div class="lux-header">
+<div class="lux-header-top">
+<div class="lux-brand">
+<div class="lux-brand-mark">
+<div class="lux-brand-orbit"></div>
+<div style="position: absolute; inset: 6px; display: flex; align-items: center; justify-content: center;">
+<svg width="22" height="22" viewBox="0 0 100 100">
+<defs>
+<linearGradient id="brandGem" x1="20%" y1="0%" x2="80%" y2="100%">
+<stop offset="0%" stop-color="#FFE082"/>
+<stop offset="50%" stop-color="#FAC775"/>
+<stop offset="100%" stop-color="#854F0B"/>
+</linearGradient>
+</defs>
+<polygon points="50,12 80.91,30 80.91,70 50,88 19.09,70 19.09,30" fill="url(#brandGem)" stroke="#FFF4D6" stroke-width="0.8"/>
+<polygon points="50,12 65.45,21 50,30 34.54,21" fill="#FFFFFF" opacity="0.4"/>
+</svg>
+</div>
+</div>
+<div class="lux-brand-text">
+<div class="lux-brand-name">Maison Soprano</div>
+<div class="lux-brand-sub">— L U X U R Y · M A R K E T —</div>
+</div>
+</div>
+
+<div class="lux-balance-card">
+<svg class="lux-balance-gem" viewBox="0 0 100 100">
+<defs>
+<linearGradient id="balGem" x1="20%" y1="0%" x2="80%" y2="100%">
+<stop offset="0%" stop-color="#FFE082"/>
+<stop offset="50%" stop-color="#FAC775"/>
+<stop offset="100%" stop-color="#854F0B"/>
+</linearGradient>
+</defs>
+<polygon points="50,12 80.91,30 80.91,70 50,88 19.09,70 19.09,30" fill="url(#balGem)" stroke="#FFF4D6" stroke-width="1"/>
+<polygon points="50,12 65.45,21 50,30 34.54,21" fill="#FFFFFF" opacity="0.4"/>
+</svg>
+<div class="lux-balance-num">3.210</div>
+</div>
+</div>
+
+<div class="lux-search">
+<span class="lux-search-icon">⌕</span>
+<span class="lux-search-text">Koleksiyonda ara…</span>
+<span class="lux-search-mic">◉</span>
+</div>
+
+<div class="lux-cats">
+<div class="lux-cat-pill active">★ Atelier</div>
+<div class="lux-cat-pill">Profil</div>
+<div class="lux-cat-pill">Mesaj Sanatı</div>
+<div class="lux-cat-pill">Hediyeler</div>
+<div class="lux-cat-pill">Salonlar</div>
+<div class="lux-cat-pill">Ünvanlar</div>
+<div class="lux-cat-pill">Boost</div>
+<div class="lux-cat-pill">SP</div>
+</div>
+</div>
+
+<div class="lux-body">
+
+<div class="lux-hero">
+<div class="lux-hero-art">⚜️</div>
+<div class="lux-hero-tag">CANLI · YENİ KOLEKSİYON</div>
+<div class="lux-hero-title">Soprano Couture<br/>Sonbahar 2026</div>
+<div class="lux-hero-desc">Yedi tasarımcı. On iki sınırlı parça.<br/>Sadece bu sezona özel.</div>
+<div class="lux-hero-cta">
+KEŞFET
+<span style="font-size: 14px;">→</span>
+</div>
+</div>
+
+<div class="lux-section">
+<div class="lux-section-divider">
+<span class="lux-section-line"></span>
+<span class="lux-section-label">★ ATELIER · İMZA PARÇALARI ★</span>
+<span class="lux-section-line"></span>
+</div>
+<div class="lux-section-title" style="text-align: center;">Vitrin</div>
+<div class="lux-section-sub" style="text-align: center;">El işçiliği · Sınırlı sayıda · Her biri tek</div>
+
+<div class="lux-showcase-row">
+
+<div class="lux-showcase-card divine showcase-bg-2">
+<div class="lux-showcase-rare-tag tag-divine">İLAHİ</div>
+<div class="lux-showcase-rays"></div>
+<div class="lux-showcase-art" style="color: #F472B6;">👑</div>
+<div class="lux-showcase-info">
+<div class="lux-showcase-name">Phoenix Diadem</div>
+<div class="lux-showcase-meta">Çerçeve · Animasyonlu</div>
+<div class="lux-showcase-price">
+<span class="lux-showcase-price-num">2.500</span>
+<span class="lux-showcase-price-unit">SP</span>
+</div>
+</div>
+</div>
+
+<div class="lux-showcase-card mythic showcase-bg-1">
+<div class="lux-showcase-rare-tag tag-mythic">EFSANEVİ</div>
+<div class="lux-showcase-rays"></div>
+<div class="lux-showcase-art" style="color: #C4B5FD;">🪐</div>
+<div class="lux-showcase-info">
+<div class="lux-showcase-name">Galactique</div>
+<div class="lux-showcase-meta">Galaksi Çerçevesi</div>
+<div class="lux-showcase-price">
+<span class="lux-showcase-price-num">1.800</span>
+<span class="lux-showcase-price-unit">SP</span>
+</div>
+</div>
+</div>
+
+<div class="lux-showcase-card legendary showcase-bg-5">
+<div class="lux-showcase-rare-tag tag-legendary">EFSANE</div>
+<div class="lux-showcase-rays"></div>
+<div class="lux-showcase-art" style="color: #FBBF24;">⚡</div>
+<div class="lux-showcase-info">
+<div class="lux-showcase-name">Aurum Strike</div>
+<div class="lux-showcase-meta">Giriş Efekti</div>
+<div class="lux-showcase-price">
+<span class="lux-showcase-price-num">1.200</span>
+<span class="lux-showcase-price-unit">SP</span>
+</div>
+</div>
+</div>
+
+<div class="lux-showcase-card showcase-bg-3">
+<div class="lux-showcase-rare-tag tag-mythic" style="color: #22D3EE; border-color: rgba(34, 211, 238, 0.5);">NADİR</div>
+<div class="lux-showcase-rays"></div>
+<div class="lux-showcase-art" style="color: #22D3EE;">❄️</div>
+<div class="lux-showcase-info">
+<div class="lux-showcase-name">Glacier Aura</div>
+<div class="lux-showcase-meta">Buz Halesi</div>
+<div class="lux-showcase-price">
+<span class="lux-showcase-price-num">800</span>
+<span class="lux-showcase-price-unit">SP</span>
+</div>
+</div>
+</div>
+
+<div class="lux-showcase-card showcase-bg-4">
+<div class="lux-showcase-rare-tag tag-legendary">YENİ</div>
+<div class="lux-showcase-rays"></div>
+<div class="lux-showcase-art" style="color: #FB923C;">🌋</div>
+<div class="lux-showcase-info">
+<div class="lux-showcase-name">Vesuvius</div>
+<div class="lux-showcase-meta">Magma Çerçevesi</div>
+<div class="lux-showcase-price">
+<span class="lux-showcase-price-num">950</span>
+<span class="lux-showcase-price-unit">SP</span>
+</div>
+</div>
+</div>
+
+</div>
+</div>
+
+<div class="lux-section">
+<div class="lux-section-divider">
+<span class="lux-section-line"></span>
+<span class="lux-section-label">— GALERİ · MESAJ SANATI —</span>
+<span class="lux-section-line"></span>
+</div>
+
+<div class="gallery-grid">
+
+<div class="gallery-card featured">
+<div class="gallery-bg-featured" style="position: absolute; inset: 0;"></div>
+<div class="gallery-rare-dot dot-divine"></div>
+<div class="gallery-art" style="color: #FBBF24; transform: translate(-50%, -55%) rotate(-12deg);">✦</div>
+<div class="gallery-info">
+<div class="gallery-name">Constellation</div>
+<div class="gallery-tagline">Kelimeleriniz yıldızlar gibi parlasın</div>
+<div class="gallery-price">
+✦ 35 <span style="font-size: 9px; color: rgba(251,191,36,0.6); font-weight: 600;">SP / mesaj</span>
+</div>
+</div>
+</div>
+
+<div class="gallery-card">
+<div class="gallery-bg-1" style="position: absolute; inset: 0;"></div>
+<div class="gallery-rare-dot dot-legendary"></div>
+<div class="gallery-art" style="color: #FBBF24;">✨</div>
+<div class="gallery-info">
+<div class="gallery-name">Or Ancien</div>
+<div class="gallery-price">⚜ 12</div>
+</div>
+</div>
+
+<div class="gallery-card">
+<div class="gallery-bg-2" style="position: absolute; inset: 0;"></div>
+<div class="gallery-rare-dot dot-rare"></div>
+<div class="gallery-art" style="color: #DC2626;">🔥</div>
+<div class="gallery-info">
+<div class="gallery-name">Inferno</div>
+<div class="gallery-price">⚜ 18</div>
+</div>
+</div>
+
+<div class="gallery-card">
+<div class="gallery-bg-3" style="position: absolute; inset: 0;"></div>
+<div class="gallery-rare-dot dot-rare"></div>
+<div class="gallery-art" style="color: #22D3EE;">⚡</div>
+<div class="gallery-info">
+<div class="gallery-name">Voltaire</div>
+<div class="gallery-price">⚜ 22</div>
+</div>
+</div>
+
+<div class="gallery-card">
+<div class="gallery-bg-4" style="position: absolute; inset: 0;"></div>
+<div class="gallery-rare-dot dot-divine"></div>
+<div class="gallery-art" style="color: #F472B6;">💗</div>
+<div class="gallery-info">
+<div class="gallery-name">Belle Époque</div>
+<div class="gallery-price">⚜ 28</div>
+</div>
+</div>
+
+</div>
+</div>
+
+<div class="lux-tier-section">
+<div class="lux-tier-header-block">
+<div class="lux-tier-header-symbol">⚜</div>
+<div class="lux-tier-header-title">Soprano Tezgâhı</div>
+<div class="lux-tier-header-sub">— S P · K O L E K S İ Y O N L A R I —</div>
+</div>
+
+<div class="sp-pack-row">
+
+<div class="sp-pack-luxury tier-bronze">
+<div class="sp-pack-icon">
+<svg width="44" height="44" viewBox="0 0 100 100">
+<defs>
+<linearGradient id="bronzeGem" x1="20%" y1="0%" x2="80%" y2="100%">
+<stop offset="0%" stop-color="#E2A87E"/>
+<stop offset="50%" stop-color="#B8723A"/>
+<stop offset="100%" stop-color="#5C3920"/>
+</linearGradient>
+</defs>
+<polygon points="50,12 80.91,30 80.91,70 50,88 19.09,70 19.09,30" fill="url(#bronzeGem)" stroke="#E2A87E" stroke-width="1"/>
+<polygon points="50,12 65.45,21 50,30 34.54,21" fill="#FFFFFF" opacity="0.3"/>
+</svg>
+</div>
+<div class="sp-pack-info">
+<div class="sp-pack-tier-name">Bronz · Atölye</div>
+<div>
+<span class="sp-pack-amount-num">100</span>
+<span class="sp-pack-amount-unit">SP</span>
+</div>
+</div>
+<div class="sp-pack-buy-area">
+<div class="sp-pack-fiat">9,99 ₺</div>
+<div class="sp-pack-buy-btn" style="background: linear-gradient(135deg, #D4A574, #B8723A); color: white;">SATIN AL</div>
+</div>
+</div>
+
+<div class="sp-pack-luxury tier-silver">
+<div class="sp-pack-icon">
+<svg width="44" height="44" viewBox="0 0 100 100">
+<defs>
+<linearGradient id="silverGem" x1="20%" y1="0%" x2="80%" y2="100%">
+<stop offset="0%" stop-color="#F1F5F9"/>
+<stop offset="50%" stop-color="#94A3B8"/>
+<stop offset="100%" stop-color="#475569"/>
+</linearGradient>
+</defs>
+<polygon points="50,12 80.91,30 80.91,70 50,88 19.09,70 19.09,30" fill="url(#silverGem)" stroke="#F1F5F9" stroke-width="1"/>
+<polygon points="50,12 65.45,21 50,30 34.54,21" fill="#FFFFFF" opacity="0.5"/>
+</svg>
+</div>
+<div class="sp-pack-info">
+<div class="sp-pack-tier-name">Gümüş · Salon</div>
+<div>
+<span class="sp-pack-amount-num">500</span>
+<span class="sp-pack-amount-unit">SP</span>
+</div>
+<div class="sp-pack-bonus">+ %10 LÜTUF</div>
+</div>
+<div class="sp-pack-buy-area">
+<div class="sp-pack-fiat">39,99 ₺</div>
+<div class="sp-pack-buy-btn" style="background: linear-gradient(135deg, #E2E8F0, #94A3B8); color: #1F2937;">SATIN AL</div>
+</div>
+</div>
+
+<div class="sp-pack-luxury tier-gold">
+<div class="sp-pack-most-popular">⚜ EN POPÜLER</div>
+<div class="sp-pack-icon">
+<svg width="48" height="48" viewBox="0 0 100 100" style="filter: drop-shadow(0 0 8px rgba(251, 191, 36, 0.5));">
+<defs>
+<linearGradient id="goldGem" x1="20%" y1="0%" x2="80%" y2="100%">
+<stop offset="0%" stop-color="#FFF4D6"/>
+<stop offset="20%" stop-color="#FFE082"/>
+<stop offset="50%" stop-color="#FAC775"/>
+<stop offset="80%" stop-color="#EF9F27"/>
+<stop offset="100%" stop-color="#854F0B"/>
+</linearGradient>
+</defs>
+<polygon points="50,12 80.91,30 80.91,70 50,88 19.09,70 19.09,30" fill="url(#goldGem)" stroke="#FFF4D6" stroke-width="1.2"/>
+<polygon points="50,12 65.45,21 50,30 34.54,21" fill="#FFFFFF" opacity="0.5"/>
+<polygon points="50,12 80.91,30 50,50 19.09,30" fill="#FFFFFF" opacity="0.15"/>
+<text x="50" y="62" text-anchor="middle" font-family="Georgia,serif" font-size="22" font-weight="700" fill="#3D1F00">SP</text>
+</svg>
+</div>
+<div class="sp-pack-info">
+<div class="sp-pack-tier-name">Altın · Vitrin</div>
+<div>
+<span class="sp-pack-amount-num">1.500</span>
+<span class="sp-pack-amount-unit">SP</span>
+</div>
+<div class="sp-pack-bonus" style="background: rgba(251, 191, 36, 0.15); color: #FBBF24;">+ %20 LÜTUF · 1.800 SP</div>
+</div>
+<div class="sp-pack-buy-area">
+<div class="sp-pack-fiat">99,99 ₺</div>
+<div class="sp-pack-buy-btn">SATIN AL</div>
+</div>
+</div>
+
+<div class="sp-pack-luxury tier-platinum">
+<div class="sp-pack-icon">
+<svg width="48" height="48" viewBox="0 0 100 100" style="filter: drop-shadow(0 0 10px rgba(167, 139, 250, 0.6));">
+<defs>
+<linearGradient id="platGem" x1="20%" y1="0%" x2="80%" y2="100%">
+<stop offset="0%" stop-color="#EDE9FE"/>
+<stop offset="50%" stop-color="#A78BFA"/>
+<stop offset="100%" stop-color="#5B21B6"/>
+</linearGradient>
+</defs>
+<polygon points="50,12 80.91,30 80.91,70 50,88 19.09,70 19.09,30" fill="url(#platGem)" stroke="#EDE9FE" stroke-width="1.2"/>
+<polygon points="50,12 65.45,21 50,30 34.54,21" fill="#FFFFFF" opacity="0.6"/>
+<polygon points="50,12 80.91,30 50,50 19.09,30" fill="#FFFFFF" opacity="0.2"/>
+<text x="50" y="62" text-anchor="middle" font-family="Georgia,serif" font-size="22" font-weight="700" fill="#2E1065">SP</text>
+</svg>
+</div>
+<div class="sp-pack-info">
+<div class="sp-pack-tier-name">Platin · Loca</div>
+<div>
+<span class="sp-pack-amount-num">5.000</span>
+<span class="sp-pack-amount-unit">SP</span>
+</div>
+<div class="sp-pack-bonus" style="background: rgba(167, 139, 250, 0.15); color: #C4B5FD;">+ %35 LÜTUF · 6.750 SP</div>
+</div>
+<div class="sp-pack-buy-area">
+<div class="sp-pack-fiat">299,99 ₺</div>
+<div class="sp-pack-buy-btn">SATIN AL</div>
+</div>
+</div>
+
+<div class="sp-pack-luxury tier-diamond">
+<div class="sp-pack-icon">
+<svg width="50" height="50" viewBox="0 0 100 100" style="filter: drop-shadow(0 0 12px rgba(244, 114, 182, 0.7));">
+<defs>
+<linearGradient id="diamGem" x1="20%" y1="0%" x2="80%" y2="100%">
+<stop offset="0%" stop-color="#FCE7F3"/>
+<stop offset="40%" stop-color="#F9A8D4"/>
+<stop offset="80%" stop-color="#BE185D"/>
+<stop offset="100%" stop-color="#500724"/>
+</linearGradient>
+<radialGradient id="diamShine" cx="35%" cy="25%">
+<stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.9"/>
+<stop offset="40%" stop-color="#FFFFFF" stop-opacity="0.3"/>
+<stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
+</radialGradient>
+</defs>
+<polygon points="50,10 82.91,28 82.91,72 50,90 17.09,72 17.09,28" fill="url(#diamGem)" stroke="#FCE7F3" stroke-width="1.5"/>
+<polygon points="50,10 65.45,19 50,28 34.54,19" fill="#FFFFFF" opacity="0.7"/>
+<polygon points="50,10 82.91,28 50,46 17.09,28" fill="url(#diamShine)"/>
+<polygon points="50,10 82.91,28 50,46 17.09,28" fill="none" stroke="#FFFFFF" stroke-width="0.4" opacity="0.5"/>
+<text x="50" y="60" text-anchor="middle" font-family="Georgia,serif" font-size="22" font-weight="700" fill="#500724">SP</text>
+</svg>
+</div>
+<div class="sp-pack-info">
+<div class="sp-pack-tier-name">Elmas · Maison</div>
+<div>
+<span class="sp-pack-amount-num">15.000</span>
+<span class="sp-pack-amount-unit">SP</span>
+</div>
+<div class="sp-pack-bonus" style="background: rgba(244, 114, 182, 0.15); color: #F9A8D4;">+ %50 LÜTUF · 22.500 SP</div>
+</div>
+<div class="sp-pack-buy-area">
+<div class="sp-pack-fiat">799,99 ₺</div>
+<div class="sp-pack-buy-btn">SATIN AL</div>
+</div>
+</div>
+
+</div>
+</div>
+
+<div class="lux-section">
+<div class="lux-section-divider">
+<span class="lux-section-line"></span>
+<span class="lux-section-label">— KOLEKSİYONLAR · TÜM SEZON —</span>
+<span class="lux-section-line"></span>
+</div>
+
+<div class="collection-strip">
+
+<div class="collection-card collection-bg-1">
+<div class="collection-tag">12 PARÇA</div>
+<div class="collection-art" style="color: #F472B6;">🌹</div>
+<div class="collection-name">La Rose<br/>Noir</div>
+<div class="collection-cta">KEŞFET →</div>
+</div>
+
+<div class="collection-card collection-bg-2">
+<div class="collection-tag">8 PARÇA</div>
+<div class="collection-art" style="color: #60A5FA;">⚓</div>
+<div class="collection-name">Marina<br/>Royale</div>
+<div class="collection-cta">KEŞFET →</div>
+</div>
+
+<div class="collection-card collection-bg-3">
+<div class="collection-tag">SINIRLI</div>
+<div class="collection-art" style="color: #FBBF24;">⚜</div>
+<div class="collection-name">Versailles<br/>Édition</div>
+<div class="collection-cta">KEŞFET →</div>
+</div>
+
+<div class="collection-card collection-bg-4">
+<div class="collection-tag">15 PARÇA</div>
+<div class="collection-art" style="color: #5EEAD4;">🦚</div>
+<div class="collection-name">Émeraude<br/>Forêt</div>
+<div class="collection-cta">KEŞFET →</div>
+</div>
+
+</div>
+</div>
+
+</div>
+
+<div class="lux-bottom-bar">
+<div class="lux-bottom-text">
+<div class="lux-bottom-text-label">EKSİK SP MİKTARI</div>
+<div class="lux-bottom-text-action">Hesabını yükle</div>
+</div>
+<div class="lux-bottom-cta-btn">⚜ ŞIK YÜKLEME</div>
+</div>
+
+</div>
+
+<div style="margin-top: 16px; padding: 14px 16px; background: var(--color-background-secondary); border-radius: var(--border-radius-lg); font-size: 11px; color: var(--color-text-secondary); line-height: 1.7;">
+<div style="color: var(--color-text-primary); font-weight: 600; margin-bottom: 6px;">Bu tasarımın lüks butik DNA'sı:</div>
+
+<strong>1. Marka kimliği:</strong> "Maison Soprano" — Fransız moda evi gibi (Maison Margiela, Maison Valentino). "L U X U R Y · M A R K E T" alt yazı<br/>
+
+<strong>2. Tipografi:</strong> Tüm başlıklar Georgia serif (klasik, lüks dergi). Etiketler harf aralığı geniş, küçük caps (lüks marka dili)<br/>
+
+<strong>3. Atmosfer:</strong> Sahne yıldızlarla dolu, ambient gradient'ler, parıltılar yavaşça hareket eder. Müze galerisi hissi<br/>
+
+<strong>4. Vitrin kartları (180×240px):</strong> Yatay scroll, her ürün kendi galeri kartında. Conic gradient ile dönen ışın efekti her ürünü "lambası altında" sergiler<br/>
+
+<strong>5. Rarity sistemi:</strong> İLAHİ (pembe glow) / EFSANEVİ (mor) / EFSANE (altın) / NADİR (cyan) — sıradan "rare/epic" değil, mitolojik hiyerarşi<br/>
+
+<strong>6. Ürün isimleri Fransızca/Latince:</strong> "Phoenix Diadem", "Galactique", "Aurum Strike", "Vesuvius", "Belle Époque", "Or Ancien", "Constellation" — sıradan değil, koleksiyon parçası gibi<br/>
+
+<strong>7. SP Paketleri = Soprano Tezgâhı:</strong> Bronz/Gümüş/Altın/Platin/Elmas her birinin kendi mücevheri (ayrı SVG, ayrı renk DNA'sı). Bonus = "LÜTUF"<br/>
+
+<strong>8. Mesaj sanatı = "Galeri":</strong> Featured ürün geniş kart (asymmetric grid), diğerleri altında. Müze yerleşimi gibi<br/>
+
+<strong>9. Sezon koleksiyonları:</strong> "La Rose Noir", "Marina Royale", "Versailles Édition", "Émeraude Forêt" — moda evi sezon koleksiyonları gibi adlandırılmış<br/>
+
+<strong>10. Alt bar = "Şık Yükleme":</strong> Sıradan "SP Yükle" değil, lüks dilde geri çağrı. Floating glassmorphism kart, altın kenarlık glow<br/>
+
+<br/>
+
+<strong style="color: var(--color-text-primary);">Kategori isimleri:</strong> Atelier (vitrin) · Profil · Mesaj Sanatı · Hediyeler · Salonlar (oda süslemeleri) · Ünvanlar (rütbe) · Boost · SP. Hiçbiri sıradan kelime — hepsi haute couture sözlüğünden
+</div>
+</div>

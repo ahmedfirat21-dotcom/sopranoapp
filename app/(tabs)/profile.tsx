@@ -533,7 +533,10 @@ export default function ProfileScreen() {
               <AnimatedHeaderIconBtn index={1} style={styles.headerIconBtn} onPress={() => router.push('/leaderboard' as any)} accessibilityLabel="Liderlik Tablosu">
                 <Ionicons name="trophy-outline" size={22} color="#F1F5F9" style={iconShadow} />
               </AnimatedHeaderIconBtn>
-              <AnimatedHeaderIconBtn index={2} style={styles.headerIconBtn} onPress={() => router.push('/settings' as any)} accessibilityLabel="Ayarlar">
+              <AnimatedHeaderIconBtn index={2} style={styles.headerIconBtn} onPress={() => router.push('/store' as any)} accessibilityLabel="Maison Soprano Mağaza">
+                <Ionicons name="storefront-outline" size={22} color="#FBBF24" style={iconShadow} />
+              </AnimatedHeaderIconBtn>
+              <AnimatedHeaderIconBtn index={3} style={styles.headerIconBtn} onPress={() => router.push('/settings' as any)} accessibilityLabel="Ayarlar">
                 <Ionicons name="settings-outline" size={22} color="#F1F5F9" style={iconShadow} />
               </AnimatedHeaderIconBtn>
             </View>

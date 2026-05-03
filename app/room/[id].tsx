@@ -4149,12 +4149,11 @@ export default function RoomScreen() {
       {/* ★ Faz 3.2 — Voice Reaction Overlay (LiveKit data channel) */}
       <VoiceReactionOverlay ref={voiceReactionOverlayRef} />
 
-      {/* ★ 2026-04-26: LiveKit bağlantısı koptuğunda full-screen overlay — kullanıcı net görsün, kafası karışmasın.
-           Retry: useLiveKit zaten 3 kere otomatik reconnect ediyor. Manuel "Tekrar Dene" odadan çık + tekrar gir akışı tetikler.
-           Leave: handleSettingsLeave (mevcut leave akışı). */}
+      {/* ★ 2026-04-26: LiveKit bağlantısı koptuğunda full-screen overlay.
+           Retry: useLiveKit.retry() — sayaç sıfırlanır, fresh connect tetiklenir. Odadan çıkmaz. */}
       <RoomDisconnectOverlay
         state={lk.connectionState as any}
-        onRetry={() => handleSettingsLeave()}
+        onRetry={() => lk.retry()}
         onLeave={() => handleSettingsLeave()}
       />
 
@@ -4297,6 +4296,18 @@ export default function RoomScreen() {
           setInRoomProfileId(uid);
         }}
         currentUserId={firebaseUser?.uid} roomId={id as string}
+        currentSP={(profile as any)?.system_points || 0}
+        onSendGlow={async (content, glowStyle) => {
+          // ★ v107 (3 May 2026): Mesaj Parlat — atomic RPC, SP düş + insert + log
+          if (!firebaseUser) return;
+          const r = await RoomChatService.sendGlow(id as string, firebaseUser.uid, content, glowStyle);
+          if (r.success) {
+            setChatInput('');
+            showToast({ title: '✨ Parlatıldı', message: `${r.cost} SP harcandı`, type: 'success' });
+          } else {
+            showToast({ title: 'Gönderilemedi', message: r.error || 'Bağlantı hatası', type: 'error' });
+          }
+        }}
         onSendRaw={(content: string) => {
           // GIF ve emoji reaksiyonlar için: floating emoji animasyonu + DB throttle
           sendEmojiReaction(content);

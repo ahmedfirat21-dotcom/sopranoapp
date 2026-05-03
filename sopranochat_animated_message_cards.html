@@ -1,0 +1,642 @@
+<div style="padding: 1rem 0;">
+<h2 class="sr-only">SopranoChat oda sohbeti animasyonlu mesaj kartları</h2>
+
+<style>
+.msg-stage {
+  background: linear-gradient(180deg, #1F2D3D 0%, #0F1729 100%);
+  border-radius: 24px;
+  border: 8px solid #1a1a1a;
+  padding: 0;
+  position: relative;
+  overflow: hidden;
+  height: 720px;
+  display: flex;
+  flex-direction: column;
+}
+
+.msg-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  background: rgba(0,0,0,0.2);
+}
+
+.msg-handle-bar {
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 36px;
+  height: 4px;
+  background: rgba(255,255,255,0.25);
+  border-radius: 2px;
+}
+
+.msg-header-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.msg-icon-wrap {
+  width: 24px; height: 24px;
+  background: #5DCAA5;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+}
+
+.unread-count {
+  background: rgba(255,255,255,0.1);
+  color: white;
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-weight: 600;
+}
+
+.msg-list {
+  flex: 1;
+  padding: 12px 10px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.msg-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.msg-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #534AB7, #8B7FE8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 700;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.msg-bubble-plain {
+  max-width: 75%;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.05);
+  padding: 8px 12px;
+  border-radius: 14px;
+  border-bottom-left-radius: 4px;
+  color: white;
+  font-size: 13px;
+}
+
+.msg-bubble-plain .name {
+  color: rgba(255,255,255,0.6);
+  font-size: 11px;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.msg-card {
+  max-width: 80%;
+  border-radius: 14px;
+  overflow: hidden;
+  position: relative;
+}
+
+.msg-card-header {
+  padding: 6px 12px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.msg-card-body {
+  padding: 10px 14px;
+}
+
+.msg-card-name { font-size: 12px; font-weight: 700; margin-bottom: 2px; }
+.msg-card-text { font-size: 14px; font-weight: 500; }
+
+@keyframes shine-sweep {
+  0% { transform: translateX(-100%) skewX(-20deg); }
+  100% { transform: translateX(300%) skewX(-20deg); }
+}
+
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 12px rgba(251, 191, 36, 0.3), 0 0 24px rgba(251, 191, 36, 0.15); }
+  50% { box-shadow: 0 0 20px rgba(251, 191, 36, 0.6), 0 0 40px rgba(251, 191, 36, 0.3); }
+}
+
+@keyframes rainbow-shift {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+}
+
+@keyframes heart-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.15); }
+}
+
+@keyframes float-particle {
+  0% { transform: translateY(0) scale(0); opacity: 0; }
+  20% { transform: translateY(-10px) scale(1); opacity: 1; }
+  100% { transform: translateY(-40px) scale(0.5); opacity: 0; }
+}
+
+@keyframes neon-flicker {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.85; }
+}
+
+@keyframes border-snake {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 400% 50%; }
+}
+
+@keyframes confetti-rain {
+  0% { transform: translateY(-20px) rotate(0deg); opacity: 0; }
+  20% { opacity: 1; }
+  100% { transform: translateY(60px) rotate(360deg); opacity: 0; }
+}
+
+@keyframes star-twinkle {
+  0%, 100% { opacity: 0.3; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1.3); }
+}
+
+@keyframes fire-flicker {
+  0%, 100% { transform: scaleY(1) rotate(-2deg); }
+  33% { transform: scaleY(1.1) rotate(2deg); }
+  66% { transform: scaleY(0.95) rotate(-1deg); }
+}
+
+.card-style-1 {
+  background: linear-gradient(135deg, #854F0B, #EF9F27, #FBBF24);
+  background-size: 200% 200%;
+  animation: rainbow-shift 4s ease infinite, glow-pulse 2s ease-in-out infinite;
+  position: relative;
+  overflow: hidden;
+}
+
+.card-style-1::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+  animation: shine-sweep 3s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.card-style-1 .msg-card-header {
+  background: linear-gradient(180deg, rgba(0,0,0,0.3), transparent);
+  color: #FFE082;
+}
+
+.card-style-1 .msg-card-body { background: rgba(0,0,0,0.15); }
+.card-style-1 .msg-card-name { color: #3D1F00; }
+.card-style-1 .msg-card-text { color: #1A0A00; }
+
+.card-style-2 {
+  background: linear-gradient(135deg, #BE185D, #F472B6, #F9A8D4);
+  position: relative;
+  overflow: hidden;
+}
+
+.card-style-2 .msg-card-header {
+  background: linear-gradient(180deg, rgba(0,0,0,0.25), transparent);
+  color: #FCE7F3;
+}
+
+.card-style-2 .msg-card-body { background: rgba(255,255,255,0.1); }
+.card-style-2 .msg-card-name { color: #831843; }
+.card-style-2 .msg-card-text { color: #500724; }
+
+.heart-particle {
+  position: absolute;
+  font-size: 14px;
+  animation: float-particle 2s ease-out infinite;
+  pointer-events: none;
+}
+
+.card-style-3 {
+  background: linear-gradient(135deg, #1E1B4B, #3730A3, #6366F1);
+  position: relative;
+  overflow: hidden;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.card-style-3::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  background: linear-gradient(90deg, #00FFFF, #FF00FF, #00FF00, #FFFF00, #FF00FF, #00FFFF);
+  background-size: 400% 100%;
+  animation: border-snake 3s linear infinite;
+  z-index: -1;
+  border-radius: 14px;
+}
+
+.card-style-3 .msg-card-header {
+  background: rgba(0,0,0,0.4);
+  color: #00FFFF;
+  text-shadow: 0 0 8px #00FFFF;
+  animation: neon-flicker 0.5s ease-in-out infinite;
+}
+
+.card-style-3 .msg-card-body { background: rgba(0,0,0,0.5); }
+.card-style-3 .msg-card-name { color: #00FFFF; text-shadow: 0 0 6px #00FFFF; }
+.card-style-3 .msg-card-text { color: white; }
+
+.card-style-4 {
+  background: linear-gradient(135deg, #7F1D1D, #DC2626, #FB923C);
+  position: relative;
+  overflow: hidden;
+}
+
+.card-style-4 .msg-card-header {
+  background: rgba(0,0,0,0.35);
+  color: #FED7AA;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.fire-icon {
+  display: inline-block;
+  animation: fire-flicker 0.4s ease-in-out infinite;
+}
+
+.card-style-4 .msg-card-body { background: rgba(0,0,0,0.2); }
+.card-style-4 .msg-card-name { color: #FED7AA; }
+.card-style-4 .msg-card-text { color: white; font-weight: 600; }
+
+.card-style-5 {
+  background:
+    repeating-linear-gradient(
+      0deg,
+      rgba(0,0,0,0.1) 0px,
+      rgba(0,0,0,0.1) 1px,
+      transparent 1px,
+      transparent 4px
+    ),
+    linear-gradient(135deg, #064E3B, #059669, #10B981);
+  position: relative;
+  overflow: hidden;
+}
+
+.card-style-5::before {
+  content: '🎉';
+  position: absolute;
+  top: 5px;
+  left: 10%;
+  font-size: 16px;
+  animation: confetti-rain 1.8s ease-in infinite;
+  pointer-events: none;
+}
+
+.card-style-5::after {
+  content: '✨';
+  position: absolute;
+  top: 5px;
+  right: 20%;
+  font-size: 14px;
+  animation: confetti-rain 2.2s ease-in infinite 0.6s;
+  pointer-events: none;
+}
+
+.card-style-5 .msg-card-header {
+  background: rgba(0,0,0,0.25);
+  color: #D1FAE5;
+}
+
+.card-style-5 .msg-card-body { background: rgba(0,0,0,0.15); }
+.card-style-5 .msg-card-name { color: #064E3B; }
+.card-style-5 .msg-card-text { color: white; font-weight: 600; }
+
+.card-style-6 {
+  background:
+    radial-gradient(circle at 20% 20%, #FFE082, transparent 40%),
+    radial-gradient(circle at 80% 80%, #FBBF24, transparent 40%),
+    linear-gradient(135deg, #1E1B4B, #4C1D95);
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(251, 191, 36, 0.3);
+}
+
+.star-pop {
+  position: absolute;
+  font-size: 12px;
+  animation: star-twinkle 1.5s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.card-style-6 .msg-card-header {
+  background: linear-gradient(90deg, rgba(251, 191, 36, 0.3), rgba(167, 139, 250, 0.3));
+  color: #FBBF24;
+  text-shadow: 0 0 6px rgba(251, 191, 36, 0.5);
+}
+
+.card-style-6 .msg-card-body { background: rgba(0,0,0,0.4); }
+.card-style-6 .msg-card-name { color: #FBBF24; }
+.card-style-6 .msg-card-text { color: #FDE68A; }
+
+.cost-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: rgba(0,0,0,0.4);
+  color: #FAC775;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 100px;
+  margin-left: auto;
+}
+
+.compose-bar {
+  background: rgba(0,0,0,0.4);
+  border-top: 0.5px solid rgba(255,255,255,0.06);
+  padding: 10px 12px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.compose-emoji {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.06);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+}
+
+.compose-input {
+  flex: 1;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 100px;
+  padding: 9px 16px;
+  color: rgba(255,255,255,0.5);
+  font-size: 13px;
+}
+
+.compose-send {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  background: #16A085;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 14px;
+}
+
+.style-picker {
+  position: sticky;
+  top: 0;
+  background: rgba(15, 23, 41, 0.95);
+  backdrop-filter: blur(10px);
+  z-index: 10;
+  padding: 10px 8px;
+  border-bottom: 0.5px solid rgba(255,255,255,0.08);
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+}
+
+.style-chip {
+  flex-shrink: 0;
+  padding: 6px 12px;
+  border-radius: 100px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.7);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.style-chip.active {
+  background: rgba(251, 191, 36, 0.2);
+  color: #FBBF24;
+  border-color: rgba(251, 191, 36, 0.4);
+}
+</style>
+
+<div class="msg-stage">
+
+<div class="msg-handle-bar"></div>
+
+<div class="msg-header">
+<div class="msg-header-title">
+<div class="msg-icon-wrap">💬</div>
+Oda Sohbeti
+<div class="unread-count">12</div>
+</div>
+<div style="color: rgba(255,255,255,0.5); font-size: 16px;">⌄</div>
+</div>
+
+<div class="style-picker">
+<div class="style-chip">✨ Tümü</div>
+<div class="style-chip">⭐ Premium</div>
+<div class="style-chip">💝 Hediye</div>
+<div class="style-chip">🌈 Neon</div>
+<div class="style-chip">🔥 Ateş</div>
+<div class="style-chip">🎉 Kutlama</div>
+<div class="style-chip">🌌 Galaksi</div>
+</div>
+
+<div class="msg-list">
+
+<div class="msg-row">
+<div class="msg-avatar" style="background: linear-gradient(135deg, #185FA5, #5DCAA5);">A</div>
+<div class="msg-bubble-plain">
+<div class="name">Ayşe</div>
+<div>Selam herkese 👋</div>
+</div>
+</div>
+
+<div class="msg-row">
+<div class="msg-avatar" style="background: linear-gradient(135deg, #BE185D, #F472B6);">M</div>
+<div class="msg-bubble-plain">
+<div class="name">Mehmet</div>
+<div>Hoş geldin Ayşe</div>
+</div>
+</div>
+
+<div class="msg-row">
+<div class="msg-avatar" style="background: linear-gradient(135deg, #534AB7, #8B7FE8);">B</div>
+<div class="msg-card card-style-1">
+<div class="msg-card-header">
+<span>✨</span> ALTIN PARLAT
+<span class="cost-badge">💎 5 SP</span>
+</div>
+<div class="msg-card-body">
+<div class="msg-card-name">Burak DENİZ</div>
+<div class="msg-card-text">Bugün doğum günüm! 🎂</div>
+</div>
+</div>
+</div>
+
+<div class="msg-row">
+<div class="msg-avatar" style="background: linear-gradient(135deg, #DC2626, #F87171);">Z</div>
+<div class="msg-bubble-plain">
+<div class="name">Zeynep</div>
+<div>Mutlu yıllar 🎉</div>
+</div>
+</div>
+
+<div class="msg-row">
+<div class="msg-avatar" style="background: linear-gradient(135deg, #BE185D, #F472B6);">S</div>
+<div class="msg-card card-style-2">
+<div class="msg-card-header">
+<span>💗</span> KALP ATIŞI
+<span class="cost-badge">💎 8 SP</span>
+</div>
+<div class="msg-card-body">
+<div class="heart-particle" style="left: 20%; animation-delay: 0s;">💖</div>
+<div class="heart-particle" style="left: 50%; animation-delay: 0.5s;">💕</div>
+<div class="heart-particle" style="left: 80%; animation-delay: 1s;">❤️</div>
+<div class="msg-card-name">Selin</div>
+<div class="msg-card-text">Seni çok seviyoruz Burak ❤️</div>
+</div>
+</div>
+</div>
+
+<div class="msg-row">
+<div class="msg-avatar" style="background: linear-gradient(135deg, #0891B2, #22D3EE);">K</div>
+<div class="msg-card card-style-3">
+<div class="msg-card-header">
+<span>⚡</span> NEON
+<span class="cost-badge">💎 12 SP</span>
+</div>
+<div class="msg-card-body">
+<div class="msg-card-name">Khalid</div>
+<div class="msg-card-text">Bu gece efsane geçiyor</div>
+</div>
+</div>
+</div>
+
+<div class="msg-row">
+<div class="msg-avatar" style="background: linear-gradient(135deg, #16A34A, #4ADE80);">F</div>
+<div class="msg-bubble-plain">
+<div class="name">Fatma</div>
+<div>katılıyorum 🙌</div>
+</div>
+</div>
+
+<div class="msg-row">
+<div class="msg-avatar" style="background: linear-gradient(135deg, #854F0B, #EF9F27);">A</div>
+<div class="msg-card card-style-4">
+<div class="msg-card-header">
+<span class="fire-icon">🔥</span> ATEŞ
+<span class="cost-badge">💎 10 SP</span>
+</div>
+<div class="msg-card-body">
+<div class="msg-card-name">Ali</div>
+<div class="msg-card-text">SAHNEYİ YAKIYORUZ! 🚀</div>
+</div>
+</div>
+</div>
+
+<div class="msg-row">
+<div class="msg-avatar" style="background: linear-gradient(135deg, #7C3AED, #A78BFA);">C</div>
+<div class="msg-card card-style-5">
+<div class="msg-card-header">
+<span>🎊</span> KUTLAMA
+<span class="cost-badge">💎 15 SP</span>
+</div>
+<div class="msg-card-body">
+<div class="msg-card-name">Cem</div>
+<div class="msg-card-text">Burak'a iyi ki doğdun 🥳</div>
+</div>
+</div>
+</div>
+
+<div class="msg-row">
+<div class="msg-avatar" style="background: linear-gradient(135deg, #1E40AF, #60A5FA);">Y</div>
+<div class="msg-card card-style-6">
+<div class="star-pop" style="top: 15%; left: 8%;">⭐</div>
+<div class="star-pop" style="top: 60%; right: 10%; animation-delay: 0.5s;">✨</div>
+<div class="star-pop" style="top: 35%; left: 65%; animation-delay: 1s;">⭐</div>
+<div class="msg-card-header">
+<span>🌌</span> GALAKSİ
+<span class="cost-badge">💎 20 SP</span>
+</div>
+<div class="msg-card-body">
+<div class="msg-card-name">Yasin</div>
+<div class="msg-card-text">Geleceğe doğru beraber 🌠</div>
+</div>
+</div>
+</div>
+
+<div class="msg-row">
+<div class="msg-avatar" style="background: linear-gradient(135deg, #CA8A04, #FACC15);">E</div>
+<div class="msg-bubble-plain">
+<div class="name">Esra</div>
+<div>çok güzel oldu hepsi 😊</div>
+</div>
+</div>
+
+</div>
+
+<div class="compose-bar">
+<div class="compose-emoji">😊</div>
+<div class="compose-input">Bir mesaj yaz...</div>
+<div class="compose-send">→</div>
+</div>
+
+</div>
+
+<div style="margin-top: 16px; padding: 14px 16px; background: var(--color-background-secondary); border-radius: var(--border-radius-lg); font-size: 11px; color: var(--color-text-secondary); line-height: 1.7;">
+<div style="color: var(--color-text-primary); font-weight: 600; margin-bottom: 6px;">Bu mockup'taki 6 parlatma stili:</div>
+
+<strong style="color: #FBBF24;">1. ALTIN PARLAT (5 SP)</strong> — Mevcut "Mesaj Parlat" gibi ama animasyonlu: ışık şeridi süpürmesi + glow pulse + gradient kayması<br/>
+
+<strong style="color: #F472B6;">2. KALP ATIŞI (8 SP)</strong> — Kart üzerinde küçük kalpler yukarı süzülür. Aşk/sevgi mesajları için<br/>
+
+<strong style="color: #00FFFF;">3. NEON (12 SP)</strong> — Sürekli renk değiştiren neon kenarlık + flicker efekti. Cyberpunk hissi<br/>
+
+<strong style="color: #FB923C;">4. ATEŞ (10 SP)</strong> — Sıcak gradient (kırmızı-turuncu) + alev ikonu titreşir. Yoğun mesajlar için<br/>
+
+<strong style="color: #10B981;">5. KUTLAMA (15 SP)</strong> — Kart üzerinden konfeti yağar (🎉 ✨). Doğum günü, başarı, kutlamalar için<br/>
+
+<strong style="color: #FBBF24;">6. GALAKSİ (20 SP)</strong> — Mor-altın radyal gradient + parıldayan yıldızlar. Premium en üst seviye<br/>
+
+<br/>
+
+<strong style="color: var(--color-text-primary);">Etkileşim akışı:</strong><br/>
+1. Kullanıcı mesaj yazar<br/>
+2. ✨ ikonuna basar (mevcut Mesaj Parlat butonu)<br/>
+3. Açılan modal'da 6 stil görür, fiyatları SP olarak listelenir<br/>
+4. Stil seçer → SP düşülür → mesaj o stilde gönderilir<br/>
+5. Diğer kullanıcılarda animasyonlu olarak görünür<br/>
+
+<br/>
+
+<strong style="color: var(--color-text-primary);">Ekonomi mantığı:</strong> Daha karmaşık animasyon = daha yüksek SP. Kullanıcılar kendini ifade etmek için para harcar, sen pasif gelir kazanırsın.
+</div>
+</div>
