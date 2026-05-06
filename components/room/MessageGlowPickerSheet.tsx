@@ -3,9 +3,10 @@
 //   parent'a callback ile id iletir → bir sonraki mesaj o stilde gönderilir.
 //   SP yetersizse stil disabled görünür. PowerUpsSheet pattern'ı (slate gradient + handle).
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import {
   View, Text, StyleSheet, Pressable, Animated, PanResponder, Dimensions, Platform,
+  ScrollView, useWindowDimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
@@ -15,8 +16,6 @@ import SPIcon from '../SPIcon';
 import { GLOW_STYLES, PREMIUM_GLOW_IDS, type GlowStyleId } from './glowStyles';
 
 const { width: W } = Dimensions.get('window');
-// ★ v107: 6 sabit + 5 premium stil ekran sığması için panel yüksekliği +200
-const PANEL_HEIGHT_BASE = 660;
 
 interface Props {
   visible: boolean;
@@ -35,19 +34,32 @@ const STYLE_ORDER: GlowStyleId[] = ['gold', 'heart', 'fire', 'neon', 'celebratio
 
 export default function MessageGlowPickerSheet({ visible, onClose, currentSP, onSelect, ownedPremiumIds, onOpenStore }: Props) {
   const insets = useSafeAreaInsets();
-  const PANEL_HEIGHT = PANEL_HEIGHT_BASE + Math.max(insets.bottom, 0);
-  const translateY = useRef(new Animated.Value(PANEL_HEIGHT)).current;
+  const { height: windowH } = useWindowDimensions();
+  // ★ v110 fix (6 May 2026): Panel ekrana oranlı, içerik ScrollView ile kaydırılabilir.
+  // ★ v110.6 fix (6 May 2026): Panel ekranın %92'sine çıkarıldı — alt içerik kırpılıyordu.
+  //   maxAllowed sabit cap (640) yerine ekrana oranlı; içerik tüm ürünleri görsün.
+  const PANEL_HEIGHT = useMemo(() => {
+    const topPad = Math.max(insets.top, 24) + 24;
+    const maxAllowed = windowH - topPad;
+    return Math.max(480, maxAllowed);
+  }, [windowH, insets.top, insets.bottom]);
+  const SNAP_FULL = 0;
+  const SNAP_DISMISS = PANEL_HEIGHT;
+  const translateY = useRef(new Animated.Value(SNAP_DISMISS)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
+  const currentSnapRef = useRef<number>(SNAP_DISMISS);
 
   useEffect(() => {
     if (visible) {
+      currentSnapRef.current = SNAP_FULL;
       Animated.parallel([
-        Animated.spring(translateY, { toValue: 0, useNativeDriver: true, damping: 22, stiffness: 220 }),
+        Animated.spring(translateY, { toValue: SNAP_FULL, useNativeDriver: true, damping: 22, stiffness: 220 }),
         Animated.timing(backdropOpacity, { toValue: 1, duration: 240, useNativeDriver: true }),
       ]).start();
     } else {
+      currentSnapRef.current = SNAP_DISMISS;
       Animated.parallel([
-        Animated.timing(translateY, { toValue: PANEL_HEIGHT, duration: 220, useNativeDriver: true }),
+        Animated.timing(translateY, { toValue: SNAP_DISMISS, duration: 220, useNativeDriver: true }),
         Animated.timing(backdropOpacity, { toValue: 0, duration: 180, useNativeDriver: true }),
       ]).start();
     }
@@ -59,15 +71,39 @@ export default function MessageGlowPickerSheet({ visible, onClose, currentSP, on
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => false,
-      onMoveShouldSetPanResponder: (_, gs) => gs.dy > 8 && Math.abs(gs.dy) > Math.abs(gs.dx) * 1.5,
+      onMoveShouldSetPanResponder: (_, gs) => Math.abs(gs.dy) > 8 && Math.abs(gs.dy) > Math.abs(gs.dx) * 1.5,
       onPanResponderTerminationRequest: () => false,
-      onPanResponderMove: (_, gs) => { if (gs.dy > 0) translateY.setValue(gs.dy); },
+      onPanResponderMove: (_, gs) => {
+        const newY = currentSnapRef.current + gs.dy;
+        // ★ Sadece üst sınır (FULL'un üstüne çıkma); aşağı hareketi serbest — kullanıcı
+        //   parmağıyla panel'i tam olarak takip edebilsin (kayıp hissi olmasın).
+        translateY.setValue(Math.max(SNAP_FULL - 10, newY));
+      },
       onPanResponderRelease: (_, gs) => {
-        if (gs.dy > 60 || gs.vy > 0.5) {
-          Animated.timing(translateY, { toValue: PANEL_HEIGHT, duration: 200, useNativeDriver: true }).start(() => onCloseRef.current());
-        } else {
-          Animated.spring(translateY, { toValue: 0, useNativeDriver: true, damping: 22, stiffness: 220 }).start();
-        }
+        const finalPos = currentSnapRef.current + gs.dy;
+        const fastDown = gs.vy > 0.6;
+
+        const animateDismiss = () => {
+          currentSnapRef.current = SNAP_DISMISS;
+          Animated.parallel([
+            Animated.spring(translateY, {
+              toValue: SNAP_DISMISS,
+              useNativeDriver: true,
+              damping: 28, stiffness: 180, mass: 0.9,
+              overshootClamping: true,
+            }),
+            Animated.timing(backdropOpacity, { toValue: 0, duration: 260, useNativeDriver: true }),
+          ]).start(() => onCloseRef.current());
+        };
+        const animateToFull = () => {
+          currentSnapRef.current = SNAP_FULL;
+          Animated.spring(translateY, { toValue: SNAP_FULL, useNativeDriver: true, damping: 22, stiffness: 220 }).start();
+        };
+
+        // 2-snap: FULL ↔ DISMISS. Hızlı aşağı çek veya yarıdan fazla indi → kapan.
+        const dismissThreshold = PANEL_HEIGHT * 0.30;
+        if (fastDown || finalPos > dismissThreshold) animateDismiss();
+        else animateToFull();
       },
     })
   ).current;
@@ -76,11 +112,16 @@ export default function MessageGlowPickerSheet({ visible, onClose, currentSP, on
 
   return (
     <View style={StyleSheet.absoluteFillObject as any} pointerEvents="box-none">
-      <View style={{ ...StyleSheet.absoluteFillObject, zIndex: 540 }} pointerEvents="box-none">
+      {/* ★ v110.7 fix (7 May 2026): Android elevation eklendi.
+          RoomChatDrawer sheet'i elevation:58 ile renderlanıyor; picker'ın ScrollView
+          alanı drawer ile fiziksel olarak çakıştığı için touch event drawer'a gidiyor,
+          scroll çalışmıyordu. zIndex Android'de cross-component stacking için yetmez,
+          elevation şart. 100 → drawer'ın 58'inin çok üstünde. */}
+      <View style={{ ...StyleSheet.absoluteFillObject, zIndex: 540, elevation: 100 }} pointerEvents="box-none">
         {/* Backdrop */}
         <Animated.View style={[StyleSheet.absoluteFill, { opacity: backdropOpacity }]}>
           <BlurView intensity={28} tint="dark" style={StyleSheet.absoluteFill} />
-          <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.55)' }]} />
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(8,12,22,0.45)' }]} />
           <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
         </Animated.View>
 
@@ -88,42 +129,73 @@ export default function MessageGlowPickerSheet({ visible, onClose, currentSP, on
         <Animated.View
           style={[
             s.panel,
-            { paddingBottom: 24 + insets.bottom, transform: [{ translateY }] },
+            { height: PANEL_HEIGHT, transform: [{ translateY }] },
           ]}
-          {...panResponder.panHandlers}
         >
-          {/* Bg slate gradient */}
+          {/* ★ 2026-05-05: NotificationDrawer dili — slate diagonal + üst amber halo (mevcut palet).
+              2 katman gradient (FPS koruma). */}
           <LinearGradient
-            colors={['#1e2230', '#15182a', '#0a0b16']}
-            locations={[0, 0.55, 1]}
-            start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
+            colors={['#3a4658', '#2a3344', '#1a2030']}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
             style={StyleSheet.absoluteFillObject}
+            pointerEvents="none"
+          />
+          <LinearGradient
+            colors={['rgba(251,191,36,0.20)', 'rgba(251,191,36,0.05)', 'transparent']}
+            start={{ x: 0, y: 0 }} end={{ x: 0, y: 0.4 }}
+            style={StyleSheet.absoluteFillObject}
+            pointerEvents="none"
+          />
+          <LinearGradient
+            colors={['rgba(251,191,36,0.08)', 'transparent']}
+            start={{ x: 0, y: 0 }} end={{ x: 0.7, y: 0.6 }}
+            style={StyleSheet.absoluteFillObject}
+            pointerEvents="none"
           />
           {/* Top edge altın highlight */}
           <LinearGradient
             colors={['transparent', 'rgba(251,191,36,0.85)', 'transparent']}
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
             style={s.topEdge}
+            pointerEvents="none"
           />
 
-          {/* Handle */}
-          <View style={s.handle}><View style={s.handleBar} /></View>
+          {/* ★ v110 fix: handle+header+ScrollView'u explicit flex container'a sar.
+              Android'de Animated.View > flex:1 ScrollView bazen düzgün ölçülmüyor;
+              ek View {flex:1} sınır net hale getirir. */}
+          <View style={{ flex: 1, minHeight: 0 }}>
+            {/* Drag yalnız handle + header'da; ScrollView'a karışmaz */}
+            <View {...panResponder.panHandlers}>
+              {/* Handle */}
+              <View style={s.handle}><View style={s.handleBar} /></View>
 
-          {/* Header */}
-          <View style={s.header}>
-            <View style={s.headerIconWrap}>
-              <Ionicons name="sparkles" size={16} color="#FBBF24" style={iconShadow} />
+              {/* Header */}
+              <View style={s.header}>
+                <View style={s.headerIconWrap}>
+                  <Ionicons name="sparkles" size={16} color="#FBBF24" style={iconShadow} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.headerTitle}>MESAJINI PARLAT</Text>
+                  <Text style={s.headerSub}>Bir stil seç — bir sonraki mesajın o şekilde gönderilir</Text>
+                </View>
+                <View style={s.balancePill}>
+                  <SPIcon size={14} />
+                  <Text style={s.balanceText}>{currentSP.toLocaleString('tr-TR')}</Text>
+                </View>
+              </View>
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={s.headerTitle}>MESAJINI PARLAT</Text>
-              <Text style={s.headerSub}>Bir stil seç — bir sonraki mesajın o şekilde gönderilir</Text>
-            </View>
-            <View style={s.balancePill}>
-              <SPIcon size={14} />
-              <Text style={s.balanceText}>{currentSP.toLocaleString('tr-TR')}</Text>
-            </View>
-          </View>
 
+            <ScrollView
+              style={{ flex: 1 }}
+              contentContainerStyle={{ paddingBottom: 220 + insets.bottom, flexGrow: 1 }}
+              showsVerticalScrollIndicator
+              indicatorStyle="white"
+              keyboardShouldPersistTaps="handled"
+              nestedScrollEnabled
+              bounces
+              overScrollMode="auto"
+              scrollEventThrottle={16}
+            >
           {/* ─── Standart 6 stil — pay-per-use ─── */}
           <Text style={s.sectionLabel}>STANDART · MESAJ BAŞI ÜCRET</Text>
           <View style={s.grid}>
@@ -216,6 +288,8 @@ export default function MessageGlowPickerSheet({ visible, onClose, currentSP, on
             Standart stiller mesaj başı SP harcar. Premium stiller mağazadan tek seferlik
             satın alınır, sonsuz kullanım.
           </Text>
+            </ScrollView>
+          </View>
         </Animated.View>
       </View>
     </View>
@@ -232,20 +306,21 @@ const s = StyleSheet.create({
   panel: {
     position: 'absolute',
     left: 0, right: 0, bottom: 0,
-    minHeight: PANEL_HEIGHT_BASE,
-    borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    borderTopLeftRadius: 26, borderTopRightRadius: 26,
     overflow: 'hidden',
-    borderWidth: 1.5,
-    borderColor: 'rgba(251,191,36,0.35)',
+    backgroundColor: '#1a2030',
     borderBottomWidth: 0,
     ...Platform.select({
       ios: {
         shadowColor: '#000',
         shadowOffset: { width: 0, height: -8 },
-        shadowOpacity: 0.6,
-        shadowRadius: 22,
+        shadowOpacity: 0.55,
+        shadowRadius: 18,
       },
-      android: {},
+      // ★ v110.7: Android elevation panel düzeyinde de — outer wrapper 100 yetmezse
+      //   panel kendi içinde de chat drawer'ı ezsin. ScrollView'un touch event'i
+      //   drawer tarafından çalınmasını engeller.
+      android: { elevation: 100 },
     }),
   },
   topEdge: { position: 'absolute', top: 0, left: 0, right: 0, height: 1.6 },
