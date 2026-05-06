@@ -5,155 +5,458 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SopranoChat — Gizlilik Politikası</title>
   <style>
+    @import url('https://fonts.cdnfonts.com/css/cooper-black');
+
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
+
+    html, body {
+      background: #0A0F1A;
+      color: #cbd5e1;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-      background: #0D1421;
-      color: #CBD5E1;
       line-height: 1.7;
-      padding: 24px;
-      max-width: 720px;
-      margin: 0 auto;
+      min-height: 100%;
     }
-    h1 { color: #14B8A6; font-size: 28px; margin-bottom: 8px; }
-    h2 { color: #F1F5F9; font-size: 20px; margin: 32px 0 12px; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 8px; }
-    h3 { color: #94A3B8; font-size: 16px; margin: 20px 0 8px; }
-    p { margin-bottom: 12px; font-size: 14px; }
-    ul { padding-left: 20px; margin-bottom: 12px; }
-    li { margin-bottom: 6px; font-size: 14px; }
-    .update-date { color: #64748B; font-size: 13px; margin-bottom: 32px; }
-    a { color: #14B8A6; text-decoration: none; }
-    a:hover { text-decoration: underline; }
-    .footer { margin-top: 48px; padding-top: 24px; border-top: 1px solid rgba(255,255,255,0.06); color: #475569; font-size: 12px; text-align: center; }
-    strong { color: #E2E8F0; }
+
+    /* ★ Ana sayfa ile birebir aynı radial gradient arka plan halesi */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(ellipse 60% 50% at 20% 0%, rgba(78, 176, 168, 0.15), transparent 60%),
+        radial-gradient(ellipse 50% 40% at 80% 100%, rgba(123, 159, 239, 0.10), transparent 60%);
+      z-index: 0;
+    }
+
+    .container {
+      position: relative;
+      z-index: 1;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 24px 16px 48px;
+    }
+
+    /* ★ Header — SopranoChat logosu (ana sayfa ile birebir) */
+    header {
+      padding: 20px 0 32px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    @keyframes logoGlow {
+      0%, 100% { filter: drop-shadow(0 0 2px rgba(120,200,200,0)) drop-shadow(0 2px 4px rgba(0,0,0,0.6)); }
+      50% { filter: drop-shadow(0 0 8px rgba(120,200,200,0.3)) drop-shadow(0 0 20px rgba(120,200,200,0.1)) drop-shadow(0 2px 4px rgba(0,0,0,0.6)); }
+    }
+    .sc-logo {
+      font-family: 'Cooper Black', 'Arial Rounded MT Bold', serif;
+      font-weight: 900;
+      letter-spacing: 0.5px;
+      display: inline-flex;
+      align-items: baseline;
+      line-height: 1;
+      position: relative;
+      padding-bottom: 13px;
+    }
+    .sc-logo-soprano {
+      font-size: 36px;
+      line-height: 1;
+      background: linear-gradient(180deg, #ffffff 0%, #dde4ee 35%, #b8c2d4 70%, #ccd4e4 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      filter: drop-shadow(0 2px 4px rgba(0,0,0,0.6)) drop-shadow(1px 1px 0 rgba(0,0,0,0.4));
+    }
+    .sc-logo-chat {
+      font-size: 36px;
+      line-height: 1;
+      margin-left: 1px;
+      background: linear-gradient(180deg, #b8f0f0 0%, #5ec8c8 30%, #3a9e9e 65%, #4db0a8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      filter: drop-shadow(0 2px 4px rgba(0,0,0,0.6)) drop-shadow(1px 1px 0 rgba(20,80,70,0.5));
+      animation: logoGlow 3s ease-in-out infinite;
+    }
+    .sc-logo-tagline {
+      font-family: 'Cooper Black', 'Arial Rounded MT Bold', sans-serif;
+      letter-spacing: 1.5px;
+      font-size: 9px;
+      line-height: 1;
+      position: absolute;
+      right: 0;
+      bottom: 0;
+      background: linear-gradient(180deg, #ffffff 0%, #dde4ee 35%, #b8c2d4 70%, #ccd4e4 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5));
+    }
+
+    /* ★ Sayfa başlığı pill rozeti — ana sayfadaki "YAYIN HAZIR" stili */
+    .page-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 12px;
+      border-radius: 999px;
+      background: rgba(20, 184, 166, 0.10);
+      border: 1px solid rgba(20, 184, 166, 0.30);
+      margin-bottom: 16px;
+    }
+    .page-pill .dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: #5EEAD4;
+    }
+    .page-pill .label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.15em;
+      color: #5EEAD4;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      font-size: 36px;
+      font-weight: 800;
+      line-height: 1.1;
+      color: #f8fafc;
+      margin-bottom: 12px;
+      letter-spacing: -0.01em;
+    }
+    h1 .accent {
+      background: linear-gradient(90deg, #fcd34d 0%, #fbbf24 50%, #f0abfc 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .update-date {
+      color: #64748b;
+      font-size: 13px;
+      margin-bottom: 32px;
+      font-weight: 500;
+    }
+
+    /* ★ Card — ana sayfadaki "Ne sunuyor?" kartlarıyla aynı dil */
+    section.card {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.10);
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 16px;
+      -webkit-backdrop-filter: blur(10px);
+      backdrop-filter: blur(10px);
+    }
+
+    /* ★ Intro paragrafı — h1 altında açıklama */
+    .intro {
+      font-size: 15px;
+      color: #cbd5e1;
+      margin-bottom: 28px;
+      max-width: 640px;
+    }
+
+    /* ★ İletişim kartı içindeki email link */
+    .contact-line { margin-top: 8px; }
+    .contact-link-inline {
+      font-size: 14px;
+      color: #5EEAD4;
+    }
+    .contact-link-inline svg { color: #5EEAD4; }
+
+    h2 {
+      font-size: 18px;
+      font-weight: 700;
+      color: #f1f5f9;
+      margin-bottom: 14px;
+      letter-spacing: -0.005em;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    h2 .num {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      background: rgba(20, 184, 166, 0.15);
+      border: 1px solid rgba(20, 184, 166, 0.30);
+      color: #5EEAD4;
+      font-size: 13px;
+      font-weight: 800;
+      flex-shrink: 0;
+    }
+    h3 {
+      font-size: 14px;
+      font-weight: 700;
+      color: #cbd5e1;
+      margin: 16px 0 8px;
+      letter-spacing: 0.01em;
+    }
+
+    p { font-size: 14px; margin-bottom: 12px; color: #94a3b8; }
+    p strong { color: #e2e8f0; font-weight: 600; }
+
+    ul { padding-left: 4px; margin-bottom: 12px; list-style: none; }
+    li {
+      font-size: 14px;
+      color: #94a3b8;
+      margin-bottom: 8px;
+      padding-left: 22px;
+      position: relative;
+      line-height: 1.65;
+    }
+    li::before {
+      content: '';
+      position: absolute;
+      left: 6px; top: 10px;
+      width: 4px; height: 4px;
+      border-radius: 50%;
+      background: #14B8A6;
+    }
+    li strong { color: #e2e8f0; font-weight: 600; }
+    li.no-collect { padding-left: 28px; }
+    li.no-collect::before {
+      content: '✕';
+      background: transparent;
+      color: #64748b;
+      font-weight: 700;
+      width: auto; height: auto;
+      top: -1px; left: 8px;
+      font-size: 12px;
+    }
+
+    a {
+      color: #5EEAD4;
+      text-decoration: none;
+      border-bottom: 1px solid rgba(94, 234, 212, 0.3);
+      transition: border-color 0.2s;
+    }
+    a:hover { border-bottom-color: #5EEAD4; }
+
+    /* ★ Footer — ana sayfa ile birebir aynı */
+    footer {
+      margin-top: 32px;
+      padding: 24px 0;
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      align-items: center;
+      text-align: center;
+    }
+    @media (min-width: 640px) {
+      footer { flex-direction: row; justify-content: space-between; }
+    }
+    .footer-logo {
+      opacity: 0.7;
+      padding-bottom: 8.5px;
+    }
+    .footer-logo .sc-logo-soprano,
+    .footer-logo .sc-logo-chat { font-size: 22px; }
+    .footer-logo .sc-logo-tagline { font-size: 6.5px; }
+
+    .contact-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: #64748b;
+      border-bottom: none;
+    }
+    .contact-link:hover { color: #cbd5e1; }
+    .contact-link svg { width: 14px; height: 14px; opacity: 0.7; }
+
+    @media (max-width: 640px) {
+      h1 { font-size: 28px; }
+      .sc-logo-soprano, .sc-logo-chat { font-size: 30px !important; }
+      .sc-logo-tagline { font-size: 7.5px !important; }
+      section.card { padding: 18px; }
+    }
   </style>
 </head>
 <body>
 
-<h1>🔒 SopranoChat Gizlilik Politikası</h1>
-<p class="update-date">Son Güncelleme: 7 Mayıs 2026</p>
+<div class="container">
 
-<p>SopranoChat ("uygulama", "biz") olarak kullanıcılarımızın gizliliğini önemsiyoruz. Bu gizlilik politikası, uygulamayı kullanırken hangi verilerin toplandığını, nasıl işlendiğini ve korunduğunu açıklamaktadır.</p>
+  <header>
+    <div class="sc-logo">
+      <span class="sc-logo-soprano">Soprano</span><span class="sc-logo-chat">Chat</span><span class="sc-logo-tagline">Senin Sesin</span>
+    </div>
+  </header>
 
-<h2>1. Toplanan Veriler</h2>
+  <div class="page-pill">
+    <span class="dot"></span>
+    <span class="label">Gizlilik Politikası</span>
+  </div>
 
-<h3>1.1 Hesap Bilgileri</h3>
-<ul>
-  <li><strong>E-posta adresi</strong> — Kimlik doğrulama, hesap kurtarma ve şifre sıfırlama linki için</li>
-  <li><strong>Görünen ad (display name)</strong> — Diğer kullanıcılara gösterilmek üzere</li>
-  <li><strong>Kullanıcı adı (username)</strong> — Profilinizi tanımlamak için</li>
-  <li><strong>Profil fotoğrafı</strong> — Yalnızca kullanıcı yüklediğinde</li>
-  <li><strong>Doğum tarihi</strong> — Yaş doğrulaması (13+ zorunluluğu) için</li>
-  <li><strong>Cinsiyet</strong> — Profil bilgisi olarak (isteğe bağlı)</li>
-  <li><strong>Profil ek bilgileri</strong> — Konuştuğunuz diller, ilgi alanları, kişisel not, sosyal medya bağlantıları (tamamı isteğe bağlı, profilinizi zenginleştirmek için)</li>
-  <li><strong>Sesli profil tanıtımı (Voice Bio)</strong> — Profilinize kısa bir ses kaydı eklediğinizde sunucumuzda saklanır ve diğer kullanıcılara gösterilir; istediğiniz zaman silebilirsiniz</li>
-</ul>
+  <h1>Senin verin, <span class="accent">senin sesin</span>.</h1>
+  <p class="update-date">Son güncelleme: 7 Mayıs 2026</p>
 
-<h3>1.2 Kullanım Verileri</h3>
-<ul>
-  <li><strong>Mesajlar</strong> — Kullanıcılar arası metin, fotoğraf ve sesli mesajlar sunucularımızda saklanır</li>
-  <li><strong>Oda katılım geçmişi</strong> — Hangi sohbet odalarına katıldığınız, oda içi rolünüz (sahne/dinleyici/moderatör)</li>
-  <li><strong>Bildirim tercihleri</strong> — Push bildirim için ayrı tabloda saklanan cihaz token'ları (yalnızca bildirim göndermek için kullanılır)</li>
-  <li><strong>Cihaz bilgileri</strong> — İşletim sistemi, uygulama sürümü (hata ayıklama için)</li>
-  <li><strong>Cihaz tanımlayıcısı</strong> — Aynı hesapla iki cihazdan aynı anda giriş yapılmasını engellemek (çift oturum koruması) için cihazınıza özel rastgele bir kimlik (UUID) saklanır. Reklam takibi için kullanılmaz, üçüncü taraflarla paylaşılmaz.</li>
-  <li><strong>Etkileşim verileri</strong> — Takip ettikleriniz, takipçileriniz, arkadaş listesi, engellediğiniz kullanıcılar</li>
-</ul>
+  <p class="intro">
+    SopranoChat olarak gizliliğine saygı duyuyoruz. Bu politika, uygulamayı kullanırken hangi verilerin toplandığını, nasıl işlendiğini ve nasıl korunduğunu sade bir dille açıklar.
+  </p>
 
-<h3>1.3 Uygulama İçi Ekonomi ve Satın Alma Verileri</h3>
-<ul>
-  <li><strong>SP bakiyesi</strong> — Uygulama içi sanal puan (Soprano Puanı) bakiyesi ve işlem geçmişi</li>
-  <li><strong>SP transferi/hediye geçmişi</strong> — Diğer kullanıcılara gönderdiğiniz/aldığınız hediye, bağış ve ödüller; "top destekçi" gibi liderlik tabloları için kullanılır</li>
-  <li><strong>Mağaza envanteri (Maison Soprano)</strong> — Satın aldığınız kozmetik ürünler (avatar çerçevesi, mesaj parıltısı, sahne ışığı vb.) ve aktif kullandığınız ürünler diğer kullanıcılara gösterilir</li>
-  <li><strong>Abonelik durumu</strong> — Aktif aboneliğiniz (Plus/Pro), başlangıç ve yenilenme tarihleri</li>
-  <li><strong>Satın alma geçmişi</strong> — Uygulama içi satın alma kayıtları (yalnızca kayıt amaçlı, kart/finansal bilgi içermez)</li>
-</ul>
+  <section class="card">
+    <h2><span class="num">1</span>Toplanan Veriler</h2>
 
-<h3>1.4 Sesli/Görüntülü İletişim Verileri</h3>
-<ul>
-  <li><strong>Mikrofon ve kamera</strong> — Yalnızca sesli/görüntülü oda oturumlarında, izin verdiğinizde aktif olur</li>
-  <li><strong>Arka plan ses bağlantısı (Android)</strong> — Bir sesli odadayken telefonu kilitlerseniz veya başka bir uygulamaya geçerseniz bağlantınızın kopmaması için Android'in "ön plan servisi" özelliği kullanılır. Bu sırada bildirim çubuğunda bir ikon görünür. Mikrofonunuz yalnızca odadayken ve siz konuştuğunuzda etkindir; oda dışında dinleme yapılmaz.</li>
-  <li><strong>Oda kayıtları (opsiyonel)</strong> — Oda sahibi açıkça başlatırsa oda içi ses kaydedilebilir; tüm katılımcılar bilgilendirilir, kayıtlar yasal saklama süresi sonunda otomatik silinir</li>
-</ul>
+    <h3>Hesap bilgileri</h3>
+    <ul>
+      <li><strong>E-posta adresi</strong> — kimlik doğrulama, hesap kurtarma ve şifre sıfırlama linki için</li>
+      <li><strong>Görünen ad</strong> — diğer kullanıcılara gösterilmek üzere</li>
+      <li><strong>Kullanıcı adı</strong> — profilini tanımlamak için</li>
+      <li><strong>Profil fotoğrafı</strong> — yalnızca kendin yüklediğinde</li>
+      <li><strong>Doğum tarihi</strong> — yaş doğrulaması (13+ zorunluluğu) için</li>
+      <li><strong>Cinsiyet</strong> — profil bilgisi olarak (isteğe bağlı)</li>
+      <li><strong>Profil ek bilgileri</strong> — diller, ilgi alanları, kişisel not, sosyal medya bağlantıları (tamamı isteğe bağlı)</li>
+      <li><strong>Sesli profil tanıtımı (Voice Bio)</strong> — profiline ses kaydı eklediğinde sunucumuzda saklanır ve diğer kullanıcılara gösterilir; istediğin zaman silebilirsin</li>
+    </ul>
 
-<h3>1.5 Toplamadığımız Veriler</h3>
-<ul>
-  <li>❌ <strong>Konum bilgisi</strong> — GPS veya IP tabanlı kesin konum verisi toplamıyoruz</li>
-  <li>❌ <strong>Kişi listesi</strong> — Telefon rehberinize erişmiyoruz</li>
-  <li>❌ <strong>Arama geçmişi</strong> — Telefon aramalarınıza erişmiyoruz</li>
-  <li>❌ <strong>Reklam tanımlayıcısı</strong> — Google Advertising ID veya benzer reklam takip kimlikleri toplamıyoruz</li>
-  <li>❌ <strong>Finansal bilgiler</strong> — Kredi kartı bilgileri yalnızca ödeme sağlayıcıda (RevenueCat/Google Play) tutulur, bizim sunucularımıza gelmez</li>
-</ul>
+    <h3>Kullanım verileri</h3>
+    <ul>
+      <li><strong>Mesajlar</strong> — kullanıcılar arası metin, fotoğraf ve sesli mesajlar sunucularımızda saklanır</li>
+      <li><strong>Oda katılım geçmişi</strong> — hangi sohbet odalarına katıldığın ve oda içi rolün (sahne, dinleyici, moderatör)</li>
+      <li><strong>Bildirim tercihleri</strong> — push bildirim için ayrı bir tabloda saklanan cihaz token'ları (yalnızca bildirim göndermek için)</li>
+      <li><strong>Cihaz bilgileri</strong> — işletim sistemi, uygulama sürümü (hata ayıklama için)</li>
+      <li><strong>Cihaz tanımlayıcısı</strong> — aynı hesapla iki cihazdan aynı anda giriş yapılmasını engellemek (çift oturum koruması) için cihazına özel rastgele bir kimlik (UUID) saklanır. Reklam takibi için kullanılmaz, üçüncü taraflarla paylaşılmaz.</li>
+      <li><strong>Etkileşim verileri</strong> — takip ettiklerin, takipçilerin, arkadaş listesi, engellediğin kullanıcılar</li>
+    </ul>
 
-<h2>2. Verilerin İşlenme Amaçları</h2>
-<ul>
-  <li>Kullanıcı kimlik doğrulaması ve hesap yönetimi</li>
-  <li>Mesaj iletimi ve sesli/görüntülü sohbet odası hizmetleri</li>
-  <li>Push bildirim gönderimi (mesaj, oda daveti, hediye bildirimleri)</li>
-  <li>Uygulama içi sanal ekonomi (SP) ve satın alma kayıtları</li>
-  <li>Çift oturum koruması (aynı hesap iki cihazda aktif olmasın)</li>
-  <li>Uygulama güvenliği, kötüye kullanım önleme ve moderasyon</li>
-  <li>Hizmet kalitesinin iyileştirilmesi ve hata ayıklama</li>
-</ul>
+    <h3>Uygulama içi ekonomi ve satın alma</h3>
+    <ul>
+      <li><strong>SP bakiyesi</strong> — uygulama içi sanal puan (Soprano Puanı) bakiyesi ve işlem geçmişi</li>
+      <li><strong>SP transferi/hediye geçmişi</strong> — diğer kullanıcılara gönderdiğin/aldığın hediye, bağış ve ödüller; "top destekçi" gibi liderlik tabloları için kullanılır</li>
+      <li><strong>Mağaza envanteri (Maison Soprano)</strong> — satın aldığın kozmetik ürünler (avatar çerçevesi, mesaj parıltısı, sahne ışığı vb.) ve aktif kullandıkların diğer kullanıcılara gösterilir</li>
+      <li><strong>Abonelik durumu</strong> — aktif aboneliğin (Plus / Pro), başlangıç ve yenilenme tarihleri</li>
+      <li><strong>Satın alma geçmişi</strong> — uygulama içi satın alma kayıtları (yalnızca kayıt amaçlı, kart/finansal bilgi içermez)</li>
+    </ul>
 
-<h2>3. Üçüncü Taraf Hizmetler</h2>
-<p>SopranoChat aşağıdaki üçüncü taraf hizmetleri kullanmaktadır:</p>
-<ul>
-  <li><strong>Firebase Authentication (Google)</strong> — Kimlik doğrulama. <a href="https://firebase.google.com/support/privacy" target="_blank" rel="noopener noreferrer">Firebase Gizlilik Politikası</a></li>
-  <li><strong>Firebase Cloud Messaging (Google)</strong> — Push bildirim gönderimi. <a href="https://firebase.google.com/support/privacy" target="_blank" rel="noopener noreferrer">Firebase Gizlilik Politikası</a></li>
-  <li><strong>Supabase</strong> — Veritabanı, dosya depolama ve gerçek zamanlı veri. <a href="https://supabase.com/privacy" target="_blank" rel="noopener noreferrer">Supabase Gizlilik Politikası</a></li>
-  <li><strong>LiveKit (Hetzner Almanya altyapısı)</strong> — Sesli ve görüntülü arama altyapısı. <a href="https://livekit.io/privacy" target="_blank" rel="noopener noreferrer">LiveKit Gizlilik Politikası</a></li>
-  <li><strong>RevenueCat</strong> — Uygulama içi satın alma ve abonelik yönetimi. <a href="https://www.revenuecat.com/privacy" target="_blank" rel="noopener noreferrer">RevenueCat Gizlilik Politikası</a></li>
-  <li><strong>Google Play Hizmetleri</strong> — Google ile giriş ve ödeme. <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Google Gizlilik Politikası</a></li>
-</ul>
+    <h3>Sesli ve görüntülü iletişim</h3>
+    <ul>
+      <li><strong>Mikrofon ve kamera</strong> — yalnızca sesli/görüntülü oda oturumlarında, izin verdiğinde aktif olur</li>
+      <li><strong>Arka plan ses bağlantısı (Android)</strong> — bir sesli odadayken telefonu kilitlersen veya başka bir uygulamaya geçersen bağlantın kopmasın diye Android'in "ön plan servisi" özelliği kullanılır. Bu sırada bildirim çubuğunda bir ikon görünür. Mikrofonun yalnızca odadayken ve sen konuştuğunda etkindir; oda dışında dinleme yapılmaz.</li>
+      <li><strong>Oda kayıtları (opsiyonel)</strong> — oda sahibi açıkça başlatırsa oda içi ses kaydedilebilir; tüm katılımcılar bilgilendirilir, kayıtlar yasal saklama süresi sonunda otomatik silinir</li>
+    </ul>
 
-<h2>4. Verilerin Saklanması ve Güvenliği</h2>
-<ul>
-  <li>Verileriniz Supabase (AWS altyapısı) üzerinde şifreli olarak saklanır</li>
-  <li>Sesli/görüntülü iletişim sunucuları LiveKit (Hetzner Almanya) üzerinde çalışır; ses/görüntü trafiği WebRTC üzerinden uçtan uca şifrelidir</li>
-  <li>Tüm veri iletişimi HTTPS/TLS üzerinden gerçekleşir</li>
-  <li>Şifreler Firebase Authentication tarafından hash'lenir, düz metin olarak saklanmaz</li>
-  <li>Veritabanı erişimi satır seviyesinde güvenlik kuralları (RLS) ile korunur — kendi verilerinize yalnızca siz erişebilirsiniz</li>
-</ul>
+    <h3>Toplamadığımız veriler</h3>
+    <ul>
+      <li class="no-collect"><strong>Konum bilgisi</strong> — GPS veya IP tabanlı kesin konum verisi toplamıyoruz</li>
+      <li class="no-collect"><strong>Kişi listesi</strong> — telefon rehberine erişmiyoruz</li>
+      <li class="no-collect"><strong>Arama geçmişi</strong> — telefon aramalarına erişmiyoruz</li>
+      <li class="no-collect"><strong>Reklam tanımlayıcısı</strong> — Google Advertising ID veya benzer reklam takip kimlikleri toplamıyoruz</li>
+      <li class="no-collect"><strong>Finansal bilgiler</strong> — kredi kartı bilgileri yalnızca ödeme sağlayıcıda (RevenueCat / Google Play) tutulur, bizim sunucularımıza gelmez</li>
+    </ul>
+  </section>
 
-<h2>5. Kullanıcı Hakları (6698 Sayılı KVKK)</h2>
-<p>6698 sayılı Kişisel Verilerin Korunması Kanunu kapsamında aşağıdaki haklarınız bulunmaktadır:</p>
-<ul>
-  <li>Kişisel verilerinizin işlenip işlenmediğini öğrenme</li>
-  <li>İşlenmiş ise buna ilişkin bilgi talep etme</li>
-  <li>İşlenme amacını ve bunların amacına uygun kullanılıp kullanılmadığını öğrenme</li>
-  <li>Yurt içinde veya yurt dışında kişisel verilerinizin aktarıldığı üçüncü kişileri bilme</li>
-  <li>Kişisel verilerinizin eksik veya yanlış işlenmiş olması hâlinde bunların düzeltilmesini isteme</li>
-  <li>Kişisel verilerinizin silinmesini veya yok edilmesini isteme</li>
-  <li>Verilerinizin bir kopyasını indirme (Ayarlar → Veri İndir)</li>
-</ul>
+  <section class="card">
+    <h2><span class="num">2</span>Verilerin İşlenme Amaçları</h2>
+    <ul>
+      <li>Kullanıcı kimlik doğrulaması ve hesap yönetimi</li>
+      <li>Mesaj iletimi ve sesli/görüntülü sohbet odası hizmetleri</li>
+      <li>Push bildirim gönderimi (mesaj, oda daveti, hediye bildirimleri)</li>
+      <li>Uygulama içi sanal ekonomi (SP) ve satın alma kayıtları</li>
+      <li>Çift oturum koruması (aynı hesabın iki cihazda aktif olmaması)</li>
+      <li>Uygulama güvenliği, kötüye kullanım önleme ve moderasyon</li>
+      <li>Hizmet kalitesinin iyileştirilmesi ve hata ayıklama</li>
+    </ul>
+  </section>
 
-<h2>6. Hesap Silme</h2>
-<p>Hesabınızı istediğiniz zaman silebilirsiniz:</p>
-<ul>
-  <li><strong>Uygulama içinden:</strong> Ayarlar → Hesap → Hesabımı Sil</li>
-  <li>Hesap silindiğinde tüm profil bilgileri, mesajlar, ses kayıtları, mağaza envanteri ve ilişkili veriler kalıcı olarak kaldırılır</li>
-  <li>SP bakiyeniz ve aktif aboneliğiniz iade edilmez</li>
-  <li>Silme işlemi geri alınamaz</li>
-</ul>
+  <section class="card">
+    <h2><span class="num">3</span>Üçüncü Taraf Hizmetler</h2>
+    <p>SopranoChat aşağıdaki üçüncü taraf hizmetleri kullanmaktadır:</p>
+    <ul>
+      <li><strong>Firebase Authentication (Google)</strong> — kimlik doğrulama. <a href="https://firebase.google.com/support/privacy" target="_blank" rel="noopener noreferrer">Firebase Gizlilik Politikası</a></li>
+      <li><strong>Firebase Cloud Messaging (Google)</strong> — push bildirim gönderimi. <a href="https://firebase.google.com/support/privacy" target="_blank" rel="noopener noreferrer">Firebase Gizlilik Politikası</a></li>
+      <li><strong>Supabase</strong> — veritabanı, dosya depolama ve gerçek zamanlı veri. <a href="https://supabase.com/privacy" target="_blank" rel="noopener noreferrer">Supabase Gizlilik Politikası</a></li>
+      <li><strong>LiveKit (Hetzner Almanya altyapısı)</strong> — sesli ve görüntülü arama altyapısı. <a href="https://livekit.io/privacy" target="_blank" rel="noopener noreferrer">LiveKit Gizlilik Politikası</a></li>
+      <li><strong>RevenueCat</strong> — uygulama içi satın alma ve abonelik yönetimi. <a href="https://www.revenuecat.com/privacy" target="_blank" rel="noopener noreferrer">RevenueCat Gizlilik Politikası</a></li>
+      <li><strong>Google Play Hizmetleri</strong> — Google ile giriş ve ödeme. <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Google Gizlilik Politikası</a></li>
+    </ul>
+  </section>
 
-<h2>7. Çocukların Gizliliği</h2>
-<p>SopranoChat 13 yaşından küçük çocuklara yönelik değildir. Kayıt sırasında doğum tarihi doğrulaması yapılmaktadır. 13 yaş altı kullanıcıların hesapları tespit edildiğinde kapatılır.</p>
+  <section class="card">
+    <h2><span class="num">4</span>Verilerin Saklanması ve Güvenliği</h2>
+    <ul>
+      <li>Verilerin Supabase (AWS altyapısı) üzerinde şifreli olarak saklanır</li>
+      <li>Sesli/görüntülü iletişim sunucuları LiveKit (Hetzner Almanya) üzerinde çalışır; ses ve görüntü trafiği WebRTC üzerinden uçtan uca şifrelidir</li>
+      <li>Tüm veri iletişimi HTTPS / TLS üzerinden gerçekleşir</li>
+      <li>Şifreler Firebase Authentication tarafından hash'lenir, düz metin olarak saklanmaz</li>
+      <li>Veritabanı erişimi satır seviyesinde güvenlik kuralları (RLS) ile korunur — kendi verilerine yalnızca sen erişebilirsin</li>
+    </ul>
+  </section>
 
-<h2>8. Çerezler ve Analitik</h2>
-<p>Mobil uygulama olarak tarayıcı çerezleri kullanmıyoruz. Firebase ve Supabase SDK'ları cihaz üzerinde oturum bilgisi saklamak için güvenli depolama (AsyncStorage) kullanır. Reklam veya davranışsal hedefleme amaçlı analitik kullanmıyoruz.</p>
+  <section class="card">
+    <h2><span class="num">5</span>Kullanıcı Hakların (KVKK)</h2>
+    <p>6698 sayılı Kişisel Verilerin Korunması Kanunu kapsamında aşağıdaki haklara sahipsin:</p>
+    <ul>
+      <li>Kişisel verilerinin işlenip işlenmediğini öğrenme</li>
+      <li>İşlenmiş ise buna ilişkin bilgi talep etme</li>
+      <li>İşlenme amacını ve amacına uygun kullanılıp kullanılmadığını öğrenme</li>
+      <li>Yurt içinde veya yurt dışında kişisel verilerinin aktarıldığı üçüncü kişileri bilme</li>
+      <li>Kişisel verilerin eksik veya yanlış işlenmiş olması hâlinde düzeltilmesini isteme</li>
+      <li>Kişisel verilerinin silinmesini veya yok edilmesini isteme</li>
+      <li>Verilerinin bir kopyasını indirme (Ayarlar → Veri İndir)</li>
+    </ul>
+  </section>
 
-<h2>9. Değişiklikler</h2>
-<p>Bu gizlilik politikası zaman zaman güncellenebilir. Önemli değişikliklerde uygulama içinde bildirim yapılır.</p>
+  <section class="card">
+    <h2><span class="num">6</span>Hesap Silme</h2>
+    <p>Hesabını istediğin zaman silebilirsin:</p>
+    <ul>
+      <li><strong>Uygulama içinden:</strong> Ayarlar → Hesap → Hesabımı Sil</li>
+      <li>Hesap silindiğinde tüm profil bilgileri, mesajlar, ses kayıtları, mağaza envanteri ve ilişkili veriler kalıcı olarak kaldırılır</li>
+      <li>SP bakiyen ve aktif aboneliğin iade edilmez</li>
+      <li>Silme işlemi geri alınamaz</li>
+    </ul>
+  </section>
 
-<h2>10. İletişim</h2>
-<p>Gizlilik ile ilgili sorularınız için bize ulaşabilirsiniz:</p>
-<ul>
-  <li>📧 E-posta: <a href="mailto:gizlilik@sopranochat.com">gizlilik@sopranochat.com</a></li>
-  <li>📧 Destek: <a href="mailto:destek@sopranochat.com">destek@sopranochat.com</a></li>
-</ul>
+  <section class="card">
+    <h2><span class="num">7</span>Çocukların Gizliliği</h2>
+    <p>SopranoChat 13 yaşından küçük çocuklara yönelik değildir. Kayıt sırasında doğum tarihi doğrulaması yapılmaktadır. 13 yaş altı kullanıcıların hesapları tespit edildiğinde kapatılır.</p>
+  </section>
 
-<div class="footer">
-  © 2026 SopranoChat. Tüm hakları saklıdır.
+  <section class="card">
+    <h2><span class="num">8</span>Çerezler ve Analitik</h2>
+    <p>Mobil uygulama olarak tarayıcı çerezleri kullanmıyoruz. Firebase ve Supabase SDK'ları cihaz üzerinde oturum bilgisi saklamak için güvenli depolama (AsyncStorage) kullanır. Reklam veya davranışsal hedefleme amaçlı analitik kullanmıyoruz.</p>
+  </section>
+
+  <section class="card">
+    <h2><span class="num">9</span>Değişiklikler</h2>
+    <p>Bu gizlilik politikası zaman zaman güncellenebilir. Önemli değişikliklerde uygulama içinde bildirim yapılır.</p>
+  </section>
+
+  <section class="card">
+    <h2><span class="num">10</span>İletişim</h2>
+    <p>Gizlilik ile ilgili sorularını bize iletebilirsin:</p>
+    <p class="contact-line">
+      <a href="mailto:sopranochat@gmail.com" class="contact-link contact-link-inline">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7"></path>
+          <rect x="2" y="4" width="20" height="16" rx="2"></rect>
+        </svg>
+        sopranochat@gmail.com
+      </a>
+    </p>
+  </section>
+
+  <footer>
+    <div class="sc-logo footer-logo">
+      <span class="sc-logo-soprano">Soprano</span><span class="sc-logo-chat">Chat</span><span class="sc-logo-tagline">Senin Sesin</span>
+    </div>
+    <a href="mailto:sopranochat@gmail.com" class="contact-link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7"></path>
+        <rect x="2" y="4" width="20" height="16" rx="2"></rect>
+      </svg>
+      sopranochat@gmail.com
+    </a>
+  </footer>
+
 </div>
 
 </body>
