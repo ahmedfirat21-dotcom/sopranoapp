@@ -4,26 +4,32 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { getAvatarSource } from '../../constants/avatars';
 import AvatarPenaltyFlash, { type FlashType } from './AvatarPenaltyFlash';
+import RoomAvatarFrame from './RoomAvatarFrame';
+import TierBadge from '../TierBadge';
+import { migrateLegacyTier } from '../../types';
 import type { RoomParticipant } from '../../services/database';
 
 // ★ Dinamik boyutlandırma — modern platform grid sistemi (Clubhouse/Spaces pattern)
 // 2026-04-20: Sayı arttıkça avatar daha agresif küçülür.
 // 2026-04-22: window width runtime'dan alınıyor (useWindowDimensions) — fiziksel
 // Android'de gesture-nav/rotation ile değişen ekran boyutuna adapte olsun.
+// 2026-05-07: maxSize cap eklendi — az sayıda dinleyici varken (1-4 kişi) avatar
+// sahne kartı (~100px) boyutuna şişmesin. Hiyerarşi: dinleyici < sahne (~%50).
 function getGridMetrics(listenerCount: number, W: number) {
-  let cols: number, avatarGap: number;
+  let cols: number, avatarGap: number, maxSize: number;
   if (listenerCount <= 4) {
-    cols = 4; avatarGap = 12;
+    cols = 5; avatarGap = 12; maxSize = 56;   // Clubhouse: az kişide bile küçük kal
   } else if (listenerCount <= 8) {
-    cols = 5; avatarGap = 10;   // 4 col → 5 (daha kompakt)
+    cols = 6; avatarGap = 10; maxSize = 52;
   } else if (listenerCount <= 15) {
-    cols = 6; avatarGap = 7;    // 5 col → 6
+    cols = 7; avatarGap = 7; maxSize = 46;
   } else {
-    cols = 7; avatarGap = 5;    // 16+ (gerekirse "+N Seyirci" badge'de)
+    cols = 8; avatarGap = 5; maxSize = 40;    // 16+ (gerekirse "+N Seyirci" badge'de)
   }
   const cellW = Math.floor((W - 32 - avatarGap * (cols - 1)) / cols);
   // Avatar size agresif shrink: ufak hücrelerde padding büyümesin
-  const avatarSize = Math.max(32, cellW - (listenerCount <= 8 ? 10 : listenerCount <= 15 ? 8 : 5));
+  const calculated = Math.max(32, cellW - (listenerCount <= 8 ? 10 : listenerCount <= 15 ? 8 : 5));
+  const avatarSize = Math.min(calculated, maxSize);
   return { cols, avatarGap, cellW, avatarSize };
 }
 
@@ -69,12 +75,37 @@ const ListenerCell = React.memo(function ListenerCell({
   // ★ 2026-04-20: Owner avatarı %10 büyük — sade ama belirgin
   const ownerScale = isOwner ? 1.10 : 1;
   const ownerAvatarSize = Math.floor(avatarSize * ownerScale);
+  // ★ v108.14: Aktif çerçeve varsa — owner crown + avatarOwner border + avatarWrap turkuaz border
+  //   gizlenir; çerçeve zaten kullanıcının statü/aksesuarını taşır, çift halka karmaşası kalkar.
+  const activeFrameId = !(u as any).disguise ? (u.user as any)?.active_frame : null;
+  const hasFrame = !!activeFrameId;
+  // ★ 2026-05-05: Plus/Pro/GM kompakt tier etiketi — dinleyici/mini avatar üstünde sağ-altta.
+  //   Free → hiç gösterme. Disguise (maske) modunda da gizle.
+  const userTier = !(u as any).disguise
+    ? migrateLegacyTier((u.user as any)?.subscription_tier as string)
+    : 'Free';
+  const showTier = userTier !== 'Free';
   return (
-    // ★ v107.41: Reanimated entering/exiting KALDIRILDI — zıplama hissi veriyordu.
     <Pressable style={[s.cell, { width: cellW }]} onPress={() => onSelectUser(u)}>
-      {isOwner && <ListenerOwnerBadge />}
-      <View style={[s.avatarWrap, { width: ownerAvatarSize, height: ownerAvatarSize, borderRadius: ownerAvatarSize / 2 }, isSelected && s.avatarSelected, isOwner && s.avatarOwner, showMuteIndicator && s.avatarMuted]}>
-        <Image source={getAvatarSource((u as any).disguise?.avatar_url || u.user?.avatar_url)} style={s.avatar} />
+      {isOwner && !hasFrame && <ListenerOwnerBadge />}
+      <View style={[
+        s.avatarWrap,
+        { width: ownerAvatarSize, height: ownerAvatarSize, borderRadius: ownerAvatarSize / 2 },
+        isSelected && s.avatarSelected,
+        isOwner && !hasFrame && s.avatarOwner,
+        showMuteIndicator && s.avatarMuted,
+        hasFrame && { borderWidth: 0, backgroundColor: 'transparent', overflow: 'visible' },
+      ]}>
+        {/* ★ v108.14: Frame ÖNCE render — render order'da arkada kalır, Image üstte */}
+        {hasFrame && (
+          <RoomAvatarFrame frameId={activeFrameId} avatarSize={ownerAvatarSize} minSize={36} />
+        )}
+        {/* ★ v108.15: hasFrame durumunda parent overflow:visible (frame kanatları için);
+             Image'e ayrıca borderRadius ver ki daire şeklinde kalsın. */}
+        <Image
+          source={getAvatarSource((u as any).disguise?.avatar_url || u.user?.avatar_url)}
+          style={[s.avatar, hasFrame && { borderRadius: ownerAvatarSize / 2 }]}
+        />
       </View>
       {showMuteIndicator && (
         <View style={[s.mutedBadge, { right: (cellW - ownerAvatarSize) / 2 - 6 }]}>
@@ -88,6 +119,20 @@ const ListenerCell = React.memo(function ListenerCell({
       )}
       {flash && <View style={[s.flashWrap, { height: ownerAvatarSize }]}><AvatarPenaltyFlash flashType={flash} size={ownerAvatarSize} onFlashDone={() => onFlashDone?.(u.user_id)} /></View>}
       {hasHandRaised && <HandRaiseBadge />}
+      {showTier && (
+        <View
+          style={{
+            position: 'absolute',
+            top: 8 + ownerAvatarSize - 10,
+            left: (cellW + ownerAvatarSize) / 2 - 14,
+            zIndex: 22,
+            elevation: 10,
+          }}
+          pointerEvents="none"
+        >
+          <TierBadge tier={userTier} size="xs" />
+        </View>
+      )}
       <Text style={[s.name, { fontSize: nameSize, maxWidth: cellW }, isOwner && s.nameOwner, showMuteIndicator && { color: 'rgba(239,68,68,0.6)' }]} numberOfLines={1}>
         {(u as any).disguise?.display_name || u.user?.display_name || 'Misafir'}
       </Text>
