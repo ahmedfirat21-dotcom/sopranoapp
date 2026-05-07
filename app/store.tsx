@@ -1,42 +1,67 @@
-// ★ v107 (3 May 2026): Maison Soprano mağaza — native UI (HTML mockup ilhamlı).
+// ★ v108 (4 May 2026): Maison Soprano mağaza — Oda odaklı kozmetik sistemi.
 //
-// HTML mockup: sopranochat_luxury_store_redesign.html
-// Native render — RN Animated API ile akıcı animasyonlar (HeroFleurDeLis float,
-// HeroGlow pulse, ShowcaseArtAnimated rotate-scale, BrandOrbitDot 12s rotate,
-// ShimmerOverlay balance + SP packs).
+// Kategoriler: Çerçeveler (avatar frames), Giriş Efektleri (oda giriş animasyonları),
+// Hediyeler (oda içi gift), SP Paketleri.
 //
 // DB-bound: cosmetic_items + collections + user_inventory + store_purchase RPC.
 // Showcase/gallery kart tıklama → Alert onay → SP düş + envantere ekle + toast.
 
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, Pressable, Animated, Platform, Dimensions, Alert, Easing,
+  View, Text, StyleSheet, ScrollView, Pressable, Animated, Platform, Dimensions, Easing, TextInput,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
-import { WebView } from 'react-native-webview';
 import { useRouter } from 'expo-router';
 import { safeGoBack } from '../constants/navigation';
 import AppBackground from '../components/AppBackground';
 import SPIcon from '../components/SPIcon';
 import { showToast } from '../components/Toast';
+import PremiumAlert, { type AlertButton } from '../components/PremiumAlert';
+import PurchaseSuccessModal from '../components/PurchaseSuccessModal';
 import { useAuth } from './_layout';
-import { StoreService, type CosmeticItem, type Collection, type Rarity } from '../services/store';
-import { getIllustrationHtml, isFullCardItem } from '../constants/storeIllustrations';
+import { StoreService, type CosmeticItem, type Collection, type Rarity, type SPPack as SPPackDB, type CosmeticBundle, type DailyDeal } from '../services/store';
+import { hasIllustration, isFullCardItem } from '../constants/storeIllustrationsPng';
+import Item3DArt from '../components/store/Item3DArt';
+import StoreItemPreviewSheet from '../components/store/StoreItemPreviewSheet';
+import { hasGiftLottie, getGiftLottie } from '../constants/giftLottieRegistry';
+import { hasFrameLottie, getFrameLottie, getFrameMeta } from '../constants/frameLottieRegistry';
+import { hasEntryEffectLottie, getEntryEffectLottie } from '../constants/entryEffectLottieRegistry';
+
+let LottieView: any = null;
+try {
+  LottieView = require('lottie-react-native').default;
+} catch { /* PNG fallback */ }
+
+function lottieFor(id: string): any | null {
+  if (hasGiftLottie(id)) return getGiftLottie(id);
+  if (hasFrameLottie(id)) return getFrameLottie(id);
+  if (hasEntryEffectLottie(id)) return getEntryEffectLottie(id);
+  return null;
+}
+
+/** ★ v110.12: SopranoAura-tarzı halka frame'ler (scale ≤ 1.25) mağaza kartında
+ *  daha küçük gösterilmeli — 500px canvas'ta 450px çaplı halka 125px'te çok büyük.
+ *  Kanatlı VIP frame'ler ve entry effect'ler 125px kalır. */
+function storeLottieSize(id: string): number {
+  const meta = getFrameMeta(id);
+  if (meta && meta.scale <= 1.25) return 90;
+  return 125;
+}
 
 const { width: W } = Dimensions.get('window');
 
-// ★ v107 hotfix: kategori pill'leri sadece dolu olan 4'üne indirildi.
-//   Profil/Salonlar/Ünvanlar/Boost post-launch'a ertelendi (memory: store_v107).
-//   key = scroll-to-section anchor; ana ScrollView ref'iyle eşleşir.
-type CategoryKey = 'atelier' | 'message_art' | 'gift' | 'sp';
-const CATEGORIES: { key: CategoryKey; label: string }[] = [
-  { key: 'atelier',     label: '★ Atelier' },
-  { key: 'message_art', label: 'Mesaj Sanatı' },
-  { key: 'gift',        label: 'Hediyeler' },
-  { key: 'sp',          label: 'SP' },
+// ★ v108.21: Hediyeler vitrin olarak geri eklendi — satılmaz, fiyat referansı
+//   (pay-per-send oda içi). Kullanıcı hediye fiyatlarını mağazada görsün.
+type CategoryKey = 'bundles' | 'frames' | 'entry_effect' | 'gifts' | 'sp';
+const CATEGORIES: { key: CategoryKey; label: string; icon: string }[] = [
+  { key: 'bundles',      label: 'Setler',          icon: 'cube-outline' },
+  { key: 'frames',       label: 'Çerçeveler',     icon: 'ellipse-outline' },
+  { key: 'entry_effect', label: 'Giriş Efektleri', icon: 'sparkles-outline' },
+  { key: 'gifts',        label: 'Hediyeler',       icon: 'gift-outline' },
+  { key: 'sp',           label: 'SP Paketleri',    icon: 'diamond-outline' },
 ];
 
 const RARITY_LABEL: Record<Rarity, string> = {
@@ -205,37 +230,8 @@ function ConicRays({ size = 200, color = 'rgba(255,255,255,0.08)' }: { size?: nu
   );
 }
 
-// ★ 3D SVG illustration WebView'i — transparent zemin, küçük scope (yalnız art alanı).
-//   itemId → constants/storeIllustrations.ts'ten HTML string. Her ürün için ayrı 3D SVG.
-//   fullSize=true → WebView parent View'i tamamen kapsar (full-card item için).
-function Item3DArt({ itemId, size = 140, fullSize = false }: {
-  itemId: string; size?: number; fullSize?: boolean;
-}) {
-  const html = getIllustrationHtml(itemId);
-  if (!html) return null;
-  const wrapStyle = fullSize ? StyleSheet.absoluteFillObject : { width: size, height: size };
-  const webStyle = fullSize
-    ? { flex: 1, backgroundColor: 'transparent' }
-    : { width: size, height: size, backgroundColor: 'transparent' };
-  return (
-    <View pointerEvents="none" style={wrapStyle}>
-      <WebView
-        source={{ html }}
-        style={webStyle}
-        containerStyle={{ backgroundColor: 'transparent' }}
-        scrollEnabled={false}
-        bounces={false}
-        showsHorizontalScrollIndicator={false}
-        showsVerticalScrollIndicator={false}
-        originWhitelist={['*']}
-        javaScriptEnabled
-        domStorageEnabled={false}
-        androidLayerType="hardware"
-        scalesPageToFit={false}
-      />
-    </View>
-  );
-}
+// ★ v107 hotfix: Item3DArt WebView'dan PNG asset'e geçti (components/store/Item3DArt.tsx).
+//   Eski 23 WebView mağaza performansını yiyordu; native <Image> ile sorun çözüldü.
 
 function ShowcaseArtAnimated({ emoji, color }: { emoji: string; color: string }) {
   const t = useRef(new Animated.Value(0)).current;
@@ -320,13 +316,16 @@ function ShimmerOverlay({ duration = 5000 }: { duration?: number }) {
   );
 }
 
-// ─── SP paketleri (statik UI, fiat ödeme için sp-store'a yönlendir) ──
+// ─── SP paketleri ───────────────────────────────────────────────
+// ★ v108.21: Hardcoded yerine sp_packages tablosundan çekilir.
+//   Local UI tipi (DB tipinden minimal map). Fallback olarak DEFAULT_SP_PACKS,
+//   DB henüz yüklenmediği veya boş döndüğü durumlar için.
 interface SPPack {
   id: string; tierName: string; tierKey: 'bronze' | 'silver' | 'gold' | 'platinum' | 'diamond';
   amount: number; bonusAmount?: number; bonusPct?: number;
   fiat: string; popular?: boolean; tierColor: string;
 }
-const SP_PACKS: SPPack[] = [
+const DEFAULT_SP_PACKS: SPPack[] = [
   { id: 'sp-bronze', tierName: 'Bronz · Atölye', tierKey: 'bronze',
     amount: 100, fiat: '9,99 ₺', tierColor: '#D4A574' },
   { id: 'sp-silver', tierName: 'Gümüş · Salon', tierKey: 'silver',
@@ -339,20 +338,73 @@ const SP_PACKS: SPPack[] = [
     amount: 15000, bonusAmount: 22500, bonusPct: 50, fiat: '799,99 ₺', tierColor: '#F9A8D4' },
 ];
 
+function spPackFromDB(p: SPPackDB): SPPack {
+  const total = p.sp_amount + (p.bonus_sp || 0);
+  return {
+    id: p.id,
+    tierName: p.tier_name,
+    tierKey: p.tier_key,
+    amount: p.sp_amount,
+    bonusAmount: p.bonus_sp > 0 ? total : undefined,
+    // ★ v108.21 hotfix: 0 → undefined; aksi halde JSX'te `{0 && ...}` naked "0" render eder
+    bonusPct: (p.bonus_pct && p.bonus_pct > 0) ? p.bonus_pct : undefined,
+    fiat: p.fiat_label,
+    popular: p.popular,
+    tierColor: p.tier_color,
+  };
+}
+
 export default function StoreScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { profile, firebaseUser } = useAuth();
   const sp = (profile as any)?.system_points || 0;
-  const [activeCat, setActiveCat] = useState<CategoryKey>('atelier');
+  // ★ v108.21: Tier indirimi — Plus %10, Pro/GodMaster %20
+  const tier = (profile as any)?.subscription_tier;
+  const expires = (profile as any)?.subscription_expires_at;
+  const tierActive = !expires || new Date(expires) > new Date();
+  const tierDiscountPct = tierActive
+    ? (tier === 'Pro' || tier === 'GodMaster' ? 20 : tier === 'Plus' ? 10 : 0)
+    : 0;
+  const [activeCat, setActiveCat] = useState<CategoryKey>('frames');
   const [items, setItems] = useState<CosmeticItem[]>([]);
   const [collections, setCollections] = useState<Collection[]>([]);
   const [inventory, setInventory] = useState<Set<string>>(new Set());
   const [purchasing, setPurchasing] = useState<string | null>(null);
+  // ★ v108.21: Search + Sort
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortMode, setSortMode] = useState<'default' | 'price-asc' | 'price-desc' | 'rarity'>('default');
+  // ★ v108.21: SP paketleri DB'den; fallback hardcoded
+  const [spPacks, setSpPacks] = useState<SPPack[]>(DEFAULT_SP_PACKS);
+  // ★ v108.21: Bundle paketleri (set fırsatları)
+  const [bundles, setBundles] = useState<CosmeticBundle[]>([]);
+  // ★ v108.21: Wishlist + daily deal
+  const [wishlist, setWishlist] = useState<Set<string>>(new Set());
+  const [dailyDeal, setDailyDeal] = useState<DailyDeal | null>(null);
+  // ★ v108.21: Yükleniyor durumu — boş kartlar yerine skeleton göstermek için
+  const [catalogLoading, setCatalogLoading] = useState(true);
+  // ★ v107 hotfix: Native Alert.alert → PremiumAlert (uygulama tasarımına uygun)
+  const [confirmAlert, setConfirmAlert] = useState<{
+    visible: boolean;
+    title: string;
+    message: string;
+    buttons: AlertButton[];
+  }>({ visible: false, title: '', message: '', buttons: [] });
+  // ★ v109.1: Satın alma başarı modalı — toast yerine premium kutlama (Applied.json Lottie)
+  const [successModal, setSuccessModal] = useState<{
+    visible: boolean;
+    title: string;
+    subtitle?: string;
+    accent?: readonly [string, string];
+  }>({ visible: false, title: '' });
+  // ★ v109.5: Ürün önizleme sheet'i — kart/banner tıklaması direkt PremiumAlert'e gitmez,
+  //   önce ürünü gösterir (Item3DArt + bilgi + fiyat). Sheet'teki "Satın Al" butonu
+  //   PremiumAlert onay akışını tetikler.
+  const [previewItem, setPreviewItem] = useState<CosmeticItem | null>(null);
   // ★ v107 hotfix: pill tıklama scroll-to-section anchor — ScrollView ref + her section'ın y offset'i
   const scrollRef = useRef<ScrollView>(null);
   const sectionOffsets = useRef<Record<CategoryKey, number>>({
-    atelier: 0, message_art: 0, gift: 0, sp: 0,
+    bundles: 0, frames: 0, entry_effect: 0, gifts: 0, sp: 0,
   });
   const scrollToSection = (key: CategoryKey) => {
     setActiveCat(key);
@@ -363,22 +415,199 @@ export default function StoreScreen() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const { items: fetchedItems, collections: fetchedCols } = await StoreService.getCatalog();
+      const [{ items: fetchedItems, collections: fetchedCols }, packs, fetchedBundles, deal] = await Promise.all([
+        StoreService.getCatalog(),
+        StoreService.getSPPacks(),
+        StoreService.getBundles(),
+        StoreService.getDailyDeal(),
+      ]);
       if (cancelled) return;
       setItems(fetchedItems);
       setCollections(fetchedCols);
+      if (packs.length > 0) setSpPacks(packs.map(spPackFromDB));
+      setBundles(fetchedBundles);
+      setDailyDeal(deal);
+      setCatalogLoading(false);
     })();
     if (firebaseUser?.uid) {
-      StoreService.getUserInventory(firebaseUser.uid).then((inv) => {
-        if (!cancelled) setInventory(inv);
+      Promise.all([
+        StoreService.getUserInventory(firebaseUser.uid),
+        StoreService.getWishlist(firebaseUser.uid),
+      ]).then(([inv, wish]) => {
+        if (cancelled) return;
+        setInventory(inv);
+        setWishlist(wish);
       });
     }
     return () => { cancelled = true; };
   }, [firebaseUser?.uid]);
 
-  const showcaseItems = items.filter((i) => i.category === 'atelier');
-  const galleryItems = items.filter((i) => i.category === 'message_art');
-  const giftItems = items.filter((i) => i.category === 'gift');
+  // ★ v108.21: Search + sort uygulanan filter helper
+  const RARITY_RANK: Record<string, number> = { divine: 0, mythic: 1, legendary: 2, rare: 3, new: 4 };
+  const applyFilters = (list: CosmeticItem[]): CosmeticItem[] => {
+    let filtered = list;
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      filtered = filtered.filter((i) =>
+        i.name?.toLowerCase().includes(q) ||
+        i.meta?.toLowerCase().includes(q) ||
+        i.tagline?.toLowerCase().includes(q)
+      );
+    }
+    if (sortMode === 'price-asc') filtered = [...filtered].sort((a, b) => a.price_sp - b.price_sp);
+    else if (sortMode === 'price-desc') filtered = [...filtered].sort((a, b) => b.price_sp - a.price_sp);
+    else if (sortMode === 'rarity') filtered = [...filtered].sort((a, b) =>
+      (RARITY_RANK[a.rarity || 'new'] ?? 5) - (RARITY_RANK[b.rarity || 'new'] ?? 5)
+    );
+    return filtered;
+  };
+  const frameItems = applyFilters(items.filter((i) => i.category === 'atelier' || i.category === 'frames'));
+  const entryItems = applyFilters(items.filter((i) => i.category === 'message_art' || i.category === 'entry_effect'));
+  const giftItems = applyFilters(items.filter((i) => i.category === 'gift'));
+
+  // ★ v108.21: Wishlist toggle (optimistic update + DB sync)
+  const handleWishlistToggle = async (item: CosmeticItem) => {
+    if (!firebaseUser?.uid) return;
+    if (inventory.has(item.id)) return; // owned → wishlist gerekmez
+    const isOnList = wishlist.has(item.id);
+    setWishlist((prev) => {
+      const next = new Set(prev);
+      if (isOnList) next.delete(item.id);
+      else next.add(item.id);
+      return next;
+    });
+    const ok = isOnList
+      ? await StoreService.removeFromWishlist(firebaseUser.uid, item.id)
+      : await StoreService.addToWishlist(firebaseUser.uid, item.id);
+    if (!ok) {
+      // Rollback
+      setWishlist((prev) => {
+        const next = new Set(prev);
+        if (isOnList) next.add(item.id);
+        else next.delete(item.id);
+        return next;
+      });
+      showToast({ title: 'Hata', message: 'İstek listesi güncellenemedi', type: 'error' });
+    } else if (!isOnList) {
+      showToast({ title: '♡ Listene eklendi', message: `${item.name} istek listende.`, type: 'success' });
+    }
+  };
+
+  // ★ v109.1: Kategori → kullanıcı dostu etiket eşlemesi (success modal alt metni için)
+  const categoryLabel = (cat: string): string => {
+    if (cat === 'atelier' || cat === 'frames') return 'Çerçeve';
+    if (cat === 'message_art' || cat === 'entry_effect') return 'Giriş Efekti';
+    if (cat === 'gift') return 'Hediye';
+    return 'Ürün';
+  };
+  const accentForRarity = (rarity?: string | null): readonly [string, string] => {
+    switch (rarity) {
+      case 'divine': return ['#FBBF24', '#854F0B'] as const;
+      case 'mythic': return ['#F472B6', '#831843'] as const;
+      case 'legendary': return ['#FFE082', '#B45309'] as const;
+      case 'rare': return ['#A78BFA', '#5B21B6'] as const;
+      default: return ['#14B8A6', '#0E7490'] as const;
+    }
+  };
+
+  const handleBundlePurchase = (bundle: CosmeticBundle) => {
+    if (!firebaseUser?.uid) return;
+    const allOwned = bundle.item_ids.every((id) => inventory.has(id));
+    if (allOwned) {
+      showToast({ title: 'Tüm parçalar sende', message: `${bundle.name} parçalarına zaten sahipsin.`, type: 'info' });
+      return;
+    }
+    const totalDiscount = Math.min(bundle.discount_pct + tierDiscountPct, 80);
+    const finalPrice = Math.round(bundle.total_price_sp * (100 - totalDiscount) / 100);
+    setConfirmAlert({
+      visible: true,
+      title: 'Set Satın Al',
+      message: `${bundle.name} setinin ${bundle.item_ids.length} parçası ${finalPrice.toLocaleString('tr-TR')} SP karşılığında envanterine eklenecek (-%${totalDiscount}${tierDiscountPct > 0 ? ` · ${tier}` : ''}). Onaylıyor musun?`,
+      buttons: [
+        { text: 'Vazgeç', style: 'cancel', onPress: () => setConfirmAlert(p => ({ ...p, visible: false })) },
+        {
+          text: 'Satın Al', style: 'default', icon: 'cube',
+          onPress: async () => {
+            setConfirmAlert(p => ({ ...p, visible: false }));
+            setPurchasing(bundle.id);
+            const r = await StoreService.purchaseBundle(firebaseUser.uid, bundle.id);
+            setPurchasing(null);
+            if (r.success) {
+              setSuccessModal({
+                visible: true,
+                title: `${bundle.name} Satın Alındı`,
+                subtitle: `${r.items_added || bundle.item_ids.length} parça envanterine eklendi · ${r.cost} SP harcandı`,
+                accent: accentForRarity(bundle.rarity),
+              });
+              setInventory((prev) => {
+                const next = new Set(prev);
+                bundle.item_ids.forEach((id) => next.add(id));
+                return next;
+              });
+            } else {
+              showToast({
+                title: 'Hata',
+                message: r.error || 'Bağlantı sorunu',
+                type: r.already_owned ? 'info' : 'error',
+              });
+            }
+          },
+        },
+      ],
+    });
+  };
+
+  // ★ v109.5: Daily Deal banner için ürün önizleme — direkt satın alma onay modalı yerine
+  //   önce ürün görseli + fiyat detayı + indirim breakdown'ı sheet olarak gösterilir.
+  //   Sheet'in "Satın Al" butonu executePurchase'i direkt çağırır (preview ZATEN onaydır,
+  //   ikinci PremiumAlert'e gerek yok — friction azaltma).
+  const openItemPreview = (item: CosmeticItem) => {
+    if (!firebaseUser?.uid) return;
+    setPreviewItem(item);
+  };
+
+  // ★ v109.5: Ortak satın alma akışı — hem PremiumAlert (handlePurchase) hem
+  //   preview sheet onPurchase tarafından çağrılır. StoreService.purchase + success
+  //   modal + inventory güncelleme + tier-lock + error handling tek yerde.
+  const executePurchase = async (item: CosmeticItem) => {
+    if (!firebaseUser?.uid) return;
+    setPurchasing(item.id);
+    const r = await StoreService.purchase(firebaseUser.uid, item.id);
+    setPurchasing(null);
+    if (r.success) {
+      const label = categoryLabel(item.category);
+      setSuccessModal({
+        visible: true,
+        title: `${label} Satın Alındı`,
+        subtitle: `${item.name} envanterine eklendi · ${r.cost} SP harcandı`,
+        accent: accentForRarity(item.rarity),
+      });
+      setInventory((prev) => new Set(prev).add(item.id));
+    } else if ((r as any).tier_locked) {
+      const reqTier = (r as any).required_tier || 'Plus';
+      setConfirmAlert({
+        visible: true,
+        title: `${reqTier} Üyelik Gerekiyor`,
+        message: `${item.name} sadece ${reqTier} üyelere açık. ${reqTier} üyelik avantajları arasında %10-20 mağaza indirimi, premium oda araçları ve daha fazlası var.`,
+        buttons: [
+          { text: 'Şimdi Değil', style: 'cancel', onPress: () => setConfirmAlert(p => ({ ...p, visible: false })) },
+          {
+            text: `${reqTier}'a Yükselt`, style: 'default', icon: 'star',
+            onPress: () => {
+              setConfirmAlert(p => ({ ...p, visible: false }));
+              router.push('/plus' as any);
+            },
+          },
+        ],
+      });
+    } else {
+      showToast({
+        title: 'Hata',
+        message: r.error || 'Bağlantı sorunu',
+        type: r.alreadyOwned ? 'info' : 'error',
+      });
+    }
+  };
 
   const handlePurchase = (item: CosmeticItem) => {
     if (!firebaseUser?.uid) return;
@@ -386,43 +615,33 @@ export default function StoreScreen() {
       showToast({ title: 'Zaten sahipsin', message: `${item.name} envanterinde.`, type: 'info' });
       return;
     }
-    if (item.per_message) {
-      showToast({
-        title: 'Mesaj başına',
-        message: `"${item.name}" oda sohbetinde ✨ butonundan kullanılır.`,
-        type: 'info',
-      });
-      return;
-    }
-    Alert.alert(
-      'Satın Al',
-      `${item.name} için ${item.price_sp.toLocaleString('tr-TR')} SP harcanacak. Onaylıyor musun?`,
-      [
-        { text: 'Vazgeç', style: 'cancel' },
+    // ★ v107 hotfix: PremiumAlert (native Alert yerine) — uygulama tasarımıyla tutarlı
+    setConfirmAlert({
+      visible: true,
+      title: 'Satın Al',
+      message: (() => {
+        const dealOff = (dailyDeal && dailyDeal.item_id === item.id) ? dailyDeal.extra_discount_pct : 0;
+        const totalOff = Math.min(tierDiscountPct + dealOff, 80);
+        if (totalOff === 0) {
+          return `${item.name} için ${item.price_sp.toLocaleString('tr-TR')} SP harcanacak. Onaylıyor musun?`;
+        }
+        const final = Math.round(item.price_sp * (100 - totalOff) / 100);
+        const parts: string[] = [];
+        if (tierDiscountPct > 0) parts.push(`${tier} indirimi -%${tierDiscountPct}`);
+        if (dealOff > 0) parts.push(`Günün Fırsatı -%${dealOff}`);
+        return `${item.name} için ${final.toLocaleString('tr-TR')} SP harcanacak (${parts.join(' + ')}). Onaylıyor musun?`;
+      })(),
+      buttons: [
+        { text: 'Vazgeç', style: 'cancel', onPress: () => setConfirmAlert(p => ({ ...p, visible: false })) },
         {
-          text: 'Satın Al', style: 'default',
-          onPress: async () => {
-            setPurchasing(item.id);
-            const r = await StoreService.purchase(firebaseUser.uid, item.id);
-            setPurchasing(null);
-            if (r.success) {
-              showToast({
-                title: '✓ Satın Alındı',
-                message: `${item.name} envanterinde (-${r.cost} SP)`,
-                type: 'success',
-              });
-              setInventory((prev) => new Set(prev).add(item.id));
-            } else {
-              showToast({
-                title: 'Hata',
-                message: r.error || 'Bağlantı sorunu',
-                type: r.alreadyOwned ? 'info' : 'error',
-              });
-            }
+          text: 'Satın Al', style: 'default', icon: 'sparkles',
+          onPress: () => {
+            setConfirmAlert(p => ({ ...p, visible: false }));
+            executePurchase(item);
           },
         },
       ],
-    );
+    });
   };
 
   return (
@@ -479,10 +698,68 @@ export default function StoreScreen() {
             </View>
           </View>
 
-          <View style={s.search}>
-            <Ionicons name="search" size={13} color="rgba(251,191,36,0.6)" />
-            <Text style={s.searchText}>Koleksiyonda ara…</Text>
-            <Ionicons name="mic-outline" size={13} color="rgba(255,255,255,0.4)" />
+          {/* ★ v108.21: GÜNÜN FIRSATI — bugünün daily deal'ı varsa banner */}
+          {/* ★ v109.5: onPress artık önce StoreItemPreviewSheet'i açar — ürünü gör + fiyat + indirim breakdown */}
+          <DailyDealBanner
+            dailyDeal={dailyDeal}
+            items={items}
+            inventory={inventory}
+            tierDiscountPct={tierDiscountPct}
+            onPress={openItemPreview}
+          />
+
+          {/* ★ v108.21: Tier indirim rozet — Plus/Pro üyelere kozmetiklerde indirim */}
+          {tierDiscountPct > 0 && (
+            <View style={s.tierDiscountBanner}>
+              <LinearGradient
+                colors={['rgba(34,211,238,0.18)', 'rgba(34,211,238,0.04)']}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                style={StyleSheet.absoluteFillObject}
+              />
+              <Ionicons name="diamond" size={14} color="#22D3EE" />
+              <Text style={s.tierDiscountText}>
+                {tier} üyeliğinle çerçeve & efektlerde <Text style={{ color: '#22D3EE', fontWeight: '800' }}>%{tierDiscountPct}</Text> indirim aktif.
+              </Text>
+            </View>
+          )}
+
+          {/* ★ v108.21: Functional search + sort */}
+          <View style={s.searchRow}>
+            <View style={s.search}>
+              <Ionicons name="search" size={13} color="rgba(251,191,36,0.6)" />
+              <TextInput
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                placeholder="Koleksiyonda ara…"
+                placeholderTextColor="rgba(255,255,255,0.4)"
+                style={s.searchInput}
+              />
+              {searchQuery.length > 0 && (
+                <Pressable onPress={() => setSearchQuery('')} hitSlop={8}>
+                  <Ionicons name="close-circle" size={14} color="rgba(255,255,255,0.5)" />
+                </Pressable>
+              )}
+            </View>
+            <Pressable
+              onPress={() => {
+                const next = sortMode === 'default' ? 'price-asc'
+                  : sortMode === 'price-asc' ? 'price-desc'
+                  : sortMode === 'price-desc' ? 'rarity'
+                  : 'default';
+                setSortMode(next);
+              }}
+              style={s.sortBtn}
+              hitSlop={6}
+            >
+              <Ionicons
+                name={sortMode === 'price-asc' ? 'arrow-up' : sortMode === 'price-desc' ? 'arrow-down' : sortMode === 'rarity' ? 'star' : 'swap-vertical'}
+                size={13}
+                color="#FBBF24"
+              />
+              <Text style={s.sortBtnText}>
+                {sortMode === 'price-asc' ? 'Ucuz' : sortMode === 'price-desc' ? 'Pahalı' : sortMode === 'rarity' ? 'Nadir' : 'Sırala'}
+              </Text>
+            </Pressable>
           </View>
 
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
@@ -494,6 +771,7 @@ export default function StoreScreen() {
                   onPress={() => scrollToSection(cat.key)}
                   style={[s.catPill, active && s.catPillActive]}
                 >
+                  <Ionicons name={cat.icon as any} size={12} color={active ? '#FBBF24' : 'rgba(255,255,255,0.45)'} style={{ marginRight: 4 }} />
                   <Text style={[s.catPillText, active && s.catPillTextActive]}>{cat.label}</Text>
                 </Pressable>
               );
@@ -508,15 +786,22 @@ export default function StoreScreen() {
           contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 100 + insets.bottom }}
           showsVerticalScrollIndicator={false}
         >
-          {/* Hero */}
+          {/* Hero — ★ v107 hotfix: HeroGlow (4 katmanlı altın daire) kaldırıldı ve
+              renkli mor/pembe gradient sakin slate + altın hint'e indirgendi.
+              Fleur-de-lis kendi başına focal point. */}
           <View style={s.hero}>
             <LinearGradient
-              colors={['rgba(124,58,237,0.3)', 'rgba(190,24,93,0.2)', 'rgba(0,0,0,0.3)']}
-              locations={[0, 0.5, 1]}
+              colors={['rgba(30,40,65,0.65)', 'rgba(15,22,38,0.85)', 'rgba(8,12,22,0.95)']}
+              locations={[0, 0.55, 1]}
               start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
               style={StyleSheet.absoluteFillObject}
             />
-            <HeroGlow />
+            {/* Fleur tarafına çok hafif altın halo (tek katman, daire değil — soft oval glow) */}
+            <LinearGradient
+              colors={['transparent', 'rgba(251,191,36,0.10)', 'transparent']}
+              start={{ x: 0.4, y: 0.5 }} end={{ x: 1, y: 0.5 }}
+              style={StyleSheet.absoluteFillObject}
+            />
             <View pointerEvents="none" style={s.heroArt}><HeroFleurDeLis /></View>
             <View style={s.heroTag}>
               <View style={s.heroTagDot} />
@@ -524,7 +809,10 @@ export default function StoreScreen() {
             </View>
             <Text style={s.heroTitle}>Soprano Couture{'\n'}Sonbahar 2026</Text>
             <Text style={s.heroDesc}>Yedi tasarımcı. On iki sınırlı parça.{'\n'}Sadece bu sezona özel.</Text>
-            <Pressable style={s.heroCta}>
+            <Pressable
+              style={s.heroCta}
+              onPress={() => scrollToSection(bundles.length > 0 ? 'bundles' : 'frames')}
+            >
               <LinearGradient
                 colors={['#FFE082', '#FAC775']}
                 start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
@@ -535,58 +823,114 @@ export default function StoreScreen() {
             </Pressable>
           </View>
 
-          {/* Atelier Vitrin */}
-          <View onLayout={(e) => { sectionOffsets.current.atelier = e.nativeEvent.layout.y; }} />
-          <SectionDivider label="★ ATELIER · İMZA PARÇALARI ★" />
-          <Text style={s.sectionTitle}>Vitrin</Text>
-          <Text style={s.sectionSub}>El işçiliği · Sınırlı sayıda · Her biri tek</Text>
-          <ScrollView
-            horizontal showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ gap: 12, paddingHorizontal: 4, paddingVertical: 8 }}
-            style={{ marginHorizontal: -4 }}
-          >
-            {showcaseItems.map((item) => (
-              <ShowcaseCard
-                key={item.id}
-                item={item}
-                owned={inventory.has(item.id)}
-                purchasing={purchasing === item.id}
-                onPress={() => handlePurchase(item)}
-              />
-            ))}
-          </ScrollView>
-
-          {/* Galeri */}
-          <View onLayout={(e) => { sectionOffsets.current.message_art = e.nativeEvent.layout.y; }} />
-          <SectionDivider label="— GALERİ · MESAJ SANATI —" />
-          <View style={s.galleryGrid}>
-            {galleryItems.map((item) => (
-              <GalleryCard
-                key={item.id}
-                item={item}
-                owned={inventory.has(item.id)}
-                onPress={() => handlePurchase(item)}
-              />
-            ))}
-          </View>
-
-          {/* Hediyeler — arkadaşa atılan anlık sembol koleksiyonu */}
-          {giftItems.length > 0 && (
+          {/* ═══ SETLER — Tema Bundle Paketleri (FOMO + indirim) ═══ */}
+          {(catalogLoading || bundles.length > 0) ? (
             <>
-              <View onLayout={(e) => { sectionOffsets.current.gift = e.nativeEvent.layout.y; }} />
-              <SectionDivider label="— HEDİYELER · ARKADAŞA · GÖNDER —" />
-              <Text style={s.sectionSub}>Sembol seç · Sevdiğine bir parıltı bırak</Text>
-              <View style={s.galleryGrid}>
-                {giftItems.map((item) => (
+              <View onLayout={(e) => { sectionOffsets.current.bundles = e.nativeEvent.layout.y; }} />
+              <SectionDivider label="— SETLER · TEMA PAKETLERİ —" />
+              <Text style={s.sectionTitle}>Set Fırsatları</Text>
+              <Text style={s.sectionSub}>Birlikte daha ucuz · Tema set + büyük indirim</Text>
+              {catalogLoading && bundles.length === 0 ? (
+                <SkeletonShowcaseRow />
+              ) : (
+                <ScrollView
+                  horizontal showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{ gap: 12, paddingHorizontal: 4, paddingVertical: 8 }}
+                  style={{ marginHorizontal: -4 }}
+                >
+                  {bundles.map((b) => (
+                    <BundleCard
+                      key={b.id}
+                      bundle={b}
+                      items={items}
+                      owned={b.item_ids.every((id) => inventory.has(id))}
+                      purchasing={purchasing === b.id}
+                      tierDiscountPct={tierDiscountPct}
+                      onPress={() => handleBundlePurchase(b)}
+                    />
+                  ))}
+                </ScrollView>
+              )}
+            </>
+          ) : null}
+
+          {/* ═══ ÇERÇEVELER — Avatar Frame Koleksiyonu ═══ */}
+          <View onLayout={(e) => { sectionOffsets.current.frames = e.nativeEvent.layout.y; }} />
+          <SectionDivider label="— ÇERÇEVELER · AVATAR —" />
+          <Text style={s.sectionTitle}>Avatar Çerçeveleri</Text>
+          <Text style={s.sectionSub}>Profilini özelleştir · Tarzını yansıt</Text>
+          {catalogLoading && frameItems.length === 0 ? (
+            <SkeletonShowcaseRow />
+          ) : (
+            <ScrollView
+              horizontal showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ gap: 12, paddingHorizontal: 4, paddingVertical: 8 }}
+              style={{ marginHorizontal: -4 }}
+            >
+              {frameItems.map((item) => {
+                const dealOff = (dailyDeal && dailyDeal.item_id === item.id) ? dailyDeal.extra_discount_pct : 0;
+                const totalOff = inventory.has(item.id) ? 0 : Math.min(tierDiscountPct + dealOff, 80);
+                return (
+                  <ShowcaseCard
+                    key={item.id}
+                    item={item}
+                    owned={inventory.has(item.id)}
+                    purchasing={purchasing === item.id}
+                    discountPct={totalOff}
+                    wished={wishlist.has(item.id)}
+                    onWishToggle={() => handleWishlistToggle(item)}
+                    onPress={() => handlePurchase(item)}
+                  />
+                );
+              })}
+            </ScrollView>
+          )}
+
+          {/* ═══ GİRİŞ EFEKTLERİ — Odaya Giriş Animasyonları ═══ */}
+          <View onLayout={(e) => { sectionOffsets.current.entry_effect = e.nativeEvent.layout.y; }} />
+          <SectionDivider label="— GİRİŞ EFEKTLERİ · ODA —" />
+          <Text style={s.sectionTitle}>Giriş Efektleri</Text>
+          <Text style={s.sectionSub}>Odaya girdiğinde herkes görsün · Şıklığını göster</Text>
+          {catalogLoading && entryItems.length === 0 ? (
+            <SkeletonGalleryGrid />
+          ) : (
+            <View style={s.galleryGrid}>
+              {entryItems.map((item) => {
+                const dealOff = (dailyDeal && dailyDeal.item_id === item.id) ? dailyDeal.extra_discount_pct : 0;
+                const totalOff = inventory.has(item.id) ? 0 : Math.min(tierDiscountPct + dealOff, 80);
+                return (
                   <GalleryCard
                     key={item.id}
                     item={item}
                     owned={inventory.has(item.id)}
+                    discountPct={totalOff}
+                    wished={wishlist.has(item.id)}
+                    onWishToggle={() => handleWishlistToggle(item)}
                     onPress={() => handlePurchase(item)}
                   />
-                ))}
-              </View>
-            </>
+                );
+              })}
+            </View>
+          )}
+
+          {/* ═══ HEDİYELER — Vitrin (pay-per-send, oda içi gönderim) ═══ */}
+          <View onLayout={(e) => { sectionOffsets.current.gifts = e.nativeEvent.layout.y; }} />
+          <SectionDivider label="— HEDİYELER · ODA İÇİ —" />
+          <Text style={s.sectionTitle}>Sembol Hediyeler</Text>
+          <Text style={s.sectionSub}>Vitrin · Odada 🎁 panelden gönder, satın almaya gerek yok</Text>
+          {catalogLoading && giftItems.length === 0 ? (
+            <SkeletonGalleryGrid />
+          ) : (
+            <View style={s.galleryGrid}>
+              {giftItems.map((item) => (
+                <GalleryCard
+                  key={item.id}
+                  item={item}
+                  owned={false}
+                  onPress={() => router.push('/(tabs)/myrooms' as any)}
+                />
+              ))}
+            </View>
           )}
 
           {/* Soprano Tezgâhı */}
@@ -600,27 +944,73 @@ export default function StoreScreen() {
               <Text style={s.tierHeaderTitle}>Soprano Tezgâhı</Text>
               <Text style={s.tierHeaderSub}>S P · K O L E K S İ Y O N L A R I</Text>
             </View>
-            {SP_PACKS.map((pack) => <SPPackRow key={pack.id} pack={pack} onPress={() => router.push('/sp-store')} />)}
+
+            {/* ★ v109.3: Premium Bonus banner — eski sp-store'dan taşındı.
+                 Plus %10, Pro %20 ekstra SP bilgilendirmesi. */}
+            <Pressable style={s.spBonusBanner} onPress={() => router.push('/plus' as any)}>
+              <LinearGradient
+                colors={['rgba(20,184,166,0.14)', 'rgba(20,184,166,0.04)']}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                style={StyleSheet.absoluteFillObject}
+              />
+              <View style={s.spBonusIconWrap}>
+                <Ionicons name="star" size={15} color="#14B8A6" style={{
+                  textShadowColor: '#14B8A6bb', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 8,
+                }} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={s.spBonusTitle}>Premium Bonus</Text>
+                <Text style={s.spBonusDesc}>
+                  {tierDiscountPct >= 20 ? `${tier} üyeliğinle %20 ekstra SP kazanıyorsun! 🎉`
+                    : tierDiscountPct >= 10 ? `${tier} üyeliğinle %10 ekstra SP kazanıyorsun! 🎉`
+                    : 'Plus ile %10, Pro ile %20 ekstra SP kazan'}
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={15} color="rgba(255,255,255,0.4)" />
+            </Pressable>
+
+            {spPacks.map((pack) => (
+              <SPPackRow
+                key={pack.id}
+                pack={pack}
+                onPress={() => {
+                  // ★ v109.3: Eski sp-store'a yönlendirme yerine doğrudan burada bilgilendirme.
+                  //   Google Play IAP henüz aktif değil; alpha sürüm boyunca kapalı.
+                  showToast({
+                    title: '🚧 Yakında',
+                    message: 'SP satın alma alfa sürüm süresince kapalı. Yakında Google Play üzerinden aktif olacak!',
+                    type: 'info',
+                  });
+                }}
+              />
+            ))}
           </View>
 
           {/* Koleksiyonlar */}
           <SectionDivider label="— KOLEKSİYONLAR · TÜM SEZON —" />
-          <ScrollView
-            horizontal showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ gap: 10, paddingHorizontal: 4, paddingVertical: 8 }}
-            style={{ marginHorizontal: -16 }}
-          >
-            {collections.map((col) => (
-              <CollectionCard
-                key={col.id}
-                col={col}
-                onPress={() => router.push(`/store/collection/${col.id}` as any)}
-              />
-            ))}
-          </ScrollView>
+          {catalogLoading && collections.length === 0 ? (
+            <SkeletonCollectionRow />
+          ) : (
+            <ScrollView
+              horizontal showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ gap: 10, paddingHorizontal: 4, paddingVertical: 8 }}
+              style={{ marginHorizontal: -16 }}
+            >
+              {collections.map((col) => (
+                <CollectionCard
+                  key={col.id}
+                  col={col}
+                  itemCount={items.filter((i) => i.collection_id === col.id).length}
+                  onPress={() => router.push(`/store/collection/${col.id}` as any)}
+                />
+              ))}
+            </ScrollView>
+          )}
         </ScrollView>
 
-        {/* Bottom bar — glassmorphism (BlurView + soft gradient) */}
+        {/* Bottom bar — glassmorphism (BlurView + soft gradient).
+            ★ v108.21: ŞIK YÜKLEME ayrı sp-store sayfası yerine sayfa içi
+            "Soprano Tezgâhı" bölümüne kaydırır (SP paketleri zaten orada). */}
         <View style={[s.bottomBar, { bottom: 12 + insets.bottom }]}>
           <BlurView intensity={32} tint="dark" style={StyleSheet.absoluteFillObject} />
           <LinearGradient
@@ -632,7 +1022,7 @@ export default function StoreScreen() {
             <Text style={s.bottomLabel}>SP PAKETLERİ</Text>
             <Text style={s.bottomAction}>Daha fazla SP edin</Text>
           </View>
-          <Pressable style={s.bottomCta} onPress={() => router.push('/sp-store')}>
+          <Pressable style={s.bottomCta} onPress={() => scrollToSection('sp')}>
             <LinearGradient
               colors={['#FFE082', '#FAC775', '#EF9F27']}
               start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
@@ -642,8 +1032,316 @@ export default function StoreScreen() {
           </Pressable>
         </View>
       </View>
+      {/* ★ v107 hotfix: Native Alert yerine premium tasarım onay diyaloğu */}
+      <PremiumAlert
+        visible={confirmAlert.visible}
+        title={confirmAlert.title}
+        message={confirmAlert.message}
+        type="warning"
+        icon="bag-handle"
+        buttons={confirmAlert.buttons}
+        onDismiss={() => setConfirmAlert(p => ({ ...p, visible: false }))}
+      />
+      {/* ★ v109.1: Satın alma başarı modalı (Applied.json Lottie) */}
+      <PurchaseSuccessModal
+        visible={successModal.visible}
+        title={successModal.title}
+        subtitle={successModal.subtitle}
+        accent={successModal.accent}
+        onClose={() => setSuccessModal(p => ({ ...p, visible: false }))}
+      />
+      {/* ★ v109.5: Ürün önizleme bottom sheet — Daily Deal banner tıklamasında ve
+           gelecekteki kart tıklamalarında kullanılır. Sheet'in "Satın Al" butonu
+           handlePurchase'i tetikler (mevcut PremiumAlert onay akışı). */}
+      <StoreItemPreviewSheet
+        visible={!!previewItem}
+        item={previewItem}
+        dailyDeal={dailyDeal}
+        tierDiscountPct={tierDiscountPct}
+        currentTier={(tier || 'Free') as any}
+        spBalance={sp}
+        owned={previewItem ? inventory.has(previewItem.id) : false}
+        purchasing={!!purchasing}
+        onClose={() => setPreviewItem(null)}
+        // ★ v109.5: Sheet'in "Satın Al"ı PremiumAlert atlayıp direkt purchase yapar.
+        //   Sheet ZATEN onaydır — fiyat, indirim, bakiye hep görünür. İkinci modal friction.
+        onPurchase={(it) => { setPreviewItem(null); executePurchase(it); }}
+        onUpgradeTier={() => router.push('/plus' as any)}
+      />
     </AppBackground>
   );
+}
+
+// ★ v108.21: Skeleton placeholder — veriler yüklenirken boş ekran yerine
+//   pulse animasyonlu kutucuk göster. Showcase (yatay) + Gallery (grid) varyantları.
+function SkeletonPulse({ children, style }: { children?: React.ReactNode; style?: any }) {
+  const opacity = useRef(new Animated.Value(0.4)).current;
+  useEffect(() => {
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(opacity, { toValue: 0.8, duration: 800, useNativeDriver: true }),
+      Animated.timing(opacity, { toValue: 0.4, duration: 800, useNativeDriver: true }),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, [opacity]);
+  return <Animated.View style={[style, { opacity }]}>{children}</Animated.View>;
+}
+
+function SkeletonCardInner() {
+  return (
+    <>
+      {/* art alanı placeholder dairesi */}
+      <View style={s.skelArt} />
+      {/* iki kısa çizgi (isim + fiyat) */}
+      <View style={s.skelLineLong} />
+      <View style={s.skelLineShort} />
+    </>
+  );
+}
+
+function SkeletonShowcaseRow() {
+  return (
+    <ScrollView
+      horizontal scrollEnabled={false}
+      contentContainerStyle={{ gap: 12, paddingHorizontal: 4, paddingVertical: 8 }}
+      style={{ marginHorizontal: -4 }}
+    >
+      {[0, 1, 2].map((i) => (
+        <SkeletonPulse key={i} style={[s.showcaseCard, s.skelCard]}>
+          <SkeletonCardInner />
+        </SkeletonPulse>
+      ))}
+    </ScrollView>
+  );
+}
+
+function SkeletonGalleryGrid() {
+  return (
+    <View style={s.galleryGrid}>
+      {[0, 1, 2, 3].map((i) => (
+        <SkeletonPulse key={i} style={[s.galleryCard, s.skelCard]}>
+          <SkeletonCardInner />
+        </SkeletonPulse>
+      ))}
+    </View>
+  );
+}
+
+function SkeletonCollectionRow() {
+  return (
+    <ScrollView
+      horizontal scrollEnabled={false}
+      contentContainerStyle={{ gap: 10, paddingHorizontal: 4, paddingVertical: 8 }}
+      style={{ marginHorizontal: -16 }}
+    >
+      {[0, 1, 2].map((i) => (
+        <SkeletonPulse key={i} style={[s.collectionCard, s.skelCard]}>
+          <SkeletonCardInner />
+        </SkeletonPulse>
+      ))}
+    </ScrollView>
+  );
+}
+
+// ★ v108.21: GÜNÜN FIRSATI banner — daily deal var + dealItem yüklü + henüz satın alınmamış
+function DailyDealBanner({
+  dailyDeal, items, inventory, tierDiscountPct, onPress,
+}: {
+  dailyDeal: DailyDeal | null;
+  items: CosmeticItem[];
+  inventory: Set<string>;
+  tierDiscountPct: number;
+  onPress: (item: CosmeticItem) => void;
+}) {
+  if (!dailyDeal) return null;
+  const dealItem = items.find((i) => i.id === dailyDeal.item_id);
+  if (!dealItem) return null;
+  // ★ v109.2: Sahip olsa bile banner kalır — flicker önlenir, kullanıcı kaçırmadığını bilir.
+  //   Tıklanırsa "Zaten sahipsin" toast'ı çıkar (handlePurchase guard'ı zaten var).
+  const isOwned = inventory.has(dealItem.id);
+
+  const totalOff = Math.min(tierDiscountPct + dailyDeal.extra_discount_pct, 80);
+  const finalPrice = Math.round(dealItem.price_sp * (100 - totalOff) / 100);
+
+  return (
+    <Pressable onPress={() => onPress(dealItem)} style={s.dailyDealBanner}>
+      <LinearGradient
+        colors={isOwned
+          ? ['#475569', '#1E293B', '#0A0F1A'] as [string, string, string]
+          : ['#F472B6', '#831843', '#0A0F1A'] as [string, string, string]}
+        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+        style={StyleSheet.absoluteFillObject}
+      />
+      <ShimmerOverlay duration={4500} />
+      <View style={s.dailyDealLeft}>
+        <Text style={s.dailyDealKicker}>
+          {isOwned ? '✓ SAHİPSİN' : '⚡ GÜNÜN FIRSATI'}
+        </Text>
+        <Text style={s.dailyDealItemName}>{dealItem.name}</Text>
+        {dailyDeal.banner_text ? (
+          <Text style={s.dailyDealSubtitle} numberOfLines={2}>
+            {isOwned ? 'Bu ürün zaten envanterinde · iyi tercih!' : dailyDeal.banner_text}
+          </Text>
+        ) : null}
+        {!isOwned ? (
+          <View style={s.dailyDealPriceRow}>
+            <Text style={s.dailyDealStrike}>{dealItem.price_sp.toLocaleString('tr-TR')}</Text>
+            <Text style={s.dailyDealFinal}>{finalPrice.toLocaleString('tr-TR')}</Text>
+            <Text style={s.dailyDealUnit}>SP</Text>
+            <View style={s.dailyDealOff}>
+              <Text style={s.dailyDealOffText}>-%{totalOff}</Text>
+            </View>
+          </View>
+        ) : null}
+      </View>
+      <View style={s.dailyDealRight}>
+        {isOwned ? (
+          <View style={[s.dailyDealArrow, { backgroundColor: 'rgba(93,202,165,0.18)', borderColor: 'rgba(93,202,165,0.4)' }]}>
+            <Ionicons name="checkmark" size={16} color="#5DCAA5" />
+          </View>
+        ) : (
+          <>
+            <DailyDealCountdown />
+            <View style={s.dailyDealArrow}>
+              <Ionicons name="arrow-forward" size={16} color="#fff" />
+            </View>
+          </>
+        )}
+      </View>
+    </Pressable>
+  );
+}
+
+// ★ v108.21: Daily deal countdown — gece yarısına kadar kalan saat:dk
+function DailyDealCountdown() {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(id);
+  }, []);
+  const today = new Date(now);
+  const midnight = new Date(today);
+  midnight.setHours(24, 0, 0, 0);
+  const ms = Math.max(0, midnight.getTime() - now);
+  const totalMin = Math.floor(ms / 60_000);
+  const hh = Math.floor(totalMin / 60);
+  const mm = totalMin % 60;
+  return (
+    <View style={s.dailyDealCountdown}>
+      <Ionicons name="time" size={11} color="#fff" />
+      <Text style={s.dailyDealCountdownText}>
+        {String(hh).padStart(2, '0')}:{String(mm).padStart(2, '0')}
+      </Text>
+    </View>
+  );
+}
+
+// ★ v108.21: Limited edition rozetleri — countdown + stok + yeni
+function getLimitedInfo(item: CosmeticItem): {
+  isLimited: boolean;
+  isExpired: boolean;
+  isSoldOut: boolean;
+  isNew: boolean;
+  daysLeft: number | null;
+  remainingStock: number | null;
+} {
+  const now = Date.now();
+  const expiresAt = item.available_until ? new Date(item.available_until).getTime() : null;
+  const launchedAt = item.launched_at ? new Date(item.launched_at).getTime() : null;
+  const daysLeft = expiresAt ? Math.max(0, Math.ceil((expiresAt - now) / (1000 * 60 * 60 * 24))) : null;
+  const remainingStock = item.max_supply != null ? Math.max(0, item.max_supply - (item.sold_count || 0)) : null;
+  const isExpired = !!(expiresAt && expiresAt < now);
+  const isSoldOut = !!(remainingStock !== null && remainingStock === 0);
+  const isLimited = expiresAt !== null || item.max_supply !== null;
+  const isNew = !!(launchedAt && (now - launchedAt) < 7 * 24 * 60 * 60 * 1000);
+  return { isLimited, isExpired, isSoldOut, isNew, daysLeft, remainingStock };
+}
+
+// ★ v109.2: Plus/Pro üyelik gerektiren ürünler için kilit rozeti
+function TierLockBadge({ tier, offsetTop = 8, alignRight }: {
+  tier: 'Plus' | 'Pro' | 'GodMaster' | 'Free';
+  offsetTop?: number;
+  alignRight?: boolean;
+}) {
+  const tierColors: Record<string, [string, string]> = {
+    Plus: ['#14B8A6', '#0E7490'],
+    Pro: ['#FBBF24', '#854F0B'],
+    GodMaster: ['#F472B6', '#831843'],
+    Free: ['#94A3B8', '#475569'],
+  };
+  const colors = tierColors[tier] || tierColors.Plus;
+  return (
+    <View style={[s.tierLockBadge, {
+      top: offsetTop,
+      ...(alignRight ? { right: 8 } : { left: 8 }),
+    }]}>
+      <LinearGradient
+        colors={colors}
+        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+        style={StyleSheet.absoluteFillObject}
+      />
+      <Ionicons name="lock-closed" size={9} color="#fff" style={{ marginRight: 3 }} />
+      <Text style={s.tierLockBadgeText}>{tier.toUpperCase()}</Text>
+    </View>
+  );
+}
+
+function LimitedBadge({ item, offsetTop = 8 }: { item: CosmeticItem; offsetTop?: number }) {
+  const info = getLimitedInfo(item);
+  if (!info.isLimited && !info.isNew) return null;
+  if (info.isExpired || info.isSoldOut) {
+    return (
+      <View style={[s.limitedBadge, { top: offsetTop }]}>
+        <LinearGradient
+          colors={['#9CA3AF', '#4B5563']}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFillObject}
+        />
+        <Text style={s.limitedBadgeText}>{info.isSoldOut ? 'TÜKENDİ' : 'SÜRE DOLDU'}</Text>
+      </View>
+    );
+  }
+  if (info.daysLeft !== null) {
+    const urgent = info.daysLeft <= 3;
+    return (
+      <View style={[s.limitedBadge, { top: offsetTop }]}>
+        <LinearGradient
+          colors={urgent ? ['#EF4444', '#991B1B'] : ['#F472B6', '#831843']}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFillObject}
+        />
+        <Ionicons name="hourglass" size={9} color="#fff" style={{ marginRight: 3 }} />
+        <Text style={s.limitedBadgeText}>{info.daysLeft}G KALDI</Text>
+      </View>
+    );
+  }
+  if (info.remainingStock !== null) {
+    const urgent = info.remainingStock <= 10;
+    return (
+      <View style={[s.limitedBadge, { top: offsetTop }]}>
+        <LinearGradient
+          colors={urgent ? ['#EF4444', '#991B1B'] : ['#FBBF24', '#854F0B']}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFillObject}
+        />
+        <Ionicons name="flame" size={9} color="#fff" style={{ marginRight: 3 }} />
+        <Text style={s.limitedBadgeText}>{info.remainingStock} ADET</Text>
+      </View>
+    );
+  }
+  if (info.isNew) {
+    return (
+      <View style={[s.limitedBadge, { top: offsetTop }]}>
+        <LinearGradient
+          colors={['#22D3EE', '#0E7490']}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFillObject}
+        />
+        <Text style={s.limitedBadgeText}>YENİ</Text>
+      </View>
+    );
+  }
+  return null;
 }
 
 function SectionDivider({ label }: { label: string }) {
@@ -656,13 +1354,18 @@ function SectionDivider({ label }: { label: string }) {
   );
 }
 
-function ShowcaseCard({ item, owned, purchasing, onPress }: {
+function ShowcaseCard({ item, owned, purchasing, onPress, discountPct = 0, wished, onWishToggle }: {
   item: CosmeticItem; owned: boolean; purchasing: boolean; onPress: () => void;
+  discountPct?: number;
+  wished?: boolean;
+  onWishToggle?: () => void;
 }) {
   const rarity = (item.rarity as Rarity) || 'rare';
   const rarityColor = RARITY_COLOR[rarity];
   const bgGradient = [item.bg_gradient_start, item.bg_gradient_mid, item.bg_gradient_end].filter(Boolean) as string[];
   const fullCard = isFullCardItem(item.id);
+  // ★ v108: Lottie öncelikli — frame/gift Lottie varsa PNG yerine onu göster.
+  const lottieSrc = LottieView ? lottieFor(item.id) : null;
   return (
     <Pressable
       onPress={onPress}
@@ -676,27 +1379,38 @@ function ShowcaseCard({ item, owned, purchasing, onPress }: {
         }),
       }]}
     >
-      {/* Full-card item ise WebView kartın tüm zeminini kapsar (frame bg + rays HTML içinde) */}
-      {fullCard ? (
-        <Item3DArt itemId={item.id} fullSize />
-      ) : (
-        <>
-          <LinearGradient
-            colors={(bgGradient.length >= 2 ? bgGradient : ['#1a1330', '#2D1B4E', '#0a0a1a']) as any}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-            style={StyleSheet.absoluteFillObject}
-          />
-          {/* ★ v107 hotfix: 3D illustration'lı ürünlerde dairesel halo yok — illustration kendi
-              drop-shadow'unu taşır, ek halka double-vision yaratıyordu. */}
-          {item.bg_radial && !getIllustrationHtml(item.id) && (
-            <View pointerEvents="none" style={[s.showcaseRadial, { backgroundColor: item.bg_radial }]} />
-          )}
-        </>
+      {/* Koyu zemin + rarity tint */}
+      <View style={[StyleSheet.absoluteFillObject, { backgroundColor: '#0A0F1A' }]} />
+      <LinearGradient
+        colors={[rarityColor + '1F', 'transparent']}
+        start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 0.7 }}
+        style={StyleSheet.absoluteFillObject}
+      />
+      {fullCard && !lottieSrc && (
+        <Item3DArt itemId={item.id} fullSize color={item.art_color || undefined} />
       )}
       <View style={[s.rareTag, { borderColor: rarityColor + '80' }]}>
         <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFillObject} />
         <Text style={[s.rareTagText, { color: rarityColor }]}>{RARITY_LABEL[rarity]}</Text>
       </View>
+      {!owned && <LimitedBadge item={item} offsetTop={36} />}
+      {!owned && item.min_tier && item.min_tier !== 'Free' && (
+        <TierLockBadge tier={item.min_tier} offsetTop={36} alignRight />
+      )}
+      {!owned && onWishToggle && (
+        <Pressable
+          onPress={(e) => { e.stopPropagation(); onWishToggle(); }}
+          hitSlop={10}
+          style={s.wishlistBtn}
+        >
+          <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFillObject} />
+          <Ionicons
+            name={wished ? 'heart' : 'heart-outline'}
+            size={14}
+            color={wished ? '#F472B6' : 'rgba(255,255,255,0.85)'}
+          />
+        </Pressable>
+      )}
       {owned && (
         <View style={s.ownedBadge}>
           <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFillObject} />
@@ -704,17 +1418,24 @@ function ShowcaseCard({ item, owned, purchasing, onPress }: {
           <Text style={s.ownedBadgeText}>SAHİPSİN</Text>
         </View>
       )}
-      {/* Native SoftHalo SADECE emoji ürünlerde — 3D illustration kendi drop-shadow'unu taşır */}
-      {!getIllustrationHtml(item.id) && (
-        <View pointerEvents="none" style={{ position: 'absolute', top: '20%', left: '20%', right: '20%', height: '60%' }}>
-          <SoftHalo color={item.art_color || '#fff'} size={140} opacity={0.3} />
-        </View>
-      )}
-      {/* Full-card item ise yukarıda WebView kart-genişliği render ediliyor; orta art skip */}
-      {!fullCard && (
+      {/* ★ v108: Lottie öncelikli — frame/gift Lottie varsa kart art alanında oynat
+          ★ v110.12 (8 May 2026): SopranoAura-tarzı halka frame'ler 90px, diğerleri 125px */}
+      {lottieSrc ? (
         <View style={s.showcaseArtWrap}>
-          {getIllustrationHtml(item.id) ? (
-            <Item3DArt itemId={item.id} size={110} />
+          <View style={{ width: storeLottieSize(item.id), height: storeLottieSize(item.id) }}>
+            <LottieView
+              source={lottieSrc}
+              autoPlay
+              loop
+              resizeMode="contain"
+              style={{ width: '100%', height: '100%' }}
+            />
+          </View>
+        </View>
+      ) : !fullCard && (
+        <View style={s.showcaseArtWrap}>
+          {hasIllustration(item.id) ? (
+            <Item3DArt itemId={item.id} size={110} color={item.art_color || undefined} />
           ) : (
             <ShowcaseArtAnimated emoji={item.art_emoji || '✦'} color={item.art_color || '#fff'} />
           )}
@@ -730,7 +1451,126 @@ function ShowcaseCard({ item, owned, purchasing, onPress }: {
         <Text style={s.showcaseName}>{item.name}</Text>
         {item.meta && <Text style={s.showcaseMeta}>{item.meta}</Text>}
         <View style={s.showcasePrice}>
-          <Text style={s.showcasePriceNum}>{item.price_sp.toLocaleString('tr-TR')}</Text>
+          {discountPct > 0 ? (
+            <>
+              <Text style={s.showcasePriceStrike}>{item.price_sp.toLocaleString('tr-TR')}</Text>
+              <Text style={[s.showcasePriceNum, { color: '#22D3EE' }]}>
+                {Math.round(item.price_sp * (100 - discountPct) / 100).toLocaleString('tr-TR')}
+              </Text>
+              <Text style={s.showcasePriceUnit}>SP</Text>
+              <Text style={s.discountChip}>-%{discountPct}</Text>
+            </>
+          ) : (
+            <>
+              <Text style={s.showcasePriceNum}>{item.price_sp.toLocaleString('tr-TR')}</Text>
+              <Text style={s.showcasePriceUnit}>SP</Text>
+            </>
+          )}
+        </View>
+      </View>
+    </Pressable>
+  );
+}
+
+// ★ v108.21: Bundle paketi kartı — yatay scroll, set parça önizleme + total indirim badge
+function BundleCard({ bundle, items, owned, purchasing, tierDiscountPct, onPress }: {
+  bundle: CosmeticBundle;
+  items: CosmeticItem[];
+  owned: boolean;
+  purchasing: boolean;
+  tierDiscountPct: number;
+  onPress: () => void;
+}) {
+  const totalDiscount = Math.min(bundle.discount_pct + tierDiscountPct, 80);
+  const finalPrice = Math.round(bundle.total_price_sp * (100 - totalDiscount) / 100);
+  const rarity = (bundle.rarity as Rarity) || 'legendary';
+  const rarityColor = RARITY_COLOR[rarity];
+  const bundleItems = bundle.item_ids
+    .map((id) => items.find((i) => i.id === id))
+    .filter(Boolean) as CosmeticItem[];
+
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={purchasing || owned}
+      style={[s.showcaseCard, {
+        borderColor: rarityColor + '80',
+        opacity: purchasing ? 0.6 : 1,
+        ...Platform.select({
+          ios: { shadowColor: rarityColor, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.4, shadowRadius: 14 },
+          android: {},
+        }),
+      }]}
+    >
+      <View style={[StyleSheet.absoluteFillObject, { backgroundColor: '#0A0F1A' }]} />
+      <LinearGradient
+        colors={[bundle.bg_gradient_start || rarityColor + '33', bundle.bg_gradient_end || '#0A0F1A']}
+        start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
+        style={StyleSheet.absoluteFillObject}
+      />
+      <ShimmerOverlay duration={5500} />
+
+      {/* Discount big badge */}
+      <View style={s.bundleDiscountBadge}>
+        <LinearGradient
+          colors={['#22D3EE', '#0E7490']}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFillObject}
+        />
+        <Text style={s.bundleDiscountBadgeText}>-%{totalDiscount}</Text>
+      </View>
+
+      {owned && (
+        <View style={s.ownedBadge}>
+          <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFillObject} />
+          <Ionicons name="checkmark-circle" size={11} color="#5DCAA5" />
+          <Text style={s.ownedBadgeText}>SAHİPSİN</Text>
+        </View>
+      )}
+
+      {/* Mini avatars row — set parça vitrini */}
+      <View style={s.bundleItemsRow}>
+        {bundleItems.slice(0, 3).map((it, idx) => {
+          const lottieSrc = LottieView ? lottieFor(it.id) : null;
+          return (
+            <View
+              key={it.id}
+              style={[
+                s.bundleItemMini,
+                {
+                  borderColor: rarityColor + '66',
+                  marginLeft: idx === 0 ? 0 : -16,
+                  zIndex: 10 - idx,
+                },
+              ]}
+            >
+              {lottieSrc ? (
+                <LottieView source={lottieSrc} autoPlay loop resizeMode="contain" style={{ width: '110%', height: '110%' }} />
+              ) : (
+                <Text style={{ fontSize: 28, color: it.art_color || '#fff' }}>{it.art_emoji || '✦'}</Text>
+              )}
+            </View>
+          );
+        })}
+        {bundleItems.length > 3 && (
+          <View style={[s.bundleItemMini, { marginLeft: -16, zIndex: 0, alignItems: 'center', justifyContent: 'center' }]}>
+            <Text style={{ color: '#fff', fontWeight: '800', fontSize: 14 }}>+{bundleItems.length - 3}</Text>
+          </View>
+        )}
+      </View>
+
+      <View style={s.showcaseInfo}>
+        <LinearGradient
+          colors={['transparent', 'rgba(0,0,0,0.85)', 'rgba(0,0,0,0.95)']}
+          locations={[0, 0.4, 1]}
+          start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
+          style={StyleSheet.absoluteFillObject}
+        />
+        <Text style={s.showcaseName}>{bundle.name}</Text>
+        {bundle.tagline && <Text style={s.showcaseMeta}>{bundle.tagline}</Text>}
+        <View style={s.showcasePrice}>
+          <Text style={s.showcasePriceStrike}>{bundle.total_price_sp.toLocaleString('tr-TR')}</Text>
+          <Text style={[s.showcasePriceNum, { color: '#22D3EE' }]}>{finalPrice.toLocaleString('tr-TR')}</Text>
           <Text style={s.showcasePriceUnit}>SP</Text>
         </View>
       </View>
@@ -738,8 +1578,11 @@ function ShowcaseCard({ item, owned, purchasing, onPress }: {
   );
 }
 
-function GalleryCard({ item, owned, onPress }: {
+export function GalleryCard({ item, owned, onPress, discountPct = 0, wished, onWishToggle }: {
   item: CosmeticItem; owned: boolean; onPress: () => void;
+  discountPct?: number;
+  wished?: boolean;
+  onWishToggle?: () => void;
 }) {
   const rarity = (item.rarity as Rarity) || 'rare';
   const rarityColor = RARITY_COLOR[rarity];
@@ -749,6 +1592,8 @@ function GalleryCard({ item, owned, onPress }: {
   //   kenarlarda boş alan oluşuyordu. Featured = sağda büyük art + solda info eski layout'una dön.
   //   Normal kartlarda fullCard aktif (kart-kenarına yayılan luxury frame).
   const fullCard = isFullCardItem(item.id) && !featured;
+  // ★ v108: Lottie öncelikli — Lottie varsa PNG/emoji yerine onu göster.
+  const lottieSrc = LottieView ? lottieFor(item.id) : null;
   return (
     <Pressable
       onPress={onPress}
@@ -758,19 +1603,15 @@ function GalleryCard({ item, owned, onPress }: {
         { borderColor: featured ? rarityColor + '4D' : 'rgba(255,255,255,0.06)' },
       ]}
     >
-      {fullCard ? (
-        <Item3DArt itemId={item.id} fullSize />
-      ) : (
-        <>
-          <LinearGradient
-            colors={(bgGradient.length >= 2 ? bgGradient : ['#1a1330', '#2D1B4E']) as any}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-            style={StyleSheet.absoluteFillObject}
-          />
-          {item.bg_radial && !getIllustrationHtml(item.id) && (
-            <View pointerEvents="none" style={[s.galleryRadial, { backgroundColor: item.bg_radial }]} />
-          )}
-        </>
+      {/* Koyu zemin + rarity tint */}
+      <View style={[StyleSheet.absoluteFillObject, { backgroundColor: '#0A0F1A' }]} />
+      <LinearGradient
+        colors={[rarityColor + '1F', 'transparent']}
+        start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 0.7 }}
+        style={StyleSheet.absoluteFillObject}
+      />
+      {fullCard && !lottieSrc && (
+        <Item3DArt itemId={item.id} fullSize color={item.art_color || undefined} />
       )}
       <View style={[s.rareDot, {
         backgroundColor: rarityColor,
@@ -779,6 +1620,24 @@ function GalleryCard({ item, owned, onPress }: {
           android: {},
         }),
       }]} />
+      {!owned && <LimitedBadge item={item} />}
+      {!owned && item.min_tier && item.min_tier !== 'Free' && (
+        <TierLockBadge tier={item.min_tier} offsetTop={8} alignRight />
+      )}
+      {!owned && onWishToggle && (
+        <Pressable
+          onPress={(e) => { e.stopPropagation(); onWishToggle(); }}
+          hitSlop={10}
+          style={s.wishlistBtn}
+        >
+          <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFillObject} />
+          <Ionicons
+            name={wished ? 'heart' : 'heart-outline'}
+            size={14}
+            color={wished ? '#F472B6' : 'rgba(255,255,255,0.85)'}
+          />
+        </Pressable>
+      )}
       {owned && (
         <View style={[s.ownedBadge, { top: 8, left: 8, right: 'auto' }]}>
           <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFillObject} />
@@ -786,27 +1645,37 @@ function GalleryCard({ item, owned, onPress }: {
           <Text style={[s.ownedBadgeText, { fontSize: 7 }]}>SAHİP</Text>
         </View>
       )}
-      {/* Native halo SADECE illustration olmayanlarda (3D HTML kendi drop-shadow'u taşır) */}
-      {!getIllustrationHtml(item.id) && (
-        <View pointerEvents="none" style={{
-          position: 'absolute',
-          top: '20%',
-          left: featured ? '50%' : '20%',
-          right: featured ? 'auto' : '20%',
-          width: featured ? '40%' : undefined,
-          height: featured ? '60%' : '50%',
-        }}>
-          <SoftHalo color={item.art_color || '#fff'} size={featured ? 110 : 80} opacity={0.28} />
-        </View>
-      )}
-      {!fullCard && getIllustrationHtml(item.id) ? (
+      {/* ★ v108: Lottie öncelikli — varsa PNG/emoji yerine animasyon göster
+          ★ v110.12: SopranoAura-tarzı halka frame'ler daha küçük inset ile */}
+      {lottieSrc ? (() => {
+          const isRing = storeLottieSize(item.id) < 125;
+          return (
+            <View style={[
+              { position: 'absolute', alignItems: 'center', justifyContent: 'center' },
+              featured
+                ? { top: '10%', left: '50%', width: '45%', height: '80%' }
+                : isRing
+                  ? { top: '18%', left: '18%', right: '18%', height: '55%' }
+                  : { top: '8%', left: '8%', right: '8%', height: '70%' },
+            ]}>
+              <LottieView
+                source={lottieSrc}
+                autoPlay
+                loop
+                resizeMode="contain"
+                style={{ width: '100%', height: '100%' }}
+              />
+            </View>
+          );
+        })()
+      : !fullCard && hasIllustration(item.id) ? (
         <View style={[
           { position: 'absolute', alignItems: 'center', justifyContent: 'center' },
           featured
             ? { top: '15%', left: '55%', width: '40%', height: '70%' }
             : { top: '15%', left: '15%', right: '15%', height: '60%' },
         ]}>
-          <Item3DArt itemId={item.id} size={featured ? 110 : 70} />
+          <Item3DArt itemId={item.id} size={featured ? 110 : 70} color={item.art_color || undefined} />
         </View>
       ) : !fullCard ? (
         <Text style={[s.galleryArt, featured && s.galleryArtFeatured, {
@@ -829,8 +1698,18 @@ function GalleryCard({ item, owned, onPress }: {
         <Text style={[s.galleryName, featured && s.galleryNameFeatured]}>{item.name}</Text>
         {item.tagline && <Text style={s.galleryTagline}>{item.tagline}</Text>}
         <View style={s.galleryPriceRow}>
-          <Text style={[s.galleryPrice, featured && { fontSize: 16 }]}>✦ {item.price_sp}</Text>
-          {item.per_message && <Text style={s.galleryPriceUnit}>SP / mesaj</Text>}
+          {discountPct > 0 ? (
+            <>
+              <Text style={[s.galleryPriceStrike, featured && { fontSize: 12 }]}>✦ {item.price_sp}</Text>
+              <Text style={[s.galleryPrice, featured && { fontSize: 16 }, { color: '#22D3EE' }]}>
+                ✦ {Math.round(item.price_sp * (100 - discountPct) / 100)}
+              </Text>
+              <Text style={s.discountChip}>-%{discountPct}</Text>
+            </>
+          ) : (
+            <Text style={[s.galleryPrice, featured && { fontSize: 16 }]}>✦ {item.price_sp}</Text>
+          )}
+          {item.per_message && <Text style={s.galleryPriceUnit}>SP · sınırsız</Text>}
         </View>
       </View>
     </Pressable>
@@ -888,13 +1767,13 @@ function SPPackRow({ pack, onPress }: { pack: SPPack; onPress: () => void }) {
           <Text style={s.spPackAmount}>{pack.amount.toLocaleString('tr-TR')}</Text>
           <Text style={s.spPackAmountUnit}>SP</Text>
         </View>
-        {pack.bonusPct && (
+        {pack.bonusPct ? (
           <View style={[s.spPackBonus, { backgroundColor: pack.tierColor + '26' }]}>
             <Text style={[s.spPackBonusText, { color: pack.tierColor }]}>
               + %{pack.bonusPct} LÜTUF{pack.bonusAmount ? ` · ${pack.bonusAmount.toLocaleString('tr-TR')} SP` : ''}
             </Text>
           </View>
-        )}
+        ) : null}
       </View>
       <View style={{ alignItems: 'flex-end', gap: 6 }}>
         <Text style={s.spPackFiat}>{pack.fiat}</Text>
@@ -911,37 +1790,49 @@ function SPPackRow({ pack, onPress }: { pack: SPPack; onPress: () => void }) {
   );
 }
 
-function CollectionCard({ col, onPress }: { col: Collection; onPress?: () => void }) {
+function CollectionCard({ col, onPress, itemCount }: {
+  col: Collection;
+  onPress?: () => void;
+  itemCount: number;
+}) {
   const bgGradient = [col.bg_gradient_start, col.bg_gradient_end].filter(Boolean) as string[];
   const nameLines = col.name.split(' ');
   const displayName = nameLines.length > 1
     ? nameLines[0] + '\n' + nameLines.slice(1).join(' ')
     : col.name;
+  // ★ v108.21: DB tag yanıltıcıydı ("8 PARÇA" yazılıyor ama 4 item var). Gerçek
+  //   itemCount baz alınır; sadece "SINIRLI" gibi özel etiketler korunur.
+  const isSpecialTag = col.tag && !/parça/i.test(col.tag);
+  const displayTag = isSpecialTag ? col.tag : `${itemCount} PARÇA`;
   return (
     <Pressable style={s.collectionCard} onPress={onPress}>
-      {/* ★ v107 hotfix: koleksiyonlar da luxury frame ile sarılı geliyor — kart kenarına yay. */}
+      {/* ★ v107 hotfix: Düz koyu zemin + col.art_color üstten abartısız ışık */}
       {isFullCardItem(col.id) ? (
-        <Item3DArt itemId={col.id} fullSize />
+        <Item3DArt itemId={col.id} fullSize color={col.art_color || undefined} />
       ) : (
-        <LinearGradient
-          colors={(bgGradient.length >= 2 ? bgGradient : ['#1a1330', '#2D1B4E']) as any}
-          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-          style={StyleSheet.absoluteFillObject}
-        />
+        <>
+          <View style={[StyleSheet.absoluteFillObject, { backgroundColor: '#0A0F1A' }]} />
+          <LinearGradient
+            colors={[(col.art_color || '#94A3B8') + '1A', 'transparent']}
+            start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 0.7 }}
+            style={StyleSheet.absoluteFillObject}
+          />
+        </>
       )}
-      {col.tag && (
+      {itemCount > 0 ? (
         <View style={s.collectionTag}>
           <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFillObject} />
-          <Text style={s.collectionTagText}>{col.tag}</Text>
+          <Text style={s.collectionTagText}>{displayTag}</Text>
         </View>
-      )}
-      {/* Native halo SADECE illustration olmayanlarda */}
-      {!getIllustrationHtml(col.id) && (
-        <View pointerEvents="none" style={{ position: 'absolute', top: '15%', left: '15%', right: '15%', height: '50%' }}>
-          <SoftHalo color={col.art_color || '#fff'} size={110} opacity={0.25} />
+      ) : null}
+      {/* ★ v108.21: PNG asset'i varsa Item3DArt göster, yoksa emoji.
+           Önceden sadece !hasIllustration koşulunda emoji render ediliyordu;
+           PNG kolu yoktu → kart boş görünüyordu. */}
+      {hasIllustration(col.id) ? (
+        <View pointerEvents="none" style={s.collectionArtWrap}>
+          <Item3DArt itemId={col.id} size={68} color={col.art_color || undefined} />
         </View>
-      )}
-      {!getIllustrationHtml(col.id) && (
+      ) : (
         <Text style={[s.collectionArt, {
           color: col.art_color || '#fff',
           textShadowColor: col.art_color || '#fff',
@@ -976,13 +1867,87 @@ const s = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.4)', overflow: 'hidden',
   },
   balanceNum: { color: '#FFE082', fontSize: 13, fontWeight: '800', fontFamily: serif, letterSpacing: 0.5 },
+  searchRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12,
+  },
+  // ★ v108.21: GÜNÜN FIRSATI banner — sticky FOMO at top
+  dailyDealBanner: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 14, paddingVertical: 14, borderRadius: 18,
+    borderWidth: 0.5, borderColor: 'rgba(244,114,182,0.45)',
+    marginBottom: 12, overflow: 'hidden', minHeight: 92,
+  },
+  dailyDealLeft: { flex: 1, gap: 3 },
+  dailyDealKicker: {
+    color: '#FCE7F3', fontSize: 9, fontWeight: '800', letterSpacing: 1.5,
+    textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
+  },
+  dailyDealItemName: {
+    color: '#fff', fontFamily: serif, fontSize: 16, fontWeight: '700',
+    textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
+  },
+  dailyDealSubtitle: {
+    color: 'rgba(255,255,255,0.7)', fontSize: 10, fontStyle: 'italic',
+    marginBottom: 4, maxWidth: '95%',
+  },
+  dailyDealPriceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 5, marginTop: 2 },
+  dailyDealStrike: {
+    color: 'rgba(255,255,255,0.55)', fontSize: 11, fontWeight: '600',
+    textDecorationLine: 'line-through', fontFamily: serif,
+  },
+  dailyDealFinal: { color: '#FFE082', fontSize: 18, fontWeight: '800', fontFamily: serif },
+  dailyDealUnit: { color: 'rgba(255,224,130,0.75)', fontSize: 9, fontWeight: '700' },
+  dailyDealOff: {
+    paddingHorizontal: 6, paddingVertical: 2, borderRadius: 100,
+    backgroundColor: 'rgba(0,0,0,0.4)', borderWidth: 0.5, borderColor: 'rgba(255,224,130,0.35)',
+    marginLeft: 4,
+  },
+  dailyDealOffText: { color: '#FFE082', fontSize: 9, fontWeight: '800' },
+  dailyDealRight: { alignItems: 'center', gap: 8, marginLeft: 8 },
+  dailyDealCountdown: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 8, paddingVertical: 4, borderRadius: 100,
+    backgroundColor: 'rgba(0,0,0,0.5)', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.2)',
+  },
+  dailyDealCountdownText: { color: '#fff', fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
+  dailyDealArrow: {
+    width: 28, height: 28, borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.18)', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.3)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  tierDiscountBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingHorizontal: 14, paddingVertical: 10, borderRadius: 14,
+    borderWidth: 0.5, borderColor: 'rgba(34,211,238,0.35)',
+    marginBottom: 12, overflow: 'hidden',
+  },
+  tierDiscountText: {
+    flex: 1, color: 'rgba(255,255,255,0.85)', fontSize: 11, fontWeight: '600', letterSpacing: 0.2,
+  },
   search: {
+    flex: 1,
     flexDirection: 'row', alignItems: 'center', gap: 10,
     backgroundColor: 'rgba(0,0,0,0.4)', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.08)',
-    borderRadius: 100, paddingHorizontal: 14, paddingVertical: 9, marginBottom: 12,
+    borderRadius: 100, paddingHorizontal: 14, paddingVertical: 9,
+  },
+  searchInput: {
+    flex: 1, color: '#fff', fontSize: 12, padding: 0,
+    fontFamily: Platform.OS === 'ios' ? undefined : 'sans-serif',
   },
   searchText: { color: 'rgba(255,255,255,0.4)', fontSize: 12, flex: 1 },
+  sortBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    paddingHorizontal: 11, paddingVertical: 9,
+    backgroundColor: 'rgba(251,191,36,0.08)',
+    borderWidth: 0.5, borderColor: 'rgba(251,191,36,0.3)',
+    borderRadius: 100,
+  },
+  sortBtnText: {
+    color: '#FBBF24', fontSize: 10, fontWeight: '700',
+    letterSpacing: 0.5, textTransform: 'uppercase',
+  },
   catPill: {
+    flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: 14, paddingVertical: 7, borderRadius: 100,
     backgroundColor: 'rgba(255,255,255,0.04)', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.06)',
   },
@@ -1017,7 +1982,7 @@ const s = StyleSheet.create({
   sectionTitle: { color: '#fff', fontFamily: serif, fontSize: 18, fontWeight: '700', textAlign: 'center', marginBottom: 4 },
   sectionSub: { color: 'rgba(255,255,255,0.5)', fontSize: 11, fontStyle: 'italic', textAlign: 'center', marginBottom: 10 },
 
-  showcaseCard: { width: 180, height: 240, borderRadius: 18, borderWidth: 0.5, overflow: 'hidden' },
+  showcaseCard: { width: 158, height: 212, borderRadius: 16, borderWidth: 0.5, overflow: 'hidden' },
   showcaseRadial: {
     position: 'absolute', top: '20%', left: '20%', right: '20%', height: '60%',
     borderRadius: 100, opacity: 0.7,
@@ -1036,7 +2001,58 @@ const s = StyleSheet.create({
     overflow: 'hidden',
   },
   ownedBadgeText: { fontSize: 8, fontWeight: '800', letterSpacing: 1, color: '#5DCAA5' },
-  showcaseArtWrap: { position: 'absolute', top: '25%', left: 0, right: 0, alignItems: 'center' },
+  // ★ v108.21: Wishlist heart — bottom-right, blur backdrop
+  wishlistBtn: {
+    position: 'absolute', top: 8, right: 8, zIndex: 4,
+    width: 28, height: 28, borderRadius: 14,
+    alignItems: 'center', justifyContent: 'center',
+    overflow: 'hidden',
+    borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.15)',
+  },
+  // ★ v108.21: Limited edition badge — top-left, FOMO indicator
+  limitedBadge: {
+    position: 'absolute', top: 8, left: 8, zIndex: 4,
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 8, paddingVertical: 4,
+    borderRadius: 100, overflow: 'hidden',
+  },
+  limitedBadgeText: {
+    color: '#fff', fontSize: 8, fontWeight: '800', letterSpacing: 1,
+  },
+  // ★ v109.2: Tier-lock badge — Plus/Pro üyelik kilidi
+  tierLockBadge: {
+    position: 'absolute', zIndex: 4,
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 7, paddingVertical: 4,
+    borderRadius: 100, overflow: 'hidden',
+  },
+  tierLockBadgeText: {
+    color: '#fff', fontSize: 8, fontWeight: '800', letterSpacing: 1,
+  },
+  showcaseArtWrap: { position: 'absolute', top: '8%', left: 0, right: 0, alignItems: 'center' },
+  // ★ v108.21: Bundle card-specific
+  bundleItemsRow: {
+    position: 'absolute', top: 28, left: 0, right: 0,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    height: 88,
+  },
+  bundleItemMini: {
+    width: 66, height: 66, borderRadius: 33, borderWidth: 1.2,
+    backgroundColor: 'rgba(0,0,0,0.55)', overflow: 'hidden',
+    alignItems: 'center', justifyContent: 'center',
+    ...Platform.select({
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 6 },
+      android: { elevation: 4 },
+    }),
+  },
+  bundleDiscountBadge: {
+    position: 'absolute', top: 8, right: 8, zIndex: 5,
+    paddingHorizontal: 10, paddingVertical: 5, borderRadius: 100,
+    overflow: 'hidden', alignItems: 'center', justifyContent: 'center',
+  },
+  bundleDiscountBadgeText: {
+    color: '#fff', fontSize: 11, fontWeight: '800', letterSpacing: 0.5,
+  },
   showcaseInfo: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
     paddingHorizontal: 14, paddingVertical: 12, overflow: 'hidden',
@@ -1045,6 +2061,10 @@ const s = StyleSheet.create({
   showcaseMeta: { color: 'rgba(255,255,255,0.5)', fontSize: 9, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 },
   showcasePrice: { flexDirection: 'row', alignItems: 'baseline', gap: 4 },
   showcasePriceNum: { color: '#FFE082', fontSize: 16, fontWeight: '800', fontFamily: serif },
+  showcasePriceStrike: {
+    color: 'rgba(255,255,255,0.4)', fontSize: 13, fontWeight: '600', fontFamily: serif,
+    textDecorationLine: 'line-through',
+  },
   showcasePriceUnit: { color: 'rgba(251,191,36,0.7)', fontSize: 10, fontWeight: '600' },
 
   galleryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 4 },
@@ -1063,7 +2083,17 @@ const s = StyleSheet.create({
   galleryTagline: { color: 'rgba(255,255,255,0.6)', fontSize: 10, fontStyle: 'italic', marginBottom: 8, maxWidth: '90%' },
   galleryPriceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 4 },
   galleryPrice: { color: '#FFE082', fontSize: 12, fontWeight: '700', fontFamily: serif },
+  galleryPriceStrike: {
+    color: 'rgba(255,255,255,0.4)', fontSize: 10, fontWeight: '600', fontFamily: serif,
+    textDecorationLine: 'line-through',
+  },
   galleryPriceUnit: { fontSize: 9, color: 'rgba(251,191,36,0.6)', fontWeight: '600' },
+  // ★ v108.21: Plus/Pro tier discount chip
+  discountChip: {
+    color: '#06B6D4', fontSize: 9, fontWeight: '800', letterSpacing: 0.5,
+    backgroundColor: 'rgba(34,211,238,0.18)', borderWidth: 0.5, borderColor: 'rgba(34,211,238,0.45)',
+    paddingHorizontal: 5, paddingVertical: 2, borderRadius: 6, marginLeft: 4,
+  },
 
   tierSection: {
     marginTop: 12, marginBottom: 12, paddingHorizontal: 16, paddingTop: 18, paddingBottom: 14,
@@ -1075,6 +2105,21 @@ const s = StyleSheet.create({
   tierHeaderSymbol: { fontSize: 24, marginBottom: 6, color: '#FBBF24' },
   tierHeaderTitle: { color: '#fff', fontFamily: serif, fontSize: 18, fontWeight: '700', letterSpacing: 1 },
   tierHeaderSub: { color: 'rgba(251,191,36,0.7)', fontSize: 9, letterSpacing: 2.5, marginTop: 4, fontWeight: '600' },
+  // ★ v109.3: Premium bonus banner — Soprano Tezgâhı içine eklendi (eski sp-store'dan)
+  spBonusBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingHorizontal: 12, paddingVertical: 10,
+    borderRadius: 12, borderWidth: 0.5, borderColor: 'rgba(20,184,166,0.25)',
+    overflow: 'hidden', marginBottom: 12,
+  },
+  spBonusIconWrap: {
+    width: 30, height: 30, borderRadius: 15,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'rgba(20,184,166,0.12)',
+    borderWidth: 0.5, borderColor: 'rgba(20,184,166,0.3)',
+  },
+  spBonusTitle: { color: '#5EEAD4', fontSize: 11, fontWeight: '800', letterSpacing: 0.3 },
+  spBonusDesc: { color: 'rgba(255,255,255,0.7)', fontSize: 11, marginTop: 1 },
   spPack: {
     flexDirection: 'row', alignItems: 'center', gap: 14,
     paddingVertical: 14, paddingHorizontal: 16,
@@ -1094,10 +2139,35 @@ const s = StyleSheet.create({
   spPackBuyBtn: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 100, overflow: 'hidden' },
   spPackBuyText: { fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
 
-  collectionCard: { width: 140, height: 180, borderRadius: 14, borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.08)', overflow: 'hidden', position: 'relative' },
+  collectionCard: { width: 124, height: 160, borderRadius: 12, borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.08)', overflow: 'hidden', position: 'relative' },
   collectionTag: { position: 'absolute', top: 8, right: 8, zIndex: 3, paddingHorizontal: 8, paddingVertical: 2, backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: 100, overflow: 'hidden' },
   collectionTagText: { color: 'rgba(255,255,255,0.7)', fontSize: 8, fontWeight: '700', letterSpacing: 0.5 },
   collectionArt: { position: 'absolute', top: 38, left: '50%', fontSize: 50, transform: [{ translateX: -25 }] },
+  collectionArtWrap: {
+    position: 'absolute', top: 28, left: 0, right: 0, height: 68,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  // ★ v108.21: Skeleton placeholder stilleri — pulse animasyonlu, içeride
+  //   art dairesi + 2 çizgi göstererek kart şekli hissi verir.
+  skelCard: {
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderColor: 'rgba(255,255,255,0.10)',
+    alignItems: 'center', justifyContent: 'center',
+    paddingTop: 24,
+  },
+  skelArt: {
+    width: 60, height: 60, borderRadius: 30,
+    backgroundColor: 'rgba(255,255,255,0.10)',
+    marginBottom: 16,
+  },
+  skelLineLong: {
+    width: '60%', height: 8, borderRadius: 4,
+    backgroundColor: 'rgba(255,255,255,0.10)', marginBottom: 6,
+  },
+  skelLineShort: {
+    width: '35%', height: 6, borderRadius: 3,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
   collectionName: { position: 'absolute', bottom: 36, left: 0, right: 0, textAlign: 'center', color: '#fff', fontFamily: serif, fontSize: 12, fontWeight: '700', paddingHorizontal: 8 },
   collectionCta: {
     position: 'absolute', bottom: 8, left: '50%', transform: [{ translateX: -42 }],
