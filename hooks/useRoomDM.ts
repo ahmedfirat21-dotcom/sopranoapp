@@ -54,9 +54,16 @@ export function useRoomDM(params: UseRoomDMParams) {
       }, 250);
     };
 
-    // DM broadcast — yeni mesaj/accept/reject geldiğinde badge yenile
+    // ★ v110.14: DM broadcast — anlık optimistic +1, ek olarak DB fetch ile teyit.
+    //   Önceden sadece 250ms debounce sonra fetch yapılıyordu, kullanıcı oda içinde
+    //   DM badge'in geç güncellendiğini görüyordu. Şimdi sinyalle birlikte hemen +1,
+    //   sonra fetch ile düzelt.
     const unsub = dmNotif?.onSignal((signal) => {
-      if (signal.event === 'dm_new' || signal.event === 'dm_accepted' || signal.event === 'dm_rejected') {
+      if (signal.event === 'dm_new' && !signal.is_request) {
+        // Anlık badge artırma (sadece kabul edilmiş DM'ler için)
+        setDmUnreadCount(prev => prev + 1);
+        refreshDmBadge();
+      } else if (signal.event === 'dm_new' || signal.event === 'dm_accepted' || signal.event === 'dm_rejected') {
         refreshDmBadge();
       }
     });
