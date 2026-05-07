@@ -140,16 +140,14 @@ export default function ProfileHero({
                 style={StyleSheet.absoluteFillObject}
               />
               <Ionicons
-                name="ribbon"
-                size={14}
+                name={hasUnequippedFrame ? 'gift' : 'ribbon'}
+                size={15}
                 color={hasUnequippedFrame ? '#FFFFFF' : '#FBBF24'}
                 style={iconShadow}
               />
-              {hasUnequippedFrame && (
-                <View style={s.frameReadyBadge}>
-                  <Ionicons name="checkmark" size={9} color="#FFF" />
-                </View>
-              )}
+              {/* ★ v110.14: frameReadyBadge (üst sağ check daire) kaldırıldı —
+                   tek katman olunca "yeni çerçeven hazır" hint'i daha sade. Pulse
+                   animasyonu (frameIconAbsLeft scale) zaten dikkat çekiyor. */}
             </Pressable>
           </Animated.View>
         )}

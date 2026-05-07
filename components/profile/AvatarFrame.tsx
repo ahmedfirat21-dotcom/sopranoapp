@@ -274,10 +274,9 @@ function AvatarFrameImpl({ frameId, size, forceRing }: Props) {
   // ★ v109.3: Halka SABİT BOYUT ile konumlandı — absoluteFillObject parent
   //   boyutuna bağlıydı, parent avatardan uzun olunca halka aşağı kayıyordu.
   //   Yeni: top:0/left:0 + size (avatar boyutunda) → halka tam avatar üstüne biner.
-  // ★ v110.14 (8 May 2026): Halka kalınlığı %6 → %9. Pro Lottie kanatlı çerçeveler
-  //   1.8x yer kapladığı için Plus halkalar yanlarında ince kalıyordu; daha kalın
-  //   ve glow daha belirgin halka, sahnedeki dengesizliği görsel olarak azaltır.
-  const thickness = Math.max(3, Math.round(size * 0.09));
+  // ★ v110.14: %9 fazla kalın geldi (kullanıcı feedback) → %7. Ortalama bir değer:
+  //   eskiden %6 ince kalıyordu, %9 fazla kalın oldu, %7 dengeli.
+  const thickness = Math.max(2, Math.round(size * 0.07));
 
   return (
     <View
