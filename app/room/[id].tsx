@@ -25,6 +25,11 @@ import {
   UIManager,
 } from 'react-native';
 import AppLoader from '../../components/AppLoader';
+import BoostSuccessOverlay from '../../components/BoostSuccessOverlay';
+import LinkifiedText from '../../components/LinkifiedText';
+import LinkPreviewCard from '../../components/LinkPreviewCard';
+import MessageActionMenu from '../../components/MessageActionMenu';
+import * as Clipboard from 'expo-clipboard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
@@ -68,7 +73,7 @@ const showToast = (opts: Partial<ToastMessage> & { title: string }) => {
   // Diğer başarı toastları (ayar güncelleme) sessizce ignore — spam önleme
 };
 
-import { useAuth, useBadges, useDMNotifOptional, useUserProfileSheet } from '../_layout';
+import { useAuth, useBadges, useDMNotifOptional, useUserProfileSheet, useUserSearchSheet } from '../_layout';
 import useLiveKit from '../../hooks/useLiveKit';
 import { useMicMeter } from '../../hooks/useMicMeter';
 
@@ -83,7 +88,7 @@ import { EmojiReactionBar, FloatingReactionsView, type FloatingReactionsRef } fr
 
 // Extracted Room Sub-Components
 import { COLORS } from '../../components/room/constants';
-import PremiumEntryBanner from '../../components/room/PremiumEntryBanner';
+import RoomEntryEffectOverlay from '../../components/room/RoomEntryEffectOverlay';
 import InRoomUserProfile from '../../components/room/InRoomUserProfile';
 import AudienceDrawer from '../../components/room/AudienceDrawer';
 import { FriendshipService } from '../../services/friendship';
@@ -105,6 +110,8 @@ import RoomDisconnectOverlay from '../../components/room/RoomDisconnectOverlay';
 import RoomClosedScreen, { type RoomClosedReason } from '../../components/room/RoomClosedScreen';
 import { VoiceReactionService } from '../../services/voiceReactions';
 import RoomChatDrawer from '../../components/room/RoomChatDrawer';
+import RoomGiftAnimationOverlay from '../../components/room/RoomGiftAnimationOverlay';
+import RoomGiftPanel from '../../components/room/RoomGiftPanel';
 import { StoreService } from '../../services/store';
 import { PREMIUM_GLOW_IDS } from '../../components/room/glowStyles';
 // ★ v107.3: Host bağışı StageSupportSheet'e taşındı (DonationAlert tüm odaya gösterilen bildirim)
@@ -138,7 +145,8 @@ try { LKVideoView = require('@livekit/react-native').VideoView; } catch {}
 
 const { width: W, height: H } = Dimensions.get('window');
 const IS_SMALL_DM = W <= 375;
-const DM_PANEL_W = IS_SMALL_DM ? Math.min(W * 0.78, 310) : Math.min(W * 0.68, 320);
+// ★ 2026-05-05: NotificationDrawer/FriendsDrawer ile birebir aynı boyut — bildirim modalı ailesi
+const DM_PANEL_W = Math.min(W * 0.72, 300);
 const DM_SWIPE_ACTION_W = 180; // 3 buton × 60px
 
 // ★ 2026-04-20: Bundled MP3 oynatma kaldırıldı — YouTube/Spotify/SoundCloud linki
@@ -444,62 +452,83 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   // ★ İç navigasyon: inbox vs chat
-  const [chatTarget, setChatTarget] = useState<{ userId: string; name: string; avatar?: string } | null>(null);
+  const [chatTarget, setChatTarget] = useState<{ userId: string; name: string; avatar?: string; online?: boolean } | null>(null);
   const [chatMessages, setChatMessages] = useState<any[]>([]);
   const [chatInput, setChatInput] = useState('');
   const [chatSending, setChatSending] = useState(false);
   const [loadingChat, setLoadingChat] = useState(false);
+  // ★ v109: chat ekranı paritesi — Reply / Edit / Action menu / Saved / Typing
+  const [dmActionMenuMsg, setDmActionMenuMsg] = useState<any | null>(null);
+  const [dmReplyingTo, setDmReplyingTo] = useState<any | null>(null);
+  const [dmEditingMessageId, setDmEditingMessageId] = useState<string | null>(null);
+  const [dmSavedIds, setDmSavedIds] = useState<Set<string>>(new Set());
+  const [dmIsTyping, setDmIsTyping] = useState(false);
+  const dmTypingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // ★ v109: Forward için kullanıcı seçici (global UserSearchSheet)
+  const { openSearch: openDmUserSearch } = useUserSearchSheet();
   // ★ 2026-04-22: DM panel request status — main chat ile aynı accept/reject UI
   const [msgReq, setMsgReq] = useState<{ status: 'none' | 'pending_incoming' | 'pending_outgoing' | 'accepted' | 'rejected' }>({ status: 'none' });
   const [reqResponding, setReqResponding] = useState(false);
 
-  // ★ 2026-04-30 FIX: Klavye açıldığında panel boyutunu screen-based hesapla.
-  //   Android adjustResize parent view'ı küçültür → eski top+bottom yaklaşımı
-  //   çift küçülmeye yol açıyordu. Şimdi: screen height'tan bottom+height hesaplanır,
-  //   adjustResize etkisi bypass edilir. Input bar her zaman klavyenin tam üstünde.
-  //   Referans: chat/[id].tsx KeyboardAvoidingView pattern'ı.
+  // ★ v110.6 (6 May 2026): Klavye açıldığında panel boyutunu adjustResize-aware hesapla.
+  //   Android adjustResize: window shrinks → panel bottom=0 yeter (parent altı = klavye üstü).
+  //   iOS: keyboard overlay → bottom shift gerekli (screen-based).
+  //   ESKİ SORUN: Her iki platformda da screen-based bottom=kbHeight → Android'de çift küçülme.
+  //   Input bar klavyenin arkasına kalıyordu.
   const screenH = Dimensions.get('screen').height;
   const REST_BOTTOM = 120; // control bar + safe area
   const REST_TOP = 120;    // status bar + header alanı
   const restHeight = screenH - REST_BOTTOM - REST_TOP;
   const dmPanelBottomAnim = useRef(new Animated.Value(REST_BOTTOM)).current;
   const dmPanelHeightAnim = useRef(new Animated.Value(restHeight)).current;
+  // ★ 2026-05-05 FIX: Bir DM kullanıcısı seçilip chat ekranı açılınca, önceki klavye state'i
+  //   panel'i yanlış konumda gösteriyordu (input bar üst-orta'da kayma glitch'i). Geçişte
+  //   panel pozisyonunu anında reset et — klavye event'i sonra normal animasyonu yapar.
+  useEffect(() => {
+    if (chatTarget) {
+      const fullScreenH = Dimensions.get('screen').height;
+      dmPanelBottomAnim.setValue(REST_BOTTOM);
+      dmPanelHeightAnim.setValue(fullScreenH - REST_BOTTOM - REST_TOP);
+    }
+  }, [chatTarget?.userId]);
+  // ★ v110.5.12 (6 May 2026): Klavye listener — DOĞRU formül.
+  //   Eski yanlış: bottom=0, height=kbScreenY-44 → modal klavye altında kalıyordu.
+  //   Yeni doğru: bottom=kbHeight (modal klavye ÜSTÜNE çık), height=screen-kbHeight-REST_TOP.
+  //   Hem iOS hem Android için tek formül. Modal toplam alan korunur (üstte status bar boşluk).
   useEffect(() => {
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
     const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
     const showSub = Keyboard.addListener(showEvent, (e) => {
       const fullScreenH = Dimensions.get('screen').height;
-      // ★ v86 FIX: Samsung uyumlu — height direkt al (screenY status/nav bar dahiliyetinde tutarsız).
-      const kbHeight = e.endCoordinates.height || (fullScreenH - e.endCoordinates.screenY);
-      // Panel bottom = klavye yüksekliği, height = klavye üstü - status bar arası
-      const newBottom = Math.max(kbHeight, REST_BOTTOM);
-      const statusBarH = 44; // yaklaşık status bar + header
-      const newHeight = fullScreenH - newBottom - statusBarH;
-      Animated.parallel([
-        Animated.timing(dmPanelBottomAnim, {
-          toValue: newBottom,
-          duration: Platform.OS === 'ios' ? 250 : 150,
-          useNativeDriver: false,
-        }),
-        Animated.timing(dmPanelHeightAnim, {
-          toValue: Math.max(newHeight, 200), // minimum 200px
-          duration: Platform.OS === 'ios' ? 250 : 150,
-          useNativeDriver: false,
-        }),
-      ]).start();
+      // ★ v110.5.13: Klavye yüksekliği — Android'de .height bazen 0 dönüyor,
+      //   fullScreenH - screenY daha güvenilir (klavyenin üst kenarı = ekran altından
+      //   yukarıdaki mesafe). max ile ikisinden büyüğünü al.
+      const reportedH = e.endCoordinates.height || 0;
+      const calcH = fullScreenH - (e.endCoordinates.screenY || fullScreenH);
+      const kbHeight = Math.max(reportedH, calcH, 0);
+      // Modal alt kenarı = klavyenin üst kenarına yapışsın
+      const newBottom = kbHeight;
+      // Modal yüksekliği = ekran - klavye - üst margin (status bar + mini room header)
+      const newHeight = Math.max(fullScreenH - kbHeight - REST_TOP, 240);
+      // ★ v110.5.14: Animation INSTANT — keyboardDidShow Android'de klavye TAM açıldıktan
+      //   sonra fire ediyor (~300ms+). Üzerine 200ms animation = 1.5sn hissi. Şimdi
+      //   keyboardDidShow gelir gelmez modal anında yerine oturur (duration 0).
+      dmPanelBottomAnim.setValue(newBottom);
+      dmPanelHeightAnim.setValue(newHeight);
     });
     const hideSub = Keyboard.addListener(hideEvent, () => {
       const fullScreenH = Dimensions.get('screen').height;
       const rH = fullScreenH - REST_BOTTOM - REST_TOP;
+      // Klavye kapanırken kısa animation (gözden hoş)
       Animated.parallel([
         Animated.timing(dmPanelBottomAnim, {
           toValue: REST_BOTTOM,
-          duration: 200,
+          duration: 150,
           useNativeDriver: false,
         }),
         Animated.timing(dmPanelHeightAnim, {
           toValue: rH,
-          duration: 200,
+          duration: 150,
           useNativeDriver: false,
         }),
       ]).start();
@@ -600,36 +629,45 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
     }
   }, [visible, initialChatTarget]);
 
-  // ★ Sohbet görünümüne geçiş — mesajları yükle
+  // ★ v110.6 (6 May 2026): Sohbet görünümüne geçiş — WhatsApp/Instagram tarzı ANLIK gösterim.
+  //   ESKİ: Sıralı await'ler (request → mesajlar → clearedMap) → spinner → flash/atlama.
+  //   YENİ: Tüm fetch'ler Promise.all ile paralel, loadingChat spinner GÖSTERİLMEZ.
+  //   FlatList her zaman render olur (boş data ile başlar, veri gelince dolur).
+  //   3 mesaj bile olsa spinner gösterme — kullanıcı anında mesajları görmeli.
   const openChat = async (userId: string, name: string, avatar?: string) => {
     setChatTarget({ userId, name, avatar });
     setChatInput('');
-    setLoadingChat(true);
-    // ★ 2026-04-22: message_request durumu yükle (accept/reject banner için)
-    try {
-      const req = await MessageService.getMessageRequest(firebaseUser.uid, userId);
-      if (!req) setMsgReq({ status: 'none' });
-      else if (req.status === 'accepted') setMsgReq({ status: 'accepted' });
-      else if (req.status === 'rejected') setMsgReq({ status: 'rejected' });
-      else if (req.status === 'pending') setMsgReq({ status: req.receiver_id === firebaseUser.uid ? 'pending_incoming' : 'pending_outgoing' });
-    } catch { setMsgReq({ status: 'none' }); }
-    // ★ 2026-04-21: Oda içi DM panelden chat açılınca hidden entry'yi temizle.
-    //   /messages tab'taki chat ekranıyla senkron davranış — explicit restore pattern.
-    // ★ 2026-04-22 FIX: Chat açılırken hidden entry TEMİZLEME — sohbeti sildikten sonra
-    //   panel'den tekrar açmak eski mesajları getirir. cleared_before kalıcıdır.
-    try {
-      const { data } = await supabase
-        .from('messages')
-        .select('*')
-        .or(`and(sender_id.eq.${firebaseUser.uid},receiver_id.eq.${userId}),and(sender_id.eq.${userId},receiver_id.eq.${firebaseUser.uid})`)
-        .not('is_deleted', 'is', true)
-        .order('created_at', { ascending: false })
-        .limit(50);
+    setChatMessages([]); // Boş başla — FlatList "Henüz mesaj yok" gösterir anlık, spinner yok
+    setLoadingChat(false); // ★ Spinner ASLA gösterilmez — layout sabit kalır
+    setMsgReq({ status: 'none' }); // Default safe state
 
-      // ★ 2026-04-22: cleared_before filter — silinmiş mesajlar geri gelmesin.
-      const clearedMap = await MessageService.getClearedBefore(firebaseUser.uid);
+    // ★ Tüm fetch'ler paralel — en yavaş olanın süresi kadar bekler (tipik <200ms)
+    try {
+      const [reqResult, msgResult, clearedMap] = await Promise.all([
+        // 1. Message request durumu
+        MessageService.getMessageRequest(firebaseUser.uid, userId).catch(() => null),
+        // 2. Mesajlar
+        supabase
+          .from('messages')
+          .select('*')
+          .or(`and(sender_id.eq.${firebaseUser.uid},receiver_id.eq.${userId}),and(sender_id.eq.${userId},receiver_id.eq.${firebaseUser.uid})`)
+          .not('is_deleted', 'is', true)
+          .order('created_at', { ascending: false })
+          .limit(50)
+          .then(r => r.data || []),
+        // 3. Cleared before map
+        MessageService.getClearedBefore(firebaseUser.uid).catch(() => ({} as Record<string, string>)),
+      ]);
+
+      // ★ Message request durumu set et
+      if (!reqResult) setMsgReq({ status: 'none' });
+      else if (reqResult.status === 'accepted') setMsgReq({ status: 'accepted' });
+      else if (reqResult.status === 'rejected') setMsgReq({ status: 'rejected' });
+      else if (reqResult.status === 'pending') setMsgReq({ status: reqResult.receiver_id === firebaseUser.uid ? 'pending_incoming' : 'pending_outgoing' });
+
+      // ★ Cleared before filter
       const clearedBefore = clearedMap[userId];
-      let rows = (data || []);
+      let rows = msgResult;
       if (clearedBefore) {
         rows = rows.filter((m: any) => new Date(m.created_at) > new Date(clearedBefore));
       }
@@ -642,18 +680,40 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
         },
       }));
       setChatMessages(msgs);
-      // Okundu işaretle
+      // Okundu işaretle (arka plan, UI'ı bloklamaz)
       MessageService.markAsRead(firebaseUser.uid, userId).catch(() => {});
     } catch {}
-    setLoadingChat(false);
   };
 
-  // ★ Mesaj gönder — takip kontrolü + engel kontrolü
+  // ★ Mesaj gönder — takip kontrolü + engel kontrolü + reply + edit (v109)
   const handleSend = async () => {
     if (!chatInput.trim() || !chatTarget || chatSending) return;
     const text = chatInput.trim();
+
+    // ★ v109: Edit modu — yeni mesaj göndermek yerine RPC ile düzenle
+    if (dmEditingMessageId) {
+      const r = await MessageService.editMessage(firebaseUser.uid, dmEditingMessageId, text);
+      if (r.success) {
+        setChatMessages((prev: any[]) => prev.map((m: any) => m.id === dmEditingMessageId
+          ? { ...m, content: text, edited_at: r.edited_at || new Date().toISOString() } : m));
+        setDmEditingMessageId(null);
+        setChatInput('');
+      } else {
+        showToast({ title: 'Düzenlenemedi', message: r.error || 'Tekrar dene.', type: 'error' });
+      }
+      return;
+    }
+
+    // ★ v109: Reply modu — sendReply ile reply_to_id yaz
+    const replyId = dmReplyingTo?.id || null;
+    setDmReplyingTo(null);
     setChatInput('');
     setChatSending(true);
+    // Typing'i sustur
+    if (firebaseUser && chatTarget) {
+      MessageService.sendTypingStatus(firebaseUser.uid, chatTarget.userId, false);
+      if (dmPublishTypingRef.current) clearTimeout(dmPublishTypingRef.current);
+    }
 
     try {
       // ★ Engel kontrolü
@@ -685,11 +745,17 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
         content: text,
         created_at: new Date().toISOString(),
         sender: { display_name: 'Sen', avatar_url: '' },
+        reply_to_id: replyId,
         _isMessageRequest: isMessageRequest,
       };
       setChatMessages(prev => [optMsg, ...prev]);
 
-      await MessageService.send(firebaseUser.uid, chatTarget.userId, text, isMessageRequest);
+      // ★ v109: replyId varsa sendReply
+      if (replyId) {
+        await MessageService.sendReply(firebaseUser.uid, chatTarget.userId, text, replyId);
+      } else {
+        await MessageService.send(firebaseUser.uid, chatTarget.userId, text, isMessageRequest);
+      }
       // ★ 2026-04-22: Kullanıcı mesaj gönderdi → hidden entry temizle (inbox'a sohbet geri
       //   dönsün). cleared_before korunduğu için eski mesajlar yine gizli kalır.
       try {
@@ -754,6 +820,143 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
     return unsub;
   }, [chatTarget?.userId, firebaseUser?.uid, dmNotif]);
 
+  // ★ v109: Typing indicator — karşı taraf yazıyor mu (chat target değişince listener)
+  useEffect(() => {
+    if (!chatTarget || !firebaseUser) return;
+    const targetId = chatTarget.userId;
+    const sub = MessageService.onTypingStatus(firebaseUser.uid, (payload) => {
+      if (payload.user_id !== targetId) return;
+      if (payload.is_typing) {
+        setDmIsTyping(true);
+        if (dmTypingTimerRef.current) clearTimeout(dmTypingTimerRef.current);
+        dmTypingTimerRef.current = setTimeout(() => setDmIsTyping(false), 3000);
+      } else {
+        setDmIsTyping(false);
+        if (dmTypingTimerRef.current) clearTimeout(dmTypingTimerRef.current);
+      }
+    });
+    return () => {
+      sub.unsubscribe();
+      supabase.removeChannel(sub);
+      if (dmTypingTimerRef.current) clearTimeout(dmTypingTimerRef.current);
+    };
+  }, [chatTarget?.userId, firebaseUser?.uid]);
+
+  // ★ v109: Saved messages — chat açıldığında yüklenir
+  useEffect(() => {
+    if (!chatTarget || !firebaseUser?.uid) return;
+    MessageService.getSavedMessageIds(firebaseUser.uid).then(setDmSavedIds).catch(() => {});
+  }, [chatTarget?.userId, firebaseUser?.uid]);
+
+  // ★ v109: Chat input typing publish — kullanıcı yazıyor mu broadcast
+  const dmPublishTypingRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handleDmInputChange = (text: string) => {
+    setChatInput(text);
+    if (!firebaseUser || !chatTarget) return;
+    MessageService.sendTypingStatus(firebaseUser.uid, chatTarget.userId, text.length > 0);
+    if (dmPublishTypingRef.current) clearTimeout(dmPublishTypingRef.current);
+    if (text.length > 0) {
+      dmPublishTypingRef.current = setTimeout(() => {
+        MessageService.sendTypingStatus(firebaseUser.uid, chatTarget.userId, false);
+      }, 2000);
+    }
+  };
+
+  // ★ v109: Chat ekranı paritesi — action handlers
+  const handleDmReply = useCallback((msg: any) => {
+    setDmReplyingTo(msg);
+    setDmEditingMessageId(null);
+  }, []);
+
+  const handleDmEdit = useCallback((msg: any) => {
+    setDmEditingMessageId(msg.id);
+    setDmReplyingTo(null);
+    setChatInput(msg.content || '');
+  }, []);
+
+  const handleDmCancelCompose = useCallback(() => {
+    setDmReplyingTo(null);
+    if (dmEditingMessageId) {
+      setDmEditingMessageId(null);
+      setChatInput('');
+    }
+  }, [dmEditingMessageId]);
+
+  const handleDmDeleteForEveryone = useCallback(async (msg: any) => {
+    if (!firebaseUser) return;
+    const r = await MessageService.deleteForEveryone(firebaseUser.uid, msg.id);
+    if (r.success) {
+      setChatMessages((prev: any[]) => prev.map((m: any) => m.id === msg.id
+        ? { ...m, deleted_for_everyone: true, content: '', voice_url: null, image_url: null } : m));
+    } else {
+      showToast({ title: 'Silinemedi', message: r.error || 'Tekrar dene.', type: 'error' });
+    }
+  }, [firebaseUser]);
+
+  const handleDmDeleteFromChat = useCallback(async (msg: any) => {
+    if (!firebaseUser) return;
+    try {
+      await MessageService.deleteMessage(msg.id, firebaseUser.uid);
+      setChatMessages((prev: any[]) => prev.map((m: any) => m.id === msg.id ? { ...m, is_deleted: true } : m));
+    } catch {
+      showToast({ title: 'Silinemedi', type: 'error' });
+    }
+  }, [firebaseUser]);
+
+  const handleDmCopy = useCallback(async (msg: any) => {
+    if (!msg.content) return;
+    await Clipboard.setStringAsync(msg.content);
+    showToast({ title: '✓ Kopyalandı', type: 'success' });
+  }, []);
+
+  const handleDmSave = useCallback(async (msg: any) => {
+    if (!firebaseUser) return;
+    const wasSaved = dmSavedIds.has(msg.id);
+    setDmSavedIds(prev => {
+      const next = new Set(prev);
+      if (wasSaved) next.delete(msg.id); else next.add(msg.id);
+      return next;
+    });
+    await MessageService.toggleSavedMessage(firebaseUser.uid, msg.id);
+    showToast({ title: wasSaved ? 'Kaydedilenden çıkarıldı' : '🔖 Kaydedildi', type: 'success' });
+  }, [firebaseUser, dmSavedIds]);
+
+  // ★ v109: Forward — global user search sheet aç → seçilen kişiye forward RPC
+  const handleDmForward = useCallback((msg: any) => {
+    if (!firebaseUser) return;
+    openDmUserSearch({
+      mode: 'compose',
+      onSelectUser: async (targetUserId: string) => {
+        if (targetUserId === firebaseUser.uid) {
+          showToast({ title: 'Geçersiz hedef', message: 'Mesajı kendine iletemezsin.', type: 'warning' });
+          return;
+        }
+        const r = await MessageService.forwardMessage(firebaseUser.uid, msg.id, targetUserId);
+        if (r.success) {
+          showToast({ title: '✓ İletildi', type: 'success' });
+        } else {
+          showToast({ title: 'İletilemedi', message: r.error || 'Tekrar dene.', type: 'error' });
+        }
+      },
+    });
+  }, [firebaseUser, openDmUserSearch]);
+
+  const handleDmReact = useCallback(async (msg: any, emoji: string) => {
+    if (!firebaseUser) return;
+    const existing: Record<string, string[]> = msg.reactions ? JSON.parse(msg.reactions) : {};
+    const myId = firebaseUser.uid;
+    if (existing[emoji]?.includes(myId)) {
+      existing[emoji] = existing[emoji].filter((id: string) => id !== myId);
+      if (existing[emoji].length === 0) delete existing[emoji];
+    } else {
+      if (!existing[emoji]) existing[emoji] = [];
+      existing[emoji].push(myId);
+    }
+    const reactionsJson = JSON.stringify(existing);
+    await MessageService.updateReaction(msg.id, reactionsJson, firebaseUser.uid);
+    setChatMessages((prev: any[]) => prev.map((m: any) => m.id === msg.id ? { ...m, reactions: reactionsJson } : m));
+  }, [firebaseUser]);
+
   // ★ Engelle aksiyonu
   const handleBlock = async (userId: string) => {
     try {
@@ -802,46 +1005,92 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
       }}>
       <Animated.View {...dmPanHandlers} style={{
         flex: 1,
-        borderTopLeftRadius: 22, borderBottomLeftRadius: 22,
+        borderTopLeftRadius: 26, borderBottomLeftRadius: 26,
         overflow: 'hidden',
-        shadowColor: '#000', shadowOffset: { width: -6, height: 0 }, shadowOpacity: 0.5, shadowRadius: 16, elevation: 16,
+        backgroundColor: '#1a2030',
+        shadowColor: '#000', shadowOffset: { width: -6, height: 0 }, shadowOpacity: 0.45, shadowRadius: 14, elevation: 10,
         transform: [{ translateX: Animated.add(slideAnim, dmSwipeX) }],
       }}>
-        {/* ★ FriendsDrawer paleti */}
-        <LinearGradient colors={['#4a5668', '#37414f', '#232a35']} locations={[0, 0.35, 1]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFillObject} />
+        {/* ★ 2026-05-05: NotificationDrawer dili (bildirim modalı ailesi) — 3 katman gradient.
+            Karakter: teal (iletişim/DM). Slate diagonal + üst halo + soft glow. */}
+        <LinearGradient
+          colors={['#3a4658', '#2a3344', '#1a2030']}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFillObject}
+          pointerEvents="none"
+        />
+        <LinearGradient
+          colors={['rgba(20,184,166,0.20)', 'rgba(20,184,166,0.05)', 'transparent']}
+          start={{ x: 0, y: 0 }} end={{ x: 0, y: 0.4 }}
+          style={StyleSheet.absoluteFillObject}
+          pointerEvents="none"
+        />
+        <LinearGradient
+          colors={['rgba(20,184,166,0.08)', 'transparent']}
+          start={{ x: 0, y: 0 }} end={{ x: 0.7, y: 0.6 }}
+          style={StyleSheet.absoluteFillObject}
+          pointerEvents="none"
+        />
 
         {/* ═══ SOHBET GÖRÜNÜMÜ ═══ */}
         {chatTarget ? (
           <View style={{ flex: 1 }}>
-            {/* Chat Header */}
+            {/* Chat Header — NotificationDrawer dili (bildirim modalı ailesi) */}
             <View collapsable={false} style={{
               flexDirection: 'row', alignItems: 'center', gap: 10,
-              paddingHorizontal: 12, paddingVertical: 10,
-              borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)',
-              backgroundColor: 'rgba(20,184,166,0.06)',
+              paddingHorizontal: 14, paddingTop: 16, paddingBottom: 12,
             }}>
               <Pressable onPress={() => setChatTarget(null)} hitSlop={12} style={{
-                width: 28, height: 28, borderRadius: 14,
-                backgroundColor: 'rgba(255,255,255,0.06)',
+                width: 30, height: 30, borderRadius: 15,
+                backgroundColor: 'rgba(255,255,255,0.05)',
+                borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
                 alignItems: 'center', justifyContent: 'center',
               }}>
                 <Ionicons name="arrow-back" size={15} color="#F1F5F9" />
               </Pressable>
-              <Image source={getAvatarSource(chatTarget.avatar)} style={{
-                width: 30, height: 30, borderRadius: 15,
-                borderWidth: 1, borderColor: 'rgba(20,184,166,0.3)',
-              }} />
-              <Text style={{ color: '#F1F5F9', fontSize: 13, fontWeight: '700', flex: 1 }} numberOfLines={1}>
-                {chatTarget.name}
-              </Text>
+              <View style={{ position: 'relative' }}>
+                <Image source={getAvatarSource(chatTarget.avatar)} style={{
+                  width: 32, height: 32, borderRadius: 16,
+                  borderWidth: 1, borderColor: 'rgba(20,184,166,0.4)',
+                }} />
+                {/* ★ v109: Online dot — yeşil göstergeç */}
+                {chatTarget.online ? (
+                  <View style={{
+                    position: 'absolute', bottom: -1, right: -1,
+                    width: 10, height: 10, borderRadius: 5,
+                    backgroundColor: '#22C55E',
+                    borderWidth: 1.5, borderColor: '#1a2030',
+                  }} />
+                ) : null}
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{
+                  color: '#F1F5F9', fontSize: 15, fontWeight: '800', letterSpacing: 0.3,
+                  textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4,
+                }} numberOfLines={1}>
+                  {chatTarget.name}
+                </Text>
+                {/* ★ v109: Yazıyor / Çevrimiçi durumu */}
+                {dmIsTyping ? (
+                  <Text style={{ color: '#14B8A6', fontSize: 10, fontWeight: '600', fontStyle: 'italic' }}>
+                    yazıyor…
+                  </Text>
+                ) : chatTarget.online ? (
+                  <Text style={{ color: 'rgba(34,197,94,0.85)', fontSize: 10, fontWeight: '600' }}>
+                    çevrimiçi
+                  </Text>
+                ) : null}
+              </View>
               {/* ★ Sessize alma badge — chat header'da */}
               {mutedDmUsers.has(chatTarget.userId) && (
                 <Ionicons name="notifications-off" size={14} color="rgba(245,158,11,0.5)" style={{ marginRight: 4 }} />
               )}
             </View>
+            {/* ★ 2026-05-05: NotificationDrawer dili — header separator */}
+            <View style={{ height: 1, backgroundColor: 'rgba(255,255,255,0.06)', marginHorizontal: 12 }} />
 
             {/* ★ 2026-04-22: Message request banner — DM panel içinde accept/reject */}
-            {!loadingChat && msgReq.status === 'pending_incoming' && (
+            {msgReq.status === 'pending_incoming' && (
               <View style={{ backgroundColor: 'rgba(59,130,246,0.08)', borderBottomWidth: 1, borderBottomColor: 'rgba(59,130,246,0.2)', padding: 12 }}>
                 <Text style={{ fontSize: 13, fontWeight: '700', color: '#E2E8F0', marginBottom: 4 }}>
                   {chatTarget.name} sizinle mesajlaşmak istiyor
@@ -874,7 +1123,7 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
                 </View>
               </View>
             )}
-            {!loadingChat && msgReq.status === 'pending_outgoing' && (
+            {msgReq.status === 'pending_outgoing' && (
               <View style={{ backgroundColor: 'rgba(251,191,36,0.08)', borderBottomWidth: 1, borderBottomColor: 'rgba(251,191,36,0.2)', padding: 10, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <Ionicons name="time-outline" size={14} color="#FBBF24" />
                 <Text style={{ fontSize: 11, color: '#FBBF24', flex: 1 }}>
@@ -882,7 +1131,7 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
                 </Text>
               </View>
             )}
-            {!loadingChat && msgReq.status === 'rejected' && (
+            {msgReq.status === 'rejected' && (
               <View style={{ backgroundColor: 'rgba(239,68,68,0.08)', borderBottomWidth: 1, borderBottomColor: 'rgba(239,68,68,0.2)', padding: 10, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <Ionicons name="close-circle-outline" size={14} color="#F87171" />
                 <Text style={{ fontSize: 11, color: '#FCA5A5', flex: 1 }}>
@@ -891,56 +1140,236 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
               </View>
             )}
 
-            {/* Mesaj Listesi — inverted */}
-            {loadingChat ? (
-              <AppLoader color="#14B8A6" style={{ marginTop: 40 }} />
-            ) : (
+            {/* Mesaj Listesi — inverted
+                ★ v110.6 (6 May 2026): Spinner/AppLoader KALDIRILDI — FlatList HER ZAMAN render olur.
+                Mesaj olmayınca "Henüz mesaj yok" boş state gösterir (ListEmptyComponent).
+                Bu sayede flex layout SABIT kalır, input bar asla yukarı atlamaz.
+                WhatsApp/Instagram gibi: mesajlar anında render olur, loading hissi yok. */}
               <FlatList
                 data={chatMessages}
                 keyExtractor={(item, i) => item.id || `msg_${i}`}
                 inverted
                 showsVerticalScrollIndicator={false}
-                contentContainerStyle={{ padding: 10, gap: 4 }}
+                style={{ flex: 1 }}
+                contentContainerStyle={{ padding: 10, gap: 4, flexGrow: 1 }}
                 renderItem={({ item }) => {
                   const isMine = item.sender_id === firebaseUser?.uid;
+                  const isDeletedForEveryone = !!item.deleted_for_everyone;
+                  const isDeleted = !!item.is_deleted;
+                  // ★ v109: "Sohbetten Sil" — kendi tarafımda gizle (mesajın kendisi DB'de kalır)
+                  if (isDeleted && isMine) return null;
+                  const isEdited = !!item.edited_at;
+                  const isForwarded = !!item.forwarded_from_id;
+                  const isTemp = (item.id || '').startsWith('opt_');
+                  const replyTo = item.reply_to_id ? chatMessages.find((m: any) => m.id === item.reply_to_id) : null;
+                  // ★ v109: Reactions parse
+                  const reactions: Record<string, string[]> = item.reactions ? (() => {
+                    try { return JSON.parse(item.reactions); } catch { return {}; }
+                  })() : {};
+                  const reactionEntries = Object.entries(reactions);
                   return (
                     <View style={{
-                      alignSelf: isMine ? 'flex-end' : 'flex-start',
-                      maxWidth: '80%',
-                      paddingHorizontal: 12, paddingVertical: 8,
-                      borderRadius: 16,
-                      borderBottomRightRadius: isMine ? 4 : 16,
-                      borderBottomLeftRadius: isMine ? 16 : 4,
-                      backgroundColor: isMine ? 'rgba(20,184,166,0.2)' : 'rgba(255,255,255,0.06)',
-                      borderWidth: 1,
-                      borderColor: isMine ? 'rgba(20,184,166,0.15)' : 'rgba(255,255,255,0.04)',
+                      flexDirection: 'row',
+                      justifyContent: isMine ? 'flex-end' : 'flex-start',
+                      gap: 6, marginVertical: 1,
                     }}>
-                      <Text style={{ color: '#F1F5F9', fontSize: 13, lineHeight: 18 }}>{item.content}</Text>
-                      <Text style={{
-                        color: 'rgba(255,255,255,0.2)', fontSize: 9,
-                        alignSelf: 'flex-end', marginTop: 2,
-                      }}>
-                        {new Date(item.created_at).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
-                      </Text>
+                      {/* ★ Avatar — sadece karşı taraf (kendi mesajlarımda gizli) */}
+                      {!isMine ? (
+                        <Image
+                          source={getAvatarSource(chatTarget?.avatar)}
+                          style={{ width: 34, height: 34, borderRadius: 17, marginTop: 4 }}
+                        />
+                      ) : null}
+                      <View style={{ alignItems: isMine ? 'flex-end' : 'flex-start', maxWidth: '78%' }}>
+                      <Pressable
+                        onLongPress={() => {
+                          if (isTemp || isDeletedForEveryone || item.is_deleted) return;
+                          setDmActionMenuMsg(item);
+                        }}
+                        delayLongPress={400}
+                        style={{
+                          paddingHorizontal: 14, paddingVertical: 10,
+                          borderRadius: 16,
+                          borderBottomRightRadius: isMine ? 4 : 16,
+                          borderBottomLeftRadius: isMine ? 16 : 4,
+                          // ★ 2026-05-05: Karşı tarafa solid bg — yarı-saydam bg + elevation
+                          //   Android'de gölge artefaktı yaratıyordu (siyah karış reaction pill arkası).
+                          //   Solid #37414f slate balonun arkasını opaklaştırır, elevation temiz görünür.
+                          backgroundColor: isMine ? '#14B8A6' : '#37414f',
+                          shadowColor: '#000',
+                          shadowOffset: { width: 0, height: 3 },
+                          shadowOpacity: 0.28,
+                          shadowRadius: 6,
+                          elevation: 4,
+                        }}
+                      >
+                        {/* Forwarded rozeti */}
+                        {isForwarded && !isDeletedForEveryone ? (
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 3 }}>
+                            <Ionicons name="arrow-redo" size={10} color="rgba(255,255,255,0.5)" />
+                            <Text style={{ fontSize: 10, fontStyle: 'italic', color: 'rgba(255,255,255,0.5)' }}>
+                              İletildi
+                            </Text>
+                          </View>
+                        ) : null}
+                        {/* Reply preview */}
+                        {replyTo ? (
+                          <View style={{
+                            flexDirection: 'row', gap: 6, marginBottom: 4,
+                            paddingVertical: 4, paddingRight: 6, paddingLeft: 0,
+                            backgroundColor: 'rgba(0,0,0,0.18)', borderRadius: 6, overflow: 'hidden',
+                          }}>
+                            <View style={{ width: 2, backgroundColor: '#14B8A6' }} />
+                            <View style={{ flex: 1 }}>
+                              <Text style={{ color: '#5EEAD4', fontSize: 10, fontWeight: '700' }} numberOfLines={1}>
+                                {replyTo.sender_id === firebaseUser?.uid ? 'Kendine' : (chatTarget?.name || 'Kullanıcı')}
+                              </Text>
+                              <Text style={{ color: 'rgba(255,255,255,0.65)', fontSize: 11 }} numberOfLines={1}>
+                                {replyTo.deleted_for_everyone ? '🚫 Bu mesaj silindi'
+                                  : replyTo.voice_url ? '🎙️ Sesli mesaj'
+                                  : replyTo.image_url ? '📷 Fotoğraf'
+                                  : (replyTo.content || '...')}
+                              </Text>
+                            </View>
+                          </View>
+                        ) : null}
+                        {/* İçerik */}
+                        {isDeletedForEveryone ? (
+                          <Text style={{ color: 'rgba(255,255,255,0.35)', fontSize: 13, fontStyle: 'italic' }}>
+                            🚫 Bu mesaj silindi
+                          </Text>
+                        ) : (
+                          <>
+                            <LinkifiedText
+                              text={item.content || ''}
+                              style={{
+                                color: '#F1F5F9', fontSize: 14, lineHeight: 20,
+                                textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
+                              }}
+                            />
+                            {item.content ? <LinkPreviewCard text={item.content} isMe={isMine} /> : null}
+                          </>
+                        )}
+                        {/* Edited */}
+                        {isEdited && !isDeletedForEveryone ? (
+                          <Text style={{
+                            color: 'rgba(255,255,255,0.4)', fontSize: 9, fontStyle: 'italic',
+                            alignSelf: 'flex-end', marginTop: 1,
+                          }}>düzenlendi</Text>
+                        ) : null}
+                        {/* Time + read receipts — chat/[id].tsx dili */}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-end', marginTop: 3 }}>
+                          <Text style={{
+                            color: isMine ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.45)',
+                            fontSize: 9,
+                            textShadowColor: 'rgba(0,0,0,0.45)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
+                          }}>
+                            {new Date(item.created_at).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
+                          </Text>
+                          {isMine && !isDeletedForEveryone ? (
+                            isTemp ? (
+                              <Ionicons name="time-outline" size={11} color="rgba(255,255,255,0.55)" />
+                            ) : item.is_read ? (
+                              <View style={{ flexDirection: 'row' }}>
+                                <Ionicons name="checkmark" size={12} color="#FFFFFF" style={{ marginRight: -5 }} />
+                                <Ionicons name="checkmark" size={12} color="#FFFFFF" />
+                              </View>
+                            ) : (
+                              <Ionicons name="checkmark" size={12} color="rgba(255,255,255,0.7)" />
+                            )
+                          ) : null}
+                        </View>
+                      </Pressable>
+                      {/* ★ Reactions pill — bubble altında, hizalama parent View'a göre */}
+                      {reactionEntries.length > 0 ? (
+                        <View style={{
+                          flexDirection: 'row', gap: 3,
+                          backgroundColor: 'rgba(15,23,41,0.95)',
+                          borderRadius: 100, paddingHorizontal: 6, paddingVertical: 2,
+                          borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.1)',
+                          marginTop: -6, marginHorizontal: 6,
+                        }}>
+                          {reactionEntries.slice(0, 3).map(([emoji, users]: any) => (
+                            <Text key={emoji} style={{ fontSize: 11, color: '#F1F5F9' }}>
+                              {emoji}{users.length > 1 ? ` ${users.length}` : ''}
+                            </Text>
+                          ))}
+                        </View>
+                      ) : null}
+                      </View>
                     </View>
                   );
                 }}
+                ListHeaderComponent={
+                  // ★ v109: Typing 3 nokta bubble — inverted FlatList'te en altta görünür
+                  dmIsTyping ? (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 4, paddingHorizontal: 4 }}>
+                      <Image
+                        source={getAvatarSource(chatTarget?.avatar)}
+                        style={{ width: 24, height: 24, borderRadius: 12 }}
+                      />
+                      <View style={{
+                        flexDirection: 'row', alignItems: 'center', gap: 3,
+                        paddingHorizontal: 10, paddingVertical: 7,
+                        borderRadius: 14,
+                        backgroundColor: 'rgba(20,184,166,0.20)',
+                        borderWidth: 0.5, borderColor: 'rgba(20,184,166,0.35)',
+                      }}>
+                        <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: '#FFFFFF', opacity: 0.7 }} />
+                        <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: '#FFFFFF', opacity: 0.85 }} />
+                        <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: '#FFFFFF' }} />
+                      </View>
+                    </View>
+                  ) : null
+                }
                 ListEmptyComponent={
-                  <View style={{ alignItems: 'center', paddingVertical: 40 }}>
+                  <View style={{ alignItems: 'center', justifyContent: 'center', flex: 1, paddingVertical: 40 }}>
                     <Ionicons name="chatbubble-outline" size={24} color="rgba(255,255,255,0.1)" />
                     <Text style={{ color: 'rgba(255,255,255,0.2)', fontSize: 12, marginTop: 8 }}>Henüz mesaj yok</Text>
                   </View>
                 }
               />
-            )}
 
             {/* Input Bar */}
             <View style={{
-              flexDirection: 'row', alignItems: 'center', gap: 8,
+              flexDirection: 'column', alignItems: 'stretch', gap: 0,
               paddingHorizontal: 10, paddingVertical: 8,
               borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.06)',
               backgroundColor: 'rgba(30,40,50,0.5)',
             }}>
+              {/* ★ v109: Compose banner — reply ya da edit modunda göster */}
+              {(dmReplyingTo || dmEditingMessageId) ? (
+                <View style={{
+                  flexDirection: 'row', alignItems: 'center', gap: 8,
+                  paddingHorizontal: 10, paddingVertical: 6,
+                  marginBottom: 6, borderRadius: 10,
+                  backgroundColor: 'rgba(20,184,166,0.10)',
+                  borderWidth: 0.5, borderColor: 'rgba(20,184,166,0.25)',
+                }}>
+                  <View style={{ width: 2, alignSelf: 'stretch', borderRadius: 1, backgroundColor: '#14B8A6' }} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: '#14B8A6', fontSize: 10, fontWeight: '800' }}>
+                      {dmEditingMessageId ? '✎ Düzenleniyor'
+                        : `↩︎ Yanıt: ${dmReplyingTo?.sender_id === firebaseUser?.uid ? 'Kendine' : (chatTarget?.name || 'Kullanıcı')}`}
+                    </Text>
+                    <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 11 }} numberOfLines={1}>
+                      {dmEditingMessageId
+                        ? 'Mevcut metni değiştir, gönder'
+                        : (dmReplyingTo?.voice_url ? '🎙️ Sesli mesaj'
+                           : dmReplyingTo?.image_url ? '📷 Fotoğraf'
+                           : (dmReplyingTo?.content || '...'))}
+                    </Text>
+                  </View>
+                  <Pressable onPress={handleDmCancelCompose} hitSlop={8} style={{
+                    width: 24, height: 24, borderRadius: 12,
+                    alignItems: 'center', justifyContent: 'center',
+                    backgroundColor: 'rgba(255,255,255,0.06)',
+                  }}>
+                    <Ionicons name="close" size={14} color="rgba(255,255,255,0.6)" />
+                  </Pressable>
+                </View>
+              ) : null}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               <TextInput
                 style={{
                   flex: 1, height: 36, borderRadius: 18,
@@ -948,10 +1377,10 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
                   borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
                   paddingHorizontal: 14, fontSize: 13, color: '#F1F5F9',
                 }}
-                placeholder="Mesaj yaz..."
+                placeholder={dmEditingMessageId ? 'Düzenle...' : 'Mesaj yaz...'}
                 placeholderTextColor="rgba(255,255,255,0.2)"
                 value={chatInput}
-                onChangeText={setChatInput}
+                onChangeText={handleDmInputChange}
                 maxLength={500}
                 returnKeyType="send"
                 onSubmitEditing={handleSend}
@@ -965,39 +1394,46 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
                 }}
                 disabled={!chatInput.trim() || chatSending}
               >
-                <Ionicons name="send" size={16} color={chatInput.trim() ? '#14B8A6' : 'rgba(255,255,255,0.15)'} />
+                <Ionicons
+                  name={dmEditingMessageId ? 'checkmark' : 'send'}
+                  size={16}
+                  color={chatInput.trim() ? '#14B8A6' : 'rgba(255,255,255,0.15)'}
+                />
               </Pressable>
+              </View>
             </View>
           </View>
         ) : (
           /* ═══ İNBOX GÖRÜNÜMÜ ═══ */
           <>
-            {/* Header */}
+            {/* Header — NotificationDrawer dili (bildirim modalı ailesi) */}
             <View collapsable={false} style={{
-              flexDirection: 'row', alignItems: 'center', gap: 8,
-              paddingHorizontal: 12, paddingVertical: 8,
-              borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)',
-              backgroundColor: 'rgba(20,184,166,0.06)',
+              flexDirection: 'row', alignItems: 'center', gap: 10,
+              paddingHorizontal: 14, paddingTop: 16, paddingBottom: 12,
             }}>
               <Ionicons
                 name="chatbubbles"
-                size={20}
+                size={18}
                 color="#14B8A6"
-                style={{ textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 3 }}
+                style={{ textShadowColor: 'rgba(20,184,166,0.7)', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 5 }}
               />
               <Text style={{
-                color: '#F1F5F9', fontSize: 14, fontWeight: '700', flex: 1, letterSpacing: -0.2,
-                textShadowColor: 'rgba(0,0,0,0.45)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
+                color: '#F1F5F9', fontSize: 15, fontWeight: '800', flex: 1, letterSpacing: 0.3,
+                textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4,
               }}>Mesajlar</Text>
               {dmUnreadCount > 0 && (
                 <View style={{
-                  minWidth: 20, height: 20, borderRadius: 10,
-                  backgroundColor: '#14B8A6', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5,
+                  paddingHorizontal: 7, paddingVertical: 2,
+                  borderRadius: 100, minWidth: 20, alignItems: 'center',
+                  backgroundColor: 'rgba(20,184,166,0.18)',
+                  borderWidth: 1, borderColor: 'rgba(20,184,166,0.45)',
                 }}>
-                  <Text style={{ color: '#FFF', fontSize: 10, fontWeight: '800' }}>{dmUnreadCount > 99 ? '99+' : dmUnreadCount}</Text>
+                  <Text style={{ color: '#5EEAD4', fontSize: 10, fontWeight: '800', letterSpacing: 0.3 }}>{dmUnreadCount > 99 ? '99+' : dmUnreadCount}</Text>
                 </View>
               )}
             </View>
+            {/* Header separator */}
+            <View style={{ height: 1, backgroundColor: 'rgba(255,255,255,0.06)', marginHorizontal: 12 }} />
 
             {/* Mesaj listesi — ★ Swipe-to-action ile */}
             <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 8, gap: 2 }}>
@@ -1088,20 +1524,41 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
             </ScrollView>
           </>
         )}
+        {/* ★ v109: Mesaj aksiyon menüsü — embedded mod, sadece DmPanel içinde
+             (sağ panel scope'unda) açılır. Backdrop oda görünümünü kapatmaz. */}
+        <MessageActionMenu
+          embedded
+          visible={!!dmActionMenuMsg}
+          message={dmActionMenuMsg}
+          isMe={!!dmActionMenuMsg && dmActionMenuMsg.sender_id === firebaseUser?.uid}
+          onClose={() => setDmActionMenuMsg(null)}
+          isSaved={dmActionMenuMsg ? dmSavedIds.has(dmActionMenuMsg.id) : false}
+          onReply={handleDmReply}
+          onForward={handleDmForward}
+          onCopy={handleDmCopy}
+          onSave={handleDmSave}
+          onEdit={handleDmEdit}
+          onDeleteForEveryone={handleDmDeleteForEveryone}
+          onDeleteFromChat={handleDmDeleteFromChat}
+          onReact={handleDmReact}
+        />
       </Animated.View>
       </Animated.View>
     </View>
   );
 }
 
-/* 
+/*
    ANA EKRAN
     */
 export default function RoomScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, justCreated, caption } = useLocalSearchParams<{ id: string; justCreated?: string; caption?: string }>();
   const { firebaseUser, profile, setMinimizedRoom, minimizedRoom, showNotifDrawer, setShowNotifDrawer, setNotifDrawerAnchorRight, setNotifDrawerRight, setNotifDrawerTop } = useAuth();
+  // ★ 2026-05-05: Oda yeni oluşturulduysa içeride success overlay göster (checked.json + caption).
+  //   create-room?justCreated=1&caption=... ile yönlendiriliyor; overlay tüketince temizlenir.
+  const [showJustCreated, setShowJustCreated] = useState(justCreated === '1');
   const { unreadNotifs } = useBadges();
   
   const [room, setRoom] = useState<Room | null>(null);
@@ -1137,7 +1594,7 @@ export default function RoomScreen() {
   const [inRoomProfileId, setInRoomProfileId] = useState<string | null>(null);
   // ★ 2026-04-20: Kamera fullscreen için seçili kullanıcı (rozete tap ile set edilir)
   const [cameraExpandUser, setCameraExpandUser] = useState<RoomParticipant | null>(null);
-  const [entryEffectName, setEntryEffectName] = useState<string | null>(null);
+  const [entryEffectData, setEntryEffectData] = useState<{ effectId: string; userName: string } | null>(null);
   // Mic permission system (local)
   const [micRequests, setMicRequests] = useState<string[]>([]); // user_id'ler
   const [showMicRequests, setShowMicRequests] = useState(false);
@@ -1150,6 +1607,8 @@ export default function RoomScreen() {
 
   const [showAudienceDrawer, setShowAudienceDrawer] = useState(false);
   const [showChatDrawer, setShowChatDrawer] = useState(false);
+  // ★ v107: Hediye paneli — kontrol barındaki 🎁 butonu açar
+  const [showGiftPanel, setShowGiftPanel] = useState(false);
   // ★ v107: Premium mesaj parlat stilleri — kullanıcının envanteri (cosmetic_items.message_art ürünleri)
   const [ownedPremiumGlowIds, setOwnedPremiumGlowIds] = useState<Set<string>>(new Set());
   useEffect(() => {
@@ -1392,11 +1851,19 @@ export default function RoomScreen() {
         .single();
       const currentSP = userProfile?.system_points || 0;
       if (currentSP < fee) {
+        // ★ 2026-05-05: Toast değil bilgilendirici modal + SP satın al yönlendirmesi.
+        //   Eksik fark vurgulanır, kullanıcıya net seçim sunulur (Vazgeç / SP Al).
+        const missing = fee - currentSP;
         setAlertConfig({
-          visible: true, title: '💰 Yetersiz SP',
-          message: `Bu odaya girmek için ${fee} SP gerekiyor. Mevcut bakiyeniz: ${currentSP} SP.`,
-          type: 'warning', icon: 'wallet-outline',
-          buttons: [{ text: 'Geri Dön', onPress: () => safeGoBack(router) }],
+          visible: true,
+          title: 'SP Yetersiz',
+          message: `Bu oda için ${fee} SP gerekiyor — bakiyen ${currentSP} SP.\n${missing} SP eksik. Mağazadan SP alıp tekrar deneyebilirsin.`,
+          type: 'info',
+          icon: 'wallet-outline',
+          buttons: [
+            { text: 'Vazgeç', style: 'cancel', onPress: () => safeGoBack(router) },
+            { text: 'SP Satın Al', style: 'primary', onPress: () => { safeGoBack(router); setTimeout(() => router.push('/sp-store' as any), 250); } },
+          ],
         });
         return false;
       }
@@ -1754,7 +2221,9 @@ export default function RoomScreen() {
           const _rsPwd = rs.room_password;
           const _rsPwdExplicitNull = _rsPwd === null || _rsPwd === '';
           const hasPwd = !_rsPwdExplicitNull && !!(_rsPwd || roomForCheck.room_password);
-          if (hasPwd) filters.push({ icon: 'lock-closed', color: '#14B8A6', title: 'Şifre Korumalı', desc: 'Doğru şifreyi girersen direkt katılırsın.' });
+          // ★ 2026-05-05: Şifre filtresi pre-check preview'a EKLENMEZ — kullanıcı talebi.
+          //   "Devam Et" → "Şifre Gir" iki adımlı modal yerine direkt şifre sheet'i gösterilir.
+          //   Doğru şifre girer → girer; geri/vazgeç tuşu ile çıkar.
           if (roomForCheck.type === 'invite') filters.push({ icon: 'mail-open', color: '#3B82F6', title: 'Davetli Oda', desc: 'Sahibine istek gönderirsin, onay bekler.' });
 
           if (filters.length > 0) {
@@ -1957,6 +2426,14 @@ export default function RoomScreen() {
                 isJoin: true,
               } as any;
               setChatMessages(prev => [joinMsg, ...prev].slice(0, 100));
+              // ★ v108: Giriş efekti overlay tetikle
+              const npEntryEffect = (np as any).entry_effect;
+              if (npEntryEffect) {
+                setEntryEffectData({
+                  effectId: npEntryEffect,
+                  userName: np.user?.display_name || 'Misafir',
+                });
+              }
             }
           });
         } else {
@@ -2012,6 +2489,19 @@ export default function RoomScreen() {
         setChatMessages(prev => {
           // Initial load ile gelen mesajla aynısı tekrar eklenmesin
           if (prev.find(m => m.id === msg.id)) return prev;
+          // ★ v110.5.9: Optimistic match — kendi gönderdiğim mesaj realtime'dan
+          //   geldiğinde, optimistic temp mesajı server mesajıyla DEĞİŞTİR
+          //   (yoksa duplicate görünür: temp + real).
+          if (msg.sender_id === firebaseUser?.uid) {
+            const optIdx = prev.findIndex((m: any) =>
+              m._optimistic && m.sender_id === msg.sender_id && m.content === msg.content
+            );
+            if (optIdx >= 0) {
+              const next = [...prev];
+              next[optIdx] = msg;
+              return next;
+            }
+          }
           return [msg, ...prev].slice(0, 100);
         });
         // ★ 2026-04-26: Drawer kapalıysa + mesaj başkasından geldiyse → badge artır.
@@ -2360,15 +2850,56 @@ export default function RoomScreen() {
       showToast({ title: '💬 Susturuldun', message: 'Metin sohbetiniz moderatör tarafından kapatıldı.', type: 'warning' });
       return;
     }
+    // ★ v110.5.9 (6 May 2026): OPTIMISTIC UPDATE — WhatsApp pattern.
+    //   Eski: send → DB → realtime → UI. Realtime gecikiyorsa veya kanal kopuksa
+    //   mesaj UI'da görünmüyor → kullanıcı "send tıkladım, bir şey olmadı" sanıyor.
+    //   Yeni: send öncesi optimistic local mesaj eklenir → kullanıcı kendi mesajını
+    //   anında görür. Server timestamp gelince real ID ile replace.
+    const content = chatInput.trim();
+    const tempId = `temp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const myProfile = participants.find(p => p.user_id === firebaseUser.uid)?.profile;
+    const optimisticMsg: any = {
+      id: tempId,
+      room_id: id,
+      sender_id: firebaseUser.uid,
+      user_id: firebaseUser.uid, // RoomChatDrawer'ın user_id alanı için
+      content,
+      created_at: new Date().toISOString(),
+      profiles: myProfile ? {
+        display_name: myProfile.display_name,
+        avatar_url: myProfile.avatar_url,
+        subscription_tier: myProfile.subscription_tier,
+      } : undefined,
+      _optimistic: true,
+    };
+    // ★ v110.14 (8 May 2026): FlatList inverted — başa eklenen alta gelir.
+    //   Önceden [...prev, optimisticMsg] sona eklendiği için inverted yüzünden
+    //   en üstte görünüyordu (kendi mesajım üstte, başkasının mesajı altta).
+    //   Diğer akışlar (join, system, incoming) zaten başa ekliyor; tutarlı olalım.
+    setChatMessages(prev => [optimisticMsg, ...prev]);
+    setChatInput(''); // Input hemen temizlenir, kullanıcı yeni mesaj yazabilir
+    setTimeout(() => chatInputRef.current?.focus(), 100);
+
     try {
-      await RoomChatService.send(id as string, firebaseUser.uid, chatInput.trim());
-      setChatInput('');
-      setTimeout(() => chatInputRef.current?.focus(), 100);
+      const sentMsg = await RoomChatService.send(id as string, firebaseUser.uid, content);
+      if (sentMsg) {
+        // Optimistic'i gerçek server mesajıyla değiştir (id ve timestamp güncellenir)
+        setChatMessages(prev => prev.map(m => m.id === tempId ? { ...sentMsg, user_id: sentMsg.sender_id } as any : m));
+      } else {
+        // Insert null döndü (RLS reject vs.) — optimistic kaldır + uyarı
+        setChatMessages(prev => prev.filter(m => m.id !== tempId));
+        showToast({ title: 'Mesaj gönderilemedi', message: 'Yetkiniz olmayabilir veya bağlantı sorunu.', type: 'error' });
+        return;
+      }
       // ★ SP: Mesaj gönderme (30sn cooldown ile)
       GamificationService.onMessageSent(firebaseUser.uid).then(sp => {
         if (sp > 0) spToastRef.current?.show(sp, 'Mesaj');
       }).catch(() => {});
-    } catch { /* silent fail */ }
+    } catch (err: any) {
+      // Network/exception — optimistic kaldır + uyarı
+      setChatMessages(prev => prev.filter(m => m.id !== tempId));
+      showToast({ title: 'Mesaj gönderilemedi', message: err?.message || 'Bağlantı hatası', type: 'error' });
+    }
   };
 
 
@@ -3861,6 +4392,31 @@ export default function RoomScreen() {
             safeGoBack(router);
           }}
         />
+        {/* ★ 2026-05-05: SP'li oda giriş ücreti onay kartı — early-return blokunda da
+             render edilmeli. Eskiden sadece ana render'daydı; SP'li odalarda
+             accessGranted=false → isAccessPending=true → early-return → modal hiç
+             gösterilmiyor → "Oda hazırlanıyor" sonsuza takılı kalıyordu. */}
+        {entryFeeRequest?.visible && (
+          <EntryFeeCard
+            visible={entryFeeRequest.visible}
+            fee={entryFeeRequest.fee}
+            balance={entryFeeRequest.balance}
+            roomName={entryFeeRequest.roomName}
+            hostName={entryFeeRequest.hostName}
+            hostAvatar={entryFeeRequest.hostAvatar}
+            onConfirm={() => {
+              const r = entryFeeRequest.resolver;
+              setEntryFeeRequest(null);
+              r(true);
+            }}
+            onCancel={() => {
+              const r = entryFeeRequest.resolver;
+              setEntryFeeRequest(null);
+              r(false);
+              safeGoBack(router);
+            }}
+          />
+        )}
       </View>
     </AppBackground>
   );
@@ -3917,13 +4473,17 @@ export default function RoomScreen() {
           roomType={room?.type}
           hostAvatarUrl={room?.host?.avatar_url}
           hostTier={room?.host?.subscription_tier || room?.owner_tier}
+          hostFrameId={(room?.host as any)?.active_frame || null}
           followerCount={followerCount}
           onBellPress={() => {
             // ★ Oda header: bir tık aşağı + bir tık sola. RN'de `right: N` = sağ edge'ten N px;
             //   N büyüdükçe element SOLA gider. Default 8 → 20 (12px sola kaydırma).
             setNotifDrawerAnchorRight(86);          // bell altı (drawer sola gelince arrow orantılı)
             setNotifDrawerRight(38);                // 20→38: ~18px daha sola
-            setNotifDrawerTop(insets.top + 52);     // 46→52: 6px aşağı
+            // ★ 2026-05-05: 52→66 — RoomInfoHeader total height = insets.top + 58 (paddingTop 2 + topNav 50 + paddingBottom 6).
+            //   NotificationDrawer artık Modal kullanmıyor → backdrop drawer top - 8'den başlıyor.
+            //   66 = header alt + 8 → backdrop tam header sınırından, header dim/kapalı kalmaz.
+            setNotifDrawerTop(insets.top + 66);
             setShowNotifDrawer(true);
           }}
           isBellActive={showNotifDrawer}
@@ -4064,7 +4624,13 @@ export default function RoomScreen() {
 
       {/* ★ Hoş geldin artık toast ile (showToast helper) — banner JSX kaldırıldı */}
 
-      {!!entryEffectName && <PremiumEntryBanner name={entryEffectName} onDone={() => setEntryEffectName(null)} />}
+      {!!entryEffectData && (
+        <RoomEntryEffectOverlay
+          effectId={entryEffectData.effectId}
+          userName={entryEffectData.userName}
+          onDone={() => setEntryEffectData(null)}
+        />
+      )}
       <SPToast ref={spToastRef} />
       <ModerationOverlay ref={penaltyRef} />
       {/* ★ 2026-04-22: Welcome overlay — SP toast tarzı fade-in/out animasyonlu.
@@ -4177,6 +4743,21 @@ export default function RoomScreen() {
       {/* ★ Bağış Animasyonu — tüm odaya görünür premium bildirim */}
       <DonationAlert ref={donationAlertRef} />
 
+      {/* ★ v107: Sembol Hediye animasyonu — biri hediye yollayınca alttan uçan emoji + üstte banner */}
+      {id && <RoomGiftAnimationOverlay roomId={id as string} currentUserId={firebaseUser?.uid} />}
+
+      {/* ★ v107: Hediye Paneli — kontrol barındaki 🎁 butonu açar, hep elinin altında */}
+      {firebaseUser?.uid && id && (
+        <RoomGiftPanel
+          visible={showGiftPanel}
+          onClose={() => setShowGiftPanel(false)}
+          senderId={firebaseUser.uid}
+          roomId={id as string}
+          participants={participants}
+          defaultRecipientId={room?.host_id}
+        />
+      )}
+
       {/* ★ v107: GiftSheet — odadaki bir kişiye SP hediyesi (host bağışı değil, listener-to-listener)
            ★ v107.16: inRoom={true} → success modal sinematik mode'da açılır (oda içi en zengin görünüm) */}
       {firebaseUser?.uid && tipSheetTarget && (
@@ -4235,7 +4816,9 @@ export default function RoomScreen() {
         {/* ★ v107.28: StageActionPill — kontrol bar'ın hemen üstünde "Sahneye Çık" / "Sahneden İn" pill.
              ★ v107.33: Chat/DM/audience drawer açıkken GİZLENİR — text input'un üzerine binmesin (kullanıcı raporu).
              Diğer drawer'lar (settings, plus menu) zaten kontrol bar'ı kaplıyor, çakışma yok. */}
-        {firebaseUser?.uid && !showChatDrawer && !showDmPanel && !showAudienceDrawer && (() => {
+        {firebaseUser?.uid && !showChatDrawer && !showDmPanel && !showAudienceDrawer
+          && !showPlusMenu && !showSettings && !showAccessPanel && !showMicRequests
+          && !showInviteFriends && !selectedUser && (() => {
           const myPart = participants.find(p => p.user_id === firebaseUser.uid);
           const myRole = myPart?.role as any;
           const totalSpeakers = stageUsers.length;
@@ -4296,6 +4879,7 @@ export default function RoomScreen() {
             try { lk.toggleCamera?.(); } catch {}
           }}
           onHandPress={handleMicRequest} onChatPress={() => { if (showChatDrawer) setShowChatDrawer(false); else { openOverlay(() => setShowChatDrawer(true)); setChatUnreadCount(0); } }} onPlusPress={() => { if (showPlusMenu) setShowPlusMenu(false); else openOverlay(() => setShowPlusMenu(true)); }}
+          onGiftPress={() => { openOverlay(() => setShowGiftPanel(true)); }}
           onLeavePress={() => {
             setAlertConfig({
               visible: true, title: 'Odadan Ayrıl', message: 'Odadan ayrılmak istediğinize emin misiniz?', type: 'warning', icon: 'exit-outline',
@@ -5097,6 +5681,18 @@ export default function RoomScreen() {
             onSelfPromote: _isSelf && (amIHost || amIModerator) ? handleOwnerModJoinStage : undefined,
           };
         })()}
+      />
+
+      {/* ★ 2026-05-05: Oda yeni oluşturulduysa success overlay (checked.json + caption).
+          Kullanıcı oda içine girdikten sonra animasyon + "Odan Hazır" yazısı görür. */}
+      <BoostSuccessOverlay
+        visible={showJustCreated}
+        caption={caption ? decodeURIComponent(caption) : 'Odan Hazır'}
+        onComplete={() => {
+          setShowJustCreated(false);
+          // URL param'i temizle — geri tuşunda tekrar tetiklenmesin
+          try { router.setParams({ justCreated: undefined, caption: undefined } as any); } catch {}
+        }}
       />
     </Animated.View>
   );
