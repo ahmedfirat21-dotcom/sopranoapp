@@ -175,6 +175,10 @@ interface Props {
   frameId?: string | null;
   /** Avatar boyutu (px) — frame buna göre genişler */
   size: number;
+  /** ★ v110.14: true ise Lottie dalı atlanır, sadece sade palette halka render edilir.
+   *  Sahnedeki host olmayan kullanıcılarda (avatar dengesizliği için) kullanılır;
+   *  herkes Plus halka boyutunda görünür, sadece host kanatlı Lottie alır. */
+  forceRing?: boolean;
 }
 
 // ★ v110.7 (6 May 2026): Web admin panelinden eklenen Lottie/PNG URL'lerinden runtime
@@ -246,12 +250,14 @@ function RemoteAssetFrame({ frameId, size }: { frameId: string; size: number }) 
   return null;
 }
 
-function AvatarFrameImpl({ frameId, size }: Props) {
+function AvatarFrameImpl({ frameId, size, forceRing }: Props) {
   if (!frameId) return null;
 
   // ★ v108.13: Boyuta göre render — büyük avatarlarda Lottie, küçüklerde sade halka.
+  // ★ v110.14: forceRing=true ise Lottie atlanır (sahnede host hariç herkes için
+  //   sade halka — boyut dengesi için kullanıcı talebi).
   const meta = getFrameMeta(frameId);
-  if (meta && LottieView && size >= LOTTIE_MIN_AVATAR_SIZE) {
+  if (meta && LottieView && size >= LOTTIE_MIN_AVATAR_SIZE && !forceRing) {
     return <LottieFrame meta={meta} size={size} />;
   }
 
@@ -318,5 +324,5 @@ function AvatarFrameImpl({ frameId, size }: Props) {
 }
 
 // ★ v108.16: React.memo — frameId/size değişmedikçe re-render etme (ağır Lottie load yok).
-const AvatarFrame = React.memo(AvatarFrameImpl, (a, b) => a.frameId === b.frameId && a.size === b.size);
+const AvatarFrame = React.memo(AvatarFrameImpl, (a, b) => a.frameId === b.frameId && a.size === b.size && a.forceRing === b.forceRing);
 export default AvatarFrame;

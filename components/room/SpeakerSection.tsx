@@ -5,6 +5,8 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { getAvatarSource } from '../../constants/avatars';
 import { RoleColors } from '../../constants/theme';
 import AvatarPenaltyFlash, { type FlashType } from './AvatarPenaltyFlash';
+import RoomAvatarFrame from './RoomAvatarFrame';
+import TierBadge from '../TierBadge';
 import type { RoomParticipant } from '../../services/database';
 
 // ★ Dinamik sahne boyutlandırma — modern platform grid sistemi (Clubhouse/Spaces pattern)
@@ -222,14 +224,13 @@ function StageLightHalo({ active, borderRadius = 16 }: { active: boolean; border
 
   return (
     <>
-      {/* ★ Parlaktan koyuya gradient halka — top-down vertical, sahte radial.
-          Avatar arkası ışıkla yıkanmış hissi; opacity breath ile canlı kalır. */}
+      {/* ★ v109: Avatar arkası gradient ışık — scale 1.02→1.08 (dış) yerine 1.0→1.0 sabit,
+           sadece opacity ile breath. Avatar dış sınırını taşmaz. */}
       <Animated.View
         pointerEvents="none"
         style={[StyleSheet.absoluteFill, {
           borderRadius,
           opacity: innerPulse.interpolate({ inputRange: [0, 1], outputRange: [0.55, 0.9] }),
-          transform: [{ scale: innerPulse.interpolate({ inputRange: [0, 1], outputRange: [1.02, 1.08] }) }],
         }]}
       >
         <LinearGradient
@@ -239,25 +240,27 @@ function StageLightHalo({ active, borderRadius = 16 }: { active: boolean; border
         />
       </Animated.View>
 
-      {/* Dış 3 expand-ring — parlaktan koyuya: light gold → gold → deep amber */}
+      {/* ★ v109: Halkalar avatar dışına taşmasın — scale outward (1.0 → 1.4) yerine
+           inward contract (1.0 → 0.78). Avatar üzerinde "içe doğru sönen ışık dalgası"
+           hissi. Sarı halka avatar dışında parlamaz, üstüne biner. */}
       <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, {
         borderRadius, borderWidth: 2, borderColor: '#FFE082',
-        ...ringStyle(ringA, [0.95, 0.5, 0], [1.0, 1.25]),
+        ...ringStyle(ringA, [0.95, 0.5, 0], [1.0, 0.78]),
       }]} />
       <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, {
         borderRadius, borderWidth: 1.6, borderColor: '#FFD700',
-        ...ringStyle(ringB, [0.8, 0.35, 0], [1.0, 1.32]),
+        ...ringStyle(ringB, [0.8, 0.35, 0], [1.0, 0.72]),
       }]} />
       <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, {
         borderRadius, borderWidth: 1.4, borderColor: '#B45309',
-        ...ringStyle(ringC, [0.5, 0.18, 0], [1.0, 1.42]),
+        ...ringStyle(ringC, [0.5, 0.18, 0], [1.0, 0.66]),
       }]} />
 
-      {/* İç parlayan altın çerçeve — breath pulse, shadow YOK (Android uyumlu) */}
+      {/* İç parlayan altın çerçeve — breath pulse SADECE içe doğru (1.0 → 0.97) */}
       <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, {
         borderRadius, borderWidth: 2.5, borderColor: '#FFD700',
         opacity: innerPulse.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1] }),
-        transform: [{ scale: innerPulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.04] }) }],
+        transform: [{ scale: innerPulse.interpolate({ inputRange: [0, 1], outputRange: [1, 0.97] }) }],
       }]} />
 
       {/* ★ Toz bulutu — 8 partikül, kart merkezinden yukarı süzülür, hafif drift, twinkle. */}
@@ -466,6 +469,8 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, i
   const isMod = user.role === 'moderator';
   const displayName = (user as any).disguise?.display_name || user.user?.display_name || 'Misafir';
   const avatarUrl = (user as any).disguise?.avatar_url || user.user?.avatar_url;
+  // ★ v107: Mağaza avatar çerçevesi — disguise yokken aktif (gizlenmiş kullanıcı normal görünür)
+  const activeFrame = (user as any).disguise ? null : (user.user as any)?.active_frame;
   const { mic: rawMic, speaking, videoTrack, cameraOn } = micStatus;
   const isGhost = (user as any).is_ghost;
   // ★ D3: DB'de is_muted=true ise UI'da kesinlikle "muted" olarak göster — LiveKit
@@ -499,23 +504,47 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, i
     //   Şimdilik instant — kullanıcı pozisyon değişimini görür, zıplama yok.
     <View style={[s.speakerCard, { width: cardWidth }]}>
       <Pressable style={({ pressed }) => [{ width: '100%' }, pressed && { opacity: 0.9, transform: [{ scale: 0.97 }] }]} onPress={onPress}>
-      {/* ★ v92.21 (1 May 2026): HİBRİT shape — kameralı kişi RECTANGULAR rounded
-          (video doğal aspect ratio'sıyla okunur), audio-only kişi CIRCLE (Clubhouse).
-          Bu Discord Stage / TikTok Live / Twitch ko-stream pattern'i. */}
-      {(() => null)()}
-      {/* hasVideo: bu tile kamerayla mı render edilecek */}
-      {(() => null)()}
+      {/* ★ v109.4: Frame wrapper'ı SADECE avatar alanına kilitlendi (top:0, height:cardWidth).
+           Eski: absoluteFillObject Pressable'ın tüm yüksekliğini (avatar + label) kapsıyordu
+           → flex center label payı kadar aşağı kaydırıyordu, frame avatardan kayıktı.
+           Şimdi: avatar boyutunda fixed wrapper → frame tam avatar üstünde.
+           Audio modda çalışır, kameralı modda zaten gizli. */}
+      {!(cameraOn && videoTrack && VideoView) && activeFrame && (
+        <View
+          style={{
+            position: 'absolute',
+            top: 0, left: 0, right: 0,
+            height: cardWidth,
+            alignItems: 'center',
+            justifyContent: 'center',
+            // ★ 2026-05-05: Frame avatar Image üstünde (zIndex 2) — palette halka çerçeveleri
+            //   (ince ring tipi: aurum-ring, glacier-ring vs.) avatar dairesinin EDGE'inde
+            //   render olduğu için altta kalırsa Image tarafından tamamen örtülüyor.
+            //   Badge'ler (zIndex 999, elevation 30) zaten frame'in de üstünde kalıyor.
+            zIndex: 2,
+            elevation: 2,
+          }}
+          pointerEvents="none"
+        >
+          <View style={{ width: cardWidth, height: cardWidth }}>
+            <RoomAvatarFrame frameId={activeFrame} avatarSize={cardWidth} minSize={56} forceRing={!isHost} />
+          </View>
+        </View>
+      )}
       <View style={[
         s.speakerCardInner,
         {
           width: cardWidth,
           height: cameraOn && videoTrack && VideoView ? cardHeight : cardWidth,
-          borderColor: ringColor,
-          borderWidth: isHost || isMod ? 2 : 1.5,
+          // ★ v108.32: Aktif frame varsa rol border'ı kaldır — çift halka önlenir
+          //   (StatusAvatar ile aynı pattern: frameId ? 0 : borderWidth)
+          borderColor: activeFrame ? 'transparent' : ringColor,
+          borderWidth: activeFrame ? 0 : (isHost || isMod ? 2 : 1.5),
           // Kameralı: rounded rectangle (cardWidth*0.08 ~ 8-12px corner)
           // Audio-only: full circle (cardWidth/2)
           borderRadius: cameraOn && videoTrack && VideoView ? Math.max(12, Math.floor(cardWidth * 0.08)) : cardWidth / 2,
           overflow: 'visible',
+          // ★ 2026-05-05: Frame artık zIndex 2 ile üstte — speakerCardInner default z'de kalır.
         },
       ]}>
         <View style={[StyleSheet.absoluteFill, {
@@ -571,47 +600,18 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, i
         {/* ★ v92.18 (1 May 2026): Compact badge mode — küçük tile'da (cardWidth<200)
             ikonlar küçülür, kenarlık incelir, gölge azalır. Yüzü kaplamaz.
             Kullanıcı şikâyeti: "ikonlar görüşü bozuyor". */}
+        {/* ★ v109.4.4: Sahnede tier rozeti avatar değil, isim ALTINDA gösteriliyor (aşağıda).
+             Sol-alt avatar render kaldırıldı — kullanıcı talebi. */}
         {(() => {
+          // ★ 2026-05-05: Mic + camera statü ikonları KALDIRILDI (kullanıcı talebi).
+          //   Konuşma sinyali zaten SpeakingGlow ile (avatar etrafı pulse) görünüyor.
+          //   Mod quick-mute kalır — bu statü değil, moderasyon eylemi.
           const compact = cardWidth < 200;
-          const sz = compact ? 22 : 28;
-          const inner = compact ? 12 : 14;
-          const pos = compact ? 6 : 10;
-          const cameraSz = compact ? 20 : 26;
-          const cameraInner = compact ? 11 : 13;
+          const pos = compact ? -8 : -12;
           const quickSz = compact ? 20 : 26;
           const quickInner = compact ? 10 : 12;
           return (
             <>
-              <View style={[
-                {
-                  position: 'absolute', bottom: pos, right: pos, width: sz, height: sz,
-                  borderRadius: sz / 2, alignItems: 'center', justifyContent: 'center',
-                  borderWidth: compact ? 1 : 2, borderColor: 'rgba(15,23,42,0.7)',
-                  shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-                  shadowOpacity: compact ? 0.3 : 0.5, shadowRadius: compact ? 3 : 6,
-                  elevation: compact ? 3 : 6, zIndex: 2,
-                },
-                mic ? s.micBadgeOn : s.micBadgeOff,
-              ]}>
-                <Ionicons name={mic ? 'mic' : 'mic-off'} size={inner} color="#fff" />
-              </View>
-              {cameraOn && videoTrack && onCameraExpand && (
-                <Pressable
-                  onPress={(e) => { e.stopPropagation?.(); onCameraExpand(user); }}
-                  hitSlop={6}
-                  style={({ pressed }) => [{
-                    position: 'absolute', top: pos, right: pos, width: cameraSz, height: cameraSz,
-                    borderRadius: cameraSz / 2, alignItems: 'center', justifyContent: 'center',
-                    borderWidth: compact ? 1 : 2, borderColor: 'rgba(15,23,42,0.7)',
-                    backgroundColor: '#0EA5A3',
-                    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-                    shadowOpacity: compact ? 0.3 : 0.6, shadowRadius: compact ? 3 : 8,
-                    elevation: compact ? 3 : 6, zIndex: 2,
-                  }, pressed && { opacity: 0.7, transform: [{ scale: 0.92 }] }]}
-                >
-                  <Ionicons name="videocam" size={cameraInner} color="#fff" />
-                </Pressable>
-              )}
               {canModerate && onQuickMute && (
                 <Pressable
                   onPress={(e) => { e.stopPropagation?.(); onQuickMute(); }}
@@ -624,7 +624,7 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, i
                     backgroundColor: dbMuted ? 'rgba(16,185,129,0.8)' : 'rgba(245,158,11,0.8)',
                     shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
                     shadowOpacity: compact ? 0.3 : 0.6, shadowRadius: compact ? 3 : 8,
-                    elevation: compact ? 3 : 6, zIndex: 2,
+                    elevation: 12, zIndex: 10,
                   }, pressed && { opacity: 0.7, transform: [{ scale: 0.9 }] }]}
                 >
                   <Ionicons name={dbMuted ? 'volume-high' : 'volume-mute'} size={quickInner} color="#fff" />
@@ -636,7 +636,19 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, i
         {/* ★ Owner sadece altın border + biraz büyük kart ile belli. Crown badge + label
             KALDIRILDI (kullanıcı "kötü oldu" dedi, sade olmasını istiyor). */}
       </View>
-      <Text style={[s.speakerName, { maxWidth: cardWidth - 8, fontSize: cardWidth < 95 ? 10 : 11 }, isHost && { color: '#FFD700' }, isMod && !isHost && { color: '#C4B5FD' }]} numberOfLines={1} ellipsizeMode="tail">{displayName}</Text>
+      {/* ★ v109.4.4: İsim ortalı + altında "PRO" pill (sm, label dahil)
+          ★ 2026-05-05: Frame Lottie kanat'ları altta kalsın diye z-order yükseltildi.
+          İsim ve tier badge avatar çerçevesinin üzerinde görünür. */}
+      <View style={{ alignItems: 'center', maxWidth: cardWidth, gap: 2, zIndex: 50, elevation: 20 }}>
+        <Text
+          style={[s.speakerName, { maxWidth: cardWidth - 4, fontSize: cardWidth < 95 ? 10 : 11 }, isHost && { color: '#FFD700' }, isMod && !isHost && { color: '#C4B5FD' }]}
+          numberOfLines={1}
+          ellipsizeMode="tail"
+        >
+          {displayName}
+        </Text>
+        <TierBadge tier={(user.user as any)?.subscription_tier} size="sm" />
+      </View>
       </Pressable>
       {/* ★ 2026-04-22: "Sahneden İn" butonu kart içinden KALDIRILDI — parent container'ın
           maxHeight'ı Android'de touch event'i çocuk dışına bırakmıyordu (RN bug).
@@ -903,31 +915,37 @@ const s = StyleSheet.create({
   },
   // ★ 2026-04-26: Squircle kart için pozisyon iç kenardan 10px (eski 6px köşe yuvarlağının dışında kalıyordu).
   micBadge: {
-    position: 'absolute', bottom: 10, right: 10, width: 28, height: 28,
+    // ★ v109.3: bottom/right 10 → 0 — frame içinde değil, kart kenarında otursun.
+    //   Audio mod kare daire kart, badge yuvarlak avatar dış sınırına yakın.
+    //   Frame halkasının dışında göründüğünden artık badge halkanın altında kalmaz.
+    position: 'absolute', bottom: 0, right: 0, width: 28, height: 28,
     borderRadius: 14, alignItems: 'center', justifyContent: 'center',
     borderWidth: 2, borderColor: 'rgba(15,23,42,0.8)',
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.5, shadowRadius: 6, elevation: 6, zIndex: 2,
+    shadowOpacity: 0.5, shadowRadius: 6,
+    zIndex: 10, elevation: 12,
   },
   micBadgeOn: { backgroundColor: '#14B8A6' },
   micBadgeOff: { backgroundColor: 'rgba(239,68,68,0.9)' },
   cameraBadge: {
-    position: 'absolute', top: 10, right: 10, width: 26, height: 26,
+    // ★ v109.3: top/right 0 → kart köşesi, frame halkası altında kalmasın
+    position: 'absolute', top: 0, right: 0, width: 26, height: 26,
     borderRadius: 13, alignItems: 'center', justifyContent: 'center',
     borderWidth: 2, borderColor: 'rgba(15,23,42,0.8)',
     backgroundColor: '#0EA5A3',
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.6, shadowRadius: 8, elevation: 6, zIndex: 2,
+    shadowOpacity: 0.6, shadowRadius: 8,
+    zIndex: 10, elevation: 12,
   },
-  // ★ 2026-04-26: Inline mute butonu — moderatör için kart sağ-alt köşede
-  // ★ 2026-04-26: Sol-alt köşede — micBadge ile çakışmaz, kart sınırı içinde durur.
+  // ★ 2026-04-26: Inline mute butonu — moderatör için kart sol-alt köşede
   quickMuteBadge: {
-    position: 'absolute', bottom: 10, left: 10, width: 26, height: 26,
+    position: 'absolute', bottom: 0, left: 0, width: 26, height: 26,
     borderRadius: 13, alignItems: 'center', justifyContent: 'center',
     borderWidth: 1.5, borderColor: 'rgba(245,158,11,0.55)',
     backgroundColor: 'rgba(245,158,11,0.85)',
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.6, shadowRadius: 8, elevation: 6, zIndex: 2,
+    shadowOpacity: 0.6, shadowRadius: 8,
+    zIndex: 10, elevation: 12,
   },
   // ★ Ghost overlay — "gizli" modunda hafif bir tonda üstüne bindirilir (badge yerine)
   ghostOverlay: {
@@ -955,7 +973,15 @@ const s = StyleSheet.create({
     fontSize: 9, fontWeight: '800', color: '#CFFAFE',
     letterSpacing: 0.3, fontVariant: ['tabular-nums'],
   },
-  speakerName: { fontSize: 11, fontWeight: '700', color: '#F1F5F9', marginTop: 5, textAlign: 'center', maxWidth: 140, textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
+  // ★ 2026-05-05: İsim "pop" — fontWeight 700→800, daha belirgin glow + letterSpacing
+  speakerName: {
+    fontSize: 12, fontWeight: '800', color: '#F1F5F9',
+    marginTop: 6, textAlign: 'center', maxWidth: 140,
+    letterSpacing: 0.3,
+    textShadowColor: 'rgba(0,0,0,0.75)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 6,
+  },
   speakerNameHost: { color: '#FFD700' },
   speakerNameHostBig: {
     color: '#FFD700',
