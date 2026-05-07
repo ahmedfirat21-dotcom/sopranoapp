@@ -112,7 +112,6 @@ import { VoiceReactionService } from '../../services/voiceReactions';
 import RoomChatDrawer from '../../components/room/RoomChatDrawer';
 import RoomGiftAnimationOverlay from '../../components/room/RoomGiftAnimationOverlay';
 import RoomGiftPanel from '../../components/room/RoomGiftPanel';
-import FrameSelectSheet from '../../components/profile/FrameSelectSheet';
 import { StoreService } from '../../services/store';
 import { PREMIUM_GLOW_IDS } from '../../components/room/glowStyles';
 // ★ v107.3: Host bağışı StageSupportSheet'e taşındı (DonationAlert tüm odaya gösterilen bildirim)
@@ -1608,11 +1607,6 @@ export default function RoomScreen() {
 
   const [showAudienceDrawer, setShowAudienceDrawer] = useState(false);
   const [showChatDrawer, setShowChatDrawer] = useState(false);
-  // ★ v110.14: Kendi avatara tıklayınca envanter (çerçeve + giriş efekti) sheet'i açılır.
-  //   Profil sayfasına gitmek zorunda kalmadan oda içinde değiştirilebilir.
-  const [showSelfFrameSheet, setShowSelfFrameSheet] = useState(false);
-  const [myActiveFrame, setMyActiveFrame] = useState<string | null>(null);
-  const [myActiveEntryEffect, setMyActiveEntryEffect] = useState<string | null>(null);
   // ★ v107: Hediye paneli — kontrol barındaki 🎁 butonu açar
   const [showGiftPanel, setShowGiftPanel] = useState(false);
   // ★ v107: Premium mesaj parlat stilleri — kullanıcının envanteri (cosmetic_items.message_art ürünleri)
@@ -4586,17 +4580,7 @@ export default function RoomScreen() {
         paddingTop: 8,
       }}>
         <SpeakerSection stageUsers={stageUsers} getMicStatus={getMicStatus}
-          onSelectUser={(u) => {
-            // ★ v110.14: Kendi avatara tıklayınca envanter sheet'i (frame + entry effect)
-            //   doğrudan açılır — profile gitmeye gerek yok.
-            if (u.user_id === firebaseUser?.uid) {
-              setMyActiveFrame((u as any)?.user?.active_frame || null);
-              setMyActiveEntryEffect((u as any)?.user?.active_entry_effect || null);
-              setShowSelfFrameSheet(true);
-              return;
-            }
-            setSelectedUser(u); setInRoomProfileId(u.user_id);
-          }}
+          onSelectUser={(u) => { setSelectedUser(u); setInRoomProfileId(u.user_id); }}
           onSelfDemote={handleSelfDemote}
           currentUserId={firebaseUser?.uid} VideoView={LKVideoView}
           onGhostSeatPress={handleGhostSeatPress} showSeatTooltip={showSeatTooltip}
@@ -4634,15 +4618,7 @@ export default function RoomScreen() {
       {/* Clubhouse modeli: zemin overlay chat KALDIRILDI.
           Oda içi sohbet yalnızca kontrol barın chat butonundan açılan RoomChatDrawer üzerinden erişilir. */}
       <View style={{ flex: 1, overflow: 'hidden' }}>
-        <ListenerGrid listeners={listenerUsers} onSelectUser={(u) => {
-          if (u.user_id === firebaseUser?.uid) {
-            setMyActiveFrame((u as any)?.user?.active_frame || null);
-            setMyActiveEntryEffect((u as any)?.user?.active_entry_effect || null);
-            setShowSelfFrameSheet(true);
-            return;
-          }
-          setSelectedUser(u); setInRoomProfileId(u.user_id);
-        }} selectedUserId={selectedUser?.user_id} onShowAllUsers={() => openOverlay(() => setShowAudienceDrawer(true))} maxListeners={getRoomLimits(ownerTier as any).maxListeners} spectatorCount={spectatorUsers.length} roomOwnerId={room?.host_id}
+        <ListenerGrid listeners={listenerUsers} onSelectUser={(u) => { setSelectedUser(u); setInRoomProfileId(u.user_id); }} selectedUserId={selectedUser?.user_id} onShowAllUsers={() => openOverlay(() => setShowAudienceDrawer(true))} maxListeners={getRoomLimits(ownerTier as any).maxListeners} spectatorCount={spectatorUsers.length} roomOwnerId={room?.host_id}
           avatarFlashes={avatarFlashes} onFlashDone={clearAvatarFlash} micRequestUserIds={micRequests} />
       </View>
 
@@ -4962,28 +4938,7 @@ export default function RoomScreen() {
 
       {/* ★ HOST-FIX: AudienceDrawer'da host her zaman 'owner' olarak gösterilsin */}
       <AudienceDrawer visible={showAudienceDrawer} users={[...stageUsers, ...listenerUsers, ...spectatorUsers].map(u => u.user_id === room?.host_id ? { ...u, role: 'owner' } : u)}
-        onClose={() => setShowAudienceDrawer(false)} onSelectUser={(u) => {
-          if ((u as any).user_id === firebaseUser?.uid) {
-            setMyActiveFrame((u as any)?.user?.active_frame || null);
-            setMyActiveEntryEffect((u as any)?.user?.active_entry_effect || null);
-            setShowSelfFrameSheet(true);
-            return;
-          }
-          setSelectedUser(u as any); setInRoomProfileId((u as any).user_id);
-        }} />
-
-      {/* ★ v110.14: Kendi avatara tıklayınca açılan envanter sheet (frame + entry effect) */}
-      {firebaseUser?.uid && (
-        <FrameSelectSheet
-          visible={showSelfFrameSheet}
-          onClose={() => setShowSelfFrameSheet(false)}
-          userId={firebaseUser.uid}
-          currentFrameId={myActiveFrame}
-          currentEntryEffectId={myActiveEntryEffect}
-          onFrameChange={(id) => setMyActiveFrame(id)}
-          onEntryEffectChange={(id) => setMyActiveEntryEffect(id)}
-        />
-      )}
+        onClose={() => setShowAudienceDrawer(false)} onSelectUser={(u) => { setSelectedUser(u as any); setInRoomProfileId((u as any).user_id); }} />
 
       {/* ★ 2026-04-26: ProfileCard kaldırıldı — mod aksiyonları InRoomUserProfile'a taşındı.
            selectedUser odadan ayrılırsa her iki state'i de temizle. */}
