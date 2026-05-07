@@ -604,7 +604,11 @@ export default function OnboardingScreen() {
         </ScrollView>
 
         {/* ═══ Footer CTA ═══ */}
-        <View style={[s.footer, { paddingBottom: Math.max(Platform.OS === 'android' ? 64 : 36, insets.bottom + 24) }]}>
+        {/* ★ v110.14: Math.max yerine toplama — insets.bottom + sabit margin. Samsung
+             S25 3-button nav modunda insets 0 dönebiliyor; eskisinde Math.max(64, 24) = 64
+             yeterli değildi, buton nav bar'ın altına giriyordu. Yeni: insets + 96 Android
+             (3-button nav 48dp + 48dp tampon), insets + 36 iOS. */}
+        <View style={[s.footer, { paddingBottom: insets.bottom + (Platform.OS === 'android' ? 96 : 36) }]}>
           {step === 4 ? (
             <View style={s.footerRow}>
               <Pressable
