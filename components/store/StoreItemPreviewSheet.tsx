@@ -169,13 +169,13 @@ export default function StoreItemPreviewSheet({
         {/* Hero — büyük ürün görseli */}
         <View style={s.hero}>
           {/* Rarity glow halo */}
-          {/* ★ v110.14: Android shadow blur etmediği için backgroundColor düz dolgun daire
-               olarak görünüyordu. Android'de alpha 0A (%4), iOS'ta 22 (%13) — iOS shadow
-               zaten yumuşak halo yapıyor, alpha düşük olabilir. */}
-          <View style={[s.heroGlow, {
-            backgroundColor: rarityColor + (Platform.OS === 'android' ? '0A' : '22'),
-            shadowColor: rarityColor,
-          }]} pointerEvents="none" />
+          {/* ★ v110.14: Android'de heroGlow tamamen kaldırıldı — shadow blur etmediği
+               için yumuşak halo yerine düz dolgun renk dairesi çıkıyordu (kullanıcı
+               "modal öncesi hal gibi göster"). iOS'ta shadow gerçek halo yaptığı için
+               iOS'ta korunuyor. */}
+          {Platform.OS === 'ios' && (
+            <View style={[s.heroGlow, { backgroundColor: rarityColor + '22', shadowColor: rarityColor }]} pointerEvents="none" />
+          )}
           <Animated.View style={{ transform: [{ scale: heroScale }] }}>
             <Item3DArt
               itemId={item.id}
