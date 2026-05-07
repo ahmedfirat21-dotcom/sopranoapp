@@ -10,7 +10,7 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, Animated, Pressable, TextInput,
-  FlatList, Image, Platform, PanResponder, useWindowDimensions, Keyboard, Dimensions, Easing,
+  FlatList, Image, Platform, PanResponder, Keyboard, Dimensions, Easing,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -19,7 +19,11 @@ import { getAvatarSource } from '../../constants/avatars';
 import { EmojiReactionBar } from '../EmojiReactions';
 import { RoomChatService } from '../../services/roomChat';
 import MessageGlowPickerSheet from './MessageGlowPickerSheet';
+import RoomAvatarFrame from './RoomAvatarFrame';
+import LinkifiedText from '../LinkifiedText';
 import SPIcon from '../SPIcon';
+import TierBadge from '../TierBadge';
+import { migrateLegacyTier } from '../../types';
 
 // Snap points — CONTROL_BAR_AREA: bar + padding alanı (insets.bottom hariç).
 // RoomControlBar: BAR_H=50 + üstündeki wrapper paddingBottom(8) = 58.
@@ -366,30 +370,80 @@ export default function RoomChatDrawer({
   const [pendingGlowStyle, setPendingGlowStyle] = useState<GlowStyleId | null>(null);
 
   // ════════════════════════════════════════════════════════════
-  // Dynamic snap points — useWindowDimensions window boyutu değişince
-  // (adjustResize ile klavye açılınca küçülür) snap'ler otomatik güncellenir.
+  // ★ v108.30 (5 May 2026): TOP-BASED POSITIONING — adjustResize tamamen bypass.
+  //
+  // SORUN: position:absolute + bottom → parent'ın alt kenarından ölçer.
+  //   adjustResize parent (window) yüksekliğini küçültüyor → parent alt kenarı
+  //   yukarı kayıyor → bottom:72 artık ekranın ortasında. Her cihazda farklı.
+  //
+  // ÇÖZÜM: `bottom` yerine `top` kullan. Keyboard event'in screenY değeri
+  //   ekranın mutlak koordinat sistemi — adjustResize'dan etkilenmez.
+  //   Klavye kapalı → top = screenH - controlBarArea - inputBarH
+  //   Klavye açık → top = e.endCoordinates.screenY - inputBarH
+  //   Bu değerler parent boyutundan bağımsız, her cihazda aynı.
   // ════════════════════════════════════════════════════════════
-  const { height: windowH } = useWindowDimensions();
-  // ★ 2026-04-24: Sheet bottom = control barın üst kenarıyla birebir hizalı.
-  //   Eski formül +26px gap bırakıyordu (S9 vs. küçük-ekran modellerde belirgin).
-  const bottomOffset = CONTROL_BAR_AREA + Math.max(insets.bottom, 14);
-  const availableH = windowH - bottomOffset - Math.max(insets.top, 20);
+  const screenH = Dimensions.get('screen').height;
+
+  // Rest bottom (kontrol barı + safe area) — bottom offset olarak hesapla
+  const restBottom = CONTROL_BAR_AREA + Math.max(insets.bottom, 14);
+  // Snap points — screen-based, adjustResize'dan bağımsız
+  const availableH = screenH - restBottom - Math.max(insets.top, 20);
   const SNAP_CLOSED = 0;
-  const SNAP_HALF = Math.min(availableH * 0.55, windowH * 0.45);
+  const SNAP_HALF = Math.min(availableH * 0.55, screenH * 0.45);
   const SNAP_FULL = availableH;
 
   // ════════════════════════════════════════════════════════════
-  // Input bar — bağımsız Keyboard-aware bottom konumlandırma
+  // Input bar — TOP-based konumlandırma (screen-based, adjustResize-proof)
   // ════════════════════════════════════════════════════════════
-  const INPUT_BAR_H = 54;
-  const inputBottomAnim = useRef(new Animated.Value(bottomOffset)).current;
-  const sheetBottomAnim = useRef(new Animated.Value(bottomOffset)).current;
+  const GLOW_BANNER_H = 38;
+  const INPUT_BAR_BASE_H = 54;
+  const INPUT_BAR_H = pendingGlowStyle ? INPUT_BAR_BASE_H + GLOW_BANNER_H : INPUT_BAR_BASE_H;
 
+  // ★ Rest (klavye kapalı): input bar kontrol barının hemen üstünde
+  //   top = screenH - restBottom - INPUT_BAR_H (screen'in en altından itibaren)
+  //   Ama position:absolute + top → PARENT'ın üst kenarından ölçer.
+  //   Parent top = statusBar üstü ≈ 0 (SafeAreaView parent'ında)
+  //   Ancak room page'de parent tam ekran.
+  //   → top = screenH - restBottom - INPUT_BAR_H parent'ın nerede olduğuna bakmaz
+  //   ÇÜNKÜ adjustResize parent'ı küçültür → top değeri fiziksel olarak window içinde
+  //   daha aşağıda kalır ama window'un bottom'u zaten yukarı çıkar...
+  //
+  //   ★ DOĞRU ÇÖZÜM: `bottom` kullan AMA adjustResize'ı BU ekran için kapat.
+  //   adjustNothing/adjustPan ile window küçülmez → bottom değerleri stabil kalır.
+  //   Bunun için softwareKeyboardLayoutMode'u runtime'da değiştirmek yerine,
+  //   daha pragmatik bir yol: inputBar ve sheet'i React Native Modal içinde render et
+  //   (Modal kendi Window'unu kullanır, adjustResize etkisinden bağımsız).
+  //
+  // ★★ PRAGMATIK FIX: Tüm bu karmaşıklığı bypass etmek için:
+  //   adjustResize window'u H kadar küçültür (kbHeight kadar)
+  //   → parent bottom = screen bottom - kbHeight
+  //   → bottom:X → screen bottom'dan X + kbHeight yukarıda
+  //   AMA biz bottom:restBottom diyoruz → screen bottom'dan restBottom + kbHeight yukarıda
+  //   İstediğimiz: screen bottom'dan restBottom yukarıda (klavye kapalı), kbHeight yukarıda (klavye açık)
+  //
+  //   adjustResize OTOMATIK olarak kbHeight eklediği için:
+  //   Klavye kapalı: bottom:restBottom → ekranın altından restBottom px yukarıda ✓
+  //   Klavye açık: window küçülüyor → bottom:restBottom → ekranın altından restBottom + kbHeight yukarıda ✗ (çok yukarı!)
+  //   Düzeltme: Klavye açıkken bottom değerini adjustResize etkisini compense edecek şekilde DÜŞÜR.
+  //   Klavye açık hedef: bottom = max(kbHeight, restBottom)  (ekranın altından)
+  //   adjustResize zaten kbHeight ekliyor → bottom = max(kbHeight, restBottom) - kbHeight
+  //   VEYA: bottom = 0 (adjustResize + 0 = kbHeight'ta, bu klavyenin tam üstü)
+  //   VEYA: bottom = max(0, restBottom - kbHeight) (kontrol bar alanı > klavye ise restBottom tut)
+  //
+  // SONUÇ: adjustResize'ı KOMPENSE et — kbHeight kadar bottom'u düşür.
+  const [kbCompensation, setKbCompensation] = useState(0);
+  const adjustedBottom = restBottom - kbCompensation;
+
+  const inputBottomAnim = useRef(new Animated.Value(restBottom)).current;
+  const sheetBottomAnim = useRef(new Animated.Value(restBottom)).current;
+
+  // İlk açılışta instant set (animasyonsuz)
   useEffect(() => {
     if (!visible) return;
-    inputBottomAnim.setValue(bottomOffset);
-    sheetBottomAnim.setValue(bottomOffset);
-  }, [visible, bottomOffset]);
+    inputBottomAnim.setValue(restBottom);
+    sheetBottomAnim.setValue(restBottom);
+    setKbCompensation(0);
+  }, [visible]);
 
   useEffect(() => {
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
@@ -397,55 +451,94 @@ export default function RoomChatDrawer({
 
     const showSub = Keyboard.addListener(showEvent, (e) => {
       if (!visible) return;
-      const screenH = Dimensions.get('screen').height;
-      // ★ v86 FIX: Samsung Android'de e.endCoordinates.screenY yanlış değer döndürebilir
-      //   (status bar / nav bar dahil/hariç tutarsızlığı). e.endCoordinates.height direkt
-      //   klavye yüksekliğini verir — keyboard-controller pattern'iyle aynı.
-      const kbHeight = e.endCoordinates.height || (screenH - e.endCoordinates.screenY);
-      const kbTop = screenH - kbHeight;
-      // Klavye üstü ile status bar arasındaki kullanılabilir alan
-      const visibleArea = kbTop - Math.max(insets.top, 20) - INPUT_BAR_H;
-      // Sheet yüksekliğini görünür alana sınırla (header kaybolmasın)
+      const kbHeight = e.endCoordinates?.height || 0;
+
+      if (Platform.OS === 'ios') {
+        // iOS: adjustResize yok → bottom'a kbHeight ekle (eski mantık)
+        const targetBottom = restBottom + kbHeight;
+        Animated.parallel([
+          Animated.timing(inputBottomAnim, { toValue: targetBottom, duration: 250, useNativeDriver: false }),
+          Animated.timing(sheetBottomAnim, { toValue: targetBottom, duration: 250, useNativeDriver: false }),
+        ]).start();
+      } else {
+        // ★ v108.32 (6 May 2026): Universal Android keyboard positioning.
+        //
+        // İKİ FARKLI ANDROID DAVRANIŞI:
+        //   1) Eski API (<36): adjustResize window'u küçültür → parent alt kenarı = screenH - kbHeight
+        //   2) Yeni API (36+): edge-to-edge → window sabit kalır → parent alt kenarı = screenH
+        //
+        // HER İKİSİNDE DE ÇALIŞAN ÇÖZÜM:
+        //   kbScreenY = klavyenin üst kenarının mutlak ekran koordinatı (her zaman doğru)
+        //   restScreenY = inputBar'ın olması gereken minimum ekran pozisyonu (kontrol barı üstü)
+        //
+        //   Eğer kbScreenY < restScreenY → klavye kontrol barını örttü → inputBar'ı kbScreenY'ye taşı
+        //   Eğer kbScreenY >= restScreenY → klavye küçük → inputBar restBottom'da kalsın
+        //
+        // HESAPLAMA:
+        //   adjustResize durumu: window küçülmüş, parent bottom = kbScreenY
+        //     bottom:0 = kbScreenY (tam üstü) ✓
+        //   edge-to-edge durumu: window sabit, parent bottom = screenH  
+        //     bottom: (screenH - kbScreenY) = kbHeight (tam üstü) ✓
+        //
+        //   Genel formül: targetBottom = max(restBottom, screenH - kbScreenY)
+        //   Ama adjustResize'da screenH - kbScreenY = kbHeight, ve window küçülmüş.
+        //   Bu yüzden 50ms delay ile gerçek window boyutunu alıp düzeltiyoruz.
+        
+        const kbScreenY = e.endCoordinates?.screenY || (screenH - kbHeight);
+        
+        // Hemen bir ilk pozisyon ayarla (ani atlama hissi olmasın)
+        const immediateTarget = Math.max(0, restBottom);
+        inputBottomAnim.setValue(immediateTarget);
+        sheetBottomAnim.setValue(immediateTarget);
+        
+        // 50ms sonra kesin pozisyon hesapla (adjustResize tamamlansın)
+        setTimeout(() => {
+          const currentWindowH = Dimensions.get('window').height;
+          const windowShrunk = screenH - currentWindowH;
+          
+          let targetBottom: number;
+          if (windowShrunk > 20) {
+            // Eski adjustResize: window küçüldü
+            // bottom:0 artık kbScreenY'de → restBottom'u kompanse et
+            targetBottom = Math.max(0, restBottom - windowShrunk);
+          } else {
+            // Yeni edge-to-edge VEYA window henüz küçülmedi
+            // bottom = screenH - kbScreenY = kbHeight (klavyenin tam üstü)
+            targetBottom = Math.max(restBottom, screenH - kbScreenY);
+          }
+
+          Animated.parallel([
+            Animated.timing(inputBottomAnim, { toValue: targetBottom, duration: 120, useNativeDriver: false }),
+            Animated.timing(sheetBottomAnim, { toValue: targetBottom, duration: 120, useNativeDriver: false }),
+          ]).start();
+
+          setKbCompensation(Math.max(windowShrunk, 0));
+        }, 50);
+      }
+
+      // Sheet height'ını klavye üstüne sığdır
+      const statusBarH = Math.max(insets.top, 20);
+      const visibleArea = screenH - Math.max(kbHeight, restBottom) - statusBarH - INPUT_BAR_H;
       if (currentSnap.current > visibleArea && visibleArea > 0) {
         currentSnap.current = visibleArea;
         Animated.timing(sheetHeight, {
           toValue: visibleArea,
-          duration: 250,
+          duration: 220,
           useNativeDriver: false,
         }).start();
       }
-      // Input bar + Sheet birlikte yukarı kay
-      Animated.parallel([
-        Animated.timing(inputBottomAnim, {
-          toValue: kbHeight,
-          duration: 250,
-          useNativeDriver: false,
-        }),
-        Animated.timing(sheetBottomAnim, {
-          toValue: kbHeight,
-          duration: 250,
-          useNativeDriver: false,
-        }),
-      ]).start();
     });
 
     const hideSub = Keyboard.addListener(hideEvent, () => {
+      setKbCompensation(0);
       Animated.parallel([
-        Animated.timing(inputBottomAnim, {
-          toValue: bottomOffset,
-          duration: 200,
-          useNativeDriver: false,
-        }),
-        Animated.timing(sheetBottomAnim, {
-          toValue: bottomOffset,
-          duration: 200,
-          useNativeDriver: false,
-        }),
+        Animated.timing(inputBottomAnim, { toValue: restBottom, duration: 200, useNativeDriver: false }),
+        Animated.timing(sheetBottomAnim, { toValue: restBottom, duration: 200, useNativeDriver: false }),
       ]).start();
     });
 
     return () => { showSub.remove(); hideSub.remove(); };
-  }, [visible, bottomOffset]);
+  }, [visible, restBottom, INPUT_BAR_H, insets.top, screenH]);
 
   // ════════════════════════════════════════════════════════════
   // Animated sheet height — 0 (closed) → SNAP_HALF → SNAP_FULL
@@ -652,9 +745,54 @@ export default function RoomChatDrawer({
   // ════════════════════════════════════════════════════════════
   const renderMessage = useCallback(({ item }: { item: ChatMsg }) => {
     if (!item) return null;
+    // ★ v110.14 (8 May 2026): Join/Leave bildirimi — balonsuz, ortada, sade.
+    //   Önceden büyük chat balonu olarak görünüyordu, içinde "odaya katıldı" yazıyordu.
+    //   Şimdi tek satır italic gri text, akışı kesmiyor.
+    const isJoin = (item as any).isJoin === true;
+    const isLeave = (item as any).isLeave === true;
+    if (isJoin || isLeave) {
+      const name = item.profiles?.display_name || 'Misafir';
+      const verb = isJoin ? 'odaya katıldı' : 'odadan ayrıldı';
+      return (
+        <View style={st.joinNotice}>
+          <Text style={st.joinNoticeText}>
+            <Text style={{ fontWeight: '600', color: 'rgba(255,255,255,0.55)' }}>{name}</Text>
+            <Text style={{ color: 'rgba(255,255,255,0.40)' }}>{' ' + verb}</Text>
+          </Text>
+        </View>
+      );
+    }
     // ★ v92.10 (1 May 2026): DB type='system' mesajları (bağış vs.) — '✨' prefix ile
     //   gelen donation mesajları altın çerçeveli, diğer sistem mesajları sade gri.
     const isSystemMsg = item.isSystem || (item as any).type === 'system';
+    // ★ v107 (4 May 2026): Sembol Hediye sistem mesajı — type='gift_system'
+    const isGiftSystem = (item as any).type === 'gift_system';
+    if (isGiftSystem) {
+      const meta = (item as any).metadata || {};
+      const color = meta.art_color || '#F472B6';
+      const emoji = meta.art_emoji || '🎁';
+      return (
+        <View style={[st.giftSysMsg, { borderColor: color + '70' }]}>
+          <LinearGradient
+            colors={[color + '38', color + '15', 'transparent']}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+            style={StyleSheet.absoluteFillObject}
+          />
+          <Text style={st.giftSysEmoji}>{emoji}</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={st.giftSysTitle} numberOfLines={1}>
+              <Text style={{ color: color, fontWeight: '800' }}>{meta.sender_name || 'Birisi'}</Text>
+              <Text style={{ color: 'rgba(255,255,255,0.65)' }}>{' → '}</Text>
+              <Text style={{ color: '#FFF', fontWeight: '700' }}>{meta.recipient_name || 'Kullanıcı'}</Text>
+            </Text>
+            <Text style={st.giftSysSub} numberOfLines={1}>
+              <Text style={{ color: color, fontWeight: '700' }}>{meta.item_name || 'Hediye'}</Text>
+              {meta.price_sp ? <Text style={{ color: 'rgba(255,255,255,0.5)' }}>{' • ' + meta.price_sp + ' SP'}</Text> : null}
+            </Text>
+          </View>
+        </View>
+      );
+    }
     if (isSystemMsg) {
       const isDonation = (item.content || '').trimStart().startsWith('✨');
       if (isDonation) {
@@ -692,14 +830,29 @@ export default function RoomChatDrawer({
     const isGlowMsg = !!glowStyleId;
     const glowCfg = glowStyleId ? GLOW_STYLES[glowStyleId] : null;
 
+    const senderFrame = (item.profiles as any)?.active_frame || null;
+    // ★ 2026-05-05: Mesaj avatarı için kompakt tier etiketi (Plus/Pro/GM).
+    const senderTier = migrateLegacyTier((item.profiles as any)?.subscription_tier as string);
+    const showSenderTier = senderTier !== 'Free';
     return (
       <View style={st.msgRow}>
         {/* ★ 2026-04-26: Avatar tıklanınca profil sheet — diğer platformlardaki gibi standart davranış. */}
         <Pressable
           onPress={() => { if (senderUid && onAvatarPress) onAvatarPress(senderUid); }}
           hitSlop={6}
+          style={{ position: 'relative', width: 32, height: 32 }}
         >
           <Image source={getAvatarSource(item.profiles?.avatar_url)} style={[st.msgAvatar, { borderColor: nameColor + '40' }]} />
+          {/* ★ v107: Mağaza avatar çerçevesi — sohbet mesaj balonunda */}
+          <RoomAvatarFrame frameId={senderFrame} avatarSize={32} minSize={28} />
+          {showSenderTier && (
+            <View
+              style={{ position: 'absolute', bottom: -3, right: -3, zIndex: 5, elevation: 6 }}
+              pointerEvents="none"
+            >
+              <TierBadge tier={senderTier} size="xs" />
+            </View>
+          )}
         </Pressable>
         <Pressable
           onLongPress={() => handleToggleReaction(item.id)}
@@ -731,7 +884,12 @@ export default function RoomChatDrawer({
           ) : emojiOnly ? (
             <Text style={{ fontSize: 36, lineHeight: 44 }}>{content}</Text>
           ) : (
-            <Text style={[st.msgText, glowCfg && { color: glowCfg.textColor, fontWeight: '500' }]}>{content}</Text>
+            // ★ v109: Linkify — URL'ler tıklanabilir + farklı renkte
+            <LinkifiedText
+              text={content}
+              style={[st.msgText, glowCfg && { color: glowCfg.textColor, fontWeight: '500' }] as any}
+              linkColor={glowCfg ? glowCfg.textColor : '#5EEAD4'}
+            />
           )}
           {reaction && reaction.count > 0 ? (
             <View style={[st.reactionBadge, reaction.liked && st.reactionBadgeLiked]}>
@@ -752,7 +910,7 @@ export default function RoomChatDrawer({
     <>
       {/* Backdrop — hafif karartma, tıklayınca kapat */}
       <Animated.View
-        style={[StyleSheet.absoluteFill, { zIndex: 55, elevation: 55, opacity: backdropOpacity, backgroundColor: 'rgba(0,0,0,0.6)' }]}
+        style={[StyleSheet.absoluteFill, { zIndex: 55, elevation: 55, opacity: backdropOpacity, backgroundColor: 'rgba(8,12,22,0.45)' }]}
         pointerEvents={currentSnap.current > 0 ? 'auto' : 'none'}
       >
         <Pressable style={StyleSheet.absoluteFill} onPress={() => { Keyboard.dismiss(); animateTo(SNAP_CLOSED); }} />
@@ -772,12 +930,26 @@ export default function RoomChatDrawer({
           },
         ]}
       >
-        {/* Gradient background — DM panel paleti */}
+        {/* ★ 2026-05-05: NotificationDrawer dili — bildirim modalı ailesi.
+            3 katman gradient: slate diagonal + üst teal halo + üst-sol soft glow.
+            Karakter: teal (oda sohbeti). collapsable={false} ile RN view tree opt. */}
         <LinearGradient
-          colors={['#4a5668', '#37414f', '#232a35']}
-          locations={[0, 0.35, 1]}
+          colors={['#3a4658', '#2a3344', '#1a2030']}
           start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
           style={StyleSheet.absoluteFillObject}
+          pointerEvents="none"
+        />
+        <LinearGradient
+          colors={['rgba(20,184,166,0.20)', 'rgba(20,184,166,0.05)', 'transparent']}
+          start={{ x: 0, y: 0 }} end={{ x: 0, y: 0.4 }}
+          style={StyleSheet.absoluteFillObject}
+          pointerEvents="none"
+        />
+        <LinearGradient
+          colors={['rgba(20,184,166,0.08)', 'transparent']}
+          start={{ x: 0, y: 0 }} end={{ x: 0.7, y: 0.6 }}
+          style={StyleSheet.absoluteFillObject}
+          pointerEvents="none"
         />
 
         {/* ── Handle bar — sürükle ── */}
@@ -883,9 +1055,16 @@ export default function RoomChatDrawer({
             color={showEmojiPicker ? '#5CE1E6' : 'rgba(255,255,255,0.55)'}
           />
         </Pressable>
-        {/* ★ v107: Mesaj Parlat — picker aç */}
+        {/* ★ v107: Mesaj Parlat — picker aç.
+            Hotfix: Klavye tamamen kapansın diye 220ms gecikme — Android adjustResize
+            ile pencere küçükken sheet açılırsa bottom referansı kayar, "yukarıya fırlar". */}
         <Pressable
-          onPress={() => { inputRef.current?.blur(); setShowEmojiPicker(false); setGlowPickerVisible(true); }}
+          onPress={() => {
+            inputRef.current?.blur();
+            setShowEmojiPicker(false);
+            Keyboard.dismiss();
+            setTimeout(() => setGlowPickerVisible(true), 220);
+          }}
           style={st.iconBtn}
           hitSlop={6}
         >
@@ -954,21 +1133,33 @@ export default function RoomChatDrawer({
 // STYLES
 // ═══════════════════════════════════════════════════
 const st = StyleSheet.create({
+  // ★ v110.14: Sade join/leave notice — balon yok, orta hiza, küçük italik
+  joinNotice: {
+    paddingVertical: 4,
+    paddingHorizontal: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  joinNoticeText: {
+    fontSize: 11,
+    fontStyle: 'italic',
+    textAlign: 'center',
+  },
   sheet: {
     position: 'absolute',
     left: 6, right: 6,
     zIndex: 58,
-    elevation: 58,
-    borderTopLeftRadius: 18,
-    borderTopRightRadius: 18,
-    borderBottomLeftRadius: 18,
-    borderBottomRightRadius: 18,
+    elevation: 58, // z-order için kritik (oda chat üstte kalmalı)
+    borderTopLeftRadius: 26,
+    borderTopRightRadius: 26,
+    borderBottomLeftRadius: 26,
+    borderBottomRightRadius: 26,
     overflow: 'hidden',
-    // ★ v92.23 (1 May 2026): drop shadow — iOS shadowColor/Opacity, Android elevation: 58 (yukarıda)
+    backgroundColor: '#1a2030',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 16,
+    shadowOpacity: 0.45,
+    shadowRadius: 14,
   },
 
   handle: { alignItems: 'center', paddingTop: 8, paddingBottom: 2 },
@@ -991,18 +1182,26 @@ const st = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
   },
+  // ★ 2026-05-05: NotificationDrawer dili — teal glow ikonda, bold title, count pill.
   headerIcon: {
-    textShadowColor: 'rgba(0,0,0,0.5)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
+    textShadowColor: 'rgba(20,184,166,0.7)',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 5,
   },
   headerTitle: {
-    fontSize: 14, fontWeight: '700', color: '#F1F5F9', letterSpacing: 0.2,
-    textShadowColor: 'rgba(0,0,0,0.5)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
+    fontSize: 15, fontWeight: '800', color: '#F1F5F9', letterSpacing: 0.3,
+    textShadowColor: 'rgba(0,0,0,0.6)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
   },
-  msgCount: { fontSize: 11, fontWeight: '600', color: 'rgba(255,255,255,0.3)', marginLeft: 2 },
+  msgCount: {
+    fontSize: 10, fontWeight: '800', color: '#5EEAD4', letterSpacing: 0.3,
+    paddingHorizontal: 7, paddingVertical: 2, marginLeft: 6,
+    borderRadius: 100, minWidth: 20, textAlign: 'center',
+    backgroundColor: 'rgba(20,184,166,0.18)',
+    borderWidth: 1, borderColor: 'rgba(20,184,166,0.45)',
+    overflow: 'hidden',
+  },
   closeBtn: {
     width: 32, height: 32, borderRadius: 16,
     alignItems: 'center', justifyContent: 'center',
@@ -1144,6 +1343,29 @@ const st = StyleSheet.create({
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
   },
+
+  // ★ v107 (4 May 2026): Sembol Hediye sistem mesajı — premium kart, tematik renk
+  giftSysMsg: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'stretch',
+    marginHorizontal: 8,
+    marginVertical: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 14,
+    borderWidth: 1,
+    backgroundColor: 'rgba(15,22,38,0.7)',
+    overflow: 'hidden',
+    gap: 10,
+    ...Platform.select({
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.4, shadowRadius: 6 },
+      android: { elevation: 2 },
+    }),
+  },
+  giftSysEmoji: { fontSize: 22, lineHeight: 26 },
+  giftSysTitle: { fontSize: 12, color: '#FFF', letterSpacing: 0.2 },
+  giftSysSub: { fontSize: 11, marginTop: 2 },
 
   // ★ v107 (3 May 2026): Mesaj Parlat — 6 stilli (HTML mockup).
   //   Bg/border transparent (overlay hepsini çiziyor). paddingTop: 30 = 24px header + 6px nefes.

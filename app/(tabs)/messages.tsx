@@ -140,32 +140,54 @@ const skStyles = StyleSheet.create({
 });
 
 // ═══ Memoized Conversation Card — FlatList re-render'ı izole ═══
-// ★ 2026-04-21: TypingDots — "yazıyor" metninin sağında 3 animasyonlu nokta,
-//   teker teker parlar (typing indicator). Typing state aktifken loop eder, kapanınca durur.
-function TypingDots() {
-  const d1 = useRef(new RNAnimated.Value(0.3)).current;
-  const d2 = useRef(new RNAnimated.Value(0.3)).current;
-  const d3 = useRef(new RNAnimated.Value(0.3)).current;
+// ★ v109: WhatsApp/iMessage tarzı bubble — opacity yerine TRANSLATEY ile "zıplayan"
+//   3 nokta. Daha canlı, kompakt. "yazıyor" text'i kaldırıldı, sade bubble.
+function TypingDots({ bubble = false }: { bubble?: boolean }) {
+  const d1 = useRef(new RNAnimated.Value(0)).current;
+  const d2 = useRef(new RNAnimated.Value(0)).current;
+  const d3 = useRef(new RNAnimated.Value(0)).current;
   useEffect(() => {
     const make = (v: RNAnimated.Value, delay: number) => RNAnimated.loop(
       RNAnimated.sequence([
         RNAnimated.delay(delay),
-        RNAnimated.timing(v, { toValue: 1, duration: 250, useNativeDriver: true }),
-        RNAnimated.timing(v, { toValue: 0.3, duration: 250, useNativeDriver: true }),
-        RNAnimated.delay(Math.max(0, 450 - delay)),
+        RNAnimated.timing(v, { toValue: 1, duration: 360, useNativeDriver: true, easing: Easing.out(Easing.quad) }),
+        RNAnimated.timing(v, { toValue: 0, duration: 360, useNativeDriver: true, easing: Easing.in(Easing.quad) }),
+        RNAnimated.delay(Math.max(0, 540 - delay)),
       ])
     );
     const a1 = make(d1, 0);
-    const a2 = make(d2, 150);
-    const a3 = make(d3, 300);
+    const a2 = make(d2, 180);
+    const a3 = make(d3, 360);
     a1.start(); a2.start(); a3.start();
     return () => { a1.stop(); a2.stop(); a3.stop(); };
   }, []);
+  const dotSize = bubble ? 6 : 5;
   const dot = (v: RNAnimated.Value) => (
-    <RNAnimated.View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: Colors.teal, opacity: v, marginLeft: 2 }} />
+    <RNAnimated.View
+      style={{
+        width: dotSize, height: dotSize, borderRadius: dotSize / 2,
+        backgroundColor: bubble ? '#FFFFFF' : Colors.teal,
+        opacity: v.interpolate({ inputRange: [0, 1], outputRange: [0.35, 1] }),
+        transform: [{ translateY: v.interpolate({ inputRange: [0, 1], outputRange: [0, -3] }) }],
+        marginHorizontal: 2,
+      }}
+    />
   );
+  if (bubble) {
+    return (
+      <View style={{
+        flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+        paddingHorizontal: 10, paddingVertical: 7,
+        borderRadius: 14,
+        backgroundColor: 'rgba(20,184,166,0.20)',
+        borderWidth: 0.5, borderColor: 'rgba(20,184,166,0.35)',
+      }}>
+        {dot(d1)}{dot(d2)}{dot(d3)}
+      </View>
+    );
+  }
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 4 }}>
+    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
       {dot(d1)}{dot(d2)}{dot(d3)}
     </View>
   );
@@ -201,11 +223,16 @@ const ConversationCard = React.memo(function ConversationCard({
         onLongPress={() => onLongPress(item)}
         delayLongPress={400}
       >
+        {/* ★ 2026-05-05: NotificationDrawer aile dili — slate diagonal + teal halo (DM karakter) */}
         <LinearGradient
-          colors={['rgba(48,65,94,0.85)', 'rgba(26,40,64,0.75)', 'rgba(12,22,40,0.55)']}
-          locations={[0, 0.55, 1]}
-          start={{ x: 0.5, y: 0 }}
-          end={{ x: 0.5, y: 1 }}
+          colors={['#3a4658', '#2a3344', '#1a2030']}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFillObject}
+          pointerEvents="none"
+        />
+        <LinearGradient
+          colors={[unread ? 'rgba(20,184,166,0.20)' : 'rgba(20,184,166,0.10)', 'rgba(20,184,166,0.04)', 'transparent']}
+          start={{ x: 0, y: 0 }} end={{ x: 0, y: 0.5 }}
           style={StyleSheet.absoluteFillObject}
           pointerEvents="none"
         />
@@ -224,7 +251,7 @@ const ConversationCard = React.memo(function ConversationCard({
             </View>
           )}
           <Pressable style={styles.avatarWrap} onPress={() => onAvatarPress(item.partner_id)}>
-            <StatusAvatar uri={item.partner_avatar} size={52} isOnline={item.partner_is_online} tier={item.partner_tier} />
+            <StatusAvatar uri={item.partner_avatar} size={52} isOnline={item.partner_is_online} tier={item.partner_tier} frameId={item.partner_frame} />
           </Pressable>
           <View style={styles.msgInfo}>
             <View style={styles.msgTop}>
@@ -245,12 +272,18 @@ const ConversationCard = React.memo(function ConversationCard({
             </View>
             <View style={styles.msgPreviewRow}>
               {isTyping ? (
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <Text style={[styles.msgText, { color: Colors.teal, fontWeight: '700' }]} numberOfLines={1}>
-                    yazıyor
+                // ★ v109: WhatsApp tarzı 3 nokta bubble — "yazıyor" text yok, sade animasyon
+                <TypingDots bubble />
+              ) : item.draft ? (
+                // ★ v109: Taslak göstergesi — kırmızımsı turuncu, "Taslak: ..." önekli
+                <>
+                  <Text style={{ color: '#F87171', fontSize: 13, fontWeight: '700', marginRight: 4 }}>
+                    Taslak:
                   </Text>
-                  <TypingDots />
-                </View>
+                  <Text style={[styles.msgText, { fontStyle: 'italic' }]} numberOfLines={1}>
+                    {item.draft}
+                  </Text>
+                </>
               ) : (
                 <>
                   {item.is_last_msg_mine && (
@@ -421,14 +454,21 @@ export default function MessagesScreen() {
     if (!firebaseUser) return;
     try {
       setLoadError(null);
-      const inbox = await MessageService.getInbox(firebaseUser.uid);
-      const hiddenMap = await MessageService.getHiddenConversations(firebaseUser.uid);
-      const filtered = inbox.filter(c => {
-        if (blockedIdsRef.current.has(c.partner_id)) return false;
-        // ★ 2026-04-21: Hidden entry varsa filtrele (auto-unhide kaldırıldı)
-        if (hiddenMap[c.partner_id]) return false;
-        return true;
-      });
+      const [inbox, hiddenMap, drafts] = await Promise.all([
+        MessageService.getInbox(firebaseUser.uid),
+        MessageService.getHiddenConversations(firebaseUser.uid),
+        MessageService.getAllDrafts(firebaseUser.uid),
+      ]);
+      const filtered = inbox
+        .filter(c => {
+          // ★ v110.5.24 (6 May 2026): Engellenen kişiyi GÖSTER (eski yazışmalara erişim).
+          //   blocked filter kaldırıldı — getInbox tarafında zaten beni engelleyenleri
+          //   filtreliyor, BENIM engellediklerim listede görünür.
+          if (hiddenMap[c.partner_id]) return false;
+          return true;
+        })
+        // ★ v109: Taslak varsa item'a yapıştır → kart "Taslak: ..." gösterir
+        .map(c => drafts[c.partner_id] ? { ...c, draft: drafts[c.partner_id] } : c);
       setConversations(filtered);
       // ★ 2026-04-22: Pending mesaj isteklerini paralel çek
       try {
@@ -459,16 +499,36 @@ export default function MessagesScreen() {
 
   // ★ v86: DM broadcast — yeni mesaj/accept/reject geldiğinde inbox listesi
   //   anlık tazelensin (postgres_changes anon Realtime'da çalışmıyor).
+  // ★ v110.14 (8 May 2026): is_request=true sinyallerinde sadece loadInbox() yetmiyor —
+  //   inbox kabul edilmiş sohbetleri çekiyor, pending istekleri "İstekler" sekmesi gösteriyor.
+  //   Yabancıdan ilk mesaj geldiğinde pendingRequests state'i de güncellenmeli ki
+  //   "İstekler (N)" sayacı anında görünsün. Önceden bu kayboluyor, sayfa fokuslanmadan
+  //   alıcıya hiç bildirim ulaşmıyordu.
   const dmNotif = useDMNotif();
   useEffect(() => {
     if (!firebaseUser) return;
-    const unsub = dmNotif.onSignal((signal) => {
-      if (signal.event === 'dm_new' || signal.event === 'dm_accepted' || signal.event === 'dm_rejected') {
+    const unsub = dmNotif.onSignal(async (signal) => {
+      if (signal.event === 'dm_new') {
+        if (signal.is_request) {
+          try {
+            const reqs = await MessageService.getPendingRequests(firebaseUser.uid);
+            setPendingRequests(reqs || []);
+          } catch { /* sessiz */ }
+          refreshBadges();
+        } else {
+          loadInbox();
+        }
+      } else if (signal.event === 'dm_accepted' || signal.event === 'dm_rejected') {
         loadInbox();
+        try {
+          const reqs = await MessageService.getPendingRequests(firebaseUser.uid);
+          setPendingRequests(reqs || []);
+        } catch { /* sessiz */ }
+        refreshBadges();
       }
     });
     return unsub;
-  }, [firebaseUser, dmNotif, loadInbox]);
+  }, [firebaseUser, dmNotif, loadInbox, refreshBadges]);
 
   useEffect(() => {
     const onlineIdSet = new Set(onlineFriends.map(f => f.id));
@@ -820,6 +880,40 @@ export default function MessagesScreen() {
     }
   }, [conversations]);
 
+  // ★ v109: Mute toggle — DB'de muted_at flip, optimistic update + rollback
+  const handleToggleMute = useCallback(async (partnerId: string, partnerName: string) => {
+    const current = conversations.find(c => c.partner_id === partnerId);
+    if (!current || !firebaseUser) return;
+    const newMuted = !current.is_muted;
+    setConversations(prev => prev.map(c =>
+      c.partner_id === partnerId ? { ...c, is_muted: newMuted } : c));
+    try {
+      await MessageService.toggleMute(firebaseUser.uid, partnerId);
+      showToast({
+        title: newMuted ? `🔕 ${partnerName} sessize alındı` : `🔔 Sessizden çıkarıldı`,
+        message: newMuted ? 'Bu sohbetten bildirim gelmeyecek.' : undefined,
+        type: 'success',
+      });
+    } catch {
+      setConversations(prev => prev.map(c =>
+        c.partner_id === partnerId ? { ...c, is_muted: current.is_muted } : c));
+      showToast({ title: 'Sessize Alma Başarısız', message: 'Tekrar dene.', type: 'error' });
+    }
+  }, [conversations, firebaseUser]);
+
+  // ★ v109: İstek tek-tık reddet — kullanıcı listede bekleyen istekten direkt reddetebilir
+  const handleRejectRequest = useCallback(async (senderId: string, senderName: string) => {
+    if (!firebaseUser) return;
+    setPendingRequests(prev => prev.filter((r: any) => r.sender_id !== senderId));
+    try {
+      await MessageService.rejectMessageRequest(firebaseUser.uid, senderId);
+      showToast({ title: '🚫 İstek reddedildi', message: `${senderName} için reddedildi.`, type: 'info' });
+      refreshBadges();
+    } catch {
+      showToast({ title: 'Reddedilemedi', message: 'Tekrar dene.', type: 'error' });
+    }
+  }, [firebaseUser, refreshBadges]);
+
   const handleBlockUser = useCallback(async (partnerId: string, partnerName: string) => {
     if (!firebaseUser) return;
     try {
@@ -853,6 +947,12 @@ export default function MessagesScreen() {
       onPress: () => handleTogglePin(sheetItem.partner_id),
     },
     {
+      id: 'mute',
+      label: sheetItem.is_muted ? 'Sessizden Çıkar' : 'Sessize Al',
+      icon: (sheetItem.is_muted ? 'notifications' : 'notifications-off') as any,
+      onPress: () => handleToggleMute(sheetItem.partner_id, sheetItem.partner_name),
+    },
+    {
       id: 'archive',
       label: sheetItem.is_archived ? 'Arşivden Çıkar' : 'Arşivle',
       icon: (sheetItem.is_archived ? 'arrow-undo' : 'archive') as any,
@@ -880,11 +980,16 @@ export default function MessagesScreen() {
 
       {/* ═══ Header — Premium Glassmorphic banner (myrooms/home ile tutarlı) ═══ */}
       <RNAnimated.View style={[styles.topBarWrap, { paddingTop: insets.top, transform: [{ translateY: bannerTranslateY }] }]}>
+        {/* ★ 2026-05-05: Aile dili — slate diagonal + mor halo (Mesajlar karakter rengi) */}
         <LinearGradient
-          colors={['rgba(48,65,94,0.92)', 'rgba(26,40,64,0.82)', 'rgba(12,22,40,0.6)']}
-          locations={[0, 0.55, 1]}
-          start={{ x: 0.5, y: 0 }}
-          end={{ x: 0.5, y: 1 }}
+          colors={['#3a4658', '#2a3344', '#1a2030']}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+          style={styles.topBarGlass}
+          pointerEvents="none"
+        />
+        <LinearGradient
+          colors={['rgba(139,92,246,0.18)', 'rgba(139,92,246,0.05)', 'transparent']}
+          start={{ x: 0, y: 0 }} end={{ x: 0, y: 0.7 }}
           style={styles.topBarGlass}
           pointerEvents="none"
         />
@@ -981,7 +1086,7 @@ export default function MessagesScreen() {
                 style={styles.friendChip}
                 onPress={() => router.push(`/chat/${friend.id}`)}
               >
-                <StatusAvatar uri={friend.avatar_url} size={52} isOnline={true} tier={(friend as any).subscription_tier} />
+                <StatusAvatar uri={friend.avatar_url} size={52} isOnline={true} tier={(friend as any).subscription_tier} frameId={(friend as any).active_frame || null} />
                 <Text style={styles.friendName} numberOfLines={1}>{friend.display_name?.split(' ')[0] || 'Kullanıcı'}</Text>
               </Pressable>
             )}
@@ -1052,27 +1157,46 @@ export default function MessagesScreen() {
             contentContainerStyle={{ paddingTop: 6, paddingBottom: 20 }}
             renderItem={({ item }: any) => {
               const sender = item.sender || {};
+              // ★ v109: İlk mesajın snippet'i — Instagram tarzı
+              const firstMsg = item.first_message_content || item.last_message_content || '';
+              const senderName = sender.display_name || 'Kullanıcı';
               return (
-                <Pressable
-                  onPress={() => router.push({ pathname: '/chat/[id]', params: { id: item.sender_id } } as any)}
-                  style={({ pressed }) => [{
-                    flexDirection: 'row', alignItems: 'center', gap: 10,
-                    paddingHorizontal: 14, paddingVertical: 10,
-                    backgroundColor: pressed ? 'rgba(20,184,166,0.08)' : 'transparent',
-                  }]}>
-                  <StatusAvatar uri={sender.avatar_url} size={44} tier={(sender as any).subscription_tier} showTierBadge={false} />
-                  <View style={{ flex: 1 }}>
+                <View style={{
+                  flexDirection: 'row', alignItems: 'center', gap: 10,
+                  paddingHorizontal: 14, paddingVertical: 12,
+                }}>
+                  <StatusAvatar uri={sender.avatar_url} size={44} tier={(sender as any).subscription_tier} showTierBadge={false} frameId={(sender as any).active_frame || null} />
+                  <Pressable
+                    style={{ flex: 1 }}
+                    onPress={() => router.push({ pathname: '/chat/[id]', params: { id: item.sender_id } } as any)}
+                  >
                     <Text style={{ fontSize: 14, fontWeight: '700', color: '#F1F5F9' }} numberOfLines={1}>
-                      {sender.display_name || 'Kullanıcı'}
+                      {senderName}
                     </Text>
-                    <Text style={{ fontSize: 11, color: '#94A3B8', marginTop: 2 }} numberOfLines={1}>
-                      Sizinle mesajlaşmak istiyor — dokun ve cevap ver
-                    </Text>
-                  </View>
-                  <View style={{ backgroundColor: 'rgba(251,191,36,0.12)', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: 'rgba(251,191,36,0.25)' }}>
-                    <Text style={{ fontSize: 10, fontWeight: '700', color: '#FBBF24' }}>İstek</Text>
-                  </View>
-                </Pressable>
+                    {firstMsg ? (
+                      <Text style={{ fontSize: 12, color: '#CBD5E1', marginTop: 2, fontStyle: 'italic' }} numberOfLines={2}>
+                        "{firstMsg}"
+                      </Text>
+                    ) : (
+                      <Text style={{ fontSize: 11, color: '#94A3B8', marginTop: 2 }} numberOfLines={1}>
+                        Mesajlaşmak istiyor — dokun ve cevap ver
+                      </Text>
+                    )}
+                  </Pressable>
+                  {/* ★ v109: Tek-tık reddet butonu */}
+                  <Pressable
+                    onPress={() => handleRejectRequest(item.sender_id, senderName)}
+                    style={{
+                      width: 32, height: 32, borderRadius: 16,
+                      backgroundColor: 'rgba(248,113,113,0.10)',
+                      borderWidth: 0.5, borderColor: 'rgba(248,113,113,0.3)',
+                      alignItems: 'center', justifyContent: 'center',
+                    }}
+                    hitSlop={8}
+                  >
+                    <Ionicons name="close" size={16} color="#F87171" />
+                  </Pressable>
+                </View>
               );
             }}
           />
@@ -1225,6 +1349,7 @@ export default function MessagesScreen() {
         partnerName={sheetItem?.partner_name || ''}
         partnerAvatar={sheetItem?.partner_avatar}
         partnerOnline={sheetItem?.partner_is_online}
+        partnerFrame={sheetItem?.partner_frame}
         subtitle={sheetItem?.unread_count
           ? `${sheetItem.unread_count} yeni mesaj`
           : sheetItem?.is_muted ? 'Sessize alındı' : undefined}
@@ -1473,14 +1598,14 @@ const styles = StyleSheet.create({
   msgInfo: { flex: 1, justifyContent: 'center', gap: 4 },
   msgTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   msgName: { fontSize: 15, fontWeight: '600', color: '#E2E8F0', flexShrink: 1, ...Shadows.text },
-  // ─── Arşiv & İstek chip ───
+  // ★ 2026-05-05: Aile dili — radius 12→16, biraz daha belirgin background
   archiveChip: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
     marginHorizontal: 14, marginTop: 4, marginBottom: 8,
     paddingHorizontal: 14, paddingVertical: 10,
-    borderRadius: 12,
-    backgroundColor: 'rgba(20,184,166,0.08)',
-    borderWidth: 1, borderColor: 'rgba(20,184,166,0.2)',
+    borderRadius: 16,
+    backgroundColor: 'rgba(20,184,166,0.10)',
+    borderWidth: 1, borderColor: 'rgba(20,184,166,0.22)',
   },
   requestChip: {
     backgroundColor: 'rgba(251,191,36,0.06)',
