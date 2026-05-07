@@ -24,7 +24,7 @@ export const MessageService = {
     // is_deleted sütunu varsa filtrele, yoksa filtresiz çek
     const { data: d1, error: e1 } = await supabase
       .from('messages')
-      .select('id, sender_id, receiver_id, content, is_read, created_at, is_deleted')
+      .select('id, sender_id, receiver_id, content, is_read, created_at, is_deleted, deleted_for_everyone, expires_at')
       .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
       .not('is_deleted', 'is', true)
       .order('created_at', { ascending: false })
@@ -49,23 +49,40 @@ export const MessageService = {
     if (!data || data.length === 0) return [] as InboxItem[];
 
     // Partner bazında grupla — her partner için son mesajı bul
+    // ★ v109: Süresi dolmuş (expires_at < now()) mesajları client-side filtrele —
+    //   cron 15dk'da bir çalışır, ara dilim için UI tutarsızlığı önle.
+    const nowMs = Date.now();
     const partnerMap = new Map<string, { lastMsg: any; unread: number }>();
     for (const msg of data) {
+      if (msg.expires_at && new Date(msg.expires_at).getTime() < nowMs) continue;
       const partnerId = msg.sender_id === userId ? msg.receiver_id : msg.sender_id;
       // ★ Null/undefined partnerId — bozuk veri, atla
       if (!partnerId) continue;
       if (!partnerMap.has(partnerId)) {
         partnerMap.set(partnerId, { lastMsg: msg, unread: 0 });
       }
-      // Okunmamış sayısı: karşı taraftan gelen + okunmamış
-      if (msg.receiver_id === userId && !msg.is_read) {
+      // Okunmamış sayısı: karşı taraftan gelen + okunmamış (silinmemiş)
+      if (msg.receiver_id === userId && !msg.is_read && !msg.deleted_for_everyone) {
         const entry = partnerMap.get(partnerId)!;
         entry.unread++;
       }
     }
 
-    // ★ Engellenen kişileri filtrele — inbox'ta görünmesinler
-    const blockedIds = await FriendshipService._getBlockedIds(userId);
+    // ★ v110.5.24 (6 May 2026): Engellenen kişiler İNBOX'TA GÖRÜNÜR — eski
+    //   yazışmaların kaybolmasın. Tıklayınca chat açılır, mesajlar görünür,
+    //   üstte "Engellediniz" banner + input disable. (Kullanıcı şikayeti.)
+    //   Reverse block (beni engelleyenler) GİZLİ kalır — onların yeni mesajı
+    //   bana zaten gelmedi, eski yazışma gizli olsun.
+    const allBlockedIds = await FriendshipService._getBlockedIds(userId);
+    // _getBlockedIds iki yönlü dönüyor; ben engelledim olanları AYIR.
+    const { data: iBlockedRows } = await supabase
+      .from('blocked_users')
+      .select('blocked_id')
+      .eq('blocker_id', userId);
+    const iBlockedSet = new Set((iBlockedRows || []).map((r: any) => r.blocked_id));
+    // Beni engelleyenler = allBlockedIds - iBlockedSet
+    const reverseBlockedSet = new Set<string>();
+    allBlockedIds.forEach(id => { if (!iBlockedSet.has(id)) reverseBlockedSet.add(id); });
 
     // ★ v85: Pending mesaj isteği gönderenleri filtrele — onlar "İstekler" sekmesinde görünür
     const { data: pendingReqRows } = await supabase
@@ -75,15 +92,15 @@ export const MessageService = {
       .eq('status', 'pending');
     const pendingRequestSenderIds = new Set((pendingReqRows || []).map((r: any) => r.sender_id));
 
-    // Partner profil bilgilerini toplu çek
-    const partnerIds = Array.from(partnerMap.keys()).filter(id => !blockedIds.has(id) && !pendingRequestSenderIds.has(id));
+    // Partner profil bilgilerini toplu çek — sadece BENİ ENGELLEYENLERİ + pending istekleri filtrele
+    const partnerIds = Array.from(partnerMap.keys()).filter(id => !reverseBlockedSet.has(id) && !pendingRequestSenderIds.has(id));
     if (partnerIds.length === 0) return [] as InboxItem[];
 
     // ★ Paralel çek: profiller + conversation_state (pin/archive/mute)
     const [profRes, stateRes] = await Promise.all([
       supabase
         .from('profiles')
-        .select('id, display_name, avatar_url, is_online, subscription_tier, last_seen')
+        .select('id, display_name, avatar_url, is_online, subscription_tier, last_seen, active_frame')
         .in('id', partnerIds),
       supabase
         .from('conversation_state')
@@ -106,16 +123,22 @@ export const MessageService = {
       const state = stateMap.get(partnerId);
       const isSentByMe = lastMsg.sender_id === userId;
       let preview = lastMsg.content || '';
-      if (preview.startsWith('🎤') || preview.includes('voice_messages/')) preview = '🎤 Sesli mesaj';
+      // ★ v109: Herkes için silinmiş mesaj önizlemede placeholder
+      if (lastMsg.deleted_for_everyone) {
+        preview = '🚫 Bu mesaj silindi';
+      } else if (preview.startsWith('🎤') || preview.includes('voice_messages/')) preview = '🎤 Sesli mesaj';
       else if (preview.startsWith('📷') || preview.match(/^https?.*\.(jpg|png|webp)/i)) preview = '📷 Fotoğraf';
-      if (isSentByMe && !preview.startsWith('Sen:')) preview = `Sen: ${preview}`;
+      if (isSentByMe && !preview.startsWith('Sen:') && !lastMsg.deleted_for_everyone) preview = `Sen: ${preview}`;
 
       inbox.push({
         partner_id: partnerId,
-        partner_name: prof?.display_name || 'Kullanıcı',
+        // ★ v110.14: profile fetch RLS/network nedeniyle null dönerse generic 'Kullanıcı'
+        //   yerine sender_id'den türetilmiş kısa tag — en azından unique görünür.
+        partner_name: prof?.display_name || `…${String(partnerId).slice(0, 4)}`,
         partner_avatar: prof?.avatar_url || '',
         partner_is_online: prof?.is_online || false,
         partner_tier: (prof as any)?.subscription_tier || 'Free',
+        partner_frame: (prof as any)?.active_frame || null,
         partner_last_seen: (prof as any)?.last_seen,
         last_message_content: preview,
         last_message_time: lastMsg.created_at,
@@ -166,14 +189,10 @@ export const MessageService = {
 
   /** İki kişi arasındaki tüm konuşma geçmişini getir */
   async getConversation(user1Id: string, user2Id: string, limit = 200) {
-    // ★ ORTA-H: Engel kontrolü — blocker/blocked çifti sohbet açsa da mesaj görülmesin.
-    // Privacy: blocklanan kişi eski mesajları OKUYAMASIN.
-    try {
-      const blockedIds = await FriendshipService._getBlockedIds(user1Id);
-      if (blockedIds.has(user2Id)) return [];
-      const reverseBlock = await FriendshipService._getBlockedIds(user2Id);
-      if (reverseBlock.has(user1Id)) return [];
-    } catch { /* block check başarısızsa sohbeti göster */ }
+    // ★ v110.5.21 (6 May 2026): Mesajlar HER zaman görünür — kullanıcı mesaj
+    //   geçmişini kaybolmasın, sadece cevap vermek için engel kaldırma gerek.
+    //   Block filter UI tarafında yapılıyor (inbox'ta gizli + chat ekranı banner +
+    //   input disabled). getConversation hep gerçek mesajları döndürür.
 
     // ★ is_deleted sütunu varsa filtrele, yoksa filtresiz — getInbox ile aynı strateji
     const orFilter = `and(sender_id.eq.${user1Id},receiver_id.eq.${user2Id}),and(sender_id.eq.${user2Id},receiver_id.eq.${user1Id})`;
@@ -351,8 +370,24 @@ export const MessageService = {
       .eq('status', 'pending')
       .order('created_at', { ascending: false });
     if (error) throw error;
-    // İlk mesajı da çek (preview için)
-    const list = data || [];
+    const list = (data || []) as any[];
+    if (list.length === 0) return list;
+    // ★ v109: Her istek için ilk mesaj snippet'i — Instagram tarzı önizleme
+    const senderIds = list.map(r => r.sender_id);
+    const { data: msgs } = await supabase
+      .from('messages')
+      .select('sender_id, content, created_at')
+      .in('sender_id', senderIds)
+      .eq('receiver_id', userId)
+      .eq('is_deleted', false)
+      .order('created_at', { ascending: true });
+    if (msgs) {
+      const firstBySender: Record<string, string> = {};
+      for (const m of msgs as any[]) {
+        if (!firstBySender[m.sender_id]) firstBySender[m.sender_id] = m.content;
+      }
+      for (const r of list) r.first_message_content = firstBySender[r.sender_id] || '';
+    }
     return list;
   },
 
@@ -378,6 +413,161 @@ export const MessageService = {
       .eq('id', messageId)
       .eq('sender_id', senderId);
     if (error) throw error;
+  },
+
+  /** ★ v109: Mesajı düzenle — RPC: 24 saat içinde, sadece kendi mesajı, metin */
+  async editMessage(userId: string, messageId: string, newContent: string): Promise<{ success: boolean; error?: string; edited_at?: string }> {
+    const { data, error } = await supabase.rpc('edit_message', {
+      p_user_id: userId,
+      p_message_id: messageId,
+      p_new_content: newContent,
+    });
+    if (error) return { success: false, error: error.message };
+    return data as any;
+  },
+
+  /** ★ v109: Herkes için sil — RPC: 1 saat içinde, sadece kendi mesajı */
+  async deleteForEveryone(userId: string, messageId: string): Promise<{ success: boolean; error?: string }> {
+    const { data, error } = await supabase.rpc('delete_message_for_everyone', {
+      p_user_id: userId,
+      p_message_id: messageId,
+    });
+    if (error) return { success: false, error: error.message };
+    return data as any;
+  },
+
+  /** ★ v109: Mesajı başka kişiye ilet — RPC: yetki kontrol + yeni satır oluştur */
+  async forwardMessage(userId: string, sourceMessageId: string, targetPartnerId: string): Promise<{ success: boolean; error?: string; new_message_id?: string }> {
+    const { data, error } = await supabase.rpc('forward_message', {
+      p_user_id: userId,
+      p_source_message_id: sourceMessageId,
+      p_target_partner_id: targetPartnerId,
+    });
+    if (error) return { success: false, error: error.message };
+    return data as any;
+  },
+
+  /** ★ v109: Reply (yanıt) ile mesaj gönder — reply_to_id yazılır.
+   *  Mevcut send() image/voice destekli, biz sadece reply_to_id ek olarak gönderelim. */
+  async sendReply(senderId: string, receiverId: string, content: string, replyToId: string): Promise<Message | null> {
+    const { data, error } = await supabase
+      .from('messages')
+      .insert({ sender_id: senderId, receiver_id: receiverId, content, reply_to_id: replyToId, type: 'text' })
+      .select('*, sender:profiles!sender_id(*), receiver:profiles!receiver_id(*)')
+      .single();
+    if (error) { if (__DEV__) console.warn('[Messages] sendReply hata:', error.message); return null; }
+    return data as Message;
+  },
+
+  /** ★ v109: Sohbet içinde arama — son 500 mesaj limit, ILIKE case-insensitive */
+  async searchInChat(userA: string, userB: string, query: string, limit = 50): Promise<Message[]> {
+    if (!query || query.trim().length < 2) return [];
+    const q = `%${query.trim()}%`;
+    const { data, error } = await supabase
+      .from('messages')
+      .select('*, sender:profiles!sender_id(display_name, avatar_url)')
+      .or(`and(sender_id.eq.${userA},receiver_id.eq.${userB}),and(sender_id.eq.${userB},receiver_id.eq.${userA})`)
+      .ilike('content', q)
+      .eq('is_deleted', false)
+      .eq('deleted_for_everyone', false)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    if (error) { if (__DEV__) console.warn('[Messages] searchInChat hata:', error.message); return []; }
+    return (data || []) as Message[];
+  },
+
+  /** ★ v109: Taslak kaydet (yarım yazılmış mesaj) — RPC */
+  async saveDraft(userId: string, partnerId: string, content: string, replyToId?: string | null) {
+    const { error } = await supabase.rpc('save_draft', {
+      p_user_id: userId,
+      p_partner_id: partnerId,
+      p_content: content || '',
+      p_reply_to_id: replyToId || null,
+    });
+    if (error && __DEV__) console.warn('[Messages] saveDraft hata:', error.message);
+  },
+
+  /** ★ v109: Bir partnerin taslağını oku — chat ekranı açıldığında input'a doldur */
+  async getDraft(userId: string, partnerId: string): Promise<{ content: string; reply_to_id: string | null } | null> {
+    const { data, error } = await supabase
+      .from('message_drafts')
+      .select('content, reply_to_id')
+      .eq('user_id', userId).eq('partner_id', partnerId)
+      .maybeSingle();
+    if (error || !data) return null;
+    return data as any;
+  },
+
+  /** ★ v109: Inbox için tüm taslakları çek — listede "Taslak: ..." göstermek için */
+  async getAllDrafts(userId: string): Promise<Record<string, string>> {
+    const { data, error } = await supabase
+      .from('message_drafts')
+      .select('partner_id, content')
+      .eq('user_id', userId);
+    if (error || !data) return {};
+    const map: Record<string, string> = {};
+    for (const r of data as any[]) map[r.partner_id] = r.content;
+    return map;
+  },
+
+  /** ★ v109: Mute toggle — conversation_state.muted_at flip */
+  async toggleMute(userId: string, partnerId: string): Promise<boolean> {
+    const { data: existing } = await supabase
+      .from('conversation_state')
+      .select('muted_at')
+      .eq('user_id', userId).eq('partner_id', partnerId)
+      .maybeSingle();
+    const newMuted = !existing?.muted_at;
+    const { error } = await supabase
+      .from('conversation_state')
+      .upsert({
+        user_id: userId, partner_id: partnerId,
+        muted_at: newMuted ? new Date().toISOString() : null,
+      }, { onConflict: 'user_id,partner_id' });
+    if (error) throw error;
+    return newMuted;
+  },
+
+  /** ★ v109: Disappearing messages — TTL süresi (saniye) belirle (0 = kapat) */
+  async setDisappearingTimer(userId: string, partnerId: string, seconds: number): Promise<{ success: boolean; error?: string }> {
+    const { data, error } = await supabase.rpc('set_disappearing_timer', {
+      p_user_id: userId, p_partner_id: partnerId, p_seconds: seconds,
+    });
+    if (error) return { success: false, error: error.message };
+    return data as any;
+  },
+
+  /** ★ v109: Mevcut TTL'i oku (chat header rozet için) */
+  async getDisappearingTimer(userId: string, partnerId: string): Promise<number> {
+    const { data } = await supabase
+      .from('conversation_state')
+      .select('disappearing_seconds')
+      .eq('user_id', userId).eq('partner_id', partnerId)
+      .maybeSingle();
+    return (data as any)?.disappearing_seconds || 0;
+  },
+
+  /** ★ v109: Saved messages — kaydet/kaldır/listele */
+  async toggleSavedMessage(userId: string, messageId: string): Promise<boolean> {
+    const { data: existing } = await supabase
+      .from('saved_messages')
+      .select('message_id')
+      .eq('user_id', userId).eq('message_id', messageId)
+      .maybeSingle();
+    if (existing) {
+      await supabase.from('saved_messages').delete()
+        .eq('user_id', userId).eq('message_id', messageId);
+      return false;
+    }
+    await supabase.from('saved_messages')
+      .insert({ user_id: userId, message_id: messageId });
+    return true;
+  },
+
+  async getSavedMessageIds(userId: string): Promise<Set<string>> {
+    const { data } = await supabase
+      .from('saved_messages').select('message_id').eq('user_id', userId);
+    return new Set((data || []).map((r: any) => r.message_id));
   },
 
   /** ★ Emoji tepki güncelle (WhatsApp tarzı) — SEC-DM2: Yetki kontrolü eklendi */

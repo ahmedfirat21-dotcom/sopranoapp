@@ -1451,7 +1451,7 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
                 </View>
               ) : (
                 dmInboxMessages.slice(0, 15).map((msg: any, idx: number) => {
-                  const senderName = msg.partner_name || msg.sender_display_name || msg.other_display_name || 'Kullanıcı';
+                  const senderName = msg.partner_name || msg.sender_display_name || msg.other_display_name || (msg.partner_id || msg.sender_id ? `…${String(msg.partner_id || msg.sender_id).slice(0, 4)}` : 'Kullanıcı');
                   const senderAvatar = msg.partner_avatar || msg.sender_avatar_url || msg.other_avatar_url;
                   const preview = msg.last_message_content || msg.last_message || msg.content || '';
                   const isUnread = (msg.unread_count || 0) > 0 || !msg.is_read;
