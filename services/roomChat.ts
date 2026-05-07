@@ -363,7 +363,15 @@ export const RoomChatService = {
               .select('*, profiles!messages_sender_id_fkey(display_name, avatar_url, active_chat_color, active_frame)')
               .eq('id', newMsg.id)
               .single();
-            if (data) onNewMessage(data as RoomMessage);
+            if (data) {
+              // ★ v110.14 (8 May 2026): RLS profiles join'i NULL döndüyse anlık "Kullanıcı"
+              //   flash önle — profil bilgisini cache'e yaz ki UI hep doğru render etsin.
+              const dataProfiles = (data as any).profiles;
+              if (dataProfiles?.display_name) {
+                _profileCache.set(newMsg.sender_id, { ...dataProfiles, cachedAt: Date.now() });
+              }
+              onNewMessage(data as RoomMessage);
+            }
           }
         }
       )

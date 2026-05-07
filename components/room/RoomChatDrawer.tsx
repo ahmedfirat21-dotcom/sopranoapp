@@ -877,7 +877,7 @@ export default function RoomChatDrawer({
             onPress={() => { if (senderUid && onAvatarPress) onAvatarPress(senderUid); }}
             hitSlop={4}
           >
-            <Text style={[st.msgName, { color: glowCfg ? glowCfg.nameColor : nameColor }]}>{item.profiles?.display_name || 'Kullanıcı'}</Text>
+            <Text style={[st.msgName, { color: glowCfg ? glowCfg.nameColor : nameColor }]}>{item.profiles?.display_name || (item.user_id ? `…${String(item.user_id).slice(0, 4)}` : '…')}</Text>
           </Pressable>
           {isGifSafe ? (
             <Image source={{ uri: gifMatch![1] }} style={{ width: 220, height: 165, borderRadius: 12 }} resizeMode="cover" />
