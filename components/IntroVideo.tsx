@@ -34,12 +34,13 @@ export default function IntroVideo({ onFinish }: Props) {
     ]).start();
 
     // Glow pulse
-    Animated.loop(
+    const glowLoop = Animated.loop(
       Animated.sequence([
         Animated.timing(glowAnim, { toValue: 1, duration: 1000, useNativeDriver: true }),
         Animated.timing(glowAnim, { toValue: 0.3, duration: 1000, useNativeDriver: true }),
       ])
-    ).start();
+    );
+    glowLoop.start();
 
     // ★ 2.5sn sonra fade-out
     const timer = setTimeout(() => {
@@ -52,7 +53,10 @@ export default function IntroVideo({ onFinish }: Props) {
       });
     }, 2500);
 
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      glowLoop.stop();
+    };
   }, []);
 
   return (

@@ -33,6 +33,8 @@ export function IncomingCallOverlay({ visible, callerName, callerAvatar, callTyp
   const soundRef = useRef<Audio.Sound | null>(null);
   const cleaningUpRef = useRef(false);
   const autoCloseTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const pulseLoopRef = useRef<Animated.CompositeAnimation | null>(null);
+  const ringLoopRef = useRef<Animated.CompositeAnimation | null>(null);
 
   // ★ CALL-3 FIX: Senkron ses durdurma — kabul/red'de ANINDA çağrılır
   const stopSoundImmediately = useCallback(async () => {
@@ -152,20 +154,24 @@ export function IncomingCallOverlay({ visible, callerName, callerAvatar, callTyp
       }).start();
 
       // ★ Avatar pulse animasyonu
-      Animated.loop(
+      const pulseLoop = Animated.loop(
         Animated.sequence([
           Animated.timing(pulseAnim, { toValue: 1.08, duration: 800, useNativeDriver: true }),
           Animated.timing(pulseAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
         ])
-      ).start();
+      );
+      pulseLoop.start();
+      pulseLoopRef.current = pulseLoop;
 
       // ★ Halka pulse animasyonu (ring effect)
-      Animated.loop(
+      const ringLoop = Animated.loop(
         Animated.sequence([
           Animated.timing(ringPulseAnim, { toValue: 0.8, duration: 1200, useNativeDriver: true }),
           Animated.timing(ringPulseAnim, { toValue: 0.4, duration: 1200, useNativeDriver: true }),
         ])
-      ).start();
+      );
+      ringLoop.start();
+      ringLoopRef.current = ringLoop;
 
       // ★ Buton giriş animasyonu
       Animated.stagger(100, [
@@ -197,6 +203,10 @@ export function IncomingCallOverlay({ visible, callerName, callerAvatar, callTyp
       isCancelled = true;
       Vibration.cancel();
       stopSoundImmediately();
+      pulseLoopRef.current?.stop();
+      ringLoopRef.current?.stop();
+      pulseLoopRef.current = null;
+      ringLoopRef.current = null;
       if (autoCloseTimerRef.current) { clearTimeout(autoCloseTimerRef.current); autoCloseTimerRef.current = null; }
     };
   }, [visible]);

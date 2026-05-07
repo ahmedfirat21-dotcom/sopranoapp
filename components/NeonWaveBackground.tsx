@@ -33,12 +33,14 @@ export default function NeonWaveBackground({ variant = 'default', intensity = 1,
   const anim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    Animated.loop(
+    const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(anim, { toValue: 1, duration: 8000, useNativeDriver: true }),
         Animated.timing(anim, { toValue: 0, duration: 8000, useNativeDriver: true }),
       ])
-    ).start();
+    );
+    loop.start();
+    return () => { loop.stop(); };
   }, []);
 
   const translateY = anim.interpolate({
