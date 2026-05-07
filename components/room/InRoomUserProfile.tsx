@@ -1,4 +1,4 @@
-﻿/**
+/**
  * SopranoChat — User Profile Overlay (Clubhouse tarzı)
  * Avatar tıklamasında her yerden açılır (oda içi + dışı).
  * Oda içi: tek dokunuş = profil + moderasyon. Odadan çıkmaz, peek chain.
@@ -6,8 +6,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, Image, Pressable, ScrollView, Dimensions, Animated,
-  PanResponder,
+  PanResponder, Share, KeyboardAvoidingView, Platform,
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import AppLoader from '../AppLoader';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -26,17 +27,67 @@ import { ModerationService } from '../../services/moderation';
 import { UserTitleService, type UserTitle } from '../../services/userTitles';
 import { showToast } from '../Toast';
 import ProfileHero from '../profile/ProfileHero';
+import ProfileSectionHeader from '../profile/ProfileSectionHeader';
 import BadgeListModal from '../profile/BadgeListModal';
+import GiftDetailModal from '../profile/GiftDetailModal';
+import { GiftStatsService } from '../../services/giftStats';
 // ★ v107: SPDonateSheet → GiftSheet (kişiye hediye akışı kendi sheet'inde)
 import GiftSheet from '../profile/GiftSheet';
-// ★ v107: Sembol Hediye — mağazadan satın alınmış gift item'ları arkadaşa gönder
-import SymbolGiftSheet from '../profile/SymbolGiftSheet';
+// ★ v108.7: SymbolGiftSheet kaldırıldı — hediye akışı sadece oda kontrol barındaki
+//   RoomGiftPanel üzerinden (envanter sistemi yok, pay-per-send).
 import FollowListModal from '../FollowListModal';
 import { ReportModal } from '../ReportModal';
 import PremiumAlert, { type AlertButton } from '../PremiumAlert';
 import { supabase } from '../../constants/supabase';
+import { RoomService } from '../../services/room';
+import ProfileIdentityStrip from '../profile/ProfileIdentityStrip';
+import {
+  VoiceBioPlayer, TopSupportersStrip, MutualRoomsStrip,
+  FeaturedBadgesShowcase, SocialLinksRow, InvitedByRow, SpeakingRhythmHint,
+} from '../profile/ProfileExtras';
+import PersonalNoteCard from '../profile/PersonalNoteCard';
+import {
+  SupportersService, MutualRoomsService, FeaturedBadgesService,
+  UserNotesService, SpeakingRhythmService,
+  type Supporter, type MutualRoom,
+} from '../../services/profileExtras';
 
 const { height: H } = Dimensions.get('window');
+
+// ═══════════════════════════════════════════════════════════════════
+// ★ v110.2 (6 May 2026): Module-level profil cache (5dk TTL)
+// Aynı kullanıcının profili kısa sürede tekrar açılırsa veriler ANLIK
+// gösterilir — her seferinde sıfırdan fetch + 0 stat flash YOK.
+// Background'da revalidate olur (stale-while-revalidate pattern).
+// TTL 60sn→5dk: Profil verisi sık değişmez, hızlı geri dönüşlerde
+// kullanıcı her seferinde "yükleniyor" hissini almasın.
+// ═══════════════════════════════════════════════════════════════════
+type ProfileCacheEntry = {
+  ts: number;
+  userProfile: any;
+  stats: { friends: number; followers: number; following: number; rooms: number; badges: number; gifts: number };
+  friendsPreview: any[];
+  profileStats: { stageMinutes: number; roomsCreated: number; totalListeners: number; totalReactions: number };
+  userTitle: any;
+  followStatus: any;
+  incomingStatus: any;
+  isUserBlocked: boolean;
+  currentRoom: any;
+  isFollowingUser: boolean;
+  mutualFriendCount: number;
+  recentRooms: any[];
+  /** ★ v110.3: Mevcut kullanıcının (sheet'i açanın) host'u olduğu CANLI oda — varsa "Davet Et" butonu görünür. */
+  myLiveRoom: { id: string; name: string } | null;
+  // ★ v110.5 (Faz B + C)
+  topSupporters: Supporter[];
+  mutualRooms: MutualRoom[];
+  featuredBadges: string[];
+  personalNote: string | null;
+  invitedBy: { id: string; display_name: string; avatar_url: string } | null;
+  speakingRhythmText: string | null;
+};
+const profileCache = new Map<string, ProfileCacheEntry>();
+const PROFILE_CACHE_TTL_MS = 5 * 60 * 1000;
 
 /** ★ 2026-04-28: Hibrit pattern — Clubhouse 3-snap mekanik + wizard görsel chrome.
  *  - Açılışta SHEET_HALF (yarım gözat). Drag-up → SHEET_FULL. Drag-down → dismiss.
@@ -93,15 +144,12 @@ type Props = {
   modActions?: ModActions;
   /** ★ 2026-04-26: Aynı odadaysak "Şu an dinliyor" banner'ını gizle (gereksiz tekrar bilgi). */
   excludeRoomId?: string;
-  /** ★ 2026-04-26: SADECE oda DIŞI sheet için — "Tam Profili Aç" linki render eder.
-   *  Oda içi sheet'ten escape yasak (memory: feedback_clubhouse_no_exit), bu yüzden parent vermez. */
-  onViewFullProfile?: () => void;
   /** ★ 2026-04-26: Backdrop tıklanınca kapansın mı? Oda DIŞI'nda evet (kullanıcı beklentisi),
    *  oda İÇİ'nde hayır (oda alanı tıklanabilir kalmalı, Clubhouse no-exit). */
   closeOnBackdropTap?: boolean;
 };
 
-export default function InRoomUserProfile({ visible, userId, currentUserId, onClose, onSelectUser, modActions, excludeRoomId, onViewFullProfile, closeOnBackdropTap = false }: Props) {
+export default function InRoomUserProfile({ visible, userId, currentUserId, onClose, onSelectUser, modActions, excludeRoomId, closeOnBackdropTap = false }: Props) {
   const router = useRouter();
   const [userProfile, setUserProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -115,7 +163,8 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
   //   fetch arka planda gerçek state'e güncellenir. Yükleniyor sadece kullanıcının
   //   tıkladığı sırada (followToggleLoading / followLoading) görünür — bu mantıklı.
   const interactionsReady = true; // backward compat — diğer kullanım yerleri etkilenmesin
-  const [stats, setStats] = useState({ friends: 0, followers: 0, following: 0, rooms: 0, badges: 0 });
+  const [stats, setStats] = useState({ friends: 0, followers: 0, following: 0, rooms: 0, badges: 0, gifts: 0 });
+  const [showGiftDetail, setShowGiftDetail] = useState(false);
   const [friendsPreview, setFriendsPreview] = useState<FriendUser[]>([]);
   const [profileStats, setProfileStats] = useState({ stageMinutes: 0, roomsCreated: 0, totalListeners: 0, totalReactions: 0 });
   const [userTitle, setUserTitle] = useState<UserTitle | null>(null);
@@ -124,7 +173,6 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
   const [showFollowList, setShowFollowList] = useState(false);
   const [followListTab, setFollowListTab] = useState<'friends' | 'followers' | 'following'>('friends');
   const [showSPSheet, setShowSPSheet] = useState(false);
-  const [showSymbolGift, setShowSymbolGift] = useState(false);
    const [showBadgesModal, setShowBadgesModal] = useState(false);
    const [cAlert, setCAlert] = useState<{ visible: boolean; title: string; message: string; type?: 'info' | 'warning' | 'error' | 'success'; buttons?: AlertButton[] }>({ visible: false, title: '', message: '' });
    // ★ 2026-04-26: Şu an hangi odada + ortak arkadaş + one-way follow
@@ -132,8 +180,25 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
    const [isFollowingUser, setIsFollowingUser] = useState(false);
    const [followToggleLoading, setFollowToggleLoading] = useState(false);
    const [mutualFriendCount, setMutualFriendCount] = useState(0);
+   // ★ v110 (6 May 2026): Kullanıcının odaları — daha önce sadece /user/[id] sayfasında gösteriliyordu.
+   //   Artık sheet içinde gerçek profil sayfası deneyimini tamamlıyor (full-page'e gerek kalmadı).
+   const [recentRooms, setRecentRooms] = useState<any[]>([]);
+   // ★ v110: Tüm "phase 2" verileri (stats, friendship, rooms, mutual) hazır mı?
+   //   FALSE iken: stats "—" gösterir, "Bu hesap gizli" banner'ı render edilmez (flash önleme).
+   const [dataReady, setDataReady] = useState(false);
    /** ★ 2026-04-26: 3-nokta menü açıkken az kullanılan mod aksiyonları görünür (Clubhouse pattern) */
    const [showMoreActions, setShowMoreActions] = useState(false);
+   // ★ v110.3 (6 May 2026): Mevcut kullanıcının canlı oda host'u olup olmadığı —
+   //   "Odama Davet Et" butonunun görünürlüğünü belirler.
+   const [myLiveRoom, setMyLiveRoom] = useState<{ id: string; name: string } | null>(null);
+   const [inviteSending, setInviteSending] = useState(false);
+   // ★ v110.5 (Faz B + C)
+   const [topSupporters, setTopSupporters] = useState<Supporter[]>([]);
+   const [mutualRooms, setMutualRooms] = useState<MutualRoom[]>([]);
+   const [featuredBadges, setFeaturedBadges] = useState<string[]>([]);
+   const [personalNote, setPersonalNote] = useState<string | null>(null);
+   const [invitedBy, setInvitedBy] = useState<{ id: string; display_name: string; avatar_url: string } | null>(null);
+   const [speakingRhythmText, setSpeakingRhythmText] = useState<string | null>(null);
 
   // ★ 2026-04-28: 3-snap mekanik — translateY-based (useNativeDriver:true).
   //   Önceki top-based JS-driven animation pan gesture ile race ediyordu — sadece handle bar'da çalışıyordu.
@@ -151,131 +216,250 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
 
   const loadProfile = useCallback(async () => {
     if (!userId) return;
-    // ★ 2026-04-26: 2 aşamalı yükleme — önce kritik (profile + block), spinner kalkar.
-    //   Sonra ek detaylar (stats, friends, tier, currentRoom) arka planda yüklenir.
-    //   Kullanıcı 11 sorgunun bitmesini beklemez, ilk gördüğünde profile gözükür.
+    // ★ v110 (6 May 2026): Module-level cache HIT → tüm veriler ANLIK gelir,
+    //   spinner/0-flash görünmez. Background'da hâlâ revalidate olur.
     const targetUserId = userId; // race condition koruması: userId değişirse eski response ezilmesin
-    setLoading(true);
-    setUserProfile(null);
-    setFriendsPreview([]);
-    setStats({ friends: 0, followers: 0, following: 0, rooms: 0, badges: 0 });
-    setProfileStats({ stageMinutes: 0, roomsCreated: 0, totalListeners: 0, totalReactions: 0 });
-    setUserTitle(null);
-    setFollowStatus(null);
-    setIncomingStatus(null);
-    setIsUserBlocked(false);
-    setCurrentRoom(null);
-    // ★ v107.23: setInteractionsReady KALDIRILDI — butonlar instant görünür
-    setIsFollowingUser(false);
-    setMutualFriendCount(0);
-    setShowMoreActions(false);
-    try {
-      // ── Aşama 1: Kritik veri — profile + block check (avatar/isim/bio görünsün, spinner kalksın) ──
-      let blocked = false;
-      if (currentUserId && !isOwnProfile) {
-        try {
-          const blockedIds = await ModerationService.getBlockedUsers(currentUserId);
-          blocked = blockedIds.includes(targetUserId);
-          if (targetUserId !== userId) return; // userId değişti
-          setIsUserBlocked(blocked);
-        } catch {}
-      }
+    const cached = profileCache.get(targetUserId);
+    const isFresh = cached && (Date.now() - cached.ts < PROFILE_CACHE_TTL_MS);
 
-      if (blocked) {
-        const { data } = await supabase.from('profiles').select('id, display_name, avatar_url').eq('id', targetUserId).single();
-        if (targetUserId !== userId) return;
-        setUserProfile(data as any);
-        setStats({ friends: 0, followers: 0, following: 0, rooms: 0, badges: 0 });
+    if (isFresh && cached) {
+      // Cache'ten hidrasyon — kullanıcı sheet'i açar açmaz tüm profil görünür
+      setUserProfile(cached.userProfile);
+      setStats(cached.stats);
+      setFriendsPreview(cached.friendsPreview);
+      setProfileStats(cached.profileStats);
+      setUserTitle(cached.userTitle);
+      setFollowStatus(cached.followStatus);
+      setIncomingStatus(cached.incomingStatus);
+      setIsUserBlocked(cached.isUserBlocked);
+      setCurrentRoom(cached.currentRoom);
+      setIsFollowingUser(cached.isFollowingUser);
+      setMutualFriendCount(cached.mutualFriendCount);
+      setRecentRooms(cached.recentRooms);
+      setMyLiveRoom(cached.myLiveRoom);
+      setTopSupporters(cached.topSupporters);
+      setMutualRooms(cached.mutualRooms);
+      setFeaturedBadges(cached.featuredBadges);
+      setPersonalNote(cached.personalNote);
+      setInvitedBy(cached.invitedBy);
+      setSpeakingRhythmText(cached.speakingRhythmText);
+      setDataReady(true);
+      setLoading(false);
+      // Background revalidation altta devam eder (cached değerler güncellensin)
+    } else {
+      setLoading(true);
+      setUserProfile(null);
+      setFriendsPreview([]);
+      setStats({ friends: 0, followers: 0, following: 0, rooms: 0, badges: 0, gifts: 0 });
+      setProfileStats({ stageMinutes: 0, roomsCreated: 0, totalListeners: 0, totalReactions: 0 });
+      setUserTitle(null);
+      setFollowStatus(null);
+      setIncomingStatus(null);
+      setIsUserBlocked(false);
+      setCurrentRoom(null);
+      setIsFollowingUser(false);
+      setMutualFriendCount(0);
+      setRecentRooms([]);
+      setMyLiveRoom(null);
+      setTopSupporters([]);
+      setMutualRooms([]);
+      setFeaturedBadges([]);
+      setPersonalNote(null);
+      setInvitedBy(null);
+      setSpeakingRhythmText(null);
+      setDataReady(false);
+    }
+    setShowMoreActions(false);
+
+    // ★ v110.5 (6 May 2026): "Hepsi birlikte yüklensin" stratejisi.
+    //   ESKİ: progressive — her .then ayrı state set ederdi → ortak arkadaş, mutual, stats
+    //         farklı zamanlarda flash'lı görünürdü (kullanıcı şikayeti).
+    //   YENİ: Cache MISS durumunda hiçbir state aşamalı set edilmez. Skeleton görünür ta ki
+    //         TÜM kritik veriler hazır → sonra tek seferde her şey render edilir.
+    //         Cache HIT durumunda hidrasyon zaten anlık — revalidation arka planda sessiz.
+    const stillCurrent = () => targetUserId === userId;
+
+    // ── Promise'ları başlat (hepsi paralel) ──
+    const profilePromise = ProfileService.get(targetUserId).catch((e: any) => {
+      if (__DEV__) console.warn('[Profile fetch fail]', e);
+      return null;
+    });
+    const blockedPromise = (currentUserId && !isOwnProfile)
+      ? ModerationService.getBlockedUsers(currentUserId).catch(() => [] as string[])
+      : Promise.resolve([] as string[]);
+    const detailedPromise = (currentUserId && !isOwnProfile)
+      ? FriendshipService.getDetailedStatus(currentUserId, targetUserId).catch(() => null)
+      : Promise.resolve(null);
+    const followPromise = (currentUserId && !isOwnProfile)
+      ? FollowService.isFollowing(currentUserId, targetUserId).catch(() => false)
+      : Promise.resolve(false);
+    const currentRoomPromise = supabase.from('room_participants')
+      .select('room_id, rooms!inner(id, name, is_live)')
+      .eq('user_id', targetUserId)
+      .limit(1)
+      .then(r => {
+        const row = r.data?.[0] as any;
+        return row?.rooms?.is_live ? { id: row.rooms.id, name: row.rooms.name } : null;
+      })
+      .catch(() => null as null);
+    // ★ v110.14 (8 May 2026): Hedef kullanıcı zaten odadaysa "Odama Davet" butonu
+    //   gösterilmemeli — odada olan birini odaya davet etmek anlamsız.
+    const myLiveRoomPromise = (currentUserId && !isOwnProfile)
+      ? supabase.from('rooms').select('id, name').eq('host_id', currentUserId).eq('is_live', true).limit(1)
+          .then(async (r) => {
+            const row = r.data?.[0] as any;
+            if (!row) return null;
+            // Hedef kullanıcı bu odanın katılımcısı mı? Varsa davet düğmesi gizle.
+            const { data: partRow } = await supabase
+              .from('room_participants')
+              .select('user_id')
+              .eq('room_id', row.id)
+              .eq('user_id', targetUserId)
+              .maybeSingle();
+            if (partRow) return null;
+            return { id: row.id, name: row.name };
+          })
+          .catch(() => null as null)
+      : Promise.resolve(null as null);
+    const friendListPromise = FriendshipService.getFriends(targetUserId).catch(() => [] as any[]);
+    const myFriendsPromise = (currentUserId && !isOwnProfile)
+      ? FriendshipService.getFriends(currentUserId).catch(() => [] as any[])
+      : Promise.resolve([] as any[]);
+    const pStatsPromise = ProfileService.getProfileStats(targetUserId)
+      .catch(() => ({ stageMinutes: 0, roomsCreated: 0, totalListeners: 0, totalReactions: 0 }));
+    const roomCountPromise = supabase.from('rooms').select('*', { count: 'exact', head: true }).eq('host_id', targetUserId);
+    const badgePromise = supabase.from('user_badges').select('*', { count: 'exact', head: true }).eq('user_id', targetUserId);
+    const followerNPromise = FollowService.getFollowerCount(targetUserId).catch(() => 0);
+    const followingNPromise = FollowService.getFollowingCount(targetUserId).catch(() => 0);
+    const giftRecvPromise = GiftStatsService.getReceivedTotal(targetUserId).catch(() => ({ count: 0, total_amount: 0 }));
+    const giftSentPromise = GiftStatsService.getSentTotal(targetUserId).catch(() => ({ count: 0, total_amount: 0 }));
+    const titlePromise = UserTitleService.getPrimaryTitle(targetUserId).catch(() => null);
+    const roomsListPromise = ProfileService.getRecentRooms(targetUserId).catch(() => [] as any[]);
+
+    // ★ v110.5 (Faz B + C): Ekstra paralel fetch'ler — hepsi aynı batch'te yüklenir
+    const topSupportersPromise = SupportersService.getTop(targetUserId, 3).catch(() => [] as Supporter[]);
+    const mutualRoomsPromise = (currentUserId && !isOwnProfile)
+      ? MutualRoomsService.get(currentUserId, targetUserId, 5).catch(() => [] as MutualRoom[])
+      : Promise.resolve([] as MutualRoom[]);
+    const featuredBadgesPromise = FeaturedBadgesService.getFeatured(targetUserId).catch(() => [] as string[]);
+    const personalNotePromise = (currentUserId && !isOwnProfile)
+      ? UserNotesService.get(currentUserId, targetUserId).catch(() => null)
+      : Promise.resolve(null);
+    const speakingRhythmPromise = SpeakingRhythmService.get(targetUserId)
+      .then(SpeakingRhythmService.derivePrimeTimeText)
+      .catch(() => null);
+
+    // ── Hepsi tamamlanınca: TEK seferde state'leri set et + cache yaz + dataReady aç ──
+    //   Skeleton görünüyor olduğundan kullanıcı parça parça flash görmez.
+    try {
+      const [
+        profile, blockedIds, detailed, follow, currentRoomData, myLiveRoomData,
+        friends, myFriends, pStats, rc, badge, followerN, followingN, giftR, giftS, title, rooms,
+        topSupportersData, mutualRoomsData, featuredBadgesData, personalNoteData, rhythmText,
+      ] = await Promise.all([
+        profilePromise, blockedPromise, detailedPromise, followPromise, currentRoomPromise, myLiveRoomPromise,
+        friendListPromise, myFriendsPromise, pStatsPromise, roomCountPromise, badgePromise,
+        followerNPromise, followingNPromise, giftRecvPromise, giftSentPromise, titlePromise, roomsListPromise,
+        topSupportersPromise, mutualRoomsPromise, featuredBadgesPromise, personalNotePromise, speakingRhythmPromise,
+      ]);
+
+      if (!stillCurrent()) return;
+      if (!profile) {
+        // Profile dönmediyse (silinmiş/RLS) — skeleton kalksın, "Kullanıcı bulunamadı" göster
         setLoading(false);
+        setDataReady(true);
         return;
       }
 
-      const profile = await ProfileService.get(targetUserId);
-      if (targetUserId !== userId) return; // userId değişti, eski cevabı ez
-      setUserProfile(profile);
-      setLoading(false); // ★ Spinner KAPANIR — kullanıcı profile'ı görür, ek veriler arka planda gelir.
-
-      // ── Aşama 2: Detaylı veriler (paralel, arka planda) ──
-      const detailedPromise = currentUserId && !isOwnProfile
-        ? FriendshipService.getDetailedStatus(currentUserId, targetUserId).catch(() => null)
-        : Promise.resolve(null);
-
-      const [
-        detailed,
-        friendList,
-        roomCountRes,
-        pStats,
-        title,
-        followerN,
-        followingN,
-      ] = await Promise.all([
-        detailedPromise,
-        FriendshipService.getFriends(targetUserId).catch(() => [] as any[]),
-        supabase.from('rooms').select('*', { count: 'exact', head: true }).eq('host_id', targetUserId),
-        ProfileService.getProfileStats(targetUserId).catch(() => ({ stageMinutes: 0, roomsCreated: 0, totalListeners: 0, totalReactions: 0 })),
-        UserTitleService.getPrimaryTitle(targetUserId).catch(() => null),
-        FollowService.getFollowerCount(targetUserId).catch(() => 0),
-        FollowService.getFollowingCount(targetUserId).catch(() => 0),
-      ]);
-
-      if (targetUserId !== userId) return;
-
-      // ★ Faz 6.3 — Rozet sayısı (ayrı catch'lı query, Promise.all type karmaşası önlendi)
-      let badgeCount = 0;
-      try {
-        const r = await supabase.from('user_badges').select('*', { count: 'exact', head: true }).eq('user_id', targetUserId);
-        badgeCount = r.count ?? 0;
-      } catch { /* yoksa 0 */ }
-
-      if (targetUserId !== userId) return;
-      if (detailed) {
-        setFollowStatus(detailed.outgoing);
-        setIncomingStatus(detailed.incoming);
+      // ★ v110.5 — Davet eden profil (referred_by varsa fetch)
+      let invitedByData: { id: string; display_name: string; avatar_url: string } | null = null;
+      const referrerId = (profile as any).referred_by;
+      if (referrerId && referrerId !== targetUserId) {
+        try {
+          const { data: refProfile } = await supabase
+            .from('profiles')
+            .select('id, display_name, avatar_url')
+            .eq('id', referrerId)
+            .maybeSingle();
+          if (refProfile) {
+            invitedByData = {
+              id: refProfile.id,
+              display_name: refProfile.display_name || 'Kullanıcı',
+              avatar_url: refProfile.avatar_url || '',
+            };
+          }
+        } catch { /* sessiz */ }
       }
-      // ★ v92.1 (1 May 2026): Mevcut kullanıcı kendi adını başkasının arkadaş listesinde görmesin
-      //   (anlamsız self-reference). Stat sayısı tam liste, preview'da filtrelenir.
+
+      // ★ v92.1: Mevcut kullanıcı kendi adını başkasının arkadaş listesinde görmesin
+      // ★ v110.5.20 (6 May 2026): Engellediğim kullanıcılar HİÇBİR LİSTEDE görünmez
+      //   (Instagram pattern — engelli yokmuş gibi). "Arkadaşımın arkadaş listesinde
+      //   görüyorum" şikayeti — bu fix.
+      const myBlockedSet = new Set(blockedIds);
       const visibleFriends = currentUserId
-        ? friendList.filter((f: any) => f.id !== currentUserId)
-        : friendList;
+        ? friends.filter((f: any) => f.id !== currentUserId && !myBlockedSet.has(f.id))
+        : friends;
+      const myIds = new Set(myFriends.map((f: any) => f.id));
+      const mutualCount = friends.filter((f: any) => myIds.has(f.id) && !myBlockedSet.has(f.id)).length;
+      const finalStats = {
+        friends: friends.length,
+        followers: followerN,
+        following: followingN,
+        rooms: rc.count ?? 0,
+        badges: badge.count ?? 0,
+        gifts: ((giftR as any).count || 0) + ((giftS as any).count || 0),
+      };
+      const isBlocked = blockedIds.includes(targetUserId);
+
+      // ── TEK SEFER batch state update — React 18+ otomatik batch'ler ──
+      setUserProfile(profile);
+      setIsUserBlocked(isBlocked);
+      setFollowStatus(detailed?.outgoing ?? null);
+      setIncomingStatus(detailed?.incoming ?? null);
+      setIsFollowingUser(follow);
+      setCurrentRoom(currentRoomData);
+      setMyLiveRoom(myLiveRoomData);
       setFriendsPreview(visibleFriends);
-      setStats({ friends: friendList.length, followers: followerN, following: followingN, rooms: roomCountRes.count ?? 0, badges: badgeCount });
-      // ★ v107.23: setInteractionsReady KALDIRILDI — butonlar zaten instant
+      setMutualFriendCount(mutualCount);
+      setStats(finalStats);
       setProfileStats(pStats);
       setUserTitle(title);
+      setRecentRooms(rooms || []);
+      // ★ v110.5
+      setTopSupporters(topSupportersData);
+      setMutualRooms(mutualRoomsData);
+      setFeaturedBadges(featuredBadgesData);
+      setPersonalNote(personalNoteData);
+      setInvitedBy(invitedByData);
+      setSpeakingRhythmText(rhythmText);
 
-      // ★ 2026-04-26: Currently-in-room + one-way follow + mutual friends (non-blocking)
-      try {
-        const [roomRes, followRes, mutualRes] = await Promise.all([
-          // Şu an hangi odada
-          Promise.resolve(
-            supabase.from('room_participants')
-              .select('room_id, rooms!inner(id, name, is_live)')
-              .eq('user_id', userId)
-              .limit(1)
-          ).then(r => {
-              const row = r.data?.[0] as any;
-              if (row?.rooms?.is_live) return { id: row.rooms.id, name: row.rooms.name };
-              return null;
-            }).catch(() => null),
-          // One-way follow
-          currentUserId && !isOwnProfile
-            ? FollowService.isFollowing(currentUserId, userId).catch(() => false)
-            : Promise.resolve(false),
-          // Mutual friends (ortak arkadaş)
-          currentUserId && !isOwnProfile
-            ? FriendshipService.getFriends(currentUserId).then(myFriends => {
-                const myFriendIds = new Set(myFriends.map((f: any) => f.id));
-                return friendList.filter((f: any) => myFriendIds.has(f.id)).length;
-              }).catch(() => 0)
-            : Promise.resolve(0),
-        ]);
-        setCurrentRoom(roomRes);
-        setIsFollowingUser(followRes);
-        setMutualFriendCount(mutualRes);
-      } catch { /* non-critical */ }
+      profileCache.set(targetUserId, {
+        ts: Date.now(),
+        userProfile: profile,
+        stats: finalStats,
+        friendsPreview: visibleFriends,
+        profileStats: pStats,
+        userTitle: title,
+        followStatus: detailed?.outgoing ?? null,
+        incomingStatus: detailed?.incoming ?? null,
+        isUserBlocked: isBlocked,
+        currentRoom: currentRoomData,
+        isFollowingUser: follow,
+        mutualFriendCount: mutualCount,
+        recentRooms: rooms || [],
+        myLiveRoom: myLiveRoomData,
+        // ★ v110.5
+        topSupporters: topSupportersData,
+        mutualRooms: mutualRoomsData,
+        featuredBadges: featuredBadgesData,
+        personalNote: personalNoteData,
+        invitedBy: invitedByData,
+        speakingRhythmText: rhythmText,
+      });
+      setDataReady(true);
+      setLoading(false);
     } catch (err) {
       if (__DEV__) console.warn('[InRoomUserProfile] load failed:', err);
-    } finally {
       setLoading(false);
     }
   }, [userId, currentUserId, isOwnProfile]);
@@ -448,6 +632,61 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
     } catch {} finally { setIncomingLoading(false); }
   };
 
+  /** ★ v110.3 (6 May 2026): Profili paylaş — sistem share sheet (WhatsApp/SMS/kopyala vs.).
+   *  Deep link `https://sopranochat.com/user/<id>` — uygulama yüklüyse direkt sheet açılır,
+   *  yüklü değilse Vercel fallback HTML açılır (mevcut Universal Link altyapısı). */
+  const handleShareProfile = useCallback(async () => {
+    if (!userId || !userProfile) return;
+    const url = `https://sopranochat.com/user/${userId}`;
+    const message = userProfile.display_name
+      ? `${userProfile.display_name} adlı kullanıcının SopranoChat profili: ${url}`
+      : `Bu profili SopranoChat'te incele: ${url}`;
+    try {
+      await Share.share({ message, url, title: userProfile.display_name || 'SopranoChat Profili' });
+    } catch {
+      // Kullanıcı vazgeçti veya sistem reddetti — sessizce yutsuz, link kopyala fallback
+      try {
+        await Clipboard.setStringAsync(url);
+        showToast({ title: 'Profil linki kopyalandı', type: 'success' });
+      } catch {}
+    }
+  }, [userId, userProfile]);
+
+  /** ★ v110.3 (6 May 2026): Linki direkt kopyala — share sheet açmadan tek tıkla. */
+  const handleCopyProfileLink = useCallback(async () => {
+    if (!userId) return;
+    const url = `https://sopranochat.com/user/${userId}`;
+    try {
+      await Clipboard.setStringAsync(url);
+      showToast({ title: 'Profil linki kopyalandı', type: 'success' });
+    } catch {
+      showToast({ title: 'Kopyalanamadı', type: 'error' });
+    }
+  }, [userId]);
+
+  /** ★ v110.3 (6 May 2026): Aktif odama davet et — sadece host iken görünür buton.
+   *  RoomService.sendRoomInvite + push notif tetiklenir. Hedef kullanıcı bildirim alır. */
+  const handleInviteToMyRoom = useCallback(async () => {
+    if (!currentUserId || !userId || !myLiveRoom || inviteSending) return;
+    setInviteSending(true);
+    try {
+      await RoomService.sendRoomInvite(myLiveRoom.id, currentUserId, [userId]);
+      showToast({
+        title: 'Davet gönderildi',
+        message: `"${myLiveRoom.name}" odasına davet edildi`,
+        type: 'success',
+      });
+    } catch (err: any) {
+      showToast({
+        title: 'Davet gönderilemedi',
+        message: err?.message || 'Daha sonra tekrar dene',
+        type: 'error',
+      });
+    } finally {
+      setInviteSending(false);
+    }
+  }, [currentUserId, userId, myLiveRoom, inviteSending]);
+
   const handleBlock = () => {
     if (!currentUserId || !userId) return;
     if (isUserBlocked) {
@@ -507,19 +746,31 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
     //   da Modal kullanmıyor (route root View) ve sürükleme sorunsuz çalışıyor.
     //   Global mount _layout.tsx'te → absolute overlay yeterli.
     <View style={sty.root} pointerEvents="box-none">
-      <Animated.View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.55)', opacity: backdropOpacity }]} pointerEvents={closeOnBackdropTap ? 'auto' : 'none'}>
+      <Animated.View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(8,12,22,0.45)', opacity: backdropOpacity }]} pointerEvents={closeOnBackdropTap ? 'auto' : 'none'}>
         {closeOnBackdropTap && <Pressable style={StyleSheet.absoluteFill} onPress={handleClose} />}
       </Animated.View>
 
-      {/* ★ Wizard pattern: top:0+bottom:0+transform translateY, slate-blue gradient, chevron-down + tier chip header. */}
+      {/* ★ 2026-05-05: NotificationDrawer aile dili — slate diagonal + amber halo + soft glow.
+          Karakter: amber (profil). Bildirim/mesaj modallarıyla birebir aynı kabuk. */}
       <Animated.View
         style={[sty.sheet, { transform: [{ translateY }] }]}
         {...panResponder.panHandlers}
       >
           <LinearGradient
-            colors={['#4a5668', '#37414f', '#232a35']}
-            locations={[0, 0.35, 1]}
+            colors={['#3a4658', '#2a3344', '#1a2030']}
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFillObject}
+            pointerEvents="none"
+          />
+          <LinearGradient
+            colors={['rgba(245,158,11,0.20)', 'rgba(245,158,11,0.05)', 'transparent']}
+            start={{ x: 0, y: 0 }} end={{ x: 0, y: 0.4 }}
+            style={StyleSheet.absoluteFillObject}
+            pointerEvents="none"
+          />
+          <LinearGradient
+            colors={['rgba(245,158,11,0.08)', 'transparent']}
+            start={{ x: 0, y: 0 }} end={{ x: 0.7, y: 0.6 }}
             style={StyleSheet.absoluteFillObject}
             pointerEvents="none"
           />
@@ -574,11 +825,17 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
             <Text style={{ color: Colors.text2, marginTop: 12 }}>Kullanıcı bulunamadı</Text>
           </View>
         ) : (
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={{ flex: 1 }}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 24}
+          >
           <ScrollView
             showsVerticalScrollIndicator={false}
             contentContainerStyle={{ paddingBottom: 100 + insets.bottom }}
             onScroll={handleScroll}
             scrollEventThrottle={16}
+            keyboardShouldPersistTaps="handled"
           >
 
             {isUserBlocked && (
@@ -598,13 +855,57 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
               subscriptionTier={tier as any}
               isAdmin={!!userProfile.is_admin}
               userTitle={userTitle}
-              stats={{ followers: stats.followers, rooms: stats.rooms }}
+              stats={{ followers: stats.followers, rooms: stats.rooms, gifts: stats.gifts }}
+              statsLoading={!dataReady}
               onFollowersPress={() => { setFollowListTab('followers'); setShowFollowList(true); }}
               onRoomsPress={() => {}}
+              onGiftsPress={() => setShowGiftDetail(true)}
               memberSince={userProfile.created_at}
               boostExpiresAt={(userProfile as any)?.profile_boost_expires_at}
-              isOnline={isFriend || isOwnProfile ? userProfile.is_online : undefined}
+              isOnline={isFriend && !isOwnProfile ? userProfile.is_online : undefined}
+              // ★ v110.3: Son aktif zamanı — settings.show_online_status kapalıysa
+              //   backend last_seen=null döner (services/profile.ts setOnline), o zaman gizlenir.
+              lastSeen={(isOwnProfile || isFriend) ? userProfile.last_seen : null}
+              isVerified={!!(userProfile as any)?.is_verified}
+              activeFrame={(userProfile as any)?.active_frame || null}
             />
+
+            {/* ★ v110.5 (6 May 2026): Diller + İlgi alanları kimlik şeridi
+                Modern sesli platform için kritik. Yabancı kullanıcı hangi dilde
+                konuşulduğunu, hangi konularda aktif olduğunu görsün. */}
+            <ProfileIdentityStrip
+              languages={(userProfile as any)?.languages}
+              interests={(userProfile as any)?.interests}
+              isOwn={isOwnProfile}
+              onEditPress={isOwnProfile ? () => {
+                handleClose();
+                setTimeout(() => router.push('/edit-profile' as any), 250);
+              } : undefined}
+            />
+
+            {/* ★ v110.5 — Sesli tanıtım (Voice Bio) */}
+            {(userProfile as any)?.voice_bio_url && (
+              <VoiceBioPlayer
+                url={(userProfile as any).voice_bio_url}
+                durationMs={(userProfile as any).voice_bio_duration_ms}
+              />
+            )}
+
+            {/* ★ v110.5 — Sosyal linkler (IG/X/web küçük butonlar) */}
+            <SocialLinksRow links={(userProfile as any)?.social_links} />
+
+            {/* ★ v110.5 — Konuşma ritmi text */}
+            <SpeakingRhythmHint text={speakingRhythmText} />
+
+            {/* ★ v110.5 — Davet eden satırı (referred_by varsa) */}
+            {invitedBy && !isOwnProfile && (
+              <InvitedByRow
+                inviterName={invitedBy.display_name}
+                inviterAvatar={invitedBy.avatar_url}
+                inviterId={invitedBy.id}
+                onPress={(uid) => onSelectUser?.(uid)}
+              />
+            )}
 
             {!isOwnProfile && (
               <>
@@ -748,17 +1049,8 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                       <SPHexagonIcon size={62} static />
                     </Pressable>
                   )}
-                  {/* ★ v107: Sembol Hediye — Mağazadan satın alınmış gift sembolünü arkadaşa gönder */}
-                  {!isOwnProfile && !isUserBlocked && currentUserId && (
-                    <Pressable
-                      style={sty.actionBtn}
-                      onPress={() => setShowSymbolGift(true)}
-                      hitSlop={6}
-                      accessibilityLabel="Sembol Hediye Gönder"
-                    >
-                      <Ionicons name="gift" size={20} color="#F472B6" />
-                    </Pressable>
-                  )}
+                  {/* ★ v108.7: Sembol Hediye butonu kaldırıldı (envanter sistemi kalktı,
+                      hediyeler artık sadece RoomGiftPanel — oda kontrol barından — gönderilir). */}
                 </View>
 
                 {/* ★ 2026-04-26: Şu an hangi odada — aynı odadaysak gizle (gereksiz tekrar). */}
@@ -778,69 +1070,150 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                   </View>
                 )}
 
-                {/* ★ 2026-04-26: Clubhouse pattern — mod aksiyonları profil sheet İÇİNDE inline.
-                     Primer aksiyon (büyük buton) + Mute toggle (varsa) + 3-nokta menü (az kullanılanlar).
-                     Mevcut modActions değişkenleri görünürlük belirler. */}
-                {modActions && (() => {
+                {/* ★ v110.5.4: Yardımcı eylem satırı + 3-nokta TEK SATIR.
+                     Paylaş + Linki Kopyala + (host iken) Odama Davet + 3-nokta (Rapor/Engelle).
+                     Eski "Daha fazla" yazısı kaldırıldı (redundant), sadece "..." ikon. */}
+                {currentUserId && (
+                  <View style={sty.utilityRow}>
+                    {!isUserBlocked && (
+                      <>
+                        <Pressable
+                          onPress={handleShareProfile}
+                          style={({ pressed }) => [sty.utilityChip, pressed && { opacity: 0.7, transform: [{ scale: 0.97 }] }]}
+                          hitSlop={6}
+                        >
+                          <Ionicons name="share-social-outline" size={14} color="#5CBFB5" />
+                          <Text style={sty.utilityChipText}>Paylaş</Text>
+                        </Pressable>
+                        <Pressable
+                          onPress={handleCopyProfileLink}
+                          style={({ pressed }) => [sty.utilityChip, pressed && { opacity: 0.7, transform: [{ scale: 0.97 }] }]}
+                          hitSlop={6}
+                        >
+                          <Ionicons name="link-outline" size={14} color="#5CBFB5" />
+                          <Text style={sty.utilityChipText}>Linki Kopyala</Text>
+                        </Pressable>
+                        {myLiveRoom && (
+                          <Pressable
+                            onPress={handleInviteToMyRoom}
+                            disabled={inviteSending}
+                            style={({ pressed }) => [
+                              sty.utilityChipPrimary,
+                              pressed && { opacity: 0.85, transform: [{ scale: 0.97 }] },
+                              inviteSending && { opacity: 0.6 },
+                            ]}
+                            hitSlop={6}
+                          >
+                            {inviteSending ? (
+                              <AppLoader size="small" color="#fff" />
+                            ) : (
+                              <>
+                                <Ionicons name="mic-circle" size={15} color="#FFF" />
+                                <Text style={sty.utilityChipPrimaryText}>Odama Davet</Text>
+                              </>
+                            )}
+                          </Pressable>
+                        )}
+                      </>
+                    )}
+                    {/* Spacer — 3-noktayı sağa it */}
+                    <View style={{ flex: 1 }} />
+                    {/* 3-nokta — Engelle/Rapor menüsünü açar (her zaman görünür yabancı profilde) */}
+                    {!isOwnProfile && (
+                      <Pressable
+                        onPress={() => setShowMoreActions(s => !s)}
+                        style={({ pressed }) => [
+                          sty.utilityDots,
+                          showMoreActions && { backgroundColor: 'rgba(255,255,255,0.10)', borderColor: 'rgba(255,255,255,0.22)' },
+                          pressed && { opacity: 0.7 },
+                        ]}
+                        hitSlop={8}
+                        accessibilityLabel="Daha fazla seçenek"
+                      >
+                        <Ionicons name="ellipsis-horizontal" size={16} color="#94A3B8" />
+                      </Pressable>
+                    )}
+                  </View>
+                )}
+
+                {/* ★ v110.3: Aksiyon menüsü — modActions opsiyonel; Engelle/Rapor HER zaman görünür.
+                     Eskiden tüm blok `{modActions && ...}` ile sarılıydı → oda dışında engelle/rapor erişilemiyordu. */}
+                {!isOwnProfile && currentUserId && (() => {
                   // ★ 2026-04-26: Renk paleti standardı — mod aksiyonları MOR (#A855F7),
                   //   sosyal/info turkuaz, tehlike (kick/ban) kırmızı. Renk kakofonisi giderildi.
                   const MOD = '#A855F7';
                   const DANGER = '#EF4444';
+                  const ma = modActions; // opsiyonel — oda dışında undefined olur
 
-                  // Primer aksiyon: en kritik tek aksiyon (sahne kontrolü)
-                  const primary = modActions.onPromoteToStage
-                    ? { fn: modActions.onPromoteToStage, icon: 'arrow-up-circle' as const, label: 'Sahneye Davet', color: MOD }
-                    : modActions.onRemoveFromStage
-                    ? { fn: modActions.onRemoveFromStage, icon: 'arrow-down-circle' as const, label: 'Sahneden İndir', color: MOD }
-                    : modActions.onSelfPromote
-                    ? { fn: modActions.onSelfPromote, icon: 'arrow-up-circle' as const, label: 'Sahneye Çık', color: MOD }
-                    : modActions.onSelfDemote
-                    ? { fn: modActions.onSelfDemote, icon: 'arrow-down-circle-outline' as const, label: 'Sahneden İn', color: DANGER }
+                  // Primer aksiyon: sadece oda içinde (modActions varsa) anlamlı
+                  const primary = ma?.onPromoteToStage
+                    ? { fn: ma.onPromoteToStage, icon: 'arrow-up-circle' as const, label: 'Sahneye Davet', color: MOD }
+                    : ma?.onRemoveFromStage
+                    ? { fn: ma.onRemoveFromStage, icon: 'arrow-down-circle' as const, label: 'Sahneden İndir', color: MOD }
+                    : ma?.onSelfPromote
+                    ? { fn: ma.onSelfPromote, icon: 'arrow-up-circle' as const, label: 'Sahneye Çık', color: MOD }
+                    : ma?.onSelfDemote
+                    ? { fn: ma.onSelfDemote, icon: 'arrow-down-circle-outline' as const, label: 'Sahneden İn', color: DANGER }
                     : null;
 
-                  // Mute toggle: moderatör + hedef speaker
-                  const muteToggle = modActions.isMuted && modActions.onUnmute
-                    ? { fn: modActions.onUnmute, icon: 'volume-high' as const, label: 'Sesi Aç', color: MOD }
-                    : modActions.onMute
-                    ? { fn: modActions.onMute, icon: 'volume-mute' as const, label: 'Sustur', color: MOD }
+                  // Mute toggle: sadece oda içinde
+                  const muteToggle = ma?.isMuted && ma?.onUnmute
+                    ? { fn: ma.onUnmute, icon: 'volume-high' as const, label: 'Sesi Aç', color: MOD }
+                    : ma?.onMute
+                    ? { fn: ma.onMute, icon: 'volume-mute' as const, label: 'Sustur', color: MOD }
                     : null;
 
                   // ★ 2026-04-26: 3-nokta menüsü iki gruba ayrıldı — sade mod (mor) ve tehlikeli yaptırım (kırmızı).
                   //   Görsel olarak ayraç çizgi ile ayrılır, kullanıcı yanlışlıkla ban/kick'e basmaz.
-                  type MenuItem = { fn: () => void; icon: keyof typeof Ionicons.glyphMap; label: string; color: string; danger?: boolean };
+                  type MenuItem = { fn: () => void; icon: keyof typeof Ionicons.glyphMap; label: string; color: string; danger?: boolean; keepSheet?: boolean };
                   const moderationItems: MenuItem[] = [];
                   const enforcementItems: MenuItem[] = [];
 
-                  if (modActions.onChatMute) moderationItems.push({ fn: modActions.onChatMute, icon: modActions.isChatMuted ? 'chatbox' : 'chatbox-outline', label: modActions.isChatMuted ? 'Yazı Aç' : 'Yazı Kapat', color: MOD });
-                  if (modActions.onMakeModerator) moderationItems.push({ fn: modActions.onMakeModerator, icon: 'shield', label: modActions.displayRole === 'moderator' ? 'Moderatörlüğü Kaldır' : 'Moderatör Yap', color: MOD });
-                  if (modActions.onPersonalMute) moderationItems.push({ fn: modActions.onPersonalMute, icon: modActions.isPersonallyMuted ? 'volume-high' : 'volume-mute', label: modActions.isPersonallyMuted ? 'Sesi Aç (sadece bana)' : 'Benim İçin Sustur', color: MOD });
-                  if (modActions.onGhostMode) moderationItems.push({ fn: modActions.onGhostMode, icon: modActions.isGhost ? 'eye' : 'eye-off', label: modActions.isGhost ? 'Görünür Ol' : 'Görünmez Mod', color: MOD });
-                  if (modActions.onDisguise) moderationItems.push({
-                    fn: modActions.onDisguise,
-                    icon: modActions.isDisguised ? 'person' : 'person-circle',
-                    label: modActions.isDisguised ? 'Kılığı Çıkar' : 'Kılığa Bürün',
+                  // Mod aksiyonları — sadece oda içinde
+                  if (ma?.onChatMute) moderationItems.push({ fn: ma.onChatMute, icon: ma.isChatMuted ? 'chatbox' : 'chatbox-outline', label: ma.isChatMuted ? 'Yazı Aç' : 'Yazı Kapat', color: MOD });
+                  if (ma?.onMakeModerator) moderationItems.push({ fn: ma.onMakeModerator, icon: 'shield', label: ma.displayRole === 'moderator' ? 'Moderatörlüğü Kaldır' : 'Moderatör Yap', color: MOD });
+                  if (ma?.onPersonalMute) moderationItems.push({ fn: ma.onPersonalMute, icon: ma.isPersonallyMuted ? 'volume-high' : 'volume-mute', label: ma.isPersonallyMuted ? 'Sesi Aç (sadece bana)' : 'Benim İçin Sustur', color: MOD });
+                  if (ma?.onGhostMode) moderationItems.push({ fn: ma.onGhostMode, icon: ma.isGhost ? 'eye' : 'eye-off', label: ma.isGhost ? 'Görünür Ol' : 'Görünmez Mod', color: MOD });
+                  if (ma?.onDisguise) moderationItems.push({
+                    fn: ma.onDisguise,
+                    icon: ma.isDisguised ? 'person' : 'person-circle',
+                    label: ma.isDisguised ? 'Kılığı Çıkar' : 'Kılığa Bürün',
                     color: MOD,
                   });
 
-                  if (modActions.onKick) enforcementItems.push({ fn: modActions.onKick, icon: 'exit', label: 'Odadan Çıkar', color: DANGER, danger: true });
-                  if (modActions.onBanTemp) enforcementItems.push({ fn: modActions.onBanTemp, icon: 'timer', label: 'Geçici Ban', color: DANGER, danger: true });
-                  if (modActions.onBanPerm) enforcementItems.push({ fn: modActions.onBanPerm, icon: 'ban', label: 'Kalıcı Ban', color: DANGER, danger: true });
-                  if (!isOwnProfile && currentUserId) {
-                    enforcementItems.push({ fn: () => setShowReportModal(true), icon: 'flag-outline', label: 'Rapor Et', color: DANGER, danger: true });
-                    enforcementItems.push({ fn: handleBlock, icon: isUserBlocked ? 'checkmark-circle' : 'ban', label: isUserBlocked ? 'Engeli Kaldır' : 'Engelle', color: DANGER, danger: true });
-                  }
+                  // Yaptırım — kick/ban sadece oda içinde, RAPOR/ENGELLE HER ZAMAN
+                  //   ★ v110.5.4: keepSheet=true → Rapor/Engelle modallari sheet'in ÜSTÜNE açılır
+                  //     (sheet'i kapatınca ReportModal unmount oluyordu, fix bu).
+                  if (ma?.onKick) enforcementItems.push({ fn: ma.onKick, icon: 'exit', label: 'Odadan Çıkar', color: DANGER, danger: true });
+                  if (ma?.onBanTemp) enforcementItems.push({ fn: ma.onBanTemp, icon: 'timer', label: 'Geçici Ban', color: DANGER, danger: true });
+                  if (ma?.onBanPerm) enforcementItems.push({ fn: ma.onBanPerm, icon: 'ban', label: 'Kalıcı Ban', color: DANGER, danger: true });
+                  enforcementItems.push({ fn: () => setShowReportModal(true), icon: 'flag-outline', label: 'Rapor Et', color: DANGER, danger: true, keepSheet: true });
+                  enforcementItems.push({ fn: handleBlock, icon: isUserBlocked ? 'checkmark-circle' : 'ban', label: isUserBlocked ? 'Engeli Kaldır' : 'Engelle', color: DANGER, danger: true, keepSheet: true });
 
                   const hasMore = moderationItems.length > 0 || enforcementItems.length > 0;
                   if (!primary && !muteToggle && !hasMore) return null;
 
-                  // ★ 2026-04-26: Inline butonlar yoksa 3-nokta yalnız kalıyor (sıradan kullanıcı görüntüsü) — menüyü direkt aç.
+                  // ★ v110.3: Engelle/Rapor "tehlikeli" aksiyon — yanlışlıkla basılmasın diye
+                  //   her zaman explicit 3-nokta tıklaması gerekir (auto-expand kaldırıldı).
                   const hasInlineButtons = !!primary || !!muteToggle;
-                  const expandMore = !hasInlineButtons || showMoreActions;
+                  const expandMore = showMoreActions;
 
-                  const fire = (fn?: () => void) => { if (!fn) return; handleClose(); setTimeout(fn, 250); };
+                  // ★ v110.5.4: keepSheet flag → modal sheet üstünde açılır, parent kapatılmaz
+                  const fire = (fn?: () => void, keepSheet?: boolean) => {
+                    if (!fn) return;
+                    if (keepSheet) {
+                      // Sheet açık kalır, modal üstünde açılır. Sadece "Daha fazla" menüsü kapanır.
+                      setShowMoreActions(false);
+                      fn();
+                    } else {
+                      handleClose();
+                      setTimeout(fn, 250);
+                    }
+                  };
 
                   return (
                     <View style={sty.modInlineWrap}>
+                      {/* ★ v110.5.4: 3-nokta kaldırıldı (utility row'a taşındı), modInlineRow sadece primary + mute */}
                       {hasInlineButtons && (
                       <View style={sty.modInlineRow}>
                         {primary && (
@@ -848,8 +1221,6 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                             style={[sty.modPrimaryBtn, { borderColor: primary.color + '40' }]}
                             onPress={() => fire(primary.fn)}
                           >
-                            {/* ★ 2026-04-26: Yumuşak gradient — parlaklık düşürüldü, mat premium hissi.
-                                 Eski: parlak → siyah agresif gradient. Yeni: koyu mor → daha koyu mor (subtle) */}
                             <LinearGradient
                               colors={[primary.color + 'DD', primary.color + '77']}
                               start={{ x: 0, y: 0 }}
@@ -868,26 +1239,17 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                             <Ionicons name={muteToggle.icon} size={18} color={muteToggle.color} style={iconShadow} />
                           </Pressable>
                         )}
-                        {hasMore && (
-                          <Pressable
-                            // ★ 2026-04-26: 3-nokta gri (nötr) — Sahneye Davet'in mor primary CTA'sıyla rekabet etmesin.
-                            style={[sty.modIconBtn, showMoreActions && { backgroundColor: 'rgba(255,255,255,0.1)', borderColor: 'rgba(255,255,255,0.2)' }]}
-                            onPress={() => setShowMoreActions(s => !s)}
-                          >
-                            <Ionicons name="ellipsis-horizontal" size={18} color="#CBD5E1" style={iconShadow} />
-                          </Pressable>
-                        )}
                       </View>
                       )}
 
                       {expandMore && hasMore && (
                         <View style={sty.moreActionsCard}>
-                          <LinearGradient colors={['#4a5668', '#37414f', '#232a35']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFillObject} />
+                          <LinearGradient colors={['#3a4658', '#2a3344', '#1a2030']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFillObject} pointerEvents="none" />
                           {moderationItems.map((it, idx) => (
                             <Pressable
                               key={`mod-${idx}`}
                               style={[sty.moreActionRow, idx > 0 && sty.moreActionDivider]}
-                              onPress={() => fire(it.fn)}
+                              onPress={() => fire(it.fn, it.keepSheet)}
                             >
                               <Ionicons name={it.icon} size={16} color={it.color} style={iconShadow} />
                               <Text style={sty.moreActionLabel}>{it.label}</Text>
@@ -905,7 +1267,7 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                             <Pressable
                               key={`enf-${idx}`}
                               style={[sty.moreActionRow, idx > 0 && sty.moreActionDivider]}
-                              onPress={() => fire(it.fn)}
+                              onPress={() => fire(it.fn, it.keepSheet)}
                             >
                               <Ionicons name={it.icon} size={16} color={it.color} style={iconShadow} />
                               <Text style={[sty.moreActionLabel, { color: '#FCA5A5' }]}>{it.label}</Text>
@@ -919,7 +1281,9 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
               </>
             )}
 
-            {!canSeeFullProfile && (
+            {/* ★ v110: Friendship status netleşene kadar (dataReady=false) bu banner gizli kalır.
+                 Önceden Phase 1 (profile yüklendi) ile Phase 2 (friendship yüklendi) arası flash görünüyordu. */}
+            {dataReady && !canSeeFullProfile && (
               <View style={sty.privateBox}>
                 <Ionicons name="lock-closed" size={28} color="#94A3B8" />
                 <Text style={sty.privateTitle}>Bu hesap gizli</Text>
@@ -932,16 +1296,48 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                 {/* ★ 2026-04-26: activityCard kaldırıldı — ProfileHero'nun detay strip'inde
                      aynı bilgiler (sahne dk + dinleyici + reaksiyon) zaten gösteriliyor (activityStats prop). */}
 
+                {/* ★ v110.5 — Kişisel not (sadece başkasının profilinde, sadece sahibi görür) */}
+                {!isOwnProfile && currentUserId && userId && (
+                  <PersonalNoteCard
+                    ownerId={currentUserId}
+                    targetId={userId}
+                    initialNote={personalNote}
+                  />
+                )}
+
+                {/* ★ v110.5 — Ortak odalar (mutualRooms varsa) */}
+                {!isOwnProfile && mutualRooms.length > 0 && (
+                  <MutualRoomsStrip
+                    rooms={mutualRooms}
+                    onSelectRoom={(roomId) => {
+                      handleClose();
+                      setTimeout(() => router.push(`/room/${roomId}` as any), 250);
+                    }}
+                  />
+                )}
+
+                {/* ★ v110.5 — Öne çıkan rozetler */}
+                {featuredBadges.length > 0 && (
+                  <FeaturedBadgesShowcase
+                    featuredIds={featuredBadges}
+                    onPress={() => setShowBadgesModal(true)}
+                  />
+                )}
+
+                {/* ★ v110.5 — Top 3 destekçiler */}
+                {topSupporters.length > 0 && (
+                  <TopSupportersStrip
+                    supporters={topSupporters}
+                    onSelectUser={(uid) => onSelectUser?.(uid)}
+                  />
+                )}
+
                 {/* ★ 2026-04-25: ÜYELİK — Plus/Pro için premium section header + diagonal gradient kart */}
                 {tier !== 'Free' && (
                   <>
-                    <View style={sty.premiumSectionHeader}>
-                      <View style={[sty.sectionAccent, { backgroundColor: tierDef.color }]} />
-                      <Ionicons name={tierDef.icon as any} size={13} color={tierDef.color} style={iconShadow} />
-                      <Text style={sty.premiumSectionText}>ÜYELİK</Text>
-                    </View>
+                    <ProfileSectionHeader label="ÜYELİK" icon={tierDef.icon as any} accentColor={tierDef.color} />
                     <View style={sty.sectionCard}>
-                      <LinearGradient colors={['#4a5668', '#37414f', '#232a35']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFillObject} />
+                      <LinearGradient colors={['#3a4658', '#2a3344', '#1a2030']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFillObject} pointerEvents="none" />
                       <LinearGradient colors={['transparent', tierDef.color + '99', 'transparent']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={sty.sectionTopEdge} />
                       <View style={sty.tierRow}>
                         <LinearGradient colors={tierDef.gradient as [string, string]} style={sty.tierIcon}>
@@ -961,11 +1357,7 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                 {/* ★ 2026-04-25: CÜZDANIM — section header + altın gradient kart (sadece own profile) */}
                 {isOwnProfile && (
                   <>
-                    <View style={sty.premiumSectionHeader}>
-                      <View style={[sty.sectionAccent, { backgroundColor: '#FBBF24' }]} />
-                      <SPIcon size={18} />
-                      <Text style={sty.premiumSectionText}>CÜZDANIM</Text>
-                    </View>
+                    <ProfileSectionHeader label="CÜZDANIM" icon="diamond" accentColor="#FBBF24" />
                     <View style={sty.walletCard}>
                       <LinearGradient colors={['#2a1e14', '#17100a', '#0a0604']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFillObject} />
                       <LinearGradient colors={['rgba(251,191,36,0.35)', 'rgba(251,191,36,0.1)', 'rgba(251,191,36,0.02)']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFillObject} />
@@ -982,50 +1374,228 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                   </>
                 )}
 
+                {/* ★ v110 (6 May 2026): ODALARI — eskiden /user/[id] sayfasındaydı,
+                     full-page kaldırıldı, profilin tamamı sheet içinde.
+                     Privacy: own profile'da her zaman görünür; başkasınınkinde
+                     hide_owned_rooms=false VE (arkadaş ya da public) olunca.
+                   ★ v110.5.4 (6 May 2026): Yabancı profilde KAPALI odalar GİZLENİR.
+                     Sadece canlı (is_live) veya uyuyan (is_persistent) odalar gösterilir.
+                     Kullanıcı kendi profilinde tüm geçmişi görebilir. */}
+                {(() => {
+                  const isFriend = followStatus === 'accepted';
+                  const isPrivate = !isOwnProfile && (
+                    (userProfile as any)?.privacy_mode === 'followers_only' ||
+                    (userProfile as any)?.privacy_mode === 'private' ||
+                    (userProfile as any)?.is_private === true
+                  );
+                  const canSeeFullProfile = isOwnProfile || isFriend || !isPrivate;
+                  const hideOwned = (userProfile as any)?.hide_owned_rooms;
+                  // ★ v110.5.4: Yabancı profilde sadece canlı veya persistent odalar
+                  const visibleRooms = isOwnProfile
+                    ? recentRooms
+                    : recentRooms.filter((r: any) => r.is_live || r.is_persistent);
+                  const showRooms = visibleRooms.length > 0 && (isOwnProfile || (canSeeFullProfile && !hideOwned));
+                  if (!showRooms) return null;
+
+                  const THEME_GRADS: Record<string, [string, string]> = {
+                    ocean: ['#0E4D6F', '#083344'], sunset: ['#7F1D1D', '#4C0519'],
+                    forest: ['#14532D', '#052E16'], galaxy: ['#312E81', '#1E1B4B'],
+                    aurora: ['#134E4A', '#042F2E'], cherry: ['#831843', '#500724'],
+                    cyber: ['#1E3A8A', '#172554'], volcano: ['#7C2D12', '#431407'],
+                    midnight: ['#0C0A3E', '#1B1464'], rose: ['#9F1239', '#881337'],
+                    arctic: ['#164E63', '#0E7490'], amber: ['#78350F', '#92400E'],
+                    slate: ['#1E293B', '#334155'],
+                  };
+
+                  return (
+                    <>
+                      <ProfileSectionHeader
+                        label={isOwnProfile ? 'ODALARIM' : 'ODALARI'}
+                        icon="headset"
+                        accentColor={Colors.accentTeal}
+                        count={visibleRooms.length}
+                      />
+                      <View style={{ marginHorizontal: 16, marginBottom: 14, gap: 8 }}>
+                        {visibleRooms.map((room: any) => {
+                          const listeners = room.listener_count || 0;
+                          const isLive = !!room.is_live;
+                          const hasListeners = isLive && listeners > 0;
+                          const isOpen = isLive && listeners === 0;
+                          const isPersistent = !!room.is_persistent;
+                          const isSleeping = !isLive && isPersistent;
+                          const isClosed = !isLive && !isPersistent;
+                          const cardImage = room.room_settings?.card_image_url;
+                          const themeId = room.theme_id || room.room_settings?.theme_id;
+                          const settings = room.room_settings || {};
+                          const fee = settings.entry_fee_sp || 0;
+                          const grad = (themeId && THEME_GRADS[themeId]) || null;
+                          const accentColor = hasListeners ? '#22C55E' : isOpen ? '#14B8A6' : isSleeping ? '#A78BFA' : '#64748B';
+
+                          return (
+                            <Pressable
+                              key={room.id}
+                              onPress={() => { handleClose(); setTimeout(() => router.push(`/room/${room.id}` as any), 250); }}
+                              style={({ pressed }) => ({
+                                flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+                                padding: 12, paddingLeft: 16, borderRadius: 16, overflow: 'hidden',
+                                borderWidth: 1,
+                                borderColor: hasListeners ? 'rgba(34,197,94,0.35)' : isPersistent ? 'rgba(212,175,55,0.25)' : 'rgba(255,255,255,0.06)',
+                                backgroundColor: Colors.cardBg,
+                                shadowColor: hasListeners ? '#22C55E' : '#000',
+                                shadowOffset: { width: 0, height: 3 },
+                                shadowOpacity: hasListeners ? 0.3 : 0.2, shadowRadius: 8, elevation: 4,
+                                opacity: pressed ? 0.92 : isClosed ? 0.7 : 1,
+                                transform: [{ scale: pressed ? 0.985 : 1 }],
+                              })}
+                            >
+                              <LinearGradient
+                                colors={['#3a4658', '#2a3344', '#1a2030']}
+                                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                                style={StyleSheet.absoluteFillObject}
+                                pointerEvents="none"
+                              />
+                              {grad && (
+                                <LinearGradient
+                                  colors={[grad[0], grad[1]]}
+                                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                                  style={[StyleSheet.absoluteFillObject, { opacity: isLive ? 0.18 : 0.09, borderRadius: 16 }]}
+                                />
+                              )}
+                              <View style={{ position: 'absolute', left: 0, top: 8, bottom: 8, width: 3, borderRadius: 2, backgroundColor: accentColor, opacity: isLive ? 1 : 0.5 }} />
+
+                              <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 10, minWidth: 0 }}>
+                                {cardImage ? (
+                                  <View style={{ width: 40, height: 40, borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }}>
+                                    <Image source={{ uri: cardImage }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
+                                    <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.2)' }]} />
+                                  </View>
+                                ) : (
+                                  <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center' }}>
+                                    <Ionicons
+                                      name={room.category === 'music' ? 'musical-notes' : room.category === 'game' ? 'game-controller' : room.category === 'tech' ? 'code-slash' : 'chatbubbles'}
+                                      size={18} color="rgba(255,255,255,0.4)"
+                                    />
+                                  </View>
+                                )}
+
+                                <View style={{ flex: 1, minWidth: 0 }}>
+                                  <Text style={{ fontSize: 14, fontWeight: '700', color: isClosed ? '#94A3B8' : '#F1F5F9' }} numberOfLines={1}>
+                                    {room.name}
+                                  </Text>
+                                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
+                                    {hasListeners ? (
+                                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(34,197,94,0.15)', paddingHorizontal: 7, paddingVertical: 2.5, borderRadius: 7 }}>
+                                        <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: '#22C55E' }} />
+                                        <Text style={{ fontSize: 9, fontWeight: '800', color: '#86EFAC', letterSpacing: 0.4 }}>CANLI</Text>
+                                        <Text style={{ fontSize: 9, fontWeight: '600', color: '#94A3B8', marginLeft: 1 }}>· {listeners}</Text>
+                                      </View>
+                                    ) : isOpen ? (
+                                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(20,184,166,0.12)', paddingHorizontal: 7, paddingVertical: 2.5, borderRadius: 7 }}>
+                                        <Ionicons name="radio-outline" size={9} color="#14B8A6" />
+                                        <Text style={{ fontSize: 9, fontWeight: '800', color: '#5EEAD4', letterSpacing: 0.3 }}>Açık</Text>
+                                      </View>
+                                    ) : isSleeping ? (
+                                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(167,139,250,0.12)', paddingHorizontal: 7, paddingVertical: 2.5, borderRadius: 7, borderWidth: 0.5, borderColor: 'rgba(167,139,250,0.25)' }}>
+                                        <Ionicons name="moon" size={8} color="#A78BFA" />
+                                        <Text style={{ fontSize: 9, fontWeight: '700', color: '#A78BFA' }}>Uyuyor</Text>
+                                      </View>
+                                    ) : (
+                                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(100,116,139,0.12)', paddingHorizontal: 7, paddingVertical: 2.5, borderRadius: 7 }}>
+                                        <Ionicons name="close-circle" size={8} color="#64748B" />
+                                        <Text style={{ fontSize: 9, fontWeight: '700', color: '#64748B' }}>Kapalı</Text>
+                                      </View>
+                                    )}
+                                    {isPersistent && (
+                                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(212,175,55,0.15)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, borderWidth: 0.5, borderColor: 'rgba(212,175,55,0.3)' }}>
+                                        <Ionicons name="trophy" size={8} color="#D4AF37" />
+                                        <Text style={{ fontSize: 7, fontWeight: '800', color: '#D4AF37', letterSpacing: 0.3 }}>Premium</Text>
+                                      </View>
+                                    )}
+                                    {room.type === 'closed' && (
+                                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(245,158,11,0.12)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, borderWidth: 0.5, borderColor: 'rgba(245,158,11,0.25)' }}>
+                                        <Ionicons name="lock-closed" size={7} color="#F59E0B" />
+                                        <Text style={{ fontSize: 7, fontWeight: '700', color: '#F59E0B' }}>Şifreli</Text>
+                                      </View>
+                                    )}
+                                    {room.type === 'invite' && (
+                                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(139,92,246,0.12)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, borderWidth: 0.5, borderColor: 'rgba(139,92,246,0.25)' }}>
+                                        <Ionicons name="mail" size={7} color="#8B5CF6" />
+                                        <Text style={{ fontSize: 7, fontWeight: '700', color: '#8B5CF6' }}>Davetli</Text>
+                                      </View>
+                                    )}
+                                    {fee > 0 && (
+                                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, backgroundColor: 'rgba(212,175,55,0.12)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, borderWidth: 0.5, borderColor: 'rgba(212,175,55,0.25)' }}>
+                                        <Ionicons name="cash" size={7} color="#D4AF37" />
+                                        <Text style={{ fontSize: 7, fontWeight: '800', color: '#D4AF37' }}>{fee} SP</Text>
+                                      </View>
+                                    )}
+                                  </View>
+                                </View>
+                              </View>
+
+                              <LinearGradient
+                                colors={hasListeners ? ['#14B8A6', '#0D9488'] : isOpen ? ['#14B8A6', '#0D9488'] : ['#475569', '#334155']}
+                                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                                style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 12, marginLeft: 10 }}
+                              >
+                                <Ionicons name={isLive ? 'headset' : 'eye-outline'} size={12} color="#FFF" />
+                                <Text style={{ fontSize: 10, fontWeight: '800', color: '#FFF', letterSpacing: 0.3 }}>
+                                  {isLive ? 'Katıl' : 'Gör'}
+                                </Text>
+                              </LinearGradient>
+                            </Pressable>
+                          );
+                        })}
+                      </View>
+                    </>
+                  );
+                })()}
+
                 {/* ★ 2026-04-26: ARKADAŞLAR — sadece 2+ arkadaş varsa kart göster.
                      Tek arkadaş için bütün bir kart açmak yer israfı.
                      "Tümü" linki sadece 4+ varsa anlamlı (3 chip görünüyor zaten). */}
                 {friendsPreview.length >= 2 && (
                   <>
-                    <View style={sty.premiumSectionHeader}>
-                      <View style={[sty.sectionAccent, { backgroundColor: Colors.teal }]} />
-                      <Ionicons name="people" size={13} color={Colors.teal} style={iconShadow} />
-                      <Text style={sty.premiumSectionText}>{isOwnProfile ? 'ARKADAŞLARIM' : 'ARKADAŞLARI'}</Text>
-                      <View style={sty.friendsCountBadge}>
-                        <Text style={sty.friendsCountText}>{friendsPreview.length}</Text>
-                      </View>
-                      {friendsPreview.length >= 4 && (
-                        <Pressable onPress={() => { setFollowListTab('friends'); setShowFollowList(true); }} hitSlop={8}>
-                          <Text style={sty.friendsSeeAll}>Tümü</Text>
-                        </Pressable>
-                      )}
-                    </View>
+                    <ProfileSectionHeader
+                      label={isOwnProfile ? 'ARKADAŞLARIM' : 'ARKADAŞLARI'}
+                      icon="people"
+                      accentColor={Colors.teal}
+                      count={friendsPreview.length}
+                      actionLabel={friendsPreview.length >= 4 ? 'Tümü' : undefined}
+                      onActionPress={friendsPreview.length >= 4 ? () => { setFollowListTab('friends'); setShowFollowList(true); } : undefined}
+                    />
                     <View style={sty.friendsStripCard}>
-                      <LinearGradient colors={['#4a5668', '#37414f', '#232a35']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFillObject} />
+                      <LinearGradient colors={['#3a4658', '#2a3344', '#1a2030']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFillObject} pointerEvents="none" />
                       <LinearGradient colors={['transparent', 'rgba(20,184,166,0.6)', 'transparent']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={sty.sectionTopEdge} />
                       <ScrollView
                         horizontal
                         showsHorizontalScrollIndicator={false}
                         contentContainerStyle={sty.friendsStripContent}
                       >
-                        {friendsPreview.map((f) => (
-                          <Pressable
-                            key={f.id}
-                            style={({ pressed }) => [sty.friendChip, pressed && { opacity: 0.75 }]}
-                            onPress={() => onSelectUser?.(f.id)}
-                          >
-                            <StatusAvatar
-                              uri={f.avatar_url || undefined}
-                              size={36}
-                              // ★ v87 (1 May 2026): stale is_online yerine last_seen 5dk eşiği (commit 6d3a467 paterni).
-                              isOnline={(() => { const ls = (f as any)?.last_seen; return ls ? new Date(ls).getTime() > Date.now() - 5 * 60 * 1000 : false; })()}
-                              tier={(f as any).subscription_tier}
-                            />
-                            <Text style={sty.friendChipName} numberOfLines={1}>
-                              {f.display_name || 'Kullanıcı'}
-                            </Text>
-                          </Pressable>
-                        ))}
+                        {friendsPreview.map((f) => {
+                          const ls = (f as any)?.last_seen;
+                          const isOnline = ls ? new Date(ls).getTime() > Date.now() - 5 * 60 * 1000 : false;
+                          return (
+                            <Pressable
+                              key={f.id}
+                              style={({ pressed }) => [sty.friendChip, pressed && { opacity: 0.75 }]}
+                              onPress={() => onSelectUser?.(f.id)}
+                            >
+                              <StatusAvatar
+                                uri={f.avatar_url || undefined}
+                                size={54}
+                                isOnline={isOnline}
+                                tier={(f as any).subscription_tier}
+                              />
+                              <Text style={sty.friendChipName} numberOfLines={1}>
+                                {f.display_name || 'Kullanıcı'}
+                              </Text>
+                              <Text style={isOnline ? sty.friendStatusOn : sty.friendStatusOff}>
+                                {isOnline ? 'Çevrimiçi' : 'Çevrimdışı'}
+                              </Text>
+                            </Pressable>
+                          );
+                        })}
                       </ScrollView>
                     </View>
                   </>
@@ -1033,18 +1603,9 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
 
                 {/* ★ 2026-04-26: Eski full-width SP Gönder kartı kaldırıldı — interaction row'a yuvarlak altın chip olarak taşındı. */}
 
-                {/* ★ 2026-04-26: "Tam Profili Aç" linki — sadece oda DIŞI sheet'te (universal mount).
-                     Kullanıcı arkadaşının odalarına/detaylarına ulaşmak için tam sayfaya geçebilir. */}
-                {onViewFullProfile && (
-                  <Pressable
-                    style={sty.viewFullBtn}
-                    onPress={() => { handleClose(); setTimeout(() => onViewFullProfile(), 250); }}
-                  >
-                    <Ionicons name="open-outline" size={14} color="#94A3B8" style={iconShadow} />
-                    <Text style={sty.viewFullText}>Tam Profili Aç</Text>
-                    <Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.3)" />
-                  </Pressable>
-                )}
+                {/* ★ v110 (6 May 2026): "Tam Profili Aç" linki KALDIRILDI.
+                     Profilin tüm verileri artık sheet içinde (rooms list dahil) — full-page'e gerek yok.
+                     /user/[id] route bouncer'a dönüştü, deep link gelirse sheet açıp geri navigate eder. */}
 
                 {/* ★ 2026-04-26: Rapor Et / Engelle 3-nokta menüsüne taşındı — alt satırı sil, daha az scroll. */}
 
@@ -1053,6 +1614,7 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
               </>
             )}
           </ScrollView>
+          </KeyboardAvoidingView>
         )}
       </Animated.View>
 
@@ -1087,6 +1649,16 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
         />
       )}
 
+      {/* ★ 2026-05-05: Hediye detay modalı — tab'lı (Aldığı / Verdiği) */}
+      {userId && userProfile && (
+        <GiftDetailModal
+          visible={showGiftDetail}
+          userId={userId}
+          displayName={userProfile.display_name}
+          onClose={() => setShowGiftDetail(false)}
+        />
+      )}
+
       {currentUserId && userId && userProfile && (
         <GiftSheet
           visible={showSPSheet}
@@ -1098,17 +1670,6 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
           recipientUsername={(userProfile as any).username || undefined}
           recipientTier={(userProfile as any).subscription_tier || null}
           inRoom={true}
-        />
-      )}
-
-      {/* ★ v107: Sembol Hediye sheet — envanterden seç + RPC + receiver bildirim */}
-      {currentUserId && userId && userProfile && (
-        <SymbolGiftSheet
-          visible={showSymbolGift}
-          onClose={() => setShowSymbolGift(false)}
-          senderId={currentUserId}
-          recipientId={userId}
-          recipientName={userProfile.display_name || 'Kullanıcı'}
         />
       )}
 
@@ -1127,26 +1688,22 @@ const sty = StyleSheet.create({
     backgroundColor: '#000',
   },
   sheet: {
-    // ★ 2026-04-28: top:0+bottom:0 sabit, transform translateY ile snap (useNativeDriver:true).
-    //   translateY=SHEET_FULL → sheet üstü insets+30'da görünür (FULL state)
-    //   translateY=SHEET_HALF → sheet üstü ekran ortasında (HALF state)
-    //   translateY=SHEET_DISMISS → sheet ekran dışı (kapalı)
+    // ★ 2026-05-05: NotificationDrawer aile dili — borderRadius 22→26, gri border kaldırıldı,
+    //   shadowRadius 14, elevation 16→10 (Android FPS).
     position: 'absolute',
     left: 0,
     right: 0,
     top: 0,
     bottom: 0,
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
+    borderTopLeftRadius: 26,
+    borderTopRightRadius: 26,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderBottomWidth: 0,
-    borderColor: '#95a1ae',
+    backgroundColor: '#1a2030',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.5,
+    shadowOffset: { width: 0, height: -6 },
+    shadowOpacity: 0.45,
     shadowRadius: 14,
-    elevation: 16,
+    elevation: 10,
   },
   handleWrap: {
     alignItems: 'center',
@@ -1158,10 +1715,9 @@ const sty = StyleSheet.create({
   },
   wizardHeader: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingTop: 4, paddingBottom: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.06)',
-    backgroundColor: 'rgba(20,184,166,0.06)',
+    paddingHorizontal: 16, paddingTop: 4, paddingBottom: 12,
+    // ★ 2026-05-05: Eski teal bg ve borderBottom kaldırıldı — gradient halo zaten görsel
+    //   ayrım sağlıyor, NotificationDrawer aile dili (sade header + separator).
   },
   iconBtn: {
     width: 36, height: 36, borderRadius: 12,
@@ -1466,24 +2022,27 @@ const sty = StyleSheet.create({
     ...Shadows.text,
   },
 
-  // ★ Yatay scrollable avatar strip kartı
+  // ★ 2026-05-05: ProfileFriendsList tile dili ile birebir aynı (kod tekrarı yerine
+  //   stil senkronu — refactor riski düşük, görsel sonuç tutarlı).
   friendsStripCard: {
-    marginHorizontal: 16, borderRadius: 16, overflow: 'hidden',
-    borderWidth: 1, borderColor: Colors.cardBorder,
+    marginHorizontal: 16, borderRadius: 26, overflow: 'hidden',
+    backgroundColor: '#1a2030',
     ...Shadows.card,
   },
   friendsStripContent: {
     flexDirection: 'row', alignItems: 'center',
-    paddingVertical: 10, paddingHorizontal: 12, gap: 10,
+    paddingVertical: 14, paddingHorizontal: 12, gap: 12,
   },
   friendChip: {
-    alignItems: 'center', width: 48, gap: 4,
+    alignItems: 'center', width: 70, gap: 4,
   },
   friendChipName: {
-    fontSize: 9, fontWeight: '700', color: '#E2E8F0',
-    maxWidth: 48, textAlign: 'center',
+    fontSize: 11, fontWeight: '700', color: '#E2E8F0',
+    maxWidth: 70, textAlign: 'center', letterSpacing: 0.15,
     ...Shadows.text,
   },
+  friendStatusOn: { fontSize: 9, fontWeight: '600', color: '#22C55E' },
+  friendStatusOff: { fontSize: 9, fontWeight: '500', color: '#64748B' },
 
   // ★ v92.1 (1 May 2026): DM butonu — SP chip ile orantılı (56×56).
   // ★ v107.26: Chat circle followBtn ile uyumlu (48x48)
@@ -1564,6 +2123,40 @@ const sty = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.04)',
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
   },
+  // ★ v110.3: Yardımcı eylem satırı — Paylaş / Linki Kopyala / Odama Davet
+  utilityRow: {
+    flexDirection: 'row' as const, alignItems: 'center' as const, flexWrap: 'wrap' as const,
+    gap: 8, marginHorizontal: 16, marginTop: 10,
+  },
+  utilityChip: {
+    flexDirection: 'row' as const, alignItems: 'center' as const, gap: 6,
+    paddingHorizontal: 12, paddingVertical: 7,
+    borderRadius: 999,
+    backgroundColor: 'rgba(20,184,166,0.08)',
+    borderWidth: 1, borderColor: 'rgba(20,184,166,0.25)',
+  },
+  utilityChipText: {
+    fontSize: 11, fontWeight: '700' as const, color: '#5CBFB5', letterSpacing: 0.2,
+  },
+  utilityChipPrimary: {
+    flexDirection: 'row' as const, alignItems: 'center' as const, gap: 6,
+    paddingHorizontal: 14, paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: '#A855F7',
+    borderWidth: 1, borderColor: 'rgba(168,85,247,0.45)',
+    ...Shadows.card,
+  },
+  utilityChipPrimaryText: {
+    fontSize: 11, fontWeight: '800' as const, color: '#FFF', letterSpacing: 0.3,
+    ...Shadows.text,
+  },
+  // ★ v110.5.4: Utility row 3-nokta — sade yuvarlak buton, "Daha fazla" yazısı kaldırıldı
+  utilityDots: {
+    width: 32, height: 32, borderRadius: 16,
+    alignItems: 'center' as const, justifyContent: 'center' as const,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)',
+  },
   // ★ 2026-04-26: 3-nokta menüsü — border + shadow kaldırıldı, sayfa akışkan tek bütün.
   moreActionsCard: {
     borderRadius: 14, overflow: 'hidden' as const,
@@ -1591,20 +2184,6 @@ const sty = StyleSheet.create({
   dangerHeading: {
     fontSize: 9, fontWeight: '900' as const, color: '#FCA5A5',
     letterSpacing: 1.5, textTransform: 'uppercase' as const,
-    ...Shadows.text,
-  },
-  // ★ 2026-04-26: "Tam Profili Aç" linki (sadece oda dışı sheet)
-  viewFullBtn: {
-    flexDirection: 'row' as const, alignItems: 'center' as const,
-    gap: 8, marginHorizontal: 16, marginTop: 14,
-    paddingHorizontal: 14, paddingVertical: 12,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.04)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
-  },
-  viewFullText: {
-    flex: 1, fontSize: 12, fontWeight: '700' as const, color: '#CBD5E1',
-    letterSpacing: 0.3,
     ...Shadows.text,
   },
 });
