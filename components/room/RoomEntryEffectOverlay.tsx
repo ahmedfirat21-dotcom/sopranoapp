@@ -277,8 +277,10 @@ const s = StyleSheet.create({
     zIndex: 9999,
   },
   lottie: {
-    width: 200,
-    height: 200,
+    // ★ v110.14: 200 → 300 (kullanıcı "çok küçük giriyor"). Oda girişinde
+    //   Lottie animasyon daha büyük + dramatik görünür.
+    width: 300,
+    height: 300,
   },
   emoji: {
     fontSize: 100,

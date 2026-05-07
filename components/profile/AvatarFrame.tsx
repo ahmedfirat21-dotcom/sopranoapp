@@ -274,9 +274,9 @@ function AvatarFrameImpl({ frameId, size, forceRing }: Props) {
   // ★ v109.3: Halka SABİT BOYUT ile konumlandı — absoluteFillObject parent
   //   boyutuna bağlıydı, parent avatardan uzun olunca halka aşağı kayıyordu.
   //   Yeni: top:0/left:0 + size (avatar boyutunda) → halka tam avatar üstüne biner.
-  // ★ v110.14: %9 fazla kalın geldi (kullanıcı feedback) → %7. Ortalama bir değer:
-  //   eskiden %6 ince kalıyordu, %9 fazla kalın oldu, %7 dengeli.
-  const thickness = Math.max(2, Math.round(size * 0.07));
+  // ★ v110.14: %9 → %7 → %5 → MAX 3px sabit cap. Avatar büyüklüğünden bağımsız
+  //   ince halka — premium ve şık duruyor.
+  const thickness = Math.min(3, Math.max(2, Math.round(size * 0.04)));
 
   return (
     <View

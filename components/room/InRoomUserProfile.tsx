@@ -41,6 +41,7 @@ import PremiumAlert, { type AlertButton } from '../PremiumAlert';
 import { supabase } from '../../constants/supabase';
 import { RoomService } from '../../services/room';
 import ProfileIdentityStrip from '../profile/ProfileIdentityStrip';
+import FrameSelectSheet from '../profile/FrameSelectSheet';
 import {
   VoiceBioPlayer, TopSupportersStrip, MutualRoomsStrip,
   FeaturedBadgesShowcase, SocialLinksRow, InvitedByRow, SpeakingRhythmHint,
@@ -152,6 +153,8 @@ type Props = {
 export default function InRoomUserProfile({ visible, userId, currentUserId, onClose, onSelectUser, modActions, excludeRoomId, closeOnBackdropTap = false }: Props) {
   const router = useRouter();
   const [userProfile, setUserProfile] = useState<Profile | null>(null);
+  // ★ v110.14: Kendi profilimde "Envanter / Çerçeve" hızlı butonu — FrameSelectSheet açar.
+  const [showOwnFrameSheet, setShowOwnFrameSheet] = useState(false);
   const [loading, setLoading] = useState(true);
   const [followStatus, setFollowStatus] = useState<FriendshipStatus | null>(null);
   const [incomingStatus, setIncomingStatus] = useState<FriendshipStatus | null>(null);
@@ -882,6 +885,36 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                 setTimeout(() => router.push('/edit-profile' as any), 250);
               } : undefined}
             />
+
+            {/* ★ v110.14: Kendi profilim — Envanter/Çerçeve hızlı erişim. Profil sayfasına
+                gitmeden oda içinden çerçeve + giriş efekti değiştirmek için. */}
+            {isOwnProfile && (
+              <Pressable
+                onPress={() => setShowOwnFrameSheet(true)}
+                style={({ pressed }) => [
+                  {
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
+                    paddingVertical: 12,
+                    paddingHorizontal: 16,
+                    marginHorizontal: 14,
+                    marginVertical: 10,
+                    borderRadius: 14,
+                    backgroundColor: 'rgba(20,184,166,0.12)',
+                    borderWidth: 1,
+                    borderColor: 'rgba(20,184,166,0.35)',
+                  },
+                  pressed && { opacity: 0.75, transform: [{ scale: 0.98 }] },
+                ]}
+              >
+                <Ionicons name="sparkles" size={16} color="#14B8A6" />
+                <Text style={{ color: '#5EEAD4', fontSize: 13, fontWeight: '700' }}>
+                  Envanter · Çerçeve / Giriş Efekti
+                </Text>
+              </Pressable>
+            )}
 
             {/* ★ v110.5 — Sesli tanıtım (Voice Bio) */}
             {(userProfile as any)?.voice_bio_url && (
@@ -1617,6 +1650,18 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
           </KeyboardAvoidingView>
         )}
       </Animated.View>
+
+      {/* ★ v110.14: Kendi profilimde envanter sheet — yukarıdaki Envanter butonu açar */}
+      {isOwnProfile && currentUserId && (
+        <FrameSelectSheet
+          visible={showOwnFrameSheet}
+          onClose={() => setShowOwnFrameSheet(false)}
+          userId={currentUserId}
+          currentFrameId={(userProfile as any)?.active_frame || null}
+          currentEntryEffectId={(userProfile as any)?.active_entry_effect || null}
+          currentAvatarUrl={userProfile?.avatar_url}
+        />
+      )}
 
       {/* Nested Modals */}
       {currentUserId && userId && (
