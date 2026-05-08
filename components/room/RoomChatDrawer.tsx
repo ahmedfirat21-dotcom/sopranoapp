@@ -738,10 +738,30 @@ export default function RoomChatDrawer({
     return unsub;
   }, [visible, currentUserId, roomId]);
 
-  // ★ v110.14: WhatsApp tarzı emoji reaction — emoji parametresi opsiyonel (default ❤️)
+  // ★ v110.14: WhatsApp tek-emoji-per-user. Yeni emoji secince eski silinir.
   const handleToggleReaction = useCallback(async (messageId: string, emoji = '❤️') => {
     if (!currentUserId || !messageId) return;
     const prevAll = reactionsRef.current[messageId] || {};
+    // Kullanicinin bu mesaja koydugu mevcut emoji'yi bul
+    const existingEmoji = Object.entries(prevAll).find(([, r]) => r.liked)?.[0];
+    if (existingEmoji && existingEmoji !== emoji) {
+      // Farkli emoji secildi — eski'yi sessizce kaldir
+      RoomChatService.toggleReaction(messageId, currentUserId, existingEmoji).catch(() => {});
+      // Optimistic: eski emoji'nin count'unu -1 + liked=false
+      setReactions(r => {
+        const next = { ...r };
+        const msgMap = { ...(next[messageId] || {}) };
+        const oldR = msgMap[existingEmoji];
+        if (oldR) {
+          const newCount = Math.max(0, oldR.count - 1);
+          if (newCount === 0) delete msgMap[existingEmoji];
+          else msgMap[existingEmoji] = { count: newCount, liked: false };
+        }
+        if (Object.keys(msgMap).length === 0) delete next[messageId];
+        else next[messageId] = msgMap;
+        return next;
+      });
+    }
     const prev = prevAll[emoji] || { count: 0, liked: false };
     const optimistic = { liked: !prev.liked, count: prev.count + (prev.liked ? -1 : 1) };
     // Optimistic state — emoji bazlı update
