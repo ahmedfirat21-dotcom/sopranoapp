@@ -70,7 +70,10 @@ export function OnlineFriendsProvider({ userId, children }: { userId: string | n
     }
   }, [userId]);
 
-  // İlk yükleme
+  // İlk yükleme + ★ v110.14: 30sn polling yedek + foreground refresh.
+  //   postgres_changes friendships filter RLS/network nedeniyle bazen kayıp event
+  //   yaşıyor (kabul edilen istek karşı tarafta gözükmüyor — kullanıcı raporu).
+  //   Polling, kayıp event'leri 30sn içinde toparlar.
   useEffect(() => {
     if (!userId) {
       setAllFriends([]);
@@ -81,6 +84,14 @@ export function OnlineFriendsProvider({ userId, children }: { userId: string | n
       return;
     }
     refreshFriends();
+    const interval = setInterval(() => { refreshFriends().catch(() => {}); }, 30_000);
+    const appStateSub = AppState.addEventListener('change', (next) => {
+      if (next === 'active') refreshFriends().catch(() => {});
+    });
+    return () => {
+      clearInterval(interval);
+      appStateSub.remove();
+    };
   }, [userId, refreshFriends]);
 
   // Ref ile güncel friend ID listesi — subscription closure'ını yeniden oluşturmadan güncellenir
