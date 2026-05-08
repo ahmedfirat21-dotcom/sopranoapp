@@ -17,7 +17,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getAvatarSource } from '../../constants/avatars';
 import { EmojiReactionBar } from '../EmojiReactions';
-import { RoomChatService } from '../../services/roomChat';
+import { RoomChatService, getRoomProfileFromCache } from '../../services/roomChat';
 import MessageGlowPickerSheet from './MessageGlowPickerSheet';
 import RoomAvatarFrame from './RoomAvatarFrame';
 import LinkifiedText from '../LinkifiedText';
@@ -892,7 +892,11 @@ export default function RoomChatDrawer({
     //   diğerlerini text olarak gösteriyordu (GIF kayıp). Tüm tenor/giphy subdomain'leri kabul.
     const isGifSafe = !!gifMatch?.[1] && /^https:\/\/(?:[\w-]+\.)?(?:tenor|giphy)\.com\//i.test(gifMatch[1]);
     const emojiOnly = /^[\p{Emoji_Presentation}\p{Extended_Pictographic}‍️⃣]{1,6}$/u.test(content) && content.length <= 14;
-    const nameColor = getUserColor(item.user_id || '', item.role, item.profiles?.subscription_tier);
+    // ★ v110.14: Cache lookup — eski mesajların profile join'i eksik olsa bile
+    //   güncel renk/çerçeve gösterilir. Aynı kullanıcıdan gelen tüm mesajlar tutarlı.
+    const cachedSenderProfile = getRoomProfileFromCache(item.user_id);
+    const senderTierRaw = (item.profiles as any)?.subscription_tier ?? cachedSenderProfile?.subscription_tier ?? null;
+    const nameColor = getUserColor(item.user_id || '', item.role, senderTierRaw);
     const msgReactions = reactions[item.id]; // Record<emoji, {count, liked}> | undefined
     const isOwn = item.user_id === currentUserId;
 
@@ -907,9 +911,9 @@ export default function RoomChatDrawer({
     const isGlowMsg = !!glowStyleId;
     const glowCfg = glowStyleId ? GLOW_STYLES[glowStyleId] : null;
 
-    const senderFrame = (item.profiles as any)?.active_frame || null;
+    const senderFrame = (item.profiles as any)?.active_frame || cachedSenderProfile?.active_frame || null;
     // ★ 2026-05-05: Mesaj avatarı için kompakt tier etiketi (Plus/Pro/GM).
-    const senderTier = migrateLegacyTier((item.profiles as any)?.subscription_tier as string);
+    const senderTier = migrateLegacyTier(senderTierRaw as string);
     const showSenderTier = senderTier !== 'Free';
     return (
       <View style={st.msgRow}>

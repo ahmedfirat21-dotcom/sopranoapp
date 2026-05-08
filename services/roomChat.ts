@@ -27,15 +27,26 @@ export type RoomMessage = {
 
 // ★ BÖLÜM 6 FIX: Profil cache — N+1 sorunu çözümü
 // Her mesajda ayrı profil sorgusu yapmak yerine cache'ten oku
+// ★ v110.14: subscription_tier de cache'lenir (render'da renk hesabı için)
 type CachedProfile = {
   display_name: string;
   avatar_url: string;
   active_chat_color?: string | null;
   active_frame?: string | null;
+  subscription_tier?: string | null;
   cachedAt: number;
 };
 const _profileCache = new Map<string, CachedProfile>();
 const CACHE_TTL = 5 * 60 * 1000; // 5 dakika
+
+/**
+ * ★ v110.14: Senkron cache lookup — RoomChatDrawer render'da kullanır.
+ * Eski mesajların profile join'i eksik olsa bile güncel renk/çerçeve gösterir.
+ */
+export function getRoomProfileFromCache(userId: string | null | undefined): CachedProfile | null {
+  if (!userId) return null;
+  return _profileCache.get(userId) || null;
+}
 
 async function _getCachedProfile(userId: string): Promise<CachedProfile | null> {
   const cached = _profileCache.get(userId);
@@ -45,7 +56,7 @@ async function _getCachedProfile(userId: string): Promise<CachedProfile | null> 
   try {
     const { data } = await supabase
       .from('profiles')
-      .select('display_name, avatar_url, active_chat_color, active_frame')
+      .select('display_name, avatar_url, active_chat_color, active_frame, subscription_tier')
       .eq('id', userId)
       .single();
     if (data) {
