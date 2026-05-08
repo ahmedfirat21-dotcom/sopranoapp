@@ -739,8 +739,14 @@ export default function RoomChatDrawer({
   }, [visible, currentUserId, roomId]);
 
   // ★ v110.14: WhatsApp tarzı emoji reaction — emoji parametresi opsiyonel (default ❤️)
+  // ★ Race condition fix: aynı (messageId, emoji) için RPC dönüşü beklenirken ikinci
+  //   tıklama ignore edilir — yoksa hızlı tap'lerde count yanlış birikiyor.
+  const reactionInFlightRef = useRef<Set<string>>(new Set());
   const handleToggleReaction = useCallback(async (messageId: string, emoji = '❤️') => {
     if (!currentUserId || !messageId) return;
+    const flightKey = `${messageId}::${emoji}`;
+    if (reactionInFlightRef.current.has(flightKey)) return;
+    reactionInFlightRef.current.add(flightKey);
     const prevAll = reactionsRef.current[messageId] || {};
     const prev = prevAll[emoji] || { count: 0, liked: false };
     const optimistic = { liked: !prev.liked, count: prev.count + (prev.liked ? -1 : 1) };
@@ -760,7 +766,12 @@ export default function RoomChatDrawer({
       }
       return next;
     });
-    const result = await RoomChatService.toggleReaction(messageId, currentUserId, emoji);
+    let result: { liked: boolean; count: number } | null = null;
+    try {
+      result = await RoomChatService.toggleReaction(messageId, currentUserId, emoji);
+    } finally {
+      reactionInFlightRef.current.delete(flightKey);
+    }
     if (result) {
       setReactions(r => {
         const next = { ...r };
