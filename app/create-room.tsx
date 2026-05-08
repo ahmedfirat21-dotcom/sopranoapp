@@ -1,5 +1,5 @@
 ﻿import { useState, useMemo, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TextInput, Pressable, ScrollView, Image, Animated, Easing, Dimensions, PanResponder, InteractionManager } from 'react-native';
+import { View, Text, StyleSheet, TextInput, Pressable, ScrollView, Image, Animated, Easing, Dimensions, PanResponder, InteractionManager, Platform, KeyboardAvoidingView } from 'react-native';
 import AppLoader from '../components/AppLoader';
 
 const { height: SCREEN_H } = Dimensions.get('window');
@@ -93,23 +93,27 @@ interface StepMeta {
   skippable?: boolean;
 }
 
+// ★ 2026-05-05: Aile dili refactor — her step'in vibrant gradient'i KALDIRILDI.
+//   Tüm hero ikonlar profil sayfası slate paleti ile (3a4658→2a3344→1a2030),
+//   sadece accent rengi halo ring + icon tint olarak kalıyor. Rainbow → kohezyon.
+const FAMILY_GRADIENT: [string, string, string] = ['#3a4658', '#2a3344', '#1a2030'];
 const STEPS: StepMeta[] = [
   { id: 'basics',       title: 'Odana bir isim ver',       subtitle: 'Arkadaşlar seni bu isimle bulacak — akılda kalsın, karakterini yansıtsın.',
-    icon: 'create-outline',        gradient: ['#0EA5E9', '#0284C7', '#075985'], accent: '#38BDF8', watermark: 'sparkles' },
+    icon: 'create-outline',        gradient: FAMILY_GRADIENT, accent: '#5EEAD4', watermark: 'sparkles' },
   { id: 'category',     title: 'Ne konuşacaksınız?',       subtitle: 'Doğru kategori, doğru insanları çeker.',
-    icon: 'pricetags',             gradient: ['#A855F7', '#7E22CE', '#581C87'], accent: '#C084FC', watermark: 'grid' },
+    icon: 'pricetags',             gradient: FAMILY_GRADIENT, accent: '#C084FC', watermark: 'grid' },
   { id: 'access',       title: 'Kimler girebilir?',        subtitle: 'Kapıyı herkese mi açarsın, yoksa özel bir topluluk mu?',
-    icon: 'key',                   gradient: ['#F59E0B', '#D97706', '#92400E'], accent: '#FBBF24', watermark: 'lock-closed' },
+    icon: 'key',                   gradient: FAMILY_GRADIENT, accent: '#FBBF24', watermark: 'lock-closed' },
   { id: 'speaking',     title: 'Mikrofonu kim alır?',      subtitle: 'Sahnedeki düzen senin elinde.',
-    icon: 'mic',                   gradient: ['#14B8A6', '#0D9488', '#065F56'], accent: '#5EEAD4', watermark: 'radio' },
+    icon: 'mic',                   gradient: FAMILY_GRADIENT, accent: '#5EEAD4', watermark: 'radio' },
   { id: 'welcome',      title: 'Karşılama zamanı',         subtitle: 'Gelenlerin ilk gördüğü şey — sıcak bir selam ve kurallar.',
-    icon: 'hand-right',            gradient: ['#EC4899', '#BE185D', '#831843'], accent: '#F9A8D4', watermark: 'heart', skippable: true },
+    icon: 'hand-right',            gradient: FAMILY_GRADIENT, accent: '#F9A8D4', watermark: 'heart', skippable: true },
   { id: 'visual',       title: 'Görsel dokunuş',           subtitle: 'Tema seç, kapak koy — odana karakterini kat.',
-    icon: 'color-palette',         gradient: ['#8B5CF6', '#6D28D9', '#4C1D95'], accent: '#A78BFA', watermark: 'image', skippable: true },
+    icon: 'color-palette',         gradient: FAMILY_GRADIENT, accent: '#A78BFA', watermark: 'image', skippable: true },
   { id: 'monetization', title: 'İster kazan, ister bedava',subtitle: 'Giriş ücreti veya bağış — tamamen sana kalmış.',
-    icon: 'diamond',               gradient: ['#D4AF37', '#B45309', '#78350F'], accent: '#FBBF24', watermark: 'cash', skippable: true },
+    icon: 'diamond',               gradient: FAMILY_GRADIENT, accent: '#FBBF24', watermark: 'cash', skippable: true },
   { id: 'review',       title: 'Her şey hazır',             subtitle: 'Son bir kontrol, sonra canlıya alırız.',
-    icon: 'rocket',                gradient: ['#14B8A6', '#0D9488', '#065F56'], accent: '#5EEAD4', watermark: 'checkmark-done' },
+    icon: 'rocket',                gradient: FAMILY_GRADIENT, accent: '#5EEAD4', watermark: 'checkmark-done' },
 ];
 
 async function uploadRoomImage(userId: string, localUri: string, prefix: 'card' | 'bg'): Promise<string> {
@@ -198,6 +202,8 @@ export default function CreateRoomScreen() {
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [createdRoomId, setCreatedRoomId] = useState<string | null>(null);
   const [createdRoomName, setCreatedRoomName] = useState('');
+  // ★ 2026-05-05: Caption odaya yönlendirme param'ında geçiyor (oda içinde gösterilir)
+  const [roomSuccessCaption, setRoomSuccessCaption] = useState('Odan Hazır');
 
   // ── Wizard state ──
   const [step, setStep] = useState<WizardStep>('basics');
@@ -364,7 +370,8 @@ export default function CreateRoomScreen() {
     todayStart.setHours(0, 0, 0, 0);
     (async () => {
       try {
-        const { count } = await supabase.from('rooms').select('id', { count: 'exact', head: true }).eq('host_id', firebaseUser.uid).gte('created_at', todayStart.toISOString());
+        // ★ v110.14: room_creation_log'tan say (oda silinince limit yenilenmesin)
+        const { count } = await supabase.from('room_creation_log').select('id', { count: 'exact', head: true }).eq('user_id', firebaseUser.uid).gte('created_at', todayStart.toISOString());
         setTodayRoomCount(count || 0);
       } catch {}
     })();
@@ -463,24 +470,16 @@ export default function CreateRoomScreen() {
         });
       }
       const isScheduled = !!(scheduledAt && scheduledAt.getTime() > Date.now());
-      const scheduledLabel = isScheduled && scheduledAt
-        ? scheduledAt.toLocaleString('tr-TR', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })
-        : '';
-      showToast({
-        title: isScheduled ? '📅 Oda Planlandı!' : '🎉 Oda Hazır!',
-        message: isScheduled
-          ? `"${cleanName}" odası ${scheduledLabel} tarihinde başlayacak. "Odalarım"dan başlatabilirsin.`
-          : `"${cleanName}" odası açıldı.`,
-        type: 'success',
-      });
       // ★ PERF FIX: fire-and-forget — SP hesaplama navigasyonu bloklamamalı
       GamificationService.onRoomCreate(firebaseUser.uid).catch(() => {});
       // ★ 2026-04-21: Başarılı oluşturma → draft temizle (tekrar açılışta eski state gelmesin)
       AsyncStorage.removeItem(DRAFT_KEY).catch(() => {});
       setCreatedRoomId(room.id);
       setCreatedRoomName(cleanName);
-      // ★ PERF FIX: Modal açılışını bir sonraki frame'e erte — oda oluşturma state
-      // güncellemeleri (setCreating(false) vs.) ile modal mount'u çakışmasın.
+      // ★ 2026-05-05: Overlay artık oda içinde gösteriliyor (kullanıcı yazıyı görsün diye).
+      //   Davet modalı önce açılır, oraya yönlendirme room/[id]?justCreated=1 ile geçer.
+      setRoomSuccessCaption(isScheduled ? 'Oda Planlandı' : 'Odan Hazır');
+      // ★ PERF FIX: Modal açılışını bir sonraki frame'e erte
       requestAnimationFrame(() => setShowInviteModal(true));
     } catch (err: any) {
       // ★ 2026-04-21: Detaylı hata gösterimi — "Hata" yerine kullanıcıya net neden bildir.
@@ -1019,9 +1018,9 @@ export default function CreateRoomScreen() {
                 placeholder="https://youtube.com/... veya https://open.spotify.com/..."
                 placeholderTextColor="#475569"
                 style={{
-                  backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 10, borderWidth: 1,
-                  borderColor: musicInvalid ? 'rgba(239,68,68,0.5)' : 'rgba(255,255,255,0.08)',
-                  paddingHorizontal: 12, paddingVertical: 10, color: '#E5E7EB', fontSize: 13,
+                  backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 18, borderWidth: 1,
+                  borderColor: musicInvalid ? 'rgba(239,68,68,0.5)' : 'rgba(255,255,255,0.10)',
+                  paddingHorizontal: 14, paddingVertical: 12, color: '#E5E7EB', fontSize: 13,
                 }}
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -1316,7 +1315,7 @@ export default function CreateRoomScreen() {
     return (
       <View style={{ flex: 1, backgroundColor: 'transparent' }}>
         <Animated.View
-          style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.55)', opacity: backdropOpacity }]}
+          style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(8,12,22,0.45)', opacity: backdropOpacity }]}
           pointerEvents="box-none"
         >
           <Pressable style={{ flex: 1 }} onPress={() => closeSheetRef.current()} />
@@ -1325,11 +1324,18 @@ export default function CreateRoomScreen() {
           style={[w.sheetPanel, { top: Math.max(insets.top, 20) + 10, transform: [{ translateY }] }]}
           {...panResponder.panHandlers}
         >
+          {/* ★ 2026-05-05: Aile dili — slate + amber halo (limit semantik) */}
           <LinearGradient
-            colors={['#4a5668', '#37414f', '#232a35']}
-            locations={[0, 0.35, 1]}
+            colors={['#3a4658', '#2a3344', '#1a2030']}
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
             style={StyleSheet.absoluteFillObject}
+            pointerEvents="none"
+          />
+          <LinearGradient
+            colors={['rgba(245,158,11,0.18)', 'rgba(245,158,11,0.05)', 'transparent']}
+            start={{ x: 0, y: 0 }} end={{ x: 0, y: 0.45 }}
+            style={StyleSheet.absoluteFillObject}
+            pointerEvents="none"
           />
           <View style={{ flex: 1 }}>
               {/* ★ 2026-04-28: Handle artık görsel — pan tüm sheet'te (Clubhouse). */}
@@ -1392,25 +1398,36 @@ export default function CreateRoomScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: 'transparent' }}>
-      {/* ★ Backdrop — tap to close, fade animation */}
+      {/* ★ Backdrop — tap to close, fade animation (aile dim) */}
       <Animated.View
-        style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.55)', opacity: backdropOpacity }]}
+        style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(8,12,22,0.45)', opacity: backdropOpacity }]}
         pointerEvents="box-none"
       >
         <Pressable style={{ flex: 1 }} onPress={() => closeSheetRef.current()} />
       </Animated.View>
 
-      {/* ★ Sheet panel — slides up, drag-to-close
-           Tema: RoomChatDrawer ile bire bir — gri-gradient + #95a1ae border + subtle top shadow */}
+      {/* ★ 2026-05-05: NotificationDrawer aile dili — slate diagonal + teal halo + soft glow */}
       <Animated.View
         style={[w.sheetPanel, { top: Math.max(insets.top, 20) + 10, transform: [{ translateY }] }]}
         {...panResponder.panHandlers}
       >
         <LinearGradient
-          colors={['#4a5668', '#37414f', '#232a35']}
-          locations={[0, 0.35, 1]}
+          colors={['#3a4658', '#2a3344', '#1a2030']}
           start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
           style={StyleSheet.absoluteFillObject}
+          pointerEvents="none"
+        />
+        <LinearGradient
+          colors={['rgba(20,184,166,0.20)', 'rgba(20,184,166,0.05)', 'transparent']}
+          start={{ x: 0, y: 0 }} end={{ x: 0, y: 0.4 }}
+          style={StyleSheet.absoluteFillObject}
+          pointerEvents="none"
+        />
+        <LinearGradient
+          colors={['rgba(20,184,166,0.08)', 'transparent']}
+          start={{ x: 0, y: 0 }} end={{ x: 0.7, y: 0.6 }}
+          style={StyleSheet.absoluteFillObject}
+          pointerEvents="none"
         />
         <View style={{ flex: 1 }}>
           {/* ★ 2026-04-28: Handle artık görsel — pan tüm sheet'te (Clubhouse). */}
@@ -1451,26 +1468,38 @@ export default function CreateRoomScreen() {
           </View>
         ) : null}
 
+        {/* ★ v110.5.3: Klavye yönetimi — TextInput odaklanınca scroll otomatik */}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1 }}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 24}
+        >
         <ScrollView
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 160, paddingTop: 12 }}
         >
           <Animated.View style={{ opacity: fadeAnim, transform: [{ translateX: slideAnim }] }}>
-            {/* ★ Gradient circle + icon — alt tarafta koyu yumuşak gölge (ilk tasarım) */}
+            {/* ★ 2026-05-05: Hero icon — family slate base + accent halo ring (vibrant gradient yerine).
+                 Step renkleri artık SADECE accent ring + ikon tint olarak görünür (sade fark işareti). */}
             <View style={w.heroIconWrap}>
+              {/* Accent halo — dış glow ring, step rengini hissettirir */}
+              <View style={[w.heroAccentRing, {
+                borderColor: currentStepMeta.accent + '55',
+                shadowColor: currentStepMeta.accent,
+              }]} pointerEvents="none" />
               <LinearGradient
                 colors={currentStepMeta.gradient}
                 start={{ x: 0.2, y: 0 }} end={{ x: 0.8, y: 1 }}
-                style={w.heroIconCircle}
+                style={[w.heroIconCircle, { borderColor: currentStepMeta.accent + '40' }]}
               >
-                {/* İç parıltı — üst beyaz, alt koyu → 3D derinlik */}
+                {/* İç parıltı — üst beyaz, alt koyu → 3D derinlik (slate'te de işe yarar) */}
                 <LinearGradient
-                  colors={['rgba(255,255,255,0.22)', 'transparent', 'rgba(0,0,0,0.15)']}
+                  colors={['rgba(255,255,255,0.10)', 'transparent', 'rgba(0,0,0,0.20)']}
                   start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                   style={StyleSheet.absoluteFillObject}
                 />
-                <Ionicons name={currentStepMeta.icon as any} size={36} color="#FFF" />
+                <Ionicons name={currentStepMeta.icon as any} size={36} color={currentStepMeta.accent} />
               </LinearGradient>
             </View>
 
@@ -1484,6 +1513,7 @@ export default function CreateRoomScreen() {
             </View>
           </Animated.View>
         </ScrollView>
+        </KeyboardAvoidingView>
 
         {/* ── FOOTER (Back / Skip / Next) ── */}
         <View style={[w.footer, { paddingBottom: insets.bottom + 12 }]}>
@@ -1557,8 +1587,9 @@ export default function CreateRoomScreen() {
             // ★ PERF FIX: Modal kapanış animasyonu bitene kadar navigasyonu ertele
             // Aksi halde room ekranı mount olurken modal fade-out çakışır → FPS drop
             if (createdRoomId) {
+              const cap = encodeURIComponent(roomSuccessCaption);
               InteractionManager.runAfterInteractions(() => {
-                router.replace(`/room/${createdRoomId}` as any);
+                router.replace(`/room/${createdRoomId}?justCreated=1&caption=${cap}` as any);
               });
             }
           }}
@@ -1566,14 +1597,16 @@ export default function CreateRoomScreen() {
             await handleInviteFriends(selectedUsers);
             setShowInviteModal(false);
             if (createdRoomId) {
+              const cap = encodeURIComponent(roomSuccessCaption);
               InteractionManager.runAfterInteractions(() => {
-                router.replace(`/room/${createdRoomId}` as any);
+                router.replace(`/room/${createdRoomId}?justCreated=1&caption=${cap}` as any);
               });
             }
           }}
         />
         </View>
       </Animated.View>
+
     </View>
   );
 }
@@ -1598,22 +1631,19 @@ function SummaryRow({ icon, label, value }: { icon: string; label: string; value
 // STYLES — Apple-like wizard
 // ═══════════════════════════════════════════════════════════════════
 const w = StyleSheet.create({
-  // ★ 2026-04-23: Sheet panel — RoomChatDrawer ile birebir görsel dil
-  //   gri gradient LinearGradient dışarıdan; panel container'ı border/radius/shadow taşır.
+  // ★ 2026-05-05: NotificationDrawer aile standardı — radius 20→26, slate bg, gri border kaldırıldı
   sheetPanel: {
     position: 'absolute',
     left: 0, right: 0, bottom: 0,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    borderTopLeftRadius: 26,
+    borderTopRightRadius: 26,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderBottomWidth: 0,
-    borderColor: '#95a1ae',
+    backgroundColor: '#1a2030',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 16,
-    elevation: 20,
+    shadowOffset: { width: 0, height: -6 },
+    shadowOpacity: 0.45,
+    shadowRadius: 14,
+    elevation: 12,
   },
   sheetHandleWrap: {
     alignItems: 'center',
@@ -1623,12 +1653,9 @@ const w = StyleSheet.create({
     width: 36, height: 4, borderRadius: 2,
     backgroundColor: 'rgba(255,255,255,0.2)',
   },
-  // Drawer header — subtle teal tint + bottom border (chat drawer ile aynı)
+  // ★ 2026-05-05: Aile dili — gradient halo zaten var, ekstra teal bg + border kaldırıldı
   sheetHeader: {
-    paddingTop: 4, paddingBottom: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.06)',
-    backgroundColor: 'rgba(20,184,166,0.06)',
+    paddingTop: 4, paddingBottom: 12,
   },
   // Header
   header: {
@@ -1676,7 +1703,7 @@ const w = StyleSheet.create({
     width: 84, height: 84, borderRadius: 26,
     alignItems: 'center', justifyContent: 'center',
     overflow: 'hidden',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
+    borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.12)',
     // ★ Ionicons optik kaymasını telafi — ikon tam merkeze oturur
     paddingLeft: 2, paddingTop: 1,
     // ★ KOYU yumuşak dağılmış gölge — renkli değil
@@ -1685,6 +1712,16 @@ const w = StyleSheet.create({
     shadowOpacity: 0.55,
     shadowRadius: 22,
     elevation: 14,
+  },
+  // ★ 2026-05-05: Hero accent halo — slate dairenin etrafında step accent rengi soft glow.
+  //   Family slate'i taban, accent ring step renk işareti — rainbow yerine kohezyon.
+  heroAccentRing: {
+    position: 'absolute',
+    width: 100, height: 100, borderRadius: 30,
+    borderWidth: 1.2,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.45, shadowRadius: 14,
+    ...(Platform.OS === 'android' ? { elevation: 4 } : {}),
   },
   // Arka plan watermark — her step'e özel büyük soluk ikon
   watermarkWrap: {
@@ -1710,34 +1747,29 @@ const w = StyleSheet.create({
   },
 
   // ★ Hero input wrapper — oda adı alanı
+  // ★ 2026-05-05: Belirgin glass-pill — underline-only çok soluktu, kullanıcı görmüyordu
   heroInputWrap: {
-    alignItems: 'center',
+    alignItems: 'stretch',
   },
-  // ★ Big input — step 1 oda adı (minimal underline, premium)
   bigInput: {
     fontSize: 22, fontWeight: '700', color: '#F1F5F9',
-    paddingVertical: 14, paddingHorizontal: 4,
+    paddingVertical: 18, paddingHorizontal: 20,
     textAlign: 'center',
     letterSpacing: 0.3,
-    width: '100%',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1.5, borderColor: 'rgba(20,184,166,0.45)',
+    borderRadius: 22,
   } as any,
-  // ★ Gradient underline efekti — teal glow
+  // ★ Gradient underline kaldırıldı — pill kabuk yeterli görsel
   heroInputLine: {
-    width: '80%', height: 2, borderRadius: 1,
-    backgroundColor: 'rgba(20,184,166,0.45)',
-    marginTop: 2,
-    shadowColor: '#14B8A6',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 6,
-    elevation: 2,
+    height: 0,
   } as any,
   mediumInput: {
     fontSize: 14, color: '#E2E8F0',
-    backgroundColor: 'rgba(30,41,59,0.5)',
-    borderWidth: 1, borderColor: 'rgba(148,163,184,0.12)',
-    borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14,
-    minHeight: 52, textAlignVertical: 'top',
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)',
+    borderRadius: 18, paddingHorizontal: 16, paddingVertical: 14,
+    minHeight: 80, textAlignVertical: 'top',
     fontWeight: '500', lineHeight: 20,
   },
   charCount: { fontSize: 10, color: 'rgba(148,163,184,0.5)', textAlign: 'right', marginTop: 6, fontWeight: '500', textShadowColor: 'rgba(0,0,0,0.3)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
@@ -2000,22 +2032,23 @@ const w = StyleSheet.create({
   scheduleDateText: { fontSize: 13, fontWeight: '700', color: '#F1F5F9' },
   scheduleHint: { fontSize: 11, color: '#94A3B8', marginTop: 8, lineHeight: 16 },
 
-  // Footer
+  // ★ 2026-05-05: Aile dili — slate solid + ince üst separator
   footer: {
     position: 'absolute', left: 0, right: 0, bottom: 0,
     flexDirection: 'row', alignItems: 'center', gap: 10,
     paddingHorizontal: 24, paddingTop: 12,
-    backgroundColor: 'rgba(15,23,42,0.85)',
+    backgroundColor: 'rgba(26,32,48,0.92)',
     borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.06)',
   },
   skipBtn: {
     paddingHorizontal: 18, paddingVertical: 14, borderRadius: 14,
   },
   skipText: { fontSize: 14, fontWeight: '700', color: '#64748B' },
+  // ★ 2026-05-05: Aile dili — radius 14→999 (full pill, NotificationDrawer pattern)
   primaryBtn: {
-    flex: 1, borderRadius: 14, overflow: 'hidden',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.45, shadowRadius: 16, elevation: 10,
+    flex: 1, borderRadius: 999, overflow: 'hidden',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.40, shadowRadius: 12, elevation: 8,
   },
   primaryBtnGrad: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,

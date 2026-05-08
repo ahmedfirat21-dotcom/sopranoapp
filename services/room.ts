@@ -210,10 +210,12 @@ export const RoomService = {
     if (limits.dailyRooms >= 999) return { ok: true, count: 0, limit: 999 };
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
+    // ★ v110.14: room_creation_log'tan say — oda silinince row gitse bile log kalır
+    //   (eski 'rooms' COUNT kullanımı exploit'e açıktı: kullanıcı silince limit yenilenirdi).
     const { count } = await supabase
-      .from('rooms')
+      .from('room_creation_log')
       .select('id', { count: 'exact', head: true })
-      .eq('host_id', userId)
+      .eq('user_id', userId)
       .gte('created_at', todayStart.toISOString());
     const today = count || 0;
     return { ok: today < limits.dailyRooms, count: today, limit: limits.dailyRooms };
@@ -762,14 +764,14 @@ export const RoomService = {
       throw new Error(`${normalizedTier} planıyla "${requestedType}" oda açılamaz. İzinli tipler: ${limits.allowedTypes.join(', ')}`);
     }
 
-    // ★ BUG-T3 FIX: dailyRooms limiti — bugün oluşturulan oda sayısını kontrol et
+    // ★ v110.14: dailyRooms limiti — room_creation_log'tan say (silmeye karşı dayanıklı)
     if (limits.dailyRooms < 999) {
       const todayStart = new Date();
       todayStart.setHours(0, 0, 0, 0);
       const { count } = await supabase
-        .from('rooms')
+        .from('room_creation_log')
         .select('*', { count: 'exact', head: true })
-        .eq('host_id', hostId)
+        .eq('user_id', hostId)
         .gte('created_at', todayStart.toISOString());
       if ((count || 0) >= limits.dailyRooms) {
         throw new Error(`Günlük oda limiti doldu (max ${limits.dailyRooms}/${normalizedTier}). Yarın tekrar deneyin.`);
@@ -2172,57 +2174,71 @@ export const RoomService = {
   },
 
   /**
-   * Free tier odalar için otomatik temizlik.
+   * ★ v110 (6 May 2026): Üyelik planları ile hizalı otomatik temizlik.
+   *   - Free (non-persistent) → expires_at hit ise klasik kapat
+   *   - Plus (persistent)     → expires_at hit ise dondur (wakeUp için)
+   *   - Pro (expires_at=null) → bu kontrol etkilemez
+   *
+   *   Server-side cron (v110 migration) zaten 7/24 çalışır — bu fonksiyon
+   *   keşfet sekmesi açıldığında "anlık" temizlik için fallback.
    */
   async autoCloseExpired(): Promise<number> {
     const now = new Date().toISOString();
     let closedCount = 0;
 
-    // ═══ 1. Free tier: expires_at süresi dolmuş odaları kapat ═══
+    // ═══ 1. expires_at süresi dolmuş odalar (TÜM tier) ═══
     const { data: expired } = await supabase
       .from('rooms')
-      .select('id, owner_tier')
+      .select('id, is_persistent, room_settings')
       .eq('is_live', true)
       .not('expires_at', 'is', null)
       .lte('expires_at', now);
 
     if (expired && expired.length > 0) {
       for (const room of expired) {
-        const roomTier = migrateLegacyTier((room as any).owner_tier);
-        if (roomTier !== 'Free') continue; // Plus+ muaf
-        await supabase.from('rooms').update({ is_live: false, listener_count: 0 }).eq('id', room.id);
+        const isPersistent = !!(room as any).is_persistent;
+        if (isPersistent) {
+          // Plus persistent → dondur (oda kaydı kalır, wakeUpRoom ile dönülebilir)
+          const settings = { ...((room as any).room_settings || {}), frozen_at: new Date().toISOString(), remaining_ms: 0 };
+          await supabase.from('rooms')
+            .update({ is_live: false, listener_count: 0, expires_at: null, room_settings: settings })
+            .eq('id', room.id);
+          if (__DEV__) console.log(`[AutoClose] Süresi dolan persistent oda donduruldu: ${room.id}`);
+        } else {
+          // Free non-persistent → klasik kapat
+          await supabase.from('rooms')
+            .update({ is_live: false, listener_count: 0 })
+            .eq('id', room.id);
+          if (__DEV__) console.log(`[AutoClose] Süresi dolan Free oda kapatıldı: ${room.id}`);
+        }
         await supabase.from('room_participants').delete().eq('room_id', room.id);
         closedCount++;
-        if (__DEV__) console.log(`[AutoClose] Süresi dolan Free oda kapatıldı: ${room.id}`);
       }
     }
 
-    // ═══ 2. Free tier: 30+ dakika boş kalan odaları kapat ═══
-    const thirtyMinAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
-    const { data: freeRooms } = await supabase
+    // ═══ 2. 5+ dakika boş kalan odalar (herkes için, v92.22 davranışı) ═══
+    const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    const { data: aliveRooms } = await supabase
       .from('rooms')
-      .select('id, owner_tier')
+      .select('id')
       .eq('is_live', true)
-      .lt('created_at', thirtyMinAgo);
+      .lt('created_at', fiveMinAgo);
 
-    if (freeRooms && freeRooms.length > 0) {
-      const freeOnly = freeRooms.filter(r => migrateLegacyTier((r as any).owner_tier) === 'Free');
-      if (freeOnly.length > 0) {
-        const freeIds = freeOnly.map(r => r.id);
-        const { data: activeParticipants } = await supabase
-          .from('room_participants')
-          .select('room_id')
-          .in('room_id', freeIds);
+    if (aliveRooms && aliveRooms.length > 0) {
+      const ids = aliveRooms.map(r => r.id);
+      const { data: activeParticipants } = await supabase
+        .from('room_participants')
+        .select('room_id')
+        .in('room_id', ids);
 
-        const roomsWithParticipants = new Set((activeParticipants || []).map((p: any) => p.room_id));
+      const roomsWithParticipants = new Set((activeParticipants || []).map((p: any) => p.room_id));
 
-        for (const room of freeOnly) {
-          if (!roomsWithParticipants.has(room.id)) {
-            await supabase.from('rooms').update({ is_live: false, listener_count: 0 }).eq('id', room.id);
-            await supabase.from('room_participants').delete().eq('room_id', room.id);
-            closedCount++;
-            if (__DEV__) console.log(`[AutoClose] 30dk+ boş Free oda kapatıldı: ${room.id}`);
-          }
+      for (const room of aliveRooms) {
+        if (!roomsWithParticipants.has(room.id)) {
+          await supabase.from('rooms').update({ is_live: false, listener_count: 0 }).eq('id', room.id);
+          await supabase.from('room_participants').delete().eq('room_id', room.id);
+          closedCount++;
+          if (__DEV__) console.log(`[AutoClose] 5dk+ boş oda kapatıldı: ${room.id}`);
         }
       }
     }
