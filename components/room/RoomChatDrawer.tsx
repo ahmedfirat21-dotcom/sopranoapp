@@ -738,10 +738,31 @@ export default function RoomChatDrawer({
     return unsub;
   }, [visible, currentUserId, roomId]);
 
-  // ★ v110.14: WhatsApp tarzı emoji reaction — emoji parametresi opsiyonel (default ❤️)
+  // ★ v110.14: WhatsApp tarzı tek-emoji-per-user. Kullanıcı yeni emoji seçince eski'si silinir.
   const handleToggleReaction = useCallback(async (messageId: string, emoji = '❤️') => {
     if (!currentUserId || !messageId) return;
     const prevAll = reactionsRef.current[messageId] || {};
+    // Kullanıcının bu mesajda mevcut emoji'sini bul (liked=true olan)
+    const existingEmoji = Object.entries(prevAll).find(([, r]) => r.liked)?.[0];
+    // Aynı emoji ise → toggle off (kaldır). Farklı emoji ise → önce eski'yi kaldır, sonra yeni'yi ekle.
+    if (existingEmoji && existingEmoji !== emoji) {
+      // Eski emoji'yi sessizce kaldır (RPC arka planda)
+      RoomChatService.toggleReaction(messageId, currentUserId, existingEmoji).catch(() => {});
+      // Optimistic: eski'yi sil
+      setReactions(r => {
+        const next = { ...r };
+        const msgMap = { ...(next[messageId] || {}) };
+        const oldR = msgMap[existingEmoji];
+        if (oldR) {
+          const newCount = Math.max(0, oldR.count - 1);
+          if (newCount === 0) delete msgMap[existingEmoji];
+          else msgMap[existingEmoji] = { count: newCount, liked: false };
+        }
+        if (Object.keys(msgMap).length === 0) delete next[messageId];
+        else next[messageId] = msgMap;
+        return next;
+      });
+    }
     const prev = prevAll[emoji] || { count: 0, liked: false };
     const optimistic = { liked: !prev.liked, count: prev.count + (prev.liked ? -1 : 1) };
     // Optimistic state — emoji bazlı update
@@ -1499,27 +1520,28 @@ const st = StyleSheet.create({
     minWidth: 175,
   },
 
-  // ★ v110.14: WhatsApp tarzı çoklu emoji chip satırı — balonun altında
+  // ★ v110.14: WhatsApp tarzı reaction chip — balonun ALT-SOL köşesinde dış taşkın küçük daire
   reactionChipRow: {
+    position: 'absolute',
+    bottom: -10,
+    left: 8,
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 4,
-    marginTop: 6,
-    marginRight: -2,
-    alignSelf: 'flex-start',
+    gap: 3,
+    zIndex: 5,
+    elevation: 5,
   },
-  // ★ v56→v110.14: Reaction chip (eski absolute → inline)
   reactionBadge: {
-    flexDirection: 'row', alignItems: 'center', gap: 3,
-    paddingHorizontal: 7, paddingVertical: 2.5,
-    borderRadius: 11,
-    backgroundColor: 'rgba(15,23,42,0.92)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
+    flexDirection: 'row', alignItems: 'center', gap: 2,
+    paddingHorizontal: 5, paddingVertical: 1.5,
+    borderRadius: 14,
+    backgroundColor: '#1F2937',
+    borderWidth: 1.5,
+    borderColor: '#0B1220',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.35, shadowRadius: 3,
-    elevation: 3,
+    shadowOpacity: 0.45, shadowRadius: 2,
+    elevation: 4,
+    minHeight: 22,
   },
   reactionBadgeLiked: {
     backgroundColor: 'rgba(239,68,68,0.92)',
