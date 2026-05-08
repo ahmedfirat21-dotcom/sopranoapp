@@ -36,7 +36,23 @@ export async function shouldShowCreateRoomCoachmark(uid?: string | null): Promis
   if (!uid) return false;
   try {
     const v = await AsyncStorage.getItem(`${STORAGE_KEY_PREFIX}${uid}`);
-    return v === 'pending';
+    if (v !== 'pending') return false;
+    // ★ v110.14: DB check — kullanıcı daha önce oda açtıysa coachmark gösterme
+    //   (yeni cihaz/silmiş kurulum için AsyncStorage 'pending' olsa bile DB gerçeği bildirir).
+    try {
+      const { supabase } = await import('../constants/supabase');
+      const { count } = await supabase
+        .from('room_creation_log')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', uid)
+        .limit(1);
+      if ((count || 0) > 0) {
+        // Daha önce oda açmış — pending flag'ini de seen'e çevir, bir daha sorgulama
+        try { await AsyncStorage.setItem(`${STORAGE_KEY_PREFIX}${uid}`, 'seen'); } catch {}
+        return false;
+      }
+    } catch { /* DB check başarısız — pending davranışı kalır (en kötü gösterilir, kullanıcı dismiss eder) */ }
+    return true;
   } catch {
     return false;
   }

@@ -170,12 +170,13 @@ export const ROOM_TIER_LIMITS: Record<SubscriptionTier, RoomLimits> = {
   Free: {
     // ★ 2026-04-24 (v3): Free esnetildi — "tap taze platform" stratejisi.
     //   Kullanıcı ücretsiz planla rahat hissetmeli, Plus ekstra güç verir.
+    // ★ 2026-05-06 (v110): Free oda süresi 24sa — gün boyu açık kalsın, sonra kapansın.
     maxSpeakers: 5,
     maxListeners: 15,
     maxSpectators: 40,
     maxCameras: 2,
     maxModerators: 0,
-    durationHours: 4,
+    durationHours: 3,    // ★ v110.14: Free 24 → 3 saat (kullanıcı talebi)
     dailyRooms: 5,
     persistent: false,
     maxPersistentRooms: 0,
@@ -198,7 +199,7 @@ export const ROOM_TIER_LIMITS: Record<SubscriptionTier, RoomLimits> = {
     maxSpectators: 200,
     maxCameras: 6,
     maxModerators: 2,
-    durationHours: 12,
+    durationHours: 8,    // ★ v110.14: Plus 12 → 8 saat (kullanıcı talebi)
     dailyRooms: 10,
     persistent: true,
     maxPersistentRooms: 3,
