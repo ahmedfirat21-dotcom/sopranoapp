@@ -695,8 +695,17 @@ export default function RoomChatDrawer({
   const [reactions, setReactions] = useState<Record<string, Record<string, { count: number; liked: boolean }>>>({});
   const reactionsRef = useRef(reactions);
   useEffect(() => { reactionsRef.current = reactions; }, [reactions]);
-  // Long press'le açılan emoji picker — { messageId, anchorY }
-  const [reactionPicker, setReactionPicker] = useState<{ messageId: string } | null>(null);
+  // ★ v110.14: WhatsApp tarzı reaction picker — long press ile mesajın üstüne pop
+  const [reactionPicker, setReactionPicker] = useState<{ messageId: string; anchorY: number } | null>(null);
+  const reactionPickerScale = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (reactionPicker) {
+      reactionPickerScale.setValue(0);
+      Animated.spring(reactionPickerScale, {
+        toValue: 1, friction: 7, tension: 90, useNativeDriver: true,
+      }).start();
+    }
+  }, [reactionPicker, reactionPickerScale]);
 
   // Açılışta / yeni mesaj geldiğinde toplu reaksiyon özeti çek
   const fetchedIdsRef = useRef<Set<string>>(new Set());
@@ -903,7 +912,11 @@ export default function RoomChatDrawer({
           )}
         </Pressable>
         <Pressable
-          onLongPress={() => setReactionPicker({ messageId: item.id })}
+          onLongPress={(e) => {
+            // Picker'ı tam mesaj balonunun üstüne yerleştir (WhatsApp paritesi)
+            const anchorY = (e.nativeEvent as any)?.pageY ?? 0;
+            setReactionPicker({ messageId: item.id, anchorY });
+          }}
           delayLongPress={220}
           style={({ pressed }) => [
             st.msgBubble,
@@ -1035,46 +1048,58 @@ export default function RoomChatDrawer({
           keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
         />
 
-        {/* ★ v110.14: WhatsApp tarzı reaction picker — long press ile açılır */}
+        {/* ★ v110.14: WhatsApp tarzı reaction picker — long press anchor pozisyonu üstüne pop */}
         {reactionPicker && (
           <Pressable
             onPress={() => setReactionPicker(null)}
             style={{
               position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-              backgroundColor: 'rgba(0,0,0,0.55)',
+              backgroundColor: 'rgba(0,0,0,0.20)',
               zIndex: 200, elevation: 200,
-              alignItems: 'center', justifyContent: 'center',
             }}
           >
-            <View style={{
-              flexDirection: 'row',
-              gap: 4,
-              paddingHorizontal: 12, paddingVertical: 10,
-              borderRadius: 30,
-              backgroundColor: '#1F2937',
-              borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
-              shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.5, shadowRadius: 12,
-              elevation: 12,
-            }}>
-              {['❤️', '😂', '👍', '😮', '😢', '🙏'].map((emoji) => (
-                <Pressable
-                  key={emoji}
-                  onPress={() => {
-                    handleToggleReaction(reactionPicker.messageId, emoji);
-                    setReactionPicker(null);
-                  }}
-                  style={({ pressed }) => ({
-                    width: 44, height: 44, alignItems: 'center', justifyContent: 'center',
-                    borderRadius: 22,
-                    transform: pressed ? [{ scale: 1.2 }] : [{ scale: 1 }],
-                    backgroundColor: pressed ? 'rgba(255,255,255,0.08)' : 'transparent',
-                  })}
-                  hitSlop={4}
-                >
-                  <Text style={{ fontSize: 26 }}>{emoji}</Text>
-                </Pressable>
-              ))}
-            </View>
+            <Animated.View
+              pointerEvents="box-none"
+              style={{
+                position: 'absolute',
+                top: Math.max(80, reactionPicker.anchorY - 60),
+                left: 0, right: 0,
+                alignItems: 'center',
+                opacity: reactionPickerScale,
+                transform: [
+                  { scale: reactionPickerScale.interpolate({ inputRange: [0, 1], outputRange: [0.4, 1] }) },
+                  { translateY: reactionPickerScale.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) },
+                ],
+              }}
+            >
+              <View style={{
+                flexDirection: 'row',
+                paddingHorizontal: 6, paddingVertical: 4,
+                borderRadius: 28,
+                backgroundColor: '#1F2937',
+                borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)',
+                shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.45, shadowRadius: 10,
+                elevation: 10,
+              }}>
+                {['❤️', '😂', '👍', '😮', '😢', '🙏'].map((emoji) => (
+                  <Pressable
+                    key={emoji}
+                    onPress={() => {
+                      handleToggleReaction(reactionPicker.messageId, emoji);
+                      setReactionPicker(null);
+                    }}
+                    style={({ pressed }) => ({
+                      width: 36, height: 36, alignItems: 'center', justifyContent: 'center',
+                      borderRadius: 18,
+                      transform: pressed ? [{ scale: 1.3 }] : [{ scale: 1 }],
+                    })}
+                    hitSlop={2}
+                  >
+                    <Text style={{ fontSize: 22 }}>{emoji}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            </Animated.View>
           </Pressable>
         )}
 
