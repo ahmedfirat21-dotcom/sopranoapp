@@ -969,7 +969,7 @@ export default function RoomChatDrawer({
               linkColor={glowCfg ? glowCfg.textColor : '#5EEAD4'}
             />
           )}
-          {/* ★ v110.14: WhatsApp tarzı çoklu emoji chip listesi */}
+          {/* ★ v110.14: WhatsApp tarzı chip — count > 1 ise sayı göster */}
           {msgReactions && Object.keys(msgReactions).length > 0 ? (
             <View style={st.reactionChipRow}>
               {Object.entries(msgReactions).map(([emoji, r]) => (
@@ -980,7 +980,7 @@ export default function RoomChatDrawer({
                   hitSlop={4}
                 >
                   <Text style={st.reactionEmoji}>{emoji}</Text>
-                  <Text style={[st.reactionCount, r.liked && { color: '#FFE4E6' }]}>{r.count}</Text>
+                  {r.count > 1 && <Text style={st.reactionCount}>{r.count}</Text>}
                 </Pressable>
               ))}
             </View>
@@ -1520,11 +1520,11 @@ const st = StyleSheet.create({
     minWidth: 175,
   },
 
-  // ★ v110.14: WhatsApp paritesi — balon ALT-SOL köşesinde dış taşkın chip satırı
+  // ★ v110.14: WhatsApp paritesi — balon ALT-SOL köşesinde yarı dış taşkın chip
   reactionChipRow: {
     position: 'absolute',
-    bottom: -12,
-    left: 6,
+    bottom: -10,
+    left: -4,
     flexDirection: 'row',
     gap: 3,
     zIndex: 5,
@@ -1544,9 +1544,10 @@ const st = StyleSheet.create({
     elevation: 4,
     minHeight: 24,
   },
+  // ★ v110.14: Liked durum — sadece ince teal vurgu, dolgun kırmızı yerine sade
   reactionBadgeLiked: {
-    backgroundColor: 'rgba(239,68,68,0.92)',
-    borderColor: 'rgba(254,205,211,0.35)',
+    backgroundColor: '#1F2937',
+    borderColor: 'rgba(94,234,212,0.6)',
   },
   reactionEmoji: { fontSize: 10 },
   reactionCount: { fontSize: 10, fontWeight: '800', color: '#E2E8F0', letterSpacing: 0.2 },
