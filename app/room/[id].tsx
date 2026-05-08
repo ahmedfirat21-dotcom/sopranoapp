@@ -2857,7 +2857,11 @@ export default function RoomScreen() {
     //   anında görür. Server timestamp gelince real ID ile replace.
     const content = chatInput.trim();
     const tempId = `temp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-    const myProfile = participants.find(p => p.user_id === firebaseUser.uid)?.profile;
+    const myParticipantProfile = participants.find(p => p.user_id === firebaseUser.uid)?.profile;
+    // ★ v110.14: Participant listesinde yoksa (dinleyici/spectator) useAuth profile fallback —
+    //   önceden myProfile undefined kalıyordu, optimistic mesajda profiles boş geliyor,
+    //   render fallback "...id4" tag gösteriyordu (flash bug).
+    const myProfile = myParticipantProfile || profile;
     const optimisticMsg: any = {
       id: tempId,
       room_id: id,
@@ -2866,10 +2870,10 @@ export default function RoomScreen() {
       content,
       created_at: new Date().toISOString(),
       profiles: myProfile ? {
-        display_name: myProfile.display_name,
-        avatar_url: myProfile.avatar_url,
-        subscription_tier: myProfile.subscription_tier,
-      } : undefined,
+        display_name: (myProfile as any).display_name || firebaseUser.displayName || 'Sen',
+        avatar_url: (myProfile as any).avatar_url,
+        subscription_tier: (myProfile as any).subscription_tier,
+      } : { display_name: firebaseUser.displayName || 'Sen', avatar_url: undefined, subscription_tier: undefined },
       _optimistic: true,
     };
     // ★ v110.14 (8 May 2026): FlatList inverted — başa eklenen alta gelir.
