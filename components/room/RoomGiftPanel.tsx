@@ -25,6 +25,7 @@ import { useRouter } from 'expo-router';
 import { supabase } from '../../constants/supabase';
 import { getAvatarSource } from '../../constants/avatars';
 import { StoreService, type CosmeticItem } from '../../services/store';
+import SPHexagonIcon from '../SPHexagonIcon';
 import { showToast } from '../Toast';
 import { getGiftLottie, hasGiftLottie } from '../../constants/giftLottieRegistry';
 import Item3DArt from '../store/Item3DArt';
@@ -411,7 +412,7 @@ export default function RoomGiftPanel({
                 </Text>
               </View>
               <View style={s.spPill}>
-                <Ionicons name="diamond" size={11} color="#FBBF24" />
+                <SPHexagonIcon size={14} />
                 <Text style={s.spPillText}>{senderSP.toLocaleString('tr-TR')}</Text>
               </View>
             </View>
