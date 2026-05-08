@@ -19,7 +19,22 @@ export async function hasSeenRoomCreateHint(uid?: string | null): Promise<boolea
   if (!uid) return true;
   try {
     const v = await AsyncStorage.getItem(`${STORAGE_KEY_PREFIX}${uid}`);
-    return v === '1';
+    if (v === '1') return true;
+    // ★ v110.14: DB check — kullanıcı daha önce oda açtıysa hint hiç gösterilme
+    //   (yeni cihaz/silmiş kurulum için AsyncStorage flag yok ama DB gerçeği bilir).
+    try {
+      const { supabase } = await import('../constants/supabase');
+      const { count } = await supabase
+        .from('room_creation_log')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', uid)
+        .limit(1);
+      if ((count || 0) > 0) {
+        try { await AsyncStorage.setItem(`${STORAGE_KEY_PREFIX}${uid}`, '1'); } catch {}
+        return true;
+      }
+    } catch { /* DB check başarısız — flag yoksa gösterilir */ }
+    return false;
   } catch {
     return true;
   }
@@ -144,7 +159,7 @@ export default function RoomCreateHintSheet({ visible, onGoToMyRooms, onClose }:
               },
             ]}
           >
-            Odalarım sekmesindeki + butonuyla istediğin konuda sesli oda kur, arkadaşlarını davet et — bağlanmak çok kolay.
+            Odalarım sekmesine git, <Text style={styles.bodyHighlight}>Yeni Oda Oluştur</Text> düğmesine dokun. İstediğin konuda sesli oda aç, arkadaşlarını davet et — bağlanmak çok kolay.
           </Animated.Text>
 
           {/* CTA buttons */}
@@ -227,6 +242,10 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     paddingHorizontal: 12,
     marginBottom: 32,
+  },
+  bodyHighlight: {
+    color: '#FBCFE8',
+    fontWeight: '800',
   },
   ctaWrap: {
     width: '100%',

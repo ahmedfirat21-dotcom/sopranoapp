@@ -63,7 +63,7 @@ const SLIDES: Slide[] = [
   {
     icon: 'add-circle',
     title: 'Kendi odanı aç',
-    body: 'Sağ alttaki + butonuyla istediğin konuda oda aç.\nArkadaşlarını davet et, topluluğunu kur.',
+    body: 'Odalarım sekmesindeki "Yeni Oda Oluştur" düğmesiyle istediğin konuda oda aç.\nArkadaşlarını davet et, topluluğunu kur.',
     accent: '#F59E0B',
     accentDeep: '#B45309',
     bgFrom: '#3B2507',
