@@ -155,9 +155,10 @@ export default function RoomGiftPanel({
   // Animasyon
   useEffect(() => {
     if (visible) {
-      currentSnapRef.current = SNAP_FULL;
+      // ★ v110.14: Varsayılan açılış HALF — kullanıcı drag-up ile FULL'e çıkartabilir.
+      currentSnapRef.current = SNAP_HALF;
       Animated.parallel([
-        Animated.spring(translateY, { toValue: SNAP_FULL, useNativeDriver: true, damping: 22, stiffness: 220 }),
+        Animated.spring(translateY, { toValue: SNAP_HALF, useNativeDriver: true, damping: 22, stiffness: 220 }),
         Animated.timing(backdropOpacity, { toValue: 1, duration: 240, useNativeDriver: true }),
       ]).start();
       // Floating gift watermark — yumuşak süzülme (4sn cycle)
