@@ -872,13 +872,9 @@ export default function RoomChatDrawer({
               <GlowHeader style={glowStyleId} />
             </>
           )}
-          {/* İsim de tıklanır — avatar gibi profil sheet'i açar */}
-          <Pressable
-            onPress={() => { if (senderUid && onAvatarPress) { Keyboard.dismiss(); onAvatarPress(senderUid); } }}
-            hitSlop={4}
-          >
-            <Text style={[st.msgName, { color: glowCfg ? glowCfg.nameColor : nameColor }]}>{item.profiles?.display_name || (item.user_id ? `…${String(item.user_id).slice(0, 4)}` : '…')}</Text>
-          </Pressable>
+          {/* ★ v110.14: İsim tıklanmasın — sadece avatar profil sheet'i açar.
+               Balon tıklaması reaction'a ait, balon içine başka onPress girmesin. */}
+          <Text style={[st.msgName, { color: glowCfg ? glowCfg.nameColor : nameColor }]}>{item.profiles?.display_name || (item.user_id ? `…${String(item.user_id).slice(0, 4)}` : '…')}</Text>
           {isGifSafe ? (
             <Image source={{ uri: gifMatch![1] }} style={{ width: 220, height: 165, borderRadius: 12 }} resizeMode="cover" />
           ) : emojiOnly ? (
