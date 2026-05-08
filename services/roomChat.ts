@@ -428,15 +428,20 @@ export const RoomChatService = {
    * ★ v56: Oda açılınca son mesajlar için reaksiyon özetini çek.
    * Dönüş: { [messageId]: { count, liked } } — UI tek tur render'da hazır.
    */
-  async getReactions(messageIds: string[], userId: string): Promise<Record<string, { count: number; liked: boolean }>> {
+  async getReactions(messageIds: string[], userId: string): Promise<Record<string, Record<string, { count: number; liked: boolean }>>> {
     if (!messageIds.length) return {};
     try {
       const { data, error } = await supabase.rpc('get_message_reactions', { p_message_ids: messageIds });
       if (error || !Array.isArray(data)) return {};
-      const out: Record<string, { count: number; liked: boolean }> = {};
+      // ★ v110.14: WhatsApp tarzı çoklu emoji — her (message_id, emoji) ayrı chip.
+      //   Önceden son emoji satırı overwrite ediyordu; şimdi emoji-bazlı object.
+      const out: Record<string, Record<string, { count: number; liked: boolean }>> = {};
       for (const row of data as any[]) {
         const likedBy: string[] = Array.isArray(row.liked_by_users) ? row.liked_by_users : [];
-        out[row.message_id] = {
+        const mid = row.message_id;
+        const emoji = row.emoji || '❤️';
+        if (!out[mid]) out[mid] = {};
+        out[mid][emoji] = {
           count: Number(row.count || 0),
           liked: likedBy.includes(userId),
         };
