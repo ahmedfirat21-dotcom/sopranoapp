@@ -932,12 +932,14 @@ export default function RoomChatDrawer({
           )}
         </Pressable>
         <Pressable
+          onPress={() => { /* no-op: onLongPress'in tetiklenmesi için onPress de tanımlı olmalı */ }}
           onLongPress={(e) => {
             // Picker'ı tam mesaj balonunun üstüne yerleştir (WhatsApp paritesi)
             const anchorY = (e.nativeEvent as any)?.pageY ?? 0;
+            console.log('[Reaction] long press OK', item.id, 'anchorY=', anchorY);
             setReactionPicker({ messageId: item.id, anchorY });
           }}
-          delayLongPress={220}
+          delayLongPress={300}
           style={({ pressed }) => [
             st.msgBubble,
             isGifSafe && { backgroundColor: 'transparent', borderWidth: 0, paddingHorizontal: 4, paddingVertical: 2 },
