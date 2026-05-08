@@ -838,7 +838,7 @@ export default function RoomChatDrawer({
       <View style={st.msgRow}>
         {/* ★ 2026-04-26: Avatar tıklanınca profil sheet — diğer platformlardaki gibi standart davranış. */}
         <Pressable
-          onPress={() => { if (senderUid && onAvatarPress) onAvatarPress(senderUid); }}
+          onPress={() => { if (senderUid && onAvatarPress) { Keyboard.dismiss(); onAvatarPress(senderUid); } }}
           hitSlop={6}
           style={{ position: 'relative', width: 32, height: 32 }}
         >
@@ -874,7 +874,7 @@ export default function RoomChatDrawer({
           )}
           {/* İsim de tıklanır — avatar gibi profil sheet'i açar */}
           <Pressable
-            onPress={() => { if (senderUid && onAvatarPress) onAvatarPress(senderUid); }}
+            onPress={() => { if (senderUid && onAvatarPress) { Keyboard.dismiss(); onAvatarPress(senderUid); } }}
             hitSlop={4}
           >
             <Text style={[st.msgName, { color: glowCfg ? glowCfg.nameColor : nameColor }]}>{item.profiles?.display_name || (item.user_id ? `…${String(item.user_id).slice(0, 4)}` : '…')}</Text>
