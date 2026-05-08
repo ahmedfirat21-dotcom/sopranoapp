@@ -691,9 +691,21 @@ export default function RoomChatDrawer({
   // ════════════════════════════════════════════════════════════
   // ★ v56: Mesaj reaksiyonları (❤️) — state, fetch, realtime sync
   // ════════════════════════════════════════════════════════════
-  const [reactions, setReactions] = useState<Record<string, { count: number; liked: boolean }>>({});
+  // ★ v110.14: WhatsApp tarzı çoklu emoji — Record<messageId, Record<emoji, {count, liked}>>
+  const [reactions, setReactions] = useState<Record<string, Record<string, { count: number; liked: boolean }>>>({});
   const reactionsRef = useRef(reactions);
   useEffect(() => { reactionsRef.current = reactions; }, [reactions]);
+  // ★ v110.14: WhatsApp tarzı reaction picker — long press ile mesajın üstüne pop
+  const [reactionPicker, setReactionPicker] = useState<{ messageId: string; anchorY: number } | null>(null);
+  const reactionPickerScale = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (reactionPicker) {
+      reactionPickerScale.setValue(0);
+      Animated.spring(reactionPickerScale, {
+        toValue: 1, friction: 7, tension: 90, useNativeDriver: true,
+      }).start();
+    }
+  }, [reactionPicker, reactionPickerScale]);
 
   // Açılışta / yeni mesaj geldiğinde toplu reaksiyon özeti çek
   const fetchedIdsRef = useRef<Set<string>>(new Set());
@@ -715,7 +727,8 @@ export default function RoomChatDrawer({
     if (!visible || !currentUserId || !roomId) return;
     const unsub = RoomChatService.subscribeReactions(roomId, async (messageId) => {
       const map = await RoomChatService.getReactions([messageId], currentUserId);
-      if (map[messageId]) {
+      // ★ v110.14: Yeni emoji-bazlı yapı — Record<emoji, {count, liked}>
+      if (map[messageId] && Object.keys(map[messageId]).length > 0) {
         setReactions(prev => ({ ...prev, [messageId]: map[messageId] }));
       } else {
         // count düştü 0 — kaldır
@@ -725,18 +738,62 @@ export default function RoomChatDrawer({
     return unsub;
   }, [visible, currentUserId, roomId]);
 
-  // Tap-to-like (optimistic)
-  const handleToggleReaction = useCallback(async (messageId: string) => {
+  // ★ v110.14: WhatsApp tarzı emoji reaction — emoji parametresi opsiyonel (default ❤️)
+  const handleToggleReaction = useCallback(async (messageId: string, emoji = '❤️') => {
     if (!currentUserId || !messageId) return;
-    const prev = reactionsRef.current[messageId] || { count: 0, liked: false };
+    const prevAll = reactionsRef.current[messageId] || {};
+    const prev = prevAll[emoji] || { count: 0, liked: false };
     const optimistic = { liked: !prev.liked, count: prev.count + (prev.liked ? -1 : 1) };
-    setReactions(r => ({ ...r, [messageId]: optimistic }));
-    const result = await RoomChatService.toggleReaction(messageId, currentUserId);
+    // Optimistic state — emoji bazlı update
+    setReactions(r => {
+      const next = { ...r };
+      const msgMap = { ...(next[messageId] || {}) };
+      if (optimistic.count <= 0 && !optimistic.liked) {
+        delete msgMap[emoji];
+      } else {
+        msgMap[emoji] = optimistic;
+      }
+      if (Object.keys(msgMap).length === 0) {
+        delete next[messageId];
+      } else {
+        next[messageId] = msgMap;
+      }
+      return next;
+    });
+    const result = await RoomChatService.toggleReaction(messageId, currentUserId, emoji);
     if (result) {
-      setReactions(r => ({ ...r, [messageId]: { count: result.count, liked: result.liked } }));
+      setReactions(r => {
+        const next = { ...r };
+        const msgMap = { ...(next[messageId] || {}) };
+        if (result.count <= 0) {
+          delete msgMap[emoji];
+        } else {
+          msgMap[emoji] = { count: result.count, liked: result.liked };
+        }
+        if (Object.keys(msgMap).length === 0) {
+          delete next[messageId];
+        } else {
+          next[messageId] = msgMap;
+        }
+        return next;
+      });
     } else {
       // rollback
-      setReactions(r => ({ ...r, [messageId]: prev }));
+      setReactions(r => {
+        const next = { ...r };
+        const msgMap = { ...(next[messageId] || {}) };
+        if (prev.count <= 0) {
+          delete msgMap[emoji];
+        } else {
+          msgMap[emoji] = prev;
+        }
+        if (Object.keys(msgMap).length === 0) {
+          delete next[messageId];
+        } else {
+          next[messageId] = msgMap;
+        }
+        return next;
+      });
     }
   }, [currentUserId]);
 
@@ -816,7 +873,7 @@ export default function RoomChatDrawer({
     const isGifSafe = !!gifMatch?.[1] && /^https:\/\/(?:[\w-]+\.)?(?:tenor|giphy)\.com\//i.test(gifMatch[1]);
     const emojiOnly = /^[\p{Emoji_Presentation}\p{Extended_Pictographic}‍️⃣]{1,6}$/u.test(content) && content.length <= 14;
     const nameColor = getUserColor(item.user_id || '', item.role, item.profiles?.subscription_tier);
-    const reaction = reactions[item.id];
+    const msgReactions = reactions[item.id]; // Record<emoji, {count, liked}> | undefined
     const isOwn = item.user_id === currentUserId;
 
     // ★ 2026-04-26 FIX: Mesaj objesinde gönderen alanı `sender_id` (DB) — ChatMsg type'ında `user_id` adıyla
@@ -855,8 +912,11 @@ export default function RoomChatDrawer({
           )}
         </Pressable>
         <Pressable
-          onLongPress={() => handleToggleReaction(item.id)}
-          onPress={() => { if (reaction?.liked || (reaction?.count || 0) > 0) handleToggleReaction(item.id); }}
+          onLongPress={(e) => {
+            // Picker'ı tam mesaj balonunun üstüne yerleştir (WhatsApp paritesi)
+            const anchorY = (e.nativeEvent as any)?.pageY ?? 0;
+            setReactionPicker({ messageId: item.id, anchorY });
+          }}
           delayLongPress={220}
           style={({ pressed }) => [
             st.msgBubble,
@@ -887,10 +947,20 @@ export default function RoomChatDrawer({
               linkColor={glowCfg ? glowCfg.textColor : '#5EEAD4'}
             />
           )}
-          {reaction && reaction.count > 0 ? (
-            <View style={[st.reactionBadge, reaction.liked && st.reactionBadgeLiked]}>
-              <Text style={st.reactionEmoji}>{reaction.liked ? '❤️' : '🤍'}</Text>
-              <Text style={[st.reactionCount, reaction.liked && { color: '#FFE4E6' }]}>{reaction.count}</Text>
+          {/* ★ v110.14: WhatsApp tarzı çoklu emoji chip listesi */}
+          {msgReactions && Object.keys(msgReactions).length > 0 ? (
+            <View style={st.reactionChipRow}>
+              {Object.entries(msgReactions).map(([emoji, r]) => (
+                <Pressable
+                  key={emoji}
+                  onPress={(e) => { e.stopPropagation(); handleToggleReaction(item.id, emoji); }}
+                  style={[st.reactionBadge, r.liked && st.reactionBadgeLiked]}
+                  hitSlop={4}
+                >
+                  <Text style={st.reactionEmoji}>{emoji}</Text>
+                  <Text style={[st.reactionCount, r.liked && { color: '#FFE4E6' }]}>{r.count}</Text>
+                </Pressable>
+              ))}
             </View>
           ) : null}
         </Pressable>
@@ -977,6 +1047,61 @@ export default function RoomChatDrawer({
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
         />
+
+        {/* ★ v110.14: WhatsApp tarzı reaction picker — long press anchor pozisyonu üstüne pop */}
+        {reactionPicker && (
+          <Pressable
+            onPress={() => setReactionPicker(null)}
+            style={{
+              position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+              backgroundColor: 'rgba(0,0,0,0.20)',
+              zIndex: 200, elevation: 200,
+            }}
+          >
+            <Animated.View
+              pointerEvents="box-none"
+              style={{
+                position: 'absolute',
+                top: Math.max(80, reactionPicker.anchorY - 60),
+                left: 0, right: 0,
+                alignItems: 'center',
+                opacity: reactionPickerScale,
+                transform: [
+                  { scale: reactionPickerScale.interpolate({ inputRange: [0, 1], outputRange: [0.4, 1] }) },
+                  { translateY: reactionPickerScale.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) },
+                ],
+              }}
+            >
+              <View style={{
+                flexDirection: 'row',
+                paddingHorizontal: 6, paddingVertical: 4,
+                borderRadius: 28,
+                backgroundColor: '#1F2937',
+                borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)',
+                shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.45, shadowRadius: 10,
+                elevation: 10,
+              }}>
+                {['❤️', '😂', '👍', '😮', '😢', '🙏'].map((emoji) => (
+                  <Pressable
+                    key={emoji}
+                    onPress={() => {
+                      handleToggleReaction(reactionPicker.messageId, emoji);
+                      setReactionPicker(null);
+                    }}
+                    style={({ pressed }) => ({
+                      width: 36, height: 36, alignItems: 'center', justifyContent: 'center',
+                      borderRadius: 18,
+                      transform: pressed ? [{ scale: 1.3 }] : [{ scale: 1 }],
+                    })}
+                    hitSlop={2}
+                  >
+                    <Text style={{ fontSize: 22 }}>{emoji}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            </Animated.View>
+          </Pressable>
+        )}
 
         {/* Emoji picker (conditional) */}
         {showEmojiPicker && (
@@ -1373,20 +1498,29 @@ const st = StyleSheet.create({
     minWidth: 175,
   },
 
-  // ★ v56: Reaction badge — balonun sağ-altında küçük ❤️+sayı pill
-  reactionBadge: {
+  // ★ v110.14: WhatsApp paritesi — balon ALT-SOL köşesinde dış taşkın chip satırı
+  reactionChipRow: {
     position: 'absolute',
-    right: -6, bottom: -8,
-    flexDirection: 'row', alignItems: 'center', gap: 3,
-    paddingHorizontal: 7, paddingVertical: 2.5,
-    borderRadius: 11,
-    backgroundColor: 'rgba(15,23,42,0.92)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
+    bottom: -12,
+    left: 6,
+    flexDirection: 'row',
+    gap: 3,
+    zIndex: 5,
+    elevation: 5,
+  },
+  // ★ v110.14: Küçük daire chip — emoji + sayı, koyu arkaplan + ince border
+  reactionBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 2,
+    paddingHorizontal: 6, paddingVertical: 2,
+    borderRadius: 14,
+    backgroundColor: '#1F2937',
+    borderWidth: 1.5,
+    borderColor: '#0B1220',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.35, shadowRadius: 3,
-    elevation: 3,
+    shadowOpacity: 0.45, shadowRadius: 2,
+    elevation: 4,
+    minHeight: 24,
   },
   reactionBadgeLiked: {
     backgroundColor: 'rgba(239,68,68,0.92)',
