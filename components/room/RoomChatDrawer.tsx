@@ -695,6 +695,8 @@ export default function RoomChatDrawer({
   const [reactions, setReactions] = useState<Record<string, Record<string, { count: number; liked: boolean }>>>({});
   const reactionsRef = useRef(reactions);
   useEffect(() => { reactionsRef.current = reactions; }, [reactions]);
+  // ★ Race fix: aynı (messageId, emoji) için RPC dönüşü beklenirken ikinci tıklama ignore.
+  const reactionInFlightRef = useRef<Set<string>>(new Set());
   // ★ v110.14: WhatsApp tarzı reaction picker — long press ile mesajın üstüne pop
   const [reactionPicker, setReactionPicker] = useState<{ messageId: string; anchorY: number } | null>(null);
   const reactionPickerScale = useRef(new Animated.Value(0)).current;
@@ -738,10 +740,6 @@ export default function RoomChatDrawer({
     return unsub;
   }, [visible, currentUserId, roomId]);
 
-  // ★ v110.14: WhatsApp tarzı emoji reaction — emoji parametresi opsiyonel (default ❤️)
-  // ★ Race condition fix: aynı (messageId, emoji) için RPC dönüşü beklenirken ikinci
-  //   tıklama ignore edilir — yoksa hızlı tap'lerde count yanlış birikiyor.
-  const reactionInFlightRef = useRef<Set<string>>(new Set());
   const handleToggleReaction = useCallback(async (messageId: string, emoji = '❤️') => {
     if (!currentUserId || !messageId) return;
     const flightKey = `${messageId}::${emoji}`;
@@ -1509,27 +1507,29 @@ const st = StyleSheet.create({
     minWidth: 175,
   },
 
-  // ★ v110.14: WhatsApp tarzı çoklu emoji chip satırı — balonun altında
+  // ★ v110.14: WhatsApp tarzı reaction chip — balonun ALT-SOL köşesine yapışık,
+  //   yarısı balonun içinde yarısı dışında.
   reactionChipRow: {
+    position: 'absolute',
+    bottom: -10,
+    left: 8,
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 4,
-    marginTop: 6,
-    marginRight: -2,
-    alignSelf: 'flex-start',
+    gap: 3,
+    zIndex: 5,
   },
-  // ★ v56→v110.14: Reaction chip (eski absolute → inline)
+  // ★ v56→v110.14: Daire chip — emoji + sayı kompakt
   reactionBadge: {
-    flexDirection: 'row', alignItems: 'center', gap: 3,
-    paddingHorizontal: 7, paddingVertical: 2.5,
-    borderRadius: 11,
-    backgroundColor: 'rgba(15,23,42,0.92)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
+    flexDirection: 'row', alignItems: 'center', gap: 2,
+    paddingHorizontal: 5, paddingVertical: 1,
+    borderRadius: 14,
+    backgroundColor: '#1F2937',
+    borderWidth: 1.5,
+    borderColor: '#0B1220',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.35, shadowRadius: 3,
-    elevation: 3,
+    shadowOpacity: 0.45, shadowRadius: 2,
+    elevation: 4,
+    minHeight: 22,
   },
   reactionBadgeLiked: {
     backgroundColor: 'rgba(239,68,68,0.92)',
