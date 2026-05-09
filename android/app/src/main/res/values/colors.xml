@@ -1,5 +1,8 @@
 <resources>
-  <color name="splashscreen_background">#131D30</color>
+  <!-- ★ 2026-05-09: Splash zemini app ana rengi (#0A0F1A) ile eşitlendi.
+       Önceki #131D30 daha aydınlıktı, splash → app geçişinde "iki tonlu" hissi yaratıyordu.
+       Artık logo aynı zemin üzerinde "pop" yapar, kayma yok. -->
+  <color name="splashscreen_background">#0A0F1A</color>
   <!-- ★ 2026-05-09: Adaptive icon arka planı şeffaf — uygulama logosu çerçevesiz görünsün
        (bildirim büyük ikonu + ekran kısayolu). Splash zemini ayrı kalır. -->
   <color name="iconBackground">#00FFFFFF</color>

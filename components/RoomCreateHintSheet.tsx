@@ -18,9 +18,9 @@ const STORAGE_KEY_PREFIX = 'soprano_room_hint_v1_';
 export async function hasSeenRoomCreateHint(uid?: string | null): Promise<boolean> {
   if (!uid) return true;
   try {
+    const { supabase } = await import('../constants/supabase');
     // 1) Daha önce oda açmış mı? (DB gerçeği — hesap silinse bile yeni profilde count=0 olur)
     try {
-      const { supabase } = await import('../constants/supabase');
       const { count } = await supabase
         .from('room_creation_log')
         .select('id', { count: 'exact', head: true })
@@ -32,21 +32,21 @@ export async function hasSeenRoomCreateHint(uid?: string | null): Promise<boolea
       }
     } catch { /* DB fail — devam */ }
 
-    // 2) AsyncStorage seen mi?
-    const v = await AsyncStorage.getItem(`${STORAGE_KEY_PREFIX}${uid}`);
-    if (v !== '1') return false;
-
-    // 3) AsyncStorage seen ama DB profile.preferences.room_create_hint_seen yoksa kalıntı
+    // ★ 2026-05-09 FIX: DB ÖNCE — yeni kurulum (AsyncStorage boş) durumunda DB flag varsa
+    //   yine "görüldü" sayılır. Aksi halde uninstall+reinstall sonrası RoomHint
+    //   her açılışta tekrar görünüyordu.
     try {
-      const { supabase } = await import('../constants/supabase');
       const { data } = await supabase.from('profiles').select('preferences').eq('id', uid).maybeSingle();
       const dbSeen = (data as any)?.preferences?.room_create_hint_seen === true;
-      if (!dbSeen) {
-        try { await AsyncStorage.removeItem(`${STORAGE_KEY_PREFIX}${uid}`); } catch {}
-        return false;
+      if (dbSeen) {
+        try { await AsyncStorage.setItem(`${STORAGE_KEY_PREFIX}${uid}`, '1'); } catch {}
+        return true;
       }
-      return true;
-    } catch { return true; }
+    } catch { /* DB fail — AsyncStorage'a düş */ }
+
+    // 2) AsyncStorage check (fallback — eski cihaz kaydı, DB yoksa kabul)
+    const v = await AsyncStorage.getItem(`${STORAGE_KEY_PREFIX}${uid}`);
+    return v === '1';
   } catch {
     return true;
   }

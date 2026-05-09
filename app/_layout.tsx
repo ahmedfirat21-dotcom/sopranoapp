@@ -60,6 +60,9 @@ const __SUPPRESS_PATTERNS = [
   //   Metro yeni bundle'ı gönderirken oluşur, prod APK'da çıkmaz. APK içinde modül var.
   /Native module RNFBAppModule not found/,
   /RNFBNativeEventEmitter/,
+  // ★ 2026-05-09: Reanimated 3.16+ strict mode — shared value render sırasında okuma uyarısı.
+  //   Genelde library iç animasyonlarından, app davranışını etkilemiyor.
+  /\[Reanimated\] Reading from `value`/,
 ];
 const __origWarn = console.warn;
 const __origError = console.error;

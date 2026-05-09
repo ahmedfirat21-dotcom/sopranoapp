@@ -7,13 +7,17 @@ const path = require('path');
 const SRC = path.join(__dirname, '..', 'assets', 'app_icon.png');
 const ANDROID_RES = path.join(__dirname, '..', 'android', 'app', 'src', 'main', 'res');
 
-// Android 12+ Splash Screen icon boyutları (240dp baseline)
+// Android 12+ Splash Screen icon — windowSplashScreenAnimatedIcon (no icon background)
+// Resmi spec: 192dp × 192dp icon canvas (icon-only mode). PNG native pixel boyutuyla render edilir,
+// dolayısıyla density başına 192dp = px/density katsayısı verilmeli.
+//   mdpi(1×)=192, hdpi(1.5×)=288, xhdpi(2×)=384, xxhdpi(3×)=576, xxxhdpi(4×)=768
+// Önceki 108dp tablosu küçük kalıyordu (logo ekranın ~25%'i); 192dp ile ~%40-45 ekran kaplama.
 const SIZES = {
-  'drawable-mdpi':    240,
-  'drawable-hdpi':    360,
-  'drawable-xhdpi':   480,
-  'drawable-xxhdpi':  720,
-  'drawable-xxxhdpi': 960,
+  'drawable-mdpi':    192,
+  'drawable-hdpi':    288,
+  'drawable-xhdpi':   384,
+  'drawable-xxhdpi':  576,
+  'drawable-xxxhdpi': 768,
 };
 
 (async () => {
@@ -26,9 +30,11 @@ const SIZES = {
   const trimmed = await img.clone().trim({ threshold: 5 }).toBuffer({ resolveWithObject: true });
   console.log(`Kırpıldı: ${trimmed.info.width}x${trimmed.info.height}`);
 
-  // Kareye getir + nefes payı
+  // Kareye getir + nefes payı (%25 — Android 12+ splash icon dairesel mask uygular;
+  // logo bbox köşegeni inscribed circle'ın içine sığsın diye geniş padding gerekli.
+  // Logo: 457×613 dikdörtgen, köşegeni ~765 → canvas 920+ olmalı.)
   const maxDim = Math.max(trimmed.info.width, trimmed.info.height);
-  const padding = Math.round(maxDim * 0.05);
+  const padding = Math.round(maxDim * 0.25);
   const canvasSize = maxDim + padding * 2;
   const squared = await sharp({
     create: { width: canvasSize, height: canvasSize, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
