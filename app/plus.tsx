@@ -26,8 +26,11 @@ const PLANS = [
     name: TIER_DEFINITIONS.Plus.label,
     subtitle: 'Gelişmiş',
     icon: 'rocket',
-    gradient: TIER_DEFINITIONS.Plus.gradient,
+    // ★ 3-stop jewel-tone gradient — ametist (parlak mor → derin mor → indigo siyah)
+    gradient: ['#C084FC', '#7C3AED', '#2A1065'] as [string, string, string],
+    headerGradient: TIER_DEFINITIONS.Plus.gradient,
     color: TIER_DEFINITIONS.Plus.color,
+    glowColor: '#A855F750',
     monthly: TIER_DEFINITIONS.Plus.monthlyPrice,
     yearly: TIER_DEFINITIONS.Plus.yearlyPrice,
     savePct: 27,
@@ -35,15 +38,15 @@ const PLANS = [
       { text: `${ROOM_TIER_LIMITS.Plus.maxSpeakers} kişi sahne`, included: true },
       { text: `${ROOM_TIER_LIMITS.Plus.maxListeners} dinleyici`, included: true },
       { text: `${ROOM_TIER_LIMITS.Plus.maxCameras} kamera`, included: true },
-      { text: `${ROOM_TIER_LIMITS.Plus.durationHours} saat oda süresi`, included: true },
-      { text: `Günde ${ROOM_TIER_LIMITS.Plus.dailyRooms} oda`, included: true },
+      { text: `Her oda ${ROOM_TIER_LIMITS.Plus.durationHours} saat açık kalır`, included: true },
+      { text: `Günde ${ROOM_TIER_LIMITS.Plus.dailyRooms} oda açabilirsin`, included: true },
       { text: 'Tüm oda türleri', included: true },
       { text: 'HD ses + 720p video', included: true },
       { text: 'Oda kart görseli + arka plan', included: true },
       { text: 'Yaş/Dil filtresi', included: true },
       { text: 'Sadece Arkadaşlar modu', included: true },
-      { text: 'Kalıcı oda (3 adet)', included: true },
-      { text: '300 SP karşılama bonusu', included: true },
+      { text: '3 odanı dondurup tekrar açabilirsin', included: true },
+      { text: '600 SP karşılama bonusu', included: true },
     ],
   },
   {
@@ -52,8 +55,11 @@ const PLANS = [
     name: TIER_DEFINITIONS.Pro.label,
     subtitle: 'Sınırsız',
     icon: 'flame',
-    gradient: TIER_DEFINITIONS.Pro.gradient,
+    // ★ 3-stop jewel-tone gradient — topaz (parlak altın → kehribar → derin kahve)
+    gradient: ['#FDE68A', '#D97706', '#451A03'] as [string, string, string],
+    headerGradient: TIER_DEFINITIONS.Pro.gradient,
     color: TIER_DEFINITIONS.Pro.color,
+    glowColor: '#F59E0B60',
     monthly: TIER_DEFINITIONS.Pro.monthlyPrice,
     yearly: TIER_DEFINITIONS.Pro.yearlyPrice,
     savePct: 25,
@@ -61,15 +67,15 @@ const PLANS = [
       { text: `${ROOM_TIER_LIMITS.Pro.maxSpeakers} kişi sahne`, included: true },
       { text: 'Sınırsız dinleyici', included: true },
       { text: `${ROOM_TIER_LIMITS.Pro.maxCameras} kamera`, included: true },
-      { text: 'Sınırsız oda süresi', included: true },
-      { text: 'Sınırsız oda oluşturma', included: true },
-      { text: 'HD stereo ses + 1080p', included: true },
+      { text: 'Odan 7/24 açık kalır, kapanmaz', included: true },
+      { text: 'Sınırsız oda açabilirsin', included: true },
+      { text: 'HD stereo ses + 1080p video', included: true },
       { text: 'Oda müziği + Arka plan', included: true },
       { text: 'Ghost mode + Kılık', included: true },
       { text: 'Takipçi-only mod', included: true },
       { text: 'Seçilmişler konuşma modu', included: true },
       { text: 'Keşfet boost erişimi', included: true },
-      { text: '800 SP karşılama bonusu', included: true },
+      { text: '1500 SP karşılama bonusu', included: true },
     ],
   },
 ];
@@ -160,7 +166,7 @@ export default function PlusScreen() {
                     visible: true,
                     title: `${selectedPlan.name} Üyelik Aktif!`,
                     subtitle: `Artık ${selectedPlan.name} üyesisiniz — tüm premium özellikler açıldı.`,
-                    accent: [selectedPlan.gradient[0], selectedPlan.gradient[1]] as const,
+                    accent: [selectedPlan.headerGradient[0], selectedPlan.headerGradient[1]] as const,
                   });
                 }
               }
@@ -259,7 +265,7 @@ export default function PlusScreen() {
             {billingCycle === 'yearly' && <View style={styles.billingDot} />}
             <Text style={[styles.billingText, billingCycle === 'yearly' && styles.billingTextActive]}>Yıllık</Text>
             <View style={styles.saveBadge}>
-              <Text style={styles.saveText}>-27%</Text>
+              <Text style={styles.saveText}>-{selectedPlan.savePct}%</Text>
             </View>
           </Pressable>
         </View>
@@ -275,32 +281,66 @@ export default function PlusScreen() {
             return (
               <Pressable
                 key={plan.id}
-                style={[
+                style={({ pressed }) => [
                   styles.planCard,
+                  // ★ Glow shadow — accent rengi ile ambient halo
+                  {
+                    shadowColor: plan.glowColor.slice(0, 7),
+                    shadowOffset: { width: 0, height: 10 },
+                    shadowOpacity: 0.6,
+                    shadowRadius: 18,
+                    elevation: 12,
+                  },
                   isSelected && { borderColor: plan.color, borderWidth: 2 },
                   isCurrentPlan && !isSelected && { borderColor: plan.color + '60' },
+                  pressed && { transform: [{ scale: 0.97 }], opacity: 0.95 },
                 ]}
                 onPress={() => setSelectedTier(plan.id as any)}
               >
-                {/* Gradient Header */}
+                {/* ★ 3-stop jewel-tone gradient (kart geneli) */}
                 <LinearGradient
                   colors={plan.gradient}
-                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                  style={styles.planCardHeader}
-                >
+                  locations={[0, 0.5, 1]}
+                  start={{ x: 0.3, y: 0 }} end={{ x: 0.7, y: 1 }}
+                  style={StyleSheet.absoluteFillObject}
+                />
+
+                {/* ★ Üst cam parıltı — glassmorphic shine */}
+                <LinearGradient
+                  colors={['rgba(255,255,255,0.20)', 'rgba(255,255,255,0.05)', 'transparent']}
+                  locations={[0, 0.4, 0.8]}
+                  start={{ x: 0.2, y: 0 }} end={{ x: 0.8, y: 0.5 }}
+                  style={[StyleSheet.absoluteFillObject, { borderRadius: 18 }]}
+                />
+
+                {/* Header: ikon + isim + EN İYİ rozeti */}
+                <View style={styles.planCardHeader}>
                   {plan.id === 'pro' && (
-                    <View style={[styles.popularBadge, { backgroundColor: '#D97706' }]}>
+                    <View style={styles.popularBadge}>
+                      <LinearGradient
+                        colors={['#FFE066', '#FBBF24', '#D4A017']}
+                        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                        style={StyleSheet.absoluteFillObject}
+                      />
+                      <Ionicons name="flame" size={9} color="#3B1F00" />
                       <Text style={styles.popularText}>EN İYİ</Text>
                     </View>
                   )}
-                  <Ionicons name={plan.icon as any} size={32} color="rgba(255,255,255,0.95)" style={{ textShadowColor: 'rgba(0,0,0,0.3)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 6 }} />
+                  <View style={[styles.planIconCircle, { backgroundColor: 'rgba(255,255,255,0.18)', borderColor: 'rgba(255,255,255,0.35)' }]}>
+                    <Ionicons
+                      name={plan.icon as any}
+                      size={26}
+                      color="#FFFFFF"
+                      style={{ textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 8 }}
+                    />
+                  </View>
                   <Text style={styles.planCardName}>{plan.name}</Text>
-                </LinearGradient>
+                </View>
 
-                {/* Fiyat */}
+                {/* Fiyat & İçerik (cam katman üstünde) */}
                 <View style={styles.planCardBody}>
                   <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'center' }}>
-                    <Text style={[styles.planPrice, { color: plan.color }]}>{price}₺</Text>
+                    <Text style={styles.planPrice}>{price}₺</Text>
                     <Text style={styles.planPeriod}>{period}</Text>
                   </View>
                   {billingCycle === 'yearly' && (
@@ -311,12 +351,12 @@ export default function PlusScreen() {
                   <View style={styles.planFeatures}>
                     {plan.features.filter(f => f.included).slice(0, 7).map((f, i) => (
                       <View key={i} style={styles.planFeatureRow}>
-                        <Ionicons name="checkmark" size={13} color={plan.color} />
+                        <Ionicons name="checkmark-circle" size={13} color="#FFFFFF" style={{ textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }} />
                         <Text style={styles.planFeatureText} numberOfLines={1}>{f.text}</Text>
                       </View>
                     ))}
                     {plan.features.filter(f => f.included).length > 7 && (
-                      <Text style={[styles.planFeatureMore, { color: plan.color }]}>
+                      <Text style={styles.planFeatureMore}>
                         +{plan.features.filter(f => f.included).length - 7} daha
                       </Text>
                     )}
@@ -324,13 +364,13 @@ export default function PlusScreen() {
 
                   {/* Aktif / Seçildi */}
                   {isCurrentPlan ? (
-                    <View style={[styles.planSelectBtn, { backgroundColor: plan.color + '15', borderColor: plan.color + '40' }]}>
-                      <Ionicons name="checkmark-circle" size={14} color={plan.color} />
-                      <Text style={[styles.planSelectText, { color: plan.color }]}>Aktif</Text>
+                    <View style={[styles.planSelectBtn, { backgroundColor: 'rgba(255,255,255,0.22)', borderColor: 'rgba(255,255,255,0.50)' }]}>
+                      <Ionicons name="checkmark-circle" size={14} color="#FFFFFF" />
+                      <Text style={[styles.planSelectText, { color: '#FFFFFF' }]}>Aktif</Text>
                     </View>
                   ) : (
-                    <View style={[styles.planSelectBtn, isSelected ? { backgroundColor: plan.color + '15', borderColor: plan.color } : {}]}>
-                      <Text style={[styles.planSelectText, isSelected && { color: plan.color }]}>
+                    <View style={[styles.planSelectBtn, isSelected ? { backgroundColor: 'rgba(255,255,255,0.22)', borderColor: 'rgba(255,255,255,0.50)' } : {}]}>
+                      <Text style={[styles.planSelectText, isSelected && { color: '#FFFFFF' }]}>
                         {isSelected ? '✓ Seçildi' : 'Seç'}
                       </Text>
                     </View>
@@ -358,8 +398,9 @@ export default function PlusScreen() {
             { label: 'Sahne', values: [`${ROOM_TIER_LIMITS.Free.maxSpeakers}`, `${ROOM_TIER_LIMITS.Plus.maxSpeakers}`, `${ROOM_TIER_LIMITS.Pro.maxSpeakers}`] },
             { label: 'Dinleyici', values: [`${ROOM_TIER_LIMITS.Free.maxListeners}`, `${ROOM_TIER_LIMITS.Plus.maxListeners}`, '∞'] },
             { label: 'Kamera', values: [`${ROOM_TIER_LIMITS.Free.maxCameras}`, `${ROOM_TIER_LIMITS.Plus.maxCameras}`, `${ROOM_TIER_LIMITS.Pro.maxCameras}`] },
-            { label: 'Oda Süresi', values: [`${ROOM_TIER_LIMITS.Free.durationHours}sa`, `${ROOM_TIER_LIMITS.Plus.durationHours}sa`, '∞'] },
+            { label: 'Oda Açık Kalma', values: [`${ROOM_TIER_LIMITS.Free.durationHours}sa`, `${ROOM_TIER_LIMITS.Plus.durationHours}sa`, '7/24'] },
             { label: 'Günlük Oda', values: [`${ROOM_TIER_LIMITS.Free.dailyRooms}`, `${ROOM_TIER_LIMITS.Plus.dailyRooms}`, '∞'] },
+            { label: 'Kalıcı Oda Slotu', values: ['—', '3', '∞'] },
             { label: 'Oda Türü', values: ['Açık + Şifreli', 'Hepsi', 'Hepsi'] },
             { label: 'Ses', values: ['HD Mono', 'HD', 'Stereo'] },
             { label: 'Video', values: ['720p', '720p', '1080p'] },
@@ -368,7 +409,6 @@ export default function PlusScreen() {
             { label: 'Tema', values: ['—', '✓', '✓'] },
             { label: 'Moderatör', values: ['—', '2', '5'] },
             { label: 'Takipçi-Only', values: ['—', '✓', '✓'] },
-            { label: 'Kalıcı Oda', values: ['—', '3', '∞'] },
             { label: 'Oda Müziği', values: ['—', '—', '✓'] },
           ].map((row, i) => (
             <View key={i} style={[styles.compareRow, i % 2 === 0 && { backgroundColor: 'rgba(255,255,255,0.03)' }]}>
@@ -381,6 +421,39 @@ export default function PlusScreen() {
             </View>
           ))}
         </LinearGradient>
+
+        {/* ═══ Oda Açık Kalma Süresi Açıklaması ═══ */}
+        <View style={styles.durationExplain}>
+          <View style={styles.durationRow}>
+            <View style={[styles.durationIcon, { backgroundColor: '#94A3B818', borderColor: '#94A3B830' }]}>
+              <Ionicons name="time-outline" size={16} color="#94A3B8" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.durationTitle, { color: '#94A3B8' }]}>Free</Text>
+              <Text style={styles.durationDesc}>Açtığın oda 24 saat sonra otomatik kapanır — kullansan da kullanmasan da.</Text>
+            </View>
+          </View>
+          <View style={styles.durationDivider} />
+          <View style={styles.durationRow}>
+            <View style={[styles.durationIcon, { backgroundColor: TIER_DEFINITIONS.Plus.color + '18', borderColor: TIER_DEFINITIONS.Plus.color + '40' }]}>
+              <Ionicons name="snow-outline" size={16} color={TIER_DEFINITIONS.Plus.color} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.durationTitle, { color: TIER_DEFINITIONS.Plus.color }]}>Plus</Text>
+              <Text style={styles.durationDesc}>Her odan 12 saat aktif kalır. Süre dolunca silinmez — 3 odanı dondurup istediğinde tekrar açarsın.</Text>
+            </View>
+          </View>
+          <View style={styles.durationDivider} />
+          <View style={styles.durationRow}>
+            <View style={[styles.durationIcon, { backgroundColor: TIER_DEFINITIONS.Pro.color + '18', borderColor: TIER_DEFINITIONS.Pro.color + '40' }]}>
+              <Ionicons name="infinite-outline" size={16} color={TIER_DEFINITIONS.Pro.color} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.durationTitle, { color: TIER_DEFINITIONS.Pro.color }]}>Pro</Text>
+              <Text style={styles.durationDesc}>Odaların 7/24 açık kalır. Kapanmaz, dondurulmaz — istediğin sayıda kalıcı oda kurabilirsin.</Text>
+            </View>
+          </View>
+        </View>
 
         {/* ★ Abonelik sistemi kurulum uyarısı (prod'da Dashboard boşsa) */}
         {!subReady && !__DEV__ && (
@@ -401,7 +474,7 @@ export default function PlusScreen() {
               style={[styles.ctaOuter, (!subReady && !__DEV__) && { opacity: 0.45 }]}
             >
               <LinearGradient
-                colors={selectedPlan.gradient}
+                colors={selectedPlan.headerGradient}
                 start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                 style={styles.ctaBtn}
               >
@@ -507,43 +580,61 @@ const styles = StyleSheet.create({
 
   plansRow: { flexDirection: 'row', paddingHorizontal: 14, gap: 12 },
   planCard: {
-    flex: 1, borderRadius: 18, overflow: 'hidden',
-    backgroundColor: Colors.cardBg,
-    borderWidth: 1.5, borderColor: Colors.cardBorder + '40',
-    ...Shadows.card,
+    flex: 1, borderRadius: 20, overflow: 'hidden',
+    // ★ İnce parlak kenarlık — cam kenar etkisi
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)',
+    borderTopWidth: 1.8, borderTopColor: 'rgba(255,255,255,0.32)',
+    minHeight: 380,
   },
   planCardHeader: {
-    alignItems: 'center', paddingVertical: 20, gap: 6, position: 'relative',
+    alignItems: 'center', paddingTop: 22, paddingBottom: 6, gap: 8, position: 'relative',
+  },
+  planIconCircle: {
+    width: 54, height: 54, borderRadius: 27,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1.2,
   },
   planCardName: {
-    fontSize: 20, fontWeight: '900', color: '#fff', letterSpacing: 0.5,
-    ...Shadows.text,
+    fontSize: 22, fontWeight: '900', color: '#FFFFFF', letterSpacing: 0.6,
+    textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 6,
   },
   popularBadge: {
     position: 'absolute', top: 10, right: 10,
-    backgroundColor: '#0891B2', borderRadius: 6,
-    paddingHorizontal: 6, paddingVertical: 3,
-    ...Shadows.icon,
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    paddingHorizontal: 8, paddingVertical: 4,
+    borderRadius: 8, overflow: 'hidden',
+    zIndex: 2,
   },
-  popularText: { fontSize: 8, fontWeight: '900', color: '#fff', letterSpacing: 0.8 },
+  popularText: { fontSize: 9, fontWeight: '900', color: '#3B1F00', letterSpacing: 0.8 },
 
-  planCardBody: { padding: 14, gap: 6 },
-  planPrice: { fontSize: 26, fontWeight: '900', ...Shadows.textLight },
-  planPeriod: { fontSize: 11, color: Colors.text3, marginLeft: 2, fontWeight: '600' },
-  planMonthly: { fontSize: 10, color: Colors.text3, textAlign: 'center', marginBottom: 2, fontWeight: '500' },
+  planCardBody: { paddingHorizontal: 14, paddingBottom: 14, paddingTop: 8, gap: 6 },
+  planPrice: {
+    fontSize: 30, fontWeight: '900', color: '#FFFFFF', letterSpacing: -0.5,
+    textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 8,
+  },
+  planPeriod: { fontSize: 12, color: 'rgba(255,255,255,0.85)', marginLeft: 3, fontWeight: '700' },
+  planMonthly: {
+    fontSize: 11, color: 'rgba(255,255,255,0.75)', textAlign: 'center', marginBottom: 2, fontWeight: '600',
+  },
 
-  planFeatures: { marginTop: 10, gap: 5 },
-  planFeatureRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  planFeatureText: { fontSize: 11, color: '#CBD5E1', flex: 1, fontWeight: '500' },
-  planFeatureMore: { fontSize: 11, fontWeight: '700', textAlign: 'center', marginTop: 4 },
+  planFeatures: { marginTop: 10, gap: 6 },
+  planFeatureRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  planFeatureText: {
+    fontSize: 11, color: 'rgba(255,255,255,0.95)', flex: 1, fontWeight: '600',
+    textShadowColor: 'rgba(0,0,0,0.3)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
+  },
+  planFeatureMore: {
+    fontSize: 11, fontWeight: '800', textAlign: 'center', marginTop: 4,
+    color: 'rgba(255,255,255,0.85)',
+  },
 
   planSelectBtn: {
-    marginTop: 12, flexDirection: 'row', justifyContent: 'center', alignItems: 'center',
-    gap: 4, paddingVertical: 10, borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.12)',
+    marginTop: 14, flexDirection: 'row', justifyContent: 'center', alignItems: 'center',
+    gap: 4, paddingVertical: 11, borderRadius: 12,
+    backgroundColor: 'rgba(0,0,0,0.20)',
+    borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.20)',
   },
-  planSelectText: { fontSize: 13, fontWeight: '800', color: Colors.text3 },
+  planSelectText: { fontSize: 13, fontWeight: '800', color: 'rgba(255,255,255,0.85)' },
 
   sectionTitle: {
     fontSize: 16, fontWeight: '800', color: '#F1F5F9',
@@ -608,4 +699,31 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: 'rgba(239,68,68,0.2)',
   },
   downgradeText: { fontSize: 13, color: Colors.red, fontWeight: '700' },
+
+  // ═══ Oda Açık Kalma Açıklaması ═══
+  durationExplain: {
+    marginHorizontal: 16, marginTop: 22, padding: 14, borderRadius: 16,
+    backgroundColor: 'rgba(20,30,42,0.85)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
+    ...Shadows.card,
+  },
+  durationRow: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: 12,
+    paddingVertical: 4,
+  },
+  durationIcon: {
+    width: 32, height: 32, borderRadius: 10,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1,
+  },
+  durationTitle: {
+    fontSize: 13, fontWeight: '800', letterSpacing: 0.3, marginBottom: 2,
+  },
+  durationDesc: {
+    fontSize: 11.5, color: '#94A3B8', lineHeight: 16, fontWeight: '500',
+  },
+  durationDivider: {
+    height: 1, backgroundColor: 'rgba(255,255,255,0.05)',
+    marginVertical: 8, marginLeft: 44,
+  },
 });

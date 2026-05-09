@@ -206,7 +206,7 @@ export const ClubService = {
       .from('club_members')
       .select(`
         club_id, user_id, role, joined_at,
-        profile:profiles!user_id(id, display_name, avatar_url, username, subscription_tier, is_online, last_seen)
+        profile:profiles!user_id(id, display_name, avatar_url, username, subscription_tier, is_online, last_seen, active_frame)
       `)
       .eq('club_id', clubId)
       .order('joined_at', { ascending: false })

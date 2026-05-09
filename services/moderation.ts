@@ -190,6 +190,22 @@ export const ModerationService = {
       .from('blocked_users')
       .upsert({ blocker_id: blockerId, blocked_id: blockedId }, { onConflict: 'blocker_id,blocked_id' });
     if (error) throw error;
+    // ★ v110.5.17 (6 May 2026): Block sonrası arkadaşlığı otomatik temizle.
+    //   Eski: sadece in-room profile'da manuel silme. Diğer bağlamlarda (mesajlar, tab,
+    //   keşfet vs) blokla ama "arkadaş" kalmaya devam ediyordu (kullanıcı şikayeti).
+    //   Şimdi: her iki yöndeki friendship + follow kayıtları silinir.
+    try {
+      // Friendships (mutual) — iki yön de
+      await supabase
+        .from('friendships')
+        .delete()
+        .or(`and(user_id.eq.${blockerId},friend_id.eq.${blockedId}),and(user_id.eq.${blockedId},friend_id.eq.${blockerId})`);
+      // Follows (one-way) — iki yön de
+      await supabase
+        .from('follows')
+        .delete()
+        .or(`and(follower_id.eq.${blockerId},following_id.eq.${blockedId}),and(follower_id.eq.${blockedId},following_id.eq.${blockerId})`);
+    } catch { /* sessiz — block zaten yapıldı, friendship temizliği fail olabilir ama UI block'u algılar */ }
     return true;
   },
 

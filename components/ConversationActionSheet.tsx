@@ -40,13 +40,15 @@ interface Props {
   partnerName: string;
   partnerAvatar?: string | null;
   partnerOnline?: boolean;
+  /** ★ v107: Mağaza avatar çerçevesi */
+  partnerFrame?: string | null;
   /** Sheet üstünde gösterilecek kısa info (örn. "5 yeni mesaj" veya kapalı bırak) */
   subtitle?: string;
   actions: SheetAction[];
 }
 
 export default function ConversationActionSheet({
-  visible, onClose, partnerName, partnerAvatar, partnerOnline, subtitle, actions,
+  visible, onClose, partnerName, partnerAvatar, partnerOnline, partnerFrame, subtitle, actions,
 }: Props) {
   const translateY = useRef(new Animated.Value(SHEET_MAX_HEIGHT)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -124,10 +126,26 @@ export default function ConversationActionSheet({
 
       {/* Sheet — panResponder tüm sheet üzerinde */}
       <Animated.View style={[s.sheet, { transform: [{ translateY }] }]} {...panResponder.panHandlers}>
+        {/* ★ 2026-05-05: NotificationDrawer aile dili — slate diagonal + teal halo + soft glow */}
         <LinearGradient
-          colors={['#4a5668', '#37414f', '#232a35']}
-          locations={[0, 0.35, 1]}
+          colors={['#3a4658', '#2a3344', '#1a2030']}
           start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFillObject}
+          pointerEvents="none"
+        />
+        <LinearGradient
+          colors={['rgba(20,184,166,0.20)', 'rgba(20,184,166,0.05)', 'transparent']}
+          start={{ x: 0, y: 0 }} end={{ x: 0, y: 0.4 }}
+          style={StyleSheet.absoluteFillObject}
+          pointerEvents="none"
+        />
+        <LinearGradient
+          colors={['rgba(20,184,166,0.08)', 'transparent']}
+          start={{ x: 0, y: 0 }} end={{ x: 0.7, y: 0.6 }}
+          style={StyleSheet.absoluteFillObject}
+          pointerEvents="none"
+        />
+        <View
           style={s.sheetInner}
         >
           {/* Handle bar — beyaz şerit (RoomChatDrawer ile aynı) */}
@@ -137,7 +155,7 @@ export default function ConversationActionSheet({
 
           {/* Partner header — X kaldırıldı, swipe-to-dismiss yeterli */}
           <View style={s.header}>
-            <StatusAvatar uri={partnerAvatar || undefined} size={48} isOnline={partnerOnline} />
+            <StatusAvatar uri={partnerAvatar || undefined} size={48} isOnline={partnerOnline} frameId={partnerFrame || null} />
             <View style={{ flex: 1, marginLeft: 12 }}>
               <Text style={s.name} numberOfLines={1}>{partnerName}</Text>
               {!!subtitle && <Text style={s.subtitle} numberOfLines={1}>{subtitle}</Text>}
@@ -194,7 +212,7 @@ export default function ConversationActionSheet({
 
           {/* Safe inner padding — floating card zaten tab bar üstünde, ekstra padding gerekmiyor */}
           <View style={{ height: 10 }} />
-        </LinearGradient>
+        </View>
       </Animated.View>
     </View>
   );
@@ -210,20 +228,22 @@ const s = StyleSheet.create({
   },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.55)',
+    backgroundColor: 'rgba(8,12,22,0.45)',
   },
+  // ★ 2026-05-05: Aile dili — radius 18→22, slate bg
   sheet: {
     position: 'absolute',
     left: 14, right: 14,
-    bottom: 96, // tab bar (~82) + 14px gap → panel tab bar'ın tam üstünde floats
+    bottom: 96,
     maxHeight: SHEET_MAX_HEIGHT,
     overflow: 'hidden',
-    borderRadius: 18,
+    borderRadius: 22,
+    backgroundColor: '#1a2030',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.45,
-    shadowRadius: 18,
-    elevation: 20,
+    shadowRadius: 14,
+    elevation: 12,
   },
   sheetInner: {
     paddingTop: 8,

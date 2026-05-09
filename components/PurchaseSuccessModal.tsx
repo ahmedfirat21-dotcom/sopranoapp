@@ -1,24 +1,37 @@
-// SopranoChat — Satın Alma Başarı Modalı
-// Tam ekran kutlama: animasyonlu tik + sparkle + glow + auto-dismiss.
-// Plus/Pro üyelik, SP paket gibi satın alma sonrası toast yerine bu kullanılır.
+// SopranoChat — Satın Alma Başarı Pop'u (v109.3)
+// ════════════════════════════════════════════════════════════════════
+// Modal yerine TOAST-STYLE POP. Backdrop yok — ekran ortasında çıkar,
+// auto-dismiss eder, kullanıcı altta etkileşime devam edebilir.
+// Applied-clean.json (beyaz BG layer'ı çıkarılmış) Lottie ile tik animasyonu.
 
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Pressable, Animated, Easing, Modal, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Animated, Easing, Dimensions, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
-import { useSwipeToDismiss } from '../hooks/useSwipeToDismiss';
 
 const { width: W } = Dimensions.get('window');
 
+let LottieView: any = null;
+let APPLIED_LOTTIE: any = null;
+try {
+  LottieView = require('lottie-react-native').default;
+  // ★ v109.3: BG layer'ı çıkarılmış temiz versiyon (şeffaf zemin)
+  APPLIED_LOTTIE = require('../assets/Applied-clean.json');
+} catch { /* fallback to Ionicons checkmark */ }
+
 interface Props {
   visible: boolean;
-  /** Büyük başlık örn. "Pro Üyelik Aktif!" */
+  /** Büyük başlık örn. "Pro Üyelik Satın Alındı" */
   title: string;
-  /** Alt satır açıklaması örn. "Tebrikler, tüm premium özellikler açıldı." */
+  /** Alt satır örn. "Pro üyelik onaylandı" */
   subtitle?: string;
-  /** Tik dairesinin gradient renkleri — tier/contexte göre */
+  /** Aksent rengi — tier/rarity'e göre */
   accent?: readonly [string, string];
-  /** Kendi kendine kapanma süresi ms (default 2800) */
+  /** Auto-dismiss süresi (ms). Default 4000 — Lottie tik animasyonu ~2.2s,
+   *  ardından kullanıcının başlık+alt metni rahat okuyup ürünün kazanıldığını
+   *  hissetmesi için ~1.8s nefes payı. Çok hızlı kapanma "ne oldu?" hissini
+   *  bırakıyor; bu süre kutlama anının değerini artırıyor. */
   autoHideMs?: number;
   onClose: () => void;
 }
@@ -28,244 +41,151 @@ export default function PurchaseSuccessModal({
   title,
   subtitle,
   accent = ['#14B8A6', '#0E7490'] as const,
-  autoHideMs = 2800,
+  autoHideMs = 4000,
   onClose,
 }: Props) {
-  // Ana badge scale (spring pop)
-  const badgeScale = useRef(new Animated.Value(0)).current;
-  const badgeRotate = useRef(new Animated.Value(0)).current;
-  // Checkmark (scale + draw-in fade)
-  const tickScale = useRef(new Animated.Value(0)).current;
-  const tickOpacity = useRef(new Animated.Value(0)).current;
-  // Glow pulse ring
-  const ringScale = useRef(new Animated.Value(0.6)).current;
-  const ringOpacity = useRef(new Animated.Value(0)).current;
-  // Text fade-up
+  const cardScale = useRef(new Animated.Value(0.6)).current;
+  const cardOpacity = useRef(new Animated.Value(0)).current;
   const textOpacity = useRef(new Animated.Value(0)).current;
-  const textTranslateY = useRef(new Animated.Value(14)).current;
-  // Sparkles — 8 adet radial
-  const sparkles = useRef(
-    Array.from({ length: 8 }, () => ({
-      scale: new Animated.Value(0),
-      translateX: new Animated.Value(0),
-      translateY: new Animated.Value(0),
-      opacity: new Animated.Value(0),
-    }))
-  ).current;
+  const lottieRef = useRef<any>(null);
 
   useEffect(() => {
-    if (!visible) return;
+    if (!visible) {
+      cardScale.setValue(0.6);
+      cardOpacity.setValue(0);
+      textOpacity.setValue(0);
+      return;
+    }
 
-    // Reset
-    badgeScale.setValue(0);
-    badgeRotate.setValue(0);
-    tickScale.setValue(0);
-    tickOpacity.setValue(0);
-    ringScale.setValue(0.6);
-    ringOpacity.setValue(0);
-    textOpacity.setValue(0);
-    textTranslateY.setValue(14);
-    sparkles.forEach(s => {
-      s.scale.setValue(0);
-      s.translateX.setValue(0);
-      s.translateY.setValue(0);
-      s.opacity.setValue(0);
-    });
-
-    // Sequence: 1) badge pop + ring 2) tick draw 3) sparkles 4) text
     Animated.parallel([
-      // Badge spring-pop
-      Animated.spring(badgeScale, {
-        toValue: 1, tension: 80, friction: 6, useNativeDriver: true,
-      }),
-      // Badge slight wiggle
-      Animated.sequence([
-        Animated.timing(badgeRotate, { toValue: 1, duration: 220, easing: Easing.out(Easing.back(2)), useNativeDriver: true }),
-        Animated.timing(badgeRotate, { toValue: 0, duration: 380, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-      ]),
-      // Ring pulse — 2 tekrar
-      Animated.loop(
-        Animated.sequence([
-          Animated.parallel([
-            Animated.timing(ringScale, { toValue: 1.5, duration: 1100, easing: Easing.out(Easing.ease), useNativeDriver: true }),
-            Animated.sequence([
-              Animated.timing(ringOpacity, { toValue: 0.5, duration: 160, useNativeDriver: true }),
-              Animated.timing(ringOpacity, { toValue: 0, duration: 940, useNativeDriver: true }),
-            ]),
-          ]),
-          Animated.timing(ringScale, { toValue: 0.6, duration: 1, useNativeDriver: true }),
-        ]),
-        { iterations: 2 }
-      ),
-      // Tick — badge pop sonrası delayed
-      Animated.sequence([
-        Animated.delay(180),
-        Animated.parallel([
-          Animated.spring(tickScale, { toValue: 1, tension: 100, friction: 5, useNativeDriver: true }),
-          Animated.timing(tickOpacity, { toValue: 1, duration: 200, useNativeDriver: true }),
-        ]),
-      ]),
-      // Sparkles — radial out
-      ...sparkles.map((s, i) => {
-        const angle = (i / sparkles.length) * Math.PI * 2;
-        const radius = 60 + Math.random() * 20;
-        const tx = Math.cos(angle) * radius;
-        const ty = Math.sin(angle) * radius;
-        return Animated.sequence([
-          Animated.delay(320 + i * 30),
-          Animated.parallel([
-            Animated.timing(s.scale, { toValue: 1, duration: 350, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
-            Animated.timing(s.translateX, { toValue: tx, duration: 700, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
-            Animated.timing(s.translateY, { toValue: ty, duration: 700, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
-            Animated.sequence([
-              Animated.timing(s.opacity, { toValue: 1, duration: 200, useNativeDriver: true }),
-              Animated.delay(250),
-              Animated.timing(s.opacity, { toValue: 0, duration: 400, useNativeDriver: true }),
-            ]),
-          ]),
-        ]);
-      }),
-      // Text
+      Animated.spring(cardScale, { toValue: 1, useNativeDriver: true, damping: 14, stiffness: 220 }),
+      Animated.timing(cardOpacity, { toValue: 1, duration: 180, useNativeDriver: true, easing: Easing.out(Easing.cubic) }),
       Animated.sequence([
         Animated.delay(360),
-        Animated.parallel([
-          Animated.timing(textOpacity, { toValue: 1, duration: 350, useNativeDriver: true }),
-          Animated.timing(textTranslateY, { toValue: 0, duration: 450, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
-        ]),
+        Animated.timing(textOpacity, { toValue: 1, duration: 280, useNativeDriver: true }),
       ]),
     ]).start();
 
-    // Auto-dismiss
+    lottieRef.current?.reset?.();
+    lottieRef.current?.play?.();
+
     const t = setTimeout(() => onClose(), autoHideMs);
     return () => clearTimeout(t);
-  }, [visible]);
-
-  const { translateValue: swipeTranslate, panHandlers } = useSwipeToDismiss({
-    direction: 'down',
-    threshold: 70,
-    onDismiss: onClose,
-  });
+  }, [visible, autoHideMs]);
 
   if (!visible) return null;
 
-  const badgeRot = badgeRotate.interpolate({ inputRange: [0, 1], outputRange: ['-8deg', '8deg'] });
-
   return (
-    <Modal transparent visible={visible} animationType="fade" statusBarTranslucent onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose}>
-        <Animated.View style={[styles.content, { transform: [{ translateY: swipeTranslate }] }]} {...panHandlers}>
-        {/* Pulse ring */}
-        <Animated.View style={[styles.glowRing, {
-          borderColor: accent[0],
-          opacity: ringOpacity,
-          transform: [{ scale: ringScale }],
-        }]} />
+    <View style={s.overlay} pointerEvents="box-none">
+      {/* ★ Tap-to-dismiss alt katman (önce render → en altta) */}
+      <Pressable
+        style={StyleSheet.absoluteFill}
+        onPress={onClose}
+        accessibilityLabel="Kapat"
+      />
+      <Animated.View
+        style={[
+          s.card,
+          {
+            opacity: cardOpacity,
+            transform: [{ scale: cardScale }],
+            borderColor: accent[0] + '99',
+            ...Platform.select({
+              ios: {
+                shadowColor: accent[0],
+                shadowOffset: { width: 0, height: 12 },
+                shadowOpacity: 0.55, shadowRadius: 26,
+              },
+              android: { elevation: 20 },
+            }),
+          },
+        ]}
+      >
+        <BlurView intensity={36} tint="dark" style={StyleSheet.absoluteFillObject} />
+        <LinearGradient
+          colors={['rgba(48,65,94,0.92)', 'rgba(26,40,64,0.96)', 'rgba(12,22,40,0.98)']}
+          start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
+          style={StyleSheet.absoluteFillObject}
+        />
+        {/* Aksent halo top */}
+        <LinearGradient
+          colors={[accent[0] + '55', accent[0] + '08', 'transparent'] as [string, string, string]}
+          start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 0.7 }}
+          style={[StyleSheet.absoluteFillObject, { height: 100 }] as any}
+          pointerEvents="none"
+        />
 
-        {/* Sparkles */}
-        {sparkles.map((s, i) => (
-          <Animated.View key={i} style={[styles.sparkle, {
-            opacity: s.opacity,
-            transform: [
-              { translateX: s.translateX },
-              { translateY: s.translateY },
-              { scale: s.scale },
-            ],
-          }]}>
-            <Ionicons name="star" size={11} color={accent[0]} />
-          </Animated.View>
-        ))}
+        {/* Tik animasyonu — temiz Lottie veya fallback */}
+        <View style={s.tickWrap}>
+          {LottieView && APPLIED_LOTTIE ? (
+            <LottieView
+              ref={lottieRef}
+              source={APPLIED_LOTTIE}
+              autoPlay
+              loop={false}
+              resizeMode="contain"
+              style={{ width: 130, height: 130 }}
+            />
+          ) : (
+            <View style={[s.fallbackBadge, { backgroundColor: accent[0] + '22', borderColor: accent[0] }]}>
+              <Ionicons name="checkmark" size={56} color={accent[0]} />
+            </View>
+          )}
+        </View>
 
-        {/* Badge with check */}
-        <Animated.View style={{
-          transform: [{ scale: badgeScale }, { rotate: badgeRot }],
-        }}>
-          <LinearGradient
-            colors={accent as any}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-            style={styles.badge}
-          >
-            <Animated.View style={{ transform: [{ scale: tickScale }], opacity: tickOpacity }}>
-              <Ionicons name="checkmark" size={68} color="#fff" style={styles.tickIcon} />
-            </Animated.View>
-          </LinearGradient>
+        {/* Metin */}
+        <Animated.View style={[s.textWrap, { opacity: textOpacity }]}>
+          <Text style={s.title} numberOfLines={2}>{title}</Text>
+          {subtitle ? <Text style={s.subtitle} numberOfLines={2}>{subtitle}</Text> : null}
         </Animated.View>
-
-        {/* Text */}
-        <Animated.View style={[styles.textWrap, {
-          opacity: textOpacity,
-          transform: [{ translateY: textTranslateY }],
-        }]}>
-          <Text style={styles.title}>{title}</Text>
-          {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
-        </Animated.View>
-        </Animated.View>
-      </Pressable>
-    </Modal>
+      </Animated.View>
+    </View>
   );
 }
 
-const BADGE_SIZE = 128;
-
-const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(5,10,18,0.82)',
+const s = StyleSheet.create({
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
     alignItems: 'center',
     justifyContent: 'center',
+    zIndex: 100,
   },
-  content: {
+  card: {
+    width: Math.min(W * 0.78, 320),
+    paddingTop: 14, paddingBottom: 18, paddingHorizontal: 20,
+    borderRadius: 20, overflow: 'hidden',
+    borderWidth: 1,
     alignItems: 'center',
-    justifyContent: 'center',
   },
-  glowRing: {
-    position: 'absolute',
-    width: BADGE_SIZE,
-    height: BADGE_SIZE,
-    borderRadius: BADGE_SIZE / 2,
-    borderWidth: 3,
+  tickWrap: {
+    width: 130, height: 130,
+    alignItems: 'center', justifyContent: 'center',
+    marginBottom: 6,
   },
-  badge: {
-    width: BADGE_SIZE,
-    height: BADGE_SIZE,
-    borderRadius: BADGE_SIZE / 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.45,
-    shadowRadius: 20,
-    elevation: 14,
-  },
-  tickIcon: {
-    textShadowColor: 'rgba(0,0,0,0.35)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 5,
-  },
-  sparkle: {
-    position: 'absolute',
+  fallbackBadge: {
+    width: 86, height: 86, borderRadius: 43,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 2,
   },
   textWrap: {
-    marginTop: 26,
     alignItems: 'center',
-    paddingHorizontal: 32,
+    paddingHorizontal: 4,
   },
   title: {
-    fontSize: 22,
-    fontWeight: '800',
+    fontSize: 16, fontWeight: '800',
     color: '#F1F5F9',
     textAlign: 'center',
-    letterSpacing: 0.3,
-    textShadowColor: 'rgba(0,0,0,0.6)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 6,
+    letterSpacing: 0.2,
+    marginBottom: 4,
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
   subtitle: {
-    marginTop: 8,
-    fontSize: 13,
-    color: '#CBD5E1',
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.7)',
     textAlign: 'center',
     fontWeight: '500',
-    lineHeight: 19,
-    maxWidth: W * 0.78,
+    lineHeight: 17,
   },
 });

@@ -36,9 +36,8 @@ export async function shouldShowCreateRoomCoachmark(uid?: string | null): Promis
   if (!uid) return false;
   try {
     const v = await AsyncStorage.getItem(`${STORAGE_KEY_PREFIX}${uid}`);
-    if (v !== 'pending') return false;
-    // ★ v110.14: DB check — kullanıcı daha önce oda açtıysa coachmark gösterme
-    //   (yeni cihaz/silmiş kurulum için AsyncStorage 'pending' olsa bile DB gerçeği bildirir).
+    if (v === 'seen') return false;
+    // DB check — kullanıcı daha önce oda açtıysa coachmark gösterme.
     try {
       const { supabase } = await import('../constants/supabase');
       const { count } = await supabase
@@ -47,11 +46,10 @@ export async function shouldShowCreateRoomCoachmark(uid?: string | null): Promis
         .eq('user_id', uid)
         .limit(1);
       if ((count || 0) > 0) {
-        // Daha önce oda açmış — pending flag'ini de seen'e çevir, bir daha sorgulama
         try { await AsyncStorage.setItem(`${STORAGE_KEY_PREFIX}${uid}`, 'seen'); } catch {}
         return false;
       }
-    } catch { /* DB check başarısız — pending davranışı kalır (en kötü gösterilir, kullanıcı dismiss eder) */ }
+    } catch { /* DB fail — yine göster, kullanıcı dismiss eder */ }
     return true;
   } catch {
     return false;
@@ -314,7 +312,6 @@ export default function CreateRoomCoachmark({ visible, ctaTopOffset = 130, onDis
               <Ionicons name="checkmark-circle" size={22} color="#FFD700" style={iconShadow} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.tooltipTitle}>Harika seçim!</Text>
               <Text style={styles.tooltipBody}>
                 Yukarıdaki <Text style={styles.tooltipHighlight}>+ Yeni Oda Oluştur</Text> butonuna dokun ve ilk odanı aç.
               </Text>

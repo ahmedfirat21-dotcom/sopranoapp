@@ -214,10 +214,22 @@ export default function RoomRecordingsSheet({ visible, roomId, hostId, onClose }
       <View style={st.overlay}>
         <Pressable style={st.overlayBg} onPress={() => { stopAudio(); onClose(); }} />
         <Animated.View style={[st.container, { transform: [{ translateY: translateValue }] }]} {...panHandlers}>
+          {/* ★ 2026-05-05: NotificationDrawer dili — slate diagonal + üst kırmızı halo (kayıt karakteri). */}
           <LinearGradient
-            colors={['#4a5668', '#37414f', '#232a35']}
-            locations={[0, 0.35, 1]}
+            colors={['#3a4658', '#2a3344', '#1a2030']}
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFillObject}
+            pointerEvents="none"
+          />
+          <LinearGradient
+            colors={['rgba(239,68,68,0.20)', 'rgba(239,68,68,0.05)', 'transparent']}
+            start={{ x: 0, y: 0 }} end={{ x: 0, y: 0.4 }}
+            style={StyleSheet.absoluteFillObject}
+            pointerEvents="none"
+          />
+          <LinearGradient
+            colors={['rgba(239,68,68,0.08)', 'transparent']}
+            start={{ x: 0, y: 0 }} end={{ x: 0.7, y: 0.6 }}
             style={StyleSheet.absoluteFillObject}
             pointerEvents="none"
           />
@@ -270,18 +282,18 @@ export default function RoomRecordingsSheet({ visible, roomId, hostId, onClose }
 // ═══════════════════════════════════════════════════════════
 const st = StyleSheet.create({
   overlay: { flex: 1, justifyContent: 'flex-end' },
-  overlayBg: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.6)' },
+  overlayBg: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(8,12,22,0.45)' },
   container: {
     height: '65%',
-    backgroundColor: '#232a35',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    backgroundColor: '#1a2030',
+    borderTopLeftRadius: 26,
+    borderTopRightRadius: 26,
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -8 },
-    shadowOpacity: 0.5,
-    shadowRadius: 20,
-    elevation: 24,
+    shadowOpacity: 0.55,
+    shadowRadius: 18,
+    elevation: 12,
   },
   handleWrap: { alignItems: 'center', paddingTop: 10, paddingBottom: 4 },
   handle: { width: 48, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.25)' },

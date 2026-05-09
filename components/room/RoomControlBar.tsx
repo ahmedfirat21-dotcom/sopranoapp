@@ -216,6 +216,8 @@ interface Props {
   onMicPress: () => void; onCameraPress: () => void;
   onHandPress: () => void;
   onChatPress: () => void; onPlusPress: () => void;
+  /** ★ v107: Hediye butonu — odadaki birine sembol/Lottie hediye gönderme paneli */
+  onGiftPress?: () => void;
   onMuteRoomPress?: () => void;
   onLeavePress?: () => void;
   dmBadgeCount?: number;
@@ -234,7 +236,7 @@ export default function RoomControlBar({
   isForcedMuted,
   stageAction, stageQueuePosition,
   onMicPress, onCameraPress,
-  onHandPress, onChatPress, onPlusPress, onMuteRoomPress,
+  onHandPress, onChatPress, onPlusPress, onGiftPress, onMuteRoomPress,
   onJoinStagePress,
   dmBadgeCount, plusBadgeCount, onDmPress, isDmOpen, isPlusOpen,
 }: Props) {
@@ -380,6 +382,16 @@ export default function RoomControlBar({
             active={isDmOpen}
             accent="#8B5CF6"
             label="Mesajlar"
+          />
+        )}
+
+        {/* ★ v107: Hediye — odadaki birine Lottie animasyonlu hediye yolla */}
+        {onGiftPress && (
+          <CtrlBtn
+            icon="gift"
+            onPress={onGiftPress}
+            accent="#F472B6"
+            label="Hediye gönder"
           />
         )}
 

@@ -39,6 +39,8 @@ export type FollowUser = {
   subscription_tier: string;
   is_online: boolean;
   last_seen?: string | null;
+  /** ★ v107: Mağaza avatar çerçevesi */
+  active_frame?: string | null;
 };
 export type FriendUser = FollowUser;
 
@@ -459,7 +461,7 @@ export const FriendshipService = {
     try {
       const { data, error } = await supabase
         .from('friendships')
-        .select('user_id, profiles!friendships_user_id_fkey(id, display_name, avatar_url, username, subscription_tier, is_online, last_seen)')
+        .select('user_id, profiles!friendships_user_id_fkey(id, display_name, avatar_url, username, subscription_tier, is_online, last_seen, active_frame)')
         .eq('friend_id', userId)
         .eq('status', 'accepted');
       if (error) throw error;
@@ -482,7 +484,7 @@ export const FriendshipService = {
     try {
       const { data, error } = await supabase
         .from('friendships')
-        .select('friend_id, profiles!friendships_friend_id_fkey(id, display_name, avatar_url, username, subscription_tier, is_online, last_seen)')
+        .select('friend_id, profiles!friendships_friend_id_fkey(id, display_name, avatar_url, username, subscription_tier, is_online, last_seen, active_frame)')
         .eq('user_id', userId)
         .eq('status', 'accepted');
       if (error) throw error;
@@ -529,7 +531,7 @@ export const FriendshipService = {
       // 3. Mutual friend profillerini toplu çek
       const { data: profiles, error: e3 } = await supabase
         .from('profiles')
-        .select('id, display_name, avatar_url, username, subscription_tier, is_online, last_seen')
+        .select('id, display_name, avatar_url, username, subscription_tier, is_online, last_seen, active_frame')
         .in('id', mutualIds);
       if (e3) throw e3;
       return (profiles || []) as FollowUser[];
@@ -740,12 +742,12 @@ export const FriendshipService = {
     const [outRes, inRes] = await Promise.all([
       supabase
         .from('friendships')
-        .select('friend_id, friend:profiles!friend_id(id, display_name, avatar_url, username, subscription_tier, is_online, last_seen)')
+        .select('friend_id, friend:profiles!friend_id(id, display_name, avatar_url, username, subscription_tier, is_online, last_seen, active_frame)')
         .eq('user_id', userId)
         .eq('status', 'accepted'),
       supabase
         .from('friendships')
-        .select('user_id, user:profiles!user_id(id, display_name, avatar_url, username, subscription_tier, is_online, last_seen)')
+        .select('user_id, user:profiles!user_id(id, display_name, avatar_url, username, subscription_tier, is_online, last_seen, active_frame)')
         .eq('friend_id', userId)
         .eq('status', 'accepted'),
     ]);

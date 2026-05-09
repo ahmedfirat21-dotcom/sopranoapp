@@ -97,7 +97,7 @@ export default function RoomFollowersSheet({ visible, onClose, roomId, totalCoun
   return (
     <View style={StyleSheet.absoluteFillObject as any} pointerEvents="box-none">
       <View style={{ ...StyleSheet.absoluteFillObject, zIndex: 530 }} pointerEvents="box-none">
-        <Animated.View style={[StyleSheet.absoluteFill, { opacity: backdropOpacity, backgroundColor: 'rgba(0,0,0,0.55)' }]}>
+        <Animated.View style={[StyleSheet.absoluteFill, { opacity: backdropOpacity, backgroundColor: 'rgba(8,12,22,0.45)' }]}>
           <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
         </Animated.View>
 
@@ -108,16 +108,31 @@ export default function RoomFollowersSheet({ visible, onClose, roomId, totalCoun
           ]}
           {...panResponder.panHandlers}
         >
+          {/* ★ 2026-05-05: NotificationDrawer dili — slate diagonal + üst pink halo.
+              Karakter: pink (takipçi/heart). 2 katman gradient (FPS koruma). */}
           <LinearGradient
-            colors={['#1e2230', '#15182a', '#0a0b16']}
-            locations={[0, 0.55, 1]}
-            start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
+            colors={['#3a4658', '#2a3344', '#1a2030']}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
             style={StyleSheet.absoluteFillObject}
+            pointerEvents="none"
+          />
+          <LinearGradient
+            colors={['rgba(236,72,153,0.20)', 'rgba(236,72,153,0.05)', 'transparent']}
+            start={{ x: 0, y: 0 }} end={{ x: 0, y: 0.4 }}
+            style={StyleSheet.absoluteFillObject}
+            pointerEvents="none"
+          />
+          <LinearGradient
+            colors={['rgba(236,72,153,0.08)', 'transparent']}
+            start={{ x: 0, y: 0 }} end={{ x: 0.7, y: 0.6 }}
+            style={StyleSheet.absoluteFillObject}
+            pointerEvents="none"
           />
           <LinearGradient
             colors={['transparent', 'rgba(236,72,153,0.85)', 'transparent']}
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
             style={s.topEdge}
+            pointerEvents="none"
           />
 
           <View style={s.handle}>
@@ -169,14 +184,13 @@ const s = StyleSheet.create({
     position: 'absolute',
     left: 0, right: 0, bottom: 0,
     height: PANEL_HEIGHT,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    borderTopLeftRadius: 26,
+    borderTopRightRadius: 26,
     overflow: 'hidden',
-    borderWidth: 1.5,
-    borderColor: 'rgba(236,72,153,0.35)',
+    backgroundColor: '#1a2030',
     borderBottomWidth: 0,
     ...Platform.select({
-      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: -8 }, shadowOpacity: 0.6, shadowRadius: 22 },
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: -8 }, shadowOpacity: 0.55, shadowRadius: 18 },
       android: {},
     }),
   },

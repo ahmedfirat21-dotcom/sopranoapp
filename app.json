@@ -2,7 +2,7 @@
   "expo": {
     "name": "SopranoChat",
     "slug": "SopranoChat",
-    "version": "1.2.84",
+    "version": "1.3.11",
     "privacy": "public",
     "orientation": "portrait",
     "icon": "./assets/app_icon.png",
@@ -11,7 +11,8 @@
     "splash": {
       "image": "./assets/app_icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#0A0F1A"
+      "backgroundColor": "#0A0F1A",
+      "imageBackgroundColor": "transparent"
     },
     "ios": {
       "supportsTablet": true,
@@ -29,11 +30,12 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#0A0F1A",
+        "backgroundColor": "#FFFFFF00",
         "foregroundImage": "./assets/app_icon.png"
       },
       "package": "com.sopranochat",
-      "versionCode": 167,
+      "versionCode": 195,
+      "allowBackup": false,
       "softwareKeyboardLayoutMode": "resize",
       "googleServicesFile": "./google-services.json",
       "permissions": [

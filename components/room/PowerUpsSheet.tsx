@@ -240,10 +240,10 @@ export default function PowerUpsSheet({
   return (
     <View style={StyleSheet.absoluteFillObject as any} pointerEvents="box-none">
       <View style={{ ...StyleSheet.absoluteFillObject, zIndex: 520 }} pointerEvents="box-none">
-        {/* Backdrop — BlurView + dim layer */}
+        {/* Backdrop — BlurView + dim layer (NotificationDrawer dim tonu) */}
         <Animated.View style={[StyleSheet.absoluteFill, { opacity: backdropOpacity }]}>
           <BlurView intensity={30} tint="dark" style={StyleSheet.absoluteFill} />
-          <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.55)' }]} />
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(8,12,22,0.45)' }]} />
           <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
         </Animated.View>
 
@@ -258,24 +258,32 @@ export default function PowerUpsSheet({
           ]}
           {...panResponder.panHandlers}
         >
-          {/* Bg gradient — slate */}
+          {/* ★ 2026-05-05: NotificationDrawer dili — slate diagonal + üst amber halo.
+              Karakter: amber (Power-Up premium hissi). 2 katman gradient (FPS koruma). */}
           <LinearGradient
-            colors={['#1e2230', '#15182a', '#0a0b16']}
-            locations={[0, 0.55, 1]}
-            start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
+            colors={['#3a4658', '#2a3344', '#1a2030']}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
             style={StyleSheet.absoluteFillObject}
+            pointerEvents="none"
           />
-          {/* Top edge highlight */}
+          <LinearGradient
+            colors={['rgba(251,191,36,0.20)', 'rgba(251,191,36,0.05)', 'transparent']}
+            start={{ x: 0, y: 0 }} end={{ x: 0, y: 0.4 }}
+            style={StyleSheet.absoluteFillObject}
+            pointerEvents="none"
+          />
+          <LinearGradient
+            colors={['rgba(251,191,36,0.08)', 'transparent']}
+            start={{ x: 0, y: 0 }} end={{ x: 0.7, y: 0.6 }}
+            style={StyleSheet.absoluteFillObject}
+            pointerEvents="none"
+          />
+          {/* Top edge highlight (ince çizgi) */}
           <LinearGradient
             colors={['transparent', 'rgba(251,191,36,0.85)', 'transparent']}
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
             style={styles.topEdge}
-          />
-          {/* Subtle radial tint */}
-          <LinearGradient
-            colors={['rgba(251,191,36,0.08)', 'transparent']}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-            style={StyleSheet.absoluteFillObject}
+            pointerEvents="none"
           />
 
           {/* Handle */}
@@ -376,22 +384,19 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0, right: 0, bottom: 0,
     minHeight: PANEL_CONTENT_HEIGHT,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    borderTopLeftRadius: 26,
+    borderTopRightRadius: 26,
     overflow: 'hidden',
-    // ★ v92.10.2: Android'de elevation kaldırıldı (border yeterli, elevation
-    //   amber border ile çakışıp glow halka yapıyordu). iOS shadow korunuyor.
-    borderWidth: Platform.OS === 'android' ? 1.5 : 1.5,
-    borderColor: 'rgba(251,191,36,0.35)',
+    backgroundColor: '#1a2030',
     borderBottomWidth: 0,
     ...Platform.select({
       ios: {
         shadowColor: '#000',
         shadowOffset: { width: 0, height: -8 },
-        shadowOpacity: 0.6,
-        shadowRadius: 22,
+        shadowOpacity: 0.55,
+        shadowRadius: 18,
       },
-      android: {},  // elevation YOK — border + LinearGradient bg yeterli
+      android: {},  // elevation YOK — FPS için. LinearGradient + slate bg yeterli.
     }),
   },
   topEdge: {

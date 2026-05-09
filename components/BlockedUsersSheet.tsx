@@ -18,6 +18,7 @@ import { ModerationService } from '../services/moderation';
 import { useUserProfileSheet } from '../app/_layout';
 import { showToast } from './Toast';
 import StatusAvatar from './StatusAvatar';
+import { useRouter } from 'expo-router';
 
 const { height: SCREEN_H } = Dimensions.get('window');
 const PANEL_HEIGHT = Math.min(SCREEN_H * 0.7, 560);
@@ -39,6 +40,7 @@ export default function BlockedUsersSheet({ visible, onClose, currentUserId }: P
   const insets = useSafeAreaInsets();
   const bottomInset = Math.max(insets.bottom, 14);
   const { openUserProfile } = useUserProfileSheet();
+  const router = useRouter();
   const CLOSED_Y = PANEL_HEIGHT + bottomInset + 50;
 
   const translateY = useRef(new Animated.Value(CLOSED_Y)).current;
@@ -212,6 +214,20 @@ export default function BlockedUsersSheet({ visible, onClose, currentUserId }: P
                       {u.display_name || 'Kullanıcı'}
                     </Text>
                     <Text style={s.sub} numberOfLines={1}>Engelli</Text>
+                  </Pressable>
+                  {/* ★ v110.5.23: Sohbeti aç — engellediği kişinin eski mesajlarına erişim */}
+                  <Pressable
+                    onPress={() => {
+                      onClose();
+                      setTimeout(() => router.push(`/chat/${u.id}` as any), 250);
+                    }}
+                    style={({ pressed }) => [
+                      { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(20,184,166,0.10)', borderWidth: 1, borderColor: 'rgba(20,184,166,0.25)' },
+                      pressed && { opacity: 0.7 },
+                    ]}
+                    hitSlop={6}
+                  >
+                    <Ionicons name="chatbubble-outline" size={16} color="#14B8A6" />
                   </Pressable>
                   <Pressable
                     onPress={() => handleUnblock(u)}

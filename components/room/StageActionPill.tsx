@@ -39,11 +39,10 @@ interface Props {
 export default function StageActionPill({
   role, isHost, onClaimStage, onSelfDemote, stageFull, cooldownSeconds,
 }: Props) {
-  // Spectator → buton gösterme (sahne+dinleyici dolu)
-  if (role === 'spectator') return null;
+  // ★ v108.20: Listener için pill geri açıldı — sahne BOŞ veya yer varsa çıkabilir.
+  //   stageFull → buton disabled (zaten mevcut). spectator → gizli.
+  if (role === 'spectator' || !role) return null;
 
-  // ★ v107.32: owner rolü de speaker gibi (host kendi odasından inebilir — memory).
-  //   isHost prop'u korunuyor ama artık gizleme yok; host pill'i görür ve kullanır.
   const isSpeaker = role === 'speaker' || role === 'moderator' || role === 'owner';
   const onCooldown = (cooldownSeconds ?? 0) > 0;
 

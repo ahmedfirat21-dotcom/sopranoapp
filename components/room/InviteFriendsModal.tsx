@@ -208,19 +208,39 @@ export default function InviteFriendsModal({ visible, userId, onClose, onInvite,
     <View style={s.overlay}>
       <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
       <Animated.View style={[s.modal, { transform: [{ translateY: translateValue }] }]} {...panHandlers}>
-        <LinearGradient colors={['#4a5668', '#37414f', '#232a35']} locations={[0, 0.35, 1]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[StyleSheet.absoluteFillObject, { borderRadius: 20 }]} />
+        {/* ★ 2026-05-05: NotificationDrawer dili — 2 katman gradient (slate diagonal + teal halo).
+            Soft glow katmanı kaldırıldı (oda içi FPS koruma). */}
+        <LinearGradient
+          colors={['#3a4658', '#2a3344', '#1a2030']}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+          style={[StyleSheet.absoluteFillObject, { borderRadius: 26 }]}
+          pointerEvents="none"
+        />
+        <LinearGradient
+          colors={['rgba(20,184,166,0.20)', 'rgba(20,184,166,0.05)', 'transparent']}
+          start={{ x: 0, y: 0 }} end={{ x: 0, y: 0.4 }}
+          style={[StyleSheet.absoluteFillObject, { borderRadius: 26 }]}
+          pointerEvents="none"
+        />
+        <LinearGradient
+          colors={['rgba(20,184,166,0.08)', 'transparent']}
+          start={{ x: 0, y: 0 }} end={{ x: 0.7, y: 0.6 }}
+          style={[StyleSheet.absoluteFillObject, { borderRadius: 26 }]}
+          pointerEvents="none"
+        />
         {/* ★ 2026-04-28: Swipe handle artık görsel — pan tüm modal'da (Clubhouse). */}
         <View style={s.handleWrap}>
           <View style={s.handle} />
         </View>
         {/* Header */}
         <View style={s.header}>
-          <Ionicons name="people" size={16} color="#14B8A6" />
+          <Ionicons name="people" size={18} color="#14B8A6" style={s.headerIconGlow} />
           <Text style={s.headerTitle}>Arkadaşlarını Davet Et</Text>
           <Pressable onPress={onClose} hitSlop={12}>
             <Ionicons name="close" size={18} color="rgba(255,255,255,0.4)" />
           </Pressable>
         </View>
+        <View style={s.headerSeparator} />
 
         {renderContent()}
 
@@ -239,41 +259,54 @@ export default function InviteFriendsModal({ visible, userId, onClose, onInvite,
 const s = StyleSheet.create({
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(8,12,22,0.45)',
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 500,
   },
   modal: {
-    width: W * 0.88,
+    width: Math.min(W * 0.88, 360),
     maxHeight: 460,
     minHeight: 200,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#95a1ae',
+    borderRadius: 26,
+    backgroundColor: '#1a2030',
     overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.55,
+    shadowRadius: 18,
+    elevation: 16,
   },
   handleWrap: {
     alignItems: 'center',
-    paddingTop: 8,
-    paddingBottom: 2,
+    paddingTop: 10,
+    paddingBottom: 4,
   },
   handle: {
     width: 40,
     height: 4,
     borderRadius: 2,
-    backgroundColor: 'rgba(20,184,166,0.4)',
+    backgroundColor: 'rgba(20,184,166,0.5)',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
     paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.06)',
+    paddingTop: 14,
+    paddingBottom: 12,
   },
-  headerTitle: { flex: 1, fontSize: 15, fontWeight: '700', color: '#F1F5F9', textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
+  headerIconGlow: {
+    textShadowColor: 'rgba(20,184,166,0.7)',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 5,
+  },
+  headerSeparator: {
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    marginHorizontal: 14,
+  },
+  headerTitle: { flex: 1, fontSize: 15, fontWeight: '800', color: '#F1F5F9', letterSpacing: 0.3, textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4 },
   
   // ── Merkez wrap (loading / error / empty) ──
   centerWrap: { 

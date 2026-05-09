@@ -1,6 +1,8 @@
 <resources>
   <color name="splashscreen_background">#131D30</color>
-  <color name="iconBackground">#131D30</color>
+  <!-- ★ 2026-05-09: Adaptive icon arka planı şeffaf — uygulama logosu çerçevesiz görünsün
+       (bildirim büyük ikonu + ekran kısayolu). Splash zemini ayrı kalır. -->
+  <color name="iconBackground">#00FFFFFF</color>
   <color name="colorPrimary">#023c69</color>
   <color name="colorPrimaryDark">#131D30</color>
   <color name="notification_icon_color">#14B8A6</color>

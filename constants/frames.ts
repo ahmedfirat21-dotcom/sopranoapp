@@ -54,6 +54,28 @@ const FRAME_REGISTRY: Record<string, FrameConfig> = {
     source: require('../assets/avatar_frames/sifcircle.json'),
     scale: 1.75,
   },
+
+  // ── 500x500 Premium El Yapımı Çerçeveler (SopranoAura tarzı) ──
+  frame_midnight_amethyst: {
+    source: require('../assets/avatar_frames/MidnightAmethyst.json'),
+    scale: 1.0,
+  },
+  frame_sunrise_gold: {
+    source: require('../assets/avatar_frames/SunriseGold.json'),
+    scale: 1.0,
+  },
+  frame_ocean_pearl: {
+    source: require('../assets/avatar_frames/OceanPearl.json'),
+    scale: 1.0,
+  },
+  frame_ruby_flame: {
+    source: require('../assets/avatar_frames/RubyFlame.json'),
+    scale: 1.0,
+  },
+  frame_neon_pulse: {
+    source: require('../assets/avatar_frames/NeonPulse.json'),
+    scale: 1.0,
+  },
 };
 
 /**

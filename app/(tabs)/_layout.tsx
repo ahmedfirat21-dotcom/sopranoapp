@@ -1,6 +1,6 @@
 import { Tabs } from 'expo-router';
-import { View, Text, StyleSheet, Pressable, Dimensions, Platform, useWindowDimensions, Keyboard, Image } from 'react-native';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { View, Text, StyleSheet, Pressable, Dimensions, Platform, useWindowDimensions, Keyboard } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { Colors } from '../../constants/theme';
@@ -19,7 +19,7 @@ import Animated, {
 
 export { useAuth } from '../_layout';
 export { useBadges } from '../_layout';
-import { useBadges } from '../_layout';
+import { useAuth, useBadges } from '../_layout';
 
 // ★ 2026-04-22: Module-level width kullanımı kaldırıldı — fiziksel telefonda (özellikle
 // Android gesture-nav) Dimensions.get('window') modül yüklenirken sistem bar boyutunu
@@ -44,20 +44,15 @@ const darken = (hex: string, pct: number) => lighten(hex, -pct);
 const TAB_CFG: Record<string, {
   activeIcon: any;
   inactiveIcon: any;
-  /** ★ 2026-04-28: ikon kütüphanesi — varsayılan Ionicons, 'mci' = MaterialCommunityIcons.
-   *  Korolar için sol anahtarı (music-clef-treble) gerekiyor (uygulama ikonu hissi). */
-  iconLib?: 'ion' | 'mci';
   label: string;
   accent: string;
 }> = {
   home:     { activeIcon: 'radio',               inactiveIcon: 'radio-outline',               label: 'Keşfet',   accent: '#14B8A6' },
-  clubs:    { activeIcon: 'mic',                 inactiveIcon: 'mic-outline',                 label: 'Korolar',  accent: '#9F1239' },
   myrooms:  { activeIcon: 'home',                inactiveIcon: 'home-outline',                label: 'Odalarım', accent: '#3B82F6' },
   messages: { activeIcon: 'chatbubble-ellipses', inactiveIcon: 'chatbubble-ellipses-outline', label: 'Mesajlar', accent: '#8B5CF6' },
   profile:  { activeIcon: 'person',              inactiveIcon: 'person-outline',              label: 'Profil',   accent: '#F59E0B' },
 };
 
-// ★ 2026-04-29: Korolar tab'ı public sürüm sonrasına ertelendi — tab bar'dan gizli, route korunuyor.
 const TABS = ['home', 'myrooms', 'messages', 'profile'];
 // ★ A11Y: pasif tab text rengi WCAG AA için 4.5:1 contrast gerek (#0F172A bg üzeri).
 //   Eski #7B8D9F = 3.99:1 (fail). #B0BDCC = 6.87:1 (pass).
@@ -224,19 +219,6 @@ function Tab({ isFocused, cfg, badge, onPress, routeName }: {
         withTiming(-4, { duration: 100, easing: Easing.inOut(Easing.quad) }),
         withTiming(0, { duration: 120, easing: Easing.in(Easing.quad) }),
       );
-    } else if (routeName === 'clubs') {
-      // 🎵 Korolar — Notalar dans ediyor: scale pulse + hafif sallanma rotate
-      iconScale.value = withSequence(
-        withTiming(1.18, { duration: 180, easing: Easing.out(Easing.quad) }),
-        withTiming(0.94, { duration: 160, easing: Easing.inOut(Easing.quad) }),
-        withTiming(1, { duration: 200, easing: Easing.inOut(Easing.quad) }),
-      );
-      iconRotate.value = withSequence(
-        withTiming(-8, { duration: 120, easing: Easing.out(Easing.quad) }),
-        withTiming(8, { duration: 200, easing: Easing.inOut(Easing.quad) }),
-        withTiming(-4, { duration: 140, easing: Easing.inOut(Easing.quad) }),
-        withTiming(0, { duration: 160, easing: Easing.in(Easing.quad) }),
-      );
     } else if (routeName === 'messages') {
       defaultWiggle(); // 💬 Mesajlar — eski translateX wiggle
     } else if (routeName === 'profile') {
@@ -277,13 +259,7 @@ function Tab({ isFocused, cfg, badge, onPress, routeName }: {
           style={s.gradient}
         >
           <Animated.View style={iconAnim}>
-            {routeName === 'clubs' ? (
-              <Image source={require('../../assets/koro_icon_inactive.png')} style={{ width: 30, height: 30, tintColor: '#FFF' }} resizeMode="contain" />
-            ) : cfg.iconLib === 'mci' ? (
-              <MaterialCommunityIcons name={cfg.activeIcon} size={28} color="#FFF" style={s.iconDrop} />
-            ) : (
-              <Ionicons name={cfg.activeIcon} size={28} color="#FFF" style={s.iconDrop} />
-            )}
+            <Ionicons name={cfg.activeIcon} size={28} color="#FFF" style={s.iconDrop} />
           </Animated.View>
         </LinearGradient>
         {/* ★ 2026-04-21: Glossy parlaklık — üstten aşağı fade out, sert çizgi yok */}
@@ -299,13 +275,7 @@ function Tab({ isFocused, cfg, badge, onPress, routeName }: {
       {/* ═══ PASİF İKON ═══ */}
       <Animated.View style={[s.passiveIcon, passiveAnim]}>
         <Animated.View style={iconAnim}>
-          {routeName === 'clubs' ? (
-            <Image source={require('../../assets/koro_icon_inactive.png')} style={{ width: 28, height: 28, tintColor: INACTIVE }} resizeMode="contain" />
-          ) : cfg.iconLib === 'mci' ? (
-            <MaterialCommunityIcons name={cfg.inactiveIcon} size={28} color={INACTIVE} style={s.inactiveShadow} />
-          ) : (
-            <Ionicons name={cfg.inactiveIcon} size={28} color={INACTIVE} style={s.inactiveShadow} />
-          )}
+          <Ionicons name={cfg.inactiveIcon} size={28} color={INACTIVE} style={s.inactiveShadow} />
         </Animated.View>
         {badge > 0 && (
           <View style={s.badge}>
@@ -326,6 +296,9 @@ function Tab({ isFocused, cfg, badge, onPress, routeName }: {
 function CurvedTabBar({ state, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
   const { unreadDMs } = useBadges();
+  const { tabBarCovered } = useAuth();
+  // ★ 2026-05-09: home.tsx Hoşgeldin/Oda aç ipucu zinciri sırasında tab bar gizlensin.
+  if (tabBarCovered) return null;
   // ★ Runtime width — fiziksel telefonda gesture-nav varken güncellenen değer alınır.
   //   SafeArea insets'i de çıkararak (landscape notch) tam ekran genişliğini kullan.
   const { width: winW } = useWindowDimensions();
@@ -612,8 +585,6 @@ export default function TabLayout() {
   return (
     <Tabs tabBar={renderTabBar} screenOptions={TAB_SCREEN_OPTIONS}>
       <Tabs.Screen name="home" />
-      {/* ★ 2026-04-29: Korolar tab gizli — public sonrası tekrar açılacak */}
-      <Tabs.Screen name="clubs" options={{ href: null }} />
       <Tabs.Screen name="myrooms" />
       <Tabs.Screen name="messages" />
       <Tabs.Screen name="profile" />

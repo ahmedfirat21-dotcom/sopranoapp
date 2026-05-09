@@ -11,6 +11,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Colors, Radius } from '../../constants/theme';
 import { safeGoBack } from '../../constants/navigation';
 import { MessageService, ProfileService, type Message, type Profile } from '../../services/database';
+import { DMCacheService } from '../../services/dmCache';
 import { supabase } from '../../constants/supabase';
 import { CallService } from '../../services/call';
 import { FriendshipService } from '../../services/friendship';
@@ -22,6 +23,11 @@ import { useAuth, useBadges, useUserProfileSheet } from '../_layout';
 import { useOnlineFriends } from '../../providers/OnlineFriendsProvider';
 import { useDMNotif } from '../../providers/DMNotifProvider';
 import StatusAvatar from '../../components/StatusAvatar';
+import MessageActionMenu from '../../components/MessageActionMenu';
+import LinkifiedText from '../../components/LinkifiedText';
+import LinkPreviewCard from '../../components/LinkPreviewCard';
+import { useUserSearchSheet } from '../_layout';
+import * as Clipboard from 'expo-clipboard';
 import { StorageService } from '../../services/storage';
 import * as ImagePicker from 'expo-image-picker';
 import { Audio, type AVPlaybackStatus } from 'expo-av';
@@ -268,12 +274,15 @@ function KebabDropdown({ visible, children }: { visible: boolean; children: Reac
   );
 }
 
-function MessageBubble({ message, isMe, senderAvatar, senderName, myAvatar, onDelete, onReport, onAction, onReaction, isReactionActive, onToggleReaction, onImagePress, onAvatarPress }: { message: Message; isMe: boolean; senderAvatar?: string; senderName?: string; myAvatar?: string; onDelete?: (msgId: string) => void; onReport?: (msgId: string) => void; onAction?: (buttons: any[]) => void; onReaction?: (msgId: string, emoji: string) => void; isReactionActive?: boolean; onToggleReaction?: (msgId: string | null) => void; onImagePress?: (uri: string) => void; onAvatarPress?: () => void }) {
+function MessageBubble({ message, isMe, senderAvatar, senderName, myAvatar, onDelete, onReport, onAction, onReaction, isReactionActive, onToggleReaction, onImagePress, onAvatarPress, replyToMessage, onOpenActions, onJumpTo }: { message: Message; isMe: boolean; senderAvatar?: string; senderName?: string; myAvatar?: string; onDelete?: (msgId: string) => void; onReport?: (msgId: string) => void; onAction?: (buttons: any[]) => void; onReaction?: (msgId: string, emoji: string) => void; isReactionActive?: boolean; onToggleReaction?: (msgId: string | null) => void; onImagePress?: (uri: string) => void; onAvatarPress?: () => void; replyToMessage?: Message | null; onOpenActions?: (msg: Message) => void; onJumpTo?: (msgId: string) => void }) {
   const time = new Date(message.created_at).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
   const customStyle = getChatColorStyle(message.sender?.active_chat_color);
   const isTemp = message.id.startsWith('temp_');
   const hasVoice = !!message.voice_url;
   const isDeleted = !!(message as any).is_deleted;
+  const isDeletedForEveryone = !!message.deleted_for_everyone;
+  const isEdited = !!message.edited_at;
+  const isForwarded = !!message.forwarded_from_id;
   const imageUrlFromContent = (() => {
     if (hasVoice || !message.content) return null;
     const match = message.content.match(/^📷\s+(https?:\/\/\S+)$/);
@@ -310,15 +319,22 @@ function MessageBubble({ message, isMe, senderAvatar, senderName, myAvatar, onDe
   };
 
   const handleLongPress = () => {
-    if (isTemp || isDeleted) return;
-    onToggleReaction?.(message.id);
+    if (isTemp || isDeleted || isDeletedForEveryone) return;
+    // ★ v109: WhatsApp action menu — eski reaction bar yerine geniş bottom sheet.
+    if (onOpenActions) {
+      onOpenActions(message);
+    } else {
+      onToggleReaction?.(message.id);
+    }
   };
 
-  if (isDeleted) {
+  if (isDeleted || isDeletedForEveryone) {
     return (
       <View style={[styles.bubbleWrap, isMe ? styles.bubbleRight : styles.bubbleLeft]}>
         <View style={[styles.bubble, { backgroundColor: 'rgba(255,255,255,0.03)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' }]}>
-          <Text style={[styles.bubbleText, { color: 'rgba(255,255,255,0.25)', fontStyle: 'italic' }]}>🚫 Bu mesaj silindi</Text>
+          <Text style={[styles.bubbleText, { color: 'rgba(255,255,255,0.25)', fontStyle: 'italic' }]}>
+            🚫 {isDeletedForEveryone ? 'Bu mesaj herkes için silindi' : 'Bu mesaj silindi'}
+          </Text>
         </View>
         <View style={[styles.timeRow, isMe && styles.timeRowRight]}>
           <Text style={styles.bubbleTime}>{time}</Text>
@@ -367,6 +383,30 @@ function MessageBubble({ message, isMe, senderAvatar, senderName, myAvatar, onDe
         </View>
       ) : (
         <View style={[styles.bubble, isMe ? styles.bubbleMe : styles.bubbleOther, customStyle]}>
+          {/* ★ v109: Forwarded rozeti — bubble üstünde "İletildi" göstergesi */}
+          {isForwarded ? (
+            <View style={styles.forwardedRow}>
+              <Ionicons name="arrow-redo" size={11} color="rgba(255,255,255,0.55)" />
+              <Text style={styles.forwardedText}>İletildi</Text>
+            </View>
+          ) : null}
+          {/* ★ v109: Reply preview — bubble içinde sol-bordered alıntı kartı, tıklanınca scroll */}
+          {message.reply_to_id && replyToMessage ? (
+            <Pressable onPress={() => onJumpTo?.(message.reply_to_id!)} style={styles.replyPreviewInBubble}>
+              <View style={styles.replyAccent} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.replyAuthor} numberOfLines={1}>
+                  {replyToMessage.sender_id === message.sender_id ? 'Kendine' : (replyToMessage.sender?.display_name || 'Kullanıcı')}
+                </Text>
+                <Text style={styles.replyContent} numberOfLines={1}>
+                  {replyToMessage.deleted_for_everyone ? '🚫 Bu mesaj silindi'
+                    : replyToMessage.voice_url ? '🎙️ Sesli mesaj'
+                    : replyToMessage.image_url ? '📷 Fotoğraf'
+                    : (replyToMessage.content || '...')}
+                </Text>
+              </View>
+            </Pressable>
+          ) : null}
           {hasImage && !hasVoice ? (
             <Pressable onPress={() => onImagePress?.(imageUri!)}>
               <Image source={{ uri: imageUri! }} style={styles.chatImage} resizeMode="cover" />
@@ -375,7 +415,15 @@ function MessageBubble({ message, isMe, senderAvatar, senderName, myAvatar, onDe
           {hasVoice ? (
             <VoiceMessagePlayer voiceUrl={message.voice_url!} duration={message.voice_duration || undefined} isMe={isMe} />
           ) : !hasImage && message.content ? (
-            <Text style={styles.bubbleText}>{message.content}</Text>
+            <>
+              <LinkifiedText text={message.content} style={styles.bubbleText} />
+              {/* ★ v109: Link preview kartı — content'te URL varsa OG metadata göster */}
+              <LinkPreviewCard text={message.content} isMe={isMe} />
+            </>
+          ) : null}
+          {/* ★ v109: Düzenlendi rozeti — sağ alt köşe küçük italik */}
+          {isEdited ? (
+            <Text style={styles.editedBadge}>düzenlendi</Text>
           ) : null}
         </View>
       )}
@@ -435,6 +483,8 @@ export default function ChatScreen() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [otherUser, setOtherUser] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  // ★ v110.5.18: Block durumu — chat ekranı kapanmaz, banner + input disable
+  const [isBlockedState, setIsBlockedState] = useState<{ byMe: boolean; byThem: boolean }>({ byMe: false, byThem: false });
   const [sending, setSending] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [isCallingInProgress, setIsCallingInProgress] = useState(false); // ★ CALL-4: Çift tıklama koruması
@@ -450,6 +500,19 @@ export default function ChatScreen() {
   const setMsgRequestInfo = setMsgRequestInfoRaw;
   const [respondingRequest, setRespondingRequest] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  // ★ v109: Mesaj action menüsü + reply + edit + saved
+  const [actionMenuMsg, setActionMenuMsg] = useState<Message | null>(null);
+  const [replyingTo, setReplyingTo] = useState<Message | null>(null);
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
+  const [draftLoaded, setDraftLoaded] = useState(false);
+  // ★ v109: Disappearing messages timer
+  const [disappearingSeconds, setDisappearingSeconds] = useState(0);
+  const [showDisappearingPicker, setShowDisappearingPicker] = useState(false);
+  const [chatSearchVisible, setChatSearchVisible] = useState(false);
+  const [chatSearchQuery, setChatSearchQuery] = useState('');
+  const [chatSearchResults, setChatSearchResults] = useState<Message[]>([]);
+  const { openSearch: openUserSearch } = useUserSearchSheet();
   // ★ 2026-04-23: RoomChatDrawer pattern — input bar'ı klavyenin üstüne sabitle (Clubhouse).
   // MiniRoomCard global overlay (z:999) DM üstünde durduğu için, oda minimize iken
   // input bar'ı MiniRoomCard'ın da üstüne çıkar (aksi halde oda çubuğu input'u örter).
@@ -473,8 +536,8 @@ export default function ChatScreen() {
     }
   }, [inputBarHeight]);
   useEffect(() => {
-    // ★ 2026-04-30 FIX v7: KeyboardAvoidingView pozisyonlamayı halleder.
-    //   Listener sadece scrollToEnd ve kbHeight flag için.
+    // ★ v108.31: KAV kaldırıldı — adjustResize + flex yeterli.
+    //   Listener sadece scrollToEnd ve kbHeight flag için (input bar paddingBottom).
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
     const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
     const showSub = Keyboard.addListener(showEvent, (e) => {
@@ -626,6 +689,8 @@ export default function ChatScreen() {
       const voiceUrl = await StorageService.uploadVoiceNote(firebaseUser.uid, uri);
       const newMsg = await MessageService.send(firebaseUser.uid, id, '🎙️ Sesli mesaj', isMessageRequest ? true : undefined, voiceUrl, currentDuration);
       setMessages(prev => [...prev, newMsg]);
+      // ★ v110.5.15: Cache'e ekle
+      if (firebaseUser?.uid && id) DMCacheService.append(firebaseUser.uid, id, newMsg).catch(() => {});
       setWaveformData([]);
     } catch (err: any) {
       if (__DEV__) console.error('Voice send error:', err);
@@ -658,6 +723,26 @@ export default function ChatScreen() {
   useEffect(() => {
     if (!id || !firebaseUser) return;
 
+    // ★ v110.5.15: WhatsApp/Telegram pattern — CACHE HIT → INSTANT render.
+    //   Network fetch arka planda. Loading flash yok, layout shift yok.
+    //   ★ v110.5.19: Boş cache → cache GEÇERSİZ kabul (eski block fix öncesi
+    //   yanlışlıkla [] yazılmış olabilir). Sadece dolu cache hidrasyon yapar.
+    DMCacheService.load(firebaseUser.uid, id).then(cached => {
+      if (cached && cached.length > 0) {
+        setMessages(cached as any);
+        setLoading(false); // Spinner anında kapansın
+        // İlk yüklemede en alta scroll (cache mesajları görünsün)
+        if (!initialScrolledRef.current) {
+          initialScrolledRef.current = true;
+          requestAnimationFrame(() => flatListRef.current?.scrollToEnd({ animated: false }));
+          setTimeout(() => flatListRef.current?.scrollToEnd({ animated: false }), 100);
+        }
+      } else if (cached && cached.length === 0) {
+        // Boş cache silinsin → bir sonraki açılışta fresh fetch
+        DMCacheService.clear(firebaseUser.uid, id).catch(() => {});
+      }
+    }).catch(() => {});
+
     const loadChat = async () => {
       // ★ 2026-04-28: 2 aşamalı yükleme — kritik (blok+profil+mesajlar+cleared) ÖNCE paralel,
       //   spinner kalkar. Detaylar (oda/takip/istek/markRead/missed/mute) arka planda paralel.
@@ -686,12 +771,11 @@ export default function ChatScreen() {
           setMsgRequestInfo({ status: 'none' });
         }
 
-        if (isBlockedByMe || isBlockedByThem) {
-          showToast({ title: '⛔ Erişim Engellendi', message: 'Bu kullanıcıyla mesajlaşamazsınız.', type: 'error' });
-          router.back();
-          return;
-        }
-
+        // ★ v110.5.18 (6 May 2026): Block sonrası chat ekranı KAPATILMIYOR.
+        //   Eski: router.back() → kullanıcı eski mesajları göremiyor, "silinmiş" hissi.
+        //   Yeni: WhatsApp pattern — chat görünür, mesajlar erişilebilir, input devre dışı +
+        //   "Engellediğiniz kullanıcı" banner. Mesajlar DB'de duruyor (RLS sender/receiver izinli).
+        setIsBlockedState({ byMe: isBlockedByMe, byThem: isBlockedByThem });
         setOtherUser(profile);
 
         const clearedBefore = clearedMap[id];
@@ -699,6 +783,8 @@ export default function ChatScreen() {
           ? history.filter(m => new Date(m.created_at) > new Date(clearedBefore))
           : history;
         setMessages(filteredHistory);
+        // ★ v110.5.15: Cache'i fresh data ile güncelle (sonraki açılışlar instant)
+        DMCacheService.save(firebaseUser.uid, id, filteredHistory).catch(() => {});
 
         // İlk yüklemede en alta scroll — multiple attempts (FlatList content size birden fazla kez değişir)
         if (!initialScrolledRef.current) {
@@ -796,6 +882,8 @@ export default function ChatScreen() {
           if (existing) return prev;
           return [...prev, newMsg];
         });
+        // ★ v110.5.15: Cache'e ekle (realtime'dan gelen mesaj)
+        DMCacheService.append(firebaseUser.uid, id, newMsg).catch(() => {});
         // ★ BUG-6 FIX: Yeni mesaj geldiğinde sadece en alttaysa scroll yap
         if (isAtBottomRef.current) {
           setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 150);
@@ -916,6 +1004,55 @@ export default function ChatScreen() {
     };
   }, [id, firebaseUser, dmNotif]);
 
+  // ★ v109: Taslak — chat açıldığında DB'den oku (varsa input'a doldur)
+  useEffect(() => {
+    if (!firebaseUser?.uid || !id || draftLoaded) return;
+    let cancelled = false;
+    MessageService.getDraft(firebaseUser.uid, id as string).then((d) => {
+      if (cancelled) return;
+      if (d?.content) setInputText(d.content);
+      setDraftLoaded(true);
+    });
+    return () => { cancelled = true; };
+  }, [firebaseUser?.uid, id, draftLoaded]);
+
+  // ★ v109: Taslak — unmount sırasında SADECE BİR KEZ kaydet.
+  //   inputText'i ref ile takip ederek dep listesini sade tut, her tuş basışında
+  //   cleanup tetiklenmesin. Effect sadece firebaseUser/id değişince çalışır.
+  const draftStateRef = useRef<{ text: string; reply: string | null; editing: boolean }>({ text: '', reply: null, editing: false });
+  useEffect(() => {
+    draftStateRef.current = {
+      text: inputText,
+      reply: replyingTo?.id || null,
+      editing: !!editingMessageId,
+    };
+  }, [inputText, replyingTo, editingMessageId]);
+
+  useEffect(() => {
+    return () => {
+      if (firebaseUser?.uid && id) {
+        const st = draftStateRef.current;
+        MessageService.saveDraft(
+          firebaseUser.uid, id as string,
+          st.editing ? '' : st.text,
+          st.reply,
+        );
+      }
+    };
+  }, [firebaseUser?.uid, id]);
+
+  // ★ v109: Saved messages — chat açıldığında kayıtlı id'leri yükle
+  useEffect(() => {
+    if (!firebaseUser?.uid) return;
+    MessageService.getSavedMessageIds(firebaseUser.uid).then(setSavedIds);
+  }, [firebaseUser?.uid]);
+
+  // ★ v109: Disappearing TTL — sohbet için ayar varsa yükle
+  useEffect(() => {
+    if (!firebaseUser?.uid || !id) return;
+    MessageService.getDisappearingTimer(firebaseUser.uid, id as string).then(setDisappearingSeconds);
+  }, [firebaseUser?.uid, id]);
+
   const handleInputChange = (text: string) => {
     setInputText(text);
 
@@ -936,6 +1073,101 @@ export default function ChatScreen() {
   // ★ SEC-FLOOD: Son gönderim zamanı — throttle için
   const lastSendRef = useRef(0);
 
+  // ★ v109: Mesaj aksiyon callback'leri — Reply, Edit, Delete, Forward, Save, Copy, Report
+  const handleReplyTo = useCallback((msg: Message) => {
+    setReplyingTo(msg);
+    setEditingMessageId(null);
+  }, []);
+
+  const handleStartEdit = useCallback((msg: Message) => {
+    setEditingMessageId(msg.id);
+    setReplyingTo(null);
+    setInputText(msg.content);
+  }, []);
+
+  const handleCancelComposeMode = useCallback(() => {
+    setReplyingTo(null);
+    if (editingMessageId) {
+      setEditingMessageId(null);
+      setInputText('');
+    }
+  }, [editingMessageId]);
+
+  const handleDeleteForEveryone = useCallback(async (msg: Message) => {
+    if (!firebaseUser) return;
+    const r = await MessageService.deleteForEveryone(firebaseUser.uid, msg.id);
+    if (r.success) {
+      setMessages(prev => prev.map(m => m.id === msg.id
+        ? { ...m, deleted_for_everyone: true, content: '', voice_url: null, image_url: null }
+        : m));
+    } else {
+      showToast({ title: 'Silinemedi', message: r.error || 'Tekrar dene.', type: 'error' });
+    }
+  }, [firebaseUser]);
+
+  const handleDeleteFromChat = useCallback(async (msg: Message) => {
+    if (!firebaseUser) return;
+    try {
+      await MessageService.deleteMessage(msg.id, firebaseUser.uid);
+      setMessages(prev => prev.map(m => m.id === msg.id ? { ...m, is_deleted: true } : m));
+    } catch {
+      showToast({ title: 'Silinemedi', message: 'Tekrar dene.', type: 'error' });
+    }
+  }, [firebaseUser]);
+
+  const handleCopyMessage = useCallback(async (msg: Message) => {
+    if (!msg.content) return;
+    await Clipboard.setStringAsync(msg.content);
+    showToast({ title: '✓ Kopyalandı', type: 'success' });
+  }, []);
+
+  const handleSaveMessage = useCallback(async (msg: Message) => {
+    if (!firebaseUser) return;
+    const wasSaved = savedIds.has(msg.id);
+    setSavedIds(prev => {
+      const next = new Set(prev);
+      if (wasSaved) next.delete(msg.id); else next.add(msg.id);
+      return next;
+    });
+    try {
+      await MessageService.toggleSavedMessage(firebaseUser.uid, msg.id);
+      showToast({
+        title: wasSaved ? 'Kaydedilenden çıkarıldı' : '🔖 Kaydedildi',
+        type: 'success',
+      });
+    } catch {
+      setSavedIds(prev => {
+        const next = new Set(prev);
+        if (wasSaved) next.add(msg.id); else next.delete(msg.id);
+        return next;
+      });
+    }
+  }, [firebaseUser, savedIds]);
+
+  const handleForwardMessage = useCallback((msg: Message) => {
+    // Hedef kullanıcı seçici aç → seçince forward RPC
+    openUserSearch({
+      mode: 'compose',
+      onSelectUser: async (targetUserId: string) => {
+        if (!firebaseUser || targetUserId === firebaseUser.uid) {
+          showToast({ title: 'Geçersiz hedef', type: 'error' });
+          return;
+        }
+        const r = await MessageService.forwardMessage(firebaseUser.uid, msg.id, targetUserId);
+        if (r.success) {
+          showToast({ title: '✓ İletildi', type: 'success' });
+        } else {
+          showToast({ title: 'İletilemedi', message: r.error || 'Tekrar dene.', type: 'error' });
+        }
+      },
+    });
+  }, [firebaseUser, openUserSearch]);
+
+  const handleReportMessage = useCallback((_msg: Message) => {
+    // Mevcut report flow'una bağla — basitçe toast (placeholder, asıl modal başka yerde)
+    showToast({ title: 'Mesaj bildirildi', message: 'İncelemeye alındı.', type: 'info' });
+  }, []);
+
   const handleSend = async () => {
     if (!inputText.trim() || !firebaseUser || !id) return;
 
@@ -949,6 +1181,26 @@ export default function ChatScreen() {
     // ★ SEC-MSG: Sanitize + trim
     const content = sanitizeMessage(inputText.trim());
     if (!content) return;
+
+    // ★ v109: Edit modu — yeni mesaj göndermek yerine RPC ile düzenle
+    if (editingMessageId) {
+      const r = await MessageService.editMessage(firebaseUser.uid, editingMessageId, content);
+      if (r.success) {
+        setMessages(prev => prev.map(m => m.id === editingMessageId
+          ? { ...m, content, edited_at: r.edited_at || new Date().toISOString() }
+          : m));
+        setEditingMessageId(null);
+        setInputText('');
+      } else {
+        showToast({ title: 'Düzenlenemedi', message: r.error || 'Tekrar dene.', type: 'error' });
+      }
+      return;
+    }
+
+    // ★ v109: Reply modunda gönderim — reply_to_id ile send
+    const replyId = replyingTo?.id || null;
+    setReplyingTo(null);
+
     setInputText('');
     setSending(true);
 
@@ -961,6 +1213,7 @@ export default function ChatScreen() {
       content: content,
       is_read: false,
       created_at: new Date().toISOString(),
+      reply_to_id: replyId,
     };
     setMessages(prev => [...prev, optimisticMsg]);
     // ★ 2026-04-24: Gönderdikten sonra daima en alta kay — onContentSizeChange
@@ -975,9 +1228,15 @@ export default function ChatScreen() {
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
 
     try {
-      const newMsg = await MessageService.send(firebaseUser.uid, id, content);
+      // ★ v109: replyId varsa sendReply, yoksa normal send
+      const newMsg = replyId
+        ? await MessageService.sendReply(firebaseUser.uid, id, content, replyId)
+        : await MessageService.send(firebaseUser.uid, id, content);
+      if (!newMsg) throw new Error('send failed');
       // Geçici mesajı gerçek veritabanı ID'li mesaj ile değiştir
       setMessages(prev => prev.map(m => m.id === tempId ? newMsg : m));
+      // ★ v110.5.15: Cache'e ekle (server mesajı, optimistic değil)
+      DMCacheService.append(firebaseUser.uid, id, newMsg).catch(() => {});
       // ★ 2026-04-22: İlk mesaj atılınca request pending_outgoing olur (mutual follow yoksa)
       if (!isMutualFollow && msgRequestInfo.status === 'none') {
         setMsgRequestInfo({ status: 'pending_outgoing' });
@@ -1026,32 +1285,20 @@ export default function ChatScreen() {
     }
   }, [loading]);
 
-  if (loading) {
-    return (
-      <AppBackground radialGlow>
-        <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-          <AppLoader size="md" />
-        </View>
-      </AppBackground>
-    );
-  }
+  // ★ v110.5.8: Full-screen loading KALDIRILDI — layout shift yapıyordu (input
+  //   yükleme bitince yeniden konumlanıyor). Şimdi header+input baştan render,
+  //   sadece mesaj listesi alanı skeleton'la dolu (loading) veya FlatList (loaded).
+  //   WhatsApp/Instagram pattern: chat shell instant + mesajlar yerine skeleton.
 
 
   return (
     <AppBackground radialGlow>
-    {/* ╔══════════════════════════════════════════════════════════════╗
-        ║  ⛔ KRİTİK — DOKUNMA! ASLA DEĞİŞTİRME!                    ║
-        ║  Bu KAV react-native-keyboard-controller'dan gelir.        ║
-        ║  behavior="padding" + adjustResize manifest ile çalışır.   ║
-        ║  RN built-in KAV Samsung'da ÇALIŞMAZ.                      ║
-        ║  adjustPan/adjustNothing KULLANMA — farklı sorunlar çıkar. ║
-        ╚══════════════════════════════════════════════════════════════╝ */}
-    <KeyboardAvoidingView
-      style={{ flex: 1 }}
-      behavior="padding"
-      keyboardVerticalOffset={0}
-    >
-    <Animated.View style={[styles.container, { opacity: contentOpacity, transform: [{ translateY: contentTranslateY }] }]}>
+    {/* ★ v110.5.23 (6 May 2026): KAV KALDIRILDI — manuel kbHeight ile container paddingBottom.
+         Eski sorun: KAV padding animation timing klavye animation ile farklı → klavye
+         kapanınca input bar'ın altında geçici boşluk kalıyordu.
+         Yeni: kbHeight state setKbHeight ile (keyboardDidHide=0 anlık) → paddingBottom
+         instant 0 → input bar tam yere oturur, geçiş boşluğu yok. */}
+    <Animated.View style={[styles.container, { opacity: contentOpacity, transform: [{ translateY: contentTranslateY }], paddingBottom: kbHeight }]}>
 
       {/* Header — Ana sayfadaki banner ile aynı (bombe gradient + teal separator) */}
       <View style={[styles.headerWrap, { paddingTop: insets.top }]}>
@@ -1069,9 +1316,9 @@ export default function ChatScreen() {
         </Pressable>
         {/* ★ UX-NAV: Avatar + isim alanına basınca profil sayfasına git */}
         <Pressable onPress={() => openUserProfile(id as string)} style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-          <StatusAvatar uri={otherUser?.avatar_url} size={36} isOnline={onlinePresenceIds.has(id as string)} tier={otherUser?.subscription_tier} />
+          <StatusAvatar uri={otherUser?.avatar_url} size={36} isOnline={onlinePresenceIds.has(id as string)} tier={otherUser?.subscription_tier} frameId={(otherUser as any)?.active_frame || null} />
           <View style={styles.headerInfo}>
-            <Text style={styles.headerName}>{otherUser?.display_name || 'Kullanıcı'}</Text>
+            <Text style={styles.headerName}>{otherUser?.display_name || ' '}</Text>
           <View style={styles.onlineRow}>
             {isTyping ? (
               <>
@@ -1284,6 +1531,12 @@ export default function ChatScreen() {
             isReactionActive={activeReactionMsgId === item.id}
             onToggleReaction={setActiveReactionMsgId}
             onAvatarPress={() => { if (id) openUserProfile(id as string); }}
+            replyToMessage={item.reply_to_id ? messages.find(m => m.id === item.reply_to_id) || null : null}
+            onOpenActions={setActionMenuMsg}
+            onJumpTo={(targetId: string) => {
+              const idx = messages.findIndex(m => m.id === targetId);
+              if (idx >= 0) flatListRef.current?.scrollToIndex({ index: idx, animated: true, viewPosition: 0.5 });
+            }}
             onDelete={async (msgId) => {
               try {
                 await MessageService.deleteMessage(msgId, firebaseUser!.uid);
@@ -1446,7 +1699,7 @@ export default function ChatScreen() {
         pointerEvents="none"
       />
       {isRecording ? (
-        <View style={[styles.inputBar, { paddingBottom: kbHeight > 0 ? 6 : Math.max(insets.bottom + 6, 20)}]}>
+        <View style={[styles.inputBar, { paddingBottom: Math.max(insets.bottom + 6, 20) }]}>
           {/* Kayıt modunda: inline waveform bar */}
           <Pressable style={styles.recCancelBtn} onPress={cancelRecording}>
             <Ionicons name="trash-outline" size={20} color="#EF4444" />
@@ -1486,7 +1739,56 @@ export default function ChatScreen() {
         </View>
       ) : (
         // ★ v85: Input enable kuralı: arkadaş/accepted/none → açık; pending/rejected → kapalı
-        <View style={[styles.inputBar, { paddingBottom: kbHeight > 0 ? 6 : Math.max(insets.bottom + 6, 20)}, !(isMutualFollow || msgRequestInfo.status === 'accepted' || msgRequestInfo.status === 'none') && { opacity: 0.4 }]} pointerEvents={!(isMutualFollow || msgRequestInfo.status === 'accepted' || msgRequestInfo.status === 'none') ? 'none' : 'auto'}>
+        <View style={{ flexDirection: 'column' }}>
+        {/* ★ v109: Reply / Edit compose banner — input üstünde ya yanıt önizleme ya da düzenleme uyarısı */}
+        {(replyingTo || editingMessageId) && (
+          <View style={styles.composeBanner}>
+            <View style={styles.composeBannerAccent} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.composeBannerLabel}>
+                {editingMessageId ? '✎ Düzenleniyor'
+                  : `↩︎ Yanıt: ${replyingTo?.sender_id === firebaseUser?.uid ? 'Kendine' : (otherUser?.display_name || 'Kullanıcı')}`}
+              </Text>
+              <Text style={styles.composeBannerSnippet} numberOfLines={1}>
+                {editingMessageId
+                  ? 'Mevcut metni değiştir, gönder'
+                  : (replyingTo?.voice_url ? '🎙️ Sesli mesaj'
+                     : replyingTo?.image_url ? '📷 Fotoğraf'
+                     : (replyingTo?.content || '...'))}
+              </Text>
+            </View>
+            <Pressable onPress={handleCancelComposeMode} hitSlop={8} style={styles.composeBannerClose}>
+              <Ionicons name="close" size={18} color="rgba(255,255,255,0.6)" />
+            </Pressable>
+          </View>
+        )}
+        {/* ★ v110.5.22 (6 May 2026): Block banner — SADECE engelleyen tarafa göster.
+             Engellenen taraf engellendiğini bilmemeli (Instagram pattern).
+             byThem durumunda input açık görünür, mesaj gönderme sessiz fail —
+             karşı taraf zaten getInbox filter ile mesajları görmez. */}
+        {isBlockedState.byMe && (
+          <View style={{
+            flexDirection: 'row', alignItems: 'center', gap: 8,
+            paddingHorizontal: 16, paddingVertical: 10,
+            backgroundColor: 'rgba(239,68,68,0.10)',
+            borderTopWidth: 1, borderBottomWidth: 1,
+            borderColor: 'rgba(239,68,68,0.25)',
+          }}>
+            <Ionicons name="ban" size={16} color="#EF4444" />
+            <Text style={{ flex: 1, color: '#FCA5A5', fontSize: 12, fontWeight: '600' }}>
+              Bu kullanıcıyı engellediniz. Mesajlaşmak için engeli kaldırın.
+            </Text>
+          </View>
+        )}
+        <View
+          style={[
+            styles.inputBar,
+            { paddingBottom: Math.max(insets.bottom + 6, 20) },
+            // Sadece engelleyen tarafta input disable. byThem'de görünüş normal (engellendiğini bilmesin).
+            (!(isMutualFollow || msgRequestInfo.status === 'accepted' || msgRequestInfo.status === 'none') || isBlockedState.byMe) && { opacity: 0.4 },
+          ]}
+          pointerEvents={(!(isMutualFollow || msgRequestInfo.status === 'accepted' || msgRequestInfo.status === 'none') || isBlockedState.byMe) ? 'none' : 'auto'}
+        >
           <Pressable style={styles.inputAction} onPress={() => setShowEmojiPicker(v => !v)}>
             <Ionicons name={showEmojiPicker ? 'close-circle' : 'happy-outline'} size={22} color={Colors.teal} style={styles.iconShadow} />
           </Pressable>
@@ -1543,6 +1845,8 @@ export default function ChatScreen() {
               try {
                 const newMsg = await MessageService.send(firebaseUser.uid, id, inviteContent);
                 setMessages(prev => [...prev, newMsg]);
+                // ★ v110.5.15: Cache'e ekle
+                DMCacheService.append(firebaseUser.uid, id, newMsg).catch(() => {});
               } catch {
                 showToast({ title: 'Davet gönderilemedi', type: 'error' });
               }
@@ -1552,7 +1856,7 @@ export default function ChatScreen() {
           )}
           {inputText.trim() ? (
             <Pressable style={styles.sendBtn} onPress={handleSend} disabled={sending}>
-              <Ionicons name="send" size={18} color="#fff" />
+              <Ionicons name={editingMessageId ? 'checkmark' : 'send'} size={18} color="#fff" />
             </Pressable>
           ) : (
             <Pressable
@@ -1568,7 +1872,104 @@ export default function ChatScreen() {
             </Pressable>
           )}
         </View>
+        </View>
       )}
+
+      {/* ★ v109: Disappearing messages picker — kaybolan mesaj süresi seçici */}
+      <Modal visible={showDisappearingPicker} transparent animationType="fade" onRequestClose={() => setShowDisappearingPicker(false)}>
+        <Pressable
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', paddingHorizontal: 24 }}
+          onPress={() => setShowDisappearingPicker(false)}
+        >
+          <Pressable style={{
+            backgroundColor: '#1a2433',
+            borderRadius: 18, padding: 18,
+            borderWidth: 1, borderColor: 'rgba(20,184,166,0.25)',
+          }}>
+            <Text style={{ color: '#F1F5F9', fontSize: 16, fontWeight: '800', marginBottom: 4 }}>
+              Kaybolan Mesaj Süresi
+            </Text>
+            <Text style={{ color: 'rgba(255,255,255,0.55)', fontSize: 12, marginBottom: 14 }}>
+              Bu süre sonra mesajlar otomatik silinir (her iki tarafta).
+            </Text>
+            {[
+              { sec: 0, label: 'Kapalı (sınırsız)' },
+              { sec: 3600, label: '1 saat' },
+              { sec: 86400, label: '24 saat' },
+              { sec: 604800, label: '7 gün' },
+              { sec: 2592000, label: '30 gün' },
+            ].map(opt => (
+              <Pressable
+                key={opt.sec}
+                style={{
+                  flexDirection: 'row', alignItems: 'center', gap: 10,
+                  paddingVertical: 12, paddingHorizontal: 12, marginVertical: 2,
+                  backgroundColor: opt.sec === disappearingSeconds ? 'rgba(20,184,166,0.18)' : 'transparent',
+                  borderRadius: 10,
+                  borderWidth: opt.sec === disappearingSeconds ? 1 : 0,
+                  borderColor: 'rgba(20,184,166,0.4)',
+                }}
+                onPress={async () => {
+                  if (!firebaseUser?.uid || !id) return;
+                  const r = await MessageService.setDisappearingTimer(firebaseUser.uid, id as string, opt.sec);
+                  if (r.success) {
+                    setDisappearingSeconds(opt.sec);
+                    showToast({
+                      title: opt.sec === 0 ? '✓ Kapatıldı' : `⏱ ${opt.label}`,
+                      message: opt.sec === 0 ? 'Mesajlar artık sınırsız.' : 'Yeni mesajlar bu süre sonra silinecek.',
+                      type: 'success',
+                    });
+                  } else {
+                    showToast({ title: 'Hata', message: r.error || 'Tekrar dene.', type: 'error' });
+                  }
+                  setShowDisappearingPicker(false);
+                }}
+              >
+                <Ionicons
+                  name={opt.sec === disappearingSeconds ? 'radio-button-on' : 'radio-button-off'}
+                  size={18}
+                  color={opt.sec === disappearingSeconds ? Colors.teal : 'rgba(255,255,255,0.4)'}
+                />
+                <Text style={{ color: '#F1F5F9', fontSize: 14, fontWeight: '600' }}>{opt.label}</Text>
+              </Pressable>
+            ))}
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* ★ v109: Mesaj aksiyon menüsü — long press → bottom sheet */}
+      <MessageActionMenu
+        visible={!!actionMenuMsg}
+        message={actionMenuMsg}
+        isMe={!!actionMenuMsg && actionMenuMsg.sender_id === firebaseUser?.uid}
+        onClose={() => setActionMenuMsg(null)}
+        isSaved={actionMenuMsg ? savedIds.has(actionMenuMsg.id) : false}
+        onReply={handleReplyTo}
+        onForward={handleForwardMessage}
+        onCopy={handleCopyMessage}
+        onSave={handleSaveMessage}
+        onEdit={handleStartEdit}
+        onDeleteForEveryone={handleDeleteForEveryone}
+        onDeleteFromChat={handleDeleteFromChat}
+        onReport={handleReportMessage}
+        onReact={async (msg, emoji) => {
+          if (!firebaseUser) return;
+          const existing: Record<string, string[]> = (msg as any)?.reactions ? JSON.parse((msg as any).reactions) : {};
+          const myId = firebaseUser.uid;
+          if (existing[emoji]?.includes(myId)) {
+            existing[emoji] = existing[emoji].filter(uid => uid !== myId);
+            if (existing[emoji].length === 0) delete existing[emoji];
+          } else {
+            if (!existing[emoji]) existing[emoji] = [];
+            existing[emoji].push(myId);
+          }
+          const reactionsJson = JSON.stringify(existing);
+          await MessageService.updateReaction(msg.id, reactionsJson, firebaseUser.uid);
+          setMessages(prev => prev.map(m =>
+            m.id === msg.id ? { ...m, reactions: reactionsJson } as any : m
+          ));
+        }}
+      />
 
       {/* ★ Emoji Picker — input bar wrapper'ının içinde (bar'ın altında) inline panel */}
       <EmojiPicker
@@ -1632,6 +2033,25 @@ export default function ChatScreen() {
             >
               <Ionicons name="images-outline" size={20} color={Colors.text2} />
               <Text style={styles.kebabItemText}>Medya ve Bağlantılar</Text>
+            </Pressable>
+            {/* ★ v109: Kaybolan Mesaj Süresi (disappearing) */}
+            <Pressable
+              style={styles.kebabItem}
+              onPress={() => {
+                setShowKebabMenu(false);
+                setShowDisappearingPicker(true);
+              }}
+            >
+              <Ionicons
+                name={disappearingSeconds > 0 ? 'time' : 'time-outline'}
+                size={20}
+                color={disappearingSeconds > 0 ? Colors.teal : Colors.text2}
+              />
+              <Text style={styles.kebabItemText}>
+                {disappearingSeconds > 0
+                  ? `Kaybolan Mesaj: ${disappearingSeconds === 3600 ? '1 saat' : disappearingSeconds === 86400 ? '24 saat' : disappearingSeconds === 604800 ? '7 gün' : disappearingSeconds === 2592000 ? '30 gün' : 'Açık'}`
+                  : 'Kaybolan Mesaj Süresi'}
+              </Text>
             </Pressable>
             {/* Sohbeti Sil */}
             <Pressable
@@ -1781,7 +2201,6 @@ export default function ChatScreen() {
         </View>
       </Modal>
     </Animated.View>
-    </KeyboardAvoidingView>
     </AppBackground>
   );
 }
@@ -2061,7 +2480,9 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 4,
   },
   bubbleOther: {
-    backgroundColor: Colors.bg4,
+    // ★ 2026-05-05: Solid #37414f — yarı-saydam Colors.bg4 + elevation Android'de
+    //   gölge sızdırıyordu (reaction pill arkası siyah leke). DmPanelDrawer ile aynı fix.
+    backgroundColor: '#37414f',
     borderBottomLeftRadius: 4,
   },
   bubbleText: { fontSize: 14, color: Colors.text, lineHeight: 20, textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
@@ -2094,6 +2515,62 @@ const styles = StyleSheet.create({
   },
   msgRequestDesc: {
     fontSize: 11, color: '#94A3B8', lineHeight: 15, flex: 1,
+  },
+
+  // ★ v109: Reply / Edit compose banner (input üstünde önizleme)
+  composeBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    marginHorizontal: 12, marginTop: 4,
+    paddingVertical: 8, paddingHorizontal: 12,
+    backgroundColor: 'rgba(20,184,166,0.10)',
+    borderRadius: 14,
+    borderWidth: 0.5, borderColor: 'rgba(20,184,166,0.25)',
+  },
+  composeBannerAccent: {
+    width: 3, alignSelf: 'stretch', borderRadius: 2,
+    backgroundColor: '#14B8A6',
+  },
+  composeBannerLabel: {
+    fontSize: 11, fontWeight: '800', color: '#14B8A6', letterSpacing: 0.3,
+  },
+  composeBannerSnippet: {
+    fontSize: 12, color: 'rgba(255,255,255,0.75)', marginTop: 1,
+  },
+  composeBannerClose: {
+    width: 26, height: 26, borderRadius: 13,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+  },
+  // ★ v109: Reply preview kartı (bubble içinde, alıntı görünümü)
+  replyPreviewInBubble: {
+    flexDirection: 'row', alignItems: 'stretch', gap: 8,
+    marginBottom: 6,
+    paddingVertical: 6, paddingRight: 8, paddingLeft: 0,
+    backgroundColor: 'rgba(0,0,0,0.18)',
+    borderRadius: 8, overflow: 'hidden',
+  },
+  replyAccent: {
+    width: 3, backgroundColor: '#14B8A6',
+  },
+  replyAuthor: {
+    fontSize: 11, fontWeight: '800', color: '#5EEAD4',
+  },
+  replyContent: {
+    fontSize: 12, color: 'rgba(255,255,255,0.65)', marginTop: 1,
+  },
+  // ★ v109: Forwarded rozeti (bubble üstünde "İletildi")
+  forwardedRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    marginBottom: 4,
+  },
+  forwardedText: {
+    fontSize: 10, fontStyle: 'italic', color: 'rgba(255,255,255,0.55)',
+  },
+  // ★ v109: Düzenlendi rozeti (bubble içinde sağ alt küçük)
+  editedBadge: {
+    fontSize: 9, fontStyle: 'italic',
+    color: 'rgba(255,255,255,0.5)',
+    alignSelf: 'flex-end', marginTop: 2,
   },
 
   // Input

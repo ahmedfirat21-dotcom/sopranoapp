@@ -1,24 +1,27 @@
 /**
- * SopranoChat — Şifre Sıfırlama Ekranı (in-app)
+ * SopranoChat — Auth Action Code Ekranı (in-app)
  * ═══════════════════════════════════════════════════════════════════
- * v107.46 (2 May 2026) — Firebase'in default hosted sayfasını ezip uygulama
- * içinde profesyonel reset deneyimi. Email link kullanıcıyı buraya getirir.
+ * v110.10 (7 May 2026) — Firebase'in 3 mail eyleminin tek noktası:
+ *   • mode=resetPassword  → şifre sıfırlama formu
+ *   • mode=verifyEmail    → e-posta doğrulama (otomatik applyActionCode)
+ *   • mode=recoverEmail   → e-posta kurtarma (otomatik applyActionCode)
  *
- * Akış:
+ * Akış (resetPassword):
  *   1. Kullanıcı "Şifremi Unuttum" → mail gönderilir (login.tsx)
  *   2. Mail linki: https://sopranochat.com/auth/reset-password?oobCode=XXX&mode=resetPassword
  *      (Universal Link / App Links ile uygulama açılır)
  *   3. Bu ekran oobCode'u verifyPasswordResetCode ile kontrol eder
- *   4. Kullanıcı yeni şifresini girer → confirmPasswordReset
- *   5. Login ekranına döner
+ *   4. Kullanıcı yeni şifresini girer → confirmPasswordReset → login ekranı
  *
- * NOT: App Links autoVerify çalışması için sopranochat.com/.well-known/assetlinks.json
- * yüklenmiş olmalı (bir defalık DNS işi). Yoksa link tarayıcıda açılır.
+ * Akış (verifyEmail / recoverEmail):
+ *   1. Mail linki açılınca applyActionCode çağrılır
+ *   2. Başarı: tebrik ekranı → "Devam Et" → tab/home
+ *   3. Hata: red ekranı → "Tekrar Dene"
  */
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TextInput, Pressable, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { confirmPasswordReset, verifyPasswordResetCode } from 'firebase/auth';
+import { applyActionCode, confirmPasswordReset, verifyPasswordResetCode } from 'firebase/auth';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { auth } from '../../constants/firebase';
@@ -27,6 +30,12 @@ import { Colors } from '../../constants/theme';
 import AppBackground from '../../components/AppBackground';
 import AppLoader from '../../components/AppLoader';
 
+type FlowState =
+  | 'verifying'                  // oobCode kontrol ediliyor
+  | 'reset_form'                 // resetPassword formu göster
+  | 'verify_success'             // verifyEmail / recoverEmail başarılı
+  | 'invalid';                   // bağlantı geçersiz / süresi dolmuş
+
 export default function ResetPasswordScreen() {
   const params = useLocalSearchParams<{ oobCode?: string; mode?: string }>();
   const router = useRouter();
@@ -34,8 +43,7 @@ export default function ResetPasswordScreen() {
   const mode = typeof params.mode === 'string' ? params.mode : 'resetPassword';
 
   const [email, setEmail] = useState('');
-  const [verifying, setVerifying] = useState(true);
-  const [validCode, setValidCode] = useState(false);
+  const [flow, setFlow] = useState<FlowState>('verifying');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -43,18 +51,32 @@ export default function ResetPasswordScreen() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    if (!oobCode || mode !== 'resetPassword') {
-      setValidCode(false);
-      setVerifying(false);
+    if (!oobCode) {
+      setFlow('invalid');
       return;
     }
-    verifyPasswordResetCode(auth, oobCode)
-      .then((emailFromCode) => {
-        setEmail(emailFromCode);
-        setValidCode(true);
-      })
-      .catch(() => setValidCode(false))
-      .finally(() => setVerifying(false));
+
+    if (mode === 'resetPassword') {
+      // Şifre sıfırlama: kodu doğrula, formu göster
+      verifyPasswordResetCode(auth, oobCode)
+        .then((emailFromCode) => {
+          setEmail(emailFromCode);
+          setFlow('reset_form');
+        })
+        .catch(() => setFlow('invalid'));
+      return;
+    }
+
+    if (mode === 'verifyEmail' || mode === 'recoverEmail') {
+      // E-posta doğrulama / kurtarma: applyActionCode otomatik tamamlar
+      applyActionCode(auth, oobCode)
+        .then(() => setFlow('verify_success'))
+        .catch(() => setFlow('invalid'));
+      return;
+    }
+
+    // Bilinmeyen mode
+    setFlow('invalid');
   }, [oobCode, mode]);
 
   const passwordStrength = (() => {
@@ -111,7 +133,7 @@ export default function ResetPasswordScreen() {
   };
 
   // ─── Doğrulanıyor ────────────────────────────
-  if (verifying) {
+  if (flow === 'verifying') {
     return (
       <AppBackground radialGlow>
         <View style={s.center}>
@@ -122,8 +144,39 @@ export default function ResetPasswordScreen() {
     );
   }
 
+  // ─── E-posta doğrulama/kurtarma BAŞARILI ─────
+  if (flow === 'verify_success') {
+    const isVerify = mode === 'verifyEmail';
+    return (
+      <AppBackground radialGlow>
+        <View style={s.center}>
+          <View style={[s.errorIcon, { borderColor: Colors.accentTeal }]}>
+            <Ionicons name="checkmark-circle" size={56} color={Colors.accentTeal} />
+          </View>
+          <Text style={s.errorTitle}>
+            {isVerify ? 'E-posta Doğrulandı' : 'E-posta Kurtarıldı'}
+          </Text>
+          <Text style={s.errorDesc}>
+            {isVerify
+              ? 'E-posta adresin başarıyla doğrulandı. Artık SopranoChat\'in tüm özelliklerini kullanabilirsin.'
+              : 'E-posta adresin başarıyla kurtarıldı. Artık eski hesabınla giriş yapabilirsin.'}
+          </Text>
+          <Pressable style={s.primaryBtn} onPress={() => router.replace('/(tabs)/home')}>
+            <LinearGradient
+              colors={[Colors.accentTeal, '#0F766E']}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+              style={s.primaryBtnGrad}
+            >
+              <Text style={s.primaryBtnText}>Devam Et</Text>
+            </LinearGradient>
+          </Pressable>
+        </View>
+      </AppBackground>
+    );
+  }
+
   // ─── Geçersiz / süresi dolmuş ────────────────
-  if (!validCode) {
+  if (flow === 'invalid') {
     return (
       <AppBackground radialGlow>
         <View style={s.center}>
@@ -132,9 +185,11 @@ export default function ResetPasswordScreen() {
           </View>
           <Text style={s.errorTitle}>Bağlantı Geçersiz</Text>
           <Text style={s.errorDesc}>
-            Bu şifre sıfırlama bağlantısı süresi dolmuş ya da daha önce kullanılmış.
-            {'\n\n'}
-            Lütfen giriş ekranından yeni bir sıfırlama maili iste.
+            {mode === 'verifyEmail'
+              ? 'Bu doğrulama bağlantısı süresi dolmuş ya da daha önce kullanılmış. Yeni bir doğrulama maili için profil ayarlarından tekrar talep et.'
+              : mode === 'recoverEmail'
+              ? 'Bu kurtarma bağlantısı süresi dolmuş ya da daha önce kullanılmış. Destekten yardım iste.'
+              : 'Bu şifre sıfırlama bağlantısı süresi dolmuş ya da daha önce kullanılmış. Lütfen giriş ekranından yeni bir sıfırlama maili iste.'}
           </Text>
           <Pressable style={s.primaryBtn} onPress={() => router.replace('/(auth)/login')}>
             <LinearGradient
@@ -150,7 +205,7 @@ export default function ResetPasswordScreen() {
     );
   }
 
-  // ─── Şifre değiştirme formu ──────────────────
+  // ─── Şifre değiştirme formu (flow === 'reset_form') ──
   return (
     <AppBackground radialGlow>
       <KeyboardAvoidingView

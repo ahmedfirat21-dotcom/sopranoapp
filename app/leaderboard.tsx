@@ -21,6 +21,7 @@ import { useRouter } from 'expo-router';
 import { safeGoBack } from '../constants/navigation';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../constants/supabase';
+import { GiftStatsService } from '../services/giftStats';
 import { getAvatarSource, getLevelFromSP, getTierBadgeInfo } from '../constants/avatars';
 import StatusAvatar from '../components/StatusAvatar';
 import { Colors } from '../constants/theme';
@@ -54,6 +55,8 @@ interface LeaderEntry {
   display_name: string;
   avatar_url: string;
   tier?: string;
+  /** ★ v107: Mağaza avatar çerçevesi */
+  active_frame?: string | null;
   count: number;
 }
 
@@ -62,6 +65,8 @@ interface RoomEntry {
   room_name: string;
   host_name: string;
   host_avatar: string;
+  /** ★ v107: Mağaza avatar çerçevesi (host) */
+  host_frame?: string | null;
   count: number;
 }
 
@@ -235,7 +240,7 @@ function LeaderListItem({ entry, rank, label }: { entry: LeaderEntry; rank: numb
         <View style={[liS.rankCircle, { borderColor: rankColor + '50' }]}>
           <Text style={[liS.rankText, { color: rankColor }]}>{rank}</Text>
         </View>
-        <StatusAvatar uri={entry.avatar_url} size={46} tier={entry.tier} />
+        <StatusAvatar uri={entry.avatar_url} size={46} tier={entry.tier} frameId={(entry as any).active_frame || null} />
         <View style={liS.info}>
           <Text style={liS.name} numberOfLines={1}>{entry.display_name}</Text>
           <Text style={liS.sub}>{label}: {entry.count.toLocaleString()}</Text>
@@ -303,7 +308,7 @@ function RoomListItem({ entry, rank }: { entry: RoomEntry; rank: number }) {
       <View style={[rlS.rankCircle, { borderColor: rankColor + '50' }]}>
         <Text style={[rlS.rankText, { color: rankColor }]}>{rank}</Text>
       </View>
-      <StatusAvatar uri={entry.host_avatar} size={46} />
+      <StatusAvatar uri={entry.host_avatar} size={46} frameId={entry.host_frame || null} />
       <View style={rlS.info}>
         <Text style={rlS.name} numberOfLines={1}>{entry.room_name}</Text>
         <Text style={rlS.sub}>{entry.host_name} · {entry.count} katılımcı</Text>
@@ -375,6 +380,8 @@ export default function LeaderboardScreen() {
   const [topSenders, setTopSenders] = useState<LeaderEntry[]>([]);
   const [topRooms, setTopRooms] = useState<RoomEntry[]>([]);
   const [topCreators, setTopCreators] = useState<LeaderEntry[]>([]);
+  // ★ v107: Cömert (top gifters) — son 30 gün hediye değeri
+  const [topGifters, setTopGifters] = useState<LeaderEntry[]>([]);
   // ★ v91 (1 May 2026): Haftalık SP Ligi — RPC'lerden anlık çekilir (cache yok, haftada bir bakılır)
   const [weeklyDonors, setWeeklyDonors] = useState<LeaderEntry[]>([]);
   const [weeklyEarners, setWeeklyEarners] = useState<LeaderEntry[]>([]);
@@ -415,7 +422,7 @@ export default function LeaderboardScreen() {
       // ★ 1. En Zengin — SP sıralaması (O8: GodMaster/admin hesaplar leaderboard'da görünmemeli)
       const { data: spData } = await supabase
         .from('profiles')
-        .select('id, display_name, avatar_url, subscription_tier, system_points, is_admin')
+        .select('id, display_name, avatar_url, subscription_tier, system_points, is_admin, active_frame')
         .gt('system_points', 0)
         .neq('is_admin', true)
         .order('system_points', { ascending: false })
@@ -427,6 +434,7 @@ export default function LeaderboardScreen() {
           display_name: p.display_name || 'Kullanıcı',
           avatar_url: p.avatar_url || '',
           tier: p.subscription_tier || 'Free',
+          active_frame: p.active_frame || null,
           count: p.system_points || 0,
         })));
       } else {
@@ -436,7 +444,7 @@ export default function LeaderboardScreen() {
       // ★ 2. En Popüler — En çok takipçisi olan (O8: admin'leri hariç tut)
       const { data: friendData } = await supabase
         .from('friendships')
-        .select('friend_id, friend:profiles!friendships_friend_id_fkey(display_name, avatar_url, subscription_tier, is_admin)')
+        .select('friend_id, friend:profiles!friendships_friend_id_fkey(display_name, avatar_url, subscription_tier, is_admin, active_frame)')
         .eq('status', 'accepted');
 
       if (friendData) {
@@ -451,6 +459,7 @@ export default function LeaderboardScreen() {
               display_name: profile?.display_name || 'Kullanıcı',
               avatar_url: profile?.avatar_url || '',
               tier: profile?.subscription_tier || 'Free',
+              active_frame: profile?.active_frame || null,
               count: 0,
             };
           }
@@ -465,7 +474,7 @@ export default function LeaderboardScreen() {
       // ★ 3. En Popüler Odalar — room_participants sayısı
       let roomQuery = supabase
         .from('room_participants')
-        .select('room_id, room:rooms!inner(id, name, host_id, host:profiles!rooms_host_id_fkey(display_name, avatar_url))');
+        .select('room_id, room:rooms!inner(id, name, host_id, host:profiles!rooms_host_id_fkey(display_name, avatar_url, active_frame))');
       if (cutoff) roomQuery = roomQuery.gte('joined_at', cutoff);
       const { data: rpData } = await roomQuery;
 
@@ -481,6 +490,7 @@ export default function LeaderboardScreen() {
               room_name: room?.name || 'İsimsiz Oda',
               host_name: host?.display_name || 'Bilinmeyen',
               host_avatar: host?.avatar_url || '',
+              host_frame: host?.active_frame || null,
               count: 0,
             };
           }
@@ -495,7 +505,7 @@ export default function LeaderboardScreen() {
       // ★ 4. En Aktif — en çok oda açanlar (O8: admin host hariç)
       let creatorQuery = supabase
         .from('rooms')
-        .select('host_id, host:profiles!host_id(display_name, avatar_url, subscription_tier, is_admin)');
+        .select('host_id, host:profiles!host_id(display_name, avatar_url, subscription_tier, is_admin, active_frame)');
       if (cutoff) creatorQuery = creatorQuery.gte('created_at', cutoff);
       const { data: roomsCreated } = await creatorQuery;
 
@@ -511,6 +521,7 @@ export default function LeaderboardScreen() {
               display_name: profile?.display_name || 'Kullanıcı',
               avatar_url: profile?.avatar_url || '',
               tier: profile?.subscription_tier || 'Free',
+              active_frame: profile?.active_frame || null,
               count: 0,
             };
           }
@@ -521,6 +532,17 @@ export default function LeaderboardScreen() {
       } else {
         setTopCreators([]);
       }
+
+      // ★ v107: 5. CÖMERT — son 30 gün toplam hediye SP değeri
+      const gifters = await GiftStatsService.getTopGifters(10);
+      setTopGifters(gifters.map((g) => ({
+        user_id: g.user_id,
+        display_name: g.display_name,
+        avatar_url: g.avatar_url,
+        tier: g.subscription_tier,
+        active_frame: g.active_frame,
+        count: g.total_amount,
+      })));
     } catch (err) {
       if (__DEV__) console.warn('[Leaderboard] Veri yükleme hatası:', err);
     } finally {
@@ -774,6 +796,35 @@ export default function LeaderboardScreen() {
             <View style={[s.emptySection]}>
               <Ionicons name="flame-outline" size={28} color="rgba(255,255,255,0.15)" />
               <Text style={s.emptyText}>Henüz aktivite verisi yok</Text>
+            </View>
+          )}
+
+          {/* ════ v107: BÖLÜM 5: EN CÖMERT (Top Gifters) ════ */}
+          <SectionHeader icon="gift" iconColor="#F472B6" title="En Cömert" />
+
+          {topGifters.length >= 3 ? (
+            <>
+              <View style={s.podiumRow}>
+                <PodiumCard entry={topGifters[1]} rank={2} label="SP hediye" />
+                <PodiumCard entry={topGifters[0]} rank={1} label="SP hediye" />
+                <PodiumCard entry={topGifters[2]} rank={3} label="SP hediye" />
+              </View>
+              <View style={[s.listCard]}>
+                {topGifters.slice(3).map((entry, idx) => (
+                  <LeaderListItem key={entry.user_id} entry={entry} rank={idx + 4} label="SP hediye" />
+                ))}
+              </View>
+            </>
+          ) : topGifters.length > 0 ? (
+            <View style={[s.listCard]}>
+              {topGifters.map((entry, idx) => (
+                <LeaderListItem key={entry.user_id} entry={entry} rank={idx + 1} label="SP hediye" />
+              ))}
+            </View>
+          ) : (
+            <View style={[s.emptySection]}>
+              <Ionicons name="gift-outline" size={28} color="rgba(255,255,255,0.15)" />
+              <Text style={s.emptyText}>Henüz hediye veren yok — ilk sen ol!</Text>
             </View>
           )}
         </ScrollView>

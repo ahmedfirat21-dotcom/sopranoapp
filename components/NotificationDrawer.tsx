@@ -4,19 +4,12 @@
  * ★ Sadece oda + arama + hediye bildirimleri gösterilir
  * Takip istekleri → FriendsDrawer, DM → Mesajlar tab'ında
  */
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  View, Text, StyleSheet, Pressable, FlatList, Dimensions, Modal,
+  View, Text, StyleSheet, Pressable, SectionList, Dimensions, BackHandler, Animated, Easing, PanResponder,
 } from 'react-native';
 import AppLoader from './AppLoader';
 import UserListSkeleton from './UserListSkeleton';
-import ReAnimated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-  withDelay,
-  Easing,
-} from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter, usePathname } from 'expo-router';
@@ -30,6 +23,18 @@ import { showToast } from './Toast';
 import { useUserProfileSheet } from '../providers/UserProfileSheetContext';
 
 const { width: W, height: H } = Dimensions.get('window');
+// ★ 2026-05-05: Yan drawer (sağdan kayar) — FriendsDrawer ile birebir aynı ölçü.
+//   İki kardeş drawer aynı boyut → görsel tutarlılık.
+const DRAWER_W = Math.min(W * 0.72, 300);
+const DRAWER_H = Math.min(H * 0.86, 820);
+// ★ 2026-05-05: Tab bar gerçek yüksekliği = BAR_H + max(insets.bottom, 6).
+//   FriendsDrawer page-level render ediliyor → Tabs z-order'ı drawer alt köşesini
+//   tab bar üst kenarında kesiyor (görsel: drawer tab bar'a kadar uzanır, üstüne bindirmez).
+//   NotificationDrawer global _layout'ta render edildiği için tab bar onu kesemiyor;
+//   aynı GÖRSEL boyutu sağlamak için drawer alt sınırını manuel olarak tab bar üst
+//   kenarına oturtuyoruz (extra hava yok — FriendsDrawer ile birebir).
+const TAB_BAR_BASE = 60;
+const TAB_BAR_MIN_BOTTOM_INSET = 6;
 
 type NotifItem = {
   id: string;
@@ -72,10 +77,12 @@ interface Props {
 // ★ 2026-04-21: follow_pending context-aware — oda içinde zil gösterir, oda dışında arkadaş simgesi gösterir.
 // ★ v92.14 (1 May 2026): 'room_access_request' KALDIRILDI — bu istek artık host'un in-room
 //   PlusMenu > Katılım İstekleri accordion'unda gösteriliyor. Zilde duplikasyon istenmiyor.
+// ★ v108.21: 'symbol_gift' eklendi — sembol hediye bildirimleri _layout badge query'de
+//   sayılıyordu ama drawer okumuyordu → badge "1" kalıyordu. Drawer artık tam kapsam.
 const BELL_NOTIF_TYPES_BASE = [
   'room_live', 'room_invite', 'room_invite_accepted', 'room_invite_rejected',
   'missed_call', 'incoming_call',
-  'gift', 'thank_you',
+  'gift', 'symbol_gift', 'thank_you',
   'event_reminder',
   'follow_accepted', 'follow_rejected',
 ];
@@ -84,6 +91,7 @@ const BELL_NOTIF_TYPES_IN_ROOM = [...BELL_NOTIF_TYPES_BASE, 'follow_pending'];
 function getNotifIcon(type: string): { name: string; color: string } {
   switch (type) {
     case 'gift': return { name: 'gift', color: '#F59E0B' };
+    case 'symbol_gift': return { name: 'sparkles', color: '#F472B6' };
     case 'thank_you': return { name: 'heart', color: '#EC4899' };
     case 'room_live': return { name: 'mic', color: '#EF4444' };
     case 'room_invite': return { name: 'mail-open', color: '#14B8A6' };
@@ -103,6 +111,7 @@ function getNotifIcon(type: string): { name: string; color: string } {
 function getDefaultBody(type: string): string {
   switch (type) {
     case 'gift': return 'sana hediye gönderdi';
+    case 'symbol_gift': return 'sana bir sembol hediyesi gönderdi';
     case 'thank_you': return 'sana teşekkür etti';
     case 'room_live': return 'odası canlıya geçti';
     case 'room_invite': return 'seni odaya davet etti';
@@ -119,6 +128,21 @@ function getDefaultBody(type: string): string {
   }
 }
 
+// ★ v108.21: Section grouping — "Bugün / Bu Hafta / Önceki" hızlı tarama için
+function getTimeGroup(dateStr: string): 'today' | 'week' | 'older' {
+  const now = Date.now();
+  const t = new Date(dateStr).getTime();
+  const dayMs = 24 * 60 * 60 * 1000;
+  if (now - t < dayMs) return 'today';
+  if (now - t < 7 * dayMs) return 'week';
+  return 'older';
+}
+const GROUP_LABELS: Record<string, string> = {
+  today: 'Bugün',
+  week: 'Bu Hafta',
+  older: 'Önceki',
+};
+
 function timeAgo(date: string): string {
   const diff = Date.now() - new Date(date).getTime();
   const mins = Math.floor(diff / 60000);
@@ -134,6 +158,10 @@ export default function NotificationDrawer({ visible, onClose, userId, anchorTop
   // Header: paddingTop(insets.top+4) + logo(~32) + padding = bell merkezi ≈ insets.top+22
   // Bell buton alt kenarı ≈ insets.top + 40. Drawer okuyla arasına 6px boşluk.
   const resolvedAnchor = anchorTop ?? (insets.top + 46);
+  // ★ 2026-05-05: Drawer alt sınırı = tab bar gerçek yüksekliği. Bu değerle drawer alt
+  //   köşesi tam tab bar üst kenarında biter — FriendsDrawer'daki Tabs-z-order kesişimiyle
+  //   birebir aynı görsel boyut. Extra hava boşluğu yok (kullanıcı talebi: çevrimiçi boyu).
+  const tabBarSpace = TAB_BAR_BASE + Math.max(insets.bottom, TAB_BAR_MIN_BOTTOM_INSET);
   const router = useRouter();
   const { openUserProfile } = useUserProfileSheet();
   const pathname = usePathname();
@@ -188,7 +216,7 @@ export default function NotificationDrawer({ visible, onClose, userId, anchorTop
       }, async (payload) => {
         const { data } = await supabase
           .from('notifications')
-          .select('*, sender:profiles!notifications_sender_id_fkey(display_name, avatar_url)')
+          .select('*, sender:profiles!notifications_sender_id_fkey(display_name, avatar_url, active_frame)')
           .eq('id', payload.new.id)
           .single();
         if (data) {
@@ -247,7 +275,7 @@ export default function NotificationDrawer({ visible, onClose, userId, anchorTop
       // follow_* → FriendsDrawer'da, dm → Mesajlar tab'ında gösteriliyor
       const { data, error } = await supabase
         .from('notifications')
-        .select('*, sender:profiles!notifications_sender_id_fkey(display_name, avatar_url)')
+        .select('*, sender:profiles!notifications_sender_id_fkey(display_name, avatar_url, active_frame)')
         .eq('user_id', userId)
         .in('type', BELL_NOTIF_TYPES)
         .order('created_at', { ascending: false })
@@ -388,77 +416,145 @@ export default function NotificationDrawer({ visible, onClose, userId, anchorTop
 
   const unreadCount = items.filter(n => !n.is_read).length;
 
-  // ★ 2026-04-24 v5: Tamamen UI thread animasyonu — JS bridge yok, takılma yok.
-  //   withDelay kullanılarak tüm animasyon native tarafta çalışır.
-  const slideY = useSharedValue(-50);
-  const contentOpacity = useSharedValue(0);
-  const backdropOpacity = useSharedValue(0);
+  // ★ v108.21: Modernize — bildirimleri zaman gruplarına ayır (Bugün / Bu Hafta / Önceki)
+  const sections = (() => {
+    const groups: Record<string, NotifItem[]> = { today: [], week: [], older: [] };
+    for (const it of items) groups[getTimeGroup(it.created_at)].push(it);
+    const result: { title: string; data: NotifItem[] }[] = [];
+    if (groups.today.length) result.push({ title: GROUP_LABELS.today, data: groups.today });
+    if (groups.week.length) result.push({ title: GROUP_LABELS.week, data: groups.week });
+    if (groups.older.length) result.push({ title: GROUP_LABELS.older, data: groups.older });
+    return result;
+  })();
+
+  // ★ 2026-05-05 modernize v2: Sağdan-açılan yan drawer (FriendsDrawer pattern'i).
+  //   Bottom sheet karmaşıktı (Reanimated+Animated çift engine, layout instabilitesi).
+  //   Yan drawer: tek engine (Animated), denenmiş, FriendsDrawer ile tutarlı kabuk.
+  const slideAnim = useRef(new Animated.Value(DRAWER_W)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const isClosingRef = useRef(false);
+  const topGap = Math.max((H - DRAWER_H) / 2, insets.top + 12);
 
   useEffect(() => {
     if (visible) {
-      // Reset — direkt atama (animasyon yok, anlık)
-      slideY.value = -50;
-      contentOpacity.value = 0;
-      backdropOpacity.value = 0;
-      // Giriş animasyonu — withDelay ile UI thread'de 16ms sonra başlat
-      slideY.value = withDelay(16, withTiming(0, { duration: 320, easing: Easing.out(Easing.cubic) }));
-      contentOpacity.value = withDelay(16, withTiming(1, { duration: 220, easing: Easing.out(Easing.quad) }));
-      backdropOpacity.value = withDelay(0, withTiming(1, { duration: 200 }));
+      isClosingRef.current = false;
+      Animated.parallel([
+        Animated.timing(slideAnim, { toValue: 0, duration: 280, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+        Animated.timing(fadeAnim, { toValue: 1, duration: 220, useNativeDriver: true }),
+      ]).start();
+    } else {
+      if (isClosingRef.current) return;
+      slideAnim.setValue(DRAWER_W);
+      fadeAnim.setValue(0);
     }
   }, [visible]);
 
-  const dropdownAnimStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: slideY.value }],
-    opacity: contentOpacity.value,
-  }));
+  // ★ 2026-05-05: Animasyonlu kapatma — backdrop tap veya programatik kapatmada
+  //   anlık setValue yerine pürüzsüz translateX animasyonu çalışır.
+  const closeWithAnim = useCallback(() => {
+    if (isClosingRef.current) return;
+    isClosingRef.current = true;
+    Animated.parallel([
+      Animated.timing(slideAnim, { toValue: DRAWER_W, duration: 220, easing: Easing.in(Easing.cubic), useNativeDriver: true }),
+      Animated.timing(fadeAnim, { toValue: 0, duration: 220, useNativeDriver: true }),
+    ]).start(() => onClose());
+  }, [onClose]);
 
-  const backdropAnimStyle = useAnimatedStyle(() => ({
-    opacity: backdropOpacity.value,
-  }));
+  // ★ Sürükleyerek kapatma — sağa swipe, FriendsDrawer ile aynı sıkı eşik
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onStartShouldSetPanResponderCapture: () => false,
+      onMoveShouldSetPanResponder: (_, g) => g.dx > 25 && Math.abs(g.dx) > Math.abs(g.dy) * 2,
+      onMoveShouldSetPanResponderCapture: () => false,
+      onPanResponderTerminationRequest: () => false,
+      onPanResponderMove: (_, g) => {
+        const newX = Math.max(0, g.dx);
+        slideAnim.setValue(newX);
+        fadeAnim.setValue(Math.max(0, 1 - (newX / DRAWER_W) * 0.8));
+      },
+      onPanResponderRelease: (_, g) => {
+        const closeThreshold = DRAWER_W / 3;
+        if (g.dx > closeThreshold || g.vx > 0.5) {
+          isClosingRef.current = true;
+          Animated.parallel([
+            Animated.timing(slideAnim, { toValue: DRAWER_W, duration: 220, easing: Easing.in(Easing.cubic), useNativeDriver: true }),
+            Animated.timing(fadeAnim, { toValue: 0, duration: 220, useNativeDriver: true }),
+          ]).start(() => onClose());
+        } else {
+          Animated.parallel([
+            Animated.timing(slideAnim, { toValue: 0, duration: 200, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+            Animated.timing(fadeAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
+          ]).start();
+        }
+      },
+    })
+  ).current;
 
-  if (!visible) return null;
+  // ★ 2026-05-05: Android back tuşu drawer açıkken kapatma — Modal kaldırıldığı için
+  //   onRequestClose yok; manuel BackHandler ile davranışı koru.
+  useEffect(() => {
+    if (!visible) return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      closeWithAnim();
+      return true;
+    });
+    return () => sub.remove();
+  }, [visible, closeWithAnim]);
 
   return (
-    <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
-      <ReAnimated.View style={[s.backdrop, backdropAnimStyle]}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-      </ReAnimated.View>
+    <View style={StyleSheet.absoluteFill} pointerEvents={visible ? 'box-none' : 'none'}>
+      {/* Backdrop — koyu dim, tıklayınca animasyonlu kapanır.
+          ★ Alt sınır tab bar üstünde biter (dinamik) → tab bar dim altında kalmaz. */}
+      <Animated.View style={[s.backdrop, { bottom: tabBarSpace, opacity: fadeAnim }]}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={closeWithAnim} />
+      </Animated.View>
 
-      <ReAnimated.View style={[s.dropdown, { top: resolvedAnchor }, dropdownAnimStyle]}>
-        {/* ★ Odalarım paleti: diagonal gradient (parlak üst-sol → koyu alt-sağ) */}
+      {/* Yan panel — sağdan kayar, FriendsDrawer ile aynı kabuk.
+          ★ 2026-05-05: Alt bölüm FriendsDrawer ile aynı görsel için tab bar'ın üstünde
+          belirgin boşlukla bitsin diye `bottom: tabBarSpace` (dinamik, safe area dahil).
+          FriendsDrawer Tabs z-order'ı sayesinde drawer'ın altını otomatik kesiyor; biz
+          global _layout'ta render ettiğimiz için drawer alt sınırını manuel veriyoruz. */}
+      <Animated.View
+        {...panResponder.panHandlers}
+        style={[s.panel, { top: topGap, bottom: tabBarSpace, transform: [{ translateX: slideAnim }] }]}
+      >
+        {/* Profil sayfası gradient dili — diagonal slate */}
         <LinearGradient
-          colors={['#4a5668', '#37414f', '#232a35']}
+          colors={['#3a4658', '#2a3344', '#1a2030']}
           start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
           style={StyleSheet.absoluteFillObject}
           pointerEvents="none"
         />
-        {/* Teal accent üst-sol parıltı */}
+        {/* Üst kenar teal accent halo */}
+        <LinearGradient
+          colors={['rgba(20,184,166,0.22)', 'rgba(20,184,166,0.06)', 'transparent']}
+          start={{ x: 0, y: 0 }} end={{ x: 0, y: 0.4 }}
+          style={StyleSheet.absoluteFillObject}
+          pointerEvents="none"
+        />
+        {/* Üst-sol diyagonal glow */}
         <LinearGradient
           colors={['rgba(20,184,166,0.08)', 'transparent']}
-          start={{ x: 0, y: 0 }} end={{ x: 0.6, y: 0.8 }}
+          start={{ x: 0, y: 0 }} end={{ x: 0.7, y: 0.6 }}
           style={StyleSheet.absoluteFillObject}
           pointerEvents="none"
         />
 
-        {/* Başlık — uzun basınca tümünü okundu işaretle; panHandlers burada swipe-up */}
+        {/* Header — Bildirimler + okunmamış pill + Temizle */}
         <Pressable
           style={s.header}
           onLongPress={handleMarkAllRead}
           delayLongPress={500}
           accessibilityHint="Uzun bas: tümünü okundu işaretle"
         >
-          <Ionicons name="notifications" size={18} color="#14B8A6" style={{
-            textShadowColor: 'rgba(0,0,0,0.6)',
-            textShadowOffset: { width: 0, height: 2 },
-            textShadowRadius: 4,
-          }} />
+          <Ionicons name="notifications" size={20} color="#14B8A6" style={s.headerIcon} />
           <Text style={s.title}>Bildirimler</Text>
           {unreadCount > 0 && (
             <View style={s.badgePill}>
               <Text style={s.badgeText}>{unreadCount}</Text>
             </View>
           )}
-          {/* ★ Tümünü Temizle butonu */}
           {items.length > 0 && (
             <Pressable
               style={({ pressed }) => [s.clearBtn, pressed && { opacity: 0.6 }]}
@@ -475,37 +571,50 @@ export default function NotificationDrawer({ visible, onClose, userId, anchorTop
             </Pressable>
           )}
         </Pressable>
+        <View style={s.headerSeparator} />
 
         {loading ? (
-          /* ★ v107.25: AppLoader spinner kaldırıldı — odalarım pattern'i (skeleton kart) */
           <UserListSkeleton count={3} showAction={false} />
         ) : items.length === 0 ? (
           <View style={s.emptyState}>
-            <Ionicons name="notifications-off-outline" size={28} color="rgba(255,255,255,0.1)" />
+            <View style={s.emptyIconWrap}>
+              <Ionicons name="notifications-off-outline" size={28} color="rgba(255,255,255,0.4)" />
+            </View>
             <Text style={s.emptyText}>Henüz bildirim yok</Text>
+            <Text style={s.emptySub}>Yeni etkileşimler burada görünür</Text>
           </View>
         ) : (
-          <FlatList
-            data={items}
+          <SectionList
+            sections={sections}
             keyExtractor={(item) => item.id}
             showsVerticalScrollIndicator={false}
-            style={{ maxHeight: showAll ? H * 0.75 : H * 0.55 }}
-            contentContainerStyle={{ paddingVertical: 4 }}
-            ItemSeparatorComponent={() => <View style={s.separator} />}
+            style={{ flex: 1 }}
+            contentContainerStyle={{ paddingHorizontal: 12, paddingTop: 6, paddingBottom: 12, gap: 6 }}
+            stickySectionHeadersEnabled={false}
+            renderSectionHeader={({ section: { title } }) => (
+              <Text style={s.sectionLabel}>{title.toUpperCase()}</Text>
+            )}
             renderItem={({ item }) => {
               const icon = getNotifIcon(item.type);
 
               return (
-                <View>
+                <View style={s.notifItemWrap}>
                   <Pressable
-                    style={({ pressed }) => [s.notifItem, !item.is_read && s.notifUnread, pressed && { opacity: 0.7 }]}
+                    style={({ pressed }) => [
+                      s.notifItem,
+                      !item.is_read && s.notifUnread,
+                      pressed && { opacity: 0.65 },
+                    ]}
                     onPress={() => handlePress(item)}
                   >
+                    {/* ★ Sol kenar accent strip — okunmamış için teal vurgu */}
+                    {!item.is_read && <View style={s.unreadStrip} />}
+
                     {/* Avatar + tip ikonu overlay */}
                     <View style={s.avatarWrap}>
-                      <StatusAvatar uri={item.sender?.avatar_url} size={44} />
+                      <StatusAvatar uri={item.sender?.avatar_url} size={42} frameId={(item.sender as any)?.active_frame || null} />
                       <View style={[s.typeIconBadge, { backgroundColor: icon.color }]}>
-                        <Ionicons name={icon.name as any} size={11} color="#FFF" />
+                        <Ionicons name={icon.name as any} size={10} color="#FFF" />
                       </View>
                     </View>
 
@@ -517,8 +626,6 @@ export default function NotificationDrawer({ visible, onClose, userId, anchorTop
                       </Text>
                       <Text style={s.notifTime}>{timeAgo(item.created_at)}</Text>
                     </View>
-
-                    {!item.is_read && <View style={s.unreadDot} />}
                   </Pressable>
 
                   {/* ★ Oda daveti: Kabul / Ret butonları */}
@@ -567,77 +674,121 @@ export default function NotificationDrawer({ visible, onClose, userId, anchorTop
             <Ionicons name="chevron-up" size={14} color="#14B8A6" />
           </Pressable>
         )}
-      </ReAnimated.View>
-
-      {/* ★ 2026-04-26: Teşekkür modal'ı drawer içinden ÇIKARILDI — race condition çözüldü.
-           Artık parent'ta global ThankYouReceivedModal kullanılıyor (onShowThankYou prop). */}
-    </Modal>
+      </Animated.View>
+    </View>
   );
 }
 
 const s = StyleSheet.create({
+  // ★ 2026-05-05 modernize v2: Yan drawer (sağdan kayar) — FriendsDrawer ile aynı kabuk.
+  //   Backdrop alt sınırı tab bar'da biter (TAB_BAR_SPACE) → alt kontroller dim altında
+  //   kalmaz, normal renkte görünür. FriendsDrawer Tabs hierarchy'sinde tab bar drawer
+  //   üstünde paint olduğu için bu dim'i otomatik atlatıyordu; biz manuel keserek aynı
+  //   görsel sonucu sağlıyoruz.
   backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'transparent',
-  },
-  dropdown: {
-    // ★ 2026-04-24 v2: Geniş, premium boyut — neredeyse tam genişlik
     position: 'absolute',
-    left: W * 0.04,
-    right: W * 0.04,
-    borderRadius: 20,
-    paddingBottom: 6,
+    top: 0, left: 0, right: 0,
+    // bottom inline veriliyor (dinamik — safe area dahil)
+    backgroundColor: 'rgba(8,12,22,0.45)',
+  },
+  panel: {
+    position: 'absolute', right: 0,
+    width: DRAWER_W,
+    borderTopLeftRadius: 26, borderBottomLeftRadius: 26,
     overflow: 'hidden',
+    backgroundColor: '#1a2030',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.7,
-    shadowRadius: 24,
-    elevation: 24, // ★ 2026-04-24: Android shadow (elevation olmadan görünmez)
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
+    shadowOffset: { width: -8, height: 0 },
+    shadowOpacity: 0.55,
+    shadowRadius: 22,
+    elevation: 22,
   },
   header: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    paddingHorizontal: 16, paddingTop: 14, paddingBottom: 10,
-    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)',
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingHorizontal: 14, paddingTop: 16, paddingBottom: 12,
+  },
+  headerSeparator: {
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    marginHorizontal: 12,
+  },
+  // ★ Eski (kullanılmıyor)
+  headerGlow: {
+    position: 'absolute', top: 0, left: 0, right: 0, height: 60,
+    pointerEvents: 'none',
   },
   title: {
-    fontSize: 16, fontWeight: '800', color: '#F1F5F9', flex: 1,
+    fontSize: 15, fontWeight: '800', color: '#F1F5F9', flex: 1,
+    letterSpacing: 0.3,
     textShadowColor: 'rgba(0,0,0,0.6)',
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 4,
   },
   badgePill: {
-    backgroundColor: '#EF4444',
-    paddingHorizontal: 6, paddingVertical: 1,
-    borderRadius: 9, minWidth: 18, alignItems: 'center',
+    paddingHorizontal: 7, paddingVertical: 2,
+    borderRadius: 100, minWidth: 20, alignItems: 'center',
+    backgroundColor: 'rgba(20,184,166,0.18)',
+    borderWidth: 1, borderColor: 'rgba(20,184,166,0.45)',
   },
-  badgeText: { fontSize: 10, fontWeight: '800', color: '#FFF' },
+  badgeText: { fontSize: 10, fontWeight: '800', color: '#5EEAD4', letterSpacing: 0.3 },
   emptyState: {
-    alignItems: 'center', paddingVertical: 40, gap: 10,
+    alignItems: 'center', paddingVertical: 56, gap: 14,
   },
-  emptyText: { fontSize: 13, color: 'rgba(255,255,255,0.25)', fontWeight: '500' },
+  emptyIconWrap: {
+    width: 56, height: 56, borderRadius: 28,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  emptyText: { fontSize: 13, color: 'rgba(255,255,255,0.45)', fontWeight: '600', letterSpacing: 0.3 },
+  emptySub: { fontSize: 11, color: 'rgba(255,255,255,0.25)', marginTop: -8 },
   separator: {
     height: 1, backgroundColor: 'rgba(255,255,255,0.04)',
     marginHorizontal: 16,
   },
+  // ★ v108.21: Section label — gruplar arası ayraç başlık (Bugün / Bu Hafta / Önceki)
+  sectionLabel: {
+    fontSize: 10, fontWeight: '800', color: 'rgba(20,184,166,0.65)',
+    letterSpacing: 1.6, textTransform: 'uppercase',
+    paddingHorizontal: 6, paddingTop: 8, paddingBottom: 4,
+  },
+  // ★ v108.21: Item wrapper — radius + soft bg, separator yerine kart-stili gap
+  notifItemWrap: {
+    borderRadius: 14, overflow: 'hidden',
+  },
   notifItem: {
     flexDirection: 'row', alignItems: 'center',
-    paddingVertical: 12, paddingHorizontal: 16,
+    paddingVertical: 11, paddingHorizontal: 14, paddingLeft: 16,
     gap: 12,
+    backgroundColor: 'rgba(255,255,255,0.025)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.04)',
+    borderRadius: 14,
+    position: 'relative',
   },
   notifUnread: {
-    backgroundColor: 'rgba(20,184,166,0.06)',
+    backgroundColor: 'rgba(20,184,166,0.10)',
+    borderColor: 'rgba(20,184,166,0.25)',
+  },
+  // ★ v108.21: Sol kenar accent strip — okunmamış vurgu (Discord/Slack tarzı)
+  unreadStrip: {
+    position: 'absolute', left: 0, top: 8, bottom: 8, width: 3,
+    borderRadius: 2,
+    backgroundColor: '#14B8A6',
+    shadowColor: '#14B8A6', shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6, shadowRadius: 4,
   },
   avatarWrap: {
     position: 'relative',
   },
-  notifAvatar: { width: 44, height: 44, borderRadius: 22 },
+  notifAvatar: { width: 42, height: 42, borderRadius: 21 },
   typeIconBadge: {
     position: 'absolute', bottom: -2, right: -2,
     width: 18, height: 18, borderRadius: 9,
     alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1.5, borderColor: '#2f404f',
+    borderWidth: 2, borderColor: '#2f3b4a',
+    // ★ v109.3: AvatarFrame (zIndex:1) üstünde kalsın, frame border'ının arkasına gizlenmesin
+    zIndex: 4,
+    elevation: 7,
   },
   notifText: { fontSize: 13, color: '#CBD5E1', lineHeight: 18 },
   notifSender: { fontWeight: '700', color: '#F1F5F9' },
@@ -657,22 +808,30 @@ const s = StyleSheet.create({
   },
   seeAllText: { fontSize: 14, fontWeight: '700', color: '#14B8A6' },
 
-  // ★ Tümünü Temizle butonu
+  // ★ 2026-05-05: Halka kaldırıldı — sadece zil + altta koyu drop shadow.
+  //   Kullanıcı talebi: altındaki gölge koyu olsun (klasik depth shadow).
+  headerIcon: {
+    textShadowColor: 'rgba(0,0,0,0.75)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
+  },
+  // ★ v108.21 modernize: Temizle butonu soft slate (kırmızı yerine), kompakt + zarif
   clearBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    backgroundColor: 'rgba(239,68,68,0.08)',
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 100,
+    backgroundColor: 'rgba(255,255,255,0.05)',
     borderWidth: 1,
-    borderColor: 'rgba(239,68,68,0.12)',
+    borderColor: 'rgba(255,255,255,0.08)',
   },
   clearBtnText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#94A3B8',
+    fontSize: 10,
+    fontWeight: '700',
+    color: 'rgba(255,255,255,0.55)',
+    letterSpacing: 0.3,
   },
 
   // ★ Oda daveti Kabul/Ret butonları

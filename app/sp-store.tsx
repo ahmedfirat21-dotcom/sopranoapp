@@ -13,15 +13,15 @@ import { migrateLegacyTier } from '../types';
 
 // ═══ SP Paketleri — Premium Jewel-Tone Design ═══
 // ★ id alanları Google Play Console'daki In-App Product ID'leriyle eşleşmeli
+// ★ v108: store.tsx SP_PACKS ile birebir eşleştirildi (aynı 5 tier, aynı fiyat/bonus)
 // ★ gradient: 3-stop — parlak üst → zengin orta → derin alt (mücevher etkisi)
 // ★ glowColor: kart altı ambient gölge rengi
 const SP_PACKAGES = [
-  { id: 'soprano_sp_100',  sp: 100,  price: 14.99,  icon: 'flash' as const,     accent: '#60A5FA', gradient: ['#3B6CB5', '#1E3F70', '#0B1A30'] as [string, string, string], glowColor: '#3B82F640', bonus: 0,    popular: false },
-  { id: 'soprano_sp_250',  sp: 250,  price: 34.99,  icon: 'diamond' as const,   accent: '#C4B5FD', gradient: ['#7C5CC8', '#4A2D8B', '#1A0E3A'] as [string, string, string], glowColor: '#8B5CF640', bonus: 25,   popular: false },
-  { id: 'soprano_sp_600',  sp: 600,  price: 99.99,  icon: 'trophy' as const,    accent: '#FCD34D', gradient: ['#D4A017', '#7A5B0E', '#2E2108'] as [string, string, string], glowColor: '#FBBF2450', bonus: 75,   popular: true },
-  { id: 'soprano_sp_1500', sp: 1500, price: 199.99, icon: 'star' as const,      accent: '#5EEAD4', gradient: ['#18A08E', '#0D5E55', '#061F1C'] as [string, string, string], glowColor: '#14B8A640', bonus: 250,  popular: false },
-  { id: 'soprano_sp_4000', sp: 4000, price: 449.99, icon: 'shield-checkmark' as const, accent: '#F9A8D4', gradient: ['#C74B8B', '#7A2255', '#2D0C22'] as [string, string, string], glowColor: '#EC489940', bonus: 800,  popular: false },
-  { id: 'soprano_sp_10000', sp: 10000, price: 999.99, icon: 'rocket' as const,  accent: '#FDBA74', gradient: ['#E8751A', '#8B3E0A', '#2C1205'] as [string, string, string], glowColor: '#FB923C50', bonus: 2500, popular: false },
+  { id: 'soprano_sp_100',   sp: 100,   price: 9.99,   icon: 'flash' as const,             accent: '#D4A574', gradient: ['#A67C52', '#6B4A2E', '#2E1F12'] as [string, string, string], glowColor: '#D4A57440', bonus: 0,    popular: false, tierName: 'Bronz' },
+  { id: 'soprano_sp_500',   sp: 500,   price: 39.99,  icon: 'diamond' as const,            accent: '#D1D5DB', gradient: ['#7C8490', '#4A4F5A', '#1A1D24'] as [string, string, string], glowColor: '#D1D5DB40', bonus: 50,   popular: false, tierName: 'Gümüş' },
+  { id: 'soprano_sp_1500',  sp: 1500,  price: 99.99,  icon: 'trophy' as const,             accent: '#FBBF24', gradient: ['#D4A017', '#7A5B0E', '#2E2108'] as [string, string, string], glowColor: '#FBBF2450', bonus: 300,  popular: true,  tierName: 'Altın' },
+  { id: 'soprano_sp_5000',  sp: 5000,  price: 299.99, icon: 'star' as const,               accent: '#C4B5FD', gradient: ['#7C5CC8', '#4A2D8B', '#1A0E3A'] as [string, string, string], glowColor: '#8B5CF640', bonus: 1750, popular: false, tierName: 'Platin' },
+  { id: 'soprano_sp_15000', sp: 15000, price: 799.99, icon: 'shield-checkmark' as const,   accent: '#F9A8D4', gradient: ['#C74B8B', '#7A2255', '#2D0C22'] as [string, string, string], glowColor: '#EC489940', bonus: 7500, popular: false, tierName: 'Elmas' },
 ];
 
 export default function SPStoreScreen() {

@@ -325,7 +325,7 @@ export function UserSearchModal({ visible, onClose, currentUserId, onSelectUser,
         onClose();
       }}
     >
-      <StatusAvatar uri={item.avatar_url} size={48} isOnline={liveOnlineIds.has(item.id)} tier={item.subscription_tier} />
+      <StatusAvatar uri={item.avatar_url} size={48} isOnline={liveOnlineIds.has(item.id)} tier={item.subscription_tier} frameId={(item as any).active_frame || null} />
       <View style={s.userInfo}>
         <Text style={s.displayName}>{item.display_name || 'Kullanıcı'}</Text>
         {item.username && <Text style={s.username}>@{item.username}</Text>}
@@ -340,17 +340,28 @@ export function UserSearchModal({ visible, onClose, currentUserId, onSelectUser,
     // ★ 2026-04-27: Modal sarmalı kaldırıldı — FollowListModal ile aynı pattern.
     //   View overlay zIndex:300 ile sayfanın üstünde kalır.
     <View style={s.overlay} pointerEvents="box-none">
-      <Animated.View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.55)', opacity: backdropOpacity }]}>
+      <Animated.View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(8,12,22,0.45)', opacity: backdropOpacity }]}>
         <Pressable style={StyleSheet.absoluteFillObject} onPress={dismiss} />
       </Animated.View>
 
       {/* Sheet — translateY-based positioning (useNativeDriver:true) */}
       <Animated.View style={[s.sheet, { transform: [{ translateY }] }]} {...panResponder.panHandlers}>
-          {/* Diagonal gradient fon */}
+          {/* ★ 2026-05-05: NotificationDrawer aile dili — slate diagonal + teal halo + soft glow */}
           <LinearGradient
-            colors={['#4a5668', '#37414f', '#232a35']}
-            locations={[0, 0.35, 1]}
+            colors={['#3a4658', '#2a3344', '#1a2030']}
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFillObject}
+            pointerEvents="none"
+          />
+          <LinearGradient
+            colors={['rgba(20,184,166,0.20)', 'rgba(20,184,166,0.05)', 'transparent']}
+            start={{ x: 0, y: 0 }} end={{ x: 0, y: 0.4 }}
+            style={StyleSheet.absoluteFillObject}
+            pointerEvents="none"
+          />
+          <LinearGradient
+            colors={['rgba(20,184,166,0.08)', 'transparent']}
+            start={{ x: 0, y: 0 }} end={{ x: 0.7, y: 0.6 }}
             style={StyleSheet.absoluteFillObject}
             pointerEvents="none"
           />
@@ -436,6 +447,11 @@ export function UserSearchModal({ visible, onClose, currentUserId, onSelectUser,
                   contentContainerStyle={{ paddingBottom: 40 }}
                   onScroll={handleScroll}
                   scrollEventThrottle={16}
+                  // ★ v110.5.5: Klavye açıkken arama sonucuna ilk dokunuşta tıklama yakalansın
+                  //   "handled" → tap çocuk handler'ı (Pressable) tarafından yutulur, klavye kapanmaz.
+                  //   Aksi halde Android'de tap önce klavyeyi kapatır, modal hareket eder, tap kaçar.
+                  keyboardShouldPersistTaps="handled"
+                  keyboardDismissMode="on-drag"
                   ListEmptyComponent={
                     <View style={s.emptyState}>
                       <Ionicons name="search-outline" size={36} color="rgba(92,225,230,0.2)" />
@@ -459,6 +475,8 @@ export function UserSearchModal({ visible, onClose, currentUserId, onSelectUser,
                   contentContainerStyle={{ paddingBottom: 40 }}
                   onScroll={handleScroll}
                   scrollEventThrottle={16}
+                  keyboardShouldPersistTaps="handled"
+                  keyboardDismissMode="on-drag"
                   ListHeaderComponent={
                     <>
                       {/* Arkadaşların */}
@@ -474,7 +492,7 @@ export function UserSearchModal({ visible, onClose, currentUserId, onSelectUser,
                               style={({ pressed }) => [s.userRow, pressed && { opacity: 0.8, backgroundColor: 'rgba(92,225,230,0.06)' }]}
                               onPress={() => { onSelectUser(item.id, item.display_name || 'Kullanıcı'); onClose(); }}
                             >
-                              <StatusAvatar uri={item.avatar_url} size={48} isOnline={liveOnlineIds.has(item.id)} tier={item.subscription_tier} />
+                              <StatusAvatar uri={item.avatar_url} size={48} isOnline={liveOnlineIds.has(item.id)} tier={item.subscription_tier} frameId={(item as any).active_frame || null} />
                               <View style={s.userInfo}>
                                 <Text style={s.displayName}>{item.display_name || 'Kullanıcı'}</Text>
                                 {item.username && <Text style={s.username}>@{item.username}</Text>}
@@ -498,7 +516,7 @@ export function UserSearchModal({ visible, onClose, currentUserId, onSelectUser,
                               style={({ pressed }) => [s.userRow, pressed && { opacity: 0.8, backgroundColor: 'rgba(92,225,230,0.06)' }]}
                               onPress={() => { onSelectUser(item.id, item.display_name || 'Kullanıcı'); onClose(); }}
                             >
-                              <StatusAvatar uri={item.avatar_url} size={48} isOnline={liveOnlineIds.has(item.id)} tier={item.subscription_tier} />
+                              <StatusAvatar uri={item.avatar_url} size={48} isOnline={liveOnlineIds.has(item.id)} tier={item.subscription_tier} frameId={(item as any).active_frame || null} />
                               <View style={s.userInfo}>
                                 <Text style={s.displayName}>{item.display_name || 'Kullanıcı'}</Text>
                                 {item.username && <Text style={s.username}>@{item.username}</Text>}
@@ -535,16 +553,15 @@ const s = StyleSheet.create({
     zIndex: 300,
     elevation: 24,
   },
+  // ★ 2026-05-05: Aile standardı — radius 22→26, slate bg, gri border kaldırıldı
   sheet: {
     position: 'absolute',
     left: 0, right: 0,
     top: 0, bottom: 0,
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
+    borderTopLeftRadius: 26,
+    borderTopRightRadius: 26,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderBottomWidth: 0,
-    borderColor: Colors.glassBorder,
+    backgroundColor: '#1a2030',
     ...Shadows.card,
   },
   topEdge: {

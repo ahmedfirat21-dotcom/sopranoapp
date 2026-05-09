@@ -12,6 +12,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import SPIcon from './SPIcon';
 import { Colors, Shadows } from '../constants/theme';
+import BoostSuccessOverlay from './BoostSuccessOverlay';
 
 const { height: SCREEN_H } = Dimensions.get('window');
 const SHEET_H = 380;
@@ -93,19 +94,32 @@ export default function BoostPickerSheet({ visible, onClose, onBoost, currentSP 
   const selected = BOOST_TIERS.find(t => t.id === selectedId)!;
   const canAfford = currentSP >= selected.cost;
 
+  // ★ 2026-05-05: Boost ödeme başarılı olunca tam ekran şeffaf checked.json animasyonu
+  //   gösterilir (modal değil, inline overlay). 500ms bekleyip otomatik kapanır.
+  const [showSuccess, setShowSuccess] = useState(false);
+
   const handleBoost = async () => {
     if (!canAfford || loading) return;
     setLoading(true);
+    // ★ 2026-05-05: Optimistic UI — backend cevabını beklemeden HEMEN sheet kapan +
+    //   success overlay başlat. Backend arkada paralel çalışır. Kullanıcı anında feedback.
+    dismiss();
+    setShowSuccess(true);
     try {
       await onBoost(selected);
-      dismiss();
     } catch {
+      // Hata olursa sessiz — overlay zaten oynamış olur, kullanıcı bilgilendirilebilir
     } finally {
       setLoading(false);
     }
   };
 
-  if (!visible) return null;
+  if (!visible && !showSuccess) return null;
+
+  // ★ Sheet zaten dismiss edildi, sadece success overlay göster
+  if (!visible && showSuccess) {
+    return <BoostSuccessOverlay visible={showSuccess} onComplete={() => setShowSuccess(false)} />;
+  }
 
   return (
     <Modal visible transparent statusBarTranslucent animationType="none">

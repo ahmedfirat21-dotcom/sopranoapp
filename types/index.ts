@@ -96,6 +96,30 @@ export type Profile = {
   profile_boost_expires_at?: string | null;
   /** Pro+ banner resmi URL'i */
   banner_url?: string | null;
+
+  // ── Sosyal kimlik (v110.5) ──
+  /** ISO 639-1 dil kodları — kullanıcının konuştuğu diller (tr, en, ar, ku, de, fr, ru) */
+  languages?: string[] | null;
+  /** Önceden tanımlı ilgi alanı tag'leri (constants/profileTags.ts'deki INTEREST_TAGS) */
+  interests?: string[] | null;
+
+  // ── Voice Bio (v110.5 — Faz B.1) ──
+  /** Supabase Storage voice-notes bucket içinde 15-30sn ses kaydı URL */
+  voice_bio_url?: string | null;
+  /** Sesli tanıtım süresi (ms) — UI player progress bar */
+  voice_bio_duration_ms?: number | null;
+
+  // ── Trust & Sosyal (v110.5 — Faz C) ──
+  /** Manuel admin onaylı doğrulama tiki */
+  is_verified?: boolean;
+  /** {instagram?, twitter?, website?} — opsiyonel sosyal linkler */
+  social_links?: {
+    instagram?: string;
+    twitter?: string;
+    website?: string;
+  } | null;
+  /** Davet eden kullanıcı id (zaten v50'de eklenmişti) */
+  referred_by?: string | null;
 };
 
 // ============================================
@@ -478,6 +502,13 @@ export type Message = {
   created_at: string;
   sender?: Profile;
   receiver?: Profile;
+  /** ★ v109: WhatsApp-style messaging features */
+  reply_to_id?: string | null;
+  edited_at?: string | null;
+  deleted_for_everyone?: boolean;
+  forwarded_from_id?: string | null;
+  link_preview?: { title?: string; description?: string; image?: string; url?: string } | null;
+  reactions?: string;
 };
 
 export type InboxItem = {
@@ -487,6 +518,8 @@ export type InboxItem = {
   partner_is_online: boolean;
   /** ★ Tier ring tutarlılığı — mesajlar sayfasında doğru çerçeve rengi */
   partner_tier?: string;
+  /** ★ v107: Mağaza avatar çerçevesi — DM listesinde görünsün */
+  partner_frame?: string | null;
   /** Karşı tarafın son görülme zamanı (ISO) — offline iken "2s önce" göstermek için */
   partner_last_seen?: string;
   last_message_content: string;
@@ -500,6 +533,8 @@ export type InboxItem = {
   is_pinned?: boolean;
   is_archived?: boolean;
   is_muted?: boolean;
+  /** ★ v109: Yarım yazılmış taslak (varsa "Taslak: ..." olarak göster) */
+  draft?: string;
 };
 
 // ============================================

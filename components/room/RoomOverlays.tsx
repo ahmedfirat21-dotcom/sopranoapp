@@ -15,6 +15,7 @@ import { ModerationService } from '../../services/moderation';
 import { getAvatarSource } from '../../constants/avatars';
 import { showToast } from '../Toast';
 import { supabase } from '../../constants/supabase';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -23,7 +24,10 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 const { width: W, height: H } = Dimensions.get('window');
 // ★ 2026-04-20: Responsive panel genişlik — küçük telefonlarda daha geniş oran
 const IS_SMALL_SCREEN = W <= 375;
-const PANEL_W = IS_SMALL_SCREEN ? Math.min(W * 0.78, 310) : Math.min(W * 0.68, 320);
+// ★ 2026-05-05: Keşfet drawer dili — birebir aynı boyut (NotificationDrawer ile).
+const PANEL_W = Math.min(W * 0.72, 300);
+const ROOM_TOP_GAP = 70;
+const ROOM_BOTTOM_GAP = 90;
 
 const layoutAnim = () => LayoutAnimation.configureNext({
   duration: 220,
@@ -307,6 +311,7 @@ export function PlusMenu({
   roomId: _roomId, hostId: _hostId, roomType: _roomType,
   isTempHost = false,
 }: PlusMenuProps) {
+  const insets = useSafeAreaInsets();
   const slideAnim = useRef(new Animated.Value(PANEL_W)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const compactSlideY = useRef(new Animated.Value(300)).current;
@@ -930,18 +935,37 @@ export function PlusMenu({
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
       </Animated.View>
 
-      <Animated.View {...panHandlers} style={[s.panel, { bottom: 120, top: 120, transform: [{ translateX: Animated.add(slideAnim, swipeX) }] }]}>
-        {/* ★ FriendsDrawer paleti — diagonal warm-neutral gradient */}
+      <Animated.View
+        {...panHandlers}
+        style={[s.panel, {
+          top: Math.max(insets.top + 12, ROOM_TOP_GAP),
+          bottom: Math.max(insets.bottom + 8, ROOM_BOTTOM_GAP),
+          transform: [{ translateX: Animated.add(slideAnim, swipeX) }],
+        }]}
+      >
+        {/* Profil sayfası gradient dili — diagonal slate (NotificationDrawer dili) */}
         <LinearGradient
-          colors={['#4a5668', '#37414f', '#232a35']}
-          locations={[0, 0.35, 1]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={StyleSheet.absoluteFill}
+          colors={['#3a4658', '#2a3344', '#1a2030']}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFillObject}
+          pointerEvents="none"
+        />
+        {/* ★ 2026-05-05: 3 katman aile dili — slate + halo + soft glow. Role-based renk. */}
+        <LinearGradient
+          colors={[`${role.color}33`, `${role.color}0D`, 'transparent']}
+          start={{ x: 0, y: 0 }} end={{ x: 0, y: 0.4 }}
+          style={StyleSheet.absoluteFillObject}
+          pointerEvents="none"
+        />
+        <LinearGradient
+          colors={[`${role.color}14`, 'transparent']}
+          start={{ x: 0, y: 0 }} end={{ x: 0.7, y: 0.6 }}
+          style={StyleSheet.absoluteFillObject}
+          pointerEvents="none"
         />
         {/* Header */}
         <View style={s.header}>
-          <Ionicons name="grid" size={16} color={role.color} style={s.iconShadow} />
+          <Ionicons name="grid" size={18} color={role.color} style={[s.iconShadow, { textShadowColor: `${role.color}B0`, textShadowRadius: 5 }]} />
           <Text style={s.headerTitle}>Menü</Text>
           <View style={[s.rolePill, { backgroundColor: role.color + '22', borderColor: role.color + '35' }]}>
             <Ionicons name={role.icon as any} size={10} color={role.color} />
@@ -1004,19 +1028,20 @@ export function AdvancedSettingsPanel({ visible }: { visible: boolean;[key: stri
 // STİLLER
 // ═══════════════════════════════════════════════════════
 const s = StyleSheet.create({
-  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.55)' },
+  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(8,12,22,0.45)' },
   panel: {
-    // ★ 2026-04-20: Full-height responsive panel — küçük ekranlarda daha fazla alan kullanır.
-    // top + bottom ile esnek yükseklik — maxHeight kaldırıldı, absolute pozisyonla hesaplanır.
+    // ★ 2026-05-05: NotificationDrawer dili — top+bottom inline insets bazlı
     position: 'absolute', right: 0,
     width: PANEL_W,
-    borderTopLeftRadius: 22, borderBottomLeftRadius: 22,
+    borderTopLeftRadius: 26, borderBottomLeftRadius: 26,
     overflow: 'hidden',
+    backgroundColor: '#1a2030',
+    // ★ 2026-05-05 perf: Android elevation azaltıldı (FPS koruma)
     shadowColor: '#000',
     shadowOffset: { width: -6, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 16,
-    elevation: 16,
+    shadowOpacity: 0.45,
+    shadowRadius: 14,
+    elevation: 10,
   },
   compactPanel: {
     position: 'absolute',

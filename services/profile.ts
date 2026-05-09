@@ -178,14 +178,11 @@ export const ProfileService = {
     is_online: boolean;
   }[]> {
     try {
-      // RPC fonksiyonu varsa kullan, yoksa doğrudan sorgu
-      const { data: rpcData } = await supabase.rpc('get_boosted_profiles', { max_count: limit });
-      if (rpcData && rpcData.length > 0) return rpcData;
-
-      // Fallback: doğrudan sorgu
+      // ★ v108.16: Doğrudan select — RPC active_frame döndürmüyor (eski sürüm),
+      //   client tarafında fallback select kullanılıyor (active_frame dahil).
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, display_name, username, avatar_url, subscription_tier, bio, is_online, profile_boost_expires_at')
+        .select('id, display_name, username, avatar_url, subscription_tier, bio, is_online, profile_boost_expires_at, active_frame')
         .gt('profile_boost_expires_at', new Date().toISOString())
         .order('profile_boost_expires_at', { ascending: false })
         .limit(limit);
@@ -204,38 +201,38 @@ export const ProfileService = {
     totalReactions: number;
   }> {
     try {
-      // Oluşturulan oda sayısı
-      const { count: roomsCreated } = await supabase
-        .from('rooms')
-        .select('id', { count: 'exact', head: true })
-        .eq('host_id', userId);
+      // ★ v110.2: 4 sorgu paralel (Promise.all) — eskiden sıralıydı, ~4x hızlandı.
+      const [roomsCreatedRes, stageEventsRes, roomsListRes, totalReactionsRes] = await Promise.all([
+        supabase
+          .from('rooms')
+          .select('id', { count: 'exact', head: true })
+          .eq('host_id', userId),
+        supabase
+          .from('sp_transactions')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', userId)
+          .eq('type', 'stage_time'),
+        supabase
+          .from('rooms')
+          .select('listener_count')
+          .eq('host_id', userId),
+        supabase
+          .from('sp_transactions')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', userId)
+          .eq('type', 'emoji_reaction'),
+      ]);
 
-      // SP transaction'lardan sahne süresi tahmini (stage_time tetikleyicisi 10dk'da 1)
-      const { count: stageEvents } = await supabase
-        .from('sp_transactions')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', userId)
-        .eq('type', 'stage_time');
-
-      // Toplam dinleyici (odalarının listener_count toplamı)
-      const { data: rooms } = await supabase
-        .from('rooms')
-        .select('listener_count')
-        .eq('host_id', userId);
-      const totalListeners = (rooms || []).reduce((sum, r) => sum + (r.listener_count || 0), 0);
-
-      // Toplam alınan tepkiler (emoji_reaction SP kayıtları)
-      const { count: totalReactions } = await supabase
-        .from('sp_transactions')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', userId)
-        .eq('type', 'emoji_reaction');
+      const totalListeners = (roomsListRes.data || []).reduce(
+        (sum: number, r: any) => sum + (r.listener_count || 0),
+        0,
+      );
 
       return {
-        stageMinutes: (stageEvents || 0) * 10,
-        roomsCreated: roomsCreated || 0,
+        stageMinutes: (stageEventsRes.count || 0) * 10,
+        roomsCreated: roomsCreatedRes.count || 0,
         totalListeners,
-        totalReactions: totalReactions || 0,
+        totalReactions: totalReactionsRes.count || 0,
       };
     } catch {
       return { stageMinutes: 0, roomsCreated: 0, totalListeners: 0, totalReactions: 0 };

@@ -1,5 +1,5 @@
-﻿import { useState, useCallback, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, Modal, TextInput, Image, InteractionManager, Platform, Animated, Easing, type ImageStyle } from 'react-native';
+import { useState, useCallback, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, Pressable, ScrollView, Modal, TextInput, Image, InteractionManager, Platform, Animated, Easing, Dimensions, type ImageStyle } from 'react-native';
 import AppLoader from '../../components/AppLoader';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -21,10 +21,20 @@ import PlusDiamondIcon from '../../components/PlusDiamondIcon';
 import AnimatedHeaderIconBtn from '../../components/AnimatedHeaderIconBtn';
 import TabBarFadeOut from '../../components/TabBarFadeOut';
 import ProfileHero from '../../components/profile/ProfileHero';
+import ProfileIdentityStrip from '../../components/profile/ProfileIdentityStrip';
+import {
+  VoiceBioPlayer, SocialLinksRow, FeaturedBadgesShowcase, SpeakingRhythmHint,
+} from '../../components/profile/ProfileExtras';
+import {
+  FeaturedBadgesService, SpeakingRhythmService,
+} from '../../services/profileExtras';
 import FrameSelectSheet from '../../components/profile/FrameSelectSheet';
 import BadgeListModal from '../../components/profile/BadgeListModal';
+import GiftDetailModal from '../../components/profile/GiftDetailModal';
+import { GiftStatsService } from '../../services/giftStats';
 import BioEditorSheet from '../../components/profile/BioEditorSheet';
 import ProfileFriendsList from '../../components/profile/ProfileFriendsList';
+import ProfileSectionHeader from '../../components/profile/ProfileSectionHeader';
 import SPHistorySheet from '../../components/profile/SPHistorySheet';
 import { useOnlineFriends } from '../../providers/OnlineFriendsProvider';
 
@@ -42,6 +52,8 @@ import { signOut, deleteUser as firebaseDeleteUser } from 'firebase/auth';
 const PROF_SOP_W = 110;
 const PROF_PROF_W = 75;
 const PROF_H = 30;
+// ★ 2026-05-04: stat satırı dar ekranlarda padding kullanır
+const _sw = Dimensions.get('window').width;
 
 let _profilIntroPlayed = false;
 function profilIntroPlayed() { return _profilIntroPlayed; }
@@ -254,10 +266,14 @@ export default function ProfileScreen() {
   const { allFriends } = useOnlineFriends();
   const { openUserProfile } = useUserProfileSheet();
 
-  // Dinamik istatistikler — friends (mutual) + followers/following (one-way) + rooms
-  const [stats, setStats] = useState({ friends: 0, followers: 0, following: 0, rooms: 0, badges: 0 });
+  // Dinamik istatistikler — friends (mutual) + followers/following (one-way) + rooms + gifts
+  const [stats, setStats] = useState({ friends: 0, followers: 0, following: 0, rooms: 0, badges: 0, gifts: 0 });
   const [showBadgesModal, setShowBadgesModal] = useState(false);
+  const [showGiftDetail, setShowGiftDetail] = useState(false);
   const [profileStats, setProfileStats] = useState({ stageMinutes: 0, roomsCreated: 0, totalListeners: 0, totalReactions: 0 });
+  // ★ v110.5: Featured rozetler + konuşma ritmi (kendi profilim)
+  const [featuredBadgeIds, setFeaturedBadgeIds] = useState<string[]>([]);
+  const [speakingRhythmText, setSpeakingRhythmText] = useState<string | null>(null);
 
   // Referans Modal
   const [showReferral, setShowReferral] = useState(false);
@@ -272,10 +288,36 @@ export default function ProfileScreen() {
   const [showAvatarPreview, setShowAvatarPreview] = useState(false);
   const [showFrameSheet, setShowFrameSheet] = useState(false);
   const [activeFrame, setActiveFrame] = useState<string | null>(null);
-  // ★ v107: profil yüklenince active_frame'i state'e ata, FrameSelectSheet sonrası optimistic update
+  const [activeEntryEffect, setActiveEntryEffect] = useState<string | null>(null);
+  // ★ v108.16: Envanterde frame var ama equip edilmemiş mi? — ribbon butonunda
+  //   "Çerçeven hazır" hint'i göstermek için. Fetch yalnız uid bazlı; equip durumu render time.
+  const [ownsAnyFrame, setOwnsAnyFrame] = useState(false);
+  // ★ v108: profil yüklenince active_frame + active_entry_effect'i state'e ata
   useEffect(() => {
     setActiveFrame((profile as any)?.active_frame || null);
-  }, [(profile as any)?.active_frame]);
+    setActiveEntryEffect((profile as any)?.active_entry_effect || null);
+  }, [(profile as any)?.active_frame, (profile as any)?.active_entry_effect]);
+  // Frame envanteri kontrolü — sadece uid bazlı tek fetch; equip durumu render time
+  useEffect(() => {
+    if (!firebaseUser?.uid) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { StoreService } = await import('../../services/store');
+        const [{ items }, inv] = await Promise.all([
+          StoreService.getCatalog(),
+          StoreService.getUserInventory(firebaseUser.uid),
+        ]);
+        if (cancelled) return;
+        const owns = items.some(
+          (i) => (i.category === 'frames' || i.category === 'atelier') && inv.has(i.id)
+        );
+        setOwnsAnyFrame(owns);
+      } catch { /* sessiz fail */ }
+    })();
+    return () => { cancelled = true; };
+  }, [firebaseUser?.uid]);
+  const hasUnequippedFrame = ownsAnyFrame && !activeFrame;
   // ★ 2026-04-21: Bio inline edit — bio'ya tap ile hafif modal
   const [showBioEditor, setShowBioEditor] = useState(false);
   const [showSPHistory, setShowSPHistory] = useState(false);
@@ -293,7 +335,7 @@ export default function ProfileScreen() {
   // ★ Paralel fetch — tüm sorgular tek Promise.allSettled'da
   const loadStats = useCallback(async (signal?: { cancelled: boolean }) => {
     if (!userId) return;
-    const [friendRes, roomRes, statsRes, titleRes, followerRes, followingRes, badgeRes] = await Promise.allSettled([
+    const [friendRes, roomRes, statsRes, titleRes, followerRes, followingRes, badgeRes, giftRecvRes, giftSentRes, featuredRes, rhythmRes] = await Promise.allSettled([
       FriendshipService.getFriendCount(userId),
       supabase.from('rooms').select('*', { count: 'exact', head: true }).eq('host_id', userId),
       ProfileService.getProfileStats(userId),
@@ -302,6 +344,12 @@ export default function ProfileScreen() {
       FollowService.getFollowingCount(userId),
       // ★ Faz 6.3 — Rozet sayısı (head:count, ucuz query)
       supabase.from('user_badges').select('*', { count: 'exact', head: true }).eq('user_id', userId),
+      // ★ 2026-05-05: Hediye sayıları (aldığı + verdiği) — stat satırında tek sayı (toplam)
+      GiftStatsService.getReceivedTotal(userId),
+      GiftStatsService.getSentTotal(userId),
+      // ★ v110.5: Featured rozetler + konuşma ritmi
+      FeaturedBadgesService.getFeatured(userId),
+      SpeakingRhythmService.get(userId).then(SpeakingRhythmService.derivePrimeTimeText),
     ]);
 
     // Sayfa kapandıysa state'e dokunma (memory leak + stale update önleme)
@@ -312,7 +360,10 @@ export default function ProfileScreen() {
     const followerCount = followerRes.status === 'fulfilled' ? followerRes.value : 0;
     const followingCount = followingRes.status === 'fulfilled' ? followingRes.value : 0;
     const badgeCount = badgeRes.status === 'fulfilled' ? (badgeRes.value.count ?? 0) : 0;
-    setStats({ friends: friendCount, followers: followerCount, following: followingCount, rooms: roomCount, badges: badgeCount });
+    const recvCount = giftRecvRes.status === 'fulfilled' ? giftRecvRes.value.count : 0;
+    const sentCount = giftSentRes.status === 'fulfilled' ? giftSentRes.value.count : 0;
+    const giftCount = recvCount + sentCount;
+    setStats({ friends: friendCount, followers: followerCount, following: followingCount, rooms: roomCount, badges: badgeCount, gifts: giftCount });
 
     if (statsRes.status === 'fulfilled') {
       setProfileStats(statsRes.value);
@@ -323,6 +374,10 @@ export default function ProfileScreen() {
     }
 
     if (titleRes.status === 'fulfilled') setUserTitle(titleRes.value);
+
+    // ★ v110.5: Featured rozetler + konuşma ritmi
+    if (featuredRes.status === 'fulfilled') setFeaturedBadgeIds(featuredRes.value);
+    if (rhythmRes.status === 'fulfilled') setSpeakingRhythmText(rhythmRes.value);
   }, [userId]);
 
   // ★ 2026-04-21: Logout flow — settings.tsx pattern'ine eşit.
@@ -530,23 +585,10 @@ export default function ProfileScreen() {
             style={StyleSheet.absoluteFillObject}
             pointerEvents="none"
           />
+          {/* ★ v108.20: Header sadeleştirildi — 4 ikon dar ekranlarda taşıyordu (Ayar kayboluyordu).
+               Premium / Mağaza / Liderlik / Ayarlar artık scroll içinde menü satırları olarak. */}
           <View style={styles.headerContent}>
             <AnimatedProfilLogo />
-            <View style={styles.headerRight}>
-              {/* ★ 2026-04-29: Plus üyelik animasyonlu mavi elmas — kendi shine animation'ı var */}
-              <AnimatedHeaderIconBtn index={0} style={styles.headerIconBtn} onPress={() => router.push('/plus' as any)} accessibilityLabel="Soprano Premium">
-                <PlusDiamondIcon size={40} />
-              </AnimatedHeaderIconBtn>
-              <AnimatedHeaderIconBtn index={1} style={styles.headerIconBtn} onPress={() => router.push('/leaderboard' as any)} accessibilityLabel="Liderlik Tablosu">
-                <Ionicons name="trophy-outline" size={22} color="#F1F5F9" style={iconShadow} />
-              </AnimatedHeaderIconBtn>
-              <AnimatedHeaderIconBtn index={2} style={styles.headerIconBtn} onPress={() => router.push('/store' as any)} accessibilityLabel="Maison Soprano Mağaza">
-                <Ionicons name="storefront-outline" size={22} color="#FBBF24" style={iconShadow} />
-              </AnimatedHeaderIconBtn>
-              <AnimatedHeaderIconBtn index={3} style={styles.headerIconBtn} onPress={() => router.push('/settings' as any)} accessibilityLabel="Ayarlar">
-                <Ionicons name="settings-outline" size={22} color="#F1F5F9" style={iconShadow} />
-              </AnimatedHeaderIconBtn>
-            </View>
           </View>
           <LinearGradient
             colors={['transparent', 'rgba(245,158,11,0.55)', 'rgba(245,158,11,0.55)', 'transparent']}
@@ -555,7 +597,11 @@ export default function ProfileScreen() {
             style={styles.headerSeparator}
           />
         </View>
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingTop: 14, paddingBottom: Math.max(insets.bottom, 16) + 70 }}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingTop: 12, paddingBottom: Math.max(insets.bottom, 16) + 70 }}
+          removeClippedSubviews
+        >
 
           {/* ═══ Profil Hero Kartı (kompakt v2) ═══ */}
           <ProfileHero
@@ -566,104 +612,134 @@ export default function ProfileScreen() {
             subscriptionTier={subscriptionTier}
             isAdmin={isAdmin}
             userTitle={userTitle}
-            stats={{ followers: stats.followers, rooms: stats.rooms, badges: stats.badges }}
+            stats={{ followers: stats.friends, rooms: stats.rooms, badges: stats.badges, gifts: stats.gifts }}
             onEdit={() => router.push('/edit-profile')}
             onBioPress={() => setShowBioEditor(true)}
-            onFollowersPress={() => { setFollowModalTab('followers'); setFollowModalVisible(true); }}
+            onFollowersPress={() => { setFollowModalTab('friends'); setFollowModalVisible(true); }}
             onRoomsPress={() => router.push('/(tabs)/myrooms' as any)}
             onBadgesPress={() => setShowBadgesModal(true)}
+            onGiftsPress={() => setShowGiftDetail(true)}
             onAvatarPress={() => setShowAvatarPreview(true)}
             memberSince={profile?.created_at}
             boostExpiresAt={(profile as any)?.profile_boost_expires_at}
+            isVerified={!!(profile as any)?.is_verified}
             userLevel={userLevel}
             activeFrame={activeFrame}
             onFramePress={() => setShowFrameSheet(true)}
+            hasUnequippedFrame={hasUnequippedFrame}
           />
 
+          {/* ★ v110.5: Diller + İlgi alanları (sade chip şeridi) */}
+          <ProfileIdentityStrip
+            languages={(profile as any)?.languages}
+            interests={(profile as any)?.interests}
+            isOwn
+            onEditPress={() => router.push('/edit-profile' as any)}
+          />
 
+          {/* ★ v110.5: Sesli tanıtım çalar (varsa) */}
+          {(profile as any)?.voice_bio_url && (
+            <VoiceBioPlayer
+              url={(profile as any).voice_bio_url}
+              durationMs={(profile as any).voice_bio_duration_ms}
+            />
+          )}
 
-          {/* ═══ SP Cüzdan — premium altın gradient ═══ */}
-          <Pressable
-            style={p.walletCard}
-            onPress={openSPHistory}
-            accessibilityLabel="SP geçmişi"
-          >
+          {/* ★ v110.5: Sosyal linkler (IG/X/web) */}
+          <SocialLinksRow links={(profile as any)?.social_links} />
+
+          {/* ★ v110.5: Konuşma ritmi insight */}
+          <SpeakingRhythmHint text={speakingRhythmText} />
+
+          {/* ★ v110.5: Öne çıkan rozetler (3 büyük) */}
+          {featuredBadgeIds.length > 0 && (
+            <FeaturedBadgesShowcase
+              featuredIds={featuredBadgeIds}
+              onPress={() => setShowBadgesModal(true)}
+            />
+          )}
+
+          {/* ═══ SP Cüzdan — kompakt tek satır (v108.17) ═══ */}
+          <Pressable style={p.walletCompact} onPress={openSPHistory} accessibilityLabel="SP geçmişi">
             <LinearGradient
-              colors={['#2A1F12', '#1e160d', '#130d07']}
-              locations={[0, 0.5, 1]}
-              start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
+              colors={['#2A1F12', '#1e160d']}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
               style={StyleSheet.absoluteFillObject}
             />
             <LinearGradient
-              colors={['rgba(251,191,36,0.28)', 'rgba(251,191,36,0.04)']}
-              start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
+              colors={['rgba(251,191,36,0.20)', 'rgba(251,191,36,0.04)']}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
               style={StyleSheet.absoluteFillObject}
             />
-
-            {/* ★ 2026-04-30: Arka plan watermark — büyük SP jetonu silueti, sağ kenar */}
-            <View style={p.walletWatermark} pointerEvents="none">
-              <SPHexagonIcon size={140} />
+            <SPHexagonIcon size={56} />
+            <View style={{ flex: 1, marginLeft: 14 }}>
+              <Text style={p.walletCompactLabel}>SP CÜZDANIM</Text>
+              <Text style={p.walletCompactAmount}>{isGM ? '∞' : spBalance.toLocaleString('tr-TR')}</Text>
             </View>
-
-            <View style={p.walletHeader}>
-              <Text style={p.walletTitle}>SP CÜZDANIM</Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Pressable onPress={openSPHistory} style={p.historyBtn} hitSlop={10} accessibilityLabel="SP geçmişi">
-                  <Ionicons name="time-outline" size={18} color="#FAC775" />
-                </Pressable>
-                <View style={p.levelBadge}>
-                  <Text style={p.levelText}>Lv.{userLevel}</Text>
-                </View>
-              </View>
+            <View style={p.levelBadge}>
+              <Text style={p.levelText}>Lv.{userLevel}</Text>
             </View>
-
-            {/* ★ 2026-04-30: SP ana ikonu — sabit, animasyon yok, sade View */}
-            <View style={p.walletBody}>
-              <SPHexagonIcon size={96} />
-              <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
-                <Text style={p.walletAmount}>{isGM ? '∞' : spBalance.toLocaleString('tr-TR')}</Text>
-                <Text style={p.walletCurrency}>SP</Text>
-              </View>
-            </View>
-
-            {/* Level progress bar — kompakt */}
-            {userLevel < 99 && !isGM && (
-              <View style={p.levelProgressWrap}>
-                <View style={p.levelProgressTrack}>
-                  <LinearGradient
-                    colors={['#FFE082', '#FBBF24', '#D97706']}
-                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                    style={[p.levelProgressFill, { width: `${((spBalance % 100))}%` }]}
-                  />
-                </View>
-                <Text style={p.levelProgressHint}>
-                  Lv.{userLevel + 1}'e {100 - (spBalance % 100)} SP
-                </Text>
-              </View>
-            )}
+            <Ionicons name="time-outline" size={18} color="#FAC775" style={{ marginLeft: 8 }} />
           </Pressable>
+
+          {/* ★ 2026-05-05: Hediye vitrini ProfileHero stats satırına Hediye butonu olarak taşındı.
+              Tıklayınca tab'lı GiftDetailModal açılır (Aldığı / Verdiği sekmeleri). */}
 
           {/* ═══ Tüm Arkadaşlar — SP cüzdanın hemen altında ═══ */}
           <ProfileFriendsList
             friends={allFriends as any}
             onFriendPress={(friendId) => openUserProfile(friendId)}
-            onShowAll={() => { setFollowModalTab('followers'); setFollowModalVisible(true); }}
+            onShowAll={() => { setFollowModalTab('friends'); setFollowModalVisible(true); }}
           />
 
-          {/* ═══ Tek aksiyon kartı — vertical gradient (parlak → koyu) ═══ */}
+          {/* ═══ Tek aksiyon kartı — NotificationDrawer aile dili (slate + teal halo + soft glow) ═══ */}
           <View style={p.unifiedCard}>
             <LinearGradient
-              colors={['#2D3F5F', '#1E2D4A', '#152238', '#0E1A2E']}
-              locations={[0, 0.35, 0.7, 1]}
-              start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
-              style={StyleSheet.absoluteFillObject}
-            />
-            <LinearGradient
-              colors={['rgba(20,184,166,0.12)', 'transparent']}
-              start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 0.7 }}
+              colors={['#3a4658', '#2a3344', '#1a2030']}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
               style={StyleSheet.absoluteFillObject}
               pointerEvents="none"
             />
+            <LinearGradient
+              colors={['rgba(20,184,166,0.20)', 'rgba(20,184,166,0.05)', 'transparent']}
+              start={{ x: 0, y: 0 }} end={{ x: 0, y: 0.4 }}
+              style={StyleSheet.absoluteFillObject}
+              pointerEvents="none"
+            />
+            <LinearGradient
+              colors={['rgba(20,184,166,0.08)', 'transparent']}
+              start={{ x: 0, y: 0 }} end={{ x: 0.7, y: 0.6 }}
+              style={StyleSheet.absoluteFillObject}
+              pointerEvents="none"
+            />
+            {/* ★ v108.20: Header'dan taşınan navigation satırları */}
+            <PremiumListItem
+              icon="crown-outline"
+              iconColor="#FBBF24"
+              label="Soprano Premium"
+              badge="VIP"
+              badgeColor="#FBBF24"
+              onPress={() => router.push('/plus' as any)}
+            />
+            <PremiumListItem
+              icon="storefront-outline"
+              iconColor="#FBBF24"
+              label="Maison Soprano Mağaza"
+              onPress={() => router.push('/store' as any)}
+            />
+            <PremiumListItem
+              icon="trophy-outline"
+              iconColor="#F1F5F9"
+              label="Liderlik Tablosu"
+              onPress={() => router.push('/leaderboard' as any)}
+            />
+            <PremiumListItem
+              icon="cog-outline"
+              iconColor="#F1F5F9"
+              label="Ayarlar"
+              onPress={() => router.push('/settings' as any)}
+            />
+            <View style={p.sectionDivider} />
             <PremiumListItem
               icon="gift"
               iconColor="#A78BFA"
@@ -706,25 +782,8 @@ export default function ProfileScreen() {
           </View>
 
           {/* GodMaster Admin Paneli — admin only */}
-          {profile?.is_admin && (
-            <>
-              <View style={p.premiumSectionHeader}>
-                <View style={[p.sectionAccent, { backgroundColor: '#EF4444' }]} />
-                <Ionicons name="shield-checkmark" size={13} color="#EF4444" style={iconShadow} />
-                <Text style={[p.premiumSectionText, { color: '#F87171' }]}>SİSTEM YÖNETİMİ</Text>
-              </View>
-              <View style={[p.unifiedCard, { borderColor: 'rgba(239,68,68,0.2)' }]}>
-                <PremiumListItem
-                  icon="shield-crown"
-                  iconColor="#EF4444"
-                  label="GodMaster Panel"
-                  labelColor="#F87171"
-                  onPress={() => router.push('/admin' as any)}
-                  isLast
-                />
-              </View>
-            </>
-          )}
+          {/* ★ 2026-05-06: Mobile GodMaster Panel kaldırıldı — şikayet/moderasyon/kullanıcı yönetimi
+               artık web admin paneline (sopranochat.com/yonet) taşındı. is_admin için sadece görsel tik kalır. */}
 
 
           {/* Referans Modal — iki bölümlü: kendi kodum + arkadaş kodu gir (premium) */}
@@ -827,26 +886,30 @@ export default function ProfileScreen() {
             </Pressable>
           </Modal>
 
-          {/* ★ v107: Çerçeve seçim sheet — envanterindeki atelier ürünlerini gösterir */}
-          {user?.uid && (
-            <FrameSelectSheet
-              visible={showFrameSheet}
-              onClose={() => setShowFrameSheet(false)}
-              userId={user.uid}
-              currentFrameId={activeFrame}
-              onFrameChange={(id) => setActiveFrame(id)}
-            />
-          )}
-
-          {/* ★ SP Geçmişi — swipe-to-dismiss + realtime altın bottom sheet */}
-          <SPHistorySheet
-            visible={showSPHistory}
-            onClose={() => setShowSPHistory(false)}
-            balance={spBalance}
-            history={spHistory}
-          />
-
         </ScrollView>
+
+        {/* ★ v107 hotfix: Sheet'ler ScrollView DIŞINDA olmalı — içerideyken position:absolute
+            scroll content'inde takılır, tıklamaya tepki vermez. */}
+        {firebaseUser?.uid && (
+          <FrameSelectSheet
+            visible={showFrameSheet}
+            onClose={() => setShowFrameSheet(false)}
+            userId={firebaseUser.uid}
+            currentFrameId={activeFrame}
+            currentEntryEffectId={activeEntryEffect}
+            currentAvatarUrl={profile?.avatar_url}
+            onFrameChange={(id) => setActiveFrame(id)}
+            onEntryEffectChange={(id) => setActiveEntryEffect(id)}
+          />
+        )}
+
+        {/* ★ SP Geçmişi — swipe-to-dismiss + realtime altın bottom sheet */}
+        <SPHistorySheet
+          visible={showSPHistory}
+          onClose={() => setShowSPHistory(false)}
+          balance={spBalance}
+          history={spHistory}
+        />
 
         {/* Boost Picker — Premium Bottom Sheet */}
         <BoostPickerSheet
@@ -858,11 +921,7 @@ export default function ProfileScreen() {
             try {
               await ProfileService.boostProfile(profile.id, tier.cost, tier.duration);
               await refreshProfile();
-              showToast({
-                title: `${tier.label} Aktif! 🚀`,
-                message: `Profilin ve odaların ${tier.duration} saat boyunca Keşfet'te öne çıkacak.`,
-                type: 'success',
-              });
+              // ★ 2026-05-05: Başarı toast'ı kaldırıldı — checked.json overlay yeterli görsel feedback.
             } catch (err: any) {
               showToast({ title: 'Boost başarısız', message: err.message || 'Hata oluştu', type: 'error' });
               throw err; // BoostPickerSheet loading state'i kapatsın
@@ -889,6 +948,16 @@ export default function ProfileScreen() {
             onClose={() => setShowBadgesModal(false)}
             userId={userId}
             displayName={displayName}
+          />
+        )}
+
+        {/* ★ 2026-05-05: Hediye detay modalı — tab'lı (Aldığı / Verdiği) */}
+        {userId && (
+          <GiftDetailModal
+            visible={showGiftDetail}
+            userId={userId}
+            displayName={displayName}
+            onClose={() => setShowGiftDetail(false)}
           />
         )}
 
@@ -1008,18 +1077,18 @@ const p = StyleSheet.create({
   cardTopEdge: {
     position: 'absolute', top: 0, left: 0, right: 0, height: 1,
   },
-  // ★ 2026-04-29: Unified kart — tek sade kart, flat transparan zemin
-  // ★ 2026-04-29: Premium gradient + teal hairline + derin shadow
+  // ★ 2026-05-05: NotificationDrawer aile standardı — radius 14→26, teal border
+  //   kaldırıldı (halo gradient yeterli), shadow tutarlı.
   unifiedCard: {
     marginHorizontal: 16, marginBottom: 10,
-    borderRadius: 14,
-    borderWidth: 1, borderColor: 'rgba(20,184,166,0.22)',
+    borderRadius: 26,
+    backgroundColor: '#1a2030',
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
+    shadowOpacity: 0.45,
+    shadowRadius: 14,
+    elevation: 10,
   },
   // ★ 2026-04-29: Section divider — tehlikeli aksiyonlar üstünde ince ayırıcı
   sectionDivider: {
@@ -1072,6 +1141,26 @@ const p = StyleSheet.create({
     borderColor: 'rgba(255,224,130,0.3)',
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.4, shadowRadius: 4, elevation: 3,
+  },
+  // ★ v108.17: SP Cüzdan kompakt — eski büyük blok yerine 56px ince satır
+  walletCompact: {
+    flexDirection: 'row', alignItems: 'center',
+    marginHorizontal: 16, marginBottom: 10,
+    paddingHorizontal: 14, paddingVertical: 10,
+    borderRadius: 14, overflow: 'hidden',
+    borderWidth: 1, borderColor: 'rgba(251,191,36,0.28)',
+  },
+  walletCompactLabel: {
+    fontSize: 9, fontWeight: '700', letterSpacing: 1.2,
+    color: 'rgba(251,191,36,0.7)', textTransform: 'uppercase',
+    marginBottom: 2,
+  },
+  walletCompactAmount: {
+    fontSize: 18, fontWeight: '800', color: '#FFE082',
+    letterSpacing: 0.3,
+  },
+  walletCompactCurrency: {
+    fontSize: 11, fontWeight: '700', color: 'rgba(251,191,36,0.7)',
   },
   levelText: { fontSize: 11, fontWeight: '900', color: '#FFE082', letterSpacing: 0.3, ..._textGlow },
   // ★ 2026-04-30: Sol tarafta SPHexagonIcon (mücevher) + sağ tarafta rakam — kompakt

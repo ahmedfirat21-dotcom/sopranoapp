@@ -16,18 +16,23 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  View, Text, StyleSheet, Animated, PanResponder, Dimensions, Pressable, Platform,
+  View, Text, StyleSheet, Animated, PanResponder, Dimensions, Pressable, Platform, Modal,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
-import { WebView } from 'react-native-webview';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../constants/supabase';
 import { StoreService, type CosmeticItem } from '../../services/store';
-import { getIllustrationHtml } from '../../constants/storeIllustrations';
+import Item3DArt from '../store/Item3DArt';
 import { showToast } from '../Toast';
+import { getGiftLottie, hasGiftLottie } from '../../constants/giftLottieRegistry';
+
+let LottieView: any = null;
+try {
+  LottieView = require('lottie-react-native').default;
+} catch { /* fallback */ }
 
 const { width: W } = Dimensions.get('window');
 const PANEL_HEIGHT_BASE = 580;
@@ -38,22 +43,23 @@ interface Props {
   senderId: string;
   recipientId: string;
   recipientName: string;
+  /** ★ v107: Oda içinden gönderim — RPC bunu room_live_gifts + sistem mesajına yansıtır */
+  roomId?: string | null;
 }
 
 function GiftThumb({ itemId }: { itemId: string }) {
-  const html = getIllustrationHtml(itemId);
-  if (!html) return null;
-  return (
-    <View pointerEvents="none" style={StyleSheet.absoluteFillObject}>
-      <WebView source={{ html }} style={{ flex: 1, backgroundColor: 'transparent' }}
-        containerStyle={{ backgroundColor: 'transparent' }}
-        scrollEnabled={false} bounces={false} originWhitelist={['*']}
-        javaScriptEnabled domStorageEnabled={false} androidLayerType="hardware" scalesPageToFit={false} />
-    </View>
-  );
+  // ★ v107: Lottie animasyonu varsa onu göster (Bigo/TikTok seviyesi), yoksa PNG
+  if (hasGiftLottie(itemId) && LottieView) {
+    return (
+      <View pointerEvents="none" style={StyleSheet.absoluteFillObject}>
+        <LottieView source={getGiftLottie(itemId)} autoPlay loop style={{ flex: 1 }} />
+      </View>
+    );
+  }
+  return <Item3DArt itemId={itemId} fullSize />;
 }
 
-export default function SymbolGiftSheet({ visible, onClose, senderId, recipientId, recipientName }: Props) {
+export default function SymbolGiftSheet({ visible, onClose, senderId, recipientId, recipientName, roomId }: Props) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const PANEL_HEIGHT = PANEL_HEIGHT_BASE + Math.max(insets.bottom, 0);
@@ -61,20 +67,23 @@ export default function SymbolGiftSheet({ visible, onClose, senderId, recipientI
   const translateY = useRef(new Animated.Value(PANEL_HEIGHT)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
 
-  const [ownedGifts, setOwnedGifts] = useState<CosmeticItem[]>([]);
+  const [allGifts, setAllGifts] = useState<CosmeticItem[]>([]);
+  const [senderSP, setSenderSP] = useState<number>(0);
   const [sending, setSending] = useState(false);
 
   useEffect(() => {
     if (!visible) return;
     let cancelled = false;
     (async () => {
-      const [{ items }, inv] = await Promise.all([
+      const [{ items }, profileRes] = await Promise.all([
         StoreService.getCatalog(),
-        StoreService.getUserInventory(senderId),
+        supabase.from('profiles').select('donatable_sp').eq('id', senderId).single(),
       ]);
       if (cancelled) return;
-      const owned = items.filter((i) => i.category === 'gift' && inv.has(i.id));
-      setOwnedGifts(owned);
+      const gifts = items.filter((i) => i.category === 'gift');
+      gifts.sort((a, b) => a.price_sp - b.price_sp);
+      setAllGifts(gifts);
+      setSenderSP(profileRes.data?.donatable_sp || 0);
     })();
     return () => { cancelled = true; };
   }, [visible, senderId]);
@@ -113,11 +122,20 @@ export default function SymbolGiftSheet({ visible, onClose, senderId, recipientI
 
   const handleSend = async (item: CosmeticItem) => {
     if (sending) return;
+    if (senderSP < item.price_sp) {
+      showToast({
+        title: 'Yetersiz SP',
+        message: `${item.name} için ${item.price_sp} SP gerekli, ${senderSP} SP'n var.`,
+        type: 'error',
+      });
+      return;
+    }
     setSending(true);
     const { data, error } = await supabase.rpc('send_symbol_gift', {
       p_sender_id: senderId,
       p_recipient_id: recipientId,
       p_item_id: item.id,
+      p_room_id: roomId || null,
     });
     setSending(false);
     if (error || !data?.success) {
@@ -128,9 +146,10 @@ export default function SymbolGiftSheet({ visible, onClose, senderId, recipientI
       });
       return;
     }
+    setSenderSP((prev) => Math.max(0, prev - item.price_sp));
     showToast({
       title: `${item.art_emoji || '✨'} Gönderildi`,
-      message: `${recipientName} → ${item.name}`,
+      message: `${recipientName} → ${item.name} (-${item.price_sp} SP)`,
       type: 'success',
     });
     onClose();
@@ -138,9 +157,10 @@ export default function SymbolGiftSheet({ visible, onClose, senderId, recipientI
 
   if (!visible) return null;
 
+  // ★ v107 hotfix: Modal — sistem seviyesinde render, parent layout takılmasını önler.
   return (
-    <View style={StyleSheet.absoluteFillObject as any} pointerEvents="box-none">
-      <View style={{ ...StyleSheet.absoluteFillObject, zIndex: 540 }} pointerEvents="box-none">
+    <Modal visible={visible} transparent animationType="none" onRequestClose={onClose} statusBarTranslucent>
+      <View style={StyleSheet.absoluteFillObject as any} pointerEvents="box-none">
         <Animated.View style={[StyleSheet.absoluteFill, { opacity: backdropOpacity }]}>
           <BlurView intensity={28} tint="dark" style={StyleSheet.absoluteFill} />
           <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.55)' }]} />
@@ -175,44 +195,40 @@ export default function SymbolGiftSheet({ visible, onClose, senderId, recipientI
             </View>
           </View>
 
-          {ownedGifts.length === 0 ? (
+          {allGifts.length === 0 ? (
             <View style={s.empty}>
               <Ionicons name="bag-outline" size={42} color="rgba(255,255,255,0.3)" />
-              <Text style={s.emptyText}>Envanterinde hediye sembolün yok</Text>
-              <Pressable style={s.emptyCta} onPress={() => { onClose(); router.push('/store' as any); }}>
-                <LinearGradient
-                  colors={['#FFE082', '#FAC775']}
-                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                  style={StyleSheet.absoluteFillObject}
-                />
-                <Text style={s.emptyCtaText}>MAĞAZAYA GİT</Text>
-              </Pressable>
+              <Text style={s.emptyText}>Hediye katalogu yüklenemedi</Text>
             </View>
           ) : (
             <>
               <View style={s.grid}>
-                {ownedGifts.map((item) => (
-                  <Pressable
-                    key={item.id}
-                    style={[s.giftCard, sending && { opacity: 0.5 }]}
-                    onPress={() => handleSend(item)}
-                    disabled={sending}
-                  >
-                    <View style={s.giftThumbWrap}>
-                      <GiftThumb itemId={item.id} />
-                    </View>
-                    <Text style={s.giftName} numberOfLines={1}>{item.name}</Text>
-                  </Pressable>
-                ))}
+                {allGifts.map((item) => {
+                  const affordable = senderSP >= item.price_sp;
+                  return (
+                    <Pressable
+                      key={item.id}
+                      style={[s.giftCard, sending && { opacity: 0.5 }, !affordable && { opacity: 0.55 }]}
+                      onPress={() => handleSend(item)}
+                      disabled={sending}
+                    >
+                      <View style={s.giftThumbWrap}>
+                        <GiftThumb itemId={item.id} />
+                      </View>
+                      <Text style={s.giftName} numberOfLines={1}>{item.name}</Text>
+                      <Text style={s.giftPrice}>{item.price_sp} SP</Text>
+                    </Pressable>
+                  );
+                })}
               </View>
               <Text style={s.footnote}>
-                Sembol arkadaşının ekranına animasyon olarak düşer. Envanterinden silinmez.
+                Her gönderimde SP'n düşer · Alıcı %50 kazanır
               </Text>
             </>
           )}
         </Animated.View>
       </View>
-    </View>
+    </Modal>
   );
 }
 
@@ -276,6 +292,12 @@ const s = StyleSheet.create({
     color: '#F1F5F9',
     textAlign: 'center',
     fontFamily: serif,
+  },
+  giftPrice: {
+    fontSize: 10, fontWeight: '800',
+    color: '#FBBF24',
+    textAlign: 'center',
+    marginTop: 2,
   },
   footnote: {
     fontSize: 10.5, fontWeight: '500',

@@ -294,7 +294,7 @@ export default function FollowListModal({
         style={({ pressed }) => [st.row, pressed && { backgroundColor: 'rgba(255,255,255,0.04)' }]}
         onPress={() => navigateToProfile(item.id)}
       >
-        <StatusAvatar uri={item.avatar_url} size={40} tier={(item as any).subscription_tier} showTierBadge={false} />
+        <StatusAvatar uri={item.avatar_url} size={40} tier={(item as any).subscription_tier} showTierBadge={false} frameId={(item as any).active_frame || null} />
         <View style={{ flex: 1 }}>
           <Text style={st.name} numberOfLines={1}>{item.display_name}</Text>
           {item.username && <Text style={st.username}>@{item.username}</Text>}
@@ -351,16 +351,28 @@ export default function FollowListModal({
     //   pan responder Capture phase'i de Pressable child'larla çakışıyordu (drag handle dışında ölü).
     //   View overlay zIndex:300 ile sayfanın üstünde kalır (InRoomUserProfile/profile.tsx/user/[id].tsx).
     <View style={st.overlay} pointerEvents="box-none">
-      <Animated.View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.55)', opacity: backdropOpacity }]}>
+      <Animated.View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(8,12,22,0.45)', opacity: backdropOpacity }]}>
         <Pressable style={StyleSheet.absoluteFillObject} onPress={dismiss} />
       </Animated.View>
 
       {/* Sheet — translateY-based animated positioning (useNativeDriver:true) */}
       <Animated.View style={[st.sheet, { transform: [{ translateY }] }]} {...panResponder.panHandlers}>
-          {/* ★ Diagonal gradient fon — profil sayfası ile birebir */}
+          {/* ★ 2026-05-05: NotificationDrawer aile dili — slate diagonal + teal halo + soft glow */}
           <LinearGradient
-            colors={['#4a5668', '#37414f', '#232a35']}
+            colors={['#3a4658', '#2a3344', '#1a2030']}
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFillObject}
+            pointerEvents="none"
+          />
+          <LinearGradient
+            colors={['rgba(20,184,166,0.20)', 'rgba(20,184,166,0.05)', 'transparent']}
+            start={{ x: 0, y: 0 }} end={{ x: 0, y: 0.4 }}
+            style={StyleSheet.absoluteFillObject}
+            pointerEvents="none"
+          />
+          <LinearGradient
+            colors={['rgba(20,184,166,0.08)', 'transparent']}
+            start={{ x: 0, y: 0 }} end={{ x: 0.7, y: 0.6 }}
             style={StyleSheet.absoluteFillObject}
             pointerEvents="none"
           />
@@ -419,19 +431,17 @@ const st = StyleSheet.create({
     zIndex: 400, // InRoomUserProfile (300) üstünde — profil sheet'inin üzerine açılır
     elevation: 24, // Android için
   },
+  // ★ 2026-05-05: NotificationDrawer aile standardı — radius 22→26, slate bg, gri border kaldırıldı
   sheet: {
-    // ★ 2026-04-28: top:0+bottom:0 sabit, transform translateY ile snap (useNativeDriver:true).
     position: 'absolute',
     left: 0,
     right: 0,
     top: 0,
     bottom: 0,
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
+    borderTopLeftRadius: 26,
+    borderTopRightRadius: 26,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderBottomWidth: 0,
-    borderColor: Colors.cardBorder,
+    backgroundColor: '#1a2030',
     ...Shadows.card,
   },
   topEdge: {

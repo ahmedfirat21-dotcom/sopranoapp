@@ -115,6 +115,32 @@ const FRAME_PALETTES: Record<string, FramePalette> = {
     inner: '#E0FFFE',
     glowIos: 'rgba(76,224,226,0.75)',
   },
+  // ★ v110.15: Egzantrik çerçeveler — palette fallback (küçük avatarlarda halka olarak)
+  'celestial-orbit': {
+    outer: ['#A5F3FC', '#4CE0E2', '#FBBF24'],
+    inner: '#E0FFFE',
+    glowIos: 'rgba(76,224,226,0.75)',
+  },
+  'hex-prism': {
+    outer: ['#C4B5FD', '#A78BFA', '#F472B6'],
+    inner: '#EDE9FE',
+    glowIos: 'rgba(167,139,250,0.75)',
+  },
+  'pulse-wave': {
+    outer: ['#5EEAD4', '#14B8A6', '#0D9488'],
+    inner: '#CCFBF1',
+    glowIos: 'rgba(20,184,166,0.75)',
+  },
+  'eclipse-corona': {
+    outer: ['#C084FC', '#7C3AED', '#4C1D95'],
+    inner: '#DDD6FE',
+    glowIos: 'rgba(124,58,237,0.75)',
+  },
+  'glitch-matrix': {
+    outer: ['#34D399', '#10B981', '#059669'],
+    inner: '#D1FAE5',
+    glowIos: 'rgba(16,185,129,0.75)',
+  },
 };
 
 // ★ v108.13: Avatar bu boyutun altındaysa Lottie göster yerine sade halka palette
@@ -124,8 +150,6 @@ const LOTTIE_MIN_AVATAR_SIZE = 64;
 // ★ v108.16: Lottie frame — sadece kanatlı (useMidLoop) frame'ler için intro+mid-loop
 //   pattern; diğer frame'ler default full loop. Kanat açılma sallanma efekti elde edilir.
 function LottieFrame({ meta, size }: { meta: any; size: number }) {
-  const lottieSize = Math.round(size * meta.scale);
-  const offset = (lottieSize - size) / -2;
   const ip = meta.source?.ip ?? 0;
   const op = meta.source?.op ?? 90;
   const totalFrames = op - ip;
@@ -138,21 +162,23 @@ function LottieFrame({ meta, size }: { meta: any; size: number }) {
     [meta.source, loopStart, op]
   );
 
+  const lottieSize = Math.round(size * meta.scale);
+  const offset = (lottieSize - size) / -2;
+
   return (
     <View
       pointerEvents="none"
       style={{
         position: 'absolute',
+        // ★ v110.14 (8 May 2026): overflow:'visible' + elevation kaldırıldı.
+        //   Android'de elevation bitmap layer'ı layout sınırlarında çizip kenarları
+        //   kırpıyordu → daire ezilmiş görünüyordu. overflow:'visible' kırpmayı
+        //   devre dışı bırakır, zIndex tek başına stacking yeter.
         top: offset, left: offset,
         width: lottieSize, height: lottieSize,
         alignItems: 'center', justifyContent: 'center',
-        // ★ v110.9 (7 May 2026): zIndex -1→3 + elevation 0→3 — kullanıcı raporu:
-        //   "çerçeveler avatarın ARKASINDA kalıyor, üstte POP olmalı". Eski yorumdaki
-        //   "Image elevation 12" varsayımı doğru değil (gerçek Image elevation 0); Lottie
-        //   frame Image üstüne render olunca kanat/halka tam görünür. Tier badge zIndex 5
-        //   ile hâlâ frame üstünde kalır.
+        overflow: 'visible',
         zIndex: 3,
-        elevation: 3,
       }}
     >
       <LottieView
@@ -164,7 +190,7 @@ function LottieFrame({ meta, size }: { meta: any; size: number }) {
         onAnimationFinish={() => {
           if (useMidLoop && phase === 'intro') setPhase('loop');
         }}
-        style={{ width: '100%', height: '100%' }}
+        style={{ width: lottieSize, height: lottieSize }}
       />
     </View>
   );

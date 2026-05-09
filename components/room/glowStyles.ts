@@ -9,10 +9,10 @@ export type GlowStyleId =
   | 'gold' | 'heart' | 'neon' | 'fire' | 'celebration' | 'galaxy'
   | 'constellation' | 'or-ancien' | 'inferno' | 'voltaire' | 'belle-epoque';
 
-// ★ v107 hotfix: Inferno premium listeden kaldırıldı (görsel kalitesi yetersiz, mağaza
-//   tarafında deactivate). Tip enum'da kalır (eski mesajların render'ını bozmaz).
+// ★ v107 hotfix (4 May 2026): Inferno geri eklendi — manuel SVG yerine PNG asset
+//   kullanıldığı için görsel kalitesi uygun. Tüm premium glow ID'leri burada.
 export const PREMIUM_GLOW_IDS: GlowStyleId[] = [
-  'constellation', 'or-ancien', 'voltaire', 'belle-epoque',
+  'constellation', 'or-ancien', 'inferno', 'voltaire', 'belle-epoque',
 ];
 
 export const GLOW_STYLES: Record<GlowStyleId, {
@@ -93,7 +93,7 @@ export const GLOW_STYLES: Record<GlowStyleId, {
   // Tek seferlik satın alma → envanterde varsa free render, RPC SP düşmez.
   // unlockPrice: cosmetic_items.price_sp ile birebir.
   constellation: {
-    cost: 0, premium: true, unlockPrice: 35,
+    cost: 0, premium: true, unlockPrice: 400,
     label: 'CONSTELLATION', icon: '✨',
     bgGradient: ['#0A0518', '#1E1B4B', '#312E81'],
     headerBg: ['rgba(255,224,130,0.4)', 'rgba(167,139,250,0.3)'],
@@ -103,7 +103,7 @@ export const GLOW_STYLES: Record<GlowStyleId, {
     particles: 'stars',
   },
   'or-ancien': {
-    cost: 0, premium: true, unlockPrice: 12,
+    cost: 0, premium: true, unlockPrice: 120,
     label: 'OR ANCIEN', icon: '✦',
     bgGradient: ['#1A1500', '#5C4612', '#854F0B'],
     headerBg: ['rgba(255,224,130,0.45)', 'transparent'],
@@ -113,7 +113,7 @@ export const GLOW_STYLES: Record<GlowStyleId, {
     particles: 'shine',
   },
   inferno: {
-    cost: 0, premium: true, unlockPrice: 18,
+    cost: 0, premium: true, unlockPrice: 180,
     label: 'INFERNO', icon: '🔥',
     bgGradient: ['#1F0500', '#7F1D1D', '#B91C1C'],
     headerBg: ['rgba(0,0,0,0.4)', 'rgba(0,0,0,0.4)'],
@@ -123,7 +123,7 @@ export const GLOW_STYLES: Record<GlowStyleId, {
     particles: 'fire-icon',
   },
   voltaire: {
-    cost: 0, premium: true, unlockPrice: 22,
+    cost: 0, premium: true, unlockPrice: 220,
     label: 'VOLTAIRE', icon: '⚡',
     bgGradient: ['#0A1828', '#155E75', '#0E7490'],
     headerBg: ['rgba(0,0,0,0.5)', 'rgba(0,0,0,0.5)'],
@@ -133,7 +133,7 @@ export const GLOW_STYLES: Record<GlowStyleId, {
     particles: 'neon-border',
   },
   'belle-epoque': {
-    cost: 0, premium: true, unlockPrice: 28,
+    cost: 0, premium: true, unlockPrice: 280,
     label: 'BELLE ÉPOQUE', icon: '💗',
     bgGradient: ['#1A0518', '#831843', '#BE185D'],
     headerBg: ['rgba(0,0,0,0.3)', 'transparent'],

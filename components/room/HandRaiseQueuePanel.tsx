@@ -172,7 +172,25 @@ export default function HandRaiseQueuePanel({
         {...panResponder.panHandlers}
         style={[s.panel, { bottom: BAR_OFFSET_INNER, maxHeight: maxPanelH, transform: [{ translateY }] }]}
       >
-        <LinearGradient colors={['#4a5668', '#37414f', '#232a35']} locations={[0, 0.35, 1]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[StyleSheet.absoluteFillObject, { borderRadius: 18 }]} />
+        {/* ★ 2026-05-05: NotificationDrawer dili — slate diagonal + üst amber halo (el kaldır karakteri). */}
+        <LinearGradient
+          colors={['#3a4658', '#2a3344', '#1a2030']}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+          style={[StyleSheet.absoluteFillObject, { borderRadius: 22 }]}
+          pointerEvents="none"
+        />
+        <LinearGradient
+          colors={['rgba(251,191,36,0.20)', 'rgba(251,191,36,0.05)', 'transparent']}
+          start={{ x: 0, y: 0 }} end={{ x: 0, y: 0.4 }}
+          style={[StyleSheet.absoluteFillObject, { borderRadius: 22 }]}
+          pointerEvents="none"
+        />
+        <LinearGradient
+          colors={['rgba(251,191,36,0.08)', 'transparent']}
+          start={{ x: 0, y: 0 }} end={{ x: 0.7, y: 0.6 }}
+          style={[StyleSheet.absoluteFillObject, { borderRadius: 22 }]}
+          pointerEvents="none"
+        />
         {/* Sürükleme tutamağı */}
         <View style={s.handle}>
           <View style={s.handleBar} />
@@ -234,25 +252,23 @@ export default function HandRaiseQueuePanel({
 const s = StyleSheet.create({
   backdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.25)',
+    backgroundColor: 'rgba(8,12,22,0.45)',
   },
-  // ★ Panel — chat drawer ile aynı tasarım dili
+  // ★ Panel — NotificationDrawer dili (slate kabuk + amber halo)
   panel: {
     position: 'absolute',
     left: 6,
     right: 6,
     zIndex: 50,
-    borderTopLeftRadius: 18,
-    borderTopRightRadius: 18,
-    borderBottomLeftRadius: 18,
-    borderBottomRightRadius: 18,
+    borderRadius: 22,
     overflow: 'hidden',
+    backgroundColor: '#1a2030',
     paddingBottom: 8,
-    elevation: 20,
+    elevation: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 16,
+    shadowOpacity: 0.45,
+    shadowRadius: 14,
   },
   handle: { alignItems: 'center', paddingTop: 8, paddingBottom: 2 },
   handleBar: { width: 36, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.25)' },

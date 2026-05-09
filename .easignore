@@ -1,0 +1,16 @@
+# EAS Build ignore — git'te olmayan ama build üretimine de gerekmeyen yerel klasörler.
+# Symlink'ler özellikle Windows'ta tarball pack hatası veriyor.
+web-admin
+playstore_screenshots/
+icon_concepts/
+screenshots/
+build_*.log
+_aab_check/
+.playwright-mcp/
+
+# Geliştirme/test scriptleri
+tools/
+MOCK_DATA*.sql
+
+# Web admin paneli
+public/

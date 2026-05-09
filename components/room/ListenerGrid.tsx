@@ -18,13 +18,13 @@ import type { RoomParticipant } from '../../services/database';
 function getGridMetrics(listenerCount: number, W: number) {
   let cols: number, avatarGap: number, maxSize: number;
   if (listenerCount <= 4) {
-    cols = 5; avatarGap = 12; maxSize = 56;   // Clubhouse: az kişide bile küçük kal
+    cols = 5; avatarGap = 12; maxSize = 60;   // Clubhouse: az kişide bile küçük kal (kullanıcı "çok az büyüt" istedi 7 May 2026)
   } else if (listenerCount <= 8) {
-    cols = 6; avatarGap = 10; maxSize = 52;
+    cols = 6; avatarGap = 10; maxSize = 54;
   } else if (listenerCount <= 15) {
-    cols = 7; avatarGap = 7; maxSize = 46;
+    cols = 7; avatarGap = 7; maxSize = 48;
   } else {
-    cols = 8; avatarGap = 5; maxSize = 40;    // 16+ (gerekirse "+N Seyirci" badge'de)
+    cols = 8; avatarGap = 5; maxSize = 42;    // 16+ (gerekirse "+N Seyirci" badge'de)
   }
   const cellW = Math.floor((W - 32 - avatarGap * (cols - 1)) / cols);
   // Avatar size agresif shrink: ufak hücrelerde padding büyümesin
@@ -96,16 +96,28 @@ const ListenerCell = React.memo(function ListenerCell({
         showMuteIndicator && s.avatarMuted,
         hasFrame && { borderWidth: 0, backgroundColor: 'transparent', overflow: 'visible' },
       ]}>
-        {/* ★ v108.14: Frame ÖNCE render — render order'da arkada kalır, Image üstte */}
-        {hasFrame && (
-          <RoomAvatarFrame frameId={activeFrameId} avatarSize={ownerAvatarSize} minSize={36} />
-        )}
-        {/* ★ v108.15: hasFrame durumunda parent overflow:visible (frame kanatları için);
-             Image'e ayrıca borderRadius ver ki daire şeklinde kalsın. */}
+        {/* ★ v110.9 (7 May 2026): Image ÖNCE, frame SONRA — frame avatar üstüne POP olsun.
+             Eski sıralamada (frame önce, image sonra) RN render order'ı yüzünden
+             palette halka çerçeveleri (aurum-ring, glacier-ring vb.) avatar dairesinin
+             EDGE'inde çiziliyor ve Image tarafından örtülüyordu. SpeakerSection'da
+             aynı pattern (v108.32). zIndex 2 + elevation 2 Android için kritik. */}
         <Image
           source={getAvatarSource((u as any).disguise?.avatar_url || u.user?.avatar_url)}
           style={[s.avatar, hasFrame && { borderRadius: ownerAvatarSize / 2 }]}
         />
+        {hasFrame && (
+          <View
+            style={{
+              position: 'absolute',
+              top: 0, left: 0, right: 0, bottom: 0,
+              alignItems: 'center', justifyContent: 'center',
+              zIndex: 2, elevation: 2,
+            }}
+            pointerEvents="none"
+          >
+            <RoomAvatarFrame frameId={activeFrameId} avatarSize={ownerAvatarSize} minSize={36} />
+          </View>
+        )}
       </View>
       {showMuteIndicator && (
         <View style={[s.mutedBadge, { right: (cellW - ownerAvatarSize) / 2 - 6 }]}>

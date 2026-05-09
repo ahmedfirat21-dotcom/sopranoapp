@@ -125,7 +125,7 @@ export const RoomFollowService = {
 
   /** Odanın takipçi profillerini getir (avatar + isim)
    *  ★ 2026-04-23: Embedded join yerine 2-step query — PGRST200 FK hint hatası önlenir */
-  async getRoomFollowers(roomId: string, limit = 20): Promise<{ id: string; display_name: string; avatar_url: string }[]> {
+  async getRoomFollowers(roomId: string, limit = 20): Promise<{ id: string; display_name: string; avatar_url: string; active_frame: string | null }[]> {
     try {
       // Adım 1: Takipçi user_id'lerini çek
       const { data: follows, error: fErr } = await supabase
@@ -141,13 +141,14 @@ export const RoomFollowService = {
       // Adım 2: Profilleri toplu çek
       const { data: profiles, error: pErr } = await supabase
         .from('profiles')
-        .select('id, display_name, avatar_url')
+        .select('id, display_name, avatar_url, active_frame')
         .in('id', userIds);
       if (pErr) throw pErr;
       return (profiles || []).map((p: any) => ({
         id: p.id,
         display_name: p.display_name || 'Kullanıcı',
         avatar_url: p.avatar_url || '',
+        active_frame: p.active_frame || null,
       }));
     } catch (e) {
       if (__DEV__) console.warn('[RoomFollowService] getRoomFollowers error:', e);

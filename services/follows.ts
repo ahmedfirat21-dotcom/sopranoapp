@@ -105,7 +105,7 @@ export const FollowService = {
     if (!userId) return [];
     const { data, error } = await supabase
       .from('follows')
-      .select('follower:profiles!follower_id(id, display_name, avatar_url, username, subscription_tier, is_online)')
+      .select('follower:profiles!follower_id(id, display_name, avatar_url, username, subscription_tier, is_online, active_frame)')
       .eq('following_id', userId)
       .order('created_at', { ascending: false })
       .limit(Math.min(limit, 500));
@@ -126,7 +126,7 @@ export const FollowService = {
     if (!userId) return [];
     const { data, error } = await supabase
       .from('follows')
-      .select('following:profiles!following_id(id, display_name, avatar_url, username, subscription_tier, is_online)')
+      .select('following:profiles!following_id(id, display_name, avatar_url, username, subscription_tier, is_online, active_frame)')
       .eq('follower_id', userId)
       .order('created_at', { ascending: false })
       .limit(Math.min(limit, 500));

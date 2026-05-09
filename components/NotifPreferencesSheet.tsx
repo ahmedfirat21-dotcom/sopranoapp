@@ -1,25 +1,27 @@
-﻿/**
- * SopranoChat — Bildirim Tercihleri Sheet (Faz 5.1)
+/**
+ * SopranoChat — Bildirim Tercihleri Sheet
  * ═══════════════════════════════════════════════════
- * Settings'ten açılan sürüklenebilir bottom-sheet.
- * notification_preferences tablosuyla iki yönlü bağlı.
+ * ★ v110 (6 May 2026): BlockedUsersSheet pattern'ına geçildi —
+ *   önceki RN Modal sarmalı Android'de drag-to-dismiss'i engelliyordu.
+ *   Artık absolute-positioned Animated.View + backdrop pattern.
  *
- * - DND penceresi (başlangıç + bitiş saati)
+ * - DND penceresi (4 quick-pick preset)
  * - friends_only toggle
  * - Per-kategori toggle: room_invites, dm_messages, stage_invites,
  *   sp_received, friend_online
  *
- * Tasarım: profil sayfası diline uygun gradient + section header.
+ * Tasarım: BlockedUsersSheet ile aynı gradient + handle + header dili.
  *          Draggable; X butonu YOK (memory: feedback_no_x_on_draggable).
  */
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, Modal, Pressable, Switch, ScrollView,
-  Animated, PanResponder,
+  View, Text, StyleSheet, Pressable, Switch, ScrollView,
+  Animated, PanResponder, Dimensions,
 } from 'react-native';
 import AppLoader from './AppLoader';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Shadows } from '../constants/theme';
 import { showToast } from './Toast';
 import {
@@ -27,6 +29,9 @@ import {
   DEFAULT_PREFERENCES,
   type NotificationPreferences,
 } from '../services/notifPrefs';
+
+const { height: SCREEN_H } = Dimensions.get('window');
+const PANEL_HEIGHT = Math.min(SCREEN_H * 0.78, 620);
 
 const iconShadow = {
   textShadowColor: 'rgba(0,0,0,0.5)',
@@ -41,6 +46,13 @@ interface Props {
 }
 
 export default function NotifPreferencesSheet({ visible, onClose, userId }: Props) {
+  const insets = useSafeAreaInsets();
+  const bottomInset = Math.max(insets.bottom, 14);
+  const CLOSED_Y = PANEL_HEIGHT + bottomInset + 50;
+
+  const translateY = useRef(new Animated.Value(CLOSED_Y)).current;
+  const backdropOpacity = useRef(new Animated.Value(0)).current;
+  const [mounted, setMounted] = useState(visible);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [prefs, setPrefs] = useState<NotificationPreferences>({
@@ -48,37 +60,28 @@ export default function NotifPreferencesSheet({ visible, onClose, userId }: Prop
     ...DEFAULT_PREFERENCES,
   });
 
-  // ★ 2026-04-28: Clubhouse pattern — pan tüm sheet'e bağlı, ScrollView ile koordineli.
-  const translateY = useRef(new Animated.Value(0)).current;
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
-  const scrollOffsetRef = useRef(0);
-  const handleScroll = useCallback((e: any) => {
-    scrollOffsetRef.current = e?.nativeEvent?.contentOffset?.y ?? 0;
-  }, []);
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => false,
-      onStartShouldSetPanResponderCapture: () => false,
-      onMoveShouldSetPanResponder: (_, g) =>
-        g.dy > 8 && Math.abs(g.dy) > Math.abs(g.dx) && scrollOffsetRef.current <= 0,
-      onMoveShouldSetPanResponderCapture: (_, g) =>
-        g.dy > 25 && Math.abs(g.dy) > Math.abs(g.dx) * 2 && scrollOffsetRef.current <= 0,
-      onPanResponderTerminationRequest: () => false,
-      onPanResponderMove: (_, g) => {
-        if (g.dy > 0) translateY.setValue(g.dy);
-      },
-      onPanResponderRelease: (_, g) => {
-        if (g.dy > 80 || g.vy > 0.5) {
-          Animated.timing(translateY, { toValue: 600, duration: 200, useNativeDriver: true })
-            .start(() => { translateY.setValue(0); onCloseRef.current(); });
-        } else {
-          Animated.spring(translateY, { toValue: 0, useNativeDriver: true, tension: 100, friction: 10 }).start();
-        }
-      },
-    })
-  ).current;
 
+  // ─── Açılış / Kapanış animasyonu (BlockedUsersSheet ile birebir) ───
+  useEffect(() => {
+    if (visible) {
+      setMounted(true);
+      Animated.parallel([
+        Animated.spring(translateY, { toValue: 0, useNativeDriver: true, damping: 20, stiffness: 220 }),
+        Animated.timing(backdropOpacity, { toValue: 1, duration: 180, useNativeDriver: true }),
+      ]).start();
+    } else if (mounted) {
+      Animated.parallel([
+        Animated.timing(translateY, { toValue: CLOSED_Y, duration: 200, useNativeDriver: true }),
+        Animated.timing(backdropOpacity, { toValue: 0, duration: 200, useNativeDriver: true }),
+      ]).start(({ finished }) => {
+        if (finished) setMounted(false);
+      });
+    }
+  }, [visible]);
+
+  // ─── Veri yükleme ───
   useEffect(() => {
     if (!visible || !userId) return;
     setLoading(true);
@@ -86,6 +89,35 @@ export default function NotifPreferencesSheet({ visible, onClose, userId }: Prop
       .then(setPrefs)
       .finally(() => setLoading(false));
   }, [visible, userId]);
+
+  // ─── Pan: tüm sheet'e bağlı + ScrollView ile koordineli (BlockedUsersSheet pattern) ───
+  const scrollOffsetRef = useRef(0);
+  const handleScroll = useCallback((e: any) => {
+    scrollOffsetRef.current = e?.nativeEvent?.contentOffset?.y ?? 0;
+  }, []);
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onStartShouldSetPanResponderCapture: () => false,
+      onMoveShouldSetPanResponder: (_, gs) =>
+        gs.dy > 8 && Math.abs(gs.dy) > Math.abs(gs.dx) && scrollOffsetRef.current <= 0,
+      onMoveShouldSetPanResponderCapture: (_, gs) =>
+        gs.dy > 25 && Math.abs(gs.dy) > Math.abs(gs.dx) * 2 && scrollOffsetRef.current <= 0,
+      onPanResponderTerminationRequest: () => false,
+      onPanResponderMove: (_, gs) => {
+        translateY.setValue(Math.max(0, gs.dy));
+      },
+      onPanResponderRelease: (_, gs) => {
+        if (gs.dy > 80 || gs.vy > 0.4) {
+          Animated.timing(translateY, { toValue: CLOSED_Y, duration: 180, useNativeDriver: true })
+            .start(() => onCloseRef.current());
+        } else {
+          Animated.spring(translateY, { toValue: 0, useNativeDriver: true, damping: 20, stiffness: 220 }).start();
+        }
+      },
+    })
+  ).current;
 
   const update = async (partial: Partial<Omit<NotificationPreferences, 'user_id'>>) => {
     setPrefs(p => ({ ...p, ...partial }));
@@ -108,129 +140,143 @@ export default function NotifPreferencesSheet({ visible, onClose, userId }: Prop
   const isPresetActive = (s: number | null, e: number | null) =>
     prefs.dnd_start_hour === s && prefs.dnd_end_hour === e;
 
-  return (
-    <Modal visible={visible} animationType="none" transparent statusBarTranslucent onRequestClose={onClose}>
-      <View style={st.overlay}>
-        {/* Backdrop tap to close */}
-        <Pressable style={StyleSheet.absoluteFillObject} onPress={onClose} />
-        <Animated.View
-          style={[st.sheet, { transform: [{ translateY }] }]}
-          {...panResponder.panHandlers}
-        >
-          {/* Diagonal gradient — profil dili */}
-          <LinearGradient
-            colors={['#4a5668', '#37414f', '#232a35']}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-            style={StyleSheet.absoluteFillObject}
-            pointerEvents="none"
-          />
-          <LinearGradient
-            colors={['transparent', 'rgba(20,184,166,0.55)', 'transparent']}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-            style={st.topEdge}
-            pointerEvents="none"
-          />
+  if (!mounted) return null;
 
-          {/* ★ 2026-04-28: Drag handle/header artık görsel — pan tüm sheet'te (Clubhouse). */}
-          <View>
-          <View style={st.handleWrap}>
-            <View style={st.handle} />
+  return (
+    <>
+      {/* Backdrop — tap to close */}
+      <Animated.View style={[StyleSheet.absoluteFill, { zIndex: 100, opacity: backdropOpacity }]}>
+        <Pressable style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.55)' }]} onPress={onClose} />
+      </Animated.View>
+
+      {/* Panel — absolute + draggable (BlockedUsersSheet pattern) */}
+      <Animated.View
+        style={[
+          st.panel,
+          {
+            bottom: 0,
+            paddingBottom: bottomInset + 14,
+            height: PANEL_HEIGHT + bottomInset + 14,
+            transform: [{ translateY }],
+          },
+        ]}
+        {...panResponder.panHandlers}
+      >
+        <LinearGradient
+          colors={['#4a5668', '#37414f', '#232a35']}
+          locations={[0, 0.35, 1]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[StyleSheet.absoluteFillObject, { borderTopLeftRadius: 20, borderTopRightRadius: 20 }]}
+        />
+        {/* Top edge teal highlight (aile dili) */}
+        <LinearGradient
+          colors={['transparent', 'rgba(20,184,166,0.55)', 'transparent']}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+          style={st.topEdge}
+          pointerEvents="none"
+        />
+
+        {/* Handle + Header */}
+        <View>
+          <View style={st.handle}>
+            <View style={st.handleBar} />
           </View>
           <View style={st.header}>
             <View style={st.sectionAccent} />
-            <Ionicons name="notifications" size={14} color={Colors.teal} style={iconShadow} />
-            <Text style={st.headerTitle}>BİLDİRİM TERCİHLERİ</Text>
+            <Ionicons name="notifications" size={16} color={Colors.teal} style={iconShadow} />
+            <Text style={st.headerTitle}>Bildirim Tercihleri</Text>
             {saving && <AppLoader size="small" color="#14B8A6" />}
           </View>
+        </View>
+
+        {loading ? (
+          <View style={st.loading}>
+            <AppLoader size="large" color="#14B8A6" />
           </View>
-
-          {loading ? (
-            <View style={st.loading}>
-              <AppLoader size="large" color="#14B8A6" />
+        ) : (
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={{ paddingBottom: 24 }}
+            showsVerticalScrollIndicator={false}
+            onScroll={handleScroll}
+            scrollEventThrottle={16}
+          >
+            {/* ── DND Penceresi ── */}
+            <Text style={st.sectionLabel}>RAHATSIZ ETMEME</Text>
+            <Text style={st.sectionHint}>
+              Belirttiğin saatlerde bildirim almazsın (acil çağrılar hariç).
+            </Text>
+            <View style={st.presetRow}>
+              {dndPresets.map(p => {
+                const active = isPresetActive(p.start, p.end);
+                return (
+                  <Pressable
+                    key={p.label}
+                    style={[st.presetChip, active && st.presetChipActive]}
+                    onPress={() => update({ dnd_start_hour: p.start, dnd_end_hour: p.end })}
+                  >
+                    <Text style={[st.presetChipText, active && st.presetChipTextActive]}>{p.label}</Text>
+                  </Pressable>
+                );
+              })}
             </View>
-          ) : (
-            <ScrollView
-              contentContainerStyle={{ paddingBottom: 32 }}
-              showsVerticalScrollIndicator={false}
-              onScroll={handleScroll}
-              scrollEventThrottle={16}
-            >
-              {/* ── DND Penceresi ── */}
-              <Text style={st.sectionLabel}>RAHATSIZ ETMEME</Text>
-              <Text style={st.sectionHint}>
-                Belirttiğin saatlerde bildirim almazsın (acil çağrılar hariç).
-              </Text>
-              <View style={st.presetRow}>
-                {dndPresets.map(p => {
-                  const active = isPresetActive(p.start, p.end);
-                  return (
-                    <Pressable
-                      key={p.label}
-                      style={[st.presetChip, active && st.presetChipActive]}
-                      onPress={() => update({ dnd_start_hour: p.start, dnd_end_hour: p.end })}
-                    >
-                      <Text style={[st.presetChipText, active && st.presetChipTextActive]}>{p.label}</Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
 
-              {/* ── Filtre ── */}
-              <Text style={st.sectionLabel}>FİLTRELEME</Text>
-              <ToggleRow
-                icon="people"
-                label="Sadece arkadaşlardan"
-                desc="Sadece arkadaşların gönderdiği bildirimleri al"
-                value={prefs.friends_only}
-                onChange={v => update({ friends_only: v })}
-              />
+            {/* ── Filtre ── */}
+            <Text style={st.sectionLabel}>FİLTRELEME</Text>
+            <ToggleRow
+              icon="people"
+              label="Sadece arkadaşlardan"
+              desc="Sadece arkadaşların gönderdiği bildirimleri al"
+              value={prefs.friends_only}
+              onChange={v => update({ friends_only: v })}
+            />
 
-              {/* ── Kategoriler ── */}
-              <Text style={st.sectionLabel}>KATEGORİLER</Text>
-              <ToggleRow
-                icon="megaphone"
-                label="Oda davetleri"
-                desc="Birinin seni odaya davet etmesi"
-                value={prefs.room_invites}
-                onChange={v => update({ room_invites: v })}
-              />
-              <ToggleRow
-                icon="chatbubble"
-                label="DM mesajları"
-                desc="Yeni özel mesaj geldiğinde"
-                value={prefs.dm_messages}
-                onChange={v => update({ dm_messages: v })}
-              />
-              <ToggleRow
-                icon="mic"
-                label="Sahne davetleri"
-                desc="Bir odada sahneye çağrıldığında"
-                value={prefs.stage_invites}
-                onChange={v => update({ stage_invites: v })}
-              />
-              <ToggleRow
-                icon="gift"
-                label="SP / Hediye"
-                desc="Sana SP gönderildiğinde"
-                value={prefs.sp_received}
-                onChange={v => update({ sp_received: v })}
-              />
-              <ToggleRow
-                icon="ellipse"
-                label="Arkadaş çevrimiçi"
-                desc="Arkadaşın yeni oda açtığında"
-                value={prefs.friend_online}
-                onChange={v => update({ friend_online: v })}
-              />
+            {/* ── Kategoriler ── */}
+            <Text style={st.sectionLabel}>KATEGORİLER</Text>
+            <ToggleRow
+              icon="megaphone"
+              label="Oda davetleri"
+              desc="Birinin seni odaya davet etmesi"
+              value={prefs.room_invites}
+              onChange={v => update({ room_invites: v })}
+            />
+            <ToggleRow
+              icon="chatbubble"
+              label="DM mesajları"
+              desc="Yeni özel mesaj geldiğinde"
+              value={prefs.dm_messages}
+              onChange={v => update({ dm_messages: v })}
+            />
+            <ToggleRow
+              icon="mic"
+              label="Sahne davetleri"
+              desc="Bir odada sahneye çağrıldığında"
+              value={prefs.stage_invites}
+              onChange={v => update({ stage_invites: v })}
+            />
+            <ToggleRow
+              icon="gift"
+              label="SP / Hediye"
+              desc="Sana SP gönderildiğinde"
+              value={prefs.sp_received}
+              onChange={v => update({ sp_received: v })}
+            />
+            <ToggleRow
+              icon="ellipse"
+              label="Arkadaş çevrimiçi"
+              desc="Arkadaşın yeni oda açtığında"
+              value={prefs.friend_online}
+              onChange={v => update({ friend_online: v })}
+            />
 
-              <Text style={st.footerNote}>
-                Acil çağrılar ve arkadaşlık istekleri her zaman ulaşır.
-              </Text>
-            </ScrollView>
-          )}
-        </Animated.View>
-      </View>
-    </Modal>
+            <Text style={st.footerNote}>
+              Acil çağrılar ve arkadaşlık istekleri her zaman ulaşır.
+            </Text>
+          </ScrollView>
+        )}
+      </Animated.View>
+    </>
   );
 }
 
@@ -263,29 +309,39 @@ function ToggleRow({ icon, label, desc, value, onChange }: RowProps) {
 }
 
 const st = StyleSheet.create({
-  overlay: {
-    flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'flex-end',
-  },
-  sheet: {
-    borderTopLeftRadius: 22, borderTopRightRadius: 22,
-    maxHeight: '88%', minHeight: '60%',
-    borderWidth: 1, borderBottomWidth: 0, borderColor: Colors.cardBorder,
+  panel: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    zIndex: 101,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
     overflow: 'hidden',
-    ...Shadows.card,
+    borderWidth: 1,
+    borderBottomWidth: 0,
+    borderColor: '#95a1ae',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 16,
+    elevation: 20,
   },
   topEdge: { position: 'absolute', top: 0, left: 0, right: 0, height: 1.5, zIndex: 1 },
-  handleWrap: { alignItems: 'center', paddingTop: 10, paddingBottom: 6 },
-  handle: { width: 40, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.18)' },
+  handle: { alignItems: 'center', paddingVertical: 8 },
+  handleBar: {
+    width: 36, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.20)',
+  },
   header: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
-    paddingHorizontal: 16, paddingTop: 6, paddingBottom: 12,
+    paddingHorizontal: 16, paddingVertical: 10,
     borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: 'rgba(20,184,166,0.05)',
   },
   sectionAccent: { width: 3, height: 16, borderRadius: 2, backgroundColor: Colors.teal },
   headerTitle: {
     flex: 1,
-    fontSize: 12, fontWeight: '900', color: '#CBD5E1',
-    letterSpacing: 1.2, textTransform: 'uppercase', ...Shadows.text,
+    fontSize: 15, fontWeight: '700', color: '#F1F5F9', letterSpacing: 0.15,
+    textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
   loading: { paddingVertical: 80, alignItems: 'center' },
   sectionLabel: {

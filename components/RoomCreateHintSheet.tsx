@@ -18,10 +18,7 @@ const STORAGE_KEY_PREFIX = 'soprano_room_hint_v1_';
 export async function hasSeenRoomCreateHint(uid?: string | null): Promise<boolean> {
   if (!uid) return true;
   try {
-    const v = await AsyncStorage.getItem(`${STORAGE_KEY_PREFIX}${uid}`);
-    if (v === '1') return true;
-    // ★ v110.14: DB check — kullanıcı daha önce oda açtıysa hint hiç gösterilme
-    //   (yeni cihaz/silmiş kurulum için AsyncStorage flag yok ama DB gerçeği bilir).
+    // 1) Daha önce oda açmış mı? (DB gerçeği — hesap silinse bile yeni profilde count=0 olur)
     try {
       const { supabase } = await import('../constants/supabase');
       const { count } = await supabase
@@ -33,8 +30,23 @@ export async function hasSeenRoomCreateHint(uid?: string | null): Promise<boolea
         try { await AsyncStorage.setItem(`${STORAGE_KEY_PREFIX}${uid}`, '1'); } catch {}
         return true;
       }
-    } catch { /* DB check başarısız — flag yoksa gösterilir */ }
-    return false;
+    } catch { /* DB fail — devam */ }
+
+    // 2) AsyncStorage seen mi?
+    const v = await AsyncStorage.getItem(`${STORAGE_KEY_PREFIX}${uid}`);
+    if (v !== '1') return false;
+
+    // 3) AsyncStorage seen ama DB profile.preferences.room_create_hint_seen yoksa kalıntı
+    try {
+      const { supabase } = await import('../constants/supabase');
+      const { data } = await supabase.from('profiles').select('preferences').eq('id', uid).maybeSingle();
+      const dbSeen = (data as any)?.preferences?.room_create_hint_seen === true;
+      if (!dbSeen) {
+        try { await AsyncStorage.removeItem(`${STORAGE_KEY_PREFIX}${uid}`); } catch {}
+        return false;
+      }
+      return true;
+    } catch { return true; }
   } catch {
     return true;
   }
@@ -43,6 +55,12 @@ export async function hasSeenRoomCreateHint(uid?: string | null): Promise<boolea
 export async function markRoomCreateHintSeen(uid?: string | null) {
   if (!uid) return;
   try { await AsyncStorage.setItem(`${STORAGE_KEY_PREFIX}${uid}`, '1'); } catch {}
+  try {
+    const { supabase } = await import('../constants/supabase');
+    const { data } = await supabase.from('profiles').select('preferences').eq('id', uid).maybeSingle();
+    const prefs = { ...((data as any)?.preferences || {}), room_create_hint_seen: true };
+    await supabase.from('profiles').update({ preferences: prefs }).eq('id', uid);
+  } catch {}
 }
 
 // ★ Gem hexagon HTML — DiscoverWelcome ile aynı şablon, pembe-bordo renk paleti.

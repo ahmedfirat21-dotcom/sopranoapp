@@ -32,4 +32,16 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
 
 config.resolver.assetExts.push('glb', 'gltf');
 
+// ★ v108.1: Metro file watcher gradle build klasörlerinde race condition yaşıyor
+//   (node_modules/<pkg>/android/build/... klasörleri build sırasında oluşup siliniyor).
+//   Bu klasörleri izleme listesinden çıkar → ENOENT watch hatasını önler.
+const exclusionList = require('metro-config/src/defaults/exclusionList');
+config.resolver.blockList = exclusionList([
+  /.*\/android\/build\/.*/,
+  /.*\/android\/\.cxx\/.*/,
+  /.*\/ios\/build\/.*/,
+  /.*\/ios\/Pods\/.*/,
+  /.*\/\.gradle\/.*/,
+]);
+
 module.exports = config;

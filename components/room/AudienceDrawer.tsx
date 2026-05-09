@@ -4,20 +4,25 @@
  * ★ Sağa sürükleyerek kapatma özelliği (DM panel ile aynı useSwipeToDismiss pattern)
  */
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, FlatList, Pressable, Image, Animated, StyleSheet, useWindowDimensions, Dimensions } from 'react-native';
+import { View, Text, FlatList, Pressable, Image, Animated, StyleSheet, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getAvatarSource } from '../../constants/avatars';
 import { useSwipeToDismiss } from '../../hooks/useSwipeToDismiss';
+import TierBadge from '../TierBadge';
+import { migrateLegacyTier } from '../../types';
 
-// ★ 2026-04-22: Module-level Dimensions kaldırıldı — fiziksel Android'de gesture-nav
-// sırasında stale kalıyor, panel genişliği ekran dışına kayıyordu. Runtime hesap.
+// ★ 2026-05-05: Keşfet drawer dili (NotificationDrawer/FriendsDrawer) — birebir aynı
+//   boyut + 3 katman gradient + slate kabuk. Karakter rengi: teal (insan listesi).
+const ROOM_TOP_GAP = 70;     // RoomInfoHeader altında bitsin
+const ROOM_BOTTOM_GAP = 90;  // RoomControlBar üstünde bitsin
 
 interface UserItem {
   id: string;
   user_id: string;
   role: string;
-  user?: { display_name?: string; avatar_url?: string };
+  user?: { display_name?: string; avatar_url?: string; subscription_tier?: string };
 }
 
 interface Props {
@@ -30,9 +35,10 @@ interface Props {
 
 export default function AudienceDrawer({ visible, users, onClose, onSelectUser, micRequests = [] }: Props) {
   // ★ Runtime window width — cihazın gerçek ekran genişliği
-  const { width: W } = useWindowDimensions();
-  const IS_SMALL = W <= 375;
-  const PANEL_W = IS_SMALL ? Math.min(W * 0.78, 310) : Math.min(W * 0.68, 320);
+  const { width: W, height: H } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  // ★ NotificationDrawer/FriendsDrawer ile birebir aynı ölçü
+  const PANEL_W = Math.min(W * 0.72, 300);
   const slideAnim = useRef(new Animated.Value(W)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
@@ -91,27 +97,48 @@ export default function AudienceDrawer({ visible, users, onClose, onSelectUser, 
         {...panHandlers}
         style={[s.panel, {
           width: PANEL_W,
+          top: Math.max(insets.top + 12, ROOM_TOP_GAP),
+          bottom: Math.max(insets.bottom + 8, ROOM_BOTTOM_GAP),
           transform: [{ translateX: Animated.add(slideAnim, swipeX) }],
         }]}
       >
-        <LinearGradient colors={['#4a5668', '#37414f', '#232a35']} locations={[0, 0.35, 1]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFillObject} />
-        {/* ★ Sürükleme tutacağı — sol kenar çizgisi */}
-        <View style={s.dragHandle}>
-          <View style={s.dragHandleBar} />
-        </View>
+        {/* Profil sayfası gradient dili — diagonal slate */}
+        <LinearGradient
+          colors={['#3a4658', '#2a3344', '#1a2030']}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFillObject}
+          pointerEvents="none"
+        />
+        {/* ★ 2026-05-05: 3 katman aile dili — slate + halo + soft glow.
+            Karakter teal: Odadakiler. */}
+        <LinearGradient
+          colors={['rgba(20,184,166,0.20)', 'rgba(20,184,166,0.05)', 'transparent']}
+          start={{ x: 0, y: 0 }} end={{ x: 0, y: 0.4 }}
+          style={StyleSheet.absoluteFillObject}
+          pointerEvents="none"
+        />
+        <LinearGradient
+          colors={['rgba(20,184,166,0.08)', 'transparent']}
+          start={{ x: 0, y: 0 }} end={{ x: 0.7, y: 0.6 }}
+          style={StyleSheet.absoluteFillObject}
+          pointerEvents="none"
+        />
 
-        {/* Başlık */}
+        {/* Başlık — NotificationDrawer dili: ikon + başlık + count pill + separator */}
         <View style={s.header}>
-          <Ionicons name="people" size={15} color="#14B8A6" />
+          <Ionicons name="people" size={18} color="#14B8A6" style={s.headerIcon} />
           <Text style={s.headerTitle}>Odadakiler</Text>
-          <View style={s.countPill}>
-            <Text style={s.countText}>{users.length}</Text>
-          </View>
+          {users.length > 0 && (
+            <View style={s.countPill}>
+              <Text style={s.countText}>{users.length}</Text>
+            </View>
+          )}
           <View style={{ flex: 1 }} />
           <Pressable onPress={onClose} hitSlop={12}>
             <Ionicons name="close" size={16} color="rgba(255,255,255,0.4)" />
           </Pressable>
         </View>
+        <View style={s.headerSeparator} />
 
         {/* ★ v92.28 (2 May 2026) PERF: ScrollView + .map() → FlatList virtualization.
             Önceden 100+ listener'da TÜM cell'ler render ediliyordu. FlatList ile
@@ -128,15 +155,28 @@ export default function AudienceDrawer({ visible, users, onClose, onSelectUser, 
           renderItem={({ item: u }) => {
             const role = getRoleLabel(u.role);
             const hasMicReq = micRequests.includes(u.user_id);
+            // ★ 2026-05-05: Plus/Pro/GM kompakt tier etiketi — avatar sağ-altında.
+            const userTier = migrateLegacyTier(u.user?.subscription_tier as string);
+            const showTier = userTier !== 'Free';
             return (
               <Pressable
                 style={({ pressed }) => [s.userRow, pressed && s.userRowPressed]}
                 onPress={() => { onClose(); setTimeout(() => onSelectUser(u), 200); }}
               >
-                <Image
-                  source={getAvatarSource(u.user?.avatar_url)}
-                  style={[s.avatar, u.role === 'owner' && s.avatarOwner]}
-                />
+                <View style={{ position: 'relative' }}>
+                  <Image
+                    source={getAvatarSource(u.user?.avatar_url)}
+                    style={[s.avatar, u.role === 'owner' && s.avatarOwner]}
+                  />
+                  {showTier && (
+                    <View
+                      style={{ position: 'absolute', bottom: -2, right: -2, zIndex: 5, elevation: 6 }}
+                      pointerEvents="none"
+                    >
+                      <TierBadge tier={userTier} size="xs" />
+                    </View>
+                  )}
+                </View>
                 <View style={{ flex: 1 }}>
                   <Text style={s.userName} numberOfLines={1}>
                     {u.user?.display_name || 'Misafir'}
@@ -164,62 +204,57 @@ export default function AudienceDrawer({ visible, users, onClose, onSelectUser, 
 const s = StyleSheet.create({
   backdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.3)',
+    backgroundColor: 'rgba(8,12,22,0.45)',
   },
   panel: {
     position: 'absolute',
-    // ★ 2026-04-23: Yan modaller eşit boyut — DM, Plus, Audience aynı top/bottom
-    right: 0, top: 120, bottom: 120,
+    right: 0,
+    // top + bottom inline veriliyor (insets bazlı, oda header/control bar üstünde biter)
     // width inline olarak component içinde atanır (useWindowDimensions runtime).
-    borderTopLeftRadius: 22, borderBottomLeftRadius: 22,
+    borderTopLeftRadius: 26, borderBottomLeftRadius: 26,
     overflow: 'hidden',
+    backgroundColor: '#1a2030',
+    // ★ 2026-05-05 perf: Android elevation 22→10 (GPU pahalı), iOS shadow azaltıldı.
     shadowColor: '#000',
     shadowOffset: { width: -6, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 16,
-    elevation: 16,
-  },
-  dragHandle: {
-    position: 'absolute',
-    left: 0, top: 0, bottom: 0,
-    width: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 10,
-  },
-  dragHandleBar: {
-    width: 3,
-    height: 32,
-    borderRadius: 1.5,
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    shadowOpacity: 0.45,
+    shadowRadius: 14,
+    elevation: 10,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.06)',
-    backgroundColor: 'rgba(20,184,166,0.04)',
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingTop: 16,
+    paddingBottom: 12,
+  },
+  headerIcon: {
+    textShadowColor: 'rgba(20,184,166,0.7)',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 5,
+  },
+  headerSeparator: {
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    marginHorizontal: 12,
   },
   headerTitle: {
-    fontSize: 14,
-    fontWeight: '700',
+    fontSize: 15,
+    fontWeight: '800',
     color: '#F1F5F9',
-    textShadowColor: 'rgba(0,0,0,0.4)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
+    letterSpacing: 0.3,
+    textShadowColor: 'rgba(0,0,0,0.6)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
   },
   countPill: {
-    backgroundColor: 'rgba(20,184,166,0.12)',
-    borderRadius: 10,
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderWidth: 1,
-    borderColor: 'rgba(20,184,166,0.2)',
+    paddingHorizontal: 7, paddingVertical: 2,
+    borderRadius: 100, minWidth: 20, alignItems: 'center',
+    backgroundColor: 'rgba(20,184,166,0.18)',
+    borderWidth: 1, borderColor: 'rgba(20,184,166,0.45)',
   },
-  countText: { color: '#14B8A6', fontSize: 10, fontWeight: '700' },
+  countText: { color: '#5EEAD4', fontSize: 10, fontWeight: '800', letterSpacing: 0.3 },
   userRow: {
     flexDirection: 'row',
     alignItems: 'center',

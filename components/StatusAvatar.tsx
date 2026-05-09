@@ -1,11 +1,13 @@
 import React from 'react';
-import { View, Image, Text, StyleSheet, type ImageSourcePropType } from 'react-native';
+import { View, Image, Text, StyleSheet, Platform, type ImageSourcePropType } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { getAvatarSource } from '../constants/avatars';
 import { TIER_DEFINITIONS } from '../constants/tiers';
 import type { SubscriptionTier } from '../types';
 import { migrateLegacyTier } from '../types';
+import AvatarFrame from './profile/AvatarFrame';
+import TierBadge from './TierBadge';
 
 interface StatusAvatarProps {
   /** Avatar URL string or ImageSource */
@@ -26,6 +28,11 @@ interface StatusAvatarProps {
   showTierBadge?: boolean;
   /** Kullanıcının kendi avatarı mı? Evetse online dot gizlenir (kendi online durumunu görmek anlamsız). */
   isSelf?: boolean;
+  /** ★ v107: profiles.active_frame — mağaza atelier item id'si, varsa avatar etrafına çerçeve render */
+  frameId?: string | null;
+  /** ★ v109.4.3: TierBadge boyutu — xs (mini avatar, sadece ikon) / sm (label dahil "PRO" pill).
+   *  Default xs. Profil hero ve sahnede sm/md kullanılır. */
+  tierBadgeSize?: 'xs' | 'sm' | 'md' | 'lg';
 }
 
 /**
@@ -48,8 +55,14 @@ export default function StatusAvatar({
   isAdmin,
   borderColor,
   borderWidth = 2,
-  showTierBadge = false,
+  // ★ 2026-05-05: Default true — kullanıcı talebi: "mini avatarların tamamına
+  //   plus ve pro etiketlerinin kompakt versiyonu". Free zaten otomatik gizli
+  //   (`normalizedTier !== 'Free'` filtresi). Hiç istenmeyen yerlerde explicit
+  //   `showTierBadge={false}` geç.
+  showTierBadge = true,
   isSelf = false,
+  frameId,
+  tierBadgeSize = 'xs',
 }: StatusAvatarProps) {
   const radius = size / 2;
   // ★ 2026-04-21: Daha zarif nokta — %26 yerine %22, çerçeve 0.3x → 0.18x
@@ -87,7 +100,12 @@ export default function StatusAvatar({
 
   return (
     <View style={{ width: size, height: size + (showTierBadge ? 8 : 0), position: 'relative' }}>
-      {/* Avatar — tier renginde çerçeve */}
+      {/* ★ v107.69: Mağaza çerçevesi avatar'dan ÖNCE render — yoksa AvatarFrame'in iç
+         koyu cutout'u avatar Image'i kapatıyor (kullanıcı: "profil resmi gidiyor"). */}
+      <AvatarFrame frameId={frameId} size={size} />
+      {/* ★ v108.13: Aktif çerçeve varsa tier border'ı kapat — çift halka görünmesin.
+         Çerçeve zaten tema halkası; tier rozeti (showTierBadge) avatar altında ayrıca gösterilir.
+         ★ v108.14: Frame varsa avatar'a hafif yumuşak gölge — derinlik hissi. */}
       <View
         style={[
           styles.ring,
@@ -95,8 +113,20 @@ export default function StatusAvatar({
             width: size,
             height: size,
             borderRadius: radius,
-            borderWidth,
-            borderColor: ringColor,
+            borderWidth: frameId ? 0 : borderWidth,
+            borderColor: frameId ? 'transparent' : ringColor,
+          },
+          frameId && {
+            ...Platform.select({
+              ios: {
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.4,
+                shadowRadius: 6,
+              },
+              android: { elevation: 12 },
+            }),
+            zIndex: 2, // Avatar Image her zaman frame'in üstünde
           },
         ]}
       >
@@ -130,22 +160,23 @@ export default function StatusAvatar({
       )}
 
       {/* ★ 2026-04-29: Tier badge — Free'yi hiç gösterme (default), Plus/Pro/GM için
-          minimalist yuvarlak ikon (yazı kaldırıldı, daha zarif). */}
-      {showTierBadge && tierDef && normalizedTier !== 'Free' && (
-        <LinearGradient
-          colors={tierGradient as [string, string]}
-          style={[
-            styles.tierBadge,
-            {
-              width: Math.max(18, size * 0.30),
-              height: Math.max(18, size * 0.30),
-              borderRadius: Math.max(9, size * 0.15),
-              transform: [{ scale: pillScale }],
-            },
-          ]}
+          minimalist yuvarlak ikon (yazı kaldırıldı, daha zarif).
+          ★ v108.14: Aktif çerçeve varsa rozet gizlenir — kullanıcının istediği
+          sade görünüm (avatar + frame + hafif gölge yeterli). */}
+      {/* ★ v109.4.2: TierBadge avatar üstünde, mini için xs ikon-only.
+           Sahne/profil çağrıları `tierBadgeSize="sm"` ile büyük "PRO" pill alır. */}
+      {showTierBadge && normalizedTier !== 'Free' && (
+        <View
+          style={{
+            position: 'absolute',
+            bottom: -2, right: -2,
+            transform: [{ scale: pillScale }],
+            zIndex: 4, elevation: 8,
+          }}
+          pointerEvents="none"
         >
-          <Ionicons name={tierIcon as any} size={Math.max(10, size * 0.18)} color="#FFF" />
-        </LinearGradient>
+          <TierBadge tier={normalizedTier} size={tierBadgeSize} />
+        </View>
       )}
     </View>
   );
@@ -162,16 +193,15 @@ const styles = StyleSheet.create({
     top: 2,
     right: 2,
     backgroundColor: '#22C55E',
-    // ★ 2026-04-21: Sert siyah çerçeve yerine hafif şeffaf beyaz kenar — zarif durur
     borderColor: 'rgba(255,255,255,0.6)',
-    // Hafif glow efekti — online rengi daha canlı hissettirir
     shadowColor: '#22C55E',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.7,
     shadowRadius: 3,
-    elevation: 3,
+    // ★ v109.3: zIndex 3 — AvatarFrame (zIndex:1) üstünde, frame altında kalmasın
+    zIndex: 3,
+    elevation: 6,
   },
-  // ★ 2026-04-29: Yuvarlak kompakt tier rozeti — yazı yok, sadece simge
   tierBadge: {
     position: 'absolute',
     bottom: 0,
@@ -184,6 +214,8 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.45,
     shadowRadius: 2.5,
-    elevation: 3,
+    // ★ v109.3: zIndex 3 — frame üstünde
+    zIndex: 3,
+    elevation: 6,
   },
 });

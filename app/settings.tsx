@@ -142,7 +142,7 @@ const SETTING_GROUPS: { title: string; icon: string; color: string; items: Setti
 export default function SettingsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { firebaseUser, setIsLoggedIn, setUser, profile } = useAuth();
+  const { firebaseUser, setIsLoggedIn, setUser, profile, refreshProfile } = useAuth();
   const { applyTheme } = useTheme();
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [cAlert, setCAlert] = useState<{ visible: boolean; title: string; message: string; type?: 'info' | 'warning' | 'error' | 'success'; buttons?: AlertButton[] }>({ visible: false, title: '', message: '' });
@@ -203,13 +203,27 @@ export default function SettingsScreen() {
       if (key === 'show_online_status' && firebaseUser) {
         ProfileService.setOnline(firebaseUser.uid, value).catch(() => {});
       }
-      // ★ Gizli profil toggle — 2026-04-26: 'private' kaldırıldı, sadece followers_only
+      // ★ Gizli profil toggle — v110 (6 May 2026): hata yutulmuyor + cache refresh.
+      //   Önceden silent catch + refreshProfile yoktu → useAuth().profile stale kalıyor,
+      //   ekran kapanınca sync mantığı toggle'ı geri çeviriyordu ("çalışmıyor" hissi).
       if (key === 'profile_private' && firebaseUser) {
         const newPrivacyMode = value ? 'followers_only' : 'public';
-        ProfileService.update(firebaseUser.uid, {
-          is_private: value,
-          privacy_mode: newPrivacyMode,
-        } as any).catch(() => {});
+        try {
+          await ProfileService.update(firebaseUser.uid, {
+            is_private: value,
+            privacy_mode: newPrivacyMode,
+          } as any);
+          await refreshProfile(); // useAuth().profile'ı tazele — sonraki açılışta tutarlı
+        } catch (err: any) {
+          // DB yazımı başarısızsa toggle'ı eski haline döndür + kullanıcıyı bilgilendir
+          setSettings(prev => prev ? { ...prev, profile_private: !value } : prev);
+          await SettingsService.update({ profile_private: !value });
+          showToast({
+            title: 'Kaydedilemedi',
+            message: 'Gizli profil ayarı sunucuya iletilemedi. Bağlantını kontrol et.',
+            type: 'error',
+          });
+        }
       }
     })();
   }, [firebaseUser, applyTheme, profile]);
@@ -356,13 +370,11 @@ export default function SettingsScreen() {
                 if (!firebaseUser) return;
                 try {
                   // ★ 2026-04-21: Atomic cascade — v49 RPC tek transaction'da siler.
-                  //   Önceden 9 ayrı DELETE query vardı → partial deletion risk.
-                  //   Storage + Firebase auth client'ta (SQL'de yapılamaz).
+                  // ★ 2026-05-09: Manuel setIsLoggedIn + router.replace KALDIRILDI.
+                  //   Firebase user silindiğinde onAuthStateChanged null fire eder,
+                  //   AuthGuard otomatik login'e yönlendirir → çift yönlendirme yoktu.
                   const { performDeleteAccount } = require('../services/account');
                   await performDeleteAccount(firebaseUser);
-                  setIsLoggedIn(false);
-                  setUser(null);
-                  router.replace('/(auth)/login');
                   showToast({ title: 'Hesap Silindi', message: 'Tüm verileriniz silindi.', type: 'info' });
                 } catch (e: any) {
                   showToast({ title: 'Hesap Silinemedi', message: e?.message || 'İşlem tamamlanamadı.', type: 'error' });
@@ -405,15 +417,27 @@ export default function SettingsScreen() {
               <Text style={s.groupTitle}>{group.title}</Text>
             </View>
 
-            {/* ★ 2026-04-24: Unified bombe gradient — proje DNA'sı ile tutarlı, renkli overlay kaldırıldı */}
+            {/* ★ 2026-05-05: NotificationDrawer aile dili — slate diagonal + group color halo + soft glow */}
             <View style={s.groupCard}>
               <LinearGradient
-                colors={['rgba(48,65,94,0.85)', 'rgba(26,40,64,0.75)', 'rgba(12,22,40,0.55)']}
-                locations={[0, 0.55, 1]}
-                start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
+                colors={['#3a4658', '#2a3344', '#1a2030']}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                 style={StyleSheet.absoluteFillObject}
+                pointerEvents="none"
               />
-              {/* Üst teal hairline — ince aksan */}
+              <LinearGradient
+                colors={[`${group.color}20`, `${group.color}06`, 'transparent']}
+                start={{ x: 0, y: 0 }} end={{ x: 0, y: 0.45 }}
+                style={StyleSheet.absoluteFillObject}
+                pointerEvents="none"
+              />
+              <LinearGradient
+                colors={[`${group.color}0D`, 'transparent']}
+                start={{ x: 0, y: 0 }} end={{ x: 0.7, y: 0.6 }}
+                style={StyleSheet.absoluteFillObject}
+                pointerEvents="none"
+              />
+              {/* Üst hairline — ince aksan korundu */}
               <LinearGradient
                 colors={['transparent', `${group.color}99`, 'transparent']}
                 locations={[0, 0.5, 1]}
@@ -580,15 +604,14 @@ const s = StyleSheet.create({
     ...Shadows.text,
   },
 
-  // Card container — premium 3 katmanlı (wallet ile tutarlı)
+  // ★ 2026-05-05: NotificationDrawer aile standardı — radius 16→22, slate bg
   groupCard: {
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
+    borderRadius: 22,
+    backgroundColor: '#1a2030',
     overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.5,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.45,
     shadowRadius: 14,
     elevation: 8,
   },

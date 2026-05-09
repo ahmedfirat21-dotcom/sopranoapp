@@ -852,7 +852,7 @@ const BigLiveRoomCard = React.memo(function BigLiveRoomCard({ room, onJoin, isFo
 // ════════════════════════════════════════════════════════════
 export default function HomeScreen() {
   const router = useRouter();
-  const { firebaseUser, profile, setShowNotifDrawer, setNotifDrawerAnchorRight, minimizedRoom, justCompletedOnboarding, setJustCompletedOnboarding } = useAuth();
+  const { firebaseUser, profile, setShowNotifDrawer, setNotifDrawerAnchorRight, minimizedRoom, justCompletedOnboarding, setJustCompletedOnboarding, setTabBarCovered } = useAuth();
   const { openUserProfile } = useUserProfileSheet();
   const insets = useSafeAreaInsets();
   // ★ 2026-04-24: Banner slide-down — sadece uygulama ilk açılışında
@@ -937,6 +937,19 @@ export default function HomeScreen() {
   const [showFABHint, setShowFABHint] = useState(false);
   // ★ 2026-04-29: First-time user "Oda oluştur!" yönlendirmesi — DiscoverWelcome bittikten sonra Keşfet'e düşünce
   const [showRoomHint, setShowRoomHint] = useState(false);
+  // ★ 2026-05-09 FLASH FIX v3: Cover şartı değişince tab bar'ı da gizle/göster.
+  //   View cover ana içeriği kaplar ama tab bar ayrı katmanda render ediliyor.
+  //   Bu effect context flag'ini set eder → CurvedTabBar onu görüp null döner.
+  // ★ 2026-05-09 FLASH FIX: RoomHint kararı verilene kadar Keşfet gizli kalsın.
+  //   Default true → karar başlamadıysa cover çalışmaz (eski/oda açmış kullanıcı yolu).
+  //   Welcome onClose veya onboardingDone branch effect başlamadan önce false yapar.
+  const [roomHintReady, setRoomHintReady] = useState(true);
+  useEffect(() => {
+    const covered = (showWelcome !== false) || !roomHintReady || showRoomHint;
+    setTabBarCovered(covered);
+  }, [showWelcome, roomHintReady, showRoomHint, setTabBarCovered]);
+  // ★ home unmount → tab bar her zaman geri gelsin (gerçi tab nav'da unmount olmaz, ama emniyet)
+  useEffect(() => () => { setTabBarCovered(false); }, [setTabBarCovered]);
   // ★ 2026-04-22: Quick-create sheet — FAB ve empty state chip'lerinden tetiklenir.
   const [showQuickCreate, setShowQuickCreate] = useState(false);
   const [creatingRoom, setCreatingRoom] = useState(false);
@@ -966,55 +979,86 @@ export default function HomeScreen() {
       setCreatingRoom(false);
     }
   };
-  // ★ v107.48 (3 May 2026): Discovery sheet sadece YENİ kullanıcılara gösterilir.
-  //   Kayıtlı (onboarding tamamlamış) kullanıcı çıkış yapıp tekrar girince Discovery
-  //   tekrar AÇILMAZ. Mantık:
-  //     (a) justCompletedOnboarding → onboarding'i yeni bitirdi → GÖSTER (ilk ve tek sefer)
-  //     (b) profile.preferences.onboarding_completed === true → kayıtlı kullanıcı → GÖSTERME
-  //         + AsyncStorage'a "seen" yaz (önceden swipe ile kapatmışsa kaybolan flag'i toparla)
-  //     (c) Profil yüklenmediyse / onboarding flag'i yoksa → AsyncStorage check (eski mantık)
+  // ★ 2026-05-09: Welcome kararı SADECE BİR KEZ verilir (welcomeDecidedRef).
+  //   Eski hâlinde: justCompletedOnboarding=true → Welcome açılır → flag false yapılır →
+  //   effect re-run → onboardingDone=true (DB güncel) → Welcome KAPATILIR (flash bug).
+  //   Yeni hâlinde: ilk geçerli karar verildikten sonra effect dokunmaz; kullanıcı
+  //   onClose'a basınca kapanır.
+  const welcomeDecidedRef = useRef(false);
   useEffect(() => {
+    if (welcomeDecidedRef.current) return;
     if (justCompletedOnboarding) {
+      welcomeDecidedRef.current = true;
       setShowWelcome(true);
-      setJustCompletedOnboarding(false); // tek seferlik — consume
+      setJustCompletedOnboarding(false);
       return;
     }
-    if (!firebaseUser?.uid) { setShowWelcome(false); return; }
-    // ★ v107.48: Onboarding tamamlanmışsa hiç gösterme + AsyncStorage'ı senkronla
-    const onboardingDone = (profile as any)?.preferences?.onboarding_completed === true;
-    if (onboardingDone) {
+    if (!firebaseUser?.uid) {
+      welcomeDecidedRef.current = true;
       setShowWelcome(false);
-      // Forward-compat: AsyncStorage'a "seen" yaz, sonraki kontroller hızlı dönsün
-      markDiscoverWelcomeSeen(firebaseUser.uid).catch(() => {});
+      return;
+    }
+    if (!profile) return; // profil yüklenene kadar bekle, karar verme
+    const onboardingDone = (profile as any)?.preferences?.onboarding_completed === true;
+    const dbWelcomeSeen = (profile as any)?.preferences?.discover_welcome_seen === true;
+    // ★ 2026-05-09: Sadece onboarding tamamlanmış DEĞİL, aynı zamanda Welcome de görülmüş olmalı.
+    //   Aksi halde admin DB'den flag'i temizleyince Welcome yine açılabilsin.
+    if (onboardingDone && dbWelcomeSeen) {
+      welcomeDecidedRef.current = true;
+      setRoomHintReady(false);
+      setShowWelcome(false);
       return;
     }
     hasSeenDiscoverWelcome(firebaseUser.uid).then(seen => {
-      setShowWelcome(seen ? false : true);
-    }).catch(() => setShowWelcome(false));
-  }, [firebaseUser?.uid, justCompletedOnboarding, (profile as any)?.preferences?.onboarding_completed]);
+      welcomeDecidedRef.current = true;
+      if (seen) {
+        setRoomHintReady(false);
+        setShowWelcome(false);
+      } else {
+        setShowWelcome(true);
+      }
+    }).catch(() => {
+      welcomeDecidedRef.current = true;
+      setRoomHintReady(false);
+      setShowWelcome(false);
+    });
+  }, [firebaseUser?.uid, justCompletedOnboarding, (profile as any)?.preferences?.onboarding_completed, !!profile]);
 
   // ★ 2026-04-29: DiscoverWelcome bittikten sonra (showWelcome=false) Keşfet'e düşen
   //   YENİ + odası olmayan kullanıcıya "Oda oluştur!" yönlendirmesi. UID-bazlı bir kez
   //   (room_hint flag). Odası olan kullanıcıya gösterilmez (zaten biliyor).
   useEffect(() => {
-    if (showWelcome !== false || !firebaseUser?.uid) return;
+    if (showWelcome !== false) return;
+    if (!firebaseUser?.uid) { setRoomHintReady(true); return; }
     let cancelled = false;
+    setRoomHintReady(false);
+    // ★ Safety timeout: DB sorgusu pending kalırsa 5sn sonra cover'ı kaldır → siyah ekran riski yok
+    const safetyTimer = setTimeout(() => { if (!cancelled) setRoomHintReady(true); }, 5000);
     (async () => {
-      const seen = await hasSeenRoomCreateHint(firebaseUser.uid).catch(() => true);
-      if (seen || cancelled) return;
-      // Kullanıcının zaten odası varsa hint gerekmez — sessizce mark + skip
+      const seen = await Promise.race([
+        hasSeenRoomCreateHint(firebaseUser.uid),
+        new Promise<boolean>(r => setTimeout(() => r(true), 4500)),
+      ]).catch(() => true);
+      if (cancelled) return;
+      if (seen) { clearTimeout(safetyTimer); setRoomHintReady(true); return; }
       try {
         const myRooms = await RoomService.getMyRooms(firebaseUser.uid);
         if (cancelled) return;
         if (myRooms && myRooms.length > 0) {
           await markRoomCreateHintSeen(firebaseUser.uid);
+          clearTimeout(safetyTimer);
+          setRoomHintReady(true);
           return;
         }
       } catch { /* fetch fail — hint'i yine de göstermek mantıklı (yeni kullanıcı varsayım) */ }
       if (cancelled) return;
-      setTimeout(() => { if (!cancelled) setShowRoomHint(true); }, 1500);
+      // ★ 2026-05-09 FLASH FIX: hint açılmadan önce kısa nefes (modal animasyonu temiz),
+      //   cover hâlâ aktif (showRoomHint cover şartında).
+      setShowRoomHint(true);
+      clearTimeout(safetyTimer);
+      setRoomHintReady(true);
     })();
-    return () => { cancelled = true; };
+    return () => { cancelled = true; clearTimeout(safetyTimer); };
   }, [showWelcome, firebaseUser?.uid]);
   const [showAdvFilterPanel, setShowAdvFilterPanel] = useState(false);
 
@@ -2072,9 +2116,8 @@ export default function HomeScreen() {
           currentUserId={firebaseUser?.uid}
         />
 
-        {/* ★ 2026-04-23: Welcome kontrol edilirken veya gösterilecekken tam ekran örtü
-             — tab bar dahil her şeyi kaplar, flash önlenir */}
-        {showWelcome !== false && (
+        {/* ★ 2026-05-09: View cover — content alanını kaplar. Tab bar gizleme useEffect ile. */}
+        {(showWelcome !== false || !roomHintReady || showRoomHint) && (
           <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: -100, backgroundColor: '#0A0F1A', zIndex: 9998 }} />
         )}
 
@@ -2083,6 +2126,9 @@ export default function HomeScreen() {
           visible={!!showWelcome}
           uid={firebaseUser?.uid}
           onClose={() => {
+            // ★ 2026-05-09 FLASH FIX: setShowWelcome(false) ile AYNI tick'te roomHintReady=false
+            //   → cover şartı kesintisiz aktif kalır, Keşfet flash etmez.
+            setRoomHintReady(false);
             setShowWelcome(false);
             // ★ Onboarding bittikten sonra FAB hint'ini göster (ilk kez)
             hasSeenFABHint().then(seen => {
@@ -2094,17 +2140,24 @@ export default function HomeScreen() {
         {/* ★ 2026-04-29: First-time "Oda oluştur!" yönlendirmesi — gem hexagon + CTA */}
         <RoomCreateHintSheet
           visible={showRoomHint}
-          onGoToMyRooms={async () => {
-            setShowRoomHint(false);
-            await markRoomCreateHintSeen(firebaseUser?.uid);
-            // ★ v92 (1 May 2026): myrooms ekranında "+ Yeni Oda" butonunu işaret eden
-            //   premium coachmark için flag set et — myrooms mount'ta tetiklenir.
-            await markCreateRoomCoachmarkPending(firebaseUser?.uid);
+          onGoToMyRooms={() => {
+            // ★ 2026-05-09 FLASH FIX: ÖNCE coachmark flag + route push (myrooms tab aktif olur,
+            //   modal hâlâ üstte). SONRA modal'ı geç kapat → modal kapandığında arka tab artık
+            //   myrooms, dolayısıyla Keşfet asla bir frame bile görünmez.
+            markCreateRoomCoachmarkPending(firebaseUser?.uid).catch(() => {});
+            markRoomCreateHintSeen(firebaseUser?.uid).catch(() => {});
+            // ★ Tab bar'ı navigate'ten ÖNCE göster — home tab freezeOnBlur ile donar,
+            //   sonraki setShowRoomHint(false) gecikir, tab bar geri gelmez.
+            setTabBarCovered(false);
             router.push('/(tabs)/myrooms' as any);
+            setTimeout(() => setShowRoomHint(false), 450);
           }}
-          onClose={async () => {
+          onClose={() => {
+            // Skip → kullanıcı şimdi değil dedi ama sonra Odalarım'a kendi giderse
+            //   "+ Yeni Oda" butonunu işaret eden oku göster — yardım etmeye devam et.
             setShowRoomHint(false);
-            await markRoomCreateHintSeen(firebaseUser?.uid);
+            markRoomCreateHintSeen(firebaseUser?.uid).catch(() => {});
+            markCreateRoomCoachmarkPending(firebaseUser?.uid).catch(() => {});
           }}
         />
 

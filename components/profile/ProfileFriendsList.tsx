@@ -1,16 +1,15 @@
 // SopranoChat — Profil Arkadaşlar Bölümü
 // Kendi profil sayfasında "Arkadaşlarım" kartı.
-// ★ "Ayarlar ve Yönetim" kartı ile aynı premium tasarım dili:
-//   - premiumSectionHeader (accent bar + ikon + label)
-//   - Diagonal gradient arka plan (parlak üst-sol → koyu alt-sağ)
-//   - PremiumListItem tarzı satırlar
-// Birleşik friends listesinden ilk 8 kişiyi gösterir, "Tümünü Gör" modala gider.
+// ★ 2026-05-05: Dikey liste → yatay scroll story-tile pattern.
+//   Avatar + isim (kompakt). Çevrimiçi olanlar başta. "Tümünü Gör" hem
+//   section header sağında hem scroll sonunda son tile olarak.
 
-import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Shadows } from '../../constants/theme';
 import StatusAvatar from '../StatusAvatar';
+import ProfileSectionHeader from './ProfileSectionHeader';
 
 const iconShadow = {
   textShadowColor: 'rgba(0,0,0,0.5)',
@@ -27,6 +26,8 @@ interface Friend {
   avatar_url?: string;
   is_online?: boolean;
   subscription_tier?: string;
+  /** İleride backend DM count ile beslenecek (en sık konuşulan sıralaması) */
+  recent_dm_at?: string | null;
 }
 
 interface Props {
@@ -35,112 +36,154 @@ interface Props {
   onShowAll: () => void;
 }
 
+// ★ Yatay tile sayısı limiti — fazlası scroll'da kalır, son tile "Tümü"
+const PREVIEW_LIMIT = 12;
+
 export default function ProfileFriendsList({ friends, onFriendPress, onShowAll }: Props) {
   if (friends.length === 0) return null;
-  const previewCount = Math.min(friends.length, 8);
+
+  // ★ Sıralama: önce son DM (varsa), sonra çevrimiçi olanlar, sonra geri kalan
+  //   recent_dm_at backend'den gelirse "en sık konuşulan" gerçek sıralama olur.
+  //   Şu an çevrimiçi-öncelikli sıralama ile başlıyor.
+  const sorted = [...friends].sort((a, b) => {
+    const aRecent = a.recent_dm_at ? new Date(a.recent_dm_at).getTime() : 0;
+    const bRecent = b.recent_dm_at ? new Date(b.recent_dm_at).getTime() : 0;
+    if (aRecent !== bRecent) return bRecent - aRecent;
+    const aOn = a.is_online ? 1 : 0;
+    const bOn = b.is_online ? 1 : 0;
+    if (aOn !== bOn) return bOn - aOn;
+    return 0;
+  });
+  const previewList = sorted.slice(0, PREVIEW_LIMIT);
+  const hasMore = friends.length > PREVIEW_LIMIT;
 
   return (
     <>
-      {/* ★ Section header — "Ayarlar ve Yönetim" ile aynı format */}
-      <View style={s.premiumSectionHeader}>
-        <View style={s.sectionAccent} />
-        <Ionicons name="people" size={13} color={Colors.teal} style={iconShadow} />
-        <Text style={s.premiumSectionText}>ARKADAŞLARIM</Text>
-        {/* Arkadaş sayısı rozeti — section header'da */}
-        <View style={s.countBadge}>
-          <Text style={s.countText}>{friends.length}</Text>
-        </View>
-      </View>
+      {/* ★ 2026-05-05: Paylaşılan ProfileSectionHeader — 4 yerdeki duplike kod tek bileşende */}
+      <ProfileSectionHeader
+        label="ARKADAŞLARIM"
+        icon="people"
+        accentColor={Colors.teal}
+        count={friends.length}
+        actionLabel="Tümünü Gör"
+        onActionPress={onShowAll}
+      />
 
-      {/* ★ Kart — diagonal gradient (Ayarlar ve Yönetim ile aynı) */}
+      {/* ★ 2026-05-05: NotificationDrawer aile dili — slate diagonal + teal halo + soft glow.
+          Karakter: teal (sosyal/arkadaş). */}
       <View style={s.card}>
         <LinearGradient
-          colors={['#4a5668', '#37414f', '#232a35']}
+          colors={['#3a4658', '#2a3344', '#1a2030']}
           start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
           style={StyleSheet.absoluteFillObject}
+          pointerEvents="none"
+        />
+        <LinearGradient
+          colors={['rgba(20,184,166,0.20)', 'rgba(20,184,166,0.05)', 'transparent']}
+          start={{ x: 0, y: 0 }} end={{ x: 0, y: 0.4 }}
+          style={StyleSheet.absoluteFillObject}
+          pointerEvents="none"
+        />
+        <LinearGradient
+          colors={['rgba(20,184,166,0.08)', 'transparent']}
+          start={{ x: 0, y: 0 }} end={{ x: 0.7, y: 0.6 }}
+          style={StyleSheet.absoluteFillObject}
+          pointerEvents="none"
         />
 
-        {friends.slice(0, 8).map((friend, idx) => (
-          <Pressable
-            key={friend.id}
-            style={({ pressed }) => [
-              s.row,
-              idx === previewCount - 1 && !friends.length && { borderBottomWidth: 0 },
-              idx === previewCount - 1 && friends.length <= 8 && { borderBottomWidth: 0 },
-              pressed && { backgroundColor: 'rgba(255,255,255,0.04)' },
-            ]}
-            onPress={() => onFriendPress(friend.id)}
-          >
-            <StatusAvatar
-              uri={friend.avatar_url}
-              size={36}
-              isOnline={friend.is_online}
-              tier={friend.subscription_tier as any}
-            />
-            <View style={{ flex: 1 }}>
-              <Text style={s.name} numberOfLines={1}>{friend.display_name}</Text>
-              <Text style={[s.status, friend.is_online && { color: '#22C55E' }]}>
-                {friend.is_online ? 'Çevrimiçi' : 'Çevrimdışı'}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={s.scrollContent}
+        >
+          {previewList.map((friend) => (
+            <Pressable
+              key={friend.id}
+              style={({ pressed }) => [s.tile, pressed && { opacity: 0.7 }]}
+              onPress={() => onFriendPress(friend.id)}
+            >
+              <View style={s.avatarWrap}>
+                <StatusAvatar
+                  uri={friend.avatar_url}
+                  size={54}
+                  isOnline={friend.is_online}
+                  tier={friend.subscription_tier as any}
+                  frameId={(friend as any).active_frame || null}
+                />
+              </View>
+              <Text style={s.tileName} numberOfLines={1}>
+                {friend.display_name}
               </Text>
-            </View>
-            <Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.25)" />
-          </Pressable>
-        ))}
+              {friend.is_online ? (
+                <Text style={s.tileStatus}>Çevrimiçi</Text>
+              ) : (
+                <Text style={s.tileStatusOff}>Çevrimdışı</Text>
+              )}
+            </Pressable>
+          ))}
 
-        {friends.length > 8 && (
-          <Pressable
-            style={({ pressed }) => [s.showAllBtn, pressed && { backgroundColor: 'rgba(255,255,255,0.04)' }]}
-            onPress={onShowAll}
-          >
-            <Text style={s.showAllText}>Tümünü Gör ({friends.length})</Text>
-            <Ionicons name="chevron-forward" size={14} color={Colors.teal} />
-          </Pressable>
-        )}
+          {/* Son tile — "Tümü" geçişi (12'den fazlası varsa veya her zaman) */}
+          {hasMore && (
+            <Pressable
+              style={({ pressed }) => [s.tile, pressed && { opacity: 0.7 }]}
+              onPress={onShowAll}
+            >
+              <View style={s.allTileCircle}>
+                <Ionicons name="people" size={22} color={Colors.teal} style={iconShadow} />
+              </View>
+              <Text style={[s.tileName, { color: Colors.teal }]} numberOfLines={1}>
+                Tümünü Gör
+              </Text>
+              <Text style={s.tileStatus}>+{friends.length - PREVIEW_LIMIT}</Text>
+            </Pressable>
+          )}
+        </ScrollView>
       </View>
     </>
   );
 }
 
 const s = StyleSheet.create({
-  // ★ Section header — "Ayarlar ve Yönetim" tarzı premium header
-  premiumSectionHeader: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    marginHorizontal: 16, marginTop: 14, marginBottom: 8,
-  },
-  sectionAccent: { width: 3, height: 14, borderRadius: 2, backgroundColor: Colors.teal },
-  premiumSectionText: {
-    flex: 1, fontSize: 11, fontWeight: '800', color: '#94A3B8',
-    letterSpacing: 1, ..._textGlow,
-  },
-  countBadge: {
-    backgroundColor: 'rgba(20,184,166,0.12)', borderRadius: 10,
-    paddingHorizontal: 8, paddingVertical: 3,
-    borderWidth: 1, borderColor: 'rgba(20,184,166,0.25)',
-  },
-  countText: { fontSize: 10, fontWeight: '800', color: '#14B8A6' },
-
-  // ★ Kart — diagonal gradient + cardBorder (Ayarlar kartıyla aynı)
+  // ★ Yatay scroll kart — aile standardı (radius 26, amber border kaldırıldı)
   card: {
     marginHorizontal: 16, marginBottom: 10,
-    borderRadius: 16, overflow: 'hidden',
-    borderWidth: 1, borderColor: Colors.cardBorder,
+    borderRadius: 26, overflow: 'hidden',
+    backgroundColor: '#1a2030',
     ..._cardShadow,
   },
-
-  // Satır — PremiumListItem tarzı padding'ler
-  row: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    paddingVertical: 10, paddingHorizontal: 14,
-    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)',
+  scrollContent: {
+    paddingHorizontal: 12, paddingVertical: 14,
+    gap: 12,
   },
-  name: { fontSize: 14, fontWeight: '600', color: '#E2E8F0', letterSpacing: 0.15, ..._textGlow },
-  status: { fontSize: 10, color: '#64748B', marginTop: 1 },
 
-  // "Tümünü Gör" butonu
-  showAllBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4,
-    paddingVertical: 11,
-    borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.06)',
+  // ★ Tile (avatar + isim) — story-tile pattern
+  tile: {
+    width: 70,
+    alignItems: 'center',
+    gap: 4,
   },
-  showAllText: { fontSize: 12, fontWeight: '700', color: Colors.teal, letterSpacing: 0.3, ..._textGlow },
+  avatarWrap: {
+    width: 56, height: 56,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  tileName: {
+    fontSize: 11, fontWeight: '700', color: '#E2E8F0',
+    letterSpacing: 0.15, textAlign: 'center',
+    maxWidth: 70,
+    ..._textGlow,
+  },
+  tileStatus: {
+    fontSize: 9, fontWeight: '600', color: '#22C55E',
+  },
+  tileStatusOff: {
+    fontSize: 9, fontWeight: '500', color: '#64748B',
+  },
+
+  // ★ "Tümü" tile sonda — daire içinde ikon
+  allTileCircle: {
+    width: 54, height: 54, borderRadius: 27,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'rgba(20,184,166,0.10)',
+    borderWidth: 1.5, borderColor: 'rgba(20,184,166,0.35)',
+  },
 });

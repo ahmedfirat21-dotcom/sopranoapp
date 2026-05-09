@@ -12,6 +12,7 @@ import {
 import AppLoader from '../AppLoader';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RoomAccessService } from '../../services/roomAccess';
 import { ProfileService, type Profile } from '../../services/database';
 import { useUserProfileSheet } from '../../app/_layout';
@@ -22,7 +23,10 @@ import { useSwipeToDismiss } from '../../hooks/useSwipeToDismiss';
 import { supabase } from '../../constants/supabase';
 
 const { width: W } = Dimensions.get('window');
-const DRAWER_W = W * 0.72;
+// ★ 2026-05-05: Keşfet drawer dili — birebir aynı boyut (NotificationDrawer ile).
+const DRAWER_W = Math.min(W * 0.72, 300);
+const ROOM_TOP_GAP = 70;
+const ROOM_BOTTOM_GAP = 90;
 
 interface Props {
   visible: boolean;
@@ -33,6 +37,7 @@ interface Props {
 }
 
 export default function HostAccessPanel({ visible, onClose, roomId, roomType, hostId }: Props) {
+  const insets = useSafeAreaInsets();
   const slideAnim = useRef(new Animated.Value(DRAWER_W)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const { openUserProfile } = useUserProfileSheet();
@@ -185,29 +190,51 @@ export default function HostAccessPanel({ visible, onClose, roomId, roomType, ho
 
   return (
     <View style={[StyleSheet.absoluteFill, { zIndex: 9998 }]} pointerEvents={visible ? 'box-none' : 'none'}>
-      {/* Backdrop — sadece dismiss alanı, görsel efekt yok */}
-      <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+      {/* Backdrop — keşfet drawer dim tonu */}
+      <Animated.View style={[s.backdrop, { opacity: fadeAnim }]}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+      </Animated.View>
 
       {/* Panel — sağdan süzülür + sağa sürükle kapat */}
-      <Animated.View style={[s.panel, { transform: [{ translateX: Animated.add(slideAnim, swipeX) }] }]} {...panHandlers}>
-        <LinearGradient colors={['#4a5668', '#37414f', '#232a35']} locations={[0, 0.35, 1]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFillObject} />
-        {/* Üst parlak mor accent — palette üzerine hafif ışık */}
+      <Animated.View
+        style={[s.panel, {
+          top: Math.max(insets.top + 12, ROOM_TOP_GAP),
+          bottom: Math.max(insets.bottom + 8, ROOM_BOTTOM_GAP),
+          transform: [{ translateX: Animated.add(slideAnim, swipeX) }],
+        }]}
+        {...panHandlers}
+      >
+        {/* Profil sayfası gradient dili — diagonal slate */}
         <LinearGradient
-          colors={['rgba(167,139,250,0.12)', 'rgba(167,139,250,0.03)', 'transparent']}
-          style={s.topGlow}
+          colors={['#3a4658', '#2a3344', '#1a2030']}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFillObject}
+          pointerEvents="none"
+        />
+        {/* ★ 2026-05-05: 3 katman aile dili — slate + halo + soft glow. Mor: Moderasyon. */}
+        <LinearGradient
+          colors={['rgba(167,139,250,0.22)', 'rgba(167,139,250,0.06)', 'transparent']}
+          start={{ x: 0, y: 0 }} end={{ x: 0, y: 0.4 }}
+          style={StyleSheet.absoluteFillObject}
+          pointerEvents="none"
+        />
+        <LinearGradient
+          colors={['rgba(167,139,250,0.08)', 'transparent']}
+          start={{ x: 0, y: 0 }} end={{ x: 0.7, y: 0.6 }}
+          style={StyleSheet.absoluteFillObject}
+          pointerEvents="none"
         />
 
-        {/* Başlık */}
+        {/* Başlık — NotificationDrawer dili */}
         <View style={s.header}>
-          <View style={s.headerIcon}>
-            <Ionicons name="shield-checkmark" size={14} color="#A78BFA" style={s.iconShadow} />
-          </View>
+          <Ionicons name="shield-checkmark" size={18} color="#A78BFA" style={s.headerIconGlow} />
           <Text style={s.headerTitle}>Moderasyon</Text>
           <View style={{ flex: 1 }} />
           <Pressable onPress={onClose} hitSlop={12} style={s.closeBtn}>
             <Ionicons name="close" size={16} color="rgba(255,255,255,0.4)" />
           </Pressable>
         </View>
+        <View style={s.headerSeparator} />
 
         {/* Tab Bar */}
         <View style={s.tabBar}>
@@ -343,34 +370,39 @@ export default function HostAccessPanel({ visible, onClose, roomId, roomType, ho
 }
 
 const s = StyleSheet.create({
-  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'transparent' },
+  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(8,12,22,0.45)' },
   panel: {
-    position: 'absolute', right: 0, top: 70, bottom: 80,
+    position: 'absolute', right: 0,
     width: DRAWER_W,
-    borderTopLeftRadius: 18, borderBottomLeftRadius: 18,
-    borderWidth: 1, borderRightWidth: 0,
-    borderColor: '#95a1ae',
+    borderTopLeftRadius: 26, borderBottomLeftRadius: 26,
     overflow: 'hidden',
-    shadowColor: '#000', shadowOffset: { width: -2, height: 0 }, shadowOpacity: 0.2, shadowRadius: 8,
-    elevation: 8,
-  },
-  topGlow: {
-    position: 'absolute', top: 0, left: 0, right: 0, height: 120,
-    borderTopLeftRadius: 22,
+    backgroundColor: '#1a2030',
+    // ★ 2026-05-05 perf: Android elevation azaltıldı (FPS koruma)
+    shadowColor: '#000',
+    shadowOffset: { width: -6, height: 0 },
+    shadowOpacity: 0.45,
+    shadowRadius: 14,
+    elevation: 10,
   },
   header: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    paddingHorizontal: 14, paddingTop: 14, paddingBottom: 12,
-    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.04)',
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingHorizontal: 14, paddingTop: 16, paddingBottom: 12,
   },
-  headerIcon: {
-    width: 28, height: 28,
-    alignItems: 'center', justifyContent: 'center',
+  headerIconGlow: {
+    textShadowColor: 'rgba(167,139,250,0.7)',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 5,
+  },
+  headerSeparator: {
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    marginHorizontal: 12,
   },
   iconShadow: { textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 3 },
   headerTitle: {
-    fontSize: 15, fontWeight: '700', color: '#F1F5F9',
-    textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
+    fontSize: 15, fontWeight: '800', color: '#F1F5F9',
+    letterSpacing: 0.3,
+    textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4,
   },
   closeBtn: {
     width: 28, height: 28, borderRadius: 14,

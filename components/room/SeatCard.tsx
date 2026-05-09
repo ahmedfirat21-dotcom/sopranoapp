@@ -115,15 +115,16 @@ const SeatCard = React.memo(function SeatCard({
     <TouchableOpacity onPress={onPress} activeOpacity={0.7} style={{ alignItems: 'center', width: Math.max(currentWidth, frameContainerSize), marginBottom: 2 }}>
 
       {/* ★ Avatar + Çerçeve sarmalayıcı: çerçeve ve avatar aynı merkeze sahip */}
-      <View style={{ width: frameContainerSize, height: frameContainerSize, alignItems: 'center', justifyContent: 'center' }}>
-        {/* Lottie çerçeve — tam container boyutunda */}
+      <View style={{ width: frameContainerSize, height: frameContainerSize, alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+        {/* Lottie çerçeve — avatar ARKASINDA (zIndex -1) ki badge ve mic etiketleri üzerinde kalsın */}
         {hasFrame && (
           <View
             style={{
               position: 'absolute',
               width: frameContainerSize,
               height: frameContainerSize,
-              zIndex: 5,
+              zIndex: -1,
+              elevation: 0,
             }}
             pointerEvents="none"
           >
@@ -188,72 +189,87 @@ const SeatCard = React.memo(function SeatCard({
             <Text style={[styles.seatInitials, { fontSize: size * 0.3 }]}>{initials}</Text>
           )}
         </Animated.View>
+
+        {/* ★ Badge overlay — avatar boyutunda, ortalanmış. Tüm rozetler buradan
+             avatar köşelerine hizalanır; zIndex/elevation Lottie çerçeve ÜSTÜNDE kalır. */}
+        <View
+          pointerEvents="box-none"
+          style={{
+            position: 'absolute',
+            width: avatarSize,
+            height: avatarHeight,
+            zIndex: 10,
+            elevation: 10,
+          }}
+        >
+          {/* Mikrofon badge — avatar sağ-alt */}
+          {(role === 'speaker' || role === 'owner' || role === 'moderator') ? (
+            <View style={[styles.micIndicator, (mic && !isMuted) ? styles.micOn : styles.micMuted, { right: -2, bottom: -2 }]}>
+              <Ionicons name={(mic && !isMuted) ? 'mic' : 'mic-off'} size={9} color="#fff" />
+            </View>
+          ) : (
+            <View style={[styles.micIndicator, styles.micOff, { right: -2, bottom: -2 }]}>
+              <Ionicons name="mic-off" size={9} color="rgba(255,255,255,0.35)" />
+            </View>
+          )}
+
+          {/* Muted badge — avatar sağ-üst */}
+          {isMuted && (
+            <View style={styles.mutedBadge}>
+              <Ionicons name="volume-mute" size={10} color="#EF4444" />
+            </View>
+          )}
+
+          {/* Chat muted badge — avatar sol-üst */}
+          {isChatMuted && (
+            <View style={[styles.mutedBadge, { left: -2, right: undefined, backgroundColor: 'rgba(249,115,22,0.25)', borderColor: 'rgba(249,115,22,0.5)' }]}>
+              <Ionicons name="chatbox-outline" size={9} color="#F97316" />
+            </View>
+          )}
+
+          {/* Koltuk numarası — avatar sol-alt */}
+          {seatNumber != null && seatNumber > 0 && (
+            <View style={styles.seatNumberBadge}>
+              <Text style={styles.seatNumberText}>{seatNumber}</Text>
+            </View>
+          )}
+
+          {/* Host/admin/moderator badge — avatar sağ-üst (muted yoksa) */}
+          {isAdmin && (
+            <View style={[styles.hostBadge, { backgroundColor: 'rgba(220,38,38,0.25)', borderColor: 'rgba(220,38,38,0.5)' }]}>
+              <Ionicons name="shield-checkmark" size={8} color="#DC2626" />
+            </View>
+          )}
+
+          {isHost && !isAdmin && !isActingHost && (
+            <View style={styles.hostBadge}>
+              <Ionicons name="star" size={8} color={COLORS.premiumGold} />
+            </View>
+          )}
+
+          {isHost && !isAdmin && isActingHost && (
+            <View style={[styles.hostBadge, { backgroundColor: 'rgba(249,115,22,0.15)', borderColor: 'rgba(249,115,22,0.5)' }]}>
+              <Ionicons name="shield-half" size={8} color="#F97316" />
+            </View>
+          )}
+
+          {role === 'moderator' && !isAdmin && (
+            <View style={[styles.hostBadge, { backgroundColor: 'rgba(139,92,246,0.25)', borderColor: 'rgba(139,92,246,0.5)' }]}>
+              <Ionicons name="shield" size={8} color="#8B5CF6" />
+            </View>
+          )}
+
+          {micRequesting && (
+            <View style={styles.micRequestBadge}>
+              <Ionicons name="mic" size={10} color="#fff" />
+              <Text style={{ color: '#fff', fontSize: 8, fontWeight: 'bold' }}>İstek</Text>
+            </View>
+          )}
+        </View>
       </View>
 
-      {/* Mikrofon badge */}
-      {(role === 'speaker' || role === 'owner' || role === 'moderator') ? (
-        <View style={[styles.micIndicator, (mic && !isMuted) ? styles.micOn : styles.micMuted, { right: -2, bottom: -2 }]}>
-          <Ionicons name={(mic && !isMuted) ? 'mic' : 'mic-off'} size={9} color="#fff" />
-        </View>
-      ) : (
-        <View style={[styles.micIndicator, styles.micOff, { right: -2, bottom: -2 }]}>
-          <Ionicons name="mic-off" size={9} color="rgba(255,255,255,0.35)" />
-        </View>
-      )}
-
-      {/* ★ Muted badge */}
-      {isMuted && (
-        <View style={styles.mutedBadge}>
-          <Ionicons name="volume-mute" size={10} color="#EF4444" />
-        </View>
-      )}
-
-      {/* ★ Chat muted badge */}
-      {isChatMuted && (
-        <View style={[styles.mutedBadge, { left: -2, right: undefined, backgroundColor: 'rgba(249,115,22,0.25)', borderColor: 'rgba(249,115,22,0.5)' }]}>
-          <Ionicons name="chatbox-outline" size={9} color="#F97316" />
-        </View>
-      )}
-
-      {/* ★ Koltuk numarası badge */}
-      {seatNumber != null && seatNumber > 0 && (
-        <View style={styles.seatNumberBadge}>
-          <Text style={styles.seatNumberText}>{seatNumber}</Text>
-        </View>
-      )}
-
+      {/* Nick — wrapper altında, çerçeve dışında */}
       <Text style={[styles.seatNick, { marginTop: 5 }, isAdmin && { color: '#F87171' }, isMuted && { color: 'rgba(239,68,68,0.6)' }]} numberOfLines={1}>{nick}</Text>
-
-      {isAdmin && (
-        <View style={[styles.hostBadge, { backgroundColor: 'rgba(220,38,38,0.25)', borderColor: 'rgba(220,38,38,0.5)' }]}>
-          <Ionicons name="shield-checkmark" size={8} color="#DC2626" />
-        </View>
-      )}
-
-      {isHost && !isAdmin && !isActingHost && (
-        <View style={styles.hostBadge}>
-          <Ionicons name="star" size={8} color={COLORS.premiumGold} />
-        </View>
-      )}
-
-      {isHost && !isAdmin && isActingHost && (
-        <View style={[styles.hostBadge, { backgroundColor: 'rgba(249,115,22,0.15)', borderColor: 'rgba(249,115,22,0.5)' }]}>
-          <Ionicons name="shield-half" size={8} color="#F97316" />
-        </View>
-      )}
-
-      {role === 'moderator' && !isAdmin && (
-        <View style={[styles.hostBadge, { backgroundColor: 'rgba(139,92,246,0.25)', borderColor: 'rgba(139,92,246,0.5)' }]}>
-          <Ionicons name="shield" size={8} color="#8B5CF6" />
-        </View>
-      )}
-
-      {micRequesting && (
-        <View style={styles.micRequestBadge}>
-          <Ionicons name="mic" size={10} color="#fff" />
-          <Text style={{ color: '#fff', fontSize: 8, fontWeight: 'bold' }}>İstek</Text>
-        </View>
-      )}
     </TouchableOpacity>
   );
 });

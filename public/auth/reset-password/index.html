@@ -119,13 +119,21 @@
 
       var openUrl = isAndroid ? androidIntent : customScheme;
       var appLink = document.getElementById('appLink');
-      // ★ Chrome native intent:// handler'ı en güvenilir yol — JS preventDefault YOK.
-      //   Buton href'ine intent:// koyduk; kullanıcı tıkladığında Chrome standart link
-      //   navigation'ını yapar, intent:// formatını parse edip uygulamayı açar.
       appLink.href = openUrl;
 
+      // ★ v110.5.16 (6 May 2026): Buton click'ine explicit handler.
+      //   Eski sorun: auto-redirect intent gesture'ı tükettiği için kullanıcı
+      //   sonradan butona basınca Chrome ikinci intent'i işlemiyordu ("gesture spent").
+      //   Yeni: her click'te yeni navigation tetiklenir, kullanıcı her zaman uygulamayı açabilir.
+      appLink.addEventListener('click', function (ev) {
+        ev.preventDefault();
+        // Android'de intent:// her click'te yeniden tetiklenir
+        // iOS/desktop'ta sopranochat:// scheme açılır
+        try { window.location.href = openUrl; } catch (e) {}
+      });
+
       // Otomatik redirect — sayfa yüklenir yüklenmez sessizce uygulamayı dene
-      setTimeout(function () {
+      var autoTimer = setTimeout(function () {
         window.location.href = openUrl;
       }, 100);
 

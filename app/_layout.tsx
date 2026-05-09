@@ -1,7 +1,8 @@
 // LiveKit polyfill kaldırıldı — native modül yoksa Hermes'te 'Requiring unknown module' crash'ine sebep oluyordu
 import { useEffect, useState, useRef, useCallback, useMemo, createContext, useContext } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { View, StyleSheet, Dimensions, AppState, Platform, PermissionsAndroid, LogBox } from 'react-native';
+import { View, Text, Pressable, StyleSheet, Dimensions, AppState, Platform, PermissionsAndroid, LogBox } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 // ★ 2026-04-25: Crashlytics — Firebase ile entegre crash izleme.
 //   @react-native-firebase/crashlytics native module; sadece dev-client/release build'de çalışır.
@@ -207,6 +208,14 @@ type AuthContextType = {
   profile: Profile | null;
   setProfile: (p: Profile | null) => void;
   refreshProfile: () => Promise<void>;
+  /** ★ 2026-05-09: Profile fetch network başarısız oldu mu? AuthGuard yanlışlıkla
+   *  onboarding'e yollamasın diye true ise "Bağlantı Sorunu" UI gösterilir. */
+  profileFetchFailed: boolean;
+  retryProfileFetch: () => void;
+  /** ★ 2026-05-09: Hoşgeldin/Oda aç ipucu zinciri sırasında tab bar'ı gizlemek için.
+   *  home.tsx cover şartı aktifken true → CurvedTabBar null döner, alt menü kaybolur. */
+  tabBarCovered: boolean;
+  setTabBarCovered: (v: boolean) => void;
   minimizedRoom: MinimizedRoom | null;
   setMinimizedRoom: (r: MinimizedRoom | null) => void;
   /** ★ Cached call signals — call screen mount olmadan gelen sinyalleri yakalar */
@@ -240,6 +249,10 @@ export const AuthContext = createContext<AuthContextType>({
   profile: null,
   setProfile: () => {},
   refreshProfile: async () => {},
+  profileFetchFailed: false,
+  retryProfileFetch: () => {},
+  tabBarCovered: false,
+  setTabBarCovered: () => {},
   minimizedRoom: null,
   setMinimizedRoom: () => {},
   pendingCallSignals: [],
@@ -573,7 +586,7 @@ function RealtimeBadgeProvider({ userId, children }: { userId: string | null; ch
 
 // ========== AUTH GUARD ==========
 function AuthGuard({ children }: { children: React.ReactNode }) {
-  const { isAuthReady, isLoggedIn, profile, firebaseUser, authVersion } = useAuth();
+  const { isAuthReady, isLoggedIn, profile, firebaseUser, authVersion, profileFetchFailed, retryProfileFetch } = useAuth();
   const segments = useSegments();
   const router = useRouter();
 
@@ -624,6 +637,10 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
       const hasCompleteProfile = profile && profile.display_name && profile.id && onboardingDone;
 
       if (!profile) {
+        // ★ 2026-05-09: profileFetchFailed → AuthGuard'ın render branch'i "Bağlantı Sorunu"
+        //   UI'ı gösterir; effect içinde redirect yapmıyoruz. Aksi halde network koparsa
+        //   var olan hesap yanlışlıkla onboarding'e yollanır.
+        if (profileFetchFailed) return;
         // ★ 2026-04-18 FIX: Profil null — giriş yapılmış ama profile henüz yüklenmemiş
         // olabilir (retry inflight). Hemen onboarding'e atmak yerine 2 saniye bekle;
         // bu sürede profile gelirse effect yeniden çalışır ve bu branch'e düşmez.
@@ -654,7 +671,7 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
         }
       }
     }
-  }, [isAuthReady, isLoggedIn, profile, firebaseUser?.emailVerified, segments, authVersion]);
+  }, [isAuthReady, isLoggedIn, profile, firebaseUser?.emailVerified, segments, authVersion, profileFetchFailed]);
 
   // ★ Auth hazır değilken loading göster — proje bg + animated spinner
   if (!isAuthReady) {
@@ -662,6 +679,42 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
       <AppBackground radialGlow>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <AppLoader size={56} />
+        </View>
+      </AppBackground>
+    );
+  }
+
+  // ★ 2026-05-09: Profile fetch network başarısız → onboarding yerine "Tekrar Dene" UI.
+  //   isLoggedIn=true (Firebase auth tamam) ama profile DB'den çekilemedi → kullanıcı
+  //   yanlışlıkla onboarding'e atılırsa hesabını "yeni" sanıp yeniden setup'a girer.
+  if (isLoggedIn && profileFetchFailed && !profile) {
+    return (
+      <AppBackground radialGlow>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 }}>
+          <View style={{
+            width: 80, height: 80, borderRadius: 40, alignItems: 'center', justifyContent: 'center',
+            backgroundColor: 'rgba(239,68,68,0.12)', borderWidth: 1, borderColor: 'rgba(239,68,68,0.35)',
+            marginBottom: 20,
+          }}>
+            <Ionicons name="cloud-offline-outline" size={42} color="#EF4444" />
+          </View>
+          <Text style={{ color: '#F1F5F9', fontSize: 20, fontWeight: '800', marginBottom: 8, textAlign: 'center' }}>
+            Bağlantı Sorunu
+          </Text>
+          <Text style={{ color: 'rgba(255,255,255,0.65)', fontSize: 14, lineHeight: 20, textAlign: 'center', marginBottom: 28 }}>
+            Profilini sunucudan getiremedik. İnternet bağlantını kontrol edip tekrar dene.
+          </Text>
+          <Pressable
+            onPress={retryProfileFetch}
+            style={({ pressed }) => [{
+              paddingHorizontal: 28, paddingVertical: 14, borderRadius: 14,
+              backgroundColor: '#14B8A6', flexDirection: 'row', alignItems: 'center', gap: 8,
+              opacity: pressed ? 0.8 : 1,
+            }]}
+          >
+            <Ionicons name="refresh" size={18} color="#FFF" />
+            <Text style={{ color: '#FFF', fontSize: 15, fontWeight: '700' }}>Tekrar Dene</Text>
+          </Pressable>
         </View>
       </AppBackground>
     );
@@ -758,6 +811,10 @@ export default function RootLayout() {
   // ★ 2026-04-22: Onboarding freshly completed flag — intro'yu garantili göster
   const [justCompletedOnboarding, setJustCompletedOnboarding] = useState(false);
   const [profile, setProfile] = useState<Profile | null>(null);
+  // ★ 2026-05-09: syncProfile 3 retry sonrası başarısızsa true. AuthGuard
+  //   onboarding redirect yerine "tekrar dene" UI gösterir.
+  const [profileFetchFailed, setProfileFetchFailed] = useState(false);
+  const [tabBarCovered, setTabBarCovered] = useState(false);
   const [minimizedRoom, setMinimizedRoom] = useState<MinimizedRoom | null>(null);
   // ★ 2026-04-21: Ref — call signal handler closure'da stale değer kullanmasın
   const minimizedRoomRef = useRef<MinimizedRoom | null>(null);
@@ -1002,6 +1059,8 @@ export default function RootLayout() {
           await ProfileService.setOnline(fbUser.uid, true);
         }
         setProfile(existingProfile);
+        // ★ 2026-05-09: Önceki başarısızlık varsa temizle
+        setProfileFetchFailed(false);
 
         // ★ SP Tetikleyiciler: Günlük giriş + Prime-time
         try {
@@ -1012,17 +1071,26 @@ export default function RootLayout() {
         // ★ RevenueCat: SDK başlat + kullanıcı kimliğini bağla
         RevenueCatService.init(fbUser.uid).catch(() => {});
       } else if (fetchErr) {
-        // 3 denemede de başarısız — network sorunu muhtemelen. Mevcut profili koru.
-        // AuthGuard için profile null ise onboarding'e gitmesin.
-        if (__DEV__) console.warn('[syncProfile] 3 denemede profile yüklenemedi, mevcut state korunuyor:', fetchErr);
+        // ★ 2026-05-09: 3 denemede başarısız — AuthGuard onboarding'e atmasın diye
+        //   profileFetchFailed=true. Kullanıcı "Tekrar Dene" → retryProfileFetch çağrılır.
+        if (__DEV__) console.warn('[syncProfile] 3 denemede profile yüklenemedi:', fetchErr);
+        setProfileFetchFailed(true);
       } else {
         // Gerçekten yok — yeni kullanıcı, onboarding akışına gidecek
         setProfile(null);
+        setProfileFetchFailed(false);
       }
     } finally {
       setIsAuthReady(true);
     }
   };
+
+  // ★ 2026-05-09: AuthGuard "Bağlantı Sorunu" ekranındaki "Tekrar Dene" butonu için.
+  const retryProfileFetch = useCallback(() => {
+    if (!firebaseUser) return;
+    setProfileFetchFailed(false);
+    syncProfile(firebaseUser).catch(() => {});
+  }, [firebaseUser]);
 
   const refreshProfile = async () => {
     if (firebaseUser) {
@@ -1483,13 +1551,17 @@ export default function RootLayout() {
   const authContextValue = useMemo(() => ({
     isAuthReady, isLoggedIn, setIsLoggedIn, user, setUser, firebaseUser,
     authVersion, refreshAuth, justCompletedOnboarding, setJustCompletedOnboarding,
-    profile, setProfile, refreshProfile, minimizedRoom, setMinimizedRoom,
+    profile, setProfile, refreshProfile, profileFetchFailed, retryProfileFetch,
+    tabBarCovered, setTabBarCovered,
+    minimizedRoom, setMinimizedRoom,
     pendingCallSignals, consumeCallSignal, activeCallId,
     setActiveCallId: updateActiveCallId, showNotifDrawer, setShowNotifDrawer,
     setNotifDrawerAnchorRight, setNotifDrawerRight, setNotifDrawerTop,
   }), [
     isAuthReady, isLoggedIn, user, firebaseUser, authVersion,
-    justCompletedOnboarding, profile, minimizedRoom,
+    justCompletedOnboarding, profile, profileFetchFailed, retryProfileFetch,
+    tabBarCovered,
+    minimizedRoom,
     pendingCallSignals, activeCallId, showNotifDrawer,
   ]);
 

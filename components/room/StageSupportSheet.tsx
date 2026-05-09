@@ -311,10 +311,10 @@ export default function StageSupportSheet({
   return (
     <View style={StyleSheet.absoluteFillObject as any} pointerEvents="box-none">
       <View style={{ ...StyleSheet.absoluteFillObject, zIndex: 500 }} pointerEvents="box-none">
-        {/* Backdrop */}
+        {/* Backdrop — NotificationDrawer dim tonu */}
         <Animated.View style={[StyleSheet.absoluteFill, { opacity: backdropOpacity }]}>
           <BlurView intensity={30} tint="dark" style={StyleSheet.absoluteFill} />
-          <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.45)' }]} />
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(8,12,22,0.45)' }]} />
           <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
         </Animated.View>
 
@@ -331,17 +331,25 @@ export default function StageSupportSheet({
           ]}
           {...panResponder.panHandlers}
         >
-          {/* Koyu zemin */}
+          {/* ★ 2026-05-05: NotificationDrawer dili — slate diagonal + üst tier halo + soft glow.
+              Sahne ışığı huzmesi + light sweep KORUNUR (sahne karakteri). */}
           <LinearGradient
-            colors={PANEL_BG_GRADIENT}
-            start={{ x: 0, y: 0 }} end={{ x: 0.7, y: 1 }}
-            style={StyleSheet.absoluteFillObject}
-          />
-          {/* Tier tint */}
-          <LinearGradient
-            colors={[palette.accentTint, 'transparent']}
+            colors={['#3a4658', '#2a3344', '#1a2030']}
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
             style={StyleSheet.absoluteFillObject}
+            pointerEvents="none"
+          />
+          <LinearGradient
+            colors={[palette.accent + '38', palette.accent + '10', 'transparent']}
+            start={{ x: 0, y: 0 }} end={{ x: 0, y: 0.45 }}
+            style={StyleSheet.absoluteFillObject}
+            pointerEvents="none"
+          />
+          <LinearGradient
+            colors={[palette.accent + '14', 'transparent']}
+            start={{ x: 0, y: 0 }} end={{ x: 0.7, y: 0.6 }}
+            style={StyleSheet.absoluteFillObject}
+            pointerEvents="none"
           />
 
           {/* ★ Sahne ışığı huzmesi — panel üstünden yumuşakça düşer.
@@ -646,11 +654,11 @@ const styles = StyleSheet.create({
   panel: {
     position: 'absolute',
     left: 0, right: 0, bottom: 0,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    borderWidth: Platform.OS === 'android' ? 2 : 1.5,
+    borderTopLeftRadius: 26,
+    borderTopRightRadius: 26,
     borderBottomWidth: 0,
     overflow: 'hidden',
+    backgroundColor: '#1a2030',
   },
   topEdge: { position: 'absolute', top: 0, left: 0, right: 0, height: 1.5 },
   handle: { alignItems: 'center', paddingVertical: 12 },

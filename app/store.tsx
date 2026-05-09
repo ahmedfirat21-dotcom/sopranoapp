@@ -47,7 +47,7 @@ function lottieFor(id: string): any | null {
  *  Kanatlı VIP frame'ler ve entry effect'ler 125px kalır. */
 function storeLottieSize(id: string): number {
   const meta = getFrameMeta(id);
-  if (meta && meta.scale <= 1.25) return 90;
+  if (meta && meta.scale <= 1.05) return 90;
   return 125;
 }
 

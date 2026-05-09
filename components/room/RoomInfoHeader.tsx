@@ -34,6 +34,8 @@ interface Props {
   // ★ Host avatarı ve oda kuralları
   hostAvatarUrl?: string;
   hostTier?: string;
+  /** ★ v107: host'un aktif mağaza çerçevesi — avatar etrafında render edilir */
+  hostFrameId?: string | null;
   roomRules?: string;
   followerCount?: number;
   // ★ 2026-04-20: Bildirim zili — oda içinden NotificationDrawer açma
@@ -115,13 +117,20 @@ export default function RoomInfoHeader({
   isFollowing, onBack, onMinimize, onToggleFollow,
   roomLanguage, ageRestricted, entryFeeSp, isLocked, followersOnly,
   donationsEnabled, speakingMode, roomType,
-  hostAvatarUrl, hostTier, roomRules, followerCount,
+  hostAvatarUrl, hostTier, hostFrameId, roomRules, followerCount,
   onBellPress, notifBadgeCount, isBellActive,
   onViewersPress,
 }: Props) {
   const langFlags: Record<string, string> = { tr: '🇹🇷', en: '🇬🇧', de: '🇩🇪', ar: '🇸🇦' };
   const [showRules, setShowRules] = useState(false);
   const insets = useSafeAreaInsets();
+  // ★ 2026-05-05: Insets.top monotonik sabit — Android'de Modal (NotificationDrawer)
+  //   açıldığında bir frame için safe-area top düşüp tekrar yükseliyor, üst header
+  //   görsel olarak kayıyordu. Sadece artışa izin ver: header asla yukarı sıçramaz.
+  const [stableTop, setStableTop] = useState(insets.top);
+  useEffect(() => {
+    if (insets.top > stableTop) setStableTop(insets.top);
+  }, [insets.top, stableTop]);
 
   // ★ 2026-04-26: Header kompakt — yazılar kaldırıldı, sadece ikonlar (header kalabalıklığı çözüldü).
   //   Sadece KRİTİK olanlar (yaş, ücret, dil) yazıyla görünür; oda tipi + konuşma modu sadece ikon olarak.
@@ -144,7 +153,7 @@ export default function RoomInfoHeader({
   if (speakingMode === 'selected_only') badges.push({ icon: 'shield-checkmark', color: '#A78BFA', bg: 'rgba(167,139,250,0.12)', border: 'rgba(167,139,250,0.3)' });
 
   return (
-    <View style={[s.wrap, { paddingTop: insets.top + 2 }]}>
+    <View style={[s.wrap, { paddingTop: stableTop + 2 }]}>
       {/* ★ 2026-04-24: Banner bombe gradient + teal separator (ana sayfa ile tutarlı).
           Gradient absoluteFill sayesinde safe-area top'ı da kapsar — notch/status bar altında şeffaf boşluk kalmaz. */}
       <LinearGradient
@@ -167,7 +176,7 @@ export default function RoomInfoHeader({
         <View style={s.topLeft}>
           {/* ★ Host avatar + süre göstergesi grubu */}
           <View style={s.hostAvatarGroup}>
-            <StatusAvatar uri={hostAvatarUrl} size={36} tier={hostTier} borderWidth={1.5} />
+            <StatusAvatar uri={hostAvatarUrl} size={36} tier={hostTier} borderWidth={1.5} frameId={hostFrameId} />
             {/* ★ Kalan süre — avatar altında kum saati */}
             {roomExpiry ? (
               <View style={[s.expiryBadge, roomExpiry.includes('doldu') && s.expiryBadgeExpired]}>
@@ -299,10 +308,15 @@ export default function RoomInfoHeader({
   );
 }
 
+// ★ 2026-05-05: Üst header bar yüksekliği — alt RoomControlBar BAR_H=50 ile eşit.
+//   Kullanıcı talebi: "oda içindeki üst headar boyutlarını alt kontrol barındaki
+//   headar ile eşitle" — top/bottom bar simetrisi sağlanır.
+const HEADER_BAR_H = 50;
+
 const s = StyleSheet.create({
   wrap: {
     paddingHorizontal: 16,
-    paddingBottom: 8,
+    paddingBottom: 6,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.22,
@@ -313,7 +327,7 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 2,
+    height: HEADER_BAR_H,
   },
   topLeft: {
     flex: 1,

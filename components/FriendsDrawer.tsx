@@ -13,9 +13,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 const TAB_BAR_SPACE = 60 + 8 + 6; // BAR_H (60) + min paddingBottom (8) + extra gap
 
 const { width: W, height: H } = Dimensions.get('window');
-// ★ 2026-04-24: Yanal daraltma (2. iterasyon) — kompakt panel, Clubhouse side-drawer hissi.
-const DRAWER_W = Math.min(W * 0.48, 230);
-const DRAWER_H = Math.min(H * 0.72, 640);
+// ★ 2026-05-05: NotificationDrawer ile birebir eşit boyut — iki kardeş drawer
+//   aynı ölçüde, görsel tutarlılık. Eski 230px dar idi, bildirim cardları sığmadı;
+//   300px ortak değer ikisinde de dengeli görünür.
+const DRAWER_W = Math.min(W * 0.72, 300);
+const DRAWER_H = Math.min(H * 0.86, 820);
 
 export default function FriendsDrawer({ visible, friends, onClose, onSelect, currentUserId }: {
   visible: boolean;
@@ -100,6 +102,17 @@ export default function FriendsDrawer({ visible, friends, onClose, onSelect, cur
     }
   }, [visible]);
 
+  // ★ 2026-05-05: Animasyonlu kapatma — backdrop tap'ında pürüzsüz translateX
+  //   animasyonu çalışır, anlık setValue ile drawer "yarıda kalma" görsel artifact'i olmaz.
+  const closeWithAnim = React.useCallback(() => {
+    if (isClosingRef.current) return;
+    isClosingRef.current = true;
+    Animated.parallel([
+      Animated.timing(slideAnim, { toValue: DRAWER_W, duration: 220, easing: Easing.in(Easing.cubic), useNativeDriver: true }),
+      Animated.timing(fadeAnim, { toValue: 0, duration: 220, useNativeDriver: true }),
+    ]).start(() => onClose());
+  }, [onClose]);
+
   // ★ Sürükleyerek kapatma (sağa swipe) — sıkı eşik, tap güvenliği
   const panResponder = React.useRef(
     React.useMemo(() => {
@@ -151,29 +164,49 @@ export default function FriendsDrawer({ visible, friends, onClose, onSelect, cur
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents={visible ? 'box-none' : 'none'}>
-      {/* Backdrop */}
+      {/* Backdrop — tıklayınca animasyonlu kapanır */}
       <Animated.View style={[fd.backdrop, { opacity: fadeAnim }]}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+        <Pressable style={StyleSheet.absoluteFill} onPress={closeWithAnim} />
       </Animated.View>
 
-      {/* Panel — sağdan süzülür + sürüklenebilir, alt barın üstünde biter */}
+      {/* Panel — sağdan süzülür + sürüklenebilir, alt barın üstünde biter.
+          ★ 2026-05-05 modernize: NotificationDrawer palette dilinde (3 katman gradient,
+          accent halo, kart stili list rows) — modal tasarım tutarlılığı. */}
       <Animated.View {...panResponder.panHandlers} style={[fd.panel, { top: topGap, height: DRAWER_H, transform: [{ translateX: slideAnim }] }]}>
-        {/* ★ Odalarım kart paleti: diagonal gradient (parlak üst-sol → koyu alt-sağ) */}
+        {/* Profil sayfası gradient dili — diagonal slate */}
         <LinearGradient
-          colors={['#4a5668', '#37414f', '#232a35']}
+          colors={['#3a4658', '#2a3344', '#1a2030']}
           start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
           style={StyleSheet.absoluteFillObject}
+          pointerEvents="none"
+        />
+        {/* Üst kenar yeşil accent halo — Çevrimiçi semantik */}
+        <LinearGradient
+          colors={['rgba(34,197,94,0.18)', 'rgba(34,197,94,0.05)', 'transparent']}
+          start={{ x: 0, y: 0 }} end={{ x: 0, y: 0.4 }}
+          style={StyleSheet.absoluteFillObject}
+          pointerEvents="none"
+        />
+        {/* Üst-sol diyagonal yumuşak glow */}
+        <LinearGradient
+          colors={['rgba(20,184,166,0.08)', 'transparent']}
+          start={{ x: 0, y: 0 }} end={{ x: 0.7, y: 0.6 }}
+          style={StyleSheet.absoluteFillObject}
+          pointerEvents="none"
         />
 
-        {/* Başlık */}
+        {/* Başlık — sade ikon + yumuşak yeşil glow (halka yok, NotificationDrawer dili) */}
         <View style={fd.header}>
-          <Ionicons name="radio" size={15} color="#22C55E" />
+          <Ionicons name="radio" size={18} color="#22C55E" style={fd.headerIcon} />
           <Text style={fd.headerTitle}>Çevrimiçi</Text>
-          <View style={fd.countPill}>
-            <Text style={fd.countText}>{onlineCount} aktif</Text>
-          </View>
+          {onlineCount > 0 && (
+            <View style={fd.countPill}>
+              <Text style={fd.countText}>{onlineCount}</Text>
+            </View>
+          )}
           <View style={{ flex: 1 }} />
         </View>
+        <View style={fd.headerSeparator} />
 
         {/* Liste */}
         <ScrollView
@@ -205,7 +238,7 @@ export default function FriendsDrawer({ visible, friends, onClose, onSelect, cur
                       style={fd.requestAvatarWrap}
                       onPress={() => { onSelect(req.user_id); onClose(); }}
                     >
-                      <StatusAvatar uri={sender?.avatar_url} size={34} tier={sender?.subscription_tier} />
+                      <StatusAvatar uri={sender?.avatar_url} size={34} tier={sender?.subscription_tier} frameId={(sender as any)?.active_frame || null} />
                     </Pressable>
                     <View style={{ flex: 1, marginRight: 6 }}>
                       <Text style={[fd.requestName, handled && { opacity: 0.6 }]} numberOfLines={1}>
@@ -245,22 +278,24 @@ export default function FriendsDrawer({ visible, friends, onClose, onSelect, cur
           {/* Çevrimiçi Arkadaş Listesi — Sadece online olanlar */}
           {onlineOnly.length === 0 && pendingRequests.length === 0 ? (
             <View style={fd.empty}>
-              <Ionicons name="radio-outline" size={32} color="rgba(34,197,94,0.2)" />
-              <Text style={fd.emptyText}>Şu an çevrimiçi arkadaşın yok</Text>
-              <Text style={[fd.emptyText, { fontSize: 10, marginTop: -4 }]}>Çevrimdışı arkadaşların profilinde listelenir</Text>
+              <View style={fd.emptyIconWrap}>
+                <Ionicons name="radio-outline" size={28} color="rgba(255,255,255,0.4)" />
+              </View>
+              <Text style={fd.emptyText}>Şu an kimse çevrimiçi değil</Text>
+              <Text style={fd.emptySub}>Çevrimdışı arkadaşların profilinde listelenir</Text>
             </View>
           ) : onlineOnly.map((friend) => (
               <Pressable
                 key={friend.id}
-                style={({ pressed }) => [fd.row, pressed && { opacity: 0.8, backgroundColor: 'rgba(255,255,255,0.04)' }]}
+                style={({ pressed }) => [fd.row, pressed && { opacity: 0.7 }]}
                 onPress={() => { onSelect(friend.id); onClose(); }}
               >
-                  <StatusAvatar uri={friend.avatar_url} size={33} isOnline={true} tier={(friend as any).subscription_tier} />
+                <StatusAvatar uri={friend.avatar_url} size={36} isOnline={true} tier={(friend as any).subscription_tier} frameId={(friend as any).active_frame || null} />
                 <View style={{ flex: 1 }}>
                   <Text style={fd.name} numberOfLines={1}>{friend.display_name}</Text>
-                  <Text style={[fd.status, { color: '#22C55E' }]}>Çevrimiçi</Text>
+                  <Text style={fd.status}>Çevrimiçi</Text>
                 </View>
-                <Ionicons name="chevron-forward" size={12} color="rgba(255,255,255,0.1)" />
+                <Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.15)" />
               </Pressable>
             ))}
         </ScrollView>
@@ -270,40 +305,61 @@ export default function FriendsDrawer({ visible, friends, onClose, onSelect, cur
 }
 
 const fd = StyleSheet.create({
-  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.3)' },
+  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(8,12,22,0.45)' },
   panel: {
     position: 'absolute', right: 0,
     width: DRAWER_W,
-    borderTopLeftRadius: 22, borderBottomLeftRadius: 22,
-    borderWidth: 1, borderRightWidth: 0,
-    borderColor: Colors.cardBorder,
+    borderTopLeftRadius: 26, borderBottomLeftRadius: 26,
     overflow: 'hidden',
+    backgroundColor: '#1a2030',
     shadowColor: '#000',
-    shadowOffset: { width: -6, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 16,
-    elevation: 16,
+    shadowOffset: { width: -8, height: 0 },
+    shadowOpacity: 0.55,
+    shadowRadius: 22,
+    elevation: 22,
   },
   header: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    paddingHorizontal: 14, paddingTop: 14, paddingBottom: 10,
-    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.04)',
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingHorizontal: 14, paddingTop: 16, paddingBottom: 12,
+  },
+  // ★ 2026-05-05: NotificationDrawer dili — sade ikon + yumuşak glow (halka yok)
+  headerIcon: {
+    textShadowColor: 'rgba(34,197,94,0.7)',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 5,
   },
   headerTitle: {
-    fontSize: 14, fontWeight: '700', color: '#F1F5F9',
-    textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
+    fontSize: 15, fontWeight: '800', color: '#F1F5F9', letterSpacing: 0.3,
+    textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4,
+  },
+  headerSeparator: {
+    height: 1, backgroundColor: 'rgba(255,255,255,0.06)',
+    marginHorizontal: 12,
   },
   countPill: {
-    backgroundColor: 'rgba(34,197,94,0.1)', borderRadius: 10,
     paddingHorizontal: 7, paddingVertical: 2,
-    borderWidth: 1, borderColor: 'rgba(34,197,94,0.18)',
+    borderRadius: 100, minWidth: 20, alignItems: 'center',
+    backgroundColor: 'rgba(34,197,94,0.18)',
+    borderWidth: 1, borderColor: 'rgba(34,197,94,0.45)',
   },
-  countText: { color: '#22C55E', fontSize: 9, fontWeight: '700' },
-  empty: { alignItems: 'center', paddingVertical: 60, gap: 10 },
-  emptyText: { fontSize: 12, color: 'rgba(255,255,255,0.25)' },
+  countText: { color: '#86EFAC', fontSize: 10, fontWeight: '800', letterSpacing: 0.3 },
+  empty: { alignItems: 'center', paddingVertical: 56, gap: 14 },
+  emptyIconWrap: {
+    width: 56, height: 56, borderRadius: 28,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  emptyText: { fontSize: 13, color: 'rgba(255,255,255,0.45)', fontWeight: '600', letterSpacing: 0.3 },
+  emptySub: { fontSize: 11, color: 'rgba(255,255,255,0.25)', marginTop: -8, textAlign: 'center', paddingHorizontal: 12 },
+  // ★ Kart stili row — NotificationDrawer'daki notifItem ile aynı dil
   row: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
-    paddingVertical: 9, paddingHorizontal: 6, borderRadius: 12,
+    paddingVertical: 10, paddingHorizontal: 12,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.025)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)',
+    marginVertical: 3,
   },
   avatarWrap: {
     width: 36, height: 36, borderRadius: 18, position: 'relative' as const,
@@ -317,10 +373,10 @@ const fd = StyleSheet.create({
   dotOn: { backgroundColor: '#22C55E' },
   dotOff: { backgroundColor: '#475569' },
   name: {
-    fontSize: 12, fontWeight: '600', color: '#F1F5F9',
+    fontSize: 13, fontWeight: '700', color: '#F1F5F9',
     textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
   },
-  status: { fontSize: 9, color: 'rgba(255,255,255,0.25)', marginTop: 1 },
+  status: { fontSize: 10, color: '#86EFAC', marginTop: 2, fontWeight: '600', letterSpacing: 0.2 },
 
   // ★ Takip İstekleri bölümü
   requestSection: {
@@ -342,8 +398,12 @@ const fd = StyleSheet.create({
   },
   requestCountText: { fontSize: 9, fontWeight: '800', color: '#60A5FA' },
   requestRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    paddingVertical: 7, paddingHorizontal: 6, borderRadius: 10,
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingVertical: 9, paddingHorizontal: 12,
+    borderRadius: 14,
+    backgroundColor: 'rgba(96,165,250,0.06)',
+    borderWidth: 1, borderColor: 'rgba(96,165,250,0.18)',
+    marginVertical: 3,
   },
   requestAvatarWrap: {},
   requestAvatar: { width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(255,255,255,0.05)' },

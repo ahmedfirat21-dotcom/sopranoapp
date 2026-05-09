@@ -108,12 +108,31 @@ function buildGemHtml(c: GemColors, gemText?: string): string {
 // ★ 2026-04-29: SP_HEXAGON_HTML SPHexagonIcon bileşenine taşındı (DRY).
 
 export async function hasSeenDiscoverWelcome(uid?: string | null): Promise<boolean> {
-  // ★ 2026-04-22 FIX: Legacy global-key fallback KALDIRILDI. Önceki halinde eski
-  //   global flag "1" varsa her yeni UID otomatik "seen" olarak işaretleniyordu →
-  //   launch öncesi olduğumuz için yeni hesaplar intro'yu hiç göremiyordu.
+  // ★ 2026-05-09: AsyncStorage + DB iki katmanlı kontrol. Hesap silinip aynı Google ile
+  //   yeniden girildiğinde AsyncStorage flag aynı UID için kalıyordu (cihaz bazlı kalıntı).
+  //   Artık DB profile.preferences.discover_welcome_seen de set olmalı; yoksa AsyncStorage
+  //   hayalet sayılır ve sheet yeniden gösterilir.
+  if (!uid) {
+    try {
+      const v = await AsyncStorage.getItem(buildKey(uid));
+      return v === '1';
+    } catch { return true; }
+  }
   try {
-    const v = await AsyncStorage.getItem(buildKey(uid));
-    return v === '1';
+    const local = await AsyncStorage.getItem(buildKey(uid));
+    if (local !== '1') return false;
+    // AsyncStorage seen diyor — DB ile teyit
+    try {
+      const { supabase } = await import('../constants/supabase');
+      const { data } = await supabase.from('profiles').select('preferences').eq('id', uid).maybeSingle();
+      const dbSeen = (data as any)?.preferences?.discover_welcome_seen === true;
+      if (!dbSeen) {
+        // DB temiz → AsyncStorage kalıntı, flag'i temizle ve sheet'i göster
+        try { await AsyncStorage.removeItem(buildKey(uid)); } catch {}
+        return false;
+      }
+      return true;
+    } catch { return true; /* DB fail — AsyncStorage'a güven */ }
   } catch {
     return true;
   }
@@ -121,6 +140,13 @@ export async function hasSeenDiscoverWelcome(uid?: string | null): Promise<boole
 
 export async function markDiscoverWelcomeSeen(uid?: string | null) {
   try { await AsyncStorage.setItem(buildKey(uid), '1'); } catch {}
+  if (!uid) return;
+  try {
+    const { supabase } = await import('../constants/supabase');
+    const { data } = await supabase.from('profiles').select('preferences').eq('id', uid).maybeSingle();
+    const prefs = { ...((data as any)?.preferences || {}), discover_welcome_seen: true };
+    await supabase.from('profiles').update({ preferences: prefs }).eq('id', uid);
+  } catch {}
 }
 
 type Props = {

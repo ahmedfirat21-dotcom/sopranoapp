@@ -737,6 +737,7 @@ function MembersSheet({ visible, onClose, clubId, onMemberCount, actorUserId, ac
                       size={38}
                       tier={m.profile?.subscription_tier as any}
                       isOnline={(() => { const ls = (m.profile as any)?.last_seen; return ls && new Date(ls).getTime() > Date.now() - 5 * 60 * 1000; })()}
+                      frameId={(m.profile as any)?.active_frame || null}
                     />
                     <View style={{ flex: 1 }}>
                       <Text style={ms.name} numberOfLines={1}>{m.profile?.display_name || 'Kullanıcı'}</Text>

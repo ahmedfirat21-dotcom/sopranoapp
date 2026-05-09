@@ -40,6 +40,12 @@ import FriendsDrawer from '../../components/FriendsDrawer';
 import QuickCreateSheet from '../../components/QuickCreateSheet';
 import CreateRoomCoachmark, { shouldShowCreateRoomCoachmark, markCreateRoomCoachmarkSeen } from '../../components/CreateRoomCoachmark';
 
+// ★ 2026-05-09: Lottie animasyonu (Microphone.json) — odası yokken empty state için.
+//   Yüklenemezse fallback olarak PNG gösterilir.
+let LottieView: any = null;
+try { LottieView = require('lottie-react-native').default; } catch { /* fallback */ }
+const MIC_LOTTIE = require('../../assets/Microphone.json');
+
 // ★ 2026-04-28: Odalarım header logosu — SopranoHome (soprano_part + home_part mavi)
 const HOME_SOP_W = 110;
 const HOME_PART_W = 75;
@@ -368,7 +374,24 @@ function ManagedRoomsEmptyCard() {
         />
         <Text style={mrS.emptyTitle}>Henüz bir odanız yok.{'\n'}İlk odanızı oluşturun!</Text>
         <View style={mrS.emptyImageWrap}>
-          <Image source={require('../../assets/images/mock/empty_room_mic.png')} style={mrS.emptyImage} resizeMode="contain" />
+          {LottieView ? (
+            <LottieView
+              source={MIC_LOTTIE}
+              autoPlay
+              loop
+              style={mrS.emptyImage}
+              // ★ 2026-05-09: Loop sırasında oluşan kısa flash'ı azaltmak için optimize parametreler.
+              //   cacheComposition: ilk yüklemeden sonra Lottie verisini bellekte tut
+              //   renderMode HARDWARE: GPU hızlandırma, JS thread'i bloke etmez
+              //   resizeMode "cover": boş kenar pikseller yerine tüm alanı kapla → blank frame görünmez
+              cacheComposition
+              renderMode="HARDWARE"
+              resizeMode="cover"
+              speed={0.8}
+            />
+          ) : (
+            <Image source={require('../../assets/images/mock/empty_room_mic.png')} style={mrS.emptyImage} resizeMode="contain" />
+          )}
         </View>
         <Text style={mrS.emptySub}>Sesli sohbet, müzik, oyun ve daha fazlası...</Text>
       </View>
@@ -396,7 +419,16 @@ const mrS = StyleSheet.create({
     ...Shadows.card,
   },
   emptyTitle: { fontSize: 14, fontWeight: '700', color: '#F1F5F9', textAlign: 'center', lineHeight: 20 },
-  emptyImageWrap: { width: 120, height: 120, alignItems: 'center', justifyContent: 'center' },
+  emptyImageWrap: {
+    width: 180, height: 180,
+    alignItems: 'center', justifyContent: 'center',
+    // ★ 2026-05-09: Yumuşak teal gölge (Soprano kimliği) — mikrofon ekranda öne çıksın
+    shadowColor: '#14B8A6',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.45,
+    shadowRadius: 18,
+    elevation: 12,
+  },
   emptyImage: { width: '100%', height: '100%' },
   emptySub: { fontSize: 12, color: '#94A3B8', textAlign: 'center' },
 });

@@ -2,7 +2,7 @@
 import {
   View, Text, StyleSheet, Image, Pressable, TextInput,
   ScrollView, Alert, Switch,
-  Platform, Keyboard, Dimensions, Share,
+  Platform, Keyboard, Dimensions, Share, KeyboardAvoidingView,
 } from 'react-native';
 import AppLoader from '../components/AppLoader';
 
@@ -30,6 +30,13 @@ import { showToast } from '../components/Toast';
 import * as ImagePicker from 'expo-image-picker';
 import { StorageService } from '../services/storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import LanguageInterestPicker from '../components/profile/LanguageInterestPicker';
+import { getLanguage, getInterest, INTEREST_CATEGORY_COLOR } from '../constants/profileTags';
+import VoiceBioRecorder from '../components/profile/VoiceBioRecorder';
+import FeaturedBadgesPicker from '../components/profile/FeaturedBadgesPicker';
+import SocialLinksEditor, { type SocialLinks } from '../components/profile/SocialLinksEditor';
+import { BADGES } from '../constants/badges';
+import { FeaturedBadgesService } from '../services/profileExtras';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -88,6 +95,33 @@ export default function EditProfileScreen() {
   const [privacyMode, setPrivacyMode] = useState<'public' | 'followers_only'>(
     (profile as any)?.privacy_mode === 'private' ? 'followers_only' : ((profile as any)?.privacy_mode || 'public')
   );
+
+  // === v110.5: Diller + İlgi Alanları ===
+  const [languages, setLanguages] = useState<string[]>(
+    Array.isArray((profile as any)?.languages) ? (profile as any).languages : []
+  );
+  const [interests, setInterests] = useState<string[]>(
+    Array.isArray((profile as any)?.interests) ? (profile as any).interests : []
+  );
+  const [showLangIntPicker, setShowLangIntPicker] = useState(false);
+
+  // === v110.5: Voice Bio + Featured Badges + Social Links ===
+  const [voiceBioUrl, setVoiceBioUrl] = useState<string | null>((profile as any)?.voice_bio_url || null);
+  const [voiceBioDurationMs, setVoiceBioDurationMs] = useState<number | null>((profile as any)?.voice_bio_duration_ms || null);
+  const [showVoiceBioRecorder, setShowVoiceBioRecorder] = useState(false);
+
+  const [featuredBadgeIds, setFeaturedBadgeIds] = useState<string[]>([]);
+  const [showFeaturedBadgesPicker, setShowFeaturedBadgesPicker] = useState(false);
+
+  // ★ v110.5: Sosyal linkler — local state, save'de profiles.social_links jsonb'a yazılır
+  const [socialLinks, setSocialLinks] = useState<SocialLinks>((profile as any)?.social_links || {});
+  const [showSocialLinksEditor, setShowSocialLinksEditor] = useState(false);
+
+  // Featured badges'i mount'ta yükle
+  useEffect(() => {
+    if (!userId) return;
+    FeaturedBadgesService.getFeatured(userId).then((ids) => setFeaturedBadgeIds(ids)).catch(() => {});
+  }, [userId]);
 
   // === Account linking (anonymous upgrade) ===
   const [showEmailRegister, setShowEmailRegister] = useState(false);
@@ -210,7 +244,11 @@ export default function EditProfileScreen() {
         hide_owned_rooms: hideOwnedRooms,
         privacy_mode: privacyMode,
         is_private: derivedIsPrivate,
-      });
+        // ★ v110.5: Diller + İlgi alanları + Sosyal linkler
+        languages,
+        interests,
+        social_links: socialLinks,
+      } as any);
 
       // Firebase profile da güncelle
       if (firebaseUser) {
@@ -230,7 +268,10 @@ export default function EditProfileScreen() {
         hide_owned_rooms: hideOwnedRooms,
         privacy_mode: privacyMode,
         is_private: derivedIsPrivate,
-      };
+        // ★ v110.5
+        languages,
+        interests,
+      } as any;
       setProfile(updatedProfile);
       setUser({ name: updatedProfile.display_name, avatar: updatedProfile.avatar_url });
 
@@ -378,7 +419,10 @@ export default function EditProfileScreen() {
     bio !== (profile?.bio || '') ||
     avatarUrl !== (profile?.avatar_url || '') ||
     hideOwnedRooms !== ((profile as any)?.hide_owned_rooms || false) ||
-    privacyMode !== ((profile as any)?.privacy_mode || 'public');
+    privacyMode !== ((profile as any)?.privacy_mode || 'public') ||
+    JSON.stringify(languages) !== JSON.stringify((profile as any)?.languages || []) ||
+    JSON.stringify(interests) !== JSON.stringify((profile as any)?.interests || []) ||
+    JSON.stringify(socialLinks) !== JSON.stringify((profile as any)?.social_links || {});
 
   // Auth type label
   const getAuthTypeInfo = () => {
@@ -393,10 +437,16 @@ export default function EditProfileScreen() {
     <View style={styles.container}>
       {/* ★ 2026-04-29: Glassmorphic header — Keşfet/Odalarım/Profil pattern */}
       <View style={[styles.headerBar, { paddingTop: insets.top }]}>
+        {/* ★ 2026-05-05: NotificationDrawer aile dili — slate diagonal + amber halo */}
         <LinearGradient
-          colors={['rgba(48,65,94,0.92)', 'rgba(26,40,64,0.82)', 'rgba(12,22,40,0.6)']}
-          locations={[0, 0.55, 1]}
-          start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
+          colors={['#3a4658', '#2a3344', '#1a2030']}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFillObject}
+          pointerEvents="none"
+        />
+        <LinearGradient
+          colors={['rgba(245,158,11,0.18)', 'rgba(245,158,11,0.05)', 'transparent']}
+          start={{ x: 0, y: 0 }} end={{ x: 0, y: 0.7 }}
           style={StyleSheet.absoluteFillObject}
           pointerEvents="none"
         />
@@ -426,6 +476,12 @@ export default function EditProfileScreen() {
         />
       </View>
 
+      {/* ★ v110.5.3: Klavye yönetimi — TextInput odaklanınca scroll otomatik */}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 24}
+      >
       <ScrollView
         ref={scrollRef}
         showsVerticalScrollIndicator={false}
@@ -699,6 +755,197 @@ export default function EditProfileScreen() {
           </Text>
         </View>
 
+        {/* ===== KİMLİĞİN — v110.5: Diller + İlgi Alanları ===== */}
+        <View style={styles.sectionDivider}>
+          <View style={styles.sectionAccent} />
+          <Ionicons name="sparkles-outline" size={13} color="#FBBF24" />
+          <Text style={styles.sectionLabel}>KİMLİĞİN</Text>
+        </View>
+
+        <Pressable
+          onPress={() => setShowLangIntPicker(true)}
+          style={({ pressed }) => [
+            styles.accountInfoCard,
+            pressed && { opacity: 0.85 },
+          ]}
+        >
+          <View style={[styles.accountRow, { justifyContent: 'space-between' }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 12 }}>
+              <View style={[styles.accountIcon, { backgroundColor: 'rgba(251,191,36,0.12)' }]}>
+                <Ionicons name="language" size={18} color="#FBBF24" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.accountLabel}>Diller & İlgi Alanları</Text>
+                <Text style={styles.fieldHint}>
+                  {languages.length === 0 && interests.length === 0
+                    ? 'Konuştuğun dilleri ve ilgi alanlarını ekle'
+                    : `${languages.length} dil · ${interests.length} ilgi alanı`}
+                </Text>
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+          </View>
+
+          {/* Mini önizleme — seçilenleri chip olarak göster */}
+          {(languages.length > 0 || interests.length > 0) && (
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginTop: 12 }}>
+              {languages.slice(0, 3).map(code => {
+                const l = getLanguage(code);
+                if (!l) return null;
+                return (
+                  <View key={code} style={{
+                    flexDirection: 'row', alignItems: 'center', gap: 4,
+                    paddingHorizontal: 8, paddingVertical: 3.5,
+                    borderRadius: 999,
+                    backgroundColor: 'rgba(255,255,255,0.04)',
+                    borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)',
+                  }}>
+                    <Text style={{ fontSize: 11 }}>{l.flag}</Text>
+                    <Text style={{ fontSize: 10, fontWeight: '700', color: '#E2E8F0' }}>{l.label}</Text>
+                  </View>
+                );
+              })}
+              {languages.length > 3 && (
+                <View style={{
+                  paddingHorizontal: 8, paddingVertical: 3.5,
+                  borderRadius: 999,
+                  backgroundColor: 'rgba(255,255,255,0.04)',
+                  borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)',
+                }}>
+                  <Text style={{ fontSize: 10, fontWeight: '700', color: '#94A3B8' }}>+{languages.length - 3}</Text>
+                </View>
+              )}
+              {interests.slice(0, 3).map(id => {
+                const t = getInterest(id);
+                if (!t) return null;
+                const color = INTEREST_CATEGORY_COLOR[t.category];
+                return (
+                  <View key={id} style={{
+                    flexDirection: 'row', alignItems: 'center', gap: 4,
+                    paddingHorizontal: 8, paddingVertical: 3.5,
+                    borderRadius: 999,
+                    borderWidth: 1, borderColor: color + '55',
+                    backgroundColor: color + '14',
+                  }}>
+                    <Ionicons name={t.icon as any} size={10} color={color} />
+                    <Text style={{ fontSize: 10, fontWeight: '800', color }}>{t.label}</Text>
+                  </View>
+                );
+              })}
+              {interests.length > 3 && (
+                <View style={{
+                  paddingHorizontal: 8, paddingVertical: 3.5,
+                  borderRadius: 999,
+                  backgroundColor: 'rgba(255,255,255,0.04)',
+                  borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)',
+                }}>
+                  <Text style={{ fontSize: 10, fontWeight: '700', color: '#94A3B8' }}>+{interests.length - 3}</Text>
+                </View>
+              )}
+            </View>
+          )}
+        </Pressable>
+
+        {/* ===== v110.5: PROFİL ANLATIMI — Voice Bio + Featured Badges + Social Links ===== */}
+        <View style={styles.sectionDivider}>
+          <View style={styles.sectionAccent} />
+          <Ionicons name="megaphone-outline" size={13} color="#A855F7" />
+          <Text style={styles.sectionLabel}>PROFİL ANLATIMI</Text>
+        </View>
+
+        {/* Voice Bio satırı */}
+        <Pressable
+          onPress={() => setShowVoiceBioRecorder(true)}
+          style={({ pressed }) => [styles.accountInfoCard, pressed && { opacity: 0.85 }]}
+        >
+          <View style={[styles.accountRow, { justifyContent: 'space-between' }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 12 }}>
+              <View style={[styles.accountIcon, { backgroundColor: 'rgba(245,158,11,0.12)' }]}>
+                <Ionicons name="mic" size={18} color="#F59E0B" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.accountLabel}>Sesli Tanıtım</Text>
+                <Text style={styles.fieldHint}>
+                  {voiceBioUrl
+                    ? `${Math.ceil((voiceBioDurationMs || 0) / 1000)}sn kayıt mevcut · değiştirmek için bas`
+                    : '15-30sn kendini tanıt — yabancı kullanıcılar dinlesin'}
+                </Text>
+              </View>
+            </View>
+            {voiceBioUrl && (
+              <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#22C55E', marginRight: 8 }} />
+            )}
+            <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+          </View>
+        </Pressable>
+
+        {/* Featured Badges satırı */}
+        <Pressable
+          onPress={() => setShowFeaturedBadgesPicker(true)}
+          style={({ pressed }) => [styles.accountInfoCard, pressed && { opacity: 0.85 }]}
+        >
+          <View style={[styles.accountRow, { justifyContent: 'space-between' }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 12 }}>
+              <View style={[styles.accountIcon, { backgroundColor: 'rgba(251,191,36,0.12)' }]}>
+                <Ionicons name="ribbon" size={18} color="#FBBF24" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.accountLabel}>Öne Çıkan Rozetler</Text>
+                <Text style={styles.fieldHint}>
+                  {featuredBadgeIds.length > 0
+                    ? `${featuredBadgeIds.length} rozet seçili — profilde büyük gösterilir`
+                    : 'En değer verdiğin 3 rozeti öne çıkar'}
+                </Text>
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+          </View>
+          {featuredBadgeIds.length > 0 && (
+            <View style={{ flexDirection: 'row', gap: 6, marginTop: 10 }}>
+              {featuredBadgeIds.map(id => {
+                const b = BADGES[id];
+                if (!b) return null;
+                return (
+                  <View key={id} style={{
+                    flexDirection: 'row', alignItems: 'center', gap: 4,
+                    paddingHorizontal: 8, paddingVertical: 4,
+                    borderRadius: 999,
+                    backgroundColor: b.color + '22',
+                    borderWidth: 1, borderColor: b.color + '55',
+                  }}>
+                    <Ionicons name={b.icon as any} size={11} color={b.color} />
+                    <Text style={{ fontSize: 10, fontWeight: '800', color: b.color }}>{b.label}</Text>
+                  </View>
+                );
+              })}
+            </View>
+          )}
+        </Pressable>
+
+        {/* Social Links satırı */}
+        <Pressable
+          onPress={() => setShowSocialLinksEditor(true)}
+          style={({ pressed }) => [styles.accountInfoCard, pressed && { opacity: 0.85 }]}
+        >
+          <View style={[styles.accountRow, { justifyContent: 'space-between' }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 12 }}>
+              <View style={[styles.accountIcon, { backgroundColor: 'rgba(20,184,166,0.12)' }]}>
+                <Ionicons name="link" size={18} color="#14B8A6" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.accountLabel}>Sosyal Linkler</Text>
+                <Text style={styles.fieldHint}>
+                  {(() => {
+                    const count = [socialLinks.instagram, socialLinks.twitter, socialLinks.website].filter(Boolean).length;
+                    return count > 0 ? `${count} link bağlı` : 'Instagram · X · Web sitesi';
+                  })()}
+                </Text>
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+          </View>
+        </Pressable>
+
         {/* ===== GİZLİLİK AYARLARI ===== */}
         <View style={styles.sectionDivider}>
           <View style={styles.sectionAccent} />
@@ -758,6 +1005,56 @@ export default function EditProfileScreen() {
           </View>
         </View>
       </ScrollView>
+      </KeyboardAvoidingView>
+
+      {/* ★ v110.5: Diller + İlgi Alanları seçici sheet — absolute mount */}
+      <LanguageInterestPicker
+        visible={showLangIntPicker}
+        initialLanguages={languages}
+        initialInterests={interests}
+        onSave={(newLangs, newInts) => {
+          setLanguages(newLangs);
+          setInterests(newInts);
+        }}
+        onClose={() => setShowLangIntPicker(false)}
+      />
+
+      {/* ★ v110.5: Sesli tanıtım kayıt modal */}
+      {userId && (
+        <VoiceBioRecorder
+          visible={showVoiceBioRecorder}
+          userId={userId}
+          currentUrl={voiceBioUrl}
+          currentDurationMs={voiceBioDurationMs}
+          onClose={() => setShowVoiceBioRecorder(false)}
+          onSaved={(url, ms) => {
+            setVoiceBioUrl(url);
+            setVoiceBioDurationMs(ms);
+          }}
+          onRemoved={() => {
+            setVoiceBioUrl(null);
+            setVoiceBioDurationMs(null);
+          }}
+        />
+      )}
+
+      {/* ★ v110.5: Öne çıkan rozet seçici */}
+      {userId && (
+        <FeaturedBadgesPicker
+          visible={showFeaturedBadgesPicker}
+          userId={userId}
+          onSaved={(ids) => setFeaturedBadgeIds(ids)}
+          onClose={() => setShowFeaturedBadgesPicker(false)}
+        />
+      )}
+
+      {/* ★ v110.5: Sosyal linkler editör */}
+      <SocialLinksEditor
+        visible={showSocialLinksEditor}
+        initial={socialLinks}
+        onSave={(links) => setSocialLinks(links)}
+        onClose={() => setShowSocialLinksEditor(false)}
+      />
     </View>
     </AppBackground>
   );
@@ -843,8 +1140,7 @@ const styles = StyleSheet.create({
   changeAvatarText: { fontSize: 12, fontWeight: '700', color: '#F59E0B', letterSpacing: 0.3 },
   avatarPicker: {
     marginHorizontal: 16, marginTop: 8, padding: 12,
-    backgroundColor: 'rgba(15,23,42,0.55)', borderRadius: 14,
-    borderWidth: 1, borderColor: 'rgba(20,184,166,0.18)',
+    backgroundColor: '#1a2030', borderRadius: 22,
   },
   pickerTitle: { fontSize: 12, fontWeight: '700', color: Colors.text, marginBottom: 8, ...Shadows.textLight },
   uploadBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: Colors.teal, paddingVertical: 8, borderRadius: Radius.full, marginBottom: 8 },
@@ -863,8 +1159,7 @@ const styles = StyleSheet.create({
   // ★ 2026-04-29: Form kartı — glassmorphic dark navy (Keşfet/Odalarım kart pattern)
   form: {
     marginHorizontal: 16, padding: 14, paddingTop: 14,
-    backgroundColor: 'rgba(15,23,42,0.55)', borderRadius: 14,
-    borderWidth: 1, borderColor: 'rgba(20,184,166,0.18)',
+    backgroundColor: '#1a2030', borderRadius: 22,
     ...Shadows.card, marginBottom: 8,
   },
   field: { marginBottom: 8 },
@@ -905,8 +1200,7 @@ const styles = StyleSheet.create({
   // ★ 2026-04-29: Account info kartı — glassmorphic dark navy
   accountInfoCard: {
     marginHorizontal: 16, padding: 14,
-    borderRadius: 14, backgroundColor: 'rgba(15,23,42,0.55)',
-    borderWidth: 1, borderColor: 'rgba(20,184,166,0.18)', marginBottom: 8,
+    borderRadius: 22, backgroundColor: '#1a2030', marginBottom: 8,
     ...Shadows.card,
   },
   accountRow: { flexDirection: 'row', alignItems: 'center' },
@@ -946,13 +1240,12 @@ const styles = StyleSheet.create({
   passwordSection: { marginHorizontal: 16, marginBottom: 8 },
   passwordToggle: {
     flexDirection: 'row', alignItems: 'center', padding: 12, gap: 10,
-    borderRadius: 14, backgroundColor: 'rgba(15,23,42,0.55)',
-    borderWidth: 1, borderColor: 'rgba(20,184,166,0.18)', ...Shadows.card,
+    borderRadius: 22, backgroundColor: '#1a2030', ...Shadows.card,
   },
   passwordForm: {
-    marginTop: 6, padding: 14, borderRadius: 14,
-    backgroundColor: 'rgba(15,23,42,0.55)',
-    borderWidth: 1, borderColor: 'rgba(20,184,166,0.18)', ...Shadows.card,
+    marginTop: 6, padding: 14, borderRadius: 22,
+    backgroundColor: '#1a2030',
+    ...Shadows.card,
   },
   menuLabel: { fontSize: 12, fontWeight: '600', color: '#F1F5F9', ...Shadows.textLight },
 

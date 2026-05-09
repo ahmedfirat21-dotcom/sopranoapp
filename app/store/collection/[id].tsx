@@ -4,21 +4,24 @@
 
 import React, { useEffect, useState } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, Pressable, Animated, Easing, Platform, Dimensions, Alert,
+  View, Text, StyleSheet, ScrollView, Pressable, Animated, Easing, Platform, Dimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
-import { WebView } from 'react-native-webview';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { safeGoBack } from '../../../constants/navigation';
 import AppBackground from '../../../components/AppBackground';
 import SPIcon from '../../../components/SPIcon';
 import { showToast } from '../../../components/Toast';
+import PremiumAlert, { type AlertButton } from '../../../components/PremiumAlert';
+import PurchaseSuccessModal from '../../../components/PurchaseSuccessModal';
 import { useAuth } from '../../_layout';
 import { StoreService, type CosmeticItem, type Collection, type Rarity } from '../../../services/store';
-import { getIllustrationHtml, isFullCardItem } from '../../../constants/storeIllustrations';
+// ★ v109.2: Ana store'daki GalleryCard'ı reuse — kart render hiyerarşisi
+//   (Lottie / Item3DArt / emoji) tek yerde, kod tekrarı yok.
+import { GalleryCard } from '../../store';
 
 const { width: W } = Dimensions.get('window');
 
@@ -29,63 +32,8 @@ const RARITY_COLOR: Record<Rarity, string> = {
   divine: '#F472B6', mythic: '#C4B5FD', legendary: '#FBBF24', rare: '#22D3EE', new: '#FB923C',
 };
 
-function Item3DArt({ itemId, fullSize = false, size = 110 }: { itemId: string; fullSize?: boolean; size?: number }) {
-  const html = getIllustrationHtml(itemId);
-  if (!html) return null;
-  const wrapStyle = fullSize ? StyleSheet.absoluteFillObject : { width: size, height: size };
-  const webStyle = fullSize
-    ? { flex: 1, backgroundColor: 'transparent' as const }
-    : { width: size, height: size, backgroundColor: 'transparent' as const };
-  return (
-    <View pointerEvents="none" style={wrapStyle}>
-      <WebView source={{ html }} style={webStyle} containerStyle={{ backgroundColor: 'transparent' }}
-        scrollEnabled={false} bounces={false} originWhitelist={['*']}
-        javaScriptEnabled domStorageEnabled={false} androidLayerType="hardware" scalesPageToFit={false} />
-    </View>
-  );
-}
-
-function ItemCard({ item, owned, onPress }: { item: CosmeticItem; owned: boolean; onPress: () => void }) {
-  const rarity = (item.rarity as Rarity) || 'rare';
-  const rarityColor = RARITY_COLOR[rarity];
-  const fullCard = isFullCardItem(item.id);
-  return (
-    <Pressable onPress={onPress} style={[s.card, { borderColor: rarityColor + '4D' }]}>
-      {fullCard ? (
-        <Item3DArt itemId={item.id} fullSize />
-      ) : (
-        <LinearGradient
-          colors={[item.bg_gradient_start || '#1a1330', item.bg_gradient_end || '#0a0a1a']}
-          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-          style={StyleSheet.absoluteFillObject}
-        />
-      )}
-      <View style={[s.rareDot, { backgroundColor: rarityColor }]} />
-      {owned && (
-        <View style={s.ownedBadge}>
-          <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFillObject} />
-          <Ionicons name="checkmark-circle" size={10} color="#5DCAA5" />
-          <Text style={s.ownedText}>SAHİP</Text>
-        </View>
-      )}
-      <View style={s.cardInfo}>
-        <LinearGradient
-          colors={['transparent', 'rgba(0,0,0,0.85)', 'rgba(0,0,0,0.95)']}
-          locations={[0, 0.4, 1]}
-          start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
-          style={StyleSheet.absoluteFillObject}
-        />
-        <Text style={s.cardName}>{item.name}</Text>
-        {item.meta && <Text style={s.cardMeta} numberOfLines={1}>{item.meta}</Text>}
-        <View style={s.priceRow}>
-          <SPIcon size={11} />
-          <Text style={s.priceText}>{item.price_sp.toLocaleString('tr-TR')}</Text>
-          {item.per_message && <Text style={s.priceUnit}>/ mesaj</Text>}
-        </View>
-      </View>
-    </Pressable>
-  );
-}
+// ★ v109.2: Local ItemCard kaldırıldı — ana store'daki GalleryCard reuse edildi
+//   (yukarı import'a bakın). Lottie/PNG/emoji render hiyerarşisi tek yerde.
 
 export default function CollectionDetailScreen() {
   const insets = useSafeAreaInsets();
@@ -97,6 +45,14 @@ export default function CollectionDetailScreen() {
   const [collection, setCollection] = useState<Collection | null>(null);
   const [inventory, setInventory] = useState<Set<string>>(new Set());
   const [purchasing, setPurchasing] = useState<string | null>(null);
+  // ★ v107 hotfix: Native Alert → PremiumAlert
+  const [confirmAlert, setConfirmAlert] = useState<{
+    visible: boolean; title: string; message: string; buttons: AlertButton[];
+  }>({ visible: false, title: '', message: '', buttons: [] });
+  // ★ v109.1: Satın alma başarı modalı
+  const [successModal, setSuccessModal] = useState<{
+    visible: boolean; title: string; subtitle?: string; accent?: readonly [string, string];
+  }>({ visible: false, title: '' });
 
   useEffect(() => {
     let cancelled = false;
@@ -121,19 +77,34 @@ export default function CollectionDetailScreen() {
       showToast({ title: 'Zaten sahipsin', message: `${item.name} envanterinde.`, type: 'info' });
       return;
     }
-    Alert.alert(
-      'Satın Al',
-      `${item.name} için ${item.price_sp.toLocaleString('tr-TR')} SP harcanacak. Onaylıyor musun?`,
-      [
-        { text: 'Vazgeç', style: 'cancel' },
+    setConfirmAlert({
+      visible: true,
+      title: 'Satın Al',
+      message: `${item.name} için ${item.price_sp.toLocaleString('tr-TR')} SP harcanacak. Onaylıyor musun?`,
+      buttons: [
+        { text: 'Vazgeç', style: 'cancel', onPress: () => setConfirmAlert(p => ({ ...p, visible: false })) },
         {
-          text: 'Satın Al', style: 'default',
+          text: 'Satın Al', style: 'default', icon: 'sparkles',
           onPress: async () => {
+            setConfirmAlert(p => ({ ...p, visible: false }));
             setPurchasing(item.id);
             const r = await StoreService.purchase(firebaseUser.uid, item.id);
             setPurchasing(null);
             if (r.success) {
-              showToast({ title: '✓ Satın Alındı', message: `${item.name} envanterinde`, type: 'success' });
+              const label = (item.category === 'atelier' || item.category === 'frames') ? 'Çerçeve'
+                : (item.category === 'message_art' || item.category === 'entry_effect') ? 'Giriş Efekti'
+                : item.category === 'gift' ? 'Hediye' : 'Ürün';
+              const accentByRarity: readonly [string, string] = item.rarity === 'divine' ? ['#FBBF24', '#854F0B']
+                : item.rarity === 'mythic' ? ['#F472B6', '#831843']
+                : item.rarity === 'legendary' ? ['#FFE082', '#B45309']
+                : item.rarity === 'rare' ? ['#A78BFA', '#5B21B6']
+                : ['#14B8A6', '#0E7490'];
+              setSuccessModal({
+                visible: true,
+                title: `${label} Satın Alındı`,
+                subtitle: `${item.name} envanterine eklendi · ${r.cost} SP harcandı`,
+                accent: accentByRarity,
+              });
               setInventory((prev) => new Set(prev).add(item.id));
             } else {
               showToast({ title: 'Hata', message: r.error || 'Bağlantı sorunu', type: 'error' });
@@ -141,7 +112,7 @@ export default function CollectionDetailScreen() {
           },
         },
       ],
-    );
+    });
   };
 
   return (
@@ -186,7 +157,7 @@ export default function CollectionDetailScreen() {
           ) : (
             <View style={s.grid}>
               {items.map((item) => (
-                <ItemCard
+                <GalleryCard
                   key={item.id}
                   item={item}
                   owned={inventory.has(item.id)}
@@ -197,6 +168,22 @@ export default function CollectionDetailScreen() {
           )}
         </ScrollView>
       </View>
+      <PremiumAlert
+        visible={confirmAlert.visible}
+        title={confirmAlert.title}
+        message={confirmAlert.message}
+        type="warning"
+        icon="bag-handle"
+        buttons={confirmAlert.buttons}
+        onDismiss={() => setConfirmAlert(p => ({ ...p, visible: false }))}
+      />
+      <PurchaseSuccessModal
+        visible={successModal.visible}
+        title={successModal.title}
+        subtitle={successModal.subtitle}
+        accent={successModal.accent}
+        onClose={() => setSuccessModal(p => ({ ...p, visible: false }))}
+      />
     </AppBackground>
   );
 }
@@ -236,6 +223,18 @@ const s = StyleSheet.create({
     width: cardSize, height: cardSize,
     borderRadius: 16, borderWidth: 0.5,
     overflow: 'hidden', position: 'relative',
+  },
+  // ★ v109.2: Art alanı — Lottie/PNG ortalanmış, kart üst %70 alanı
+  artWrap: {
+    position: 'absolute',
+    top: '8%', left: '8%', right: '8%', height: '60%',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  cardArt: {
+    position: 'absolute',
+    top: '20%', left: '50%',
+    fontSize: 56,
+    transform: [{ translateX: -28 }],
   },
   rareDot: {
     position: 'absolute', top: 8, right: 8,

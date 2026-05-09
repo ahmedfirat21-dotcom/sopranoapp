@@ -1,32 +1,30 @@
-﻿/**
- * SopranoChat — Premium Raporlama Modal
- * Glassmorphism + Pill buttons + Slide-up
+/**
+ * SopranoChat — Raporlama Modal
+ * v110.5.2 (6 May 2026) — Modal aile dili uyumu
+ *
+ * Profil sayfası ailesi: slate gradient (#3a4658 → #2a3344 → #1a2030)
+ *  + amber halo overlay + chevron-down header + drag handle.
+ * Eski "glassmorphic" dağınık dil kaldırıldı.
  */
 import { useState, useRef, useEffect, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, Pressable, Modal, TextInput,
-  ScrollView, Dimensions, TouchableOpacity,
-  Animated, PanResponder,
+  View, Text, StyleSheet, Pressable, TextInput,
+  ScrollView, Dimensions, Animated, PanResponder,
+  KeyboardAvoidingView, Platform, Keyboard,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import AppLoader from './AppLoader';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ModerationService, ReportReason } from '../services/moderation';
 import { showToast } from './Toast';
+import { Shadows } from '../constants/theme';
 
 const { height: H } = Dimensions.get('window');
-const DISMISS_THRESHOLD = 120;
-
-const C = {
-  glass: 'rgba(45,55,64,0.95)',
-  border: 'rgba(255,255,255,0.06)',
-  white: '#F1F5F9',
-  white60: 'rgba(255,255,255,0.6)',
-  white30: 'rgba(255,255,255,0.3)',
-  white08: 'rgba(255,255,255,0.08)',
-  white04: 'rgba(255,255,255,0.04)',
-  red: '#EF4444',
-  teal: '#14B8A6',
-};
+// ★ v110.5.6: Yarı ekran bottom-sheet — eskiden full-screen idi, çok büyüktü.
+//   Sheet alttan H*0.65 (klavyeyle birlikte sığar) yükselir, üstte backdrop kalır.
+const SHEET_HEIGHT = Math.round(H * 0.65);
+const SHEET_DISMISS = SHEET_HEIGHT + 30; // sheet'i tamamen ekran dışına it
 
 type ReportTarget =
   | { type: 'user'; id: string }
@@ -54,42 +52,99 @@ const REASONS: { key: ReportReason; label: string; icon: string }[] = [
 ];
 
 export function ReportModal({ visible, onClose, reporterId, target }: ReportModalProps) {
+  const insets = useSafeAreaInsets();
   const [selectedReason, setSelectedReason] = useState<ReportReason | null>(null);
   const [description, setDescription] = useState('');
   const [sending, setSending] = useState(false);
+  // ★ v110.5.3: visible=false'da return null YERİNE mount kalır + animation ile gizlenir.
+  //   Eski yaklaşım ilk açılışta animasyon kaçırıyordu (mount/animate timing race).
+  //   Şimdi internal mounted state ile kontrollü mount/unmount.
+  const [internalMounted, setInternalMounted] = useState(false);
 
-  // ★ Swipe-down-to-dismiss
-  const translateY = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new Animated.Value(SHEET_DISMISS)).current;
+  const backdropOpacity = useRef(new Animated.Value(0)).current;
+  // ★ v110.5.7: Klavye açıkken sheet'i yukarı kaydırma offset'i.
+  //   KAV bottom-anchored absolute sheet'te yetmiyordu (TextInput hala klavye altında kalıyordu).
+  //   Manuel: keyboardDidShow → translateY -keyboardHeight (sheet yukarı çık)
+  //          keyboardDidHide → translateY 0 (orijinal yerine dön)
+  const keyboardOffset = useRef(0);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  // ★ v110.5.7: Klavye event listener — TextInput odaklanınca sheet otomatik yukarı kayar
   useEffect(() => {
-    if (visible) translateY.setValue(0);
-  }, [visible, translateY]);
+    if (!internalMounted) return;
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSub = Keyboard.addListener(showEvent, (e) => {
+      const kbHeight = e.endCoordinates?.height || 0;
+      keyboardOffset.current = kbHeight;
+      Animated.timing(translateY, {
+        toValue: -kbHeight,
+        duration: Platform.OS === 'ios' ? (e as any).duration || 250 : 250,
+        useNativeDriver: true,
+      }).start();
+    });
+    const hideSub = Keyboard.addListener(hideEvent, () => {
+      keyboardOffset.current = 0;
+      Animated.timing(translateY, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }).start();
+    });
+    return () => { showSub.remove(); hideSub.remove(); };
+  }, [internalMounted]);
 
-  // ★ 2026-04-28: Clubhouse pattern — pan tüm sheet'e bağlı, ScrollView ile koordineli.
-  const scrollOffsetRef = useRef(0);
-  const handleScroll = useCallback((e: any) => {
-    scrollOffsetRef.current = e?.nativeEvent?.contentOffset?.y ?? 0;
-  }, []);
+  useEffect(() => {
+    if (visible) {
+      // Mount immediately, sonra animation
+      setInternalMounted(true);
+      setSelectedReason(null);
+      setDescription('');
+      // requestAnimationFrame: mount → next frame'de animation başlat (timing güvenli)
+      requestAnimationFrame(() => {
+        Animated.parallel([
+          // ★ v110.5.6: Bottom-anchored — translateY 0 = yerinde (alttan)
+          Animated.spring(translateY, { toValue: 0, useNativeDriver: true, damping: 22, stiffness: 200 }),
+          Animated.timing(backdropOpacity, { toValue: 1, duration: 250, useNativeDriver: true }),
+        ]).start();
+      });
+    } else if (internalMounted) {
+      // Animate out, sonra unmount
+      Animated.parallel([
+        Animated.timing(translateY, { toValue: SHEET_DISMISS, duration: 200, useNativeDriver: true }),
+        Animated.timing(backdropOpacity, { toValue: 0, duration: 180, useNativeDriver: true }),
+      ]).start(() => {
+        setInternalMounted(false);
+      });
+    }
+  }, [visible]);
 
-  const panResponder = useRef(
+  const handleClose = () => {
+    Keyboard.dismiss();
+    Animated.parallel([
+      Animated.timing(translateY, { toValue: SHEET_DISMISS, duration: 200, useNativeDriver: true }),
+      Animated.timing(backdropOpacity, { toValue: 0, duration: 180, useNativeDriver: true }),
+    ]).start(() => {
+      setInternalMounted(false);
+      onCloseRef.current();
+    });
+  };
+
+  // Drag-to-dismiss header'dan — translateY 0 baseline
+  const headerPan = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => false,
-      onStartShouldSetPanResponderCapture: () => false,
-      onMoveShouldSetPanResponder: (_e, g) =>
-        g.dy > 8 && Math.abs(g.dy) > Math.abs(g.dx) && scrollOffsetRef.current <= 0,
-      onMoveShouldSetPanResponderCapture: (_e, g) =>
-        g.dy > 25 && Math.abs(g.dy) > Math.abs(g.dx) * 2 && scrollOffsetRef.current <= 0,
-      onPanResponderTerminationRequest: () => false,
-      onPanResponderMove: (_e, g) => {
+      onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dy) > 8 && Math.abs(g.dy) > Math.abs(g.dx),
+      onPanResponderMove: (_, g) => {
         if (g.dy > 0) translateY.setValue(g.dy);
       },
-      onPanResponderRelease: (_e, g) => {
-        if (g.dy > DISMISS_THRESHOLD) {
-          Animated.timing(translateY, { toValue: H, duration: 180, useNativeDriver: true }).start(() => {
-            translateY.setValue(0);
-            onClose();
-          });
+      onPanResponderRelease: (_, g) => {
+        if (g.dy > 100 || g.vy > 0.6) {
+          handleClose();
         } else {
-          Animated.spring(translateY, { toValue: 0, useNativeDriver: true, tension: 80, friction: 8 }).start();
+          Animated.spring(translateY, { toValue: 0, useNativeDriver: true, damping: 22, stiffness: 200 }).start();
         }
       },
     }),
@@ -108,10 +163,10 @@ export function ReportModal({ visible, onClose, reporterId, target }: ReportModa
         case 'post': await ModerationService.reportPost(reporterId, target.id, selectedReason, description); break;
         case 'message': await ModerationService.reportMessage(reporterId, target.id, selectedReason, description); break;
       }
-      showToast({ title: '✅ Raporunuz alındı', message: 'En kısa sürede incelenecektir.', type: 'success' });
+      showToast({ title: 'Raporun alındı', message: 'En kısa sürede incelenecektir.', type: 'success' });
       setSelectedReason(null);
       setDescription('');
-      onClose();
+      handleClose();
     } catch (err: any) {
       showToast({ title: 'Rapor Gönderilemedi', message: err.message || 'Şikayetin iletilemedi.', type: 'error' });
     } finally {
@@ -119,164 +174,229 @@ export function ReportModal({ visible, onClose, reporterId, target }: ReportModa
     }
   };
 
+  if (!internalMounted) return null;
+
   const targetLabel =
     target.type === 'user' ? 'Kullanıcıyı' :
     target.type === 'room' ? 'Odayı' :
     target.type === 'post' ? 'Gönderiyi' : 'Mesajı';
 
   return (
-    <Modal transparent animationType="slide" visible={visible} onRequestClose={onClose}>
-      <View style={sty.overlay}>
-        <Pressable style={sty.backdrop} onPress={onClose} />
-        <Animated.View style={[sty.sheet, { transform: [{ translateY }] }]} {...panResponder.panHandlers}>
-          {/* ★ 2026-04-28: Drag handle/header artık görsel — pan tüm sheet'te (Clubhouse). */}
-          <View>
-            <View style={sty.handleWrap}>
-              <View style={sty.handle} />
-            </View>
-            <View style={sty.header}>
-              <View style={sty.headerIcon}>
-                <Ionicons name="flag" size={16} color={C.red} />
-              </View>
-              <Text style={sty.title}>{targetLabel} Rapor Et</Text>
-            </View>
+    <View style={s.root} pointerEvents="box-none">
+      <Animated.View
+        style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(8,12,22,0.55)', opacity: backdropOpacity }]}
+        pointerEvents="auto"
+      >
+        <Pressable style={StyleSheet.absoluteFill} onPress={handleClose} />
+      </Animated.View>
+
+      <Animated.View style={[s.sheet, { transform: [{ translateY }] }]}>
+        {/* ★ Aile dili — slate diagonal + amber halo */}
+        <LinearGradient
+          colors={['#3a4658', '#2a3344', '#1a2030']}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFillObject}
+          pointerEvents="none"
+        />
+        <LinearGradient
+          colors={['rgba(245,158,11,0.20)', 'rgba(245,158,11,0.05)', 'transparent']}
+          start={{ x: 0, y: 0 }} end={{ x: 0, y: 0.4 }}
+          style={StyleSheet.absoluteFillObject}
+          pointerEvents="none"
+        />
+
+        {/* Header — drag handle + chevron-down + başlık */}
+        <View {...headerPan.panHandlers}>
+          <View style={s.handleWrap}>
+            <View style={s.dragHandle} />
           </View>
+          <View style={s.header}>
+            <Pressable onPress={handleClose} style={s.iconBtn} hitSlop={8}>
+              <Ionicons name="chevron-down" size={22} color="#F1F5F9" />
+            </Pressable>
+            <Text style={s.title}>{targetLabel.toUpperCase()} RAPOR ET</Text>
+            <View style={{ width: 34 }} />
+          </View>
+        </View>
 
-          <ScrollView
-            style={sty.scrollContent}
-            showsVerticalScrollIndicator={false}
-            onScroll={handleScroll}
-            scrollEventThrottle={16}
-          >
-            <Text style={sty.sectionLabel}>RAPORLAMA SEBEBİ</Text>
+        {/* ★ v110.5.7: KAV kaldırıldı — manuel translateY ile sheet yukarı kayar.
+             Çift kayma önlendi (KAV+manuel olmasın). */}
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 40 + insets.bottom }}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
+        >
+          <Text style={s.sectionLabel}>RAPORLAMA SEBEBİ</Text>
 
+          {/* ★ v110.5.4: 2 sütunlu kompakt grid — eskiden 9 satır dikey alan kaplıyordu */}
+          <View style={s.reasonGrid}>
             {REASONS.map((reason) => {
               const selected = selectedReason === reason.key;
               return (
-                <TouchableOpacity
+                <Pressable
                   key={reason.key}
-                  style={[sty.reasonRow, selected && sty.reasonRowSelected]}
+                  style={({ pressed }) => [
+                    s.reasonCell,
+                    selected && s.reasonCellSelected,
+                    pressed && { opacity: 0.7 },
+                  ]}
                   onPress={() => setSelectedReason(reason.key)}
-                  activeOpacity={0.7}
                 >
-                  <View style={[sty.reasonIcon, selected && { backgroundColor: 'rgba(20,184,166,0.1)' }]}>
-                    <Ionicons name={reason.icon as any} size={16} color={selected ? C.teal : C.white30} />
-                  </View>
-                  <Text style={[sty.reasonText, selected && sty.reasonTextSelected]}>
+                  <Ionicons
+                    name={reason.icon as any}
+                    size={14}
+                    color={selected ? '#FBBF24' : '#94A3B8'}
+                  />
+                  <Text
+                    style={[s.reasonText, selected && s.reasonTextSelected]}
+                    numberOfLines={1}
+                  >
                     {reason.label}
                   </Text>
                   {selected && (
-                    <Ionicons name="checkmark-circle" size={16} color={C.teal} style={{ marginLeft: 'auto' }} />
+                    <Ionicons name="checkmark-circle" size={14} color="#FBBF24" />
                   )}
-                </TouchableOpacity>
+                </Pressable>
               );
             })}
+          </View>
 
-            {/* Açıklama */}
-            <TextInput
-              style={sty.descInput}
-              placeholder="Ek açıklama (opsiyonel)..."
-              placeholderTextColor={C.white30}
-              value={description}
-              onChangeText={setDescription}
-              multiline
-              maxLength={300}
+          {/* Açıklama */}
+          <Text style={[s.sectionLabel, { marginTop: 14 }]}>EK AÇIKLAMA (İSTEĞE BAĞLI)</Text>
+          <TextInput
+            style={s.descInput}
+            placeholder="Detayları kısaca yaz..."
+            placeholderTextColor="rgba(148,163,184,0.5)"
+            value={description}
+            onChangeText={setDescription}
+            multiline
+            maxLength={300}
+          />
+          <Text style={s.charCount}>{description.length}/300</Text>
+
+          {/* Submit */}
+          <Pressable
+            onPress={handleSubmit}
+            disabled={sending || !selectedReason}
+            style={({ pressed }) => [
+              s.submitBtn,
+              (!selectedReason || sending) && { opacity: 0.4 },
+              pressed && !sending && { opacity: 0.85 },
+            ]}
+          >
+            <LinearGradient
+              colors={['#EF4444', '#B91C1C']}
+              start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }}
+              style={StyleSheet.absoluteFillObject}
             />
+            {sending ? (
+              <AppLoader color="#fff" size="small" />
+            ) : (
+              <>
+                <Ionicons name="flag" size={15} color="#FFF" />
+                <Text style={s.submitText}>Rapor Gönder</Text>
+              </>
+            )}
+          </Pressable>
 
-            {/* Submit */}
-            <TouchableOpacity
-              onPress={handleSubmit}
-              disabled={sending || !selectedReason}
-              activeOpacity={0.7}
-              style={[sty.submitBtn, (!selectedReason || sending) && { opacity: 0.4 }]}
-            >
-              {sending ? (
-                <AppLoader color="#fff" size="small" />
-              ) : (
-                <>
-                  <Ionicons name="send" size={14} color="#fff" />
-                  <Text style={sty.submitText}>Rapor Gönder</Text>
-                </>
-              )}
-            </TouchableOpacity>
-
-            <View style={{ height: 40 }} />
-          </ScrollView>
-        </Animated.View>
-      </View>
-    </Modal>
+          <Text style={s.disclaimer}>
+            Yanlış raporlar hesabının kısıtlanmasına yol açabilir. Lütfen sadece
+            kuralları gerçekten ihlal eden içerikleri raporla.
+          </Text>
+        </ScrollView>
+      </Animated.View>
+    </View>
   );
 }
 
-const sty = StyleSheet.create({
-  overlay: { flex: 1, justifyContent: 'flex-end' },
-  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.6)' },
-  sheet: {
-    backgroundColor: C.glass,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: H * 0.75,
-    paddingBottom: 20,
-    borderWidth: 1,
-    borderBottomWidth: 0,
-    borderColor: C.border,
+const s = StyleSheet.create({
+  root: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    zIndex: 1000,
   },
-  handleWrap: { alignItems: 'center', paddingTop: 10, paddingBottom: 8 },
-  handle: {
-    width: 44, height: 5, borderRadius: 3,
-    backgroundColor: C.white08,
+  // ★ v110.5.6: Yarı ekran bottom-sheet (eski full-screen değil)
+  sheet: {
+    position: 'absolute', left: 0, right: 0, bottom: 0,
+    height: SHEET_HEIGHT,
+    overflow: 'hidden',
+    borderTopLeftRadius: 24, borderTopRightRadius: 24,
+  },
+  handleWrap: { alignItems: 'center', paddingTop: 8 },
+  dragHandle: {
+    width: 40, height: 4, borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.25)',
   },
   header: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    paddingHorizontal: 20, paddingVertical: 12,
-    borderBottomWidth: 1, borderBottomColor: C.border,
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 16, paddingVertical: 12, gap: 12,
   },
-  headerIcon: {
-    width: 32, height: 32, borderRadius: 16,
-    backgroundColor: 'rgba(239,68,68,0.08)',
+  iconBtn: {
+    width: 34, height: 34, borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
     alignItems: 'center', justifyContent: 'center',
   },
-  title: { fontSize: 15, fontWeight: '700', color: C.white, flex: 1, letterSpacing: 0.1 },
-  closeBtn: {
-    width: 28, height: 28, borderRadius: 14,
-    backgroundColor: C.white04,
-    borderWidth: 1, borderColor: C.border,
-    alignItems: 'center', justifyContent: 'center',
+  title: {
+    flex: 1,
+    fontSize: 13, fontWeight: '900' as const, color: '#F1F5F9',
+    letterSpacing: 1.2, textAlign: 'center' as const,
+    ...Shadows.text,
   },
-  scrollContent: { paddingHorizontal: 20 },
   sectionLabel: {
-    fontSize: 10, fontWeight: '600', color: C.white30,
-    letterSpacing: 1.5, marginTop: 16, marginBottom: 10, marginLeft: 4,
+    fontSize: 10, fontWeight: '900' as const, color: '#FBBF24',
+    letterSpacing: 1.2, marginTop: 8, marginBottom: 10, marginLeft: 4,
+    ...Shadows.text,
   },
-  reasonRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    paddingVertical: 10, paddingHorizontal: 12,
-    borderRadius: 14, marginBottom: 4,
-    backgroundColor: C.white04,
-    borderWidth: 1, borderColor: 'transparent',
+  // ★ v110.5.4: Kompakt 2 sütunlu grid — 9 reason ekran boyu kaplamasın
+  reasonGrid: {
+    flexDirection: 'row', flexWrap: 'wrap', gap: 6,
   },
-  reasonRowSelected: {
-    backgroundColor: 'rgba(20,184,166,0.06)',
-    borderColor: 'rgba(20,184,166,0.2)',
+  reasonCell: {
+    width: '48.5%',
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: 10, paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
   },
-  reasonIcon: {
-    width: 30, height: 30, borderRadius: 15,
-    backgroundColor: C.white04,
-    alignItems: 'center', justifyContent: 'center',
+  reasonCellSelected: {
+    backgroundColor: 'rgba(251,191,36,0.10)',
+    borderColor: 'rgba(251,191,36,0.45)',
   },
-  reasonText: { fontSize: 13, color: C.white60, fontWeight: '500' },
-  reasonTextSelected: { color: C.teal, fontWeight: '600' },
+  reasonText: {
+    flex: 1,
+    fontSize: 12, color: '#CBD5E1', fontWeight: '600' as const,
+    ...Shadows.text,
+  },
+  reasonTextSelected: {
+    color: '#FDE68A', fontWeight: '700' as const,
+  },
   descInput: {
-    marginTop: 12, padding: 14,
-    backgroundColor: C.white04, borderRadius: 14,
-    color: C.white, fontSize: 13,
-    minHeight: 72, textAlignVertical: 'top',
-    borderWidth: 1, borderColor: C.border,
+    padding: 14,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderRadius: 14,
+    color: '#F1F5F9', fontSize: 13,
+    minHeight: 80, textAlignVertical: 'top' as const,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+  },
+  charCount: {
+    fontSize: 10, color: '#94A3B8', fontWeight: '600' as const,
+    textAlign: 'right' as const, marginTop: 4,
   },
   submitBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    marginTop: 16, paddingVertical: 13, borderRadius: 99,
-    backgroundColor: C.red,
+    marginTop: 18, paddingVertical: 13,
+    borderRadius: 14, overflow: 'hidden',
+    borderWidth: 1, borderColor: 'rgba(239,68,68,0.45)',
   },
-  submitText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  submitText: {
+    color: '#FFF', fontSize: 14, fontWeight: '900' as const,
+    letterSpacing: 0.4, ...Shadows.text,
+  },
+  disclaimer: {
+    fontSize: 10, color: 'rgba(148,163,184,0.7)', lineHeight: 15,
+    textAlign: 'center' as const, marginTop: 14, paddingHorizontal: 8,
+  },
 });

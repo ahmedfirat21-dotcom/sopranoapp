@@ -45,7 +45,9 @@ const PALETTE = {
   buttonGrad: ['#60A5FA', '#3B82F6', '#1D4ED8'] as [string, string, string],
 };
 
-const PANEL_BG: [string, string, string] = ['#1c2330', '#11151e', '#06080d'];
+// ★ 2026-05-05: NotificationDrawer slate kabuk ile uyumlu — "bilet" karakteri korunsun
+//   diye halo + watermark mavi kalır, sadece BG açık slate dile çekildi.
+const PANEL_BG: [string, string, string] = ['#3a4658', '#2a3344', '#1a2030'];
 
 const PANEL_CONTENT_HEIGHT = 540;
 
@@ -146,10 +148,11 @@ export default function EntryFeeCard({
   return (
     <View style={StyleSheet.absoluteFillObject as any} pointerEvents="box-none">
       <View style={{ ...StyleSheet.absoluteFillObject, zIndex: 1200 }} pointerEvents="box-none">
-        {/* Backdrop — backdrop tap'i kazara onaylamasın diye Cancel'a bağlı */}
+        {/* Backdrop — backdrop tap'i kazara onaylamasın diye Cancel'a bağlı.
+            ★ 2026-05-05: NotificationDrawer dim tonu (rgba(8,12,22,0.45)). */}
         <Animated.View style={[StyleSheet.absoluteFill, { opacity: backdropOpacity }]}>
           <BlurView intensity={32} tint="dark" style={StyleSheet.absoluteFill} />
-          <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.55)' }]} />
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(8,12,22,0.45)' }]} />
           <Pressable style={StyleSheet.absoluteFill} onPress={onCancel} />
         </Animated.View>
 
@@ -200,17 +203,26 @@ export default function EntryFeeCard({
           ]}
           {...panResponder.panHandlers}
         >
-          {/* Koyu zemin */}
+          {/* ★ 2026-05-05: NotificationDrawer dili — slate diagonal + üst halo (mavi).
+              Tek `pointerEvents="none"` ekran etkileşimini bloke etmesin. */}
           <LinearGradient
             colors={PANEL_BG}
-            start={{ x: 0, y: 0 }} end={{ x: 0.7, y: 1 }}
-            style={StyleSheet.absoluteFillObject}
-          />
-          {/* Slate-mavi tint */}
-          <LinearGradient
-            colors={[PALETTE.primaryTint, 'transparent']}
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
             style={StyleSheet.absoluteFillObject}
+            pointerEvents="none"
+          />
+          {/* Üst kenar mavi accent halo — Bilet semantik */}
+          <LinearGradient
+            colors={['rgba(59,130,246,0.20)', 'rgba(59,130,246,0.05)', 'transparent']}
+            start={{ x: 0, y: 0 }} end={{ x: 0, y: 0.4 }}
+            style={StyleSheet.absoluteFillObject}
+            pointerEvents="none"
+          />
+          <LinearGradient
+            colors={['rgba(59,130,246,0.08)', 'transparent']}
+            start={{ x: 0, y: 0 }} end={{ x: 0.7, y: 0.6 }}
+            style={StyleSheet.absoluteFillObject}
+            pointerEvents="none"
           />
           {/* Top edge highlight */}
           <LinearGradient
@@ -355,11 +367,11 @@ const styles = StyleSheet.create({
   panel: {
     position: 'absolute',
     left: 0, right: 0, bottom: 0,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    borderWidth: Platform.OS === 'android' ? 2 : 1.5,
+    borderTopLeftRadius: 26,
+    borderTopRightRadius: 26,
     borderBottomWidth: 0,
     overflow: 'hidden',
+    backgroundColor: '#1a2030',
   },
   topEdge: { position: 'absolute', top: 0, left: 0, right: 0, height: 1.5 },
   handle: { alignItems: 'center', paddingVertical: 12 },

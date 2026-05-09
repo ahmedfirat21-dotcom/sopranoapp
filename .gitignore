@@ -4,6 +4,10 @@ dist/
 ios/
 supabase/.temp/
 
+# ★ 7 May 2026: web-admin junction (Desktop\sopranochatnorolji'ye link).
+#   Ayrı git repo, ayrı remote, ayrı Vercel deploy — bu repo'nun parçası DEĞİL.
+web-admin/
+
 # ★ 2026-04-27: android/ artık track ediliyor (manuel native kodlar: LiveKitForegroundService
 #   + LiveKitReactNative.setup vs). expo prebuild riskine karşı git'te tutuluyor.
 #   Build artifacts ve generated dosyalar dışlanıyor.

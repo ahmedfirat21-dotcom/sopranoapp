@@ -1,17 +1,22 @@
 /**
- * SopranoChat — Premium yükleniyor simgesi (v92.27, 2 May 2026)
+ * SopranoChat — Modern yükleniyor (v109, 5 May 2026)
  * ════════════════════════════════════════════════════════════════════
- * Tasarım: Ionicons "sync" ikonu (2 ok birbirini kovalar) + 3 katmanlı halo glow + breath.
- * macOS / Stripe / iOS sync icon estetiği.
+ * Lottie tabanlı loading (Loading animation blue.json). Lottie modülü
+ * yüklenemezse 3-dot pulse fallback'ine düşer (Hermes uyumlu, native
+ * modül zorunluluğu yok).
  *
- * NOT: Font yüklendikten sonra çağrılmalı. _layout.tsx splash fallback için
- * ayrı SplashSpinner component'i var (Ionicons-bağımsız).
+ * State sistemi korunur (color/state mapping); Lottie tek renk olduğu
+ * için color override sadece fallback dot'larda etki eder. State badge
+ * için mavi/yeşil/turuncu Lottie versiyonları post-launch eklenebilir.
  */
 
 import React, { useEffect, useRef } from 'react';
-import { View, Animated, Easing, Platform } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
+import { View, Animated, Easing } from 'react-native';
+
+// ★ v109.1: Lottie kaldırıldı — modern 3-dot pulse standart loader.
+//   Kullanıcı talebi: Lottie deneyleri sonrası eski tasarıma geri dön.
+const LottieView: any = null;
+const LOADING_LOTTIE: any = null;
 
 type Size = 'sm' | 'md' | 'lg' | 'small' | 'large';
 type LoaderState = 'default' | 'connecting' | 'reconnect' | 'error';
@@ -26,8 +31,6 @@ interface Props {
   style?: any;
 }
 
-// ★ v107.15: Boyutlar küçültüldü (kullanıcı talebi). Eski: sm 32 / md 56 / lg 80
-//   Yeni: sm 24 / md 40 / lg 60 — özellikle "Odaya bağlanılıyor" gibi tam-ekran loading'lerde ferah
 const SIZE_MAP: Record<Size, number> = {
   sm: 24, md: 40, lg: 60,
   small: 24, large: 40,
@@ -38,7 +41,10 @@ const STATE_COLOR: Record<LoaderState, string> = {
   reconnect:  '#3B82F6',
   error:      '#F59E0B',
 };
-const SPEED_MAP = { fast: 700, normal: 1100, slow: 1600 };
+// Animation cycle (ms). speed='fast' = hızlı pulse.
+const CYCLE_MS = { fast: 900, normal: 1200, slow: 1600 };
+// Lottie speed multipler (frame oranı)
+const LOTTIE_SPEED = { fast: 1.6, normal: 1, slow: 0.7 };
 
 export default function AppLoader({
   size = 'md',
@@ -50,80 +56,108 @@ export default function AppLoader({
   style,
 }: Props) {
   const dim = typeof size === 'number' ? size : SIZE_MAP[size];
-  const finalColor = color ?? STATE_COLOR[state];
-  const duration = SPEED_MAP[speed];
 
-  const rotate = useRef(new Animated.Value(0)).current;
-  const halo = useRef(new Animated.Value(0)).current;
-
+  // ★ Hooks rules: hooks her render'da AYNI sırada çağrılır.
+  //   Fallback dot loop'u koşulsuz hook olarak tutuluyor; gerçekten render
+  //   edilmezse animasyon görünmez, performans etkisi marjinal.
+  const cycle = CYCLE_MS[speed];
+  const d1 = useRef(new Animated.Value(0)).current;
+  const d2 = useRef(new Animated.Value(0)).current;
+  const d3 = useRef(new Animated.Value(0)).current;
   useEffect(() => {
-    rotate.setValue(0);
-    halo.setValue(0);
-    // ★ v92.28 (2 May 2026) PERF FIX: Önceki sürümde loop'lar cleanup edilmiyordu.
-    //   85+ AppLoader instance'ı unmount sonrası bile native driver'da dönmeye devam ediyordu
-    //   → 5 kişilik odada FPS drop. Şimdi loop ref'leri tutuluyor, unmount'ta stop().
-    const rotateLoop = Animated.loop(
-      Animated.timing(rotate, { toValue: 1, duration, easing: Easing.linear, useNativeDriver: true }),
-    );
-    const haloLoop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(halo, { toValue: 1, duration: duration * 1.2, useNativeDriver: true, easing: Easing.inOut(Easing.sin) }),
-        Animated.timing(halo, { toValue: 0, duration: duration * 1.2, useNativeDriver: true, easing: Easing.inOut(Easing.sin) }),
-      ]),
-    );
-    rotateLoop.start();
-    haloLoop.start();
-    return () => {
-      rotateLoop.stop();
-      haloLoop.stop();
-    };
-  }, [duration]);
+    if (LottieView && LOADING_LOTTIE) return; // Lottie aktifken dot loop atılır
+    const makeLoop = (val: Animated.Value, delay: number) =>
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(delay),
+          Animated.timing(val, {
+            toValue: 1, duration: cycle / 2,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(val, {
+            toValue: 0, duration: cycle / 2,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+        ]),
+      );
+    const stagger = cycle / 6;
+    const l1 = makeLoop(d1, 0);
+    const l2 = makeLoop(d2, stagger);
+    const l3 = makeLoop(d3, stagger * 2);
+    l1.start(); l2.start(); l3.start();
+    return () => { l1.stop(); l2.stop(); l3.stop(); };
+  }, [cycle]);
 
-  const rotateDeg = rotate.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
-  const haloScale = halo.interpolate({ inputRange: [0, 1], outputRange: [0.92, 1.08] });
-  const haloOpacity = halo.interpolate({ inputRange: [0, 1], outputRange: [0.35, 0.7] });
+  // ★ Lottie öncelikli render — yüklü ve asset varsa
+  if (LottieView && LOADING_LOTTIE) {
+    // Lottie kareleri zaten kompakt; küçük boyutlarda hafif büyütüyoruz çünkü
+    // animasyonun aktif piksel alanı dosyanın merkez %70'inde.
+    const lottieScale = dim < 30 ? 1.4 : dim < 60 ? 1.2 : 1.05;
+    const renderSize = Math.round(dim * lottieScale);
+    const offset = Math.round((renderSize - dim) / -2);
 
-  // ★ v107.15: Sert 3 katman backgroundColor yerine TEK yumuşak LinearGradient halo.
-  //   Eski: solid renkler 1A/26/33 → kenarlar belirgin, "halka" gibi görünüyordu.
-  //   Yeni: radial-tarzı gradient (merkez doygun → kenar transparan) + Android shadow kaldırıldı.
-  const inner = (
-    <View style={[{ width: dim * 1.5, height: dim * 1.5, alignItems: 'center', justifyContent: 'center' }, style]}>
-      {/* Yumuşak halo — LinearGradient ile merkezden kenara fade (Android'de de görünür) */}
-      <Animated.View
-        pointerEvents="none"
-        style={{
-          position: 'absolute',
-          width: dim * 1.5,
-          height: dim * 1.5,
-          borderRadius: dim * 0.75,
-          opacity: haloOpacity,
-          transform: [{ scale: haloScale }],
-          overflow: 'hidden',
-        }}
+    const inner = (
+      <View
+        style={[
+          {
+            width: dim, height: dim,
+            alignItems: 'center', justifyContent: 'center',
+            overflow: 'hidden',
+          },
+          style,
+        ]}
       >
-        <LinearGradient
-          colors={[`${finalColor}40`, `${finalColor}20`, `${finalColor}08`, 'transparent']}
-          locations={[0, 0.4, 0.75, 1]}
-          start={{ x: 0.5, y: 0.5 }}
-          end={{ x: 1, y: 1 }}
-          style={{ width: '100%', height: '100%', borderRadius: dim * 0.75 }}
+        <LottieView
+          source={LOADING_LOTTIE}
+          autoPlay
+          loop
+          speed={LOTTIE_SPEED[speed]}
+          resizeMode="contain"
+          style={{
+            position: 'absolute',
+            width: renderSize, height: renderSize,
+            top: offset, left: offset,
+          }}
         />
-      </Animated.View>
-      {/* Sync ikonu — kendi etrafında döner. Android shadow kaldırıldı (gri görünür, glow vermez) */}
-      <Animated.View
-        pointerEvents="none"
-        style={{
-          transform: [{ rotate: rotateDeg }],
-          ...(Platform.OS === 'ios' ? {
-            shadowColor: finalColor,
-            shadowOffset: { width: 0, height: 0 },
-            shadowOpacity: 0.6,
-            shadowRadius: dim * 0.25,
-          } : {}),
-        }}
-      >
-        <Ionicons name="sync" size={dim * 0.85} color={finalColor} />
-      </Animated.View>
+      </View>
+    );
+
+    if (fullscreen) {
+      return (
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: bg ?? '#0A0F1A' }}>
+          {inner}
+        </View>
+      );
+    }
+    return inner;
+  }
+
+  // ─── Fallback: 3-dot pulse ───────────────────────────────────────
+  const finalColor = color ?? STATE_COLOR[state];
+  const dotSize = Math.max(4, Math.round(dim * 0.22));
+  const gap = Math.max(3, Math.round(dim * 0.14));
+
+  const dotAnim = (val: Animated.Value) => ({
+    width: dotSize,
+    height: dotSize,
+    borderRadius: dotSize / 2,
+    backgroundColor: finalColor,
+    opacity: val.interpolate({ inputRange: [0, 1], outputRange: [0.28, 1] }),
+    transform: [{ scale: val.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1.15] }) }],
+  });
+
+  const inner = (
+    <View
+      style={[
+        { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap },
+        style,
+      ]}
+    >
+      <Animated.View style={dotAnim(d1)} />
+      <Animated.View style={dotAnim(d2)} />
+      <Animated.View style={dotAnim(d3)} />
     </View>
   );
 

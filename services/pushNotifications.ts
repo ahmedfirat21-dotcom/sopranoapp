@@ -78,10 +78,13 @@ export const PushNotificationService = {
       return null;
     }
 
-    // Sadece gerçek cihazlarda çalışır
-    if (!Device.isDevice) {
-      if (__DEV__) console.log('Push bildirimler yalnızca gerçek cihazlarda çalışır.');
+    // Sadece gerçek cihazlarda çalışır (DEV mode'da Google Play'li emülatör için bypass)
+    if (!Device.isDevice && !__DEV__) {
+      console.log('Push bildirimler yalnızca gerçek cihazlarda çalışır.');
       return null;
+    }
+    if (!Device.isDevice && __DEV__) {
+      console.log('[DEV] Emülatör algılandı — push token denenecek.');
     }
 
     // Expo Go'da (SDK 53+) push notification kurulumu uygulamayı çökertir, bu yüzden direkt atla
@@ -173,11 +176,24 @@ export const PushNotificationService = {
       if (__DEV__) logger.warn('[Push] Notification category set hatası:', catErr);
     }
 
-    // Expo Push Token al
-    // ★ CRITICAL FIX 2026-04-25: projectId Firebase project değil EAS project UUID olmalı.
-    //   Eski 'sopranochat-5738e' (Firebase) Expo'nun expected uuid format'ı geçmediği için
-    //   token getirme hep fail edip catch'lenmiş — push notifications hiç çalışmıyor olabilir.
-    //   app.json#extra.eas.projectId ile uyumlu.
+    // ★ 2026-05-09 FCM v1 MIGRATION: Eski credentials zamanından kalan tokenlar Expo backend'inde
+    //   FCM v1 service account ile bağlanmamış → tüm push'lar DeviceNotRegistered ile fail.
+    //   Bir kez unregister yapıp yeniden register ederek Expo'nun token'ı yeni credentials'a bağlamasını
+    //   sağlıyoruz. AsyncStorage flag ile bir defa çalışır.
+    try {
+      const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+      const FCM_MIGRATION_FLAG = 'soprano_fcm_v1_migrated';
+      const migrated = await AsyncStorage.getItem(FCM_MIGRATION_FLAG);
+      if (migrated !== '1') {
+        try {
+          await Notifications.unregisterForNotificationsAsync();
+          if (__DEV__) console.log('[Push] FCM v1 migration: eski token kaydı silindi.');
+        } catch { /* unregister fail — devam */ }
+        await AsyncStorage.setItem(FCM_MIGRATION_FLAG, '1');
+      }
+    } catch { /* migration fail — devam */ }
+
+    // Expo Push Token al — projectId EAS project UUID
     try {
       const tokenData = await Notifications.getExpoPushTokenAsync({
         projectId: 'bbd97aec-9d58-426f-8acc-215b24ff286a',
