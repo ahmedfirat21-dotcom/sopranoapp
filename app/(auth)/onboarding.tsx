@@ -1,5 +1,5 @@
 ﻿import { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, Image, Pressable, ScrollView, Dimensions, TextInput, KeyboardAvoidingView, Platform, Keyboard, ImageBackground, Animated, Easing } from 'react-native';
+import { View, Text, StyleSheet, Image, Pressable, ScrollView, Dimensions, TextInput, KeyboardAvoidingView, Platform, Keyboard, ImageBackground, Animated, Easing, Alert } from 'react-native';
 import AppLoader from '../../components/AppLoader';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -108,6 +108,32 @@ export default function OnboardingScreen() {
   // ★ UX-OB: Geri adım — bir önceki step'e dön
   const goBack = () => {
     if (step > 1) animateStep(step - 1);
+  };
+
+  // ★ 2026-05-09 v201: Step 1'de "vazgeç" — onboarding'i iptal eder, oturumu kapatır,
+  //   kullanıcıyı login'e döndürür. Partial profile (display_name vs.) kaydedilmemiş
+  //   olabilir; sign-out yeterli — Firebase user kalır ama login'e dönüşte AuthGuard
+  //   yine onboarding'e yollayacaktır. Tam silme istenirse Ayarlar > Hesabı Sil.
+  const handleCancelOnboarding = () => {
+    Alert.alert(
+      'Vazgeçmek istiyor musun?',
+      'Şu ana kadar girdiğin bilgiler kaydedilmeyecek ve oturum kapanacak.',
+      [
+        { text: 'Devam Et', style: 'cancel' },
+        {
+          text: 'Vazgeç',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const { performLogout } = require('../../services/account');
+              await performLogout();
+            } catch {}
+            router.replace('/(auth)/login' as any);
+          },
+        },
+      ],
+      { cancelable: true },
+    );
   };
 
   const finalizeOnboarding = async () => {
@@ -418,7 +444,10 @@ export default function OnboardingScreen() {
               <Ionicons name="arrow-back" size={18} color="#F1F5F9" />
             </Pressable>
           ) : (
-            <View style={{ width: 34 }} />
+            // ★ v201: Step 1'de vazgeç (X) butonu — onboarding'i iptal eder, oturum kapanır.
+            <Pressable onPress={handleCancelOnboarding} style={s.topBackBtn} hitSlop={8}>
+              <Ionicons name="close" size={20} color="#F1F5F9" />
+            </Pressable>
           )}
           <View style={s.progressTrack}>
             <Animated.View style={[s.progressFill, { width: `${(step / TOTAL_STEPS) * 100}%` }]} />

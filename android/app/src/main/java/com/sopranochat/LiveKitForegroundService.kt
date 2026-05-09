@@ -11,6 +11,7 @@ import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
 
 /**
  * Odadayken arka planda çalan ön plan servisi (foreground service).
@@ -119,10 +120,16 @@ class LiveKitForegroundService : Service() {
             )
         } else null
 
+        // ★ 2026-05-09: Önceki kod applicationInfo.icon (renkli launcher) kullanıyordu;
+        //   Android sistemi monokrom bekliyor → lacivert plate içine sıkıştırıyordu.
+        //   Standart yol: R.drawable.notification_icon (saydam, beyaz silüet) + setColor tint.
+        //   Bu sayede status bar'da temiz silüet, expanded view'da tint'li ikon görünür.
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("SopranoChat")
             .setContentText("Sesli odadasınız")
-            .setSmallIcon(applicationInfo.icon)
+            .setSmallIcon(R.drawable.notification_icon)
+            .setColor(ContextCompat.getColor(this, R.color.notification_icon_color))
+            .setColorized(false)
             .setOngoing(true)
             .setSilent(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)

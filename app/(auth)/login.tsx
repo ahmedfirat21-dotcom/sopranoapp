@@ -35,6 +35,8 @@ import { GoogleAuthProvider, signInWithCredential, signInWithEmailAndPassword, c
 
 import { showToast } from '../../components/Toast';
 import AppBackground from '../../components/AppBackground';
+import AccountDeletedOverlay from '../../components/AccountDeletedOverlay';
+import { ACCOUNT_DELETED_FLAG_KEY } from '../../services/account';
 import { auth, GOOGLE_WEB_CLIENT_ID } from '../../constants/firebase';
 import { useAuth } from '../_layout';
 
@@ -91,6 +93,10 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const [resendLoading, setResendLoading] = useState(false);
 
+  // ★ 2026-05-09: Hesap silme sonrası tek seferlik Lottie animasyonu —
+  //   AccountDeletedOverlay flag'i temizler, animasyon bitince false olur.
+  const [showAccountDeleted, setShowAccountDeleted] = useState(false);
+
   // ★ SEC-BF2: Brute force koruması — kalıcı (AsyncStorage tabanlı)
   const failedAttemptsRef = useRef(0);
   const cooldownUntilRef = useRef(0);
@@ -135,6 +141,19 @@ export default function LoginScreen() {
         ]);
         if (storedAttempts) failedAttemptsRef.current = parseInt(storedAttempts, 10) || 0;
         if (storedCooldown) cooldownUntilRef.current = parseInt(storedCooldown, 10) || 0;
+      } catch {}
+    })();
+
+    // ★ 2026-05-09: Hesap silme bayrağı varsa Lottie'yi tetikle ve hemen temizle.
+    //   Tek seferlik göstermek için flag'i animasyon BAŞLAMADAN önce siliyoruz —
+    //   tekrar yüklenmede gözükmemesi için.
+    (async () => {
+      try {
+        const flag = await AsyncStorage.getItem(ACCOUNT_DELETED_FLAG_KEY);
+        if (flag === '1') {
+          await AsyncStorage.removeItem(ACCOUNT_DELETED_FLAG_KEY);
+          setShowAccountDeleted(true);
+        }
       } catch {}
     })();
 
@@ -204,13 +223,16 @@ export default function LoginScreen() {
       if (idToken) {
         const credential = GoogleAuthProvider.credential(idToken);
         await signInWithCredential(auth, credential);
+        // ★ 2026-05-09 v206: Başarılı auth — loading=true kalsın → AppLoader (yükleniyor)
+        //   ekranda durur, AuthGuard onboarding/home'a yönlendirene kadar boş "flash" yok.
+        //   Component unmount olunca loading state kendi kendini temizler.
+        return;
       } else {
         throw new Error('No ID token present!');
       }
     } catch (error: any) {
       if (__DEV__) console.warn('Google login hatasi:', error);
       showToast({ title: 'Dikkat', message: error?.message || 'Google ile giriş iptal edildi.', type: 'warning' });
-    } finally {
       setLoading(false);
     }
   };
@@ -239,6 +261,9 @@ export default function LoginScreen() {
       failedAttemptsRef.current = 0;
       cooldownUntilRef.current = 0;
       AsyncStorage.multiRemove([BF_ATTEMPTS_KEY, BF_COOLDOWN_KEY]).catch(() => {});
+      // ★ 2026-05-09 v206: Başarılı auth — loading=true kalsın → AppLoader gösterilir
+      //   AuthGuard yönlendirene kadar. Aksi halde forms tekrar açılıp "flash" oluyordu.
+      return;
     } catch (error: any) {
       failedAttemptsRef.current++;
       // ★ SEC-BF2: Kalıcı cooldown — uygulama yeniden başlatılsa bile korunur
@@ -259,7 +284,8 @@ export default function LoginScreen() {
       if (cooldownUntilRef.current > 0) {
         AsyncStorage.setItem(BF_COOLDOWN_KEY, String(cooldownUntilRef.current)).catch(() => {});
       }
-    } finally {
+      // ★ v206: Loading=false sadece HATA durumunda — başarılı login'de AuthGuard
+      //   yönlendirene kadar AppLoader gösterilir.
       setLoading(false);
     }
   };
@@ -459,6 +485,15 @@ export default function LoginScreen() {
 
   return (
     <AppBackground radialGlow>
+      {/* ★ 2026-05-09 v205: Hesap silme animasyonu — KeyboardAvoidingView/ScrollView
+          DIŞINDA, AppBackground seviyesinde. Böylece status bar'ın hemen altına,
+          SopranoChat logosunun ÜZERİNE değil ÜSTÜNE konumlanır. */}
+      {showAccountDeleted && (
+        <AccountDeletedOverlay
+          size={180}
+          onDone={() => setShowAccountDeleted(false)}
+        />
+      )}
       <KeyboardAvoidingView style={s.container} behavior={'padding'}>
 
         <ScrollView contentContainerStyle={s.contentContainer} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>

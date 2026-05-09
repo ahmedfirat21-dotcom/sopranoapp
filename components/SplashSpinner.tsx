@@ -1,11 +1,17 @@
 /**
  * SopranoChat — Splash spinner (font-bağımsız, sadece _layout splash için)
- * AppLoader Ionicons kullanıyor, font yüklenmeden gösterilemez. Bu component
- * sadece pure RN border ile dönen halka — splash'ta güvenle gösterilir.
+ * ════════════════════════════════════════════════════════════════════
+ * ★ 2026-05-09: AppLoader 3-dot pulse pattern'iyle birebir aynı görünüm.
+ *   Önceki "dönen halka" tasarımı boyut/şekil olarak AppLoader'la
+ *   uyumsuzdu (kullanıcı feedback: ilki ikincisinden büyük). Şimdi
+ *   ikisi de aynı 3-dot pulse, tek görsel dil.
+ *
+ * Bu component fontlar/Ionicons yüklenmeden önce de güvenle render eder
+ * (sadece View + Animated, harici bağımlılık yok).
  */
 
 import React, { useEffect, useRef } from 'react';
-import { View, Animated, Easing, Platform } from 'react-native';
+import { View, Animated, Easing } from 'react-native';
 
 interface Props {
   size?: number;
@@ -14,34 +20,47 @@ interface Props {
 }
 
 export default function SplashSpinner({ size = 56, color = '#14B8A6', bg = '#0A0F1A' }: Props) {
-  const rotate = useRef(new Animated.Value(0)).current;
+  const cycle = 1200;
+  const d1 = useRef(new Animated.Value(0)).current;
+  const d2 = useRef(new Animated.Value(0)).current;
+  const d3 = useRef(new Animated.Value(0)).current;
+
   useEffect(() => {
-    Animated.loop(
-      Animated.timing(rotate, { toValue: 1, duration: 1100, easing: Easing.linear, useNativeDriver: true }),
-    ).start();
+    const makeLoop = (val: Animated.Value, delay: number) =>
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(delay),
+          Animated.timing(val, { toValue: 1, duration: cycle / 2, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+          Animated.timing(val, { toValue: 0, duration: cycle / 2, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        ]),
+      );
+    const stagger = cycle / 6;
+    const l1 = makeLoop(d1, 0);
+    const l2 = makeLoop(d2, stagger);
+    const l3 = makeLoop(d3, stagger * 2);
+    l1.start(); l2.start(); l3.start();
+    return () => { l1.stop(); l2.stop(); l3.stop(); };
   }, []);
-  const rotateDeg = rotate.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
-  // ★ v107.21: Dış solid halka KALDIRILDI (kullanıcı talebi: "halka çizgisi" gibi görünüyordu).
-  //   Sadece dönen ince ring kalır + Android elevation kaldırıldı.
-  //   iOS shadow soft, Android'de border opacity ile telafi.
+
+  const dotSize = Math.max(4, Math.round(size * 0.22));
+  const gap = Math.max(3, Math.round(size * 0.14));
+
+  const dotAnim = (val: Animated.Value) => ({
+    width: dotSize,
+    height: dotSize,
+    borderRadius: dotSize / 2,
+    backgroundColor: color,
+    opacity: val.interpolate({ inputRange: [0, 1], outputRange: [0.28, 1] }),
+    transform: [{ scale: val.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1.15] }) }],
+  });
+
   return (
     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: bg }}>
-      <Animated.View
-        style={{
-          width: size, height: size, borderRadius: size / 2,
-          borderWidth: Math.max(2, size * 0.06),
-          borderColor: `${color}22`,
-          borderTopColor: color,
-          borderRightColor: color,
-          transform: [{ rotate: rotateDeg }],
-          ...(Platform.OS === 'ios' ? {
-            shadowColor: color,
-            shadowOffset: { width: 0, height: 0 },
-            shadowOpacity: 0.5,
-            shadowRadius: size * 0.18,
-          } : {}),
-        }}
-      />
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap }}>
+        <Animated.View style={dotAnim(d1)} />
+        <Animated.View style={dotAnim(d2)} />
+        <Animated.View style={dotAnim(d3)} />
+      </View>
     </View>
   );
 }

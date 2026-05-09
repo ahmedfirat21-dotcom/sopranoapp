@@ -791,6 +791,8 @@ export default function RootLayout() {
   }, []);
 
   // ★ CRITICAL: Her şey hazır olduğunda splash screen'i gizle
+  // ★ 2026-05-09: 300ms → 1200ms — splash çok hızlı geçiyordu, logo göze takılmadan
+  //   kayboluyor; +900ms ekstra logoyu göstermek için yeterli (toplam ~1.2sn JS hazırsa).
   useEffect(() => {
     if (appIsReady && (fontsLoaded || fontError)) {
       const timer = setTimeout(async () => {
@@ -799,7 +801,7 @@ export default function RootLayout() {
         } catch (e) {
           if (__DEV__) console.warn('[RootLayout] Splash gizleme hatası:', e);
         }
-      }, 300);
+      }, 1200);
       return () => clearTimeout(timer);
     }
   }, [appIsReady, fontsLoaded, fontError]);

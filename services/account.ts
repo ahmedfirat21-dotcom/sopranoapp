@@ -10,9 +10,15 @@
  * ekliyor.
  */
 import { signOut } from 'firebase/auth';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { auth } from '../constants/firebase';
 import { supabase } from '../constants/supabase';
 import { logger } from '../utils/logger';
+
+// ★ 2026-05-09: Hesap silme sonrası login ekranında Lottie animasyonu
+//   tetiklemek için kullanılan bir kerelik bayrak. Login ekranı mount'ta
+//   okur ve hemen temizler.
+export const ACCOUNT_DELETED_FLAG_KEY = '@soprano_account_just_deleted';
 
 /** Full logout flow — state cleanup + navigation caller'da yapılır. */
 export async function performLogout(): Promise<void> {
@@ -89,6 +95,9 @@ export async function performDeleteAccount(firebaseUser: any): Promise<{ success
   try { await performLogout(); } catch (e: any) {
     if (__DEV__) logger.warn('[Account] performLogout error after delete:', e?.message);
   }
+
+  // 5) Login ekranı için bayrak — Lottie animasyonunu tetikleyecek.
+  try { await AsyncStorage.setItem(ACCOUNT_DELETED_FLAG_KEY, '1'); } catch {}
 
   return { success: true, stats };
 }

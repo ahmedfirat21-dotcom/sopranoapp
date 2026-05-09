@@ -433,37 +433,8 @@ export default function ProfileScreen() {
     });
   }, [setIsLoggedIn, setUser, router]);
 
-  // ★ 2026-04-21: Hesap silme — doğrudan modal (settings redirect kaldırıldı).
-  //   Tek atomik RPC (v49) + storage cleanup + Firebase delete + logout.
-  //   Kullanıcı profilden ayrılmak zorunda kalmadan hesabını silebilir.
-  const handleGoToDeleteAccount = useCallback(() => {
-    setDeleteAlert({
-      visible: true,
-      title: '⚠️ Hesabını Sil',
-      message: 'Bu işlem GERİ ALINAMAZ. Tüm verilerin, mesajların, odaların ve rozetlerin kalıcı olarak silinecek.',
-      type: 'error',
-      buttons: [
-        { text: 'İptal', style: 'cancel' },
-        {
-          text: 'Hesabımı Kalıcı Olarak Sil',
-          style: 'destructive',
-          onPress: async () => {
-            if (!firebaseUser) return;
-            try {
-              const { performDeleteAccount } = require('../../services/account');
-              await performDeleteAccount(firebaseUser);
-              setIsLoggedIn(false);
-              setUser(null);
-              router.replace('/(auth)/login' as any);
-              showToast({ title: '🗑 Hesap Silindi', message: 'Tüm verilerin kaldırıldı.', type: 'info' });
-            } catch (e: any) {
-              showToast({ title: 'Hesap Silinemedi', message: e?.message || 'İşlem tamamlanamadı.', type: 'error' });
-            }
-          },
-        },
-      ],
-    });
-  }, [firebaseUser, setIsLoggedIn, setUser, router]);
+  // ★ 2026-05-09: handleGoToDeleteAccount kaldırıldı — profil ekranındaki "Hesabımı Sil"
+  //   butonu Ayarlar menüsündeki ile mükerrerdi, tek kaynak olarak Ayarlar'a taşındı.
 
   const handleClaimReferral = async () => {
     if (!userId || !referralCodeText.trim()) return;
@@ -763,6 +734,8 @@ export default function ProfileScreen() {
               }}
             />
             {/* Tehlikeli aksiyonlar — ince ayırıcı sonrası */}
+            {/* ★ 2026-05-09: "Hesabımı Sil" kaldırıldı — Ayarlar menüsündeki ile mükerrerdi.
+                 Tek kaynak Ayarlar > Hesabı Sil. */}
             <View style={p.sectionDivider} />
             <PremiumListItem
               icon="logout-variant"
@@ -770,13 +743,6 @@ export default function ProfileScreen() {
               label="Oturumu Kapat"
               labelColor="#EF4444"
               onPress={handleLogout}
-            />
-            <PremiumListItem
-              icon="trash-can"
-              iconColor="#EF4444"
-              label="Hesabımı Sil"
-              labelColor="#EF4444"
-              onPress={handleGoToDeleteAccount}
               isLast
             />
           </View>
