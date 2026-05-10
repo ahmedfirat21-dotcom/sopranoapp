@@ -1183,7 +1183,7 @@ const styles = StyleSheet.create({
 
   // ★ 2026-04-28: Section header — profile.tsx premium pattern ile birleştirildi.
   //   Eskiden flat sectionDivider + sectionLabel idi; tutarsızdı.
-  //   Yeni: 3px teal accent bar + Ionicons + uppercase metin (profile/clubs/settings ile aynı).
+  //   Yeni: 3px teal accent bar + Ionicons + uppercase metin (profile/settings ile aynı).
   sectionDivider: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
     marginHorizontal: 16, marginTop: 14, marginBottom: 8,

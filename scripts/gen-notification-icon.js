@@ -28,7 +28,8 @@ const SIZES = {
 
   // 2) Kareye getir (içerik tam kareye yerleşsin, hafif kenar boşluğu ekle)
   const maxDim = Math.max(trimmed.info.width, trimmed.info.height);
-  const padding = Math.round(maxDim * 0.08); // %8 nefes
+  // ★ 2026-05-10: %8 → %3 — status bar'da silüet daha dolu/belirgin görünsün (kullanıcı talebi)
+  const padding = Math.round(maxDim * 0.03);
   const canvasSize = maxDim + padding * 2;
   const squared = await sharp({
     create: { width: canvasSize, height: canvasSize, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },

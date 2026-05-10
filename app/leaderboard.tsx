@@ -614,7 +614,7 @@ export default function LeaderboardScreen() {
       {/* ─── Content ─── */}
       {loading ? (
         <View style={s.loadingWrap}>
-          <AppLoader size="large" color="#D4AF37" />
+          <AppLoader size={56} color="#D4AF37" />
           <Text style={s.loadingText}>Sıralama yükleniyor...</Text>
         </View>
       ) : (

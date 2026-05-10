@@ -14,7 +14,6 @@
  *
  * 2026-04-25 (Drag Fix): useSwipeToDismiss kaldırıldı, doğrudan
  *   PanResponder + top-based Animated.Value kullanılıyor.
- *   Koro üyeler modalı (MembersSheet) ile aynı pattern.
  *   Modal donma ve sürüklenememe sorunu çözüldü.
  */
 import React, { useState, useEffect, useCallback, useRef } from 'react';

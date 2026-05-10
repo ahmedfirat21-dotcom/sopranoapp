@@ -14,6 +14,7 @@ import { supabase } from '../constants/supabase';
 import StatusAvatar from './StatusAvatar';
 import type { Profile } from '../services/database';
 import { useOnlineFriends } from '../providers/OnlineFriendsProvider';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // ★ 2026-04-27: FollowListModal/InRoomUserProfile ile aynı 2-snap mekanik.
 //   Modal sarmalı YOK (Modal native dialog Pressable backdrop'u yutuyor + pan responder Capture
@@ -34,6 +35,10 @@ type UserSearchModalProps = {
 
 export function UserSearchModal({ visible, onClose, currentUserId, onSelectUser, onSelectRoom, mode = 'compose' }: UserSearchModalProps) {
   const isDiscover = mode === 'discover';
+  // ★ 2026-05-10: Samsung 3-button nav + iPhone home indicator için dinamik alt padding.
+  //   Eski sabit 40 — son kullanıcı satırı navigasyon tuşları arkasında kalıyordu.
+  const insets = useSafeAreaInsets();
+  const listBottomPad = Math.max(insets.bottom, 16) + 32;
   // ★ 2026-04-30: Presence-based online — stale DB flag yerine canlı websocket durumu.
   const { onlineFriends: liveFriends } = useOnlineFriends();
   const liveOnlineIds = new Set(liveFriends.map(f => f.id));
@@ -444,7 +449,7 @@ export function UserSearchModal({ visible, onClose, currentUserId, onSelectUser,
                   keyExtractor={(item) => item.id}
                   renderItem={renderUser}
                   showsVerticalScrollIndicator={false}
-                  contentContainerStyle={{ paddingBottom: 40 }}
+                  contentContainerStyle={{ paddingBottom: listBottomPad }}
                   onScroll={handleScroll}
                   scrollEventThrottle={16}
                   // ★ v110.5.5: Klavye açıkken arama sonucuna ilk dokunuşta tıklama yakalansın
@@ -472,7 +477,7 @@ export function UserSearchModal({ visible, onClose, currentUserId, onSelectUser,
                   keyExtractor={() => 'dummy'}
                   renderItem={() => null}
                   showsVerticalScrollIndicator={false}
-                  contentContainerStyle={{ paddingBottom: 40 }}
+                  contentContainerStyle={{ paddingBottom: listBottomPad }}
                   onScroll={handleScroll}
                   scrollEventThrottle={16}
                   keyboardShouldPersistTaps="handled"

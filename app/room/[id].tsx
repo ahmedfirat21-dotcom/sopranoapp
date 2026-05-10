@@ -2667,10 +2667,14 @@ export default function RoomScreen() {
 
   // ★ 2026-04-26: LiveKit kalıcı fail → bağlantı kurulamadı (oda var olabilir, sunucu down/network kopuk).
   //   "not_found" yanıltıcıydı; ayrı 'connection_failed' reason — retry butonu sunar.
+  // ★ 2026-05-10 GRACE: Auto-reconnect 1-2sn'de başarılı olursa flash önle. 3sn delay,
+  //   bu süre içinde connectFailed=false olursa setRoomBlock atlanır.
   useEffect(() => {
-    if (lk.connectFailed && !loading && !roomBlock) {
+    if (!lk.connectFailed || loading || roomBlock) return;
+    const t = setTimeout(() => {
       setRoomBlock({ reason: 'connection_failed' });
-    }
+    }, 3000);
+    return () => clearTimeout(t);
   }, [lk.connectFailed, loading, roomBlock]);
 
   // ★ 2026-04-29 v2: Manuel timeout tamamen kaldırıldı — LiveKit'in kendi
@@ -3463,8 +3467,33 @@ export default function RoomScreen() {
   }, [!!room]);
   // Rol Dağılımları — useMemo ile cache'le (performans)
   const { stageUsers, listenerUsers, spectatorUsers, viewerCount, amIHost, amIModerator, amIGodMaster, canModerate, isGodOrHost, hostUser, amIActingHost, isOriginalHost, isStageDelegate } = useMemo(() => {
+    // ★ 2026-05-10 SAHNE FIX: Mount/giriş sırasında DB'de host'un katılım kaydı henüz yoksa
+    //   (RoomService.join async, 9sn sürebiliyor) sahne "boş" gözüküyordu. Render seviyesinde
+    //   room.host_id varsa host'u synthesize et — owner rolüyle stage'de hep görünsün.
+    //   DB'den gerçek kayıt geldiğinde realtime callback override eder.
+    let _participants = participants;
+    if (room?.host_id && !participants.some(p => p.user_id === room.host_id)) {
+      const hj: any = (room as any).host;
+      _participants = [...participants, {
+        id: `_synth_host_${room.host_id}`,
+        room_id: room.id,
+        user_id: room.host_id,
+        role: 'owner' as const,
+        is_muted: false,
+        joined_at: new Date().toISOString(),
+        user: hj ? {
+          id: room.host_id,
+          display_name: hj.display_name,
+          avatar_url: hj.avatar_url,
+          subscription_tier: hj.subscription_tier,
+          active_frame: hj.active_frame,
+          active_chat_color: hj.active_chat_color,
+        } : undefined,
+        _synthetic: true,
+      } as any];
+    }
     // Banned kullanıcıları filtrele
-    const active = participants.filter(p => p.role !== 'banned');
+    const active = _participants.filter(p => p.role !== 'banned');
 
     const stage = active.filter(p => p.role === 'owner' || p.role === 'speaker' || p.role === 'moderator');
     // ★ BUG-C FIX: Listener ve Spectator ayrı — spectator'lar grid'de görünmez
@@ -3497,7 +3526,7 @@ export default function RoomScreen() {
     const _viewerCount = canSeeGhosts ? active.length : visibleTotal;
 
     return { stageUsers: visibleStage, listenerUsers: visibleListeners, spectatorUsers: visibleSpectators, viewerCount: _viewerCount, amIHost: _amIHost || _amIActingHost, amIModerator: _amIMod, amIGodMaster: _amIGod, canModerate: _canMod, isGodOrHost: _isGodOrHost, hostUser: _hostUser, amIActingHost: _amIActingHost, isOriginalHost: _isOriginalHost, isStageDelegate: _isStageDelegate };
-  }, [participants, room?.host_id, room?.room_settings?.original_host_id, firebaseUser?.uid, profile?.is_admin]);
+  }, [participants, room, firebaseUser?.uid, profile?.is_admin]);
 
   // ★ 2026-04-21: Minimize payload ref her render taze tutulur — toast/upsell closure'larında
   // stale olmaması için gerekli. Toast action'ları 15/5 dk sonra tetikleniyor.
@@ -4244,7 +4273,9 @@ export default function RoomScreen() {
       </AppBackground>
     );
   }
-  if (roomBlock || lk.connectFailed) {
+  // ★ 2026-05-10: Sadece roomBlock kontrol — lk.connectFailed grace period'lı
+  //   useEffect üzerinden roomBlock'a yansır (3sn). Direkt lk.connectFailed flash atıyordu.
+  if (roomBlock) {
     const effectiveReason: RoomClosedReason = roomBlock?.reason || 'connection_failed';
     const isRecoverable = effectiveReason === 'connection_failed';
     return (

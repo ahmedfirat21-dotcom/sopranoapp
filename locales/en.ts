@@ -174,13 +174,6 @@ const en: Record<string, string> = {
   'sp.received': 'SP Received',
   'sp.history': 'SP History',
 
-  // ── Clubs (Choirs / Korolar) ───────────────────────
-  'clubs.title': 'Choirs',
-  'clubs.create': 'Create Choir',
-  'clubs.members': 'Members',
-  'clubs.join': 'Join',
-  'clubs.leave': 'Leave',
-
   // ── Errors ─────────────────────────────────────────
   'error.network': 'No internet connection',
   'error.generic': 'Something went wrong',

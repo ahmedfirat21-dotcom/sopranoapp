@@ -19,6 +19,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { StoreService, type CosmeticItem } from '../../services/store';
 import { CosmeticService } from '../../services/cosmetic';
+import { supabase } from '../../constants/supabase';
 import Item3DArt from '../store/Item3DArt';
 import AvatarFrame from './AvatarFrame';
 import { hasFrameLottie, getFrameLottie } from '../../constants/frameLottieRegistry';
@@ -125,13 +126,26 @@ export default function FrameSelectSheet({
     }
   }, [visible, PANEL_HEIGHT]);
 
-  // Pan-to-dismiss — drag handle bölgesine bağlı (ScrollView'la çakışmaz)
+  // ★ 2026-05-10 (v2): Pan-to-dismiss — Modal içindeki ScrollView+Lottie kombinasyonu
+  //   render thread'i bloklayıp parent gesture detection'ı geç tetikliyordu. Çözüm:
+  //   1. Header pan responder (handle/tabs/header) — her zaman drag-down yakalar
+  //   2. Body pan responder (panel) — scroll-top'ta drag-down yakalar
+  //   3. Capture threshold düşük (5-8px) — child Lottie'ler kapamadan önce parent yakar
   const closeRef = useRef(closeWithAnim);
   closeRef.current = closeWithAnim;
-  const panResponder = useRef(
+  const scrollOffsetRef = useRef(0);
+  const handleScroll = React.useCallback((e: any) => {
+    scrollOffsetRef.current = e?.nativeEvent?.contentOffset?.y ?? 0;
+  }, []);
+
+  // Header pan — handle + tabs + header bölgesi. Scroll-aware DEĞİL, her zaman drag yakalar.
+  const headerPanResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => false,
-      onMoveShouldSetPanResponder: (_, gs) => gs.dy > 8 && Math.abs(gs.dy) > Math.abs(gs.dx) * 1.5,
+      onStartShouldSetPanResponderCapture: () => false,
+      onMoveShouldSetPanResponder: (_, gs) => Math.abs(gs.dy) > 6 && Math.abs(gs.dy) > Math.abs(gs.dx),
+      onMoveShouldSetPanResponderCapture: (_, gs) => Math.abs(gs.dy) > 6 && Math.abs(gs.dy) > Math.abs(gs.dx),
+      onPanResponderTerminationRequest: () => false,
       onPanResponderMove: (_, gs) => { if (gs.dy > 0) translateY.setValue(gs.dy); },
       onPanResponderRelease: (_, gs) => {
         if (gs.dy > 60 || gs.vy > 0.5) {
@@ -142,6 +156,49 @@ export default function FrameSelectSheet({
       },
     })
   ).current;
+
+  // Body pan — ScrollView'un dış wrapper'ında. Scroll-top'ta drag-down yakalar.
+  const bodyPanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onStartShouldSetPanResponderCapture: () => false,
+      onMoveShouldSetPanResponder: (_, gs) => {
+        if (Math.abs(gs.dy) < 8) return false;
+        if (Math.abs(gs.dy) <= Math.abs(gs.dx)) return false;
+        return gs.dy > 0 && scrollOffsetRef.current <= 0;
+      },
+      onMoveShouldSetPanResponderCapture: (_, gs) => {
+        if (Math.abs(gs.dy) < 12) return false;
+        if (Math.abs(gs.dy) <= Math.abs(gs.dx) * 1.5) return false;
+        return gs.dy > 0 && scrollOffsetRef.current <= 0;
+      },
+      onPanResponderTerminationRequest: () => false,
+      onPanResponderMove: (_, gs) => { if (gs.dy > 0) translateY.setValue(gs.dy); },
+      onPanResponderRelease: (_, gs) => {
+        if (gs.dy > 60 || gs.vy > 0.5) {
+          closeRef.current();
+        } else {
+          Animated.spring(translateY, { toValue: 0, useNativeDriver: true, damping: 22, stiffness: 220 }).start();
+        }
+      },
+    })
+  ).current;
+
+  // ★ 2026-05-10: Kullanıcı odadayken kozmetik değiştirirse, oda içindeki diğer
+  //   katılımcılar değişikliği realtime görsün. profiles UPDATE oda kanalında
+  //   dinlenmiyor; room_participants tablosuna touch UPDATE atınca mevcut sub
+  //   fetchParticipants tetikler, profiles join ile fresh active_frame gelir.
+  const touchRoomPresenceIfInRoom = async () => {
+    try {
+      const inRoomId = (global as any).__sopranoInRoom as string | undefined;
+      if (!inRoomId) return;
+      await supabase
+        .from('room_participants')
+        .update({ last_seen_at: new Date().toISOString() })
+        .eq('room_id', inRoomId)
+        .eq('user_id', userId);
+    } catch { /* realtime push non-critical */ }
+  };
 
   // Çerçeve equip
   const handleEquipFrame = async (frameId: string | null) => {
@@ -154,7 +211,7 @@ export default function FrameSelectSheet({
       return;
     }
     onFrameChange?.(frameId);
-    // ★ 2026-05-05: Başarı toast'ı kaldırıldı — kart üstündeki "AKTİF" rozeti yeterli görsel feedback.
+    touchRoomPresenceIfInRoom();
   };
 
   // Giriş efekti equip
@@ -168,7 +225,7 @@ export default function FrameSelectSheet({
       return;
     }
     onEntryEffectChange?.(effectId);
-    // ★ 2026-05-05: Başarı toast'ı kaldırıldı — kart üstündeki "AKTİF" rozeti yeterli görsel feedback.
+    touchRoomPresenceIfInRoom();
   };
 
   if (!mounted) return null;
@@ -180,7 +237,11 @@ export default function FrameSelectSheet({
   const accentColor = isFrameTab ? '#FBBF24' : '#A855F7';
 
   return (
-    <Modal visible={mounted} transparent animationType="none" onRequestClose={closeWithAnim} statusBarTranslucent>
+    // ★ 2026-05-10 v3: Modal sarmalı kaldırıldı — UserSearchModal pattern'i.
+    //   RN Modal native component pan gesture'ları yutuyordu (drag-to-dismiss
+    //   FrameSelectSheet'in tab değişiminden sonra kırılıyordu). View overlay
+    //   zIndex:300 ile aynı görsel davranış, ama gesture'lar tertemiz iletilir.
+    <View style={[StyleSheet.absoluteFillObject as any, { zIndex: 300, elevation: 24 }]} pointerEvents="box-none">
       <View style={StyleSheet.absoluteFillObject as any} pointerEvents="box-none">
         <Animated.View style={[StyleSheet.absoluteFill, { opacity: backdropOpacity }]}>
           <BlurView intensity={28} tint="dark" style={StyleSheet.absoluteFill} />
@@ -203,9 +264,8 @@ export default function FrameSelectSheet({
             style={s.topEdge}
           />
 
-          {/* ★ Drag bölgesi — sadece handle + tabs + header'da pan algılanır,
-              ScrollView (grid) ile çakışmaz. Memory: feedback_modal_drag_dismiss.md */}
-          <View {...panResponder.panHandlers}>
+          {/* ★ 2026-05-10 v2: Header pan zone (handle/tabs/header) — her zaman drag yakalar */}
+          <View {...headerPanResponder.panHandlers}>
             <View style={s.handle}><View style={[s.handleBar, { backgroundColor: accentColor + '80' }]} /></View>
 
           {/* Tab seçici */}
@@ -250,10 +310,16 @@ export default function FrameSelectSheet({
               </Pressable>
             )}
           </View>
-          </View>{/* /pan bölgesi — buradan sonra ScrollView kendi gesture'unu yönetir */}
+          </View>{/* /header pan zone */}
 
-          {/* Grid */}
-          <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
+          {/* ★ 2026-05-10 v3: Body pan zone KALDIRILDI — ScrollView native scroll'unu
+              engelliyordu. Drag-to-dismiss artık SADECE handle/tabs/header bölgesinden.
+              Memory feedback_modal_drag_dismiss.md uyumlu (handle yeter). */}
+          <ScrollView
+            style={{ flex: 1 }}
+            showsVerticalScrollIndicator={false}
+            nestedScrollEnabled
+          >
             {currentItems.length === 0 ? (
               <View style={s.empty}>
                 <Ionicons
@@ -329,7 +395,7 @@ export default function FrameSelectSheet({
           </ScrollView>
         </Animated.View>
       </View>
-    </Modal>
+    </View>
   );
 }
 

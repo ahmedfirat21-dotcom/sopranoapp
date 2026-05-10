@@ -19,6 +19,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { getIllustrationPng } from '../../constants/storeIllustrationsPng';
 import { getEntryEffectLottie } from '../../constants/entryEffectLottieRegistry';
 import { getCosmeticAsset, getCachedCosmeticAsset, type AssetMeta } from '../../services/cosmeticAssetCache';
+import { ensureEntryConfig, getCachedEntryConfig } from '../../services/cosmeticConfigCache';
 
 // ★ v110.7: Lottie player — web admin'den URL ile eklenen entry_effect ürünleri için
 let LottieView: any = null;
@@ -38,6 +39,7 @@ const ENTRY_META: Record<string, { emoji: string; color: string; label: string }
   'glacier-aura':   { emoji: '❄️', color: '#22D3EE', label: 'Buzul Hâlesi' },
   'vesuvius':       { emoji: '🌋', color: '#FB923C', label: 'Vesuvius' },
   'ai-spark':       { emoji: '🤖', color: '#A78BFA', label: 'AI Spark' },
+  'phoenix-rising': { emoji: '🔥', color: '#FF8C19', label: 'Anka Kuşu' },
 };
 
 interface Props {
@@ -92,6 +94,21 @@ function SparkleParticle({ delay, color, side, png }: { delay: number; color: st
 }
 
 export default function RoomEntryEffectOverlay({ effectId, userName, onDone }: Props) {
+  // ★ v213f: Web admin'den ayarlanan entry_config — duration, lottie hız/scale/opacity
+  const [entryCfg, setEntryCfg] = useState<any>(getCachedEntryConfig(effectId));
+  useEffect(() => {
+    if (!effectId) return;
+    ensureEntryConfig(effectId).then(setEntryCfg);
+  }, [effectId]);
+
+  // Config defaults
+  const cfgDurationMs = entryCfg?.duration_ms ?? 2000;       // bekleme süresi (intro+hold+outro içinde)
+  const cfgLottieSpeed = entryCfg?.lottie_speed ?? 1;
+  const cfgLottieScale = entryCfg?.lottie_scale ?? 1;
+  const cfgLottieOpacity = entryCfg?.lottie_opacity ?? 1;
+  const cfgLottieRotation = entryCfg?.lottie_rotation ?? 0;
+  const cfgGlowVisible = entryCfg ? (entryCfg.loop_glow !== false) : true;
+
   // ★ v108.20: Yandan slide-in — sağdan kayma + opacity. Köşeler yumuşak,
   //   sis/toz hissi için banner kart border'ı yok, soft radial fade.
   const opacity = useRef(new Animated.Value(0)).current;
@@ -102,8 +119,8 @@ export default function RoomEntryEffectOverlay({ effectId, userName, onDone }: P
     Animated.parallel([
       // Tier rengi vignette glow — yumuşak kenar
       Animated.sequence([
-        Animated.timing(glowOpacity, { toValue: 0.4, duration: 500, useNativeDriver: true }),
-        Animated.delay(1700),
+        Animated.timing(glowOpacity, { toValue: cfgGlowVisible ? 0.4 : 0, duration: 500, useNativeDriver: true }),
+        Animated.delay(cfgDurationMs - 300),
         Animated.timing(glowOpacity, { toValue: 0, duration: 600, useNativeDriver: true }),
       ]),
       // Banner: sağdan slide-in → hold → sola çıkış
@@ -112,14 +129,14 @@ export default function RoomEntryEffectOverlay({ effectId, userName, onDone }: P
           Animated.timing(opacity, { toValue: 1, duration: 350, useNativeDriver: true }),
           Animated.spring(slideX, { toValue: 0, useNativeDriver: true, damping: 14, stiffness: 90 }),
         ]),
-        Animated.delay(2000),
+        Animated.delay(cfgDurationMs),
         Animated.parallel([
           Animated.timing(opacity, { toValue: 0, duration: 500, useNativeDriver: true }),
           Animated.timing(slideX, { toValue: -W * 0.4, duration: 500, useNativeDriver: true, easing: Easing.in(Easing.cubic) }),
         ]),
       ]),
     ]).start(() => onDone());
-  }, []);
+  }, [cfgDurationMs, cfgGlowVisible]);
 
   // ★ v109.4: Lottie kaldırıldı — mağaza PNG'leri kullanılıyor (kullanıcı talebi).
   const pngSource = getIllustrationPng(effectId);
@@ -130,9 +147,13 @@ export default function RoomEntryEffectOverlay({ effectId, userName, onDone }: P
 
   // ★ v110.7: Hardcoded PNG/meta'da yoksa cosmetic_items.meta'dan runtime URL fetch.
   //   Web admin'den eklenen yeni entry_effect ürünleri için Lottie/Image render.
+  // ★ 2026-05-10 FIX: ENTRY_META kontrolü kaldırıldı — ENTRY_META sadece label/emoji
+  //   metadata içerir, asset varlığını göstermez. Önceki mantıkta phoenix-rising
+  //   gibi remote-Lottie ürünler ENTRY_META'da kayıt aldığı için fetch atlanıyor,
+  //   sadece emoji görünüyordu (animasyon yok). Doğru kontrol: lokal asset yoksa fetch.
   const initialAsset = getCachedCosmeticAsset(effectId);
   const [remoteAsset, setRemoteAsset] = useState<AssetMeta | null>(initialAsset);
-  const needsRemoteFetch = !pngSource && !localLottieSource && !ENTRY_META[effectId];
+  const needsRemoteFetch = !pngSource && !localLottieSource;
 
   useEffect(() => {
     if (!needsRemoteFetch || initialAsset) return;
@@ -184,24 +205,36 @@ export default function RoomEntryEffectOverlay({ effectId, userName, onDone }: P
             resizeMode="contain"
           />
         ) : localLottieSource && LottieView ? (
-          /* ★ v110.12: Local Lottie registry (AI Spark gibi sadece Lottie urunler) */
+          /* ★ v110.12 + v213f: Lottie + dynamic config (web admin scale/speed/opacity/rotation) */
           <LottieView
             source={localLottieSource}
             autoPlay
             loop={false}
-            speed={1}
+            speed={cfgLottieSpeed}
             resizeMode="contain"
-            style={s.lottie}
+            style={[s.lottie, {
+              opacity: cfgLottieOpacity,
+              transform: [
+                { scale: cfgLottieScale },
+                { rotate: `${cfgLottieRotation}deg` },
+              ],
+            }]}
           />
         ) : remoteAsset?.url && remoteAsset.type === 'lottie' && LottieView ? (
-          /* ★ v110.7: Web admin'den yüklenen Lottie URL */
+          /* ★ v110.7 + v213f: Remote Lottie + dynamic config */
           <LottieView
             source={{ uri: remoteAsset.url }}
             autoPlay
             loop={false}
-            speed={1}
+            speed={cfgLottieSpeed}
             resizeMode="contain"
-            style={s.lottie}
+            style={[s.lottie, {
+              opacity: cfgLottieOpacity,
+              transform: [
+                { scale: cfgLottieScale },
+                { rotate: `${cfgLottieRotation}deg` },
+              ],
+            }]}
           />
         ) : remoteAsset?.url && remoteAsset.type === 'image' ? (
           /* ★ v110.7: Web admin'den yüklenen PNG/SVG URL */

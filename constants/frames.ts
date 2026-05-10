@@ -18,6 +18,11 @@
 type FrameConfig = {
   source: any;
   scale: number;
+  /** ★ v212: Avatar boyutu / orijinal size oranı.
+   *  Default 0.78 (overflow frame'ler için).
+   *  Premium scale=1.0 frame'lerde (SunriseGold vb.) iç daire büyük olduğundan
+   *  avatar 0.88'e çıkartılmalı — gap kalmasın. */
+  avatarRatio?: number;
 };
 
 const FRAME_REGISTRY: Record<string, FrameConfig> = {
@@ -56,25 +61,31 @@ const FRAME_REGISTRY: Record<string, FrameConfig> = {
   },
 
   // ── 500x500 Premium El Yapımı Çerçeveler (SopranoAura tarzı) ──
+  // ★ v212: avatarRatio 0.88 — inner daire büyük olduğundan avatar dolgun otursun.
   frame_midnight_amethyst: {
     source: require('../assets/avatar_frames/MidnightAmethyst.json'),
     scale: 1.0,
+    avatarRatio: 0.88,
   },
   frame_sunrise_gold: {
     source: require('../assets/avatar_frames/SunriseGold.json'),
     scale: 1.0,
+    avatarRatio: 0.88,
   },
   frame_ocean_pearl: {
     source: require('../assets/avatar_frames/OceanPearl.json'),
     scale: 1.0,
+    avatarRatio: 0.88,
   },
   frame_ruby_flame: {
     source: require('../assets/avatar_frames/RubyFlame.json'),
     scale: 1.0,
+    avatarRatio: 0.88,
   },
   frame_neon_pulse: {
     source: require('../assets/avatar_frames/NeonPulse.json'),
     scale: 1.0,
+    avatarRatio: 0.88,
   },
 };
 
@@ -92,6 +103,14 @@ export function getFrameLottieSource(frameId: string | null | undefined): any | 
 export function getFrameScale(frameId: string | null | undefined): number {
   if (!frameId) return 1.5;
   return FRAME_REGISTRY[frameId]?.scale || 1.5;
+}
+
+/**
+ * ★ v212: Frame ID → avatar boyut oranı (size'ın % kaçı). Eşleşme yoksa 0.78 (overflow frame default).
+ */
+export function getFrameAvatarRatio(frameId: string | null | undefined): number {
+  if (!frameId) return 0.78;
+  return FRAME_REGISTRY[frameId]?.avatarRatio || 0.78;
 }
 
 export const ALL_FRAME_IDS = Object.keys(FRAME_REGISTRY);

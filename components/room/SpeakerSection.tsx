@@ -433,13 +433,17 @@ function CaretakerTimerBadge({ expiresAt }: { expiresAt: string }) {
   const label = `${min}:${sec.toString().padStart(2, '0')}`;
   const isUrgent = remaining <= 30; // Son 30 saniyede kırmızı/pulsing
   const pulseAnim = React.useRef(new Animated.Value(1)).current;
+  const pulseLoopRef = React.useRef<Animated.CompositeAnimation | null>(null);
 
   React.useEffect(() => {
     if (isUrgent) {
-      Animated.loop(Animated.sequence([
+      const loop = Animated.loop(Animated.sequence([
         Animated.timing(pulseAnim, { toValue: 1.15, duration: 500, useNativeDriver: true }),
         Animated.timing(pulseAnim, { toValue: 1.0, duration: 500, useNativeDriver: true }),
-      ])).start();
+      ]));
+      pulseLoopRef.current = loop;
+      loop.start();
+      return () => { loop.stop(); pulseLoopRef.current = null; };
     } else {
       pulseAnim.setValue(1);
     }
@@ -678,10 +682,12 @@ export default function SpeakerSection({ stageUsers, getMicStatus, onSelectUser,
   const tooltipSlide = useRef(new Animated.Value(-8)).current;
 
   useEffect(() => {
-    Animated.loop(Animated.sequence([
+    const loop = Animated.loop(Animated.sequence([
       Animated.timing(ghostPulse, { toValue: 0.7, duration: 1800, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
       Animated.timing(ghostPulse, { toValue: 0.4, duration: 1800, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-    ])).start();
+    ]));
+    loop.start();
+    return () => loop.stop();
   }, []);
 
   useEffect(() => {

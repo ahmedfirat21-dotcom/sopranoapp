@@ -13,11 +13,13 @@
  * Tüm animasyonlar native driver — GPU-optimize, JS thread'i takılmaz.
  */
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Image, View, StyleSheet, Animated, Easing, Platform, type ImageStyle } from 'react-native';
 import LottieView from 'lottie-react-native';
 import { getIllustrationPng } from '../../constants/storeIllustrationsPng';
 import { getEntryEffectLottie } from '../../constants/entryEffectLottieRegistry';
+import { AVATAR_OPTIONS, getAvatarSource } from '../../constants/avatars';
+import { getCosmeticAsset, getCachedCosmeticAsset, type AssetMeta } from '../../services/cosmeticAssetCache';
 
 interface Props {
   itemId: string;
@@ -38,6 +40,21 @@ export default function Item3DArt({
   // ★ PNG yoksa Lottie fallback (AI Spark gibi PNG'si olmayan entry_effect ürünleri için)
   const lottieSource = source ? null : getEntryEffectLottie(itemId);
 
+  // ★ 2026-05-10: Remote asset desteği — local registry'de YOKSA cosmetic_items.meta'dan
+  //   URL fetch (Phoenix Rising gibi web admin'den eklenen ürünler için).
+  //   Önceden Item3DArt local-only idi, mağaza kartı boş gözüküyordu.
+  const initialRemote = (!source && !lottieSource) ? getCachedCosmeticAsset(itemId) : null;
+  const [remoteAsset, setRemoteAsset] = useState<AssetMeta | null>(initialRemote);
+  const needsRemote = !source && !lottieSource;
+  useEffect(() => {
+    if (!needsRemote || initialRemote) return;
+    let cancelled = false;
+    getCosmeticAsset(itemId).then(m => {
+      if (!cancelled) setRemoteAsset(m);
+    });
+    return () => { cancelled = true; };
+  }, [itemId, needsRemote, initialRemote]);
+
   // Animation values
   const float = useRef(new Animated.Value(0)).current;
   const breath = useRef(new Animated.Value(0)).current;
@@ -57,7 +74,7 @@ export default function Item3DArt({
     return () => { floatLoop.stop(); breathLoop.stop(); };
   }, [staticMode, float, breath]);
 
-  if (!source && !lottieSource) return null;
+  if (!source && !lottieSource && !remoteAsset?.url) return null;
 
   const wrapStyle: any = fullSize
     ? { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' }
@@ -105,6 +122,33 @@ export default function Item3DArt({
             resizeMode="contain"
           />
         </Animated.View>
+      ) : remoteAsset?.url && remoteAsset.type === 'lottie' ? (
+        <Animated.View
+          style={{
+            width: symbolSize as any,
+            height: symbolSize as any,
+            transform: staticMode ? [] : [{ translateY: symbolY }, { scale: symbolScale }],
+          }}
+        >
+          <LottieView
+            source={{ uri: remoteAsset.url }}
+            autoPlay={!staticMode}
+            loop={!staticMode}
+            style={{ width: '100%', height: '100%' }}
+            resizeMode="contain"
+          />
+        </Animated.View>
+      ) : remoteAsset?.url && remoteAsset.type === 'image' ? (
+        <Animated.Image
+          source={{ uri: remoteAsset.url }}
+          style={{
+            width: symbolSize as any,
+            height: symbolSize as any,
+            transform: staticMode ? [] : [{ translateY: symbolY }, { scale: symbolScale }],
+          }}
+          resizeMode="contain"
+          fadeDuration={0}
+        />
       ) : null}
       {/* 3. Tematik parçacık */}
       {!staticMode && <ThematicParticles itemId={itemId} containerSize={typeof haloSize === 'number' ? haloSize : 100} />}
@@ -329,3 +373,5 @@ function Bubbles() {
     </>
   );
 }
+
+// ★ v213d: WelcomeAvatarPreview kaldırıldı (welcome-avatar feature silindi).

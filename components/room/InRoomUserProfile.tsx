@@ -866,11 +866,16 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
               memberSince={userProfile.created_at}
               boostExpiresAt={(userProfile as any)?.profile_boost_expires_at}
               isOnline={isFriend && !isOwnProfile ? userProfile.is_online : undefined}
-              // ★ v110.3: Son aktif zamanı — settings.show_online_status kapalıysa
-              //   backend last_seen=null döner (services/profile.ts setOnline), o zaman gizlenir.
               lastSeen={(isOwnProfile || isFriend) ? userProfile.last_seen : null}
               isVerified={!!(userProfile as any)?.is_verified}
               activeFrame={(userProfile as any)?.active_frame || null}
+              // ★ v213: Kendi profilinde sol üst envanter (madalya) ve sağ üst düzenleme
+              //   butonları — profil sayfasındakiyle birebir aynı. Modal'dan hızlı erişim.
+              onFramePress={isOwnProfile ? () => setShowOwnFrameSheet(true) : undefined}
+              onEdit={isOwnProfile ? () => {
+                handleClose();
+                setTimeout(() => router.push('/edit-profile' as any), 250);
+              } : undefined}
             />
 
             {/* ★ v110.5 (6 May 2026): Diller + İlgi alanları kimlik şeridi
@@ -886,35 +891,9 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
               } : undefined}
             />
 
-            {/* ★ v110.14: Kendi profilim — Envanter/Çerçeve hızlı erişim. Profil sayfasına
-                gitmeden oda içinden çerçeve + giriş efekti değiştirmek için. */}
-            {isOwnProfile && (
-              <Pressable
-                onPress={() => setShowOwnFrameSheet(true)}
-                style={({ pressed }) => [
-                  {
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 8,
-                    paddingVertical: 12,
-                    paddingHorizontal: 16,
-                    marginHorizontal: 14,
-                    marginVertical: 10,
-                    borderRadius: 14,
-                    backgroundColor: 'rgba(20,184,166,0.12)',
-                    borderWidth: 1,
-                    borderColor: 'rgba(20,184,166,0.35)',
-                  },
-                  pressed && { opacity: 0.75, transform: [{ scale: 0.98 }] },
-                ]}
-              >
-                <Ionicons name="sparkles" size={16} color="#14B8A6" />
-                <Text style={{ color: '#5EEAD4', fontSize: 13, fontWeight: '700' }}>
-                  Envanter · Çerçeve / Giriş Efekti
-                </Text>
-              </Pressable>
-            )}
+            {/* ★ v213: Büyük "Envanter" pill butonu kaldırıldı — ProfileHero üstünde
+                profil sayfasındakiyle aynı sol-üst madalya ikonu + sağ-üst düzenleme
+                kalemi var. (onFramePress + onEdit props ProfileHero'ya geçildi) */}
 
             {/* ★ v110.5 — Sesli tanıtım (Voice Bio) */}
             {(userProfile as any)?.voice_bio_url && (
@@ -1652,6 +1631,10 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
       </Animated.View>
 
       {/* ★ v110.14: Kendi profilimde envanter sheet — yukarıdaki Envanter butonu açar */}
+      {/* ★ v213 BUG FIX: onFrameChange + onEntryEffectChange callback'leri eklendi.
+           Önceki sürümde callback'ler yoktu → equip RPC başarılı oluyor ama modal UI
+           güncellenmiyordu (kullanıcı: "tıklıyorum hala önceki seçili görünüyor").
+           Şimdi userProfile state local olarak güncelleniyor → AKTİF rozeti yer değiştirir. */}
       {isOwnProfile && currentUserId && (
         <FrameSelectSheet
           visible={showOwnFrameSheet}
@@ -1660,6 +1643,8 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
           currentFrameId={(userProfile as any)?.active_frame || null}
           currentEntryEffectId={(userProfile as any)?.active_entry_effect || null}
           currentAvatarUrl={userProfile?.avatar_url}
+          onFrameChange={(id) => setUserProfile(p => p ? { ...(p as any), active_frame: id } : p)}
+          onEntryEffectChange={(id) => setUserProfile(p => p ? { ...(p as any), active_entry_effect: id } : p)}
         />
       )}
 

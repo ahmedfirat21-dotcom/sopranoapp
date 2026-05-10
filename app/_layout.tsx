@@ -779,6 +779,12 @@ export default function RootLayout() {
             autoGainControl: s.auto_gain,
           });
         } catch {}
+        // ★ 2026-05-10: Web admin'den frame_config / entry_config güncellenince
+        //   mobil tarafta cache invalidate edilsin diye realtime sub başlat.
+        try {
+          const { startCosmeticConfigSync } = require('../services/cosmeticConfigCache');
+          startCosmeticConfigSync();
+        } catch {}
       } catch (e) {
         if (__DEV__) console.error('[RootLayout] Hazırlık hatası:', e);
       } finally {
@@ -793,15 +799,19 @@ export default function RootLayout() {
   // ★ CRITICAL: Her şey hazır olduğunda splash screen'i gizle
   // ★ 2026-05-09: 300ms → 1200ms — splash çok hızlı geçiyordu, logo göze takılmadan
   //   kayboluyor; +900ms ekstra logoyu göstermek için yeterli (toplam ~1.2sn JS hazırsa).
+  // ★ 2026-05-10: 1200ms → 600ms — kullanıcı "ufak tefek flash bug'lar" raporladı,
+  //   splash → login geçişini yumuşatmak için süre yarıya. Native splash drag-edilemez
+  //   (OS özelliği), ama kısa süre + login'in kendi staggered animasyonu yumuşak hisse
+  //   yeter. Login screen mount'ta logo zaten 600ms'de süzülerek geliyor.
   useEffect(() => {
     if (appIsReady && (fontsLoaded || fontError)) {
       const timer = setTimeout(async () => {
         try {
-          await SplashScreen.hideAsync();
+          await SplashScreen.hideAsync({ fade: true } as any);
         } catch (e) {
           if (__DEV__) console.warn('[RootLayout] Splash gizleme hatası:', e);
         }
-      }, 1200);
+      }, 600);
       return () => clearTimeout(timer);
     }
   }, [appIsReady, fontsLoaded, fontError]);
@@ -1040,7 +1050,10 @@ export default function RootLayout() {
   // Profili Supabase'den yükle (Eskisi gibi yoksa hemen OLUŞTURMA! Onboarding ekranında oluşturulacak)
   // ★ 2026-04-18 FIX: Retry mekanizması — reload/token refresh sırasında network
   // kesintisinde ProfileService.get throw ediyor; 3 deneme ile 400ms aralıklarla retry.
+  // ★ 2026-05-09 v208: isAuthReady=false set edilir → AuthGuard "yükleniyor" branch'ine
+  //   düşer, profile fetch tamamlanmadan onboarding'e fake redirect olmaz (Google login flash fix).
   const syncProfile = async (fbUser: User) => {
+    setIsAuthReady(false);
     let existingProfile: Profile | null = null;
     let fetchErr: any = null;
     for (let attempt = 1; attempt <= 3; attempt++) {
@@ -1616,7 +1629,7 @@ export default function RootLayout() {
             }} />
             {/* broadcast/[id] kaldırıldı — Room'a "Yayın Modu" toggle eklendi */}
             {/* ★ 2026-04-26 (v2): Mesajlar sayfası ISTISNA — sürükleme yerine yanal animasyon.
-                 Diğer modal'lar (user/[id], club/[id]) alttan kayar; bu sayfa klasik sayfa geçişi pattern'i. */}
+                 Diğer modal'lar (user/[id]) alttan kayar; bu sayfa klasik sayfa geçişi pattern'i. */}
             <Stack.Screen
               name="chat/[id]"
               options={{
@@ -1627,17 +1640,6 @@ export default function RootLayout() {
             {/* ★ 2026-04-26: user/[id] modal — başka kullanıcının tam profili sayfası, bağlam-içi açılışlar modal olsun (Clubhouse/Telegram pattern) */}
             <Stack.Screen
               name="user/[id]"
-              options={{
-                presentation: 'modal',
-                animation: 'slide_from_bottom',
-                animationDuration: 280,
-                gestureEnabled: true,
-                gestureDirection: 'vertical',
-              }}
-            />
-            {/* ★ 2026-04-26: club/[id] modal — korolar listesinden açılan Koro detayı */}
-            <Stack.Screen
-              name="club/[id]"
               options={{
                 presentation: 'modal',
                 animation: 'slide_from_bottom',

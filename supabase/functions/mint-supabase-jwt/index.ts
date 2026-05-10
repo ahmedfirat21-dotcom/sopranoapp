@@ -28,10 +28,13 @@ const FIREBASE_ISSUER = `https://securetoken.google.com/${FIREBASE_PROJECT_ID}`;
 const FIREBASE_CERTS_URL = "https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com";
 
 // ── JWKS (x509 PEM) cache ───────────────────────────────────
-// Google sertifikaları her ~6 saat değişir. In-memory cache yeterli.
+// Google sertifikaları her ~6 saat değişir.
+// ★ 2026-05-10 SECURITY: TTL 1h → 30dk. Revoked cert ile token doğrulama
+//   penceresini yarıya indir. Edge function memory cache zaten container
+//   reboot'unda sıfırlanıyor, bu sadece warm container için ek güvenlik.
 type CertCache = { certs: Record<string, string>; fetchedAt: number };
 let _certCache: CertCache | null = null;
-const CERT_TTL_MS = 60 * 60 * 1000; // 1 saat
+const CERT_TTL_MS = 30 * 60 * 1000; // 30 dk
 
 async function getFirebaseCerts(): Promise<Record<string, string>> {
   const now = Date.now();

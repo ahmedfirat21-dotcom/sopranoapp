@@ -870,8 +870,6 @@ export default function HomeScreen() {
   const [filteredRooms, setFilteredRooms] = useState<Room[]>([]);
   const [followedRooms, setFollowedRooms] = useState<Room[]>([]);
   const [boostedProfiles, setBoostedProfiles] = useState<any[]>([]);
-  // ★ 2026-04-26: Popüler korolar carousel — keşif noktası (önceden sadece Profile > Korolar'dan ulaşılıyordu)
-  const [featuredClubs, setFeaturedClubs] = useState<any[]>([]);
   // ★ 2026-04-21: Her oda için top N katılımcı avatarı — keşfet kartında stack gösterilir.
   const [participantAvatars, setParticipantAvatars] = useState<Record<string, { avatar_url: string | null; display_name: string | null }[]>>({});
   // ★ 2026-04-21: recentRooms state kaldırıldı — Keşfet'te hiçbir yerde render
@@ -1108,13 +1106,6 @@ export default function HomeScreen() {
       try {
         const bp = await ProfileService.getBoostedProfiles(8);
         setBoostedProfiles(bp);
-      } catch { }
-
-      // ★ 2026-04-26: Popüler Korolar — keşif feed'ine giriş noktası
-      try {
-        const { ClubService } = await import('../../services/clubs');
-        const clubs = await ClubService.listPublicClubs(10);
-        setFeaturedClubs(clubs);
       } catch { }
     } catch (err: any) {
       if (__DEV__) console.warn('[Home] Load error:', err);
@@ -1367,7 +1358,7 @@ export default function HomeScreen() {
     return (
       <AppBackground variant="explore" radialGlow>
         <View style={[s.container, { justifyContent: 'center', alignItems: 'center' }]}>
-          <AppLoader size="md" />
+          <AppLoader size={56} />
         </View>
       </AppBackground>
     );
@@ -1497,51 +1488,9 @@ export default function HomeScreen() {
                 </View>
               </View>
 
-              {/* ★ v107.48 (3 May 2026): Online arkadaş yatay şerit — keşif ekranında
-                  tanıdığın arkadaşlar bir bakışta görünür, modal/drawer açmaya gerek yok.
-                  Kompakt: avatar 44 + status dot, isim yok (tanıdık yüzler için yeterli).
-                  Boost section'la kafa karıştırmasın diye gradient çerçeve yok, sadelik. */}
-              {onlineFriends.length > 0 && (
-                <View style={s.onlineStripWrap}>
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={s.onlineStripContent}
-                    decelerationRate="fast"
-                  >
-                    {onlineFriends.slice(0, 30).map((f) => (
-                      <Pressable
-                        key={f.id}
-                        onPress={() => openUserProfile(f.id)}
-                        style={({ pressed }) => [
-                          s.onlineAvatarWrap,
-                          pressed && { opacity: 0.7, transform: [{ scale: 0.94 }] },
-                        ]}
-                        hitSlop={4}
-                      >
-                        <StatusAvatar
-                          uri={f.avatar_url}
-                          size={44}
-                          tier={(f as any).subscription_tier}
-                          isOnline={true}
-                          showTierBadge={false}
-                        />
-                      </Pressable>
-                    ))}
-                    {onlineFriends.length > 30 && (
-                      <Pressable
-                        onPress={() => setShowFriends(true)}
-                        style={({ pressed }) => [
-                          s.onlineMoreBtn,
-                          pressed && { opacity: 0.7 },
-                        ]}
-                      >
-                        <Text style={s.onlineMoreText}>+{onlineFriends.length - 30}</Text>
-                      </Pressable>
-                    )}
-                  </ScrollView>
-                </View>
-              )}
+              {/* ★ v213f (10 May 2026): Online arkadaş yatay şerit kaldırıldı —
+                  keşfette zaten "Çevrimiçi" drawer (sağ üst person ikonu) bu işlevi
+                  üstleniyor. Mükerrer satır karmaşa yaratıyordu. */}
 
               {/* ★ 2026-04-21: Tek profilde kompakt strip, 2+ profilde carousel */}
               {boostedProfiles.length === 1 && (() => {
@@ -1674,74 +1623,6 @@ export default function HomeScreen() {
                   style={{ height: 1.5 }}
                 />
               </View>
-
-              {/* ★ 2026-04-26: Popüler Korolar carousel ana sayfadan KALDIRILDI — sağ üst header'a Koro ikonu (planet) eklendi.
-                   Renk paleti karışıyordu, kullanıcı ayrı bir alan istedi. /clubs sayfası tüm Koro keşfini yapıyor. */}
-              {false && featuredClubs.length > 0 && (
-                <View style={{ marginBottom: 14 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, marginBottom: 10 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                      <Ionicons name="planet" size={14} color="#14B8A6" style={{ textShadowColor: '#14B8A6aa', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 8 }} />
-                      <Text style={{ fontSize: 12, fontWeight: '900', color: '#CBD5E1', letterSpacing: 1.0, textTransform: 'uppercase', ...Shadows.text }}>Popüler Korolar</Text>
-                    </View>
-                    <Pressable onPress={() => router.push('/clubs' as any)} hitSlop={8}>
-                      <Text style={{ fontSize: 11, fontWeight: '700', color: '#14B8A6' }}>Tümünü Gör →</Text>
-                    </Pressable>
-                  </View>
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={{ paddingHorizontal: 16, gap: 10 }}
-                  >
-                    {featuredClubs.map(c => (
-                      <Pressable
-                        key={c.id}
-                        onPress={() => router.push(`/club/${c.id}` as any)}
-                        style={({ pressed }) => ({
-                          width: 110,
-                          opacity: pressed ? 0.85 : 1,
-                          transform: [{ scale: pressed ? 0.97 : 1 }],
-                        })}
-                      >
-                        <View style={{ width: 110, height: 110, borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(168,85,247,0.3)' }}>
-                          {c.banner_url ? (
-                            <Image source={{ uri: c.banner_url }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
-                          ) : (
-                            // ★ 2026-04-26 (v2): Çoklu ton Koro gradient — mor accent + slate (eski tek-ton yeşilimsi/slate yerine).
-                            <LinearGradient
-                              colors={['#3B2A4F', '#1E1B3A', '#0F0F1F']}
-                              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                              style={StyleSheet.absoluteFillObject}
-                            />
-                          )}
-                          <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.4)' }]} />
-                          <View style={{ position: 'absolute', top: 8, left: 8 }}>
-                            {c.avatar_url ? (
-                              <Image source={{ uri: c.avatar_url }} style={{ width: 32, height: 32, borderRadius: 10, borderWidth: 1.5, borderColor: 'rgba(20,184,166,0.6)' }} />
-                            ) : (
-                              <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: 'rgba(20,184,166,0.25)', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: 'rgba(20,184,166,0.6)' }}>
-                                <Ionicons name="planet" size={16} color="#5EEAD4" />
-                              </View>
-                            )}
-                          </View>
-                          {c.is_premium && (
-                            <View style={{ position: 'absolute', top: 8, right: 8, backgroundColor: 'rgba(251,191,36,0.2)', borderRadius: 10, padding: 3, borderWidth: 1, borderColor: 'rgba(251,191,36,0.5)' }}>
-                              <Ionicons name="star" size={10} color="#FBBF24" />
-                            </View>
-                          )}
-                          <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: 8 }}>
-                            <Text numberOfLines={1} style={{ fontSize: 12, fontWeight: '900', color: '#FFF', ...Shadows.text }}>{c.name}</Text>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 2 }}>
-                              <Ionicons name="people" size={9} color="#5EEAD4" />
-                              <Text style={{ fontSize: 9.5, fontWeight: '700', color: '#5EEAD4', ...Shadows.textLight }}>{c.member_count}</Text>
-                            </View>
-                          </View>
-                        </View>
-                      </Pressable>
-                    ))}
-                  </ScrollView>
-                </View>
-              )}
 
               {/* ═══ Birleşik Filtre Satırı: Kategori chips + Filtre butonu
                    ★ 2026-04-22: Ekran "gerçekten boş" ise filtrelemek mantıksız —

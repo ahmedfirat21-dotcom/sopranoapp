@@ -26,7 +26,6 @@ import { isTierAtLeast, TIER_DEFINITIONS } from '../../constants/tiers';
 import { AUDIENCE_OPTIONS, audienceModeToFields, getAudienceMode, type AudienceMode } from '../../constants/audience';
 import { TagService, normalizeTag, MAX_TAGS_PER_ROOM, SUGGESTED_TAGS } from '../../services/tags';
 import StatusAvatar from '../StatusAvatar';
-import AttachRoomToClubButton from './AttachRoomToClubButton';
 import { showToast } from '../Toast';
 import PremiumAlert, { type AlertButton } from '../PremiumAlert';
 import { supabase } from '../../constants/supabase';
@@ -815,9 +814,6 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
           </Pressable>
         )}
 
-        {/* ★ 2026-04-26: Koroya Ekle/Çıkar — sadece kullanıcının owner/mod olduğu korolar varsa render eder */}
-        <AttachRoomToClubButton roomId={room.id} userId={hostId} />
-
         {/* Odayı Sil */}
         <Pressable style={p.actionCta} onPress={handleDelete}>
           <LinearGradient colors={['#EF4444', '#DC2626', '#B91C1C']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={p.actionCtaGrad}>
@@ -1291,6 +1287,7 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
         {...recAlert}
         onDismiss={() => setRecAlert(prev => ({ ...prev, visible: false }))}
       />
+
     </View>
   );
 }

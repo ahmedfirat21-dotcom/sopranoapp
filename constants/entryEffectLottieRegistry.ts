@@ -15,6 +15,7 @@ const ENTRY_EFFECT_LOTTIE_MAP: Record<string, any> = {
   'belle-epoque':   require('../assets/avatar_frames/Heart characters crying.json'),
   // ★ v110.8 (7 May 2026): AI Spark — interaktif AI asistan animasyonu
   'ai-spark':       require('../assets/avatar_frames/AI_Spark.json'),
+  // ★ v213d: welcome-avatar kaldırıldı (kullanıcı talebi).
 };
 
 export function getEntryEffectLottie(id: string): any | null {

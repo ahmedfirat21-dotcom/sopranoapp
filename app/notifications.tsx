@@ -266,7 +266,7 @@ export default function NotificationsScreen() {
 
       {loading ? (
         <View style={styles.center}>
-          <AppLoader size="large" color={Colors.teal} />
+          <AppLoader size={56} color={Colors.teal} />
         </View>
       ) : (
         <FlatList

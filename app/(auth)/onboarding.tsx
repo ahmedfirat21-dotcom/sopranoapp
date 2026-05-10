@@ -1,5 +1,6 @@
 ﻿import { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, Image, Pressable, ScrollView, Dimensions, TextInput, KeyboardAvoidingView, Platform, Keyboard, ImageBackground, Animated, Easing, Alert } from 'react-native';
+import { View, Text, StyleSheet, Image, Pressable, ScrollView, Dimensions, TextInput, KeyboardAvoidingView, Platform, Keyboard, ImageBackground, Animated, Easing } from 'react-native';
+import PremiumAlert from '../../components/PremiumAlert';
 import AppLoader from '../../components/AppLoader';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -43,6 +44,8 @@ export default function OnboardingScreen() {
   // ★ v89 (1 May 2026): Welcome bonus modal — onboarding tamamlanınca DB trigger
   //   50 SP yatırır; modal görsel feedback'i verir, "Keşfetmeye Başla" → home.
   const [showWelcomeBonus, setShowWelcomeBonus] = useState(false);
+  // ★ 2026-05-10: "Vazgeç" onayı — klasik Alert.alert YASAK (memory kuralı).
+  const [showCancelAlert, setShowCancelAlert] = useState(false);
 
   // Animations
   const fadeAnim = useRef(new Animated.Value(1)).current;
@@ -114,26 +117,15 @@ export default function OnboardingScreen() {
   //   kullanıcıyı login'e döndürür. Partial profile (display_name vs.) kaydedilmemiş
   //   olabilir; sign-out yeterli — Firebase user kalır ama login'e dönüşte AuthGuard
   //   yine onboarding'e yollayacaktır. Tam silme istenirse Ayarlar > Hesabı Sil.
-  const handleCancelOnboarding = () => {
-    Alert.alert(
-      'Vazgeçmek istiyor musun?',
-      'Şu ana kadar girdiğin bilgiler kaydedilmeyecek ve oturum kapanacak.',
-      [
-        { text: 'Devam Et', style: 'cancel' },
-        {
-          text: 'Vazgeç',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const { performLogout } = require('../../services/account');
-              await performLogout();
-            } catch {}
-            router.replace('/(auth)/login' as any);
-          },
-        },
-      ],
-      { cancelable: true },
-    );
+  // ★ 2026-05-10: Alert.alert YASAK (memory: feedback_no_classic_popups) — PremiumAlert kullanılır.
+  const handleCancelOnboarding = () => setShowCancelAlert(true);
+  const handleConfirmCancel = async () => {
+    setShowCancelAlert(false);
+    try {
+      const { performLogout } = require('../../services/account');
+      await performLogout();
+    } catch {}
+    router.replace('/(auth)/login' as any);
   };
 
   const finalizeOnboarding = async () => {
@@ -682,6 +674,19 @@ export default function OnboardingScreen() {
         visible={showWelcomeBonus}
         amount={50}
         onClose={handleWelcomeBonusClose}
+      />
+
+      {/* ★ 2026-05-10: Vazgeç onayı — klasik popup yerine PremiumAlert (memory kuralı) */}
+      <PremiumAlert
+        visible={showCancelAlert}
+        title="Vazgeçmek istiyor musun?"
+        message="Şu ana kadar girdiğin bilgiler kaydedilmeyecek ve oturum kapanacak."
+        type="warning"
+        onDismiss={() => setShowCancelAlert(false)}
+        buttons={[
+          { text: 'Devam Et', style: 'cancel', icon: 'arrow-forward', onPress: () => setShowCancelAlert(false) },
+          { text: 'Vazgeç', style: 'destructive', icon: 'log-out-outline', onPress: handleConfirmCancel },
+        ]}
       />
     </AppBackground>
   );

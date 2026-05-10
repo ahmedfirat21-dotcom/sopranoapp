@@ -434,7 +434,7 @@ export default function AdminPanel() {
     return (
       <AppBackground radialGlow>
         <View style={[s.container, { justifyContent: 'center', alignItems: 'center' }]}>
-          <AppLoader size="large" color={Colors.teal} />
+          <AppLoader size={56} color={Colors.teal} />
           <Text style={{ color: Colors.text2, marginTop: 12 }}>GodMaster yükleniyor...</Text>
         </View>
       </AppBackground>

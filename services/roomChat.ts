@@ -100,7 +100,7 @@ export const RoomChatService = {
     if (isSystemRoom(roomId)) return [];
     let query = supabase
       .from('messages')
-      .select('*, profiles!messages_sender_id_fkey(display_name, avatar_url)')
+      .select('*, profiles!messages_sender_id_fkey(display_name, avatar_url, active_chat_color, active_frame, subscription_tier)')
       .eq('room_id', roomId);
     if (sinceIso) query = query.gte('created_at', sinceIso);
     const { data, error } = await query
@@ -111,6 +111,59 @@ export const RoomChatService = {
       return [];
     }
     // Cache'i doldur
+    (data || []).forEach((msg: any) => {
+      if (msg.profiles && msg.sender_id) {
+        _profileCache.set(msg.sender_id, { ...msg.profiles, cachedAt: Date.now() });
+      }
+    });
+    return (data || []) as RoomMessage[];
+  },
+
+  /**
+   * ★ 2026-05-10 v111b: Plus/Pro host odanın tüm user mesajlarını siler.
+   * Backend (clear_room_messages RPC) tier + host kontrollü; Free reddedilir.
+   * System mesajları korunur. DELETE event'i postgres_changes ile odadaki
+   * tüm kullanıcılara realtime gider — herkesin chat paneli temizlenir.
+   * @returns silinen mesaj sayısı
+   */
+  async clearAllMessages(roomId: string, userId: string): Promise<{ success: boolean; deletedCount?: number; error?: string }> {
+    if (isSystemRoom(roomId)) return { success: false, error: 'Sistem odası temizlenemez.' };
+    try {
+      const { data, error } = await supabase.rpc('clear_room_messages', {
+        p_room_id: roomId,
+        p_user_id: userId,
+      });
+      if (error) {
+        if (__DEV__) logger.warn('clearAllMessages RPC error:', error);
+        return { success: false, error: error.message || 'Temizleme başarısız.' };
+      }
+      return { success: true, deletedCount: typeof data === 'number' ? data : 0 };
+    } catch (e: any) {
+      if (__DEV__) logger.warn('clearAllMessages exception:', e);
+      return { success: false, error: e?.message || 'Bağlantı hatası.' };
+    }
+  },
+
+  /**
+   * ★ 2026-05-10 v111: Frozen persistent oda için arşivlenmiş mesaj geçmişi.
+   * getMessages'tan tek farkı: sinceIso filtresi YOK → tüm geçmişi getirir.
+   * Plus/Pro üyeler kapanan odasına geri döndüğünde wakeUp öncesi chat panelinde
+   * önceki konuşma görünsün diye kullanılır. Trigger metadata.archived_at damgası
+   * bastığı için DB'de mesajlar duruyor olur (Free için bu fonksiyon boş döner).
+   */
+  async getMessagesForFrozenRoom(roomId: string, limit = 50): Promise<RoomMessage[]> {
+    if (isSystemRoom(roomId)) return [];
+    const { data, error } = await supabase
+      .from('messages')
+      .select('*, profiles!messages_sender_id_fkey(display_name, avatar_url, active_chat_color, active_frame, subscription_tier)')
+      .eq('room_id', roomId)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    if (error) {
+      if (__DEV__) logger.warn('Frozen room messages yuklenemedi:', error);
+      return [];
+    }
+    // Profile cache'i doldur (mevcut pattern)
     (data || []).forEach((msg: any) => {
       if (msg.profiles && msg.sender_id) {
         _profileCache.set(msg.sender_id, { ...msg.profiles, cachedAt: Date.now() });
@@ -236,7 +289,7 @@ export const RoomChatService = {
     const { data, error } = await supabase
       .from('messages')
       .insert(insertData)
-      .select('*, profiles!messages_sender_id_fkey(display_name, avatar_url)')
+      .select('*, profiles!messages_sender_id_fkey(display_name, avatar_url, active_chat_color, active_frame, subscription_tier)')
       .single();
     if (error) {
       logger.error('Room mesaji gonderilemedi:', error);
@@ -365,13 +418,14 @@ export const RoomChatService = {
                 avatar_url: cachedProfile.avatar_url,
                 active_chat_color: cachedProfile.active_chat_color,
                 active_frame: cachedProfile.active_frame,
+                subscription_tier: (cachedProfile as any).subscription_tier,
               },
             };
             onNewMessage(msg);
           } else {
             const { data } = await supabase
               .from('messages')
-              .select('*, profiles!messages_sender_id_fkey(display_name, avatar_url, active_chat_color, active_frame)')
+              .select('*, profiles!messages_sender_id_fkey(display_name, avatar_url, active_chat_color, active_frame, subscription_tier)')
               .eq('id', newMsg.id)
               .single();
             if (data) {

@@ -36,7 +36,7 @@ import { GoogleAuthProvider, signInWithCredential, signInWithEmailAndPassword, c
 import { showToast } from '../../components/Toast';
 import AppBackground from '../../components/AppBackground';
 import AccountDeletedOverlay from '../../components/AccountDeletedOverlay';
-import { ACCOUNT_DELETED_FLAG_KEY } from '../../services/account';
+import { consumeAccountJustDeletedFlag } from '../../services/account';
 import { auth, GOOGLE_WEB_CLIENT_ID } from '../../constants/firebase';
 import { useAuth } from '../_layout';
 
@@ -144,18 +144,13 @@ export default function LoginScreen() {
       } catch {}
     })();
 
-    // ★ 2026-05-09: Hesap silme bayrağı varsa Lottie'yi tetikle ve hemen temizle.
-    //   Tek seferlik göstermek için flag'i animasyon BAŞLAMADAN önce siliyoruz —
-    //   tekrar yüklenmede gözükmemesi için.
-    (async () => {
-      try {
-        const flag = await AsyncStorage.getItem(ACCOUNT_DELETED_FLAG_KEY);
-        if (flag === '1') {
-          await AsyncStorage.removeItem(ACCOUNT_DELETED_FLAG_KEY);
-          setShowAccountDeleted(true);
-        }
-      } catch {}
-    })();
+    // ★ v211: Module variable flag — sadece SAME JS runtime'da set edildiyse oku.
+    //   Logout sonrası eski stale flag yok, sadece gerçek delete tetikler.
+    if (consumeAccountJustDeletedFlag()) {
+      setShowAccountDeleted(true);
+    }
+    // ★ v211 cleanup: Eski AsyncStorage tabanlı flag'i sil (önceki sürümlerden kalabilir)
+    AsyncStorage.removeItem('@soprano_account_just_deleted').catch(() => {});
 
     (async () => {
       try {
@@ -482,6 +477,22 @@ export default function LoginScreen() {
     if (n >= 1000) return `${(n / 1000).toFixed(1).replace('.0', '')}K`;
     return String(n);
   };
+
+  // ★ 2026-05-10: Google sign-in sonrası flash önle.
+  //   Auth listener firebaseUser'ı set ettikten sonra AuthGuard yönlendirene
+  //   kadar (~200-500ms) login content tekrar görünüyor — Google butonu flash.
+  //   emailVerified=true ise (Google + verified email) tüm içeriği AppLoader ile
+  //   değiştir; email/password yeni kayıtta emailVerified=false → doğrulama UI
+  //   normal akışta gözükmeye devam eder.
+  if (firebaseUser?.emailVerified) {
+    return (
+      <AppBackground radialGlow>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <AppLoader size={56} />
+        </View>
+      </AppBackground>
+    );
+  }
 
   return (
     <AppBackground radialGlow>

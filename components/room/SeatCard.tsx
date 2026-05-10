@@ -11,7 +11,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { getAvatarSource } from '../../constants/avatars';
-import { getFrameLottieSource, getFrameScale } from '../../constants/frames';
+import { getFrameLottieSource, getFrameScale, getFrameAvatarRatio } from '../../constants/frames';
 import { COLORS } from './constants';
 // ★ 2026-04-25: lottie-react-native opsiyonel (Sentry kaldırılırken birlikte gitti).
 //   Yoksa frame animasyonu sessizce atla.
@@ -106,10 +106,12 @@ const SeatCard = React.memo(function SeatCard({
   // ★ Çerçeve boyut hesabı — avatar dairesine tam oturmak için
   const fScale = hasFrame ? getFrameScale(activeFrame) : 1;
   const frameContainerSize = hasFrame ? size * fScale : size;
-  // ★ FIX: Çerçeve varken avatar'ı biraz küçült — iç boşluğa oturması için
-  const avatarSize = hasFrame ? size * 0.78 : currentWidth;
-  const avatarHeight = hasFrame ? size * 0.78 : currentHeight;
-  const avatarRadius = hasFrame ? (size * 0.78) / 2 : currentRadius;
+  // ★ v212: Per-frame avatar oranı — premium frame'lerde (scale=1.0) iç daire büyük
+  //   olduğundan avatar 0.88'e çıkar; overflow frame'lerde 0.78 kalır.
+  const avatarRatio = hasFrame ? getFrameAvatarRatio(activeFrame) : 1;
+  const avatarSize = hasFrame ? size * avatarRatio : currentWidth;
+  const avatarHeight = hasFrame ? size * avatarRatio : currentHeight;
+  const avatarRadius = hasFrame ? (size * avatarRatio) / 2 : currentRadius;
 
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.7} style={{ alignItems: 'center', width: Math.max(currentWidth, frameContainerSize), marginBottom: 2 }}>

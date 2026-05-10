@@ -7,7 +7,10 @@ import { TIER_DEFINITIONS } from '../constants/tiers';
 import type { SubscriptionTier } from '../types';
 import { migrateLegacyTier } from '../types';
 import AvatarFrame from './profile/AvatarFrame';
+import { getFrameAvatarRatio } from '../constants/frameLottieRegistry';
 import TierBadge from './TierBadge';
+import { ensureFrameConfig, getCachedFrameConfig } from '../services/cosmeticConfigCache';
+import { useEffect, useState } from 'react';
 
 interface StatusAvatarProps {
   /** Avatar URL string or ImageSource */
@@ -98,6 +101,22 @@ export default function StatusAvatar({
   // Pill badge boyut hesabı (avatar boyutuna göre ölçekli)
   const pillScale = Math.max(0.7, Math.min(1, size / 60));
 
+  // ★ v213: Web admin'den yapılandırılmış frame_config — cosmetic_items.meta.frame_config
+  const [dynFrameCfg, setDynFrameCfg] = useState(getCachedFrameConfig(frameId));
+  useEffect(() => {
+    if (!frameId) { setDynFrameCfg(null); return; }
+    ensureFrameConfig(frameId).then((cfg) => setDynFrameCfg(cfg));
+  }, [frameId]);
+
+  // Avatar oranı: önce dynamic config, yoksa registry default
+  const dynamicAvatarRatio = dynFrameCfg?.avatar_ratio ?? (frameId ? getFrameAvatarRatio(frameId) : 1.0);
+  const dynamicGlow = dynFrameCfg?.glow_enabled ? {
+    shadowColor: dynFrameCfg.glow_color || '#fbbf24',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: dynFrameCfg.glow_intensity ?? 0.5,
+    shadowRadius: 12 * (dynFrameCfg.glow_intensity ?? 0.5),
+  } : null;
+
   return (
     <View style={{ width: size, height: size + (showTierBadge ? 8 : 0), position: 'relative' }}>
       {/* ★ v107.69: Mağaza çerçevesi avatar'dan ÖNCE render — yoksa AvatarFrame'in iç
@@ -132,31 +151,70 @@ export default function StatusAvatar({
       >
         <Image
           source={source}
-          style={{
-            width: size - borderWidth * 2 - 2,
-            height: size - borderWidth * 2 - 2,
-            borderRadius: (size - borderWidth * 2 - 2) / 2,
-            // ★ 2026-04-20: backgroundColor kaldırıldı — Android'de borderRadius
-            //   image background'ı her zaman yuvarlak kırpamıyor; dim kartlarda
-            //   (opacity 0.55) alpha'lı avatar arkasında kare gri kutu görünüyordu.
-          }}
+          style={(() => {
+            // ★ v213: Avatar boyutu — dynamic frame config (web admin) öncelikli, yoksa registry default
+            const ratio = frameId ? dynamicAvatarRatio : 1.0;
+            const targetSize = frameId ? Math.round(size * ratio) : (size - borderWidth * 2 - 2);
+            return {
+              width: targetSize,
+              height: targetSize,
+              borderRadius: targetSize / 2,
+              ...(dynamicGlow ? Platform.select({ ios: dynamicGlow, android: { elevation: 16 } }) : {}),
+            };
+          })()}
         />
       </View>
 
-      {/* Online durum dot — kendi avatarında gizle (self-view'da online işareti anlamsız) */}
+      {/* ★ v213f: Modern online indicator — gradient nokta + dual halo + glow.
+          Eski tek-ton yeşil dot yerine emerald-teal gradient + iç parlak iz + dış soft glow */}
       {isOnline && !isSelf && (
         <View
-          style={[
-            styles.dot,
-            {
-              width: dotSize,
-              height: dotSize,
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            top: showTierBadge ? 0 : 2,
+            right: 2,
+            width: dotSize, height: dotSize,
+            zIndex: 3, elevation: 6,
+            alignItems: 'center', justifyContent: 'center',
+          }}
+        >
+          {/* Dış soft glow halo */}
+          <View style={{
+            position: 'absolute',
+            width: dotSize * 1.6, height: dotSize * 1.6,
+            borderRadius: (dotSize * 1.6) / 2,
+            backgroundColor: 'rgba(16,185,129,0.18)',
+          }} />
+          {/* Gradient nokta */}
+          <LinearGradient
+            colors={['#34D399', '#10B981', '#047857']}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+            style={{
+              width: dotSize, height: dotSize,
               borderRadius: dotRadius,
-              borderWidth: dotBorder,
-              top: showTierBadge ? 0 : 2,
-            },
-          ]}
-        />
+              borderWidth: Math.max(1.5, dotBorder),
+              borderColor: 'rgba(255,255,255,0.92)',
+              ...Platform.select({
+                ios: {
+                  shadowColor: '#10B981',
+                  shadowOffset: { width: 0, height: 0 },
+                  shadowOpacity: 0.55,
+                  shadowRadius: dotSize * 0.45,
+                },
+                android: {},
+              }),
+            }}
+          />
+          {/* İç highlight (specular hint) */}
+          <View style={{
+            position: 'absolute',
+            top: dotBorder + 1, left: dotBorder + 1,
+            width: dotSize * 0.32, height: dotSize * 0.32,
+            borderRadius: (dotSize * 0.32) / 2,
+            backgroundColor: 'rgba(255,255,255,0.55)',
+          }} />
+        </View>
       )}
 
       {/* ★ 2026-04-29: Tier badge — Free'yi hiç gösterme (default), Plus/Pro/GM için

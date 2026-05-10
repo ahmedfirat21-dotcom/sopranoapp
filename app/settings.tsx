@@ -370,19 +370,14 @@ export default function SettingsScreen() {
                 if (!firebaseUser) return;
                 const userToDelete = firebaseUser;
                 try {
-                  // ★ 2026-05-09 v201: Doğru sıra:
-                  //   1) Lottie flag'i ÖNCE set et — login mount ettiğinde okuyabilsin
-                  //   2) Optimistic navigation — settings unmount, null user crash riski yok
-                  //   3) Delete arkaplanda devam etsin (await etmiyoruz, blokken bırakmaz)
-                  const AsyncStorage = require('@react-native-async-storage/async-storage').default;
-                  const { performDeleteAccount, ACCOUNT_DELETED_FLAG_KEY } = require('../services/account');
-                  await AsyncStorage.setItem(ACCOUNT_DELETED_FLAG_KEY, '1');
+                  // ★ 2026-05-09 v211: Module variable flag — AsyncStorage stale problemi yok.
+                  //   Sıra: flag set → optimistic redirect → background delete.
+                  const { performDeleteAccount, markAccountJustDeleted } = require('../services/account');
+                  markAccountJustDeleted();
                   setIsLoggedIn(false);
                   setUser(null);
                   router.replace('/(auth)/login' as any);
-                  // Background delete — hata olursa flag'i geri al
-                  performDeleteAccount(userToDelete).catch(async (e: any) => {
-                    try { await AsyncStorage.removeItem(ACCOUNT_DELETED_FLAG_KEY); } catch {}
+                  performDeleteAccount(userToDelete).catch((e: any) => {
                     showToast({ title: 'Hesap Silinemedi', message: e?.message || 'İşlem tamamlanamadı.', type: 'error' });
                   });
                 } catch (e: any) {

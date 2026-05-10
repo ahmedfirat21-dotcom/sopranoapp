@@ -144,7 +144,7 @@ function PremiumListItem({
       onPress={onPress}
       style={({ pressed }) => [
         pliStyles.row,
-        !isLast && pliStyles.rowBorder,
+        // ★ v213e: Satırlar arası border kaldırıldı (kullanıcı talebi: "fazladan tablo çizgileri")
         pressed && { backgroundColor: 'rgba(255,255,255,0.04)' },
       ]}
     >

@@ -16,10 +16,11 @@
  */
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { View, StyleSheet, Platform, Image } from 'react-native';
+import { View, StyleSheet, Platform, Image, Animated, Easing } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { getFrameMeta, hasFrameLottie } from '../../constants/frameLottieRegistry';
 import { getCosmeticAsset, getCachedCosmeticAsset, type AssetMeta } from '../../services/cosmeticAssetCache';
+import { ensureFrameConfig, getCachedFrameConfig } from '../../services/cosmeticConfigCache';
 
 let LottieView: any = null;
 try {
@@ -141,15 +142,35 @@ const FRAME_PALETTES: Record<string, FramePalette> = {
     inner: '#D1FAE5',
     glowIos: 'rgba(16,185,129,0.75)',
   },
+  // ★ v214: TealRibbon — teal-cyan temalı kurdaleli çerçeve
+  'teal-ribbon': {
+    outer: ['#A5F3FC', '#14B8A6', '#0D5F68'],
+    inner: '#E0FFFE',
+    glowIos: 'rgba(20,184,166,0.75)',
+  },
+  // ★ v214: Teal Energy — enerji halkası PNG çerçeve (remote asset)
+  'teal-energy': {
+    outer: ['#5EEAD4', '#14B8A6', '#0D5F68'],
+    inner: '#CCFBF1',
+    glowIos: 'rgba(20,184,166,0.8)',
+  },
+  // ★ v214: Soprano Ribbon — turkuaz kurdaleli çerçeve (remote PNG)
+  'soprano-ribbon': {
+    outer: ['#5EEAD4', '#14B8A6', '#0D5F68'],
+    inner: '#E0FFFE',
+    glowIos: 'rgba(20,184,166,0.75)',
+  },
 };
 
 // ★ v108.13: Avatar bu boyutun altındaysa Lottie göster yerine sade halka palette
 //   render edilir — küçük avatarlarda VIP frame Lottie'leri çok kalın görünüyordu.
-const LOTTIE_MIN_AVATAR_SIZE = 64;
+// ★ v213f: 64 → 32 — oda içi mini avatarlarda da çerçeve görünsün (kullanıcı talebi).
+//   Lottie frame'ler düşük boyutta da render olur, gradient fallback'e düşmez.
+const LOTTIE_MIN_AVATAR_SIZE = 32;
 
 // ★ v108.16: Lottie frame — sadece kanatlı (useMidLoop) frame'ler için intro+mid-loop
 //   pattern; diğer frame'ler default full loop. Kanat açılma sallanma efekti elde edilir.
-function LottieFrame({ meta, size }: { meta: any; size: number }) {
+function LottieFrame({ meta, size, dynCfg }: { meta: any; size: number; dynCfg?: any }) {
   const ip = meta.source?.ip ?? 0;
   const op = meta.source?.op ?? 90;
   const totalFrames = op - ip;
@@ -162,37 +183,59 @@ function LottieFrame({ meta, size }: { meta: any; size: number }) {
     [meta.source, loopStart, op]
   );
 
-  const lottieSize = Math.round(size * meta.scale);
-  const offset = (lottieSize - size) / -2;
+  // ★ v213f: Web admin'den ayarlanan dynamic frame config
+  //   frame_scale, offset, rotation, opacity, lottie_speed → buradan uygulanır
+  const dynScale = dynCfg?.frame_scale ?? 1.0;
+  const dynOffsetX = dynCfg?.frame_offset_x ?? 0;
+  const dynOffsetY = dynCfg?.frame_offset_y ?? 0;
+  const dynRotation = dynCfg?.frame_rotation ?? 0;  // sn / tam tur (0 = sabit)
+  const dynOpacity = dynCfg?.frame_opacity ?? 1;
+  const dynLottieSpeed = dynCfg?.lottie_speed ?? 0.85;
+
+  const lottieSize = Math.round(size * meta.scale * dynScale);
+  const baseOffset = (lottieSize - size) / -2;
+  const offsetX = baseOffset + Math.round(dynOffsetX * size);
+  const offsetY = baseOffset + Math.round(dynOffsetY * size);
+
+  // ★ Sürekli dönme animasyonu (frame_rotation > 0 ise)
+  const rotateAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (dynRotation <= 0) return;
+    const loop = Animated.loop(
+      Animated.timing(rotateAnim, { toValue: 1, duration: dynRotation * 1000, easing: Easing.linear, useNativeDriver: true })
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [dynRotation, rotateAnim]);
+
+  const rotateInterp = rotateAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
 
   return (
-    <View
+    <Animated.View
       pointerEvents="none"
       style={{
         position: 'absolute',
-        // ★ v110.14 (8 May 2026): overflow:'visible' + elevation kaldırıldı.
-        //   Android'de elevation bitmap layer'ı layout sınırlarında çizip kenarları
-        //   kırpıyordu → daire ezilmiş görünüyordu. overflow:'visible' kırpmayı
-        //   devre dışı bırakır, zIndex tek başına stacking yeter.
-        top: offset, left: offset,
+        top: offsetY, left: offsetX,
         width: lottieSize, height: lottieSize,
         alignItems: 'center', justifyContent: 'center',
         overflow: 'visible',
         zIndex: 3,
+        opacity: dynOpacity,
+        transform: dynRotation > 0 ? [{ rotate: rotateInterp as any }] : undefined,
       }}
     >
       <LottieView
         source={useMidLoop && phase === 'intro' ? meta.source : (useMidLoop ? loopSource : meta.source)}
         autoPlay
         loop={!useMidLoop || phase === 'loop'}
-        speed={0.85}
+        speed={dynLottieSpeed}
         resizeMode={meta.resizeMode}
         onAnimationFinish={() => {
           if (useMidLoop && phase === 'intro') setPhase('loop');
         }}
         style={{ width: lottieSize, height: lottieSize }}
       />
-    </View>
+    </Animated.View>
   );
 }
 
@@ -277,6 +320,14 @@ function RemoteAssetFrame({ frameId, size }: { frameId: string; size: number }) 
 }
 
 function AvatarFrameImpl({ frameId, size, forceRing }: Props) {
+  // ★ v213f: Web admin'den ayarlanan dynamic frame config — Hook her zaman çağrılmalı,
+  //   conditional return ÖNCESİNDE; aksi halde "rendered fewer hooks" crash riski.
+  const [dynCfg, setDynCfg] = useState<any>(getCachedFrameConfig(frameId));
+  useEffect(() => {
+    if (!frameId) { setDynCfg(null); return; }
+    ensureFrameConfig(frameId).then(setDynCfg);
+  }, [frameId]);
+
   if (!frameId) return null;
 
   // ★ v108.13: Boyuta göre render — büyük avatarlarda Lottie, küçüklerde sade halka.
@@ -284,7 +335,7 @@ function AvatarFrameImpl({ frameId, size, forceRing }: Props) {
   //   sade halka — boyut dengesi için kullanıcı talebi).
   const meta = getFrameMeta(frameId);
   if (meta && LottieView && size >= LOTTIE_MIN_AVATAR_SIZE && !forceRing) {
-    return <LottieFrame meta={meta} size={size} />;
+    return <LottieFrame meta={meta} size={size} dynCfg={dynCfg} />;
   }
 
   const palette = FRAME_PALETTES[frameId];

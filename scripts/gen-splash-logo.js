@@ -34,7 +34,7 @@ const SIZES = {
   // logo bbox köşegeni inscribed circle'ın içine sığsın diye geniş padding gerekli.
   // Logo: 457×613 dikdörtgen, köşegeni ~765 → canvas 920+ olmalı.)
   const maxDim = Math.max(trimmed.info.width, trimmed.info.height);
-  const padding = Math.round(maxDim * 0.25);
+  const padding = Math.round(maxDim * 0.30);
   const canvasSize = maxDim + padding * 2;
   const squared = await sharp({
     create: { width: canvasSize, height: canvasSize, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },

@@ -174,13 +174,6 @@ const tr: Record<string, string> = {
   'sp.received': 'SP Alındı',
   'sp.history': 'SP Geçmişi',
 
-  // ── Clubs (Korolar) ────────────────────────────────
-  'clubs.title': 'Korolar',
-  'clubs.create': 'Koro Oluştur',
-  'clubs.members': 'Üyeler',
-  'clubs.join': 'Katıl',
-  'clubs.leave': 'Ayrıl',
-
   // ── Errors ─────────────────────────────────────────
   'error.network': 'İnternet bağlantısı bulunamadı',
   'error.generic': 'Bir şeyler yanlış gitti',

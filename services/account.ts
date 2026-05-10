@@ -18,7 +18,19 @@ import { logger } from '../utils/logger';
 // ★ 2026-05-09: Hesap silme sonrası login ekranında Lottie animasyonu
 //   tetiklemek için kullanılan bir kerelik bayrak. Login ekranı mount'ta
 //   okur ve hemen temizler.
-export const ACCOUNT_DELETED_FLAG_KEY = '@soprano_account_just_deleted';
+// ★ v211 (9 May 2026): AsyncStorage yerine module-level variable —
+//   önceki delete denemelerinden kalan stale flag yüzünden logout sonrası
+//   yanlışlıkla delete animasyonu gösteriliyordu. Module var her app
+//   restart'ta sıfırlanır, sadece tek JS runtime ömrü boyunca yaşar.
+export const ACCOUNT_DELETED_FLAG_KEY = '@soprano_account_just_deleted'; // legacy export, no longer used
+
+let _accountJustDeleted = false;
+export function markAccountJustDeleted() { _accountJustDeleted = true; }
+export function consumeAccountJustDeletedFlag(): boolean {
+  const v = _accountJustDeleted;
+  _accountJustDeleted = false;
+  return v;
+}
 
 /** Full logout flow — state cleanup + navigation caller'da yapılır. */
 export async function performLogout(): Promise<void> {
@@ -96,8 +108,10 @@ export async function performDeleteAccount(firebaseUser: any): Promise<{ success
     if (__DEV__) logger.warn('[Account] performLogout error after delete:', e?.message);
   }
 
-  // 5) Login ekranı için bayrak — Lottie animasyonunu tetikleyecek.
-  try { await AsyncStorage.setItem(ACCOUNT_DELETED_FLAG_KEY, '1'); } catch {}
+  // ★ 2026-05-10: Bayrak BURADA set edilmiyor — settings.tsx onPress içinde optimistic
+  //   redirect anında zaten markAccountJustDeleted() çağrılıyor. Burada tekrar set edersek
+  //   async işlem bittikten sonra flag yeniden true olur ve sonraki Google sign-in'de
+  //   login mount'ta Lottie + onboarding tekrar tetiklenir (kullanıcı bug raporu).
 
   return { success: true, stats };
 }

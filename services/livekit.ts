@@ -298,10 +298,10 @@ export class LiveKitService {
           }
         }
 
-        // Token alma: 10sn timeout
+        // Token alma: 35sn timeout (Supabase edge cold start için — bazen 9-15sn sürüyor)
         const token = await Promise.race([
           fetchToken(roomId, userId, displayName),
-          new Promise<string>((_, reject) => setTimeout(() => reject(new Error('Token timeout (10s)')), 10000)),
+          new Promise<string>((_, reject) => setTimeout(() => reject(new Error('Token timeout (35s)')), 35000)),
         ]);
 
         // Her bağlantı denemesinde temiz room oluştur

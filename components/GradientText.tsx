@@ -5,7 +5,7 @@
  * Kullanım:
  *   <GradientText colors={['#fecdd3','#fb7185','#e11d48','#f43f5e']}
  *     style={{ fontSize: 28, fontWeight: '900' }}>
- *     Koro
+ *     Başlık
  *   </GradientText>
  */
 import React from 'react';

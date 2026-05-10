@@ -15,7 +15,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { ProfileService } from '../../services/profile';
-import { ClubService } from '../../services/clubs';
 import { supabase } from '../../constants/supabase';
 import { showToast } from '../Toast';
 import SPSentSuccessModal from './SPSentSuccessModal';
@@ -111,15 +110,11 @@ interface Props {
   recipientName: string;
   /** ★ v92.6 (1 May 2026): Alıcı avatar URL'i — başarı modalında küçük avatar gösterilir */
   recipientAvatar?: string;
-  /** ★ 2026-04-26: clubId verilirse SP kullanıcıya değil Koro hazinesine gider. */
-  clubId?: string;
   onSuccess?: (amount: number) => void;
-  /** Koro bağışı sonrası yeni hazine bakiyesini bildirir (opsiyonel). */
-  onTreasuryUpdate?: (newBalance: number) => void;
 }
 
 export default function SPDonateSheet({
-  visible, onClose, senderId, recipientId, recipientName, recipientAvatar, clubId, onSuccess, onTreasuryUpdate,
+  visible, onClose, senderId, recipientId, recipientName, recipientAvatar, onSuccess,
 }: Props) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -262,7 +257,7 @@ export default function SPDonateSheet({
 
   const handleDonate = async () => {
     if (amount <= 0 || loading) return;
-    if (!clubId && senderId === recipientId) return;
+    if (senderId === recipientId) return;
     if (balance !== null && balance < amount) {
       // ★ v92.1: Premium alert + "Mağazaya Git" yönlendirmesi
       setInsufficientAlert({ visible: true, needed: amount - (balance ?? 0) });
@@ -279,36 +274,22 @@ export default function SPDonateSheet({
     onClose();
 
     try {
-      if (clubId) {
-        const r = await ClubService.contributeTreasury(clubId, sentAmount, senderId);
-        if (!mountedRef.current) return;
-        if (!r.success) {
-          // Rollback
-          setBalance(prev => (prev ?? 0) + sentAmount);
-          setShowSuccess(false);
-          showToast({ title: 'Bağış başarısız', message: r.error || '', type: 'error' });
-          return;
-        }
-        onTreasuryUpdate?.(r.newBalance ?? 0);
-        onSuccess?.(sentAmount);
-      } else {
-        const result = await ProfileService.donateToUser(senderId, recipientId, sentAmount);
-        if (!mountedRef.current) return;
-        if (!result.success) {
-          // Rollback
-          setBalance(prev => (prev ?? 0) + sentAmount);
-          setShowSuccess(false);
-          // ★ v92.28 (2 May 2026): Spesifik hata mesajı — kullanıcı neden başarısız
-          //   olduğunu bilmek istiyor (welcome bonus exploit, rate limit, yetersiz, vs.)
-          showToast({
-            title: 'Bağış başarısız',
-            message: result.error || 'Bilinmeyen bir hata oluştu, lütfen tekrar dene.',
-            type: 'error',
-          });
-          return;
-        }
-        onSuccess?.(sentAmount);
+      const result = await ProfileService.donateToUser(senderId, recipientId, sentAmount);
+      if (!mountedRef.current) return;
+      if (!result.success) {
+        // Rollback
+        setBalance(prev => (prev ?? 0) + sentAmount);
+        setShowSuccess(false);
+        // ★ v92.28 (2 May 2026): Spesifik hata mesajı — kullanıcı neden başarısız
+        //   olduğunu bilmek istiyor (welcome bonus exploit, rate limit, yetersiz, vs.)
+        showToast({
+          title: 'Bağış başarısız',
+          message: result.error || 'Bilinmeyen bir hata oluştu, lütfen tekrar dene.',
+          type: 'error',
+        });
+        return;
       }
+      onSuccess?.(sentAmount);
     } catch (e: any) {
       if (mountedRef.current) {
         setBalance(prev => (prev ?? 0) + sentAmount);
@@ -324,7 +305,7 @@ export default function SPDonateSheet({
     }
   };
 
-  const canDonate = amount > 0 && balance !== null && balance >= amount && (!!clubId || senderId !== recipientId);
+  const canDonate = amount > 0 && balance !== null && balance >= amount && senderId !== recipientId;
   const fillRatio = (amount - 1) / (MAX_SLIDER - 1);
   // ★ 2026-04-21: Miktar arttıkça modal paleti değişir
   const tier = getTier(amount);
@@ -482,12 +463,8 @@ export default function SPDonateSheet({
           {/* ★ v92 (1 May 2026): Ionicons "diamond" → SPIcon (PNG hexagon) — marka tutarlılığı.
               Hazine bağışında "planet" korunur (oda hazinesi sembolü).
               ★ v92.1: ikon 20→28 büyütüldü (header'da daha belirgin). */}
-          {clubId ? (
-            <Ionicons name="planet" size={20} color={palette.accentSolid} style={iconShadow} />
-          ) : (
-            <SPIcon size={28} />
-          )}
-          <Text style={styles.headerTitle}>{clubId ? 'HAZİNEYE BAĞIŞ' : 'SP BAĞIŞLA'}</Text>
+          <SPIcon size={28} />
+          <Text style={styles.headerTitle}>SP BAĞIŞLA</Text>
           {palette.labelText && (
             <View style={{ paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6, backgroundColor: palette.accentSolid + '22', borderWidth: 0.7, borderColor: palette.accentSolid + '60' }}>
               <Text style={{ fontSize: 8, fontWeight: '900', color: palette.accentSolid, letterSpacing: 1.2 }}>{palette.labelText}</Text>
@@ -502,7 +479,7 @@ export default function SPDonateSheet({
         {/* Alıcı */}
         <Text style={styles.recipientText}>
           <Text style={{ color: palette.accentSolid, fontWeight: '800' }}>{recipientName}</Text>
-          <Text>{clubId ? ' Korosunun hazinesine' : ' adlı kullanıcıya'}</Text>
+          <Text> adlı kullanıcıya</Text>
         </Text>
 
         {/* ★ v92 (1 May 2026): Miktar göstergesi — tier-aware hexagon + sayı/SP.
@@ -575,12 +552,8 @@ export default function SPDonateSheet({
               <AppLoader color="#FFF" size="small" />
             ) : (
               <>
-                {clubId ? (
-                  <Ionicons name="planet" size={18} color="#FFF" style={iconShadow} />
-                ) : (
-                  <SPIcon size={26} />
-                )}
-                <Text style={styles.sendBtnText}>{amount.toLocaleString('tr-TR')} SP {clubId ? 'Hazineye Ekle' : 'Gönder'}</Text>
+                <SPIcon size={26} />
+                <Text style={styles.sendBtnText}>{amount.toLocaleString('tr-TR')} SP Gönder</Text>
               </>
             )}
           </LinearGradient>

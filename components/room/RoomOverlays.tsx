@@ -147,6 +147,8 @@ type PlusMenuProps = {
   bottomInset?: number;
   // ★ Odadan ayrıl — tüm rollerde erişilebilir; owner'da host transfer uyarısı backend'de
   onLeaveRoom?: () => void;
+  // ★ 2026-05-10 v111b: Mesajları Temizle (Plus/Pro/GodMaster host only)
+  onClearMessages?: () => void;
   // ★ 2026-04-18: Cihaz ayarları inline — ayrı modal yerine "Konuşma & Ses" accordion içinde
   deviceConfig?: {
     micMode: 'normal' | 'music';
@@ -308,6 +310,7 @@ export function PlusMenu({
   onDonate, isDonationsEnabled,
   bottomInset = 14,
   onLeaveRoom, deviceConfig,
+  onClearMessages,
   roomId: _roomId, hostId: _hostId, roomType: _roomType,
   isTempHost = false,
 }: PlusMenuProps) {
@@ -908,6 +911,18 @@ export function PlusMenu({
   // Dondur & Sil (owner, direkt aksiyon) — geçici host yapamaz
   if (isOwner && !isTempHost && sc?.onFreezeRoom) {
     items.push({ id: 'freeze', icon: 'snow-outline', label: 'Odayı Dondur', desc: 'Katılımcılar çıkar, sonra tekrar aç', accent: '#3B82F6', onPress: () => { onClose(); sc.onFreezeRoom?.(); } });
+  }
+
+  // ★ 2026-05-10 v111b: Mesajları Temizle — sadece Plus/Pro/GodMaster host (geçici host yapamaz)
+  if (isOwner && !isTempHost && onClearMessages && isTierAtLeast(tier, 'Plus' as any)) {
+    items.push({
+      id: 'clear-messages',
+      icon: 'sparkles-outline',
+      label: 'Mesajları Temizle',
+      desc: 'Sohbet anında silinir, herkesin ekranı tazelenir',
+      accent: '#F59E0B',
+      onPress: () => { onClose(); onClearMessages(); },
+    });
   }
 
   // ★ Odadan Ayrıl — tüm roller için (owner'da host transfer / moderator/speaker/listener normal çıkış)

@@ -688,6 +688,12 @@ export const RoomService = {
     //   2 dakikalık zombie filter exemption sona erdiğinde keşfet odayı gizler.
     await this.syncListenerCount(roomId);
 
+    // ★ 2026-05-10 v111: Persistent history Faz 1 — wakeUp 7-gün retention saatini
+    //   sıfırlar. Frozen iken trigger metadata.archived_at damgası bastı, host
+    //   uyandırınca damgaları temizliyoruz. Fail olursa worst case "biraz erken
+    //   silinir" — trigger her freeze'de overwrite yapıyor, veri kaybı yok.
+    supabase.rpc('clear_archived_at', { p_room_id: roomId }).then(() => {}).catch(() => {});
+
     return data as Room;
   },
 
@@ -2216,29 +2222,41 @@ export const RoomService = {
       }
     }
 
-    // ═══ 2. 5+ dakika boş kalan odalar (herkes için, v92.22 davranışı) ═══
+    // ═══ 2. 5+ dakika boş kalan odalar — SADECE Free non-persistent ═══
+    // ★ 2026-05-10 FIX: Plus/Pro persistent odalar muaf — host minimize edip
+    //   geri döndüğünde room_participants anlık boş olabiliyor (race), eski kod
+    //   bu pencerede odayı öldürüp "Bağlantı kurulamadı" 403 hatasına yol açıyordu.
+    //   SQL cron (close_expired_free_rooms) zaten Free + 30dk filtresi uyguluyor;
+    //   client interval bu kadar agresif olmamalı.
     const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
     const { data: aliveRooms } = await supabase
       .from('rooms')
-      .select('id')
+      .select('id, owner_tier, is_persistent')
       .eq('is_live', true)
       .lt('created_at', fiveMinAgo);
 
     if (aliveRooms && aliveRooms.length > 0) {
-      const ids = aliveRooms.map(r => r.id);
-      const { data: activeParticipants } = await supabase
-        .from('room_participants')
-        .select('room_id')
-        .in('room_id', ids);
+      // Sadece Free + non-persistent odaları aday al
+      const candidates = (aliveRooms as any[]).filter(r =>
+        !r.is_persistent &&
+        !['Plus', 'Pro', 'GodMaster'].includes(r.owner_tier || 'Free')
+      );
+      if (candidates.length > 0) {
+        const ids = candidates.map(r => r.id);
+        const { data: activeParticipants } = await supabase
+          .from('room_participants')
+          .select('room_id')
+          .in('room_id', ids);
 
-      const roomsWithParticipants = new Set((activeParticipants || []).map((p: any) => p.room_id));
+        const roomsWithParticipants = new Set((activeParticipants || []).map((p: any) => p.room_id));
 
-      for (const room of aliveRooms) {
-        if (!roomsWithParticipants.has(room.id)) {
-          await supabase.from('rooms').update({ is_live: false, listener_count: 0 }).eq('id', room.id);
-          await supabase.from('room_participants').delete().eq('room_id', room.id);
-          closedCount++;
-          if (__DEV__) console.log(`[AutoClose] 5dk+ boş oda kapatıldı: ${room.id}`);
+        for (const room of candidates) {
+          if (!roomsWithParticipants.has(room.id)) {
+            await supabase.from('rooms').update({ is_live: false, listener_count: 0 }).eq('id', room.id);
+            await supabase.from('room_participants').delete().eq('room_id', room.id);
+            closedCount++;
+            if (__DEV__) console.log(`[AutoClose] 5dk+ boş Free oda kapatıldı: ${room.id}`);
+          }
         }
       }
     }
