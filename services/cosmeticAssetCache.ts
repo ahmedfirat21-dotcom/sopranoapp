@@ -49,9 +49,11 @@ export async function getCosmeticAsset(itemId: string): Promise<AssetMeta> {
 
   const fetchPromise = (async (): Promise<AssetMeta> => {
     try {
+      // ★ 2026-05-10 v114: asset_url top-level column eklendi.
+      //   Önce ona bak, yoksa eski meta JSON'dan oku (backward compat).
       const { data, error } = await supabase
         .from('cosmetic_items')
-        .select('meta')
+        .select('asset_url, meta')
         .eq('id', itemId)
         .maybeSingle();
 
@@ -62,17 +64,27 @@ export async function getCosmeticAsset(itemId: string): Promise<AssetMeta> {
       }
 
       let parsed: AssetMeta = { url: null, type: null };
-      if (data.meta && typeof data.meta === 'string') {
-        try {
-          const obj = JSON.parse(data.meta);
-          if (obj && typeof obj === 'object') {
-            parsed = {
-              url: typeof obj.asset_url === 'string' ? obj.asset_url : null,
-              type: obj.asset_type === 'lottie' || obj.asset_type === 'image' ? obj.asset_type : null,
-            };
+
+      // Birinci kaynak: asset_url column (yeni)
+      const directUrl = (data as any).asset_url;
+      if (typeof directUrl === 'string' && directUrl.length > 0) {
+        const isJson = directUrl.toLowerCase().endsWith('.json');
+        parsed = { url: directUrl, type: isJson ? 'lottie' : 'image' };
+      } else if (data.meta) {
+        // Fallback: legacy meta JSON
+        const metaRaw: any = typeof data.meta === 'string' ? data.meta : null;
+        if (metaRaw) {
+          try {
+            const obj = JSON.parse(metaRaw);
+            if (obj && typeof obj === 'object') {
+              parsed = {
+                url: typeof obj.asset_url === 'string' ? obj.asset_url : null,
+                type: obj.asset_type === 'lottie' || obj.asset_type === 'image' ? obj.asset_type : null,
+              };
+            }
+          } catch {
+            // meta JSON parse edilemedi
           }
-        } catch {
-          // meta JSON parse edilemedi — null olarak kabul et
         }
       }
 

@@ -26,10 +26,11 @@ const SIZES = {
   const trimmed = await img.clone().trim({ threshold: 5 }).toBuffer({ resolveWithObject: true });
   console.log(`Kırpıldı: ${trimmed.info.width}x${trimmed.info.height}`);
 
-  // 2) Kareye getir (içerik tam kareye yerleşsin, hafif kenar boşluğu ekle)
+  // 2) Kareye getir (içerik tam kareye yerleşsin)
   const maxDim = Math.max(trimmed.info.width, trimmed.info.height);
-  // ★ 2026-05-10: %8 → %3 — status bar'da silüet daha dolu/belirgin görünsün (kullanıcı talebi)
-  const padding = Math.round(maxDim * 0.03);
+  // ★ 2026-05-10: %3 → %0 — status bar'daki ikonu maksimum büyüt (kullanıcı talebi).
+  //   Padding kaldırıldı, silüet tüm canvas'ı dolduruyor.
+  const padding = 0;
   const canvasSize = maxDim + padding * 2;
   const squared = await sharp({
     create: { width: canvasSize, height: canvasSize, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },

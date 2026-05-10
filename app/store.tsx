@@ -56,11 +56,14 @@ const { width: W } = Dimensions.get('window');
 // ★ v108.21: Hediyeler vitrin olarak geri eklendi — satılmaz, fiyat referansı
 //   (pay-per-send oda içi). Kullanıcı hediye fiyatlarını mağazada görsün.
 type CategoryKey = 'bundles' | 'frames' | 'entry_effect' | 'gifts' | 'sp';
+// ★ 2026-05-10: 'gifts' kategorisi mağaza UI'ndan gizlendi (kullanıcı talebi).
+//   Lottie hediyeler oda içi gift panelinden zaten gönderilebiliyor; mağazada
+//   ayrıca kart olarak göstermeye gerek yok. DB'de aktif kalıyor — geri açmak
+//   istenirse 'gifts' object'ini tekrar listeye eklemek yeterli.
 const CATEGORIES: { key: CategoryKey; label: string; icon: string }[] = [
   { key: 'bundles',      label: 'Setler',          icon: 'cube-outline' },
   { key: 'frames',       label: 'Çerçeveler',     icon: 'ellipse-outline' },
   { key: 'entry_effect', label: 'Giriş Efektleri', icon: 'sparkles-outline' },
-  { key: 'gifts',        label: 'Hediyeler',       icon: 'gift-outline' },
   { key: 'sp',           label: 'SP Paketleri',    icon: 'diamond-outline' },
 ];
 
@@ -463,7 +466,7 @@ export default function StoreScreen() {
   };
   const frameItems = applyFilters(items.filter((i) => i.category === 'atelier' || i.category === 'frames'));
   const entryItems = applyFilters(items.filter((i) => i.category === 'message_art' || i.category === 'entry_effect'));
-  const giftItems = applyFilters(items.filter((i) => i.category === 'gift'));
+  // ★ 2026-05-10: giftItems kaldırıldı — mağaza UI'ndan gizlendi (kullanıcı talebi)
 
   // ★ v108.21: Wishlist toggle (optimistic update + DB sync)
   const handleWishlistToggle = async (item: CosmeticItem) => {
@@ -913,25 +916,10 @@ export default function StoreScreen() {
             </View>
           )}
 
-          {/* ═══ HEDİYELER — Vitrin (pay-per-send, oda içi gönderim) ═══ */}
-          <View onLayout={(e) => { sectionOffsets.current.gifts = e.nativeEvent.layout.y; }} />
-          <SectionDivider label="— HEDİYELER · ODA İÇİ —" />
-          <Text style={s.sectionTitle}>Sembol Hediyeler</Text>
-          <Text style={s.sectionSub}>Vitrin · Odada 🎁 panelden gönder, satın almaya gerek yok</Text>
-          {catalogLoading && giftItems.length === 0 ? (
-            <SkeletonGalleryGrid />
-          ) : (
-            <View style={s.galleryGrid}>
-              {giftItems.map((item) => (
-                <GalleryCard
-                  key={item.id}
-                  item={item}
-                  owned={false}
-                  onPress={() => router.push('/(tabs)/myrooms' as any)}
-                />
-              ))}
-            </View>
-          )}
+          {/* ★ 2026-05-10: HEDİYELER vitrin section'ı kaldırıldı (kullanıcı talebi).
+              Lottie hediyeler oda içi 🎁 panelden zaten gönderiliyor; mağazada
+              ayrıca vitrin gerekmiyor. Geri açmak istenirse: bu blok'u restore et
+              + CATEGORIES listesine 'gifts' tab'ı tekrar ekle. */}
 
           {/* Soprano Tezgâhı */}
           <View
