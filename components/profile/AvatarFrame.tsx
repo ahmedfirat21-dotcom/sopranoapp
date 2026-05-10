@@ -16,7 +16,7 @@
  */
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { View, StyleSheet, Platform, Image, Animated, Easing } from 'react-native';
+import { View, StyleSheet, Platform, Image, Animated, Easing, Text } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { getFrameMeta, hasFrameLottie } from '../../constants/frameLottieRegistry';
 import { getCosmeticAsset, getCachedCosmeticAsset, type AssetMeta } from '../../services/cosmeticAssetCache';
@@ -160,6 +160,32 @@ const FRAME_PALETTES: Record<string, FramePalette> = {
     inner: '#E0FFFE',
     glowIos: 'rgba(20,184,166,0.75)',
   },
+  // ★ v215: Premium PNG çerçeveler — küçük avatarlarda halka fallback
+  'gold-royal': {
+    outer: ['#FFE082', '#FBBF24', '#854F0B'],
+    inner: '#FFF4D6',
+    glowIos: 'rgba(255,224,130,0.85)',
+  },
+  'silver-platinum': {
+    outer: ['#E2E8F0', '#94A3B8', '#475569'],
+    inner: '#F8FAFC',
+    glowIos: 'rgba(226,232,240,0.75)',
+  },
+  'rose-gold': {
+    outer: ['#FBCFE8', '#F472B6', '#9D174D'],
+    inner: '#FCE7F3',
+    glowIos: 'rgba(244,114,182,0.75)',
+  },
+  'teal-neon': {
+    outer: ['#5EEAD4', '#14B8A6', '#0D5F68'],
+    inner: '#CCFBF1',
+    glowIos: 'rgba(20,184,166,0.8)',
+  },
+  'purple-violet': {
+    outer: ['#C4B5FD', '#8B5CF6', '#5B21B6'],
+    inner: '#EDE9FE',
+    glowIos: 'rgba(139,92,246,0.75)',
+  },
 };
 
 // ★ v108.13: Avatar bu boyutun altındaysa Lottie göster yerine sade halka palette
@@ -167,6 +193,152 @@ const FRAME_PALETTES: Record<string, FramePalette> = {
 // ★ v213f: 64 → 32 — oda içi mini avatarlarda da çerçeve görünsün (kullanıcı talebi).
 //   Lottie frame'ler düşük boyutta da render olur, gradient fallback'e düşmez.
 const LOTTIE_MIN_AVATAR_SIZE = 32;
+
+// ★ 2026-05-11: Avatar etrafında parçacık efekti — sparkle/stars/hearts/bubbles.
+//   Animated.loop ile yörüngede döner, color_cycle aktifse renk de cycle olur.
+function ParticleOverlay({ size, dynCfg }: { size: number; dynCfg: any }) {
+  const type: string = dynCfg?.particle_type || 'none';
+  const count: number = Math.max(4, Math.min(12, dynCfg?.particle_count || 6));
+  const baseColor: string = dynCfg?.particle_color || '#fbbf24';
+  const colorCycleOn = !!dynCfg?.color_cycle;
+
+  const orbitAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (type === 'none') return;
+    const loop = Animated.loop(
+      Animated.timing(orbitAnim, { toValue: 1, duration: 12000, easing: Easing.linear, useNativeDriver: true })
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [type, orbitAnim]);
+
+  // Renk döngüsü — particle_color cycle olur (color_cycle açıksa)
+  const [particleColor, setParticleColor] = useState(baseColor);
+  useEffect(() => {
+    if (!colorCycleOn) { setParticleColor(baseColor); return; }
+    const speedSec = dynCfg?.color_cycle_speed ?? 12;
+    const startMs = Date.now();
+    const intervalId = setInterval(() => {
+      const elapsed = (Date.now() - startMs) / 1000;
+      const hue = ((elapsed / speedSec) * 360) % 360;
+      setParticleColor(`hsl(${Math.round(hue)}, 80%, 65%)`);
+    }, 100);
+    return () => clearInterval(intervalId);
+  }, [colorCycleOn, baseColor, dynCfg?.color_cycle_speed]);
+
+  if (type === 'none') return null;
+
+  const symbol = type === 'sparkle' ? '✦' : type === 'stars' ? '★' : type === 'hearts' ? '♥' : '○';
+  const rotateInterp = orbitAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
+  const radius = size * 0.65;
+  const fontSize = Math.max(10, Math.round(size * 0.14));
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={{
+        position: 'absolute',
+        top: -(size * 0.4), left: -(size * 0.4),
+        width: size * 1.8, height: size * 1.8,
+        alignItems: 'center', justifyContent: 'center',
+        zIndex: 4,
+        elevation: 4,
+        transform: [{ rotate: rotateInterp }],
+      }}
+    >
+      {Array.from({ length: count }).map((_, i) => {
+        const angle = (360 / count) * i;
+        const rad = (angle * Math.PI) / 180;
+        const x = Math.cos(rad) * radius;
+        const y = Math.sin(rad) * radius;
+        return (
+          <Text
+            key={i}
+            style={{
+              position: 'absolute',
+              left: '50%' as any, top: '50%' as any,
+              marginLeft: x - fontSize / 2,
+              marginTop: y - fontSize / 2,
+              color: particleColor,
+              fontSize,
+              textShadowColor: particleColor,
+              textShadowRadius: 6,
+              textShadowOffset: { width: 0, height: 0 },
+            }}
+          >
+            {symbol}
+          </Text>
+        );
+      })}
+    </Animated.View>
+  );
+}
+
+// ★ v215: PNG frame — statik Image render. Lottie'siz, hafif, premium PNG çerçeveler.
+function PngFrame({ meta, size, dynCfg }: { meta: any; size: number; dynCfg?: any }) {
+  const dynScale = dynCfg?.frame_scale ?? 1.0;
+  const dynOffsetX = dynCfg?.frame_offset_x ?? 0;
+  const dynOffsetY = dynCfg?.frame_offset_y ?? 0;
+  const dynOpacity = dynCfg?.frame_opacity ?? 1;
+  const dynBreathe = !!dynCfg?.frame_breathe;
+  const dynColorCycle = !!dynCfg?.color_cycle;
+
+  const frameSize = Math.round(size * meta.scale * dynScale);
+  const baseOffset = (frameSize - size) / -2;
+  const offsetX = baseOffset + Math.round(dynOffsetX * size);
+  const offsetY = baseOffset + Math.round(dynOffsetY * size);
+
+  // ★ frame_breathe — yumuşak nefes
+  const breatheAnim = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    if (!dynBreathe) { breatheAnim.setValue(1); return; }
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(breatheAnim, { toValue: 1.06, duration: 2000, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      Animated.timing(breatheAnim, { toValue: 1, duration: 2000, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, [dynBreathe, breatheAnim]);
+
+  // ★ color_cycle — PNG'ye tintColor cycle (HSL hue değiştirme)
+  const [cycleColor, setCycleColor] = useState<string | null>(null);
+  useEffect(() => {
+    if (!dynColorCycle) { setCycleColor(null); return; }
+    const speedSec = dynCfg?.color_cycle_speed ?? 12;
+    const startMs = Date.now();
+    const intervalId = setInterval(() => {
+      const elapsed = (Date.now() - startMs) / 1000;
+      const hue = ((elapsed / speedSec) * 360) % 360;
+      setCycleColor(`hsl(${Math.round(hue)}, 80%, 60%)`);
+    }, 100);
+    return () => clearInterval(intervalId);
+  }, [dynColorCycle, dynCfg?.color_cycle_speed]);
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={{
+        position: 'absolute',
+        top: offsetY, left: offsetX,
+        width: frameSize, height: frameSize,
+        alignItems: 'center', justifyContent: 'center',
+        overflow: 'visible',
+        zIndex: 3,
+        opacity: dynOpacity,
+        transform: dynBreathe ? [{ scale: breatheAnim }] : undefined,
+      }}
+    >
+      <Image
+        source={meta.source}
+        resizeMode="contain"
+        style={{
+          width: frameSize, height: frameSize,
+          tintColor: cycleColor || undefined,
+        }}
+      />
+    </Animated.View>
+  );
+}
 
 // ★ v108.16: Lottie frame — sadece kanatlı (useMidLoop) frame'ler için intro+mid-loop
 //   pattern; diğer frame'ler default full loop. Kanat açılma sallanma efekti elde edilir.
@@ -191,6 +363,8 @@ function LottieFrame({ meta, size, dynCfg }: { meta: any; size: number; dynCfg?:
   const dynRotation = dynCfg?.frame_rotation ?? 0;  // sn / tam tur (0 = sabit)
   const dynOpacity = dynCfg?.frame_opacity ?? 1;
   const dynLottieSpeed = dynCfg?.lottie_speed ?? 0.85;
+  // ★ 2026-05-11: frame_breathe — frame yavaş büyüyüp küçülür (4 sn döngü)
+  const dynBreathe = !!dynCfg?.frame_breathe;
 
   const lottieSize = Math.round(size * meta.scale * dynScale);
   const baseOffset = (lottieSize - size) / -2;
@@ -208,7 +382,29 @@ function LottieFrame({ meta, size, dynCfg }: { meta: any; size: number; dynCfg?:
     return () => loop.stop();
   }, [dynRotation, rotateAnim]);
 
+  // ★ Frame breathe — scale 1↔1.06 yumuşak nefes
+  const breatheAnim = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    if (!dynBreathe) {
+      breatheAnim.setValue(1);
+      return;
+    }
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(breatheAnim, { toValue: 1.06, duration: 2000, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(breatheAnim, { toValue: 1, duration: 2000, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [dynBreathe, breatheAnim]);
+
   const rotateInterp = rotateAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
+
+  // Transform stack — rotate + scale birlikte çalışabilir
+  const transformStack: any[] = [];
+  if (dynRotation > 0) transformStack.push({ rotate: rotateInterp });
+  if (dynBreathe) transformStack.push({ scale: breatheAnim });
 
   return (
     <Animated.View
@@ -221,7 +417,7 @@ function LottieFrame({ meta, size, dynCfg }: { meta: any; size: number; dynCfg?:
         overflow: 'visible',
         zIndex: 3,
         opacity: dynOpacity,
-        transform: dynRotation > 0 ? [{ rotate: rotateInterp as any }] : undefined,
+        transform: transformStack.length > 0 ? transformStack : undefined,
       }}
     >
       <LottieView
@@ -253,7 +449,7 @@ interface Props {
 // ★ v110.7 (6 May 2026): Web admin panelinden eklenen Lottie/PNG URL'lerinden runtime
 //   render. Registry/palette'de bulunmayan ürünler için cosmetic_items.meta'dan asset_url
 //   çekilir, Lottie'ye {uri} ile veya Image'e source ile bağlanır.
-function RemoteAssetFrame({ frameId, size }: { frameId: string; size: number }) {
+function RemoteAssetFrame({ frameId, size, dynCfg }: { frameId: string; size: number; dynCfg?: any }) {
   // Senkron cache hit — flicker önler
   const initial = getCachedCosmeticAsset(frameId);
   const [asset, setAsset] = useState<AssetMeta | null>(initial);
@@ -267,11 +463,41 @@ function RemoteAssetFrame({ frameId, size }: { frameId: string; size: number }) 
     return () => { cancelled = true; };
   }, [frameId, initial]);
 
+  // ★ frame_breathe — yumuşak nefes
+  const dynBreathe = !!dynCfg?.frame_breathe;
+  const breatheAnim = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    if (!dynBreathe) { breatheAnim.setValue(1); return; }
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(breatheAnim, { toValue: 1.06, duration: 2000, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      Animated.timing(breatheAnim, { toValue: 1, duration: 2000, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, [dynBreathe, breatheAnim]);
+
+  // ★ color_cycle — image asset için tintColor cycle
+  const dynColorCycle = !!dynCfg?.color_cycle;
+  const [cycleColor, setCycleColor] = useState<string | null>(null);
+  useEffect(() => {
+    if (!dynColorCycle) { setCycleColor(null); return; }
+    const speedSec = dynCfg?.color_cycle_speed ?? 12;
+    const startMs = Date.now();
+    const intervalId = setInterval(() => {
+      const elapsed = (Date.now() - startMs) / 1000;
+      const hue = ((elapsed / speedSec) * 360) % 360;
+      setCycleColor(`hsl(${Math.round(hue)}, 80%, 60%)`);
+    }, 100);
+    return () => clearInterval(intervalId);
+  }, [dynColorCycle, dynCfg?.color_cycle_speed]);
+
   if (!asset || !asset.url) return null;
+
+  const transformStack = dynBreathe ? [{ scale: breatheAnim }] : undefined;
 
   if (asset.type === 'lottie' && LottieView) {
     return (
-      <View
+      <Animated.View
         pointerEvents="none"
         style={{
           position: 'absolute',
@@ -280,6 +506,7 @@ function RemoteAssetFrame({ frameId, size }: { frameId: string; size: number }) 
           alignItems: 'center', justifyContent: 'center',
           zIndex: 3,
           elevation: 3,
+          transform: transformStack,
         }}
       >
         <LottieView
@@ -290,14 +517,14 @@ function RemoteAssetFrame({ frameId, size }: { frameId: string; size: number }) 
           resizeMode="contain"
           style={{ width: '100%', height: '100%' }}
         />
-      </View>
+      </Animated.View>
     );
   }
 
-  // Image (PNG/SVG/WebP)
+  // Image (PNG/SVG/WebP) — tintColor cycle ve breathe destekli
   if (asset.type === 'image') {
     return (
-      <View
+      <Animated.View
         pointerEvents="none"
         style={{
           position: 'absolute',
@@ -305,14 +532,18 @@ function RemoteAssetFrame({ frameId, size }: { frameId: string; size: number }) 
           width: size * 1.4, height: size * 1.4,
           zIndex: 3,
           elevation: 3,
+          transform: transformStack,
         }}
       >
         <Image
           source={{ uri: asset.url }}
           resizeMode="contain"
-          style={{ width: '100%', height: '100%' }}
+          style={{
+            width: '100%', height: '100%',
+            tintColor: cycleColor || undefined,
+          }}
         />
-      </View>
+      </Animated.View>
     );
   }
 
@@ -334,8 +565,24 @@ function AvatarFrameImpl({ frameId, size, forceRing }: Props) {
   // ★ v110.14: forceRing=true ise Lottie atlanır (sahnede host hariç herkes için
   //   sade halka — boyut dengesi için kullanıcı talebi).
   const meta = getFrameMeta(frameId);
+  const hasParticles = dynCfg?.particle_type && dynCfg.particle_type !== 'none';
+  // ★ v215: PNG frame — Image component ile render
+  if (meta && meta.type === 'png' && size >= LOTTIE_MIN_AVATAR_SIZE && !forceRing) {
+    return (
+      <>
+        <PngFrame meta={meta} size={size} dynCfg={dynCfg} />
+        {hasParticles && <ParticleOverlay size={size} dynCfg={dynCfg} />}
+      </>
+    );
+  }
+  // Lottie frame
   if (meta && LottieView && size >= LOTTIE_MIN_AVATAR_SIZE && !forceRing) {
-    return <LottieFrame meta={meta} size={size} dynCfg={dynCfg} />;
+    return (
+      <>
+        <LottieFrame meta={meta} size={size} dynCfg={dynCfg} />
+        {hasParticles && <ParticleOverlay size={size} dynCfg={dynCfg} />}
+      </>
+    );
   }
 
   const palette = FRAME_PALETTES[frameId];
@@ -343,7 +590,12 @@ function AvatarFrameImpl({ frameId, size, forceRing }: Props) {
     // ★ v110.7: Registry/palette'de yok — web'den eklenmiş yeni Lottie/PNG ürünü olabilir.
     //   cosmetic_items.meta'dan asset URL çek, runtime render et.
     if (size >= LOTTIE_MIN_AVATAR_SIZE) {
-      return <RemoteAssetFrame frameId={frameId} size={size} />;
+      return (
+        <>
+          <RemoteAssetFrame frameId={frameId} size={size} dynCfg={dynCfg} />
+          {hasParticles && <ParticleOverlay size={size} dynCfg={dynCfg} />}
+        </>
+      );
     }
     return null;
   }
