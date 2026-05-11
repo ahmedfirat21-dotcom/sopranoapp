@@ -1204,15 +1204,9 @@ function AvatarFrameImpl({ frameId, size, forceRing, userName, userTier }: Props
       )}
       {/* zIndex 4: particle */}
       {hasParticles && <ParticleOverlay size={size} dynCfg={dynCfg} />}
-      {/* zIndex 5: tier_badge */}
-      {dynCfg?.tier_badge_enabled && userTier && (
-        <TierBadgeOverlay
-          size={size}
-          position={dynCfg?.tier_badge_position || 'tr'}
-          style={dynCfg?.tier_badge_style || 'chip'}
-          label={userTier}
-        />
-      )}
+      {/* ★ 2026-05-11: Tier badge AvatarFrame içinde render EDİLMEZ — çift badge
+           çakışmasını önlemek için StatusAvatar mevcut TierBadge component'ini
+           web admin tier_badge_position'a göre konumlar. */}
       {/* zIndex 6: name overlay (en üstte) */}
       {dynCfg?.name_enabled && userName && (
         <NameOverlay size={size} name={userName} dynCfg={dynCfg} />

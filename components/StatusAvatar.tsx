@@ -401,28 +401,45 @@ export default function StatusAvatar({
         </View>
       )}
 
-      {/* ★ 2026-04-29: Tier badge — Free'yi hiç gösterme (default), Plus/Pro/GM için
-          minimalist yuvarlak ikon (yazı kaldırıldı, daha zarif).
-          ★ v108.14: Aktif çerçeve varsa rozet gizlenir — kullanıcının istediği
-          sade görünüm (avatar + frame + hafif gölge yeterli). */}
-      {/* ★ v109.4.2: TierBadge avatar üstünde, mini için xs ikon-only.
-           Sahne/profil çağrıları `tierBadgeSize="sm"` ile büyük "PRO" pill alır.
-           ★ 2026-05-11: Web admin tier_badge_enabled=true ise eski badge gizlenir
-           — AvatarFrame içindeki TierBadgeOverlay tarafından (web admin konum/stil ile)
-           render edilir, çift badge görünmesin. */}
-      {showTierBadge && normalizedTier !== 'Free' && !dynFrameCfg?.tier_badge_enabled && (
-        <View
-          style={{
-            position: 'absolute',
-            bottom: -2, right: -2,
-            transform: [{ scale: pillScale }],
-            zIndex: 4, elevation: 8,
-          }}
-          pointerEvents="none"
-        >
-          <TierBadge tier={normalizedTier} size={tierBadgeSize} />
-        </View>
-      )}
+      {/* ★ 2026-05-11: Tier badge tek sistem — mevcut TierBadge component'i (PRO pill)
+          korunur, web admin tier_badge_enabled=true ise SADECE KONUMU değişir.
+          Yeni overlay yaratılmaz, çift badge görünmez. */}
+      {showTierBadge && normalizedTier !== 'Free' && (() => {
+        // Web admin tier_badge_enabled=false ise default sağ-alt; true ise pos
+        const useDyn = !!dynFrameCfg?.tier_badge_enabled;
+        const tbPos = String(dynFrameCfg?.tier_badge_position || 'br');
+        // tl/tc/tr/ml/mr/bl/bc/br → top/left/right/bottom değerleri
+        const POS_STYLES: Record<string, any> = {
+          tl: { top: -2, left: -2 },
+          tc: { top: -2, alignSelf: 'center' },
+          tr: { top: -2, right: -2 },
+          ml: { top: '50%', left: -2, marginTop: -10 },
+          mr: { top: '50%', right: -2, marginTop: -10 },
+          bl: { bottom: -2, left: -2 },
+          bc: { bottom: -2, alignSelf: 'center' },
+          br: { bottom: -2, right: -2 },
+        };
+        // tc/bc için flex hizalama (transform translate ile ortala)
+        const isCenter = tbPos === 'tc' || tbPos === 'bc';
+        const positionStyle = useDyn
+          ? (isCenter
+              ? { ...(POS_STYLES[tbPos] || POS_STYLES.br), left: 0, right: 0, alignItems: 'center' }
+              : POS_STYLES[tbPos] || POS_STYLES.br)
+          : { bottom: -2, right: -2 };
+        return (
+          <View
+            style={{
+              position: 'absolute',
+              ...positionStyle,
+              transform: [{ scale: pillScale }],
+              zIndex: 4, elevation: 8,
+            }}
+            pointerEvents="none"
+          >
+            <TierBadge tier={normalizedTier} size={tierBadgeSize} />
+          </View>
+        );
+      })()}
     </View>
   );
 }

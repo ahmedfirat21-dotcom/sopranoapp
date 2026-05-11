@@ -1,4 +1,5 @@
-import React, { useMemo, useEffect, useRef } from 'react';
+import React, { useMemo, useEffect, useRef, useState } from 'react';
+import { ensureFrameConfig, getCachedFrameConfig, subscribeConfigChange } from '../../services/cosmeticConfigCache';
 import { View, Text, StyleSheet, Pressable, Image, useWindowDimensions, Animated, Easing, ScrollView, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -475,6 +476,20 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, i
   const avatarUrl = (user as any).disguise?.avatar_url || user.user?.avatar_url;
   // ★ v107: Mağaza avatar çerçevesi — disguise yokken aktif (gizlenmiş kullanıcı normal görünür)
   const activeFrame = (user as any).disguise ? null : (user.user as any)?.active_frame;
+
+  // ★ 2026-05-11: Web admin name overlay aktifse bizim default isim Text'ini
+  //   gizleriz (çift isim çakışmasın). RoomAvatarFrame içindeki NameOverlay
+  //   web admin'in konum/animasyon/glow ayarlarıyla render edecek.
+  const [frameCfg, setFrameCfg] = useState<any>(getCachedFrameConfig(activeFrame));
+  useEffect(() => {
+    if (!activeFrame) { setFrameCfg(null); return; }
+    ensureFrameConfig(activeFrame).then(setFrameCfg);
+    const unsub = subscribeConfigChange((id) => {
+      if (id === activeFrame) ensureFrameConfig(activeFrame).then(setFrameCfg);
+    });
+    return unsub;
+  }, [activeFrame]);
+  const hideDefaultName = !!frameCfg?.name_enabled;
   const { mic: rawMic, speaking, videoTrack, cameraOn } = micStatus;
   const isGhost = (user as any).is_ghost;
   // ★ D3: DB'de is_muted=true ise UI'da kesinlikle "muted" olarak göster — LiveKit
@@ -653,13 +668,19 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, i
           ★ 2026-05-05: Frame Lottie kanat'ları altta kalsın diye z-order yükseltildi.
           İsim ve tier badge avatar çerçevesinin üzerinde görünür. */}
       <View style={{ alignItems: 'center', maxWidth: cardWidth, gap: 2, zIndex: 50, elevation: 20 }}>
-        <Text
-          style={[s.speakerName, { maxWidth: cardWidth - 4, fontSize: cardWidth < 95 ? 10 : 11 }, isHost && { color: '#FFD700' }, isMod && !isHost && { color: '#C4B5FD' }]}
-          numberOfLines={1}
-          ellipsizeMode="tail"
-        >
-          {displayName}
-        </Text>
+        {/* ★ 2026-05-11: Web admin name aktifse bizim isim gizlenir (çift gösterim önle).
+             Frame içindeki NameOverlay web admin'in konum/şekil/animasyon ayarıyla render eder. */}
+        {!hideDefaultName && (
+          <Text
+            style={[s.speakerName, { maxWidth: cardWidth - 4, fontSize: cardWidth < 95 ? 10 : 11 }, isHost && { color: '#FFD700' }, isMod && !isHost && { color: '#C4B5FD' }]}
+            numberOfLines={1}
+            ellipsizeMode="tail"
+          >
+            {displayName}
+          </Text>
+        )}
+        {/* TierBadge zaten StatusAvatar içinde de var (sahnede ayrı yer). Web admin
+             tier_badge_enabled ile StatusAvatar konum değiştirir, burası ayrı altta kalır. */}
         <TierBadge tier={(user.user as any)?.subscription_tier} size="sm" />
       </View>
       </Pressable>
