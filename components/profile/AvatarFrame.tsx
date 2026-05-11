@@ -1207,10 +1207,11 @@ function AvatarFrameImpl({ frameId, size, forceRing, userName, userTier }: Props
       {/* ★ 2026-05-11: Tier badge AvatarFrame içinde render EDİLMEZ — çift badge
            çakışmasını önlemek için StatusAvatar mevcut TierBadge component'ini
            web admin tier_badge_position'a göre konumlar. */}
-      {/* zIndex 6: name overlay (en üstte) */}
-      {dynCfg?.name_enabled && userName && (
-        <NameOverlay size={size} name={userName} dynCfg={dynCfg} />
-      )}
+      {/* ★ 2026-05-11: NameOverlay KALDIRILDI — RN'de SVG yok, web admin
+           SVG textPath (yay/dairesel/eğim) ile mobile RN Text farklı render
+           ediyor → tutarsızlık + parent Text ile çakışma. Sade çözüm: name
+           overlay yok, mobile parent Text kalır (mevcut görünüm). Web admin'de
+           name ayarları yine görsel önizlemede çalışır ama mobile'a yansımaz. */}
     </>
   );
 

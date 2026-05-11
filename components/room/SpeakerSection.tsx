@@ -668,19 +668,13 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, i
           ★ 2026-05-05: Frame Lottie kanat'ları altta kalsın diye z-order yükseltildi.
           İsim ve tier badge avatar çerçevesinin üzerinde görünür. */}
       <View style={{ alignItems: 'center', maxWidth: cardWidth, gap: 2, zIndex: 50, elevation: 20 }}>
-        {/* ★ 2026-05-11: Web admin name aktifse bizim isim gizlenir (çift gösterim önle).
-             Frame içindeki NameOverlay web admin'in konum/şekil/animasyon ayarıyla render eder. */}
-        {!hideDefaultName && (
-          <Text
-            style={[s.speakerName, { maxWidth: cardWidth - 4, fontSize: cardWidth < 95 ? 10 : 11 }, isHost && { color: '#FFD700' }, isMod && !isHost && { color: '#C4B5FD' }]}
-            numberOfLines={1}
-            ellipsizeMode="tail"
-          >
-            {displayName}
-          </Text>
-        )}
-        {/* TierBadge zaten StatusAvatar içinde de var (sahnede ayrı yer). Web admin
-             tier_badge_enabled ile StatusAvatar konum değiştirir, burası ayrı altta kalır. */}
+        <Text
+          style={[s.speakerName, { maxWidth: cardWidth - 4, fontSize: cardWidth < 95 ? 10 : 11 }, isHost && { color: '#FFD700' }, isMod && !isHost && { color: '#C4B5FD' }]}
+          numberOfLines={1}
+          ellipsizeMode="tail"
+        >
+          {displayName}
+        </Text>
         <TierBadge tier={(user.user as any)?.subscription_tier} size="sm" />
       </View>
       </Pressable>
