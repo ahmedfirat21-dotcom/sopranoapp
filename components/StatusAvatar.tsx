@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Image, Text, StyleSheet, Platform, type ImageSourcePropType } from 'react-native';
+import { View, Image, Text, StyleSheet, Platform, Animated, Easing, type ImageSourcePropType } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { getAvatarSource } from '../constants/avatars';
@@ -9,8 +9,8 @@ import { migrateLegacyTier } from '../types';
 import AvatarFrame from './profile/AvatarFrame';
 import { getFrameAvatarRatio } from '../constants/frameLottieRegistry';
 import TierBadge from './TierBadge';
-import { ensureFrameConfig, getCachedFrameConfig } from '../services/cosmeticConfigCache';
-import { useEffect, useState } from 'react';
+import { ensureFrameConfig, getCachedFrameConfig, subscribeConfigChange } from '../services/cosmeticConfigCache';
+import { useEffect, useRef, useState } from 'react';
 
 interface StatusAvatarProps {
   /** Avatar URL string or ImageSource */
@@ -102,10 +102,21 @@ export default function StatusAvatar({
   const pillScale = Math.max(0.7, Math.min(1, size / 60));
 
   // ★ v213: Web admin'den yapılandırılmış frame_config — cosmetic_items.meta.frame_config
-  const [dynFrameCfg, setDynFrameCfg] = useState(getCachedFrameConfig(frameId));
+  const [dynFrameCfg, setDynFrameCfg] = useState<any>(getCachedFrameConfig(frameId));
   useEffect(() => {
     if (!frameId) { setDynFrameCfg(null); return; }
     ensureFrameConfig(frameId).then((cfg) => setDynFrameCfg(cfg));
+  }, [frameId]);
+
+  // ★ 2026-05-11: REALTIME — admin değişiklik yapınca AvatarFrame gibi
+  //   StatusAvatar da anında güncellensin (5dk cache yerine ~1sn).
+  useEffect(() => {
+    if (!frameId) return;
+    const unsub = subscribeConfigChange((id) => {
+      if (id !== frameId) return;
+      ensureFrameConfig(frameId).then((cfg) => setDynFrameCfg(cfg));
+    });
+    return unsub;
   }, [frameId]);
 
   // Avatar oranı: önce dynamic config, yoksa registry default
@@ -116,6 +127,150 @@ export default function StatusAvatar({
     shadowOpacity: dynFrameCfg.glow_intensity ?? 0.5,
     shadowRadius: 12 * (dynFrameCfg.glow_intensity ?? 0.5),
   } : null;
+
+  // ★ 2026-05-11: AVATAR HAREKET ANİMASYONLARI — web admin'deki ön izlemenin
+  //   mobil gerçek karşılığı. Hepsi paralel (toggle bağımsız), useNativeDriver:true.
+  const pulseAnim = useRef(new Animated.Value(0)).current;
+  const floatAnim = useRef(new Animated.Value(0)).current;
+  const shakeAnim = useRef(new Animated.Value(0)).current;
+  const swingAnim = useRef(new Animated.Value(0)).current;
+  const tiltAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (!dynFrameCfg?.avatar_pulse) return;
+    const dur = (dynFrameCfg?.avatar_pulse_speed ?? 2) * 500;
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(pulseAnim, { toValue: 1, duration: dur, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      Animated.timing(pulseAnim, { toValue: 0, duration: dur, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, [pulseAnim, dynFrameCfg?.avatar_pulse, dynFrameCfg?.avatar_pulse_speed]);
+
+  useEffect(() => {
+    if (!dynFrameCfg?.avatar_float) return;
+    const dur = (dynFrameCfg?.avatar_float_speed ?? 4) * 500;
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(floatAnim, { toValue: 1, duration: dur, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      Animated.timing(floatAnim, { toValue: 0, duration: dur, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, [floatAnim, dynFrameCfg?.avatar_float, dynFrameCfg?.avatar_float_speed]);
+
+  useEffect(() => {
+    if (!dynFrameCfg?.avatar_shake) return;
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(shakeAnim, { toValue: 1, duration: 120, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: -1, duration: 120, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: 0.5, duration: 120, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: -0.5, duration: 120, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: 0, duration: 120, useNativeDriver: true }),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, [shakeAnim, dynFrameCfg?.avatar_shake]);
+
+  useEffect(() => {
+    if (!dynFrameCfg?.avatar_swing) return;
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(swingAnim, { toValue: 1, duration: 625, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      Animated.timing(swingAnim, { toValue: 0, duration: 625, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      Animated.timing(swingAnim, { toValue: -1, duration: 625, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      Animated.timing(swingAnim, { toValue: 0, duration: 625, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, [swingAnim, dynFrameCfg?.avatar_swing]);
+
+  useEffect(() => {
+    if (!dynFrameCfg?.avatar_tilt) return;
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(tiltAnim, { toValue: 1, duration: 1500, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      Animated.timing(tiltAnim, { toValue: 0, duration: 1500, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, [tiltAnim, dynFrameCfg?.avatar_tilt]);
+
+  // Avatar transform stack — hepsi paralel
+  const avatarTransform: any[] = [];
+  if (dynFrameCfg?.avatar_pulse) avatarTransform.push({ scale: pulseAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.08] }) });
+  if (dynFrameCfg?.avatar_float) avatarTransform.push({ translateY: floatAnim.interpolate({ inputRange: [0, 1], outputRange: [0, -8] }) });
+  if (dynFrameCfg?.avatar_shake) avatarTransform.push({ translateX: shakeAnim.interpolate({ inputRange: [-1, 1], outputRange: [-2, 2] }) });
+  if (dynFrameCfg?.avatar_swing) avatarTransform.push({ rotate: swingAnim.interpolate({ inputRange: [-1, 1], outputRange: ['-8deg', '8deg'] }) });
+  if (dynFrameCfg?.avatar_tilt)  avatarTransform.push({ rotate: tiltAnim.interpolate({ inputRange: [0, 1], outputRange: ['-3deg', '3deg'] }) });
+
+  // ★ AVATAR ŞEKLİ — clip-path mobile'da yok, borderRadius mapping ile yaklaşım.
+  //   Tam parite için react-native-masked-view gerek; circle/squircle/rounded-square
+  //   mevcut araçlarla doğru, hex/star/diamond için 'squircle' fallback.
+  const shapeRadius = (() => {
+    const targetSize = frameId ? Math.round(size * dynamicAvatarRatio) : (size - borderWidth * 2 - 2);
+    switch (dynFrameCfg?.avatar_shape) {
+      case 'rounded-square': return targetSize * 0.22;
+      case 'squircle':       return targetSize * 0.36;
+      case 'hexagon':        return targetSize * 0.36; // squircle fallback
+      case 'star':           return targetSize * 0.36; // squircle fallback (clip-path yok)
+      case 'diamond':        return targetSize * 0.36; // squircle fallback
+      case 'circle':
+      default:               return targetSize / 2;
+    }
+  })();
+
+  // ★ AVATAR FİLTRE OVERLAY'leri — RN'de Image filter native değil.
+  //   Her filtre için kademeli overlay yaklaşımı: blur (expo-blur),
+  //   grayscale (siyah-beyaz overlay), sepia (kahverengi tint), brightness (siyah/beyaz),
+  //   saturation/hue (mümkün değil, skip + uyarı log).
+  const filterOverlays: React.ReactNode[] = [];
+  const targetSizeForFilters = frameId ? Math.round(size * dynamicAvatarRatio) : (size - borderWidth * 2 - 2);
+  if ((dynFrameCfg?.avatar_grayscale ?? 0) > 0) {
+    filterOverlays.push(
+      <View key="gray" pointerEvents="none" style={{
+        position: 'absolute', top: 0, left: 0,
+        width: targetSizeForFilters, height: targetSizeForFilters,
+        borderRadius: shapeRadius,
+        backgroundColor: 'rgba(128,128,128,1)',
+        opacity: (dynFrameCfg.avatar_grayscale / 100) * 0.55, // gri tone yaklaşımı
+      }} />
+    );
+  }
+  if ((dynFrameCfg?.avatar_sepia ?? 0) > 0) {
+    filterOverlays.push(
+      <View key="sepia" pointerEvents="none" style={{
+        position: 'absolute', top: 0, left: 0,
+        width: targetSizeForFilters, height: targetSizeForFilters,
+        borderRadius: shapeRadius,
+        backgroundColor: '#704214',
+        opacity: (dynFrameCfg.avatar_sepia / 100) * 0.4,
+      }} />
+    );
+  }
+  const brightnessVal = dynFrameCfg?.avatar_brightness ?? 1;
+  if (brightnessVal !== 1) {
+    const isUp = brightnessVal > 1;
+    filterOverlays.push(
+      <View key="bright" pointerEvents="none" style={{
+        position: 'absolute', top: 0, left: 0,
+        width: targetSizeForFilters, height: targetSizeForFilters,
+        borderRadius: shapeRadius,
+        backgroundColor: isUp ? 'white' : 'black',
+        opacity: Math.abs(brightnessVal - 1) * 0.4,
+      }} />
+    );
+  }
+
+  // ★ glow_pulse — Animated shadowOpacity (iOS) / overlay opacity (Android)
+  //   useNativeDriver:false çünkü shadowOpacity native driver'a yok.
+  const glowPulseAnim = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    if (!dynFrameCfg?.glow_enabled || !dynFrameCfg?.glow_pulse) return;
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(glowPulseAnim, { toValue: 1.4, duration: 900, easing: Easing.inOut(Easing.ease), useNativeDriver: false }),
+      Animated.timing(glowPulseAnim, { toValue: 1, duration: 900, easing: Easing.inOut(Easing.ease), useNativeDriver: false }),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, [glowPulseAnim, dynFrameCfg?.glow_enabled, dynFrameCfg?.glow_pulse]);
 
   return (
     <View style={{ width: size, height: size + (showTierBadge ? 8 : 0), position: 'relative' }}>
@@ -149,20 +304,40 @@ export default function StatusAvatar({
           },
         ]}
       >
-        <Image
-          source={source}
-          style={(() => {
-            // ★ v213: Avatar boyutu — dynamic frame config (web admin) öncelikli, yoksa registry default
-            const ratio = frameId ? dynamicAvatarRatio : 1.0;
-            const targetSize = frameId ? Math.round(size * ratio) : (size - borderWidth * 2 - 2);
-            return {
-              width: targetSize,
-              height: targetSize,
-              borderRadius: targetSize / 2,
-              ...(dynamicGlow ? Platform.select({ ios: dynamicGlow, android: { elevation: 16 } }) : {}),
-            };
-          })()}
-        />
+        {(() => {
+          // ★ 2026-05-11: Avatar render — web admin'den gelen avatar_* config'leri uygulanır.
+          //   Animated.View wrapper → transform stack (pulse/float/shake/swing/tilt).
+          //   Image → boyut + dinamik şekil (borderRadius mapping).
+          //   Filter overlay'leri → grayscale/sepia/brightness yaklaşımı.
+          const ratio = frameId ? dynamicAvatarRatio : 1.0;
+          const targetSize = frameId ? Math.round(size * ratio) : (size - borderWidth * 2 - 2);
+          // Glow pulse aktifse shadowRadius animated, değilse sabit
+          const glowStyle = dynamicGlow
+            ? Platform.select({
+                ios: dynFrameCfg?.glow_pulse
+                  ? { ...dynamicGlow, shadowRadius: glowPulseAnim.interpolate({ inputRange: [1, 1.4], outputRange: [dynamicGlow.shadowRadius, dynamicGlow.shadowRadius * 2] }) as any }
+                  : dynamicGlow,
+                android: { elevation: 16 },
+              })
+            : {};
+          return (
+            <Animated.View style={{
+              width: targetSize, height: targetSize,
+              transform: avatarTransform.length > 0 ? avatarTransform : undefined,
+            }}>
+              <Animated.Image
+                source={source}
+                style={{
+                  width: targetSize, height: targetSize,
+                  borderRadius: shapeRadius,
+                  ...glowStyle,
+                }}
+              />
+              {/* Avatar filtre overlay'leri (grayscale/sepia/brightness) */}
+              {filterOverlays}
+            </Animated.View>
+          );
+        })()}
       </View>
 
       {/* ★ v213f: Modern online indicator — gradient nokta + dual halo + glow.
