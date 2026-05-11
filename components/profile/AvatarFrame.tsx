@@ -20,7 +20,7 @@ import { View, StyleSheet, Platform, Image, Animated, Easing, Text } from 'react
 import { LinearGradient } from 'expo-linear-gradient';
 import { getFrameMeta, hasFrameLottie } from '../../constants/frameLottieRegistry';
 import { getCosmeticAsset, getCachedCosmeticAsset, type AssetMeta } from '../../services/cosmeticAssetCache';
-import { ensureFrameConfig, getCachedFrameConfig } from '../../services/cosmeticConfigCache';
+import { ensureFrameConfig, getCachedFrameConfig, subscribeConfigChange } from '../../services/cosmeticConfigCache';
 
 let LottieView: any = null;
 try {
@@ -328,6 +328,328 @@ function ParticleOverlay({ size, dynCfg }: { size: number; dynCfg: any }) {
   );
 }
 
+// ★ 2026-05-11: Background Halo — avatarın arkasında soft diffuse glow.
+//   Native radial-gradient yok; LinearGradient + opacity katmanlarıyla yaklaşık.
+//   Tek View + radial benzeri shadow ile basit ve performanslı.
+function BgHaloOverlay({ size, color, sizeMul, intensity }: {
+  size: number; color: string; sizeMul: number; intensity: number;
+}) {
+  const haloSize = size * sizeMul;
+  const offset = (haloSize - size) / 2;
+  return (
+    <View
+      pointerEvents="none"
+      style={{
+        position: 'absolute',
+        top: -offset, left: -offset,
+        width: haloSize, height: haloSize,
+        borderRadius: haloSize / 2,
+        backgroundColor: color,
+        opacity: intensity * 0.35,
+        zIndex: 0,
+        elevation: 0,
+        ...Platform.select({
+          ios: {
+            shadowColor: color,
+            shadowOffset: { width: 0, height: 0 },
+            shadowOpacity: intensity,
+            shadowRadius: haloSize / 4,
+          },
+          android: {},
+        }),
+      }}
+    />
+  );
+}
+
+// ★ 2026-05-11: Avatar Border — premium ring (avatar etrafında static halka)
+function AvatarBorderRing({ size, color, width, style: borderStyle }: {
+  size: number; color: string; width: number; style: 'solid' | 'dashed' | 'dotted' | 'double';
+}) {
+  // RN borderStyle 'double' desteklemez — fallback solid + ekstra inner ring
+  const isDouble = borderStyle === 'double';
+  const rnStyle = isDouble ? 'solid' : borderStyle;
+  return (
+    <>
+      <View
+        pointerEvents="none"
+        style={{
+          position: 'absolute',
+          top: 0, left: 0,
+          width: size, height: size,
+          borderRadius: size / 2,
+          borderColor: color,
+          borderWidth: width,
+          borderStyle: rnStyle,
+          zIndex: 2,
+          elevation: 2,
+        }}
+      />
+      {isDouble && (
+        <View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            top: width + 1, left: width + 1,
+            width: size - 2 * (width + 1), height: size - 2 * (width + 1),
+            borderRadius: (size - 2 * (width + 1)) / 2,
+            borderColor: color,
+            borderWidth: 1,
+            zIndex: 2,
+            elevation: 2,
+          }}
+        />
+      )}
+    </>
+  );
+}
+
+// ★ 2026-05-11: Pulse Ring (radar dalgası) — frame_pulse_ring true ise 3 katman
+//   dışa yayılan halka. Web admin'deki @keyframes pulse-ring karşılığı.
+function PulseRingOverlay({ size, color }: { size: number; color: string }) {
+  const a1 = useRef(new Animated.Value(0)).current;
+  const a2 = useRef(new Animated.Value(0)).current;
+  const a3 = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const mk = (anim: Animated.Value, delay: number) =>
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(delay),
+          Animated.timing(anim, { toValue: 1, duration: 2400, easing: Easing.out(Easing.ease), useNativeDriver: true }),
+          Animated.timing(anim, { toValue: 0, duration: 0, useNativeDriver: true }),
+        ])
+      );
+    const l1 = mk(a1, 0);
+    const l2 = mk(a2, 800);
+    const l3 = mk(a3, 1600);
+    l1.start(); l2.start(); l3.start();
+    return () => { l1.stop(); l2.stop(); l3.stop(); };
+  }, [a1, a2, a3]);
+
+  return (
+    <>
+      {[a1, a2, a3].map((anim, i) => {
+        const scale = anim.interpolate({ inputRange: [0, 1], outputRange: [1, 2.2] });
+        const opacity = anim.interpolate({ inputRange: [0, 1], outputRange: [0.7, 0] });
+        return (
+          <Animated.View
+            key={i}
+            pointerEvents="none"
+            style={{
+              position: 'absolute',
+              top: 0, left: 0,
+              width: size, height: size,
+              borderRadius: size / 2,
+              borderWidth: 2,
+              borderColor: color,
+              zIndex: 1,
+              elevation: 1,
+              opacity,
+              transform: [{ scale }],
+            }}
+          />
+        );
+      })}
+    </>
+  );
+}
+
+// ★ 2026-05-11: Frame Shimmer — frame üzerinden ışık süpürmesi.
+//   Web'de mixBlendMode:overlay + bg-gradient sweep. Mobile'da basit overlay
+//   View opacity pulse ile yaklaşık. expo-linear-gradient ile gradient sweep.
+function FrameShimmerOverlay({ size }: { size: number }) {
+  const shimmer = useRef(new Animated.Value(-1)).current;
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.timing(shimmer, { toValue: 1, duration: 2500, easing: Easing.linear, useNativeDriver: true })
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [shimmer]);
+  const translateX = shimmer.interpolate({ inputRange: [-1, 1], outputRange: [-size, size] });
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={{
+        position: 'absolute',
+        top: 0, left: 0,
+        width: size, height: size,
+        borderRadius: size / 2,
+        overflow: 'hidden',
+        zIndex: 4,
+        elevation: 4,
+        transform: [{ translateX }],
+      }}
+    >
+      <LinearGradient
+        colors={['transparent', 'rgba(255,255,255,0.4)', 'transparent']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={{ width: '100%', height: '100%' }}
+      />
+    </Animated.View>
+  );
+}
+
+// ★ 2026-05-11: Tier Badge — 8 nokta + 4 stil overlay
+//   Web'deki BADGE_POSITIONS karşılığı. PRO örnek metin (mobilde gerçek
+//   user.tier ile değiştirilecek).
+const BADGE_POS_MOBILE: Record<string, { x: number; y: number }> = {
+  tl: { x: -0.5, y: -0.5 }, tc: { x: 0, y: -0.55 }, tr: { x: 0.5, y: -0.5 },
+  ml: { x: -0.55, y: 0 },                            mr: { x: 0.55, y: 0 },
+  bl: { x: -0.5, y: 0.5 },  bc: { x: 0, y: 0.55 },   br: { x: 0.5, y: 0.5 },
+};
+function TierBadgeOverlay({ size, position, style: badgeStyle, label }: {
+  size: number; position: string; style: string; label: string;
+}) {
+  const pos = BADGE_POS_MOBILE[position] || BADGE_POS_MOBILE.tr;
+  const badgeFont = Math.max(8, Math.round(size * 0.1));
+  const padH = Math.round(badgeFont * 0.7);
+  const padV = Math.round(badgeFont * 0.25);
+  const isStar = badgeStyle === 'star';
+  const isCapsule = badgeStyle === 'capsule';
+  const radius = isCapsule ? 999 : isStar ? 0 : 6;
+  return (
+    <View
+      pointerEvents="none"
+      style={{
+        position: 'absolute',
+        left: size / 2 + pos.x * size,
+        top: size / 2 + pos.y * size,
+        zIndex: 5, elevation: 5,
+        transform: [{ translateX: -16 }, { translateY: -10 }],
+      }}
+    >
+      <View style={{
+        backgroundColor: '#fbbf24',
+        paddingHorizontal: padH,
+        paddingVertical: padV,
+        borderRadius: radius,
+        borderWidth: 1,
+        borderColor: 'rgba(251,191,36,0.6)',
+        ...Platform.select({
+          ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.4, shadowRadius: 4 },
+          android: { elevation: 5 },
+        }),
+      }}>
+        <Text style={{ color: '#0a0f1a', fontSize: badgeFont, fontWeight: '800', letterSpacing: 0.5 }}>
+          {label}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+// ★ 2026-05-11: Name Overlay — kullanıcı adı çerçeve etrafında.
+//   react-native-svg yok, bu yüzden curve_style 'flat' her zaman; yay/dairesel
+//   web'de gözükür ama mobilde düz çıkar (post-launch SVG eklenince curve).
+//   Yüzdelik bazlı: name_offset = % avatar yarıçapı, name_size = % avatar boyutu.
+function NameOverlay({ size, name, dynCfg }: { size: number; name: string; dynCfg: any }) {
+  const offsetPct = dynCfg?.name_offset ?? 25;
+  const sizePct = dynCfg?.name_size ?? 14;
+  const fontPx = Math.max(8, Math.round((sizePct / 100) * size));
+  const offsetPx = (offsetPct / 100) * (size / 2);
+  const radius = size / 2 + offsetPx;
+
+  // Konuma göre absolute pozisyon — center bazlı
+  const pos = dynCfg?.name_position || 'bottom';
+  let posStyle: any = {};
+  switch (pos) {
+    case 'top':    posStyle = { top: -radius - fontPx, left: 0, right: 0, alignItems: 'center' }; break;
+    case 'bottom': posStyle = { bottom: -radius - fontPx, left: 0, right: 0, alignItems: 'center' }; break;
+    case 'left':   posStyle = { right: size + offsetPx, top: 0, bottom: 0, justifyContent: 'center' }; break;
+    case 'right':  posStyle = { left: size + offsetPx, top: 0, bottom: 0, justifyContent: 'center' }; break;
+  }
+
+  // Animasyon zinciri — pulse / float / shake / swing / tilt / breathe / wobble / spin
+  const animVal = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    let loop: Animated.CompositeAnimation | null = null;
+    if (dynCfg?.name_pulse) {
+      loop = Animated.loop(Animated.sequence([
+        Animated.timing(animVal, { toValue: 1, duration: (dynCfg?.name_pulse_speed ?? 2) * 500, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(animVal, { toValue: 0, duration: (dynCfg?.name_pulse_speed ?? 2) * 500, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      ]));
+    } else if (dynCfg?.name_float) {
+      loop = Animated.loop(Animated.sequence([
+        Animated.timing(animVal, { toValue: 1, duration: (dynCfg?.name_float_speed ?? 4) * 500, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(animVal, { toValue: 0, duration: (dynCfg?.name_float_speed ?? 4) * 500, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      ]));
+    } else if (dynCfg?.name_breathe) {
+      loop = Animated.loop(Animated.sequence([
+        Animated.timing(animVal, { toValue: 1, duration: 2000, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(animVal, { toValue: 0, duration: 2000, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      ]));
+    } else if (dynCfg?.name_rotation_continuous) {
+      loop = Animated.loop(
+        Animated.timing(animVal, { toValue: 1, duration: (dynCfg?.name_rotation_speed ?? 12) * 1000, easing: Easing.linear, useNativeDriver: true })
+      );
+    }
+    loop?.start();
+    return () => { loop?.stop(); };
+  }, [animVal, dynCfg?.name_pulse, dynCfg?.name_pulse_speed, dynCfg?.name_float, dynCfg?.name_float_speed, dynCfg?.name_breathe, dynCfg?.name_rotation_continuous, dynCfg?.name_rotation_speed]);
+
+  // Renk döngüsü (color_cycle veya name_color_cycle)
+  const [cycleColor, setCycleColor] = useState<string | null>(null);
+  useEffect(() => {
+    if (!dynCfg?.name_color_cycle) { setCycleColor(null); return; }
+    const speedSec = dynCfg?.color_cycle_speed ?? 12;
+    const startMs = Date.now();
+    const id = setInterval(() => {
+      const elapsed = (Date.now() - startMs) / 1000;
+      const hue = ((elapsed / speedSec) * 360) % 360;
+      setCycleColor(`hsl(${Math.round(hue)}, 85%, 65%)`);
+    }, 100);
+    return () => clearInterval(id);
+  }, [dynCfg?.name_color_cycle, dynCfg?.color_cycle_speed]);
+
+  // Transform stack
+  const transformStack: any[] = [];
+  if (dynCfg?.name_pulse) transformStack.push({ scale: animVal.interpolate({ inputRange: [0, 1], outputRange: [1, 1.1] }) });
+  if (dynCfg?.name_float) transformStack.push({ translateY: animVal.interpolate({ inputRange: [0, 1], outputRange: [0, -6] }) });
+  if (dynCfg?.name_breathe) transformStack.push({ scale: animVal.interpolate({ inputRange: [0, 1], outputRange: [1, 1.04] }) });
+  if (dynCfg?.name_rotation_continuous) transformStack.push({ rotate: animVal.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }) });
+  // Static eğim (animation aktifse skip — çakışmasın)
+  const hasMovementRotate = !!(dynCfg?.name_rotation_continuous);
+  if (!hasMovementRotate && (dynCfg?.name_rotation ?? 0) !== 0) {
+    transformStack.push({ rotate: `${dynCfg?.name_rotation}deg` });
+  }
+
+  const color = cycleColor || dynCfg?.name_color || '#f8fafc';
+  const glowColor = dynCfg?.name_glow_color || color;
+  const glowIntensity = dynCfg?.name_glow_intensity ?? 0.6;
+  const opacity = dynCfg?.name_opacity ?? 1;
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={{
+        position: 'absolute',
+        ...posStyle,
+        zIndex: 6, elevation: 6,
+        opacity,
+        transform: transformStack.length > 0 ? transformStack : undefined,
+      }}
+    >
+      <Text
+        numberOfLines={1}
+        style={{
+          color,
+          fontSize: fontPx,
+          fontWeight: dynCfg?.name_bold ? '700' : '400',
+          textAlign: 'center',
+          textShadowColor: dynCfg?.name_glow ? glowColor : 'rgba(0,0,0,0.7)',
+          textShadowRadius: dynCfg?.name_glow ? 4 + glowIntensity * 6 : 2,
+          textShadowOffset: { width: 0, height: 1 },
+        }}
+      >
+        {name}
+      </Text>
+    </Animated.View>
+  );
+}
+
 // ★ v215: PNG frame — statik Image render. Lottie'siz, hafif, premium PNG çerçeveler.
 function PngFrame({ meta, size, dynCfg }: { meta: any; size: number; dynCfg?: any }) {
   const dynScale = dynCfg?.frame_scale ?? 1.0;
@@ -516,6 +838,12 @@ interface Props {
    *  Sahnedeki host olmayan kullanıcılarda (avatar dengesizliği için) kullanılır;
    *  herkes Plus halka boyutunda görünür, sadece host kanatlı Lottie alır. */
   forceRing?: boolean;
+  /** ★ 2026-05-11: Opsiyonel — name overlay aktifse gerçek kullanıcı adı render edilir.
+   *  Sağlanmadıysa name_enabled config olsa bile gösterilmez (ham frame). */
+  userName?: string;
+  /** ★ 2026-05-11: Opsiyonel — tier badge aktifse rozet metni (PRO/PLUS/FREE).
+   *  Sağlanmadıysa tier_badge_enabled olsa bile gösterilmez. */
+  userTier?: string;
 }
 
 // ★ v110.7 (6 May 2026): Web admin panelinden eklenen Lottie/PNG URL'lerinden runtime
@@ -622,13 +950,25 @@ function RemoteAssetFrame({ frameId, size, dynCfg }: { frameId: string; size: nu
   return null;
 }
 
-function AvatarFrameImpl({ frameId, size, forceRing }: Props) {
+function AvatarFrameImpl({ frameId, size, forceRing, userName, userTier }: Props) {
   // ★ v213f: Web admin'den ayarlanan dynamic frame config — Hook her zaman çağrılmalı,
   //   conditional return ÖNCESİNDE; aksi halde "rendered fewer hooks" crash riski.
   const [dynCfg, setDynCfg] = useState<any>(getCachedFrameConfig(frameId));
   useEffect(() => {
     if (!frameId) { setDynCfg(null); return; }
     ensureFrameConfig(frameId).then(setDynCfg);
+  }, [frameId]);
+
+  // ★ 2026-05-11: REALTIME PUSH — admin değişiklik yapınca cache invalidate olur,
+  //   listener tetiklenir, hemen fresh config çekilip state'e yazılır.
+  //   Önceden 5dk bekleyip yeni render'da fetch oluyordu; artık ~1sn.
+  useEffect(() => {
+    if (!frameId) return;
+    const unsub = subscribeConfigChange((changedId) => {
+      if (changedId !== frameId) return;
+      ensureFrameConfig(frameId).then(setDynCfg);
+    });
+    return unsub;
   }, [frameId]);
 
   if (!frameId) return null;
@@ -638,12 +978,61 @@ function AvatarFrameImpl({ frameId, size, forceRing }: Props) {
   //   sade halka — boyut dengesi için kullanıcı talebi).
   const meta = getFrameMeta(frameId);
   const hasParticles = dynCfg?.particle_type && dynCfg.particle_type !== 'none';
+
+  // ★ 2026-05-11: Tüm overlay katmanlar — her render branch için tek yerden oluşturulur
+  //   (Lottie / PNG / Remote / palette branch'lerinin hepsinde aynı extras).
+  const renderExtras = () => (
+    <>
+      {/* zIndex 0: bg_halo (en altta, frame ve avatar arkasında) */}
+      {dynCfg?.bg_halo_enabled && (
+        <BgHaloOverlay
+          size={size}
+          color={dynCfg?.bg_halo_color || '#fbbf24'}
+          sizeMul={dynCfg?.bg_halo_size ?? 1.6}
+          intensity={dynCfg?.bg_halo_intensity ?? 0.6}
+        />
+      )}
+      {/* zIndex 1: frame_pulse_ring (radar dalgası) */}
+      {dynCfg?.frame_pulse_ring && (
+        <PulseRingOverlay size={size} color={dynCfg?.glow_color || '#fbbf24'} />
+      )}
+      {/* zIndex 2: avatar_border (premium ring) */}
+      {dynCfg?.avatar_border_enabled && (
+        <AvatarBorderRing
+          size={size}
+          color={dynCfg?.avatar_border_color || '#fbbf24'}
+          width={dynCfg?.avatar_border_width ?? 3}
+          style={dynCfg?.avatar_border_style || 'solid'}
+        />
+      )}
+      {/* zIndex 4: frame_shimmer (ışık süpürmesi) */}
+      {dynCfg?.frame_shimmer && (
+        <FrameShimmerOverlay size={size} />
+      )}
+      {/* zIndex 4: particle */}
+      {hasParticles && <ParticleOverlay size={size} dynCfg={dynCfg} />}
+      {/* zIndex 5: tier_badge */}
+      {dynCfg?.tier_badge_enabled && userTier && (
+        <TierBadgeOverlay
+          size={size}
+          position={dynCfg?.tier_badge_position || 'tr'}
+          style={dynCfg?.tier_badge_style || 'chip'}
+          label={userTier}
+        />
+      )}
+      {/* zIndex 6: name overlay (en üstte) */}
+      {dynCfg?.name_enabled && userName && (
+        <NameOverlay size={size} name={userName} dynCfg={dynCfg} />
+      )}
+    </>
+  );
+
   // ★ v215: PNG frame — Image component ile render
-  if (meta && meta.type === 'png' && size >= LOTTIE_MIN_AVATAR_SIZE && !forceRing) {
+  if (meta && (meta as any).type === 'png' && size >= LOTTIE_MIN_AVATAR_SIZE && !forceRing) {
     return (
       <>
         <PngFrame meta={meta} size={size} dynCfg={dynCfg} />
-        {hasParticles && <ParticleOverlay size={size} dynCfg={dynCfg} />}
+        {renderExtras()}
       </>
     );
   }
@@ -652,7 +1041,7 @@ function AvatarFrameImpl({ frameId, size, forceRing }: Props) {
     return (
       <>
         <LottieFrame meta={meta} size={size} dynCfg={dynCfg} />
-        {hasParticles && <ParticleOverlay size={size} dynCfg={dynCfg} />}
+        {renderExtras()}
       </>
     );
   }
@@ -665,7 +1054,7 @@ function AvatarFrameImpl({ frameId, size, forceRing }: Props) {
       return (
         <>
           <RemoteAssetFrame frameId={frameId} size={size} dynCfg={dynCfg} />
-          {hasParticles && <ParticleOverlay size={size} dynCfg={dynCfg} />}
+          {renderExtras()}
         </>
       );
     }
@@ -680,49 +1069,60 @@ function AvatarFrameImpl({ frameId, size, forceRing }: Props) {
   const thickness = Math.min(3, Math.max(2, Math.round(size * 0.04)));
 
   return (
-    <View
-      pointerEvents="none"
-      style={{
-        position: 'absolute',
-        top: 0, left: 0,
-        width: size, height: size,
-        // ★ v110.9 (7 May 2026): elevation 0→3 — Android'de palette halka Image
-        //   üstünde POP olsun. Tier badge zIndex 5 hâlâ üstte.
-        zIndex: 3,
-        elevation: 3,
-      }}
-    >
-      {/* Dış halka — avatar boyutunda, border içeride */}
+    <>
       <View
-        style={{
-          width: size, height: size, borderRadius: size / 2,
-          borderWidth: thickness,
-          borderColor: palette.outer[1] || palette.outer[0],
-          ...Platform.select({
-            ios: {
-              shadowColor: palette.glowIos,
-              shadowOffset: { width: 0, height: 0 },
-              shadowOpacity: 0.5, shadowRadius: 4,
-            },
-            android: {},
-          }),
-        }}
-      />
-      {/* İç parlaklık çizgisi — avatarın iç kenarında */}
-      <View
+        pointerEvents="none"
         style={{
           position: 'absolute',
-          top: thickness, left: thickness,
-          width: size - thickness * 2, height: size - thickness * 2,
-          borderRadius: (size - thickness * 2) / 2,
-          borderWidth: 0.8, borderColor: palette.inner,
-          backgroundColor: 'transparent',
+          top: 0, left: 0,
+          width: size, height: size,
+          // ★ v110.9 (7 May 2026): elevation 0→3 — Android'de palette halka Image
+          //   üstünde POP olsun. Tier badge zIndex 5 hâlâ üstte.
+          zIndex: 3,
+          elevation: 3,
         }}
-      />
-    </View>
+      >
+        {/* Dış halka — avatar boyutunda, border içeride */}
+        <View
+          style={{
+            width: size, height: size, borderRadius: size / 2,
+            borderWidth: thickness,
+            borderColor: palette.outer[1] || palette.outer[0],
+            ...Platform.select({
+              ios: {
+                shadowColor: palette.glowIos,
+                shadowOffset: { width: 0, height: 0 },
+                shadowOpacity: 0.5, shadowRadius: 4,
+              },
+              android: {},
+            }),
+          }}
+        />
+        {/* İç parlaklık çizgisi — avatarın iç kenarında */}
+        <View
+          style={{
+            position: 'absolute',
+            top: thickness, left: thickness,
+            width: size - thickness * 2, height: size - thickness * 2,
+            borderRadius: (size - thickness * 2) / 2,
+            borderWidth: 0.8, borderColor: palette.inner,
+            backgroundColor: 'transparent',
+          }}
+        />
+      </View>
+      {renderExtras()}
+    </>
   );
 }
 
 // ★ v108.16: React.memo — frameId/size değişmedikçe re-render etme (ağır Lottie load yok).
-const AvatarFrame = React.memo(AvatarFrameImpl, (a, b) => a.frameId === b.frameId && a.size === b.size && a.forceRing === b.forceRing);
+//   2026-05-11: userName + userTier prop'ları da equality kontrolüne eklendi
+//   (name overlay ve tier badge için).
+const AvatarFrame = React.memo(AvatarFrameImpl, (a, b) =>
+  a.frameId === b.frameId &&
+  a.size === b.size &&
+  a.forceRing === b.forceRing &&
+  a.userName === b.userName &&
+  a.userTier === b.userTier
+);
 export default AvatarFrame;

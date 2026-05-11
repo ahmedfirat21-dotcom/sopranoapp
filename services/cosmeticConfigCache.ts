@@ -138,10 +138,27 @@ export async function ensureEntryConfig(effectId: string | null | undefined): Pr
   return cfg;
 }
 
-/** Manuel cache invalidate (admin değişiklik sonrası). */
+/** ★ 2026-05-11: Listener pattern — invalidate sonrası mount edilmiş bileşenler
+ *  state'lerini güncellesin diye. cache silmek yetmiyor çünkü bileşenler dynCfg'i
+ *  state olarak tutar; bir sonraki render'da değişmedikçe yeni veriyi çekmez.
+ *  AvatarFrame subscribeConfigChange ile dinler, kendi item id'si geldiğinde
+ *  ensureFrameConfig çağırıp state'i günceller. */
+type ConfigChangeListener = (itemId: string) => void;
+const _listeners = new Set<ConfigChangeListener>();
+
+export function subscribeConfigChange(fn: ConfigChangeListener): () => void {
+  _listeners.add(fn);
+  return () => { _listeners.delete(fn); };
+}
+
+/** Manuel cache invalidate (admin değişiklik sonrası). Listener'lara da bildirir. */
 export function invalidateConfig(itemId: string) {
   frameCache.delete(itemId);
   entryCache.delete(itemId);
+  // Tüm subscriber'lara haber ver — sadece kendi itemId'sini eşleştirenler tepki verir
+  _listeners.forEach(fn => {
+    try { fn(itemId); } catch { /* listener crash'leri sessizce yut, diğerleri devam etsin */ }
+  });
 }
 
 // ★ 2026-05-10: Web admin'den frame_config / entry_config güncellenince mobil
