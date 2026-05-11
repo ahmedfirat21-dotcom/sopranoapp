@@ -18,7 +18,7 @@ import { migrateLegacyTier } from '../types';
 import AvatarFrame from './profile/AvatarFrame';
 import { getFrameAvatarRatio } from '../constants/frameLottieRegistry';
 import TierBadge from './TierBadge';
-import { ensureFrameConfig, getCachedFrameConfig, subscribeConfigChange, pickSizeKey } from '../services/cosmeticConfigCache';
+import { ensureFrameConfig, getCachedFrameConfig, subscribeConfigChange, pickSizeKey, type SizeKey } from '../services/cosmeticConfigCache';
 import { useEffect, useRef, useState } from 'react';
 
 // ★ v1.3.54 (2026-05-11): SVG Filter matrix yardımcıları — web admin avatar filter
@@ -92,6 +92,11 @@ interface StatusAvatarProps {
   /** ★ 2026-05-11: Web admin frame name overlay için kullanıcı adı.
    *  Sağlanmadıysa name_enabled config olsa bile gösterilmez. */
   displayName?: string;
+  /** ★ v1.3.55: Hangi size_overrides anahtarı kullanılacak — set edilirse pickSizeKey(size)
+   *  yerine kullanılır. ProfileHero gibi "ekran bağlamı" bilinen yerlerde anahtar override edilebilir
+   *  (ProfileHero size=92 normalde 'listener' key alır ama context "profil sayfası" olduğu için
+   *  contextKey="profile" geçilir). */
+  contextKey?: SizeKey;
 }
 
 /**
@@ -123,6 +128,7 @@ export default function StatusAvatar({
   frameId,
   tierBadgeSize = 'xs',
   displayName,
+  contextKey,
 }: StatusAvatarProps) {
   const radius = size / 2;
   // ★ 2026-04-21: Daha zarif nokta — %26 yerine %22, çerçeve 0.3x → 0.18x
@@ -158,8 +164,8 @@ export default function StatusAvatar({
   // Pill badge boyut hesabı (avatar boyutuna göre ölçekli)
   const pillScale = Math.max(0.7, Math.min(1, size / 60));
 
-  // ★ v1.3.54: Boyuta göre size_overrides uygulanır.
-  const sizeKey = pickSizeKey(size);
+  // ★ v1.3.55: contextKey set edilirse kullan (parent ekran "ben profilim" der), yoksa pickSizeKey(size).
+  const sizeKey: SizeKey = contextKey ?? pickSizeKey(size);
   const [dynFrameCfg, setDynFrameCfg] = useState<any>(getCachedFrameConfig(frameId, sizeKey));
   useEffect(() => {
     if (!frameId) { setDynFrameCfg(null); return; }
@@ -312,6 +318,7 @@ export default function StatusAvatar({
         size={size}
         userName={displayName}
         userTier={normalizedTier !== 'Free' ? normalizedTier.toUpperCase() : undefined}
+        contextKey={contextKey}
       />
       {/* ★ v108.13: Aktif çerçeve varsa tier border'ı kapat — çift halka görünmesin.
          Çerçeve zaten tema halkası; tier rozeti (showTierBadge) avatar altında ayrıca gösterilir.

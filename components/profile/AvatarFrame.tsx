@@ -21,7 +21,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path, Text as SvgText, TextPath, Defs } from 'react-native-svg';
 import { getFrameMeta, hasFrameLottie } from '../../constants/frameLottieRegistry';
 import { getCosmeticAsset, getCachedCosmeticAsset, type AssetMeta } from '../../services/cosmeticAssetCache';
-import { ensureFrameConfig, getCachedFrameConfig, subscribeConfigChange, pickSizeKey } from '../../services/cosmeticConfigCache';
+import { ensureFrameConfig, getCachedFrameConfig, subscribeConfigChange, pickSizeKey, type SizeKey } from '../../services/cosmeticConfigCache';
 
 let LottieView: any = null;
 try {
@@ -1176,6 +1176,8 @@ interface Props {
   /** ★ 2026-05-11: Opsiyonel — tier badge aktifse rozet metni (PRO/PLUS/FREE).
    *  Sağlanmadıysa tier_badge_enabled olsa bile gösterilmez. */
   userTier?: string;
+  /** ★ v1.3.55: size_overrides anahtarı override'ı (parent ekran "ben profilim" der). */
+  contextKey?: SizeKey;
 }
 
 // ★ v110.7 (6 May 2026): Web admin panelinden eklenen Lottie/PNG URL'lerinden runtime
@@ -1315,10 +1317,10 @@ function RemoteAssetFrame({ frameId, size, dynCfg }: { frameId: string; size: nu
   return null;
 }
 
-function AvatarFrameImpl({ frameId, size, forceRing, userName, userTier }: Props) {
-  // ★ v1.3.54: Boyuta göre size_overrides uygulanır — mini/listener/speaker/stage_host/profile
-  //   her biri kendi ayar override'ına sahip olabilir.
-  const sizeKey = pickSizeKey(size);
+function AvatarFrameImpl({ frameId, size, forceRing, userName, userTier, contextKey }: Props) {
+  // ★ v1.3.55: contextKey set edilirse onu kullan (ProfileHero gibi "ekran bağlamı" bilen yerler),
+  //   yoksa pickSizeKey(size) ile pixel boyutuna göre seç.
+  const sizeKey: SizeKey = contextKey ?? pickSizeKey(size);
   const [dynCfg, setDynCfg] = useState<any>(getCachedFrameConfig(frameId, sizeKey));
   useEffect(() => {
     if (!frameId) { setDynCfg(null); return; }
@@ -1483,6 +1485,7 @@ const AvatarFrame = React.memo(AvatarFrameImpl, (a, b) =>
   a.size === b.size &&
   a.forceRing === b.forceRing &&
   a.userName === b.userName &&
-  a.userTier === b.userTier
+  a.userTier === b.userTier &&
+  a.contextKey === b.contextKey
 );
 export default AvatarFrame;

@@ -16,6 +16,7 @@ const iconShadow = {
 import StatusAvatar from '../StatusAvatar';
 import type { UserTitle } from '../../services/userTitles';
 import type { SubscriptionTier } from '../../types';
+import { useFrameConfig } from '../../services/cosmeticConfigCache';
 
 const _cardShadow = Shadows.card;
 const _textGlow = Shadows.text;
@@ -50,8 +51,6 @@ interface Props {
   /** ★ v110.3: Son aktif zamanı (ISO) — online değilse "X dk önce aktifti" gösterir.
    *  Privacy: settings.show_online_status kapalıysa backend null döner, hiç gösterilmez. */
   lastSeen?: string | null;
-  /** ★ v110.5: Doğrulama tiki (mavi tik) — ismin yanında gösterilir */
-  isVerified?: boolean;
   /** Kullanıcının seviyesi (level system) */
   userLevel?: number;
   /** ★ v107: Mağazadan satın alınmış aktif çerçeve (atelier item id) — avatar etrafında render */
@@ -61,15 +60,22 @@ interface Props {
   /** ★ v108.16: Kullanıcının envanterinde frame var ama henüz equip etmemiş —
    *  ribbon butonu üstüne "hazır" hint'i (yeşil ✓ + pulse) göstermek için. */
   hasUnequippedFrame?: boolean;
+  /** ★ v1.3.54: profiles.show_tier_badge — false ise tier rozeti gizlenir. Default true. */
+  showTierBadge?: boolean;
 }
 
 export default function ProfileHero({
   displayName, username, bio, avatarUrl, subscriptionTier, isAdmin, userTitle,
   stats, statsLoading, onEdit, onBioPress, onFollowersPress, onRoomsPress, onGiftsPress, onAvatarPress,
-  memberSince, boostExpiresAt, isOnline, lastSeen, isVerified, activeFrame, onFramePress, hasUnequippedFrame,
+  memberSince, boostExpiresAt, isOnline, lastSeen, activeFrame, onFramePress, hasUnequippedFrame,
+  showTierBadge = true,
 }: Props) {
   // ★ v110: Phase 2 fetch tamamlanana kadar sayı yerine "—" — yanıltıcı 0 flash önlenir.
   const fmtStat = (n: number | undefined) => statsLoading ? '—' : String(n ?? 0);
+  // ★ v1.3.54: Frame'in name_enabled aktifse, çerçeve etrafında isim render edilir;
+  //   bu yüzden hero altındaki ayrı isim Text'i gizlenir → çift isim çakışması yok.
+  const frameCfg = useFrameConfig(activeFrame, 'profile');
+  const frameRendersName = !!frameCfg?.name_enabled;
   // Hint pulse animasyonu (sadece hasUnequippedFrame durumunda)
   const pulseAnim = useRef(new Animated.Value(1)).current;
   useEffect(() => {
@@ -171,35 +177,24 @@ export default function ProfileHero({
             hitSlop={4}
             accessibilityLabel="Avatarı büyüt"
           >
-            <StatusAvatar uri={avatarUrl} size={92} tier={subscriptionTier} isAdmin={isAdmin} isOnline={isOnline} isSelf={!!onEdit} showTierBadge tierBadgeSize="sm" frameId={activeFrame} displayName={displayName} />
+            <StatusAvatar uri={avatarUrl} size={92} tier={subscriptionTier} isAdmin={isAdmin} isOnline={isOnline} isSelf={!!onEdit} showTierBadge={showTierBadge} tierBadgeSize="sm" frameId={activeFrame} displayName={displayName} contextKey="profile" />
           </Pressable>
         </View>
 
-        {/* İsim ortalanmış */}
+        {/* İsim ortalanmış — frame name_enabled true ise gizli (çerçeve etrafında render edilir) */}
         <View style={s.nameRow}>
-          <Text
-            style={[s.displayName, isAdmin && { color: '#F87171' }]}
-            numberOfLines={1}
-            adjustsFontSizeToFit
-            minimumFontScale={0.7}
-          >
-            {displayName}
-          </Text>
+          {!frameRendersName && (
+            <Text
+              style={[s.displayName, isAdmin && { color: '#F87171' }]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.7}
+            >
+              {displayName}
+            </Text>
+          )}
           {isAdmin && (
             <Ionicons name="shield-checkmark" size={16} color="#DC2626" style={[{ marginLeft: 6 }, iconShadow]} />
-          )}
-          {/* ★ v110.5: Doğrulama tiki (admin değilse, verified ise) */}
-          {!isAdmin && isVerified && (
-            <View style={{ marginLeft: 6 }}>
-              <View style={{
-                width: 16, height: 16, borderRadius: 8,
-                alignItems: 'center', justifyContent: 'center',
-                backgroundColor: '#1D9BF0',
-                shadowColor: '#1D9BF0', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.6, shadowRadius: 4,
-              }}>
-                <Ionicons name="checkmark" size={11} color="#FFF" />
-              </View>
-            </View>
           )}
         </View>
         {username && <Text style={[s.username, { textAlign: 'center' }]} numberOfLines={1}>@{username}</Text>}
