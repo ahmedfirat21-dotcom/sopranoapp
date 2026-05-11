@@ -689,7 +689,7 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, i
               />
             );
           })()}
-          {/* ★ Avatar filtre overlay'leri (grayscale/sepia/brightness) */}
+          {/* ★ Avatar filtre overlay'leri (grayscale/sepia/brightness/hue/saturation) */}
           {(frameCfg?.avatar_grayscale ?? 0) > 0 && (
             <View pointerEvents="none" style={[StyleSheet.absoluteFill, {
               backgroundColor: 'rgba(128,128,128,1)',
@@ -707,6 +707,52 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, i
               backgroundColor: (frameCfg.avatar_brightness > 1) ? 'white' : 'black',
               opacity: Math.abs(frameCfg.avatar_brightness - 1) * 0.4,
             }]} />
+          )}
+          {/* ★ v1.3.56: avatar_hue_rotate — HSL hue'ye karşılık gelen renkli tint overlay.
+                RN'de native hue-rotate yok; approximation: HSL(hue,80%,50%) tint düşük opacity. */}
+          {(frameCfg?.avatar_hue_rotate ?? 0) > 0 && (() => {
+            const h = ((frameCfg.avatar_hue_rotate % 360) + 360) % 360;
+            // HSL → RGB (s=0.8, l=0.5)
+            const s = 0.8, l = 0.5;
+            const c = (1 - Math.abs(2 * l - 1)) * s;
+            const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+            const m = l - c / 2;
+            let r = 0, g = 0, b = 0;
+            if (h < 60)      { r = c; g = x; b = 0; }
+            else if (h < 120){ r = x; g = c; b = 0; }
+            else if (h < 180){ r = 0; g = c; b = x; }
+            else if (h < 240){ r = 0; g = x; b = c; }
+            else if (h < 300){ r = x; g = 0; b = c; }
+            else             { r = c; g = 0; b = x; }
+            const R = Math.round((r + m) * 255), G = Math.round((g + m) * 255), B = Math.round((b + m) * 255);
+            return (
+              <View pointerEvents="none" style={[StyleSheet.absoluteFill, {
+                backgroundColor: `rgb(${R},${G},${B})`,
+                opacity: 0.28,
+              }]} />
+            );
+          })()}
+          {/* ★ v1.3.56: avatar_saturation < 1 → gri tint (saturation düşürür);
+                > 1 RN'de native blend yok, no-op. */}
+          {(frameCfg?.avatar_saturation ?? 1) < 1 && (
+            <View pointerEvents="none" style={[StyleSheet.absoluteFill, {
+              backgroundColor: 'rgba(128,128,128,1)',
+              opacity: (1 - frameCfg.avatar_saturation) * 0.45,
+            }]} />
+          )}
+          {/* ★ v1.3.56: avatar_border_enabled — Image etrafında ek halka.
+                Frame Lottie/PNG ZATEN avatar etrafında, çift halka olmasın diye
+                opacity ayarlandı; frame yoksa pure border görünür. */}
+          {frameCfg?.avatar_border_enabled && (
+            <View
+              pointerEvents="none"
+              style={[StyleSheet.absoluteFill, {
+                borderRadius: cardWidth / 2,
+                borderWidth: Math.max(1, Math.min(12, frameCfg?.avatar_border_width ?? 3)),
+                borderColor: frameCfg?.avatar_border_color || '#fbbf24',
+                borderStyle: (frameCfg?.avatar_border_style as any) || 'solid',
+              }]}
+            />
           )}
           {/* ★ 2026-04-24: Kamera açıkken alt + üst gradient overlay — badge'ler video üzerinde okunur kalır. */}
           {cameraOn && videoTrack && VideoView && (

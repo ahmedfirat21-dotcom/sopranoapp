@@ -605,6 +605,11 @@ function NameOverlay({ size, name, dynCfg }: { size: number; name: string; dynCf
   const tiltAnim = useRef(new Animated.Value(0)).current;
   const wobbleAnim = useRef(new Animated.Value(0)).current;
   const glowPulseAnim = useRef(new Animated.Value(0)).current;
+  // ★ v1.3.56: name_shimmer — text üstünde subtle parıldama (opacity wave).
+  //   RN'de gerçek "ışık süpürmesi" MaskedView gerektirir (ek paket); pratik yaklaşım
+  //   olarak outer wrapper opacity'sini 0.55 ↔ 1.0 yumuşak dalgalandırıyoruz —
+  //   hem flat hem SVG textPath branch'inde tutarlı çalışır.
+  const shimmerAnim = useRef(new Animated.Value(0)).current;
 
   // Hepsi için useEffect — toggle on/off'a göre loop start/stop
   useEffect(() => {
@@ -710,6 +715,17 @@ function NameOverlay({ size, name, dynCfg }: { size: number; name: string; dynCf
     return () => loop.stop();
   }, [glowPulseAnim, dynCfg?.name_glow, dynCfg?.name_glow_pulse]);
 
+  // ★ v1.3.56: name_shimmer — outer wrapper opacity 0.55 ↔ 1.0 yumuşak pulse.
+  useEffect(() => {
+    if (!dynCfg?.name_shimmer) return;
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(shimmerAnim, { toValue: 1, duration: 1200, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      Animated.timing(shimmerAnim, { toValue: 0, duration: 1200, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, [shimmerAnim, dynCfg?.name_shimmer]);
+
   // Renk döngüsü (color_cycle veya name_color_cycle)
   const [cycleColor, setCycleColor] = useState<string | null>(null);
   useEffect(() => {
@@ -743,7 +759,11 @@ function NameOverlay({ size, name, dynCfg }: { size: number; name: string; dynCf
   const color = cycleColor || dynCfg?.name_color || '#f8fafc';
   const glowColor = dynCfg?.name_glow_color || color;
   const glowIntensity = dynCfg?.name_glow_intensity ?? 0.6;
-  const opacity = dynCfg?.name_opacity ?? 1;
+  const baseOpacity = dynCfg?.name_opacity ?? 1;
+  // ★ v1.3.56: shimmer aktif iken outer wrapper opacity'si dalgalanır
+  const opacity: number | Animated.AnimatedInterpolation<number> = dynCfg?.name_shimmer
+    ? shimmerAnim.interpolate({ inputRange: [0, 1], outputRange: [baseOpacity * 0.55, baseOpacity] })
+    : baseOpacity;
 
   // Glow text-shadow radius — pulse aktifse Animated, değilse sabit
   const baseGlowRadius = dynCfg?.name_glow ? 4 + glowIntensity * 6 : 2;
