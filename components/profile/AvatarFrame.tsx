@@ -562,33 +562,122 @@ function NameOverlay({ size, name, dynCfg }: { size: number; name: string; dynCf
     case 'right':  posStyle = { left: size + offsetPx, top: 0, bottom: 0, justifyContent: 'center' }; break;
   }
 
-  // Animasyon zinciri — pulse / float / shake / swing / tilt / breathe / wobble / spin
-  const animVal = useRef(new Animated.Value(0)).current;
+  // ★ 2026-05-11: Tüm animasyonlar paralel çalışsın diye HER birinin ayrı Animated.Value'su.
+  //   Web admin'de toggle'lar bağımsız → mobile'da da paralel olmalı (önceden if-else
+  //   chain'di, sadece biri çalışıyordu — bug'dı).
+  const pulseAnim = useRef(new Animated.Value(0)).current;
+  const floatAnim = useRef(new Animated.Value(0)).current;
+  const breatheAnim = useRef(new Animated.Value(0)).current;
+  const spinAnim = useRef(new Animated.Value(0)).current;
+  const shakeAnim = useRef(new Animated.Value(0)).current;
+  const swingAnim = useRef(new Animated.Value(0)).current;
+  const tiltAnim = useRef(new Animated.Value(0)).current;
+  const wobbleAnim = useRef(new Animated.Value(0)).current;
+  const glowPulseAnim = useRef(new Animated.Value(0)).current;
+
+  // Hepsi için useEffect — toggle on/off'a göre loop start/stop
   useEffect(() => {
-    let loop: Animated.CompositeAnimation | null = null;
-    if (dynCfg?.name_pulse) {
-      loop = Animated.loop(Animated.sequence([
-        Animated.timing(animVal, { toValue: 1, duration: (dynCfg?.name_pulse_speed ?? 2) * 500, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-        Animated.timing(animVal, { toValue: 0, duration: (dynCfg?.name_pulse_speed ?? 2) * 500, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-      ]));
-    } else if (dynCfg?.name_float) {
-      loop = Animated.loop(Animated.sequence([
-        Animated.timing(animVal, { toValue: 1, duration: (dynCfg?.name_float_speed ?? 4) * 500, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-        Animated.timing(animVal, { toValue: 0, duration: (dynCfg?.name_float_speed ?? 4) * 500, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-      ]));
-    } else if (dynCfg?.name_breathe) {
-      loop = Animated.loop(Animated.sequence([
-        Animated.timing(animVal, { toValue: 1, duration: 2000, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-        Animated.timing(animVal, { toValue: 0, duration: 2000, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-      ]));
-    } else if (dynCfg?.name_rotation_continuous) {
-      loop = Animated.loop(
-        Animated.timing(animVal, { toValue: 1, duration: (dynCfg?.name_rotation_speed ?? 12) * 1000, easing: Easing.linear, useNativeDriver: true })
-      );
-    }
-    loop?.start();
-    return () => { loop?.stop(); };
-  }, [animVal, dynCfg?.name_pulse, dynCfg?.name_pulse_speed, dynCfg?.name_float, dynCfg?.name_float_speed, dynCfg?.name_breathe, dynCfg?.name_rotation_continuous, dynCfg?.name_rotation_speed]);
+    if (!dynCfg?.name_pulse) return;
+    const dur = (dynCfg?.name_pulse_speed ?? 2) * 500;
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(pulseAnim, { toValue: 1, duration: dur, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      Animated.timing(pulseAnim, { toValue: 0, duration: dur, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, [pulseAnim, dynCfg?.name_pulse, dynCfg?.name_pulse_speed]);
+
+  useEffect(() => {
+    if (!dynCfg?.name_float) return;
+    const dur = (dynCfg?.name_float_speed ?? 4) * 500;
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(floatAnim, { toValue: 1, duration: dur, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      Animated.timing(floatAnim, { toValue: 0, duration: dur, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, [floatAnim, dynCfg?.name_float, dynCfg?.name_float_speed]);
+
+  useEffect(() => {
+    if (!dynCfg?.name_breathe) return;
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(breatheAnim, { toValue: 1, duration: 2000, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      Animated.timing(breatheAnim, { toValue: 0, duration: 2000, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, [breatheAnim, dynCfg?.name_breathe]);
+
+  useEffect(() => {
+    if (!dynCfg?.name_rotation_continuous) return;
+    const dur = (dynCfg?.name_rotation_speed ?? 12) * 1000;
+    const loop = Animated.loop(
+      Animated.timing(spinAnim, { toValue: 1, duration: dur, easing: Easing.linear, useNativeDriver: true })
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [spinAnim, dynCfg?.name_rotation_continuous, dynCfg?.name_rotation_speed]);
+
+  // shake — 0.6sn linear loop (5 keyframe yaklaşık)
+  useEffect(() => {
+    if (!dynCfg?.name_shake) return;
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(shakeAnim, { toValue: 1, duration: 120, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: -1, duration: 120, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: 0.5, duration: 120, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: -0.5, duration: 120, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: 0, duration: 120, useNativeDriver: true }),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, [shakeAnim, dynCfg?.name_shake]);
+
+  // swing — sarkaç ±8°
+  useEffect(() => {
+    if (!dynCfg?.name_swing) return;
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(swingAnim, { toValue: 1, duration: 625, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      Animated.timing(swingAnim, { toValue: 0, duration: 625, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      Animated.timing(swingAnim, { toValue: -1, duration: 625, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      Animated.timing(swingAnim, { toValue: 0, duration: 625, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, [swingAnim, dynCfg?.name_swing]);
+
+  // tilt — yan yatma ±3°
+  useEffect(() => {
+    if (!dynCfg?.name_tilt) return;
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(tiltAnim, { toValue: 1, duration: 1500, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      Animated.timing(tiltAnim, { toValue: 0, duration: 1500, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, [tiltAnim, dynCfg?.name_tilt]);
+
+  // wobble — titreşim ±2.5°
+  useEffect(() => {
+    if (!dynCfg?.name_wobble) return;
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(wobbleAnim, { toValue: 1, duration: 500, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      Animated.timing(wobbleAnim, { toValue: -1, duration: 1000, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      Animated.timing(wobbleAnim, { toValue: 0, duration: 500, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, [wobbleAnim, dynCfg?.name_wobble]);
+
+  // glow_pulse — text shadow yoğunluğu dalgalanır
+  useEffect(() => {
+    if (!dynCfg?.name_glow || !dynCfg?.name_glow_pulse) return;
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(glowPulseAnim, { toValue: 1, duration: 900, easing: Easing.inOut(Easing.ease), useNativeDriver: false }),
+      Animated.timing(glowPulseAnim, { toValue: 0, duration: 900, easing: Easing.inOut(Easing.ease), useNativeDriver: false }),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, [glowPulseAnim, dynCfg?.name_glow, dynCfg?.name_glow_pulse]);
 
   // Renk döngüsü (color_cycle veya name_color_cycle)
   const [cycleColor, setCycleColor] = useState<string | null>(null);
@@ -604,15 +693,19 @@ function NameOverlay({ size, name, dynCfg }: { size: number; name: string; dynCf
     return () => clearInterval(id);
   }, [dynCfg?.name_color_cycle, dynCfg?.color_cycle_speed]);
 
-  // Transform stack
+  // Transform stack — paralel: tüm aktif animasyonlar üst üste eklenir
   const transformStack: any[] = [];
-  if (dynCfg?.name_pulse) transformStack.push({ scale: animVal.interpolate({ inputRange: [0, 1], outputRange: [1, 1.1] }) });
-  if (dynCfg?.name_float) transformStack.push({ translateY: animVal.interpolate({ inputRange: [0, 1], outputRange: [0, -6] }) });
-  if (dynCfg?.name_breathe) transformStack.push({ scale: animVal.interpolate({ inputRange: [0, 1], outputRange: [1, 1.04] }) });
-  if (dynCfg?.name_rotation_continuous) transformStack.push({ rotate: animVal.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }) });
-  // Static eğim (animation aktifse skip — çakışmasın)
-  const hasMovementRotate = !!(dynCfg?.name_rotation_continuous);
-  if (!hasMovementRotate && (dynCfg?.name_rotation ?? 0) !== 0) {
+  if (dynCfg?.name_pulse)               transformStack.push({ scale: pulseAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.1] }) });
+  if (dynCfg?.name_breathe)             transformStack.push({ scale: breatheAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.04] }) });
+  if (dynCfg?.name_float)               transformStack.push({ translateY: floatAnim.interpolate({ inputRange: [0, 1], outputRange: [0, -6] }) });
+  if (dynCfg?.name_shake)               transformStack.push({ translateX: shakeAnim.interpolate({ inputRange: [-1, 1], outputRange: [-2, 2] }) });
+  if (dynCfg?.name_rotation_continuous) transformStack.push({ rotate: spinAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }) });
+  if (dynCfg?.name_swing)               transformStack.push({ rotate: swingAnim.interpolate({ inputRange: [-1, 1], outputRange: ['-8deg', '8deg'] }) });
+  if (dynCfg?.name_tilt)                transformStack.push({ rotate: tiltAnim.interpolate({ inputRange: [0, 1], outputRange: ['-3deg', '3deg'] }) });
+  if (dynCfg?.name_wobble)              transformStack.push({ rotate: wobbleAnim.interpolate({ inputRange: [-1, 1], outputRange: ['-2.5deg', '2.5deg'] }) });
+  // Static eğim — sadece dinamik rotate yoksa (çakışma önleme)
+  const hasDynamicRotate = !!(dynCfg?.name_rotation_continuous || dynCfg?.name_swing || dynCfg?.name_tilt || dynCfg?.name_wobble);
+  if (!hasDynamicRotate && (dynCfg?.name_rotation ?? 0) !== 0) {
     transformStack.push({ rotate: `${dynCfg?.name_rotation}deg` });
   }
 
@@ -620,6 +713,15 @@ function NameOverlay({ size, name, dynCfg }: { size: number; name: string; dynCf
   const glowColor = dynCfg?.name_glow_color || color;
   const glowIntensity = dynCfg?.name_glow_intensity ?? 0.6;
   const opacity = dynCfg?.name_opacity ?? 1;
+
+  // Glow text-shadow radius — pulse aktifse Animated, değilse sabit
+  const baseGlowRadius = dynCfg?.name_glow ? 4 + glowIntensity * 6 : 2;
+  const animatedGlowRadius = dynCfg?.name_glow_pulse
+    ? glowPulseAnim.interpolate({ inputRange: [0, 1], outputRange: [baseGlowRadius, baseGlowRadius * 2.5] })
+    : baseGlowRadius;
+
+  // Wave — harf-harf yukarı dalga (sadece düz/flat, RN'de tspan yok)
+  const showWave = dynCfg?.name_wave && (dynCfg?.name_curve_style || 'flat') === 'flat';
 
   return (
     <Animated.View
@@ -630,23 +732,74 @@ function NameOverlay({ size, name, dynCfg }: { size: number; name: string; dynCf
         zIndex: 6, elevation: 6,
         opacity,
         transform: transformStack.length > 0 ? transformStack : undefined,
+        // Row layout for wave (harf-harf rendering)
+        flexDirection: showWave ? 'row' : undefined,
       }}
     >
-      <Text
-        numberOfLines={1}
-        style={{
-          color,
-          fontSize: fontPx,
-          fontWeight: dynCfg?.name_bold ? '700' : '400',
-          textAlign: 'center',
-          textShadowColor: dynCfg?.name_glow ? glowColor : 'rgba(0,0,0,0.7)',
-          textShadowRadius: dynCfg?.name_glow ? 4 + glowIntensity * 6 : 2,
-          textShadowOffset: { width: 0, height: 1 },
-        }}
-      >
-        {name}
-      </Text>
+      {showWave ? (
+        // Wave: her harf ayrı Animated.Text, kendi delay'iyle yukarı-aşağı
+        name.split('').map((ch, i) => (
+          <WaveLetter key={i} char={ch} index={i} fontPx={fontPx}
+            color={color} glowColor={glowColor} glowRadius={baseGlowRadius}
+            bold={!!dynCfg?.name_bold} />
+        ))
+      ) : (
+        <Animated.Text
+          numberOfLines={1}
+          style={{
+            color,
+            fontSize: fontPx,
+            fontWeight: dynCfg?.name_bold ? '700' : '400',
+            textAlign: 'center',
+            textShadowColor: dynCfg?.name_glow ? glowColor : 'rgba(0,0,0,0.7)',
+            textShadowRadius: animatedGlowRadius as any,
+            textShadowOffset: { width: 0, height: 1 },
+          }}
+        >
+          {name}
+        </Animated.Text>
+      )}
     </Animated.View>
+  );
+}
+
+// ★ Wave için tek harf — kendi yukarı-aşağı animasyonu, dağıtık delay
+function WaveLetter({ char, index, fontPx, color, glowColor, glowRadius, bold }: {
+  char: string; index: number; fontPx: number; color: string; glowColor: string; glowRadius: number; bold: boolean;
+}) {
+  const wave = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    let cancelled = false;
+    let loop: Animated.CompositeAnimation | null = null;
+    const timeoutId = setTimeout(() => {
+      if (cancelled) return;
+      loop = Animated.loop(Animated.sequence([
+        Animated.timing(wave, { toValue: 1, duration: 600, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(wave, { toValue: 0, duration: 600, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      ]));
+      loop.start();
+    }, index * 80);
+    return () => {
+      cancelled = true;
+      clearTimeout(timeoutId);
+      loop?.stop();
+    };
+  }, [wave, index]);
+  const translateY = wave.interpolate({ inputRange: [0, 1], outputRange: [0, -3] });
+  return (
+    <Animated.Text
+      style={{
+        color,
+        fontSize: fontPx,
+        fontWeight: bold ? '700' : '400',
+        textShadowColor: glowColor,
+        textShadowRadius: glowRadius,
+        textShadowOffset: { width: 0, height: 1 },
+        transform: [{ translateY }],
+      }}
+    >
+      {char}
+    </Animated.Text>
   );
 }
 
