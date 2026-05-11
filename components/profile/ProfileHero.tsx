@@ -171,7 +171,7 @@ export default function ProfileHero({
             hitSlop={4}
             accessibilityLabel="Avatarı büyüt"
           >
-            <StatusAvatar uri={avatarUrl} size={92} tier={subscriptionTier} isAdmin={isAdmin} isOnline={isOnline} isSelf={!!onEdit} showTierBadge tierBadgeSize="sm" frameId={activeFrame} />
+            <StatusAvatar uri={avatarUrl} size={92} tier={subscriptionTier} isAdmin={isAdmin} isOnline={isOnline} isSelf={!!onEdit} showTierBadge tierBadgeSize="sm" frameId={activeFrame} displayName={displayName} />
           </Pressable>
         </View>
 

@@ -19,10 +19,14 @@ interface Props {
   /** ★ v110.14: true ise Lottie dalı atlanır, sade halka render edilir.
    *  Host olmayan sahnedeki kullanıcılarda dengesizliği gidermek için. */
   forceRing?: boolean;
+  /** ★ 2026-05-11: Web admin name overlay için kullanıcı adı pas-through. */
+  userName?: string;
+  /** ★ 2026-05-11: Web admin tier badge için tier label pas-through. */
+  userTier?: string;
 }
 
-export default function RoomAvatarFrame({ frameId, avatarSize, minSize = 30, forceRing }: Props) {
+export default function RoomAvatarFrame({ frameId, avatarSize, minSize = 30, forceRing, userName, userTier }: Props) {
   if (!frameId) return null;
   if (avatarSize < minSize) return null;
-  return <AvatarFrame frameId={frameId} size={avatarSize} forceRing={forceRing} />;
+  return <AvatarFrame frameId={frameId} size={avatarSize} forceRing={forceRing} userName={userName} userTier={userTier} />;
 }

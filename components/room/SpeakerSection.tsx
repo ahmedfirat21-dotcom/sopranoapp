@@ -531,7 +531,16 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, i
           pointerEvents="none"
         >
           <View style={{ width: cardWidth, height: cardWidth }}>
-            <RoomAvatarFrame frameId={activeFrame} avatarSize={cardWidth} minSize={56} forceRing={!isHost} />
+            <RoomAvatarFrame
+              frameId={activeFrame}
+              avatarSize={cardWidth}
+              minSize={56}
+              forceRing={!isHost}
+              userName={displayName}
+              userTier={(user.user as any)?.subscription_tier && (user.user as any).subscription_tier !== 'Free'
+                ? String((user.user as any).subscription_tier).toUpperCase()
+                : undefined}
+            />
           </View>
         </View>
       )}
