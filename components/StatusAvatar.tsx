@@ -36,6 +36,9 @@ interface StatusAvatarProps {
   /** ★ v109.4.3: TierBadge boyutu — xs (mini avatar, sadece ikon) / sm (label dahil "PRO" pill).
    *  Default xs. Profil hero ve sahnede sm/md kullanılır. */
   tierBadgeSize?: 'xs' | 'sm' | 'md' | 'lg';
+  /** ★ 2026-05-11: Web admin frame name overlay için kullanıcı adı.
+   *  Sağlanmadıysa name_enabled config olsa bile gösterilmez. */
+  displayName?: string;
 }
 
 /**
@@ -66,6 +69,7 @@ export default function StatusAvatar({
   isSelf = false,
   frameId,
   tierBadgeSize = 'xs',
+  displayName,
 }: StatusAvatarProps) {
   const radius = size / 2;
   // ★ 2026-04-21: Daha zarif nokta — %26 yerine %22, çerçeve 0.3x → 0.18x
@@ -276,7 +280,12 @@ export default function StatusAvatar({
     <View style={{ width: size, height: size + (showTierBadge ? 8 : 0), position: 'relative' }}>
       {/* ★ v107.69: Mağaza çerçevesi avatar'dan ÖNCE render — yoksa AvatarFrame'in iç
          koyu cutout'u avatar Image'i kapatıyor (kullanıcı: "profil resmi gidiyor"). */}
-      <AvatarFrame frameId={frameId} size={size} />
+      <AvatarFrame
+        frameId={frameId}
+        size={size}
+        userName={displayName}
+        userTier={normalizedTier !== 'Free' ? normalizedTier.toUpperCase() : undefined}
+      />
       {/* ★ v108.13: Aktif çerçeve varsa tier border'ı kapat — çift halka görünmesin.
          Çerçeve zaten tema halkası; tier rozeti (showTierBadge) avatar altında ayrıca gösterilir.
          ★ v108.14: Frame varsa avatar'a hafif yumuşak gölge — derinlik hissi. */}
@@ -397,8 +406,11 @@ export default function StatusAvatar({
           ★ v108.14: Aktif çerçeve varsa rozet gizlenir — kullanıcının istediği
           sade görünüm (avatar + frame + hafif gölge yeterli). */}
       {/* ★ v109.4.2: TierBadge avatar üstünde, mini için xs ikon-only.
-           Sahne/profil çağrıları `tierBadgeSize="sm"` ile büyük "PRO" pill alır. */}
-      {showTierBadge && normalizedTier !== 'Free' && (
+           Sahne/profil çağrıları `tierBadgeSize="sm"` ile büyük "PRO" pill alır.
+           ★ 2026-05-11: Web admin tier_badge_enabled=true ise eski badge gizlenir
+           — AvatarFrame içindeki TierBadgeOverlay tarafından (web admin konum/stil ile)
+           render edilir, çift badge görünmesin. */}
+      {showTierBadge && normalizedTier !== 'Free' && !dynFrameCfg?.tier_badge_enabled && (
         <View
           style={{
             position: 'absolute',
