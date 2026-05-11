@@ -503,6 +503,9 @@ const BADGE_POS_MOBILE: Record<string, { x: number; y: number }> = {
 function TierBadgeOverlay({ size, position, style: badgeStyle, label }: {
   size: number; position: string; style: string; label: string;
 }) {
+  // ★ 2026-05-11: Konum hesaplaması düzeltildi — eski transform[-16,-10] hardcoded
+  //   badge boyutunu hesaba katmıyordu. Yeni: dış container flex hizalama ile
+  //   her boyutta badge tam o noktaya gelir.
   const pos = BADGE_POS_MOBILE[position] || BADGE_POS_MOBILE.tr;
   const badgeFont = Math.max(8, Math.round(size * 0.1));
   const padH = Math.round(badgeFont * 0.7);
@@ -510,15 +513,24 @@ function TierBadgeOverlay({ size, position, style: badgeStyle, label }: {
   const isStar = badgeStyle === 'star';
   const isCapsule = badgeStyle === 'capsule';
   const radius = isCapsule ? 999 : isStar ? 0 : 6;
+
+  // Hizalama: pos.x/y -1..1 arası → flex-start / center / flex-end
+  const horizAlign = pos.x < -0.2 ? 'flex-start' : pos.x > 0.2 ? 'flex-end' : 'center';
+  const vertAlign  = pos.y < -0.2 ? 'flex-start' : pos.y > 0.2 ? 'flex-end' : 'center';
+  // Badge avatarın YARIM dışına taşsın istiyoruz (kenarda durur). Margin negatif.
+  const overflow = badgeFont * 0.5;
+
   return (
     <View
       pointerEvents="none"
       style={{
         position: 'absolute',
-        left: size / 2 + pos.x * size,
-        top: size / 2 + pos.y * size,
-        zIndex: 5, elevation: 5,
-        transform: [{ translateX: -16 }, { translateY: -10 }],
+        top: -overflow, left: -overflow,
+        right: -overflow, bottom: -overflow,
+        alignItems: horizAlign,
+        justifyContent: vertAlign,
+        zIndex: 5,
+        elevation: 5,
       }}
     >
       <View style={{
@@ -552,14 +564,31 @@ function NameOverlay({ size, name, dynCfg }: { size: number; name: string; dynCf
   const offsetPx = (offsetPct / 100) * (size / 2);
   const radius = size / 2 + offsetPx;
 
-  // Konuma göre absolute pozisyon — center bazlı
+  // ★ 2026-05-11: Konum güvenli — kendi size x size wrapper'ında flex hizalama.
+  //   Önceki bug: posStyle absolute parent'a göre yerleşiyordu, parent positioned
+  //   değilse veya farklı boyutta ise yazı yanlış yere düşüyordu. Şimdi wrapper
+  //   garantili size x size, içeride hizalama doğru çalışır.
   const pos = dynCfg?.name_position || 'bottom';
-  let posStyle: any = {};
+  // İç hizalama — wrapper size x size, name avatar'ın belirli kenarına
+  let containerStyle: any = {};
+  let textWrapperStyle: any = {};
   switch (pos) {
-    case 'top':    posStyle = { top: -radius - fontPx, left: 0, right: 0, alignItems: 'center' }; break;
-    case 'bottom': posStyle = { bottom: -radius - fontPx, left: 0, right: 0, alignItems: 'center' }; break;
-    case 'left':   posStyle = { right: size + offsetPx, top: 0, bottom: 0, justifyContent: 'center' }; break;
-    case 'right':  posStyle = { left: size + offsetPx, top: 0, bottom: 0, justifyContent: 'center' }; break;
+    case 'top':
+      containerStyle = { justifyContent: 'flex-start', alignItems: 'center' };
+      textWrapperStyle = { transform: [{ translateY: -fontPx - offsetPx }] };
+      break;
+    case 'bottom':
+      containerStyle = { justifyContent: 'flex-end', alignItems: 'center' };
+      textWrapperStyle = { transform: [{ translateY: fontPx + offsetPx }] };
+      break;
+    case 'left':
+      containerStyle = { justifyContent: 'center', alignItems: 'flex-start' };
+      textWrapperStyle = { transform: [{ translateX: -offsetPx - fontPx * 2 }] };
+      break;
+    case 'right':
+      containerStyle = { justifyContent: 'center', alignItems: 'flex-end' };
+      textWrapperStyle = { transform: [{ translateX: offsetPx + fontPx * 2 }] };
+      break;
   }
 
   // ★ 2026-05-11: Tüm animasyonlar paralel çalışsın diye HER birinin ayrı Animated.Value'su.
@@ -724,15 +753,25 @@ function NameOverlay({ size, name, dynCfg }: { size: number; name: string; dynCf
   const showWave = dynCfg?.name_wave && (dynCfg?.name_curve_style || 'flat') === 'flat';
 
   return (
-    <Animated.View
+    <View
       pointerEvents="none"
       style={{
         position: 'absolute',
-        ...posStyle,
+        top: 0, left: 0,
+        width: size, height: size,
         zIndex: 6, elevation: 6,
+        ...containerStyle,
+      }}
+    >
+    <Animated.View
+      pointerEvents="none"
+      style={{
+        ...textWrapperStyle,
         opacity,
-        transform: transformStack.length > 0 ? transformStack : undefined,
-        // Row layout for wave (harf-harf rendering)
+        transform: [
+          ...(textWrapperStyle.transform || []),
+          ...transformStack,
+        ],
         flexDirection: showWave ? 'row' : undefined,
       }}
     >
@@ -760,6 +799,7 @@ function NameOverlay({ size, name, dynCfg }: { size: number; name: string; dynCf
         </Animated.Text>
       )}
     </Animated.View>
+    </View>
   );
 }
 
