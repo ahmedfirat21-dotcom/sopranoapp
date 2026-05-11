@@ -1,16 +1,9 @@
 /**
- * SopranoChat — Tier Etiketi (v109.4)
+ * SopranoChat — Tier Etiketi (v1.3.54 — sade, eski model)
  * ════════════════════════════════════════════════════════════════════
- * Plus / Pro / GodMaster üyeler için kompakt, parlamayla canlı pill rozet.
- * İsim yanında, sade ama premium hissiyatlı.
- *
- *  PLUS  → teal aurora (cyan-mint)
- *  PRO   → altın gradient + glow
- *  GM    → magenta-amber kraliyet
- *
- * Kullanım:
- *   <TierBadge tier={profile.subscription_tier} />
- *   <TierBadge tier="Pro" size="sm" />
+ * Plus / Pro / GodMaster üyeler için kompakt pill rozet.
+ * Web admin sadece aç/kapat + 8 nokta konum kontrolü yapar; rozetin
+ * görünüm tasarımı (gradient + glow + shimmer) sabittir.
  */
 
 import React, { useEffect, useRef } from 'react';
@@ -26,6 +19,9 @@ interface Props {
   size?: 'xs' | 'sm' | 'md' | 'lg';
   /** Yatay margin için style override */
   style?: any;
+  /** Geriye dönük uyum için tutuldu — görünürlük kararı parent (StatusAvatar)
+   *  tarafında size-aware şekilde verilir, TierBadge ek kontrol yapmaz. */
+  frameId?: string | null;
 }
 
 const CONFIG: Record<string, {
@@ -67,18 +63,15 @@ const SIZE: Record<string, {
   radius: number;
   letterSpacing: number;
 }> = {
-  // ★ v109.4.2: xs — sadece ikon, label yok. Mini avatar yanlarında (oda kartı, mesaj listesi)
   xs: { height: 14, paddingH: 4, fontSize: 0, iconSize: 9, gap: 0, radius: 7, letterSpacing: 0 },
   sm: { height: 14, paddingH: 5, fontSize: 8.5, iconSize: 8, gap: 2, radius: 7, letterSpacing: 0.6 },
   md: { height: 17, paddingH: 6, fontSize: 9.5, iconSize: 9, gap: 3, radius: 8.5, letterSpacing: 0.7 },
   lg: { height: 22, paddingH: 8, fontSize: 11, iconSize: 11, gap: 4, radius: 11, letterSpacing: 0.8 },
 };
 
-export default function TierBadge({ tier, size = 'md', style }: Props) {
+export default function TierBadge({ tier, size = 'md', style, frameId: _frameId }: Props) {
   const cfg = tier ? CONFIG[tier] : null;
   const sz = SIZE[size];
-
-  // Pro/GM için yumuşak parlama
   const shimmer = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     if (!cfg || (tier !== 'Pro' && tier !== 'GodMaster')) return;
@@ -127,7 +120,6 @@ export default function TierBadge({ tier, size = 'md', style }: Props) {
       />
       <View style={[s.inner, { gap: sz.gap }]}>
         <Ionicons name={cfg.icon} size={sz.iconSize} color={cfg.textColor} />
-        {/* ★ xs modda label gizli — sadece ikon yuvarlak pill (kompakt mini avatar yanı) */}
         {size !== 'xs' && (
           <Text style={[s.text, {
             color: cfg.textColor,
@@ -142,8 +134,6 @@ export default function TierBadge({ tier, size = 'md', style }: Props) {
 
 const s = StyleSheet.create({
   wrap: {
-    // ★ v109.4.1: alignSelf:'flex-start' kaldırıldı — parent alignItems'ı override
-    //   ediyordu, pill sola yapışıyordu. Artık parent layout'a uyar (column → ortalı).
     overflow: 'hidden',
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
   },

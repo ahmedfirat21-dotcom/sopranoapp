@@ -18,9 +18,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, StyleSheet, Platform, Image, Animated, Easing, Text } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import Svg, { Path, Text as SvgText, TextPath, Defs } from 'react-native-svg';
 import { getFrameMeta, hasFrameLottie } from '../../constants/frameLottieRegistry';
 import { getCosmeticAsset, getCachedCosmeticAsset, type AssetMeta } from '../../services/cosmeticAssetCache';
-import { ensureFrameConfig, getCachedFrameConfig, subscribeConfigChange } from '../../services/cosmeticConfigCache';
+import { ensureFrameConfig, getCachedFrameConfig, subscribeConfigChange, pickSizeKey } from '../../services/cosmeticConfigCache';
 
 let LottieView: any = null;
 try {
@@ -554,8 +555,8 @@ function TierBadgeOverlay({ size, position, style: badgeStyle, label }: {
 }
 
 // ★ 2026-05-11: Name Overlay — kullanıcı adı çerçeve etrafında.
-//   react-native-svg yok, bu yüzden curve_style 'flat' her zaman; yay/dairesel
-//   web'de gözükür ama mobilde düz çıkar (post-launch SVG eklenince curve).
+//   v1.3.50: react-native-svg eklendi; curve_style 'arc-top' / 'arc-bottom' / 'circle'
+//   gerçek yay olarak çıkar. 'flat' her zaman düz RN Text (animasyonlar daha güçlü).
 //   Yüzdelik bazlı: name_offset = % avatar yarıçapı, name_size = % avatar boyutu.
 function NameOverlay({ size, name, dynCfg }: { size: number; name: string; dynCfg: any }) {
   const offsetPct = dynCfg?.name_offset ?? 25;
@@ -563,6 +564,7 @@ function NameOverlay({ size, name, dynCfg }: { size: number; name: string; dynCf
   const fontPx = Math.max(8, Math.round((sizePct / 100) * size));
   const offsetPx = (offsetPct / 100) * (size / 2);
   const radius = size / 2 + offsetPx;
+  const curveStyle = dynCfg?.name_curve_style || 'flat';
 
   // ★ 2026-05-11: Konum güvenli — kendi size x size wrapper'ında flex hizalama.
   //   Önceki bug: posStyle absolute parent'a göre yerleşiyordu, parent positioned
@@ -750,7 +752,57 @@ function NameOverlay({ size, name, dynCfg }: { size: number; name: string; dynCf
     : baseGlowRadius;
 
   // Wave — harf-harf yukarı dalga (sadece düz/flat, RN'de tspan yok)
-  const showWave = dynCfg?.name_wave && (dynCfg?.name_curve_style || 'flat') === 'flat';
+  const showWave = dynCfg?.name_wave && curveStyle === 'flat';
+
+  // ★ 2026-05-11: SVG branch — arc-top / arc-bottom / circle gerçek yay olarak render.
+  //   Path avatar etrafında yarıçap radius'ta. SVG wrapper avatardan büyük (2.4x) ki
+  //   yazı dışa taşabilsin. Animasyonlar Animated.View ile dış kabuğa uygulanır.
+  if (curveStyle !== 'flat') {
+    const svgSize = Math.max(size * 2.4, (radius + fontPx) * 2.4);
+    const cx = svgSize / 2;
+    const cy = svgSize / 2;
+    let pathD = '';
+    if (curveStyle === 'arc-top') {
+      pathD = `M ${cx - radius},${cy} A ${radius},${radius} 0 0,1 ${cx + radius},${cy}`;
+    } else if (curveStyle === 'arc-bottom') {
+      pathD = `M ${cx - radius},${cy} A ${radius},${radius} 0 0,0 ${cx + radius},${cy}`;
+    } else {
+      // circle — tam daire (saat yönünde, üstten başlar)
+      pathD = `M ${cx},${cy - radius} A ${radius},${radius} 0 1,1 ${cx - 0.01},${cy - radius} Z`;
+    }
+    const svgOffset = -(svgSize - size) / 2;
+    return (
+      <Animated.View
+        pointerEvents="none"
+        style={{
+          position: 'absolute',
+          top: svgOffset, left: svgOffset,
+          width: svgSize, height: svgSize,
+          zIndex: 6, elevation: 6,
+          opacity,
+          transform: transformStack.length > 0 ? transformStack : undefined,
+        }}
+      >
+        <Svg width={svgSize} height={svgSize}>
+          <Defs>
+            <Path id={`namepath-${size}-${curveStyle}`} d={pathD} fill="transparent" />
+          </Defs>
+          <SvgText
+            fill={color}
+            fontSize={fontPx}
+            fontWeight={dynCfg?.name_bold ? '700' : '400'}
+            textAnchor="middle"
+            stroke={dynCfg?.name_glow ? glowColor : undefined}
+            strokeWidth={dynCfg?.name_glow ? 0.5 : 0}
+          >
+            <TextPath href={`#namepath-${size}-${curveStyle}`} startOffset="50%">
+              {name}
+            </TextPath>
+          </SvgText>
+        </Svg>
+      </Animated.View>
+    );
+  }
 
   return (
     <View
@@ -851,6 +903,10 @@ function PngFrame({ meta, size, dynCfg }: { meta: any; size: number; dynCfg?: an
   const dynOpacity = dynCfg?.frame_opacity ?? 1;
   const dynBreathe = !!dynCfg?.frame_breathe;
   const dynColorCycle = !!dynCfg?.color_cycle;
+  // ★ 2026-05-11: frame_rotation (sürekli dönme) + frame_wobble — Lottie'de zaten var,
+  //   PNG/Remote'a da pariteli olsun.
+  const dynRotation = dynCfg?.frame_rotation ?? 0;
+  const dynWobble = !!dynCfg?.frame_wobble;
 
   const frameSize = Math.round(size * meta.scale * dynScale);
   const baseOffset = (frameSize - size) / -2;
@@ -869,6 +925,30 @@ function PngFrame({ meta, size, dynCfg }: { meta: any; size: number; dynCfg?: an
     return () => loop.stop();
   }, [dynBreathe, breatheAnim]);
 
+  // ★ frame_rotation — sürekli dönme (sn / 1 tur)
+  const rotateAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (dynRotation <= 0) return;
+    const loop = Animated.loop(
+      Animated.timing(rotateAnim, { toValue: 1, duration: dynRotation * 1000, easing: Easing.linear, useNativeDriver: true })
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [dynRotation, rotateAnim]);
+
+  // ★ frame_wobble — ±2.5° hafif sallanma (rotate yoksa)
+  const wobbleAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (!dynWobble) { wobbleAnim.setValue(0); return; }
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(wobbleAnim, { toValue: 1, duration: 500, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      Animated.timing(wobbleAnim, { toValue: -1, duration: 1000, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      Animated.timing(wobbleAnim, { toValue: 0, duration: 500, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, [dynWobble, wobbleAnim]);
+
   // ★ color_cycle — PNG'ye tintColor cycle (HSL hue değiştirme)
   const [cycleColor, setCycleColor] = useState<string | null>(null);
   useEffect(() => {
@@ -883,6 +963,16 @@ function PngFrame({ meta, size, dynCfg }: { meta: any; size: number; dynCfg?: an
     return () => clearInterval(intervalId);
   }, [dynColorCycle, dynCfg?.color_cycle_speed]);
 
+  // Transform stack — rotate + scale + wobble paralel çalışabilir
+  const transformStack: any[] = [];
+  if (dynRotation > 0) {
+    transformStack.push({ rotate: rotateAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }) });
+  }
+  if (dynWobble && dynRotation === 0) {
+    transformStack.push({ rotate: wobbleAnim.interpolate({ inputRange: [-1, 1], outputRange: ['-2.5deg', '2.5deg'] }) });
+  }
+  if (dynBreathe) transformStack.push({ scale: breatheAnim });
+
   return (
     <Animated.View
       pointerEvents="none"
@@ -894,7 +984,7 @@ function PngFrame({ meta, size, dynCfg }: { meta: any; size: number; dynCfg?: an
         overflow: 'visible',
         zIndex: 3,
         opacity: dynOpacity,
-        transform: dynBreathe ? [{ scale: breatheAnim }] : undefined,
+        transform: transformStack.length > 0 ? transformStack : undefined,
       }}
     >
       <Image
@@ -935,6 +1025,14 @@ function LottieFrame({ meta, size, dynCfg }: { meta: any; size: number; dynCfg?:
   // ★ 2026-05-11: frame_breathe — frame yavaş büyüyüp küçülür (4 sn döngü)
   const dynBreathe = !!dynCfg?.frame_breathe;
   const dynWobble = !!dynCfg?.frame_wobble;
+  // ★ v1.3.54: Lottie filter (hue_rotate/brightness/saturation) — Lottie kütüphanesi
+  //   native filter desteklemez. Yaklaşık efekt için renkli overlay + blend opacity.
+  //   Tam parite değil ama görsel olarak kullanıcı admin'de değişiklik yaptığında
+  //   mobile'da fark görür (kahverengi → mavi tonlama, parlaklık az/çok).
+  const lottieHue = dynCfg?.lottie_hue_rotate ?? 0;       // 0-360°
+  const lottieBrightness = dynCfg?.lottie_brightness ?? 1; // 0.5-1.5
+  const lottieSaturation = dynCfg?.lottie_saturation ?? 1; // 0-2
+  const hasLottieFilter = lottieHue !== 0 || lottieBrightness !== 1 || lottieSaturation !== 1;
 
   const lottieSize = Math.round(size * meta.scale * dynScale);
   const baseOffset = (lottieSize - size) / -2;
@@ -1018,6 +1116,47 @@ function LottieFrame({ meta, size, dynCfg }: { meta: any; size: number; dynCfg?:
         }}
         style={{ width: lottieSize, height: lottieSize }}
       />
+      {/* ★ v1.3.54: Lottie filter yaklaşımı — gerçek feColorMatrix yok, renkli overlay ile yaklaşık.
+           hue_rotate: HSL renk overlay'i; brightness: beyaz/siyah katman; saturation<1: gri katman. */}
+      {hasLottieFilter && (
+        <View pointerEvents="none" style={{
+          position: 'absolute',
+          top: 0, left: 0,
+          width: lottieSize, height: lottieSize,
+          borderRadius: lottieSize / 2,
+        }}>
+          {lottieHue !== 0 && (
+            <View style={{
+              position: 'absolute',
+              top: 0, left: 0,
+              width: lottieSize, height: lottieSize,
+              backgroundColor: `hsl(${lottieHue}, 70%, 50%)`,
+              opacity: 0.25,
+              borderRadius: lottieSize / 2,
+            }} />
+          )}
+          {lottieBrightness !== 1 && (
+            <View style={{
+              position: 'absolute',
+              top: 0, left: 0,
+              width: lottieSize, height: lottieSize,
+              backgroundColor: lottieBrightness > 1 ? 'white' : 'black',
+              opacity: Math.min(0.5, Math.abs(lottieBrightness - 1) * 0.4),
+              borderRadius: lottieSize / 2,
+            }} />
+          )}
+          {lottieSaturation < 1 && (
+            <View style={{
+              position: 'absolute',
+              top: 0, left: 0,
+              width: lottieSize, height: lottieSize,
+              backgroundColor: 'rgba(128,128,128,1)',
+              opacity: (1 - lottieSaturation) * 0.4,
+              borderRadius: lottieSize / 2,
+            }} />
+          )}
+        </View>
+      )}
     </Animated.View>
   );
 }
@@ -1069,6 +1208,30 @@ function RemoteAssetFrame({ frameId, size, dynCfg }: { frameId: string; size: nu
     return () => loop.stop();
   }, [dynBreathe, breatheAnim]);
 
+  // ★ 2026-05-11: frame_rotation + frame_wobble — Lottie/PNG paritesi.
+  const dynRotation = dynCfg?.frame_rotation ?? 0;
+  const dynWobble = !!dynCfg?.frame_wobble;
+  const rotateAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (dynRotation <= 0) return;
+    const loop = Animated.loop(
+      Animated.timing(rotateAnim, { toValue: 1, duration: dynRotation * 1000, easing: Easing.linear, useNativeDriver: true })
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [dynRotation, rotateAnim]);
+  const wobbleAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (!dynWobble) { wobbleAnim.setValue(0); return; }
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(wobbleAnim, { toValue: 1, duration: 500, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      Animated.timing(wobbleAnim, { toValue: -1, duration: 1000, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      Animated.timing(wobbleAnim, { toValue: 0, duration: 500, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, [dynWobble, wobbleAnim]);
+
   // ★ color_cycle — image asset için tintColor cycle
   const dynColorCycle = !!dynCfg?.color_cycle;
   const [cycleColor, setCycleColor] = useState<string | null>(null);
@@ -1086,7 +1249,16 @@ function RemoteAssetFrame({ frameId, size, dynCfg }: { frameId: string; size: nu
 
   if (!asset || !asset.url) return null;
 
-  const transformStack = dynBreathe ? [{ scale: breatheAnim }] : undefined;
+  // Transform stack — rotate + scale + wobble paralel çalışabilir
+  const _transformStack: any[] = [];
+  if (dynRotation > 0) {
+    _transformStack.push({ rotate: rotateAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }) });
+  }
+  if (dynWobble && dynRotation === 0) {
+    _transformStack.push({ rotate: wobbleAnim.interpolate({ inputRange: [-1, 1], outputRange: ['-2.5deg', '2.5deg'] }) });
+  }
+  if (dynBreathe) _transformStack.push({ scale: breatheAnim });
+  const transformStack = _transformStack.length > 0 ? _transformStack : undefined;
 
   if (asset.type === 'lottie' && LottieView) {
     return (
@@ -1144,25 +1316,23 @@ function RemoteAssetFrame({ frameId, size, dynCfg }: { frameId: string; size: nu
 }
 
 function AvatarFrameImpl({ frameId, size, forceRing, userName, userTier }: Props) {
-  // ★ v213f: Web admin'den ayarlanan dynamic frame config — Hook her zaman çağrılmalı,
-  //   conditional return ÖNCESİNDE; aksi halde "rendered fewer hooks" crash riski.
-  const [dynCfg, setDynCfg] = useState<any>(getCachedFrameConfig(frameId));
+  // ★ v1.3.54: Boyuta göre size_overrides uygulanır — mini/listener/speaker/stage_host/profile
+  //   her biri kendi ayar override'ına sahip olabilir.
+  const sizeKey = pickSizeKey(size);
+  const [dynCfg, setDynCfg] = useState<any>(getCachedFrameConfig(frameId, sizeKey));
   useEffect(() => {
     if (!frameId) { setDynCfg(null); return; }
-    ensureFrameConfig(frameId).then(setDynCfg);
-  }, [frameId]);
+    ensureFrameConfig(frameId, sizeKey).then(setDynCfg);
+  }, [frameId, sizeKey]);
 
-  // ★ 2026-05-11: REALTIME PUSH — admin değişiklik yapınca cache invalidate olur,
-  //   listener tetiklenir, hemen fresh config çekilip state'e yazılır.
-  //   Önceden 5dk bekleyip yeni render'da fetch oluyordu; artık ~1sn.
   useEffect(() => {
     if (!frameId) return;
     const unsub = subscribeConfigChange((changedId) => {
       if (changedId !== frameId) return;
-      ensureFrameConfig(frameId).then(setDynCfg);
+      ensureFrameConfig(frameId, sizeKey).then(setDynCfg);
     });
     return unsub;
-  }, [frameId]);
+  }, [frameId, sizeKey]);
 
   if (!frameId) return null;
 
@@ -1207,11 +1377,13 @@ function AvatarFrameImpl({ frameId, size, forceRing, userName, userTier }: Props
       {/* ★ 2026-05-11: Tier badge AvatarFrame içinde render EDİLMEZ — çift badge
            çakışmasını önlemek için StatusAvatar mevcut TierBadge component'ini
            web admin tier_badge_position'a göre konumlar. */}
-      {/* ★ 2026-05-11: NameOverlay KALDIRILDI — RN'de SVG yok, web admin
-           SVG textPath (yay/dairesel/eğim) ile mobile RN Text farklı render
-           ediyor → tutarsızlık + parent Text ile çakışma. Sade çözüm: name
-           overlay yok, mobile parent Text kalır (mevcut görünüm). Web admin'de
-           name ayarları yine görsel önizlemede çalışır ama mobile'a yansımaz. */}
+      {/* ★ v1.3.50: NameOverlay GERİ EKLENDİ — react-native-svg ile yay/daire
+           gerçek render. userName prop sağlanmadıysa hiç gösterilmez (parent
+           ekrandaki normal isimle çakışmadan, sadece name_enabled=true frame'ler
+           için ekstra isim katmanı). */}
+      {dynCfg?.name_enabled && userName && (
+        <NameOverlay size={size} name={userName} dynCfg={dynCfg} />
+      )}
     </>
   );
 

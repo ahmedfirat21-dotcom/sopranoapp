@@ -8,22 +8,112 @@
  * Frame config: avatar boyutu, offset, glow, rotation hızı, lottie filters.
  * Entry config: avatar pozisyonu, animasyonlar (intro/loop/outro), text ayarları.
  */
+import { useEffect, useState } from 'react';
 import { supabase } from '../constants/supabase';
 
+// ★ v1.3.54: Boyut anahtarları — web admin'deki MOBILE_SIZES ile senkron.
+//   Her boyut için ayrı override yapılabilir. Avatar render edilirken px boyutuna
+//   göre otomatik en yakın anahtar seçilir.
+export type SizeKey = 'mini' | 'listener' | 'speaker' | 'stage_host' | 'profile';
+
+export function pickSizeKey(px: number): SizeKey {
+  if (px <= 70) return 'mini';
+  if (px <= 100) return 'listener';
+  if (px <= 140) return 'speaker';
+  if (px <= 180) return 'stage_host';
+  return 'profile';
+}
+
 export interface FrameConfig {
+  // Frame Lottie/PNG ayarları
   frame_scale?: number;
   frame_offset_x?: number;
   frame_offset_y?: number;
-  frame_rotation?: number;
+  frame_rotation?: number;       // sürekli dönme hızı (sn) — 0 sabit
   frame_opacity?: number;
+  // Avatar
   avatar_ratio?: number;
+  // Glow
   glow_enabled?: boolean;
   glow_color?: string;
   glow_intensity?: number;
+  glow_pulse?: boolean;
+  // Lottie filter (RN'de Lottie filter yok — sessiz no-op, sadece tip tamlığı için)
   lottie_hue_rotate?: number;
   lottie_brightness?: number;
   lottie_saturation?: number;
   lottie_speed?: number;
+  // Hareket & efekt animasyonları
+  avatar_pulse?: boolean;
+  avatar_pulse_speed?: number;
+  avatar_float?: boolean;
+  avatar_float_speed?: number;
+  frame_breathe?: boolean;
+  // Parçacık
+  particle_type?: 'none' | 'sparkle' | 'stars' | 'hearts' | 'bubbles';
+  particle_count?: number;
+  particle_color?: string;
+  // Renk döngüsü
+  color_cycle?: boolean;
+  color_cycle_speed?: number;
+  // Kullanıcı adı — mobile'da SVG yok, render edilmez (v632fced); tip için tutuluyor
+  name_enabled?: boolean;
+  name_position?: 'top' | 'bottom' | 'left' | 'right';
+  name_offset?: number;
+  name_rotation?: number;
+  name_curve_style?: 'flat' | 'arc-top' | 'arc-bottom' | 'circle';
+  name_color?: string;
+  name_size?: number;
+  name_bold?: boolean;
+  // Tier rozet — sade model: sadece aç/kapat + 8 nokta konum
+  tier_badge_enabled?: boolean;
+  tier_badge_position?: 'tl' | 'tc' | 'tr' | 'ml' | 'mr' | 'bl' | 'bc' | 'br';
+  // Ek animasyon paleti
+  avatar_shake?: boolean;
+  avatar_swing?: boolean;
+  avatar_tilt?: boolean;
+  frame_shimmer?: boolean;
+  frame_wobble?: boolean;
+  frame_pulse_ring?: boolean;
+  // İsim animasyonları (mobile'da name overlay yok; tip için)
+  name_glow?: boolean;
+  name_wave?: boolean;
+  name_shimmer?: boolean;
+  name_color_cycle?: boolean;
+  name_pulse?: boolean;
+  name_pulse_speed?: number;
+  name_float?: boolean;
+  name_float_speed?: number;
+  name_shake?: boolean;
+  name_swing?: boolean;
+  name_tilt?: boolean;
+  name_breathe?: boolean;
+  name_wobble?: boolean;
+  name_rotation_continuous?: boolean;
+  name_rotation_speed?: number;
+  name_opacity?: number;
+  name_glow_color?: string;
+  name_glow_intensity?: number;
+  name_glow_pulse?: boolean;
+  // Avatar şekli
+  avatar_shape?: 'circle' | 'rounded-square' | 'hexagon' | 'squircle' | 'star' | 'diamond';
+  // Avatar border
+  avatar_border_enabled?: boolean;
+  avatar_border_color?: string;
+  avatar_border_width?: number;
+  avatar_border_style?: 'solid' | 'dashed' | 'dotted' | 'double';
+  // Background halo
+  bg_halo_enabled?: boolean;
+  bg_halo_color?: string;
+  bg_halo_size?: number;
+  bg_halo_intensity?: number;
+  // Avatar filtreleri (hue/saturation/blur RN'de yok — grayscale/sepia/brightness yaklaşımı)
+  avatar_hue_rotate?: number;
+  avatar_brightness?: number;
+  avatar_saturation?: number;
+  avatar_blur?: number;
+  avatar_grayscale?: number;
+  avatar_sepia?: number;
 }
 
 export interface EntryConfig {
@@ -103,22 +193,35 @@ async function fetchMeta(itemId: string): Promise<any> {
   return p;
 }
 
-/** Frame config — sync getter (cache only). Async warmup için ensureFrameConfig kullan. */
-export function getCachedFrameConfig(frameId: string | null | undefined): FrameConfig | null {
+/** Frame config — sync getter (cache only). Async warmup için ensureFrameConfig kullan.
+ *  v1.3.54: sizeKey opsiyonel — verilirse size_overrides[sizeKey] base config'e merge edilir.
+ */
+function applySizeOverrides(base: any, sizeKey?: SizeKey): any {
+  if (!base || !sizeKey) return base;
+  const overrides = base?.size_overrides?.[sizeKey];
+  if (!overrides || typeof overrides !== 'object') return base;
+  // Shallow merge — override sadece set edilen alanları değiştirir
+  return { ...base, ...overrides };
+}
+
+export function getCachedFrameConfig(frameId: string | null | undefined, sizeKey?: SizeKey): FrameConfig | null {
   if (!frameId) return null;
   const e = frameCache.get(frameId);
   if (!e || Date.now() - e.ts > TTL_MS) return null;
-  return e.config;
+  return applySizeOverrides(e.config, sizeKey);
 }
 
-export async function ensureFrameConfig(frameId: string | null | undefined): Promise<FrameConfig | null> {
+export async function ensureFrameConfig(frameId: string | null | undefined, sizeKey?: SizeKey): Promise<FrameConfig | null> {
   if (!frameId) return null;
-  const cached = getCachedFrameConfig(frameId);
-  if (cached) return cached;
+  // Cache hit kontrol (raw base, size override sonra uygulanır)
+  const rawEntry = frameCache.get(frameId);
+  if (rawEntry && Date.now() - rawEntry.ts <= TTL_MS) {
+    return applySizeOverrides(rawEntry.config, sizeKey);
+  }
   const meta = await fetchMeta(frameId);
   const cfg = meta?.frame_config || null;
   if (cfg) frameCache.set(frameId, { config: cfg, ts: Date.now() });
-  return cfg;
+  return applySizeOverrides(cfg, sizeKey);
 }
 
 export function getCachedEntryConfig(effectId: string | null | undefined): EntryConfig | null {
@@ -159,6 +262,26 @@ export function invalidateConfig(itemId: string) {
   _listeners.forEach(fn => {
     try { fn(itemId); } catch { /* listener crash'leri sessizce yut, diğerleri devam etsin */ }
   });
+}
+
+// ★ v1.3.54 (2026-05-11): React hook — frame config'i realtime takip et.
+//   sizeKey opsiyonel — verilirse size_overrides[sizeKey] base config'e merge edilir.
+//   parent ekranlar (profil, sahne) name_enabled gibi bilgilere bakmak için kullanır.
+export function useFrameConfig(frameId: string | null | undefined, sizeKey?: SizeKey): FrameConfig | null {
+  const [cfg, setCfg] = useState<FrameConfig | null>(() => getCachedFrameConfig(frameId, sizeKey));
+
+  useEffect(() => {
+    if (!frameId) { setCfg(null); return; }
+    let mounted = true;
+    ensureFrameConfig(frameId, sizeKey).then((c) => { if (mounted) setCfg(c); });
+    const unsub = subscribeConfigChange((id) => {
+      if (id !== frameId) return;
+      ensureFrameConfig(frameId, sizeKey).then((c) => { if (mounted) setCfg(c); });
+    });
+    return () => { mounted = false; unsub(); };
+  }, [frameId, sizeKey]);
+
+  return cfg;
 }
 
 // ★ 2026-05-10: Web admin'den frame_config / entry_config güncellenince mobil

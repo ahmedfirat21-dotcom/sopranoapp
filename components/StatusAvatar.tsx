@@ -2,6 +2,15 @@ import React from 'react';
 import { View, Image, Text, StyleSheet, Platform, Animated, Easing, type ImageSourcePropType } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import Svg, {
+  Image as SvgImage,
+  Defs,
+  ClipPath,
+  Path as SvgPath,
+  Filter,
+  FeColorMatrix,
+  FeGaussianBlur,
+} from 'react-native-svg';
 import { getAvatarSource } from '../constants/avatars';
 import { TIER_DEFINITIONS } from '../constants/tiers';
 import type { SubscriptionTier } from '../types';
@@ -9,8 +18,52 @@ import { migrateLegacyTier } from '../types';
 import AvatarFrame from './profile/AvatarFrame';
 import { getFrameAvatarRatio } from '../constants/frameLottieRegistry';
 import TierBadge from './TierBadge';
-import { ensureFrameConfig, getCachedFrameConfig, subscribeConfigChange } from '../services/cosmeticConfigCache';
+import { ensureFrameConfig, getCachedFrameConfig, subscribeConfigChange, pickSizeKey } from '../services/cosmeticConfigCache';
 import { useEffect, useRef, useState } from 'react';
+
+// ★ v1.3.54 (2026-05-11): SVG Filter matrix yardımcıları — web admin avatar filter
+//   ayarlarını gerçek render etmek için. CSS filter karşılığı:
+//   - brightness(b): RGB scale matrix
+//   - sepia(s): identity × sepia matrix lineer karışımı
+//   - grayscale(g): identity × luminance matrix lineer karışımı
+//   Birden fazla filter zincirleme uygulanır (feColorMatrix peş peşe + feGaussianBlur).
+
+/** Brightness matrix — RGB her kanalı b ile çarp */
+function brightnessMatrix(b: number): string {
+  return `${b} 0 0 0 0  0 ${b} 0 0 0  0 0 ${b} 0 0  0 0 0 1 0`;
+}
+
+/** Sepia karışım matrisi — s: 0-1 arası karışım oranı */
+function sepiaMatrix(s: number): string {
+  const r1 = 1 - s * (1 - 0.393), r2 = s * 0.769,        r3 = s * 0.189;
+  const g1 = s * 0.349,           g2 = 1 - s * (1 - 0.686), g3 = s * 0.168;
+  const b1 = s * 0.272,           b2 = s * 0.534,        b3 = 1 - s * (1 - 0.131);
+  return `${r1} ${r2} ${r3} 0 0  ${g1} ${g2} ${g3} 0 0  ${b1} ${b2} ${b3} 0 0  0 0 0 1 0`;
+}
+
+/** Grayscale karışım matrisi — g: 0-1 arası karışım oranı (1 = tam siyah-beyaz) */
+function grayscaleMatrix(g: number): string {
+  const r1 = 0.2126 + 0.7874 * (1 - g), r2 = 0.7152 - 0.7152 * (1 - g), r3 = 0.0722 - 0.0722 * (1 - g);
+  const g1 = 0.2126 - 0.2126 * (1 - g), g2 = 0.7152 + 0.2848 * (1 - g), g3 = 0.0722 - 0.0722 * (1 - g);
+  const b1 = 0.2126 - 0.2126 * (1 - g), b2 = 0.7152 - 0.7152 * (1 - g), b3 = 0.0722 + 0.9278 * (1 - g);
+  return `${r1} ${r2} ${r3} 0 0  ${g1} ${g2} ${g3} 0 0  ${b1} ${b2} ${b3} 0 0  0 0 0 1 0`;
+}
+
+/** Avatar şekli için SVG path d-string. cx=cy=size/2 merkezli, size genişlikte. */
+function shapePath(shape: string, size: number): string | null {
+  const s = size;
+  switch (shape) {
+    case 'hexagon':
+      return `M ${s * 0.25},${s * 0.067} L ${s * 0.75},${s * 0.067} L ${s},${s * 0.5} L ${s * 0.75},${s * 0.933} L ${s * 0.25},${s * 0.933} L 0,${s * 0.5} Z`;
+    case 'star':
+      // 5-uçlu yıldız
+      return `M ${s * 0.5},0 L ${s * 0.61},${s * 0.35} L ${s * 0.98},${s * 0.35} L ${s * 0.68},${s * 0.57} L ${s * 0.79},${s * 0.91} L ${s * 0.5},${s * 0.70} L ${s * 0.21},${s * 0.91} L ${s * 0.32},${s * 0.57} L ${s * 0.02},${s * 0.35} L ${s * 0.39},${s * 0.35} Z`;
+    case 'diamond':
+      return `M ${s * 0.5},0 L ${s},${s * 0.5} L ${s * 0.5},${s} L 0,${s * 0.5} Z`;
+    default:
+      return null;
+  }
+}
 
 interface StatusAvatarProps {
   /** Avatar URL string or ImageSource */
@@ -105,23 +158,22 @@ export default function StatusAvatar({
   // Pill badge boyut hesabı (avatar boyutuna göre ölçekli)
   const pillScale = Math.max(0.7, Math.min(1, size / 60));
 
-  // ★ v213: Web admin'den yapılandırılmış frame_config — cosmetic_items.meta.frame_config
-  const [dynFrameCfg, setDynFrameCfg] = useState<any>(getCachedFrameConfig(frameId));
+  // ★ v1.3.54: Boyuta göre size_overrides uygulanır.
+  const sizeKey = pickSizeKey(size);
+  const [dynFrameCfg, setDynFrameCfg] = useState<any>(getCachedFrameConfig(frameId, sizeKey));
   useEffect(() => {
     if (!frameId) { setDynFrameCfg(null); return; }
-    ensureFrameConfig(frameId).then((cfg) => setDynFrameCfg(cfg));
-  }, [frameId]);
+    ensureFrameConfig(frameId, sizeKey).then((cfg) => setDynFrameCfg(cfg));
+  }, [frameId, sizeKey]);
 
-  // ★ 2026-05-11: REALTIME — admin değişiklik yapınca AvatarFrame gibi
-  //   StatusAvatar da anında güncellensin (5dk cache yerine ~1sn).
   useEffect(() => {
     if (!frameId) return;
     const unsub = subscribeConfigChange((id) => {
       if (id !== frameId) return;
-      ensureFrameConfig(frameId).then((cfg) => setDynFrameCfg(cfg));
+      ensureFrameConfig(frameId, sizeKey).then((cfg) => setDynFrameCfg(cfg));
     });
     return unsub;
-  }, [frameId]);
+  }, [frameId, sizeKey]);
 
   // Avatar oranı: önce dynamic config, yoksa registry default
   const dynamicAvatarRatio = dynFrameCfg?.avatar_ratio ?? (frameId ? getFrameAvatarRatio(frameId) : 1.0);
@@ -221,47 +273,22 @@ export default function StatusAvatar({
     }
   })();
 
-  // ★ AVATAR FİLTRE OVERLAY'leri — RN'de Image filter native değil.
-  //   Her filtre için kademeli overlay yaklaşımı: blur (expo-blur),
-  //   grayscale (siyah-beyaz overlay), sepia (kahverengi tint), brightness (siyah/beyaz),
-  //   saturation/hue (mümkün değil, skip + uyarı log).
-  const filterOverlays: React.ReactNode[] = [];
+  // ★ v1.3.54: GERÇEK FİLTRE — eski overlay yaklaşımı kaldırıldı; SVG feColorMatrix
+  //   ile native render. avatar Image SVG <Image> içine alınıp filter zinciri uygulanır.
+  //   Sadece filter VEYA custom shape (hex/star/diamond) varsa SVG kullan — yoksa
+  //   normal RN Image (performans için).
   const targetSizeForFilters = frameId ? Math.round(size * dynamicAvatarRatio) : (size - borderWidth * 2 - 2);
-  if ((dynFrameCfg?.avatar_grayscale ?? 0) > 0) {
-    filterOverlays.push(
-      <View key="gray" pointerEvents="none" style={{
-        position: 'absolute', top: 0, left: 0,
-        width: targetSizeForFilters, height: targetSizeForFilters,
-        borderRadius: shapeRadius,
-        backgroundColor: 'rgba(128,128,128,1)',
-        opacity: (dynFrameCfg.avatar_grayscale / 100) * 0.55, // gri tone yaklaşımı
-      }} />
-    );
-  }
-  if ((dynFrameCfg?.avatar_sepia ?? 0) > 0) {
-    filterOverlays.push(
-      <View key="sepia" pointerEvents="none" style={{
-        position: 'absolute', top: 0, left: 0,
-        width: targetSizeForFilters, height: targetSizeForFilters,
-        borderRadius: shapeRadius,
-        backgroundColor: '#704214',
-        opacity: (dynFrameCfg.avatar_sepia / 100) * 0.4,
-      }} />
-    );
-  }
+  const hueRotate = dynFrameCfg?.avatar_hue_rotate ?? 0;
+  const saturationVal = dynFrameCfg?.avatar_saturation ?? 1;
+  const blurVal = dynFrameCfg?.avatar_blur ?? 0;
   const brightnessVal = dynFrameCfg?.avatar_brightness ?? 1;
-  if (brightnessVal !== 1) {
-    const isUp = brightnessVal > 1;
-    filterOverlays.push(
-      <View key="bright" pointerEvents="none" style={{
-        position: 'absolute', top: 0, left: 0,
-        width: targetSizeForFilters, height: targetSizeForFilters,
-        borderRadius: shapeRadius,
-        backgroundColor: isUp ? 'white' : 'black',
-        opacity: Math.abs(brightnessVal - 1) * 0.4,
-      }} />
-    );
-  }
+  const grayscaleVal = (dynFrameCfg?.avatar_grayscale ?? 0) / 100; // 0-1
+  const sepiaVal = (dynFrameCfg?.avatar_sepia ?? 0) / 100;          // 0-1
+  const hasAnyFilter =
+    hueRotate !== 0 || saturationVal !== 1 || blurVal > 0 ||
+    brightnessVal !== 1 || grayscaleVal > 0 || sepiaVal > 0;
+  const customShape = ['hexagon', 'star', 'diamond'].includes(dynFrameCfg?.avatar_shape || '');
+  const useSvgRender = hasAnyFilter || customShape;
 
   // ★ glow_pulse — Animated shadowOpacity (iOS) / overlay opacity (Android)
   //   useNativeDriver:false çünkü shadowOpacity native driver'a yok.
@@ -316,8 +343,9 @@ export default function StatusAvatar({
         {(() => {
           // ★ 2026-05-11: Avatar render — web admin'den gelen avatar_* config'leri uygulanır.
           //   Animated.View wrapper → transform stack (pulse/float/shake/swing/tilt).
-          //   Image → boyut + dinamik şekil (borderRadius mapping).
-          //   Filter overlay'leri → grayscale/sepia/brightness yaklaşımı.
+          //   v1.3.54: SVG branch — filter veya custom shape (hex/star/diamond) varsa
+          //   SVG <Image> + <Filter feColorMatrix> + <ClipPath> gerçek native render.
+          //   Diğer durumda mevcut RN Image (performans korunur).
           const ratio = frameId ? dynamicAvatarRatio : 1.0;
           const targetSize = frameId ? Math.round(size * ratio) : (size - borderWidth * 2 - 2);
           // Glow pulse aktifse shadowRadius animated, değilse sabit
@@ -329,6 +357,67 @@ export default function StatusAvatar({
                 android: { elevation: 16 },
               })
             : {};
+
+          // ★ SVG render dalı — filter veya custom shape varsa
+          if (useSvgRender) {
+            // SVG <Image href> sadece string URI kabul eder; require number için fallback yok.
+            const svgHref = typeof source === 'object' && source && 'uri' in source ? (source as any).uri : null;
+            if (svgHref) {
+              const filterId = `f-${targetSize}-${hueRotate}-${saturationVal}-${blurVal}-${brightnessVal}-${grayscaleVal}-${sepiaVal}`;
+              const clipId = `c-${targetSize}-${dynFrameCfg?.avatar_shape}`;
+              const sPath = shapePath(dynFrameCfg?.avatar_shape || 'circle', targetSize);
+              return (
+                <Animated.View style={{
+                  width: targetSize, height: targetSize,
+                  transform: avatarTransform.length > 0 ? avatarTransform : undefined,
+                  ...glowStyle,
+                }}>
+                  <Svg width={targetSize} height={targetSize}>
+                    <Defs>
+                      {sPath && (
+                        <ClipPath id={clipId}>
+                          <SvgPath d={sPath} />
+                        </ClipPath>
+                      )}
+                      {hasAnyFilter && (
+                        <Filter id={filterId} x="-10%" y="-10%" width="120%" height="120%">
+                          {blurVal > 0 && (
+                            <FeGaussianBlur stdDeviation={blurVal} />
+                          )}
+                          {brightnessVal !== 1 && (
+                            <FeColorMatrix type="matrix" values={brightnessMatrix(brightnessVal)} />
+                          )}
+                          {hueRotate !== 0 && (
+                            <FeColorMatrix type="hueRotate" values={String(hueRotate)} />
+                          )}
+                          {saturationVal !== 1 && (
+                            <FeColorMatrix type="saturate" values={String(saturationVal)} />
+                          )}
+                          {grayscaleVal > 0 && (
+                            <FeColorMatrix type="matrix" values={grayscaleMatrix(grayscaleVal)} />
+                          )}
+                          {sepiaVal > 0 && (
+                            <FeColorMatrix type="matrix" values={sepiaMatrix(sepiaVal)} />
+                          )}
+                        </Filter>
+                      )}
+                    </Defs>
+                    <SvgImage
+                      href={svgHref}
+                      width={targetSize}
+                      height={targetSize}
+                      preserveAspectRatio="xMidYMid slice"
+                      clipPath={sPath ? `url(#${clipId})` : undefined}
+                      filter={hasAnyFilter ? `url(#${filterId})` : undefined}
+                    />
+                  </Svg>
+                </Animated.View>
+              );
+            }
+            // require source — SVG kullanamayız, normal Image'a düş (filter yok, fallback)
+          }
+
+          // Standart RN Image render — filter/custom shape yoksa
           return (
             <Animated.View style={{
               width: targetSize, height: targetSize,
@@ -342,8 +431,6 @@ export default function StatusAvatar({
                   ...glowStyle,
                 }}
               />
-              {/* Avatar filtre overlay'leri (grayscale/sepia/brightness) */}
-              {filterOverlays}
             </Animated.View>
           );
         })()}
@@ -401,11 +488,17 @@ export default function StatusAvatar({
         </View>
       )}
 
-      {/* ★ 2026-05-11: Tier badge tek sistem — mevcut TierBadge component'i (PRO pill)
-          korunur, web admin tier_badge_enabled=true ise SADECE KONUMU değişir.
-          Yeni overlay yaratılmaz, çift badge görünmez. */}
-      {showTierBadge && normalizedTier !== 'Free' && (() => {
-        // Web admin tier_badge_enabled=false ise default sağ-alt; true ise pos
+      {/* ★ v1.3.54: Tier badge görünürlük zinciri (öncelik sırası):
+            1) Kullanıcı APK'dan kapatmışsa (showTierBadge=false) → gizli
+            2) Web admin çerçeve ayarında tier_badge_enabled=false ise → gizli (admin kapattı)
+            3) Web admin tier_badge_enabled=true ise → görünür (Free dahil, admin açtı)
+            4) Hiç ayarlanmamışsa (undefined) → default: Free gizli, Plus/Pro/GM görünür. */}
+      {(() => {
+        if (!showTierBadge) return false;
+        if (dynFrameCfg?.tier_badge_enabled === false) return false;
+        if (dynFrameCfg?.tier_badge_enabled === true) return true;
+        return normalizedTier !== 'Free';
+      })() && (() => {
         const useDyn = !!dynFrameCfg?.tier_badge_enabled;
         const tbPos = String(dynFrameCfg?.tier_badge_position || 'br');
         // tl/tc/tr/ml/mr/bl/bc/br → top/left/right/bottom değerleri
@@ -436,7 +529,11 @@ export default function StatusAvatar({
             }}
             pointerEvents="none"
           >
-            <TierBadge tier={normalizedTier} size={tierBadgeSize} />
+            <TierBadge
+              tier={normalizedTier}
+              size={tierBadgeSize}
+              frameId={frameId}
+            />
           </View>
         );
       })()}
