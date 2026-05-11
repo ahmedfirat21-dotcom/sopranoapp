@@ -365,6 +365,7 @@ function LottieFrame({ meta, size, dynCfg }: { meta: any; size: number; dynCfg?:
   const dynLottieSpeed = dynCfg?.lottie_speed ?? 0.85;
   // ★ 2026-05-11: frame_breathe — frame yavaş büyüyüp küçülür (4 sn döngü)
   const dynBreathe = !!dynCfg?.frame_breathe;
+  const dynWobble = !!dynCfg?.frame_wobble;
 
   const lottieSize = Math.round(size * meta.scale * dynScale);
   const baseOffset = (lottieSize - size) / -2;
@@ -399,11 +400,28 @@ function LottieFrame({ meta, size, dynCfg }: { meta: any; size: number; dynCfg?:
     return () => loop.stop();
   }, [dynBreathe, breatheAnim]);
 
-  const rotateInterp = rotateAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
+  // ★ Frame wobble — ±2.5° hafif sallanma (2 sn)
+  const wobbleAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (!dynWobble) { wobbleAnim.setValue(0); return; }
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(wobbleAnim, { toValue: 1,  duration: 500, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(wobbleAnim, { toValue: -1, duration: 1000, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(wobbleAnim, { toValue: 0,  duration: 500, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [dynWobble, wobbleAnim]);
 
-  // Transform stack — rotate + scale birlikte çalışabilir
+  const rotateInterp = rotateAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
+  const wobbleInterp = wobbleAnim.interpolate({ inputRange: [-1, 1], outputRange: ['-2.5deg', '2.5deg'] });
+
+  // Transform stack — rotate + scale + wobble birlikte çalışabilir
   const transformStack: any[] = [];
   if (dynRotation > 0) transformStack.push({ rotate: rotateInterp });
+  if (dynWobble && dynRotation === 0) transformStack.push({ rotate: wobbleInterp });
   if (dynBreathe) transformStack.push({ scale: breatheAnim });
 
   return (
