@@ -480,16 +480,99 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, i
   // ★ 2026-05-11: Web admin name overlay aktifse bizim default isim Text'ini
   //   gizleriz (çift isim çakışmasın). RoomAvatarFrame içindeki NameOverlay
   //   web admin'in konum/animasyon/glow ayarlarıyla render edecek.
-  const [frameCfg, setFrameCfg] = useState<any>(getCachedFrameConfig(activeFrame));
+  // ★ v1.3.55: Sahnedeki host ve diğer speaker'lar için size_overrides ayrı anahtarlar.
+  //   Host → "stage_host" (web admin'in "Sahne Host" tab'ı), diğerleri → "speaker".
+  const speakerSizeKey: 'stage_host' | 'speaker' = isHost ? 'stage_host' : 'speaker';
+  const [frameCfg, setFrameCfg] = useState<any>(getCachedFrameConfig(activeFrame, speakerSizeKey));
   useEffect(() => {
     if (!activeFrame) { setFrameCfg(null); return; }
-    ensureFrameConfig(activeFrame).then(setFrameCfg);
+    ensureFrameConfig(activeFrame, speakerSizeKey).then(setFrameCfg);
     const unsub = subscribeConfigChange((id) => {
-      if (id === activeFrame) ensureFrameConfig(activeFrame).then(setFrameCfg);
+      if (id === activeFrame) ensureFrameConfig(activeFrame, speakerSizeKey).then(setFrameCfg);
     });
     return unsub;
-  }, [activeFrame]);
+  }, [activeFrame, speakerSizeKey]);
   const hideDefaultName = !!frameCfg?.name_enabled;
+
+  // ★ 2026-05-11: Avatar shape — parent View borderRadius'a uygulanır,
+  //   overflow:hidden ile Image kırpılır. Daire dışı şekiller görünsün.
+  const avatarShapeRadius = (() => {
+    switch (frameCfg?.avatar_shape) {
+      case 'rounded-square': return cardWidth * 0.22;
+      case 'squircle':       return cardWidth * 0.36;
+      case 'hexagon':
+      case 'star':
+      case 'diamond':        return cardWidth * 0.36; // squircle fallback
+      case 'circle':
+      default:               return cardWidth / 2;
+    }
+  })();
+
+  // ★ Avatar hareket animasyonları — paralel
+  const pulseAnim = useRef(new Animated.Value(0)).current;
+  const floatAnim = useRef(new Animated.Value(0)).current;
+  const shakeAnim = useRef(new Animated.Value(0)).current;
+  const swingAnim = useRef(new Animated.Value(0)).current;
+  const tiltAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (!frameCfg?.avatar_pulse) return;
+    const dur = (frameCfg?.avatar_pulse_speed ?? 2) * 500;
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(pulseAnim, { toValue: 1, duration: dur, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      Animated.timing(pulseAnim, { toValue: 0, duration: dur, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, [pulseAnim, frameCfg?.avatar_pulse, frameCfg?.avatar_pulse_speed]);
+  useEffect(() => {
+    if (!frameCfg?.avatar_float) return;
+    const dur = (frameCfg?.avatar_float_speed ?? 4) * 500;
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(floatAnim, { toValue: 1, duration: dur, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      Animated.timing(floatAnim, { toValue: 0, duration: dur, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, [floatAnim, frameCfg?.avatar_float, frameCfg?.avatar_float_speed]);
+  useEffect(() => {
+    if (!frameCfg?.avatar_shake) return;
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(shakeAnim, { toValue: 1, duration: 120, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: -1, duration: 120, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: 0.5, duration: 120, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: -0.5, duration: 120, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: 0, duration: 120, useNativeDriver: true }),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, [shakeAnim, frameCfg?.avatar_shake]);
+  useEffect(() => {
+    if (!frameCfg?.avatar_swing) return;
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(swingAnim, { toValue: 1, duration: 625, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      Animated.timing(swingAnim, { toValue: 0, duration: 625, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      Animated.timing(swingAnim, { toValue: -1, duration: 625, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      Animated.timing(swingAnim, { toValue: 0, duration: 625, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, [swingAnim, frameCfg?.avatar_swing]);
+  useEffect(() => {
+    if (!frameCfg?.avatar_tilt) return;
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(tiltAnim, { toValue: 1, duration: 1500, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      Animated.timing(tiltAnim, { toValue: 0, duration: 1500, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, [tiltAnim, frameCfg?.avatar_tilt]);
+
+  const avatarTransform: any[] = [];
+  if (frameCfg?.avatar_pulse) avatarTransform.push({ scale: pulseAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.08] }) });
+  if (frameCfg?.avatar_float) avatarTransform.push({ translateY: floatAnim.interpolate({ inputRange: [0, 1], outputRange: [0, -8] }) });
+  if (frameCfg?.avatar_shake) avatarTransform.push({ translateX: shakeAnim.interpolate({ inputRange: [-1, 1], outputRange: [-2, 2] }) });
+  if (frameCfg?.avatar_swing) avatarTransform.push({ rotate: swingAnim.interpolate({ inputRange: [-1, 1], outputRange: ['-8deg', '8deg'] }) });
+  if (frameCfg?.avatar_tilt)  avatarTransform.push({ rotate: tiltAnim.interpolate({ inputRange: [0, 1], outputRange: ['-3deg', '3deg'] }) });
   const { mic: rawMic, speaking, videoTrack, cameraOn } = micStatus;
   const isGhost = (user as any).is_ghost;
   // ★ D3: DB'de is_muted=true ise UI'da kesinlikle "muted" olarak göster — LiveKit
@@ -555,6 +638,7 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, i
               userTier={(user.user as any)?.subscription_tier && (user.user as any).subscription_tier !== 'Free'
                 ? String((user.user as any).subscription_tier).toUpperCase()
                 : undefined}
+              contextKey={isHost ? 'stage_host' : 'speaker'}
             />
           </View>
         </View>
@@ -575,15 +659,54 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, i
           // ★ 2026-05-05: Frame artık zIndex 2 ile üstte — speakerCardInner default z'de kalır.
         },
       ]}>
-        <View style={[StyleSheet.absoluteFill, {
-          borderRadius: cameraOn && videoTrack && VideoView ? Math.max(12, Math.floor(cardWidth * 0.08)) : cardWidth / 2,
+        <Animated.View style={[StyleSheet.absoluteFill, {
+          // ★ 2026-05-11: Shape — web admin avatar_shape'e göre borderRadius.
+          //   Camera açıkken kare-yumuşak (8% radius), kapalıyken shape mapping.
+          borderRadius: cameraOn && videoTrack && VideoView ? Math.max(12, Math.floor(cardWidth * 0.08)) : avatarShapeRadius,
           overflow: 'hidden',
+          // Avatar transform stack — pulse/float/shake/swing/tilt
+          transform: avatarTransform.length > 0 ? avatarTransform : undefined,
         }]}>
           <LinearGradient colors={['rgba(30,41,59,0.7)', 'rgba(15,23,42,0.85)']} style={StyleSheet.absoluteFill} />
           {cameraOn && videoTrack && VideoView ? (
             <VideoView videoTrack={videoTrack} style={StyleSheet.absoluteFill} objectFit="cover" mirror={isMe} />
-          ) : (
-            <Image source={getAvatarSource(avatarUrl)} style={s.speakerAvatar} />
+          ) : (() => {
+            // ★ v1.3.55: avatar_ratio uygulanır — frame içindeki avatar görseli web admin'in
+            //   "Avatar Oranı" ayarına göre küçülür/büyür. Default 1.0 (frame'i tamamen doldurur).
+            const ratio = Math.max(0.4, Math.min(1.05, frameCfg?.avatar_ratio ?? 1.0));
+            const inner = Math.round(cardWidth * ratio);
+            return (
+              <Image
+                source={getAvatarSource(avatarUrl)}
+                style={[s.speakerAvatar, ratio < 1 && {
+                  position: 'absolute',
+                  width: inner,
+                  height: inner,
+                  left: (cardWidth - inner) / 2,
+                  top: (cardWidth - inner) / 2,
+                  borderRadius: inner / 2,
+                }]}
+              />
+            );
+          })()}
+          {/* ★ Avatar filtre overlay'leri (grayscale/sepia/brightness) */}
+          {(frameCfg?.avatar_grayscale ?? 0) > 0 && (
+            <View pointerEvents="none" style={[StyleSheet.absoluteFill, {
+              backgroundColor: 'rgba(128,128,128,1)',
+              opacity: (frameCfg.avatar_grayscale / 100) * 0.55,
+            }]} />
+          )}
+          {(frameCfg?.avatar_sepia ?? 0) > 0 && (
+            <View pointerEvents="none" style={[StyleSheet.absoluteFill, {
+              backgroundColor: '#704214',
+              opacity: (frameCfg.avatar_sepia / 100) * 0.4,
+            }]} />
+          )}
+          {(frameCfg?.avatar_brightness ?? 1) !== 1 && (
+            <View pointerEvents="none" style={[StyleSheet.absoluteFill, {
+              backgroundColor: (frameCfg.avatar_brightness > 1) ? 'white' : 'black',
+              opacity: Math.abs(frameCfg.avatar_brightness - 1) * 0.4,
+            }]} />
           )}
           {/* ★ 2026-04-24: Kamera açıkken alt + üst gradient overlay — badge'ler video üzerinde okunur kalır. */}
           {cameraOn && videoTrack && VideoView && (
@@ -600,7 +723,7 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, i
               />
             </>
           )}
-        </View>
+        </Animated.View>
         {/* ★ v92.13 (1 May 2026): SpeakingGlow yalnızca konuşma için (teal pulse).
             Sahne Işığı power-up'ı ARTIK ayrı component (StageLightHalo) — 3 katmanlı
             altın expand-pulse halka + iç parlayan border. Kullanıcı "vasat" dedi,
@@ -666,16 +789,25 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, i
       </View>
       {/* ★ v109.4.4: İsim ortalı + altında "PRO" pill (sm, label dahil)
           ★ 2026-05-05: Frame Lottie kanat'ları altta kalsın diye z-order yükseltildi.
-          İsim ve tier badge avatar çerçevesinin üzerinde görünür. */}
+          ★ v1.3.54: name_enabled ise default Text gizli — RoomAvatarFrame çerçeve etrafına yazıyor. */}
       <View style={{ alignItems: 'center', maxWidth: cardWidth, gap: 2, zIndex: 50, elevation: 20 }}>
-        <Text
-          style={[s.speakerName, { maxWidth: cardWidth - 4, fontSize: cardWidth < 95 ? 10 : 11 }, isHost && { color: '#FFD700' }, isMod && !isHost && { color: '#C4B5FD' }]}
-          numberOfLines={1}
-          ellipsizeMode="tail"
-        >
-          {displayName}
-        </Text>
-        <TierBadge tier={(user.user as any)?.subscription_tier} size="sm" />
+        {!hideDefaultName && (
+          <Text
+            style={[s.speakerName, { maxWidth: cardWidth - 4, fontSize: cardWidth < 95 ? 10 : 11 }, isHost && { color: '#FFD700' }, isMod && !isHost && { color: '#C4B5FD' }]}
+            numberOfLines={1}
+            ellipsizeMode="tail"
+          >
+            {displayName}
+          </Text>
+        )}
+        {/* ★ v1.3.54: Web admin tier_badge_enabled=false ise sahnede de gizle.
+             Default davranış: tier varsa göster (Free için gizli). */}
+        {(() => {
+          const tier = (user.user as any)?.subscription_tier;
+          const explicitlyDisabled = frameCfg?.tier_badge_enabled === false;
+          if (explicitlyDisabled) return null;
+          return <TierBadge tier={tier} size="sm" />;
+        })()}
       </View>
       </Pressable>
       {/* ★ 2026-04-22: "Sahneden İn" butonu kart içinden KALDIRILDI — parent container'ın

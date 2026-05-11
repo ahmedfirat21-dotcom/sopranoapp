@@ -115,7 +115,7 @@ const ListenerCell = React.memo(function ListenerCell({
             }}
             pointerEvents="none"
           >
-            <RoomAvatarFrame frameId={activeFrameId} avatarSize={ownerAvatarSize} minSize={36} />
+            <RoomAvatarFrame frameId={activeFrameId} avatarSize={ownerAvatarSize} minSize={36} contextKey="listener" />
           </View>
         )}
       </View>
@@ -142,7 +142,7 @@ const ListenerCell = React.memo(function ListenerCell({
           }}
           pointerEvents="none"
         >
-          <TierBadge tier={userTier} size="xs" />
+          <TierBadge tier={userTier} size="xs" frameId={activeFrameId} />
         </View>
       )}
       <Text style={[s.name, { fontSize: nameSize, maxWidth: cellW }, isOwner && s.nameOwner, showMuteIndicator && { color: 'rgba(239,68,68,0.6)' }]} numberOfLines={1}>

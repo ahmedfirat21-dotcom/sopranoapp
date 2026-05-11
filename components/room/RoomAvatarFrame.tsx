@@ -9,6 +9,7 @@
  */
 import React from 'react';
 import AvatarFrame from '../profile/AvatarFrame';
+import type { SizeKey } from '../../services/cosmeticConfigCache';
 
 interface Props {
   frameId?: string | null;
@@ -23,10 +24,14 @@ interface Props {
   userName?: string;
   /** ★ 2026-05-11: Web admin tier badge için tier label pas-through. */
   userTier?: string;
+  /** ★ v1.3.55: size_overrides anahtarı override'ı — host avatar fiziksel boyutu
+   *  speaker key'ine düşse bile "stage_host" override'ı uygulansın diye parent
+   *  ekran (SpeakerSection) "ben host'um" diye explicit söyleyebilir. */
+  contextKey?: SizeKey;
 }
 
-export default function RoomAvatarFrame({ frameId, avatarSize, minSize = 30, forceRing, userName, userTier }: Props) {
+export default function RoomAvatarFrame({ frameId, avatarSize, minSize = 30, forceRing, userName, userTier, contextKey }: Props) {
   if (!frameId) return null;
   if (avatarSize < minSize) return null;
-  return <AvatarFrame frameId={frameId} size={avatarSize} forceRing={forceRing} userName={userName} userTier={userTier} />;
+  return <AvatarFrame frameId={frameId} size={avatarSize} forceRing={forceRing} userName={userName} userTier={userTier} contextKey={contextKey} />;
 }
