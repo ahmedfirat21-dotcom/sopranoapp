@@ -1656,7 +1656,11 @@ export function GalleryCard({ item, owned, onPress, discountPct = 0, wished, onW
             </View>
           );
         })()
-      : !fullCard && hasIllustration(item.id) ? (
+      : !fullCard && (hasIllustration(item.id) || (item as any).asset_url) ? (
+        // ★ 2026-05-11: hasIllustration check'i item.asset_url ile genişletildi —
+        //   web admin'den eklenen yeni ürünler (Turkuaz Premium gibi) mağaza
+        //   kartında emoji yerine gerçek thumbnail görünür. Item3DArt remoteAsset
+        //   async fetch eder (asset_url DB kolonundan).
         <View style={[
           { position: 'absolute', alignItems: 'center', justifyContent: 'center' },
           featured
