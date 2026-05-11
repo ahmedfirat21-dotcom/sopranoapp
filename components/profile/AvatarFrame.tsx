@@ -194,6 +194,59 @@ const FRAME_PALETTES: Record<string, FramePalette> = {
 //   Lottie frame'ler düşük boyutta da render olur, gradient fallback'e düşmez.
 const LOTTIE_MIN_AVATAR_SIZE = 32;
 
+// ★ 2026-05-11: Tek parçacık — scale/opacity pulse (twinkle) ile soft görünür.
+//   Wrapper orbit yapıyor, ParticleDot sabit konumda + kendine özel pulse.
+function ParticleDot({ emoji, color, x, y, fontSize, twinkleDelay }: {
+  emoji: string; color: string; x: number; y: number; fontSize: number; twinkleDelay: number;
+}) {
+  const twinkleAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    let cancelled = false;
+    let loop: Animated.CompositeAnimation | null = null;
+    const timeoutId = setTimeout(() => {
+      if (cancelled) return;
+      loop = Animated.loop(
+        Animated.sequence([
+          Animated.timing(twinkleAnim, { toValue: 1, duration: 900, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+          Animated.timing(twinkleAnim, { toValue: 0, duration: 900, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        ])
+      );
+      loop.start();
+    }, twinkleDelay);
+    return () => {
+      cancelled = true;
+      clearTimeout(timeoutId);
+      loop?.stop();
+    };
+  }, [twinkleAnim, twinkleDelay]);
+
+  const scaleInterp = twinkleAnim.interpolate({ inputRange: [0, 1], outputRange: [0.85, 1.2] });
+  const opacityInterp = twinkleAnim.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1] });
+
+  return (
+    <Animated.Text
+      style={{
+        position: 'absolute',
+        left: '50%' as any, top: '50%' as any,
+        marginLeft: x - fontSize / 2,
+        marginTop: y - fontSize / 2,
+        width: fontSize, height: fontSize,
+        fontSize,
+        lineHeight: fontSize,
+        textAlign: 'center',
+        color, // emoji default rengini override etmez ama tintColor alternatif yok Text'te
+        textShadowColor: color,
+        textShadowRadius: 8,
+        textShadowOffset: { width: 0, height: 0 },
+        opacity: opacityInterp,
+        transform: [{ scale: scaleInterp }],
+      }}
+    >
+      {emoji}
+    </Animated.Text>
+  );
+}
+
 // ★ 2026-05-11: Avatar etrafında parçacık efekti — sparkle/stars/hearts/bubbles.
 //   Animated.loop ile yörüngede döner, color_cycle aktifse renk de cycle olur.
 function ParticleOverlay({ size, dynCfg }: { size: number; dynCfg: any }) {
@@ -228,18 +281,26 @@ function ParticleOverlay({ size, dynCfg }: { size: number; dynCfg: any }) {
 
   if (type === 'none') return null;
 
-  const symbol = type === 'sparkle' ? '✦' : type === 'stars' ? '★' : type === 'hearts' ? '♥' : '○';
+  // ★ 2026-05-11: Gerçek emoji + yörünge avatar dışında en az 18px boşluk + her
+  //   parçacığa scale/opacity twinkle. Önceki düz Unicode (✦♥) kalitesizdi
+  //   ve yarıçap çok yakın (avatar üstüne biniyordu) — düzeltildi.
+  const emoji = type === 'sparkle' ? '✨' : type === 'stars' ? '⭐' : type === 'hearts' ? '❤️' : '🫧';
+  const fontSize = Math.max(14, Math.round(size * 0.18));
+  // Yörünge: avatar yarıçapı + min 18px boşluk
+  const orbitRadius = size / 2 + Math.max(18, fontSize * 0.4);
+  const wrapperOffset = orbitRadius + fontSize;
+  const wrapperSize = wrapperOffset * 2;
   const rotateInterp = orbitAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
-  const radius = size * 0.65;
-  const fontSize = Math.max(10, Math.round(size * 0.14));
 
   return (
     <Animated.View
       pointerEvents="none"
       style={{
         position: 'absolute',
-        top: -(size * 0.4), left: -(size * 0.4),
-        width: size * 1.8, height: size * 1.8,
+        top: -(wrapperOffset - size / 2),
+        left: -(wrapperOffset - size / 2),
+        width: wrapperSize,
+        height: wrapperSize,
         alignItems: 'center', justifyContent: 'center',
         zIndex: 4,
         elevation: 4,
@@ -249,25 +310,18 @@ function ParticleOverlay({ size, dynCfg }: { size: number; dynCfg: any }) {
       {Array.from({ length: count }).map((_, i) => {
         const angle = (360 / count) * i;
         const rad = (angle * Math.PI) / 180;
-        const x = Math.cos(rad) * radius;
-        const y = Math.sin(rad) * radius;
+        const x = Math.cos(rad) * orbitRadius;
+        const y = Math.sin(rad) * orbitRadius;
         return (
-          <Text
+          <ParticleDot
             key={i}
-            style={{
-              position: 'absolute',
-              left: '50%' as any, top: '50%' as any,
-              marginLeft: x - fontSize / 2,
-              marginTop: y - fontSize / 2,
-              color: particleColor,
-              fontSize,
-              textShadowColor: particleColor,
-              textShadowRadius: 6,
-              textShadowOffset: { width: 0, height: 0 },
-            }}
-          >
-            {symbol}
-          </Text>
+            emoji={emoji}
+            color={particleColor}
+            x={x}
+            y={y}
+            fontSize={fontSize}
+            twinkleDelay={(i * 250) % 2000}
+          />
         );
       })}
     </Animated.View>
