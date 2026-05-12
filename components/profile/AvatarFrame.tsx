@@ -1067,25 +1067,10 @@ function PngFrame({ meta, size, dynCfg }: { meta: any; size: number; dynCfg?: an
 
   // ★ v1.3.68: color_cycle — Skia ColorMatrix ile gerçek hue-rotate.
   //   Eski: tintColor + hsl(N,80%,60%) → tüm PNG'yi düz renkle değiştiriyor (fosforlu pembe/yeşil bug).
-  //   Yeni: Skia <Image> + <ColorMatrix> hue-rotate matris → orijinal renkleri koruyup tonu kaydırır
-  //         (CSS filter:hue-rotate paritesi). Skia native yoksa eski tintColor fallback.
-  const [hueDeg, setHueDeg] = useState(0);
-  useEffect(() => {
-    if (!dynColorCycle) { setHueDeg(0); return; }
-    const speedSec = dynCfg?.color_cycle_speed ?? 12;
-    const startMs = Date.now();
-    const intervalId = setInterval(() => {
-      const elapsed = (Date.now() - startMs) / 1000;
-      const h = ((elapsed / speedSec) * 360) % 360;
-      setHueDeg(h);
-    }, 50); // 20fps yumuşak akış
-    return () => clearInterval(intervalId);
-  }, [dynColorCycle, dynCfg?.color_cycle_speed]);
-
-  // Skia kullanılabilir mi (color_cycle açıkken)?
+  //   Yeni: Skia <Image> + <ColorMatrix> hue-rotate matris → orijinal renkleri koruyup tonu kaydırır.
+  //   Animasyon Skia native clock üzerinden çalışır → React re-render YOK, GPU-side, frame drop yok.
   const useSkiaColorCycle = dynColorCycle && !!SkiaMod;
-  // Skia yokken eski tintColor fallback için fosforlu HSL — pre-Skia bozuk davranış.
-  const fallbackTintColor = (dynColorCycle && !SkiaMod) ? `hsl(${Math.round(hueDeg)}, 80%, 60%)` : null;
+  const speedSec = dynCfg?.color_cycle_speed ?? 12;
 
   // Transform stack — rotate + scale + wobble paralel çalışabilir
   const transformStack: any[] = [];
@@ -1112,15 +1097,12 @@ function PngFrame({ meta, size, dynCfg }: { meta: any; size: number; dynCfg?: an
       }}
     >
       {useSkiaColorCycle ? (
-        <PngFrameSkiaHueRotate source={meta.source} size={frameSize} hueDeg={hueDeg} />
+        <PngFrameSkiaHueRotate source={meta.source} size={frameSize} speedSec={speedSec} />
       ) : (
         <Image
           source={meta.source}
           resizeMode="contain"
-          style={{
-            width: frameSize, height: frameSize,
-            tintColor: fallbackTintColor || undefined,
-          }}
+          style={{ width: frameSize, height: frameSize }}
         />
       )}
     </Animated.View>
@@ -1129,15 +1111,55 @@ function PngFrame({ meta, size, dynCfg }: { meta: any; size: number; dynCfg?: an
 
 /**
  * PngFrame + color_cycle için Skia hue-rotate renderer.
- * useImage hook üst seviyede çağrılmalı, o yüzden ayrı sub-component.
- * PngFrameSkiaHueRotate sadece dynColorCycle=true ve Skia mevcutken render edilir.
+ * Reanimated useSharedValue + withRepeat ile GPU-side hue animasyonu → React re-render YOK.
+ * matrix bir Reanimated derived value, Skia ColorMatrix props olarak alır ve UI thread'de günceller.
  */
-function PngFrameSkiaHueRotate({ source, size, hueDeg }: { source: any; size: number; hueDeg: number }) {
+function PngFrameSkiaHueRotate({ source, size, speedSec }: { source: any; size: number; speedSec: number }) {
   const { Canvas, Image: SkiaImage, ColorMatrix, useImage } = SkiaMod;
-  const image = useImage(source);
-  const matrix = React.useMemo(() => hueRotateMatrix(hueDeg), [hueDeg]);
+  // require import — Reanimated her zaman yüklü olmayabilir, defensive
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const Reanimated = require('react-native-reanimated');
+  const { useSharedValue, useDerivedValue, withRepeat, withTiming, Easing: RAEasing } = Reanimated;
+
+  // Skia useImage local require'd kaynaklar için bazen güvenilir değil — explicit URI çevirisi yap.
+  const resolvedSource = React.useMemo(() => {
+    if (!source) return null;
+    if (typeof source === 'string') return source;
+    if (typeof source === 'number') {
+      const resolved = Image.resolveAssetSource(source);
+      return resolved?.uri || null;
+    }
+    if (typeof source === 'object' && source.uri) return source.uri;
+    return null;
+  }, [source]);
+
+  const image = useImage(resolvedSource);
+  const hue = useSharedValue(0);
+  React.useEffect(() => {
+    hue.value = 0;
+    hue.value = withRepeat(
+      withTiming(360, { duration: speedSec * 1000, easing: RAEasing.linear }),
+      -1, // infinite
+      false,
+    );
+  }, [speedSec, hue, withRepeat, withTiming, RAEasing]);
+  // ★ Worklet: matrisi UI thread'de hesapla — dışarıdaki JS fonksiyonu çağrılamıyor.
+  //   CSS filter:hue-rotate(Ndeg) W3C spec 5x4 ColorMatrix inline.
+  const matrix = useDerivedValue(() => {
+    'worklet';
+    const deg = hue.value;
+    const rad = (deg * Math.PI) / 180;
+    const cos = Math.cos(rad);
+    const sin = Math.sin(rad);
+    return [
+      0.213 + cos * 0.787 - sin * 0.213, 0.715 - cos * 0.715 - sin * 0.715, 0.072 - cos * 0.072 + sin * 0.928, 0, 0,
+      0.213 - cos * 0.213 + sin * 0.143, 0.715 + cos * 0.285 + sin * 0.140, 0.072 - cos * 0.072 - sin * 0.283, 0, 0,
+      0.213 - cos * 0.213 - sin * 0.787, 0.715 - cos * 0.715 + sin * 0.715, 0.072 + cos * 0.928 + sin * 0.072, 0, 0,
+      0, 0, 0, 1, 0,
+    ];
+  });
+
   if (!image) {
-    // İlk yüklemede image hazır olana kadar boş View
     return <View style={{ width: size, height: size }} />;
   }
   return (
@@ -1384,20 +1406,11 @@ function RemoteAssetFrame({ frameId, size, dynCfg }: { frameId: string; size: nu
     return () => loop.stop();
   }, [dynWobble, wobbleAnim]);
 
-  // ★ color_cycle — image asset için tintColor cycle
+  // ★ v1.3.68: color_cycle — Skia ColorMatrix hue-rotate (web admin filter:hue-rotate paritesi).
+  //   Eski: tintColor + hsl() → fosforlu solid renk bug. Yeni: orijinal görseli koruyarak hue kaydırma.
   const dynColorCycle = !!dynCfg?.color_cycle;
-  const [cycleColor, setCycleColor] = useState<string | null>(null);
-  useEffect(() => {
-    if (!dynColorCycle) { setCycleColor(null); return; }
-    const speedSec = dynCfg?.color_cycle_speed ?? 12;
-    const startMs = Date.now();
-    const intervalId = setInterval(() => {
-      const elapsed = (Date.now() - startMs) / 1000;
-      const hue = ((elapsed / speedSec) * 360) % 360;
-      setCycleColor(`hsl(${Math.round(hue)}, 80%, 60%)`);
-    }, 100);
-    return () => clearInterval(intervalId);
-  }, [dynColorCycle, dynCfg?.color_cycle_speed]);
+  const useSkiaColorCycle = dynColorCycle && !!SkiaMod;
+  const colorCycleSpeedSec = dynCfg?.color_cycle_speed ?? 12;
 
   if (!asset || !asset.url) return null;
 
@@ -1520,14 +1533,15 @@ function RemoteAssetFrame({ frameId, size, dynCfg }: { frameId: string; size: nu
           transform: transformStack,
         }}
       >
-        <Image
-          source={{ uri: asset.url }}
-          resizeMode="contain"
-          style={{
-            width: '100%', height: '100%',
-            tintColor: cycleColor || undefined,
-          }}
-        />
+        {useSkiaColorCycle ? (
+          <PngFrameSkiaHueRotate source={asset.url} size={frameSize} speedSec={colorCycleSpeedSec} />
+        ) : (
+          <Image
+            source={{ uri: asset.url }}
+            resizeMode="contain"
+            style={{ width: '100%', height: '100%' }}
+          />
+        )}
       </Animated.View>
     );
   }
