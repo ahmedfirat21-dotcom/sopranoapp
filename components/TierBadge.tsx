@@ -15,8 +15,8 @@
  *   Skia native modül yoksa fallback: expo-linear-gradient + utils/shadow.
  */
 
-import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Animated, Easing, LayoutChangeEvent, Platform } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, Animated, LayoutChangeEvent, Platform } from 'react-native';
 import { LinearGradient as ExpoGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { isSkiaAvailable } from './skia';
@@ -85,25 +85,12 @@ const SIZE: Record<string, {
 export default function TierBadge({ tier, size = 'md', style, frameId: _frameId }: Props) {
   const cfg = tier ? CONFIG[tier] : null;
   const sz = SIZE[size];
-  const shimmer = useRef(new Animated.Value(0)).current;
   const [measured, setMeasured] = useState({ width: 0, height: 0 });
 
-  useEffect(() => {
-    if (!cfg || (tier !== 'Pro' && tier !== 'GodMaster')) return;
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(shimmer, { toValue: 1, duration: 1600, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-        Animated.timing(shimmer, { toValue: 0, duration: 1600, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-      ]),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [cfg, tier, shimmer]);
+  // ★ v1.3.68: Shimmer (yanıp sönme + scale) animasyonu kullanıcı talebi ile kaldırıldı.
+  //   Rozet artık sabit görünür. Glow halka durağan kalır.
 
   if (!cfg) return null;
-
-  const shimmerOpacity = shimmer.interpolate({ inputRange: [0, 1], outputRange: [0.85, 1] });
-  const shimmerScale = shimmer.interpolate({ inputRange: [0, 1], outputRange: [1, 1.04] });
 
   const onLayout = (e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;
@@ -123,8 +110,6 @@ export default function TierBadge({ tier, size = 'md', style, frameId: _frameId 
           height: sz.height,
           paddingHorizontal: sz.paddingH,
           borderRadius: sz.radius,
-          opacity: shimmerOpacity,
-          transform: [{ scale: shimmerScale }],
         },
         // Skia yoksa RN shadow ile fallback:
         !useSkia && Platform.select({
