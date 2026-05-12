@@ -28,6 +28,29 @@ try {
   LottieView = require('lottie-react-native').default;
 } catch { /* fallback to gradient ring */ }
 
+// Skia — color_cycle için gerçek hue-rotate (CSS filter:hue-rotate paritesi)
+let SkiaMod: any = null;
+try {
+  SkiaMod = require('@shopify/react-native-skia');
+} catch { /* native module yoksa tintColor fallback'e düş */ }
+
+/**
+ * CSS filter: hue-rotate(Ndeg) W3C spec ile birebir 5x4 ColorMatrix.
+ * Orijinal PNG renklerinin luminance'ını korur, sadece hue kaydırır.
+ * (tintColor + hsl() yaklaşımının aksine renk doygunluğunu sıfırlamaz.)
+ */
+function hueRotateMatrix(deg: number): number[] {
+  const rad = (deg * Math.PI) / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+  return [
+    0.213 + cos * 0.787 - sin * 0.213, 0.715 - cos * 0.715 - sin * 0.715, 0.072 - cos * 0.072 + sin * 0.928, 0, 0,
+    0.213 - cos * 0.213 + sin * 0.143, 0.715 + cos * 0.285 + sin * 0.140, 0.072 - cos * 0.072 - sin * 0.283, 0, 0,
+    0.213 - cos * 0.213 - sin * 0.787, 0.715 - cos * 0.715 + sin * 0.715, 0.072 + cos * 0.928 + sin * 0.072, 0, 0,
+    0, 0, 0, 1, 0,
+  ];
+}
+
 interface FramePalette {
   outer: string[];   // dış halka gradient (3 stop)
   inner: string;     // iç çizgi rengi
@@ -1042,19 +1065,27 @@ function PngFrame({ meta, size, dynCfg }: { meta: any; size: number; dynCfg?: an
     return () => loop.stop();
   }, [dynWobble, wobbleAnim]);
 
-  // ★ color_cycle — PNG'ye tintColor cycle (HSL hue değiştirme)
-  const [cycleColor, setCycleColor] = useState<string | null>(null);
+  // ★ v1.3.68: color_cycle — Skia ColorMatrix ile gerçek hue-rotate.
+  //   Eski: tintColor + hsl(N,80%,60%) → tüm PNG'yi düz renkle değiştiriyor (fosforlu pembe/yeşil bug).
+  //   Yeni: Skia <Image> + <ColorMatrix> hue-rotate matris → orijinal renkleri koruyup tonu kaydırır
+  //         (CSS filter:hue-rotate paritesi). Skia native yoksa eski tintColor fallback.
+  const [hueDeg, setHueDeg] = useState(0);
   useEffect(() => {
-    if (!dynColorCycle) { setCycleColor(null); return; }
+    if (!dynColorCycle) { setHueDeg(0); return; }
     const speedSec = dynCfg?.color_cycle_speed ?? 12;
     const startMs = Date.now();
     const intervalId = setInterval(() => {
       const elapsed = (Date.now() - startMs) / 1000;
-      const hue = ((elapsed / speedSec) * 360) % 360;
-      setCycleColor(`hsl(${Math.round(hue)}, 80%, 60%)`);
-    }, 100);
+      const h = ((elapsed / speedSec) * 360) % 360;
+      setHueDeg(h);
+    }, 50); // 20fps yumuşak akış
     return () => clearInterval(intervalId);
   }, [dynColorCycle, dynCfg?.color_cycle_speed]);
+
+  // Skia kullanılabilir mi (color_cycle açıkken)?
+  const useSkiaColorCycle = dynColorCycle && !!SkiaMod;
+  // Skia yokken eski tintColor fallback için fosforlu HSL — pre-Skia bozuk davranış.
+  const fallbackTintColor = (dynColorCycle && !SkiaMod) ? `hsl(${Math.round(hueDeg)}, 80%, 60%)` : null;
 
   // Transform stack — rotate + scale + wobble paralel çalışabilir
   const transformStack: any[] = [];
@@ -1080,15 +1111,41 @@ function PngFrame({ meta, size, dynCfg }: { meta: any; size: number; dynCfg?: an
         transform: transformStack.length > 0 ? transformStack : undefined,
       }}
     >
-      <Image
-        source={meta.source}
-        resizeMode="contain"
-        style={{
-          width: frameSize, height: frameSize,
-          tintColor: cycleColor || undefined,
-        }}
-      />
+      {useSkiaColorCycle ? (
+        <PngFrameSkiaHueRotate source={meta.source} size={frameSize} hueDeg={hueDeg} />
+      ) : (
+        <Image
+          source={meta.source}
+          resizeMode="contain"
+          style={{
+            width: frameSize, height: frameSize,
+            tintColor: fallbackTintColor || undefined,
+          }}
+        />
+      )}
     </Animated.View>
+  );
+}
+
+/**
+ * PngFrame + color_cycle için Skia hue-rotate renderer.
+ * useImage hook üst seviyede çağrılmalı, o yüzden ayrı sub-component.
+ * PngFrameSkiaHueRotate sadece dynColorCycle=true ve Skia mevcutken render edilir.
+ */
+function PngFrameSkiaHueRotate({ source, size, hueDeg }: { source: any; size: number; hueDeg: number }) {
+  const { Canvas, Image: SkiaImage, ColorMatrix, useImage } = SkiaMod;
+  const image = useImage(source);
+  const matrix = React.useMemo(() => hueRotateMatrix(hueDeg), [hueDeg]);
+  if (!image) {
+    // İlk yüklemede image hazır olana kadar boş View
+    return <View style={{ width: size, height: size }} />;
+  }
+  return (
+    <Canvas style={{ width: size, height: size }}>
+      <SkiaImage image={image} x={0} y={0} width={size} height={size} fit="contain">
+        <ColorMatrix matrix={matrix} />
+      </SkiaImage>
+    </Canvas>
   );
 }
 
