@@ -771,14 +771,17 @@ function NameOverlay({ size, name, dynCfg }: { size: number; name: string; dynCf
   const glowIntensity = dynCfg?.name_glow_intensity ?? 0.6;
   const baseOpacity = dynCfg?.name_opacity ?? 1;
   // ★ v1.3.56: shimmer aktif iken outer wrapper opacity'si dalgalanır
+  //   v1.3.59: Daha dramatic shimmer (0.4 ↔ 1.0) — web admin önizleme parite.
   const opacity: number | Animated.AnimatedInterpolation<number> = dynCfg?.name_shimmer
-    ? shimmerAnim.interpolate({ inputRange: [0, 1], outputRange: [baseOpacity * 0.55, baseOpacity] })
+    ? shimmerAnim.interpolate({ inputRange: [0, 1], outputRange: [baseOpacity * 0.4, baseOpacity] })
     : baseOpacity;
 
-  // Glow text-shadow radius — pulse aktifse Animated, değilse sabit
-  const baseGlowRadius = dynCfg?.name_glow ? 4 + glowIntensity * 6 : 2;
+  // ★ v1.3.59: Glow text-shadow radius — web admin 2 katmanlı box-shadow
+  //   (4+intensity*6 + 10+intensity*12 → ~25px) ile parite. RN tek katman shadow
+  //   olduğu için radius'u arttırıp tek yumuşak geniş glow simülasyonu.
+  const baseGlowRadius = dynCfg?.name_glow ? 14 + glowIntensity * 18 : 2;
   const animatedGlowRadius = dynCfg?.name_glow_pulse
-    ? glowPulseAnim.interpolate({ inputRange: [0, 1], outputRange: [baseGlowRadius, baseGlowRadius * 2.5] })
+    ? glowPulseAnim.interpolate({ inputRange: [0, 1], outputRange: [baseGlowRadius * 0.7, baseGlowRadius * 1.3] })
     : baseGlowRadius;
 
   // Wave — harf-harf yukarı dalga (sadece düz/flat, RN'de tspan yok)
