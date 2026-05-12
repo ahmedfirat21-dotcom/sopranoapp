@@ -71,6 +71,12 @@ function shapePath(shape: string, size: number): string | null {
       const r = s * 0.36;
       return `M ${r},0 L ${s - r},0 Q ${s},0 ${s},${r} L ${s},${s - r} Q ${s},${s} ${s - r},${s} L ${r},${s} Q 0,${s} 0,${s - r} L 0,${r} Q 0,0 ${r},0 Z`;
     }
+    case 'circle': {
+      // ★ v1.3.68: SVG render dalında (filter varken) circle için clipPath yoksa
+      //   SvgImage dikdörtgen kalıyordu (web admin "Daire" parite bozuk). Açık daire path.
+      const r = s / 2;
+      return `M ${r},0 a ${r},${r} 0 1,0 0,${s} a ${r},${r} 0 1,0 0,-${s} Z`;
+    }
     default:
       return null;
   }
