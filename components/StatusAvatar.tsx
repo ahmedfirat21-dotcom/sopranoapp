@@ -529,19 +529,28 @@ export default function StatusAvatar({
           }
 
           // Standart RN Image render — filter/custom shape yoksa
+          // ★ v1.3.67: Android elevation + Image borderRadius çakışması — elevation hardware
+          //   layer'a yükseltince Image'ın borderRadius'u clip etmiyor (kare köşeler görünür).
+          //   Çözüm: Image'ı overflow:'hidden' + borderRadius olan bir clip wrapper içine al,
+          //   elevation/glow dış wrapper'da kalsın. Web admin "Daire" parite sorunu çözüldü.
           return (
             <Animated.View style={{
               width: targetSize, height: targetSize,
               transform: avatarTransform.length > 0 ? avatarTransform : undefined,
+              ...glowStyle,
             }}>
-              <Animated.Image
-                source={source}
-                style={{
-                  width: targetSize, height: targetSize,
-                  borderRadius: shapeRadius,
-                  ...glowStyle,
-                }}
-              />
+              <View style={{
+                width: targetSize, height: targetSize,
+                borderRadius: shapeRadius,
+                overflow: 'hidden',
+              }}>
+                <Animated.Image
+                  source={source}
+                  style={{
+                    width: targetSize, height: targetSize,
+                  }}
+                />
+              </View>
             </Animated.View>
           );
         })()}
