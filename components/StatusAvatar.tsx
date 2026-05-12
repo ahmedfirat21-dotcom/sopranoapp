@@ -338,7 +338,10 @@ export default function StatusAvatar({
             borderColor: frameId ? 'transparent' : ringColor,
           },
           frameId && {
-            ...Platform.select({
+            // ★ v1.3.58: customShape (hexagon/diamond/star) ise wrap borderRadius=0
+            //   olduğundan elevation shadow KARE oluşuyordu — Android'de avatar
+            //   arkasında belirgin kare gölge. Custom shape için shadow kapat.
+            ...(customShape ? {} : Platform.select({
               ios: {
                 shadowColor: '#000',
                 shadowOffset: { width: 0, height: 2 },
@@ -346,8 +349,8 @@ export default function StatusAvatar({
                 shadowRadius: 6,
               },
               android: { elevation: 12 },
-            }),
-            zIndex: 2, // Avatar Image her zaman frame'in üstünde
+            })),
+            zIndex: 2,
           },
         ]}
       >
