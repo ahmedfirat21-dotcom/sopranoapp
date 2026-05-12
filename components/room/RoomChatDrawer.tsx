@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getAvatarSource } from '../../constants/avatars';
+import StatusAvatar from '../StatusAvatar';
 import { EmojiReactionBar } from '../EmojiReactions';
 import { RoomChatService, getRoomProfileFromCache } from '../../services/roomChat';
 import MessageGlowPickerSheet from './MessageGlowPickerSheet';
@@ -923,17 +924,17 @@ export default function RoomChatDrawer({
           hitSlop={6}
           style={{ position: 'relative', width: 32, height: 32 }}
         >
-          <Image source={getAvatarSource(item.profiles?.avatar_url)} style={[st.msgAvatar, { borderColor: nameColor + '40' }]} />
-          {/* ★ v107: Mağaza avatar çerçevesi — sohbet mesaj balonunda */}
-          <RoomAvatarFrame frameId={senderFrame} avatarSize={32} minSize={28} />
-          {showSenderTier && (
-            <View
-              style={{ position: 'absolute', bottom: -3, right: -3, zIndex: 5, elevation: 6 }}
-              pointerEvents="none"
-            >
-              <TierBadge tier={senderTier} size="xs" />
-            </View>
-          )}
+          {/* ★ v1.3.56: Image + RoomAvatarFrame + ayrı TierBadge yerine StatusAvatar —
+               avatar_* filtreler (hue/shape/brightness/border/halo) + frame + tier badge tek
+               yerde. Frame contextKey="mini" çünkü mesaj avatar'ı 32px (≤70 mini key). */}
+          <StatusAvatar
+            uri={item.profiles?.avatar_url}
+            size={32}
+            tier={senderTier}
+            frameId={senderFrame}
+            contextKey="mini"
+            showTierBadge={showSenderTier}
+          />
         </Pressable>
         <Pressable
           onPress={() => { /* no-op: onLongPress'in tetiklenmesi için onPress de tanımlı olmalı */ }}

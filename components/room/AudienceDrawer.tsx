@@ -4,13 +4,12 @@
  * ★ Sağa sürükleyerek kapatma özelliği (DM panel ile aynı useSwipeToDismiss pattern)
  */
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, FlatList, Pressable, Image, Animated, StyleSheet, useWindowDimensions } from 'react-native';
+import { View, Text, FlatList, Pressable, Animated, StyleSheet, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { getAvatarSource } from '../../constants/avatars';
 import { useSwipeToDismiss } from '../../hooks/useSwipeToDismiss';
-import TierBadge from '../TierBadge';
+import StatusAvatar from '../StatusAvatar';
 import { migrateLegacyTier } from '../../types';
 
 // ★ 2026-05-05: Keşfet drawer dili (NotificationDrawer/FriendsDrawer) — birebir aynı
@@ -163,19 +162,15 @@ export default function AudienceDrawer({ visible, users, onClose, onSelectUser, 
                 style={({ pressed }) => [s.userRow, pressed && s.userRowPressed]}
                 onPress={() => { onClose(); setTimeout(() => onSelectUser(u), 200); }}
               >
-                <View style={{ position: 'relative' }}>
-                  <Image
-                    source={getAvatarSource(u.user?.avatar_url)}
-                    style={[s.avatar, u.role === 'owner' && s.avatarOwner]}
+                <View style={{ width: 34, height: 34 }}>
+                  <StatusAvatar
+                    uri={u.user?.avatar_url}
+                    size={34}
+                    tier={userTier}
+                    frameId={(u.user as any)?.active_frame}
+                    contextKey="listener"
+                    showTierBadge={showTier}
                   />
-                  {showTier && (
-                    <View
-                      style={{ position: 'absolute', bottom: -2, right: -2, zIndex: 5, elevation: 6 }}
-                      pointerEvents="none"
-                    >
-                      <TierBadge tier={userTier} size="xs" />
-                    </View>
-                  )}
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={s.userName} numberOfLines={1}>
