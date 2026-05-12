@@ -581,22 +581,27 @@ function NameOverlay({ size, name, dynCfg }: { size: number; name: string; dynCf
   // İç hizalama — wrapper size x size, name avatar'ın belirli kenarına
   let containerStyle: any = {};
   let textWrapperStyle: any = {};
+  // ★ v1.3.59: frame_scale > 1 ise text frame Lottie/PNG'nin alt halkası hizasına
+  //   çıksın — web admin önizlemesinde "altın bant üzerinde isim" görselinin parite'si.
+  //   frame_scale=1.3 ile size=160 → frameExtra=24 piksel ek alt offset.
+  const frameScale: number = dynCfg?.frame_scale ?? 1;
+  const frameExtra: number = frameScale > 1 ? (frameScale - 1) * (size / 2) : 0;
   switch (pos) {
     case 'top':
       containerStyle = { justifyContent: 'flex-start', alignItems: 'center' };
-      textWrapperStyle = { transform: [{ translateY: -fontPx - offsetPx }] };
+      textWrapperStyle = { transform: [{ translateY: -fontPx - offsetPx - frameExtra }] };
       break;
     case 'bottom':
       containerStyle = { justifyContent: 'flex-end', alignItems: 'center' };
-      textWrapperStyle = { transform: [{ translateY: fontPx + offsetPx }] };
+      textWrapperStyle = { transform: [{ translateY: fontPx + offsetPx + frameExtra }] };
       break;
     case 'left':
       containerStyle = { justifyContent: 'center', alignItems: 'flex-start' };
-      textWrapperStyle = { transform: [{ translateX: -offsetPx - fontPx * 2 }] };
+      textWrapperStyle = { transform: [{ translateX: -offsetPx - fontPx * 2 - frameExtra }] };
       break;
     case 'right':
       containerStyle = { justifyContent: 'center', alignItems: 'flex-end' };
-      textWrapperStyle = { transform: [{ translateX: offsetPx + fontPx * 2 }] };
+      textWrapperStyle = { transform: [{ translateX: offsetPx + fontPx * 2 + frameExtra }] };
       break;
   }
 
