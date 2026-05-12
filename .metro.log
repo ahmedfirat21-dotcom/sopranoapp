@@ -1,0 +1,906 @@
+Starting project at C:\SopranoChat
+Starting Metro Bundler
+warning: Bundler cache is empty, rebuilding (this may take a minute)
+Waiting on http://localhost:8081
+Logs for your project will appear below.
+Android Bundled 10364ms C:\SopranoChat\services\store.ts (640 modules)
+Android Bundled 16581ms C:\SopranoChat\index.ts (2395 modules)
+ INFO  
+[7m [1m💡 JavaScript logs will be removed from Metro in React Native 0.77![22m Please use React Native DevTools as your default tool. Tip: Type [1mj[22m in the terminal to open (requires Google Chrome or Microsoft Edge).[27m
+ LOG  [RootLayout] Hazırlık süreci başlatıldı...
+ LOG  [RootLayout] Firebase auth listener başlatılıyor...
+Android Bundled 647ms C:\SopranoChat\services\livekit.ts (809 modules)
+ LOG  [RootLayout] Firebase auth state: LOGGED_IN
+ LOG  [RootLayout] Firebase user ready, accessToken factory aktif.
+ LOG  [Analytics] userId: dv9zOs9wgYUBVUnLeilzgpJNoZ53
+ LOG  [Analytics] login_success 
+ LOG  [SPSync] channel status: SUBSCRIBED 
+ LOG  [GiftRT] channel status: SUBSCRIBED for user dv9zOs9wgYUBVUnLeilzgpJNoZ53 
+ LOG  [CallService] Call signal kanal durumu: SUBSCRIBED (user: dv9zOs9w) 
+ LOG  [SPSync] Bakiye güncellendi: 14968693 SP
+ LOG  [DMNotif] dm:user:dv9zOs9wgYUBVUnLeilzgpJNoZ53 → SUBSCRIBED
+ LOG  [DEV] Emülatör algılandı — push token denenecek.
+Android Bundled 356ms C:\SopranoChat\constants\supabase.ts (638 modules)
+ INFO  [RevenueCat] Purchases instance already set with the same configuration. Ignoring duplicate call.
+ LOG  [SPSync] Bakiye güncellendi: 14968693 SP
+ LOG  [RevenueCat] SDK başlatıldı
+ LOG  [Session] Conflict kanalı: SUBSCRIBED
+Android Bundled 41ms C:\SopranoChat\services\store.ts (1 module)
+ ERROR  Warning: TypeError: Cannot read property 'forEach' of null
+
+This error is located at:
+    in RCTView (created by View)
+    in View (created by Animated(View))
+    in Animated(View) (created by StatusAvatar)
+    in RCTView (created by View)
+    in View (created by StatusAvatar)
+    in RCTView (created by View)
+    in View (created by StatusAvatar)
+    in StatusAvatar (created by ProfileHero)
+    in RCTView (created by View)
+    in View (created by Pressable)
+    in Pressable (created by Pressable)
+    in RCTView (created by View)
+    in View (created by ProfileHero)
+    in RCTView (created by View)
+    in View (created by ProfileHero)
+    in RCTView (created by View)
+    in View (created by ProfileHero)
+    in ProfileHero (created by ProfileScreen)
+    in RCTView (created by View)
+    in View (created by ScrollView)
+    in RCTScrollView
+    in VScrollViewNativeComponent (created by ScrollView)
+    in ScrollView (created by ScrollView)
+    in Wrapper (created by ProfileScreen)
+    in RCTView (created by View)
+    in View (created by ProfileScreen)
+    in RCTView (created by View)
+    in View (created by AppBackground)
+    in AppBackground (created by ProfileScreen)
+    in ProfileScreen
+    in Unknown (created by Route(profile))
+    in Suspense (created by Route(profile))
+    in Route (created by Route(profile))
+    in Route(profile) (created by SceneView)
+    in StaticContainer
+    in EnsureSingleNavigator (created by SceneView)
+    in SceneView (created by BottomTabNavigator)
+    in NavigationProvider (created by BottomTabNavigator)
+    in RCTView (created by View)
+    in View (created by Screen)
+    in RCTView (created by View)
+    in View (created by Animated(View))
+    in Animated(View) (created by Background)
+    in Background (created by Screen)
+    in Screen (created by BottomTabView)
+    in RNSScreen (created by Animated(Anonymous))
+    in Animated(Anonymous)
+    in Suspender (created by Freeze)
+    in Suspense (created by Freeze)
+    in Freeze (created by DelayedFreeze)
+    in DelayedFreeze
+    in InnerScreen (created by Screen)
+    in Screen (created by MaybeScreen)
+    in MaybeScreen (created by BottomTabView)
+    in RNSScreenContainer (created by ScreenContainer)
+    in ScreenContainer (created by MaybeScreenContainer)
+    in MaybeScreenContainer (created by BottomTabView)
+    in RCTView (created by View)
+    in View (created by FrameSizeProvider)
+    in FrameSizeProvider (created by SafeAreaProviderCompat)
+    in SafeAreaProviderCompat (created by BottomTabView)
+    in BottomTabView (created by BottomTabNavigator)
+    in PreventRemoveProvider (created by NavigationContent)
+    in NavigationStateListenerProvider (created by NavigationContent)
+    in NavigationContent
+    in Unknown (created by BottomTabNavigator)
+    in BottomTabNavigator
+    in Unknown (created by TabLayout)
+    in TabLayout
+    in Unknown (created by Route((tabs)))
+    in Suspense (created by Route((tabs)))
+    in Route (created by Route((tabs)))
+    in Route((tabs)) (created by SceneView)
+    in StaticContainer
+    in EnsureSingleNavigator (created by SceneView)
+    in SceneView (created by NativeStackNavigator)
+    in NavigationProvider (created by NativeStackNavigator)
+    in RNSScreenContentWrapper (created by ScreenContentWrapper)
+    in ScreenContentWrapper (created by DebugContainer)
+    in DebugContainer
+    in RNSScreen (created by Animated(Anonymous))
+    in Animated(Anonymous)
+    in Suspender (created by Freeze)
+    in Suspense (created by Freeze)
+    in Freeze (created by DelayedFreeze)
+    in DelayedFreeze
+    in InnerScreen (created by Screen)
+    in Screen
+    in ScreenStackItem (created by SceneView)
+    in NavigationProvider (created by SceneView)
+    in SceneView (created by NativeStackView)
+    in RNSScreenStack (created by ScreenStack)
+    in Unknown (created by ScreenStack)
+    in ScreenStack (created by NativeStackView)
+    in RCTView (created by View)
+    in View (created by FrameSizeProvider)
+    in FrameSizeProvider (created by SafeAreaProviderCompat)
+    in SafeAreaProviderCompat (created by NativeStackView)
+    in NativeStackView (created by NativeStackNavigator)
+    in PreventRemoveProvider (created by NavigationContent)
+    in NavigationStateListenerProvider (created by NavigationContent)
+    in NavigationContent
+    in Unknown (created by NativeStackNavigator)
+    in NativeStackNavigator
+    in Unknown (created by RootLayout)
+    in AuthGuard (created by RootLayout)
+    in ErrorBoundary (created by RootLayout)
+    in RCTView (created by View)
+    in View (created by RootLayout)
+    in RNCSafeAreaProvider (created by SafeAreaProvider)
+    in SafeAreaProvider (created by RootLayout)
+    in DMNotifProvider (created by RootLayout)
+    in OnlineFriendsProvider (created by RootLayout)
+    in RealtimeBadgeProvider (created by RootLayout)
+    in RootLayout
+    in Unknown (created by Route())
+    in Suspense (created by Route())
+    in Route (created by Route())
+    in Route() (created by ContextNavigator)
+    in RNCSafeAreaProvider (created by SafeAreaProvider)
+    in SafeAreaProvider (created by wrapper)
+    in wrapper (created by ContextNavigator)
+    in ThemeProvider
+    in EnsureSingleNavigator
+    in BaseNavigationContainer
+    in NavigationContainerInner (created by ContextNavigator)
+    in ContextNavigator (created by ExpoRoot)
+    in ExpoRoot (created by App)
+    in App (created by ErrorOverlay)
+    in ErrorToastContainer (created by ErrorOverlay)
+    in ErrorOverlay (created by withDevTools(ErrorOverlay))
+    in withDevTools(ErrorOverlay)
+    in RCTView (created by View)
+    in View (created by AppContainer)
+    in RCTView (created by View)
+    in View (created by AppContainer)
+    in AppContainer
+    in main(RootComponent), js engine: hermes
+ ERROR  [ErrorBoundary] Crash yakalandı: Cannot read property 'forEach' of null [Component Stack]
+ ERROR  Warning: [ErrorBoundary] Component Stack: 
+    in RCTView (created by View)
+    in View (created by Animated(View))
+    in Animated(View) (created by StatusAvatar)
+    in RCTView (created by View)
+    in View (created by StatusAvatar)
+    in RCTView (created by View)
+    in View (created by StatusAvatar)
+    in StatusAvatar (created by ProfileHero)
+    in RCTView (created by View)
+    in View (created by Pressable)
+    in Pressable (created by Pressable)
+    in RCTView (created by View)
+    in View (created by ProfileHero)
+    in RCTView (created by View)
+    in View (created by ProfileHero)
+    in RCTView (created by View)
+    in View (created by ProfileHero)
+    in ProfileHero (created by ProfileScreen)
+    in RCTView (created by View)
+    in View (created by ScrollView)
+    in RCTScrollView
+    in VScrollViewNativeComponent (created by ScrollView)
+    in ScrollView (created by ScrollView)
+    in Wrapper (created by ProfileScreen)
+    in RCTView (created by View)
+    in View (created by ProfileScreen)
+    in RCTView (created by View)
+    in View (created by AppBackground)
+    in AppBackground (created by ProfileScreen)
+    in ProfileScreen
+    in Unknown (created by Route(profile))
+    in Suspense (created by Route(profile))
+    in Route (created by Route(profile))
+    in Route(profile) (created by SceneView)
+    in StaticContainer
+    in EnsureSingleNavigator (created by SceneView)
+    in SceneView (created by BottomTabNavigator)
+    in NavigationProvider (created by BottomTabNavigator)
+    in RCTView (created by View)
+    in View (created by Screen)
+    in RCTView (created by View)
+    in View (created by Animated(View))
+    in Animated(View) (created by Background)
+    in Background (created by Screen)
+    in Screen (created by BottomTabView)
+    in RNSScreen (created by Animated(Anonymous))
+    in Animated(Anonymous)
+    in Suspender (created by Freeze)
+    in Suspense (created by Freeze)
+    in Freeze (created by DelayedFreeze)
+    in DelayedFreeze
+    in InnerScreen (created by Screen)
+    in Screen (created by MaybeScreen)
+    in MaybeScreen (created by BottomTabView)
+    in RNSScreenContainer (created by ScreenContainer)
+    in ScreenContainer (created by MaybeScreenContainer)
+    in MaybeScreenContainer (created by BottomTabView)
+    in RCTView (created by View)
+    in View (created by FrameSizeProvider)
+    in FrameSizeProvider (created by SafeAreaProviderCompat)
+    in SafeAreaProviderCompat (created by BottomTabView)
+    in BottomTabView (created by BottomTabNavigator)
+    in PreventRemoveProvider (created by NavigationContent)
+    in NavigationStateListenerProvider (created by NavigationContent)
+    in NavigationContent
+    in Unknown (created by BottomTabNavigator)
+    in BottomTabNavigator
+    in Unknown (created by TabLayout)
+    in TabLayout
+    in Unknown (created by Route((tabs)))
+    in Suspense (created by Route((tabs)))
+    in Route (created by Route((tabs)))
+    in Route((tabs)) (created by SceneView)
+    in StaticContainer
+    in EnsureSingleNavigator (created by SceneView)
+    in SceneView (created by NativeStackNavigator)
+    in NavigationProvider (created by NativeStackNavigator)
+    in RNSScreenContentWrapper (created by ScreenContentWrapper)
+    in ScreenContentWrapper (created by DebugContainer)
+    in DebugContainer
+    in RNSScreen (created by Animated(Anonymous))
+    in Animated(Anonymous)
+    in Suspender (created by Freeze)
+    in Suspense (created by Freeze)
+    in Freeze (created by DelayedFreeze)
+    in DelayedFreeze
+    in InnerScreen (created by Screen)
+    in Screen
+    in ScreenStackItem (created by SceneView)
+    in NavigationProvider (created by SceneView)
+    in SceneView (created by NativeStackView)
+    in RNSScreenStack (created by ScreenStack)
+    in Unknown (created by ScreenStack)
+    in ScreenStack (created by NativeStackView)
+    in RCTView (created by View)
+    in View (created by FrameSizeProvider)
+    in FrameSizeProvider (created by SafeAreaProviderCompat)
+    in SafeAreaProviderCompat (created by NativeStackView)
+    in NativeStackView (created by NativeStackNavigator)
+    in PreventRemoveProvider (created by NavigationContent)
+    in NavigationStateListenerProvider (created by NavigationContent)
+    in NavigationContent
+    in Unknown (created by NativeStackNavigator)
+    in NativeStackNavigator
+    in Unknown (created by RootLayout)
+    in AuthGuard (created by RootLayout)
+    in ErrorBoundary (created by RootLayout)
+    in RCTView (created by View)
+    in View (created by RootLayout)
+    in RNCSafeAreaProvider (created by SafeAreaProvider)
+    in SafeAreaProvider (created by RootLayout)
+    in DMNotifProvider (created by RootLayout)
+    in OnlineFriendsProvider (created by RootLayout)
+    in RealtimeBadgeProvider (created by RootLayout)
+    in RootLayout
+    in Unknown (created by Route())
+    in Suspense (created by Route())
+    in Route (created by Route())
+    in Route() (created by ContextNavigator)
+    in RNCSafeAreaProvider (created by SafeAreaProvider)
+    in SafeAreaProvider (created by wrapper)
+    in wrapper (created by ContextNavigator)
+    in ThemeProvider
+    in EnsureSingleNavigator
+    in BaseNavigationContainer
+    in NavigationContainerInner (created by ContextNavigator)
+    in ContextNavigator (created by ExpoRoot)
+    in ExpoRoot (created by App)
+    in App (created by ErrorOverlay)
+    in ErrorToastContainer (created by ErrorOverlay)
+    in ErrorOverlay (created by withDevTools(ErrorOverlay))
+    in withDevTools(ErrorOverlay)
+    in RCTView (created by View)
+    in View (created by AppContainer)
+    in RCTView (created by View)
+    in View (created by AppContainer)
+    in AppContainer
+    in main(RootComponent)
+ LOG  [Layout] App ön plana geldi — call signal kanalı yeniden bağlanıyor
+ LOG  [CallService] Manuel reconnect tetiklendi
+ LOG  [CallService] Call signal kanal durumu: CLOSED (user: dv9zOs9w) 
+ LOG  [CallService] Call signal kanal durumu: SUBSCRIBED (user: dv9zOs9w) 
+ LOG  [SPSync] Bakiye güncellendi: 14968693 SP
+ LOG  [SPSync] Bakiye güncellendi: 14968693 SP
+ LOG  [SPSync] Bakiye güncellendi: 14968693 SP
+Android Bundled 169ms C:\SopranoChat\index.ts (1 module)
+ INFO  
+[7m [1m💡 JavaScript logs will be removed from Metro in React Native 0.77![22m Please use React Native DevTools as your default tool. Tip: Type [1mj[22m in the terminal to open (requires Google Chrome or Microsoft Edge).[27m
+ LOG  [RootLayout] Hazırlık süreci başlatıldı...
+ LOG  [RootLayout] Firebase auth listener başlatılıyor...
+Android Bundled 57ms C:\SopranoChat\services\livekit.ts (1 module)
+ LOG  [RootLayout] Firebase auth state: LOGGED_IN
+ LOG  [RootLayout] Firebase user ready, accessToken factory aktif.
+ LOG  [Analytics] userId: dv9zOs9wgYUBVUnLeilzgpJNoZ53
+ LOG  [Analytics] login_success 
+ LOG  [SPSync] channel status: SUBSCRIBED 
+ LOG  [GiftRT] channel status: SUBSCRIBED for user dv9zOs9wgYUBVUnLeilzgpJNoZ53 
+ LOG  [CallService] Call signal kanal durumu: SUBSCRIBED (user: dv9zOs9w) 
+ LOG  [DEV] Emülatör algılandı — push token denenecek.
+ LOG  [SPSync] Bakiye güncellendi: 14968693 SP
+ LOG  [RevenueCat] SDK başlatıldı
+ LOG  [DMNotif] dm:user:dv9zOs9wgYUBVUnLeilzgpJNoZ53 → SUBSCRIBED
+Android Bundled 43ms C:\SopranoChat\constants\supabase.ts (1 module)
+ LOG  [SPSync] Bakiye güncellendi: 14968693 SP
+ LOG  [Session] Conflict kanalı: SUBSCRIBED
+Android Bundled 38ms C:\SopranoChat\services\store.ts (1 module)
+ LOG  [Layout] App ön plana geldi — call signal kanalı yeniden bağlanıyor
+ LOG  [CallService] Manuel reconnect tetiklendi
+ LOG  [CallService] Call signal kanal durumu: CLOSED (user: dv9zOs9w) 
+ LOG  [CallService] Call signal kanal durumu: SUBSCRIBED (user: dv9zOs9w) 
+ LOG  [SPSync] Bakiye güncellendi: 14968693 SP
+ LOG  [SPSync] Bakiye güncellendi: 14968693 SP
+ LOG  [SPSync] Bakiye güncellendi: 14968693 SP
+ LOG  [SPSync] Bakiye güncellendi: 14968693 SP
+Android Bundled 434ms C:\SopranoChat\index.ts (1 module)
+ INFO  
+[7m [1m💡 JavaScript logs will be removed from Metro in React Native 0.77![22m Please use React Native DevTools as your default tool. Tip: Type [1mj[22m in the terminal to open (requires Google Chrome or Microsoft Edge).[27m
+ LOG  [RootLayout] Hazırlık süreci başlatıldı...
+ LOG  [RootLayout] Firebase auth listener başlatılıyor...
+Android Bundled 38ms C:\SopranoChat\services\livekit.ts (1 module)
+ LOG  [RootLayout] Firebase auth state: LOGGED_IN
+ LOG  [RootLayout] Firebase user ready, accessToken factory aktif.
+ LOG  [Analytics] userId: dv9zOs9wgYUBVUnLeilzgpJNoZ53
+ LOG  [Analytics] login_success 
+ LOG  [SPSync] channel status: SUBSCRIBED 
+ LOG  [GiftRT] channel status: SUBSCRIBED for user dv9zOs9wgYUBVUnLeilzgpJNoZ53 
+ LOG  [CallService] Call signal kanal durumu: SUBSCRIBED (user: dv9zOs9w) 
+ LOG  [DEV] Emülatör algılandı — push token denenecek.
+ LOG  [RevenueCat] SDK başlatıldı
+ LOG  [DMNotif] dm:user:dv9zOs9wgYUBVUnLeilzgpJNoZ53 → SUBSCRIBED
+Android Bundled 23ms C:\SopranoChat\constants\supabase.ts (1 module)
+ LOG  [SPSync] Bakiye güncellendi: 14968693 SP
+ LOG  [Session] Conflict kanalı: SUBSCRIBED
+Android Bundled 29ms C:\SopranoChat\services\store.ts (1 module)
+ LOG  [SPSync] Bakiye güncellendi: 14968693 SP
+ LOG  [SPSync] channel status: CHANNEL_ERROR 
+ WARN  [SPSync] Kanal hatası (CHANNEL_ERROR) — 3sn sonra yeniden bağlanıyor... undefined
+ LOG  [GiftRT] channel status: CHANNEL_ERROR for user dv9zOs9wgYUBVUnLeilzgpJNoZ53 
+ WARN  [GiftRT] Kanal hatası (CHANNEL_ERROR) — 3sn sonra yeniden bağlanıyor... undefined
+ LOG  [CallService] Call signal kanal durumu: CHANNEL_ERROR (user: dv9zOs9w) 
+ WARN  [CallService] Kanal hatası (CHANNEL_ERROR) — 3sn sonra yeniden bağlanıyor... undefined
+ LOG  [DMNotif] dm:user:dv9zOs9wgYUBVUnLeilzgpJNoZ53 → CHANNEL_ERROR
+ LOG  [Session] Conflict kanalı: CHANNEL_ERROR
+ LOG  [SPSync] channel status: SUBSCRIBED 
+ LOG  [GiftRT] channel status: SUBSCRIBED for user dv9zOs9wgYUBVUnLeilzgpJNoZ53 
+ LOG  [CallService] Call signal kanal durumu: SUBSCRIBED (user: dv9zOs9w) 
+ LOG  [DMNotif] dm:user:dv9zOs9wgYUBVUnLeilzgpJNoZ53 → SUBSCRIBED
+ LOG  [Session] Conflict kanalı: SUBSCRIBED
+ LOG  [SPSync] channel status: CLOSED 
+ LOG  [GiftRT] channel status: CLOSED for user dv9zOs9wgYUBVUnLeilzgpJNoZ53 
+ LOG  [CallService] Call signal kanal durumu: CLOSED (user: dv9zOs9w) 
+ LOG  [SPSync] channel status: SUBSCRIBED 
+ LOG  [GiftRT] channel status: SUBSCRIBED for user dv9zOs9wgYUBVUnLeilzgpJNoZ53 
+ LOG  [CallService] Call signal kanal durumu: SUBSCRIBED (user: dv9zOs9w) 
+ LOG  [SPSync] channel status: CLOSED 
+ LOG  [GiftRT] channel status: CLOSED for user dv9zOs9wgYUBVUnLeilzgpJNoZ53 
+ LOG  [DMNotif] dm:user:dv9zOs9wgYUBVUnLeilzgpJNoZ53 → CLOSED
+ LOG  [Session] Conflict kanalı: CLOSED
+ LOG  [RootLayout] Hazırlık süreci başlatıldı...
+ LOG  [RootLayout] Firebase auth listener başlatılıyor...
+ LOG  [RootLayout] Firebase auth state: LOGGED_IN
+ LOG  [RootLayout] Firebase user ready, accessToken factory aktif.
+ LOG  [Analytics] userId: dv9zOs9wgYUBVUnLeilzgpJNoZ53
+ LOG  [Analytics] login_success 
+ LOG  [SPSync] channel status: SUBSCRIBED 
+ LOG  [GiftRT] channel status: SUBSCRIBED for user dv9zOs9wgYUBVUnLeilzgpJNoZ53 
+ LOG  [DMNotif] dm:user:dv9zOs9wgYUBVUnLeilzgpJNoZ53 → SUBSCRIBED
+ LOG  [DEV] Emülatör algılandı — push token denenecek.
+ LOG  [SPSync] Bakiye güncellendi: 14968693 SP
+ LOG  [SPSync] Bakiye güncellendi: 14968693 SP
+ LOG  [Session] Conflict kanalı: SUBSCRIBED
+ LOG  [SPSync] Bakiye güncellendi: 14968693 SP
+Android Bundled 388ms C:\SopranoChat\index.ts (1 module)
+ INFO  
+[7m [1m💡 JavaScript logs will be removed from Metro in React Native 0.77![22m Please use React Native DevTools as your default tool. Tip: Type [1mj[22m in the terminal to open (requires Google Chrome or Microsoft Edge).[27m
+ LOG  [RootLayout] Hazırlık süreci başlatıldı...
+ LOG  [RootLayout] Firebase auth listener başlatılıyor...
+Android Bundled 64ms C:\SopranoChat\services\livekit.ts (1 module)
+ LOG  [RootLayout] Firebase auth state: LOGGED_IN
+ LOG  [RootLayout] Firebase user ready, accessToken factory aktif.
+ LOG  [Analytics] userId: dv9zOs9wgYUBVUnLeilzgpJNoZ53
+ LOG  [Analytics] login_success 
+ LOG  [SPSync] channel status: SUBSCRIBED 
+ LOG  [GiftRT] channel status: SUBSCRIBED for user dv9zOs9wgYUBVUnLeilzgpJNoZ53 
+ LOG  [CallService] Call signal kanal durumu: SUBSCRIBED (user: dv9zOs9w) 
+ LOG  [DEV] Emülatör algılandı — push token denenecek.
+ INFO  [RevenueCat] Purchases instance already set with the same configuration. Ignoring duplicate call.
+ LOG  [RevenueCat] SDK başlatıldı
+ LOG  [DMNotif] dm:user:dv9zOs9wgYUBVUnLeilzgpJNoZ53 → SUBSCRIBED
+Android Bundled 60ms C:\SopranoChat\constants\supabase.ts (1 module)
+ LOG  [SPSync] Bakiye güncellendi: 14968693 SP
+ LOG  [Session] Conflict kanalı: SUBSCRIBED
+ LOG  [SPSync] Bakiye güncellendi: 14968693 SP
+Android Bundled 73ms C:\SopranoChat\services\store.ts (1 module)
+ LOG  [Layout] App ön plana geldi — call signal kanalı yeniden bağlanıyor
+ LOG  [CallService] Manuel reconnect tetiklendi
+ LOG  [CallService] Call signal kanal durumu: CLOSED (user: dv9zOs9w) 
+ LOG  [CallService] Call signal kanal durumu: SUBSCRIBED (user: dv9zOs9w) 
+ LOG  [SPSync] Bakiye güncellendi: 14968693 SP
+ LOG  [SPSync] Bakiye güncellendi: 14968693 SP
+ LOG  [SPSync] Bakiye güncellendi: 14968693 SP
+ LOG  [SPSync] Bakiye güncellendi: 14968697 SP
+ LOG  [SPSync] Bakiye güncellendi: 14968697 SP
+ LOG  [SPSync] Bakiye güncellendi: 14968697 SP
+Android Bundled 383ms C:\SopranoChat\index.ts (1 module)
+ INFO  
+[7m [1m💡 JavaScript logs will be removed from Metro in React Native 0.77![22m Please use React Native DevTools as your default tool. Tip: Type [1mj[22m in the terminal to open (requires Google Chrome or Microsoft Edge).[27m
+ LOG  [RootLayout] Hazırlık süreci başlatıldı...
+ LOG  [RootLayout] Firebase auth listener başlatılıyor...
+Android Bundled 136ms C:\SopranoChat\services\livekit.ts (1 module)
+ LOG  [RootLayout] Firebase auth state: LOGGED_IN
+ LOG  [RootLayout] Firebase user ready, accessToken factory aktif.
+ LOG  [Analytics] userId: dv9zOs9wgYUBVUnLeilzgpJNoZ53
+ LOG  [Analytics] login_success 
+ LOG  [SPSync] channel status: SUBSCRIBED 
+ LOG  [GiftRT] channel status: SUBSCRIBED for user dv9zOs9wgYUBVUnLeilzgpJNoZ53 
+ LOG  [CallService] Call signal kanal durumu: SUBSCRIBED (user: dv9zOs9w) 
+ LOG  [SPSync] Bakiye güncellendi: 14968697 SP
+ LOG  [DMNotif] dm:user:dv9zOs9wgYUBVUnLeilzgpJNoZ53 → SUBSCRIBED
+ LOG  [DEV] Emülatör algılandı — push token denenecek.
+ LOG  [SPSync] Bakiye güncellendi: 14968697 SP
+ INFO  [RevenueCat] Purchases instance already set with the same configuration. Ignoring duplicate call.
+Android Bundled 65ms C:\SopranoChat\constants\supabase.ts (1 module)
+ LOG  [RevenueCat] SDK başlatıldı
+ LOG  [Session] Conflict kanalı: SUBSCRIBED
+ ERROR  Warning: ReferenceError: Property 'BadgeCenterWrapper' doesn't exist
+
+This error is located at:
+    in StatusAvatar (created by BigLiveRoomCard)
+    in RCTView (created by View)
+    in View (created by BigLiveRoomCard)
+    in RCTView (created by View)
+    in View (created by Pressable)
+    in Pressable (created by Pressable)
+    in RCTView (created by View)
+    in View (created by BigLiveRoomCard)
+    in BigLiveRoomCard (created by CellRenderer)
+    in RCTView (created by View)
+    in View (created by Animated(View))
+    in Animated(View) (created by SwipeToHideRow)
+    in RCTView (created by View)
+    in View (created by SwipeToHideRow)
+    in SwipeToHideRow (created by CellRenderer)
+    in RCTView (created by View)
+    in View (created by CellRenderer)
+    in VirtualizedListCellContextProvider (created by CellRenderer)
+    in CellRenderer (created by VirtualizedList)
+    in RCTView (created by View)
+    in View (created by ScrollView)
+    in RCTScrollView
+    in VScrollViewNativeComponent (created by ScrollView)
+    in AndroidSwipeRefreshLayout (created by RefreshControl)
+    in RefreshControl (created by HomeScreen)
+    in ScrollView (created by ScrollView)
+    in Wrapper (created by VirtualizedList)
+    in VirtualizedListContextProvider (created by VirtualizedList)
+    in VirtualizedList (created by FlatList)
+    in FlatList (created by HomeScreen)
+    in RCTView (created by View)
+    in View (created by HomeScreen)
+    in RCTView (created by View)
+    in View (created by AppBackground)
+    in AppBackground (created by HomeScreen)
+    in HomeScreen
+    in Unknown (created by Route(home))
+    in Suspense (created by Route(home))
+    in Route (created by Route(home))
+    in Route(home) (created by SceneView)
+    in StaticContainer
+    in EnsureSingleNavigator (created by SceneView)
+    in SceneView (created by BottomTabNavigator)
+    in NavigationProvider (created by BottomTabNavigator)
+    in RCTView (created by View)
+    in View (created by Screen)
+    in RCTView (created by View)
+    in View (created by Animated(View))
+    in Animated(View) (created by Background)
+    in Background (created by Screen)
+    in Screen (created by BottomTabView)
+    in RNSScreen (created by Animated(Anonymous))
+    in Animated(Anonymous)
+    in Suspender (created by Freeze)
+    in Suspense (created by Freeze)
+    in Freeze (created by DelayedFreeze)
+    in DelayedFreeze
+    in InnerScreen (created by Screen)
+    in Screen (created by MaybeScreen)
+    in MaybeScreen (created by BottomTabView)
+    in RNSScreenContainer (created by ScreenContainer)
+    in ScreenContainer (created by MaybeScreenContainer)
+    in MaybeScreenContainer (created by BottomTabView)
+    in RCTView (created by View)
+    in View (created by FrameSizeProvider)
+    in FrameSizeProvider (created by SafeAreaProviderCompat)
+    in SafeAreaProviderCompat (created by BottomTabView)
+    in BottomTabView (created by BottomTabNavigator)
+    in PreventRemoveProvider (created by NavigationContent)
+    in NavigationStateListenerProvider (created by NavigationContent)
+    in NavigationContent
+    in Unknown (created by BottomTabNavigator)
+    in BottomTabNavigator
+    in Unknown (created by TabLayout)
+    in TabLayout
+    in Unknown (created by Route((tabs)))
+    in Suspense (created by Route((tabs)))
+    in Route (created by Route((tabs)))
+    in Route((tabs)) (created by SceneView)
+    in StaticContainer
+    in EnsureSingleNavigator (created by SceneView)
+    in SceneView (created by NativeStackNavigator)
+    in NavigationProvider (created by NativeStackNavigator)
+    in RNSScreenContentWrapper (created by ScreenContentWrapper)
+    in ScreenContentWrapper (created by DebugContainer)
+    in DebugContainer
+    in RNSScreen (created by Animated(Anonymous))
+    in Animated(Anonymous)
+    in Suspender (created by Freeze)
+    in Suspense (created by Freeze)
+    in Freeze (created by DelayedFreeze)
+    in DelayedFreeze
+    in InnerScreen (created by Screen)
+    in Screen
+    in ScreenStackItem (created by SceneView)
+    in NavigationProvider (created by SceneView)
+    in SceneView (created by NativeStackView)
+    in RNSScreenStack (created by ScreenStack)
+    in Unknown (created by ScreenStack)
+    in ScreenStack (created by NativeStackView)
+    in RCTView (created by View)
+    in View (created by FrameSizeProvider)
+    in FrameSizeProvider (created by SafeAreaProviderCompat)
+    in SafeAreaProviderCompat (created by NativeStackView)
+    in NativeStackView (created by NativeStackNavigator)
+    in PreventRemoveProvider (created by NavigationContent)
+    in NavigationStateListenerProvider (created by NavigationContent)
+    in NavigationContent
+    in Unknown (created by NativeStackNavigator)
+    in NativeStackNavigator
+    in Unknown (created by RootLayout)
+    in AuthGuard (created by RootLayout)
+    in ErrorBoundary (created by RootLayout)
+    in RCTView (created by View)
+    in View (created by RootLayout)
+    in RNCSafeAreaProvider (created by SafeAreaProvider)
+    in SafeAreaProvider (created by RootLayout)
+    in DMNotifProvider (created by RootLayout)
+    in OnlineFriendsProvider (created by RootLayout)
+    in RealtimeBadgeProvider (created by RootLayout)
+    in RootLayout
+    in Unknown (created by Route())
+    in Suspense (created by Route())
+    in Route (created by Route())
+    in Route() (created by ContextNavigator)
+    in RNCSafeAreaProvider (created by SafeAreaProvider)
+    in SafeAreaProvider (created by wrapper)
+    in wrapper (created by ContextNavigator)
+    in ThemeProvider
+    in EnsureSingleNavigator
+    in BaseNavigationContainer
+    in NavigationContainerInner (created by ContextNavigator)
+    in ContextNavigator (created by ExpoRoot)
+    in ExpoRoot (created by App)
+    in App (created by ErrorOverlay)
+    in ErrorToastContainer (created by ErrorOverlay)
+    in ErrorOverlay (created by withDevTools(ErrorOverlay))
+    in withDevTools(ErrorOverlay)
+    in RCTView (created by View)
+    in View (created by AppContainer)
+    in RCTView (created by View)
+    in View (created by AppContainer)
+    in AppContainer
+    in main(RootComponent), js engine: hermes
+ ERROR  [ErrorBoundary] Crash yakalandı: Property 'BadgeCenterWrapper' doesn't exist [Component Stack]
+ ERROR  Warning: [ErrorBoundary] Component Stack: 
+    in StatusAvatar (created by BigLiveRoomCard)
+    in RCTView (created by View)
+    in View (created by BigLiveRoomCard)
+    in RCTView (created by View)
+    in View (created by Pressable)
+    in Pressable (created by Pressable)
+    in RCTView (created by View)
+    in View (created by BigLiveRoomCard)
+    in BigLiveRoomCard (created by CellRenderer)
+    in RCTView (created by View)
+    in View (created by Animated(View))
+    in Animated(View) (created by SwipeToHideRow)
+    in RCTView (created by View)
+    in View (created by SwipeToHideRow)
+    in SwipeToHideRow (created by CellRenderer)
+    in RCTView (created by View)
+    in View (created by CellRenderer)
+    in VirtualizedListCellContextProvider (created by CellRenderer)
+    in CellRenderer (created by VirtualizedList)
+    in RCTView (created by View)
+    in View (created by ScrollView)
+    in RCTScrollView
+    in VScrollViewNativeComponent (created by ScrollView)
+    in AndroidSwipeRefreshLayout (created by RefreshControl)
+    in RefreshControl (created by HomeScreen)
+    in ScrollView (created by ScrollView)
+    in Wrapper (created by VirtualizedList)
+    in VirtualizedListContextProvider (created by VirtualizedList)
+    in VirtualizedList (created by FlatList)
+    in FlatList (created by HomeScreen)
+    in RCTView (created by View)
+    in View (created by HomeScreen)
+    in RCTView (created by View)
+    in View (created by AppBackground)
+    in AppBackground (created by HomeScreen)
+    in HomeScreen
+    in Unknown (created by Route(home))
+    in Suspense (created by Route(home))
+    in Route (created by Route(home))
+    in Route(home) (created by SceneView)
+    in StaticContainer
+    in EnsureSingleNavigator (created by SceneView)
+    in SceneView (created by BottomTabNavigator)
+    in NavigationProvider (created by BottomTabNavigator)
+    in RCTView (created by View)
+    in View (created by Screen)
+    in RCTView (created by View)
+    in View (created by Animated(View))
+    in Animated(View) (created by Background)
+    in Background (created by Screen)
+    in Screen (created by BottomTabView)
+    in RNSScreen (created by Animated(Anonymous))
+    in Animated(Anonymous)
+    in Suspender (created by Freeze)
+    in Suspense (created by Freeze)
+    in Freeze (created by DelayedFreeze)
+    in DelayedFreeze
+    in InnerScreen (created by Screen)
+    in Screen (created by MaybeScreen)
+    in MaybeScreen (created by BottomTabView)
+    in RNSScreenContainer (created by ScreenContainer)
+    in ScreenContainer (created by MaybeScreenContainer)
+    in MaybeScreenContainer (created by BottomTabView)
+    in RCTView (created by View)
+    in View (created by FrameSizeProvider)
+    in FrameSizeProvider (created by SafeAreaProviderCompat)
+    in SafeAreaProviderCompat (created by BottomTabView)
+    in BottomTabView (created by BottomTabNavigator)
+    in PreventRemoveProvider (created by NavigationContent)
+    in NavigationStateListenerProvider (created by NavigationContent)
+    in NavigationContent
+    in Unknown (created by BottomTabNavigator)
+    in BottomTabNavigator
+    in Unknown (created by TabLayout)
+    in TabLayout
+    in Unknown (created by Route((tabs)))
+    in Suspense (created by Route((tabs)))
+    in Route (created by Route((tabs)))
+    in Route((tabs)) (created by SceneView)
+    in StaticContainer
+    in EnsureSingleNavigator (created by SceneView)
+    in SceneView (created by NativeStackNavigator)
+    in NavigationProvider (created by NativeStackNavigator)
+    in RNSScreenContentWrapper (created by ScreenContentWrapper)
+    in ScreenContentWrapper (created by DebugContainer)
+    in DebugContainer
+    in RNSScreen (created by Animated(Anonymous))
+    in Animated(Anonymous)
+    in Suspender (created by Freeze)
+    in Suspense (created by Freeze)
+    in Freeze (created by DelayedFreeze)
+    in DelayedFreeze
+    in InnerScreen (created by Screen)
+    in Screen
+    in ScreenStackItem (created by SceneView)
+    in NavigationProvider (created by SceneView)
+    in SceneView (created by NativeStackView)
+    in RNSScreenStack (created by ScreenStack)
+    in Unknown (created by ScreenStack)
+    in ScreenStack (created by NativeStackView)
+    in RCTView (created by View)
+    in View (created by FrameSizeProvider)
+    in FrameSizeProvider (created by SafeAreaProviderCompat)
+    in SafeAreaProviderCompat (created by NativeStackView)
+    in NativeStackView (created by NativeStackNavigator)
+    in PreventRemoveProvider (created by NavigationContent)
+    in NavigationStateListenerProvider (created by NavigationContent)
+    in NavigationContent
+    in Unknown (created by NativeStackNavigator)
+    in NativeStackNavigator
+    in Unknown (created by RootLayout)
+    in AuthGuard (created by RootLayout)
+    in ErrorBoundary (created by RootLayout)
+    in RCTView (created by View)
+    in View (created by RootLayout)
+    in RNCSafeAreaProvider (created by SafeAreaProvider)
+    in SafeAreaProvider (created by RootLayout)
+    in DMNotifProvider (created by RootLayout)
+    in OnlineFriendsProvider (created by RootLayout)
+    in RealtimeBadgeProvider (created by RootLayout)
+    in RootLayout
+    in Unknown (created by Route())
+    in Suspense (created by Route())
+    in Route (created by Route())
+    in Route() (created by ContextNavigator)
+    in RNCSafeAreaProvider (created by SafeAreaProvider)
+    in SafeAreaProvider (created by wrapper)
+    in wrapper (created by ContextNavigator)
+    in ThemeProvider
+    in EnsureSingleNavigator
+    in BaseNavigationContainer
+    in NavigationContainerInner (created by ContextNavigator)
+    in ContextNavigator (created by ExpoRoot)
+    in ExpoRoot (created by App)
+    in App (created by ErrorOverlay)
+    in ErrorToastContainer (created by ErrorOverlay)
+    in ErrorOverlay (created by withDevTools(ErrorOverlay))
+    in withDevTools(ErrorOverlay)
+    in RCTView (created by View)
+    in View (created by AppContainer)
+    in RCTView (created by View)
+    in View (created by AppContainer)
+    in AppContainer
+    in main(RootComponent)
+ LOG  [SPSync] Bakiye güncellendi: 14968697 SP
+Android Bundled 278ms C:\SopranoChat\index.ts (1 module)
+ INFO  
+[7m [1m💡 JavaScript logs will be removed from Metro in React Native 0.77![22m Please use React Native DevTools as your default tool. Tip: Type [1mj[22m in the terminal to open (requires Google Chrome or Microsoft Edge).[27m
+ LOG  [RootLayout] Hazırlık süreci başlatıldı...
+ LOG  [RootLayout] Firebase auth listener başlatılıyor...
+Android Bundled 55ms C:\SopranoChat\services\livekit.ts (1 module)
+ LOG  [RootLayout] Firebase auth state: LOGGED_IN
+ LOG  [RootLayout] Firebase user ready, accessToken factory aktif.
+ LOG  [Analytics] userId: dv9zOs9wgYUBVUnLeilzgpJNoZ53
+ LOG  [Analytics] login_success 
+ LOG  [SPSync] channel status: SUBSCRIBED 
+ LOG  [GiftRT] channel status: SUBSCRIBED for user dv9zOs9wgYUBVUnLeilzgpJNoZ53 
+ LOG  [CallService] Call signal kanal durumu: SUBSCRIBED (user: dv9zOs9w) 
+ LOG  [SPSync] Bakiye güncellendi: 14968697 SP
+ LOG  [DEV] Emülatör algılandı — push token denenecek.
+ INFO  [RevenueCat] Purchases instance already set with the same configuration. Ignoring duplicate call.
+ LOG  [RevenueCat] SDK başlatıldı
+ LOG  [DMNotif] dm:user:dv9zOs9wgYUBVUnLeilzgpJNoZ53 → SUBSCRIBED
+Android Bundled 57ms C:\SopranoChat\constants\supabase.ts (1 module)
+ LOG  [SPSync] Bakiye güncellendi: 14968697 SP
+ LOG  [Session] Conflict kanalı: SUBSCRIBED
+Android Bundled 51ms C:\SopranoChat\services\store.ts (1 module)
+ LOG  [Layout] App ön plana geldi — call signal kanalı yeniden bağlanıyor
+ LOG  [CallService] Manuel reconnect tetiklendi
+ LOG  [CallService] Call signal kanal durumu: CLOSED (user: dv9zOs9w) 
+ LOG  [CallService] Call signal kanal durumu: SUBSCRIBED (user: dv9zOs9w) 
+ LOG  [SPSync] Bakiye güncellendi: 14968697 SP
+ LOG  [SPSync] Bakiye güncellendi: 14968697 SP
+ LOG  [SPSync] Bakiye güncellendi: 14968697 SP
+ LOG  [SPSync] Bakiye güncellendi: 14968697 SP
+ LOG  [SPSync] channel status: CHANNEL_ERROR 
+ WARN  [SPSync] Kanal hatası (CHANNEL_ERROR) — 3sn sonra yeniden bağlanıyor... undefined
+ LOG  [GiftRT] channel status: CHANNEL_ERROR for user dv9zOs9wgYUBVUnLeilzgpJNoZ53 
+ WARN  [GiftRT] Kanal hatası (CHANNEL_ERROR) — 3sn sonra yeniden bağlanıyor... undefined
+ LOG  [DMNotif] dm:user:dv9zOs9wgYUBVUnLeilzgpJNoZ53 → CHANNEL_ERROR
+ LOG  [Session] Conflict kanalı: CHANNEL_ERROR
+ LOG  [CallService] Call signal kanal durumu: CHANNEL_ERROR (user: dv9zOs9w) 
+ WARN  [CallService] Kanal hatası (CHANNEL_ERROR) — 3sn sonra yeniden bağlanıyor... undefined
+ LOG  [SPSync] channel status: CLOSED 
+ LOG  [GiftRT] channel status: CLOSED for user dv9zOs9wgYUBVUnLeilzgpJNoZ53 
+ LOG  [CallService] Call signal kanal durumu: CLOSED (user: dv9zOs9w) 
+ LOG  [SPSync] channel status: SUBSCRIBED 
+ LOG  [GiftRT] channel status: SUBSCRIBED for user dv9zOs9wgYUBVUnLeilzgpJNoZ53 
+ LOG  [CallService] Call signal kanal durumu: SUBSCRIBED (user: dv9zOs9w) 
+ LOG  [DMNotif] dm:user:dv9zOs9wgYUBVUnLeilzgpJNoZ53 → SUBSCRIBED
+ LOG  [Session] Conflict kanalı: SUBSCRIBED
+Android Bundled 172ms C:\SopranoChat\index.ts (1 module)
+ INFO  
+[7m [1m💡 JavaScript logs will be removed from Metro in React Native 0.77![22m Please use React Native DevTools as your default tool. Tip: Type [1mj[22m in the terminal to open (requires Google Chrome or Microsoft Edge).[27m
+ LOG  [RootLayout] Hazırlık süreci başlatıldı...
+ LOG  [RootLayout] Firebase auth listener başlatılıyor...
+Android Bundled 45ms C:\SopranoChat\services\livekit.ts (1 module)
+ LOG  [RootLayout] Firebase auth state: LOGGED_IN
+ LOG  [RootLayout] Firebase user ready, accessToken factory aktif.
+ LOG  [Analytics] userId: dv9zOs9wgYUBVUnLeilzgpJNoZ53
+ LOG  [Analytics] login_success 
+ LOG  [SPSync] channel status: SUBSCRIBED 
+ LOG  [GiftRT] channel status: SUBSCRIBED for user dv9zOs9wgYUBVUnLeilzgpJNoZ53 
+ LOG  [CallService] Call signal kanal durumu: SUBSCRIBED (user: dv9zOs9w) 
+ LOG  [DEV] Emülatör algılandı — push token denenecek.
+ LOG  [SPSync] Bakiye güncellendi: 14968697 SP
+ LOG  [DMNotif] dm:user:dv9zOs9wgYUBVUnLeilzgpJNoZ53 → SUBSCRIBED
+Android Bundled 35ms C:\SopranoChat\constants\supabase.ts (1 module)
+ LOG  [RevenueCat] SDK başlatıldı
+ LOG  [SPSync] Bakiye güncellendi: 14968697 SP
+ LOG  [Session] Conflict kanalı: SUBSCRIBED
+Android Bundled 45ms C:\SopranoChat\services\store.ts (1 module)
+ LOG  [SPSync] Bakiye güncellendi: 14968697 SP
+ LOG  [STATUS_AV] frames_turkuaz_premium_0xik sz 160 key profile pos bc scale 1.3 name true
+Android Bundled 3452ms C:\SopranoChat\services\gamification.ts (1151 modules)
+Android Bundled 255ms C:\SopranoChat\index.ts (1 module)
+ INFO  
+[7m [1m💡 JavaScript logs will be removed from Metro in React Native 0.77![22m Please use React Native DevTools as your default tool. Tip: Type [1mj[22m in the terminal to open (requires Google Chrome or Microsoft Edge).[27m
+ LOG  [RootLayout] Hazırlık süreci başlatıldı...
+ LOG  [RootLayout] Firebase auth listener başlatılıyor...
+Android Bundled 82ms C:\SopranoChat\services\livekit.ts (1 module)
+ LOG  [RootLayout] Firebase auth state: LOGGED_IN
+ LOG  [RootLayout] Firebase user ready, accessToken factory aktif.
+ LOG  [Analytics] userId: dv9zOs9wgYUBVUnLeilzgpJNoZ53
+ LOG  [Analytics] login_success 
+ LOG  [SPSync] channel status: SUBSCRIBED 
+ LOG  [GiftRT] channel status: SUBSCRIBED for user dv9zOs9wgYUBVUnLeilzgpJNoZ53 
+ LOG  [CallService] Call signal kanal durumu: SUBSCRIBED (user: dv9zOs9w) 
+ LOG  [SPSync] Bakiye güncellendi: 14968697 SP
+ LOG  [DMNotif] dm:user:dv9zOs9wgYUBVUnLeilzgpJNoZ53 → SUBSCRIBED
+ LOG  [DEV] Emülatör algılandı — push token denenecek.
+ LOG  [SPSync] Bakiye güncellendi: 14968697 SP
+ LOG  [Session] Conflict kanalı: SUBSCRIBED
+Android Bundled 53ms C:\SopranoChat\constants\supabase.ts (1 module)
+ LOG  [RevenueCat] SDK başlatıldı
+ LOG  [SPSync] Bakiye güncellendi: 14968697 SP
+Unable to resolve "./renderer/Offscreen" from "node_modules\@shopify\react-native-skia\src\index.ts"
+ ERROR  [Error: undefined Unable to resolve module ./renderer/Offscreen from C:\SopranoChat\node_modules\@shopify\react-native-skia\src\index.ts: 
+
+None of these files exist:
+  * node_modules\@shopify\react-native-skia\src\renderer\Offscreen(.android.ts|.native.ts|.ts|.android.tsx|.native.tsx|.tsx|.android.mjs|.native.mjs|.mjs|.android.js|.native.js|.js|.android.jsx|.native.jsx|.jsx|.android.json|.native.json|.json|.android.cjs|.native.cjs|.cjs|.android.scss|.native.scss|.scss|.android.sass|.native.sass|.sass|.android.css|.native.css|.css)
+  * node_modules\@shopify\react-native-skia\src\renderer\Offscreen
+[0m [90m 3 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m"./renderer"[39m[33m;[39m
+ [90m 4 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m"./renderer/Canvas"[39m[33m;[39m
+[31m[1m>[22m[39m[90m 5 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m"./renderer/Offscreen"[39m[33m;[39m
+ [90m   |[39m                [31m[1m^[22m[39m
+ [90m 6 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m"./views"[39m[33m;[39m
+ [90m 7 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m"./skia"[39m[33m;[39m
+ [90m 8 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m"./external"[39m[33m;[39m[0m]
+Unable to resolve "./renderer/Offscreen" from "node_modules\@shopify\react-native-skia\src\index.ts"
+ ERROR  [Error: undefined Unable to resolve module ./renderer/Offscreen from C:\SopranoChat\node_modules\@shopify\react-native-skia\src\index.ts: 
+
+None of these files exist:
+  * node_modules\@shopify\react-native-skia\src\renderer\Offscreen(.android.ts|.native.ts|.ts|.android.tsx|.native.tsx|.tsx|.android.mjs|.native.mjs|.mjs|.android.js|.native.js|.js|.android.jsx|.native.jsx|.jsx|.android.json|.native.json|.json|.android.cjs|.native.cjs|.cjs|.android.scss|.native.scss|.scss|.android.sass|.native.sass|.sass|.android.css|.native.css|.css)
+  * node_modules\@shopify\react-native-skia\src\renderer\Offscreen
+[0m [90m 3 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m"./renderer"[39m[33m;[39m
+ [90m 4 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m"./renderer/Canvas"[39m[33m;[39m
+[31m[1m>[22m[39m[90m 5 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m"./renderer/Offscreen"[39m[33m;[39m
+ [90m   |[39m                [31m[1m^[22m[39m
+ [90m 6 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m"./views"[39m[33m;[39m
+ [90m 7 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m"./skia"[39m[33m;[39m
+ [90m 8 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m"./external"[39m[33m;[39m[0m]
+Unable to resolve "./renderer/Offscreen" from "node_modules\@shopify\react-native-skia\src\index.ts"
+ ERROR  [Error: undefined Unable to resolve module ./renderer/Offscreen from C:\SopranoChat\node_modules\@shopify\react-native-skia\src\index.ts: 
+
+None of these files exist:
+  * node_modules\@shopify\react-native-skia\src\renderer\Offscreen(.android.ts|.native.ts|.ts|.android.tsx|.native.tsx|.tsx|.android.mjs|.native.mjs|.mjs|.android.js|.native.js|.js|.android.jsx|.native.jsx|.jsx|.android.json|.native.json|.json|.android.cjs|.native.cjs|.cjs|.android.scss|.native.scss|.scss|.android.sass|.native.sass|.sass|.android.css|.native.css|.css)
+  * node_modules\@shopify\react-native-skia\src\renderer\Offscreen
+[0m [90m 3 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m"./renderer"[39m[33m;[39m
+ [90m 4 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m"./renderer/Canvas"[39m[33m;[39m
+[31m[1m>[22m[39m[90m 5 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m"./renderer/Offscreen"[39m[33m;[39m
+ [90m   |[39m                [31m[1m^[22m[39m
+ [90m 6 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m"./views"[39m[33m;[39m
+ [90m 7 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m"./skia"[39m[33m;[39m
+ [90m 8 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m"./external"[39m[33m;[39m[0m]
+Unable to resolve "./renderer/Offscreen" from "node_modules\@shopify\react-native-skia\src\index.ts"
+ ERROR  [Error: undefined Unable to resolve module ./renderer/Offscreen from C:\SopranoChat\node_modules\@shopify\react-native-skia\src\index.ts: 
+
+None of these files exist:
+  * node_modules\@shopify\react-native-skia\src\renderer\Offscreen(.android.ts|.native.ts|.ts|.android.tsx|.native.tsx|.tsx|.android.mjs|.native.mjs|.mjs|.android.js|.native.js|.js|.android.jsx|.native.jsx|.jsx|.android.json|.native.json|.json|.android.cjs|.native.cjs|.cjs|.android.scss|.native.scss|.scss|.android.sass|.native.sass|.sass|.android.css|.native.css|.css)
+  * node_modules\@shopify\react-native-skia\src\renderer\Offscreen
+[0m [90m 3 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m"./renderer"[39m[33m;[39m
+ [90m 4 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m"./renderer/Canvas"[39m[33m;[39m
+[31m[1m>[22m[39m[90m 5 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m"./renderer/Offscreen"[39m[33m;[39m
+ [90m   |[39m                [31m[1m^[22m[39m
+ [90m 6 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m"./views"[39m[33m;[39m
+ [90m 7 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m"./skia"[39m[33m;[39m
+ [90m 8 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m"./external"[39m[33m;[39m[0m]
+Unable to resolve "./renderer/Offscreen" from "node_modules\@shopify\react-native-skia\src\index.ts"
+ ERROR  [Error: undefined Unable to resolve module ./renderer/Offscreen from C:\SopranoChat\node_modules\@shopify\react-native-skia\src\index.ts: 
+
+None of these files exist:
+  * node_modules\@shopify\react-native-skia\src\renderer\Offscreen(.android.ts|.native.ts|.ts|.android.tsx|.native.tsx|.tsx|.android.mjs|.native.mjs|.mjs|.android.js|.native.js|.js|.android.jsx|.native.jsx|.jsx|.android.json|.native.json|.json|.android.cjs|.native.cjs|.cjs|.android.scss|.native.scss|.scss|.android.sass|.native.sass|.sass|.android.css|.native.css|.css)
+  * node_modules\@shopify\react-native-skia\src\renderer\Offscreen
+[0m [90m 3 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m"./renderer"[39m[33m;[39m
+ [90m 4 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m"./renderer/Canvas"[39m[33m;[39m
+[31m[1m>[22m[39m[90m 5 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m"./renderer/Offscreen"[39m[33m;[39m
+ [90m   |[39m                [31m[1m^[22m[39m
+ [90m 6 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m"./views"[39m[33m;[39m
+ [90m 7 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m"./skia"[39m[33m;[39m
+ [90m 8 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m"./external"[39m[33m;[39m[0m]

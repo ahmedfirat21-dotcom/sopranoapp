@@ -35,6 +35,7 @@ import AnimatedLogo from '../../components/AnimatedLogo';
 import AnimatedHeaderIconBtn from '../../components/AnimatedHeaderIconBtn';
 import StatusAvatar from '../../components/StatusAvatar';
 import { getAvatarSource } from '../../constants/avatars';
+import { SkiaShadow } from '../../components/skia';
 
 import { showToast } from '../../components/Toast';
 import { isSystemRoom } from '../../services/showcaseRooms';
@@ -619,14 +620,19 @@ const BigLiveRoomCard = React.memo(function BigLiveRoomCard({ room, onJoin, isFo
     return () => { livePulseRef.current?.stop(); };
   }, [isLive]);
 
-  return (
-    <View style={s.bigCardWrapper}>
+  // ★ v1.3.66: Persistent/boosted room glow Skia ile çiziliyor — Android'de renkli halo
+  //   parite (eski shadowColor + elevation Android'de görünmüyordu).
+  const skiaGlowColor = isPersistent ? Colors.premiumGold : (isBoosted ? '#F472B6' : null);
+  const skiaGlowOpacity = isPersistent ? 0.55 : 0.6;
+  const skiaGlowBlur = isPersistent ? 20 : 24;
+
+  const cardPressable = (
     <Pressable
       style={({ pressed }) => [
         s.bigCard,
         isSystem && { borderColor: '#14B8A6', borderWidth: 1.5 },
-        isPersistent && { borderColor: Colors.premiumGold, borderWidth: 1.5, shadowColor: Colors.premiumGold, shadowOpacity: 0.15, shadowRadius: 8 },
-        isBoosted && !isPersistent && { borderColor: '#F472B6', borderWidth: 1.5, shadowColor: '#F472B6', shadowOpacity: 0.2, shadowRadius: 10 },
+        isPersistent && { borderColor: Colors.premiumGold, borderWidth: 1.5 },
+        isBoosted && !isPersistent && { borderColor: '#F472B6', borderWidth: 1.5 },
         pressed && { opacity: 0.92, transform: [{ scale: 0.98 }] },
       ]}
       onPress={() => onJoin(room.id)}
@@ -843,6 +849,15 @@ const BigLiveRoomCard = React.memo(function BigLiveRoomCard({ room, onJoin, isFo
         </Pressable>
       </View>
     </Pressable>
+  );
+
+  return (
+    <View style={s.bigCardWrapper}>
+      {skiaGlowColor ? (
+        <SkiaShadow shadowColor={skiaGlowColor} shadowOpacity={skiaGlowOpacity} shadowBlur={skiaGlowBlur} shadowOffsetY={0} borderRadius={18}>
+          {cardPressable}
+        </SkiaShadow>
+      ) : cardPressable}
     </View>
   );
 });

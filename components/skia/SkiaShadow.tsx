@@ -120,10 +120,6 @@ export function SkiaShadow({
 }
 
 const styles = StyleSheet.create({
-  container: {
-    alignSelf: 'flex-start',
-  },
-  contentWrapper: {
-    alignSelf: 'flex-start',
-  },
+  container: {},
+  contentWrapper: {},
 });

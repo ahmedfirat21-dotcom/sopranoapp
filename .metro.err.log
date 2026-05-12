@@ -1,0 +1,23 @@
+The following packages should be updated for best compatibility with the installed expo version:
+  expo@52.0.0 - expected version: ~52.0.49
+Your project may not work correctly until you install the expected versions of the packages.
+
+<--- Last few GCs --->
+
+[43360:000001FA31B1E000]  3286358 ms: Scavenge (interleaved) 4089.3 (4095.6) -> 4087.7 (4099.8) MB, pooled: 0 MB, 12.91 / 0.00 ms  (average mu = 0.303, current mu = 0.275) allocation failure; 
+[43360:000001FA31B1E000]  3288270 ms: Mark-Compact (reduce) 4092.3 (4100.6) -> 4088.0 (4093.3) MB, pooled: 0 MB, 1191.83 / 0.00 ms  (+ 368.6 ms in 72 steps since start of marking, biggest step 6.1 ms, walltime since start of marking 1686 ms) (average mu =
+FATAL ERROR: Ineffective mark-compacts near heap limit Allocation failed - JavaScript heap out of memory
+----- Native stack trace -----
+
+ 1: 00007FF68C80B6AF node::OnFatalError+1343
+ 2: 00007FF68D453257 v8::Function::NewInstance+423
+ 3: 00007FF68D253937 v8::base::AddressSpaceReservation::AddressSpaceReservation+322071
+ 4: 00007FF68D257644 v8::base::AddressSpaceReservation::AddressSpaceReservation+337700
+ 5: 00007FF68D2665DC v8::internal::StrongRootAllocatorBase::deallocate_impl+16604
+ 6: 00007FF68D265E1B v8::internal::StrongRootAllocatorBase::deallocate_impl+14619
+ 7: 00007FF68E6E4BAD v8::base::UnsignedDivisionByConstant<unsigned __int64>+2791405
+ 8: 00007FF68D251400 v8::base::AddressSpaceReservation::AddressSpaceReservation+312544
+ 9: 00007FF68D26BC8A X509_STORE_set_cleanup+5098
+10: 00007FF68D278126 uv_timer_set_repeat+20694
+11: 00007FF68CE4B207 v8::String::Utf8Value::~Utf8Value+143495
+12: 000001FA6A1F733A 

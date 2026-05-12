@@ -4,7 +4,7 @@
  * Plus / Pro / GodMaster üyeler için kompakt pill rozet.
  *
  * RENDER:
- *   - Önceki versiyon: expo-linear-gradient + RN shadow*/elevation
+ *   - Önceki versiyon: expo-linear-gradient + RN shadow & elevation
  *     (Android'de glow soluk, web admin önizleme ile farklı)
  *   - Bu versiyon: Skia Canvas + LinearGradient shader + BlurMask glow
  *     (web admin'deki CSS çıktısı ile birebir parite)

@@ -1,0 +1,89 @@
+Starting project at C:\SopranoChat
+Starting Metro Bundler
+warning: Bundler cache is empty, rebuilding (this may take a minute)
+Waiting on http://localhost:8081
+Logs for your project will appear below.
+Android Bundled 69324ms C:\SopranoChat\index.ts (2672 modules)
+Android Bundled 78018ms C:\SopranoChat\index.ts (2676 modules)
+ INFO  
+[7m [1m💡 JavaScript logs will be removed from Metro in React Native 0.77![22m Please use React Native DevTools as your default tool. Tip: Type [1mj[22m in the terminal to open (requires Google Chrome or Microsoft Edge).[27m
+ ERROR  Invariant Violation: TurboModuleRegistry.getEnforcing(...): 'RNSkiaModule' could not be found. Verify that a module by this name is registered in the native binary., js engine: hermes [Component Stack]
+ WARN  Route "./skia-test.tsx" is missing the required default export. Ensure a React component is exported as default. [Component Stack]
+ LOG  [RootLayout] Hazırlık süreci başlatıldı...
+ LOG  [RootLayout] Firebase auth listener başlatılıyor...
+Android Bundled 1871ms C:\SopranoChat\services\livekit.ts (890 modules)
+ LOG  [RootLayout] Firebase auth state: LOGGED_IN
+ LOG  [RootLayout] Firebase user ready, accessToken factory aktif.
+ LOG  [Analytics] userId: dv9zOs9wgYUBVUnLeilzgpJNoZ53
+ LOG  [Analytics] login_success 
+ LOG  [SPSync] channel status: SUBSCRIBED 
+ LOG  [GiftRT] channel status: SUBSCRIBED for user dv9zOs9wgYUBVUnLeilzgpJNoZ53 
+ LOG  [CallService] Call signal kanal durumu: SUBSCRIBED (user: dv9zOs9w) 
+ LOG  [DMNotif] dm:user:dv9zOs9wgYUBVUnLeilzgpJNoZ53 → SUBSCRIBED
+ LOG  [SPSync] Bakiye güncellendi: 14968697 SP
+ LOG  [SPSync] Bakiye güncellendi: 14968697 SP
+ LOG  [Session] Conflict kanalı: SUBSCRIBED
+ LOG  [DEV] Emülatör algılandı — push token denenecek.
+ LOG  [RevenueCat] SDK başlatıldı
+Android Bundled 1073ms C:\SopranoChat\constants\supabase.ts (613 modules)
+ LOG  [SPSync] channel status: CLOSED 
+ LOG  [GiftRT] channel status: CLOSED for user dv9zOs9wgYUBVUnLeilzgpJNoZ53 
+ LOG  [DMNotif] dm:user:dv9zOs9wgYUBVUnLeilzgpJNoZ53 → CLOSED
+ LOG  [Session] Conflict kanalı: CLOSED
+ LOG  [RootLayout] Hazırlık süreci başlatıldı...
+ LOG  [RootLayout] Firebase auth listener başlatılıyor...
+ LOG  [RootLayout] Firebase auth state: LOGGED_IN
+ LOG  [RootLayout] Firebase user ready, accessToken factory aktif.
+ LOG  [Analytics] userId: dv9zOs9wgYUBVUnLeilzgpJNoZ53
+ LOG  [Analytics] login_success 
+ LOG  [SPSync] channel status: SUBSCRIBED 
+ LOG  [GiftRT] channel status: SUBSCRIBED for user dv9zOs9wgYUBVUnLeilzgpJNoZ53 
+ LOG  [DMNotif] dm:user:dv9zOs9wgYUBVUnLeilzgpJNoZ53 → SUBSCRIBED
+ LOG  [SPSync] Bakiye güncellendi: 14968697 SP
+ LOG  [Session] Conflict kanalı: SUBSCRIBED
+ LOG  [DEV] Emülatör algılandı — push token denenecek.
+ LOG  [SPSync] Bakiye güncellendi: 14968697 SP
+Android Bundled 329ms C:\SopranoChat\index.ts (1 module)
+Android Bundled 429ms C:\SopranoChat\index.ts (1 module)
+ INFO  
+[7m [1m💡 JavaScript logs will be removed from Metro in React Native 0.77![22m Please use React Native DevTools as your default tool. Tip: Type [1mj[22m in the terminal to open (requires Google Chrome or Microsoft Edge).[27m
+ LOG  [RootLayout] Hazırlık süreci başlatıldı...
+ LOG  [RootLayout] Firebase auth listener başlatılıyor...
+Android Bundled 78ms C:\SopranoChat\services\livekit.ts (1 module)
+ LOG  [RootLayout] Firebase auth state: LOGGED_IN
+ LOG  [RootLayout] Firebase user ready, accessToken factory aktif.
+ LOG  [Analytics] userId: dv9zOs9wgYUBVUnLeilzgpJNoZ53
+ LOG  [Analytics] login_success 
+ LOG  [SPSync] channel status: SUBSCRIBED 
+ LOG  [GiftRT] channel status: SUBSCRIBED for user dv9zOs9wgYUBVUnLeilzgpJNoZ53 
+ LOG  [CallService] Call signal kanal durumu: SUBSCRIBED (user: dv9zOs9w) 
+ LOG  [SPSync] Bakiye güncellendi: 14968697 SP
+ LOG  [DMNotif] dm:user:dv9zOs9wgYUBVUnLeilzgpJNoZ53 → SUBSCRIBED
+ LOG  [Session] Conflict kanalı: SUBSCRIBED
+ LOG  [DEV] Emülatör algılandı — push token denenecek.
+ LOG  [SPSync] Bakiye güncellendi: 14968697 SP
+Android Bundled 71ms C:\SopranoChat\constants\supabase.ts (1 module)
+ LOG  [RevenueCat] SDK başlatıldı
+ LOG  [Typing] typing_dv9zOs9wgYUBVUnLeilzgpJNoZ53 → SUBSCRIBED
+Android Bundled 1273ms C:\SopranoChat\services\store.ts (640 modules)
+ LOG  [STATUS_AV] frames_turkuaz_premium_0xik sz 160 key profile pos bc scale 1.3 name true
+Android Bundled 467ms C:\SopranoChat\index.ts (1 module)
+ LOG  [SPSync] Bakiye güncellendi: 14968697 SP
+ LOG  [SPSync] channel status: CHANNEL_ERROR 
+ WARN  [SPSync] Kanal hatası (CHANNEL_ERROR) — 3sn sonra yeniden bağlanıyor... undefined
+ LOG  [GiftRT] channel status: CHANNEL_ERROR for user dv9zOs9wgYUBVUnLeilzgpJNoZ53 
+ WARN  [GiftRT] Kanal hatası (CHANNEL_ERROR) — 3sn sonra yeniden bağlanıyor... undefined
+ LOG  [CallService] Call signal kanal durumu: CHANNEL_ERROR (user: dv9zOs9w) 
+ WARN  [CallService] Kanal hatası (CHANNEL_ERROR) — 3sn sonra yeniden bağlanıyor... undefined
+ LOG  [DMNotif] dm:user:dv9zOs9wgYUBVUnLeilzgpJNoZ53 → CHANNEL_ERROR
+ LOG  [Session] Conflict kanalı: CHANNEL_ERROR
+ LOG  [Typing] typing_dv9zOs9wgYUBVUnLeilzgpJNoZ53 → CHANNEL_ERROR
+ LOG  [SPSync] channel status: CLOSED 
+ LOG  [GiftRT] channel status: CLOSED for user dv9zOs9wgYUBVUnLeilzgpJNoZ53 
+ LOG  [CallService] Call signal kanal durumu: CLOSED (user: dv9zOs9w) 
+ LOG  [SPSync] channel status: SUBSCRIBED 
+ LOG  [GiftRT] channel status: SUBSCRIBED for user dv9zOs9wgYUBVUnLeilzgpJNoZ53 
+ LOG  [CallService] Call signal kanal durumu: SUBSCRIBED (user: dv9zOs9w) 
+ LOG  [DMNotif] dm:user:dv9zOs9wgYUBVUnLeilzgpJNoZ53 → SUBSCRIBED
+ LOG  [Session] Conflict kanalı: SUBSCRIBED
+ LOG  [Typing] typing_dv9zOs9wgYUBVUnLeilzgpJNoZ53 → SUBSCRIBED
