@@ -18,7 +18,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, StyleSheet, Platform, Image, Animated, Easing, Text } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import Svg, { Path, Text as SvgText, TextPath, Defs } from 'react-native-svg';
+import Svg, { Path, Text as SvgText, TextPath, Defs, RadialGradient, Stop, Circle as SvgCircle } from 'react-native-svg';
 import { getFrameMeta, hasFrameLottie } from '../../constants/frameLottieRegistry';
 import { getCosmeticAsset, getCachedCosmeticAsset, type AssetMeta } from '../../services/cosmeticAssetCache';
 import { ensureFrameConfig, getCachedFrameConfig, subscribeConfigChange, pickSizeKey, type SizeKey } from '../../services/cosmeticConfigCache';
@@ -335,8 +335,13 @@ function ParticleOverlay({ size, dynCfg }: { size: number; dynCfg: any }) {
 function BgHaloOverlay({ size, color, sizeMul, intensity }: {
   size: number; color: string; sizeMul: number; intensity: number;
 }) {
+  // ★ v1.3.58: SVG RadialGradient ile gerçek yumuşak halo — merkez parlak,
+  //   kenarlar saydam fade. Eski düz daire (backgroundColor + opacity) Android'de
+  //   "sıradan halka" görünümüne neden oluyordu, gradient ile web admin önizleme
+  //   ile birebir.
   const haloSize = size * sizeMul;
   const offset = (haloSize - size) / 2;
+  const gradId = `halo-${size}-${color.replace('#', '')}-${Math.round(intensity * 100)}`;
   return (
     <View
       pointerEvents="none"
@@ -344,22 +349,20 @@ function BgHaloOverlay({ size, color, sizeMul, intensity }: {
         position: 'absolute',
         top: -offset, left: -offset,
         width: haloSize, height: haloSize,
-        borderRadius: haloSize / 2,
-        backgroundColor: color,
-        opacity: intensity * 0.35,
         zIndex: 0,
-        elevation: 0,
-        ...Platform.select({
-          ios: {
-            shadowColor: color,
-            shadowOffset: { width: 0, height: 0 },
-            shadowOpacity: intensity,
-            shadowRadius: haloSize / 4,
-          },
-          android: {},
-        }),
       }}
-    />
+    >
+      <Svg width={haloSize} height={haloSize}>
+        <Defs>
+          <RadialGradient id={gradId} cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
+            <Stop offset="0" stopColor={color} stopOpacity={String(Math.min(1, intensity * 0.9))} />
+            <Stop offset="0.5" stopColor={color} stopOpacity={String(Math.min(1, intensity * 0.45))} />
+            <Stop offset="1" stopColor={color} stopOpacity="0" />
+          </RadialGradient>
+        </Defs>
+        <SvgCircle cx={haloSize / 2} cy={haloSize / 2} r={haloSize / 2} fill={`url(#${gradId})`} />
+      </Svg>
+    </View>
   );
 }
 

@@ -199,16 +199,18 @@ export default function ProfileHero({
         </View>
         {username && <Text style={[s.username, { textAlign: 'center' }]} numberOfLines={1}>@{username}</Text>}
 
-        {/* ★ 2026-05-05: Tek görsel dil — outline pill + Ionicons (emoji yok).
-            Title öne, BOOST + üyelik küçük subtle chip. Profesyonel sade görünüm. */}
-        {userTitle && (
-          <View style={[s.titlePill, { borderColor: (userTitle.color || '#FBBF24') + '60', backgroundColor: (userTitle.color || '#FBBF24') + '14' }]}>
-            <Ionicons name="star" size={11} color={userTitle.color || '#FBBF24'} style={iconShadow} />
-            <Text style={[s.titlePillText, { color: userTitle.color || '#FBBF24' }]}>{userTitle.name}</Text>
-          </View>
-        )}
-        {(isBoostActive || memberSinceJoinedText || lastSeenText) && (
-          <View style={[s.metaRow, { marginTop: userTitle ? 6 : 8 }]}>
+        {/* ★ v1.3.58: Tek satır chip rowu — userTitle (Sahne Yıldızı vs.) + BOOST +
+            üyelik + son aktif hepsi yan yana. Eski 3 ayrı satır (title pill, metaRow
+            iki kere) → tek yatay metaRow. Daha kompakt + modern. */}
+        {(userTitle || isBoostActive || memberSinceJoinedText || lastSeenText) && (
+          <View style={s.metaRow}>
+            {userTitle && (
+              <View style={[s.metaPill, { borderColor: (userTitle.color || '#FBBF24') + '60', backgroundColor: (userTitle.color || '#FBBF24') + '14' }]}>
+                <Ionicons name="star" size={10} color={userTitle.color || '#FBBF24'} style={iconShadow} />
+                <Text style={[s.metaPillText, { color: userTitle.color || '#FBBF24' }]}>{userTitle.name}</Text>
+              </View>
+            )}
+            {userTitle && (isBoostActive || memberSinceJoinedText || lastSeenText) && <View style={s.metaDot} />}
             {isBoostActive && (
               <View style={s.metaPill}>
                 <Ionicons name="rocket-outline" size={10} color="#F472B6" style={iconShadow} />
@@ -216,7 +218,6 @@ export default function ProfileHero({
               </View>
             )}
             {isBoostActive && (memberSinceJoinedText || lastSeenText) && <View style={s.metaDot} />}
-            {/* ★ v110.3: "Mart 2026'da katıldı" net format — eski "3 aydır" yerine */}
             {memberSinceJoinedText && (
               <View style={s.metaPill}>
                 <Ionicons name="calendar-outline" size={10} color="rgba(148,163,184,0.85)" style={iconShadow} />
@@ -224,7 +225,6 @@ export default function ProfileHero({
               </View>
             )}
             {memberSinceJoinedText && lastSeenText && <View style={s.metaDot} />}
-            {/* ★ v110.3: Son aktif zamanı — yeşil nokta yokken (offline) bilgi verir */}
             {lastSeenText && (
               <View style={s.metaPill}>
                 <Ionicons name="ellipse-outline" size={10} color="rgba(148,163,184,0.85)" style={iconShadow} />
