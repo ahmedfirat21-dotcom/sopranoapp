@@ -367,8 +367,18 @@ export default function StatusAvatar({
 
           // ★ SVG render dalı — filter veya custom shape varsa
           if (useSvgRender) {
-            // SVG <Image href> sadece string URI kabul eder; require number için fallback yok.
-            const svgHref = typeof source === 'object' && source && 'uri' in source ? (source as any).uri : null;
+            // ★ v1.3.57: SVG <Image href> string URI gerektirir. http URL'ler hazır;
+            //   local require()'lar için Image.resolveAssetSource ile URI'ye çevir
+            //   (dev'de http://localhost:8081/assets/..., prod'da file://). Böylece
+            //   default avatar_m/f_X.png gibi local resimlerde de custom shape +
+            //   filter uygulanır.
+            let svgHref: string | null = null;
+            if (typeof source === 'object' && source && 'uri' in source) {
+              svgHref = (source as any).uri;
+            } else if (typeof source === 'number') {
+              const resolved = Image.resolveAssetSource(source);
+              svgHref = resolved?.uri || null;
+            }
             if (svgHref) {
               const filterId = `f-${targetSize}-${hueRotate}-${saturationVal}-${blurVal}-${brightnessVal}-${grayscaleVal}-${sepiaVal}`;
               const clipId = `c-${targetSize}-${dynFrameCfg?.avatar_shape}`;
