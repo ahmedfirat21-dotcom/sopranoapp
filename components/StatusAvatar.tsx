@@ -10,6 +10,7 @@ import Svg, {
   Filter,
   FeColorMatrix,
   FeGaussianBlur,
+  G as SvgG,
 } from 'react-native-svg';
 import { getAvatarSource } from '../constants/avatars';
 import { TIER_DEFINITIONS } from '../constants/tiers';
@@ -419,14 +420,28 @@ export default function StatusAvatar({
                         </Filter>
                       )}
                     </Defs>
-                    <SvgImage
-                      href={svgHref}
-                      width={targetSize}
-                      height={targetSize}
-                      preserveAspectRatio="xMidYMid slice"
-                      clipPath={sPath ? `url(#${clipId})` : undefined}
-                      filter={hasAnyFilter ? `url(#${filterId})` : undefined}
-                    />
+                    {/* ★ v1.3.58: <Image> doğrudan clipPath prop'u react-native-svg'de
+                         güvenilir çalışmıyor — <G clipPath="url(...)"> wrapper'ı ile
+                         sar, hexagon/diamond/star clip path'ler net uygulanır. */}
+                    {sPath ? (
+                      <SvgG clipPath={`url(#${clipId})`}>
+                        <SvgImage
+                          href={svgHref}
+                          width={targetSize}
+                          height={targetSize}
+                          preserveAspectRatio="xMidYMid slice"
+                          filter={hasAnyFilter ? `url(#${filterId})` : undefined}
+                        />
+                      </SvgG>
+                    ) : (
+                      <SvgImage
+                        href={svgHref}
+                        width={targetSize}
+                        height={targetSize}
+                        preserveAspectRatio="xMidYMid slice"
+                        filter={hasAnyFilter ? `url(#${filterId})` : undefined}
+                      />
+                    )}
                   </Svg>
                 </Animated.View>
               );
