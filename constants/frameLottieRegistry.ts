@@ -28,6 +28,10 @@ export type FrameMeta = {
    *  SopranoAura scale=1.14 → 1.0 (avatar full size).
    *  Overflow scale 1.8+ frame'ler için 0.78. */
   avatarRatio?: number;
+  /** ★ v1.3.65: PNG frame'ler için 'png', Lottie için undefined.
+   *  AvatarFrame.tsx PngFrame branch'ı meta.type='png' ise tetiklenir;
+   *  yoksa LottieFrame branch'ı çalışır. */
+  type?: 'png' | 'lottie';
 };
 
 // ★ v108.16.1: Scale arttırıldı — Lottie kompozisyonlarının "iç dairesel boşluğu"
@@ -58,6 +62,15 @@ const FRAME_LOTTIE_MAP: Record<string, FrameMeta> = {
   'glitch-matrix':     { source: require('../assets/avatar_frames/GlitchMatrix.json'),              scale: 1.0, resizeMode: 'contain', avatarRatio: 0.92 },
   // ★ v214: TealRibbon — toz parçacıkları + parlama animasyonlu, alt kısımda kurdale banner
   'teal-ribbon':       { source: require('../assets/avatar_frames/TealRibbon.json'),               scale: 1.15, resizeMode: 'contain', avatarRatio: 0.85 },
+  // ★ v1.3.65: 5 premium PNG çerçeve — bundle'a gömülü, type='png' (AvatarFrame PngFrame).
+  //   Eski palette LinearGradient halka FALLBACK olarak kalıyor (FRAME_PALETTES içinde),
+  //   küçük avatarlarda (<32px) palette devreye girer. scale 1.0 / avatarRatio 0.92
+  //   premium Lottie'lerle aynı (iç cutout ~%92).
+  'gold-royal':        { source: require('../assets/avatar_frames/premium/GoldRoyal.png'),         scale: 1.0, resizeMode: 'contain', avatarRatio: 0.92, type: 'png' },
+  'silver-platinum':   { source: require('../assets/avatar_frames/premium/SilverPlatinum.png'),    scale: 1.0, resizeMode: 'contain', avatarRatio: 0.92, type: 'png' },
+  'rose-gold':         { source: require('../assets/avatar_frames/premium/RoseGold.png'),          scale: 1.0, resizeMode: 'contain', avatarRatio: 0.92, type: 'png' },
+  'teal-neon':         { source: require('../assets/avatar_frames/premium/TealNeon.png'),          scale: 1.0, resizeMode: 'contain', avatarRatio: 0.92, type: 'png' },
+  'purple-violet':     { source: require('../assets/avatar_frames/premium/PurpleViolet.png'),      scale: 1.0, resizeMode: 'contain', avatarRatio: 0.92, type: 'png' },
 };
 
 /** ★ v213: Frame avatar oranı (size'ın % kaçı). Default 0.92. */

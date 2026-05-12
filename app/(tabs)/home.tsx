@@ -209,7 +209,7 @@ function BoostedProfileCard({ profile: bp, index, friendIds, onlineIds }: { prof
                 opacity: pulseAnim,
               }} />
             )}
-            <StatusAvatar uri={bp.avatar_url} size={58} tier={tier} isAdmin={bp.is_admin} />
+            <StatusAvatar uri={bp.avatar_url} size={58} tier={tier} isAdmin={bp.is_admin} frameId={(bp as any).active_frame} />
             {showOnline && (
               <View style={{
                 position: 'absolute', bottom: 2, right: 2,
@@ -397,7 +397,7 @@ function FollowedRoomCard({ room, index }: { room: Room; index: number }) {
             </View>
           )}
           <View style={s.fHostRow}>
-            <StatusAvatar uri={room.host?.avatar_url} size={28} tier={(room.host as any)?.subscription_tier} />
+            <StatusAvatar uri={room.host?.avatar_url} size={28} tier={(room.host as any)?.subscription_tier} frameId={(room.host as any)?.active_frame} />
             <Text style={s.fHostName} numberOfLines={1}>{room.host?.display_name || 'Anonim'}</Text>
             {(room.listener_count || 0) > 0 && (
               <View style={s.fListenerPill}>
@@ -788,7 +788,7 @@ const BigLiveRoomCard = React.memo(function BigLiveRoomCard({ room, onJoin, isFo
 
       {/* === Host + Stats + Katıl — tek satır === */}
       <View style={s.bigHostStatsRow}>
-        <StatusAvatar uri={room.host?.avatar_url} size={36} tier={(room.host as any)?.subscription_tier} />
+        <StatusAvatar uri={room.host?.avatar_url} size={36} tier={(room.host as any)?.subscription_tier} frameId={(room.host as any)?.active_frame} />
         <Text style={[s.bigHostName, { flex: 1, minWidth: 0 }]} numberOfLines={1}>{hostName}</Text>
         {/* ★ 2026-04-21: Katılımcı avatar stack — Clubhouse tarzı (top 4 + sayı)
             ★ 2026-04-22 FIX: Profil resmi olmayanlar stack'ten EXCLUDE edilir — slate-gray
@@ -1451,7 +1451,7 @@ export default function HomeScreen() {
               <View style={s.welcomeCard}>
                 <View style={s.welcomeRow}>
                   <Pressable onPress={() => router.push('/(tabs)/profile')}>
-                    <StatusAvatar uri={profile?.avatar_url} size={42} isOnline={true} tier={profile?.subscription_tier} isSelf showTierBadge={false} />
+                    <StatusAvatar uri={profile?.avatar_url} size={42} isOnline={true} tier={profile?.subscription_tier} isSelf showTierBadge={false} frameId={(profile as any)?.active_frame} />
                   </Pressable>
                   <View style={{ flex: 1 }}>
                     <Text style={s.welcomeTitle}>
@@ -1521,7 +1521,7 @@ export default function HomeScreen() {
                     >
                       {/* Sparkle + Başlık */}
                       <Ionicons name="sparkles" size={12} color="#FBBF24" style={{ position: 'absolute', top: 5, left: 10, opacity: 0.6 }} />
-                      <StatusAvatar uri={bp.avatar_url} size={42} tier={bpTier} isAdmin={bp.is_admin} isOnline={friendIdSet?.has(bp.id) ? onlineIdSet.has(bp.id) : undefined} />
+                      <StatusAvatar uri={bp.avatar_url} size={42} tier={bpTier} isAdmin={bp.is_admin} isOnline={friendIdSet?.has(bp.id) ? onlineIdSet.has(bp.id) : undefined} frameId={(bp as any).active_frame} />
                       <View style={{ flex: 1, minWidth: 0 }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                           <Text numberOfLines={1} style={{ fontSize: 14, fontWeight: '800', color: '#F1F5F9', flexShrink: 1, textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }}>

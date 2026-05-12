@@ -867,7 +867,6 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
               boostExpiresAt={(userProfile as any)?.profile_boost_expires_at}
               isOnline={isFriend && !isOwnProfile ? userProfile.is_online : undefined}
               lastSeen={(isOwnProfile || isFriend) ? userProfile.last_seen : null}
-              isVerified={!!(userProfile as any)?.is_verified}
               activeFrame={(userProfile as any)?.active_frame || null}
               // ★ v213: Kendi profilinde sol üst envanter (madalya) ve sağ üst düzenleme
               //   butonları — profil sayfasındakiyle birebir aynı. Modal'dan hızlı erişim.
@@ -1598,6 +1597,7 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                                 size={54}
                                 isOnline={isOnline}
                                 tier={(f as any).subscription_tier}
+                                frameId={(f as any).active_frame}
                               />
                               <Text style={sty.friendChipName} numberOfLines={1}>
                                 {f.display_name || 'Kullanıcı'}

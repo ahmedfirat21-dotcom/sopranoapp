@@ -26,25 +26,6 @@ const iconShadow = {
 } as const;
 
 // ═══════════════════════════════════════════════════════════════════
-// VerifiedTick — Mavi tik (Twitter/X tarzı)
-// ═══════════════════════════════════════════════════════════════════
-export function VerifiedTick({ size = 16 }: { size?: number }) {
-  return (
-    <View style={{
-      width: size, height: size, borderRadius: size / 2,
-      alignItems: 'center', justifyContent: 'center',
-      backgroundColor: '#1D9BF0',
-      shadowColor: '#1D9BF0',
-      shadowOffset: { width: 0, height: 0 },
-      shadowOpacity: 0.6,
-      shadowRadius: 4,
-    }}>
-      <Ionicons name="checkmark" size={size * 0.65} color="#FFF" />
-    </View>
-  );
-}
-
-// ═══════════════════════════════════════════════════════════════════
 // VoiceBioPlayer — Sesli tanıtım çalar
 // ═══════════════════════════════════════════════════════════════════
 type VoiceBioPlayerProps = {
@@ -240,6 +221,7 @@ export function TopSupportersStrip({ supporters, onSelectUser }: TopSupportersSt
               uri={s.avatar_url || undefined}
               size={48}
               tier={s.subscription_tier as any}
+              frameId={(s as any).active_frame}
             />
             <Text style={tss.name} numberOfLines={1}>
               {s.display_name}

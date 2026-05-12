@@ -512,6 +512,7 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, i
   const pulseAnim = useRef(new Animated.Value(0)).current;
   const floatAnim = useRef(new Animated.Value(0)).current;
   const shakeAnim = useRef(new Animated.Value(0)).current;
+  const shakeAnimY = useRef(new Animated.Value(0)).current;
   const swingAnim = useRef(new Animated.Value(0)).current;
   const tiltAnim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
@@ -536,16 +537,25 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, i
   }, [floatAnim, frameCfg?.avatar_float, frameCfg?.avatar_float_speed]);
   useEffect(() => {
     if (!frameCfg?.avatar_shake) return;
-    const loop = Animated.loop(Animated.sequence([
+    // ★ v1.3.70 PARİTE: Web admin shake X+Y çapraz hareket — birebir
+    const loopX = Animated.loop(Animated.sequence([
       Animated.timing(shakeAnim, { toValue: 1, duration: 120, useNativeDriver: true }),
       Animated.timing(shakeAnim, { toValue: -1, duration: 120, useNativeDriver: true }),
       Animated.timing(shakeAnim, { toValue: 0.5, duration: 120, useNativeDriver: true }),
       Animated.timing(shakeAnim, { toValue: -0.5, duration: 120, useNativeDriver: true }),
       Animated.timing(shakeAnim, { toValue: 0, duration: 120, useNativeDriver: true }),
     ]));
-    loop.start();
-    return () => loop.stop();
-  }, [shakeAnim, frameCfg?.avatar_shake]);
+    const loopY = Animated.loop(Animated.sequence([
+      Animated.timing(shakeAnimY, { toValue: -0.5, duration: 120, useNativeDriver: true }),
+      Animated.timing(shakeAnimY, { toValue: 0.5, duration: 120, useNativeDriver: true }),
+      Animated.timing(shakeAnimY, { toValue: -1, duration: 120, useNativeDriver: true }),
+      Animated.timing(shakeAnimY, { toValue: 1, duration: 120, useNativeDriver: true }),
+      Animated.timing(shakeAnimY, { toValue: 0, duration: 120, useNativeDriver: true }),
+    ]));
+    loopX.start();
+    loopY.start();
+    return () => { loopX.stop(); loopY.stop(); };
+  }, [shakeAnim, shakeAnimY, frameCfg?.avatar_shake]);
   useEffect(() => {
     if (!frameCfg?.avatar_swing) return;
     const loop = Animated.loop(Animated.sequence([
@@ -570,7 +580,10 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, i
   const avatarTransform: any[] = [];
   if (frameCfg?.avatar_pulse) avatarTransform.push({ scale: pulseAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.08] }) });
   if (frameCfg?.avatar_float) avatarTransform.push({ translateY: floatAnim.interpolate({ inputRange: [0, 1], outputRange: [0, -8] }) });
-  if (frameCfg?.avatar_shake) avatarTransform.push({ translateX: shakeAnim.interpolate({ inputRange: [-1, 1], outputRange: [-2, 2] }) });
+  if (frameCfg?.avatar_shake) {
+    avatarTransform.push({ translateX: shakeAnim.interpolate({ inputRange: [-1, 1], outputRange: [-2, 2] }) });
+    avatarTransform.push({ translateY: shakeAnimY.interpolate({ inputRange: [-1, 1], outputRange: [-1, 1] }) });
+  }
   if (frameCfg?.avatar_swing) avatarTransform.push({ rotate: swingAnim.interpolate({ inputRange: [-1, 1], outputRange: ['-8deg', '8deg'] }) });
   if (frameCfg?.avatar_tilt)  avatarTransform.push({ rotate: tiltAnim.interpolate({ inputRange: [0, 1], outputRange: ['-3deg', '3deg'] }) });
   const { mic: rawMic, speaking, videoTrack, cameraOn } = micStatus;
@@ -738,6 +751,19 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, i
             <View pointerEvents="none" style={[StyleSheet.absoluteFill, {
               backgroundColor: 'rgba(128,128,128,1)',
               opacity: (1 - frameCfg.avatar_saturation) * 0.45,
+            }]} />
+          )}
+          {/* ★ v1.3.70 PARİTE: avatar_blur — web admin'de CSS filter:blur(Npx) ile
+                birebir. RN'de Image blurRadius prop'u sadece source'a blur uygular
+                (render'a değil). SpeakerSection overlay yaklaşımı: beyaz/siyah düşük
+                opacity katman + borderRadius → yumuşak "bulanık" görünüm simülasyonu.
+                Gerçek parite için StatusAvatar'daki SVG feGaussianBlur pipeline tercih
+                edilmeli. overlay ile yaklaşık ama fark %80 giderilir. */}
+          {(frameCfg?.avatar_blur ?? 0) > 0 && (
+            <View pointerEvents="none" style={[StyleSheet.absoluteFill, {
+              backgroundColor: 'rgba(200,200,200,0.5)',
+              opacity: Math.min(0.6, frameCfg.avatar_blur * 0.12),
+              borderRadius: cameraOn && videoTrack && VideoView ? Math.max(12, Math.floor(cardWidth * 0.08)) : avatarShapeRadius,
             }]} />
           )}
           {/* ★ v1.3.56: avatar_border_enabled — Image etrafında ek halka.

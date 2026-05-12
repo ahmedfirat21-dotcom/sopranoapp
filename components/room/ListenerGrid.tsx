@@ -1,11 +1,10 @@
 import React, { useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, Pressable, Image, useWindowDimensions, Animated, Easing } from 'react-native';
+import { View, Text, StyleSheet, Pressable, useWindowDimensions, Animated, Easing } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { getAvatarSource } from '../../constants/avatars';
+
 import AvatarPenaltyFlash, { type FlashType } from './AvatarPenaltyFlash';
-import RoomAvatarFrame from './RoomAvatarFrame';
-import TierBadge from '../TierBadge';
+import StatusAvatar from '../StatusAvatar';
 import { migrateLegacyTier } from '../../types';
 import type { RoomParticipant } from '../../services/database';
 
@@ -84,40 +83,33 @@ const ListenerCell = React.memo(function ListenerCell({
   const userTier = !(u as any).disguise
     ? migrateLegacyTier((u.user as any)?.subscription_tier as string)
     : 'Free';
-  const showTier = userTier !== 'Free';
+  const displayName = (u as any).disguise?.display_name || u.user?.display_name || 'Misafir';
+  // ★ v1.3.70 PARİTE: StatusAvatar'a geçiş — web admin'deki tüm frame config ayarları
+  //   (avatar animasyonları, filtreler, şekil, tier badge konum/ölçek, isim overlay,
+  //   glow, halo, parçacıklar) artık dinleyici grid'de de tam çalışır.
+  //   Eski: ham Image + ayrı RoomAvatarFrame + hardcoded TierBadge.
+  //   Yeni: StatusAvatar hepsini tek component'te yönetir.
   return (
     <Pressable style={[s.cell, { width: cellW }]} onPress={() => onSelectUser(u)}>
       {isOwner && !hasFrame && <ListenerOwnerBadge />}
       <View style={[
-        s.avatarWrap,
-        { width: ownerAvatarSize, height: ownerAvatarSize, borderRadius: ownerAvatarSize / 2 },
         isSelected && s.avatarSelected,
         isOwner && !hasFrame && s.avatarOwner,
         showMuteIndicator && s.avatarMuted,
-        hasFrame && { borderWidth: 0, backgroundColor: 'transparent', overflow: 'visible' },
+        { borderRadius: ownerAvatarSize / 2, overflow: 'visible' },
       ]}>
-        {/* ★ v110.9 (7 May 2026): Image ÖNCE, frame SONRA — frame avatar üstüne POP olsun.
-             Eski sıralamada (frame önce, image sonra) RN render order'ı yüzünden
-             palette halka çerçeveleri (aurum-ring, glacier-ring vb.) avatar dairesinin
-             EDGE'inde çiziliyor ve Image tarafından örtülüyordu. SpeakerSection'da
-             aynı pattern (v108.32). zIndex 2 + elevation 2 Android için kritik. */}
-        <Image
-          source={getAvatarSource((u as any).disguise?.avatar_url || u.user?.avatar_url)}
-          style={[s.avatar, hasFrame && { borderRadius: ownerAvatarSize / 2 }]}
+        <StatusAvatar
+          uri={(u as any).disguise?.avatar_url || u.user?.avatar_url}
+          size={ownerAvatarSize}
+          tier={userTier}
+          frameId={activeFrameId}
+          showTierBadge
+          tierBadgeSize="xs"
+          displayName={displayName}
+          contextKey="listener"
+          borderColor={isOwner && !hasFrame ? 'rgba(255,215,0,0.7)' : 'rgba(20,184,166,0.25)'}
+          borderWidth={hasFrame ? 0 : 2}
         />
-        {hasFrame && (
-          <View
-            style={{
-              position: 'absolute',
-              top: 0, left: 0, right: 0, bottom: 0,
-              alignItems: 'center', justifyContent: 'center',
-              zIndex: 2, elevation: 2,
-            }}
-            pointerEvents="none"
-          >
-            <RoomAvatarFrame frameId={activeFrameId} avatarSize={ownerAvatarSize} minSize={36} contextKey="listener" />
-          </View>
-        )}
       </View>
       {showMuteIndicator && (
         <View style={[s.mutedBadge, { right: (cellW - ownerAvatarSize) / 2 - 6 }]}>
@@ -131,22 +123,8 @@ const ListenerCell = React.memo(function ListenerCell({
       )}
       {flash && <View style={[s.flashWrap, { height: ownerAvatarSize }]}><AvatarPenaltyFlash flashType={flash} size={ownerAvatarSize} onFlashDone={() => onFlashDone?.(u.user_id)} /></View>}
       {hasHandRaised && <HandRaiseBadge />}
-      {showTier && (
-        <View
-          style={{
-            position: 'absolute',
-            top: 8 + ownerAvatarSize - 10,
-            left: (cellW + ownerAvatarSize) / 2 - 14,
-            zIndex: 22,
-            elevation: 10,
-          }}
-          pointerEvents="none"
-        >
-          <TierBadge tier={userTier} size="xs" frameId={activeFrameId} />
-        </View>
-      )}
       <Text style={[s.name, { fontSize: nameSize, maxWidth: cellW }, isOwner && s.nameOwner, showMuteIndicator && { color: 'rgba(239,68,68,0.6)' }]} numberOfLines={1}>
-        {(u as any).disguise?.display_name || u.user?.display_name || 'Misafir'}
+        {displayName}
       </Text>
     </Pressable>
   );

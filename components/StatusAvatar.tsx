@@ -76,6 +76,41 @@ function shapePath(shape: string, size: number): string | null {
   }
 }
 
+/**
+ * ★ v1.3.70 PARİTE: CSS translate(-50%, -50%) simülasyonu.
+ * Web admin badge konumlandırması: left/top ile merkez noktası belirler,
+ * transform: translate(-50%, -50%) ile badge kendi boyutunun yarısı kadar geri çekilir.
+ * RN Paper bridge'de % translate desteklenmiyor — onLayout ile child boyutunu ölçüp
+ * negatif translateX/Y uyguluyoruz. İlk render için yaklaşık boyut kullanılır.
+ */
+function BadgeCenterWrapper({ x, y, scale, children }: {
+  x: number; y: number; scale: number; children: React.ReactNode;
+}) {
+  // TierBadge md default boyutu: ~52×17 — ilk render tahmini
+  const [dims, setDims] = React.useState({ w: 52, h: 17 });
+  return (
+    <View
+      onLayout={(e) => {
+        const { width, height } = e.nativeEvent.layout;
+        if (width > 0 && height > 0) {
+          setDims((prev) => (prev.w === width && prev.h === height ? prev : { w: width, h: height }));
+        }
+      }}
+      style={{
+        position: 'absolute',
+        left: x - dims.w / 2,
+        top: y - dims.h / 2,
+        transform: [{ scale }],
+        zIndex: 4,
+        elevation: 8,
+      }}
+      pointerEvents="none"
+    >
+      {children}
+    </View>
+  );
+}
+
 interface StatusAvatarProps {
   /** Avatar URL string or ImageSource */
   uri?: string | null;
@@ -180,8 +215,12 @@ export default function StatusAvatar({
   const [dynFrameCfg, setDynFrameCfg] = useState<any>(getCachedFrameConfig(frameId, sizeKey));
   useEffect(() => {
     if (!frameId) { setDynFrameCfg(null); return; }
-    ensureFrameConfig(frameId, sizeKey).then((cfg) => setDynFrameCfg(cfg));
-  }, [frameId, sizeKey]);
+    ensureFrameConfig(frameId, sizeKey).then((cfg) => {
+      // GEÇİCİ DEBUG — parite kontrol
+      if (size >= 100) console.log('[STATUS_AV]', frameId, 'sz', size, 'key', sizeKey, 'pos', cfg?.tier_badge_position, 'scale', cfg?.tier_badge_scale, 'name', cfg?.name_enabled);
+      setDynFrameCfg(cfg);
+    });
+  }, [frameId, sizeKey, size]);
 
   useEffect(() => {
     if (!frameId) return;
@@ -206,6 +245,7 @@ export default function StatusAvatar({
   const pulseAnim = useRef(new Animated.Value(0)).current;
   const floatAnim = useRef(new Animated.Value(0)).current;
   const shakeAnim = useRef(new Animated.Value(0)).current;
+  const shakeAnimY = useRef(new Animated.Value(0)).current;
   const swingAnim = useRef(new Animated.Value(0)).current;
   const tiltAnim = useRef(new Animated.Value(0)).current;
 
@@ -233,16 +273,27 @@ export default function StatusAvatar({
 
   useEffect(() => {
     if (!dynFrameCfg?.avatar_shake) return;
-    const loop = Animated.loop(Animated.sequence([
+    // ★ v1.3.70 PARİTE: Web admin shake X+Y çapraz hareket kullanır:
+    //   translate(-2px,1px) → (2px,-1px) → (-1px,2px) → (1px,-2px)
+    //   APK'da paralel iki Animated.Value (X ve Y) ile birebir simüle.
+    const loopX = Animated.loop(Animated.sequence([
       Animated.timing(shakeAnim, { toValue: 1, duration: 120, useNativeDriver: true }),
       Animated.timing(shakeAnim, { toValue: -1, duration: 120, useNativeDriver: true }),
       Animated.timing(shakeAnim, { toValue: 0.5, duration: 120, useNativeDriver: true }),
       Animated.timing(shakeAnim, { toValue: -0.5, duration: 120, useNativeDriver: true }),
       Animated.timing(shakeAnim, { toValue: 0, duration: 120, useNativeDriver: true }),
     ]));
-    loop.start();
-    return () => loop.stop();
-  }, [shakeAnim, dynFrameCfg?.avatar_shake]);
+    const loopY = Animated.loop(Animated.sequence([
+      Animated.timing(shakeAnimY, { toValue: -0.5, duration: 120, useNativeDriver: true }),
+      Animated.timing(shakeAnimY, { toValue: 0.5, duration: 120, useNativeDriver: true }),
+      Animated.timing(shakeAnimY, { toValue: -1, duration: 120, useNativeDriver: true }),
+      Animated.timing(shakeAnimY, { toValue: 1, duration: 120, useNativeDriver: true }),
+      Animated.timing(shakeAnimY, { toValue: 0, duration: 120, useNativeDriver: true }),
+    ]));
+    loopX.start();
+    loopY.start();
+    return () => { loopX.stop(); loopY.stop(); };
+  }, [shakeAnim, shakeAnimY, dynFrameCfg?.avatar_shake]);
 
   useEffect(() => {
     if (!dynFrameCfg?.avatar_swing) return;
@@ -270,7 +321,10 @@ export default function StatusAvatar({
   const avatarTransform: any[] = [];
   if (dynFrameCfg?.avatar_pulse) avatarTransform.push({ scale: pulseAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.08] }) });
   if (dynFrameCfg?.avatar_float) avatarTransform.push({ translateY: floatAnim.interpolate({ inputRange: [0, 1], outputRange: [0, -8] }) });
-  if (dynFrameCfg?.avatar_shake) avatarTransform.push({ translateX: shakeAnim.interpolate({ inputRange: [-1, 1], outputRange: [-2, 2] }) });
+  if (dynFrameCfg?.avatar_shake) {
+    avatarTransform.push({ translateX: shakeAnim.interpolate({ inputRange: [-1, 1], outputRange: [-2, 2] }) });
+    avatarTransform.push({ translateY: shakeAnimY.interpolate({ inputRange: [-1, 1], outputRange: [-1, 1] }) });
+  }
   if (dynFrameCfg?.avatar_swing) avatarTransform.push({ rotate: swingAnim.interpolate({ inputRange: [-1, 1], outputRange: ['-8deg', '8deg'] }) });
   if (dynFrameCfg?.avatar_tilt)  avatarTransform.push({ rotate: tiltAnim.interpolate({ inputRange: [0, 1], outputRange: ['-3deg', '3deg'] }) });
 
@@ -417,8 +471,14 @@ export default function StatusAvatar({
                         </ClipPath>
                       )}
                       {hasAnyFilter && (
-                        <Filter id={filterId} x="-10%" y="-10%" width="120%" height="120%">
+                        // ★ v1.3.63 PARİTE: Eski %10 padding (120% width) yüksek blur
+                        //   değerlerinde halo'yu kırpıyordu (5px blur → 5px halo > 0.5px pad).
+                        //   Yeni: %25 padding (150% width) — blur=5px (max) için bile halo
+                        //   kırpılmaz. Web filter:blur() Chrome'da overflow:visible default.
+                        <Filter id={filterId} x="-25%" y="-25%" width="150%" height="150%">
                           {blurVal > 0 && (
+                            // CSS filter:blur(Npx) ≈ SVG feGaussianBlur stdDeviation=N
+                            // (W3C spec birebir; RN SVG aynı yorum). Direkt geçir.
                             <FeGaussianBlur stdDeviation={blurVal} />
                           )}
                           {brightnessVal !== 1 && (
@@ -552,40 +612,49 @@ export default function StatusAvatar({
       })() && (() => {
         const useDyn = !!dynFrameCfg?.tier_badge_enabled;
         const tbPos = String(dynFrameCfg?.tier_badge_position || 'br');
-        // tl/tc/tr/ml/mr/bl/bc/br → top/left/right/bottom değerleri
-        const POS_STYLES: Record<string, any> = {
-          tl: { top: -2, left: -2 },
-          tc: { top: -2, alignSelf: 'center' },
-          tr: { top: -2, right: -2 },
-          ml: { top: '50%', left: -2, marginTop: -10 },
-          mr: { top: '50%', right: -2, marginTop: -10 },
-          bl: { bottom: -2, left: -2 },
-          bc: { bottom: -2, alignSelf: 'center' },
-          br: { bottom: -2, right: -2 },
+        // ★ v1.3.70 PARİTE: Web admin BADGE_POSITIONS ile birebir eşleşme.
+        //   Web admin: badgeX = stageCenter + pos.x × avatarSize + fineOffsetX
+        //              badgeY = stageCenter + pos.y × avatarSize + fineOffsetY
+        //              transform: translate(-50%, -50%) — badge merkezden konumlanır
+        //   APK: aynı formül — center (size/2) + pos × size + fineOffset
+        //   Eski POS_STYLES (top/bottom/left/right) referansı web admin ile uyuşmuyordu.
+        const BADGE_POS: Record<string, { x: number; y: number }> = {
+          tl: { x: -0.5,  y: -0.5 },
+          tc: { x: 0,     y: -0.55 },
+          tr: { x: 0.5,   y: -0.5 },
+          ml: { x: -0.55, y: 0 },
+          mr: { x: 0.55,  y: 0 },
+          bl: { x: -0.5,  y: 0.5 },
+          bc: { x: 0,     y: 0.55 },
+          br: { x: 0.5,   y: 0.5 },
         };
-        // tc/bc için flex hizalama (transform translate ile ortala)
-        const isCenter = tbPos === 'tc' || tbPos === 'bc';
-        const positionStyle = useDyn
-          ? (isCenter
-              ? { ...(POS_STYLES[tbPos] || POS_STYLES.br), left: 0, right: 0, alignItems: 'center' }
-              : POS_STYLES[tbPos] || POS_STYLES.br)
-          : { bottom: -2, right: -2 };
+        const pos = BADGE_POS[tbPos] || BADGE_POS.br;
+        const offsetXPct = Number(dynFrameCfg?.tier_badge_offset_x) || 0;
+        const offsetYPct = Number(dynFrameCfg?.tier_badge_offset_y) || 0;
+        const dynScale = typeof dynFrameCfg?.tier_badge_scale === 'number'
+          ? dynFrameCfg.tier_badge_scale : 1.0;
+        const fineOffsetX = Math.round((offsetXPct / 100) * size);
+        const fineOffsetY = Math.round((offsetYPct / 100) * size);
+        // Badge merkezi: avatar merkezinden pos × size kadar kaydır + ince ayar
+        const badgeCenterX = size / 2 + pos.x * size + fineOffsetX;
+        const badgeCenterY = size / 2 + pos.y * size + fineOffsetY;
+        // Web admin yalnızca `tier_badge_scale` uyguluyor (pillScale yok). useDyn=true
+        // ise kullanıcının ayarladığı ölçeğe güven; aksi halde küçük avatarlarda
+        // otomatik küçültme için pillScale (geriye dönük). Aksi takdirde admin'de
+        // 1.0 görünen badge, mini avatarda 0.7× çıkıyordu.
+        const effectiveScale = useDyn ? dynScale : (pillScale * dynScale);
         return (
-          <View
-            style={{
-              position: 'absolute',
-              ...positionStyle,
-              transform: [{ scale: pillScale }],
-              zIndex: 4, elevation: 8,
-            }}
-            pointerEvents="none"
+          <BadgeCenterWrapper
+            x={badgeCenterX}
+            y={badgeCenterY}
+            scale={effectiveScale}
           >
             <TierBadge
               tier={normalizedTier}
               size={tierBadgeSize}
               frameId={frameId}
             />
-          </View>
+          </BadgeCenterWrapper>
         );
       })()}
     </View>

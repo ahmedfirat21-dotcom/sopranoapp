@@ -224,27 +224,36 @@ function ParticleDot({ emoji, color, x, y, fontSize, twinkleDelay }: {
   const scaleInterp = twinkleAnim.interpolate({ inputRange: [0, 1], outputRange: [0.85, 1.2] });
   const opacityInterp = twinkleAnim.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1] });
 
+  // ★ v1.3.63 PARİTE: Web admin'de particle filter 2 katman drop-shadow
+  //   (4px + 8px) ile daha yoğun parlama. RN Text tek textShadowRadius destekler;
+  //   iki üst üste Animated.Text ile iç (radius 4) + dış (radius 10) glow simüle.
+  //   Birikimli ışıma web ile birebir.
+  const baseStyle = {
+    position: 'absolute' as const,
+    left: '50%' as any, top: '50%' as any,
+    marginLeft: x - fontSize / 2,
+    marginTop: y - fontSize / 2,
+    width: fontSize, height: fontSize,
+    fontSize,
+    lineHeight: fontSize,
+    textAlign: 'center' as const,
+    color,
+    textShadowColor: color,
+    textShadowOffset: { width: 0, height: 0 },
+    opacity: opacityInterp,
+    transform: [{ scale: scaleInterp }],
+  };
   return (
-    <Animated.Text
-      style={{
-        position: 'absolute',
-        left: '50%' as any, top: '50%' as any,
-        marginLeft: x - fontSize / 2,
-        marginTop: y - fontSize / 2,
-        width: fontSize, height: fontSize,
-        fontSize,
-        lineHeight: fontSize,
-        textAlign: 'center',
-        color, // emoji default rengini override etmez ama tintColor alternatif yok Text'te
-        textShadowColor: color,
-        textShadowRadius: 8,
-        textShadowOffset: { width: 0, height: 0 },
-        opacity: opacityInterp,
-        transform: [{ scale: scaleInterp }],
-      }}
-    >
-      {emoji}
-    </Animated.Text>
+    <>
+      {/* Dış katman — geniş yumuşak glow (web drop-shadow 8px karşılığı) */}
+      <Animated.Text style={{ ...baseStyle, textShadowRadius: 10 }}>
+        {emoji}
+      </Animated.Text>
+      {/* İç katman — sıkı yakın glow (web drop-shadow 4px karşılığı) */}
+      <Animated.Text style={{ ...baseStyle, textShadowRadius: 4 }}>
+        {emoji}
+      </Animated.Text>
+    </>
   );
 }
 
@@ -287,10 +296,16 @@ function ParticleOverlay({ size, dynCfg }: { size: number; dynCfg: any }) {
   // ★ 2026-05-11: Gerçek emoji + yörünge avatar dışında en az 18px boşluk + her
   //   parçacığa scale/opacity twinkle. Önceki düz Unicode (✦♥) kalitesizdi
   //   ve yarıçap çok yakın (avatar üstüne biniyordu) — düzeltildi.
+  // ★ v1.3.63 PARİTE: Web admin yörünge yarıçapını `avatarSize` (= mobileSize ×
+  //   avatar_ratio) üzerinden hesaplıyor. APK'da `size` slot boyutu, gerçek görsel
+  //   avatar `size × avatar_ratio`. Avatar_ratio<1 olunca web'de particle avatara
+  //   yapışır, APK'da uzakta kalırdı — fark görsel parite bozuyordu. Düzeltildi.
   const emoji = type === 'sparkle' ? '✨' : type === 'stars' ? '⭐' : type === 'hearts' ? '❤️' : '🫧';
-  const fontSize = Math.max(14, Math.round(size * 0.18));
-  // Yörünge: avatar yarıçapı + min 18px boşluk
-  const orbitRadius = size / 2 + Math.max(18, fontSize * 0.4);
+  const avatarRatio: number = typeof dynCfg?.avatar_ratio === 'number' ? dynCfg.avatar_ratio : 0.92;
+  const effectiveAvatarSize = size * avatarRatio;
+  const fontSize = Math.max(14, Math.round(effectiveAvatarSize * 0.18));
+  // Yörünge: gerçek görsel avatar yarıçapı + min 18px boşluk
+  const orbitRadius = effectiveAvatarSize / 2 + Math.max(18, fontSize * 0.4);
   const wrapperOffset = orbitRadius + fontSize;
   const wrapperSize = wrapperOffset * 2;
   const rotateInterp = orbitAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
@@ -334,8 +349,11 @@ function ParticleOverlay({ size, dynCfg }: { size: number; dynCfg: any }) {
 // ★ 2026-05-11: Background Halo — avatarın arkasında soft diffuse glow.
 //   Native radial-gradient yok; LinearGradient + opacity katmanlarıyla yaklaşık.
 //   Tek View + radial benzeri shadow ile basit ve performanslı.
-function BgHaloOverlay({ size, color, sizeMul, intensity }: {
+//   ★ pulse opsiyonu: web admin `glow-halo-pulse` keyframe'i ile parite —
+//   opacity 0.7↔1.0 dalgalanır (avatar_pulse_speed * 1.5sn süre).
+function BgHaloOverlay({ size, color, sizeMul, intensity, pulse, pulseSpeed }: {
   size: number; color: string; sizeMul: number; intensity: number;
+  pulse?: boolean; pulseSpeed?: number;
 }) {
   // ★ v1.3.58: SVG RadialGradient ile gerçek yumuşak halo — merkez parlak,
   //   kenarlar saydam fade. Eski düz daire (backgroundColor + opacity) Android'de
@@ -344,29 +362,47 @@ function BgHaloOverlay({ size, color, sizeMul, intensity }: {
   const haloSize = size * sizeMul;
   const offset = (haloSize - size) / 2;
   const gradId = `halo-${size}-${color.replace('#', '')}-${Math.round(intensity * 100)}`;
+
+  // Halo opacity nabzı — web admin `@keyframes glow-halo-pulse` paritesi.
+  // Süre: avatar_pulse_speed × 1.5sn (web admin formülü). 0.7↔1.0 arası.
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    if (!pulse) { pulseAnim.setValue(1); return; }
+    const half = ((pulseSpeed ?? 2) * 1500) / 2;
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(pulseAnim, { toValue: 1.0, duration: half, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      Animated.timing(pulseAnim, { toValue: 0.7, duration: half, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, [pulse, pulseSpeed, pulseAnim]);
+
   return (
-    <View
+    <Animated.View
       pointerEvents="none"
       style={{
         position: 'absolute',
         top: -offset, left: -offset,
         width: haloSize, height: haloSize,
         zIndex: 0,
+        opacity: pulse ? pulseAnim : 1,
       }}
     >
       <Svg width={haloSize} height={haloSize}>
         <Defs>
-          {/* ★ v1.3.59: Web admin radial-gradient ile birebir parite:
-               0% intensity (tam parlak merkez) → 70% saydam fade. Eski 3-stop
-               daha hızlı solduğu için APK'da "sıradan/zayıf" görünüyordu. */}
-          <RadialGradient id={gradId} cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
+          {/* CSS `radial-gradient(circle, ...)` default `farthest-corner` ekstent
+              ile kutu_boyutu × √2/2 (≈ 0.7071) yarıçapta hesaplar. r="50%" ile
+              gradient kutunun yarıçapında biter → APK halo web'den ~%30 sıkı/küçük.
+              r="70.71%" ile web'in farthest-corner davranışı birebir taklit edilir;
+              70% stop = 0.7071 × 0.70 ≈ 0.495 × kutu_boyutu (web ile aynı mesafe). */}
+          <RadialGradient id={gradId} cx="50%" cy="50%" r="70.71%" fx="50%" fy="50%">
             <Stop offset="0" stopColor={color} stopOpacity={String(Math.min(1, intensity))} />
             <Stop offset="0.7" stopColor={color} stopOpacity="0" />
           </RadialGradient>
         </Defs>
         <SvgCircle cx={haloSize / 2} cy={haloSize / 2} r={haloSize / 2} fill={`url(#${gradId})`} />
       </Svg>
-    </View>
+    </Animated.View>
   );
 }
 
@@ -584,6 +620,12 @@ function NameOverlay({ size, name, dynCfg }: { size: number; name: string; dynCf
   // ★ v1.3.59 REVERT: Önceki frameExtra (frame_scale offset) web admin önizleme
   //   ile UYUMSUZ — text 24 piksel fazla aşağı kayıyordu. Web admin NamePreviewSvg
   //   sadece avatar yarıçapı + offsetPx kullanıyor. Parite için frameExtra kaldırıldı.
+  // ★ v1.3.63 PARİTE: left/right — eski formül `translateX(-offsetPx - fontPx*2)`
+  //   isim uzunluğunu fontPx*2 ile sabit tahmin ediyordu, uzun isimde text avatar
+  //   üstüne biniyor, kısa isimde uzakta kalıyordu. Yeni formül: text wrapper'ı
+  //   width:size + flex hizalama ile avatar kenarına kilitle, sonra translateX
+  //   `size + offsetPx` kadar tam yana kaydır. Web SVG textPath orta noktasıyla
+  //   birebir aynı pozisyon — isim uzunluğundan bağımsız.
   switch (pos) {
     case 'top':
       containerStyle = { justifyContent: 'flex-start', alignItems: 'center' };
@@ -594,12 +636,23 @@ function NameOverlay({ size, name, dynCfg }: { size: number; name: string; dynCf
       textWrapperStyle = { transform: [{ translateY: fontPx + offsetPx }] };
       break;
     case 'left':
-      containerStyle = { justifyContent: 'center', alignItems: 'flex-start' };
-      textWrapperStyle = { transform: [{ translateX: -offsetPx - fontPx * 2 }] };
+      // Wrapper avatar slot içinde sağa yapışık (text sağ kenarı avatar sol kenarında),
+      // sonra dışına size + offsetPx kadar kaydır → text avatar sol kenarından offsetPx
+      // uzakta biter (web textAnchor='end' + path orta noktası ile birebir).
+      containerStyle = { justifyContent: 'center', alignItems: 'flex-end' };
+      textWrapperStyle = {
+        width: size,
+        transform: [{ translateX: -size - offsetPx }],
+      };
       break;
     case 'right':
-      containerStyle = { justifyContent: 'center', alignItems: 'flex-end' };
-      textWrapperStyle = { transform: [{ translateX: offsetPx + fontPx * 2 }] };
+      // Wrapper avatar slot içinde sola yapışık, dışına size + offsetPx kadar kaydır
+      // → text avatar sağ kenarından offsetPx uzakta başlar.
+      containerStyle = { justifyContent: 'center', alignItems: 'flex-start' };
+      textWrapperStyle = {
+        width: size,
+        transform: [{ translateX: size + offsetPx }],
+      };
       break;
   }
 
@@ -874,7 +927,14 @@ function NameOverlay({ size, name, dynCfg }: { size: number; name: string; dynCf
             color,
             fontSize: fontPx,
             fontWeight: dynCfg?.name_bold ? '700' : '400',
-            textAlign: 'center',
+            // ★ v1.3.63 PARİTE: left/right pozisyonunda text alignment'i kenar bazlı
+            //   olmalı yoksa wrapper translateX'i text'i avatar üstüne kaydırıyor.
+            //   left → text sağ kenarı avatar sol kenarında (textAlign:'right')
+            //   right → text sol kenarı avatar sağ kenarında (textAlign:'left')
+            //   top/bottom → ortalanmış (textAlign:'center')
+            textAlign: pos === 'left' ? 'right' : pos === 'right' ? 'left' : 'center',
+            // left/right için wrapper width:size ile aynı genişlik — textAlign bunda hizalar
+            width: (pos === 'left' || pos === 'right') ? size : undefined,
             textShadowColor: dynCfg?.name_glow ? glowColor : 'rgba(0,0,0,0.7)',
             textShadowRadius: animatedGlowRadius as any,
             textShadowOffset: { width: 0, height: 1 },
@@ -1284,6 +1344,31 @@ function RemoteAssetFrame({ frameId, size, dynCfg }: { frameId: string; size: nu
 
   if (!asset || !asset.url) return null;
 
+  // ★ v1.3.63 PARİTE: Web admin slider'larını RemoteAssetFrame'e bağla.
+  //   Eski: sabit 1.8x (lottie) / 1.4x (image), offset/opacity/speed yoksayılıyordu.
+  //   Yeni: web admin FrameEditor.tsx ile birebir formül kullanılır:
+  //     frameContainerSize = size × baseFactor × frame_scale
+  //     baseFactor = isLottie ? 1.8 : 1.4   (registry yok = remoteFactor)
+  //     offsetX/Y = (frameSize-size)/-2 + frame_offset × size
+  //   Böylece web admin'de slider'a basınca APK'da gerçek değişiklik olur.
+  const isLottie = asset.type === 'lottie';
+  const baseFactor = isLottie ? 1.8 : 1.4;
+  const dynScale = dynCfg?.frame_scale ?? 1.0;
+  const dynOffsetX = dynCfg?.frame_offset_x ?? 0;
+  const dynOffsetY = dynCfg?.frame_offset_y ?? 0;
+  const dynOpacity = dynCfg?.frame_opacity ?? 1;
+  const dynLottieSpeed = dynCfg?.lottie_speed ?? 0.85;
+  // Lottie filter (yaklaşık, renkli overlay) — LottieFrame ile aynı formül
+  const lottieHue = dynCfg?.lottie_hue_rotate ?? 0;
+  const lottieBrightness = dynCfg?.lottie_brightness ?? 1;
+  const lottieSaturation = dynCfg?.lottie_saturation ?? 1;
+  const hasLottieFilter = isLottie && (lottieHue !== 0 || lottieBrightness !== 1 || lottieSaturation !== 1);
+
+  const frameSize = Math.round(size * baseFactor * dynScale);
+  const baseOffset = (frameSize - size) / -2;
+  const offsetX = baseOffset + Math.round(dynOffsetX * size);
+  const offsetY = baseOffset + Math.round(dynOffsetY * size);
+
   // Transform stack — rotate + scale + wobble paralel çalışabilir
   const _transformStack: any[] = [];
   if (dynRotation > 0) {
@@ -1295,17 +1380,18 @@ function RemoteAssetFrame({ frameId, size, dynCfg }: { frameId: string; size: nu
   if (dynBreathe) _transformStack.push({ scale: breatheAnim });
   const transformStack = _transformStack.length > 0 ? _transformStack : undefined;
 
-  if (asset.type === 'lottie' && LottieView) {
+  if (isLottie && LottieView) {
     return (
       <Animated.View
         pointerEvents="none"
         style={{
           position: 'absolute',
-          top: -(size * 0.4), left: -(size * 0.4),
-          width: size * 1.8, height: size * 1.8,
+          top: offsetY, left: offsetX,
+          width: frameSize, height: frameSize,
           alignItems: 'center', justifyContent: 'center',
           zIndex: 3,
           elevation: 3,
+          opacity: dynOpacity,
           transform: transformStack,
         }}
       >
@@ -1313,25 +1399,67 @@ function RemoteAssetFrame({ frameId, size, dynCfg }: { frameId: string; size: nu
           source={{ uri: asset.url }}
           autoPlay
           loop
-          speed={0.85}
+          speed={dynLottieSpeed}
           resizeMode="contain"
           style={{ width: '100%', height: '100%' }}
         />
+        {/* ★ v1.3.63: Lottie filter yaklaşımı — LottieFrame ile aynı renkli overlay.
+              hue_rotate: HSL renk overlay'i; brightness: beyaz/siyah katman; saturation<1: gri. */}
+        {hasLottieFilter && (
+          <View pointerEvents="none" style={{
+            position: 'absolute',
+            top: 0, left: 0,
+            width: frameSize, height: frameSize,
+            borderRadius: frameSize / 2,
+          }}>
+            {lottieHue !== 0 && (
+              <View style={{
+                position: 'absolute',
+                top: 0, left: 0,
+                width: frameSize, height: frameSize,
+                backgroundColor: `hsl(${lottieHue}, 70%, 50%)`,
+                opacity: 0.25,
+                borderRadius: frameSize / 2,
+              }} />
+            )}
+            {lottieBrightness !== 1 && (
+              <View style={{
+                position: 'absolute',
+                top: 0, left: 0,
+                width: frameSize, height: frameSize,
+                backgroundColor: lottieBrightness > 1 ? 'white' : 'black',
+                opacity: Math.min(0.5, Math.abs(lottieBrightness - 1) * 0.4),
+                borderRadius: frameSize / 2,
+              }} />
+            )}
+            {lottieSaturation < 1 && (
+              <View style={{
+                position: 'absolute',
+                top: 0, left: 0,
+                width: frameSize, height: frameSize,
+                backgroundColor: 'rgba(128,128,128,1)',
+                opacity: (1 - lottieSaturation) * 0.4,
+                borderRadius: frameSize / 2,
+              }} />
+            )}
+          </View>
+        )}
       </Animated.View>
     );
   }
 
-  // Image (PNG/SVG/WebP) — tintColor cycle ve breathe destekli
+  // Image (PNG/SVG/WebP) — frame_scale/offset/opacity/cycle/lottie filter destekli
   if (asset.type === 'image') {
     return (
       <Animated.View
         pointerEvents="none"
         style={{
           position: 'absolute',
-          top: -(size * 0.2), left: -(size * 0.2),
-          width: size * 1.4, height: size * 1.4,
+          top: offsetY, left: offsetX,
+          width: frameSize, height: frameSize,
           zIndex: 3,
           elevation: 3,
+          opacity: dynOpacity,
           transform: transformStack,
         }}
       >
@@ -1388,6 +1516,22 @@ function AvatarFrameImpl({ frameId, size, forceRing, userName, userTier, context
           color={dynCfg?.bg_halo_color || '#fbbf24'}
           sizeMul={dynCfg?.bg_halo_size ?? 1.6}
           intensity={dynCfg?.bg_halo_intensity ?? 0.6}
+        />
+      )}
+      {/* ★ v1.3.61: zIndex 0.5: glow_enabled — Android'de RN shadow yumuşak glow
+           vermiyor (platform limit), avatar etrafında glow_color ile sıkı parlak
+           SVG halka. Web admin box-shadow ile parite.
+           ★ glow_pulse aktifse halo opacity 0.7↔1.0 nefes alır (web `glow-halo-pulse`
+              keyframe paritesi). Eski sürüm yalnızca iOS shadow'u pulsing yapıyordu
+              → Android'de glow_pulse görünmüyordu. */}
+      {dynCfg?.glow_enabled && (
+        <BgHaloOverlay
+          size={size}
+          color={dynCfg?.glow_color || '#fbbf24'}
+          sizeMul={1.15 + (dynCfg?.glow_intensity ?? 0.5) * 0.15}
+          intensity={Math.min(1, (dynCfg?.glow_intensity ?? 0.5) * 0.8)}
+          pulse={!!dynCfg?.glow_pulse}
+          pulseSpeed={dynCfg?.avatar_pulse_speed ?? 2}
         />
       )}
       {/* zIndex 1: frame_pulse_ring (radar dalgası) */}

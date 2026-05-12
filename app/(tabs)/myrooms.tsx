@@ -180,7 +180,7 @@ const ManagedRoomCard = React.memo(function ManagedRoomCard({ room, onManage, on
             <Ionicons name={theme.icon as any} size={16} color="rgba(255,255,255,0.85)" />
           </View>
         ) : (
-          <StatusAvatar uri={room.host?.avatar_url} size={40} tier={(room.host as any)?.subscription_tier} />
+          <StatusAvatar uri={room.host?.avatar_url} size={40} tier={(room.host as any)?.subscription_tier} frameId={(room.host as any)?.active_frame} />
         )}
         <View style={mS.cardInfo}>
           <Text style={mS.roomName} numberOfLines={1}>{room.name}</Text>

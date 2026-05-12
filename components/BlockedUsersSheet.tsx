@@ -207,6 +207,7 @@ export default function BlockedUsersSheet({ visible, onClose, currentUserId }: P
                       uri={u.avatar_url || undefined}
                       size={36}
                       tier={(u.subscription_tier as any) || undefined}
+                      frameId={(u as any).active_frame}
                     />
                   </Pressable>
                   <Pressable style={{ flex: 1 }} onPress={() => openUserProfile(u.id)} hitSlop={4}>

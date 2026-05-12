@@ -593,7 +593,6 @@ export default function ProfileScreen() {
             onAvatarPress={() => setShowAvatarPreview(true)}
             memberSince={profile?.created_at}
             boostExpiresAt={(profile as any)?.profile_boost_expires_at}
-            isVerified={!!(profile as any)?.is_verified}
             userLevel={userLevel}
             activeFrame={activeFrame}
             onFramePress={() => setShowFrameSheet(true)}

@@ -65,9 +65,14 @@ export interface FrameConfig {
   name_color?: string;
   name_size?: number;
   name_bold?: boolean;
-  // Tier rozet — sade model: sadece aç/kapat + 8 nokta konum
+  // Tier rozet — sade model: sadece aç/kapat + 8 nokta konum + ince ayar
   tier_badge_enabled?: boolean;
   tier_badge_position?: 'tl' | 'tc' | 'tr' | 'ml' | 'mr' | 'bl' | 'bc' | 'br';
+  // ★ v1.3.70: İnce ayar — web admin slider'larından gelen % offset + boyut çarpanı.
+  //   offset: % avatar boyutu (-50..+50), scale: 0.5..2.0
+  tier_badge_offset_x?: number;
+  tier_badge_offset_y?: number;
+  tier_badge_scale?: number;
   // Ek animasyon paleti
   avatar_shake?: boolean;
   avatar_swing?: boolean;
