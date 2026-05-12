@@ -260,7 +260,9 @@ function ParticleOverlay({ size, dynCfg }: { size: number; dynCfg: any }) {
   useEffect(() => {
     if (type === 'none') return;
     const loop = Animated.loop(
-      Animated.timing(orbitAnim, { toValue: 1, duration: 12000, easing: Easing.linear, useNativeDriver: true })
+      // ★ v1.3.59: Web admin CSS `particle-orbit-wrapper 14s linear infinite` ile birebir parite.
+      //   Eski 12000ms %15 daha hızlıydı.
+      Animated.timing(orbitAnim, { toValue: 1, duration: 14000, easing: Easing.linear, useNativeDriver: true })
     );
     loop.start();
     return () => loop.stop();
