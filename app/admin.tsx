@@ -507,6 +507,7 @@ export default function AdminPanel() {
                 <QuickAction icon="megaphone" color="#F59E0B" label="Tüm Kullanıcılara Duyuru Gönder" onPress={() => {
                   showAdAlert('Duyuru', 'Bu özellik yakında eklenecek.', [{ text: 'Tamam' }], 'info');
                 }} />
+                <QuickAction icon="color-palette" color="#A78BFA" label="Skia Parite Testi (geliştirme)" onPress={() => router.push('/skia-test')} />
               </View>
             </>
           )}
