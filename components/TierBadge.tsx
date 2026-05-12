@@ -1,15 +1,29 @@
 /**
- * SopranoChat — Tier Etiketi (v1.3.54 — sade, eski model)
+ * SopranoChat — Tier Etiketi (v1.3.66 — Skia render)
  * ════════════════════════════════════════════════════════════════════
  * Plus / Pro / GodMaster üyeler için kompakt pill rozet.
- * Web admin sadece aç/kapat + 8 nokta konum kontrolü yapar; rozetin
- * görünüm tasarımı (gradient + glow + shimmer) sabittir.
+ *
+ * RENDER:
+ *   - Önceki versiyon: expo-linear-gradient + RN shadow*/elevation
+ *     (Android'de glow soluk, web admin önizleme ile farklı)
+ *   - Bu versiyon: Skia Canvas + LinearGradient shader + BlurMask glow
+ *     (web admin'deki CSS çıktısı ile birebir parite)
+ *
+ *   Shimmer animasyonu (opacity + scale 1→1.04) RN Animated ile sarmalanır
+ *   — bu Skia katmanına da uygulanır (transform: scale Canvas'a da geçer).
+ *
+ *   Skia native modül yoksa fallback: expo-linear-gradient + utils/shadow.
  */
 
-import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Animated, Easing, Platform } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, Text, StyleSheet, Animated, Easing, LayoutChangeEvent, Platform } from 'react-native';
+import { LinearGradient as ExpoGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { isSkiaAvailable } from './skia';
+import { cssBlurToSkiaSigma } from '../utils/skiaUnits';
+
+let SkiaMod: any = null;
+try { SkiaMod = require('@shopify/react-native-skia'); } catch (_e) { /* fallback */ }
 
 type Tier = 'Free' | 'Plus' | 'Pro' | 'GodMaster' | string | null | undefined;
 
@@ -17,10 +31,8 @@ interface Props {
   tier: Tier;
   /** Boyut: xs (icon-only mini), sm (kompakt liste), md (default), lg (profil hero) */
   size?: 'xs' | 'sm' | 'md' | 'lg';
-  /** Yatay margin için style override */
   style?: any;
-  /** Geriye dönük uyum için tutuldu — görünürlük kararı parent (StatusAvatar)
-   *  tarafında size-aware şekilde verilir, TierBadge ek kontrol yapmaz. */
+  /** Geriye dönük uyum için tutuldu — görünürlük kararı parent'ta verilir. */
   frameId?: string | null;
 }
 
@@ -62,17 +74,20 @@ const SIZE: Record<string, {
   gap: number;
   radius: number;
   letterSpacing: number;
+  glowBlur: number;
 }> = {
-  xs: { height: 14, paddingH: 4, fontSize: 0, iconSize: 9, gap: 0, radius: 7, letterSpacing: 0 },
-  sm: { height: 14, paddingH: 5, fontSize: 8.5, iconSize: 8, gap: 2, radius: 7, letterSpacing: 0.6 },
-  md: { height: 17, paddingH: 6, fontSize: 9.5, iconSize: 9, gap: 3, radius: 8.5, letterSpacing: 0.7 },
-  lg: { height: 22, paddingH: 8, fontSize: 11, iconSize: 11, gap: 4, radius: 11, letterSpacing: 0.8 },
+  xs: { height: 14, paddingH: 4, fontSize: 0, iconSize: 9, gap: 0, radius: 7, letterSpacing: 0, glowBlur: 8 },
+  sm: { height: 14, paddingH: 5, fontSize: 8.5, iconSize: 8, gap: 2, radius: 7, letterSpacing: 0.6, glowBlur: 10 },
+  md: { height: 17, paddingH: 6, fontSize: 9.5, iconSize: 9, gap: 3, radius: 8.5, letterSpacing: 0.7, glowBlur: 12 },
+  lg: { height: 22, paddingH: 8, fontSize: 11, iconSize: 11, gap: 4, radius: 11, letterSpacing: 0.8, glowBlur: 18 },
 };
 
 export default function TierBadge({ tier, size = 'md', style, frameId: _frameId }: Props) {
   const cfg = tier ? CONFIG[tier] : null;
   const sz = SIZE[size];
   const shimmer = useRef(new Animated.Value(0)).current;
+  const [measured, setMeasured] = useState({ width: 0, height: 0 });
+
   useEffect(() => {
     if (!cfg || (tier !== 'Pro' && tier !== 'GodMaster')) return;
     const loop = Animated.loop(
@@ -83,12 +98,22 @@ export default function TierBadge({ tier, size = 'md', style, frameId: _frameId 
     );
     loop.start();
     return () => loop.stop();
-  }, [cfg, tier]);
+  }, [cfg, tier, shimmer]);
 
   if (!cfg) return null;
 
   const shimmerOpacity = shimmer.interpolate({ inputRange: [0, 1], outputRange: [0.85, 1] });
   const shimmerScale = shimmer.interpolate({ inputRange: [0, 1], outputRange: [1, 1.04] });
+
+  const onLayout = (e: LayoutChangeEvent) => {
+    const { width, height } = e.nativeEvent.layout;
+    if (width !== measured.width || height !== measured.height) {
+      setMeasured({ width, height });
+    }
+  };
+
+  const useSkia = isSkiaAvailable() && !!SkiaMod;
+  const { Canvas, RoundedRect, LinearGradient: SkiaGradient, BlurMask, vec } = useSkia ? SkiaMod : ({} as any);
 
   return (
     <Animated.View
@@ -100,24 +125,60 @@ export default function TierBadge({ tier, size = 'md', style, frameId: _frameId 
           borderRadius: sz.radius,
           opacity: shimmerOpacity,
           transform: [{ scale: shimmerScale }],
-          ...Platform.select({
-            ios: {
-              shadowColor: cfg.glow,
-              shadowOffset: { width: 0, height: 0 },
-              shadowOpacity: 0.7,
-              shadowRadius: size === 'lg' ? 8 : 5,
-            },
-            android: { elevation: size === 'lg' ? 4 : 2 },
-          }),
         },
+        // Skia yoksa RN shadow ile fallback:
+        !useSkia && Platform.select({
+          ios: { shadowColor: cfg.glow, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.7, shadowRadius: size === 'lg' ? 8 : 5 },
+          android: { elevation: size === 'lg' ? 4 : 2 },
+        }),
         style,
       ]}
+      onLayout={onLayout}
     >
-      <LinearGradient
-        colors={cfg.colors as any}
-        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-        style={StyleSheet.absoluteFillObject}
-      />
+      {useSkia && measured.width > 0 ? (
+        <Canvas
+          style={[
+            StyleSheet.absoluteFillObject,
+            { left: -sz.glowBlur, top: -sz.glowBlur, width: measured.width + sz.glowBlur * 2, height: measured.height + sz.glowBlur * 2 },
+          ]}
+          pointerEvents="none"
+        >
+          {/* Glow halo — gradient renginde, blur ile */}
+          <RoundedRect
+            x={sz.glowBlur}
+            y={sz.glowBlur}
+            width={measured.width}
+            height={measured.height}
+            r={sz.radius}
+            color={cfg.glow}
+            opacity={0.85}
+          >
+            <BlurMask blur={cssBlurToSkiaSigma(sz.glowBlur)} style="normal" />
+          </RoundedRect>
+          {/* Gradient background — pill */}
+          <RoundedRect
+            x={sz.glowBlur}
+            y={sz.glowBlur}
+            width={measured.width}
+            height={measured.height}
+            r={sz.radius}
+          >
+            <SkiaGradient
+              start={vec(sz.glowBlur, sz.glowBlur)}
+              end={vec(sz.glowBlur + measured.width, sz.glowBlur + measured.height)}
+              colors={cfg.colors as unknown as string[]}
+            />
+          </RoundedRect>
+        </Canvas>
+      ) : (
+        // Skia yoksa expo-linear-gradient fallback (eski davranış)
+        <ExpoGradient
+          colors={cfg.colors as any}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFillObject}
+        />
+      )}
       <View style={[s.inner, { gap: sz.gap }]}>
         <Ionicons name={cfg.icon} size={sz.iconSize} color={cfg.textColor} />
         {size !== 'xs' && (
@@ -134,11 +195,14 @@ export default function TierBadge({ tier, size = 'md', style, frameId: _frameId 
 
 const s = StyleSheet.create({
   wrap: {
-    overflow: 'hidden',
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    overflow: 'visible',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   inner: {
-    flexDirection: 'row', alignItems: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   text: {
     fontWeight: '900',
