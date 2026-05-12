@@ -11,7 +11,7 @@
 import React from 'react';
 import { View, Text, ScrollView, StyleSheet, Platform } from 'react-native';
 import { Stack } from 'expo-router';
-import { SkiaShadow } from '../components/skia';
+import { SkiaShadow, isSkiaAvailable } from '../components/skia';
 import { shadow as rnShadow, glow as rnGlow } from '../utils/shadow';
 
 export default function SkiaTestScreen() {
@@ -21,6 +21,13 @@ export default function SkiaTestScreen() {
       <ScrollView contentContainerStyle={styles.scroll}>
         <Text style={styles.header}>Skia vs RN — Gölge Paritesi</Text>
         <Text style={styles.sub}>Her sıra: solda mevcut RN shadow(), sağda yeni SkiaShadow. iOS ve Android'de bakıp aynı görünmeli.</Text>
+
+        {!isSkiaAvailable() && (
+          <View style={styles.warnBanner}>
+            <Text style={styles.warnTitle}>Skia native modül APK'da yok</Text>
+            <Text style={styles.warnBody}>Sağ taraftaki gölgeler şu an boş görünecek (fallback aktif). APK'yı Skia ile rebuild ettikten sonra Skia gölgeleri çalışacak.</Text>
+          </View>
+        )}
 
         <Section title="1. Düz kart (4px down, 12px blur, %25 black)">
           <View style={styles.row}>
@@ -115,4 +122,7 @@ const styles = StyleSheet.create({
   avatar: { width: 60, height: 60, backgroundColor: '#1E293B', borderRadius: 30, alignItems: 'center', justifyContent: 'center' },
   cardLabel: { color: '#fff', fontSize: 12, fontWeight: '500' },
   footer: { color: '#475569', fontSize: 11, textAlign: 'center', marginTop: 16 },
+  warnBanner: { backgroundColor: '#451A03', borderColor: '#F59E0B', borderWidth: 1, padding: 12, borderRadius: 8, marginBottom: 20 },
+  warnTitle: { color: '#F59E0B', fontSize: 13, fontWeight: '700', marginBottom: 4 },
+  warnBody: { color: '#FBBF24', fontSize: 12, lineHeight: 17 },
 });

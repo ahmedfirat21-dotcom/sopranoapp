@@ -10,24 +10,30 @@
  * ÇÖZÜM:
  *   Skia Canvas içinde gerçek bir RoundedRect + BlurMask çiziyoruz. Bu çıktı iOS, Android ve
  *   web'de aynı pixel'leri üretir — çünkü Skia Chrome'un da kullandığı motor.
- *   Çocuk view normal RN olarak render olur (text, image, touch hâlâ native), gölge altta Skia.
+ *
+ * NATIVE MODULE FALLBACK:
+ *   @shopify/react-native-skia bir native modül. APK rebuild edilmeden çalışmaz. Bu yüzden
+ *   require() try/catch ile sarılı — Skia yoksa SkiaShadow sade <View> gibi davranır, app
+ *   crash atmaz. APK build edilince otomatik aktif olur.
  *
  * KULLANIM:
  *   <SkiaShadow shadowColor="#000" shadowOpacity={0.25} shadowBlur={12} shadowOffsetY={4} borderRadius={16}>
- *     <View style={{ width: 200, height: 100, backgroundColor: '#1a2030', borderRadius: 16 }}>
- *       <Text>Card content</Text>
- *     </View>
+ *     <View style={{ ... }} />
  *   </SkiaShadow>
- *
- * NOT:
- *   shadowBlur web admin'deki CSS blur radius değerini (px) doğrudan kabul eder.
- *   Skia BlurMask sigma dönüşümü dahili olarak yapılır (cssBlurToSkiaSigma).
  */
 
 import React, { useState, useCallback, ReactNode } from 'react';
 import { View, ViewStyle, StyleSheet, LayoutChangeEvent } from 'react-native';
-import { Canvas, RoundedRect, BlurMask } from '@shopify/react-native-skia';
 import { cssBlurToSkiaSigma } from '../../utils/skiaUnits';
+
+// Lazy + safe Skia require — native module yoksa null kalır, app çalışmaya devam eder.
+let SkiaMod: any = null;
+let skiaLoadFailed = false;
+try {
+  SkiaMod = require('@shopify/react-native-skia');
+} catch (_e) {
+  skiaLoadFailed = true;
+}
 
 export interface SkiaShadowProps {
   /** Gölge rengi. CSS color string. Default #000. */
@@ -40,12 +46,17 @@ export interface SkiaShadowProps {
   shadowOffsetX?: number;
   /** Dikey offset (px). Pozitif aşağı. Default 4. */
   shadowOffsetY?: number;
-  /** Gölgenin alacağı şeklin köşe yarıçapı (px). Child'ın borderRadius'u ile aynı olmalı. Default 0. */
+  /** Gölgenin köşe yarıçapı (px). Child'ın borderRadius'u ile aynı olmalı. Default 0. */
   borderRadius?: number;
   /** Sarıcı View'ın stili. */
   style?: ViewStyle | ViewStyle[];
   /** Child genelde tek bir kart/buton View'ı. */
   children: ReactNode;
+}
+
+/** Skia native modül mevcut mu? (APK build sonrası true olur) */
+export function isSkiaAvailable(): boolean {
+  return !!SkiaMod && !skiaLoadFailed;
 }
 
 export function SkiaShadow({
@@ -67,6 +78,12 @@ export function SkiaShadow({
     }
   }, [size.width, size.height]);
 
+  // Skia yoksa fallback: sade view, gölge yok.
+  if (!isSkiaAvailable()) {
+    return <View style={style}>{children}</View>;
+  }
+
+  const { Canvas, RoundedRect, BlurMask } = SkiaMod;
   const padding = shadowBlur + Math.max(Math.abs(shadowOffsetX), Math.abs(shadowOffsetY)) + 4;
 
   return (
