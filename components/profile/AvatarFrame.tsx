@@ -552,11 +552,35 @@ function BgHaloOverlay({ size, color, sizeMul, intensity, pulse, pulseSpeed }: {
   );
 }
 
-// ★ 2026-05-11: Avatar Border — premium ring (avatar etrafında static halka)
+// ★ v1.3.68: Avatar Border — Skia Circle stroke (web admin CSS border paritesi).
+//   Eski: View borderColor + borderRadius — Android'de dashed/dotted yuvarlama bug'lı,
+//   double hiç desteklenmiyordu (manuel iç ring overlay).
+//   Yeni: Skia Circle stroke + dashed pattern → tam parite.
 function AvatarBorderRing({ size, color, width, style: borderStyle }: {
   size: number; color: string; width: number; style: 'solid' | 'dashed' | 'dotted' | 'double';
 }) {
-  // RN borderStyle 'double' desteklemez — fallback solid + ekstra inner ring
+  // Skia ile gerçek vektörel border
+  if (SkiaMod) {
+    const { Canvas, Circle, DashPathEffect } = SkiaMod;
+    const cx = size / 2;
+    const cy = size / 2;
+    const r = (size - width) / 2;
+    return (
+      <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, width: size, height: size, zIndex: 2 }}>
+        <Canvas style={{ width: size, height: size }}>
+          <Circle cx={cx} cy={cy} r={r} color={color} style="stroke" strokeWidth={width}>
+            {borderStyle === 'dashed' && <DashPathEffect intervals={[width * 2.5, width * 1.5]} />}
+            {borderStyle === 'dotted' && <DashPathEffect intervals={[width * 0.5, width * 1.5]} />}
+          </Circle>
+          {borderStyle === 'double' && (
+            <Circle cx={cx} cy={cy} r={r - width - 1} color={color} style="stroke" strokeWidth={1} />
+          )}
+        </Canvas>
+      </View>
+    );
+  }
+
+  // Fallback: eski View borderColor (Skia yokken)
   const isDouble = borderStyle === 'double';
   const rnStyle = isDouble ? 'solid' : borderStyle;
   return (
@@ -594,8 +618,9 @@ function AvatarBorderRing({ size, color, width, style: borderStyle }: {
   );
 }
 
-// ★ 2026-05-11: Pulse Ring (radar dalgası) — frame_pulse_ring true ise 3 katman
-//   dışa yayılan halka. Web admin'deki @keyframes pulse-ring karşılığı.
+// ★ v1.3.68: Pulse Ring (radar dalgası) — Skia Circle stroke ile yumuşak halka.
+//   Eski: View borderColor + borderRadius — Android'de border render kaba.
+//   Yeni: Animated.View wrapper (scale + opacity) + içeride Skia Circle stroke.
 function PulseRingOverlay({ size, color }: { size: number; color: string }) {
   const a1 = useRef(new Animated.Value(0)).current;
   const a2 = useRef(new Animated.Value(0)).current;
@@ -617,6 +642,18 @@ function PulseRingOverlay({ size, color }: { size: number; color: string }) {
     return () => { l1.stop(); l2.stop(); l3.stop(); };
   }, [a1, a2, a3]);
 
+  const useSkia = !!SkiaMod;
+  const SkiaRingCanvas = useSkia ? (() => {
+    const { Canvas, Circle } = SkiaMod;
+    const cx = size / 2;
+    const r = (size - 2) / 2;
+    return (
+      <Canvas style={{ width: size, height: size }}>
+        <Circle cx={cx} cy={cx} r={r} color={color} style="stroke" strokeWidth={2} />
+      </Canvas>
+    );
+  })() : null;
+
   return (
     <>
       {[a1, a2, a3].map((anim, i) => {
@@ -630,24 +667,29 @@ function PulseRingOverlay({ size, color }: { size: number; color: string }) {
               position: 'absolute',
               top: 0, left: 0,
               width: size, height: size,
-              borderRadius: size / 2,
-              borderWidth: 2,
-              borderColor: color,
               zIndex: 1,
-              elevation: 1,
               opacity,
               transform: [{ scale }],
+              // Skia yoksa eski View border fallback
+              ...(useSkia ? {} : {
+                borderRadius: size / 2,
+                borderWidth: 2,
+                borderColor: color,
+                elevation: 1,
+              }),
             }}
-          />
+          >
+            {SkiaRingCanvas}
+          </Animated.View>
         );
       })}
     </>
   );
 }
 
-// ★ 2026-05-11: Frame Shimmer — frame üzerinden ışık süpürmesi.
-//   Web'de mixBlendMode:overlay + bg-gradient sweep. Mobile'da basit overlay
-//   View opacity pulse ile yaklaşık. expo-linear-gradient ile gradient sweep.
+// ★ v1.3.68: Frame Shimmer — Skia LinearGradient ile soft ışık süpürmesi.
+//   Eski: expo-linear-gradient → Android'de farklı renk interpolation.
+//   Yeni: Skia LinearGradient → web ile birebir.
 function FrameShimmerOverlay({ size }: { size: number }) {
   const shimmer = useRef(new Animated.Value(-1)).current;
   useEffect(() => {
@@ -658,6 +700,31 @@ function FrameShimmerOverlay({ size }: { size: number }) {
     return () => loop.stop();
   }, [shimmer]);
   const translateX = shimmer.interpolate({ inputRange: [-1, 1], outputRange: [-size, size] });
+
+  const useSkia = !!SkiaMod;
+  const SkiaContent = useSkia ? (() => {
+    const { Canvas, Rect, LinearGradient: SkiaLG, vec } = SkiaMod;
+    return (
+      <Canvas style={{ width: size, height: size }}>
+        <Rect x={0} y={0} width={size} height={size}>
+          <SkiaLG
+            start={vec(0, 0)}
+            end={vec(size, 0)}
+            colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.4)', 'rgba(255,255,255,0)']}
+            positions={[0, 0.5, 1]}
+          />
+        </Rect>
+      </Canvas>
+    );
+  })() : (
+    <LinearGradient
+      colors={['transparent', 'rgba(255,255,255,0.4)', 'transparent']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 0 }}
+      style={{ width: '100%', height: '100%' }}
+    />
+  );
+
   return (
     <Animated.View
       pointerEvents="none"
@@ -672,12 +739,7 @@ function FrameShimmerOverlay({ size }: { size: number }) {
         transform: [{ translateX }],
       }}
     >
-      <LinearGradient
-        colors={['transparent', 'rgba(255,255,255,0.4)', 'transparent']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={{ width: '100%', height: '100%' }}
-      />
+      {SkiaContent}
     </Animated.View>
   );
 }
