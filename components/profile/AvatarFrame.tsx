@@ -354,10 +354,12 @@ function BgHaloOverlay({ size, color, sizeMul, intensity }: {
     >
       <Svg width={haloSize} height={haloSize}>
         <Defs>
+          {/* ★ v1.3.59: Web admin radial-gradient ile birebir parite:
+               0% intensity (tam parlak merkez) → 70% saydam fade. Eski 3-stop
+               daha hızlı solduğu için APK'da "sıradan/zayıf" görünüyordu. */}
           <RadialGradient id={gradId} cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
-            <Stop offset="0" stopColor={color} stopOpacity={String(Math.min(1, intensity * 0.9))} />
-            <Stop offset="0.5" stopColor={color} stopOpacity={String(Math.min(1, intensity * 0.45))} />
-            <Stop offset="1" stopColor={color} stopOpacity="0" />
+            <Stop offset="0" stopColor={color} stopOpacity={String(Math.min(1, intensity))} />
+            <Stop offset="0.7" stopColor={color} stopOpacity="0" />
           </RadialGradient>
         </Defs>
         <SvgCircle cx={haloSize / 2} cy={haloSize / 2} r={haloSize / 2} fill={`url(#${gradId})`} />
