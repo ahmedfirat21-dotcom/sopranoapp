@@ -330,7 +330,10 @@ export default function StatusAvatar({
           {
             width: size,
             height: size,
-            borderRadius: radius,
+            // ★ v1.3.58: Android'de borderRadius içeriği clip ediyor — custom shape
+            //   (hexagon/diamond/star) varsa borderRadius=0, SVG kendi clipPath'ini
+            //   uygular. circle/rounded-square/squircle için yuvarlak/dikdörtgen wrap.
+            borderRadius: customShape ? 0 : radius,
             borderWidth: frameId ? 0 : borderWidth,
             borderColor: frameId ? 'transparent' : ringColor,
           },
