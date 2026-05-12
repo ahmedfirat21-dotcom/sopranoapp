@@ -280,6 +280,79 @@ function ParticleDot({ emoji, color, x, y, fontSize, twinkleDelay }: {
   );
 }
 
+// ★ v1.3.68: Skia tabanlı parçacık — gerçek vektörel shape, seçilen renk birebir.
+//   Eski: emoji (⭐❤️✨🫧) — sistem fontuna bağlı, particle_color uygulanmaz.
+//   Yeni: Skia Path + BlurMask glow — web admin parite, renk seçimi tam yansır.
+const PARTICLE_PATHS: Record<string, string> = {
+  // 5-uçlu yıldız (100x100 viewbox)
+  stars: 'M 50,2 L 61,38 L 98,38 L 68,60 L 79,96 L 50,75 L 21,96 L 32,60 L 2,38 L 39,38 Z',
+  // 4-uçlu kıvılcım (CSS sparkle paritesi)
+  sparkle: 'M 50,0 L 58,42 L 100,50 L 58,58 L 50,100 L 42,58 L 0,50 L 42,42 Z',
+  // Kalp (Bezier)
+  hearts: 'M 50,88 C 10,60 -10,38 12,18 C 28,4 44,12 50,28 C 56,12 72,4 88,18 C 110,38 90,60 50,88 Z',
+  // Baloncuk (hollow ring)
+  bubbles: 'M 50,5 A 45,45 0 1,0 50,95 A 45,45 0 1,0 50,5 Z M 50,18 A 32,32 0 1,1 50,82 A 32,32 0 1,1 50,18 Z',
+};
+
+let SkiaParticleMod: any = SkiaMod;
+
+function ParticleSkia({ x, y, fontSize, path, color, twinkleDelay }: {
+  x: number; y: number; fontSize: number; path: string; color: string; twinkleDelay: number;
+}) {
+  const { Canvas, Path, Group, BlurMask, Skia: SkiaApi } = SkiaParticleMod;
+  const twinkleAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    let cancelled = false;
+    let loop: Animated.CompositeAnimation | null = null;
+    const timeoutId = setTimeout(() => {
+      if (cancelled) return;
+      loop = Animated.loop(Animated.sequence([
+        Animated.timing(twinkleAnim, { toValue: 1, duration: 900, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(twinkleAnim, { toValue: 0, duration: 900, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      ]));
+      loop.start();
+    }, twinkleDelay);
+    return () => { cancelled = true; clearTimeout(timeoutId); loop?.stop(); };
+  }, [twinkleAnim, twinkleDelay]);
+
+  const scaleInterp = twinkleAnim.interpolate({ inputRange: [0, 1], outputRange: [0.85, 1.2] });
+  const opacityInterp = twinkleAnim.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1] });
+
+  // Path 100x100 viewbox'ta tanımlı, fontSize'a ölçekle.
+  const scale = fontSize / 100;
+  const skPath = useMemo(() => SkiaApi.Path.MakeFromSVGString(path) || SkiaApi.Path.Make(), [path, SkiaApi]);
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={{
+        position: 'absolute',
+        left: '50%' as any, top: '50%' as any,
+        marginLeft: x - fontSize / 2,
+        marginTop: y - fontSize / 2,
+        width: fontSize, height: fontSize,
+        opacity: opacityInterp,
+        transform: [{ scale: scaleInterp }],
+      }}
+    >
+      <Canvas style={{ width: fontSize, height: fontSize }}>
+        <Group transform={[{ scale }]}>
+          {/* Dış glow halo (web drop-shadow 8px) */}
+          <Path path={skPath} color={color} opacity={0.55}>
+            <BlurMask blur={4} style="normal" />
+          </Path>
+          {/* Sıkı glow (web drop-shadow 4px) */}
+          <Path path={skPath} color={color} opacity={0.85}>
+            <BlurMask blur={2} style="normal" />
+          </Path>
+          {/* Solid shape */}
+          <Path path={skPath} color={color} />
+        </Group>
+      </Canvas>
+    </Animated.View>
+  );
+}
+
 // ★ 2026-05-11: Avatar etrafında parçacık efekti — sparkle/stars/hearts/bubbles.
 //   Animated.loop ile yörüngede döner, color_cycle aktifse renk de cycle olur.
 function ParticleOverlay({ size, dynCfg }: { size: number; dynCfg: any }) {
@@ -353,13 +426,25 @@ function ParticleOverlay({ size, dynCfg }: { size: number; dynCfg: any }) {
         const rad = (angle * Math.PI) / 180;
         const x = Math.cos(rad) * orbitRadius;
         const y = Math.sin(rad) * orbitRadius;
+        const skiaPath = SkiaParticleMod ? (PARTICLE_PATHS[type] || PARTICLE_PATHS.stars) : null;
+        if (skiaPath) {
+          return (
+            <ParticleSkia
+              key={i}
+              x={x} y={y} fontSize={fontSize}
+              path={skiaPath}
+              color={particleColor}
+              twinkleDelay={(i * 250) % 2000}
+            />
+          );
+        }
+        // Skia yoksa eski emoji fallback
         return (
           <ParticleDot
             key={i}
             emoji={emoji}
             color={particleColor}
-            x={x}
-            y={y}
+            x={x} y={y}
             fontSize={fontSize}
             twinkleDelay={(i * 250) % 2000}
           />
@@ -400,6 +485,49 @@ function BgHaloOverlay({ size, color, sizeMul, intensity, pulse, pulseSpeed }: {
     return () => loop.stop();
   }, [pulse, pulseSpeed, pulseAnim]);
 
+  // ★ v1.3.68: Skia RadialGradient ile gerçek halo — web admin CSS radial-gradient paritesi.
+  if (SkiaMod) {
+    const { Canvas, Circle, RadialGradient: SkiaRG, vec } = SkiaMod;
+    // CSS `farthest-corner` = boyut × √2/2 ≈ 0.7071. 70% stop = transparent fade.
+    const rOuter = haloSize * 0.7071;
+    const opacityNum = Math.min(1, intensity);
+    // Hex'i rgba'ya çevir, alpha ile birleştir
+    const hexToRgba = (hex: string, a: number) => {
+      const m = hex.match(/^#([0-9a-f]{6})$/i);
+      if (!m) return hex;
+      const r = parseInt(m[1].slice(0, 2), 16);
+      const g = parseInt(m[1].slice(2, 4), 16);
+      const b = parseInt(m[1].slice(4, 6), 16);
+      return `rgba(${r},${g},${b},${a})`;
+    };
+    const centerColor = hexToRgba(color, opacityNum);
+    const edgeColor = hexToRgba(color, 0);
+    return (
+      <Animated.View
+        pointerEvents="none"
+        style={{
+          position: 'absolute',
+          top: -offset, left: -offset,
+          width: haloSize, height: haloSize,
+          zIndex: 0,
+          opacity: pulse ? pulseAnim : 1,
+        }}
+      >
+        <Canvas style={{ width: haloSize, height: haloSize }}>
+          <Circle cx={haloSize / 2} cy={haloSize / 2} r={haloSize / 2}>
+            <SkiaRG
+              c={vec(haloSize / 2, haloSize / 2)}
+              r={rOuter}
+              colors={[centerColor, edgeColor]}
+              positions={[0, 0.7]}
+            />
+          </Circle>
+        </Canvas>
+      </Animated.View>
+    );
+  }
+
+  // Fallback: eski SVG RadialGradient (Skia yokken)
   return (
     <Animated.View
       pointerEvents="none"
@@ -413,11 +541,6 @@ function BgHaloOverlay({ size, color, sizeMul, intensity, pulse, pulseSpeed }: {
     >
       <Svg width={haloSize} height={haloSize}>
         <Defs>
-          {/* CSS `radial-gradient(circle, ...)` default `farthest-corner` ekstent
-              ile kutu_boyutu × √2/2 (≈ 0.7071) yarıçapta hesaplar. r="50%" ile
-              gradient kutunun yarıçapında biter → APK halo web'den ~%30 sıkı/küçük.
-              r="70.71%" ile web'in farthest-corner davranışı birebir taklit edilir;
-              70% stop = 0.7071 × 0.70 ≈ 0.495 × kutu_boyutu (web ile aynı mesafe). */}
           <RadialGradient id={gradId} cx="50%" cy="50%" r="70.71%" fx="50%" fy="50%">
             <Stop offset="0" stopColor={color} stopOpacity={String(Math.min(1, intensity))} />
             <Stop offset="0.7" stopColor={color} stopOpacity="0" />
