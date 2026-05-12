@@ -61,6 +61,16 @@ function shapePath(shape: string, size: number): string | null {
       return `M ${s * 0.5},0 L ${s * 0.61},${s * 0.35} L ${s * 0.98},${s * 0.35} L ${s * 0.68},${s * 0.57} L ${s * 0.79},${s * 0.91} L ${s * 0.5},${s * 0.70} L ${s * 0.21},${s * 0.91} L ${s * 0.32},${s * 0.57} L ${s * 0.02},${s * 0.35} L ${s * 0.39},${s * 0.35} Z`;
     case 'diamond':
       return `M ${s * 0.5},0 L ${s},${s * 0.5} L ${s * 0.5},${s} L 0,${s * 0.5} Z`;
+    case 'rounded-square': {
+      // ★ v1.3.59: %22 köşe yuvarlatma (web admin borderRadius='22%' parite)
+      const r = s * 0.22;
+      return `M ${r},0 L ${s - r},0 Q ${s},0 ${s},${r} L ${s},${s - r} Q ${s},${s} ${s - r},${s} L ${r},${s} Q 0,${s} 0,${s - r} L 0,${r} Q 0,0 ${r},0 Z`;
+    }
+    case 'squircle': {
+      // ★ v1.3.59: Yumuşak squircle (Bezier ile ~%36 yuvarlatma — web admin borderRadius='36%' parite)
+      const r = s * 0.36;
+      return `M ${r},0 L ${s - r},0 Q ${s},0 ${s},${r} L ${s},${s - r} Q ${s},${s} ${s - r},${s} L ${r},${s} Q 0,${s} 0,${s - r} L 0,${r} Q 0,0 ${r},0 Z`;
+    }
     default:
       return null;
   }
@@ -294,7 +304,10 @@ export default function StatusAvatar({
   const hasAnyFilter =
     hueRotate !== 0 || saturationVal !== 1 || blurVal > 0 ||
     brightnessVal !== 1 || grayscaleVal > 0 || sepiaVal > 0;
-  const customShape = ['hexagon', 'star', 'diamond'].includes(dynFrameCfg?.avatar_shape || '');
+  // ★ v1.3.59: rounded-square + squircle SVG clip-path ile yansıması için
+  //   customShape listesine dahil — wrap borderRadius=0 olur, SVG clip görünür.
+  //   Circle default null path → eski davranış (Image + wrap borderRadius=size/2 yuvarlak crop).
+  const customShape = ['hexagon', 'star', 'diamond', 'rounded-square', 'squircle'].includes(dynFrameCfg?.avatar_shape || '');
   const useSvgRender = hasAnyFilter || customShape;
 
   // ★ glow_pulse — Animated shadowOpacity (iOS) / overlay opacity (Android)
