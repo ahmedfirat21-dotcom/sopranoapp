@@ -581,27 +581,25 @@ function NameOverlay({ size, name, dynCfg }: { size: number; name: string; dynCf
   // İç hizalama — wrapper size x size, name avatar'ın belirli kenarına
   let containerStyle: any = {};
   let textWrapperStyle: any = {};
-  // ★ v1.3.59: frame_scale > 1 ise text frame Lottie/PNG'nin alt halkası hizasına
-  //   çıksın — web admin önizlemesinde "altın bant üzerinde isim" görselinin parite'si.
-  //   frame_scale=1.3 ile size=160 → frameExtra=24 piksel ek alt offset.
-  const frameScale: number = dynCfg?.frame_scale ?? 1;
-  const frameExtra: number = frameScale > 1 ? (frameScale - 1) * (size / 2) : 0;
+  // ★ v1.3.59 REVERT: Önceki frameExtra (frame_scale offset) web admin önizleme
+  //   ile UYUMSUZ — text 24 piksel fazla aşağı kayıyordu. Web admin NamePreviewSvg
+  //   sadece avatar yarıçapı + offsetPx kullanıyor. Parite için frameExtra kaldırıldı.
   switch (pos) {
     case 'top':
       containerStyle = { justifyContent: 'flex-start', alignItems: 'center' };
-      textWrapperStyle = { transform: [{ translateY: -fontPx - offsetPx - frameExtra }] };
+      textWrapperStyle = { transform: [{ translateY: -fontPx - offsetPx }] };
       break;
     case 'bottom':
       containerStyle = { justifyContent: 'flex-end', alignItems: 'center' };
-      textWrapperStyle = { transform: [{ translateY: fontPx + offsetPx + frameExtra }] };
+      textWrapperStyle = { transform: [{ translateY: fontPx + offsetPx }] };
       break;
     case 'left':
       containerStyle = { justifyContent: 'center', alignItems: 'flex-start' };
-      textWrapperStyle = { transform: [{ translateX: -offsetPx - fontPx * 2 - frameExtra }] };
+      textWrapperStyle = { transform: [{ translateX: -offsetPx - fontPx * 2 }] };
       break;
     case 'right':
       containerStyle = { justifyContent: 'center', alignItems: 'flex-end' };
-      textWrapperStyle = { transform: [{ translateX: offsetPx + fontPx * 2 + frameExtra }] };
+      textWrapperStyle = { transform: [{ translateX: offsetPx + fontPx * 2 }] };
       break;
   }
 
