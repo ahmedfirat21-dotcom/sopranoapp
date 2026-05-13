@@ -691,13 +691,38 @@ function PulseRingOverlay({ size, color }: { size: number; color: string }) {
   );
 }
 
-// ★ v1.3.68 PARİTE: Frame Shimmer — web admin CSS linear-gradient(110deg, ...) + bg-pos animation.
-//   CSS @keyframes 200% → -200% : gradient SAĞDAN SOLA kayar (band sağda başlar, sola geçer).
-//   Skia: Group transform animated (Reanimated SharedValue) — wrapper sabit, sadece içerideki band hareket eder.
-//   scale prop: web admin ileride slider ekledikte çağırır (default 1.0).
-function FrameShimmerOverlay({ size, scale = 1 }: { size: number; scale?: number }) {
+// ★ v1.3.68 PARİTE: Frame Shimmer — web admin CSS linear-gradient + bg-pos animation.
+//   Tüm parametreler web admin slider'larından beslenir:
+//     scale: shimmer kutu boyutu (0.3-2.0)
+//     speed: bir süpürme süresi saniye (0.5-10)
+//     opacity: parlaklık peak (0.05-1)
+//     angle: süpürme açısı derece (0-359, default 110)
+//     band: bant genişliği (0.05-0.5, peak ± half)
+//     reverse: yön ters çevir
+function FrameShimmerOverlay({
+  size,
+  scale = 1,
+  speed = 2.5,
+  opacity = 0.4,
+  angle = 110,
+  band = 0.2,
+  reverse = false,
+}: {
+  size: number; scale?: number; speed?: number; opacity?: number;
+  angle?: number; band?: number; reverse?: boolean;
+}) {
   const effSize = size * scale;
   const offsetCenter = (size - effSize) / 2;
+  // CSS açı (0° = up) → math (atan tilt). 110° default = ~20° saat yönü
+  const cssAngleRad = ((angle - 90) * Math.PI) / 180;
+  const tiltX = Math.cos(cssAngleRad);
+  const tiltY = Math.sin(cssAngleRad);
+  // Bant stop pozisyonları: peak %50, half-width = band/2
+  const bandHalf = Math.max(0.02, Math.min(0.48, band / 2));
+  const stopStart = 0.5 - bandHalf;
+  const stopEnd = 0.5 + bandHalf;
+  const peakAlpha = Math.max(0, Math.min(1, opacity));
+  const peakColor = `rgba(255,255,255,${peakAlpha})`;
 
   if (SkiaMod) {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -705,20 +730,23 @@ function FrameShimmerOverlay({ size, scale = 1 }: { size: number; scale?: number
     const { useSharedValue, useDerivedValue, withRepeat, withTiming, Easing: RAEasing } = Reanimated;
     const { Canvas, Rect, LinearGradient: SkiaLG, vec, Group } = SkiaMod;
 
-    // CSS 200% → -200% = gradient bg pozisyonu (200% sağ, -200% sol) → SAĞ→SOL
-    // Skia translateX: +effSize×2 (sağda) → -effSize×2 (solda) === aynı yön.
-    const tx = useSharedValue(effSize * 2);
+    // CSS bg-pos 200% → -200% = sağdan sola. reverse=true ise -200% → 200% (soldan sağa).
+    const startX = reverse ? -effSize * 2 : effSize * 2;
+    const endX = reverse ? effSize * 2 : -effSize * 2;
+    const tx = useSharedValue(startX);
     useEffect(() => {
-      tx.value = effSize * 2;
+      tx.value = startX;
       tx.value = withRepeat(
-        withTiming(-effSize * 2, { duration: 2500, easing: RAEasing.linear }),
+        withTiming(endX, { duration: Math.max(100, speed * 1000), easing: RAEasing.linear }),
         -1,
         false,
       );
-    }, [effSize, tx, withRepeat, withTiming, RAEasing]);
+    }, [startX, endX, speed, tx, withRepeat, withTiming, RAEasing]);
 
     const transform = useDerivedValue(() => [{ translateX: tx.value }]);
-    const tiltY = effSize * 0.36;
+    // Gradient yön vektörü: CSS açıya göre start/end noktaları
+    const gStart = vec(effSize * (0.5 - tiltX * 0.5), effSize * (0.5 - tiltY * 0.5));
+    const gEnd = vec(effSize * (0.5 + tiltX * 0.5), effSize * (0.5 + tiltY * 0.5));
 
     return (
       <View
@@ -737,10 +765,10 @@ function FrameShimmerOverlay({ size, scale = 1 }: { size: number; scale?: number
           <Group transform={transform}>
             <Rect x={0} y={0} width={effSize} height={effSize}>
               <SkiaLG
-                start={vec(0, -tiltY / 2)}
-                end={vec(effSize, effSize + tiltY / 2)}
-                colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0)', 'rgba(255,255,255,0.4)', 'rgba(255,255,255,0)', 'rgba(255,255,255,0)']}
-                positions={[0, 0.3, 0.5, 0.7, 1]}
+                start={gStart}
+                end={gEnd}
+                colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0)', peakColor, 'rgba(255,255,255,0)', 'rgba(255,255,255,0)']}
+                positions={[0, stopStart, 0.5, stopEnd, 1]}
               />
             </Rect>
           </Group>
@@ -1844,9 +1872,17 @@ function AvatarFrameImpl({ frameId, size, forceRing, userName, userTier, context
           style={dynCfg?.avatar_border_style || 'solid'}
         />
       )}
-      {/* zIndex 4: frame_shimmer (ışık süpürmesi). scale prop → web admin slider (frame_shimmer_scale) ile büyütme/küçültme. */}
+      {/* zIndex 4: frame_shimmer — web admin slider'larından besleniyor. */}
       {dynCfg?.frame_shimmer && (
-        <FrameShimmerOverlay size={size} scale={dynCfg?.frame_shimmer_scale ?? 1} />
+        <FrameShimmerOverlay
+          size={size}
+          scale={dynCfg?.frame_shimmer_scale ?? 1}
+          speed={dynCfg?.frame_shimmer_speed ?? 2.5}
+          opacity={dynCfg?.frame_shimmer_opacity ?? 0.4}
+          angle={dynCfg?.frame_shimmer_angle ?? 110}
+          band={dynCfg?.frame_shimmer_band ?? 0.2}
+          reverse={!!dynCfg?.frame_shimmer_reverse}
+        />
       )}
       {/* zIndex 4: particle */}
       {hasParticles && <ParticleOverlay size={size} dynCfg={dynCfg} />}
