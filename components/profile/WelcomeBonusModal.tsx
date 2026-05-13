@@ -25,6 +25,7 @@ import {
   View, Text, StyleSheet, Pressable, Animated, Easing, Modal, Dimensions, Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { SkiaShadow } from '../skia';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import SPHexagonIcon from '../SPHexagonIcon';
@@ -403,6 +404,7 @@ export default function WelcomeBonusModal({
               width: '100%',
             }}
           >
+            <SkiaShadow shadowColor="#FBBF24" shadowOpacity={0.6} shadowBlur={16} shadowOffsetY={6} borderRadius={14} style={{ width: '100%' }}>
             <Pressable onPress={onClose} style={s.btn}>
               <LinearGradient
                 colors={PALETTE.buttonGradient}
@@ -429,6 +431,7 @@ export default function WelcomeBonusModal({
                 <Ionicons name="arrow-forward" size={18} color="#5a3500" style={iconShadow} />
               </View>
             </Pressable>
+            </SkiaShadow>
           </Animated.View>
         </Animated.View>
       </View>
