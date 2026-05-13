@@ -6,3 +6,4 @@ export { SkiaButton } from './SkiaButton';
 export type { SkiaButtonProps } from './SkiaButton';
 export { SkiaDivider } from './SkiaDivider';
 export type { SkiaDividerProps } from './SkiaDivider';
+export { GlowView } from './GlowView';

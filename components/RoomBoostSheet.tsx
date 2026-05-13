@@ -12,6 +12,7 @@ import AppLoader from './AppLoader';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import SPIcon from './SPIcon';
+import { SkiaShadow } from './skia';
 
 const SHEET_H = 420;
 
@@ -155,30 +156,32 @@ export default function RoomBoostSheet({ visible, onClose, onBoost, currentSP, r
           </View>
         </View>
 
-        {/* CTA */}
-        <Pressable style={[s.ctaWrap, !canAfford && { opacity: 0.4 }]} onPress={handleConfirm} disabled={!canAfford || loading}>
-          <LinearGradient
-            colors={canAfford ? ['#FB923C', '#F59E0B', '#B45309'] : ['#334155', '#1E293B', '#0F172A']}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-            style={s.ctaGradient}
-          >
-            {loading ? (
-              <AppLoader size="small" color="#FFF" />
-            ) : (
-              <>
-                <View style={s.ctaIconWrap}>
-                  <Ionicons name="rocket" size={18} color="#FFF" />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={s.ctaTitle}>{canAfford ? 'Boost Başlat' : 'Yetersiz SP'}</Text>
-                  <Text style={s.ctaSub}>{selected.label} · {selected.sublabel}</Text>
-                </View>
-                <Text style={s.ctaCost}>{selected.cost} SP</Text>
-                <Ionicons name="arrow-forward" size={18} color="rgba(255,255,255,0.75)" />
-              </>
-            )}
-          </LinearGradient>
-        </Pressable>
+        {/* CTA — Skia ile cross-platform orange glow */}
+        <SkiaShadow shadowColor="#FB923C" shadowOpacity={canAfford ? 0.4 : 0} shadowBlur={10} shadowOffsetY={4} borderRadius={14}>
+          <Pressable style={[s.ctaWrap, !canAfford && { opacity: 0.4 }]} onPress={handleConfirm} disabled={!canAfford || loading}>
+            <LinearGradient
+              colors={canAfford ? ['#FB923C', '#F59E0B', '#B45309'] : ['#334155', '#1E293B', '#0F172A']}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+              style={s.ctaGradient}
+            >
+              {loading ? (
+                <AppLoader size="small" color="#FFF" />
+              ) : (
+                <>
+                  <View style={s.ctaIconWrap}>
+                    <Ionicons name="rocket" size={18} color="#FFF" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.ctaTitle}>{canAfford ? 'Boost Başlat' : 'Yetersiz SP'}</Text>
+                    <Text style={s.ctaSub}>{selected.label} · {selected.sublabel}</Text>
+                  </View>
+                  <Text style={s.ctaCost}>{selected.cost} SP</Text>
+                  <Ionicons name="arrow-forward" size={18} color="rgba(255,255,255,0.75)" />
+                </>
+              )}
+            </LinearGradient>
+          </Pressable>
+        </SkiaShadow>
       </Animated.View>
     </Modal>
   );
@@ -254,8 +257,7 @@ const s = StyleSheet.create({
 
   ctaWrap: {
     borderRadius: 14, overflow: 'hidden',
-    shadowColor: '#FB923C', shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35, shadowRadius: 8, elevation: 6,
+    // ★ v1.3.69: Skia ile cross-platform orange glow (SkiaShadow wrap'ı dışarıda).
   },
   ctaGradient: {
     flexDirection: 'row', alignItems: 'center',

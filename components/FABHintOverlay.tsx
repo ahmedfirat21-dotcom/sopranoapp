@@ -4,6 +4,7 @@ import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Pressable, Animated, Easing, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { GlowView } from './skia';
 
 const { width: W, height: H } = Dimensions.get('window');
 const STORAGE_KEY = 'soprano_fab_hint_seen';
@@ -159,7 +160,7 @@ export default function FABHintOverlay({ visible, bottomOffset, onDismiss }: Pro
           },
         ]}
       >
-        <View style={s.tooltipCard}>
+        <GlowView style={s.tooltipCard}>
           <View style={s.tooltipHeader}>
             <Ionicons name="sparkles" size={14} color="#14B8A6" />
             <Text style={s.tooltipTitle}>İpucu</Text>
@@ -172,7 +173,7 @@ export default function FABHintOverlay({ visible, bottomOffset, onDismiss }: Pro
           </View>
           {/* Arrow pointer → FAB yönüne */}
           <View style={s.tooltipTail} />
-        </View>
+        </GlowView>
       </Animated.View>
     </Pressable>
   );
