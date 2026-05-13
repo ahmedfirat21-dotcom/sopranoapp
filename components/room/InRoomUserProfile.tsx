@@ -11,6 +11,7 @@ import {
 import * as Clipboard from 'expo-clipboard';
 import AppLoader from '../AppLoader';
 import { LinearGradient } from 'expo-linear-gradient';
+import { GlowView } from '../skia';
 import { Ionicons } from '@expo/vector-icons';
 import SPIcon from '../SPIcon';
 import SPHexagonIcon from '../SPHexagonIcon';
@@ -1369,7 +1370,7 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                 {isOwnProfile && (
                   <>
                     <ProfileSectionHeader label="CÜZDANIM" icon="diamond" accentColor="#FBBF24" />
-                    <View style={sty.walletCard}>
+                    <GlowView style={sty.walletCard}>
                       <LinearGradient colors={['#2a1e14', '#17100a', '#0a0604']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFillObject} />
                       <LinearGradient colors={['rgba(251,191,36,0.35)', 'rgba(251,191,36,0.1)', 'rgba(251,191,36,0.02)']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFillObject} />
                       <LinearGradient colors={['transparent', 'rgba(251,191,36,0.6)', 'transparent']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={sty.sectionTopEdge} />
@@ -1381,7 +1382,7 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                         <Text style={sty.walletCurrency}>SP</Text>
                       </View>
                       <Text style={sty.walletSub}>Soprano Points</Text>
-                    </View>
+                    </GlowView>
                   </>
                 )}
 
