@@ -837,6 +837,7 @@ const BigLiveRoomCard = React.memo(function BigLiveRoomCard({ room, onJoin, isFo
             <Ionicons name={isFollowed ? 'bookmark' : 'bookmark-outline'} size={13} color={isFollowed ? '#14B8A6' : '#64748B'} />
           </Pressable>
         )}
+        <SkiaShadow shadowColor="#14B8A6" shadowOpacity={0.4} shadowBlur={6} shadowOffsetY={2} borderRadius={11}>
         <Pressable onPress={() => onJoin(room.id)}>
           <LinearGradient
             colors={['#14B8A6', '#0D9488', '#065F56']}
@@ -847,6 +848,7 @@ const BigLiveRoomCard = React.memo(function BigLiveRoomCard({ room, onJoin, isFo
             <Text style={s.bigJoinText}>Katıl</Text>
           </LinearGradient>
         </Pressable>
+        </SkiaShadow>
       </View>
     </Pressable>
   );
@@ -2587,11 +2589,7 @@ const s = StyleSheet.create({
     marginLeft: 4,
     borderWidth: 0.8,
     borderColor: 'rgba(255,255,255,0.22)',
-    shadowColor: '#14B8A6',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.35,
-    shadowRadius: 5,
-    elevation: 4,
+    // ★ v1.3.69: Skia ile cross-platform teal glow (dış SkiaShadow wrap)
   },
   bigJoinText: {
     fontSize: 12,
