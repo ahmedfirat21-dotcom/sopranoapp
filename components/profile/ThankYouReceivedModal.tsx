@@ -8,6 +8,7 @@ import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Pressable, Animated, Easing, Modal, Dimensions, PanResponder } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { GlowView } from '../skia';
 import { Image } from 'react-native';
 import { getAvatarSource } from '../../constants/avatars';
 
@@ -167,11 +168,12 @@ export default function ThankYouReceivedModal({
       </Animated.View>
 
       <View style={s.center} pointerEvents="box-none">
-        {/* Card — swipe-to-dismiss + entry animation */}
+        {/* Card — swipe-to-dismiss + entry animation. Animated outer + GlowView inner = Skia teal glow. */}
         <Animated.View
-          style={[s.card, { opacity: cardOpacity, transform: [{ scale: cardScale }, { translateY: panY }] }]}
+          style={{ opacity: cardOpacity, transform: [{ scale: cardScale }, { translateY: panY }] }}
           {...panResponder.panHandlers}
         >
+        <GlowView style={s.card}>
           {/* Background layers */}
           <LinearGradient
             colors={['#1a2e2a', '#0f1f1c', '#091412']}
@@ -253,6 +255,7 @@ export default function ThankYouReceivedModal({
           <Pressable style={s.closeBtn} onPress={onClose} hitSlop={8}>
             <Ionicons name="close" size={16} color="rgba(20,184,166,0.7)" />
           </Pressable>
+        </GlowView>
         </Animated.View>
       </View>
     </Modal>
