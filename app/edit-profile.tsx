@@ -7,6 +7,7 @@ import {
 import AppLoader from '../components/AppLoader';
 
 import { LinearGradient } from 'expo-linear-gradient';
+import { SkiaShadow } from '../components/skia';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { safeGoBack } from '../constants/navigation';
@@ -455,17 +456,19 @@ export default function EditProfileScreen() {
             <Ionicons name="close" size={22} color="#F1F5F9" style={iconShadow} />
           </Pressable>
           <Text style={styles.headerTitle}>Profili Düzenle</Text>
-          <Pressable
-            onPress={handleSave}
-            disabled={saving || !hasChanges}
-            style={[styles.saveBtn, (!hasChanges || saving) && styles.saveBtnDisabled]}
-          >
-            {saving ? (
-              <AppLoader size="small" color="#fff" />
-            ) : (
-              <Text style={[styles.saveBtnText, !hasChanges && styles.saveBtnTextDisabled]}>Kaydet</Text>
-            )}
-          </Pressable>
+          <SkiaShadow shadowColor="#F59E0B" shadowOpacity={hasChanges && !saving ? 0.5 : 0} shadowBlur={8} shadowOffsetY={2} borderRadius={999}>
+            <Pressable
+              onPress={handleSave}
+              disabled={saving || !hasChanges}
+              style={[styles.saveBtn, (!hasChanges || saving) && styles.saveBtnDisabled]}
+            >
+              {saving ? (
+                <AppLoader size="small" color="#fff" />
+              ) : (
+                <Text style={[styles.saveBtnText, !hasChanges && styles.saveBtnTextDisabled]}>Kaydet</Text>
+              )}
+            </Pressable>
+          </SkiaShadow>
         </View>
         {/* Alt amber separator — profil tab accent ile uyumlu */}
         <LinearGradient
@@ -1094,9 +1097,9 @@ const styles = StyleSheet.create({
     borderRadius: Radius.full,
     backgroundColor: '#F59E0B',
     borderWidth: 1, borderColor: 'rgba(245,158,11,0.55)',
-    shadowColor: '#F59E0B', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.4, shadowRadius: 6, elevation: 4,
+    // ★ v1.3.69: Skia ile cross-platform amber glow (dış SkiaShadow wrap)
   },
-  saveBtnDisabled: { backgroundColor: 'rgba(255,255,255,0.08)', borderColor: 'rgba(255,255,255,0.12)', shadowOpacity: 0 },
+  saveBtnDisabled: { backgroundColor: 'rgba(255,255,255,0.08)', borderColor: 'rgba(255,255,255,0.12)' },
   saveBtnText: { fontSize: 12, fontWeight: '800', color: '#FFF', letterSpacing: 0.4, ...Shadows.textLight },
   saveBtnTextDisabled: { color: 'rgba(255,255,255,0.4)' },
 
