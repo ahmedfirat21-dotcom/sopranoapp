@@ -8,6 +8,7 @@ import { View, Text, StyleSheet, Image, Pressable, TextInput, FlatList, Platform
 import PremiumAlert, { type AlertButton } from '../../components/PremiumAlert';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { SkiaShadow } from '../../components/skia';
 import { Colors, Radius } from '../../constants/theme';
 import { safeGoBack } from '../../constants/navigation';
 import { MessageService, ProfileService, type Message, type Profile } from '../../services/database';
@@ -1479,6 +1480,7 @@ export default function ChatScreen() {
               <Ionicons name="close-circle" size={18} color="#F87171" />
               <Text style={msgReqBannerStyles.btnRejectText}>Sil</Text>
             </Pressable>
+            <SkiaShadow shadowColor="#14B8A6" shadowOpacity={0.55} shadowBlur={10} shadowOffsetY={3} borderRadius={10} style={{ flex: 1 }}>
             <Pressable
               style={[msgReqBannerStyles.btnFull, msgReqBannerStyles.btnAcceptFull]}
               disabled={respondingRequest}
@@ -1497,6 +1499,7 @@ export default function ChatScreen() {
               <Ionicons name="checkmark-circle" size={18} color="#FFF" />
               <Text style={msgReqBannerStyles.btnAcceptText}>Kabul Et</Text>
             </Pressable>
+            </SkiaShadow>
           </View>
         </View>
       )}
