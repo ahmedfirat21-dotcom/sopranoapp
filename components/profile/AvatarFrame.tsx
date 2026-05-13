@@ -1204,6 +1204,20 @@ function NameOverlay({ size, name, dynCfg }: { size: number; name: string; dynCf
             color={color} glowColor={glowColor} glowRadius={baseGlowRadius}
             bold={!!dynCfg?.name_bold} />
         ))
+      ) : dynCfg?.name_shimmer && SkiaMod ? (
+        // ★ v1.3.68: Skia sliding gradient shimmer (web admin CSS background-clip:text parity).
+        //   Text Skia ile çizilir, içindeki LinearGradient shader translateX ile kayar.
+        <SkiaShimmerText
+          name={name}
+          fontPx={fontPx}
+          color={color}
+          bold={!!dynCfg?.name_bold}
+          glowColor={glowColor}
+          glowEnabled={!!dynCfg?.name_glow}
+          glowRadius={baseGlowRadius}
+          pos={pos}
+          size={size}
+        />
       ) : (
         <Animated.Text
           numberOfLines={1}
@@ -1211,13 +1225,7 @@ function NameOverlay({ size, name, dynCfg }: { size: number; name: string; dynCf
             color,
             fontSize: fontPx,
             fontWeight: dynCfg?.name_bold ? '700' : '400',
-            // ★ v1.3.63 PARİTE: left/right pozisyonunda text alignment'i kenar bazlı
-            //   olmalı yoksa wrapper translateX'i text'i avatar üstüne kaydırıyor.
-            //   left → text sağ kenarı avatar sol kenarında (textAlign:'right')
-            //   right → text sol kenarı avatar sağ kenarında (textAlign:'left')
-            //   top/bottom → ortalanmış (textAlign:'center')
             textAlign: pos === 'left' ? 'right' : pos === 'right' ? 'left' : 'center',
-            // left/right için wrapper width:size ile aynı genişlik — textAlign bunda hizalar
             width: (pos === 'left' || pos === 'right') ? size : undefined,
             textShadowColor: dynCfg?.name_glow ? glowColor : 'rgba(0,0,0,0.7)',
             textShadowRadius: animatedGlowRadius as any,
@@ -1228,6 +1236,80 @@ function NameOverlay({ size, name, dynCfg }: { size: number; name: string; dynCf
         </Animated.Text>
       )}
     </Animated.View>
+    </View>
+  );
+}
+
+// ★ v1.3.68: Skia text + sliding LinearGradient shader — gerçek shimmer (web admin
+//   CSS background-clip:text + bg-position animation paritesi).
+//   Sadece name_shimmer=true ve flat (non-wave, non-curve) durumda kullanılır.
+function SkiaShimmerText({
+  name, fontPx, color, bold, glowColor, glowEnabled, glowRadius, pos, size,
+}: {
+  name: string; fontPx: number; color: string; bold: boolean;
+  glowColor: string; glowEnabled: boolean; glowRadius: number;
+  pos: string; size: number;
+}) {
+  const { Canvas, Text: SkText, matchFont, LinearGradient: SkiaLG, vec, Group } = SkiaMod;
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const Reanimated = require('react-native-reanimated');
+  const { useSharedValue, useDerivedValue, withRepeat, withTiming, Easing: RAEasing } = Reanimated;
+
+  // matchFont: platform system font matching (Android Roboto, iOS SF)
+  const font = useMemo(() => matchFont({
+    fontFamily: Platform.OS === 'ios' ? 'Helvetica' : 'sans-serif',
+    fontSize: fontPx,
+    fontStyle: 'normal',
+    fontWeight: bold ? 'bold' : 'normal',
+  } as any), [fontPx, bold]);
+
+  const textWidth = useMemo(() => {
+    try { return font?.measureText ? font.measureText(name).width : name.length * fontPx * 0.55; }
+    catch { return name.length * fontPx * 0.55; }
+  }, [font, name, fontPx]);
+
+  const canvasW = textWidth + fontPx * 2 + glowRadius * 2;
+  const canvasH = fontPx * 1.6 + glowRadius * 2;
+  const textY = fontPx + glowRadius; // baseline pozisyonu
+  const textX = fontPx + glowRadius; // sol padding
+
+  // Shimmer: gradient shader translation. Gradient genişliği textWidth × 2.5.
+  const tx = useSharedValue(-textWidth);
+  useEffect(() => {
+    tx.value = -textWidth;
+    tx.value = withRepeat(
+      withTiming(textWidth * 2, { duration: 2200, easing: RAEasing.linear }),
+      -1,
+      false,
+    );
+  }, [textWidth, tx, withRepeat, withTiming, RAEasing]);
+  const shaderTransform = useDerivedValue(() => [{ translateX: tx.value }]);
+
+  const wrapperAlignment = pos === 'left' ? 'flex-end' : pos === 'right' ? 'flex-start' : 'center';
+
+  return (
+    <View style={{ width: pos === 'left' || pos === 'right' ? size : 'auto', alignItems: wrapperAlignment }}>
+      <Canvas style={{ width: canvasW, height: canvasH }}>
+        <Group>
+          {/* Glow halo (Skia BlurMask) — name_glow açıkken */}
+          {glowEnabled && (
+            <SkText x={textX} y={textY} text={name} font={font} color={glowColor} opacity={0.7}>
+              {/* @ts-ignore Skia BlurMask Path/Text içinde geçerli */}
+              <SkiaMod.BlurMask blur={Math.max(2, glowRadius / 3)} style="normal" />
+            </SkText>
+          )}
+          {/* Ana text + sliding gradient fill */}
+          <SkText x={textX} y={textY} text={name} font={font}>
+            <SkiaLG
+              start={vec(0, 0)}
+              end={vec(textWidth, 0)}
+              colors={[color, color, '#ffffff', color, color]}
+              positions={[0, 0.35, 0.5, 0.65, 1]}
+              transform={shaderTransform}
+            />
+          </SkText>
+        </Group>
+      </Canvas>
     </View>
   );
 }
