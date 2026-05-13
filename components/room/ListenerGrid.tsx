@@ -5,6 +5,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
 import AvatarPenaltyFlash, { type FlashType } from './AvatarPenaltyFlash';
 import StatusAvatar from '../StatusAvatar';
+import { GlowView } from '../skia';
 import { migrateLegacyTier } from '../../types';
 import type { RoomParticipant } from '../../services/database';
 
@@ -92,7 +93,7 @@ const ListenerCell = React.memo(function ListenerCell({
   return (
     <Pressable style={[s.cell, { width: cellW }]} onPress={() => onSelectUser(u)}>
       {isOwner && !hasFrame && <ListenerOwnerBadge />}
-      <View style={[
+      <GlowView style={[
         isSelected && s.avatarSelected,
         isOwner && !hasFrame && s.avatarOwner,
         showMuteIndicator && s.avatarMuted,
@@ -110,7 +111,7 @@ const ListenerCell = React.memo(function ListenerCell({
           borderColor={isOwner && !hasFrame ? 'rgba(255,215,0,0.7)' : 'rgba(20,184,166,0.25)'}
           borderWidth={hasFrame ? 0 : 2}
         />
-      </View>
+      </GlowView>
       {showMuteIndicator && (
         <View style={[s.mutedBadge, { right: (cellW - ownerAvatarSize) / 2 - 6 }]}>
           <Ionicons name="volume-mute" size={9} color="#FFF" />
