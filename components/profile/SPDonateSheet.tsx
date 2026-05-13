@@ -13,6 +13,7 @@ import AppLoader from '../AppLoader';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { SkiaShadow } from '../skia';
 import { BlurView } from 'expo-blur';
 import { ProfileService } from '../../services/profile';
 import { supabase } from '../../constants/supabase';
@@ -537,27 +538,29 @@ export default function SPDonateSheet({
           })}
         </View>
 
-        {/* Gönder butonu — tier gradient */}
-        <Pressable
-          style={[styles.sendBtn, !canDonate && { opacity: 0.4 }]}
-          onPress={handleDonate}
-          disabled={!canDonate || loading}
-        >
-          <LinearGradient
-            colors={palette.sendBtnGrad}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-            style={styles.sendBtnGrad}
+        {/* Gönder butonu — tier gradient + Skia gold glow */}
+        <SkiaShadow shadowColor="#FBBF24" shadowOpacity={canDonate ? 0.5 : 0} shadowBlur={12} shadowOffsetY={4} borderRadius={14} style={{ marginHorizontal: 18, marginTop: 4 }}>
+          <Pressable
+            style={[styles.sendBtn, !canDonate && { opacity: 0.4 }, { marginHorizontal: 0, marginTop: 0 }]}
+            onPress={handleDonate}
+            disabled={!canDonate || loading}
           >
-            {loading ? (
-              <AppLoader color="#FFF" size="small" />
-            ) : (
-              <>
-                <SPIcon size={26} />
-                <Text style={styles.sendBtnText}>{amount.toLocaleString('tr-TR')} SP Gönder</Text>
-              </>
-            )}
-          </LinearGradient>
-        </Pressable>
+            <LinearGradient
+              colors={palette.sendBtnGrad}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+              style={styles.sendBtnGrad}
+            >
+              {loading ? (
+                <AppLoader color="#FFF" size="small" />
+              ) : (
+                <>
+                  <SPIcon size={26} />
+                  <Text style={styles.sendBtnText}>{amount.toLocaleString('tr-TR')} SP Gönder</Text>
+                </>
+              )}
+            </LinearGradient>
+          </Pressable>
+        </SkiaShadow>
       </Animated.View>
       </View>
 
