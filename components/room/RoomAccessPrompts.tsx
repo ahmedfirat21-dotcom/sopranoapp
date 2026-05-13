@@ -21,6 +21,7 @@ import {
 import AppLoader from '../AppLoader';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { SkiaShadow } from '../skia';
 import { supabase } from '../../constants/supabase';
 import { getAvatarSource } from '../../constants/avatars';
 
@@ -187,20 +188,22 @@ export function PasswordPromptSheet({
           <Pressable style={st.btnSecondary} onPress={onDismiss} disabled={submitting}>
             <Text style={st.btnSecondaryText}>Vazgeç</Text>
           </Pressable>
-          <Pressable
-            style={[st.btnPrimary, (submitting || pw.length < 1) && { opacity: 0.5 }]}
-            onPress={() => pw.trim() && onSubmit(pw.trim())}
-            disabled={submitting || pw.length < 1}
-          >
-            {submitting ? (
-              <AppLoader color="#FFF" size="small" />
-            ) : (
-              <>
-                <Ionicons name="log-in-outline" size={14} color="#FFF" />
-                <Text style={st.btnPrimaryText}>Giriş</Text>
-              </>
-            )}
-          </Pressable>
+          <SkiaShadow shadowColor="#14B8A6" shadowOpacity={pw.length > 0 && !submitting ? 0.4 : 0} shadowBlur={10} shadowOffsetY={4} borderRadius={12} style={{ flex: 1.4 }}>
+            <Pressable
+              style={[st.btnPrimary, (submitting || pw.length < 1) && { opacity: 0.5 }, { flex: 1 }]}
+              onPress={() => pw.trim() && onSubmit(pw.trim())}
+              disabled={submitting || pw.length < 1}
+            >
+              {submitting ? (
+                <AppLoader color="#FFF" size="small" />
+              ) : (
+                <>
+                  <Ionicons name="log-in-outline" size={14} color="#FFF" />
+                  <Text style={st.btnPrimaryText}>Giriş</Text>
+                </>
+              )}
+            </Pressable>
+          </SkiaShadow>
         </View>
       </View>
     </BaseSheet>
@@ -263,10 +266,12 @@ export function RoomEntryPreviewSheet({
           <Pressable style={st.btnSecondary} onPress={onCancel}>
             <Text style={st.btnSecondaryText}>Vazgeç</Text>
           </Pressable>
-          <Pressable style={st.btnPrimary} onPress={onContinue}>
-            <Ionicons name="arrow-forward" size={14} color="#FFF" />
-            <Text style={st.btnPrimaryText}>Devam Et</Text>
-          </Pressable>
+          <SkiaShadow shadowColor="#14B8A6" shadowOpacity={0.4} shadowBlur={10} shadowOffsetY={4} borderRadius={12} style={{ flex: 1.4 }}>
+            <Pressable style={[st.btnPrimary, { flex: 1 }]} onPress={onContinue}>
+              <Ionicons name="arrow-forward" size={14} color="#FFF" />
+              <Text style={st.btnPrimaryText}>Devam Et</Text>
+            </Pressable>
+          </SkiaShadow>
         </View>
       </View>
     </BaseSheet>
@@ -313,20 +318,22 @@ export function InviteRequestPromptSheet({
           <Pressable style={st.btnSecondary} onPress={onDismiss} disabled={submitting}>
             <Text style={st.btnSecondaryText}>Vazgeç</Text>
           </Pressable>
-          <Pressable
-            style={[st.btnPrimary, submitting && { opacity: 0.5 }]}
-            onPress={onConfirm}
-            disabled={submitting}
-          >
-            {submitting ? (
-              <AppLoader color="#FFF" size="small" />
-            ) : (
-              <>
-                <Ionicons name="paper-plane" size={14} color="#FFF" />
-                <Text style={st.btnPrimaryText}>İstek Gönder</Text>
-              </>
-            )}
-          </Pressable>
+          <SkiaShadow shadowColor="#14B8A6" shadowOpacity={submitting ? 0 : 0.4} shadowBlur={10} shadowOffsetY={4} borderRadius={12} style={{ flex: 1.4 }}>
+            <Pressable
+              style={[st.btnPrimary, submitting && { opacity: 0.5 }, { flex: 1 }]}
+              onPress={onConfirm}
+              disabled={submitting}
+            >
+              {submitting ? (
+                <AppLoader color="#FFF" size="small" />
+              ) : (
+                <>
+                  <Ionicons name="paper-plane" size={14} color="#FFF" />
+                  <Text style={st.btnPrimaryText}>İstek Gönder</Text>
+                </>
+              )}
+            </Pressable>
+          </SkiaShadow>
         </View>
       </View>
     </BaseSheet>
@@ -711,7 +718,7 @@ const st = StyleSheet.create({
   btnPrimary: {
     flex: 1.4, height: 46, borderRadius: 12, backgroundColor: '#14B8A6',
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
-    shadowColor: '#14B8A6', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4,
+    // ★ v1.3.69: Skia ile cross-platform teal glow (her Pressable use site'da SkiaShadow wrap)
   },
   btnPrimaryText: { fontSize: 14, color: '#FFF', fontWeight: '800' },
   // ★ 2026-04-27: Pre-check özet sheet için filtre satırları
