@@ -18,6 +18,7 @@ import {
   Dimensions, Platform, ScrollView, Image, DeviceEventEmitter, Easing,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { GlowView } from '../skia';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -439,7 +440,7 @@ export default function RoomGiftPanel({
                       onPress={() => setSelectedRecipientId(r.id)}
                       style={s.recipientCell}
                     >
-                      <View style={[
+                      <GlowView style={[
                         s.recipientAvatarRing,
                         { borderColor: isSelected ? '#F472B6' : ringColor + '60' },
                         isSelected && s.recipientAvatarRingActive,
@@ -450,7 +451,7 @@ export default function RoomGiftPanel({
                             <Ionicons name="star" size={8} color="#1A0A00" />
                           </View>
                         )}
-                      </View>
+                      </GlowView>
                       <Text style={[s.recipientName, isSelected && { color: '#F472B6' }]} numberOfLines={1}>
                         {r.display_name.split(' ')[0]}
                       </Text>
@@ -591,10 +592,8 @@ const s = StyleSheet.create({
     // Image kendi borderRadius:23 ile dairesel görünmeye devam eder.
   },
   recipientAvatarRingActive: {
-    ...Platform.select({
-      ios: { shadowColor: '#F472B6', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.85, shadowRadius: 8 },
-      android: { elevation: 6 },
-    }),
+    // ★ v1.3.69: Skia GlowView ile cross-platform pink glow (recipient seçili durumu)
+    shadowColor: '#F472B6', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.85, shadowRadius: 8,
   },
   recipientAvatar: { width: '100%', height: '100%', borderRadius: 23 },
   ownerCrown: {
