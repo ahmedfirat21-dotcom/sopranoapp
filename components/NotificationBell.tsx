@@ -7,6 +7,7 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Pressable, Animated, AccessibilityInfo } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { GlowView } from './skia';
 import * as Haptics from 'expo-haptics';
 
 interface Props {
@@ -82,8 +83,10 @@ export default function NotificationBell({ unreadCount, onPress, style }: Props)
         />
       </Animated.View>
       {unreadCount > 0 && (
-        <Animated.View style={[s.badge, { transform: [{ scale: pulseAnim }] }]}>
-          <Text style={s.badgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
+        <Animated.View style={[s.badgePos, { transform: [{ scale: pulseAnim }] }]}>
+          <GlowView style={s.badge}>
+            <Text style={s.badgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
+          </GlowView>
         </Animated.View>
       )}
     </Pressable>
@@ -96,18 +99,20 @@ const s = StyleSheet.create({
     justifyContent: 'center', alignItems: 'center',
     position: 'relative',
   },
-  badge: {
+  badgePos: {
     position: 'absolute', top: -4, right: -4,
+  },
+  badge: {
     minWidth: 18, height: 18, borderRadius: 9,
     backgroundColor: '#EF4444',
     paddingHorizontal: 5,
     justifyContent: 'center', alignItems: 'center',
     borderWidth: 2, borderColor: '#0F172A',
+    // ★ v1.3.69: Skia GlowView ile cross-platform red glow (Android'de görünür)
     shadowColor: '#EF4444',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.6,
     shadowRadius: 6,
-    elevation: 4,
   },
   badgeText: {
     fontSize: 10, fontWeight: '900', color: '#FFF',
