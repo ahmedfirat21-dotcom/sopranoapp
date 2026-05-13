@@ -496,12 +496,16 @@ export default function EditProfileScreen() {
       >
         {/* ===== AVATAR SECTION ===== */}
         <View style={styles.avatarSection}>
+          <SkiaShadow shadowColor="#F59E0B" shadowOpacity={0.4} shadowBlur={14} shadowOffsetY={4} borderRadius={40}>
           <View style={styles.avatarWrap}>
             <Image source={getAvatarSource(avatarUrl)} style={styles.avatarImage} />
-            <Pressable style={styles.cameraBtn} onPress={() => setShowAvatarPicker(!showAvatarPicker)}>
-              <Ionicons name="camera" size={16} color="#fff" />
-            </Pressable>
+            <SkiaShadow shadowColor="#F59E0B" shadowOpacity={0.55} shadowBlur={6} shadowOffsetY={2} borderRadius={14}>
+              <Pressable style={styles.cameraBtn} onPress={() => setShowAvatarPicker(!showAvatarPicker)}>
+                <Ionicons name="camera" size={16} color="#fff" />
+              </Pressable>
+            </SkiaShadow>
           </View>
+          </SkiaShadow>
           <Pressable onPress={() => setShowAvatarPicker(!showAvatarPicker)}>
             <Text style={styles.changeAvatarText}>
               {showAvatarPicker ? 'Kapat' : 'Fotoğrafı Değiştir'}
@@ -1127,7 +1131,7 @@ const styles = StyleSheet.create({
   avatarSection: { alignItems: 'center', paddingTop: 14, paddingBottom: 6 },
   avatarWrap: {
     position: 'relative', marginBottom: 8,
-    shadowColor: '#F59E0B', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 12, elevation: 8,
+    // ★ v1.3.69: Skia ile cross-platform amber glow (dış SkiaShadow wrap)
   },
   avatarImage: {
     width: 80, height: 80, borderRadius: 40,
@@ -1138,7 +1142,7 @@ const styles = StyleSheet.create({
     width: 28, height: 28, borderRadius: 14,
     backgroundColor: '#F59E0B', justifyContent: 'center', alignItems: 'center',
     borderWidth: 2, borderColor: '#0E1A2E',
-    shadowColor: '#F59E0B', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.5, shadowRadius: 4, elevation: 4,
+    // ★ v1.3.69: Skia ile cross-platform amber glow (dış SkiaShadow wrap)
   },
   changeAvatarText: { fontSize: 12, fontWeight: '700', color: '#F59E0B', letterSpacing: 0.3 },
   avatarPicker: {
