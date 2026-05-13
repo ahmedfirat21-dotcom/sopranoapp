@@ -701,18 +701,24 @@ function PulseRingOverlay({ size, color }: { size: number; color: string }) {
 //     reverse: yön ters çevir
 function FrameShimmerOverlay({
   size,
+  baseSize,
   scale = 1,
   speed = 2.5,
   opacity = 0.4,
   angle = 110,
   band = 0.2,
   reverse = false,
+  layer = 'above',
 }: {
-  size: number; scale?: number; speed?: number; opacity?: number;
-  angle?: number; band?: number; reverse?: boolean;
+  size: number; baseSize?: number; scale?: number; speed?: number; opacity?: number;
+  angle?: number; band?: number; reverse?: boolean; layer?: 'above' | 'below';
 }) {
+  // size = frame container boyutu; baseSize = avatar boyutu (parent View bound).
+  // Container avatardan büyükse, shimmer'ı avatar merkezine doğru kaydır (web admin parity).
+  const parentSize = baseSize ?? size;
   const effSize = size * scale;
-  const offsetCenter = (size - effSize) / 2;
+  const baseOffset = (parentSize - size) / 2;
+  const offsetCenter = baseOffset + (size - effSize) / 2;
   // CSS açı (0° = up) → math (atan tilt). 110° default = ~20° saat yönü
   const cssAngleRad = ((angle - 90) * Math.PI) / 180;
   const tiltX = Math.cos(cssAngleRad);
@@ -748,6 +754,7 @@ function FrameShimmerOverlay({
     const gStart = vec(effSize * (0.5 - tiltX * 0.5), effSize * (0.5 - tiltY * 0.5));
     const gEnd = vec(effSize * (0.5 + tiltX * 0.5), effSize * (0.5 + tiltY * 0.5));
 
+    const zi = layer === 'below' ? 2 : 4;
     return (
       <View
         pointerEvents="none"
@@ -757,8 +764,8 @@ function FrameShimmerOverlay({
           width: effSize, height: effSize,
           borderRadius: effSize / 2,
           overflow: 'hidden',
-          zIndex: 4,
-          elevation: 4,
+          zIndex: zi,
+          elevation: zi,
         }}
       >
         <Canvas style={{ width: effSize, height: effSize }}>
@@ -1830,6 +1837,14 @@ function AvatarFrameImpl({ frameId, size, forceRing, userName, userTier, context
   const meta = getFrameMeta(frameId);
   const hasParticles = dynCfg?.particle_type && dynCfg.particle_type !== 'none';
 
+  // ★ v1.3.68: Shimmer için frame container size hesabı (web admin parity).
+  //   PngFrame/Lottie meta.scale, Remote için baseFactor (image:1.4, lottie:1.8 default image).
+  //   Yoksa avatar size = halo'nun avatar etrafına yapışmaması için fallback.
+  const dynFrameScale = dynCfg?.frame_scale ?? 1;
+  const remoteFactor = meta ? 1.0 : 1.4; // remote default image; lottie ise caller branch ayrıca handle
+  const metaScale = meta?.scale ?? 1;
+  const computedFrameContainerSize = Math.round(size * metaScale * dynFrameScale * remoteFactor);
+
   // ★ 2026-05-11: Tüm overlay katmanlar — her render branch için tek yerden oluşturulur
   //   (Lottie / PNG / Remote / palette branch'lerinin hepsinde aynı extras).
   const renderExtras = () => (
@@ -1872,16 +1887,20 @@ function AvatarFrameImpl({ frameId, size, forceRing, userName, userTier, context
           style={dynCfg?.avatar_border_style || 'solid'}
         />
       )}
-      {/* zIndex 4: frame_shimmer — web admin slider'larından besleniyor. */}
+      {/* frame_shimmer — web admin slider'larından besleniyor.
+           size = frame container boyutu (web admin frameContainerSize parity).
+           layer prop: above (zIndex 4) / below (zIndex 2). */}
       {dynCfg?.frame_shimmer && (
         <FrameShimmerOverlay
-          size={size}
+          size={computedFrameContainerSize}
+          baseSize={size}
           scale={dynCfg?.frame_shimmer_scale ?? 1}
           speed={dynCfg?.frame_shimmer_speed ?? 2.5}
           opacity={dynCfg?.frame_shimmer_opacity ?? 0.4}
           angle={dynCfg?.frame_shimmer_angle ?? 110}
           band={dynCfg?.frame_shimmer_band ?? 0.2}
           reverse={!!dynCfg?.frame_shimmer_reverse}
+          layer={(dynCfg?.frame_shimmer_layer as 'above' | 'below') ?? 'above'}
         />
       )}
       {/* zIndex 4: particle */}
