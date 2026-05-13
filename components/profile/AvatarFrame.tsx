@@ -299,7 +299,7 @@ let SkiaParticleMod: any = SkiaMod;
 function ParticleSkia({ x, y, fontSize, path, color, twinkleDelay }: {
   x: number; y: number; fontSize: number; path: string; color: string; twinkleDelay: number;
 }) {
-  const { Canvas, Path, Group, BlurMask, Skia: SkiaApi } = SkiaParticleMod;
+  const { Canvas, Path, Group, BlurMask, Skia: SkiaApi, RadialGradient, vec } = SkiaParticleMod;
   const twinkleAnim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     let cancelled = false;
@@ -320,11 +320,25 @@ function ParticleSkia({ x, y, fontSize, path, color, twinkleDelay }: {
 
   // ★ v1.3.68 FIX: Canvas padding — BlurMask halo dışa taşar, padding olmayınca
   //   square corners olarak kırpılır ("altıgen gölge artifact" bug'ı).
+  //   ★ v1.3.69: Emoji-style yıldız (%85 boyut + gradient + outline = web admin ⭐ parity).
   const blurPad = 12;
   const canvasSize = fontSize + blurPad * 2;
-  // Path 100x100 viewbox; canvas içinde ortala + fontSize'a ölçekle.
-  const scale = fontSize / 100;
+  const starRatio = 0.85; // emoji ⭐ karakterindeki gerçek yıldızın oranı
+  const starSize = fontSize * starRatio;
+  const starOffset = blurPad + (fontSize - starSize) / 2;
+  const scale = starSize / 100;
   const skPath = useMemo(() => SkiaApi.Path.MakeFromSVGString(path) || SkiaApi.Path.Make(), [path, SkiaApi]);
+
+  // Lighter ton — emoji'nin parlak iç kısmı
+  const lightenColor = (hex: string) => {
+    const m = hex.match(/^#([0-9a-f]{6})$/i);
+    if (!m) return '#FFEF8A';
+    const r = Math.min(255, parseInt(m[1].slice(0, 2), 16) + 80);
+    const g = Math.min(255, parseInt(m[1].slice(2, 4), 16) + 80);
+    const b = Math.min(255, parseInt(m[1].slice(4, 6), 16) + 50);
+    return `rgb(${r},${g},${b})`;
+  };
+  const innerColor = lightenColor(color);
 
   return (
     <Animated.View
@@ -340,17 +354,26 @@ function ParticleSkia({ x, y, fontSize, path, color, twinkleDelay }: {
       }}
     >
       <Canvas style={{ width: canvasSize, height: canvasSize }}>
-        <Group transform={[{ translateX: blurPad, translateY: blurPad }, { scale }]}>
-          {/* Dış glow halo (web drop-shadow 8px) */}
-          <Path path={skPath} color={color} opacity={0.55}>
-            <BlurMask blur={4} style="normal" />
+        <Group transform={[{ translateX: starOffset, translateY: starOffset }, { scale }]}>
+          {/* Dış glow halo (web drop-shadow 8px) — Skia path canvas dışına taşmasın diye blur düşük */}
+          <Path path={skPath} color={color} opacity={0.45}>
+            <BlurMask blur={6} style="normal" />
           </Path>
           {/* Sıkı glow (web drop-shadow 4px) */}
-          <Path path={skPath} color={color} opacity={0.85}>
-            <BlurMask blur={2} style="normal" />
+          <Path path={skPath} color={color} opacity={0.7}>
+            <BlurMask blur={3} style="normal" />
           </Path>
-          {/* Solid shape */}
-          <Path path={skPath} color={color} />
+          {/* Ana fill — emoji-style radial gradient (parlak iç, derin dış) */}
+          <Path path={skPath}>
+            <RadialGradient
+              c={vec(50, 45)}
+              r={55}
+              colors={[innerColor, color, color]}
+              positions={[0, 0.55, 1]}
+            />
+          </Path>
+          {/* Koyu outline — emoji'nin siyah kenarına yaklaşır */}
+          <Path path={skPath} color="rgba(0,0,0,0.35)" style="stroke" strokeWidth={4} />
         </Group>
       </Canvas>
     </Animated.View>
@@ -1207,6 +1230,7 @@ function NameOverlay({ size, name, dynCfg }: { size: number; name: string; dynCf
       ) : dynCfg?.name_shimmer && SkiaMod ? (
         // ★ v1.3.68: Skia sliding gradient shimmer (web admin CSS background-clip:text parity).
         //   Text Skia ile çizilir, içindeki LinearGradient shader translateX ile kayar.
+        //   colorCycle aktifse rainbow gradient (gerçek gradient görüntüsü).
         <SkiaShimmerText
           name={name}
           fontPx={fontPx}
@@ -1217,6 +1241,7 @@ function NameOverlay({ size, name, dynCfg }: { size: number; name: string; dynCf
           glowRadius={baseGlowRadius}
           pos={pos}
           size={size}
+          rainbow={!!dynCfg?.name_color_cycle}
         />
       ) : (
         <Animated.Text
@@ -1244,11 +1269,11 @@ function NameOverlay({ size, name, dynCfg }: { size: number; name: string; dynCf
 //   CSS background-clip:text + bg-position animation paritesi).
 //   Sadece name_shimmer=true ve flat (non-wave, non-curve) durumda kullanılır.
 function SkiaShimmerText({
-  name, fontPx, color, bold, glowColor, glowEnabled, glowRadius, pos, size,
+  name, fontPx, color, bold, glowColor, glowEnabled, glowRadius, pos, size, rainbow,
 }: {
   name: string; fontPx: number; color: string; bold: boolean;
   glowColor: string; glowEnabled: boolean; glowRadius: number;
-  pos: string; size: number;
+  pos: string; size: number; rainbow?: boolean;
 }) {
   const { Canvas, Text: SkText, matchFont, LinearGradient: SkiaLG, vec, Group } = SkiaMod;
   // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -1303,8 +1328,12 @@ function SkiaShimmerText({
             <SkiaLG
               start={vec(0, 0)}
               end={vec(textWidth, 0)}
-              colors={[color, color, '#ffffff', color, color]}
-              positions={[0, 0.35, 0.5, 0.65, 1]}
+              colors={rainbow
+                ? ['#ff6b9d', '#ffd93d', '#6bcb77', '#4d96ff', '#9b59b6', '#ff6b9d', '#ffd93d']
+                : [color, color, glowEnabled ? glowColor : '#fffacd', color, color]}
+              positions={rainbow
+                ? [0, 0.18, 0.36, 0.54, 0.72, 0.9, 1]
+                : [0, 0.35, 0.5, 0.65, 1]}
               transform={shaderTransform}
             />
           </SkText>
