@@ -9,6 +9,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { WebView } from 'react-native-webview';
+import { SkiaShadow } from './skia';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -193,15 +194,17 @@ export default function RoomCreateHintSheet({ visible, onGoToMyRooms, onClose }:
             <Pressable style={styles.ctaSecondary} onPress={onClose}>
               <Text style={styles.ctaSecondaryText}>Şimdi değil</Text>
             </Pressable>
-            <Pressable style={styles.ctaPrimary} onPress={onGoToMyRooms}>
-              <LinearGradient
-                colors={['#EC4899', '#BE185D', '#831843']}
-                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                style={StyleSheet.absoluteFillObject}
-              />
-              <Ionicons name="add-circle" size={18} color="#FFF" />
-              <Text style={styles.ctaPrimaryText}>Odalarım'a Git</Text>
-            </Pressable>
+            <SkiaShadow shadowColor="#EC4899" shadowOpacity={0.55} shadowBlur={12} shadowOffsetY={4} borderRadius={12}>
+              <Pressable style={styles.ctaPrimary} onPress={onGoToMyRooms}>
+                <LinearGradient
+                  colors={['#EC4899', '#BE185D', '#831843']}
+                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                  style={StyleSheet.absoluteFillObject}
+                />
+                <Ionicons name="add-circle" size={18} color="#FFF" />
+                <Text style={styles.ctaPrimaryText}>Odalarım'a Git</Text>
+              </Pressable>
+            </SkiaShadow>
           </Animated.View>
         </View>
       </Animated.View>
@@ -296,11 +299,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    shadowColor: '#EC4899',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.5,
-    shadowRadius: 10,
-    elevation: 8,
+    // ★ v1.3.69: Skia ile cross-platform pink glow (dış SkiaShadow wrap)
   },
   ctaPrimaryText: {
     fontSize: 14,
