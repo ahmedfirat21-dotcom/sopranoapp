@@ -106,31 +106,31 @@ export default function FABHintOverlay({ visible, bottomOffset, onDismiss }: Pro
     <Pressable style={s.overlay} onPress={handleDismiss}>
       <Animated.View style={[StyleSheet.absoluteFill, { opacity: fadeIn, backgroundColor: 'rgba(0,0,0,0.6)' }]} />
 
-      {/* Glow ringleri — FAB etrafında */}
+      {/* Glow ringleri — FAB etrafında. Animated split: outer transform/opacity, inner GlowView teal glow */}
       <Animated.View
         pointerEvents="none"
-        style={[
-          s.glow,
-          {
-            right: fabCenterRight - 56,
-            bottom: fabCenterBottom - 56,
-            opacity: glow1Opacity,
-            transform: [{ scale: glow1Scale }],
-          },
-        ]}
-      />
+        style={{
+          position: 'absolute',
+          right: fabCenterRight - 56,
+          bottom: fabCenterBottom - 56,
+          opacity: glow1Opacity,
+          transform: [{ scale: glow1Scale }],
+        }}
+      >
+        <GlowView style={s.glow} />
+      </Animated.View>
       <Animated.View
         pointerEvents="none"
-        style={[
-          s.glow,
-          {
-            right: fabCenterRight - 56,
-            bottom: fabCenterBottom - 56,
-            opacity: glow2Opacity,
-            transform: [{ scale: glow2Scale }],
-          },
-        ]}
-      />
+        style={{
+          position: 'absolute',
+          right: fabCenterRight - 56,
+          bottom: fabCenterBottom - 56,
+          opacity: glow2Opacity,
+          transform: [{ scale: glow2Scale }],
+        }}
+      >
+        <GlowView style={s.glow} />
+      </Animated.View>
 
       {/* Arrow — FAB'ın hemen üstünde yukarıdan aşağı salınıyor */}
       <Animated.View
@@ -185,19 +185,17 @@ const s = StyleSheet.create({
     zIndex: 999,
   },
   glow: {
-    position: 'absolute',
     width: 168,
     height: 168,
     borderRadius: 84,
     borderWidth: 2,
     borderColor: '#14B8A6',
     backgroundColor: 'rgba(20,184,166,0.06)',
-    // ★ v92.23 (1 May 2026): Android'de elevation eksikti, glow halka görünmüyordu
+    // ★ v1.3.69: Skia GlowView ile cross-platform teal glow + Animated split (outer transform/opacity)
     shadowColor: '#14B8A6',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.8,
     shadowRadius: 24,
-    elevation: 12,
   },
   arrowWrap: {
     position: 'absolute',
