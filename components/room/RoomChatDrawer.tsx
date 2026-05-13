@@ -18,6 +18,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getAvatarSource } from '../../constants/avatars';
 import StatusAvatar from '../StatusAvatar';
 import { EmojiReactionBar } from '../EmojiReactions';
+import { GlowMessageBubble } from '../skia';
+import { InlineEmoji } from '../skia/CustomEmojiRenderer';
 import { RoomChatService, getRoomProfileFromCache } from '../../services/roomChat';
 import MessageGlowPickerSheet from './MessageGlowPickerSheet';
 import RoomAvatarFrame from './RoomAvatarFrame';
@@ -916,6 +918,18 @@ export default function RoomChatDrawer({
     // ★ 2026-05-05: Mesaj avatarı için kompakt tier etiketi (Plus/Pro/GM).
     const senderTier = migrateLegacyTier(senderTierRaw as string);
     const showSenderTier = senderTier !== 'Free';
+    // ★ v268 (13 May 2026): Oda mesajlarına active_glow_id desteği — web admin "Parlak Mesajlar"
+    //   editöründen seçilen Skia glow config'i. Hardcoded GLOW_STYLES sistemiyle birlikte çalışır
+    //   (eski metadata.glow_style mesajlar bozulmaz, yeni dinamik glow eklenir).
+    const senderActiveGlowId = (item.profiles as any)?.active_glow_id
+      || (cachedSenderProfile as any)?.active_glow_id
+      || null;
+    // ★ v270: Custom emoji desteği — sender'ın active_emoji_id'si varsa :shortcode:
+    //   pattern'lerini Skia ile image olarak render et.
+    const senderActiveEmojiId = (item.profiles as any)?.active_emoji_id
+      || (cachedSenderProfile as any)?.active_emoji_id
+      || null;
+    const hasEmojiShortcode = /:[a-z0-9_-]+:/i.test(content);
     return (
       <View style={st.msgRow}>
         {/* ★ 2026-04-26: Avatar tıklanınca profil sheet — diğer platformlardaki gibi standart davranış. */}
@@ -936,6 +950,7 @@ export default function RoomChatDrawer({
             showTierBadge={showSenderTier}
           />
         </Pressable>
+        <GlowMessageBubble glowItemId={senderActiveGlowId} isMine={isOwn} context="room" style={{ flex: 1 } as any}>
         <Pressable
           onPress={() => { /* no-op: onLongPress'in tetiklenmesi için onPress de tanımlı olmalı */ }}
           onLongPress={(e) => {
@@ -966,6 +981,9 @@ export default function RoomChatDrawer({
             <Image source={{ uri: gifMatch![1] }} style={{ width: 220, height: 165, borderRadius: 12 }} resizeMode="cover" />
           ) : emojiOnly ? (
             <Text style={{ fontSize: 36, lineHeight: 44 }}>{content}</Text>
+          ) : hasEmojiShortcode && senderActiveEmojiId ? (
+            // ★ v270: Custom emoji içeriyor → InlineEmoji ile shortcode'ları image render et
+            <InlineEmoji text={content} emojiSetId={senderActiveEmojiId} textStyle={[st.msgText, glowCfg && { color: glowCfg.textColor, fontWeight: '500' }] as any} />
           ) : (
             // ★ v109: Linkify — URL'ler tıklanabilir + farklı renkte
             <LinkifiedText
@@ -991,6 +1009,7 @@ export default function RoomChatDrawer({
             </View>
           ) : null}
         </Pressable>
+        </GlowMessageBubble>
       </View>
     );
   }, [reactions, currentUserId, handleToggleReaction, onAvatarPress]);

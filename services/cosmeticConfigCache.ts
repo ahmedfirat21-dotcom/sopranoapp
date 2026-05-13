@@ -78,6 +78,17 @@ export interface FrameConfig {
   avatar_swing?: boolean;
   avatar_tilt?: boolean;
   frame_shimmer?: boolean;
+  // ★ v269 (14 May 2026): Shimmer sub-field'lar — audit raporundan interface'e eklendi.
+  //   Runtime'da JS dynamic access ile çalışıyordu (AvatarFrame L:2010-2016), TypeScript
+  //   tip güvenliği için artık explicit tanımlı. Frame Shimmer Overlay tüm 7 parametreyi
+  //   kullanıyor (Skia Reanimated GPU shimmer).
+  frame_shimmer_scale?: number;
+  frame_shimmer_speed?: number;
+  frame_shimmer_opacity?: number;
+  frame_shimmer_angle?: number;
+  frame_shimmer_band?: number;
+  frame_shimmer_reverse?: boolean;
+  frame_shimmer_layer?: 'above' | 'below';
   frame_wobble?: boolean;
   frame_pulse_ring?: boolean;
   // İsim animasyonları (mobile'da name overlay yok; tip için)
@@ -167,6 +178,70 @@ export interface EntryConfig {
   lottie_brightness?: number;
   lottie_saturation?: number;
   lottie_invert?: boolean;
+  // ★ v117 (13 May 2026): Yeni paket — partikül + sahne efektleri + aura/halo + ses + trigger
+  particles_enabled?: boolean;
+  particles_type?: string;
+  particles_count?: number;
+  particles_lifetime_ms?: number;
+  particles_speed?: number;
+  particles_spread_deg?: number;
+  particles_gravity?: number;
+  particles_size_min?: number;
+  particles_size_max?: number;
+  particles_color_palette?: string[];
+  particles_emit_x?: number;
+  particles_emit_y?: number;
+  particles_burst?: boolean;
+  particles_emit_rate?: number;
+  particles_fade_out?: boolean;
+  particles_rotation_speed?: number;
+  scene_flash_enabled?: boolean;
+  scene_flash_color?: string;
+  scene_flash_intensity?: number;
+  scene_flash_duration_ms?: number;
+  scene_shake_enabled?: boolean;
+  scene_shake_intensity?: number;
+  scene_shake_duration_ms?: number;
+  scene_vignette_enabled?: boolean;
+  scene_vignette_color?: string;
+  scene_vignette_pulse?: boolean;
+  scene_vignette_size?: number;
+  scene_bg_blur_enabled?: boolean;
+  scene_bg_blur_max?: number;
+  scene_bg_blur_duration_ms?: number;
+  scene_color_tint_enabled?: boolean;
+  scene_color_tint_color?: string;
+  scene_color_tint_intensity?: number;
+  scene_zoom_in_enabled?: boolean;
+  scene_zoom_in_scale?: number;
+  scene_zoom_in_duration_ms?: number;
+  aura_enabled?: boolean;
+  aura_color?: string;
+  aura_size?: number;
+  aura_pulse?: boolean;
+  aura_pulse_speed?: number;
+  aura_intensity?: number;
+  aura_layers?: number;
+  trail_enabled?: boolean;
+  trail_color?: string;
+  trail_length?: number;
+  trail_decay_ms?: number;
+  trail_thickness?: number;
+  halo_ring_enabled?: boolean;
+  halo_ring_color?: string;
+  halo_ring_thickness?: number;
+  halo_ring_spin_speed?: number;
+  halo_ring_dashed?: boolean;
+  sound_enabled?: boolean;
+  sound_id?: string;
+  sound_volume?: number;
+  sound_delay_ms?: number;
+  trigger_first_join_only?: boolean;
+  trigger_min_tier?: string;
+  trigger_owner_only?: boolean;
+  trigger_cooldown_minutes?: number;
+  trigger_birthday_only?: boolean;
+  trigger_milestone?: string;
 }
 
 const TTL_MS = 5 * 60 * 1000; // 5 dakika
@@ -182,12 +257,20 @@ async function fetchMeta(itemId: string): Promise<any> {
   const p = (async () => {
     try {
       // ★ v213e: editor_config (JSONB) — web admin'den yapılandırılan ayarlar
+      // ★ v263 (13 May 2026): Web admin editor_config içinde `frame_config` wrapper
+      //   altında ayarları saklıyor: { frame_config: { size_overrides, tier_badge_*, ... } }
+      //   Mobile direkt editor_config okurken size_overrides bulamıyordu → hiçbir
+      //   listener/profile/stage_host ayarı yansımıyordu. Wrapper'ı unwrap et.
       const { data } = await supabase
         .from('cosmetic_items')
         .select('editor_config')
         .eq('id', itemId)
         .maybeSingle();
-      return (data as any)?.editor_config || null;
+      const ec = (data as any)?.editor_config;
+      if (!ec) return null;
+      // Yeni yapı: editor_config.frame_config.X → unwrap
+      // Eski yapı (geriye dönük): editor_config.X → olduğu gibi
+      return ec.frame_config && typeof ec.frame_config === 'object' ? ec.frame_config : ec;
     } catch {
       return null;
     } finally {
@@ -223,8 +306,12 @@ export async function ensureFrameConfig(frameId: string | null | undefined, size
   if (rawEntry && Date.now() - rawEntry.ts <= TTL_MS) {
     return applySizeOverrides(rawEntry.config, sizeKey);
   }
+  // ★ v266 (13 May 2026) CRITICAL FIX: fetchMeta ZATEN editor_config.frame_config'i
+  //   unwrap ediyor (v264'te eklendi). Burada bir kez daha .frame_config aramak
+  //   ÇİFT UNWRAP yapıyor ve cfg her zaman null dönüyordu → 3 GÜNDÜR HİÇBİR FRAME
+  //   AYARI APK'YA YANSIMAMASININ KAYNAĞI. Direkt meta = cfg.
   const meta = await fetchMeta(frameId);
-  const cfg = meta?.frame_config || null;
+  const cfg = meta || null;
   if (cfg) frameCache.set(frameId, { config: cfg, ts: Date.now() });
   return applySizeOverrides(cfg, sizeKey);
 }

@@ -16,6 +16,7 @@ import { getAvatarSource } from '../constants/avatars';
 import StatusAvatar from '../components/StatusAvatar';
 import EmptyState from '../components/EmptyState';
 import AppBackground from '../components/AppBackground';
+import { CosmeticBackground } from '../components/skia';
 import { useAuth, useBadges, useUserProfileSheet } from './_layout';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -52,7 +53,7 @@ const NOTIF_CONFIG: Record<string, { icon: string; color: string; verb: string }
 
 export default function NotificationsScreen() {
   const router = useRouter();
-  const { firebaseUser } = useAuth();
+  const { firebaseUser, profile } = useAuth();
   const { openUserProfile } = useUserProfileSheet();
   const { refreshBadges } = useBadges();
   const insets = useSafeAreaInsets();
@@ -254,6 +255,7 @@ export default function NotificationsScreen() {
 
   return (
     <AppBackground radialGlow>
+    <CosmeticBackground bgItemId={(profile as any)?.active_bg_id} context="notifications" style={{ flex: 1 }}>
     <View style={[styles.container, { backgroundColor: 'transparent' }]}>
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
@@ -290,6 +292,7 @@ export default function NotificationsScreen() {
         />
       )}
     </View>
+    </CosmeticBackground>
     </AppBackground>
   );
 }

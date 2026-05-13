@@ -20,6 +20,7 @@ import { getIllustrationPng } from '../../constants/storeIllustrationsPng';
 import { getEntryEffectLottie } from '../../constants/entryEffectLottieRegistry';
 import { getCosmeticAsset, getCachedCosmeticAsset, type AssetMeta } from '../../services/cosmeticAssetCache';
 import { ensureEntryConfig, getCachedEntryConfig } from '../../services/cosmeticConfigCache';
+import { EntryEffectExtras } from '../skia';
 
 // ★ v110.7: Lottie player — web admin'den URL ile eklenen entry_effect ürünleri için
 let LottieView: any = null;
@@ -185,6 +186,9 @@ export default function RoomEntryEffectOverlay({ effectId, userName, onDone }: P
       <SparkleParticle delay={120} color={meta.color} side="tr" png={pngSource} />
       <SparkleParticle delay={240} color={meta.color} side="bl" png={pngSource} />
       <SparkleParticle delay={360} color={meta.color} side="br" png={pngSource} />
+
+      {/* ★ v117: Yeni özellik paketi — partikül + sahne efekti + aura layer'ları (Skia) */}
+      {entryCfg && <EntryEffectExtras cfg={entryCfg} active={true} />}
 
       <Animated.View
         pointerEvents="none"

@@ -16,6 +16,7 @@ import { FollowService } from '../../services/follows';
 import { showToast } from '../../components/Toast';
 import FollowListModal from '../../components/FollowListModal';
 import AppBackground from '../../components/AppBackground';
+import { CosmeticBackground } from '../../components/skia';
 import SPHexagonIcon from '../../components/SPHexagonIcon';
 import PlusDiamondIcon from '../../components/PlusDiamondIcon';
 import AnimatedHeaderIconBtn from '../../components/AnimatedHeaderIconBtn';
@@ -545,6 +546,8 @@ export default function ProfileScreen() {
 
   return (
     <AppBackground variant="profile" radialGlow>
+      {/* ★ v117: Kullanıcının seçtiği özel arkaplan (Skia render) — varsa AppBackground üstüne katman */}
+      <CosmeticBackground bgItemId={(profile as any)?.active_bg_id} context="profile" style={{ flex: 1 }}>
       <View style={styles.container}>
         {/* ═══ SopranoProfil Header ═══ */}
         <View style={[styles.headerBar, { paddingTop: insets.top }]}>
@@ -597,6 +600,7 @@ export default function ProfileScreen() {
             activeFrame={activeFrame}
             onFramePress={() => setShowFrameSheet(true)}
             hasUnequippedFrame={hasUnequippedFrame}
+            activeBadgeId={(profile as any)?.active_badge_id}
           />
 
           {/* ★ v110.5: Diller + İlgi alanları (sade chip şeridi) */}
@@ -1008,6 +1012,7 @@ export default function ProfileScreen() {
         {/* ★ 2026-04-21: Tab bar scroll fade — tüm tab sayfalarında tutarlı */}
         <TabBarFadeOut />
       </View>
+      </CosmeticBackground>
     </AppBackground>
   );
 }

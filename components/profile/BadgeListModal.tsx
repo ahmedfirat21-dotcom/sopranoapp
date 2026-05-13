@@ -81,10 +81,13 @@ export default function BadgeListModal({ visible, onClose, userId, displayName }
     PanResponder.create({
       onStartShouldSetPanResponder: () => false,
       onStartShouldSetPanResponderCapture: () => false,
+      // ★ v251: threshold düşürüldü — Clubhouse pattern korunur, drag-to-dismiss
+      //   küçük dokunmalarda algılamıyordu. 8→4, 25→12 ile daha hassas, hâlâ horizontal
+      //   scroll/Pressable tap'ları engellemez.
       onMoveShouldSetPanResponder: (_, g) =>
-        g.dy > 8 && Math.abs(g.dy) > Math.abs(g.dx) && scrollOffsetRef.current <= 0,
+        g.dy > 4 && Math.abs(g.dy) > Math.abs(g.dx) && scrollOffsetRef.current <= 0,
       onMoveShouldSetPanResponderCapture: (_, g) =>
-        g.dy > 25 && Math.abs(g.dy) > Math.abs(g.dx) * 2 && scrollOffsetRef.current <= 0,
+        g.dy > 12 && Math.abs(g.dy) > Math.abs(g.dx) * 2 && scrollOffsetRef.current <= 0,
       onPanResponderTerminationRequest: () => false,
       onPanResponderMove: (_, g) => {
         if (g.dy > 0) translateY.setValue(g.dy);

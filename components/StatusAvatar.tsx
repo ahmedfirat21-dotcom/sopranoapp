@@ -19,6 +19,7 @@ import { migrateLegacyTier } from '../types';
 import AvatarFrame from './profile/AvatarFrame';
 import { getFrameAvatarRatio } from '../constants/frameLottieRegistry';
 import TierBadge from './TierBadge';
+import { CosmeticBadge } from './skia';
 import { ensureFrameConfig, getCachedFrameConfig, subscribeConfigChange, pickSizeKey, type SizeKey } from '../services/cosmeticConfigCache';
 import { useEffect, useRef, useState } from 'react';
 
@@ -149,6 +150,9 @@ interface StatusAvatarProps {
    *  (ProfileHero size=92 normalde 'listener' key alır ama context "profil sayfası" olduğu için
    *  contextKey="profile" geçilir). */
   contextKey?: SizeKey;
+  /** ★ v117 (13 May 2026): Kullanıcının active_badge_id'si — varsa TierBadge yerine
+   *  CosmeticBadge (Skia, web admin'den config'li) render edilir. */
+  customBadgeId?: string | null;
 }
 
 /**
@@ -181,6 +185,7 @@ export default function StatusAvatar({
   tierBadgeSize = 'xs',
   displayName,
   contextKey,
+  customBadgeId,
 }: StatusAvatarProps) {
   const radius = size / 2;
   // ★ 2026-04-21: Daha zarif nokta — %26 yerine %22, çerçeve 0.3x → 0.18x
@@ -637,15 +642,19 @@ export default function StatusAvatar({
         //              transform: translate(-50%, -50%) — badge merkezden konumlanır
         //   APK: aynı formül — center (size/2) + pos × size + fineOffset
         //   Eski POS_STYLES (top/bottom/left/right) referansı web admin ile uyuşmuyordu.
+        // ★ v250 (13 May 2026): Daire avatarda köşe değerleri (br/bl/tr/tl) 0.5 ile
+        //   avatardan dışarı asılı kalıyordu. Daire kenarı 45° açıda sin(45°)≈0.354 — bu
+        //   değer kullanılınca rozet daire çevresine oturur. Web admin tarafıyla da
+        //   senkronlamak için aynı değerler /apps/web BADGE_POSITIONS'a da uygulanmalı.
         const BADGE_POS: Record<string, { x: number; y: number }> = {
-          tl: { x: -0.5,  y: -0.5 },
-          tc: { x: 0,     y: -0.55 },
-          tr: { x: 0.5,   y: -0.5 },
-          ml: { x: -0.55, y: 0 },
-          mr: { x: 0.55,  y: 0 },
-          bl: { x: -0.5,  y: 0.5 },
-          bc: { x: 0,     y: 0.55 },
-          br: { x: 0.5,   y: 0.5 },
+          tl: { x: -0.354, y: -0.354 },
+          tc: { x: 0,      y: -0.5   },
+          tr: { x: 0.354,  y: -0.354 },
+          ml: { x: -0.5,   y: 0      },
+          mr: { x: 0.5,    y: 0      },
+          bl: { x: -0.354, y: 0.354  },
+          bc: { x: 0,      y: 0.5    },
+          br: { x: 0.354,  y: 0.354  },
         };
         const pos = BADGE_POS[tbPos] || BADGE_POS.br;
         const offsetXPct = Number(dynFrameCfg?.tier_badge_offset_x) || 0;
@@ -668,11 +677,16 @@ export default function StatusAvatar({
             y={badgeCenterY}
             scale={effectiveScale}
           >
-            <TierBadge
-              tier={normalizedTier}
-              size={tierBadgeSize}
-              frameId={frameId}
-            />
+            {customBadgeId ? (
+              /* ★ v117: Web admin "Rozetler" editöründen seçilmiş özel rozet (Skia render) */
+              <CosmeticBadge badgeItemId={customBadgeId} context="avatar" />
+            ) : (
+              <TierBadge
+                tier={normalizedTier}
+                size={tierBadgeSize}
+                frameId={frameId}
+              />
+            )}
           </BadgeCenterWrapper>
         );
       })()}

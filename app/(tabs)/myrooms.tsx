@@ -4,7 +4,7 @@ import {
   RefreshControl, Animated, Easing, FlatList, TextInput, InteractionManager,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { GlowView } from '../../components/skia';
+import { GlowView, CosmeticBackground } from '../../components/skia';
 import AppBackground from '../../components/AppBackground';
 import AnimatedHeaderIconBtn from '../../components/AnimatedHeaderIconBtn';
 // ★ 2026-04-28: AnimatedLogo kaldırıldı — SopranoHome branding için inline component.
@@ -374,17 +374,16 @@ function ManagedRoomsEmptyCard() {
           style={StyleSheet.absoluteFillObject}
         />
         <Text style={mrS.emptyTitle}>Henüz bir odanız yok.{'\n'}İlk odanızı oluşturun!</Text>
-        <GlowView style={mrS.emptyImageWrap}>
+        {/* ★ v255 (13 May 2026): GlowView wrap kaldırıldı — Lottie mikrofon zaten kendi
+            glow'unu içeriyor, üstüne Skia BlurMask binince "teal kare gölge" oluşuyordu.
+            Sade Lottie ile temiz görünüm. */}
+        <View style={mrS.emptyImageWrap}>
           {LottieView ? (
             <LottieView
               source={MIC_LOTTIE}
               autoPlay
               loop
               style={mrS.emptyImage}
-              // ★ 2026-05-09: Loop sırasında oluşan kısa flash'ı azaltmak için optimize parametreler.
-              //   cacheComposition: ilk yüklemeden sonra Lottie verisini bellekte tut
-              //   renderMode HARDWARE: GPU hızlandırma, JS thread'i bloke etmez
-              //   resizeMode "cover": boş kenar pikseller yerine tüm alanı kapla → blank frame görünmez
               cacheComposition
               renderMode="HARDWARE"
               resizeMode="cover"
@@ -393,7 +392,7 @@ function ManagedRoomsEmptyCard() {
           ) : (
             <Image source={require('../../assets/images/mock/empty_room_mic.png')} style={mrS.emptyImage} resizeMode="contain" />
           )}
-        </GlowView>
+        </View>
         <Text style={mrS.emptySub}>Sesli sohbet, müzik, oyun ve daha fazlası...</Text>
       </View>
     </>
@@ -1408,6 +1407,8 @@ export default function MyRoomsScreen() {
 
   return (
     <AppBackground variant="myrooms" radialGlow>
+    {/* ★ v270 (14 May 2026): Kullanıcı kozmetik arkaplan — varsa AppBackground üstüne Skia katman */}
+    <CosmeticBackground bgItemId={(profile as any)?.active_bg_id} context="myrooms" style={{ flex: 1 }}>
     <View style={s.container}>
       {/* ═══ Premium Header — Keşfet ile aynı Glassmorphic topBar ═══ */}
       <Animated.View style={[s.topBarWrap, { paddingTop: insets.top, transform: [{ translateY: bannerTranslateY }] }]}>
@@ -1721,7 +1722,7 @@ export default function MyRoomsScreen() {
 
       {/* ★ 2026-04-21: Tab bar scroll fade — tüm tab sayfalarında tutarlı */}
       <TabBarFadeOut />
-    </View></AppBackground>
+    </View></CosmeticBackground></AppBackground>
   );
 }
 

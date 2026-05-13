@@ -20,6 +20,14 @@ import { supabase } from '../constants/supabase';
 export type AssetMeta = {
   url: string | null;
   type: 'lottie' | 'image' | null;
+  // ★ v119 (13 May 2026): Mağaza listesi ön kapak görseli + boyut ayarları
+  thumbUrl?: string | null;
+  cover?: {
+    fit?: string;            // 'cover' | 'contain' | 'fill' | 'none'
+    scale?: number;          // 0.5..1.5
+    padding?: number;        // 0..20 px
+    position?: string;       // 'center' | 'top' | ...
+  };
 };
 
 type CacheEntry = {
@@ -53,7 +61,7 @@ export async function getCosmeticAsset(itemId: string): Promise<AssetMeta> {
       //   Önce ona bak, yoksa eski meta JSON'dan oku (backward compat).
       const { data, error } = await supabase
         .from('cosmetic_items')
-        .select('asset_url, meta')
+        .select('asset_url, meta, thumb_url, editor_config')
         .eq('id', itemId)
         .maybeSingle();
 
@@ -86,6 +94,19 @@ export async function getCosmeticAsset(itemId: string): Promise<AssetMeta> {
             // meta JSON parse edilemedi
           }
         }
+      }
+
+      // ★ v119: Ön kapak görseli + boyut ayarları
+      const tu = (data as any).thumb_url;
+      if (typeof tu === 'string' && tu.length > 0) parsed.thumbUrl = tu;
+      const ec = (data as any).editor_config;
+      if (ec && typeof ec === 'object' && ec.cover && typeof ec.cover === 'object') {
+        parsed.cover = {
+          fit: typeof ec.cover.fit === 'string' ? ec.cover.fit : 'cover',
+          scale: typeof ec.cover.scale === 'number' ? ec.cover.scale : 1,
+          padding: typeof ec.cover.padding === 'number' ? ec.cover.padding : 0,
+          position: typeof ec.cover.position === 'string' ? ec.cover.position : 'center',
+        };
       }
 
       cache.set(itemId, { meta: parsed, timestamp: Date.now() });

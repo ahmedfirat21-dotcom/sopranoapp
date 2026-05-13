@@ -8,8 +8,20 @@ import { RoleColors } from '../../constants/theme';
 import AvatarPenaltyFlash, { type FlashType } from './AvatarPenaltyFlash';
 import RoomAvatarFrame from './RoomAvatarFrame';
 import TierBadge from '../TierBadge';
-import { SkiaShadow } from '../skia';
+import { SkiaShadow, CosmeticBadge } from '../skia';
 import type { RoomParticipant } from '../../services/database';
+import { useRoomLayout, type SpeakersLayoutConfig, type AvatarShape } from '../../services/roomLayoutConfig';
+
+// ★ v115: Avatar shape → borderRadius çevirici (config.speakers.avatarShape için)
+function shapeBorderRadius(shape: AvatarShape, size: number, configRadius: number): number {
+  switch (shape) {
+    case 'circle':  return size / 2;
+    case 'square':  return 0;
+    case 'rounded': return Math.min(configRadius, size / 2);
+    case 'hex':     return size / 2; // mobile'da hex shape için ayrı mask; şimdilik circle fallback
+    default:        return size / 2;
+  }
+}
 
 // ★ Dinamik sahne boyutlandırma — modern platform grid sistemi (Clubhouse/Spaces pattern)
 // 2026-04-20: Oda içi SCROLL YOK kuralı — yüksek yoğunlukta daha kompakt grid.
@@ -32,16 +44,31 @@ import type { RoomParticipant } from '../../services/database';
 //     4-6     → 3 col, ~100px (2 satır)
 //     7-9     → 3 col, ~90px (3 satır)
 //     10+     → 4 col, ~80px
-function getSpeakerMetrics(count: number, W: number) {
+// ★ v115: Config-driven metrics. cfg verilirse maxCols/colGap/sizePresets'ten okur,
+//   yoksa eski hard-coded değerlere düşer (backward compat).
+function getSpeakerMetrics(count: number, W: number, cfg?: SpeakersLayoutConfig) {
   const availableW = W - 32;
   let cols: number, gap: number, maxSize: number;
-  if (count <= 1) { cols = 1; gap = 0; maxSize = 140; }
-  else if (count <= 3) { cols = 3; gap = 16; maxSize = 110; }
-  else if (count <= 6) { cols = 3; gap = 14; maxSize = 100; }
-  else if (count <= 9) { cols = 3; gap = 12; maxSize = 92; }
-  else if (count <= 12) { cols = 4; gap = 10; maxSize = 84; }
-  else { cols = 5; gap = 8; maxSize = 76; }
-  // cardWidth = ekran sığacak max; ama maxSize sınırını aşma (büyük cihazlarda overshoot olmasın)
+
+  if (cfg) {
+    // Config aware sizing — count'a göre size preset pick'le
+    const presets = cfg.sizePresets;
+    if (count <= 1)       { cols = 1; maxSize = 140; }
+    else if (count <= 3)  { cols = Math.min(3, cfg.maxCols); maxSize = presets.large; }
+    else if (count <= 6)  { cols = Math.min(3, cfg.maxCols); maxSize = presets.medium; }
+    else if (count <= 9)  { cols = Math.min(3, cfg.maxCols); maxSize = Math.round(presets.medium * 0.92); }
+    else if (count <= 12) { cols = Math.min(4, cfg.maxCols); maxSize = presets.small; }
+    else                  { cols = Math.min(5, cfg.maxCols); maxSize = Math.round(presets.small * 0.9); }
+    gap = cfg.colGap;
+  } else {
+    if (count <= 1) { cols = 1; gap = 0; maxSize = 140; }
+    else if (count <= 3) { cols = 3; gap = 16; maxSize = 110; }
+    else if (count <= 6) { cols = 3; gap = 14; maxSize = 100; }
+    else if (count <= 9) { cols = 3; gap = 12; maxSize = 92; }
+    else if (count <= 12) { cols = 4; gap = 10; maxSize = 84; }
+    else { cols = 5; gap = 8; maxSize = 76; }
+  }
+
   const calculated = Math.floor((availableW - gap * (cols - 1)) / cols);
   const cardWidth = Math.min(calculated, maxSize);
   const cardHeight = cardWidth + 18; // alt isim alanı
@@ -473,6 +500,9 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, i
 }) {
   const isHost = user.role === 'owner';
   const isMod = user.role === 'moderator';
+  // ★ v117: Oda düzen config — avatar shape için kullanılır (line 541 civarı)
+  const layout = useRoomLayout();
+  const speakersCfg = layout.speakers;
   const displayName = (user as any).disguise?.display_name || user.user?.display_name || 'Misafir';
   const avatarUrl = (user as any).disguise?.avatar_url || user.user?.avatar_url;
   // ★ v107: Mağaza avatar çerçevesi — disguise yokken aktif (gizlenmiş kullanıcı normal görünür)
@@ -497,15 +527,28 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, i
 
   // ★ 2026-05-11: Avatar shape — parent View borderRadius'a uygulanır,
   //   overflow:hidden ile Image kırpılır. Daire dışı şekiller görünsün.
+  // ★ v117: Frame yoksa roomLayout config'ten al (web admin'den oda düzeni)
   const avatarShapeRadius = (() => {
-    switch (frameCfg?.avatar_shape) {
-      case 'rounded-square': return cardWidth * 0.22;
-      case 'squircle':       return cardWidth * 0.36;
-      case 'hexagon':
-      case 'star':
-      case 'diamond':        return cardWidth * 0.36; // squircle fallback
+    // Frame config öncelikli (kullanıcının taktığı çerçevenin önerdiği şekil)
+    if (frameCfg?.avatar_shape) {
+      switch (frameCfg.avatar_shape) {
+        case 'rounded-square': return cardWidth * 0.22;
+        case 'squircle':       return cardWidth * 0.36;
+        case 'hexagon':
+        case 'star':
+        case 'diamond':        return cardWidth * 0.36;
+        case 'circle':         return cardWidth / 2;
+      }
+    }
+    // ★ v117: Frame yoksa roomLayout config'inden (web admin > Oda Düzeni > Konuşmacılar > Şekil)
+    const cfgShape = isHost ? layout.host.avatarShape : speakersCfg.avatarShape;
+    const cfgRadius = isHost ? layout.host.borderRadius : speakersCfg.borderRadius;
+    switch (cfgShape) {
+      case 'square':  return 0;
+      case 'rounded': return Math.min(cfgRadius, cardWidth / 2);
+      case 'hex':     return cardWidth * 0.36;
       case 'circle':
-      default:               return cardWidth / 2;
+      default:        return cardWidth / 2;
     }
   })();
 
@@ -654,6 +697,12 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, i
                 : undefined}
               contextKey={isHost ? 'stage_host' : 'speaker'}
             />
+            {/* ★ v120: Web admin "Rozetler" — kullanıcının active_badge_id'si varsa Skia overlay */}
+            {!(user as any).disguise && (user.user as any)?.active_badge_id && (
+              <View pointerEvents="none" style={{ position: 'absolute', bottom: -2, right: -2, zIndex: 999 }}>
+                <CosmeticBadge badgeItemId={(user.user as any).active_badge_id} context="avatar" />
+              </View>
+            )}
           </View>
         </View>
       )}
@@ -895,6 +944,9 @@ export default function SpeakerSection({ stageUsers, getMicStatus, onSelectUser,
   // ★ 2026-04-22: Runtime window width — fiziksel Android cihazda gesture-nav/
   //   rotation ile değişen dimensions'a adapte olur.
   const { width: W } = useWindowDimensions();
+  // ★ v115 (13 May 2026): Web admin oda düzen ayarları — avatar shape, gap, size
+  const layout = useRoomLayout();
+  const speakersCfg = layout.speakers;
   const sortedUsers = useMemo(() => {
     if (stageUsers.length === 0) return [];
     const roleOrder: Record<string, number> = { owner: 0, host: 0, moderator: 1, speaker: 2 };
@@ -946,7 +998,9 @@ export default function SpeakerSection({ stageUsers, getMicStatus, onSelectUser,
   }
 
   const count = sortedUsers.length;
-  const { cardWidth, cardHeight, gap } = getSpeakerMetrics(count, W);
+  const { cardWidth, cardHeight, gap } = getSpeakerMetrics(count, W, speakersCfg);
+  // ★ v115: Avatar shape config'ten — circle/square/rounded
+  const speakerAvatarRadius = shapeBorderRadius(speakersCfg.avatarShape, cardWidth, speakersCfg.borderRadius);
 
   // ★ v92.21 (1 May 2026): HİBRİT pattern — Discord Stage / TikTok Live / Twitch ko-stream.
   //   - Audio-only kişi: Clubhouse circle avatar (yuvarlak)
@@ -1124,6 +1178,9 @@ const s = StyleSheet.create({
   },
   ownerBadgeBody: {
     width: 30, height: 30, borderRadius: 15,
+    // ★ v263: overflow:hidden eksikti → LinearGradient kare çiziyordu, listener
+    //   rozetiyle aynı sorun. Clip ile daire çıkar.
+    overflow: 'hidden',
     alignItems: 'center', justifyContent: 'center',
     borderWidth: 2, borderColor: 'rgba(255,255,255,0.65)',
     shadowColor: '#FFD700', shadowOffset: { width: 0, height: 2 },

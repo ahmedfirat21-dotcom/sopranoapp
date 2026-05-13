@@ -428,7 +428,10 @@ export default function OnboardingScreen() {
   // ═══════════════════════ RENDER ═══════════════════════
   return (
     <AppBackground radialGlow>
-      <KeyboardAvoidingView style={s.flex} behavior={'padding'}>
+      {/* ★ v258 fix: Android'de behavior="padding" + softwareKeyboardLayoutMode="resize"
+           (app.json'daki) çakışıyordu — klavye açılınca absolute footer Doğum Yılı input'unun
+           üstüne biniyordu. iOS'ta padding gerek, Android'de sistem zaten resize yapıyor. */}
+      <KeyboardAvoidingView style={s.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         {/* ═══ Top: Progress Bar + Geri Butonu ═══ */}
         <View style={s.topBar}>
           {step > 1 ? (

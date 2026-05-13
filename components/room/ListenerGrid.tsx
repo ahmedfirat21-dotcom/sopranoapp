@@ -8,6 +8,19 @@ import StatusAvatar from '../StatusAvatar';
 import { GlowView } from '../skia';
 import { migrateLegacyTier } from '../../types';
 import type { RoomParticipant } from '../../services/database';
+import { useRoomLayout, type ListenersLayoutConfig, type AvatarShape } from '../../services/roomLayoutConfig';
+import { useFrameConfig } from '../../services/cosmeticConfigCache';
+
+// ★ v115: Avatar shape → borderRadius çevirici
+function shapeBorderRadius(shape: AvatarShape, size: number, configRadius: number): number {
+  switch (shape) {
+    case 'circle':  return size / 2;
+    case 'square':  return 0;
+    case 'rounded': return Math.min(configRadius, size / 2);
+    case 'hex':     return size / 2; // mobile hex shape için ayrı mask; circle fallback
+    default:        return size / 2;
+  }
+}
 
 // ★ Dinamik boyutlandırma — modern platform grid sistemi (Clubhouse/Spaces pattern)
 // 2026-04-20: Sayı arttıkça avatar daha agresif küçülür.
@@ -15,19 +28,25 @@ import type { RoomParticipant } from '../../services/database';
 // Android'de gesture-nav/rotation ile değişen ekran boyutuna adapte olsun.
 // 2026-05-07: maxSize cap eklendi — az sayıda dinleyici varken (1-4 kişi) avatar
 // sahne kartı (~100px) boyutuna şişmesin. Hiyerarşi: dinleyici < sahne (~%50).
-function getGridMetrics(listenerCount: number, W: number) {
+// ★ v115: Config-driven metrics. cfg verilirse maxCols/colGap/sizePresets'ten okur.
+function getGridMetrics(listenerCount: number, W: number, cfg?: ListenersLayoutConfig) {
   let cols: number, avatarGap: number, maxSize: number;
-  if (listenerCount <= 4) {
-    cols = 5; avatarGap = 12; maxSize = 60;   // Clubhouse: az kişide bile küçük kal (kullanıcı "çok az büyüt" istedi 7 May 2026)
-  } else if (listenerCount <= 8) {
-    cols = 6; avatarGap = 10; maxSize = 54;
-  } else if (listenerCount <= 15) {
-    cols = 7; avatarGap = 7; maxSize = 48;
+
+  if (cfg) {
+    const presets = cfg.sizePresets;
+    if (listenerCount <= 4)       { cols = Math.min(5, cfg.maxCols + 1); maxSize = presets.large; }
+    else if (listenerCount <= 8)  { cols = Math.min(6, cfg.maxCols); maxSize = presets.medium; }
+    else if (listenerCount <= 15) { cols = Math.min(7, cfg.maxCols + 1); maxSize = Math.round(presets.medium * 0.95); }
+    else                          { cols = Math.min(8, cfg.maxCols + 2); maxSize = presets.small; }
+    avatarGap = cfg.colGap;
   } else {
-    cols = 8; avatarGap = 5; maxSize = 42;    // 16+ (gerekirse "+N Seyirci" badge'de)
+    if (listenerCount <= 4)       { cols = 5; avatarGap = 12; maxSize = 60; }
+    else if (listenerCount <= 8)  { cols = 6; avatarGap = 10; maxSize = 54; }
+    else if (listenerCount <= 15) { cols = 7; avatarGap = 7; maxSize = 48; }
+    else                          { cols = 8; avatarGap = 5; maxSize = 42; }
   }
+
   const cellW = Math.floor((W - 32 - avatarGap * (cols - 1)) / cols);
-  // Avatar size agresif shrink: ufak hücrelerde padding büyümesin
   const calculated = Math.max(32, cellW - (listenerCount <= 8 ? 10 : listenerCount <= 15 ? 8 : 5));
   const avatarSize = Math.min(calculated, maxSize);
   return { cols, avatarGap, cellW, avatarSize };
@@ -67,18 +86,36 @@ type CellProps = {
   hasHandRaised: boolean;
   onSelectUser: (u: RoomParticipant) => void;
   onFlashDone?: (userId: string) => void;
+  // ★ v116: Config-driven layout overrides
+  cfgShape?: AvatarShape;
+  cfgBorderRadius?: number;
+  cfgRingWidth?: number;
+  cfgRingColor?: string;
+  cfgShowName?: boolean;
+  cfgOwnerCrownEnabled?: boolean;
+  cfgOwnerHighlight?: string;
 };
 const ListenerCell = React.memo(function ListenerCell({
   u, cellW, avatarSize, nameSize, isSelected, isOwner, showMuteIndicator,
   isChatMuted, flash, hasHandRaised, onSelectUser, onFlashDone,
+  // ★ v117: Web admin oda düzen config'inden gelen propslar
+  cfgShape, cfgBorderRadius, cfgRingWidth, cfgRingColor, cfgShowName,
+  cfgOwnerCrownEnabled, cfgOwnerHighlight,
 }: CellProps) {
-  // ★ 2026-04-20: Owner avatarı %10 büyük — sade ama belirgin
-  const ownerScale = isOwner ? 1.10 : 1;
-  const ownerAvatarSize = Math.floor(avatarSize * ownerScale);
+  // ★ v259 (13 May 2026): ownerScale 1.10 KALDIRILDI — owner avatarı diğer
+  //   listener'lardan büyüktü, GlowView wrap'a uyumsuz oluyordu (yarım clip).
+  //   Owner için crown rozet (sarı yıldız) tek başına yeterli sinyal. Frame
+  //   config'ten size_overrides geldiğinde de tutarsızlık önlenir.
+  const ownerAvatarSize = avatarSize;
   // ★ v108.14: Aktif çerçeve varsa — owner crown + avatarOwner border + avatarWrap turkuaz border
   //   gizlenir; çerçeve zaten kullanıcının statü/aksesuarını taşır, çift halka karmaşası kalkar.
   const activeFrameId = !(u as any).disguise ? (u.user as any)?.active_frame : null;
   const hasFrame = !!activeFrameId;
+  // ★ v267: Frame name_enabled aktifse AvatarFrame içindeki NameOverlay isim yazıyor.
+  //   Bizim default Text de aynı anda render edilirse ÇİFT İSİM çakışması olur.
+  //   SpeakerCard'da bu kontrol var, ListenerCell'de eksikti.
+  const listenerFrameCfg = useFrameConfig(activeFrameId, 'listener');
+  const hideDefaultName = !!listenerFrameCfg?.name_enabled;
   // ★ 2026-05-05: Plus/Pro/GM kompakt tier etiketi — dinleyici/mini avatar üstünde sağ-altta.
   //   Free → hiç gösterme. Disguise (maske) modunda da gizle.
   const userTier = !(u as any).disguise
@@ -90,26 +127,49 @@ const ListenerCell = React.memo(function ListenerCell({
   //   glow, halo, parçacıklar) artık dinleyici grid'de de tam çalışır.
   //   Eski: ham Image + ayrı RoomAvatarFrame + hardcoded TierBadge.
   //   Yeni: StatusAvatar hepsini tek component'te yönetir.
+  // ★ v117: Web admin config'ten gelen shape ve indicator overrides
+  const cfgRadius = cfgShape && cfgBorderRadius !== undefined
+    ? (cfgShape === 'circle' ? ownerAvatarSize / 2
+      : cfgShape === 'square' ? 0
+      : cfgShape === 'rounded' ? Math.min(cfgBorderRadius, ownerAvatarSize / 2)
+      : ownerAvatarSize / 2)
+    : ownerAvatarSize / 2;
+  // ★ v258 fix: Owner için ÇİFT sinyal kaldırıldı — sarı halka + sarı crown badge
+  //   aynı avatara biniyordu (çift "owner" işareti, küçük avatarı daha da büyütüyordu).
+  //   Crown badge tek başına yeterli sinyal; halka kaldırıldı.
+  const ringW = cfgRingWidth ?? (hasFrame ? 0 : 2);
+  const ringC = cfgRingColor && cfgRingColor !== 'transparent'
+    ? cfgRingColor
+    : 'rgba(20,184,166,0.25)';
+
   return (
     <Pressable style={[s.cell, { width: cellW }]} onPress={() => onSelectUser(u)}>
-      {isOwner && !hasFrame && <ListenerOwnerBadge />}
+      {isOwner && !hasFrame && (cfgOwnerCrownEnabled !== false) && <ListenerOwnerBadge />}
+      {/* ★ v262 (13 May 2026): GlowView'a sadece borderRadius (cfgRadius) eklendi —
+          selected/muted highlight border'ı avatarın MEVCUT şekline (circle/square/rounded/
+          hex) uyacak. width/height ve overflow:hidden YOK çünkü onlar frame editör ile
+          çakışıyor (size_overrides, frame Lottie taşması). Border yuvarlaması ise zararsız. */}
       <GlowView style={[
         isSelected && s.avatarSelected,
-        isOwner && !hasFrame && s.avatarOwner,
         showMuteIndicator && s.avatarMuted,
-        { borderRadius: ownerAvatarSize / 2, overflow: 'visible' },
+        { borderRadius: cfgRadius },
       ]}>
         <StatusAvatar
           uri={(u as any).disguise?.avatar_url || u.user?.avatar_url}
           size={ownerAvatarSize}
           tier={userTier}
           frameId={activeFrameId}
+          // ★ v265 (13 May 2026): showTierBadge HARDCODE KALDIRILDI — frame editör
+          //   'tier_badge_enabled' ayarı kontrol etsin. Web admin'den listener override'da
+          //   açıp kapatmak artık çalışır. Frame YOKSA default davranış (Free gizli, Pro/Plus
+          //   görünür) geçerli.
           showTierBadge
           tierBadgeSize="xs"
           displayName={displayName}
           contextKey="listener"
-          borderColor={isOwner && !hasFrame ? 'rgba(255,215,0,0.7)' : 'rgba(20,184,166,0.25)'}
-          borderWidth={hasFrame ? 0 : 2}
+          borderColor={ringC}
+          borderWidth={ringW}
+          customBadgeId={!(u as any).disguise ? ((u.user as any)?.active_badge_id ?? null) : null}
         />
       </GlowView>
       {showMuteIndicator && (
@@ -124,9 +184,16 @@ const ListenerCell = React.memo(function ListenerCell({
       )}
       {flash && <View style={[s.flashWrap, { height: ownerAvatarSize }]}><AvatarPenaltyFlash flashType={flash} size={ownerAvatarSize} onFlashDone={() => onFlashDone?.(u.user_id)} /></View>}
       {hasHandRaised && <HandRaiseBadge />}
-      <Text style={[s.name, { fontSize: nameSize, maxWidth: cellW }, isOwner && s.nameOwner, showMuteIndicator && { color: 'rgba(239,68,68,0.6)' }]} numberOfLines={1}>
-        {displayName}
-      </Text>
+      {!hideDefaultName && (
+        <Text
+          style={[s.name, { fontSize: nameSize, maxWidth: cellW }, isOwner && s.nameOwner, showMuteIndicator && { color: 'rgba(239,68,68,0.6)' }]}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.7}
+        >
+          {displayName}
+        </Text>
+      )}
     </Pressable>
   );
 });
@@ -138,6 +205,9 @@ export default function ListenerGrid({ listeners, onSelectUser, selectedUserId, 
   //   Eskiden W module-level idi, erken return sonrası useMemo sorunsuzdu; şimdi
   //   useWindowDimensions hook olduğu için useMemo'dan ayrılmamalı.
   const { width: W } = useWindowDimensions();
+  // ★ v115 (13 May 2026): Oda düzen config — avatar shape, gap, size preset
+  const layout = useRoomLayout();
+  const listenersCfg = layout.listeners;
 
   // ★ Hiyerarşik sıralama — modern platform pattern (Clubhouse/Spaces)
   // 1. Oda sahibi (owner) en başta
@@ -174,7 +244,9 @@ export default function ListenerGrid({ listeners, onSelectUser, selectedUserId, 
   const overflowCount = overflowListeners + spectatorCount;
 
   // ★ Dinamik boyut hesapla
-  const { avatarGap, cellW, avatarSize } = getGridMetrics(visibleListeners.length, W);
+  const { avatarGap, cellW, avatarSize } = getGridMetrics(visibleListeners.length, W, listenersCfg);
+  // ★ v115: Avatar shape config'ten
+  const listenerAvatarRadius = shapeBorderRadius(listenersCfg.avatarShape, avatarSize, listenersCfg.borderRadius);
   const nameSize = visibleListeners.length > 12 ? 9 : visibleListeners.length > 8 ? 10 : 11;
 
   return (
@@ -203,6 +275,13 @@ export default function ListenerGrid({ listeners, onSelectUser, selectedUserId, 
               isChatMuted={isChatMuted}
               flash={flash}
               hasHandRaised={hasHandRaised}
+              cfgShape={listenersCfg.avatarShape}
+              cfgBorderRadius={listenersCfg.borderRadius}
+              cfgRingWidth={listenersCfg.ringWidth}
+              cfgRingColor={listenersCfg.ringColor}
+              cfgShowName={listenersCfg.showName}
+              cfgOwnerCrownEnabled={listenersCfg.ownerCrownEnabled}
+              cfgOwnerHighlight={layout.accents.ownerHighlight}
               onSelectUser={onSelectUser}
               onFlashDone={onFlashDone}
             />
@@ -368,6 +447,9 @@ const s = StyleSheet.create({
   },
   listenerBadgeBody: {
     width: 18, height: 18, borderRadius: 9,
+    // ★ v261: overflow:hidden eksikti → LinearGradient kare çizip borderRadius'u
+    //   görmezden geliyordu. Rozet "kare" görünüyordu, halka "daire". Şimdi clip ile daire.
+    overflow: 'hidden',
     alignItems: 'center', justifyContent: 'center',
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)',
     shadowColor: '#FFD700', shadowOffset: { width: 0, height: 1 },
@@ -397,17 +479,18 @@ function ListenerOwnerBadge() {
 
   return (
     <View style={s.listenerBadgeContainer}>
-      <Animated.View style={{ position: 'absolute', opacity: glowAnim }}>
-        <GlowView style={s.listenerGlowRing} />
-      </Animated.View>
-      <GlowView style={s.listenerBadgeBody}>
+      {/* ★ v260 (13 May 2026): GlowView (Skia BlurMask) kaldırıldı — sade View geri geldi.
+          Kullanıcı geri bildirimi: "host yıldızı yapısı değişmiş" — Skia glow halo 60px
+          küçük avatar etrafında abartı duruyordu. Pulse animasyonu opacity ile korundu. */}
+      <Animated.View style={[s.listenerGlowRing, { position: 'absolute', opacity: glowAnim }]} />
+      <View style={s.listenerBadgeBody}>
         <LinearGradient
           colors={['#FFD700', '#F59E0B', '#D97706']}
           start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
           style={StyleSheet.absoluteFillObject}
         />
         <Ionicons name="star" size={10} color="#FFF" />
-      </GlowView>
+      </View>
     </View>
   );
 }

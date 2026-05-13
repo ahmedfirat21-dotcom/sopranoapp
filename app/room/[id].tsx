@@ -101,6 +101,7 @@ import RoomBoostSheet, { type RoomBoostTier } from '../../components/RoomBoostSh
 import InviteFriendsModal from '../../components/room/InviteFriendsModal';
 import RoomInfoHeader from '../../components/room/RoomInfoHeader';
 import SpeakerSection from '../../components/room/SpeakerSection';
+import { CosmeticParticleEffect } from '../../components/skia';
 import CameraFullscreenModal from '../../components/room/CameraFullscreenModal';
 import ListenerGrid from '../../components/room/ListenerGrid';
 import RoomControlBar from '../../components/room/RoomControlBar';
@@ -4603,6 +4604,14 @@ export default function RoomScreen() {
           </Text>
         </Pressable>
       )}
+
+      {/* ★ v117: Oda partikül/sahne efekti — host'un active_effect_id'sine göre Skia render */}
+      <CosmeticParticleEffect
+        effectItemId={(room as any)?.active_effect_id || null}
+        context="room"
+        width={W}
+        height={H}
+      />
 
       {/* ★ 2026-04-21: SAHNE max-height DİNAMİK — konuşmacı sayısına göre,
           chat alanına daha fazla yer kalsın. Avatarlar grid zaten shrink (getSpeakerMetrics). */}

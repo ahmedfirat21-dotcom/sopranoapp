@@ -194,7 +194,7 @@ export default function RoomCreateHintSheet({ visible, onGoToMyRooms, onClose }:
             <Pressable style={styles.ctaSecondary} onPress={onClose}>
               <Text style={styles.ctaSecondaryText}>Şimdi değil</Text>
             </Pressable>
-            <SkiaShadow shadowColor="#EC4899" shadowOpacity={0.55} shadowBlur={12} shadowOffsetY={4} borderRadius={12}>
+            <SkiaShadow shadowColor="#EC4899" shadowOpacity={0.55} shadowBlur={12} shadowOffsetY={4} borderRadius={12} style={{ flex: 1.5 }}>
               <Pressable style={styles.ctaPrimary} onPress={onGoToMyRooms}>
                 <LinearGradient
                   colors={['#EC4899', '#BE185D', '#831843']}
@@ -291,7 +291,10 @@ const styles = StyleSheet.create({
     color: '#94A3B8',
   },
   ctaPrimary: {
-    flex: 1.5,
+    // ★ v254: flex SkiaShadow wrapper'a taşındı (style={{flex:1.5}}); buton parent'ı
+    //   tam doldursun diye width:'100%'. Önceden ctaPrimary flex:1.5 verilse de
+    //   SkiaShadow contentWrapper inline (flex:0) içeride sıkışıyordu.
+    width: '100%',
     height: 50,
     borderRadius: 14,
     overflow: 'hidden',
@@ -299,7 +302,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    // ★ v1.3.69: Skia ile cross-platform pink glow (dış SkiaShadow wrap)
   },
   ctaPrimaryText: {
     fontSize: 14,

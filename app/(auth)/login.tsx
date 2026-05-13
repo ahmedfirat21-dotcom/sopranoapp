@@ -8,6 +8,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Shadows, Gradients, Radius } from '../../constants/theme';
 import { supabase } from '../../constants/supabase';
+import { GlowView } from '../../components/skia';
 
 // ★ v107.48: Google Sign-In v16 export uyumsuzluğu düzeltildi.
 //   Önceden: const gsignin = require(...); GoogleSignin = gsignin.GoogleSignin
@@ -165,35 +166,35 @@ export default function LoginScreen() {
       }
     })();
 
-    // ★ Staggered entrance: Soprano ← … → Chat (coming together efekti)
-    // Adım 1: "Soprano" soldan süzülerek gelir (300ms bekleme sonrası)
+    // ★ v274 (14 May 2026) ANIMATION REFACTOR:
+    //   Eski sırada bug vardı (buttons timer 1000ms iken stats 1600ms — buttons önce
+    //   geliyordu). Ek olarak Soprano+Chat farklı spring config'leri görsel uyumsuzluk
+    //   yaratıyordu. Toplam süre 1.6sn+ ile modern app standartlarının (Spotify/IG ~1s)
+    //   üzerindeydi. Yeni: hızlı + sıralı + tutarlı (~1.1sn total).
+    // Adım 1 (200ms): Soprano + Chat AYNI ANDA, aynı spring config — "birleşik tek nefes"
     const sopranoTimer = setTimeout(() => {
       Animated.parallel([
-        Animated.timing(sopranoOpacity, { toValue: 1, duration: 800, useNativeDriver: true }),
-        Animated.spring(sopranoTranslateX, { toValue: 0, friction: 7, tension: 40, useNativeDriver: true }),
+        Animated.timing(sopranoOpacity, { toValue: 1, duration: 500, useNativeDriver: true }),
+        Animated.spring(sopranoTranslateX, { toValue: 0, friction: 7, tension: 45, useNativeDriver: true }),
+        Animated.timing(chatOpacity, { toValue: 1, duration: 500, useNativeDriver: true }),
+        Animated.spring(chatTranslateX, { toValue: 0, friction: 7, tension: 45, useNativeDriver: true }),
       ]).start();
-    }, 300);
+    }, 200);
 
-    // Adım 2: "Chat" sağdan bounce ederek gelir (900ms bekleme — Soprano yarıda iken)
-    const chatTimer = setTimeout(() => {
-      Animated.parallel([
-        Animated.timing(chatOpacity, { toValue: 1, duration: 700, useNativeDriver: true }),
-        Animated.spring(chatTranslateX, { toValue: 0, friction: 6, tension: 50, useNativeDriver: true }),
-      ]).start();
-    }, 900);
-
-    // Adım 3: Stats (1600ms — logo yerleştikten sonra)
+    // Adım 2 (500ms): Stats fade — logo yerleşirken
     const statsTimer = setTimeout(() => {
-      Animated.timing(statsOpacity, { toValue: 1, duration: 400, useNativeDriver: true }).start();
-    }, 1600);
+      Animated.timing(statsOpacity, { toValue: 1, duration: 350, useNativeDriver: true }).start();
+    }, 500);
 
-    // Adım 4: Buttons (2000ms — her şey hazır)
+    // Adım 3 (800ms): Buttons slide-up — her şey hazır
     const buttonsTimer = setTimeout(() => {
       Animated.parallel([
-        Animated.timing(buttonsOpacity, { toValue: 1, duration: 500, useNativeDriver: true }),
-        Animated.timing(buttonsTranslateY, { toValue: 0, duration: 500, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+        Animated.timing(buttonsOpacity, { toValue: 1, duration: 400, useNativeDriver: true }),
+        Animated.timing(buttonsTranslateY, { toValue: 0, duration: 400, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
       ]).start();
-    }, 1000);
+    }, 800);
+    // Geriye dönük uyumluluk için chatTimer hala referans olarak tutulur (cleanup'ta gerek)
+    const chatTimer = setTimeout(() => {}, 0);
 
     // ★ Cleanup — unmount'ta timer'ları iptal et
     return () => {
@@ -545,11 +546,11 @@ export default function LoginScreen() {
             <Animated.View style={[s.statsContainer, { opacity: statsOpacity }]}>
               <View style={s.statsRow}>
                 <View style={s.statPill}>
-                  <View style={[s.statDot, { backgroundColor: '#4ADE80' }]} />
+                  <GlowView style={[s.statDot, { backgroundColor: '#4ADE80' }]} />
                   <Text style={s.statText}>{formatStatNumber(onlineCount)} çevrimiçi</Text>
                 </View>
                 <View style={s.statPill}>
-                  <View style={[s.statDot, s.statDotLive]} />
+                  <GlowView style={[s.statDot, s.statDotLive]} />
                   <Text style={s.statText}>{formatStatNumber(liveRoomCount)} canlı oda</Text>
                 </View>
               </View>

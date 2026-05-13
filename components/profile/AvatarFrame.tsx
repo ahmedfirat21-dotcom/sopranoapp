@@ -426,9 +426,10 @@ function ParticleOverlay({ size, dynCfg }: { size: number; dynCfg: any }) {
   const emoji = type === 'sparkle' ? '✨' : type === 'stars' ? '⭐' : type === 'hearts' ? '❤️' : '🫧';
   const avatarRatio: number = typeof dynCfg?.avatar_ratio === 'number' ? dynCfg.avatar_ratio : 0.92;
   const effectiveAvatarSize = size * avatarRatio;
-  const fontSize = Math.max(14, Math.round(effectiveAvatarSize * 0.18));
-  // Yörünge: gerçek görsel avatar yarıçapı + min 18px boşluk
-  const orbitRadius = effectiveAvatarSize / 2 + Math.max(18, fontSize * 0.4);
+  const fontSize = Math.max(12, Math.round(effectiveAvatarSize * 0.15));
+  // ★ v267: Yörünge avatar'a YAKIN — eskiden +18px boşluk vardı, çok dış görünüyordu.
+  //   Şimdi +4px ile avatar kenarına yapışık orbit. Web admin önizleme paritesi.
+  const orbitRadius = effectiveAvatarSize / 2 + Math.max(4, fontSize * 0.15);
   const wrapperOffset = orbitRadius + fontSize;
   const wrapperSize = wrapperOffset * 2;
   const rotateInterp = orbitAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
@@ -843,13 +844,13 @@ function FrameShimmerOverlay({
   );
 }
 
-// ★ 2026-05-11: Tier Badge — 8 nokta + 4 stil overlay
-//   Web'deki BADGE_POSITIONS karşılığı. PRO örnek metin (mobilde gerçek
-//   user.tier ile değiştirilecek).
+// ★ v269 (14 May 2026): BADGE_POS_MOBILE değerleri Web admin paritesi için 0.5/0.55
+//   → 0.354 (daire avatar 45°) ile eşitlendi. Audit raporundaki ölü kod tutarsızlığı
+//   düzeltildi. StatusAvatar'daki ana BADGE_POS ile birebir aynı.
 const BADGE_POS_MOBILE: Record<string, { x: number; y: number }> = {
-  tl: { x: -0.5, y: -0.5 }, tc: { x: 0, y: -0.55 }, tr: { x: 0.5, y: -0.5 },
-  ml: { x: -0.55, y: 0 },                            mr: { x: 0.55, y: 0 },
-  bl: { x: -0.5, y: 0.5 },  bc: { x: 0, y: 0.55 },   br: { x: 0.5, y: 0.5 },
+  tl: { x: -0.354, y: -0.354 }, tc: { x: 0,      y: -0.5   }, tr: { x: 0.354,  y: -0.354 },
+  ml: { x: -0.5,   y: 0       },                                mr: { x: 0.5,    y: 0       },
+  bl: { x: -0.354, y: 0.354   }, bc: { x: 0,      y: 0.5    }, br: { x: 0.354,  y: 0.354   },
 };
 function TierBadgeOverlay({ size, position, style: badgeStyle, label }: {
   size: number; position: string; style: string; label: string;

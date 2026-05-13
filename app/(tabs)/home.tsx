@@ -35,7 +35,7 @@ import AnimatedLogo from '../../components/AnimatedLogo';
 import AnimatedHeaderIconBtn from '../../components/AnimatedHeaderIconBtn';
 import StatusAvatar from '../../components/StatusAvatar';
 import { getAvatarSource } from '../../constants/avatars';
-import { SkiaShadow } from '../../components/skia';
+import { SkiaShadow, GlowView, CosmeticBackground } from '../../components/skia';
 
 import { showToast } from '../../components/Toast';
 import { isSystemRoom } from '../../services/showcaseRooms';
@@ -212,7 +212,7 @@ function BoostedProfileCard({ profile: bp, index, friendIds, onlineIds }: { prof
             )}
             <StatusAvatar uri={bp.avatar_url} size={58} tier={tier} isAdmin={bp.is_admin} frameId={(bp as any).active_frame} />
             {showOnline && (
-              <View style={{
+              <GlowView style={{
                 position: 'absolute', bottom: 2, right: 2,
                 width: 13, height: 13, borderRadius: 6.5,
                 backgroundColor: '#22C55E',
@@ -1392,6 +1392,8 @@ export default function HomeScreen() {
 
   return (
     <AppBackground variant="explore" radialGlow>
+      {/* ★ v270 (14 May 2026): Kullanıcı kozmetik arkaplan — varsa AppBackground üstüne Skia katman */}
+      <CosmeticBackground bgItemId={(profile as any)?.active_bg_id} context="home" style={{ flex: 1 }}>
       <View style={s.container}>
         {/* ═══ Premium Header — Glassmorphic topBar + SP Wallet Hero ═══ */}
         <Animated.View style={[s.topBarWrap, { paddingTop: insets.top, transform: [{ translateY: bannerTranslateY }] }]}>
@@ -1769,7 +1771,7 @@ export default function HomeScreen() {
                    yanıltıcı duruyordu. Empty state kendi başına anlatsın. */}
               {(filteredRooms.length > 0 || loadError) && (
                 <View style={s.sectionTitleRow}>
-                  <View style={s.sectionAccent} />
+                  <GlowView style={s.sectionAccent} />
                   <Ionicons name="radio" size={16} color="#EF4444" />
                   <Text style={s.sectionTitle}>
                     {activeFilter === 'all'
@@ -2087,6 +2089,7 @@ export default function HomeScreen() {
 
 
       </View>
+      </CosmeticBackground>
     </AppBackground>
   );
 }

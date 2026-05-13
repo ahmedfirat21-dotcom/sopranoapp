@@ -74,7 +74,7 @@ export default function Item3DArt({
     return () => { floatLoop.stop(); breathLoop.stop(); };
   }, [staticMode, float, breath]);
 
-  if (!source && !lottieSource && !remoteAsset?.url) return null;
+  if (!source && !lottieSource && !remoteAsset?.url && !remoteAsset?.thumbUrl) return null;
 
   const wrapStyle: any = fullSize
     ? { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' }
@@ -83,7 +83,21 @@ export default function Item3DArt({
   // ★ v110.8 (7 May 2026): PNG sembol büyütüldü — 70%/0.85 → 80%/0.95.
   //   Mağazada Lottie ürünleri (Soprano Aura) ile PNG ürünleri (Phoenix Halkası, Galaktik)
   //   arasındaki boyut farkı belirgindi; PNG hafif büyüyüp Lottie hafif küçüldü.
-  const symbolSize = fullSize ? '80%' : size * 0.95;
+  // ★ v249 (13 May 2026): cover ayarları (scale/padding/fit) thumbUrl varken uygulanır.
+  const coverScale = remoteAsset?.cover?.scale ?? 1;
+  const coverPadding = remoteAsset?.cover?.padding ?? 0;
+  // ★ v249: Web admin 'fit' değerleri (cover|contain|fill|none) → RN resizeMode eşleme.
+  //   Geçersiz değer → 'contain' fallback (crash/propTypes uyarısı önlenir).
+  const _rawFit = remoteAsset?.cover?.fit;
+  const coverFit: 'cover' | 'contain' | 'stretch' | 'center' =
+    _rawFit === 'cover' ? 'cover'
+    : _rawFit === 'fill' ? 'stretch'
+    : _rawFit === 'none' ? 'center'
+    : 'contain';
+  const baseSymbol = fullSize ? 0.80 : 0.95;
+  const symbolSize = fullSize
+    ? `${Math.round(baseSymbol * coverScale * 100)}%`
+    : size * baseSymbol * coverScale;
   const haloSize = fullSize ? '90%' : size * 1.0; // tematik parçacık container'ı için
 
   const symbolScale = breath.interpolate({ inputRange: [0, 1], outputRange: [1, 1.05] });
@@ -122,11 +136,26 @@ export default function Item3DArt({
             resizeMode="contain"
           />
         </Animated.View>
+      ) : remoteAsset?.thumbUrl && staticMode ? (
+        // ★ v249: Mağaza listesi/küçük kart — admin'in yüklediği ön kapak
+        //   (efektlerin uygulanmış cured hali). Statik, hafif.
+        <Animated.Image
+          source={{ uri: remoteAsset.thumbUrl }}
+          style={{
+            width: symbolSize as any,
+            height: symbolSize as any,
+            padding: coverPadding,
+            transform: [],
+          }}
+          resizeMode={coverFit}
+          fadeDuration={0}
+        />
       ) : remoteAsset?.url && remoteAsset.type === 'lottie' ? (
         <Animated.View
           style={{
             width: symbolSize as any,
             height: symbolSize as any,
+            padding: coverPadding,
             transform: staticMode ? [] : [{ translateY: symbolY }, { scale: symbolScale }],
           }}
         >
@@ -135,7 +164,7 @@ export default function Item3DArt({
             autoPlay={!staticMode}
             loop={!staticMode}
             style={{ width: '100%', height: '100%' }}
-            resizeMode="contain"
+            resizeMode={coverFit}
           />
         </Animated.View>
       ) : remoteAsset?.url && remoteAsset.type === 'image' ? (
@@ -144,9 +173,23 @@ export default function Item3DArt({
           style={{
             width: symbolSize as any,
             height: symbolSize as any,
+            padding: coverPadding,
             transform: staticMode ? [] : [{ translateY: symbolY }, { scale: symbolScale }],
           }}
-          resizeMode="contain"
+          resizeMode={coverFit}
+          fadeDuration={0}
+        />
+      ) : remoteAsset?.thumbUrl ? (
+        // ★ v249: Detay/dolu kart için thumb fallback (Lottie/image yok ama thumb var)
+        <Animated.Image
+          source={{ uri: remoteAsset.thumbUrl }}
+          style={{
+            width: symbolSize as any,
+            height: symbolSize as any,
+            padding: coverPadding,
+            transform: staticMode ? [] : [{ translateY: symbolY }, { scale: symbolScale }],
+          }}
+          resizeMode={coverFit}
           fadeDuration={0}
         />
       ) : null}

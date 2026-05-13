@@ -62,13 +62,15 @@ interface Props {
   hasUnequippedFrame?: boolean;
   /** ★ v1.3.54: profiles.show_tier_badge — false ise tier rozeti gizlenir. Default true. */
   showTierBadge?: boolean;
+  /** ★ v120: profiles.active_badge_id — Web admin Rozet ürünü (Skia render). */
+  activeBadgeId?: string | null;
 }
 
 export default function ProfileHero({
   displayName, username, bio, avatarUrl, subscriptionTier, isAdmin, userTitle,
   stats, statsLoading, onEdit, onBioPress, onFollowersPress, onRoomsPress, onGiftsPress, onAvatarPress,
   memberSince, boostExpiresAt, isOnline, lastSeen, activeFrame, onFramePress, hasUnequippedFrame,
-  showTierBadge = true,
+  showTierBadge = true, activeBadgeId,
 }: Props) {
   // ★ v110: Phase 2 fetch tamamlanana kadar sayı yerine "—" — yanıltıcı 0 flash önlenir.
   const fmtStat = (n: number | undefined) => statsLoading ? '—' : String(n ?? 0);
@@ -177,7 +179,7 @@ export default function ProfileHero({
             hitSlop={4}
             accessibilityLabel="Avatarı büyüt"
           >
-            <StatusAvatar uri={avatarUrl} size={160} tier={subscriptionTier} isAdmin={isAdmin} isOnline={isOnline} isSelf={!!onEdit} showTierBadge={showTierBadge} tierBadgeSize="md" frameId={activeFrame} displayName={displayName} contextKey="profile" />
+            <StatusAvatar uri={avatarUrl} size={160} tier={subscriptionTier} isAdmin={isAdmin} isOnline={isOnline} isSelf={!!onEdit} showTierBadge={showTierBadge} tierBadgeSize="md" frameId={activeFrame} displayName={displayName} contextKey="profile" customBadgeId={activeBadgeId} />
           </Pressable>
         </View>
 

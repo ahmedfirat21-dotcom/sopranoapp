@@ -3,10 +3,11 @@
        Önceki #131D30 daha aydınlıktı, splash → app geçişinde "iki tonlu" hissi yaratıyordu.
        Artık logo aynı zemin üzerinde "pop" yapar, kayma yok. -->
   <color name="splashscreen_background">#0A0F1A</color>
-  <!-- ★ 2026-05-09: Adaptive icon arka planı app/splash rengi (#0A0F1A) ile eşitlendi.
-       Önceki #00FFFFFF (saydam) launcher'da siyah render ediliyordu (Pixel/emülatör)
-       veya rastgele beyaz/wallpaper geliyordu — tutarsızdı. Tek brand rengi sağlam. -->
-  <color name="iconBackground">#0A0F1A</color>
+  <!-- ★ 2026-05-13 v253: Launcher icon'u kullanıcının verdiği teal-gradient PNG ile
+       değiştirildi (assets/launcher_icon.png). Adaptive icon foreground inset edildiğinde
+       köşelerde görünen background rengi PNG'nin dış kenar teal'ı ile uyumlu seçildi —
+       önceki #0A0F1A (siyahımsı) Samsung One UI launcher'da batık görünüyordu. -->
+  <color name="iconBackground">#0F7670</color>
   <color name="colorPrimary">#023c69</color>
   <color name="colorPrimaryDark">#131D30</color>
   <color name="notification_icon_color">#14B8A6</color>

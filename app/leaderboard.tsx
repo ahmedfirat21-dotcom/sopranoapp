@@ -27,7 +27,8 @@ import StatusAvatar from '../components/StatusAvatar';
 import { Colors } from '../constants/theme';
 import AppBackground from '../components/AppBackground';
 import SPIcon from '../components/SPIcon';
-import { useUserProfileSheet } from './_layout';
+import { useUserProfileSheet, useAuth } from './_layout';
+import { CosmeticBackground } from '../components/skia';
 
 const { width: W } = Dimensions.get('window');
 
@@ -370,6 +371,7 @@ const shS = StyleSheet.create({
 export default function LeaderboardScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { profile } = useAuth();
 
   const [period, setPeriod] = useState<TimePeriod>('weekly');
   const [loading, setLoading] = useState(true);
@@ -584,7 +586,7 @@ export default function LeaderboardScreen() {
 
   // ─── RENDER ────────────────────────────────────────────
   return (
-    <AppBackground radialGlow><View style={s.container}>{/* ─── Header ─── */}
+    <AppBackground radialGlow><CosmeticBackground bgItemId={(profile as any)?.active_bg_id} context="leaderboard" style={{ flex: 1 }}><View style={s.container}>{/* ─── Header ─── */}
       <View style={[s.header, { paddingTop: insets.top + 8 }]}>
         <Pressable style={[s.backBtn]} onPress={() => safeGoBack(router)}>
           <Ionicons name="chevron-back" size={22} color="#F1F5F9" />
@@ -829,7 +831,7 @@ export default function LeaderboardScreen() {
           )}
         </ScrollView>
       )}
-    </View></AppBackground>
+    </View></CosmeticBackground></AppBackground>
   );
 }
 

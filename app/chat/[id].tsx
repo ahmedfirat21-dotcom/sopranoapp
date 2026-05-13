@@ -8,7 +8,7 @@ import { View, Text, StyleSheet, Image, Pressable, TextInput, FlatList, Platform
 import PremiumAlert, { type AlertButton } from '../../components/PremiumAlert';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { SkiaShadow } from '../../components/skia';
+import { SkiaShadow, GlowMessageBubble } from '../../components/skia';
 import { Colors, Radius } from '../../constants/theme';
 import { safeGoBack } from '../../constants/navigation';
 import { MessageService, ProfileService, type Message, type Profile } from '../../services/database';
@@ -26,6 +26,8 @@ import { useDMNotif } from '../../providers/DMNotifProvider';
 import StatusAvatar from '../../components/StatusAvatar';
 import MessageActionMenu from '../../components/MessageActionMenu';
 import LinkifiedText from '../../components/LinkifiedText';
+// ★ v270 (14 May 2026): Custom emoji shortcode → image render
+import { InlineEmoji } from '../../components/skia/CustomEmojiRenderer';
 import LinkPreviewCard from '../../components/LinkPreviewCard';
 import { useUserSearchSheet } from '../_layout';
 import * as Clipboard from 'expo-clipboard';
@@ -383,7 +385,9 @@ function MessageBubble({ message, isMe, senderAvatar, senderName, myAvatar, onDe
           </Text>
         </View>
       ) : (
-        <View style={[styles.bubble, isMe ? styles.bubbleMe : styles.bubbleOther, customStyle]}>
+        <GlowMessageBubble glowItemId={(message.sender as any)?.active_glow_id} context="dm" style={[styles.bubble, isMe ? styles.bubbleMe : styles.bubbleOther, customStyle] as any}>
+          {/* ★ v117: GlowMessageBubble — sender'ın active_glow_id'sine göre Skia glow + animasyon
+             Eğer glow_id yoksa düz View wrapper olarak davranır (no-op). */}
           {/* ★ v109: Forwarded rozeti — bubble üstünde "İletildi" göstergesi */}
           {isForwarded ? (
             <View style={styles.forwardedRow}>
@@ -417,7 +421,16 @@ function MessageBubble({ message, isMe, senderAvatar, senderName, myAvatar, onDe
             <VoiceMessagePlayer voiceUrl={message.voice_url!} duration={message.voice_duration || undefined} isMe={isMe} />
           ) : !hasImage && message.content ? (
             <>
-              <LinkifiedText text={message.content} style={styles.bubbleText} />
+              {/* ★ v270: Custom emoji shortcode varsa InlineEmoji ile image render et,
+                   yoksa standart LinkifiedText (link parsing + tıklanabilir). */}
+              {(() => {
+                const senderEmojiId = (message.sender as any)?.active_emoji_id || null;
+                const hasShortcode = /:[a-z0-9_-]+:/i.test(message.content);
+                if (hasShortcode && senderEmojiId) {
+                  return <InlineEmoji text={message.content} emojiSetId={senderEmojiId} textStyle={styles.bubbleText as any} />;
+                }
+                return <LinkifiedText text={message.content} style={styles.bubbleText} />;
+              })()}
               {/* ★ v109: Link preview kartı — content'te URL varsa OG metadata göster */}
               <LinkPreviewCard text={message.content} isMe={isMe} />
             </>
@@ -426,7 +439,7 @@ function MessageBubble({ message, isMe, senderAvatar, senderName, myAvatar, onDe
           {isEdited ? (
             <Text style={styles.editedBadge}>düzenlendi</Text>
           ) : null}
-        </View>
+        </GlowMessageBubble>
       )}
       {/* ★ Emoji tepkileri göster — balon stilinde */}
       {Object.keys(reactions).length > 0 && (

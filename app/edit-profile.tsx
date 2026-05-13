@@ -7,7 +7,7 @@ import {
 import AppLoader from '../components/AppLoader';
 
 import { LinearGradient } from 'expo-linear-gradient';
-import { SkiaShadow } from '../components/skia';
+import { SkiaShadow, CosmeticBackground } from '../components/skia';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { safeGoBack } from '../constants/navigation';
@@ -435,6 +435,7 @@ export default function EditProfileScreen() {
 
   return (
     <AppBackground variant="profile" radialGlow>
+    <CosmeticBackground bgItemId={(profile as any)?.active_bg_id} context="edit-profile" style={{ flex: 1 }}>
     <View style={styles.container}>
       {/* ★ 2026-04-29: Glassmorphic header — Keşfet/Odalarım/Profil pattern */}
       <View style={[styles.headerBar, { paddingTop: insets.top }]}>
@@ -1063,6 +1064,7 @@ export default function EditProfileScreen() {
         onClose={() => setShowSocialLinksEditor(false)}
       />
     </View>
+    </CosmeticBackground>
     </AppBackground>
   );
 }

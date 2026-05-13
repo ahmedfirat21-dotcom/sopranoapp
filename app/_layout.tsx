@@ -100,6 +100,7 @@ import { auth } from '../constants/firebase';
 import { setActiveTheme, type ThemeKey } from '../constants/themeEngine';
 import { Colors } from '../constants/theme';
 import { ProfileService, MessageService, type Profile } from '../services/database';
+import { ThemeProvider as DynamicThemeProvider } from '../services/themeContext';
 import { FriendshipService } from '../services/friendship';
 import { GamificationService } from '../services/gamification';
 import { supabase, setSupabaseAuthToken, clearTokenCache, refreshTokenCache } from '../constants/supabase';
@@ -784,6 +785,24 @@ export default function RootLayout() {
         try {
           const { startCosmeticConfigSync } = require('../services/cosmeticConfigCache');
           startCosmeticConfigSync();
+        } catch {}
+        // ★ v115 (13 May 2026): Oda layout config realtime sub — web admin'de
+        //   yapılan oda düzeni ayarları mobile'a anında yansısın.
+        try {
+          const { startRoomLayoutSync } = require('../services/roomLayoutConfig');
+          startRoomLayoutSync();
+        } catch {}
+        // ★ v117 (13 May 2026): Yeni 6 kozmetik editör (glow/badge/background/theme/emoji/effect)
+        //   için merkezi cache+realtime sub. cosmetic_items UPDATE eventlerini dinler.
+        try {
+          const { startEditorConfigSync } = require('../services/cosmeticEditorConfigs');
+          startEditorConfigSync();
+        } catch {}
+        // ★ v120 (13 May 2026): Sistem teması (app_theme_config) realtime sub —
+        //   web admin tema renklerini değiştirdiğinde mobile anında yansır.
+        try {
+          const { startAppThemeSync } = require('../services/appThemeConfig');
+          startAppThemeSync();
         } catch {}
       } catch (e) {
         if (__DEV__) console.error('[RootLayout] Hazırlık hatası:', e);
@@ -1599,6 +1618,7 @@ export default function RootLayout() {
       <UserProfileSheetContext.Provider value={userProfileSheetContextValue}>
       <UserSearchSheetContext.Provider value={userSearchSheetContextValue}>
       <ThemeContext.Provider value={themeContextValue}>
+      <DynamicThemeProvider themeItemId={(profile as any)?.active_theme_id || null}>
       <RealtimeBadgeProvider userId={firebaseUser?.uid || null}>
       <OnlineFriendsProvider userId={firebaseUser?.uid || null}>
       <DMNotifProvider userId={firebaseUser?.uid || null}>
@@ -1843,6 +1863,7 @@ export default function RootLayout() {
     </DMNotifProvider>
     </OnlineFriendsProvider>
     </RealtimeBadgeProvider>
+    </DynamicThemeProvider>
     </ThemeContext.Provider>
       </UserSearchSheetContext.Provider>
       </UserProfileSheetContext.Provider>

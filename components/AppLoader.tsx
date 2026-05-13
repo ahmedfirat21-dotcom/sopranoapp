@@ -12,6 +12,9 @@
 
 import React, { useEffect, useRef } from 'react';
 import { View, Animated, Easing } from 'react-native';
+// ★ v270 (14 May 2026): Dinamik tema — admin'in tema sistemiyle ayarladığı color_primary
+//   loading rengini etkilesin. useThemedColors merkez context'ten okur.
+import { useThemedColors } from '../services/themeContext';
 
 // ★ v109.1: Lottie kaldırıldı — modern 3-dot pulse standart loader.
 //   Kullanıcı talebi: Lottie deneyleri sonrası eski tasarıma geri dön.
@@ -135,7 +138,11 @@ export default function AppLoader({
   }
 
   // ─── Fallback: 3-dot pulse ───────────────────────────────────────
-  const finalColor = color ?? STATE_COLOR[state];
+  // ★ v270: Theme entegrasyonu — color prop yoksa state için themed primary kullan.
+  //   Admin tema değiştirirse loader bunu otomatik yansıtır (default state için).
+  const themed = useThemedColors();
+  const stateColor = state === 'default' ? themed.color_primary : STATE_COLOR[state];
+  const finalColor = color ?? stateColor;
   const dotSize = Math.max(4, Math.round(dim * 0.22));
   const gap = Math.max(3, Math.round(dim * 0.14));
 

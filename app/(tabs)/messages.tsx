@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { View, Text, StyleSheet, FlatList, Image, Pressable, TextInput, ScrollView, Animated as RNAnimated, PanResponder, RefreshControl, Easing } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { SkiaShadow } from '../../components/skia';
+import { SkiaShadow, CosmeticBackground } from '../../components/skia';
 
 import { useRouter } from 'expo-router';
 import { Colors, Shadows } from '../../constants/theme';
@@ -977,6 +977,8 @@ export default function MessagesScreen() {
 
   return (
     <AppBackground variant="messages" radialGlow>
+    {/* ★ v270 (14 May 2026): Kullanıcı kozmetik arkaplan */}
+    <CosmeticBackground bgItemId={(profile as any)?.active_bg_id} context="messages" style={{ flex: 1 }}>
     <View style={[styles.container, { backgroundColor: 'transparent' }]}>
 
       {/* ═══ Header — Premium Glassmorphic banner (myrooms/home ile tutarlı) ═══ */}
@@ -1361,6 +1363,7 @@ export default function MessagesScreen() {
       {/* ★ 2026-04-21: Tab bar scroll fade — tüm tab sayfalarında tutarlı */}
       <TabBarFadeOut />
     </View>
+    </CosmeticBackground>
     </AppBackground>
   );
 }
