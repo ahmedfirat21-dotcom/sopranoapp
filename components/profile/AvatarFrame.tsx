@@ -318,7 +318,11 @@ function ParticleSkia({ x, y, fontSize, path, color, twinkleDelay }: {
   const scaleInterp = twinkleAnim.interpolate({ inputRange: [0, 1], outputRange: [0.85, 1.2] });
   const opacityInterp = twinkleAnim.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1] });
 
-  // Path 100x100 viewbox'ta tanımlı, fontSize'a ölçekle.
+  // ★ v1.3.68 FIX: Canvas padding — BlurMask halo dışa taşar, padding olmayınca
+  //   square corners olarak kırpılır ("altıgen gölge artifact" bug'ı).
+  const blurPad = 12;
+  const canvasSize = fontSize + blurPad * 2;
+  // Path 100x100 viewbox; canvas içinde ortala + fontSize'a ölçekle.
   const scale = fontSize / 100;
   const skPath = useMemo(() => SkiaApi.Path.MakeFromSVGString(path) || SkiaApi.Path.Make(), [path, SkiaApi]);
 
@@ -328,15 +332,15 @@ function ParticleSkia({ x, y, fontSize, path, color, twinkleDelay }: {
       style={{
         position: 'absolute',
         left: '50%' as any, top: '50%' as any,
-        marginLeft: x - fontSize / 2,
-        marginTop: y - fontSize / 2,
-        width: fontSize, height: fontSize,
+        marginLeft: x - canvasSize / 2,
+        marginTop: y - canvasSize / 2,
+        width: canvasSize, height: canvasSize,
         opacity: opacityInterp,
         transform: [{ scale: scaleInterp }],
       }}
     >
-      <Canvas style={{ width: fontSize, height: fontSize }}>
-        <Group transform={[{ scale }]}>
+      <Canvas style={{ width: canvasSize, height: canvasSize }}>
+        <Group transform={[{ translateX: blurPad, translateY: blurPad }, { scale }]}>
           {/* Dış glow halo (web drop-shadow 8px) */}
           <Path path={skPath} color={color} opacity={0.55}>
             <BlurMask blur={4} style="normal" />
