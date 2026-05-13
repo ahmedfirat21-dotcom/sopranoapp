@@ -8,6 +8,7 @@
 import React, { useEffect, useRef, useState, useCallback, useImperativeHandle, forwardRef } from 'react';
 import { View, Text, StyleSheet, Animated, Easing } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { GlowView } from './skia';
 
 export interface SPToastRef {
   show: (amount: number, label?: string) => void;
@@ -79,18 +80,17 @@ const SPToast = forwardRef<SPToastRef>((_, ref) => {
         return (
           <Animated.View
             key={item.id}
-            style={[
-              s.toast,
-              {
-                transform: [{ translateY }, { scale }],
-                opacity,
-                marginBottom: 4,
-              },
-            ]}
+            style={{
+              transform: [{ translateY }, { scale }],
+              opacity,
+              marginBottom: 4,
+            }}
           >
-            <Ionicons name="star" size={12} color="#FFD700" />
-            <Text style={s.amount}>+{item.amount}</Text>
-            <Text style={s.label}>{item.label}</Text>
+            <GlowView style={s.toast}>
+              <Ionicons name="star" size={12} color="#FFD700" />
+              <Text style={s.amount}>+{item.amount}</Text>
+              <Text style={s.label}>{item.label}</Text>
+            </GlowView>
           </Animated.View>
         );
       })}
