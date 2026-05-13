@@ -687,65 +687,96 @@ function PulseRingOverlay({ size, color }: { size: number; color: string }) {
   );
 }
 
-// ★ v1.3.68 PARİTE: Frame Shimmer — web admin CSS linear-gradient(110deg, ...)
-//   ile birebir. Eski: 0° yatay sweep, stops 0/0.5/1 — flow yanlıştı.
-//   Yeni: 110° diagonal sweep, stops 0.3/0.5/0.7 — web ile aynı parıltı bandı.
-function FrameShimmerOverlay({ size }: { size: number }) {
-  const shimmer = useRef(new Animated.Value(-1)).current;
+// ★ v1.3.68 PARİTE: Frame Shimmer — web admin CSS linear-gradient(110deg, ...) + bg-pos animation.
+//   CSS @keyframes 200% → -200% : gradient SAĞDAN SOLA kayar (band sağda başlar, sola geçer).
+//   Skia: Group transform animated (Reanimated SharedValue) — wrapper sabit, sadece içerideki band hareket eder.
+//   scale prop: web admin ileride slider ekledikte çağırır (default 1.0).
+function FrameShimmerOverlay({ size, scale = 1 }: { size: number; scale?: number }) {
+  const effSize = size * scale;
+  const offsetCenter = (size - effSize) / 2;
+
+  if (SkiaMod) {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const Reanimated = require('react-native-reanimated');
+    const { useSharedValue, useDerivedValue, withRepeat, withTiming, Easing: RAEasing } = Reanimated;
+    const { Canvas, Rect, LinearGradient: SkiaLG, vec, Group } = SkiaMod;
+
+    // CSS 200% → -200% = gradient bg pozisyonu (200% sağ, -200% sol) → SAĞ→SOL
+    // Skia translateX: +effSize×2 (sağda) → -effSize×2 (solda) === aynı yön.
+    const tx = useSharedValue(effSize * 2);
+    useEffect(() => {
+      tx.value = effSize * 2;
+      tx.value = withRepeat(
+        withTiming(-effSize * 2, { duration: 2500, easing: RAEasing.linear }),
+        -1,
+        false,
+      );
+    }, [effSize, tx, withRepeat, withTiming, RAEasing]);
+
+    const transform = useDerivedValue(() => [{ translateX: tx.value }]);
+    const tiltY = effSize * 0.36;
+
+    return (
+      <View
+        pointerEvents="none"
+        style={{
+          position: 'absolute',
+          top: offsetCenter, left: offsetCenter,
+          width: effSize, height: effSize,
+          borderRadius: effSize / 2,
+          overflow: 'hidden',
+          zIndex: 4,
+          elevation: 4,
+        }}
+      >
+        <Canvas style={{ width: effSize, height: effSize }}>
+          <Group transform={transform}>
+            <Rect x={0} y={0} width={effSize} height={effSize}>
+              <SkiaLG
+                start={vec(0, -tiltY / 2)}
+                end={vec(effSize, effSize + tiltY / 2)}
+                colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0)', 'rgba(255,255,255,0.4)', 'rgba(255,255,255,0)', 'rgba(255,255,255,0)']}
+                positions={[0, 0.3, 0.5, 0.7, 1]}
+              />
+            </Rect>
+          </Group>
+        </Canvas>
+      </View>
+    );
+  }
+
+  // Fallback: Skia yoksa eski Animated.View + LinearGradient
+  const shimmer = useRef(new Animated.Value(1)).current;
   useEffect(() => {
     const loop = Animated.loop(
-      Animated.timing(shimmer, { toValue: 1, duration: 2500, easing: Easing.linear, useNativeDriver: true })
+      Animated.timing(shimmer, { toValue: -1, duration: 2500, easing: Easing.linear, useNativeDriver: true })
     );
     loop.start();
     return () => loop.stop();
   }, [shimmer]);
-  // Sweep mesafesi: container × 1.5 (gradient bandı geçişe yetsin)
-  const translateX = shimmer.interpolate({ inputRange: [-1, 1], outputRange: [-size * 1.2, size * 1.2] });
-
-  const useSkia = !!SkiaMod;
-  const SkiaContent = useSkia ? (() => {
-    const { Canvas, Rect, LinearGradient: SkiaLG, vec } = SkiaMod;
-    // 110° CSS angle = mostly horizontal, ~20° tilt down to right.
-    // Skia vec start/end belirler gradient yönünü. Diagonal için Y eksenine hafif düşüş.
-    // CSS 110°: math 20° (atan(20°) ≈ 0.36 y/x ratio)
-    const tiltY = size * 0.36;
-    return (
-      <Canvas style={{ width: size, height: size }}>
-        <Rect x={0} y={0} width={size} height={size}>
-          <SkiaLG
-            start={vec(0, -tiltY / 2)}
-            end={vec(size, size + tiltY / 2)}
-            colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0)', 'rgba(255,255,255,0.4)', 'rgba(255,255,255,0)', 'rgba(255,255,255,0)']}
-            positions={[0, 0.3, 0.5, 0.7, 1]}
-          />
-        </Rect>
-      </Canvas>
-    );
-  })() : (
-    <LinearGradient
-      colors={['transparent', 'rgba(255,255,255,0.4)', 'transparent']}
-      start={{ x: 0.15, y: 0 }}
-      end={{ x: 0.85, y: 1 }}
-      locations={[0.3, 0.5, 0.7]}
-      style={{ width: '100%', height: '100%' }}
-    />
-  );
+  const translateX = shimmer.interpolate({ inputRange: [-1, 1], outputRange: [-effSize * 1.2, effSize * 1.2] });
 
   return (
     <Animated.View
       pointerEvents="none"
       style={{
         position: 'absolute',
-        top: 0, left: 0,
-        width: size, height: size,
-        borderRadius: size / 2,
+        top: offsetCenter, left: offsetCenter,
+        width: effSize, height: effSize,
+        borderRadius: effSize / 2,
         overflow: 'hidden',
         zIndex: 4,
         elevation: 4,
         transform: [{ translateX }],
       }}
     >
-      {SkiaContent}
+      <LinearGradient
+        colors={['transparent', 'rgba(255,255,255,0.4)', 'transparent']}
+        start={{ x: 0.15, y: 0 }}
+        end={{ x: 0.85, y: 1 }}
+        locations={[0.3, 0.5, 0.7]}
+        style={{ width: '100%', height: '100%' }}
+      />
     </Animated.View>
   );
 }
@@ -1809,9 +1840,9 @@ function AvatarFrameImpl({ frameId, size, forceRing, userName, userTier, context
           style={dynCfg?.avatar_border_style || 'solid'}
         />
       )}
-      {/* zIndex 4: frame_shimmer (ışık süpürmesi) */}
+      {/* zIndex 4: frame_shimmer (ışık süpürmesi). scale prop → web admin slider (frame_shimmer_scale) ile büyütme/küçültme. */}
       {dynCfg?.frame_shimmer && (
-        <FrameShimmerOverlay size={size} />
+        <FrameShimmerOverlay size={size} scale={dynCfg?.frame_shimmer_scale ?? 1} />
       )}
       {/* zIndex 4: particle */}
       {hasParticles && <ParticleOverlay size={size} dynCfg={dynCfg} />}
