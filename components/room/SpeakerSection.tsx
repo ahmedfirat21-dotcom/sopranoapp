@@ -8,6 +8,7 @@ import { RoleColors } from '../../constants/theme';
 import AvatarPenaltyFlash, { type FlashType } from './AvatarPenaltyFlash';
 import RoomAvatarFrame from './RoomAvatarFrame';
 import TierBadge from '../TierBadge';
+import { SkiaShadow } from '../skia';
 import type { RoomParticipant } from '../../services/database';
 
 // ★ Dinamik sahne boyutlandırma — modern platform grid sistemi (Clubhouse/Spaces pattern)
@@ -136,18 +137,12 @@ function SpeakingGlow({ speaking, borderRadius = 16 }: { speaking: boolean; bord
           opacity: ringBOpacity,
         }]}
       />
-      {/* Sabit referans border — yumuşak nefes (parlak iç çizgi, iOS'ta glow shadow) */}
+      {/* Sabit referans border — Skia BlurMask ile cross-platform turkuaz glow (Android dahil) */}
       <Animated.View
         pointerEvents="none"
         style={[StyleSheet.absoluteFill, {
           borderRadius, borderWidth: 2, borderColor: '#14B8A6',
           transform: [{ scale: breathScale }],
-          ...(Platform.OS === 'ios' ? {
-            shadowColor: '#14B8A6',
-            shadowOffset: { width: 0, height: 0 },
-            shadowOpacity: 0.6,
-            shadowRadius: 12,
-          } : {}),
         }]}
       />
     </>
@@ -395,7 +390,13 @@ function OwnerBadge() {
 
   return (
     <Animated.View style={[s.ownerBadgeContainer, { transform: [{ translateY: floatAnim }] }]}>
-      {/* ★ Outer glow ring */}
+      {/* ★ v1.3.68: Skia gold glow halo — Android'de görünür altın parıltı */}
+      <Animated.View style={{ position: 'absolute', opacity: glowAnim, alignItems: 'center', justifyContent: 'center' }}>
+        <SkiaShadow shadowColor="#FFD700" shadowOpacity={0.9} shadowBlur={18} shadowOffsetY={0} borderRadius={22}>
+          <View style={{ width: 44, height: 44, borderRadius: 22 }} />
+        </SkiaShadow>
+      </Animated.View>
+      {/* ★ Outer glow ring (border + iOS shadow korunur) */}
       <Animated.View style={[s.ownerGlowRing, { opacity: glowAnim }]} />
       {/* ★ Badge body — 4-stop gradient (parlak taç efekti) */}
       <LinearGradient
