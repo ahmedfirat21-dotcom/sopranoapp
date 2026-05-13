@@ -687,9 +687,9 @@ function PulseRingOverlay({ size, color }: { size: number; color: string }) {
   );
 }
 
-// ★ v1.3.68: Frame Shimmer — Skia LinearGradient ile soft ışık süpürmesi.
-//   Eski: expo-linear-gradient → Android'de farklı renk interpolation.
-//   Yeni: Skia LinearGradient → web ile birebir.
+// ★ v1.3.68 PARİTE: Frame Shimmer — web admin CSS linear-gradient(110deg, ...)
+//   ile birebir. Eski: 0° yatay sweep, stops 0/0.5/1 — flow yanlıştı.
+//   Yeni: 110° diagonal sweep, stops 0.3/0.5/0.7 — web ile aynı parıltı bandı.
 function FrameShimmerOverlay({ size }: { size: number }) {
   const shimmer = useRef(new Animated.Value(-1)).current;
   useEffect(() => {
@@ -699,19 +699,24 @@ function FrameShimmerOverlay({ size }: { size: number }) {
     loop.start();
     return () => loop.stop();
   }, [shimmer]);
-  const translateX = shimmer.interpolate({ inputRange: [-1, 1], outputRange: [-size, size] });
+  // Sweep mesafesi: container × 1.5 (gradient bandı geçişe yetsin)
+  const translateX = shimmer.interpolate({ inputRange: [-1, 1], outputRange: [-size * 1.2, size * 1.2] });
 
   const useSkia = !!SkiaMod;
   const SkiaContent = useSkia ? (() => {
     const { Canvas, Rect, LinearGradient: SkiaLG, vec } = SkiaMod;
+    // 110° CSS angle = mostly horizontal, ~20° tilt down to right.
+    // Skia vec start/end belirler gradient yönünü. Diagonal için Y eksenine hafif düşüş.
+    // CSS 110°: math 20° (atan(20°) ≈ 0.36 y/x ratio)
+    const tiltY = size * 0.36;
     return (
       <Canvas style={{ width: size, height: size }}>
         <Rect x={0} y={0} width={size} height={size}>
           <SkiaLG
-            start={vec(0, 0)}
-            end={vec(size, 0)}
-            colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.4)', 'rgba(255,255,255,0)']}
-            positions={[0, 0.5, 1]}
+            start={vec(0, -tiltY / 2)}
+            end={vec(size, size + tiltY / 2)}
+            colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0)', 'rgba(255,255,255,0.4)', 'rgba(255,255,255,0)', 'rgba(255,255,255,0)']}
+            positions={[0, 0.3, 0.5, 0.7, 1]}
           />
         </Rect>
       </Canvas>
@@ -719,8 +724,9 @@ function FrameShimmerOverlay({ size }: { size: number }) {
   })() : (
     <LinearGradient
       colors={['transparent', 'rgba(255,255,255,0.4)', 'transparent']}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 0 }}
+      start={{ x: 0.15, y: 0 }}
+      end={{ x: 0.85, y: 1 }}
+      locations={[0.3, 0.5, 0.7]}
       style={{ width: '100%', height: '100%' }}
     />
   );
