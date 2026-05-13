@@ -435,13 +435,17 @@ export default function StatusAvatar({
           //   Diğer durumda mevcut RN Image (performans korunur).
           const ratio = frameId ? dynamicAvatarRatio : 1.0;
           const targetSize = frameId ? Math.round(size * ratio) : (size - borderWidth * 2 - 2);
-          // Glow pulse aktifse shadowRadius animated, değilse sabit
+          // Glow pulse aktifse shadowRadius animated, değilse sabit.
+          // ★ v1.3.68: Android elevation:16 KALDIRILDI — wrapper kare olduğu için
+          //   Android elevation kare gölge kutusu çiziyordu (yuvarlak/hexagon avatarın
+          //   etrafında kare köşeler görünüyordu — "altıgen gölge" bug'ı).
+          //   Halo zaten BgHaloOverlay (Skia RadialGradient) ile çiziliyor, elevation gereksiz.
           const glowStyle = dynamicGlow
             ? Platform.select({
                 ios: dynFrameCfg?.glow_pulse
                   ? { ...dynamicGlow, shadowRadius: glowPulseAnim.interpolate({ inputRange: [1, 1.4], outputRange: [dynamicGlow.shadowRadius, dynamicGlow.shadowRadius * 2] }) as any }
                   : dynamicGlow,
-                android: { elevation: 16 },
+                android: {}, // BgHaloOverlay (Skia) glow'u sağlar; elevation kullanma.
               })
             : {};
 
