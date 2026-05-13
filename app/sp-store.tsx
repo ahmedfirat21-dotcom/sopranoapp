@@ -3,6 +3,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import SPIcon from '../components/SPIcon';
+import { SkiaShadow } from '../components/skia';
 import { useRouter } from 'expo-router';
 import { safeGoBack } from '../constants/navigation';
 import { Shadows } from '../constants/theme';
@@ -78,18 +79,17 @@ export default function SPStoreScreen() {
           {/* SP Packages Grid — Premium Jewel Cards */}
           <View style={s.grid}>
             {SP_PACKAGES.map((pkg) => (
-              <Pressable
+              <SkiaShadow
                 key={pkg.id}
+                shadowColor={pkg.glowColor.slice(0, 7)}
+                shadowOpacity={0.55}
+                shadowBlur={18}
+                shadowOffsetY={8}
+                borderRadius={20}
+              >
+              <Pressable
                 style={({ pressed }) => [
                   s.pkgCard,
-                  // ★ Ambient glow shadow — her kartın kendi accent rengiyle
-                  {
-                    shadowColor: pkg.glowColor.slice(0, 7),
-                    shadowOffset: { width: 0, height: 8 },
-                    shadowOpacity: 0.6,
-                    shadowRadius: 16,
-                    elevation: 10,
-                  },
                   pkg.popular && s.pkgCardPopular,
                   pressed && { opacity: 0.92, transform: [{ scale: 0.96 }] },
                 ]}
@@ -163,6 +163,7 @@ export default function SPStoreScreen() {
                   </Text>
                 </View>
               </Pressable>
+              </SkiaShadow>
             ))}
           </View>
 
