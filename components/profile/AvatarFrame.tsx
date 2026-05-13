@@ -1280,9 +1280,10 @@ function SkiaShimmerText({
   const Reanimated = require('react-native-reanimated');
   const { useSharedValue, useDerivedValue, withRepeat, withTiming, Easing: RAEasing } = Reanimated;
 
-  // matchFont: platform system font matching (Android Roboto, iOS SF)
+  // ★ v1.3.69: Inter fontu — web admin de Inter kullanıyor, parity için APK de aynı.
+  //   @expo-google-fonts/inter zaten yüklü (app/_layout.tsx).
   const font = useMemo(() => matchFont({
-    fontFamily: Platform.OS === 'ios' ? 'Helvetica' : 'sans-serif',
+    fontFamily: bold ? 'Inter_700Bold' : 'Inter_400Regular',
     fontSize: fontPx,
     fontStyle: 'normal',
     fontWeight: bold ? 'bold' : 'normal',
