@@ -113,14 +113,14 @@ const ListenerCell = React.memo(function ListenerCell({
         />
       </GlowView>
       {showMuteIndicator && (
-        <View style={[s.mutedBadge, { right: (cellW - ownerAvatarSize) / 2 - 6 }]}>
+        <GlowView style={[s.mutedBadge, { right: (cellW - ownerAvatarSize) / 2 - 6 }]}>
           <Ionicons name="volume-mute" size={9} color="#FFF" />
-        </View>
+        </GlowView>
       )}
       {isChatMuted && (
-        <View style={[s.chatMutedBadge, { left: (cellW - ownerAvatarSize) / 2 - 6 }]}>
+        <GlowView style={[s.chatMutedBadge, { left: (cellW - ownerAvatarSize) / 2 - 6 }]}>
           <Ionicons name="chatbox-outline" size={8} color="#FFF" />
-        </View>
+        </GlowView>
       )}
       {flash && <View style={[s.flashWrap, { height: ownerAvatarSize }]}><AvatarPenaltyFlash flashType={flash} size={ownerAvatarSize} onFlashDone={() => onFlashDone?.(u.user_id)} /></View>}
       {hasHandRaised && <HandRaiseBadge />}
@@ -397,14 +397,17 @@ function ListenerOwnerBadge() {
 
   return (
     <View style={s.listenerBadgeContainer}>
-      <Animated.View style={[s.listenerGlowRing, { opacity: glowAnim }]} />
-      <LinearGradient
-        colors={['#FFD700', '#F59E0B', '#D97706']}
-        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-        style={s.listenerBadgeBody}
-      >
+      <Animated.View style={{ position: 'absolute', opacity: glowAnim }}>
+        <GlowView style={s.listenerGlowRing} />
+      </Animated.View>
+      <GlowView style={s.listenerBadgeBody}>
+        <LinearGradient
+          colors={['#FFD700', '#F59E0B', '#D97706']}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFillObject}
+        />
         <Ionicons name="star" size={10} color="#FFF" />
-      </LinearGradient>
+      </GlowView>
     </View>
   );
 }
