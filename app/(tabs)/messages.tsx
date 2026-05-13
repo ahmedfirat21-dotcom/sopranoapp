@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { View, Text, StyleSheet, FlatList, Image, Pressable, TextInput, ScrollView, Animated as RNAnimated, PanResponder, RefreshControl, Easing } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { SkiaShadow } from '../../components/skia';
 
 import { useRouter } from 'expo-router';
 import { Colors, Shadows } from '../../constants/theme';
@@ -1298,6 +1299,7 @@ export default function MessagesScreen() {
               {selectedIds.size === conversations.length ? 'Seçimi Kaldır' : 'Tümünü Seç'}
             </Text>
           </Pressable>
+          <SkiaShadow shadowColor="#EF4444" shadowOpacity={0.45} shadowBlur={8} shadowOffsetY={2} borderRadius={20}>
           <Pressable
             style={styles.bulkDeleteBtn}
             onPress={() => {
@@ -1335,6 +1337,7 @@ export default function MessagesScreen() {
             <Ionicons name="trash" size={16} color="#fff" />
             <Text style={styles.bulkDeleteText}>{selectedIds.size} Sil</Text>
           </Pressable>
+          </SkiaShadow>
         </View>
       )}
 
@@ -1662,7 +1665,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#EF4444',
     paddingHorizontal: 18, paddingVertical: 10,
     borderRadius: 20,
-    shadowColor: '#EF4444', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.4, shadowRadius: 6, elevation: 4,
+    // ★ v1.3.69: Skia ile cross-platform red glow (dış SkiaShadow wrap)
   },
   bulkDeleteText: { fontSize: 13, fontWeight: '700', color: '#fff', ...Shadows.textLight },
 });

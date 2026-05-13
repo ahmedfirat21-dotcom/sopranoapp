@@ -4,6 +4,7 @@ import {
   RefreshControl, Animated, Easing, FlatList, TextInput, InteractionManager,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { GlowView } from '../../components/skia';
 import AppBackground from '../../components/AppBackground';
 import AnimatedHeaderIconBtn from '../../components/AnimatedHeaderIconBtn';
 // ★ 2026-04-28: AnimatedLogo kaldırıldı — SopranoHome branding için inline component.
@@ -373,7 +374,7 @@ function ManagedRoomsEmptyCard() {
           style={StyleSheet.absoluteFillObject}
         />
         <Text style={mrS.emptyTitle}>Henüz bir odanız yok.{'\n'}İlk odanızı oluşturun!</Text>
-        <View style={mrS.emptyImageWrap}>
+        <GlowView style={mrS.emptyImageWrap}>
           {LottieView ? (
             <LottieView
               source={MIC_LOTTIE}
@@ -392,7 +393,7 @@ function ManagedRoomsEmptyCard() {
           ) : (
             <Image source={require('../../assets/images/mock/empty_room_mic.png')} style={mrS.emptyImage} resizeMode="contain" />
           )}
-        </View>
+        </GlowView>
         <Text style={mrS.emptySub}>Sesli sohbet, müzik, oyun ve daha fazlası...</Text>
       </View>
     </>
