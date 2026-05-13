@@ -12,6 +12,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, Animated, Linking, ScrollView } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { SkiaShadow } from '../skia';
 import { Audio } from 'expo-av';
 import { Shadows, Colors } from '../../constants/theme';
 import StatusAvatar from '../StatusAvatar';
@@ -150,7 +151,7 @@ const vbp = StyleSheet.create({
     width: 32, height: 32, borderRadius: 16,
     alignItems: 'center', justifyContent: 'center',
     backgroundColor: '#F59E0B',
-    shadowColor: '#F59E0B', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.5, shadowRadius: 6,
+    // ★ v1.3.69: SkiaShadow dış wrap ile dynamic color glow (her FB ikonu kendi rengiyle)
   },
   label: {
     fontSize: 9, fontWeight: '900' as const, color: '#FBBF24',
@@ -398,13 +399,15 @@ export function FeaturedBadgesShowcase({ featuredIds, onPress }: FeaturedBadgesS
             onPress={() => onPress?.(d.id)}
             style={({ pressed }) => [fbs.cell, pressed && { opacity: 0.75, transform: [{ scale: 0.97 }] }]}
           >
-            <LinearGradient
-              colors={[d.color + 'CC', d.color + '55']}
-              start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }}
-              style={fbs.iconCircle}
-            >
-              <Ionicons name={d.icon as any} size={26} color="#FFF" style={iconShadow} />
-            </LinearGradient>
+            <SkiaShadow shadowColor={d.color} shadowOpacity={0.5} shadowBlur={6} shadowOffsetY={0} borderRadius={16}>
+              <LinearGradient
+                colors={[d.color + 'CC', d.color + '55']}
+                start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }}
+                style={fbs.iconCircle}
+              >
+                <Ionicons name={d.icon as any} size={26} color="#FFF" style={iconShadow} />
+              </LinearGradient>
+            </SkiaShadow>
             <Text style={[fbs.label, { color: d.color }]} numberOfLines={1}>{d.label}</Text>
           </Pressable>
         ))}
