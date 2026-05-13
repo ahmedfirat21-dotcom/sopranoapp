@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useRef, useCallback } from 'react';
 import { Audio } from 'expo-av';
 import { LinearGradient } from 'expo-linear-gradient';
+import { GlowView } from './skia';
 import { Colors } from '../constants/theme';
 import { getAvatarSource } from '../constants/avatars';
 import { Platform } from 'react-native';
@@ -256,9 +257,9 @@ export function IncomingCallOverlay({ visible, callerName, callerAvatar, callTyp
           {/* Red butonu */}
           <Animated.View style={{ transform: [{ scale: rejectBtnAnim }] }}>
             <TouchableOpacity style={styles.rejectBtn} onPress={handleReject} activeOpacity={0.7}>
-              <View style={styles.rejectBtnInner}>
+              <GlowView style={styles.rejectBtnInner}>
                 <Ionicons name="close" size={32} color="#fff" />
-              </View>
+              </GlowView>
               <Text style={styles.btnLabel}>Reddet</Text>
             </TouchableOpacity>
           </Animated.View>
@@ -266,9 +267,9 @@ export function IncomingCallOverlay({ visible, callerName, callerAvatar, callTyp
           {/* Kabul butonu */}
           <Animated.View style={{ transform: [{ scale: acceptBtnAnim }] }}>
             <TouchableOpacity style={styles.acceptBtn} onPress={handleAccept} activeOpacity={0.7}>
-              <View style={styles.acceptBtnInner}>
+              <GlowView style={styles.acceptBtnInner}>
                 <Ionicons name="call" size={28} color="#fff" />
-              </View>
+              </GlowView>
               <Text style={styles.btnLabel}>Kabul Et</Text>
             </TouchableOpacity>
           </Animated.View>
