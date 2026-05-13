@@ -16,6 +16,7 @@ import {
   ImageBackground,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { GlowView } from './skia';
 
 const { width, height } = Dimensions.get('window');
 
@@ -138,7 +139,7 @@ export default function PremiumIntro({ onFinish }: PremiumIntroProps) {
           />
         </Animated.View>
 
-        {/* App Icon */}
+        {/* App Icon — Animated split: outer pulse transform, inner GlowView teal glow ring scales with it */}
         <Animated.View style={[
           s.iconWrap,
           {
@@ -148,8 +149,8 @@ export default function PremiumIntro({ onFinish }: PremiumIntroProps) {
             ],
           },
         ]}>
-          {/* Glow ring behind icon */}
-          <View style={s.glowRing} />
+          {/* Glow ring behind icon — Skia teal glow */}
+          <GlowView style={s.glowRing} />
           <Image
             source={require('../assets/app_icon.png')}
             style={s.appIcon}
