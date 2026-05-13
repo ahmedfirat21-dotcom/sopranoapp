@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { safeGoBack } from '../../constants/navigation';
 import { LinearGradient } from 'expo-linear-gradient';
+import { SkiaShadow } from '../../components/skia';
 import { Audio } from 'expo-av';
 import { Colors } from '../../constants/theme';
 import { ProfileService, type Profile } from '../../services/database';
@@ -657,10 +658,12 @@ export default function CallScreen() {
               {/* Kamera kaldırıldı — yalnız sesli arama */}
             </View>
 
-            {/* KAPAT */}
-            <TouchableOpacity style={st.endBtn} onPress={handleEndCall}>
-              <Ionicons name="call" size={28} color="#FFF" style={{ transform: [{ rotate: '135deg' }] }} />
-            </TouchableOpacity>
+            {/* KAPAT — Skia red glow */}
+            <SkiaShadow shadowColor="#EF4444" shadowOpacity={0.55} shadowBlur={16} shadowOffsetY={4} borderRadius={34}>
+              <TouchableOpacity style={st.endBtn} onPress={handleEndCall}>
+                <Ionicons name="call" size={28} color="#FFF" style={{ transform: [{ rotate: '135deg' }] }} />
+              </TouchableOpacity>
+            </SkiaShadow>
           </View>
         </View>
       )}
@@ -968,8 +971,7 @@ const st = StyleSheet.create({
     width: 68, height: 68, borderRadius: 34,
     backgroundColor: '#EF4444',
     justifyContent: 'center', alignItems: 'center',
-    shadowColor: '#EF4444', shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.5, shadowRadius: 16, elevation: 8,
+    // ★ v1.3.69: Skia ile cross-platform red glow (dış SkiaShadow wrap)
     borderWidth: 2, borderColor: 'rgba(239,68,68,0.6)',
   },
 
