@@ -196,15 +196,21 @@ export default function ThankYouReceivedModal({
 
           {/* Emoji hero + sparkles */}
           <View style={s.emojiSection}>
-            <Animated.View style={[s.glowRing, { transform: [{ scale: glowPulse }] }]} pointerEvents="none" />
-            <Animated.View style={[s.emojiWrap, { transform: [{ scale: emojiScale }, { rotate }] }]}>
-              <LinearGradient
-                colors={['rgba(34,197,94,0.3)', 'rgba(20,184,166,0.2)', 'rgba(20,184,166,0.1)']}
-                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                style={s.emojiGrad}
-              >
-                <Text style={s.heroEmoji}>{emoji}</Text>
-              </LinearGradient>
+            {/* Glow ring — Animated split (outer transform, inner GlowView teal glow scales with ring) */}
+            <Animated.View style={{ position: 'absolute', transform: [{ scale: glowPulse }] }} pointerEvents="none">
+              <GlowView style={s.glowRing} />
+            </Animated.View>
+            {/* Emoji wrap — Animated split (outer scale + rotate, inner GlowView green glow scales with emoji) */}
+            <Animated.View style={{ transform: [{ scale: emojiScale }, { rotate }] }}>
+              <GlowView style={s.emojiWrap}>
+                <LinearGradient
+                  colors={['rgba(34,197,94,0.3)', 'rgba(20,184,166,0.2)', 'rgba(20,184,166,0.1)']}
+                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                  style={s.emojiGrad}
+                >
+                  <Text style={s.heroEmoji}>{emoji}</Text>
+                </LinearGradient>
+              </GlowView>
             </Animated.View>
 
             {/* Sparkles */}
