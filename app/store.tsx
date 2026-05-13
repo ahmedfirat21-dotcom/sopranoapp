@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import { SkiaShadow } from '../components/skia';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -1355,16 +1356,13 @@ function ShowcaseCard({ item, owned, purchasing, onPress, discountPct = 0, wishe
   // ★ v108: Lottie öncelikli — frame/gift Lottie varsa PNG yerine onu göster.
   const lottieSrc = LottieView ? lottieFor(item.id) : null;
   return (
+    <SkiaShadow shadowColor={rarityColor} shadowOpacity={0.4} shadowBlur={14} shadowOffsetY={0} borderRadius={16}>
     <Pressable
       onPress={onPress}
       disabled={purchasing}
       style={[s.showcaseCard, {
         borderColor: rarityColor + '66',
         opacity: purchasing ? 0.6 : 1,
-        ...Platform.select({
-          ios: { shadowColor: rarityColor, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.3, shadowRadius: 12 },
-          android: {},
-        }),
       }]}
     >
       {/* Koyu zemin + rarity tint */}
@@ -1457,6 +1455,7 @@ function ShowcaseCard({ item, owned, purchasing, onPress, discountPct = 0, wishe
         </View>
       </View>
     </Pressable>
+    </SkiaShadow>
   );
 }
 
@@ -1478,16 +1477,13 @@ function BundleCard({ bundle, items, owned, purchasing, tierDiscountPct, onPress
     .filter(Boolean) as CosmeticItem[];
 
   return (
+    <SkiaShadow shadowColor={rarityColor} shadowOpacity={0.5} shadowBlur={16} shadowOffsetY={0} borderRadius={16}>
     <Pressable
       onPress={onPress}
       disabled={purchasing || owned}
       style={[s.showcaseCard, {
         borderColor: rarityColor + '80',
         opacity: purchasing ? 0.6 : 1,
-        ...Platform.select({
-          ios: { shadowColor: rarityColor, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.4, shadowRadius: 14 },
-          android: {},
-        }),
       }]}
     >
       <View style={[StyleSheet.absoluteFillObject, { backgroundColor: '#0A0F1A' }]} />
@@ -1563,6 +1559,7 @@ function BundleCard({ bundle, items, owned, purchasing, tierDiscountPct, onPress
         </View>
       </View>
     </Pressable>
+    </SkiaShadow>
   );
 }
 
