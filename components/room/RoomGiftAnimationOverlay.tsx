@@ -19,6 +19,7 @@ import {
   View, Animated, Easing, StyleSheet, Text, Dimensions, Platform, Vibration, DeviceEventEmitter,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { GlowView } from '../skia';
 import { supabase } from '../../constants/supabase';
 import Item3DArt from '../store/Item3DArt';
 import { hasIllustration } from '../../constants/storeIllustrationsPng';
@@ -425,7 +426,7 @@ function FloatingGift({ event, startY, stackIndex }: {
           start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
           style={[StyleSheet.absoluteFillObject, { borderRadius: 999 }]}
         />
-        <View style={[
+        <GlowView style={[
           styles.bannerInner,
           tier === 'mega' && styles.bannerInnerMega,
         ]}>
@@ -446,7 +447,7 @@ function FloatingGift({ event, startY, stackIndex }: {
               )}
             </Text>
           </View>
-        </View>
+        </GlowView>
       </Animated.View>
 
       {/* Yükselen hediye görseli */}
