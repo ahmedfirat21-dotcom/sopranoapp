@@ -12,6 +12,7 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated, Easing } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { GlowView } from '../skia';
 
 export type FlashType = 'mute' | 'unmute' | 'chat_mute' | 'chat_unmute' | 'kick' | 'ban' | 'permban' | 'demote' | 'promote';
 
@@ -155,10 +156,6 @@ export default function AvatarPenaltyFlash({ flashType, size = 64, onFlashDone }
         style={[
           sty.root,
           {
-            width: badgeSize,
-            height: badgeSize,
-            borderRadius: badgeSize / 2,
-            backgroundColor: config.bg,
             transform: [
               { translateX: shakeX },
               { scale: scaleAnim },
@@ -167,11 +164,22 @@ export default function AvatarPenaltyFlash({ flashType, size = 64, onFlashDone }
             ],
             opacity: opacityAnim,
           },
-          isDramatic && sty.rootDramatic,
         ]}
         pointerEvents="none"
       >
-        <Ionicons name={config.icon as any} size={badgeSize * 0.6} color={config.color} />
+        <GlowView style={[
+          {
+            width: badgeSize,
+            height: badgeSize,
+            borderRadius: badgeSize / 2,
+            backgroundColor: config.bg,
+            alignItems: 'center',
+            justifyContent: 'center',
+          },
+          isDramatic && sty.rootDramatic,
+        ]}>
+          <Ionicons name={config.icon as any} size={badgeSize * 0.6} color={config.color} />
+        </GlowView>
       </Animated.View>
 
       {/* ★ "BANLANDI" label — avatarın altında */}
