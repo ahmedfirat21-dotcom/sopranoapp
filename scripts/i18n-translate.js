@@ -53,7 +53,8 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
   for (let i = 0; i < lines.length; i++) {
     if (lines[i].includes('// TODO: translate')) {
       // Parse: '  'key.id': "TR text",  // TODO: translate'
-      const match = lines[i].match(/^(\s*'[^']+':\s*)("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')(,?)(\s*\/\/ TODO: translate.*)$/);
+      // ★ CRLF tolerant — \r line ending'leri pattern'da kabul et
+      const match = lines[i].replace(/\r$/, '').match(/^(\s*'[^']+':\s*)("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')(,?)(\s*\/\/ TODO: translate.*)$/);
       if (match) {
         const [, prefix, valueLit, comma, comment] = match;
         // valueLit: "TR" veya 'TR' (escape'li olabilir)
