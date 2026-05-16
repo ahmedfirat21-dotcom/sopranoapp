@@ -4667,15 +4667,23 @@ export default function RoomScreen() {
           }} />
       </View>
 
-      {/* ★ v107.32: ESKİ "Sahneden İn / Sahneye Dön" üst pill'leri KALDIRILDI.
-           Yerine StageActionPill kontrol bar'ın hemen üstünde (kullanıcı talebi).
-           Aşağıdaki blok artık null döner; render edilmez. */}
-      {(() => {
-        return null;
-      })()}
+      {/* ★ v287 (16 May 2026): Stage divider — admin stage.dividerStyle='line'/'gradient'/'none' */}
+      {roomLayout.stage.dividerStyle !== 'none' && (
+        <View style={{ paddingHorizontal: roomLayout.global.horizontalPadding, marginVertical: 4 }} pointerEvents="none">
+          {roomLayout.stage.dividerStyle === 'gradient' ? (
+            <LinearGradient
+              colors={['transparent', roomLayout.stage.dividerColor, roomLayout.stage.dividerColor, 'transparent']}
+              locations={[0, 0.25, 0.75, 1]}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+              style={{ height: 1 }}
+            />
+          ) : (
+            <View style={{ height: 1, backgroundColor: roomLayout.stage.dividerColor }} />
+          )}
+        </View>
+      )}
 
-      {/* Clubhouse modeli: zemin overlay chat KALDIRILDI.
-          Oda içi sohbet yalnızca kontrol barın chat butonundan açılan RoomChatDrawer üzerinden erişilir. */}
+      {/* Clubhouse modeli: zemin overlay chat KALDIRILDI. */}
       <View style={{ flex: 1, overflow: 'hidden', paddingHorizontal: roomLayout.global.horizontalPadding }}>
         <ListenerGrid listeners={listenerUsers} onSelectUser={(u) => { setSelectedUser(u); setInRoomProfileId(u.user_id); }} selectedUserId={selectedUser?.user_id} onShowAllUsers={() => openOverlay(() => setShowAudienceDrawer(true))} maxListeners={getRoomLimits(ownerTier as any).maxListeners} spectatorCount={spectatorUsers.length} roomOwnerId={room?.host_id}
           avatarFlashes={avatarFlashes} onFlashDone={clearAvatarFlash} micRequestUserIds={micRequests} />

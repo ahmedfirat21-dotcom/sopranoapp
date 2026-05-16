@@ -657,23 +657,30 @@ export default function StatusAvatar({
           pointerEvents="none"
           style={{
             position: 'absolute',
-            top: showTierBadge ? 0 : 2,
-            right: 2,
+            // ★ v287 (16 May 2026): indicators.onlineDotPosition admin'den okur
+            ...(() => {
+              const pos = _layoutCfg.indicators.onlineDotPosition;
+              const off = 2;
+              if (pos === 'topLeft')     return { top: showTierBadge ? 0 : off, left: off };
+              if (pos === 'bottomLeft')  return { bottom: off, left: off };
+              if (pos === 'bottomRight') return { bottom: off, right: off };
+              return { top: showTierBadge ? 0 : off, right: off }; // topRight default
+            })(),
             width: dotSize, height: dotSize,
             zIndex: 3, elevation: 6,
             alignItems: 'center', justifyContent: 'center',
           }}
         >
-          {/* Dış soft glow halo */}
+          {/* Dış soft glow halo (v287: color admin'den) */}
           <View style={{
             position: 'absolute',
             width: dotSize * 1.6, height: dotSize * 1.6,
             borderRadius: (dotSize * 1.6) / 2,
-            backgroundColor: 'rgba(16,185,129,0.18)',
+            backgroundColor: onlineDotColor + '2E', // 18% alpha
           }} />
-          {/* Gradient nokta */}
+          {/* Gradient nokta (v287: color admin'den) */}
           <LinearGradient
-            colors={['#34D399', '#10B981', '#047857']}
+            colors={[onlineDotColor, onlineDotColor, onlineDotColor]}
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
             style={{
               width: dotSize, height: dotSize,

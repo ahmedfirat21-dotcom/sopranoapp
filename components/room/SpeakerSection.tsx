@@ -746,15 +746,17 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, i
     : null;
   const isCaretakerActive = caretakerExpiresAt && new Date(caretakerExpiresAt).getTime() > Date.now();
 
-  // ★ 2026-04-19 EKSİLTME ŞABLONu — rol rengiyle ring, badge minimal
-  // Her rol için ayrı badge yerine tek sistem: avatar ring'in rengi rol'ü belirtir.
-  // Owner: altın / Moderator: mor / Speaker (+caretaker): teal / Caretaker urgent: amber
-  // ★ Tek ring sistemi: RoleColors constant (tüm projede tutarlı — constants/theme.ts)
+  // ★ v287 (16 May 2026): Rol ring rengi web admin'den okunur (canlı):
+  //   - isMod → accents.moderatorHighlight (default mor)
+  //   - speaker → speakers.ringColor (default teal)
+  //   - host border zaten kaldırıldı (transparent)
   const ringColor = isHost
     ? RoleColors.owner
     : isMod
-    ? RoleColors.moderator
-    : RoleColors.speaker;
+    ? (layout.accents.moderatorHighlight || RoleColors.moderator)
+    : (speakersCfg.ringColor || RoleColors.speaker);
+  // Speakers.ringWidth — config'den (default önceki: isMod 2, speaker 1.5)
+  const cfgRingWidth = speakersCfg.ringWidth;
 
   return (
     // ★ 2026-04-21 FIX: Outer element View (eski: Pressable) — nested Pressable touch çakışması
@@ -894,7 +896,8 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, i
           //   96 > speakers 84-100) ile ayırt edilir. Moderator için border kalır.
           //   Frame yüklüyse rol border'ı zaten kaldırılıyor (çift halka önleme).
           borderColor: activeFrame || isHost ? 'transparent' : ringColor,
-          borderWidth: activeFrame || isHost ? 0 : (isMod ? 2 : 1.5),
+          // ★ v287: speakers.ringWidth admin'den (isMod yine biraz daha kalın)
+          borderWidth: activeFrame || isHost ? 0 : (isMod ? Math.max(2, cfgRingWidth) : cfgRingWidth),
           // ★ v283: borderRadius web admin avatarShape'i takip etsin (önceden hep daire).
           //   Camera açıkken kare-yumuşak (8% radius), audio-only shape mapping.
           borderRadius: cameraOn && videoTrack && VideoView ? Math.max(12, Math.floor(cardWidth * 0.08)) : avatarShapeRadius,
@@ -1099,13 +1102,20 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, i
           ★ 2026-05-05: Frame Lottie kanat'ları altta kalsın diye z-order yükseltildi.
           ★ v1.3.54: name_enabled ise default Text gizli — RoomAvatarFrame çerçeve etrafına yazıyor. */}
       <View style={{ alignItems: 'center', maxWidth: cardWidth, gap: 2, zIndex: 50, elevation: 20 }}>
-        {!hideDefaultName && (
+        {/* ★ v287 (16 May 2026): speakers.namePosition='hidden' isim hiç render edilmez;
+            speakers.nameFontSize + nameMaxChars admin'den okur. */}
+        {!hideDefaultName && speakersCfg.namePosition !== 'hidden' && (
           <Text
-            style={[s.speakerName, { maxWidth: cardWidth - 4, fontSize: cardWidth < 95 ? 10 : 11 }, isHost && { color: '#FFD700' }, isMod && !isHost && { color: '#C4B5FD' }]}
+            style={[
+              s.speakerName,
+              { maxWidth: cardWidth - 4, fontSize: speakersCfg.nameFontSize || (cardWidth < 95 ? 10 : 11) },
+              isHost && { color: '#FFD700' },
+              isMod && !isHost && { color: layout.accents.moderatorHighlight || '#C4B5FD' },
+            ]}
             numberOfLines={1}
             ellipsizeMode="tail"
           >
-            {displayName}
+            {speakersCfg.nameMaxChars > 0 ? displayName.slice(0, speakersCfg.nameMaxChars) : displayName}
           </Text>
         )}
         {/* ★ v283 (16 May 2026): "EV SAHİBİ" chip KALDIRILDI (kullanıcı talebi). */}

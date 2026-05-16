@@ -195,16 +195,24 @@ const ListenerCell = React.memo(function ListenerCell({
         </GlowView>
       )}
       {flash && <View style={[s.flashWrap, { height: ownerAvatarSize }]}><AvatarPenaltyFlash flashType={flash} size={ownerAvatarSize} onFlashDone={() => onFlashDone?.(u.user_id)} /></View>}
-      {hasHandRaised && <HandRaiseBadge />}
-      {/* ★ v284: cfgShowName=false ise dinleyici altı isim hiç render edilmez */}
+      {hasHandRaised && cellLayout.accents.handRaiseEnabled !== false && (
+        <HandRaiseBadge color={cellLayout.accents.handRaiseColor} />
+      )}
+      {/* ★ v284: cfgShowName=false ise dinleyici altı isim hiç render edilmez.
+          ★ v287 (16 May 2026): listeners.nameFontSize + nameMaxChars admin'den okur. */}
       {!hideDefaultName && cfgShowName !== false && (
         <Text
-          style={[s.name, { fontSize: nameSize, maxWidth: cellW }, isOwner && s.nameOwner, showMuteIndicator && { color: 'rgba(239,68,68,0.6)' }]}
+          style={[
+            s.name,
+            { fontSize: cellLayout.listeners.nameFontSize || nameSize, maxWidth: cellW },
+            isOwner && s.nameOwner,
+            showMuteIndicator && { color: 'rgba(239,68,68,0.6)' },
+          ]}
           numberOfLines={1}
           adjustsFontSizeToFit
           minimumFontScale={0.7}
         >
-          {displayName}
+          {cellLayout.listeners.nameMaxChars > 0 ? displayName.slice(0, cellLayout.listeners.nameMaxChars) : displayName}
         </Text>
       )}
     </Pressable>
@@ -300,14 +308,24 @@ export default function ListenerGrid({ listeners, onSelectUser, selectedUserId, 
             />
           );
         })}
-        {overflowCount > 0 && (
-          <Pressable style={[s.cell, { width: cellW }]} onPress={onShowAllUsers}>
-            <View style={[s.avatarWrap, { width: avatarSize, height: avatarSize, borderRadius: avatarSize / 2, backgroundColor: 'rgba(20,184,166,0.1)', alignItems: 'center', justifyContent: 'center' }]}>
-              <Text style={{ color: '#14B8A6', fontSize: avatarSize > 50 ? 14 : 11, fontWeight: '700' }}>+{overflowCount}</Text>
-            </View>
-            <Text style={[s.name, { color: '#14B8A6', fontSize: nameSize }]}>Seyirci</Text>
-          </Pressable>
-        )}
+        {overflowCount > 0 && (() => {
+          // ★ v287 (16 May 2026): listeners_advanced.overflowBadge* admin'den
+          const ladv = layout.listeners_advanced;
+          const badgeBg = ladv.overflowBadgeColor || 'rgba(20,184,166,0.1)';
+          const badgeFg = ladv.overflowBadgeTextColor || '#14B8A6';
+          const tmpl = ladv.overflowBadgeText || '+{N} Seyirci';
+          const labelParts = tmpl.split('{N}');
+          const numericPart = `+${overflowCount}`;
+          const labelText = (labelParts[1] || ' Seyirci').trim();
+          return (
+            <Pressable style={[s.cell, { width: cellW }]} onPress={onShowAllUsers}>
+              <View style={[s.avatarWrap, { width: avatarSize, height: avatarSize, borderRadius: avatarSize / 2, backgroundColor: badgeBg, alignItems: 'center', justifyContent: 'center' }]}>
+                <Text style={{ color: badgeFg, fontSize: avatarSize > 50 ? 14 : 11, fontWeight: '700' }}>{numericPart}</Text>
+              </View>
+              <Text style={[s.name, { color: badgeFg, fontSize: nameSize }]}>{labelText}</Text>
+            </Pressable>
+          );
+        })()}
       </View>
     </View>
   );
@@ -520,7 +538,7 @@ function ListenerOwnerBadge() {
 }
 
 // ★ El kaldırma animasyonlu badge — mikrofon isteği gönderen dinleyicilerde
-function HandRaiseBadge() {
+function HandRaiseBadge({ color }: { color?: string }) {
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const bounceAnim = useRef(new Animated.Value(0)).current;
 
@@ -545,7 +563,17 @@ function HandRaiseBadge() {
 
   return (
     <Animated.View style={[s.handRaiseBadge, { transform: [{ scale: pulseAnim }, { translateY: bounceAnim }] }]}>
-      <Text style={{ fontSize: 14 }}>✋</Text>
+      <View style={{
+        // ★ v287 (16 May 2026): admin'in accents.handRaiseColor verdiğinde pill arka plan,
+        //   yoksa şeffaf (sadece emoji).
+        backgroundColor: color ? color + '33' : 'transparent',
+        borderColor: color || 'transparent',
+        borderWidth: color ? 1.5 : 0,
+        paddingHorizontal: color ? 4 : 0, paddingVertical: color ? 1 : 0,
+        borderRadius: 10,
+      }}>
+        <Text style={{ fontSize: 14 }}>✋</Text>
+      </View>
     </Animated.View>
   );
 }
