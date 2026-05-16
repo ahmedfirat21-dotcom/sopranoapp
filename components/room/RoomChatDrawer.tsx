@@ -25,7 +25,7 @@ import MessageGlowPickerSheet from './MessageGlowPickerSheet';
 import RoomAvatarFrame from './RoomAvatarFrame';
 import LinkifiedText from '../LinkifiedText';
 import SPIcon from '../SPIcon';
-import TierBadge from '../TierBadge';
+// ★ v280 (15 May 2026): TierBadge import KALDIRILDI — web admin CosmeticBadge sistemi kullanılıyor.
 import { migrateLegacyTier } from '../../types';
 
 // Snap points — CONTROL_BAR_AREA: bar + padding alanı (insets.bottom hariç).

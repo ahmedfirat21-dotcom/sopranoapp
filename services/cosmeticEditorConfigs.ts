@@ -129,6 +129,11 @@ export interface BadgeConfig {
   offset_x: number; offset_y: number; scale_on_avatar: number;
   visible_on_avatar: boolean; visible_on_profile: boolean; visible_inline_with_name: boolean;
   hover_tooltip_text: string; z_index: number;
+  // ★ v281 (16 May 2026): Web admin parite — eksik alanlar eklendi.
+  //   Admin BadgeEditor'da bu alanları girer; APK CosmeticBadge artık render ediyor.
+  tier_label_override?: string;     // Rozet üzerinde "PLUS" / "PRO" yazısı
+  tier_label_color?: string;        // Yazı rengi
+  tier_label_font_size?: number;    // Yazı boyutu (size=24 baz)
 }
 
 export interface BackgroundConfig {
@@ -220,6 +225,19 @@ function makeHook<T>(category: string, configKey: string) {
 
 export const useGlowMessageConfig = makeHook<GlowMessageConfig>('glow_message', 'glow_config');
 export const useBadgeConfig = makeHook<BadgeConfig>('badge', 'badge_config');
+
+/**
+ * Badge render boyutu — Canvas dahil toplam W×H (cfg.size + glowPad×2).
+ * CosmeticBadge.tsx içindeki `totalW = cfg.size + glowPad*2` hesabıyla AYNI.
+ * Parent component'te wrap dims'i önceden tahmin etmek için kullanılır
+ * (onLayout reflow olmadan badge merkez konumlandırması için).
+ */
+export function getBadgeRenderSize(cfg: BadgeConfig | null | undefined): { w: number; h: number } {
+  if (!cfg) return { w: 28, h: 28 };
+  const glowPad = cfg.glow_enabled ? cfg.glow_blur + 4 : 0;
+  const total = (cfg.size || 24) + glowPad * 2;
+  return { w: total, h: total };
+}
 export const useBackgroundConfig = makeHook<BackgroundConfig>('background', 'background_config');
 export const useThemeConfig = makeHook<ThemeConfig>('theme', 'theme_config');
 export const useEmojiConfig = makeHook<EmojiConfig>('emoji', 'emoji_config');

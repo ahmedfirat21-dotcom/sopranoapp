@@ -304,6 +304,13 @@ const s = StyleSheet.create({
   wrap: {
     paddingHorizontal: 16,
     marginTop: 4,
+    // ★ v281 (16 May 2026): zIndex:10/elevation:10 yetmedi — ghost-seat dashed border
+    //   listener avatarın yıldız rozeti üzerinde çıkmaya devam ediyordu. position:'relative'
+    //   eklendi (RN'de zIndex sadece pozisyonlu elementlerde çalışır), zIndex 100'e çekildi,
+    //   elevation Android için 30'a (ghost seat'in default 0/parent shadow'un üstünde).
+    position: 'relative',
+    zIndex: 100,
+    elevation: 30,
   },
   headerRow: {
     flexDirection: 'row',
@@ -375,13 +382,13 @@ const s = StyleSheet.create({
     backgroundColor: 'rgba(20,184,166,0.05)',
   },
   avatarSelected: {
-    borderColor: '#14B8A6',
-    borderWidth: 2.5,
-    shadowColor: '#14B8A6',
+    // ★ v281 (16 May 2026): Border KALDIRILDI — kullanıcı "çerçeve değil sadece gölge"
+    //   istedi. Tap feedback artık tamamen radial gold shadow ile, avatar şeklini ezmiyor.
+    shadowColor: '#FCD34D',
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.6,
-    shadowRadius: 8,
-    elevation: 8,
+    shadowOpacity: 0.85,
+    shadowRadius: 14,
+    elevation: 14,
   },
   avatarMuted: {
     borderColor: 'rgba(239,68,68,0.4)',
@@ -420,7 +427,9 @@ const s = StyleSheet.create({
   name: {
     color: 'rgba(255,255,255,0.7)',
     fontWeight: '500',
-    marginTop: 4,
+    // ★ v275 (14 May 2026): marginTop 4 → 1, isim avatara yapışık. Kullanıcı feedback'i:
+    //   "default kullanıcı isimleri avatarlarından biraz uzakta aşağıda kalıyor".
+    marginTop: 1,
     textAlign: 'center',
   },
   nameOwner: {
@@ -439,9 +448,11 @@ const s = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   listenerGlowRing: {
+    // ★ v281 (16 May 2026): Border KALDIRILDI — avatarın dışına 2px taşıyordu, parent kart
+    //   clip'lediği için "kesik altın iz" gibi görünüyordu. Sadece radial shadow bıraktım,
+    //   yıldızın etrafı yumuşak altın hale veriyor, sert border yok.
     position: 'absolute', width: 24, height: 24, borderRadius: 12,
     backgroundColor: 'transparent',
-    borderWidth: 1, borderColor: 'rgba(255,215,0,0.5)',
     shadowColor: '#FFD700', shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.7, shadowRadius: 6, elevation: 4,
   },

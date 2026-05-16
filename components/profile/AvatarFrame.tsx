@@ -391,10 +391,13 @@ function ParticleOverlay({ size, dynCfg }: { size: number; dynCfg: any }) {
   const orbitAnim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     if (type === 'none') return;
+    // ★ v275 (14 May 2026): Animated.loop default resetBeforeIteration:true → her
+    //   iteration başında 1'den 0'a snap yapıyordu (kullanıcı "tam tur atmadan sıfırlanıyor"
+    //   feedback'i). resetBeforeIteration:false ile sürekli artar (0→1→0→1 yerine 0→1
+    //   anlık snap, hızlandırılmış continuous rotation hissi). Süre 14s → 10s (görünürlük).
     const loop = Animated.loop(
-      // ★ v1.3.59: Web admin CSS `particle-orbit-wrapper 14s linear infinite` ile birebir parite.
-      //   Eski 12000ms %15 daha hızlıydı.
-      Animated.timing(orbitAnim, { toValue: 1, duration: 14000, easing: Easing.linear, useNativeDriver: true })
+      Animated.timing(orbitAnim, { toValue: 1, duration: 10000, easing: Easing.linear, useNativeDriver: true }),
+      { resetBeforeIteration: false },
     );
     loop.start();
     return () => loop.stop();
@@ -518,7 +521,10 @@ function BgHaloOverlay({ size, color, sizeMul, intensity, pulse, pulseSpeed }: {
     const { Canvas, Circle, RadialGradient: SkiaRG, vec } = SkiaMod;
     // CSS `farthest-corner` = boyut × √2/2 ≈ 0.7071. 70% stop = transparent fade.
     const rOuter = haloSize * 0.7071;
-    const opacityNum = Math.min(1, intensity);
+    // ★ v275 (14 May 2026): BgHalo opacity cap'i 0.6 → intensity=1.0 ile renk
+    //   sahnedeki host avatarı yutuyordu. Daha düşük max opacity + büyük radius
+    //   = "parlaklık dalga" görsel etkisi, avatar üstüne taşmaz.
+    const opacityNum = Math.min(0.6, intensity * 0.7);
     // Hex'i rgba'ya çevir, alpha ile birleştir
     const hexToRgba = (hex: string, a: number) => {
       const m = hex.match(/^#([0-9a-f]{6})$/i);
@@ -910,7 +916,11 @@ function TierBadgeOverlay({ size, position, style: badgeStyle, label }: {
 //   gerçek yay olarak çıkar. 'flat' her zaman düz RN Text (animasyonlar daha güçlü).
 //   Yüzdelik bazlı: name_offset = % avatar yarıçapı, name_size = % avatar boyutu.
 function NameOverlay({ size, name, dynCfg }: { size: number; name: string; dynCfg: any }) {
-  const offsetPct = dynCfg?.name_offset ?? 25;
+  // ★ v278 (14 May 2026): name_offset cap'lendi — kullanıcı feedback'i: "profil
+  //   sayfasında özel tasarım verildiğinde karttaki metinler ile kullanıcının adı ile
+  //   diğer metinler karışıyor". 30% güvenli sınır — username/bio/stats alanına taşmaz.
+  const offsetPctRaw = dynCfg?.name_offset ?? 25;
+  const offsetPct = Math.max(-30, Math.min(30, offsetPctRaw));
   const sizePct = dynCfg?.name_size ?? 14;
   const fontPx = Math.max(8, Math.round((sizePct / 100) * size));
   const offsetPx = (offsetPct / 100) * (size / 2);
@@ -1121,9 +1131,11 @@ function NameOverlay({ size, name, dynCfg }: { size: number; name: string; dynCf
   if (dynCfg?.name_swing)               transformStack.push({ rotate: swingAnim.interpolate({ inputRange: [-1, 1], outputRange: ['-8deg', '8deg'] }) });
   if (dynCfg?.name_tilt)                transformStack.push({ rotate: tiltAnim.interpolate({ inputRange: [0, 1], outputRange: ['-3deg', '3deg'] }) });
   if (dynCfg?.name_wobble)              transformStack.push({ rotate: wobbleAnim.interpolate({ inputRange: [-1, 1], outputRange: ['-2.5deg', '2.5deg'] }) });
-  // Static eğim — sadece dinamik rotate yoksa (çakışma önleme)
-  const hasDynamicRotate = !!(dynCfg?.name_rotation_continuous || dynCfg?.name_swing || dynCfg?.name_tilt || dynCfg?.name_wobble);
-  if (!hasDynamicRotate && (dynCfg?.name_rotation ?? 0) !== 0) {
+  // ★ v275 (14 May 2026): Static rotation HER ZAMAN uygulanır, animasyonlar UZERINE ek
+  //   olarak compose edilir. Önceden hasDynamicRotate ile bloke ediliyordu → kullanıcı
+  //   name_swing aktif ederse name_rotation:45° unutuluyordu. Şimdi 45° base + ±8° swing
+  //   = ekran 37°↔53° arasında salınır (compose).
+  if ((dynCfg?.name_rotation ?? 0) !== 0) {
     transformStack.push({ rotate: `${dynCfg?.name_rotation}deg` });
   }
 
@@ -1677,7 +1689,9 @@ function LottieFrame({ meta, size, dynCfg }: { meta: any; size: number; dynCfg?:
               top: 0, left: 0,
               width: lottieSize, height: lottieSize,
               backgroundColor: `hsl(${lottieHue}, 70%, 50%)`,
-              opacity: 0.25,
+              // ★ v275: opacity 0.25 → 0.45 (kullanıcı "lottie renk filtreleri çalışmıyor"
+              //   feedback'i: değişim çok zayıftı). Web admin tarafı da paralel artırıldı.
+              opacity: 0.45,
               borderRadius: lottieSize / 2,
             }} />
           )}
@@ -1687,7 +1701,7 @@ function LottieFrame({ meta, size, dynCfg }: { meta: any; size: number; dynCfg?:
               top: 0, left: 0,
               width: lottieSize, height: lottieSize,
               backgroundColor: lottieBrightness > 1 ? 'white' : 'black',
-              opacity: Math.min(0.5, Math.abs(lottieBrightness - 1) * 0.4),
+              opacity: Math.min(0.7, Math.abs(lottieBrightness - 1) * 0.6),
               borderRadius: lottieSize / 2,
             }} />
           )}
@@ -1697,7 +1711,7 @@ function LottieFrame({ meta, size, dynCfg }: { meta: any; size: number; dynCfg?:
               top: 0, left: 0,
               width: lottieSize, height: lottieSize,
               backgroundColor: 'rgba(128,128,128,1)',
-              opacity: (1 - lottieSaturation) * 0.4,
+              opacity: (1 - lottieSaturation) * 0.55,
               borderRadius: lottieSize / 2,
             }} />
           )}

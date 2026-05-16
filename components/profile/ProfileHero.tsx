@@ -184,7 +184,9 @@ export default function ProfileHero({
         </View>
 
         {/* İsim ortalanmış — frame name_enabled true ise gizli (çerçeve etrafında render edilir) */}
-        <View style={s.nameRow}>
+        {/* ★ v278: Frame name overlay aktifse extra padding — avatar etrafındaki name
+             username/bio gibi alt metinlerin üzerine basmasın. */}
+        <View style={[s.nameRow, frameRendersName && { marginTop: 16 }]}>
           {!frameRendersName && (
             <Text
               style={[s.displayName, isAdmin && { color: '#F87171' }]}

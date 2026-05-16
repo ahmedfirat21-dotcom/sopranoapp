@@ -7,8 +7,9 @@ import { getAvatarSource } from '../../constants/avatars';
 import { RoleColors } from '../../constants/theme';
 import AvatarPenaltyFlash, { type FlashType } from './AvatarPenaltyFlash';
 import RoomAvatarFrame from './RoomAvatarFrame';
-import TierBadge from '../TierBadge';
+// ★ v280 (15 May 2026): TierBadge import KALDIRILDI — web admin CosmeticBadge sistemi kullanılıyor.
 import { SkiaShadow, CosmeticBadge } from '../skia';
+import { useBadgeConfig, getBadgeRenderSize } from '../../services/cosmeticEditorConfigs';
 import type { RoomParticipant } from '../../services/database';
 import { useRoomLayout, type SpeakersLayoutConfig, type AvatarShape } from '../../services/roomLayoutConfig';
 
@@ -490,6 +491,40 @@ function CaretakerTimerBadge({ expiresAt }: { expiresAt: string }) {
   );
 }
 
+// ★ v281 (16 May 2026): Sahnedeki konuşmacı için tik merkez konumlandırma.
+//   `expected` = useBadgeConfig + getBadgeRenderSize ile ÖNCEDEN hesaplanmış W×H.
+//   Bu sayede ilk render'da pozisyon zaten doğru — "tik önce aşağıda, sonra avatara
+//   yapışıyor" kayma bug'ı kalmıyor. onLayout sadece konfirmasyon.
+function SpeakerBadgeCenter({ x, y, scale, expected, children }: {
+  x: number; y: number; scale: number; expected: { w: number; h: number }; children: React.ReactNode;
+}) {
+  const [dims, setDims] = React.useState(expected);
+  React.useEffect(() => {
+    setDims((prev) => (prev.w === expected.w && prev.h === expected.h ? prev : expected));
+  }, [expected.w, expected.h]);
+  return (
+    <View
+      onLayout={(e) => {
+        const { width, height } = e.nativeEvent.layout;
+        if (width > 0 && height > 0) {
+          setDims((prev) => (prev.w === width && prev.h === height ? prev : { w: width, h: height }));
+        }
+      }}
+      style={{
+        position: 'absolute',
+        left: x - dims.w / 2,
+        top: y - dims.h / 2,
+        transform: [{ scale }],
+        zIndex: 999,
+        elevation: 30,
+      }}
+      pointerEvents="none"
+    >
+      {children}
+    </View>
+  );
+}
+
 function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, isMe, cardWidth, cardHeight, VideoView, canModerate, onQuickMute }: {
   canModerate?: boolean;
   onQuickMute?: () => void;
@@ -505,6 +540,14 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, i
   const speakersCfg = layout.speakers;
   const displayName = (user as any).disguise?.display_name || user.user?.display_name || 'Misafir';
   const avatarUrl = (user as any).disguise?.avatar_url || user.user?.avatar_url;
+  // ★ v281: Badge config'i önceden çek → render size SpeakerBadgeCenter'a verilir → initial
+  //   render'da konum doğru. avatarSize × scale_on_avatar effective boyutla expected hesabı.
+  const activeBadgeId = !(user as any).disguise ? ((user.user as any)?.active_badge_id ?? null) : null;
+  const badgeCfgForSize = useBadgeConfig(activeBadgeId);
+  const effectiveBadgeCfg = badgeCfgForSize && typeof badgeCfgForSize.scale_on_avatar === 'number'
+    ? { ...badgeCfgForSize, size: Math.max(8, Math.round(cardWidth * badgeCfgForSize.scale_on_avatar)) }
+    : badgeCfgForSize;
+  const badgeExpectedSize = getBadgeRenderSize(effectiveBadgeCfg);
   // ★ v107: Mağaza avatar çerçevesi — disguise yokken aktif (gizlenmiş kullanıcı normal görünür)
   const activeFrame = (user as any).disguise ? null : (user.user as any)?.active_frame;
 
@@ -668,7 +711,11 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, i
            → flex center label payı kadar aşağı kaydırıyordu, frame avatardan kayıktı.
            Şimdi: avatar boyutunda fixed wrapper → frame tam avatar üstünde.
            Audio modda çalışır, kameralı modda zaten gizli. */}
-      {!(cameraOn && videoTrack && VideoView) && activeFrame && (
+      {/* ★ v281 (16 May 2026): Eski koşul `activeFrame &&` idi — frame yoksa BÜTÜN sarmalayıcı
+           render olmuyor, dolayısıyla CosmeticBadge de hiç çıkmıyordu. Şimdi: dış wrap
+           kameralı modda gizli, frame YOKSA `RoomAvatarFrame` skip ama badge bağımsız render.
+           Frame seçmeyen kullanıcının sahnede tikini görmeme bug'ı düzeldi. */}
+      {!(cameraOn && videoTrack && VideoView) && (activeFrame || (!(user as any).disguise && (user.user as any)?.active_badge_id)) && (
         <View
           style={{
             position: 'absolute',
@@ -676,33 +723,85 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, i
             height: cardWidth,
             alignItems: 'center',
             justifyContent: 'center',
-            // ★ 2026-05-05: Frame avatar Image üstünde (zIndex 2) — palette halka çerçeveleri
-            //   (ince ring tipi: aurum-ring, glacier-ring vs.) avatar dairesinin EDGE'inde
-            //   render olduğu için altta kalırsa Image tarafından tamamen örtülüyor.
-            //   Badge'ler (zIndex 999, elevation 30) zaten frame'in de üstünde kalıyor.
             zIndex: 2,
             elevation: 2,
           }}
           pointerEvents="none"
         >
           <View style={{ width: cardWidth, height: cardWidth }}>
-            <RoomAvatarFrame
-              frameId={activeFrame}
-              avatarSize={cardWidth}
-              minSize={56}
-              forceRing={!isHost}
-              userName={displayName}
-              userTier={(user.user as any)?.subscription_tier && (user.user as any).subscription_tier !== 'Free'
-                ? String((user.user as any).subscription_tier).toUpperCase()
-                : undefined}
-              contextKey={isHost ? 'stage_host' : 'speaker'}
-            />
-            {/* ★ v120: Web admin "Rozetler" — kullanıcının active_badge_id'si varsa Skia overlay */}
-            {!(user as any).disguise && (user.user as any)?.active_badge_id && (
-              <View pointerEvents="none" style={{ position: 'absolute', bottom: -2, right: -2, zIndex: 999 }}>
-                <CosmeticBadge badgeItemId={(user.user as any).active_badge_id} context="avatar" />
-              </View>
+            {activeFrame && (
+              <RoomAvatarFrame
+                frameId={activeFrame}
+                avatarSize={cardWidth}
+                minSize={56}
+                forceRing={!isHost}
+                userName={displayName}
+                userTier={(user.user as any)?.subscription_tier && (user.user as any).subscription_tier !== 'Free'
+                  ? String((user.user as any).subscription_tier).toUpperCase()
+                  : undefined}
+                contextKey={isHost ? 'stage_host' : 'speaker'}
+              />
             )}
+            {!(user as any).disguise && (user.user as any)?.active_badge_id && (() => {
+              // ★ v281 (16 May 2026): Konum hesabı web admin frame config'inden — StatusAvatar
+              //   (listener/profil) ile BİREBİR aynı pattern. Web admin'de speaker/stage_host
+              //   sekmelerine girilen tier_badge_position/offset/scale değerleri buraya
+              //   geliyor (frameCfg, speakerSizeKey ile çekildi). BADGE_PX hardcode KALDIRILDI
+              //   — BadgeCenterWrapper onLayout ile measure ediyor, hangi boyutta olursa
+              //   olsun badge'in MERKEZİ doğru noktaya oturuyor.
+              const BADGE_POS: Record<string, { x: number; y: number }> = {
+                tl: { x: -0.354, y: -0.354 },
+                tc: { x: 0,      y: -0.5   },
+                tr: { x: 0.354,  y: -0.354 },
+                ml: { x: -0.5,   y: 0      },
+                mr: { x: 0.5,    y: 0      },
+                bl: { x: -0.354, y: 0.354  },
+                bc: { x: 0,      y: 0.5    },
+                br: { x: 0.354,  y: 0.354  },
+              };
+              // ★ v281 (16 May 2026): Konum öncelik Frame > Badge > 'br' (StatusAvatar ile aynı).
+              const POS_MAP: Record<string, string> = {
+                topLeft: 'tl', topRight: 'tr', bottomLeft: 'bl', bottomRight: 'br', inline: 'br',
+              };
+              const tbPos = String(
+                frameCfg?.tier_badge_position
+                || (badgeCfgForSize?.position ? POS_MAP[badgeCfgForSize.position] : undefined)
+                || 'br'
+              );
+              const pos = BADGE_POS[tbPos] || BADGE_POS.br;
+              const offsetXPct = Number(
+                frameCfg?.tier_badge_offset_x
+                ?? badgeCfgForSize?.offset_x
+                ?? 0
+              );
+              const offsetYPct = Number(
+                frameCfg?.tier_badge_offset_y
+                ?? badgeCfgForSize?.offset_y
+                ?? 0
+              );
+              // ★ v281 (16 May 2026): Boyut CosmeticBadge içinde avatarSize prop ile uygulanır.
+              //   Wrap sadece konum + frame scale (varsa) ile transform sağlar.
+              const dynScale = typeof frameCfg?.tier_badge_scale === 'number'
+                ? frameCfg.tier_badge_scale : 1.0;
+              // ★ v281: Offset % rozet boyutuna oranlı (web admin CSS translate(%, %) ile aynı)
+              const effectiveBadgeSize = (typeof badgeCfgForSize?.scale_on_avatar === 'number')
+                ? cardWidth * badgeCfgForSize.scale_on_avatar
+                : (badgeCfgForSize?.size || 24);
+              const fineOffsetX = Math.round((offsetXPct / 100) * effectiveBadgeSize);
+              const fineOffsetY = Math.round((offsetYPct / 100) * effectiveBadgeSize);
+              const badgeCenterX = cardWidth / 2 + pos.x * cardWidth + fineOffsetX;
+              const badgeCenterY = cardWidth / 2 + pos.y * cardWidth + fineOffsetY;
+              return (
+                <SpeakerBadgeCenter
+                  x={badgeCenterX}
+                  y={badgeCenterY}
+                  scale={dynScale}
+                  expected={badgeExpectedSize}
+                >
+                  <CosmeticBadge badgeItemId={(user.user as any).active_badge_id} context="avatar" avatarSize={cardWidth} />
+                </SpeakerBadgeCenter>
+              );
+            })()}
           </View>
         </View>
       )}
@@ -747,7 +846,11 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, i
                   height: inner,
                   left: (cardWidth - inner) / 2,
                   top: (cardWidth - inner) / 2,
-                  borderRadius: inner / 2,
+                  // ★ v275 (14 May 2026): borderRadius:inner/2 HARDCODE DAİRE idi → sahnede
+                  //   avatar şekli daire kalıyordu (parent wrap shape clip etse de Image kendi
+                  //   borderRadius'u ile daire). Şimdi shape'e oranlı (avatarShapeRadius
+                  //   cardWidth'in oranı olduğundan inner içinde aynı oranla uygulanır).
+                  borderRadius: (avatarShapeRadius / cardWidth) * inner,
                 }]}
               />
             );
@@ -823,7 +926,8 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, i
             <View
               pointerEvents="none"
               style={[StyleSheet.absoluteFill, {
-                borderRadius: cardWidth / 2,
+                // ★ v275: HARDCODE daire kaldırıldı, avatar shape'e uyumlu border halkası
+                borderRadius: avatarShapeRadius,
                 borderWidth: Math.max(1, Math.min(12, frameCfg?.avatar_border_width ?? 3)),
                 borderColor: frameCfg?.avatar_border_color || '#fbbf24',
                 borderStyle: (frameCfg?.avatar_border_style as any) || 'solid',
@@ -922,14 +1026,8 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, i
             {displayName}
           </Text>
         )}
-        {/* ★ v1.3.54: Web admin tier_badge_enabled=false ise sahnede de gizle.
-             Default davranış: tier varsa göster (Free için gizli). */}
-        {(() => {
-          const tier = (user.user as any)?.subscription_tier;
-          const explicitlyDisabled = frameCfg?.tier_badge_enabled === false;
-          if (explicitlyDisabled) return null;
-          return <TierBadge tier={tier} size="sm" />;
-        })()}
+        {/* ★ v280 (15 May 2026): TierBadge KALDIRILDI — web admin CosmeticBadge sistemi
+             avatar köşesinde zaten render ediyor (L:701-704). İsim altında ayrı rozet artık yok. */}
       </View>
       </Pressable>
       {/* ★ 2026-04-22: "Sahneden İn" butonu kart içinden KALDIRILDI — parent container'ın
@@ -1154,7 +1252,10 @@ const s = StyleSheet.create({
   tooltipBubble: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(20,184,166,0.12)', borderWidth: 1, borderColor: 'rgba(20,184,166,0.25)', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 7 },
   tooltipText: { fontSize: 13, fontWeight: '600', color: '#5EEAD4', letterSpacing: 0.2 },
   tooltipArrow: { width: 0, height: 0, borderLeftWidth: 7, borderRightWidth: 7, borderTopWidth: 7, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderTopColor: 'rgba(20,184,166,0.25)', marginTop: -1 },
-  ghostSeat: { alignItems: 'center', marginTop: 4 },
+  // ★ v281 (16 May 2026): ghostSeat'e explicit DÜŞÜK zIndex — dashed border'ın altındaki
+  //   ListenerGrid avatar yıldız rozetiyle çakışma; ListenerGrid wrap zIndex:100 + bu zIndex:0
+  //   ile kesin ayrım.
+  ghostSeat: { alignItems: 'center', marginTop: 4, zIndex: 0, elevation: 0 },
   ghostSeatInner: { width: 72, height: 72, borderRadius: 36, borderWidth: 2, borderColor: 'rgba(20,184,166,0.25)', borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(20,184,166,0.05)' },
   ghostSeatIcon: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(20,184,166,0.08)', alignItems: 'center', justifyContent: 'center' },
   ghostSeatLabel: { fontSize: 11, fontWeight: '600', color: 'rgba(20,184,166,0.5)', marginTop: 6, letterSpacing: 0.3 },

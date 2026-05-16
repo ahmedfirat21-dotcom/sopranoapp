@@ -2,10 +2,13 @@
  * SopranoChat — Emoji Picker (DM Sohbet İçi)
  * ★ WhatsApp tarzı kompakt inline klavye boyutu
  */
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Dimensions, Image } from 'react-native';
 import { useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Radius } from '../constants/theme';
+// ★ v277 (14 May 2026): Custom emoji desteği — kullanıcının active_emoji_id seti
+//   "Özel" sekmesinde image'larla listelenir. Seçince :shortcode: input'a düşer.
+import { useEmojiConfig } from '../services/cosmeticEditorConfigs';
 
 const { height: H } = Dimensions.get('window');
 
@@ -51,12 +54,20 @@ type Props = {
   visible: boolean;
   onClose: () => void;
   onEmojiSelect: (emoji: string) => void;
+  /** ★ v277: Kullanıcının active_emoji_id'si — varsa "Özel" sekmesi otomatik açılır */
+  customEmojiSetId?: string | null;
 };
 
-export function EmojiPicker({ visible, onClose, onEmojiSelect }: Props) {
+export function EmojiPicker({ visible, onClose, onEmojiSelect, customEmojiSetId }: Props) {
   const [activeCategory, setActiveCategory] = useState(0);
+  const customCfg = useEmojiConfig(customEmojiSetId);
+  const hasCustom = !!(customCfg && customCfg.emojis && customCfg.emojis.length > 0);
 
   if (!visible) return null;
+
+  // ★ v277: Custom emoji sekmesi varsa indeks = native kategori sayısı (sona)
+  const customIndex = hasCustom ? EMOJI_CATEGORIES.length : -1;
+  const isCustomActive = activeCategory === customIndex;
 
   return (
     <View style={styles.container}>
@@ -71,6 +82,15 @@ export function EmojiPicker({ visible, onClose, onEmojiSelect }: Props) {
             <Ionicons name={cat.icon} size={16} color={activeCategory === i ? Colors.teal : Colors.text3} />
           </TouchableOpacity>
         ))}
+        {/* ★ v277: Özel emoji sekmesi (sadece set varsa) */}
+        {hasCustom && (
+          <TouchableOpacity
+            style={[styles.categoryTab, isCustomActive && styles.categoryTabActive]}
+            onPress={() => setActiveCategory(customIndex)}
+          >
+            <Ionicons name="sparkles-outline" size={16} color={isCustomActive ? Colors.teal : Colors.text3} />
+          </TouchableOpacity>
+        )}
         {/* Kapat butonu — sağ uçta */}
         <TouchableOpacity style={styles.closeTab} onPress={onClose}>
           <Ionicons name="close" size={16} color={Colors.text3} />
@@ -80,16 +100,31 @@ export function EmojiPicker({ visible, onClose, onEmojiSelect }: Props) {
       {/* Emoji grid — kompakt */}
       <ScrollView style={styles.emojiScroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         <View style={styles.emojiGrid}>
-          {EMOJI_CATEGORIES[activeCategory].emojis.map((emoji, i) => (
-            <TouchableOpacity
-              key={`${emoji}_${i}`}
-              style={styles.emojiBtn}
-              onPress={() => onEmojiSelect(emoji)}
-              activeOpacity={0.5}
-            >
-              <Text style={styles.emojiText}>{emoji}</Text>
-            </TouchableOpacity>
-          ))}
+          {isCustomActive
+            ? (customCfg?.emojis || []).map((e: any, i: number) => (
+                <TouchableOpacity
+                  key={`${e.shortcode}_${i}`}
+                  style={styles.emojiBtn}
+                  onPress={() => onEmojiSelect(e.shortcode)}
+                  activeOpacity={0.5}
+                >
+                  {e.image_url ? (
+                    <Image source={{ uri: e.image_url }} style={{ width: 28, height: 28 }} resizeMode="contain" />
+                  ) : (
+                    <Text style={styles.emojiText}>{e.fallback || '✦'}</Text>
+                  )}
+                </TouchableOpacity>
+              ))
+            : EMOJI_CATEGORIES[activeCategory].emojis.map((emoji, i) => (
+                <TouchableOpacity
+                  key={`${emoji}_${i}`}
+                  style={styles.emojiBtn}
+                  onPress={() => onEmojiSelect(emoji)}
+                  activeOpacity={0.5}
+                >
+                  <Text style={styles.emojiText}>{emoji}</Text>
+                </TouchableOpacity>
+              ))}
         </View>
       </ScrollView>
     </View>

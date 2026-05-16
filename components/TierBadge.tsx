@@ -36,6 +36,8 @@ interface Props {
   frameId?: string | null;
 }
 
+// ★ v278 (14 May 2026): Tik renkleri rafine edildi — Twitter/IG pattern (parlak gradient
+//   + tier'a göre KOYU kontrast tik). Eski beyaz tik gradient üzerinde sönük duruyordu.
 const CONFIG: Record<string, {
   label: string;
   icon: keyof typeof Ionicons.glyphMap;
@@ -44,25 +46,31 @@ const CONFIG: Record<string, {
   textColor: string;
 }> = {
   Plus: {
-    label: 'PLUS',
-    icon: 'diamond',
-    colors: ['#5EEAD4', '#0E7490'] as const,
-    glow: 'rgba(94,234,212,0.55)',
-    textColor: '#F0FDFA',
+    label: '',
+    icon: 'checkmark',
+    // Açık teal → mid teal (3D parlaklık)
+    colors: ['#7DFCE0', '#0E7490'] as const,
+    glow: 'rgba(94,234,212,0.7)',
+    // Koyu teal tik — yüksek kontrast
+    textColor: '#0F4F4D',
   },
   Pro: {
-    label: 'PRO',
-    icon: 'star',
-    colors: ['#FCD34D', '#B45309'] as const,
-    glow: 'rgba(251,191,36,0.65)',
-    textColor: '#7C2D12',
+    label: '',
+    icon: 'checkmark',
+    // Parlak altın → turuncu (3-tone hissi)
+    colors: ['#FFE082', '#F59E0B'] as const,
+    glow: 'rgba(251,191,36,0.8)',
+    // Koyu kahve tik — premium kontrast
+    textColor: '#5C2C0E',
   },
   GodMaster: {
-    label: 'GM',
-    icon: 'sparkles',
-    colors: ['#F472B6', '#FBBF24'] as const,
-    glow: 'rgba(244,114,182,0.7)',
-    textColor: '#fff',
+    label: '',
+    icon: 'checkmark',
+    // Pembe → mor (ilahi tier)
+    colors: ['#F9A8D4', '#A855F7'] as const,
+    glow: 'rgba(244,114,182,0.85)',
+    // Koyu mor tik
+    textColor: '#3F1D3E',
   },
 };
 
@@ -76,10 +84,12 @@ const SIZE: Record<string, {
   letterSpacing: number;
   glowBlur: number;
 }> = {
-  xs: { height: 14, paddingH: 4, fontSize: 0, iconSize: 9, gap: 0, radius: 7, letterSpacing: 0, glowBlur: 8 },
-  sm: { height: 14, paddingH: 5, fontSize: 8.5, iconSize: 8, gap: 2, radius: 7, letterSpacing: 0.6, glowBlur: 10 },
-  md: { height: 17, paddingH: 6, fontSize: 9.5, iconSize: 9, gap: 3, radius: 8.5, letterSpacing: 0.7, glowBlur: 12 },
-  lg: { height: 22, paddingH: 8, fontSize: 11, iconSize: 11, gap: 4, radius: 11, letterSpacing: 0.8, glowBlur: 18 },
+  // ★ v275: Tik sistemine geçiş — tam daire (height=2*radius), padding minimal, label yok.
+  //   Twitter/IG verified tik dimensions: ~18-22px height, daire.
+  xs: { height: 14, paddingH: 0, fontSize: 0, iconSize: 10, gap: 0, radius: 7,  letterSpacing: 0, glowBlur: 8 },
+  sm: { height: 16, paddingH: 0, fontSize: 0, iconSize: 11, gap: 0, radius: 8,  letterSpacing: 0, glowBlur: 10 },
+  md: { height: 20, paddingH: 0, fontSize: 0, iconSize: 13, gap: 0, radius: 10, letterSpacing: 0, glowBlur: 12 },
+  lg: { height: 26, paddingH: 0, fontSize: 0, iconSize: 16, gap: 0, radius: 13, letterSpacing: 0, glowBlur: 18 },
 };
 
 export default function TierBadge({ tier, size = 'md', style, frameId: _frameId }: Props) {

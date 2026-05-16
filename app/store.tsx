@@ -25,6 +25,7 @@ import PurchaseSuccessModal from '../components/PurchaseSuccessModal';
 import { useAuth } from './_layout';
 import { StoreService, type CosmeticItem, type Collection, type Rarity, type SPPack as SPPackDB, type CosmeticBundle, type DailyDeal } from '../services/store';
 import { hasIllustration, isFullCardItem } from '../constants/storeIllustrationsPng';
+import { APK_STORE_TABS, type StoreTabKey } from '../constants/cosmeticCategories';
 import Item3DArt from '../components/store/Item3DArt';
 import StoreItemPreviewSheet from '../components/store/StoreItemPreviewSheet';
 import { hasGiftLottie, getGiftLottie } from '../constants/giftLottieRegistry';
@@ -54,19 +55,13 @@ function storeLottieSize(id: string): number {
 
 const { width: W } = Dimensions.get('window');
 
-// ★ v108.21: Hediyeler vitrin olarak geri eklendi — satılmaz, fiyat referansı
-//   (pay-per-send oda içi). Kullanıcı hediye fiyatlarını mağazada görsün.
-type CategoryKey = 'bundles' | 'frames' | 'entry_effect' | 'gifts' | 'sp';
-// ★ 2026-05-10: 'gifts' kategorisi mağaza UI'ndan gizlendi (kullanıcı talebi).
-//   Lottie hediyeler oda içi gift panelinden zaten gönderilebiliyor; mağazada
-//   ayrıca kart olarak göstermeye gerek yok. DB'de aktif kalıyor — geri açmak
-//   istenirse 'gifts' object'ini tekrar listeye eklemek yeterli.
-const CATEGORIES: { key: CategoryKey; label: string; icon: string }[] = [
-  { key: 'bundles',      label: 'Setler',          icon: 'cube-outline' },
-  { key: 'frames',       label: 'Çerçeveler',     icon: 'ellipse-outline' },
-  { key: 'entry_effect', label: 'Giriş Efektleri', icon: 'sparkles-outline' },
-  { key: 'sp',           label: 'SP Paketleri',    icon: 'diamond-outline' },
-];
+// ★ P1-4 (16 May 2026): Tek merkezi kategori dosyası — constants/cosmeticCategories.ts.
+//   Önceden burada inline liste vardı, admin'in categories.ts'inden bağımsız → kayma riski.
+//   Şimdi merkezi APK_STORE_TABS'tan okunuyor. Yeni tab istersen O dosyayı düzelt.
+//   Not: 'gift' burada YOK çünkü gift ürünleri oda içi pay-per-send paneli kullanır.
+type CategoryKey = StoreTabKey;
+const CATEGORIES: { key: CategoryKey; label: string; icon: string }[] =
+  APK_STORE_TABS.map(t => ({ key: t.key, label: t.label, icon: t.ionIcon }));
 
 const RARITY_LABEL: Record<Rarity, string> = {
   divine: 'İLAHİ', mythic: 'EFSANEVİ', legendary: 'EFSANE', rare: 'NADİR', new: 'YENİ',
@@ -467,6 +462,13 @@ export default function StoreScreen() {
   };
   const frameItems = applyFilters(items.filter((i) => i.category === 'atelier' || i.category === 'frames'));
   const entryItems = applyFilters(items.filter((i) => i.category === 'message_art' || i.category === 'entry_effect'));
+  // ★ v277 (14 May 2026): Yeni cosmetic kategoriler — admin'in eklediği glow/badge/bg/effect/emoji
+  //   ürünleri mağazada listelenmiyordu. Şimdi her biri kendi tab'ında görünür.
+  const glowMessageItems = applyFilters(items.filter((i) => i.category === 'glow_message'));
+  const badgeItems = applyFilters(items.filter((i) => i.category === 'badge'));
+  const backgroundItems = applyFilters(items.filter((i) => i.category === 'background'));
+  const effectItems = applyFilters(items.filter((i) => i.category === 'effect'));
+  const emojiItems = applyFilters(items.filter((i) => i.category === 'emoji'));
   // ★ 2026-05-10: giftItems kaldırıldı — mağaza UI'ndan gizlendi (kullanıcı talebi)
 
   // ★ v108.21: Wishlist toggle (optimistic update + DB sync)
@@ -921,6 +923,101 @@ export default function StoreScreen() {
               Lottie hediyeler oda içi 🎁 panelden zaten gönderiliyor; mağazada
               ayrıca vitrin gerekmiyor. Geri açmak istenirse: bu blok'u restore et
               + CATEGORIES listesine 'gifts' tab'ı tekrar ekle. */}
+
+          {/* ★ v277 (14 May 2026): PARLAK MESAJLAR */}
+          {glowMessageItems.length > 0 && (
+            <>
+              <View onLayout={(e) => { sectionOffsets.current.glow_message = e.nativeEvent.layout.y; }} />
+              <SectionDivider label="— PARLAK MESAJLAR · SOHBET —" />
+              <Text style={s.sectionTitle}>Parlak Mesajlar</Text>
+              <Text style={s.sectionSub}>Mesajlarına parıltı kat · Sohbette öne çık</Text>
+              <View style={s.galleryGrid}>
+                {glowMessageItems.map((item) => {
+                  const totalOff = inventory.has(item.id) ? 0 : Math.min(tierDiscountPct, 80);
+                  return (
+                    <GalleryCard key={item.id} item={item} owned={inventory.has(item.id)} discountPct={totalOff}
+                      wished={wishlist.has(item.id)} onWishToggle={() => handleWishlistToggle(item)} onPress={() => handlePurchase(item)} />
+                  );
+                })}
+              </View>
+            </>
+          )}
+
+          {/* ★ v277: ROZETLER */}
+          {badgeItems.length > 0 && (
+            <>
+              <View onLayout={(e) => { sectionOffsets.current.badge = e.nativeEvent.layout.y; }} />
+              <SectionDivider label="— ROZETLER · PROFİL —" />
+              <Text style={s.sectionTitle}>Özel Rozetler</Text>
+              <Text style={s.sectionSub}>Profilinde ayrıcalık · Statünü göster</Text>
+              <View style={s.galleryGrid}>
+                {badgeItems.map((item) => {
+                  const totalOff = inventory.has(item.id) ? 0 : Math.min(tierDiscountPct, 80);
+                  return (
+                    <GalleryCard key={item.id} item={item} owned={inventory.has(item.id)} discountPct={totalOff}
+                      wished={wishlist.has(item.id)} onWishToggle={() => handleWishlistToggle(item)} onPress={() => handlePurchase(item)} />
+                  );
+                })}
+              </View>
+            </>
+          )}
+
+          {/* ★ v277: ARKAPLANLAR */}
+          {backgroundItems.length > 0 && (
+            <>
+              <View onLayout={(e) => { sectionOffsets.current.background = e.nativeEvent.layout.y; }} />
+              <SectionDivider label="— ARKAPLANLAR · UYGULAMA —" />
+              <Text style={s.sectionTitle}>Uygulama Arkaplanları</Text>
+              <Text style={s.sectionSub}>Profilini ve ekranlarını kişiselleştir</Text>
+              <View style={s.galleryGrid}>
+                {backgroundItems.map((item) => {
+                  const totalOff = inventory.has(item.id) ? 0 : Math.min(tierDiscountPct, 80);
+                  return (
+                    <GalleryCard key={item.id} item={item} owned={inventory.has(item.id)} discountPct={totalOff}
+                      wished={wishlist.has(item.id)} onWishToggle={() => handleWishlistToggle(item)} onPress={() => handlePurchase(item)} />
+                  );
+                })}
+              </View>
+            </>
+          )}
+
+          {/* ★ v277: EFEKTLER */}
+          {effectItems.length > 0 && (
+            <>
+              <View onLayout={(e) => { sectionOffsets.current.effect = e.nativeEvent.layout.y; }} />
+              <SectionDivider label="— EFEKTLER · ODA —" />
+              <Text style={s.sectionTitle}>Özel Efektler</Text>
+              <Text style={s.sectionSub}>Odada görsel şölen · Parçacık efektleri</Text>
+              <View style={s.galleryGrid}>
+                {effectItems.map((item) => {
+                  const totalOff = inventory.has(item.id) ? 0 : Math.min(tierDiscountPct, 80);
+                  return (
+                    <GalleryCard key={item.id} item={item} owned={inventory.has(item.id)} discountPct={totalOff}
+                      wished={wishlist.has(item.id)} onWishToggle={() => handleWishlistToggle(item)} onPress={() => handlePurchase(item)} />
+                  );
+                })}
+              </View>
+            </>
+          )}
+
+          {/* ★ v277: ÖZEL EMOJİ SETLERİ */}
+          {emojiItems.length > 0 && (
+            <>
+              <View onLayout={(e) => { sectionOffsets.current.emoji = e.nativeEvent.layout.y; }} />
+              <SectionDivider label="— ÖZEL EMOJİ · SOHBET —" />
+              <Text style={s.sectionTitle}>Özel Emoji Setleri</Text>
+              <Text style={s.sectionSub}>Mesajlarında özel emojiler · Topluluk içinde fark</Text>
+              <View style={s.galleryGrid}>
+                {emojiItems.map((item) => {
+                  const totalOff = inventory.has(item.id) ? 0 : Math.min(tierDiscountPct, 80);
+                  return (
+                    <GalleryCard key={item.id} item={item} owned={inventory.has(item.id)} discountPct={totalOff}
+                      wished={wishlist.has(item.id)} onWishToggle={() => handleWishlistToggle(item)} onPress={() => handlePurchase(item)} />
+                  );
+                })}
+              </View>
+            </>
+          )}
 
           {/* Soprano Tezgâhı */}
           <View

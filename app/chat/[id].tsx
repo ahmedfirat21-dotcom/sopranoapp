@@ -1991,6 +1991,7 @@ export default function ChatScreen() {
       <EmojiPicker
         visible={showEmojiPicker}
         onClose={() => setShowEmojiPicker(false)}
+        customEmojiSetId={(profile as any)?.active_emoji_id || null}
         onEmojiSelect={(emoji) => {
           setInputText(prev => prev + emoji);
         }}
