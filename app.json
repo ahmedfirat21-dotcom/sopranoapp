@@ -2,7 +2,7 @@
   "expo": {
     "name": "SopranoChat",
     "slug": "SopranoChat",
-    "version": "1.4.3",
+    "version": "1.4.4",
     "privacy": "public",
     "orientation": "portrait",
     "icon": "./assets/app_icon.png",

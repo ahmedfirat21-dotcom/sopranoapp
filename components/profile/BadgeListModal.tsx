@@ -11,11 +11,12 @@
  * Tap → PremiumAlert detay modal.
  * Swipe-down ile kapanır.
  */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { i18n } from '../../services/i18n';
 import {
-  View, Text, StyleSheet, Pressable, ScrollView,
+  View, Text, StyleSheet, Pressable, ScrollView, Animated, Easing,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import AppLoader from '../AppLoader';
 import BottomSheet from '../BottomSheet';
 import { Ionicons } from '@expo/vector-icons';
