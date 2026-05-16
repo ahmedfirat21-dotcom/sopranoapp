@@ -279,7 +279,6 @@ const en: Record<string, string> = {
   'access.joining': 'Joining the room',
   'access.try_later': 'You can try again later',
   'access.discover_similar': 'Discover similar rooms',
-  'common.back': 'Back',
   'access.hidden_until_approved': 'Room content is hidden until approved',
   'queue.hand_raised': 'Hand Raised',
   'queue.next': 'Next',
@@ -394,7 +393,6 @@ const en: Record<string, string> = {
   'profile.friends_label_other': 'FRIENDS',
   'profile.see_all_short': 'All',
   'profile.follow': 'Follow',
-  'profile.following': 'Following',
   'profile.stage_promote_self': 'Go on Stage',
   'profile.ghost_invisible': 'Invisible Mode',
   'profile.ghost_visible': 'Become Visible',
@@ -750,8 +748,6 @@ const en: Record<string, string> = {
   'boostpickersheet.002': "Profilin ve odaların Keşfet'te öne çıkar. Tıklayan kullanıcılar odalarına ulaşır.",  // TODO: translate
   'boostpickersheet.003': "Boost Başlat",  // TODO: translate
   'createroomcoachmark.001': "butonuna dokun ve ilk odanı aç.",  // TODO: translate
-  'discoverwelcomesheet.001': "Sesle tanış",  // TODO: translate
-  'discoverwelcomesheet.002': "Kendi odanı aç",  // TODO: translate
   'fabhintoverlay.001': "Buradan yeni bir oda açabilirsin. Arkadaşlarını davet et, sohbete başla!",  // TODO: translate
   'fabhintoverlay.002': "Anladım — dokun",  // TODO: translate
   'followlistmodal.001': "ARKADAŞLAR",  // TODO: translate
@@ -936,16 +932,6 @@ const en: Record<string, string> = {
   'auth.login.061': "Please check your mailbox.",  // translated
   'auth.login.062': "Failed to get verification status. Try again.",  // translated
   'auth.login.063': "Reset password",  // translated
-  'auth.onboarding.001': "Female",  // translated
-  'auth.onboarding.002': "Music",  // translated
-  'auth.onboarding.003': "Failed to complete onboarding — DB error. Try again.",  // translated
-  'auth.onboarding.004': "Connection Error",  // translated
-  'auth.onboarding.005': "Failed to save onboarding. Check your internet connection and try again.",  // translated
-  'auth.onboarding.006': "Invalid Code!",  // translated
-  'auth.onboarding.007': "Please enter a valid invite code.",  // translated
-  'auth.onboarding.008': "Welcome to the community! 50 SP has been added to your account.",  // translated
-  'auth.onboarding.009': "Photo successfully uploaded",  // translated
-  'auth.onboarding.010': "Your profile photo is ready!",  // translated
   'auth.onboarding.011': "Name is required",  // translated
   'auth.onboarding.012': "Name is too short",  // translated
   'auth.onboarding.013': "Must be at least 2 characters.",  // translated
@@ -965,7 +951,6 @@ const en: Record<string, string> = {
   'auth.onboarding.027': "Failed to write interests. There may be an Internet / DB problem.",  // translated
   'auth.onboarding.028': "Do you want to give up?",  // translated
   'auth.onboarding.029': "The information you have entered so far will not be saved and you will be logged out.",  // translated
-  'tabs.home.001': "Feature Profile",  // translated
   'tabs.home.002': "You are already in a room",  // translated
   'tabs.home.003': "Leave the existing room first.",  // translated
   'tabs.home.004': "Daily Limit Expired",  // translated
@@ -2151,7 +2136,6 @@ const en: Record<string, string> = {
   'auto.userTitles.006': "Hayırsever",  // TODO: translate
   'auto.voiceReactions.001': "Yangın",  // TODO: translate
   'auto.voiceReactions.002': "Alkış",  // TODO: translate
-  'tabs.myrooms.001': "Music",  // translated
   'tabs.myrooms.002': "Private",  // translated
   'tabs.myrooms.003': "📅 Planned Room Starts Early",  // translated
   'tabs.myrooms.004': "Could not start",  // translated
@@ -2179,8 +2163,6 @@ const en: Record<string, string> = {
   'tabs.myrooms.026': "Room Closed",  // translated
   'tabs.myrooms.027': "This room is not alive right now.",  // translated
   'tabs.myrooms.028': "Invitation sent",  // translated
-  'tabs.profile.001': "Failed to load activity data",  // translated
-  'tabs.profile.002': "Are you sure you want to log out of your account?",  // translated
   'tabs.profile.003': "Signed out",  // translated
   'tabs.profile.004': "Failed to logout",  // translated
   'tabs.profile.005': "You 💎 Gained 50 HP!",  // translated
@@ -2198,18 +2180,6 @@ const en: Record<string, string> = {
   'tabs.profile.017': "Uninstallation Failed",  // translated
   'tabs.profile.018': "Bio updated",  // translated
   'tabs.profile.019': "Update Failed",  // translated
-  'admin.001': "Complaint Closed",  // translated
-  'admin.002': "Alert",  // translated
-  'admin.003': "User Alerted",  // translated
-  'admin.004': "User Banned",  // translated
-  'admin.005': "Room Closed",  // translated
-  'admin.006': "Room Awakened",  // translated
-  'admin.007': "Failed to wake up",  // translated
-  'admin.008': "Failed to Update Tier",  // translated
-  'admin.009': "Failed to Change Authority",  // translated
-  'admin.010': "Disable",  // translated
-  'admin.011': "You can't delete your own account.",  // translated
-  'admin.012': "User could not be deleted.",  // translated
   'admin.013': "User deleted",  // translated
   'admin.014': "Users",  // translated
   'admin.015': "Total Partner",  // translated
@@ -2222,17 +2192,6 @@ const en: Record<string, string> = {
   'admin.022': "Send Announcement to All Users",  // translated
   'admin.023': "Skia Parity Test (development)",  // translated
   'admin.024': "Duration",  // translated
-  'auth.resetpassword.001': "Underweight",  // translated
-  'auth.resetpassword.002': "Good",  // translated
-  'auth.resetpassword.003': "Strong",  // translated
-  'auth.resetpassword.004': "Password is too short!",  // translated
-  'auth.resetpassword.005': "Have at least 8 characters",  // translated
-  'auth.resetpassword.006': "Uppercase Missing",  // translated
-  'auth.resetpassword.007': "Password must contain at least 1 uppercase letter.",  // translated
-  'auth.resetpassword.008': "Password must have at least 1 number.",  // translated
-  'auth.resetpassword.009': "Passwords don't match.",  // translated
-  'auth.resetpassword.010': "The two fields must be the same.",  // translated
-  'auth.resetpassword.011': "Password changed",  // translated
   'auth.resetpassword.012': "You can login with your new password.",  // translated
   'auth.resetpassword.013': "The link has expired",  // translated
   'auth.resetpassword.014': "Request a new reset email.",  // translated
@@ -2241,16 +2200,7 @@ const en: Record<string, string> = {
   'auth.resetpassword.017': "Weak Password",  // translated
   'auth.resetpassword.018': "Choose a stronger password.",  // translated
   'auth.resetpassword.019': "Failed to change password, try again.",  // translated
-  'call.id.001': "Connection Error",  // translated
-  'call.id.002': "Search link could not be established.",  // translated
   'call.id.003': "Error Search",  // translated
-  'chat.id.001': "Your first message will be sent as a request. You can text if the other party approves.",  // translated
-  'chat.id.002': "This user doesn't want to message you.",  // translated
-  'chat.id.003': "You can't send new messages until the other party approves.",  // translated
-  'chat.id.004': "Missed voice call",  // translated
-  'chat.id.005': "You have blocked this user. Unblock them for messaging.",  // translated
-  'chat.id.006': "Missing Message Duration",  // translated
-  'chat.id.007': "After this time, messages are automatically deleted (on both sides).",  // translated
   'chat.id.008': "Failed to play audio",  // translated
   'chat.id.009': "Settings → Apps Turn → on the microphone from SopranoChat → Permissions\\\\",  // translated
   'chat.id.010': "Failed to record audio",  // translated
@@ -2297,42 +2247,10 @@ const en: Record<string, string> = {
   'chat.id.051': "✓ Disabled",
   'chat.id.052': "Messages no longer expire.",
   'chat.id.053': "New messages will be deleted after this time.",
-  'createroom.001': "Paste YouTube / Spotify / SoundCloud link — people in the room listen on their own platform.",  // translated
-  'createroom.002': "∇️ The room will remain closed until the scheduled time. You can start it manually from the \"My Rooms\" screen.",  // translated
-  'createroom.003': "Your Daily Room Limit Has Been Expired",  // translated
-  'createroom.004': "Sunset Style",  // translated
-  'createroom.005': "Insufficient Membership",  // translated
-  'createroom.006': "Upgrade your membership to use this access mode.",  // translated
-  'createroom.007': "Daily Limit",  // translated
-  'createroom.008': "Invalid Music Link",  // translated
-  'createroom.009': "Failed to Open Room",  // translated
-  'createroom.010': "Invitations Sent",  // translated
-  'createroom.011': "∇️ Slow Mode Recommended",  // translated
-  'createroom.012': "Slow mode turned on for 5s in the encrypted room (spam protection). You can turn it off below.",  // translated
-  'createroom.013': "Audience: Sees the Get 🎙️ On Stage button",  // translated
-  'createroom.014': "Audience: He sees the Raise ✋ Hand button",  // translated
-  'createroom.015': "Audience: Sees a 🔒 locked button",  // translated
-  'createroom.016': "\tPermission Required",  // translated
-  'createroom.017': "Permission to access the gallery was not granted. You can allow it in the settings.",  // translated
-  'createroom.018': "Failed to select image",  // translated
-  'createroom.019': "\tPermission Required",  // translated
-  'createroom.020': "Permission to access the gallery was not granted.",  // translated
-  'createroom.021': "Failed to select image",  // translated
-  'createroom.022': "Access",  // translated
-  'createroom.023': "Welcoming",  // translated
-  'createroom.024': "Introduction",  // translated
   'createroom.025': "Gift",  // translated
   'createroom.026': "Age Limit",  // translated
   'createroom.027': "SLOW&#10;MODE",  // translated
   'createroom.028': "Music Link",  // translated
-  'editprofile.001': "Your password is managed through your Google account. Use the Google Account Settings → Security section to change your password.",  // translated
-  'editprofile.002': "Photo successfully uploaded",  // translated
-  'editprofile.003': "Your profile photo has been updated.",  // translated
-  'editprofile.004': "Failed to Upload Photo",  // translated
-  'editprofile.005': "Alert",  // translated
-  'editprofile.006': "Display name cannot be empty.",  // translated
-  'editprofile.007': "Logged Out",  // translated
-  'editprofile.008': "Your login information was not found, please log in again.",  // translated
   'editprofile.009': "Username is already taken",  // translated
   'editprofile.010': "Try another username.",  // translated
   'editprofile.011': "Checking username availability...",  // translated
@@ -2378,29 +2296,7 @@ const en: Record<string, string> = {
   'editprofile.051': "Unable to complete transaction, try again.",  // translated
   'editprofile.052': "Google Hesabı",  // translated
   'editprofile.053': "E-mail Account",  // translated
-  'hiddenrooms.001': "Could not load ability list.",  // translated
-  'hiddenrooms.002': "All secret rooms have been brought back",  // translated
-  'leaderboard.001': "Weekly",  // translated
-  'leaderboard.002': "Monthly",  // translated
-  'leaderboard.003': "Top Generous",  // translated
-  'leaderboard.004': "SP donation",  // translated
-  'leaderboard.005': "Gained HP",  // translated
-  'leaderboard.006': "opened a room",  // translated
-  'leaderboard.007': "Most Popularity",  // translated
-  'leaderboard.008': "follower",  // translated
-  'leaderboard.009': "Most Popular Rooms",  // translated
-  'leaderboard.010': "Most Generous",  // translated
   'notifications.001': "Friend requests, gifts, and messages will appear here",  // translated
-  'plus.001': "Subscription system is in maintenance mode. It will be available for purchase very soon.",  // translated
-  'plus.002': "ENHANCED",  // translated
-  'plus.003': "Unlimited",  // translated
-  'plus.004': "You need to logged in first",  // translated
-  'plus.005': "Upgrade Failed",  // translated
-  'plus.006': "Cancel Plan",  // translated
-  'plus.007': "Plan has been changed",  // translated
-  'plus.008': "You're back on the free plan.",  // translated
-  'plus.009': "You can cancel your subscription in Google Play settings.",  // translated
-  'plus.010': "Room Staying Open",  // translated
   'plus.011': "Casual Room",  // translated
   'plus.012': "Permanent Room Slot",  // translated
   'plus.013': "Room Type",  // translated
@@ -2409,8 +2305,6 @@ const en: Record<string, string> = {
   'plus.016': "Internet forum",  // translated
   'plus.017': "Follower-Only",  // translated
   'plus.018': "chamber music",  // translated
-  'room.id.001': "Writing",  // translated
-  'room.id.002': "online",  // translated
   'room.id.003': "If you agree, you can start messaging.",  // translated
   'room.id.004': "Your request is pending approval. You cannot send a new message until approval is received.",  // translated
   'room.id.005': "Your request has been declined — you cannot send a message.",  // translated
@@ -2587,19 +2481,6 @@ const en: Record<string, string> = {
   'spstore.001': "With SP, you can make your profile stand out, pay room admission, and access premium features.",  // translated
   'spstore.002': "Coming Up",  // translated
   'spstore.003': "The SP store is closed for the alpha version. It will be active on Google Play soon!",  // translated
-  'store.collection.id.001': "Buy",  // translated
-  'store.001': "Failed to update wishlist",  // translated
-  'store.002': "You have all the pieces",  // translated
-  'store.003': "Buy",  // translated
-  'store.004': "Buy",  // translated
-  'store.005': "Coming Up",  // translated
-  'store.006': "SP purchase is turned off during alpha version. It will be active on Google Play soon!",  // translated
-  'store.007': "— SETS · THEME PACKAGES —",  // translated
-  'store.008': "-FRAMES · AVATAR —",  // translated
-  'store.009': "— INPUT EFFECTS · ROOM —",  // translated
-  'store.010': "— BADGES · PROFILE —",  // translated
-  'store.011': "— PRIVATE EMOJİ · CHAT —",  // translated
-  'store.012': "— COLLECTIONS · ALL SEASON —",  // translated
   'layout.001': "Connection Problem",  // translated
   'layout.002': "We couldn't retrieve your profile from the server. Check your internet connection and try again.",  // translated
   'layout.003': "Live Coverage",  // translated
@@ -2608,9 +2489,6 @@ const en: Record<string, string> = {
   'layout.006': "Missed Call",  // translated
   'layout.007': "⏰ Event Reminder",  // translated
   'layout.008': "🎉 Friendship Acceptance",  // translated
-  'blockeduserssheet.001': "Could not load ability list.",  // translated
-  'blockeduserssheet.002': "Blocked users could not be withdrawn.",  // translated
-  'blockeduserssheet.003': "Unblocked",  // translated
   'blockeduserssheet.004': "Unblock Failed",  // translated
   'boostpickersheet.001': "Fast Boost",  // translated
   'createroomcoachmark.001': "tap the button and open your first room.",  // translated
@@ -2663,45 +2541,28 @@ const en: Record<string, string> = {
   'profile.badgecelebration.001': "NADIR",  // translated
   'profile.badgecelebration.002': "EPIC",  // translated
   'profile.badgecelebration.003': "LEGENDARY",  // translated
-  'profile.featuredbadgespicker.001': "Featured badges updated",  // translated
   'profile.giftsheet.toast_send_failed': "Couldn't send gift",
   'profile.giftsheet.toast_network_error': "Couldn't send gift",
   'profile.spdonatesheet.toast_failed': "Donation failed",
   'profile.spdonatesheet.toast_network': "Donation failed",
-  'profile.spreceivedmodal.001': "Teşekkürler",  // TODO: translate
-  'profile.spreceivedmodal.002': "Sağol",  // TODO: translate
   'profile.spreceivedmodal.003': "Çok naziksin",  // TODO: translate
   'profile.spreceivedmodal.004': "İyisin",  // TODO: translate
   'profile.spreceivedmodal.005': "HEDİYE GELDİ",  // TODO: translate
   'profile.spreceivedmodal.006': "BAĞIŞ ALDIN",  // TODO: translate
   'profile.spreceivedmodal.007': "İletilemedi",  // TODO: translate
   'profile.spreceivedmodal.008': "Teşekkür Gönderilemedi",  // TODO: translate
-  'profile.spsentsuccessmodal.001': "SP HEDİYE EDİLEN KİŞİ",  // TODO: translate
   'profile.symbolgiftsheet.footnote': "Each gift deducts SP from you · Recipient earns 50%",
   'profile.symbolgiftsheet.toast_failed': "Couldn't send",
-  'profile.tieredprofilesections.001': "Dil & Yaş Etiketleri",  // TODO: translate
-  'profile.tieredprofilesections.002': "Kapsamlı Moderasyon Geçmişi",  // TODO: translate
-  'profile.tieredprofilesections.003': "Profil Teması",  // TODO: translate
-  'profile.tieredprofilesections.004': "Kapak Fotoğrafı",  // TODO: translate
   'profile.tieredprofilesections.005': "Takipçilere Özel İçerik",  // TODO: translate
   'profile.tieredprofilesections.006': "Destekle / SP Bağış",  // TODO: translate
   'profile.tieredprofilesections.007': "Ghost Mode Göstergesi",  // TODO: translate
   'profile.tieredprofilesections.008': "Gelişmiş İstatistik Paneli",  // TODO: translate
   'profile.tieredprofilesections.009': "Gelir Göstergesi",  // TODO: translate
-  'profile.voicebiorecorder.001': "Kayıt başlatılamadı",  // TODO: translate
-  'profile.voicebiorecorder.002': "Çok kısa",  // TODO: translate
-  'profile.voicebiorecorder.003': "Kayıt sonlanmadı",  // TODO: translate
-  'profile.voicebiorecorder.004': "Sesli tanıtım kaydedildi",  // TODO: translate
-  'profile.voicebiorecorder.005': "Yükleme başarısız",  // TODO: translate
   'profile.voicebiorecorder.006': "Sesli tanıtım kaldırıldı",  // TODO: translate
   'quickcreatesheet.001': "Hızlı Aç",  // TODO: translate
   'quickcreatesheet.002': "Varsayılanlarla hemen yayına başla",  // TODO: translate
   'quickcreatesheet.003': "Detaylı Ayarla",  // TODO: translate
   'quickcreatesheet.004': "Tema, izin, planlama — tüm seçenekleri elden tut",  // TODO: translate
-  'reportmodal.001': "Taciz / Zorbalık",  // TODO: translate
-  'reportmodal.002': "Nefret Söylemi",  // TODO: translate
-  'reportmodal.003': "Uygunsuz İçerik",  // TODO: translate
-  'reportmodal.004': "Kimliğe Bürünme",  // TODO: translate
   'reportmodal.005': "Şiddet",  // TODO: translate
   'reportmodal.006': "Yaş Altı Kullanıcı",  // TODO: translate
   'reportmodal.007': "Other",  // translated
@@ -2715,9 +2576,6 @@ const en: Record<string, string> = {
   'room.glowstyles.001': "KALP ATIŞI",  // TODO: translate
   'room.glowstyles.002': "ATEŞ",  // TODO: translate
   'room.glowstyles.003': "GALAKSİ",  // TODO: translate
-  'room.hostaccesspanel.001': "✅ Ban Kaldırıldı",  // TODO: translate
-  'room.hostaccesspanel.002': "Ban Kaldırılamadı",  // TODO: translate
-  'room.hostaccesspanel.003': "📨 Davet Gönderildi",  // TODO: translate
   'room.hostaccesspanel.004': "Davet Gönderilemedi",  // TODO: translate
   'room.hostaccesspanel.005': "İstekler",  // TODO: translate
   'room.hostaccesspanel.006': "Banlılar",  // TODO: translate
@@ -2804,14 +2662,6 @@ const en: Record<string, string> = {
   'room.roominfoheader.006': "Oda sahibi yeni katılımcı kabulünü geçici olarak durdurdu.",  // TODO: translate
   'room.roominfoheader.007': "👥 Arkadaşlara Özel",  // TODO: translate
   'room.roominfoheader.008': "Bu oda yalnızca oda sahibinin arkadaşlarına açık.",  // TODO: translate
-  'room.roommanagesheet.001': "Oda kilitli — kimse giremiyor. Erişim modunu değiştirmek için kilidi kapat.",  // TODO: translate
-  'room.roommanagesheet.002': "Geçici host moddasın. Yalnız moderasyon ve takipçi görüntüleme açık. Oda adı, teması, ücreti gibi ayarlar yalnız asıl sahibinde.",  // TODO: translate
-  'room.roommanagesheet.003': "Gün Batımı",  // TODO: translate
-  'room.roommanagesheet.004': "Gül",  // TODO: translate
-  'room.roommanagesheet.005': "Ayar Güncellenemedi",  // TODO: translate
-  'room.roommanagesheet.006': "🔐 Şifre Gerekli",  // TODO: translate
-  'room.roommanagesheet.007': "Şifreli oda için en az 1 karakter şifre yaz.",  // TODO: translate
-  'room.roommanagesheet.008': "🔐 Çok Kısa",  // TODO: translate
   'room.roommanagesheet.009': "Şifre en az 3 karakter olmalı.",  // TODO: translate
   'room.roommanagesheet.010': "⏱️ Yavaş Mod Önerildi",  // TODO: translate
   'room.roommanagesheet.011': "Şifreli odada 5sn yavaş mod açıldı (spam koruması). Aşağıdan kapatabilirsin.",  // TODO: translate
@@ -2865,22 +2715,6 @@ const en: Record<string, string> = {
   'room.roommanagesheet.059': "Bağış (Tip) Aç/Kapat",  // TODO: translate
   'room.roommanagesheet.060': "SP cinsinden oda giriş ücreti",  // TODO: translate
   'room.roommanagesheet.061': "Giriş Ücreti Belirleme (SP)",  // TODO: translate
-  'room.roomoverlays.001': "İzinli",  // TODO: translate
-  'room.roomoverlays.002': "Seçili",  // TODO: translate
-  'room.roomoverlays.003': "Gün Batımı",  // TODO: translate
-  'room.roomoverlays.004': "Gül",  // TODO: translate
-  'room.roomoverlays.005': "Open",  // translated
-  'room.roomoverlays.006': "Şifreli",  // TODO: translate
-  'room.roomoverlays.007': "✅ Ban Kaldırıldı",  // TODO: translate
-  'room.roomoverlays.008': "Ban Kaldırılamadı",  // TODO: translate
-  'room.roomoverlays.009': "Bu kullanıcının banı kaldırılamadı.",  // TODO: translate
-  'room.roomoverlays.010': "Konuşma",  // TODO: translate
-  'room.roomoverlays.011': "Music",  // translated
-  'room.roomoverlays.012': "Katılım İstekleri",  // TODO: translate
-  'room.roomoverlays.013': "Katılım İstekleri",  // TODO: translate
-  'room.roomoverlays.014': "Oda Linkini Paylaş",  // TODO: translate
-  'room.roomoverlays.015': "İstatistikler & Boost",  // TODO: translate
-  'room.roomoverlays.016': "Keşfette Öne Çıkar",  // TODO: translate
   'room.roomoverlays.017': "Güçlendiriciler",  // TODO: translate
   'room.roomoverlays.018': "SP harca, an\\'ı taçlandır",  // TODO: translate
   'room.roomoverlays.019': "Odayı Bildir",  // TODO: translate

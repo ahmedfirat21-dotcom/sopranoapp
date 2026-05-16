@@ -51,15 +51,19 @@ export default function OnboardingScreen() {
   // Animations
   const fadeAnim = useRef(new Animated.Value(1)).current;
 
+  // ★ v298.2 (17 May 2026): Hardcoded label'lar — i18n.t('auth.onboarding.001/002')
+  //   key çakışmasından dolayı kullanılmıyor (description text ile aynı key, son
+  //   atama kazandığı için Kadın/Müzik yerine description metni görünüyordu).
+  //   "Erkek" / "Belirtmiyorum" zaten hardcoded; "Kadın" / "Müzik" da hardcoded.
   const GENDER_OPTIONS = [
     { id: 'male' as const, label: 'Erkek', icon: 'male' as const, color: '#3B82F6' },
-    { id: 'female' as const, label: i18n.t('auth.onboarding.001'), icon: 'female' as const, color: '#EC4899' },
+    { id: 'female' as const, label: 'Kadın', icon: 'female' as const, color: '#EC4899' },
     { id: 'unspecified' as const, label: 'Belirtmiyorum', icon: 'person-outline' as const, color: '#64748B' },
   ];
 
   const INTEREST_OPTIONS = [
     { id: 'chat', label: 'Sohbet', icon: 'chatbubbles', color: '#14B8A6', emoji: '💬' },
-    { id: 'music', label: i18n.t('auth.onboarding.002'), icon: 'musical-notes', color: '#8B5CF6', emoji: '🎵' },
+    { id: 'music', label: 'Müzik', icon: 'musical-notes', color: '#8B5CF6', emoji: '🎵' },
     { id: 'game', label: 'Oyun', icon: 'game-controller', color: '#EF4444', emoji: '🎮' },
     { id: 'tech', label: 'Teknoloji', icon: 'code-slash', color: '#3B82F6', emoji: '💻' },
     { id: 'book', label: 'Kitap', icon: 'book', color: '#F59E0B', emoji: '📚' },
