@@ -756,15 +756,15 @@ const en: Record<string, string> = {
   'profile.featuredbadgespicker.004': "Aktif kullanım, sahne, bağış ile rozet kazan",  // TODO: translate
   'profile.giftdetailmodal.001': "ALDIĞI HEDİYELER",  // TODO: translate
   'profile.giftdetailmodal.002': "VERDİĞİ HEDİYELER",  // TODO: translate
-  'profile.giftsheet.001': "Hediye gönderilemedi",  // TODO: translate
-  'profile.giftsheet.002': "Hediye gönderilemedi",  // TODO: translate
+  'profile.giftsheet.001': "Send Gift",
+  'profile.giftsheet.002': "Add a short message (optional)",
   'profile.giftshowcase.001': "· son 30 gün",  // TODO: translate
   'profile.giftshowcase.002': "· son 30 gün",  // TODO: translate
   'profile.languageinterestpicker.001': "KİMLİĞİN",  // TODO: translate
   'profile.personalnotecard.001': "Bu kişi hakkında özel not bırak (sadece sen görürsün)",  // TODO: translate
   'profile.sociallinkseditor.001': "SOSYAL LİNKLER",  // TODO: translate
-  'profile.spdonatesheet.001': "Bağış başarısız",  // TODO: translate
-  'profile.spdonatesheet.002': "Bağış başarısız",  // TODO: translate
+  'profile.spdonatesheet.001': "Send SP",
+  'profile.spdonatesheet.002': "to",
   'profile.sphistorysheet.001': "SP GEÇMİŞİM",  // TODO: translate
   'profile.sphistorysheet.002': "Son 30 işlem · Canlı",  // TODO: translate
   'profile.sphistorysheet.003': "Güncel Bakiye",  // TODO: translate
@@ -773,8 +773,8 @@ const en: Record<string, string> = {
   'profile.spreceivedmodal.001': "Teşekkürler",  // TODO: translate
   'profile.spreceivedmodal.002': "Sağol",  // TODO: translate
   'profile.spsentsuccessmodal.001': "SP HEDİYE EDİLEN KİŞİ",  // TODO: translate
-  'profile.symbolgiftsheet.001': "Her gönderimde SP'n düşer · Alıcı %50 kazanır",  // TODO: translate
-  'profile.symbolgiftsheet.002': "Gönderilemedi",  // TODO: translate
+  'profile.symbolgiftsheet.001': "Symbol Gift",
+  'profile.symbolgiftsheet.002': "Gift catalog could not be loaded",
   'profile.thankyoureceivedmodal.001': "🙏 TEŞEKKÜR ALDIN!",  // TODO: translate
   'profile.thankyoureceivedmodal.002': "sana teşekkür etti",  // TODO: translate
   'profile.tieredprofilesections.001': "Dil & Yaş Etiketleri",  // TODO: translate
@@ -818,9 +818,6 @@ const en: Record<string, string> = {
   'room.roomfollowerssheet.001': "ODA TAKİPÇİLERİ",  // TODO: translate
   'room.roomfollowerssheet.002': "Bu odanın henüz takipçisi yok",  // TODO: translate
   'room.roomfollowerssheet.003': "Odanın altında \"Takip Et\" tıklayanlar burada listelenir.",  // TODO: translate
-  'room.roomgiftpanel.001': "Hediyeler her gönderimde SP'ni düşürür · Alıcı %50 SP kazanır",  // TODO: translate
-  'room.roomgiftpanel.002': "Hediye gönderebileceğin kullanıcı yok.",  // TODO: translate
-  'room.roomgiftpanel.003': "Önce alıcı seç (üstteki avatarlardan)",  // TODO: translate
   'room.roommanagesheet.001': "Oda kilitli — kimse giremiyor. Erişim modunu değiştirmek için kilidi kapat.",  // TODO: translate
   'room.roommanagesheet.002': "Geçici host moddasın. Yalnız moderasyon ve takipçi görüntüleme açık. Oda adı, teması, ücreti gibi ayarlar yalnız asıl sahibinde.",  // TODO: translate
   'room.roommanagesheet.003': "Gün Batımı",  // TODO: translate
@@ -850,7 +847,7 @@ const en: Record<string, string> = {
   'room.roomstatspanel.001': "Anlık katılımcı",  // TODO: translate
   'room.roomstatspanel.002': "Benzersiz katılımcı",  // TODO: translate
   'room.speakersection.001': "Sahne boş",  // TODO: translate
-  'room.stagesupportsheet.001': "Destek gönderilemedi",  // TODO: translate
+  'room.stagesupportsheet.001': "Support the Stage",
   'roomboostsheet.001': "Hızlı Boost",  // TODO: translate
   'roomboostsheet.002': "POPÜLER",  // TODO: translate
   'roomcreatehintsheet.001': "Yeni Oda Oluştur",  // TODO: translate
@@ -2656,10 +2653,10 @@ const en: Record<string, string> = {
   'profile.badgecelebration.002': "EPIC",  // translated
   'profile.badgecelebration.003': "LEGENDARY",  // translated
   'profile.featuredbadgespicker.001': "Featured badges updated",  // translated
-  'profile.giftsheet.001': "Hediye gönderilemedi",  // TODO: translate
-  'profile.giftsheet.002': "Hediye gönderilemedi",  // TODO: translate
-  'profile.spdonatesheet.001': "Bağış başarısız",  // TODO: translate
-  'profile.spdonatesheet.002': "Bağış başarısız",  // TODO: translate
+  'profile.giftsheet.toast_send_failed': "Couldn't send gift",
+  'profile.giftsheet.toast_network_error': "Couldn't send gift",
+  'profile.spdonatesheet.toast_failed': "Donation failed",
+  'profile.spdonatesheet.toast_network': "Donation failed",
   'profile.spreceivedmodal.001': "Teşekkürler",  // TODO: translate
   'profile.spreceivedmodal.002': "Sağol",  // TODO: translate
   'profile.spreceivedmodal.003': "Çok naziksin",  // TODO: translate
@@ -2669,8 +2666,8 @@ const en: Record<string, string> = {
   'profile.spreceivedmodal.007': "İletilemedi",  // TODO: translate
   'profile.spreceivedmodal.008': "Teşekkür Gönderilemedi",  // TODO: translate
   'profile.spsentsuccessmodal.001': "SP HEDİYE EDİLEN KİŞİ",  // TODO: translate
-  'profile.symbolgiftsheet.001': "Her gönderimde SP'n düşer · Alıcı %50 kazanır",  // TODO: translate
-  'profile.symbolgiftsheet.002': "Gönderilemedi",  // TODO: translate
+  'profile.symbolgiftsheet.footnote': "Each gift deducts SP from you · Recipient earns 50%",
+  'profile.symbolgiftsheet.toast_failed': "Couldn't send",
   'profile.tieredprofilesections.001': "Dil & Yaş Etiketleri",  // TODO: translate
   'profile.tieredprofilesections.002': "Kapsamlı Moderasyon Geçmişi",  // TODO: translate
   'profile.tieredprofilesections.003': "Profil Teması",  // TODO: translate
@@ -2782,11 +2779,12 @@ const en: Record<string, string> = {
   'room.roomentryeffectoverlay.004': "Zarif Çağ",  // TODO: translate
   'room.roomentryeffectoverlay.005': "Altın Hükmü",  // TODO: translate
   'room.roomentryeffectoverlay.006': "Anka Kuşu",  // TODO: translate
-  'room.roomgiftpanel.001': "Hediyeler her gönderimde SP'ni düşürür · Alıcı %50 SP kazanır",  // TODO: translate
-  'room.roomgiftpanel.002': "Hediye gönderebileceğin kullanıcı yok.",  // TODO: translate
-  'room.roomgiftpanel.003': "Önce alıcı seç (üstteki avatarlardan)",  // TODO: translate
-  'room.roomgiftpanel.004': "Kendine hediye gönderemezsin — sahneden başka birini seç.",  // TODO: translate
-  'room.roomgiftpanel.005': "Gönderilemedi",  // TODO: translate
+  'room.roomgiftpanel.001': "Send Gift",
+  'room.roomgiftpanel.002': "No one available to receive a gift.",
+  'room.roomgiftpanel.003': "Pick a recipient first (from the avatars above)",
+  'room.roomgiftpanel.004': "You can't gift yourself — pick someone else on stage.",
+  'room.roomgiftpanel.005': "Couldn't send",
+  'room.roomgiftpanel.006': "Each gift deducts SP from you · Recipient earns 50% SP",
   'room.roominfoheader.001': "🔞 Yaş Sınırı",  // TODO: translate
   'room.roominfoheader.002': "Bu odaya yalnızca 18 yaş üzeri kullanıcılar girebilir.",  // TODO: translate
   'room.roominfoheader.003': "🔒 Şifreli Oda",  // TODO: translate
@@ -2902,8 +2900,8 @@ const en: Record<string, string> = {
   'room.roomstatspanel.006': "Oda açık süresi",  // TODO: translate
   'room.roomstatspanel.007': "Takipçi",  // TODO: translate
   'room.roomstatspanel.008': "Oda takipçisi",  // TODO: translate
-  'room.stagesupportsheet.001': "Destek gönderilemedi",  // TODO: translate
-  'room.stagesupportsheet.002': "Destek gönderilemedi",  // TODO: translate
+  'room.stagesupportsheet.toast_failed': "Couldn't send support",
+  'room.stagesupportsheet.toast_network': "Couldn't send support",
   'roomboostsheet.001': "Hızlı Boost",  // TODO: translate
   'roominfoheader.live': "LIVE",
   'sessionconflictmodal.003': "This account was just used on another device. The same account can't be active in two places.",

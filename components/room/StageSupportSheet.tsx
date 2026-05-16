@@ -284,7 +284,7 @@ export default function StageSupportSheet({
         setBalance(prev => (prev ?? 0) + sentAmount);
         setShowSuccess(false);
         showToast({
-          title: i18n.t('room.stagesupportsheet.001'),
+          title: i18n.t('room.stagesupportsheet.toast_failed'),
           message: result.error || i18n.t('auto.room.StageSupportSheet.005'),
           type: 'error',
         });
@@ -296,7 +296,7 @@ export default function StageSupportSheet({
         setBalance(prev => (prev ?? 0) + sentAmount);
         setShowSuccess(false);
         showToast({
-          title: i18n.t('room.stagesupportsheet.002'),
+          title: i18n.t('room.stagesupportsheet.toast_network'),
           message: e?.message || i18n.t('auto.room.StageSupportSheet.004'),
           type: 'error',
         });

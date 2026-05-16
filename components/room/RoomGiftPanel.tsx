@@ -519,7 +519,7 @@ export default function RoomGiftPanel({
                   );
                 })}
               </View>
-              <Text style={s.footnote}>{i18n.t('room.roomgiftpanel.001')}</Text>
+              <Text style={s.footnote}>{i18n.t('room.roomgiftpanel.006')}</Text>
             </ScrollView>
           )}
         </Animated.View>

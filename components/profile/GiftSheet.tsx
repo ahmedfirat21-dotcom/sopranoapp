@@ -282,7 +282,7 @@ export default function GiftSheet({
         setBalance(prev => (prev ?? 0) + sentAmount);
         setShowSuccess(false);
         showToast({
-          title: i18n.t('profile.giftsheet.001'),
+          title: i18n.t('profile.giftsheet.toast_send_failed'),
           message: result.error || i18n.t('auto.profile.GiftSheet.005'),
           type: 'error',
         });
@@ -294,7 +294,7 @@ export default function GiftSheet({
         setBalance(prev => (prev ?? 0) + sentAmount);
         setShowSuccess(false);
         showToast({
-          title: i18n.t('profile.giftsheet.002'),
+          title: i18n.t('profile.giftsheet.toast_network_error'),
           message: e?.message || i18n.t('auto.profile.GiftSheet.004'),
           type: 'error',
         });

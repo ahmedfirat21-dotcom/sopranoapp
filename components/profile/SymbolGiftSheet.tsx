@@ -141,7 +141,7 @@ export default function SymbolGiftSheet({ visible, onClose, senderId, recipientI
     setSending(false);
     if (error || !data?.success) {
       showToast({
-        title: i18n.t('profile.symbolgiftsheet.002'),
+        title: i18n.t('profile.symbolgiftsheet.toast_failed'),
         message: data?.error || error?.message || i18n.t('auto.profile.SymbolGiftSheet.003'),
         type: 'error',
       });
@@ -222,7 +222,7 @@ export default function SymbolGiftSheet({ visible, onClose, senderId, recipientI
                   );
                 })}
               </View>
-              <Text style={s.footnote}>{i18n.t('profile.symbolgiftsheet.001')}</Text>
+              <Text style={s.footnote}>{i18n.t('profile.symbolgiftsheet.footnote')}</Text>
             </>
           )}
         </Animated.View>

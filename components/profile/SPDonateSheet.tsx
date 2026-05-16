@@ -298,7 +298,7 @@ export default function SPDonateSheet({
         // ★ v92.28 (2 May 2026): Spesifik hata mesajı — kullanıcı neden başarısız
         //   olduğunu bilmek istiyor (welcome bonus exploit, rate limit, yetersiz, vs.)
         showToast({
-          title: i18n.t('profile.spdonatesheet.001'),
+          title: i18n.t('profile.spdonatesheet.toast_failed'),
           message: result.error || i18n.t('auto.profile.SPDonateSheet.006'),
           type: 'error',
         });
@@ -310,7 +310,7 @@ export default function SPDonateSheet({
         setBalance(prev => (prev ?? 0) + sentAmount);
         setShowSuccess(false);
         showToast({
-          title: i18n.t('profile.spdonatesheet.002'),
+          title: i18n.t('profile.spdonatesheet.toast_network'),
           message: e?.message || i18n.t('auto.profile.SPDonateSheet.005'),
           type: 'error',
         });
