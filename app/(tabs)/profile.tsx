@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, Modal, TextInput, Image, InteractionManager, Animated, PanResponder, type ImageStyle } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, Modal, TextInput, Image, InteractionManager, Animated, PanResponder, KeyboardAvoidingView, Platform, type ImageStyle } from 'react-native';
 import AppLoader from '../../components/AppLoader';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -214,8 +214,10 @@ function AvatarPreviewModal({
 
   useEffect(() => {
     if (visible) {
+      // ★ v289: Modal animationType=none olduğu için kendimiz fade-in animasyonu yapıyoruz.
       translateY.setValue(0);
-      fadeOpacity.setValue(1);
+      fadeOpacity.setValue(0);
+      Animated.timing(fadeOpacity, { toValue: 1, duration: 220, useNativeDriver: true }).start();
     }
   }, [visible]);
 
@@ -249,7 +251,10 @@ function AvatarPreviewModal({
   ).current;
 
   return (
-    <Modal visible={visible} transparent animationType="fade" statusBarTranslucent>
+    // ★ v289 (16 May 2026): animationType="none" — Modal native fade ile custom
+    //   Animated.Value (fadeOpacity) çakışıyordu, çift solma görsel kalitesizliği.
+    //   Custom Animated tek kaynak; spring/timing kontrolü daha hassas.
+    <Modal visible={visible} transparent animationType="none" statusBarTranslucent>
       <Animated.View style={[styles.avatarPreviewOverlay, { opacity: fadeOpacity }]} {...panResponder.panHandlers}>
         <Pressable style={StyleSheet.absoluteFillObject} onPress={closeWithAnim} />
         <Animated.View style={{ transform: [{ translateY }], alignItems: 'center' }} pointerEvents="box-none">
@@ -957,7 +962,11 @@ export default function ProfileScreen() {
             accentColor="#A78BFA"
             maxHeightRatio={0.7}
           >
-            <View style={{ paddingHorizontal: 16, paddingTop: 4 }}>
+            {/* ★ v289 (16 May 2026): KeyboardAvoidingView — Davet kodu TextInput'una
+                tıklayınca klavye açılıyor, BottomSheet 70% yer kaplıyor, input klavye
+                altında kalmasın. BioEditorSheet pattern: iOS padding, Android height. */}
+            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flexShrink: 1 }}>
+              <View style={{ paddingHorizontal: 16, paddingTop: 4 }}>
                 {/* Bölüm 1: Kendi kodum */}
                 <Text style={[styles.modalSubtitle, { marginTop: 4 }]}>{t('profile.your_invite_code')}</Text>
                 <View style={styles.myCodeRow}>
@@ -1016,7 +1025,8 @@ export default function ProfileScreen() {
                     </Pressable>
                   </>
                 )}
-            </View>
+              </View>
+            </KeyboardAvoidingView>
           </BottomSheet>
 
           {/* ★ Avatar Preview Modal — Instagram tarzı yuvarlak + tier glow
@@ -1138,6 +1148,9 @@ export default function ProfileScreen() {
               onPress: () => {
                 if (!firebaseUser || !friendActionSheet) return;
                 const target = friendActionSheet;
+                // ★ v289 (16 May 2026): Action sheet kapatıldıktan SONRA confirm alert aç.
+                //   Aksi halde iki sheet üst üste karışıklık yaratıyordu.
+                setFriendActionSheet(null);
                 setDeleteAlert({
                   visible: true,
                   title: i18n.t('tabs.profile.014'),
