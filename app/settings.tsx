@@ -231,17 +231,14 @@ export default function SettingsScreen() {
     })();
   }, [firebaseUser, applyTheme, profile]);
 
-  // ★ v284: Dil değiştir — i18n motoru + SettingsService senkron + toast
+  // ★ v284: Dil değiştir — i18n motoru + SettingsService senkron
+  //   v283 (16 May 2026): Toast kaldırıldı — kullanıcı dil değişikliğini UI'da
+  //   anında görüyor zaten, ekstra bildirim gereksiz görsel gürültü.
   const switchLocale = useCallback(async (next: SupportedLocale) => {
     if (i18n.locale === next) return;
     await i18n.setLocale(next);
     await SettingsService.update({ language: next });
     setSettings(prev => prev ? { ...prev, language: next } : prev);
-    showToast({
-      title: i18n.t('settings.language_changed'),
-      message: i18n.t('settings.language_restart_hint'),
-      type: 'success',
-    });
   }, []);
 
   const handleAction = useCallback((key: string) => {
