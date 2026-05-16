@@ -682,3 +682,49 @@ Android Bundled 33ms C:\SopranoChat\services\livekit.ts (1 module)
  LOG  [DEV] Emülatör algılandı — push token denenecek.
  LOG  [Session] Conflict kanalı: SUBSCRIBED
  WARN  Push token kayıt hatası: insert or update on table "push_tokens" violates foreign key constraint "push_tokens_user_id_fkey"
+ LOG  [SPSync] Bakiye güncellendi: 0 SP
+ LOG  [SPSync] Bakiye güncellendi: 0 SP
+ LOG  [Analytics] signup_completed 
+ LOG  [Analytics] property: signup_date = 2026-05-16
+ LOG  [Analytics] property: tier = Free
+ LOG  [Analytics] property: age_range = 35_44
+ LOG  [SPSync] Bakiye güncellendi: 0 SP
+ LOG  [WelcomeBonus] error
+Android Bundled 27ms C:\SopranoChat\constants\supabase.ts (1 module)
+ LOG  [SPSync] Bakiye güncellendi: 0 SP
+ ERROR  SyntaxError: C:\SopranoChat\app\create-room.tsx: Expected corresponding JSX closing tag for <View>. (1499:14)
+
+  1497 |                 <Ionicons name={currentStepMeta.icon as any} size={36} color={currentStepMeta.accent} />
+  1498 |               </LinearGradient>
+> 1499 |               </SkiaShadow>
+       |               ^
+  1500 |             </View>
+  1501 |
+  1502 |             {/* Hero Title + Subtitle — text shadow yok, sade */}
+ ERROR  [Error: TransformError SyntaxError: C:\SopranoChat\app\create-room.tsx: Expected corresponding JSX closing tag for <View>. (1499:14)
+
+[0m [90m 1497 |[39m                 [33m<[39m[33mIonicons[39m name[33m=[39m{currentStepMeta[33m.[39micon [36mas[39m any} size[33m=[39m{[35m36[39m} color[33m=[39m{currentStepMeta[33m.[39maccent} [33m/[39m[33m>[39m
+ [90m 1498 |[39m               [33m<[39m[33m/[39m[33mLinearGradient[39m[33m>[39m
+[31m[1m>[22m[39m[90m 1499 |[39m               [33m<[39m[33m/[39m[33mSkiaShadow[39m[33m>[39m
+ [90m      |[39m               [31m[1m^[22m[39m
+ [90m 1500 |[39m             [33m<[39m[33m/[39m[33mView[39m[33m>[39m
+ [90m 1501 |[39m
+ [90m 1502 |[39m             {[90m/* Hero Title + Subtitle — text shadow yok, sade */[39m}[0m]
+ ERROR  SyntaxError: C:\SopranoChat\app\create-room.tsx: Expected corresponding JSX closing tag for <View>. (1499:14)
+
+  1497 |                 <Ionicons name={currentStepMeta.icon as any} size={36} color={currentStepMeta.accent} />
+  1498 |               </LinearGradient>
+> 1499 |               </SkiaShadow>
+       |               ^
+  1500 |             </View>
+  1501 |
+  1502 |             {/* Hero Title + Subtitle — text shadow yok, sade */}
+ ERROR  [Error: TransformError SyntaxError: C:\SopranoChat\app\create-room.tsx: Expected corresponding JSX closing tag for <View>. (1499:14)
+
+[0m [90m 1497 |[39m                 [33m<[39m[33mIonicons[39m name[33m=[39m{currentStepMeta[33m.[39micon [36mas[39m any} size[33m=[39m{[35m36[39m} color[33m=[39m{currentStepMeta[33m.[39maccent} [33m/[39m[33m>[39m
+ [90m 1498 |[39m               [33m<[39m[33m/[39m[33mLinearGradient[39m[33m>[39m
+[31m[1m>[22m[39m[90m 1499 |[39m               [33m<[39m[33m/[39m[33mSkiaShadow[39m[33m>[39m
+ [90m      |[39m               [31m[1m^[22m[39m
+ [90m 1500 |[39m             [33m<[39m[33m/[39m[33mView[39m[33m>[39m
+ [90m 1501 |[39m
+ [90m 1502 |[39m             {[90m/* Hero Title + Subtitle — text shadow yok, sade */[39m}[0m]

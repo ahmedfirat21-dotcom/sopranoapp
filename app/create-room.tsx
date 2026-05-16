@@ -725,7 +725,7 @@ export default function CreateRoomScreen() {
               <Pressable
                 key={lang.id}
                 onPress={() => { if (!locked) setRoomLanguage(lang.id); else UpsellService.onFeatureLocked(tier, 'Plus'); }}
-                style={[{ borderRadius: 20, overflow: 'hidden', borderWidth: 1, borderColor: active ? 'rgba(20,184,166,0.5)' : 'rgba(255,255,255,0.08)', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 3, elevation: 2 }, locked && { opacity: 0.5 }]}
+                style={[{ borderRadius: 20, overflow: 'hidden', borderWidth: 1, borderColor: active ? 'rgba(20,184,166,0.5)' : 'rgba(255,255,255,0.08)', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 3 }, locked && { opacity: 0.5 }]}
               >
                 {active ? (
                   <LinearGradient
@@ -758,7 +758,7 @@ export default function CreateRoomScreen() {
               <Pressable
                 key={s}
                 onPress={() => { if (!locked) setSlowModeSeconds(s); else UpsellService.onFeatureLocked(tier, 'Plus'); }}
-                style={[{ borderRadius: 20, overflow: 'hidden', borderWidth: 1, borderColor: active ? 'rgba(20,184,166,0.5)' : 'rgba(255,255,255,0.08)', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 3, elevation: 2 }, locked && { opacity: 0.5 }]}
+                style={[{ borderRadius: 20, overflow: 'hidden', borderWidth: 1, borderColor: active ? 'rgba(20,184,166,0.5)' : 'rgba(255,255,255,0.08)', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 3 }, locked && { opacity: 0.5 }]}
               >
                 {active ? (
                   <LinearGradient
@@ -1473,15 +1473,13 @@ export default function CreateRoomScreen() {
             {/* ★ 2026-05-05: Hero icon — family slate base + accent halo ring (vibrant gradient yerine).
                  Step renkleri artık SADECE accent ring + ikon tint olarak görünür (sade fark işareti). */}
             <View style={w.heroIconWrap}>
-              {/* ★ v298.3 (17 May 2026): Accent halo basit GlowView (Skia) — wrapper YOK,
-                  layout korunur. Önceden SkiaShadow ekledim → iconCircle accent ring'den
-                  kaydı (görsel offset duplicate). Tek katman GlowView yeterli. */}
-              <GlowView style={[w.heroAccentRing, {
-                borderColor: currentStepMeta.accent + '55',
-                shadowColor: currentStepMeta.accent,
-                shadowOpacity: 0.55,
-                shadowRadius: 18,
-                shadowOffset: { width: 0, height: 0 },
+              {/* ★ v298.4 (17 May 2026): GlowView wrapper KALDIRILDI — position:absolute
+                  inner View'a düşünce normal flow'a girip iconCircle'ı kaydırıyordu
+                  (kullanıcı feedback: "duplicate icon görüntüsü").
+                  Çözüm: plain absolute View, sadece border ile accent vurgu (renkli
+                  glow YOK — accent rengi border'ında görünür, yeterince premium). */}
+              <View style={[w.heroAccentRing, {
+                borderColor: currentStepMeta.accent + '70',
               }]} pointerEvents="none" />
               <LinearGradient
                 colors={currentStepMeta.gradient}
@@ -1638,7 +1636,6 @@ const w = StyleSheet.create({
     shadowOffset: { width: 0, height: -6 },
     shadowOpacity: 0.45,
     shadowRadius: 14,
-    elevation: 12,
   },
   sheetHandleWrap: {
     alignItems: 'center',
@@ -1683,7 +1680,7 @@ const w = StyleSheet.create({
     width: 26, height: 6, borderRadius: 3,
     backgroundColor: Colors.teal,
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.35, shadowRadius: 6, elevation: 3,
+    shadowOpacity: 0.35, shadowRadius: 6,
   },
   progressDotDone: {
     backgroundColor: 'rgba(20,184,166,0.5)',
@@ -1701,7 +1698,7 @@ const w = StyleSheet.create({
     borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.12)',
     // ★ Ionicons optik kaymasını telafi — ikon tam merkeze oturur
     paddingLeft: 2, paddingTop: 1,
-    // ★ v298.2 (17 May 2026): RN shadow + elevation:14 KALDIRILDI — Android'de
+    // ★ v298.2 (17 May 2026): RN shadow +  KALDIRILDI — Android'de
     //   dikdörtgen native shadow çiziyordu. Cross-platform gölge artık parent
     //   SkiaShadow wrapper tarafından yönetiliyor (BlurMask, hem iOS hem Android
     //   yumuşak yuvarlak halo).
@@ -1712,7 +1709,7 @@ const w = StyleSheet.create({
     position: 'absolute',
     width: 100, height: 100, borderRadius: 30,
     borderWidth: 1.2,
-    // ★ v298.2 (17 May 2026): Android elevation:4 KALDIRILDI — GlowView wrapper
+    // ★ v298.2 (17 May 2026): Android  KALDIRILDI — GlowView wrapper
     //   colored shadow için Skia BlurMask kullanır (RN elevation dikdörtgen
     //   çiziyordu, halo ring'in rounded estetiğini bozuyordu).
   },
@@ -1781,7 +1778,7 @@ const w = StyleSheet.create({
     borderWidth: 1.5, borderColor: 'rgba(149,161,174,0.2)',
     alignItems: 'center', justifyContent: 'center',
     shadowColor: '#000', shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4, shadowRadius: 14, elevation: 6,
+    shadowOpacity: 0.4, shadowRadius: 14,
   },
   catName: {
     fontSize: 12, fontWeight: '700', color: '#CBD5E1', letterSpacing: 0.2,
@@ -1855,11 +1852,11 @@ const w = StyleSheet.create({
     paddingVertical: 14, paddingHorizontal: 16,
     marginBottom: 8, overflow: 'hidden',
     shadowColor: '#000', shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.25, shadowRadius: 6, elevation: 3,
+    shadowOpacity: 0.25, shadowRadius: 6,
   },
   accessRowActive: {
     borderColor: Colors.teal,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.4, shadowRadius: 14, elevation: 6,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.4, shadowRadius: 14,
   },
   accessIcon: {
     width: 48, height: 48, borderRadius: 16,
@@ -1926,7 +1923,7 @@ const w = StyleSheet.create({
     paddingVertical: 16, paddingHorizontal: 16,
     marginBottom: 10,
     shadowColor: '#000', shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.2, shadowRadius: 6, elevation: 3,
+    shadowOpacity: 0.2, shadowRadius: 6,
   },
   toggleLabel: { fontSize: 15, fontWeight: '700', color: '#F1F5F9', letterSpacing: 0.15 },
   toggleDesc: { fontSize: 12, color: 'rgba(203,213,225,0.75)', marginTop: 3, lineHeight: 16 },
@@ -1948,7 +1945,7 @@ const w = StyleSheet.create({
     borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.12)',
     padding: 18, justifyContent: 'flex-end',
     marginBottom: 18,
-    // ★ v298.3 (17 May 2026): RN shadow + elevation:10 KALDIRILDI — Android'de
+    // ★ v298.3 (17 May 2026): RN shadow +  KALDIRILDI — Android'de
     //   dikdörtgen native shadow oluyordu, fade transition'da iz bırakıyordu.
     //   Border + inner gradient zaten yeterli derinlik veriyor.
   },
@@ -2042,7 +2039,7 @@ const w = StyleSheet.create({
   primaryBtn: {
     flex: 1, borderRadius: 999, overflow: 'hidden',
     shadowColor: '#000', shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.40, shadowRadius: 12, elevation: 8,
+    shadowOpacity: 0.40, shadowRadius: 12,
   },
   primaryBtnGrad: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
