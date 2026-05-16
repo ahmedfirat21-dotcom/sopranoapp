@@ -29,6 +29,7 @@ import AppBackground from '../components/AppBackground';
 import PremiumAlert, { type AlertButton } from '../components/PremiumAlert';
 import BlockedUsersSheet from '../components/BlockedUsersSheet';
 import NotifPreferencesSheet from '../components/NotifPreferencesSheet';
+import LanguageSegmentedToggle from '../components/LanguageSegmentedToggle';
 import { useTranslation, i18n, type SupportedLocale } from '../services/i18n';
 // ★ Version — app.json'dan dinamik okunur, hardcode kaldırıldı (v86 fix)
 //   Eski hardcode "v1.2.4" yüzünden her APK'da aynı görünüyordu, kullanıcı güncellemediğini sanıyordu.
@@ -482,10 +483,9 @@ export default function SettingsScreen() {
                       } else if (item.type === 'select') {
                         if (item.key === 'theme') {
                           updateSetting('theme', settingValue === 'dark' ? 'light' : 'dark');
-                        } else if (item.key === 'language') {
-                          // ★ v284: inline TR↔EN toggle + i18n motorunu tetikle
-                          switchLocale(settingValue === 'tr' ? 'en' : 'tr');
                         }
+                        // ★ v283: language artık segmented toggle (sağda) — outer tıklama no-op,
+                        //   kendi 2 segment'i (TR / EN) tıklamayı yönetir.
                       } else if (item.type === 'toggle') {
                         updateSetting(item.key as keyof UserSettings, !settingValue);
                       }
@@ -538,12 +538,10 @@ export default function SettingsScreen() {
                             }}
                           />
                         ) : item.key === 'language' ? (
-                          <View style={s.langPill}>
-                            <Text style={{ fontSize: 13 }}>{settingValue === 'en' ? '🇬🇧' : '🇹🇷'}</Text>
-                            <Text style={s.selectValue}>
-                              {settingValue === 'en' ? 'EN' : 'TR'}
-                            </Text>
-                          </View>
+                          <LanguageSegmentedToggle
+                            value={(settingValue === 'en' ? 'en' : 'tr') as 'tr' | 'en'}
+                            onChange={(next) => switchLocale(next)}
+                          />
                         ) : null}
                       </View>
                     )}
@@ -674,11 +672,5 @@ const s = StyleSheet.create({
   selectValue: {
     fontSize: 13, fontWeight: '700', color: '#E2E8F0', letterSpacing: 1,
     textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
-  },
-  langPill: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: 'rgba(52,211,153,0.1)',
-    borderWidth: 1, borderColor: 'rgba(52,211,153,0.25)',
-    paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8,
   },
 });
