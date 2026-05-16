@@ -330,7 +330,7 @@ export function UserSearchModal({ visible, onClose, currentUserId, onSelectUser,
         onClose();
       }}
     >
-      <StatusAvatar uri={item.avatar_url} size={48} isOnline={liveOnlineIds.has(item.id)} tier={item.subscription_tier} frameId={(item as any).active_frame || null} />
+      <StatusAvatar uri={item.avatar_url} size={48} isOnline={liveOnlineIds.has(item.id)} tier={item.subscription_tier} frameId={(item as any).active_frame || null} customBadgeId={(item as any).active_badge_id ?? null} />
       <View style={s.userInfo}>
         <Text style={s.displayName}>{item.display_name || 'Kullanıcı'}</Text>
         {item.username && <Text style={s.username}>@{item.username}</Text>}
@@ -497,7 +497,7 @@ export function UserSearchModal({ visible, onClose, currentUserId, onSelectUser,
                               style={({ pressed }) => [s.userRow, pressed && { opacity: 0.8, backgroundColor: 'rgba(92,225,230,0.06)' }]}
                               onPress={() => { onSelectUser(item.id, item.display_name || 'Kullanıcı'); onClose(); }}
                             >
-                              <StatusAvatar uri={item.avatar_url} size={48} isOnline={liveOnlineIds.has(item.id)} tier={item.subscription_tier} frameId={(item as any).active_frame || null} />
+                              <StatusAvatar uri={item.avatar_url} size={48} isOnline={liveOnlineIds.has(item.id)} tier={item.subscription_tier} frameId={(item as any).active_frame || null} customBadgeId={(item as any).active_badge_id ?? null} />
                               <View style={s.userInfo}>
                                 <Text style={s.displayName}>{item.display_name || 'Kullanıcı'}</Text>
                                 {item.username && <Text style={s.username}>@{item.username}</Text>}
@@ -521,7 +521,7 @@ export function UserSearchModal({ visible, onClose, currentUserId, onSelectUser,
                               style={({ pressed }) => [s.userRow, pressed && { opacity: 0.8, backgroundColor: 'rgba(92,225,230,0.06)' }]}
                               onPress={() => { onSelectUser(item.id, item.display_name || 'Kullanıcı'); onClose(); }}
                             >
-                              <StatusAvatar uri={item.avatar_url} size={48} isOnline={liveOnlineIds.has(item.id)} tier={item.subscription_tier} frameId={(item as any).active_frame || null} />
+                              <StatusAvatar uri={item.avatar_url} size={48} isOnline={liveOnlineIds.has(item.id)} tier={item.subscription_tier} frameId={(item as any).active_frame || null} customBadgeId={(item as any).active_badge_id ?? null} />
                               <View style={s.userInfo}>
                                 <Text style={s.displayName}>{item.display_name || 'Kullanıcı'}</Text>
                                 {item.username && <Text style={s.username}>@{item.username}</Text>}

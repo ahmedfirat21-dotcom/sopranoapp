@@ -181,7 +181,7 @@ export default function NotificationsScreen() {
                     style={styles.pendingUser}
                     onPress={() => openUserProfile(req.sender?.id || req.user_id)}
                   >
-                    <StatusAvatar uri={req.sender?.avatar_url} size={44} tier={(req.sender as any)?.subscription_tier} frameId={(req.sender as any)?.active_frame || null} />
+                    <StatusAvatar uri={req.sender?.avatar_url} size={44} tier={(req.sender as any)?.subscription_tier} frameId={(req.sender as any)?.active_frame || null} customBadgeId={(req.sender as any)?.active_badge_id ?? null} />
                     <View style={styles.pendingInfo}>
                       <Text style={styles.pendingName} numberOfLines={1}>
                         {req.sender?.display_name || 'Kullanıcı'}
@@ -241,7 +241,7 @@ export default function NotificationsScreen() {
         <View style={[styles.notifIcon, { backgroundColor: `${config.color}18` }]}>
           <Ionicons name={config.icon as any} size={18} color={config.color} />
         </View>
-        <StatusAvatar uri={item.sender?.avatar_url} size={40} tier={(item.sender as any)?.subscription_tier} frameId={(item.sender as any)?.active_frame || null} />
+        <StatusAvatar uri={item.sender?.avatar_url} size={40} tier={(item.sender as any)?.subscription_tier} frameId={(item.sender as any)?.active_frame || null} customBadgeId={(item.sender as any)?.active_badge_id ?? null} />
         <View style={styles.notifContent}>
           <Text style={styles.notifText}>
             <Text style={styles.notifName}>{item.sender?.display_name || 'Kullanıcı'}</Text>

@@ -109,6 +109,7 @@ export default function ProfileFriendsList({ friends, onFriendPress, onShowAll }
                   isOnline={friend.is_online}
                   tier={friend.subscription_tier as any}
                   frameId={(friend as any).active_frame || null}
+                  customBadgeId={(friend as any).active_badge_id ?? null}
                 />
               </View>
               <Text style={s.tileName} numberOfLines={1}>

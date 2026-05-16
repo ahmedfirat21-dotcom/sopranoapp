@@ -560,9 +560,21 @@ export default function ProfileScreen() {
             pointerEvents="none"
           />
           {/* ★ v108.20: Header sadeleştirildi — 4 ikon dar ekranlarda taşıyordu (Ayar kayboluyordu).
-               Premium / Mağaza / Liderlik / Ayarlar artık scroll içinde menü satırları olarak. */}
+               Premium / Mağaza / Liderlik / Ayarlar artık scroll içinde menü satırları olarak.
+               ★ v283 (16 May 2026): TEK ayarlar ikonu sağa eklendi (Instagram/Twitter pattern).
+               Scroll içinde "Ayarlar" liste itemı da kalır — hızlı erişim + tam menü. */}
           <View style={styles.headerContent}>
             <AnimatedProfilLogo />
+            <View style={styles.headerRight}>
+              <AnimatedHeaderIconBtn
+                index={0}
+                style={styles.headerIconBtn}
+                onPress={() => router.push('/settings' as any)}
+                accessibilityLabel="Ayarlar"
+              >
+                <Ionicons name="settings-outline" size={22} color="#F1F5F9" />
+              </AnimatedHeaderIconBtn>
+            </View>
           </View>
           <LinearGradient
             colors={['transparent', 'rgba(245,158,11,0.55)', 'rgba(245,158,11,0.55)', 'transparent']}

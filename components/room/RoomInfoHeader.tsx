@@ -36,6 +36,8 @@ interface Props {
   hostTier?: string;
   /** ★ v107: host'un aktif mağaza çerçevesi — avatar etrafında render edilir */
   hostFrameId?: string | null;
+  /** ★ v283 (16 May 2026): host'un aktif rozeti — mini avatar köşesinde */
+  hostActiveBadgeId?: string | null;
   roomRules?: string;
   followerCount?: number;
   // ★ 2026-04-20: Bildirim zili — oda içinden NotificationDrawer açma
@@ -117,7 +119,7 @@ export default function RoomInfoHeader({
   isFollowing, onBack, onMinimize, onToggleFollow,
   roomLanguage, ageRestricted, entryFeeSp, isLocked, followersOnly,
   donationsEnabled, speakingMode, roomType,
-  hostAvatarUrl, hostTier, hostFrameId, roomRules, followerCount,
+  hostAvatarUrl, hostTier, hostFrameId, hostActiveBadgeId, roomRules, followerCount,
   onBellPress, notifBadgeCount, isBellActive,
   onViewersPress,
 }: Props) {
@@ -176,7 +178,7 @@ export default function RoomInfoHeader({
         <View style={s.topLeft}>
           {/* ★ Host avatar + süre göstergesi grubu */}
           <View style={s.hostAvatarGroup}>
-            <StatusAvatar uri={hostAvatarUrl} size={36} tier={hostTier} borderWidth={1.5} frameId={hostFrameId} />
+            <StatusAvatar uri={hostAvatarUrl} size={36} tier={hostTier} borderWidth={1.5} frameId={hostFrameId} customBadgeId={hostActiveBadgeId ?? null} />
             {/* ★ Kalan süre — avatar altında kum saati */}
             {roomExpiry ? (
               <View style={[s.expiryBadge, roomExpiry.includes('doldu') && s.expiryBadgeExpired]}>

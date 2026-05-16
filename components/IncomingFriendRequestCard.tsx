@@ -22,6 +22,8 @@ export interface IncomingFriendRequest {
   senderAvatar?: string;
   /** ★ v107: Mağaza avatar çerçevesi */
   senderFrame?: string | null;
+  /** ★ v283 (16 May 2026): profiles.active_badge_id — mini avatar rozeti */
+  senderActiveBadgeId?: string | null;
   notificationId?: string;
   currentUserId: string;
 }
@@ -115,7 +117,7 @@ export default function IncomingFriendRequestCard({ request, onDismiss, onHandle
         <View style={s.row}>
           {/* ★ 2026-04-26: Avatar/isim tıklanınca profil sheet — gönderen kim diye bakabilir kullanıcı */}
           <Pressable onPress={() => openUserProfile(request.senderId)} hitSlop={6}>
-            <StatusAvatar uri={request.senderAvatar} size={44} frameId={request.senderFrame || null} />
+            <StatusAvatar uri={request.senderAvatar} size={44} frameId={request.senderFrame || null} customBadgeId={request.senderActiveBadgeId ?? null} />
           </Pressable>
           <Pressable style={s.textWrap} onPress={() => openUserProfile(request.senderId)} hitSlop={4}>
             <Text style={s.title} numberOfLines={1}>{request.senderName}</Text>

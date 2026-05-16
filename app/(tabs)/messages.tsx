@@ -252,7 +252,7 @@ const ConversationCard = React.memo(function ConversationCard({
             </View>
           )}
           <Pressable style={styles.avatarWrap} onPress={() => onAvatarPress(item.partner_id)}>
-            <StatusAvatar uri={item.partner_avatar} size={52} isOnline={item.partner_is_online} tier={item.partner_tier} frameId={item.partner_frame} />
+            <StatusAvatar uri={item.partner_avatar} size={52} isOnline={item.partner_is_online} tier={item.partner_tier} frameId={item.partner_frame} customBadgeId={(item as any).partner_active_badge_id ?? null} />
           </Pressable>
           <View style={styles.msgInfo}>
             <View style={styles.msgTop}>
@@ -403,6 +403,8 @@ export default function MessagesScreen() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const { openSearch } = useUserSearchSheet();
   const [searchQuery, setSearchQuery] = useState('');
+  // ★ v283 (16 May 2026): Header'da search ikonu, basınca arama pill toggle
+  const [searchOpen, setSearchOpen] = useState(false);
   // ★ Debounced sorgu — her karakter 100+ yeniden render yapıyordu
   const [debouncedQuery, setDebouncedQuery] = useState('');
   useEffect(() => {
@@ -999,10 +1001,32 @@ export default function MessagesScreen() {
         <View style={styles.topBar}>
           <AnimatedMesajLogo />
           <View style={styles.headerRight}>
+            {/* ★ v283 (16 May 2026): Sohbet arama ikonu — home.tsx ile aynı konum
+                (headerRight içinde EN SOLDA, NotificationBell'den önce). */}
+            <AnimatedHeaderIconBtn
+              index={0}
+              style={styles.headerIconBtn}
+              onPress={() => {
+                if (searchOpen) {
+                  setSearchOpen(false);
+                  setSearchQuery('');
+                } else {
+                  setSearchOpen(true);
+                }
+              }}
+              accessibilityLabel={searchOpen ? 'Aramayı kapat' : 'Sohbet ara'}
+            >
+              <Ionicons
+                name={searchOpen ? 'close-outline' : 'search-outline'}
+                size={22}
+                color="#F1F5F9"
+                style={styles.headerIcon}
+              />
+            </AnimatedHeaderIconBtn>
             <AnimatedHeaderIconBtn staticIcon>
               <NotificationBell unreadCount={unreadCount} onPress={() => { setNotifDrawerAnchorRight(60); setShowNotifDrawer(true); }} />
             </AnimatedHeaderIconBtn>
-            <AnimatedHeaderIconBtn index={1} style={styles.headerIconBtn} onPress={() => openSearch({
+            <AnimatedHeaderIconBtn index={2} style={styles.headerIconBtn} onPress={() => openSearch({
               mode: 'compose',
               onSelectUser: (userId) => router.push(`/chat/${userId}` as any),
             })} accessibilityLabel="Yeni mesaj">
@@ -1010,6 +1034,34 @@ export default function MessagesScreen() {
             </AnimatedHeaderIconBtn>
           </View>
         </View>
+        {/* ★ v283: Search ikonu basıldığında açılan arama pill */}
+        {searchOpen && (
+          <View style={styles.headerSearchRow}>
+            <View style={styles.headerSearchPill}>
+              <Ionicons name="search" size={14} color="rgba(241,245,249,0.7)" />
+              <View style={styles.searchInputWrap}>
+                <TextInput
+                  style={styles.headerSearchInput}
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                  autoCorrect={false}
+                  autoFocus
+                  placeholder=""
+                />
+                {searchQuery.length === 0 && (
+                  <View pointerEvents="none" style={styles.searchPlaceholderWrap}>
+                    <Text style={styles.searchPlaceholder}>Sohbet ara...</Text>
+                  </View>
+                )}
+              </View>
+              {searchQuery.length > 0 && (
+                <Pressable onPress={() => setSearchQuery('')} hitSlop={6}>
+                  <Ionicons name="close-circle" size={16} color="rgba(255,255,255,0.5)" />
+                </Pressable>
+              )}
+            </View>
+          </View>
+        )}
         <LinearGradient
           colors={['transparent', 'rgba(139,92,246,0.55)', 'rgba(139,92,246,0.55)', 'transparent']}
           locations={[0, 0.25, 0.75, 1]}
@@ -1040,29 +1092,7 @@ export default function MessagesScreen() {
         )}
       </View>
 
-      {/* ═══ Arama Çubuğu ═══ */}
-      <View style={styles.searchWrap}>
-        <Ionicons name="search" size={15} color={Colors.teal} style={{ textShadowColor: Colors.teal, textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 6 }} />
-        <View style={styles.searchInputWrap}>
-          <TextInput
-            style={styles.searchInput}
-            placeholder=""
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            autoCorrect={false}
-          />
-          {searchQuery.length === 0 && (
-            <View pointerEvents="none" style={styles.searchPlaceholderWrap}>
-              <Text style={styles.searchPlaceholder}>Sohbet ara...</Text>
-            </View>
-          )}
-        </View>
-        {searchQuery.length > 0 && (
-          <Pressable onPress={() => setSearchQuery('')}>
-            <Ionicons name="close-circle" size={16} color="rgba(255,255,255,0.3)" />
-          </Pressable>
-        )}
-      </View>
+      {/* ★ v283: Arama çubuğu header'a taşındı (yukarıda) */}
 
       {/* ═══ Online Arkadaşlar — horizontal FlatList (nested ScrollView'den dönüştürüldü) ═══
          ★ 2026-04-21: ScrollView içinde FlatList = Android momentum glitch + warning.
@@ -1089,7 +1119,7 @@ export default function MessagesScreen() {
                 style={styles.friendChip}
                 onPress={() => router.push(`/chat/${friend.id}`)}
               >
-                <StatusAvatar uri={friend.avatar_url} size={52} isOnline={true} tier={(friend as any).subscription_tier} frameId={(friend as any).active_frame || null} />
+                <StatusAvatar uri={friend.avatar_url} size={52} isOnline={true} tier={(friend as any).subscription_tier} frameId={(friend as any).active_frame || null} customBadgeId={(friend as any).active_badge_id ?? null} />
                 <Text style={styles.friendName} numberOfLines={1}>{friend.display_name?.split(' ')[0] || 'Kullanıcı'}</Text>
               </Pressable>
             )}
@@ -1168,7 +1198,7 @@ export default function MessagesScreen() {
                   flexDirection: 'row', alignItems: 'center', gap: 10,
                   paddingHorizontal: 14, paddingVertical: 12,
                 }}>
-                  <StatusAvatar uri={sender.avatar_url} size={44} tier={(sender as any).subscription_tier} showTierBadge={false} frameId={(sender as any).active_frame || null} />
+                  <StatusAvatar uri={sender.avatar_url} size={44} tier={(sender as any).subscription_tier} showTierBadge={false} frameId={(sender as any).active_frame || null} customBadgeId={(sender as any).active_badge_id ?? null} />
                   <Pressable
                     style={{ flex: 1 }}
                     onPress={() => router.push({ pathname: '/chat/[id]', params: { id: item.sender_id } } as any)}
@@ -1355,6 +1385,7 @@ export default function MessagesScreen() {
         partnerAvatar={sheetItem?.partner_avatar}
         partnerOnline={sheetItem?.partner_is_online}
         partnerFrame={sheetItem?.partner_frame}
+        partnerActiveBadgeId={sheetItem?.partner_active_badge_id ?? null}
         subtitle={sheetItem?.unread_count
           ? `${sheetItem.unread_count} yeni mesaj`
           : sheetItem?.is_muted ? 'Sessize alındı' : undefined}
@@ -1446,7 +1477,30 @@ const styles = StyleSheet.create({
   },
   editBtnText: { fontSize: 13, fontWeight: '600', color: Colors.teal, ...Shadows.textLight },
 
-  // ─── Arama ─── Solid koyu zemin + teal aksent border + derin gölge
+  // ★ v283 (16 May 2026): Header içi arama kutusu — kompakt pill, glassmorphic
+  headerSearchRow: {
+    paddingHorizontal: 14,
+    paddingBottom: 8,
+    paddingTop: 2,
+  },
+  headerSearchPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    backgroundColor: 'rgba(15, 23, 42, 0.55)',
+    borderWidth: 1,
+    borderColor: 'rgba(139,92,246,0.25)',
+  },
+  headerSearchInput: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#F1F5F9',
+    padding: 0,
+  },
+  // ─── ESKİ (sayfa gövdesi) arama stili — artık kullanılmıyor, geriye uyum için tutuldu
   searchWrap: {
     flexDirection: 'row', alignItems: 'center',
     marginHorizontal: 16, marginBottom: 12,

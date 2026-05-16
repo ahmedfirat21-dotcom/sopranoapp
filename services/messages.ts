@@ -100,7 +100,7 @@ export const MessageService = {
     const [profRes, stateRes] = await Promise.all([
       supabase
         .from('profiles')
-        .select('id, display_name, avatar_url, is_online, subscription_tier, last_seen, active_frame')
+        .select('id, display_name, avatar_url, is_online, subscription_tier, last_seen, active_frame, active_badge_id')
         .in('id', partnerIds),
       supabase
         .from('conversation_state')
@@ -139,6 +139,7 @@ export const MessageService = {
         partner_is_online: prof?.is_online || false,
         partner_tier: (prof as any)?.subscription_tier || 'Free',
         partner_frame: (prof as any)?.active_frame || null,
+        partner_active_badge_id: (prof as any)?.active_badge_id || null,
         partner_last_seen: (prof as any)?.last_seen,
         last_message_content: preview,
         last_message_time: lastMsg.created_at,

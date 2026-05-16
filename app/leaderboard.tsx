@@ -241,7 +241,7 @@ function LeaderListItem({ entry, rank, label }: { entry: LeaderEntry; rank: numb
         <View style={[liS.rankCircle, { borderColor: rankColor + '50' }]}>
           <Text style={[liS.rankText, { color: rankColor }]}>{rank}</Text>
         </View>
-        <StatusAvatar uri={entry.avatar_url} size={46} tier={entry.tier} frameId={(entry as any).active_frame || null} />
+        <StatusAvatar uri={entry.avatar_url} size={46} tier={entry.tier} frameId={(entry as any).active_frame || null} customBadgeId={(entry as any).active_badge_id ?? null} />
         <View style={liS.info}>
           <Text style={liS.name} numberOfLines={1}>{entry.display_name}</Text>
           <Text style={liS.sub}>{label}: {entry.count.toLocaleString()}</Text>
@@ -309,7 +309,7 @@ function RoomListItem({ entry, rank }: { entry: RoomEntry; rank: number }) {
       <View style={[rlS.rankCircle, { borderColor: rankColor + '50' }]}>
         <Text style={[rlS.rankText, { color: rankColor }]}>{rank}</Text>
       </View>
-      <StatusAvatar uri={entry.host_avatar} size={46} frameId={entry.host_frame || null} />
+      <StatusAvatar uri={entry.host_avatar} size={46} frameId={entry.host_frame || null} customBadgeId={(entry as any).host_active_badge_id ?? null} />
       <View style={rlS.info}>
         <Text style={rlS.name} numberOfLines={1}>{entry.room_name}</Text>
         <Text style={rlS.sub}>{entry.host_name} · {entry.count} katılımcı</Text>

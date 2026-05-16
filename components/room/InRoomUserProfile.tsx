@@ -1599,6 +1599,7 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                                 isOnline={isOnline}
                                 tier={(f as any).subscription_tier}
                                 frameId={(f as any).active_frame}
+                                customBadgeId={(f as any).active_badge_id ?? null}
                               />
                               <Text style={sty.friendChipName} numberOfLines={1}>
                                 {f.display_name || 'Kullanıcı'}

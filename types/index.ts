@@ -520,6 +520,8 @@ export type InboxItem = {
   partner_tier?: string;
   /** ★ v107: Mağaza avatar çerçevesi — DM listesinde görünsün */
   partner_frame?: string | null;
+  /** ★ v282 (16 May 2026): profiles.active_badge_id — DM listesi mini rozet */
+  partner_active_badge_id?: string | null;
   /** Karşı tarafın son görülme zamanı (ISO) — offline iken "2s önce" göstermek için */
   partner_last_seen?: string;
   last_message_content: string;

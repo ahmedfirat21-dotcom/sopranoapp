@@ -170,6 +170,7 @@ export default function AudienceDrawer({ visible, users, onClose, onSelectUser, 
                     frameId={(u.user as any)?.active_frame}
                     contextKey="listener"
                     showTierBadge={showTier}
+                    customBadgeId={(u.user as any)?.active_badge_id ?? null}
                   />
                 </View>
                 <View style={{ flex: 1 }}>

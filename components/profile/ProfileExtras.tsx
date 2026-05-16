@@ -223,6 +223,7 @@ export function TopSupportersStrip({ supporters, onSelectUser }: TopSupportersSt
               size={48}
               tier={s.subscription_tier as any}
               frameId={(s as any).active_frame}
+              customBadgeId={(s as any).active_badge_id ?? null}
             />
             <Text style={tss.name} numberOfLines={1}>
               {s.display_name}

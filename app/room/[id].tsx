@@ -4510,6 +4510,7 @@ export default function RoomScreen() {
           hostAvatarUrl={room?.host?.avatar_url}
           hostTier={room?.host?.subscription_tier || room?.owner_tier}
           hostFrameId={(room?.host as any)?.active_frame || null}
+          hostActiveBadgeId={(room?.host as any)?.active_badge_id ?? null}
           followerCount={followerCount}
           onBellPress={() => {
             // ★ Oda header: bir tık aşağı + bir tık sola. RN'de `right: N` = sağ edge'ten N px;

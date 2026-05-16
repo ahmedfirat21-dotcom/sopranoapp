@@ -921,6 +921,9 @@ export default function RoomChatDrawer({
     // ★ v268 (13 May 2026): Oda mesajlarına active_glow_id desteği — web admin "Parlak Mesajlar"
     //   editöründen seçilen Skia glow config'i. Hardcoded GLOW_STYLES sistemiyle birlikte çalışır
     //   (eski metadata.glow_style mesajlar bozulmaz, yeni dinamik glow eklenir).
+    const senderActiveBadgeId = (item.profiles as any)?.active_badge_id
+      ?? cachedSenderProfile?.active_badge_id
+      ?? null;
     const senderActiveGlowId = (item.profiles as any)?.active_glow_id
       || (cachedSenderProfile as any)?.active_glow_id
       || null;
@@ -948,6 +951,7 @@ export default function RoomChatDrawer({
             frameId={senderFrame}
             contextKey="mini"
             showTierBadge={showSenderTier}
+            customBadgeId={senderActiveBadgeId}
           />
         </Pressable>
         <GlowMessageBubble glowItemId={senderActiveGlowId} isMine={isOwn} context="room" style={{ flex: 1 } as any}>

@@ -1330,7 +1330,7 @@ export default function ChatScreen() {
         </Pressable>
         {/* ★ UX-NAV: Avatar + isim alanına basınca profil sayfasına git */}
         <Pressable onPress={() => openUserProfile(id as string)} style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-          <StatusAvatar uri={otherUser?.avatar_url} size={36} isOnline={onlinePresenceIds.has(id as string)} tier={otherUser?.subscription_tier} frameId={(otherUser as any)?.active_frame || null} />
+          <StatusAvatar uri={otherUser?.avatar_url} size={36} isOnline={onlinePresenceIds.has(id as string)} tier={otherUser?.subscription_tier} frameId={(otherUser as any)?.active_frame || null} customBadgeId={(otherUser as any)?.active_badge_id ?? null} />
           <View style={styles.headerInfo}>
             <Text style={styles.headerName}>{otherUser?.display_name || ' '}</Text>
           <View style={styles.onlineRow}>

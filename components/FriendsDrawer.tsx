@@ -238,7 +238,7 @@ export default function FriendsDrawer({ visible, friends, onClose, onSelect, cur
                       style={fd.requestAvatarWrap}
                       onPress={() => { onSelect(req.user_id); onClose(); }}
                     >
-                      <StatusAvatar uri={sender?.avatar_url} size={34} tier={sender?.subscription_tier} frameId={(sender as any)?.active_frame || null} />
+                      <StatusAvatar uri={sender?.avatar_url} size={34} tier={sender?.subscription_tier} frameId={(sender as any)?.active_frame || null} customBadgeId={(sender as any)?.active_badge_id ?? null} />
                     </Pressable>
                     <View style={{ flex: 1, marginRight: 6 }}>
                       <Text style={[fd.requestName, handled && { opacity: 0.6 }]} numberOfLines={1}>
@@ -290,7 +290,7 @@ export default function FriendsDrawer({ visible, friends, onClose, onSelect, cur
                 style={({ pressed }) => [fd.row, pressed && { opacity: 0.7 }]}
                 onPress={() => { onSelect(friend.id); onClose(); }}
               >
-                <StatusAvatar uri={friend.avatar_url} size={36} isOnline={true} tier={(friend as any).subscription_tier} frameId={(friend as any).active_frame || null} />
+                <StatusAvatar uri={friend.avatar_url} size={36} isOnline={true} tier={(friend as any).subscription_tier} frameId={(friend as any).active_frame || null} customBadgeId={(friend as any).active_badge_id ?? null} />
                 <View style={{ flex: 1 }}>
                   <Text style={fd.name} numberOfLines={1}>{friend.display_name}</Text>
                   <Text style={fd.status}>Çevrimiçi</Text>

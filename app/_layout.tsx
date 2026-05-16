@@ -132,6 +132,9 @@ import { OnlineFriendsProvider } from '../providers/OnlineFriendsProvider';
 export { useOnlineFriends } from '../providers/OnlineFriendsProvider';
 import { DMNotifProvider } from '../providers/DMNotifProvider';
 export { useDMNotif, useDMNotifOptional } from '../providers/DMNotifProvider';
+// ★ F-1 (16 May 2026): Sistem ayarları (bakım modu/zorunlu güncelleme/banner)
+import { startSystemSettingsSync, stopSystemSettingsSync } from '../services/systemSettings';
+import SystemSettingsOverlay from '../components/SystemSettingsOverlay';
 import { useFonts, Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
 import { RoomService } from '../services/database';
 import { liveKitService } from '../services/livekit';
@@ -803,6 +806,10 @@ export default function RootLayout() {
         try {
           const { startAppThemeSync } = require('../services/appThemeConfig');
           startAppThemeSync();
+        } catch {}
+        // ★ F-1 (16 May 2026): Sistem ayarları (bakım modu/banner/force-update) realtime sub.
+        try {
+          startSystemSettingsSync();
         } catch {}
       } catch (e) {
         if (__DEV__) console.error('[RootLayout] Hazırlık hatası:', e);
@@ -1857,6 +1864,8 @@ export default function RootLayout() {
         {/* ★ Intro Video kaldırıldı */}
         {/* ★ v107 (3 May 2026): Çift oturum uyarısı — başka cihaz takeover algılarsa modal */}
         <SessionConflictGuard userId={firebaseUser?.uid || null} />
+        {/* ★ F-1 (16 May 2026): Bakım modu / zorunlu güncelleme / banner — en üst overlay */}
+        <SystemSettingsOverlay />
       </View>
     </SafeAreaProvider>
 

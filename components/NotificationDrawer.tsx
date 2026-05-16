@@ -612,7 +612,7 @@ export default function NotificationDrawer({ visible, onClose, userId, anchorTop
 
                     {/* Avatar + tip ikonu overlay */}
                     <View style={s.avatarWrap}>
-                      <StatusAvatar uri={item.sender?.avatar_url} size={42} frameId={(item.sender as any)?.active_frame || null} />
+                      <StatusAvatar uri={item.sender?.avatar_url} size={42} frameId={(item.sender as any)?.active_frame || null} customBadgeId={(item.sender as any)?.active_badge_id ?? null} />
                       <View style={[s.typeIconBadge, { backgroundColor: icon.color }]}>
                         <Ionicons name={icon.name as any} size={10} color="#FFF" />
                       </View>

@@ -42,13 +42,15 @@ interface Props {
   partnerOnline?: boolean;
   /** ★ v107: Mağaza avatar çerçevesi */
   partnerFrame?: string | null;
+  /** ★ v283 (16 May 2026): profiles.active_badge_id — DM mini rozet */
+  partnerActiveBadgeId?: string | null;
   /** Sheet üstünde gösterilecek kısa info (örn. "5 yeni mesaj" veya kapalı bırak) */
   subtitle?: string;
   actions: SheetAction[];
 }
 
 export default function ConversationActionSheet({
-  visible, onClose, partnerName, partnerAvatar, partnerOnline, partnerFrame, subtitle, actions,
+  visible, onClose, partnerName, partnerAvatar, partnerOnline, partnerFrame, partnerActiveBadgeId, subtitle, actions,
 }: Props) {
   const translateY = useRef(new Animated.Value(SHEET_MAX_HEIGHT)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -155,7 +157,7 @@ export default function ConversationActionSheet({
 
           {/* Partner header — X kaldırıldı, swipe-to-dismiss yeterli */}
           <View style={s.header}>
-            <StatusAvatar uri={partnerAvatar || undefined} size={48} isOnline={partnerOnline} frameId={partnerFrame || null} />
+            <StatusAvatar uri={partnerAvatar || undefined} size={48} isOnline={partnerOnline} frameId={partnerFrame || null} customBadgeId={partnerActiveBadgeId ?? null} />
             <View style={{ flex: 1, marginLeft: 12 }}>
               <Text style={s.name} numberOfLines={1}>{partnerName}</Text>
               {!!subtitle && <Text style={s.subtitle} numberOfLines={1}>{subtitle}</Text>}

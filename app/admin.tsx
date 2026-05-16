@@ -731,7 +731,7 @@ export default function AdminPanel() {
             <>
               {recentUsers.map(user => (
                 <View key={user.id} style={s.userCard}>
-                  <StatusAvatar uri={user.avatar_url} size={40} isOnline={user.is_online} tier={user.subscription_tier} isAdmin={user.is_admin} frameId={(user as any).active_frame} />
+                  <StatusAvatar uri={user.avatar_url} size={40} isOnline={user.is_online} tier={user.subscription_tier} isAdmin={user.is_admin} frameId={(user as any).active_frame} customBadgeId={(user as any).active_badge_id ?? null} />
                   <View style={{ flex: 1 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                       <Text style={s.userName}>{user.display_name}</Text>
