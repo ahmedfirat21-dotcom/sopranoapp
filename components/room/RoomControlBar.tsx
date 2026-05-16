@@ -45,7 +45,7 @@ const darken = (hex: string, pct: number) => lighten(hex, -pct);
 // ════════════════════════════════════════════════════════════
 function CtrlBtn({
   icon, onPress, active, accent = '#14B8A6',
-  badge, label, mutedColor, iconSize = ICON_SIZE,
+  badge, label, mutedColor, iconSize = ICON_SIZE, inactiveIconColor = '#7B8D9F',
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   onPress: () => void;
@@ -55,6 +55,7 @@ function CtrlBtn({
   label?: string;
   mutedColor?: string;
   iconSize?: number;
+  inactiveIconColor?: string;
 }) {
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const handleIn = () => Animated.spring(scaleAnim, { toValue: 1.1, useNativeDriver: true, damping: 8, stiffness: 300 }).start();
@@ -96,7 +97,7 @@ function CtrlBtn({
           </>
         ) : (
           // ═══ INACTIVE = bg yok, sadece ikon + drop-shadow (tab pasif ikon gibi)
-          <Ionicons name={icon} size={iconSize} color="#7B8D9F" style={s.iconDrop} />
+          <Ionicons name={icon} size={iconSize} color={inactiveIconColor} style={s.iconDrop} />
         )}
       </Animated.View>
       {badge !== undefined && badge > 0 && (

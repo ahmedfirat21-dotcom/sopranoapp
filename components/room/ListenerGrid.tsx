@@ -184,7 +184,8 @@ const ListenerCell = React.memo(function ListenerCell({
       )}
       {flash && <View style={[s.flashWrap, { height: ownerAvatarSize }]}><AvatarPenaltyFlash flashType={flash} size={ownerAvatarSize} onFlashDone={() => onFlashDone?.(u.user_id)} /></View>}
       {hasHandRaised && <HandRaiseBadge />}
-      {!hideDefaultName && (
+      {/* ★ v284: cfgShowName=false ise dinleyici altı isim hiç render edilmez */}
+      {!hideDefaultName && cfgShowName !== false && (
         <Text
           style={[s.name, { fontSize: nameSize, maxWidth: cellW }, isOwner && s.nameOwner, showMuteIndicator && { color: 'rgba(239,68,68,0.6)' }]}
           numberOfLines={1}

@@ -4457,7 +4457,16 @@ export default function RoomScreen() {
   );
 
   return (
-    <Animated.View style={[sty.root, { opacity: fadeIn }]}>
+    <Animated.View
+      style={[
+        sty.root,
+        { opacity: fadeIn },
+        // ★ v284: web admin global.safePaddingTop / safePaddingBottom / horizontalPadding
+        {
+          paddingHorizontal: roomLayout.global.horizontalPadding,
+        },
+      ]}
+    >
       <StatusBar hidden />
       {/* ★ Dinamik Oda Arka Planı — tema + arkaplan görseli desteği */}
       {(() => {

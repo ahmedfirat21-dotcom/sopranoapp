@@ -168,7 +168,7 @@ export default function RoomInfoHeader({
         locations={[0, 0.55, 1]}
         start={{ x: 0.5, y: 0 }}
         end={{ x: 0.5, y: 1 }}
-        style={StyleSheet.absoluteFillObject}
+        style={[StyleSheet.absoluteFillObject, { opacity: headerCfg.headerBgOpacity > 0 ? headerCfg.headerBgOpacity : 1 }]}
         pointerEvents="none"
       />
       {/* ★ v284: headerBorderBottom toggle — web admin'den kapatılabilir */}
@@ -216,6 +216,13 @@ export default function RoomInfoHeader({
             </Text>
             {roomDuration ? (
               <View style={s.durationInline}>
+                {/* ★ v284: header.showLiveIndicator → LIVE dot + 'LIVE' text */}
+                {headerCfg.showLiveIndicator && (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginRight: 4 }}>
+                    <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: headerCfg.liveDotColor }} />
+                    <Text style={{ fontSize: 8, fontWeight: '800', color: headerCfg.liveDotColor, letterSpacing: 0.6 }}>LIVE</Text>
+                  </View>
+                )}
                 <Ionicons name="time-outline" size={8} color="rgba(20,184,166,0.6)" />
                 <Text style={s.durationText}>{roomDuration}</Text>
                 {roomExpiry ? (
