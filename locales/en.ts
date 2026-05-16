@@ -451,6 +451,7 @@ const en: Record<string, string> = {
   'profile.boost_label': 'BOOST',
   'profile.stat_friend': 'Friend',
   'profile.stat_room': 'Room',
+  'profile.stat_badge': 'Badge',
   'profile.stat_gift': 'Gift',
   'profile.voice_intro_label': 'VOICE INTRO',
   'profile.top_supporters': 'TOP SUPPORTERS',

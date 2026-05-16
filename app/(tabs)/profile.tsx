@@ -484,6 +484,23 @@ export default function ProfileScreen() {
     } catch { }
   }, [myReferralCode]);
 
+  // ★ v289 (16 May 2026): Kendi profilini paylaş — universal deep link + Web fallback.
+  //   Hem app içinde (sopranochat://user/<id>) hem tarayıcıda
+  //   (https://sopranochat.com/user/<id>) açılır. app/_layout.tsx handleDeepLink
+  //   bu formatı işler.
+  const handleShareProfile = useCallback(async () => {
+    if (!userId) return;
+    try {
+      const { Share } = require('react-native');
+      const link = `https://sopranochat.com/user/${userId}`;
+      const name = displayName || profile?.username || 'SopranoChat kullanıcısı';
+      await Share.share({
+        message: `${name} profilini SopranoChat'te keşfet:\n${link}`,
+        url: link, // iOS Share Sheet için ayrı URL alanı
+      });
+    } catch { }
+  }, [userId, displayName, profile?.username]);
+
   // ★ SP transaction history'i yükle + modal aç
   const openSPHistory = useCallback(async () => {
     setShowSPHistory(true);
@@ -608,6 +625,7 @@ export default function ProfileScreen() {
             onBadgesPress={() => setShowBadgesModal(true)}
             onGiftsPress={() => setShowGiftDetail(true)}
             onAvatarPress={() => setShowAvatarPreview(true)}
+            onSharePress={handleShareProfile}
             memberSince={profile?.created_at}
             boostExpiresAt={(profile as any)?.profile_boost_expires_at}
             userLevel={userLevel}

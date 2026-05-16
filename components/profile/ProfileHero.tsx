@@ -65,13 +65,15 @@ interface Props {
   showTierBadge?: boolean;
   /** ★ v120: profiles.active_badge_id — Web admin Rozet ürünü (Skia render). */
   activeBadgeId?: string | null;
+  /** ★ v289 (16 May 2026): Profili paylaş — kendi profilinde share butonu açar. */
+  onSharePress?: () => void;
 }
 
 export default function ProfileHero({
   displayName, username, bio, avatarUrl, subscriptionTier, isAdmin, userTitle,
-  stats, statsLoading, onEdit, onBioPress, onFollowersPress, onRoomsPress, onGiftsPress, onAvatarPress,
+  stats, statsLoading, onEdit, onBioPress, onFollowersPress, onRoomsPress, onBadgesPress, onGiftsPress, onAvatarPress,
   memberSince, boostExpiresAt, isOnline, lastSeen, activeFrame, onFramePress, hasUnequippedFrame,
-  showTierBadge = true, activeBadgeId,
+  showTierBadge = true, activeBadgeId, onSharePress,
 }: Props) {
   // ★ v110: Phase 2 fetch tamamlanana kadar sayı yerine "—" — yanıltıcı 0 flash önlenir.
   const fmtStat = (n: number | undefined) => statsLoading ? '—' : String(n ?? 0);
@@ -159,6 +161,18 @@ export default function ProfileHero({
                    animasyonu (frameIconAbsLeft scale) zaten dikkat çekiyor. */}
             </Pressable>
           </Animated.View>
+        )}
+        {/* ★ v289 (16 May 2026): Paylaş + Edit ikonları sağ üstte yan yana.
+            Paylaş kullanıcının kendi profil deep link'ini native Share ile gönderir. */}
+        {onSharePress && (
+          <Pressable
+            style={[s.editBtn, s.shareBtnAbs]}
+            onPress={onSharePress}
+            hitSlop={10}
+            accessibilityLabel="Profili paylaş"
+          >
+            <Ionicons name="share-outline" size={16} color="#14B8A6" style={iconShadow} />
+          </Pressable>
         )}
         {/* Edit butonu — sağ üst absolute */}
         {onEdit && (
@@ -255,7 +269,9 @@ export default function ProfileHero({
         ) : null}
       </View>
 
-      {/* Stats satırı — Arkadaş / Oda / Hediye (3 stat, touch target min 48px) */}
+      {/* Stats satırı — Arkadaş / Oda / Rozet / Hediye (4 stat, touch target min 48px)
+          ★ v289 (16 May 2026): Rozet stat'ı eklendi. Önce stats.badges prop'ta vardı
+          ama UI'da gösterilmiyordu (dead prop). Şimdi 3. stat olarak — Hediye sağa kaydı. */}
       <View style={s.statsRow}>
         <Pressable
           style={s.statItem}
@@ -276,7 +292,22 @@ export default function ProfileHero({
           <Text style={s.statNum}>{fmtStat(stats.rooms)}</Text>
           <Text style={s.statLabelClickable}>{i18n.t('profile.stat_room')}</Text>
         </Pressable>
-        {/* ★ 2026-05-05: 3. stat — Hediye (tıklayınca tab'lı detay modal) */}
+        {/* ★ v289: Rozet stat — tıklayınca BadgeListModal açılır (Hediye gibi) */}
+        {onBadgesPress && (
+          <>
+            <View style={s.statDiv} />
+            <Pressable
+              style={s.statItem}
+              onPress={onBadgesPress}
+              hitSlop={8}
+              accessibilityLabel={`${stats.badges || 0} rozet`}
+            >
+              <Text style={s.statNum}>{fmtStat(stats.badges)}</Text>
+              <Text style={[s.statLabelClickable, { color: '#A78BFA' }]}>{i18n.t('profile.stat_badge')}</Text>
+            </Pressable>
+          </>
+        )}
+        {/* ★ 2026-05-05: 4. stat — Hediye (tıklayınca tab'lı detay modal) */}
         {onGiftsPress && (
           <>
             <View style={s.statDiv} />
@@ -376,6 +407,10 @@ const s = StyleSheet.create({
   },
   editBtnAbs: {
     position: 'absolute', top: 12, right: 12, zIndex: 5,
+  },
+  // ★ v289: Paylaş butonu Edit'in solunda — sağ üst köşede yan yana iki ikon.
+  shareBtnAbs: {
+    position: 'absolute', top: 12, right: 52, zIndex: 5,
   },
   // ★ v108.18: Frame ikon sol üst — edit ile simetrik
   frameIconAbsLeft: {

@@ -459,6 +459,7 @@ const tr: Record<string, string> = {
   'profile.boost_label': 'BOOST',
   'profile.stat_friend': 'Arkadaş',
   'profile.stat_room': 'Oda',
+  'profile.stat_badge': 'Rozet',
   'profile.stat_gift': 'Hediye',
   'profile.voice_intro_label': 'SESLİ TANITIM',
   'profile.top_supporters': 'TOP DESTEKÇİLER',
