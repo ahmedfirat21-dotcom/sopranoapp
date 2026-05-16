@@ -162,6 +162,23 @@ interface StatusAvatarProps {
   /** ★ v117 (13 May 2026): Kullanıcının active_badge_id'si — varsa TierBadge yerine
    *  CosmeticBadge (Skia, web admin'den config'li) render edilir. */
   customBadgeId?: string | null;
+  /**
+   * ★ v282 (16 May 2026): Tek profil objesi pass etme yöntemi.
+   * Verilirse içinden frameId, customBadgeId, tier, vb. otomatik resolve edilir.
+   * Explicit prop'lar (frameId, customBadgeId, tier) varsa onlar öncelikli (override).
+   * Yeni cosmetic alanı eklendiğinde callsite'larda DEĞİŞİKLİK GEREKMEZ — sadece
+   * user objesi DB select'inde alan var olsun yeter.
+   *
+   * Pattern: `<StatusAvatar uri={u.avatar_url} size={44} user={u} />`
+   */
+  user?: {
+    active_frame?: string | null;
+    active_badge_id?: string | null;
+    subscription_tier?: string | null;
+    is_online?: boolean | null;
+    is_admin?: boolean | null;
+    display_name?: string | null;
+  } | null;
 }
 
 /**
@@ -179,9 +196,9 @@ interface StatusAvatarProps {
 export default function StatusAvatar({
   uri,
   size = 44,
-  isOnline,
-  tier,
-  isAdmin,
+  isOnline: isOnlineProp,
+  tier: tierProp,
+  isAdmin: isAdminProp,
   borderColor,
   borderWidth = 2,
   // ★ 2026-05-05: Default true — kullanıcı talebi: "mini avatarların tamamına
@@ -190,12 +207,23 @@ export default function StatusAvatar({
   //   `showTierBadge={false}` geç.
   showTierBadge = true,
   isSelf = false,
-  frameId,
+  frameId: frameIdProp,
   tierBadgeSize = 'xs',
-  displayName,
+  displayName: displayNameProp,
   contextKey,
-  customBadgeId,
+  customBadgeId: customBadgeIdProp,
+  user,
 }: StatusAvatarProps) {
+  // ★ v282 (16 May 2026): user objesi verilirse içinden default'ları al; explicit
+  //   prop'lar (frameId/customBadgeId/tier/vb.) öncelikli override. Bu pattern sayesinde
+  //   yeni cosmetic alanı eklendiğinde callsite'lar değişmez — sadece user objesi DB
+  //   select'inde alan var olsun.
+  const frameId = frameIdProp !== undefined ? frameIdProp : (user?.active_frame ?? null);
+  const customBadgeId = customBadgeIdProp !== undefined ? customBadgeIdProp : (user?.active_badge_id ?? null);
+  const tier = tierProp !== undefined ? tierProp : (user?.subscription_tier ?? undefined);
+  const isOnline = isOnlineProp !== undefined ? isOnlineProp : !!user?.is_online;
+  const isAdmin = isAdminProp !== undefined ? isAdminProp : !!user?.is_admin;
+  const displayName = displayNameProp !== undefined ? displayNameProp : (user?.display_name ?? undefined);
   const radius = size / 2;
   // ★ 2026-04-21: Daha zarif nokta — %26 yerine %22, çerçeve 0.3x → 0.18x
   const dotSize = Math.max(8, size * 0.22);
@@ -657,33 +685,21 @@ export default function StatusAvatar({
           bc: { x: 0,      y: 0.5    },
           br: { x: 0.354,  y: 0.354  },
         };
-        // ★ v281 (16 May 2026): Konum öncelik — Frame override (FrameEditor → tier_badge tab) >
-        //   Badge default (BadgeEditor → konum tab) > 'br'. Önceden sadece frame cfg vardı;
-        //   frame yokken admin BadgeEditor'da set ettiği position/offset boşa gidiyordu.
-        //   Badge cfg position'ları (topRight/bottomRight/topLeft/bottomLeft/inline) tl/tr/bl/br'ye mapleniyor.
+        // ★ v283 (16 May 2026): Konum ARTIK SADECE badge cfg'den (BadgeEditor → konum sekmesi).
+        //   Eski frame cfg.tier_badge_* fallback'ı kaldırıldı — çerçeve editöründe rozet
+        //   ayarları yer almıyor artık. Tek kaynak: Mağaza → Rozetler.
         const POS_MAP: Record<string, string> = {
           topLeft: 'tl', topRight: 'tr', bottomLeft: 'bl', bottomRight: 'br', inline: 'br',
         };
         const tbPos = String(
-          dynFrameCfg?.tier_badge_position
-          || (badgeCfgForSize?.position ? POS_MAP[badgeCfgForSize.position] : undefined)
-          || 'br'
+          (badgeCfgForSize?.position ? POS_MAP[badgeCfgForSize.position] : undefined) || 'br'
         );
         const pos = BADGE_POS[tbPos] || BADGE_POS.br;
-        const offsetXPct = Number(
-          dynFrameCfg?.tier_badge_offset_x
-          ?? badgeCfgForSize?.offset_x
-          ?? 0
-        );
-        const offsetYPct = Number(
-          dynFrameCfg?.tier_badge_offset_y
-          ?? badgeCfgForSize?.offset_y
-          ?? 0
-        );
-        // ★ v281 (16 May 2026): Boyut artık CosmeticBadge component'i içinde uygulanıyor
-        //   (avatarSize prop ile). Wrap sadece konum + opsiyonel frame scale uyguluyor.
-        const dynScale = typeof dynFrameCfg?.tier_badge_scale === 'number'
-          ? dynFrameCfg.tier_badge_scale : 1.0;
+        const offsetXPct = Number(badgeCfgForSize?.offset_x ?? 0);
+        const offsetYPct = Number(badgeCfgForSize?.offset_y ?? 0);
+        // ★ v283 (16 May 2026): Boyut CosmeticBadge içinde avatarSize prop ile uygulanır.
+        //   Wrap için ekstra scale gerekmiyor — frame cfg tier_badge_scale fallback'ı KALDIRILDI.
+        const dynScale = 1.0;
         // ★ v281 (16 May 2026): Offset % artık ROZET boyutuna oranlı (avatar değil) —
         //   web admin BadgeEditor'da CSS `translate(${offset_x}%, ${offset_y}%)` rozet'in
         //   kendi boyutuna göre. APK'da avatar boyutuyla çarpıyordum → 5-10x büyük kayma.

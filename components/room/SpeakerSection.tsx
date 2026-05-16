@@ -759,30 +759,20 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, i
                 bc: { x: 0,      y: 0.5    },
                 br: { x: 0.354,  y: 0.354  },
               };
-              // ★ v281 (16 May 2026): Konum öncelik Frame > Badge > 'br' (StatusAvatar ile aynı).
+              // ★ v283 (16 May 2026): Konum ARTIK SADECE badge cfg'den.
+              //   Frame cfg.tier_badge_* fallback'ı KALDIRILDI — rozet ayarları artık
+              //   Mağaza → Rozetler menüsünden yönetiliyor (tek kaynak).
               const POS_MAP: Record<string, string> = {
                 topLeft: 'tl', topRight: 'tr', bottomLeft: 'bl', bottomRight: 'br', inline: 'br',
               };
               const tbPos = String(
-                frameCfg?.tier_badge_position
-                || (badgeCfgForSize?.position ? POS_MAP[badgeCfgForSize.position] : undefined)
-                || 'br'
+                (badgeCfgForSize?.position ? POS_MAP[badgeCfgForSize.position] : undefined) || 'br'
               );
               const pos = BADGE_POS[tbPos] || BADGE_POS.br;
-              const offsetXPct = Number(
-                frameCfg?.tier_badge_offset_x
-                ?? badgeCfgForSize?.offset_x
-                ?? 0
-              );
-              const offsetYPct = Number(
-                frameCfg?.tier_badge_offset_y
-                ?? badgeCfgForSize?.offset_y
-                ?? 0
-              );
-              // ★ v281 (16 May 2026): Boyut CosmeticBadge içinde avatarSize prop ile uygulanır.
-              //   Wrap sadece konum + frame scale (varsa) ile transform sağlar.
-              const dynScale = typeof frameCfg?.tier_badge_scale === 'number'
-                ? frameCfg.tier_badge_scale : 1.0;
+              const offsetXPct = Number(badgeCfgForSize?.offset_x ?? 0);
+              const offsetYPct = Number(badgeCfgForSize?.offset_y ?? 0);
+              // Boyut CosmeticBadge içinde avatarSize prop ile uygulanır
+              const dynScale = 1.0;
               // ★ v281: Offset % rozet boyutuna oranlı (web admin CSS translate(%, %) ile aynı)
               const effectiveBadgeSize = (typeof badgeCfgForSize?.scale_on_avatar === 'number')
                 ? cardWidth * badgeCfgForSize.scale_on_avatar
@@ -934,6 +924,7 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, i
               }]}
             />
           )}
+          {/* ★ v283 (16 May 2026): EV SAHİBİ altın halka KALDIRILDI (kullanıcı talebi). */}
           {/* ★ 2026-04-24: Kamera açıkken alt + üst gradient overlay — badge'ler video üzerinde okunur kalır. */}
           {cameraOn && videoTrack && VideoView && (
             <>
@@ -1026,8 +1017,7 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, i
             {displayName}
           </Text>
         )}
-        {/* ★ v280 (15 May 2026): TierBadge KALDIRILDI — web admin CosmeticBadge sistemi
-             avatar köşesinde zaten render ediyor (L:701-704). İsim altında ayrı rozet artık yok. */}
+        {/* ★ v283 (16 May 2026): "EV SAHİBİ" chip KALDIRILDI (kullanıcı talebi). */}
       </View>
       </Pressable>
       {/* ★ 2026-04-22: "Sahneden İn" butonu kart içinden KALDIRILDI — parent container'ın
