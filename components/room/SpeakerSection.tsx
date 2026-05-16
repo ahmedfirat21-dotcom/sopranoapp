@@ -761,13 +761,15 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, i
   //   - isMod → accents.moderatorHighlight (default mor)
   //   - speaker → speakers.ringColor (default teal)
   //   - host border zaten kaldırıldı (transparent)
+  // ★ v291 (16 May 2026): Host için halka GERİ — admin host.ringWidth/ringColor
+  //   ayarlanabilir. Frame'li kullanıcılar için halka otomatik gizlenir (kural).
   const ringColor = isHost
-    ? RoleColors.owner
+    ? (layout.host.ringColor || RoleColors.owner)
     : isMod
     ? (layout.accents.moderatorHighlight || RoleColors.moderator)
     : (speakersCfg.ringColor || RoleColors.speaker);
-  // Speakers.ringWidth — config'den (default önceki: isMod 2, speaker 1.5)
-  const cfgRingWidth = speakersCfg.ringWidth;
+  // ★ v291: ringWidth host için ayrı, diğerleri speakers cfg.
+  const cfgRingWidth = isHost ? layout.host.ringWidth : speakersCfg.ringWidth;
 
   return (
     // ★ 2026-04-21 FIX: Outer element View (eski: Pressable) — nested Pressable touch çakışması
@@ -902,13 +904,13 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, i
         {
           width: cardWidth,
           height: cameraOn && videoTrack && VideoView ? cardHeight : cardWidth,
-          // ★ v283 (16 May 2026): Host artık özel renkli çerçeve TAŞIMAZ — kullanıcı
-          //   tercihi. Host konum (sahnede ilk sırada) + boyut (host.avatarSize, default
-          //   96 > speakers 84-100) ile ayırt edilir. Moderator için border kalır.
-          //   Frame yüklüyse rol border'ı zaten kaldırılıyor (çift halka önleme).
-          borderColor: activeFrame || isHost ? 'transparent' : ringColor,
-          // ★ v287: speakers.ringWidth admin'den (isMod yine biraz daha kalın)
-          borderWidth: activeFrame || isHost ? 0 : (isMod ? Math.max(2, cfgRingWidth) : cfgRingWidth),
+          // ★ v291 (16 May 2026): Host için halka GERİ — admin'den ayarlanabilir
+          //   (host.ringWidth/ringColor). Frame'li kullanıcı için halka kapanır
+          //   (frame önceliği — kural: çerçeve satın alanın halkası gizlenir,
+          //   host/speaker/moderator hepsi için geçerli).
+          borderColor: activeFrame ? 'transparent' : ringColor,
+          // ★ v287/v291: speakers.ringWidth admin'den (isMod biraz kalın, host kendi cfg).
+          borderWidth: activeFrame ? 0 : (isMod ? Math.max(2, cfgRingWidth) : cfgRingWidth),
           // ★ v283: borderRadius web admin avatarShape'i takip etsin (önceden hep daire).
           //   Camera açıkken kare-yumuşak (8% radius), audio-only shape mapping.
           borderRadius: cameraOn && videoTrack && VideoView ? Math.max(12, Math.floor(cardWidth * 0.08)) : avatarShapeRadius,

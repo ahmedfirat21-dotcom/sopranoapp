@@ -166,7 +166,10 @@ const ListenerCell = React.memo(function ListenerCell({
         showMuteIndicator && s.avatarMuted,
         { borderRadius: cfgRadius },
         // ★ v286: Listener Skia shadow — admin'den config
-        cellShadows.listenerShadowEnabled && {
+        // ★ v291 (16 May 2026): Frame önceliği kuralı — kullanıcı çerçeve satın
+        //   almışsa default shadow KAPATILIR (frame zaten kendi efektini taşır,
+        //   çift glow çakışmasın). hasFrame check eklendi.
+        !hasFrame && cellShadows.listenerShadowEnabled && {
           shadowColor: cellShadows.listenerShadowColor,
           shadowOpacity: cellShadows.listenerShadowOpacity,
           shadowRadius: cellShadows.listenerShadowBlur,
