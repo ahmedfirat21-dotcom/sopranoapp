@@ -161,14 +161,18 @@ export default function RoomInfoHeader({
 
   return (
     <View style={[s.wrap, { paddingTop: stableTop + 2 }]}>
-      {/* ★ 2026-04-24: Banner bombe gradient + teal separator (ana sayfa ile tutarlı).
-          Gradient absoluteFill sayesinde safe-area top'ı da kapsar — notch/status bar altında şeffaf boşluk kalmaz. */}
+      {/* ★ v283 (16 May 2026): Tab ailesi gradient'ı (keşfet/odalarım/mesajlar/profil
+          ile birebir aynı): slate diagonal + teal karakter halo. */}
       <LinearGradient
-        colors={['rgba(48,65,94,0.92)', 'rgba(26,40,64,0.82)', 'rgba(12,22,40,0.6)']}
-        locations={[0, 0.55, 1]}
-        start={{ x: 0.5, y: 0 }}
-        end={{ x: 0.5, y: 1 }}
+        colors={['#3a4658', '#2a3344', '#1a2030']}
+        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
         style={[StyleSheet.absoluteFillObject, { opacity: headerCfg.headerBgOpacity > 0 ? headerCfg.headerBgOpacity : 1 }]}
+        pointerEvents="none"
+      />
+      <LinearGradient
+        colors={['rgba(20,184,166,0.18)', 'rgba(20,184,166,0.05)', 'transparent']}
+        start={{ x: 0, y: 0 }} end={{ x: 0, y: 0.7 }}
+        style={StyleSheet.absoluteFillObject}
         pointerEvents="none"
       />
       {/* ★ v284: headerBorderBottom toggle — web admin'den kapatılabilir */}
