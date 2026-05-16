@@ -13,6 +13,7 @@ const SCREEN_HEIGHT = Dimensions.get('window').height;
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import SPIcon from '../SPIcon';
+import SPHexagonIcon from '../SPHexagonIcon';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSpring, runOnJS } from 'react-native-reanimated';
 import { supabase } from '../../constants/supabase';
@@ -232,8 +233,11 @@ export default function SPHistorySheet({ visible, onClose, balance, history: ini
               <View style={s.handle} />
             </View>
             <View style={s.header}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                <SPIcon size={52} />
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                {/* ★ v289 (16 May 2026): SPIcon (statik PNG) → SPHexagonIcon (rich
+                    animasyonlu — gem-float, shine-march, halo-breathe, ring-expand,
+                    twinkle stars, orbiters). Kullanıcı talebi: büyük + hareketli parlayan. */}
+                <SPHexagonIcon size={72} tier="premium" rich />
                 <View>
                   <Text style={s.title}>{i18n.t('profile.sphistorysheet.001')}</Text>
                   <Text style={s.subtitle}>{i18n.t('profile.sphistorysheet.002')}</Text>
