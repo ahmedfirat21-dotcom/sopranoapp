@@ -296,6 +296,11 @@ const tr: Record<string, string> = {
   'search.user_not_found': 'Kullanıcı bulunamadı',
   'search.your_friends': 'Arkadaşların',
   'search.no_friends': 'Henüz arkadaşın yok',
+  'search.discover_title': 'Keşfet',
+  'search.new_message': 'Yeni Mesaj',
+  'search.placeholder_discover': 'Oda, kişi veya üye ara...',
+  'search.placeholder_message': 'İsim veya kullanıcı adı ara...',
+  'search.discover_all_members': 'Keşfet — Tüm Üyeler',
   // NotifPreferencesSheet
   'notif_prefs.title': 'Bildirim Tercihleri',
   'notif_prefs.dnd': 'RAHATSIZ ETMEME',

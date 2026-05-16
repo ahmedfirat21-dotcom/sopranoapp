@@ -387,7 +387,7 @@ export function UserSearchModal({ visible, onClose, currentUserId, onSelectUser,
             <View style={s.header}>
               <View style={s.headerLeft}>
                 <Ionicons name={isDiscover ? 'search' : 'create'} size={18} color={Colors.teal} />
-                <Text style={s.headerTitle}>{isDiscover ? 'Keşfet' : 'Yeni Mesaj'}</Text>
+                <Text style={s.headerTitle}>{isDiscover ? i18n.t('search.discover_title') : i18n.t('search.new_message')}</Text>
               </View>
             </View>
           </View>
@@ -397,7 +397,7 @@ export function UserSearchModal({ visible, onClose, currentUserId, onSelectUser,
             <Ionicons name="search" size={16} color={Colors.text3} />
             <TextInput
               style={s.searchInput}
-              placeholder={isDiscover ? 'Oda, kişi veya üye ara...' : 'İsim veya kullanıcı adı ara...'}
+              placeholder={isDiscover ? i18n.t('search.placeholder_discover') : i18n.t('search.placeholder_message')}
               placeholderTextColor={Colors.text3}
               value={query}
               onChangeText={handleQueryChange}
@@ -519,7 +519,7 @@ export function UserSearchModal({ visible, onClose, currentUserId, onSelectUser,
                         <>
                           <View style={[s.sectionHeader, { marginTop: friends.length > 0 ? 8 : 0 }]}>
                             <Ionicons name="sparkles" size={13} color={Colors.teal} />
-                            <Text style={s.sectionTitle}>Keşfet — Tüm Üyeler</Text>
+                            <Text style={s.sectionTitle}>{i18n.t('search.discover_all_members')}</Text>
                           </View>
                           {suggestedUsers.map((item) => (
                             <Pressable
