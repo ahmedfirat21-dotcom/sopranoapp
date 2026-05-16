@@ -8,7 +8,7 @@ import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Colors, Shadows } from '../../constants/theme';
 import { getLevelFromSP, getAvatarSource } from '../../constants/avatars';
 import { useAuth, useTheme, useUserProfileSheet } from '../_layout';
-import { useTranslation } from '../../services/i18n';
+import { i18n, useTranslation } from '../../services/i18n';
 import { supabase } from '../../constants/supabase';
 import { ReferralService } from '../../services/referral';
 import { ProfileService } from '../../services/database';
@@ -810,7 +810,7 @@ export default function ProfileScreen() {
                     <Ionicons name="share-social-outline" size={14} color="#FFF" style={iconShadow} />
                   </Pressable>
                 </View>
-                <Text style={styles.modalDesc}>Bir arkadaşın kodunu kullanırsa, ikiniz de 50 SP kazanırsınız.</Text>
+                <Text style={styles.modalDesc}>{i18n.t('tabs.profile.001')}</Text>
 
                 {/* Bölüm 2: Arkadaş kodu gir — zaten kullanıldıysa kilit göster */}
                 <Text style={[styles.modalSubtitle, { marginTop: 16 }]}>{t('profile.enter_invite_code')}</Text>
@@ -829,7 +829,7 @@ export default function ProfileScreen() {
                   <>
                     <TextInput
                       style={styles.modalInput}
-                      placeholder="Örn: XHFDK9"
+                      placeholder={i18n.t('tabs.profile.002')}
                       placeholderTextColor={Colors.text3}
                       value={referralCodeText}
                       onChangeText={setReferralCodeText}

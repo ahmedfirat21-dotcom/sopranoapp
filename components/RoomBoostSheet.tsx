@@ -5,6 +5,7 @@
  * 2026-04-21: Basit Alert yerine modern seçim kartları + özet + CTA.
  */
 import React, { useState, useRef, useEffect } from 'react';
+import { i18n } from '../services/i18n';
 import {
   View, Text, StyleSheet, Pressable, Modal, Animated, PanResponder,
 } from 'react-native';
@@ -104,7 +105,7 @@ export default function RoomBoostSheet({ visible, onClose, onBoost, currentSP, r
 
         <View style={s.header}>
           <Ionicons name="rocket" size={18} color="#FB923C" style={s.glowIcon} />
-          <Text style={s.title}>Keşfette Öne Çıkar</Text>
+          <Text style={s.title}>{i18n.t('roomboostsheet.001')}</Text>
         </View>
         <Text style={s.subtitle} numberOfLines={2}>
           {roomName ? `"${roomName}"` : 'Bu oda'} keşfet sayfasında üst sıralara çıkar ve daha çok dinleyici çeker.
@@ -127,7 +128,7 @@ export default function RoomBoostSheet({ visible, onClose, onBoost, currentSP, r
               >
                 {tier.popular && (
                   <View style={[s.popularPill, { backgroundColor: tier.accent + '20', borderColor: tier.accent + '60' }]}>
-                    <Text style={[s.popularText, { color: tier.accent }]}>POPÜLER</Text>
+                    <Text style={[s.popularText, { color: tier.accent }]}>{i18n.t('roomboostsheet.002')}</Text>
                   </View>
                 )}
                 <View style={[s.tierIconWrap, { backgroundColor: tier.accent + '18', borderColor: tier.accent + '45' }]}>

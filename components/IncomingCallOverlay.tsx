@@ -5,6 +5,7 @@
  * ★ Fallback: Gömülü ringtone.mp3
  */
 import { View, Text, StyleSheet, Image, TouchableOpacity, Animated, Vibration, Dimensions } from 'react-native';
+import { i18n } from '../services/i18n';
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useRef, useCallback } from 'react';
 import { Audio } from 'expo-av';
@@ -249,7 +250,7 @@ export function IncomingCallOverlay({ visible, callerName, callerAvatar, callTyp
           </Animated.View>
           
           <Text style={styles.callerName} numberOfLines={1}>{callerName}</Text>
-          <Text style={styles.statusText}>Arıyor...</Text>
+          <Text style={styles.statusText}>{i18n.t('incomingcalloverlay.001')}</Text>
         </View>
 
         {/* Alt kısım — butonlar */}

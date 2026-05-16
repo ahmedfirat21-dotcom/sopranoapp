@@ -394,7 +394,7 @@ function ManagedRoomsEmptyCard() {
             <Image source={require('../../assets/images/mock/empty_room_mic.png')} style={mrS.emptyImage} resizeMode="contain" />
           )}
         </View>
-        <Text style={mrS.emptySub}>Sesli sohbet, müzik, oyun ve daha fazlası...</Text>
+        <Text style={mrS.emptySub}>{i18n.t('tabs.myrooms.001')}</Text>
       </View>
     </>
   );

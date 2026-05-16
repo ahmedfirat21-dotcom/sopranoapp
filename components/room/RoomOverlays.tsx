@@ -284,7 +284,7 @@ function InlineTextEditor({ icon, label, value, onSave, placeholder, multiline, 
       />
       <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 4 }}>
         <Pressable onPress={() => { setDraft(value); setEditing(false); }} hitSlop={6}>
-          <Text style={{ fontSize: 10, color: '#64748B', fontWeight: '600', textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 }}>İptal</Text>
+          <Text style={{ fontSize: 10, color: '#64748B', fontWeight: '600', textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 }}>{i18n.t('room.roomoverlays.001')}</Text>
         </Pressable>
         <Pressable onPress={() => { onSave(draft.trim()); setEditing(false); }} hitSlop={6}>
           <Text style={{ fontSize: 10, color: '#14B8A6', fontWeight: '700', textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 }}>Kaydet</Text>
@@ -477,17 +477,17 @@ export function PlusMenu({
     if (!sc) return null;
     return (
       <View style={st.subWrap}>
-        <InlineTextEditor icon="create-outline" label="Oda Adı" value={sc.roomName} onSave={sc.onRenameRoom} placeholder="Oda adı..." accent="#D4AF37" />
+        <InlineTextEditor icon="create-outline" label="Oda Adı" value={sc.roomName} onSave={sc.onRenameRoom} placeholder={i18n.t('room.roomoverlays.013')} accent="#D4AF37" />
         <View style={st.sep} />
         {sc.onDescriptionChange && (
           <>
-            <InlineTextEditor icon="information-circle-outline" label="Açıklama" value={sc.description || ''} onSave={sc.onDescriptionChange} placeholder="Odanın kısa açıklaması..." multiline accent="#14B8A6" />
+            <InlineTextEditor icon="information-circle-outline" label="Açıklama" value={sc.description || ''} onSave={sc.onDescriptionChange} placeholder={i18n.t('room.roomoverlays.014')} multiline accent="#14B8A6" />
             <View style={st.sep} />
           </>
         )}
-        <InlineTextEditor icon="chatbubble-outline" label="Hoş Geldin" value={sc.welcomeMessage} onSave={sc.onWelcomeMessageChange} placeholder="Hoş geldin mesajı..." multiline accent="#3B82F6" />
+        <InlineTextEditor icon="chatbubble-outline" label="Hoş Geldin" value={sc.welcomeMessage} onSave={sc.onWelcomeMessageChange} placeholder={i18n.t('room.roomoverlays.015')} multiline accent="#3B82F6" />
         <View style={st.sep} />
-        <InlineTextEditor icon="document-text-outline" label="Kurallar" value={sc.roomRules} onSave={sc.onRulesChange} placeholder="Oda kuralları..." multiline accent="#A78BFA" />
+        <InlineTextEditor icon="document-text-outline" label="Kurallar" value={sc.roomRules} onSave={sc.onRulesChange} placeholder={i18n.t('room.roomoverlays.016')} multiline accent="#A78BFA" />
       </View>
     );
   };
@@ -544,7 +544,7 @@ export function PlusMenu({
                 <View style={st.sep} />
                 <Pressable style={({ pressed }) => [st.actionBtn, pressed && { opacity: 0.7 }]} onPress={() => { onMuteAll(); onClose(); }}>
                   <Ionicons name="volume-mute-outline" size={13} color="#EF4444" />
-                  <Text style={st.actionBtnText}>Tümünü Sustur</Text>
+                  <Text style={st.actionBtnText}>{i18n.t('room.roomoverlays.002')}</Text>
                 </Pressable>
               </>
             )}
@@ -553,7 +553,7 @@ export function PlusMenu({
                 <View style={st.sep} />
                 <Pressable style={({ pressed }) => [st.actionBtn, pressed && { opacity: 0.7 }]} onPress={() => { onUnmuteAll(); onClose(); }}>
                   <Ionicons name="volume-high-outline" size={13} color="#14B8A6" />
-                  <Text style={[st.actionBtnText, { color: '#14B8A6' }]}>Tümünü Aç</Text>
+                  <Text style={[st.actionBtnText, { color: '#14B8A6' }]}>{i18n.t('room.roomoverlays.003')}</Text>
                 </Pressable>
               </>
             )}
@@ -637,7 +637,7 @@ export function PlusMenu({
        inlineBans.length === 0 ? (
         <View style={{ alignItems: 'center', paddingVertical: 16 }}>
           <Ionicons name="shield-checkmark" size={20} color="rgba(34,197,94,0.3)" />
-          <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)', marginTop: 4 }}>Banlı kullanıcı yok 🎉</Text>
+          <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)', marginTop: 4 }}>{i18n.t('room.roomoverlays.004')}</Text>
         </View>
       ) : inlineBans.map(ban => {
         const isPermanent = ban.ban_type === 'permanent';
@@ -653,7 +653,7 @@ export function PlusMenu({
             </View>
             {processingIds.has(ban.id) ? <AppLoader size="small" color="#14B8A6" /> : (
               <Pressable onPress={() => handleUnban(ban)} style={{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, backgroundColor: 'rgba(20,184,166,0.08)', borderWidth: 1, borderColor: 'rgba(20,184,166,0.18)' }}>
-                <Text style={{ fontSize: 9, fontWeight: '700', color: '#14B8A6' }}>Kaldır</Text>
+                <Text style={{ fontSize: 9, fontWeight: '700', color: '#14B8A6' }}>{i18n.t('room.roomoverlays.005')}</Text>
               </Pressable>
             )}
           </View>
@@ -750,7 +750,7 @@ export function PlusMenu({
         {/* ★ 2026-04-21: Kart Görseli — artık herkes (oluşturma ile aynı kural). */}
         <View style={st.toggleRow}>
           <Ionicons name="albums-outline" size={13} color="#D4AF37" />
-          <Text style={st.toggleLabel}>Kart Görseli</Text>
+          <Text style={st.toggleLabel}>{i18n.t('room.roomoverlays.006')}</Text>
           {sc.coverImage ? (
             <Pressable hitSlop={6} onPress={sc.onRemoveCoverImage}>
               <Ionicons name="close-circle" size={16} color="#EF4444" />
@@ -774,7 +774,7 @@ export function PlusMenu({
         ) : (
           <View style={st.chipRow}>
             <Ionicons name="lock-closed" size={12} color="#475569" />
-            <Text style={[st.chipLabel, { color: '#475569' }]}>Oda Müzik Linki</Text>
+            <Text style={[st.chipLabel, { color: '#475569' }]}>{i18n.t('room.roomoverlays.007')}</Text>
             <View style={st.tierPill}><Text style={st.tierPillText}>Pro+</Text></View>
           </View>
         )}
@@ -787,13 +787,13 @@ export function PlusMenu({
     <View style={st.subWrap}>
       <Pressable style={({ pressed }) => [s.subRow, pressed && s.subRowPressed]} onPress={() => { onInviteFriends(); onClose(); }}>
         <View style={s.subIconCircle}><Ionicons name="people-outline" size={13} color="#14B8A6" style={s.iconShadow} /></View>
-        <Text style={s.subLabel}>Arkadaşlarını Davet Et</Text>
+        <Text style={s.subLabel}>{i18n.t('room.roomoverlays.008')}</Text>
         <Ionicons name="chevron-forward" size={12} color="rgba(255,255,255,0.15)" />
       </Pressable>
       <View style={{ height: 1, backgroundColor: 'rgba(255,255,255,0.03)' }} />
       <Pressable style={({ pressed }) => [s.subRow, pressed && s.subRowPressed]} onPress={() => { onShareLink(); onClose(); }}>
         <View style={s.subIconCircle}><Ionicons name="link-outline" size={13} color="#3B82F6" style={s.iconShadow} /></View>
-        <Text style={s.subLabel}>Oda Linkini Paylaş</Text>
+        <Text style={s.subLabel}>{i18n.t('room.roomoverlays.009')}</Text>
         <Ionicons name="chevron-forward" size={12} color="rgba(255,255,255,0.15)" />
       </Pressable>
     </View>
@@ -808,7 +808,7 @@ export function PlusMenu({
         style={({ pressed }) => [st.toggleRow, pressed && { opacity: 0.6 }]}
       >
         <Ionicons name="people-circle-outline" size={13} color="#EC4899" />
-        <Text style={st.toggleLabel}>Oda Takipçileri</Text>
+        <Text style={st.toggleLabel}>{i18n.t('room.roomoverlays.010')}</Text>
         <View style={{ backgroundColor: 'rgba(236,72,153,0.12)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8, borderWidth: 0.5, borderColor: 'rgba(236,72,153,0.25)' }}>
           <Text style={{ fontSize: 11, fontWeight: '800', color: '#EC4899', textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 }}>{followerCount}</Text>
         </View>
@@ -817,7 +817,7 @@ export function PlusMenu({
       <View style={st.sep} />
       <Pressable style={({ pressed }) => [s.subRow, pressed && s.subRowPressed]} onPress={() => { onRoomStats?.(); onClose(); }}>
         <View style={s.subIconCircle}><Ionicons name="analytics-outline" size={13} color="#3B82F6" style={s.iconShadow} /></View>
-        <Text style={s.subLabel}>Oda İstatistikleri</Text>
+        <Text style={s.subLabel}>{i18n.t('room.roomoverlays.011')}</Text>
         <Ionicons name="chevron-forward" size={12} color="rgba(255,255,255,0.15)" />
       </Pressable>
       {onBoostRoom && can('Plus') && (
@@ -825,7 +825,7 @@ export function PlusMenu({
           <View style={{ height: 1, backgroundColor: 'rgba(255,255,255,0.03)' }} />
           <Pressable style={({ pressed }) => [s.subRow, pressed && s.subRowPressed]} onPress={() => { onBoostRoom(); onClose(); }}>
             <View style={s.subIconCircle}><Ionicons name="rocket-outline" size={13} color="#F59E0B" style={s.iconShadow} /></View>
-            <Text style={s.subLabel}>Keşfette Öne Çıkar</Text>
+            <Text style={s.subLabel}>{i18n.t('room.roomoverlays.012')}</Text>
             <Ionicons name="chevron-forward" size={12} color="rgba(255,255,255,0.15)" />
           </Pressable>
         </>

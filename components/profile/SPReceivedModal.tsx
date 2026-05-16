@@ -24,6 +24,7 @@
  */
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { i18n } from '../../services/i18n';
 import {
   View, Text, StyleSheet, Pressable, Animated, Easing, Modal, Dimensions, Platform, Image,
 } from 'react-native';
@@ -676,7 +677,7 @@ export default function SPReceivedModal({
               />
             )}
             <View style={{ flex: 1 }}>
-              <Text style={s.senderLabel}>Gönderen</Text>
+              <Text style={s.senderLabel}>{i18n.t('profile.spreceivedmodal.001')}</Text>
               <Text style={s.senderName} numberOfLines={1}>{senderName}</Text>
             </View>
           </View>
@@ -691,7 +692,7 @@ export default function SPReceivedModal({
             </View>
           ) : (
             <>
-              <Text style={s.repliesLabel}>Ücretsiz teşekkür et:</Text>
+              <Text style={s.repliesLabel}>{i18n.t('profile.spreceivedmodal.002')}</Text>
               <View style={s.repliesGrid}>
                 {THANK_YOU_REPLIES.map(r => (
                   <Pressable

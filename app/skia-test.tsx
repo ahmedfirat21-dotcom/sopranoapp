@@ -7,6 +7,7 @@
  */
 
 import React from 'react';
+import { i18n } from '../services/i18n';
 import { View, Text, ScrollView, StyleSheet, Platform, Alert } from 'react-native';
 import { Stack } from 'expo-router';
 import { SkiaShadow, SkiaCard, SkiaButton, SkiaDivider, isSkiaAvailable } from '../components/skia';
@@ -20,12 +21,12 @@ export default function SkiaTestScreen() {
       <Stack.Screen options={{ title: 'Skia Parite Testi', headerStyle: { backgroundColor: '#0A0F1A' }, headerTintColor: '#fff' }} />
       <ScrollView contentContainerStyle={styles.scroll}>
         <Text style={styles.header}>Skia vs RN — Parite Testi</Text>
-        <Text style={styles.sub}>Her sıra: solda mevcut RN yaklaşımı, sağda Skia primitive. Aynı görünmeli.</Text>
+        <Text style={styles.sub}>{i18n.t('skiatest.001')}</Text>
 
         {!skiaOk && (
           <View style={styles.warnBanner}>
-            <Text style={styles.warnTitle}>Skia native modül APK'da yok</Text>
-            <Text style={styles.warnBody}>Sağ taraftaki Skia çıktıları şu an fallback (sade View) gösteriyor. APK'yı Skia ile rebuild ettikten sonra gerçek Skia render'ı çalışacak.</Text>
+            <Text style={styles.warnTitle}>{i18n.t('skiatest.002')}</Text>
+            <Text style={styles.warnBody}>{i18n.t('skiatest.003')}</Text>
           </View>
         )}
 

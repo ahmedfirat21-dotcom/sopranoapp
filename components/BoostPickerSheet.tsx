@@ -4,6 +4,7 @@
  * Premium bottom sheet — swipe-to-dismiss, room modal tarzı.
  */
 import React, { useState, useRef, useEffect } from 'react';
+import { i18n } from '../services/i18n';
 import {
   View, Text, StyleSheet, Pressable, Modal, Animated, PanResponder, Dimensions,
 } from 'react-native';
@@ -159,9 +160,9 @@ export default function BoostPickerSheet({ visible, onClose, onBoost, currentSP 
             textShadowColor: 'rgba(244,114,182,0.8)',
             textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 8,
           }} />
-          <Text style={s.title}>Profili Öne Çıkar</Text>
+          <Text style={s.title}>{i18n.t('boostpickersheet.001')}</Text>
         </View>
-        <Text style={s.subtitle}>Profilin ve odaların Keşfet'te öne çıkar. Tıklayan kullanıcılar odalarına ulaşır.</Text>
+        <Text style={s.subtitle}>{i18n.t('boostpickersheet.002')}</Text>
 
         {/* Tier Seçici */}
         <View style={s.tierRow}>
@@ -225,7 +226,7 @@ export default function BoostPickerSheet({ visible, onClose, onBoost, currentSP 
                   <Ionicons name="rocket-outline" size={18} color="#FFF" />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={s.ctaTitle}>Boost Başlat</Text>
+                  <Text style={s.ctaTitle}>{i18n.t('boostpickersheet.003')}</Text>
                   <Text style={s.ctaSub}>{selected.label} · {selected.duration} saat</Text>
                 </View>
                 <Text style={s.ctaCost}>{selected.cost} SP</Text>

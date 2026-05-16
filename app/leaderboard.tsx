@@ -11,6 +11,7 @@
  * Zaman filtreleri: Haftalık / Aylık / Tüm Zamanlar
  */
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { i18n } from '../services/i18n';
 import {
   View, Text, StyleSheet, Image, Pressable, ScrollView, Animated, Dimensions, RefreshControl, Platform,
 } from 'react-native';
@@ -617,7 +618,7 @@ export default function LeaderboardScreen() {
       {loading ? (
         <View style={s.loadingWrap}>
           <AppLoader size={56} color="#D4AF37" />
-          <Text style={s.loadingText}>Sıralama yükleniyor...</Text>
+          <Text style={s.loadingText}>{i18n.t('leaderboard.001')}</Text>
         </View>
       ) : (
         <ScrollView
@@ -665,7 +666,7 @@ export default function LeaderboardScreen() {
                     }} />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={ws.heroTitle}>Haftalık SP Ligi</Text>
+                    <Text style={ws.heroTitle}>{i18n.t('leaderboard.002')}</Text>
                     <Text style={ws.heroSubtitle}>
                       Pazartesi 09:00'da sıfırlanır. Her kategoride <Text style={ws.heroHighlight}>top 3</Text> ödülü:{' '}
                       <Text style={ws.heroHighlight}>100 / 50 / 25 SP</Text>
@@ -685,7 +686,7 @@ export default function LeaderboardScreen() {
               ) : (
                 <View style={[s.emptySection]}>
                   <Ionicons name="gift-outline" size={28} color="rgba(255,255,255,0.15)" />
-                  <Text style={s.emptyText}>Bu hafta henüz bağış yok</Text>
+                  <Text style={s.emptyText}>{i18n.t('leaderboard.003')}</Text>
                 </View>
               )}
 
@@ -700,7 +701,7 @@ export default function LeaderboardScreen() {
               ) : (
                 <View style={[s.emptySection]}>
                   <Ionicons name="flash-outline" size={28} color="rgba(255,255,255,0.15)" />
-                  <Text style={s.emptyText}>Bu hafta kazanım verisi yok</Text>
+                  <Text style={s.emptyText}>{i18n.t('leaderboard.004')}</Text>
                 </View>
               )}
 
@@ -715,7 +716,7 @@ export default function LeaderboardScreen() {
               ) : (
                 <View style={[s.emptySection]}>
                   <Ionicons name="mic-outline" size={28} color="rgba(255,255,255,0.15)" />
-                  <Text style={s.emptyText}>Bu hafta oda açılmamış</Text>
+                  <Text style={s.emptyText}>{i18n.t('leaderboard.005')}</Text>
                 </View>
               )}
             </>
@@ -749,7 +750,7 @@ export default function LeaderboardScreen() {
           ) : (
             <View style={[s.emptySection]}>
               <SPIcon size={28} style={{ opacity: 0.4 }} />
-              <Text style={s.emptyText}>Henüz SP verisi yok</Text>
+              <Text style={s.emptyText}>{i18n.t('leaderboard.006')}</Text>
             </View>
           )}
 
@@ -765,7 +766,7 @@ export default function LeaderboardScreen() {
           ) : (
             <View style={[s.emptySection]}>
               <Ionicons name="people-outline" size={28} color="rgba(255,255,255,0.15)" />
-              <Text style={s.emptyText}>Henüz takipçi verisi yok</Text>
+              <Text style={s.emptyText}>{i18n.t('leaderboard.007')}</Text>
             </View>
           )}
 
@@ -781,7 +782,7 @@ export default function LeaderboardScreen() {
           ) : (
             <View style={[s.emptySection]}>
               <Ionicons name="people-outline" size={28} color="rgba(255,255,255,0.15)" />
-              <Text style={s.emptyText}>Henüz oda verisi yok</Text>
+              <Text style={s.emptyText}>{i18n.t('leaderboard.008')}</Text>
             </View>
           )}
 
@@ -797,7 +798,7 @@ export default function LeaderboardScreen() {
           ) : (
             <View style={[s.emptySection]}>
               <Ionicons name="flame-outline" size={28} color="rgba(255,255,255,0.15)" />
-              <Text style={s.emptyText}>Henüz aktivite verisi yok</Text>
+              <Text style={s.emptyText}>{i18n.t('leaderboard.009')}</Text>
             </View>
           )}
 
@@ -826,7 +827,7 @@ export default function LeaderboardScreen() {
           ) : (
             <View style={[s.emptySection]}>
               <Ionicons name="gift-outline" size={28} color="rgba(255,255,255,0.15)" />
-              <Text style={s.emptyText}>Henüz hediye veren yok — ilk sen ol!</Text>
+              <Text style={s.emptyText}>{i18n.t('leaderboard.010')}</Text>
             </View>
           )}
         </ScrollView>

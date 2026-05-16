@@ -11,6 +11,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
+import { i18n } from '../../services/i18n';
 import { View, Text, StyleSheet, Pressable, Platform, ScrollView } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -66,7 +67,7 @@ export default function GiftShowcase({ userId, mode, limit = 8, embedded = false
       <View style={s.embeddedTotalRow}>
         <Text style={s.totalText}>
           <Text style={{ color: '#FBBF24', fontWeight: '800' }}>{totalAmount.toLocaleString('tr-TR')} SP</Text>
-          <Text style={{ color: 'rgba(255,255,255,0.5)' }}> · son 30 gün</Text>
+          <Text style={{ color: 'rgba(255,255,255,0.5)' }}>{i18n.t('profile.giftshowcase.001')}</Text>
         </Text>
       </View>
       <ScrollView
@@ -121,7 +122,7 @@ export default function GiftShowcase({ userId, mode, limit = 8, embedded = false
         <View style={{ flex: 1 }} />
         <Text style={s.totalText}>
           <Text style={{ color: TEAL, fontWeight: '800' }}>{totalAmount.toLocaleString('tr-TR')}</Text>
-          <Text style={{ color: 'rgba(255,255,255,0.5)' }}> · son 30 gün</Text>
+          <Text style={{ color: 'rgba(255,255,255,0.5)' }}>{i18n.t('profile.giftshowcase.002')}</Text>
         </Text>
       </View>
 

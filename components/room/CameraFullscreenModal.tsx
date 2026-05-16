@@ -3,6 +3,7 @@
 // 2026-04-20: Yeni eklendi — avatar kamera rozeti tap → bu modal.
 
 import React, { useRef } from 'react';
+import { i18n } from '../../services/i18n';
 import { View, Text, StyleSheet, Pressable, Modal, Dimensions, Animated, PanResponder, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -58,7 +59,7 @@ export default function CameraFullscreenModal({ visible, user, videoTrack, Video
         ) : (
           <View style={[StyleSheet.absoluteFill, styles.fallback]}>
             <Image source={getAvatarSource(avatarUrl)} style={styles.fallbackAvatar} />
-            <Text style={styles.fallbackText}>Kamera yayını bekleniyor…</Text>
+            <Text style={styles.fallbackText}>{i18n.t('room.camerafullscreenmodal.001')}</Text>
           </View>
         )}
 
@@ -84,7 +85,7 @@ export default function CameraFullscreenModal({ visible, user, videoTrack, Video
         {/* Alt ipucu — swipe to dismiss */}
         <View style={styles.bottomHint}>
           <View style={styles.hintBar} />
-          <Text style={styles.hintText}>Aşağı kaydır ya da ✕ ile kapat</Text>
+          <Text style={styles.hintText}>{i18n.t('room.camerafullscreenmodal.002')}</Text>
         </View>
       </Animated.View>
     </Modal>

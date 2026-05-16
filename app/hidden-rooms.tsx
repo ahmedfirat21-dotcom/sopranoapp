@@ -14,6 +14,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { i18n } from '../services/i18n';
 import {
   View, Text, StyleSheet, Pressable, FlatList, Image,
 } from 'react-native';
@@ -111,7 +112,7 @@ export default function HiddenRoomsScreen() {
             <Text style={styles.countText}>{hiddenIds.length} gizli oda</Text>
             <Pressable onPress={unignoreAll} style={({ pressed }) => [styles.unignoreAllBtn, pressed && { opacity: 0.7 }]}>
               <Ionicons name="refresh" size={14} color="#FBBF24" />
-              <Text style={styles.unignoreAllText}>Tümünü Geri Getir</Text>
+              <Text style={styles.unignoreAllText}>{i18n.t('hiddenrooms.001')}</Text>
             </Pressable>
           </View>
         )}
@@ -122,8 +123,8 @@ export default function HiddenRoomsScreen() {
         ) : hiddenIds.length === 0 ? (
           <View style={styles.emptyWrap}>
             <Ionicons name="eye-outline" size={42} color="rgba(94,234,212,0.25)" />
-            <Text style={styles.emptyTitle}>Hiç gizlenmiş oda yok</Text>
-            <Text style={styles.emptySub}>Keşfette bir oda kartını sola kaydırıp "Gizle" diyerek bu listeye ekleyebilirsin.</Text>
+            <Text style={styles.emptyTitle}>{i18n.t('hiddenrooms.002')}</Text>
+            <Text style={styles.emptySub}>{i18n.t('hiddenrooms.003')}</Text>
           </View>
         ) : (
           <FlatList
@@ -163,7 +164,7 @@ export default function HiddenRoomsScreen() {
             ListEmptyComponent={
               hiddenIds.length > 0 ? (
                 <View style={styles.emptyWrap}>
-                  <Text style={styles.emptySub}>Oda detayları yüklenemedi.</Text>
+                  <Text style={styles.emptySub}>{i18n.t('hiddenrooms.004')}</Text>
                 </View>
               ) : null
             }

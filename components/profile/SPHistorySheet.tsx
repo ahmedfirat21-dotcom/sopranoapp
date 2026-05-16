@@ -4,6 +4,7 @@
 // - Altın premium tema (wallet ile tutarlı)
 
 import React, { useEffect, useState, useCallback } from 'react';
+import { i18n } from '../../services/i18n';
 import {
   View, Text, StyleSheet, Pressable, Modal, ScrollView, Dimensions,
 } from 'react-native';
@@ -234,14 +235,14 @@ export default function SPHistorySheet({ visible, onClose, balance, history: ini
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                 <SPIcon size={52} />
                 <View>
-                  <Text style={s.title}>SP GEÇMİŞİM</Text>
-                  <Text style={s.subtitle}>Son 30 işlem · Canlı</Text>
+                  <Text style={s.title}>{i18n.t('profile.sphistorysheet.001')}</Text>
+                  <Text style={s.subtitle}>{i18n.t('profile.sphistorysheet.002')}</Text>
                 </View>
               </View>
             </View>
 
             <View style={s.balanceStrip}>
-              <Text style={s.balanceLabel}>Güncel Bakiye</Text>
+              <Text style={s.balanceLabel}>{i18n.t('profile.sphistorysheet.003')}</Text>
               <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
                 <Text style={s.balanceAmount}>{balance.toLocaleString('tr-TR')}</Text>
                 <Text style={s.balanceCurrency}>SP</Text>
@@ -258,8 +259,8 @@ export default function SPHistorySheet({ visible, onClose, balance, history: ini
             {history.length === 0 ? (
               <View style={s.emptyWrap}>
                 <Ionicons name="receipt-outline" size={44} color="rgba(251,191,36,0.25)" style={iconShadow} />
-                <Text style={s.emptyText}>Henüz işlem yok</Text>
-                <Text style={s.emptySub}>Oda aç, sahneye çık — kazanmaya başla</Text>
+                <Text style={s.emptyText}>{i18n.t('profile.sphistorysheet.004')}</Text>
+                <Text style={s.emptySub}>{i18n.t('profile.sphistorysheet.005')}</Text>
               </View>
             ) : history.map((tx: any, i: number) => {
               const isPositive = (tx.amount || 0) > 0;

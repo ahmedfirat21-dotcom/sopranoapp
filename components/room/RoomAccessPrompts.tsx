@@ -149,7 +149,7 @@ export function PasswordPromptSheet({
               style={st.input}
               value={pw}
               onChangeText={setPw}
-              placeholder="Şifreyi girin..."
+              placeholder={i18n.t('room.roomaccessprompts.003')}
               placeholderTextColor="#475569"
               secureTextEntry={!reveal}
               autoCapitalize="none"
@@ -499,7 +499,7 @@ export function AccessRequestSheet({
           {status === 'pending' ? (
             <Pressable style={[st.btnSecondary, { flex: 1 }]} onPress={handleCancel} disabled={cancelling}>
               {cancelling ? <AppLoader color="#94A3B8" size="small" /> : (
-                <><Ionicons name="close" size={14} color="#94A3B8" /><Text style={st.btnSecondaryText}>Vazgeç</Text></>
+                <><Ionicons name="close" size={14} color="#94A3B8" /><Text style={st.btnSecondaryText}>{i18n.t('room.roomaccessprompts.001')}</Text></>
               )}
             </Pressable>
           ) : (
@@ -594,7 +594,7 @@ export function AccessGate({
 
         <View style={gate.statusPill}>
           <AppLoader size="small" color="#14B8A6" />
-          <Text style={gate.statusText}>Erişim kontrol ediliyor…</Text>
+          <Text style={gate.statusText}>{i18n.t('room.roomaccessprompts.002')}</Text>
         </View>
       </View>
 

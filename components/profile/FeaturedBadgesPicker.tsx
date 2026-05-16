@@ -6,6 +6,7 @@
  * Edit profile sayfasından açılır.
  */
 import React, { useEffect, useRef, useState } from 'react';
+import { i18n } from '../../services/i18n';
 import {
   View, Text, StyleSheet, Pressable, ScrollView, Dimensions,
   Animated,
@@ -119,7 +120,7 @@ export default function FeaturedBadgesPicker({ visible, userId, onSaved, onClose
           <Pressable onPress={onClose} style={s.iconBtn} hitSlop={8}>
             <Ionicons name="chevron-down" size={22} color="#F1F5F9" />
           </Pressable>
-          <Text style={s.title}>ÖNE ÇIKAN ROZETLER</Text>
+          <Text style={s.title}>{i18n.t('profile.featuredbadgespicker.001')}</Text>
           <Pressable
             onPress={handleSave}
             disabled={saving}
@@ -140,12 +141,12 @@ export default function FeaturedBadgesPicker({ visible, userId, onSaved, onClose
           showsVerticalScrollIndicator={false}
         >
           {loading ? (
-            <Text style={[s.hint, { textAlign: 'center', marginTop: 40 }]}>Yükleniyor...</Text>
+            <Text style={[s.hint, { textAlign: 'center', marginTop: 40 }]}>{i18n.t('profile.featuredbadgespicker.002')}</Text>
           ) : validBadges.length === 0 ? (
             <View style={s.emptyBox}>
               <Ionicons name="ribbon-outline" size={48} color="rgba(148,163,184,0.5)" />
-              <Text style={s.emptyTitle}>Henüz rozetin yok</Text>
-              <Text style={s.emptyDesc}>Aktif kullanım, sahne, bağış ile rozet kazan</Text>
+              <Text style={s.emptyTitle}>{i18n.t('profile.featuredbadgespicker.003')}</Text>
+              <Text style={s.emptyDesc}>{i18n.t('profile.featuredbadgespicker.004')}</Text>
             </View>
           ) : (
             <View style={s.grid}>

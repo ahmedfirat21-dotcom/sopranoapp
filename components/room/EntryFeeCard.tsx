@@ -17,6 +17,7 @@
  */
 
 import React, { useRef, useEffect, useState } from 'react';
+import { i18n } from '../../services/i18n';
 import {
   View, Text, StyleSheet, Animated, PanResponder, Dimensions,
   Pressable, Platform, Image,
@@ -245,7 +246,7 @@ export default function EntryFeeCard({
           {/* Header */}
           <View style={styles.header}>
             <Ionicons name="ticket" size={20} color={PALETTE.primary} style={iconShadow} />
-            <Text style={styles.headerTitle}>ODA BİLETİ</Text>
+            <Text style={styles.headerTitle}>{i18n.t('room.entryfeecard.001')}</Text>
             <View style={styles.balancePill}>
               <Ionicons name="wallet" size={10} color={PALETTE.primary} />
               <Text style={styles.balanceText}>{balance.toLocaleString('tr-TR')}</Text>
@@ -305,7 +306,7 @@ export default function EntryFeeCard({
               {/* Alt etiket */}
               <View style={styles.ticketLabelRow}>
                 <View style={styles.ticketDivider} />
-                <Text style={styles.ticketLabel}>GİRİŞ ÜCRETİ</Text>
+                <Text style={styles.ticketLabel}>{i18n.t('room.entryfeecard.002')}</Text>
                 <View style={styles.ticketDivider} />
               </View>
             </View>
@@ -325,7 +326,7 @@ export default function EntryFeeCard({
               onPress={onCancel}
               disabled={submitting}
             >
-              <Text style={styles.btnSecondaryText}>Vazgeç</Text>
+              <Text style={styles.btnSecondaryText}>{i18n.t('room.entryfeecard.003')}</Text>
             </Pressable>
             <Pressable
               style={[

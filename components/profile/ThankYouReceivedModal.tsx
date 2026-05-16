@@ -5,6 +5,7 @@
 // ═══════════════════════════════════════════════════════════════════
 
 import React, { useEffect, useRef } from 'react';
+import { i18n } from '../../services/i18n';
 import { View, Text, StyleSheet, Pressable, Animated, Easing, Modal, Dimensions, PanResponder } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -192,7 +193,7 @@ export default function ThankYouReceivedModal({
           />
 
           {/* Header */}
-          <Text style={s.headerText}>🙏 TEŞEKKÜR ALDIN!</Text>
+          <Text style={s.headerText}>{i18n.t('profile.thankyoureceivedmodal.001')}</Text>
 
           {/* Emoji hero + sparkles */}
           <View style={s.emojiSection}>
@@ -246,7 +247,7 @@ export default function ThankYouReceivedModal({
               )}
               <View style={{ flex: 1 }}>
                 <Text style={s.senderName} numberOfLines={1}>{senderName}</Text>
-                <Text style={s.senderLabel}>sana teşekkür etti</Text>
+                <Text style={s.senderLabel}>{i18n.t('profile.thankyoureceivedmodal.002')}</Text>
               </View>
             </View>
             {message && (

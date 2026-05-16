@@ -1,4 +1,5 @@
 import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
+import { i18n } from '../services/i18n';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -51,7 +52,7 @@ export default function SPStoreScreen() {
               textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4,
             }} />
           </Pressable>
-          <Text style={s.headerTitle}>SP Mağaza</Text>
+          <Text style={s.headerTitle}>{i18n.t('spstore.001')}</Text>
           <View style={s.balancePill}>
             <SPIcon size={16} />
             <Text style={s.balanceText}>{spBalance.toLocaleString()}</Text>
@@ -120,7 +121,7 @@ export default function SPStoreScreen() {
                       style={StyleSheet.absoluteFillObject}
                     />
                     <Ionicons name="flame" size={8} color="#3B1F00" />
-                    <Text style={s.popularText}>POPÜLER</Text>
+                    <Text style={s.popularText}>{i18n.t('spstore.002')}</Text>
                   </View>
                 )}
 

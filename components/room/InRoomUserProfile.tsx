@@ -1070,7 +1070,7 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                 {currentRoom && currentRoom.id !== excludeRoomId && (
                   <View style={sty.currentRoomBanner}>
                     <View style={sty.currentRoomDot} />
-                    <Text style={sty.currentRoomLabel}>Şu an dinliyor:</Text>
+                    <Text style={sty.currentRoomLabel}>{i18n.t('room.inroomuserprofile.001')}</Text>
                     <Text style={sty.currentRoomName} numberOfLines={1}>{currentRoom.name}</Text>
                   </View>
                 )}

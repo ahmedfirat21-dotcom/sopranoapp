@@ -9,6 +9,7 @@
  * düzgün URL'ye çevrilir. https:// prefix otomatik eklenir.
  */
 import React, { useEffect, useRef, useState } from 'react';
+import { i18n } from '../../services/i18n';
 import {
   View, Text, StyleSheet, Pressable, TextInput, Dimensions, Animated, KeyboardAvoidingView, Platform,
 } from 'react-native';
@@ -111,7 +112,7 @@ export default function SocialLinksEditor({ visible, initial, onSave, onClose }:
           <Pressable onPress={onClose} style={s.iconBtn} hitSlop={8}>
             <Ionicons name="chevron-down" size={22} color="#F1F5F9" />
           </Pressable>
-          <Text style={s.title}>SOSYAL LİNKLER</Text>
+          <Text style={s.title}>{i18n.t('profile.sociallinkseditor.001')}</Text>
           <Pressable onPress={handleSave} style={s.saveBtn} hitSlop={8}>
             <Text style={s.saveText}>Kaydet</Text>
           </Pressable>

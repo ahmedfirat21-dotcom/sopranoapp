@@ -21,6 +21,7 @@
  */
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
+import { i18n } from '../../services/i18n';
 import {
   View, Text, StyleSheet, Animated, PanResponder, Dimensions,
   Pressable, GestureResponderEvent, Platform, Image,
@@ -468,7 +469,7 @@ export default function StageSupportSheet({
           {/* Header */}
           <View style={styles.header}>
             <Ionicons name="mic" size={20} color={palette.accent} style={iconShadow} />
-            <Text style={[styles.headerTitle, { color: palette.accent }]}>SAHNEYİ DESTEKLE</Text>
+            <Text style={[styles.headerTitle, { color: palette.accent }]}>{i18n.t('room.stagesupportsheet.001')}</Text>
             {palette.label && (
               <View style={[styles.tierBadge, { backgroundColor: palette.accentSoft, borderColor: palette.accent + '60' }]}>
                 <Text style={[styles.tierBadgeText, { color: palette.accent }]}>{palette.label}</Text>

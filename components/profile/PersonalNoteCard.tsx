@@ -100,7 +100,7 @@ export default function PersonalNoteCard({ ownerId, targetId, initialNote }: Pro
             multiline
             autoFocus
             maxLength={MAX_NOTE_LENGTH}
-            placeholder="Bu kişi hakkında özel not bırak (sadece sen görürsün)"
+            placeholder={i18n.t('profile.personalnotecard.001')}
             placeholderTextColor="rgba(148,163,184,0.5)"
             style={s.input}
           />

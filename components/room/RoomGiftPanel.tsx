@@ -13,6 +13,7 @@
  */
 
 import React, { useEffect, useRef, useState } from 'react';
+import { i18n } from '../../services/i18n';
 import {
   View, Text, StyleSheet, Pressable, Animated, PanResponder,
   Dimensions, Platform, ScrollView, Image, DeviceEventEmitter, Easing,
@@ -405,7 +406,7 @@ export default function RoomGiftPanel({
                 <Ionicons name="gift" size={18} color="#F472B6" />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={s.headerTitle}>HEDİYE GÖNDER</Text>
+                <Text style={s.headerTitle}>{i18n.t('room.roomgiftpanel.001')}</Text>
                 <Text style={s.headerSub}>
                   {recipients.length === 0
                     ? 'Odada başka kimse yok'
@@ -472,12 +473,12 @@ export default function RoomGiftPanel({
               <Animated.View style={{ transform: [{ rotate: giftFloat.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }) }] }}>
                 <Ionicons name="gift" size={42} color="rgba(244,114,182,0.6)" />
               </Animated.View>
-              <Text style={s.emptyText}>Hediyeler yükleniyor…</Text>
+              <Text style={s.emptyText}>{i18n.t('room.roomgiftpanel.002')}</Text>
             </View>
           ) : allGifts.length === 0 ? (
             <View style={s.empty}>
               <Ionicons name="bag-outline" size={42} color="rgba(255,255,255,0.3)" />
-              <Text style={s.emptyText}>Hediye katalogu yüklenemedi</Text>
+              <Text style={s.emptyText}>{i18n.t('room.roomgiftpanel.003')}</Text>
             </View>
           ) : (
             <ScrollView

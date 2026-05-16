@@ -8,6 +8,7 @@
  *  - Banner aktifse: tüm sayfaların üstünde ince satır (Maintenance/ForceUpdate yokken)
  */
 import React from 'react';
+import { i18n } from '../services/i18n';
 import { View, Text, StyleSheet, Pressable, Linking, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -29,7 +30,7 @@ function MaintenanceScreen({ message, eta }: { message: string; eta: string | nu
       <View style={s.iconWrap}>
         <Ionicons name="construct" size={64} color="#FBBF24" />
       </View>
-      <Text style={s.title}>Bakım Modu</Text>
+      <Text style={s.title}>{i18n.t('systemsettingsoverlay.001')}</Text>
       <Text style={s.message}>{message}</Text>
       {eta && (
         <View style={s.etaBox}>
@@ -49,7 +50,7 @@ function ForceUpdateScreen({ message }: { message: string }) {
       <View style={[s.iconWrap, { backgroundColor: 'rgba(20,184,166,0.12)' }]}>
         <Ionicons name="cloud-download-outline" size={64} color="#14B8A6" />
       </View>
-      <Text style={s.title}>Güncelleme Gerekli</Text>
+      <Text style={s.title}>{i18n.t('systemsettingsoverlay.002')}</Text>
       <Text style={s.message}>{message}</Text>
       <Pressable style={s.updateBtn} onPress={openStore}>
         <Ionicons name="open-outline" size={16} color="#FFF" />

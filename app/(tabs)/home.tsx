@@ -1841,7 +1841,7 @@ export default function HomeScreen() {
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={s.heroEmptyTitle}>{t('home.filter_empty')}</Text>
-                  <Text style={s.heroEmptySub}>Seçili filtrelere uyan oda yok. Filtreleri değiştirmeyi dene.</Text>
+                  <Text style={s.heroEmptySub}>{i18n.t('tabs.home.001')}</Text>
                 </View>
               </LinearGradient>
             </View>
@@ -1866,7 +1866,7 @@ export default function HomeScreen() {
                 <View style={{ flex: 1 }}>
                   <Text style={s.heroEmptyTitle}>{t('home.be_first')}</Text>
                   <Text style={s.heroEmptySub}>
-                    {`İlk ${SMART_FILTERS.find(f => f.id === activeFilter)?.label || ''} odasını açarak öncü ol!`}
+                    {t('home.first_in_category', { category: t((SMART_FILTERS.find(f => f.id === activeFilter) as any)?.labelKey || 'category.all') })}
                   </Text>
                 </View>
                 <Ionicons name="add-circle" size={24} color="rgba(255,255,255,0.8)" />

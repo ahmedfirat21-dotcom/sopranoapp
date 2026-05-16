@@ -19,6 +19,7 @@
  *   3. Hata: red ekranı → "Tekrar Dene"
  */
 import React, { useState, useEffect } from 'react';
+import { i18n } from '../../services/i18n';
 import { View, Text, StyleSheet, TextInput, Pressable, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { applyActionCode, confirmPasswordReset, verifyPasswordResetCode } from 'firebase/auth';
@@ -138,7 +139,7 @@ export default function ResetPasswordScreen() {
       <AppBackground radialGlow>
         <View style={s.center}>
           <AppLoader size="md" />
-          <Text style={s.loadingText}>Bağlantı doğrulanıyor...</Text>
+          <Text style={s.loadingText}>{i18n.t('auth.resetpassword.001')}</Text>
         </View>
       </AppBackground>
     );
@@ -183,7 +184,7 @@ export default function ResetPasswordScreen() {
           <View style={s.errorIcon}>
             <Ionicons name="alert-circle" size={56} color="#EF4444" />
           </View>
-          <Text style={s.errorTitle}>Bağlantı Geçersiz</Text>
+          <Text style={s.errorTitle}>{i18n.t('auth.resetpassword.002')}</Text>
           <Text style={s.errorDesc}>
             {mode === 'verifyEmail'
               ? 'Bu doğrulama bağlantısı süresi dolmuş ya da daha önce kullanılmış. Yeni bir doğrulama maili için profil ayarlarından tekrar talep et.'
@@ -197,7 +198,7 @@ export default function ResetPasswordScreen() {
               start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
               style={s.primaryBtnGrad}
             >
-              <Text style={s.primaryBtnText}>Giriş Ekranına Dön</Text>
+              <Text style={s.primaryBtnText}>{i18n.t('auth.resetpassword.003')}</Text>
             </LinearGradient>
           </Pressable>
         </View>
@@ -227,16 +228,16 @@ export default function ResetPasswordScreen() {
             </LinearGradient>
           </View>
 
-          <Text style={s.title}>Şifreni Sıfırla</Text>
+          <Text style={s.title}>{i18n.t('auth.resetpassword.004')}</Text>
           <Text style={s.emailText}>{email}</Text>
-          <Text style={s.desc}>Hesabın için yeni bir şifre belirle</Text>
+          <Text style={s.desc}>{i18n.t('auth.resetpassword.005')}</Text>
 
           {/* Yeni şifre */}
           <View style={s.inputWrap}>
             <Ionicons name="lock-closed-outline" size={18} color="#64748B" style={s.inputIcon} />
             <TextInput
               style={s.input}
-              placeholder="Yeni şifre"
+              placeholder={i18n.t('auth.resetpassword.010')}
               placeholderTextColor="#475569"
               value={newPassword}
               onChangeText={setNewPassword}
@@ -264,7 +265,7 @@ export default function ResetPasswordScreen() {
             <Ionicons name="lock-closed-outline" size={18} color="#64748B" style={s.inputIcon} />
             <TextInput
               style={s.input}
-              placeholder="Şifre (Tekrar)"
+              placeholder={i18n.t('auth.resetpassword.011')}
               placeholderTextColor="#475569"
               value={confirmPassword}
               onChangeText={setConfirmPassword}
@@ -278,7 +279,7 @@ export default function ResetPasswordScreen() {
 
           {/* Kurallar */}
           <View style={s.rulesBox}>
-            <Text style={s.rulesTitle}>Şifre kuralları:</Text>
+            <Text style={s.rulesTitle}>{i18n.t('auth.resetpassword.006')}</Text>
             <View style={s.ruleRow}>
               <Ionicons
                 name={newPassword.length >= 8 ? 'checkmark-circle' : 'ellipse-outline'}
@@ -293,7 +294,7 @@ export default function ResetPasswordScreen() {
                 size={14}
                 color={/[A-ZÇĞİÖŞÜ]/.test(newPassword) ? '#10B981' : '#64748B'}
               />
-              <Text style={[s.ruleText, /[A-ZÇĞİÖŞÜ]/.test(newPassword) && { color: '#10B981' }]}>1 büyük harf</Text>
+              <Text style={[s.ruleText, /[A-ZÇĞİÖŞÜ]/.test(newPassword) && { color: '#10B981' }]}>{i18n.t('auth.resetpassword.007')}</Text>
             </View>
             <View style={s.ruleRow}>
               <Ionicons
@@ -318,13 +319,13 @@ export default function ResetPasswordScreen() {
               {submitting ? (
                 <AppLoader size="sm" />
               ) : (
-                <Text style={s.primaryBtnText}>Şifreyi Değiştir</Text>
+                <Text style={s.primaryBtnText}>{i18n.t('auth.resetpassword.008')}</Text>
               )}
             </LinearGradient>
           </Pressable>
 
           <Pressable onPress={() => router.replace('/(auth)/login')} style={s.cancelBtn}>
-            <Text style={s.cancelText}>İptal et</Text>
+            <Text style={s.cancelText}>{i18n.t('auth.resetpassword.009')}</Text>
           </Pressable>
         </ScrollView>
       </KeyboardAvoidingView>

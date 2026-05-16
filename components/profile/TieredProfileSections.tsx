@@ -196,7 +196,7 @@ export default function TieredProfileSections({
 
       {/* ═══ Premium Özellikler Listesi (Settings List Match) ═══ */}
       <View style={s.sectionCard}>
-        <Text style={s.sectionTitle}>PREMİUM ÖZELLİKLER (Önizleme)</Text>
+        <Text style={s.sectionTitle}>{i18n.t('profile.tieredprofilesections.001')}</Text>
 
         {!isTierAtLeast(tier, 'Plus') && (
           <LockedFeatureHint label="Kapsamlı Moderasyon Geçmişi" requiredTier="Plus" icon="shield-checkmark-outline" />
@@ -220,7 +220,7 @@ export default function TieredProfileSections({
               <Pressable style={[s.donateBtn, { width: '100%' }]} onPress={onDonate}>
                 <LinearGradient colors={['#F59E0B', '#D97706']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.donateBtnGradient}>
                   <Ionicons name="heart" size={16} color="#FFF" />
-                  <Text style={s.donateBtnText}>Destekle (SP Gönder)</Text>
+                  <Text style={s.donateBtnText}>{i18n.t('profile.tieredprofilesections.002')}</Text>
                 </LinearGradient>
               </Pressable>
             </View>
@@ -248,7 +248,7 @@ export default function TieredProfileSections({
       {/* ═══ Pro Gelişmiş İstatistik Paneli ═══ */}
       {isTierAtLeast(tier, 'Pro') ? (
         <View style={s.sectionCard}>
-          <Text style={s.sectionTitle}>👑 Pro İstatistikler</Text>
+          <Text style={s.sectionTitle}>{i18n.t('profile.tieredprofilesections.003')}</Text>
           <View style={s.vipStatsGrid}>
             <View style={s.vipStatBox}>
               <Text style={[s.vipStatNum, { color: '#FF6B35' }]}>{stats.totalListeners}</Text>
@@ -285,7 +285,7 @@ export default function TieredProfileSections({
         isOwnProfile && incomeStats ? (
           /* Kendi profili — tam gelir detayları */
           <View style={[s.sectionCard, { borderColor: 'rgba(255,107,53,0.15)' }]}>
-            <Text style={s.sectionTitle}>💰 Gelir Özeti</Text>
+            <Text style={s.sectionTitle}>{i18n.t('profile.tieredprofilesections.004')}</Text>
             <View style={s.incomeGrid}>
               <View style={s.incomeBox}>
                 <Text style={[s.incomeNum, { color: '#FFD700' }]}>{incomeStats.totalEarned.toLocaleString()}</Text>

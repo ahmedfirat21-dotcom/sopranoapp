@@ -5,6 +5,7 @@
 // Referans: components/room/DonationDrawer.tsx
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
+import { i18n } from '../../services/i18n';
 import {
   View, Text, StyleSheet, Animated, PanResponder, Dimensions,
   Pressable, GestureResponderEvent, Platform, Easing,
@@ -478,7 +479,7 @@ export default function SPDonateSheet({
               Hazine bağışında "planet" korunur (oda hazinesi sembolü).
               ★ v92.1: ikon 20→28 büyütüldü (header'da daha belirgin). */}
           <SPIcon size={28} />
-          <Text style={styles.headerTitle}>SP BAĞIŞLA</Text>
+          <Text style={styles.headerTitle}>{i18n.t('profile.spdonatesheet.001')}</Text>
           {palette.labelText && (
             <View style={{ paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6, backgroundColor: palette.accentSolid + '22', borderWidth: 0.7, borderColor: palette.accentSolid + '60' }}>
               <Text style={{ fontSize: 8, fontWeight: '900', color: palette.accentSolid, letterSpacing: 1.2 }}>{palette.labelText}</Text>
@@ -493,7 +494,7 @@ export default function SPDonateSheet({
         {/* Alıcı */}
         <Text style={styles.recipientText}>
           <Text style={{ color: palette.accentSolid, fontWeight: '800' }}>{recipientName}</Text>
-          <Text> adlı kullanıcıya</Text>
+          <Text>{i18n.t('profile.spdonatesheet.002')}</Text>
         </Text>
 
         {/* ★ v92 (1 May 2026): Miktar göstergesi — tier-aware hexagon + sayı/SP.

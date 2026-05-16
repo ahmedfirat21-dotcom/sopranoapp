@@ -17,6 +17,7 @@
  *   Modal donma ve sürüklenememe sorunu çözüldü.
  */
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { i18n } from '../services/i18n';
 import {
   View, Text, StyleSheet, Pressable, FlatList,
   Image, Animated, PanResponder, Dimensions,
@@ -310,7 +311,7 @@ export default function FollowListModal({
                   style={st.removeBtn}
                   onPress={() => handleRemoveFriend(item.id, item.display_name)}
                 >
-                  <Text style={st.removeBtnText}>Çıkar</Text>
+                  <Text style={st.removeBtnText}>{i18n.t('followlistmodal.001')}</Text>
                 </Pressable>
                 <Pressable
                   style={st.blockBtn}
@@ -325,7 +326,7 @@ export default function FollowListModal({
                 style={st.removeBtn}
                 onPress={() => handleUnfollow(item.id, item.display_name)}
               >
-                <Text style={st.removeBtnText}>Takipten Çık</Text>
+                <Text style={st.removeBtnText}>{i18n.t('followlistmodal.002')}</Text>
               </Pressable>
             ) : (
               // followers — sadece engelle aksiyonu

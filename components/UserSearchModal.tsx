@@ -543,7 +543,7 @@ export function UserSearchModal({ visible, onClose, currentUserId, onSelectUser,
                         <View style={s.emptyState}>
                           <Ionicons name="people-outline" size={36} color="rgba(92,225,230,0.2)" />
                           <Text style={s.emptyText}>{i18n.t('search.no_friends')}</Text>
-                          <Text style={s.emptySubtext}>Yukarıdaki arama çubuğundan tüm üyeleri arayabilirsin!</Text>
+                          <Text style={s.emptySubtext}>{i18n.t('usersearchmodal.001')}</Text>
                         </View>
                       )}
                     </>

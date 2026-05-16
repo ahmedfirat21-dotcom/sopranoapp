@@ -4,6 +4,7 @@
  * Engelli kullanıcı listesi + tek tek "Engeli Kaldır" aksiyonu.
  */
 import React, { useRef, useEffect, useState, useCallback } from 'react';
+import { i18n } from '../services/i18n';
 import {
   View, Text, StyleSheet, Animated, PanResponder, Pressable, Dimensions,
   ScrollView,
@@ -171,7 +172,7 @@ export default function BlockedUsersSheet({ visible, onClose, currentUserId }: P
           </View>
           <View style={s.header}>
             <Ionicons name="ban-outline" size={18} color="#EF4444" />
-            <Text style={s.headerTitle}>Engellenen Kullanıcılar</Text>
+            <Text style={s.headerTitle}>{i18n.t('blockeduserssheet.001')}</Text>
             {users.length > 0 && (
               <View style={s.countBadge}>
                 <Text style={s.countText}>{users.length}</Text>
@@ -187,7 +188,7 @@ export default function BlockedUsersSheet({ visible, onClose, currentUserId }: P
           <View style={s.emptyWrap}>
             <Ionicons name="shield-checkmark-outline" size={44} color="rgba(20,184,166,0.4)" />
             <Text style={s.emptyTitle}>Engellenen yok</Text>
-            <Text style={s.emptySub}>Hiç engellediğin kullanıcı yok.</Text>
+            <Text style={s.emptySub}>{i18n.t('blockeduserssheet.002')}</Text>
           </View>
         ) : (
           <ScrollView
@@ -245,7 +246,7 @@ export default function BlockedUsersSheet({ visible, onClose, currentUserId }: P
                     ) : (
                       <>
                         <Ionicons name="person-add-outline" size={14} color="#14B8A6" />
-                        <Text style={s.unblockText}>Kaldır</Text>
+                        <Text style={s.unblockText}>{i18n.t('blockeduserssheet.003')}</Text>
                       </>
                     )}
                   </Pressable>

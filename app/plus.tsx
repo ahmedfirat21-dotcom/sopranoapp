@@ -1,5 +1,6 @@
 ﻿import { useState, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
+import { i18n } from '../services/i18n';
 import AppLoader from '../components/AppLoader';
 import PremiumAlert, { type AlertButton } from '../components/PremiumAlert';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -224,7 +225,7 @@ export default function PlusScreen() {
             textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4,
           }} />
         </Pressable>
-        <Text style={styles.headerTitle}>Üyelik Planları</Text>
+        <Text style={styles.headerTitle}>{i18n.t('plus.001')}</Text>
         <Ionicons name="star" size={22} color={Colors.gold} style={{
           textShadowColor: `${Colors.gold}dd`,
           textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 10,
@@ -234,7 +235,7 @@ export default function PlusScreen() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 16) + 20 }}>
         {/* Mevcut Tier */}
         <View style={styles.currentTierBar}>
-          <Text style={styles.currentTierLabel}>Mevcut planın:</Text>
+          <Text style={styles.currentTierLabel}>{i18n.t('plus.002')}</Text>
           <View style={[styles.currentTierBadge, {
             backgroundColor: currentTier === 'Pro' ? '#F59E0B18' : currentTier === 'Plus' ? '#A855F718' : '#6B728018'
           }]}>
@@ -255,7 +256,7 @@ export default function PlusScreen() {
             android_ripple={{ color: 'rgba(255,255,255,0.1)' }}
           >
             {billingCycle === 'monthly' && <View style={styles.billingDot} />}
-            <Text style={[styles.billingText, billingCycle === 'monthly' && styles.billingTextActive]}>Aylık</Text>
+            <Text style={[styles.billingText, billingCycle === 'monthly' && styles.billingTextActive]}>{i18n.t('plus.003')}</Text>
           </Pressable>
           <Pressable
             style={[styles.billingBtn, billingCycle === 'yearly' && styles.billingActive, { overflow: 'hidden' }]}
@@ -263,7 +264,7 @@ export default function PlusScreen() {
             android_ripple={{ color: 'rgba(255,255,255,0.1)' }}
           >
             {billingCycle === 'yearly' && <View style={styles.billingDot} />}
-            <Text style={[styles.billingText, billingCycle === 'yearly' && styles.billingTextActive]}>Yıllık</Text>
+            <Text style={[styles.billingText, billingCycle === 'yearly' && styles.billingTextActive]}>{i18n.t('plus.004')}</Text>
             <View style={styles.saveBadge}>
               <Text style={styles.saveText}>-{selectedPlan.savePct}%</Text>
             </View>
@@ -323,7 +324,7 @@ export default function PlusScreen() {
                         style={StyleSheet.absoluteFillObject}
                       />
                       <Ionicons name="flame" size={9} color="#3B1F00" />
-                      <Text style={styles.popularText}>EN İYİ</Text>
+                      <Text style={styles.popularText}>{i18n.t('plus.005')}</Text>
                     </View>
                   )}
                   <View style={[styles.planIconCircle, { backgroundColor: 'rgba(255,255,255,0.18)', borderColor: 'rgba(255,255,255,0.35)' }]}>
@@ -382,7 +383,7 @@ export default function PlusScreen() {
         </View>
 
         {/* Karşılaştırma Tablosu — 3 Sütun */}
-        <Text style={styles.sectionTitle}>Plan Karşılaştırması</Text>
+        <Text style={styles.sectionTitle}>{i18n.t('plus.006')}</Text>
         <LinearGradient
           colors={['rgba(40,48,62,0.95)', 'rgba(30,38,50,0.85)', 'rgba(25,32,44,0.9)']}
           start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
@@ -430,7 +431,7 @@ export default function PlusScreen() {
             </View>
             <View style={{ flex: 1 }}>
               <Text style={[styles.durationTitle, { color: '#94A3B8' }]}>Free</Text>
-              <Text style={styles.durationDesc}>Açtığın oda 24 saat sonra otomatik kapanır — kullansan da kullanmasan da.</Text>
+              <Text style={styles.durationDesc}>{i18n.t('plus.007')}</Text>
             </View>
           </View>
           <View style={styles.durationDivider} />
@@ -440,7 +441,7 @@ export default function PlusScreen() {
             </View>
             <View style={{ flex: 1 }}>
               <Text style={[styles.durationTitle, { color: TIER_DEFINITIONS.Plus.color }]}>Plus</Text>
-              <Text style={styles.durationDesc}>Her odan 12 saat aktif kalır. Süre dolunca silinmez — 3 odanı dondurup istediğinde tekrar açarsın.</Text>
+              <Text style={styles.durationDesc}>{i18n.t('plus.008')}</Text>
             </View>
           </View>
           <View style={styles.durationDivider} />
@@ -450,7 +451,7 @@ export default function PlusScreen() {
             </View>
             <View style={{ flex: 1 }}>
               <Text style={[styles.durationTitle, { color: TIER_DEFINITIONS.Pro.color }]}>Pro</Text>
-              <Text style={styles.durationDesc}>Odaların 7/24 açık kalır. Kapanmaz, dondurulmaz — istediğin sayıda kalıcı oda kurabilirsin.</Text>
+              <Text style={styles.durationDesc}>{i18n.t('plus.009')}</Text>
             </View>
           </View>
         </View>
@@ -496,7 +497,7 @@ export default function PlusScreen() {
         {/* Free'ye dönme */}
         {currentTier !== 'Free' && (
           <Pressable style={styles.downgradeBtn} onPress={handleDowngrade}>
-            <Text style={styles.downgradeText}>Planı İptal Et / Free'ye Dön</Text>
+            <Text style={styles.downgradeText}>{i18n.t('plus.010')}</Text>
           </Pressable>
         )}
 

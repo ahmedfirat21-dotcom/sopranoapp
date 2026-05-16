@@ -438,7 +438,7 @@ function MessageBubble({ message, isMe, senderAvatar, senderName, myAvatar, onDe
           ) : null}
           {/* ★ v109: Düzenlendi rozeti — sağ alt köşe küçük italik */}
           {isEdited ? (
-            <Text style={styles.editedBadge}>düzenlendi</Text>
+            <Text style={styles.editedBadge}>{i18n.t('chat.id.001')}</Text>
           ) : null}
         </GlowMessageBubble>
       )}
@@ -1338,7 +1338,7 @@ export default function ChatScreen() {
           <View style={styles.onlineRow}>
             {isTyping ? (
               <>
-                <Text style={styles.typingHeaderText}>yazıyor</Text>
+                <Text style={styles.typingHeaderText}>{i18n.t('chat.id.002')}</Text>
                 <Text style={styles.typingDots}>…</Text>
               </>
             ) : onlinePresenceIds.has(id as string) ? (
@@ -1439,7 +1439,7 @@ export default function ChatScreen() {
             <Ionicons name="paper-plane-outline" size={22} color="#FBBF24" />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={[msgReqBannerStyles.title, { color: '#FCD34D' }]}>📨 Mesaj isteği</Text>
+            <Text style={[msgReqBannerStyles.title, { color: '#FCD34D' }]}>{i18n.t('chat.id.003')}</Text>
             <Text style={msgReqBannerStyles.subtitle}>
               İlk mesajın istek olarak gönderilir. Karşı taraf onaylarsa mesajlaşabilirsiniz.
             </Text>
@@ -1470,7 +1470,7 @@ export default function ChatScreen() {
               <Ionicons name="mail-unread" size={22} color="#FBBF24" />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={msgReqBannerStyles.title}>📨 Mesaj İsteği</Text>
+              <Text style={msgReqBannerStyles.title}>{i18n.t('chat.id.004')}</Text>
               <Text style={msgReqBannerStyles.subtitle}>
                 {otherUser?.display_name || 'Bu kullanıcı'} sana ilk kez yazıyor. Kabul edersen mesajlaşabilirsiniz.
               </Text>
@@ -1526,7 +1526,7 @@ export default function ChatScreen() {
             <Ionicons name="time-outline" size={22} color={Colors.teal} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={[msgReqBannerStyles.title, { color: Colors.teal }]}>⏳ İstek gönderildi</Text>
+            <Text style={[msgReqBannerStyles.title, { color: Colors.teal }]}>{i18n.t('chat.id.005')}</Text>
             <Text style={msgReqBannerStyles.subtitle}>
               Karşı taraf onaylayana kadar yeni mesaj atamazsın.
             </Text>
@@ -1678,7 +1678,7 @@ export default function ChatScreen() {
             <View style={styles.typingIndicatorWrap}>
               <View style={[styles.bubble, styles.bubbleOther, styles.typingBubble]}>
                 <AppLoader size="small" color={Colors.text2} />
-                <Text style={styles.typingText}>Yazıyor...</Text>
+                <Text style={styles.typingText}>{i18n.t('chat.id.006')}</Text>
               </View>
             </View>
           ) : null
@@ -1686,7 +1686,7 @@ export default function ChatScreen() {
         ListEmptyComponent={
           <View style={styles.emptyChat}>
             <Ionicons name="chatbubble-outline" size={40} color={Colors.text3} />
-            <Text style={styles.emptyChatText}>Henüz mesaj yok. İlk mesajı sen yaz!</Text>
+            <Text style={styles.emptyChatText}>{i18n.t('chat.id.007')}</Text>
           </View>
         }
         // ★ v284 (16 May 2026): DM mesaj listesi performans config

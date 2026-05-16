@@ -3,6 +3,7 @@
  * Profilden /edit-profile sayfasına gitmeden bio değiştirilsin.
  */
 import React, { useEffect, useRef, useState } from 'react';
+import { i18n } from '../../services/i18n';
 import { View, Text, StyleSheet, Modal, TextInput, Pressable, Animated, Easing, KeyboardAvoidingView, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -79,7 +80,7 @@ export default function BioEditorSheet({ visible, initialBio, maxLength = 150, o
               <TextInput
                 value={bio}
                 onChangeText={(t) => setBio(t.slice(0, maxLength))}
-                placeholder="Örn: Müzik, kahve ve kod ☕"
+                placeholder={i18n.t('profile.bioeditorsheet.002')}
                 placeholderTextColor="#475569"
                 style={s.input}
                 multiline
@@ -91,7 +92,7 @@ export default function BioEditorSheet({ visible, initialBio, maxLength = 150, o
 
               <View style={s.actions}>
                 <Pressable style={s.cancelBtn} onPress={onClose} disabled={saving}>
-                  <Text style={s.cancelText}>Vazgeç</Text>
+                  <Text style={s.cancelText}>{i18n.t('profile.bioeditorsheet.001')}</Text>
                 </Pressable>
                 <Pressable
                   style={({ pressed }) => [s.saveBtn, (pressed || saving) && { opacity: 0.75 }]}

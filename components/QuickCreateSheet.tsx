@@ -9,6 +9,7 @@
  *   Hemen/Sonra toggle var. İki ayrı buton aynı sayfaya gidiyordu → mantık zayıftı.
  */
 import React, { useRef, useEffect, useState } from 'react';
+import { i18n } from '../services/i18n';
 import {
   View, Text, StyleSheet, Animated, PanResponder, Pressable, Dimensions,
 } from 'react-native';
@@ -123,7 +124,7 @@ export default function QuickCreateSheet({
           </View>
           <View style={s.header}>
             <Ionicons name="mic" size={18} color="#14B8A6" />
-            <Text style={s.headerTitle}>Yeni Oda Aç</Text>
+            <Text style={s.headerTitle}>{i18n.t('quickcreatesheet.001')}</Text>
           </View>
         </View>
 

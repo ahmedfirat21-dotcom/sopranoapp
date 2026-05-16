@@ -27,7 +27,7 @@ import { auth, GOOGLE_WEB_CLIENT_ID } from '../constants/firebase';
 import { AVATAR_OPTIONS, getAvatarSource } from '../constants/avatars';
 import { useAuth } from './_layout';
 import { showToast } from '../components/Toast';
-import { useTranslation } from '../services/i18n';
+import { i18n, useTranslation } from '../services/i18n';
 // ★ 2026-04-28: ReferralService + ExpoClipboard kaldırıldı — davet kodu profile.tsx'te
 import * as ImagePicker from 'expo-image-picker';
 import { StorageService } from '../services/storage';
@@ -566,7 +566,7 @@ export default function EditProfileScreen() {
               style={styles.textInput}
               value={displayName}
               onChangeText={setDisplayName}
-              placeholder="Adınız"
+              placeholder={i18n.t('editprofile.006')}
               placeholderTextColor={Colors.text3}
               maxLength={30}
               returnKeyType="next"
@@ -605,11 +605,11 @@ export default function EditProfileScreen() {
               )}
             </View>
             {usernameStatus === 'taken' ? (
-              <Text style={[styles.fieldHint, { color: '#EF4444' }]}>Bu kullanıcı adı zaten alınmış.</Text>
+              <Text style={[styles.fieldHint, { color: '#EF4444' }]}>{i18n.t('editprofile.001')}</Text>
             ) : usernameStatus === 'available' ? (
-              <Text style={[styles.fieldHint, { color: '#22C55E' }]}>Müsait ✓</Text>
+              <Text style={[styles.fieldHint, { color: '#22C55E' }]}>{i18n.t('editprofile.002')}</Text>
             ) : (
-              <Text style={styles.fieldHint}>Sadece küçük harfler, rakamlar ve alt çizgi</Text>
+              <Text style={styles.fieldHint}>{i18n.t('editprofile.003')}</Text>
             )}
           </View>
 
@@ -711,7 +711,7 @@ export default function EditProfileScreen() {
                     style={styles.textInput}
                     value={currentPassword}
                     onChangeText={setCurrentPassword}
-                    placeholder="Mevcut şifreniz"
+                    placeholder={i18n.t('editprofile.007')}
                     placeholderTextColor={Colors.text3}
                     secureTextEntry
                   />
@@ -733,7 +733,7 @@ export default function EditProfileScreen() {
                     style={styles.textInput}
                     value={newPasswordConfirm}
                     onChangeText={setNewPasswordConfirm}
-                    placeholder="Yeni şifrenizi tekrar girin"
+                    placeholder={i18n.t('editprofile.008')}
                     placeholderTextColor={Colors.text3}
                     secureTextEntry
                   />
@@ -785,7 +785,7 @@ export default function EditProfileScreen() {
                 <Ionicons name="language" size={18} color="#FBBF24" />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.accountLabel}>Diller & İlgi Alanları</Text>
+                <Text style={styles.accountLabel}>{i18n.t('editprofile.004')}</Text>
                 <Text style={styles.fieldHint}>
                   {languages.length === 0 && interests.length === 0
                     ? 'Konuştuğun dilleri ve ilgi alanlarını ekle'
@@ -972,7 +972,7 @@ export default function EditProfileScreen() {
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.accountLabel}>{t('profile.hide_rooms')}</Text>
-                <Text style={styles.fieldHint}>Yabancılar odalarını göremez (arkadaşların görür)</Text>
+                <Text style={styles.fieldHint}>{i18n.t('editprofile.005')}</Text>
               </View>
             </View>
             <Switch

@@ -4,6 +4,7 @@
  * Katılım istekleri + Davet + Banlı kullanıcılar
  */
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { i18n } from '../../services/i18n';
 import {
   View, Text, StyleSheet, Pressable, FlatList,
   Image, TextInput, Animated,
@@ -269,7 +270,7 @@ export default function HostAccessPanel({ visible, onClose, roomId, roomType, ho
                     <Ionicons name="checkmark-circle" size={28} color="rgba(167,139,250,0.25)" />
                   </View>
                   <Text style={s.emptyTitle}>Bekleyen istek yok</Text>
-                  <Text style={s.emptySub}>Yeni katılım istekleri burada görünecek</Text>
+                  <Text style={s.emptySub}>{i18n.t('room.hostaccesspanel.001')}</Text>
                 </View>
               ) : (
                 requests.map((req) => {
@@ -313,7 +314,7 @@ export default function HostAccessPanel({ visible, onClose, roomId, roomType, ho
                   <View style={[s.emptyIcon, { backgroundColor: 'rgba(34,197,94,0.08)' }]}>
                     <Ionicons name="shield-checkmark" size={28} color="rgba(34,197,94,0.3)" />
                   </View>
-                  <Text style={s.emptyTitle}>Banlı kullanıcı yok</Text>
+                  <Text style={s.emptyTitle}>{i18n.t('room.hostaccesspanel.002')}</Text>
                   <Text style={s.emptySub}>Oda temiz! 🎉</Text>
                 </View>
               ) : (
@@ -354,7 +355,7 @@ export default function HostAccessPanel({ visible, onClose, roomId, roomType, ho
                       ) : (
                         <Pressable style={s.unbanBtn} onPress={() => handleUnban(ban)}>
                           <Ionicons name="lock-open-outline" size={12} color="#14B8A6" />
-                          <Text style={s.unbanText}>Kaldır</Text>
+                          <Text style={s.unbanText}>{i18n.t('room.hostaccesspanel.003')}</Text>
                         </Pressable>
                       )}
                     </View>

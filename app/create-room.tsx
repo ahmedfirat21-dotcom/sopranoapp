@@ -593,7 +593,7 @@ export default function CreateRoomScreen() {
 
       {/* ★ Faz 4.3 — Etiket chip input (max 3) */}
       <View style={w.tagSection}>
-        <Text style={w.tagSectionLabel}>ETİKETLER (opsiyonel)</Text>
+        <Text style={w.tagSectionLabel}>{i18n.t('createroom.001')}</Text>
         <Text style={w.tagSectionHint}>
           Odanı 2-30 karakterlik en fazla {MAX_TAGS_PER_ROOM} etiketle tarif et — keşfette aramayı kolaylaştırır.
         </Text>
@@ -693,7 +693,7 @@ export default function CreateRoomScreen() {
 
       {audienceMode === 'password' && (
         <View style={{ marginTop: 20 }}>
-          <Text style={w.sublabel}>Şifre (min 4 karakter)</Text>
+          <Text style={w.sublabel}>{i18n.t('createroom.002')}</Text>
           <TextInput
             style={w.mediumInput}
             placeholder={t('create.password_placeholder')}
@@ -748,7 +748,7 @@ export default function CreateRoomScreen() {
 
       {/* ★ 2026-04-24: Yavaş Mod — Free'ye açıldı (moderasyon herkese lazım, spam'den korur) */}
       <View style={{ marginTop: 14 }}>
-        <Text style={w.sublabel}>Yavaş mod</Text>
+        <Text style={w.sublabel}>{i18n.t('createroom.003')}</Text>
         <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
           {[0, 5, 15, 30, 60].map(s => {
             const active = slowModeSeconds === s;
@@ -861,7 +861,7 @@ export default function CreateRoomScreen() {
   // 5. KARŞILAMA (welcome + rules — opsiyonel)
   const renderWelcome = () => (
     <View>
-      <Text style={w.sublabel}>Hoş geldin mesajı</Text>
+      <Text style={w.sublabel}>{i18n.t('createroom.004')}</Text>
       <TextInput
         style={w.mediumInput}
         placeholder={t('create.welcome_placeholder')}
@@ -874,7 +874,7 @@ export default function CreateRoomScreen() {
       <Text style={[w.charCount, { marginTop: 4 }]}>{welcomeMessage.length}/200</Text>
 
       <View style={{ marginTop: 24 }}>
-        <Text style={w.sublabel}>Oda kuralları</Text>
+        <Text style={w.sublabel}>{i18n.t('createroom.005')}</Text>
         <TextInput
           style={[w.mediumInput, { height: 90 }]}
           placeholder={t('create.rules_placeholder')}
@@ -893,8 +893,8 @@ export default function CreateRoomScreen() {
   const renderVisual = () => (
     <View>
       {/* Kapak görseli (Kart) — 16:9 yatay, keşfet kartında gösterilir */}
-      <Text style={w.sublabel}>Kart görseli (opsiyonel)</Text>
-      <Text style={w.hint}>Keşfet akışında oda kartında görünür · 16:9 yatay</Text>
+      <Text style={w.sublabel}>{i18n.t('createroom.006')}</Text>
+      <Text style={w.hint}>{i18n.t('createroom.007')}</Text>
       <Pressable
         style={[w.cardImageBox, cardImage ? { borderColor: Colors.teal, borderStyle: 'solid' } : {}]}
         onPress={async () => {
@@ -921,7 +921,7 @@ export default function CreateRoomScreen() {
         ) : (
           <View style={w.cardImagePlaceholder}>
             <Ionicons name="image-outline" size={32} color="rgba(255,255,255,0.3)" />
-            <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, marginTop: 6 }}>Keşfet'te görünecek</Text>
+            <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, marginTop: 6 }}>{i18n.t('createroom.008')}</Text>
           </View>
         )}
       </Pressable>
@@ -930,8 +930,8 @@ export default function CreateRoomScreen() {
          Önceden sadece state vardı UI yoktu → arka plan görseli hiç kayıt edilemiyordu.
          Oda içinde (SeatCard/ListenerGrid arkasında) gösterilir. */}
       <View style={{ marginTop: 24 }}>
-        <Text style={w.sublabel}>Oda içi arka plan (opsiyonel · Plus)</Text>
-        <Text style={w.hint}>Oda içinde dikey arka plan · 9:16 portrait</Text>
+        <Text style={w.sublabel}>{i18n.t('createroom.009')}</Text>
+        <Text style={w.hint}>{i18n.t('createroom.010')}</Text>
         {(() => {
           const locked = !isTierEnough(tier, 'Plus');
           return (
@@ -974,7 +974,7 @@ export default function CreateRoomScreen() {
 
       {/* Tema */}
       <View style={{ marginTop: 24 }}>
-        <Text style={w.sublabel}>Oda teması (opsiyonel)</Text>
+        <Text style={w.sublabel}>{i18n.t('createroom.011')}</Text>
         <View style={w.themeGrid}>
           <Pressable onPress={() => setSelectedTheme(null)} style={[w.themeCircle, !selectedTheme && { borderColor: Colors.teal }]}>
             <LinearGradient colors={['#0E1420', '#070B14']} style={StyleSheet.absoluteFillObject} />
@@ -994,7 +994,7 @@ export default function CreateRoomScreen() {
       {/* ★ 2026-04-20: Müzik linki (Pro) — YouTube/Spotify/SoundCloud
          ★ 2026-04-21: URL regex validation eklendi; geçersiz linkte uyarı. */}
       <View style={{ marginTop: 24 }}>
-        <Text style={w.sublabel}>Oda müzik linki (Pro)</Text>
+        <Text style={w.sublabel}>{i18n.t('createroom.012')}</Text>
         <Text style={{ fontSize: 11, color: '#64748B', marginBottom: 8 }}>
           YouTube / Spotify / SoundCloud linki yapıştır — odadakiler kendi platformlarında dinler.
         </Text>
@@ -1024,7 +1024,7 @@ export default function CreateRoomScreen() {
               {locked && (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 }}>
                   <Ionicons name="lock-closed" size={11} color="#F59E0B" />
-                  <Text style={{ fontSize: 11, color: '#F59E0B' }}>Pro üyelik gerekli</Text>
+                  <Text style={{ fontSize: 11, color: '#F59E0B' }}>{i18n.t('createroom.013')}</Text>
                 </View>
               )}
               {!locked && musicInvalid && (
@@ -1045,8 +1045,8 @@ export default function CreateRoomScreen() {
     <View>
       {/* Giriş ücreti */}
       <View>
-        <Text style={w.sublabel}>Giriş ücreti (SP)</Text>
-        <Text style={w.hint}>Odaya girmek için SP ödensin mi?</Text>
+        <Text style={w.sublabel}>{i18n.t('createroom.014')}</Text>
+        <Text style={w.hint}>{i18n.t('createroom.015')}</Text>
         <View style={w.feeRow}>
           {[0, 25, 50, 100, 250, 500].map(fee => {
             const active = entryFee === fee;
@@ -1073,8 +1073,8 @@ export default function CreateRoomScreen() {
       >
         <Ionicons name="heart" size={20} color={donationsEnabled ? '#EC4899' : '#94A3B8'} />
         <View style={{ flex: 1 }}>
-          <Text style={w.toggleLabel}>Bağış aktif</Text>
-          <Text style={w.toggleDesc}>Dinleyiciler sana SP bağışlayabilir</Text>
+          <Text style={w.toggleLabel}>{i18n.t('createroom.016')}</Text>
+          <Text style={w.toggleDesc}>{i18n.t('createroom.017')}</Text>
         </View>
         {!isTierEnough(tier, 'Pro') ? (
           <View style={w.lockBadge}><Ionicons name="lock-closed" size={9} color="#F59E0B" /><Text style={w.lockText}>Pro+</Text></View>
@@ -1096,8 +1096,8 @@ export default function CreateRoomScreen() {
       >
         <Ionicons name="warning" size={20} color={ageRestricted ? '#EF4444' : '#94A3B8'} />
         <View style={{ flex: 1 }}>
-          <Text style={w.toggleLabel}>+18 İçerik</Text>
-          <Text style={w.toggleDesc}>Yetişkinlere özel oda — 18 yaş altı giremez</Text>
+          <Text style={w.toggleLabel}>{i18n.t('createroom.018')}</Text>
+          <Text style={w.toggleDesc}>{i18n.t('createroom.019')}</Text>
         </View>
         {!isTierEnough(tier, 'Plus') ? (
           <View style={w.lockBadge}><Ionicons name="lock-closed" size={9} color="#F59E0B" /><Text style={w.lockText}>Plus</Text></View>
@@ -1167,7 +1167,7 @@ export default function CreateRoomScreen() {
             />
             <View style={{ position: 'absolute', left: 10, bottom: 8, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <Ionicons name="image" size={13} color="#FFF" />
-              <Text style={{ fontSize: 11, fontWeight: '700', color: '#FFF' }}>Oda içi arka plan</Text>
+              <Text style={{ fontSize: 11, fontWeight: '700', color: '#FFF' }}>{i18n.t('createroom.020')}</Text>
             </View>
           </View>
         ) : null}
@@ -1202,7 +1202,7 @@ export default function CreateRoomScreen() {
 
         {/* ★ 2026-04-26: Planlı oda — hemen vs sonra başlat */}
         <View style={w.scheduleBlock}>
-          <Text style={w.scheduleTitle}>Ne Zaman Başlasın?</Text>
+          <Text style={w.scheduleTitle}>{i18n.t('createroom.021')}</Text>
           <View style={w.scheduleToggleRow}>
             <Pressable
               onPress={() => setScheduledAt(null)}
@@ -1378,11 +1378,11 @@ export default function CreateRoomScreen() {
                     style={{ paddingVertical: 14, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 }}
                   >
                     <Ionicons name="rocket" size={18} color="#FFF" />
-                    <Text style={{ color: '#FFF', fontWeight: '800', fontSize: 15 }}>Üyeliğimi Yükselt</Text>
+                    <Text style={{ color: '#FFF', fontWeight: '800', fontSize: 15 }}>{i18n.t('createroom.022')}</Text>
                   </LinearGradient>
                 </Pressable>
                 <Pressable onPress={() => closeSheetRef.current()} style={{ marginTop: 12, paddingVertical: 12 }}>
-                  <Text style={{ color: '#94A3B8', fontSize: 14, fontWeight: '600' }}>Geri Dön</Text>
+                  <Text style={{ color: '#94A3B8', fontSize: 14, fontWeight: '600' }}>{i18n.t('createroom.023')}</Text>
                 </Pressable>
               </View>
             </View>
@@ -1549,7 +1549,7 @@ export default function CreateRoomScreen() {
                 ) : (
                   <>
                     <Ionicons name="rocket" size={18} color="#FFF" />
-                    <Text style={w.primaryBtnText}>Odayı Aç</Text>
+                    <Text style={w.primaryBtnText}>{i18n.t('createroom.024')}</Text>
                   </>
                 )}
               </LinearGradient>

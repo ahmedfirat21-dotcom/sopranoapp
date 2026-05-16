@@ -5,6 +5,7 @@
  *   Pop modal değil, kayan modal değil — sayfa gibi davranır.
  */
 import { useEffect, useRef } from 'react';
+import { i18n } from '../../services/i18n';
 import { View, Text, StyleSheet, Pressable, Animated, Easing } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -187,7 +188,7 @@ export default function RoomClosedScreen({ reason, onGoHome, customMessage, onRe
               style={StyleSheet.absoluteFillObject}
             />
             <Ionicons name="home" size={16} color="#FFF" style={iconShadow} />
-            <Text style={s.buttonText}>Ana Sayfaya Dön</Text>
+            <Text style={s.buttonText}>{i18n.t('room.roomclosedscreen.001')}</Text>
           </Pressable>
         )}
       </Animated.View>

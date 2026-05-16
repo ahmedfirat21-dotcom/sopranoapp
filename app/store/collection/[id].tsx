@@ -3,6 +3,7 @@
 //   StoreScreen'deki gallery card pattern'ı + filtered fetch.
 
 import React, { useEffect, useState } from 'react';
+import { i18n } from '../../../services/i18n';
 import {
   View, Text, StyleSheet, ScrollView, Pressable, Animated, Easing, Platform, Dimensions,
 } from 'react-native';
@@ -152,7 +153,7 @@ export default function CollectionDetailScreen() {
           {items.length === 0 ? (
             <View style={s.empty}>
               <Ionicons name="bag-outline" size={48} color="rgba(255,255,255,0.3)" />
-              <Text style={s.emptyText}>Bu koleksiyonda henüz ürün yok</Text>
+              <Text style={s.emptyText}>{i18n.t('store.collection.id.001')}</Text>
             </View>
           ) : (
             <View style={s.grid}>

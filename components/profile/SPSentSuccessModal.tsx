@@ -29,6 +29,7 @@
  */
 
 import React, { useEffect, useRef, useMemo, useState } from 'react';
+import { i18n } from '../../services/i18n';
 import {
   View, Text, StyleSheet, Pressable, Animated, Easing, Modal, Dimensions, Platform, Image,
 } from 'react-native';
@@ -702,7 +703,7 @@ export default function SPSentSuccessModal({
             <Text style={st.messageEmoji} allowFontScaling={false}>💝</Text>
             <Text style={st.messageText}>
               <Text style={st.messageStrong}>{recipientName}</Text>
-              <Text>'a hediye gönderdin</Text>
+              <Text>{i18n.t('profile.spsentsuccessmodal.001')}</Text>
             </Text>
           </Animated.View>
 

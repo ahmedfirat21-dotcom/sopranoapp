@@ -3,6 +3,7 @@
 //   "Odalarım'a git, oda aç" yönlendirmesini gem hexagon dilinde gösterir.
 //   AsyncStorage flag ile UID-bazlı bir kez gösterilir.
 import React, { useEffect, useRef } from 'react';
+import { i18n } from '../services/i18n';
 import {
   View, Text, StyleSheet, Modal, Pressable, Animated, Easing, Dimensions,
 } from 'react-native';
@@ -178,7 +179,7 @@ export default function RoomCreateHintSheet({ visible, onGoToMyRooms, onClose }:
               },
             ]}
           >
-            Odalarım sekmesine git, <Text style={styles.bodyHighlight}>Yeni Oda Oluştur</Text> düğmesine dokun. İstediğin konuda sesli oda aç, arkadaşlarını davet et — bağlanmak çok kolay.
+            Odalarım sekmesine git, <Text style={styles.bodyHighlight}>{i18n.t('roomcreatehintsheet.001')}</Text> düğmesine dokun. İstediğin konuda sesli oda aç, arkadaşlarını davet et — bağlanmak çok kolay.
           </Animated.Text>
 
           {/* CTA buttons */}
@@ -192,7 +193,7 @@ export default function RoomCreateHintSheet({ visible, onGoToMyRooms, onClose }:
             ]}
           >
             <Pressable style={styles.ctaSecondary} onPress={onClose}>
-              <Text style={styles.ctaSecondaryText}>Şimdi değil</Text>
+              <Text style={styles.ctaSecondaryText}>{i18n.t('roomcreatehintsheet.002')}</Text>
             </Pressable>
             <SkiaShadow shadowColor="#EC4899" shadowOpacity={0.55} shadowBlur={12} shadowOffsetY={4} borderRadius={12} style={{ flex: 1.5 }}>
               <Pressable style={styles.ctaPrimary} onPress={onGoToMyRooms}>
@@ -202,7 +203,7 @@ export default function RoomCreateHintSheet({ visible, onGoToMyRooms, onClose }:
                   style={StyleSheet.absoluteFillObject}
                 />
                 <Ionicons name="add-circle" size={18} color="#FFF" />
-                <Text style={styles.ctaPrimaryText}>Odalarım'a Git</Text>
+                <Text style={styles.ctaPrimaryText}>{i18n.t('roomcreatehintsheet.003')}</Text>
               </Pressable>
             </SkiaShadow>
           </Animated.View>

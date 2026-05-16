@@ -21,6 +21,7 @@
  */
 
 import React, { useEffect, useRef, useState } from 'react';
+import { i18n } from '../../services/i18n';
 import {
   View, Text, StyleSheet, Animated, PanResponder, Dimensions,
   Pressable, Platform,
@@ -186,7 +187,7 @@ export default function StoreItemPreviewSheet({
           {dealOff > 0 && (
             <View style={s.dealBadge}>
               <Ionicons name="flash" size={11} color="#fff" />
-              <Text style={s.dealBadgeText}>GÜNÜN FIRSATI</Text>
+              <Text style={s.dealBadgeText}>{i18n.t('store.storeitempreviewsheet.001')}</Text>
               <DailyDealCountdown />
             </View>
           )}
@@ -220,7 +221,7 @@ export default function StoreItemPreviewSheet({
             style={StyleSheet.absoluteFillObject}
           />
           <View style={s.priceLeft}>
-            <Text style={s.priceLabel}>FİYAT</Text>
+            <Text style={s.priceLabel}>{i18n.t('store.storeitempreviewsheet.002')}</Text>
             <View style={s.priceRow}>
               {totalOff > 0 && (
                 <Text style={s.priceStrike}>{item.price_sp.toLocaleString('tr-TR')}</Text>

@@ -12,6 +12,7 @@
  *   onClose
  */
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { i18n } from '../../services/i18n';
 import {
   View, Text, StyleSheet, Pressable, FlatList, Animated, Modal,
 } from 'react-native';
@@ -241,7 +242,7 @@ export default function RoomRecordingsSheet({ visible, roomId, hostId, onClose }
           <View style={st.header}>
             <View style={st.headerLeft}>
               <Ionicons name="recording" size={18} color="#EF4444" />
-              <Text style={st.headerTitle}>Oda Kayıtları</Text>
+              <Text style={st.headerTitle}>{i18n.t('room.roomrecordingssheet.001')}</Text>
               <View style={st.countBadge}>
                 <Text style={st.countText}>{recordings.length}</Text>
               </View>
@@ -257,7 +258,7 @@ export default function RoomRecordingsSheet({ visible, roomId, hostId, onClose }
           ) : recordings.length === 0 ? (
             <View style={st.emptyState}>
               <Ionicons name="mic-off-outline" size={44} color="rgba(92,225,230,0.15)" />
-              <Text style={st.emptyTitle}>Henüz kayıt yok</Text>
+              <Text style={st.emptyTitle}>{i18n.t('room.roomrecordingssheet.002')}</Text>
               <Text style={st.emptyDesc}>
                 Oda yönetim panelinden "Kaydı Başlat" ile sesli sohbeti kaydedin.
               </Text>

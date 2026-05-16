@@ -22,6 +22,7 @@
 // ═══════════════════════════════════════════════════════════════════
 
 import React, { useEffect, useRef } from 'react';
+import { i18n } from '../services/i18n';
 import {
   View, Text, StyleSheet, Pressable, Animated, Easing, Dimensions, Platform,
 } from 'react-native';
@@ -313,7 +314,7 @@ export default function CreateRoomCoachmark({ visible, ctaTopOffset = 130, onDis
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.tooltipBody}>
-                Yukarıdaki <Text style={styles.tooltipHighlight}>+ Yeni Oda Oluştur</Text> butonuna dokun ve ilk odanı aç.
+                Yukarıdaki <Text style={styles.tooltipHighlight}>{i18n.t('createroomcoachmark.001')}</Text> butonuna dokun ve ilk odanı aç.
               </Text>
             </View>
           </View>

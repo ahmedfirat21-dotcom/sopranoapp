@@ -14,6 +14,7 @@
  */
 
 import React, { useEffect, useRef, useState } from 'react';
+import { i18n } from '../../services/i18n';
 import { View, Text, StyleSheet, Animated, Easing, Platform, Dimensions, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { getIllustrationPng } from '../../constants/storeIllustrationsPng';
@@ -284,7 +285,7 @@ export default function RoomEntryEffectOverlay({ effectId, userName, onDone }: P
           >
             {userName}
           </Text>
-          <Text style={s.joinedText}>aramıza katıldı</Text>
+          <Text style={s.joinedText}>{i18n.t('room.roomentryeffectoverlay.001')}</Text>
           <Text
             style={[s.effectLabelInline, {
               color: meta.color,

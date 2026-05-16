@@ -9,6 +9,7 @@
  * Tutarlılık: Profil sheet aile dili (slate gradient + amber halo + chevron-down).
  */
 import React, { useState, useRef, useEffect } from 'react';
+import { i18n } from '../../services/i18n';
 import {
   View, Text, StyleSheet, Pressable, ScrollView, Dimensions,
   Animated, PanResponder,
@@ -157,7 +158,7 @@ export default function LanguageInterestPicker({
             <Pressable onPress={handleClose} style={s.iconBtn} hitSlop={8}>
               <Ionicons name="chevron-down" size={22} color="#F1F5F9" />
             </Pressable>
-            <Text style={s.title}>KİMLİĞİN</Text>
+            <Text style={s.title}>{i18n.t('profile.languageinterestpicker.001')}</Text>
             <Pressable onPress={handleSave} style={s.saveBtn} hitSlop={8}>
               <Text style={s.saveText}>Kaydet</Text>
             </Pressable>

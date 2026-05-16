@@ -51,6 +51,7 @@ const en: Record<string, string> = {
   'home.discover': 'Discover',
   'home.live_now': 'Live Now',
   'home.category_rooms': '{{category}} Rooms',
+  'home.first_in_category': 'Be the first to open a {{category}} room!',
   'home.trending': 'Trending',
   'home.featured': 'Featured',
   'home.friends_live': 'Friends Live',
@@ -591,6 +592,276 @@ const en: Record<string, string> = {
   'error.generic': 'Something went wrong',
   'error.permission': 'Permission required',
   'error.not_found': 'Not found',
-};
 
+  // ═══ AUTO-EXTRACTED (translate me) ═══
+  'auth.onboarding.001': "Sesli sohbet dünyasına katıl. Fotoğrafını ve ismini ayarla.",  // TODO: translate
+  'auth.onboarding.002': "İsim veya lakap",  // TODO: translate
+  'auth.onboarding.003': "Bu bilgiler profilinde gösterilmez, güvenlik ve öneri amaçlıdır.",  // TODO: translate
+  'auth.onboarding.004': "Nelerden hoşlanırsın? 🎯",  // TODO: translate
+  'auth.onboarding.005': "Seçimlerine göre sana özel odalar önereceğiz.",  // TODO: translate
+  'auth.onboarding.006': "Profilin hazır! 🎉",  // TODO: translate
+  'auth.onboarding.007': "Bir arkadaşının davet kodu varsa girerek 50 SP kazan.",  // TODO: translate
+  'auth.onboarding.008': "Nasıl çağıralım?",  // TODO: translate
+  'auth.onboarding.009': "Örn: 2000 (zorunlu)",  // TODO: translate
+  'auth.onboarding.010': "KODU GİR",  // TODO: translate
+  'tabs.home.001': "Seçili filtrelere uyan oda yok. Filtreleri değiştirmeyi dene.",  // TODO: translate
+  'tabs.myrooms.001': "Sesli sohbet, müzik, oyun ve daha fazlası...",  // TODO: translate
+  'tabs.profile.001': "Bir arkadaşın kodunu kullanırsa, ikiniz de 50 SP kazanırsınız.",  // TODO: translate
+  'tabs.profile.002': "Örn: XHFDK9",  // TODO: translate
+  'admin.001': "Erişim Reddedildi",  // TODO: translate
+  'admin.002': "Bu sayfaya erişim yetkiniz yok.",  // TODO: translate
+  'admin.003': "Geri Dön",  // TODO: translate
+  'admin.004': "GodMaster yükleniyor...",  // TODO: translate
+  'admin.005': "Platform Yönetimi",  // TODO: translate
+  'admin.006': "Hızlı Aksiyonlar",  // TODO: translate
+  'admin.007': "Bekleyen şikayet yok",  // TODO: translate
+  'admin.008': "Yeni Oda Oluştur",  // TODO: translate
+  'admin.009': "Tüm Odalar",  // TODO: translate
+  'admin.010': "Bitiş",  // TODO: translate
+  'admin.011': "Tier Değiştir",  // TODO: translate
+  'admin.012': "Kalıcı Sil",  // TODO: translate
+  'auth.resetpassword.001': "Bağlantı doğrulanıyor...",  // TODO: translate
+  'auth.resetpassword.002': "Bağlantı Geçersiz",  // TODO: translate
+  'auth.resetpassword.003': "Giriş Ekranına Dön",  // TODO: translate
+  'auth.resetpassword.004': "Şifreni Sıfırla",  // TODO: translate
+  'auth.resetpassword.005': "Hesabın için yeni bir şifre belirle",  // TODO: translate
+  'auth.resetpassword.006': "Şifre kuralları:",  // TODO: translate
+  'auth.resetpassword.007': "1 büyük harf",  // TODO: translate
+  'auth.resetpassword.008': "Şifreyi Değiştir",  // TODO: translate
+  'auth.resetpassword.009': "İptal et",  // TODO: translate
+  'auth.resetpassword.010': "Yeni şifre",  // TODO: translate
+  'auth.resetpassword.011': "Şifre (Tekrar)",  // TODO: translate
+  'call.id.001': "Yeniden bağlanılıyor...",  // TODO: translate
+  'call.id.002': "Otomatik kapanıyor...",  // TODO: translate
+  'chat.id.001': "düzenlendi",  // TODO: translate
+  'chat.id.002': "yazıyor",  // TODO: translate
+  'chat.id.003': "📨 Mesaj isteği",  // TODO: translate
+  'chat.id.004': "📨 Mesaj İsteği",  // TODO: translate
+  'chat.id.005': "⏳ İstek gönderildi",  // TODO: translate
+  'chat.id.006': "Yazıyor...",  // TODO: translate
+  'chat.id.007': "Henüz mesaj yok. İlk mesajı sen yaz!",  // TODO: translate
+  'createroom.001': "ETİKETLER (opsiyonel)",  // TODO: translate
+  'createroom.002': "Şifre (min 4 karakter)",  // TODO: translate
+  'createroom.003': "Yavaş mod",  // TODO: translate
+  'createroom.004': "Hoş geldin mesajı",  // TODO: translate
+  'createroom.005': "Oda kuralları",  // TODO: translate
+  'createroom.006': "Kart görseli (opsiyonel)",  // TODO: translate
+  'createroom.007': "Keşfet akışında oda kartında görünür · 16:9 yatay",  // TODO: translate
+  'createroom.008': "Keşfet'te görünecek",  // TODO: translate
+  'createroom.009': "Oda içi arka plan (opsiyonel · Plus)",  // TODO: translate
+  'createroom.010': "Oda içinde dikey arka plan · 9:16 portrait",  // TODO: translate
+  'createroom.011': "Oda teması (opsiyonel)",  // TODO: translate
+  'createroom.012': "Oda müzik linki (Pro)",  // TODO: translate
+  'createroom.013': "Pro üyelik gerekli",  // TODO: translate
+  'createroom.014': "Giriş ücreti (SP)",  // TODO: translate
+  'createroom.015': "Odaya girmek için SP ödensin mi?",  // TODO: translate
+  'createroom.016': "Bağış aktif",  // TODO: translate
+  'createroom.017': "Dinleyiciler sana SP bağışlayabilir",  // TODO: translate
+  'createroom.018': "+18 İçerik",  // TODO: translate
+  'createroom.019': "Yetişkinlere özel oda — 18 yaş altı giremez",  // TODO: translate
+  'createroom.020': "Oda içi arka plan",  // TODO: translate
+  'createroom.021': "Ne Zaman Başlasın?",  // TODO: translate
+  'createroom.022': "Üyeliğimi Yükselt",  // TODO: translate
+  'createroom.023': "Geri Dön",  // TODO: translate
+  'createroom.024': "Odayı Aç",  // TODO: translate
+  'editprofile.001': "Bu kullanıcı adı zaten alınmış.",  // TODO: translate
+  'editprofile.002': "Müsait ✓",  // TODO: translate
+  'editprofile.003': "Sadece küçük harfler, rakamlar ve alt çizgi",  // TODO: translate
+  'editprofile.004': "Diller & İlgi Alanları",  // TODO: translate
+  'editprofile.005': "Yabancılar odalarını göremez (arkadaşların görür)",  // TODO: translate
+  'editprofile.006': "Adınız",  // TODO: translate
+  'editprofile.007': "Mevcut şifreniz",  // TODO: translate
+  'editprofile.008': "Yeni şifrenizi tekrar girin",  // TODO: translate
+  'hiddenrooms.001': "Tümünü Geri Getir",  // TODO: translate
+  'hiddenrooms.002': "Hiç gizlenmiş oda yok",  // TODO: translate
+  'hiddenrooms.003': "Keşfette bir oda kartını sola kaydırıp \"Gizle\" diyerek bu listeye ekleyebilirsin.",  // TODO: translate
+  'hiddenrooms.004': "Oda detayları yüklenemedi.",  // TODO: translate
+  'leaderboard.001': "Sıralama yükleniyor...",  // TODO: translate
+  'leaderboard.002': "Haftalık SP Ligi",  // TODO: translate
+  'leaderboard.003': "Bu hafta henüz bağış yok",  // TODO: translate
+  'leaderboard.004': "Bu hafta kazanım verisi yok",  // TODO: translate
+  'leaderboard.005': "Bu hafta oda açılmamış",  // TODO: translate
+  'leaderboard.006': "Henüz SP verisi yok",  // TODO: translate
+  'leaderboard.007': "Henüz takipçi verisi yok",  // TODO: translate
+  'leaderboard.008': "Henüz oda verisi yok",  // TODO: translate
+  'leaderboard.009': "Henüz aktivite verisi yok",  // TODO: translate
+  'leaderboard.010': "Henüz hediye veren yok — ilk sen ol!",  // TODO: translate
+  'plus.001': "Üyelik Planları",  // TODO: translate
+  'plus.002': "Mevcut planın:",  // TODO: translate
+  'plus.003': "Aylık",  // TODO: translate
+  'plus.004': "Yıllık",  // TODO: translate
+  'plus.005': "EN İYİ",  // TODO: translate
+  'plus.006': "Plan Karşılaştırması",  // TODO: translate
+  'plus.007': "Açtığın oda 24 saat sonra otomatik kapanır — kullansan da kullanmasan da.",  // TODO: translate
+  'plus.008': "Her odan 12 saat aktif kalır. Süre dolunca silinmez — 3 odanı dondurup istediğinde tekrar açarsın.",  // TODO: translate
+  'plus.009': "Odaların 7/24 açık kalır. Kapanmaz, dondurulmaz — istediğin sayıda kalıcı oda kurabilirsin.",  // TODO: translate
+  'plus.010': "Planı İptal Et / Free'ye Dön",  // TODO: translate
+  'room.id.001': "düzenlendi",  // TODO: translate
+  'room.id.002': "Oda sahibi ve moderatör ayrıldı.",  // TODO: translate
+  'skiatest.001': "Her sıra: solda mevcut RN yaklaşımı, sağda Skia primitive. Aynı görünmeli.",  // TODO: translate
+  'skiatest.002': "Skia native modül APK'da yok",  // TODO: translate
+  'skiatest.003': "Sağ taraftaki Skia çıktıları şu an fallback (sade View) gösteriyor. APK'yı Skia ile rebuild ettikten sonra gerçek Skia render'ı çalışacak.",  // TODO: translate
+  'spstore.001': "SP Mağaza",  // TODO: translate
+  'spstore.002': "POPÜLER",  // TODO: translate
+  'store.collection.id.001': "Bu koleksiyonda henüz ürün yok",  // TODO: translate
+  'store.001': "CANLI · YENİ KOLEKSİYON",  // TODO: translate
+  'store.002': "KEŞFET",  // TODO: translate
+  'store.003': "Set Fırsatları",  // TODO: translate
+  'store.004': "Birlikte daha ucuz · Tema set + büyük indirim",  // TODO: translate
+  'store.005': "Avatar Çerçeveleri",  // TODO: translate
+  'store.006': "Profilini özelleştir · Tarzını yansıt",  // TODO: translate
+  'store.007': "Giriş Efektleri",  // TODO: translate
+  'store.008': "Odaya girdiğinde herkes görsün · Şıklığını göster",  // TODO: translate
+  'store.009': "Mesajlarına parıltı kat · Sohbette öne çık",  // TODO: translate
+  'store.010': "Özel Rozetler",  // TODO: translate
+  'store.011': "Profilinde ayrıcalık · Statünü göster",  // TODO: translate
+  'store.012': "Uygulama Arkaplanları",  // TODO: translate
+  'store.013': "Profilini ve ekranlarını kişiselleştir",  // TODO: translate
+  'store.014': "Özel Efektler",  // TODO: translate
+  'store.015': "Odada görsel şölen · Parçacık efektleri",  // TODO: translate
+  'store.016': "Özel Emoji Setleri",  // TODO: translate
+  'store.017': "Mesajlarında özel emojiler · Topluluk içinde fark",  // TODO: translate
+  'store.018': "Soprano Tezgâhı",  // TODO: translate
+  'store.019': "S P · K O L E K S İ Y O N L A R I",  // TODO: translate
+  'store.020': "SP PAKETLERİ",  // TODO: translate
+  'store.021': "⚜ ŞIK YÜKLEME",  // TODO: translate
+  'store.022': "YENİ",  // TODO: translate
+  'store.023': "SAHİPSİN",  // TODO: translate
+  'store.024': "SAHİPSİN",  // TODO: translate
+  'store.025': "SAHİP",  // TODO: translate
+  'store.026': "SP · sınırsız",  // TODO: translate
+  'store.027': "⚜ EN POPÜLER",  // TODO: translate
+  'store.028': "KEŞFET →",  // TODO: translate
+  'blockeduserssheet.001': "Engellenen Kullanıcılar",  // TODO: translate
+  'blockeduserssheet.002': "Hiç engellediğin kullanıcı yok.",  // TODO: translate
+  'blockeduserssheet.003': "Kaldır",  // TODO: translate
+  'boostpickersheet.001': "Profili Öne Çıkar",  // TODO: translate
+  'boostpickersheet.002': "Profilin ve odaların Keşfet'te öne çıkar. Tıklayan kullanıcılar odalarına ulaşır.",  // TODO: translate
+  'boostpickersheet.003': "Boost Başlat",  // TODO: translate
+  'createroomcoachmark.001': "+ Yeni Oda Oluştur",  // TODO: translate
+  'discoverwelcomesheet.001': "Geç",  // TODO: translate
+  'discoverwelcomesheet.002': "Geri Dön",  // TODO: translate
+  'fabhintoverlay.001': "İpucu",  // TODO: translate
+  'fabhintoverlay.002': "Anladım — dokun",  // TODO: translate
+  'followlistmodal.001': "Çıkar",  // TODO: translate
+  'followlistmodal.002': "Takipten Çık",  // TODO: translate
+  'incomingcalloverlay.001': "Arıyor...",  // TODO: translate
+  'profile.badgelistmodal.001': "Henüz rozet kazanmamış",  // TODO: translate
+  'profile.badgelistmodal.002': "Oda kur, arkadaş edin, SP gönder — rozetler otomatik gelir.",  // TODO: translate
+  'profile.bioeditorsheet.001': "Vazgeç",  // TODO: translate
+  'profile.bioeditorsheet.002': "Örn: Müzik, kahve ve kod ☕",  // TODO: translate
+  'profile.featuredbadgespicker.001': "ÖNE ÇIKAN ROZETLER",  // TODO: translate
+  'profile.featuredbadgespicker.002': "Yükleniyor...",  // TODO: translate
+  'profile.featuredbadgespicker.003': "Henüz rozetin yok",  // TODO: translate
+  'profile.featuredbadgespicker.004': "Aktif kullanım, sahne, bağış ile rozet kazan",  // TODO: translate
+  'profile.giftdetailmodal.001': "ALDIĞI HEDİYELER",  // TODO: translate
+  'profile.giftdetailmodal.002': "VERDİĞİ HEDİYELER",  // TODO: translate
+  'profile.giftsheet.001': "HEDİYE GÖNDER",  // TODO: translate
+  'profile.giftsheet.002': "Kısa bir mesaj ekle (isteğe bağlı)",  // TODO: translate
+  'profile.giftshowcase.001': "· son 30 gün",  // TODO: translate
+  'profile.giftshowcase.002': "· son 30 gün",  // TODO: translate
+  'profile.languageinterestpicker.001': "KİMLİĞİN",  // TODO: translate
+  'profile.personalnotecard.001': "Bu kişi hakkında özel not bırak (sadece sen görürsün)",  // TODO: translate
+  'profile.sociallinkseditor.001': "SOSYAL LİNKLER",  // TODO: translate
+  'profile.spdonatesheet.001': "SP BAĞIŞLA",  // TODO: translate
+  'profile.spdonatesheet.002': "adlı kullanıcıya",  // TODO: translate
+  'profile.sphistorysheet.001': "SP GEÇMİŞİM",  // TODO: translate
+  'profile.sphistorysheet.002': "Son 30 işlem · Canlı",  // TODO: translate
+  'profile.sphistorysheet.003': "Güncel Bakiye",  // TODO: translate
+  'profile.sphistorysheet.004': "Henüz işlem yok",  // TODO: translate
+  'profile.sphistorysheet.005': "Oda aç, sahneye çık — kazanmaya başla",  // TODO: translate
+  'profile.spreceivedmodal.001': "Gönderen",  // TODO: translate
+  'profile.spreceivedmodal.002': "Ücretsiz teşekkür et:",  // TODO: translate
+  'profile.spsentsuccessmodal.001': "'a hediye gönderdin",  // TODO: translate
+  'profile.symbolgiftsheet.001': "SEMBOL HEDİYE",  // TODO: translate
+  'profile.symbolgiftsheet.002': "Hediye katalogu yüklenemedi",  // TODO: translate
+  'profile.thankyoureceivedmodal.001': "🙏 TEŞEKKÜR ALDIN!",  // TODO: translate
+  'profile.thankyoureceivedmodal.002': "sana teşekkür etti",  // TODO: translate
+  'profile.tieredprofilesections.001': "PREMİUM ÖZELLİKLER (Önizleme)",  // TODO: translate
+  'profile.tieredprofilesections.002': "Destekle (SP Gönder)",  // TODO: translate
+  'profile.tieredprofilesections.003': "👑 Pro İstatistikler",  // TODO: translate
+  'profile.tieredprofilesections.004': "💰 Gelir Özeti",  // TODO: translate
+  'profile.voicebiorecorder.001': "SESLİ TANITIM",  // TODO: translate
+  'profile.voicebiorecorder.002': "Kaydı Başlat",  // TODO: translate
+  'profile.voicebiorecorder.003': "Mevcut tanıtımı kaldır",  // TODO: translate
+  'profile.voicebiorecorder.004': "Kayıt sürüyor — bitirmek için bas",  // TODO: translate
+  'profile.voicebiorecorder.005': "Yükleniyor...",  // TODO: translate
+  'profile.welcomebonusmodal.001': "Keşfetmeye Başla",  // TODO: translate
+  'quickcreatesheet.001': "Yeni Oda Aç",  // TODO: translate
+  'reportmodal.001': "RAPORLAMA SEBEBİ",  // TODO: translate
+  'reportmodal.002': "EK AÇIKLAMA (İSTEĞE BAĞLI)",  // TODO: translate
+  'reportmodal.003': "Rapor Gönder",  // TODO: translate
+  'reportmodal.004': "Detayları kısaca yaz...",  // TODO: translate
+  'room.camerafullscreenmodal.001': "Kamera yayını bekleniyor…",  // TODO: translate
+  'room.camerafullscreenmodal.002': "Aşağı kaydır ya da ✕ ile kapat",  // TODO: translate
+  'room.entryfeecard.001': "ODA BİLETİ",  // TODO: translate
+  'room.entryfeecard.002': "GİRİŞ ÜCRETİ",  // TODO: translate
+  'room.entryfeecard.003': "Vazgeç",  // TODO: translate
+  'room.hostaccesspanel.001': "Yeni katılım istekleri burada görünecek",  // TODO: translate
+  'room.hostaccesspanel.002': "Banlı kullanıcı yok",  // TODO: translate
+  'room.hostaccesspanel.003': "Kaldır",  // TODO: translate
+  'room.inroomuserprofile.001': "Şu an dinliyor:",  // TODO: translate
+  'room.invitefriendsmodal.001': "Arkadaşlar yükleniyor...",  // TODO: translate
+  'room.invitefriendsmodal.002': "Keşfet sayfasından yeni insanlar bul ve takip et!",  // TODO: translate
+  'room.messageglowpickersheet.001': "Bir stil seç — bir sonraki mesajın o şekilde gönderilir",  // TODO: translate
+  'room.messageglowpickersheet.002': "STANDART · MESAJ BAŞI ÜCRET",  // TODO: translate
+  'room.messageglowpickersheet.003': "★ PREMIUM · KOLEKSİYON ★",  // TODO: translate
+  'room.messageglowpickersheet.004': "SAHİPSİN · FREE",  // TODO: translate
+  'room.powerupssheet.001': "GÜÇLENDİRİCİLER",  // TODO: translate
+  'room.powerupssheet.002': "Oda içinde anlık etki — SP harca, an'ı taçlandır",  // TODO: translate
+  'room.roomaccessprompts.001': "Vazgeç",  // TODO: translate
+  'room.roomaccessprompts.002': "Erişim kontrol ediliyor…",  // TODO: translate
+  'room.roomaccessprompts.003': "Şifreyi girin...",  // TODO: translate
+  'room.roomclosedscreen.001': "Ana Sayfaya Dön",  // TODO: translate
+  'room.roomdisconnectoverlay.001': "Odadan Çık",  // TODO: translate
+  'room.roomentryeffectoverlay.001': "aramıza katıldı",  // TODO: translate
+  'room.roomfollowerssheet.001': "ODA TAKİPÇİLERİ",  // TODO: translate
+  'room.roomfollowerssheet.002': "Bu odanın henüz takipçisi yok",  // TODO: translate
+  'room.roomfollowerssheet.003': "Odanın altında \"Takip Et\" tıklayanlar burada listelenir.",  // TODO: translate
+  'room.roomgiftpanel.001': "HEDİYE GÖNDER",  // TODO: translate
+  'room.roomgiftpanel.002': "Hediyeler yükleniyor…",  // TODO: translate
+  'room.roomgiftpanel.003': "Hediye katalogu yüklenemedi",  // TODO: translate
+  'room.roommanagesheet.001': "Oda dondurulur, dilediğinde tekrar aktifleştir",  // TODO: translate
+  'room.roommanagesheet.002': "Oda kalıcı olarak silinir, geri alınamaz",  // TODO: translate
+  'room.roommanagesheet.003': "Aç",  // TODO: translate
+  'room.roommanagesheet.004': "Seç",  // TODO: translate
+  'room.roommanagesheet.005': "Seç",  // TODO: translate
+  'room.roommanagesheet.006': "â„ï¸ Dondurulmuş",  // TODO: translate
+  'room.roommanagesheet.007': "örn. anime",  // TODO: translate
+  'room.roommanagesheet.008': "Oda şifresi (min 4 karakter)...",  // TODO: translate
+  'room.roomoverlays.001': "İptal",  // TODO: translate
+  'room.roomoverlays.002': "Tümünü Sustur",  // TODO: translate
+  'room.roomoverlays.003': "Tümünü Aç",  // TODO: translate
+  'room.roomoverlays.004': "Banlı kullanıcı yok 🎉",  // TODO: translate
+  'room.roomoverlays.005': "Kaldır",  // TODO: translate
+  'room.roomoverlays.006': "Kart Görseli",  // TODO: translate
+  'room.roomoverlays.007': "Oda Müzik Linki",  // TODO: translate
+  'room.roomoverlays.008': "Arkadaşlarını Davet Et",  // TODO: translate
+  'room.roomoverlays.009': "Oda Linkini Paylaş",  // TODO: translate
+  'room.roomoverlays.010': "Oda Takipçileri",  // TODO: translate
+  'room.roomoverlays.011': "Oda İstatistikleri",  // TODO: translate
+  'room.roomoverlays.012': "Keşfette Öne Çıkar",  // TODO: translate
+  'room.roomoverlays.013': "Oda adı...",  // TODO: translate
+  'room.roomoverlays.014': "Odanın kısa açıklaması...",  // TODO: translate
+  'room.roomoverlays.015': "Hoş geldin mesajı...",  // TODO: translate
+  'room.roomoverlays.016': "Oda kuralları...",  // TODO: translate
+  'room.roomrecordingssheet.001': "Oda Kayıtları",  // TODO: translate
+  'room.roomrecordingssheet.002': "Henüz kayıt yok",  // TODO: translate
+  'room.roomstatspanel.001': "Oda İstatistikleri",  // TODO: translate
+  'room.roomstatspanel.002': "🏆 En Aktif Kullanıcılar",  // TODO: translate
+  'room.speakersection.001': "Sahne boş",  // TODO: translate
+  'room.stagesupportsheet.001': "SAHNEYİ DESTEKLE",  // TODO: translate
+  'roomboostsheet.001': "Keşfette Öne Çıkar",  // TODO: translate
+  'roomboostsheet.002': "POPÜLER",  // TODO: translate
+  'roomcreatehintsheet.001': "Yeni Oda Oluştur",  // TODO: translate
+  'roomcreatehintsheet.002': "Şimdi değil",  // TODO: translate
+  'roomcreatehintsheet.003': "Odalarım'a Git",  // TODO: translate
+  'sessionconflictmodal.001': "Hesabın başka bir cihazda açıldı",  // TODO: translate
+  'sessionconflictmodal.002': "Çıkış Yap",  // TODO: translate
+  'store.storeitempreviewsheet.001': "GÜNÜN FIRSATI",  // TODO: translate
+  'store.storeitempreviewsheet.002': "FİYAT",  // TODO: translate
+  'systemsettingsoverlay.001': "Bakım Modu",  // TODO: translate
+  'systemsettingsoverlay.002': "Güncelleme Gerekli",  // TODO: translate
+  'usersearchmodal.001': "Yukarıdaki arama çubuğundan tüm üyeleri arayabilirsin!",  // TODO: translate
+};
 export default en;

@@ -7,6 +7,7 @@
 // Showcase/gallery kart tıklama → Alert onay → SP düş + envantere ekle + toast.
 
 import React, { useEffect, useRef, useState } from 'react';
+import { i18n } from '../services/i18n';
 import {
   View, Text, StyleSheet, ScrollView, Pressable, Animated, Platform, Dimensions, Easing, TextInput,
 } from 'react-native';
@@ -811,7 +812,7 @@ export default function StoreScreen() {
             <View pointerEvents="none" style={s.heroArt}><HeroFleurDeLis /></View>
             <View style={s.heroTag}>
               <View style={s.heroTagDot} />
-              <Text style={s.heroTagText}>CANLI · YENİ KOLEKSİYON</Text>
+              <Text style={s.heroTagText}>{i18n.t('store.001')}</Text>
             </View>
             <Text style={s.heroTitle}>Soprano Couture{'\n'}Sonbahar 2026</Text>
             <Text style={s.heroDesc}>Yedi tasarımcı. On iki sınırlı parça.{'\n'}Sadece bu sezona özel.</Text>
@@ -824,7 +825,7 @@ export default function StoreScreen() {
                 start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                 style={StyleSheet.absoluteFillObject}
               />
-              <Text style={s.heroCtaText}>KEŞFET</Text>
+              <Text style={s.heroCtaText}>{i18n.t('store.002')}</Text>
               <Ionicons name="arrow-forward" size={14} color="#3D1F00" />
             </Pressable>
           </View>
@@ -834,8 +835,8 @@ export default function StoreScreen() {
             <>
               <View onLayout={(e) => { sectionOffsets.current.bundles = e.nativeEvent.layout.y; }} />
               <SectionDivider label="— SETLER · TEMA PAKETLERİ —" />
-              <Text style={s.sectionTitle}>Set Fırsatları</Text>
-              <Text style={s.sectionSub}>Birlikte daha ucuz · Tema set + büyük indirim</Text>
+              <Text style={s.sectionTitle}>{i18n.t('store.003')}</Text>
+              <Text style={s.sectionSub}>{i18n.t('store.004')}</Text>
               {catalogLoading && bundles.length === 0 ? (
                 <SkeletonShowcaseRow />
               ) : (
@@ -863,8 +864,8 @@ export default function StoreScreen() {
           {/* ═══ ÇERÇEVELER — Avatar Frame Koleksiyonu ═══ */}
           <View onLayout={(e) => { sectionOffsets.current.frames = e.nativeEvent.layout.y; }} />
           <SectionDivider label="— ÇERÇEVELER · AVATAR —" />
-          <Text style={s.sectionTitle}>Avatar Çerçeveleri</Text>
-          <Text style={s.sectionSub}>Profilini özelleştir · Tarzını yansıt</Text>
+          <Text style={s.sectionTitle}>{i18n.t('store.005')}</Text>
+          <Text style={s.sectionSub}>{i18n.t('store.006')}</Text>
           {catalogLoading && frameItems.length === 0 ? (
             <SkeletonShowcaseRow />
           ) : (
@@ -895,8 +896,8 @@ export default function StoreScreen() {
           {/* ═══ GİRİŞ EFEKTLERİ — Odaya Giriş Animasyonları ═══ */}
           <View onLayout={(e) => { sectionOffsets.current.entry_effect = e.nativeEvent.layout.y; }} />
           <SectionDivider label="— GİRİŞ EFEKTLERİ · ODA —" />
-          <Text style={s.sectionTitle}>Giriş Efektleri</Text>
-          <Text style={s.sectionSub}>Odaya girdiğinde herkes görsün · Şıklığını göster</Text>
+          <Text style={s.sectionTitle}>{i18n.t('store.007')}</Text>
+          <Text style={s.sectionSub}>{i18n.t('store.008')}</Text>
           {catalogLoading && entryItems.length === 0 ? (
             <SkeletonGalleryGrid />
           ) : (
@@ -930,7 +931,7 @@ export default function StoreScreen() {
               <View onLayout={(e) => { sectionOffsets.current.glow_message = e.nativeEvent.layout.y; }} />
               <SectionDivider label="— PARLAK MESAJLAR · SOHBET —" />
               <Text style={s.sectionTitle}>Parlak Mesajlar</Text>
-              <Text style={s.sectionSub}>Mesajlarına parıltı kat · Sohbette öne çık</Text>
+              <Text style={s.sectionSub}>{i18n.t('store.009')}</Text>
               <View style={s.galleryGrid}>
                 {glowMessageItems.map((item) => {
                   const totalOff = inventory.has(item.id) ? 0 : Math.min(tierDiscountPct, 80);
@@ -948,8 +949,8 @@ export default function StoreScreen() {
             <>
               <View onLayout={(e) => { sectionOffsets.current.badge = e.nativeEvent.layout.y; }} />
               <SectionDivider label="— ROZETLER · PROFİL —" />
-              <Text style={s.sectionTitle}>Özel Rozetler</Text>
-              <Text style={s.sectionSub}>Profilinde ayrıcalık · Statünü göster</Text>
+              <Text style={s.sectionTitle}>{i18n.t('store.010')}</Text>
+              <Text style={s.sectionSub}>{i18n.t('store.011')}</Text>
               <View style={s.galleryGrid}>
                 {badgeItems.map((item) => {
                   const totalOff = inventory.has(item.id) ? 0 : Math.min(tierDiscountPct, 80);
@@ -967,8 +968,8 @@ export default function StoreScreen() {
             <>
               <View onLayout={(e) => { sectionOffsets.current.background = e.nativeEvent.layout.y; }} />
               <SectionDivider label="— ARKAPLANLAR · UYGULAMA —" />
-              <Text style={s.sectionTitle}>Uygulama Arkaplanları</Text>
-              <Text style={s.sectionSub}>Profilini ve ekranlarını kişiselleştir</Text>
+              <Text style={s.sectionTitle}>{i18n.t('store.012')}</Text>
+              <Text style={s.sectionSub}>{i18n.t('store.013')}</Text>
               <View style={s.galleryGrid}>
                 {backgroundItems.map((item) => {
                   const totalOff = inventory.has(item.id) ? 0 : Math.min(tierDiscountPct, 80);
@@ -986,8 +987,8 @@ export default function StoreScreen() {
             <>
               <View onLayout={(e) => { sectionOffsets.current.effect = e.nativeEvent.layout.y; }} />
               <SectionDivider label="— EFEKTLER · ODA —" />
-              <Text style={s.sectionTitle}>Özel Efektler</Text>
-              <Text style={s.sectionSub}>Odada görsel şölen · Parçacık efektleri</Text>
+              <Text style={s.sectionTitle}>{i18n.t('store.014')}</Text>
+              <Text style={s.sectionSub}>{i18n.t('store.015')}</Text>
               <View style={s.galleryGrid}>
                 {effectItems.map((item) => {
                   const totalOff = inventory.has(item.id) ? 0 : Math.min(tierDiscountPct, 80);
@@ -1005,8 +1006,8 @@ export default function StoreScreen() {
             <>
               <View onLayout={(e) => { sectionOffsets.current.emoji = e.nativeEvent.layout.y; }} />
               <SectionDivider label="— ÖZEL EMOJİ · SOHBET —" />
-              <Text style={s.sectionTitle}>Özel Emoji Setleri</Text>
-              <Text style={s.sectionSub}>Mesajlarında özel emojiler · Topluluk içinde fark</Text>
+              <Text style={s.sectionTitle}>{i18n.t('store.016')}</Text>
+              <Text style={s.sectionSub}>{i18n.t('store.017')}</Text>
               <View style={s.galleryGrid}>
                 {emojiItems.map((item) => {
                   const totalOff = inventory.has(item.id) ? 0 : Math.min(tierDiscountPct, 80);
@@ -1027,8 +1028,8 @@ export default function StoreScreen() {
             <View pointerEvents="none" style={s.tierTopLine} />
             <View style={s.tierHeaderBlock}>
               <Text style={s.tierHeaderSymbol}>⚜</Text>
-              <Text style={s.tierHeaderTitle}>Soprano Tezgâhı</Text>
-              <Text style={s.tierHeaderSub}>S P · K O L E K S İ Y O N L A R I</Text>
+              <Text style={s.tierHeaderTitle}>{i18n.t('store.018')}</Text>
+              <Text style={s.tierHeaderSub}>{i18n.t('store.019')}</Text>
             </View>
 
             {/* ★ v109.3: Premium Bonus banner — eski sp-store'dan taşındı.
@@ -1105,7 +1106,7 @@ export default function StoreScreen() {
             style={StyleSheet.absoluteFillObject}
           />
           <View>
-            <Text style={s.bottomLabel}>SP PAKETLERİ</Text>
+            <Text style={s.bottomLabel}>{i18n.t('store.020')}</Text>
             <Text style={s.bottomAction}>Daha fazla SP edin</Text>
           </View>
           <Pressable style={s.bottomCta} onPress={() => scrollToSection('sp')}>
@@ -1114,7 +1115,7 @@ export default function StoreScreen() {
               start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
               style={StyleSheet.absoluteFillObject}
             />
-            <Text style={s.bottomCtaText}>⚜ ŞIK YÜKLEME</Text>
+            <Text style={s.bottomCtaText}>{i18n.t('store.021')}</Text>
           </Pressable>
         </View>
       </View>
@@ -1423,7 +1424,7 @@ function LimitedBadge({ item, offsetTop = 8 }: { item: CosmeticItem; offsetTop?:
           start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
           style={StyleSheet.absoluteFillObject}
         />
-        <Text style={s.limitedBadgeText}>YENİ</Text>
+        <Text style={s.limitedBadgeText}>{i18n.t('store.022')}</Text>
       </View>
     );
   }
@@ -1498,7 +1499,7 @@ function ShowcaseCard({ item, owned, purchasing, onPress, discountPct = 0, wishe
         <View style={s.ownedBadge}>
           <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFillObject} />
           <Ionicons name="checkmark-circle" size={11} color="#5DCAA5" />
-          <Text style={s.ownedBadgeText}>SAHİPSİN</Text>
+          <Text style={s.ownedBadgeText}>{i18n.t('store.023')}</Text>
         </View>
       )}
       {/* ★ v108: Lottie öncelikli — frame/gift Lottie varsa kart art alanında oynat
@@ -1605,7 +1606,7 @@ function BundleCard({ bundle, items, owned, purchasing, tierDiscountPct, onPress
         <View style={s.ownedBadge}>
           <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFillObject} />
           <Ionicons name="checkmark-circle" size={11} color="#5DCAA5" />
-          <Text style={s.ownedBadgeText}>SAHİPSİN</Text>
+          <Text style={s.ownedBadgeText}>{i18n.t('store.024')}</Text>
         </View>
       )}
 
@@ -1724,7 +1725,7 @@ export function GalleryCard({ item, owned, onPress, discountPct = 0, wished, onW
         <View style={[s.ownedBadge, { top: 8, left: 8, right: 'auto' }]}>
           <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFillObject} />
           <Ionicons name="checkmark-circle" size={10} color="#5DCAA5" />
-          <Text style={[s.ownedBadgeText, { fontSize: 7 }]}>SAHİP</Text>
+          <Text style={[s.ownedBadgeText, { fontSize: 7 }]}>{i18n.t('store.025')}</Text>
         </View>
       )}
       {/* ★ v108: Lottie öncelikli — varsa PNG/emoji yerine animasyon göster
@@ -1795,7 +1796,7 @@ export function GalleryCard({ item, owned, onPress, discountPct = 0, wished, onW
           ) : (
             <Text style={[s.galleryPrice, featured && { fontSize: 16 }]}>✦ {item.price_sp}</Text>
           )}
-          {item.per_message && <Text style={s.galleryPriceUnit}>SP · sınırsız</Text>}
+          {item.per_message && <Text style={s.galleryPriceUnit}>{i18n.t('store.026')}</Text>}
         </View>
       </View>
     </Pressable>
@@ -1843,7 +1844,7 @@ function SPPackRow({ pack, onPress }: { pack: SPPack; onPress: () => void }) {
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
             style={StyleSheet.absoluteFillObject}
           />
-          <Text style={s.popularBadgeText}>⚜ EN POPÜLER</Text>
+          <Text style={s.popularBadgeText}>{i18n.t('store.027')}</Text>
         </View>
       )}
       <SPGem size={pack.tierKey === 'gold' || pack.tierKey === 'platinum' ? 48 : pack.tierKey === 'diamond' ? 50 : 44} />
@@ -1929,7 +1930,7 @@ function CollectionCard({ col, onPress, itemCount }: {
       <Text style={s.collectionName}>{displayName}</Text>
       <View style={s.collectionCta}>
         <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFillObject} />
-        <Text style={s.collectionCtaText}>KEŞFET →</Text>
+        <Text style={s.collectionCtaText}>{i18n.t('store.028')}</Text>
       </View>
     </Pressable>
   );

@@ -12,6 +12,7 @@
  *  uploading → spinner
  */
 import React, { useState, useEffect, useRef } from 'react';
+import { i18n } from '../../services/i18n';
 import { View, Text, StyleSheet, Pressable, Animated, Dimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -271,7 +272,7 @@ export default function VoiceBioRecorder({
           >
             <Ionicons name="chevron-down" size={22} color="#F1F5F9" />
           </Pressable>
-          <Text style={s.title}>SESLİ TANITIM</Text>
+          <Text style={s.title}>{i18n.t('profile.voicebiorecorder.001')}</Text>
           <View style={{ width: 34 }} />
         </View>
 
@@ -306,14 +307,14 @@ export default function VoiceBioRecorder({
                   />
                   <Ionicons name="mic" size={32} color="#FFF" />
                 </Pressable>
-                <Text style={s.actionLabel}>Kaydı Başlat</Text>
+                <Text style={s.actionLabel}>{i18n.t('profile.voicebiorecorder.002')}</Text>
                 {currentUrl && (
                   <Pressable
                     onPress={handleRemoveExisting}
                     style={({ pressed }) => [s.removeBtn, pressed && { opacity: 0.7 }]}
                   >
                     <Ionicons name="trash-outline" size={14} color="#EF4444" />
-                    <Text style={s.removeText}>Mevcut tanıtımı kaldır</Text>
+                    <Text style={s.removeText}>{i18n.t('profile.voicebiorecorder.003')}</Text>
                   </Pressable>
                 )}
               </>
@@ -334,7 +335,7 @@ export default function VoiceBioRecorder({
                     <View style={s.stopSquare} />
                   </Pressable>
                 </Animated.View>
-                <Text style={[s.actionLabel, { color: '#FCA5A5' }]}>Kayıt sürüyor — bitirmek için bas</Text>
+                <Text style={[s.actionLabel, { color: '#FCA5A5' }]}>{i18n.t('profile.voicebiorecorder.004')}</Text>
               </>
             )}
 
@@ -382,7 +383,7 @@ export default function VoiceBioRecorder({
                 <View style={[s.recordBtn, { backgroundColor: 'rgba(245,158,11,0.4)' }]}>
                   <AppLoader size="small" color="#FFF" />
                 </View>
-                <Text style={s.actionLabel}>Yükleniyor...</Text>
+                <Text style={s.actionLabel}>{i18n.t('profile.voicebiorecorder.005')}</Text>
               </>
             )}
           </View>

@@ -10,6 +10,7 @@
  *   + 30sn timeout, Çalıyor/Arıyor durumları, süre sayacı, animasyonlar
  */
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { i18n } from '../../services/i18n';
 import { View, Text, StyleSheet, Image, TouchableOpacity, Dimensions, StatusBar, Animated, Easing, BackHandler, AppState, Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -673,7 +674,7 @@ export default function CallScreen() {
         <View style={st.reconnectOverlay}>
           <View style={st.reconnectPill}>
             <Ionicons name="reload" size={14} color="#FFC107" />
-            <Text style={st.reconnectText}>Yeniden bağlanılıyor...</Text>
+            <Text style={st.reconnectText}>{i18n.t('call.id.001')}</Text>
           </View>
         </View>
       )}
@@ -752,7 +753,7 @@ export default function CallScreen() {
             </View>
 
             {/* Geri sayım göstergesi — kullanıcı istemezse 3sn sonra kendi kapanır */}
-            <Text style={st.endAutoClose}>Otomatik kapanıyor...</Text>
+            <Text style={st.endAutoClose}>{i18n.t('call.id.002')}</Text>
           </View>
         </View>
       )}

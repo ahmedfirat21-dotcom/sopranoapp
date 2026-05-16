@@ -3,6 +3,7 @@
 //   Slide 4: SP Kazanç tanıtımı — WebView ile altın hexagon mücevher animasyonu.
 //   AsyncStorage ile bir kez gösterilir (`soprano_discover_welcome_seen=1`).
 import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { i18n } from '../services/i18n';
 import {
   View, Text, StyleSheet, Modal, Pressable, Dimensions, Animated, Easing,
   PanResponder, Platform,
@@ -412,7 +413,7 @@ export default function DiscoverWelcomeSheet({ visible, onClose, uid }: Props) {
             />
           </View>
           <Pressable onPress={skip} hitSlop={14} style={styles.skipBtn}>
-            <Text style={styles.skipText}>Geç</Text>
+            <Text style={styles.skipText}>{i18n.t('discoverwelcomesheet.001')}</Text>
           </Pressable>
         </View>
 
@@ -571,7 +572,7 @@ export default function DiscoverWelcomeSheet({ visible, onClose, uid }: Props) {
                 <View style={styles.socialIconWrapSecondary}>
                   <Ionicons name="chevron-back" size={20} color="rgba(255,255,255,0.85)" />
                 </View>
-                <Text style={styles.socialBtnTextSecondary}>Geri Dön</Text>
+                <Text style={styles.socialBtnTextSecondary}>{i18n.t('discoverwelcomesheet.002')}</Text>
                 <Ionicons
                   name="return-down-back"
                   size={18}

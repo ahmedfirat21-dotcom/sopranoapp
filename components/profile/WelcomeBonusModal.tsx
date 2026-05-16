@@ -21,6 +21,7 @@
 // ═══════════════════════════════════════════════════════════════════
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { i18n } from '../../services/i18n';
 import {
   View, Text, StyleSheet, Pressable, Animated, Easing, Modal, Dimensions, Platform,
 } from 'react-native';
@@ -427,7 +428,7 @@ export default function WelcomeBonusModal({
               </Animated.View>
               <View style={s.btnContent}>
                 <Ionicons name="sparkles" size={18} color="#5a3500" style={iconShadow} />
-                <Text style={s.btnText}>Keşfetmeye Başla</Text>
+                <Text style={s.btnText}>{i18n.t('profile.welcomebonusmodal.001')}</Text>
                 <Ionicons name="arrow-forward" size={18} color="#5a3500" style={iconShadow} />
               </View>
             </Pressable>

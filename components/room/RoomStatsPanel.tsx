@@ -1,4 +1,5 @@
 import React, { useRef, useEffect } from 'react';
+import { i18n } from '../../services/i18n';
 import { View, Text, StyleSheet, Pressable, Animated, Dimensions, ScrollView, PanResponder, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -102,7 +103,7 @@ export default function RoomStatsPanel({
             <View style={st.headerIcon}>
               <Ionicons name="stats-chart" size={16} color="#3B82F6" style={st.iconShadow} />
             </View>
-            <Text style={st.headerTitle}>Oda İstatistikleri</Text>
+            <Text style={st.headerTitle}>{i18n.t('room.roomstatspanel.001')}</Text>
             {isRecording && (
               <View style={st.recBadge}>
                 <View style={st.recDot} />
@@ -129,7 +130,7 @@ export default function RoomStatsPanel({
           {/* Top Users */}
           {topUsers.length > 0 && (
             <View style={st.topSection}>
-              <Text style={st.sectionTitle}>🏆 En Aktif Kullanıcılar</Text>
+              <Text style={st.sectionTitle}>{i18n.t('room.roomstatspanel.002')}</Text>
               {topUsers.slice(0, 3).map((u, i) => (
                 <View key={u.nick} style={st.topRow}>
                   <View style={[st.rankBadge, i === 0 && { backgroundColor: 'rgba(212,175,55,0.15)' }]}>

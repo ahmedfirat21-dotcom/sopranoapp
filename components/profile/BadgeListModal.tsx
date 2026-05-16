@@ -12,6 +12,7 @@
  * Swipe-down ile kapanır.
  */
 import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { i18n } from '../../services/i18n';
 import {
   View, Text, StyleSheet, Modal, Pressable, ScrollView,
   Animated, PanResponder, Easing,
@@ -167,8 +168,8 @@ export default function BadgeListModal({ visible, onClose, userId, displayName }
           ) : badges.length === 0 ? (
             <View style={st.empty}>
               <Ionicons name="ribbon-outline" size={42} color="rgba(252,211,77,0.25)" style={iconShadow} />
-              <Text style={st.emptyText}>Henüz rozet kazanmamış</Text>
-              <Text style={st.emptyHint}>Oda kur, arkadaş edin, SP gönder — rozetler otomatik gelir.</Text>
+              <Text style={st.emptyText}>{i18n.t('profile.badgelistmodal.001')}</Text>
+              <Text style={st.emptyHint}>{i18n.t('profile.badgelistmodal.002')}</Text>
             </View>
           ) : (
             <ScrollView

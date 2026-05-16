@@ -3,6 +3,7 @@
  * Platform sahibi için sınırsız yetki ile yönetim ekranı
  */
 import { useState, useEffect, useCallback } from 'react';
+import { i18n } from '../services/i18n';
 import { View, Text, StyleSheet, ScrollView, Pressable, Image, RefreshControl, TextInput, Dimensions } from 'react-native';
 import AppLoader from '../components/AppLoader';
 import PremiumAlert, { type AlertButton } from '../components/PremiumAlert';
@@ -113,10 +114,10 @@ export default function AdminPanel() {
       <AppBackground radialGlow>
         <View style={[s.container, { justifyContent: 'center', alignItems: 'center' }]}>
           <Ionicons name="shield-outline" size={64} color="#EF4444" />
-          <Text style={{ color: '#EF4444', fontSize: 18, fontWeight: '700', marginTop: 16 }}>Erişim Reddedildi</Text>
-          <Text style={{ color: Colors.text3, fontSize: 13, marginTop: 8 }}>Bu sayfaya erişim yetkiniz yok.</Text>
+          <Text style={{ color: '#EF4444', fontSize: 18, fontWeight: '700', marginTop: 16 }}>{i18n.t('admin.001')}</Text>
+          <Text style={{ color: Colors.text3, fontSize: 13, marginTop: 8 }}>{i18n.t('admin.002')}</Text>
           <Pressable style={s.backBtn} onPress={() => safeGoBack(router)}>
-            <Text style={{ color: Colors.teal, fontWeight: '600' }}>Geri Dön</Text>
+            <Text style={{ color: Colors.teal, fontWeight: '600' }}>{i18n.t('admin.003')}</Text>
           </Pressable>
         </View>
       </AppBackground>
@@ -435,7 +436,7 @@ export default function AdminPanel() {
       <AppBackground radialGlow>
         <View style={[s.container, { justifyContent: 'center', alignItems: 'center' }]}>
           <AppLoader size={56} color={Colors.teal} />
-          <Text style={{ color: Colors.text2, marginTop: 12 }}>GodMaster yükleniyor...</Text>
+          <Text style={{ color: Colors.text2, marginTop: 12 }}>{i18n.t('admin.004')}</Text>
         </View>
       </AppBackground>
     );
@@ -462,7 +463,7 @@ export default function AdminPanel() {
             </Pressable>
             <View style={{ flex: 1 }}>
               <Text style={s.headerTitle}>GodMaster Panel</Text>
-              <Text style={s.headerSub}>Platform Yönetimi</Text>
+              <Text style={s.headerSub}>{i18n.t('admin.005')}</Text>
             </View>
             <Pressable onPress={onRefresh} style={s.headerRefresh}>
               <Ionicons name="refresh" size={18} color={Colors.text2} />
@@ -496,7 +497,7 @@ export default function AdminPanel() {
                 <StatCard icon="albums" color={Colors.teal} label="Toplam Oda" value={stats.totalRooms} />
               </View>
 
-              <Text style={s.sectionTitle}>Hızlı Aksiyonlar</Text>
+              <Text style={s.sectionTitle}>{i18n.t('admin.006')}</Text>
               <View style={{ gap: 8 }}>
                 <QuickAction icon="add-circle" color={Colors.teal} label="Yeni Oda Oluştur" onPress={() => router.push('/create-room')} />
                 <QuickAction icon="trash" color="#EF4444" label="Free Boş Odaları Temizle" onPress={async () => {
@@ -518,7 +519,7 @@ export default function AdminPanel() {
               {reports.length === 0 ? (
                 <View style={s.emptyState}>
                   <Ionicons name="checkmark-circle" size={48} color="#10B981" />
-                  <Text style={s.emptyText}>Bekleyen şikayet yok</Text>
+                  <Text style={s.emptyText}>{i18n.t('admin.007')}</Text>
                 </View>
               ) : (
                 reports.map(report => (
@@ -608,7 +609,7 @@ export default function AdminPanel() {
                 <View style={s.createRoomIconWrap}>
                   <Ionicons name="add" size={18} color="#fff" />
                 </View>
-                <Text style={s.createRoomBtnText}>Yeni Oda Oluştur</Text>
+                <Text style={s.createRoomBtnText}>{i18n.t('admin.008')}</Text>
                 <Ionicons name="chevron-forward" size={14} color="#64748B" />
               </Pressable>
 
@@ -620,7 +621,7 @@ export default function AdminPanel() {
                     <View style={[s.systemSectionHeader, { marginTop: 16 }]}>
                       <View style={[s.systemBadge, { backgroundColor: '#3B82F612' }]}>
                         <Ionicons name="mic" size={13} color="#3B82F6" />
-                        <Text style={[s.systemBadgeText, { color: '#3B82F6' }]}>Tüm Odalar</Text>
+                        <Text style={[s.systemBadgeText, { color: '#3B82F6' }]}>{i18n.t('admin.009')}</Text>
                       </View>
                       <Text style={s.systemCount}>{userRooms.length} oda</Text>
                     </View>
@@ -694,7 +695,7 @@ export default function AdminPanel() {
                                 </View>
                                 {room.expires_at && (
                                   <View style={s.roomDetailRow}>
-                                    <Text style={s.roomDetailLabel}>Bitiş</Text>
+                                    <Text style={s.roomDetailLabel}>{i18n.t('admin.010')}</Text>
                                     <Text style={[s.roomDetailValue, new Date(room.expires_at) < new Date() && { color: '#EF4444' }]}>
                                       {new Date(room.expires_at).toLocaleString('tr-TR')}
                                     </Text>
@@ -703,7 +704,7 @@ export default function AdminPanel() {
                                 <View style={s.roomExpandedActions}>
                                   <Pressable style={s.roomExpandedBtn} onPress={() => handleChangeTier(room.id, room.name, ownerTier)}>
                                     <Ionicons name="star" size={14} color="#D4AF37" />
-                                    <Text style={s.roomExpandedBtnText}>Tier Değiştir</Text>
+                                    <Text style={s.roomExpandedBtnText}>{i18n.t('admin.011')}</Text>
                                   </Pressable>
                                   <Pressable style={s.roomExpandedBtn} onPress={() => router.push(`/room/${room.id}`)}>
                                     <Ionicons name="enter" size={14} color={Colors.teal} />
@@ -711,7 +712,7 @@ export default function AdminPanel() {
                                   </Pressable>
                                   <Pressable style={[s.roomExpandedBtn, { backgroundColor: '#EF444412', borderColor: '#EF444425' }]} onPress={() => handleDeleteRoom(room.id, room.name)}>
                                     <Ionicons name="trash" size={14} color="#EF4444" />
-                                    <Text style={[s.roomExpandedBtnText, { color: '#EF4444' }]}>Kalıcı Sil</Text>
+                                    <Text style={[s.roomExpandedBtnText, { color: '#EF4444' }]}>{i18n.t('admin.012')}</Text>
                                   </Pressable>
                                 </View>
                               </View>

@@ -1,5 +1,6 @@
 ﻿import { useState, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, Image, Pressable, ScrollView, Dimensions, TextInput, KeyboardAvoidingView, Platform, Keyboard, ImageBackground, Animated, Easing } from 'react-native';
+import { i18n } from '../../services/i18n';
 import PremiumAlert from '../../components/PremiumAlert';
 import AppLoader from '../../components/AppLoader';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -463,7 +464,7 @@ export default function OnboardingScreen() {
             {step === 1 && (
               <View style={s.stepContainer}>
                 <Text style={s.heading}>Merhaba! 👋</Text>
-                <Text style={s.desc}>Sesli sohbet dünyasına katıl. Fotoğrafını ve ismini ayarla.</Text>
+                <Text style={s.desc}>{i18n.t('auth.onboarding.001')}</Text>
 
                 {/* Big Avatar */}
                 <Pressable style={s.bigAvatarWrap} onPress={handlePickPhoto}>
@@ -499,11 +500,11 @@ export default function OnboardingScreen() {
                 </ScrollView>
 
                 {/* Name */}
-                <Text style={s.label}>İsim veya lakap</Text>
+                <Text style={s.label}>{i18n.t('auth.onboarding.002')}</Text>
                 <View style={s.inputWrap}>
                   <TextInput
                     style={s.input}
-                    placeholder="Nasıl çağıralım?"
+                    placeholder={i18n.t('auth.onboarding.008')}
                     placeholderTextColor="rgba(255,255,255,0.25)"
                     value={displayName}
                     onChangeText={setDisplayName}
@@ -523,7 +524,7 @@ export default function OnboardingScreen() {
             {step === 2 && (
               <View style={s.stepContainer}>
                 <Text style={s.heading}>Biraz kendinden bahset</Text>
-                <Text style={s.desc}>Bu bilgiler profilinde gösterilmez, güvenlik ve öneri amaçlıdır.</Text>
+                <Text style={s.desc}>{i18n.t('auth.onboarding.003')}</Text>
 
                 <Text style={s.label}>Cinsiyet</Text>
                 <View style={s.genderGrid}>
@@ -554,7 +555,7 @@ export default function OnboardingScreen() {
                   <Ionicons name="calendar-outline" size={18} color="rgba(255,255,255,0.3)" style={{ marginRight: 12 }} />
                   <TextInput
                     style={s.input}
-                    placeholder="Örn: 2000 (zorunlu)"
+                    placeholder={i18n.t('auth.onboarding.009')}
                     placeholderTextColor="rgba(255,255,255,0.25)"
                     value={birthYear}
                     onChangeText={(t) => setBirthYear(t.replace(/[^0-9]/g, ''))}
@@ -568,8 +569,8 @@ export default function OnboardingScreen() {
             {/* =================== STEP 3: İLGİ ALANLARI =================== */}
             {step === 3 && (
               <View style={s.stepContainer}>
-                <Text style={s.heading}>Nelerden hoşlanırsın? 🎯</Text>
-                <Text style={s.desc}>Seçimlerine göre sana özel odalar önereceğiz.</Text>
+                <Text style={s.heading}>{i18n.t('auth.onboarding.004')}</Text>
+                <Text style={s.desc}>{i18n.t('auth.onboarding.005')}</Text>
 
                 <View style={s.interestGrid}>
                   {INTEREST_OPTIONS.map((item) => {
@@ -606,14 +607,14 @@ export default function OnboardingScreen() {
                     <Ionicons name="gift" size={40} color={Colors.teal} />
                   </LinearGradient>
                 </View>
-                <Text style={s.heading}>Profilin hazır! 🎉</Text>
-                <Text style={s.desc}>Bir arkadaşının davet kodu varsa girerek 50 SP kazan.</Text>
+                <Text style={s.heading}>{i18n.t('auth.onboarding.006')}</Text>
+                <Text style={s.desc}>{i18n.t('auth.onboarding.007')}</Text>
 
                 <View style={[s.inputWrap, { marginTop: 24 }]}>
                   <Ionicons name="key-outline" size={18} color="rgba(255,255,255,0.3)" style={{ marginRight: 12 }} />
                   <TextInput
                     style={[s.input, { fontSize: 20, fontWeight: '800', letterSpacing: 3 }]}
-                    placeholder="KODU GİR"
+                    placeholder={i18n.t('auth.onboarding.010')}
                     placeholderTextColor="rgba(255,255,255,0.15)"
                     autoCapitalize="characters"
                     maxLength={8}

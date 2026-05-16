@@ -4,6 +4,7 @@
 //   SP yetersizse stil disabled görünür. PowerUpsSheet pattern'ı (slate gradient + handle).
 
 import React, { useEffect, useMemo, useRef } from 'react';
+import { i18n } from '../../services/i18n';
 import {
   View, Text, StyleSheet, Pressable, Animated, PanResponder, Dimensions, Platform,
   ScrollView, useWindowDimensions,
@@ -176,7 +177,7 @@ export default function MessageGlowPickerSheet({ visible, onClose, currentSP, on
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={s.headerTitle}>MESAJINI PARLAT</Text>
-                  <Text style={s.headerSub}>Bir stil seç — bir sonraki mesajın o şekilde gönderilir</Text>
+                  <Text style={s.headerSub}>{i18n.t('room.messageglowpickersheet.001')}</Text>
                 </View>
                 <View style={s.balancePill}>
                   <SPIcon size={14} />
@@ -197,7 +198,7 @@ export default function MessageGlowPickerSheet({ visible, onClose, currentSP, on
               scrollEventThrottle={16}
             >
           {/* ─── Standart 6 stil — pay-per-use ─── */}
-          <Text style={s.sectionLabel}>STANDART · MESAJ BAŞI ÜCRET</Text>
+          <Text style={s.sectionLabel}>{i18n.t('room.messageglowpickersheet.002')}</Text>
           <View style={s.grid}>
             {STYLE_ORDER.map((id) => {
               const cfg = GLOW_STYLES[id];
@@ -234,7 +235,7 @@ export default function MessageGlowPickerSheet({ visible, onClose, currentSP, on
           {/* ─── Premium 5 stil — Mağaza unlock ─── */}
           <View style={s.premiumDivider}>
             <View style={s.dividerLine} />
-            <Text style={s.premiumLabel}>★ PREMIUM · KOLEKSİYON ★</Text>
+            <Text style={s.premiumLabel}>{i18n.t('room.messageglowpickersheet.003')}</Text>
             <View style={s.dividerLine} />
           </View>
           <View style={s.grid}>
@@ -271,7 +272,7 @@ export default function MessageGlowPickerSheet({ visible, onClose, currentSP, on
                   <Text style={s.cardLabel}>{cfg.label}</Text>
                   <View style={s.costRow}>
                     {owned ? (
-                      <Text style={[s.costText, { color: '#5DCAA5' }]}>SAHİPSİN · FREE</Text>
+                      <Text style={[s.costText, { color: '#5DCAA5' }]}>{i18n.t('room.messageglowpickersheet.004')}</Text>
                     ) : (
                       <>
                         <SPIcon size={12} />

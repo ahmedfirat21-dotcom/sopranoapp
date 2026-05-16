@@ -636,7 +636,7 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
                 value={tagDraft}
                 onChangeText={setTagDraft}
                 onSubmitEditing={() => handleAddTag(tagDraft)}
-                placeholder="örn. anime"
+                placeholder={i18n.t('room.roommanagesheet.007')}
                 placeholderTextColor="rgba(148,163,184,0.5)"
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -753,7 +753,7 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
       {(audienceMode === 'password' || editingPassword) && (
         editingPassword ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-            <TextInput style={[p.nameInput, { fontSize: 11 }]} value={roomPassword} onChangeText={setRoomPassword} autoFocus maxLength={20} returnKeyType="done" placeholder="Oda şifresi (min 4 karakter)..." placeholderTextColor="#475569"
+            <TextInput style={[p.nameInput, { fontSize: 11 }]} value={roomPassword} onChangeText={setRoomPassword} autoFocus maxLength={20} returnKeyType="done" placeholder={i18n.t('room.roommanagesheet.008')} placeholderTextColor="#475569"
               onSubmitEditing={() => {
                 if (roomPassword.trim().length < 4) { showToast({ title: 'Şifre Çok Kısa', message: 'En az 4 karakter olmalı.', type: 'warning' }); return; }
                 handleAudienceChange('password', roomPassword.trim());
@@ -809,7 +809,7 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
               <View style={p.actionCtaIcon}><Ionicons name="snow" size={20} color="#FFF" /></View>
               <View style={{ flex: 1 }}>
                 <Text style={p.actionCtaTitle}>{i18n.t('manage.cta.freeze.title')}</Text>
-                <Text style={p.actionCtaSub}>Oda dondurulur, dilediğinde tekrar aktifleştir</Text>
+                <Text style={p.actionCtaSub}>{i18n.t('room.roommanagesheet.001')}</Text>
               </View>
             </LinearGradient>
           </Pressable>
@@ -821,7 +821,7 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
             <View style={p.actionCtaIcon}><Ionicons name="trash" size={20} color="#FFF" /></View>
             <View style={{ flex: 1 }}>
               <Text style={p.actionCtaTitle}>{i18n.t('manage.cta.delete.title')}</Text>
-              <Text style={p.actionCtaSub}>Oda kalıcı olarak silinir, geri alınamaz</Text>
+              <Text style={p.actionCtaSub}>{i18n.t('room.roommanagesheet.002')}</Text>
             </View>
           </LinearGradient>
         </Pressable>
@@ -985,7 +985,7 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
                   } catch { setMutedUsers(prev => [...prev, mute]); showToast({ title: 'Susturma Kalkmadı', message: 'Kullanıcının susturması kaldırılamadı.', type: 'error' }); }
                 }}>
                   <Ionicons name="volume-high-outline" size={10} color="#14B8A6" />
-                  <Text style={{ fontSize: 9, fontWeight: '700', color: '#14B8A6' }}>Aç</Text>
+                  <Text style={{ fontSize: 9, fontWeight: '700', color: '#14B8A6' }}>{i18n.t('room.roommanagesheet.003')}</Text>
                 </Pressable>
               </View>
             );
@@ -1028,7 +1028,7 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
                 </Pressable>
               ) : (
                 <Pressable onPress={() => handleBgImage('default')} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8, backgroundColor: 'rgba(139,92,246,0.1)', borderWidth: 1, borderColor: 'rgba(139,92,246,0.2)' }}>
-                  <Ionicons name="add" size={12} color="#A78BFA" /><Text style={{ fontSize: 10, fontWeight: '600', color: '#A78BFA' }}>Seç</Text>
+                  <Ionicons name="add" size={12} color="#A78BFA" /><Text style={{ fontSize: 10, fontWeight: '600', color: '#A78BFA' }}>{i18n.t('room.roommanagesheet.004')}</Text>
                 </Pressable>
               )}
             </View>
@@ -1046,7 +1046,7 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
               </Pressable>
             ) : (
               <Pressable onPress={() => handleCoverImage('pick')} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8, backgroundColor: 'rgba(255,215,0,0.1)', borderWidth: 1, borderColor: 'rgba(255,215,0,0.2)' }}>
-                <Ionicons name="add" size={12} color="#FFD700" /><Text style={{ fontSize: 10, fontWeight: '600', color: '#FFD700' }}>Seç</Text>
+                <Ionicons name="add" size={12} color="#FFD700" /><Text style={{ fontSize: 10, fontWeight: '600', color: '#FFD700' }}>{i18n.t('room.roommanagesheet.005')}</Text>
               </Pressable>
             )}
           </View>
@@ -1228,7 +1228,7 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
                 {isLive ? (
                   <View style={p.liveBadge}><View style={p.liveDot} /><Text style={p.liveText}>{i18n.t('rooms.live_pill')}</Text></View>
                 ) : (
-                  <Text style={{ fontSize: 9, color: '#94A3B8' }}>â„ï¸ Dondurulmuş</Text>
+                  <Text style={{ fontSize: 9, color: '#94A3B8' }}>{i18n.t('room.roommanagesheet.006')}</Text>
                 )}
                 <View style={p.followerBadge}><Ionicons name="heart" size={8} color="#EF4444" /><Text style={p.followerBadgeText}>{followerCount}</Text></View>
               </View>

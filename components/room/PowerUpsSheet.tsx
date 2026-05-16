@@ -17,6 +17,7 @@
 // ═══════════════════════════════════════════════════════════════════
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { i18n } from '../../services/i18n';
 import {
   View, Text, StyleSheet, Pressable, Animated, PanResponder,
   Dimensions, Platform, ScrollView,
@@ -305,8 +306,8 @@ export default function PowerUpsSheet({
               <Ionicons name="flash" size={16} color="#FBBF24" style={iconShadow} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.headerTitle}>GÜÇLENDİRİCİLER</Text>
-              <Text style={styles.headerSub}>Oda içinde anlık etki — SP harca, an'ı taçlandır</Text>
+              <Text style={styles.headerTitle}>{i18n.t('room.powerupssheet.001')}</Text>
+              <Text style={styles.headerSub}>{i18n.t('room.powerupssheet.002')}</Text>
             </View>
             <View style={styles.balancePill}>
               <SPIcon size={14} />

@@ -10,6 +10,7 @@
  */
 
 import React, { useEffect, useRef } from 'react';
+import { i18n } from '../../services/i18n';
 import {
   View, Text, StyleSheet, Pressable, Animated, Easing, PanResponder, Dimensions, ScrollView,
 } from 'react-native';
@@ -137,7 +138,7 @@ export default function GiftDetailModal({
             {/* Aldığı Hediyeler */}
             <View style={s.groupHeader}>
               <Ionicons name="gift" size={13} color="#FBBF24" />
-              <Text style={s.groupTitle}>ALDIĞI HEDİYELER</Text>
+              <Text style={s.groupTitle}>{i18n.t('profile.giftdetailmodal.001')}</Text>
             </View>
             <GiftShowcase userId={userId} mode="received" limit={50} embedded />
 
@@ -147,7 +148,7 @@ export default function GiftDetailModal({
             {/* Verdiği Hediyeler */}
             <View style={s.groupHeader}>
               <Ionicons name="send" size={12} color="#FBBF24" />
-              <Text style={s.groupTitle}>VERDİĞİ HEDİYELER</Text>
+              <Text style={s.groupTitle}>{i18n.t('profile.giftdetailmodal.002')}</Text>
             </View>
             <GiftShowcase userId={userId} mode="sent" limit={50} embedded />
           </ScrollView>

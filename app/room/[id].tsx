@@ -1261,7 +1261,7 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
                           <Text style={{
                             color: 'rgba(255,255,255,0.4)', fontSize: 9, fontStyle: 'italic',
                             alignSelf: 'flex-end', marginTop: 1,
-                          }}>düzenlendi</Text>
+                          }}>{i18n.t('room.id.001')}</Text>
                         ) : null}
                         {/* Time + read receipts — chat/[id].tsx dili */}
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-end', marginTop: 3 }}>
@@ -4548,7 +4548,7 @@ export default function RoomScreen() {
         <View style={{ marginHorizontal: 14, marginBottom: 8, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 12, backgroundColor: 'rgba(239,68,68,0.15)', borderWidth: 1, borderColor: 'rgba(239,68,68,0.3)', flexDirection: 'row', alignItems: 'center', gap: 10 }}>
           <View style={{ flex: 1 }}>
             <Text style={{ color: '#FCA5A5', fontSize: 12, fontWeight: '700' }}>⏳ Oda {closingCountdown}sn içinde kapanacak</Text>
-            <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 10, marginTop: 2 }}>Oda sahibi ve moderatör ayrıldı.</Text>
+            <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 10, marginTop: 2 }}>{i18n.t('room.id.002')}</Text>
           </View>
           {!amIHost && (
             <Pressable

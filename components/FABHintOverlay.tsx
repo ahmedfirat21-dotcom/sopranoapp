@@ -1,6 +1,7 @@
 // ★ 2026-04-21: Onboarding tamamlandıktan sonra + butonunu işaret eden tek-seferlik hint.
 //   Pulse glow + animasyonlu arrow + tooltip. AsyncStorage flag ile bir kez gösterilir.
 import React, { useEffect, useRef } from 'react';
+import { i18n } from '../services/i18n';
 import { View, Text, StyleSheet, Pressable, Animated, Easing, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -163,13 +164,13 @@ export default function FABHintOverlay({ visible, bottomOffset, onDismiss }: Pro
         <GlowView style={s.tooltipCard}>
           <View style={s.tooltipHeader}>
             <Ionicons name="sparkles" size={14} color="#14B8A6" />
-            <Text style={s.tooltipTitle}>İpucu</Text>
+            <Text style={s.tooltipTitle}>{i18n.t('fabhintoverlay.001')}</Text>
           </View>
           <Text style={s.tooltipBody}>
             Buradan yeni bir oda açabilirsin. Arkadaşlarını davet et, sohbete başla!
           </Text>
           <View style={s.tooltipFooter}>
-            <Text style={s.tooltipDismiss}>Anladım — dokun</Text>
+            <Text style={s.tooltipDismiss}>{i18n.t('fabhintoverlay.002')}</Text>
           </View>
           {/* Arrow pointer → FAB yönüne */}
           <View style={s.tooltipTail} />

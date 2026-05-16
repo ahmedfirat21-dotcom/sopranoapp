@@ -6,6 +6,7 @@
 //   - "Çıkış Yap" → caller signOut tetikler
 
 import React, { useEffect, useRef } from 'react';
+import { i18n } from '../services/i18n';
 import {
   View, Text, StyleSheet, Pressable, Animated, Platform,
 } from 'react-native';
@@ -57,7 +58,7 @@ export default function SessionConflictModal({ visible, onContinueHere, onSignOu
             <Ionicons name="phone-portrait-outline" size={36} color="#FBBF24" style={iconShadow} />
           </View>
 
-          <Text style={s.title}>Hesabın başka bir cihazda açıldı</Text>
+          <Text style={s.title}>{i18n.t('sessionconflictmodal.001')}</Text>
           <Text style={s.message}>
             Bu hesap az önce başka bir cihazda kullanılmaya başladı. Aynı hesap iki yerden aktif olamaz.
           </Text>
@@ -65,7 +66,7 @@ export default function SessionConflictModal({ visible, onContinueHere, onSignOu
           <View style={s.buttons}>
             <Pressable style={s.btnSecondary} onPress={onSignOut}>
               <Ionicons name="exit-outline" size={16} color="#94A3B8" />
-              <Text style={s.btnSecondaryText}>Çıkış Yap</Text>
+              <Text style={s.btnSecondaryText}>{i18n.t('sessionconflictmodal.002')}</Text>
             </Pressable>
             <Pressable style={s.btnPrimary} onPress={onContinueHere}>
               <LinearGradient

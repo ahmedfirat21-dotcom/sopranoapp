@@ -20,6 +20,7 @@
  */
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
+import { i18n } from '../../services/i18n';
 import {
   View, Text, StyleSheet, Animated, PanResponder, Dimensions,
   Pressable, GestureResponderEvent, Platform, Image, TextInput,
@@ -444,7 +445,7 @@ export default function GiftSheet({
             {/* Header */}
             <View style={styles.header}>
               <Ionicons name="gift" size={20} color={palette.accent} style={iconShadow} />
-              <Text style={[styles.headerTitle, { color: palette.accent }]}>HEDİYE GÖNDER</Text>
+              <Text style={[styles.headerTitle, { color: palette.accent }]}>{i18n.t('profile.giftsheet.001')}</Text>
               {palette.label && (
                 <View style={[styles.tierBadge, { backgroundColor: palette.accentSoft, borderColor: palette.accent + '60' }]}>
                   <Text style={[styles.tierBadgeText, { color: palette.accent }]}>{palette.label}</Text>
@@ -570,7 +571,7 @@ export default function GiftSheet({
                 style={styles.messageInput}
                 value={message}
                 onChangeText={setMessage}
-                placeholder="Kısa bir mesaj ekle (isteğe bağlı)"
+                placeholder={i18n.t('profile.giftsheet.002')}
                 placeholderTextColor="rgba(255,255,255,0.30)"
                 maxLength={60}
                 returnKeyType="done"

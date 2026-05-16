@@ -149,7 +149,7 @@ export default function InviteFriendsModal({ visible, userId, onClose, onInvite,
       return (
         <View style={s.centerWrap}>
           <AppLoader color="#14B8A6" size="large" />
-          <Text style={s.centerText}>Arkadaşlar yükleniyor...</Text>
+          <Text style={s.centerText}>{i18n.t('room.invitefriendsmodal.001')}</Text>
         </View>
       );
     }
@@ -172,7 +172,7 @@ export default function InviteFriendsModal({ visible, userId, onClose, onInvite,
         <View style={s.centerWrap}>
           <Ionicons name="people-outline" size={48} color="rgba(255,255,255,0.1)" />
           <Text style={s.emptyTitle}>{i18n.t('invite.empty_title')}</Text>
-          <Text style={s.emptySubtext}>Keşfet sayfasından yeni insanlar bul ve takip et!</Text>
+          <Text style={s.emptySubtext}>{i18n.t('room.invitefriendsmodal.002')}</Text>
           <Pressable style={s.closeBtn} onPress={onClose}>
             <Text style={s.closeBtnText}>{i18n.t('common.close')}</Text>
           </Pressable>

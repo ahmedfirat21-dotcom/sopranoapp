@@ -7,6 +7,7 @@
  * Eski "glassmorphic" dağınık dil kaldırıldı.
  */
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { i18n } from '../services/i18n';
 import {
   View, Text, StyleSheet, Pressable, TextInput,
   ScrollView, Dimensions, Animated, PanResponder,
@@ -228,7 +229,7 @@ export function ReportModal({ visible, onClose, reporterId, target }: ReportModa
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="interactive"
         >
-          <Text style={s.sectionLabel}>RAPORLAMA SEBEBİ</Text>
+          <Text style={s.sectionLabel}>{i18n.t('reportmodal.001')}</Text>
 
           {/* ★ v110.5.4: 2 sütunlu kompakt grid — eskiden 9 satır dikey alan kaplıyordu */}
           <View style={s.reasonGrid}>
@@ -264,10 +265,10 @@ export function ReportModal({ visible, onClose, reporterId, target }: ReportModa
           </View>
 
           {/* Açıklama */}
-          <Text style={[s.sectionLabel, { marginTop: 14 }]}>EK AÇIKLAMA (İSTEĞE BAĞLI)</Text>
+          <Text style={[s.sectionLabel, { marginTop: 14 }]}>{i18n.t('reportmodal.002')}</Text>
           <TextInput
             style={s.descInput}
-            placeholder="Detayları kısaca yaz..."
+            placeholder={i18n.t('reportmodal.004')}
             placeholderTextColor="rgba(148,163,184,0.5)"
             value={description}
             onChangeText={setDescription}
@@ -296,7 +297,7 @@ export function ReportModal({ visible, onClose, reporterId, target }: ReportModa
             ) : (
               <>
                 <Ionicons name="flag" size={15} color="#FFF" />
-                <Text style={s.submitText}>Rapor Gönder</Text>
+                <Text style={s.submitText}>{i18n.t('reportmodal.003')}</Text>
               </>
             )}
           </Pressable>

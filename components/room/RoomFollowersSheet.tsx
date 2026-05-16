@@ -6,6 +6,7 @@
  * avatar + isim listesi. Tap'te profil sheet açılır.
  */
 import React, { useEffect, useRef, useState } from 'react';
+import { i18n } from '../../services/i18n';
 import {
   View, Text, StyleSheet, Pressable, Animated, Easing, FlatList,
   Image, Dimensions, Platform, PanResponder,
@@ -144,7 +145,7 @@ export default function RoomFollowersSheet({ visible, onClose, roomId, totalCoun
               <Ionicons name="people-circle" size={18} color="#EC4899" />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={s.title}>ODA TAKİPÇİLERİ</Text>
+              <Text style={s.title}>{i18n.t('room.roomfollowerssheet.001')}</Text>
               <Text style={s.subtitle}>
                 {totalCount > 0
                   ? `${totalCount} kişi bu odayı takip ediyor`
@@ -160,8 +161,8 @@ export default function RoomFollowersSheet({ visible, onClose, roomId, totalCoun
           ) : items.length === 0 ? (
             <View style={s.emptyWrap}>
               <Ionicons name="heart-dislike-outline" size={36} color="rgba(255,255,255,0.18)" />
-              <Text style={s.emptyText}>Bu odanın henüz takipçisi yok</Text>
-              <Text style={s.emptyHint}>Odanın altında "Takip Et" tıklayanlar burada listelenir.</Text>
+              <Text style={s.emptyText}>{i18n.t('room.roomfollowerssheet.002')}</Text>
+              <Text style={s.emptyHint}>{i18n.t('room.roomfollowerssheet.003')}</Text>
             </View>
           ) : (
             <FlatList

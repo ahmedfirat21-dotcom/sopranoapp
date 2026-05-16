@@ -5,6 +5,7 @@
  *   Şimdi: net mesaj + "Tekrar Dene" / "Odadan Çık" CTA.
  */
 import { useEffect, useRef } from 'react';
+import { i18n } from '../../services/i18n';
 import { View, Text, StyleSheet, Pressable, Animated } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -71,7 +72,7 @@ export default function RoomDisconnectOverlay({ state, onRetry, onLeave }: Props
           <View style={s.buttons}>
             <Pressable style={s.btnSecondary} onPress={onLeave}>
               <Ionicons name="exit-outline" size={16} color="#94A3B8" />
-              <Text style={s.btnSecondaryText}>Odadan Çık</Text>
+              <Text style={s.btnSecondaryText}>{i18n.t('room.roomdisconnectoverlay.001')}</Text>
             </Pressable>
             <Pressable style={s.btnPrimary} onPress={onRetry}>
               <LinearGradient

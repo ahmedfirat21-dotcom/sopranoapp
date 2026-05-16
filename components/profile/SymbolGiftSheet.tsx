@@ -15,6 +15,7 @@
  */
 
 import React, { useEffect, useRef, useState } from 'react';
+import { i18n } from '../../services/i18n';
 import {
   View, Text, StyleSheet, Animated, PanResponder, Dimensions, Pressable, Platform, Modal,
 } from 'react-native';
@@ -190,7 +191,7 @@ export default function SymbolGiftSheet({ visible, onClose, senderId, recipientI
               <Ionicons name="gift" size={18} color="#F472B6" />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={s.headerTitle}>SEMBOL HEDİYE</Text>
+              <Text style={s.headerTitle}>{i18n.t('profile.symbolgiftsheet.001')}</Text>
               <Text style={s.headerSub}>{recipientName} kişisine</Text>
             </View>
           </View>
@@ -198,7 +199,7 @@ export default function SymbolGiftSheet({ visible, onClose, senderId, recipientI
           {allGifts.length === 0 ? (
             <View style={s.empty}>
               <Ionicons name="bag-outline" size={42} color="rgba(255,255,255,0.3)" />
-              <Text style={s.emptyText}>Hediye katalogu yüklenemedi</Text>
+              <Text style={s.emptyText}>{i18n.t('profile.symbolgiftsheet.002')}</Text>
             </View>
           ) : (
             <>

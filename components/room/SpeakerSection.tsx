@@ -1,4 +1,5 @@
 import React, { useMemo, useEffect, useRef, useState } from 'react';
+import { i18n } from '../../services/i18n';
 import { ensureFrameConfig, getCachedFrameConfig, subscribeConfigChange } from '../../services/cosmeticConfigCache';
 import { View, Text, StyleSheet, Pressable, Image, useWindowDimensions, Animated, Easing, ScrollView, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -1079,7 +1080,7 @@ export default function SpeakerSection({ stageUsers, getMicStatus, onSelectUser,
               <Ionicons name="mic-outline" size={22} color="rgba(20,184,166,0.35)" />
             </View>
           </Animated.View>
-          <Text style={[s.ghostSeatLabel, { color: 'rgba(148,163,184,0.45)', fontSize: 11, fontWeight: '500' }]}>Sahne boş</Text>
+          <Text style={[s.ghostSeatLabel, { color: 'rgba(148,163,184,0.45)', fontSize: 11, fontWeight: '500' }]}>{i18n.t('room.speakersection.001')}</Text>
         </Pressable>
       </View>
     );
