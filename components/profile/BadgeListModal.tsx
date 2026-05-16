@@ -11,14 +11,13 @@
  * Tap → PremiumAlert detay modal.
  * Swipe-down ile kapanır.
  */
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useState } from 'react';
 import { i18n } from '../../services/i18n';
 import {
-  View, Text, StyleSheet, Modal, Pressable, ScrollView,
-  Animated, PanResponder, Easing,
+  View, Text, StyleSheet, Pressable, ScrollView,
 } from 'react-native';
 import AppLoader from '../AppLoader';
-import { LinearGradient } from 'expo-linear-gradient';
+import BottomSheet from '../BottomSheet';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Shadows } from '../../constants/theme';
 import { BadgeService } from '../../services/badges';
@@ -70,39 +69,10 @@ export default function BadgeListModal({ visible, onClose, userId, displayName }
   const [loading, setLoading] = useState(true);
   const [alert, setAlert] = useState<{ visible: boolean; title: string; message: string; type?: 'info' | 'warning' | 'error' | 'success'; buttons?: AlertButton[] }>({ visible: false, title: '', message: '' });
 
-  // ★ 2026-04-28: Clubhouse pattern — pan tüm sheet'e bağlı, ScrollView ile koordineli.
-  const translateY = useRef(new Animated.Value(0)).current;
-  const onCloseRef = useRef(onClose);
-  onCloseRef.current = onClose;
-  const scrollOffsetRef = useRef(0);
-  const handleScroll = useCallback((e: any) => {
-    scrollOffsetRef.current = e?.nativeEvent?.contentOffset?.y ?? 0;
-  }, []);
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => false,
-      onStartShouldSetPanResponderCapture: () => false,
-      // ★ v251: threshold düşürüldü — Clubhouse pattern korunur, drag-to-dismiss
-      //   küçük dokunmalarda algılamıyordu. 8→4, 25→12 ile daha hassas, hâlâ horizontal
-      //   scroll/Pressable tap'ları engellemez.
-      onMoveShouldSetPanResponder: (_, g) =>
-        g.dy > 4 && Math.abs(g.dy) > Math.abs(g.dx) && scrollOffsetRef.current <= 0,
-      onMoveShouldSetPanResponderCapture: (_, g) =>
-        g.dy > 12 && Math.abs(g.dy) > Math.abs(g.dx) * 2 && scrollOffsetRef.current <= 0,
-      onPanResponderTerminationRequest: () => false,
-      onPanResponderMove: (_, g) => {
-        if (g.dy > 0) translateY.setValue(g.dy);
-      },
-      onPanResponderRelease: (_, g) => {
-        if (g.dy > 80 || g.vy > 0.5) {
-          Animated.timing(translateY, { toValue: 600, duration: 200, useNativeDriver: true })
-            .start(() => { translateY.setValue(0); onCloseRef.current(); });
-        } else {
-          Animated.spring(translateY, { toValue: 0, useNativeDriver: true, tension: 100, friction: 10 }).start();
-        }
-      },
-    })
-  ).current;
+  // ★ v291 (16 May 2026): Manuel PanResponder + Modal yapısı KALDIRILDI — Davet Kodu
+  //   sheet'inde olduğu gibi BottomSheet wrapper kullanıyor. Sebep: önceki manuel
+  //   yapıda scrollOffsetRef.current <= 0 koşulu çok katıydı (ScrollView'a hafif
+  //   dokunulunca drag iptal oluyordu). BottomSheet pattern garantili çalışır.
 
   useEffect(() => {
     if (!visible || !userId) return;
@@ -121,89 +91,59 @@ export default function BadgeListModal({ visible, onClose, userId, displayName }
     });
   };
 
+  const title = displayName ? displayName.toLocaleUpperCase('tr-TR') : 'ROZETLER';
+
   return (
-    <Modal visible={visible} animationType="none" transparent statusBarTranslucent onRequestClose={onClose}>
-      <View style={st.overlay}>
-        <Pressable style={StyleSheet.absoluteFillObject} onPress={onClose} />
-
-        <Animated.View style={[st.sheet, { transform: [{ translateY }] }]} {...panResponder.panHandlers}>
-          <LinearGradient
-            colors={['#1c2735', '#151c2a', '#0d121d']}
-            start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }}
-            style={StyleSheet.absoluteFillObject}
-            pointerEvents="none"
-          />
-          {/* Üst hairline — gold (premium hissi) */}
-          <LinearGradient
-            colors={['transparent', 'rgba(252,211,77,0.55)', 'transparent']}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-            style={st.topEdge}
-            pointerEvents="none"
-          />
-
-          {/* ★ 2026-04-28: Drag handle/header artık görsel — pan tüm sheet'te (Clubhouse). */}
-          <View>
-            <View style={st.handleWrap}>
-              <View style={st.handle} />
-            </View>
-            <View style={st.header}>
-              <View style={st.headerAccent} />
-              <Ionicons name="ribbon" size={14} color="#FCD34D" style={iconShadow} />
-              <Text style={st.headerTitle}>
-                {displayName ? `${displayName.toLocaleUpperCase('tr-TR')}` : 'ROZETLER'}
-              </Text>
-              <View style={st.countBadge}>
-                <Text style={st.countText}>{badges.length}</Text>
-              </View>
-            </View>
-            <Text style={st.headerSubtitle}>
-              {badges.length} rozet kazandı
-            </Text>
+    <>
+      <BottomSheet
+        visible={visible}
+        onClose={onClose}
+        title={title}
+        icon="ribbon"
+        accentColor="#FCD34D"
+        badge={badges.length}
+        maxHeightRatio={0.82}
+      >
+        {loading ? (
+          <View style={st.loading}>
+            <AppLoader size="large" color="#FCD34D" />
           </View>
-
-          {loading ? (
-            <View style={st.loading}>
-              <AppLoader size="large" color="#FCD34D" />
+        ) : badges.length === 0 ? (
+          <View style={st.empty}>
+            <Ionicons name="ribbon-outline" size={42} color="rgba(252,211,77,0.25)" />
+            <Text style={st.emptyText}>{i18n.t('profile.badgelistmodal.001')}</Text>
+            <Text style={st.emptyHint}>{i18n.t('profile.badgelistmodal.002')}</Text>
+          </View>
+        ) : (
+          <ScrollView
+            contentContainerStyle={st.scrollContent}
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={st.grid}>
+              {badges.map(b => (
+                <Pressable
+                  key={b.id}
+                  onPress={() => showBadgeDetail(b)}
+                  style={({ pressed }) => [
+                    st.gridCard,
+                    pressed && { opacity: 0.85, transform: [{ scale: 0.96 }] },
+                  ]}
+                >
+                  <BadgeMedal badge={b} />
+                  <Text style={[st.cardLabel, { color: getLabelColor(b.rarity) }]} numberOfLines={1}>
+                    {b.label}
+                  </Text>
+                  <Text style={[st.rarityTag, { color: getRarityTagColor(b.rarity) }]} numberOfLines={1}>
+                    {RARITY_LABEL[b.rarity]}
+                  </Text>
+                </Pressable>
+              ))}
             </View>
-          ) : badges.length === 0 ? (
-            <View style={st.empty}>
-              <Ionicons name="ribbon-outline" size={42} color="rgba(252,211,77,0.25)" style={iconShadow} />
-              <Text style={st.emptyText}>{i18n.t('profile.badgelistmodal.001')}</Text>
-              <Text style={st.emptyHint}>{i18n.t('profile.badgelistmodal.002')}</Text>
-            </View>
-          ) : (
-            <ScrollView
-              contentContainerStyle={st.scrollContent}
-              showsVerticalScrollIndicator={false}
-              onScroll={handleScroll}
-              scrollEventThrottle={16}
-            >
-              <View style={st.grid}>
-                {badges.map(b => (
-                  <Pressable
-                    key={b.id}
-                    onPress={() => showBadgeDetail(b)}
-                    style={({ pressed }) => [
-                      st.gridCard,
-                      pressed && { opacity: 0.85, transform: [{ scale: 0.96 }] },
-                    ]}
-                  >
-                    <BadgeMedal badge={b} />
-                    <Text style={[st.cardLabel, { color: getLabelColor(b.rarity) }]} numberOfLines={1}>
-                      {b.label}
-                    </Text>
-                    <Text style={[st.rarityTag, { color: getRarityTagColor(b.rarity) }]} numberOfLines={1}>
-                      {RARITY_LABEL[b.rarity]}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-            </ScrollView>
-          )}
-        </Animated.View>
-      </View>
+          </ScrollView>
+        )}
+      </BottomSheet>
       <PremiumAlert {...alert} onDismiss={() => setAlert(prev => ({ ...prev, visible: false }))} />
-    </Modal>
+    </>
   );
 }
 
