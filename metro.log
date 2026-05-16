@@ -276,3 +276,44 @@ Android Bundled 31ms C:\SopranoChat\services\store.ts (1 module)
  LOG  [Session] Conflict kanalı: SUBSCRIBED
  WARN  Push token kayıt hatası: insert or update on table "push_tokens" violates foreign key constraint "push_tokens_user_id_fkey"
  LOG  [SPSync] Bakiye güncellendi: 0 SP
+ LOG  [SPSync] Bakiye güncellendi: 0 SP
+ LOG  [SPSync] Bakiye güncellendi: 0 SP
+ LOG  [Analytics] signup_completed 
+ LOG  [Analytics] property: signup_date = 2026-05-16
+ LOG  [Analytics] property: tier = Free
+ LOG  [Analytics] property: age_range = 25_34
+ LOG  [SPSync] Bakiye güncellendi: 0 SP
+ LOG  [WelcomeBonus] error
+ LOG  [SPSync] Bakiye güncellendi: 0 SP
+ LOG  [SPSync] Bakiye güncellendi: 0 SP
+ LOG  [SPSync] channel status: CLOSED 
+ LOG  [GiftRT] channel status: CLOSED for user I8feZfsmpDO0M0HvbCtWEBot5Jp2 
+ LOG  [DMNotif] dm:user:I8feZfsmpDO0M0HvbCtWEBot5Jp2 → CLOSED
+ LOG  [Session] Conflict kanalı: CLOSED
+ LOG  [RootLayout] Hazırlık süreci başlatıldı...
+ LOG  [RootLayout] Firebase auth listener başlatılıyor...
+ LOG  [RootLayout] Firebase auth state: LOGGED_IN
+ LOG  [RootLayout] Firebase user ready, accessToken factory aktif.
+ LOG  [Analytics] userId: I8feZfsmpDO0M0HvbCtWEBot5Jp2
+ LOG  [Analytics] login_success 
+ LOG  [SPSync] channel status: SUBSCRIBED 
+ LOG  [GiftRT] channel status: SUBSCRIBED for user I8feZfsmpDO0M0HvbCtWEBot5Jp2 
+ LOG  [DMNotif] dm:user:I8feZfsmpDO0M0HvbCtWEBot5Jp2 → SUBSCRIBED
+ LOG  [DEV] Emülatör algılandı — push token denenecek.
+ LOG  [SPSync] Bakiye güncellendi: 0 SP
+ LOG  [SPSync] Bakiye güncellendi: 0 SP
+ LOG  [Session] Conflict kanalı: SUBSCRIBED
+ INFO  [RevenueCat] Purchases instance already set with the same configuration. Ignoring duplicate call.
+ LOG  [RevenueCat] SDK başlatıldı
+ LOG  [SPSync] Bakiye güncellendi: 3 SP
+ LOG  [SPSync] Bakiye güncellendi: 3 SP
+ LOG  [Broadcast] emoji:5d8408db-7264-46de-96aa-4d67d1ee2ead → SUBSCRIBED
+ LOG  [Broadcast] mic_req:5d8408db-7264-46de-96aa-4d67d1ee2ead → SUBSCRIBED
+ LOG  [Broadcast] mod_action:5d8408db-7264-46de-96aa-4d67d1ee2ead → SUBSCRIBED
+ LOG  [Realtime] room:5d8408db-7264-46de-96aa-4d67d1ee2ead status → SUBSCRIBED 
+ LOG  [Realtime] room_status:5d8408db-7264-46de-96aa-4d67d1ee2ead status → SUBSCRIBED
+ LOG  [cleanupFrozenRooms] Deleted: 0, Reset: 0
+ LOG  [LiveKit] AudioSession başlatıldı
+Android Bundled 36ms C:\SopranoChat\utils\fetchTimeout.ts (1 module)
+ LOG  [LiveKit] Token alındı — roomId=5d8408db-7264-46de-96aa-4d67d1ee2ead, role=owner
+ LOG  [LiveKit] Bağlantı başarılı (deneme 1/3)
