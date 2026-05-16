@@ -586,7 +586,7 @@ function SpeakerBadgeCenter({ x, y, scale, expected, children }: {
   );
 }
 
-function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, isMe, cardWidth, cardHeight, VideoView, canModerate, onQuickMute }: {
+function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, isMe, cardWidth: rawCardWidth, cardHeight: rawCardHeight, VideoView, canModerate, onQuickMute }: {
   canModerate?: boolean;
   onQuickMute?: () => void;
   user: RoomParticipant; micStatus: MicStatus; onPress: () => void;
@@ -599,6 +599,14 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, i
   // ★ v117: Oda düzen config — avatar shape için kullanılır (line 541 civarı)
   const layout = useRoomLayout();
   const speakersCfg = layout.speakers;
+  // ★ v288 (16 May 2026): Host büyüt/küçült — web admin'den ayarlanan host.avatarSize
+  //   sadece audio modda (kamerasız) uygulanır; kamera açıkken spotlight tile aspect'i
+  //   korunur. Kullanıcının "host büyüt küçült yok" geri bildirimi → defaults.ts 140,
+  //   slider 80-200dp aralık.
+  const { cameraOn: _camForSize, videoTrack: _vtForSize } = micStatus;
+  const useHostSize = isHost && !(_camForSize && _vtForSize && VideoView);
+  const cardWidth = useHostSize ? (layout.host.avatarSize || rawCardWidth) : rawCardWidth;
+  const cardHeight = useHostSize ? (layout.host.avatarSize || rawCardHeight) : rawCardHeight;
   const displayName = (user as any).disguise?.display_name || user.user?.display_name || 'Misafir';
   const avatarUrl = (user as any).disguise?.avatar_url || user.user?.avatar_url;
   // ★ v281: Badge config'i önceden çek → render size SpeakerBadgeCenter'a verilir → initial

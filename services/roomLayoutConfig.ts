@@ -240,7 +240,7 @@ export interface RoomLayoutConfig {
 export const DEFAULT_ROOM_LAYOUT: RoomLayoutConfig = {
   host: {
     avatarShape: 'circle',
-    avatarSize: 96,
+    avatarSize: 140,
     borderRadius: 48,
     ringWidth: 3,
     ringColor: '#FBBF24',
@@ -267,7 +267,7 @@ export const DEFAULT_ROOM_LAYOUT: RoomLayoutConfig = {
     speakingRingColor: '#10B981',
     namePosition: 'below',
     nameFontSize: 12,
-    nameMaxChars: 10,
+    nameMaxChars: 0,
     showMicIcon: true,
     muteOpacity: 0.55,
     sizePresets: { small: 84, medium: 100, large: 110 },
@@ -280,7 +280,7 @@ export const DEFAULT_ROOM_LAYOUT: RoomLayoutConfig = {
     rowGap: 12,
     showName: true,
     nameFontSize: 10,
-    nameMaxChars: 8,
+    nameMaxChars: 0,
     ringWidth: 0,
     ringColor: 'transparent',
     ownerCrownEnabled: true,
