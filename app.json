@@ -34,7 +34,7 @@
         "foregroundImage": "./assets/launcher_icon.png"
       },
       "package": "com.sopranochat",
-      "versionCode": 287,
+      "versionCode": 297,
       "allowBackup": false,
       "softwareKeyboardLayoutMode": "resize",
       "googleServicesFile": "./google-services.json",

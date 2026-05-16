@@ -1297,13 +1297,20 @@ export default function SpeakerSection({ stageUsers, getMicStatus, onSelectUser,
           {sortedUsers.map((u) => {
             const st = getMicStatus(u.user_id);
             const isMe = u.user_id === currentUserId;
+            // ★ v288 (16 May 2026): host.avatarSize override — admin'in Boyut slider'ı.
+            //   Host'un kendi grid hücresi host.avatarSize değerine çekilir, diğer
+            //   konuşmacılar getSpeakerMetrics hesabı (cardWidth).
+            const isHostUser = u.role === 'owner' || u.role === 'host';
+            const hostSize = layout?.host?.avatarSize;
+            const renderWidth = isHostUser && hostSize ? Math.max(40, hostSize) : cardWidth;
+            const renderHeight = isHostUser && hostSize ? Math.max(40, hostSize) : cardHeight;
             return (
               <SpeakerCard key={u.id} user={u} micStatus={st} onPress={() => onSelectUser(u)}
                 onSelfDemote={onSelfDemote}
                 onCameraExpand={onCameraExpand}
                 canModerate={canModerate?.(u) ?? false}
                 onQuickMute={onQuickMute ? () => onQuickMute(u) : undefined}
-                isMe={isMe} cardWidth={cardWidth} cardHeight={cardHeight} VideoView={VideoView} />
+                isMe={isMe} cardWidth={renderWidth} cardHeight={renderHeight} VideoView={VideoView} />
             );
           })}
         </View>
