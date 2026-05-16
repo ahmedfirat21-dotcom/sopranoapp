@@ -32,6 +32,7 @@ import { supabase } from '../../constants/supabase';
 import { useRouter } from 'expo-router';
 import { useUserProfileSheet } from '../../providers/UserProfileSheetContext';
 import type { SubscriptionTier } from '../../types';
+import { i18n } from '../../services/i18n';
 import RoomRecordingsSheet from './RoomRecordingsSheet';
 
 const { width: W } = Dimensions.get('window');
@@ -45,14 +46,14 @@ type Follower = { id: string; display_name: string; avatar_url: string; active_f
 // â˜… Sekmeler â€” RoomSettingsSheet ile birebir aynı + Takipçiler
 type TabId = 'general' | 'speaking' | 'moderation' | 'visual' | 'monetization' | 'advanced' | 'followers';
 
-const TABS: { id: TabId; label: string; icon: string }[] = [
-  { id: 'general', label: 'Genel', icon: 'settings-outline' },
-  { id: 'speaking', label: 'Konuşma', icon: 'mic-outline' },
-  { id: 'moderation', label: 'Moderasyon', icon: 'shield-outline' },
-  { id: 'visual', label: 'Görsellik', icon: 'color-palette-outline' },
-  { id: 'monetization', label: 'Monetizasyon', icon: 'cash-outline' },
-  { id: 'advanced', label: 'Gelişmiş', icon: 'rocket-outline' },
-  { id: 'followers', label: 'Takipçiler', icon: 'heart-outline' },
+const TABS: { id: TabId; labelKey: string; icon: string }[] = [
+  { id: 'general', labelKey: 'manage.tab.general', icon: 'settings-outline' },
+  { id: 'speaking', labelKey: 'manage.tab.speaking', icon: 'mic-outline' },
+  { id: 'moderation', labelKey: 'manage.tab.moderation', icon: 'shield-outline' },
+  { id: 'visual', labelKey: 'manage.tab.visual', icon: 'color-palette-outline' },
+  { id: 'monetization', labelKey: 'manage.tab.monetization', icon: 'cash-outline' },
+  { id: 'advanced', labelKey: 'manage.tab.advanced', icon: 'rocket-outline' },
+  { id: 'followers', labelKey: 'manage.tab.followers', icon: 'heart-outline' },
 ];
 
 // ★ 2026-04-27: Geçici host (asıl sahip dışarda iken devralan) yalnız moderasyon
@@ -616,7 +617,7 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
         <View style={p.tagBlockHeader}>
           <View style={p.rowIcon}><Ionicons name="pricetags" size={14} color="rgba(20,184,166,0.8)" style={p.iconShadow} /></View>
           <View style={{ flex: 1 }}>
-            <Text style={p.rowLabel}>Etiketler</Text>
+            <Text style={p.rowLabel}>{i18n.t('manage.tags')}</Text>
             <Text style={p.rowDesc}>Keşfet için en fazla {MAX_TAGS_PER_ROOM} etiket</Text>
           </View>
           {tagSaving && <AppLoader size="small" color="#14B8A6" />}
@@ -784,8 +785,8 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
             <LinearGradient colors={['#14B8A6', '#0D9488', '#065F56']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={p.actionCtaGrad}>
               <View style={p.actionCtaIcon}><Ionicons name="enter-outline" size={20} color="#FFF" /></View>
               <View style={{ flex: 1 }}>
-                <Text style={p.actionCtaTitle}>Odaya Git</Text>
-                <Text style={p.actionCtaSub}>Canlı odana gir ve yönet</Text>
+                <Text style={p.actionCtaTitle}>{i18n.t('manage.cta.go_to_room.title')}</Text>
+                <Text style={p.actionCtaSub}>{i18n.t('manage.cta.go_to_room.sub')}</Text>
               </View>
             </LinearGradient>
           </Pressable>
@@ -794,8 +795,8 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
             <LinearGradient colors={['#F59E0B', '#D97706', '#B45309']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={p.actionCtaGrad}>
               <View style={p.actionCtaIcon}><Ionicons name="sunny" size={20} color="#FFF" /></View>
               <View style={{ flex: 1 }}>
-                <Text style={p.actionCtaTitle}>Uyandır</Text>
-                <Text style={p.actionCtaSub}>Dondurulmuş odayı tekrar aktifleştir</Text>
+                <Text style={p.actionCtaTitle}>{i18n.t('manage.cta.wake.title')}</Text>
+                <Text style={p.actionCtaSub}>{i18n.t('manage.cta.wake.sub')}</Text>
               </View>
             </LinearGradient>
           </Pressable>
@@ -807,7 +808,7 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
             <LinearGradient colors={['#3B82F6', '#2563EB', '#1D4ED8']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={p.actionCtaGrad}>
               <View style={p.actionCtaIcon}><Ionicons name="snow" size={20} color="#FFF" /></View>
               <View style={{ flex: 1 }}>
-                <Text style={p.actionCtaTitle}>Odayı Dondur</Text>
+                <Text style={p.actionCtaTitle}>{i18n.t('manage.cta.freeze.title')}</Text>
                 <Text style={p.actionCtaSub}>Oda dondurulur, dilediğinde tekrar aktifleştir</Text>
               </View>
             </LinearGradient>
@@ -819,7 +820,7 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
           <LinearGradient colors={['#EF4444', '#DC2626', '#B91C1C']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={p.actionCtaGrad}>
             <View style={p.actionCtaIcon}><Ionicons name="trash" size={20} color="#FFF" /></View>
             <View style={{ flex: 1 }}>
-              <Text style={p.actionCtaTitle}>Odayı Sil</Text>
+              <Text style={p.actionCtaTitle}>{i18n.t('manage.cta.delete.title')}</Text>
               <Text style={p.actionCtaSub}>Oda kalıcı olarak silinir, geri alınamaz</Text>
             </View>
           </LinearGradient>
@@ -912,7 +913,7 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
         ) : bannedUsers.length === 0 ? (
           <View style={p.emptyCard}>
             <Ionicons name="shield-checkmark" size={20} color="rgba(34,197,94,0.3)" />
-            <Text style={p.emptyText}>Banlı kullanıcı yok</Text>
+            <Text style={p.emptyText}>{i18n.t('manage.empty.bans')}</Text>
           </View>
         ) : (
           bannedUsers.map((ban: any) => {
@@ -949,7 +950,7 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
                   }
                 }}>
                   <Ionicons name="lock-open-outline" size={10} color="#14B8A6" />
-                  <Text style={{ fontSize: 9, fontWeight: '700', color: '#14B8A6' }}>Kaldır</Text>
+                  <Text style={{ fontSize: 9, fontWeight: '700', color: '#14B8A6' }}>{i18n.t('common.remove')}</Text>
                 </Pressable>
               </View>
             );
@@ -963,7 +964,7 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
         {loadingModData ? null : mutedUsers.length === 0 ? (
           <View style={p.emptyCard}>
             <Ionicons name="volume-high" size={20} color="rgba(34,197,94,0.3)" />
-            <Text style={p.emptyText}>Susturulan kullanıcı yok</Text>
+            <Text style={p.emptyText}>{i18n.t('manage.empty.mutes')}</Text>
           </View>
         ) : (
           mutedUsers.map((mute: any) => {
@@ -1002,7 +1003,7 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
       {/* Tema â€” Plus+ */}
       {can('Plus') ? (
         <View style={{ marginBottom: 8 }}>
-          <Text style={p.subTitle}>Oda Teması</Text>
+          <Text style={p.subTitle}>{i18n.t('manage.theme')}</Text>
           <View style={p.themeGrid}>
             <Pressable style={[p.themeCircle, !themeId && p.themeCircleActive]} onPress={() => { setThemeId(null); RoomService.setRoomTheme(room.id, hostId, null).then(() => broadcastSettingsChange({ theme_id: null })).catch(() => {}); }}>
               <LinearGradient colors={['#0E1420', '#070B14']} style={p.themeGrad}><Ionicons name="moon-outline" size={12} color="rgba(255,255,255,0.35)" /></LinearGradient>
@@ -1023,7 +1024,7 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               {backgroundImage ? (
                 <Pressable onPress={() => handleBgImage(null)} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8, backgroundColor: 'rgba(239,68,68,0.1)', borderWidth: 1, borderColor: 'rgba(239,68,68,0.2)' }}>
-                  <Ionicons name="trash-outline" size={12} color="#EF4444" /><Text style={{ fontSize: 10, fontWeight: '600', color: '#EF4444' }}>Kaldır</Text>
+                  <Ionicons name="trash-outline" size={12} color="#EF4444" /><Text style={{ fontSize: 10, fontWeight: '600', color: '#EF4444' }}>{i18n.t('common.remove')}</Text>
                 </Pressable>
               ) : (
                 <Pressable onPress={() => handleBgImage('default')} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8, backgroundColor: 'rgba(139,92,246,0.1)', borderWidth: 1, borderColor: 'rgba(139,92,246,0.2)' }}>
@@ -1041,7 +1042,7 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             {coverImage ? (
               <Pressable onPress={() => handleCoverImage(null)} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8, backgroundColor: 'rgba(239,68,68,0.1)', borderWidth: 1, borderColor: 'rgba(239,68,68,0.2)' }}>
-                <Ionicons name="trash-outline" size={12} color="#EF4444" /><Text style={{ fontSize: 10, fontWeight: '600', color: '#EF4444' }}>Kaldır</Text>
+                <Ionicons name="trash-outline" size={12} color="#EF4444" /><Text style={{ fontSize: 10, fontWeight: '600', color: '#EF4444' }}>{i18n.t('common.remove')}</Text>
               </Pressable>
             ) : (
               <Pressable onPress={() => handleCoverImage('pick')} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8, backgroundColor: 'rgba(255,215,0,0.1)', borderWidth: 1, borderColor: 'rgba(255,215,0,0.2)' }}>
@@ -1161,7 +1162,7 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
       ) : (
         <View style={p.emptyCard}>
           <Ionicons name="heart-outline" size={24} color="#475569" />
-          <Text style={p.emptyText}>Henüz takipçi yok</Text>
+          <Text style={p.emptyText}>{i18n.t('manage.empty.followers')}</Text>
         </View>
       )}
     </View>
@@ -1225,7 +1226,7 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
               <Text style={p.headerTitle} numberOfLines={1}>{roomName || room.name}</Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                 {isLive ? (
-                  <View style={p.liveBadge}><View style={p.liveDot} /><Text style={p.liveText}>Canlı</Text></View>
+                  <View style={p.liveBadge}><View style={p.liveDot} /><Text style={p.liveText}>{i18n.t('rooms.live_pill')}</Text></View>
                 ) : (
                   <Text style={{ fontSize: 9, color: '#94A3B8' }}>â„ï¸ Dondurulmuş</Text>
                 )}
@@ -1261,7 +1262,7 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
                 if (tab.id === 'moderation') loadModerationData();
               }}>
                 <Ionicons name={tab.icon as any} size={11} color={active ? Colors.accentTeal : '#475569'} />
-                <Text style={[p.tabText, active && p.tabTextActive]}>{tab.label}</Text>
+                <Text style={[p.tabText, active && p.tabTextActive]}>{i18n.t(tab.labelKey)}</Text>
               </Pressable>
             );
           })}
