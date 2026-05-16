@@ -104,6 +104,7 @@ export default function PowerUpsSheet({
   const backdropOpacity = useRef(new Animated.Value(0)).current;
   // Ring loop — premium derinlik
   const ringPulse = useRef(new Animated.Value(0)).current;
+  const ringLoopRef = useRef<Animated.CompositeAnimation | null>(null);
   const [loading, setLoading] = useState<string | null>(null);
 
   useEffect(() => {
@@ -112,19 +113,26 @@ export default function PowerUpsSheet({
         Animated.spring(translateY, { toValue: 0, useNativeDriver: true, damping: 22, stiffness: 220 }),
         Animated.timing(backdropOpacity, { toValue: 1, duration: 240, useNativeDriver: true }),
       ]).start();
-      Animated.loop(
+      const ringLoop = Animated.loop(
         Animated.sequence([
           Animated.timing(ringPulse, { toValue: 1, duration: 1800, useNativeDriver: true }),
           Animated.timing(ringPulse, { toValue: 0, duration: 1800, useNativeDriver: true }),
         ]),
-      ).start();
+      );
+      ringLoopRef.current = ringLoop;
+      ringLoop.start();
     } else {
       Animated.parallel([
         Animated.timing(translateY, { toValue: PANEL_HEIGHT, duration: 220, useNativeDriver: true }),
         Animated.timing(backdropOpacity, { toValue: 0, duration: 180, useNativeDriver: true }),
       ]).start();
-      ringPulse.stopAnimation();
+      ringLoopRef.current?.stop();
+      ringLoopRef.current = null;
     }
+    return () => {
+      ringLoopRef.current?.stop();
+      ringLoopRef.current = null;
+    };
   }, [visible]);
 
   // Pan-down to dismiss

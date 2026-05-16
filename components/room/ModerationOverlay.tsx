@@ -175,6 +175,7 @@ const ModerationOverlay = forwardRef<ModerationOverlayRef>((_, ref) => {
   const cardScale = useRef(new Animated.Value(0.6)).current;
   const cardOpacity = useRef(new Animated.Value(0)).current;
   const iconPulse = useRef(new Animated.Value(1)).current;
+  const iconPulseLoopRef = useRef<Animated.CompositeAnimation | null>(null);
   const dismissTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const dismiss = useCallback(() => {
@@ -227,13 +228,16 @@ const ModerationOverlay = forwardRef<ModerationOverlayRef>((_, ref) => {
         Animated.timing(cardOpacity, { toValue: 1, duration: 250, useNativeDriver: true }),
       ]).start();
 
-      // İkon pulse
-      Animated.loop(
+      // İkon pulse — ref ile cleanup-safe
+      iconPulseLoopRef.current?.stop();
+      const iconPulseLoop = Animated.loop(
         Animated.sequence([
           Animated.timing(iconPulse, { toValue: 1.15, duration: 600, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
           Animated.timing(iconPulse, { toValue: 1, duration: 600, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
         ])
-      ).start();
+      );
+      iconPulseLoopRef.current = iconPulseLoop;
+      iconPulseLoop.start();
 
       // Otomatik kapanma
       const config = PENALTY_MAP[payload.type];
@@ -246,6 +250,8 @@ const ModerationOverlay = forwardRef<ModerationOverlayRef>((_, ref) => {
   useEffect(() => {
     return () => {
       if (dismissTimer.current) clearTimeout(dismissTimer.current);
+      iconPulseLoopRef.current?.stop();
+      iconPulseLoopRef.current = null;
     };
   }, []);
 

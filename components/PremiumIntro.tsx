@@ -76,7 +76,7 @@ export default function PremiumIntro({ onFinish }: PremiumIntroProps) {
     }, 200);
 
     // 3. Subtle pulse animation on icon
-    Animated.loop(
+    const pulseLoop = Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, {
           toValue: 1.04,
@@ -91,7 +91,8 @@ export default function PremiumIntro({ onFinish }: PremiumIntroProps) {
           useNativeDriver: true,
         }),
       ])
-    ).start();
+    );
+    pulseLoop.start();
 
     // 4. Auto-finish after 2.5s with fade-out
     const finishTimer = setTimeout(fadeOutAndFinish, 2500);
@@ -105,6 +106,7 @@ export default function PremiumIntro({ onFinish }: PremiumIntroProps) {
     return () => {
       clearTimeout(finishTimer);
       clearTimeout(safetyTimer);
+      pulseLoop.stop();
     };
   }, []);
 
