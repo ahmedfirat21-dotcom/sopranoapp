@@ -39,6 +39,7 @@ import { getAvatarSource } from '../../constants/avatars';
 import { SkiaShadow, GlowView, CosmeticBackground } from '../../components/skia';
 
 import { showToast } from '../../components/Toast';
+import DiscoverEmptyState from '../../components/DiscoverEmptyState';
 import { isSystemRoom } from '../../services/showcaseRooms';
 import { TIER_DEFINITIONS, getEffectiveTier } from '../../constants/tiers';
 import { roomPreviewService } from '../../services/roomPreview';
@@ -1468,14 +1469,18 @@ export default function HomeScreen() {
           //   scroll sınırı artık top bar (logo+ikonlar); diğer her şey rooms ile birlikte kaydırılıyor.
           ListHeaderComponent={
             <>
-              {/* Hoşgeldin — Glassmorphism konteyner + Zamana göre selamlama */}
+              {/* Hoşgeldin — Glassmorphism konteyner + Zamana göre selamlama
+                  ★ v298 (17 May 2026): Welcome card'a "Oda Aç" gradient pill eklendi.
+                  Önceki FAB (yuvarlak floating button) kullanıcı tarafından çirkin
+                  bulundu, kaldırıldı. Yerine Clubhouse "Start a Room" pattern —
+                  bağlamsal gradient pill, profil avatar yanında. */}
               <View style={s.welcomeCard}>
                 <View style={s.welcomeRow}>
                   <Pressable onPress={() => router.push('/(tabs)/profile')}>
                     <StatusAvatar uri={profile?.avatar_url} size={42} isOnline={true} tier={profile?.subscription_tier} isSelf frameId={(profile as any)?.active_frame} customBadgeId={(profile as any)?.active_badge_id ?? null} />
                   </Pressable>
-                  <View style={{ flex: 1 }}>
-                    <Text style={s.welcomeTitle}>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={s.welcomeTitle} numberOfLines={1}>
                       {(() => {
                         const hour = new Date().getHours();
                         const name = profile?.display_name ? `, ${profile.display_name}` : '';
@@ -1485,7 +1490,7 @@ export default function HomeScreen() {
                         return `${t('home.good_night')}${name} 🌙`;
                       })()}
                     </Text>
-                    <Text style={s.welcomeSub}>
+                    <Text style={s.welcomeSub} numberOfLines={1}>
                       {(() => {
                         const realRooms = rooms.filter(r => !isSystemRoom(r.id));
                         const totalListeners = realRooms.reduce((sum, r) => sum + (r.listener_count || 0), 0);
@@ -1499,13 +1504,23 @@ export default function HomeScreen() {
                       })()}
                     </Text>
                   </View>
-                  {/* ★ 2026-04-24: Online arkadaş sayısı — subtle pill */}
-                  {onlineFriends.length > 0 && (
-                    <Pressable onPress={() => router.push('/(tabs)/messages' as any)} style={s.welcomeOnlinePill} hitSlop={6}>
-                      <View style={s.welcomeOnlineDot} />
-                      <Text style={s.welcomeOnlinePillText}>{onlineFriends.length}</Text>
-                    </Pressable>
-                  )}
+                  {/* ★ v298 (17 May 2026): "Oda Aç" gradient pill — Clubhouse pattern.
+                      Eski FAB kaldırıldı (çirkindi), bağlamsal CTA welcome card'a gömüldü.
+                      QuickCreateSheet zaten mount edilmiş — sadece tetik bağlandı. */}
+                  <Pressable
+                    onPress={() => setShowQuickCreate(true)}
+                    style={({ pressed }) => [s.welcomeCreatePill, pressed && { opacity: 0.85, transform: [{ scale: 0.96 }] }]}
+                    hitSlop={6}
+                    accessibilityLabel={t('home.create_room') || 'Oda Aç'}
+                  >
+                    <LinearGradient
+                      colors={['#14B8A6', '#0891B2']}
+                      start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                      style={StyleSheet.absoluteFillObject}
+                    />
+                    <Ionicons name="add" size={18} color="#FFF" style={s.welcomeCreatePillIcon} />
+                    <Text style={s.welcomeCreatePillText}>Oda Aç</Text>
+                  </Pressable>
                 </View>
               </View>
 
@@ -1871,95 +1886,21 @@ export default function HomeScreen() {
               </LinearGradient>
             </Pressable>
           ) : (
-            // ═══ 'all' + gerçekten boş → UNIFIED empty state
-            //     Tek büyük kart: başlık + 4 kategori chip (2x2 grid) + detay linki.
-            //     ★ 2026-04-22: önceki üç parçalı tasarım (hero kart + HIZLI BAŞLA başlık + chips)
-            //     aynı mesajı 3 kez tekrarlıyordu; artık tek bütünleşik blok. ═══
-            <View style={s.unifiedEmpty}>
-              <LinearGradient
-                colors={['rgba(20,184,166,0.12)', 'rgba(13,148,136,0.06)', 'rgba(15,23,42,0.02)']}
-                start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
-                style={s.unifiedEmptyGradient}
-              >
-                <View style={s.unifiedEmptyIconWrap}>
-                  <LinearGradient
-                    colors={['rgba(20,184,166,0.25)', 'rgba(13,148,136,0.10)']}
-                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                    style={s.unifiedEmptyIconGlow}
-                  >
-                    <Ionicons name="mic" size={40} color="#14B8A6" />
-                  </LinearGradient>
-                </View>
-
-                <Text style={s.unifiedEmptyTitle}>{t('home.stage_empty_title')}</Text>
-                <Text style={s.unifiedEmptySub}>{t('home.stage_empty_sub')}</Text>
-
-                {/* ★ 2026-04-24: Sosyal ipucu — online arkadaş varsa motivasyonel satır */}
-                {onlineFriends.length > 0 && (
-                  <Pressable onPress={() => router.push('/(tabs)/messages' as any)} style={s.unifiedSocialHint} hitSlop={6}>
-                    <View style={s.welcomeOnlineDot} />
-                    <Text style={s.unifiedSocialHintText}>
-                      {onlineFriends.length === 1
-                        ? i18n.t('auto.tabs.home.002')
-                        : i18n.t('auto.tabs.home.001', { 0: onlineFriends.length })}
-                    </Text>
-                  </Pressable>
-                )}
-
-                {firebaseUser && (
-                  <View style={s.unifiedChipsGrid}>
-                    {[
-                      { id: 'chat',  labelKey: 'category.chat',  icon: 'chatbubbles' as const,     color: '#3B82F6' },
-                      { id: 'music', labelKey: 'category.music', icon: 'musical-notes' as const,   color: '#EC4899' },
-                      { id: 'game',  labelKey: 'category.game',  icon: 'game-controller' as const, color: '#A78BFA' },
-                      { id: 'tech',  labelKey: 'category.tech',  icon: 'code-slash' as const,      color: '#14B8A6' },
-                    ].map((chip) => (
-                      <Pressable
-                        key={chip.id}
-                        onPress={() => handleQuickCreate(chip.id)}
-                        disabled={creatingRoom}
-                        style={({ pressed }) => [
-                          s.unifiedChip,
-                          { borderColor: chip.color + '55', backgroundColor: chip.color + '14' },
-                          pressed && { transform: [{ scale: 0.96 }], backgroundColor: chip.color + '22' },
-                          creatingRoom && { opacity: 0.5 },
-                        ]}
-                      >
-                        <Ionicons name={chip.icon} size={22} color={chip.color} />
-                        <Text style={[s.unifiedChipText, { color: chip.color }]}>{t(chip.labelKey)}</Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                )}
-
-                <Pressable
-                  onPress={() => {
-                    if (!firebaseUser) { router.push('/create-room'); return; }
-                    router.push('/create-room');
-                  }}
-                  style={({ pressed }) => [s.unifiedDetailLink, pressed && { opacity: 0.6 }]}
-                  hitSlop={8}
-                >
-                  <Text style={s.unifiedDetailLinkText}>{t('home.detailed_setup')}</Text>
-                  <Ionicons name="chevron-forward" size={14} color="#94A3B8" />
-                </Pressable>
-
-                {/* ★ v107.13: Gizlenen odalar — empty state içinde geri getirme yolu */}
-                {ignoredRoomIds.size > 0 && (
-                  <Pressable
-                    onPress={unignoreAll}
-                    style={({ pressed }) => [s.hiddenRoomsHint, pressed && { opacity: 0.6 }]}
-                    hitSlop={8}
-                  >
-                    <Ionicons name="eye-outline" size={14} color="#FBBF24" />
-                    <Text style={s.hiddenRoomsHintText}>
-                      {ignoredRoomIds.size} gizli oda var — Geri Getir
-                    </Text>
-                    <Ionicons name="refresh" size={12} color="#FBBF24" />
-                  </Pressable>
-                )}
-              </LinearGradient>
-            </View>
+            // ═══ ★ v298 (17 May 2026): Eski unifiedEmpty kaldırıldı (kullanıcı "vasat").
+            //     Yerine premium DiscoverEmptyState: Skia ses dalgası + kişiselleştirilmiş
+            //     başlık + 4 fikir kartı. DiscoverWelcomeSheet'in gem hero'su ile çakışmaz
+            //     (farklı motif: gem değil, dalga). ═══
+            <DiscoverEmptyState
+              firebaseUser={firebaseUser}
+              onlineFriendsCount={onlineFriends.length}
+              ignoredCount={ignoredRoomIds.size}
+              creatingRoom={creatingRoom}
+              onIdea={handleQuickCreate}
+              onDetailedSetup={() => router.push('/create-room')}
+              onRestoreHidden={unignoreAll}
+              onMessages={() => router.push('/(tabs)/messages' as any)}
+              userName={profile?.display_name}
+            />
           )}
 
           // ═══ Footer: Gizlenen odalar (varsa) + Takip Ettiğin Odalar ═══
@@ -2216,6 +2157,26 @@ const s = StyleSheet.create({
   },
   welcomeTitle: { fontSize: 15, fontWeight: '700', color: '#F1F5F9', ...Shadows.text },
   welcomeSub: { fontSize: 11, color: '#94A3B8', marginTop: 2, ...Shadows.textLight },
+  // ★ v298 (17 May 2026): "Oda Aç" gradient pill — welcome card sağında (Clubhouse pattern)
+  welcomeCreatePill: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 11, paddingVertical: 7,
+    borderRadius: 14, overflow: 'hidden',
+    borderWidth: 1, borderColor: 'rgba(20,184,166,0.45)',
+    gap: 4,
+    shadowColor: '#14B8A6',
+    shadowOpacity: 0.35, shadowRadius: 8, shadowOffset: { width: 0, height: 2 },
+  },
+  welcomeCreatePillIcon: {
+    textShadowColor: 'rgba(0,0,0,0.45)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  welcomeCreatePillText: {
+    fontSize: 12, fontWeight: '800', color: '#FFF',
+    letterSpacing: 0.3,
+    ...Shadows.text,
+  },
   // ★ 2026-04-24: Online friends pill — welcome card sağında
   welcomeOnlinePill: {
     flexDirection: 'row', alignItems: 'center', gap: 5,

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
 import { i18n } from '../services/i18n';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -12,6 +13,7 @@ import { useAuth } from './_layout';
 import AppBackground from '../components/AppBackground';
 import { showToast } from '../components/Toast';
 import { migrateLegacyTier } from '../types';
+import { RevenueCatService } from '../services/revenuecat';
 
 // ═══ SP Paketleri — Premium Jewel-Tone Design ═══
 // ★ id alanları Google Play Console'daki In-App Product ID'leriyle eşleşmeli
@@ -29,17 +31,55 @@ const SP_PACKAGES = [
 export default function SPStoreScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { profile } = useAuth();
+  const { profile, refreshProfile } = useAuth();
   const spBalance = profile?.system_points ?? 0;
   const userTier = migrateLegacyTier(profile?.subscription_tier);
   const storeBonusPct = userTier === 'Pro' ? 0.20 : userTier === 'Plus' ? 0.10 : 0;
+  const [purchasing, setPurchasing] = useState<string | null>(null);
 
-  const handleBuy = () => {
-    showToast({
-      title: i18n.t('spstore.002'),
-      message: i18n.t('spstore.003'),
-      type: 'info',
-    });
+  // ★ v298 (17 May 2026): Gerçek SP satın alma — RevenueCat Google Play consumable IAP
+  //   sonrası Supabase RPC ile DB'ye SP credit. Eski "fake toast" davranışı kaldırıldı.
+  const handleBuy = async (packageId: string) => {
+    if (!profile?.id) {
+      showToast({ title: 'Giriş Gerekli', message: 'Önce hesabına gir.', type: 'error' });
+      return;
+    }
+    if (purchasing) return; // Çift tıklama koruması
+    setPurchasing(packageId);
+    try {
+      const result = await RevenueCatService.purchaseSPPackage(profile.id, packageId);
+      if (!result.success) {
+        if (result.error === 'iptal_edildi') {
+          // Sessizce geç — kullanıcı kendi iptal etti
+          return;
+        }
+        if (result.error === 'already_processed') {
+          showToast({ title: 'Zaten İşlendi', message: 'Bu satın alma daha önce kaydedildi.', type: 'info' });
+          return;
+        }
+        showToast({
+          title: 'Satın Alma Başarısız',
+          message: result.error || 'Bilinmeyen hata',
+          type: 'error',
+        });
+        return;
+      }
+      // Profili yenile (balance güncel görünsün)
+      try { await refreshProfile?.(); } catch {}
+      showToast({
+        title: 'SP Yüklendi! ✨',
+        message: `+${result.spAdded?.toLocaleString('tr-TR')} SP hesabına eklendi.`,
+        type: 'success',
+      });
+    } catch (e: any) {
+      showToast({
+        title: 'Hata',
+        message: e?.message || 'Beklenmedik hata',
+        type: 'error',
+      });
+    } finally {
+      setPurchasing(null);
+    }
   };
 
   return (
@@ -93,8 +133,10 @@ export default function SPStoreScreen() {
                   s.pkgCard,
                   pkg.popular && s.pkgCardPopular,
                   pressed && { opacity: 0.92, transform: [{ scale: 0.96 }] },
+                  purchasing && purchasing !== pkg.id && { opacity: 0.5 },
                 ]}
-                onPress={handleBuy}
+                onPress={() => handleBuy(pkg.id)}
+                disabled={!!purchasing}
               >
                 {/* ★ 3-stop gradient: parlak → zengin → derin (mücevher etkisi) */}
                 <LinearGradient

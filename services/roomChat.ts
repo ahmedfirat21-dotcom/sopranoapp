@@ -313,7 +313,12 @@ export const RoomChatService = {
     roomId: string,
     userId: string,
     content: string,
-    glowStyle: 'gold' | 'heart' | 'fire' | 'neon' | 'celebration' | 'galaxy',
+    // ★ v298 (17 May 2026) FIX: GlowStyleId tipi 11 stilden oluşuyor (6 sabit + 5 premium).
+    //   Eski imza sadece 6 sabit'i kabul ediyordu, premium glow'lar (constellation/
+    //   or-ancien/inferno/voltaire/belle-epoque) silent type-mismatch ile gönderiliyordu.
+    //   Tip union genişletildi → tüm 11 stil destekleniyor.
+    glowStyle: 'gold' | 'heart' | 'fire' | 'neon' | 'celebration' | 'galaxy'
+      | 'constellation' | 'or-ancien' | 'inferno' | 'voltaire' | 'belle-epoque',
   ): Promise<{ success: boolean; error?: string; cost?: number; newBalance?: number; messageId?: string }> {
     if (isSystemRoom(roomId)) return { success: false, error: i18n.t('auto.roomChat.004') };
     const cleaned = (content || '').trim().replace(/<[^>]*>/g, '').slice(0, 500);

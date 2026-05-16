@@ -96,37 +96,36 @@ const RARITY_PALETTE: Record<BadgeRarity, {
 // SKIA PREMIUM MEDAL — Rarity'e özel path + glow + animasyon
 // ═══════════════════════════════════════════════════════════════
 const MEDAL_SIZE = 180;
+// ★ v297 (17 May 2026): Halo glow Canvas kenarında clip oluyordu (BlurMask
+//   normal style → blur radius'un yarısı canvas dışına taşıyor). GLOW_PAD ile
+//   Canvas büyütüldü, content GLOW_PAD kadar offset'lendi. CosmeticBadge ile aynı pattern.
+const GLOW_PAD = 40;
+const CANVAS_SIZE = MEDAL_SIZE + GLOW_PAD * 2;
+
+// ★ v297: Hex → rgba helper (multi-layer halo için)
+function hexToRgba(hex: string, alpha: number): string {
+  if (!hex?.startsWith('#') || hex.length !== 7) return `rgba(252,211,77,${alpha})`;
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
 
 function PremiumMedal({ rarity }: { rarity: BadgeRarity }) {
   const palette = RARITY_PALETTE[rarity];
-  const Skia = SkiaMod;
-  const Reanimated = ReanimatedMod;
+  // ★ v297: Doğru Skia namespace pattern — CosmeticBadge'daki v281 fix ile aynı.
+  //   SkiaMod = full module (Canvas/Path JSX components), SkiaMod.Skia = imperative
+  //   namespace (Path.Make() vb.). İkisini karıştırmak "Skia.Path.Make is not a function"
+  //   render hatası verir.
+  const SkiaNS = SkiaMod?.Skia;
 
-  // ★ Legendary için sürekli rotasyon (sparkle ring)
-  const rotation = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    if (rarity !== 'legendary' && rarity !== 'epic') return;
-    const loop = Animated.loop(
-      Animated.timing(rotation, { toValue: 1, duration: rarity === 'legendary' ? 9000 : 14000, easing: Easing.linear, useNativeDriver: true })
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [rarity]);
+  // ★ v297 (17 May 2026): Sparkle ring rotation KALDIRILDI — Animated.View overlay'leri
+  //   silindiği için rotation kullanıcısı yok. Sade gem + halo statik premium görünüm.
 
-  const rotateStr = rotation.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
-  const reverseRotateStr = rotation.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '-360deg'] });
-
-  // Skia yoksa fallback: RN gradient + Animated.View
-  if (!Skia) {
+  // Skia yoksa fallback: RN gradient + Animated.View (Android elevation YOK — keskin shadow olur)
+  if (!SkiaMod || !SkiaNS) {
     return (
       <View style={{ width: MEDAL_SIZE, height: MEDAL_SIZE, alignItems: 'center', justifyContent: 'center' }}>
-        {/* Halo */}
-        <View style={{
-          position: 'absolute', width: MEDAL_SIZE * 0.96, height: MEDAL_SIZE * 0.96,
-          borderRadius: MEDAL_SIZE / 2, shadowColor: palette.primary,
-          shadowOpacity: 0.6, shadowRadius: 32, shadowOffset: { width: 0, height: 0 }, elevation: 18,
-          backgroundColor: palette.halo,
-        }} />
         <LinearGradient
           colors={palette.gradient}
           start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
@@ -138,11 +137,12 @@ function PremiumMedal({ rarity }: { rarity: BadgeRarity }) {
     );
   }
 
-  const { Canvas, Group, Path, Circle, LinearGradient: SkLinearGradient, BlurMask, vec, useFonts } = Skia;
+  const { Canvas, Group, Path, Circle, LinearGradient: SkLinearGradient, RadialGradient: SkRadialGradient, BlurMask, vec } = SkiaMod;
 
-  // ★ Medal path — rarity'e göre şekil
+  // ★ Medal path — rarity'e göre şekil. Coordinates 0..MEDAL_SIZE range — Group
+  //   transform ile GLOW_PAD offset'i Canvas üstünden uygulanır.
   const buildMedalPath = (): any => {
-    const path = Skia.Skia.Path.Make();
+    const path = SkiaNS.Path.Make();
     const cx = MEDAL_SIZE / 2;
     const cy = MEDAL_SIZE / 2;
     const r = MEDAL_SIZE * 0.34;
@@ -193,50 +193,64 @@ function PremiumMedal({ rarity }: { rarity: BadgeRarity }) {
   };
 
   const medalPath = buildMedalPath();
-  const cx = MEDAL_SIZE / 2;
-  const cy = MEDAL_SIZE / 2;
+  // ★ v297: Coords Canvas içinde GLOW_PAD offset'li çizilir (Group transform).
+  const cx = MEDAL_SIZE / 2 + GLOW_PAD;
+  const cy = MEDAL_SIZE / 2 + GLOW_PAD;
   const haloRadius = MEDAL_SIZE * 0.45;
 
   return (
     <View style={{ width: MEDAL_SIZE, height: MEDAL_SIZE, alignItems: 'center', justifyContent: 'center' }}>
-      <Canvas style={{ width: MEDAL_SIZE, height: MEDAL_SIZE }}>
-        {/* Halo glow (blur arka katman) */}
-        <Group>
-          <Circle cx={cx} cy={cy} r={haloRadius} color={palette.halo}>
-            <BlurMask blur={24} style="normal" />
-          </Circle>
-        </Group>
+      <Canvas
+        style={{
+          position: 'absolute',
+          left: -GLOW_PAD, top: -GLOW_PAD,
+          width: CANVAS_SIZE, height: CANVAS_SIZE,
+        }}
+      >
+        {/* ★ v297: Multi-layer halo — soft cross-platform glow (Android elevation YERINE).
+            3 katman: dış+yumuşak, orta+belirgin, iç+parlak. */}
+        <Circle cx={cx} cy={cy} r={haloRadius * 1.25} color={hexToRgba(palette.primary, 0.14)}>
+          <BlurMask blur={36} style="normal" />
+        </Circle>
+        <Circle cx={cx} cy={cy} r={haloRadius} color={palette.halo}>
+          <BlurMask blur={22} style="normal" />
+        </Circle>
+        <Circle cx={cx} cy={cy} r={haloRadius * 0.9} color={hexToRgba(palette.light, 0.35)}>
+          <BlurMask blur={12} style="normal" />
+        </Circle>
 
-        {/* Ana medal — gradient'li path */}
-        <Group>
+        {/* Ana medal — KESKIN ÇERÇEVE YOK, sadece soft glow + gradient fill.
+            Kullanıcı feedback: "kare çerçeve yapmışsın, glow belirsiz blur tarzı istiyorum". */}
+        <Group transform={[{ translateX: GLOW_PAD }, { translateY: GLOW_PAD }]}>
+          {/* (a) Heavy blur aura — sharp stroke YOK, edge'lerde dağılan glow */}
+          <Path path={medalPath} style="stroke" strokeWidth={8} color={hexToRgba(palette.light, 0.55)}>
+            <BlurMask blur={14} style="normal" />
+          </Path>
+
+          {/* (b) Ana fill — RADIAL gradient (sol-üst aydınlık, sağ-alt koyu)
+              spherical/gem 3D hissi */}
           <Path path={medalPath} style="fill">
-            <SkLinearGradient
-              start={vec(0, 0)} end={vec(MEDAL_SIZE, MEDAL_SIZE)}
-              colors={palette.gradient}
+            <SkRadialGradient
+              c={vec(MEDAL_SIZE * 0.32, MEDAL_SIZE * 0.28)}
+              r={MEDAL_SIZE * 0.85}
+              colors={[palette.light, palette.gradient[1], palette.gradient[2]]}
+              positions={[0, 0.55, 1]}
             />
           </Path>
 
-          {/* İç highlight — üstte ışık vurgusu (Path stroke) */}
-          <Path path={medalPath} style="stroke" strokeWidth={3} color={palette.light}>
-            <BlurMask blur={1} style="solid" />
+          {/* (c) Üst highlight — gem refraction (üst yarıda yumuşak parlak overlay) */}
+          <Path path={medalPath} style="fill">
+            <SkLinearGradient
+              start={vec(MEDAL_SIZE / 2, 0)}
+              end={vec(MEDAL_SIZE / 2, MEDAL_SIZE * 0.55)}
+              colors={[hexToRgba(palette.light, 0.45), 'transparent']}
+            />
           </Path>
         </Group>
 
-        {/* Inner sparkle (legendary için sürekli, epic için yavaş, rare/common yok) */}
-        {(rarity === 'legendary' || rarity === 'epic') && (
-          <Group origin={vec(cx, cy)}>
-            {[0, 60, 120, 180, 240, 300].map((deg, i) => {
-              const rad = (deg * Math.PI) / 180;
-              const sx = cx + Math.cos(rad) * (haloRadius * 0.95);
-              const sy = cy + Math.sin(rad) * (haloRadius * 0.95);
-              return (
-                <Circle key={i} cx={sx} cy={sy} r={3} color={palette.light}>
-                  <BlurMask blur={4} style="solid" />
-                </Circle>
-              );
-            })}
-          </Group>
-        )}
+        {/* ★ v297 (17 May 2026): Sparkle nokta'lar KALDIRILDI — kullanıcı feedback:
+            "kare desen oluşturuyor". 8 nokta (Skia 6 + Animated 4+4) ızgara hissi
+            veriyordu. Sade gem + halo daha premium. */}
       </Canvas>
 
       {/* Üst overlay — orta ikon (MaterialCommunityIcons, Skia content üstünde) */}
@@ -249,71 +263,11 @@ function PremiumMedal({ rarity }: { rarity: BadgeRarity }) {
         />
       </View>
 
-      {/* Animasyonlu sparkle ring overlay (legendary/epic) */}
-      {(rarity === 'legendary' || rarity === 'epic') && (
-        <Animated.View
-          style={{
-            position: 'absolute', width: MEDAL_SIZE, height: MEDAL_SIZE,
-            transform: [{ rotate: rotateStr }],
-            pointerEvents: 'none',
-          }}
-        >
-          {[0, 90, 180, 270].map(deg => (
-            <View
-              key={deg}
-              style={{
-                position: 'absolute',
-                top: '50%', left: '50%',
-                width: 6, height: 6,
-                borderRadius: 3,
-                backgroundColor: palette.light,
-                transform: [
-                  { translateX: -3 },
-                  { translateY: -3 },
-                  { rotate: `${deg}deg` },
-                  { translateY: -MEDAL_SIZE * 0.42 },
-                ],
-                shadowColor: palette.primary,
-                shadowOpacity: 1, shadowRadius: 6, shadowOffset: { width: 0, height: 0 },
-                elevation: 6,
-              }}
-            />
-          ))}
-        </Animated.View>
-      )}
-
-      {/* İkincil halka (sadece legendary) — counter-rotating küçük noktalar */}
-      {rarity === 'legendary' && (
-        <Animated.View
-          style={{
-            position: 'absolute', width: MEDAL_SIZE, height: MEDAL_SIZE,
-            transform: [{ rotate: reverseRotateStr }],
-            pointerEvents: 'none',
-          }}
-        >
-          {[45, 135, 225, 315].map(deg => (
-            <View
-              key={deg}
-              style={{
-                position: 'absolute',
-                top: '50%', left: '50%',
-                width: 4, height: 4,
-                borderRadius: 2,
-                backgroundColor: palette.primary,
-                transform: [
-                  { translateX: -2 },
-                  { translateY: -2 },
-                  { rotate: `${deg}deg` },
-                  { translateY: -MEDAL_SIZE * 0.48 },
-                ],
-                shadowColor: palette.primary,
-                shadowOpacity: 1, shadowRadius: 4, shadowOffset: { width: 0, height: 0 },
-                elevation: 4,
-              }}
-            />
-          ))}
-        </Animated.View>
-      )}
+      {/* ★ v297 (17 May 2026): Tüm Animated.View rotating sparkle overlay'leri KALDIRILDI.
+          Sebep: kullanıcı geri bildirimi "kare çerçeve görünüyor". 8 dot (4+4 ızgara konumu)
+          + Skia içi 6 dot birleşince kareli ızgara hissi veriyordu. Plus shadow elevation:6
+          Android'de zaten dikdörtgen native shadow çiziyordu. Sade gem + multi-layer halo
+          daha premium ("belirsiz blur tarzı" kullanıcı isteği). */}
     </View>
   );
 }
@@ -512,11 +466,11 @@ const styles = StyleSheet.create({
     paddingBottom: 18,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.5,
-    shadowRadius: 24,
-    elevation: 18,
+    borderColor: 'rgba(255,255,255,0.08)',
+    // ★ v297 (17 May 2026): Android elevation:18 + RN shadow KALDIRILDI —
+    //   keskin dikdörtgen native shadow oluyordu. Medal kendi Skia halo'sunu
+    //   taşıyor + backdrop dim arka plan zaten yeterli görsel ayrım. iOS'ta
+    //   da artık shadow yok (sade premium).
   },
   topEdge: {
     position: 'absolute',

@@ -597,13 +597,23 @@ export const RoomService = {
    * ★ Kullanıcının sahip olduğu odaları getir (Odalarım sekmesi)
    */
   async getMyRooms(userId: string): Promise<Room[]> {
+    // ★ v298 (17 May 2026) FIX: Geçici host bug'ı — kullanıcı başka birinin
+    //   odasında geçici host olunca `host_id` ona geçer ama `original_host_id`
+    //   asıl sahibi tutar. Eski query `eq('host_id', userId)` geçici host'a da
+    //   "senin oda" gibi gösteriyordu (kullanıcı sildiğinde "yetki yok" hatası).
+    //   Yeni query: SADECE asıl sahibi user olan odalar döner.
     const { data, error } = await supabase
       .from('rooms')
       .select('*, host:profiles!host_id(*)')
-      .eq('host_id', userId)
+      .or(`host_id.eq.${userId},room_settings->>original_host_id.eq.${userId}`)
       .order('created_at', { ascending: false });
     if (error) throw error;
-    return (data || []) as Room[];
+    // Client-side guard: orijinal sahip kontrolü
+    return (data || []).filter((r: any) => {
+      const orig = r.room_settings?.original_host_id as string | undefined;
+      if (orig) return orig === userId; // Yeni odalar: original_host_id var
+      return r.host_id === userId;       // Legacy odalar: original_host_id yok
+    }) as Room[];
   },
 
   /** Uyuyan odayı uyandır.

@@ -301,6 +301,76 @@ export const RevenueCatService = {
   },
 
   /**
+   * ★ v298 (17 May 2026): SP paket satın alma — Google Play consumable IAP.
+   * Plus/Pro abonelikten farklı: tek seferlik tüketilebilir, balance'a SP ekler.
+   *
+   * Akış:
+   *   1. RevenueCat purchaseProduct(productId) — Google Play receipt al
+   *   2. Başarılı ise → Supabase RPC `purchase_sp_grant(user, package, txId)` çağır
+   *   3. RPC DB'ye SP credit + sp_transactions log
+   *   4. Cache invalidate + return
+   *
+   * Güvenlik notu: Post-launch RevenueCat webhook ile server-side validation
+   * yapılmalı (şu an client'tan trust). Webhook fail-safe değil, ek koruma.
+   */
+  async purchaseSPPackage(
+    userId: string,
+    productId: string, // 'soprano_sp_100' vb.
+  ): Promise<{ success: boolean; spAdded?: number; newBalance?: number; error?: string }> {
+    if (REVENUECAT_MOCK_MODE && __DEV__) {
+      // Dev mode'da fake purchase (test için)
+      try {
+        const { data, error } = await supabase.rpc('purchase_sp_grant', {
+          p_user_id: userId,
+          p_package_id: productId,
+          p_transaction_id: 'mock_' + Date.now(),
+        });
+        if (error) return { success: false, error: error.message };
+        const result = data as any;
+        if (!result?.success) return { success: false, error: result?.error || 'unknown' };
+        return { success: true, spAdded: result.sp_added, newBalance: result.new_balance };
+      } catch (e: any) {
+        return { success: false, error: e.message };
+      }
+    }
+
+    if (!__DEV__ && (REVENUECAT_MOCK_MODE || this._dashboardEmpty)) {
+      return { success: false, error: 'RevenueCat yapılandırılmamış. SP satın alma kullanılamıyor.' };
+    }
+
+    if (this._initPromise) await this._initPromise;
+    if (!this._Purchases) return { success: false, error: 'Satın alma sistemi hazır değil.' };
+
+    try {
+      // RevenueCat purchaseProduct ile consumable product al
+      // Not: subscription product'lardan farklı, purchaseProduct kullanılır
+      const { customerInfo, productIdentifier, transactionIdentifier } =
+        await this._Purchases.purchaseProduct(productId, null, 'INAPP' as any);
+
+      if (!transactionIdentifier) {
+        return { success: false, error: 'Transaction ID alınamadı.' };
+      }
+
+      // DB'ye SP credit + log
+      const { data, error } = await supabase.rpc('purchase_sp_grant', {
+        p_user_id: userId,
+        p_package_id: productId,
+        p_transaction_id: transactionIdentifier,
+      });
+
+      if (error) return { success: false, error: error.message };
+      const result = data as any;
+      if (!result?.success) return { success: false, error: result?.error || 'unknown' };
+
+      return { success: true, spAdded: result.sp_added, newBalance: result.new_balance };
+    } catch (e: any) {
+      // Kullanıcı iptal etti
+      if (e.userCancelled) return { success: false, error: 'iptal_edildi' };
+      return { success: false, error: e.message || 'Satın alma hatası.' };
+    }
+  },
+
+  /**
    * Önceki satın almaları geri yükle.
    * Cihaz değişikliğinde veya yeniden kurulumda kullanılır.
    */

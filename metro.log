@@ -1,4 +1,278 @@
 Starting project at C:\SopranoChat
 Starting Metro Bundler
+warning: Bundler cache is empty, rebuilding (this may take a minute)
 Waiting on http://localhost:8081
 Logs for your project will appear below.
+Android Bundled 18861ms C:\SopranoChat\index.ts (2692 modules)
+ INFO  
+[7m [1m💡 JavaScript logs will be removed from Metro in React Native 0.77![22m Please use React Native DevTools as your default tool. Tip: Type [1mj[22m in the terminal to open (requires Google Chrome or Microsoft Edge).[27m
+ LOG  [RootLayout] Hazırlık süreci başlatıldı...
+ LOG  [RootLayout] Firebase auth listener başlatılıyor...
+ LOG  [RootLayout] Firebase auth state: LOGGED_OUT
+ LOG  [Analytics] userId: (cleared)
+ LOG  [LiveKit] DISCONNECT ÇAĞRILDI
+ LOG  [LiveKit] Stack:     at ?anon_0_ (http://10.0.2.2:8081/index.bundle//&platform=android&dev=true&lazy=true&minify=false&app=com.sopranochat&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&transform.routerRoot=app&transform.engine=hermes&transform.bytecode=1&unstable_transformProfile=hermes-stable:406128:54)
+    at next (native)
+    at asyncGeneratorStep (http://10.0.2.2:8081/index.bundle//&platform=android&dev=true&lazy=true&minify=false&app=com.sopranochat&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&transform.routerRoot=app&transform.engine=hermes&transform.bytecode=1&unstable_transformProfile=hermes-stable:5541:19)
+    at _next (http://10.0.2.2:8081/index.bundle//&platform=android&dev=true&lazy=true&minify=false&app=com.sopranochat&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&transform.routerRoot=app&transform.engine=hermes&transform.bytecode=1&unstable_transformProfile=hermes-stable:5555:29)
+ LOG  [LiveKit] AudioSession modülü hazır
+ LOG  [LiveKit] registerGlobals başarılı
+ LOG  [LiveKit] Client lazily loaded
+Android Bundled 432ms C:\SopranoChat\services\livekit.ts (869 modules)
+ LOG  [RootLayout] Firebase auth state: LOGGED_IN
+ LOG  [RootLayout] Firebase user ready, accessToken factory aktif.
+ LOG  [Analytics] userId: dv9zOs9wgYUBVUnLeilzgpJNoZ53
+ LOG  [Analytics] login_success 
+ LOG  [DMNotif] dm:user:dv9zOs9wgYUBVUnLeilzgpJNoZ53 → SUBSCRIBED
+ LOG  [SPSync] channel status: SUBSCRIBED 
+ LOG  [GiftRT] channel status: SUBSCRIBED for user dv9zOs9wgYUBVUnLeilzgpJNoZ53 
+ LOG  [CallService] Call signal kanal durumu: SUBSCRIBED (user: dv9zOs9w) 
+ LOG  [BoostCleanup] ok {"profile_boosts_cleaned": 0, "room_boosts_cleaned": 0}
+ LOG  [Session] Conflict kanalı: SUBSCRIBED
+ LOG  [DEV] Emülatör algılandı — push token denenecek.
+ LOG  [SPSync] Bakiye güncellendi: 14967166 SP
+ LOG  [SPSync] Bakiye güncellendi: 14967166 SP
+ WARN  Bildirim izni daha önce reddedildi. Ayarlardan açılmalı.
+ LOG  [SPSync] Bakiye güncellendi: 14967166 SP
+ LOG  [RevenueCat] SDK başlatıldı
+Android Bundled 312ms C:\SopranoChat\constants\supabase.ts (526 modules)
+ LOG  [Layout] App ön plana geldi — call signal kanalı yeniden bağlanıyor
+ LOG  [CallService] Manuel reconnect tetiklendi
+ LOG  [CallService] Call signal kanal durumu: CLOSED (user: dv9zOs9w) 
+ LOG  [DEV] Emülatör algılandı — push token denenecek.
+ LOG  [CallService] Call signal kanal durumu: SUBSCRIBED (user: dv9zOs9w) 
+ LOG  [SPSync] Bakiye güncellendi: 14967166 SP
+ LOG  [Push] FCM v1 migration: eski token kaydı silindi.
+ LOG  [Permissions] Tüm izinler (kamera, mikrofon, bildirim) istendi
+Android Bundled 133ms C:\SopranoChat\index.ts (1 module)
+ INFO  
+[7m [1m💡 JavaScript logs will be removed from Metro in React Native 0.77![22m Please use React Native DevTools as your default tool. Tip: Type [1mj[22m in the terminal to open (requires Google Chrome or Microsoft Edge).[27m
+ LOG  [RootLayout] Hazırlık süreci başlatıldı...
+ LOG  [RootLayout] Firebase auth listener başlatılıyor...
+Android Bundled 34ms C:\SopranoChat\services\livekit.ts (1 module)
+ LOG  [RootLayout] Firebase auth state: LOGGED_IN
+ LOG  [RootLayout] Firebase user ready, accessToken factory aktif.
+ LOG  [Analytics] userId: dv9zOs9wgYUBVUnLeilzgpJNoZ53
+ LOG  [Analytics] login_success 
+ LOG  [SPSync] channel status: SUBSCRIBED 
+ LOG  [GiftRT] channel status: SUBSCRIBED for user dv9zOs9wgYUBVUnLeilzgpJNoZ53 
+ LOG  [CallService] Call signal kanal durumu: SUBSCRIBED (user: dv9zOs9w) 
+ LOG  [DEV] Emülatör algılandı — push token denenecek.
+ LOG  [SPSync] Bakiye güncellendi: 14967166 SP
+ LOG  [RevenueCat] SDK başlatıldı
+Android Bundled 32ms C:\SopranoChat\constants\supabase.ts (1 module)
+ LOG  [DMNotif] dm:user:dv9zOs9wgYUBVUnLeilzgpJNoZ53 → SUBSCRIBED
+ LOG  [SPSync] Bakiye güncellendi: 14967166 SP
+ LOG  [Session] Conflict kanalı: SUBSCRIBED
+ LOG  [Typing] typing_dv9zOs9wgYUBVUnLeilzgpJNoZ53 → SUBSCRIBED
+Android Bundled 137ms C:\SopranoChat\index.ts (1 module)
+ INFO  
+[7m [1m💡 JavaScript logs will be removed from Metro in React Native 0.77![22m Please use React Native DevTools as your default tool. Tip: Type [1mj[22m in the terminal to open (requires Google Chrome or Microsoft Edge).[27m
+ LOG  [RootLayout] Hazırlık süreci başlatıldı...
+ LOG  [RootLayout] Firebase auth listener başlatılıyor...
+Android Bundled 35ms C:\SopranoChat\services\livekit.ts (1 module)
+ LOG  [RootLayout] Firebase auth state: LOGGED_IN
+ LOG  [RootLayout] Firebase user ready, accessToken factory aktif.
+ LOG  [Analytics] userId: dv9zOs9wgYUBVUnLeilzgpJNoZ53
+ LOG  [Analytics] login_success 
+ LOG  [SPSync] channel status: SUBSCRIBED 
+ LOG  [GiftRT] channel status: SUBSCRIBED for user dv9zOs9wgYUBVUnLeilzgpJNoZ53 
+ LOG  [CallService] Call signal kanal durumu: SUBSCRIBED (user: dv9zOs9w) 
+ LOG  [DMNotif] dm:user:dv9zOs9wgYUBVUnLeilzgpJNoZ53 → SUBSCRIBED
+ LOG  [Session] Conflict kanalı: SUBSCRIBED
+ LOG  [DEV] Emülatör algılandı — push token denenecek.
+ LOG  [SPSync] Bakiye güncellendi: 14967166 SP
+ LOG  [SPSync] Bakiye güncellendi: 14967166 SP
+Android Bundled 32ms C:\SopranoChat\constants\supabase.ts (1 module)
+ LOG  [RevenueCat] SDK başlatıldı
+ LOG  [SPSync] Bakiye güncellendi: 14967166 SP
+ WARN  [Session] Takeover algılandı, başka cihaz aktif: 199760f2-7e9f-4ad4-b6bd-9e94aebdaf40
+ LOG  [SPSync] Bakiye güncellendi: 14967166 SP
+ WARN  [Session] Takeover algılandı, başka cihaz aktif: 199760f2-7e9f-4ad4-b6bd-9e94aebdaf40
+ LOG  [SPSync] Bakiye güncellendi: 14967166 SP
+ WARN  [Session] Takeover algılandı, başka cihaz aktif: 199760f2-7e9f-4ad4-b6bd-9e94aebdaf40
+ LOG  [SPSync] Bakiye güncellendi: 14967172 SP
+ WARN  [Session] Takeover algılandı, başka cihaz aktif: 199760f2-7e9f-4ad4-b6bd-9e94aebdaf40
+ LOG  [SPSync] Bakiye güncellendi: 14967172 SP
+ LOG  [SPSync] Bakiye güncellendi: 14967172 SP
+ LOG  [SPSync] Bakiye güncellendi: 14967172 SP
+Android Bundled 796ms C:\SopranoChat\services\blocklist.ts (639 modules)
+Android Bundled 497ms C:\SopranoChat\services\store.ts (585 modules)
+ LOG  [Typing] typing_dv9zOs9wgYUBVUnLeilzgpJNoZ53 → SUBSCRIBED
+ LOG  [RootLayout] Firebase auth state: LOGGED_OUT
+ LOG  [LiveKit] DISCONNECT ÇAĞRILDI
+ LOG  [LiveKit] Stack:     at ?anon_0_ (http://10.0.2.2:8081/index.bundle//&platform=android&dev=true&lazy=true&minify=false&app=com.sopranochat&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&transform.routerRoot=app&transform.engine=hermes&transform.bytecode=1&unstable_transformProfile=hermes-stable:406128:54)
+    at next (native)
+    at asyncGeneratorStep (http://10.0.2.2:8081/index.bundle//&platform=android&dev=true&lazy=true&minify=false&app=com.sopranochat&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&transform.routerRoot=app&transform.engine=hermes&transform.bytecode=1&unstable_transformProfile=hermes-stable:5541:19)
+    at _next (http://10.0.2.2:8081/index.bundle//&platform=android&dev=true&lazy=true&minify=false&app=com.sopranochat&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&transform.routerRoot=app&transform.engine=hermes&transform.bytecode=1&unstable_transformProfile=hermes-stable:5555:29)
+ LOG  [Typing] typing_dv9zOs9wgYUBVUnLeilzgpJNoZ53 → CLOSED
+ LOG  [Typing] typing_dv9zOs9wgYUBVUnLeilzgpJNoZ53 → CLOSED
+ LOG  [LiveKit] AudioSession modülü hazır
+ LOG  [LiveKit] registerGlobals başarılı
+ LOG  [LiveKit] Client lazily loaded
+ LOG  [Session] Conflict kanalı: CLOSED
+ LOG  [DMNotif] dm:user:dv9zOs9wgYUBVUnLeilzgpJNoZ53 → CLOSED
+ LOG  [SPSync] channel status: CLOSED 
+ LOG  [GiftRT] channel status: CLOSED for user dv9zOs9wgYUBVUnLeilzgpJNoZ53 
+ LOG  [Analytics] userId: (cleared)
+ LOG  [LiveKit] DISCONNECT ÇAĞRILDI
+ LOG  [LiveKit] Stack:     at ?anon_0_ (http://10.0.2.2:8081/index.bundle//&platform=android&dev=true&lazy=true&minify=false&app=com.sopranochat&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&transform.routerRoot=app&transform.engine=hermes&transform.bytecode=1&unstable_transformProfile=hermes-stable:406128:54)
+    at next (native)
+    at asyncGeneratorStep (http://10.0.2.2:8081/index.bundle//&platform=android&dev=true&lazy=true&minify=false&app=com.sopranochat&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&transform.routerRoot=app&transform.engine=hermes&transform.bytecode=1&unstable_transformProfile=hermes-stable:5541:19)
+    at _next (http://10.0.2.2:8081/index.bundle//&platform=android&dev=true&lazy=true&minify=false&app=com.sopranochat&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&transform.routerRoot=app&transform.engine=hermes&transform.bytecode=1&unstable_transformProfile=hermes-stable:5555:29)
+ LOG  [LiveKit] AudioSession durduruldu
+ LOG  [RootLayout] Firebase auth state: LOGGED_IN
+ LOG  [RootLayout] Firebase user ready, accessToken factory aktif.
+ LOG  [CallService] Call signal kanal durumu: CLOSED (user: dv9zOs9w) 
+ LOG  [Analytics] userId: I8feZfsmpDO0M0HvbCtWEBot5Jp2
+ LOG  [Analytics] login_success 
+ LOG  [DMNotif] dm:user:I8feZfsmpDO0M0HvbCtWEBot5Jp2 → SUBSCRIBED
+ LOG  [SPSync] channel status: SUBSCRIBED 
+ LOG  [GiftRT] channel status: SUBSCRIBED for user I8feZfsmpDO0M0HvbCtWEBot5Jp2 
+ LOG  [CallService] Call signal kanal durumu: SUBSCRIBED (user: I8feZfsm) 
+ LOG  [Session] Conflict kanalı: SUBSCRIBED
+ LOG  [SPSync] Bakiye güncellendi: 287 SP
+ LOG  [SPSync] Bakiye güncellendi: 287 SP
+ LOG  [DEV] Emülatör algılandı — push token denenecek.
+ LOG  [SPSync] Bakiye güncellendi: 290 SP
+ LOG  [SPSync] Bakiye güncellendi: 290 SP
+Android Bundled 177ms C:\SopranoChat\index.ts (1 module)
+Android Bundled 218ms C:\SopranoChat\index.ts (1 module)
+Android Bundled 316ms C:\SopranoChat\index.ts (1 module)
+Android Bundled 198ms C:\SopranoChat\index.ts (1 module)
+Android Bundled 188ms C:\SopranoChat\index.ts (1 module)
+Android Bundled 192ms C:\SopranoChat\index.ts (1 module)
+ INFO  
+[7m [1m💡 JavaScript logs will be removed from Metro in React Native 0.77![22m Please use React Native DevTools as your default tool. Tip: Type [1mj[22m in the terminal to open (requires Google Chrome or Microsoft Edge).[27m
+ LOG  [RootLayout] Hazırlık süreci başlatıldı...
+ LOG  [RootLayout] Firebase auth listener başlatılıyor...
+Android Bundled 64ms C:\SopranoChat\services\livekit.ts (1 module)
+ LOG  [RootLayout] Firebase auth state: LOGGED_IN
+ LOG  [RootLayout] Firebase user ready, accessToken factory aktif.
+ LOG  [Analytics] userId: I8feZfsmpDO0M0HvbCtWEBot5Jp2
+ LOG  [Analytics] login_success 
+ LOG  [SPSync] channel status: SUBSCRIBED 
+ LOG  [GiftRT] channel status: SUBSCRIBED for user I8feZfsmpDO0M0HvbCtWEBot5Jp2 
+ LOG  [CallService] Call signal kanal durumu: SUBSCRIBED (user: I8feZfsm) 
+ LOG  [DEV] Emülatör algılandı — push token denenecek.
+ INFO  [RevenueCat] Purchases instance already set with the same configuration. Ignoring duplicate call.
+ LOG  [SPSync] Bakiye güncellendi: 290 SP
+ LOG  [RevenueCat] SDK başlatıldı
+Android Bundled 49ms C:\SopranoChat\constants\supabase.ts (1 module)
+ LOG  [DMNotif] dm:user:I8feZfsmpDO0M0HvbCtWEBot5Jp2 → SUBSCRIBED
+ LOG  [SPSync] Bakiye güncellendi: 290 SP
+ LOG  [Session] Conflict kanalı: SUBSCRIBED
+Android Bundled 217ms C:\SopranoChat\index.ts (1 module)
+Android Bundled 348ms C:\SopranoChat\index.ts (1 module)
+Android Bundled 52ms C:\SopranoChat\services\store.ts (1 module)
+ INFO  
+[7m [1m💡 JavaScript logs will be removed from Metro in React Native 0.77![22m Please use React Native DevTools as your default tool. Tip: Type [1mj[22m in the terminal to open (requires Google Chrome or Microsoft Edge).[27m
+ LOG  [RootLayout] Hazırlık süreci başlatıldı...
+ LOG  [RootLayout] Firebase auth listener başlatılıyor...
+Android Bundled 48ms C:\SopranoChat\services\livekit.ts (1 module)
+ LOG  [RootLayout] Firebase auth state: LOGGED_IN
+ LOG  [RootLayout] Firebase user ready, accessToken factory aktif.
+ LOG  [Analytics] userId: I8feZfsmpDO0M0HvbCtWEBot5Jp2
+ LOG  [Analytics] login_success 
+ LOG  [SPSync] channel status: SUBSCRIBED 
+ LOG  [GiftRT] channel status: SUBSCRIBED for user I8feZfsmpDO0M0HvbCtWEBot5Jp2 
+ LOG  [CallService] Call signal kanal durumu: SUBSCRIBED (user: I8feZfsm) 
+ LOG  [SPSync] Bakiye güncellendi: 290 SP
+ LOG  [DMNotif] dm:user:I8feZfsmpDO0M0HvbCtWEBot5Jp2 → SUBSCRIBED
+ LOG  [DEV] Emülatör algılandı — push token denenecek.
+ LOG  [Session] Conflict kanalı: SUBSCRIBED
+ INFO  [RevenueCat] Purchases instance already set with the same configuration. Ignoring duplicate call.
+Android Bundled 37ms C:\SopranoChat\constants\supabase.ts (1 module)
+ LOG  [SPSync] Bakiye güncellendi: 290 SP
+ LOG  [RevenueCat] SDK başlatıldı
+Android Bundled 133ms C:\SopranoChat\index.ts (1 module)
+ INFO  
+[7m [1m💡 JavaScript logs will be removed from Metro in React Native 0.77![22m Please use React Native DevTools as your default tool. Tip: Type [1mj[22m in the terminal to open (requires Google Chrome or Microsoft Edge).[27m
+ LOG  [RootLayout] Hazırlık süreci başlatıldı...
+ LOG  [RootLayout] Firebase auth listener başlatılıyor...
+Android Bundled 45ms C:\SopranoChat\services\livekit.ts (1 module)
+ LOG  [RootLayout] Firebase auth state: LOGGED_IN
+ LOG  [RootLayout] Firebase user ready, accessToken factory aktif.
+ LOG  [Analytics] userId: I8feZfsmpDO0M0HvbCtWEBot5Jp2
+ LOG  [Analytics] login_success 
+ LOG  [SPSync] channel status: SUBSCRIBED 
+ LOG  [GiftRT] channel status: SUBSCRIBED for user I8feZfsmpDO0M0HvbCtWEBot5Jp2 
+ LOG  [CallService] Call signal kanal durumu: SUBSCRIBED (user: I8feZfsm) 
+ LOG  [DEV] Emülatör algılandı — push token denenecek.
+ LOG  [RevenueCat] SDK başlatıldı
+Android Bundled 26ms C:\SopranoChat\constants\supabase.ts (1 module)
+ LOG  [DMNotif] dm:user:I8feZfsmpDO0M0HvbCtWEBot5Jp2 → SUBSCRIBED
+ LOG  [SPSync] Bakiye güncellendi: 290 SP
+ LOG  [Session] Conflict kanalı: SUBSCRIBED
+ LOG  [SPSync] channel status: CLOSED 
+ LOG  [GiftRT] channel status: CLOSED for user I8feZfsmpDO0M0HvbCtWEBot5Jp2 
+ LOG  [DMNotif] dm:user:I8feZfsmpDO0M0HvbCtWEBot5Jp2 → CLOSED
+ LOG  [Session] Conflict kanalı: CLOSED
+ LOG  [RootLayout] Hazırlık süreci başlatıldı...
+ LOG  [RootLayout] Firebase auth listener başlatılıyor...
+ LOG  [RootLayout] Firebase auth state: LOGGED_IN
+ LOG  [RootLayout] Firebase user ready, accessToken factory aktif.
+ LOG  [Analytics] userId: I8feZfsmpDO0M0HvbCtWEBot5Jp2
+ LOG  [Analytics] login_success 
+ LOG  [SPSync] channel status: SUBSCRIBED 
+ LOG  [GiftRT] channel status: SUBSCRIBED for user I8feZfsmpDO0M0HvbCtWEBot5Jp2 
+ LOG  [DMNotif] dm:user:I8feZfsmpDO0M0HvbCtWEBot5Jp2 → SUBSCRIBED
+ LOG  [DEV] Emülatör algılandı — push token denenecek.
+ INFO  [RevenueCat] Purchases instance already set with the same configuration. Ignoring duplicate call.
+ LOG  [Session] Conflict kanalı: SUBSCRIBED
+ LOG  [RevenueCat] SDK başlatıldı
+ LOG  [SPSync] Bakiye güncellendi: 290 SP
+ LOG  [SPSync] Bakiye güncellendi: 290 SP
+Android Bundled 133ms C:\SopranoChat\index.ts (1 module)
+ INFO  
+[7m [1m💡 JavaScript logs will be removed from Metro in React Native 0.77![22m Please use React Native DevTools as your default tool. Tip: Type [1mj[22m in the terminal to open (requires Google Chrome or Microsoft Edge).[27m
+ LOG  [RootLayout] Hazırlık süreci başlatıldı...
+ LOG  [RootLayout] Firebase auth listener başlatılıyor...
+Android Bundled 34ms C:\SopranoChat\services\livekit.ts (1 module)
+ LOG  [RootLayout] Firebase auth state: LOGGED_IN
+ LOG  [RootLayout] Firebase user ready, accessToken factory aktif.
+ LOG  [Analytics] userId: I8feZfsmpDO0M0HvbCtWEBot5Jp2
+ LOG  [Analytics] login_success 
+ LOG  [SPSync] channel status: SUBSCRIBED 
+ LOG  [GiftRT] channel status: SUBSCRIBED for user I8feZfsmpDO0M0HvbCtWEBot5Jp2 
+ LOG  [CallService] Call signal kanal durumu: SUBSCRIBED (user: I8feZfsm) 
+ LOG  [DEV] Emülatör algılandı — push token denenecek.
+ LOG  [SPSync] Bakiye güncellendi: 290 SP
+ LOG  [RevenueCat] SDK başlatıldı
+ LOG  [DMNotif] dm:user:I8feZfsmpDO0M0HvbCtWEBot5Jp2 → SUBSCRIBED
+Android Bundled 25ms C:\SopranoChat\constants\supabase.ts (1 module)
+ LOG  [SPSync] Bakiye güncellendi: 290 SP
+ LOG  [Session] Conflict kanalı: SUBSCRIBED
+Android Bundled 31ms C:\SopranoChat\services\store.ts (1 module)
+ WARN  [Account] Firebase delete error (may need re-auth): Firebase: Error (auth/requires-recent-login).
+ LOG  [RootLayout] Firebase auth state: LOGGED_OUT
+ LOG  [LiveKit] DISCONNECT ÇAĞRILDI
+ LOG  [LiveKit] Stack:     at ?anon_0_ (http://10.0.2.2:8081/index.bundle//&platform=android&dev=true&lazy=true&minify=false&app=com.sopranochat&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&transform.routerRoot=app&transform.engine=hermes&transform.bytecode=1&unstable_transformProfile=hermes-stable:405582:54)
+    at next (native)
+    at asyncGeneratorStep (http://10.0.2.2:8081/index.bundle//&platform=android&dev=true&lazy=true&minify=false&app=com.sopranochat&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&transform.routerRoot=app&transform.engine=hermes&transform.bytecode=1&unstable_transformProfile=hermes-stable:5541:19)
+    at _next (http://10.0.2.2:8081/index.bundle//&platform=android&dev=true&lazy=true&minify=false&app=com.sopranochat&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&transform.routerRoot=app&transform.engine=hermes&transform.bytecode=1&unstable_transformProfile=hermes-stable:5555:29)
+ LOG  [LiveKit] AudioSession modülü hazır
+ LOG  [LiveKit] registerGlobals başarılı
+ LOG  [LiveKit] Client lazily loaded
+ LOG  [Session] Conflict kanalı: CLOSED
+ LOG  [DMNotif] dm:user:I8feZfsmpDO0M0HvbCtWEBot5Jp2 → CLOSED
+ LOG  [SPSync] channel status: CLOSED 
+ LOG  [GiftRT] channel status: CLOSED for user I8feZfsmpDO0M0HvbCtWEBot5Jp2 
+ LOG  [Analytics] userId: (cleared)
+ LOG  [LiveKit] DISCONNECT ÇAĞRILDI
+ LOG  [LiveKit] Stack:     at ?anon_0_ (http://10.0.2.2:8081/index.bundle//&platform=android&dev=true&lazy=true&minify=false&app=com.sopranochat&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&transform.routerRoot=app&transform.engine=hermes&transform.bytecode=1&unstable_transformProfile=hermes-stable:405582:54)
+    at next (native)
+    at asyncGeneratorStep (http://10.0.2.2:8081/index.bundle//&platform=android&dev=true&lazy=true&minify=false&app=com.sopranochat&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&transform.routerRoot=app&transform.engine=hermes&transform.bytecode=1&unstable_transformProfile=hermes-stable:5541:19)
+    at _next (http://10.0.2.2:8081/index.bundle//&platform=android&dev=true&lazy=true&minify=false&app=com.sopranochat&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&transform.routerRoot=app&transform.engine=hermes&transform.bytecode=1&unstable_transformProfile=hermes-stable:5555:29)
+ LOG  [LiveKit] AudioSession durduruldu
+ LOG  [RootLayout] Firebase auth state: LOGGED_IN
+ LOG  [RootLayout] Firebase user ready, accessToken factory aktif.
+ LOG  [Analytics] userId: I8feZfsmpDO0M0HvbCtWEBot5Jp2
+ LOG  [Analytics] login_success 
+ LOG  [DMNotif] dm:user:I8feZfsmpDO0M0HvbCtWEBot5Jp2 → SUBSCRIBED
+ LOG  [SPSync] channel status: SUBSCRIBED 
+ LOG  [GiftRT] channel status: SUBSCRIBED for user I8feZfsmpDO0M0HvbCtWEBot5Jp2 
+ LOG  [DEV] Emülatör algılandı — push token denenecek.
+ LOG  [Session] Conflict kanalı: SUBSCRIBED
+ WARN  Push token kayıt hatası: insert or update on table "push_tokens" violates foreign key constraint "push_tokens_user_id_fkey"
+ LOG  [SPSync] Bakiye güncellendi: 0 SP
