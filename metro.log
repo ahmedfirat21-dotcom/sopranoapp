@@ -580,3 +580,105 @@ Android Bundled 2ms C:\SopranoChat\utils\fetchTimeout.ts (1 module)
  LOG  [LiveKit] Token alındı — roomId=3e1c79fd-df55-42f0-83bb-bddcd56bb1f7, role=owner
  LOG  [LiveKit] Bağlantı başarılı (deneme 1/3)
  LOG  [SPSync] Bakiye güncellendi: 3 SP
+ LOG  [Broadcast] emoji:3e1c79fd-df55-42f0-83bb-bddcd56bb1f7 → CLOSED
+ LOG  [Broadcast] mic_req:3e1c79fd-df55-42f0-83bb-bddcd56bb1f7 → CLOSED
+ LOG  [Broadcast] mod_action:3e1c79fd-df55-42f0-83bb-bddcd56bb1f7 → CLOSED
+ LOG  [Realtime] room:3e1c79fd-df55-42f0-83bb-bddcd56bb1f7 status → CLOSED 
+ LOG  [Realtime] room_status:3e1c79fd-df55-42f0-83bb-bddcd56bb1f7 status → CLOSED
+ LOG  [Room] CLEANUP — isMinimizing=true
+ LOG  [Room] CLEANUP — minimize mode, LiveKit korunuyor
+ LOG  [useLiveKit] UNMOUNT CLEANUP — shouldDisconnect=false
+ LOG  [useLiveKit] UNMOUNT SKIPPED — minimize, LiveKit korunuyor
+ LOG  [LiveKit] DISCONNECT ÇAĞRILDI
+ LOG  [LiveKit] Stack:     at ?anon_0_ (http://10.0.2.2:8081/index.bundle//&platform=android&dev=true&lazy=true&minify=false&app=com.sopranochat&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&transform.routerRoot=app&transform.engine=hermes&transform.bytecode=1&unstable_transformProfile=hermes-stable:405754:54)
+    at next (native)
+    at asyncGeneratorStep (http://10.0.2.2:8081/index.bundle//&platform=android&dev=true&lazy=true&minify=false&app=com.sopranochat&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&transform.routerRoot=app&transform.engine=hermes&transform.bytecode=1&unstable_transformProfile=hermes-stable:5541:19)
+    at _next (http://10.0.2.2:8081/index.bundle//&platform=android&dev=true&lazy=true&minify=false&app=com.sopranochat&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&transform.routerRoot=app&transform.engine=hermes&transform.bytecode=1&unstable_transformProfile=hermes-stable:5555:29)
+ INFO  disconnect from room {"participant": "I8feZfsmpDO0M0HvbCtWEBot5Jp2", "participantID": "PA_YB8fzuyGr6WT", "room": "3e1c79fd-df55-42f0-83bb-bddcd56bb1f7", "roomID": "RM_BpZWGsruo9Lp"}
+ WARN  detected connection state mismatch {"engine": {"closed": true, "transportsConnectedOrConnecting": false}, "numFailures": 1, "participant": "I8feZfsmpDO0M0HvbCtWEBot5Jp2", "participantID": "PA_YB8fzuyGr6WT", "room": "3e1c79fd-df55-42f0-83bb-bddcd56bb1f7", "roomID": "RM_BpZWGsruo9Lp"}
+ LOG  [LiveKit] AudioSession durduruldu
+ LOG  [AutoClose] Boş oda kapatıldı: 3e1c79fd-df55-42f0-83bb-bddcd56bb1f7
+ WARN  [Account] Firebase delete error (may need re-auth): Firebase: Error (auth/requires-recent-login).
+ ERROR  [RevenueCat] 😿‼️ Called logOut but the current user is anonymous
+ WARN  [RevenueCat] logout hatası: [Error: Called logOut but the current user is anonymous.]
+ LOG  [RootLayout] Firebase auth state: LOGGED_OUT
+ LOG  [LiveKit] DISCONNECT ÇAĞRILDI
+ LOG  [LiveKit] Stack:     at ?anon_0_ (http://10.0.2.2:8081/index.bundle//&platform=android&dev=true&lazy=true&minify=false&app=com.sopranochat&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&transform.routerRoot=app&transform.engine=hermes&transform.bytecode=1&unstable_transformProfile=hermes-stable:405754:54)
+    at next (native)
+    at asyncGeneratorStep (http://10.0.2.2:8081/index.bundle//&platform=android&dev=true&lazy=true&minify=false&app=com.sopranochat&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&transform.routerRoot=app&transform.engine=hermes&transform.bytecode=1&unstable_transformProfile=hermes-stable:5541:19)
+    at _next (http://10.0.2.2:8081/index.bundle//&platform=android&dev=true&lazy=true&minify=false&app=com.sopranochat&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&transform.routerRoot=app&transform.engine=hermes&transform.bytecode=1&unstable_transformProfile=hermes-stable:5555:29)
+ LOG  [LiveKit] AudioSession durduruldu
+ LOG  [Session] Conflict kanalı: CLOSED
+ LOG  [DMNotif] dm:user:I8feZfsmpDO0M0HvbCtWEBot5Jp2 → CLOSED
+ LOG  [SPSync] channel status: CLOSED 
+ LOG  [GiftRT] channel status: CLOSED for user I8feZfsmpDO0M0HvbCtWEBot5Jp2 
+ LOG  [Analytics] userId: (cleared)
+ LOG  [LiveKit] DISCONNECT ÇAĞRILDI
+ LOG  [LiveKit] Stack:     at ?anon_0_ (http://10.0.2.2:8081/index.bundle//&platform=android&dev=true&lazy=true&minify=false&app=com.sopranochat&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&transform.routerRoot=app&transform.engine=hermes&transform.bytecode=1&unstable_transformProfile=hermes-stable:405754:54)
+    at next (native)
+    at asyncGeneratorStep (http://10.0.2.2:8081/index.bundle//&platform=android&dev=true&lazy=true&minify=false&app=com.sopranochat&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&transform.routerRoot=app&transform.engine=hermes&transform.bytecode=1&unstable_transformProfile=hermes-stable:5541:19)
+    at _next (http://10.0.2.2:8081/index.bundle//&platform=android&dev=true&lazy=true&minify=false&app=com.sopranochat&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&transform.routerRoot=app&transform.engine=hermes&transform.bytecode=1&unstable_transformProfile=hermes-stable:5555:29)
+ LOG  [LiveKit] AudioSession durduruldu
+ ERROR  SyntaxError: C:\SopranoChat\app\create-room.tsx: Expected corresponding JSX closing tag for <SkiaShadow>. (1509:12)
+
+  1507 |                 <Ionicons name={currentStepMeta.icon as any} size={36} color={currentStepMeta.accent} />
+  1508 |               </LinearGradient>
+> 1509 |             </View>
+       |             ^
+  1510 |
+  1511 |             {/* Hero Title + Subtitle — text shadow yok, sade */}
+  1512 |             <Text style={w.heroTitle}>{t(currentStepMeta.titleKey)}</Text>
+ ERROR  [Error: TransformError SyntaxError: C:\SopranoChat\app\create-room.tsx: Expected corresponding JSX closing tag for <SkiaShadow>. (1509:12)
+
+[0m [90m 1507 |[39m                 [33m<[39m[33mIonicons[39m name[33m=[39m{currentStepMeta[33m.[39micon [36mas[39m any} size[33m=[39m{[35m36[39m} color[33m=[39m{currentStepMeta[33m.[39maccent} [33m/[39m[33m>[39m
+ [90m 1508 |[39m               [33m<[39m[33m/[39m[33mLinearGradient[39m[33m>[39m
+[31m[1m>[22m[39m[90m 1509 |[39m             [33m<[39m[33m/[39m[33mView[39m[33m>[39m
+ [90m      |[39m             [31m[1m^[22m[39m
+ [90m 1510 |[39m
+ [90m 1511 |[39m             {[90m/* Hero Title + Subtitle — text shadow yok, sade */[39m}
+ [90m 1512 |[39m             [33m<[39m[33mText[39m style[33m=[39m{w[33m.[39mheroTitle}[33m>[39m{t(currentStepMeta[33m.[39mtitleKey)}[33m<[39m[33m/[39m[33mText[39m[33m>[39m[0m]
+ ERROR  SyntaxError: C:\SopranoChat\app\create-room.tsx: Expected corresponding JSX closing tag for <SkiaShadow>. (1509:12)
+
+  1507 |                 <Ionicons name={currentStepMeta.icon as any} size={36} color={currentStepMeta.accent} />
+  1508 |               </LinearGradient>
+> 1509 |             </View>
+       |             ^
+  1510 |
+  1511 |             {/* Hero Title + Subtitle — text shadow yok, sade */}
+  1512 |             <Text style={w.heroTitle}>{t(currentStepMeta.titleKey)}</Text>
+ ERROR  [Error: TransformError SyntaxError: C:\SopranoChat\app\create-room.tsx: Expected corresponding JSX closing tag for <SkiaShadow>. (1509:12)
+
+[0m [90m 1507 |[39m                 [33m<[39m[33mIonicons[39m name[33m=[39m{currentStepMeta[33m.[39micon [36mas[39m any} size[33m=[39m{[35m36[39m} color[33m=[39m{currentStepMeta[33m.[39maccent} [33m/[39m[33m>[39m
+ [90m 1508 |[39m               [33m<[39m[33m/[39m[33mLinearGradient[39m[33m>[39m
+[31m[1m>[22m[39m[90m 1509 |[39m             [33m<[39m[33m/[39m[33mView[39m[33m>[39m
+ [90m      |[39m             [31m[1m^[22m[39m
+ [90m 1510 |[39m
+ [90m 1511 |[39m             {[90m/* Hero Title + Subtitle — text shadow yok, sade */[39m}
+ [90m 1512 |[39m             [33m<[39m[33mText[39m style[33m=[39m{w[33m.[39mheroTitle}[33m>[39m{t(currentStepMeta[33m.[39mtitleKey)}[33m<[39m[33m/[39m[33mText[39m[33m>[39m[0m]
+Android Bundled 128ms C:\SopranoChat\index.ts (1 module)
+ INFO  
+[7m [1m💡 JavaScript logs will be removed from Metro in React Native 0.77![22m Please use React Native DevTools as your default tool. Tip: Type [1mj[22m in the terminal to open (requires Google Chrome or Microsoft Edge).[27m
+ LOG  [RootLayout] Hazırlık süreci başlatıldı...
+ LOG  [RootLayout] Firebase auth listener başlatılıyor...
+ LOG  [RootLayout] Firebase auth state: LOGGED_OUT
+ LOG  [Analytics] userId: (cleared)
+ LOG  [LiveKit] DISCONNECT ÇAĞRILDI
+ LOG  [LiveKit] Stack:     at ?anon_0_ (http://10.0.2.2:8081/index.bundle//&platform=android&dev=true&lazy=true&minify=false&app=com.sopranochat&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&transform.routerRoot=app&transform.engine=hermes&transform.bytecode=1&unstable_transformProfile=hermes-stable:405754:54)
+    at next (native)
+    at asyncGeneratorStep (http://10.0.2.2:8081/index.bundle//&platform=android&dev=true&lazy=true&minify=false&app=com.sopranochat&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&transform.routerRoot=app&transform.engine=hermes&transform.bytecode=1&unstable_transformProfile=hermes-stable:5541:19)
+    at _next (http://10.0.2.2:8081/index.bundle//&platform=android&dev=true&lazy=true&minify=false&app=com.sopranochat&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&transform.routerRoot=app&transform.engine=hermes&transform.bytecode=1&unstable_transformProfile=hermes-stable:5555:29)
+ LOG  [LiveKit] AudioSession modülü hazır
+ LOG  [LiveKit] registerGlobals başarılı
+ LOG  [LiveKit] Client lazily loaded
+Android Bundled 33ms C:\SopranoChat\services\livekit.ts (1 module)
+ LOG  [RootLayout] Firebase auth state: LOGGED_IN
+ LOG  [RootLayout] Firebase user ready, accessToken factory aktif.
+ LOG  [Analytics] userId: I8feZfsmpDO0M0HvbCtWEBot5Jp2
+ LOG  [Analytics] login_success 
+ LOG  [DMNotif] dm:user:I8feZfsmpDO0M0HvbCtWEBot5Jp2 → SUBSCRIBED
+ LOG  [SPSync] channel status: SUBSCRIBED 
+ LOG  [GiftRT] channel status: SUBSCRIBED for user I8feZfsmpDO0M0HvbCtWEBot5Jp2 
+ LOG  [CallService] Call signal kanal durumu: SUBSCRIBED (user: I8feZfsm) 
+ LOG  [DEV] Emülatör algılandı — push token denenecek.
+ LOG  [Session] Conflict kanalı: SUBSCRIBED
+ WARN  Push token kayıt hatası: insert or update on table "push_tokens" violates foreign key constraint "push_tokens_user_id_fkey"

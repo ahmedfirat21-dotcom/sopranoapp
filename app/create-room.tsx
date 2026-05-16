@@ -1473,10 +1473,9 @@ export default function CreateRoomScreen() {
             {/* ★ 2026-05-05: Hero icon — family slate base + accent halo ring (vibrant gradient yerine).
                  Step renkleri artık SADECE accent ring + ikon tint olarak görünür (sade fark işareti). */}
             <View style={w.heroIconWrap}>
-              {/* ★ v298.2 (17 May 2026): Accent halo Skia ile cross-platform glow.
-                  Önceden View + colored shadowColor + Android elevation:4 →
-                  dikdörtgen iz kalıyordu. GlowView auto-detect renkli shadow için
-                  Skia BlurMask kullanıyor. */}
+              {/* ★ v298.3 (17 May 2026): Accent halo basit GlowView (Skia) — wrapper YOK,
+                  layout korunur. Önceden SkiaShadow ekledim → iconCircle accent ring'den
+                  kaydı (görsel offset duplicate). Tek katman GlowView yeterli. */}
               <GlowView style={[w.heroAccentRing, {
                 borderColor: currentStepMeta.accent + '55',
                 shadowColor: currentStepMeta.accent,
@@ -1484,15 +1483,6 @@ export default function CreateRoomScreen() {
                 shadowRadius: 18,
                 shadowOffset: { width: 0, height: 0 },
               }]} pointerEvents="none" />
-              {/* ★ v298.2: Hero icon Skia shadow — black RN shadow + elevation:14
-                  Android'de dikdörtgen iz oluşturuyordu. SkiaShadow ile soft cross-platform. */}
-              <SkiaShadow
-                shadowColor={currentStepMeta.accent}
-                shadowOpacity={0.35}
-                shadowBlur={20}
-                shadowOffsetY={8}
-                borderRadius={26}
-              >
               <LinearGradient
                 colors={currentStepMeta.gradient}
                 start={{ x: 0.2, y: 0 }} end={{ x: 0.8, y: 1 }}
@@ -1506,7 +1496,6 @@ export default function CreateRoomScreen() {
                 />
                 <Ionicons name={currentStepMeta.icon as any} size={36} color={currentStepMeta.accent} />
               </LinearGradient>
-              </SkiaShadow>
             </View>
 
             {/* Hero Title + Subtitle — text shadow yok, sade */}
@@ -1959,15 +1948,16 @@ const w = StyleSheet.create({
     borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.12)',
     padding: 18, justifyContent: 'flex-end',
     marginBottom: 18,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.45, shadowRadius: 18, elevation: 10,
+    // ★ v298.3 (17 May 2026): RN shadow + elevation:10 KALDIRILDI — Android'de
+    //   dikdörtgen native shadow oluyordu, fade transition'da iz bırakıyordu.
+    //   Border + inner gradient zaten yeterli derinlik veriyor.
   },
   reviewBadge: {
     position: 'absolute', top: 14, left: 14,
     flexDirection: 'row', alignItems: 'center', gap: 5,
     backgroundColor: 'rgba(239,68,68,0.95)',
     paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.4, shadowRadius: 8, elevation: 4,
+    // ★ v298.3: elevation kaldırıldı (Android dikdörtgen shadow iz bırakıyordu).
   },
   reviewTitle: { fontSize: 22, fontWeight: '800', color: '#FFF', letterSpacing: 0.2 },
   reviewDesc: { fontSize: 13, color: 'rgba(255,255,255,0.85)', marginTop: 4, lineHeight: 17 },
