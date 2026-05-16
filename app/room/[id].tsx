@@ -75,6 +75,7 @@ const showToast = (opts: Partial<ToastMessage> & { title: string }) => {
 
 import { useAuth, useBadges, useDMNotifOptional, useUserProfileSheet, useUserSearchSheet } from '../_layout';
 import { i18n, useTranslation } from '../../services/i18n';
+import { useRoomLayout } from '../../services/roomLayoutConfig';
 import useLiveKit from '../../hooks/useLiveKit';
 import { useMicMeter } from '../../hooks/useMicMeter';
 
@@ -1548,6 +1549,10 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
 export default function RoomScreen() {
   const router = useRouter();
   const { t } = useTranslation();
+  // ★ v284 (16 May 2026): Web admin → DB → realtime → buradaki tüm görsel ayarlar.
+  //   roomLayout.global.bg* renk/arkaplan; header.* başlık; controls.* alt bar.
+  //   sub-component'ler de aynı hook'u çağırır (singleton cache).
+  const roomLayout = useRoomLayout();
   const insets = useSafeAreaInsets();
   const { id, justCreated, caption } = useLocalSearchParams<{ id: string; justCreated?: string; caption?: string }>();
   const { firebaseUser, profile, setMinimizedRoom, minimizedRoom, showNotifDrawer, setShowNotifDrawer, setNotifDrawerAnchorRight, setNotifDrawerRight, setNotifDrawerTop } = useAuth();
@@ -4481,6 +4486,28 @@ export default function RoomScreen() {
             <LinearGradient colors={[themeColors[0], themeColors[1], '#070B14']} start={{ x: 0, y: 0 }} end={{ x: 0.5, y: 1 }} style={StyleSheet.absoluteFillObject} pointerEvents="none" />
           );
         }
+        // ★ v284: Web admin "Oda Düzeni" config → room_layout_config.global.bg*
+        //   Theme/bgImage yoksa admin config'i uygulanır. Admin "none" seçerse
+        //   default room_in_bg.jpg gösterilir.
+        const gb = roomLayout.global;
+        if (gb.background === 'solid' && gb.bgColor) {
+          return (
+            <View style={[StyleSheet.absoluteFillObject, { backgroundColor: gb.bgColor }]} pointerEvents="none" />
+          );
+        }
+        if (gb.background === 'gradient' && Array.isArray(gb.bgGradient) && gb.bgGradient.length >= 2) {
+          return (
+            <LinearGradient colors={gb.bgGradient as any} style={StyleSheet.absoluteFillObject} pointerEvents="none" />
+          );
+        }
+        if (gb.background === 'image' && gb.bgImageUrl) {
+          return (
+            <ImageBackground source={{ uri: gb.bgImageUrl }} style={StyleSheet.absoluteFillObject} resizeMode="cover">
+              <LinearGradient colors={['rgba(12,24,41,0.3)', 'rgba(10,21,32,0.5)', 'rgba(7,16,24,0.7)']} style={StyleSheet.absoluteFillObject} pointerEvents="none" />
+            </ImageBackground>
+          );
+        }
+        // Fallback: mevcut default (admin "none" seçerse veya config yüklenirken)
         return (
           <ImageBackground source={require('../../assets/images/room_in_bg.jpg')} style={StyleSheet.absoluteFillObject} resizeMode="cover">
             <LinearGradient colors={['rgba(12,24,41,0.3)', 'rgba(10,21,32,0.5)', 'rgba(7,16,24,0.7)']} style={StyleSheet.absoluteFillObject} pointerEvents="none" />

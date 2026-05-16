@@ -8,6 +8,7 @@ import { getAvatarSource } from '../../constants/avatars';
 import StatusAvatar from '../StatusAvatar';
 import ConnectionQualityIndicator from './ConnectionQualityIndicator';
 import { showToast } from '../Toast';
+import { useRoomLayout } from '../../services/roomLayoutConfig';
 
 interface Props {
   roomName: string;
@@ -127,6 +128,9 @@ export default function RoomInfoHeader({
   const langFlags: Record<string, string> = { tr: '🇹🇷', en: '🇬🇧', de: '🇩🇪', ar: '🇸🇦' };
   const [showRules, setShowRules] = useState(false);
   const insets = useSafeAreaInsets();
+  // ★ v284 (16 May 2026): Web admin "Oda Düzeni" → header config (title font/color,
+  //   live indicator, listener count, border).
+  const headerCfg = useRoomLayout().header;
   // ★ 2026-05-05: Insets.top monotonik sabit — Android'de Modal (NotificationDrawer)
   //   açıldığında bir frame için safe-area top düşüp tekrar yükseliyor, üst header
   //   görsel olarak kayıyordu. Sadece artışa izin ver: header asla yukarı sıçramaz.
@@ -193,7 +197,20 @@ export default function RoomInfoHeader({
           </View>
           {/* ★ Oda ismi + geçen süre tek satırda */}
           <View style={s.nameTimeCol}>
-            <Text style={s.roomName} numberOfLines={1}>{roomName}</Text>
+            <Text
+              style={[
+                s.roomName,
+                // ★ v284: Web admin oda düzeni — title font ayarları
+                {
+                  fontSize: headerCfg.titleFontSize,
+                  fontWeight: headerCfg.titleFontWeight as any,
+                  color: headerCfg.titleColor,
+                },
+              ]}
+              numberOfLines={1}
+            >
+              {roomName}
+            </Text>
             {roomDuration ? (
               <View style={s.durationInline}>
                 <Ionicons name="time-outline" size={8} color="rgba(20,184,166,0.6)" />
@@ -211,7 +228,10 @@ export default function RoomInfoHeader({
         </View>
 
         <View style={s.topActions}>
-          <ConnectionHeartbeat state={connectionState} viewerCount={viewerCount} onPress={onViewersPress} />
+          {/* ★ v284: showListenerCount=false ise listener sayısı + heartbeat tamamen gizli */}
+          {headerCfg.showListenerCount && (
+            <ConnectionHeartbeat state={connectionState} viewerCount={viewerCount} onPress={onViewersPress} />
+          )}
           {/* ★ 2026-04-25: Bağlantı kalitesi (LiveKit) — sadece bağlıyken göster */}
           {connectionState === 'connected' && (
             <ConnectionQualityIndicator quality={connectionQuality || 'unknown'} size={12} />
