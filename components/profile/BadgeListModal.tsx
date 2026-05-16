@@ -23,7 +23,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors, Shadows } from '../../constants/theme';
 import { BadgeService } from '../../services/badges';
 import type { BadgeDef, BadgeRarity } from '../../constants/badges';
-import PremiumAlert, { type AlertButton } from '../PremiumAlert';
+import BadgeDetailModal from './BadgeDetailModal';
 
 const iconShadow = {
   textShadowColor: 'rgba(0,0,0,0.5)',
@@ -68,7 +68,9 @@ interface Props {
 export default function BadgeListModal({ visible, onClose, userId, displayName }: Props) {
   const [badges, setBadges] = useState<BadgeDef[]>([]);
   const [loading, setLoading] = useState(true);
-  const [alert, setAlert] = useState<{ visible: boolean; title: string; message: string; type?: 'info' | 'warning' | 'error' | 'success'; buttons?: AlertButton[] }>({ visible: false, title: '', message: '' });
+  // ★ v295 (17 May 2026): PremiumAlert kaldırıldı — yeni BadgeDetailModal celebration
+  //   tarz Skia medal'lı modal (rarity'e duyarlı, animasyonlu).
+  const [selectedBadge, setSelectedBadge] = useState<BadgeDef | null>(null);
 
   // ★ v291 (16 May 2026): Manuel PanResponder + Modal yapısı KALDIRILDI — Davet Kodu
   //   sheet'inde olduğu gibi BottomSheet wrapper kullanıyor. Sebep: önceki manuel
@@ -84,12 +86,7 @@ export default function BadgeListModal({ visible, onClose, userId, displayName }
   }, [visible, userId]);
 
   const showBadgeDetail = (b: BadgeDef) => {
-    setAlert({
-      visible: true,
-      title: b.label,
-      message: `${b.description}\n\n${b.criteriaText ? `📌 ${b.criteriaText}` : ''}${b.spReward > 0 ? i18n.t('auto.profile.BadgeListModal.001', { 0: b.spReward }) : ''}`,
-      type: 'info',
-    });
+    setSelectedBadge(b);
   };
 
   const title = displayName ? displayName.toLocaleUpperCase('tr-TR') : 'ROZETLER';
@@ -143,7 +140,11 @@ export default function BadgeListModal({ visible, onClose, userId, displayName }
           </ScrollView>
         )}
       </BottomSheet>
-      <PremiumAlert {...alert} onDismiss={() => setAlert(prev => ({ ...prev, visible: false }))} />
+      <BadgeDetailModal
+        visible={!!selectedBadge}
+        badge={selectedBadge}
+        onClose={() => setSelectedBadge(null)}
+      />
     </>
   );
 }
