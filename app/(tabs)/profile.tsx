@@ -704,34 +704,34 @@ export default function ProfileScreen() {
             <PremiumListItem
               icon="crown-outline"
               iconColor="#FBBF24"
-              label="Soprano Premium"
-              badge="VIP"
+              label={t('profile.menu.premium')}
+              badge={t('profile.menu.vip_badge')}
               badgeColor="#FBBF24"
               onPress={() => router.push('/plus' as any)}
             />
             <PremiumListItem
               icon="storefront-outline"
               iconColor="#FBBF24"
-              label="Maison Soprano Mağaza"
+              label={t('profile.menu.store')}
               onPress={() => router.push('/store' as any)}
             />
             <PremiumListItem
               icon="trophy-outline"
               iconColor="#F1F5F9"
-              label="Liderlik Tablosu"
+              label={t('profile.menu.leaderboard')}
               onPress={() => router.push('/leaderboard' as any)}
             />
             <PremiumListItem
               icon="cog-outline"
               iconColor="#F1F5F9"
-              label="Ayarlar"
+              label={t('profile.menu.settings')}
               onPress={() => router.push('/settings' as any)}
             />
             <View style={p.sectionDivider} />
             <PremiumListItem
               icon="gift"
               iconColor="#A78BFA"
-              label="Davet Kodu"
+              label={t('profile.menu.invite_code')}
               badge="+50 SP"
               badgeColor="#A78BFA"
               onPress={openReferralModal}
@@ -739,13 +739,13 @@ export default function ProfileScreen() {
             <PremiumListItem
               icon="rocket-launch"
               iconColor="#F472B6"
-              label="Profilimi Öne Çıkar"
+              label={t('profile.menu.boost')}
               lockedForFree={!isTierAtLeast(subscriptionTier, 'Plus')}
               onPress={() => {
                 if (isTierAtLeast(subscriptionTier, 'Plus')) {
                   setShowBoostPicker(true);
                 } else {
-                  showToast({ title: 'Plus Üyelik Gerekli', message: 'Profili öne çıkarma Plus üyelikle açılır.', type: 'info' });
+                  showToast({ title: t('profile.plus_required'), message: t('profile.plus_required_boost'), type: 'info' });
                   setTimeout(() => router.push('/plus' as any), 800);
                 }
               }}
@@ -757,7 +757,7 @@ export default function ProfileScreen() {
             <PremiumListItem
               icon="logout-variant"
               iconColor="#EF4444"
-              label="Oturumu Kapat"
+              label={t('profile.menu.logout')}
               labelColor="#EF4444"
               onPress={handleLogout}
               isLast
@@ -781,7 +781,7 @@ export default function ProfileScreen() {
                   style={styles.modalTopEdge}
                 />
                 <View style={styles.modalHeader}>
-                  <Text style={styles.modalTitle}>🎁 Davet Kodu</Text>
+                  <Text style={styles.modalTitle}>{t('profile.invite_code_modal_title')}</Text>
                   <Pressable onPress={() => setShowReferral(false)} hitSlop={12} style={styles.modalCloseBtn}>
                     <Ionicons name="close" size={18} color="rgba(167,139,250,0.8)" style={iconShadow} />
                   </Pressable>

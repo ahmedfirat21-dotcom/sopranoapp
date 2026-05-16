@@ -5,6 +5,16 @@
  * En yüksek öncelikli unvan gösterilir.
  */
 import { supabase } from '../constants/supabase';
+import { i18n } from './i18n';
+
+// ★ v284 (16 May 2026): Title name'leri i18n key'lerden runtime çözülür.
+//   TITLE_DEFINITIONS'taki name fallback olarak TR string tutar; resolveTitleName()
+//   ile UI render anında geçerli locale'e döner.
+function resolveTitleName(id: string, fallback: string): string {
+  const key = `title.${id}`;
+  const translated = i18n.t(key);
+  return translated === key ? fallback : translated;
+}
 
 export type UserTitle = {
   id: string;
@@ -156,8 +166,10 @@ export const UserTitleService = {
       if (__DEV__) console.warn('[UserTitleService] Error:', err);
     }
 
-    // Öncelik sırasına göre sırala
-    return titles.sort((a, b) => b.priority - a.priority);
+    // Öncelik sırasına göre sırala + i18n ile isimleri çevir
+    return titles
+      .sort((a, b) => b.priority - a.priority)
+      .map(t => ({ ...t, name: resolveTitleName(t.id, t.name) }));
   },
 
   /** Birincil (en prestijli) unvanı getir */
@@ -166,8 +178,10 @@ export const UserTitleService = {
     return titles.length > 0 ? titles[0] : null;
   },
 
-  /** Tüm unvan tanımlarını döndür (UI'da göstermek için) */
+  /** Tüm unvan tanımlarını döndür (UI'da göstermek için) — i18n ile çevrilmiş */
   getAllDefinitions(): UserTitle[] {
-    return Object.values(TITLE_DEFINITIONS).sort((a, b) => b.priority - a.priority);
+    return Object.values(TITLE_DEFINITIONS)
+      .sort((a, b) => b.priority - a.priority)
+      .map(t => ({ ...t, name: resolveTitleName(t.id, t.name) }));
   },
 };

@@ -313,12 +313,12 @@ function formatMemberSince(iso: string): string {
 }
 
 // ★ v110.3: "Mart 2026'da katıldı" — modern platform standardı (Twitter/X tarzı kesin tarih)
-const MONTHS_TR = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
+// v284: i18n key'lere bağlandı (date.month.* + date.month_year_joined)
 function formatJoinedDate(iso: string): string {
   try {
     const d = new Date(iso);
-    const m = MONTHS_TR[d.getMonth()];
-    return `${m} ${d.getFullYear()}'da katıldı`;
+    const m = i18n.t(`date.month.${d.getMonth() + 1}`);
+    return i18n.t('date.month_year_joined', { month: m, year: d.getFullYear() });
   } catch { return ''; }
 }
 
@@ -328,18 +328,18 @@ function formatLastSeen(iso: string): string {
     const now = new Date();
     const then = new Date(iso);
     const diffSec = Math.floor((now.getTime() - then.getTime()) / 1000);
-    if (diffSec < 60) return 'Az önce aktifti';
+    if (diffSec < 60) return i18n.t('date.last_seen.just_now');
     const min = Math.floor(diffSec / 60);
-    if (min < 60) return `${min} dk önce aktifti`;
+    if (min < 60) return i18n.t('date.last_seen.minutes', { count: min });
     const hr = Math.floor(min / 60);
-    if (hr < 24) return `${hr} saat önce aktifti`;
+    if (hr < 24) return i18n.t('date.last_seen.hours', { count: hr });
     const day = Math.floor(hr / 24);
-    if (day < 7) return `${day} gün önce aktifti`;
+    if (day < 7) return i18n.t('date.last_seen.days', { count: day });
     const week = Math.floor(day / 7);
-    if (week < 5) return `${week} hafta önce aktifti`;
+    if (week < 5) return i18n.t('date.last_seen.weeks', { count: week });
     const month = Math.floor(day / 30);
-    if (month < 12) return `${month} ay önce aktifti`;
-    return 'Uzun süredir aktif değil';
+    if (month < 12) return i18n.t('date.last_seen.months', { count: month });
+    return i18n.t('date.last_seen.long_ago');
   } catch { return ''; }
 }
 

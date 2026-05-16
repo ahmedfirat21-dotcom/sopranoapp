@@ -1348,7 +1348,7 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                 {/* ★ 2026-04-25: ÜYELİK — Plus/Pro için premium section header + diagonal gradient kart */}
                 {tier !== 'Free' && (
                   <>
-                    <ProfileSectionHeader label="ÜYELİK" icon={tierDef.icon as any} accentColor={tierDef.color} />
+                    <ProfileSectionHeader label={i18n.t('profile.section.membership')} icon={tierDef.icon as any} accentColor={tierDef.color} />
                     <View style={sty.sectionCard}>
                       <LinearGradient colors={['#3a4658', '#2a3344', '#1a2030']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFillObject} pointerEvents="none" />
                       <LinearGradient colors={['transparent', tierDef.color + '99', 'transparent']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={sty.sectionTopEdge} />
@@ -1357,9 +1357,9 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                           <Ionicons name={tierDef.icon as any} size={18} color="#fff" style={iconShadow} />
                         </LinearGradient>
                         <View style={{ flex: 1 }}>
-                          <Text style={[sty.tierTitle, { color: tierDef.color }]}>{tierDef.label} Üye</Text>
+                          <Text style={[sty.tierTitle, { color: tierDef.color }]}>{i18n.t('profile.tier_member_suffix', { tier: tierDef.label })}</Text>
                           <Text style={sty.tierDesc}>
-                            {tier === 'Pro' ? 'Sınırsız oda · 1080p · Stereo ses' : 'HD ses · 720p video · Tüm oda türleri'}
+                            {tier === 'Pro' ? i18n.t('profile.tier_pro_features') : i18n.t('profile.tier_plus_features')}
                           </Text>
                         </View>
                       </View>
@@ -1370,7 +1370,7 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                 {/* ★ 2026-04-25: CÜZDANIM — section header + altın gradient kart (sadece own profile) */}
                 {isOwnProfile && (
                   <>
-                    <ProfileSectionHeader label="CÜZDANIM" icon="diamond" accentColor="#FBBF24" />
+                    <ProfileSectionHeader label={i18n.t('profile.section.wallet')} icon="diamond" accentColor="#FBBF24" />
                     <GlowView style={sty.walletCard}>
                       <LinearGradient colors={['#2a1e14', '#17100a', '#0a0604']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFillObject} />
                       <LinearGradient colors={['rgba(251,191,36,0.35)', 'rgba(251,191,36,0.1)', 'rgba(251,191,36,0.02)']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFillObject} />
@@ -1423,7 +1423,7 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                   return (
                     <>
                       <ProfileSectionHeader
-                        label={isOwnProfile ? 'ODALARIM' : 'ODALARI'}
+                        label={isOwnProfile ? i18n.t('profile.section.my_rooms') : i18n.t('profile.section.their_rooms')}
                         icon="headset"
                         accentColor={Colors.accentTeal}
                         count={visibleRooms.length}

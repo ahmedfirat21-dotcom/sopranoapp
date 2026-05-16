@@ -10,6 +10,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors, Shadows } from '../../constants/theme';
 import StatusAvatar from '../StatusAvatar';
 import ProfileSectionHeader from './ProfileSectionHeader';
+import { i18n } from '../../services/i18n';
 
 const iconShadow = {
   textShadowColor: 'rgba(0,0,0,0.5)',
@@ -61,11 +62,11 @@ export default function ProfileFriendsList({ friends, onFriendPress, onShowAll }
     <>
       {/* ★ 2026-05-05: Paylaşılan ProfileSectionHeader — 4 yerdeki duplike kod tek bileşende */}
       <ProfileSectionHeader
-        label="ARKADAŞLARIM"
+        label={i18n.t('profile.friends_label')}
         icon="people"
         accentColor={Colors.teal}
         count={friends.length}
-        actionLabel="Tümünü Gör"
+        actionLabel={i18n.t('profile.see_all')}
         onActionPress={onShowAll}
       />
 
@@ -116,9 +117,9 @@ export default function ProfileFriendsList({ friends, onFriendPress, onShowAll }
                 {friend.display_name}
               </Text>
               {friend.is_online ? (
-                <Text style={s.tileStatus}>Çevrimiçi</Text>
+                <Text style={s.tileStatus}>{i18n.t('profile.online_status')}</Text>
               ) : (
-                <Text style={s.tileStatusOff}>Çevrimdışı</Text>
+                <Text style={s.tileStatusOff}>{i18n.t('profile.offline_status')}</Text>
               )}
             </Pressable>
           ))}
@@ -133,7 +134,7 @@ export default function ProfileFriendsList({ friends, onFriendPress, onShowAll }
                 <Ionicons name="people" size={22} color={Colors.teal} style={iconShadow} />
               </View>
               <Text style={[s.tileName, { color: Colors.teal }]} numberOfLines={1}>
-                Tümünü Gör
+                {i18n.t('profile.see_all')}
               </Text>
               <Text style={s.tileStatus}>+{friends.length - PREVIEW_LIMIT}</Text>
             </Pressable>
