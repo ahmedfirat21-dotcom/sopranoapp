@@ -594,44 +594,44 @@ const en: Record<string, string> = {
   'error.not_found': 'Not found',
 
   // ═══ AUTO-EXTRACTED (translate me) ═══
-  'auth.onboarding.001': "Kadın",  // TODO: translate
-  'auth.onboarding.002': "Müzik",  // TODO: translate
-  'auth.onboarding.003': "Onboarding tamamlanamadı — DB hatası. Tekrar deneyin.",  // TODO: translate
-  'auth.onboarding.004': "Bağlantı Hatası",  // TODO: translate
-  'auth.onboarding.005': "Onboarding kaydedilemedi. İnternet bağlantınızı kontrol edip tekrar deneyin.",  // TODO: translate
-  'auth.onboarding.006': "Geçersiz Kod",  // TODO: translate
-  'auth.onboarding.007': "Lütfen geçerli bir davet kodu gir.",  // TODO: translate
-  'auth.onboarding.008': "Topluluğa hoş geldin! Hesabına 50 SP yüklendi.",  // TODO: translate
-  'auth.onboarding.009': "📸 Fotoğraf Yüklendi",  // TODO: translate
-  'auth.onboarding.010': "Profil fotoğrafın hazır!",  // TODO: translate
-  'tabs.home.001': "✨ Öne Çıkan Profil",  // TODO: translate
-  'tabs.myrooms.001': "Müzik",  // TODO: translate
-  'tabs.profile.001': "Aktivite verileri yüklenemedi",  // TODO: translate
-  'tabs.profile.002': "Hesabından çıkış yapmak istediğinden emin misin?",  // TODO: translate
-  'admin.001': "Şikayet Kapatıldı",  // TODO: translate
-  'admin.002': "Uyarı",  // TODO: translate
-  'admin.003': "Kullanıcı Uyarıldı",  // TODO: translate
-  'admin.004': "Kullanıcı Banlandı",  // TODO: translate
-  'admin.005': "Oda Kapatıldı",  // TODO: translate
-  'admin.006': "Oda Uyandırıldı",  // TODO: translate
-  'admin.007': "Uyandırılamadı",  // TODO: translate
-  'admin.008': "Tier Güncellenemedi",  // TODO: translate
-  'admin.009': "Yetki Değiştirilemedi",  // TODO: translate
-  'admin.010': "İzin Verilmedi",  // TODO: translate
-  'admin.011': "Kendi hesabını silemezsin.",  // TODO: translate
-  'admin.012': "Kullanıcı Silinemedi",  // TODO: translate
-  'auth.resetpassword.001': "Zayıf",  // TODO: translate
-  'auth.resetpassword.002': "İyi",  // TODO: translate
-  'auth.resetpassword.003': "Güçlü",  // TODO: translate
-  'auth.resetpassword.004': "Şifre Çok Kısa",  // TODO: translate
+  'auth.onboarding.001': "Female",  // translated
+  'auth.onboarding.002': "Music",  // translated
+  'auth.onboarding.003': "Onboarding could not complete — database error. Try again.",  // translated
+  'auth.onboarding.004': "Connection Error",  // translated
+  'auth.onboarding.005': "Onboarding could not be saved. Check your internet connection and try again.",  // translated
+  'auth.onboarding.006': "Invalid Code",  // translated
+  'auth.onboarding.007': "Please enter a valid invite code.",  // translated
+  'auth.onboarding.008': "Welcome to the community! 50 SP added to your account.",  // translated
+  'auth.onboarding.009': "📸 Photo Uploaded",  // translated
+  'auth.onboarding.010': "Your profile photo is ready!",  // translated
+  'tabs.home.001': "✨ Featured Profile",  // translated
+  'tabs.myrooms.001': "Music",  // translated
+  'tabs.profile.001': "Activity data could not be loaded",  // translated
+  'tabs.profile.002': "Are you sure you want to sign out?",  // translated
+  'admin.001': "Report Closed",  // translated
+  'admin.002': "Warning",  // translated
+  'admin.003': "User Warned",  // translated
+  'admin.004': "User Banned",  // translated
+  'admin.005': "Room Closed",  // translated
+  'admin.006': "Room Reopened",  // translated
+  'admin.007': "Could Not Reopen",  // translated
+  'admin.008': "Tier Could Not Be Updated",  // translated
+  'admin.009': "Permission Could Not Be Changed",  // translated
+  'admin.010': "Permission Denied",  // translated
+  'admin.011': "You cannot delete your own account.",  // translated
+  'admin.012': "User Could Not Be Deleted",  // translated
+  'auth.resetpassword.001': "Weak",  // translated
+  'auth.resetpassword.002': "Good",  // translated
+  'auth.resetpassword.003': "Strong",  // translated
+  'auth.resetpassword.004': "Password Too Short",  // translated
   'auth.resetpassword.005': "En az 8 karakter olmalı.",  // TODO: translate
   'auth.resetpassword.006': "Büyük Harf Eksik",  // TODO: translate
   'auth.resetpassword.007': "Şifrede en az 1 büyük harf olmalı.",  // TODO: translate
   'auth.resetpassword.008': "Şifrede en az 1 rakam olmalı.",  // TODO: translate
-  'auth.resetpassword.009': "Şifreler Eşleşmiyor",  // TODO: translate
+  'auth.resetpassword.009': "Passwords Don't Match",  // translated
   'auth.resetpassword.010': "İki alan da aynı olmalı.",  // TODO: translate
   'auth.resetpassword.011': "✅ Şifre Değiştirildi",  // TODO: translate
-  'call.id.001': "Bağlantı Hatası",  // TODO: translate
+  'call.id.001': "Connection Error",  // translated
   'call.id.002': "Arama bağlantısı kurulamadı.",  // TODO: translate
   'chat.id.001': "İlk mesajın istek olarak gönderilir. Karşı taraf onaylarsa mesajlaşabilirsiniz.",  // TODO: translate
   'chat.id.002': "Bu kullanıcı seninle mesajlaşmak istemiyor.",  // TODO: translate
@@ -665,10 +665,10 @@ const en: Record<string, string> = {
   'createroom.023': "Karşılama",  // TODO: translate
   'createroom.024': "Giriş",  // TODO: translate
   'editprofile.001': "Şifreniz Google hesabınız üzerinden yönetilmektedir. Şifre değişikliği için Google Hesap Ayarları → Güvenlik bölümünü kullanın.",  // TODO: translate
-  'editprofile.002': "📸 Fotoğraf Yüklendi",  // TODO: translate
+  'editprofile.002': "📸 Photo Uploaded",  // translated
   'editprofile.003': "Profil fotoğrafın güncellendi.",  // TODO: translate
   'editprofile.004': "Fotoğraf Yüklenemedi",  // TODO: translate
-  'editprofile.005': "Uyarı",  // TODO: translate
+  'editprofile.005': "Warning",  // translated
   'editprofile.006': "Görünen ad boş olamaz.",  // TODO: translate
   'editprofile.007': "Oturum Kapalı",  // TODO: translate
   'editprofile.008': "Giriş bilgin bulunamadı, yeniden giriş yap.",  // TODO: translate
@@ -748,10 +748,10 @@ const en: Record<string, string> = {
   'incomingcalloverlay.001': "Arıyor...",  // TODO: translate
   'profile.badgelistmodal.001': "Henüz rozet kazanmamış",  // TODO: translate
   'profile.badgelistmodal.002': "Oda kur, arkadaş edin, SP gönder — rozetler otomatik gelir.",  // TODO: translate
-  'profile.bioeditorsheet.001': "Vazgeç",  // TODO: translate
+  'profile.bioeditorsheet.001': "Cancel",  // translated
   'profile.bioeditorsheet.002': "Örn: Müzik, kahve ve kod ☕",  // TODO: translate
   'profile.featuredbadgespicker.001': "Öne çıkan rozetler güncellendi",  // TODO: translate
-  'profile.featuredbadgespicker.002': "Yükleniyor...",  // TODO: translate
+  'profile.featuredbadgespicker.002': "Loading...",  // translated
   'profile.featuredbadgespicker.003': "Henüz rozetin yok",  // TODO: translate
   'profile.featuredbadgespicker.004': "Aktif kullanım, sahne, bağış ile rozet kazan",  // TODO: translate
   'profile.giftdetailmodal.001': "ALDIĞI HEDİYELER",  // TODO: translate
@@ -796,7 +796,7 @@ const en: Record<string, string> = {
   'room.camerafullscreenmodal.002': "Aşağı kaydır ya da ✕ ile kapat",  // TODO: translate
   'room.entryfeecard.001': "ODA BİLETİ",  // TODO: translate
   'room.entryfeecard.002': "GİRİŞ ÜCRETİ",  // TODO: translate
-  'room.entryfeecard.003': "Vazgeç",  // TODO: translate
+  'room.entryfeecard.003': "Cancel",  // translated
   'room.hostaccesspanel.001': "✅ Ban Kaldırıldı",  // TODO: translate
   'room.hostaccesspanel.002': "Ban Kaldırılamadı",  // TODO: translate
   'room.hostaccesspanel.003': "📨 Davet Gönderildi",  // TODO: translate
@@ -809,7 +809,7 @@ const en: Record<string, string> = {
   'room.messageglowpickersheet.004': "SAHİPSİN · FREE",  // TODO: translate
   'room.powerupssheet.001': "Süre Uzat",  // TODO: translate
   'room.powerupssheet.002': "Odanın süresini +30 dk uzatır",  // TODO: translate
-  'room.roomaccessprompts.001': "Vazgeç",  // TODO: translate
+  'room.roomaccessprompts.001': "Cancel",  // translated
   'room.roomaccessprompts.002': "Erişim kontrol ediliyor…",  // TODO: translate
   'room.roomaccessprompts.003': "Şifreyi girin...",  // TODO: translate
   'room.roomclosedscreen.001': "Bu oda kapanmış",  // TODO: translate
@@ -833,13 +833,13 @@ const en: Record<string, string> = {
   'room.roomoverlays.002': "Seçili",  // TODO: translate
   'room.roomoverlays.003': "Gün Batımı",  // TODO: translate
   'room.roomoverlays.004': "Gül",  // TODO: translate
-  'room.roomoverlays.005': "Açık",  // TODO: translate
+  'room.roomoverlays.005': "Open",  // translated
   'room.roomoverlays.006': "Şifreli",  // TODO: translate
   'room.roomoverlays.007': "✅ Ban Kaldırıldı",  // TODO: translate
   'room.roomoverlays.008': "Ban Kaldırılamadı",  // TODO: translate
   'room.roomoverlays.009': "Bu kullanıcının banı kaldırılamadı.",  // TODO: translate
   'room.roomoverlays.010': "Konuşma",  // TODO: translate
-  'room.roomoverlays.011': "Müzik",  // TODO: translate
+  'room.roomoverlays.011': "Music",  // translated
   'room.roomoverlays.012': "Katılım İstekleri",  // TODO: translate
   'room.roomoverlays.013': "Katılım İstekleri",  // TODO: translate
   'room.roomoverlays.014': "Oda Linkini Paylaş",  // TODO: translate
@@ -1027,7 +1027,7 @@ const en: Record<string, string> = {
   'tabs.messages.057': "{{count}} new messages",
   'auto.auth.login.001': "Gönder",  // TODO: translate
   'auto.auth.login.002': "Gönderiliyor...",  // TODO: translate
-  'auto.auth.login.003': "İptal",  // TODO: translate
+  'auto.auth.login.003': "Cancel",  // translated
   'auto.auth.login.004': "Şifreyi göster",  // TODO: translate
   'auto.auth.login.005': "Şifreyi gizle",  // TODO: translate
   'auto.auth.login.006': "canlı oda",  // TODO: translate
@@ -1035,21 +1035,21 @@ const en: Record<string, string> = {
   'auto.auth.login.008': "Google ile giriş iptal edildi.",  // TODO: translate
   'auto.auth.login.009': "Google ile giriş şu an kullanılamıyor. E-posta ile giriş yapabilirsin.",  // TODO: translate
   'auto.auth.login.010': "GoogleSignin module yüklendi ama signIn fonksiyonu bulunamadı",  // TODO: translate
-  'auto.auth.onboarding.001': "Vazgeç",  // TODO: translate
+  'auto.auth.onboarding.001': "Cancel",  // translated
   'auto.auth.onboarding.002': "Seçimleri Kaydet",  // TODO: translate
   'auto.auth.onboarding.003': "Doğum Yılı",  // TODO: translate
   'auto.auth.onboarding.004': "Profil oluşturulamadı.",  // TODO: translate
   'auto.tabs.home.001': "{{0}} arkadaşın online — ilk sen yayına geç",  // TODO: translate
-  'auto.tabs.home.003': "Kullanıcı",  // TODO: translate
-  'auto.tabs.home.004': "Kullanıcı",  // TODO: translate
+  'auto.tabs.home.003': "User",  // translated
+  'auto.tabs.home.004': "User",  // translated
   'auto.tabs.home.005': "Arkadaşlar",  // TODO: translate
   'auto.tabs.home.006': "Arkadaşlar, {{0}} bekleyen istek",  // TODO: translate
   'auto.tabs.home.007': "Takipten çıkılamadı.",  // TODO: translate
   'auto.tabs.home.008': "İnternet bağlantını kontrol et.",  // TODO: translate
-  'auto.tabs.home.009': "Kullanıcı",  // TODO: translate
+  'auto.tabs.home.009': "User",  // translated
   'auto.tabs.home.011': "Bağlanıyor...",  // TODO: translate
   'auto.tabs.home.012': "Ziyaretçi",  // TODO: translate
-  'auto.tabs.home.013': "Kullanıcı",  // TODO: translate
+  'auto.tabs.home.013': "User",  // translated
   'auto.tabs.myrooms.001': "{{0}} kişiye davet gönderildi",  // TODO: translate
   'auto.tabs.myrooms.002': "SopranoChat Odası",  // TODO: translate
   'auto.tabs.myrooms.003': "🎤 \"{{0}}\" odasına gel! SopranoChat'te konuşalım:\nhttps://sopranochat.com/room/{{1}}",  // TODO: translate
@@ -1062,7 +1062,7 @@ const en: Record<string, string> = {
   'auto.tabs.myrooms.010': "Görsel yüklenirken hata oluştu.",  // TODO: translate
   'auto.tabs.myrooms.011': "Görsel yüklenirken hata oluştu.",  // TODO: translate
   'auto.tabs.myrooms.012': "Oda uyku moduna alınamadı.",  // TODO: translate
-  'auto.tabs.myrooms.013': "Kullanıcı",  // TODO: translate
+  'auto.tabs.myrooms.013': "User",  // translated
   'auto.tabs.myrooms.014': "İşlem tamamlanamadı.",  // TODO: translate
   'auto.tabs.myrooms.015': "Sunucuya ulaşılamadı.",  // TODO: translate
   'auto.tabs.myrooms.016': "Oda başlatılamadı.",  // TODO: translate
@@ -1076,7 +1076,7 @@ const en: Record<string, string> = {
   'auto.tabs.profile.002': "Arkadaş listesinden çıkarılamadı.",  // TODO: translate
   'auto.tabs.profile.003': "{{0}} listenden çıkarıldı.",  // TODO: translate
   'auto.tabs.profile.004': "Çıkar",  // TODO: translate
-  'auto.tabs.profile.005': "İptal",  // TODO: translate
+  'auto.tabs.profile.005': "Cancel",  // translated
   'auto.tabs.profile.006': "{{0}} artık arkadaş listenden kaldırılacak.",  // TODO: translate
   'auto.tabs.profile.007': "Hata oluştu",  // TODO: translate
   'auto.tabs.profile.008': "Bir kod zaten uygulandı",  // TODO: translate
@@ -1084,8 +1084,8 @@ const en: Record<string, string> = {
   'auto.tabs.profile.010': "SopranoChat'e katıl! Davet kodumu kullan, 50 SP hediye kazan: {{0}}\nhttps://sopranochat.com",  // TODO: translate
   'auto.tabs.profile.011': "Bir sorun oluştu.",  // TODO: translate
   'auto.tabs.profile.012': "Çıkış Yap",  // TODO: translate
-  'auto.tabs.profile.013': "Vazgeç",  // TODO: translate
-  'auto.tabs.profile.014': "Kullanıcı",  // TODO: translate
+  'auto.tabs.profile.013': "Cancel",  // translated
+  'auto.tabs.profile.014': "User",  // translated
   'auto.tabs.profile.015': "SP işlemi",  // TODO: translate
   'auto.tabs.profile.016': "İade",  // TODO: translate
   'auto.tabs.profile.017': "Admin ödülü",  // TODO: translate
@@ -1098,8 +1098,8 @@ const en: Record<string, string> = {
   'auto.tabs.profile.024': "Sahne süresi",  // TODO: translate
   'auto.tabs.profile.025': "Prime-time dönüş",  // TODO: translate
   'auto.tabs.profile.026': "Günlük giriş",  // TODO: translate
-  'auto.admin.001': "Çevrimdışı",  // TODO: translate
-  'auto.admin.002': "Çevrimiçi",  // TODO: translate
+  'auto.admin.001': "Offline",  // translated
+  'auto.admin.002': "Online",  // translated
   'auto.admin.003': "kişi ·",  // TODO: translate
   'auto.admin.004': "{{0}}gün",  // TODO: translate
   'auto.admin.005': "Bu kategoride kullanıcı odası yok",  // TODO: translate
@@ -1112,54 +1112,54 @@ const en: Record<string, string> = {
   'auto.admin.012': "{{0}} kalıcı olarak silindi.",  // TODO: translate
   'auto.admin.013': "İşlem tamamlanamadı.",  // TODO: translate
   'auto.admin.014': "Kalıcı Sil",  // TODO: translate
-  'auto.admin.015': "İptal",  // TODO: translate
+  'auto.admin.015': "Cancel",  // translated
   'auto.admin.016': "\"{{0}}\" adlı kullanıcıyı KALICI olarak silmek istiyor musun?\n\nBu işlem GERİ ALINAMAZ!\n\nSilinecekler:\n• Profil\n• Tüm odalar\n• Mesajlar\n• Arkadaşlıklar\n• Raporlar",  // TODO: translate
   'auto.admin.017': "⚠️ Kullanıcıyı Sil",  // TODO: translate
   'auto.admin.018': "Transfer başarısız.",  // TODO: translate
   'auto.admin.019': "{{0}} hesabına eklendi.",  // TODO: translate
-  'auto.admin.020': "İptal",  // TODO: translate
+  'auto.admin.020': "Cancel",  // translated
   'auto.admin.021': "{{0}} adlı kullanıcıya kaç SP vermek istiyorsun?",  // TODO: translate
   'auto.admin.022': "⭐ Admin Yapıldı",  // TODO: translate
   'auto.admin.023': "🔻 Adminlik Kaldırıldı",  // TODO: translate
   'auto.admin.024': "İşlem tamamlanamadı.",  // TODO: translate
-  'auto.admin.025': "İptal",  // TODO: translate
+  'auto.admin.025': "Cancel",  // translated
   'auto.admin.026': "Adminliği Kaldır",  // TODO: translate
   'auto.admin.027': "Banlandı",  // TODO: translate
   'auto.admin.028': "Ban Kaldırıldı",  // TODO: translate
-  'auto.admin.029': "İptal",  // TODO: translate
+  'auto.admin.029': "Cancel",  // translated
   'auto.admin.030': "Banı Kaldır",  // TODO: translate
   'auto.admin.031': "\"{{0}}\" — Mevcut: {{1}}\n\nYeni tier seçin:",  // TODO: translate
   'auto.admin.032': "Oda Tier Değiştir",  // TODO: translate
-  'auto.admin.033': "İptal",  // TODO: translate
+  'auto.admin.033': "Cancel",  // translated
   'auto.admin.034': "{{0}} tier değişikliği uygulanamadı.",  // TODO: translate
   'auto.admin.035': "{{0}} uyandırılamadı.",  // TODO: translate
   'auto.admin.036': "Uyandır",  // TODO: translate
-  'auto.admin.037': "İptal",  // TODO: translate
+  'auto.admin.037': "Cancel",  // translated
   'auto.admin.038': "\"{{0}}\" odasını yeniden canlıya almak istiyor musun?",  // TODO: translate
   'auto.admin.039': "Odayı Uyandır",  // TODO: translate
   'auto.admin.040': "İşlem tamamlanamadı.",  // TODO: translate
   'auto.admin.041': "Kalıcı Sil",  // TODO: translate
-  'auto.admin.042': "İptal",  // TODO: translate
+  'auto.admin.042': "Cancel",  // translated
   'auto.admin.043': "\"{{0}}\" odasını KALICI olarak silmek istiyor musun?\n\nBu işlem geri alınamaz!",  // TODO: translate
   'auto.admin.044': "Odayı Kalıcı Sil",  // TODO: translate
-  'auto.admin.045': "İptal",  // TODO: translate
+  'auto.admin.045': "Cancel",  // translated
   'auto.admin.046': "\"{{0}}\" odasını kapatmak istiyor musun?\n\nTüm kullanıcılar çıkarılacak.",  // TODO: translate
   'auto.admin.047': "Odayı Kapat",  // TODO: translate
-  'auto.admin.048': "İptal",  // TODO: translate
+  'auto.admin.048': "Cancel",  // translated
   'auto.admin.049': "{{0}} adlı kullanıcıyı BANLAMAK istiyor musun?\n\nBu işlem geri alınabilir.",  // TODO: translate
   'auto.admin.050': "Kullanıcıyı Banla",  // TODO: translate
   'auto.admin.051': "Davranışlarınız nedeniyle bir uyarı aldınız. Kuralları tekrar ihlal etmeniz durumunda hesabınız askıya alınabilir.",  // TODO: translate
-  'auto.admin.052': "İptal",  // TODO: translate
+  'auto.admin.052': "Cancel",  // translated
   'auto.admin.053': "Bu kullanıcıya uyarı vermek istiyor musun?",  // TODO: translate
   'auto.admin.054': "Kullanıcıyı Uyar",  // TODO: translate
-  'auto.admin.055': "İptal",  // TODO: translate
+  'auto.admin.055': "Cancel",  // translated
   'auto.admin.056': "Bu şikayeti \"geçersiz\" olarak kapatmak istiyor musun?",  // TODO: translate
   'auto.admin.057': "Şikayeti Kapat",  // TODO: translate
-  'auto.admin.058': "Diğer",  // TODO: translate
+  'auto.admin.058': "Other",  // translated
   'auto.admin.059': "Tartışma",  // TODO: translate
   'auto.admin.060': "Eğitim",  // TODO: translate
-  'auto.admin.061': "Müzik",  // TODO: translate
-  'auto.admin.062': "Diğer",  // TODO: translate
+  'auto.admin.061': "Music",  // translated
+  'auto.admin.062': "Other",  // translated
   'auto.admin.063': "Reşit Olmayan",  // TODO: translate
   'auto.admin.064': "Şiddet",  // TODO: translate
   'auto.admin.065': "Kimliğe Bürünme",  // TODO: translate
@@ -1173,8 +1173,8 @@ const en: Record<string, string> = {
   'auto.auth.reset_password.006': "E-posta Kurtarıldı",  // TODO: translate
   'auto.auth.reset_password.007': "E-posta Doğrulandı",  // TODO: translate
   'auto.call.id.001': "Arama başlatılamadı",  // TODO: translate
-  'auto.call.id.002': "Kullanıcı",  // TODO: translate
-  'auto.call.id.003': "Kullanıcı",  // TODO: translate
+  'auto.call.id.002': "User",  // translated
+  'auto.call.id.003': "User",  // translated
   'auto.call.id.004': "Süresi",  // TODO: translate
   'auto.call.id.005': "Arama Sonlandı",  // TODO: translate
   'auto.call.id.006': "Arama Tamamlandı",  // TODO: translate
@@ -1182,37 +1182,37 @@ const en: Record<string, string> = {
   'auto.call.id.008': "Süresi",  // TODO: translate
   'auto.call.id.009': "Süresi",  // TODO: translate
   'auto.call.id.010': "Hoparlör",  // TODO: translate
-  'auto.call.id.011': "Aç",  // TODO: translate
-  'auto.call.id.012': "Çevrimdışı",  // TODO: translate
-  'auto.call.id.013': "Çevrimiçi",  // TODO: translate
-  'auto.call.id.014': "Kullanıcı",  // TODO: translate
+  'auto.call.id.011': "Open",  // translated
+  'auto.call.id.012': "Offline",  // translated
+  'auto.call.id.013': "Online",  // translated
+  'auto.call.id.014': "User",  // translated
   'auto.call.id.015': "Arama Sonlandı",  // TODO: translate
   'auto.call.id.016': "Çalıyor...",  // TODO: translate
   'auto.call.id.017': "Aranıyor...",  // TODO: translate
   'auto.call.id.018': "Çalıyor...",  // TODO: translate
-  'auto.call.id.019': "Kullanıcı",  // TODO: translate
+  'auto.call.id.019': "User",  // translated
   'auto.call.id.020': "Arama Sonlandı",  // TODO: translate
   'auto.call.id.021': "Arama Süresi: {{0}}",  // TODO: translate
   'auto.call.id.022': "Aramada {{0}} kullanmak için ayarlardan izin vermelisiniz.",  // TODO: translate
   'auto.call.id.023': "⚠️ {{0}} İzni Gerekli",  // TODO: translate
   'auto.call.id.024': "Karşı Taraf Bağlantıyı Kesti",  // TODO: translate
   'auto.call.id.025': "Bağlantı Koptu",  // TODO: translate
-  'auto.call.id.026': "Kullanıcı",  // TODO: translate
-  'auto.call.id.027': "Kullanıcı",  // TODO: translate
+  'auto.call.id.026': "User",  // translated
+  'auto.call.id.027': "User",  // translated
   'auto.call.id.028': "Meşgul",  // TODO: translate
   'auto.call.id.029': "Meşgul",  // TODO: translate
   'auto.call.id.030': "Arama Sonlandı",  // TODO: translate
   'auto.call.id.031': "Arama Süresi: {{0}}",  // TODO: translate
   'auto.chat.id.001': "Engeli Kaldır",  // TODO: translate
-  'auto.chat.id.002': "Vazgeç",  // TODO: translate
+  'auto.chat.id.002': "Cancel",  // translated
   'auto.chat.id.003': "Bu kullanıcı",  // TODO: translate
-  'auto.chat.id.004': "Vazgeç",  // TODO: translate
+  'auto.chat.id.004': "Cancel",  // translated
   'auto.chat.id.005': "Kaldır",  // TODO: translate
   'auto.chat.id.006': "Bu kullanıcı",  // TODO: translate
   'auto.chat.id.007': "Sesi Aç",  // TODO: translate
-  'auto.chat.id.008': "Vazgeç",  // TODO: translate
+  'auto.chat.id.008': "Cancel",  // translated
   'auto.chat.id.009': "Kaybolan Mesaj Süresi",  // TODO: translate
-  'auto.chat.id.010': "Açık",  // TODO: translate
+  'auto.chat.id.010': "Open",  // translated
   'auto.chat.id.011': "30 gün",  // TODO: translate
   'auto.chat.id.012': "7 gün",  // TODO: translate
   'auto.chat.id.013': "Yeni mesajlar bu süre sonra silinecek.",  // TODO: translate
@@ -1225,22 +1225,22 @@ const en: Record<string, string> = {
   'auto.chat.id.020': "Önce isteği kabul et",  // TODO: translate
   'auto.chat.id.021': "📷 Fotoğraf",  // TODO: translate
   'auto.chat.id.022': "Mevcut metni değiştir, gönder",  // TODO: translate
-  'auto.chat.id.023': "Kullanıcı",  // TODO: translate
+  'auto.chat.id.023': "User",  // translated
   'auto.chat.id.024': "✎ Düzenleniyor",  // TODO: translate
-  'auto.chat.id.025': "Kullanıcı",  // TODO: translate
-  'auto.chat.id.026': "İşlem başarısız",  // TODO: translate
-  'auto.chat.id.027': "İşlem başarısız",  // TODO: translate
+  'auto.chat.id.025': "User",  // translated
+  'auto.chat.id.026': "Action failed",  // translated
+  'auto.chat.id.027': "Action failed",  // translated
   'auto.chat.id.028': "Bu kullanıcı",  // TODO: translate
   'auto.chat.id.029': "Arama başlatılamadı",  // TODO: translate
-  'auto.chat.id.030': "Kullanıcı",  // TODO: translate
-  'auto.chat.id.031': "Çevrimdışı",  // TODO: translate
+  'auto.chat.id.030': "User",  // translated
+  'auto.chat.id.031': "Offline",  // translated
   'auto.chat.id.032': "Son görülme: {{0}}",  // TODO: translate
   'auto.chat.id.033': "Mesaj Gönderilemedi",  // TODO: translate
   'auto.chat.id.034': "Mesaj gönderilemedi",  // TODO: translate
   'auto.chat.id.035': "Kaydedilenden çıkarıldı",  // TODO: translate
-  'auto.chat.id.036': "Kullanıcı",  // TODO: translate
+  'auto.chat.id.036': "User",  // translated
   'auto.chat.id.037': "📷 Fotoğraf",  // TODO: translate
-  'auto.chat.id.038': "Kullanıcı",  // TODO: translate
+  'auto.chat.id.038': "User",  // translated
   'auto.chat.id.039': "Bu mesaj herkes için silindi",  // TODO: translate
   'auto.create_room.001': "Günlük limit doldu (",  // TODO: translate
   'auto.create_room.002': "Yüklendi",  // TODO: translate
@@ -1254,8 +1254,8 @@ const en: Record<string, string> = {
   'auto.create_room.010': "Sadece sen \"Sahneye Davet Et\"le konuşmacı ekleyebilirsin. Dinleyiciler el kaldıramaz, \"sahne kilitli\" uyarısı görürler.",  // TODO: translate
   'auto.create_room.011': "İstek kuyruğa düşer, sen veya moderatörlerin onayıyla sahneye çıkar. Dinleyici sırasını ve kaç kişi olduğunu görebilir.",  // TODO: translate
   'auto.create_room.012': "Tek tıkla mikrofonu açar, onay gerekmez. Sen veya bir moderatör sahnedeyken otomatik olarak \"el kaldırma\" akışına döner — hiyerarşi korunur.",  // TODO: translate
-  'auto.create_room.013': "Kapalı",  // TODO: translate
-  'auto.create_room.014': "Kapalı",  // TODO: translate
+  'auto.create_room.013': "Closed",  // translated
+  'auto.create_room.014': "Closed",  // translated
   'auto.create_room.015': "{{0}} arkadaşına davet gönderildi.",  // TODO: translate
   'auto.create_room.016': "Görsel yüklenemedi. Farklı bir resim seç veya internetini kontrol et.",  // TODO: translate
   'auto.create_room.017': "Yetki hatası. Lütfen tekrar giriş yap.",  // TODO: translate
@@ -1282,16 +1282,16 @@ const en: Record<string, string> = {
   'auto.edit_profile.011': "Fotoğrafı Değiştir",  // TODO: translate
   'auto.edit_profile.012': "Görsel yüklenirken sorun oluştu.",  // TODO: translate
   'auto.leaderboard.001': "ödülü:",  // TODO: translate
-  'auto.leaderboard.002': "Kullanıcı",  // TODO: translate
+  'auto.leaderboard.002': "User",  // translated
   'auto.leaderboard.003': "İsimsiz Oda",  // TODO: translate
-  'auto.leaderboard.004': "Kullanıcı",  // TODO: translate
-  'auto.leaderboard.005': "Kullanıcı",  // TODO: translate
-  'auto.leaderboard.006': "Kullanıcı",  // TODO: translate
-  'auto.leaderboard.007': "Kullanıcı",  // TODO: translate
-  'auto.leaderboard.008': "Kullanıcı",  // TODO: translate
+  'auto.leaderboard.004': "User",  // translated
+  'auto.leaderboard.005': "User",  // translated
+  'auto.leaderboard.006': "User",  // translated
+  'auto.leaderboard.007': "User",  // translated
+  'auto.leaderboard.008': "User",  // translated
   'auto.leaderboard.009': "katılımcı",  // TODO: translate
-  'auto.notifications.001': "Kullanıcı",  // TODO: translate
-  'auto.notifications.002': "Kullanıcı",  // TODO: translate
+  'auto.notifications.001': "User",  // translated
+  'auto.notifications.002': "User",  // translated
   'auto.notifications.003': "yeni bir oda açtı",  // TODO: translate
   'auto.notifications.004': "odanızı takip etmeye başladı",  // TODO: translate
   'auto.notifications.005': "arkadaşlık isteğini kabul etti",  // TODO: translate
@@ -1309,13 +1309,13 @@ const en: Record<string, string> = {
   'auto.plus.007': "Aylık",  // TODO: translate
   'auto.plus.008': "/yıl",  // TODO: translate
   'auto.plus.009': "Free'ye Dön",  // TODO: translate
-  'auto.plus.010': "Hayır",  // TODO: translate
+  'auto.plus.010': "No",  // translated
   'auto.plus.011': "Mevcut planınız: {{0}}.\n\nFree (ücretsiz) plana dönmek ister misiniz?\nPremium özellikleriniz devre dışı kalacak.",  // TODO: translate
   'auto.plus.012': "Üyelik aktifleştirilemedi.",  // TODO: translate
   'auto.plus.013': "Artık {{0}} üyesisiniz — tüm premium özellikler açıldı.",  // TODO: translate
   'auto.plus.014': "{{0}} Üyelik Aktif!",  // TODO: translate
   'auto.plus.015': "{{0}}'a Geç",  // TODO: translate
-  'auto.plus.016': "Vazgeç",  // TODO: translate
+  'auto.plus.016': "Cancel",  // translated
   'auto.plus.017': "{{0}} planına geçmek istediğinize emin misiniz?\n\nFiyat: {{1}}{{2}}",  // TODO: translate
   'auto.plus.018': "\n\n⚠️ Test modunda — gerçek ödeme alınmaz.",  // TODO: translate
   'auto.plus.019': "{{0}}₺/yıl",  // TODO: translate
@@ -1341,16 +1341,16 @@ const en: Record<string, string> = {
   'auto.plus.039': "Her oda {{0}} saat açık kalır",  // TODO: translate
   'auto.plus.040': "{{0}} kişi sahne",  // TODO: translate
   'auto.room.id.001': "Odan Hazır",  // TODO: translate
-  'auto.room.id.002': "Kullanıcı",  // TODO: translate
-  'auto.room.id.003': "Kullanıcı",  // TODO: translate
-  'auto.room.id.004': "Kullanıcı",  // TODO: translate
-  'auto.room.id.005': "Kullanıcı",  // TODO: translate
-  'auto.room.id.006': "Kullanıcı",  // TODO: translate
-  'auto.room.id.007': "Kullanıcı",  // TODO: translate
-  'auto.room.id.008': "Kullanıcı",  // TODO: translate
-  'auto.room.id.009': "Kullanıcı",  // TODO: translate
-  'auto.room.id.010': "Kullanıcı",  // TODO: translate
-  'auto.room.id.011': "Kullanıcı",  // TODO: translate
+  'auto.room.id.002': "User",  // translated
+  'auto.room.id.003': "User",  // translated
+  'auto.room.id.004': "User",  // translated
+  'auto.room.id.005': "User",  // translated
+  'auto.room.id.006': "User",  // translated
+  'auto.room.id.007': "User",  // translated
+  'auto.room.id.008': "User",  // translated
+  'auto.room.id.009': "User",  // translated
+  'auto.room.id.010': "User",  // translated
+  'auto.room.id.011': "User",  // translated
   'auto.room.id.012': "İstek reddedildi",  // TODO: translate
   'auto.room.id.013': "Bir hata oluştu. Tekrar deneyin.",  // TODO: translate
   'auto.room.id.014': "Yanlış şifre.",  // TODO: translate
@@ -1369,7 +1369,7 @@ const en: Record<string, string> = {
   'auto.room.id.027': "🆓 Giriş Ücretsiz",  // TODO: translate
   'auto.room.id.028': "💰 Giriş: {{0}} SP",  // TODO: translate
   'auto.room.id.029': "Oda uyku moduna alınamadı.",  // TODO: translate
-  'auto.room.id.030': "İptal",  // TODO: translate
+  'auto.room.id.030': "Cancel",  // translated
   'auto.room.id.031': "🔓 Şifre Kaldırıldı",  // TODO: translate
   'auto.room.id.032': "🔐 Şifre Ayarlandı",  // TODO: translate
   'auto.room.id.033': "Şifreli",  // TODO: translate
@@ -1388,11 +1388,11 @@ const en: Record<string, string> = {
   'auto.room.id.046': "Premium stilin sonsuz kullanım hakkı var",  // TODO: translate
   'auto.room.id.047': "{{0}} SP harcandı",  // TODO: translate
   'auto.room.id.048': "Ayrıl",  // TODO: translate
-  'auto.room.id.049': "İptal",  // TODO: translate
+  'auto.room.id.049': "Cancel",  // translated
   'auto.room.id.050': " kamera açılabilir.",  // TODO: translate
   'auto.room.id.051': "🎁 {{0}}, {{1}}'a {{2}} SP hediye gönderdi",  // TODO: translate
   'auto.room.id.052': "✨ {{0}}, {{1}}'ın sahnesini {{2}} SP destekledi",  // TODO: translate
-  'auto.room.id.053': "Kullanıcı",  // TODO: translate
+  'auto.room.id.053': "User",  // translated
   'auto.room.id.054': "sn içinde kapanacak",  // TODO: translate
   'auto.room.id.055': "İstek reddedildi",  // TODO: translate
   'auto.room.id.056': "Bir hata oluştu. Tekrar deneyin.",  // TODO: translate
@@ -1407,13 +1407,13 @@ const en: Record<string, string> = {
   'auto.room.id.065': "Sahneye çıkılamadı",  // TODO: translate
   'auto.room.id.066': "Sahneye Hoş Geldin!",  // TODO: translate
   'auto.room.id.067': "👑 Sahneye Döndün!",  // TODO: translate
-  'auto.room.id.068': "Kullanıcı",  // TODO: translate
-  'auto.room.id.069': "Kullanıcı",  // TODO: translate
+  'auto.room.id.068': "User",  // translated
+  'auto.room.id.069': "User",  // translated
   'auto.room.id.070': "{{0}} konuşmacı serbest bırakıldı",  // TODO: translate
-  'auto.room.id.071': "Aç",  // TODO: translate
-  'auto.room.id.072': "İptal",  // TODO: translate
+  'auto.room.id.071': "Open",  // translated
+  'auto.room.id.072': "Cancel",  // translated
   'auto.room.id.073': "{{0}} konuşmacı susturuldu",  // TODO: translate
-  'auto.room.id.074': "İptal",  // TODO: translate
+  'auto.room.id.074': "Cancel",  // translated
   'auto.room.id.075': "Tekrar sahneye çıkmak için {{0}} saniye bekle.",  // TODO: translate
   'auto.room.id.076': "Sahneye çıkılamadı",  // TODO: translate
   'auto.room.id.077': "Hoş geldin",  // TODO: translate
@@ -1421,19 +1421,19 @@ const en: Record<string, string> = {
   'auto.room.id.079': "Host transferi başarısız.",  // TODO: translate
   'auto.room.id.080': "İşlem tamamlanamadı.",  // TODO: translate
   'auto.room.id.081': "Kalıcı Sil",  // TODO: translate
-  'auto.room.id.082': "İptal",  // TODO: translate
+  'auto.room.id.082': "Cancel",  // translated
   'auto.room.id.083': "Ayrıl",  // TODO: translate
-  'auto.room.id.084': "İptal",  // TODO: translate
+  'auto.room.id.084': "Cancel",  // translated
   'auto.room.id.085': "Ayrıl",  // TODO: translate
-  'auto.room.id.086': "İptal",  // TODO: translate
-  'auto.room.id.087': "Kullanıcı",  // TODO: translate
+  'auto.room.id.086': "Cancel",  // translated
+  'auto.room.id.087': "User",  // translated
   'auto.room.id.088': "🤚 sahneye çıktı",  // TODO: translate
   'auto.room.id.089': "Sahnede maksimum {{0}} kişi olabilir",  // TODO: translate
-  'auto.room.id.090': "Kullanıcı",  // TODO: translate
+  'auto.room.id.090': "User",  // translated
   'auto.room.id.091': "Bağlantı hatası",  // TODO: translate
   'auto.room.id.092': "Bu odada {{0}} konuşuluyor.",  // TODO: translate
   'auto.room.id.093': "Ayarları Aç",  // TODO: translate
-  'auto.room.id.094': "İptal",  // TODO: translate
+  'auto.room.id.094': "Cancel",  // translated
   'auto.room.id.095': "kameranızı açamadık",  // TODO: translate
   'auto.room.id.096': "mikrofonunuzu açamadık",  // TODO: translate
   'auto.room.id.097': "⚠️ {{0}} İzni Gerekli",  // TODO: translate
@@ -1445,20 +1445,20 @@ const en: Record<string, string> = {
   'auto.room.id.103': "Günlük",  // TODO: translate
   'auto.room.id.104': "Giriş Ücreti",  // TODO: translate
   'auto.room.id.105': "Bu oda şu anda dolu. Birazdan tekrar dene.",  // TODO: translate
-  'auto.room.id.106': "Kullanıcı",  // TODO: translate
-  'auto.room.id.107': "Kullanıcı",  // TODO: translate
+  'auto.room.id.106': "User",  // translated
+  'auto.room.id.107': "User",  // translated
   'auto.room.id.108': "SP Satın Al",  // TODO: translate
-  'auto.room.id.109': "Vazgeç",  // TODO: translate
+  'auto.room.id.109': "Cancel",  // translated
   'auto.room.id.110': "Bu oda için {{0}} SP gerekiyor — bakiyen {{1}} SP.\n{{2}} SP eksik. Mağazadan SP alıp tekrar deneyebilirsin.",  // TODO: translate
-  'auto.room.id.111': "şimdi",  // TODO: translate
-  'auto.room.id.112': "Kullanıcı",  // TODO: translate
+  'auto.room.id.111': "now",  // translated
+  'auto.room.id.112': "User",  // translated
   'auto.room.id.113': "Düzenle...",  // TODO: translate
   'auto.room.id.114': "📷 Fotoğraf",  // TODO: translate
   'auto.room.id.115': "Mevcut metni değiştir, gönder",  // TODO: translate
-  'auto.room.id.116': "Kullanıcı",  // TODO: translate
+  'auto.room.id.116': "User",  // translated
   'auto.room.id.117': "✎ Düzenleniyor",  // TODO: translate
   'auto.room.id.118': "📷 Fotoğraf",  // TODO: translate
-  'auto.room.id.119': "Kullanıcı",  // TODO: translate
+  'auto.room.id.119': "User",  // translated
   'auto.room.id.120': "Kaydedilenden çıkarıldı",  // TODO: translate
   'auto.room.id.121': "Mesaj gönderilemedi",  // TODO: translate
   'auto.room.id.122': "Sesi Aç",  // TODO: translate
@@ -1483,7 +1483,7 @@ const en: Record<string, string> = {
   'auto.store.collection.id.006': "Giriş Efekti",  // TODO: translate
   'auto.store.collection.id.007': "Çerçeve",  // TODO: translate
   'auto.store.collection.id.008': "Satın Al",  // TODO: translate
-  'auto.store.collection.id.009': "Vazgeç",  // TODO: translate
+  'auto.store.collection.id.009': "Cancel",  // translated
   'auto.store.collection.id.010': "{{0}} için {{1}} SP harcanacak. Onaylıyor musun?",  // TODO: translate
   'auto.store.collection.id.011': "YENİ",  // TODO: translate
   'auto.store.collection.id.012': "NADİR",  // TODO: translate
@@ -1504,7 +1504,7 @@ const en: Record<string, string> = {
   'auto.store.013': "Pahalı",  // TODO: translate
   'auto.store.014': "üyeliğinle çerçeve & efektlerde",  // TODO: translate
   'auto.store.015': "Satın Al",  // TODO: translate
-  'auto.store.016': "Vazgeç",  // TODO: translate
+  'auto.store.016': "Cancel",  // translated
   'auto.store.017': "{{0}} için {{1}} SP harcanacak ({{2}}). Onaylıyor musun?",  // TODO: translate
   'auto.store.018': "Günün Fırsatı -%{{0}}",  // TODO: translate
   'auto.store.019': "{{0}} için {{1}} SP harcanacak. Onaylıyor musun?",  // TODO: translate
@@ -1519,7 +1519,7 @@ const en: Record<string, string> = {
   'auto.store.028': "{{0}} parça envanterine eklendi · {{1}} SP harcandı",  // TODO: translate
   'auto.store.029': "{{0}} Satın Alındı",  // TODO: translate
   'auto.store.030': "Satın Al",  // TODO: translate
-  'auto.store.031': "Vazgeç",  // TODO: translate
+  'auto.store.031': "Cancel",  // translated
   'auto.store.032': "{{0}} setinin {{1}} parçası {{2}} SP karşılığında envanterine eklenecek (-%{{3}}{{4}}). Onaylıyor musun?",  // TODO: translate
   'auto.store.033': "{{0}} parçalarına zaten sahipsin.",  // TODO: translate
   'auto.store.034': "Ürün",  // TODO: translate
@@ -1533,12 +1533,12 @@ const en: Record<string, string> = {
   'auto.store.042': "EFSANEVİ",  // TODO: translate
   'auto.store.043': "İLAHİ",  // TODO: translate
   'auto._layout.001': "Ekran Yüklenemedi",  // TODO: translate
-  'auto._layout.002': "Kullanıcı",  // TODO: translate
+  'auto._layout.002': "User",  // translated
   'auto._layout.003': "{{0}} hediye aldın",  // TODO: translate
-  'auto._layout.004': "Kullanıcı",  // TODO: translate
-  'auto.BlockedUsersSheet.001': "Kullanıcı",  // TODO: translate
-  'auto.BlockedUsersSheet.002': "Kullanıcı",  // TODO: translate
-  'auto.BlockedUsersSheet.003': "Kullanıcı",  // TODO: translate
+  'auto._layout.004': "User",  // translated
+  'auto.BlockedUsersSheet.001': "User",  // translated
+  'auto.BlockedUsersSheet.002': "User",  // translated
+  'auto.BlockedUsersSheet.003': "User",  // translated
   'auto.BoostPickerSheet.001': "saatlik görünürlük",  // TODO: translate
   'auto.DiscoverWelcomeSheet.001': "Başlayalım",  // TODO: translate
   'auto.DiscoverWelcomeSheet.002': "Soprano Points (SP) ile hediye gönder, profilini öne çıkar.\nOda aç, sohbet et, arkadaş edin — her etkileşim SP kazandırır.",  // TODO: translate
@@ -1552,22 +1552,22 @@ const en: Record<string, string> = {
   'auto.EmojiReactions.005': "GIF Yüklenemedi (Debug)",  // TODO: translate
   'auto.ErrorBoundary.001': "Bir Hata Oluştu",  // TODO: translate
   'auto.FollowListModal.001': "Takipten Çık",  // TODO: translate
-  'auto.FollowListModal.002': "Vazgeç",  // TODO: translate
+  'auto.FollowListModal.002': "Cancel",  // translated
   'auto.FollowListModal.003': "{{0}} kullanıcısını takipten çıkmak istiyor musun?",  // TODO: translate
-  'auto.FollowListModal.004': "Vazgeç",  // TODO: translate
+  'auto.FollowListModal.004': "Cancel",  // translated
   'auto.FollowListModal.005': "Çıkar",  // TODO: translate
-  'auto.FollowListModal.006': "Vazgeç",  // TODO: translate
+  'auto.FollowListModal.006': "Cancel",  // translated
   'auto.FollowListModal.007': "{{0}} ile arkadaşlığın sona ersin mi?",  // TODO: translate
   'auto.FollowListModal.008': "Henüz takipçi yok",  // TODO: translate
   'auto.FollowListModal.009': "Henüz arkadaş yok",  // TODO: translate
   'auto.FriendsDrawer.001': "Onaylandı",  // TODO: translate
-  'auto.FriendsDrawer.002': "Kullanıcı",  // TODO: translate
+  'auto.FriendsDrawer.002': "User",  // translated
   'auto.IncomingFriendRequestCard.001': "seninle arkadaş olmak istiyor",  // TODO: translate
   'auto.IncomingFriendRequestCard.002': "✗ İstek reddedildi",  // TODO: translate
   'auto.IncomingFriendRequestCard.003': "✓ Arkadaşlık onaylandı",  // TODO: translate
   'auto.MessageActionMenu.001': "Kaydedilenden Çıkar",  // TODO: translate
   'auto.NotificationDrawer.001': "Uzun bas: tümünü okundu işaretle",  // TODO: translate
-  'auto.NotificationDrawer.002': "şimdi",  // TODO: translate
+  'auto.NotificationDrawer.002': "now",  // translated
   'auto.NotificationDrawer.003': "Önceki",  // TODO: translate
   'auto.NotificationDrawer.004': "Bugün",  // TODO: translate
   'auto.NotificationDrawer.005': "arkadaşlık isteğini reddetti",  // TODO: translate
@@ -1597,7 +1597,7 @@ const en: Record<string, string> = {
   'auto.profile.FrameSelectSheet.009': "Bağlantı hatası",  // TODO: translate
   'auto.profile.FrameSelectSheet.010': "Bağlantı hatası",  // TODO: translate
   'auto.profile.GiftSheet.001': "Mağazaya Git",  // TODO: translate
-  'auto.profile.GiftSheet.002': "İptal",  // TODO: translate
+  'auto.profile.GiftSheet.002': "Cancel",  // translated
   'auto.profile.GiftSheet.003': "{{0}} SP eksik. Mağazadan SP yükleyip hediyeni gönderebilirsin.",  // TODO: translate
   'auto.profile.GiftSheet.004': "Beklenmeyen bir hata, internet bağlantını kontrol et.",  // TODO: translate
   'auto.profile.GiftSheet.005': "Bilinmeyen bir hata oluştu, lütfen tekrar dene.",  // TODO: translate
@@ -1612,7 +1612,7 @@ const en: Record<string, string> = {
   'auto.profile.ProfileHero.007': "Profili düzenle",  // TODO: translate
   'auto.profile.ProfileHero.008': "Çerçeve seç",  // TODO: translate
   'auto.profile.SPDonateSheet.001': "Mağazaya Git",  // TODO: translate
-  'auto.profile.SPDonateSheet.002': "İptal",  // TODO: translate
+  'auto.profile.SPDonateSheet.002': "Cancel",  // translated
   'auto.profile.SPDonateSheet.003': "{{0}} SP eksik. Mağazadan SP yükleyip bağışını tamamlayabilirsin.",  // TODO: translate
   'auto.profile.SPDonateSheet.004': "SP Gönder",  // TODO: translate
   'auto.profile.SPDonateSheet.005': "Beklenmeyen bir hata, internet bağlantını kontrol et.",  // TODO: translate
@@ -1674,29 +1674,29 @@ const en: Record<string, string> = {
   'auto.ReportModal.005': "Şikayetin iletilemedi.",  // TODO: translate
   'auto.room.CameraFullscreenModal.001': "Konuşmacı",  // TODO: translate
   'auto.room.CameraFullscreenModal.002': "Moderatör",  // TODO: translate
-  'auto.room.CameraFullscreenModal.003': "Kullanıcı",  // TODO: translate
+  'auto.room.CameraFullscreenModal.003': "User",  // translated
   'auto.room.ConnectionQualityIndicator.001': "Bağlantı: {{0}}",  // TODO: translate
   'auto.room.ConnectionQualityIndicator.002': "Bağlantı kalitesi henüz ölçülmedi.",  // TODO: translate
   'auto.room.ConnectionQualityIndicator.003': "Bağlantı zayıf — internet veya hücresel ağı kontrol et.",  // TODO: translate
   'auto.room.ConnectionQualityIndicator.004': "Bağlantı iyi — küçük gecikmeler olabilir.",  // TODO: translate
   'auto.room.ConnectionQualityIndicator.005': "Bağlantı mükemmel — düşük gecikme, kayıpsız ses.",  // TODO: translate
   'auto.room.EntryFeeCard.001': " bakiyenden düşülür ve odaya giriş yaparsın.",  // TODO: translate
-  'auto.room.HandRaiseQueuePanel.001': "Kullanıcı",  // TODO: translate
-  'auto.room.HandRaiseQueuePanel.002': "Kullanıcı",  // TODO: translate
-  'auto.room.HandRaiseQueuePanel.003': "Kullanıcı",  // TODO: translate
+  'auto.room.HandRaiseQueuePanel.001': "User",  // translated
+  'auto.room.HandRaiseQueuePanel.002': "User",  // translated
+  'auto.room.HandRaiseQueuePanel.003': "User",  // translated
   'auto.room.HostAccessPanel.001': "⏳ GEÇİCİ",  // TODO: translate
-  'auto.room.HostAccessPanel.002': "Kullanıcı",  // TODO: translate
+  'auto.room.HostAccessPanel.002': "User",  // translated
   'auto.room.HostAccessPanel.003': "{{0}}dk kaldı",  // TODO: translate
   'auto.room.HostAccessPanel.004': "Süresi dolmuş",  // TODO: translate
   'auto.room.HostAccessPanel.005': "Kalıcı",  // TODO: translate
-  'auto.room.HostAccessPanel.006': "Kullanıcı",  // TODO: translate
-  'auto.room.HostAccessPanel.007': "Kullanıcı",  // TODO: translate
-  'auto.room.HostAccessPanel.008': "Kullanıcı",  // TODO: translate
-  'auto.room.HostAccessPanel.009': "Kullanıcı",  // TODO: translate
-  'auto.room.InRoomUserProfile.001': "Kullanıcı",  // TODO: translate
-  'auto.room.InRoomUserProfile.002': "Çevrimdışı",  // TODO: translate
-  'auto.room.InRoomUserProfile.003': "Çevrimiçi",  // TODO: translate
-  'auto.room.InRoomUserProfile.004': "Kullanıcı",  // TODO: translate
+  'auto.room.HostAccessPanel.006': "User",  // translated
+  'auto.room.HostAccessPanel.007': "User",  // translated
+  'auto.room.HostAccessPanel.008': "User",  // translated
+  'auto.room.HostAccessPanel.009': "User",  // translated
+  'auto.room.InRoomUserProfile.001': "User",  // translated
+  'auto.room.InRoomUserProfile.002': "Offline",  // translated
+  'auto.room.InRoomUserProfile.003': "Online",  // translated
+  'auto.room.InRoomUserProfile.004': "User",  // translated
   'auto.room.InRoomUserProfile.005': "Tümü",  // TODO: translate
   'auto.room.InRoomUserProfile.006': "Benim İçin Sustur",  // TODO: translate
   'auto.room.InRoomUserProfile.007': "Sesi Aç (sadece bana)",  // TODO: translate
@@ -1706,10 +1706,10 @@ const en: Record<string, string> = {
   'auto.room.InRoomUserProfile.011': "Yazı Aç",  // TODO: translate
   'auto.room.InRoomUserProfile.012': "Daha fazla seçenek",  // TODO: translate
   'auto.room.InRoomUserProfile.013': "ortak arkadaş",  // TODO: translate
-  'auto.room.InRoomUserProfile.014': "Vazgeç",  // TODO: translate
+  'auto.room.InRoomUserProfile.014': "Cancel",  // translated
   'auto.room.InRoomUserProfile.015': "\"{{0}}\" odasına davet edildi",  // TODO: translate
   'auto.room.InRoomUserProfile.016': "{{0}} adlı kullanıcının SopranoChat profili: {{1}}",  // TODO: translate
-  'auto.room.InRoomUserProfile.017': "Kullanıcı",  // TODO: translate
+  'auto.room.InRoomUserProfile.017': "User",  // translated
   'auto.room.InviteFriendsModal.001': "Kişiyi Davet Et",  // TODO: translate
   'auto.room.InviteFriendsModal.002': "Arkadaş listesi yüklenemedi",  // TODO: translate
   'auto.room.MessageGlowPickerSheet.001': "SP · KİLİTLİ",  // TODO: translate
@@ -1732,7 +1732,7 @@ const en: Record<string, string> = {
   'auto.room.RoomAccessPrompts.012': "Bu odaya girmek için şartlar var:",  // TODO: translate
   'auto.room.RoomAccessPrompts.013': "{{0}} bu odaya bazı şartlar koymuş:",  // TODO: translate
   'auto.room.RoomAccessPrompts.014': "Bu odaya girmek için şifre gerekiyor",  // TODO: translate
-  'auto.room.RoomChatDrawer.001': "Kullanıcı",  // TODO: translate
+  'auto.room.RoomChatDrawer.001': "User",  // translated
   'auto.room.RoomChatDrawer.002': "odadan ayrıldı",  // TODO: translate
   'auto.room.RoomChatDrawer.003': "odaya katıldı",  // TODO: translate
   'auto.room.RoomClosedScreen.001': "Birden fazla erişim engeli var:",  // TODO: translate
@@ -1749,14 +1749,14 @@ const en: Record<string, string> = {
   'auto.room.RoomDisconnectOverlay.004': "Bağlantı koptu",  // TODO: translate
   'auto.room.RoomFollowersSheet.001': "Henüz takipçi yok",  // TODO: translate
   'auto.room.RoomFollowersSheet.002': "{{0}} kişi bu odayı takip ediyor",  // TODO: translate
-  'auto.room.RoomGiftAnimationOverlay.001': "Kullanıcı",  // TODO: translate
+  'auto.room.RoomGiftAnimationOverlay.001': "User",  // translated
   'auto.room.RoomGiftPanel.001': "{{0}} kişiyi seç",  // TODO: translate
   'auto.room.RoomGiftPanel.002': "{{0}} kişi seçilebilir",  // TODO: translate
   'auto.room.RoomGiftPanel.003': "Odada başka kimse yok",  // TODO: translate
   'auto.room.RoomGiftPanel.004': "Bağlantı hatası",  // TODO: translate
   'auto.room.RoomGiftPanel.005': "Alıcı",  // TODO: translate
   'auto.room.RoomGiftPanel.006': "{{0}} için {{1}} SP gerekli, {{2}} SP'n var.",  // TODO: translate
-  'auto.room.RoomGiftPanel.007': "Kullanıcı",  // TODO: translate
+  'auto.room.RoomGiftPanel.007': "User",  // translated
   'auto.room.RoomInfoHeader.001': "Bu odada {{0}} konuşuluyor.",  // TODO: translate
   'auto.room.RoomInfoHeader.002': "Français",  // TODO: translate
   'auto.room.RoomInfoHeader.003': "Bu odaya girmek için {{0}} SP harcanır.",  // TODO: translate
@@ -1770,20 +1770,20 @@ const en: Record<string, string> = {
   'auto.room.RoomManageSheet.006': "Giriş: {{0}} SP",  // TODO: translate
   'auto.room.RoomManageSheet.007': "Bağış Kapalı",  // TODO: translate
   'auto.room.RoomManageSheet.008': "Bağış Açık",  // TODO: translate
-  'auto.room.RoomManageSheet.009': "Düzenle",  // TODO: translate
+  'auto.room.RoomManageSheet.009': "Edit",  // translated
   'auto.room.RoomManageSheet.010': "Oda Müzik Linki",  // TODO: translate
   'auto.room.RoomManageSheet.011': "Müzik: {{0}}",  // TODO: translate
   'auto.room.RoomManageSheet.012': "Keşfet akışında görünen banner",  // TODO: translate
   'auto.room.RoomManageSheet.013': "Kart görseli ayarlandı",  // TODO: translate
   'auto.room.RoomManageSheet.014': "Üyelik statüsüne göre",  // TODO: translate
   'auto.room.RoomManageSheet.015': "Arka plan ayarlandı",  // TODO: translate
-  'auto.room.RoomManageSheet.016': "Kullanıcı",  // TODO: translate
+  'auto.room.RoomManageSheet.016': "User",  // translated
   'auto.room.RoomManageSheet.017': "Süresiz",  // TODO: translate
   'auto.room.RoomManageSheet.018': "{{0}}dk kaldı",  // TODO: translate
   'auto.room.RoomManageSheet.019': "Susturulan Kullanıcılar (",  // TODO: translate
   'auto.room.RoomManageSheet.020': "Sunucu hatası",  // TODO: translate
   'auto.room.RoomManageSheet.021': "GEÇİCİ",  // TODO: translate
-  'auto.room.RoomManageSheet.022': "Kullanıcı",  // TODO: translate
+  'auto.room.RoomManageSheet.022': "User",  // translated
   'auto.room.RoomManageSheet.023': "{{0}}dk kaldı",  // TODO: translate
   'auto.room.RoomManageSheet.024': "Süresi dolmuş",  // TODO: translate
   'auto.room.RoomManageSheet.025': "Kalıcı",  // TODO: translate
@@ -1808,7 +1808,7 @@ const en: Record<string, string> = {
   'auto.room.RoomManageSheet.044': "Ayarlanmadı (en az 4 karakter)",  // TODO: translate
   'auto.room.RoomManageSheet.045': "Şifreli",  // TODO: translate
   'auto.room.RoomManageSheet.046': "Takipçi",  // TODO: translate
-  'auto.room.RoomManageSheet.047': "Açık",  // TODO: translate
+  'auto.room.RoomManageSheet.047': "Open",  // translated
   'auto.room.RoomManageSheet.048': "Sadece arkadaşlar modu Plus üyelikle açılır.",  // TODO: translate
   'auto.room.RoomManageSheet.049': "Davetli oda Plus üyelikle açılır.",  // TODO: translate
   'auto.room.RoomManageSheet.050': "Erişim",  // TODO: translate
@@ -1821,7 +1821,7 @@ const en: Record<string, string> = {
   'auto.room.RoomManageSheet.057': "Sunucuya ulaşılamadı.",  // TODO: translate
   'auto.room.RoomManageSheet.058': "Sunucuya ulaşılamadı.",  // TODO: translate
   'auto.room.RoomManageSheet.059': "Sunucuya ulaşılamadı.",  // TODO: translate
-  'auto.room.RoomManageSheet.060': "Vazgeç",  // TODO: translate
+  'auto.room.RoomManageSheet.060': "Cancel",  // translated
   'auto.room.RoomManageSheet.061': "Bu sorumluluğu kabul ediyor musun?",  // TODO: translate
   'auto.room.RoomManageSheet.062': "• Konuşmacı talebi halinde kayıt silinmelidir.\n\n",  // TODO: translate
   'auto.room.RoomManageSheet.063': "• Kayıt 7 gün boyunca saklanır, sonra otomatik silinir.\n",  // TODO: translate
@@ -1834,8 +1834,8 @@ const en: Record<string, string> = {
   'auto.room.RoomOverlays.002': "Oda açık kalır, sahiplik devri yapılır",  // TODO: translate
   'auto.room.RoomOverlays.003': "Odayı Takip Et",  // TODO: translate
   'auto.room.RoomOverlays.004': "Takibi Bırak",  // TODO: translate
-  'auto.room.RoomOverlays.005': "Kullanıcı",  // TODO: translate
-  'auto.room.RoomOverlays.006': "Kullanıcı",  // TODO: translate
+  'auto.room.RoomOverlays.005': "User",  // translated
+  'auto.room.RoomOverlays.006': "User",  // translated
   'auto.room.RoomOverlays.007': "Kalıcı",  // TODO: translate
   'auto.room.RoomOverlays.008': "Ücretsiz",  // TODO: translate
   'auto.room.RoomOverlays.009': "Kulaklık",  // TODO: translate
@@ -1847,10 +1847,10 @@ const en: Record<string, string> = {
   'auto.room.RoomRecordingsSheet.003': "{{0}}g önce",  // TODO: translate
   'auto.room.RoomRecordingsSheet.004': "{{0}}sa önce",  // TODO: translate
   'auto.room.RoomRecordingsSheet.005': "{{0}}dk önce",  // TODO: translate
-  'auto.room.RoomRecordingsSheet.006': "az önce",  // TODO: translate
+  'auto.room.RoomRecordingsSheet.006': "just now",  // translated
   'auto.room.RoomStatsPanel.001': "❤️ Oda Takipçileri (",  // TODO: translate
   'auto.room.StageSupportSheet.001': "Mağazaya Git",  // TODO: translate
-  'auto.room.StageSupportSheet.002': "İptal",  // TODO: translate
+  'auto.room.StageSupportSheet.002': "Cancel",  // translated
   'auto.room.StageSupportSheet.003': "{{0}} SP eksik. Mağazadan SP yükleyip sahneyi destekleyebilirsin.",  // TODO: translate
   'auto.room.StageSupportSheet.004': "Beklenmeyen bir hata, internet bağlantını kontrol et.",  // TODO: translate
   'auto.room.StageSupportSheet.005': "Bilinmeyen bir hata oluştu, lütfen tekrar dene.",  // TODO: translate
@@ -1871,12 +1871,12 @@ const en: Record<string, string> = {
   'auto.store.StoreItemPreviewSheet.011': "EFSANEVİ",  // TODO: translate
   'auto.store.StoreItemPreviewSheet.012': "İLAHİ",  // TODO: translate
   'auto.SystemSettingsOverlay.001': "Tahmini bitiş:",  // TODO: translate
-  'auto.UserSearchModal.001': "Kullanıcı",  // TODO: translate
-  'auto.UserSearchModal.002': "Kullanıcı",  // TODO: translate
-  'auto.UserSearchModal.003': "Kullanıcı",  // TODO: translate
-  'auto.UserSearchModal.004': "Kullanıcı",  // TODO: translate
-  'auto.UserSearchModal.005': "Kullanıcı",  // TODO: translate
-  'auto.UserSearchModal.006': "Kullanıcı",  // TODO: translate
+  'auto.UserSearchModal.001': "User",  // translated
+  'auto.UserSearchModal.002': "User",  // translated
+  'auto.UserSearchModal.003': "User",  // translated
+  'auto.UserSearchModal.004': "User",  // translated
+  'auto.UserSearchModal.005': "User",  // translated
+  'auto.UserSearchModal.006': "User",  // translated
   'auto.account.001': "Hesap silme işlemi başarısız.",  // TODO: translate
   'auto.account.002': "Kullanıcı kimliği bulunamadı.",  // TODO: translate
   'auto.badgeEngine.001': "{{0}} rozeti ödülü",  // TODO: translate
@@ -1909,7 +1909,7 @@ const en: Record<string, string> = {
   'auto.gamification.004': "SP kazanıldı: {{0}}",  // TODO: translate
   'auto.gamification.005': "Bugün 300 SP kazanım limitine ulaştın. Yarın tekrar dene.",  // TODO: translate
   'auto.gamification.006': "Günlük Limit",  // TODO: translate
-  'auto.giftStats.001': "Kullanıcı",  // TODO: translate
+  'auto.giftStats.001': "User",  // translated
   'auto.i18n.001': "Türkçe",  // TODO: translate
   'auto.livekit.001': "Bu cihazda ekran paylaşımı desteklenmiyor",  // TODO: translate
   'auto.livekit.002': "Ekran video track bulunamadı",  // TODO: translate
@@ -1932,12 +1932,12 @@ const en: Record<string, string> = {
   'auto.moderation.001': "Bu işlem için yetkiniz yok.",  // TODO: translate
   'auto.moderation.002': "Oda ismi boş olamaz",  // TODO: translate
   'auto.moderation.003': "Bu işlem için yetkiniz yok.",  // TODO: translate
-  'auto.moderation.004': "Kullanıcı",  // TODO: translate
+  'auto.moderation.004': "User",  // translated
   'auto.moderation.005': "Bir kullanıcı",  // TODO: translate
   'auto.moderation.006': "gönderiyi",  // TODO: translate
   'auto.moderation.007': "odayı",  // TODO: translate
   'auto.moderation.008': "kullanıcıyı",  // TODO: translate
-  'auto.moderation.009': "Diğer",  // TODO: translate
+  'auto.moderation.009': "Other",  // translated
   'auto.moderation.010': "Reşit Olmayan",  // TODO: translate
   'auto.moderation.011': "Şiddet",  // TODO: translate
   'auto.moderation.012': "Kimliğe Bürünme",  // TODO: translate
@@ -1971,7 +1971,7 @@ const en: Record<string, string> = {
   'auto.profile.013': "Kendinize SP gönderemezsiniz",  // TODO: translate
   'auto.profile.014': "Profil boost özelliği Plus ve üzeri üyeliklerde kullanılabilir.",  // TODO: translate
   'auto.profileExtras.001': "Genelde {{0}} - {{1}} arası aktif",  // TODO: translate
-  'auto.profileExtras.002': "Kullanıcı",  // TODO: translate
+  'auto.profileExtras.002': "User",  // translated
   'auto.profileExtras.003': "Sesli tanıtım çok uzun (en fazla 30 saniye)",  // TODO: translate
   'auto.profileExtras.004': "Sesli tanıtım çok kısa (en az 3 saniye)",  // TODO: translate
   'auto.push.001': "{{0}} \"{{1}}\" odanızı takip etmeye başladı",  // TODO: translate
@@ -2072,8 +2072,8 @@ const en: Record<string, string> = {
   'auto.room.033': "Çok hızlı oda kuruyorsun.",  // TODO: translate
   'auto.room.034': "Oda uyandırılamadı: ",  // TODO: translate
   'auto.room.035': "{{0}}'in Odası",  // TODO: translate
-  'auto.room.036': "Kullanıcı",  // TODO: translate
-  'auto.room.037': "Kullanıcı",  // TODO: translate
+  'auto.room.036': "User",  // translated
+  'auto.room.037': "User",  // translated
   'auto.room.038': "Film Odası",  // TODO: translate
   'auto.room.039': "Kitap Odası",  // TODO: translate
   'auto.room.040': "Oyun Odası",  // TODO: translate
@@ -2112,7 +2112,7 @@ const en: Record<string, string> = {
   'auto.roomFollow.001': "{{0}} yeni bir oda açtı: \"{{1}}\"",  // TODO: translate
   'auto.roomFollow.002': "🎤 Yeni Canlı Oda",  // TODO: translate
   'auto.roomFollow.003': "🎤 yeni bir oda açtı: \"{{0}}\"",  // TODO: translate
-  'auto.roomFollow.004': "Kullanıcı",  // TODO: translate
+  'auto.roomFollow.004': "User",  // translated
   'auto.roomFollow.005': "🏠 {{0}} \"{{1}}\" odanızı takip etmeye başladı",  // TODO: translate
   'auto.settings.001': "Türkçe",  // TODO: translate
   'auto.storage.001': "Ses dosyası",  // TODO: translate
@@ -2696,14 +2696,14 @@ const en: Record<string, string> = {
   'reportmodal.004': "Kimliğe Bürünme",  // TODO: translate
   'reportmodal.005': "Şiddet",  // TODO: translate
   'reportmodal.006': "Yaş Altı Kullanıcı",  // TODO: translate
-  'reportmodal.007': "Diğer",  // TODO: translate
+  'reportmodal.007': "Other",  // translated
   'reportmodal.008': "Bir sebep seçin",  // TODO: translate
   'reportmodal.009': "Raporun alındı",  // TODO: translate
   'reportmodal.010': "En kısa sürede incelenecektir.",  // TODO: translate
   'reportmodal.011': "Rapor Gönderilemedi",  // TODO: translate
   'room.connectionqualityindicator.001': "Mükemmel",  // TODO: translate
-  'room.connectionqualityindicator.002': "İyi",  // TODO: translate
-  'room.connectionqualityindicator.003': "Zayıf",  // TODO: translate
+  'room.connectionqualityindicator.002': "Good",  // translated
+  'room.connectionqualityindicator.003': "Weak",  // translated
   'room.glowstyles.001': "KALP ATIŞI",  // TODO: translate
   'room.glowstyles.002': "ATEŞ",  // TODO: translate
   'room.glowstyles.003': "GALAKSİ",  // TODO: translate
@@ -2829,9 +2829,9 @@ const en: Record<string, string> = {
   'room.roommanagesheet.032': "Ayar Güncellenemedi",  // TODO: translate
   'room.roommanagesheet.033': "Plus Üyelik Gerekli",  // TODO: translate
   'room.roommanagesheet.034': "Erişim modunu değiştirmek için önce kilidi kapat.",  // TODO: translate
-  'room.roommanagesheet.035': "Şifre Çok Kısa",  // TODO: translate
+  'room.roommanagesheet.035': "Password Too Short",  // translated
   'room.roommanagesheet.036': "En az 4 karakter olmalı.",  // TODO: translate
-  'room.roommanagesheet.037': "Şifre Çok Kısa",  // TODO: translate
+  'room.roommanagesheet.037': "Password Too Short",  // translated
   'room.roommanagesheet.038': "En az 4 karakter olmalı.",  // TODO: translate
   'room.roommanagesheet.039': "Pro+ ile açılır",  // TODO: translate
   'room.roommanagesheet.040': "Ban Kaldırıldı",  // TODO: translate
@@ -2860,13 +2860,13 @@ const en: Record<string, string> = {
   'room.roomoverlays.002': "Seçili",  // TODO: translate
   'room.roomoverlays.003': "Gün Batımı",  // TODO: translate
   'room.roomoverlays.004': "Gül",  // TODO: translate
-  'room.roomoverlays.005': "Açık",  // TODO: translate
+  'room.roomoverlays.005': "Open",  // translated
   'room.roomoverlays.006': "Şifreli",  // TODO: translate
   'room.roomoverlays.007': "✅ Ban Kaldırıldı",  // TODO: translate
   'room.roomoverlays.008': "Ban Kaldırılamadı",  // TODO: translate
   'room.roomoverlays.009': "Bu kullanıcının banı kaldırılamadı.",  // TODO: translate
   'room.roomoverlays.010': "Konuşma",  // TODO: translate
-  'room.roomoverlays.011': "Müzik",  // TODO: translate
+  'room.roomoverlays.011': "Music",  // translated
   'room.roomoverlays.012': "Katılım İstekleri",  // TODO: translate
   'room.roomoverlays.013': "Katılım İstekleri",  // TODO: translate
   'room.roomoverlays.014': "Oda Linkini Paylaş",  // TODO: translate
