@@ -74,7 +74,7 @@ export default function PersonalNoteCard({ ownerId, targetId, initialNote }: Pro
         style={({ pressed }) => [s.emptyWrap, pressed && { opacity: 0.7 }]}
       >
         <Ionicons name="bookmark-outline" size={13} color="rgba(148,163,184,0.7)" />
-        <Text style={s.emptyText}>Bu kişi için not ekle (sadece sen görürsün)</Text>
+        <Text style={s.emptyText}>{i18n.t('profile.note_placeholder')}</Text>
       </Pressable>
     );
   }

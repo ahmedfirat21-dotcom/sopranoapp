@@ -702,13 +702,13 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
     }
     setCAlert({
       visible: true,
-      title: 'Kullanıcıyı Engelle',
-      message: `${userProfile?.display_name || 'Bu kullanıcı'} engellenecek. Engellenmiş kullanıcıların postlarını ve mesajlarını göremezsiniz.`,
+      title: i18n.t('profile.block_title'),
+      message: i18n.t('profile.block_message', { name: userProfile?.display_name || 'Bu kullanıcı' }),
       type: 'warning',
       buttons: [
         { text: 'Vazgeç', style: 'cancel' },
         {
-          text: 'Engelle', style: 'destructive',
+          text: i18n.t('profile.block_action'), style: 'destructive',
           onPress: async () => {
             try {
               await ModerationService.blockUser(currentUserId, userId);
@@ -987,7 +987,7 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                           color={isFollowingUser ? '#14B8A6' : '#F1F5F9'}
                         />
                         <Text style={[sty.actionPillText, { color: isFollowingUser ? '#14B8A6' : '#F1F5F9' }]}>
-                          {isFollowingUser ? 'Takipte' : 'Takip Et'}
+                          {isFollowingUser ? i18n.t('profile.following') : i18n.t('profile.follow')}
                         </Text>
                       </>
                     )}
@@ -1164,7 +1164,7 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                     : ma?.onRemoveFromStage
                     ? { fn: ma.onRemoveFromStage, icon: 'arrow-down-circle' as const, label: 'Sahneden İndir', color: MOD }
                     : ma?.onSelfPromote
-                    ? { fn: ma.onSelfPromote, icon: 'arrow-up-circle' as const, label: 'Sahneye Çık', color: MOD }
+                    ? { fn: ma.onSelfPromote, icon: 'arrow-up-circle' as const, label: i18n.t('profile.stage_promote_self'), color: MOD }
                     : ma?.onSelfDemote
                     ? { fn: ma.onSelfDemote, icon: 'arrow-down-circle-outline' as const, label: 'Sahneden İn', color: DANGER }
                     : null;
@@ -1186,11 +1186,11 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                   if (ma?.onChatMute) moderationItems.push({ fn: ma.onChatMute, icon: ma.isChatMuted ? 'chatbox' : 'chatbox-outline', label: ma.isChatMuted ? 'Yazı Aç' : 'Yazı Kapat', color: MOD });
                   if (ma?.onMakeModerator) moderationItems.push({ fn: ma.onMakeModerator, icon: 'shield', label: ma.displayRole === 'moderator' ? 'Moderatörlüğü Kaldır' : 'Moderatör Yap', color: MOD });
                   if (ma?.onPersonalMute) moderationItems.push({ fn: ma.onPersonalMute, icon: ma.isPersonallyMuted ? 'volume-high' : 'volume-mute', label: ma.isPersonallyMuted ? 'Sesi Aç (sadece bana)' : 'Benim İçin Sustur', color: MOD });
-                  if (ma?.onGhostMode) moderationItems.push({ fn: ma.onGhostMode, icon: ma.isGhost ? 'eye' : 'eye-off', label: ma.isGhost ? 'Görünür Ol' : 'Görünmez Mod', color: MOD });
+                  if (ma?.onGhostMode) moderationItems.push({ fn: ma.onGhostMode, icon: ma.isGhost ? 'eye' : 'eye-off', label: ma.isGhost ? i18n.t('profile.ghost_visible') : i18n.t('profile.ghost_invisible'), color: MOD });
                   if (ma?.onDisguise) moderationItems.push({
                     fn: ma.onDisguise,
                     icon: ma.isDisguised ? 'person' : 'person-circle',
-                    label: ma.isDisguised ? 'Kılığı Çıkar' : 'Kılığa Bürün',
+                    label: ma.isDisguised ? i18n.t('profile.disguise_off') : i18n.t('profile.disguise_on'),
                     color: MOD,
                   });
 
@@ -1200,8 +1200,8 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                   if (ma?.onKick) enforcementItems.push({ fn: ma.onKick, icon: 'exit', label: 'Odadan Çıkar', color: DANGER, danger: true });
                   if (ma?.onBanTemp) enforcementItems.push({ fn: ma.onBanTemp, icon: 'timer', label: 'Geçici Ban', color: DANGER, danger: true });
                   if (ma?.onBanPerm) enforcementItems.push({ fn: ma.onBanPerm, icon: 'ban', label: 'Kalıcı Ban', color: DANGER, danger: true });
-                  enforcementItems.push({ fn: () => setShowReportModal(true), icon: 'flag-outline', label: 'Rapor Et', color: DANGER, danger: true, keepSheet: true });
-                  enforcementItems.push({ fn: handleBlock, icon: isUserBlocked ? 'checkmark-circle' : 'ban', label: isUserBlocked ? 'Engeli Kaldır' : 'Engelle', color: DANGER, danger: true, keepSheet: true });
+                  enforcementItems.push({ fn: () => setShowReportModal(true), icon: 'flag-outline', label: i18n.t('profile.report'), color: DANGER, danger: true, keepSheet: true });
+                  enforcementItems.push({ fn: handleBlock, icon: isUserBlocked ? 'checkmark-circle' : 'ban', label: isUserBlocked ? i18n.t('profile.unblock_action') : i18n.t('profile.block_action'), color: DANGER, danger: true, keepSheet: true });
 
                   const hasMore = moderationItems.length > 0 || enforcementItems.length > 0;
                   if (!primary && !muteToggle && !hasMore) return null;
@@ -1553,7 +1553,7 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                               >
                                 <Ionicons name={isLive ? 'headset' : 'eye-outline'} size={12} color="#FFF" />
                                 <Text style={{ fontSize: 10, fontWeight: '800', color: '#FFF', letterSpacing: 0.3 }}>
-                                  {isLive ? 'Katıl' : 'Gör'}
+                                  {isLive ? i18n.t('profile.join_room') : i18n.t('profile.view_room')}
                                 </Text>
                               </LinearGradient>
                             </Pressable>
@@ -1570,7 +1570,7 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                 {friendsPreview.length >= 2 && (
                   <>
                     <ProfileSectionHeader
-                      label={isOwnProfile ? 'ARKADAŞLARIM' : 'ARKADAŞLARI'}
+                      label={isOwnProfile ? i18n.t('profile.friends_label_my') : i18n.t('profile.friends_label_other')}
                       icon="people"
                       accentColor={Colors.teal}
                       count={friendsPreview.length}
