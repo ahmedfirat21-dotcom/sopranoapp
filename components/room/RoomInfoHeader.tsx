@@ -216,13 +216,8 @@ export default function RoomInfoHeader({
             </Text>
             {roomDuration ? (
               <View style={s.durationInline}>
-                {/* ★ v284: header.showLiveIndicator → LIVE dot + 'LIVE' text */}
-                {headerCfg.showLiveIndicator && (
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginRight: 4 }}>
-                    <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: headerCfg.liveDotColor }} />
-                    <Text style={{ fontSize: 8, fontWeight: '800', color: headerCfg.liveDotColor, letterSpacing: 0.6 }}>{i18n.t('roominfoheader.live')}</Text>
-                  </View>
-                )}
+                {/* ★ v283: CANLI/LIVE pill kaldırıldı — eski v278 yapısı korunsun
+                    (kullanıcı tercihi: minimal header, sadece time + duration). */}
                 <Ionicons name="time-outline" size={8} color="rgba(20,184,166,0.6)" />
                 <Text style={s.durationText}>{roomDuration}</Text>
                 {roomExpiry ? (
