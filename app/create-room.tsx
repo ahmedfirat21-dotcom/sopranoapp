@@ -15,6 +15,7 @@ import { Colors, Shadows } from '../constants/theme';
 import { showToast } from '../components/Toast';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from './_layout';
+import { i18n, useTranslation } from '../services/i18n';
 import { UpsellService } from '../services/upsell';
 import { supabase } from '../constants/supabase';
 import InviteFriendsModal from '../components/room/InviteFriendsModal';
@@ -57,21 +58,21 @@ const ROOM_THEMES: { id: string; name: string; colors: [string, string] }[] = [
 ];
 
 const CATEGORIES = [
-  { id: 'chat',  label: 'Sohbet',     icon: 'chatbubbles',          color: '#14B8A6', desc: 'Günlük muhabbet, serbest konular' },
-  { id: 'music', label: 'Müzik',      icon: 'musical-notes',        color: '#8B5CF6', desc: 'Sevdiğin parçaları paylaş' },
-  { id: 'game',  label: 'Oyun',       icon: 'game-controller',      color: '#EF4444', desc: 'Oyuncularla strateji, skor' },
-  { id: 'tech',  label: 'Teknoloji',  icon: 'code-slash',           color: '#3B82F6', desc: 'Yazılım, donanım, yeni araçlar' },
-  { id: 'book',  label: 'Kitap',      icon: 'book',                 color: '#F59E0B', desc: 'Okuma deneyimleri, yazarlar' },
-  { id: 'film',  label: 'Film',       icon: 'film',                 color: '#EC4899', desc: 'Sinema, dizi, tartışmalar' },
-  { id: 'other', label: 'Diğer',      icon: 'ellipsis-horizontal',  color: '#64748B', desc: 'Kategorilere sığmayan her şey' },
+  { id: 'chat',  labelKey: 'category.chat',           icon: 'chatbubbles',          color: '#14B8A6', descKey: 'create.cat.chat.desc' },
+  { id: 'music', labelKey: 'category.music',          icon: 'musical-notes',        color: '#8B5CF6', descKey: 'create.cat.music.desc' },
+  { id: 'game',  labelKey: 'category.game',           icon: 'game-controller',      color: '#EF4444', descKey: 'create.cat.game.desc' },
+  { id: 'tech',  labelKey: 'create.cat.tech.label',   icon: 'code-slash',           color: '#3B82F6', descKey: 'create.cat.tech.desc' },
+  { id: 'book',  labelKey: 'category.book',           icon: 'book',                 color: '#F59E0B', descKey: 'create.cat.book.desc' },
+  { id: 'film',  labelKey: 'category.film',           icon: 'film',                 color: '#EC4899', descKey: 'create.cat.film.desc' },
+  { id: 'other', labelKey: 'create.cat.other.label',  icon: 'ellipsis-horizontal',  color: '#64748B', descKey: 'create.cat.other.desc' },
 ];
 
 // ★ 2026-04-25: ROOM_TYPES kaldırıldı → constants/audience.ts AUDIENCE_OPTIONS
 
 const SPEAKING_MODES = [
-  { id: 'free_for_all',    label: 'Serbest',     icon: 'people',            desc: 'Herkes istediğinde konuşur',       minTier: 'Free' as const },
-  { id: 'permission_only', label: 'İzinli',      icon: 'hand-left',         desc: 'El kaldırıp izin beklersin',        minTier: 'Free' as const },
-  { id: 'selected_only',   label: 'Seçilmişler', icon: 'shield-checkmark',  desc: 'Sadece owner\'ın seçtikleri konuşur', minTier: 'Pro' as const },
+  { id: 'free_for_all',    labelKey: 'create.speak.free.label',       icon: 'people',            descKey: 'create.speak.free.desc',       minTier: 'Free' as const },
+  { id: 'permission_only', labelKey: 'create.speak.permission.label', icon: 'hand-left',         descKey: 'create.speak.permission.desc', minTier: 'Free' as const },
+  { id: 'selected_only',   labelKey: 'create.speak.selected.label',   icon: 'shield-checkmark',  descKey: 'create.speak.selected.desc',   minTier: 'Pro' as const },
 ];
 
 // ═══════════════════════════════════════════════════════════════════
@@ -82,8 +83,9 @@ type WizardStep = 'basics' | 'category' | 'access' | 'speaking' | 'welcome' | 'v
 // ★ Her adım için zengin metadata — gradient circle + icon + kendi tema rengi
 interface StepMeta {
   id: WizardStep;
-  title: string;
-  subtitle: string;
+  /** i18n key — runtime'da t() ile çevrilir */
+  titleKey: string;
+  subtitleKey: string;
   icon: string;
   iconLib?: 'ionicons' | 'mci'; // material community icons alternatif
   gradient: [string, string, string];
@@ -97,21 +99,21 @@ interface StepMeta {
 //   sadece accent rengi halo ring + icon tint olarak kalıyor. Rainbow → kohezyon.
 const FAMILY_GRADIENT: [string, string, string] = ['#3a4658', '#2a3344', '#1a2030'];
 const STEPS: StepMeta[] = [
-  { id: 'basics',       title: 'Odana bir isim ver',       subtitle: 'Arkadaşlar seni bu isimle bulacak — akılda kalsın, karakterini yansıtsın.',
+  { id: 'basics',       titleKey: 'create.step.basics.title',       subtitleKey: 'create.step.basics.subtitle',
     icon: 'create-outline',        gradient: FAMILY_GRADIENT, accent: '#5EEAD4', watermark: 'sparkles' },
-  { id: 'category',     title: 'Ne konuşacaksınız?',       subtitle: 'Doğru kategori, doğru insanları çeker.',
+  { id: 'category',     titleKey: 'create.step.category.title',     subtitleKey: 'create.step.category.subtitle',
     icon: 'pricetags',             gradient: FAMILY_GRADIENT, accent: '#C084FC', watermark: 'grid' },
-  { id: 'access',       title: 'Kimler girebilir?',        subtitle: 'Kapıyı herkese mi açarsın, yoksa özel bir topluluk mu?',
+  { id: 'access',       titleKey: 'create.step.access.title',       subtitleKey: 'create.step.access.subtitle',
     icon: 'key',                   gradient: FAMILY_GRADIENT, accent: '#FBBF24', watermark: 'lock-closed' },
-  { id: 'speaking',     title: 'Mikrofonu kim alır?',      subtitle: 'Sahnedeki düzen senin elinde.',
+  { id: 'speaking',     titleKey: 'create.step.speaking.title',     subtitleKey: 'create.step.speaking.subtitle',
     icon: 'mic',                   gradient: FAMILY_GRADIENT, accent: '#5EEAD4', watermark: 'radio' },
-  { id: 'welcome',      title: 'Karşılama zamanı',         subtitle: 'Gelenlerin ilk gördüğü şey — sıcak bir selam ve kurallar.',
+  { id: 'welcome',      titleKey: 'create.step.welcome.title',      subtitleKey: 'create.step.welcome.subtitle',
     icon: 'hand-right',            gradient: FAMILY_GRADIENT, accent: '#F9A8D4', watermark: 'heart', skippable: true },
-  { id: 'visual',       title: 'Görsel dokunuş',           subtitle: 'Tema seç, kapak koy — odana karakterini kat.',
+  { id: 'visual',       titleKey: 'create.step.visual.title',       subtitleKey: 'create.step.visual.subtitle',
     icon: 'color-palette',         gradient: FAMILY_GRADIENT, accent: '#A78BFA', watermark: 'image', skippable: true },
-  { id: 'monetization', title: 'İster kazan, ister bedava',subtitle: 'Giriş ücreti veya bağış — tamamen sana kalmış.',
+  { id: 'monetization', titleKey: 'create.step.monetization.title', subtitleKey: 'create.step.monetization.subtitle',
     icon: 'diamond',               gradient: FAMILY_GRADIENT, accent: '#FBBF24', watermark: 'cash', skippable: true },
-  { id: 'review',       title: 'Her şey hazır',             subtitle: 'Son bir kontrol, sonra canlıya alırız.',
+  { id: 'review',       titleKey: 'create.step.review.title',       subtitleKey: 'create.step.review.subtitle',
     icon: 'rocket',                gradient: FAMILY_GRADIENT, accent: '#5EEAD4', watermark: 'checkmark-done' },
 ];
 
@@ -143,6 +145,7 @@ function isValidMusicUrl(url: string): boolean {
 // ═══════════════════════════════════════════════════════════════════
 export default function CreateRoomScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const { firebaseUser, profile } = useAuth();
   const isAdmin = profile?.is_admin === true;
@@ -518,7 +521,7 @@ export default function CreateRoomScreen() {
       <View style={w.heroInputWrap}>
         <TextInput
           style={w.bigInput}
-          placeholder="Odanın adını yaz..."
+          placeholder={t('create.room_name_placeholder')}
           placeholderTextColor="rgba(148,163,184,0.5)"
           value={name}
           onChangeText={setName}
@@ -540,10 +543,10 @@ export default function CreateRoomScreen() {
 
       {/* ★ Açıklama — ince kenarlıklı, şeffaf */}
       <View style={{ marginTop: 32 }}>
-        <Text style={w.sublabel}>Açıklama (opsiyonel)</Text>
+        <Text style={w.sublabel}>{t('create.desc_label')}</Text>
         <TextInput
           style={w.mediumInput}
-          placeholder="Bu oda neden var? Kısa bir özet..."
+          placeholder={t('create.desc_placeholder')}
           placeholderTextColor="rgba(148,163,184,0.35)"
           value={description}
           onChangeText={setDescription}
@@ -579,13 +582,13 @@ export default function CreateRoomScreen() {
               <View style={[w.catCard, active && { borderColor: c.color, borderWidth: 2 }]}>
                 <Ionicons name={c.icon as any} size={30} color={c.color} style={{ textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 6 }} />
               </View>
-              <Text style={[w.catName, active && { color: '#FFF' }]}>{c.label}</Text>
+              <Text style={[w.catName, active && { color: '#FFF' }]}>{t(c.labelKey)}</Text>
             </Pressable>
           );
         })}
       </View>
       {category && (
-        <Text style={w.categoryHint}>{CATEGORIES.find(c => c.id === category)?.desc}</Text>
+        <Text style={w.categoryHint}>{(() => { const c = CATEGORIES.find(c => c.id === category); return c ? t(c.descKey) : ''; })()}</Text>
       )}
 
       {/* ★ Faz 4.3 — Etiket chip input (max 3) */}
@@ -608,7 +611,7 @@ export default function CreateRoomScreen() {
                 value={tagDraft}
                 onChangeText={setTagDraft}
                 onSubmitEditing={() => addTag(tagDraft)}
-                placeholder="örn. anime"
+                placeholder={t('create.tag_placeholder')}
                 placeholderTextColor="rgba(148,163,184,0.5)"
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -693,7 +696,7 @@ export default function CreateRoomScreen() {
           <Text style={w.sublabel}>Şifre (min 4 karakter)</Text>
           <TextInput
             style={w.mediumInput}
-            placeholder="Gizli şifren..."
+            placeholder={t('create.password_placeholder')}
             placeholderTextColor="rgba(255,255,255,0.2)"
             value={password}
             onChangeText={setPassword}
@@ -818,7 +821,7 @@ export default function CreateRoomScreen() {
               <Ionicons name={sm.icon as any} size={22} color={active ? Colors.teal : '#94A3B8'} style={{ marginRight: 2 }} />
               <View style={{ flex: 1 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Text style={[w.accessLabel, active && { color: Colors.teal }]}>{sm.label}</Text>
+                  <Text style={[w.accessLabel, active && { color: Colors.teal }]}>{t(sm.labelKey)}</Text>
                   {locked && (
                     <View style={w.lockBadge}>
                       <Ionicons name="lock-closed" size={9} color="#F59E0B" />
@@ -826,7 +829,7 @@ export default function CreateRoomScreen() {
                     </View>
                   )}
                 </View>
-                <Text style={w.accessDesc}>{sm.desc}</Text>
+                <Text style={w.accessDesc}>{t(sm.descKey)}</Text>
               </View>
               {active && <Ionicons name="checkmark-circle" size={22} color={Colors.teal} />}
             </Pressable>
@@ -861,7 +864,7 @@ export default function CreateRoomScreen() {
       <Text style={w.sublabel}>Hoş geldin mesajı</Text>
       <TextInput
         style={w.mediumInput}
-        placeholder="Herkese merhaba! Buyurun..."
+        placeholder={t('create.welcome_placeholder')}
         placeholderTextColor="rgba(255,255,255,0.2)"
         value={welcomeMessage}
         onChangeText={setWelcomeMessage}
@@ -874,7 +877,7 @@ export default function CreateRoomScreen() {
         <Text style={w.sublabel}>Oda kuralları</Text>
         <TextInput
           style={[w.mediumInput, { height: 90 }]}
-          placeholder="Herkese saygılı olun, küfür yasak..."
+          placeholder={t('create.rules_placeholder')}
           placeholderTextColor="rgba(255,255,255,0.2)"
           value={rules}
           onChangeText={setRules}
@@ -1007,7 +1010,7 @@ export default function CreateRoomScreen() {
                 value={musicLink}
                 onChangeText={(v) => { if (!locked) setMusicLink(v); }}
                 editable={!locked}
-                placeholder="https://youtube.com/... veya https://open.spotify.com/..."
+                placeholder={t('create.music_link_placeholder')}
                 placeholderTextColor="#475569"
                 style={{
                   backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 18, borderWidth: 1,
@@ -1141,7 +1144,7 @@ export default function CreateRoomScreen() {
             {catObj && (
               <View style={[w.chipMini, { backgroundColor: `${catObj.color}22`, borderColor: `${catObj.color}55` }]}>
                 <Ionicons name={catObj.icon as any} size={9} color={catObj.color} />
-                <Text style={[w.chipMiniText, { color: catObj.color }]}>{catObj.label}</Text>
+                <Text style={[w.chipMiniText, { color: catObj.color }]}>{t(catObj.labelKey)}</Text>
               </View>
             )}
             {audienceObj && audienceObj.mode !== 'public' && (
@@ -1184,7 +1187,7 @@ export default function CreateRoomScreen() {
               value={AUDIENCE_OPTIONS.find(o => o.mode === audienceMode)?.label || ''}
             />
           )}
-          <SummaryRow icon="mic" label="Konuşma" value={smObj?.label || ''} />
+          <SummaryRow icon="mic" label={t('create.step.speaking.title')} value={smObj ? t(smObj.labelKey) : ''} />
           {welcomeMessage && <SummaryRow icon="chatbubble-ellipses" label="Karşılama" value={welcomeMessage} />}
           {rules && <SummaryRow icon="document-text" label="Kurallar" value="Tanımlandı" />}
           {entryFee > 0 && <SummaryRow icon="diamond" label="Giriş" value={`${entryFee} SP`} />}
@@ -1496,8 +1499,8 @@ export default function CreateRoomScreen() {
             </View>
 
             {/* Hero Title + Subtitle — text shadow yok, sade */}
-            <Text style={w.heroTitle}>{currentStepMeta.title}</Text>
-            <Text style={w.heroSubtitle}>{currentStepMeta.subtitle}</Text>
+            <Text style={w.heroTitle}>{t(currentStepMeta.titleKey)}</Text>
+            <Text style={w.heroSubtitle}>{t(currentStepMeta.subtitleKey)}</Text>
 
             {/* Step Content */}
             <View style={{ marginTop: 24 }}>
@@ -1562,7 +1565,7 @@ export default function CreateRoomScreen() {
                 start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                 style={w.primaryBtnGrad}
               >
-                <Text style={w.primaryBtnText}>Devam</Text>
+                <Text style={w.primaryBtnText}>{t('create.continue')}</Text>
                 <Ionicons name="arrow-forward" size={18} color="#FFF" />
               </LinearGradient>
             </Pressable>
