@@ -13,6 +13,7 @@ import { getAvatarSource } from '../../constants/avatars';
 import { supabase } from '../../constants/supabase';
 import { useSwipeToDismiss } from '../../hooks/useSwipeToDismiss';
 import { useOnlineFriends } from '../../providers/OnlineFriendsProvider';
+import { i18n } from '../../services/i18n';
 
 const { width: W } = Dimensions.get('window');
 
@@ -160,7 +161,7 @@ export default function InviteFriendsModal({ visible, userId, onClose, onInvite,
           <Text style={s.centerText}>{error}</Text>
           <Pressable style={s.retryBtn} onPress={loadFriends}>
             <Ionicons name="refresh" size={14} color="#14B8A6" />
-            <Text style={s.retryText}>Tekrar Dene</Text>
+            <Text style={s.retryText}>{i18n.t('common.retry')}</Text>
           </Pressable>
         </View>
       );
@@ -170,10 +171,10 @@ export default function InviteFriendsModal({ visible, userId, onClose, onInvite,
       return (
         <View style={s.centerWrap}>
           <Ionicons name="people-outline" size={48} color="rgba(255,255,255,0.1)" />
-          <Text style={s.emptyTitle}>Henüz arkadaşın yok</Text>
+          <Text style={s.emptyTitle}>{i18n.t('invite.empty_title')}</Text>
           <Text style={s.emptySubtext}>Keşfet sayfasından yeni insanlar bul ve takip et!</Text>
           <Pressable style={s.closeBtn} onPress={onClose}>
-            <Text style={s.closeBtnText}>Kapat</Text>
+            <Text style={s.closeBtnText}>{i18n.t('common.close')}</Text>
           </Pressable>
         </View>
       );
@@ -196,7 +197,7 @@ export default function InviteFriendsModal({ visible, userId, onClose, onInvite,
               <Image source={getAvatarSource(item.avatar_url)} style={s.avatar} />
               <View style={{ flex: 1 }}>
                 <Text style={s.userName} numberOfLines={1}>{item.display_name}</Text>
-                {liveOnlineIds.has(item.id) && <Text style={s.onlineText}>Çevrimiçi</Text>}
+                {liveOnlineIds.has(item.id) && <Text style={s.onlineText}>{i18n.t('messages.online')}</Text>}
               </View>
               <View style={[s.checkbox, isChecked && s.checkboxActive]}>
                 {isChecked && <Ionicons name="checkmark" size={14} color="#FFF" />}
@@ -239,7 +240,7 @@ export default function InviteFriendsModal({ visible, userId, onClose, onInvite,
         {/* Header */}
         <View style={s.header}>
           <Ionicons name="people" size={18} color="#14B8A6" style={s.headerIconGlow} />
-          <Text style={s.headerTitle}>Arkadaşlarını Davet Et</Text>
+          <Text style={s.headerTitle}>{i18n.t('invite.title')}</Text>
           <Pressable onPress={onClose} hitSlop={12}>
             <Ionicons name="close" size={18} color="rgba(255,255,255,0.4)" />
           </Pressable>

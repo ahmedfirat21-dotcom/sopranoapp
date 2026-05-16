@@ -14,6 +14,7 @@ import { Colors } from '../../constants/theme';
 import { getAvatarSource } from '../../constants/avatars';
 import { type RoomParticipant } from '../../services/database';
 import { useUserProfileSheet } from '../../app/_layout';
+import { i18n } from '../../services/i18n';
 
 
 interface Props {
@@ -199,7 +200,7 @@ export default function HandRaiseQueuePanel({
         {/* Header + Sahne Durumu */}
         <View style={s.header}>
           <View style={s.headerDot} />
-          <Text style={s.headerTitle}>El Kaldıranlar</Text>
+          <Text style={s.headerTitle}>{i18n.t('queue.hand_raised')}</Text>
           {queueList.length > 0 && (
             <View style={s.countBadge}>
               <Text style={s.countText}>{queueList.length}</Text>
@@ -215,7 +216,7 @@ export default function HandRaiseQueuePanel({
           {queueList.length > 0 && !stageSlotsFull && (
             <Pressable style={s.nextBtn} onPress={handleNextInQueue}>
               <Ionicons name="arrow-up-circle" size={12} color="#FFF" />
-              <Text style={s.nextBtnText}>Sıradaki</Text>
+              <Text style={s.nextBtnText}>{i18n.t('queue.next')}</Text>
             </Pressable>
           )}
         </View>
@@ -244,8 +245,8 @@ export default function HandRaiseQueuePanel({
         ) : (
           <View style={s.emptyState}>
             <Ionicons name="hand-right-outline" size={24} color="rgba(255,255,255,0.06)" />
-            <Text style={s.emptyTitle}>Kuyruk Boş</Text>
-            <Text style={s.emptySub}>Henüz kimse el kaldırmadı</Text>
+            <Text style={s.emptyTitle}>{i18n.t('queue.empty_title')}</Text>
+            <Text style={s.emptySub}>{i18n.t('queue.empty_sub')}</Text>
           </View>
         )}
       </Animated.View>

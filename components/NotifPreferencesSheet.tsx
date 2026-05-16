@@ -24,6 +24,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Shadows } from '../constants/theme';
 import { showToast } from './Toast';
+import { i18n } from '../services/i18n';
 import {
   NotifPrefsService,
   DEFAULT_PREFERENCES,
@@ -185,7 +186,7 @@ export default function NotifPreferencesSheet({ visible, onClose, userId }: Prop
           <View style={st.header}>
             <View style={st.sectionAccent} />
             <Ionicons name="notifications" size={16} color={Colors.teal} style={iconShadow} />
-            <Text style={st.headerTitle}>Bildirim Tercihleri</Text>
+            <Text style={st.headerTitle}>{i18n.t('notif_prefs.title')}</Text>
             {saving && <AppLoader size="small" color="#14B8A6" />}
           </View>
         </View>
@@ -203,7 +204,7 @@ export default function NotifPreferencesSheet({ visible, onClose, userId }: Prop
             scrollEventThrottle={16}
           >
             {/* ── DND Penceresi ── */}
-            <Text style={st.sectionLabel}>RAHATSIZ ETMEME</Text>
+            <Text style={st.sectionLabel}>{i18n.t('notif_prefs.dnd')}</Text>
             <Text style={st.sectionHint}>
               Belirttiğin saatlerde bildirim almazsın (acil çağrılar hariç).
             </Text>
@@ -223,7 +224,7 @@ export default function NotifPreferencesSheet({ visible, onClose, userId }: Prop
             </View>
 
             {/* ── Filtre ── */}
-            <Text style={st.sectionLabel}>FİLTRELEME</Text>
+            <Text style={st.sectionLabel}>{i18n.t('notif_prefs.filter')}</Text>
             <ToggleRow
               icon="people"
               label="Sadece arkadaşlardan"
@@ -233,7 +234,7 @@ export default function NotifPreferencesSheet({ visible, onClose, userId }: Prop
             />
 
             {/* ── Kategoriler ── */}
-            <Text style={st.sectionLabel}>KATEGORİLER</Text>
+            <Text style={st.sectionLabel}>{i18n.t('notif_prefs.categories')}</Text>
             <ToggleRow
               icon="megaphone"
               label="Oda davetleri"

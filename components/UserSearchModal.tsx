@@ -15,6 +15,7 @@ import StatusAvatar from './StatusAvatar';
 import type { Profile } from '../services/database';
 import { useOnlineFriends } from '../providers/OnlineFriendsProvider';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { i18n } from '../services/i18n';
 
 // ★ 2026-04-27: FollowListModal/InRoomUserProfile ile aynı 2-snap mekanik.
 //   Modal sarmalı YOK (Modal native dialog Pressable backdrop'u yutuyor + pan responder Capture
@@ -414,7 +415,7 @@ export function UserSearchModal({ visible, onClose, currentUserId, onSelectUser,
             <>
               <View style={s.sectionHeader}>
                 <Ionicons name="radio" size={13} color={Colors.text3} />
-                <Text style={s.sectionTitle}>Odalar</Text>
+                <Text style={s.sectionTitle}>{i18n.t('search.rooms_section')}</Text>
               </View>
               {roomResults.map((room: any) => (
                 <Pressable
@@ -439,7 +440,7 @@ export function UserSearchModal({ visible, onClose, currentUserId, onSelectUser,
             <>
               <View style={s.sectionHeader}>
                 <Ionicons name="search" size={13} color={Colors.text3} />
-                <Text style={s.sectionTitle}>Kişiler</Text>
+                <Text style={s.sectionTitle}>{i18n.t('search.people_section')}</Text>
               </View>
               {loading ? (
                 <UserListSkeleton count={5} showAction />
@@ -465,7 +466,7 @@ export function UserSearchModal({ visible, onClose, currentUserId, onSelectUser,
                   ListEmptyComponent={
                     <View style={s.emptyState}>
                       <Ionicons name="search-outline" size={36} color="rgba(92,225,230,0.2)" />
-                      <Text style={s.emptyText}>Kullanıcı bulunamadı</Text>
+                      <Text style={s.emptyText}>{i18n.t('search.user_not_found')}</Text>
                     </View>
                   }
                 />
@@ -494,7 +495,7 @@ export function UserSearchModal({ visible, onClose, currentUserId, onSelectUser,
                         <>
                           <View style={s.sectionHeader}>
                             <Ionicons name="people" size={13} color={Colors.text3} />
-                            <Text style={s.sectionTitle}>Arkadaşların</Text>
+                            <Text style={s.sectionTitle}>{i18n.t('search.your_friends')}</Text>
                           </View>
                           {friends.map((item) => (
                             <Pressable
@@ -541,7 +542,7 @@ export function UserSearchModal({ visible, onClose, currentUserId, onSelectUser,
                       {friends.length === 0 && suggestedUsers.length === 0 && (
                         <View style={s.emptyState}>
                           <Ionicons name="people-outline" size={36} color="rgba(92,225,230,0.2)" />
-                          <Text style={s.emptyText}>Henüz arkadaşın yok</Text>
+                          <Text style={s.emptyText}>{i18n.t('search.no_friends')}</Text>
                           <Text style={s.emptySubtext}>Yukarıdaki arama çubuğundan tüm üyeleri arayabilirsin!</Text>
                         </View>
                       )}

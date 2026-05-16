@@ -24,6 +24,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { SkiaShadow } from '../skia';
 import { supabase } from '../../constants/supabase';
 import { getAvatarSource } from '../../constants/avatars';
+import { i18n } from '../../services/i18n';
 
 const { height: H } = Dimensions.get('window');
 
@@ -136,7 +137,7 @@ export function PasswordPromptSheet({
             <Ionicons name="lock-closed" size={22} color="#14B8A6" style={st.iconShadow} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={st.title}>Şifreli Oda</Text>
+            <Text style={st.title}>{i18n.t('access.locked_room')}</Text>
             <Text style={st.subtitle} numberOfLines={1}>{roomName || 'Bu odaya girmek için şifre gerekiyor'}</Text>
           </View>
         </View>
@@ -186,7 +187,7 @@ export function PasswordPromptSheet({
 
         <View style={st.btnRow}>
           <Pressable style={st.btnSecondary} onPress={onDismiss} disabled={submitting}>
-            <Text style={st.btnSecondaryText}>Vazgeç</Text>
+            <Text style={st.btnSecondaryText}>{i18n.t('access.cancel')}</Text>
           </Pressable>
           <SkiaShadow shadowColor="#14B8A6" shadowOpacity={pw.length > 0 && !submitting ? 0.4 : 0} shadowBlur={10} shadowOffsetY={4} borderRadius={12} style={{ flex: 1.4 }}>
             <Pressable
@@ -199,7 +200,7 @@ export function PasswordPromptSheet({
               ) : (
                 <>
                   <Ionicons name="log-in-outline" size={14} color="#FFF" />
-                  <Text style={st.btnPrimaryText}>Giriş</Text>
+                  <Text style={st.btnPrimaryText}>{i18n.t('access.enter')}</Text>
                 </>
               )}
             </Pressable>
@@ -264,12 +265,12 @@ export function RoomEntryPreviewSheet({
 
         <View style={st.btnRow}>
           <Pressable style={st.btnSecondary} onPress={onCancel}>
-            <Text style={st.btnSecondaryText}>Vazgeç</Text>
+            <Text style={st.btnSecondaryText}>{i18n.t('access.cancel')}</Text>
           </Pressable>
           <SkiaShadow shadowColor="#14B8A6" shadowOpacity={0.4} shadowBlur={10} shadowOffsetY={4} borderRadius={12} style={{ flex: 1.4 }}>
             <Pressable style={[st.btnPrimary, { flex: 1 }]} onPress={onContinue}>
               <Ionicons name="arrow-forward" size={14} color="#FFF" />
-              <Text style={st.btnPrimaryText}>Devam Et</Text>
+              <Text style={st.btnPrimaryText}>{i18n.t('access.continue')}</Text>
             </Pressable>
           </SkiaShadow>
         </View>
@@ -300,7 +301,7 @@ export function InviteRequestPromptSheet({
             <Ionicons name="mail-open-outline" size={22} color="#3B82F6" style={st.iconShadow} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={st.title}>Davetli Oda</Text>
+            <Text style={st.title}>{i18n.t('access.invite_room')}</Text>
             <Text style={st.subtitle} numberOfLines={2}>
               {roomName ? `"${roomName}" davetli kişilere açık.` : 'Bu oda davetli kişilere açık.'} Katılmak için oda sahibine istek gönderebilirsin.
             </Text>
@@ -316,7 +317,7 @@ export function InviteRequestPromptSheet({
 
         <View style={st.btnRow}>
           <Pressable style={st.btnSecondary} onPress={onDismiss} disabled={submitting}>
-            <Text style={st.btnSecondaryText}>Vazgeç</Text>
+            <Text style={st.btnSecondaryText}>{i18n.t('access.cancel')}</Text>
           </Pressable>
           <SkiaShadow shadowColor="#14B8A6" shadowOpacity={submitting ? 0 : 0.4} shadowBlur={10} shadowOffsetY={4} borderRadius={12} style={{ flex: 1.4 }}>
             <Pressable
@@ -329,7 +330,7 @@ export function InviteRequestPromptSheet({
               ) : (
                 <>
                   <Ionicons name="paper-plane" size={14} color="#FFF" />
-                  <Text style={st.btnPrimaryText}>İstek Gönder</Text>
+                  <Text style={st.btnPrimaryText}>{i18n.t('access.send_request')}</Text>
                 </>
               )}
             </Pressable>
@@ -462,13 +463,13 @@ export function AccessRequestSheet({
           {status === 'accepted' && (
             <>
               <Ionicons name="arrow-forward-circle" size={16} color="#22C55E" />
-              <Text style={[st.statusText, { color: '#22C55E' }]}>Odaya katılıyorsun</Text>
+              <Text style={[st.statusText, { color: '#22C55E' }]}>{i18n.t('access.joining')}</Text>
             </>
           )}
           {status === 'rejected' && (
             <>
               <Ionicons name="information-circle" size={16} color="#94A3B8" />
-              <Text style={st.statusText}>Daha sonra tekrar deneyebilirsin</Text>
+              <Text style={st.statusText}>{i18n.t('access.try_later')}</Text>
             </>
           )}
         </View>
@@ -487,7 +488,7 @@ export function AccessRequestSheet({
             {onDiscoverRooms && (
               <Pressable style={st.ctaRow} onPress={onDiscoverRooms}>
                 <Ionicons name="compass-outline" size={16} color="#5EEAD4" />
-                <Text style={st.ctaRowText}>Benzer odaları keşfet</Text>
+                <Text style={st.ctaRowText}>{i18n.t('access.discover_similar')}</Text>
                 <Ionicons name="chevron-forward" size={13} color="#5EEAD4" />
               </Pressable>
             )}
@@ -503,7 +504,7 @@ export function AccessRequestSheet({
             </Pressable>
           ) : (
             <Pressable style={[st.btnSecondary, { flex: 1 }]} onPress={onCancelled}>
-              <Text style={st.btnSecondaryText}>Kapat</Text>
+              <Text style={st.btnSecondaryText}>{i18n.t('common.close')}</Text>
             </Pressable>
           )}
         </View>
@@ -575,7 +576,7 @@ export function AccessGate({
       {onCancel && (
         <Pressable onPress={onCancel} style={gate.backBtn} hitSlop={8}>
           <Ionicons name="chevron-back" size={20} color="#F1F5F9" />
-          <Text style={gate.backText}>Geri</Text>
+          <Text style={gate.backText}>{i18n.t('common.back')}</Text>
         </Pressable>
       )}
 
@@ -600,7 +601,7 @@ export function AccessGate({
       {/* Alt bilgi */}
       <View style={gate.footer}>
         <Ionicons name="shield-checkmark-outline" size={12} color="#64748B" />
-        <Text style={gate.footerText}>Oda içeriği onaylanana kadar gizli</Text>
+        <Text style={gate.footerText}>{i18n.t('access.hidden_until_approved')}</Text>
       </View>
     </View>
   );
