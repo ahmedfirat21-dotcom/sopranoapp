@@ -1598,7 +1598,7 @@ export default function HomeScreen() {
                             start={{ x: 0, y: 0 }} end={{ x: 0.7, y: 1 }}
                             style={{ alignItems: 'center', paddingVertical: 12, paddingHorizontal: 8 }}
                           >
-                            <StatusAvatar uri={bp.avatar_url} size={52} tier={t} isAdmin={bp.is_admin} isOnline={friendIdSet?.has(bp.id) ? onlineIdSet.has(bp.id) : undefined} />
+                            <StatusAvatar uri={bp.avatar_url} size={52} tier={t} isAdmin={bp.is_admin} isOnline={friendIdSet?.has(bp.id) ? onlineIdSet.has(bp.id) : undefined} frameId={(bp as any).active_frame || null} customBadgeId={(bp as any).active_badge_id ?? null} />
                             <Text numberOfLines={1} style={{ fontSize: 12, fontWeight: '800', color: '#F1F5F9', marginTop: 6, maxWidth: '90%', textAlign: 'center', textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }}>
                               {bp.display_name || 'Kullanıcı'}
                             </Text>
