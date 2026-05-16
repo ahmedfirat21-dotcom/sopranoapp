@@ -24,6 +24,9 @@ const EN_PATH = path.join(ROOT, 'locales/en.ts');
 const APPLY = process.argv.includes('--apply');
 
 // ─── MyMemory request ────────────────────────────────────
+// ★ Rate-limit detection — MyMemory quota dolunca translatedText alanı warning
+//   string'i döner ("MYMEMORY WARNING: YOU USED ALL..."). responseStatus de 429
+//   olabilir; ikisini de yakala, hata fırlat.
 function translate(tr) {
   return new Promise((resolve, reject) => {
     const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(tr)}&langpair=tr|en`;
@@ -34,8 +37,16 @@ function translate(tr) {
         try {
           const json = JSON.parse(body);
           const en = json?.responseData?.translatedText;
-          if (en && typeof en === 'string') resolve(en);
-          else reject(new Error('no translation'));
+          const status = json?.responseStatus;
+          // ★ v285: Quota / warning detect
+          if (status === 429 || status === '429') return reject(new Error('rate_limit:' + status));
+          if (en && typeof en === 'string') {
+            if (en.toUpperCase().startsWith('MYMEMORY WARNING') || en.toUpperCase().includes('USED ALL AVAILABLE FREE')) {
+              return reject(new Error('rate_limit:warning_text'));
+            }
+            return resolve(en);
+          }
+          reject(new Error('no translation'));
         } catch (e) { reject(e); }
       });
     }).on('error', reject);
