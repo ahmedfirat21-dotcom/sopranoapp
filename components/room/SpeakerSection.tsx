@@ -114,7 +114,9 @@ function HostHalo({ size, borderRadius }: { size: number; borderRadius: number }
   const pulseRef = React.useRef(new Animated.Value(0)).current;
 
   React.useEffect(() => {
-    if (!host.haloEnabled || !anims.haloPulseEnabled) {
+    // ★ v289 (16 May 2026): reduceMotion aktifse halo pulse animasyonu kapatılır
+    //   (statik halo görünür ama nefes alma yok). Accessibility ayarı.
+    if (!host.haloEnabled || !anims.haloPulseEnabled || anims.reduceMotion) {
       pulseRef.setValue(0);
       return;
     }
@@ -125,7 +127,7 @@ function HostHalo({ size, borderRadius }: { size: number; borderRadius: number }
     ]));
     loop.start();
     return () => loop.stop();
-  }, [host.haloEnabled, anims.haloPulseEnabled, anims.haloPulseSpeed]);
+  }, [host.haloEnabled, anims.haloPulseEnabled, anims.haloPulseSpeed, anims.reduceMotion]);
 
   if (!host.haloEnabled) return null;
 
@@ -165,7 +167,8 @@ function SpeakingGlow({ speaking, borderRadius = 16 }: { speaking: boolean; bord
   // ★ v286 (16 May 2026): Web admin animations.speakingPulse* canlı bağlı.
   const anims = useRoomLayout().animations;
   const sp = useRoomLayout().speakers;
-  const pulseEnabled = anims.speakingPulseEnabled;
+  // ★ v289: reduceMotion override — konuşma pulse'ları kapansın (accessibility).
+  const pulseEnabled = anims.speakingPulseEnabled && !anims.reduceMotion;
   const pulseSpeed = Math.max(400, anims.speakingPulseSpeed);
   const ringExpand = Math.max(1.0, Math.min(2.0, anims.speakingRingExpand || 1.35));
   const ringColor = sp.speakingRingColor || '#14B8A6';
@@ -804,7 +807,7 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, i
           />
         );
       })()}
-      <Pressable style={({ pressed }) => [{ width: '100%' }, pressed && { opacity: 0.9, transform: [{ scale: layout.animations.avatarTapScale || 0.97 }] }]} onPress={onPress}>
+      <Pressable style={({ pressed }) => [{ width: '100%' }, pressed && { opacity: 0.9, transform: [{ scale: layout.animations.reduceMotion ? 1.0 : (layout.animations.avatarTapScale || 0.97) }] }]} onPress={onPress}>
       {/* ★ v109.4: Frame wrapper'ı SADECE avatar alanına kilitlendi (top:0, height:cardWidth).
            Eski: absoluteFillObject Pressable'ın tüm yüksekliğini (avatar + label) kapsıyordu
            → flex center label payı kadar aşağı kaydırıyordu, frame avatardan kayıktı.

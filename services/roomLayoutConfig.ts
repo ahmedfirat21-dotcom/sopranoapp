@@ -182,18 +182,10 @@ export interface ControlsConfig {
   iconSize: number;
 }
 
-export interface SpeakersAdvancedConfig {
-  cameraTileEnabled: boolean;
-  cameraAspectRatio: CameraAspect;
-  cameraTileBorderRadius: number;
-  singleCameraFullWidth: boolean;
-  spotlightEnabled: boolean;
-  spotlightScale: number;
-  ownerScale: number;
-  micIconColor: string;
-  micIconOffsetY: number;
-  mutedAvatarGrayscale: number;
-}
+// ★ v289 (16 May 2026): SpeakersAdvancedConfig + NameAdvancedConfig KALDIRILDI.
+//   19 alan tamamen ölüydü (admin'de UI yok, mobile'da hiç okunmuyor). Audit sonucu
+//   types/defaults/mobile usage'tan temizlendi. DB jsonb'sinde varsa geriye uyum
+//   için mergeWithDefaults görmezden gelir (zaten artık spread'lemiyor).
 
 export interface ListenersAdvancedConfig {
   maxVisibleSmallScreen: number;
@@ -204,18 +196,6 @@ export interface ListenersAdvancedConfig {
   showHandRaiseBadge: boolean;
   handRaiseBadgePosition: CornerPosition;
   showMicRequestPulse: boolean;
-}
-
-export interface NameAdvancedConfig {
-  textShadowEnabled: boolean;
-  textShadowColor: string;
-  textShadowOffsetY: number;
-  textShadowRadius: number;
-  strokeEnabled: boolean;
-  strokeColor: string;
-  strokeWidth: number;
-  letterSpacing: number;
-  lineHeight: number;
 }
 
 export interface RoomLayoutConfig {
@@ -231,9 +211,7 @@ export interface RoomLayoutConfig {
   shadows: ShadowsConfig;
   header: HeaderConfig;
   controls: ControlsConfig;
-  speakers_advanced: SpeakersAdvancedConfig;
   listeners_advanced: ListenersAdvancedConfig;
-  name_advanced: NameAdvancedConfig;
 }
 
 // ── Default fallback (DB fetch fail/loading) — mevcut hard-coded değerler ──
@@ -385,18 +363,6 @@ export const DEFAULT_ROOM_LAYOUT: RoomLayoutConfig = {
     iconColor: '#E2E8F0',
     iconSize: 22,
   },
-  speakers_advanced: {
-    cameraTileEnabled: true,
-    cameraAspectRatio: '1:1',
-    cameraTileBorderRadius: 16,
-    singleCameraFullWidth: true,
-    spotlightEnabled: false,
-    spotlightScale: 1.20,
-    ownerScale: 1.0,
-    micIconColor: '#10B981',
-    micIconOffsetY: -2,
-    mutedAvatarGrayscale: 0.0,
-  },
   listeners_advanced: {
     maxVisibleSmallScreen: 10,
     maxVisibleDefault: 14,
@@ -407,40 +373,48 @@ export const DEFAULT_ROOM_LAYOUT: RoomLayoutConfig = {
     handRaiseBadgePosition: 'topLeft',
     showMicRequestPulse: true,
   },
-  name_advanced: {
-    textShadowEnabled: true,
-    textShadowColor: 'rgba(0,0,0,0.7)',
-    textShadowOffsetY: 1,
-    textShadowRadius: 2,
-    strokeEnabled: false,
-    strokeColor: 'rgba(0,0,0,0.5)',
-    strokeWidth: 0.5,
-    letterSpacing: 0.0,
-    lineHeight: 1.2,
-  },
 };
 
 const TTL_MS = 5 * 60 * 1000;
 let _cache: { config: RoomLayoutConfig; ts: number } | null = null;
 const _listeners = new Set<(cfg: RoomLayoutConfig) => void>();
 
+// ★ v289 (16 May 2026): Nested merge helper — sizePresets gibi iç içe objelerin
+//   kısmi update'lerinde default kaybolmasın diye. Önce sığ spread yapıyorduk →
+//   DB'de `speakers.sizePresets: {small:60}` saved olursa medium/large kayboluyordu.
+function mergeNested(defaults: any, raw: any): any {
+  if (raw === null || raw === undefined) return defaults;
+  if (typeof raw !== 'object' || typeof defaults !== 'object') return raw;
+  if (Array.isArray(defaults) || Array.isArray(raw)) return raw;
+  const out: any = { ...defaults };
+  for (const k of Object.keys(raw)) {
+    const dv = defaults[k];
+    const rv = raw[k];
+    if (dv && typeof dv === 'object' && !Array.isArray(dv)) {
+      out[k] = mergeNested(dv, rv);
+    } else {
+      out[k] = rv;
+    }
+  }
+  return out;
+}
+
 function mergeWithDefaults(raw: any): RoomLayoutConfig {
   if (!raw || typeof raw !== 'object') return DEFAULT_ROOM_LAYOUT;
+  // ★ v289: Deep merge — iç içe objelerde (sizePresets gibi) default'lar korunur.
   return {
-    host:               { ...DEFAULT_ROOM_LAYOUT.host,               ...(raw.host               || {}) },
-    speakers:           { ...DEFAULT_ROOM_LAYOUT.speakers,           ...(raw.speakers           || {}) },
-    listeners:          { ...DEFAULT_ROOM_LAYOUT.listeners,          ...(raw.listeners          || {}) },
-    stage:              { ...DEFAULT_ROOM_LAYOUT.stage,              ...(raw.stage              || {}) },
-    global:             { ...DEFAULT_ROOM_LAYOUT.global,             ...(raw.global             || {}) },
-    animations:         { ...DEFAULT_ROOM_LAYOUT.animations,         ...(raw.animations         || {}) },
-    accents:            { ...DEFAULT_ROOM_LAYOUT.accents,            ...(raw.accents            || {}) },
-    indicators:         { ...DEFAULT_ROOM_LAYOUT.indicators,         ...(raw.indicators         || {}) },
-    shadows:            { ...DEFAULT_ROOM_LAYOUT.shadows,            ...(raw.shadows            || {}) },
-    header:             { ...DEFAULT_ROOM_LAYOUT.header,             ...(raw.header             || {}) },
-    controls:           { ...DEFAULT_ROOM_LAYOUT.controls,           ...(raw.controls           || {}) },
-    speakers_advanced:  { ...DEFAULT_ROOM_LAYOUT.speakers_advanced,  ...(raw.speakers_advanced  || {}) },
-    listeners_advanced: { ...DEFAULT_ROOM_LAYOUT.listeners_advanced, ...(raw.listeners_advanced || {}) },
-    name_advanced:      { ...DEFAULT_ROOM_LAYOUT.name_advanced,      ...(raw.name_advanced      || {}) },
+    host:               mergeNested(DEFAULT_ROOM_LAYOUT.host,               raw.host),
+    speakers:           mergeNested(DEFAULT_ROOM_LAYOUT.speakers,           raw.speakers),
+    listeners:          mergeNested(DEFAULT_ROOM_LAYOUT.listeners,          raw.listeners),
+    stage:              mergeNested(DEFAULT_ROOM_LAYOUT.stage,              raw.stage),
+    global:             mergeNested(DEFAULT_ROOM_LAYOUT.global,             raw.global),
+    animations:         mergeNested(DEFAULT_ROOM_LAYOUT.animations,         raw.animations),
+    accents:            mergeNested(DEFAULT_ROOM_LAYOUT.accents,            raw.accents),
+    indicators:         mergeNested(DEFAULT_ROOM_LAYOUT.indicators,         raw.indicators),
+    shadows:            mergeNested(DEFAULT_ROOM_LAYOUT.shadows,            raw.shadows),
+    header:             mergeNested(DEFAULT_ROOM_LAYOUT.header,             raw.header),
+    controls:           mergeNested(DEFAULT_ROOM_LAYOUT.controls,           raw.controls),
+    listeners_advanced: mergeNested(DEFAULT_ROOM_LAYOUT.listeners_advanced, raw.listeners_advanced),
   };
 }
 

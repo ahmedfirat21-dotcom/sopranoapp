@@ -142,9 +142,17 @@ const ListenerCell = React.memo(function ListenerCell({
   //   aynı avatara biniyordu (çift "owner" işareti, küçük avatarı daha da büyütüyordu).
   //   Crown badge tek başına yeterli sinyal; halka kaldırıldı.
   const ringW = cfgRingWidth ?? (hasFrame ? 0 : 2);
-  const ringC = cfgRingColor && cfgRingColor !== 'transparent'
-    ? cfgRingColor
-    : 'rgba(20,184,166,0.25)';
+  // ★ v289 (16 May 2026): Owner için cfgOwnerHighlight override — admin'in Dinleyiciler→
+  //   Vurgu Rengi ayarı listener tablosundaki owner avatar halkasına uygulanır.
+  //   Önce dead prop'tu (sadece geçiliyordu, kullanılmıyordu), şimdi border rengini
+  //   override ediyor. Frame'li owner için ringW zaten 0 → ovverride görünmez (doğru).
+  const ringC = (isOwner && cfgOwnerHighlight)
+    ? cfgOwnerHighlight
+    : (cfgRingColor && cfgRingColor !== 'transparent'
+        ? cfgRingColor
+        : 'rgba(20,184,166,0.25)');
+  // Owner için ringW=0 olursa highlight görünmez — minimum 2 yap.
+  const finalRingW = (isOwner && cfgOwnerHighlight && !hasFrame) ? Math.max(2, ringW) : ringW;
 
   return (
     <Pressable style={[s.cell, { width: cellW }]} onPress={() => onSelectUser(u)}>
@@ -180,7 +188,7 @@ const ListenerCell = React.memo(function ListenerCell({
           displayName={displayName}
           contextKey="listener"
           borderColor={ringC}
-          borderWidth={ringW}
+          borderWidth={finalRingW}
           customBadgeId={!(u as any).disguise ? ((u.user as any)?.active_badge_id ?? null) : null}
         />
       </GlowView>
@@ -256,9 +264,12 @@ export default function ListenerGrid({ listeners, onSelectUser, selectedUserId, 
   // ★ Tüm hook'lar tamamlandıktan SONRA erken return yapılabilir.
   if (listeners.length === 0 && spectatorCount === 0) return null;
 
-  // ★ 2026-04-20: Grid'de maks 14 dinleyici. Daha fazlası "+N Seyirci" badge
+  // ★ 2026-04-20: Grid'de maks N dinleyici. Daha fazlası "+N Seyirci" badge
   // olarak overflow'a düşer — tıkla → AudienceDrawer. Küçük ekranlarda daha az.
-  const GRID_VISIBLE_CAP = W < 360 ? 10 : 14;
+  // ★ v289 (16 May 2026): listeners_advanced.maxVisibleSmallScreen/Default admin'den.
+  //   Önce hardcoded 10/14 idi → admin defaults'ta vardı ama hiç okunmuyordu (hayalet).
+  const ladv = layout.listeners_advanced;
+  const GRID_VISIBLE_CAP = W < 360 ? (ladv.maxVisibleSmallScreen || 10) : (ladv.maxVisibleDefault || 14);
   const gridCap = Math.min(maxListeners, GRID_VISIBLE_CAP);
   const visibleListeners = sortedListeners.slice(0, gridCap);
   const overflowListeners = Math.max(0, listeners.length - gridCap);
@@ -310,7 +321,7 @@ export default function ListenerGrid({ listeners, onSelectUser, selectedUserId, 
         })}
         {overflowCount > 0 && (() => {
           // ★ v287 (16 May 2026): listeners_advanced.overflowBadge* admin'den
-          const ladv = layout.listeners_advanced;
+          //   (ladv yukarıda zaten tanımlı — KIRMIZI-3 v289)
           const badgeBg = ladv.overflowBadgeColor || 'rgba(20,184,166,0.1)';
           const badgeFg = ladv.overflowBadgeTextColor || '#14B8A6';
           const tmpl = ladv.overflowBadgeText || '+{N} Seyirci';
