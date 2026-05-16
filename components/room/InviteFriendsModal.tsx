@@ -185,6 +185,10 @@ export default function InviteFriendsModal({ visible, userId, onClose, onInvite,
         keyExtractor={(f) => f.id}
         style={{ maxHeight: 300 }}
         contentContainerStyle={{ paddingHorizontal: 8, paddingBottom: 12 }}
+        initialNumToRender={10}
+        windowSize={5}
+        maxToRenderPerBatch={10}
+        removeClippedSubviews
         renderItem={({ item }) => {
           const isChecked = selected.has(item.id);
           return (

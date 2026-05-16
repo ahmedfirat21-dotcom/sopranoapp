@@ -130,6 +130,10 @@ export default function HiddenRoomsScreen() {
             data={rooms}
             keyExtractor={(item) => item.id}
             contentContainerStyle={{ paddingBottom: insets.bottom + 32, paddingHorizontal: 16, gap: 10 }}
+            initialNumToRender={10}
+            windowSize={5}
+            maxToRenderPerBatch={10}
+            removeClippedSubviews
             renderItem={({ item }) => (
               <View style={styles.row}>
                 <Image

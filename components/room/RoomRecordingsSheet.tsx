@@ -269,6 +269,10 @@ export default function RoomRecordingsSheet({ visible, roomId, hostId, onClose }
               renderItem={renderItem}
               showsVerticalScrollIndicator={false}
               contentContainerStyle={{ paddingBottom: 40, paddingHorizontal: 16 }}
+              initialNumToRender={8}
+              windowSize={5}
+              maxToRenderPerBatch={8}
+              removeClippedSubviews
             />
           )}
         </Animated.View>

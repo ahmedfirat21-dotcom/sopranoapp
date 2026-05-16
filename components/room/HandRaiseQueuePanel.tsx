@@ -227,6 +227,10 @@ export default function HandRaiseQueuePanel({
             keyExtractor={(item) => item.user_id}
             style={{ flexShrink: 1 }}
             showsVerticalScrollIndicator={false}
+            initialNumToRender={10}
+            windowSize={5}
+            maxToRenderPerBatch={8}
+            removeClippedSubviews
             renderItem={({ item, index }) => (
               <QueueItem
                 participant={item}

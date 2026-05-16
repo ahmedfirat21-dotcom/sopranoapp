@@ -1153,6 +1153,10 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
                 showsVerticalScrollIndicator={false}
                 style={{ flex: 1 }}
                 contentContainerStyle={{ padding: 10, gap: 4, flexGrow: 1 }}
+                initialNumToRender={15}
+                windowSize={7}
+                maxToRenderPerBatch={10}
+                removeClippedSubviews
                 renderItem={({ item }) => {
                   const isMine = item.sender_id === firebaseUser?.uid;
                   const isDeletedForEveryone = !!item.deleted_for_everyone;

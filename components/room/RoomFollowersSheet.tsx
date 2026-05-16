@@ -171,6 +171,10 @@ export default function RoomFollowersSheet({ visible, onClose, roomId, totalCoun
               contentContainerStyle={{ paddingBottom: 12 }}
               showsVerticalScrollIndicator={false}
               ItemSeparatorComponent={() => <View style={s.sep} />}
+              initialNumToRender={12}
+              windowSize={5}
+              maxToRenderPerBatch={10}
+              removeClippedSubviews
             />
           )}
         </Animated.View>
