@@ -21,6 +21,7 @@ import { EmojiPicker } from '../../components/EmojiPicker';
 import { ReportModal } from '../../components/ReportModal';
 import { showToast } from '../../components/Toast';
 import { useAuth, useBadges, useUserProfileSheet } from '../_layout';
+import { useTranslation } from '../../services/i18n';
 import { useOnlineFriends } from '../../providers/OnlineFriendsProvider';
 import { useDMNotif } from '../../providers/DMNotifProvider';
 import StatusAvatar from '../../components/StatusAvatar';
@@ -180,7 +181,7 @@ function MediaLinksModal({ visible, messages, onClose, onImagePress }: {
       <Pressable style={styles.mediaOverlay} onPress={onClose}>
         <Pressable style={styles.mediaSheet} onPress={(e) => e.stopPropagation()}>
           <View style={styles.mediaHeader}>
-            <Text style={styles.mediaTitle}>Medya ve Bağlantılar</Text>
+            <Text style={styles.mediaTitle}>{t('messages.media_links')}</Text>
             <Pressable onPress={onClose} hitSlop={8}>
               <Ionicons name="close" size={20} color={Colors.text3} />
             </Pressable>
@@ -198,7 +199,7 @@ function MediaLinksModal({ visible, messages, onClose, onImagePress }: {
           </View>
           {tab === 'media' && (
             images.length === 0 ? (
-              <View style={styles.mediaEmpty}><Ionicons name="images-outline" size={32} color={Colors.text3} /><Text style={styles.mediaEmptyText}>Görsel yok</Text></View>
+              <View style={styles.mediaEmpty}><Ionicons name="images-outline" size={32} color={Colors.text3} /><Text style={styles.mediaEmptyText}>{t('messages.no_images')}</Text></View>
             ) : (
               <FlatList
                 data={images}
@@ -215,7 +216,7 @@ function MediaLinksModal({ visible, messages, onClose, onImagePress }: {
           )}
           {tab === 'voice' && (
             voices.length === 0 ? (
-              <View style={styles.mediaEmpty}><Ionicons name="mic-outline" size={32} color={Colors.text3} /><Text style={styles.mediaEmptyText}>Ses kaydı yok</Text></View>
+              <View style={styles.mediaEmpty}><Ionicons name="mic-outline" size={32} color={Colors.text3} /><Text style={styles.mediaEmptyText}>{t('messages.no_voice')}</Text></View>
             ) : (
               <FlatList
                 data={voices}
@@ -232,7 +233,7 @@ function MediaLinksModal({ visible, messages, onClose, onImagePress }: {
           )}
           {tab === 'links' && (
             links.length === 0 ? (
-              <View style={styles.mediaEmpty}><Ionicons name="link-outline" size={32} color={Colors.text3} /><Text style={styles.mediaEmptyText}>Bağlantı yok</Text></View>
+              <View style={styles.mediaEmpty}><Ionicons name="link-outline" size={32} color={Colors.text3} /><Text style={styles.mediaEmptyText}>{t('messages.no_links')}</Text></View>
             ) : (
               <FlatList
                 data={links}
@@ -392,7 +393,7 @@ function MessageBubble({ message, isMe, senderAvatar, senderName, myAvatar, onDe
           {isForwarded ? (
             <View style={styles.forwardedRow}>
               <Ionicons name="arrow-redo" size={11} color="rgba(255,255,255,0.55)" />
-              <Text style={styles.forwardedText}>İletildi</Text>
+              <Text style={styles.forwardedText}>{t('messages.forwarded')}</Text>
             </View>
           ) : null}
           {/* ★ v109: Reply preview — bubble içinde sol-bordered alıntı kartı, tıklanınca scroll */}
@@ -480,6 +481,7 @@ function MessageBubble({ message, isMe, senderAvatar, senderName, myAvatar, onDe
 
 export default function ChatScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { firebaseUser, profile, refreshProfile, minimizedRoom } = useAuth();
   const { openUserProfile } = useUserProfileSheet();
@@ -1342,7 +1344,7 @@ export default function ChatScreen() {
             ) : onlinePresenceIds.has(id as string) ? (
               <>
                 <View style={styles.onlineDot} />
-                <Text style={styles.onlineText}>Çevrimiçi</Text>
+                <Text style={styles.onlineText}>{t('messages.online')}</Text>
               </>
             ) : (
               <Text style={styles.offlineText}>
@@ -1452,7 +1454,7 @@ export default function ChatScreen() {
             <Ionicons name="ban-outline" size={22} color="#EF4444" />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={[msgReqBannerStyles.title, { color: '#F87171' }]}>İstek reddedildi</Text>
+            <Text style={[msgReqBannerStyles.title, { color: '#F87171' }]}>{t('messages.request_rejected')}</Text>
             <Text style={msgReqBannerStyles.subtitle}>
               Bu kullanıcı seninle mesajlaşmak istemiyor.
             </Text>
@@ -1491,7 +1493,7 @@ export default function ChatScreen() {
               }}
             >
               <Ionicons name="close-circle" size={18} color="#F87171" />
-              <Text style={msgReqBannerStyles.btnRejectText}>Sil</Text>
+              <Text style={msgReqBannerStyles.btnRejectText}>{t('common.delete')}</Text>
             </Pressable>
             <SkiaShadow shadowColor="#14B8A6" shadowOpacity={0.55} shadowBlur={10} shadowOffsetY={3} borderRadius={10} style={{ flex: 1 }}>
             <Pressable
@@ -1510,7 +1512,7 @@ export default function ChatScreen() {
               }}
             >
               <Ionicons name="checkmark-circle" size={18} color="#FFF" />
-              <Text style={msgReqBannerStyles.btnAcceptText}>Kabul Et</Text>
+              <Text style={msgReqBannerStyles.btnAcceptText}>{t('common.accept')}</Text>
             </Pressable>
             </SkiaShadow>
           </View>
@@ -1663,7 +1665,7 @@ export default function ChatScreen() {
                       }}
                     >
                       <Ionicons name="call" size={16} color="#fff" />
-                      <Text style={styles.missedCallBackText}>Geri Ara</Text>
+                      <Text style={styles.missedCallBackText}>{t('messages.call_back')}</Text>
                     </Pressable>
                   </View>
                 );
@@ -2033,7 +2035,7 @@ export default function ChatScreen() {
               }}
             >
               <Ionicons name="person-outline" size={20} color={Colors.text2} />
-              <Text style={styles.kebabItemText}>Kişiyi Görüntüle</Text>
+              <Text style={styles.kebabItemText}>{t('messages.view_profile')}</Text>
             </Pressable>
             {/* ★ Ara */}
             <Pressable
@@ -2044,7 +2046,7 @@ export default function ChatScreen() {
               }}
             >
               <Ionicons name="search-outline" size={20} color={Colors.text2} />
-              <Text style={styles.kebabItemText}>Ara</Text>
+              <Text style={styles.kebabItemText}>{t('messages.call')}</Text>
             </Pressable>
             {/* ★ Medya ve bağlantılar */}
             <Pressable
@@ -2055,7 +2057,7 @@ export default function ChatScreen() {
               }}
             >
               <Ionicons name="images-outline" size={20} color={Colors.text2} />
-              <Text style={styles.kebabItemText}>Medya ve Bağlantılar</Text>
+              <Text style={styles.kebabItemText}>{t('messages.media_links')}</Text>
             </Pressable>
             {/* ★ v109: Kaybolan Mesaj Süresi (disappearing) */}
             <Pressable
@@ -2103,7 +2105,7 @@ export default function ChatScreen() {
               }}
             >
               <Ionicons name="trash-outline" size={20} color="#EF4444" />
-              <Text style={[styles.kebabItemText, { color: '#EF4444' }]}>Sohbeti Sil</Text>
+              <Text style={[styles.kebabItemText, { color: '#EF4444' }]}>{t('messages.delete_chat')}</Text>
             </Pressable>
 
             {/* Sessize Al / Sesini Aç */}
@@ -2188,7 +2190,7 @@ export default function ChatScreen() {
               }}
             >
               <Ionicons name="flag-outline" size={20} color={Colors.text3} />
-              <Text style={[styles.kebabItemText, { color: Colors.text3 }]}>Bildir</Text>
+              <Text style={[styles.kebabItemText, { color: Colors.text3 }]}>{t('common.report')}</Text>
             </Pressable>
           </KebabDropdown>
         </Pressable>

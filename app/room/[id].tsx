@@ -74,6 +74,7 @@ const showToast = (opts: Partial<ToastMessage> & { title: string }) => {
 };
 
 import { useAuth, useBadges, useDMNotifOptional, useUserProfileSheet, useUserSearchSheet } from '../_layout';
+import { i18n, useTranslation } from '../../services/i18n';
 import useLiveKit from '../../hooks/useLiveKit';
 import { useMicMeter } from '../../hooks/useMicMeter';
 
@@ -303,7 +304,7 @@ function MusicBanner({ link }: { link: string }) {
                 onPress={() => setPlayerOpen(false)}
                 style={{ marginTop: 12, paddingHorizontal: 18, paddingVertical: 8, borderRadius: 20, backgroundColor: 'rgba(255,215,0,0.15)', borderWidth: 1, borderColor: '#FFD700' }}
               >
-                <Text style={{ color: '#FFD700', fontWeight: '700', fontSize: 13 }}>Kapat</Text>
+                <Text style={{ color: '#FFD700', fontWeight: '700', fontSize: 13 }}>{i18n.t('rooms.close')}</Text>
               </Pressable>
             </View>
           );
@@ -385,7 +386,7 @@ function DmSwipeableRow({ children, onDelete, onMute, onBlock, isMuted }: {
           style={[dmSwipeS.actionBtn, { backgroundColor: '#DC2626' }]}
         >
           <Ionicons name="trash-outline" size={18} color="#FFF" />
-          <Text style={dmSwipeS.actionLabel}>Sil</Text>
+          <Text style={dmSwipeS.actionLabel}>{i18n.t('common.delete')}</Text>
         </Pressable>
         {/* Sessize Al / Aç */}
         <Pressable
@@ -401,7 +402,7 @@ function DmSwipeableRow({ children, onDelete, onMute, onBlock, isMuted }: {
           style={[dmSwipeS.actionBtn, { backgroundColor: '#7F1D1D' }]}
         >
           <Ionicons name="ban-outline" size={18} color="#FFF" />
-          <Text style={dmSwipeS.actionLabel}>Engelle</Text>
+          <Text style={dmSwipeS.actionLabel}>{i18n.t('rooms.block')}</Text>
         </Pressable>
       </Animated.View>
       {/* Ön plan — kaydırılabilir satır */}
@@ -1108,7 +1109,7 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
                       setMsgReq({ status: 'accepted' });
                     } catch {} finally { setReqResponding(false); }
                   }} style={({ pressed }) => [{ flex: 1, paddingVertical: 8, borderRadius: 10, alignItems: 'center', backgroundColor: '#14B8A6' }, (pressed || reqResponding) && { opacity: 0.6 }]}>
-                    <Text style={{ fontSize: 12, fontWeight: '800', color: '#FFF' }}>Kabul Et</Text>
+                    <Text style={{ fontSize: 12, fontWeight: '800', color: '#FFF' }}>{t('common.accept')}</Text>
                   </Pressable>
                   <Pressable disabled={reqResponding} onPress={async () => {
                     if (reqResponding) return;
@@ -1119,7 +1120,7 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
                       setChatTarget(null);
                     } catch {} finally { setReqResponding(false); }
                   }} style={({ pressed }) => [{ flex: 1, paddingVertical: 8, borderRadius: 10, alignItems: 'center', backgroundColor: 'rgba(239,68,68,0.15)', borderWidth: 1, borderColor: 'rgba(239,68,68,0.4)' }, (pressed || reqResponding) && { opacity: 0.6 }]}>
-                    <Text style={{ fontSize: 12, fontWeight: '800', color: '#F87171' }}>Reddet</Text>
+                    <Text style={{ fontSize: 12, fontWeight: '800', color: '#F87171' }}>{t('common.reject')}</Text>
                   </Pressable>
                 </View>
               </View>
@@ -1330,7 +1331,7 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
                 ListEmptyComponent={
                   <View style={{ alignItems: 'center', justifyContent: 'center', flex: 1, paddingVertical: 40 }}>
                     <Ionicons name="chatbubble-outline" size={24} color="rgba(255,255,255,0.1)" />
-                    <Text style={{ color: 'rgba(255,255,255,0.2)', fontSize: 12, marginTop: 8 }}>Henüz mesaj yok</Text>
+                    <Text style={{ color: 'rgba(255,255,255,0.2)', fontSize: 12, marginTop: 8 }}>{t('rooms.chat_empty')}</Text>
                   </View>
                 }
               />
@@ -1425,7 +1426,7 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
               <Text style={{
                 color: '#F1F5F9', fontSize: 15, fontWeight: '800', flex: 1, letterSpacing: 0.3,
                 textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4,
-              }}>Mesajlar</Text>
+              }}>{t('rooms.chat_title')}</Text>
               {dmUnreadCount > 0 && (
                 <View style={{
                   paddingHorizontal: 7, paddingVertical: 2,
@@ -1451,8 +1452,8 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
                   }}>
                     <Ionicons name="chatbubbles-outline" size={24} color="rgba(20,184,166,0.3)" />
                   </View>
-                  <Text style={{ color: 'rgba(255,255,255,0.35)', fontSize: 13, fontWeight: '600' }}>Henüz mesaj yok</Text>
-                  <Text style={{ color: 'rgba(255,255,255,0.15)', fontSize: 11, marginTop: 4 }}>Birine tıklayarak mesaj gönderebilirsin</Text>
+                  <Text style={{ color: 'rgba(255,255,255,0.35)', fontSize: 13, fontWeight: '600' }}>{t('rooms.chat_empty')}</Text>
+                  <Text style={{ color: 'rgba(255,255,255,0.15)', fontSize: 11, marginTop: 4 }}>{t('rooms.chat_hint')}</Text>
                 </View>
               ) : (
                 dmInboxMessages.slice(0, 15).map((msg: any, idx: number) => {
@@ -1558,6 +1559,7 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
     */
 export default function RoomScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const { id, justCreated, caption } = useLocalSearchParams<{ id: string; justCreated?: string; caption?: string }>();
   const { firebaseUser, profile, setMinimizedRoom, minimizedRoom, showNotifDrawer, setShowNotifDrawer, setNotifDrawerAnchorRight, setNotifDrawerRight, setNotifDrawerTop } = useAuth();

@@ -8,6 +8,7 @@ import { supabase } from '../constants/supabase';
 import StatusAvatar from './StatusAvatar';
 import { Colors } from '../constants/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from '../services/i18n';
 
 // Tab bar height + gap — alt navigasyon barının üstünde bitsin
 const TAB_BAR_SPACE = 60 + 8 + 6; // BAR_H (60) + min paddingBottom (8) + extra gap
@@ -26,6 +27,7 @@ export default function FriendsDrawer({ visible, friends, onClose, onSelect, cur
   onSelect: (userId: string) => void;
   currentUserId?: string;
 }) {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   // ★ 2026-04-24: Dikey olarak ekran ortasına konumlandır.
   const topGap = Math.max((H - DRAWER_H) / 2, insets.top + 12);
@@ -198,7 +200,7 @@ export default function FriendsDrawer({ visible, friends, onClose, onSelect, cur
         {/* Başlık — sade ikon + yumuşak yeşil glow (halka yok, NotificationDrawer dili) */}
         <View style={fd.header}>
           <Ionicons name="radio" size={18} color="#22C55E" style={fd.headerIcon} />
-          <Text style={fd.headerTitle}>Çevrimiçi</Text>
+          <Text style={fd.headerTitle}>{t('messages.online')}</Text>
           {onlineCount > 0 && (
             <View style={fd.countPill}>
               <Text style={fd.countText}>{onlineCount}</Text>
@@ -220,7 +222,7 @@ export default function FriendsDrawer({ visible, friends, onClose, onSelect, cur
             <View style={fd.requestSection}>
               <View style={fd.requestHeader}>
                 <Ionicons name="person-add" size={13} color="#60A5FA" />
-                <Text style={fd.requestTitle}>Arkadaşlık İstekleri</Text>
+                <Text style={fd.requestTitle}>{t('notif.friend_requests')}</Text>
                 {activePendingCount > 0 && (
                   <View style={fd.requestCountPill}>
                     <Text style={fd.requestCountText}>{activePendingCount}</Text>
@@ -281,8 +283,8 @@ export default function FriendsDrawer({ visible, friends, onClose, onSelect, cur
               <View style={fd.emptyIconWrap}>
                 <Ionicons name="radio-outline" size={28} color="rgba(255,255,255,0.4)" />
               </View>
-              <Text style={fd.emptyText}>Şu an kimse çevrimiçi değil</Text>
-              <Text style={fd.emptySub}>Çevrimdışı arkadaşların profilinde listelenir</Text>
+              <Text style={fd.emptyText}>{t('notif.no_one_online')}</Text>
+              <Text style={fd.emptySub}>{t('notif.offline_in_profile')}</Text>
             </View>
           ) : onlineOnly.map((friend) => (
               <Pressable
@@ -293,7 +295,7 @@ export default function FriendsDrawer({ visible, friends, onClose, onSelect, cur
                 <StatusAvatar uri={friend.avatar_url} size={36} isOnline={true} tier={(friend as any).subscription_tier} frameId={(friend as any).active_frame || null} customBadgeId={(friend as any).active_badge_id ?? null} />
                 <View style={{ flex: 1 }}>
                   <Text style={fd.name} numberOfLines={1}>{friend.display_name}</Text>
-                  <Text style={fd.status}>Çevrimiçi</Text>
+                  <Text style={fd.status}>{t('messages.online')}</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.15)" />
               </Pressable>

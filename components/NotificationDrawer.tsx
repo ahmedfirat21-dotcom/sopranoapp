@@ -21,6 +21,7 @@ import StatusAvatar from './StatusAvatar';
 import { showToast } from './Toast';
 // ★ v107.34: Cycle kırma — _layout yerine direkt context dosyasından
 import { useUserProfileSheet } from '../providers/UserProfileSheetContext';
+import { useTranslation } from '../services/i18n';
 
 const { width: W, height: H } = Dimensions.get('window');
 // ★ 2026-05-05: Yan drawer (sağdan kayar) — FriendsDrawer ile birebir aynı ölçü.
@@ -154,6 +155,7 @@ function timeAgo(date: string): string {
 }
 
 export default function NotificationDrawer({ visible, onClose, userId, anchorTop, anchorRight, drawerRight, onShowGiftModal, onShowThankYou }: Props) {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   // Header: paddingTop(insets.top+4) + logo(~32) + padding = bell merkezi ≈ insets.top+22
   // Bell buton alt kenarı ≈ insets.top + 40. Drawer okuyla arasına 6px boşluk.
@@ -549,7 +551,7 @@ export default function NotificationDrawer({ visible, onClose, userId, anchorTop
           accessibilityHint="Uzun bas: tümünü okundu işaretle"
         >
           <Ionicons name="notifications" size={20} color="#14B8A6" style={s.headerIcon} />
-          <Text style={s.title}>Bildirimler</Text>
+          <Text style={s.title}>{t('notif.title')}</Text>
           {unreadCount > 0 && (
             <View style={s.badgePill}>
               <Text style={s.badgeText}>{unreadCount}</Text>
@@ -567,7 +569,7 @@ export default function NotificationDrawer({ visible, onClose, userId, anchorTop
               ) : (
                 <Ionicons name="trash-outline" size={15} color="#94A3B8" />
               )}
-              <Text style={s.clearBtnText}>Temizle</Text>
+              <Text style={s.clearBtnText}>{t('common.clear')}</Text>
             </Pressable>
           )}
         </Pressable>
@@ -580,8 +582,8 @@ export default function NotificationDrawer({ visible, onClose, userId, anchorTop
             <View style={s.emptyIconWrap}>
               <Ionicons name="notifications-off-outline" size={28} color="rgba(255,255,255,0.4)" />
             </View>
-            <Text style={s.emptyText}>Henüz bildirim yok</Text>
-            <Text style={s.emptySub}>Yeni etkileşimler burada görünür</Text>
+            <Text style={s.emptyText}>{t('notif.empty')}</Text>
+            <Text style={s.emptySub}>{t('notif.empty_sub')}</Text>
           </View>
         ) : (
           <SectionList
@@ -641,7 +643,7 @@ export default function NotificationDrawer({ visible, onClose, userId, anchorTop
                         ) : (
                           <>
                             <Ionicons name="checkmark" size={13} color="#FFF" />
-                            <Text style={s.inviteAcceptText}>Kabul Et</Text>
+                            <Text style={s.inviteAcceptText}>{t('common.accept')}</Text>
                           </>
                         )}
                       </Pressable>
@@ -651,7 +653,7 @@ export default function NotificationDrawer({ visible, onClose, userId, anchorTop
                         disabled={processingInvites.has(item.id)}
                       >
                         <Ionicons name="close" size={13} color="#94A3B8" />
-                        <Text style={s.inviteRejectText}>Reddet</Text>
+                        <Text style={s.inviteRejectText}>{t('common.reject')}</Text>
                       </Pressable>
                     </View>
                   )}
@@ -664,13 +666,13 @@ export default function NotificationDrawer({ visible, onClose, userId, anchorTop
         {/* Tümünü Gör — aynı modal içinde genişlet */}
         {!showAll && items.length >= 20 && (
           <Pressable style={s.seeAllBtn} onPress={() => { setShowAll(true); loadNotifications(true); }}>
-            <Text style={s.seeAllText}>Tümünü Gör</Text>
+            <Text style={s.seeAllText}>{t('notif.see_all')}</Text>
             <Ionicons name="chevron-down" size={14} color="#14B8A6" />
           </Pressable>
         )}
         {showAll && (
           <Pressable style={s.seeAllBtn} onPress={() => { setShowAll(false); loadNotifications(false); }}>
-            <Text style={s.seeAllText}>Daralt</Text>
+            <Text style={s.seeAllText}>{t('notif.collapse')}</Text>
             <Ionicons name="chevron-up" size={14} color="#14B8A6" />
           </Pressable>
         )}

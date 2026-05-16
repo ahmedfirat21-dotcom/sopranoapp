@@ -27,6 +27,7 @@ import { auth, GOOGLE_WEB_CLIENT_ID } from '../constants/firebase';
 import { AVATAR_OPTIONS, getAvatarSource } from '../constants/avatars';
 import { useAuth } from './_layout';
 import { showToast } from '../components/Toast';
+import { useTranslation } from '../services/i18n';
 // ★ 2026-04-28: ReferralService + ExpoClipboard kaldırıldı — davet kodu profile.tsx'te
 import * as ImagePicker from 'expo-image-picker';
 import { StorageService } from '../services/storage';
@@ -56,6 +57,7 @@ const discovery = {
 
 export default function EditProfileScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const { profile, firebaseUser, setProfile, setUser, refreshProfile } = useAuth();
   const insets = useSafeAreaInsets();
 
@@ -456,7 +458,7 @@ export default function EditProfileScreen() {
           <Pressable onPress={() => safeGoBack(router)} style={styles.backBtn} hitSlop={8}>
             <Ionicons name="close" size={22} color="#F1F5F9" style={iconShadow} />
           </Pressable>
-          <Text style={styles.headerTitle}>Profili Düzenle</Text>
+          <Text style={styles.headerTitle}>{t('profile.edit_title')}</Text>
           <SkiaShadow shadowColor="#F59E0B" shadowOpacity={hasChanges && !saving ? 0.5 : 0} shadowBlur={8} shadowOffsetY={2} borderRadius={999}>
             <Pressable
               onPress={handleSave}
@@ -466,7 +468,7 @@ export default function EditProfileScreen() {
               {saving ? (
                 <AppLoader size="small" color="#fff" />
               ) : (
-                <Text style={[styles.saveBtnText, !hasChanges && styles.saveBtnTextDisabled]}>Kaydet</Text>
+                <Text style={[styles.saveBtnText, !hasChanges && styles.saveBtnTextDisabled]}>{t('common.save')}</Text>
               )}
             </Pressable>
           </SkiaShadow>
@@ -516,7 +518,7 @@ export default function EditProfileScreen() {
 
         {showAvatarPicker && (
           <View style={styles.avatarPicker}>
-            <Text style={styles.pickerTitle}>Avatar Seç</Text>
+            <Text style={styles.pickerTitle}>{t('profile.pick_avatar')}</Text>
             
             <Pressable style={styles.ctaWrap} onPress={handlePickAvatar} disabled={uploadingAvatar}>
               <LinearGradient colors={['#14B8A6', '#0D9488', '#065F56']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.ctaGradient}>
@@ -525,7 +527,7 @@ export default function EditProfileScreen() {
                 ) : (
                   <>
                     <View style={styles.ctaIconWrap}><Ionicons name="images" size={16} color="#FFF" /></View>
-                    <Text style={styles.ctaTitle}>Galeriden Yükle</Text>
+                    <Text style={styles.ctaTitle}>{t('profile.upload_gallery')}</Text>
                   </>
                 )}
               </LinearGradient>
@@ -559,7 +561,7 @@ export default function EditProfileScreen() {
             style={styles.field}
             onLayout={(e) => { fieldPositions.current['displayName'] = e.nativeEvent.layout.y; }}
           >
-            <Text style={styles.fieldLabel}>Görünen Ad</Text>
+            <Text style={styles.fieldLabel}>{t('profile.display_name')}</Text>
             <TextInput
               style={styles.textInput}
               value={displayName}
@@ -577,7 +579,7 @@ export default function EditProfileScreen() {
             style={styles.field}
             onLayout={(e) => { fieldPositions.current['username'] = e.nativeEvent.layout.y; }}
           >
-            <Text style={styles.fieldLabel}>Kullanıcı Adı</Text>
+            <Text style={styles.fieldLabel}>{t('profile.username')}</Text>
             <View style={styles.usernameWrap}>
               <Text style={styles.usernameAt}>@</Text>
               <TextInput
@@ -615,7 +617,7 @@ export default function EditProfileScreen() {
             style={styles.field}
             onLayout={(e) => { fieldPositions.current['bio'] = e.nativeEvent.layout.y; }}
           >
-            <Text style={styles.fieldLabel}>Biyografi</Text>
+            <Text style={styles.fieldLabel}>{t('profile.bio')}</Text>
             <TextInput
               style={[styles.textInput, styles.bioInput]}
               value={bio}
@@ -640,7 +642,7 @@ export default function EditProfileScreen() {
         <View style={styles.sectionDivider}>
           <View style={styles.sectionAccent} />
           <Ionicons name="person-circle-outline" size={13} color={Colors.teal} />
-          <Text style={styles.sectionLabel}>HESAP BİLGİLERİ</Text>
+          <Text style={styles.sectionLabel}>{t('profile.section.account_info')}</Text>
         </View>
 
         {/* Account Type */}
@@ -650,12 +652,12 @@ export default function EditProfileScreen() {
               <Ionicons name={authInfo.icon} size={18} color={authInfo.color} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.accountLabel}>Hesap Türü</Text>
+              <Text style={styles.accountLabel}>{t('profile.account_type')}</Text>
               <Text style={styles.accountValue}>{authInfo.label}</Text>
             </View>
             <View style={styles.verifiedBadge}>
               <Ionicons name="checkmark-circle" size={16} color={Colors.emerald} />
-              <Text style={styles.verifiedText}>Doğrulanmış</Text>
+              <Text style={styles.verifiedText}>{t('profile.verified')}</Text>
             </View>
           </View>
 
@@ -693,7 +695,7 @@ export default function EditProfileScreen() {
               <View style={[styles.accountIcon, { backgroundColor: `${Colors.amber}18` }]}>
                 <Ionicons name="key-outline" size={18} color={Colors.amber} />
               </View>
-              <Text style={[styles.menuLabel, { flex: 1 }]}>Şifre Değiştir</Text>
+              <Text style={[styles.menuLabel, { flex: 1 }]}>{t('profile.change_password')}</Text>
               <Ionicons
                 name={showPasswordChange ? 'chevron-up' : 'chevron-down'}
                 size={16}
@@ -704,7 +706,7 @@ export default function EditProfileScreen() {
             {showPasswordChange && (
               <View style={styles.passwordForm}>
                 <View style={styles.field}>
-                  <Text style={styles.fieldLabel}>Mevcut Şifre</Text>
+                  <Text style={styles.fieldLabel}>{t('profile.current_password')}</Text>
                   <TextInput
                     style={styles.textInput}
                     value={currentPassword}
@@ -715,7 +717,7 @@ export default function EditProfileScreen() {
                   />
                 </View>
                 <View style={styles.field}>
-                  <Text style={styles.fieldLabel}>Yeni Şifre</Text>
+                  <Text style={styles.fieldLabel}>{t('profile.new_password')}</Text>
                   <TextInput
                     style={styles.textInput}
                     value={newPassword}
@@ -726,7 +728,7 @@ export default function EditProfileScreen() {
                   />
                 </View>
                 <View style={styles.field}>
-                  <Text style={styles.fieldLabel}>Yeni Şifre Tekrar</Text>
+                  <Text style={styles.fieldLabel}>{t('profile.new_password_again')}</Text>
                   <TextInput
                     style={styles.textInput}
                     value={newPasswordConfirm}
@@ -744,7 +746,7 @@ export default function EditProfileScreen() {
                     ) : (
                       <>
                         <View style={styles.ctaIconWrap}><Ionicons name="checkmark-circle" size={16} color="#FFF" /></View>
-                        <Text style={styles.ctaTitle}>Şifreyi Güncelle</Text>
+                        <Text style={styles.ctaTitle}>{t('profile.update_password')}</Text>
                       </>
                     )}
                   </LinearGradient>
@@ -767,7 +769,7 @@ export default function EditProfileScreen() {
         <View style={styles.sectionDivider}>
           <View style={styles.sectionAccent} />
           <Ionicons name="sparkles-outline" size={13} color="#FBBF24" />
-          <Text style={styles.sectionLabel}>KİMLİĞİN</Text>
+          <Text style={styles.sectionLabel}>{t('profile.section.identity')}</Text>
         </View>
 
         <Pressable
@@ -858,7 +860,7 @@ export default function EditProfileScreen() {
         <View style={styles.sectionDivider}>
           <View style={styles.sectionAccent} />
           <Ionicons name="megaphone-outline" size={13} color="#A855F7" />
-          <Text style={styles.sectionLabel}>PROFİL ANLATIMI</Text>
+          <Text style={styles.sectionLabel}>{t('profile.section.narrative')}</Text>
         </View>
 
         {/* Voice Bio satırı */}
@@ -872,7 +874,7 @@ export default function EditProfileScreen() {
                 <Ionicons name="mic" size={18} color="#F59E0B" />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.accountLabel}>Sesli Tanıtım</Text>
+                <Text style={styles.accountLabel}>{t('profile.voice_intro')}</Text>
                 <Text style={styles.fieldHint}>
                   {voiceBioUrl
                     ? `${Math.ceil((voiceBioDurationMs || 0) / 1000)}sn kayıt mevcut · değiştirmek için bas`
@@ -898,7 +900,7 @@ export default function EditProfileScreen() {
                 <Ionicons name="ribbon" size={18} color="#FBBF24" />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.accountLabel}>Öne Çıkan Rozetler</Text>
+                <Text style={styles.accountLabel}>{t('profile.featured_badges')}</Text>
                 <Text style={styles.fieldHint}>
                   {featuredBadgeIds.length > 0
                     ? `${featuredBadgeIds.length} rozet seçili — profilde büyük gösterilir`
@@ -941,7 +943,7 @@ export default function EditProfileScreen() {
                 <Ionicons name="link" size={18} color="#14B8A6" />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.accountLabel}>Sosyal Linkler</Text>
+                <Text style={styles.accountLabel}>{t('profile.social_links')}</Text>
                 <Text style={styles.fieldHint}>
                   {(() => {
                     const count = [socialLinks.instagram, socialLinks.twitter, socialLinks.website].filter(Boolean).length;
@@ -958,7 +960,7 @@ export default function EditProfileScreen() {
         <View style={styles.sectionDivider}>
           <View style={styles.sectionAccent} />
           <Ionicons name="shield-checkmark-outline" size={13} color={Colors.teal} />
-          <Text style={styles.sectionLabel}>GİZLİLİK</Text>
+          <Text style={styles.sectionLabel}>{t('profile.section.privacy')}</Text>
         </View>
 
         <View style={styles.accountInfoCard}>
@@ -969,7 +971,7 @@ export default function EditProfileScreen() {
                 <Ionicons name="eye-off-outline" size={18} color="#A855F7" />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.accountLabel}>Odalarımı Gizle</Text>
+                <Text style={styles.accountLabel}>{t('profile.hide_rooms')}</Text>
                 <Text style={styles.fieldHint}>Yabancılar odalarını göremez (arkadaşların görür)</Text>
               </View>
             </View>
@@ -988,7 +990,7 @@ export default function EditProfileScreen() {
                 <Ionicons name="lock-closed-outline" size={18} color={Colors.teal} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.accountLabel}>Profil Gizliliği</Text>
+                <Text style={styles.accountLabel}>{t('profile.profile_privacy')}</Text>
                 <Text style={styles.fieldHint}>{privacyMode === 'public' ? 'Profilini herkes görebilir' : 'Profilini sadece arkadaşların görebilir'}</Text>
               </View>
             </View>

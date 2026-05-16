@@ -19,6 +19,7 @@ import AppBackground from '../components/AppBackground';
 import { CosmeticBackground } from '../components/skia';
 import { useAuth, useBadges, useUserProfileSheet } from './_layout';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from '../services/i18n';
 
 type Notification = {
   id: string;
@@ -53,6 +54,7 @@ const NOTIF_CONFIG: Record<string, { icon: string; color: string; verb: string }
 
 export default function NotificationsScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const { firebaseUser, profile } = useAuth();
   const { openUserProfile } = useUserProfileSheet();
   const { refreshBadges } = useBadges();
@@ -159,7 +161,7 @@ export default function NotificationsScreen() {
               <Ionicons name="person-add" size={18} color="#F59E0B" />
             </View>
             <View>
-              <Text style={styles.pendingTitle}>Arkadaşlık İstekleri</Text>
+              <Text style={styles.pendingTitle}>{t('notif.friend_requests')}</Text>
               <Text style={styles.pendingSubtitle}>
                 {pendingRequests.length} yeni istek
               </Text>
@@ -200,14 +202,14 @@ export default function NotificationsScreen() {
                           style={styles.approveBtn}
                           onPress={() => handleApprove(req.user_id)}
                         >
-                          <Text style={styles.approveBtnText}>Onayla</Text>
+                          <Text style={styles.approveBtnText}>{t('common.approve')}</Text>
                         </Pressable>
                         {/* Reddet */}
                         <Pressable
                           style={styles.rejectBtn}
                           onPress={() => handleReject(req.user_id)}
                         >
-                          <Text style={styles.rejectBtnText}>Sil</Text>
+                          <Text style={styles.rejectBtnText}>{t('common.delete')}</Text>
                         </Pressable>
                       </>
                     )}
@@ -262,7 +264,7 @@ export default function NotificationsScreen() {
         <Pressable onPress={() => safeGoBack(router)} style={styles.backBtn}>
           <Ionicons name="chevron-back" size={24} color={Colors.text} />
         </Pressable>
-        <Text style={styles.headerTitle}>Bildirimler</Text>
+        <Text style={styles.headerTitle}>{t('notif.title')}</Text>
         <View style={{ width: 40 }} />
       </View>
 
