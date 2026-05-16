@@ -1470,7 +1470,7 @@ export default function HomeScreen() {
               <View style={s.welcomeCard}>
                 <View style={s.welcomeRow}>
                   <Pressable onPress={() => router.push('/(tabs)/profile')}>
-                    <StatusAvatar uri={profile?.avatar_url} size={42} isOnline={true} tier={profile?.subscription_tier} isSelf showTierBadge={false} frameId={(profile as any)?.active_frame} customBadgeId={(profile as any)?.active_badge_id ?? null} />
+                    <StatusAvatar uri={profile?.avatar_url} size={42} isOnline={true} tier={profile?.subscription_tier} isSelf frameId={(profile as any)?.active_frame} customBadgeId={(profile as any)?.active_badge_id ?? null} />
                   </Pressable>
                   <View style={{ flex: 1 }}>
                     <Text style={s.welcomeTitle}>

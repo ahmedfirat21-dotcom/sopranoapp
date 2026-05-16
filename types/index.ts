@@ -91,6 +91,8 @@ export type Profile = {
   active_frame?: string | null;
   /** Avatar çerçevesi */
   avatar_frame?: string | null;
+  /** ★ v284 (16 May 2026): Kullanıcının taktığı özel rozet (cosmetic_items.id) */
+  active_badge_id?: string | null;
   active_chat_color?: string | null;
   active_entry_effect?: string | null;
   profile_boost_expires_at?: string | null;

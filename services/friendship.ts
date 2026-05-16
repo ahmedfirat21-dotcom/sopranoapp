@@ -41,6 +41,8 @@ export type FollowUser = {
   last_seen?: string | null;
   /** ★ v107: Mağaza avatar çerçevesi */
   active_frame?: string | null;
+  /** ★ v284 (16 May 2026): profiles.active_badge_id — mini avatar rozeti */
+  active_badge_id?: string | null;
 };
 export type FriendUser = FollowUser;
 
@@ -461,7 +463,7 @@ export const FriendshipService = {
     try {
       const { data, error } = await supabase
         .from('friendships')
-        .select('user_id, profiles!friendships_user_id_fkey(id, display_name, avatar_url, username, subscription_tier, is_online, last_seen, active_frame)')
+        .select('user_id, profiles!friendships_user_id_fkey(id, display_name, avatar_url, username, subscription_tier, is_online, last_seen, active_frame, active_badge_id)')
         .eq('friend_id', userId)
         .eq('status', 'accepted');
       if (error) throw error;
@@ -484,7 +486,7 @@ export const FriendshipService = {
     try {
       const { data, error } = await supabase
         .from('friendships')
-        .select('friend_id, profiles!friendships_friend_id_fkey(id, display_name, avatar_url, username, subscription_tier, is_online, last_seen, active_frame)')
+        .select('friend_id, profiles!friendships_friend_id_fkey(id, display_name, avatar_url, username, subscription_tier, is_online, last_seen, active_frame, active_badge_id)')
         .eq('user_id', userId)
         .eq('status', 'accepted');
       if (error) throw error;
@@ -531,7 +533,7 @@ export const FriendshipService = {
       // 3. Mutual friend profillerini toplu çek
       const { data: profiles, error: e3 } = await supabase
         .from('profiles')
-        .select('id, display_name, avatar_url, username, subscription_tier, is_online, last_seen, active_frame')
+        .select('id, display_name, avatar_url, username, subscription_tier, is_online, last_seen, active_frame, active_badge_id')
         .in('id', mutualIds);
       if (e3) throw e3;
       return (profiles || []) as FollowUser[];
@@ -742,12 +744,12 @@ export const FriendshipService = {
     const [outRes, inRes] = await Promise.all([
       supabase
         .from('friendships')
-        .select('friend_id, friend:profiles!friend_id(id, display_name, avatar_url, username, subscription_tier, is_online, last_seen, active_frame)')
+        .select('friend_id, friend:profiles!friend_id(id, display_name, avatar_url, username, subscription_tier, is_online, last_seen, active_frame, active_badge_id)')
         .eq('user_id', userId)
         .eq('status', 'accepted'),
       supabase
         .from('friendships')
-        .select('user_id, user:profiles!user_id(id, display_name, avatar_url, username, subscription_tier, is_online, last_seen, active_frame)')
+        .select('user_id, user:profiles!user_id(id, display_name, avatar_url, username, subscription_tier, is_online, last_seen, active_frame, active_badge_id)')
         .eq('friend_id', userId)
         .eq('status', 'accepted'),
     ]);

@@ -19,6 +19,8 @@ export type RoomMessage = {
     avatar_url: string;
     active_chat_color?: string | null;
     active_frame?: string | null;
+    active_badge_id?: string | null;
+    subscription_tier?: string | null;
   };
   // Client-side flags
   isSystem?: boolean;
@@ -33,6 +35,7 @@ type CachedProfile = {
   avatar_url: string;
   active_chat_color?: string | null;
   active_frame?: string | null;
+  active_badge_id?: string | null;
   subscription_tier?: string | null;
   cachedAt: number;
 };
@@ -56,7 +59,7 @@ async function _getCachedProfile(userId: string): Promise<CachedProfile | null> 
   try {
     const { data } = await supabase
       .from('profiles')
-      .select('display_name, avatar_url, active_chat_color, active_frame, subscription_tier')
+      .select('display_name, avatar_url, active_chat_color, active_frame, active_badge_id, subscription_tier')
       .eq('id', userId)
       .single();
     if (data) {
@@ -100,7 +103,7 @@ export const RoomChatService = {
     if (isSystemRoom(roomId)) return [];
     let query = supabase
       .from('messages')
-      .select('*, profiles!messages_sender_id_fkey(display_name, avatar_url, active_chat_color, active_frame, subscription_tier)')
+      .select('*, profiles!messages_sender_id_fkey(display_name, avatar_url, active_chat_color, active_frame, active_badge_id, subscription_tier)')
       .eq('room_id', roomId);
     if (sinceIso) query = query.gte('created_at', sinceIso);
     const { data, error } = await query
@@ -155,7 +158,7 @@ export const RoomChatService = {
     if (isSystemRoom(roomId)) return [];
     const { data, error } = await supabase
       .from('messages')
-      .select('*, profiles!messages_sender_id_fkey(display_name, avatar_url, active_chat_color, active_frame, subscription_tier)')
+      .select('*, profiles!messages_sender_id_fkey(display_name, avatar_url, active_chat_color, active_frame, active_badge_id, subscription_tier)')
       .eq('room_id', roomId)
       .order('created_at', { ascending: false })
       .limit(limit);
@@ -289,7 +292,7 @@ export const RoomChatService = {
     const { data, error } = await supabase
       .from('messages')
       .insert(insertData)
-      .select('*, profiles!messages_sender_id_fkey(display_name, avatar_url, active_chat_color, active_frame, subscription_tier)')
+      .select('*, profiles!messages_sender_id_fkey(display_name, avatar_url, active_chat_color, active_frame, active_badge_id, subscription_tier)')
       .single();
     if (error) {
       logger.error('Room mesaji gonderilemedi:', error);
@@ -425,7 +428,7 @@ export const RoomChatService = {
           } else {
             const { data } = await supabase
               .from('messages')
-              .select('*, profiles!messages_sender_id_fkey(display_name, avatar_url, active_chat_color, active_frame, subscription_tier)')
+              .select('*, profiles!messages_sender_id_fkey(display_name, avatar_url, active_chat_color, active_frame, active_badge_id, subscription_tier)')
               .eq('id', newMsg.id)
               .single();
             if (data) {

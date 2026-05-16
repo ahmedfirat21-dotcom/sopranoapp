@@ -182,7 +182,7 @@ export const ProfileService = {
       //   client tarafında fallback select kullanılıyor (active_frame dahil).
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, display_name, username, avatar_url, subscription_tier, bio, is_online, profile_boost_expires_at, active_frame')
+        .select('id, display_name, username, avatar_url, subscription_tier, bio, is_online, profile_boost_expires_at, active_frame, active_badge_id')
         .gt('profile_boost_expires_at', new Date().toISOString())
         .order('profile_boost_expires_at', { ascending: false })
         .limit(limit);

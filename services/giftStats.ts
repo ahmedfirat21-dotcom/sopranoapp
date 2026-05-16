@@ -32,6 +32,7 @@ export interface TopGifter {
   display_name: string;
   avatar_url: string;
   active_frame: string | null;
+  active_badge_id: string | null;
   subscription_tier: string;
   total_amount: number;
   count: number;
@@ -92,7 +93,7 @@ export const GiftStatsService = {
     const userIds = sorted.map(([uid]) => uid);
     const { data: profiles } = await supabase
       .from('profiles')
-      .select('id, display_name, avatar_url, active_frame, subscription_tier')
+      .select('id, display_name, avatar_url, active_frame, active_badge_id, subscription_tier')
       .in('id', userIds);
     const profMap = new Map((profiles || []).map((p: any) => [p.id, p]));
     return sorted.map(([uid, agg]) => {
@@ -102,6 +103,7 @@ export const GiftStatsService = {
         display_name: p?.display_name || 'Kullanıcı',
         avatar_url: p?.avatar_url || '',
         active_frame: p?.active_frame || null,
+        active_badge_id: p?.active_badge_id || null,
         subscription_tier: p?.subscription_tier || 'Free',
         total_amount: agg.total,
         count: agg.count,

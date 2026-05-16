@@ -1153,7 +1153,7 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
         <View style={p.followerGrid}>
           {followers.map(f => (
             <Pressable key={f.id} style={p.followerCard} onPress={() => { onClose(); setTimeout(() => openUserProfile(f.id), 200); }}>
-              <StatusAvatar uri={f.avatar_url} size={36} frameId={f.active_frame || null} />
+              <StatusAvatar uri={f.avatar_url} size={36} tier={(f as any).subscription_tier} frameId={f.active_frame || null} customBadgeId={(f as any).active_badge_id ?? null} />
               <Text style={p.followerName} numberOfLines={1}>{f.display_name}</Text>
             </Pressable>
           ))}
@@ -1220,7 +1220,7 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
         </View>
         <View style={p.header}>
           <View style={p.headerLeft}>
-            <StatusAvatar uri={(room as any).host?.avatar_url} size={30} tier={(room as any).host?.subscription_tier} frameId={(room as any).host?.active_frame || null} />
+            <StatusAvatar uri={(room as any).host?.avatar_url} size={30} tier={(room as any).host?.subscription_tier} frameId={(room as any).host?.active_frame || null} customBadgeId={(room as any).host?.active_badge_id ?? null} />
             <View style={{ flex: 1 }}>
               <Text style={p.headerTitle} numberOfLines={1}>{roomName || room.name}</Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
