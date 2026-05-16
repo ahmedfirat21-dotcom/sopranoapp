@@ -4,6 +4,19 @@ dist/
 ios/
 supabase/.temp/
 
+# ★ v284 (16 May 2026): Build log spam — gradle/EAS her sürümde yeni dosya yaratıyor.
+#   60+ build-v*.log birikmişti. Repo'da değil, gerekirse Desktop\sopranochat-builds\.
+build-v*.log
+build-v*.err.log
+build-debug-v*.log
+build-debug-v*.err.log
+metro-dev.log
+.metro.*.log
+webdev.*.log
+*.metro.out.log
+*.metro.err.log
+i18n-scan-report.json
+
 # ★ 7 May 2026: web-admin junction (Desktop\sopranochatnorolji'ye link).
 #   Ayrı git repo, ayrı remote, ayrı Vercel deploy — bu repo'nun parçası DEĞİL.
 web-admin/
