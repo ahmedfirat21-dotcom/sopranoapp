@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Shadows } from '../../constants/theme';
 import { UserNotesService, MAX_NOTE_LENGTH } from '../../services/profileExtras';
 import { showToast } from '../Toast';
+import { i18n } from '../../services/i18n';
 
 type Props = {
   ownerId: string;
@@ -82,7 +83,7 @@ export default function PersonalNoteCard({ ownerId, targetId, initialNote }: Pro
     <View style={s.wrap}>
       <View style={s.header}>
         <Ionicons name="bookmark" size={12} color="#FBBF24" />
-        <Text style={s.headerText}>SENİN NOTUN</Text>
+        <Text style={s.headerText}>{i18n.t('profile.your_note')}</Text>
         <View style={{ flex: 1 }} />
         {!editing && (
           <Pressable onPress={startEdit} hitSlop={6} style={s.editIcon}>
@@ -112,7 +113,7 @@ export default function PersonalNoteCard({ ownerId, targetId, initialNote }: Pro
               hitSlop={6}
               disabled={saving}
             >
-              <Text style={s.btnGhostText}>Vazgeç</Text>
+              <Text style={s.btnGhostText}>{i18n.t('profile.cancel')}</Text>
             </Pressable>
             <Pressable
               onPress={handleSave}

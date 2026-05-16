@@ -1109,7 +1109,7 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
                       setMsgReq({ status: 'accepted' });
                     } catch {} finally { setReqResponding(false); }
                   }} style={({ pressed }) => [{ flex: 1, paddingVertical: 8, borderRadius: 10, alignItems: 'center', backgroundColor: '#14B8A6' }, (pressed || reqResponding) && { opacity: 0.6 }]}>
-                    <Text style={{ fontSize: 12, fontWeight: '800', color: '#FFF' }}>{t('common.accept')}</Text>
+                    <Text style={{ fontSize: 12, fontWeight: '800', color: '#FFF' }}>{i18n.t('common.accept')}</Text>
                   </Pressable>
                   <Pressable disabled={reqResponding} onPress={async () => {
                     if (reqResponding) return;
@@ -1120,7 +1120,7 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
                       setChatTarget(null);
                     } catch {} finally { setReqResponding(false); }
                   }} style={({ pressed }) => [{ flex: 1, paddingVertical: 8, borderRadius: 10, alignItems: 'center', backgroundColor: 'rgba(239,68,68,0.15)', borderWidth: 1, borderColor: 'rgba(239,68,68,0.4)' }, (pressed || reqResponding) && { opacity: 0.6 }]}>
-                    <Text style={{ fontSize: 12, fontWeight: '800', color: '#F87171' }}>{t('common.reject')}</Text>
+                    <Text style={{ fontSize: 12, fontWeight: '800', color: '#F87171' }}>{i18n.t('common.reject')}</Text>
                   </Pressable>
                 </View>
               </View>
@@ -1331,7 +1331,7 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
                 ListEmptyComponent={
                   <View style={{ alignItems: 'center', justifyContent: 'center', flex: 1, paddingVertical: 40 }}>
                     <Ionicons name="chatbubble-outline" size={24} color="rgba(255,255,255,0.1)" />
-                    <Text style={{ color: 'rgba(255,255,255,0.2)', fontSize: 12, marginTop: 8 }}>{t('rooms.chat_empty')}</Text>
+                    <Text style={{ color: 'rgba(255,255,255,0.2)', fontSize: 12, marginTop: 8 }}>{i18n.t('rooms.chat_empty')}</Text>
                   </View>
                 }
               />
@@ -1426,7 +1426,7 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
               <Text style={{
                 color: '#F1F5F9', fontSize: 15, fontWeight: '800', flex: 1, letterSpacing: 0.3,
                 textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4,
-              }}>{t('rooms.chat_title')}</Text>
+              }}>{i18n.t('rooms.chat_title')}</Text>
               {dmUnreadCount > 0 && (
                 <View style={{
                   paddingHorizontal: 7, paddingVertical: 2,
@@ -1452,8 +1452,8 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
                   }}>
                     <Ionicons name="chatbubbles-outline" size={24} color="rgba(20,184,166,0.3)" />
                   </View>
-                  <Text style={{ color: 'rgba(255,255,255,0.35)', fontSize: 13, fontWeight: '600' }}>{t('rooms.chat_empty')}</Text>
-                  <Text style={{ color: 'rgba(255,255,255,0.15)', fontSize: 11, marginTop: 4 }}>{t('rooms.chat_hint')}</Text>
+                  <Text style={{ color: 'rgba(255,255,255,0.35)', fontSize: 13, fontWeight: '600' }}>{i18n.t('rooms.chat_empty')}</Text>
+                  <Text style={{ color: 'rgba(255,255,255,0.15)', fontSize: 11, marginTop: 4 }}>{i18n.t('rooms.chat_hint')}</Text>
                 </View>
               ) : (
                 dmInboxMessages.slice(0, 15).map((msg: any, idx: number) => {

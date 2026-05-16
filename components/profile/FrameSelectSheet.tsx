@@ -23,6 +23,7 @@ import { supabase } from '../../constants/supabase';
 import Item3DArt from '../store/Item3DArt';
 import AvatarFrame from './AvatarFrame';
 import { hasFrameLottie, getFrameLottie } from '../../constants/frameLottieRegistry';
+import { i18n } from '../../services/i18n';
 import { hasGiftLottie, getGiftLottie } from '../../constants/giftLottieRegistry';
 import { hasIllustration } from '../../constants/storeIllustrationsPng';
 import { Image } from 'react-native';
@@ -275,14 +276,14 @@ export default function FrameSelectSheet({
               onPress={() => setActiveTab('frames')}
             >
               <Ionicons name="ribbon" size={16} color={activeTab === 'frames' ? '#FBBF24' : 'rgba(255,255,255,0.4)'} />
-              <Text style={[s.tabText, activeTab === 'frames' && { color: '#FBBF24' }]}>Çerçeveler</Text>
+              <Text style={[s.tabText, activeTab === 'frames' && { color: '#FBBF24' }]}>{i18n.t('profile.frames_tab')}</Text>
             </Pressable>
             <Pressable
               style={[s.tab, activeTab === 'effects' && [s.tabActive, { borderBottomColor: '#A855F7' }]]}
               onPress={() => setActiveTab('effects')}
             >
               <Ionicons name="sparkles" size={16} color={activeTab === 'effects' ? '#A855F7' : 'rgba(255,255,255,0.4)'} />
-              <Text style={[s.tabText, activeTab === 'effects' && { color: '#A855F7' }]}>Giriş Efektleri</Text>
+              <Text style={[s.tabText, activeTab === 'effects' && { color: '#A855F7' }]}>{i18n.t('profile.entry_effects_tab')}</Text>
             </Pressable>
           </View>
 
@@ -306,7 +307,7 @@ export default function FrameSelectSheet({
                 style={s.removeBtn}
               >
                 <Ionicons name="close" size={14} color="#F87171" />
-                <Text style={s.removeBtnText}>ÇIKAR</Text>
+                <Text style={s.removeBtnText}>{i18n.t('profile.remove_uppercase')}</Text>
               </Pressable>
             )}
           </View>
@@ -336,7 +337,7 @@ export default function FrameSelectSheet({
                     start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                     style={StyleSheet.absoluteFillObject}
                   />
-                  <Text style={[s.emptyCtaText, !isFrameTab && { color: '#fff' }]}>MAĞAZAYA GİT</Text>
+                  <Text style={[s.emptyCtaText, !isFrameTab && { color: '#fff' }]}>{i18n.t('profile.go_to_store')}</Text>
                 </Pressable>
               </View>
             ) : (
@@ -378,7 +379,7 @@ export default function FrameSelectSheet({
                         {selected && (
                           <View style={[s.activeBadge, { backgroundColor: accentColor }]}>
                             <Ionicons name="checkmark" size={12} color="#0A0F1A" />
-                            <Text style={s.activeBadgeText}>AKTİF</Text>
+                            <Text style={s.activeBadgeText}>{i18n.t('profile.active_uppercase')}</Text>
                           </View>
                         )}
                       </Pressable>

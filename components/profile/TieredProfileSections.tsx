@@ -14,6 +14,7 @@ import { useRouter } from 'expo-router';
 import { isTierAtLeast, TIER_DEFINITIONS } from '../../constants/tiers';
 import { Colors, Radius } from '../../constants/theme';
 import type { SubscriptionTier } from '../../types';
+import { i18n } from '../../services/i18n';
 
 // ── LockedFeatureHint ─────────────────────────────
 interface LockedHintProps {
@@ -189,7 +190,7 @@ export default function TieredProfileSections({
       ) : (
         <View style={s.sectionCard}>
           <Text style={s.sectionTitle}>📡 Son Aktif Odalar</Text>
-          <Text style={s.emptyText}>Henüz aktif olunan oda yok</Text>
+          <Text style={s.emptyText}>{i18n.t('profile.no_active_rooms')}</Text>
         </View>
       )}
 
@@ -235,7 +236,7 @@ export default function TieredProfileSections({
                 <View style={[lk.iconWrap, { backgroundColor: 'rgba(139,92,246,0.15)' }]}>
                   <Text style={{ fontSize: 14 }}>👻</Text>
                 </View>
-                <Text style={lk.label}>Ghost Mode Aktif</Text>
+                <Text style={lk.label}>{i18n.t('profile.ghost_mode')}</Text>
               </View>
             </View>
           ) : null
@@ -251,15 +252,15 @@ export default function TieredProfileSections({
           <View style={s.vipStatsGrid}>
             <View style={s.vipStatBox}>
               <Text style={[s.vipStatNum, { color: '#FF6B35' }]}>{stats.totalListeners}</Text>
-              <Text style={s.vipStatLabel}>Toplam Dinleyici</Text>
+              <Text style={s.vipStatLabel}>{i18n.t('profile.total_listeners')}</Text>
             </View>
             <View style={s.vipStatBox}>
               <Text style={[s.vipStatNum, { color: '#14B8A6' }]}>{formatStageTime(stats.stageMinutes)}</Text>
-              <Text style={s.vipStatLabel}>Sahne Süresi</Text>
+              <Text style={s.vipStatLabel}>{i18n.t('profile.stage_time')}</Text>
             </View>
             <View style={s.vipStatBox}>
               <Text style={[s.vipStatNum, { color: '#F59E0B' }]}>{stats.totalReactions}</Text>
-              <Text style={s.vipStatLabel}>Etkileşim</Text>
+              <Text style={s.vipStatLabel}>{i18n.t('profile.engagement')}</Text>
             </View>
           </View>
           {/* Stereo ses rozeti */}
@@ -267,7 +268,7 @@ export default function TieredProfileSections({
             <View style={{ width: 24, height: 24, borderRadius: 6, backgroundColor: 'rgba(255,107,53,0.15)', alignItems: 'center', justifyContent: 'center' }}>
               <Ionicons name="headset" size={12} color="#FF6B35" />
             </View>
-            <Text style={{ fontSize: 11, color: '#FF6B35', fontWeight: '700' }}>Stereo Ses Aktif</Text>
+            <Text style={{ fontSize: 11, color: '#FF6B35', fontWeight: '700' }}>{i18n.t('profile.stereo_active')}</Text>
             <View style={{ flex: 1 }} />
             <View style={[lk.badge, { borderColor: 'rgba(255,107,53,0.3)', backgroundColor: 'rgba(255,107,53,0.08)' }]}>
               <Ionicons name="checkmark" size={8} color="#FF6B35" />
@@ -288,17 +289,17 @@ export default function TieredProfileSections({
             <View style={s.incomeGrid}>
               <View style={s.incomeBox}>
                 <Text style={[s.incomeNum, { color: '#FFD700' }]}>{incomeStats.totalEarned.toLocaleString()}</Text>
-                <Text style={s.incomeLabel}>Toplam SP</Text>
+                <Text style={s.incomeLabel}>{i18n.t('profile.total_sp')}</Text>
               </View>
               <View style={s.incomeDivider} />
               <View style={s.incomeBox}>
                 <Text style={[s.incomeNum, { color: '#14B8A6' }]}>{incomeStats.roomFeeRooms}</Text>
-                <Text style={s.incomeLabel}>Ücretli Oda</Text>
+                <Text style={s.incomeLabel}>{i18n.t('profile.paid_room')}</Text>
               </View>
               <View style={s.incomeDivider} />
               <View style={s.incomeBox}>
                 <Text style={[s.incomeNum, { color: '#EC4899' }]}>{incomeStats.donationsReceived}</Text>
-                <Text style={s.incomeLabel}>Bağış</Text>
+                <Text style={s.incomeLabel}>{i18n.t('profile.donations')}</Text>
               </View>
             </View>
           </View>
@@ -309,8 +310,8 @@ export default function TieredProfileSections({
               <Ionicons name="star" size={14} color="#FF6B35" />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 12, fontWeight: '700', color: '#FF6B35' }}>Monetized Creator</Text>
-              <Text style={{ fontSize: 10, color: '#64748B', marginTop: 1 }}>Desteklenebilir içerik üreticisi</Text>
+              <Text style={{ fontSize: 12, fontWeight: '700', color: '#FF6B35' }}>{i18n.t('profile.monetized_creator')}</Text>
+              <Text style={{ fontSize: 10, color: '#64748B', marginTop: 1 }}>{i18n.t('profile.monetized_desc')}</Text>
             </View>
             <View style={[lk.badge, { borderColor: 'rgba(255,107,53,0.3)', backgroundColor: 'rgba(255,107,53,0.08)' }]}>
               <Ionicons name="checkmark" size={8} color="#FF6B35" />

@@ -11,6 +11,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { i18n } from '../../services/i18n';
 import {
   getLanguage,
   getInterest,
@@ -79,7 +80,7 @@ export default function ProfileIdentityStrip({ languages, interests, isOwn, onEd
           hitSlop={6}
         >
           <Ionicons name="add-circle-outline" size={14} color="rgba(20,184,166,0.85)" />
-          <Text style={s.emptyCtaText}>Dil ve ilgi alanı ekle</Text>
+          <Text style={s.emptyCtaText}>{i18n.t('profile.add_language_interest')}</Text>
         </Pressable>
       )}
     </View>

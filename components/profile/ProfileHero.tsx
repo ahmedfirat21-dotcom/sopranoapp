@@ -17,6 +17,7 @@ import StatusAvatar from '../StatusAvatar';
 import type { UserTitle } from '../../services/userTitles';
 import type { SubscriptionTier } from '../../types';
 import { useFrameConfig } from '../../services/cosmeticConfigCache';
+import { i18n } from '../../services/i18n';
 
 const _cardShadow = Shadows.card;
 const _textGlow = Shadows.text;
@@ -218,7 +219,7 @@ export default function ProfileHero({
             {isBoostActive && (
               <View style={s.metaPill}>
                 <Ionicons name="rocket-outline" size={10} color="#F472B6" style={iconShadow} />
-                <Text style={[s.metaPillText, { color: '#F472B6' }]}>BOOST</Text>
+                <Text style={[s.metaPillText, { color: '#F472B6' }]}>{i18n.t('profile.boost_label')}</Text>
               </View>
             )}
             {isBoostActive && (memberSinceJoinedText || lastSeenText) && <View style={s.metaDot} />}
@@ -263,7 +264,7 @@ export default function ProfileHero({
           accessibilityLabel={`${stats.followers} arkadaş`}
         >
           <Text style={s.statNum}>{fmtStat(stats.followers)}</Text>
-          <Text style={s.statLabelClickable}>Arkadaş</Text>
+          <Text style={s.statLabelClickable}>{i18n.t('profile.stat_friend')}</Text>
         </Pressable>
         <View style={s.statDiv} />
         <Pressable
@@ -273,7 +274,7 @@ export default function ProfileHero({
           accessibilityLabel={`${stats.rooms} oda`}
         >
           <Text style={s.statNum}>{fmtStat(stats.rooms)}</Text>
-          <Text style={s.statLabelClickable}>Oda</Text>
+          <Text style={s.statLabelClickable}>{i18n.t('profile.stat_room')}</Text>
         </Pressable>
         {/* ★ 2026-05-05: 3. stat — Hediye (tıklayınca tab'lı detay modal) */}
         {onGiftsPress && (
@@ -286,7 +287,7 @@ export default function ProfileHero({
               accessibilityLabel={`${stats.gifts || 0} hediye`}
             >
               <Text style={s.statNum}>{fmtStat(stats.gifts)}</Text>
-              <Text style={[s.statLabelClickable, { color: '#FBBF24' }]}>Hediye</Text>
+              <Text style={[s.statLabelClickable, { color: '#FBBF24' }]}>{i18n.t('profile.stat_gift')}</Text>
             </Pressable>
           </>
         )}

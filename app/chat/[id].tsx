@@ -21,7 +21,7 @@ import { EmojiPicker } from '../../components/EmojiPicker';
 import { ReportModal } from '../../components/ReportModal';
 import { showToast } from '../../components/Toast';
 import { useAuth, useBadges, useUserProfileSheet } from '../_layout';
-import { useTranslation } from '../../services/i18n';
+import { i18n, useTranslation } from '../../services/i18n';
 import { useOnlineFriends } from '../../providers/OnlineFriendsProvider';
 import { useDMNotif } from '../../providers/DMNotifProvider';
 import StatusAvatar from '../../components/StatusAvatar';
@@ -181,7 +181,7 @@ function MediaLinksModal({ visible, messages, onClose, onImagePress }: {
       <Pressable style={styles.mediaOverlay} onPress={onClose}>
         <Pressable style={styles.mediaSheet} onPress={(e) => e.stopPropagation()}>
           <View style={styles.mediaHeader}>
-            <Text style={styles.mediaTitle}>{t('messages.media_links')}</Text>
+            <Text style={styles.mediaTitle}>{i18n.t('messages.media_links')}</Text>
             <Pressable onPress={onClose} hitSlop={8}>
               <Ionicons name="close" size={20} color={Colors.text3} />
             </Pressable>
@@ -199,7 +199,7 @@ function MediaLinksModal({ visible, messages, onClose, onImagePress }: {
           </View>
           {tab === 'media' && (
             images.length === 0 ? (
-              <View style={styles.mediaEmpty}><Ionicons name="images-outline" size={32} color={Colors.text3} /><Text style={styles.mediaEmptyText}>{t('messages.no_images')}</Text></View>
+              <View style={styles.mediaEmpty}><Ionicons name="images-outline" size={32} color={Colors.text3} /><Text style={styles.mediaEmptyText}>{i18n.t('messages.no_images')}</Text></View>
             ) : (
               <FlatList
                 data={images}
@@ -216,7 +216,7 @@ function MediaLinksModal({ visible, messages, onClose, onImagePress }: {
           )}
           {tab === 'voice' && (
             voices.length === 0 ? (
-              <View style={styles.mediaEmpty}><Ionicons name="mic-outline" size={32} color={Colors.text3} /><Text style={styles.mediaEmptyText}>{t('messages.no_voice')}</Text></View>
+              <View style={styles.mediaEmpty}><Ionicons name="mic-outline" size={32} color={Colors.text3} /><Text style={styles.mediaEmptyText}>{i18n.t('messages.no_voice')}</Text></View>
             ) : (
               <FlatList
                 data={voices}
@@ -233,7 +233,7 @@ function MediaLinksModal({ visible, messages, onClose, onImagePress }: {
           )}
           {tab === 'links' && (
             links.length === 0 ? (
-              <View style={styles.mediaEmpty}><Ionicons name="link-outline" size={32} color={Colors.text3} /><Text style={styles.mediaEmptyText}>{t('messages.no_links')}</Text></View>
+              <View style={styles.mediaEmpty}><Ionicons name="link-outline" size={32} color={Colors.text3} /><Text style={styles.mediaEmptyText}>{i18n.t('messages.no_links')}</Text></View>
             ) : (
               <FlatList
                 data={links}
@@ -393,7 +393,7 @@ function MessageBubble({ message, isMe, senderAvatar, senderName, myAvatar, onDe
           {isForwarded ? (
             <View style={styles.forwardedRow}>
               <Ionicons name="arrow-redo" size={11} color="rgba(255,255,255,0.55)" />
-              <Text style={styles.forwardedText}>{t('messages.forwarded')}</Text>
+              <Text style={styles.forwardedText}>{i18n.t('messages.forwarded')}</Text>
             </View>
           ) : null}
           {/* ★ v109: Reply preview — bubble içinde sol-bordered alıntı kartı, tıklanınca scroll */}

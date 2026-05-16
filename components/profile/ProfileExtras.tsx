@@ -18,6 +18,7 @@ import { Shadows, Colors } from '../../constants/theme';
 import StatusAvatar from '../StatusAvatar';
 import SPIcon from '../SPIcon';
 import { BADGES } from '../../constants/badges';
+import { i18n } from '../../services/i18n';
 import type { Supporter, MutualRoom } from '../../services/profileExtras';
 
 const iconShadow = {
@@ -128,7 +129,7 @@ export function VoiceBioPlayer({ url, durationMs }: VoiceBioPlayerProps) {
         />
       </Animated.View>
       <View style={{ flex: 1 }}>
-        <Text style={vbp.label}>SESLİ TANITIM</Text>
+        <Text style={vbp.label}>{i18n.t('profile.voice_intro_label')}</Text>
         <View style={vbp.progressBg}>
           <View style={[vbp.progressFill, { width: `${progress * 100}%` }]} />
         </View>
@@ -200,7 +201,7 @@ export function TopSupportersStrip({ supporters, onSelectUser }: TopSupportersSt
       />
       <View style={tss.header}>
         <Ionicons name="diamond" size={13} color="#FBBF24" style={iconShadow} />
-        <Text style={tss.headerLabel}>TOP DESTEKÇİLER</Text>
+        <Text style={tss.headerLabel}>{i18n.t('profile.top_supporters')}</Text>
         <View style={{ flex: 1 }} />
         <View style={tss.totalChip}>
           <SPIcon size={11} />
@@ -391,7 +392,7 @@ export function FeaturedBadgesShowcase({ featuredIds, onPress }: FeaturedBadgesS
     <View style={fbs.wrap}>
       <View style={fbs.header}>
         <Ionicons name="ribbon" size={13} color="#FBBF24" style={iconShadow} />
-        <Text style={fbs.headerLabel}>ÖNE ÇIKAN ROZETLER</Text>
+        <Text style={fbs.headerLabel}>{i18n.t('profile.featured_badges_label')}</Text>
       </View>
       <View style={fbs.row}>
         {defs.map(d => (

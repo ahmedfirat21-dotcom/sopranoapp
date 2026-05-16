@@ -9,7 +9,7 @@ import { Colors, Shadows } from '../../constants/theme';
 import { MessageService, ProfileService, type InboxItem, type Message } from '../../services/database';
 import { supabase } from '../../constants/supabase';
 import { useAuth, useBadges, useTheme, useOnlineFriends, useUserProfileSheet, useDMNotif } from '../_layout';
-import { useTranslation } from '../../services/i18n';
+import { i18n, useTranslation } from '../../services/i18n';
 import { useFocusEffect } from 'expo-router';
 import { useCallback } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -374,7 +374,7 @@ function SwipeableRow({ children, onDelete, containerStyle }: { children: React.
         <RNAnimated.View style={[styles.swipeDeleteBtn, { opacity: deleteOpacity }]}>
           <Pressable onPress={onDelete} style={{ flex: 1, justifyContent: 'center', alignItems: 'center', gap: 4 }}>
             <Ionicons name="trash-outline" size={18} color="#FFF" />
-            <Text style={styles.swipeDeleteText}>{t('common.delete')}</Text>
+            <Text style={styles.swipeDeleteText}>{i18n.t('common.delete')}</Text>
           </Pressable>
         </RNAnimated.View>
         <RNAnimated.View style={{ transform: [{ translateX }] }} {...panResponder.panHandlers}>
