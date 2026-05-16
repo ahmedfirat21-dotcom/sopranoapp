@@ -171,13 +171,16 @@ export default function RoomInfoHeader({
         style={StyleSheet.absoluteFillObject}
         pointerEvents="none"
       />
-      <LinearGradient
-        colors={['transparent', 'rgba(20,184,166,0.55)', 'rgba(20,184,166,0.55)', 'transparent']}
-        locations={[0, 0.25, 0.75, 1]}
-        start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-        style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 1.5 }}
-        pointerEvents="none"
-      />
+      {/* ★ v284: headerBorderBottom toggle — web admin'den kapatılabilir */}
+      {headerCfg.headerBorderBottom && (
+        <LinearGradient
+          colors={['transparent', headerCfg.headerBorderColor, headerCfg.headerBorderColor, 'transparent']}
+          locations={[0, 0.25, 0.75, 1]}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+          style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 1.5 }}
+          pointerEvents="none"
+        />
+      )}
       {/* Satır 1 — Avatar + Süre + Oda İsmi + Aksiyonlar */}
       <View style={s.topNav}>
         <View style={s.topLeft}>

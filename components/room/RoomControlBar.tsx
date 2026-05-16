@@ -13,6 +13,7 @@ import ReAnimated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useRoomLayout } from '../../services/roomLayoutConfig';
 
 // ★ 2026-04-23 redesign v2: Ana sayfa alt nav (CurvedTabBar) ile birebir tema.
 //   Bar: gradient (#2A3A58→#243250→#1A2540) + teal spotlight + parlak beyaz border + radius 22.
@@ -242,6 +243,11 @@ export default function RoomControlBar({
   dmBadgeCount, plusBadgeCount, onDmPress, isDmOpen, isPlusOpen,
 }: Props) {
   const resolvedStageAction: StageAction = stageAction ?? (isHandRaised ? 'waiting' : 'raise_hand');
+  // ★ v284: Web admin "Oda Düzeni" → controls config
+  const controlsCfg = useRoomLayout().controls;
+  const dynBtnSize = controlsCfg.buttonSize;
+  const dynIconSize = controlsCfg.iconSize;
+  const dynIconColor = controlsCfg.iconColor;
 
   const handleMicPress = () => {
     if (isForcedMuted) {
