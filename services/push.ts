@@ -98,6 +98,12 @@ export const PushService = {
         if (__DEV__) logger.warn('[Push] Edge function hata:', invokeErr.message);
         return;
       }
+      // ★ v284: Beklenen "token yok" durumu = sessiz skip
+      if (invokeData?.skipped === 'no_token') return;
+      // Expo API non-2xx döndüyse edge fn artık 200 + success:false döndürüyor — logla
+      if (__DEV__ && invokeData?.success === false) {
+        logger.warn(`[Push] Expo ${invokeData.expo_status}: ${invokeData.expo_error}`);
+      }
       // Receipt analizi — herhangi bir cihazda fail varsa logla (DEV)
       if (__DEV__ && invokeData?.result?.data && Array.isArray(invokeData.result.data)) {
         const failures = invokeData.result.data.filter((t: any) => t?.status === 'error');

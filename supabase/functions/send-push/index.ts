@@ -11,6 +11,10 @@
 //   - Authorization header sadece "Bearer <anon_key>" gate'i (drive-by abuse koruması).
 //   - push_tokens tablosu RLS ile korunuyor — sadece service_role okuyabilir.
 //   - İleride: Firebase ID token doğrulaması + sender→target ilişki kontrolü.
+//
+// ★ v284 (16 May 2026): Status code politikası — beklenen "boş hedef" durumları
+//   (token yok, izin verilmemiş) 200 + skipped döndürür. Bu sayede client tarafında
+//   "non-2xx status" hata logu spam etmez. Yalnızca gerçek runtime hatalar 5xx kalır.
 
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
@@ -66,49 +70,9 @@ serve(async (req: Request) => {
     }
 
     if (!tokens || tokens.length === 0) {
-      // ★ Backward compat: push_tokens tablosu boşsa profiles.push_token'a bak
-      //   Geçiş dönemi — eski client henüz push_tokens'a yazmamış olabilir.
-      const { data: profile, error: profileErr } = await adminClient
-        .from('profiles')
-        .select('push_token')
-        .eq('id', target_user_id)
-        .single();
-
-      if (profileErr || !profile?.push_token) {
-        return jsonResponse(404, { error: 'Kullanıcıda push token bulunamadı.' });
-      }
-
-      // Fallback: tek token ile gönder (eski davranış)
-      const callPayload = is_call
-        ? {
-            priority: 'high',
-            channelId: 'calls',
-            ttl: 0,
-            _contentAvailable: true,
-            interruptionLevel: 'timeSensitive',
-            sticky: true,
-            categoryId: 'incoming_call',
-          }
-        : {};
-
-      const pushResponse = await fetch(EXPO_PUSH_URL, {
-        method: 'POST',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          to: profile.push_token,
-          title,
-          body,
-          sound: 'default',
-          data: data || {},
-          ...callPayload,
-        }),
-      });
-
-      const pushResult = await pushResponse.json();
-      return jsonResponse(200, { success: true, result: pushResult, source: 'profiles_fallback' });
+      // ★ v284: Token yok = beklenen durum (kullanıcı uygulamayı açmamış / izin
+      //   vermemiş). Client tarafı "fail" log'u atmasın diye 200 + skipped döndür.
+      return jsonResponse(200, { success: true, skipped: 'no_token', devices: 0 });
     }
 
     // ★ Multi-device: Tüm cihazlara paralel push gönder
@@ -142,6 +106,18 @@ serve(async (req: Request) => {
       },
       body: JSON.stringify(messages),
     });
+
+    // ★ v284: Expo API'dan non-2xx geldiyse hatayı 200 + error_detail ile döndür
+    //   (client console'u temiz kalır, ama detay loglanabilir).
+    if (!pushResponse.ok) {
+      const errText = await pushResponse.text().catch(() => 'unknown');
+      return jsonResponse(200, {
+        success: false,
+        expo_status: pushResponse.status,
+        expo_error: errText.slice(0, 500),
+        devices: tokens.length,
+      });
+    }
 
     const pushResult = await pushResponse.json();
 
