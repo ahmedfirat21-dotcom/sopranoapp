@@ -457,6 +457,11 @@ export function UserSearchModal({ visible, onClose, currentUserId, onSelectUser,
                   //   Aksi halde Android'de tap önce klavyeyi kapatır, modal hareket eder, tap kaçar.
                   keyboardShouldPersistTaps="handled"
                   keyboardDismissMode="on-drag"
+                  // ★ v284 (16 May 2026): Performans config (büyük kullanıcı arama listeleri)
+                  initialNumToRender={15}
+                  maxToRenderPerBatch={10}
+                  windowSize={9}
+                  removeClippedSubviews
                   ListEmptyComponent={
                     <View style={s.emptyState}>
                       <Ionicons name="search-outline" size={36} color="rgba(92,225,230,0.2)" />

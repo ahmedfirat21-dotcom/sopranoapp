@@ -1687,6 +1687,12 @@ export default function ChatScreen() {
             <Text style={styles.emptyChatText}>Henüz mesaj yok. İlk mesajı sen yaz!</Text>
           </View>
         }
+        // ★ v284 (16 May 2026): DM mesaj listesi performans config
+        initialNumToRender={20}
+        maxToRenderPerBatch={12}
+        updateCellsBatchingPeriod={50}
+        windowSize={11}
+        removeClippedSubviews={Platform.OS === 'android'}
       />
 
       {/* ★ 2026-04-30 FIX v7: Normal flex flow — KAV container'ı küçültünce

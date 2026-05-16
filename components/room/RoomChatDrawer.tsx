@@ -960,7 +960,7 @@ export default function RoomChatDrawer({
           onLongPress={(e) => {
             // Picker'ı tam mesaj balonunun üstüne yerleştir (WhatsApp paritesi)
             const anchorY = (e.nativeEvent as any)?.pageY ?? 0;
-            console.log('[Reaction] long press OK', item.id, 'anchorY=', anchorY);
+            if (__DEV__) console.log('[Reaction] long press OK', item.id, 'anchorY=', anchorY);
             setReactionPicker({ messageId: item.id, anchorY });
           }}
           delayLongPress={300}
@@ -1096,6 +1096,12 @@ export default function RoomChatDrawer({
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+          // ★ v284 (16 May 2026): Performans config — uzun mesaj listelerinde JS bridge yükü düşürür
+          initialNumToRender={15}
+          maxToRenderPerBatch={10}
+          updateCellsBatchingPeriod={50}
+          windowSize={11}
+          removeClippedSubviews={Platform.OS === 'android'}
         />
 
         {/* ★ v110.14: WhatsApp tarzı reaction picker — long press anchor pozisyonu üstüne pop */}

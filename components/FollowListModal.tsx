@@ -416,6 +416,11 @@ export default function FollowListModal({
               style={{ flex: 1 }}
               onScroll={handleScroll}
               scrollEventThrottle={16}
+              // ★ v284 (16 May 2026): Performans config (takipçi/arkadaş büyük listeler)
+              initialNumToRender={15}
+              maxToRenderPerBatch={10}
+              windowSize={9}
+              removeClippedSubviews
             />
           )}
       </Animated.View>

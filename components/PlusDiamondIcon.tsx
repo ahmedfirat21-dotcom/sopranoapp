@@ -17,7 +17,9 @@ export default function PlusDiamondIcon({ size = 48, style }: Props) {
   const glowOpacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    Animated.loop(
+    // ★ v284 (16 May 2026): Loop ref + cleanup. Eskiden start()'ı doğrudan çağırıyordu,
+    //   unmount sonrası loop orphan kalıyordu → FPS drop.
+    const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(glowOpacity, {
           toValue: 1,
@@ -32,8 +34,10 @@ export default function PlusDiamondIcon({ size = 48, style }: Props) {
           useNativeDriver: true,
         }),
       ])
-    ).start();
-  }, []);
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [glowOpacity]);
 
   return (
     <View

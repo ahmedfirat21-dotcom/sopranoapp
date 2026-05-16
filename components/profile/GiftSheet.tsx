@@ -86,6 +86,10 @@ export default function GiftSheet({
   const hexScale = useRef(new Animated.Value(1)).current;
   // ★ v107.31: inRoom modu için ek ambient drift (4 kalp partikülü, alttan üste süzülür)
   const driftAnims = useRef([0, 1, 2, 3].map(() => new Animated.Value(0))).current;
+  // ★ v284 (16 May 2026): Loop instance ref'ler — orphan loop önleme
+  const giftFloatLoopRef = useRef<Animated.CompositeAnimation | null>(null);
+  const avatarBreathLoopRef = useRef<Animated.CompositeAnimation | null>(null);
+  const driftLoopsRef = useRef<(Animated.CompositeAnimation | null)[]>([]);
 
   const [amount, setAmount] = useState(10);
   const [message, setMessage] = useState('');
@@ -125,30 +129,37 @@ export default function GiftSheet({
         Animated.spring(translateY, { toValue: 0, useNativeDriver: true, damping: 22, stiffness: 220 }),
         Animated.timing(backdropOpacity, { toValue: 1, duration: 220, useNativeDriver: true }),
       ]).start();
+      // ★ v284 (16 May 2026): Loop'lar ref'e atandı + cleanup. stopAnimation Animated.Value'da
+      //   mevcut iterasyonu iptal ediyor ama loop sequence callback yeni iterasyon spawn ediyordu
+      //   → orphan loop FPS drop. Şimdi loop.stop() ile kesin durur.
       // Gift watermark — yumuşak süzülme (4sn cycle, opacity + scale + rotate)
-      Animated.loop(
+      giftFloatLoopRef.current = Animated.loop(
         Animated.sequence([
           Animated.timing(giftFloat, { toValue: 1, duration: 4000, useNativeDriver: true }),
           Animated.timing(giftFloat, { toValue: 0, duration: 4000, useNativeDriver: true }),
         ]),
-      ).start();
+      );
+      giftFloatLoopRef.current.start();
       // Avatar breathing (scale 1.0 ↔ 1.02, 3sn cycle)
-      Animated.loop(
+      avatarBreathLoopRef.current = Animated.loop(
         Animated.sequence([
           Animated.timing(avatarBreath, { toValue: 1, duration: 1500, useNativeDriver: true }),
           Animated.timing(avatarBreath, { toValue: 0, duration: 1500, useNativeDriver: true }),
         ]),
-      ).start();
+      );
+      avatarBreathLoopRef.current.start();
       // ★ v107.31: inRoom modu — 4 ambient kalp partikülü alttan üste süzülür (stagger)
       if (inRoom) {
         driftAnims.forEach((a, i) => {
-          Animated.loop(
+          const dLoop = Animated.loop(
             Animated.sequence([
               Animated.delay(i * 800),
               Animated.timing(a, { toValue: 1, duration: 5000, useNativeDriver: true }),
               Animated.timing(a, { toValue: 0, duration: 0, useNativeDriver: true }),
             ]),
-          ).start();
+          );
+          driftLoopsRef.current[i] = dLoop;
+          dLoop.start();
         });
       }
     } else {
@@ -156,11 +167,18 @@ export default function GiftSheet({
         Animated.timing(translateY, { toValue: PANEL_HEIGHT, duration: 220, useNativeDriver: true }),
         Animated.timing(backdropOpacity, { toValue: 0, duration: 180, useNativeDriver: true }),
       ]).start();
-      giftFloat.stopAnimation();
-      avatarBreath.stopAnimation();
-      driftAnims.forEach(a => a.stopAnimation());
+      giftFloatLoopRef.current?.stop(); giftFloatLoopRef.current = null;
+      avatarBreathLoopRef.current?.stop(); avatarBreathLoopRef.current = null;
+      driftLoopsRef.current.forEach(l => l?.stop());
+      driftLoopsRef.current = [];
     }
   }, [visible]);
+  // ★ v284: Unmount sırasında orphan loop kalmasın
+  useEffect(() => () => {
+    giftFloatLoopRef.current?.stop();
+    avatarBreathLoopRef.current?.stop();
+    driftLoopsRef.current.forEach(l => l?.stop());
+  }, []);
 
   // Hexagon spring — amount değişince hafif "pop"
   useEffect(() => {

@@ -3,7 +3,7 @@
  * Instagram tarzı: Üstte Takip İstekleri (Onayla/Reddet), altta bildirimler
  */
 import { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, Pressable, Image, RefreshControl, Animated } from 'react-native';
+import { View, Text, StyleSheet, FlatList, Pressable, Image, RefreshControl, Animated, Platform } from 'react-native';
 import AppLoader from '../components/AppLoader';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -289,6 +289,12 @@ export default function NotificationsScreen() {
               />
             ) : null
           }
+          // ★ v284 (16 May 2026): Bildirim listesi performans config
+          initialNumToRender={15}
+          maxToRenderPerBatch={10}
+          updateCellsBatchingPeriod={50}
+          windowSize={9}
+          removeClippedSubviews={Platform.OS === 'android'}
         />
       )}
     </View>

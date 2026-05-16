@@ -79,6 +79,8 @@ export default function EntryFeeCard({
   const backdropOpacity = useRef(new Animated.Value(0)).current;
   // Watermark (🎫) süzülme
   const ticketFloat = useRef(new Animated.Value(0)).current;
+  // ★ v284 (16 May 2026): Loop instance ref — orphan loop önleme
+  const ticketFloatLoopRef = useRef<Animated.CompositeAnimation | null>(null);
   // Bilet kutusu zoom entrance (scale 0.85→1 spring)
   const ticketBoxAnim = useRef(new Animated.Value(0)).current;
 
@@ -96,22 +98,26 @@ export default function EntryFeeCard({
           Animated.spring(ticketBoxAnim, { toValue: 1, useNativeDriver: true, damping: 11, stiffness: 110 }),
         ]),
       ]).start();
-      // Watermark süzülme
-      Animated.loop(
+      // Watermark süzülme — ★ v284 (16 May 2026): ref'e atandı + cleanup için stop()
+      ticketFloatLoopRef.current = Animated.loop(
         Animated.sequence([
           Animated.timing(ticketFloat, { toValue: 1, duration: 4000, useNativeDriver: true }),
           Animated.timing(ticketFloat, { toValue: 0, duration: 4000, useNativeDriver: true }),
         ]),
-      ).start();
+      );
+      ticketFloatLoopRef.current.start();
     } else {
       Animated.parallel([
         Animated.timing(translateY, { toValue: PANEL_HEIGHT, duration: 220, useNativeDriver: true }),
         Animated.timing(backdropOpacity, { toValue: 0, duration: 180, useNativeDriver: true }),
         Animated.timing(ticketBoxAnim, { toValue: 0, duration: 180, useNativeDriver: true }),
       ]).start();
-      ticketFloat.stopAnimation();
+      ticketFloatLoopRef.current?.stop();
+      ticketFloatLoopRef.current = null;
     }
   }, [visible]);
+  // ★ v284 (16 May 2026): Unmount sırasında da loop orphan kalmasın
+  useEffect(() => () => { ticketFloatLoopRef.current?.stop(); }, []);
 
   // Pan responder — drag-to-dismiss = Vazgeç
   const onCancelRef = useRef(onCancel);
