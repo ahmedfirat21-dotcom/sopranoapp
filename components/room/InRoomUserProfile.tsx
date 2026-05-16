@@ -22,6 +22,7 @@ import { TIER_DEFINITIONS } from '../../constants/tiers';
 import type { TierName } from '../../types';
 import { ProfileService, type Profile } from '../../services/database';
 import { FriendshipService, type FriendshipStatus, type FriendUser } from '../../services/friendship';
+import { i18n } from '../../services/i18n';
 import { FollowService } from '../../services/follows';
 import StatusAvatar from '../StatusAvatar';
 import { ModerationService } from '../../services/moderation';
@@ -790,7 +791,7 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
               <Pressable onPress={handleClose} style={sty.iconBtn} hitSlop={8}>
                 <Ionicons name="chevron-down" size={22} color="#F1F5F9" />
               </Pressable>
-              <Text style={sty.wizardTitle}>PROFİL</Text>
+              <Text style={sty.wizardTitle}>{i18n.t('profile.upper_label')}</Text>
               <View style={sty.tierChip}>
                 <Text style={sty.tierChipText}>{tier}</Text>
               </View>
@@ -826,7 +827,7 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
         ) : !userProfile ? (
           <View style={sty.loadingBox}>
             <Ionicons name="person-outline" size={48} color={Colors.text3} />
-            <Text style={{ color: Colors.text2, marginTop: 12 }}>Kullanıcı bulunamadı</Text>
+            <Text style={{ color: Colors.text2, marginTop: 12 }}>{i18n.t('profile.not_found')}</Text>
           </View>
         ) : (
           <KeyboardAvoidingView
@@ -935,11 +936,11 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                         <>
                           <Pressable style={sty.incomingApproveBtn} onPress={handleApproveIncoming}>
                             <Ionicons name="checkmark" size={16} color="#FFF" />
-                            <Text style={sty.incomingApproveText}>Onayla</Text>
+                            <Text style={sty.incomingApproveText}>{i18n.t('profile.approve')}</Text>
                           </Pressable>
                           <Pressable style={sty.incomingRejectBtn} onPress={handleRejectIncoming}>
                             <Ionicons name="close" size={16} color="#94A3B8" />
-                            <Text style={sty.incomingRejectText}>Sil</Text>
+                            <Text style={sty.incomingRejectText}>{i18n.t('profile.delete_short')}</Text>
                           </Pressable>
                         </>
                       )}
@@ -1012,22 +1013,22 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                     ) : isUserBlocked ? (
                       <>
                         <Ionicons name="ban" size={16} color="#EF4444" />
-                        <Text style={[sty.actionPillText, { color: '#EF4444' }]}>Engellendi</Text>
+                        <Text style={[sty.actionPillText, { color: '#EF4444' }]}>{i18n.t('profile.blocked')}</Text>
                       </>
                     ) : isFriend ? (
                       <>
                         <Ionicons name="people" size={17} color="#A78BFA" />
-                        <Text style={[sty.actionPillText, { color: '#A78BFA' }]}>Arkadaş</Text>
+                        <Text style={[sty.actionPillText, { color: '#A78BFA' }]}>{i18n.t('profile.friend')}</Text>
                       </>
                     ) : isPending ? (
                       <>
                         <Ionicons name="time-outline" size={16} color="#FBBF24" />
-                        <Text style={[sty.actionPillText, { color: '#FBBF24', fontSize: 12 }]}>İstek Gönderildi</Text>
+                        <Text style={[sty.actionPillText, { color: '#FBBF24', fontSize: 12 }]}>{i18n.t('profile.request_sent')}</Text>
                       </>
                     ) : (
                       <>
                         <Ionicons name="person-add" size={17} color="#F1F5F9" />
-                        <Text style={[sty.actionPillText, { color: '#F1F5F9' }]}>Arkadaş Ekle</Text>
+                        <Text style={[sty.actionPillText, { color: '#F1F5F9' }]}>{i18n.t('profile.add_friend_short')}</Text>
                       </>
                     )}
                   </Pressable>
@@ -1095,7 +1096,7 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                           hitSlop={6}
                         >
                           <Ionicons name="share-social-outline" size={14} color="#5CBFB5" />
-                          <Text style={sty.utilityChipText}>Paylaş</Text>
+                          <Text style={sty.utilityChipText}>{i18n.t('profile.share')}</Text>
                         </Pressable>
                         <Pressable
                           onPress={handleCopyProfileLink}
@@ -1103,7 +1104,7 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                           hitSlop={6}
                         >
                           <Ionicons name="link-outline" size={14} color="#5CBFB5" />
-                          <Text style={sty.utilityChipText}>Linki Kopyala</Text>
+                          <Text style={sty.utilityChipText}>{i18n.t('profile.copy_link')}</Text>
                         </Pressable>
                         {myLiveRoom && (
                           <Pressable
@@ -1121,7 +1122,7 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                             ) : (
                               <>
                                 <Ionicons name="mic-circle" size={15} color="#FFF" />
-                                <Text style={sty.utilityChipPrimaryText}>Odama Davet</Text>
+                                <Text style={sty.utilityChipPrimaryText}>{i18n.t('profile.invite_to_room')}</Text>
                               </>
                             )}
                           </Pressable>
@@ -1271,7 +1272,7 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                           {moderationItems.length > 0 && enforcementItems.length > 0 && (
                             <View style={sty.dangerSeparator}>
                               <View style={sty.dangerLine} />
-                              <Text style={sty.dangerHeading}>YAPTIRIM</Text>
+                              <Text style={sty.dangerHeading}>{i18n.t('profile.sanction_heading')}</Text>
                               <View style={sty.dangerLine} />
                             </View>
                           )}
@@ -1298,8 +1299,8 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
             {dataReady && !canSeeFullProfile && (
               <View style={sty.privateBox}>
                 <Ionicons name="lock-closed" size={28} color="#94A3B8" />
-                <Text style={sty.privateTitle}>Bu hesap gizli</Text>
-                <Text style={sty.privateDesc}>İçerikleri görmek için arkadaş ol</Text>
+                <Text style={sty.privateTitle}>{i18n.t('profile.private_title')}</Text>
+                <Text style={sty.privateDesc}>{i18n.t('profile.private_desc')}</Text>
               </View>
             )}
 
@@ -1381,7 +1382,7 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                         <Text style={sty.walletAmount}>{((userProfile as any)?.system_points ?? 0).toLocaleString('tr-TR')}</Text>
                         <Text style={sty.walletCurrency}>SP</Text>
                       </View>
-                      <Text style={sty.walletSub}>Soprano Points</Text>
+                      <Text style={sty.walletSub}>{i18n.t('profile.wallet_sub')}</Text>
                     </GlowView>
                   </>
                 )}
@@ -1498,41 +1499,41 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                                     {hasListeners ? (
                                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(34,197,94,0.15)', paddingHorizontal: 7, paddingVertical: 2.5, borderRadius: 7 }}>
                                         <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: '#22C55E' }} />
-                                        <Text style={{ fontSize: 9, fontWeight: '800', color: '#86EFAC', letterSpacing: 0.4 }}>CANLI</Text>
+                                        <Text style={{ fontSize: 9, fontWeight: '800', color: '#86EFAC', letterSpacing: 0.4 }}>{i18n.t('rooms.live_short')}</Text>
                                         <Text style={{ fontSize: 9, fontWeight: '600', color: '#94A3B8', marginLeft: 1 }}>· {listeners}</Text>
                                       </View>
                                     ) : isOpen ? (
                                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(20,184,166,0.12)', paddingHorizontal: 7, paddingVertical: 2.5, borderRadius: 7 }}>
                                         <Ionicons name="radio-outline" size={9} color="#14B8A6" />
-                                        <Text style={{ fontSize: 9, fontWeight: '800', color: '#5EEAD4', letterSpacing: 0.3 }}>Açık</Text>
+                                        <Text style={{ fontSize: 9, fontWeight: '800', color: '#5EEAD4', letterSpacing: 0.3 }}>{i18n.t('rooms.open_short')}</Text>
                                       </View>
                                     ) : isSleeping ? (
                                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(167,139,250,0.12)', paddingHorizontal: 7, paddingVertical: 2.5, borderRadius: 7, borderWidth: 0.5, borderColor: 'rgba(167,139,250,0.25)' }}>
                                         <Ionicons name="moon" size={8} color="#A78BFA" />
-                                        <Text style={{ fontSize: 9, fontWeight: '700', color: '#A78BFA' }}>Uyuyor</Text>
+                                        <Text style={{ fontSize: 9, fontWeight: '700', color: '#A78BFA' }}>{i18n.t('rooms.sleeping_short')}</Text>
                                       </View>
                                     ) : (
                                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(100,116,139,0.12)', paddingHorizontal: 7, paddingVertical: 2.5, borderRadius: 7 }}>
                                         <Ionicons name="close-circle" size={8} color="#64748B" />
-                                        <Text style={{ fontSize: 9, fontWeight: '700', color: '#64748B' }}>Kapalı</Text>
+                                        <Text style={{ fontSize: 9, fontWeight: '700', color: '#64748B' }}>{i18n.t('rooms.closed_short')}</Text>
                                       </View>
                                     )}
                                     {isPersistent && (
                                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(212,175,55,0.15)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, borderWidth: 0.5, borderColor: 'rgba(212,175,55,0.3)' }}>
                                         <Ionicons name="trophy" size={8} color="#D4AF37" />
-                                        <Text style={{ fontSize: 7, fontWeight: '800', color: '#D4AF37', letterSpacing: 0.3 }}>Premium</Text>
+                                        <Text style={{ fontSize: 7, fontWeight: '800', color: '#D4AF37', letterSpacing: 0.3 }}>{i18n.t('rooms.premium_short')}</Text>
                                       </View>
                                     )}
                                     {room.type === 'closed' && (
                                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(245,158,11,0.12)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, borderWidth: 0.5, borderColor: 'rgba(245,158,11,0.25)' }}>
                                         <Ionicons name="lock-closed" size={7} color="#F59E0B" />
-                                        <Text style={{ fontSize: 7, fontWeight: '700', color: '#F59E0B' }}>Şifreli</Text>
+                                        <Text style={{ fontSize: 7, fontWeight: '700', color: '#F59E0B' }}>{i18n.t('rooms.locked_short')}</Text>
                                       </View>
                                     )}
                                     {room.type === 'invite' && (
                                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(139,92,246,0.12)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, borderWidth: 0.5, borderColor: 'rgba(139,92,246,0.25)' }}>
                                         <Ionicons name="mail" size={7} color="#8B5CF6" />
-                                        <Text style={{ fontSize: 7, fontWeight: '700', color: '#8B5CF6' }}>Davetli</Text>
+                                        <Text style={{ fontSize: 7, fontWeight: '700', color: '#8B5CF6' }}>{i18n.t('rooms.invite_short')}</Text>
                                       </View>
                                     )}
                                     {fee > 0 && (

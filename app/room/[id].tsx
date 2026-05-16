@@ -3399,8 +3399,8 @@ export default function RoomScreen() {
       const diff = Date.now() - new Date(room.created_at).getTime();
       const mins = Math.floor(diff / 60000);
       const hrs = Math.floor(mins / 60);
-      if (hrs > 0) setRoomDuration(`${hrs} sa ${mins % 60} dk`);
-      else setRoomDuration(`${mins} dk`);
+      if (hrs > 0) setRoomDuration(i18n.t('rooms.hours_minutes_short', { hours: hrs, minutes: mins % 60 }));
+      else setRoomDuration(i18n.t('rooms.minutes_short', { count: mins }));
       if (room.expires_at) {
         const remaining = new Date(room.expires_at).getTime() - Date.now();
         if (remaining <= 0) {
@@ -3418,8 +3418,8 @@ export default function RoomScreen() {
         }
         const remMins = Math.floor(remaining / 60000);
         const remHrs = Math.floor(remMins / 60);
-        if (remHrs > 0) setRoomExpiry(`${remHrs} sa ${remMins % 60} dk kaldı`);
-        else setRoomExpiry(`${remMins} dk kaldı`);
+        if (remHrs > 0) setRoomExpiry(i18n.t('rooms.hours_minutes_remaining', { hours: remHrs, minutes: remMins % 60 }));
+        else setRoomExpiry(i18n.t('rooms.minutes_remaining', { count: remMins }));
 
         // ★ Süre azalma uyarıları — 15dk ve 5dk kala
         if (remMins <= 15 && remMins > 5 && !expiryWarningsRef.current.has('15min')) {

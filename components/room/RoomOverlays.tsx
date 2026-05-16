@@ -16,6 +16,7 @@ import { getAvatarSource } from '../../constants/avatars';
 import { showToast } from '../Toast';
 import { supabase } from '../../constants/supabase';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { i18n } from '../../services/i18n';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -167,11 +168,11 @@ type PlusMenuProps = {
   isTempHost?: boolean;
 };
 
-const ROLE_META: Record<string, { label: string; color: string; icon: string }> = {
-  owner: { label: 'Oda Sahibi', color: '#D4AF37', icon: 'star' },
-  moderator: { label: 'Moderatör', color: '#A78BFA', icon: 'shield-checkmark' },
-  speaker: { label: 'Konuşmacı', color: '#14B8A6', icon: 'mic' },
-  listener: { label: 'Dinleyici', color: '#94A3B8', icon: 'headset' },
+const ROLE_META: Record<string, { labelKey: string; color: string; icon: string }> = {
+  owner: { labelKey: 'rooms.menu.owner_chip', color: '#D4AF37', icon: 'star' },
+  moderator: { labelKey: 'rooms.role_moderator', color: '#A78BFA', icon: 'shield-checkmark' },
+  speaker: { labelKey: 'rooms.role_speaker', color: '#14B8A6', icon: 'mic' },
+  listener: { labelKey: 'rooms.role_listener', color: '#94A3B8', icon: 'headset' },
 };
 
 // ═══ Yardımcı Bileşenler ═══
@@ -842,41 +843,41 @@ export function PlusMenu({
 
   if (isOwner && sc) {
     // 1. Oda Bilgileri (yalnız isim/kurallar/hoş geldin)
-    items.push({ id: 'room_info', icon: 'information-circle-outline', label: 'Oda Bilgileri', accent: '#D4AF37', onPress: () => toggle('room_info'), expandable: true, renderContent: renderRoomInfo });
+    items.push({ id: 'room_info', icon: 'information-circle-outline', label: i18n.t('rooms.menu.room_info'), accent: '#D4AF37', onPress: () => toggle('room_info'), expandable: true, renderContent: renderRoomInfo });
     // 2. Konuşma & Ses
-    items.push({ id: 'speaking', icon: 'mic-outline', label: 'Konuşma & Ses', accent: '#14B8A6', onPress: () => toggle('speaking'), expandable: true, renderContent: renderSpeaking });
+    items.push({ id: 'speaking', icon: 'mic-outline', label: i18n.t('rooms.menu.speaking_audio'), accent: '#14B8A6', onPress: () => toggle('speaking'), expandable: true, renderContent: renderSpeaking });
     // ★ 2026-04-20: Giriş & Erişim — "kime açık?" sorusunun tek merkezi.
     //   Önceden 3 farklı menüde dağılmış (tip, şifre, ücret, kilit, yaş, dil, arkadaş).
-    items.push({ id: 'access', icon: 'key-outline', label: 'Giriş & Erişim', accent: '#F59E0B', onPress: () => toggle('access'), expandable: true, renderContent: renderAccess });
+    items.push({ id: 'access', icon: 'key-outline', label: i18n.t('rooms.menu.access'), accent: '#F59E0B', onPress: () => toggle('access'), expandable: true, renderContent: renderAccess });
     // ★ 2026-04-20: Banlılar & İstekler — ayrı inline accordion (modal kaldırıldı)
     if ((_roomType === 'closed' || _roomType === 'invite') && _roomId) {
       items.push({ id: 'requests', icon: 'hourglass-outline', label: 'Katılım İstekleri', accent: '#A78BFA', badge: accessRequestCount ?? inlineRequests.length, onPress: () => { if (expandedId !== 'requests') loadRequests(); toggle('requests'); }, expandable: true, renderContent: renderRequestsInline });
     }
     if (_roomId) {
-      items.push({ id: 'bans', icon: 'ban-outline', label: 'Banlılar', accent: '#EF4444', onPress: () => { if (expandedId !== 'bans') loadBans(); toggle('bans'); }, expandable: true, renderContent: renderBans });
+      items.push({ id: 'bans', icon: 'ban-outline', label: i18n.t('rooms.menu.bans'), accent: '#EF4444', onPress: () => { if (expandedId !== 'bans') loadBans(); toggle('bans'); }, expandable: true, renderContent: renderBans });
     }
     // 4. Para Kazanma — Giriş Ücreti + Bağış (2026-04-27: Giriş Ücreti buraya taşındı)
-    items.push({ id: 'monetization', icon: 'cash-outline', label: 'Para Kazanma', accent: '#EC4899', onPress: () => toggle('monetization'), expandable: true, renderContent: renderMonetization });
+    items.push({ id: 'monetization', icon: 'cash-outline', label: i18n.t('rooms.menu.monetization'), accent: '#EC4899', onPress: () => toggle('monetization'), expandable: true, renderContent: renderMonetization });
     // 5. Görsel & Tema
-    items.push({ id: 'visual', icon: 'color-palette-outline', label: 'Görsel & Tema', accent: '#F59E0B', onPress: () => toggle('visual'), expandable: true, renderContent: renderVisual });
+    items.push({ id: 'visual', icon: 'color-palette-outline', label: i18n.t('rooms.menu.visual'), accent: '#F59E0B', onPress: () => toggle('visual'), expandable: true, renderContent: renderVisual });
   } else if (isMod) {
     // Moderatör: Konuşma & Ses (slow mode + cihaz) + Banlılar & İstekler
-    items.push({ id: 'speaking', icon: 'mic-outline', label: 'Konuşma & Ses', accent: '#14B8A6', onPress: () => toggle('speaking'), expandable: true, renderContent: renderSpeaking });
+    items.push({ id: 'speaking', icon: 'mic-outline', label: i18n.t('rooms.menu.speaking_audio'), accent: '#14B8A6', onPress: () => toggle('speaking'), expandable: true, renderContent: renderSpeaking });
     // ★ İstekler + Banlılar inline (moderatör)
     if ((_roomType === 'closed' || _roomType === 'invite') && _roomId) {
       items.push({ id: 'requests', icon: 'hourglass-outline', label: 'Katılım İstekleri', accent: '#A78BFA', badge: accessRequestCount ?? inlineRequests.length, onPress: () => { if (expandedId !== 'requests') loadRequests(); toggle('requests'); }, expandable: true, renderContent: renderRequestsInline });
     }
     if (_roomId) {
-      items.push({ id: 'bans', icon: 'ban-outline', label: 'Banlılar', accent: '#EF4444', onPress: () => { if (expandedId !== 'bans') loadBans(); toggle('bans'); }, expandable: true, renderContent: renderBans });
+      items.push({ id: 'bans', icon: 'ban-outline', label: i18n.t('rooms.menu.bans'), accent: '#EF4444', onPress: () => { if (expandedId !== 'bans') loadBans(); toggle('bans'); }, expandable: true, renderContent: renderBans });
     }
   } else if (deviceConfig) {
     // ★ Speaker/Listener: Sadece cihaz ayarları (hoparlör + sahnedeyse mic/noise)
-    items.push({ id: 'speaking', icon: 'headset-outline', label: 'Konuşma & Ses', accent: '#3B82F6', onPress: () => toggle('speaking'), expandable: true, renderContent: renderSpeaking });
+    items.push({ id: 'speaking', icon: 'headset-outline', label: i18n.t('rooms.menu.speaking_audio'), accent: '#3B82F6', onPress: () => toggle('speaking'), expandable: true, renderContent: renderSpeaking });
   }
 
   // 6. Davet & Paylaş (sahnedekiler)
   if (isOnStage) {
-    items.push({ id: 'invite', icon: 'person-add-outline', label: 'Davet & Paylaş', accent: '#14B8A6', onPress: () => toggle('invite'), expandable: true, renderContent: renderInvite });
+    items.push({ id: 'invite', icon: 'person-add-outline', label: i18n.t('rooms.menu.invite_share'), accent: '#14B8A6', onPress: () => toggle('invite'), expandable: true, renderContent: renderInvite });
   } else {
     items.push({ id: 'share', icon: 'share-social-outline', label: 'Oda Linkini Paylaş', accent: '#3B82F6', onPress: () => { onShareLink(); onClose(); } });
   }
@@ -910,7 +911,7 @@ export function PlusMenu({
 
   // Dondur & Sil (owner, direkt aksiyon) — geçici host yapamaz
   if (isOwner && !isTempHost && sc?.onFreezeRoom) {
-    items.push({ id: 'freeze', icon: 'snow-outline', label: 'Odayı Dondur', desc: 'Katılımcılar çıkar, sonra tekrar aç', accent: '#3B82F6', onPress: () => { onClose(); sc.onFreezeRoom?.(); } });
+    items.push({ id: 'freeze', icon: 'snow-outline', label: i18n.t('rooms.menu.freeze'), desc: i18n.t('rooms.menu.freeze_desc'), accent: '#3B82F6', onPress: () => { onClose(); sc.onFreezeRoom?.(); } });
   }
 
   // ★ 2026-05-10 v111b: Mesajları Temizle — sadece Plus/Pro/GodMaster host (geçici host yapamaz)
@@ -939,7 +940,7 @@ export function PlusMenu({
 
   // Odayı Sil — yalnız asıl sahip; geçici host göremez
   if (isOwner && !isTempHost && onDeleteRoom) {
-    items.push({ id: 'delete', icon: 'trash-outline', label: 'Odayı Sil', desc: 'Kalıcı olarak siler, geri alınamaz', accent: '#EF4444', onPress: () => { onDeleteRoom(); onClose(); }, destructive: true });
+    items.push({ id: 'delete', icon: 'trash-outline', label: i18n.t('rooms.menu.delete'), desc: i18n.t('rooms.menu.delete_desc'), accent: '#EF4444', onPress: () => { onDeleteRoom(); onClose(); }, destructive: true });
   }
 
   // ★ 2026-04-20: Tüm roller aynı sağdan-kayan drawer kullanır (compact bottom-sheet
@@ -981,10 +982,10 @@ export function PlusMenu({
         {/* Header */}
         <View style={s.header}>
           <Ionicons name="grid" size={18} color={role.color} style={[s.iconShadow, { textShadowColor: `${role.color}B0`, textShadowRadius: 5 }]} />
-          <Text style={s.headerTitle}>Menü</Text>
+          <Text style={s.headerTitle}>{i18n.t('rooms.menu.title')}</Text>
           <View style={[s.rolePill, { backgroundColor: role.color + '22', borderColor: role.color + '35' }]}>
             <Ionicons name={role.icon as any} size={10} color={role.color} />
-            <Text style={[s.roleLabel, { color: role.color }]}>{role.label}</Text>
+            <Text style={[s.roleLabel, { color: role.color }]}>{i18n.t(role.labelKey)}</Text>
           </View>
           {/* ★ Kapatma butonu — swipe-to-dismiss yerine ek olarak */}
           <Pressable onPress={onClose} hitSlop={10} style={s.closeBtn}>

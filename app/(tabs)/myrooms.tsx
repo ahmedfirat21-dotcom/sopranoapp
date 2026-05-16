@@ -273,7 +273,7 @@ const ManagedRoomCard = React.memo(function ManagedRoomCard({ room, onManage, on
             style={mS.gradBtn}
           >
             <Ionicons name={isLive ? 'enter' : isPersistent ? 'sunny' : 'flame'} size={14} color="#FFF" />
-            <Text style={mS.gradBtnText}>{isLive ? 'Odaya Git' : isPersistent ? 'Aktifleştir' : 'Çöz'}</Text>
+            <Text style={mS.gradBtnText}>{isLive ? i18n.t('myrooms.go_to_room') : isPersistent ? i18n.t('myrooms.activate') : i18n.t('myrooms.thaw')}</Text>
           </LinearGradient>
         </Pressable>
       </View>
@@ -655,10 +655,10 @@ type RoomStats = {
 
 function StatsBar({ stats }: { stats: RoomStats }) {
   const items = [
-    { value: stats.totalRooms, label: 'Oda', color: '#38BDF8', icon: 'home' as const },
-    { value: stats.liveRooms, label: 'Canlı', color: '#EF4444', icon: 'radio' as const },
-    { value: stats.totalListeners, label: 'Dinleyici', color: '#22C55E', icon: 'people' as const },
-    { value: stats.weeklySP, label: 'SP/Hafta', color: '#A78BFA', icon: 'diamond' as const },
+    { value: stats.totalRooms, label: i18n.t('myrooms.stat_room'), color: '#38BDF8', icon: 'home' as const },
+    { value: stats.liveRooms, label: i18n.t('myrooms.stat_live'), color: '#EF4444', icon: 'radio' as const },
+    { value: stats.totalListeners, label: i18n.t('myrooms.stat_listener'), color: '#22C55E', icon: 'people' as const },
+    { value: stats.weeklySP, label: i18n.t('myrooms.stat_sp_week'), color: '#A78BFA', icon: 'diamond' as const },
   ];
 
   return (
@@ -1153,7 +1153,7 @@ export default function MyRoomsScreen() {
     const items: ListItem[] = [];
     const groups = [
       { title: 'Canlı Odalarım', icon: 'radio', color: '#EF4444', data: live },
-      { title: 'Pasif Kalıcı Odalar', icon: 'moon', color: '#A78BFA', data: sleeping },
+      { title: i18n.t('myrooms.section.passive_persistent'), icon: 'moon', color: '#A78BFA', data: sleeping },
       { title: 'Donuk Odalar', icon: 'snow', color: '#64748B', data: frozen },
     ];
     for (const g of groups) {
@@ -1580,7 +1580,7 @@ export default function MyRoomsScreen() {
             ) : (
               <View style={s.emptyFollowed}>
                 <Text style={s.emptyFollowedText}>
-                  👥 Arkadaşların şu an bir odada değil.{`\n`}Takip ettiğin kişiler odaya girdiğinde burada görünür!
+                  👥 {t('myrooms.friends_empty_title')}{`\n`}{t('myrooms.friends_empty_sub')}
                 </Text>
               </View>
             )}
@@ -1619,7 +1619,7 @@ export default function MyRoomsScreen() {
             ) : (
               <View style={s.emptyFollowed}>
                 <Text style={s.emptyFollowedText}>
-                  🔇 Şu an canlı oda yok.{`\n`}Daha önce girdiğin odalar canlı olduğunda burada görünür!
+                  🔇 {t('myrooms.recent_empty_title')}{`\n`}{t('myrooms.recent_empty_sub')}
                 </Text>
               </View>
             )}

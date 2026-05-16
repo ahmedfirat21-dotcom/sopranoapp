@@ -27,6 +27,7 @@ import LinkifiedText from '../LinkifiedText';
 import SPIcon from '../SPIcon';
 // ★ v280 (15 May 2026): TierBadge import KALDIRILDI — web admin CosmeticBadge sistemi kullanılıyor.
 import { migrateLegacyTier } from '../../types';
+import { i18n } from '../../services/i18n';
 
 // Snap points — CONTROL_BAR_AREA: bar + padding alanı (insets.bottom hariç).
 // RoomControlBar: BAR_H=50 + üstündeki wrapper paddingBottom(8) = 58.
@@ -1076,7 +1077,7 @@ export default function RoomChatDrawer({
           <View style={st.header}>
             <View style={st.headerTitleWrap}>
               <Ionicons name="chatbubble-ellipses" size={18} color="#14B8A6" style={st.headerIcon} />
-              <Text style={st.headerTitle}>Oda Sohbeti</Text>
+              <Text style={st.headerTitle}>{i18n.t('rooms.chat_drawer_title')}</Text>
               <Text style={st.msgCount}>{messages.length}</Text>
             </View>
             <Pressable onPress={() => { Keyboard.dismiss(); animateTo(SNAP_CLOSED); }} style={st.closeBtn} hitSlop={12}>
@@ -1250,7 +1251,7 @@ export default function RoomChatDrawer({
         <TextInput
           ref={inputRef}
           style={st.input}
-          placeholder="Bir mesaj yaz..."
+          placeholder={i18n.t('rooms.chat_input_placeholder')}
           placeholderTextColor="rgba(255,255,255,0.35)"
           value={chatInput}
           onChangeText={onChangeInput}

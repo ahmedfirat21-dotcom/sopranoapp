@@ -1777,8 +1777,8 @@ export default function HomeScreen() {
                   <Ionicons name="radio" size={16} color="#EF4444" />
                   <Text style={s.sectionTitle}>
                     {activeFilter === 'all'
-                      ? 'Şu An Canlı'
-                      : `${SMART_FILTERS.find(f => f.id === activeFilter)?.label || ''} Odaları`}
+                      ? t('home.live_now')
+                      : t('home.category_rooms', { category: t((SMART_FILTERS.find(f => f.id === activeFilter) as any)?.labelKey || 'category.all') })}
                   </Text>
                 </View>
               )}

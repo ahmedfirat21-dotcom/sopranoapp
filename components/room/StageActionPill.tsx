@@ -20,6 +20,7 @@ import React from 'react';
 import { View, Text, StyleSheet, Pressable, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { i18n } from '../../services/i18n';
 
 interface Props {
   /** Kullanıcının mevcut rolü */
@@ -61,7 +62,7 @@ export default function StageActionPill({
             style={styles.pillGrad}
           >
             <Ionicons name="mic-off" size={13} color="#FFF" style={styles.iconShadow} />
-            <Text style={styles.pillText}>Sahneden İn</Text>
+            <Text style={styles.pillText}>{i18n.t('rooms.stage_in')}</Text>
           </LinearGradient>
         </Pressable>
       </View>
@@ -99,10 +100,10 @@ export default function StageActionPill({
           />
           <Text style={styles.pillText}>
             {onCooldown
-              ? `${cooldownSeconds}sn bekle`
+              ? i18n.t('rooms.stage_cooldown', { count: cooldownSeconds ?? 0 })
               : stageFull
-              ? 'Sahne Dolu'
-              : 'Sahneye Çık'}
+              ? i18n.t('rooms.stage_full')
+              : i18n.t('rooms.stage_out')}
           </Text>
         </LinearGradient>
       </Pressable>

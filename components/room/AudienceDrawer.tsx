@@ -11,6 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSwipeToDismiss } from '../../hooks/useSwipeToDismiss';
 import StatusAvatar from '../StatusAvatar';
 import { migrateLegacyTier } from '../../types';
+import { i18n } from '../../services/i18n';
 
 // ★ 2026-05-05: Keşfet drawer dili (NotificationDrawer/FriendsDrawer) — birebir aynı
 //   boyut + 3 katman gradient + slate kabuk. Karakter rengi: teal (insan listesi).
@@ -77,10 +78,10 @@ export default function AudienceDrawer({ visible, users, onClose, onSelectUser, 
 
   const getRoleLabel = (role: string) => {
     switch (role) {
-      case 'owner': return { text: 'Sahip', color: '#14B8A6', icon: 'star' as const };
-      case 'moderator': return { text: 'Mod', color: '#A78BFA', icon: 'shield-checkmark' as const };
-      case 'speaker': return { text: 'Konuşmacı', color: '#3B82F6', icon: 'mic' as const };
-      default: return { text: 'Dinleyici', color: 'rgba(255,255,255,0.3)', icon: 'headset' as const };
+      case 'owner': return { text: i18n.t('rooms.role_owner_short'), color: '#14B8A6', icon: 'star' as const };
+      case 'moderator': return { text: i18n.t('rooms.role_moderator'), color: '#A78BFA', icon: 'shield-checkmark' as const };
+      case 'speaker': return { text: i18n.t('rooms.role_speaker'), color: '#3B82F6', icon: 'mic' as const };
+      default: return { text: i18n.t('rooms.role_listener'), color: 'rgba(255,255,255,0.3)', icon: 'headset' as const };
     }
   };
 
@@ -126,7 +127,7 @@ export default function AudienceDrawer({ visible, users, onClose, onSelectUser, 
         {/* Başlık — NotificationDrawer dili: ikon + başlık + count pill + separator */}
         <View style={s.header}>
           <Ionicons name="people" size={18} color="#14B8A6" style={s.headerIcon} />
-          <Text style={s.headerTitle}>Odadakiler</Text>
+          <Text style={s.headerTitle}>{i18n.t('rooms.audience_drawer_title')}</Text>
           {users.length > 0 && (
             <View style={s.countPill}>
               <Text style={s.countText}>{users.length}</Text>
