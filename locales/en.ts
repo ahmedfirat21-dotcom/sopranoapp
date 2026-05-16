@@ -865,864 +865,864 @@ const en: Record<string, string> = {
   'usersearchmodal.001': "Yukarıdaki arama çubuğundan tüm üyeleri arayabilirsin!",  // TODO: translate
 
   // ═══ AUTO-EXTRACTED v2 (translate me) ═══
-  'auth.login.001': "E-posta adresinizi girin, size şifre sıfırlama bağlantısı gönderelim.",  // TODO: translate
-  'auth.login.002': "Zayıf",  // TODO: translate
-  'auth.login.003': "İyi",  // TODO: translate
-  'auth.login.004': "Güçlü",  // TODO: translate
-  'auth.login.005': "E-posta ve şifre alanlarını doldurun.",  // TODO: translate
-  'auth.login.006': "Geçersiz E-posta",  // TODO: translate
-  'auth.login.007': "Geçerli bir e-posta adresi gir.",  // TODO: translate
-  'auth.login.008': "Çok Fazla Deneme",  // TODO: translate
-  'auth.login.009': "Hesap Geçici Kilitli",  // TODO: translate
-  'auth.login.010': "Hesap Geçici Kilitli",  // TODO: translate
-  'auth.login.011': "Giriş Başarısız",  // TODO: translate
-  'auth.login.012': "E-posta veya şifre hatalı.",  // TODO: translate
-  'auth.login.013': "Tüm alanları doldurun.",  // TODO: translate
-  'auth.login.014': "Geçersiz E-posta",  // TODO: translate
-  'auth.login.015': "Geçerli bir e-posta adresi gir.",  // TODO: translate
-  'auth.login.016': "Geçersiz E-posta",  // TODO: translate
-  'auth.login.017': "E-posta uzantısı geçerli değil. (.com, .net, .org gibi)",  // TODO: translate
-  'auth.login.018': "Geçici E-posta Kabul Edilmiyor",  // TODO: translate
-  'auth.login.019': "Mailinator/tempmail gibi geçici e-postalar kayıt için kullanılamaz. Gerçek bir e-posta gir.",  // TODO: translate
-  'auth.login.020': "Şifreler Eşleşmiyor",  // TODO: translate
-  'auth.login.021': "İki şifre alanı aynı olmalı.",  // TODO: translate
-  'auth.login.022': "Şifre Çok Kısa",  // TODO: translate
-  'auth.login.023': "En az 8 karakter olmalı.",  // TODO: translate
-  'auth.login.024': "Büyük Harf Eksik",  // TODO: translate
-  'auth.login.025': "Şifrede en az 1 büyük harf olmalı.",  // TODO: translate
-  'auth.login.026': "Şifrede en az 1 rakam olmalı.",  // TODO: translate
-  'auth.login.027': "✉️ Doğrulama E-postası Gönderildi",  // TODO: translate
-  'auth.login.028': "Lütfen e-posta kutunuzu kontrol edip doğrulayın.",  // TODO: translate
-  'auth.login.029': "Bu E-posta Zaten Kayıtlı",  // TODO: translate
-  'auth.login.030': "Daha önce bu e-postayla kayıt olmuşsun. Giriş ekranına geçildi.",  // TODO: translate
-  'auth.login.031': "Geçersiz E-posta",  // TODO: translate
-  'auth.login.032': "Lütfen geçerli bir e-posta gir.",  // TODO: translate
-  'auth.login.033': "Şifre Zayıf",  // TODO: translate
-  'auth.login.034': "Daha güçlü bir şifre seç.",  // TODO: translate
-  'auth.login.035': "Bağlantı Hatası",  // TODO: translate
-  'auth.login.036': "İnternet bağlantını kontrol et.",  // TODO: translate
-  'auth.login.037': "Kayıt Olunamadı",  // TODO: translate
-  'auth.login.038': "Bir sorun oluştu, tekrar dene.",  // TODO: translate
-  'auth.login.039': "Lütfen e-posta adresinizi yazın.",  // TODO: translate
-  'auth.login.040': "Geçersiz E-posta",  // TODO: translate
-  'auth.login.041': "Geçerli bir e-posta adresi gir.",  // TODO: translate
-  'auth.login.042': "✉️ Mail Gönderildi",  // TODO: translate
-  'auth.login.043': "Sıfırlama bağlantısı e-postana gönderildi. Spam klasörünü de kontrol et.",  // TODO: translate
-  'auth.login.044': "Hesap Bulunamadı",  // TODO: translate
-  'auth.login.045': "Bu e-posta ile kayıtlı bir hesap yok. Önce kayıt ol.",  // TODO: translate
-  'auth.login.046': "Geçersiz E-posta",  // TODO: translate
-  'auth.login.047': "Geçerli bir e-posta adresi gir.",  // TODO: translate
-  'auth.login.048': "Çok Fazla Deneme",  // TODO: translate
-  'auth.login.049': "Bağlantı Hatası",  // TODO: translate
-  'auth.login.050': "İnternet bağlantını kontrol et.",  // TODO: translate
-  'auth.login.051': "Mail gönderilemedi, tekrar dene.",  // TODO: translate
-  'auth.login.052': "✉️ Gönderildi",  // TODO: translate
-  'auth.login.053': "Doğrulama e-postası tekrar gönderildi.",  // TODO: translate
-  'auth.login.054': "Çok Fazla İstek",  // TODO: translate
-  'auth.login.055': "Birkaç dakika bekleyip tekrar dene.",  // TODO: translate
-  'auth.login.056': "E-posta Gönderilemedi",  // TODO: translate
-  'auth.login.057': "Doğrulama e-postası iletilemedi.",  // TODO: translate
-  'auth.login.058': "✅ Doğrulandı",  // TODO: translate
-  'auth.login.059': "E-postanız doğrulandı! Giriş yapılıyor...",  // TODO: translate
-  'auth.login.060': "Henüz Doğrulanmadı",  // TODO: translate
-  'auth.login.061': "Lütfen e-posta kutunuzu kontrol edin.",  // TODO: translate
-  'auth.login.062': "Doğrulama durumu alınamadı. Tekrar dene.",  // TODO: translate
-  'auth.login.063': "Şifre Sıfırlama",  // TODO: translate
-  'auth.onboarding.001': "Kadın",  // TODO: translate
-  'auth.onboarding.002': "Müzik",  // TODO: translate
-  'auth.onboarding.003': "Onboarding tamamlanamadı — DB hatası. Tekrar deneyin.",  // TODO: translate
-  'auth.onboarding.004': "Bağlantı Hatası",  // TODO: translate
-  'auth.onboarding.005': "Onboarding kaydedilemedi. İnternet bağlantınızı kontrol edip tekrar deneyin.",  // TODO: translate
-  'auth.onboarding.006': "Geçersiz Kod",  // TODO: translate
-  'auth.onboarding.007': "Lütfen geçerli bir davet kodu gir.",  // TODO: translate
-  'auth.onboarding.008': "Topluluğa hoş geldin! Hesabına 50 SP yüklendi.",  // TODO: translate
-  'auth.onboarding.009': "📸 Fotoğraf Yüklendi",  // TODO: translate
-  'auth.onboarding.010': "Profil fotoğrafın hazır!",  // TODO: translate
-  'auth.onboarding.011': "İsim Gerekli",  // TODO: translate
-  'auth.onboarding.012': "İsim Çok Kısa",  // TODO: translate
-  'auth.onboarding.013': "En az 2 karakter olmalı.",  // TODO: translate
-  'auth.onboarding.014': "Uygunsuz İsim",  // TODO: translate
-  'auth.onboarding.015': "Lütfen uygun bir isim seçin.",  // TODO: translate
-  'auth.onboarding.016': "Geçersiz Karakter",  // TODO: translate
-  'auth.onboarding.017': "İsim görünür karakterler içermeli.",  // TODO: translate
-  'auth.onboarding.018': "Çok Fazla Emoji",  // TODO: translate
-  'auth.onboarding.019': "Profil Oluşturulamadı",  // TODO: translate
-  'auth.onboarding.020': "Lütfen doğum yılınızı girin.",  // TODO: translate
-  'auth.onboarding.021': "Yaş Sınırı",  // TODO: translate
-  'auth.onboarding.022': "SopranoChat kullanımı için 13 yaşında olmalısın.",  // TODO: translate
-  'auth.onboarding.023': "Uyarı",  // TODO: translate
-  'auth.onboarding.024': "Bilgiler kaydedilemedi, daha sonra güncelleyebilirsin.",  // TODO: translate
-  'auth.onboarding.025': "Seçim Yap",  // TODO: translate
-  'auth.onboarding.026': "En az 1 ilgi alanı seç",  // TODO: translate
-  'auth.onboarding.027': "İlgi alanları yazılamadı. İnternet / DB sorunu olabilir.",  // TODO: translate
-  'auth.onboarding.028': "Vazgeçmek istiyor musun?",  // TODO: translate
-  'auth.onboarding.029': "Şu ana kadar girdiğin bilgiler kaydedilmeyecek ve oturum kapanacak.",  // TODO: translate
-  'tabs.home.001': "✨ Öne Çıkan Profil",  // TODO: translate
-  'tabs.home.002': "Zaten bir odadasın",  // TODO: translate
-  'tabs.home.003': "Önce mevcut odadan çık.",  // TODO: translate
-  'tabs.home.004': "Günlük Limit Doldu",  // TODO: translate
-  'tabs.home.005': "Oda Açılamadı",  // TODO: translate
-  'tabs.home.006': "Odalar yüklenemedi",  // TODO: translate
-  'tabs.home.007': "Giriş Gerekli",  // TODO: translate
-  'tabs.home.008': "Odaya katılmak için giriş yapmalısınız.",  // TODO: translate
-  'tabs.home.009': "Takip Güncellenmedi",  // TODO: translate
-  'tabs.home.010': "Giriş Gerekli",  // TODO: translate
-  'tabs.home.011': "Şikayet için giriş yapmalısın.",  // TODO: translate
-  'tabs.messages.001': "Mesajlaşmak istiyor — dokun ve cevap ver",  // TODO: translate
-  'tabs.messages.002': "Mesajlar yüklenemedi",  // TODO: translate
-  'tabs.messages.003': "Arama Hatası",  // TODO: translate
-  'tabs.messages.004': "Sabitleme Güncellenmedi",  // TODO: translate
-  'tabs.messages.005': "Sohbet sabitleme durumu değişemedi.",  // TODO: translate
-  'tabs.messages.006': "Arşiv Güncellenmedi",  // TODO: translate
-  'tabs.messages.007': "Sohbet arşiv durumu değişemedi.",  // TODO: translate
-  'tabs.messages.008': "Sessize Alma Başarısız",  // TODO: translate
-  'tabs.messages.009': "🚫 İstek reddedildi",  // TODO: translate
-  'tabs.messages.010': "İstek yok",  // TODO: translate
-  'tabs.messages.011': "Bekleyen mesaj isteğin yok.",  // TODO: translate
-  'tabs.messages.012': "Arşiv boş",  // TODO: translate
-  'tabs.messages.013': "Henüz arşivlenmiş sohbetin yok.",  // TODO: translate
-  'tabs.messages.014': "Seçili sohbetler kalıcı olarak silinecek.",  // TODO: translate
-  'tabs.messages.015': "Kısmen silindi",  // TODO: translate
-  'tabs.myrooms.001': "Müzik",  // TODO: translate
-  'tabs.myrooms.002': "Özel",  // TODO: translate
-  'tabs.myrooms.003': "📅 Planlı Oda Erken Başlatılıyor",  // TODO: translate
-  'tabs.myrooms.004': "Başlatılamadı",  // TODO: translate
-  'tabs.myrooms.005': "Canlı Odalarım",  // TODO: translate
-  'tabs.myrooms.006': "Ad Değiştirilemedi",  // TODO: translate
-  'tabs.myrooms.007': "Oda adı güncellenemedi. Daha sonra tekrar dene.",  // TODO: translate
-  'tabs.myrooms.008': "Oda Tipi Değişmedi",  // TODO: translate
-  'tabs.myrooms.009': "Tip değişikliği uygulanamadı.",  // TODO: translate
-  'tabs.myrooms.010': "Tema Uygulanamadı",  // TODO: translate
-  'tabs.myrooms.011': "Oda teması güncellenemedi.",  // TODO: translate
-  'tabs.myrooms.012': "Oda ve tüm mesajları kaldırıldı.",  // TODO: translate
-  'tabs.myrooms.013': "Günlük Limit Doldu",  // TODO: translate
-  'tabs.myrooms.014': "Üyeliğini yükselterek limitsiz oda aç.",  // TODO: translate
-  'tabs.myrooms.015': "Oda Açılamadı",  // TODO: translate
-  'tabs.myrooms.016': "Oda uyku moduna alındı.",  // TODO: translate
-  'tabs.myrooms.017': "Dondurulamadı",  // TODO: translate
-  'tabs.myrooms.018': "İzin Gerekli",  // TODO: translate
-  'tabs.myrooms.019': "Galeriye erişim izni verilmedi.",  // TODO: translate
-  'tabs.myrooms.020': "🖼 Arka Plan Güncellendi",  // TODO: translate
-  'tabs.myrooms.021': "Arka Plan Yüklenemedi",  // TODO: translate
-  'tabs.myrooms.022': "İzin Gerekli",  // TODO: translate
-  'tabs.myrooms.023': "Galeriye erişim izni verilmedi.",  // TODO: translate
-  'tabs.myrooms.024': "🖼 Kart Görseli Güncellendi",  // TODO: translate
-  'tabs.myrooms.025': "Kart Görseli Yüklenemedi",  // TODO: translate
-  'tabs.myrooms.026': "Oda Kapalı",  // TODO: translate
-  'tabs.myrooms.027': "Bu oda şu an canlı değil.",  // TODO: translate
-  'tabs.myrooms.028': "📨 Davet Gönderildi",  // TODO: translate
-  'tabs.profile.001': "Aktivite verileri yüklenemedi",  // TODO: translate
-  'tabs.profile.002': "Hesabından çıkış yapmak istediğinden emin misin?",  // TODO: translate
-  'tabs.profile.003': "Oturum kapatıldı",  // TODO: translate
-  'tabs.profile.004': "Çıkış yapılamadı",  // TODO: translate
-  'tabs.profile.005': "💎 50 SP Kazandın!",  // TODO: translate
-  'tabs.profile.006': "Kod Uygulanamadı",  // TODO: translate
-  'tabs.profile.007': "Geçmiş yüklenemedi",  // TODO: translate
-  'tabs.profile.008': "Kopyalandı 📋",  // TODO: translate
-  'tabs.profile.009': "Kopyalanamadı",  // TODO: translate
-  'tabs.profile.010': "Boost başarısız",  // TODO: translate
-  'tabs.profile.011': "Profili Görüntüle",  // TODO: translate
-  'tabs.profile.012': "Mesaj Gönder",  // TODO: translate
-  'tabs.profile.013': "Arkadaşlıktan Çıkar",  // TODO: translate
-  'tabs.profile.014': "Arkadaşlıktan Çıkar",  // TODO: translate
-  'tabs.profile.015': "👋 Arkadaş Kaldırıldı",  // TODO: translate
-  'tabs.profile.016': "Kaldırılamadı",  // TODO: translate
-  'tabs.profile.017': "Kaldırılamadı",  // TODO: translate
-  'tabs.profile.018': "Bio güncellendi",  // TODO: translate
-  'tabs.profile.019': "Güncellenemedi",  // TODO: translate
-  'admin.001': "Şikayet Kapatıldı",  // TODO: translate
-  'admin.002': "Uyarı",  // TODO: translate
-  'admin.003': "Kullanıcı Uyarıldı",  // TODO: translate
-  'admin.004': "Kullanıcı Banlandı",  // TODO: translate
-  'admin.005': "Oda Kapatıldı",  // TODO: translate
-  'admin.006': "Oda Uyandırıldı",  // TODO: translate
-  'admin.007': "Uyandırılamadı",  // TODO: translate
-  'admin.008': "Tier Güncellenemedi",  // TODO: translate
-  'admin.009': "Yetki Değiştirilemedi",  // TODO: translate
-  'admin.010': "İzin Verilmedi",  // TODO: translate
-  'admin.011': "Kendi hesabını silemezsin.",  // TODO: translate
-  'admin.012': "Kullanıcı Silinemedi",  // TODO: translate
-  'admin.013': "🗑 Kullanıcı Silindi",  // TODO: translate
-  'admin.014': "Kullanıcılar",  // TODO: translate
-  'admin.015': "Toplam Üye",  // TODO: translate
-  'admin.016': "Çevrimiçi",  // TODO: translate
-  'admin.017': "Canlı Oda",  // TODO: translate
-  'admin.018': "Şikayet",  // TODO: translate
-  'admin.019': "Gönderi",  // TODO: translate
-  'admin.020': "Yeni Oda Oluştur",  // TODO: translate
-  'admin.021': "Free Boş Odaları Temizle",  // TODO: translate
-  'admin.022': "Tüm Kullanıcılara Duyuru Gönder",  // TODO: translate
-  'admin.023': "Skia Parite Testi (geliştirme)",  // TODO: translate
-  'admin.024': "Süre",  // TODO: translate
-  'auth.resetpassword.001': "Zayıf",  // TODO: translate
-  'auth.resetpassword.002': "İyi",  // TODO: translate
-  'auth.resetpassword.003': "Güçlü",  // TODO: translate
-  'auth.resetpassword.004': "Şifre Çok Kısa",  // TODO: translate
-  'auth.resetpassword.005': "En az 8 karakter olmalı.",  // TODO: translate
-  'auth.resetpassword.006': "Büyük Harf Eksik",  // TODO: translate
-  'auth.resetpassword.007': "Şifrede en az 1 büyük harf olmalı.",  // TODO: translate
-  'auth.resetpassword.008': "Şifrede en az 1 rakam olmalı.",  // TODO: translate
-  'auth.resetpassword.009': "Şifreler Eşleşmiyor",  // TODO: translate
-  'auth.resetpassword.010': "İki alan da aynı olmalı.",  // TODO: translate
-  'auth.resetpassword.011': "✅ Şifre Değiştirildi",  // TODO: translate
-  'auth.resetpassword.012': "Yeni şifrenle giriş yapabilirsin.",  // TODO: translate
-  'auth.resetpassword.013': "Bağlantı Süresi Doldu",  // TODO: translate
-  'auth.resetpassword.014': "Yeni bir sıfırlama maili iste.",  // TODO: translate
-  'auth.resetpassword.015': "Geçersiz Bağlantı",  // TODO: translate
-  'auth.resetpassword.016': "Bu link kullanılmış veya geçersiz.",  // TODO: translate
-  'auth.resetpassword.017': "Şifre Zayıf",  // TODO: translate
-  'auth.resetpassword.018': "Daha güçlü bir şifre seç.",  // TODO: translate
-  'auth.resetpassword.019': "Şifre değiştirilemedi, tekrar dene.",  // TODO: translate
-  'call.id.001': "Bağlantı Hatası",  // TODO: translate
-  'call.id.002': "Arama bağlantısı kurulamadı.",  // TODO: translate
-  'call.id.003': "Arama Hatası",  // TODO: translate
-  'chat.id.001': "İlk mesajın istek olarak gönderilir. Karşı taraf onaylarsa mesajlaşabilirsiniz.",  // TODO: translate
-  'chat.id.002': "Bu kullanıcı seninle mesajlaşmak istemiyor.",  // TODO: translate
-  'chat.id.003': "Karşı taraf onaylayana kadar yeni mesaj atamazsın.",  // TODO: translate
-  'chat.id.004': "Cevapsız sesli arama",  // TODO: translate
-  'chat.id.005': "Bu kullanıcıyı engellediniz. Mesajlaşmak için engeli kaldırın.",  // TODO: translate
-  'chat.id.006': "Kaybolan Mesaj Süresi",  // TODO: translate
-  'chat.id.007': "Bu süre sonra mesajlar otomatik silinir (her iki tarafta).",  // TODO: translate
-  'chat.id.008': "Ses oynatılamadı",  // TODO: translate
-  'chat.id.009': "Ayarlar → Uygulamalar → SopranoChat → İzinler\\'den mikrofonu açın",  // TODO: translate
-  'chat.id.010': "Ses kaydı alınamadı",  // TODO: translate
-  'chat.id.011': "Sesli mesaj gönderilemedi",  // TODO: translate
-  'chat.id.012': "✓ Kopyalandı",  // TODO: translate
-  'chat.id.013': "Geçersiz hedef",  // TODO: translate
-  'chat.id.014': "✓ İletildi",  // TODO: translate
-  'chat.id.015': "İletilemedi",  // TODO: translate
-  'chat.id.016': "İncelemeye alındı.",  // TODO: translate
-  'chat.id.017': "Düzenlenemedi",  // TODO: translate
-  'chat.id.018': "Arama Hatası",  // TODO: translate
-  'chat.id.019': "Mesaj isteği reddedildi.",  // TODO: translate
-  'chat.id.020': "Artık mesajlaşabilirsiniz.",  // TODO: translate
-  'chat.id.021': "Mesaj Seçenekleri",  // TODO: translate
-  'chat.id.022': "Arama Hatası",  // TODO: translate
-  'chat.id.023': "Fotoğraf gönderilemedi",  // TODO: translate
-  'chat.id.024': "Davet gönderilemedi",  // TODO: translate
-  'chat.id.025': "Kapalı (sınırsız)",  // TODO: translate
-  'chat.id.026': "7 gün",  // TODO: translate
-  'chat.id.027': "30 gün",  // TODO: translate
-  'chat.id.028': "Bu sohbet geçmişi silinecek. Bu işlem geri alınamaz.",  // TODO: translate
-  'chat.id.029': "Engeli Kaldır",  // TODO: translate
-  'chat.id.030': "Kullanıcıyı Engelle",  // TODO: translate
-  'createroom.001': "YouTube / Spotify / SoundCloud linki yapıştır — odadakiler kendi platformlarında dinler.",  // TODO: translate
-  'createroom.002': "ℹ️ Oda planlanan zamana kadar kapalı kalacak. \"Odalarım\" ekranından manuel başlatabilirsin.",  // TODO: translate
-  'createroom.003': "Günlük Oda Limitin Doldu",  // TODO: translate
-  'createroom.004': "Gün Batımı",  // TODO: translate
-  'createroom.005': "Yetersiz Üyelik",  // TODO: translate
-  'createroom.006': "Bu erişim modunu kullanmak için üyeliğini yükselt.",  // TODO: translate
-  'createroom.007': "Günlük Limit",  // TODO: translate
-  'createroom.008': "Geçersiz Müzik Linki",  // TODO: translate
-  'createroom.009': "Oda Açılamadı",  // TODO: translate
-  'createroom.010': "Davetler Gönderildi!",  // TODO: translate
-  'createroom.011': "⏱️ Yavaş Mod Önerildi",  // TODO: translate
-  'createroom.012': "Şifreli odada 5sn yavaş mod açıldı (spam koruması). Aşağıdan kapatabilirsin.",  // TODO: translate
-  'createroom.013': "Dinleyici: 🎙️ Sahneye Çık butonu görür",  // TODO: translate
-  'createroom.014': "Dinleyici: ✋ El Kaldır butonu görür",  // TODO: translate
-  'createroom.015': "Dinleyici: 🔒 Kilitli buton görür",  // TODO: translate
-  'createroom.016': "İzin Gerekli",  // TODO: translate
-  'createroom.017': "Galeriye erişim izni verilmedi. Ayarlardan izin verebilirsin.",  // TODO: translate
-  'createroom.018': "Görsel seçilemedi",  // TODO: translate
-  'createroom.019': "İzin Gerekli",  // TODO: translate
-  'createroom.020': "Galeriye erişim izni verilmedi.",  // TODO: translate
-  'createroom.021': "Görsel seçilemedi",  // TODO: translate
-  'createroom.022': "Erişim",  // TODO: translate
-  'createroom.023': "Karşılama",  // TODO: translate
-  'createroom.024': "Giriş",  // TODO: translate
-  'createroom.025': "Bağış",  // TODO: translate
-  'createroom.026': "Yaş Sınırı",  // TODO: translate
-  'createroom.027': "Yavaş Mod",  // TODO: translate
-  'createroom.028': "Müzik Linki",  // TODO: translate
-  'editprofile.001': "Şifreniz Google hesabınız üzerinden yönetilmektedir. Şifre değişikliği için Google Hesap Ayarları → Güvenlik bölümünü kullanın.",  // TODO: translate
-  'editprofile.002': "📸 Fotoğraf Yüklendi",  // TODO: translate
-  'editprofile.003': "Profil fotoğrafın güncellendi.",  // TODO: translate
-  'editprofile.004': "Fotoğraf Yüklenemedi",  // TODO: translate
-  'editprofile.005': "Uyarı",  // TODO: translate
-  'editprofile.006': "Görünen ad boş olamaz.",  // TODO: translate
-  'editprofile.007': "Oturum Kapalı",  // TODO: translate
-  'editprofile.008': "Giriş bilgin bulunamadı, yeniden giriş yap.",  // TODO: translate
-  'editprofile.009': "Kullanıcı adı alınmış",  // TODO: translate
-  'editprofile.010': "Başka bir kullanıcı adı dene.",  // TODO: translate
-  'editprofile.011': "Kullanıcı adı müsaitliği kontrol ediliyor...",  // TODO: translate
-  'editprofile.012': "Başarılı ✓",  // TODO: translate
-  'editprofile.013': "Profil güncellendi!",  // TODO: translate
-  'editprofile.014': "Kullanıcı Adı Alınmış",  // TODO: translate
-  'editprofile.015': "Bu kullanıcı adı başkası tarafından kullanılıyor.",  // TODO: translate
-  'editprofile.016': "Profil Güncellenmedi",  // TODO: translate
-  'editprofile.017': "Değişiklikler kaydedilemedi. Tekrar dene.",  // TODO: translate
-  'editprofile.018': "Başarılı ✓",  // TODO: translate
-  'editprofile.019': "Google hesabınız başarıyla bağlandı! Artık Google ile giriş yapabilirsiniz.",  // TODO: translate
-  'editprofile.020': "Uyarı",  // TODO: translate
-  'editprofile.021': "Bu Google hesabı zaten başka bir kullanıcıya bağlı.",  // TODO: translate
-  'editprofile.022': "Google hesabınız zaten bağlı.",  // TODO: translate
-  'editprofile.023': "Google Bağlanamadı",  // TODO: translate
-  'editprofile.024': "Google hesabı eklenemedi, tekrar dene.",  // TODO: translate
-  'editprofile.025': "Lütfen e-posta adresini gir.",  // TODO: translate
-  'editprofile.026': "Şifre Çok Kısa",  // TODO: translate
-  'editprofile.027': "Şifre en az 6 karakter olmalı.",  // TODO: translate
-  'editprofile.028': "Şifreler Eşleşmiyor",  // TODO: translate
-  'editprofile.029': "İki şifre alanı aynı olmalı.",  // TODO: translate
-  'editprofile.030': "Başarılı ✓",  // TODO: translate
-  'editprofile.031': "E-posta hesabınız başarıyla oluşturuldu! Artık e-posta ve şifre ile giriş yapabilirsiniz.",  // TODO: translate
-  'editprofile.032': "E-posta Kullanımda",  // TODO: translate
-  'editprofile.033': "Bu e-posta başka bir hesaba bağlı.",  // TODO: translate
-  'editprofile.034': "Geçersiz E-posta",  // TODO: translate
-  'editprofile.035': "Geçerli bir e-posta adresi gir.",  // TODO: translate
-  'editprofile.036': "E-posta hesabı zaten bağlı.",  // TODO: translate
-  'editprofile.037': "E-posta hesabın güncellenemedi, tekrar dene.",  // TODO: translate
-  'editprofile.038': "Uyarı",  // TODO: translate
-  'editprofile.039': "Mevcut şifrenizi girin.",  // TODO: translate
-  'editprofile.040': "Uyarı",  // TODO: translate
-  'editprofile.041': "Yeni şifre en az 6 karakter olmalıdır.",  // TODO: translate
-  'editprofile.042': "Uyarı",  // TODO: translate
-  'editprofile.043': "Yeni şifreler uyuşmuyor.",  // TODO: translate
-  'editprofile.044': "Başarılı ✓",  // TODO: translate
-  'editprofile.045': "Şifreniz güncellendi!",  // TODO: translate
-  'editprofile.046': "Şifre Yanlış",  // TODO: translate
-  'editprofile.047': "Mevcut şifren doğru değil.",  // TODO: translate
-  'editprofile.048': "Yeniden Giriş Gerekli",  // TODO: translate
-  'editprofile.049': "Güvenlik için çıkış yapıp tekrar gir.",  // TODO: translate
-  'editprofile.050': "Şifre Değiştirilemedi",  // TODO: translate
-  'editprofile.051': "İşlem tamamlanamadı, tekrar dene.",  // TODO: translate
-  'editprofile.052': "Google Hesabı",  // TODO: translate
-  'editprofile.053': "E-posta Hesabı",  // TODO: translate
-  'hiddenrooms.001': "Liste yüklenemedi",  // TODO: translate
-  'hiddenrooms.002': "Tüm gizli odalar geri getirildi",  // TODO: translate
-  'leaderboard.001': "Haftalık",  // TODO: translate
-  'leaderboard.002': "Aylık",  // TODO: translate
-  'leaderboard.003': "Top Cömert",  // TODO: translate
-  'leaderboard.004': "SP bağış",  // TODO: translate
-  'leaderboard.005': "SP kazandı",  // TODO: translate
-  'leaderboard.006': "oda açtı",  // TODO: translate
-  'leaderboard.007': "En Popüler",  // TODO: translate
-  'leaderboard.008': "takipçi",  // TODO: translate
-  'leaderboard.009': "En Popüler Odalar",  // TODO: translate
-  'leaderboard.010': "En Cömert",  // TODO: translate
-  'notifications.001': "Arkadaşlık istekleri, hediyeler ve mesajlar burada görünecek",  // TODO: translate
-  'plus.001': "Abonelik sistemi bakım modunda. Çok yakında satın almaya açılacak.",  // TODO: translate
-  'plus.002': "Gelişmiş",  // TODO: translate
-  'plus.003': "Sınırsız",  // TODO: translate
-  'plus.004': "Önce giriş yapmalısınız",  // TODO: translate
-  'plus.005': "Yükseltme Başarısız",  // TODO: translate
-  'plus.006': "Planı İptal Et",  // TODO: translate
-  'plus.007': "Plan değiştirildi",  // TODO: translate
-  'plus.008': "Free plana geri döndünüz.",  // TODO: translate
-  'plus.009': "Aboneliğinizi Google Play ayarlarından iptal edebilirsiniz.",  // TODO: translate
-  'plus.010': "Oda Açık Kalma",  // TODO: translate
-  'plus.011': "Günlük Oda",  // TODO: translate
-  'plus.012': "Kalıcı Oda Slotu",  // TODO: translate
-  'plus.013': "Oda Türü",  // TODO: translate
-  'plus.014': "Avatar Çerçevesi",  // TODO: translate
-  'plus.015': "Yaş/Dil Filtresi",  // TODO: translate
-  'plus.016': "Moderatör",  // TODO: translate
-  'plus.017': "Takipçi-Only",  // TODO: translate
-  'plus.018': "Oda Müziği",  // TODO: translate
-  'room.id.001': "yazıyor…",  // TODO: translate
-  'room.id.002': "çevrimiçi",  // TODO: translate
-  'room.id.003': "Kabul ederseniz mesajlaşmaya başlayabilirsiniz.",  // TODO: translate
-  'room.id.004': "İsteğiniz onay bekliyor. Onay gelene kadar yeni mesaj gönderemezsiniz.",  // TODO: translate
-  'room.id.005': "İsteğiniz reddedildi — mesaj gönderemezsiniz.",  // TODO: translate
-  'room.id.006': "İletildi",  // TODO: translate
-  'room.id.007': "Düzenlenemedi",  // TODO: translate
-  'room.id.008': "Gönderilemedi",  // TODO: translate
-  'room.id.009': "✓ Kopyalandı",  // TODO: translate
-  'room.id.010': "Geçersiz hedef",  // TODO: translate
-  'room.id.011': "Mesajı kendine iletemezsin.",  // TODO: translate
-  'room.id.012': "✓ İletildi",  // TODO: translate
-  'room.id.013': "İletilemedi",  // TODO: translate
-  'room.id.014': "Oda Başlatılamadı",  // TODO: translate
-  'room.id.015': "Sahibine istek gönderirsin, onay bekler.",  // TODO: translate
-  'room.id.016': "🎉 Engel Kalktı",  // TODO: translate
-  'room.id.017': "Oda sahibi ayarı değiştirdi — odaya alındın!",  // TODO: translate
-  'room.id.018': "Giriş Hatası",  // TODO: translate
-  'room.id.019': "Metin sohbetiniz moderatör tarafından kapatıldı.",  // TODO: translate
-  'room.id.020': "Mesaj gönderilemedi",  // TODO: translate
-  'room.id.021': "Yetkiniz olmayabilir veya bağlantı sorunu.",  // TODO: translate
-  'room.id.022': "Mesaj gönderilemedi",  // TODO: translate
-  'room.id.023': "Bu odada sadece oda sahibinin seçtiği kişiler sahneye çıkabilir. Sahip seni seçene kadar bekle.",  // TODO: translate
-  'room.id.024': "⏳ Kuyruğa Yazıldın",  // TODO: translate
-  'room.id.025': "Sahne dolu — biri inince otomatik olarak sahneye çıkacaksın.",  // TODO: translate
-  'room.id.026': "🤚 Sahne Talebi Gönderildi",  // TODO: translate
-  'room.id.027': "Oda sahibinin onayı bekleniyor...",  // TODO: translate
-  'room.id.028': "Bağlantı Yok",  // TODO: translate
-  'room.id.029': "Ses sunucusuna bağlanılamadı. Mikrofon kullanılamaz.",  // TODO: translate
-  'room.id.030': "Moderatör tarafından susturuldunuz. Süre dolana kadar mikrofon açamazsınız.",  // TODO: translate
-  'room.id.031': "Mikrofon Hatası",  // TODO: translate
-  'room.id.032': "Mikrofon değiştirilemedi",  // TODO: translate
-  'room.id.033': "Sahneye Alma Hatası",  // TODO: translate
-  'room.id.034': "Odadan Ayrıl",  // TODO: translate
-  'room.id.035': "Oda sahibi olarak ayrılmak istediğine emin misin? Yetki uygun birine devredilecek.",  // TODO: translate
-  'room.id.036': "Odadan Ayrıl",  // TODO: translate
-  'room.id.037': "Odadan ayrılmak istediğine emin misin?",  // TODO: translate
-  'room.id.038': "Vekil host olarak odayı silemezsin. Sadece oda sahibi silebilir.",  // TODO: translate
-  'room.id.039': "🗑️ Odayı Kalıcı Sil",  // TODO: translate
-  'room.id.040': "Bu oda tamamen silinecek ve geri alınamaz! Tüm katılımcılar çıkarılacak. Devam etmek istiyor musun?",  // TODO: translate
-  'room.id.041': "Çıkış Yapılamadı",  // TODO: translate
-  'room.id.042': "Odadan çıkış başarısız oldu.",  // TODO: translate
-  'room.id.043': "Çıkış Yapılamadı",  // TODO: translate
-  'room.id.044': "Odadan çıkış başarısız oldu.",  // TODO: translate
-  'room.id.045': "🔑 Oda Kapandı",  // TODO: translate
-  'room.id.046': "Oda sahibi ve moderatör olmadığı için oda kapatıldı.",  // TODO: translate
-  'room.id.047': "⚠️ Oda Kapanıyor!",  // TODO: translate
-  'room.id.048': "Oda 5 saniye içinde kapanacak!",  // TODO: translate
-  'room.id.049': "Host Değişikliği Engellendi",  // TODO: translate
-  'room.id.050': "Aktif odada host değiştirilemez.",  // TODO: translate
-  'room.id.051': "Bu rolde host olamazsınız.",  // TODO: translate
-  'room.id.052': "Oda yönetimi sende. Geri sayım iptal edildi.",  // TODO: translate
-  'room.id.053': "Host Olunamadı",  // TODO: translate
-  'room.id.054': "Konuşmacı Değişmedi",  // TODO: translate
-  'room.id.055': "Davet/çıkarma işlemi tamamlanamadı.",  // TODO: translate
-  'room.id.056': "⏰ Süre Doldu",  // TODO: translate
-  'room.id.057': "Oda süresi doldu. Oda kapatılıyor...",  // TODO: translate
-  'room.id.058': "⏰ Süre Doldu",  // TODO: translate
-  'room.id.059': "Oda süresi doldu. Oda kapanıyor...",  // TODO: translate
-  'room.id.060': "⏳ 15 dakika kaldı",  // TODO: translate
-  'room.id.061': "Oda süresi azalıyor. Plus\\'a geçerek süresini uzatabilirsin.",  // TODO: translate
-  'room.id.062': "Yükselt",  // TODO: translate
-  'room.id.063': "⏳ 15 dakika kaldı",  // TODO: translate
-  'room.id.064': "Oda kapanmak üzere! Pro ile sınırsız oda süresi.",  // TODO: translate
-  'room.id.065': "Pro\\'ya Geç",  // TODO: translate
-  'room.id.066': "Bu oda 5 dakika içinde kapanacak.",  // TODO: translate
-  'room.id.067': "🎙️ Sıran Geldi!",  // TODO: translate
-  'room.id.068': "Sahneye otomatik olarak çıktın.",  // TODO: translate
-  'room.id.069': "⏳ 30 saniye kaldı",  // TODO: translate
-  'room.id.070': "Sahne süren bitiyor",  // TODO: translate
-  'room.id.071': "🔇 Tümünü Sustur",  // TODO: translate
-  'room.id.072': "Sahnedeki tüm konuşmacıların mikrofonları kapatılacak.",  // TODO: translate
-  'room.id.073': "🔇 Tümü Susturuldu",  // TODO: translate
-  'room.id.074': "🔊 Tümünü Aç",  // TODO: translate
-  'room.id.075': "Sahnedeki tüm konuşmacıların mikrofonları tekrar açılacak.",  // TODO: translate
-  'room.id.076': "🔊 Tümü Açıldı",  // TODO: translate
-  'room.id.077': "🔒 Seçilmişler Modu",  // TODO: translate
-  'room.id.078': "Bu odada sadece oda sahibinin seçtiği kişiler sahneye çıkabilir.",  // TODO: translate
-  'room.id.079': "🤚 Sahne Talebi Gönderildi",  // TODO: translate
-  'room.id.080': "Oda sahibinin onayı bekleniyor...",  // TODO: translate
-  'room.id.081': "Sahne talebiniz zaten gönderildi.",  // TODO: translate
-  'room.id.082': "⏳ Kuyruğa Yazıldın",  // TODO: translate
-  'room.id.083': "Sahne dolu — biri inince otomatik olarak sahneye çıkacaksın.",  // TODO: translate
-  'room.id.084': "Zaten Kuyruktasın",  // TODO: translate
-  'room.id.085': "Sırada bekliyorsun, sahne boşalınca otomatik promote olacaksın.",  // TODO: translate
-  'room.id.086': "Mikrofon otomatik açılıyor...",  // TODO: translate
-  'room.id.087': "Sahneye Çıkılamadı",  // TODO: translate
-  'room.id.088': "Mikrofon açılamadı, tekrar dene.",  // TODO: translate
-  'room.id.089': "Sahneye Çıkılamadı",  // TODO: translate
-  'room.id.090': "Mikrofon açılamadı, tekrar dene.",  // TODO: translate
-  'room.id.091': "Sahnede sadece oda sahibi ve moderatörler var. Yer açılamıyor.",  // TODO: translate
-  'room.id.092': "Sahneye Çıkılamadı",  // TODO: translate
-  'room.id.093': "Mikrofon açılamadı, tekrar dene.",  // TODO: translate
-  'room.id.094': "Paylaşılamadı",  // TODO: translate
-  'room.id.095': "Link kopyalanamadı",  // TODO: translate
-  'room.id.096': "İşlem Tamamlanamadı",  // TODO: translate
-  'room.id.097': "Bir sorun oluştu, tekrar dene.",  // TODO: translate
-  'room.id.098': "🎧 Odaya Katıldın!",  // TODO: translate
-  'room.id.099': "Şifre doğrulandı — hoş geldin!",  // TODO: translate
-  'room.id.100': "Giriş Hatası",  // TODO: translate
-  'room.id.101': "İstek Gönderilemedi",  // TODO: translate
-  'room.id.102': "🎧 Odaya Katıldın!",  // TODO: translate
-  'room.id.103': "İsteğin onaylandı — hoş geldin!",  // TODO: translate
-  'room.id.104': "Giriş Hatası",  // TODO: translate
-  'room.id.105': "Kamera Kapalı",  // TODO: translate
-  'room.id.106': "Bu tier\\'da kamera kullanılamıyor. Üyeliği yükselt!",  // TODO: translate
-  'room.id.107': "Odadan Ayrıl",  // TODO: translate
-  'room.id.108': "Odadan ayrılmak istediğinize emin misiniz?",  // TODO: translate
-  'room.id.109': "✨ Parlatıldı",  // TODO: translate
-  'room.id.110': "Gönderilemedi",  // TODO: translate
-  'room.id.111': "Ayar Güncellenemedi",  // TODO: translate
-  'room.id.112': "Değişiklik kaydedilemedi. Tekrar dene.",  // TODO: translate
-  'room.id.113': "Seçilmişler modu Pro abonelik gerektirir.",  // TODO: translate
-  'room.id.114': "Ayar Güncellenemedi",  // TODO: translate
-  'room.id.115': "Değişiklik kaydedilemedi. Tekrar dene.",  // TODO: translate
-  'room.id.116': "Ayar Güncellenemedi",  // TODO: translate
-  'room.id.117': "Değişiklik kaydedilemedi. Tekrar dene.",  // TODO: translate
-  'room.id.118': "Ayar Güncellenemedi",  // TODO: translate
-  'room.id.119': "Değişiklik kaydedilemedi. Tekrar dene.",  // TODO: translate
-  'room.id.120': "Ayar Güncellenemedi",  // TODO: translate
-  'room.id.121': "Değişiklik kaydedilemedi. Tekrar dene.",  // TODO: translate
-  'room.id.122': "Ayar Güncellenemedi",  // TODO: translate
-  'room.id.123': "Değişiklik kaydedilemedi. Tekrar dene.",  // TODO: translate
-  'room.id.124': "Ayar Güncellenemedi",  // TODO: translate
-  'room.id.125': "Değişiklik kaydedilemedi. Tekrar dene.",  // TODO: translate
-  'room.id.126': "✏️ Oda Adı Güncellendi",  // TODO: translate
-  'room.id.127': "Ayar Güncellenemedi",  // TODO: translate
-  'room.id.128': "Değişiklik kaydedilemedi. Tekrar dene.",  // TODO: translate
-  'room.id.129': "💬 Hoş Geldin Mesajı Güncellendi",  // TODO: translate
-  'room.id.130': "Ayar Güncellenemedi",  // TODO: translate
-  'room.id.131': "Değişiklik kaydedilemedi. Tekrar dene.",  // TODO: translate
-  'room.id.132': "📋 Kurallar Güncellendi",  // TODO: translate
-  'room.id.133': "Ayar Güncellenemedi",  // TODO: translate
-  'room.id.134': "Değişiklik kaydedilemedi. Tekrar dene.",  // TODO: translate
-  'room.id.135': "📝 Açıklama Güncellendi",  // TODO: translate
-  'room.id.136': "Ayar Güncellenemedi",  // TODO: translate
-  'room.id.137': "Değişiklik kaydedilemedi. Tekrar dene.",  // TODO: translate
-  'room.id.138': "Ayar Güncellenemedi",  // TODO: translate
-  'room.id.139': "Değişiklik kaydedilemedi. Tekrar dene.",  // TODO: translate
-  'room.id.140': "Ayar Güncellenemedi",  // TODO: translate
-  'room.id.141': "Değişiklik kaydedilemedi. Tekrar dene.",  // TODO: translate
-  'room.id.142': "🎨 Tema Güncellendi",  // TODO: translate
-  'room.id.143': "Ayar Güncellenemedi",  // TODO: translate
-  'room.id.144': "Değişiklik kaydedilemedi. Tekrar dene.",  // TODO: translate
-  'room.id.145': "❄️ Odayı Dondur",  // TODO: translate
-  'room.id.146': "Oda dondurulacak. Tüm katılımcılar çıkarılacak. Daha sonra \"Odalarım\" sekmesinden tekrar aktifleştirebilirsin.",  // TODO: translate
-  'room.id.147': "Odalarım sekmesinden tekrar aktifleştirebilirsin.",  // TODO: translate
-  'room.id.148': "Dondurulamadı",  // TODO: translate
-  'room.id.149': "Ayar Güncellenemedi",  // TODO: translate
-  'room.id.150': "Değişiklik kaydedilemedi. Tekrar dene.",  // TODO: translate
-  'room.id.151': "Ayar Güncellenemedi",  // TODO: translate
-  'room.id.152': "Değişiklik kaydedilemedi. Tekrar dene.",  // TODO: translate
-  'room.id.153': "İzin Gerekli",  // TODO: translate
-  'room.id.154': "🖼 Arka Plan Güncellendi",  // TODO: translate
-  'room.id.155': "Ayar Güncellenemedi",  // TODO: translate
-  'room.id.156': "Arka Plan Kaldırıldı",  // TODO: translate
-  'room.id.157': "Ayar Güncellenemedi",  // TODO: translate
-  'room.id.158': "Değişiklik kaydedilemedi. Tekrar dene.",  // TODO: translate
-  'room.id.159': "İzin Gerekli",  // TODO: translate
-  'room.id.160': "🖼 Kart Görseli Güncellendi",  // TODO: translate
-  'room.id.161': "Ayar Güncellenemedi",  // TODO: translate
-  'room.id.162': "Kart Görseli Kaldırıldı",  // TODO: translate
-  'room.id.163': "Ayar Güncellenemedi",  // TODO: translate
-  'room.id.164': "Değişiklik kaydedilemedi. Tekrar dene.",  // TODO: translate
-  'room.id.165': "Altın Davet",  // TODO: translate
-  'room.id.166': "Listeden bir dinleyici seç.",  // TODO: translate
-  'room.id.167': "Boost Başarısız",  // TODO: translate
-  'room.id.168': "📨 Davet Gönderildi",  // TODO: translate
-  'room.id.169': "🎧 Odaya Katıldın!",  // TODO: translate
-  'room.id.170': "Şifre doğrulandı — hoş geldin!",  // TODO: translate
-  'room.id.171': "🎧 Odaya Katıldın!",  // TODO: translate
-  'room.id.172': "İsteğin onaylandı — hoş geldin!",  // TODO: translate
-  'room.id.173': "Giriş Hatası",  // TODO: translate
-  'room.id.174': "İstek Gönderilemedi",  // TODO: translate
-  'settings.001': "Teşhis hatası",  // TODO: translate
-  'spstore.001': "SP ile profilini öne çıkarabilir, oda giriş ücreti ödeyebilir ve premium özelliklere erişebilirsin.",  // TODO: translate
-  'spstore.002': "🚧 Yakında",  // TODO: translate
-  'spstore.003': "SP mağazası alfa sürüm süresince kapalı. Yakında Google Play üzerinden aktif olacak!",  // TODO: translate
-  'store.collection.id.001': "Satın Al",  // TODO: translate
-  'store.001': "İstek listesi güncellenemedi",  // TODO: translate
-  'store.002': "Tüm parçalar sende",  // TODO: translate
-  'store.003': "Set Satın Al",  // TODO: translate
-  'store.004': "Satın Al",  // TODO: translate
-  'store.005': "🚧 Yakında",  // TODO: translate
-  'store.006': "SP satın alma alfa sürüm süresince kapalı. Yakında Google Play üzerinden aktif olacak!",  // TODO: translate
-  'store.007': "— SETLER · TEMA PAKETLERİ —",  // TODO: translate
-  'store.008': "— ÇERÇEVELER · AVATAR —",  // TODO: translate
-  'store.009': "— GİRİŞ EFEKTLERİ · ODA —",  // TODO: translate
-  'store.010': "— ROZETLER · PROFİL —",  // TODO: translate
-  'store.011': "— ÖZEL EMOJİ · SOHBET —",  // TODO: translate
-  'store.012': "— KOLEKSİYONLAR · TÜM SEZON —",  // TODO: translate
-  'layout.001': "Bağlantı Sorunu",  // TODO: translate
-  'layout.002': "Profilini sunucudan getiremedik. İnternet bağlantını kontrol edip tekrar dene.",  // TODO: translate
-  'layout.003': "🔴 Canlı Yayın",  // TODO: translate
-  'layout.004': "🎁 Hediye Aldın",  // TODO: translate
-  'layout.005': "💖 Teşekkür Aldın",  // TODO: translate
-  'layout.006': "📞 Cevapsız Arama",  // TODO: translate
-  'layout.007': "⏰ Etkinlik Hatırlatıcı",  // TODO: translate
-  'layout.008': "🎉 Arkadaşlık Kabul",  // TODO: translate
-  'blockeduserssheet.001': "Liste Yüklenemedi",  // TODO: translate
-  'blockeduserssheet.002': "Engellenen kullanıcılar çekilemedi.",  // TODO: translate
-  'blockeduserssheet.003': "Engel Kaldırıldı",  // TODO: translate
-  'blockeduserssheet.004': "Engel Kaldırılamadı",  // TODO: translate
-  'boostpickersheet.001': "Hızlı Boost",  // TODO: translate
-  'createroomcoachmark.001': "butonuna dokun ve ilk odanı aç.",  // TODO: translate
-  'discoverwelcomesheet.001': "Sesle tanış",  // TODO: translate
-  'discoverwelcomesheet.002': "Kendi odanı aç",  // TODO: translate
-  'discoverwelcomesheet.003': "Keşfet ve katıl",  // TODO: translate
-  'discoverwelcomesheet.004': "Canlı ses",  // TODO: translate
-  'discoverwelcomesheet.005': "Anlık",  // TODO: translate
-  'discoverwelcomesheet.006': "Ücretsiz",  // TODO: translate
-  'discoverwelcomesheet.007': "Gizli/Açık",  // TODO: translate
-  'discoverwelcomesheet.008': "Müzik/Sohbet",  // TODO: translate
-  'discoverwelcomesheet.009': "Popüler",  // TODO: translate
-  'discoverwelcomesheet.010': "Canlı",  // TODO: translate
-  'discoverwelcomesheet.011': "Ödül",  // TODO: translate
-  'emojipicker.001': "Sık Kullanılan",  // TODO: translate
-  'emojipicker.002': "Yüzler",  // TODO: translate
-  'emojireactions.001': "Popüler",  // TODO: translate
-  'emojireactions.002': "Yüzler",  // TODO: translate
-  'emojireactions.003': "Aşk",  // TODO: translate
-  'emojireactions.004': "Doğa",  // TODO: translate
-  'fabhintoverlay.001': "Buradan yeni bir oda açabilirsin. Arkadaşlarını davet et, sohbete başla!",  // TODO: translate
-  'followlistmodal.001': "ARKADAŞLAR",  // TODO: translate
-  'followlistmodal.002': "TAKİPÇİLER",  // TODO: translate
-  'followlistmodal.003': "TAKİP EDİLENLER",  // TODO: translate
-  'followlistmodal.004': "Arkadaşlıktan Çıkar",  // TODO: translate
-  'followlistmodal.005': "Takipten Çık",  // TODO: translate
-  'messageactionmenu.001': "Yanıtla",  // TODO: translate
-  'messageactionmenu.002': "İlet",  // TODO: translate
-  'messageactionmenu.003': "Düzenle",  // TODO: translate
-  'messageactionmenu.004': "Herkes İçin Sil",  // TODO: translate
-  'notificationdrawer.001': "Davet Geçersiz",  // TODO: translate
-  'notificationdrawer.002': "Odaya katılım işlenemedi, tekrar dene.",  // TODO: translate
-  'notificationdrawer.003': "İşlem tamamlanamadı.",  // TODO: translate
-  'notificationdrawer.004': "Bildirimler silinirken hata oluştu.",  // TODO: translate
-  'notificationdrawer.005': "İşaretlenemedi",  // TODO: translate
-  'notificationdrawer.006': "Bildirimler okundu olarak işaretlenemedi.",  // TODO: translate
-  'notifpreferencessheet.001': "Belirttiğin saatlerde bildirim almazsın (acil çağrılar hariç).",  // TODO: translate
-  'notifpreferencessheet.002': "Acil çağrılar ve arkadaşlık istekleri her zaman ulaşır.",  // TODO: translate
-  'notifpreferencessheet.003': "Kapalı",  // TODO: translate
-  'notifpreferencessheet.004': "İş (09→18)",  // TODO: translate
-  'notifpreferencessheet.005': "Akşam (19→23)",  // TODO: translate
-  'notifpreferencessheet.006': "Sadece arkadaşlardan",  // TODO: translate
-  'notifpreferencessheet.007': "Sadece arkadaşların gönderdiği bildirimleri al",  // TODO: translate
-  'notifpreferencessheet.008': "DM mesajları",  // TODO: translate
-  'notifpreferencessheet.009': "Yeni özel mesaj geldiğinde",  // TODO: translate
-  'notifpreferencessheet.010': "Bir odada sahneye çağrıldığında",  // TODO: translate
-  'notifpreferencessheet.011': "Sana SP gönderildiğinde",  // TODO: translate
-  'notifpreferencessheet.012': "Arkadaş çevrimiçi",  // TODO: translate
-  'notifpreferencessheet.013': "Arkadaşın yeni oda açtığında",  // TODO: translate
-  'profile.badgecelebration.001': "NADİR",  // TODO: translate
-  'profile.badgecelebration.002': "EPİK",  // TODO: translate
-  'profile.badgecelebration.003': "EFSANEVİ",  // TODO: translate
-  'profile.featuredbadgespicker.001': "Öne çıkan rozetler güncellendi",  // TODO: translate
-  'profile.giftsheet.001': "Hediye gönderilemedi",  // TODO: translate
-  'profile.giftsheet.002': "Hediye gönderilemedi",  // TODO: translate
-  'profile.spdonatesheet.001': "Bağış başarısız",  // TODO: translate
-  'profile.spdonatesheet.002': "Bağış başarısız",  // TODO: translate
-  'profile.spreceivedmodal.001': "Teşekkürler",  // TODO: translate
-  'profile.spreceivedmodal.002': "Sağol",  // TODO: translate
-  'profile.spreceivedmodal.003': "Çok naziksin",  // TODO: translate
-  'profile.spreceivedmodal.004': "İyisin",  // TODO: translate
-  'profile.spreceivedmodal.005': "HEDİYE GELDİ",  // TODO: translate
-  'profile.spreceivedmodal.006': "BAĞIŞ ALDIN",  // TODO: translate
-  'profile.spreceivedmodal.007': "İletilemedi",  // TODO: translate
-  'profile.spreceivedmodal.008': "Teşekkür Gönderilemedi",  // TODO: translate
-  'profile.spsentsuccessmodal.001': "SP HEDİYE EDİLEN KİŞİ",  // TODO: translate
-  'profile.symbolgiftsheet.001': "Her gönderimde SP'n düşer · Alıcı %50 kazanır",  // TODO: translate
-  'profile.symbolgiftsheet.002': "Gönderilemedi",  // TODO: translate
-  'profile.tieredprofilesections.001': "Dil & Yaş Etiketleri",  // TODO: translate
-  'profile.tieredprofilesections.002': "Kapsamlı Moderasyon Geçmişi",  // TODO: translate
-  'profile.tieredprofilesections.003': "Profil Teması",  // TODO: translate
-  'profile.tieredprofilesections.004': "Kapak Fotoğrafı",  // TODO: translate
-  'profile.tieredprofilesections.005': "Takipçilere Özel İçerik",  // TODO: translate
-  'profile.tieredprofilesections.006': "Destekle / SP Bağış",  // TODO: translate
-  'profile.tieredprofilesections.007': "Ghost Mode Göstergesi",  // TODO: translate
-  'profile.tieredprofilesections.008': "Gelişmiş İstatistik Paneli",  // TODO: translate
-  'profile.tieredprofilesections.009': "Gelir Göstergesi",  // TODO: translate
-  'profile.voicebiorecorder.001': "Kayıt başlatılamadı",  // TODO: translate
-  'profile.voicebiorecorder.002': "Çok kısa",  // TODO: translate
-  'profile.voicebiorecorder.003': "Kayıt sonlanmadı",  // TODO: translate
-  'profile.voicebiorecorder.004': "Sesli tanıtım kaydedildi",  // TODO: translate
-  'profile.voicebiorecorder.005': "Yükleme başarısız",  // TODO: translate
-  'profile.voicebiorecorder.006': "Sesli tanıtım kaldırıldı",  // TODO: translate
-  'quickcreatesheet.001': "Hızlı Aç",  // TODO: translate
-  'quickcreatesheet.002': "Varsayılanlarla hemen yayına başla",  // TODO: translate
-  'quickcreatesheet.003': "Detaylı Ayarla",  // TODO: translate
-  'quickcreatesheet.004': "Tema, izin, planlama — tüm seçenekleri elden tut",  // TODO: translate
-  'reportmodal.001': "Taciz / Zorbalık",  // TODO: translate
-  'reportmodal.002': "Nefret Söylemi",  // TODO: translate
-  'reportmodal.003': "Uygunsuz İçerik",  // TODO: translate
-  'reportmodal.004': "Kimliğe Bürünme",  // TODO: translate
-  'reportmodal.005': "Şiddet",  // TODO: translate
-  'reportmodal.006': "Yaş Altı Kullanıcı",  // TODO: translate
-  'reportmodal.007': "Diğer",  // TODO: translate
-  'reportmodal.008': "Bir sebep seçin",  // TODO: translate
-  'reportmodal.009': "Raporun alındı",  // TODO: translate
-  'reportmodal.010': "En kısa sürede incelenecektir.",  // TODO: translate
-  'reportmodal.011': "Rapor Gönderilemedi",  // TODO: translate
-  'room.connectionqualityindicator.001': "Mükemmel",  // TODO: translate
-  'room.connectionqualityindicator.002': "İyi",  // TODO: translate
-  'room.connectionqualityindicator.003': "Zayıf",  // TODO: translate
-  'room.glowstyles.001': "KALP ATIŞI",  // TODO: translate
-  'room.glowstyles.002': "ATEŞ",  // TODO: translate
-  'room.glowstyles.003': "GALAKSİ",  // TODO: translate
-  'room.hostaccesspanel.001': "✅ Ban Kaldırıldı",  // TODO: translate
-  'room.hostaccesspanel.002': "Ban Kaldırılamadı",  // TODO: translate
-  'room.hostaccesspanel.003': "📨 Davet Gönderildi",  // TODO: translate
-  'room.hostaccesspanel.004': "Davet Gönderilemedi",  // TODO: translate
-  'room.hostaccesspanel.005': "İstekler",  // TODO: translate
-  'room.hostaccesspanel.006': "Banlılar",  // TODO: translate
-  'room.inroomuserprofile.001': "Bu kullanıcıyı engelledin. Profil içeriği gizli.",  // TODO: translate
-  'room.inroomuserprofile.002': "Hata oluştu",  // TODO: translate
-  'room.inroomuserprofile.003': "Profil linki kopyalandı",  // TODO: translate
-  'room.inroomuserprofile.004': "Profil linki kopyalandı",  // TODO: translate
-  'room.inroomuserprofile.005': "Kopyalanamadı",  // TODO: translate
-  'room.inroomuserprofile.006': "Davet gönderildi",  // TODO: translate
-  'room.inroomuserprofile.007': "Davet gönderilemedi",  // TODO: translate
-  'room.inroomuserprofile.008': "Kullanıcı engellendi",  // TODO: translate
-  'room.inroomuserprofile.009': "Sahneden İndir",  // TODO: translate
-  'room.inroomuserprofile.010': "Sahneden İn",  // TODO: translate
-  'room.inroomuserprofile.011': "Sesi Aç",  // TODO: translate
-  'room.inroomuserprofile.012': "Odadan Çıkar",  // TODO: translate
-  'room.inroomuserprofile.013': "Geçici Ban",  // TODO: translate
-  'room.inroomuserprofile.014': "Kalıcı Ban",  // TODO: translate
-  'room.moderationoverlay.001': "Susturma Kaldırıldı",  // TODO: translate
-  'room.moderationoverlay.002': "Metin Açıldı",  // TODO: translate
-  'room.moderationoverlay.003': "Odadan Çıkarıldın",  // TODO: translate
-  'room.moderationoverlay.004': "Yasaklandın",  // TODO: translate
-  'room.moderationoverlay.005': "Kalıcı Yasaklandın",  // TODO: translate
-  'room.moderationoverlay.006': "Sahneden İndirildin",  // TODO: translate
-  'room.moderationoverlay.007': "Sahneye Alındın!",  // TODO: translate
-  'room.moderationoverlay.008': "Moderatör Yapıldın!",  // TODO: translate
-  'room.moderationoverlay.009': "Moderatörlük Kaldırıldı",  // TODO: translate
-  'room.moderationoverlay.010': "Tümü Susturuldu",  // TODO: translate
-  'room.powerupssheet.001': "Süre Uzat",  // TODO: translate
-  'room.powerupssheet.002': "Odanın süresini +30 dk uzatır",  // TODO: translate
-  'room.powerupssheet.003': "Sahne Işığı",  // TODO: translate
-  'room.powerupssheet.004': "10 dk avatarın etrafında glow",  // TODO: translate
-  'room.powerupssheet.005': "Yakında",  // TODO: translate
-  'room.powerupssheet.006': "Bu güçlendiriciyi sadece oda sahibi kullanabilir.",  // TODO: translate
-  'room.powerupssheet.007': "Yapılamadı",  // TODO: translate
-  'room.powerupssheet.008': "Oda süresi uzatıldı.",  // TODO: translate
-  'room.powerupssheet.009': "Yapılamadı",  // TODO: translate
-  'room.powerupssheet.010': "Sonraki 5 mesajın altın çerçeveli.",  // TODO: translate
-  'room.powerupssheet.011': "Yapılamadı",  // TODO: translate
-  'room.powerupssheet.012': "🔦 Sahne Işığı açıldı",  // TODO: translate
-  'room.powerupssheet.013': "10 dk boyunca avatarın parlak.",  // TODO: translate
-  'room.roomclosedscreen.001': "Bu oda kapanmış",  // TODO: translate
-  'room.roomclosedscreen.002': "Oda sahibi odayı kapattı. Yeni bir oda bulup katılabilirsin.",  // TODO: translate
-  'room.roomclosedscreen.003': "Oda süresi dolmuş",  // TODO: translate
-  'room.roomclosedscreen.004': "Bu odanın süresi sona erdi. Üyeliğini yükselterek daha uzun süreli odalar açabilirsin.",  // TODO: translate
-  'room.roomclosedscreen.005': "Davet süresi geçmiş",  // TODO: translate
-  'room.roomclosedscreen.006': "Bu odaya davet edilme sürenin dolmuş. Oda sahibi seni tekrar davet ederse yeniden katılabilirsin.",  // TODO: translate
-  'room.roomclosedscreen.007': "Bu odaya erişimin yok",  // TODO: translate
-  'room.roomclosedscreen.008': "Oda sahibi/moderatörler tarafından bu odadan engellendin.",  // TODO: translate
-  'room.roomclosedscreen.009': "Oda bulunamadı",  // TODO: translate
-  'room.roomclosedscreen.010': "Bu oda artık mevcut değil ya da silinmiş olabilir.",  // TODO: translate
-  'room.roomclosedscreen.011': "Oda sahibi yeni katılımcı kabulünü geçici olarak durdurdu. Birazdan tekrar dene.",  // TODO: translate
-  'room.roomclosedscreen.012': "Yaş sınırı var",  // TODO: translate
-  'room.roomclosedscreen.013': "Bu odaya katılmak için belirlenen yaşın üzerinde olmalısın.",  // TODO: translate
-  'room.roomclosedscreen.014': "Arkadaşlara özel",  // TODO: translate
-  'room.roomclosedscreen.015': "Bu oda yalnızca oda sahibinin arkadaşlarına açık. Arkadaş eklenirsen tekrar dene.",  // TODO: translate
-  'room.roomclosedscreen.016': "Bağlantı kurulamadı",  // TODO: translate
-  'room.roomclosedscreen.017': "Sunucuya ulaşılamıyor. İnternetini kontrol edip tekrar dene.",  // TODO: translate
-  'room.roomcontrolbar.001': "Sahneye çık (serbest mod)",  // TODO: translate
-  'room.roomcontrolbar.002': "Sahne kilitli — sadece oda sahibi konuşmacı seçer",  // TODO: translate
-  'room.roomcontrolbar.003': "El kaldır (sahne talebi gönder)",  // TODO: translate
-  'room.roomcontrolbar.004': "🔇 Sessize alındınız",  // TODO: translate
-  'room.roomcontrolbar.005': "Moderatör tarafından sustruldunuz.",  // TODO: translate
-  'room.roomcontrolbar.006': "Sahneye geri dön",  // TODO: translate
-  'room.roomcontrolbar.007': "Sahneye geri dön",  // TODO: translate
-  'room.roomcontrolbar.008': "Hediye gönder",  // TODO: translate
-  'room.roomcontrolbar.009': "Daha fazla seçenek",  // TODO: translate
-  'room.roomentryeffectoverlay.001': "Sonsuz Burç",  // TODO: translate
-  'room.roomentryeffectoverlay.002': "Kadim Altın",  // TODO: translate
-  'room.roomentryeffectoverlay.003': "Yıldırımın Sesi",  // TODO: translate
-  'room.roomentryeffectoverlay.004': "Zarif Çağ",  // TODO: translate
-  'room.roomentryeffectoverlay.005': "Altın Hükmü",  // TODO: translate
-  'room.roomentryeffectoverlay.006': "Anka Kuşu",  // TODO: translate
-  'room.roomgiftpanel.001': "Hediyeler her gönderimde SP'ni düşürür · Alıcı %50 SP kazanır",  // TODO: translate
-  'room.roomgiftpanel.002': "Hediye gönderebileceğin kullanıcı yok.",  // TODO: translate
-  'room.roomgiftpanel.003': "Önce alıcı seç (üstteki avatarlardan)",  // TODO: translate
-  'room.roomgiftpanel.004': "Kendine hediye gönderemezsin — sahneden başka birini seç.",  // TODO: translate
-  'room.roomgiftpanel.005': "Gönderilemedi",  // TODO: translate
-  'room.roominfoheader.001': "🔞 Yaş Sınırı",  // TODO: translate
-  'room.roominfoheader.002': "Bu odaya yalnızca 18 yaş üzeri kullanıcılar girebilir.",  // TODO: translate
-  'room.roominfoheader.003': "🔒 Şifreli Oda",  // TODO: translate
-  'room.roominfoheader.004': "Bu odaya girmek için şifre bilmek gerekir.",  // TODO: translate
-  'room.roominfoheader.005': "Bu odaya yalnızca oda sahibinin davet ettikleri girebilir.",  // TODO: translate
-  'room.roominfoheader.006': "Oda sahibi yeni katılımcı kabulünü geçici olarak durdurdu.",  // TODO: translate
-  'room.roominfoheader.007': "👥 Arkadaşlara Özel",  // TODO: translate
-  'room.roominfoheader.008': "Bu oda yalnızca oda sahibinin arkadaşlarına açık.",  // TODO: translate
-  'room.roommanagesheet.001': "Oda kilitli — kimse giremiyor. Erişim modunu değiştirmek için kilidi kapat.",  // TODO: translate
-  'room.roommanagesheet.002': "Geçici host moddasın. Yalnız moderasyon ve takipçi görüntüleme açık. Oda adı, teması, ücreti gibi ayarlar yalnız asıl sahibinde.",  // TODO: translate
-  'room.roommanagesheet.003': "Gün Batımı",  // TODO: translate
-  'room.roommanagesheet.004': "Gül",  // TODO: translate
-  'room.roommanagesheet.005': "Ayar Güncellenemedi",  // TODO: translate
-  'room.roommanagesheet.006': "🔐 Şifre Gerekli",  // TODO: translate
-  'room.roommanagesheet.007': "Şifreli oda için en az 1 karakter şifre yaz.",  // TODO: translate
-  'room.roommanagesheet.008': "🔐 Çok Kısa",  // TODO: translate
-  'room.roommanagesheet.009': "Şifre en az 3 karakter olmalı.",  // TODO: translate
-  'room.roommanagesheet.010': "⏱️ Yavaş Mod Önerildi",  // TODO: translate
-  'room.roommanagesheet.011': "Şifreli odada 5sn yavaş mod açıldı (spam koruması). Aşağıdan kapatabilirsin.",  // TODO: translate
-  'room.roommanagesheet.012': "Erişim Değiştirilemedi",  // TODO: translate
-  'room.roommanagesheet.013': "✏️ Oda Adı Güncellendi",  // TODO: translate
-  'room.roommanagesheet.014': "Ad Değiştirilemedi",  // TODO: translate
-  'room.roommanagesheet.015': "Oda adı güncellenemedi.",  // TODO: translate
-  'room.roommanagesheet.016': "🔴 Kayıt Başladı",  // TODO: translate
-  'room.roommanagesheet.017': "Tüm katılımcılar bildirildi.",  // TODO: translate
-  'room.roommanagesheet.018': "Kayıt başlatılamadı",  // TODO: translate
-  'room.roommanagesheet.019': "⏹ Kayıt Durduruldu",  // TODO: translate
-  'room.roommanagesheet.020': "Kayıt birkaç dakika içinde işlenip listeye eklenir.",  // TODO: translate
-  'room.roommanagesheet.021': "Kayıt durdurulamadı",  // TODO: translate
-  'room.roommanagesheet.022': "🔴 Oda Kaydı Başlat",  // TODO: translate
-  'room.roommanagesheet.023': "Bu odadaki tüm konuşmaların ses kaydı alınacak.\\n\\n",  // TODO: translate
-  'room.roommanagesheet.024': "Odalarım sekmesinden tekrar aktifleştirebilirsin.",  // TODO: translate
-  'room.roommanagesheet.025': "Ayar Güncellenemedi",  // TODO: translate
-  'room.roommanagesheet.026': "İzin Gerekli",  // TODO: translate
-  'room.roommanagesheet.027': "Arka Plan Güncellendi",  // TODO: translate
-  'room.roommanagesheet.028': "Arka Plan Kaldırıldı",  // TODO: translate
-  'room.roommanagesheet.029': "Ayar Güncellenemedi",  // TODO: translate
-  'room.roommanagesheet.030': "Banner Yüklendi",  // TODO: translate
-  'room.roommanagesheet.031': "Banner Kaldırıldı",  // TODO: translate
-  'room.roommanagesheet.032': "Ayar Güncellenemedi",  // TODO: translate
-  'room.roommanagesheet.033': "Plus Üyelik Gerekli",  // TODO: translate
-  'room.roommanagesheet.034': "Erişim modunu değiştirmek için önce kilidi kapat.",  // TODO: translate
-  'room.roommanagesheet.035': "Şifre Çok Kısa",  // TODO: translate
-  'room.roommanagesheet.036': "En az 4 karakter olmalı.",  // TODO: translate
-  'room.roommanagesheet.037': "Şifre Çok Kısa",  // TODO: translate
-  'room.roommanagesheet.038': "En az 4 karakter olmalı.",  // TODO: translate
-  'room.roommanagesheet.039': "Pro+ ile açılır",  // TODO: translate
-  'room.roommanagesheet.040': "Ban Kaldırıldı",  // TODO: translate
-  'room.roommanagesheet.041': "Ban Kaldırılamadı",  // TODO: translate
-  'room.roommanagesheet.042': "Susturma Kalkmadı",  // TODO: translate
-  'room.roommanagesheet.043': "Kullanıcının susturması kaldırılamadı.",  // TODO: translate
-  'room.roommanagesheet.044': "Oda İsmi",  // TODO: translate
-  'room.roommanagesheet.045': "Hoş Geldin Mesajı",  // TODO: translate
-  'room.roommanagesheet.046': "Oda Kuralları",  // TODO: translate
-  'room.roommanagesheet.047': "Kayıtları Dinle",  // TODO: translate
-  'room.roommanagesheet.048': "Geçmiş oda kayıtlarını dinle",  // TODO: translate
-  'room.roommanagesheet.049': "Oda Şifresi",  // TODO: translate
-  'room.roommanagesheet.050': "Sahne Düzeni (Kaç kişi konuşabilir)",  // TODO: translate
-  'room.roommanagesheet.051': "Chat mesaj aralığını sınırla",  // TODO: translate
-  'room.roommanagesheet.052': "Yaş Filtresi (+18)",  // TODO: translate
-  'room.roommanagesheet.053': "Tümünü Sustur (Cooldown ile)",  // TODO: translate
-  'room.roommanagesheet.054': "Gelişmiş Ban Seçenekleri",  // TODO: translate
-  'room.roommanagesheet.055': "Oda Teması",  // TODO: translate
-  'room.roommanagesheet.056': "Kart Görseli",  // TODO: translate
-  'room.roommanagesheet.057': "Oda Müzik Linki",  // TODO: translate
-  'room.roommanagesheet.058': "Dinleyicilerden SP bağışı kabul et",  // TODO: translate
-  'room.roommanagesheet.059': "Bağış (Tip) Aç/Kapat",  // TODO: translate
-  'room.roommanagesheet.060': "SP cinsinden oda giriş ücreti",  // TODO: translate
-  'room.roommanagesheet.061': "Giriş Ücreti Belirleme (SP)",  // TODO: translate
-  'room.roomoverlays.001': "İzinli",  // TODO: translate
-  'room.roomoverlays.002': "Seçili",  // TODO: translate
-  'room.roomoverlays.003': "Gün Batımı",  // TODO: translate
-  'room.roomoverlays.004': "Gül",  // TODO: translate
-  'room.roomoverlays.005': "Açık",  // TODO: translate
-  'room.roomoverlays.006': "Şifreli",  // TODO: translate
-  'room.roomoverlays.007': "✅ Ban Kaldırıldı",  // TODO: translate
-  'room.roomoverlays.008': "Ban Kaldırılamadı",  // TODO: translate
-  'room.roomoverlays.009': "Bu kullanıcının banı kaldırılamadı.",  // TODO: translate
-  'room.roomoverlays.010': "Konuşma",  // TODO: translate
-  'room.roomoverlays.011': "Müzik",  // TODO: translate
-  'room.roomoverlays.012': "Katılım İstekleri",  // TODO: translate
-  'room.roomoverlays.013': "Katılım İstekleri",  // TODO: translate
-  'room.roomoverlays.014': "Oda Linkini Paylaş",  // TODO: translate
-  'room.roomoverlays.015': "İstatistikler & Boost",  // TODO: translate
-  'room.roomoverlays.016': "Keşfette Öne Çıkar",  // TODO: translate
-  'room.roomoverlays.017': "Güçlendiriciler",  // TODO: translate
-  'room.roomoverlays.018': "SP harca, an\\'ı taçlandır",  // TODO: translate
-  'room.roomoverlays.019': "Odayı Bildir",  // TODO: translate
-  'room.roomoverlays.020': "Bağış Yap",  // TODO: translate
-  'room.roomoverlays.021': "Host\\'a SP bağışla",  // TODO: translate
-  'room.roomoverlays.022': "Mesajları Temizle",  // TODO: translate
-  'room.roomoverlays.023': "Sohbet anında silinir, herkesin ekranı tazelenir",  // TODO: translate
-  'room.roomoverlays.024': "Odadan Ayrıl",  // TODO: translate
-  'room.roomoverlays.025': "Oda Adı",  // TODO: translate
-  'room.roomoverlays.026': "Açıklama",  // TODO: translate
-  'room.roomoverlays.027': "Hoş Geldin",  // TODO: translate
-  'room.roomoverlays.028': "Şifre",  // TODO: translate
-  'room.roomoverlays.029': "Odayı Kilitle (yeni giriş yok)",  // TODO: translate
-  'room.roomoverlays.030': "+18 İçerik",  // TODO: translate
-  'room.roomoverlays.031': "Sadece Arkadaşlar",  // TODO: translate
-  'room.roomoverlays.032': "Konuşma Modu",  // TODO: translate
-  'room.roomoverlays.033': "Gürültü Engelleme",  // TODO: translate
-  'room.roomoverlays.034': "Giriş Ücreti (SP)",  // TODO: translate
-  'room.roomoverlays.035': "Bağış Kabul Et",  // TODO: translate
-  'room.roomoverlays.036': "Müzik Linki",  // TODO: translate
-  'room.roomrecordingssheet.001': "Oda yönetim panelinden \"Kaydı Başlat\" ile sesli sohbeti kaydedin.",  // TODO: translate
-  'room.roomrecordingssheet.002': "Kaydı Oynatılamadı",  // TODO: translate
-  'room.roomstatspanel.001': "Anlık katılımcı",  // TODO: translate
-  'room.roomstatspanel.002': "Benzersiz katılımcı",  // TODO: translate
-  'room.roomstatspanel.003': "En yüksek eşzamanlı",  // TODO: translate
-  'room.roomstatspanel.004': "Ortalama süre",  // TODO: translate
-  'room.roomstatspanel.005': "Süre",  // TODO: translate
-  'room.roomstatspanel.006': "Oda açık süresi",  // TODO: translate
-  'room.roomstatspanel.007': "Takipçi",  // TODO: translate
-  'room.roomstatspanel.008': "Oda takipçisi",  // TODO: translate
-  'room.stagesupportsheet.001': "Destek gönderilemedi",  // TODO: translate
-  'room.stagesupportsheet.002': "Destek gönderilemedi",  // TODO: translate
-  'roomboostsheet.001': "Hızlı Boost",  // TODO: translate
-  'sessionconflictmodal.001': "Bu hesap az önce başka bir cihazda kullanılmaya başladı. Aynı hesap iki yerden aktif olamaz.",  // TODO: translate
-  'sessionconflictmodal.002': "\"Devam Et\" dersen diğer cihaz oturumdan düşer.",  // TODO: translate
+  'auth.login.001': "Enter your email address and we'll send you a password reset link.",  // translated
+  'auth.login.002': "Underweight",  // translated
+  'auth.login.003': "Good",  // translated
+  'auth.login.004': "Strong",  // translated
+  'auth.login.005': "Fill in the email and password fields.",  // translated
+  'auth.login.006': "Invalid Email",  // translated
+  'auth.login.007': "Enter a valid email address.",  // translated
+  'auth.login.008': "Too many attempts",  // translated
+  'auth.login.009': "Account Temporarily Locked",  // translated
+  'auth.login.010': "Account Temporarily Locked",  // translated
+  'auth.login.011': "Login error",  // translated
+  'auth.login.012': "Incorrect email or password",  // translated
+  'auth.login.013': "Fill all fields",  // translated
+  'auth.login.014': "Invalid Email",  // translated
+  'auth.login.015': "Enter a valid email address.",  // translated
+  'auth.login.016': "Invalid Email",  // translated
+  'auth.login.017': "The email extension is not valid. (such as .com, .net, .org)",  // translated
+  'auth.login.018': "Temporary Email Not Accepted",  // translated
+  'auth.login.019': "Temporary emails such as Mailinator/tempmail cannot be used for registration. Enter a real email.",  // translated
+  'auth.login.020': "Passwords don't match.",  // translated
+  'auth.login.021': "The two password fields must be the same.",  // translated
+  'auth.login.022': "Password is too short!",  // translated
+  'auth.login.023': "Have at least 8 characters",  // translated
+  'auth.login.024': "Uppercase Missing",  // translated
+  'auth.login.025': "Password must contain at least 1 uppercase letter.",  // translated
+  'auth.login.026': "Password must have at least 1 number.",  // translated
+  'auth.login.027': "Verification email sent",  // translated
+  'auth.login.028': "Please check and verify your email inbox.",  // translated
+  'auth.login.029': "This email already registered",  // translated
+  'auth.login.030': "You have already registered with this email. The home screen has been switched.",  // translated
+  'auth.login.031': "Invalid Email",  // translated
+  'auth.login.032': "Please enter a valid email address!",  // translated
+  'auth.login.033': "Weak Password",  // translated
+  'auth.login.034': "Choose a stronger password.",  // translated
+  'auth.login.035': "Connection Error",  // translated
+  'auth.login.036': "Check your network connection.",  // translated
+  'auth.login.037': "Registration Failed",  // translated
+  'auth.login.038': "Something went wrong, try again.",  // translated
+  'auth.login.039': "Please enter your email address.",  // translated
+  'auth.login.040': "Invalid Email",  // translated
+  'auth.login.041': "Please enter a valid email address!",  // translated
+  'auth.login.042': "✉️ Email Sent",  // translated
+  'auth.login.043': "A reset link has been sent to your email. Also check your spam folder.",  // translated
+  'auth.login.044': "This account does not exist.",  // translated
+  'auth.login.045': "There is no account registered with this email. Sign up first.",  // translated
+  'auth.login.046': "Invalid Email",  // translated
+  'auth.login.047': "Please enter a valid email address!",  // translated
+  'auth.login.048': "Too many attempts",  // translated
+  'auth.login.049': "Connection Error",  // translated
+  'auth.login.050': "Check your network connection.",  // translated
+  'auth.login.051': "Failed to send email, try again.",  // translated
+  'auth.login.052': "✉️ Sent",  // translated
+  'auth.login.053': "\"Verification email resent\":",  // translated
+  'auth.login.054': "Too many requests",  // translated
+  'auth.login.055': "Wait a few minutes and try again.",  // translated
+  'auth.login.056': "The email could not be sent.",  // translated
+  'auth.login.057': "The verification email could not be forwarded.",  // translated
+  'auth.login.058': "Authenticated",  // translated
+  'auth.login.059': "Your email has been verified! Logging in...",  // translated
+  'auth.login.060': "Not yet verified",  // translated
+  'auth.login.061': "Please check your mailbox.",  // translated
+  'auth.login.062': "Failed to get verification status. Try again.",  // translated
+  'auth.login.063': "Reset password",  // translated
+  'auth.onboarding.001': "Female",  // translated
+  'auth.onboarding.002': "Music",  // translated
+  'auth.onboarding.003': "Failed to complete onboarding — DB error. Try again.",  // translated
+  'auth.onboarding.004': "Connection Error",  // translated
+  'auth.onboarding.005': "Failed to save onboarding. Check your internet connection and try again.",  // translated
+  'auth.onboarding.006': "Invalid Code!",  // translated
+  'auth.onboarding.007': "Please enter a valid invite code.",  // translated
+  'auth.onboarding.008': "Welcome to the community! 50 SP has been added to your account.",  // translated
+  'auth.onboarding.009': "Photo successfully uploaded",  // translated
+  'auth.onboarding.010': "Your profile photo is ready!",  // translated
+  'auth.onboarding.011': "Name is required",  // translated
+  'auth.onboarding.012': "Name is too short",  // translated
+  'auth.onboarding.013': "Must be at least 2 characters.",  // translated
+  'auth.onboarding.014': "Inappropriate Name",  // translated
+  'auth.onboarding.015': "Please choose an appropriate name.",  // translated
+  'auth.onboarding.016': "Invalid Character",  // translated
+  'auth.onboarding.017': "Name must contain visible characters.",  // translated
+  'auth.onboarding.018': "Too Many Emojis",  // translated
+  'auth.onboarding.019': "Profile Creation Failed",  // translated
+  'auth.onboarding.020': "Please enter your birth year:&#09;",  // translated
+  'auth.onboarding.021': "Age Limit",  // translated
+  'auth.onboarding.022': "You must be 13 years old to use SopranoChat.",  // translated
+  'auth.onboarding.023': "Alert",  // translated
+  'auth.onboarding.024': "Failed to save information, you can update it later.",  // translated
+  'auth.onboarding.025': "You must select",  // translated
+  'auth.onboarding.026': "Select at least 1 area of interest",  // translated
+  'auth.onboarding.027': "Failed to write interests. There may be an Internet / DB problem.",  // translated
+  'auth.onboarding.028': "Do you want to give up?",  // translated
+  'auth.onboarding.029': "The information you have entered so far will not be saved and you will be logged out.",  // translated
+  'tabs.home.001': "Feature Profile",  // translated
+  'tabs.home.002': "You are already in a room",  // translated
+  'tabs.home.003': "Leave the existing room first.",  // translated
+  'tabs.home.004': "Daily Limit Expired",  // translated
+  'tabs.home.005': "Failed to Open Room",  // translated
+  'tabs.home.006': "Failed to load rooms",  // translated
+  'tabs.home.007': "Login Required",  // translated
+  'tabs.home.008': "You must be logged in to join the room.",  // translated
+  'tabs.home.009': "Tracking Not Updated",  // translated
+  'tabs.home.010': "Login Required",  // translated
+  'tabs.home.011': "You must login to ask question .",  // translated
+  'tabs.messages.001': "Wants to text — tap and reply",  // translated
+  'tabs.messages.002': "Failed to load messages",  // translated
+  'tabs.messages.003': "Error Search",  // translated
+  'tabs.messages.004': "Fixation Not Updated",  // translated
+  'tabs.messages.005': "Chat pin status could not be changed.",  // translated
+  'tabs.messages.006': "Archive Not Updated",  // translated
+  'tabs.messages.007': "Chat archive status could not be changed.",  // translated
+  'tabs.messages.008': "Mute Failed",  // translated
+  'tabs.messages.009': "Request rejected",  // translated
+  'tabs.messages.010': "No requests",  // translated
+  'tabs.messages.011': "You have no pending message requests.",  // translated
+  'tabs.messages.012': "Archive is empty",  // translated
+  'tabs.messages.013': "You don't have any archived chats yet.",  // translated
+  'tabs.messages.014': "Selected chats will be permanently deleted.",  // translated
+  'tabs.messages.015': "Partially deleted",  // translated
+  'tabs.myrooms.001': "Music",  // translated
+  'tabs.myrooms.002': "Private",  // translated
+  'tabs.myrooms.003': "📅 Planned Room Starts Early",  // translated
+  'tabs.myrooms.004': "Could not start",  // translated
+  'tabs.myrooms.005': "My Live Rooms",  // translated
+  'tabs.myrooms.006': "Failed to Change Name",  // translated
+  'tabs.myrooms.007': "Failed to update room name. Try again later.",  // translated
+  'tabs.myrooms.008': "Room Type Not Changed",  // translated
+  'tabs.myrooms.009': "Type change could not be applied.",  // translated
+  'tabs.myrooms.010': "Could Not Apply Theme",  // translated
+  'tabs.myrooms.011': "Failed to update room theme.",  // translated
+  'tabs.myrooms.012': "The room and all its messages have been removed.",  // translated
+  'tabs.myrooms.013': "Daily Limit Expired",  // translated
+  'tabs.myrooms.014': "Open unlimited rooms by upgrading your membership.",  // translated
+  'tabs.myrooms.015': "Failed to Open Room",  // translated
+  'tabs.myrooms.016': "The room has been put to sleep.",  // translated
+  'tabs.myrooms.017': "Failed to freeze",  // translated
+  'tabs.myrooms.018': "\tPermission Required",  // translated
+  'tabs.myrooms.019': "Permission to access the gallery was not granted.",  // translated
+  'tabs.myrooms.020': "🖼 Background Updated",  // translated
+  'tabs.myrooms.021': "Could Not Load Background",  // translated
+  'tabs.myrooms.022': "\tPermission Required",  // translated
+  'tabs.myrooms.023': "Permission to access the gallery was not granted.",  // translated
+  'tabs.myrooms.024': "🖼 Card Image Updated",  // translated
+  'tabs.myrooms.025': "Could Not Load Card Image",  // translated
+  'tabs.myrooms.026': "Room Closed",  // translated
+  'tabs.myrooms.027': "This room is not alive right now.",  // translated
+  'tabs.myrooms.028': "Invitation sent",  // translated
+  'tabs.profile.001': "Failed to load activity data",  // translated
+  'tabs.profile.002': "Are you sure you want to log out of your account?",  // translated
+  'tabs.profile.003': "Signed out",  // translated
+  'tabs.profile.004': "Failed to logout",  // translated
+  'tabs.profile.005': "You 💎 Gained 50 HP!",  // translated
+  'tabs.profile.006': "Code Could Not Be Applied",  // translated
+  'tabs.profile.007': "Could not load history",  // translated
+  'tabs.profile.008': "COPIED",  // translated
+  'tabs.profile.009': "Failed to copy",  // translated
+  'tabs.profile.010': "Boost failed",  // translated
+  'tabs.profile.011': "View Profile",  // translated
+  'tabs.profile.012': "Send a Message",  // translated
+  'tabs.profile.013': "Unfriend",  // translated
+  'tabs.profile.014': "Unfriend",  // translated
+  'tabs.profile.015': "Friend has been removed",  // translated
+  'tabs.profile.016': "Uninstallation Failed",  // translated
+  'tabs.profile.017': "Uninstallation Failed",  // translated
+  'tabs.profile.018': "Bio updated",  // translated
+  'tabs.profile.019': "Update Failed",  // translated
+  'admin.001': "Complaint Closed",  // translated
+  'admin.002': "Alert",  // translated
+  'admin.003': "User Alerted",  // translated
+  'admin.004': "User Banned",  // translated
+  'admin.005': "Room Closed",  // translated
+  'admin.006': "Room Awakened",  // translated
+  'admin.007': "Failed to wake up",  // translated
+  'admin.008': "Failed to Update Tier",  // translated
+  'admin.009': "Failed to Change Authority",  // translated
+  'admin.010': "Disable",  // translated
+  'admin.011': "You can't delete your own account.",  // translated
+  'admin.012': "User could not be deleted.",  // translated
+  'admin.013': "User deleted",  // translated
+  'admin.014': "Users",  // translated
+  'admin.015': "Total Partner",  // translated
+  'admin.016': "Online",  // translated
+  'admin.017': "Live Room",  // translated
+  'admin.018': "Grievance",  // translated
+  'admin.019': "Dispatch",  // translated
+  'admin.020': "Create Room",  // translated
+  'admin.021': "Clear Free Free Rooms",  // translated
+  'admin.022': "Send Announcement to All Users",  // translated
+  'admin.023': "Skia Parity Test (development)",  // translated
+  'admin.024': "Duration",  // translated
+  'auth.resetpassword.001': "Underweight",  // translated
+  'auth.resetpassword.002': "Good",  // translated
+  'auth.resetpassword.003': "Strong",  // translated
+  'auth.resetpassword.004': "Password is too short!",  // translated
+  'auth.resetpassword.005': "Have at least 8 characters",  // translated
+  'auth.resetpassword.006': "Uppercase Missing",  // translated
+  'auth.resetpassword.007': "Password must contain at least 1 uppercase letter.",  // translated
+  'auth.resetpassword.008': "Password must have at least 1 number.",  // translated
+  'auth.resetpassword.009': "Passwords don't match.",  // translated
+  'auth.resetpassword.010': "The two fields must be the same.",  // translated
+  'auth.resetpassword.011': "Password changed",  // translated
+  'auth.resetpassword.012': "You can login with your new password.",  // translated
+  'auth.resetpassword.013': "The link has expired",  // translated
+  'auth.resetpassword.014': "Request a new reset email.",  // translated
+  'auth.resetpassword.015': "url is invalid",  // translated
+  'auth.resetpassword.016': "This link has been used or is invalid.",  // translated
+  'auth.resetpassword.017': "Weak Password",  // translated
+  'auth.resetpassword.018': "Choose a stronger password.",  // translated
+  'auth.resetpassword.019': "Failed to change password, try again.",  // translated
+  'call.id.001': "Connection Error",  // translated
+  'call.id.002': "Search link could not be established.",  // translated
+  'call.id.003': "Error Search",  // translated
+  'chat.id.001': "Your first message will be sent as a request. You can text if the other party approves.",  // translated
+  'chat.id.002': "This user doesn't want to message you.",  // translated
+  'chat.id.003': "You can't send new messages until the other party approves.",  // translated
+  'chat.id.004': "Missed voice call",  // translated
+  'chat.id.005': "You have blocked this user. Unblock them for messaging.",  // translated
+  'chat.id.006': "Missing Message Duration",  // translated
+  'chat.id.007': "After this time, messages are automatically deleted (on both sides).",  // translated
+  'chat.id.008': "Failed to play audio",  // translated
+  'chat.id.009': "Settings → Apps Turn → on the microphone from SopranoChat → Permissions\\\\",  // translated
+  'chat.id.010': "Failed to record audio",  // translated
+  'chat.id.011': "Failed to send voicemail",  // translated
+  'chat.id.012': "copied",  // translated
+  'chat.id.013': " Invalid target",  // translated
+  'chat.id.014': "✓ Forwarded",  // translated
+  'chat.id.015': "Failed to transmit",  // translated
+  'chat.id.016': "He was taken into examination.",  // translated
+  'chat.id.017': "Failed to edit",  // translated
+  'chat.id.018': "Error Search",  // translated
+  'chat.id.019': "Message request declined.",  // translated
+  'chat.id.020': "You can now text.",  // translated
+  'chat.id.021': "[8theme] Post Options",  // translated
+  'chat.id.022': "Error Search",  // translated
+  'chat.id.023': "Photo send failed",  // translated
+  'chat.id.024': "The invitation could not be sent. ",  // translated
+  'chat.id.025': "Off (unlimited)",  // translated
+  'chat.id.026': "7 days",  // translated
+  'chat.id.027': "30 days",  // translated
+  'chat.id.028': "This chat history will be deleted. This cannot be undone.",  // translated
+  'chat.id.029': "Unblock",  // translated
+  'chat.id.030': "Block User",  // translated
+  'createroom.001': "Paste YouTube / Spotify / SoundCloud link — people in the room listen on their own platform.",  // translated
+  'createroom.002': "∇️ The room will remain closed until the scheduled time. You can start it manually from the \"My Rooms\" screen.",  // translated
+  'createroom.003': "Your Daily Room Limit Has Been Expired",  // translated
+  'createroom.004': "Sunset Style",  // translated
+  'createroom.005': "Insufficient Membership",  // translated
+  'createroom.006': "Upgrade your membership to use this access mode.",  // translated
+  'createroom.007': "Daily Limit",  // translated
+  'createroom.008': "Invalid Music Link",  // translated
+  'createroom.009': "Failed to Open Room",  // translated
+  'createroom.010': "Invitations Sent",  // translated
+  'createroom.011': "∇️ Slow Mode Recommended",  // translated
+  'createroom.012': "Slow mode turned on for 5s in the encrypted room (spam protection). You can turn it off below.",  // translated
+  'createroom.013': "Audience: Sees the Get 🎙️ On Stage button",  // translated
+  'createroom.014': "Audience: He sees the Raise ✋ Hand button",  // translated
+  'createroom.015': "Audience: Sees a 🔒 locked button",  // translated
+  'createroom.016': "\tPermission Required",  // translated
+  'createroom.017': "Permission to access the gallery was not granted. You can allow it in the settings.",  // translated
+  'createroom.018': "Failed to select image",  // translated
+  'createroom.019': "\tPermission Required",  // translated
+  'createroom.020': "Permission to access the gallery was not granted.",  // translated
+  'createroom.021': "Failed to select image",  // translated
+  'createroom.022': "Access",  // translated
+  'createroom.023': "Welcoming",  // translated
+  'createroom.024': "Introduction",  // translated
+  'createroom.025': "Gift",  // translated
+  'createroom.026': "Age Limit",  // translated
+  'createroom.027': "SLOW&#10;MODE",  // translated
+  'createroom.028': "Music Link",  // translated
+  'editprofile.001': "Your password is managed through your Google account. Use the Google Account Settings → Security section to change your password.",  // translated
+  'editprofile.002': "Photo successfully uploaded",  // translated
+  'editprofile.003': "Your profile photo has been updated.",  // translated
+  'editprofile.004': "Failed to Upload Photo",  // translated
+  'editprofile.005': "Alert",  // translated
+  'editprofile.006': "Display name cannot be empty.",  // translated
+  'editprofile.007': "Logged Out",  // translated
+  'editprofile.008': "Your login information was not found, please log in again.",  // translated
+  'editprofile.009': "Username is already taken",  // translated
+  'editprofile.010': "Try another username.",  // translated
+  'editprofile.011': "Checking username availability...",  // translated
+  'editprofile.012': "Success",  // translated
+  'editprofile.013': "Profile updated",  // translated
+  'editprofile.014': "Username Taken",  // translated
+  'editprofile.015': "Sorry, that username already exists!",  // translated
+  'editprofile.016': "Profile Not Updated",  // translated
+  'editprofile.017': "Failed to save changes. Try again.",  // translated
+  'editprofile.018': "Success",  // translated
+  'editprofile.019': "Your Google account has been successfully linked! You can now sign in with Google.",  // translated
+  'editprofile.020': "Alert",  // translated
+  'editprofile.021': " This %s account is already linked to another user.",  // translated
+  'editprofile.022': "Your Google account is already connected.",  // translated
+  'editprofile.023': "Google Failed to Connect",  // translated
+  'editprofile.024': "Failed to add Google account, try again.",  // translated
+  'editprofile.025': "Please enter your email address",  // translated
+  'editprofile.026': "Password is too short!",  // translated
+  'editprofile.027': "Password must be minimum 6 characters.",  // translated
+  'editprofile.028': "Passwords don't match.",  // translated
+  'editprofile.029': "The two password fields must be the same.",  // translated
+  'editprofile.030': "Success",  // translated
+  'editprofile.031': "Your email account has been created successfully! You can now log in with email and password.",  // translated
+  'editprofile.032': "Email in Use",  // translated
+  'editprofile.033': "This email is linked to another account.",  // translated
+  'editprofile.034': "Invalid Email",  // translated
+  'editprofile.035': "Please enter a valid email address!",  // translated
+  'editprofile.036': "Email account is already connected.",  // translated
+  'editprofile.037': "Youremail account could not be updated, please try again.",  // translated
+  'editprofile.038': "Alert",  // translated
+  'editprofile.039': "Enter your current password.",  // translated
+  'editprofile.040': "Alert",  // translated
+  'editprofile.041': "Password should be at least 6 characters",  // translated
+  'editprofile.042': "Alert",  // translated
+  'editprofile.043': "New passwords do not match.",  // translated
+  'editprofile.044': "Success",  // translated
+  'editprofile.045': "Your password updated",  // translated
+  'editprofile.046': "Password Lost and Found",  // translated
+  'editprofile.047': "Your current password is not correct.",  // translated
+  'editprofile.048': "Re-login required!",  // translated
+  'editprofile.049': "Log out and back in for security.",  // translated
+  'editprofile.050': "Failed to modify password",  // translated
+  'editprofile.051': "Unable to complete transaction, try again.",  // translated
+  'editprofile.052': "Google Hesabı",  // translated
+  'editprofile.053': "E-mail Account",  // translated
+  'hiddenrooms.001': "Could not load ability list.",  // translated
+  'hiddenrooms.002': "All secret rooms have been brought back",  // translated
+  'leaderboard.001': "Weekly",  // translated
+  'leaderboard.002': "Monthly",  // translated
+  'leaderboard.003': "Top Generous",  // translated
+  'leaderboard.004': "SP donation",  // translated
+  'leaderboard.005': "Gained HP",  // translated
+  'leaderboard.006': "opened a room",  // translated
+  'leaderboard.007': "Most Popularity",  // translated
+  'leaderboard.008': "follower",  // translated
+  'leaderboard.009': "Most Popular Rooms",  // translated
+  'leaderboard.010': "Most Generous",  // translated
+  'notifications.001': "Friend requests, gifts, and messages will appear here",  // translated
+  'plus.001': "Subscription system is in maintenance mode. It will be available for purchase very soon.",  // translated
+  'plus.002': "ENHANCED",  // translated
+  'plus.003': "Unlimited",  // translated
+  'plus.004': "You need to logged in first",  // translated
+  'plus.005': "Upgrade Failed",  // translated
+  'plus.006': "Cancel Plan",  // translated
+  'plus.007': "Plan has been changed",  // translated
+  'plus.008': "You're back on the free plan.",  // translated
+  'plus.009': "You can cancel your subscription in Google Play settings.",  // translated
+  'plus.010': "Room Staying Open",  // translated
+  'plus.011': "Casual Room",  // translated
+  'plus.012': "Permanent Room Slot",  // translated
+  'plus.013': "Room Type",  // translated
+  'plus.014': "Avatar Frame",  // translated
+  'plus.015': "Age/Language Filter",  // translated
+  'plus.016': "Internet forum",  // translated
+  'plus.017': "Follower-Only",  // translated
+  'plus.018': "chamber music",  // translated
+  'room.id.001': "Writing",  // translated
+  'room.id.002': "online",  // translated
+  'room.id.003': "If you agree, you can start messaging.",  // translated
+  'room.id.004': "Your request is pending approval. You cannot send a new message until approval is received.",  // translated
+  'room.id.005': "Your request has been declined — you cannot send a message.",  // translated
+  'room.id.006': "Delivered.",  // translated
+  'room.id.007': "Failed to edit",  // translated
+  'room.id.008': "Failed to send",  // translated
+  'room.id.009': "copied",  // translated
+  'room.id.010': " Invalid target",  // translated
+  'room.id.011': "You can't deliver the message to yourself.",  // translated
+  'room.id.012': "✓ Forwarded",  // translated
+  'room.id.013': "Failed to transmit",  // translated
+  'room.id.014': "Failed to Start Room",  // translated
+  'room.id.015': "You send a request to its owner, awaiting approval.",  // translated
+  'room.id.016': "🎉 Obstacle Removed",  // translated
+  'room.id.017': "The room owner has changed the setting — you have been taken to the room!",  // translated
+  'room.id.018': "Input Error",  // translated
+  'room.id.019': "Your text chat has been closed by the moderator.",  // translated
+  'room.id.020': "Failed to send the message",  // translated
+  'room.id.021': "You may not have authorization or connectivity issue.",  // translated
+  'room.id.022': "Failed to send the message",  // translated
+  'room.id.023': "Only the people chosen by the room owner can perform in this room. Wait until the owner chooses you.",  // translated
+  'room.id.024': "∇ You're Enrolled in Queue",  // translated
+  'room.id.025': "The stage is full — you'll automatically take the stage when someone gets off.",  // translated
+  'room.id.026': "🤚 Scene Request Sent",  // translated
+  'room.id.027': "Waiting for room owner's approval...",  // translated
+  'room.id.028': "No Connection",  // translated
+  'room.id.029': "Failed to connect to audio server. Microphone unavailable.",  // translated
+  'room.id.030': "You have been silenced by the moderator. You cannot turn on the microphone until the time is up.",  // translated
+  'room.id.031': "Microphone Error",  // translated
+  'room.id.032': "Failed to change microphone",  // translated
+  'room.id.033': "Staging Error",  // translated
+  'room.id.034': "Leave Room",  // translated
+  'room.id.035': "Are you sure you want to leave as a room owner? The authority will be transferred to an appropriate person.",  // translated
+  'room.id.036': "Leave Room",  // translated
+  'room.id.037': "Are you sure you want to leave the room?",  // translated
+  'room.id.038': "You cannot delete the room as a proxy host. Only the room owner can delete it.",  // translated
+  'room.id.039': "Delete 🗑️ Room Permanently",  // translated
+  'room.id.040': "This room will be completely deleted and cannot be undone! All participants will be removed. Do you want to continue?",  // translated
+  'room.id.041': "Failed to logout",  // translated
+  'room.id.042': "Exit from room failed.",  // translated
+  'room.id.043': "Failed to logout",  // translated
+  'room.id.044': "Exit from room failed.",  // translated
+  'room.id.045': "🔑 Room Closed",  // translated
+  'room.id.046': "The room was closed because there was no room owner and moderator.",  // translated
+  'room.id.047': "⚠️ Room Closing!",  // translated
+  'room.id.048': "The room will close in 5 seconds!",  // translated
+  'room.id.049': "Host Change Blocked",  // translated
+  'room.id.050': "Host cannot be changed in active room.",  // translated
+  'room.id.051': "You cannot be a host in this role.",  // translated
+  'room.id.052': "You are in charge of the room. The countdown has been cancelled.",  // translated
+  'room.id.053': "Could Not Become a Host",  // translated
+  'room.id.054': "Speaker Not Changed",  // translated
+  'room.id.055': "Unable to complete invitation/subtraction.",  // translated
+  'room.id.056': "Time’s Up",  // translated
+  'room.id.057': "Room expired. Closing room...",  // translated
+  'room.id.058': "Time’s Up",  // translated
+  'room.id.059': "Room expired. Closing room...",  // translated
+  'room.id.060': "So, 15 minutes left.",  // translated
+  'room.id.061': "Room time is running out. You can extend it by switching to Plus\\\\.",  // translated
+  'room.id.062': "Ascend",  // translated
+  'room.id.063': "So, 15 minutes left.",  // translated
+  'room.id.064': "The room is about to close! Unlimited room time with Pro.",  // translated
+  'room.id.065': "Switch to Pro\\\\",  // translated
+  'room.id.066': "This room will close in 5 minutes.",  // translated
+  'room.id.067': "It's 🎙️ Your Turn!",  // translated
+  'room.id.068': "You took to the stage automatically.",  // translated
+  'room.id.069': "30 seconds now.",  // translated
+  'room.id.070': "Your stage time is ending",  // translated
+  'room.id.071': "Mute all",  // translated
+  'room.id.072': "All speakers on stage will have their microphones turned off.",  // translated
+  'room.id.073': "🔇 All Muted",  // translated
+  'room.id.074': "Open All",  // translated
+  'room.id.075': "The microphones of all the speakers on stage will be turned back on.",  // translated
+  'room.id.076': "🔊 All Opened",  // translated
+  'room.id.077': "🔒 Chosen Mode",  // translated
+  'room.id.078': "Only the people chosen by the room owner can perform in this room.",  // translated
+  'room.id.079': "🤚 Scene Request Sent",  // translated
+  'room.id.080': "Waiting for room owner's approval...",  // translated
+  'room.id.081': "Your scene request has already been submitted.",  // translated
+  'room.id.082': "∇ You're Enrolled in Queue",  // translated
+  'room.id.083': "The stage is full — you'll automatically take the stage when someone gets off.",  // translated
+  'room.id.084': "You're Already In Queue",  // translated
+  'room.id.085': "You are waiting in line, you will be automatically promoted when the stage is empty.",  // translated
+  'room.id.086': "The microphone turns on automatically...",  // translated
+  'room.id.087': "Failed to Perform",  // translated
+  'room.id.088': "Failed to turn on the microphone, try again.",  // translated
+  'room.id.089': "Failed to Perform",  // translated
+  'room.id.090': "Failed to turn on the microphone, try again.",  // translated
+  'room.id.091': "There are only room owners and moderators on the stage. Unable to make room.",  // translated
+  'room.id.092': "Failed to Perform",  // translated
+  'room.id.093': "Failed to turn on the microphone, try again.",  // translated
+  'room.id.094': "Cannot share",  // translated
+  'room.id.095': "Failed to copy link",  // translated
+  'room.id.096': "Unable to complete process.",  // translated
+  'room.id.097': "Something went wrong, try again.",  // translated
+  'room.id.098': "You've Joined 🎧 the Room!",  // translated
+  'room.id.099': "Password verified — welcome!",  // translated
+  'room.id.100': "Input Error",  // translated
+  'room.id.101': "Could Not Submit Request",  // translated
+  'room.id.102': "You've Joined 🎧 the Room!",  // translated
+  'room.id.103': "Your request has been approved — welcome!",  // translated
+  'room.id.104': "Input Error",  // translated
+  'room.id.105': "Camera is off",  // translated
+  'room.id.106': "Camera not available on this tier. Upgrade membership!",  // translated
+  'room.id.107': "Leave Room",  // translated
+  'room.id.108': "Are you sure you want to leave the room?",  // translated
+  'room.id.109': "✨ Polished",  // translated
+  'room.id.110': "Failed to send",  // translated
+  'room.id.111': "Couldn't update setting",  // translated
+  'room.id.112': "Failed to save change. Try again.",  // translated
+  'room.id.113': "Chosen mode requires Pro subscription.",  // translated
+  'room.id.114': "Couldn't update setting",  // translated
+  'room.id.115': "Failed to save change. Try again.",  // translated
+  'room.id.116': "Couldn't update setting",  // translated
+  'room.id.117': "Failed to save change. Try again.",  // translated
+  'room.id.118': "Couldn't update setting",  // translated
+  'room.id.119': "Failed to save change. Try again.",  // translated
+  'room.id.120': "Couldn't update setting",  // translated
+  'room.id.121': "Failed to save change. Try again.",  // translated
+  'room.id.122': "Couldn't update setting",  // translated
+  'room.id.123': "Failed to save change. Try again.",  // translated
+  'room.id.124': "Couldn't update setting",  // translated
+  'room.id.125': "Failed to save change. Try again.",  // translated
+  'room.id.126': "✏️ Room Name Updated",  // translated
+  'room.id.127': "Couldn't update setting",  // translated
+  'room.id.128': "Failed to save change. Try again.",  // translated
+  'room.id.129': "💬 Welcome Message Updated",  // translated
+  'room.id.130': "Couldn't update setting",  // translated
+  'room.id.131': "Failed to save change. Try again.",  // translated
+  'room.id.132': "Rules Updated",  // translated
+  'room.id.133': "Couldn't update setting",  // translated
+  'room.id.134': "Failed to save change. Try again.",  // translated
+  'room.id.135': "📝 Description Updated",  // translated
+  'room.id.136': "Couldn't update setting",  // translated
+  'room.id.137': "Failed to save change. Try again.",  // translated
+  'room.id.138': "Couldn't update setting",  // translated
+  'room.id.139': "Failed to save change. Try again.",  // translated
+  'room.id.140': "Couldn't update setting",  // translated
+  'room.id.141': "Failed to save change. Try again.",  // translated
+  'room.id.142': "Theme updated",  // translated
+  'room.id.143': "Couldn't update setting",  // translated
+  'room.id.144': "Failed to save change. Try again.",  // translated
+  'room.id.145': "Freeze ❄️ Room",  // translated
+  'room.id.146': "Room will be frozen. All participants will be removed. You can then reactivate it from the \"My Rooms\" tab.",  // translated
+  'room.id.147': "You can reactivate it from the My Rooms tab.",  // translated
+  'room.id.148': "Failed to freeze",  // translated
+  'room.id.149': "Couldn't update setting",  // translated
+  'room.id.150': "Failed to save change. Try again.",  // translated
+  'room.id.151': "Couldn't update setting",  // translated
+  'room.id.152': "Failed to save change. Try again.",  // translated
+  'room.id.153': "\tPermission Required",  // translated
+  'room.id.154': "🖼 Background Updated",  // translated
+  'room.id.155': "Couldn't update setting",  // translated
+  'room.id.156': "Background Removed",  // translated
+  'room.id.157': "Couldn't update setting",  // translated
+  'room.id.158': "Failed to save change. Try again.",  // translated
+  'room.id.159': "\tPermission Required",  // translated
+  'room.id.160': "🖼 Card Image Updated",  // translated
+  'room.id.161': "Couldn't update setting",  // translated
+  'room.id.162': "Card Image Removed",  // translated
+  'room.id.163': "Couldn't update setting",  // translated
+  'room.id.164': "Failed to save change. Try again.",  // translated
+  'room.id.165': "Gold Invitation",  // translated
+  'room.id.166': "Select a listener from the list.",  // translated
+  'room.id.167': "Boost Failed",  // translated
+  'room.id.168': "Invitation sent",  // translated
+  'room.id.169': "You've Joined 🎧 the Room!",  // translated
+  'room.id.170': "Password verified — welcome!",  // translated
+  'room.id.171': "You've Joined 🎧 the Room!",  // translated
+  'room.id.172': "Your request has been approved — welcome!",  // translated
+  'room.id.173': "Input Error",  // translated
+  'room.id.174': "Could Not Submit Request",  // translated
+  'settings.001': "Diagnostic error",  // translated
+  'spstore.001': "With SP, you can make your profile stand out, pay room admission, and access premium features.",  // translated
+  'spstore.002': "Coming Up",  // translated
+  'spstore.003': "The SP store is closed for the alpha version. It will be active on Google Play soon!",  // translated
+  'store.collection.id.001': "Buy",  // translated
+  'store.001': "Failed to update wishlist",  // translated
+  'store.002': "You have all the pieces",  // translated
+  'store.003': "Buy",  // translated
+  'store.004': "Buy",  // translated
+  'store.005': "Coming Up",  // translated
+  'store.006': "SP purchase is turned off during alpha version. It will be active on Google Play soon!",  // translated
+  'store.007': "— SETS · THEME PACKAGES —",  // translated
+  'store.008': "-FRAMES · AVATAR —",  // translated
+  'store.009': "— INPUT EFFECTS · ROOM —",  // translated
+  'store.010': "— BADGES · PROFILE —",  // translated
+  'store.011': "— PRIVATE EMOJİ · CHAT —",  // translated
+  'store.012': "— COLLECTIONS · ALL SEASON —",  // translated
+  'layout.001': "Connection Problem",  // translated
+  'layout.002': "We couldn't retrieve your profile from the server. Check your internet connection and try again.",  // translated
+  'layout.003': "Live Coverage",  // translated
+  'layout.004': "You Received 🎁 a Gift",  // translated
+  'layout.005': "You💖 've Been Acknowled",  // translated
+  'layout.006': "Missed Call",  // translated
+  'layout.007': "⏰ Event Reminder",  // translated
+  'layout.008': "🎉 Friendship Acceptance",  // translated
+  'blockeduserssheet.001': "Could not load ability list.",  // translated
+  'blockeduserssheet.002': "Blocked users could not be withdrawn.",  // translated
+  'blockeduserssheet.003': "Unblocked",  // translated
+  'blockeduserssheet.004': "Unblock Failed",  // translated
+  'boostpickersheet.001': "Fast Boost",  // translated
+  'createroomcoachmark.001': "tap the button and open your first room.",  // translated
+  'discoverwelcomesheet.001': "Meet the voice",  // translated
+  'discoverwelcomesheet.002': "Open your own room",  // translated
+  'discoverwelcomesheet.003': "Explore and join",  // translated
+  'discoverwelcomesheet.004': "Live audio",  // translated
+  'discoverwelcomesheet.005': "Immediate",  // translated
+  'discoverwelcomesheet.006': "Free",  // translated
+  'discoverwelcomesheet.007': "Confidential/Public",  // translated
+  'discoverwelcomesheet.008': "Music/Chat",  // translated
+  'discoverwelcomesheet.009': "Hot",  // translated
+  'discoverwelcomesheet.010': "Live",  // translated
+  'discoverwelcomesheet.011': "Prize",  // translated
+  'emojipicker.001': "Favorite",  // translated
+  'emojipicker.002': "Faces",  // translated
+  'emojireactions.001': "Hot",  // translated
+  'emojireactions.002': "Faces",  // translated
+  'emojireactions.003': "Love",  // translated
+  'emojireactions.004': "Nature",  // translated
+  'fabhintoverlay.001': "You can open a new room here. Invite your friends, start chatting!",  // translated
+  'followlistmodal.001': "ARKADAŞLAR",  // translated
+  'followlistmodal.002': "FOLLOWERS",  // translated
+  'followlistmodal.003': "FOLLOWING",  // translated
+  'followlistmodal.004': "Unfriend",  // translated
+  'followlistmodal.005': "Unsubscribe",  // translated
+  'messageactionmenu.001': "Respond",  // translated
+  'messageactionmenu.002': "Forward",  // translated
+  'messageactionmenu.003': "Edit",  // translated
+  'messageactionmenu.004': "Delete For Everyone",  // translated
+  'notificationdrawer.001': "Invitation code is invalid.",  // translated
+  'notificationdrawer.002': "Failed to process attendance in room, try again.",  // translated
+  'notificationdrawer.003': "Unable to complete process.",  // translated
+  'notificationdrawer.004': "Error while deleting notifications.",  // translated
+  'notificationdrawer.005': "Failed to check",  // translated
+  'notificationdrawer.006': "Notifications could not be marked as read.",  // translated
+  'notifpreferencessheet.001': "You will not receive notifications at the times you specify (except for emergency calls).",  // translated
+  'notifpreferencessheet.002': "Emergency calls and friend requests always arrive.",  // translated
+  'notifpreferencessheet.003': "Closed",  // translated
+  'notifpreferencessheet.004': "Work (09→18)",  // translated
+  'notifpreferencessheet.005': "Evening (19→23)",  // translated
+  'notifpreferencessheet.006': "Only from friends",  // translated
+  'notifpreferencessheet.007': "Receive notifications only from friends",  // translated
+  'notifpreferencessheet.008': "DM messages",  // translated
+  'notifpreferencessheet.009': "New private message arrives",  // translated
+  'notifpreferencessheet.010': "When called to the stage in a room",  // translated
+  'notifpreferencessheet.011': "When SP is sent to you",  // translated
+  'notifpreferencessheet.012': "Friend online",  // translated
+  'notifpreferencessheet.013': "When your friend opens a new room",  // translated
+  'profile.badgecelebration.001': "NADIR",  // translated
+  'profile.badgecelebration.002': "EPIC",  // translated
+  'profile.badgecelebration.003': "LEGENDARY",  // translated
+  'profile.featuredbadgespicker.001': "Featured badges updated",  // translated
+  'profile.giftsheet.001': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 30 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'profile.giftsheet.002': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 30 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'profile.spdonatesheet.001': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 30 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'profile.spdonatesheet.002': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 30 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'profile.spreceivedmodal.001': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 30 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'profile.spreceivedmodal.002': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 30 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'profile.spreceivedmodal.003': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 29 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'profile.spreceivedmodal.004': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 29 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'profile.spreceivedmodal.005': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 29 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'profile.spreceivedmodal.006': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 29 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'profile.spreceivedmodal.007': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 29 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'profile.spreceivedmodal.008': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 29 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'profile.spsentsuccessmodal.001': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 29 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'profile.symbolgiftsheet.001': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 28 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'profile.symbolgiftsheet.002': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 28 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'profile.tieredprofilesections.001': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 28 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'profile.tieredprofilesections.002': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 28 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'profile.tieredprofilesections.003': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 28 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'profile.tieredprofilesections.004': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 28 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'profile.tieredprofilesections.005': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 28 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'profile.tieredprofilesections.006': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 27 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'profile.tieredprofilesections.007': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 27 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'profile.tieredprofilesections.008': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 27 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'profile.tieredprofilesections.009': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 27 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'profile.voicebiorecorder.001': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 27 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'profile.voicebiorecorder.002': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 27 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'profile.voicebiorecorder.003': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 27 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'profile.voicebiorecorder.004': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 26 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'profile.voicebiorecorder.005': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 26 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'profile.voicebiorecorder.006': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 26 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'quickcreatesheet.001': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 26 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'quickcreatesheet.002': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 26 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'quickcreatesheet.003': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 26 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'quickcreatesheet.004': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 25 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'reportmodal.001': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 25 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'reportmodal.002': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 25 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'reportmodal.003': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 25 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'reportmodal.004': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 25 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'reportmodal.005': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 25 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'reportmodal.006': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 25 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'reportmodal.007': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 24 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'reportmodal.008': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 24 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'reportmodal.009': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 24 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'reportmodal.010': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 24 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'reportmodal.011': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 24 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.connectionqualityindicator.001': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 24 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.connectionqualityindicator.002': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 24 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.connectionqualityindicator.003': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 23 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.glowstyles.001': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 23 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.glowstyles.002': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 23 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.glowstyles.003': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 23 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.hostaccesspanel.001': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 23 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.hostaccesspanel.002': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 23 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.hostaccesspanel.003': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 23 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.hostaccesspanel.004': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 22 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.hostaccesspanel.005': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 22 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.hostaccesspanel.006': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 22 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.inroomuserprofile.001': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 22 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.inroomuserprofile.002': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 22 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.inroomuserprofile.003': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 22 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.inroomuserprofile.004': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 22 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.inroomuserprofile.005': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 21 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.inroomuserprofile.006': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 21 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.inroomuserprofile.007': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 21 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.inroomuserprofile.008': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 21 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.inroomuserprofile.009': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 21 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.inroomuserprofile.010': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 21 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.inroomuserprofile.011': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 20 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.inroomuserprofile.012': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 20 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.inroomuserprofile.013': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 20 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.inroomuserprofile.014': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 20 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.moderationoverlay.001': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 20 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.moderationoverlay.002': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 20 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.moderationoverlay.003': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 20 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.moderationoverlay.004': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 19 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.moderationoverlay.005': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 19 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.moderationoverlay.006': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 19 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.moderationoverlay.007': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 19 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.moderationoverlay.008': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 19 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.moderationoverlay.009': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 19 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.moderationoverlay.010': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 19 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.powerupssheet.001': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 18 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.powerupssheet.002': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 18 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.powerupssheet.003': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 18 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.powerupssheet.004': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 18 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.powerupssheet.005': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 18 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.powerupssheet.006': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 18 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.powerupssheet.007': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 18 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.powerupssheet.008': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 17 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.powerupssheet.009': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 17 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.powerupssheet.010': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 17 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.powerupssheet.011': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 17 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.powerupssheet.012': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 17 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.powerupssheet.013': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 17 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomclosedscreen.001': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 17 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomclosedscreen.002': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 16 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomclosedscreen.003': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 16 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomclosedscreen.004': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 16 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomclosedscreen.005': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 16 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomclosedscreen.006': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 16 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomclosedscreen.007': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 16 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomclosedscreen.008': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 15 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomclosedscreen.009': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 15 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomclosedscreen.010': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 15 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomclosedscreen.011': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 15 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomclosedscreen.012': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 15 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomclosedscreen.013': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 15 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomclosedscreen.014': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 15 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomclosedscreen.015': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 14 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomclosedscreen.016': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 14 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomclosedscreen.017': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 14 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomcontrolbar.001': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 14 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomcontrolbar.002': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 14 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomcontrolbar.003': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 14 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomcontrolbar.004': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 14 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomcontrolbar.005': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 13 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomcontrolbar.006': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 13 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomcontrolbar.007': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 13 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomcontrolbar.008': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 13 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomcontrolbar.009': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 13 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomentryeffectoverlay.001': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 13 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomentryeffectoverlay.002': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 13 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomentryeffectoverlay.003': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 12 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomentryeffectoverlay.004': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 12 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomentryeffectoverlay.005': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 12 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomentryeffectoverlay.006': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 12 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomgiftpanel.001': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 12 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomgiftpanel.002': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 12 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomgiftpanel.003': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 12 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomgiftpanel.004': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 11 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomgiftpanel.005': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 11 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roominfoheader.001': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 11 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roominfoheader.002': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 11 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roominfoheader.003': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 11 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roominfoheader.004': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 11 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roominfoheader.005': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 10 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roominfoheader.006': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 10 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roominfoheader.007': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 10 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roominfoheader.008': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 10 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roommanagesheet.001': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 10 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roommanagesheet.002': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 10 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roommanagesheet.003': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 10 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roommanagesheet.004': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 09 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roommanagesheet.005': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 09 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roommanagesheet.006': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 09 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roommanagesheet.007': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 09 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roommanagesheet.008': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 09 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roommanagesheet.009': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 09 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roommanagesheet.010': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 09 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roommanagesheet.011': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 08 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roommanagesheet.012': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 08 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roommanagesheet.013': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 08 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roommanagesheet.014': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 08 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roommanagesheet.015': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 08 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roommanagesheet.016': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 08 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roommanagesheet.017': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 08 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roommanagesheet.018': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 07 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roommanagesheet.019': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 07 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roommanagesheet.020': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 07 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roommanagesheet.021': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 07 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roommanagesheet.022': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 07 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roommanagesheet.023': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 07 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roommanagesheet.024': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 07 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roommanagesheet.025': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 06 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roommanagesheet.026': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 06 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roommanagesheet.027': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 06 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roommanagesheet.028': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 06 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roommanagesheet.029': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 06 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roommanagesheet.030': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 06 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roommanagesheet.031': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 06 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roommanagesheet.032': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 05 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roommanagesheet.033': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 05 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roommanagesheet.034': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 05 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roommanagesheet.035': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 05 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roommanagesheet.036': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 05 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roommanagesheet.037': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 05 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roommanagesheet.038': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 04 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roommanagesheet.039': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 04 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roommanagesheet.040': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 04 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roommanagesheet.041': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 04 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roommanagesheet.042': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 04 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roommanagesheet.043': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 04 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roommanagesheet.044': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 04 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roommanagesheet.045': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 03 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roommanagesheet.046': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 03 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roommanagesheet.047': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 03 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roommanagesheet.048': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 03 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roommanagesheet.049': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 03 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roommanagesheet.050': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 03 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roommanagesheet.051': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 03 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roommanagesheet.052': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 02 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roommanagesheet.053': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 02 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roommanagesheet.054': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 02 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roommanagesheet.055': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 02 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roommanagesheet.056': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 02 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roommanagesheet.057': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 02 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roommanagesheet.058': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 02 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roommanagesheet.059': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 01 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roommanagesheet.060': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 01 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roommanagesheet.061': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 01 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomoverlays.001': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 01 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomoverlays.002': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 01 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomoverlays.003': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 01 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomoverlays.004': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 01 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomoverlays.005': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 00 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomoverlays.006': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 00 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomoverlays.007': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 00 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomoverlays.008': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 00 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomoverlays.009': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 00 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomoverlays.010': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 34 MINUTES 00 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomoverlays.011': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 33 MINUTES 59 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomoverlays.012': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 33 MINUTES 59 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomoverlays.013': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 33 MINUTES 59 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomoverlays.014': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 33 MINUTES 59 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomoverlays.015': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 33 MINUTES 59 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomoverlays.016': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 33 MINUTES 59 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomoverlays.017': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 33 MINUTES 59 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomoverlays.018': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 33 MINUTES 58 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomoverlays.019': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 33 MINUTES 58 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomoverlays.020': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 33 MINUTES 58 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomoverlays.021': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 33 MINUTES 58 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomoverlays.022': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 33 MINUTES 58 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomoverlays.023': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 33 MINUTES 58 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomoverlays.024': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 33 MINUTES 58 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomoverlays.025': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 33 MINUTES 57 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomoverlays.026': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 33 MINUTES 57 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomoverlays.027': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 33 MINUTES 57 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomoverlays.028': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 33 MINUTES 57 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomoverlays.029': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 33 MINUTES 57 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomoverlays.030': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 33 MINUTES 57 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomoverlays.031': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 33 MINUTES 57 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomoverlays.032': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 33 MINUTES 56 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomoverlays.033': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 33 MINUTES 56 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomoverlays.034': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 33 MINUTES 56 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomoverlays.035': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 33 MINUTES 56 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomoverlays.036': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 33 MINUTES 56 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomrecordingssheet.001': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 33 MINUTES 56 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomrecordingssheet.002': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 33 MINUTES 56 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomstatspanel.001': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 33 MINUTES 55 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomstatspanel.002': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 33 MINUTES 55 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomstatspanel.003': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 33 MINUTES 55 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomstatspanel.004': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 33 MINUTES 55 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomstatspanel.005': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 33 MINUTES 55 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomstatspanel.006': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 33 MINUTES 55 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomstatspanel.007': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 33 MINUTES 54 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.roomstatspanel.008': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 33 MINUTES 54 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.stagesupportsheet.001': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 33 MINUTES 54 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'room.stagesupportsheet.002': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 33 MINUTES 54 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'roomboostsheet.001': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 33 MINUTES 54 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'sessionconflictmodal.001': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 33 MINUTES 54 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
+  'sessionconflictmodal.002': "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN  19 HOURS 33 MINUTES 54 SECONDS VISIT HTTPS://MYMEMORY.TRANSLATED.NET/DOC/USAGELIMITS.PHP TO TRANSLATE MORE",  // translated
 };
 export default en;
