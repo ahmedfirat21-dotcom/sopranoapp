@@ -482,7 +482,7 @@ export default function MessagesScreen() {
       } catch {}
     } catch (err: any) {
       if (__DEV__) console.warn('Mesajlar yüklenemedi:', err);
-      const msg = err?.message || 'İnternet bağlantını kontrol et.';
+      const msg = err?.message || i18n.t('tabs.messages.016');
       setLoadError(msg);
       showToast({ title: i18n.t('tabs.messages.002'), message: msg, type: 'error' });
     } finally {
@@ -596,19 +596,19 @@ export default function MessagesScreen() {
         } catch {}
       }
 
-      let partnerName = 'Kullanıcı';
+      let partnerName = i18n.t('tabs.messages.017');
       let partnerAvatar = '';
       let partnerOnline = false;
       let resolved = false;
 
       if (!isSentByMe && newMsg.sender) {
-        partnerName = newMsg.sender.display_name || 'Kullanıcı';
+        partnerName = newMsg.sender.display_name || i18n.t('tabs.messages.017');
         partnerAvatar = newMsg.sender.avatar_url || '';
         partnerOnline = newMsg.sender.is_online || false;
         resolved = true;
       }
       if (!resolved && isSentByMe && newMsg.receiver) {
-        partnerName = newMsg.receiver.display_name || 'Kullanıcı';
+        partnerName = newMsg.receiver.display_name || i18n.t('tabs.messages.017');
         partnerAvatar = newMsg.receiver.avatar_url || '';
         partnerOnline = newMsg.receiver.is_online || false;
         resolved = true;
@@ -629,7 +629,7 @@ export default function MessagesScreen() {
         try {
           const prof = await ProfileService.get(otherId);
           if (prof) {
-            partnerName = prof.display_name || 'Kullanıcı';
+            partnerName = prof.display_name || i18n.t('tabs.messages.017');
             partnerAvatar = prof.avatar_url || '';
             partnerOnline = prof.is_online || false;
           }
@@ -827,13 +827,13 @@ export default function MessagesScreen() {
       const tier = (profile as any)?.subscription_tier || 'Free';
       const { callId, receiverIsOnline } = await CallService.initiateCall(
         firebaseUser.uid,
-        profile.display_name || 'Kullanıcı',
+        profile.display_name || i18n.t('tabs.messages.017'),
         profile.avatar_url || undefined,
         partnerId, 'audio', tier
       );
       router.push(`/call/${partnerId}?callId=${callId}&callType=audio&isIncoming=false&receiverOnline=${receiverIsOnline}` as any);
     } catch (err: any) {
-      showToast({ title: i18n.t('tabs.messages.003'), message: err?.message || 'Arama başlatılamadı.', type: 'error' });
+      showToast({ title: i18n.t('tabs.messages.003'), message: err?.message || i18n.t('tabs.messages.044'), type: 'error' });
     }
   }, [firebaseUser, profile, router]);
 
@@ -853,7 +853,7 @@ export default function MessagesScreen() {
     try {
       await MessageService.togglePin(partnerId, firebaseUser?.uid);
       showToast({
-        title: newPinned ? '📌 Sabitlendi' : 'Sabitleme kaldırıldı',
+        title: newPinned ? i18n.t('tabs.messages.018') : i18n.t('tabs.messages.019'),
         type: 'success',
       });
     } catch {
@@ -874,8 +874,8 @@ export default function MessagesScreen() {
     try {
       await MessageService.toggleArchive(partnerId, firebaseUser?.uid);
       showToast({
-        title: newArchived ? `🗄️ ${partnerName} arşivlendi` : `↩️ Arşivden çıkarıldı`,
-        message: newArchived ? 'Yeni mesaj gelince otomatik geri çıkacak.' : undefined,
+        title: newArchived ? i18n.t('tabs.messages.020', { name: partnerName }) : i18n.t('tabs.messages.021'),
+        message: newArchived ? i18n.t('tabs.messages.022') : undefined,
         type: 'success',
       });
     } catch {
@@ -895,14 +895,14 @@ export default function MessagesScreen() {
     try {
       await MessageService.toggleMute(firebaseUser.uid, partnerId);
       showToast({
-        title: newMuted ? `🔕 ${partnerName} sessize alındı` : `🔔 Sessizden çıkarıldı`,
+        title: newMuted ? i18n.t('tabs.messages.023', { name: partnerName }) : i18n.t('tabs.messages.024'),
         message: newMuted ? 'Bu sohbetten bildirim gelmeyecek.' : undefined,
         type: 'success',
       });
     } catch {
       setConversations(prev => prev.map(c =>
         c.partner_id === partnerId ? { ...c, is_muted: current.is_muted } : c));
-      showToast({ title: i18n.t('tabs.messages.008'), message: 'Tekrar dene.', type: 'error' });
+      showToast({ title: i18n.t('tabs.messages.008'), message: i18n.t('tabs.messages.045'), type: 'error' });
     }
   }, [conversations, firebaseUser]);
 
@@ -912,10 +912,10 @@ export default function MessagesScreen() {
     setPendingRequests(prev => prev.filter((r: any) => r.sender_id !== senderId));
     try {
       await MessageService.rejectMessageRequest(firebaseUser.uid, senderId);
-      showToast({ title: i18n.t('tabs.messages.009'), message: `${senderName} için reddedildi.`, type: 'info' });
+      showToast({ title: i18n.t('tabs.messages.009'), message: i18n.t('tabs.messages.046', { name: senderName }), type: 'info' });
       refreshBadges();
     } catch {
-      showToast({ title: 'Reddedilemedi', message: 'Tekrar dene.', type: 'error' });
+      showToast({ title: i18n.t('tabs.messages.047'), message: i18n.t('tabs.messages.045'), type: 'error' });
     }
   }, [firebaseUser, refreshBadges]);
 
@@ -924,9 +924,9 @@ export default function MessagesScreen() {
     try {
       await ModerationService.blockUser(firebaseUser.uid, partnerId);
       setConversations(prev => prev.filter(c => c.partner_id !== partnerId));
-      showToast({ title: '⛔ Engellendi', message: `${partnerName} engellendi.`, type: 'success' });
+      showToast({ title: i18n.t('tabs.messages.048'), message: i18n.t('tabs.messages.049', { name: partnerName }), type: 'success' });
     } catch {
-      showToast({ title: 'Engellenemedi', message: `${partnerName} engellenirken hata oluştu.`, type: 'error' });
+      showToast({ title: i18n.t('tabs.messages.025'), message: i18n.t('tabs.messages.026', { name: partnerName }), type: 'error' });
     }
   }, [firebaseUser]);
 
@@ -940,39 +940,39 @@ export default function MessagesScreen() {
   const sheetActions: SheetAction[] = sheetItem ? [
     ...(friendIds.has(sheetItem.partner_id) ? [{
       id: 'call',
-      label: 'Sesli Ara',
+      label: i18n.t('tabs.messages.050'),
       icon: 'call' as const,
       style: 'primary' as const,
       onPress: () => handleCallPress(sheetItem.partner_id),
     }] : []),
     {
       id: 'pin',
-      label: sheetItem.is_pinned ? 'Sabitlemeyi Kaldır' : 'Sabitle',
+      label: sheetItem.is_pinned ? i18n.t('tabs.messages.027') : i18n.t('tabs.messages.028'),
       icon: (sheetItem.is_pinned ? 'pin-outline' : 'pin') as any,
       onPress: () => handleTogglePin(sheetItem.partner_id),
     },
     {
       id: 'mute',
-      label: sheetItem.is_muted ? 'Sessizden Çıkar' : 'Sessize Al',
+      label: sheetItem.is_muted ? i18n.t('tabs.messages.029') : i18n.t('tabs.messages.030'),
       icon: (sheetItem.is_muted ? 'notifications' : 'notifications-off') as any,
       onPress: () => handleToggleMute(sheetItem.partner_id, sheetItem.partner_name),
     },
     {
       id: 'archive',
-      label: sheetItem.is_archived ? 'Arşivden Çıkar' : 'Arşivle',
+      label: sheetItem.is_archived ? i18n.t('tabs.messages.031') : i18n.t('tabs.messages.032'),
       icon: (sheetItem.is_archived ? 'arrow-undo' : 'archive') as any,
       onPress: () => handleToggleArchive(sheetItem.partner_id, sheetItem.partner_name),
     },
     {
       id: 'delete',
-      label: 'Sohbeti Sil',
+      label: i18n.t('tabs.messages.051'),
       icon: 'trash' as const,
       style: 'destructive' as const,
       onPress: () => handleDeleteConversation(sheetItem.partner_id),
     },
     {
       id: 'block',
-      label: 'Engelle',
+      label: i18n.t('tabs.messages.052'),
       icon: 'ban' as const,
       style: 'destructive' as const,
       onPress: () => handleBlockUser(sheetItem.partner_id, sheetItem.partner_name),
@@ -1016,7 +1016,7 @@ export default function MessagesScreen() {
                   setSearchOpen(true);
                 }
               }}
-              accessibilityLabel={searchOpen ? 'Aramayı kapat' : 'Sohbet ara'}
+              accessibilityLabel={searchOpen ? i18n.t('tabs.messages.033') : i18n.t('tabs.messages.034')}
             >
               <Ionicons
                 name={searchOpen ? 'close-outline' : 'search-outline'}
@@ -1088,7 +1088,7 @@ export default function MessagesScreen() {
             }}
           >
             <Text style={[styles.editBtnText, selectionMode && { color: '#F87171' }]}>
-              {selectionMode ? 'Vazgeç' : 'Düzenle'}
+              {selectionMode ? i18n.t('tabs.messages.035') : i18n.t('tabs.messages.036')}
             </Text>
           </Pressable>
         )}
@@ -1122,7 +1122,7 @@ export default function MessagesScreen() {
                 onPress={() => router.push(`/chat/${friend.id}`)}
               >
                 <StatusAvatar uri={friend.avatar_url} size={52} isOnline={true} tier={(friend as any).subscription_tier} frameId={(friend as any).active_frame || null} customBadgeId={(friend as any).active_badge_id ?? null} />
-                <Text style={styles.friendName} numberOfLines={1}>{friend.display_name?.split(' ')[0] || 'Kullanıcı'}</Text>
+                <Text style={styles.friendName} numberOfLines={1}>{friend.display_name?.split(' ')[0] || i18n.t('tabs.messages.017')}</Text>
               </Pressable>
             )}
           />
@@ -1149,7 +1149,7 @@ export default function MessagesScreen() {
             color={pendingRequests.length === 0 && !showRequests ? 'rgba(94,234,212,0.5)' : '#F59E0B'}
           />
           <Text style={[styles.archiveChipText, { color: '#FBBF24' }]}>
-            {showRequests ? `Geri` : `İstekler (${pendingRequests.length})`}
+            {showRequests ? i18n.t('tabs.messages.037') : i18n.t('tabs.messages.038', { count: pendingRequests.length })}
           </Text>
           <Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.3)" />
         </Pressable>
@@ -1171,7 +1171,7 @@ export default function MessagesScreen() {
             color={archivedCount === 0 && !showArchived ? 'rgba(94,234,212,0.5)' : Colors.teal}
           />
           <Text style={[styles.archiveChipText, archivedCount === 0 && !showArchived && { color: 'rgba(255,255,255,0.5)' }]}>
-            {showArchived ? `Geri` : `Arşiv (${archivedCount})`}
+            {showArchived ? i18n.t('tabs.messages.037') : i18n.t('tabs.messages.039', { count: archivedCount })}
           </Text>
           <Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.3)" />
         </Pressable>
@@ -1194,7 +1194,7 @@ export default function MessagesScreen() {
               const sender = item.sender || {};
               // ★ v109: İlk mesajın snippet'i — Instagram tarzı
               const firstMsg = item.first_message_content || item.last_message_content || '';
-              const senderName = sender.display_name || 'Kullanıcı';
+              const senderName = sender.display_name || i18n.t('tabs.messages.017');
               return (
                 <View style={{
                   flexDirection: 'row', alignItems: 'center', gap: 10,
@@ -1283,7 +1283,7 @@ export default function MessagesScreen() {
                 <Ionicons name="chatbubbles" size={72} color={Colors.teal} style={styles.emptyIcon} />
                 <Text style={styles.emptyTitle}>{t('messages.no_messages')}</Text>
                 <Text style={styles.emptySubtitle}>
-                  Keşfet sayfasından birine git,{'\n'}sohbet başlat!
+                  {i18n.t('tabs.messages.040')}
                 </Text>
                 <Pressable style={styles.emptyActionBtn} onPress={() => router.push('/(tabs)/home')}>
                   <LinearGradient
@@ -1328,7 +1328,7 @@ export default function MessagesScreen() {
           >
             <Ionicons name={selectedIds.size === conversations.length ? 'checkbox' : 'square-outline'} size={20} color={Colors.text2} />
             <Text style={styles.bulkSelectAllText}>
-              {selectedIds.size === conversations.length ? 'Seçimi Kaldır' : 'Tümünü Seç'}
+              {selectedIds.size === conversations.length ? i18n.t('tabs.messages.041') : i18n.t('tabs.messages.042')}
             </Text>
           </Pressable>
           <SkiaShadow shadowColor="#EF4444" shadowOpacity={0.45} shadowBlur={8} shadowOffsetY={2} borderRadius={20}>
@@ -1337,12 +1337,12 @@ export default function MessagesScreen() {
             onPress={() => {
               setCAlert({
                 visible: true,
-                title: `${selectedIds.size} sohbet silinecek`,
+                title: i18n.t('tabs.messages.053', { count: selectedIds.size }),
                 message: i18n.t('tabs.messages.014'),
                 type: 'warning',
                 buttons: [
                   {
-                    text: 'Sil', style: 'destructive',
+                    text: i18n.t('tabs.messages.054'), style: 'destructive',
                     onPress: async () => {
                       if (!firebaseUser) return;
                       const ids = [...selectedIds];
@@ -1357,17 +1357,17 @@ export default function MessagesScreen() {
                       setSelectionMode(false);
                       refreshBadges();
                       if (failed > 0) {
-                        showToast({ title: i18n.t('tabs.messages.015'), message: `${failed} sohbet silinemedi, tekrar dene.`, type: 'warning' });
+                        showToast({ title: i18n.t('tabs.messages.015'), message: i18n.t('tabs.messages.055', { count: failed }), type: 'warning' });
                       }
                     },
                   },
-                  { text: 'Vazgeç', style: 'cancel' },
+                  { text: i18n.t('tabs.messages.035'), style: 'cancel' },
                 ],
               });
             }}
           >
             <Ionicons name="trash" size={16} color="#fff" />
-            <Text style={styles.bulkDeleteText}>{selectedIds.size} Sil</Text>
+            <Text style={styles.bulkDeleteText}>{i18n.t('tabs.messages.056', { count: selectedIds.size })}</Text>
           </Pressable>
           </SkiaShadow>
         </View>
@@ -1387,8 +1387,8 @@ export default function MessagesScreen() {
         partnerFrame={sheetItem?.partner_frame}
         partnerActiveBadgeId={sheetItem?.partner_active_badge_id ?? null}
         subtitle={sheetItem?.unread_count
-          ? `${sheetItem.unread_count} yeni mesaj`
-          : sheetItem?.is_muted ? 'Sessize alındı' : undefined}
+          ? i18n.t('tabs.messages.057', { count: sheetItem.unread_count })
+          : sheetItem?.is_muted ? i18n.t('tabs.messages.043') : undefined}
         actions={sheetActions}
       />
       {/* ★ 2026-04-21: Tab bar scroll fade — tüm tab sayfalarında tutarlı */}
