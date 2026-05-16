@@ -45,7 +45,7 @@ const darken = (hex: string, pct: number) => lighten(hex, -pct);
 // ════════════════════════════════════════════════════════════
 function CtrlBtn({
   icon, onPress, active, accent = '#14B8A6',
-  badge, label, mutedColor, iconSize = ICON_SIZE, inactiveIconColor = '#7B8D9F',
+  badge, label, mutedColor, iconSize: iconSizeProp, inactiveIconColor,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   onPress: () => void;
@@ -57,6 +57,12 @@ function CtrlBtn({
   iconSize?: number;
   inactiveIconColor?: string;
 }) {
+  // ★ v283 (16 May 2026): Web admin controls.buttonSize/iconSize/iconColor canlı
+  //   uygulansın — eski BUBBLE_SIZE/ICON_SIZE sabitleri yerine.
+  const ctrlCfg = useRoomLayout().controls;
+  const btnSize = ctrlCfg.buttonSize;
+  const iconSize = iconSizeProp ?? ctrlCfg.iconSize;
+  const iconCol = inactiveIconColor ?? ctrlCfg.iconColor;
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const handleIn = () => Animated.spring(scaleAnim, { toValue: 1.1, useNativeDriver: true, damping: 8, stiffness: 300 }).start();
   const handleOut = () => Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true, damping: 12, stiffness: 200 }).start();
@@ -75,7 +81,7 @@ function CtrlBtn({
       accessibilityState={{ selected: !!active }}
       style={s.tab}
     >
-      <Animated.View style={[s.btnBase, { transform: [{ scale: scaleAnim }] }]}>
+      <Animated.View style={[s.btnBase, { width: btnSize, height: btnSize, borderRadius: btnSize / 2, transform: [{ scale: scaleAnim }] }]}>
         {filled && fillBase ? (
           // ═══ ACTIVE = Tab bubble stili: 3D gradient + gloss + subtle border
           <>
@@ -97,7 +103,7 @@ function CtrlBtn({
           </>
         ) : (
           // ═══ INACTIVE = bg yok, sadece ikon + drop-shadow (tab pasif ikon gibi)
-          <Ionicons name={icon} size={iconSize} color={inactiveIconColor} style={s.iconDrop} />
+          <Ionicons name={icon} size={iconSize} color={iconCol} style={s.iconDrop} />
         )}
       </Animated.View>
       {badge !== undefined && badge > 0 && (
@@ -121,6 +127,8 @@ function MicRequestBtn({ onPress, stageAction, queuePosition }: {
   stageAction: StageAction;
   queuePosition?: number;
 }) {
+  // ★ v283: controls.buttonSize live binding
+  const btnSize = useRoomLayout().controls.buttonSize;
   const isActive = stageAction === 'waiting';
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -178,7 +186,7 @@ function MicRequestBtn({ onPress, stageAction, queuePosition }: {
         {isActive && (
           <Animated.View style={[micS.pulseRing, { borderColor: variant.ringColor, transform: [{ scale: pulseAnim }], opacity: pulseOpacity }]} />
         )}
-        <Animated.View style={[s.btnBase, { transform: [{ scale: scaleAnim }] }]}>
+        <Animated.View style={[s.btnBase, { width: btnSize, height: btnSize, borderRadius: btnSize / 2, transform: [{ scale: scaleAnim }] }]}>
           <LinearGradient colors={variant.colors as any} start={{ x: 0.2, y: 0 }} end={{ x: 0.8, y: 1 }} style={s.bubble}>
             <Ionicons name={variant.icon} size={ICON_SIZE} color="#FFF" style={s.iconDrop} />
           </LinearGradient>

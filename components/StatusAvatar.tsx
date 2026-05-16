@@ -179,6 +179,12 @@ interface StatusAvatarProps {
     is_admin?: boolean | null;
     display_name?: string | null;
   } | null;
+  /** ★ v283 (16 May 2026): Web admin "Oda Düzeni" avatar şekli override.
+   *  Frame'in customShape'i yoksa bu kullanılır. Listener/speaker grid'lerinde
+   *  layout config'inden geçirilir. */
+  shapeOverride?: 'circle' | 'square' | 'rounded' | 'hex';
+  /** Rounded shape için köşe yuvarlama miktarı (cfgBorderRadius). Sadece shapeOverride='rounded' ise etkili. */
+  shapeOverrideRadius?: number;
 }
 
 /**
@@ -213,6 +219,8 @@ export default function StatusAvatar({
   contextKey,
   customBadgeId: customBadgeIdProp,
   user,
+  shapeOverride,
+  shapeOverrideRadius,
 }: StatusAvatarProps) {
   // ★ v282 (16 May 2026): user objesi verilirse içinden default'ları al; explicit
   //   prop'lar (frameId/customBadgeId/tier/vb.) öncelikli override. Bu pattern sayesinde
@@ -224,7 +232,15 @@ export default function StatusAvatar({
   const isOnline = isOnlineProp !== undefined ? isOnlineProp : !!user?.is_online;
   const isAdmin = isAdminProp !== undefined ? isAdminProp : !!user?.is_admin;
   const displayName = displayNameProp !== undefined ? displayNameProp : (user?.display_name ?? undefined);
-  const radius = size / 2;
+  // ★ v283 (16 May 2026): shapeOverride (web admin oda düzeni) frame customShape'i
+  //   yoksa borderRadius'u belirler. Default 'circle' (size/2).
+  const radius = (() => {
+    if (!shapeOverride) return size / 2;
+    if (shapeOverride === 'square') return 0;
+    if (shapeOverride === 'rounded') return Math.min(shapeOverrideRadius ?? 16, size / 2);
+    // 'circle' ve 'hex' için size/2 — hex SVG-side renderlanır, wrap daire
+    return size / 2;
+  })();
   // ★ 2026-04-21: Daha zarif nokta — %26 yerine %22, çerçeve 0.3x → 0.18x
   const dotSize = Math.max(8, size * 0.22);
   const dotRadius = dotSize / 2;
@@ -391,15 +407,24 @@ export default function StatusAvatar({
   //   mevcut araçlarla doğru, hex/star/diamond için 'squircle' fallback.
   const shapeRadius = (() => {
     const targetSize = frameId ? Math.round(size * dynamicAvatarRatio) : (size - borderWidth * 2 - 2);
-    switch (dynFrameCfg?.avatar_shape) {
-      case 'rounded-square': return targetSize * 0.22;
-      case 'squircle':       return targetSize * 0.36;
-      case 'hexagon':        return targetSize * 0.36; // squircle fallback
-      case 'star':           return targetSize * 0.36; // squircle fallback (clip-path yok)
-      case 'diamond':        return targetSize * 0.36; // squircle fallback
-      case 'circle':
-      default:               return targetSize / 2;
+    // ★ v283 (16 May 2026): Frame avatar_shape varsa öncelikli. Yoksa shapeOverride
+    //   (web admin oda düzeni) bak. İkisi yoksa default circle.
+    if (dynFrameCfg?.avatar_shape) {
+      switch (dynFrameCfg.avatar_shape) {
+        case 'rounded-square': return targetSize * 0.22;
+        case 'squircle':       return targetSize * 0.36;
+        case 'hexagon':        return targetSize * 0.36;
+        case 'star':           return targetSize * 0.36;
+        case 'diamond':        return targetSize * 0.36;
+        case 'circle':
+        default:               return targetSize / 2;
+      }
     }
+    // Web admin shapeOverride
+    if (shapeOverride === 'square') return 0;
+    if (shapeOverride === 'rounded') return Math.min(shapeOverrideRadius ?? 12, targetSize / 2);
+    if (shapeOverride === 'hex') return targetSize * 0.36; // squircle fallback (RN'de tam hex yok)
+    return targetSize / 2; // circle default
   })();
 
   // ★ v1.3.54: GERÇEK FİLTRE — eski overlay yaklaşımı kaldırıldı; SVG feColorMatrix

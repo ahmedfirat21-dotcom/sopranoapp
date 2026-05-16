@@ -801,13 +801,15 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, i
         {
           width: cardWidth,
           height: cameraOn && videoTrack && VideoView ? cardHeight : cardWidth,
-          // ★ v108.32: Aktif frame varsa rol border'ı kaldır — çift halka önlenir
-          //   (StatusAvatar ile aynı pattern: frameId ? 0 : borderWidth)
-          borderColor: activeFrame ? 'transparent' : ringColor,
-          borderWidth: activeFrame ? 0 : (isHost || isMod ? 2 : 1.5),
-          // Kameralı: rounded rectangle (cardWidth*0.08 ~ 8-12px corner)
-          // Audio-only: full circle (cardWidth/2)
-          borderRadius: cameraOn && videoTrack && VideoView ? Math.max(12, Math.floor(cardWidth * 0.08)) : cardWidth / 2,
+          // ★ v283 (16 May 2026): Host artık özel renkli çerçeve TAŞIMAZ — kullanıcı
+          //   tercihi. Host konum (sahnede ilk sırada) + boyut (host.avatarSize, default
+          //   96 > speakers 84-100) ile ayırt edilir. Moderator için border kalır.
+          //   Frame yüklüyse rol border'ı zaten kaldırılıyor (çift halka önleme).
+          borderColor: activeFrame || isHost ? 'transparent' : ringColor,
+          borderWidth: activeFrame || isHost ? 0 : (isMod ? 2 : 1.5),
+          // ★ v283: borderRadius web admin avatarShape'i takip etsin (önceden hep daire).
+          //   Camera açıkken kare-yumuşak (8% radius), audio-only shape mapping.
+          borderRadius: cameraOn && videoTrack && VideoView ? Math.max(12, Math.floor(cardWidth * 0.08)) : avatarShapeRadius,
           overflow: 'visible',
           // ★ 2026-05-05: Frame artık zIndex 2 ile üstte — speakerCardInner default z'de kalır.
         },

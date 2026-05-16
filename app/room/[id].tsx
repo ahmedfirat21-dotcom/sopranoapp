@@ -4634,6 +4634,9 @@ export default function RoomScreen() {
           stageUsers.length <= 6 ? H * 0.38 :
           H * 0.46,
         paddingTop: 8,
+        // ★ v283 (16 May 2026): Web admin global.horizontalPadding artık SADECE avatar
+        //   grid'lere uygulanır (header full bleed kalsın). v284'te root'tan kaldırılmıştı.
+        paddingHorizontal: roomLayout.global.horizontalPadding,
       }}>
         <SpeakerSection stageUsers={stageUsers} getMicStatus={getMicStatus}
           onSelectUser={(u) => { setSelectedUser(u); setInRoomProfileId(u.user_id); }}
@@ -4673,7 +4676,7 @@ export default function RoomScreen() {
 
       {/* Clubhouse modeli: zemin overlay chat KALDIRILDI.
           Oda içi sohbet yalnızca kontrol barın chat butonundan açılan RoomChatDrawer üzerinden erişilir. */}
-      <View style={{ flex: 1, overflow: 'hidden' }}>
+      <View style={{ flex: 1, overflow: 'hidden', paddingHorizontal: roomLayout.global.horizontalPadding }}>
         <ListenerGrid listeners={listenerUsers} onSelectUser={(u) => { setSelectedUser(u); setInRoomProfileId(u.user_id); }} selectedUserId={selectedUser?.user_id} onShowAllUsers={() => openOverlay(() => setShowAudienceDrawer(true))} maxListeners={getRoomLimits(ownerTier as any).maxListeners} spectatorCount={spectatorUsers.length} roomOwnerId={room?.host_id}
           avatarFlashes={avatarFlashes} onFlashDone={clearAvatarFlash} micRequestUserIds={micRequests} />
       </View>

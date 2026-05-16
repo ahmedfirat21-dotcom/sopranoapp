@@ -1,0 +1,514 @@
+[
+  {
+    "file": "app\\chat\\[id].tsx",
+    "line": 1471,
+    "col": 71,
+    "kind": "jsx_text",
+    "value": "sana ilk kez yazıyor. Kabul edersen mesajlaşabilirsiniz.",
+    "raw": " sana ilk kez yazıyor. Kabul edersen mesajlaşabilirsiniz.\n              "
+  },
+  {
+    "file": "app\\chat\\[id].tsx",
+    "line": 1766,
+    "col": 20,
+    "kind": "template",
+    "value": "↩︎ Yanıt: ${0}",
+    "expressions": [
+      "replyingTo?.sender_id === firebaseUser?.uid ? 'Kendine' : (otherUser?.display_name || i18n.t('auto.chat.id.023'))"
+    ],
+    "raw": "`↩︎ Yanıt: ${replyingTo?.sender_id === firebaseUser?.uid ? 'Kendine' : (otherUser?.display_name || i18n.t('auto.chat.id.023'))}`"
+  },
+  {
+    "file": "app\\chat\\[id].tsx",
+    "line": 2124,
+    "col": 29,
+    "kind": "template",
+    "value": "${0} engelden çıkarılacak.",
+    "expressions": [
+      "otherUser?.display_name || i18n.t('auto.chat.id.006')"
+    ],
+    "raw": "`${otherUser?.display_name || i18n.t('auto.chat.id.006')} engelden çıkarılacak.`"
+  },
+  {
+    "file": "app\\chat\\[id].tsx",
+    "line": 2144,
+    "col": 29,
+    "kind": "template",
+    "value": "${0} engellenecek ve mesaj gönderemeyecek.",
+    "expressions": [
+      "otherUser?.display_name || i18n.t('auto.chat.id.003')"
+    ],
+    "raw": "`${otherUser?.display_name || i18n.t('auto.chat.id.003')} engellenecek ve mesaj gönderemeyecek.`"
+  },
+  {
+    "file": "app\\create-room.tsx",
+    "line": 418,
+    "col": 26,
+    "kind": "template",
+    "value": "Kart görseli yüklenemedi: ${0}",
+    "expressions": [
+      "e?.message || i18n.t('auto.create_room.024')"
+    ],
+    "raw": "`Kart görseli yüklenemedi: ${e?.message || i18n.t('auto.create_room.024')}`"
+  },
+  {
+    "file": "app\\create-room.tsx",
+    "line": 425,
+    "col": 26,
+    "kind": "template",
+    "value": "Arka plan görseli yüklenemedi: ${0}",
+    "expressions": [
+      "e?.message || i18n.t('auto.create_room.023')"
+    ],
+    "raw": "`Arka plan görseli yüklenemedi: ${e?.message || i18n.t('auto.create_room.023')}`"
+  },
+  {
+    "file": "app\\create-room.tsx",
+    "line": 597,
+    "col": 39,
+    "kind": "jsx_text",
+    "value": "Odanı 2-30 karakterlik en fazla",
+    "raw": "\n          Odanı 2-30 karakterlik en fazla "
+  },
+  {
+    "file": "app\\create-room.tsx",
+    "line": 598,
+    "col": 61,
+    "kind": "jsx_text",
+    "value": "etiketle tarif et — keşfette aramayı kolaylaştırır.",
+    "raw": " etiketle tarif et — keşfette aramayı kolaylaştırır.\n        "
+  },
+  {
+    "file": "app\\create-room.tsx",
+    "line": 1353,
+    "col": 120,
+    "kind": "jsx_text",
+    "value": "Bugün",
+    "raw": "\n                  Bugün "
+  },
+  {
+    "file": "app\\create-room.tsx",
+    "line": 1354,
+    "col": 63,
+    "kind": "jsx_text",
+    "value": "oda açtın. Yarın sıfırlanacak — ya da üyeliğini yükselterek daha fazla oda aç.",
+    "raw": " oda açtın. Yarın sıfırlanacak — ya da üyeliğini yükselterek daha fazla oda aç.\n                "
+  },
+  {
+    "file": "app\\edit-profile.tsx",
+    "line": 760,
+    "col": 40,
+    "kind": "jsx_text",
+    "value": "Tier seviyeniz ve SP bakiyeniz profil düzenleme ile değiştirilemez.",
+    "raw": "\n            Tier seviyeniz ve SP bakiyeniz profil düzenleme ile değiştirilemez."
+  },
+  {
+    "file": "app\\edit-profile.tsx",
+    "line": 761,
+    "col": 84,
+    "kind": "jsx_text",
+    "value": "SP kazanmak için platformu aktif kullanın.",
+    "raw": "\n            SP kazanmak için platformu aktif kullanın.\n          "
+  },
+  {
+    "file": "app\\leaderboard.tsx",
+    "line": 670,
+    "col": 50,
+    "kind": "jsx_text",
+    "value": "Pazartesi 09:00'da sıfırlanır. Her kategoride",
+    "raw": "\n                      Pazartesi 09:00'da sıfırlanır. Her kategoride "
+  },
+  {
+    "file": "app\\plus.tsx",
+    "line": 502,
+    "col": 40,
+    "kind": "jsx_text",
+    "value": "Abonelik otomatik yenilenir. İstediğin zaman iptal edebilirsin.",
+    "raw": "\n          Abonelik otomatik yenilenir. İstediğin zaman iptal edebilirsin."
+  },
+  {
+    "file": "app\\room\\[id].tsx",
+    "line": 1095,
+    "col": 35,
+    "kind": "jsx_text",
+    "value": "sizinle mesajlaşmak istiyor",
+    "raw": " sizinle mesajlaşmak istiyor\n                "
+  },
+  {
+    "file": "app\\room\\[id].tsx",
+    "line": 1348,
+    "col": 26,
+    "kind": "template",
+    "value": "↩︎ Yanıt: ${0}",
+    "expressions": [
+      "dmReplyingTo?.sender_id === firebaseUser?.uid ? 'Kendine' : (chatTarget?.name || i18n.t('auto.room.id.116'))"
+    ],
+    "raw": "`↩︎ Yanıt: ${dmReplyingTo?.sender_id === firebaseUser?.uid ? 'Kendine' : (chatTarget?.name || i18n.t('auto.room.id.116'))}`"
+  },
+  {
+    "file": "app\\room\\[id].tsx",
+    "line": 2638,
+    "col": 17,
+    "kind": "template",
+    "value": "Sahnede konuşmak için ${0} iznine ihtiyacımız var. İzni reddettiğiniz için ${1}. Ayarlardan izni açtıktan sonra tekrar deneyin.",
+    "expressions": [
+      "label.toLocaleLowerCase('tr-TR')",
+      "device === 'microphone' ? i18n.t('auto.room.id.096') : i18n.t('auto.room.id.095')"
+    ],
+    "raw": "`Sahnede konuşmak için ${label.toLocaleLowerCase('tr-TR')} iznine ihtiyacımız var. İzni reddettiğiniz için ${device === 'microphone' ? i18n.t('auto.room.id.096') : i18n.t('auto.room.id.095')}. Ayarlardan izni açtıktan sonra tekrar deneyin.`"
+  },
+  {
+    "file": "components\\BlockedUsersSheet.tsx",
+    "line": 130,
+    "col": 17,
+    "kind": "template",
+    "value": "${0} artık engelli değil.",
+    "expressions": [
+      "user.display_name || i18n.t('auto.BlockedUsersSheet.003')"
+    ],
+    "raw": "`${user.display_name || i18n.t('auto.BlockedUsersSheet.003')} artık engelli değil.`"
+  },
+  {
+    "file": "components\\BlockedUsersSheet.tsx",
+    "line": 134,
+    "col": 67,
+    "kind": "template",
+    "value": "${0} engelli kaldı.",
+    "expressions": [
+      "user.display_name || i18n.t('auto.BlockedUsersSheet.002')"
+    ],
+    "raw": "`${user.display_name || i18n.t('auto.BlockedUsersSheet.002')} engelli kaldı.`"
+  },
+  {
+    "file": "components\\CreateRoomCoachmark.tsx",
+    "line": 316,
+    "col": 47,
+    "kind": "jsx_text",
+    "value": "Yukarıdaki",
+    "raw": "\n                Yukarıdaki "
+  },
+  {
+    "file": "components\\ErrorBoundary.tsx",
+    "line": 72,
+    "col": 41,
+    "kind": "jsx_text",
+    "value": "Bu ekran beklenmedik bir hata ile karşılaştı.",
+    "raw": "\n              Bu ekran beklenmedik bir hata ile karşılaştı."
+  },
+  {
+    "file": "components\\ErrorBoundary.tsx",
+    "line": 73,
+    "col": 65,
+    "kind": "jsx_text",
+    "value": "Lütfen tekrar deneyin veya ana sayfaya dönün.",
+    "raw": "Lütfen tekrar deneyin veya ana sayfaya dönün.\n            "
+  },
+  {
+    "file": "components\\profile\\BadgeListModal.tsx",
+    "line": 160,
+    "col": 29,
+    "kind": "jsx_text",
+    "value": "rozet kazandı",
+    "raw": " rozet kazandı\n            "
+  },
+  {
+    "file": "components\\profile\\FeaturedBadgesPicker.tsx",
+    "line": 134,
+    "col": 29,
+    "kind": "jsx_text",
+    "value": "Profilinde öne çıkacak en fazla",
+    "raw": "\n          Profilinde öne çıkacak en fazla "
+  },
+  {
+    "file": "components\\profile\\FeaturedBadgesPicker.tsx",
+    "line": 135,
+    "col": 63,
+    "kind": "jsx_text",
+    "value": "rozet seç.",
+    "raw": " rozet seç.\n          "
+  },
+  {
+    "file": "components\\profile\\GiftSheet.tsx",
+    "line": 610,
+    "col": 54,
+    "kind": "jsx_text",
+    "value": "SP Hediye Gönder",
+    "raw": " SP Hediye Gönder\n                    "
+  },
+  {
+    "file": "components\\profile\\LanguageInterestPicker.tsx",
+    "line": 183,
+    "col": 79,
+    "kind": "jsx_text",
+    "value": "İlgi Alanları",
+    "raw": "\n                İlgi Alanları "
+  },
+  {
+    "file": "components\\profile\\LanguageInterestPicker.tsx",
+    "line": 198,
+    "col": 35,
+    "kind": "jsx_text",
+    "value": "Konuştuğun dilleri seç (en fazla",
+    "raw": "\n                Konuştuğun dilleri seç (en fazla "
+  },
+  {
+    "file": "components\\profile\\LanguageInterestPicker.tsx",
+    "line": 199,
+    "col": 64,
+    "kind": "jsx_text",
+    "value": "). Yabancı kullanıcılar\n                hangi dilde sohbet edeceğini görebilir.",
+    "raw": "). Yabancı kullanıcılar\n                hangi dilde sohbet edeceğini görebilir.\n              "
+  },
+  {
+    "file": "components\\profile\\LanguageInterestPicker.tsx",
+    "line": 230,
+    "col": 35,
+    "kind": "jsx_text",
+    "value": "İlgilendiğin konuları seç (en fazla",
+    "raw": "\n                İlgilendiğin konuları seç (en fazla "
+  },
+  {
+    "file": "components\\profile\\LanguageInterestPicker.tsx",
+    "line": 231,
+    "col": 67,
+    "kind": "jsx_text",
+    "value": "). Profilinde görünür ve\n                keşfet algoritması bu seçimleri kullanır.",
+    "raw": "). Profilinde görünür ve\n                keşfet algoritması bu seçimleri kullanır.\n              "
+  },
+  {
+    "file": "components\\profile\\SocialLinksEditor.tsx",
+    "line": 126,
+    "col": 33,
+    "kind": "jsx_text",
+    "value": "Profilinde gösterilen opsiyonel sosyal linkler. Kullanıcı adını\n              veya tam URL'yi yazabilirsin.",
+    "raw": "\n              Profilinde gösterilen opsiyonel sosyal linkler. Kullanıcı adını\n              veya tam URL'yi yazabilirsin.\n            "
+  },
+  {
+    "file": "components\\profile\\SPSentSuccessCompact.tsx",
+    "line": 284,
+    "col": 67,
+    "kind": "jsx_text",
+    "value": "Kapatmak için dokun",
+    "raw": "\n              Kapatmak için dokun\n            "
+  },
+  {
+    "file": "components\\profile\\SPSentSuccessModal.tsx",
+    "line": 687,
+    "col": 11,
+    "kind": "jsx_text",
+    "value": "SOPRANO POINTS HEDİYE EDİLDİ",
+    "raw": "\n            SOPRANO POINTS HEDİYE EDİLDİ\n          "
+  },
+  {
+    "file": "components\\profile\\VoiceBioRecorder.tsx",
+    "line": 281,
+    "col": 31,
+    "kind": "jsx_text",
+    "value": "Kendini 3-30 saniye arası tanıt. Yabancı kullanıcılar profilinde\n            bu kaydı dinleyerek seni daha iyi tanır.",
+    "raw": "\n            Kendini 3-30 saniye arası tanıt. Yabancı kullanıcılar profilinde\n            bu kaydı dinleyerek seni daha iyi tanır.\n          "
+  },
+  {
+    "file": "components\\profile\\WelcomeBonusModal.tsx",
+    "line": 381,
+    "col": 11,
+    "kind": "jsx_text",
+    "value": "Hoş Geldin!",
+    "raw": "\n            Hoş Geldin!\n          "
+  },
+  {
+    "file": "components\\profile\\WelcomeBonusModal.tsx",
+    "line": 394,
+    "col": 11,
+    "kind": "jsx_text",
+    "value": "Soprano dünyasına adım attın. Hediye olarak",
+    "raw": "\n            Soprano dünyasına adım attın. Hediye olarak"
+  },
+  {
+    "file": "components\\profile\\WelcomeBonusModal.tsx",
+    "line": 396,
+    "col": 58,
+    "kind": "jsx_text",
+    "value": "hesabına yüklendi —\n            ilk boost'unu yapmaya hazır.",
+    "raw": " hesabına yüklendi —\n            ilk boost'unu yapmaya hazır.\n          "
+  },
+  {
+    "file": "components\\ReportModal.tsx",
+    "line": 305,
+    "col": 37,
+    "kind": "jsx_text",
+    "value": "Yanlış raporlar hesabının kısıtlanmasına yol açabilir. Lütfen sadece\n            kuralları gerçekten ihlal eden içerikleri raporla.",
+    "raw": "\n            Yanlış raporlar hesabının kısıtlanmasına yol açabilir. Lütfen sadece\n            kuralları gerçekten ihlal eden içerikleri raporla.\n          "
+  },
+  {
+    "file": "components\\room\\EntryFeeCard.tsx",
+    "line": 354,
+    "col": 51,
+    "kind": "jsx_text",
+    "value": "SP Öde + Gir",
+    "raw": " SP Öde + Gir\n                    "
+  },
+  {
+    "file": "components\\room\\HostAccessPanel.tsx",
+    "line": 129,
+    "col": 52,
+    "kind": "template",
+    "value": "${0} artık odaya girebilir.",
+    "expressions": [
+      "req.user?.display_name || i18n.t('auto.room.HostAccessPanel.009')"
+    ],
+    "raw": "`${req.user?.display_name || i18n.t('auto.room.HostAccessPanel.009')} artık odaya girebilir.`"
+  },
+  {
+    "file": "components\\room\\HostAccessPanel.tsx",
+    "line": 151,
+    "col": 70,
+    "kind": "template",
+    "value": "${0} artık odaya girebilir.",
+    "expressions": [
+      "ban.user?.display_name || i18n.t('auto.room.HostAccessPanel.008')"
+    ],
+    "raw": "`${ban.user?.display_name || i18n.t('auto.room.HostAccessPanel.008')} artık odaya girebilir.`"
+  },
+  {
+    "file": "components\\room\\HostAccessPanel.tsx",
+    "line": 153,
+    "col": 70,
+    "kind": "template",
+    "value": "${0} banı kaldırılamadı.",
+    "expressions": [
+      "ban.user?.display_name || i18n.t('auto.room.HostAccessPanel.007')"
+    ],
+    "raw": "`${ban.user?.display_name || i18n.t('auto.room.HostAccessPanel.007')} banı kaldırılamadı.`"
+  },
+  {
+    "file": "components\\room\\HostAccessPanel.tsx",
+    "line": 349,
+    "col": 74,
+    "kind": "jsx_text",
+    "value": "tarafından",
+    "raw": " tarafından\n                          "
+  },
+  {
+    "file": "components\\room\\InRoomUserProfile.tsx",
+    "line": 929,
+    "col": 29,
+    "kind": "jsx_text",
+    "value": "seninle arkadaş olmak istiyor",
+    "raw": "seninle arkadaş olmak istiyor\n                      "
+  },
+  {
+    "file": "components\\room\\MessageGlowPickerSheet.tsx",
+    "line": 288,
+    "col": 35,
+    "kind": "jsx_text",
+    "value": "Standart stiller mesaj başı SP harcar. Premium stiller mağazadan tek seferlik\n            satın alınır, sonsuz kullanım.",
+    "raw": "\n            Standart stiller mesaj başı SP harcar. Premium stiller mağazadan tek seferlik\n            satın alınır, sonsuz kullanım.\n          "
+  },
+  {
+    "file": "components\\room\\PowerUpsSheet.tsx",
+    "line": 374,
+    "col": 42,
+    "kind": "jsx_text",
+    "value": "Kalıcı edinim değil, anlık tüketim. Süre Uzat ve Altın Davet aktif;\n              diğer iki güçlendirici çok yakında.",
+    "raw": "\n              Kalıcı edinim değil, anlık tüketim. Süre Uzat ve Altın Davet aktif;\n              diğer iki güçlendirici çok yakında.\n            "
+  },
+  {
+    "file": "components\\room\\RoomAccessPrompts.tsx",
+    "line": 175,
+    "col": 48,
+    "kind": "jsx_text",
+    "value": "Şifreyi",
+    "raw": "\n                  Şifreyi "
+  },
+  {
+    "file": "components\\room\\RoomAccessPrompts.tsx",
+    "line": 184,
+    "col": 53,
+    "kind": "jsx_text",
+    "value": "odayı şifre ile korudu. Doğru şifreyi girersen direkt dinleyici olarak katılırsın.",
+    "raw": " odayı şifre ile korudu. Doğru şifreyi girersen direkt dinleyici olarak katılırsın.\n          "
+  },
+  {
+    "file": "components\\room\\RoomAccessPrompts.tsx",
+    "line": 306,
+    "col": 129,
+    "kind": "jsx_text",
+    "value": "Katılmak için oda sahibine istek gönderebilirsin.",
+    "raw": " Katılmak için oda sahibine istek gönderebilirsin.\n            "
+  },
+  {
+    "file": "components\\room\\RoomAccessPrompts.tsx",
+    "line": 314,
+    "col": 127,
+    "kind": "jsx_text",
+    "value": "Onaylanırsa direkt odaya alınırsın.",
+    "raw": " Onaylanırsa direkt odaya alınırsın.\n          "
+  },
+  {
+    "file": "components\\RoomBoostSheet.tsx",
+    "line": 111,
+    "col": 49,
+    "kind": "jsx_text",
+    "value": "keşfet sayfasında üst sıralara çıkar ve daha çok dinleyici çeker.",
+    "raw": " keşfet sayfasında üst sıralara çıkar ve daha çok dinleyici çeker.\n        "
+  },
+  {
+    "file": "components\\RoomCreateHintSheet.tsx",
+    "line": 168,
+    "col": 11,
+    "kind": "jsx_text",
+    "value": "Hemen ilk odanı aç!",
+    "raw": "\n            Hemen ilk odanı aç!\n          "
+  },
+  {
+    "file": "components\\RoomCreateHintSheet.tsx",
+    "line": 181,
+    "col": 11,
+    "kind": "jsx_text",
+    "value": "Odalarım sekmesine git,",
+    "raw": "\n            Odalarım sekmesine git, "
+  },
+  {
+    "file": "components\\RoomCreateHintSheet.tsx",
+    "line": 182,
+    "col": 113,
+    "kind": "jsx_text",
+    "value": "düğmesine dokun. İstediğin konuda sesli oda aç, arkadaşlarını davet et — bağlanmak çok kolay.",
+    "raw": " düğmesine dokun. İstediğin konuda sesli oda aç, arkadaşlarını davet et — bağlanmak çok kolay.\n          "
+  },
+  {
+    "file": "services\\livekit.ts",
+    "line": 98,
+    "col": 20,
+    "kind": "template",
+    "value": "Ağ hatası: ${0}",
+    "expressions": [
+      "networkErr?.message || i18n.t('auto.livekit.009')"
+    ],
+    "raw": "`Ağ hatası: ${networkErr?.message || i18n.t('auto.livekit.009')}`"
+  },
+  {
+    "file": "services\\moderation.ts",
+    "line": 170,
+    "col": 17,
+    "kind": "template",
+    "value": "${0} bir ${1} \"${2}\" nedeniyle şikayet etti.",
+    "expressions": [
+      "reporter?.display_name || i18n.t('auto.moderation.005')",
+      "targetText",
+      "REASON_TR[reason] || reason"
+    ],
+    "raw": "`${reporter?.display_name || i18n.t('auto.moderation.005')} bir ${targetText} \"${REASON_TR[reason] || reason}\" nedeniyle şikayet etti.`"
+  },
+  {
+    "file": "services\\revenuecat.ts",
+    "line": 269,
+    "col": 39,
+    "kind": "template",
+    "value": "${0} paket mevcut değil.",
+    "expressions": [
+      "isYearly ? i18n.t('auto.revenuecat.005') : i18n.t('auto.revenuecat.004')"
+    ],
+    "raw": "`${isYearly ? i18n.t('auto.revenuecat.005') : i18n.t('auto.revenuecat.004')} paket mevcut değil.`"
+  }
+]
