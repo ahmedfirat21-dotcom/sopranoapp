@@ -8,6 +8,7 @@ import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Colors, Shadows } from '../../constants/theme';
 import { getLevelFromSP, getAvatarSource } from '../../constants/avatars';
 import { useAuth, useTheme, useUserProfileSheet } from '../_layout';
+import { useTranslation } from '../../services/i18n';
 import { supabase } from '../../constants/supabase';
 import { ReferralService } from '../../services/referral';
 import { ProfileService } from '../../services/database';
@@ -250,6 +251,7 @@ function spReasonIcon(reason: string | undefined, isPositive: boolean): { name: 
 
 export default function ProfileScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const params = useLocalSearchParams<{ openSP?: string }>();
   const { profile, user, firebaseUser, refreshProfile, setIsLoggedIn, setUser } = useAuth();
   const insets = useSafeAreaInsets();
@@ -659,7 +661,7 @@ export default function ProfileScreen() {
             />
             <SPHexagonIcon size={56} />
             <View style={{ flex: 1, marginLeft: 14 }}>
-              <Text style={p.walletCompactLabel}>SP CÜZDANIM</Text>
+              <Text style={p.walletCompactLabel}>{t('profile.sp_wallet')}</Text>
               <Text style={p.walletCompactAmount}>{isGM ? '∞' : spBalance.toLocaleString('tr-TR')}</Text>
             </View>
             <View style={p.levelBadge}>
@@ -786,7 +788,7 @@ export default function ProfileScreen() {
                 </View>
 
                 {/* Bölüm 1: Kendi kodum */}
-                <Text style={[styles.modalSubtitle, { marginTop: 4 }]}>Kendi Kodun</Text>
+                <Text style={[styles.modalSubtitle, { marginTop: 4 }]}>{t('profile.your_invite_code')}</Text>
                 <View style={styles.myCodeRow}>
                   <Text style={styles.myCodeText}>{myReferralCode || '—'}</Text>
                   <Pressable
@@ -811,12 +813,12 @@ export default function ProfileScreen() {
                 <Text style={styles.modalDesc}>Bir arkadaşın kodunu kullanırsa, ikiniz de 50 SP kazanırsınız.</Text>
 
                 {/* Bölüm 2: Arkadaş kodu gir — zaten kullanıldıysa kilit göster */}
-                <Text style={[styles.modalSubtitle, { marginTop: 16 }]}>Arkadaş Kodu Gir</Text>
+                <Text style={[styles.modalSubtitle, { marginTop: 16 }]}>{t('profile.enter_invite_code')}</Text>
                 {usedReferral.used ? (
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, paddingHorizontal: 14, borderRadius: 12, backgroundColor: 'rgba(20,184,166,0.1)', borderWidth: 1, borderColor: 'rgba(20,184,166,0.3)' }}>
                     <Ionicons name="checkmark-circle" size={20} color={Colors.teal} />
                     <View style={{ flex: 1 }}>
-                      <Text style={{ color: Colors.teal, fontSize: 12, fontWeight: '700' }}>Davet kodu kullanıldı</Text>
+                      <Text style={{ color: Colors.teal, fontSize: 12, fontWeight: '700' }}>{t('profile.invite_code_used')}</Text>
                       <Text style={{ color: Colors.text3, fontSize: 11, marginTop: 2 }}>
                         {usedReferral.code ? `Kod: ${usedReferral.code}` : 'Bir kod zaten uygulandı'}
                         {usedReferral.usedAt ? ` · ${new Date(usedReferral.usedAt).toLocaleDateString('tr-TR')}` : ''}
@@ -862,7 +864,7 @@ export default function ProfileScreen() {
               <Text style={styles.avatarPreviewName}>{displayName}</Text>
               <View style={styles.avatarPreviewHint}>
                 <Ionicons name="close-circle" size={18} color="rgba(255,255,255,0.8)" />
-                <Text style={styles.avatarPreviewHintText}>Kapatmak için dokun</Text>
+                <Text style={styles.avatarPreviewHintText}>{t('profile.tap_to_close')}</Text>
               </View>
             </Pressable>
           </Modal>

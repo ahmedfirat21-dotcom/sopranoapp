@@ -16,6 +16,7 @@ import { Colors, Shadows } from '../../constants/theme';
 import { RoomService, type Room } from '../../services/database';
 import { supabase } from '../../constants/supabase';
 import { useAuth, useTheme, useBadges, useOnlineFriends as useOnlineFriendsLayout, useUserProfileSheet } from '../_layout';
+import { i18n, useTranslation } from '../../services/i18n';
 
 import StatusAvatar from '../../components/StatusAvatar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -189,13 +190,13 @@ const ManagedRoomCard = React.memo(function ManagedRoomCard({ room, onManage, on
             {isLive ? (
               <View style={mS.liveBadge}>
                 <Animated.View style={[mS.liveDot, { opacity: livePulse }]} />
-                <Text style={mS.liveText}>CANLI</Text>
+                <Text style={mS.liveText}>{i18n.t('rooms.live')}</Text>
                 {listeners > 0 && <Text style={mS.listenerCount}>· {listeners}</Text>}
               </View>
             ) : isPersistent ? (
               <View style={mS.sleepBadge}>
                 <Ionicons name="moon" size={9} color="#A78BFA" />
-                <Text style={mS.sleepText}>Pasif</Text>
+                <Text style={mS.sleepText}>{i18n.t('rooms.passive')}</Text>
               </View>
             ) : (
               <Text style={mS.offlineText}>❄️ Donuk</Text>
@@ -204,19 +205,19 @@ const ManagedRoomCard = React.memo(function ManagedRoomCard({ room, onManage, on
             {isPersistent && (
               <View style={mS.premiumBadge}>
                 <Ionicons name="trophy" size={9} color={Colors.premiumGold} />
-                <Text style={mS.premiumText}>Premium</Text>
+                <Text style={mS.premiumText}>{i18n.t('rooms.premium')}</Text>
               </View>
             )}
             {room.type === 'closed' && (
               <View style={mS.typeBadge}>
                 <Ionicons name="lock-closed" size={8} color="#F59E0B" />
-                <Text style={[mS.typeBadgeText, { color: '#F59E0B' }]}>Şifreli</Text>
+                <Text style={[mS.typeBadgeText, { color: '#F59E0B' }]}>{i18n.t('rooms.encrypted')}</Text>
               </View>
             )}
             {room.type === 'invite' && (
               <View style={[mS.typeBadge, { backgroundColor: 'rgba(139,92,246,0.12)', borderColor: 'rgba(139,92,246,0.25)' }]}>
                 <Ionicons name="mail" size={8} color="#8B5CF6" />
-                <Text style={[mS.typeBadgeText, { color: '#8B5CF6' }]}>Davetli</Text>
+                <Text style={[mS.typeBadgeText, { color: '#8B5CF6' }]}>{i18n.t('rooms.invite_only')}</Text>
               </View>
             )}
             {settings.entry_fee_sp > 0 && (
@@ -365,7 +366,7 @@ function ManagedRoomsEmptyCard() {
       <View style={mrS.sectionRow}>
         <View style={[mrS.sectionAccent, { backgroundColor: '#14B8A6' }]} />
         <Ionicons name="headset" size={14} color="#14B8A6" style={{ opacity: 0.7 }} />
-        <Text style={mrS.sectionTitle}>Yönettiğim Odalar</Text>
+        <Text style={mrS.sectionTitle}>{i18n.t('rooms.managed_rooms')}</Text>
       </View>
       <View style={mrS.emptyCard}>
         <LinearGradient
@@ -557,7 +558,7 @@ function RecentRoomCard({ item, onPress }: { item: RoomHistoryItem & { _isLive?:
       {isLive ? (
         <Text style={rcS.host} numberOfLines={1}>{item.hostName}</Text>
       ) : (
-        <Text style={rcS.closedBadge} numberOfLines={1}>Kapalı</Text>
+        <Text style={rcS.closedBadge} numberOfLines={1}>{i18n.t('rooms.closed')}</Text>
       )}
     </Pressable>
   );
@@ -610,7 +611,7 @@ function FriendLiveCard({ item, onPress }: { item: FriendInRoom; onPress: () => 
       <Text style={flcS.roomName} numberOfLines={1}>{item.roomName}</Text>
       <View style={flcS.joinBtn}>
         <Ionicons name="enter-outline" size={10} color="#22C55E" />
-        <Text style={flcS.joinText}>Katıl</Text>
+        <Text style={flcS.joinText}>{i18n.t('rooms.join')}</Text>
       </View>
     </Pressable>
   );
@@ -738,6 +739,7 @@ const tplS = StyleSheet.create({
 // ════════════════════════════════════════════════════════════
 export default function MyRoomsScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const { firebaseUser, profile, setShowNotifDrawer, setNotifDrawerAnchorRight } = useAuth();
   const { openUserProfile } = useUserProfileSheet();
   const insets = useSafeAreaInsets();
@@ -1521,7 +1523,7 @@ export default function MyRoomsScreen() {
             <Ionicons name="add-circle" size={22} color="#FFF" />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={s.ctaTitle}>Yeni Oda Oluştur</Text>
+            <Text style={s.ctaTitle}>{t('home.create_new_room')}</Text>
             <Text style={s.ctaSub}>
               {/* ★ 2026-04-21: GodMaster/admin için ∞ açık gösterimi — tier gücünü hissetsin. */}
               {dailyQuota
@@ -1558,7 +1560,7 @@ export default function MyRoomsScreen() {
             <View style={s.sectionRow}>
               <View style={[s.sectionAccent, { backgroundColor: '#22C55E' }]} />
               <Ionicons name="people" size={14} color="#22C55E" style={{ opacity: 0.7 }} />
-              <Text style={s.sectionTitle}>Arkadaşların Canlı</Text>
+              <Text style={s.sectionTitle}>{t('home.friends_live')}</Text>
             </View>
             {friendsLive.length > 0 ? (
               <ScrollView
@@ -1591,7 +1593,7 @@ export default function MyRoomsScreen() {
             <View style={s.sectionRow}>
               <View style={[s.sectionAccent, { backgroundColor: '#3B82F6' }]} />
               <Ionicons name="time" size={14} color="#3B82F6" style={{ opacity: 0.7 }} />
-              <Text style={s.sectionTitle}>Son Girdiğin Odalar</Text>
+              <Text style={s.sectionTitle}>{t('home.recent_rooms')}</Text>
             </View>
             {recentRooms.length > 0 ? (
               <ScrollView

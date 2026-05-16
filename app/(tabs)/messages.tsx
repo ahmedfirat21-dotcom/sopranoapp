@@ -9,6 +9,7 @@ import { Colors, Shadows } from '../../constants/theme';
 import { MessageService, ProfileService, type InboxItem, type Message } from '../../services/database';
 import { supabase } from '../../constants/supabase';
 import { useAuth, useBadges, useTheme, useOnlineFriends, useUserProfileSheet, useDMNotif } from '../_layout';
+import { useTranslation } from '../../services/i18n';
 import { useFocusEffect } from 'expo-router';
 import { useCallback } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -373,7 +374,7 @@ function SwipeableRow({ children, onDelete, containerStyle }: { children: React.
         <RNAnimated.View style={[styles.swipeDeleteBtn, { opacity: deleteOpacity }]}>
           <Pressable onPress={onDelete} style={{ flex: 1, justifyContent: 'center', alignItems: 'center', gap: 4 }}>
             <Ionicons name="trash-outline" size={18} color="#FFF" />
-            <Text style={styles.swipeDeleteText}>Sil</Text>
+            <Text style={styles.swipeDeleteText}>{t('common.delete')}</Text>
           </Pressable>
         </RNAnimated.View>
         <RNAnimated.View style={{ transform: [{ translateX }] }} {...panResponder.panHandlers}>
@@ -393,6 +394,7 @@ function SwipeableRow({ children, onDelete, containerStyle }: { children: React.
 
 export default function MessagesScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const { firebaseUser, profile, setShowNotifDrawer, setNotifDrawerAnchorRight } = useAuth();
   const { refreshBadges } = useBadges();
   useTheme();
@@ -1101,7 +1103,7 @@ export default function MessagesScreen() {
         <View style={styles.friendSection}>
           <View style={styles.friendSectionHeader}>
             <View style={styles.onlineDot} />
-            <Text style={styles.friendSectionTitle}>Çevrimiçi</Text>
+            <Text style={styles.friendSectionTitle}>{t('messages.friends_online')}</Text>
             <View style={styles.friendCountBadge}>
               <Text style={styles.friendCountText}>{onlineFriends.length}</Text>
             </View>
@@ -1180,7 +1182,7 @@ export default function MessagesScreen() {
         pendingRequests.length === 0 ? (
           <View style={{ alignItems: 'center', paddingVertical: 40 }}>
             <Ionicons name="mail-open-outline" size={40} color="rgba(148,163,184,0.4)" />
-            <Text style={{ marginTop: 10, fontSize: 13, color: '#94A3B8' }}>Bekleyen mesaj isteği yok</Text>
+            <Text style={{ marginTop: 10, fontSize: 13, color: '#94A3B8' }}>{t('messages.no_pending_requests')}</Text>
           </View>
         ) : (
           <FlatList
@@ -1265,7 +1267,7 @@ export default function MessagesScreen() {
               // ★ 2026-04-21: Hata state — empty'den ayrı, retry butonu
               <View style={styles.emptyWrap}>
                 <Ionicons name="cloud-offline-outline" size={64} color="#EF4444" style={styles.emptyIcon} />
-                <Text style={styles.emptyTitle}>Bağlantı sorunu</Text>
+                <Text style={styles.emptyTitle}>{t('messages.connection_issue')}</Text>
                 <Text style={styles.emptySubtitle}>{loadError}</Text>
                 <Pressable style={styles.emptyActionBtn} onPress={() => { setLoading(true); loadInbox(); }}>
                   <LinearGradient
@@ -1274,14 +1276,14 @@ export default function MessagesScreen() {
                     style={styles.emptyActionGrad}
                   >
                     <Ionicons name="refresh" size={16} color="#FFF" />
-                    <Text style={styles.emptyActionText}>Tekrar Dene</Text>
+                    <Text style={styles.emptyActionText}>{t('common.retry')}</Text>
                   </LinearGradient>
                 </Pressable>
               </View>
             ) : (
               <View style={styles.emptyWrap}>
                 <Ionicons name="chatbubbles" size={72} color={Colors.teal} style={styles.emptyIcon} />
-                <Text style={styles.emptyTitle}>Henüz mesajın yok</Text>
+                <Text style={styles.emptyTitle}>{t('messages.no_messages')}</Text>
                 <Text style={styles.emptySubtitle}>
                   Keşfet sayfasından birine git,{'\n'}sohbet başlat!
                 </Text>
@@ -1292,7 +1294,7 @@ export default function MessagesScreen() {
                     style={styles.emptyActionGrad}
                   >
                     <Ionicons name="compass" size={16} color="#FFF" />
-                    <Text style={styles.emptyActionText}>Keşfet</Text>
+                    <Text style={styles.emptyActionText}>{t('home.discover')}</Text>
                   </LinearGradient>
                 </Pressable>
               </View>

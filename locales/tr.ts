@@ -33,6 +33,7 @@ const tr: Record<string, string> = {
   'common.coming_soon': 'Çok Yakında',
   'common.or': 'veya',
   'common.and': 've',
+  'common.clear': 'Temizle',
 
   // ── Tab Bar ────────────────────────────────────────
   'tabs.home': 'Ana Sayfa',
@@ -49,10 +50,33 @@ const tr: Record<string, string> = {
   'home.for_you': 'Sana Özel',
   'home.no_rooms': 'Henüz canlı oda yok',
   'home.create_room': 'Oda Oluştur',
+  'home.featured': 'Öne Çıkan',
+  'home.friends_live': 'Arkadaşların Canlı',
+  'home.recent_rooms': 'Son Girdiğin Odalar',
+  'home.followed_rooms': 'Takip Ettiğin Odalar',
+  'home.connection_issue': 'Bağlantı Sorunu',
+  'home.filter_empty': 'Filtre Sonucu Boş',
+  'home.be_first': 'Bu Kategoride İlk Ol',
+  'home.restore_all': 'Tümünü Geri Getir',
+  'home.create_new_room': 'Yeni Oda Oluştur',
+  'home.swipe_report': 'Bildir',
+  'home.swipe_hide': 'Gizle',
+  'home.empty_seat': 'Boş',
+  'home.sleeping': 'Uyuyor',
 
   // ── Rooms ──────────────────────────────────────────
   'rooms.title': 'Odalar',
   'rooms.live': 'CANLI',
+  'rooms.passive': 'Pasif',
+  'rooms.premium': 'Premium',
+  'rooms.encrypted': 'Şifreli',
+  'rooms.invite_only': 'Davetli',
+  'rooms.closed': 'Kapalı',
+  'rooms.new': 'Yeni Açıldı',
+  'rooms.official': 'Resmi',
+  'rooms.boost': 'BOOST',
+  'rooms.trend': 'TREND',
+  'rooms.managed_rooms': 'Yönettiğim Odalar',
   'rooms.listeners': 'dinleyici',
   'rooms.speakers': 'konuşmacı',
   'rooms.join': 'Katıl',
@@ -75,6 +99,9 @@ const tr: Record<string, string> = {
   'messages.type_message': 'Mesaj yaz...',
   'messages.message_request': 'Mesaj İsteği',
   'messages.requests': 'İstekler',
+  'messages.no_pending_requests': 'Bekleyen mesaj isteği yok',
+  'messages.connection_issue': 'Bağlantı sorunu',
+  'messages.friends_online': 'Çevrimiçi',
 
   // ── Profile ────────────────────────────────────────
   'profile.title': 'Profil',
@@ -92,6 +119,11 @@ const tr: Record<string, string> = {
   'profile.remove_friend': 'Arkadaşlıktan Çıkar',
   'profile.send_message': 'Mesaj Gönder',
   'profile.send_gift': 'Hediye Gönder',
+  'profile.sp_wallet': 'SP CÜZDANIM',
+  'profile.your_invite_code': 'Kendi Kodun',
+  'profile.enter_invite_code': 'Arkadaş Kodu Gir',
+  'profile.invite_code_used': 'Davet kodu kullanıldı',
+  'profile.tap_to_close': 'Kapatmak için dokun',
 
   // ── Settings ───────────────────────────────────────
   'settings.title': 'Ayarlar',

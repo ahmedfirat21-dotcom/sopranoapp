@@ -14,6 +14,7 @@ import { RoomFollowService } from '../../services/roomFollow';
 import { ProfileService } from '../../services/profile';
 import { supabase } from '../../constants/supabase';
 import { useAuth, useTheme, useBadges, useOnlineFriends, useUserProfileSheet } from '../_layout';
+import { i18n, useTranslation } from '../../services/i18n';
 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -364,18 +365,18 @@ function FollowedRoomCard({ room, index }: { room: Room; index: number }) {
         ) : isEmpty ? (
           <View style={s.fEmptyBadge}>
             <Ionicons name="radio-outline" size={9} color="#94A3B8" />
-            <Text style={s.fEmptyText}>Boş</Text>
+            <Text style={s.fEmptyText}>{i18n.t('home.empty_seat')}</Text>
           </View>
         ) : isSleeping ? (
           <View style={s.fSleepBadge}>
             <Ionicons name="moon" size={9} color="#F59E0B" />
-            <Text style={s.fSleepText}>Uyuyor</Text>
+            <Text style={s.fSleepText}>{i18n.t('home.sleeping')}</Text>
           </View>
         ) : null}
         {isPremiumOwner && (
           <View style={s.fPremiumBadge}>
             <Ionicons name="trophy" size={8} color={Colors.premiumGold} />
-            <Text style={s.fPremiumText}>Premium</Text>
+            <Text style={s.fPremiumText}>{i18n.t('rooms.premium')}</Text>
           </View>
         )}
       </View>
@@ -510,7 +511,7 @@ function SwipeToHideRow({ children, onHide, onReport }: { children: React.ReactN
             style={{ width: SWIPE_ACTION_W, backgroundColor: '#DC2626', alignItems: 'center', justifyContent: 'center' }}
           >
             <Ionicons name="flag" size={20} color="#FFF" />
-            <Text style={{ fontSize: 10, fontWeight: '800', color: '#FFF', letterSpacing: 0.5, marginTop: 4 }}>Bildir</Text>
+            <Text style={{ fontSize: 10, fontWeight: '800', color: '#FFF', letterSpacing: 0.5, marginTop: 4 }}>{i18n.t('home.swipe_report')}</Text>
           </Pressable>
         )}
         <Pressable
@@ -518,7 +519,7 @@ function SwipeToHideRow({ children, onHide, onReport }: { children: React.ReactN
           style={{ width: SWIPE_ACTION_W, backgroundColor: '#64748B', alignItems: 'center', justifyContent: 'center' }}
         >
           <Ionicons name="eye-off-outline" size={20} color="#FFF" />
-          <Text style={{ fontSize: 10, fontWeight: '800', color: '#FFF', letterSpacing: 0.5, marginTop: 4 }}>Gizle</Text>
+          <Text style={{ fontSize: 10, fontWeight: '800', color: '#FFF', letterSpacing: 0.5, marginTop: 4 }}>{i18n.t('home.swipe_hide')}</Text>
         </Pressable>
       </Animated.View>
       {/* Kart — önde, translate ile kayar. borderRadius + overflow kart'ta */}
@@ -697,12 +698,12 @@ const BigLiveRoomCard = React.memo(function BigLiveRoomCard({ room, onJoin, isFo
           {room.is_live && listenerCount > 0 ? (
             <View style={s.bigLiveBadge}>
               <Animated.View style={[s.bigLiveDot, { opacity: livePulse }]} />
-              <Text style={s.bigLiveText}>CANLI</Text>
+              <Text style={s.bigLiveText}>{i18n.t('rooms.live')}</Text>
             </View>
           ) : room.is_live && listenerCount === 0 ? (
             <View style={s.bigEmptyBadge}>
               <Ionicons name="sparkles-outline" size={9} color="#FBBF24" />
-              <Text style={s.bigEmptyText}>Yeni Açıldı</Text>
+              <Text style={s.bigEmptyText}>{i18n.t('rooms.new')}</Text>
             </View>
           ) : null}
         </View>
@@ -714,13 +715,13 @@ const BigLiveRoomCard = React.memo(function BigLiveRoomCard({ room, onJoin, isFo
           {isPersistent && (
             <View style={s.bigPremiumPill}>
               <Ionicons name="trophy" size={9} color="#FDE68A" />
-              <Text style={s.bigPremiumPillText}>Premium</Text>
+              <Text style={s.bigPremiumPillText}>{i18n.t('rooms.premium')}</Text>
             </View>
           )}
           {isSystem && (
             <View style={[s.bigTagBadge, { backgroundColor: 'rgba(20,184,166,0.15)', borderColor: 'rgba(20,184,166,0.3)' }]}>
               <Ionicons name="shield-checkmark" size={9} color="#14B8A6" />
-              <Text style={[s.bigTagText, { color: '#14B8A6' }]}>Resmi</Text>
+              <Text style={[s.bigTagText, { color: '#14B8A6' }]}>{i18n.t('rooms.official')}</Text>
             </View>
           )}
           {isBoosted && (
@@ -730,13 +731,13 @@ const BigLiveRoomCard = React.memo(function BigLiveRoomCard({ room, onJoin, isFo
                 textShadowOffset: { width: 0, height: 0 },
                 textShadowRadius: 5,
               }} />
-              <Text style={[s.bigTagText, { color: '#F472B6', fontWeight: '900', letterSpacing: 0.5 }]}>BOOST</Text>
+              <Text style={[s.bigTagText, { color: '#F472B6', fontWeight: '900', letterSpacing: 0.5 }]}>{i18n.t('rooms.boost')}</Text>
             </View>
           )}
           {!isBoosted && !isSystem && listenerCount >= 5 && (
             <View style={[s.bigTagBadge, { backgroundColor: 'rgba(251,191,36,0.15)', borderColor: 'rgba(251,191,36,0.3)' }]}>
               <Ionicons name="star" size={9} color="#FBBF24" />
-              <Text style={[s.bigTagText, { color: '#FBBF24' }]}>TREND</Text>
+              <Text style={[s.bigTagText, { color: '#FBBF24' }]}>{i18n.t('rooms.trend')}</Text>
             </View>
           )}
         </View>
@@ -749,13 +750,13 @@ const BigLiveRoomCard = React.memo(function BigLiveRoomCard({ room, onJoin, isFo
           {room.type === 'closed' && (
             <View style={s.bigInlineBadge}>
               <Ionicons name="lock-closed" size={8} color="#F59E0B" />
-              <Text style={[s.bigInlineBadgeText, { color: '#F59E0B' }]}>Şifreli</Text>
+              <Text style={[s.bigInlineBadgeText, { color: '#F59E0B' }]}>{i18n.t('rooms.encrypted')}</Text>
             </View>
           )}
           {room.type === 'invite' && (
             <View style={[s.bigInlineBadge, { backgroundColor: 'rgba(139,92,246,0.12)', borderColor: 'rgba(139,92,246,0.25)' }]}>
               <Ionicons name="mail" size={8} color="#8B5CF6" />
-              <Text style={[s.bigInlineBadgeText, { color: '#8B5CF6' }]}>Davetli</Text>
+              <Text style={[s.bigInlineBadgeText, { color: '#8B5CF6' }]}>{i18n.t('rooms.invite_only')}</Text>
             </View>
           )}
           {(room.room_settings as any)?.entry_fee_sp > 0 && (
@@ -845,7 +846,7 @@ const BigLiveRoomCard = React.memo(function BigLiveRoomCard({ room, onJoin, isFo
             style={s.bigJoinBtn}
           >
             <Ionicons name="headset" size={13} color="#FFF" />
-            <Text style={s.bigJoinText}>Katıl</Text>
+            <Text style={s.bigJoinText}>{i18n.t('rooms.join')}</Text>
           </LinearGradient>
         </Pressable>
         </SkiaShadow>
@@ -869,6 +870,7 @@ const BigLiveRoomCard = React.memo(function BigLiveRoomCard({ room, onJoin, isFo
 // ════════════════════════════════════════════════════════════
 export default function HomeScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const { firebaseUser, profile, setShowNotifDrawer, setNotifDrawerAnchorRight, minimizedRoom, justCompletedOnboarding, setJustCompletedOnboarding, setTabBarCovered } = useAuth();
   const { openUserProfile } = useUserProfileSheet();
   const insets = useSafeAreaInsets();
@@ -1568,7 +1570,7 @@ export default function HomeScreen() {
                 <View style={{ marginBottom: 4 }}>
                   <View style={s.popularHeader}>
                     <Ionicons name="sparkles" size={14} color="#FBBF24" />
-                    <Text style={s.popularTitle}>Öne Çıkan</Text>
+                    <Text style={s.popularTitle}>{t('home.featured')}</Text>
                   </View>
                   <View style={{ flexDirection: 'row', paddingHorizontal: 16, gap: 10 }}>
                     {boostedProfiles.map((bp) => {
@@ -1619,7 +1621,7 @@ export default function HomeScreen() {
                 <View style={{ marginBottom: 2 }}>
                   <View style={s.popularHeader}>
                     <Ionicons name="sparkles" size={14} color="#FBBF24" />
-                    <Text style={s.popularTitle}>Öne Çıkan</Text>
+                    <Text style={s.popularTitle}>{t('home.featured')}</Text>
                   </View>
                   <ScrollView
                     horizontal
@@ -1759,7 +1761,7 @@ export default function HomeScreen() {
                         onPress={() => { setAdvancedFilters([]); setShowAdvFilterPanel(false); }}
                       >
                         <Ionicons name="close-circle" size={11} color="#EF4444" />
-                        <Text style={[s.advFilterText, { color: '#EF4444' }]}>Temizle</Text>
+                        <Text style={[s.advFilterText, { color: '#EF4444' }]}>{t('common.clear')}</Text>
                       </Pressable>
                     )}
                   </ScrollView>
@@ -1818,11 +1820,11 @@ export default function HomeScreen() {
                   <Ionicons name="cloud-offline-outline" size={28} color="#EF4444" />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={s.heroEmptyTitle}>Bağlantı Sorunu</Text>
+                  <Text style={s.heroEmptyTitle}>{t('home.connection_issue')}</Text>
                   <Text style={s.heroEmptySub}>{loadError}</Text>
                 </View>
                 <Pressable onPress={() => loadData()} hitSlop={10} style={{ paddingHorizontal: 10, paddingVertical: 6, backgroundColor: 'rgba(239,68,68,0.2)', borderRadius: 10, borderWidth: 1, borderColor: 'rgba(239,68,68,0.4)' }}>
-                  <Text style={{ color: '#FCA5A5', fontWeight: '800', fontSize: 12 }}>Tekrar Dene</Text>
+                  <Text style={{ color: '#FCA5A5', fontWeight: '800', fontSize: 12 }}>{t('common.retry')}</Text>
                 </Pressable>
               </LinearGradient>
             </View>
@@ -1838,7 +1840,7 @@ export default function HomeScreen() {
                   <Ionicons name="filter" size={28} color="#94A3B8" />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={s.heroEmptyTitle}>Filtre Sonucu Boş</Text>
+                  <Text style={s.heroEmptyTitle}>{t('home.filter_empty')}</Text>
                   <Text style={s.heroEmptySub}>Seçili filtrelere uyan oda yok. Filtreleri değiştirmeyi dene.</Text>
                 </View>
               </LinearGradient>
@@ -1862,7 +1864,7 @@ export default function HomeScreen() {
                   <Ionicons name="mic" size={32} color="#14B8A6" />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={s.heroEmptyTitle}>Bu Kategoride İlk Ol</Text>
+                  <Text style={s.heroEmptyTitle}>{t('home.be_first')}</Text>
                   <Text style={s.heroEmptySub}>
                     {`İlk ${SMART_FILTERS.find(f => f.id === activeFilter)?.label || ''} odasını açarak öncü ol!`}
                   </Text>
@@ -1976,7 +1978,7 @@ export default function HomeScreen() {
                   <Text style={s.hiddenRoomsBarText}>
                     {ignoredRoomIds.size} gizli oda var
                   </Text>
-                  <Text style={s.hiddenRoomsBarAction}>Tümünü Geri Getir</Text>
+                  <Text style={s.hiddenRoomsBarAction}>{t('home.restore_all')}</Text>
                   <Ionicons name="refresh" size={12} color="#FBBF24" />
                 </Pressable>
               )}
@@ -1984,7 +1986,7 @@ export default function HomeScreen() {
               <View style={{ marginTop: 8 }}>
                 <View style={s.followedPanelHeader}>
                   <Ionicons name="bookmark" size={14} color={Colors.accentTeal} />
-                  <Text style={s.followedPanelTitle}>Takip Ettiğin Odalar</Text>
+                  <Text style={s.followedPanelTitle}>{t('home.followed_rooms')}</Text>
                   <Text style={s.followedPanelCount}>{followedRooms.length}</Text>
                 </View>
                 <ScrollView
