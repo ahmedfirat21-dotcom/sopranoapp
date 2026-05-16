@@ -40,7 +40,7 @@ import AccountDeletedOverlay from '../../components/AccountDeletedOverlay';
 import { consumeAccountJustDeletedFlag } from '../../services/account';
 import { auth, GOOGLE_WEB_CLIENT_ID } from '../../constants/firebase';
 import { useAuth } from '../_layout';
-import { useTranslation } from '../../services/i18n';
+import { i18n, useTranslation } from '../../services/i18n';
 
 const { height: SCREEN_HEIGHT, width: SCREEN_W } = Dimensions.get('window');
 
@@ -80,10 +80,10 @@ function getPasswordStrength(pw: string): { score: number; label: string; color:
   if (/[0-9]/.test(pw)) score++;
   if (/[^a-zA-Z0-9çğıöşüÇĞİÖŞÜ]/.test(pw)) score++;
   if (pw.length >= 12) score++;
-  if (score <= 1) return { score, label: 'Zayıf', color: '#EF4444' };
+  if (score <= 1) return { score, label: i18n.t('auth.login.002'), color: '#EF4444' };
   if (score <= 2) return { score, label: 'Orta', color: '#F59E0B' };
-  if (score <= 3) return { score, label: 'İyi', color: '#3B82F6' };
-  return { score, label: 'Güçlü', color: '#10B981' };
+  if (score <= 3) return { score, label: i18n.t('auth.login.003'), color: '#3B82F6' };
+  return { score, label: i18n.t('auth.login.004'), color: '#10B981' };
 }
 
 // ★ SEC-BF2: AsyncStorage tabanlı kalıcı cooldown anahtarları
@@ -238,18 +238,18 @@ export default function LoginScreen() {
   const handleEmailLogin = async () => {
     const trimmedEmail = email.trim();
     if (!trimmedEmail || !password) {
-      showToast({ title: 'Eksik Bilgi', message: 'E-posta ve şifre alanlarını doldurun.', type: 'warning' });
+      showToast({ title: 'Eksik Bilgi', message: i18n.t('auth.login.005'), type: 'warning' });
       return;
     }
     // ★ SEC-BF2: Email format kontrolü
     if (!EMAIL_REGEX.test(trimmedEmail)) {
-      showToast({ title: 'Geçersiz E-posta', message: 'Geçerli bir e-posta adresi gir.', type: 'error' });
+      showToast({ title: i18n.t('auth.login.006'), message: i18n.t('auth.login.007'), type: 'error' });
       return;
     }
     // ★ SEC-BF2: Kalıcı cooldown kontrolü — 5 başarısız denemeden sonra 60sn bekleme
     if (Date.now() < cooldownUntilRef.current) {
       const remainSec = Math.ceil((cooldownUntilRef.current - Date.now()) / 1000);
-      showToast({ title: 'Çok Fazla Deneme', message: `${remainSec} saniye bekleyip tekrar dene.`, type: 'warning' });
+      showToast({ title: i18n.t('auth.login.008'), message: `${remainSec} saniye bekleyip tekrar dene.`, type: 'warning' });
       return;
     }
     setLoading(true);
@@ -269,13 +269,13 @@ export default function LoginScreen() {
         const cooldownMs = Math.min(30_000 * Math.pow(2, Math.floor(failedAttemptsRef.current / 5) - 1), 300_000); // Kademeli: 30s→60s→120s→max 5dk
         cooldownUntilRef.current = Date.now() + cooldownMs;
         const cooldownSec = Math.ceil(cooldownMs / 1000);
-        showToast({ title: 'Hesap Geçici Kilitli', message: `${cooldownSec} saniye bekleyip tekrar dene.`, type: 'warning' });
+        showToast({ title: i18n.t('auth.login.009'), message: `${cooldownSec} saniye bekleyip tekrar dene.`, type: 'warning' });
       } else if (error?.code === 'auth/too-many-requests') {
         cooldownUntilRef.current = Date.now() + 60_000;
-        showToast({ title: 'Hesap Geçici Kilitli', message: '1 dakika sonra tekrar dene.', type: 'warning' });
+        showToast({ title: i18n.t('auth.login.010'), message: '1 dakika sonra tekrar dene.', type: 'warning' });
       } else {
         // ★ SEC-ENUM: Tüm kimlik doğrulama hatalarında aynı mesaj — e-posta enumeration engeli
-        showToast({ title: 'Giriş Başarısız', message: 'E-posta veya şifre hatalı.', type: 'error' });
+        showToast({ title: i18n.t('auth.login.011'), message: i18n.t('auth.login.012'), type: 'error' });
       }
       // ★ SEC-BF2: Kalıcı kayıt
       AsyncStorage.setItem(BF_ATTEMPTS_KEY, String(failedAttemptsRef.current)).catch(() => {});
@@ -291,39 +291,39 @@ export default function LoginScreen() {
   const handleEmailRegister = async () => {
     const trimmedEmail = email.trim().toLowerCase();
     if (!trimmedEmail || !password || !passwordConfirm) {
-      showToast({ title: 'Eksik Bilgi', message: 'Tüm alanları doldurun.', type: 'warning' });
+      showToast({ title: 'Eksik Bilgi', message: i18n.t('auth.login.013'), type: 'warning' });
       return;
     }
     // ★ SEC-BF2: Email format kontrolü
     if (!EMAIL_REGEX.test(trimmedEmail)) {
-      showToast({ title: 'Geçersiz E-posta', message: 'Geçerli bir e-posta adresi gir.', type: 'error' });
+      showToast({ title: i18n.t('auth.login.014'), message: i18n.t('auth.login.015'), type: 'error' });
       return;
     }
     // ★ v107.45: Yaygın TLD kontrolü — `asd@asd.x` gibi hatalı TLD'leri engelle
     if (!VALID_TLD_REGEX.test(trimmedEmail)) {
-      showToast({ title: 'Geçersiz E-posta', message: 'E-posta uzantısı geçerli değil. (.com, .net, .org gibi)', type: 'error' });
+      showToast({ title: i18n.t('auth.login.016'), message: i18n.t('auth.login.017'), type: 'error' });
       return;
     }
     // ★ v107.45: Disposable email blacklist — sahte hesap exploit'i engelle
     if (isDisposableEmail(trimmedEmail)) {
-      showToast({ title: 'Geçici E-posta Kabul Edilmiyor', message: 'Mailinator/tempmail gibi geçici e-postalar kayıt için kullanılamaz. Gerçek bir e-posta gir.', type: 'error' });
+      showToast({ title: i18n.t('auth.login.018'), message: i18n.t('auth.login.019'), type: 'error' });
       return;
     }
     if (password !== passwordConfirm) {
-      showToast({ title: 'Şifreler Eşleşmiyor', message: 'İki şifre alanı aynı olmalı.', type: 'error' });
+      showToast({ title: i18n.t('auth.login.020'), message: i18n.t('auth.login.021'), type: 'error' });
       return;
     }
     // ★ SEC-PW: Güçlü şifre gereksinimleri — min 8 karakter, 1 büyük harf, 1 rakam
     if (password.length < 8) {
-      showToast({ title: 'Şifre Çok Kısa', message: 'En az 8 karakter olmalı.', type: 'warning' });
+      showToast({ title: i18n.t('auth.login.022'), message: i18n.t('auth.login.023'), type: 'warning' });
       return;
     }
     if (!/[A-ZÇĞİÖŞÜ]/.test(password)) {
-      showToast({ title: 'Büyük Harf Eksik', message: 'Şifrede en az 1 büyük harf olmalı.', type: 'warning' });
+      showToast({ title: i18n.t('auth.login.024'), message: i18n.t('auth.login.025'), type: 'warning' });
       return;
     }
     if (!/[0-9]/.test(password)) {
-      showToast({ title: 'Rakam Eksik', message: 'Şifrede en az 1 rakam olmalı.', type: 'warning' });
+      showToast({ title: 'Rakam Eksik', message: i18n.t('auth.login.026'), type: 'warning' });
       return;
     }
     setLoading(true);
@@ -336,28 +336,28 @@ export default function LoginScreen() {
             url: 'https://sopranochat.com/verified',
             handleCodeInApp: false,
           });
-          showToast({ title: '✉️ Doğrulama E-postası Gönderildi', message: 'Lütfen e-posta kutunuzu kontrol edip doğrulayın.', type: 'success' });
+          showToast({ title: i18n.t('auth.login.027'), message: i18n.t('auth.login.028'), type: 'success' });
         } catch { /* doğrulama gönderilemezse sessiz */ }
       }
     } catch (error: any) {
       if (error?.code === 'auth/email-already-in-use') {
         // ★ v107.46: Net mesaj + otomatik giriş moduna geç (e-posta dolu kalır, kullanıcı sadece şifre girer)
         showToast({
-          title: 'Bu E-posta Zaten Kayıtlı',
-          message: 'Daha önce bu e-postayla kayıt olmuşsun. Giriş ekranına geçildi.',
+          title: i18n.t('auth.login.029'),
+          message: i18n.t('auth.login.030'),
           type: 'info',
         });
         setIsRegisterMode(false);
         setPassword('');
         setPasswordConfirm('');
       } else if (error?.code === 'auth/invalid-email') {
-        showToast({ title: 'Geçersiz E-posta', message: 'Lütfen geçerli bir e-posta gir.', type: 'error' });
+        showToast({ title: i18n.t('auth.login.031'), message: i18n.t('auth.login.032'), type: 'error' });
       } else if (error?.code === 'auth/weak-password') {
-        showToast({ title: 'Şifre Zayıf', message: 'Daha güçlü bir şifre seç.', type: 'warning' });
+        showToast({ title: i18n.t('auth.login.033'), message: i18n.t('auth.login.034'), type: 'warning' });
       } else if (error?.code === 'auth/network-request-failed') {
-        showToast({ title: 'Bağlantı Hatası', message: 'İnternet bağlantını kontrol et.', type: 'error' });
+        showToast({ title: i18n.t('auth.login.035'), message: i18n.t('auth.login.036'), type: 'error' });
       } else {
-        showToast({ title: 'Kayıt Olunamadı', message: 'Bir sorun oluştu, tekrar dene.', type: 'error' });
+        showToast({ title: i18n.t('auth.login.037'), message: i18n.t('auth.login.038'), type: 'error' });
       }
     } finally {
       setLoading(false);
@@ -368,11 +368,11 @@ export default function LoginScreen() {
     if (resetLoading) return; // ★ SEC-FP: Çift tıklama koruması
     const trimmed = resetEmail.trim();
     if (!trimmed) {
-      showToast({ title: 'Eksik Bilgi', message: 'Lütfen e-posta adresinizi yazın.', type: 'warning' });
+      showToast({ title: 'Eksik Bilgi', message: i18n.t('auth.login.039'), type: 'warning' });
       return;
     }
     if (!EMAIL_REGEX.test(trimmed)) {
-      showToast({ title: 'Geçersiz E-posta', message: 'Geçerli bir e-posta adresi gir.', type: 'error' });
+      showToast({ title: i18n.t('auth.login.040'), message: i18n.t('auth.login.041'), type: 'error' });
       return;
     }
     setResetLoading(true);
@@ -401,8 +401,8 @@ export default function LoginScreen() {
       // ★ v107.47: Net başarı mesajı — kayıt'ta zaten "Bu E-posta Zaten Kayıtlı" dediğimiz
       //   için forgot-password'da da net konuşmak tutarlı (UX > eski SEC-ENUM yarım önlemi).
       showToast({
-        title: '✉️ Mail Gönderildi',
-        message: 'Sıfırlama bağlantısı e-postana gönderildi. Spam klasörünü de kontrol et.',
+        title: i18n.t('auth.login.042'),
+        message: i18n.t('auth.login.043'),
         type: 'success',
       });
       setShowForgotPassword(false);
@@ -413,19 +413,19 @@ export default function LoginScreen() {
       //   AÇIK ise hiç hata gelmez (yukarıdaki başarı mesajı görünür).
       if (error?.code === 'auth/user-not-found') {
         showToast({
-          title: 'Hesap Bulunamadı',
-          message: 'Bu e-posta ile kayıtlı bir hesap yok. Önce kayıt ol.',
+          title: i18n.t('auth.login.044'),
+          message: i18n.t('auth.login.045'),
           type: 'error',
         });
       } else if (error?.code === 'auth/invalid-email') {
-        showToast({ title: 'Geçersiz E-posta', message: 'Geçerli bir e-posta adresi gir.', type: 'error' });
+        showToast({ title: i18n.t('auth.login.046'), message: i18n.t('auth.login.047'), type: 'error' });
       } else if (error?.code === 'auth/too-many-requests') {
-        showToast({ title: 'Çok Fazla Deneme', message: 'Biraz bekle, sonra tekrar dene.', type: 'warning' });
+        showToast({ title: i18n.t('auth.login.048'), message: 'Biraz bekle, sonra tekrar dene.', type: 'warning' });
       } else if (error?.code === 'auth/network-request-failed') {
-        showToast({ title: 'Bağlantı Hatası', message: 'İnternet bağlantını kontrol et.', type: 'error' });
+        showToast({ title: i18n.t('auth.login.049'), message: i18n.t('auth.login.050'), type: 'error' });
       } else {
         if (__DEV__) console.warn('[ForgotPassword] Error:', error?.code);
-        showToast({ title: 'Hata', message: 'Mail gönderilemedi, tekrar dene.', type: 'error' });
+        showToast({ title: 'Hata', message: i18n.t('auth.login.051'), type: 'error' });
       }
     } finally {
       setResetLoading(false);
@@ -441,12 +441,12 @@ export default function LoginScreen() {
         url: 'https://sopranochat.com/verified',
         handleCodeInApp: false,
       });
-      showToast({ title: '✉️ Gönderildi', message: 'Doğrulama e-postası tekrar gönderildi.', type: 'success' });
+      showToast({ title: i18n.t('auth.login.052'), message: i18n.t('auth.login.053'), type: 'success' });
     } catch (error: any) {
       if (error?.code === 'auth/too-many-requests') {
-        showToast({ title: 'Çok Fazla İstek', message: 'Birkaç dakika bekleyip tekrar dene.', type: 'warning' });
+        showToast({ title: i18n.t('auth.login.054'), message: i18n.t('auth.login.055'), type: 'warning' });
       } else {
-        showToast({ title: 'E-posta Gönderilemedi', message: 'Doğrulama e-postası iletilemedi.', type: 'error' });
+        showToast({ title: i18n.t('auth.login.056'), message: i18n.t('auth.login.057'), type: 'error' });
       }
     } finally {
       setResendLoading(false);
@@ -464,13 +464,13 @@ export default function LoginScreen() {
     try {
       await firebaseUser.reload();
       if (firebaseUser.emailVerified) {
-        showToast({ title: '✅ Doğrulandı', message: 'E-postanız doğrulandı! Giriş yapılıyor...', type: 'success' });
+        showToast({ title: i18n.t('auth.login.058'), message: i18n.t('auth.login.059'), type: 'success' });
         refreshAuth(); // AuthGuard'ı tetikle → otomatik yönlendirme
       } else {
-        showToast({ title: 'Henüz Doğrulanmadı', message: 'Lütfen e-posta kutunuzu kontrol edin.', type: 'warning' });
+        showToast({ title: i18n.t('auth.login.060'), message: i18n.t('auth.login.061'), type: 'warning' });
       }
     } catch {
-      showToast({ title: 'Kontrol Edilemedi', message: 'Doğrulama durumu alınamadı. Tekrar dene.', type: 'error' });
+      showToast({ title: 'Kontrol Edilemedi', message: i18n.t('auth.login.062'), type: 'error' });
     } finally {
       setLoading(false);
     }
@@ -752,15 +752,13 @@ export default function LoginScreen() {
         {/* Şifre Sıfırlama Modal */}
         <PremiumAlert
           visible={showForgotPassword}
-          title="Şifre Sıfırlama"
+          title={i18n.t('auth.login.063')}
           type="info"
           onDismiss={() => setShowForgotPassword(false)}
           message=""
           customContent={
             <View style={{ width: '100%', paddingHorizontal: 4 }}>
-              <Text style={{ color: '#94A3B8', fontSize: 13, marginBottom: 16, lineHeight: 20 }}>
-                E-posta adresinizi girin, size şifre sıfırlama bağlantısı gönderelim.
-              </Text>
+              <Text style={{ color: '#94A3B8', fontSize: 13, marginBottom: 16, lineHeight: 20 }}>{i18n.t('auth.login.001')}</Text>
               <View style={s.inputWrap}>
                 <Ionicons name="mail-outline" size={18} color="#64748B" style={s.inputIcon} />
                 <TextInput

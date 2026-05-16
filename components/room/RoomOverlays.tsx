@@ -40,8 +40,8 @@ const layoutAnim = () => LayoutAnimation.configureNext({
 // ═══ Sabitler ═══
 const SPEAKING_MODES = [
   { id: 'free_for_all', label: 'Serbest' },
-  { id: 'permission_only', label: 'İzinli' },
-  { id: 'selected_only', label: 'Seçili' },
+  { id: 'permission_only', label: i18n.t('room.roomoverlays.001') },
+  { id: 'selected_only', label: i18n.t('room.roomoverlays.002') },
 ] as const;
 const SLOW_MODES = [0, 5, 15, 30, 60];
 const ENTRY_FEES = [0, 25, 50, 100, 250, 500]; // ★ Genişletildi: host'ların gelir potansiyeli artırıldı
@@ -51,7 +51,7 @@ const LANGUAGES = [
 ];
 const ROOM_THEMES: Record<string, { name: string; colors: [string, string] }> = {
   ocean: { name: 'Okyanus', colors: ['#0E4D6F', '#083344'] },
-  sunset: { name: 'Gün Batımı', colors: ['#7F1D1D', '#4C0519'] },
+  sunset: { name: i18n.t('room.roomoverlays.003'), colors: ['#7F1D1D', '#4C0519'] },
   forest: { name: 'Orman', colors: ['#14532D', '#052E16'] },
   galaxy: { name: 'Galaksi', colors: ['#312E81', '#1E1B4B'] },
   aurora: { name: 'Aurora', colors: ['#134E4A', '#042F2E'] },
@@ -59,14 +59,14 @@ const ROOM_THEMES: Record<string, { name: string; colors: [string, string] }> = 
   cyber: { name: 'Cyber', colors: ['#1E3A8A', '#172554'] },
   volcano: { name: 'Volkan', colors: ['#7C2D12', '#431407'] },
   midnight: { name: 'Gece', colors: ['#0C0A3E', '#1B1464'] },
-  rose: { name: 'Gül', colors: ['#9F1239', '#881337'] },
+  rose: { name: i18n.t('room.roomoverlays.004'), colors: ['#9F1239', '#881337'] },
   arctic: { name: 'Kutup', colors: ['#164E63', '#0E7490'] },
   amber: { name: 'Kehribar', colors: ['#78350F', '#92400E'] },
   slate: { name: 'Arduvaz', colors: ['#1E293B', '#334155'] },
 };
 const ROOM_TYPES = [
-  { id: 'open', label: 'Açık', icon: 'globe-outline' },
-  { id: 'closed', label: 'Şifreli', icon: 'lock-closed-outline' },
+  { id: 'open', label: i18n.t('room.roomoverlays.005'), icon: 'globe-outline' },
+  { id: 'closed', label: i18n.t('room.roomoverlays.006'), icon: 'lock-closed-outline' },
   { id: 'invite', label: 'Davet', icon: 'mail-outline' },
 ] as const;
 
@@ -395,8 +395,8 @@ export function PlusMenu({
     try {
       await ModerationService.unbanFromRoom(_roomId, ban.user_id, _hostId);
       setInlineBans(prev => prev.filter(b => b.id !== ban.id));
-      showToast({ title: '✅ Ban Kaldırıldı', type: 'success' });
-    } catch { showToast({ title: 'Ban Kaldırılamadı', message: 'Bu kullanıcının banı kaldırılamadı.', type: 'error' }); }
+      showToast({ title: i18n.t('room.roomoverlays.007'), type: 'success' });
+    } catch { showToast({ title: i18n.t('room.roomoverlays.008'), message: i18n.t('room.roomoverlays.009'), type: 'error' }); }
     finally { setProcessingIds(p => { const n = new Set(p); n.delete(ban.id); return n; }); }
   }, [_roomId, _hostId]);
 
@@ -477,15 +477,15 @@ export function PlusMenu({
     if (!sc) return null;
     return (
       <View style={st.subWrap}>
-        <InlineTextEditor icon="create-outline" label="Oda Adı" value={sc.roomName} onSave={sc.onRenameRoom} placeholder={i18n.t('room.roomoverlays.013')} accent="#D4AF37" />
+        <InlineTextEditor icon="create-outline" label={i18n.t('room.roomoverlays.025')} value={sc.roomName} onSave={sc.onRenameRoom} placeholder={i18n.t('room.roomoverlays.013')} accent="#D4AF37" />
         <View style={st.sep} />
         {sc.onDescriptionChange && (
           <>
-            <InlineTextEditor icon="information-circle-outline" label="Açıklama" value={sc.description || ''} onSave={sc.onDescriptionChange} placeholder={i18n.t('room.roomoverlays.014')} multiline accent="#14B8A6" />
+            <InlineTextEditor icon="information-circle-outline" label={i18n.t('room.roomoverlays.026')} value={sc.description || ''} onSave={sc.onDescriptionChange} placeholder={i18n.t('room.roomoverlays.014')} multiline accent="#14B8A6" />
             <View style={st.sep} />
           </>
         )}
-        <InlineTextEditor icon="chatbubble-outline" label="Hoş Geldin" value={sc.welcomeMessage} onSave={sc.onWelcomeMessageChange} placeholder={i18n.t('room.roomoverlays.015')} multiline accent="#3B82F6" />
+        <InlineTextEditor icon="chatbubble-outline" label={i18n.t('room.roomoverlays.027')} value={sc.welcomeMessage} onSave={sc.onWelcomeMessageChange} placeholder={i18n.t('room.roomoverlays.015')} multiline accent="#3B82F6" />
         <View style={st.sep} />
         <InlineTextEditor icon="document-text-outline" label="Kurallar" value={sc.roomRules} onSave={sc.onRulesChange} placeholder={i18n.t('room.roomoverlays.016')} multiline accent="#A78BFA" />
       </View>
@@ -502,18 +502,18 @@ export function PlusMenu({
         {sc.roomType === 'closed' && can('Plus') && (
           <>
             <View style={st.sep} />
-            <InlineTextEditor icon="key-outline" label="Şifre" value={sc.roomPassword || ''} onSave={sc.onPasswordChange || (() => {})} placeholder="Min 4 karakter" accent="#F59E0B" secureTextEntry maxLength={20} />
+            <InlineTextEditor icon="key-outline" label={i18n.t('room.roomoverlays.028')} value={sc.roomPassword || ''} onSave={sc.onPasswordChange || (() => {})} placeholder="Min 4 karakter" accent="#F59E0B" secureTextEntry maxLength={20} />
           </>
         )}
         <View style={st.sep} />
-        <SettingToggle icon={isRoomLocked ? 'lock-closed' : 'lock-open-outline'} label="Odayı Kilitle (yeni giriş yok)" value={!!isRoomLocked} onValueChange={onRoomLock ? () => onRoomLock() : undefined} accent="#F59E0B" locked={!can('Plus')} lockTier="Plus" />
+        <SettingToggle icon={isRoomLocked ? 'lock-closed' : 'lock-open-outline'} label={i18n.t('room.roomoverlays.029')} value={!!isRoomLocked} onValueChange={onRoomLock ? () => onRoomLock() : undefined} accent="#F59E0B" locked={!can('Plus')} lockTier="Plus" />
         <View style={st.sep} />
-        <SettingToggle icon="warning-outline" label="+18 İçerik" value={sc.ageRestricted} onValueChange={can('Plus') ? sc.onAgeRestrictedChange : undefined} accent="#EF4444" locked={!can('Plus')} lockTier="Plus" />
+        <SettingToggle icon="warning-outline" label={i18n.t('room.roomoverlays.030')} value={sc.ageRestricted} onValueChange={can('Plus') ? sc.onAgeRestrictedChange : undefined} accent="#EF4444" locked={!can('Plus')} lockTier="Plus" />
         <View style={st.sep} />
         <SettingChips icon="language-outline" label="Dil Filtresi" options={LANGUAGES.map(l => ({ id: l.id, label: l.label }))} value={sc.roomLanguage} onSelect={can('Plus') ? sc.onLanguageChange : undefined} locked={!can('Plus')} lockTier="Plus" />
         <View style={st.sep} />
         {/* ★ 2026-04-27: Pro → Plus indirildi — oda yönetim aracı (kim girebilir engeli). */}
-        <SettingToggle icon="people-outline" label="Sadece Arkadaşlar" value={sc.followersOnly} onValueChange={can('Plus') ? sc.onToggleFollowersOnly : undefined} accent="#A78BFA" locked={!can('Plus')} lockTier="Plus" />
+        <SettingToggle icon="people-outline" label={i18n.t('room.roomoverlays.031')} value={sc.followersOnly} onValueChange={can('Plus') ? sc.onToggleFollowersOnly : undefined} accent="#A78BFA" locked={!can('Plus')} lockTier="Plus" />
       </View>
     );
   };
@@ -530,7 +530,7 @@ export function PlusMenu({
         {/* ── Owner Kontrolleri ── */}
         {showOwnerControls && (
           <>
-            <SettingChips icon="mic-outline" label="Konuşma Modu" options={SPEAKING_MODES.map(m => ({ id: m.id, label: m.label }))} value={sc!.speakingMode} onSelect={(v: any) => { if (v === 'selected_only' && !can('Pro')) return; sc!.onSpeakingModeChange(v); }} />
+            <SettingChips icon="mic-outline" label={i18n.t('room.roomoverlays.032')} options={SPEAKING_MODES.map(m => ({ id: m.id, label: m.label }))} value={sc!.speakingMode} onSelect={(v: any) => { if (v === 'selected_only' && !can('Pro')) return; sc!.onSpeakingModeChange(v); }} />
             <View style={st.sep} />
           </>
         )}
@@ -569,8 +569,8 @@ export function PlusMenu({
               <Text style={st.toggleLabel}>Mikrofon Modu</Text>
               <View style={{ flexDirection: 'row', gap: 3 }}>
                 {([
-                  { id: 'normal' as const, label: 'Konuşma' },
-                  { id: 'music' as const, label: 'Müzik' },
+                  { id: 'normal' as const, label: i18n.t('room.roomoverlays.010') },
+                  { id: 'music' as const, label: i18n.t('room.roomoverlays.011') },
                 ]).map(opt => {
                   const active = deviceConfig!.micMode === opt.id;
                   return (
@@ -584,7 +584,7 @@ export function PlusMenu({
             <View style={st.sep} />
             <SettingToggle
               icon="ear-outline"
-              label="Gürültü Engelleme"
+              label={i18n.t('room.roomoverlays.033')}
               value={deviceConfig!.micMode === 'music' ? false : deviceConfig!.noiseCancellation}
               onValueChange={deviceConfig!.micMode === 'music' ? undefined : deviceConfig!.onNoiseCancellationChange}
               accent="#4ADE80"
@@ -622,10 +622,10 @@ export function PlusMenu({
     return (
       <View style={st.subWrap}>
         {/* Giriş Ücreti — odaya girmek için ödenen SP (Pro+) */}
-        <SettingChips icon="diamond-outline" label="Giriş Ücreti (SP)" options={ENTRY_FEES.map(f => ({ id: f, label: f === 0 ? 'Ücretsiz' : `${f}` }))} value={sc.entryFee} onSelect={can('Pro') ? sc.onEntryFeeChange : undefined} locked={!can('Pro')} lockTier="Pro" />
+        <SettingChips icon="diamond-outline" label={i18n.t('room.roomoverlays.034')} options={ENTRY_FEES.map(f => ({ id: f, label: f === 0 ? 'Ücretsiz' : `${f}` }))} value={sc.entryFee} onSelect={can('Pro') ? sc.onEntryFeeChange : undefined} locked={!can('Pro')} lockTier="Pro" />
         <View style={st.sep} />
         {/* Bağış kabul etme — host'a SP bağışı (Pro+) */}
-        <SettingToggle icon="heart-outline" label="Bağış Kabul Et" value={sc.donationsEnabled} onValueChange={can('Pro') ? sc.onDonationsToggle : undefined} accent="#EC4899" locked={!can('Pro')} lockTier="Pro" />
+        <SettingToggle icon="heart-outline" label={i18n.t('room.roomoverlays.035')} value={sc.donationsEnabled} onValueChange={can('Pro') ? sc.onDonationsToggle : undefined} accent="#EC4899" locked={!can('Pro')} lockTier="Pro" />
       </View>
     );
   };
@@ -765,7 +765,7 @@ export function PlusMenu({
 
         {/* Müzik Linki — Pro+ (YouTube/Spotify/SoundCloud) */}
         {can('Pro') ? (
-          <InlineTextEditor icon="musical-notes-outline" label="Müzik Linki"
+          <InlineTextEditor icon="musical-notes-outline" label={i18n.t('room.roomoverlays.036')}
             value={sc.musicLink || ''}
             onSave={(v) => sc.onMusicLinkChange(v.trim() || null)}
             placeholder="https://youtube.com/... veya https://spotify.com/..."
@@ -851,7 +851,7 @@ export function PlusMenu({
     items.push({ id: 'access', icon: 'key-outline', label: i18n.t('rooms.menu.access'), accent: '#F59E0B', onPress: () => toggle('access'), expandable: true, renderContent: renderAccess });
     // ★ 2026-04-20: Banlılar & İstekler — ayrı inline accordion (modal kaldırıldı)
     if ((_roomType === 'closed' || _roomType === 'invite') && _roomId) {
-      items.push({ id: 'requests', icon: 'hourglass-outline', label: 'Katılım İstekleri', accent: '#A78BFA', badge: accessRequestCount ?? inlineRequests.length, onPress: () => { if (expandedId !== 'requests') loadRequests(); toggle('requests'); }, expandable: true, renderContent: renderRequestsInline });
+      items.push({ id: 'requests', icon: 'hourglass-outline', label: i18n.t('room.roomoverlays.012'), accent: '#A78BFA', badge: accessRequestCount ?? inlineRequests.length, onPress: () => { if (expandedId !== 'requests') loadRequests(); toggle('requests'); }, expandable: true, renderContent: renderRequestsInline });
     }
     if (_roomId) {
       items.push({ id: 'bans', icon: 'ban-outline', label: i18n.t('rooms.menu.bans'), accent: '#EF4444', onPress: () => { if (expandedId !== 'bans') loadBans(); toggle('bans'); }, expandable: true, renderContent: renderBans });
@@ -865,7 +865,7 @@ export function PlusMenu({
     items.push({ id: 'speaking', icon: 'mic-outline', label: i18n.t('rooms.menu.speaking_audio'), accent: '#14B8A6', onPress: () => toggle('speaking'), expandable: true, renderContent: renderSpeaking });
     // ★ İstekler + Banlılar inline (moderatör)
     if ((_roomType === 'closed' || _roomType === 'invite') && _roomId) {
-      items.push({ id: 'requests', icon: 'hourglass-outline', label: 'Katılım İstekleri', accent: '#A78BFA', badge: accessRequestCount ?? inlineRequests.length, onPress: () => { if (expandedId !== 'requests') loadRequests(); toggle('requests'); }, expandable: true, renderContent: renderRequestsInline });
+      items.push({ id: 'requests', icon: 'hourglass-outline', label: i18n.t('room.roomoverlays.013'), accent: '#A78BFA', badge: accessRequestCount ?? inlineRequests.length, onPress: () => { if (expandedId !== 'requests') loadRequests(); toggle('requests'); }, expandable: true, renderContent: renderRequestsInline });
     }
     if (_roomId) {
       items.push({ id: 'bans', icon: 'ban-outline', label: i18n.t('rooms.menu.bans'), accent: '#EF4444', onPress: () => { if (expandedId !== 'bans') loadBans(); toggle('bans'); }, expandable: true, renderContent: renderBans });
@@ -879,20 +879,20 @@ export function PlusMenu({
   if (isOnStage) {
     items.push({ id: 'invite', icon: 'person-add-outline', label: i18n.t('rooms.menu.invite_share'), accent: '#14B8A6', onPress: () => toggle('invite'), expandable: true, renderContent: renderInvite });
   } else {
-    items.push({ id: 'share', icon: 'share-social-outline', label: 'Oda Linkini Paylaş', accent: '#3B82F6', onPress: () => { onShareLink(); onClose(); } });
+    items.push({ id: 'share', icon: 'share-social-outline', label: i18n.t('room.roomoverlays.014'), accent: '#3B82F6', onPress: () => { onShareLink(); onClose(); } });
   }
 
   // 7. İstatistikler & Boost — geçici host göremez (asıl sahibin yetkisi)
   if (isOwner && !isTempHost && onRoomStats && can('Pro')) {
-    items.push({ id: 'stats', icon: 'stats-chart-outline', label: 'İstatistikler & Boost', accent: '#3B82F6', onPress: () => toggle('stats'), expandable: true, renderContent: renderStats });
+    items.push({ id: 'stats', icon: 'stats-chart-outline', label: i18n.t('room.roomoverlays.015'), accent: '#3B82F6', onPress: () => toggle('stats'), expandable: true, renderContent: renderStats });
   } else if (isOwner && !isTempHost && onBoostRoom && can('Plus')) {
-    items.push({ id: 'boost', icon: 'rocket-outline', label: 'Keşfette Öne Çıkar', accent: '#F59E0B', onPress: () => { onBoostRoom(); onClose(); } });
+    items.push({ id: 'boost', icon: 'rocket-outline', label: i18n.t('room.roomoverlays.016'), accent: '#F59E0B', onPress: () => { onBoostRoom(); onClose(); } });
   }
 
   // ★ v92 (1 May 2026): Güçlendiriciler — herkese açık (Süre Uzat host-only,
   //   Altın Davet herkese; sheet içinde rol kontrolü yapılır).
   if (onPowerUps) {
-    items.push({ id: 'powerups', icon: 'flash-outline', label: 'Güçlendiriciler', desc: 'SP harca, an\'ı taçlandır', accent: '#FBBF24', onPress: () => { onPowerUps(); onClose(); } });
+    items.push({ id: 'powerups', icon: 'flash-outline', label: i18n.t('room.roomoverlays.017'), desc: i18n.t('room.roomoverlays.018'), accent: '#FBBF24', onPress: () => { onPowerUps(); onClose(); } });
   }
 
   // Takip (listener)
@@ -901,12 +901,12 @@ export function PlusMenu({
   }
   // Bildir (listener)
   if (!isOnStage && onReportRoom) {
-    items.push({ id: 'report', icon: 'flag-outline', label: 'Odayı Bildir', accent: '#EF4444', onPress: () => { onReportRoom(); onClose(); }, destructive: true });
+    items.push({ id: 'report', icon: 'flag-outline', label: i18n.t('room.roomoverlays.019'), accent: '#EF4444', onPress: () => { onReportRoom(); onClose(); }, destructive: true });
   }
 
   // ★ Bağış Yap (host olmayan herkes, bağış açıkken)
   if (!isOwner && isDonationsEnabled && onDonate) {
-    items.push({ id: 'donate', icon: 'heart', label: 'Bağış Yap', desc: 'Host\'a SP bağışla', accent: '#EF4444', onPress: () => { onDonate(); onClose(); } });
+    items.push({ id: 'donate', icon: 'heart', label: i18n.t('room.roomoverlays.020'), desc: i18n.t('room.roomoverlays.021'), accent: '#EF4444', onPress: () => { onDonate(); onClose(); } });
   }
 
   // Dondur & Sil (owner, direkt aksiyon) — geçici host yapamaz
@@ -919,8 +919,8 @@ export function PlusMenu({
     items.push({
       id: 'clear-messages',
       icon: 'sparkles-outline',
-      label: 'Mesajları Temizle',
-      desc: 'Sohbet anında silinir, herkesin ekranı tazelenir',
+      label: i18n.t('room.roomoverlays.022'),
+      desc: i18n.t('room.roomoverlays.023'),
       accent: '#F59E0B',
       onPress: () => { onClose(); onClearMessages(); },
     });
@@ -931,7 +931,7 @@ export function PlusMenu({
     items.push({
       id: 'leave',
       icon: 'exit-outline',
-      label: 'Odadan Ayrıl',
+      label: i18n.t('room.roomoverlays.024'),
       desc: isOwner ? 'Oda açık kalır, sahiplik devri yapılır' : 'Odayı terk et',
       accent: '#F59E0B',
       onPress: () => { onClose(); onLeaveRoom(); },

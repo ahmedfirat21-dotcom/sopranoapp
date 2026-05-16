@@ -701,7 +701,7 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
         setDmEditingMessageId(null);
         setChatInput('');
       } else {
-        showToast({ title: 'Düzenlenemedi', message: r.error || 'Tekrar dene.', type: 'error' });
+        showToast({ title: i18n.t('room.id.007'), message: r.error || 'Tekrar dene.', type: 'error' });
       }
       return;
     }
@@ -777,7 +777,7 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
         setMsgReq({ status: 'pending_outgoing' });
       }
     } catch (err: any) {
-      showToast({ title: 'Gönderilemedi', message: err?.message || 'Mesaj gönderilemedi', type: 'warning' });
+      showToast({ title: i18n.t('room.id.008'), message: err?.message || 'Mesaj gönderilemedi', type: 'warning' });
     }
     setChatSending(false);
   };
@@ -908,7 +908,7 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
   const handleDmCopy = useCallback(async (msg: any) => {
     if (!msg.content) return;
     await Clipboard.setStringAsync(msg.content);
-    showToast({ title: '✓ Kopyalandı', type: 'success' });
+    showToast({ title: i18n.t('room.id.009'), type: 'success' });
   }, []);
 
   const handleDmSave = useCallback(async (msg: any) => {
@@ -930,14 +930,14 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
       mode: 'compose',
       onSelectUser: async (targetUserId: string) => {
         if (targetUserId === firebaseUser.uid) {
-          showToast({ title: 'Geçersiz hedef', message: 'Mesajı kendine iletemezsin.', type: 'warning' });
+          showToast({ title: i18n.t('room.id.010'), message: i18n.t('room.id.011'), type: 'warning' });
           return;
         }
         const r = await MessageService.forwardMessage(firebaseUser.uid, msg.id, targetUserId);
         if (r.success) {
-          showToast({ title: '✓ İletildi', type: 'success' });
+          showToast({ title: i18n.t('room.id.012'), type: 'success' });
         } else {
-          showToast({ title: 'İletilemedi', message: r.error || 'Tekrar dene.', type: 'error' });
+          showToast({ title: i18n.t('room.id.013'), message: r.error || 'Tekrar dene.', type: 'error' });
         }
       },
     });
@@ -1074,13 +1074,9 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
                 </Text>
                 {/* ★ v109: Yazıyor / Çevrimiçi durumu */}
                 {dmIsTyping ? (
-                  <Text style={{ color: '#14B8A6', fontSize: 10, fontWeight: '600', fontStyle: 'italic' }}>
-                    yazıyor…
-                  </Text>
+                  <Text style={{ color: '#14B8A6', fontSize: 10, fontWeight: '600', fontStyle: 'italic' }}>{i18n.t('room.id.001')}</Text>
                 ) : chatTarget.online ? (
-                  <Text style={{ color: 'rgba(34,197,94,0.85)', fontSize: 10, fontWeight: '600' }}>
-                    çevrimiçi
-                  </Text>
+                  <Text style={{ color: 'rgba(34,197,94,0.85)', fontSize: 10, fontWeight: '600' }}>{i18n.t('room.id.002')}</Text>
                 ) : null}
               </View>
               {/* ★ Sessize alma badge — chat header'da */}
@@ -1097,9 +1093,7 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
                 <Text style={{ fontSize: 13, fontWeight: '700', color: '#E2E8F0', marginBottom: 4 }}>
                   {chatTarget.name} sizinle mesajlaşmak istiyor
                 </Text>
-                <Text style={{ fontSize: 11, color: '#94A3B8', marginBottom: 8, lineHeight: 15 }}>
-                  Kabul ederseniz mesajlaşmaya başlayabilirsiniz.
-                </Text>
+                <Text style={{ fontSize: 11, color: '#94A3B8', marginBottom: 8, lineHeight: 15 }}>{i18n.t('room.id.003')}</Text>
                 <View style={{ flexDirection: 'row', gap: 8 }}>
                   <Pressable disabled={reqResponding} onPress={async () => {
                     if (reqResponding) return;
@@ -1128,17 +1122,13 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
             {msgReq.status === 'pending_outgoing' && (
               <View style={{ backgroundColor: 'rgba(251,191,36,0.08)', borderBottomWidth: 1, borderBottomColor: 'rgba(251,191,36,0.2)', padding: 10, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <Ionicons name="time-outline" size={14} color="#FBBF24" />
-                <Text style={{ fontSize: 11, color: '#FBBF24', flex: 1 }}>
-                  İsteğiniz onay bekliyor. Onay gelene kadar yeni mesaj gönderemezsiniz.
-                </Text>
+                <Text style={{ fontSize: 11, color: '#FBBF24', flex: 1 }}>{i18n.t('room.id.004')}</Text>
               </View>
             )}
             {msgReq.status === 'rejected' && (
               <View style={{ backgroundColor: 'rgba(239,68,68,0.08)', borderBottomWidth: 1, borderBottomColor: 'rgba(239,68,68,0.2)', padding: 10, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <Ionicons name="close-circle-outline" size={14} color="#F87171" />
-                <Text style={{ fontSize: 11, color: '#FCA5A5', flex: 1 }}>
-                  İsteğiniz reddedildi — mesaj gönderemezsiniz.
-                </Text>
+                <Text style={{ fontSize: 11, color: '#FCA5A5', flex: 1 }}>{i18n.t('room.id.005')}</Text>
               </View>
             )}
 
@@ -1213,9 +1203,7 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
                         {isForwarded && !isDeletedForEveryone ? (
                           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 3 }}>
                             <Ionicons name="arrow-redo" size={10} color="rgba(255,255,255,0.5)" />
-                            <Text style={{ fontSize: 10, fontStyle: 'italic', color: 'rgba(255,255,255,0.5)' }}>
-                              İletildi
-                            </Text>
+                            <Text style={{ fontSize: 10, fontStyle: 'italic', color: 'rgba(255,255,255,0.5)' }}>{i18n.t('room.id.006')}</Text>
                           </View>
                         ) : null}
                         {/* Reply preview */}
@@ -2119,7 +2107,7 @@ export default function RoomScreen() {
           roomData = wokeRoom;
         } catch (wakeErr: any) {
           if (__DEV__) console.warn('[Room] Auto-wakeUp fail:', wakeErr?.message);
-          showToast({ title: 'Oda Başlatılamadı', message: wakeErr?.message || 'Tekrar dene.', type: 'error' });
+          showToast({ title: i18n.t('room.id.014'), message: wakeErr?.message || 'Tekrar dene.', type: 'error' });
           setRoomBlock({ reason: 'connection_failed' });
           setLoading(false);
           return;
@@ -2231,7 +2219,7 @@ export default function RoomScreen() {
           // ★ 2026-05-05: Şifre filtresi pre-check preview'a EKLENMEZ — kullanıcı talebi.
           //   "Devam Et" → "Şifre Gir" iki adımlı modal yerine direkt şifre sheet'i gösterilir.
           //   Doğru şifre girer → girer; geri/vazgeç tuşu ile çıkar.
-          if (roomForCheck.type === 'invite') filters.push({ icon: 'mail-open', color: '#3B82F6', title: 'Davetli Oda', desc: 'Sahibine istek gönderirsin, onay bekler.' });
+          if (roomForCheck.type === 'invite') filters.push({ icon: 'mail-open', color: '#3B82F6', title: 'Davetli Oda', desc: i18n.t('room.id.015') });
 
           if (filters.length > 0) {
             const previewOk = await new Promise<boolean>((resolve) => {
@@ -2775,12 +2763,12 @@ export default function RoomScreen() {
                 setRoom(updatedRoom);
                 setAccessGranted(true);
                 showToast({
-                  title: '🎉 Engel Kalktı',
-                  message: 'Oda sahibi ayarı değiştirdi — odaya alındın!',
+                  title: i18n.t('room.id.016'),
+                  message: i18n.t('room.id.017'),
                   type: 'success',
                 });
               } catch (e: any) {
-                showToast({ title: 'Giriş Hatası', message: e?.message || 'Tekrar dene', type: 'error' });
+                showToast({ title: i18n.t('room.id.018'), message: e?.message || 'Tekrar dene', type: 'error' });
               }
               return;
             }
@@ -2858,7 +2846,7 @@ export default function RoomScreen() {
     // ★ SEC-PERF: DB sorgusu kaldırıldı — broadcast ile senkronize local state yeterli
     const myParticipant = participants.find(p => p.user_id === firebaseUser.uid);
     if (myParticipant?.is_chat_muted) {
-      showToast({ title: '💬 Susturuldun', message: 'Metin sohbetiniz moderatör tarafından kapatıldı.', type: 'warning' });
+      showToast({ title: '💬 Susturuldun', message: i18n.t('room.id.019'), type: 'warning' });
       return;
     }
     // ★ v110.5.9 (6 May 2026): OPTIMISTIC UPDATE — WhatsApp pattern.
@@ -2903,7 +2891,7 @@ export default function RoomScreen() {
       } else {
         // Insert null döndü (RLS reject vs.) — optimistic kaldır + uyarı
         setChatMessages(prev => prev.filter(m => m.id !== tempId));
-        showToast({ title: 'Mesaj gönderilemedi', message: 'Yetkiniz olmayabilir veya bağlantı sorunu.', type: 'error' });
+        showToast({ title: i18n.t('room.id.020'), message: i18n.t('room.id.021'), type: 'error' });
         return;
       }
       // ★ SP: Mesaj gönderme (30sn cooldown ile)
@@ -2913,7 +2901,7 @@ export default function RoomScreen() {
     } catch (err: any) {
       // Network/exception — optimistic kaldır + uyarı
       setChatMessages(prev => prev.filter(m => m.id !== tempId));
-      showToast({ title: 'Mesaj gönderilemedi', message: err?.message || 'Bağlantı hatası', type: 'error' });
+      showToast({ title: i18n.t('room.id.022'), message: err?.message || 'Bağlantı hatası', type: 'error' });
     }
   };
 
@@ -2965,7 +2953,7 @@ export default function RoomScreen() {
     if (speakingMode === 'selected_only') {
       showToast({
         title: '🔒 Sahne Kilitli',
-        message: 'Bu odada sadece oda sahibinin seçtiği kişiler sahneye çıkabilir. Sahip seni seçene kadar bekle.',
+        message: i18n.t('room.id.023'),
         type: 'info',
       });
       return;
@@ -2983,11 +2971,11 @@ export default function RoomScreen() {
     toggleListenerMicRequest();
     if (!myMicRequested) {
       if (speakingMode === 'free_for_all' && stageFull) {
-        showToast({ title: '⏳ Kuyruğa Yazıldın', message: 'Sahne dolu — biri inince otomatik olarak sahneye çıkacaksın.', type: 'info' });
+        showToast({ title: i18n.t('room.id.024'), message: i18n.t('room.id.025'), type: 'info' });
       } else if (stageFull) {
         showToast({ title: '⚠️ Sahne Dolu', message: `${stageLimits.current}/${stageLimits.max}. Biri inince yerini alabilirsin.`, type: 'warning' });
       } else {
-        showToast({ title: '🤚 Sahne Talebi Gönderildi', message: 'Oda sahibinin onayı bekleniyor...', type: 'success' });
+        showToast({ title: i18n.t('room.id.026'), message: i18n.t('room.id.027'), type: 'success' });
       }
     }
   };
@@ -3000,7 +2988,7 @@ export default function RoomScreen() {
   const handleMicPress = async () => {
     // LiveKit bağlı değilse dokunma — donmayı önle
     if (lk.connectionState !== 'connected') {
-      showToast({ title: 'Bağlantı Yok', message: 'Ses sunucusuna bağlanılamadı. Mikrofon kullanılamaz.', type: 'warning' });
+      showToast({ title: i18n.t('room.id.028'), message: i18n.t('room.id.029'), type: 'warning' });
       return;
     }
     // Süreli susturma kontrolü — susturulan kullanıcı mikrofon açamaz
@@ -3008,7 +2996,7 @@ export default function RoomScreen() {
       try {
         const isMuted = await ModerationService.isRoomMuted(id as string, firebaseUser.uid);
         if (isMuted) {
-          showToast({ title: '🔇 Susturuldun', message: 'Moderatör tarafından susturuldunuz. Süre dolana kadar mikrofon açamazsınız.', type: 'warning' });
+          showToast({ title: '🔇 Susturuldun', message: i18n.t('room.id.030'), type: 'warning' });
           return;
         }
       } catch {}
@@ -3017,7 +3005,7 @@ export default function RoomScreen() {
       await lk.toggleMic();
     } catch (e) {
       if (__DEV__) console.warn('[Mic] Toggle hatası:', e);
-      showToast({ title: 'Mikrofon Hatası', message: 'Mikrofon değiştirilemedi', type: 'error' });
+      showToast({ title: i18n.t('room.id.031'), message: i18n.t('room.id.032'), type: 'error' });
     }
   };
 
@@ -3044,7 +3032,7 @@ export default function RoomScreen() {
     } catch (e: any) {
       // ★ v85c: RPC hatası release build'de de görünsün — debug için kritik
       const msg = e?.message || e?.error_description || String(e);
-      showToast({ title: 'Sahneye Alma Hatası', message: msg.slice(0, 200), type: 'error' });
+      showToast({ title: i18n.t('room.id.033'), message: msg.slice(0, 200), type: 'error' });
       if (__DEV__) console.warn('[approveMic] Speaker yükseltme hatası:', e);
     }
     // ★ DB yazımı başarısızsa broadcast gönderme — diğer cihazlarda hayalet sahne yaratmasın
@@ -3088,7 +3076,7 @@ export default function RoomScreen() {
   const handleSettingsLeave = () => {
     if (amIHost) {
       setAlertConfig({
-        visible: true, title: 'Odadan Ayrıl', message: 'Oda sahibi olarak ayrılmak istediğine emin misin? Yetki uygun birine devredilecek.', type: 'warning', icon: 'exit-outline',
+        visible: true, title: i18n.t('room.id.034'), message: i18n.t('room.id.035'), type: 'warning', icon: 'exit-outline',
         buttons: [
           { text: 'İptal', style: 'cancel' },
           { text: 'Ayrıl', style: 'destructive', onPress: () => { isRoomClosingRef.current = true; handleHostLeave(); } },
@@ -3096,7 +3084,7 @@ export default function RoomScreen() {
       });
     } else {
       setAlertConfig({
-        visible: true, title: 'Odadan Ayrıl', message: 'Odadan ayrılmak istediğine emin misin?', type: 'warning', icon: 'exit-outline',
+        visible: true, title: i18n.t('room.id.036'), message: i18n.t('room.id.037'), type: 'warning', icon: 'exit-outline',
         buttons: [
           { text: 'İptal', style: 'cancel' },
           { text: 'Ayrıl', style: 'destructive', onPress: () => { isRoomClosingRef.current = true; handleUserLeave(); } },
@@ -3110,11 +3098,11 @@ export default function RoomScreen() {
     if (!amIHost && !profile?.is_admin) return;
     // Vekil host odayı silemez — sadece asıl sahip veya admin silebilir
     if (amIActingHost && !profile?.is_admin) {
-      showToast({ title: 'Yetki Yok', message: 'Vekil host olarak odayı silemezsin. Sadece oda sahibi silebilir.', type: 'warning' });
+      showToast({ title: 'Yetki Yok', message: i18n.t('room.id.038'), type: 'warning' });
       return;
     }
     setAlertConfig({
-      visible: true, title: '🗑️ Odayı Kalıcı Sil', message: 'Bu oda tamamen silinecek ve geri alınamaz! Tüm katılımcılar çıkarılacak. Devam etmek istiyor musun?', type: 'error', icon: 'trash',
+      visible: true, title: i18n.t('room.id.039'), message: i18n.t('room.id.040'), type: 'error', icon: 'trash',
       buttons: [
         { text: 'İptal', style: 'cancel' },
         { text: 'Kalıcı Sil', style: 'destructive', onPress: async () => {
@@ -3181,7 +3169,7 @@ export default function RoomScreen() {
     } catch (e) {
       // ★ BUG FIX: Hata durumunda flag'ı sıfırla — cleanup effect leave() çağırabilsin, hayalet oluşmasın
       isRoomClosingRef.current = false;
-      showToast({ title: 'Çıkış Yapılamadı', message: 'Odadan çıkış başarısız oldu.', type: 'error' });
+      showToast({ title: i18n.t('room.id.041'), message: i18n.t('room.id.042'), type: 'error' });
     }
   };
 
@@ -3226,7 +3214,7 @@ export default function RoomScreen() {
     } catch (e) {
       // ★ BUG FIX: Hata durumunda flag'ı sıfırla — cleanup effect leave() çağırabilsin, hayalet oluşmasın
       isRoomClosingRef.current = false;
-      showToast({ title: 'Çıkış Yapılamadı', message: 'Odadan çıkış başarısız oldu.', type: 'error' });
+      showToast({ title: i18n.t('room.id.043'), message: i18n.t('room.id.044'), type: 'error' });
     }
   };
 
@@ -3263,7 +3251,7 @@ export default function RoomScreen() {
         RoomService.close(id as string).catch(() => {});
       }
       liveKitService.disconnect().catch(() => {});
-      showToast({ title: '🔑 Oda Kapandı', message: 'Oda sahibi ve moderatör olmadığı için oda kapatıldı.', type: 'error' });
+      showToast({ title: i18n.t('room.id.045'), message: i18n.t('room.id.046'), type: 'error' });
       setMinimizedRoom(null);
       safeGoBack(router);
       return;
@@ -3271,7 +3259,7 @@ export default function RoomScreen() {
 
     if (closingCountdown === 5) {
       // Son 5 saniye uyarısı
-      showToast({ title: '⚠️ Oda Kapanıyor!', message: 'Oda 5 saniye içinde kapanacak!', type: 'error' });
+      showToast({ title: i18n.t('room.id.047'), message: i18n.t('room.id.048'), type: 'error' });
     }
 
     closingTimerRef.current = setTimeout(() => {
@@ -3288,13 +3276,13 @@ export default function RoomScreen() {
     if (!firebaseUser || !id) return;
     // Geri sayım yoksa claim yapma (oda sahipsiz olma durumu yoksa engelle)
     if (closingCountdown === null || closingCountdown <= 0) {
-      showToast({ title: 'Host Değişikliği Engellendi', message: 'Aktif odada host değiştirilemez.', type: 'warning' });
+      showToast({ title: i18n.t('room.id.049'), message: i18n.t('room.id.050'), type: 'warning' });
       return;
     }
     // ★ BUG-R2 FIX: Yetki kontrolü — banned/spectator/guest host olamaz (frontend quick-check)
     const myPart = participants.find(p => p.user_id === firebaseUser.uid);
     if (!myPart || ['banned', 'spectator', 'guest'].includes(myPart.role)) {
-      showToast({ title: 'Yetki Yok', message: 'Bu rolde host olamazsınız.', type: 'warning' });
+      showToast({ title: 'Yetki Yok', message: i18n.t('room.id.051'), type: 'warning' });
       return;
     }
     try {
@@ -3307,14 +3295,14 @@ export default function RoomScreen() {
         type: 'broadcast', event: 'mod_action',
         payload: { action: 'host_claimed', hostName: profile?.display_name || 'Birisi' },
       });
-      showToast({ title: '👑 Host Oldun!', message: 'Oda yönetimi sende. Geri sayım iptal edildi.', type: 'success' });
+      showToast({ title: '👑 Host Oldun!', message: i18n.t('room.id.052'), type: 'success' });
       // BUG-RM5 FIX: Optimistik state güncelleme
       setRoom(prev => prev ? { ...prev, host_id: firebaseUser.uid } : prev);
       setParticipants(prev => prev.map(p => p.user_id === firebaseUser.uid ? { ...p, role: 'owner' as const } : p));
       // Ek olarak tam veriyi de çek (arka planda)
       RoomService.get(id as string).then(setRoom).catch(() => {});
     } catch (e: any) {
-      showToast({ title: 'Host Olunamadı', message: e?.message || 'Host transferi başarısız.', type: 'error' });
+      showToast({ title: i18n.t('room.id.053'), message: e?.message || 'Host transferi başarısız.', type: 'error' });
     }
   };
 
@@ -3377,7 +3365,7 @@ export default function RoomScreen() {
       }
     } catch (e: any) {
       if (__DEV__) console.warn('[SelfDemote] Hata:', e?.message);
-      showToast({ title: 'Konuşmacı Değişmedi', message: 'Davet/çıkarma işlemi tamamlanamadı.', type: 'error' });
+      showToast({ title: i18n.t('room.id.054'), message: i18n.t('room.id.055'), type: 'error' });
     }
   };
 
@@ -3408,10 +3396,10 @@ export default function RoomScreen() {
           UpsellService.onRoomDurationExpired(_t);
           setRoomExpiry('⏰ Süre doldu!');
           if (isHost) {
-            showToast({ title: '⏰ Süre Doldu', message: 'Oda süresi doldu. Oda kapatılıyor...', type: 'warning', id: 'room_expired' });
+            showToast({ title: i18n.t('room.id.056'), message: i18n.t('room.id.057'), type: 'warning', id: 'room_expired' });
             setTimeout(async () => { try { await RoomService.close(id as string); liveKitService.disconnect().catch(() => {}); setMinimizedRoom(null); safeGoBack(router); } catch {} }, 3000);
           } else {
-            showToast({ title: '⏰ Süre Doldu', message: 'Oda süresi doldu. Oda kapanıyor...', type: 'warning', id: 'room_expired' });
+            showToast({ title: i18n.t('room.id.058'), message: i18n.t('room.id.059'), type: 'warning', id: 'room_expired' });
             setTimeout(() => { liveKitService.disconnect().catch(() => {}); setMinimizedRoom(null); safeGoBack(router); }, 5000);
           }
           return;
@@ -3426,15 +3414,15 @@ export default function RoomScreen() {
           expiryWarningsRef.current.add('15min');
           if (isHost) {
             showToast({
-              title: '⏳ 15 dakika kaldı',
-              message: 'Oda süresi azalıyor. Plus\'a geçerek süresini uzatabilirsin.',
+              title: i18n.t('room.id.060'),
+              message: i18n.t('room.id.061'),
               type: 'upsell',
               duration: 5000,
               id: 'room_15min_warn',
-              action: { label: 'Yükselt', onPress: () => minimizeAndPush('/plus') },
+              action: { label: i18n.t('room.id.062'), onPress: () => minimizeAndPush('/plus') },
             });
           } else {
-            showToast({ title: '⏳ 15 dakika kaldı', message: 'Bu oda 15 dakika sonra kapanacak.', type: 'info', id: 'room_15min_warn' });
+            showToast({ title: i18n.t('room.id.063'), message: 'Bu oda 15 dakika sonra kapanacak.', type: 'info', id: 'room_15min_warn' });
           }
         }
         if (remMins <= 5 && !expiryWarningsRef.current.has('5min')) {
@@ -3442,14 +3430,14 @@ export default function RoomScreen() {
           if (isHost) {
             showToast({
               title: '🚨 Son 5 dakika!',
-              message: 'Oda kapanmak üzere! Pro ile sınırsız oda süresi.',
+              message: i18n.t('room.id.064'),
               type: 'warning',
               duration: 6000,
               id: 'room_5min_warn',
-              action: { label: 'Pro\'ya Geç', onPress: () => minimizeAndPush('/plus') },
+              action: { label: i18n.t('room.id.065'), onPress: () => minimizeAndPush('/plus') },
             });
           } else {
-            showToast({ title: '🚨 Son 5 dakika!', message: 'Bu oda 5 dakika içinde kapanacak.', type: 'warning', id: 'room_5min_warn' });
+            showToast({ title: '🚨 Son 5 dakika!', message: i18n.t('room.id.066'), type: 'warning', id: 'room_5min_warn' });
           }
         }
       }
@@ -3627,7 +3615,7 @@ export default function RoomScreen() {
           type: 'broadcast', event: 'mic_request',
           payload: { type: 'cancel', userId: firebaseUser!.uid },
         });
-        showToast({ title: '🎙️ Sıran Geldi!', message: 'Sahneye otomatik olarak çıktın.', type: 'success' });
+        showToast({ title: i18n.t('room.id.067'), message: i18n.t('room.id.068'), type: 'success' });
         setTimeout(() => { lk.enableMic?.().catch(() => {}); }, 500);
       } catch (e: any) {
         // Slot dolu hata gelirse sessiz kal — sonraki tick'te tekrar dener
@@ -3716,7 +3704,7 @@ export default function RoomScreen() {
     // Son 30 saniye uyarısı
     const warnMs = msUntilExpire - 30_000;
     const warnTimer = warnMs > 0 ? setTimeout(() => {
-      showToast({ title: '⏳ 30 saniye kaldı', message: 'Sahne süren bitiyor', type: 'warning' });
+      showToast({ title: i18n.t('room.id.069'), message: i18n.t('room.id.070'), type: 'warning' });
     }, warnMs) : null;
 
     // Süre bittiğinde server cleanup çağır; realtime row update ile rol 'listener'a geçer
@@ -3870,7 +3858,7 @@ export default function RoomScreen() {
   const handleMuteAll = useCallback(async () => {
     if (!room || !firebaseUser) return;
     setAlertConfig({
-      visible: true, title: '🔇 Tümünü Sustur', message: 'Sahnedeki tüm konuşmacıların mikrofonları kapatılacak.',
+      visible: true, title: i18n.t('room.id.071'), message: i18n.t('room.id.072'),
       type: 'warning', icon: 'volume-mute',
       buttons: [
         { text: 'İptal', style: 'cancel' },
@@ -3886,7 +3874,7 @@ export default function RoomScreen() {
               ? { ...p, is_muted: true } : p
           ));
           modChannelRef.current?.send({ type: 'broadcast', event: 'mod_action', payload: { action: 'mute_all' } });
-          showToast({ title: '🔇 Tümü Susturuldu', message: `${stagePeople.length} konuşmacı susturuldu`, type: 'success' });
+          showToast({ title: i18n.t('room.id.073'), message: `${stagePeople.length} konuşmacı susturuldu`, type: 'success' });
         }},
       ],
     });
@@ -3896,7 +3884,7 @@ export default function RoomScreen() {
   const handleUnmuteAll = useCallback(async () => {
     if (!room || !firebaseUser) return;
     setAlertConfig({
-      visible: true, title: '🔊 Tümünü Aç', message: 'Sahnedeki tüm konuşmacıların mikrofonları tekrar açılacak.',
+      visible: true, title: i18n.t('room.id.074'), message: i18n.t('room.id.075'),
       type: 'info', icon: 'volume-high',
       buttons: [
         { text: 'İptal', style: 'cancel' },
@@ -3915,7 +3903,7 @@ export default function RoomScreen() {
               ? { ...p, is_muted: false } : p
           ));
           modChannelRef.current?.send({ type: 'broadcast', event: 'mod_action', payload: { action: 'unmute_all' } });
-          showToast({ title: '🔊 Tümü Açıldı', message: `${stagePeople.length} konuşmacı serbest bırakıldı`, type: 'success' });
+          showToast({ title: i18n.t('room.id.076'), message: `${stagePeople.length} konuşmacı serbest bırakıldı`, type: 'success' });
         }},
       ],
     });
@@ -3964,7 +3952,7 @@ export default function RoomScreen() {
     //   riskini owner manuel moderasyonla (mute/kick) yönetir.
     if (!isHost && !isMod) {
       if (speakingMode === 'selected_only') {
-        showToast({ title: '🔒 Seçilmişler Modu', message: 'Bu odada sadece oda sahibinin seçtiği kişiler sahneye çıkabilir.', type: 'warning' });
+        showToast({ title: i18n.t('room.id.077'), message: i18n.t('room.id.078'), type: 'warning' });
         return;
       }
       if (speakingMode === 'permission_only') {
@@ -3974,9 +3962,9 @@ export default function RoomScreen() {
             type: 'broadcast', event: 'mic_request',
             payload: { type: 'request', userId: firebaseUser.uid, displayName: profile?.display_name || 'Kullanıcı' },
           });
-          showToast({ title: '🤚 Sahne Talebi Gönderildi', message: 'Oda sahibinin onayı bekleniyor...', type: 'success' });
+          showToast({ title: i18n.t('room.id.079'), message: i18n.t('room.id.080'), type: 'success' });
         } else {
-          showToast({ title: 'Zaten Bekliyor', message: 'Sahne talebiniz zaten gönderildi.', type: 'info' });
+          showToast({ title: 'Zaten Bekliyor', message: i18n.t('room.id.081'), type: 'info' });
         }
         setShowSeatTooltip(false);
         return;
@@ -3993,9 +3981,9 @@ export default function RoomScreen() {
               type: 'broadcast', event: 'mic_request',
               payload: { type: 'request', userId: firebaseUser.uid, displayName: profile?.display_name || 'Kullanıcı' },
             });
-            showToast({ title: '⏳ Kuyruğa Yazıldın', message: 'Sahne dolu — biri inince otomatik olarak sahneye çıkacaksın.', type: 'info' });
+            showToast({ title: i18n.t('room.id.082'), message: i18n.t('room.id.083'), type: 'info' });
           } else {
-            showToast({ title: 'Zaten Kuyruktasın', message: 'Sırada bekliyorsun, sahne boşalınca otomatik promote olacaksın.', type: 'info' });
+            showToast({ title: i18n.t('room.id.084'), message: i18n.t('room.id.085'), type: 'info' });
           }
           setShowSeatTooltip(false);
           return;
@@ -4015,7 +4003,7 @@ export default function RoomScreen() {
       }
       // ★ v67 FIX: Sahneye çıktıktan hemen sonra heartbeat — stale cleanup koruması
       RoomService.updateLastSeen(room.id, firebaseUser.uid).catch(() => {});
-      showToast({ title: isHost ? '👑 Sahneye Döndün!' : 'Sahneye Hoş Geldin!', message: 'Mikrofon otomatik açılıyor...', type: 'success' });
+      showToast({ title: isHost ? '👑 Sahneye Döndün!' : 'Sahneye Hoş Geldin!', message: i18n.t('room.id.086'), type: 'success' });
       setShowSeatTooltip(false);
       // ★ 2026-04-20 FIX: Sahneye çıkınca mikrofonu otomatik aç — önceden eksikti,
       // bu yüzden başkasının odasında sahneye çıkan kullanıcı mic açamıyordu.
@@ -4063,7 +4051,7 @@ export default function RoomScreen() {
         // ★ v107.39: "Sahneye Çıktın" toast KALDIRILDI
         setTimeout(() => { lk.enableMic?.().catch(() => {}); }, 500);
       } catch {
-        showToast({ title: 'Sahneye Çıkılamadı', message: 'Mikrofon açılamadı, tekrar dene.', type: 'error' });
+        showToast({ title: i18n.t('room.id.087'), message: i18n.t('room.id.088'), type: 'error' });
       }
       return;
     }
@@ -4080,7 +4068,7 @@ export default function RoomScreen() {
         // ★ v107.39: Owner "Sahneye Çıktın" toast KALDIRILDI
         setTimeout(() => { lk.enableMic?.().catch(() => {}); }, 500);
       } catch {
-        showToast({ title: 'Sahneye Çıkılamadı', message: 'Mikrofon açılamadı, tekrar dene.', type: 'error' });
+        showToast({ title: i18n.t('room.id.089'), message: i18n.t('room.id.090'), type: 'error' });
       }
       return;
     }
@@ -4095,7 +4083,7 @@ export default function RoomScreen() {
       });
 
     if (replaceable.length === 0) {
-      showToast({ title: 'Sahne Dolu', message: 'Sahnede sadece oda sahibi ve moderatörler var. Yer açılamıyor.', type: 'warning' });
+      showToast({ title: 'Sahne Dolu', message: i18n.t('room.id.091'), type: 'warning' });
       return;
     }
 
@@ -4121,7 +4109,7 @@ export default function RoomScreen() {
       RoomService.updateLastSeen(room.id, firebaseUser.uid).catch(() => {});
       setTimeout(() => { lk.enableMic?.().catch(() => {}); }, 500);
     } catch {
-      showToast({ title: 'Sahneye Çıkılamadı', message: 'Mikrofon açılamadı, tekrar dene.', type: 'error' });
+      showToast({ title: i18n.t('room.id.092'), message: i18n.t('room.id.093'), type: 'error' });
     }
   }, [room, firebaseUser?.uid, participants, lk, ownerTier]);
 
@@ -4141,7 +4129,7 @@ export default function RoomScreen() {
         title: room?.name || 'SopranoChat Odası',
       });
     } catch (e) {
-      showToast({ title: 'Paylaşılamadı', message: 'Link kopyalanamadı', type: 'error' });
+      showToast({ title: i18n.t('room.id.094'), message: i18n.t('room.id.095'), type: 'error' });
     }
   }, [room?.name, id]);
 
@@ -4244,7 +4232,7 @@ export default function RoomScreen() {
     } catch {
       setIsFollowingRoom(!newState); // rollback
       setFollowerCount(prev => Math.max(0, prev + (newState ? -1 : 1)));
-      showToast({ title: 'İşlem Tamamlanamadı', message: 'Bir sorun oluştu, tekrar dene.', type: 'error' });
+      showToast({ title: i18n.t('room.id.096'), message: i18n.t('room.id.097'), type: 'error' });
     }
   }, [room?.id, firebaseUser?.uid, isFollowingRoom, loadFollowerData]);
 
@@ -4355,9 +4343,9 @@ export default function RoomScreen() {
                 const joinRole: 'owner' | 'listener' | 'spectator' = isOriginalHost ? 'owner' : 'listener';
                 RoomService.join(id as string, firebaseUser.uid, joinRole).then(() => {
                   setAccessGranted(true);
-                  showToast({ title: '🎧 Odaya Katıldın!', message: 'Şifre doğrulandı — hoş geldin!', type: 'success' });
+                  showToast({ title: i18n.t('room.id.098'), message: i18n.t('room.id.099'), type: 'success' });
                 }).catch(() => {
-                  showToast({ title: 'Giriş Hatası', type: 'error' });
+                  showToast({ title: i18n.t('room.id.100'), type: 'error' });
                   safeGoBack(router);
                 });
                 setPendingRoomData(null);
@@ -4390,7 +4378,7 @@ export default function RoomScreen() {
               setShowInviteConfirm(false);
               setShowAccessRequest(true);
             } catch (e: any) {
-              showToast({ title: 'İstek Gönderilemedi', message: e?.message || 'Tekrar dene.', type: 'error' });
+              showToast({ title: i18n.t('room.id.101'), message: e?.message || 'Tekrar dene.', type: 'error' });
               setShowInviteConfirm(false);
               setPendingRoomData(null);
               safeGoBack(router);
@@ -4414,9 +4402,9 @@ export default function RoomScreen() {
               const joinRole: 'owner' | 'listener' | 'spectator' = isOriginalHost ? 'owner' : 'listener';
               RoomService.join(id as string, firebaseUser.uid, joinRole).then(() => {
                 setAccessGranted(true);
-                showToast({ title: '🎧 Odaya Katıldın!', message: 'İsteğin onaylandı — hoş geldin!', type: 'success' });
+                showToast({ title: i18n.t('room.id.102'), message: i18n.t('room.id.103'), type: 'success' });
               }).catch(() => {
-                showToast({ title: 'Giriş Hatası', type: 'error' });
+                showToast({ title: i18n.t('room.id.104'), type: 'error' });
                 safeGoBack(router);
               });
               setPendingRoomData(null);
@@ -4917,7 +4905,7 @@ export default function RoomScreen() {
             const _tLimits = getRoomLimits(ownerTier as any);
             if (_tLimits.maxCameras === 0) {
               UpsellService.onCameraLimit(ownerTier as any);
-              showToast({ title: 'Kamera Kapalı', message: 'Bu tier\'da kamera kullanılamıyor. Üyeliği yükselt!', type: 'warning' });
+              showToast({ title: i18n.t('room.id.105'), message: i18n.t('room.id.106'), type: 'warning' });
               return;
             }
             // BUG-RM21 FIX: lk.participants zaten local'i içeriyor, çift sayma
@@ -4933,7 +4921,7 @@ export default function RoomScreen() {
           onGiftPress={() => { openOverlay(() => setShowGiftPanel(true)); }}
           onLeavePress={() => {
             setAlertConfig({
-              visible: true, title: 'Odadan Ayrıl', message: 'Odadan ayrılmak istediğinize emin misiniz?', type: 'warning', icon: 'exit-outline',
+              visible: true, title: i18n.t('room.id.107'), message: i18n.t('room.id.108'), type: 'warning', icon: 'exit-outline',
               buttons: [{ text: 'İptal', style: 'cancel' }, { text: 'Ayrıl', onPress: () => { isRoomClosingRef.current = true; if (amIHost) { handleHostLeave(); } else { handleUserLeave(); } }, style: 'destructive' }],
             });
           }} />
@@ -4960,9 +4948,9 @@ export default function RoomScreen() {
             const msg = r.cost && r.cost > 0
               ? `${r.cost} SP harcandı`
               : 'Premium stilin sonsuz kullanım hakkı var';
-            showToast({ title: '✨ Parlatıldı', message: msg, type: 'success' });
+            showToast({ title: i18n.t('room.id.109'), message: msg, type: 'success' });
           } else {
-            showToast({ title: 'Gönderilemedi', message: r.error || 'Bağlantı hatası', type: 'error' });
+            showToast({ title: i18n.t('room.id.110'), message: r.error || 'Bağlantı hatası', type: 'error' });
           }
         }}
         onSendRaw={(content: string) => {
@@ -5063,14 +5051,14 @@ export default function RoomScreen() {
               setRoom(prev => prev ? { ...prev, room_settings: { ...(prev.room_settings || {}), is_locked: newLocked } } : prev);
               modChannelRef.current?.send({ type: 'broadcast', event: 'settings_changed', payload: { room_settings: { is_locked: newLocked } } });
               showToast({ title: newLocked ? '🔒 Oda Kilitlendi' : '🔓 Kilit Açıldı', type: 'success' });
-            } catch { showToast({ title: 'Ayar Güncellenemedi', message: 'Değişiklik kaydedilemedi. Tekrar dene.', type: 'error' }); }
+            } catch { showToast({ title: i18n.t('room.id.111'), message: i18n.t('room.id.112'), type: 'error' }); }
           })();
         } : undefined}
         settingsConfig={amIHost ? {
           speakingMode,
           onSpeakingModeChange: async (mode) => {
             if (mode === 'selected_only' && !isTierAtLeast(ownerTier as any, 'Pro')) {
-              showToast({ title: '👑 Pro Gerekli', message: 'Seçilmişler modu Pro abonelik gerektirir.', type: 'warning' });
+              showToast({ title: '👑 Pro Gerekli', message: i18n.t('room.id.113'), type: 'warning' });
               return;
             }
             setSpeakingMode(mode as any);
@@ -5081,7 +5069,7 @@ export default function RoomScreen() {
                 modChannelRef.current?.send({ type: 'broadcast', event: 'settings_changed', payload: { room_settings: { speaking_mode: mode } } });
                 const labels: Record<string, string> = { free_for_all: 'Serbest Mod', permission_only: 'İzinli Mod', selected_only: 'Seçilmişler Modu' };
                 showToast({ title: labels[mode] || 'Mod', type: 'success' });
-              } catch { showToast({ title: 'Ayar Güncellenemedi', message: 'Değişiklik kaydedilemedi. Tekrar dene.', type: 'error' }); }
+              } catch { showToast({ title: i18n.t('room.id.114'), message: i18n.t('room.id.115'), type: 'error' }); }
             }
           },
           slowModeSeconds: (room?.room_settings as any)?.slow_mode_seconds || 0,
@@ -5092,7 +5080,7 @@ export default function RoomScreen() {
               setRoom(prev => prev ? { ...prev, room_settings: { ...(prev.room_settings || {}), slow_mode_seconds: seconds } } : prev);
               modChannelRef.current?.send({ type: 'broadcast', event: 'settings_changed', payload: { room_settings: { slow_mode_seconds: seconds } } });
               showToast({ title: seconds ? `Slow Mode: ${seconds}sn` : 'Slow Mode Kapalı', type: 'success' });
-            } catch { showToast({ title: 'Ayar Güncellenemedi', message: 'Değişiklik kaydedilemedi. Tekrar dene.', type: 'error' }); }
+            } catch { showToast({ title: i18n.t('room.id.116'), message: i18n.t('room.id.117'), type: 'error' }); }
           },
           ageRestricted: (room?.room_settings as any)?.age_restricted || false,
           onAgeRestrictedChange: async (enabled) => {
@@ -5102,7 +5090,7 @@ export default function RoomScreen() {
               setRoom(prev => prev ? { ...prev, room_settings: { ...(prev.room_settings || {}), age_restricted: enabled } } : prev);
               modChannelRef.current?.send({ type: 'broadcast', event: 'settings_changed', payload: { room_settings: { age_restricted: enabled } } });
               showToast({ title: enabled ? '🔞 +18 Aktif' : '👥 Yaş Sınırı Kaldırıldı', type: 'success' });
-            } catch { showToast({ title: 'Ayar Güncellenemedi', message: 'Değişiklik kaydedilemedi. Tekrar dene.', type: 'error' }); }
+            } catch { showToast({ title: i18n.t('room.id.118'), message: i18n.t('room.id.119'), type: 'error' }); }
           },
           followersOnly: (room?.room_settings as any)?.followers_only || false,
           onToggleFollowersOnly: async (enabled) => {
@@ -5112,7 +5100,7 @@ export default function RoomScreen() {
               setRoom(prev => prev ? { ...prev, room_settings: { ...(prev.room_settings || {}), followers_only: enabled } } : prev);
               modChannelRef.current?.send({ type: 'broadcast', event: 'settings_changed', payload: { room_settings: { followers_only: enabled } } });
               showToast({ title: enabled ? 'Arkadaşlara Özel' : 'Herkese Açık', type: 'success' });
-            } catch { showToast({ title: 'Ayar Güncellenemedi', message: 'Değişiklik kaydedilemedi. Tekrar dene.', type: 'error' }); }
+            } catch { showToast({ title: i18n.t('room.id.120'), message: i18n.t('room.id.121'), type: 'error' }); }
           },
           donationsEnabled: (room?.room_settings as any)?.donations_enabled || false,
           onDonationsToggle: async (enabled) => {
@@ -5122,7 +5110,7 @@ export default function RoomScreen() {
               setRoom(prev => prev ? { ...prev, room_settings: { ...(prev.room_settings || {}), donations_enabled: enabled } } : prev);
               modChannelRef.current?.send({ type: 'broadcast', event: 'settings_changed', payload: { room_settings: { donations_enabled: enabled } } });
               showToast({ title: enabled ? 'Bağış Açıldı' : 'Bağış Kapatıldı', type: 'success' });
-            } catch { showToast({ title: 'Ayar Güncellenemedi', message: 'Değişiklik kaydedilemedi. Tekrar dene.', type: 'error' }); }
+            } catch { showToast({ title: i18n.t('room.id.122'), message: i18n.t('room.id.123'), type: 'error' }); }
           },
           roomLanguage: (room?.room_settings as any)?.room_language || 'tr',
           onLanguageChange: async (lang) => {
@@ -5133,7 +5121,7 @@ export default function RoomScreen() {
               modChannelRef.current?.send({ type: 'broadcast', event: 'settings_changed', payload: { room_settings: { room_language: lang } } });
               const names: Record<string,string> = { tr: 'Türkçe', en: 'English', de: 'Deutsch', ar: 'العربية' };
               showToast({ title: `🌐 ${names[lang] || lang}`, type: 'success' });
-            } catch { showToast({ title: 'Ayar Güncellenemedi', message: 'Değişiklik kaydedilemedi. Tekrar dene.', type: 'error' }); }
+            } catch { showToast({ title: i18n.t('room.id.124'), message: i18n.t('room.id.125'), type: 'error' }); }
           },
           // ★ Oda Adı
           roomName: room?.name || '',
@@ -5143,8 +5131,8 @@ export default function RoomScreen() {
               await ModerationService.editRoomName(room.id, name);
               setRoom(prev => prev ? { ...prev, name } : prev);
               modChannelRef.current?.send({ type: 'broadcast', event: 'settings_changed', payload: { name } });
-              showToast({ title: '✏️ Oda Adı Güncellendi', type: 'success' });
-            } catch { showToast({ title: 'Ayar Güncellenemedi', message: 'Değişiklik kaydedilemedi. Tekrar dene.', type: 'error' }); }
+              showToast({ title: i18n.t('room.id.126'), type: 'success' });
+            } catch { showToast({ title: i18n.t('room.id.127'), message: i18n.t('room.id.128'), type: 'error' }); }
           },
           // ★ Hoş Geldin Mesajı
           welcomeMessage: (room?.room_settings as any)?.welcome_message || '',
@@ -5154,8 +5142,8 @@ export default function RoomScreen() {
               await RoomService.updateSettings(room.id, firebaseUser.uid, { room_settings: { welcome_message: msg } });
               setRoom(prev => prev ? { ...prev, room_settings: { ...(prev.room_settings || {}), welcome_message: msg } } : prev);
               modChannelRef.current?.send({ type: 'broadcast', event: 'settings_changed', payload: { room_settings: { welcome_message: msg } } });
-              showToast({ title: '💬 Hoş Geldin Mesajı Güncellendi', type: 'success' });
-            } catch { showToast({ title: 'Ayar Güncellenemedi', message: 'Değişiklik kaydedilemedi. Tekrar dene.', type: 'error' }); }
+              showToast({ title: i18n.t('room.id.129'), type: 'success' });
+            } catch { showToast({ title: i18n.t('room.id.130'), message: i18n.t('room.id.131'), type: 'error' }); }
           },
           // ★ Kurallar
           roomRules: typeof (room?.room_settings as any)?.rules === 'string' ? (room?.room_settings as any).rules : Array.isArray((room?.room_settings as any)?.rules) ? (room?.room_settings as any).rules.join('\n') : '',
@@ -5165,8 +5153,8 @@ export default function RoomScreen() {
               await RoomService.updateSettings(room.id, firebaseUser.uid, { room_settings: { rules: rulesText } });
               setRoom(prev => prev ? { ...prev, room_settings: { ...(prev.room_settings || {}), rules: rulesText } } : prev);
               modChannelRef.current?.send({ type: 'broadcast', event: 'settings_changed', payload: { room_settings: { rules: rulesText } } });
-              showToast({ title: '📋 Kurallar Güncellendi', type: 'success' });
-            } catch { showToast({ title: 'Ayar Güncellenemedi', message: 'Değişiklik kaydedilemedi. Tekrar dene.', type: 'error' }); }
+              showToast({ title: i18n.t('room.id.132'), type: 'success' });
+            } catch { showToast({ title: i18n.t('room.id.133'), message: i18n.t('room.id.134'), type: 'error' }); }
           },
           // ★ 2026-04-20: description — create-room'da giriliyor, artık edit edilebilir
           description: room?.description || '',
@@ -5176,8 +5164,8 @@ export default function RoomScreen() {
               await RoomService.updateSettings(room.id, firebaseUser.uid, { description: d });
               setRoom(prev => prev ? { ...prev, description: d } as any : prev);
               modChannelRef.current?.send({ type: 'broadcast', event: 'settings_changed', payload: { description: d } });
-              showToast({ title: '📝 Açıklama Güncellendi', type: 'success' });
-            } catch { showToast({ title: 'Ayar Güncellenemedi', message: 'Değişiklik kaydedilemedi. Tekrar dene.', type: 'error' }); }
+              showToast({ title: i18n.t('room.id.135'), type: 'success' });
+            } catch { showToast({ title: i18n.t('room.id.136'), message: i18n.t('room.id.137'), type: 'error' }); }
           },
           // ★ Oda Tipi
           roomType: room?.type || 'open',
@@ -5189,7 +5177,7 @@ export default function RoomScreen() {
               modChannelRef.current?.send({ type: 'broadcast', event: 'settings_changed', payload: { type } });
               const labels: Record<string,string> = { open: 'Herkese Açık', closed: 'Şifreli', invite: 'Davetli' };
               showToast({ title: `🔒 ${labels[type] || type}`, type: 'success' });
-            } catch { showToast({ title: 'Ayar Güncellenemedi', message: 'Değişiklik kaydedilemedi. Tekrar dene.', type: 'error' }); }
+            } catch { showToast({ title: i18n.t('room.id.138'), message: i18n.t('room.id.139'), type: 'error' }); }
           },
           // ★ Şifre (Oda Tipi = closed olduğunda)
           //   ★ 2026-04-27 FIX: Hem rooms.room_password column hem room_settings güncelleniyor.
@@ -5206,7 +5194,7 @@ export default function RoomScreen() {
               setRoom(prev => prev ? { ...prev, room_password: pw && pw.trim().length > 0 ? pw.trim() : null, room_settings: { ...(prev.room_settings || {}), room_password: pw && pw.trim().length > 0 ? pw.trim() : '' } } as any : prev);
               modChannelRef.current?.send({ type: 'broadcast', event: 'settings_changed', payload: { room_settings: { room_password: pw } } });
               showToast({ title: pw && pw.trim().length > 0 ? '🔐 Şifre Ayarlandı' : '🔓 Şifre Kaldırıldı', type: 'success' });
-            } catch { showToast({ title: 'Ayar Güncellenemedi', message: 'Değişiklik kaydedilemedi. Tekrar dene.', type: 'error' }); }
+            } catch { showToast({ title: i18n.t('room.id.140'), message: i18n.t('room.id.141'), type: 'error' }); }
           },
           // ★ Tema
           themeId: (room as any)?.theme_id || null,
@@ -5216,14 +5204,14 @@ export default function RoomScreen() {
               await RoomService.updateSettings(room.id, firebaseUser.uid, { theme_id: themeId });
               setRoom(prev => prev ? { ...prev, theme_id: themeId } as any : prev);
               modChannelRef.current?.send({ type: 'broadcast', event: 'settings_changed', payload: { theme_id: themeId } });
-              showToast({ title: '🎨 Tema Güncellendi', type: 'success' });
-            } catch { showToast({ title: 'Ayar Güncellenemedi', message: 'Değişiklik kaydedilemedi. Tekrar dene.', type: 'error' }); }
+              showToast({ title: i18n.t('room.id.142'), type: 'success' });
+            } catch { showToast({ title: i18n.t('room.id.143'), message: i18n.t('room.id.144'), type: 'error' }); }
           },
           // ★ Odayı Dondur
           onFreezeRoom: isTierAtLeast(ownerTier as any, 'Plus') ? () => {
             setAlertConfig({
-              visible: true, title: '❄️ Odayı Dondur',
-              message: 'Oda dondurulacak. Tüm katılımcılar çıkarılacak. Daha sonra "Odalarım" sekmesinden tekrar aktifleştirebilirsin.',
+              visible: true, title: i18n.t('room.id.145'),
+              message: i18n.t('room.id.146'),
               type: 'warning', icon: 'snow-outline',
               buttons: [
                 { text: 'İptal', style: 'cancel' },
@@ -5235,9 +5223,9 @@ export default function RoomScreen() {
                     await RoomService.freezeRoom(room.id, firebaseUser.uid);
                     liveKitService.disconnect().catch(() => {});
                     setMinimizedRoom(null);
-                    showToast({ title: '❄️ Oda Donduruldu', message: 'Odalarım sekmesinden tekrar aktifleştirebilirsin.', type: 'success' });
+                    showToast({ title: '❄️ Oda Donduruldu', message: i18n.t('room.id.147'), type: 'success' });
                     safeGoBack(router);
-                  } catch (err: any) { showToast({ title: 'Dondurulamadı', message: err.message || 'Oda uyku moduna alınamadı.', type: 'error' }); }
+                  } catch (err: any) { showToast({ title: i18n.t('room.id.148'), message: err.message || 'Oda uyku moduna alınamadı.', type: 'error' }); }
                 }},
               ],
             });
@@ -5251,7 +5239,7 @@ export default function RoomScreen() {
               setRoom(prev => prev ? { ...prev, room_settings: { ...(prev.room_settings || {}), entry_fee_sp: fee } } : prev);
               modChannelRef.current?.send({ type: 'broadcast', event: 'settings_changed', payload: { room_settings: { entry_fee_sp: fee } } });
               showToast({ title: fee ? `💰 Giriş: ${fee} SP` : '🆓 Giriş Ücretsiz', type: 'success' });
-            } catch { showToast({ title: 'Ayar Güncellenemedi', message: 'Değişiklik kaydedilemedi. Tekrar dene.', type: 'error' }); }
+            } catch { showToast({ title: i18n.t('room.id.149'), message: i18n.t('room.id.150'), type: 'error' }); }
           },
           // ★ Müzik linki (YouTube/Spotify/SoundCloud) — herkes kendi platformunda dinler
           musicLink: room?.room_settings?.music_link || null,
@@ -5263,7 +5251,7 @@ export default function RoomScreen() {
               setRoom(prev => prev ? { ...prev, room_settings: { ...(prev.room_settings || {}), music_link: normalized } } : prev);
               modChannelRef.current?.send({ type: 'broadcast', event: 'settings_changed', payload: { room_settings: { music_link: normalized } } });
               showToast({ title: normalized ? '🎵 Müzik Linki Eklendi' : '🔇 Müzik Linki Kaldırıldı', type: 'success' });
-            } catch { showToast({ title: 'Ayar Güncellenemedi', message: 'Değişiklik kaydedilemedi. Tekrar dene.', type: 'error' }); }
+            } catch { showToast({ title: i18n.t('room.id.151'), message: i18n.t('room.id.152'), type: 'error' }); }
           },
           // ★ Arka Plan Resmi
           backgroundImage: room?.room_image_url || room?.room_settings?.room_image_url || null,
@@ -5272,7 +5260,7 @@ export default function RoomScreen() {
             try {
               const ImagePicker = require('expo-image-picker');
               const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-              if (!perm.granted) { showToast({ title: 'İzin Gerekli', type: 'warning' }); return; }
+              if (!perm.granted) { showToast({ title: i18n.t('room.id.153'), type: 'warning' }); return; }
               // ★ 2026-04-21: Oda içi arka plan DİKEY (9:16) — oda UI dikey; kapak görseli yatay kalır.
               const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: 'images', allowsEditing: true, aspect: [9, 16], quality: 0.7 });
               if (result.canceled) return;
@@ -5283,8 +5271,8 @@ export default function RoomScreen() {
               setRoom(prev => prev ? { ...prev, room_settings: { ...(prev.room_settings || {}), room_image_url: url } } as any : prev);
               // ★ 2026-04-19: Broadcast — diğer client'lara arka plan değişimini yay
               modChannelRef.current?.send({ type: 'broadcast', event: 'settings_changed', payload: { room_settings: { room_image_url: url } } });
-              showToast({ title: '🖼 Arka Plan Güncellendi', type: 'success' });
-            } catch (e: any) { showToast({ title: 'Ayar Güncellenemedi', message: e.message || 'Sunucuya ulaşılamadı.', type: 'error' }); }
+              showToast({ title: i18n.t('room.id.154'), type: 'success' });
+            } catch (e: any) { showToast({ title: i18n.t('room.id.155'), message: e.message || 'Sunucuya ulaşılamadı.', type: 'error' }); }
           },
           onRemoveBackgroundImage: async () => {
             if (!room || !firebaseUser) return;
@@ -5293,8 +5281,8 @@ export default function RoomScreen() {
               setRoom(prev => prev ? { ...prev, room_settings: { ...(prev.room_settings || {}), room_image_url: null } } as any : prev);
               // ★ 2026-04-19: Broadcast — diğer client'lara kaldırıldığını yay
               modChannelRef.current?.send({ type: 'broadcast', event: 'settings_changed', payload: { room_settings: { room_image_url: null } } });
-              showToast({ title: 'Arka Plan Kaldırıldı', type: 'success' });
-            } catch { showToast({ title: 'Ayar Güncellenemedi', message: 'Değişiklik kaydedilemedi. Tekrar dene.', type: 'error' }); }
+              showToast({ title: i18n.t('room.id.156'), type: 'success' });
+            } catch { showToast({ title: i18n.t('room.id.157'), message: i18n.t('room.id.158'), type: 'error' }); }
           },
           // ★ 2026-04-21: Kart Görseli — card_image_url (keşfet kartı arka planı).
           //   cover_image_url ölü field olduğu için card_image_url'ye birleştirildi.
@@ -5304,7 +5292,7 @@ export default function RoomScreen() {
             try {
               const ImagePicker = require('expo-image-picker');
               const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-              if (!perm.granted) { showToast({ title: 'İzin Gerekli', type: 'warning' }); return; }
+              if (!perm.granted) { showToast({ title: i18n.t('room.id.159'), type: 'warning' }); return; }
               const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: 'images', allowsEditing: true, aspect: [16, 9], quality: 0.7 });
               if (result.canceled) return;
               const { StorageService } = require('../../services/storage');
@@ -5313,8 +5301,8 @@ export default function RoomScreen() {
               await RoomService.updateSettings(room.id, firebaseUser.uid, { room_settings: { card_image_url: url } });
               setRoom(prev => prev ? { ...prev, room_settings: { ...(prev.room_settings || {}), card_image_url: url } } as any : prev);
               modChannelRef.current?.send({ type: 'broadcast', event: 'settings_changed', payload: { room_settings: { card_image_url: url } } });
-              showToast({ title: '🖼 Kart Görseli Güncellendi', type: 'success' });
-            } catch (e: any) { showToast({ title: 'Ayar Güncellenemedi', message: e.message || 'Sunucuya ulaşılamadı.', type: 'error' }); }
+              showToast({ title: i18n.t('room.id.160'), type: 'success' });
+            } catch (e: any) { showToast({ title: i18n.t('room.id.161'), message: e.message || 'Sunucuya ulaşılamadı.', type: 'error' }); }
           },
           onRemoveCoverImage: async () => {
             if (!room || !firebaseUser) return;
@@ -5322,8 +5310,8 @@ export default function RoomScreen() {
               await RoomService.updateSettings(room.id, firebaseUser.uid, { room_settings: { card_image_url: null } });
               setRoom(prev => prev ? { ...prev, room_settings: { ...(prev.room_settings || {}), card_image_url: null } } as any : prev);
               modChannelRef.current?.send({ type: 'broadcast', event: 'settings_changed', payload: { room_settings: { card_image_url: null } } });
-              showToast({ title: 'Kart Görseli Kaldırıldı', type: 'success' });
-            } catch { showToast({ title: 'Ayar Güncellenemedi', message: 'Değişiklik kaydedilemedi. Tekrar dene.', type: 'error' }); }
+              showToast({ title: i18n.t('room.id.162'), type: 'success' });
+            } catch { showToast({ title: i18n.t('room.id.163'), message: i18n.t('room.id.164'), type: 'error' }); }
           },
         } : undefined}
       />
@@ -5355,7 +5343,7 @@ export default function RoomScreen() {
             // Altın davet — audience drawer'da hedef seçim. Hedef seçim flow'u
             // post-launch'ta sheet içine alınır (v93+).
             setShowAudienceDrawer(true);
-            showToast({ title: 'Altın Davet', message: 'Listeden bir dinleyici seç.', type: 'info' });
+            showToast({ title: i18n.t('room.id.165'), message: i18n.t('room.id.166'), type: 'info' });
           }}
         />
       )}
@@ -5394,7 +5382,7 @@ export default function RoomScreen() {
               await RoomService.activateBoost(room.id, firebaseUser.uid, tier.durationHours);
               showToast({ title: '🚀 Boost Aktif!', message: `${tier.durationHours} saat boyunca keşfette öne çıkacaksın!`, type: 'success' });
             } catch (e: any) {
-              showToast({ title: 'Boost Başarısız', message: e?.message || 'Boost aktifleştirilemedi.', type: 'error' });
+              showToast({ title: i18n.t('room.id.167'), message: e?.message || 'Boost aktifleştirilemedi.', type: 'error' });
               throw e;
             }
           }}
@@ -5427,7 +5415,7 @@ export default function RoomScreen() {
             // ★ Oda içi no-op showToast'u bypass — global Toast kullan
             if (successCount > 0) {
               const { showToast: globalToast } = require('../../components/Toast');
-              globalToast({ title: '📨 Davet Gönderildi', message: `${successCount} kişiye davet gönderildi`, type: 'success' });
+              globalToast({ title: i18n.t('room.id.168'), message: `${successCount} kişiye davet gönderildi`, type: 'success' });
             }
             setShowInviteFriends(false);
           }}
@@ -5490,7 +5478,7 @@ export default function RoomScreen() {
               // ★ Access granted join DB insert başarısından SONRA (LiveKit token için participant row gerek)
               RoomService.join(id as string, firebaseUser.uid, joinRole).then(() => {
                 setAccessGranted(true);
-                showToast({ title: '🎧 Odaya Katıldın!', message: 'Şifre doğrulandı — hoş geldin!', type: 'success' });
+                showToast({ title: i18n.t('room.id.169'), message: i18n.t('room.id.170'), type: 'success' });
               }).catch((err: any) => {
                 const msg = err?.message || 'Odaya katılınamadı.';
                 setAlertConfig({
@@ -5544,9 +5532,9 @@ export default function RoomScreen() {
             // ★ Access granted join DB insert başarısından SONRA (LiveKit token için participant row gerek)
             RoomService.join(id as string, firebaseUser.uid, joinRole).then(() => {
               setAccessGranted(true);
-              showToast({ title: '🎧 Odaya Katıldın!', message: 'İsteğin onaylandı — hoş geldin!', type: 'success' });
+              showToast({ title: i18n.t('room.id.171'), message: i18n.t('room.id.172'), type: 'success' });
             }).catch(() => {
-              showToast({ title: 'Giriş Hatası', type: 'error' });
+              showToast({ title: i18n.t('room.id.173'), type: 'error' });
               safeGoBack(router);
             });
             setPendingRoomData(null);
@@ -5595,7 +5583,7 @@ export default function RoomScreen() {
             setShowInviteConfirm(false);
             setShowAccessRequest(true);
           } catch (e: any) {
-            showToast({ title: 'İstek Gönderilemedi', message: e?.message || 'Tekrar dene.', type: 'error' });
+            showToast({ title: i18n.t('room.id.174'), message: e?.message || 'Tekrar dene.', type: 'error' });
             setShowInviteConfirm(false);
             setPendingRoomData(null);
             safeGoBack(router);

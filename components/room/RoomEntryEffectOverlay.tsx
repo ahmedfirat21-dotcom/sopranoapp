@@ -32,16 +32,16 @@ const { width: W, height: H } = Dimensions.get('window');
 // ★ v108.19: Şiirsel/otantik label'lar — sade çeviriler (Alev, Şimşek vb.) yerine
 //   premium markalı isimler. Kullanıcının vurgusu: "daha vurucu" → epik kelime seçimi.
 const ENTRY_META: Record<string, { emoji: string; color: string; label: string }> = {
-  'constellation':  { emoji: '✦',  color: '#FBBF24', label: 'Sonsuz Burç' },
-  'or-ancien':      { emoji: '✨', color: '#FBBF24', label: 'Kadim Altın' },
+  'constellation':  { emoji: '✦',  color: '#FBBF24', label: i18n.t('room.roomentryeffectoverlay.001') },
+  'or-ancien':      { emoji: '✨', color: '#FBBF24', label: i18n.t('room.roomentryeffectoverlay.002') },
   'inferno':        { emoji: '🔥', color: '#DC2626', label: 'Volkan Nefesi' },
-  'voltaire':       { emoji: '⚡', color: '#22D3EE', label: 'Yıldırımın Sesi' },
-  'belle-epoque':   { emoji: '💗', color: '#F472B6', label: 'Zarif Çağ' },
-  'aurum-strike':   { emoji: '⚡', color: '#FBBF24', label: 'Altın Hükmü' },
+  'voltaire':       { emoji: '⚡', color: '#22D3EE', label: i18n.t('room.roomentryeffectoverlay.003') },
+  'belle-epoque':   { emoji: '💗', color: '#F472B6', label: i18n.t('room.roomentryeffectoverlay.004') },
+  'aurum-strike':   { emoji: '⚡', color: '#FBBF24', label: i18n.t('room.roomentryeffectoverlay.005') },
   'glacier-aura':   { emoji: '❄️', color: '#22D3EE', label: 'Buzul Hâlesi' },
   'vesuvius':       { emoji: '🌋', color: '#FB923C', label: 'Vesuvius' },
   'ai-spark':       { emoji: '🤖', color: '#A78BFA', label: 'AI Spark' },
-  'phoenix-rising': { emoji: '🔥', color: '#FF8C19', label: 'Anka Kuşu' },
+  'phoenix-rising': { emoji: '🔥', color: '#FF8C19', label: i18n.t('room.roomentryeffectoverlay.006') },
 };
 
 interface Props {

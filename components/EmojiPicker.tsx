@@ -3,6 +3,7 @@
  * ★ WhatsApp tarzı kompakt inline klavye boyutu
  */
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Dimensions, Image } from 'react-native';
+import { i18n } from '../services/i18n';
 import { useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Radius } from '../constants/theme';
@@ -14,12 +15,12 @@ const { height: H } = Dimensions.get('window');
 
 const EMOJI_CATEGORIES = [
   {
-    name: 'Sık Kullanılan',
+    name: i18n.t('emojipicker.001'),
     icon: 'time-outline' as const,
     emojis: ['😀', '😂', '❤️', '🔥', '👍', '😍', '🥺', '😎', '🤣', '💪', '🎉', '😊', '🥰', '😘', '💕', '✨', '🙏', '😭'],
   },
   {
-    name: 'Yüzler',
+    name: i18n.t('emojipicker.002'),
     icon: 'happy-outline' as const,
     emojis: ['😀', '😃', '😄', '😁', '😆', '😅', '🤣', '😂', '🙂', '😉', '😊', '😇', '🥰', '😍', '🤩', '😘', '😗', '😚', '😙', '🥲', '😋', '😛', '😜', '🤪', '😝', '🤑', '🤗', '🤭', '🫢', '🤫', '🤔', '🫡', '😐', '😑', '😶', '🫥', '😏', '😒', '🙄', '😬', '🤥', '😌', '😔', '😪', '🤤', '😴', '😷', '🤒', '🤕', '🤧', '🥵', '🥶', '🥴', '😵', '🤯', '😎', '🥸', '😱', '😨', '😰', '😢', '😭', '🥺'],
   },

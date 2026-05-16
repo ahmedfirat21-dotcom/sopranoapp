@@ -298,7 +298,7 @@ export default function SPDonateSheet({
         // ★ v92.28 (2 May 2026): Spesifik hata mesajı — kullanıcı neden başarısız
         //   olduğunu bilmek istiyor (welcome bonus exploit, rate limit, yetersiz, vs.)
         showToast({
-          title: 'Bağış başarısız',
+          title: i18n.t('profile.spdonatesheet.001'),
           message: result.error || 'Bilinmeyen bir hata oluştu, lütfen tekrar dene.',
           type: 'error',
         });
@@ -310,7 +310,7 @@ export default function SPDonateSheet({
         setBalance(prev => (prev ?? 0) + sentAmount);
         setShowSuccess(false);
         showToast({
-          title: 'Bağış başarısız',
+          title: i18n.t('profile.spdonatesheet.002'),
           message: e?.message || 'Beklenmeyen bir hata, internet bağlantını kontrol et.',
           type: 'error',
         });

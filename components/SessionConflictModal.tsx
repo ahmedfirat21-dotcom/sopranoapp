@@ -59,9 +59,7 @@ export default function SessionConflictModal({ visible, onContinueHere, onSignOu
           </View>
 
           <Text style={s.title}>{i18n.t('sessionconflictmodal.001')}</Text>
-          <Text style={s.message}>
-            Bu hesap az önce başka bir cihazda kullanılmaya başladı. Aynı hesap iki yerden aktif olamaz.
-          </Text>
+          <Text style={s.message}>{i18n.t('sessionconflictmodal.001')}</Text>
 
           <View style={s.buttons}>
             <Pressable style={s.btnSecondary} onPress={onSignOut}>
@@ -79,9 +77,7 @@ export default function SessionConflictModal({ visible, onContinueHere, onSignOu
             </Pressable>
           </View>
 
-          <Text style={s.footnote}>
-            "Devam Et" dersen diğer cihaz oturumdan düşer.
-          </Text>
+          <Text style={s.footnote}>{i18n.t('sessionconflictmodal.002')}</Text>
         </Animated.View>
       </View>
     </Animated.View>

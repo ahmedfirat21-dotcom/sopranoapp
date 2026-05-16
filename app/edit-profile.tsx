@@ -192,10 +192,10 @@ export default function EditProfileScreen() {
         setUploadingAvatar(true);
         const uploadUrl = await StorageService.uploadAvatar(firebaseUser.uid, result.assets[0].uri, avatarUrl);
         setAvatarUrl(uploadUrl);
-        showToast({ title: '📸 Fotoğraf Yüklendi', message: 'Profil fotoğrafın güncellendi.', type: 'success' });
+        showToast({ title: i18n.t('editprofile.002'), message: i18n.t('editprofile.003'), type: 'success' });
       }
     } catch (err: any) {
-      showToast({ title: 'Fotoğraf Yüklenemedi', message: err.message || 'Görsel yüklenirken sorun oluştu.', type: 'error' });
+      showToast({ title: i18n.t('editprofile.004'), message: err.message || 'Görsel yüklenirken sorun oluştu.', type: 'error' });
     } finally {
       setUploadingAvatar(false);
     }
@@ -213,20 +213,20 @@ export default function EditProfileScreen() {
     if (savingLockRef.current) return;
     const cleanName = sanitizeText(displayName);
     if (!cleanName) {
-      showToast({ type: 'warning', title: 'Uyarı', message: 'Görünen ad boş olamaz.' });
+      showToast({ type: 'warning', title: i18n.t('editprofile.005'), message: i18n.t('editprofile.006') });
       return;
     }
     if (!userId) {
-      showToast({ type: 'error', title: 'Oturum Kapalı', message: 'Giriş bilgin bulunamadı, yeniden giriş yap.' });
+      showToast({ type: 'error', title: i18n.t('editprofile.007'), message: i18n.t('editprofile.008') });
       return;
     }
     // ★ Username taken — kaydetmeye izin verme
     if (usernameStatus === 'taken') {
-      showToast({ type: 'warning', title: 'Kullanıcı adı alınmış', message: 'Başka bir kullanıcı adı dene.' });
+      showToast({ type: 'warning', title: i18n.t('editprofile.009'), message: i18n.t('editprofile.010') });
       return;
     }
     if (usernameStatus === 'checking') {
-      showToast({ type: 'info', title: 'Kontrol ediliyor', message: 'Kullanıcı adı müsaitliği kontrol ediliyor...' });
+      showToast({ type: 'info', title: 'Kontrol ediliyor', message: i18n.t('editprofile.011') });
       return;
     }
 
@@ -281,13 +281,13 @@ export default function EditProfileScreen() {
       // ★ U3 FIX: Profil tab'ı dönüşte güncel veriyi görsün
       refreshProfile().catch(() => {});
 
-      showToast({ title: 'Başarılı ✓', message: 'Profil güncellendi!', type: 'success' });
+      showToast({ title: i18n.t('editprofile.012'), message: i18n.t('editprofile.013'), type: 'success' });
       safeGoBack(router);
     } catch (error: any) {
       if (error?.message?.includes('duplicate') || error?.code === '23505') {
-        showToast({ type: 'warning', title: 'Kullanıcı Adı Alınmış', message: 'Bu kullanıcı adı başkası tarafından kullanılıyor.' });
+        showToast({ type: 'warning', title: i18n.t('editprofile.014'), message: i18n.t('editprofile.015') });
       } else {
-        showToast({ type: 'error', title: 'Profil Güncellenmedi', message: 'Değişiklikler kaydedilemedi. Tekrar dene.' });
+        showToast({ type: 'error', title: i18n.t('editprofile.016'), message: i18n.t('editprofile.017') });
       }
     } finally {
       setSaving(false);
@@ -313,16 +313,16 @@ export default function EditProfileScreen() {
       if (result.type === 'success' && result.params?.id_token) {
         const credential = GoogleAuthProvider.credential(result.params.id_token);
         await linkWithCredential(firebaseUser, credential);
-        showToast({ type: 'success', title: 'Başarılı ✓', message: 'Google hesabınız başarıyla bağlandı! Artık Google ile giriş yapabilirsiniz.' });
+        showToast({ type: 'success', title: i18n.t('editprofile.018'), message: i18n.t('editprofile.019') });
       }
     } catch (error: any) {
       if (__DEV__) console.error('Google link error:', error);
       if (error?.code === 'auth/credential-already-in-use') {
-        showToast({ type: 'warning', title: 'Uyarı', message: 'Bu Google hesabı zaten başka bir kullanıcıya bağlı.' });
+        showToast({ type: 'warning', title: i18n.t('editprofile.020'), message: i18n.t('editprofile.021') });
       } else if (error?.code === 'auth/provider-already-linked') {
-        showToast({ type: 'info', title: 'Bilgi', message: 'Google hesabınız zaten bağlı.' });
+        showToast({ type: 'info', title: 'Bilgi', message: i18n.t('editprofile.022') });
       } else {
-        showToast({ type: 'error', title: 'Google Bağlanamadı', message: 'Google hesabı eklenemedi, tekrar dene.' });
+        showToast({ type: 'error', title: i18n.t('editprofile.023'), message: i18n.t('editprofile.024') });
       }
     } finally {
       setLinking(false);
@@ -334,15 +334,15 @@ export default function EditProfileScreen() {
     if (!firebaseUser) return;
 
     if (!regEmail.trim()) {
-      showToast({ type: 'warning', title: 'E-posta Gerekli', message: 'Lütfen e-posta adresini gir.' });
+      showToast({ type: 'warning', title: 'E-posta Gerekli', message: i18n.t('editprofile.025') });
       return;
     }
     if (regPassword.length < 6) {
-      showToast({ type: 'warning', title: 'Şifre Çok Kısa', message: 'Şifre en az 6 karakter olmalı.' });
+      showToast({ type: 'warning', title: i18n.t('editprofile.026'), message: i18n.t('editprofile.027') });
       return;
     }
     if (regPassword !== regPasswordConfirm) {
-      showToast({ type: 'warning', title: 'Şifreler Eşleşmiyor', message: 'İki şifre alanı aynı olmalı.' });
+      showToast({ type: 'warning', title: i18n.t('editprofile.028'), message: i18n.t('editprofile.029') });
       return;
     }
 
@@ -351,7 +351,7 @@ export default function EditProfileScreen() {
     try {
       const credential = EmailAuthProvider.credential(regEmail.trim(), regPassword);
       await linkWithCredential(firebaseUser, credential);
-      showToast({ title: 'Başarılı ✓', message: 'E-posta hesabınız başarıyla oluşturuldu! Artık e-posta ve şifre ile giriş yapabilirsiniz.', type: 'success' });
+      showToast({ title: i18n.t('editprofile.030'), message: i18n.t('editprofile.031'), type: 'success' });
       setShowEmailRegister(false);
       setRegEmail('');
       setRegPassword('');
@@ -359,13 +359,13 @@ export default function EditProfileScreen() {
     } catch (error: any) {
       if (__DEV__) console.error('Email link error:', error);
       if (error?.code === 'auth/email-already-in-use') {
-        showToast({ type: 'warning', title: 'E-posta Kullanımda', message: 'Bu e-posta başka bir hesaba bağlı.' });
+        showToast({ type: 'warning', title: i18n.t('editprofile.032'), message: i18n.t('editprofile.033') });
       } else if (error?.code === 'auth/invalid-email') {
-        showToast({ type: 'warning', title: 'Geçersiz E-posta', message: 'Geçerli bir e-posta adresi gir.' });
+        showToast({ type: 'warning', title: i18n.t('editprofile.034'), message: i18n.t('editprofile.035') });
       } else if (error?.code === 'auth/provider-already-linked') {
-        showToast({ type: 'info', title: 'Bilgi', message: 'E-posta hesabı zaten bağlı.' });
+        showToast({ type: 'info', title: 'Bilgi', message: i18n.t('editprofile.036') });
       } else {
-        showToast({ type: 'error', title: 'E-posta Eklenemedi', message: 'E-posta hesabın güncellenemedi, tekrar dene.' });
+        showToast({ type: 'error', title: 'E-posta Eklenemedi', message: i18n.t('editprofile.037') });
       }
     } finally {
       setLinking(false);
@@ -377,15 +377,15 @@ export default function EditProfileScreen() {
     if (!firebaseUser || !firebaseUser.email) return;
 
     if (!currentPassword) {
-      showToast({ type: 'warning', title: 'Uyarı', message: 'Mevcut şifrenizi girin.' });
+      showToast({ type: 'warning', title: i18n.t('editprofile.038'), message: i18n.t('editprofile.039') });
       return;
     }
     if (newPassword.length < 6) {
-      showToast({ type: 'warning', title: 'Uyarı', message: 'Yeni şifre en az 6 karakter olmalıdır.' });
+      showToast({ type: 'warning', title: i18n.t('editprofile.040'), message: i18n.t('editprofile.041') });
       return;
     }
     if (newPassword !== newPasswordConfirm) {
-      showToast({ type: 'warning', title: 'Uyarı', message: 'Yeni şifreler uyuşmuyor.' });
+      showToast({ type: 'warning', title: i18n.t('editprofile.042'), message: i18n.t('editprofile.043') });
       return;
     }
 
@@ -397,7 +397,7 @@ export default function EditProfileScreen() {
       await reauthenticateWithCredential(firebaseUser, credential);
       // Sonra şifreyi güncelle
       await updatePassword(firebaseUser, newPassword);
-      showToast({ title: 'Başarılı ✓', message: 'Şifreniz güncellendi!', type: 'success' });
+      showToast({ title: i18n.t('editprofile.044'), message: i18n.t('editprofile.045'), type: 'success' });
       setShowPasswordChange(false);
       setCurrentPassword('');
       setNewPassword('');
@@ -405,11 +405,11 @@ export default function EditProfileScreen() {
     } catch (error: any) {
       if (__DEV__) console.error('Password change error:', error);
       if (error?.code === 'auth/wrong-password') {
-        showToast({ type: 'error', title: 'Şifre Yanlış', message: 'Mevcut şifren doğru değil.' });
+        showToast({ type: 'error', title: i18n.t('editprofile.046'), message: i18n.t('editprofile.047') });
       } else if (error?.code === 'auth/requires-recent-login') {
-        showToast({ type: 'warning', title: 'Yeniden Giriş Gerekli', message: 'Güvenlik için çıkış yapıp tekrar gir.' });
+        showToast({ type: 'warning', title: i18n.t('editprofile.048'), message: i18n.t('editprofile.049') });
       } else {
-        showToast({ type: 'error', title: 'Şifre Değiştirilemedi', message: 'İşlem tamamlanamadı, tekrar dene.' });
+        showToast({ type: 'error', title: i18n.t('editprofile.050'), message: i18n.t('editprofile.051') });
       }
     } finally {
       setChangingPassword(false);
@@ -429,8 +429,8 @@ export default function EditProfileScreen() {
 
   // Auth type label
   const getAuthTypeInfo = () => {
-    if (isGoogleUser) return { label: 'Google Hesabı', icon: 'logo-google' as const, color: Colors.sapphire };
-    if (isEmailUser) return { label: 'E-posta Hesabı', icon: 'mail-outline' as const, color: Colors.teal };
+    if (isGoogleUser) return { label: i18n.t('editprofile.052'), icon: 'logo-google' as const, color: Colors.sapphire };
+    if (isEmailUser) return { label: i18n.t('editprofile.053'), icon: 'mail-outline' as const, color: Colors.teal };
     return { label: 'Hesap', icon: 'person-outline' as const, color: Colors.text3 };
   };
   const authInfo = getAuthTypeInfo();
@@ -679,9 +679,7 @@ export default function EditProfileScreen() {
         {isGoogleUser && !isEmailUser && (
           <View style={styles.infoCard}>
             <Ionicons name="logo-google" size={18} color={Colors.sapphire} />
-            <Text style={styles.infoText}>
-              Şifreniz Google hesabınız üzerinden yönetilmektedir. Şifre değişikliği için Google Hesap Ayarları → Güvenlik bölümünü kullanın.
-            </Text>
+            <Text style={styles.infoText}>{i18n.t('editprofile.001')}</Text>
           </View>
         )}
 

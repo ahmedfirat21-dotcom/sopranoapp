@@ -53,7 +53,7 @@ type Slide = {
 const SLIDES: Slide[] = [
   {
     icon: 'mic',
-    title: 'Sesle tanış',
+    title: i18n.t('discoverwelcomesheet.001'),
     body: 'SopranoChat, anlık sesli sohbet odaları platformudur.\nKonuş, dinle, keşfet — hepsi gerçek zamanlı.',
     accent: '#14B8A6',
     accentDeep: '#0D9488',
@@ -63,7 +63,7 @@ const SLIDES: Slide[] = [
   },
   {
     icon: 'add-circle',
-    title: 'Kendi odanı aç',
+    title: i18n.t('discoverwelcomesheet.002'),
     body: 'Odalarım sekmesindeki "Yeni Oda Oluştur" düğmesiyle istediğin konuda oda aç.\nArkadaşlarını davet et, topluluğunu kur.',
     accent: '#F59E0B',
     accentDeep: '#B45309',
@@ -73,7 +73,7 @@ const SLIDES: Slide[] = [
   },
   {
     icon: 'radio',
-    title: 'Keşfet ve katıl',
+    title: i18n.t('discoverwelcomesheet.003'),
     body: 'Canlı odaları kategoriye göre gez, popüler kullanıcıları keşfet.\nKatıl butonuyla anında sohbete dahil ol.',
     accent: '#8B5CF6',
     accentDeep: '#6D28D9',
@@ -591,24 +591,24 @@ export default function DiscoverWelcomeSheet({ visible, onClose, uid }: Props) {
 function getSlideChips(idx: number): { icon: keyof typeof Ionicons.glyphMap; label: string }[] {
   switch (idx) {
     case 0: return [
-      { icon: 'radio', label: 'Canlı ses' },
-      { icon: 'flash', label: 'Anlık' },
+      { icon: 'radio', label: i18n.t('discoverwelcomesheet.004') },
+      { icon: 'flash', label: i18n.t('discoverwelcomesheet.005') },
       { icon: 'people', label: 'Topluluk' },
     ];
     case 1: return [
-      { icon: 'mic-circle', label: 'Ücretsiz' },
-      { icon: 'lock-closed', label: 'Gizli/Açık' },
-      { icon: 'musical-notes', label: 'Müzik/Sohbet' },
+      { icon: 'mic-circle', label: i18n.t('discoverwelcomesheet.006') },
+      { icon: 'lock-closed', label: i18n.t('discoverwelcomesheet.007') },
+      { icon: 'musical-notes', label: i18n.t('discoverwelcomesheet.008') },
     ];
     case 2: return [
-      { icon: 'trending-up', label: 'Popüler' },
+      { icon: 'trending-up', label: i18n.t('discoverwelcomesheet.009') },
       { icon: 'sparkles', label: 'Yeni' },
-      { icon: 'flame', label: 'Canlı' },
+      { icon: 'flame', label: i18n.t('discoverwelcomesheet.010') },
     ];
     case 3: return [
       { icon: 'gift', label: 'Hediye' },
       { icon: 'trophy', label: 'Seviye' },
-      { icon: 'diamond', label: 'Ödül' },
+      { icon: 'diamond', label: i18n.t('discoverwelcomesheet.011') },
     ];
     default: return [];
   }

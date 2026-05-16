@@ -5,6 +5,7 @@
  * Kick/ban durumlarında otomatik çıkış, diğerlerinde 3sn sonra kapanır.
  */
 import React, { useEffect, useRef, useImperativeHandle, forwardRef, useState, useCallback } from 'react';
+import { i18n } from '../../services/i18n';
 import { View, Text, StyleSheet, Animated, Easing, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { showToast } from '../Toast';
@@ -58,7 +59,7 @@ const PENALTY_MAP: Record<PenaltyType, PenaltyConfig> = {
   },
   unmute: {
     icon: 'volume-high',
-    title: 'Susturma Kaldırıldı',
+    title: i18n.t('room.moderationoverlay.001'),
     color: '#22C55E',
     bgColor: 'rgba(34,197,94,0.12)',
     borderColor: 'rgba(34,197,94,0.3)',
@@ -74,7 +75,7 @@ const PENALTY_MAP: Record<PenaltyType, PenaltyConfig> = {
   },
   chat_unmute: {
     icon: 'chatbox',
-    title: 'Metin Açıldı',
+    title: i18n.t('room.moderationoverlay.002'),
     color: '#22C55E',
     bgColor: 'rgba(34,197,94,0.12)',
     borderColor: 'rgba(34,197,94,0.3)',
@@ -82,7 +83,7 @@ const PENALTY_MAP: Record<PenaltyType, PenaltyConfig> = {
   },
   kick: {
     icon: 'exit',
-    title: 'Odadan Çıkarıldın',
+    title: i18n.t('room.moderationoverlay.003'),
     color: '#DC2626',
     bgColor: 'rgba(220,38,38,0.2)',
     borderColor: 'rgba(220,38,38,0.45)',
@@ -90,7 +91,7 @@ const PENALTY_MAP: Record<PenaltyType, PenaltyConfig> = {
   },
   ban: {
     icon: 'ban',
-    title: 'Yasaklandın',
+    title: i18n.t('room.moderationoverlay.004'),
     color: '#DC2626',
     bgColor: 'rgba(220,38,38,0.2)',
     borderColor: 'rgba(220,38,38,0.45)',
@@ -98,7 +99,7 @@ const PENALTY_MAP: Record<PenaltyType, PenaltyConfig> = {
   },
   permban: {
     icon: 'ban',
-    title: 'Kalıcı Yasaklandın',
+    title: i18n.t('room.moderationoverlay.005'),
     color: '#7F1D1D',
     bgColor: 'rgba(127,29,29,0.25)',
     borderColor: 'rgba(127,29,29,0.5)',
@@ -106,7 +107,7 @@ const PENALTY_MAP: Record<PenaltyType, PenaltyConfig> = {
   },
   demote: {
     icon: 'arrow-down-circle',
-    title: 'Sahneden İndirildin',
+    title: i18n.t('room.moderationoverlay.006'),
     color: '#3B82F6',
     bgColor: 'rgba(59,130,246,0.12)',
     borderColor: 'rgba(59,130,246,0.3)',
@@ -114,7 +115,7 @@ const PENALTY_MAP: Record<PenaltyType, PenaltyConfig> = {
   },
   promote: {
     icon: 'mic',
-    title: 'Sahneye Alındın!',
+    title: i18n.t('room.moderationoverlay.007'),
     color: '#14B8A6',
     bgColor: 'rgba(20,184,166,0.12)',
     borderColor: 'rgba(20,184,166,0.3)',
@@ -122,7 +123,7 @@ const PENALTY_MAP: Record<PenaltyType, PenaltyConfig> = {
   },
   make_moderator: {
     icon: 'shield-checkmark',
-    title: 'Moderatör Yapıldın!',
+    title: i18n.t('room.moderationoverlay.008'),
     color: '#8B5CF6',
     bgColor: 'rgba(139,92,246,0.12)',
     borderColor: 'rgba(139,92,246,0.3)',
@@ -130,7 +131,7 @@ const PENALTY_MAP: Record<PenaltyType, PenaltyConfig> = {
   },
   remove_moderator: {
     icon: 'shield-outline',
-    title: 'Moderatörlük Kaldırıldı',
+    title: i18n.t('room.moderationoverlay.009'),
     color: '#94A3B8',
     bgColor: 'rgba(148,163,184,0.1)',
     borderColor: 'rgba(148,163,184,0.25)',
@@ -138,7 +139,7 @@ const PENALTY_MAP: Record<PenaltyType, PenaltyConfig> = {
   },
   mute_all: {
     icon: 'volume-mute',
-    title: 'Tümü Susturuldu',
+    title: i18n.t('room.moderationoverlay.010'),
     color: '#EF4444',
     bgColor: 'rgba(239,68,68,0.12)',
     borderColor: 'rgba(239,68,68,0.3)',

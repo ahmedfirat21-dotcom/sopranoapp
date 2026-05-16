@@ -39,8 +39,8 @@ type TimePeriod = 'weekly' | 'monthly' | 'all';
 
 const TIME_TABS: { key: TimePeriod; label: string }[] = [
   { key: 'all', label: 'Genel' },
-  { key: 'weekly', label: 'Haftalık' },
-  { key: 'monthly', label: 'Aylık' },
+  { key: 'weekly', label: i18n.t('leaderboard.001') },
+  { key: 'monthly', label: i18n.t('leaderboard.002') },
 ];
 
 function getDateCutoff(period: TimePeriod): string | null {
@@ -676,11 +676,11 @@ export default function LeaderboardScreen() {
               </View>
 
               {/* ── Top Cömert — bağış lideri ── */}
-              <SectionHeader icon="gift" iconColor="#22C55E" title="Top Cömert" />
+              <SectionHeader icon="gift" iconColor="#22C55E" title={i18n.t('leaderboard.003')} />
               {weeklyDonors.length > 0 ? (
                 <View style={[s.listCard]}>
                   {weeklyDonors.map((entry, idx) => (
-                    <LeaderListItem key={`wd_${entry.user_id}`} entry={entry} rank={idx + 1} label="SP bağış" />
+                    <LeaderListItem key={`wd_${entry.user_id}`} entry={entry} rank={idx + 1} label={i18n.t('leaderboard.004')} />
                   ))}
                 </View>
               ) : (
@@ -695,7 +695,7 @@ export default function LeaderboardScreen() {
               {weeklyEarners.length > 0 ? (
                 <View style={[s.listCard]}>
                   {weeklyEarners.map((entry, idx) => (
-                    <LeaderListItem key={`we_${entry.user_id}`} entry={entry} rank={idx + 1} label="SP kazandı" />
+                    <LeaderListItem key={`we_${entry.user_id}`} entry={entry} rank={idx + 1} label={i18n.t('leaderboard.005')} />
                   ))}
                 </View>
               ) : (
@@ -710,7 +710,7 @@ export default function LeaderboardScreen() {
               {weeklyHosts.length > 0 ? (
                 <View style={[s.listCard]}>
                   {weeklyHosts.map((entry, idx) => (
-                    <LeaderListItem key={`wh_${entry.user_id}`} entry={entry} rank={idx + 1} label="oda açtı" />
+                    <LeaderListItem key={`wh_${entry.user_id}`} entry={entry} rank={idx + 1} label={i18n.t('leaderboard.006')} />
                   ))}
                 </View>
               ) : (
@@ -755,12 +755,12 @@ export default function LeaderboardScreen() {
           )}
 
           {/* ════ BÖLÜM 2: EN CÖMERT ════ */}
-          <SectionHeader icon="people" iconColor="#A855F7" title="En Popüler" />
+          <SectionHeader icon="people" iconColor="#A855F7" title={i18n.t('leaderboard.007')} />
 
           {topSenders.length > 0 ? (
             <View style={[s.listCard]}>
               {topSenders.map((entry, idx) => (
-                <LeaderListItem key={entry.user_id} entry={entry} rank={idx + 1} label="takipçi" />
+                <LeaderListItem key={entry.user_id} entry={entry} rank={idx + 1} label={i18n.t('leaderboard.008')} />
               ))}
             </View>
           ) : (
@@ -771,7 +771,7 @@ export default function LeaderboardScreen() {
           )}
 
           {/* ════ BÖLÜM 3: EN POPÜLER ODALAR ════ */}
-          <SectionHeader icon="people" iconColor="#5CC6C6" title="En Popüler Odalar" />
+          <SectionHeader icon="people" iconColor="#5CC6C6" title={i18n.t('leaderboard.009')} />
 
           {topRooms.length > 0 ? (
             <View style={[s.listCard]}>
@@ -803,7 +803,7 @@ export default function LeaderboardScreen() {
           )}
 
           {/* ════ v107: BÖLÜM 5: EN CÖMERT (Top Gifters) ════ */}
-          <SectionHeader icon="gift" iconColor="#F472B6" title="En Cömert" />
+          <SectionHeader icon="gift" iconColor="#F472B6" title={i18n.t('leaderboard.010')} />
 
           {topGifters.length >= 3 ? (
             <>

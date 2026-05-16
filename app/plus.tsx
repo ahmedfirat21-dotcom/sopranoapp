@@ -25,7 +25,7 @@ const PLANS = [
     id: 'plus',
     tier: 'Plus' as const,
     name: TIER_DEFINITIONS.Plus.label,
-    subtitle: 'Gelişmiş',
+    subtitle: i18n.t('plus.002'),
     icon: 'rocket',
     // ★ 3-stop jewel-tone gradient — ametist (parlak mor → derin mor → indigo siyah)
     gradient: ['#C084FC', '#7C3AED', '#2A1065'] as [string, string, string],
@@ -54,7 +54,7 @@ const PLANS = [
     id: 'pro',
     tier: 'Pro' as const,
     name: TIER_DEFINITIONS.Pro.label,
-    subtitle: 'Sınırsız',
+    subtitle: i18n.t('plus.003'),
     icon: 'flame',
     // ★ 3-stop jewel-tone gradient — topaz (parlak altın → kehribar → derin kahve)
     gradient: ['#FDE68A', '#D97706', '#451A03'] as [string, string, string],
@@ -130,7 +130,7 @@ export default function PlusScreen() {
 
   const handleActivate = async () => {
     if (!profile?.id) {
-      showToast({ title: 'Önce giriş yapmalısınız', type: 'error' });
+      showToast({ title: i18n.t('plus.004'), type: 'error' });
       return;
     }
 
@@ -173,7 +173,7 @@ export default function PlusScreen() {
               }
             } catch (err: any) {
               if (mountedRef.current) {
-                showToast({ title: 'Yükseltme Başarısız', message: err.message || 'Üyelik aktifleştirilemedi.', type: 'error' });
+                showToast({ title: i18n.t('plus.005'), message: err.message || 'Üyelik aktifleştirilemedi.', type: 'error' });
               }
             } finally {
               if (mountedRef.current) setActivating(false);
@@ -187,7 +187,7 @@ export default function PlusScreen() {
   const handleDowngrade = () => {
     setAlertCfg({
       visible: true,
-      title: 'Planı İptal Et',
+      title: i18n.t('plus.006'),
       message: `Mevcut planınız: ${currentTier}.\n\nFree (ücretsiz) plana dönmek ister misiniz?\nPremium özellikleriniz devre dışı kalacak.`,
       type: 'warning',
       buttons: [
@@ -202,9 +202,9 @@ export default function PlusScreen() {
               if (!mountedRef.current) return;
               if (success) {
                 await refreshProfile();
-                if (mountedRef.current) showToast({ title: 'Plan değiştirildi', message: 'Free plana geri döndünüz.', type: 'info' });
+                if (mountedRef.current) showToast({ title: i18n.t('plus.007'), message: i18n.t('plus.008'), type: 'info' });
               } else {
-                showToast({ title: 'Bilgi', message: 'Aboneliğinizi Google Play ayarlarından iptal edebilirsiniz.', type: 'info' });
+                showToast({ title: 'Bilgi', message: i18n.t('plus.009'), type: 'info' });
               }
             } catch (err: any) {
               if (mountedRef.current) showToast({ title: 'Hata', message: err.message, type: 'error' });
@@ -399,18 +399,18 @@ export default function PlusScreen() {
             { label: 'Sahne', values: [`${ROOM_TIER_LIMITS.Free.maxSpeakers}`, `${ROOM_TIER_LIMITS.Plus.maxSpeakers}`, `${ROOM_TIER_LIMITS.Pro.maxSpeakers}`] },
             { label: 'Dinleyici', values: [`${ROOM_TIER_LIMITS.Free.maxListeners}`, `${ROOM_TIER_LIMITS.Plus.maxListeners}`, '∞'] },
             { label: 'Kamera', values: [`${ROOM_TIER_LIMITS.Free.maxCameras}`, `${ROOM_TIER_LIMITS.Plus.maxCameras}`, `${ROOM_TIER_LIMITS.Pro.maxCameras}`] },
-            { label: 'Oda Açık Kalma', values: [`${ROOM_TIER_LIMITS.Free.durationHours}sa`, `${ROOM_TIER_LIMITS.Plus.durationHours}sa`, '7/24'] },
-            { label: 'Günlük Oda', values: [`${ROOM_TIER_LIMITS.Free.dailyRooms}`, `${ROOM_TIER_LIMITS.Plus.dailyRooms}`, '∞'] },
-            { label: 'Kalıcı Oda Slotu', values: ['—', '3', '∞'] },
-            { label: 'Oda Türü', values: ['Açık + Şifreli', 'Hepsi', 'Hepsi'] },
+            { label: i18n.t('plus.010'), values: [`${ROOM_TIER_LIMITS.Free.durationHours}sa`, `${ROOM_TIER_LIMITS.Plus.durationHours}sa`, '7/24'] },
+            { label: i18n.t('plus.011'), values: [`${ROOM_TIER_LIMITS.Free.dailyRooms}`, `${ROOM_TIER_LIMITS.Plus.dailyRooms}`, '∞'] },
+            { label: i18n.t('plus.012'), values: ['—', '3', '∞'] },
+            { label: i18n.t('plus.013'), values: ['Açık + Şifreli', 'Hepsi', 'Hepsi'] },
             { label: 'Ses', values: ['HD Mono', 'HD', 'Stereo'] },
             { label: 'Video', values: ['720p', '720p', '1080p'] },
-            { label: 'Avatar Çerçevesi', values: ['Temel', 'Tümü', 'Tümü'] },
-            { label: 'Yaş/Dil Filtresi', values: ['✓', '✓', '✓'] },
+            { label: i18n.t('plus.014'), values: ['Temel', 'Tümü', 'Tümü'] },
+            { label: i18n.t('plus.015'), values: ['✓', '✓', '✓'] },
             { label: 'Tema', values: ['—', '✓', '✓'] },
-            { label: 'Moderatör', values: ['—', '2', '5'] },
-            { label: 'Takipçi-Only', values: ['—', '✓', '✓'] },
-            { label: 'Oda Müziği', values: ['—', '—', '✓'] },
+            { label: i18n.t('plus.016'), values: ['—', '2', '5'] },
+            { label: i18n.t('plus.017'), values: ['—', '✓', '✓'] },
+            { label: i18n.t('plus.018'), values: ['—', '—', '✓'] },
           ].map((row, i) => (
             <View key={i} style={[styles.compareRow, i % 2 === 0 && { backgroundColor: 'rgba(255,255,255,0.03)' }]}>
               <Text style={[styles.compareCell, { flex: 1.5, color: Colors.text2 }]}>{row.label}</Text>
@@ -460,9 +460,7 @@ export default function PlusScreen() {
         {!subReady && !__DEV__ && (
           <View style={styles.subUnavailWrap}>
             <Ionicons name="time-outline" size={18} color="#FBBF24" />
-            <Text style={styles.subUnavailText}>
-              Abonelik sistemi bakım modunda. Çok yakında satın almaya açılacak.
-            </Text>
+            <Text style={styles.subUnavailText}>{i18n.t('plus.001')}</Text>
           </View>
         )}
 

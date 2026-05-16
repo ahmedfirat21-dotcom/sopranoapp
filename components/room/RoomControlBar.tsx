@@ -1,4 +1,5 @@
 import React, { useRef, useEffect } from 'react';
+import { i18n } from '../../services/i18n';
 import { View, Text, StyleSheet, Pressable, Animated, useWindowDimensions } from 'react-native';
 // ★ 2026-04-24: Hook isimlerini alias'lamadan import et — Reanimated Babel plugin
 //   useAnimatedStyle/useSharedValue isimlerini tanıyarak worklet directive ekler.
@@ -154,14 +155,14 @@ function MicRequestBtn({ onPress, stageAction, queuePosition }: {
   const variant = (() => {
     switch (stageAction) {
       case 'direct_join':
-        return { icon: 'mic' as const, colors: ['#34D399', '#14B8A6', '#0F766E'] as [string, string, string], label: 'Sahneye çık (serbest mod)', ringColor: '#14B8A6' };
+        return { icon: 'mic' as const, colors: ['#34D399', '#14B8A6', '#0F766E'] as [string, string, string], label: i18n.t('room.roomcontrolbar.001'), ringColor: '#14B8A6' };
       case 'waiting':
         return { icon: 'hand-left' as const, colors: ['#FBBF24', '#F59E0B', '#D97706'] as [string, string, string], label: queuePosition && queuePosition > 0 ? `Sıradasın (${queuePosition}. sıra) — dokun ve iptal et` : 'Onay bekleniyor — dokun ve iptal et', ringColor: '#FBBF24' };
       case 'locked':
-        return { icon: 'lock-closed' as const, colors: ['#475569', '#334155', '#1E293B'] as [string, string, string], label: 'Sahne kilitli — sadece oda sahibi konuşmacı seçer', ringColor: '#475569' };
+        return { icon: 'lock-closed' as const, colors: ['#475569', '#334155', '#1E293B'] as [string, string, string], label: i18n.t('room.roomcontrolbar.002'), ringColor: '#475569' };
       case 'raise_hand':
       default:
-        return { icon: 'hand-left' as const, colors: ['#64748B', '#475569', '#334155'] as [string, string, string], label: 'El kaldır (sahne talebi gönder)', ringColor: '#64748B' };
+        return { icon: 'hand-left' as const, colors: ['#64748B', '#475569', '#334155'] as [string, string, string], label: i18n.t('room.roomcontrolbar.003'), ringColor: '#64748B' };
     }
   })();
 
@@ -244,7 +245,7 @@ export default function RoomControlBar({
 
   const handleMicPress = () => {
     if (isForcedMuted) {
-      try { require('../Toast').showToast({ title: '🔇 Sessize alındınız', message: 'Moderatör tarafından sustruldunuz.', type: 'warning' }); } catch {}
+      try { require('../Toast').showToast({ title: i18n.t('room.roomcontrolbar.004'), message: i18n.t('room.roomcontrolbar.005'), type: 'warning' }); } catch {}
       return;
     }
     onMicPress();
@@ -328,9 +329,9 @@ export default function RoomControlBar({
         {isListener ? (
           <>
             {isOwnerInListenerMode ? (
-              <CtrlBtn icon="mic" onPress={onJoinStagePress || (() => {})} active accent="#D4AF37" label="Sahneye geri dön" iconSize={MIC_ICON} />
+              <CtrlBtn icon="mic" onPress={onJoinStagePress || (() => {})} active accent="#D4AF37" label={i18n.t('room.roomcontrolbar.006')} iconSize={MIC_ICON} />
             ) : isModInListenerMode ? (
-              <CtrlBtn icon="shield-checkmark" onPress={onJoinStagePress || (() => {})} active accent="#A78BFA" label="Sahneye geri dön" />
+              <CtrlBtn icon="shield-checkmark" onPress={onJoinStagePress || (() => {})} active accent="#A78BFA" label={i18n.t('room.roomcontrolbar.007')} />
             ) : (
               <MicRequestBtn onPress={onHandPress} stageAction={resolvedStageAction} queuePosition={stageQueuePosition} />
             )}
@@ -391,7 +392,7 @@ export default function RoomControlBar({
             icon="gift"
             onPress={onGiftPress}
             accent="#F472B6"
-            label="Hediye gönder"
+            label={i18n.t('room.roomcontrolbar.008')}
           />
         )}
 
@@ -402,7 +403,7 @@ export default function RoomControlBar({
           active={isPlusOpen}
           accent="#14B8A6"
           badge={plusBadgeCount}
-          label="Daha fazla seçenek"
+          label={i18n.t('room.roomcontrolbar.009')}
         />
       </View>
     </ReAnimated.View>

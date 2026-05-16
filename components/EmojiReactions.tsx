@@ -4,6 +4,7 @@
  * ref.current.spawn(emoji) ile floating emoji tetiklenir.
  */
 import React, { useState, useCallback, useImperativeHandle, forwardRef, useEffect, useRef } from 'react';
+import { i18n } from '../services/i18n';
 import {
   View, Text, StyleSheet, TouchableOpacity, Animated, Easing, Dimensions, useWindowDimensions,
   ScrollView, TextInput, Image, FlatList, Alert,
@@ -22,15 +23,15 @@ const { height: H, width: W } = Dimensions.get('window');
 // ═══════════════════════════════════════════════════
 const EMOJI_CATEGORIES = [
   {
-    id: 'popular', icon: '⭐', label: 'Popüler',
+    id: 'popular', icon: '⭐', label: i18n.t('emojireactions.001'),
     emojis: ['❤️','🔥','👏','😂','🎉','💎','👍','🥰','😍','🤩','💯','🙌','✨','💪','🎶','💕','🫶','😎','🤗','🥳'],
   },
   {
-    id: 'faces', icon: '😊', label: 'Yüzler',
+    id: 'faces', icon: '😊', label: i18n.t('emojireactions.002'),
     emojis: ['😊','😄','😁','🤣','😅','😆','😉','😋','😘','😗','🤑','🤭','🤫','🤔','😐','😑','😶','🙄','😏','😣','😥','😮','🤐','😯','😪','😫','🥱','😴','😌','😛','😜','🤪','😝','🤤','😒','😓','😔','😕','🙃','😲','🤯','😳','🥺','😢','😭','😤','😠','🤬','🤡','💀','☠️','👻','👽','🤖'],
   },
   {
-    id: 'love', icon: '💖', label: 'Aşk',
+    id: 'love', icon: '💖', label: i18n.t('emojireactions.003'),
     emojis: ['💖','💗','💓','💞','💘','💝','💟','❣️','💋','👫','💑','💏','🌹','🌸','🌺','🌷','💐','🥀','💍','💎','🧸','🍫','🍷','🥂'],
   },
   {
@@ -46,7 +47,7 @@ const EMOJI_CATEGORIES = [
     emojis: ['🍕','🍔','🍟','🌭','🍿','🥐','🍩','🍪','🎂','🍰','🧁','🍫','🍬','🍭','🍮','🍯','☕','🍵','🧋','🥤','🧃','🍷','🍸','🍹','🍺','🥂','🍾','🍉','🍇','🍓','🍊','🍋','🍌','🍑','🍒','🥑','🌶️','🌽'],
   },
   {
-    id: 'nature', icon: '🌿', label: 'Doğa',
+    id: 'nature', icon: '🌿', label: i18n.t('emojireactions.004'),
     emojis: ['🌈','☀️','🌤️','⛅','🌧️','❄️','🔥','💧','🌊','🌱','🌲','🌳','🌴','🌵','🌿','☘️','🍀','🍁','🍂','🍃','🌺','🌻','🌼','🌷','🌹','💐','🐶','🐱','🐭','🐰','🦊','🐻','🐼','🦁','🐯','🐸','🦋','🐝','🌙','⭐','💫'],
   },
   {

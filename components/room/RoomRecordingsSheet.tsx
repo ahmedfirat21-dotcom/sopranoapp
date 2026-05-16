@@ -121,7 +121,7 @@ export default function RoomRecordingsSheet({ visible, roomId, hostId, onClose }
         if (status.didJustFinish) { stopAudio(); }
       });
     } catch (e: any) {
-      showToast({ title: 'Kaydı Oynatılamadı', message: e?.message || 'Ses dosyası yüklenemedi.', type: 'error' });
+      showToast({ title: i18n.t('room.roomrecordingssheet.002'), message: e?.message || 'Ses dosyası yüklenemedi.', type: 'error' });
       setPlayingId(null);
     }
   }, [playingId, stopAudio]);
@@ -259,9 +259,7 @@ export default function RoomRecordingsSheet({ visible, roomId, hostId, onClose }
             <View style={st.emptyState}>
               <Ionicons name="mic-off-outline" size={44} color="rgba(92,225,230,0.15)" />
               <Text style={st.emptyTitle}>{i18n.t('room.roomrecordingssheet.002')}</Text>
-              <Text style={st.emptyDesc}>
-                Oda yönetim panelinden "Kaydı Başlat" ile sesli sohbeti kaydedin.
-              </Text>
+              <Text style={st.emptyDesc}>{i18n.t('room.roomrecordingssheet.001')}</Text>
             </View>
           ) : (
             <FlatList

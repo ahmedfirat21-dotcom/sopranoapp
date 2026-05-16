@@ -282,7 +282,7 @@ export default function GiftSheet({
         setBalance(prev => (prev ?? 0) + sentAmount);
         setShowSuccess(false);
         showToast({
-          title: 'Hediye gönderilemedi',
+          title: i18n.t('profile.giftsheet.001'),
           message: result.error || 'Bilinmeyen bir hata oluştu, lütfen tekrar dene.',
           type: 'error',
         });
@@ -294,7 +294,7 @@ export default function GiftSheet({
         setBalance(prev => (prev ?? 0) + sentAmount);
         setShowSuccess(false);
         showToast({
-          title: 'Hediye gönderilemedi',
+          title: i18n.t('profile.giftsheet.002'),
           message: e?.message || 'Beklenmeyen bir hata, internet bağlantını kontrol et.',
           type: 'error',
         });

@@ -269,15 +269,15 @@ export default function RoomGiftPanel({
   const handleSend = async (item: CosmeticItem) => {
     if (sending) return;
     if (recipients.length === 0) {
-      showToast({ title: 'Odada kimse yok', message: 'Hediye gönderebileceğin kullanıcı yok.', type: 'info' });
+      showToast({ title: 'Odada kimse yok', message: i18n.t('room.roomgiftpanel.002'), type: 'info' });
       return;
     }
     if (!selectedRecipientId) {
-      showToast({ title: 'Kime?', message: 'Önce alıcı seç (üstteki avatarlardan)', type: 'info' });
+      showToast({ title: 'Kime?', message: i18n.t('room.roomgiftpanel.003'), type: 'info' });
       return;
     }
     if (selectedRecipientId === senderId) {
-      showToast({ title: 'Kendine olmaz', message: 'Kendine hediye gönderemezsin — sahneden başka birini seç.', type: 'info' });
+      showToast({ title: 'Kendine olmaz', message: i18n.t('room.roomgiftpanel.004'), type: 'info' });
       return;
     }
     if (senderSP < item.price_sp) {
@@ -320,7 +320,7 @@ export default function RoomGiftPanel({
       // Rollback bakiye + uyarı
       setSenderSP((prev) => prev + item.price_sp);
       showToast({
-        title: 'Gönderilemedi',
+        title: i18n.t('room.roomgiftpanel.005'),
         message: data?.error || error?.message || 'Bağlantı hatası',
         type: 'error',
       });
@@ -519,9 +519,7 @@ export default function RoomGiftPanel({
                   );
                 })}
               </View>
-              <Text style={s.footnote}>
-                Hediyeler her gönderimde SP'ni düşürür · Alıcı %50 SP kazanır
-              </Text>
+              <Text style={s.footnote}>{i18n.t('room.roomgiftpanel.001')}</Text>
             </ScrollView>
           )}
         </Animated.View>

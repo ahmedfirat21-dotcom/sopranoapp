@@ -578,7 +578,7 @@ const BigLiveRoomCard = React.memo(function BigLiveRoomCard({ room, onJoin, isFo
     // ★ 2026-04-21: Kullanıcı başka odada (minimize edilmiş) ise preview çalışmaz —
     //   iki LiveKit bağlantısı eşzamanlı = üst üste ses + çifte maliyet.
     if (inRoom) {
-      showToast({ title: 'Zaten bir odadasın', message: 'Önce mevcut odadan çık.', type: 'info' });
+      showToast({ title: i18n.t('tabs.home.002'), message: i18n.t('tabs.home.003'), type: 'info' });
       return;
     }
     roomPreviewService.start(room.id, currentUserId, currentUserDisplayName || 'Ziyaretçi').catch(() => {});
@@ -983,7 +983,7 @@ export default function HomeScreen() {
       const userTier = getEffectiveTier(profile);
       const gate = await RoomService.canCreateToday(firebaseUser.uid, userTier);
       if (!gate.ok) {
-        showToast({ title: 'Günlük Limit Doldu', message: `Üyeliğini yükselterek limitsiz oda aç.`, type: 'warning' });
+        showToast({ title: i18n.t('tabs.home.004'), message: `Üyeliğini yükselterek limitsiz oda aç.`, type: 'warning' });
         setTimeout(() => router.push('/plus' as any), 400);
         return;
       }
@@ -991,7 +991,7 @@ export default function HomeScreen() {
       const room = await RoomService.quickCreate(firebaseUser.uid, displayName, category, userTier);
       router.push(`/room/${room.id}` as any);
     } catch (err: any) {
-      showToast({ title: 'Oda Açılamadı', message: err?.message || 'Beklenmedik hata', type: 'error' });
+      showToast({ title: i18n.t('tabs.home.005'), message: err?.message || 'Beklenmedik hata', type: 'error' });
     } finally {
       setCreatingRoom(false);
     }
@@ -1131,7 +1131,7 @@ export default function HomeScreen() {
       // ★ Kullanıcıya görünür hata — hem toast hem persistent error state
       const msg = err?.message || 'İnternet bağlantını kontrol et.';
       setLoadError(msg);
-      showToast({ title: 'Odalar yüklenemedi', message: msg, type: 'error' });
+      showToast({ title: i18n.t('tabs.home.006'), message: msg, type: 'error' });
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -1323,7 +1323,7 @@ export default function HomeScreen() {
   //   \u00d6nce oda sayfas\u0131na gidip orada "gir-at\u0131l" yaparak upsell g\u00f6stermektense keşfette dur.
   const handleJoinRoom = useCallback((roomId: string) => {
     if (!firebaseUser) {
-      showToast({ title: 'Giriş Gerekli', message: 'Odaya katılmak için giriş yapmalısınız.', type: 'warning' });
+      showToast({ title: i18n.t('tabs.home.007'), message: i18n.t('tabs.home.008'), type: 'warning' });
       return;
     }
     // ★ 2026-04-21: Audio preview aktifse önce kapat — ana LiveKit bağlantısı çakışmasın
@@ -1367,7 +1367,7 @@ export default function HomeScreen() {
       } else {
         setFollowedRoomIds(prev => { const n = { ...prev }; delete n[roomId]; return n; });
       }
-      showToast({ title: 'Takip Güncellenmedi', message: currentlyFollowed ? 'Takipten çıkılamadı.' : 'Oda takip edilemedi.', type: 'error' });
+      showToast({ title: i18n.t('tabs.home.009'), message: currentlyFollowed ? 'Takipten çıkılamadı.' : 'Oda takip edilemedi.', type: 'error' });
     }
   }, [firebaseUser]);
 
@@ -1554,9 +1554,7 @@ export default function HomeScreen() {
                             </View>
                           )}
                         </View>
-                        <Text style={{ fontSize: 10, color: 'rgba(251,191,36,0.65)', fontWeight: '600', marginTop: 2 }}>
-                          ✨ Öne Çıkan Profil
-                        </Text>
+                        <Text style={{ fontSize: 10, color: 'rgba(251,191,36,0.65)', fontWeight: '600', marginTop: 2 }}>{i18n.t('tabs.home.001')}</Text>
                       </View>
                       <View style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, backgroundColor: bpAccent + '20', borderWidth: 0.8, borderColor: bpAccent + '50' }}>
                         <Ionicons name="chevron-forward" size={14} color={bpAccent} />
@@ -1790,7 +1788,7 @@ export default function HomeScreen() {
             <SwipeToHideRow
               onHide={() => ignoreRoom(room.id, room.name)}
               onReport={() => {
-                if (!firebaseUser) { showToast({ title: 'Giriş Gerekli', message: 'Şikayet için giriş yapmalısın.', type: 'warning' }); return; }
+                if (!firebaseUser) { showToast({ title: i18n.t('tabs.home.010'), message: i18n.t('tabs.home.011'), type: 'warning' }); return; }
                 setReportRoom({ id: room.id, name: room.name });
               }}
             >

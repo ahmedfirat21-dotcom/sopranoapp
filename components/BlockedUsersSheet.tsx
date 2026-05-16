@@ -65,7 +65,7 @@ export default function BlockedUsersSheet({ visible, onClose, currentUserId }: P
         .in('id', ids);
       setUsers((data as BlockedUser[]) || []);
     } catch {
-      showToast({ title: 'Liste Yüklenemedi', message: 'Engellenen kullanıcılar çekilemedi.', type: 'error' });
+      showToast({ title: i18n.t('blockeduserssheet.001'), message: i18n.t('blockeduserssheet.002'), type: 'error' });
       setUsers([]);
     } finally {
       setLoading(false);
@@ -126,12 +126,12 @@ export default function BlockedUsersSheet({ visible, onClose, currentUserId }: P
       await ModerationService.unblockUser(currentUserId, user.id);
       setUsers(prev => prev.filter(u => u.id !== user.id));
       showToast({
-        title: 'Engel Kaldırıldı',
+        title: i18n.t('blockeduserssheet.003'),
         message: `${user.display_name || 'Kullanıcı'} artık engelli değil.`,
         type: 'success',
       });
     } catch {
-      showToast({ title: 'Engel Kaldırılamadı', message: `${user.display_name || 'Kullanıcı'} engelli kaldı.`, type: 'error' });
+      showToast({ title: i18n.t('blockeduserssheet.004'), message: `${user.display_name || 'Kullanıcı'} engelli kaldı.`, type: 'error' });
     } finally {
       setUnblockingIds(prev => { const n = new Set(prev); n.delete(user.id); return n; });
     }

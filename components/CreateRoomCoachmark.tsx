@@ -314,8 +314,7 @@ export default function CreateRoomCoachmark({ visible, ctaTopOffset = 130, onDis
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.tooltipBody}>
-                Yukarıdaki <Text style={styles.tooltipHighlight}>{i18n.t('createroomcoachmark.001')}</Text> butonuna dokun ve ilk odanı aç.
-              </Text>
+                Yukarıdaki <Text style={styles.tooltipHighlight}>{i18n.t('createroomcoachmark.001')}</Text>{i18n.t('createroomcoachmark.001')}</Text>
             </View>
           </View>
         </Animated.View>

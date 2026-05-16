@@ -53,13 +53,13 @@ export default function OnboardingScreen() {
 
   const GENDER_OPTIONS = [
     { id: 'male' as const, label: 'Erkek', icon: 'male' as const, color: '#3B82F6' },
-    { id: 'female' as const, label: 'Kadın', icon: 'female' as const, color: '#EC4899' },
+    { id: 'female' as const, label: i18n.t('auth.onboarding.001'), icon: 'female' as const, color: '#EC4899' },
     { id: 'unspecified' as const, label: 'Belirtmiyorum', icon: 'person-outline' as const, color: '#64748B' },
   ];
 
   const INTEREST_OPTIONS = [
     { id: 'chat', label: 'Sohbet', icon: 'chatbubbles', color: '#14B8A6', emoji: '💬' },
-    { id: 'music', label: 'Müzik', icon: 'musical-notes', color: '#8B5CF6', emoji: '🎵' },
+    { id: 'music', label: i18n.t('auth.onboarding.002'), icon: 'musical-notes', color: '#8B5CF6', emoji: '🎵' },
     { id: 'game', label: 'Oyun', icon: 'game-controller', color: '#EF4444', emoji: '🎮' },
     { id: 'tech', label: 'Teknoloji', icon: 'code-slash', color: '#3B82F6', emoji: '💻' },
     { id: 'book', label: 'Kitap', icon: 'book', color: '#F59E0B', emoji: '📚' },
@@ -180,7 +180,7 @@ export default function OnboardingScreen() {
             if (__DEV__) console.warn('[Onboarding] preferences update hata:', updErr.message);
             showToast({
               title: 'Kaydedilemedi',
-              message: 'Onboarding tamamlanamadı — DB hatası. Tekrar deneyin.',
+              message: i18n.t('auth.onboarding.003'),
               type: 'error',
             });
             return; // router.replace tetiklenmesin → kullanıcı onboarding'de kalsın
@@ -203,8 +203,8 @@ export default function OnboardingScreen() {
         //   yazılmadığı için home'a atsak bile AuthGuard bir sonraki açılışta
         //   tekrar onboarding'e yollayacak. Kullanıcıyı uyar, onboarding'de tut.
         showToast({
-          title: 'Bağlantı Hatası',
-          message: 'Onboarding kaydedilemedi. İnternet bağlantınızı kontrol edip tekrar deneyin.',
+          title: i18n.t('auth.onboarding.004'),
+          message: i18n.t('auth.onboarding.005'),
           type: 'error',
         });
         return;
@@ -256,7 +256,7 @@ export default function OnboardingScreen() {
 
   const handeApplyCode = async () => {
     if (!inviteCode || inviteCode.length < 3) {
-      showToast({ title: 'Geçersiz Kod', message: 'Lütfen geçerli bir davet kodu gir.', type: 'warning' });
+      showToast({ title: i18n.t('auth.onboarding.006'), message: i18n.t('auth.onboarding.007'), type: 'warning' });
       return;
     }
     setSaving(true);
@@ -264,7 +264,7 @@ export default function OnboardingScreen() {
     const result = await ReferralService.applyCode(inviteCode, firebaseUser!.uid, true);
     setSaving(false);
     if (result.success) {
-      showToast({ title: '🎉 Tebrikler!', message: 'Topluluğa hoş geldin! Hesabına 50 SP yüklendi.', type: 'success' });
+      showToast({ title: '🎉 Tebrikler!', message: i18n.t('auth.onboarding.008'), type: 'success' });
       finalizeOnboarding();
     } else {
       showToast({ title: 'Kod Kabul Edilmedi', message: result.message, type: 'error' });
@@ -287,7 +287,7 @@ export default function OnboardingScreen() {
           const publicUrl = await StorageService.uploadAvatar(firebaseUser.uid, uri);
           setAvatarUrl(publicUrl);
           setIsCustomAvatar(true);
-          showToast({ title: '📸 Fotoğraf Yüklendi', message: 'Profil fotoğrafın hazır!', type: 'success' });
+          showToast({ title: i18n.t('auth.onboarding.009'), message: i18n.t('auth.onboarding.010'), type: 'success' });
         } catch {
           setAvatarUrl(uri);
           setIsCustomAvatar(true);
@@ -302,17 +302,17 @@ export default function OnboardingScreen() {
     Keyboard.dismiss();
     const trimmedName = displayName.trim();
     if (!trimmedName) {
-      showToast({ title: 'İsim Gerekli', message: 'Bir isim veya lakap gir.', type: 'warning' });
+      showToast({ title: i18n.t('auth.onboarding.011'), message: 'Bir isim veya lakap gir.', type: 'warning' });
       return;
     }
     // ★ SEC-OB1: Min 2 karakter kontrolü
     if (trimmedName.length < 2) {
-      showToast({ title: 'İsim Çok Kısa', message: 'En az 2 karakter olmalı.', type: 'warning' });
+      showToast({ title: i18n.t('auth.onboarding.012'), message: i18n.t('auth.onboarding.013'), type: 'warning' });
       return;
     }
     // ★ SEC-OB2: Küfür / hakaret filtresi
     if (containsBadWords(trimmedName)) {
-      showToast({ title: 'Uygunsuz İsim', message: 'Lütfen uygun bir isim seçin.', type: 'error' });
+      showToast({ title: i18n.t('auth.onboarding.014'), message: i18n.t('auth.onboarding.015'), type: 'error' });
       return;
     }
     // ★ SEC-OB4: Unicode sanitizasyonu — sıfır genişlikli karakterler, RTL override, aşırı emoji
@@ -320,13 +320,13 @@ export default function OnboardingScreen() {
       .replace(/[\u200B\u200C\u200D\uFEFF\u00AD]/g, '') // Zero-width chars
       .replace(/[\u202A-\u202E\u2066-\u2069]/g, '');    // RTL/LTR override
     if (sanitizedName.length < 2) {
-      showToast({ title: 'Geçersiz Karakter', message: 'İsim görünür karakterler içermeli.', type: 'warning' });
+      showToast({ title: i18n.t('auth.onboarding.016'), message: i18n.t('auth.onboarding.017'), type: 'warning' });
       return;
     }
     // ★ SEC-OB5: Aşırı emoji kontrolü (10'dan fazla emoji = spam)
     const emojiCount = (sanitizedName.match(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu) || []).length;
     if (emojiCount > 10) {
-      showToast({ title: 'Çok Fazla Emoji', message: 'En fazla 10 emoji kullanabilirsin.', type: 'warning' });
+      showToast({ title: i18n.t('auth.onboarding.018'), message: 'En fazla 10 emoji kullanabilirsin.', type: 'warning' });
       return;
     }
     if (!firebaseUser) return;
@@ -364,20 +364,20 @@ export default function OnboardingScreen() {
       // ★ FIX: Fallback kaldırıldı — hata varsa kullanıcıya bildir
       throw new Error(error?.message || 'Profil oluşturulamadı.');
     } catch (error: any) {
-      showToast({ title: 'Profil Oluşturulamadı', message: error?.message || 'Daha sonra tekrar dene.', type: 'error' });
+      showToast({ title: i18n.t('auth.onboarding.019'), message: error?.message || 'Daha sonra tekrar dene.', type: 'error' });
     } finally { setSaving(false); }
   };
 
   const handleSaveGenderAge = async () => {
     // ★ Yaş zorunlu — boş bırakılamaz
     if (!birthYear || birthYear.length < 4) {
-      showToast({ title: 'Zorunlu Alan', message: 'Lütfen doğum yılınızı girin.', type: 'error' });
+      showToast({ title: 'Zorunlu Alan', message: i18n.t('auth.onboarding.020'), type: 'error' });
       return;
     }
     const y = parseInt(birthYear, 10);
     const cur = new Date().getFullYear();
     if (isNaN(y) || y < 1920 || y > cur - 13) {
-      showToast({ title: 'Yaş Sınırı', message: 'SopranoChat kullanımı için 13 yaşında olmalısın.', type: 'warning' });
+      showToast({ title: i18n.t('auth.onboarding.021'), message: i18n.t('auth.onboarding.022'), type: 'warning' });
       return;
     }
     // Gender + birth date güncelle
@@ -388,7 +388,7 @@ export default function OnboardingScreen() {
       } catch (e: any) {
         // ★ SEC-OB3: Hata sessizce yutulmasın — kullanıcıya bildir
         if (__DEV__) console.warn('[Onboarding] Step 2 DB hatası:', e?.message);
-        showToast({ title: 'Uyarı', message: 'Bilgiler kaydedilemedi, daha sonra güncelleyebilirsin.', type: 'warning' });
+        showToast({ title: i18n.t('auth.onboarding.023'), message: i18n.t('auth.onboarding.024'), type: 'warning' });
       }
     }
     animateStep(3);
@@ -396,7 +396,7 @@ export default function OnboardingScreen() {
 
   const handleSaveInterests = async () => {
     if (interests.length === 0) {
-      showToast({ title: 'Seçim Yap', message: 'En az 1 ilgi alanı seç', type: 'warning' });
+      showToast({ title: i18n.t('auth.onboarding.025'), message: i18n.t('auth.onboarding.026'), type: 'warning' });
       return;
     }
     if (tempProfile && firebaseUser) {
@@ -416,7 +416,7 @@ export default function OnboardingScreen() {
           if (__DEV__) console.warn('[Onboarding] Step 3 interests update hata:', error.message, prefErr.message);
           showToast({
             title: 'Kaydedilemedi',
-            message: 'İlgi alanları yazılamadı. İnternet / DB sorunu olabilir.',
+            message: i18n.t('auth.onboarding.027'),
             type: 'error',
           });
           return; // Step 4'e geçme — kullanıcı tekrar denesin
@@ -683,8 +683,8 @@ export default function OnboardingScreen() {
       {/* ★ 2026-05-10: Vazgeç onayı — klasik popup yerine PremiumAlert (memory kuralı) */}
       <PremiumAlert
         visible={showCancelAlert}
-        title="Vazgeçmek istiyor musun?"
-        message="Şu ana kadar girdiğin bilgiler kaydedilmeyecek ve oturum kapanacak."
+        title={i18n.t('auth.onboarding.028')}
+        message={i18n.t('auth.onboarding.029')}
         type="warning"
         onDismiss={() => setShowCancelAlert(false)}
         buttons={[

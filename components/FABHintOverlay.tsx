@@ -166,9 +166,7 @@ export default function FABHintOverlay({ visible, bottomOffset, onDismiss }: Pro
             <Ionicons name="sparkles" size={14} color="#14B8A6" />
             <Text style={s.tooltipTitle}>{i18n.t('fabhintoverlay.001')}</Text>
           </View>
-          <Text style={s.tooltipBody}>
-            Buradan yeni bir oda açabilirsin. Arkadaşlarını davet et, sohbete başla!
-          </Text>
+          <Text style={s.tooltipBody}>{i18n.t('fabhintoverlay.001')}</Text>
           <View style={s.tooltipFooter}>
             <Text style={s.tooltipDismiss}>{i18n.t('fabhintoverlay.002')}</Text>
           </View>

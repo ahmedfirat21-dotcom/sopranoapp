@@ -11,15 +11,16 @@
  *   unknown:   3 bar gri (henüz bağlanmadı)
  */
 import React from 'react';
+import { i18n } from '../../services/i18n';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { showToast } from '../Toast';
 
 export type Quality = 'excellent' | 'good' | 'poor' | 'unknown';
 
 const QUALITY_META: Record<Quality, { color: string; bars: number; label: string; tooltip: string; toastType: 'success' | 'info' | 'warning' | 'error' }> = {
-  excellent: { color: '#22C55E', bars: 3, label: 'Mükemmel', tooltip: 'Bağlantı mükemmel — düşük gecikme, kayıpsız ses.', toastType: 'success' },
-  good:      { color: '#FBBF24', bars: 2, label: 'İyi',       tooltip: 'Bağlantı iyi — küçük gecikmeler olabilir.',       toastType: 'info' },
-  poor:      { color: '#EF4444', bars: 1, label: 'Zayıf',      tooltip: 'Bağlantı zayıf — internet veya hücresel ağı kontrol et.', toastType: 'warning' },
+  excellent: { color: '#22C55E', bars: 3, label: i18n.t('room.connectionqualityindicator.001'), tooltip: 'Bağlantı mükemmel — düşük gecikme, kayıpsız ses.', toastType: 'success' },
+  good:      { color: '#FBBF24', bars: 2, label: i18n.t('room.connectionqualityindicator.002'),       tooltip: 'Bağlantı iyi — küçük gecikmeler olabilir.',       toastType: 'info' },
+  poor:      { color: '#EF4444', bars: 1, label: i18n.t('room.connectionqualityindicator.003'),      tooltip: 'Bağlantı zayıf — internet veya hücresel ağı kontrol et.', toastType: 'warning' },
   unknown:   { color: '#94A3B8', bars: 3, label: 'Bilinmiyor', tooltip: 'Bağlantı kalitesi henüz ölçülmedi.',                toastType: 'info' },
 };
 

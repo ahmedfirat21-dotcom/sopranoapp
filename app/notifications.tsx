@@ -19,7 +19,7 @@ import AppBackground from '../components/AppBackground';
 import { CosmeticBackground } from '../components/skia';
 import { useAuth, useBadges, useUserProfileSheet } from './_layout';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useTranslation } from '../services/i18n';
+import { i18n, useTranslation } from '../services/i18n';
 
 type Notification = {
   id: string;
@@ -287,7 +287,7 @@ export default function NotificationsScreen() {
               <EmptyState
                 icon="notifications-outline"
                 title="Bildirim yok"
-                subtitle="Arkadaşlık istekleri, hediyeler ve mesajlar burada görünecek"
+                subtitle={i18n.t('notifications.001')}
               />
             ) : null
           }

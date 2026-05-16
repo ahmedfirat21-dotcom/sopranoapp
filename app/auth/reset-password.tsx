@@ -88,45 +88,45 @@ export default function ResetPasswordScreen() {
     if (/[0-9]/.test(newPassword)) score++;
     if (/[^a-zA-Z0-9çğıöşüÇĞİÖŞÜ]/.test(newPassword)) score++;
     if (newPassword.length >= 12) score++;
-    if (score <= 1) return { score, label: 'Zayıf', color: '#EF4444' };
+    if (score <= 1) return { score, label: i18n.t('auth.resetpassword.001'), color: '#EF4444' };
     if (score <= 2) return { score, label: 'Orta', color: '#F59E0B' };
-    if (score <= 3) return { score, label: 'İyi', color: '#3B82F6' };
-    return { score, label: 'Güçlü', color: '#10B981' };
+    if (score <= 3) return { score, label: i18n.t('auth.resetpassword.002'), color: '#3B82F6' };
+    return { score, label: i18n.t('auth.resetpassword.003'), color: '#10B981' };
   })();
 
   const handleSubmit = async () => {
     if (!oobCode || submitting) return;
     if (newPassword.length < 8) {
-      showToast({ title: 'Şifre Çok Kısa', message: 'En az 8 karakter olmalı.', type: 'warning' });
+      showToast({ title: i18n.t('auth.resetpassword.004'), message: i18n.t('auth.resetpassword.005'), type: 'warning' });
       return;
     }
     if (!/[A-ZÇĞİÖŞÜ]/.test(newPassword)) {
-      showToast({ title: 'Büyük Harf Eksik', message: 'Şifrede en az 1 büyük harf olmalı.', type: 'warning' });
+      showToast({ title: i18n.t('auth.resetpassword.006'), message: i18n.t('auth.resetpassword.007'), type: 'warning' });
       return;
     }
     if (!/[0-9]/.test(newPassword)) {
-      showToast({ title: 'Rakam Eksik', message: 'Şifrede en az 1 rakam olmalı.', type: 'warning' });
+      showToast({ title: 'Rakam Eksik', message: i18n.t('auth.resetpassword.008'), type: 'warning' });
       return;
     }
     if (newPassword !== confirmPassword) {
-      showToast({ title: 'Şifreler Eşleşmiyor', message: 'İki alan da aynı olmalı.', type: 'error' });
+      showToast({ title: i18n.t('auth.resetpassword.009'), message: i18n.t('auth.resetpassword.010'), type: 'error' });
       return;
     }
 
     setSubmitting(true);
     try {
       await confirmPasswordReset(auth, oobCode, newPassword);
-      showToast({ title: '✅ Şifre Değiştirildi', message: 'Yeni şifrenle giriş yapabilirsin.', type: 'success' });
+      showToast({ title: i18n.t('auth.resetpassword.011'), message: i18n.t('auth.resetpassword.012'), type: 'success' });
       router.replace('/(auth)/login');
     } catch (e: any) {
       if (e?.code === 'auth/expired-action-code') {
-        showToast({ title: 'Bağlantı Süresi Doldu', message: 'Yeni bir sıfırlama maili iste.', type: 'error' });
+        showToast({ title: i18n.t('auth.resetpassword.013'), message: i18n.t('auth.resetpassword.014'), type: 'error' });
       } else if (e?.code === 'auth/invalid-action-code') {
-        showToast({ title: 'Geçersiz Bağlantı', message: 'Bu link kullanılmış veya geçersiz.', type: 'error' });
+        showToast({ title: i18n.t('auth.resetpassword.015'), message: i18n.t('auth.resetpassword.016'), type: 'error' });
       } else if (e?.code === 'auth/weak-password') {
-        showToast({ title: 'Şifre Zayıf', message: 'Daha güçlü bir şifre seç.', type: 'warning' });
+        showToast({ title: i18n.t('auth.resetpassword.017'), message: i18n.t('auth.resetpassword.018'), type: 'warning' });
       } else {
-        showToast({ title: 'Hata', message: 'Şifre değiştirilemedi, tekrar dene.', type: 'error' });
+        showToast({ title: 'Hata', message: i18n.t('auth.resetpassword.019'), type: 'error' });
       }
     } finally {
       setSubmitting(false);

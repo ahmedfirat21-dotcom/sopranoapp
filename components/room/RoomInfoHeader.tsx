@@ -1,4 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
+import { i18n } from '../../services/i18n';
 import { View, Text, StyleSheet, Pressable, Animated, Easing, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -139,12 +140,12 @@ export default function RoomInfoHeader({
   //   Default mod (free_for_all) icon dahi göstermez — gereksiz görsel yük.
   // ★ 2026-04-27: Badge'ler bilgilendirici — tıklanınca toast ile detay açıklar.
   const badges: { icon?: string; text?: string; emoji?: string; color: string; bg: string; border: string; info?: { title: string; message: string } }[] = [];
-  if (ageRestricted) badges.push({ text: '+18', color: '#EF4444', bg: 'rgba(239,68,68,0.15)', border: 'rgba(239,68,68,0.3)', info: { title: '🔞 Yaş Sınırı', message: 'Bu odaya yalnızca 18 yaş üzeri kullanıcılar girebilir.' } });
-  if (roomType === 'closed') badges.push({ icon: 'lock-closed', color: '#F59E0B', bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.25)', info: { title: '🔒 Şifreli Oda', message: 'Bu odaya girmek için şifre bilmek gerekir.' } });
-  if (roomType === 'invite') badges.push({ icon: 'mail', color: '#8B5CF6', bg: 'rgba(139,92,246,0.12)', border: 'rgba(139,92,246,0.25)', info: { title: '📨 Davetli Oda', message: 'Bu odaya yalnızca oda sahibinin davet ettikleri girebilir.' } });
-  if (isLocked) badges.push({ icon: 'lock-closed', color: '#F59E0B', bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.25)', info: { title: '🔒 Oda Kilitli', message: 'Oda sahibi yeni katılımcı kabulünü geçici olarak durdurdu.' } });
+  if (ageRestricted) badges.push({ text: '+18', color: '#EF4444', bg: 'rgba(239,68,68,0.15)', border: 'rgba(239,68,68,0.3)', info: { title: i18n.t('room.roominfoheader.001'), message: i18n.t('room.roominfoheader.002') } });
+  if (roomType === 'closed') badges.push({ icon: 'lock-closed', color: '#F59E0B', bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.25)', info: { title: i18n.t('room.roominfoheader.003'), message: i18n.t('room.roominfoheader.004') } });
+  if (roomType === 'invite') badges.push({ icon: 'mail', color: '#8B5CF6', bg: 'rgba(139,92,246,0.12)', border: 'rgba(139,92,246,0.25)', info: { title: '📨 Davetli Oda', message: i18n.t('room.roominfoheader.005') } });
+  if (isLocked) badges.push({ icon: 'lock-closed', color: '#F59E0B', bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.25)', info: { title: '🔒 Oda Kilitli', message: i18n.t('room.roominfoheader.006') } });
   if ((entryFeeSp ?? 0) > 0) badges.push({ text: `${entryFeeSp} SP`, color: '#D4AF37', bg: 'rgba(212,175,55,0.12)', border: 'rgba(212,175,55,0.25)', info: { title: `💰 ${entryFeeSp} SP Giriş Ücreti`, message: `Bu odaya girmek için ${entryFeeSp} SP harcanır.` } });
-  if (followersOnly) badges.push({ icon: 'people', color: '#A78BFA', bg: 'rgba(139,92,246,0.12)', border: 'rgba(139,92,246,0.25)', info: { title: '👥 Arkadaşlara Özel', message: 'Bu oda yalnızca oda sahibinin arkadaşlarına açık.' } });
+  if (followersOnly) badges.push({ icon: 'people', color: '#A78BFA', bg: 'rgba(139,92,246,0.12)', border: 'rgba(139,92,246,0.25)', info: { title: i18n.t('room.roominfoheader.007'), message: i18n.t('room.roominfoheader.008') } });
   if (roomLanguage && roomLanguage !== 'tr') {
     const _langLabels: Record<string, string> = { en: 'English', de: 'Deutsch', ar: 'العربية', fr: 'Français', es: 'Español', it: 'Italiano', ru: 'Русский', pt: 'Português', ja: '日本語' };
     const _label = _langLabels[roomLanguage] || roomLanguage.toUpperCase();

@@ -373,7 +373,7 @@ export default function ProfileScreen() {
     } else if (__DEV__) {
       if (__DEV__) console.warn('[Profile] getProfileStats failed:', statsRes.reason);
       // Kritik değil ama kullanıcı 0 görürse sebebini bilsin
-      showToast({ title: 'Aktivite verileri yüklenemedi', type: 'warning' });
+      showToast({ title: i18n.t('tabs.profile.001'), type: 'warning' });
     }
 
     if (titleRes.status === 'fulfilled') setUserTitle(titleRes.value);
@@ -390,7 +390,7 @@ export default function ProfileScreen() {
     setDeleteAlert({
       visible: true,
       title: 'Oturumu Kapat',
-      message: 'Hesabından çıkış yapmak istediğinden emin misin?',
+      message: i18n.t('tabs.profile.002'),
       type: 'warning',
       buttons: [
         { text: 'Vazgeç', style: 'cancel' },
@@ -426,9 +426,9 @@ export default function ProfileScreen() {
               setUser(null);
               // 5) Login ekranına replace — back stack temiz
               router.replace('/(auth)/login' as any);
-              showToast({ title: 'Oturum kapatıldı', type: 'success' });
+              showToast({ title: i18n.t('tabs.profile.003'), type: 'success' });
             } catch (err: any) {
-              showToast({ title: 'Çıkış yapılamadı', message: err.message || 'Tekrar dene.', type: 'error' });
+              showToast({ title: i18n.t('tabs.profile.004'), message: err.message || 'Tekrar dene.', type: 'error' });
             }
           },
         },
@@ -445,7 +445,7 @@ export default function ProfileScreen() {
     try {
       const res = await ReferralService.applyCode(referralCodeText, userId);
       if (res.success) {
-        showToast({ title: '💎 50 SP Kazandın!', message: 'Davet kodu kabul edildi.', type: 'success' });
+        showToast({ title: i18n.t('tabs.profile.005'), message: 'Davet kodu kabul edildi.', type: 'success' });
         setShowReferral(false);
         setReferralCodeText('');
         setUsedReferral({ used: true, code: referralCodeText.trim().toUpperCase(), usedAt: new Date().toISOString() });
@@ -453,7 +453,7 @@ export default function ProfileScreen() {
         showToast({ title: 'Kod Kabul Edilmedi', message: res.message, type: 'error' });
       }
     } catch (err: any) {
-      showToast({ title: 'Kod Uygulanamadı', message: err.message || 'Bir sorun oluştu.', type: 'error' });
+      showToast({ title: i18n.t('tabs.profile.006'), message: err.message || 'Bir sorun oluştu.', type: 'error' });
     } finally {
       setSubmittingReferral(false);
     }
@@ -493,7 +493,7 @@ export default function ProfileScreen() {
       const txs = await GamificationService.getTransactionHistory(userId, 30);
       setSPHistory(txs || []);
     } catch {
-      showToast({ title: 'Geçmiş yüklenemedi', type: 'error' });
+      showToast({ title: i18n.t('tabs.profile.007'), type: 'error' });
     }
   }, [spHistory.length, userId]);
 
@@ -798,9 +798,9 @@ export default function ProfileScreen() {
                       try {
                         const Clipboard = await import('expo-clipboard');
                         await Clipboard.setStringAsync(myReferralCode);
-                        showToast({ title: 'Kopyalandı 📋', type: 'success' });
+                        showToast({ title: i18n.t('tabs.profile.008'), type: 'success' });
                       } catch {
-                        showToast({ title: 'Kopyalanamadı', type: 'error' });
+                        showToast({ title: i18n.t('tabs.profile.009'), type: 'error' });
                       }
                     }}
                   >
@@ -906,7 +906,7 @@ export default function ProfileScreen() {
               await refreshProfile();
               // ★ 2026-05-05: Başarı toast'ı kaldırıldı — checked.json overlay yeterli görsel feedback.
             } catch (err: any) {
-              showToast({ title: 'Boost başarısız', message: err.message || 'Hata oluştu', type: 'error' });
+              showToast({ title: i18n.t('tabs.profile.010'), message: err.message || 'Hata oluştu', type: 'error' });
               throw err; // BoostPickerSheet loading state'i kapatsın
             }
           }}
@@ -957,20 +957,20 @@ export default function ProfileScreen() {
           actions={friendActionSheet ? [
             {
               id: 'view',
-              label: 'Profili Görüntüle',
+              label: i18n.t('tabs.profile.011'),
               icon: 'person-outline',
               style: 'primary',
               onPress: () => openUserProfile(friendActionSheet.id),
             },
             {
               id: 'message',
-              label: 'Mesaj Gönder',
+              label: i18n.t('tabs.profile.012'),
               icon: 'chatbubble-outline',
               onPress: () => router.push(`/chat/${friendActionSheet.id}` as any),
             },
             {
               id: 'remove',
-              label: 'Arkadaşlıktan Çıkar',
+              label: i18n.t('tabs.profile.013'),
               icon: 'person-remove-outline',
               style: 'destructive',
               onPress: () => {
@@ -978,7 +978,7 @@ export default function ProfileScreen() {
                 const target = friendActionSheet;
                 setDeleteAlert({
                   visible: true,
-                  title: 'Arkadaşlıktan Çıkar',
+                  title: i18n.t('tabs.profile.014'),
                   message: `${target.display_name} artık arkadaş listenden kaldırılacak.`,
                   type: 'warning',
                   buttons: [
@@ -990,13 +990,13 @@ export default function ProfileScreen() {
                         try {
                           const res = await FriendshipService.removeFriend(firebaseUser.uid, target.id);
                           if (res?.success) {
-                            showToast({ title: '👋 Arkadaş Kaldırıldı', message: `${target.display_name} listenden çıkarıldı.`, type: 'info' });
+                            showToast({ title: i18n.t('tabs.profile.015'), message: `${target.display_name} listenden çıkarıldı.`, type: 'info' });
                             try { (global as any).__sopranoBadgeRefresh?.(); } catch { }
                           } else {
-                            showToast({ title: 'Kaldırılamadı', message: res?.error || 'Arkadaş listesinden çıkarılamadı.', type: 'error' });
+                            showToast({ title: i18n.t('tabs.profile.016'), message: res?.error || 'Arkadaş listesinden çıkarılamadı.', type: 'error' });
                           }
                         } catch (e: any) {
-                          showToast({ title: 'Kaldırılamadı', message: e?.message || 'Bir sorun oluştu.', type: 'error' });
+                          showToast({ title: i18n.t('tabs.profile.017'), message: e?.message || 'Bir sorun oluştu.', type: 'error' });
                         }
                       },
                     },
@@ -1016,9 +1016,9 @@ export default function ProfileScreen() {
             try {
               await supabase.from('profiles').update({ bio: newBio }).eq('id', userId);
               await refreshProfile();
-              showToast({ title: 'Bio güncellendi', type: 'success' });
+              showToast({ title: i18n.t('tabs.profile.018'), type: 'success' });
             } catch (err: any) {
-              showToast({ title: 'Güncellenemedi', message: err?.message || 'Tekrar dene.', type: 'error' });
+              showToast({ title: i18n.t('tabs.profile.019'), message: err?.message || 'Tekrar dene.', type: 'error' });
               throw err;
             }
           }}

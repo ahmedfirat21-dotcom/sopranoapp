@@ -494,7 +494,7 @@ export default function StoreScreen() {
         else next.delete(item.id);
         return next;
       });
-      showToast({ title: 'Hata', message: 'İstek listesi güncellenemedi', type: 'error' });
+      showToast({ title: 'Hata', message: i18n.t('store.001'), type: 'error' });
     } else if (!isOnList) {
       showToast({ title: '♡ Listene eklendi', message: `${item.name} istek listende.`, type: 'success' });
     }
@@ -521,14 +521,14 @@ export default function StoreScreen() {
     if (!firebaseUser?.uid) return;
     const allOwned = bundle.item_ids.every((id) => inventory.has(id));
     if (allOwned) {
-      showToast({ title: 'Tüm parçalar sende', message: `${bundle.name} parçalarına zaten sahipsin.`, type: 'info' });
+      showToast({ title: i18n.t('store.002'), message: `${bundle.name} parçalarına zaten sahipsin.`, type: 'info' });
       return;
     }
     const totalDiscount = Math.min(bundle.discount_pct + tierDiscountPct, 80);
     const finalPrice = Math.round(bundle.total_price_sp * (100 - totalDiscount) / 100);
     setConfirmAlert({
       visible: true,
-      title: 'Set Satın Al',
+      title: i18n.t('store.003'),
       message: `${bundle.name} setinin ${bundle.item_ids.length} parçası ${finalPrice.toLocaleString('tr-TR')} SP karşılığında envanterine eklenecek (-%${totalDiscount}${tierDiscountPct > 0 ? ` · ${tier}` : ''}). Onaylıyor musun?`,
       buttons: [
         { text: 'Vazgeç', style: 'cancel', onPress: () => setConfirmAlert(p => ({ ...p, visible: false })) },
@@ -625,7 +625,7 @@ export default function StoreScreen() {
     // ★ v107 hotfix: PremiumAlert (native Alert yerine) — uygulama tasarımıyla tutarlı
     setConfirmAlert({
       visible: true,
-      title: 'Satın Al',
+      title: i18n.t('store.004'),
       message: (() => {
         const dealOff = (dailyDeal && dailyDeal.item_id === item.id) ? dailyDeal.extra_discount_pct : 0;
         const totalOff = Math.min(tierDiscountPct + dealOff, 80);
@@ -834,7 +834,7 @@ export default function StoreScreen() {
           {(catalogLoading || bundles.length > 0) ? (
             <>
               <View onLayout={(e) => { sectionOffsets.current.bundles = e.nativeEvent.layout.y; }} />
-              <SectionDivider label="— SETLER · TEMA PAKETLERİ —" />
+              <SectionDivider label={i18n.t('store.007')} />
               <Text style={s.sectionTitle}>{i18n.t('store.003')}</Text>
               <Text style={s.sectionSub}>{i18n.t('store.004')}</Text>
               {catalogLoading && bundles.length === 0 ? (
@@ -863,7 +863,7 @@ export default function StoreScreen() {
 
           {/* ═══ ÇERÇEVELER — Avatar Frame Koleksiyonu ═══ */}
           <View onLayout={(e) => { sectionOffsets.current.frames = e.nativeEvent.layout.y; }} />
-          <SectionDivider label="— ÇERÇEVELER · AVATAR —" />
+          <SectionDivider label={i18n.t('store.008')} />
           <Text style={s.sectionTitle}>{i18n.t('store.005')}</Text>
           <Text style={s.sectionSub}>{i18n.t('store.006')}</Text>
           {catalogLoading && frameItems.length === 0 ? (
@@ -895,7 +895,7 @@ export default function StoreScreen() {
 
           {/* ═══ GİRİŞ EFEKTLERİ — Odaya Giriş Animasyonları ═══ */}
           <View onLayout={(e) => { sectionOffsets.current.entry_effect = e.nativeEvent.layout.y; }} />
-          <SectionDivider label="— GİRİŞ EFEKTLERİ · ODA —" />
+          <SectionDivider label={i18n.t('store.009')} />
           <Text style={s.sectionTitle}>{i18n.t('store.007')}</Text>
           <Text style={s.sectionSub}>{i18n.t('store.008')}</Text>
           {catalogLoading && entryItems.length === 0 ? (
@@ -948,7 +948,7 @@ export default function StoreScreen() {
           {badgeItems.length > 0 && (
             <>
               <View onLayout={(e) => { sectionOffsets.current.badge = e.nativeEvent.layout.y; }} />
-              <SectionDivider label="— ROZETLER · PROFİL —" />
+              <SectionDivider label={i18n.t('store.010')} />
               <Text style={s.sectionTitle}>{i18n.t('store.010')}</Text>
               <Text style={s.sectionSub}>{i18n.t('store.011')}</Text>
               <View style={s.galleryGrid}>
@@ -1005,7 +1005,7 @@ export default function StoreScreen() {
           {emojiItems.length > 0 && (
             <>
               <View onLayout={(e) => { sectionOffsets.current.emoji = e.nativeEvent.layout.y; }} />
-              <SectionDivider label="— ÖZEL EMOJİ · SOHBET —" />
+              <SectionDivider label={i18n.t('store.011')} />
               <Text style={s.sectionTitle}>{i18n.t('store.016')}</Text>
               <Text style={s.sectionSub}>{i18n.t('store.017')}</Text>
               <View style={s.galleryGrid}>
@@ -1064,8 +1064,8 @@ export default function StoreScreen() {
                   // ★ v109.3: Eski sp-store'a yönlendirme yerine doğrudan burada bilgilendirme.
                   //   Google Play IAP henüz aktif değil; alpha sürüm boyunca kapalı.
                   showToast({
-                    title: '🚧 Yakında',
-                    message: 'SP satın alma alfa sürüm süresince kapalı. Yakında Google Play üzerinden aktif olacak!',
+                    title: i18n.t('store.005'),
+                    message: i18n.t('store.006'),
                     type: 'info',
                   });
                 }}
@@ -1074,7 +1074,7 @@ export default function StoreScreen() {
           </View>
 
           {/* Koleksiyonlar */}
-          <SectionDivider label="— KOLEKSİYONLAR · TÜM SEZON —" />
+          <SectionDivider label={i18n.t('store.012')} />
           {catalogLoading && collections.length === 0 ? (
             <SkeletonCollectionRow />
           ) : (

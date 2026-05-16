@@ -488,9 +488,7 @@ export default function SPSentSuccessModal({
           ]}
           pointerEvents="none"
         >
-          <Text style={[st.recipientLabel, { color: palette.accent + 'AA' }]}>
-            SP HEDİYE EDİLEN KİŞİ
-          </Text>
+          <Text style={[st.recipientLabel, { color: palette.accent + 'AA' }]}>{i18n.t('profile.spsentsuccessmodal.001')}</Text>
           <View style={[st.recipientCard, { borderColor: palette.accent + '40' }]}>
             {recipientAvatar ? (
               <Image

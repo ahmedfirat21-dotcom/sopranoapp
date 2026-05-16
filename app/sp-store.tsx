@@ -36,8 +36,8 @@ export default function SPStoreScreen() {
 
   const handleBuy = () => {
     showToast({
-      title: '🚧 Yakında',
-      message: 'SP mağazası alfa sürüm süresince kapalı. Yakında Google Play üzerinden aktif olacak!',
+      title: i18n.t('spstore.002'),
+      message: i18n.t('spstore.003'),
       type: 'info',
     });
   };
@@ -171,9 +171,7 @@ export default function SPStoreScreen() {
           {/* Info */}
           <View style={s.infoBox}>
             <Ionicons name="information-circle-outline" size={14} color="#64748B" />
-            <Text style={s.infoText}>
-              SP ile profilini öne çıkarabilir, oda giriş ücreti ödeyebilir ve premium özelliklere erişebilirsin.
-            </Text>
+            <Text style={s.infoText}>{i18n.t('spstore.001')}</Text>
           </View>
         </ScrollView>
       </View>

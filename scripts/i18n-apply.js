@@ -1,25 +1,13 @@
 /**
- * i18n Apply — i18n-scan-report.json'daki TR bulgularını otomatik dönüştürür.
+ * i18n Apply v2 — fullMatch tabanlı doğrudan replace.
  *
- * Akış:
- *   1. i18n-scan-report.json'u oku
- *   2. Her bulgu için unique key üret: auto.{dir}.{file}.{counter}
- *   3. Dosyayı patch et: TR string → `{i18n.t('key')}`
- *   4. locales/tr.ts + en.ts'ye toplu append
- *   5. import statement'ı yoksa otomatik ekle
- *
- * GÜVENLİ pattern'ler (ilk faz):
- *   - JSX Text node:           <Text>TR</Text>  →  <Text>{i18n.t('key')}</Text>
- *   - placeholder attribute:   placeholder="TR" →  placeholder={i18n.t('key')}
- *
- * RİSKLİ pattern'ler (atlanır, manuel kalır):
- *   - label/title/desc/message prop (object property context — toast/alert
- *     karışıyor, manual değerlendirilmeli)
+ * Scan v2 her bulgu için `fullMatch` (regex tam eşleşmesi) kaydeder.
+ * Apply bu STRING'i splice ile değiştirir — regex re-eval YOK, apostrof
+ * bug'ı yok.
  *
  * Mod:
- *   node scripts/i18n-apply.js --dry      → değişiklikleri sadece bildirir
- *   node scripts/i18n-apply.js --apply    → gerçek patch
- *   node scripts/i18n-apply.js --apply --file=path/to/file.tsx  → tek dosya
+ *   node scripts/i18n-apply.js --dry      → preview
+ *   node scripts/i18n-apply.js --apply    → uygula
  */
 const fs = require('fs');
 const path = require('path');
@@ -27,8 +15,7 @@ const path = require('path');
 const ROOT = path.resolve(__dirname, '..');
 const ARGV = process.argv.slice(2);
 const APPLY = ARGV.includes('--apply');
-const DRY = ARGV.includes('--dry') || !APPLY;
-const FILE_FILTER = (ARGV.find(a => a.startsWith('--file=')) || '').slice('--file='.length);
+const DRY = !APPLY;
 
 const REPORT_PATH = path.join(ROOT, 'i18n-scan-report.json');
 const TR_PATH = path.join(ROOT, 'locales/tr.ts');
@@ -41,180 +28,156 @@ if (!fs.existsSync(REPORT_PATH)) {
 
 const report = JSON.parse(fs.readFileSync(REPORT_PATH, 'utf8'));
 
-// ─── Sadece bu pattern'leri uygula (güvenli) ────────────
-const SAFE_TYPES = new Set(['JSX Text', 'placeholder']);
-
 // ─── Key generation ─────────────────────────────────────
 function fileToKeyBase(rel) {
-  // 'components/room/RoomGiftPanel.tsx' → 'room.roomgiftpanel'
   const noExt = rel.replace(/\.(tsx?|jsx?)$/, '');
   const parts = noExt.split('/').filter(p => p !== 'components' && p !== 'app');
   return parts.map(p => p.toLowerCase().replace(/[^a-z0-9]/g, '')).join('.');
 }
 
-// ─── tr.ts + en.ts append blok hazırla ──────────────────
+// ─── Tek bulgu için yeni kod parçası üret ────────────────
+function buildReplacement(type, key, fullMatch) {
+  switch (type) {
+    case 'jsx_text':
+      // > ...TR... </Text>  → >{i18n.t('key')}</Text>
+      return fullMatch.replace(/>\s*[^<]*</, `>{i18n.t('${key}')}<`);
+    case 'placeholder_dq':
+    case 'placeholder_sq':
+      return fullMatch.replace(/=["'][\s\S]*["']/, `={i18n.t('${key}')}`);
+    case 'prop_obj_dq':
+    case 'prop_obj_sq': {
+      // prop: 'value' → prop: i18n.t('key')
+      const m = fullMatch.match(/^(\s*\w+\s*:\s*)/);
+      const prefix = m ? m[1] : '';
+      return `${prefix}i18n.t('${key}')`;
+    }
+    case 'prop_attr_dq':
+    case 'prop_attr_sq': {
+      // prop="value" → prop={i18n.t('key')}
+      const m = fullMatch.match(/^(\w+)=/);
+      const attr = m ? m[1] : 'label';
+      return `${attr}={i18n.t('${key}')}`;
+    }
+    default:
+      return null;
+  }
+}
+
+// ─── Import path hesapla ─────────────────────────────────
+function relImportPath(rel) {
+  // rel örnek: 'app/(tabs)/profile.tsx' → '../../services/i18n'
+  // rel örnek: 'components/foo.tsx' → '../services/i18n'
+  // rel örnek: 'components/room/foo.tsx' → '../../services/i18n'
+  const parts = rel.split('/');
+  const depth = parts.length - 1; // file hariç klasör sayısı
+  return '../'.repeat(depth) + 'services/i18n';
+}
+
+// ─── İşlem ───────────────────────────────────────────────
 const NEW_KEYS_TR = [];
 const NEW_KEYS_EN = [];
-
-// ─── Her dosya için patch hazırla ───────────────────────
 const filePatches = {};
 let totalApplied = 0;
 let totalSkipped = 0;
+let totalAmbiguous = 0;
 
 for (const [rel, findings] of Object.entries(report.byFile)) {
-  if (FILE_FILTER && !rel.includes(FILE_FILTER)) continue;
-
   const baseKey = fileToKeyBase(rel);
   const fullPath = path.join(ROOT, rel);
   if (!fs.existsSync(fullPath)) continue;
 
   let text = fs.readFileSync(fullPath, 'utf8');
-  const originalText = text;
-
-  // Mevcut auto.* key sayısı (counter offset için)
   let counter = 1;
-
-  // Her bulgu için key + replace
   const fileMods = [];
 
   for (const f of findings) {
-    if (!SAFE_TYPES.has(f.type)) {
+    const key = `${baseKey}.${counter.toString().padStart(3, '0')}`;
+    const replacement = buildReplacement(f.type, key, f.fullMatch);
+    if (!replacement) { totalSkipped++; continue; }
+
+    // fullMatch'in dosyada KAÇ KEZ geçtiğini say
+    const occurrences = text.split(f.fullMatch).length - 1;
+    if (occurrences === 0) {
+      // Daha önceki bir patch bunu zaten dönüştürmüş olabilir
       totalSkipped++;
       continue;
     }
-
-    const trStr = f.text;
-    if (!trStr) { totalSkipped++; continue; }
-
-    // Unique key — counter dosya başına artar
-    const key = `${baseKey}.${counter.toString().padStart(3, '0')}`;
-    counter++;
-
-    // Replacement — pattern türüne göre
-    let oldNeedle, newNeedle;
-
-    if (f.type === 'JSX Text') {
-      // <Tag>TR</Tag>  — text node arasında
-      // İçeride boşluk olabilir, escape edilmiş chars olabilir
-      const escaped = trStr.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      // Tag içeriği = TR string (whitespace dahil olabilir)
-      const re = new RegExp(`(>)([^<]*?${escaped}[^<]*?)(<\\/(?:Text|Title|Heading|Label)>)`, 'g');
-      let matched = false;
-      text = text.replace(re, (m, open, content, close) => {
-        if (matched) return m; // sadece ilk eşleşme
-        if (content.trim() !== trStr) return m; // exact match
-        matched = true;
-        oldNeedle = m;
-        newNeedle = `${open}{i18n.t('${key}')}${close}`;
-        return newNeedle;
-      });
-      if (!matched) {
-        // Tekrar dene — multiline content için
-        const reMulti = new RegExp(`>\\s*(${escaped})\\s*<`, 'g');
-        text = text.replace(reMulti, (m, captured) => {
-          if (matched) return m;
-          matched = true;
-          oldNeedle = m;
-          newNeedle = `>{i18n.t('${key}')}<`;
-          return newNeedle;
-        });
-      }
-      if (matched) {
-        NEW_KEYS_TR.push(`  '${key}': ${JSON.stringify(trStr)},`);
-        NEW_KEYS_EN.push(`  '${key}': ${JSON.stringify(trStr)},  // TODO: translate`);
-        fileMods.push({ key, type: f.type, text: trStr });
-        totalApplied++;
-      } else {
-        totalSkipped++;
-      }
-    } else if (f.type === 'placeholder') {
-      const escaped = trStr.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const re = new RegExp(`placeholder=["']${escaped}["']`, 'g');
-      let matched = false;
-      text = text.replace(re, (m) => {
-        if (matched) return m;
-        matched = true;
-        return `placeholder={i18n.t('${key}')}`;
-      });
-      if (matched) {
-        NEW_KEYS_TR.push(`  '${key}': ${JSON.stringify(trStr)},`);
-        NEW_KEYS_EN.push(`  '${key}': ${JSON.stringify(trStr)},  // TODO: translate`);
-        fileMods.push({ key, type: f.type, text: trStr });
-        totalApplied++;
-      } else {
-        totalSkipped++;
-      }
+    if (occurrences > 1) {
+      // Ambigous — birden çok eşleşme: ilkini değiştir, sonrakileri eski hâliyle bırak
+      // (counter aynı key'i tekrar üretmesin diye sadece ilk match'i splice eder)
+      totalAmbiguous++;
     }
+
+    // İlk eşleşmeyi splice ile değiştir
+    const idx = text.indexOf(f.fullMatch);
+    text = text.slice(0, idx) + replacement + text.slice(idx + f.fullMatch.length);
+
+    NEW_KEYS_TR.push(`  '${key}': ${JSON.stringify(f.text)},`);
+    NEW_KEYS_EN.push(`  '${key}': ${JSON.stringify(f.text)},  // TODO: translate`);
+    fileMods.push({ key, type: f.type, text: f.text });
+    counter++;
+    totalApplied++;
   }
 
   if (fileMods.length === 0) continue;
 
-  // Import statement var mı?
-  const hasImport = /from ['"][^'"]*services\/i18n['"]/.test(text);
-  if (!hasImport) {
-    // import { i18n } from '<relative>/services/i18n' ekle
-    const depth = rel.split('/').length - 1;
-    const prefix = '../'.repeat(depth - (rel.startsWith('app/') ? 0 : 0)) || './';
-    // app/foo.tsx için: ../services/i18n
-    // app/foo/bar.tsx için: ../../services/i18n
-    // components/foo.tsx için: ../services/i18n
-    let rel2 = '';
-    if (rel.startsWith('app/')) {
-      const parts = rel.split('/');
-      rel2 = '../'.repeat(parts.length - 1) + 'services/i18n';
-    } else if (rel.startsWith('components/')) {
-      const parts = rel.split('/');
-      rel2 = '../'.repeat(parts.length - 1) + 'services/i18n';
-    } else {
-      rel2 = '../services/i18n';
-    }
-    // İlk import satırının altına ekle
-    text = text.replace(/^(import [^;]+;)/m, `$1\nimport { i18n } from '${rel2}';`);
+  // i18n import yoksa ekle
+  if (!/from\s+['"][^'"]*services\/i18n['"]/.test(text)) {
+    const importPath = relImportPath(rel);
+    // İlk import statement'ın altına ekle
+    text = text.replace(/^(import [^;]+;)/m, `$1\nimport { i18n } from '${importPath}';`);
+  } else if (!/import\s*\{[^}]*\bi18n\b[^}]*\}\s*from\s+['"][^'"]*services\/i18n['"]/.test(text)) {
+    // import { useTranslation } from '.../services/i18n'  →  import { i18n, useTranslation } from '.../services/i18n'
+    text = text.replace(/import\s*\{([^}]*)\}\s*from\s+(['"][^'"]*services\/i18n['"])/, (m, named, src) => {
+      const cleaned = named.split(',').map(s => s.trim()).filter(Boolean);
+      if (cleaned.includes('i18n')) return m;
+      cleaned.unshift('i18n');
+      return `import { ${cleaned.join(', ')} } from ${src}`;
+    });
   }
 
-  filePatches[rel] = { text, originalLength: originalText.length, newLength: text.length, mods: fileMods };
+  filePatches[rel] = { text, mods: fileMods };
 }
 
-// ─── Sonuç ────────────────────────────────────────────────
+// ─── Çıktı ───────────────────────────────────────────────
 console.log('═'.repeat(70));
-console.log(`i18n Apply — ${DRY ? 'DRY-RUN' : 'APPLY'} mode`);
+console.log(`i18n Apply v2 — ${DRY ? 'DRY-RUN' : 'APPLY'}`);
 console.log('═'.repeat(70));
 console.log(`Dosya: ${Object.keys(filePatches).length}`);
 console.log(`Uygulanan dönüşüm: ${totalApplied}`);
-console.log(`Atlanan (risky / matched değil): ${totalSkipped}`);
+console.log(`Atlanan (eşleşme yok): ${totalSkipped}`);
+console.log(`Çoklu eşleşme uyarısı (ilk match alındı): ${totalAmbiguous}`);
 console.log('');
 
 if (DRY) {
-  console.log('İlk 10 örnek değişiklik:');
-  console.log('─'.repeat(70));
   let shown = 0;
   for (const [rel, p] of Object.entries(filePatches)) {
-    for (const m of p.mods.slice(0, 3)) {
+    for (const m of p.mods.slice(0, 2)) {
       console.log(`  ${rel}`);
-      console.log(`    → key: ${m.key}`);
+      console.log(`    → key:  ${m.key}`);
+      console.log(`    → type: ${m.type}`);
       console.log(`    → text: "${m.text}"`);
       shown++;
-      if (shown >= 10) break;
+      if (shown >= 12) break;
     }
-    if (shown >= 10) break;
+    if (shown >= 12) break;
   }
-  console.log('');
-  console.log('Uygulamak için: node scripts/i18n-apply.js --apply');
+  console.log('\nUygula: node scripts/i18n-apply.js --apply');
   process.exit(0);
 }
 
-// ─── Gerçek patch ─────────────────────────────────────────
+// ─── Gerçek yazma ────────────────────────────────────────
 let modifiedFiles = 0;
 for (const [rel, p] of Object.entries(filePatches)) {
   fs.writeFileSync(path.join(ROOT, rel), p.text, 'utf8');
   modifiedFiles++;
 }
 
-// locales/tr.ts ve en.ts'ye append
+// locales append
 if (NEW_KEYS_TR.length > 0) {
   let trText = fs.readFileSync(TR_PATH, 'utf8');
-  const trMarker = '\n  // ═══ AUTO-EXTRACTED (i18n-apply.js) ═══\n';
-  if (!trText.includes(trMarker)) {
+  const trMarker = '\n  // ═══ AUTO-EXTRACTED (i18n-apply v2) ═══\n';
+  if (!trText.includes(trMarker.trim())) {
     trText = trText.replace(/^};\s*$/m, trMarker + NEW_KEYS_TR.join('\n') + '\n};');
   } else {
     trText = trText.replace(trMarker, trMarker + NEW_KEYS_TR.join('\n') + '\n');
@@ -222,8 +185,8 @@ if (NEW_KEYS_TR.length > 0) {
   fs.writeFileSync(TR_PATH, trText, 'utf8');
 
   let enText = fs.readFileSync(EN_PATH, 'utf8');
-  const enMarker = '\n  // ═══ AUTO-EXTRACTED (translate me) ═══\n';
-  if (!enText.includes(enMarker)) {
+  const enMarker = '\n  // ═══ AUTO-EXTRACTED v2 (translate me) ═══\n';
+  if (!enText.includes(enMarker.trim())) {
     enText = enText.replace(/^};\s*$/m, enMarker + NEW_KEYS_EN.join('\n') + '\n};');
   } else {
     enText = enText.replace(enMarker, enMarker + NEW_KEYS_EN.join('\n') + '\n');
@@ -233,6 +196,5 @@ if (NEW_KEYS_TR.length > 0) {
 
 console.log(`✓ ${modifiedFiles} dosya patch'lendi`);
 console.log(`✓ ${NEW_KEYS_TR.length} yeni key tr.ts + en.ts'ye eklendi`);
-console.log('');
-console.log('NOT: en.ts içindeki yeni key\'ler TR string ile dolduruldu (// TODO: translate).');
-console.log('Sonraki adım: en.ts\'de "AUTO-EXTRACTED" bölümünü manuel çevir veya Google Translate API ile batch çevir.');
+console.log(`\nNOT: en.ts içindeki yeni key'ler şu an TR string ile dolduruldu.`);
+console.log(`Manuel veya Google Translate API ile çevirmen gerek.`);

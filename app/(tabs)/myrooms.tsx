@@ -713,9 +713,9 @@ const dashS = StyleSheet.create({
 // ════════════════════════════════════════════════════════════
 const ROOM_TEMPLATES = [
   { id: 'chat', emoji: '💬', label: 'Sohbet', name: '', category: 'chat', type: 'open', mode: 'audio', speaking: 'free_for_all', colors: ['#14B8A6', '#065F56'] as [string, string] },
-  { id: 'music', emoji: '🎵', label: 'Müzik', name: '', category: 'music', type: 'open', mode: 'audio', speaking: 'permission_only', colors: ['#8B5CF6', '#4C1D95'] as [string, string] },
+  { id: 'music', emoji: '🎵', label: i18n.t('tabs.myrooms.001'), name: '', category: 'music', type: 'open', mode: 'audio', speaking: 'permission_only', colors: ['#8B5CF6', '#4C1D95'] as [string, string] },
   { id: 'game', emoji: '🎮', label: 'Oyun', name: '', category: 'game', type: 'open', mode: 'audio', speaking: 'free_for_all', colors: ['#EF4444', '#7F1D1D'] as [string, string] },
-  { id: 'private', emoji: '🔒', label: 'Özel', name: '', category: 'chat', type: 'closed', mode: 'audio', speaking: 'permission_only', colors: ['#F59E0B', '#78350F'] as [string, string] },
+  { id: 'private', emoji: '🔒', label: i18n.t('tabs.myrooms.002'), name: '', category: 'chat', type: 'closed', mode: 'audio', speaking: 'permission_only', colors: ['#F59E0B', '#78350F'] as [string, string] },
   { id: 'podcast', emoji: '🎤', label: 'Podcast', name: '', category: 'tech', type: 'open', mode: 'audio', speaking: 'selected_only', colors: ['#3B82F6', '#1E3A8A'] as [string, string] },
 ];
 
@@ -1107,7 +1107,7 @@ export default function MyRoomsScreen() {
       if (isScheduledFuture && scheduledTime) {
         const dateStr = scheduledTime.toLocaleString('tr-TR', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
         showToast({
-          title: '📅 Planlı Oda Erken Başlatılıyor',
+          title: i18n.t('tabs.myrooms.003'),
           message: `Bu oda ${dateStr} için planlanmıştı, şimdi canlıya alınıyor.`,
           type: 'info',
         });
@@ -1119,7 +1119,7 @@ export default function MyRoomsScreen() {
       } catch {}
       router.push(`/room/${room.id}`);
     } catch (err: any) {
-      showToast({ title: 'Başlatılamadı', message: err.message || 'Oda başlatılamadı.', type: 'error' });
+      showToast({ title: i18n.t('tabs.myrooms.004'), message: err.message || 'Oda başlatılamadı.', type: 'error' });
     }
   }, [firebaseUser, profile, router]);
 
@@ -1152,7 +1152,7 @@ export default function MyRoomsScreen() {
     const frozen = filter(myRooms.filter(r => !r.is_live && !r.is_persistent));
     const items: ListItem[] = [];
     const groups = [
-      { title: 'Canlı Odalarım', icon: 'radio', color: '#EF4444', data: live },
+      { title: i18n.t('tabs.myrooms.005'), icon: 'radio', color: '#EF4444', data: live },
       { title: i18n.t('myrooms.section.passive_persistent'), icon: 'moon', color: '#A78BFA', data: sleeping },
       { title: 'Donuk Odalar', icon: 'snow', color: '#64748B', data: frozen },
     ];
@@ -1265,7 +1265,7 @@ export default function MyRoomsScreen() {
     try {
       await ModerationService.editRoomName(selectedRoom.id, name.trim());
       broadcast(selectedRoom.id, { name: name.trim() });
-    } catch { showToast({ title: 'Ad Değiştirilemedi', message: 'Oda adı güncellenemedi. Daha sonra tekrar dene.', type: 'error' }); }
+    } catch { showToast({ title: i18n.t('tabs.myrooms.006'), message: i18n.t('tabs.myrooms.007'), type: 'error' }); }
   }, [selectedRoom, firebaseUser, broadcast]);
 
   const handleRoomTypeChange = useCallback(async (newType: string) => {
@@ -1274,7 +1274,7 @@ export default function MyRoomsScreen() {
     try {
       await RoomService.updateSettings(selectedRoom.id, firebaseUser.uid, { type: newType as any });
       broadcast(selectedRoom.id, { type: newType });
-    } catch { showToast({ title: 'Oda Tipi Değişmedi', message: 'Tip değişikliği uygulanamadı.', type: 'error' }); setRmType(selectedRoom.type || 'open'); }
+    } catch { showToast({ title: i18n.t('tabs.myrooms.008'), message: i18n.t('tabs.myrooms.009'), type: 'error' }); setRmType(selectedRoom.type || 'open'); }
   }, [selectedRoom, firebaseUser, broadcast]);
 
   const handleRoomThemeChange = useCallback(async (id: string | null) => {
@@ -1283,14 +1283,14 @@ export default function MyRoomsScreen() {
     try {
       await RoomService.updateSettings(selectedRoom.id, firebaseUser.uid, { theme_id: id });
       broadcast(selectedRoom.id, { theme_id: id });
-    } catch { showToast({ title: 'Tema Uygulanamadı', message: 'Oda teması güncellenemedi.', type: 'error' }); }
+    } catch { showToast({ title: i18n.t('tabs.myrooms.010'), message: i18n.t('tabs.myrooms.011'), type: 'error' }); }
   }, [selectedRoom, firebaseUser, broadcast]);
 
   const handleRoomDelete = useCallback(async () => {
     if (!selectedRoom || !firebaseUser) return;
     try {
       await RoomService.deleteRoom(selectedRoom.id, firebaseUser.uid);
-      showToast({ title: '🗑 Oda Silindi', message: 'Oda ve tüm mesajları kaldırıldı.', type: 'success' });
+      showToast({ title: '🗑 Oda Silindi', message: i18n.t('tabs.myrooms.012'), type: 'success' });
       setSelectedRoom(null);
       loadData();
     } catch (e: any) { showToast({ title: 'Oda Silinemedi', message: e.message || 'İşlem tamamlanamadı.', type: 'error' }); }
@@ -1305,7 +1305,7 @@ export default function MyRoomsScreen() {
       const userTier = effectiveTier;
       const gate = await RoomService.canCreateToday(firebaseUser.uid, userTier);
       if (!gate.ok) {
-        showToast({ title: 'Günlük Limit Doldu', message: 'Üyeliğini yükselterek limitsiz oda aç.', type: 'warning' });
+        showToast({ title: i18n.t('tabs.myrooms.013'), message: i18n.t('tabs.myrooms.014'), type: 'warning' });
         setTimeout(() => router.push('/plus' as any), 400);
         return;
       }
@@ -1317,7 +1317,7 @@ export default function MyRoomsScreen() {
       } catch {}
       router.push(`/room/${room.id}` as any);
     } catch (err: any) {
-      showToast({ title: 'Oda Açılamadı', message: err?.message || 'Beklenmedik hata', type: 'error' });
+      showToast({ title: i18n.t('tabs.myrooms.015'), message: err?.message || 'Beklenmedik hata', type: 'error' });
     } finally {
       setCreatingRoom(false);
     }
@@ -1327,10 +1327,10 @@ export default function MyRoomsScreen() {
     if (!selectedRoom || !firebaseUser) return;
     try {
       await RoomService.freezeRoom(selectedRoom.id, firebaseUser.uid);
-      showToast({ title: '❄️ Oda Donduruldu', message: 'Oda uyku moduna alındı.', type: 'success' });
+      showToast({ title: '❄️ Oda Donduruldu', message: i18n.t('tabs.myrooms.016'), type: 'success' });
       setSelectedRoom(null);
       loadData();
-    } catch (e: any) { showToast({ title: 'Dondurulamadı', message: e.message || 'Oda uyku moduna alınamadı.', type: 'error' }); }
+    } catch (e: any) { showToast({ title: i18n.t('tabs.myrooms.017'), message: e.message || 'Oda uyku moduna alınamadı.', type: 'error' }); }
   }, [selectedRoom, firebaseUser, loadData]);
 
   // settingsConfig objesi — PlusMenu'ye geçirilir
@@ -1374,7 +1374,7 @@ export default function MyRoomsScreen() {
       try {
         const ImagePicker = require('expo-image-picker');
         const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (!perm.granted) { showToast({ title: 'İzin Gerekli', message: 'Galeriye erişim izni verilmedi.', type: 'warning' }); return; }
+        if (!perm.granted) { showToast({ title: i18n.t('tabs.myrooms.018'), message: i18n.t('tabs.myrooms.019'), type: 'warning' }); return; }
         // ★ 2026-04-21: Arka plan DİKEY (9:16) — oda içi dikey layout; kapak yatay kalır.
         const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: 'images', allowsEditing: true, aspect: [9, 16], quality: 0.7 });
         if (result.canceled) return;
@@ -1383,8 +1383,8 @@ export default function MyRoomsScreen() {
         const url = await StorageService.uploadFile('post-images', fileName, result.assets[0].uri);
         setRmBgImage(url);
         updateRoomSetting('room_image_url', url);
-        showToast({ title: '🖼 Arka Plan Güncellendi', type: 'success' });
-      } catch (e: any) { showToast({ title: 'Arka Plan Yüklenemedi', message: e.message || 'Görsel yüklenirken hata oluştu.', type: 'error' }); }
+        showToast({ title: i18n.t('tabs.myrooms.020'), type: 'success' });
+      } catch (e: any) { showToast({ title: i18n.t('tabs.myrooms.021'), message: e.message || 'Görsel yüklenirken hata oluştu.', type: 'error' }); }
     },
     onRemoveBackgroundImage: () => { setRmBgImage(null); updateRoomSetting('room_image_url', null); },
     coverImage: rmCoverImage,
@@ -1393,7 +1393,7 @@ export default function MyRoomsScreen() {
       try {
         const ImagePicker = require('expo-image-picker');
         const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (!perm.granted) { showToast({ title: 'İzin Gerekli', message: 'Galeriye erişim izni verilmedi.', type: 'warning' }); return; }
+        if (!perm.granted) { showToast({ title: i18n.t('tabs.myrooms.022'), message: i18n.t('tabs.myrooms.023'), type: 'warning' }); return; }
         const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: 'images', allowsEditing: true, aspect: [16, 9], quality: 0.7 });
         if (result.canceled) return;
         const { StorageService } = require('../../services/storage');
@@ -1401,8 +1401,8 @@ export default function MyRoomsScreen() {
         const url = await StorageService.uploadFile('post-images', fileName, result.assets[0].uri);
         setRmCoverImage(url);
         updateRoomSetting('card_image_url', url);
-        showToast({ title: '🖼 Kart Görseli Güncellendi', type: 'success' });
-      } catch (e: any) { showToast({ title: 'Kart Görseli Yüklenemedi', message: e.message || 'Görsel yüklenirken hata oluştu.', type: 'error' }); }
+        showToast({ title: i18n.t('tabs.myrooms.024'), type: 'success' });
+      } catch (e: any) { showToast({ title: i18n.t('tabs.myrooms.025'), message: e.message || 'Görsel yüklenirken hata oluştu.', type: 'error' }); }
     },
     onRemoveCoverImage: () => { setRmCoverImage(null); updateRoomSetting('card_image_url', null); },
   } : undefined;
@@ -1608,7 +1608,7 @@ export default function MyRoomsScreen() {
                     item={item}
                     onPress={() => {
                       if ((item as any)._isLive === false) {
-                        showToast({ title: 'Oda Kapalı', message: 'Bu oda şu an canlı değil.', type: 'info' });
+                        showToast({ title: i18n.t('tabs.myrooms.026'), message: i18n.t('tabs.myrooms.027'), type: 'info' });
                         return;
                       }
                       router.push(`/room/${item.id}`);
@@ -1683,7 +1683,7 @@ export default function MyRoomsScreen() {
               } catch {}
             }
             if (successCount > 0) {
-              showToast({ title: '📨 Davet Gönderildi', message: `${successCount} kişiye davet gönderildi`, type: 'success' });
+              showToast({ title: i18n.t('tabs.myrooms.028'), message: `${successCount} kişiye davet gönderildi`, type: 'success' });
             }
             setShowInviteFriends(false);
           }}

@@ -48,7 +48,7 @@ const DRAFT_KEY = 'soprano_create_room_draft_v1';
 // ═══════════════════════════════════════════════════════════════════
 const ROOM_THEMES: { id: string; name: string; colors: [string, string] }[] = [
   { id: 'ocean',   name: 'Okyanus',    colors: ['#0E4D6F', '#083344'] },
-  { id: 'sunset',  name: 'Gün Batımı', colors: ['#7F1D1D', '#4C0519'] },
+  { id: 'sunset',  name: i18n.t('createroom.004'), colors: ['#7F1D1D', '#4C0519'] },
   { id: 'forest',  name: 'Orman',      colors: ['#14532D', '#052E16'] },
   { id: 'galaxy',  name: 'Galaksi',    colors: ['#312E81', '#1E1B4B'] },
   { id: 'aurora',  name: 'Aurora',     colors: ['#134E4A', '#042F2E'] },
@@ -390,19 +390,19 @@ export default function CreateRoomScreen() {
     // ★ 2026-04-25: audienceMode → backend type ile tier limit kontrolü
     const _audienceFields = audienceModeToFields(audienceMode, password);
     if (!limits.allowedTypes.includes(_audienceFields.type)) {
-      showToast({ title: 'Yetersiz Üyelik', message: 'Bu erişim modunu kullanmak için üyeliğini yükselt.', type: 'warning' });
+      showToast({ title: i18n.t('createroom.005'), message: i18n.t('createroom.006'), type: 'warning' });
       return;
     }
     if (limits.dailyRooms < 999 && todayRoomCount >= limits.dailyRooms) {
       UpsellService.onDailyRoomLimit(tier);
-      showToast({ title: 'Günlük Limit', message: `Bugün en fazla ${limits.dailyRooms} oda açabilirsin.`, type: 'warning' });
+      showToast({ title: i18n.t('createroom.007'), message: `Bugün en fazla ${limits.dailyRooms} oda açabilirsin.`, type: 'warning' });
       return;
     }
 
     // ★ 2026-04-21: Müzik linki son bir kontrol — canProceed'te yakalanıyor ama
     //   submit'e kadar geldiyse bir daha doğrula.
     if (musicLink.trim() && !isValidMusicUrl(musicLink)) {
-      showToast({ title: 'Geçersiz Müzik Linki', message: 'Sadece YouTube, Spotify veya SoundCloud linki kabul edilir.', type: 'error' });
+      showToast({ title: i18n.t('createroom.008'), message: 'Sadece YouTube, Spotify veya SoundCloud linki kabul edilir.', type: 'error' });
       return;
     }
 
@@ -484,7 +484,7 @@ export default function CreateRoomScreen() {
         /permission|denied|rls/i.test(rawMsg) ? 'Yetki hatası. Lütfen tekrar giriş yap.' :
         /storage|bucket/i.test(rawMsg) ? 'Görsel yüklenemedi. Farklı bir resim seç veya internetini kontrol et.' :
         rawMsg;
-      showToast({ title: 'Oda Açılamadı', message: friendly, type: 'error' });
+      showToast({ title: i18n.t('createroom.009'), message: friendly, type: 'error' });
     } finally {
       setCreating(false);
     }
@@ -507,7 +507,7 @@ export default function CreateRoomScreen() {
       })
     );
     const successCount = results.filter(r => r.status === 'fulfilled' && r.value).length;
-    showToast({ title: 'Davetler Gönderildi!', message: `${successCount} arkadaşına davet gönderildi.`, type: 'success' });
+    showToast({ title: i18n.t('createroom.010'), message: `${successCount} arkadaşına davet gönderildi.`, type: 'success' });
   };
 
   // ═══════════════════════════════════════════════════════════════════
@@ -660,7 +660,7 @@ export default function CreateRoomScreen() {
               //   Şifreli oda: 5sn (spam koruması). Diğer modlar: 0sn (gerek yok).
               if (slowModeSeconds === 0 && opt.mode === 'password') {
                 setSlowModeSeconds(5);
-                showToast({ title: '⏱️ Yavaş Mod Önerildi', message: 'Şifreli odada 5sn yavaş mod açıldı (spam koruması). Aşağıdan kapatabilirsin.', type: 'info' });
+                showToast({ title: i18n.t('createroom.011'), message: i18n.t('createroom.012'), type: 'info' });
               }
             }}
             style={[w.accessRow, active && w.accessRowActive, locked && { opacity: 0.5 }]}
@@ -788,19 +788,19 @@ export default function CreateRoomScreen() {
         case 'free_for_all':
           return {
             icon: 'mic' as const, color: '#14B8A6',
-            title: 'Dinleyici: 🎙️ Sahneye Çık butonu görür',
+            title: i18n.t('createroom.013'),
             body: 'Tek tıkla mikrofonu açar, onay gerekmez. Sen veya bir moderatör sahnedeyken otomatik olarak "el kaldırma" akışına döner — hiyerarşi korunur.',
           };
         case 'permission_only':
           return {
             icon: 'hand-left' as const, color: '#F59E0B',
-            title: 'Dinleyici: ✋ El Kaldır butonu görür',
+            title: i18n.t('createroom.014'),
             body: 'İstek kuyruğa düşer, sen veya moderatörlerin onayıyla sahneye çıkar. Dinleyici sırasını ve kaç kişi olduğunu görebilir.',
           };
         case 'selected_only':
           return {
             icon: 'lock-closed' as const, color: '#64748B',
-            title: 'Dinleyici: 🔒 Kilitli buton görür',
+            title: i18n.t('createroom.015'),
             body: 'Sadece sen "Sahneye Davet Et"le konuşmacı ekleyebilirsin. Dinleyiciler el kaldıramaz, "sahne kilitli" uyarısı görürler.',
           };
       }
@@ -901,13 +901,13 @@ export default function CreateRoomScreen() {
           try {
             const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
             if (!perm.granted) {
-              showToast({ title: 'İzin Gerekli', message: 'Galeriye erişim izni verilmedi. Ayarlardan izin verebilirsin.', type: 'warning' });
+              showToast({ title: i18n.t('createroom.016'), message: i18n.t('createroom.017'), type: 'warning' });
               return;
             }
             const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: 'images', allowsEditing: true, aspect: [16, 9], quality: 0.8 });
             if (!result.canceled && result.assets?.[0]) setCardImage(result.assets[0].uri);
           } catch (e: any) {
-            showToast({ title: 'Görsel seçilemedi', message: e?.message || 'Lütfen tekrar dene.', type: 'error' });
+            showToast({ title: i18n.t('createroom.018'), message: e?.message || 'Lütfen tekrar dene.', type: 'error' });
           }
         }}
       >
@@ -942,13 +942,13 @@ export default function CreateRoomScreen() {
                 try {
                   const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
                   if (!perm.granted) {
-                    showToast({ title: 'İzin Gerekli', message: 'Galeriye erişim izni verilmedi.', type: 'warning' });
+                    showToast({ title: i18n.t('createroom.019'), message: i18n.t('createroom.020'), type: 'warning' });
                     return;
                   }
                   const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: 'images', allowsEditing: true, aspect: [9, 16], quality: 0.8 });
                   if (!result.canceled && result.assets?.[0]) setBackgroundImage(result.assets[0].uri);
                 } catch (e: any) {
-                  showToast({ title: 'Görsel seçilemedi', message: e?.message || 'Lütfen tekrar dene.', type: 'error' });
+                  showToast({ title: i18n.t('createroom.021'), message: e?.message || 'Lütfen tekrar dene.', type: 'error' });
                 }
               }}
             >
@@ -995,9 +995,7 @@ export default function CreateRoomScreen() {
          ★ 2026-04-21: URL regex validation eklendi; geçersiz linkte uyarı. */}
       <View style={{ marginTop: 24 }}>
         <Text style={w.sublabel}>{i18n.t('createroom.012')}</Text>
-        <Text style={{ fontSize: 11, color: '#64748B', marginBottom: 8 }}>
-          YouTube / Spotify / SoundCloud linki yapıştır — odadakiler kendi platformlarında dinler.
-        </Text>
+        <Text style={{ fontSize: 11, color: '#64748B', marginBottom: 8 }}>{i18n.t('createroom.001')}</Text>
         {(() => {
           const locked = !isTierEnough(tier, 'Pro');
           const musicInvalid = !!musicLink.trim() && !isValidMusicUrl(musicLink);
@@ -1183,20 +1181,20 @@ export default function CreateRoomScreen() {
           {audienceMode !== 'public' && (
             <SummaryRow
               icon="lock-closed"
-              label="Erişim"
+              label={i18n.t('createroom.022')}
               value={AUDIENCE_OPTIONS.find(o => o.mode === audienceMode)?.label || ''}
             />
           )}
           <SummaryRow icon="mic" label={t('create.step.speaking.title')} value={smObj ? t(smObj.labelKey) : ''} />
-          {welcomeMessage && <SummaryRow icon="chatbubble-ellipses" label="Karşılama" value={welcomeMessage} />}
+          {welcomeMessage && <SummaryRow icon="chatbubble-ellipses" label={i18n.t('createroom.023')} value={welcomeMessage} />}
           {rules && <SummaryRow icon="document-text" label="Kurallar" value="Tanımlandı" />}
-          {entryFee > 0 && <SummaryRow icon="diamond" label="Giriş" value={`${entryFee} SP`} />}
-          {donationsEnabled && <SummaryRow icon="heart" label="Bağış" value="Aktif" />}
-          {ageRestricted && <SummaryRow icon="warning" label="Yaş Sınırı" value="+18" />}
+          {entryFee > 0 && <SummaryRow icon="diamond" label={i18n.t('createroom.024')} value={`${entryFee} SP`} />}
+          {donationsEnabled && <SummaryRow icon="heart" label={i18n.t('createroom.025')} value="Aktif" />}
+          {ageRestricted && <SummaryRow icon="warning" label={i18n.t('createroom.026')} value="+18" />}
           {roomLanguage !== 'tr' && <SummaryRow icon="language" label="Dil" value={roomLanguage.toUpperCase()} />}
-          {slowModeSeconds > 0 && <SummaryRow icon="timer" label="Yavaş Mod" value={`${slowModeSeconds}s`} />}
+          {slowModeSeconds > 0 && <SummaryRow icon="timer" label={i18n.t('createroom.027')} value={`${slowModeSeconds}s`} />}
           {selectedTheme && <SummaryRow icon="color-palette" label="Tema" value={themeObj?.name || ''} />}
-          {musicLink.trim() !== '' && <SummaryRow icon="musical-notes" label="Müzik Linki" value="Ekli" />}
+          {musicLink.trim() !== '' && <SummaryRow icon="musical-notes" label={i18n.t('createroom.028')} value="Ekli" />}
           {backgroundImage && <SummaryRow icon="image" label="Arka Plan" value="Yüklendi" />}
         </View>
 
@@ -1243,9 +1241,7 @@ export default function CreateRoomScreen() {
             </View>
           )}
           {scheduledAt && (
-            <Text style={w.scheduleHint}>
-              ℹ️ Oda planlanan zamana kadar kapalı kalacak. "Odalarım" ekranından manuel başlatabilirsin.
-            </Text>
+            <Text style={w.scheduleHint}>{i18n.t('createroom.002')}</Text>
           )}
           {showDatePicker && (
             <DateTimePicker
@@ -1353,9 +1349,7 @@ export default function CreateRoomScreen() {
                 }}>
                   <Ionicons name="hourglass" size={44} color="#F59E0B" />
                 </View>
-                <Text style={{ fontSize: 22, fontWeight: '800', color: '#F1F5F9', marginBottom: 8, textAlign: 'center' }}>
-                  Günlük Oda Limitin Doldu
-                </Text>
+                <Text style={{ fontSize: 22, fontWeight: '800', color: '#F1F5F9', marginBottom: 8, textAlign: 'center' }}>{i18n.t('createroom.003')}</Text>
                 <Text style={{ fontSize: 14, color: '#94A3B8', textAlign: 'center', lineHeight: 20, marginBottom: 24 }}>
                   Bugün {limits.dailyRooms}/{limits.dailyRooms} oda açtın. Yarın sıfırlanacak — ya da üyeliğini yükselterek daha fazla oda aç.
                 </Text>

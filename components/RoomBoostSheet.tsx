@@ -29,7 +29,7 @@ export type RoomBoostTier = {
 };
 
 export const ROOM_BOOST_TIERS: RoomBoostTier[] = [
-  { id: 'quick',    label: 'Hızlı Boost',    sublabel: '1 saat üst sıra',  icon: 'flash',       durationHours: 1, cost: 50,  accent: '#FB923C' },
+  { id: 'quick',    label: i18n.t('roomboostsheet.001'),    sublabel: '1 saat üst sıra',  icon: 'flash',       durationHours: 1, cost: 50,  accent: '#FB923C' },
   { id: 'extended', label: 'Uzun Boost',     sublabel: '6 saat üst sıra',  icon: 'trending-up', durationHours: 6, cost: 200, accent: '#F59E0B', popular: true },
 ];
 

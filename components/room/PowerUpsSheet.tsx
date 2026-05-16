@@ -55,8 +55,8 @@ const POWERUPS: PowerUp[] = [
     iconColor: '#FBBF24',
     bgGradient: ['rgba(251,191,36,0.18)', 'rgba(251,191,36,0.04)'],
     borderColor: 'rgba(251,191,36,0.45)',
-    title: 'Süre Uzat',
-    subtitle: 'Odanın süresini +30 dk uzatır',
+    title: i18n.t('room.powerupssheet.001'),
+    subtitle: i18n.t('room.powerupssheet.002'),
     cost: 50,
     available: true,
     hostOnly: true,
@@ -72,8 +72,8 @@ const POWERUPS: PowerUp[] = [
     iconColor: '#A78BFA',
     bgGradient: ['rgba(167,139,250,0.18)', 'rgba(167,139,250,0.04)'],
     borderColor: 'rgba(167,139,250,0.45)',
-    title: 'Sahne Işığı',
-    subtitle: '10 dk avatarın etrafında glow',
+    title: i18n.t('room.powerupssheet.003'),
+    subtitle: i18n.t('room.powerupssheet.004'),
     cost: 30,
     available: true,
   },
@@ -159,7 +159,7 @@ export default function PowerUpsSheet({
 
   const handleUse = useCallback(async (pu: PowerUp) => {
     if (!pu.available) {
-      showToast({ title: 'Yakında', message: `"${pu.title}" çok yakında geliyor.`, type: 'info' });
+      showToast({ title: i18n.t('room.powerupssheet.005'), message: `"${pu.title}" çok yakında geliyor.`, type: 'info' });
       return;
     }
     if (currentSP < pu.cost) {
@@ -167,7 +167,7 @@ export default function PowerUpsSheet({
       return;
     }
     if (pu.hostOnly && !isHost) {
-      showToast({ title: 'Sadece host', message: 'Bu güçlendiriciyi sadece oda sahibi kullanabilir.', type: 'warning' });
+      showToast({ title: 'Sadece host', message: i18n.t('room.powerupssheet.006'), type: 'warning' });
       return;
     }
 
@@ -178,10 +178,10 @@ export default function PowerUpsSheet({
         if (error) throw error;
         const r = data as any;
         if (!r?.success) {
-          showToast({ title: 'Yapılamadı', message: r?.error || 'Tekrar dene.', type: 'error' });
+          showToast({ title: i18n.t('room.powerupssheet.007'), message: r?.error || 'Tekrar dene.', type: 'error' });
           return;
         }
-        showToast({ title: '+30 dk eklendi', message: 'Oda süresi uzatıldı.', type: 'success' });
+        showToast({ title: '+30 dk eklendi', message: i18n.t('room.powerupssheet.008'), type: 'success' });
         onRoomExtended?.(r.new_expires_at);
         onBalanceUpdated?.(r.new_balance);
         onClose();
@@ -207,10 +207,10 @@ export default function PowerUpsSheet({
         if (error) throw error;
         const r = data as any;
         if (!r?.success) {
-          showToast({ title: 'Yapılamadı', message: r?.error || 'Tekrar dene.', type: 'error' });
+          showToast({ title: i18n.t('room.powerupssheet.009'), message: r?.error || 'Tekrar dene.', type: 'error' });
           return;
         }
-        showToast({ title: '✨ Mesaj Parlat aktif', message: 'Sonraki 5 mesajın altın çerçeveli.', type: 'success' });
+        showToast({ title: '✨ Mesaj Parlat aktif', message: i18n.t('room.powerupssheet.010'), type: 'success' });
         onBalanceUpdated?.(r.new_balance);
         onClose();
       } catch (e: any) {
@@ -229,10 +229,10 @@ export default function PowerUpsSheet({
         if (error) throw error;
         const r = data as any;
         if (!r?.success) {
-          showToast({ title: 'Yapılamadı', message: r?.error || 'Tekrar dene.', type: 'error' });
+          showToast({ title: i18n.t('room.powerupssheet.011'), message: r?.error || 'Tekrar dene.', type: 'error' });
           return;
         }
-        showToast({ title: '🔦 Sahne Işığı açıldı', message: '10 dk boyunca avatarın parlak.', type: 'success' });
+        showToast({ title: i18n.t('room.powerupssheet.012'), message: i18n.t('room.powerupssheet.013'), type: 'success' });
         onBalanceUpdated?.(r.new_balance);
         onClose();
       } catch (e: any) {

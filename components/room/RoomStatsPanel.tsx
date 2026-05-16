@@ -77,13 +77,13 @@ export default function RoomStatsPanel({
   });
 
   const stats: StatItem[] = [
-    { icon: 'people', label: 'Mevcut', value: currentListeners, color: '#14B8A6', desc: 'Anlık katılımcı' },
-    { icon: 'person-add', label: 'Toplam', value: totalUniqueListeners, color: '#3B82F6', desc: 'Benzersiz katılımcı' },
-    { icon: 'trending-up', label: 'Zirve CCU', value: peakCCU, color: '#D4AF37', desc: 'En yüksek eşzamanlı' },
-    { icon: 'time', label: 'Ort. Kalma', value: `${avgStayMinutes}dk`, color: '#8B5CF6', desc: 'Ortalama süre' },
+    { icon: 'people', label: 'Mevcut', value: currentListeners, color: '#14B8A6', desc: i18n.t('room.roomstatspanel.001') },
+    { icon: 'person-add', label: 'Toplam', value: totalUniqueListeners, color: '#3B82F6', desc: i18n.t('room.roomstatspanel.002') },
+    { icon: 'trending-up', label: 'Zirve CCU', value: peakCCU, color: '#D4AF37', desc: i18n.t('room.roomstatspanel.003') },
+    { icon: 'time', label: 'Ort. Kalma', value: `${avgStayMinutes}dk`, color: '#8B5CF6', desc: i18n.t('room.roomstatspanel.004') },
     { icon: 'heart', label: 'Reaksiyonlar', value: totalReactions, color: '#EF4444', desc: 'Toplam emoji' },
-    { icon: 'timer', label: 'Süre', value: `${roomDurationMinutes}dk`, color: '#F59E0B', desc: 'Oda açık süresi' },
-    { icon: 'people-circle', label: 'Takipçi', value: followerCount, color: '#EC4899', desc: 'Oda takipçisi' },
+    { icon: 'timer', label: i18n.t('room.roomstatspanel.005'), value: `${roomDurationMinutes}dk`, color: '#F59E0B', desc: i18n.t('room.roomstatspanel.006') },
+    { icon: 'people-circle', label: i18n.t('room.roomstatspanel.007'), value: followerCount, color: '#EC4899', desc: i18n.t('room.roomstatspanel.008') },
   ];
 
   return (

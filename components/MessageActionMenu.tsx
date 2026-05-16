@@ -16,6 +16,7 @@
  */
 
 import React, { useEffect, useRef } from 'react';
+import { i18n } from '../services/i18n';
 import { View, Text, StyleSheet, Pressable, Animated, Modal, Easing, PanResponder } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
@@ -112,11 +113,11 @@ export default function MessageActionMenu({
 
   const actions: MessageAction[] = [];
   if (onReply) actions.push({
-    id: 'reply', label: 'Yanıtla', icon: 'arrow-undo-outline',
+    id: 'reply', label: i18n.t('messageactionmenu.001'), icon: 'arrow-undo-outline',
     onPress: () => { onReply(message); onClose(); },
   });
   if (onForward) actions.push({
-    id: 'forward', label: 'İlet', icon: 'arrow-redo-outline',
+    id: 'forward', label: i18n.t('messageactionmenu.002'), icon: 'arrow-redo-outline',
     onPress: () => { onForward(message); onClose(); },
   });
   if (onCopy && isText && message.content) actions.push({
@@ -130,11 +131,11 @@ export default function MessageActionMenu({
     onPress: () => { onSave(message); onClose(); },
   });
   if (canEdit && onEdit) actions.push({
-    id: 'edit', label: 'Düzenle', icon: 'create-outline',
+    id: 'edit', label: i18n.t('messageactionmenu.003'), icon: 'create-outline',
     onPress: () => { onEdit(message); onClose(); },
   });
   if (canDeleteForEveryone && onDeleteForEveryone) actions.push({
-    id: 'delete-everyone', label: 'Herkes İçin Sil',
+    id: 'delete-everyone', label: i18n.t('messageactionmenu.004'),
     icon: 'trash-outline', destructive: true,
     onPress: () => { onDeleteForEveryone(message); onClose(); },
   });

@@ -148,9 +148,9 @@ export default function HostAccessPanel({ visible, onClose, roomId, roomType, ho
     try {
       await ModerationService.unbanFromRoom(roomId, ban.user_id, hostId);
       setBannedUsers(prev => prev.filter(b => b.id !== ban.id));
-      showToast({ title: '✅ Ban Kaldırıldı', message: `${ban.user?.display_name || 'Kullanıcı'} artık odaya girebilir.`, type: 'success' });
+      showToast({ title: i18n.t('room.hostaccesspanel.001'), message: `${ban.user?.display_name || 'Kullanıcı'} artık odaya girebilir.`, type: 'success' });
     } catch {
-      showToast({ title: 'Ban Kaldırılamadı', message: `${ban.user?.display_name || 'Kullanıcı'} banı kaldırılamadı.`, type: 'error' });
+      showToast({ title: i18n.t('room.hostaccesspanel.002'), message: `${ban.user?.display_name || 'Kullanıcı'} banı kaldırılamadı.`, type: 'error' });
     } finally {
       setProcessingIds(prev => { const n = new Set(prev); n.delete(ban.id); return n; });
     }
@@ -173,10 +173,10 @@ export default function HostAccessPanel({ visible, onClose, roomId, roomType, ho
     try {
       const result = await RoomAccessService.inviteUser(roomId, user.id, hostId);
       if (result.success) {
-        showToast({ title: '📨 Davet Gönderildi', message: `${user.display_name} odaya davet edildi.`, type: 'success' });
+        showToast({ title: i18n.t('room.hostaccesspanel.003'), message: `${user.display_name} odaya davet edildi.`, type: 'success' });
         setSearchResults(prev => prev.filter(u => u.id !== user.id));
       } else {
-        showToast({ title: 'Davet Gönderilemedi', message: result.error || `${user.display_name} davet edilemedi.`, type: 'error' });
+        showToast({ title: i18n.t('room.hostaccesspanel.004'), message: result.error || `${user.display_name} davet edilemedi.`, type: 'error' });
       }
     } catch {} finally {
       setProcessingIds(prev => { const n = new Set(prev); n.delete(user.id); return n; });
@@ -185,8 +185,8 @@ export default function HostAccessPanel({ visible, onClose, roomId, roomType, ho
 
   // Tab tanımları — 'invite' KALDIRILDI (duplikasyon; PlusMenu > Davet akışı tek yer).
   const tabs = [
-    ...((roomType === 'closed' || roomType === 'invite') ? [{ id: 'requests' as const, label: 'İstekler', icon: 'hourglass-outline' as const, count: requests.length }] : []),
-    { id: 'bans' as const, label: 'Banlılar', icon: 'ban-outline' as const, count: bannedUsers.length },
+    ...((roomType === 'closed' || roomType === 'invite') ? [{ id: 'requests' as const, label: i18n.t('room.hostaccesspanel.005'), icon: 'hourglass-outline' as const, count: requests.length }] : []),
+    { id: 'bans' as const, label: i18n.t('room.hostaccesspanel.006'), icon: 'ban-outline' as const, count: bannedUsers.length },
   ];
 
   return (

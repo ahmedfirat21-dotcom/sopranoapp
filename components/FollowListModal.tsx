@@ -60,9 +60,9 @@ interface Props {
 }
 
 const MODE_META: Record<ListMode, { title: string; emptyText: string; icon: keyof typeof Ionicons.glyphMap }> = {
-  friends:   { title: 'ARKADAŞLAR', emptyText: 'Henüz arkadaş yok', icon: 'people' },
-  followers: { title: 'TAKİPÇİLER', emptyText: 'Henüz takipçi yok', icon: 'person-add' },
-  following: { title: 'TAKİP EDİLENLER', emptyText: 'Kimseyi takip etmiyor', icon: 'person' },
+  friends:   { title: i18n.t('followlistmodal.001'), emptyText: 'Henüz arkadaş yok', icon: 'people' },
+  followers: { title: i18n.t('followlistmodal.002'), emptyText: 'Henüz takipçi yok', icon: 'person-add' },
+  following: { title: i18n.t('followlistmodal.003'), emptyText: 'Kimseyi takip etmiyor', icon: 'person' },
 };
 
 export default function FollowListModal({
@@ -222,7 +222,7 @@ export default function FollowListModal({
   const handleRemoveFriend = (targetId: string, name: string) => {
     setCAlert({
       visible: true,
-      title: 'Arkadaşlıktan Çıkar',
+      title: i18n.t('followlistmodal.004'),
       message: `${name} ile arkadaşlığın sona ersin mi?`,
       type: 'warning',
       buttons: [
@@ -263,7 +263,7 @@ export default function FollowListModal({
   const handleUnfollow = (targetId: string, name: string) => {
     setCAlert({
       visible: true,
-      title: 'Takipten Çık',
+      title: i18n.t('followlistmodal.005'),
       message: `${name} kullanıcısını takipten çıkmak istiyor musun?`,
       type: 'warning',
       buttons: [

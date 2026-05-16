@@ -484,7 +484,7 @@ export default function MessagesScreen() {
       if (__DEV__) console.warn('Mesajlar yüklenemedi:', err);
       const msg = err?.message || 'İnternet bağlantını kontrol et.';
       setLoadError(msg);
-      showToast({ title: 'Mesajlar yüklenemedi', message: msg, type: 'error' });
+      showToast({ title: i18n.t('tabs.messages.002'), message: msg, type: 'error' });
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -833,7 +833,7 @@ export default function MessagesScreen() {
       );
       router.push(`/call/${partnerId}?callId=${callId}&callType=audio&isIncoming=false&receiverOnline=${receiverIsOnline}` as any);
     } catch (err: any) {
-      showToast({ title: 'Arama Hatası', message: err?.message || 'Arama başlatılamadı.', type: 'error' });
+      showToast({ title: i18n.t('tabs.messages.003'), message: err?.message || 'Arama başlatılamadı.', type: 'error' });
     }
   }, [firebaseUser, profile, router]);
 
@@ -860,7 +860,7 @@ export default function MessagesScreen() {
       // Rollback
       setConversations(prev => prev.map(c =>
         c.partner_id === partnerId ? { ...c, is_pinned: current.is_pinned } : c));
-      showToast({ title: 'Sabitleme Güncellenmedi', message: 'Sohbet sabitleme durumu değişemedi.', type: 'error' });
+      showToast({ title: i18n.t('tabs.messages.004'), message: i18n.t('tabs.messages.005'), type: 'error' });
     }
   }, [conversations]);
 
@@ -881,7 +881,7 @@ export default function MessagesScreen() {
     } catch {
       setConversations(prev => prev.map(c =>
         c.partner_id === partnerId ? { ...c, is_archived: current.is_archived } : c));
-      showToast({ title: 'Arşiv Güncellenmedi', message: 'Sohbet arşiv durumu değişemedi.', type: 'error' });
+      showToast({ title: i18n.t('tabs.messages.006'), message: i18n.t('tabs.messages.007'), type: 'error' });
     }
   }, [conversations]);
 
@@ -902,7 +902,7 @@ export default function MessagesScreen() {
     } catch {
       setConversations(prev => prev.map(c =>
         c.partner_id === partnerId ? { ...c, is_muted: current.is_muted } : c));
-      showToast({ title: 'Sessize Alma Başarısız', message: 'Tekrar dene.', type: 'error' });
+      showToast({ title: i18n.t('tabs.messages.008'), message: 'Tekrar dene.', type: 'error' });
     }
   }, [conversations, firebaseUser]);
 
@@ -912,7 +912,7 @@ export default function MessagesScreen() {
     setPendingRequests(prev => prev.filter((r: any) => r.sender_id !== senderId));
     try {
       await MessageService.rejectMessageRequest(firebaseUser.uid, senderId);
-      showToast({ title: '🚫 İstek reddedildi', message: `${senderName} için reddedildi.`, type: 'info' });
+      showToast({ title: i18n.t('tabs.messages.009'), message: `${senderName} için reddedildi.`, type: 'info' });
       refreshBadges();
     } catch {
       showToast({ title: 'Reddedilemedi', message: 'Tekrar dene.', type: 'error' });
@@ -1136,7 +1136,7 @@ export default function MessagesScreen() {
           style={[styles.archiveChip, styles.requestChip, { flex: 1, marginHorizontal: 0 }, pendingRequests.length === 0 && !showRequests && { opacity: 0.5 }]}
           onPress={() => {
             if (pendingRequests.length === 0 && !showRequests) {
-              showToast({ title: 'İstek yok', message: 'Bekleyen mesaj isteğin yok.', type: 'info' });
+              showToast({ title: i18n.t('tabs.messages.010'), message: i18n.t('tabs.messages.011'), type: 'info' });
               return;
             }
             setShowRequests(v => !v);
@@ -1158,7 +1158,7 @@ export default function MessagesScreen() {
           style={[styles.archiveChip, { flex: 1, marginHorizontal: 0 }, archivedCount === 0 && !showArchived && { opacity: 0.5 }]}
           onPress={() => {
             if (archivedCount === 0 && !showArchived) {
-              showToast({ title: 'Arşiv boş', message: 'Henüz arşivlenmiş sohbetin yok.', type: 'info' });
+              showToast({ title: i18n.t('tabs.messages.012'), message: i18n.t('tabs.messages.013'), type: 'info' });
               return;
             }
             setShowArchived(v => !v);
@@ -1213,9 +1213,7 @@ export default function MessagesScreen() {
                         "{firstMsg}"
                       </Text>
                     ) : (
-                      <Text style={{ fontSize: 11, color: '#94A3B8', marginTop: 2 }} numberOfLines={1}>
-                        Mesajlaşmak istiyor — dokun ve cevap ver
-                      </Text>
+                      <Text style={{ fontSize: 11, color: '#94A3B8', marginTop: 2 }} numberOfLines={1}>{i18n.t('tabs.messages.001')}</Text>
                     )}
                   </Pressable>
                   {/* ★ v109: Tek-tık reddet butonu */}
@@ -1340,7 +1338,7 @@ export default function MessagesScreen() {
               setCAlert({
                 visible: true,
                 title: `${selectedIds.size} sohbet silinecek`,
-                message: 'Seçili sohbetler kalıcı olarak silinecek.',
+                message: i18n.t('tabs.messages.014'),
                 type: 'warning',
                 buttons: [
                   {
@@ -1359,7 +1357,7 @@ export default function MessagesScreen() {
                       setSelectionMode(false);
                       refreshBadges();
                       if (failed > 0) {
-                        showToast({ title: 'Kısmen silindi', message: `${failed} sohbet silinemedi, tekrar dene.`, type: 'warning' });
+                        showToast({ title: i18n.t('tabs.messages.015'), message: `${failed} sohbet silinemedi, tekrar dene.`, type: 'warning' });
                       }
                     },
                   },

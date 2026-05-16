@@ -453,7 +453,7 @@ export default function CallScreen() {
     } catch (err: any) {
       if (__DEV__) console.error('[Call] LiveKit bağlantı hatası:', err);
       if (mountedRef.current) {
-        showToast({ title: 'Bağlantı Hatası', message: 'Arama bağlantısı kurulamadı.', type: 'error' });
+        showToast({ title: i18n.t('call.id.001'), message: i18n.t('call.id.002'), type: 'error' });
       }
     }
   }, [firebaseUser, callId, callType, tier]);
@@ -728,7 +728,7 @@ export default function CallScreen() {
                     );
                     router.replace(`/call/${id}?callId=${newCallId}&callType=audio&isIncoming=false&receiverOnline=${receiverIsOnline}` as any);
                   } catch (err: any) {
-                    showToast({ title: 'Arama Hatası', message: err.message || 'Arama başlatılamadı', type: 'error' });
+                    showToast({ title: i18n.t('call.id.003'), message: err.message || 'Arama başlatılamadı', type: 'error' });
                   }
                 }}
               >

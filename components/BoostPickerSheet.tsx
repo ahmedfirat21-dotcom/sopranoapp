@@ -30,7 +30,7 @@ export type BoostTier = {
 
 export const BOOST_TIERS: BoostTier[] = [
   {
-    id: 'quick', label: 'Hızlı Boost', icon: 'flash',
+    id: 'quick', label: i18n.t('boostpickersheet.001'), icon: 'flash',
     duration: 1, cost: 25, accent: '#60A5FA',
   },
   {

@@ -141,7 +141,7 @@ export default function SymbolGiftSheet({ visible, onClose, senderId, recipientI
     setSending(false);
     if (error || !data?.success) {
       showToast({
-        title: 'Gönderilemedi',
+        title: i18n.t('profile.symbolgiftsheet.002'),
         message: data?.error || error?.message || 'Bağlantı hatası',
         type: 'error',
       });
@@ -222,9 +222,7 @@ export default function SymbolGiftSheet({ visible, onClose, senderId, recipientI
                   );
                 })}
               </View>
-              <Text style={s.footnote}>
-                Her gönderimde SP'n düşer · Alıcı %50 kazanır
-              </Text>
+              <Text style={s.footnote}>{i18n.t('profile.symbolgiftsheet.001')}</Text>
             </>
           )}
         </Animated.View>

@@ -610,7 +610,7 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
         else if (r.error) showToast({ title: r.error, type: 'warning' });
       }
     } catch {
-      showToast({ title: 'Hata oluştu', type: 'error' });
+      showToast({ title: i18n.t('room.inroomuserprofile.002'), type: 'error' });
     } finally {
       setFollowLoading(false);
     }
@@ -652,7 +652,7 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
       // Kullanıcı vazgeçti veya sistem reddetti — sessizce yutsuz, link kopyala fallback
       try {
         await Clipboard.setStringAsync(url);
-        showToast({ title: 'Profil linki kopyalandı', type: 'success' });
+        showToast({ title: i18n.t('room.inroomuserprofile.003'), type: 'success' });
       } catch {}
     }
   }, [userId, userProfile]);
@@ -663,9 +663,9 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
     const url = `https://sopranochat.com/user/${userId}`;
     try {
       await Clipboard.setStringAsync(url);
-      showToast({ title: 'Profil linki kopyalandı', type: 'success' });
+      showToast({ title: i18n.t('room.inroomuserprofile.004'), type: 'success' });
     } catch {
-      showToast({ title: 'Kopyalanamadı', type: 'error' });
+      showToast({ title: i18n.t('room.inroomuserprofile.005'), type: 'error' });
     }
   }, [userId]);
 
@@ -677,13 +677,13 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
     try {
       await RoomService.sendRoomInvite(myLiveRoom.id, currentUserId, [userId]);
       showToast({
-        title: 'Davet gönderildi',
+        title: i18n.t('room.inroomuserprofile.006'),
         message: `"${myLiveRoom.name}" odasına davet edildi`,
         type: 'success',
       });
     } catch (err: any) {
       showToast({
-        title: 'Davet gönderilemedi',
+        title: i18n.t('room.inroomuserprofile.007'),
         message: err?.message || 'Daha sonra tekrar dene',
         type: 'error',
       });
@@ -720,7 +720,7 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                 await FriendshipService.unfollow(currentUserId, userId).catch(() => {});
                 setFollowStatus(null);
               }
-              showToast({ title: 'Kullanıcı engellendi', type: 'info' });
+              showToast({ title: i18n.t('room.inroomuserprofile.008'), type: 'info' });
             } catch {}
           },
         },
@@ -846,9 +846,7 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
             {isUserBlocked && (
               <View style={sty.blockedBanner}>
                 <Ionicons name="ban" size={16} color="#EF4444" />
-                <Text style={sty.blockedBannerText}>
-                  Bu kullanıcıyı engelledin. Profil içeriği gizli.
-                </Text>
+                <Text style={sty.blockedBannerText}>{i18n.t('room.inroomuserprofile.001')}</Text>
               </View>
             )}
 
@@ -1162,16 +1160,16 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                   const primary = ma?.onPromoteToStage
                     ? { fn: ma.onPromoteToStage, icon: 'arrow-up-circle' as const, label: 'Sahneye Davet', color: MOD }
                     : ma?.onRemoveFromStage
-                    ? { fn: ma.onRemoveFromStage, icon: 'arrow-down-circle' as const, label: 'Sahneden İndir', color: MOD }
+                    ? { fn: ma.onRemoveFromStage, icon: 'arrow-down-circle' as const, label: i18n.t('room.inroomuserprofile.009'), color: MOD }
                     : ma?.onSelfPromote
                     ? { fn: ma.onSelfPromote, icon: 'arrow-up-circle' as const, label: i18n.t('profile.stage_promote_self'), color: MOD }
                     : ma?.onSelfDemote
-                    ? { fn: ma.onSelfDemote, icon: 'arrow-down-circle-outline' as const, label: 'Sahneden İn', color: DANGER }
+                    ? { fn: ma.onSelfDemote, icon: 'arrow-down-circle-outline' as const, label: i18n.t('room.inroomuserprofile.010'), color: DANGER }
                     : null;
 
                   // Mute toggle: sadece oda içinde
                   const muteToggle = ma?.isMuted && ma?.onUnmute
-                    ? { fn: ma.onUnmute, icon: 'volume-high' as const, label: 'Sesi Aç', color: MOD }
+                    ? { fn: ma.onUnmute, icon: 'volume-high' as const, label: i18n.t('room.inroomuserprofile.011'), color: MOD }
                     : ma?.onMute
                     ? { fn: ma.onMute, icon: 'volume-mute' as const, label: 'Sustur', color: MOD }
                     : null;
@@ -1197,9 +1195,9 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                   // Yaptırım — kick/ban sadece oda içinde, RAPOR/ENGELLE HER ZAMAN
                   //   ★ v110.5.4: keepSheet=true → Rapor/Engelle modallari sheet'in ÜSTÜNE açılır
                   //     (sheet'i kapatınca ReportModal unmount oluyordu, fix bu).
-                  if (ma?.onKick) enforcementItems.push({ fn: ma.onKick, icon: 'exit', label: 'Odadan Çıkar', color: DANGER, danger: true });
-                  if (ma?.onBanTemp) enforcementItems.push({ fn: ma.onBanTemp, icon: 'timer', label: 'Geçici Ban', color: DANGER, danger: true });
-                  if (ma?.onBanPerm) enforcementItems.push({ fn: ma.onBanPerm, icon: 'ban', label: 'Kalıcı Ban', color: DANGER, danger: true });
+                  if (ma?.onKick) enforcementItems.push({ fn: ma.onKick, icon: 'exit', label: i18n.t('room.inroomuserprofile.012'), color: DANGER, danger: true });
+                  if (ma?.onBanTemp) enforcementItems.push({ fn: ma.onBanTemp, icon: 'timer', label: i18n.t('room.inroomuserprofile.013'), color: DANGER, danger: true });
+                  if (ma?.onBanPerm) enforcementItems.push({ fn: ma.onBanPerm, icon: 'ban', label: i18n.t('room.inroomuserprofile.014'), color: DANGER, danger: true });
                   enforcementItems.push({ fn: () => setShowReportModal(true), icon: 'flag-outline', label: i18n.t('profile.report'), color: DANGER, danger: true, keepSheet: true });
                   enforcementItems.push({ fn: handleBlock, icon: isUserBlocked ? 'checkmark-circle' : 'ban', label: isUserBlocked ? i18n.t('profile.unblock_action') : i18n.t('profile.block_action'), color: DANGER, danger: true, keepSheet: true });
 

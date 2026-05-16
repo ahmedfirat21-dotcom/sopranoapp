@@ -80,7 +80,7 @@ export default function FeaturedBadgesPicker({ visible, userId, onSaved, onClose
       await FeaturedBadgesService.setFeatured(userId, selected);
       onSaved(selected);
       onClose();
-      showToast({ title: 'Öne çıkan rozetler güncellendi', type: 'success' });
+      showToast({ title: i18n.t('profile.featuredbadgespicker.001'), type: 'success' });
     } catch (e: any) {
       showToast({ title: 'Kaydedilemedi', message: e?.message || '', type: 'error' });
     } finally {

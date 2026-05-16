@@ -42,14 +42,14 @@ type ReportModalProps = {
 
 const REASONS: { key: ReportReason; label: string; icon: string }[] = [
   { key: 'spam', label: 'Spam', icon: 'megaphone-outline' },
-  { key: 'harassment', label: 'Taciz / Zorbalık', icon: 'sad-outline' },
-  { key: 'hate_speech', label: 'Nefret Söylemi', icon: 'flame-outline' },
-  { key: 'inappropriate_content', label: 'Uygunsuz İçerik', icon: 'eye-off-outline' },
-  { key: 'impersonation', label: 'Kimliğe Bürünme', icon: 'person-outline' },
+  { key: 'harassment', label: i18n.t('reportmodal.001'), icon: 'sad-outline' },
+  { key: 'hate_speech', label: i18n.t('reportmodal.002'), icon: 'flame-outline' },
+  { key: 'inappropriate_content', label: i18n.t('reportmodal.003'), icon: 'eye-off-outline' },
+  { key: 'impersonation', label: i18n.t('reportmodal.004'), icon: 'person-outline' },
   { key: 'self_harm', label: 'Kendine Zarar Verme', icon: 'heart-dislike-outline' },
-  { key: 'violence', label: 'Şiddet', icon: 'warning-outline' },
-  { key: 'underage', label: 'Yaş Altı Kullanıcı', icon: 'alert-circle-outline' },
-  { key: 'other', label: 'Diğer', icon: 'ellipsis-horizontal-outline' },
+  { key: 'violence', label: i18n.t('reportmodal.005'), icon: 'warning-outline' },
+  { key: 'underage', label: i18n.t('reportmodal.006'), icon: 'alert-circle-outline' },
+  { key: 'other', label: i18n.t('reportmodal.007'), icon: 'ellipsis-horizontal-outline' },
 ];
 
 export function ReportModal({ visible, onClose, reporterId, target }: ReportModalProps) {
@@ -153,7 +153,7 @@ export function ReportModal({ visible, onClose, reporterId, target }: ReportModa
 
   const handleSubmit = async () => {
     if (!selectedReason) {
-      showToast({ title: 'Bir sebep seçin', type: 'info' });
+      showToast({ title: i18n.t('reportmodal.008'), type: 'info' });
       return;
     }
     setSending(true);
@@ -164,12 +164,12 @@ export function ReportModal({ visible, onClose, reporterId, target }: ReportModa
         case 'post': await ModerationService.reportPost(reporterId, target.id, selectedReason, description); break;
         case 'message': await ModerationService.reportMessage(reporterId, target.id, selectedReason, description); break;
       }
-      showToast({ title: 'Raporun alındı', message: 'En kısa sürede incelenecektir.', type: 'success' });
+      showToast({ title: i18n.t('reportmodal.009'), message: i18n.t('reportmodal.010'), type: 'success' });
       setSelectedReason(null);
       setDescription('');
       handleClose();
     } catch (err: any) {
-      showToast({ title: 'Rapor Gönderilemedi', message: err.message || 'Şikayetin iletilemedi.', type: 'error' });
+      showToast({ title: i18n.t('reportmodal.011'), message: err.message || 'Şikayetin iletilemedi.', type: 'error' });
     } finally {
       setSending(false);
     }

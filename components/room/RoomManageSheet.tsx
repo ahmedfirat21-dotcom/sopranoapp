@@ -64,7 +64,7 @@ const TEMP_HOST_ALLOWED_TABS: TabId[] = ['moderation', 'followers'];
 // Tema tanımları â€” RoomSettingsSheet ile birebir aynı
 const ROOM_THEMES: Record<string, { name: string; colors: [string, string] }> = {
   ocean: { name: 'Okyanus', colors: ['#0E4D6F', '#083344'] },
-  sunset: { name: 'Gün Batımı', colors: ['#7F1D1D', '#4C0519'] },
+  sunset: { name: i18n.t('room.roommanagesheet.003'), colors: ['#7F1D1D', '#4C0519'] },
   forest: { name: 'Orman', colors: ['#14532D', '#052E16'] },
   galaxy: { name: 'Galaksi', colors: ['#312E81', '#1E1B4B'] },
   aurora: { name: 'Aurora', colors: ['#134E4A', '#042F2E'] },
@@ -72,7 +72,7 @@ const ROOM_THEMES: Record<string, { name: string; colors: [string, string] }> = 
   cyber: { name: 'Cyber', colors: ['#1E3A8A', '#172554'] },
   volcano: { name: 'Volkan', colors: ['#7C2D12', '#431407'] },
   midnight: { name: 'Gece', colors: ['#0C0A3E', '#1B1464'] },
-  rose: { name: 'Gül', colors: ['#9F1239', '#881337'] },
+  rose: { name: i18n.t('room.roommanagesheet.004'), colors: ['#9F1239', '#881337'] },
   arctic: { name: 'Kutup', colors: ['#164E63', '#0E7490'] },
   amber: { name: 'Kehribar', colors: ['#78350F', '#92400E'] },
   slate: { name: 'Arduvaz', colors: ['#1E293B', '#334155'] },
@@ -323,7 +323,7 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
       await RoomService.updateSettings(room.id, hostId, { room_settings: { [field]: value } });
       // â˜… Oda-içi kullanıcılara anında yansıt
       broadcastSettingsChange({ room_settings: { [field]: value } });
-    } catch (e: any) { showToast({ title: 'Ayar Güncellenemedi', message: e.message || 'Sunucuya ulaşılamadı.', type: 'error' }); }
+    } catch (e: any) { showToast({ title: i18n.t('room.roommanagesheet.005'), message: e.message || 'Sunucuya ulaşılamadı.', type: 'error' }); }
   }, [room, hostId, broadcastSettingsChange]);
 
   // ★ 2026-04-25: Unified audience değiştirici — type + followers_only + password
@@ -335,11 +335,11 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
     if (newMode === 'password') {
       const pwTrim = (passwordValue ?? roomPassword ?? '').trim();
       if (pwTrim.length < 1) {
-        showToast({ title: '🔐 Şifre Gerekli', message: 'Şifreli oda için en az 1 karakter şifre yaz.', type: 'warning' });
+        showToast({ title: i18n.t('room.roommanagesheet.006'), message: i18n.t('room.roommanagesheet.007'), type: 'warning' });
         return;
       }
       if (pwTrim.length > 0 && pwTrim.length < 3) {
-        showToast({ title: '🔐 Çok Kısa', message: 'Şifre en az 3 karakter olmalı.', type: 'warning' });
+        showToast({ title: i18n.t('room.roommanagesheet.008'), message: i18n.t('room.roommanagesheet.009'), type: 'warning' });
         return;
       }
     }
@@ -359,7 +359,7 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
       try {
         await RoomService.updateSettings(room.id, hostId, { room_settings: { slow_mode_seconds: 5 } as any });
         broadcastSettingsChange({ room_settings: { slow_mode_seconds: 5 } });
-        showToast({ title: '⏱️ Yavaş Mod Önerildi', message: 'Şifreli odada 5sn yavaş mod açıldı (spam koruması). Aşağıdan kapatabilirsin.', type: 'info' });
+        showToast({ title: i18n.t('room.roommanagesheet.010'), message: i18n.t('room.roommanagesheet.011'), type: 'info' });
       } catch { /* slowMode UI'sı zaten güncellendi, başarısızsa next save'de düzelir */ }
     }
     try {
@@ -391,7 +391,7 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
         followers_only: (room.room_settings as any)?.followers_only,
         has_password: !!(room.room_settings as any)?.room_password,
       }));
-      showToast({ title: 'Erişim Değiştirilemedi', message: e.message || 'Sunucuya ulaşılamadı.', type: 'error' });
+      showToast({ title: i18n.t('room.roommanagesheet.012'), message: e.message || 'Sunucuya ulaşılamadı.', type: 'error' });
     }
   }, [room, hostId, roomPassword, slowMode, broadcastSettingsChange]);
 
@@ -400,8 +400,8 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
     try {
       await ModerationService.editRoomName(room.id, roomName.trim());
       broadcastSettingsChange({ name: roomName.trim() });
-      showToast({ title: '✏️ Oda Adı Güncellendi', type: 'success' });
-    } catch { showToast({ title: 'Ad Değiştirilemedi', message: 'Oda adı güncellenemedi.', type: 'error' }); setRoomName(room.name || ''); }
+      showToast({ title: i18n.t('room.roommanagesheet.013'), type: 'success' });
+    } catch { showToast({ title: i18n.t('room.roommanagesheet.014'), message: i18n.t('room.roommanagesheet.015'), type: 'error' }); setRoomName(room.name || ''); }
     setEditingName(false);
   }, [room, roomName, broadcastSettingsChange]);
 
@@ -455,9 +455,9 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
       const r = await RecordingService.startEgress(room.id, hostId);
       if (r.success && r.egressId) {
         setRecordingId(r.egressId);
-        showToast({ title: '🔴 Kayıt Başladı', message: 'Tüm katılımcılar bildirildi.', type: 'success' });
+        showToast({ title: i18n.t('room.roommanagesheet.016'), message: i18n.t('room.roommanagesheet.017'), type: 'success' });
       } else {
-        showToast({ title: 'Kayıt başlatılamadı', message: r.error || '', type: 'error' });
+        showToast({ title: i18n.t('room.roommanagesheet.018'), message: r.error || '', type: 'error' });
       }
     } finally {
       setRecordingLoading(false);
@@ -473,9 +473,9 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
       const r = await RecordingService.stopEgress(room.id, hostId, recordingId);
       if (r.success) {
         setRecordingId(null);
-        showToast({ title: '⏹ Kayıt Durduruldu', message: 'Kayıt birkaç dakika içinde işlenip listeye eklenir.', type: 'success' });
+        showToast({ title: i18n.t('room.roommanagesheet.019'), message: i18n.t('room.roommanagesheet.020'), type: 'success' });
       } else {
-        showToast({ title: 'Kayıt durdurulamadı', message: r.error || '', type: 'error' });
+        showToast({ title: i18n.t('room.roommanagesheet.021'), message: r.error || '', type: 'error' });
       }
     } finally {
       setRecordingLoading(false);
@@ -493,10 +493,10 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
     // Başlatma — KVKK consent dialog
     setRecAlert({
       visible: true,
-      title: '🔴 Oda Kaydı Başlat',
+      title: i18n.t('room.roommanagesheet.022'),
       type: 'warning',
       message:
-        'Bu odadaki tüm konuşmaların ses kaydı alınacak.\n\n' +
+        i18n.t('room.roommanagesheet.023') +
         '⚠️ KVKK gereği:\n' +
         '• Konuşmacıların açık rızası senin sorumluluğundadır.\n' +
         '• Kayıt başlayınca tüm katılımcılar görsel olarak bilgilendirilir.\n' +
@@ -518,10 +518,10 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
     if (!room || !hostId) return;
     try {
       await RoomService.freezeRoom(room.id, hostId);
-      showToast({ title: 'Oda Donduruldu', message: 'Odalarım sekmesinden tekrar aktifleştirebilirsin.', type: 'success' });
+      showToast({ title: 'Oda Donduruldu', message: i18n.t('room.roommanagesheet.024'), type: 'success' });
       onDeleted(); // refresh list
       onClose();
-    } catch (e: any) { showToast({ title: 'Ayar Güncellenemedi', message: e.message || 'Sunucuya ulaşılamadı.', type: 'error' }); }
+    } catch (e: any) { showToast({ title: i18n.t('room.roommanagesheet.025'), message: e.message || 'Sunucuya ulaşılamadı.', type: 'error' }); }
   }, [room, hostId, onDeleted, onClose]);
 
   const handleBgImage = useCallback(async (imageUri: string | null) => {
@@ -530,7 +530,7 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
       if (imageUri === 'default') {
         const ImagePicker = require('expo-image-picker');
         const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (!perm.granted) { showToast({ title: 'İzin Gerekli', type: 'warning' }); return; }
+        if (!perm.granted) { showToast({ title: i18n.t('room.roommanagesheet.026'), type: 'warning' }); return; }
         // ★ 2026-04-21: Oda arka planı DİKEY (9:16) — oda UI dikey
         const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: 'images', allowsEditing: true, aspect: [9, 16], quality: 0.7 });
         if (result.canceled) return;
@@ -539,13 +539,13 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
         const url = await StorageService.uploadFile('post-images', fileName, result.assets[0].uri);
         await RoomService.updateSettings(room.id, hostId, { room_settings: { room_image_url: url } });
         setBackgroundImage(url);
-        showToast({ title: 'Arka Plan Güncellendi', type: 'success' });
+        showToast({ title: i18n.t('room.roommanagesheet.027'), type: 'success' });
       } else {
         await RoomService.updateSettings(room.id, hostId, { room_settings: { room_image_url: null } });
         setBackgroundImage(null);
-        showToast({ title: 'Arka Plan Kaldırıldı', type: 'success' });
+        showToast({ title: i18n.t('room.roommanagesheet.028'), type: 'success' });
       }
-    } catch (e: any) { showToast({ title: 'Ayar Güncellenemedi', message: e.message || 'Sunucuya ulaşılamadı.', type: 'error' }); }
+    } catch (e: any) { showToast({ title: i18n.t('room.roommanagesheet.029'), message: e.message || 'Sunucuya ulaşılamadı.', type: 'error' }); }
   }, [room, hostId]);
 
   const handleCoverImage = useCallback(async (imageUri: string | null) => {
@@ -560,13 +560,13 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
         const url = await StorageService.uploadFile('post-images', fileName, result.assets[0].uri);
         await RoomService.updateSettings(room.id, hostId, { room_settings: { card_image_url: url } });
         setCoverImage(url);
-        showToast({ title: 'Banner Yüklendi', type: 'success' });
+        showToast({ title: i18n.t('room.roommanagesheet.030'), type: 'success' });
       } else {
         await RoomService.updateSettings(room.id, hostId, { room_settings: { card_image_url: null } });
         setCoverImage(null);
-        showToast({ title: 'Banner Kaldırıldı', type: 'success' });
+        showToast({ title: i18n.t('room.roommanagesheet.031'), type: 'success' });
       }
-    } catch (e: any) { showToast({ title: 'Ayar Güncellenemedi', message: e.message || 'Sunucuya ulaşılamadı.', type: 'error' }); }
+    } catch (e: any) { showToast({ title: i18n.t('room.roommanagesheet.032'), message: e.message || 'Sunucuya ulaşılamadı.', type: 'error' }); }
   }, [room, hostId]);
 
   if (!visible || !room) return null;
@@ -586,7 +586,7 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
           <Pressable onPress={() => { setEditingName(false); setRoomName(room.name || ''); }}><Ionicons name="close" size={14} color="#64748B" /></Pressable>
         </View>
       ) : (
-        <Row icon="create" bg="rgba(59,130,246,0.2)" label="Oda İsmi" desc={roomName} onPress={() => setEditingName(true)} right={<Ionicons name="pencil-outline" size={10} color="rgba(255,255,255,0.15)" />} />
+        <Row icon="create" bg="rgba(59,130,246,0.2)" label={i18n.t('room.roommanagesheet.044')} desc={roomName} onPress={() => setEditingName(true)} right={<Ionicons name="pencil-outline" size={10} color="rgba(255,255,255,0.15)" />} />
       )}
 
       {/* Hoş Geldin Mesajı â€” Free */}
@@ -598,7 +598,7 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
           <Pressable onPress={() => setEditingWelcome(false)}><Ionicons name="close" size={14} color="#64748B" /></Pressable>
         </View>
       ) : (
-        <Row icon="chatbubble-ellipses" bg="rgba(20,184,166,0.2)" label="Hoş Geldin Mesajı" desc={welcomeMsg || 'Ayarlanmadı'} onPress={() => setEditingWelcome(true)} right={<Ionicons name="pencil-outline" size={10} color="rgba(255,255,255,0.15)" />} />
+        <Row icon="chatbubble-ellipses" bg="rgba(20,184,166,0.2)" label={i18n.t('room.roommanagesheet.045')} desc={welcomeMsg || 'Ayarlanmadı'} onPress={() => setEditingWelcome(true)} right={<Ionicons name="pencil-outline" size={10} color="rgba(255,255,255,0.15)" />} />
       )}
 
       {/* Kurallar â€” Free */}
@@ -609,7 +609,7 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
           <Pressable onPress={() => setEditingRules(false)}><Ionicons name="close" size={14} color="#64748B" /></Pressable>
         </View>
       ) : (
-        <Row icon="document-text" bg="rgba(245,158,11,0.2)" label="Oda Kuralları" desc={rules || 'Ayarlanmadı'} onPress={() => setEditingRules(true)} right={<Ionicons name="pencil-outline" size={10} color="rgba(255,255,255,0.15)" />} />
+        <Row icon="document-text" bg="rgba(245,158,11,0.2)" label={i18n.t('room.roommanagesheet.046')} desc={rules || 'Ayarlanmadı'} onPress={() => setEditingRules(true)} right={<Ionicons name="pencil-outline" size={10} color="rgba(255,255,255,0.15)" />} />
       )}
 
       {/* ★ Faz 4.3 — Etiketler (max 3) */}
@@ -676,8 +676,8 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
       <Row
         icon="headset"
         bg="rgba(139,92,246,0.2)"
-        label="Kayıtları Dinle"
-        desc="Geçmiş oda kayıtlarını dinle"
+        label={i18n.t('room.roommanagesheet.047')}
+        desc={i18n.t('room.roommanagesheet.048')}
         onPress={() => setShowRecordingsSheet(true)}
         right={<Ionicons name="chevron-forward" size={10} color="rgba(255,255,255,0.15)" />}
       />
@@ -705,8 +705,8 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
                   key={opt.mode}
                   style={[p.pill, active && p.pillActive, (locked || blockedByLock) && { opacity: 0.45 }]}
                   onPress={() => {
-                    if (locked) { showToast({ title: 'Plus Üyelik Gerekli', message: opt.mode === 'invite' ? 'Davetli oda Plus üyelikle açılır.' : 'Sadece arkadaşlar modu Plus üyelikle açılır.', type: 'warning' }); return; }
-                    if (blockedByLock) { showToast({ title: '🔒 Oda Kilitli', message: 'Erişim modunu değiştirmek için önce kilidi kapat.', type: 'warning' }); return; }
+                    if (locked) { showToast({ title: i18n.t('room.roommanagesheet.033'), message: opt.mode === 'invite' ? 'Davetli oda Plus üyelikle açılır.' : 'Sadece arkadaşlar modu Plus üyelikle açılır.', type: 'warning' }); return; }
+                    if (blockedByLock) { showToast({ title: '🔒 Oda Kilitli', message: i18n.t('room.roommanagesheet.034'), type: 'warning' }); return; }
                     // ★ 2026-04-27 FIX: 'password' modu seçildiyse şifre olmadan kaydetme.
                     //   Önceki bug: type='closed' + password=null → checkAccess'te public davranıyordu.
                     //   Yeni: şifre yoksa input'u aç, kullanıcı şifre girene kadar audience değişmesin.
@@ -740,9 +740,7 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
           borderRadius: 10,
         }}>
           <Ionicons name="lock-closed" size={14} color="#F59E0B" />
-          <Text style={{ flex: 1, fontSize: 11, color: '#FCD34D', fontWeight: '600' }}>
-            Oda kilitli — kimse giremiyor. Erişim modunu değiştirmek için kilidi kapat.
-          </Text>
+          <Text style={{ flex: 1, fontSize: 11, color: '#FCD34D', fontWeight: '600' }}>{i18n.t('room.roommanagesheet.001')}</Text>
         </View>
       )}
 
@@ -755,19 +753,19 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
             <TextInput style={[p.nameInput, { fontSize: 11 }]} value={roomPassword} onChangeText={setRoomPassword} autoFocus maxLength={20} returnKeyType="done" placeholder={i18n.t('room.roommanagesheet.008')} placeholderTextColor="#475569"
               onSubmitEditing={() => {
-                if (roomPassword.trim().length < 4) { showToast({ title: 'Şifre Çok Kısa', message: 'En az 4 karakter olmalı.', type: 'warning' }); return; }
+                if (roomPassword.trim().length < 4) { showToast({ title: i18n.t('room.roommanagesheet.035'), message: i18n.t('room.roommanagesheet.036'), type: 'warning' }); return; }
                 handleAudienceChange('password', roomPassword.trim());
                 setEditingPassword(false);
               }} />
             <Pressable style={p.saveBtn} onPress={() => {
-              if (roomPassword.trim().length < 4) { showToast({ title: 'Şifre Çok Kısa', message: 'En az 4 karakter olmalı.', type: 'warning' }); return; }
+              if (roomPassword.trim().length < 4) { showToast({ title: i18n.t('room.roommanagesheet.037'), message: i18n.t('room.roommanagesheet.038'), type: 'warning' }); return; }
               handleAudienceChange('password', roomPassword.trim());
               setEditingPassword(false);
             }}><Ionicons name="checkmark" size={14} color="#FFF" /></Pressable>
             <Pressable onPress={() => { setEditingPassword(false); setRoomPassword((room?.room_settings as any)?.room_password || ''); }}><Ionicons name="close" size={14} color="#64748B" /></Pressable>
           </View>
         ) : (
-          <Row icon="key" bg="rgba(245,158,11,0.2)" label="Oda Şifresi" desc={roomPassword || 'Ayarlanmadı (en az 4 karakter)'} onPress={() => setEditingPassword(true)} right={<Ionicons name="pencil-outline" size={10} color="rgba(255,255,255,0.15)" />} />
+          <Row icon="key" bg="rgba(245,158,11,0.2)" label={i18n.t('room.roommanagesheet.049')} desc={roomPassword || 'Ayarlanmadı (en az 4 karakter)'} onPress={() => setEditingPassword(true)} right={<Ionicons name="pencil-outline" size={10} color="rgba(255,255,255,0.15)" />} />
         )
       )}
 
@@ -843,7 +841,7 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
               const labels: Record<string, string> = { free_for_all: 'Serbest', permission_only: 'İzinli', selected_only: 'Seçili' };
               return (
                 <Pressable key={m} style={[p.pill, speakingMode === m && p.pillActive, locked && { opacity: 0.35 }]}
-                  onPress={() => { if (locked) { showToast({ title: 'Pro+ ile açılır', type: 'info' }); return; } setSpeakingMode(m); updateRS('speaking_mode', m); }}>
+                  onPress={() => { if (locked) { showToast({ title: i18n.t('room.roommanagesheet.039'), type: 'info' }); return; } setSpeakingMode(m); updateRS('speaking_mode', m); }}>
                   <Text style={[p.pillText, speakingMode === m && p.pillTextActive]}>{labels[m]}</Text>
                 </Pressable>
               );
@@ -853,7 +851,7 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
       />
 
       {/* Sahne Düzeni â€” Plus+ locked */}
-      {!can('Plus') && <LockedRow label="Sahne Düzeni (Kaç kişi konuşabilir)" tier="Plus" />}
+      {!can('Plus') && <LockedRow label={i18n.t('room.roommanagesheet.050')} tier="Plus" />}
     </View>
   );
 
@@ -863,7 +861,7 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
   const renderModeration = () => (
     <View>
       {/* Slow Mode â€” Free */}
-      <Row icon="time" bg="rgba(59,130,246,0.2)" label={slowMode ? `Slow Mode: ${slowMode}sn` : 'Slow Mode Kapalı'} desc="Chat mesaj aralığını sınırla"
+      <Row icon="time" bg="rgba(59,130,246,0.2)" label={slowMode ? `Slow Mode: ${slowMode}sn` : 'Slow Mode Kapalı'} desc={i18n.t('room.roommanagesheet.051')}
         right={
           <View style={{ flexDirection: 'row', gap: 3 }}>
             {[0, 5, 15, 30, 60].map(sec => (
@@ -894,16 +892,16 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
       {can('Plus') ? (
         <Row icon="warning" bg={ageRestricted ? 'rgba(239,68,68,0.2)' : 'rgba(192,192,192,0.2)'} label={ageRestricted ? '+18 İçerik Aktif' : 'Yaş Sınırı Yok'} desc={ageRestricted ? 'Sadece 18 yaş üstü katılabilir' : 'Tüm yaş gruplarına açık'}
           right={<Switch value={ageRestricted} onValueChange={(v) => { setAgeRestricted(v); updateRS('age_restricted', v); }} trackColor={{ false: 'rgba(255,255,255,0.08)', true: 'rgba(239,68,68,0.4)' }} thumbColor={ageRestricted ? '#EF4444' : '#475569'} />} />
-      ) : <LockedRow label="Yaş Filtresi (+18)" tier="Plus" />}
+      ) : <LockedRow label={i18n.t('room.roommanagesheet.052')} tier="Plus" />}
 
       {/* ★ 2026-04-25: "Takipçilere Özel" switch kaldırıldı —
            audienceMode='followers' ile birleştirildi (Genel sekme, Erişim seçeneği). */}
 
       {/* Tümünü Sustur â€” Pro locked */}
-      {!can('Pro') && <LockedRow label="Tümünü Sustur (Cooldown ile)" tier="Pro" />}
+      {!can('Pro') && <LockedRow label={i18n.t('room.roommanagesheet.053')} tier="Pro" />}
 
       {/* Gelişmiş Ban â€” Pro locked */}
-      {!can('Pro') && <LockedRow label="Gelişmiş Ban Seçenekleri" tier="Pro" />}
+      {!can('Pro') && <LockedRow label={i18n.t('room.roommanagesheet.054')} tier="Pro" />}
 
       {/* ��� BANLI KULLANICILAR ��� */}
       <View style={{ marginTop: 12 }}>
@@ -943,10 +941,10 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
                     if (!result?.success) {
                       throw new Error(result?.error || 'Sunucu hatası');
                     }
-                    showToast({ title: 'Ban Kaldırıldı', message: '', type: 'success' });
+                    showToast({ title: i18n.t('room.roommanagesheet.040'), message: '', type: 'success' });
                   } catch (e: any) {
                     setBannedUsers(prev => [...prev, ban]);
-                    showToast({ title: 'Ban Kaldırılamadı', message: (e?.message || '').slice(0, 200), type: 'error' });
+                    showToast({ title: i18n.t('room.roommanagesheet.041'), message: (e?.message || '').slice(0, 200), type: 'error' });
                   }
                 }}>
                   <Ionicons name="lock-open-outline" size={10} color="#14B8A6" />
@@ -982,7 +980,7 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
                   setMutedUsers(prev => prev.filter(m => m.id !== mute.id));
                   try {
                     await ModerationService.unmuteInRoom(room.id, mute.muted_user_id || mute.user?.id);
-                  } catch { setMutedUsers(prev => [...prev, mute]); showToast({ title: 'Susturma Kalkmadı', message: 'Kullanıcının susturması kaldırılamadı.', type: 'error' }); }
+                  } catch { setMutedUsers(prev => [...prev, mute]); showToast({ title: i18n.t('room.roommanagesheet.042'), message: i18n.t('room.roommanagesheet.043'), type: 'error' }); }
                 }}>
                   <Ionicons name="volume-high-outline" size={10} color="#14B8A6" />
                   <Text style={{ fontSize: 9, fontWeight: '700', color: '#14B8A6' }}>{i18n.t('room.roommanagesheet.003')}</Text>
@@ -1015,7 +1013,7 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
             ))}
           </View>
         </View>
-      ) : <LockedRow label="Oda Teması" tier="Plus" />}
+      ) : <LockedRow label={i18n.t('room.roommanagesheet.055')} tier="Plus" />}
 
       {/* Arka Plan Resmi â€” Plus+ */}
       {can('Plus') ? (
@@ -1037,7 +1035,7 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
       ) : <LockedRow label="Arka Plan Resmi" tier="Plus" />}
 
       {/* ★ 2026-04-21: Kart Görseli — herkes (oluşturma ile aynı kural). */}
-      <Row icon="albums" bg="rgba(255,215,0,0.2)" label="Kart Görseli" desc={coverImage ? 'Kart görseli ayarlandı' : 'Keşfet akışında görünen banner'}
+      <Row icon="albums" bg="rgba(255,215,0,0.2)" label={i18n.t('room.roommanagesheet.056')} desc={coverImage ? 'Kart görseli ayarlandı' : 'Keşfet akışında görünen banner'}
         right={
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             {coverImage ? (
@@ -1085,7 +1083,7 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
             )
           }
         />
-      ) : <LockedRow label="Oda Müzik Linki" tier="Pro" />}
+      ) : <LockedRow label={i18n.t('room.roommanagesheet.057')} tier="Pro" />}
     </View>
   );
 
@@ -1097,13 +1095,13 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
       {/* Bağış â€” Pro+ */}
       {/* Bağış â€” Pro */}
       {can('Pro') ? (
-        <Row icon="heart" bg="rgba(239,68,68,0.2)" label={donationsEnabled ? 'Bağış Açık' : 'Bağış Kapalı'} desc="Dinleyicilerden SP bağışı kabul et"
+        <Row icon="heart" bg="rgba(239,68,68,0.2)" label={donationsEnabled ? 'Bağış Açık' : 'Bağış Kapalı'} desc={i18n.t('room.roommanagesheet.058')}
           right={<Switch value={donationsEnabled} onValueChange={(v) => { setDonationsEnabled(v); updateRS('donations_enabled', v); }} trackColor={{ false: 'rgba(255,255,255,0.08)', true: 'rgba(239,68,68,0.4)' }} thumbColor={donationsEnabled ? '#EF4444' : '#475569'} />} />
-      ) : <LockedRow label="Bağış (Tip) Aç/Kapat" tier="Pro" />}
+      ) : <LockedRow label={i18n.t('room.roommanagesheet.059')} tier="Pro" />}
 
       {/* Giriş Ãœcreti â€” Pro */}
       {can('Pro') ? (
-        <Row icon="cash" bg="rgba(212,175,55,0.2)" label={entryFee ? `Giriş: ${entryFee} SP` : 'Giriş Ücretsiz'} desc="SP cinsinden oda giriş ücreti"
+        <Row icon="cash" bg="rgba(212,175,55,0.2)" label={entryFee ? `Giriş: ${entryFee} SP` : 'Giriş Ücretsiz'} desc={i18n.t('room.roommanagesheet.060')}
           right={
             <View style={{ flexDirection: 'row', gap: 3 }}>
               {[0, 25, 50, 100, 250, 500].map(fee => (
@@ -1114,7 +1112,7 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
             </View>
           }
         />
-      ) : <LockedRow label="Giriş Ücreti Belirleme (SP)" tier="Pro" />}
+      ) : <LockedRow label={i18n.t('room.roommanagesheet.061')} tier="Pro" />}
 
       {/* Oda Boost â€” Pro */}
       {can('Pro') && isLive ? (
@@ -1245,9 +1243,7 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
             borderWidth: 1, borderColor: 'rgba(251,191,36,0.35)',
           }}>
             <Ionicons name="information-circle" size={16} color="#FBBF24" />
-            <Text style={{ flex: 1, fontSize: 11, fontWeight: '600', color: '#FCD34D', lineHeight: 15 }}>
-              Geçici host moddasın. Yalnız moderasyon ve takipçi görüntüleme açık. Oda adı, teması, ücreti gibi ayarlar yalnız asıl sahibinde.
-            </Text>
+            <Text style={{ flex: 1, fontSize: 11, fontWeight: '600', color: '#FCD34D', lineHeight: 15 }}>{i18n.t('room.roommanagesheet.002')}</Text>
           </View>
         )}
 

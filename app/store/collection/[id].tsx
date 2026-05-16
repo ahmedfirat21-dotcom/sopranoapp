@@ -80,7 +80,7 @@ export default function CollectionDetailScreen() {
     }
     setConfirmAlert({
       visible: true,
-      title: 'Satın Al',
+      title: i18n.t('store.collection.id.001'),
       message: `${item.name} için ${item.price_sp.toLocaleString('tr-TR')} SP harcanacak. Onaylıyor musun?`,
       buttons: [
         { text: 'Vazgeç', style: 'cancel', onPress: () => setConfirmAlert(p => ({ ...p, visible: false })) },

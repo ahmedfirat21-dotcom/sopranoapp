@@ -208,7 +208,7 @@ export default function AdminPanel() {
       {
         text: 'Kapat', onPress: async () => {
           await ModerationService.resolveReport(reportId, 'dismissed');
-          showToast({ title: 'Şikayet Kapatıldı', type: 'success' });
+          showToast({ title: i18n.t('admin.001'), type: 'success' });
           loadAll();
         }
       },
@@ -222,10 +222,10 @@ export default function AdminPanel() {
         text: 'Uyar', onPress: async () => {
           await ModerationService.resolveReport(reportId, 'warned');
           await supabase.from('inbox').insert({
-            user_id: userId, type: 'system', title: 'Uyarı',
+            user_id: userId, type: 'system', title: i18n.t('admin.002'),
             body: 'Davranışlarınız nedeniyle bir uyarı aldınız. Kuralları tekrar ihlal etmeniz durumunda hesabınız askıya alınabilir.',
           });
-          showToast({ title: 'Kullanıcı Uyarıldı', type: 'success' });
+          showToast({ title: i18n.t('admin.003'), type: 'success' });
           loadAll();
         }
       },
@@ -239,7 +239,7 @@ export default function AdminPanel() {
         text: 'Banla', style: 'destructive', onPress: async () => {
           await ModerationService.resolveReport(reportId, 'banned');
           await supabase.from('profiles').update({ is_banned: true }).eq('id', userId);
-          showToast({ title: 'Kullanıcı Banlandı', message: displayName, type: 'success' });
+          showToast({ title: i18n.t('admin.004'), message: displayName, type: 'success' });
           loadAll();
         }
       },
@@ -252,7 +252,7 @@ export default function AdminPanel() {
       {
         text: 'Kapat', style: 'destructive', onPress: async () => {
           await RoomService.close(roomId);
-          showToast({ title: 'Oda Kapatıldı', message: roomName, type: 'success' });
+          showToast({ title: i18n.t('admin.005'), message: roomName, type: 'success' });
           loadAll();
         }
       },
@@ -284,10 +284,10 @@ export default function AdminPanel() {
         text: 'Uyandır', onPress: async () => {
           try {
             await RoomService.wakeUpRoom(roomId, hostId, tier as any);
-            showToast({ title: 'Oda Uyandırıldı', message: roomName, type: 'success' });
+            showToast({ title: i18n.t('admin.006'), message: roomName, type: 'success' });
             loadAll();
           } catch {
-            showToast({ title: 'Uyandırılamadı', message: `${roomName} uyandırılamadı.`, type: 'error' });
+            showToast({ title: i18n.t('admin.007'), message: `${roomName} uyandırılamadı.`, type: 'error' });
           }
         }
       },
@@ -314,7 +314,7 @@ export default function AdminPanel() {
             showToast({ title: `Tier: ${t}`, message: roomName, type: 'success' });
             loadAll();
           } catch {
-            showToast({ title: 'Tier Güncellenemedi', message: `${roomName} tier değişikliği uygulanamadı.`, type: 'error' });
+            showToast({ title: i18n.t('admin.008'), message: `${roomName} tier değişikliği uygulanamadı.`, type: 'error' });
           }
         },
       }));
@@ -348,7 +348,7 @@ export default function AdminPanel() {
             p_make_admin: !currentAdmin,
           });
           if (error) {
-            showToast({ title: 'Yetki Değiştirilemedi', message: error.message || 'İşlem tamamlanamadı.', type: 'error' });
+            showToast({ title: i18n.t('admin.009'), message: error.message || 'İşlem tamamlanamadı.', type: 'error' });
             return;
           }
           showToast({ title: currentAdmin ? '🔻 Adminlik Kaldırıldı' : '⭐ Admin Yapıldı', message: displayName, type: 'success' });
@@ -385,7 +385,7 @@ export default function AdminPanel() {
   const handleDeleteUser = (userId: string, displayName: string) => {
     // Kendi hesabını silemez
     if (userId === firebaseUser?.uid) {
-      showToast({ title: 'İzin Verilmedi', message: 'Kendi hesabını silemezsin.', type: 'warning' });
+      showToast({ title: i18n.t('admin.010'), message: i18n.t('admin.011'), type: 'warning' });
       return;
     }
     showAdAlert(
@@ -398,10 +398,10 @@ export default function AdminPanel() {
             // ★ K-PROJE-1: v25 RPC — cascade delete tek transaction, RLS bypass.
             const { error } = await supabase.rpc('admin_delete_user_cascade', { p_user_id: userId });
             if (error) {
-              showToast({ title: 'Kullanıcı Silinemedi', message: error.message || 'İşlem tamamlanamadı.', type: 'error' });
+              showToast({ title: i18n.t('admin.012'), message: error.message || 'İşlem tamamlanamadı.', type: 'error' });
               return;
             }
-            showToast({ title: '🗑 Kullanıcı Silindi', message: `${displayName} kalıcı olarak silindi.`, type: 'success' });
+            showToast({ title: i18n.t('admin.013'), message: `${displayName} kalıcı olarak silindi.`, type: 'success' });
             loadAll();
           }
         },
@@ -446,7 +446,7 @@ export default function AdminPanel() {
     { id: 'overview', icon: 'grid', label: 'Genel' },
     { id: 'reports', icon: 'flag', label: `Şikayetler (${stats.pendingReports})` },
     { id: 'rooms', icon: 'mic', label: `Odalar (${stats.totalRooms})` },
-    { id: 'users', icon: 'people', label: 'Kullanıcılar' },
+    { id: 'users', icon: 'people', label: i18n.t('admin.014') },
   ] as const;
 
   return (
@@ -489,26 +489,26 @@ export default function AdminPanel() {
           {activeTab === 'overview' && (
             <>
               <View style={s.statsGrid}>
-                <StatCard icon="people" color="#3B82F6" label="Toplam Üye" value={stats.totalUsers} />
-                <StatCard icon="pulse" color="#10B981" label="Çevrimiçi" value={stats.onlineUsers} />
-                <StatCard icon="mic" color="#F59E0B" label="Canlı Oda" value={stats.liveRooms} />
-                <StatCard icon="flag" color="#EF4444" label="Şikayet" value={stats.pendingReports} />
-                <StatCard icon="newspaper" color="#8B5CF6" label="Gönderi" value={stats.totalPosts} />
+                <StatCard icon="people" color="#3B82F6" label={i18n.t('admin.015')} value={stats.totalUsers} />
+                <StatCard icon="pulse" color="#10B981" label={i18n.t('admin.016')} value={stats.onlineUsers} />
+                <StatCard icon="mic" color="#F59E0B" label={i18n.t('admin.017')} value={stats.liveRooms} />
+                <StatCard icon="flag" color="#EF4444" label={i18n.t('admin.018')} value={stats.pendingReports} />
+                <StatCard icon="newspaper" color="#8B5CF6" label={i18n.t('admin.019')} value={stats.totalPosts} />
                 <StatCard icon="albums" color={Colors.teal} label="Toplam Oda" value={stats.totalRooms} />
               </View>
 
               <Text style={s.sectionTitle}>{i18n.t('admin.006')}</Text>
               <View style={{ gap: 8 }}>
-                <QuickAction icon="add-circle" color={Colors.teal} label="Yeni Oda Oluştur" onPress={() => router.push('/create-room')} />
-                <QuickAction icon="trash" color="#EF4444" label="Free Boş Odaları Temizle" onPress={async () => {
+                <QuickAction icon="add-circle" color={Colors.teal} label={i18n.t('admin.020')} onPress={() => router.push('/create-room')} />
+                <QuickAction icon="trash" color="#EF4444" label={i18n.t('admin.021')} onPress={async () => {
                   const count = await RoomService.autoCloseExpired();
                   showToast({ title: `${count} Free oda temizlendi`, type: 'success' });
                   loadAll();
                 }} />
-                <QuickAction icon="megaphone" color="#F59E0B" label="Tüm Kullanıcılara Duyuru Gönder" onPress={() => {
+                <QuickAction icon="megaphone" color="#F59E0B" label={i18n.t('admin.022')} onPress={() => {
                   showAdAlert('Duyuru', 'Bu özellik yakında eklenecek.', [{ text: 'Tamam' }], 'info');
                 }} />
-                <QuickAction icon="color-palette" color="#A78BFA" label="Skia Parite Testi (geliştirme)" onPress={() => router.push('/skia-test')} />
+                <QuickAction icon="color-palette" color="#A78BFA" label={i18n.t('admin.023')} onPress={() => router.push('/skia-test')} />
               </View>
             </>
           )}
@@ -683,7 +683,7 @@ export default function AdminPanel() {
                                   <RoomLimitItem icon="eye" label="Seyirci" value={limits.maxSpectators >= 999 ? '∞' : `${limits.maxSpectators}`} />
                                   <RoomLimitItem icon="videocam" label="Kamera" value={`${limits.maxCameras}`} />
                                   <RoomLimitItem icon="shield" label="Mod" value={`${limits.maxModerators}`} />
-                                  <RoomLimitItem icon="time" label="Süre" value={limits.durationHours === 0 ? '7/24' : `${limits.durationHours}sa`} />
+                                  <RoomLimitItem icon="time" label={i18n.t('admin.024')} value={limits.durationHours === 0 ? '7/24' : `${limits.durationHours}sa`} />
                                 </View>
                                 <View style={s.roomDetailRow}>
                                   <Text style={s.roomDetailLabel}>Oda ID</Text>

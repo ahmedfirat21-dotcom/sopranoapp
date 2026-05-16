@@ -514,9 +514,9 @@ function RealtimeBadgeProvider({ userId, children }: { userId: string | null; ch
         } else if (notifType === 'room_invite_rejected') {
           showToast({ title: 'Davet Reddedildi', message: body, type: 'warning', id });
         } else if (notifType === 'room_live') {
-          showToast({ title: '🔴 Canlı Yayın', message: body, type: 'info', id });
+          showToast({ title: i18n.t('layout.003'), message: body, type: 'info', id });
         } else if (notifType === 'gift') {
-          showToast({ title: '🎁 Hediye Aldın', message: body, type: 'success', id });
+          showToast({ title: i18n.t('layout.004'), message: body, type: 'success', id });
         } else if (notifType === 'symbol_gift') {
           // ★ v107: Sembol hediye — body format "<item_id>|<item_name>|<art_emoji>"
           const parts = body.split('|');
@@ -529,13 +529,13 @@ function RealtimeBadgeProvider({ userId, children }: { userId: string | null; ch
             id,
           });
         } else if (notifType === 'thank_you') {
-          showToast({ title: '💖 Teşekkür Aldın', message: body, type: 'success', id });
+          showToast({ title: i18n.t('layout.005'), message: body, type: 'success', id });
         } else if (notifType === 'missed_call') {
-          showToast({ title: '📞 Cevapsız Arama', message: body, type: 'warning', id });
+          showToast({ title: i18n.t('layout.006'), message: body, type: 'warning', id });
         } else if (notifType === 'event_reminder') {
-          showToast({ title: '⏰ Etkinlik Hatırlatıcı', message: body, type: 'info', id });
+          showToast({ title: i18n.t('layout.007'), message: body, type: 'info', id });
         } else if (notifType === 'follow_accepted') {
-          showToast({ title: '🎉 Arkadaşlık Kabul', message: body, type: 'success', id });
+          showToast({ title: i18n.t('layout.008'), message: body, type: 'success', id });
         } else if (notifType === 'room_access_request') {
           // ★ v92.12 (1 May 2026): Toast kaldırıldı — talep PlusMenu accordion'a düşer.
           //   Tab bar + butonunda badge sayı gösterir, host orada görüp onay/red verir.
@@ -705,12 +705,8 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
           }}>
             <Ionicons name="cloud-offline-outline" size={42} color="#EF4444" />
           </View>
-          <Text style={{ color: '#F1F5F9', fontSize: 20, fontWeight: '800', marginBottom: 8, textAlign: 'center' }}>
-            Bağlantı Sorunu
-          </Text>
-          <Text style={{ color: 'rgba(255,255,255,0.65)', fontSize: 14, lineHeight: 20, textAlign: 'center', marginBottom: 28 }}>
-            Profilini sunucudan getiremedik. İnternet bağlantını kontrol edip tekrar dene.
-          </Text>
+          <Text style={{ color: '#F1F5F9', fontSize: 20, fontWeight: '800', marginBottom: 8, textAlign: 'center' }}>{i18n.t('layout.001')}</Text>
+          <Text style={{ color: 'rgba(255,255,255,0.65)', fontSize: 14, lineHeight: 20, textAlign: 'center', marginBottom: 28 }}>{i18n.t('layout.002')}</Text>
           <Pressable
             onPress={retryProfileFetch}
             style={({ pressed }) => [{

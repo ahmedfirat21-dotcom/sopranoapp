@@ -21,7 +21,7 @@ import StatusAvatar from './StatusAvatar';
 import { showToast } from './Toast';
 // ★ v107.34: Cycle kırma — _layout yerine direkt context dosyasından
 import { useUserProfileSheet } from '../providers/UserProfileSheetContext';
-import { useTranslation } from '../services/i18n';
+import { i18n, useTranslation } from '../services/i18n';
 
 const { width: W, height: H } = Dimensions.get('window');
 // ★ 2026-05-05: Yan drawer (sağdan kayar) — FriendsDrawer ile birebir aynı ölçü.
@@ -351,7 +351,7 @@ export default function NotificationDrawer({ visible, onClose, userId, anchorTop
       const result = await RoomAccessService.acceptInvite(item.reference_id, userId);
       // ★ 2026-04-19: Oda kapalı/silinmiş ise graceful mesaj göster (hata fırlatma)
       if (!result.success) {
-        showToast({ title: 'Davet Geçersiz', message: result.error || 'Davet kabul edilemedi', type: 'warning' });
+        showToast({ title: i18n.t('notificationdrawer.001'), message: result.error || 'Davet kabul edilemedi', type: 'warning' });
         // Bildirimi yine de listeden kaldır (artık geçerli değil)
         setItems(prev => prev.filter(n => n.id !== item.id));
         try { await supabase.from('notifications').delete().eq('id', item.id); } catch {}
@@ -365,7 +365,7 @@ export default function NotificationDrawer({ visible, onClose, userId, anchorTop
       // Odaya yönlendir
       router.push(`/room/${item.reference_id}` as any);
     } catch {
-      showToast({ title: 'Davet Kabul Edilemedi', message: 'Odaya katılım işlenemedi, tekrar dene.', type: 'error' });
+      showToast({ title: 'Davet Kabul Edilemedi', message: i18n.t('notificationdrawer.002'), type: 'error' });
     } finally {
       setProcessingInvites(prev => { const n = new Set(prev); n.delete(item.id); return n; });
     }
@@ -381,7 +381,7 @@ export default function NotificationDrawer({ visible, onClose, userId, anchorTop
       setItems(prev => prev.filter(n => n.id !== item.id));
       showToast({ title: '🚫 Davet Reddedildi', message: 'Oda daveti silindi.', type: 'info' });
     } catch {
-      showToast({ title: 'Davet Reddedilemedi', message: 'İşlem tamamlanamadı.', type: 'error' });
+      showToast({ title: 'Davet Reddedilemedi', message: i18n.t('notificationdrawer.003'), type: 'error' });
     } finally {
       setProcessingInvites(prev => { const n = new Set(prev); n.delete(item.id); return n; });
     }
@@ -395,7 +395,7 @@ export default function NotificationDrawer({ visible, onClose, userId, anchorTop
       await supabase.from('notifications').delete().eq('user_id', userId).in('type', BELL_NOTIF_TYPES);
       setItems([]);
     } catch {
-      showToast({ title: 'Temizlenemedi', message: 'Bildirimler silinirken hata oluştu.', type: 'error' });
+      showToast({ title: 'Temizlenemedi', message: i18n.t('notificationdrawer.004'), type: 'error' });
     } finally {
       setClearing(false);
     }
@@ -412,7 +412,7 @@ export default function NotificationDrawer({ visible, onClose, userId, anchorTop
       setItems(prev => prev.map(n => ({ ...n, is_read: true })));
       showToast({ title: `✓ ${unread.length} bildirim okundu`, type: 'success' });
     } catch {
-      showToast({ title: 'İşaretlenemedi', message: 'Bildirimler okundu olarak işaretlenemedi.', type: 'error' });
+      showToast({ title: i18n.t('notificationdrawer.005'), message: i18n.t('notificationdrawer.006'), type: 'error' });
     }
   }, [userId, items]);
 

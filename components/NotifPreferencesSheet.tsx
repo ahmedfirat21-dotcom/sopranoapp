@@ -132,10 +132,10 @@ export default function NotifPreferencesSheet({ visible, onClose, userId }: Prop
 
   // ★ DND: 24 saatlik picker yerine 4 quick-pick (gece, sabah, iş saati, kapalı)
   const dndPresets: { label: string; start: number | null; end: number | null }[] = [
-    { label: 'Kapalı',         start: null, end: null },
+    { label: i18n.t('notifpreferencessheet.003'),         start: null, end: null },
     { label: 'Gece (22→07)',   start: 22,   end: 7 },
-    { label: 'İş (09→18)',     start: 9,    end: 18 },
-    { label: 'Akşam (19→23)',  start: 19,   end: 23 },
+    { label: i18n.t('notifpreferencessheet.004'),     start: 9,    end: 18 },
+    { label: i18n.t('notifpreferencessheet.005'),  start: 19,   end: 23 },
   ];
 
   const isPresetActive = (s: number | null, e: number | null) =>
@@ -205,9 +205,7 @@ export default function NotifPreferencesSheet({ visible, onClose, userId }: Prop
           >
             {/* ── DND Penceresi ── */}
             <Text style={st.sectionLabel}>{i18n.t('notif_prefs.dnd')}</Text>
-            <Text style={st.sectionHint}>
-              Belirttiğin saatlerde bildirim almazsın (acil çağrılar hariç).
-            </Text>
+            <Text style={st.sectionHint}>{i18n.t('notifpreferencessheet.001')}</Text>
             <View style={st.presetRow}>
               {dndPresets.map(p => {
                 const active = isPresetActive(p.start, p.end);
@@ -227,8 +225,8 @@ export default function NotifPreferencesSheet({ visible, onClose, userId }: Prop
             <Text style={st.sectionLabel}>{i18n.t('notif_prefs.filter')}</Text>
             <ToggleRow
               icon="people"
-              label="Sadece arkadaşlardan"
-              desc="Sadece arkadaşların gönderdiği bildirimleri al"
+              label={i18n.t('notifpreferencessheet.006')}
+              desc={i18n.t('notifpreferencessheet.007')}
               value={prefs.friends_only}
               onChange={v => update({ friends_only: v })}
             />
@@ -244,36 +242,34 @@ export default function NotifPreferencesSheet({ visible, onClose, userId }: Prop
             />
             <ToggleRow
               icon="chatbubble"
-              label="DM mesajları"
-              desc="Yeni özel mesaj geldiğinde"
+              label={i18n.t('notifpreferencessheet.008')}
+              desc={i18n.t('notifpreferencessheet.009')}
               value={prefs.dm_messages}
               onChange={v => update({ dm_messages: v })}
             />
             <ToggleRow
               icon="mic"
               label="Sahne davetleri"
-              desc="Bir odada sahneye çağrıldığında"
+              desc={i18n.t('notifpreferencessheet.010')}
               value={prefs.stage_invites}
               onChange={v => update({ stage_invites: v })}
             />
             <ToggleRow
               icon="gift"
               label="SP / Hediye"
-              desc="Sana SP gönderildiğinde"
+              desc={i18n.t('notifpreferencessheet.011')}
               value={prefs.sp_received}
               onChange={v => update({ sp_received: v })}
             />
             <ToggleRow
               icon="ellipse"
-              label="Arkadaş çevrimiçi"
-              desc="Arkadaşın yeni oda açtığında"
+              label={i18n.t('notifpreferencessheet.012')}
+              desc={i18n.t('notifpreferencessheet.013')}
               value={prefs.friend_online}
               onChange={v => update({ friend_online: v })}
             />
 
-            <Text style={st.footerNote}>
-              Acil çağrılar ve arkadaşlık istekleri her zaman ulaşır.
-            </Text>
+            <Text style={st.footerNote}>{i18n.t('notifpreferencessheet.002')}</Text>
           </ScrollView>
         )}
       </Animated.View>

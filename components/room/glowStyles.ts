@@ -4,6 +4,7 @@
 //
 // Sabit 6 stil = pay-per-use (her mesajda SP düşer).
 // Premium 5 stil = one-time-buy (Mağaza'dan satın alınca free unlock).
+import { i18n } from '../../services/i18n';
 
 export type GlowStyleId =
   | 'gold' | 'heart' | 'neon' | 'fire' | 'celebration' | 'galaxy'
@@ -44,7 +45,7 @@ export const GLOW_STYLES: Record<GlowStyleId, {
     particles: 'shine',
   },
   heart: {
-    cost: 8, label: 'KALP ATIŞI', icon: '💗',
+    cost: 8, label: i18n.t('room.glowstyles.001'), icon: '💗',
     bgGradient: ['#BE185D', '#F472B6', '#F9A8D4'],
     headerBg: ['rgba(0,0,0,0.25)', 'transparent'],
     headerColor: '#FCE7F3',
@@ -62,7 +63,7 @@ export const GLOW_STYLES: Record<GlowStyleId, {
     particles: 'neon-border',
   },
   fire: {
-    cost: 10, label: 'ATEŞ', icon: '🔥',
+    cost: 10, label: i18n.t('room.glowstyles.002'), icon: '🔥',
     bgGradient: ['#7F1D1D', '#DC2626', '#FB923C'],
     headerBg: ['rgba(0,0,0,0.35)', 'rgba(0,0,0,0.35)'],
     headerColor: '#FED7AA',
@@ -80,7 +81,7 @@ export const GLOW_STYLES: Record<GlowStyleId, {
     particles: 'confetti',
   },
   galaxy: {
-    cost: 20, label: 'GALAKSİ', icon: '🌌',
+    cost: 20, label: i18n.t('room.glowstyles.003'), icon: '🌌',
     bgGradient: ['#1E1B4B', '#4C1D95', '#7C3AED'],
     headerBg: ['rgba(251,191,36,0.3)', 'rgba(167,139,250,0.3)'],
     headerColor: '#FBBF24',

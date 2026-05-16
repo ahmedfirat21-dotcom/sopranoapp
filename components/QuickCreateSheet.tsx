@@ -132,16 +132,16 @@ export default function QuickCreateSheet({
           <Option
             icon="flash"
             iconColor="#14B8A6"
-            title="Hızlı Aç"
-            subtitle="Varsayılanlarla hemen yayına başla"
+            title={i18n.t('quickcreatesheet.001')}
+            subtitle={i18n.t('quickcreatesheet.002')}
             onPress={() => { onClose(); setTimeout(() => onQuickCreate(), 160); }}
             primary
           />
           <Option
             icon="options-outline"
             iconColor="#A78BFA"
-            title="Detaylı Ayarla"
-            subtitle="Tema, izin, planlama — tüm seçenekleri elden tut"
+            title={i18n.t('quickcreatesheet.003')}
+            subtitle={i18n.t('quickcreatesheet.004')}
             onPress={() => { onClose(); setTimeout(() => onDetailedCreate(), 160); }}
           />
         </View>

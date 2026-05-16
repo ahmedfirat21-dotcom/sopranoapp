@@ -352,7 +352,7 @@ export default function SettingsScreen() {
               buttons: [{ text: 'Tamam' }],
             });
           } catch (e: any) {
-            showToast({ title: 'Teşhis hatası', message: e?.message || 'whoami() çağrılamadı', type: 'error' });
+            showToast({ title: i18n.t('settings.001'), message: e?.message || 'whoami() çağrılamadı', type: 'error' });
           }
         })();
         break;

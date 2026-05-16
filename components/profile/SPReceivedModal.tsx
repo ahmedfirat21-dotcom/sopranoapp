@@ -40,12 +40,12 @@ const { width: W, height: H } = Dimensions.get('window');
 
 // ═══ Hızlı teşekkür seçenekleri (mevcut davranış korundu) ═══
 const THANK_YOU_REPLIES = [
-  { emoji: '🙏', label: 'Teşekkürler' },
-  { emoji: '❤️', label: 'Sağol' },
+  { emoji: '🙏', label: i18n.t('profile.spreceivedmodal.001') },
+  { emoji: '❤️', label: i18n.t('profile.spreceivedmodal.002') },
   { emoji: '🎉', label: 'Harika' },
   { emoji: '😊', label: 'Mutlu oldum' },
-  { emoji: '🌹', label: 'Çok naziksin' },
-  { emoji: '✨', label: 'İyisin' },
+  { emoji: '🌹', label: i18n.t('profile.spreceivedmodal.003') },
+  { emoji: '✨', label: i18n.t('profile.spreceivedmodal.004') },
 ];
 
 // ═══ TRANSFER TİP PALETİ ═══
@@ -74,7 +74,7 @@ interface TypeVisual {
 
 const TYPE_VISUAL: Record<TransferType, TypeVisual> = {
   gift: {
-    label: 'HEDİYE GELDİ',
+    label: i18n.t('profile.spreceivedmodal.005'),
     primary: '#F8B4C0',          // pembe
     accent: '#FAC775',           // altın
     halo: 'rgba(248,180,192,0.7)',
@@ -85,7 +85,7 @@ const TYPE_VISUAL: Record<TransferType, TypeVisual> = {
     icon: 'gift',
   },
   donation: {
-    label: 'BAĞIŞ ALDIN',
+    label: i18n.t('profile.spreceivedmodal.006'),
     primary: '#5DCAA5',          // yeşil
     accent: '#FAC775',           // altın
     halo: 'rgba(93,202,165,0.7)',
@@ -366,14 +366,14 @@ export default function SPReceivedModal({
       });
       if (error) {
         if (__DEV__) console.warn('[ThankYou] insert error:', error.message);
-        showToast({ title: 'İletilemedi', message: error.message || 'Teşekkür gönderilemedi.', type: 'error' });
+        showToast({ title: i18n.t('profile.spreceivedmodal.007'), message: error.message || 'Teşekkür gönderilemedi.', type: 'error' });
         setSending(false);
         return;
       }
       setThanked(reply.emoji);
     } catch (e: any) {
       if (__DEV__) console.warn('[ThankYou] catch:', e);
-      showToast({ title: 'Teşekkür Gönderilemedi', message: e?.message || 'Yanıtın iletilemedi.', type: 'error' });
+      showToast({ title: i18n.t('profile.spreceivedmodal.008'), message: e?.message || 'Yanıtın iletilemedi.', type: 'error' });
       setSending(false);
       return;
     }

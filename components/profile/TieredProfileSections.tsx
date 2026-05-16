@@ -164,7 +164,7 @@ export default function TieredProfileSections({
           </View>
         ) : null
       ) : (
-        <LockedFeatureHint label="Dil & Yaş Etiketleri" requiredTier="Plus" icon="globe-outline" />
+        <LockedFeatureHint label={i18n.t('profile.tieredprofilesections.001')} requiredTier="Plus" icon="globe-outline" />
       )}
 
       {/* ═══ Son Aktif Odalar (Aktivite Alanı) ═══ */}
@@ -199,19 +199,19 @@ export default function TieredProfileSections({
         <Text style={s.sectionTitle}>{i18n.t('profile.tieredprofilesections.001')}</Text>
 
         {!isTierAtLeast(tier, 'Plus') && (
-          <LockedFeatureHint label="Kapsamlı Moderasyon Geçmişi" requiredTier="Plus" icon="shield-checkmark-outline" />
+          <LockedFeatureHint label={i18n.t('profile.tieredprofilesections.002')} requiredTier="Plus" icon="shield-checkmark-outline" />
         )}
         
         {!isTierAtLeast(tier, 'Plus') && (
-          <LockedFeatureHint label="Profil Teması" requiredTier="Plus" icon="color-palette-outline" />
+          <LockedFeatureHint label={i18n.t('profile.tieredprofilesections.003')} requiredTier="Plus" icon="color-palette-outline" />
         )}
 
         {!isTierAtLeast(tier, 'Pro') && (
-          <LockedFeatureHint label="Kapak Fotoğrafı" requiredTier="Pro" icon="image-outline" />
+          <LockedFeatureHint label={i18n.t('profile.tieredprofilesections.004')} requiredTier="Pro" icon="image-outline" />
         )}
 
         {!isTierAtLeast(tier, 'Pro') && (
-          <LockedFeatureHint label="Takipçilere Özel İçerik" requiredTier="Pro" icon="lock-closed-outline" />
+          <LockedFeatureHint label={i18n.t('profile.tieredprofilesections.005')} requiredTier="Pro" icon="lock-closed-outline" />
         )}
 
         {isTierAtLeast(tier, 'Pro') ? (
@@ -226,7 +226,7 @@ export default function TieredProfileSections({
             </View>
           ) : null
         ) : (
-          !isOwnProfile && <LockedFeatureHint label="Destekle / SP Bağış" requiredTier="Pro" icon="heart-outline" />
+          !isOwnProfile && <LockedFeatureHint label={i18n.t('profile.tieredprofilesections.006')} requiredTier="Pro" icon="heart-outline" />
         )}
 
         {isTierAtLeast(tier, 'Pro') ? (
@@ -241,7 +241,7 @@ export default function TieredProfileSections({
             </View>
           ) : null
         ) : (
-          <LockedFeatureHint label="Ghost Mode Göstergesi" requiredTier="Pro" icon="eye-off-outline" />
+          <LockedFeatureHint label={i18n.t('profile.tieredprofilesections.007')} requiredTier="Pro" icon="eye-off-outline" />
         )}
       </View>
 
@@ -277,7 +277,7 @@ export default function TieredProfileSections({
           </View>
         </View>
       ) : (
-        <LockedFeatureHint label="Gelişmiş İstatistik Paneli" requiredTier="Pro" icon="stats-chart-outline" />
+        <LockedFeatureHint label={i18n.t('profile.tieredprofilesections.008')} requiredTier="Pro" icon="stats-chart-outline" />
       )}
 
       {/* ═══ Pro Gelir Göstergesi ═══ */}
@@ -320,7 +320,7 @@ export default function TieredProfileSections({
           </View>
         ) : null
       ) : isOwnProfile && !isTierAtLeast(tier, 'Pro') ? (
-        <LockedFeatureHint label="Gelir Göstergesi" requiredTier="Pro" icon="cash-outline" />
+        <LockedFeatureHint label={i18n.t('profile.tieredprofilesections.009')} requiredTier="Pro" icon="cash-outline" />
       ) : null}
 
     </View>

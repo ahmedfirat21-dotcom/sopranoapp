@@ -17,6 +17,7 @@
  *   - Backdrop: BlurView + dim (sade)
  */
 import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { i18n } from '../../services/i18n';
 import {
   View, Text, StyleSheet, Animated, Easing, Dimensions, Platform,
 } from 'react-native';
@@ -44,21 +45,21 @@ const RARITY_VISUALS: Record<BadgeRarity, {
     glowOpacity: 0.30,
   },
   rare: {
-    label: 'NADİR',
+    label: i18n.t('profile.badgecelebration.001'),
     labelColor: '#60A5FA',
     particleCount: 8,    // 14 → 8
     rayCount: 6,         // 8 → 6
     glowOpacity: 0.40,
   },
   epic: {
-    label: 'EPİK',
+    label: i18n.t('profile.badgecelebration.002'),
     labelColor: '#C084FC',
     particleCount: 12,   // 20 → 12
     rayCount: 8,         // 12 → 8
     glowOpacity: 0.50,
   },
   legendary: {
-    label: 'EFSANEVİ',
+    label: i18n.t('profile.badgecelebration.003'),
     labelColor: '#FBBF24',
     particleCount: 16,   // 28 → 16
     rayCount: 10,        // 16 → 10

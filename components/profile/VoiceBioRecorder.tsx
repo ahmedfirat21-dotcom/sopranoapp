@@ -130,7 +130,7 @@ export default function VoiceBioRecorder({
         }
       }, 100);
     } catch (e: any) {
-      showToast({ title: 'Kayıt başlatılamadı', message: e?.message || '', type: 'error' });
+      showToast({ title: i18n.t('profile.voicebiorecorder.001'), message: e?.message || '', type: 'error' });
       setPhase('idle');
     }
   };
@@ -145,7 +145,7 @@ export default function VoiceBioRecorder({
       const finalMs = recordingMs;
       recordingRef.current = null;
       if (finalMs < VOICE_BIO_MIN_MS) {
-        showToast({ title: 'Çok kısa', message: 'En az 3 saniye kaydet', type: 'warning' });
+        showToast({ title: i18n.t('profile.voicebiorecorder.002'), message: 'En az 3 saniye kaydet', type: 'warning' });
         setPhase('idle');
         setRecordingMs(0);
         return;
@@ -153,7 +153,7 @@ export default function VoiceBioRecorder({
       setRecordingUri(uri);
       setPhase('preview');
     } catch (e: any) {
-      showToast({ title: 'Kayıt sonlanmadı', message: e?.message || '', type: 'error' });
+      showToast({ title: i18n.t('profile.voicebiorecorder.003'), message: e?.message || '', type: 'error' });
       setPhase('idle');
     }
   };
@@ -192,10 +192,10 @@ export default function VoiceBioRecorder({
     try {
       const url = await VoiceBioService.upload(userId, recordingUri, recordingMs, currentUrl);
       onSaved(url, recordingMs);
-      showToast({ title: 'Sesli tanıtım kaydedildi', type: 'success' });
+      showToast({ title: i18n.t('profile.voicebiorecorder.004'), type: 'success' });
       onCloseRef.current();
     } catch (e: any) {
-      showToast({ title: 'Yükleme başarısız', message: e?.message || '', type: 'error' });
+      showToast({ title: i18n.t('profile.voicebiorecorder.005'), message: e?.message || '', type: 'error' });
       setPhase('preview');
     }
   };
@@ -213,7 +213,7 @@ export default function VoiceBioRecorder({
     try {
       await VoiceBioService.remove(userId, currentUrl);
       onRemoved();
-      showToast({ title: 'Sesli tanıtım kaldırıldı', type: 'info' });
+      showToast({ title: i18n.t('profile.voicebiorecorder.006'), type: 'info' });
       onCloseRef.current();
     } catch (e: any) {
       showToast({ title: 'Silinemedi', message: e?.message || '', type: 'error' });

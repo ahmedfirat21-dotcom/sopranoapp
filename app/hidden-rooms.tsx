@@ -66,7 +66,7 @@ export default function HiddenRoomsScreen() {
       setRooms((data || []) as any);
     } catch (e: any) {
       if (__DEV__) console.warn('[HiddenRooms] load error:', e?.message);
-      showToast({ title: 'Liste yüklenemedi', message: e?.message || 'Tekrar dene', type: 'error' });
+      showToast({ title: i18n.t('hiddenrooms.001'), message: e?.message || 'Tekrar dene', type: 'error' });
     } finally {
       setLoading(false);
     }
@@ -91,7 +91,7 @@ export default function HiddenRoomsScreen() {
     try {
       await AsyncStorage.removeItem('ignored_room_ids');
     } catch {}
-    showToast({ title: 'Tüm gizli odalar geri getirildi', type: 'success' });
+    showToast({ title: i18n.t('hiddenrooms.002'), type: 'success' });
   }, []);
 
   return (

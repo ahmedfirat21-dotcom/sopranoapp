@@ -21,59 +21,59 @@ export type RoomClosedReason = 'closed' | 'expired' | 'invite_expired' | 'banned
 
 const REASON_CONFIG: Record<RoomClosedReason, { title: string; message: string; icon: keyof typeof Ionicons.glyphMap; color: string }> = {
   closed: {
-    title: 'Bu oda kapanmış',
-    message: 'Oda sahibi odayı kapattı. Yeni bir oda bulup katılabilirsin.',
+    title: i18n.t('room.roomclosedscreen.001'),
+    message: i18n.t('room.roomclosedscreen.002'),
     icon: 'lock-closed',
     color: '#EF4444',
   },
   expired: {
-    title: 'Oda süresi dolmuş',
-    message: 'Bu odanın süresi sona erdi. Üyeliğini yükselterek daha uzun süreli odalar açabilirsin.',
+    title: i18n.t('room.roomclosedscreen.003'),
+    message: i18n.t('room.roomclosedscreen.004'),
     icon: 'hourglass',
     color: '#F59E0B',
   },
   invite_expired: {
-    title: 'Davet süresi geçmiş',
-    message: 'Bu odaya davet edilme sürenin dolmuş. Oda sahibi seni tekrar davet ederse yeniden katılabilirsin.',
+    title: i18n.t('room.roomclosedscreen.005'),
+    message: i18n.t('room.roomclosedscreen.006'),
     icon: 'mail-unread',
     color: '#A855F7',
   },
   banned: {
-    title: 'Bu odaya erişimin yok',
-    message: 'Oda sahibi/moderatörler tarafından bu odadan engellendin.',
+    title: i18n.t('room.roomclosedscreen.007'),
+    message: i18n.t('room.roomclosedscreen.008'),
     icon: 'ban',
     color: '#EF4444',
   },
   not_found: {
     // ★ 2026-04-26: gri → kırmızı (uyarı tonu, daha dikkat çekici)
-    title: 'Oda bulunamadı',
-    message: 'Bu oda artık mevcut değil ya da silinmiş olabilir.',
+    title: i18n.t('room.roomclosedscreen.009'),
+    message: i18n.t('room.roomclosedscreen.010'),
     icon: 'alert-circle',
     color: '#EF4444',
   },
   // ★ 2026-04-26: Erişim engelleri için pop-modal yerine full-screen anlatım
   room_locked: {
     title: 'Oda kilitli',
-    message: 'Oda sahibi yeni katılımcı kabulünü geçici olarak durdurdu. Birazdan tekrar dene.',
+    message: i18n.t('room.roomclosedscreen.011'),
     icon: 'lock-closed',
     color: '#EF4444',
   },
   age_restricted: {
-    title: 'Yaş sınırı var',
-    message: 'Bu odaya katılmak için belirlenen yaşın üzerinde olmalısın.',
+    title: i18n.t('room.roomclosedscreen.012'),
+    message: i18n.t('room.roomclosedscreen.013'),
     icon: 'warning',
     color: '#F59E0B',
   },
   followers_only: {
-    title: 'Arkadaşlara özel',
-    message: 'Bu oda yalnızca oda sahibinin arkadaşlarına açık. Arkadaş eklenirsen tekrar dene.',
+    title: i18n.t('room.roomclosedscreen.014'),
+    message: i18n.t('room.roomclosedscreen.015'),
     icon: 'people',
     color: '#A855F7',
   },
   // ★ 2026-04-26: LiveKit/sunucu bağlantısı kurulamadı — "oda yok" yanıltıcıydı, ayrı reason.
   connection_failed: {
-    title: 'Bağlantı kurulamadı',
-    message: 'Sunucuya ulaşılamıyor. İnternetini kontrol edip tekrar dene.',
+    title: i18n.t('room.roomclosedscreen.016'),
+    message: i18n.t('room.roomclosedscreen.017'),
     icon: 'cloud-offline',
     color: '#F59E0B',
   },
