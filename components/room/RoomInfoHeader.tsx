@@ -344,7 +344,9 @@ const HEADER_BAR_H = 50;
 
 const s = StyleSheet.create({
   wrap: {
-    paddingHorizontal: 16,
+    // ★ v283 (16 May 2026): paddingHorizontal kaldırıldı — gradient absoluteFillObject
+    //   full width yayılsın (home.tsx pattern'i). İçerik kendi paddingHorizontal'ını
+    //   topNav style'ında taşır.
     paddingBottom: 6,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
@@ -357,6 +359,7 @@ const s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     height: HEADER_BAR_H,
+    paddingHorizontal: 16, // ★ v283: wrap'tan taşındı, gradient full width olsun diye
   },
   topLeft: {
     flex: 1,
