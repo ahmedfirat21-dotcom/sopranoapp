@@ -16,7 +16,7 @@ import { PushService } from './push';
 import { GamificationService } from './gamification';
 import { logger } from '../utils/logger';
 import { RateLimitService } from './rateLimit';
-import { i18n } from '../../services/i18n';
+import { i18n } from './i18n';
 
 export type FriendshipStatus = 'pending' | 'accepted' | 'blocked';
 

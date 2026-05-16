@@ -19,7 +19,7 @@
  *   cron job v68'deki cleanup_expired_recordings() RPC'sini çağırır.
  */
 import { supabase } from '../constants/supabase';
-import { i18n } from '../../services/i18n';
+import { i18n } from './i18n';
 
 export interface RoomRecording {
   id: string;

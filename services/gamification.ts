@@ -16,7 +16,7 @@ import {
   checkCCUMilestones,
 } from '../constants/tiers';
 import type { SubscriptionTier } from '../types';
-import { i18n } from '../../services/i18n';
+import { i18n } from './i18n';
 
 // ════════════════════════════════════════════════════════════
 // İÇ DURUM — Cooldown & Günlük Cap Takibi

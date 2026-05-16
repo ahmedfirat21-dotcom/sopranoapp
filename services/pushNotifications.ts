@@ -16,7 +16,7 @@ import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { Platform } from 'react-native';
 import { supabase } from '../constants/supabase';
 import { logger } from '../utils/logger';
-import { i18n } from '../../services/i18n';
+import { i18n } from './i18n';
 
 const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
 

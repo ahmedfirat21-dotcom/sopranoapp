@@ -14,7 +14,7 @@ import type {
   RoomParticipant,
 } from '../types';
 import { ALL_PERMISSIONS, ROLE_LEVEL, normalizeRole, migrateLegacyTier } from '../types';
-import { i18n } from '../../services/i18n';
+import { i18n } from './i18n';
 
 // ════════════════════════════════════════════════════════════
 // YETKİ KONTROL FONKSİYONLARI

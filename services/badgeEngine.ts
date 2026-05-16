@@ -25,7 +25,7 @@
 import { supabase } from '../constants/supabase';
 import { BadgeService } from './badges';
 import { BADGES } from '../constants/badges';
-import { i18n } from '../../services/i18n';
+import { i18n } from './i18n';
 
 /** Güvenli wrapper — badge hatası asla caller'ı bozmasın */
 async function _safeAward(userId: string, badgeId: string): Promise<boolean> {

@@ -4,7 +4,7 @@ import * as ImageManipulator from 'expo-image-manipulator';
 import * as FileSystem from 'expo-file-system';
 import * as Crypto from 'expo-crypto';
 import { decode } from 'base64-arraybuffer';
-import { i18n } from '../../services/i18n';
+import { i18n } from './i18n';
 
 // ★ SEC-STORAGE: URL tahmin saldırısı koruması.
 //   Bucket'lar şu an public (Firebase Third-Party Auth bekliyor — known gap).

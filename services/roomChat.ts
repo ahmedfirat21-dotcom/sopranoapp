@@ -6,7 +6,7 @@ import { logger } from '../utils/logger';
 import { supabase } from '../constants/supabase';
 import { filterBadWords } from '../constants/badwords';
 import { isSystemRoom } from './showcaseRooms';
-import { i18n } from '../../services/i18n';
+import { i18n } from './i18n';
 
 export type RoomMessage = {
   id: string;

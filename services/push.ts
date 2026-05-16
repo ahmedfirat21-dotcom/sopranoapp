@@ -13,7 +13,7 @@
 import { logger } from '../utils/logger';
 import { supabase } from '../constants/supabase';
 import { NotifPrefsService, type NotificationCategory } from './notifPrefs';
-import { i18n } from '../../services/i18n';
+import { i18n } from './i18n';
 
 export type PushType = 'dm' | 'message_request' | 'follow' | 'follow_request' | 'follow_accepted' | 'gift' | 'room_invite' | 'room_live' | 'room_follow' | 'event_reminder' | 'missed_call' | 'incoming_call';
 

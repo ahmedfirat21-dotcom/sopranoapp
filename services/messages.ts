@@ -11,7 +11,7 @@ import { PushService } from './push';
 const _getFriendshipService = () => require('./friendship').FriendshipService;
 const FriendshipService = { _getBlockedIds: (userId: string) => _getFriendshipService()._getBlockedIds(userId) } as { _getBlockedIds: (userId: string) => Promise<Set<string>> };
 import type { Message, InboxItem } from '../types';
-import { i18n } from '../../services/i18n';
+import { i18n } from './i18n';
 
 // ============================================
 // MESAJ İŞLEMLERİ

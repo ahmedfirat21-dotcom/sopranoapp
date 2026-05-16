@@ -14,7 +14,7 @@ import { Platform } from 'react-native';
 import { logger } from '../utils/logger';
 import { supabase } from '../constants/supabase';
 import type { SubscriptionTier } from '../types';
-import { i18n } from '../../services/i18n';
+import { i18n } from './i18n';
 
 // ═══ KONFİGÜRASYON ═══
 // ★ RevenueCat henüz yapılandırılmadıysa production'da da mock mode kullanılır.

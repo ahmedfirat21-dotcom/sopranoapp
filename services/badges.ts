@@ -10,7 +10,7 @@
  */
 import { supabase } from '../constants/supabase';
 import { resolveBadges, sortBadgesByRarity, type BadgeDef } from '../constants/badges';
-import { i18n } from '../../services/i18n';
+import { i18n } from './i18n';
 
 interface AwardedBadge {
   badge_id: string;

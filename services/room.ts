@@ -17,7 +17,7 @@ import type {
   SubscriptionTier,
 } from '../types';
 import { migrateLegacyTier, normalizeRole } from '../types';
-import { i18n } from '../../services/i18n';
+import { i18n } from './i18n';
 
 /**
  * ★ 2026-04-27: Geçici host tespiti.

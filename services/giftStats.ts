@@ -11,7 +11,7 @@
  */
 
 import { supabase } from '../constants/supabase';
-import { i18n } from '../../services/i18n';
+import { i18n } from './i18n';
 
 const WINDOW_DAYS = 30;
 const cutoffISO = () => new Date(Date.now() - WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString();

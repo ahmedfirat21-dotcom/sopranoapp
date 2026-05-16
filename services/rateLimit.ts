@@ -17,7 +17,7 @@
  *     (Strict isteyen action'larda caller fail-closed yapabilir.)
  */
 import { supabase } from '../constants/supabase';
-import { i18n } from '../../services/i18n';
+import { i18n } from './i18n';
 
 export type RateLimitAction =
   | 'room_create'

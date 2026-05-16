@@ -18,7 +18,7 @@
  */
 import { supabase } from '../constants/supabase';
 import type { FollowUser } from './friendship';
-import { i18n } from '../../services/i18n';
+import { i18n } from './i18n';
 
 export const FollowService = {
   /**

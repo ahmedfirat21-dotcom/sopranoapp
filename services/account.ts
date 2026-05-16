@@ -14,7 +14,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { auth } from '../constants/firebase';
 import { supabase } from '../constants/supabase';
 import { logger } from '../utils/logger';
-import { i18n } from '../../services/i18n';
+import { i18n } from './i18n';
 
 // ★ 2026-05-09: Hesap silme sonrası login ekranında Lottie animasyonu
 //   tetiklemek için kullanılan bir kerelik bayrak. Login ekranı mount'ta

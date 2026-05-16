@@ -4,7 +4,7 @@
  * Hafif, dependency-free çeviri motoru.
  *
  * Kullanım:
- *   import { i18n } from '../services/i18n';
+ *   import { i18n } from './i18n';
  *
  *   // Çeviri al
  *   i18n.t('settings.title')           → "Ayarlar" veya "Settings"

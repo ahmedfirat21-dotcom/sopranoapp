@@ -9,7 +9,7 @@ import StatusAvatar from './StatusAvatar';
 import { Colors } from '../constants/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from '../services/i18n';
-import { i18n } from '../../services/i18n';
+import { i18n } from '../services/i18n';
 
 // Tab bar height + gap — alt navigasyon barının üstünde bitsin
 const TAB_BAR_SPACE = 60 + 8 + 6; // BAR_H (60) + min paddingBottom (8) + extra gap

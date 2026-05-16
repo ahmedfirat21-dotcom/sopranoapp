@@ -1,7 +1,7 @@
 import { logger } from '../utils/logger';
 import { supabase } from '../constants/supabase';
 import { GamificationService } from './gamification';
-import { i18n } from '../../services/i18n';
+import { i18n } from './i18n';
 
 export const ReferralService = {
   // Rastgele 6 haneli büyük harf+rakam kodu üret

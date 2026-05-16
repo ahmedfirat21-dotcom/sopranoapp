@@ -10,7 +10,7 @@ import { getRoomLimits, isTierAtLeast } from '../constants/tiers';
 import * as Crypto from 'expo-crypto';
 import type { Room, RoomSettings, SubscriptionTier, RoomLanguage, ParticipantRole } from '../types';
 import { migrateLegacyTier } from '../types';
-import { i18n } from '../../services/i18n';
+import { i18n } from './i18n';
 
 // ★ SEC-PWD: Oda şifre hash'leme yardımcıları
 const PWD_SALT = 'soprano_room_v1_'; // Sabit salt — oda şifreleri düşük güvenlik gerektiren alan

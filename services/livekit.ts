@@ -5,7 +5,7 @@ import { NativeModules, Platform } from 'react-native';
 import { supabase, SUPABASE_ANON_KEY } from '../constants/supabase';
 import { LIVEKIT_URL, LIVEKIT_TOKEN_ENDPOINT } from '../constants/livekit';
 import { logger } from '../utils/logger';
-import { i18n } from '../../services/i18n';
+import { i18n } from './i18n';
 
 let _lk: any = null;
 let _globalsRegistered = false;

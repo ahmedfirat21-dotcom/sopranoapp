@@ -9,7 +9,7 @@ import { getRoomLimits } from '../constants/tiers';
 import type { TierName } from '../types';
 import { PushService } from './push';
 import { FriendshipService } from './friendship';
-import { i18n } from '../../services/i18n';
+import { i18n } from './i18n';
 
 let globalCallChannel: ReturnType<typeof supabase.channel> | null = null;
 // ★ Y5: Per-caller call signal rate limit — spoofing/spam koruması (60sn içinde max 3)

@@ -8,7 +8,7 @@
 import { logger } from '../utils/logger';
 import { supabase } from '../constants/supabase';
 import { filterBadWords, containsBadWords } from '../constants/badwords';
-import { i18n } from '../../services/i18n';
+import { i18n } from './i18n';
 
 export type ReportReason =
   | 'spam' | 'harassment' | 'hate_speech' | 'inappropriate_content'

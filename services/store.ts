@@ -5,7 +5,7 @@
 
 import { supabase } from '../constants/supabase';
 import { logger } from '../utils/logger';
-import { i18n } from '../../services/i18n';
+import { i18n } from './i18n';
 
 export type Rarity = 'divine' | 'mythic' | 'legendary' | 'rare' | 'new';
 

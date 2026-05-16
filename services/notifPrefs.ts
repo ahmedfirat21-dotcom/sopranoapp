@@ -23,7 +23,7 @@
  * sorgusu yapılmaması için.
  */
 import { supabase } from '../constants/supabase';
-import { i18n } from '../../services/i18n';
+import { i18n } from './i18n';
 
 export type NotificationCategory =
   | 'room_invite'

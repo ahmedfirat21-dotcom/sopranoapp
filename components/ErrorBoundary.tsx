@@ -7,7 +7,7 @@ import React, { Component, type ReactNode } from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { i18n } from '../../services/i18n';
+import { i18n } from '../services/i18n';
 
 // ★ 2026-04-25: Crashlytics — lazy load (native module yoksa import patlamasın)
 let crashlytics: any = null;

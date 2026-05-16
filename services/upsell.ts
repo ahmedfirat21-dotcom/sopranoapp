@@ -8,7 +8,7 @@
  */
 import { TIER_ORDER } from '../constants/tiers';
 import type { SubscriptionTier, UpsellTrigger, UpsellEvent } from '../types';
-import { i18n } from '../../services/i18n';
+import { i18n } from './i18n';
 
 // ════════════════════════════════════════════════════════════
 // UPSELL MESAJLARI

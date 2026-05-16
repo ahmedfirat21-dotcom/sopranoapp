@@ -15,7 +15,7 @@ import StatusAvatar from './StatusAvatar';
 import { Colors } from '../constants/theme';
 // ★ v107.32: Cycle kırma — _layout yerine direkt context dosyasından
 import { useUserProfileSheet } from '../providers/UserProfileSheetContext';
-import { i18n } from '../../services/i18n';
+import { i18n } from '../services/i18n';
 
 export interface IncomingFriendRequest {
   senderId: string;

@@ -8,7 +8,7 @@ import { supabase } from '../constants/supabase';
 import { getRoomLimits } from '../constants/tiers';
 import type { Profile, SubscriptionTier } from '../types';
 import { migrateLegacyTier } from '../types';
-import { i18n } from '../../services/i18n';
+import { i18n } from './i18n';
 
 // ============================================
 // PROFİL İŞLEMLERİ

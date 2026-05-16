@@ -6,7 +6,7 @@
 import { supabase } from '../constants/supabase';
 import { PushService } from './push';
 import type { Room } from './database';
-import { i18n } from '../../services/i18n';
+import { i18n } from './i18n';
 
 export interface RoomFollow {
   id: string;
