@@ -249,7 +249,7 @@ const ManagedRoomCard = React.memo(function ManagedRoomCard({ room, onManage, on
               return (
                 <View style={[mS.typeBadge, { backgroundColor: 'rgba(20,184,166,0.12)', borderColor: 'rgba(20,184,166,0.25)' }]}>
                   <Ionicons name="hourglass-outline" size={8} color="#5EEAD4" />
-                  <Text style={[mS.typeBadgeText, { color: '#5EEAD4' }]}>{label} kaldı</Text>
+                  <Text style={[mS.typeBadgeText, { color: '#5EEAD4' }]}>{label}{i18n.t('auto.tabs.myrooms.022')}</Text>
                 </View>
               );
             })()}
@@ -374,7 +374,7 @@ function ManagedRoomsEmptyCard() {
           start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
           style={StyleSheet.absoluteFillObject}
         />
-        <Text style={mrS.emptyTitle}>Henüz bir odanız yok.{'\n'}İlk odanızı oluşturun!</Text>
+        <Text style={mrS.emptyTitle}>{i18n.t('auto.tabs.myrooms.021')}{'\n'}{i18n.t('auto.tabs.myrooms.020')}</Text>
         {/* ★ v255 (13 May 2026): GlowView wrap kaldırıldı — Lottie mikrofon zaten kendi
             glow'unu içeriyor, üstüne Skia BlurMask binince "teal kare gölge" oluşuyordu.
             Sade Lottie ile temiz görünüm. */}
@@ -874,7 +874,7 @@ export default function MyRoomsScreen() {
           .filter((p: any) => p.rooms?.is_live)
           .map((p: any) => ({
             friendId: p.user_id,
-            friendName: p.profiles?.display_name || 'Arkadaş',
+            friendName: p.profiles?.display_name || i18n.t('auto.tabs.myrooms.019'),
             friendAvatar: p.profiles?.avatar_url || '',
             roomId: p.rooms?.id || p.room_id,
             roomName: p.rooms?.name || 'Oda',
@@ -954,7 +954,7 @@ export default function MyRoomsScreen() {
         .filter((p: any) => p.rooms?.is_live)
         .map((p: any) => ({
           friendId: p.user_id,
-          friendName: p.profiles?.display_name || 'Arkadaş',
+          friendName: p.profiles?.display_name || i18n.t('auto.tabs.myrooms.018'),
           friendAvatar: p.profiles?.avatar_url || '',
           roomId: p.rooms?.id || p.room_id,
           roomName: p.rooms?.name || 'Oda',
@@ -1108,7 +1108,7 @@ export default function MyRoomsScreen() {
         const dateStr = scheduledTime.toLocaleString('tr-TR', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
         showToast({
           title: i18n.t('tabs.myrooms.003'),
-          message: `Bu oda ${dateStr} için planlanmıştı, şimdi canlıya alınıyor.`,
+          message: i18n.t('auto.tabs.myrooms.017', { 0: dateStr }),
           type: 'info',
         });
       }
@@ -1119,7 +1119,7 @@ export default function MyRoomsScreen() {
       } catch {}
       router.push(`/room/${room.id}`);
     } catch (err: any) {
-      showToast({ title: i18n.t('tabs.myrooms.004'), message: err.message || 'Oda başlatılamadı.', type: 'error' });
+      showToast({ title: i18n.t('tabs.myrooms.004'), message: err.message || i18n.t('auto.tabs.myrooms.016'), type: 'error' });
     }
   }, [firebaseUser, profile, router]);
 
@@ -1256,7 +1256,7 @@ export default function MyRoomsScreen() {
     try {
       await RoomService.updateSettings(selectedRoom.id, firebaseUser.uid, { room_settings: { [field]: value } });
       broadcast(selectedRoom.id, { room_settings: { [field]: value } });
-    } catch (e: any) { showToast({ title: 'Ayar Kaydedilemedi', message: e.message || 'Sunucuya ulaşılamadı.', type: 'error' }); }
+    } catch (e: any) { showToast({ title: 'Ayar Kaydedilemedi', message: e.message || i18n.t('auto.tabs.myrooms.015'), type: 'error' }); }
   }, [selectedRoom, firebaseUser, broadcast]);
 
   const handleRoomRename = useCallback(async (name: string) => {
@@ -1293,7 +1293,7 @@ export default function MyRoomsScreen() {
       showToast({ title: '🗑 Oda Silindi', message: i18n.t('tabs.myrooms.012'), type: 'success' });
       setSelectedRoom(null);
       loadData();
-    } catch (e: any) { showToast({ title: 'Oda Silinemedi', message: e.message || 'İşlem tamamlanamadı.', type: 'error' }); }
+    } catch (e: any) { showToast({ title: 'Oda Silinemedi', message: e.message || i18n.t('auto.tabs.myrooms.014'), type: 'error' }); }
   }, [selectedRoom, firebaseUser, loadData]);
 
   // ★ 2026-04-23: Hızlı oda oluşturma — CTA ve empty state chip'lerinden tetiklenir.
@@ -1309,7 +1309,7 @@ export default function MyRoomsScreen() {
         setTimeout(() => router.push('/plus' as any), 400);
         return;
       }
-      const displayName = profile?.display_name || firebaseUser.displayName || 'Kullanıcı';
+      const displayName = profile?.display_name || firebaseUser.displayName || i18n.t('auto.tabs.myrooms.013');
       const room = await RoomService.quickCreate(firebaseUser.uid, displayName, category, userTier);
       try {
         const { Analytics, Events } = require('../../services/analytics');
@@ -1330,7 +1330,7 @@ export default function MyRoomsScreen() {
       showToast({ title: '❄️ Oda Donduruldu', message: i18n.t('tabs.myrooms.016'), type: 'success' });
       setSelectedRoom(null);
       loadData();
-    } catch (e: any) { showToast({ title: i18n.t('tabs.myrooms.017'), message: e.message || 'Oda uyku moduna alınamadı.', type: 'error' }); }
+    } catch (e: any) { showToast({ title: i18n.t('tabs.myrooms.017'), message: e.message || i18n.t('auto.tabs.myrooms.012'), type: 'error' }); }
   }, [selectedRoom, firebaseUser, loadData]);
 
   // settingsConfig objesi — PlusMenu'ye geçirilir
@@ -1384,7 +1384,7 @@ export default function MyRoomsScreen() {
         setRmBgImage(url);
         updateRoomSetting('room_image_url', url);
         showToast({ title: i18n.t('tabs.myrooms.020'), type: 'success' });
-      } catch (e: any) { showToast({ title: i18n.t('tabs.myrooms.021'), message: e.message || 'Görsel yüklenirken hata oluştu.', type: 'error' }); }
+      } catch (e: any) { showToast({ title: i18n.t('tabs.myrooms.021'), message: e.message || i18n.t('auto.tabs.myrooms.011'), type: 'error' }); }
     },
     onRemoveBackgroundImage: () => { setRmBgImage(null); updateRoomSetting('room_image_url', null); },
     coverImage: rmCoverImage,
@@ -1402,7 +1402,7 @@ export default function MyRoomsScreen() {
         setRmCoverImage(url);
         updateRoomSetting('card_image_url', url);
         showToast({ title: i18n.t('tabs.myrooms.024'), type: 'success' });
-      } catch (e: any) { showToast({ title: i18n.t('tabs.myrooms.025'), message: e.message || 'Görsel yüklenirken hata oluştu.', type: 'error' }); }
+      } catch (e: any) { showToast({ title: i18n.t('tabs.myrooms.025'), message: e.message || i18n.t('auto.tabs.myrooms.010'), type: 'error' }); }
     },
     onRemoveCoverImage: () => { setRmCoverImage(null); updateRoomSetting('card_image_url', null); },
   } : undefined;
@@ -1438,7 +1438,7 @@ export default function MyRoomsScreen() {
                 if (!next) setSearchQuery('');
                 else setTimeout(() => searchInputRef.current?.focus(), 100);
               }}
-              accessibilityLabel={showSearch ? 'Aramayı kapat' : 'Ara'}
+              accessibilityLabel={showSearch ? i18n.t('auto.tabs.myrooms.009') : 'Ara'}
             >
               <Ionicons name={showSearch ? 'close' : 'search-outline'} size={22} color={showSearch ? '#14B8A6' : '#F1F5F9'} style={s.headerIcon} />
             </AnimatedHeaderIconBtn>
@@ -1449,7 +1449,7 @@ export default function MyRoomsScreen() {
               staticIcon
               style={s.headerIconBtn}
               onPress={() => setShowFriends(true)}
-              accessibilityLabel={pendingFollowCount > 0 ? `Arkadaşlar, ${pendingFollowCount} bekleyen istek` : 'Arkadaşlar'}
+              accessibilityLabel={pendingFollowCount > 0 ? i18n.t('auto.tabs.myrooms.008', { 0: pendingFollowCount }) : i18n.t('auto.tabs.myrooms.007')}
             >
               <Ionicons name="people-outline" size={22} color="#F1F5F9" style={s.headerIcon} />
               {pendingFollowCount > 0 && (
@@ -1527,10 +1527,10 @@ export default function MyRoomsScreen() {
             <Text style={s.ctaSub}>
               {/* ★ 2026-04-21: GodMaster/admin için ∞ açık gösterimi — tier gücünü hissetsin. */}
               {dailyQuota
-                ? `Bugün ${dailyQuota.count}/${dailyQuota.limit} kullandın · Sesli oda aç`
+                ? i18n.t('auto.tabs.myrooms.006', { 0: dailyQuota.count, 1: dailyQuota.limit })
                 : (isAdmin || subscriptionTier === 'GodMaster')
-                  ? 'Sınırsız oda hakkı · ∞ oda aç'
-                  : 'Sesli veya görüntülü oda aç'}
+                  ? i18n.t('auto.tabs.myrooms.005')
+                  : i18n.t('auto.tabs.myrooms.004')}
             </Text>
           </View>
           <Ionicons name="arrow-forward" size={20} color="rgba(255,255,255,0.7)" />
@@ -1638,8 +1638,8 @@ export default function MyRoomsScreen() {
           try {
             const { Share } = require('react-native');
             await Share.share({
-              message: `🎤 "${selectedRoom.name || 'Oda'}" odasına gel! SopranoChat'te konuşalım:\nhttps://sopranochat.com/room/${selectedRoom.id}`,
-              title: selectedRoom.name || 'SopranoChat Odası',
+              message: i18n.t('auto.tabs.myrooms.003', { 0: selectedRoom.name || 'Oda', 1: selectedRoom.id }),
+              title: selectedRoom.name || i18n.t('auto.tabs.myrooms.002'),
             });
           } catch {}
         }}
@@ -1683,7 +1683,7 @@ export default function MyRoomsScreen() {
               } catch {}
             }
             if (successCount > 0) {
-              showToast({ title: i18n.t('tabs.myrooms.028'), message: `${successCount} kişiye davet gönderildi`, type: 'success' });
+              showToast({ title: i18n.t('tabs.myrooms.028'), message: i18n.t('auto.tabs.myrooms.001', { 0: successCount }), type: 'success' });
             }
             setShowInviteFriends(false);
           }}

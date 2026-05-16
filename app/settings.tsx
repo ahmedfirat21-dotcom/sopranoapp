@@ -320,7 +320,7 @@ export default function SettingsScreen() {
             // ★ Önce Firebase tarafından bilgi al
             const fbUser = auth.currentUser;
             const fbUid = fbUser?.uid || '(currentUser NULL)';
-            let tokenPreview = '(token alınamadı)';
+            let tokenPreview = i18n.t('auto.settings.003');
             try {
               const tk = fbUser ? await fbUser.getIdToken(true) : null;
               tokenPreview = tk ? `${tk.slice(0, 20)}...${tk.slice(-10)}` : '(null)';
@@ -336,7 +336,7 @@ export default function SettingsScreen() {
 
             setCAlert({
               visible: true,
-              title: ok ? '✅ JWT Doğrulanıyor' : '❌ JWT Sorunu',
+              title: ok ? i18n.t('auto.settings.002') : '❌ JWT Sorunu',
               message:
                 `Versiyon: ${APP_VERSION}\n\n` +
                 `--- FIREBASE ---\n` +
@@ -352,7 +352,7 @@ export default function SettingsScreen() {
               buttons: [{ text: 'Tamam' }],
             });
           } catch (e: any) {
-            showToast({ title: i18n.t('settings.001'), message: e?.message || 'whoami() çağrılamadı', type: 'error' });
+            showToast({ title: i18n.t('settings.001'), message: e?.message || i18n.t('auto.settings.001'), type: 'error' });
           }
         })();
         break;

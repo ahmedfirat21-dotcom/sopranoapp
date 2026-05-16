@@ -60,8 +60,8 @@ interface Props {
 }
 
 const MODE_META: Record<ListMode, { title: string; emptyText: string; icon: keyof typeof Ionicons.glyphMap }> = {
-  friends:   { title: i18n.t('followlistmodal.001'), emptyText: 'Henüz arkadaş yok', icon: 'people' },
-  followers: { title: i18n.t('followlistmodal.002'), emptyText: 'Henüz takipçi yok', icon: 'person-add' },
+  friends:   { title: i18n.t('followlistmodal.001'), emptyText: i18n.t('auto.FollowListModal.009'), icon: 'people' },
+  followers: { title: i18n.t('followlistmodal.002'), emptyText: i18n.t('auto.FollowListModal.008'), icon: 'person-add' },
   following: { title: i18n.t('followlistmodal.003'), emptyText: 'Kimseyi takip etmiyor', icon: 'person' },
 };
 
@@ -223,12 +223,12 @@ export default function FollowListModal({
     setCAlert({
       visible: true,
       title: i18n.t('followlistmodal.004'),
-      message: `${name} ile arkadaşlığın sona ersin mi?`,
+      message: i18n.t('auto.FollowListModal.007', { 0: name }),
       type: 'warning',
       buttons: [
-        { text: 'Vazgeç', style: 'cancel' },
+        { text: i18n.t('auto.FollowListModal.006'), style: 'cancel' },
         {
-          text: 'Çıkar', style: 'destructive', onPress: async () => {
+          text: i18n.t('auto.FollowListModal.005'), style: 'destructive', onPress: async () => {
             setActionLoading(targetId);
             const result = await FriendshipService.removeFriend(currentUserId, targetId);
             if (result.success) setItems(prev => prev.filter(f => f.id !== targetId));
@@ -246,7 +246,7 @@ export default function FollowListModal({
       message: `${name} engellensin mi?`,
       type: 'error',
       buttons: [
-        { text: 'Vazgeç', style: 'cancel' },
+        { text: i18n.t('auto.FollowListModal.004'), style: 'cancel' },
         {
           text: 'Engelle', style: 'destructive', onPress: async () => {
             setActionLoading(targetId);
@@ -264,12 +264,12 @@ export default function FollowListModal({
     setCAlert({
       visible: true,
       title: i18n.t('followlistmodal.005'),
-      message: `${name} kullanıcısını takipten çıkmak istiyor musun?`,
+      message: i18n.t('auto.FollowListModal.003', { 0: name }),
       type: 'warning',
       buttons: [
-        { text: 'Vazgeç', style: 'cancel' },
+        { text: i18n.t('auto.FollowListModal.002'), style: 'cancel' },
         {
-          text: 'Takipten Çık', style: 'destructive', onPress: async () => {
+          text: i18n.t('auto.FollowListModal.001'), style: 'destructive', onPress: async () => {
             setActionLoading(targetId);
             const result = await FollowService.removeFollow(currentUserId, targetId);
             if (result.success) setItems(prev => prev.filter(f => f.id !== targetId));

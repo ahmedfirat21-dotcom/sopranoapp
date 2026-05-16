@@ -111,20 +111,20 @@ function getNotifIcon(type: string): { name: string; color: string } {
 
 function getDefaultBody(type: string): string {
   switch (type) {
-    case 'gift': return 'sana hediye gönderdi';
-    case 'symbol_gift': return 'sana bir sembol hediyesi gönderdi';
-    case 'thank_you': return 'sana teşekkür etti';
-    case 'room_live': return 'odası canlıya geçti';
+    case 'gift': return i18n.t('auto.NotificationDrawer.015');
+    case 'symbol_gift': return i18n.t('auto.NotificationDrawer.014');
+    case 'thank_you': return i18n.t('auto.NotificationDrawer.013');
+    case 'room_live': return i18n.t('auto.NotificationDrawer.012');
     case 'room_invite': return 'seni odaya davet etti';
     case 'room_invite_accepted': return 'oda davetini kabul etti 🎉';
     case 'room_invite_rejected': return 'oda davetini reddetti';
-    case 'room_access_request': return 'odaya katılmak istiyor';
-    case 'missed_call': return 'Cevapsız sesli arama';
-    case 'incoming_call': return 'Cevapsız görüntülü arama';
-    case 'event_reminder': return 'Etkinlik hatırlatması';
-    case 'follow_pending': return 'sana arkadaşlık isteği gönderdi';
-    case 'follow_accepted': return 'arkadaşlık isteğini kabul etti 🎉';
-    case 'follow_rejected': return 'arkadaşlık isteğini reddetti';
+    case 'room_access_request': return i18n.t('auto.NotificationDrawer.011');
+    case 'missed_call': return i18n.t('auto.NotificationDrawer.010');
+    case 'incoming_call': return i18n.t('auto.NotificationDrawer.009');
+    case 'event_reminder': return i18n.t('auto.NotificationDrawer.008');
+    case 'follow_pending': return i18n.t('auto.NotificationDrawer.007');
+    case 'follow_accepted': return i18n.t('auto.NotificationDrawer.006');
+    case 'follow_rejected': return i18n.t('auto.NotificationDrawer.005');
     default: return '';
   }
 }
@@ -139,15 +139,15 @@ function getTimeGroup(dateStr: string): 'today' | 'week' | 'older' {
   return 'older';
 }
 const GROUP_LABELS: Record<string, string> = {
-  today: 'Bugün',
+  today: i18n.t('auto.NotificationDrawer.004'),
   week: 'Bu Hafta',
-  older: 'Önceki',
+  older: i18n.t('auto.NotificationDrawer.003'),
 };
 
 function timeAgo(date: string): string {
   const diff = Date.now() - new Date(date).getTime();
   const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'şimdi';
+  if (mins < 1) return i18n.t('auto.NotificationDrawer.002');
   if (mins < 60) return `${mins}dk`;
   const hours = Math.floor(mins / 60);
   if (hours < 24) return `${hours}sa`;
@@ -548,7 +548,7 @@ export default function NotificationDrawer({ visible, onClose, userId, anchorTop
           style={s.header}
           onLongPress={handleMarkAllRead}
           delayLongPress={500}
-          accessibilityHint="Uzun bas: tümünü okundu işaretle"
+          accessibilityHint={i18n.t('auto.NotificationDrawer.001')}
         >
           <Ionicons name="notifications" size={20} color="#14B8A6" style={s.headerIcon} />
           <Text style={s.title}>{t('notif.title')}</Text>

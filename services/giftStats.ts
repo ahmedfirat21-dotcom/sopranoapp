@@ -11,6 +11,7 @@
  */
 
 import { supabase } from '../constants/supabase';
+import { i18n } from '../../services/i18n';
 
 const WINDOW_DAYS = 30;
 const cutoffISO = () => new Date(Date.now() - WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString();
@@ -100,7 +101,7 @@ export const GiftStatsService = {
       const p: any = profMap.get(uid);
       return {
         user_id: uid,
-        display_name: p?.display_name || 'Kullanıcı',
+        display_name: p?.display_name || i18n.t('auto.giftStats.001'),
         avatar_url: p?.avatar_url || '',
         active_frame: p?.active_frame || null,
         active_badge_id: p?.active_badge_id || null,

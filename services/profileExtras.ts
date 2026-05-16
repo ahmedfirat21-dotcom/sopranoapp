@@ -11,6 +11,7 @@
  */
 import { supabase } from '../constants/supabase';
 import { StorageService } from './storage';
+import { i18n } from '../../services/i18n';
 
 // ═══════════════════════════════════════════════════════════════════
 // VOICE BIO — Sesli Tanıtım
@@ -27,10 +28,10 @@ export const VoiceBioService = {
    */
   async upload(userId: string, audioUri: string, durationMs: number, prevUrl?: string | null): Promise<string> {
     if (durationMs < VOICE_BIO_MIN_MS) {
-      throw new Error('Sesli tanıtım çok kısa (en az 3 saniye)');
+      throw new Error(i18n.t('auto.profileExtras.004'));
     }
     if (durationMs > VOICE_BIO_MAX_MS) {
-      throw new Error('Sesli tanıtım çok uzun (en fazla 30 saniye)');
+      throw new Error(i18n.t('auto.profileExtras.003'));
     }
     const url = await StorageService.uploadVoiceNote(userId, audioUri);
     await supabase
@@ -98,7 +99,7 @@ export const SupportersService = {
     if (error || !data) return [];
     return (data as any[]).map(r => ({
       supporter_id: r.supporter_id,
-      display_name: r.display_name || 'Kullanıcı',
+      display_name: r.display_name || i18n.t('auto.profileExtras.002'),
       avatar_url: r.avatar_url || '',
       subscription_tier: r.subscription_tier || 'Free',
       total_amount: Number(r.total_amount) || 0,
@@ -257,6 +258,6 @@ export const SpeakingRhythmService = {
     if (bestSum < total * 0.4) return null; // 3 saat blok toplamın %40'ını taşımıyorsa pattern yok
     const end = (bestStart + 3) % 24;
     const fmt = (h: number) => `${h.toString().padStart(2, '0')}:00`;
-    return `Genelde ${fmt(bestStart)} - ${fmt(end)} arası aktif`;
+    return i18n.t('auto.profileExtras.001', { 0: fmt(bestStart), 1: fmt(end) });
   },
 };

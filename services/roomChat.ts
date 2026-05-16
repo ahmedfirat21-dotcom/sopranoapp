@@ -6,6 +6,7 @@ import { logger } from '../utils/logger';
 import { supabase } from '../constants/supabase';
 import { filterBadWords } from '../constants/badwords';
 import { isSystemRoom } from './showcaseRooms';
+import { i18n } from '../../services/i18n';
 
 export type RoomMessage = {
   id: string;
@@ -130,7 +131,7 @@ export const RoomChatService = {
    * @returns silinen mesaj sayısı
    */
   async clearAllMessages(roomId: string, userId: string): Promise<{ success: boolean; deletedCount?: number; error?: string }> {
-    if (isSystemRoom(roomId)) return { success: false, error: 'Sistem odası temizlenemez.' };
+    if (isSystemRoom(roomId)) return { success: false, error: i18n.t('auto.roomChat.007') };
     try {
       const { data, error } = await supabase.rpc('clear_room_messages', {
         p_room_id: roomId,
@@ -138,12 +139,12 @@ export const RoomChatService = {
       });
       if (error) {
         if (__DEV__) logger.warn('clearAllMessages RPC error:', error);
-        return { success: false, error: error.message || 'Temizleme başarısız.' };
+        return { success: false, error: error.message || i18n.t('auto.roomChat.006') };
       }
       return { success: true, deletedCount: typeof data === 'number' ? data : 0 };
     } catch (e: any) {
       if (__DEV__) logger.warn('clearAllMessages exception:', e);
-      return { success: false, error: e?.message || 'Bağlantı hatası.' };
+      return { success: false, error: e?.message || i18n.t('auto.roomChat.005') };
     }
   },
 
@@ -314,9 +315,9 @@ export const RoomChatService = {
     content: string,
     glowStyle: 'gold' | 'heart' | 'fire' | 'neon' | 'celebration' | 'galaxy',
   ): Promise<{ success: boolean; error?: string; cost?: number; newBalance?: number; messageId?: string }> {
-    if (isSystemRoom(roomId)) return { success: false, error: 'Sistem odasında geçersiz' };
+    if (isSystemRoom(roomId)) return { success: false, error: i18n.t('auto.roomChat.004') };
     const cleaned = (content || '').trim().replace(/<[^>]*>/g, '').slice(0, 500);
-    if (cleaned.length < 1) return { success: false, error: 'Boş mesaj' };
+    if (cleaned.length < 1) return { success: false, error: i18n.t('auto.roomChat.003') };
 
     // Client-side rate limit + emoji cooldown — server'a gereksiz RPC atılmasın
     _ensureCleanupInterval();
@@ -326,7 +327,7 @@ export const RoomChatService = {
     if (!entry) { entry = { timestamps: [], lastEmoji: 0 }; _rateLimitMap.set(rateLimitKey, entry); }
     entry.timestamps = entry.timestamps.filter(t => now - t < RATE_LIMIT_WINDOW);
     if (entry.timestamps.length >= RATE_LIMIT_MAX) {
-      return { success: false, error: 'Çok hızlı mesaj gönderiyorsun' };
+      return { success: false, error: i18n.t('auto.roomChat.002') };
     }
     entry.timestamps.push(now);
 
@@ -357,7 +358,7 @@ export const RoomChatService = {
       };
     } catch (e: any) {
       if (__DEV__) logger.warn('[RoomChat] sendGlow exception:', e?.message);
-      return { success: false, error: e?.message || 'Bağlantı hatası' };
+      return { success: false, error: e?.message || i18n.t('auto.roomChat.001') };
     }
   },
 

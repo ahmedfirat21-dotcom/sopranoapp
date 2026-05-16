@@ -25,6 +25,7 @@
 import { supabase } from '../constants/supabase';
 import { BadgeService } from './badges';
 import { BADGES } from '../constants/badges';
+import { i18n } from '../../services/i18n';
 
 /** Güvenli wrapper — badge hatası asla caller'ı bozmasın */
 async function _safeAward(userId: string, badgeId: string): Promise<boolean> {
@@ -42,7 +43,7 @@ async function _safeAward(userId: string, badgeId: string): Promise<boolean> {
           await GamificationService.earn(
             userId, badgeDef.spReward, 'badge_reward',
             `badge_reward:${badgeId}:${userId}`, // idempotent — aynı rozet 2. kez SP vermez
-            null, `${badgeDef.label} rozeti ödülü`
+            null, i18n.t('auto.badgeEngine.001', { 0: badgeDef.label })
           );
         } catch (e) {
           if (__DEV__) console.warn(`[BadgeEngine] SP reward hatası (${badgeId}):`, e);

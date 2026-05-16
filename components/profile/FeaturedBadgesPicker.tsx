@@ -67,7 +67,7 @@ export default function FeaturedBadgesPicker({ visible, userId, onSaved, onClose
     setSelected(prev => {
       if (prev.includes(id)) return prev.filter(x => x !== id);
       if (prev.length >= MAX_FEATURED_BADGES) {
-        showToast({ title: `En fazla ${MAX_FEATURED_BADGES} rozet seçebilirsin`, type: 'info' });
+        showToast({ title: i18n.t('auto.profile.FeaturedBadgesPicker.002', { 0: MAX_FEATURED_BADGES }), type: 'info' });
         return prev;
       }
       return [...prev, id];
@@ -133,7 +133,7 @@ export default function FeaturedBadgesPicker({ visible, userId, onSaved, onClose
 
         <Text style={s.hint}>
           Profilinde öne çıkacak en fazla {MAX_FEATURED_BADGES} rozet seç.
-          {selected.length > 0 && ` · Seçilen: ${selected.length}/${MAX_FEATURED_BADGES}`}
+          {selected.length > 0 && i18n.t('auto.profile.FeaturedBadgesPicker.001', { 0: selected.length, 1: MAX_FEATURED_BADGES })}
         </Text>
 
         <ScrollView

@@ -17,6 +17,7 @@
  *   - 2-30 karakter
  */
 import { supabase } from '../constants/supabase';
+import { i18n } from '../../services/i18n';
 
 export const MAX_TAGS_PER_ROOM = 3;
 
@@ -41,9 +42,9 @@ export function normalizeTag(raw: string): string | null {
 
 /** Sık kullanılan başlangıç önerileri — UI'da chip suggestion olarak gösterilir. */
 export const SUGGESTED_TAGS: ReadonlyArray<string> = [
-  'oyun', 'anime', 'müzik', 'standup', 'sohbet',
-  'kitap', 'film', 'dizi', 'futbol', 'gündem',
-  'felsefe', 'teknoloji', 'tarih', 'spor', 'eğlence',
+  'oyun', 'anime', i18n.t('auto.tags.004'), 'standup', 'sohbet',
+  'kitap', 'film', 'dizi', 'futbol', i18n.t('auto.tags.003'),
+  'felsefe', 'teknoloji', 'tarih', 'spor', i18n.t('auto.tags.002'),
 ];
 
 export const TagService = {
@@ -68,7 +69,7 @@ export const TagService = {
    * Atomik değil ama eşzamanlı düzenleme nadir; transaction RPC v64'te.
    */
   async setRoomTags(roomId: string, tags: string[]): Promise<{ success: boolean; error?: string; saved: string[] }> {
-    if (!roomId) return { success: false, error: 'Geçersiz oda.', saved: [] };
+    if (!roomId) return { success: false, error: i18n.t('auto.tags.001'), saved: [] };
 
     // Normalize + tekille
     const cleaned = Array.from(new Set(

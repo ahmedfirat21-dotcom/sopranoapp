@@ -12,6 +12,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../constants/supabase';
 import { logger } from '../utils/logger';
+import { i18n } from '../../services/i18n';
 
 export interface SystemSettings {
   maintenance_mode: boolean;
@@ -29,11 +30,11 @@ export interface SystemSettings {
 
 const DEFAULT_SETTINGS: SystemSettings = {
   maintenance_mode: false,
-  maintenance_message: 'Uygulama bakımda. Lütfen birazdan tekrar deneyin.',
+  maintenance_message: i18n.t('auto.systemSettings.002'),
   maintenance_eta: null,
   min_supported_version: null,
   force_update: false,
-  force_update_message: 'Lütfen Play Store\'dan güncelleyin.',
+  force_update_message: i18n.t('auto.systemSettings.001'),
   feature_flags: {},
   banner_enabled: false,
   banner_text: '',

@@ -141,7 +141,7 @@ export default function VoiceBioRecorder({
     try {
       await recordingRef.current.stopAndUnloadAsync();
       const uri = recordingRef.current.getURI();
-      if (!uri) throw new Error('Kayıt URI yok');
+      if (!uri) throw new Error(i18n.t('auto.profile.VoiceBioRecorder.002'));
       const finalMs = recordingMs;
       recordingRef.current = null;
       if (finalMs < VOICE_BIO_MIN_MS) {
@@ -352,7 +352,7 @@ export default function VoiceBioRecorder({
                   />
                   <Ionicons name={previewPlaying ? 'pause' : 'play'} size={32} color="#FFF" />
                 </Pressable>
-                <Text style={s.actionLabel}>{previewPlaying ? 'Durdur' : 'Önizle'}</Text>
+                <Text style={s.actionLabel}>{previewPlaying ? 'Durdur' : i18n.t('auto.profile.VoiceBioRecorder.001')}</Text>
 
                 <View style={s.previewActions}>
                   <Pressable

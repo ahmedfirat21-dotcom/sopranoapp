@@ -761,7 +761,7 @@ export default function SPSentSuccessModal({
           </Pressable>
           <Text style={st.notifText}>
             <Text style={{ fontSize: 13 }}>💝</Text>
-            <Text>  {recipientName}'a bildirim gönderildi</Text>
+            <Text>  {recipientName}{i18n.t('auto.profile.SPSentSuccessModal.001')}</Text>
           </Text>
         </Animated.View>
       </View>

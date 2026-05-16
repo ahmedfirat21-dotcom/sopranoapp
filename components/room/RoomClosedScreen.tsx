@@ -142,7 +142,7 @@ export default function RoomClosedScreen({ reason, onGoHome, customMessage, onRe
         </Animated.View>
 
         <Text style={s.title}>{hasMultipleReasons ? 'Bu odaya giremezsin' : config.title}</Text>
-        <Text style={s.message}>{hasMultipleReasons ? 'Birden fazla erişim engeli var:' : message}</Text>
+        <Text style={s.message}>{hasMultipleReasons ? i18n.t('auto.room.RoomClosedScreen.001') : message}</Text>
 
         {hasMultipleReasons && (
           <View style={s.reasonList}>

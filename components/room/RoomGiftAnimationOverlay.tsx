@@ -24,6 +24,7 @@ import { supabase } from '../../constants/supabase';
 import Item3DArt from '../store/Item3DArt';
 import { hasIllustration } from '../../constants/storeIllustrationsPng';
 import { getGiftLottie, hasGiftLottie } from '../../constants/giftLottieRegistry';
+import { i18n } from '../../services/i18n';
 
 // Lottie opsiyonel (native modül yoksa fallback)
 let LottieView: any = null;
@@ -166,7 +167,7 @@ export default function RoomGiftAnimationOverlay({ roomId, stageBottomY, current
             color: item?.color || '#FBBF24',
             itemName: item?.name || 'Hediye',
             senderName: senderRes.data?.display_name || 'Birisi',
-            recipientName: receiverRes.data?.display_name || 'Kullanıcı',
+            recipientName: receiverRes.data?.display_name || i18n.t('auto.room.RoomGiftAnimationOverlay.001'),
             amount: row.amount || 0,
             priceSP: item?.price || 0,
             receivedAt: Date.now(),

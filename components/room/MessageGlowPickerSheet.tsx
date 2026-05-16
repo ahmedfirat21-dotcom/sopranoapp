@@ -276,7 +276,7 @@ export default function MessageGlowPickerSheet({ visible, onClose, currentSP, on
                     ) : (
                       <>
                         <SPIcon size={12} />
-                        <Text style={s.costText}>{cfg.unlockPrice} SP · KİLİTLİ</Text>
+                        <Text style={s.costText}>{cfg.unlockPrice}{i18n.t('auto.room.MessageGlowPickerSheet.001')}</Text>
                       </>
                     )}
                   </View>

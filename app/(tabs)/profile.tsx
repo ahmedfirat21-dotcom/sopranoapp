@@ -205,22 +205,22 @@ const pliStyles = StyleSheet.create({
 // ★ SP transaction reason → Türkçe etiket + premium ikon
 function spReasonLabel(reason: string | undefined): string {
   const map: Record<string, string> = {
-    daily_login: 'Günlük giriş',
-    prime_time_return: 'Prime-time dönüş',
-    stage_time: 'Sahne süresi',
-    room_create: 'Oda oluşturma',
-    referral_reward: 'Davet ödülü',
-    gift_received: 'Hediye alındı',
-    gift_sent: 'Hediye gönderildi',
+    daily_login: i18n.t('auto.tabs.profile.026'),
+    prime_time_return: i18n.t('auto.tabs.profile.025'),
+    stage_time: i18n.t('auto.tabs.profile.024'),
+    room_create: i18n.t('auto.tabs.profile.023'),
+    referral_reward: i18n.t('auto.tabs.profile.022'),
+    gift_received: i18n.t('auto.tabs.profile.021'),
+    gift_sent: i18n.t('auto.tabs.profile.020'),
     room_boost: 'Oda boost',
     profile_boost: 'Profil boost',
-    store_purchase: 'Mağaza alışverişi',
+    store_purchase: i18n.t('auto.tabs.profile.019'),
     subscription_bonus: 'Abonelik bonusu',
-    achievement: 'Başarım',
-    admin_grant: 'Admin ödülü',
-    refund: 'İade',
+    achievement: i18n.t('auto.tabs.profile.018'),
+    admin_grant: i18n.t('auto.tabs.profile.017'),
+    refund: i18n.t('auto.tabs.profile.016'),
   };
-  return map[reason || ''] || reason || 'SP işlemi';
+  return map[reason || ''] || reason || i18n.t('auto.tabs.profile.015');
 }
 
 // ★ Reason → premium ikon + renk
@@ -257,7 +257,7 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   useTheme();
 
-  const displayName = profile?.display_name || user?.name || 'Kullanıcı';
+  const displayName = profile?.display_name || user?.name || i18n.t('auto.tabs.profile.014');
   const avatarUrl = profile?.avatar_url || user?.avatar || '';
   // ★ 2026-04-26: Boş bio için "Henüz bir şey yazmadı" placeholder kaldırıldı — ProfileHero zaten "+ Bio ekle" link'i gösteriyor (onBioPress varsa).
   const bio = profile?.bio || '';
@@ -393,9 +393,9 @@ export default function ProfileScreen() {
       message: i18n.t('tabs.profile.002'),
       type: 'warning',
       buttons: [
-        { text: 'Vazgeç', style: 'cancel' },
+        { text: i18n.t('auto.tabs.profile.013'), style: 'cancel' },
         {
-          text: 'Çıkış Yap', style: 'destructive', onPress: async () => {
+          text: i18n.t('auto.tabs.profile.012'), style: 'destructive', onPress: async () => {
             try {
               // ★ v92.16: Logout'ta push token'ı sil — eski cihaz bildirim almasın
               if (firebaseUser) {
@@ -453,7 +453,7 @@ export default function ProfileScreen() {
         showToast({ title: 'Kod Kabul Edilmedi', message: res.message, type: 'error' });
       }
     } catch (err: any) {
-      showToast({ title: i18n.t('tabs.profile.006'), message: err.message || 'Bir sorun oluştu.', type: 'error' });
+      showToast({ title: i18n.t('tabs.profile.006'), message: err.message || i18n.t('auto.tabs.profile.011'), type: 'error' });
     } finally {
       setSubmittingReferral(false);
     }
@@ -479,7 +479,7 @@ export default function ProfileScreen() {
     try {
       const { Share } = require('react-native');
       await Share.share({
-        message: `SopranoChat'e katıl! Davet kodumu kullan, 50 SP hediye kazan: ${myReferralCode}\nhttps://sopranochat.com`,
+        message: i18n.t('auto.tabs.profile.010', { 0: myReferralCode }),
       });
     } catch { }
   }, [myReferralCode]);
@@ -648,7 +648,7 @@ export default function ProfileScreen() {
           )}
 
           {/* ═══ SP Cüzdan — kompakt tek satır (v108.17) ═══ */}
-          <Pressable style={p.walletCompact} onPress={openSPHistory} accessibilityLabel="SP geçmişi">
+          <Pressable style={p.walletCompact} onPress={openSPHistory} accessibilityLabel={i18n.t('auto.tabs.profile.009')}>
             <LinearGradient
               colors={['#2A1F12', '#1e160d']}
               start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
@@ -820,7 +820,7 @@ export default function ProfileScreen() {
                     <View style={{ flex: 1 }}>
                       <Text style={{ color: Colors.teal, fontSize: 12, fontWeight: '700' }}>{t('profile.invite_code_used')}</Text>
                       <Text style={{ color: Colors.text3, fontSize: 11, marginTop: 2 }}>
-                        {usedReferral.code ? `Kod: ${usedReferral.code}` : 'Bir kod zaten uygulandı'}
+                        {usedReferral.code ? `Kod: ${usedReferral.code}` : i18n.t('auto.tabs.profile.008')}
                         {usedReferral.usedAt ? ` · ${new Date(usedReferral.usedAt).toLocaleDateString('tr-TR')}` : ''}
                       </Text>
                     </View>
@@ -906,7 +906,7 @@ export default function ProfileScreen() {
               await refreshProfile();
               // ★ 2026-05-05: Başarı toast'ı kaldırıldı — checked.json overlay yeterli görsel feedback.
             } catch (err: any) {
-              showToast({ title: i18n.t('tabs.profile.010'), message: err.message || 'Hata oluştu', type: 'error' });
+              showToast({ title: i18n.t('tabs.profile.010'), message: err.message || i18n.t('auto.tabs.profile.007'), type: 'error' });
               throw err; // BoostPickerSheet loading state'i kapatsın
             }
           }}
@@ -979,24 +979,24 @@ export default function ProfileScreen() {
                 setDeleteAlert({
                   visible: true,
                   title: i18n.t('tabs.profile.014'),
-                  message: `${target.display_name} artık arkadaş listenden kaldırılacak.`,
+                  message: i18n.t('auto.tabs.profile.006', { 0: target.display_name }),
                   type: 'warning',
                   buttons: [
-                    { text: 'İptal', style: 'cancel' },
+                    { text: i18n.t('auto.tabs.profile.005'), style: 'cancel' },
                     {
-                      text: 'Çıkar',
+                      text: i18n.t('auto.tabs.profile.004'),
                       style: 'destructive',
                       onPress: async () => {
                         try {
                           const res = await FriendshipService.removeFriend(firebaseUser.uid, target.id);
                           if (res?.success) {
-                            showToast({ title: i18n.t('tabs.profile.015'), message: `${target.display_name} listenden çıkarıldı.`, type: 'info' });
+                            showToast({ title: i18n.t('tabs.profile.015'), message: i18n.t('auto.tabs.profile.003', { 0: target.display_name }), type: 'info' });
                             try { (global as any).__sopranoBadgeRefresh?.(); } catch { }
                           } else {
-                            showToast({ title: i18n.t('tabs.profile.016'), message: res?.error || 'Arkadaş listesinden çıkarılamadı.', type: 'error' });
+                            showToast({ title: i18n.t('tabs.profile.016'), message: res?.error || i18n.t('auto.tabs.profile.002'), type: 'error' });
                           }
                         } catch (e: any) {
-                          showToast({ title: i18n.t('tabs.profile.017'), message: e?.message || 'Bir sorun oluştu.', type: 'error' });
+                          showToast({ title: i18n.t('tabs.profile.017'), message: e?.message || i18n.t('auto.tabs.profile.001'), type: 'error' });
                         }
                       },
                     },

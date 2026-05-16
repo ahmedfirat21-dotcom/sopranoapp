@@ -7,6 +7,7 @@ import React, { Component, type ReactNode } from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import { i18n } from '../../services/i18n';
 
 // ★ 2026-04-25: Crashlytics — lazy load (native module yoksa import patlamasın)
 let crashlytics: any = null;
@@ -67,7 +68,7 @@ export default class ErrorBoundary extends Component<Props, State> {
             <View style={styles.iconWrap}>
               <Ionicons name="warning-outline" size={48} color="#F59E0B" />
             </View>
-            <Text style={styles.title}>{this.props.fallbackTitle || 'Bir Hata Oluştu'}</Text>
+            <Text style={styles.title}>{this.props.fallbackTitle || i18n.t('auto.ErrorBoundary.001')}</Text>
             <Text style={styles.message}>
               Bu ekran beklenmedik bir hata ile karşılaştı.{'\n'}Lütfen tekrar deneyin veya ana sayfaya dönün.
             </Text>

@@ -327,13 +327,13 @@ export function UserSearchModal({ visible, onClose, currentUserId, onSelectUser,
     <Pressable
       style={({ pressed }) => [s.userRow, pressed && { opacity: 0.8, backgroundColor: 'rgba(92,225,230,0.06)' }]}
       onPress={() => {
-        onSelectUser(item.id, item.display_name || 'Kullanıcı');
+        onSelectUser(item.id, item.display_name || i18n.t('auto.UserSearchModal.006'));
         onClose();
       }}
     >
       <StatusAvatar uri={item.avatar_url} size={48} isOnline={liveOnlineIds.has(item.id)} tier={item.subscription_tier} frameId={(item as any).active_frame || null} customBadgeId={(item as any).active_badge_id ?? null} />
       <View style={s.userInfo}>
-        <Text style={s.displayName}>{item.display_name || 'Kullanıcı'}</Text>
+        <Text style={s.displayName}>{item.display_name || i18n.t('auto.UserSearchModal.005')}</Text>
         {item.username && <Text style={s.username}>@{item.username}</Text>}
       </View>
       <Ionicons name={isDiscover ? 'open-outline' : 'chatbubble-outline'} size={18} color={Colors.teal} />
@@ -501,11 +501,11 @@ export function UserSearchModal({ visible, onClose, currentUserId, onSelectUser,
                             <Pressable
                               key={item.id}
                               style={({ pressed }) => [s.userRow, pressed && { opacity: 0.8, backgroundColor: 'rgba(92,225,230,0.06)' }]}
-                              onPress={() => { onSelectUser(item.id, item.display_name || 'Kullanıcı'); onClose(); }}
+                              onPress={() => { onSelectUser(item.id, item.display_name || i18n.t('auto.UserSearchModal.004')); onClose(); }}
                             >
                               <StatusAvatar uri={item.avatar_url} size={48} isOnline={liveOnlineIds.has(item.id)} tier={item.subscription_tier} frameId={(item as any).active_frame || null} customBadgeId={(item as any).active_badge_id ?? null} />
                               <View style={s.userInfo}>
-                                <Text style={s.displayName}>{item.display_name || 'Kullanıcı'}</Text>
+                                <Text style={s.displayName}>{item.display_name || i18n.t('auto.UserSearchModal.003')}</Text>
                                 {item.username && <Text style={s.username}>@{item.username}</Text>}
                               </View>
                               <Ionicons name={isDiscover ? 'open-outline' : 'chatbubble-outline'} size={18} color={Colors.teal} />
@@ -525,11 +525,11 @@ export function UserSearchModal({ visible, onClose, currentUserId, onSelectUser,
                             <Pressable
                               key={item.id}
                               style={({ pressed }) => [s.userRow, pressed && { opacity: 0.8, backgroundColor: 'rgba(92,225,230,0.06)' }]}
-                              onPress={() => { onSelectUser(item.id, item.display_name || 'Kullanıcı'); onClose(); }}
+                              onPress={() => { onSelectUser(item.id, item.display_name || i18n.t('auto.UserSearchModal.002')); onClose(); }}
                             >
                               <StatusAvatar uri={item.avatar_url} size={48} isOnline={liveOnlineIds.has(item.id)} tier={item.subscription_tier} frameId={(item as any).active_frame || null} customBadgeId={(item as any).active_badge_id ?? null} />
                               <View style={s.userInfo}>
-                                <Text style={s.displayName}>{item.display_name || 'Kullanıcı'}</Text>
+                                <Text style={s.displayName}>{item.display_name || i18n.t('auto.UserSearchModal.001')}</Text>
                                 {item.username && <Text style={s.username}>@{item.username}</Text>}
                               </View>
                               <Ionicons name="open-outline" size={18} color={Colors.teal} />

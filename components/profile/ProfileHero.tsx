@@ -139,7 +139,7 @@ export default function ProfileHero({
               ]}
               onPress={onFramePress}
               hitSlop={10}
-              accessibilityLabel="Çerçeve seç"
+              accessibilityLabel={i18n.t('auto.profile.ProfileHero.008')}
             >
               <LinearGradient
                 colors={hasUnequippedFrame
@@ -166,7 +166,7 @@ export default function ProfileHero({
             style={[s.editBtn, s.editBtnAbs]}
             onPress={onEdit}
             hitSlop={10}
-            accessibilityLabel="Profili düzenle"
+            accessibilityLabel={i18n.t('auto.profile.ProfileHero.007')}
           >
             <Ionicons name="create-outline" size={16} color="#14B8A6" style={iconShadow} />
           </Pressable>
@@ -178,7 +178,7 @@ export default function ProfileHero({
             style={s.avatarBox}
             onPress={onAvatarPress}
             hitSlop={4}
-            accessibilityLabel="Avatarı büyüt"
+            accessibilityLabel={i18n.t('auto.profile.ProfileHero.006')}
           >
             <StatusAvatar uri={avatarUrl} size={160} tier={subscriptionTier} isAdmin={isAdmin} isOnline={isOnline} isSelf={!!onEdit} showTierBadge={showTierBadge} tierBadgeSize="md" frameId={activeFrame} displayName={displayName} contextKey="profile" customBadgeId={activeBadgeId} />
           </Pressable>
@@ -261,7 +261,7 @@ export default function ProfileHero({
           style={s.statItem}
           onPress={onFollowersPress}
           hitSlop={8}
-          accessibilityLabel={`${stats.followers} arkadaş`}
+          accessibilityLabel={i18n.t('auto.profile.ProfileHero.005', { 0: stats.followers })}
         >
           <Text style={s.statNum}>{fmtStat(stats.followers)}</Text>
           <Text style={s.statLabelClickable}>{i18n.t('profile.stat_friend')}</Text>
@@ -303,12 +303,12 @@ function formatMemberSince(iso: string): string {
     const then = new Date(iso);
     const diffMs = now.getTime() - then.getTime();
     const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-    if (days < 1) return 'Yeni üye';
-    if (days < 30) return `${days} gündür`;
+    if (days < 1) return i18n.t('auto.profile.ProfileHero.004');
+    if (days < 30) return i18n.t('auto.profile.ProfileHero.003', { 0: days });
     const months = Math.floor(days / 30);
-    if (months < 12) return `${months} aydır`;
+    if (months < 12) return i18n.t('auto.profile.ProfileHero.002', { 0: months });
     const years = Math.floor(months / 12);
-    return `${years} yıldır`;
+    return i18n.t('auto.profile.ProfileHero.001', { 0: years });
   } catch { return ''; }
 }
 

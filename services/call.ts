@@ -9,6 +9,7 @@ import { getRoomLimits } from '../constants/tiers';
 import type { TierName } from '../types';
 import { PushService } from './push';
 import { FriendshipService } from './friendship';
+import { i18n } from '../../services/i18n';
 
 let globalCallChannel: ReturnType<typeof supabase.channel> | null = null;
 // ★ Y5: Per-caller call signal rate limit — spoofing/spam koruması (60sn içinde max 3)
@@ -171,7 +172,7 @@ export const CallService = {
     // ★ CALL-1 FIX: En az bir yönde accepted arkadaşlık gerek (mutual gerekmiyor)
     const isFriend = await FriendshipService.isFriend(callerId, receiverId);
     if (!isFriend) {
-      throw new Error('Sadece arkadaşlarınızı arayabilirsiniz. Önce arkadaş olun.');
+      throw new Error(i18n.t('auto.call.003'));
     }
 
     const callId = this.generateCallId(callerId, receiverId);
@@ -195,7 +196,7 @@ export const CallService = {
 
     // ★ Her durumda push notification gönder — arka planda/kapalıyken arama almak için KRİTİK
     const callTypeLabel = '📞 Sesli Arama';
-    PushService.sendToUser(receiverId, callTypeLabel, `${callerName} seni arıyor`, {
+    PushService.sendToUser(receiverId, callTypeLabel, i18n.t('auto.call.002', { 0: callerName }), {
       type: 'incoming_call',
       callId,
       callerId,
@@ -255,7 +256,7 @@ export const CallService = {
         user_id: receiverId,
         sender_id: callerId,
         type: 'missed_call',
-        body: '📞 Cevapsız sesli arama',
+        body: i18n.t('auto.call.001'),
       })
     ).then((res: any) => {
       if (res?.error && __DEV__) console.warn('[CallService] Missed call DB kaydetme hatası:', res.error.message);

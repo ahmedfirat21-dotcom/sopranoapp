@@ -126,7 +126,7 @@ export default function HostAccessPanel({ visible, onClose, roomId, roomType, ho
     try {
       await RoomAccessService.approveRequest(req.id, hostId);
       setRequests(prev => prev.filter(r => r.id !== req.id));
-      showToast({ title: '✅ Kabul Edildi', message: `${req.user?.display_name || 'Kullanıcı'} artık odaya girebilir.`, type: 'success' });
+      showToast({ title: '✅ Kabul Edildi', message: `${req.user?.display_name || i18n.t('auto.room.HostAccessPanel.009')} artık odaya girebilir.`, type: 'success' });
     } catch {} finally {
       setProcessingIds(prev => { const n = new Set(prev); n.delete(req.id); return n; });
     }
@@ -148,9 +148,9 @@ export default function HostAccessPanel({ visible, onClose, roomId, roomType, ho
     try {
       await ModerationService.unbanFromRoom(roomId, ban.user_id, hostId);
       setBannedUsers(prev => prev.filter(b => b.id !== ban.id));
-      showToast({ title: i18n.t('room.hostaccesspanel.001'), message: `${ban.user?.display_name || 'Kullanıcı'} artık odaya girebilir.`, type: 'success' });
+      showToast({ title: i18n.t('room.hostaccesspanel.001'), message: `${ban.user?.display_name || i18n.t('auto.room.HostAccessPanel.008')} artık odaya girebilir.`, type: 'success' });
     } catch {
-      showToast({ title: i18n.t('room.hostaccesspanel.002'), message: `${ban.user?.display_name || 'Kullanıcı'} banı kaldırılamadı.`, type: 'error' });
+      showToast({ title: i18n.t('room.hostaccesspanel.002'), message: `${ban.user?.display_name || i18n.t('auto.room.HostAccessPanel.007')} banı kaldırılamadı.`, type: 'error' });
     } finally {
       setProcessingIds(prev => { const n = new Set(prev); n.delete(ban.id); return n; });
     }
@@ -281,7 +281,7 @@ export default function HostAccessPanel({ visible, onClose, roomId, roomType, ho
                         <Image source={getAvatarSource(req.user?.avatar_url)} style={s.avatar} />
                       </Pressable>
                       <Pressable style={{ flex: 1 }} onPress={() => openUserProfile(req.user_id)} hitSlop={4}>
-                        <Text style={s.name} numberOfLines={1}>{req.user?.display_name || 'Kullanıcı'}</Text>
+                        <Text style={s.name} numberOfLines={1}>{req.user?.display_name || i18n.t('auto.room.HostAccessPanel.006')}</Text>
                       </Pressable>
                       {isProcessing ? (
                         <AppLoader size="small" color="#A78BFA" />
@@ -323,7 +323,7 @@ export default function HostAccessPanel({ visible, onClose, roomId, roomType, ho
                   const expiresAt = ban.expires_at ? new Date(ban.expires_at) : null;
                   const isExpired = expiresAt && expiresAt < new Date();
                   const remainingMin = expiresAt ? Math.max(0, Math.floor((expiresAt.getTime() - Date.now()) / 60000)) : 0;
-                  const timeLabel = isPermanent ? 'Kalıcı' : isExpired ? 'Süresi dolmuş' : remainingMin > 60 ? `${Math.floor(remainingMin / 60)}sa ${remainingMin % 60}dk` : `${remainingMin}dk kaldı`;
+                  const timeLabel = isPermanent ? i18n.t('auto.room.HostAccessPanel.005') : isExpired ? i18n.t('auto.room.HostAccessPanel.004') : remainingMin > 60 ? `${Math.floor(remainingMin / 60)}sa ${remainingMin % 60}dk` : i18n.t('auto.room.HostAccessPanel.003', { 0: remainingMin });
                   const isProcessing = processingIds.has(ban.id);
 
                   return (
@@ -333,12 +333,12 @@ export default function HostAccessPanel({ visible, onClose, roomId, roomType, ho
                       </Pressable>
                       <View style={{ flex: 1 }}>
                         <Pressable onPress={() => openUserProfile(ban.user_id)} hitSlop={4}>
-                          <Text style={s.name} numberOfLines={1}>{ban.user?.display_name || 'Kullanıcı'}</Text>
+                          <Text style={s.name} numberOfLines={1}>{ban.user?.display_name || i18n.t('auto.room.HostAccessPanel.002')}</Text>
                         </Pressable>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 }}>
                           <View style={[s.banTypePill, isPermanent ? s.banPermanent : s.banTemp]}>
                             <Text style={[s.banTypeText, { color: isPermanent ? '#EF4444' : '#F59E0B' }]}>
-                              {isPermanent ? '⛔ KALICI' : '⏳ GEÇİCİ'}
+                              {isPermanent ? '⛔ KALICI' : i18n.t('auto.room.HostAccessPanel.001')}
                             </Text>
                           </View>
                           <Text style={s.banTime}>{timeLabel}</Text>

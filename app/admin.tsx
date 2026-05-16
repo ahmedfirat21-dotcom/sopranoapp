@@ -51,13 +51,13 @@ type AdminStats = {
 const REASON_TR: Record<string, string> = {
   spam: 'Spam',
   harassment: 'Taciz',
-  hate_speech: 'Nefret Söylemi',
-  inappropriate_content: 'Uygunsuz İçerik',
-  impersonation: 'Kimliğe Bürünme',
+  hate_speech: i18n.t('auto.admin.067'),
+  inappropriate_content: i18n.t('auto.admin.066'),
+  impersonation: i18n.t('auto.admin.065'),
   self_harm: 'Kendine Zarar',
-  violence: 'Şiddet',
-  underage: 'Reşit Olmayan',
-  other: 'Diğer',
+  violence: i18n.t('auto.admin.064'),
+  underage: i18n.t('auto.admin.063'),
+  other: i18n.t('auto.admin.062'),
 };
 
 const TIER_COLORS: Record<string, string> = {
@@ -68,13 +68,13 @@ const TIER_COLORS: Record<string, string> = {
 
 const CATEGORY_TR: Record<string, string> = {
   chat: 'Sohbet',
-  music: 'Müzik',
-  education: 'Eğitim',
+  music: i18n.t('auto.admin.061'),
+  education: i18n.t('auto.admin.060'),
   gaming: 'Oyun',
-  debate: 'Tartışma',
+  debate: i18n.t('auto.admin.059'),
   podcast: 'Podcast',
   social: 'Sosyal',
-  other: 'Diğer',
+  other: i18n.t('auto.admin.058'),
 };
 
 
@@ -203,8 +203,8 @@ export default function AdminPanel() {
 
   // ========== AKSIYON HANDLER ==========
   const handleDismissReport = (reportId: string) => {
-    showAdAlert('Şikayeti Kapat', 'Bu şikayeti "geçersiz" olarak kapatmak istiyor musun?', [
-      { text: 'İptal', style: 'cancel' },
+    showAdAlert(i18n.t('auto.admin.057'), i18n.t('auto.admin.056'), [
+      { text: i18n.t('auto.admin.055'), style: 'cancel' },
       {
         text: 'Kapat', onPress: async () => {
           await ModerationService.resolveReport(reportId, 'dismissed');
@@ -216,14 +216,14 @@ export default function AdminPanel() {
   };
 
   const handleWarnUser = (reportId: string, userId: string) => {
-    showAdAlert('Kullanıcıyı Uyar', 'Bu kullanıcıya uyarı vermek istiyor musun?', [
-      { text: 'İptal', style: 'cancel' },
+    showAdAlert(i18n.t('auto.admin.054'), i18n.t('auto.admin.053'), [
+      { text: i18n.t('auto.admin.052'), style: 'cancel' },
       {
         text: 'Uyar', onPress: async () => {
           await ModerationService.resolveReport(reportId, 'warned');
           await supabase.from('inbox').insert({
             user_id: userId, type: 'system', title: i18n.t('admin.002'),
-            body: 'Davranışlarınız nedeniyle bir uyarı aldınız. Kuralları tekrar ihlal etmeniz durumunda hesabınız askıya alınabilir.',
+            body: i18n.t('auto.admin.051'),
           });
           showToast({ title: i18n.t('admin.003'), type: 'success' });
           loadAll();
@@ -233,8 +233,8 @@ export default function AdminPanel() {
   };
 
   const handleBanUser = (reportId: string, userId: string, displayName: string) => {
-    showAdAlert('Kullanıcıyı Banla', `${displayName} adlı kullanıcıyı BANLAMAK istiyor musun?\n\nBu işlem geri alınabilir.`, [
-      { text: 'İptal', style: 'cancel' },
+    showAdAlert(i18n.t('auto.admin.050'), i18n.t('auto.admin.049', { 0: displayName }), [
+      { text: i18n.t('auto.admin.048'), style: 'cancel' },
       {
         text: 'Banla', style: 'destructive', onPress: async () => {
           await ModerationService.resolveReport(reportId, 'banned');
@@ -247,8 +247,8 @@ export default function AdminPanel() {
   };
 
   const handleCloseRoom = (roomId: string, roomName: string) => {
-    showAdAlert('Odayı Kapat', `"${roomName}" odasını kapatmak istiyor musun?\n\nTüm kullanıcılar çıkarılacak.`, [
-      { text: 'İptal', style: 'cancel' },
+    showAdAlert(i18n.t('auto.admin.047'), i18n.t('auto.admin.046', { 0: roomName }), [
+      { text: i18n.t('auto.admin.045'), style: 'cancel' },
       {
         text: 'Kapat', style: 'destructive', onPress: async () => {
           await RoomService.close(roomId);
@@ -260,14 +260,14 @@ export default function AdminPanel() {
   };
 
   const handleDeleteRoom = (roomId: string, roomName: string) => {
-    showAdAlert('Odayı Kalıcı Sil', `"${roomName}" odasını KALICI olarak silmek istiyor musun?\n\nBu işlem geri alınamaz!`, [
-      { text: 'İptal', style: 'cancel' },
+    showAdAlert(i18n.t('auto.admin.044'), i18n.t('auto.admin.043', { 0: roomName }), [
+      { text: i18n.t('auto.admin.042'), style: 'cancel' },
       {
-        text: 'Kalıcı Sil', style: 'destructive', onPress: async () => {
+        text: i18n.t('auto.admin.041'), style: 'destructive', onPress: async () => {
           // ★ K-PROJE-1: v25 RPC — admin bypass + cascade cleanup
           const { error } = await supabase.rpc('admin_delete_room', { p_room_id: roomId });
           if (error) {
-            showToast({ title: 'Oda Silinemedi', message: error.message || 'İşlem tamamlanamadı.', type: 'error' });
+            showToast({ title: 'Oda Silinemedi', message: error.message || i18n.t('auto.admin.040'), type: 'error' });
             return;
           }
           showToast({ title: '🗑 Oda Silindi', message: roomName, type: 'success' });
@@ -278,16 +278,16 @@ export default function AdminPanel() {
   };
 
   const handleWakeRoom = (roomId: string, roomName: string, hostId: string, tier: string) => {
-    showAdAlert('Odayı Uyandır', `"${roomName}" odasını yeniden canlıya almak istiyor musun?`, [
-      { text: 'İptal', style: 'cancel' },
+    showAdAlert(i18n.t('auto.admin.039'), i18n.t('auto.admin.038', { 0: roomName }), [
+      { text: i18n.t('auto.admin.037'), style: 'cancel' },
       {
-        text: 'Uyandır', onPress: async () => {
+        text: i18n.t('auto.admin.036'), onPress: async () => {
           try {
             await RoomService.wakeUpRoom(roomId, hostId, tier as any);
             showToast({ title: i18n.t('admin.006'), message: roomName, type: 'success' });
             loadAll();
           } catch {
-            showToast({ title: i18n.t('admin.007'), message: `${roomName} uyandırılamadı.`, type: 'error' });
+            showToast({ title: i18n.t('admin.007'), message: i18n.t('auto.admin.035', { 0: roomName }), type: 'error' });
           }
         }
       },
@@ -314,22 +314,22 @@ export default function AdminPanel() {
             showToast({ title: `Tier: ${t}`, message: roomName, type: 'success' });
             loadAll();
           } catch {
-            showToast({ title: i18n.t('admin.008'), message: `${roomName} tier değişikliği uygulanamadı.`, type: 'error' });
+            showToast({ title: i18n.t('admin.008'), message: i18n.t('auto.admin.034', { 0: roomName }), type: 'error' });
           }
         },
       }));
-    buttons.unshift({ text: 'İptal', style: 'cancel' });
-    showAdAlert('Oda Tier Değiştir', `"${roomName}" — Mevcut: ${currentTier}\n\nYeni tier seçin:`, buttons, 'info');
+    buttons.unshift({ text: i18n.t('auto.admin.033'), style: 'cancel' });
+    showAdAlert(i18n.t('auto.admin.032'), i18n.t('auto.admin.031', { 0: roomName, 1: currentTier }), buttons, 'info');
   };
 
   const handleToggleBan = (userId: string, displayName: string, currentBanned: boolean) => {
-    const action = currentBanned ? 'Banı Kaldır' : 'Banla';
+    const action = currentBanned ? i18n.t('auto.admin.030') : 'Banla';
     showAdAlert(action, `${displayName} - ${action}?`, [
-      { text: 'İptal', style: 'cancel' },
+      { text: i18n.t('auto.admin.029'), style: 'cancel' },
       {
         text: action, style: currentBanned ? 'default' : 'destructive', onPress: async () => {
           await supabase.from('profiles').update({ is_banned: !currentBanned }).eq('id', userId);
-          showToast({ title: currentBanned ? 'Ban Kaldırıldı' : 'Banlandı', message: displayName, type: 'success' });
+          showToast({ title: currentBanned ? i18n.t('auto.admin.028') : i18n.t('auto.admin.027'), message: displayName, type: 'success' });
           loadAll();
         }
       },
@@ -337,9 +337,9 @@ export default function AdminPanel() {
   };
 
   const handleToggleAdmin = (userId: string, displayName: string, currentAdmin: boolean) => {
-    const action = currentAdmin ? 'Adminliği Kaldır' : 'Admin Yap';
+    const action = currentAdmin ? i18n.t('auto.admin.026') : 'Admin Yap';
     showAdAlert(action, `${displayName} - ${action}?`, [
-      { text: 'İptal', style: 'cancel' },
+      { text: i18n.t('auto.admin.025'), style: 'cancel' },
       {
         text: action, onPress: async () => {
           // ★ K-PROJE-1: v25 RPC — sessiz RLS fail yerine backend admin-verify.
@@ -348,10 +348,10 @@ export default function AdminPanel() {
             p_make_admin: !currentAdmin,
           });
           if (error) {
-            showToast({ title: i18n.t('admin.009'), message: error.message || 'İşlem tamamlanamadı.', type: 'error' });
+            showToast({ title: i18n.t('admin.009'), message: error.message || i18n.t('auto.admin.024'), type: 'error' });
             return;
           }
-          showToast({ title: currentAdmin ? '🔻 Adminlik Kaldırıldı' : '⭐ Admin Yapıldı', message: displayName, type: 'success' });
+          showToast({ title: currentAdmin ? i18n.t('auto.admin.023') : i18n.t('auto.admin.022'), message: displayName, type: 'success' });
           loadAll();
         }
       },
@@ -359,8 +359,8 @@ export default function AdminPanel() {
   };
 
   const handleGiveSP = (userId: string, displayName: string) => {
-    showAdAlert('SP Ver', `${displayName} adlı kullanıcıya kaç SP vermek istiyorsun?`, [
-      { text: 'İptal', style: 'cancel' },
+    showAdAlert('SP Ver', i18n.t('auto.admin.021', { 0: displayName }), [
+      { text: i18n.t('auto.admin.020'), style: 'cancel' },
       { text: '100 SP', onPress: () => giveSP(userId, displayName, 100) },
       { text: '500 SP', onPress: () => giveSP(userId, displayName, 500) },
       { text: '1000 SP', onPress: () => giveSP(userId, displayName, 1000) },
@@ -376,9 +376,9 @@ export default function AdminPanel() {
       p_reason: `manual_grant_to_${displayName}`,
     });
     if (!error) {
-      showToast({ title: `💎 ${amount} SP Verildi`, message: `${displayName} hesabına eklendi.`, type: 'success' });
+      showToast({ title: `💎 ${amount} SP Verildi`, message: i18n.t('auto.admin.019', { 0: displayName }), type: 'success' });
     } else {
-      showToast({ title: 'SP Verilemedi', message: error.message || 'Transfer başarısız.', type: 'error' });
+      showToast({ title: 'SP Verilemedi', message: error.message || i18n.t('auto.admin.018'), type: 'error' });
     }
   };
 
@@ -389,19 +389,19 @@ export default function AdminPanel() {
       return;
     }
     showAdAlert(
-      '⚠️ Kullanıcıyı Sil',
-      `"${displayName}" adlı kullanıcıyı KALICI olarak silmek istiyor musun?\n\nBu işlem GERİ ALINAMAZ!\n\nSilinecekler:\n• Profil\n• Tüm odalar\n• Mesajlar\n• Arkadaşlıklar\n• Raporlar`,
+      i18n.t('auto.admin.017'),
+      i18n.t('auto.admin.016', { 0: displayName }),
       [
-        { text: 'İptal', style: 'cancel' },
+        { text: i18n.t('auto.admin.015'), style: 'cancel' },
         {
-          text: 'Kalıcı Sil', style: 'destructive', onPress: async () => {
+          text: i18n.t('auto.admin.014'), style: 'destructive', onPress: async () => {
             // ★ K-PROJE-1: v25 RPC — cascade delete tek transaction, RLS bypass.
             const { error } = await supabase.rpc('admin_delete_user_cascade', { p_user_id: userId });
             if (error) {
-              showToast({ title: i18n.t('admin.012'), message: error.message || 'İşlem tamamlanamadı.', type: 'error' });
+              showToast({ title: i18n.t('admin.012'), message: error.message || i18n.t('auto.admin.013'), type: 'error' });
               return;
             }
-            showToast({ title: i18n.t('admin.013'), message: `${displayName} kalıcı olarak silindi.`, type: 'success' });
+            showToast({ title: i18n.t('admin.013'), message: i18n.t('auto.admin.012', { 0: displayName }), type: 'success' });
             loadAll();
           }
         },
@@ -444,7 +444,7 @@ export default function AdminPanel() {
 
   const TABS = [
     { id: 'overview', icon: 'grid', label: 'Genel' },
-    { id: 'reports', icon: 'flag', label: `Şikayetler (${stats.pendingReports})` },
+    { id: 'reports', icon: 'flag', label: i18n.t('auto.admin.011', { 0: stats.pendingReports }) },
     { id: 'rooms', icon: 'mic', label: `Odalar (${stats.totalRooms})` },
     { id: 'users', icon: 'people', label: i18n.t('admin.014') },
   ] as const;
@@ -506,7 +506,7 @@ export default function AdminPanel() {
                   loadAll();
                 }} />
                 <QuickAction icon="megaphone" color="#F59E0B" label={i18n.t('admin.022')} onPress={() => {
-                  showAdAlert('Duyuru', 'Bu özellik yakında eklenecek.', [{ text: 'Tamam' }], 'info');
+                  showAdAlert('Duyuru', i18n.t('auto.admin.010'), [{ text: 'Tamam' }], 'info');
                 }} />
                 <QuickAction icon="color-palette" color="#A78BFA" label={i18n.t('admin.023')} onPress={() => router.push('/skia-test')} />
               </View>
@@ -569,7 +569,7 @@ export default function AdminPanel() {
               <View style={s.roomStatsRow}>
                 <View style={s.roomStatChip}>
                   <View style={[s.roomStatDot, { backgroundColor: '#10B981' }]} />
-                  <Text style={s.roomStatText}>{liveRooms.length} Canlı</Text>
+                  <Text style={s.roomStatText}>{liveRooms.length}{i18n.t('auto.admin.009')}</Text>
                 </View>
                 <View style={s.roomStatChip}>
                   <View style={[s.roomStatDot, { backgroundColor: '#F59E0B' }]} />
@@ -588,7 +588,7 @@ export default function AdminPanel() {
                     <Pressable key={f} style={[s.filterChip, roomFilter === f && s.filterChipActive]} onPress={() => setRoomFilter(f)}>
                       <Ionicons name={f === 'live' ? 'pulse' : f === 'sleeping' ? 'moon' : 'albums'} size={12} color={roomFilter === f ? '#fff' : '#94A3B8'} />
                       <Text style={[s.filterChipText, roomFilter === f && s.filterChipTextActive]}>
-                        {f === 'live' ? 'Canlı' : f === 'sleeping' ? 'Uyuyan' : 'Tümü'}
+                        {f === 'live' ? i18n.t('auto.admin.008') : f === 'sleeping' ? 'Uyuyan' : i18n.t('auto.admin.007')}
                       </Text>
                     </Pressable>
                   ))}
@@ -628,7 +628,7 @@ export default function AdminPanel() {
                     {userRooms.length === 0 ? (
                       <View style={s.emptyState}>
                         <Ionicons name="mic-off" size={48} color={Colors.text3} />
-                        <Text style={s.emptyText}>{roomSearch ? 'Aramayla eşleşen oda bulunamadı' : 'Bu kategoride kullanıcı odası yok'}</Text>
+                        <Text style={s.emptyText}>{roomSearch ? i18n.t('auto.admin.006') : i18n.t('auto.admin.005')}</Text>
                       </View>
                     ) : (
                       userRooms.map(room => {
@@ -636,7 +636,7 @@ export default function AdminPanel() {
                         const ownerTier = room.owner_tier || room.host?.subscription_tier || 'Free';
                         const limits = getRoomLimits(ownerTier as any);
                         const roomAge = Math.floor((Date.now() - new Date(room.created_at).getTime()) / 60000);
-                        const ageText = roomAge < 60 ? `${roomAge}dk` : roomAge < 1440 ? `${Math.floor(roomAge / 60)}sa` : `${Math.floor(roomAge / 1440)}gün`;
+                        const ageText = roomAge < 60 ? `${roomAge}dk` : roomAge < 1440 ? `${Math.floor(roomAge / 60)}sa` : i18n.t('auto.admin.004', { 0: Math.floor(roomAge / 1440) });
 
                         return (
                           <Pressable key={room.id} style={[s.roomCardV2, !room.is_live && s.roomCardSleeping]} onPress={() => setExpandedRoomId(isExpanded ? null : room.id)}>
@@ -653,7 +653,7 @@ export default function AdminPanel() {
                                   <Text style={s.roomCat}>{CATEGORY_TR[room.category] || room.category}</Text>
                                 </View>
                                 <Text style={s.roomNameV2} numberOfLines={1}>{room.name}</Text>
-                                <Text style={s.roomMetaV2}>{room.host?.display_name || '?'} · {room.listener_count || 0} kişi · {ageText}</Text>
+                                <Text style={s.roomMetaV2}>{room.host?.display_name || '?'} · {room.listener_count || 0}{i18n.t('auto.admin.003')}{ageText}</Text>
                               </View>
                               <View style={{ flexDirection: 'row', gap: 5 }}>
                                 <Pressable style={s.roomActionBtnV2} onPress={() => router.push(`/room/${room.id}`)}>
@@ -742,7 +742,7 @@ export default function AdminPanel() {
                       )}
                       {user.is_banned && <Text style={{ color: '#EF4444', fontSize: 10, fontWeight: '700' }}> BANLANDI</Text>}
                     </View>
-                    <Text style={s.userMeta}>{user.subscription_tier || user.tier || 'Free'} · {user.system_points || 0} SP · {user.is_online ? 'Çevrimiçi' : 'Çevrimdışı'}</Text>
+                    <Text style={s.userMeta}>{user.subscription_tier || user.tier || 'Free'} · {user.system_points || 0} SP · {user.is_online ? i18n.t('auto.admin.002') : i18n.t('auto.admin.001')}</Text>
                   </View>
                   <View style={{ flexDirection: 'row', gap: 4 }}>
                     <Pressable style={s.userActionBtn} onPress={() => handleGiveSP(user.id, user.display_name)}>

@@ -245,7 +245,7 @@ function MusicBanner({ link }: { link: string }) {
     setPlayerOpen(true);
   };
 
-  const displayTitle = title || 'Oda müziği';
+  const displayTitle = title || i18n.t('auto.room.id.123');
   const spin = rotation.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
 
   return (
@@ -395,7 +395,7 @@ function DmSwipeableRow({ children, onDelete, onMute, onBlock, isMuted }: {
           style={[dmSwipeS.actionBtn, { backgroundColor: isMuted ? '#14B8A6' : '#F59E0B' }]}
         >
           <Ionicons name={isMuted ? 'notifications-outline' : 'notifications-off-outline'} size={18} color="#FFF" />
-          <Text style={dmSwipeS.actionLabel}>{isMuted ? 'Sesi Aç' : 'Sessiz'}</Text>
+          <Text style={dmSwipeS.actionLabel}>{isMuted ? i18n.t('auto.room.id.122') : 'Sessiz'}</Text>
         </Pressable>
         {/* Engelle */}
         <Pressable
@@ -778,7 +778,7 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
         setMsgReq({ status: 'pending_outgoing' });
       }
     } catch (err: any) {
-      showToast({ title: i18n.t('room.id.008'), message: err?.message || 'Mesaj gönderilemedi', type: 'warning' });
+      showToast({ title: i18n.t('room.id.008'), message: err?.message || i18n.t('auto.room.id.121'), type: 'warning' });
     }
     setChatSending(false);
   };
@@ -921,7 +921,7 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
       return next;
     });
     await MessageService.toggleSavedMessage(firebaseUser.uid, msg.id);
-    showToast({ title: wasSaved ? 'Kaydedilenden çıkarıldı' : '🔖 Kaydedildi', type: 'success' });
+    showToast({ title: wasSaved ? i18n.t('auto.room.id.120') : '🔖 Kaydedildi', type: 'success' });
   }, [firebaseUser, dmSavedIds]);
 
   // ★ v109: Forward — global user search sheet aç → seçilen kişiye forward RPC
@@ -1217,12 +1217,12 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
                             <View style={{ width: 2, backgroundColor: '#14B8A6' }} />
                             <View style={{ flex: 1 }}>
                               <Text style={{ color: '#5EEAD4', fontSize: 10, fontWeight: '700' }} numberOfLines={1}>
-                                {replyTo.sender_id === firebaseUser?.uid ? 'Kendine' : (chatTarget?.name || 'Kullanıcı')}
+                                {replyTo.sender_id === firebaseUser?.uid ? 'Kendine' : (chatTarget?.name || i18n.t('auto.room.id.119'))}
                               </Text>
                               <Text style={{ color: 'rgba(255,255,255,0.65)', fontSize: 11 }} numberOfLines={1}>
                                 {replyTo.deleted_for_everyone ? '🚫 Bu mesaj silindi'
                                   : replyTo.voice_url ? '🎙️ Sesli mesaj'
-                                  : replyTo.image_url ? '📷 Fotoğraf'
+                                  : replyTo.image_url ? i18n.t('auto.room.id.118')
                                   : (replyTo.content || '...')}
                               </Text>
                             </View>
@@ -1344,14 +1344,14 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
                   <View style={{ width: 2, alignSelf: 'stretch', borderRadius: 1, backgroundColor: '#14B8A6' }} />
                   <View style={{ flex: 1 }}>
                     <Text style={{ color: '#14B8A6', fontSize: 10, fontWeight: '800' }}>
-                      {dmEditingMessageId ? '✎ Düzenleniyor'
-                        : `↩︎ Yanıt: ${dmReplyingTo?.sender_id === firebaseUser?.uid ? 'Kendine' : (chatTarget?.name || 'Kullanıcı')}`}
+                      {dmEditingMessageId ? i18n.t('auto.room.id.117')
+                        : `↩︎ Yanıt: ${dmReplyingTo?.sender_id === firebaseUser?.uid ? 'Kendine' : (chatTarget?.name || i18n.t('auto.room.id.116'))}`}
                     </Text>
                     <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 11 }} numberOfLines={1}>
                       {dmEditingMessageId
-                        ? 'Mevcut metni değiştir, gönder'
+                        ? i18n.t('auto.room.id.115')
                         : (dmReplyingTo?.voice_url ? '🎙️ Sesli mesaj'
-                           : dmReplyingTo?.image_url ? '📷 Fotoğraf'
+                           : dmReplyingTo?.image_url ? i18n.t('auto.room.id.114')
                            : (dmReplyingTo?.content || '...'))}
                     </Text>
                   </View>
@@ -1372,7 +1372,7 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
                   borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
                   paddingHorizontal: 14, fontSize: 13, color: '#F1F5F9',
                 }}
-                placeholder={dmEditingMessageId ? 'Düzenle...' : 'Mesaj yaz...'}
+                placeholder={dmEditingMessageId ? i18n.t('auto.room.id.113') : 'Mesaj yaz...'}
                 placeholderTextColor="rgba(255,255,255,0.2)"
                 value={chatInput}
                 onChangeText={handleDmInputChange}
@@ -1446,14 +1446,14 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
                 </View>
               ) : (
                 dmInboxMessages.slice(0, 15).map((msg: any, idx: number) => {
-                  const senderName = msg.partner_name || msg.sender_display_name || msg.other_display_name || (msg.partner_id || msg.sender_id ? `…${String(msg.partner_id || msg.sender_id).slice(0, 4)}` : 'Kullanıcı');
+                  const senderName = msg.partner_name || msg.sender_display_name || msg.other_display_name || (msg.partner_id || msg.sender_id ? `…${String(msg.partner_id || msg.sender_id).slice(0, 4)}` : i18n.t('auto.room.id.112'));
                   const senderAvatar = msg.partner_avatar || msg.sender_avatar_url || msg.other_avatar_url;
                   const preview = msg.last_message_content || msg.last_message || msg.content || '';
                   const isUnread = (msg.unread_count || 0) > 0 || !msg.is_read;
                   const senderId = msg.partner_id || msg.other_user_id || msg.sender_id;
                   const timeAgo = msg.last_message_time || msg.last_message_at || msg.created_at;
                   const mins = timeAgo ? Math.floor((Date.now() - new Date(timeAgo).getTime()) / 60000) : 0;
-                  const timeLabel = mins < 1 ? 'şimdi' : mins < 60 ? `${mins}dk` : mins < 1440 ? `${Math.floor(mins / 60)}sa` : `${Math.floor(mins / 1440)}g`;
+                  const timeLabel = mins < 1 ? i18n.t('auto.room.id.111') : mins < 60 ? `${mins}dk` : mins < 1440 ? `${Math.floor(mins / 60)}sa` : `${Math.floor(mins / 1440)}g`;
                   const isMutedUser = mutedDmUsers.has(senderId);
                   return (
                     <DmSwipeableRow
@@ -1857,12 +1857,12 @@ export default function RoomScreen() {
         setAlertConfig({
           visible: true,
           title: 'SP Yetersiz',
-          message: `Bu oda için ${fee} SP gerekiyor — bakiyen ${currentSP} SP.\n${missing} SP eksik. Mağazadan SP alıp tekrar deneyebilirsin.`,
+          message: i18n.t('auto.room.id.110', { 0: fee, 1: currentSP, 2: missing }),
           type: 'info',
           icon: 'wallet-outline',
           buttons: [
-            { text: 'Vazgeç', style: 'cancel', onPress: () => safeGoBack(router) },
-            { text: 'SP Satın Al', style: 'primary', onPress: () => { safeGoBack(router); setTimeout(() => router.push('/sp-store' as any), 250); } },
+            { text: i18n.t('auto.room.id.109'), style: 'cancel', onPress: () => safeGoBack(router) },
+            { text: i18n.t('auto.room.id.108'), style: 'primary', onPress: () => { safeGoBack(router); setTimeout(() => router.push('/sp-store' as any), 250); } },
           ],
         });
         return false;
@@ -2028,7 +2028,7 @@ export default function RoomScreen() {
         if (row && row.user_id) {
           setTopContributor({
             user_id: row.user_id,
-            display_name: row.display_name || 'Kullanıcı',
+            display_name: row.display_name || i18n.t('auto.room.id.107'),
             avatar_url: row.avatar_url || '',
             total_sp: Number(row.total_sp) || 0,
           });
@@ -2071,7 +2071,7 @@ export default function RoomScreen() {
           is_muted: false,
           is_chat_muted: false,
           user: {
-            display_name: profile?.display_name || 'Kullanıcı',
+            display_name: profile?.display_name || i18n.t('auto.room.id.106'),
             avatar_url: profile?.avatar_url || null,
           },
         }] as RoomParticipant[])
@@ -2283,7 +2283,7 @@ export default function RoomScreen() {
             if (accessResult.action === 'room_full') {
               showToast({
                 title: '🚫 Oda Dolu',
-                message: accessResult.reason || 'Bu oda şu anda dolu. Birazdan tekrar dene.',
+                message: accessResult.reason || i18n.t('auto.room.id.105'),
                 type: 'warning',
               });
               safeGoBack(router);
@@ -2357,7 +2357,7 @@ export default function RoomScreen() {
           // ★ K3 FIX: SP Toast timing — backend'de SP tahsilatı (eğer varsa) başarılı olduktan SONRA toast gösterilir
           const fee = roomData.room_settings?.entry_fee_sp || 0;
           if (fee > 0 && joinRole !== 'owner') {
-             spToastRef.current?.show(-fee, 'Giriş Ücreti');
+             spToastRef.current?.show(-fee, i18n.t('auto.room.id.104'));
           }
 
           // ★ Asıl sahip geri döndüyse broadcast ile bildir
@@ -2374,7 +2374,7 @@ export default function RoomScreen() {
             // ★ UX-3 FIX: Toast spam azaltma — SP bildirimleri SPToast ile gösterilir, ayrı showToast gereksiz
             // SP: Günlük giriş + Prime-time SP (sessiz — sadece SPToast badge)
             GamificationService.onDailyLogin(firebaseUser.uid).then(sp => {
-              if (sp > 0) spToastRef.current?.show(sp, 'Günlük');
+              if (sp > 0) spToastRef.current?.show(sp, i18n.t('auto.room.id.103'));
             }).catch(() => {});
             GamificationService.onPrimeTimeReturn(firebaseUser.uid).then(sp => {
               if (sp > 0) spToastRef.current?.show(sp, 'Prime Time');
@@ -2386,14 +2386,14 @@ export default function RoomScreen() {
           // ★ Join DB insert fail olursa access'i geri al — LiveKit bağlantı denemesin
           setAccessGranted(false);
           // ★ BUG FIX: Ban/kilit/erişim hatalarını kullanıcıya göster
-          const msg = err?.message || 'Bu odaya katılınamadı.';
+          const msg = err?.message || i18n.t('auto.room.id.102');
           setAlertConfig({
             visible: true,
-            title: msg.includes('yasaklan') ? '⛔ Erişim Engellendi' : msg.includes('kilitli') ? '🔒 Oda Kilitli' : '⚠️ Giriş Hatası',
+            title: msg.includes('yasaklan') ? i18n.t('auto.room.id.101') : msg.includes('kilitli') ? '🔒 Oda Kilitli' : i18n.t('auto.room.id.100'),
             message: msg,
             type: msg.includes('yasaklan') ? 'error' : 'warning',
             icon: msg.includes('yasaklan') ? 'ban' : msg.includes('kilitli') ? 'lock-closed' : 'alert-circle',
-            buttons: [{ text: 'Geri Dön', onPress: () => safeGoBack(router) }],
+            buttons: [{ text: i18n.t('auto.room.id.099'), onPress: () => safeGoBack(router) }],
           });
         });
         // ★ REMOVED: Sarı giriş banner'ı kaldırıldı — chat'te zaten "odaya katıldı" mesajı var
@@ -2420,7 +2420,7 @@ export default function RoomScreen() {
                 id: `join_${np.user_id}_${Date.now()}`,
                 room_id: id as string,
                 user_id: np.user_id,
-                content: 'odaya katıldı',
+                content: i18n.t('auto.room.id.098'),
                 created_at: new Date().toISOString(),
                 profiles: { display_name: np.user?.display_name || 'Misafir' },
                 isJoin: true,
@@ -2634,13 +2634,13 @@ export default function RoomScreen() {
       const label = device === 'microphone' ? 'Mikrofon' : 'Kamera';
       setAlertConfig({
         visible: true,
-        title: `⚠️ ${label} İzni Gerekli`,
-        message: `Sahnede konuşmak için ${label.toLocaleLowerCase('tr-TR')} iznine ihtiyacımız var. İzni reddettiğiniz için ${device === 'microphone' ? 'mikrofonunuzu açamadık' : 'kameranızı açamadık'}. Ayarlardan izni açtıktan sonra tekrar deneyin.`,
+        title: i18n.t('auto.room.id.097', { 0: label }),
+        message: `Sahnede konuşmak için ${label.toLocaleLowerCase('tr-TR')} iznine ihtiyacımız var. İzni reddettiğiniz için ${device === 'microphone' ? i18n.t('auto.room.id.096') : i18n.t('auto.room.id.095')}. Ayarlardan izni açtıktan sonra tekrar deneyin.`,
         type: 'warning',
         icon: device === 'microphone' ? 'mic-off' : 'videocam-off',
         buttons: [
-          { text: 'İptal', style: 'cancel' },
-          { text: 'Ayarları Aç', onPress: () => { Linking.openSettings().catch(() => {}); } },
+          { text: i18n.t('auto.room.id.094'), style: 'cancel' },
+          { text: i18n.t('auto.room.id.093'), onPress: () => { Linking.openSettings().catch(() => {}); } },
         ],
       });
     }, []),
@@ -2698,7 +2698,7 @@ export default function RoomScreen() {
     const label = getLanguageLabel(roomLang);
     showToast({
       title: `${flag} ${label}`,
-      message: `Bu odada ${label} konuşuluyor.`,
+      message: i18n.t('auto.room.id.092', { 0: label }),
       type: 'info',
       duration: 3500,
     });
@@ -2906,7 +2906,7 @@ export default function RoomScreen() {
     } catch (err: any) {
       // Network/exception — optimistic kaldır + uyarı
       setChatMessages(prev => prev.filter(m => m.id !== tempId));
-      showToast({ title: i18n.t('room.id.022'), message: err?.message || 'Bağlantı hatası', type: 'error' });
+      showToast({ title: i18n.t('room.id.022'), message: err?.message || i18n.t('auto.room.id.091'), type: 'error' });
     }
   };
 
@@ -2932,7 +2932,7 @@ export default function RoomScreen() {
         payload: {
           type: 'request',
           userId: firebaseUser?.uid,
-          displayName: profile?.display_name || 'Kullanıcı',
+          displayName: profile?.display_name || i18n.t('auto.room.id.090'),
         },
       });
     }
@@ -3022,7 +3022,7 @@ export default function RoomScreen() {
       const maxSlots = tierLimits.maxSpeakers;
     const currentStageCount = participants.filter(p => ['owner', 'speaker', 'moderator'].includes(p.role)).length;
     if (currentStageCount >= maxSlots) {
-      showToast({ title: 'Sahne Dolu', message: `Sahnede maksimum ${maxSlots} kişi olabilir`, type: 'warning' });
+      showToast({ title: 'Sahne Dolu', message: i18n.t('auto.room.id.089', { 0: maxSlots }), type: 'warning' });
       UpsellService.onStageCapacityFull(ownerTier as any);
       return;
     }
@@ -3060,9 +3060,9 @@ export default function RoomScreen() {
       id: `sys_promote_${uid}_${Date.now()}`,
       room_id: id as string,
       user_id: uid,
-      content: '🤚 sahneye çıktı',
+      content: i18n.t('auto.room.id.088'),
       created_at: new Date().toISOString(),
-      profiles: { display_name: p?.user?.display_name || 'Kullanıcı' },
+      profiles: { display_name: p?.user?.display_name || i18n.t('auto.room.id.087') },
       isSystem: true,
     } as any;
     setChatMessages(prev => [sysMsg, ...prev].slice(0, 100));
@@ -3083,16 +3083,16 @@ export default function RoomScreen() {
       setAlertConfig({
         visible: true, title: i18n.t('room.id.034'), message: i18n.t('room.id.035'), type: 'warning', icon: 'exit-outline',
         buttons: [
-          { text: 'İptal', style: 'cancel' },
-          { text: 'Ayrıl', style: 'destructive', onPress: () => { isRoomClosingRef.current = true; handleHostLeave(); } },
+          { text: i18n.t('auto.room.id.086'), style: 'cancel' },
+          { text: i18n.t('auto.room.id.085'), style: 'destructive', onPress: () => { isRoomClosingRef.current = true; handleHostLeave(); } },
         ],
       });
     } else {
       setAlertConfig({
         visible: true, title: i18n.t('room.id.036'), message: i18n.t('room.id.037'), type: 'warning', icon: 'exit-outline',
         buttons: [
-          { text: 'İptal', style: 'cancel' },
-          { text: 'Ayrıl', style: 'destructive', onPress: () => { isRoomClosingRef.current = true; handleUserLeave(); } },
+          { text: i18n.t('auto.room.id.084'), style: 'cancel' },
+          { text: i18n.t('auto.room.id.083'), style: 'destructive', onPress: () => { isRoomClosingRef.current = true; handleUserLeave(); } },
         ],
       });
     }
@@ -3109,8 +3109,8 @@ export default function RoomScreen() {
     setAlertConfig({
       visible: true, title: i18n.t('room.id.039'), message: i18n.t('room.id.040'), type: 'error', icon: 'trash',
       buttons: [
-        { text: 'İptal', style: 'cancel' },
-        { text: 'Kalıcı Sil', style: 'destructive', onPress: async () => {
+        { text: i18n.t('auto.room.id.082'), style: 'cancel' },
+        { text: i18n.t('auto.room.id.081'), style: 'destructive', onPress: async () => {
           try {
             // Broadcast: odadaki herkese bildir
             modChannelRef.current?.send({
@@ -3124,7 +3124,7 @@ export default function RoomScreen() {
             // Başarı toast gereksiz — sayfadan çıkılıyor
             safeGoBack(router);
           } catch (e: any) {
-            showToast({ title: 'Oda Silinemedi', message: e.message || 'İşlem tamamlanamadı.', type: 'error' });
+            showToast({ title: 'Oda Silinemedi', message: e.message || i18n.t('auto.room.id.080'), type: 'error' });
           }
         }}
       ]
@@ -3307,7 +3307,7 @@ export default function RoomScreen() {
       // Ek olarak tam veriyi de çek (arka planda)
       RoomService.get(id as string).then(setRoom).catch(() => {});
     } catch (e: any) {
-      showToast({ title: i18n.t('room.id.053'), message: e?.message || 'Host transferi başarısız.', type: 'error' });
+      showToast({ title: i18n.t('room.id.053'), message: e?.message || i18n.t('auto.room.id.079'), type: 'error' });
     }
   };
 
@@ -3399,7 +3399,7 @@ export default function RoomScreen() {
         if (remaining <= 0) {
           const _t = ((room as any)?.owner_tier || room?.host?.subscription_tier || 'Free') as any;
           UpsellService.onRoomDurationExpired(_t);
-          setRoomExpiry('⏰ Süre doldu!');
+          setRoomExpiry(i18n.t('auto.room.id.078'));
           if (isHost) {
             showToast({ title: i18n.t('room.id.056'), message: i18n.t('room.id.057'), type: 'warning', id: 'room_expired' });
             setTimeout(async () => { try { await RoomService.close(id as string); liveKitService.disconnect().catch(() => {}); setMinimizedRoom(null); safeGoBack(router); } catch {} }, 3000);
@@ -3654,7 +3654,7 @@ export default function RoomScreen() {
         const alreadyShown = await AS.getItem(key);
         if (alreadyShown) return;
 
-        const myName = (profile as any)?.display_name || firebaseUser.displayName || 'Hoş geldin';
+        const myName = (profile as any)?.display_name || firebaseUser.displayName || i18n.t('auto.room.id.077');
         setWelcomeOverlay({ name: myName, msg: welcomeMsg });
         await AS.setItem(key, new Date().toISOString());
 
@@ -3745,7 +3745,7 @@ export default function RoomScreen() {
       // ★ 2026-04-20 FIX: Sahneye çıkınca mikrofonu otomatik aç
       setTimeout(() => { lk.enableMic?.().catch(() => {}); }, 500);
     } catch (err: any) {
-      const msg = err?.message || 'Sahneye çıkılamadı';
+      const msg = err?.message || i18n.t('auto.room.id.076');
       const isCooldown = /bekleme|cooldown|biraz bekle|\d+\s*saniye/i.test(msg);
       const isFull = /dolu/i.test(msg);
       // ★ v107.27: "Önce odaya katılmalısın" hatası → DB row eksik (bağlantı düşmüş ama UI'da odada).
@@ -3780,7 +3780,7 @@ export default function RoomScreen() {
         const expiresAt = (myPart as any)?.stage_expires_at;
         if (expiresAt) {
           const remainSec = Math.max(0, Math.ceil((new Date(expiresAt).getTime() - Date.now()) / 1000));
-          if (remainSec > 0) finalMsg = `Tekrar sahneye çıkmak için ${remainSec} saniye bekle.`;
+          if (remainSec > 0) finalMsg = i18n.t('auto.room.id.075', { 0: remainSec });
         }
       }
 
@@ -3866,7 +3866,7 @@ export default function RoomScreen() {
       visible: true, title: i18n.t('room.id.071'), message: i18n.t('room.id.072'),
       type: 'warning', icon: 'volume-mute',
       buttons: [
-        { text: 'İptal', style: 'cancel' },
+        { text: i18n.t('auto.room.id.074'), style: 'cancel' },
         { text: 'Sustur', onPress: async () => {
           const stagePeople = participants.filter(p => (p.role === 'speaker' || p.role === 'moderator') && p.user_id !== firebaseUser.uid);
           await Promise.all(stagePeople.map(async (p) => {
@@ -3879,7 +3879,7 @@ export default function RoomScreen() {
               ? { ...p, is_muted: true } : p
           ));
           modChannelRef.current?.send({ type: 'broadcast', event: 'mod_action', payload: { action: 'mute_all' } });
-          showToast({ title: i18n.t('room.id.073'), message: `${stagePeople.length} konuşmacı susturuldu`, type: 'success' });
+          showToast({ title: i18n.t('room.id.073'), message: i18n.t('auto.room.id.073', { 0: stagePeople.length }), type: 'success' });
         }},
       ],
     });
@@ -3892,8 +3892,8 @@ export default function RoomScreen() {
       visible: true, title: i18n.t('room.id.074'), message: i18n.t('room.id.075'),
       type: 'info', icon: 'volume-high',
       buttons: [
-        { text: 'İptal', style: 'cancel' },
-        { text: 'Aç', onPress: async () => {
+        { text: i18n.t('auto.room.id.072'), style: 'cancel' },
+        { text: i18n.t('auto.room.id.071'), onPress: async () => {
           const stagePeople = participants.filter(p => (p.role === 'speaker' || p.role === 'moderator') && p.user_id !== firebaseUser.uid);
           await Promise.all(stagePeople.map(async (p) => {
             try {
@@ -3908,7 +3908,7 @@ export default function RoomScreen() {
               ? { ...p, is_muted: false } : p
           ));
           modChannelRef.current?.send({ type: 'broadcast', event: 'mod_action', payload: { action: 'unmute_all' } });
-          showToast({ title: i18n.t('room.id.076'), message: `${stagePeople.length} konuşmacı serbest bırakıldı`, type: 'success' });
+          showToast({ title: i18n.t('room.id.076'), message: i18n.t('auto.room.id.070', { 0: stagePeople.length }), type: 'success' });
         }},
       ],
     });
@@ -3965,7 +3965,7 @@ export default function RoomScreen() {
           setMyMicRequested(true);
           micReqChannelRef.current?.send({
             type: 'broadcast', event: 'mic_request',
-            payload: { type: 'request', userId: firebaseUser.uid, displayName: profile?.display_name || 'Kullanıcı' },
+            payload: { type: 'request', userId: firebaseUser.uid, displayName: profile?.display_name || i18n.t('auto.room.id.069') },
           });
           showToast({ title: i18n.t('room.id.079'), message: i18n.t('room.id.080'), type: 'success' });
         } else {
@@ -3984,7 +3984,7 @@ export default function RoomScreen() {
             setMyMicRequested(true);
             micReqChannelRef.current?.send({
               type: 'broadcast', event: 'mic_request',
-              payload: { type: 'request', userId: firebaseUser.uid, displayName: profile?.display_name || 'Kullanıcı' },
+              payload: { type: 'request', userId: firebaseUser.uid, displayName: profile?.display_name || i18n.t('auto.room.id.068') },
             });
             showToast({ title: i18n.t('room.id.082'), message: i18n.t('room.id.083'), type: 'info' });
           } else {
@@ -4008,13 +4008,13 @@ export default function RoomScreen() {
       }
       // ★ v67 FIX: Sahneye çıktıktan hemen sonra heartbeat — stale cleanup koruması
       RoomService.updateLastSeen(room.id, firebaseUser.uid).catch(() => {});
-      showToast({ title: isHost ? '👑 Sahneye Döndün!' : 'Sahneye Hoş Geldin!', message: i18n.t('room.id.086'), type: 'success' });
+      showToast({ title: isHost ? i18n.t('auto.room.id.067') : i18n.t('auto.room.id.066'), message: i18n.t('room.id.086'), type: 'success' });
       setShowSeatTooltip(false);
       // ★ 2026-04-20 FIX: Sahneye çıkınca mikrofonu otomatik aç — önceden eksikti,
       // bu yüzden başkasının odasında sahneye çıkan kullanıcı mic açamıyordu.
       setTimeout(() => { lk.enableMic?.().catch(() => {}); }, 500);
     } catch (e: any) {
-      showToast({ title: 'Sahne Dolu', message: e?.message || 'Sahneye çıkılamadı', type: 'warning' });
+      showToast({ title: 'Sahne Dolu', message: e?.message || i18n.t('auto.room.id.065'), type: 'warning' });
     }
   }, [room, firebaseUser?.uid, speakingMode, myMicRequested, profile?.display_name, participants, ownerTier, lk]);
 
@@ -4130,8 +4130,8 @@ export default function RoomScreen() {
   const handleShareRoom = useCallback(async () => {
     try {
       await Share.share({
-        message: `🎤 "${room?.name || 'Oda'}" odasına gel! SopranoChat'te konuşalım:\nhttps://sopranochat.com/room/${id}`,
-        title: room?.name || 'SopranoChat Odası',
+        message: i18n.t('auto.room.id.064', { 0: room?.name || 'Oda', 1: id }),
+        title: room?.name || i18n.t('auto.room.id.063'),
       });
     } catch (e) {
       showToast({ title: i18n.t('room.id.094'), message: i18n.t('room.id.095'), type: 'error' });
@@ -4230,8 +4230,8 @@ export default function RoomScreen() {
       loadFollowerData(room.id);
       // ★ 2026-04-20: Kullanıcıya gerçek zamanlı feedback
       showToast({
-        title: newState ? '❤️ Takip ediliyor' : '💔 Takipten çıkıldı',
-        message: newState ? 'Oda güncellemelerinden haberdar olacaksın.' : 'Artık bu odanın bildirimlerini almayacaksın.',
+        title: newState ? '❤️ Takip ediliyor' : i18n.t('auto.room.id.062'),
+        message: newState ? i18n.t('auto.room.id.061') : i18n.t('auto.room.id.060'),
         type: newState ? 'success' : 'info',
       });
     } catch {
@@ -4309,7 +4309,7 @@ export default function RoomScreen() {
         <View style={{ alignItems: 'center', gap: 14 }}>
           <AppLoader size={52} />
           <Text style={{ fontSize: 12, color: 'rgba(148,163,184,0.7)', fontWeight: '600', textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }}>
-            {loading ? 'Odaya bağlanılıyor...' : 'Oda hazırlanıyor...'}
+            {loading ? i18n.t('auto.room.id.059') : i18n.t('auto.room.id.058')}
           </Text>
         </View>
         {/* ★ Access loading sırasında render edilmesi gereken sheet'ler — burada da mount edilmeli */}
@@ -4355,10 +4355,10 @@ export default function RoomScreen() {
                 });
                 setPendingRoomData(null);
               } else {
-                setPasswordError(result.reason || 'Yanlış şifre.');
+                setPasswordError(result.reason || i18n.t('auto.room.id.057'));
               }
             } catch {
-              setPasswordError('Bir hata oluştu. Tekrar deneyin.');
+              setPasswordError(i18n.t('auto.room.id.056'));
             } finally {
               setAccessPending(false);
             }
@@ -4418,7 +4418,7 @@ export default function RoomScreen() {
           onRejected={(reason) => {
             setShowAccessRequest(false);
             setPendingRoomData(null);
-            showToast({ title: '❌ Reddedildi', message: reason || 'İstek reddedildi', type: 'warning' });
+            showToast({ title: '❌ Reddedildi', message: reason || i18n.t('auto.room.id.055'), type: 'warning' });
             safeGoBack(router);
           }}
           onCancelled={() => {
@@ -4571,7 +4571,7 @@ export default function RoomScreen() {
       {closingCountdown !== null && closingCountdown > 0 && (
         <View style={{ marginHorizontal: 14, marginBottom: 8, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 12, backgroundColor: 'rgba(239,68,68,0.15)', borderWidth: 1, borderColor: 'rgba(239,68,68,0.3)', flexDirection: 'row', alignItems: 'center', gap: 10 }}>
           <View style={{ flex: 1 }}>
-            <Text style={{ color: '#FCA5A5', fontSize: 12, fontWeight: '700' }}>⏳ Oda {closingCountdown}sn içinde kapanacak</Text>
+            <Text style={{ color: '#FCA5A5', fontSize: 12, fontWeight: '700' }}>⏳ Oda {closingCountdown}{i18n.t('auto.room.id.054')}</Text>
             <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 10, marginTop: 2 }}>{i18n.t('room.id.002')}</Text>
           </View>
           {!amIHost && (
@@ -4674,7 +4674,7 @@ export default function RoomScreen() {
           }}
           onQuickMute={(u) => {
             const isMuted = (u as any).is_muted === true;
-            const name = u.user?.display_name || 'Kullanıcı';
+            const name = u.user?.display_name || i18n.t('auto.room.id.053');
             if (isMuted) {
               executeUnmute(u.user_id, name);
             } else {
@@ -4769,7 +4769,7 @@ export default function RoomScreen() {
             // ★ Chat'e kalıcı sistem mesajı — sahne emoji ile (Hediye'den ayrım)
             RoomChatService.sendSystem(
               id as string,
-              `✨ ${senderN}, ${recipN}'ın sahnesini ${amt} SP destekledi`,
+              i18n.t('auto.room.id.052', { 0: senderN, 1: recipN, 2: amt }),
             ).catch(() => {});
             // Top contributor pill'i tetikle
             setTopContributorTrigger(t => t + 1);
@@ -4854,7 +4854,7 @@ export default function RoomScreen() {
             // Chat sistem mesajı + top contributor refresh
             RoomChatService.sendSystem(
               id as string,
-              `🎁 ${senderN}, ${recipN}'a ${amt} SP hediye gönderdi`,
+              i18n.t('auto.room.id.051', { 0: senderN, 1: recipN, 2: amt }),
             ).catch(() => {});
             setTopContributorTrigger(t => t + 1);
             setTipSheetTarget(null);
@@ -4948,7 +4948,7 @@ export default function RoomScreen() {
             const activeCams = lk.participants.filter((p: any) => p.isCameraEnabled).length;
             if (!lk.isCameraEnabled && activeCams >= _tLimits.maxCameras) {
               UpsellService.onCameraLimit(ownerTier as any);
-              showToast({ title: 'Kamera Limiti', message: 'Maksimum ' + _tLimits.maxCameras + ' kamera açılabilir.', type: 'warning' });
+              showToast({ title: 'Kamera Limiti', message: 'Maksimum ' + _tLimits.maxCameras + i18n.t('auto.room.id.050'), type: 'warning' });
               return;
             }
             try { lk.toggleCamera?.(); } catch {}
@@ -4958,7 +4958,7 @@ export default function RoomScreen() {
           onLeavePress={() => {
             setAlertConfig({
               visible: true, title: i18n.t('room.id.107'), message: i18n.t('room.id.108'), type: 'warning', icon: 'exit-outline',
-              buttons: [{ text: 'İptal', style: 'cancel' }, { text: 'Ayrıl', onPress: () => { isRoomClosingRef.current = true; if (amIHost) { handleHostLeave(); } else { handleUserLeave(); } }, style: 'destructive' }],
+              buttons: [{ text: i18n.t('auto.room.id.049'), style: 'cancel' }, { text: i18n.t('auto.room.id.048'), onPress: () => { isRoomClosingRef.current = true; if (amIHost) { handleHostLeave(); } else { handleUserLeave(); } }, style: 'destructive' }],
             });
           }} />
       </View>
@@ -4982,11 +4982,11 @@ export default function RoomScreen() {
           if (r.success) {
             setChatInput('');
             const msg = r.cost && r.cost > 0
-              ? `${r.cost} SP harcandı`
-              : 'Premium stilin sonsuz kullanım hakkı var';
+              ? i18n.t('auto.room.id.047', { 0: r.cost })
+              : i18n.t('auto.room.id.046');
             showToast({ title: i18n.t('room.id.109'), message: msg, type: 'success' });
           } else {
-            showToast({ title: i18n.t('room.id.110'), message: r.error || 'Bağlantı hatası', type: 'error' });
+            showToast({ title: i18n.t('room.id.110'), message: r.error || i18n.t('auto.room.id.045'), type: 'error' });
           }
         }}
         onSendRaw={(content: string) => {
@@ -5086,7 +5086,7 @@ export default function RoomScreen() {
               await RoomService.setRoomLock(room.id, newLocked);
               setRoom(prev => prev ? { ...prev, room_settings: { ...(prev.room_settings || {}), is_locked: newLocked } } : prev);
               modChannelRef.current?.send({ type: 'broadcast', event: 'settings_changed', payload: { room_settings: { is_locked: newLocked } } });
-              showToast({ title: newLocked ? '🔒 Oda Kilitlendi' : '🔓 Kilit Açıldı', type: 'success' });
+              showToast({ title: newLocked ? '🔒 Oda Kilitlendi' : i18n.t('auto.room.id.044'), type: 'success' });
             } catch { showToast({ title: i18n.t('room.id.111'), message: i18n.t('room.id.112'), type: 'error' }); }
           })();
         } : undefined}
@@ -5103,7 +5103,7 @@ export default function RoomScreen() {
                 await RoomService.updateSettings(room.id, firebaseUser!.uid, { room_settings: { speaking_mode: mode as any } });
                 setRoom(prev => prev ? { ...prev, room_settings: { ...(prev.room_settings || {}), speaking_mode: mode as any } } as any : prev);
                 modChannelRef.current?.send({ type: 'broadcast', event: 'settings_changed', payload: { room_settings: { speaking_mode: mode } } });
-                const labels: Record<string, string> = { free_for_all: 'Serbest Mod', permission_only: 'İzinli Mod', selected_only: 'Seçilmişler Modu' };
+                const labels: Record<string, string> = { free_for_all: 'Serbest Mod', permission_only: i18n.t('auto.room.id.043'), selected_only: i18n.t('auto.room.id.042') };
                 showToast({ title: labels[mode] || 'Mod', type: 'success' });
               } catch { showToast({ title: i18n.t('room.id.114'), message: i18n.t('room.id.115'), type: 'error' }); }
             }
@@ -5115,7 +5115,7 @@ export default function RoomScreen() {
               await RoomService.updateSettings(room.id, firebaseUser.uid, { room_settings: { slow_mode_seconds: seconds } });
               setRoom(prev => prev ? { ...prev, room_settings: { ...(prev.room_settings || {}), slow_mode_seconds: seconds } } : prev);
               modChannelRef.current?.send({ type: 'broadcast', event: 'settings_changed', payload: { room_settings: { slow_mode_seconds: seconds } } });
-              showToast({ title: seconds ? `Slow Mode: ${seconds}sn` : 'Slow Mode Kapalı', type: 'success' });
+              showToast({ title: seconds ? `Slow Mode: ${seconds}sn` : i18n.t('auto.room.id.041'), type: 'success' });
             } catch { showToast({ title: i18n.t('room.id.116'), message: i18n.t('room.id.117'), type: 'error' }); }
           },
           ageRestricted: (room?.room_settings as any)?.age_restricted || false,
@@ -5125,7 +5125,7 @@ export default function RoomScreen() {
               await RoomService.updateSettings(room.id, firebaseUser.uid, { room_settings: { age_restricted: enabled } });
               setRoom(prev => prev ? { ...prev, room_settings: { ...(prev.room_settings || {}), age_restricted: enabled } } : prev);
               modChannelRef.current?.send({ type: 'broadcast', event: 'settings_changed', payload: { room_settings: { age_restricted: enabled } } });
-              showToast({ title: enabled ? '🔞 +18 Aktif' : '👥 Yaş Sınırı Kaldırıldı', type: 'success' });
+              showToast({ title: enabled ? '🔞 +18 Aktif' : i18n.t('auto.room.id.040'), type: 'success' });
             } catch { showToast({ title: i18n.t('room.id.118'), message: i18n.t('room.id.119'), type: 'error' }); }
           },
           followersOnly: (room?.room_settings as any)?.followers_only || false,
@@ -5135,7 +5135,7 @@ export default function RoomScreen() {
               await RoomService.updateSettings(room.id, firebaseUser.uid, { room_settings: { followers_only: enabled } });
               setRoom(prev => prev ? { ...prev, room_settings: { ...(prev.room_settings || {}), followers_only: enabled } } : prev);
               modChannelRef.current?.send({ type: 'broadcast', event: 'settings_changed', payload: { room_settings: { followers_only: enabled } } });
-              showToast({ title: enabled ? 'Arkadaşlara Özel' : 'Herkese Açık', type: 'success' });
+              showToast({ title: enabled ? i18n.t('auto.room.id.039') : i18n.t('auto.room.id.038'), type: 'success' });
             } catch { showToast({ title: i18n.t('room.id.120'), message: i18n.t('room.id.121'), type: 'error' }); }
           },
           donationsEnabled: (room?.room_settings as any)?.donations_enabled || false,
@@ -5145,7 +5145,7 @@ export default function RoomScreen() {
               await RoomService.updateSettings(room.id, firebaseUser.uid, { room_settings: { donations_enabled: enabled } });
               setRoom(prev => prev ? { ...prev, room_settings: { ...(prev.room_settings || {}), donations_enabled: enabled } } : prev);
               modChannelRef.current?.send({ type: 'broadcast', event: 'settings_changed', payload: { room_settings: { donations_enabled: enabled } } });
-              showToast({ title: enabled ? 'Bağış Açıldı' : 'Bağış Kapatıldı', type: 'success' });
+              showToast({ title: enabled ? i18n.t('auto.room.id.037') : i18n.t('auto.room.id.036'), type: 'success' });
             } catch { showToast({ title: i18n.t('room.id.122'), message: i18n.t('room.id.123'), type: 'error' }); }
           },
           roomLanguage: (room?.room_settings as any)?.room_language || 'tr',
@@ -5155,7 +5155,7 @@ export default function RoomScreen() {
               await RoomService.updateSettings(room.id, firebaseUser.uid, { room_settings: { room_language: lang as any } });
               setRoom(prev => prev ? { ...prev, room_settings: { ...(prev.room_settings || {}), room_language: lang as any } } : prev);
               modChannelRef.current?.send({ type: 'broadcast', event: 'settings_changed', payload: { room_settings: { room_language: lang } } });
-              const names: Record<string,string> = { tr: 'Türkçe', en: 'English', de: 'Deutsch', ar: 'العربية' };
+              const names: Record<string,string> = { tr: i18n.t('auto.room.id.035'), en: 'English', de: 'Deutsch', ar: 'العربية' };
               showToast({ title: `🌐 ${names[lang] || lang}`, type: 'success' });
             } catch { showToast({ title: i18n.t('room.id.124'), message: i18n.t('room.id.125'), type: 'error' }); }
           },
@@ -5211,7 +5211,7 @@ export default function RoomScreen() {
               await RoomService.updateSettings(room.id, firebaseUser.uid, { type: type as any });
               setRoom(prev => prev ? { ...prev, type } as any : prev);
               modChannelRef.current?.send({ type: 'broadcast', event: 'settings_changed', payload: { type } });
-              const labels: Record<string,string> = { open: 'Herkese Açık', closed: 'Şifreli', invite: 'Davetli' };
+              const labels: Record<string,string> = { open: i18n.t('auto.room.id.034'), closed: i18n.t('auto.room.id.033'), invite: 'Davetli' };
               showToast({ title: `🔒 ${labels[type] || type}`, type: 'success' });
             } catch { showToast({ title: i18n.t('room.id.138'), message: i18n.t('room.id.139'), type: 'error' }); }
           },
@@ -5229,7 +5229,7 @@ export default function RoomScreen() {
               await RoomService.updateSettings(room.id, firebaseUser.uid, { room_settings: { room_password: pw && pw.trim().length > 0 ? pw.trim() : '' } as any });
               setRoom(prev => prev ? { ...prev, room_password: pw && pw.trim().length > 0 ? pw.trim() : null, room_settings: { ...(prev.room_settings || {}), room_password: pw && pw.trim().length > 0 ? pw.trim() : '' } } as any : prev);
               modChannelRef.current?.send({ type: 'broadcast', event: 'settings_changed', payload: { room_settings: { room_password: pw } } });
-              showToast({ title: pw && pw.trim().length > 0 ? '🔐 Şifre Ayarlandı' : '🔓 Şifre Kaldırıldı', type: 'success' });
+              showToast({ title: pw && pw.trim().length > 0 ? i18n.t('auto.room.id.032') : i18n.t('auto.room.id.031'), type: 'success' });
             } catch { showToast({ title: i18n.t('room.id.140'), message: i18n.t('room.id.141'), type: 'error' }); }
           },
           // ★ Tema
@@ -5250,7 +5250,7 @@ export default function RoomScreen() {
               message: i18n.t('room.id.146'),
               type: 'warning', icon: 'snow-outline',
               buttons: [
-                { text: 'İptal', style: 'cancel' },
+                { text: i18n.t('auto.room.id.030'), style: 'cancel' },
                 { text: 'Dondur', style: 'destructive', onPress: async () => {
                   if (!room || !firebaseUser) return;
                   try {
@@ -5261,7 +5261,7 @@ export default function RoomScreen() {
                     setMinimizedRoom(null);
                     showToast({ title: '❄️ Oda Donduruldu', message: i18n.t('room.id.147'), type: 'success' });
                     safeGoBack(router);
-                  } catch (err: any) { showToast({ title: i18n.t('room.id.148'), message: err.message || 'Oda uyku moduna alınamadı.', type: 'error' }); }
+                  } catch (err: any) { showToast({ title: i18n.t('room.id.148'), message: err.message || i18n.t('auto.room.id.029'), type: 'error' }); }
                 }},
               ],
             });
@@ -5274,7 +5274,7 @@ export default function RoomScreen() {
               await RoomService.updateSettings(room.id, firebaseUser.uid, { room_settings: { entry_fee_sp: fee } });
               setRoom(prev => prev ? { ...prev, room_settings: { ...(prev.room_settings || {}), entry_fee_sp: fee } } : prev);
               modChannelRef.current?.send({ type: 'broadcast', event: 'settings_changed', payload: { room_settings: { entry_fee_sp: fee } } });
-              showToast({ title: fee ? `💰 Giriş: ${fee} SP` : '🆓 Giriş Ücretsiz', type: 'success' });
+              showToast({ title: fee ? i18n.t('auto.room.id.028', { 0: fee }) : i18n.t('auto.room.id.027'), type: 'success' });
             } catch { showToast({ title: i18n.t('room.id.149'), message: i18n.t('room.id.150'), type: 'error' }); }
           },
           // ★ Müzik linki (YouTube/Spotify/SoundCloud) — herkes kendi platformunda dinler
@@ -5286,7 +5286,7 @@ export default function RoomScreen() {
               await RoomService.updateSettings(room.id, firebaseUser.uid, { room_settings: { music_link: normalized } });
               setRoom(prev => prev ? { ...prev, room_settings: { ...(prev.room_settings || {}), music_link: normalized } } : prev);
               modChannelRef.current?.send({ type: 'broadcast', event: 'settings_changed', payload: { room_settings: { music_link: normalized } } });
-              showToast({ title: normalized ? '🎵 Müzik Linki Eklendi' : '🔇 Müzik Linki Kaldırıldı', type: 'success' });
+              showToast({ title: normalized ? i18n.t('auto.room.id.026') : i18n.t('auto.room.id.025'), type: 'success' });
             } catch { showToast({ title: i18n.t('room.id.151'), message: i18n.t('room.id.152'), type: 'error' }); }
           },
           // ★ Arka Plan Resmi
@@ -5308,7 +5308,7 @@ export default function RoomScreen() {
               // ★ 2026-04-19: Broadcast — diğer client'lara arka plan değişimini yay
               modChannelRef.current?.send({ type: 'broadcast', event: 'settings_changed', payload: { room_settings: { room_image_url: url } } });
               showToast({ title: i18n.t('room.id.154'), type: 'success' });
-            } catch (e: any) { showToast({ title: i18n.t('room.id.155'), message: e.message || 'Sunucuya ulaşılamadı.', type: 'error' }); }
+            } catch (e: any) { showToast({ title: i18n.t('room.id.155'), message: e.message || i18n.t('auto.room.id.024'), type: 'error' }); }
           },
           onRemoveBackgroundImage: async () => {
             if (!room || !firebaseUser) return;
@@ -5338,7 +5338,7 @@ export default function RoomScreen() {
               setRoom(prev => prev ? { ...prev, room_settings: { ...(prev.room_settings || {}), card_image_url: url } } as any : prev);
               modChannelRef.current?.send({ type: 'broadcast', event: 'settings_changed', payload: { room_settings: { card_image_url: url } } });
               showToast({ title: i18n.t('room.id.160'), type: 'success' });
-            } catch (e: any) { showToast({ title: i18n.t('room.id.161'), message: e.message || 'Sunucuya ulaşılamadı.', type: 'error' }); }
+            } catch (e: any) { showToast({ title: i18n.t('room.id.161'), message: e.message || i18n.t('auto.room.id.023'), type: 'error' }); }
           },
           onRemoveCoverImage: async () => {
             if (!room || !firebaseUser) return;
@@ -5414,11 +5414,11 @@ export default function RoomScreen() {
           onBoost={async (tier: RoomBoostTier) => {
             try {
               const result = await GamificationService.purchaseRoomBoost(firebaseUser.uid, tier.durationHours);
-              if (!result.success) { showToast({ title: 'Yetersiz SP', message: result.error || 'SP bakiyeniz yeterli değil.', type: 'warning' }); throw new Error(result.error); }
+              if (!result.success) { showToast({ title: 'Yetersiz SP', message: result.error || i18n.t('auto.room.id.022'), type: 'warning' }); throw new Error(result.error); }
               await RoomService.activateBoost(room.id, firebaseUser.uid, tier.durationHours);
-              showToast({ title: '🚀 Boost Aktif!', message: `${tier.durationHours} saat boyunca keşfette öne çıkacaksın!`, type: 'success' });
+              showToast({ title: '🚀 Boost Aktif!', message: i18n.t('auto.room.id.021', { 0: tier.durationHours }), type: 'success' });
             } catch (e: any) {
-              showToast({ title: i18n.t('room.id.167'), message: e?.message || 'Boost aktifleştirilemedi.', type: 'error' });
+              showToast({ title: i18n.t('room.id.167'), message: e?.message || i18n.t('auto.room.id.020'), type: 'error' });
               throw e;
             }
           }}
@@ -5451,7 +5451,7 @@ export default function RoomScreen() {
             // ★ Oda içi no-op showToast'u bypass — global Toast kullan
             if (successCount > 0) {
               const { showToast: globalToast } = require('../../components/Toast');
-              globalToast({ title: i18n.t('room.id.168'), message: `${successCount} kişiye davet gönderildi`, type: 'success' });
+              globalToast({ title: i18n.t('room.id.168'), message: i18n.t('auto.room.id.019', { 0: successCount }), type: 'success' });
             }
             setShowInviteFriends(false);
           }}
@@ -5516,21 +5516,21 @@ export default function RoomScreen() {
                 setAccessGranted(true);
                 showToast({ title: i18n.t('room.id.169'), message: i18n.t('room.id.170'), type: 'success' });
               }).catch((err: any) => {
-                const msg = err?.message || 'Odaya katılınamadı.';
+                const msg = err?.message || i18n.t('auto.room.id.018');
                 setAlertConfig({
                   visible: true,
-                  title: msg.includes('yasaklan') ? '⛔ Erişim Engellendi' : '⚠️ Giriş Hatası',
+                  title: msg.includes('yasaklan') ? i18n.t('auto.room.id.017') : i18n.t('auto.room.id.016'),
                   message: msg, type: 'error',
                   icon: msg.includes('yasaklan') ? 'ban' : 'alert-circle',
-                  buttons: [{ text: 'Geri Dön', onPress: () => safeGoBack(router) }],
+                  buttons: [{ text: i18n.t('auto.room.id.015'), onPress: () => safeGoBack(router) }],
                 });
               });
               setPendingRoomData(null);
             } else {
-              setPasswordError(result.reason || 'Yanlış şifre.');
+              setPasswordError(result.reason || i18n.t('auto.room.id.014'));
             }
           } catch {
-            setPasswordError('Bir hata oluştu. Tekrar deneyin.');
+            setPasswordError(i18n.t('auto.room.id.013'));
           } finally {
             setAccessPending(false);
           }
@@ -5579,7 +5579,7 @@ export default function RoomScreen() {
         onRejected={(reason) => {
           setShowAccessRequest(false);
           setPendingRoomData(null);
-          showToast({ title: '❌ Reddedildi', message: reason || 'İstek reddedildi', type: 'warning' });
+          showToast({ title: '❌ Reddedildi', message: reason || i18n.t('auto.room.id.012'), type: 'warning' });
           safeGoBack(router);
         }}
         onCancelled={() => {
@@ -5695,21 +5695,21 @@ export default function RoomScreen() {
             isMuted: _su.is_muted || false,
             isChatMuted: _su.is_chat_muted || false,
             mutedUntil: _su.muted_until || null,
-            onPromoteToStage: _perm('promote_speaker') && _su.role === 'listener' && _notSelf ? () => handlePromoteToStage(_su.user_id, _su.user?.display_name || 'Kullanıcı') : undefined,
+            onPromoteToStage: _perm('promote_speaker') && _su.role === 'listener' && _notSelf ? () => handlePromoteToStage(_su.user_id, _su.user?.display_name || i18n.t('auto.room.id.011')) : undefined,
             onRemoveFromStage: _perm('demote_speaker') && _su.role === 'speaker' && _notSelf ? async () => { try { await RoomService.demoteSpeaker(id as string, _su.user_id); modChannelRef.current?.send({ type: 'broadcast', event: 'mod_action', payload: { action: 'demote', targetUserId: _su.user_id } }); setParticipants(prev => prev.map(p => p.user_id === _su.user_id ? { ...p, role: 'listener' as const } : p)); setSelectedUser(null); setInRoomProfileId(null); } catch {} } : undefined,
-            onMute: _perm('timed_mute') && _notSelf && !_su.is_muted && ['speaker', 'moderator', 'owner'].includes(_su.role) ? () => handleTimedMuteUser(_su.user_id, _su.user?.display_name || 'Kullanıcı') : undefined,
-            onUnmute: _canActOn && _notSelf && _su.is_muted && ['speaker', 'moderator', 'owner'].includes(_su.role) ? () => executeUnmute(_su.user_id, _su.user?.display_name || 'Kullanıcı') : undefined,
-            onChatMute: _perm('chat_block') && _notSelf ? () => handleToggleChatMute(_su.user_id, _su.user?.display_name || 'Kullanıcı', _su.is_chat_muted || false) : undefined,
-            onKick: _perm('kick') && _notSelf ? () => handleKickUser(_su.user_id, _su.user?.display_name || 'Kullanıcı') : undefined,
-            onMakeModerator: _perm('set_moderator') && _notSelf && _su.role !== 'owner' ? () => handleToggleModerator(_su.user_id, _su.user?.display_name || 'Kullanıcı', _su.role) : undefined,
+            onMute: _perm('timed_mute') && _notSelf && !_su.is_muted && ['speaker', 'moderator', 'owner'].includes(_su.role) ? () => handleTimedMuteUser(_su.user_id, _su.user?.display_name || i18n.t('auto.room.id.010')) : undefined,
+            onUnmute: _canActOn && _notSelf && _su.is_muted && ['speaker', 'moderator', 'owner'].includes(_su.role) ? () => executeUnmute(_su.user_id, _su.user?.display_name || i18n.t('auto.room.id.009')) : undefined,
+            onChatMute: _perm('chat_block') && _notSelf ? () => handleToggleChatMute(_su.user_id, _su.user?.display_name || i18n.t('auto.room.id.008'), _su.is_chat_muted || false) : undefined,
+            onKick: _perm('kick') && _notSelf ? () => handleKickUser(_su.user_id, _su.user?.display_name || i18n.t('auto.room.id.007')) : undefined,
+            onMakeModerator: _perm('set_moderator') && _notSelf && _su.role !== 'owner' ? () => handleToggleModerator(_su.user_id, _su.user?.display_name || i18n.t('auto.room.id.006'), _su.role) : undefined,
             onGhostMode: _perm('ghost_mode') && _isSelf ? handleGhostToggle : undefined,
             isGhost: (_su as any)?.is_ghost || false,
             // ★ 2026-04-28: Kılık artık SADECE host self-toggle (eski "başkasına uygula" kaldırıldı).
             //   Host kendi profil sheet'ini açınca (_isSelf) buton görünür, anlık toggle.
             onDisguise: _perm('disguise_user') && _isSelf ? handleSelfDisguiseToggle : undefined,
             isDisguised: !!(_su as any)?.disguise_data,
-            onBanTemp: _perm('ban_temporary') && _notSelf ? () => handleTempBan(_su.user_id, _su.user?.display_name || 'Kullanıcı') : undefined,
-            onBanPerm: _perm('ban_permanent') && _notSelf ? () => handlePermBan(_su.user_id, _su.user?.display_name || 'Kullanıcı') : undefined,
+            onBanTemp: _perm('ban_temporary') && _notSelf ? () => handleTempBan(_su.user_id, _su.user?.display_name || i18n.t('auto.room.id.005')) : undefined,
+            onBanPerm: _perm('ban_permanent') && _notSelf ? () => handlePermBan(_su.user_id, _su.user?.display_name || i18n.t('auto.room.id.004')) : undefined,
             onPersonalMute: _notSelf ? () => {
               const userId = _su.user_id;
               setPersonallyMutedUsers(prev => {
@@ -5738,7 +5738,7 @@ export default function RoomScreen() {
             onTip: _notSelf ? () => {
               setTipSheetTarget({
                 userId: _su.user_id,
-                displayName: _su.user?.display_name || 'Kullanıcı',
+                displayName: _su.user?.display_name || i18n.t('auto.room.id.003'),
                 avatarUrl: _su.user?.avatar_url,
                 username: (_su.user as any)?.username,
                 tier: (_su.user as any)?.subscription_tier || null,
@@ -5747,7 +5747,7 @@ export default function RoomScreen() {
               setSelectedUser(null);
             } : undefined,
             onDM: _notSelf ? () => {
-              setDmInitialTarget({ userId: _su.user_id, name: _su.user?.display_name || 'Kullanıcı', avatar: _su.user?.avatar_url });
+              setDmInitialTarget({ userId: _su.user_id, name: _su.user?.display_name || i18n.t('auto.room.id.002'), avatar: _su.user?.avatar_url });
               setShowDmPanel(true);
               setInRoomProfileId(null);
               setSelectedUser(null);
@@ -5762,7 +5762,7 @@ export default function RoomScreen() {
           Kullanıcı oda içine girdikten sonra animasyon + "Odan Hazır" yazısı görür. */}
       <BoostSuccessOverlay
         visible={showJustCreated}
-        caption={caption ? decodeURIComponent(caption) : 'Odan Hazır'}
+        caption={caption ? decodeURIComponent(caption) : i18n.t('auto.room.id.001')}
         onComplete={() => {
           setShowJustCreated(false);
           // URL param'i temizle — geri tuşunda tekrar tetiklenmesin

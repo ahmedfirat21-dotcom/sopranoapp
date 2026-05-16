@@ -18,6 +18,7 @@
  */
 import { supabase } from '../constants/supabase';
 import type { FollowUser } from './friendship';
+import { i18n } from '../../services/i18n';
 
 export const FollowService = {
   /**
@@ -28,7 +29,7 @@ export const FollowService = {
    *  - Zaten takip ediyorsa idempotent (ON CONFLICT DO NOTHING gibi)
    */
   async addFollow(followerId: string, followingId: string): Promise<{ success: boolean; error?: string }> {
-    if (!followerId || !followingId) return { success: false, error: 'Geçersiz kullanıcı.' };
+    if (!followerId || !followingId) return { success: false, error: i18n.t('auto.follows.004') };
     if (followerId === followingId) return { success: false, error: 'Kendinizi takip edemezsiniz.' };
 
     // ★ Block-aware: takip edilen kişi takip edeni engellediyse reddet
@@ -39,7 +40,7 @@ export const FollowService = {
         .eq('blocker_id', followingId)
         .eq('blocked_id', followerId)
         .maybeSingle();
-      if (blocked) return { success: false, error: 'Bu kullanıcı seni engelledi.' };
+      if (blocked) return { success: false, error: i18n.t('auto.follows.003') };
     } catch { /* engel kontrolü başarısızsa devam et — DB tarafı yine validation yapar */ }
 
     // Reverse: takip eden, takip edilenı engellediyse uyarı
@@ -50,7 +51,7 @@ export const FollowService = {
         .eq('blocker_id', followerId)
         .eq('blocked_id', followingId)
         .maybeSingle();
-      if (revBlocked) return { success: false, error: 'Engellediğin birini takip edemezsin.' };
+      if (revBlocked) return { success: false, error: i18n.t('auto.follows.002') };
     } catch { /* devam */ }
 
     const { error } = await supabase
@@ -68,7 +69,7 @@ export const FollowService = {
 
   /** Takipten çık. Idempotent — yoksa başarı dön. */
   async removeFollow(followerId: string, followingId: string): Promise<{ success: boolean; error?: string }> {
-    if (!followerId || !followingId) return { success: false, error: 'Geçersiz kullanıcı.' };
+    if (!followerId || !followingId) return { success: false, error: i18n.t('auto.follows.001') };
 
     const { error } = await supabase
       .from('follows')

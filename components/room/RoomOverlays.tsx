@@ -597,13 +597,13 @@ export function PlusMenu({
             {(showModControls || showDeviceMic) && <View style={st.sep} />}
             <View style={st.toggleRow}>
               <Ionicons name={deviceConfig!.useSpeaker ? 'volume-high' : 'headset'} size={13} color={deviceConfig!.useSpeaker ? '#F59E0B' : '#A78BFA'} />
-              <Text style={st.toggleLabel}>{deviceConfig!.useSpeaker ? 'Hoparlör' : 'Kulaklık'}</Text>
+              <Text style={st.toggleLabel}>{deviceConfig!.useSpeaker ? i18n.t('auto.room.RoomOverlays.012') : i18n.t('auto.room.RoomOverlays.011')}</Text>
               <Pressable
                 onPress={() => deviceConfig!.onSpeakerChange(!deviceConfig!.useSpeaker)}
                 style={[st.chip, deviceConfig!.useSpeaker && st.chipActive]}
               >
                 <Text style={[st.chipText, deviceConfig!.useSpeaker && st.chipTextActive]}>
-                  {deviceConfig!.useSpeaker ? 'Hoparlör' : 'Kulaklık'}
+                  {deviceConfig!.useSpeaker ? i18n.t('auto.room.RoomOverlays.010') : i18n.t('auto.room.RoomOverlays.009')}
                 </Text>
               </Pressable>
             </View>
@@ -622,7 +622,7 @@ export function PlusMenu({
     return (
       <View style={st.subWrap}>
         {/* Giriş Ücreti — odaya girmek için ödenen SP (Pro+) */}
-        <SettingChips icon="diamond-outline" label={i18n.t('room.roomoverlays.034')} options={ENTRY_FEES.map(f => ({ id: f, label: f === 0 ? 'Ücretsiz' : `${f}` }))} value={sc.entryFee} onSelect={can('Pro') ? sc.onEntryFeeChange : undefined} locked={!can('Pro')} lockTier="Pro" />
+        <SettingChips icon="diamond-outline" label={i18n.t('room.roomoverlays.034')} options={ENTRY_FEES.map(f => ({ id: f, label: f === 0 ? i18n.t('auto.room.RoomOverlays.008') : `${f}` }))} value={sc.entryFee} onSelect={can('Pro') ? sc.onEntryFeeChange : undefined} locked={!can('Pro')} lockTier="Pro" />
         <View style={st.sep} />
         {/* Bağış kabul etme — host'a SP bağışı (Pro+) */}
         <SettingToggle icon="heart-outline" label={i18n.t('room.roomoverlays.035')} value={sc.donationsEnabled} onValueChange={can('Pro') ? sc.onDonationsToggle : undefined} accent="#EC4899" locked={!can('Pro')} lockTier="Pro" />
@@ -643,12 +643,12 @@ export function PlusMenu({
         const isPermanent = ban.ban_type === 'permanent';
         const expiresAt = ban.expires_at ? new Date(ban.expires_at) : null;
         const remainingMin = expiresAt ? Math.max(0, Math.floor((expiresAt.getTime() - Date.now()) / 60000)) : 0;
-        const timeLabel = isPermanent ? 'Kalıcı' : remainingMin > 60 ? `${Math.floor(remainingMin / 60)}sa` : `${remainingMin}dk`;
+        const timeLabel = isPermanent ? i18n.t('auto.room.RoomOverlays.007') : remainingMin > 60 ? `${Math.floor(remainingMin / 60)}sa` : `${remainingMin}dk`;
         return (
           <View key={ban.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.03)' }}>
             <Image source={getAvatarSource(ban.user?.avatar_url)} style={{ width: 28, height: 28, borderRadius: 14 }} />
             <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 11, fontWeight: '600', color: '#F1F5F9' }} numberOfLines={1}>{ban.user?.display_name || 'Kullanıcı'}</Text>
+              <Text style={{ fontSize: 11, fontWeight: '600', color: '#F1F5F9' }} numberOfLines={1}>{ban.user?.display_name || i18n.t('auto.room.RoomOverlays.006')}</Text>
               <Text style={{ fontSize: 8, color: isPermanent ? '#EF4444' : '#F59E0B', fontWeight: '700' }}>{isPermanent ? '⛔ KALICI' : `⏳ ${timeLabel}`}</Text>
             </View>
             {processingIds.has(ban.id) ? <AppLoader size="small" color="#14B8A6" /> : (
@@ -674,7 +674,7 @@ export function PlusMenu({
       ) : inlineRequests.map(req => (
         <View key={req.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.03)' }}>
           <Image source={getAvatarSource(req.user?.avatar_url)} style={{ width: 28, height: 28, borderRadius: 14 }} />
-          <Text style={{ flex: 1, fontSize: 11, fontWeight: '600', color: '#F1F5F9' }} numberOfLines={1}>{req.user?.display_name || 'Kullanıcı'}</Text>
+          <Text style={{ flex: 1, fontSize: 11, fontWeight: '600', color: '#F1F5F9' }} numberOfLines={1}>{req.user?.display_name || i18n.t('auto.room.RoomOverlays.005')}</Text>
           {processingIds.has(req.id) ? <AppLoader size="small" color="#A78BFA" /> : (
             <View style={{ flexDirection: 'row', gap: 4 }}>
               <Pressable onPress={() => handleAcceptReq(req)} style={{ width: 26, height: 26, borderRadius: 8, backgroundColor: '#14B8A6', alignItems: 'center', justifyContent: 'center' }}>
@@ -897,7 +897,7 @@ export function PlusMenu({
 
   // Takip (listener)
   if (!isOwner && onToggleFollow) {
-    items.push({ id: 'follow', icon: isFollowingRoom ? 'heart' : 'heart-outline', label: isFollowingRoom ? 'Takibi Bırak' : 'Odayı Takip Et', accent: isFollowingRoom ? '#EF4444' : '#EC4899', onPress: () => { onToggleFollow(); onClose(); } });
+    items.push({ id: 'follow', icon: isFollowingRoom ? 'heart' : 'heart-outline', label: isFollowingRoom ? i18n.t('auto.room.RoomOverlays.004') : i18n.t('auto.room.RoomOverlays.003'), accent: isFollowingRoom ? '#EF4444' : '#EC4899', onPress: () => { onToggleFollow(); onClose(); } });
   }
   // Bildir (listener)
   if (!isOnStage && onReportRoom) {
@@ -932,7 +932,7 @@ export function PlusMenu({
       id: 'leave',
       icon: 'exit-outline',
       label: i18n.t('room.roomoverlays.024'),
-      desc: isOwner ? 'Oda açık kalır, sahiplik devri yapılır' : 'Odayı terk et',
+      desc: isOwner ? i18n.t('auto.room.RoomOverlays.002') : i18n.t('auto.room.RoomOverlays.001'),
       accent: '#F59E0B',
       onPress: () => { onClose(); onLeaveRoom(); },
     });

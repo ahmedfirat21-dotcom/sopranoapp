@@ -16,6 +16,7 @@ import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { Platform } from 'react-native';
 import { supabase } from '../constants/supabase';
 import { logger } from '../utils/logger';
+import { i18n } from '../../services/i18n';
 
 const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
 
@@ -62,7 +63,7 @@ if (!isExpoGo) {
       },
     });
   } catch (e) {
-    logger.warn('expo-notifications yüklenirken hata oluştu:', e);
+    logger.warn(i18n.t('auto.pushNotifications.014'), e);
   }
 }
 
@@ -94,7 +95,7 @@ export const PushNotificationService = {
     }
 
     if (!Notifications) {
-      logger.warn('Notifications modülü henüz yüklenmemiş.');
+      logger.warn(i18n.t('auto.pushNotifications.013'));
       return null;
     }
 
@@ -106,7 +107,7 @@ export const PushNotificationService = {
     // ★ FIX: 'denied' ise tekrar sormak anlamsız — kullanıcı ayarlardan açmalı
     if (existingStatus !== 'granted') {
       if (existingStatus === 'denied') {
-        logger.warn('Bildirim izni daha önce reddedildi. Ayarlardan açılmalı.');
+        logger.warn(i18n.t('auto.pushNotifications.012'));
         return null;
       }
       const { status } = await Notifications.requestPermissionsAsync();
@@ -144,8 +145,8 @@ export const PushNotificationService = {
       //   MAX importance + bypass DnD + uzun titreşim + varsayılan zil sesi.
       //   Full-screen intent için channel importance MAX olması gerekir.
       await Notifications.setNotificationChannelAsync('calls', {
-        name: 'Sesli/Görüntülü Arama',
-        description: 'Gelen aramalar — telefon kilitliyken de çalar',
+        name: i18n.t('auto.pushNotifications.011'),
+        description: i18n.t('auto.pushNotifications.010'),
         importance: Notifications.AndroidImportance.MAX,
         vibrationPattern: [0, 800, 400, 800, 400, 800, 400, 800],
         lightColor: '#14B8A6',
@@ -200,7 +201,7 @@ export const PushNotificationService = {
       });
       return tokenData.data;
     } catch (error) {
-      logger.warn('Push token alınamadı (Emulator veya yetkisiz cihaz olabilir):', error);
+      logger.warn(i18n.t('auto.pushNotifications.009'), error);
       return null;
     }
   },
@@ -224,10 +225,10 @@ export const PushNotificationService = {
         );
 
       if (error) {
-        logger.warn('Push token kayıt hatası:', error.message);
+        logger.warn(i18n.t('auto.pushNotifications.008'), error.message);
       }
     } catch (err) {
-      logger.error('Push token kayıt hatası:', err);
+      logger.error(i18n.t('auto.pushNotifications.007'), err);
     }
   },
 
@@ -244,7 +245,7 @@ export const PushNotificationService = {
         .eq('token', token);
 
       if (error && __DEV__) {
-        logger.warn('Push token silme hatası:', error.message);
+        logger.warn(i18n.t('auto.pushNotifications.006'), error.message);
       }
     } catch (err) {
       if (__DEV__) logger.error('Push token silme hatası:', err);
@@ -283,8 +284,8 @@ export const PushNotificationService = {
    */
   async notifyFriendRequest(senderName: string, senderId: string) {
     await this.sendLocalNotification(
-      '🤝 Yeni Arkadaşlık İsteği',
-      `${senderName} sana arkadaşlık isteği gönderdi.`,
+      i18n.t('auto.pushNotifications.005'),
+      i18n.t('auto.pushNotifications.004', { 0: senderName }),
       { type: 'friend_request', senderId, screen: 'profile' }
     );
   },
@@ -294,8 +295,8 @@ export const PushNotificationService = {
    */
   async notifyLike(senderName: string, postId: string) {
     await this.sendLocalNotification(
-      '❤️ Paylaşımın beğenildi!',
-      `${senderName} gönderini beğendi.`,
+      i18n.t('auto.pushNotifications.003'),
+      i18n.t('auto.pushNotifications.002', { 0: senderName }),
       { type: 'like', postId, screen: 'home' }
     );
   },
@@ -306,7 +307,7 @@ export const PushNotificationService = {
   async notifyRoomInvite(hostName: string, roomName: string, roomId: string) {
     await this.sendLocalNotification(
       '🎙️ Oda Daveti',
-      `${hostName} seni "${roomName}" odasına davet etti.`,
+      i18n.t('auto.pushNotifications.001', { 0: hostName, 1: roomName }),
       { type: 'room_invite', roomId, screen: 'room' }
     );
   },

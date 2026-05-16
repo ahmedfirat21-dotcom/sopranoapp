@@ -11,6 +11,7 @@ import { PushService } from './push';
 const _getFriendshipService = () => require('./friendship').FriendshipService;
 const FriendshipService = { _getBlockedIds: (userId: string) => _getFriendshipService()._getBlockedIds(userId) } as { _getBlockedIds: (userId: string) => Promise<Set<string>> };
 import type { Message, InboxItem } from '../types';
+import { i18n } from '../../services/i18n';
 
 // ============================================
 // MESAJ İŞLEMLERİ
@@ -127,7 +128,7 @@ export const MessageService = {
       if (lastMsg.deleted_for_everyone) {
         preview = '🚫 Bu mesaj silindi';
       } else if (preview.startsWith('🎤') || preview.includes('voice_messages/')) preview = '🎤 Sesli mesaj';
-      else if (preview.startsWith('📷') || preview.match(/^https?.*\.(jpg|png|webp)/i)) preview = '📷 Fotoğraf';
+      else if (preview.startsWith('📷') || preview.match(/^https?.*\.(jpg|png|webp)/i)) preview = i18n.t('auto.messages.009');
       if (isSentByMe && !preview.startsWith('Sen:') && !lastMsg.deleted_for_everyone) preview = `Sen: ${preview}`;
 
       inbox.push({
@@ -228,11 +229,11 @@ export const MessageService = {
     const sanitized = (content || '').replace(/[\u200B-\u200F\u202A-\u202E\u2066-\u2069\uFEFF\u00AD]/g, '').trim();
     // Sesli mesaj ve fotoğraf dışında boş content engelle
     if (!sanitized && !voiceUrl && typeof imageUrlOrIsRequest !== 'string') {
-      throw new Error('Boş mesaj gönderilemez.');
+      throw new Error(i18n.t('auto.messages.008'));
     }
     // Max 2000 karakter limiti
     if (sanitized.length > 2000) {
-      throw new Error('Mesaj çok uzun (max 2000 karakter).');
+      throw new Error(i18n.t('auto.messages.007'));
     }
     // ★ 2026-04-25: Profanity filter — DM'de de aktif. Soft mask, gönderim engellenmez.
     let filtered = sanitized;
@@ -245,7 +246,7 @@ export const MessageService = {
     // ★ Engel kontrolü: Her iki yönde de mesaj engellenir
     const blockedIds = await FriendshipService._getBlockedIds(senderId);
     if (blockedIds.has(receiverId)) {
-      throw new Error('Bu kullanıcıyla mesajlaşamazsınız.');
+      throw new Error(i18n.t('auto.messages.006'));
     }
 
     // ★ 2026-04-29 v85: Mesaj İsteği akışı geri geldi (Instagram-style).
@@ -262,7 +263,7 @@ export const MessageService = {
       .eq('sender_id', senderId)
       .gte('created_at', oneMinuteAgo);
     if ((recentCount || 0) >= 30) {
-      throw new Error('Çok hızlı mesaj gönderiyorsunuz. Lütfen biraz bekleyin.');
+      throw new Error(i18n.t('auto.messages.005'));
     }
 
     const imageUrl = typeof imageUrlOrIsRequest === 'string' ? imageUrlOrIsRequest : undefined;
@@ -276,7 +277,7 @@ export const MessageService = {
       p_voice_url: voiceUrl ?? null,
       p_voice_duration: voiceDuration ?? null,
     });
-    if (rpcErr) throw new Error(rpcErr.message || 'Mesaj gönderilemedi.');
+    if (rpcErr) throw new Error(rpcErr.message || i18n.t('auto.messages.004'));
     const isRequest = !!(rpcRes as any)?.is_request;
     const messageId = (rpcRes as any)?.message_id;
 
@@ -290,9 +291,9 @@ export const MessageService = {
 
     // Push bildirim gönder (arka planda, hata yutulur)
     const senderName = (msg as any).sender?.display_name || 'Birisi';
-    const preview = voiceUrl ? '🎙️ Sesli mesaj' : imageUrl ? '📷 Fotoğraf' : (content.length > 50 ? content.substring(0, 50) + '...' : content);
+    const preview = voiceUrl ? '🎙️ Sesli mesaj' : imageUrl ? i18n.t('auto.messages.003') : (content.length > 50 ? content.substring(0, 50) + '...' : content);
     // ★ v85: request ise farklı push tipi → receiver "Mesaj İsteği" görür
-    const pushTitle = isRequest ? 'Mesaj İsteği' : 'Yeni Mesaj';
+    const pushTitle = isRequest ? i18n.t('auto.messages.002') : 'Yeni Mesaj';
     const pushType = isRequest ? 'message_request' as const : 'dm' as const;
     const pushRoute = isRequest ? `/chat/${senderId}?request=1` : `/chat/${senderId}`;
     PushService.sendToUser(receiverId, pushTitle, `${senderName}: ${preview}`, {
@@ -585,7 +586,7 @@ export const MessageService = {
       }
     }
     // JSON formatı doğrulaması
-    try { JSON.parse(reactionsJson); } catch { throw new Error('Geçersiz tepki formatı.'); }
+    try { JSON.parse(reactionsJson); } catch { throw new Error(i18n.t('auto.messages.001')); }
 
     const { error } = await supabase
       .from('messages')

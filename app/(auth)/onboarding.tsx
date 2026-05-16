@@ -362,7 +362,7 @@ export default function OnboardingScreen() {
       if (!error && data) { setTempProfile(data); animateStep(2); return; }
       if (__DEV__) console.warn('[Onboarding] Faz 1 hata:', error?.message);
       // ★ FIX: Fallback kaldırıldı — hata varsa kullanıcıya bildir
-      throw new Error(error?.message || 'Profil oluşturulamadı.');
+      throw new Error(error?.message || i18n.t('auto.auth.onboarding.004'));
     } catch (error: any) {
       showToast({ title: i18n.t('auth.onboarding.019'), message: error?.message || 'Daha sonra tekrar dene.', type: 'error' });
     } finally { setSaving(false); }
@@ -550,7 +550,7 @@ export default function OnboardingScreen() {
                   })}
                 </View>
 
-                <Text style={[s.label, { marginTop: 28 }]}>Doğum Yılı <Text style={{ color: '#EF4444' }}>*</Text></Text>
+                <Text style={[s.label, { marginTop: 28 }]}>{i18n.t('auto.auth.onboarding.003')}<Text style={{ color: '#EF4444' }}>*</Text></Text>
                 <View style={[s.inputWrap, !birthYear && { borderColor: 'rgba(239,68,68,0.3)' }]}>
                   <Ionicons name="calendar-outline" size={18} color="rgba(255,255,255,0.3)" style={{ marginRight: 12 }} />
                   <TextInput
@@ -663,7 +663,7 @@ export default function OnboardingScreen() {
                   <AppLoader size="small" color="#fff" />
                 ) : (
                   <>
-                    <Text style={s.primaryText}>{step === 1 ? 'Profili Kaydet' : step === 2 ? 'Devam Et' : 'Seçimleri Kaydet'}</Text>
+                    <Text style={s.primaryText}>{step === 1 ? 'Profili Kaydet' : step === 2 ? 'Devam Et' : i18n.t('auto.auth.onboarding.002')}</Text>
                     <Ionicons name="arrow-forward" size={16} color="#FFF" style={{ marginLeft: 8 }} />
                   </>
                 )}
@@ -689,7 +689,7 @@ export default function OnboardingScreen() {
         onDismiss={() => setShowCancelAlert(false)}
         buttons={[
           { text: 'Devam Et', style: 'cancel', icon: 'arrow-forward', onPress: () => setShowCancelAlert(false) },
-          { text: 'Vazgeç', style: 'destructive', icon: 'log-out-outline', onPress: handleConfirmCancel },
+          { text: i18n.t('auto.auth.onboarding.001'), style: 'destructive', icon: 'log-out-outline', onPress: handleConfirmCancel },
         ]}
       />
     </AppBackground>

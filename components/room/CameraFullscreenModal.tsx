@@ -45,10 +45,10 @@ export default function CameraFullscreenModal({ visible, user, videoTrack, Video
 
   if (!visible || !user) return null;
 
-  const displayName = (user as any).disguise?.display_name || user.user?.display_name || 'Kullanıcı';
+  const displayName = (user as any).disguise?.display_name || user.user?.display_name || i18n.t('auto.room.CameraFullscreenModal.003');
   const avatarUrl = (user as any).disguise?.avatar_url || user.user?.avatar_url;
   const role = user.role;
-  const roleLabel = role === 'owner' ? 'Host' : role === 'moderator' ? 'Moderatör' : 'Konuşmacı';
+  const roleLabel = role === 'owner' ? 'Host' : role === 'moderator' ? i18n.t('auto.room.CameraFullscreenModal.002') : i18n.t('auto.room.CameraFullscreenModal.001');
 
   return (
     <Modal transparent visible={visible} animationType="fade" statusBarTranslucent onRequestClose={onClose}>

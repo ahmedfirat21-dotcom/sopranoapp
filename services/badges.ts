@@ -10,6 +10,7 @@
  */
 import { supabase } from '../constants/supabase';
 import { resolveBadges, sortBadgesByRarity, type BadgeDef } from '../constants/badges';
+import { i18n } from '../../services/i18n';
 
 interface AwardedBadge {
   badge_id: string;
@@ -76,7 +77,7 @@ export const BadgeService = {
    *   unique(user_id, badge_id) constraint idempotent davranır.
    */
   async awardBadge(userId: string, badgeId: string): Promise<{ awarded: boolean; error?: string }> {
-    if (!userId || !badgeId) return { awarded: false, error: 'Geçersiz parametre.' };
+    if (!userId || !badgeId) return { awarded: false, error: i18n.t('auto.badges.001') };
     try {
       // Önce zaten var mı kontrol et — gereksiz INSERT önlenir
       const { data: existing } = await supabase

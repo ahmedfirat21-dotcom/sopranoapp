@@ -18,6 +18,7 @@
  * abuse-prevention için ayrı RPC ileride eklenebilir.
  */
 import { liveKitService } from './livekit';
+import { i18n } from '../../services/i18n';
 
 export interface VoiceReactionDef {
   id: string;
@@ -29,8 +30,8 @@ export interface VoiceReactionDef {
 }
 
 export const VOICE_REACTIONS: VoiceReactionDef[] = [
-  { id: 'clap',      emoji: '👏', label: 'Alkış',     color: '#F59E0B', soundFile: 'clap' },
-  { id: 'fire',      emoji: '🔥', label: 'Yangın',    color: '#EF4444', soundFile: 'fire' },
+  { id: 'clap',      emoji: '👏', label: i18n.t('auto.voiceReactions.002'),     color: '#F59E0B', soundFile: 'clap' },
+  { id: 'fire',      emoji: '🔥', label: i18n.t('auto.voiceReactions.001'),    color: '#EF4444', soundFile: 'fire' },
   { id: 'heart',     emoji: '❤️', label: 'Kalp',      color: '#EC4899', soundFile: 'heart' },
   { id: 'laugh',     emoji: '😂', label: 'Kahkaha',   color: '#FBBF24', soundFile: 'laugh' },
   { id: 'wow',       emoji: '😮', label: 'Wow',       color: '#A855F7', soundFile: 'wow' },

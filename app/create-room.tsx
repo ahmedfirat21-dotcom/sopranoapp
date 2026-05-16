@@ -204,7 +204,7 @@ export default function CreateRoomScreen() {
   const [createdRoomId, setCreatedRoomId] = useState<string | null>(null);
   const [createdRoomName, setCreatedRoomName] = useState('');
   // ★ 2026-05-05: Caption odaya yönlendirme param'ında geçiyor (oda içinde gösterilir)
-  const [roomSuccessCaption, setRoomSuccessCaption] = useState('Odan Hazır');
+  const [roomSuccessCaption, setRoomSuccessCaption] = useState(i18n.t('auto.create_room.027'));
 
   // ── Wizard state ──
   const [step, setStep] = useState<WizardStep>('basics');
@@ -344,7 +344,7 @@ export default function CreateRoomScreen() {
     const sanitized = sanitizeRoomName(name);
     if (sanitized.length < 2) return { ok: false, reason: 'En az 2 karakter' };
     if (sanitized.length > 60) return { ok: false, reason: 'En fazla 60 karakter' };
-    if (containsBadWords(sanitized)) return { ok: false, reason: 'Uygunsuz kelime içeriyor' };
+    if (containsBadWords(sanitized)) return { ok: false, reason: i18n.t('auto.create_room.026') };
     return { ok: true, reason: null as string | null };
   }, [name]);
 
@@ -395,7 +395,7 @@ export default function CreateRoomScreen() {
     }
     if (limits.dailyRooms < 999 && todayRoomCount >= limits.dailyRooms) {
       UpsellService.onDailyRoomLimit(tier);
-      showToast({ title: i18n.t('createroom.007'), message: `Bugün en fazla ${limits.dailyRooms} oda açabilirsin.`, type: 'warning' });
+      showToast({ title: i18n.t('createroom.007'), message: i18n.t('auto.create_room.025', { 0: limits.dailyRooms }), type: 'warning' });
       return;
     }
 
@@ -415,21 +415,21 @@ export default function CreateRoomScreen() {
         try {
           uploadedCardUrl = await uploadRoomImage(firebaseUser.uid, cardImage, 'card');
         } catch (e: any) {
-          throw new Error(`Kart görseli yüklenemedi: ${e?.message || 'İnternet bağlantını kontrol et'}`);
+          throw new Error(`Kart görseli yüklenemedi: ${e?.message || i18n.t('auto.create_room.024')}`);
         }
       }
       if (backgroundImage && backgroundImage.startsWith('file://')) {
         try {
           uploadedBgUrl = await uploadRoomImage(firebaseUser.uid, backgroundImage, 'bg');
         } catch (e: any) {
-          throw new Error(`Arka plan görseli yüklenemedi: ${e?.message || 'İnternet bağlantını kontrol et'}`);
+          throw new Error(`Arka plan görseli yüklenemedi: ${e?.message || i18n.t('auto.create_room.023')}`);
         }
       }
 
       // ★ 2026-04-21: Sanitize + küfür kontrolü son bir defa
       const cleanName = sanitizeRoomName(name);
       if (cleanName.length < 2 || containsBadWords(cleanName)) {
-        throw new Error('Oda adı uygun değil — 2-60 karakter ve uygunsuz kelime içermemeli.');
+        throw new Error(i18n.t('auto.create_room.022'));
       }
 
       // ★ 2026-04-25: Unified audience → backend kolonlarına dönüştür
@@ -473,16 +473,16 @@ export default function CreateRoomScreen() {
       setCreatedRoomName(cleanName);
       // ★ 2026-05-05: Overlay artık oda içinde gösteriliyor (kullanıcı yazıyı görsün diye).
       //   Davet modalı önce açılır, oraya yönlendirme room/[id]?justCreated=1 ile geçer.
-      setRoomSuccessCaption(isScheduled ? 'Oda Planlandı' : 'Odan Hazır');
+      setRoomSuccessCaption(isScheduled ? i18n.t('auto.create_room.021') : i18n.t('auto.create_room.020'));
       // ★ PERF FIX: Modal açılışını bir sonraki frame'e erte
       requestAnimationFrame(() => setShowInviteModal(true));
     } catch (err: any) {
       // ★ 2026-04-21: Detaylı hata gösterimi — "Hata" yerine kullanıcıya net neden bildir.
-      const rawMsg = err?.message || 'Oda oluşturulamadı.';
+      const rawMsg = err?.message || i18n.t('auto.create_room.019');
       const friendly =
-        /network|fetch|timeout/i.test(rawMsg) ? 'İnternet bağlantın yavaş veya yok. Tekrar dene.' :
-        /permission|denied|rls/i.test(rawMsg) ? 'Yetki hatası. Lütfen tekrar giriş yap.' :
-        /storage|bucket/i.test(rawMsg) ? 'Görsel yüklenemedi. Farklı bir resim seç veya internetini kontrol et.' :
+        /network|fetch|timeout/i.test(rawMsg) ? i18n.t('auto.create_room.018') :
+        /permission|denied|rls/i.test(rawMsg) ? i18n.t('auto.create_room.017') :
+        /storage|bucket/i.test(rawMsg) ? i18n.t('auto.create_room.016') :
         rawMsg;
       showToast({ title: i18n.t('createroom.009'), message: friendly, type: 'error' });
     } finally {
@@ -507,7 +507,7 @@ export default function CreateRoomScreen() {
       })
     );
     const successCount = results.filter(r => r.status === 'fulfilled' && r.value).length;
-    showToast({ title: i18n.t('createroom.010'), message: `${successCount} arkadaşına davet gönderildi.`, type: 'success' });
+    showToast({ title: i18n.t('createroom.010'), message: i18n.t('auto.create_room.015', { 0: successCount }), type: 'success' });
   };
 
   // ═══════════════════════════════════════════════════════════════════
@@ -765,11 +765,11 @@ export default function CreateRoomScreen() {
                     start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                     style={{ paddingHorizontal: 14, paddingVertical: 8 }}
                   >
-                    <Text style={{ fontSize: 12, fontWeight: '600', color: '#FFF' }}>{s === 0 ? 'Kapalı' : `${s}s`}</Text>
+                    <Text style={{ fontSize: 12, fontWeight: '600', color: '#FFF' }}>{s === 0 ? i18n.t('auto.create_room.014') : `${s}s`}</Text>
                   </LinearGradient>
                 ) : (
                   <View style={{ paddingHorizontal: 14, paddingVertical: 8, backgroundColor: 'rgba(255,255,255,0.05)' }}>
-                    <Text style={{ fontSize: 12, fontWeight: '600', color: '#94A3B8' }}>{s === 0 ? 'Kapalı' : `${s}s`}</Text>
+                    <Text style={{ fontSize: 12, fontWeight: '600', color: '#94A3B8' }}>{s === 0 ? i18n.t('auto.create_room.013') : `${s}s`}</Text>
                   </View>
                 )}
               </Pressable>
@@ -789,19 +789,19 @@ export default function CreateRoomScreen() {
           return {
             icon: 'mic' as const, color: '#14B8A6',
             title: i18n.t('createroom.013'),
-            body: 'Tek tıkla mikrofonu açar, onay gerekmez. Sen veya bir moderatör sahnedeyken otomatik olarak "el kaldırma" akışına döner — hiyerarşi korunur.',
+            body: i18n.t('auto.create_room.012'),
           };
         case 'permission_only':
           return {
             icon: 'hand-left' as const, color: '#F59E0B',
             title: i18n.t('createroom.014'),
-            body: 'İstek kuyruğa düşer, sen veya moderatörlerin onayıyla sahneye çıkar. Dinleyici sırasını ve kaç kişi olduğunu görebilir.',
+            body: i18n.t('auto.create_room.011'),
           };
         case 'selected_only':
           return {
             icon: 'lock-closed' as const, color: '#64748B',
             title: i18n.t('createroom.015'),
-            body: 'Sadece sen "Sahneye Davet Et"le konuşmacı ekleyebilirsin. Dinleyiciler el kaldıramaz, "sahne kilitli" uyarısı görürler.',
+            body: i18n.t('auto.create_room.010'),
           };
       }
     })();
@@ -907,7 +907,7 @@ export default function CreateRoomScreen() {
             const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: 'images', allowsEditing: true, aspect: [16, 9], quality: 0.8 });
             if (!result.canceled && result.assets?.[0]) setCardImage(result.assets[0].uri);
           } catch (e: any) {
-            showToast({ title: i18n.t('createroom.018'), message: e?.message || 'Lütfen tekrar dene.', type: 'error' });
+            showToast({ title: i18n.t('createroom.018'), message: e?.message || i18n.t('auto.create_room.009'), type: 'error' });
           }
         }}
       >
@@ -948,7 +948,7 @@ export default function CreateRoomScreen() {
                   const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: 'images', allowsEditing: true, aspect: [9, 16], quality: 0.8 });
                   if (!result.canceled && result.assets?.[0]) setBackgroundImage(result.assets[0].uri);
                 } catch (e: any) {
-                  showToast({ title: i18n.t('createroom.021'), message: e?.message || 'Lütfen tekrar dene.', type: 'error' });
+                  showToast({ title: i18n.t('createroom.021'), message: e?.message || i18n.t('auto.create_room.008'), type: 'error' });
                 }
               }}
             >
@@ -963,7 +963,7 @@ export default function CreateRoomScreen() {
                 <View style={w.cardImagePlaceholder}>
                   <Ionicons name={locked ? 'lock-closed' : 'image-outline'} size={32} color={locked ? '#F59E0B' : 'rgba(255,255,255,0.3)'} />
                   <Text style={{ color: locked ? '#F59E0B' : 'rgba(255,255,255,0.4)', fontSize: 12, marginTop: 6 }}>
-                    {locked ? 'Plus üyelik gerekli' : 'Oda içinde arkada gösterilir'}
+                    {locked ? i18n.t('auto.create_room.007') : i18n.t('auto.create_room.006')}
                   </Text>
                 </View>
               )}
@@ -1056,7 +1056,7 @@ export default function CreateRoomScreen() {
                 style={[w.feePill, active && w.feePillActive, locked && { opacity: 0.4 }]}
                 android_ripple={{ color: 'transparent' }}
               >
-                <Text style={[w.feePillText, active && { color: '#FFF' }]}>{fee === 0 ? 'Ücretsiz' : `${fee} SP`}</Text>
+                <Text style={[w.feePillText, active && { color: '#FFF' }]}>{fee === 0 ? i18n.t('auto.create_room.005') : `${fee} SP`}</Text>
               </Pressable>
             );
           })}
@@ -1136,7 +1136,7 @@ export default function CreateRoomScreen() {
             <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: '#FFF' }} />
             <Text style={{ fontSize: 9, fontWeight: '800', color: '#FFF' }}>CANLI</Text>
           </View>
-          <Text style={w.reviewTitle} numberOfLines={2}>{name || 'Oda adı'}</Text>
+          <Text style={w.reviewTitle} numberOfLines={2}>{name || i18n.t('auto.create_room.004')}</Text>
           {description ? <Text style={w.reviewDesc} numberOfLines={2}>{description}</Text> : null}
           <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
             {catObj && (
@@ -1187,7 +1187,7 @@ export default function CreateRoomScreen() {
           )}
           <SummaryRow icon="mic" label={t('create.step.speaking.title')} value={smObj ? t(smObj.labelKey) : ''} />
           {welcomeMessage && <SummaryRow icon="chatbubble-ellipses" label={i18n.t('createroom.023')} value={welcomeMessage} />}
-          {rules && <SummaryRow icon="document-text" label="Kurallar" value="Tanımlandı" />}
+          {rules && <SummaryRow icon="document-text" label="Kurallar" value={i18n.t('auto.create_room.003')} />}
           {entryFee > 0 && <SummaryRow icon="diamond" label={i18n.t('createroom.024')} value={`${entryFee} SP`} />}
           {donationsEnabled && <SummaryRow icon="heart" label={i18n.t('createroom.025')} value="Aktif" />}
           {ageRestricted && <SummaryRow icon="warning" label={i18n.t('createroom.026')} value="+18" />}
@@ -1195,7 +1195,7 @@ export default function CreateRoomScreen() {
           {slowModeSeconds > 0 && <SummaryRow icon="timer" label={i18n.t('createroom.027')} value={`${slowModeSeconds}s`} />}
           {selectedTheme && <SummaryRow icon="color-palette" label="Tema" value={themeObj?.name || ''} />}
           {musicLink.trim() !== '' && <SummaryRow icon="musical-notes" label={i18n.t('createroom.028')} value="Ekli" />}
-          {backgroundImage && <SummaryRow icon="image" label="Arka Plan" value="Yüklendi" />}
+          {backgroundImage && <SummaryRow icon="image" label="Arka Plan" value={i18n.t('auto.create_room.002')} />}
         </View>
 
         {/* ★ 2026-04-26: Planlı oda — hemen vs sonra başlat */}
@@ -1538,7 +1538,7 @@ export default function CreateRoomScreen() {
                 ) : dailyLimitReached ? (
                   <>
                     <Ionicons name="lock-closed" size={16} color="#FFF" />
-                    <Text style={w.primaryBtnText}>Günlük limit doldu ({todayRoomCount}/{limits.dailyRooms})</Text>
+                    <Text style={w.primaryBtnText}>{i18n.t('auto.create_room.001')}{todayRoomCount}/{limits.dailyRooms})</Text>
                   </>
                 ) : (
                   <>

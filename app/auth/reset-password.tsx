@@ -155,12 +155,12 @@ export default function ResetPasswordScreen() {
             <Ionicons name="checkmark-circle" size={56} color={Colors.accentTeal} />
           </View>
           <Text style={s.errorTitle}>
-            {isVerify ? 'E-posta Doğrulandı' : 'E-posta Kurtarıldı'}
+            {isVerify ? i18n.t('auto.auth.reset_password.007') : i18n.t('auto.auth.reset_password.006')}
           </Text>
           <Text style={s.errorDesc}>
             {isVerify
-              ? 'E-posta adresin başarıyla doğrulandı. Artık SopranoChat\'in tüm özelliklerini kullanabilirsin.'
-              : 'E-posta adresin başarıyla kurtarıldı. Artık eski hesabınla giriş yapabilirsin.'}
+              ? i18n.t('auto.auth.reset_password.005')
+              : i18n.t('auto.auth.reset_password.004')}
           </Text>
           <Pressable style={s.primaryBtn} onPress={() => router.replace('/(tabs)/home')}>
             <LinearGradient
@@ -187,10 +187,10 @@ export default function ResetPasswordScreen() {
           <Text style={s.errorTitle}>{i18n.t('auth.resetpassword.002')}</Text>
           <Text style={s.errorDesc}>
             {mode === 'verifyEmail'
-              ? 'Bu doğrulama bağlantısı süresi dolmuş ya da daha önce kullanılmış. Yeni bir doğrulama maili için profil ayarlarından tekrar talep et.'
+              ? i18n.t('auto.auth.reset_password.003')
               : mode === 'recoverEmail'
-              ? 'Bu kurtarma bağlantısı süresi dolmuş ya da daha önce kullanılmış. Destekten yardım iste.'
-              : 'Bu şifre sıfırlama bağlantısı süresi dolmuş ya da daha önce kullanılmış. Lütfen giriş ekranından yeni bir sıfırlama maili iste.'}
+              ? i18n.t('auto.auth.reset_password.002')
+              : i18n.t('auto.auth.reset_password.001')}
           </Text>
           <Pressable style={s.primaryBtn} onPress={() => router.replace('/(auth)/login')}>
             <LinearGradient

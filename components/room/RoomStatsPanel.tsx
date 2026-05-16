@@ -146,7 +146,7 @@ export default function RoomStatsPanel({
           {/* ★ Takipçi Listesi */}
           {followers.length > 0 && (
             <View style={st.topSection}>
-              <Text style={st.sectionTitle}>❤️ Oda Takipçileri ({followerCount})</Text>
+              <Text style={st.sectionTitle}>{i18n.t('auto.room.RoomStatsPanel.001')}{followerCount})</Text>
               {followers.slice(0, 20).map((f) => (
                 <View key={f.id} style={st.followerRow}>
                   {f.avatar_url ? (

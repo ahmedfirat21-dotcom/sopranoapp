@@ -4,6 +4,7 @@ import * as ImageManipulator from 'expo-image-manipulator';
 import * as FileSystem from 'expo-file-system';
 import * as Crypto from 'expo-crypto';
 import { decode } from 'base64-arraybuffer';
+import { i18n } from '../../services/i18n';
 
 // ★ SEC-STORAGE: URL tahmin saldırısı koruması.
 //   Bucket'lar şu an public (Firebase Third-Party Auth bekliyor — known gap).
@@ -41,11 +42,11 @@ async function _validateFileSize(uri: string, maxBytes: number, label: string): 
     if (info.exists && (info as any).size && (info as any).size > maxBytes) {
       const sizeMB = ((info as any).size / (1024 * 1024)).toFixed(1);
       const limitMB = (maxBytes / (1024 * 1024)).toFixed(0);
-      throw new Error(`${label} çok büyük (${sizeMB}MB). Maksimum: ${limitMB}MB`);
+      throw new Error(i18n.t('auto.storage.003', { 0: label, 1: sizeMB, 2: limitMB }));
     }
   } catch (e: any) {
     // getInfoAsync hatası durumunda devam et — Supabase kendi limitini de uygular
-    if (e.message?.includes('çok büyük')) throw e;
+    if (e.message?.includes(i18n.t('auto.storage.002'))) throw e;
   }
 }
 
@@ -155,7 +156,7 @@ export const StorageService = {
   async uploadVoiceNote(userId: string, audioUri: string): Promise<string> {
     try {
       // ★ SEC-STORAGE: Ses dosyası boyut kontrolü (max 5MB)
-      await _validateFileSize(audioUri, MAX_VOICE_SIZE, 'Ses dosyası');
+      await _validateFileSize(audioUri, MAX_VOICE_SIZE, i18n.t('auto.storage.001'));
 
       const timestamp = new Date().getTime();
       const path = `${userId}/voice_${timestamp}_${_randomToken()}.m4a`;

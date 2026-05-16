@@ -15,6 +15,7 @@ import StatusAvatar from './StatusAvatar';
 import { Colors } from '../constants/theme';
 // ★ v107.32: Cycle kırma — _layout yerine direkt context dosyasından
 import { useUserProfileSheet } from '../providers/UserProfileSheetContext';
+import { i18n } from '../../services/i18n';
 
 export interface IncomingFriendRequest {
   senderId: string;
@@ -122,7 +123,7 @@ export default function IncomingFriendRequestCard({ request, onDismiss, onHandle
           <Pressable style={s.textWrap} onPress={() => openUserProfile(request.senderId)} hitSlop={4}>
             <Text style={s.title} numberOfLines={1}>{request.senderName}</Text>
             <Text style={s.subtitle} numberOfLines={1}>
-              {result === 'approved' ? '✓ Arkadaşlık onaylandı' : result === 'rejected' ? '✗ İstek reddedildi' : 'seninle arkadaş olmak istiyor'}
+              {result === 'approved' ? i18n.t('auto.IncomingFriendRequestCard.003') : result === 'rejected' ? i18n.t('auto.IncomingFriendRequestCard.002') : i18n.t('auto.IncomingFriendRequestCard.001')}
             </Text>
           </Pressable>
           {result ? (

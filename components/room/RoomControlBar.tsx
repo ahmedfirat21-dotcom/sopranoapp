@@ -159,7 +159,7 @@ function MicRequestBtn({ onPress, stageAction, queuePosition }: {
       case 'direct_join':
         return { icon: 'mic' as const, colors: ['#34D399', '#14B8A6', '#0F766E'] as [string, string, string], label: i18n.t('room.roomcontrolbar.001'), ringColor: '#14B8A6' };
       case 'waiting':
-        return { icon: 'hand-left' as const, colors: ['#FBBF24', '#F59E0B', '#D97706'] as [string, string, string], label: queuePosition && queuePosition > 0 ? `Sıradasın (${queuePosition}. sıra) — dokun ve iptal et` : 'Onay bekleniyor — dokun ve iptal et', ringColor: '#FBBF24' };
+        return { icon: 'hand-left' as const, colors: ['#FBBF24', '#F59E0B', '#D97706'] as [string, string, string], label: queuePosition && queuePosition > 0 ? i18n.t('auto.room.RoomControlBar.007', { 0: queuePosition }) : 'Onay bekleniyor — dokun ve iptal et', ringColor: '#FBBF24' };
       case 'locked':
         return { icon: 'lock-closed' as const, colors: ['#475569', '#334155', '#1E293B'] as [string, string, string], label: i18n.t('room.roomcontrolbar.002'), ringColor: '#475569' };
       case 'raise_hand':
@@ -328,7 +328,7 @@ export default function RoomControlBar({
           onPress={onMuteRoomPress || (() => {})}
           active={!isRoomMuted}
           accent="#14B8A6"
-          label={isRoomMuted ? 'Oda sesini aç' : 'Oda sesini kapat'}
+          label={isRoomMuted ? i18n.t('auto.room.RoomControlBar.006') : 'Oda sesini kapat'}
         />
 
         {/* Mic / Cam (speaker) — veya MicReq (listener)
@@ -352,7 +352,7 @@ export default function RoomControlBar({
                 onPress={onCameraPress}
                 active={isCameraOn}
                 accent="#14B8A6"
-                label={isCameraOn ? 'Kamerayı kapat' : 'Kamerayı aç'}
+                label={isCameraOn ? i18n.t('auto.room.RoomControlBar.005') : i18n.t('auto.room.RoomControlBar.004')}
               />
             )}
 
@@ -363,7 +363,7 @@ export default function RoomControlBar({
               active={isMicOn && !isForcedMuted}
               accent="#14B8A6"
               mutedColor={isForcedMuted ? '#991B1B' : undefined}
-              label={isForcedMuted ? 'Mikrofon kapalı (susturuldun)' : (isMicOn ? 'Mikrofonu kapat' : 'Mikrofonu aç')}
+              label={isForcedMuted ? i18n.t('auto.room.RoomControlBar.003') : (isMicOn ? 'Mikrofonu kapat' : i18n.t('auto.room.RoomControlBar.002'))}
               iconSize={MIC_ICON}
             />
           </>
@@ -377,7 +377,7 @@ export default function RoomControlBar({
             badge={handBadgeCount}
             active={handBadgeCount > 0}
             accent="#FBBF24"
-            label={`Mikrofon istek kuyruğu${handBadgeCount > 0 ? `, ${handBadgeCount} bekleyen` : ''}`}
+            label={i18n.t('auto.room.RoomControlBar.001', { 0: handBadgeCount > 0 ? `, ${handBadgeCount} bekleyen` : '' })}
           />
         )}
 

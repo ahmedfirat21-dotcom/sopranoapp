@@ -228,7 +228,7 @@ function BoostedProfileCard({ profile: bp, index, friendIds, onlineIds }: { prof
             fontSize: 11, fontWeight: '800', color: '#F1F5F9', maxWidth: 94,
             textShadowColor: 'rgba(0,0,0,0.7)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
           }}>
-            {bp.display_name || 'Kullanıcı'}
+            {bp.display_name || i18n.t('auto.tabs.home.013')}
           </Text>
 
           {/* Tier pill — altta */}
@@ -581,7 +581,7 @@ const BigLiveRoomCard = React.memo(function BigLiveRoomCard({ room, onJoin, isFo
       showToast({ title: i18n.t('tabs.home.002'), message: i18n.t('tabs.home.003'), type: 'info' });
       return;
     }
-    roomPreviewService.start(room.id, currentUserId, currentUserDisplayName || 'Ziyaretçi').catch(() => {});
+    roomPreviewService.start(room.id, currentUserId, currentUserDisplayName || i18n.t('auto.tabs.home.012')).catch(() => {});
   };
   const handlePressOut = () => {
     // Aktif önizleme bu kart içinse bırakınca durdur (auto-timeout'a gerek kalmasın)
@@ -659,7 +659,7 @@ const BigLiveRoomCard = React.memo(function BigLiveRoomCard({ room, onJoin, isFo
               color={previewState === 'playing' ? '#FBBF24' : '#94A3B8'}
             />
             <Text style={[s.previewBadgeText, previewState === 'playing' && { color: '#FBBF24' }]}>
-              {previewState === 'playing' ? 'Dinleniyor...' : 'Bağlanıyor...'}
+              {previewState === 'playing' ? 'Dinleniyor...' : i18n.t('auto.tabs.home.011')}
             </Text>
           </LinearGradient>
         </View>
@@ -983,11 +983,11 @@ export default function HomeScreen() {
       const userTier = getEffectiveTier(profile);
       const gate = await RoomService.canCreateToday(firebaseUser.uid, userTier);
       if (!gate.ok) {
-        showToast({ title: i18n.t('tabs.home.004'), message: `Üyeliğini yükselterek limitsiz oda aç.`, type: 'warning' });
+        showToast({ title: i18n.t('tabs.home.004'), message: i18n.t('auto.tabs.home.010'), type: 'warning' });
         setTimeout(() => router.push('/plus' as any), 400);
         return;
       }
-      const displayName = profile?.display_name || firebaseUser.displayName || 'Kullanıcı';
+      const displayName = profile?.display_name || firebaseUser.displayName || i18n.t('auto.tabs.home.009');
       const room = await RoomService.quickCreate(firebaseUser.uid, displayName, category, userTier);
       router.push(`/room/${room.id}` as any);
     } catch (err: any) {
@@ -1129,7 +1129,7 @@ export default function HomeScreen() {
     } catch (err: any) {
       if (__DEV__) console.warn('[Home] Load error:', err);
       // ★ Kullanıcıya görünür hata — hem toast hem persistent error state
-      const msg = err?.message || 'İnternet bağlantını kontrol et.';
+      const msg = err?.message || i18n.t('auto.tabs.home.008');
       setLoadError(msg);
       showToast({ title: i18n.t('tabs.home.006'), message: msg, type: 'error' });
     } finally {
@@ -1367,7 +1367,7 @@ export default function HomeScreen() {
       } else {
         setFollowedRoomIds(prev => { const n = { ...prev }; delete n[roomId]; return n; });
       }
-      showToast({ title: i18n.t('tabs.home.009'), message: currentlyFollowed ? 'Takipten çıkılamadı.' : 'Oda takip edilemedi.', type: 'error' });
+      showToast({ title: i18n.t('tabs.home.009'), message: currentlyFollowed ? i18n.t('auto.tabs.home.007') : 'Oda takip edilemedi.', type: 'error' });
     }
   }, [firebaseUser]);
 
@@ -1427,7 +1427,7 @@ export default function HomeScreen() {
                 staticIcon
                 style={s.headerIconBtn}
                 onPress={() => { setShowFriends(true); }}
-                accessibilityLabel={pendingFollowCount > 0 ? `Arkadaşlar, ${pendingFollowCount} bekleyen istek` : 'Arkadaşlar'}
+                accessibilityLabel={pendingFollowCount > 0 ? i18n.t('auto.tabs.home.006', { 0: pendingFollowCount }) : i18n.t('auto.tabs.home.005')}
               >
                 <Ionicons name="people-outline" size={22} color="#F1F5F9" style={s.headerIcon} />
                 {pendingFollowCount > 0 && (
@@ -1546,7 +1546,7 @@ export default function HomeScreen() {
                       <View style={{ flex: 1, minWidth: 0 }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                           <Text numberOfLines={1} style={{ fontSize: 14, fontWeight: '800', color: '#F1F5F9', flexShrink: 1, textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }}>
-                            {bp.display_name || 'Kullanıcı'}
+                            {bp.display_name || i18n.t('auto.tabs.home.004')}
                           </Text>
                           {!!bpLabel && (
                             <View style={{ paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 6, backgroundColor: bpAccent + '25', borderWidth: 0.5, borderColor: bpAccent + '60' }}>
@@ -1600,7 +1600,7 @@ export default function HomeScreen() {
                           >
                             <StatusAvatar uri={bp.avatar_url} size={52} tier={t} isAdmin={bp.is_admin} isOnline={friendIdSet?.has(bp.id) ? onlineIdSet.has(bp.id) : undefined} frameId={(bp as any).active_frame || null} customBadgeId={(bp as any).active_badge_id ?? null} />
                             <Text numberOfLines={1} style={{ fontSize: 12, fontWeight: '800', color: '#F1F5F9', marginTop: 6, maxWidth: '90%', textAlign: 'center', textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }}>
-                              {bp.display_name || 'Kullanıcı'}
+                              {bp.display_name || i18n.t('auto.tabs.home.003')}
                             </Text>
                             {!!tl && (
                               <View style={{ marginTop: 4, paddingHorizontal: 7, paddingVertical: 1.5, borderRadius: 6, backgroundColor: ac + '28', borderWidth: 0.5, borderColor: ac + '70' }}>
@@ -1900,8 +1900,8 @@ export default function HomeScreen() {
                     <View style={s.welcomeOnlineDot} />
                     <Text style={s.unifiedSocialHintText}>
                       {onlineFriends.length === 1
-                        ? `1 arkadaşın online — ilk sen yayına geç`
-                        : `${onlineFriends.length} arkadaşın online — ilk sen yayına geç`}
+                        ? i18n.t('auto.tabs.home.002')
+                        : i18n.t('auto.tabs.home.001', { 0: onlineFriends.length })}
                     </Text>
                   </Pressable>
                 )}

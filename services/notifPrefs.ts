@@ -23,6 +23,7 @@
  * sorgusu yapılmaması için.
  */
 import { supabase } from '../constants/supabase';
+import { i18n } from '../../services/i18n';
 
 export type NotificationCategory =
   | 'room_invite'
@@ -149,7 +150,7 @@ export const NotifPrefsService = {
     userId: string,
     partial: Partial<Omit<NotificationPreferences, 'user_id'>>
   ): Promise<{ success: boolean; error?: string }> {
-    if (!userId) return { success: false, error: 'Geçersiz kullanıcı.' };
+    if (!userId) return { success: false, error: i18n.t('auto.notifPrefs.001') };
 
     const payload = {
       user_id: userId,

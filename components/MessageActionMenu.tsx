@@ -125,7 +125,7 @@ export default function MessageActionMenu({
     onPress: () => { onCopy(message); onClose(); },
   });
   if (onSave) actions.push({
-    id: 'save', label: isSaved ? 'Kaydedilenden Çıkar' : 'Kaydet',
+    id: 'save', label: isSaved ? i18n.t('auto.MessageActionMenu.001') : 'Kaydet',
     icon: isSaved ? 'bookmark' : 'bookmark-outline',
     color: isSaved ? '#FBBF24' : undefined,
     onPress: () => { onSave(message); onClose(); },

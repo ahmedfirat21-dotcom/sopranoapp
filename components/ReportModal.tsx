@@ -169,7 +169,7 @@ export function ReportModal({ visible, onClose, reporterId, target }: ReportModa
       setDescription('');
       handleClose();
     } catch (err: any) {
-      showToast({ title: i18n.t('reportmodal.011'), message: err.message || 'Şikayetin iletilemedi.', type: 'error' });
+      showToast({ title: i18n.t('reportmodal.011'), message: err.message || i18n.t('auto.ReportModal.005'), type: 'error' });
     } finally {
       setSending(false);
     }
@@ -178,9 +178,9 @@ export function ReportModal({ visible, onClose, reporterId, target }: ReportModa
   if (!internalMounted) return null;
 
   const targetLabel =
-    target.type === 'user' ? 'Kullanıcıyı' :
-    target.type === 'room' ? 'Odayı' :
-    target.type === 'post' ? 'Gönderiyi' : 'Mesajı';
+    target.type === 'user' ? i18n.t('auto.ReportModal.004') :
+    target.type === 'room' ? i18n.t('auto.ReportModal.003') :
+    target.type === 'post' ? i18n.t('auto.ReportModal.002') : i18n.t('auto.ReportModal.001');
 
   return (
     <View style={s.root} pointerEvents="box-none">

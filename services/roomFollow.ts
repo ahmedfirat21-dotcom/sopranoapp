@@ -6,6 +6,7 @@
 import { supabase } from '../constants/supabase';
 import { PushService } from './push';
 import type { Room } from './database';
+import { i18n } from '../../services/i18n';
 
 export interface RoomFollow {
   id: string;
@@ -60,7 +61,7 @@ export const RoomFollowService = {
           sender_id: followerId,
           type: 'room_follow',
           reference_id: roomId,
-          body: `🏠 ${followerName} "${roomName}" odanızı takip etmeye başladı`,
+          body: i18n.t('auto.roomFollow.005', { 0: followerName, 1: roomName }),
         });
       } catch {
         // body kolonu yoksa body olmadan tekrar dene
@@ -146,7 +147,7 @@ export const RoomFollowService = {
       if (pErr) throw pErr;
       return (profiles || []).map((p: any) => ({
         id: p.id,
-        display_name: p.display_name || 'Kullanıcı',
+        display_name: p.display_name || i18n.t('auto.roomFollow.004'),
         avatar_url: p.avatar_url || '',
         active_frame: p.active_frame || null,
         active_badge_id: p.active_badge_id || null,
@@ -234,7 +235,7 @@ export const RoomFollowService = {
         sender_id: hostUserId,
         type: 'room_live',
         reference_id: roomId,
-        body: `🎤 yeni bir oda açtı: "${roomName}"`,
+        body: i18n.t('auto.roomFollow.003', { 0: roomName }),
       }));
 
       const { error } = await supabase.from('notifications').insert(batch);
@@ -249,7 +250,7 @@ export const RoomFollowService = {
       //   Fire-and-forget, DB insert'ten bağımsız. Max 50 kişiye paralel gönderim.
       Promise.allSettled(
         followerIds.slice(0, 50).map(uid =>
-          PushService.sendToUser(uid, '🎤 Yeni Canlı Oda', `${hostName} yeni bir oda açtı: "${roomName}"`, {
+          PushService.sendToUser(uid, i18n.t('auto.roomFollow.002'), i18n.t('auto.roomFollow.001', { 0: hostName, 1: roomName }), {
             type: 'room_live',
             route: `/room/${roomId}`,
           })

@@ -17,6 +17,7 @@ import type {
   SubscriptionTier,
 } from '../types';
 import { migrateLegacyTier, normalizeRole } from '../types';
+import { i18n } from '../../services/i18n';
 
 /**
  * ★ 2026-04-27: Geçici host tespiti.
@@ -56,7 +57,7 @@ async function _requireRole(
     .eq('user_id', executorId)
     .maybeSingle();
   if (!data || !allowedRoles.includes(data.role)) {
-    throw new Error('Bu işlem için yetkiniz yok.');
+    throw new Error(i18n.t('auto.room.043'));
   }
 }
 
@@ -184,19 +185,19 @@ export const RoomService = {
   ): Promise<Room> {
     const catLabel = (() => {
       switch (category) {
-        case 'chat': return 'Sohbet Odası';
-        case 'music': return 'Müzik Odası';
-        case 'game': return 'Oyun Odası';
+        case 'chat': return i18n.t('auto.room.042');
+        case 'music': return i18n.t('auto.room.041');
+        case 'game': return i18n.t('auto.room.040');
         case 'tech': return 'Teknik Oda';
-        case 'book': return 'Kitap Odası';
-        case 'film': return 'Film Odası';
+        case 'book': return i18n.t('auto.room.039');
+        case 'film': return i18n.t('auto.room.038');
         default: return null;
       }
     })();
-    const cleanName = (displayName || 'Kullanıcı').trim().split(/\s+/)[0] || 'Kullanıcı';
+    const cleanName = (displayName || i18n.t('auto.room.037')).trim().split(/\s+/)[0] || i18n.t('auto.room.036');
     const name = catLabel
       ? `${cleanName} — ${catLabel}`
-      : `${cleanName}'in Odası`;
+      : i18n.t('auto.room.035', { 0: cleanName });
     return this.create(hostId, { name, category: category || 'chat', type: 'open' }, tier);
   },
 
@@ -658,7 +659,7 @@ export const RoomService = {
       .select('*, host:profiles!host_id(*)')
       .single();
 
-    if (error) throw new Error('Oda uyandırılamadı: ' + error.message);
+    if (error) throw new Error(i18n.t('auto.room.034') + error.message);
 
     // ★ 2026-04-29 v85: Host'un MEVCUT role'unu koru — sahneden inmiş listener ise
     //   wakeUp sonrası otomatik sahneye geri yükseltmeyelim. Sadece kayıt yoksa 'owner'.
@@ -730,7 +731,7 @@ export const RoomService = {
     const rl = await RateLimitService.checkAndIncrement('room_create', hostId);
     if (!rl.allowed) {
       const wait = rl.resetAt ? Math.max(1, Math.ceil((rl.resetAt.getTime() - Date.now()) / 60000)) : 60;
-      throw new Error(`${rl.message || 'Çok hızlı oda kuruyorsun.'} (${wait} dk sonra tekrar dene)`);
+      throw new Error(`${rl.message || i18n.t('auto.room.033')} (${wait} dk sonra tekrar dene)`);
     }
 
     // ★ 2026-04-23 KRİTİK: Yeni oda açmadan önce host'un diğer canlı odalarını dondur —
@@ -740,7 +741,7 @@ export const RoomService = {
     // ★ SEC-8b: Input sanitization — room name/description/settings
     const stripHtml = (s: string) => s.replace(/<[^>]*>/g, '');
     options.name = stripHtml((options.name || '').trim()).slice(0, 60);
-    if (options.name.length < 1) throw new Error('Oda ismi boş olamaz');
+    if (options.name.length < 1) throw new Error(i18n.t('auto.room.032'));
     if (options.description) options.description = stripHtml(options.description.trim()).slice(0, 500);
     if (options.welcome_message) options.welcome_message = stripHtml(options.welcome_message.trim()).slice(0, 500);
     if (options.rules) options.rules = stripHtml(options.rules.trim()).slice(0, 1000);
@@ -767,7 +768,7 @@ export const RoomService = {
     // ★ BUG-T1 FIX: allowedTypes backend guard — tier'ın izni olmayan oda tipi engellenir
     const requestedType = options.type || 'open';
     if (!limits.allowedTypes.includes(requestedType)) {
-      throw new Error(`${normalizedTier} planıyla "${requestedType}" oda açılamaz. İzinli tipler: ${limits.allowedTypes.join(', ')}`);
+      throw new Error(i18n.t('auto.room.031', { 0: normalizedTier, 1: requestedType, 2: limits.allowedTypes.join(', ') }));
     }
 
     // ★ v110.14: dailyRooms limiti — room_creation_log'tan say (silmeye karşı dayanıklı)
@@ -780,7 +781,7 @@ export const RoomService = {
         .eq('user_id', hostId)
         .gte('created_at', todayStart.toISOString());
       if ((count || 0) >= limits.dailyRooms) {
-        throw new Error(`Günlük oda limiti doldu (max ${limits.dailyRooms}/${normalizedTier}). Yarın tekrar deneyin.`);
+        throw new Error(i18n.t('auto.room.030', { 0: limits.dailyRooms, 1: normalizedTier }));
       }
     }
 
@@ -815,7 +816,7 @@ export const RoomService = {
         .eq('host_id', hostId)
         .eq('is_persistent', true);
       if ((count || 0) >= limits.maxPersistentRooms) {
-        throw new Error(`Kalıcı oda limitine ulaştınız (max ${limits.maxPersistentRooms}/${normalizedTier}). Mevcut odalarınızı silebilirsiniz.`);
+        throw new Error(i18n.t('auto.room.029', { 0: limits.maxPersistentRooms, 1: normalizedTier }));
       }
     }
 
@@ -921,8 +922,8 @@ export const RoomService = {
       .select('*, host:profiles!host_id(*)')
       .eq('id', roomId)
       .single();
-    if (fetchErr || !room) throw new Error('Oda bulunamadı');
-    if ((room as any).host_id !== hostId) throw new Error('Bu odayı sadece sahibi başlatabilir');
+    if (fetchErr || !room) throw new Error(i18n.t('auto.room.028'));
+    if ((room as any).host_id !== hostId) throw new Error(i18n.t('auto.room.027'));
     if ((room as any).is_live) return room as Room; // Zaten canlı — no-op
 
     // Tek anda tek canlı oda kuralı
@@ -979,14 +980,14 @@ export const RoomService = {
     if (!isHost && !isOriginalHost) {
       const banned = await this.isBanned(roomId, userId);
       if (banned) {
-        throw new Error('Bu odaya erişiminiz yasaklanmıştır.');
+        throw new Error(i18n.t('auto.room.026'));
       }
     }
 
     // ── 2. Kilitli oda kontrolü ──
     const lockSettings = (roomData?.room_settings || {}) as any;
     if (lockSettings.is_locked && !isHost) {
-      throw new Error('Bu oda şu an kilitli. Yeni giriş kabul edilmiyor.');
+      throw new Error(i18n.t('auto.room.025'));
     }
 
     // ── 3. Zaten katılımcı mı? ──
@@ -1083,13 +1084,13 @@ export const RoomService = {
             p_room_id: roomId,
             p_user_id: userId,
           });
-          if (feeErr) throw new Error(feeErr.message || 'SP işlemi başarısız');
+          if (feeErr) throw new Error(feeErr.message || i18n.t('auto.room.024'));
           const r = feeRes as any;
           if (r && r.success === false) {
-            throw new Error(r.error || `Giriş ücreti: ${entryFee} SP. Mevcut bakiyeniz: ${r.balance ?? 0} SP.`);
+            throw new Error(r.error || i18n.t('auto.room.023', { 0: entryFee, 1: r.balance ?? 0 }));
           }
         } catch (e: any) {
-          throw new Error(e?.message || 'Oda giriş ücreti tahsil edilemedi');
+          throw new Error(e?.message || i18n.t('auto.room.022'));
         }
       }
     }
@@ -1129,7 +1130,7 @@ export const RoomService = {
       const rawMsg = String((error as any)?.message || '').toLowerCase();
       const rlsCode = String((error as any)?.code || '');
       if (rlsCode === '42501' || rawMsg.includes('row-level security') || rawMsg.includes('policy')) {
-        throw new Error('Bu odaya erişiminiz yasaklanmış veya oda katılıma kapalı.');
+        throw new Error(i18n.t('auto.room.021'));
       }
       throw error;
     }
@@ -1246,21 +1247,21 @@ export const RoomService = {
   async updateSettings(roomId: string, hostId: string, updates: Partial<Room & { room_settings?: Partial<RoomSettings> }>): Promise<void> {
     // Odanın gerçekten bu host'a ait olduğunu doğrula
     const { data: room } = await supabase.from('rooms').select('host_id, room_settings').eq('id', roomId).single();
-    if (!room || room.host_id !== hostId) throw new Error('Bu odanın sahibi değilsiniz');
+    if (!room || room.host_id !== hostId) throw new Error(i18n.t('auto.room.020'));
 
     // ★ 2026-04-27: Geçici host koruması — devir olmuşsa (asıl sahip ≠ aktif host) ve
     // çağıran kişi asıl sahip değilse, kritik ayarları değiştiremez. DB trigger
     // (v58) backstop sağlar; burada ön-kontrol net hata mesajı için.
     const origHost = (room.room_settings as any)?.original_host_id as string | undefined;
     if (origHost && origHost !== room.host_id && hostId !== origHost) {
-      throw new Error('Geçici host kritik oda ayarlarını değiştiremez. Bu yetki yalnız odanın asıl sahibine aittir.');
+      throw new Error(i18n.t('auto.room.019'));
     }
 
     const stripHtml = (s: string) => s.replace(/<[^>]*>/g, '');
     const dbUpdates: any = {};
     if (updates.name !== undefined) {
       const sanitizedName = stripHtml((updates.name || '').trim()).slice(0, 60);
-      if (sanitizedName.length < 1) throw new Error('Oda ismi boş olamaz');
+      if (sanitizedName.length < 1) throw new Error(i18n.t('auto.room.018'));
       dbUpdates.name = sanitizedName;
     }
     if (updates.description !== undefined) dbUpdates.description = stripHtml((updates.description || '').trim()).slice(0, 500);
@@ -1303,12 +1304,12 @@ export const RoomService = {
   /** Odayı sil (kalıcı oda) */
   async deleteRoom(roomId: string, hostId: string): Promise<void> {
     const { data: room } = await supabase.from('rooms').select('host_id, room_settings').eq('id', roomId).single();
-    if (!room || room.host_id !== hostId) throw new Error('Bu odanın sahibi değilsiniz');
+    if (!room || room.host_id !== hostId) throw new Error(i18n.t('auto.room.017'));
 
     // ★ 2026-04-27: Geçici host odayı silemez. Asıl sahip dönüp claim etmeli.
     const origHost = (room.room_settings as any)?.original_host_id as string | undefined;
     if (origHost && origHost !== room.host_id && hostId !== origHost) {
-      throw new Error('Geçici host odayı silemez. Bu yetki yalnız odanın asıl sahibine aittir.');
+      throw new Error(i18n.t('auto.room.016'));
     }
 
     // Katılımcıları temizle
@@ -1351,7 +1352,7 @@ export const RoomService = {
       .eq('id', roomId)
       .single();
 
-    if (!room || room.host_id !== hostId) throw new Error('Bu odanın sahibi değilsiniz');
+    if (!room || room.host_id !== hostId) throw new Error(i18n.t('auto.room.015'));
 
     // ★ 2026-04-22: Kalan süreyi dondur — uyandırmada bu saniye eklenir, saat akmaz.
     const remainMs = (room as any).expires_at
@@ -1451,7 +1452,7 @@ export const RoomService = {
    */
   async activateBoost(roomId: string, hostId: string, durationHours: 1 | 6): Promise<void> {
     const { data: room } = await supabase.from('rooms').select('host_id').eq('id', roomId).single();
-    if (!room || room.host_id !== hostId) throw new Error('Bu odanın sahibi değilsiniz');
+    if (!room || room.host_id !== hostId) throw new Error(i18n.t('auto.room.014'));
 
     // ★ BUG-A2 FIX: SP kontrolü — ücretsiz boost exploit önleme
     const spCost = durationHours === 6 ? 400 : 100;
@@ -1485,7 +1486,7 @@ export const RoomService = {
         user_id: hostId,
         amount: -spCost,
         type: 'room_boost',
-        description: `Keşfet boost: ${durationHours} saat`,
+        description: i18n.t('auto.room.013', { 0: durationHours }),
       });
     } catch { /* sp_transactions yoksa sessiz */ }
 
@@ -1509,10 +1510,10 @@ export const RoomService = {
   /** ★ Oda temasını değiştir (host + Plus+ gerekli) */
   async setRoomTheme(roomId: string, hostId: string, themeId: string | null) {
     const { data: room } = await supabase.from('rooms').select('host_id, owner_tier').eq('id', roomId).single();
-    if (!room || room.host_id !== hostId) throw new Error('Bu odanın sahibi değilsiniz');
+    if (!room || room.host_id !== hostId) throw new Error(i18n.t('auto.room.012'));
     // ★ Tier guard: Plus+ gerekli
     const tier = migrateLegacyTier(room.owner_tier);
-    if (!isTierAtLeast(tier, 'Plus')) throw new Error('Tema değiştirmek için Plus+ üyelik gerekli.');
+    if (!isTierAtLeast(tier, 'Plus')) throw new Error(i18n.t('auto.room.011'));
     const { error } = await supabase.from('rooms').update({ theme_id: themeId }).eq('id', roomId);
     if (error) throw error;
   },
@@ -1532,7 +1533,7 @@ export const RoomService = {
     const speakingMode = settings.speaking_mode || 'permission_only';
 
     if (speakingMode === 'selected_only' && roomData?.host_id !== userId) {
-      throw new Error('Bu odada sadece oda sahibi konuşmacı seçebilir.');
+      throw new Error(i18n.t('auto.room.010'));
     }
 
     // free_for_all modunda direkt speaker yap (onay gerekmez)
@@ -1594,7 +1595,7 @@ export const RoomService = {
       p_user_id: userId,
       p_executor_id: userId,
     });
-    if (error) throw new Error(error.message || 'Sahneye çıkılamadı');
+    if (error) throw new Error(error.message || i18n.t('auto.room.009'));
     const result = data as any;
     return {
       expires_at: result.expires_at,
@@ -1621,9 +1622,9 @@ export const RoomService = {
       if (__DEV__) console.warn('[promoteSpeaker] RPC error:', error.message);
       // ★ Self-promote denied (free_for_all RPC değişikliği uygulanmadıysa) — anlamlı mesaj
       if (/role değişikliği reddedildi|escalation|yetkiniz yok|prevent_role/i.test(error.message || '')) {
-        throw new Error('Sahneye çıkma yetkin yok. Bu modda host izni gerekiyor veya sunucu güncellemesi bekleniyor.');
+        throw new Error(i18n.t('auto.room.008'));
       }
-      throw new Error(error.message || 'Sahneye çıkılamadı.');
+      throw new Error(error.message || i18n.t('auto.room.007'));
     } catch (rpcErr: any) {
       throw rpcErr;
     }
@@ -1680,7 +1681,7 @@ export const RoomService = {
       .eq('id', roomId)
       .single();
     if (!roomInfo || roomInfo.host_id !== userId) {
-      throw new Error('Bu odanın sahibi değilsiniz');
+      throw new Error(i18n.t('auto.room.006'));
     }
     const { error } = await supabase
       .from('room_participants')
@@ -1714,7 +1715,7 @@ export const RoomService = {
     const limits = getRoomLimits(ownerTier);
     const currentModCount = await this.getModeratorCount(roomId);
     if (currentModCount >= limits.maxModerators) {
-      throw new Error(`Moderatör limiti doldu (max ${limits.maxModerators}/${ownerTier}).`);
+      throw new Error(i18n.t('auto.room.005', { 0: limits.maxModerators, 1: ownerTier }));
     }
     await supabase
       .from('room_participants')
@@ -1900,7 +1901,7 @@ export const RoomService = {
       .select('host_id, room_settings')
       .eq('id', roomId)
       .single();
-    if (roomErr || !roomInfo) throw new Error('Oda bulunamadı');
+    if (roomErr || !roomInfo) throw new Error(i18n.t('auto.room.004'));
 
     // 2. Kullanıcı katılımcı mı ve uygun rolde mi?
     const { data: myPart } = await supabase
@@ -1909,10 +1910,10 @@ export const RoomService = {
       .eq('room_id', roomId)
       .eq('user_id', userId)
       .maybeSingle();
-    if (!myPart) throw new Error('Bu odada katılımcı değilsiniz.');
+    if (!myPart) throw new Error(i18n.t('auto.room.003'));
     const BANNED_ROLES = ['banned', 'spectator', 'guest'];
     if (BANNED_ROLES.includes(myPart.role)) {
-      throw new Error('Bu rolde host olamazsınız.');
+      throw new Error(i18n.t('auto.room.002'));
     }
 
     // 3. Mevcut owner var mı kontrol et — sahipsiz değilse claim yapılamaz
@@ -1923,7 +1924,7 @@ export const RoomService = {
       .eq('role', 'owner')
       .maybeSingle();
     if (currentOwner) {
-      throw new Error('Bu odanın zaten bir sahibi var. Host değiştirme yapılamaz.');
+      throw new Error(i18n.t('auto.room.001'));
     }
 
     // 4. ★ 2026-04-24 KRİTİK FIX: Claim öncesinde original_host_id'yi kaydet —

@@ -25,6 +25,7 @@
  *        $$);
  */
 import { supabase } from '../constants/supabase';
+import { i18n } from '../../services/i18n';
 
 export const EmailDigestService = {
   /**
@@ -32,7 +33,7 @@ export const EmailDigestService = {
    * Production'da kullanılmamalı — cron tetikler.
    */
   async sendTestDigest(userId: string): Promise<{ ok: boolean; error?: string }> {
-    if (!userId) return { ok: false, error: 'Geçersiz kullanıcı.' };
+    if (!userId) return { ok: false, error: i18n.t('auto.emailDigest.001') };
     try {
       const { data, error } = await supabase.functions.invoke('send-email-digest', {
         body: { user_id: userId },

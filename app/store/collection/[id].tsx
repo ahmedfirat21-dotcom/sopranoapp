@@ -27,7 +27,7 @@ import { GalleryCard } from '../../store';
 const { width: W } = Dimensions.get('window');
 
 const RARITY_LABEL: Record<Rarity, string> = {
-  divine: 'İLAHİ', mythic: 'EFSANEVİ', legendary: 'EFSANE', rare: 'NADİR', new: 'YENİ',
+  divine: i18n.t('auto.store.collection.id.014'), mythic: i18n.t('auto.store.collection.id.013'), legendary: 'EFSANE', rare: i18n.t('auto.store.collection.id.012'), new: i18n.t('auto.store.collection.id.011'),
 };
 const RARITY_COLOR: Record<Rarity, string> = {
   divine: '#F472B6', mythic: '#C4B5FD', legendary: '#FBBF24', rare: '#22D3EE', new: '#FB923C',
@@ -81,20 +81,20 @@ export default function CollectionDetailScreen() {
     setConfirmAlert({
       visible: true,
       title: i18n.t('store.collection.id.001'),
-      message: `${item.name} için ${item.price_sp.toLocaleString('tr-TR')} SP harcanacak. Onaylıyor musun?`,
+      message: i18n.t('auto.store.collection.id.010', { 0: item.name, 1: item.price_sp.toLocaleString('tr-TR') }),
       buttons: [
-        { text: 'Vazgeç', style: 'cancel', onPress: () => setConfirmAlert(p => ({ ...p, visible: false })) },
+        { text: i18n.t('auto.store.collection.id.009'), style: 'cancel', onPress: () => setConfirmAlert(p => ({ ...p, visible: false })) },
         {
-          text: 'Satın Al', style: 'default', icon: 'sparkles',
+          text: i18n.t('auto.store.collection.id.008'), style: 'default', icon: 'sparkles',
           onPress: async () => {
             setConfirmAlert(p => ({ ...p, visible: false }));
             setPurchasing(item.id);
             const r = await StoreService.purchase(firebaseUser.uid, item.id);
             setPurchasing(null);
             if (r.success) {
-              const label = (item.category === 'atelier' || item.category === 'frames') ? 'Çerçeve'
-                : (item.category === 'message_art' || item.category === 'entry_effect') ? 'Giriş Efekti'
-                : item.category === 'gift' ? 'Hediye' : 'Ürün';
+              const label = (item.category === 'atelier' || item.category === 'frames') ? i18n.t('auto.store.collection.id.007')
+                : (item.category === 'message_art' || item.category === 'entry_effect') ? i18n.t('auto.store.collection.id.006')
+                : item.category === 'gift' ? 'Hediye' : i18n.t('auto.store.collection.id.005');
               const accentByRarity: readonly [string, string] = item.rarity === 'divine' ? ['#FBBF24', '#854F0B']
                 : item.rarity === 'mythic' ? ['#F472B6', '#831843']
                 : item.rarity === 'legendary' ? ['#FFE082', '#B45309']
@@ -102,13 +102,13 @@ export default function CollectionDetailScreen() {
                 : ['#14B8A6', '#0E7490'];
               setSuccessModal({
                 visible: true,
-                title: `${label} Satın Alındı`,
-                subtitle: `${item.name} envanterine eklendi · ${r.cost} SP harcandı`,
+                title: i18n.t('auto.store.collection.id.004', { 0: label }),
+                subtitle: i18n.t('auto.store.collection.id.003', { 0: item.name, 1: r.cost }),
                 accent: accentByRarity,
               });
               setInventory((prev) => new Set(prev).add(item.id));
             } else {
-              showToast({ title: 'Hata', message: r.error || 'Bağlantı sorunu', type: 'error' });
+              showToast({ title: 'Hata', message: r.error || i18n.t('auto.store.collection.id.002'), type: 'error' });
             }
           },
         },
@@ -141,7 +141,7 @@ export default function CollectionDetailScreen() {
               <Text style={s.balanceText}>{sp.toLocaleString('tr-TR')}</Text>
             </View>
           </View>
-          <Text style={s.itemCount}>{items.length} parça</Text>
+          <Text style={s.itemCount}>{items.length}{i18n.t('auto.store.collection.id.001')}</Text>
         </View>
 
         {/* Grid */}

@@ -18,10 +18,10 @@ import { showToast } from '../Toast';
 export type Quality = 'excellent' | 'good' | 'poor' | 'unknown';
 
 const QUALITY_META: Record<Quality, { color: string; bars: number; label: string; tooltip: string; toastType: 'success' | 'info' | 'warning' | 'error' }> = {
-  excellent: { color: '#22C55E', bars: 3, label: i18n.t('room.connectionqualityindicator.001'), tooltip: 'Bağlantı mükemmel — düşük gecikme, kayıpsız ses.', toastType: 'success' },
-  good:      { color: '#FBBF24', bars: 2, label: i18n.t('room.connectionqualityindicator.002'),       tooltip: 'Bağlantı iyi — küçük gecikmeler olabilir.',       toastType: 'info' },
-  poor:      { color: '#EF4444', bars: 1, label: i18n.t('room.connectionqualityindicator.003'),      tooltip: 'Bağlantı zayıf — internet veya hücresel ağı kontrol et.', toastType: 'warning' },
-  unknown:   { color: '#94A3B8', bars: 3, label: 'Bilinmiyor', tooltip: 'Bağlantı kalitesi henüz ölçülmedi.',                toastType: 'info' },
+  excellent: { color: '#22C55E', bars: 3, label: i18n.t('room.connectionqualityindicator.001'), tooltip: i18n.t('auto.room.ConnectionQualityIndicator.005'), toastType: 'success' },
+  good:      { color: '#FBBF24', bars: 2, label: i18n.t('room.connectionqualityindicator.002'),       tooltip: i18n.t('auto.room.ConnectionQualityIndicator.004'),       toastType: 'info' },
+  poor:      { color: '#EF4444', bars: 1, label: i18n.t('room.connectionqualityindicator.003'),      tooltip: i18n.t('auto.room.ConnectionQualityIndicator.003'), toastType: 'warning' },
+  unknown:   { color: '#94A3B8', bars: 3, label: 'Bilinmiyor', tooltip: i18n.t('auto.room.ConnectionQualityIndicator.002'),                toastType: 'info' },
 };
 
 interface Props {
@@ -39,7 +39,7 @@ export default function ConnectionQualityIndicator({ quality, showLabel = false,
 
   return (
     <Pressable
-      onPress={() => showToast({ title: `Bağlantı: ${meta.label}`, message: meta.tooltip, type: meta.toastType })}
+      onPress={() => showToast({ title: i18n.t('auto.room.ConnectionQualityIndicator.001', { 0: meta.label }), message: meta.tooltip, type: meta.toastType })}
       hitSlop={8}
       style={s.touchable}
     >

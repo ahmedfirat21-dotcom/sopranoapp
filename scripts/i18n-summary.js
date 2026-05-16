@@ -1,0 +1,12 @@
+const r = JSON.parse(require('fs').readFileSync('i18n-scan-v2-report.json', 'utf8'));
+const grp = {};
+for (const x of r) grp[x.file] = (grp[x.file] || 0) + 1;
+const byKind = {};
+for (const x of r) byKind[x.kind] = (byKind[x.kind] || 0) + 1;
+console.log('By kind:', byKind);
+const all = Object.entries(grp).sort((a, b) => b[1] - a[1]);
+console.log('TOP 30:');
+for (const [f, n] of all.slice(0, 30)) console.log('  ' + String(n).padStart(4) + '  ' + f);
+const services = all.filter(([f]) => f.startsWith('services'));
+console.log('\nSERVICES ONLY:');
+for (const [f, n] of services) console.log('  ' + String(n).padStart(4) + '  ' + f);

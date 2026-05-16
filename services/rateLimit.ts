@@ -17,6 +17,7 @@
  *     (Strict isteyen action'larda caller fail-closed yapabilir.)
  */
 import { supabase } from '../constants/supabase';
+import { i18n } from '../../services/i18n';
 
 export type RateLimitAction =
   | 'room_create'
@@ -28,12 +29,12 @@ export type RateLimitAction =
 
 /** Action başına limit + pencere — server tarafında bağlayıcı değil; caller geçirir. */
 export const RATE_LIMIT_CONFIG: Record<RateLimitAction, { maxCount: number; windowSeconds: number; userMessage: string }> = {
-  room_create:    { maxCount: 5,  windowSeconds: 3600, userMessage: 'Bir saat içinde fazla oda kurdun, biraz dinlen.' },
-  gift_send:      { maxCount: 30, windowSeconds: 60,   userMessage: 'Çok hızlı hediye gönderiyorsun, biraz yavaşla.' },
-  voice_dm_send:  { maxCount: 20, windowSeconds: 300,  userMessage: 'Çok fazla sesli mesaj gönderdin, 5 dk bekle.' },
-  message_send:   { maxCount: 60, windowSeconds: 60,   userMessage: 'Çok hızlı mesaj atıyorsun.' },
-  friend_request: { maxCount: 30, windowSeconds: 3600, userMessage: 'Saatlik arkadaşlık isteği limitini aştın.' },
-  report:         { maxCount: 10, windowSeconds: 3600, userMessage: 'Saatlik şikayet limitini aştın.' },
+  room_create:    { maxCount: 5,  windowSeconds: 3600, userMessage: i18n.t('auto.rateLimit.007') },
+  gift_send:      { maxCount: 30, windowSeconds: 60,   userMessage: i18n.t('auto.rateLimit.006') },
+  voice_dm_send:  { maxCount: 20, windowSeconds: 300,  userMessage: i18n.t('auto.rateLimit.005') },
+  message_send:   { maxCount: 60, windowSeconds: 60,   userMessage: i18n.t('auto.rateLimit.004') },
+  friend_request: { maxCount: 30, windowSeconds: 3600, userMessage: i18n.t('auto.rateLimit.003') },
+  report:         { maxCount: 10, windowSeconds: 3600, userMessage: i18n.t('auto.rateLimit.002') },
 };
 
 export interface RateLimitResult {
@@ -57,7 +58,7 @@ export const RateLimitService = {
     overrides?: { maxCount?: number; windowSeconds?: number }
   ): Promise<RateLimitResult> {
     if (!userId) {
-      return { allowed: false, remaining: 0, resetAt: null, message: 'Geçersiz kullanıcı.' };
+      return { allowed: false, remaining: 0, resetAt: null, message: i18n.t('auto.rateLimit.001') };
     }
     const cfg = RATE_LIMIT_CONFIG[action];
     const maxCount = overrides?.maxCount ?? cfg.maxCount;

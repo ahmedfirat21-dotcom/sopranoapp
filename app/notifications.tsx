@@ -36,18 +36,18 @@ type Notification = {
 };
 
 const NOTIF_CONFIG: Record<string, { icon: string; color: string; verb: string }> = {
-  like: { icon: 'heart', color: '#EF4444', verb: 'gönderini beğendi' },
-  comment: { icon: 'chatbubble', color: '#3B82F6', verb: 'gönderine yorum yaptı' },
-  gift: { icon: 'gift', color: '#F59E0B', verb: 'sana hediye gönderdi' },
-  follow: { icon: 'person-add', color: '#14B8A6', verb: 'seninle arkadaş oldu' },
-  follow_request: { icon: 'person-add', color: '#F59E0B', verb: 'seninle arkadaş olmak istiyor' },
-  follow_accepted: { icon: 'checkmark-circle', color: '#10B981', verb: 'arkadaşlık isteğini kabul etti' },
+  like: { icon: 'heart', color: '#EF4444', verb: i18n.t('auto.notifications.010') },
+  comment: { icon: 'chatbubble', color: '#3B82F6', verb: i18n.t('auto.notifications.009') },
+  gift: { icon: 'gift', color: '#F59E0B', verb: i18n.t('auto.notifications.008') },
+  follow: { icon: 'person-add', color: '#14B8A6', verb: i18n.t('auto.notifications.007') },
+  follow_request: { icon: 'person-add', color: '#F59E0B', verb: i18n.t('auto.notifications.006') },
+  follow_accepted: { icon: 'checkmark-circle', color: '#10B981', verb: i18n.t('auto.notifications.005') },
   // ★ BUG-F8 FIX: follow_rejected config'i eklendi (cooldown mekanizması için internal kayıt)
   // Görüntülenmez — FlatList'te filtrelenir (BUG-F19)
   follow_rejected: { icon: 'close-circle-outline', color: '#94A3B8', verb: '' },
   // ★ Oda takip bildirimi
-  room_follow: { icon: 'home', color: '#EC4899', verb: 'odanızı takip etmeye başladı' },
-  room_live: { icon: 'radio', color: '#14B8A6', verb: 'yeni bir oda açtı' },
+  room_follow: { icon: 'home', color: '#EC4899', verb: i18n.t('auto.notifications.004') },
+  room_live: { icon: 'radio', color: '#14B8A6', verb: i18n.t('auto.notifications.003') },
 };
 
 
@@ -186,7 +186,7 @@ export default function NotificationsScreen() {
                     <StatusAvatar uri={req.sender?.avatar_url} size={44} tier={(req.sender as any)?.subscription_tier} frameId={(req.sender as any)?.active_frame || null} customBadgeId={(req.sender as any)?.active_badge_id ?? null} />
                     <View style={styles.pendingInfo}>
                       <Text style={styles.pendingName} numberOfLines={1}>
-                        {req.sender?.display_name || 'Kullanıcı'}
+                        {req.sender?.display_name || i18n.t('auto.notifications.002')}
                       </Text>
                       <Text style={styles.pendingTime}>{getRelativeTime(req.created_at)}</Text>
                     </View>
@@ -246,7 +246,7 @@ export default function NotificationsScreen() {
         <StatusAvatar uri={item.sender?.avatar_url} size={40} tier={(item.sender as any)?.subscription_tier} frameId={(item.sender as any)?.active_frame || null} customBadgeId={(item.sender as any)?.active_badge_id ?? null} />
         <View style={styles.notifContent}>
           <Text style={styles.notifText}>
-            <Text style={styles.notifName}>{item.sender?.display_name || 'Kullanıcı'}</Text>
+            <Text style={styles.notifName}>{item.sender?.display_name || i18n.t('auto.notifications.001')}</Text>
             {' '}{config.verb}
           </Text>
           <Text style={styles.notifTime}>{getRelativeTime(item.created_at)}</Text>

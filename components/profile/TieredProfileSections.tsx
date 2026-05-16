@@ -125,9 +125,9 @@ export default function TieredProfileSections({
   const formatDate = (d: string) => {
     const diff = Date.now() - new Date(d).getTime();
     const days = Math.floor(diff / 86400000);
-    if (days < 1) return 'Bugün';
-    if (days < 7) return `${days} gün önce`;
-    return `${Math.floor(days / 7)} hf önce`;
+    if (days < 1) return i18n.t('auto.profile.TieredProfileSections.004');
+    if (days < 7) return i18n.t('auto.profile.TieredProfileSections.003', { 0: days });
+    return i18n.t('auto.profile.TieredProfileSections.002', { 0: Math.floor(days / 7) });
   };
 
   return (
@@ -180,7 +180,7 @@ export default function TieredProfileSections({
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={s.roomName} numberOfLines={1}>{room.name}</Text>
-                  <Text style={s.roomMeta}>{formatDate(room.created_at)} · Katılım</Text>
+                  <Text style={s.roomMeta}>{formatDate(room.created_at)}{i18n.t('auto.profile.TieredProfileSections.001')}</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.15)" />
               </Pressable>

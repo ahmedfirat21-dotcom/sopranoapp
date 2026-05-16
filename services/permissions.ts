@@ -14,6 +14,7 @@ import type {
   RoomParticipant,
 } from '../types';
 import { ALL_PERMISSIONS, ROLE_LEVEL, normalizeRole, migrateLegacyTier } from '../types';
+import { i18n } from '../../services/i18n';
 
 // ════════════════════════════════════════════════════════════
 // YETKİ KONTROL FONKSİYONLARI
@@ -42,37 +43,37 @@ export function checkPermission(
 ): PermissionCheckResult {
   const def = ALL_PERMISSIONS[permission];
   if (!def) {
-    return { allowed: false, reason: 'Tanımsız yetki.' };
+    return { allowed: false, reason: i18n.t('auto.permissions.007') };
   }
 
   // 1. Self-check: Bu aksiyon kendine uygulanamaz
   if (isSelf && def.hiddenOnSelf) {
-    return { allowed: false, reason: 'Bu aksiyonu kendinize uygulayamazsınız.' };
+    return { allowed: false, reason: i18n.t('auto.permissions.006') };
   }
 
   // 2. Minimum rol seviyesi kontrolü
   const actorLevel = ROLE_LEVEL[actorRole] ?? 0;
   const requiredLevel = ROLE_LEVEL[def.minRole] ?? 0;
   if (actorLevel < requiredLevel) {
-    return { allowed: false, reason: `Bu aksiyon için minimum "${def.minRole}" rolü gerekli.` };
+    return { allowed: false, reason: i18n.t('auto.permissions.005', { 0: def.minRole }) };
   }
 
   // 3. Hedef kullanıcı gerekli mi?
   if (def.requiresTarget && targetRole === null) {
-    return { allowed: false, reason: 'Hedef kullanıcı belirtilmeli.' };
+    return { allowed: false, reason: i18n.t('auto.permissions.004') };
   }
 
   // 4. Hedef kullanıcının rolü aktörden düşük mü olmalı?
   if (def.requiresLowerTarget && targetRole !== null) {
     const targetLevel = ROLE_LEVEL[targetRole] ?? 0;
     if (targetLevel >= actorLevel) {
-      return { allowed: false, reason: 'Kendinizle aynı veya daha yüksek roldeki kişileri yönetemezsiniz.' };
+      return { allowed: false, reason: i18n.t('auto.permissions.003') };
     }
   }
 
   // 5. Tier gereksinimi
   if (def.minTier && !isTierAtLeast(actorTier, def.minTier)) {
-    return { allowed: false, reason: `Bu özellik ${def.minTier}+ abonelik gerektirir.` };
+    return { allowed: false, reason: i18n.t('auto.permissions.002', { 0: def.minTier }) };
   }
 
   return { allowed: true };
@@ -136,7 +137,7 @@ export const PermissionService = {
       .single();
 
     if (!actorParticipant) {
-      return { allowed: false, reason: 'Odada aktif bir katılımcı değilsiniz.' };
+      return { allowed: false, reason: i18n.t('auto.permissions.001') };
     }
 
     // Rol normalizasyonu

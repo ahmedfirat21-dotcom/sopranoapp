@@ -42,12 +42,12 @@ function fmtDuration(seconds: number): string {
 function fmtRelative(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
   const mins = Math.floor(diff / 60_000);
-  if (mins < 1) return 'az önce';
-  if (mins < 60) return `${mins}dk önce`;
+  if (mins < 1) return i18n.t('auto.room.RoomRecordingsSheet.006');
+  if (mins < 60) return i18n.t('auto.room.RoomRecordingsSheet.005', { 0: mins });
   const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}sa önce`;
+  if (hours < 24) return i18n.t('auto.room.RoomRecordingsSheet.004', { 0: hours });
   const days = Math.floor(hours / 24);
-  return `${days}g önce`;
+  return i18n.t('auto.room.RoomRecordingsSheet.003', { 0: days });
 }
 
 export default function RoomRecordingsSheet({ visible, roomId, hostId, onClose }: Props) {
@@ -121,7 +121,7 @@ export default function RoomRecordingsSheet({ visible, roomId, hostId, onClose }
         if (status.didJustFinish) { stopAudio(); }
       });
     } catch (e: any) {
-      showToast({ title: i18n.t('room.roomrecordingssheet.002'), message: e?.message || 'Ses dosyası yüklenemedi.', type: 'error' });
+      showToast({ title: i18n.t('room.roomrecordingssheet.002'), message: e?.message || i18n.t('auto.room.RoomRecordingsSheet.002'), type: 'error' });
       setPlayingId(null);
     }
   }, [playingId, stopAudio]);
@@ -176,7 +176,7 @@ export default function RoomRecordingsSheet({ visible, roomId, hostId, onClose }
             <Ionicons name="headset-outline" size={10} color="rgba(255,255,255,0.3)" />
             <Text style={st.recordListens}>{item.listen_count} dinleme</Text>
             {expiresIn <= 3 && (
-              <Text style={st.recordExpiry}>⏳ {expiresIn}g kaldı</Text>
+              <Text style={st.recordExpiry}>⏳ {expiresIn}{i18n.t('auto.room.RoomRecordingsSheet.001')}</Text>
             )}
             {!item.is_public && (
               <View style={st.privateBadge}>

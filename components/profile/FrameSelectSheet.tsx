@@ -208,7 +208,7 @@ export default function FrameSelectSheet({
     const result = await CosmeticService.equipFrame(userId, frameId);
     setBusy(false);
     if (!result.success) {
-      showToast({ title: 'Hata', message: result.error || 'Bağlantı hatası', type: 'error' });
+      showToast({ title: 'Hata', message: result.error || i18n.t('auto.profile.FrameSelectSheet.010'), type: 'error' });
       return;
     }
     onFrameChange?.(frameId);
@@ -222,7 +222,7 @@ export default function FrameSelectSheet({
     const result = await CosmeticService.equipEntryEffect(userId, effectId);
     setBusy(false);
     if (!result.success) {
-      showToast({ title: 'Hata', message: result.error || 'Bağlantı hatası', type: 'error' });
+      showToast({ title: 'Hata', message: result.error || i18n.t('auto.profile.FrameSelectSheet.009'), type: 'error' });
       return;
     }
     onEntryEffectChange?.(effectId);
@@ -294,10 +294,10 @@ export default function FrameSelectSheet({
             </View>
             <View style={{ flex: 1 }}>
               <Text style={[s.headerTitle, { color: accentColor }]}>
-                {isFrameTab ? 'ÇERÇEVE SEÇİMİ' : 'GİRİŞ EFEKTİ SEÇ'}
+                {isFrameTab ? i18n.t('auto.profile.FrameSelectSheet.008') : i18n.t('auto.profile.FrameSelectSheet.007')}
               </Text>
               <Text style={s.headerSub}>
-                {isFrameTab ? 'Avatarın etrafında görünür' : 'Odaya girdiğinde herkese gösterilir'}
+                {isFrameTab ? i18n.t('auto.profile.FrameSelectSheet.006') : i18n.t('auto.profile.FrameSelectSheet.005')}
               </Text>
             </View>
             {currentId && (
@@ -329,7 +329,7 @@ export default function FrameSelectSheet({
                   color="rgba(255,255,255,0.3)"
                 />
                 <Text style={s.emptyText}>
-                  {isFrameTab ? 'Envanterinde çerçeve yok' : 'Envanterinde giriş efekti yok'}
+                  {isFrameTab ? i18n.t('auto.profile.FrameSelectSheet.004') : i18n.t('auto.profile.FrameSelectSheet.003')}
                 </Text>
                 <Pressable style={s.emptyCta} onPress={() => { onClose(); router.push('/store' as any); }}>
                   <LinearGradient
@@ -388,8 +388,8 @@ export default function FrameSelectSheet({
                 </View>
                 <Text style={s.footnote}>
                   {isFrameTab
-                    ? 'Tek seferde tek çerçeve aktif. Çıkar diyerek kaldırabilirsin.'
-                    : 'Odaya her girişte seçili efekt gösterilir.'}
+                    ? i18n.t('auto.profile.FrameSelectSheet.002')
+                    : i18n.t('auto.profile.FrameSelectSheet.001')}
                 </Text>
               </>
             )}

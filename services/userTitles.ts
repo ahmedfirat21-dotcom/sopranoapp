@@ -33,7 +33,7 @@ export type UserTitle = {
 const TITLE_DEFINITIONS: Record<string, UserTitle> = {
   // ── Bağış unvanları (legendary > altın > yeşil > bronz piramidi) ──
   philanthropist: {
-    id: 'philanthropist', name: 'Hayırsever', emoji: '💎',
+    id: 'philanthropist', name: i18n.t('auto.userTitles.006'), emoji: '💎',
     color: '#A78BFA', bgColor: 'rgba(167,139,250,0.18)', priority: 95,
   },
   patron: {
@@ -45,7 +45,7 @@ const TITLE_DEFINITIONS: Record<string, UserTitle> = {
     color: '#FBBF24', bgColor: 'rgba(251,191,36,0.12)', priority: 90,
   },
   stage_star: {
-    id: 'stage_star', name: 'Sahne Yıldızı', emoji: '🎤',
+    id: 'stage_star', name: i18n.t('auto.userTitles.005'), emoji: '🎤',
     color: '#EF4444', bgColor: 'rgba(239,68,68,0.12)', priority: 85,
   },
   sp_baron: {
@@ -53,7 +53,7 @@ const TITLE_DEFINITIONS: Record<string, UserTitle> = {
     color: '#F59E0B', bgColor: 'rgba(245,158,11,0.12)', priority: 80,
   },
   generous_soul: {
-    id: 'generous_soul', name: 'Cömert Ruh', emoji: '🎁',
+    id: 'generous_soul', name: i18n.t('auto.userTitles.004'), emoji: '🎁',
     color: '#22C55E', bgColor: 'rgba(34,197,94,0.12)', priority: 75,
   },
   social_butterfly: {
@@ -61,15 +61,15 @@ const TITLE_DEFINITIONS: Record<string, UserTitle> = {
     color: '#A78BFA', bgColor: 'rgba(167,139,250,0.12)', priority: 70,
   },
   fireball: {
-    id: 'fireball', name: 'Ateş Topu', emoji: '🔥',
+    id: 'fireball', name: i18n.t('auto.userTitles.003'), emoji: '🔥',
     color: '#FB923C', bgColor: 'rgba(251,146,60,0.12)', priority: 65,
   },
   supporter: {
-    id: 'supporter', name: 'Destekçi', emoji: '🤝',
+    id: 'supporter', name: i18n.t('auto.userTitles.002'), emoji: '🤝',
     color: '#CD7F32', bgColor: 'rgba(205,127,50,0.18)', priority: 55,
   },
   rising_star: {
-    id: 'rising_star', name: 'Yükselen Yıldız', emoji: '⭐',
+    id: 'rising_star', name: i18n.t('auto.userTitles.001'), emoji: '⭐',
     color: '#60A5FA', bgColor: 'rgba(96,165,250,0.12)', priority: 50,
   },
 };

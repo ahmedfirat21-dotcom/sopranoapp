@@ -65,7 +65,7 @@ const CATEGORIES: { key: CategoryKey; label: string; icon: string }[] =
   APK_STORE_TABS.map(t => ({ key: t.key, label: t.label, icon: t.ionIcon }));
 
 const RARITY_LABEL: Record<Rarity, string> = {
-  divine: 'İLAHİ', mythic: 'EFSANEVİ', legendary: 'EFSANE', rare: 'NADİR', new: 'YENİ',
+  divine: i18n.t('auto.store.043'), mythic: i18n.t('auto.store.042'), legendary: 'EFSANE', rare: i18n.t('auto.store.041'), new: i18n.t('auto.store.040'),
 };
 const RARITY_COLOR: Record<Rarity, string> = {
   divine: '#F472B6', mythic: '#C4B5FD', legendary: '#FBBF24', rare: '#22D3EE', new: '#FB923C',
@@ -326,11 +326,11 @@ interface SPPack {
   fiat: string; popular?: boolean; tierColor: string;
 }
 const DEFAULT_SP_PACKS: SPPack[] = [
-  { id: 'sp-bronze', tierName: 'Bronz · Atölye', tierKey: 'bronze',
+  { id: 'sp-bronze', tierName: i18n.t('auto.store.039'), tierKey: 'bronze',
     amount: 100, fiat: '9,99 ₺', tierColor: '#D4A574' },
-  { id: 'sp-silver', tierName: 'Gümüş · Salon', tierKey: 'silver',
+  { id: 'sp-silver', tierName: i18n.t('auto.store.038'), tierKey: 'silver',
     amount: 500, bonusPct: 10, fiat: '39,99 ₺', tierColor: '#D1D5DB' },
-  { id: 'sp-gold', tierName: 'Altın · Vitrin', tierKey: 'gold',
+  { id: 'sp-gold', tierName: i18n.t('auto.store.037'), tierKey: 'gold',
     amount: 1500, bonusAmount: 1800, bonusPct: 20, fiat: '99,99 ₺', popular: true, tierColor: '#FBBF24' },
   { id: 'sp-platinum', tierName: 'Platin · Loca', tierKey: 'platinum',
     amount: 5000, bonusAmount: 6750, bonusPct: 35, fiat: '299,99 ₺', tierColor: '#C4B5FD' },
@@ -502,10 +502,10 @@ export default function StoreScreen() {
 
   // ★ v109.1: Kategori → kullanıcı dostu etiket eşlemesi (success modal alt metni için)
   const categoryLabel = (cat: string): string => {
-    if (cat === 'atelier' || cat === 'frames') return 'Çerçeve';
-    if (cat === 'message_art' || cat === 'entry_effect') return 'Giriş Efekti';
+    if (cat === 'atelier' || cat === 'frames') return i18n.t('auto.store.036');
+    if (cat === 'message_art' || cat === 'entry_effect') return i18n.t('auto.store.035');
     if (cat === 'gift') return 'Hediye';
-    return 'Ürün';
+    return i18n.t('auto.store.034');
   };
   const accentForRarity = (rarity?: string | null): readonly [string, string] => {
     switch (rarity) {
@@ -521,7 +521,7 @@ export default function StoreScreen() {
     if (!firebaseUser?.uid) return;
     const allOwned = bundle.item_ids.every((id) => inventory.has(id));
     if (allOwned) {
-      showToast({ title: i18n.t('store.002'), message: `${bundle.name} parçalarına zaten sahipsin.`, type: 'info' });
+      showToast({ title: i18n.t('store.002'), message: i18n.t('auto.store.033', { 0: bundle.name }), type: 'info' });
       return;
     }
     const totalDiscount = Math.min(bundle.discount_pct + tierDiscountPct, 80);
@@ -529,11 +529,11 @@ export default function StoreScreen() {
     setConfirmAlert({
       visible: true,
       title: i18n.t('store.003'),
-      message: `${bundle.name} setinin ${bundle.item_ids.length} parçası ${finalPrice.toLocaleString('tr-TR')} SP karşılığında envanterine eklenecek (-%${totalDiscount}${tierDiscountPct > 0 ? ` · ${tier}` : ''}). Onaylıyor musun?`,
+      message: i18n.t('auto.store.032', { 0: bundle.name, 1: bundle.item_ids.length, 2: finalPrice.toLocaleString('tr-TR'), 3: totalDiscount, 4: tierDiscountPct > 0 ? ` · ${tier}` : '' }),
       buttons: [
-        { text: 'Vazgeç', style: 'cancel', onPress: () => setConfirmAlert(p => ({ ...p, visible: false })) },
+        { text: i18n.t('auto.store.031'), style: 'cancel', onPress: () => setConfirmAlert(p => ({ ...p, visible: false })) },
         {
-          text: 'Satın Al', style: 'default', icon: 'cube',
+          text: i18n.t('auto.store.030'), style: 'default', icon: 'cube',
           onPress: async () => {
             setConfirmAlert(p => ({ ...p, visible: false }));
             setPurchasing(bundle.id);
@@ -542,8 +542,8 @@ export default function StoreScreen() {
             if (r.success) {
               setSuccessModal({
                 visible: true,
-                title: `${bundle.name} Satın Alındı`,
-                subtitle: `${r.items_added || bundle.item_ids.length} parça envanterine eklendi · ${r.cost} SP harcandı`,
+                title: i18n.t('auto.store.029', { 0: bundle.name }),
+                subtitle: i18n.t('auto.store.028', { 0: r.items_added || bundle.item_ids.length, 1: r.cost }),
                 accent: accentForRarity(bundle.rarity),
               });
               setInventory((prev) => {
@@ -554,7 +554,7 @@ export default function StoreScreen() {
             } else {
               showToast({
                 title: 'Hata',
-                message: r.error || 'Bağlantı sorunu',
+                message: r.error || i18n.t('auto.store.027'),
                 type: r.already_owned ? 'info' : 'error',
               });
             }
@@ -585,8 +585,8 @@ export default function StoreScreen() {
       const label = categoryLabel(item.category);
       setSuccessModal({
         visible: true,
-        title: `${label} Satın Alındı`,
-        subtitle: `${item.name} envanterine eklendi · ${r.cost} SP harcandı`,
+        title: i18n.t('auto.store.026', { 0: label }),
+        subtitle: i18n.t('auto.store.025', { 0: item.name, 1: r.cost }),
         accent: accentForRarity(item.rarity),
       });
       setInventory((prev) => new Set(prev).add(item.id));
@@ -594,12 +594,12 @@ export default function StoreScreen() {
       const reqTier = (r as any).required_tier || 'Plus';
       setConfirmAlert({
         visible: true,
-        title: `${reqTier} Üyelik Gerekiyor`,
-        message: `${item.name} sadece ${reqTier} üyelere açık. ${reqTier} üyelik avantajları arasında %10-20 mağaza indirimi, premium oda araçları ve daha fazlası var.`,
+        title: i18n.t('auto.store.024', { 0: reqTier }),
+        message: i18n.t('auto.store.023', { 0: item.name, 1: reqTier, 2: reqTier }),
         buttons: [
-          { text: 'Şimdi Değil', style: 'cancel', onPress: () => setConfirmAlert(p => ({ ...p, visible: false })) },
+          { text: i18n.t('auto.store.022'), style: 'cancel', onPress: () => setConfirmAlert(p => ({ ...p, visible: false })) },
           {
-            text: `${reqTier}'a Yükselt`, style: 'default', icon: 'star',
+            text: i18n.t('auto.store.021', { 0: reqTier }), style: 'default', icon: 'star',
             onPress: () => {
               setConfirmAlert(p => ({ ...p, visible: false }));
               router.push('/plus' as any);
@@ -610,7 +610,7 @@ export default function StoreScreen() {
     } else {
       showToast({
         title: 'Hata',
-        message: r.error || 'Bağlantı sorunu',
+        message: r.error || i18n.t('auto.store.020'),
         type: r.alreadyOwned ? 'info' : 'error',
       });
     }
@@ -630,18 +630,18 @@ export default function StoreScreen() {
         const dealOff = (dailyDeal && dailyDeal.item_id === item.id) ? dailyDeal.extra_discount_pct : 0;
         const totalOff = Math.min(tierDiscountPct + dealOff, 80);
         if (totalOff === 0) {
-          return `${item.name} için ${item.price_sp.toLocaleString('tr-TR')} SP harcanacak. Onaylıyor musun?`;
+          return i18n.t('auto.store.019', { 0: item.name, 1: item.price_sp.toLocaleString('tr-TR') });
         }
         const final = Math.round(item.price_sp * (100 - totalOff) / 100);
         const parts: string[] = [];
         if (tierDiscountPct > 0) parts.push(`${tier} indirimi -%${tierDiscountPct}`);
-        if (dealOff > 0) parts.push(`Günün Fırsatı -%${dealOff}`);
-        return `${item.name} için ${final.toLocaleString('tr-TR')} SP harcanacak (${parts.join(' + ')}). Onaylıyor musun?`;
+        if (dealOff > 0) parts.push(i18n.t('auto.store.018', { 0: dealOff }));
+        return i18n.t('auto.store.017', { 0: item.name, 1: final.toLocaleString('tr-TR'), 2: parts.join(' + ') });
       })(),
       buttons: [
-        { text: 'Vazgeç', style: 'cancel', onPress: () => setConfirmAlert(p => ({ ...p, visible: false })) },
+        { text: i18n.t('auto.store.016'), style: 'cancel', onPress: () => setConfirmAlert(p => ({ ...p, visible: false })) },
         {
-          text: 'Satın Al', style: 'default', icon: 'sparkles',
+          text: i18n.t('auto.store.015'), style: 'default', icon: 'sparkles',
           onPress: () => {
             setConfirmAlert(p => ({ ...p, visible: false }));
             executePurchase(item);
@@ -725,7 +725,7 @@ export default function StoreScreen() {
               />
               <Ionicons name="diamond" size={14} color="#22D3EE" />
               <Text style={s.tierDiscountText}>
-                {tier} üyeliğinle çerçeve & efektlerde <Text style={{ color: '#22D3EE', fontWeight: '800' }}>%{tierDiscountPct}</Text> indirim aktif.
+                {tier}{i18n.t('auto.store.014')}<Text style={{ color: '#22D3EE', fontWeight: '800' }}>%{tierDiscountPct}</Text> indirim aktif.
               </Text>
             </View>
           )}
@@ -764,7 +764,7 @@ export default function StoreScreen() {
                 color="#FBBF24"
               />
               <Text style={s.sortBtnText}>
-                {sortMode === 'price-asc' ? 'Ucuz' : sortMode === 'price-desc' ? 'Pahalı' : sortMode === 'rarity' ? 'Nadir' : 'Sırala'}
+                {sortMode === 'price-asc' ? 'Ucuz' : sortMode === 'price-desc' ? i18n.t('auto.store.013') : sortMode === 'rarity' ? 'Nadir' : i18n.t('auto.store.012')}
               </Text>
             </Pressable>
           </View>
@@ -815,7 +815,7 @@ export default function StoreScreen() {
               <Text style={s.heroTagText}>{i18n.t('store.001')}</Text>
             </View>
             <Text style={s.heroTitle}>Soprano Couture{'\n'}Sonbahar 2026</Text>
-            <Text style={s.heroDesc}>Yedi tasarımcı. On iki sınırlı parça.{'\n'}Sadece bu sezona özel.</Text>
+            <Text style={s.heroDesc}>{i18n.t('auto.store.011')}{'\n'}{i18n.t('auto.store.010')}</Text>
             <Pressable
               style={s.heroCta}
               onPress={() => scrollToSection(bundles.length > 0 ? 'bundles' : 'frames')}
@@ -1048,8 +1048,8 @@ export default function StoreScreen() {
               <View style={{ flex: 1 }}>
                 <Text style={s.spBonusTitle}>Premium Bonus</Text>
                 <Text style={s.spBonusDesc}>
-                  {tierDiscountPct >= 20 ? `${tier} üyeliğinle %20 ekstra SP kazanıyorsun! 🎉`
-                    : tierDiscountPct >= 10 ? `${tier} üyeliğinle %10 ekstra SP kazanıyorsun! 🎉`
+                  {tierDiscountPct >= 20 ? i18n.t('auto.store.009', { 0: tier })
+                    : tierDiscountPct >= 10 ? i18n.t('auto.store.008', { 0: tier })
                     : 'Plus ile %10, Pro ile %20 ekstra SP kazan'}
                 </Text>
               </View>
@@ -1262,12 +1262,12 @@ function DailyDealBanner({
       <ShimmerOverlay duration={4500} />
       <View style={s.dailyDealLeft}>
         <Text style={s.dailyDealKicker}>
-          {isOwned ? '✓ SAHİPSİN' : '⚡ GÜNÜN FIRSATI'}
+          {isOwned ? i18n.t('auto.store.007') : i18n.t('auto.store.006')}
         </Text>
         <Text style={s.dailyDealItemName}>{dealItem.name}</Text>
         {dailyDeal.banner_text ? (
           <Text style={s.dailyDealSubtitle} numberOfLines={2}>
-            {isOwned ? 'Bu ürün zaten envanterinde · iyi tercih!' : dailyDeal.banner_text}
+            {isOwned ? i18n.t('auto.store.005') : dailyDeal.banner_text}
           </Text>
         ) : null}
         {!isOwned ? (
@@ -1384,7 +1384,7 @@ function LimitedBadge({ item, offsetTop = 8 }: { item: CosmeticItem; offsetTop?:
           start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
           style={StyleSheet.absoluteFillObject}
         />
-        <Text style={s.limitedBadgeText}>{info.isSoldOut ? 'TÜKENDİ' : 'SÜRE DOLDU'}</Text>
+        <Text style={s.limitedBadgeText}>{info.isSoldOut ? i18n.t('auto.store.004') : i18n.t('auto.store.003')}</Text>
       </View>
     );
   }
@@ -1857,7 +1857,7 @@ function SPPackRow({ pack, onPress }: { pack: SPPack; onPress: () => void }) {
         {pack.bonusPct ? (
           <View style={[s.spPackBonus, { backgroundColor: pack.tierColor + '26' }]}>
             <Text style={[s.spPackBonusText, { color: pack.tierColor }]}>
-              + %{pack.bonusPct} LÜTUF{pack.bonusAmount ? ` · ${pack.bonusAmount.toLocaleString('tr-TR')} SP` : ''}
+              + %{pack.bonusPct}{i18n.t('auto.store.002')}{pack.bonusAmount ? ` · ${pack.bonusAmount.toLocaleString('tr-TR')} SP` : ''}
             </Text>
           </View>
         ) : null}
@@ -1890,7 +1890,7 @@ function CollectionCard({ col, onPress, itemCount }: {
   // ★ v108.21: DB tag yanıltıcıydı ("8 PARÇA" yazılıyor ama 4 item var). Gerçek
   //   itemCount baz alınır; sadece "SINIRLI" gibi özel etiketler korunur.
   const isSpecialTag = col.tag && !/parça/i.test(col.tag);
-  const displayTag = isSpecialTag ? col.tag : `${itemCount} PARÇA`;
+  const displayTag = isSpecialTag ? col.tag : i18n.t('auto.store.001', { 0: itemCount });
   return (
     <Pressable style={s.collectionCard} onPress={onPress}>
       {/* ★ v107 hotfix: Düz koyu zemin + col.art_color üstten abartısız ışık */}

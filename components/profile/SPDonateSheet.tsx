@@ -299,7 +299,7 @@ export default function SPDonateSheet({
         //   olduğunu bilmek istiyor (welcome bonus exploit, rate limit, yetersiz, vs.)
         showToast({
           title: i18n.t('profile.spdonatesheet.001'),
-          message: result.error || 'Bilinmeyen bir hata oluştu, lütfen tekrar dene.',
+          message: result.error || i18n.t('auto.profile.SPDonateSheet.006'),
           type: 'error',
         });
         return;
@@ -311,7 +311,7 @@ export default function SPDonateSheet({
         setShowSuccess(false);
         showToast({
           title: i18n.t('profile.spdonatesheet.002'),
-          message: e?.message || 'Beklenmeyen bir hata, internet bağlantını kontrol et.',
+          message: e?.message || i18n.t('auto.profile.SPDonateSheet.005'),
           type: 'error',
         });
       }
@@ -569,7 +569,7 @@ export default function SPDonateSheet({
               ) : (
                 <>
                   <SPIcon size={26} />
-                  <Text style={styles.sendBtnText}>{amount.toLocaleString('tr-TR')} SP Gönder</Text>
+                  <Text style={styles.sendBtnText}>{amount.toLocaleString('tr-TR')}{i18n.t('auto.profile.SPDonateSheet.004')}</Text>
                 </>
               )}
             </LinearGradient>
@@ -582,12 +582,12 @@ export default function SPDonateSheet({
       <PremiumAlert
         visible={insufficientAlert.visible}
         title="Yetersiz SP"
-        message={`${insufficientAlert.needed} SP eksik. Mağazadan SP yükleyip bağışını tamamlayabilirsin.`}
+        message={i18n.t('auto.profile.SPDonateSheet.003', { 0: insufficientAlert.needed })}
         type="warning"
         buttons={[
-          { text: 'İptal', style: 'cancel' },
+          { text: i18n.t('auto.profile.SPDonateSheet.002'), style: 'cancel' },
           {
-            text: 'Mağazaya Git',
+            text: i18n.t('auto.profile.SPDonateSheet.001'),
             style: 'default',
             onPress: () => {
               setInsufficientAlert({ visible: false, needed: 0 });

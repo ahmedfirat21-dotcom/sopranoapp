@@ -285,7 +285,7 @@ export default function StageSupportSheet({
         setShowSuccess(false);
         showToast({
           title: i18n.t('room.stagesupportsheet.001'),
-          message: result.error || 'Bilinmeyen bir hata oluştu, lütfen tekrar dene.',
+          message: result.error || i18n.t('auto.room.StageSupportSheet.005'),
           type: 'error',
         });
         return;
@@ -297,7 +297,7 @@ export default function StageSupportSheet({
         setShowSuccess(false);
         showToast({
           title: i18n.t('room.stagesupportsheet.002'),
-          message: e?.message || 'Beklenmeyen bir hata, internet bağlantını kontrol et.',
+          message: e?.message || i18n.t('auto.room.StageSupportSheet.004'),
           type: 'error',
         });
       }
@@ -641,12 +641,12 @@ export default function StageSupportSheet({
       <PremiumAlert
         visible={insufficientAlert.visible}
         title="Yetersiz SP"
-        message={`${insufficientAlert.needed} SP eksik. Mağazadan SP yükleyip sahneyi destekleyebilirsin.`}
+        message={i18n.t('auto.room.StageSupportSheet.003', { 0: insufficientAlert.needed })}
         type="warning"
         buttons={[
-          { text: 'İptal', style: 'cancel' },
+          { text: i18n.t('auto.room.StageSupportSheet.002'), style: 'cancel' },
           {
-            text: 'Mağazaya Git',
+            text: i18n.t('auto.room.StageSupportSheet.001'),
             style: 'default',
             onPress: () => {
               setInsufficientAlert({ visible: false, needed: 0 });

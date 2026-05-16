@@ -113,7 +113,7 @@ export default function RoomGiftPanel({
     );
     const list: Recipient[] = others.map((p) => ({
       id: p.user_id,
-      display_name: (p as any).disguise?.display_name || p.user?.display_name || 'Kullanıcı',
+      display_name: (p as any).disguise?.display_name || p.user?.display_name || i18n.t('auto.room.RoomGiftPanel.007'),
       avatar_url: (p as any).disguise?.avatar_url || p.user?.avatar_url || '',
       role: p.role,
     }));
@@ -283,7 +283,7 @@ export default function RoomGiftPanel({
     if (senderSP < item.price_sp) {
       showToast({
         title: 'Yetersiz SP',
-        message: `${item.name} için ${item.price_sp} SP gerekli, ${senderSP} SP'n var.`,
+        message: i18n.t('auto.room.RoomGiftPanel.006', { 0: item.name, 1: item.price_sp, 2: senderSP }),
         type: 'error',
       });
       return;
@@ -301,7 +301,7 @@ export default function RoomGiftPanel({
       color: item.art_color || '#FBBF24',
       itemName: item.name,
       senderName: 'Sen',
-      recipientName: recipient?.display_name || 'Alıcı',
+      recipientName: recipient?.display_name || i18n.t('auto.room.RoomGiftPanel.005'),
       amount: item.price_sp,
       priceSP: item.price_sp,
       receivedAt: Date.now(),
@@ -321,7 +321,7 @@ export default function RoomGiftPanel({
       setSenderSP((prev) => prev + item.price_sp);
       showToast({
         title: i18n.t('room.roomgiftpanel.005'),
-        message: data?.error || error?.message || 'Bağlantı hatası',
+        message: data?.error || error?.message || i18n.t('auto.room.RoomGiftPanel.004'),
         type: 'error',
       });
       return;
@@ -409,13 +409,13 @@ export default function RoomGiftPanel({
                 <Text style={s.headerTitle}>{i18n.t('room.roomgiftpanel.001')}</Text>
                 <Text style={s.headerSub}>
                   {recipients.length === 0
-                    ? 'Odada başka kimse yok'
+                    ? i18n.t('auto.room.RoomGiftPanel.003')
                     : selectedRecipientId
                       ? (() => {
                           const r = recipients.find(x => x.id === selectedRecipientId);
-                          return r ? `→ ${r.display_name}` : `${recipients.length} kişi seçilebilir`;
+                          return r ? `→ ${r.display_name}` : i18n.t('auto.room.RoomGiftPanel.002', { 0: recipients.length });
                         })()
-                      : `${recipients.length} kişiyi seç`}
+                      : i18n.t('auto.room.RoomGiftPanel.001', { 0: recipients.length })}
                 </Text>
               </View>
               <View style={s.spPill}>

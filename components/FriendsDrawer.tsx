@@ -9,6 +9,7 @@ import StatusAvatar from './StatusAvatar';
 import { Colors } from '../constants/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from '../services/i18n';
+import { i18n } from '../../services/i18n';
 
 // Tab bar height + gap — alt navigasyon barının üstünde bitsin
 const TAB_BAR_SPACE = 60 + 8 + 6; // BAR_H (60) + min paddingBottom (8) + extra gap
@@ -244,7 +245,7 @@ export default function FriendsDrawer({ visible, friends, onClose, onSelect, cur
                     </Pressable>
                     <View style={{ flex: 1, marginRight: 6 }}>
                       <Text style={[fd.requestName, handled && { opacity: 0.6 }]} numberOfLines={1}>
-                        {sender?.display_name || 'Kullanıcı'}
+                        {sender?.display_name || i18n.t('auto.FriendsDrawer.002')}
                       </Text>
                     </View>
                     {handled ? (
@@ -256,7 +257,7 @@ export default function FriendsDrawer({ visible, friends, onClose, onSelect, cur
                           color={handled === 'approved' ? '#22C55E' : '#EF4444'}
                         />
                         <Text style={[fd.handledText, { color: handled === 'approved' ? '#22C55E' : '#EF4444' }]}>
-                          {handled === 'approved' ? 'Onaylandı' : 'Reddedildi'}
+                          {handled === 'approved' ? i18n.t('auto.FriendsDrawer.001') : 'Reddedildi'}
                         </Text>
                       </View>
                     ) : isProcessing ? (

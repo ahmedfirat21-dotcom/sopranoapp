@@ -1,6 +1,7 @@
 import { logger } from '../utils/logger';
 import { supabase } from '../constants/supabase';
 import { GamificationService } from './gamification';
+import { i18n } from '../../services/i18n';
 
 export const ReferralService = {
   // Rastgele 6 haneli büyük harf+rakam kodu üret
@@ -48,7 +49,7 @@ export const ReferralService = {
   applyCode: async (referralCode: string, referredUserId: string, isOnboarding: boolean = false): Promise<{ success: boolean; message: string }> => {
     try {
       if (!referralCode || referralCode.trim().length === 0) {
-        return { success: false, message: 'Geçersiz davet kodu' };
+        return { success: false, message: i18n.t('auto.referral.010') };
       }
 
       const code = referralCode.trim().toUpperCase();
@@ -61,12 +62,12 @@ export const ReferralService = {
         .maybeSingle();
 
       if (ownerErr || !owner) {
-        return { success: false, message: 'Bu davet kodu bulunamadı.' };
+        return { success: false, message: i18n.t('auto.referral.009') };
       }
 
       // Kendi kodunu kullanmasın
       if (owner.id === referredUserId) {
-        return { success: false, message: 'Kendi davet kodunuzu kullanamazsınız.' };
+        return { success: false, message: i18n.t('auto.referral.008') };
       }
 
       // ★ SEC-REF1: Max 20 referral limiti — SP farming engeli
@@ -75,7 +76,7 @@ export const ReferralService = {
         .select('*', { count: 'exact', head: true })
         .eq('referrer_id', owner.id);
       if ((ownerRefCount || 0) >= 20) {
-        return { success: false, message: 'Bu davet kodunun limiti dolmuş.' };
+        return { success: false, message: i18n.t('auto.referral.007') };
       }
 
       // ★ SEC-REF2: 24 saat bekleme süresi — yeni hesabın referral kullanma engeli
@@ -90,7 +91,7 @@ export const ReferralService = {
           const accountAge = Date.now() - new Date(referredProfile.created_at).getTime();
           const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
           if (accountAge < TWENTY_FOUR_HOURS) {
-            return { success: false, message: 'Davet kodunu kullanmak için hesabınızın en az 24 saat eski olması gerekir.' };
+            return { success: false, message: i18n.t('auto.referral.006') };
           }
         }
       }
@@ -103,7 +104,7 @@ export const ReferralService = {
         .maybeSingle();
 
       if (existing) {
-        return { success: false, message: 'Zaten bir davet kodu kullanmışsınız.' };
+        return { success: false, message: i18n.t('auto.referral.005') };
       }
 
       // 3. Referral kaydı oluştur
@@ -116,9 +117,9 @@ export const ReferralService = {
       if (insertErr) {
         if (__DEV__) logger.warn('Referral insert error:', insertErr.message);
         if ((insertErr as any).code === '23505') {
-          return { success: false, message: 'Zaten bir davet kodu kullanmışsınız.' };
+          return { success: false, message: i18n.t('auto.referral.004') };
         }
-        return { success: false, message: 'İşlem sırasında hata oluştu.' };
+        return { success: false, message: i18n.t('auto.referral.003') };
       }
 
       // 4. ★ 2026-04-21: Atomic SP bonus — v50 RPC tek transaction'da iki tarafa da verir.
@@ -135,11 +136,11 @@ export const ReferralService = {
           await GamificationService.earn(owner.id, 50, 'referral_bonus');
           await GamificationService.earn(referredUserId, 50, 'referral_bonus');
         } catch (fallbackErr: any) {
-          logger.error('[Referral] Fallback earn de başarısız:', fallbackErr?.message);
+          logger.error(i18n.t('auto.referral.002'), fallbackErr?.message);
         }
       }
 
-      return { success: true, message: 'Tebrikler! Her ikiniz de 50 SP kazandınız.' };
+      return { success: true, message: i18n.t('auto.referral.001') };
     } catch (e: any) {
       logger.error('Error applying code:', e.message);
       return { success: false, message: e.message };

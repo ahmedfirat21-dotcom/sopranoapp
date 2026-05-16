@@ -337,7 +337,7 @@ function MessageBubble({ message, isMe, senderAvatar, senderName, myAvatar, onDe
       <View style={[styles.bubbleWrap, isMe ? styles.bubbleRight : styles.bubbleLeft]}>
         <View style={[styles.bubble, { backgroundColor: 'rgba(255,255,255,0.03)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' }]}>
           <Text style={[styles.bubbleText, { color: 'rgba(255,255,255,0.25)', fontStyle: 'italic' }]}>
-            🚫 {isDeletedForEveryone ? 'Bu mesaj herkes için silindi' : 'Bu mesaj silindi'}
+            🚫 {isDeletedForEveryone ? i18n.t('auto.chat.id.039') : 'Bu mesaj silindi'}
           </Text>
         </View>
         <View style={[styles.timeRow, isMe && styles.timeRowRight]}>
@@ -402,12 +402,12 @@ function MessageBubble({ message, isMe, senderAvatar, senderName, myAvatar, onDe
               <View style={styles.replyAccent} />
               <View style={{ flex: 1 }}>
                 <Text style={styles.replyAuthor} numberOfLines={1}>
-                  {replyToMessage.sender_id === message.sender_id ? 'Kendine' : (replyToMessage.sender?.display_name || 'Kullanıcı')}
+                  {replyToMessage.sender_id === message.sender_id ? 'Kendine' : (replyToMessage.sender?.display_name || i18n.t('auto.chat.id.038'))}
                 </Text>
                 <Text style={styles.replyContent} numberOfLines={1}>
                   {replyToMessage.deleted_for_everyone ? '🚫 Bu mesaj silindi'
                     : replyToMessage.voice_url ? '🎙️ Sesli mesaj'
-                    : replyToMessage.image_url ? '📷 Fotoğraf'
+                    : replyToMessage.image_url ? i18n.t('auto.chat.id.037')
                     : (replyToMessage.content || '...')}
                 </Text>
               </View>
@@ -868,7 +868,7 @@ export default function ChatScreen() {
                 id: mc.id,
                 callType: 'audio' as const,
                 time: mc.created_at,
-                callerName: mc.sender?.display_name || 'Kullanıcı',
+                callerName: mc.sender?.display_name || i18n.t('auto.chat.id.036'),
               })));
             }
           })().catch(() => {}),
@@ -1148,7 +1148,7 @@ export default function ChatScreen() {
     try {
       await MessageService.toggleSavedMessage(firebaseUser.uid, msg.id);
       showToast({
-        title: wasSaved ? 'Kaydedilenden çıkarıldı' : '🔖 Kaydedildi',
+        title: wasSaved ? i18n.t('auto.chat.id.035') : '🔖 Kaydedildi',
         type: 'success',
       });
     } catch {
@@ -1275,11 +1275,11 @@ export default function ChatScreen() {
       // Hata durumunda mesajı listeden çıkar ve geri metin kutusuna koy
       setMessages(prev => prev.filter(m => m.id !== tempId));
       setInputText(content);
-      const msg = err?.message || err?.error_description || err?.toString() || 'Mesaj gönderilemedi';
+      const msg = err?.message || err?.error_description || err?.toString() || i18n.t('auto.chat.id.034');
       // ★ v85i: Toast yetersiz kaldığı durumlarda kullanıcı kaçırıyor;
       //   Alert kullanıcı dismiss etmeden ekrandan çıkmaz → debug + UX hatası net.
       Alert.alert(
-        'Mesaj Gönderilemedi',
+        i18n.t('auto.chat.id.033'),
         msg.slice(0, 500),
         [{ text: 'Tamam', style: 'default' }],
         { cancelable: true },
@@ -1349,8 +1349,8 @@ export default function ChatScreen() {
             ) : (
               <Text style={styles.offlineText}>
                 {otherUser?.last_seen
-                  ? `Son görülme: ${new Date(otherUser.last_seen).toLocaleString('tr-TR', { hour: '2-digit', minute: '2-digit' })}`
-                  : 'Çevrimdışı'}
+                  ? i18n.t('auto.chat.id.032', { 0: new Date(otherUser.last_seen).toLocaleString('tr-TR', { hour: '2-digit', minute: '2-digit' }) })
+                  : i18n.t('auto.chat.id.031')}
               </Text>
             )}
           </View>
@@ -1376,13 +1376,13 @@ export default function ChatScreen() {
                 try {
                   const { callId, receiverIsOnline } = await CallService.initiateCall(
                     firebaseUser.uid,
-                    profile?.display_name || 'Kullanıcı',
+                    profile?.display_name || i18n.t('auto.chat.id.030'),
                     profile?.avatar_url || undefined,
                     id, 'audio', tier as any
                   );
                   router.push(`/call/${id}?callId=${callId}&callType=audio&isIncoming=false&receiverOnline=${receiverIsOnline}` as any);
                 } catch (err: any) {
-                  showToast({ title: i18n.t('chat.id.018'), message: err.message || 'Arama başlatılamadı', type: 'error' });
+                  showToast({ title: i18n.t('chat.id.018'), message: err.message || i18n.t('auto.chat.id.029'), type: 'error' });
                 } finally {
                   setTimeout(() => setIsCallingInProgress(false), 2000);
                 }
@@ -1468,7 +1468,7 @@ export default function ChatScreen() {
             <View style={{ flex: 1 }}>
               <Text style={msgReqBannerStyles.title}>{i18n.t('chat.id.004')}</Text>
               <Text style={msgReqBannerStyles.subtitle}>
-                {otherUser?.display_name || 'Bu kullanıcı'} sana ilk kez yazıyor. Kabul edersen mesajlaşabilirsiniz.
+                {otherUser?.display_name || i18n.t('auto.chat.id.028')} sana ilk kez yazıyor. Kabul edersen mesajlaşabilirsiniz.
               </Text>
             </View>
           </View>
@@ -1484,7 +1484,7 @@ export default function ChatScreen() {
                   showToast({ title: '✕ Reddedildi', message: i18n.t('chat.id.019'), type: 'info' });
                   router.back();
                 } catch (e: any) {
-                  showToast({ title: 'Hata', message: e?.message || 'İşlem başarısız', type: 'error' });
+                  showToast({ title: 'Hata', message: e?.message || i18n.t('auto.chat.id.027'), type: 'error' });
                 } finally { setRespondingRequest(false); }
               }}
             >
@@ -1503,7 +1503,7 @@ export default function ChatScreen() {
                   setMsgRequestInfo({ status: 'accepted' });
                   showToast({ title: '✓ Kabul edildi', message: i18n.t('chat.id.020'), type: 'success' });
                 } catch (e: any) {
-                  showToast({ title: 'Hata', message: e?.message || 'İşlem başarısız', type: 'error' });
+                  showToast({ title: 'Hata', message: e?.message || i18n.t('auto.chat.id.026'), type: 'error' });
                 } finally { setRespondingRequest(false); }
               }}
             >
@@ -1640,7 +1640,7 @@ export default function ChatScreen() {
                         try {
                           const { callId, receiverIsOnline } = await CallService.initiateCall(
                             firebaseUser.uid,
-                            profile?.display_name || 'Kullanıcı',
+                            profile?.display_name || i18n.t('auto.chat.id.025'),
                             profile?.avatar_url || undefined,
                             id,
                             mc.callType,
@@ -1762,14 +1762,14 @@ export default function ChatScreen() {
             <View style={styles.composeBannerAccent} />
             <View style={{ flex: 1 }}>
               <Text style={styles.composeBannerLabel}>
-                {editingMessageId ? '✎ Düzenleniyor'
-                  : `↩︎ Yanıt: ${replyingTo?.sender_id === firebaseUser?.uid ? 'Kendine' : (otherUser?.display_name || 'Kullanıcı')}`}
+                {editingMessageId ? i18n.t('auto.chat.id.024')
+                  : `↩︎ Yanıt: ${replyingTo?.sender_id === firebaseUser?.uid ? 'Kendine' : (otherUser?.display_name || i18n.t('auto.chat.id.023'))}`}
               </Text>
               <Text style={styles.composeBannerSnippet} numberOfLines={1}>
                 {editingMessageId
-                  ? 'Mevcut metni değiştir, gönder'
+                  ? i18n.t('auto.chat.id.022')
                   : (replyingTo?.voice_url ? '🎙️ Sesli mesaj'
-                     : replyingTo?.image_url ? '📷 Fotoğraf'
+                     : replyingTo?.image_url ? i18n.t('auto.chat.id.021')
                      : (replyingTo?.content || '...'))}
               </Text>
             </View>
@@ -1810,9 +1810,9 @@ export default function ChatScreen() {
             style={styles.textInput}
             placeholder={
               msgRequestInfo.status === 'pending_outgoing' ? 'Cevap bekleniyor...'
-              : msgRequestInfo.status === 'pending_incoming' ? 'Önce isteği kabul et'
-              : msgRequestInfo.status === 'rejected' ? 'Mesaj atılamaz'
-              : (!isMutualFollow && msgRequestInfo.status === 'none') ? 'İlk mesajını yaz...'
+              : msgRequestInfo.status === 'pending_incoming' ? i18n.t('auto.chat.id.020')
+              : msgRequestInfo.status === 'rejected' ? i18n.t('auto.chat.id.019')
+              : (!isMutualFollow && msgRequestInfo.status === 'none') ? i18n.t('auto.chat.id.018')
               : 'Mesaj yaz...'
             }
             placeholderTextColor={Colors.text3}
@@ -1836,7 +1836,7 @@ export default function ChatScreen() {
               const tempId = `temp_img_${Date.now()}`;
               const optimisticMsg: Message = {
                 id: tempId, sender_id: firebaseUser.uid, receiver_id: id,
-                content: '📷 Fotoğraf',
+                content: i18n.t('auto.chat.id.017'),
                 is_read: false, created_at: new Date().toISOString(),
               };
               setMessages(prev => [...prev, optimisticMsg]);
@@ -1855,7 +1855,7 @@ export default function ChatScreen() {
           {activeRoom && (
             <Pressable style={[styles.inputAction, { backgroundColor: 'rgba(20,184,166,0.1)', borderRadius: 20 }]} onPress={async () => {
               if (!firebaseUser || !id || !activeRoom) return;
-              const inviteContent = `🎙️ Şu an "${activeRoom.name}" odasındayım! Gel katıl \u2192 soprano://room/${activeRoom.id}`;
+              const inviteContent = i18n.t('auto.chat.id.016', { 0: activeRoom.name, 1: activeRoom.id });
               try {
                 const newMsg = await MessageService.send(firebaseUser.uid, id, inviteContent);
                 setMessages(prev => [...prev, newMsg]);
@@ -1925,8 +1925,8 @@ export default function ChatScreen() {
                   if (r.success) {
                     setDisappearingSeconds(opt.sec);
                     showToast({
-                      title: opt.sec === 0 ? '✓ Kapatıldı' : `⏱ ${opt.label}`,
-                      message: opt.sec === 0 ? 'Mesajlar artık sınırsız.' : 'Yeni mesajlar bu süre sonra silinecek.',
+                      title: opt.sec === 0 ? i18n.t('auto.chat.id.015') : `⏱ ${opt.label}`,
+                      message: opt.sec === 0 ? i18n.t('auto.chat.id.014') : i18n.t('auto.chat.id.013'),
                       type: 'success',
                     });
                   } else {
@@ -2060,8 +2060,8 @@ export default function ChatScreen() {
               />
               <Text style={styles.kebabItemText}>
                 {disappearingSeconds > 0
-                  ? `Kaybolan Mesaj: ${disappearingSeconds === 3600 ? '1 saat' : disappearingSeconds === 86400 ? '24 saat' : disappearingSeconds === 604800 ? '7 gün' : disappearingSeconds === 2592000 ? '30 gün' : 'Açık'}`
-                  : 'Kaybolan Mesaj Süresi'}
+                  ? `Kaybolan Mesaj: ${disappearingSeconds === 3600 ? '1 saat' : disappearingSeconds === 86400 ? '24 saat' : disappearingSeconds === 604800 ? i18n.t('auto.chat.id.012') : disappearingSeconds === 2592000 ? i18n.t('auto.chat.id.011') : i18n.t('auto.chat.id.010')}`
+                  : i18n.t('auto.chat.id.009')}
               </Text>
             </Pressable>
             {/* Sohbeti Sil */}
@@ -2085,7 +2085,7 @@ export default function ChatScreen() {
                         } catch {}
                       },
                     },
-                    { text: 'Vazgeç', style: 'cancel' },
+                    { text: i18n.t('auto.chat.id.008'), style: 'cancel' },
                   ],
                 });
               }}
@@ -2108,7 +2108,7 @@ export default function ChatScreen() {
               }}
             >
               <Ionicons name={isMuted ? 'notifications-outline' : 'notifications-off-outline'} size={20} color={Colors.text2} />
-              <Text style={styles.kebabItemText}>{isMuted ? 'Sesi Aç' : 'Sessize Al'}</Text>
+              <Text style={styles.kebabItemText}>{isMuted ? i18n.t('auto.chat.id.007') : 'Sessize Al'}</Text>
             </Pressable>
 
             {/* Engelle / Engeli Kaldır */}
@@ -2121,11 +2121,11 @@ export default function ChatScreen() {
                   setCAlert({
                     visible: true,
                     title: i18n.t('chat.id.029'),
-                    message: `${otherUser?.display_name || 'Bu kullanıcı'} engelden çıkarılacak.`,
+                    message: `${otherUser?.display_name || i18n.t('auto.chat.id.006')} engelden çıkarılacak.`,
                     type: 'info',
                     buttons: [
                       {
-                        text: 'Kaldır',
+                        text: i18n.t('auto.chat.id.005'),
                         onPress: async () => {
                           try {
                             await ModerationService.unblockUser(firebaseUser!.uid, id);
@@ -2133,7 +2133,7 @@ export default function ChatScreen() {
                           } catch {}
                         },
                       },
-                      { text: 'Vazgeç', style: 'cancel' },
+                      { text: i18n.t('auto.chat.id.004'), style: 'cancel' },
                     ],
                   });
                 } else {
@@ -2141,7 +2141,7 @@ export default function ChatScreen() {
                   setCAlert({
                     visible: true,
                     title: i18n.t('chat.id.030'),
-                    message: `${otherUser?.display_name || 'Bu kullanıcı'} engellenecek ve mesaj gönderemeyecek.`,
+                    message: `${otherUser?.display_name || i18n.t('auto.chat.id.003')} engellenecek ve mesaj gönderemeyecek.`,
                     type: 'warning',
                     buttons: [
                       {
@@ -2154,7 +2154,7 @@ export default function ChatScreen() {
                           } catch {}
                         },
                       },
-                      { text: 'Vazgeç', style: 'cancel' },
+                      { text: i18n.t('auto.chat.id.002'), style: 'cancel' },
                     ],
                   });
                 }
@@ -2162,7 +2162,7 @@ export default function ChatScreen() {
             >
               <Ionicons name={isBlocked ? 'person-add-outline' : 'ban-outline'} size={20} color={isBlocked ? Colors.teal : '#F59E0B'} />
               <Text style={[styles.kebabItemText, { color: isBlocked ? Colors.teal : '#F59E0B' }]}>
-                {isBlocked ? 'Engeli Kaldır' : 'Engelle'}
+                {isBlocked ? i18n.t('auto.chat.id.001') : 'Engelle'}
               </Text>
             </Pressable>
 

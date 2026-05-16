@@ -37,17 +37,17 @@ import type { CosmeticItem, Rarity, DailyDeal } from '../../services/store';
 const { width: W } = Dimensions.get('window');
 
 const RARITY_LABEL: Record<Rarity, string> = {
-  divine: 'İLAHİ', mythic: 'EFSANEVİ', legendary: 'EFSANE', rare: 'NADİR', new: 'YENİ',
+  divine: i18n.t('auto.store.StoreItemPreviewSheet.012'), mythic: i18n.t('auto.store.StoreItemPreviewSheet.011'), legendary: 'EFSANE', rare: i18n.t('auto.store.StoreItemPreviewSheet.010'), new: i18n.t('auto.store.StoreItemPreviewSheet.009'),
 };
 const RARITY_COLOR: Record<Rarity, string> = {
   divine: '#F472B6', mythic: '#C4B5FD', legendary: '#FBBF24', rare: '#22D3EE', new: '#FB923C',
 };
 
 function categoryLabel(cat: string): string {
-  if (cat === 'atelier' || cat === 'frames') return 'Çerçeve';
-  if (cat === 'message_art' || cat === 'entry_effect') return 'Giriş Efekti';
+  if (cat === 'atelier' || cat === 'frames') return i18n.t('auto.store.StoreItemPreviewSheet.008');
+  if (cat === 'message_art' || cat === 'entry_effect') return i18n.t('auto.store.StoreItemPreviewSheet.007');
   if (cat === 'gift') return 'Hediye';
-  return 'Ürün';
+  return i18n.t('auto.store.StoreItemPreviewSheet.006');
 }
 
 const TIER_RANK: Record<string, number> = { Free: 0, Plus: 1, Pro: 2, GodMaster: 3 };
@@ -240,7 +240,7 @@ export default function StoreItemPreviewSheet({
                 {dealOff > 0 && (
                   <View style={[s.discountChip, { borderColor: 'rgba(244,114,182,0.45)', backgroundColor: 'rgba(244,114,182,0.10)' }]}>
                     <Ionicons name="flash" size={9} color="#F472B6" />
-                    <Text style={[s.discountChipText, { color: '#F472B6' }]}>Fırsat -%{dealOff}</Text>
+                    <Text style={[s.discountChipText, { color: '#F472B6' }]}>{i18n.t('auto.store.StoreItemPreviewSheet.005')}{dealOff}</Text>
                   </View>
                 )}
               </View>
@@ -248,7 +248,7 @@ export default function StoreItemPreviewSheet({
           </View>
           <View style={[s.priceOff, { borderColor: rarityColor + '66', backgroundColor: rarityColor + '14' }]}>
             <Text style={[s.priceOffText, { color: rarityColor }]}>
-              {totalOff > 0 ? `-%${totalOff}` : 'TAM FİYAT'}
+              {totalOff > 0 ? `-%${totalOff}` : i18n.t('auto.store.StoreItemPreviewSheet.004')}
             </Text>
           </View>
         </View>
@@ -282,7 +282,7 @@ export default function StoreItemPreviewSheet({
               style={({ pressed }) => [s.actionBtn, { backgroundColor: '#0A0F1A', borderColor: '#22D3EE' }, pressed && { opacity: 0.85 }]}
             >
               <Ionicons name="diamond" size={16} color="#22D3EE" />
-              <Text style={[s.actionText, { color: '#22D3EE' }]}>{minTier} Üyelik Gerekli</Text>
+              <Text style={[s.actionText, { color: '#22D3EE' }]}>{minTier}{i18n.t('auto.store.StoreItemPreviewSheet.003')}</Text>
             </Pressable>
           ) : insufficientSP ? (
             <View style={[s.actionBtn, { backgroundColor: 'rgba(248,113,113,0.12)', borderColor: 'rgba(248,113,113,0.5)' }]}>
@@ -307,7 +307,7 @@ export default function StoreItemPreviewSheet({
               />
               <Ionicons name="sparkles" size={16} color="#fff" />
               <Text style={s.actionText}>
-                {purchasing ? 'Satın alınıyor…' : `Satın Al — ${finalPrice.toLocaleString('tr-TR')} SP`}
+                {purchasing ? i18n.t('auto.store.StoreItemPreviewSheet.002') : i18n.t('auto.store.StoreItemPreviewSheet.001', { 0: finalPrice.toLocaleString('tr-TR') })}
               </Text>
             </Pressable>
           )}

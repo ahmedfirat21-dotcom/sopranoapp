@@ -35,7 +35,7 @@ function MaintenanceScreen({ message, eta }: { message: string; eta: string | nu
       {eta && (
         <View style={s.etaBox}>
           <Ionicons name="time-outline" size={14} color="#FBBF24" />
-          <Text style={s.etaText}>Tahmini bitiş: {eta}</Text>
+          <Text style={s.etaText}>{i18n.t('auto.SystemSettingsOverlay.001')}{eta}</Text>
         </View>
       )}
     </View>

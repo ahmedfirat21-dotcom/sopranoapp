@@ -833,7 +833,7 @@ export default function RoomChatDrawer({
     const isLeave = (item as any).isLeave === true;
     if (isJoin || isLeave) {
       const name = item.profiles?.display_name || 'Misafir';
-      const verb = isJoin ? 'odaya katıldı' : 'odadan ayrıldı';
+      const verb = isJoin ? i18n.t('auto.room.RoomChatDrawer.003') : i18n.t('auto.room.RoomChatDrawer.002');
       return (
         <View style={st.joinNotice}>
           <Text style={st.joinNoticeText}>
@@ -864,7 +864,7 @@ export default function RoomChatDrawer({
             <Text style={st.giftSysTitle} numberOfLines={1}>
               <Text style={{ color: color, fontWeight: '800' }}>{meta.sender_name || 'Birisi'}</Text>
               <Text style={{ color: 'rgba(255,255,255,0.65)' }}>{' → '}</Text>
-              <Text style={{ color: '#FFF', fontWeight: '700' }}>{meta.recipient_name || 'Kullanıcı'}</Text>
+              <Text style={{ color: '#FFF', fontWeight: '700' }}>{meta.recipient_name || i18n.t('auto.room.RoomChatDrawer.001')}</Text>
             </Text>
             <Text style={st.giftSysSub} numberOfLines={1}>
               <Text style={{ color: color, fontWeight: '700' }}>{meta.item_name || 'Hediye'}</Text>

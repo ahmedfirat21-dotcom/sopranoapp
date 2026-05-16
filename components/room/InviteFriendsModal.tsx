@@ -93,7 +93,7 @@ export default function InviteFriendsModal({ visible, userId, onClose, onInvite,
       setFriends((profiles || []) as FollowUser[]);
     } catch (err: any) {
       if (__DEV__) console.warn('[InviteFriendsModal] loadFriends error:', err?.message || err);
-      setError('Arkadaş listesi yüklenemedi');
+      setError(i18n.t('auto.room.InviteFriendsModal.002'));
       setFriends([]);
     } finally {
       setLoading(false);
@@ -253,7 +253,7 @@ export default function InviteFriendsModal({ visible, userId, onClose, onInvite,
         {!loading && friends.length > 0 && selected.size > 0 && (
           <Pressable style={s.inviteBtn} onPress={handleDone}>
             <Ionicons name="send" size={14} color="#FFF" />
-            <Text style={s.inviteBtnText}>{selected.size} Kişiyi Davet Et</Text>
+            <Text style={s.inviteBtnText}>{selected.size}{i18n.t('auto.room.InviteFriendsModal.001')}</Text>
           </Pressable>
         )}
       </Animated.View>

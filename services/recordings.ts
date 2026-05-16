@@ -19,6 +19,7 @@
  *   cron job v68'deki cleanup_expired_recordings() RPC'sini çağırır.
  */
 import { supabase } from '../constants/supabase';
+import { i18n } from '../../services/i18n';
 
 export interface RoomRecording {
   id: string;
@@ -153,7 +154,7 @@ export const RecordingService = {
    * Caller host_id olmalı. Server-side RPC, LIVEKIT_API_SECRET edge'de.
    */
   async startEgress(roomId: string, hostId: string): Promise<{ success: boolean; egressId?: string; error?: string }> {
-    if (!roomId || !hostId) return { success: false, error: 'Geçersiz parametre.' };
+    if (!roomId || !hostId) return { success: false, error: i18n.t('auto.recordings.002') };
     try {
       const { data, error } = await supabase.functions.invoke('room-egress', {
         body: { action: 'start', room_id: roomId, host_id: hostId },
@@ -172,7 +173,7 @@ export const RecordingService = {
    * room_recordings tablosuna otomatik INSERT eder.
    */
   async stopEgress(roomId: string, hostId: string, egressId: string): Promise<{ success: boolean; error?: string }> {
-    if (!roomId || !hostId || !egressId) return { success: false, error: 'Geçersiz parametre.' };
+    if (!roomId || !hostId || !egressId) return { success: false, error: i18n.t('auto.recordings.001') };
     try {
       const { data, error } = await supabase.functions.invoke('room-egress', {
         body: { action: 'stop', room_id: roomId, host_id: hostId, egress_id: egressId },

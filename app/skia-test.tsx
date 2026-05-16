@@ -30,7 +30,7 @@ export default function SkiaTestScreen() {
           </View>
         )}
 
-        <SectionTitle>1. Düz kart gölgesi (12px blur, 4px down, %25 black)</SectionTitle>
+        <SectionTitle>{i18n.t('auto.skia_test.006')}</SectionTitle>
         <View style={styles.row}>
           <View style={[styles.card, rnShadow({ size: 'md' })]}>
             <Text style={styles.cardLabel}>RN shadow('md')</Text>
@@ -50,7 +50,7 @@ export default function SkiaTestScreen() {
           </SkiaShadow>
         </View>
 
-        <SectionTitle>3. Altın glow (premium frame)</SectionTitle>
+        <SectionTitle>{i18n.t('auto.skia_test.005')}</SectionTitle>
         <View style={styles.row}>
           <View style={[styles.card, rnGlow('#FBBF24', { intensity: 'high' })]}>
             <Text style={styles.cardLabel}>RN glow gold</Text>
@@ -95,7 +95,7 @@ export default function SkiaTestScreen() {
             width={140} height={48} borderRadius={24}
             gradient={{ colors: ['#A78BFA', '#7C3AED'], direction: 'horizontal' }}
             shadowColor="#7C3AED" shadowOpacity={0.5} shadowBlur={14} shadowOffsetY={6}
-            onPress={() => Alert.alert('Tıklandı', 'SkiaButton basıldı')}
+            onPress={() => Alert.alert(i18n.t('auto.skia_test.004'), i18n.t('auto.skia_test.003'))}
           >
             <Text style={styles.buttonText}>Skia Button</Text>
           </SkiaButton>
@@ -103,13 +103,13 @@ export default function SkiaTestScreen() {
             width={140} height={48} borderRadius={24}
             backgroundColor="#14B8A6"
             shadowColor="#14B8A6" shadowOpacity={0.6} shadowBlur={16}
-            onPress={() => Alert.alert('Tıklandı', 'Turkuaz buton')}
+            onPress={() => Alert.alert(i18n.t('auto.skia_test.002'), 'Turkuaz buton')}
           >
             <Text style={styles.buttonText}>Turkuaz</Text>
           </SkiaButton>
         </View>
 
-        <SectionTitle>7. SkiaDivider — hairline çizgi</SectionTitle>
+        <SectionTitle>{i18n.t('auto.skia_test.001')}</SectionTitle>
         <View style={{ width: '100%' }}>
           <Text style={styles.smallLabel}>RN borderBottom 0.5:</Text>
           <View style={{ height: 0.5, backgroundColor: '#475569', width: '100%', marginBottom: 12 }} />

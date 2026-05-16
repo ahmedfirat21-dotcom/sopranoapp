@@ -159,7 +159,7 @@ export default function PowerUpsSheet({
 
   const handleUse = useCallback(async (pu: PowerUp) => {
     if (!pu.available) {
-      showToast({ title: i18n.t('room.powerupssheet.005'), message: `"${pu.title}" çok yakında geliyor.`, type: 'info' });
+      showToast({ title: i18n.t('room.powerupssheet.005'), message: i18n.t('auto.room.PowerUpsSheet.004', { 0: pu.title }), type: 'info' });
       return;
     }
     if (currentSP < pu.cost) {
@@ -186,7 +186,7 @@ export default function PowerUpsSheet({
         onBalanceUpdated?.(r.new_balance);
         onClose();
       } catch (e: any) {
-        showToast({ title: 'Hata', message: e?.message || 'Bağlantı sorunu', type: 'error' });
+        showToast({ title: 'Hata', message: e?.message || i18n.t('auto.room.PowerUpsSheet.003'), type: 'error' });
       } finally {
         setLoading(null);
       }
@@ -214,7 +214,7 @@ export default function PowerUpsSheet({
         onBalanceUpdated?.(r.new_balance);
         onClose();
       } catch (e: any) {
-        showToast({ title: 'Hata', message: e?.message || 'Bağlantı sorunu', type: 'error' });
+        showToast({ title: 'Hata', message: e?.message || i18n.t('auto.room.PowerUpsSheet.002'), type: 'error' });
       } finally {
         setLoading(null);
       }
@@ -236,7 +236,7 @@ export default function PowerUpsSheet({
         onBalanceUpdated?.(r.new_balance);
         onClose();
       } catch (e: any) {
-        showToast({ title: 'Hata', message: e?.message || 'Bağlantı sorunu', type: 'error' });
+        showToast({ title: 'Hata', message: e?.message || i18n.t('auto.room.PowerUpsSheet.001'), type: 'error' });
       } finally {
         setLoading(null);
       }

@@ -389,7 +389,7 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
           if (refProfile) {
             invitedByData = {
               id: refProfile.id,
-              display_name: refProfile.display_name || 'Kullanıcı',
+              display_name: refProfile.display_name || i18n.t('auto.room.InRoomUserProfile.017'),
               avatar_url: refProfile.avatar_url || '',
             };
           }
@@ -644,7 +644,7 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
     if (!userId || !userProfile) return;
     const url = `https://sopranochat.com/user/${userId}`;
     const message = userProfile.display_name
-      ? `${userProfile.display_name} adlı kullanıcının SopranoChat profili: ${url}`
+      ? i18n.t('auto.room.InRoomUserProfile.016', { 0: userProfile.display_name, 1: url })
       : `Bu profili SopranoChat'te incele: ${url}`;
     try {
       await Share.share({ message, url, title: userProfile.display_name || 'SopranoChat Profili' });
@@ -678,7 +678,7 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
       await RoomService.sendRoomInvite(myLiveRoom.id, currentUserId, [userId]);
       showToast({
         title: i18n.t('room.inroomuserprofile.006'),
-        message: `"${myLiveRoom.name}" odasına davet edildi`,
+        message: i18n.t('auto.room.InRoomUserProfile.015', { 0: myLiveRoom.name }),
         type: 'success',
       });
     } catch (err: any) {
@@ -706,7 +706,7 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
       message: i18n.t('profile.block_message', { name: userProfile?.display_name || 'Bu kullanıcı' }),
       type: 'warning',
       buttons: [
-        { text: 'Vazgeç', style: 'cancel' },
+        { text: i18n.t('auto.room.InRoomUserProfile.014'), style: 'cancel' },
         {
           text: i18n.t('profile.block_action'), style: 'destructive',
           onPress: async () => {
@@ -1077,7 +1077,7 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                 {mutualFriendCount > 0 && (
                   <View style={sty.mutualBadge}>
                     <Ionicons name="people" size={13} color="#A78BFA" style={iconShadow} />
-                    <Text style={sty.mutualText}>{mutualFriendCount} ortak arkadaş</Text>
+                    <Text style={sty.mutualText}>{mutualFriendCount}{i18n.t('auto.room.InRoomUserProfile.013')}</Text>
                   </View>
                 )}
 
@@ -1139,7 +1139,7 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                           pressed && { opacity: 0.7 },
                         ]}
                         hitSlop={8}
-                        accessibilityLabel="Daha fazla seçenek"
+                        accessibilityLabel={i18n.t('auto.room.InRoomUserProfile.012')}
                       >
                         <Ionicons name="ellipsis-horizontal" size={16} color="#94A3B8" />
                       </Pressable>
@@ -1181,9 +1181,9 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                   const enforcementItems: MenuItem[] = [];
 
                   // Mod aksiyonları — sadece oda içinde
-                  if (ma?.onChatMute) moderationItems.push({ fn: ma.onChatMute, icon: ma.isChatMuted ? 'chatbox' : 'chatbox-outline', label: ma.isChatMuted ? 'Yazı Aç' : 'Yazı Kapat', color: MOD });
-                  if (ma?.onMakeModerator) moderationItems.push({ fn: ma.onMakeModerator, icon: 'shield', label: ma.displayRole === 'moderator' ? 'Moderatörlüğü Kaldır' : 'Moderatör Yap', color: MOD });
-                  if (ma?.onPersonalMute) moderationItems.push({ fn: ma.onPersonalMute, icon: ma.isPersonallyMuted ? 'volume-high' : 'volume-mute', label: ma.isPersonallyMuted ? 'Sesi Aç (sadece bana)' : 'Benim İçin Sustur', color: MOD });
+                  if (ma?.onChatMute) moderationItems.push({ fn: ma.onChatMute, icon: ma.isChatMuted ? 'chatbox' : 'chatbox-outline', label: ma.isChatMuted ? i18n.t('auto.room.InRoomUserProfile.011') : i18n.t('auto.room.InRoomUserProfile.010'), color: MOD });
+                  if (ma?.onMakeModerator) moderationItems.push({ fn: ma.onMakeModerator, icon: 'shield', label: ma.displayRole === 'moderator' ? i18n.t('auto.room.InRoomUserProfile.009') : i18n.t('auto.room.InRoomUserProfile.008'), color: MOD });
+                  if (ma?.onPersonalMute) moderationItems.push({ fn: ma.onPersonalMute, icon: ma.isPersonallyMuted ? 'volume-high' : 'volume-mute', label: ma.isPersonallyMuted ? i18n.t('auto.room.InRoomUserProfile.007') : i18n.t('auto.room.InRoomUserProfile.006'), color: MOD });
                   if (ma?.onGhostMode) moderationItems.push({ fn: ma.onGhostMode, icon: ma.isGhost ? 'eye' : 'eye-off', label: ma.isGhost ? i18n.t('profile.ghost_visible') : i18n.t('profile.ghost_invisible'), color: MOD });
                   if (ma?.onDisguise) moderationItems.push({
                     fn: ma.onDisguise,
@@ -1572,7 +1572,7 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                       icon="people"
                       accentColor={Colors.teal}
                       count={friendsPreview.length}
-                      actionLabel={friendsPreview.length >= 4 ? 'Tümü' : undefined}
+                      actionLabel={friendsPreview.length >= 4 ? i18n.t('auto.room.InRoomUserProfile.005') : undefined}
                       onActionPress={friendsPreview.length >= 4 ? () => { setFollowListTab('friends'); setShowFollowList(true); } : undefined}
                     />
                     <View style={sty.friendsStripCard}>
@@ -1601,10 +1601,10 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                                 customBadgeId={(f as any).active_badge_id ?? null}
                               />
                               <Text style={sty.friendChipName} numberOfLines={1}>
-                                {f.display_name || 'Kullanıcı'}
+                                {f.display_name || i18n.t('auto.room.InRoomUserProfile.004')}
                               </Text>
                               <Text style={isOnline ? sty.friendStatusOn : sty.friendStatusOff}>
-                                {isOnline ? 'Çevrimiçi' : 'Çevrimdışı'}
+                                {isOnline ? i18n.t('auto.room.InRoomUserProfile.003') : i18n.t('auto.room.InRoomUserProfile.002')}
                               </Text>
                             </Pressable>
                           );
@@ -1696,7 +1696,7 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
           onClose={() => setShowSPSheet(false)}
           senderId={currentUserId}
           recipientId={userId}
-          recipientName={userProfile.display_name || 'Kullanıcı'}
+          recipientName={userProfile.display_name || i18n.t('auto.room.InRoomUserProfile.001')}
           recipientAvatar={userProfile.avatar_url || undefined}
           recipientUsername={(userProfile as any).username || undefined}
           recipientTier={(userProfile as any).subscription_tier || null}

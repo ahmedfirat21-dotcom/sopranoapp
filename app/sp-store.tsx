@@ -20,8 +20,8 @@ import { migrateLegacyTier } from '../types';
 // ★ glowColor: kart altı ambient gölge rengi
 const SP_PACKAGES = [
   { id: 'soprano_sp_100',   sp: 100,   price: 9.99,   icon: 'flash' as const,             accent: '#D4A574', gradient: ['#A67C52', '#6B4A2E', '#2E1F12'] as [string, string, string], glowColor: '#D4A57440', bonus: 0,    popular: false, tierName: 'Bronz' },
-  { id: 'soprano_sp_500',   sp: 500,   price: 39.99,  icon: 'diamond' as const,            accent: '#D1D5DB', gradient: ['#7C8490', '#4A4F5A', '#1A1D24'] as [string, string, string], glowColor: '#D1D5DB40', bonus: 50,   popular: false, tierName: 'Gümüş' },
-  { id: 'soprano_sp_1500',  sp: 1500,  price: 99.99,  icon: 'trophy' as const,             accent: '#FBBF24', gradient: ['#D4A017', '#7A5B0E', '#2E2108'] as [string, string, string], glowColor: '#FBBF2450', bonus: 300,  popular: true,  tierName: 'Altın' },
+  { id: 'soprano_sp_500',   sp: 500,   price: 39.99,  icon: 'diamond' as const,            accent: '#D1D5DB', gradient: ['#7C8490', '#4A4F5A', '#1A1D24'] as [string, string, string], glowColor: '#D1D5DB40', bonus: 50,   popular: false, tierName: i18n.t('auto.sp_store.003') },
+  { id: 'soprano_sp_1500',  sp: 1500,  price: 99.99,  icon: 'trophy' as const,             accent: '#FBBF24', gradient: ['#D4A017', '#7A5B0E', '#2E2108'] as [string, string, string], glowColor: '#FBBF2450', bonus: 300,  popular: true,  tierName: i18n.t('auto.sp_store.002') },
   { id: 'soprano_sp_5000',  sp: 5000,  price: 299.99, icon: 'star' as const,               accent: '#C4B5FD', gradient: ['#7C5CC8', '#4A2D8B', '#1A0E3A'] as [string, string, string], glowColor: '#8B5CF640', bonus: 1750, popular: false, tierName: 'Platin' },
   { id: 'soprano_sp_15000', sp: 15000, price: 799.99, icon: 'shield-checkmark' as const,   accent: '#F9A8D4', gradient: ['#C74B8B', '#7A2255', '#2D0C22'] as [string, string, string], glowColor: '#EC489940', bonus: 7500, popular: false, tierName: 'Elmas' },
 ];
@@ -71,7 +71,7 @@ export default function SPStoreScreen() {
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={s.bonusTitle}>Premium Bonus</Text>
-                <Text style={s.bonusDesc}>{storeBonusPct > 0 ? `${userTier} üyeliğinle %${Math.round(storeBonusPct * 100)} ekstra SP kazanıyorsun! 🎉` : 'Plus ile %10, Pro ile %20 ekstra SP kazan!'}</Text>
+                <Text style={s.bonusDesc}>{storeBonusPct > 0 ? i18n.t('auto.sp_store.001', { 0: userTier, 1: Math.round(storeBonusPct * 100) }) : 'Plus ile %10, Pro ile %20 ekstra SP kazan!'}</Text>
               </View>
             </View>
             <Ionicons name="chevron-forward" size={16} color="#64748B" />

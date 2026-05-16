@@ -29,8 +29,8 @@ export type RoomBoostTier = {
 };
 
 export const ROOM_BOOST_TIERS: RoomBoostTier[] = [
-  { id: 'quick',    label: i18n.t('roomboostsheet.001'),    sublabel: '1 saat üst sıra',  icon: 'flash',       durationHours: 1, cost: 50,  accent: '#FB923C' },
-  { id: 'extended', label: 'Uzun Boost',     sublabel: '6 saat üst sıra',  icon: 'trending-up', durationHours: 6, cost: 200, accent: '#F59E0B', popular: true },
+  { id: 'quick',    label: i18n.t('roomboostsheet.001'),    sublabel: i18n.t('auto.RoomBoostSheet.003'),  icon: 'flash',       durationHours: 1, cost: 50,  accent: '#FB923C' },
+  { id: 'extended', label: 'Uzun Boost',     sublabel: i18n.t('auto.RoomBoostSheet.002'),  icon: 'trending-up', durationHours: 6, cost: 200, accent: '#F59E0B', popular: true },
 ];
 
 type Props = {
@@ -173,7 +173,7 @@ export default function RoomBoostSheet({ visible, onClose, onBoost, currentSP, r
                     <Ionicons name="rocket" size={18} color="#FFF" />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={s.ctaTitle}>{canAfford ? 'Boost Başlat' : 'Yetersiz SP'}</Text>
+                    <Text style={s.ctaTitle}>{canAfford ? i18n.t('auto.RoomBoostSheet.001') : 'Yetersiz SP'}</Text>
                     <Text style={s.ctaSub}>{selected.label} · {selected.sublabel}</Text>
                   </View>
                   <Text style={s.ctaCost}>{selected.cost} SP</Text>

@@ -127,11 +127,11 @@ export default function BlockedUsersSheet({ visible, onClose, currentUserId }: P
       setUsers(prev => prev.filter(u => u.id !== user.id));
       showToast({
         title: i18n.t('blockeduserssheet.003'),
-        message: `${user.display_name || 'Kullanıcı'} artık engelli değil.`,
+        message: `${user.display_name || i18n.t('auto.BlockedUsersSheet.003')} artık engelli değil.`,
         type: 'success',
       });
     } catch {
-      showToast({ title: i18n.t('blockeduserssheet.004'), message: `${user.display_name || 'Kullanıcı'} engelli kaldı.`, type: 'error' });
+      showToast({ title: i18n.t('blockeduserssheet.004'), message: `${user.display_name || i18n.t('auto.BlockedUsersSheet.002')} engelli kaldı.`, type: 'error' });
     } finally {
       setUnblockingIds(prev => { const n = new Set(prev); n.delete(user.id); return n; });
     }
@@ -214,7 +214,7 @@ export default function BlockedUsersSheet({ visible, onClose, currentUserId }: P
                   </Pressable>
                   <Pressable style={{ flex: 1 }} onPress={() => openUserProfile(u.id)} hitSlop={4}>
                     <Text style={s.name} numberOfLines={1}>
-                      {u.display_name || 'Kullanıcı'}
+                      {u.display_name || i18n.t('auto.BlockedUsersSheet.001')}
                     </Text>
                     <Text style={s.sub} numberOfLines={1}>Engelli</Text>
                   </Pressable>

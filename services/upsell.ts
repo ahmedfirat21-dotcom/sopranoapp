@@ -8,22 +8,23 @@
  */
 import { TIER_ORDER } from '../constants/tiers';
 import type { SubscriptionTier, UpsellTrigger, UpsellEvent } from '../types';
+import { i18n } from '../../services/i18n';
 
 // ════════════════════════════════════════════════════════════
 // UPSELL MESAJLARI
 // ════════════════════════════════════════════════════════════
 
 const UPSELL_MESSAGES: Record<UpsellTrigger, (requiredTier: SubscriptionTier) => string> = {
-  daily_room_limit:      (t) => `Günlük oda limitine ulaştınız. ${t} ile daha fazla oda açın!`,
-  room_duration_expired: (t) => `Oda süreniz doldu. ${t} ile daha uzun yayın yapın!`,
-  room_type_locked:      (t) => `Bu oda tipi ${t}+ üyelere özel.`,
-  customization_locked:  (t) => `Kişiselleştirme özellikleri ${t}+ ile açılır.`,
-  stage_capacity_full:   (t) => `Sahne kapasitesi dolu. ${t} ile daha fazla kişiyi sahneye çıkarın!`,
-  system_room_prompt:    ()  => `Kendi kişisel odanı açmak ister misin?`,
-  moderator_limit:       (t) => `Moderatör limiti doldu. ${t} ile daha fazla moderatör atayın!`,
-  camera_limit:          (t) => `Kamera limiti doldu. ${t} ile daha fazla kamera açın!`,
-  listener_grid_full:    (t) => `Dinleyici grid'i dolu. ${t} ile daha geniş bir dinleyici alanına sahip olun!`,
-  feature_locked:        (t) => `Bu özellik ${t}+ abonelik gerektirir.`,
+  daily_room_limit:      (t) => i18n.t('auto.upsell.011', { 0: t }),
+  room_duration_expired: (t) => i18n.t('auto.upsell.010', { 0: t }),
+  room_type_locked:      (t) => i18n.t('auto.upsell.009', { 0: t }),
+  customization_locked:  (t) => i18n.t('auto.upsell.008', { 0: t }),
+  stage_capacity_full:   (t) => i18n.t('auto.upsell.007', { 0: t }),
+  system_room_prompt:    ()  => i18n.t('auto.upsell.006'),
+  moderator_limit:       (t) => i18n.t('auto.upsell.005', { 0: t }),
+  camera_limit:          (t) => i18n.t('auto.upsell.004', { 0: t }),
+  listener_grid_full:    (t) => i18n.t('auto.upsell.003', { 0: t }),
+  feature_locked:        (t) => i18n.t('auto.upsell.002', { 0: t }),
 };
 
 /**
@@ -74,7 +75,7 @@ export const UpsellService = {
   trigger(triggerType: UpsellTrigger, currentTier: SubscriptionTier, requiredTier?: SubscriptionTier): void {
     const targetTier = requiredTier || getNextTier(currentTier) || 'Plus';
     const msgFn = UPSELL_MESSAGES[triggerType];
-    const message = msgFn ? msgFn(targetTier) : `${targetTier} üyelik ile bu özelliği açın.`;
+    const message = msgFn ? msgFn(targetTier) : i18n.t('auto.upsell.001', { 0: targetTier });
 
     this.emit({
       trigger: triggerType,

@@ -54,7 +54,7 @@ const SLIDES: Slide[] = [
   {
     icon: 'mic',
     title: i18n.t('discoverwelcomesheet.001'),
-    body: 'SopranoChat, anlık sesli sohbet odaları platformudur.\nKonuş, dinle, keşfet — hepsi gerçek zamanlı.',
+    body: i18n.t('auto.DiscoverWelcomeSheet.005'),
     accent: '#14B8A6',
     accentDeep: '#0D9488',
     bgFrom: '#042F2E',
@@ -64,7 +64,7 @@ const SLIDES: Slide[] = [
   {
     icon: 'add-circle',
     title: i18n.t('discoverwelcomesheet.002'),
-    body: 'Odalarım sekmesindeki "Yeni Oda Oluştur" düğmesiyle istediğin konuda oda aç.\nArkadaşlarını davet et, topluluğunu kur.',
+    body: i18n.t('auto.DiscoverWelcomeSheet.004'),
     accent: '#F59E0B',
     accentDeep: '#B45309',
     bgFrom: '#3B2507',
@@ -74,7 +74,7 @@ const SLIDES: Slide[] = [
   {
     icon: 'radio',
     title: i18n.t('discoverwelcomesheet.003'),
-    body: 'Canlı odaları kategoriye göre gez, popüler kullanıcıları keşfet.\nKatıl butonuyla anında sohbete dahil ol.',
+    body: i18n.t('auto.DiscoverWelcomeSheet.003'),
     accent: '#8B5CF6',
     accentDeep: '#6D28D9',
     bgFrom: '#2E1065',
@@ -84,7 +84,7 @@ const SLIDES: Slide[] = [
   {
     icon: 'diamond',
     title: 'SP Kazan & Harca',
-    body: 'Soprano Points (SP) ile hediye gönder, profilini öne çıkar.\nOda aç, sohbet et, arkadaş edin — her etkileşim SP kazandırır.',
+    body: i18n.t('auto.DiscoverWelcomeSheet.002'),
     accent: '#F59E0B',
     accentDeep: '#92400E',
     bgFrom: '#451A03',
@@ -546,7 +546,7 @@ export default function DiscoverWelcomeSheet({ visible, onClose, uid }: Props) {
                   />
                 </View>
                 <Text style={styles.socialBtnText}>
-                  {isLast ? 'Başlayalım' : 'Sonraki'}
+                  {isLast ? i18n.t('auto.DiscoverWelcomeSheet.001') : 'Sonraki'}
                 </Text>
                 <Ionicons
                   name={isLast ? 'sparkles' : 'arrow-forward'}

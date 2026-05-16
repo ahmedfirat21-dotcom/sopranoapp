@@ -4,6 +4,7 @@
  * Gizlilik ayarları ayrıca Supabase'e de senkronize edilir.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { i18n } from '../../services/i18n';
 
 const SETTINGS_KEY = '@soprano_settings';
 
@@ -49,7 +50,7 @@ export const THEME_OPTIONS = [
 ];
 
 export const LANGUAGE_OPTIONS = [
-  { key: 'tr' as const, label: 'Türkçe', flag: '🇹🇷' },
+  { key: 'tr' as const, label: i18n.t('auto.settings.001'), flag: '🇹🇷' },
   { key: 'en' as const, label: 'English', flag: '🇬🇧' },
 ];
 

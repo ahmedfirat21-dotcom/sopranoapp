@@ -14,6 +14,7 @@ import { Platform } from 'react-native';
 import { logger } from '../utils/logger';
 import { supabase } from '../constants/supabase';
 import type { SubscriptionTier } from '../types';
+import { i18n } from '../../services/i18n';
 
 // ═══ KONFİGÜRASYON ═══
 // ★ RevenueCat henüz yapılandırılmadıysa production'da da mock mode kullanılır.
@@ -67,8 +68,8 @@ const MOCK_OFFERINGS = {
         packageType: 'MONTHLY',
         product: {
           identifier: PRODUCT_IDS.plus_monthly,
-          title: 'Plus Üyelik',
-          description: 'Aylık Plus abonelik',
+          title: i18n.t('auto.revenuecat.020'),
+          description: i18n.t('auto.revenuecat.019'),
           priceString: '₺39.99',
           price: 39.99,
           currencyCode: 'TRY',
@@ -80,8 +81,8 @@ const MOCK_OFFERINGS = {
         packageType: 'ANNUAL',
         product: {
           identifier: PRODUCT_IDS.plus_yearly,
-          title: 'Plus Üyelik (Yıllık)',
-          description: 'Yıllık Plus abonelik',
+          title: i18n.t('auto.revenuecat.018'),
+          description: i18n.t('auto.revenuecat.017'),
           priceString: '₺349.99',
           price: 349.99,
           currencyCode: 'TRY',
@@ -93,8 +94,8 @@ const MOCK_OFFERINGS = {
         packageType: 'MONTHLY',
         product: {
           identifier: PRODUCT_IDS.pro_monthly,
-          title: 'Pro Üyelik',
-          description: 'Aylık Pro abonelik',
+          title: i18n.t('auto.revenuecat.016'),
+          description: i18n.t('auto.revenuecat.015'),
           priceString: '₺99.99',
           price: 99.99,
           currencyCode: 'TRY',
@@ -106,8 +107,8 @@ const MOCK_OFFERINGS = {
         packageType: 'ANNUAL',
         product: {
           identifier: PRODUCT_IDS.pro_yearly,
-          title: 'Pro Üyelik (Yıllık)',
-          description: 'Yıllık Pro abonelik',
+          title: i18n.t('auto.revenuecat.014'),
+          description: i18n.t('auto.revenuecat.013'),
           priceString: '₺899.99',
           price: 899.99,
           currencyCode: 'TRY',
@@ -169,7 +170,7 @@ export const RevenueCatService = {
         try {
           const offerings = await Purchases.getOfferings();
           if (!offerings?.current?.availablePackages?.length) {
-            logger.warn('[RevenueCat] Dashboard\'da offering/ürün bulunamadı — mock offerings kullanılacak');
+            logger.warn(i18n.t('auto.revenuecat.012'));
             this._dashboardEmpty = true;
           }
         } catch {
@@ -178,7 +179,7 @@ export const RevenueCatService = {
         }
       } catch (e) {
         this._initPromise = null; // Hata durumunda tekrar denenebilsin
-        logger.warn('[RevenueCat] SDK başlatma hatası:', e);
+        logger.warn(i18n.t('auto.revenuecat.011'), e);
       }
     })();
     return this._initPromise;
@@ -193,7 +194,7 @@ export const RevenueCatService = {
     try {
       await this._Purchases.logIn(userId);
     } catch (e) {
-      logger.warn('[RevenueCat] identify hatası:', e);
+      logger.warn(i18n.t('auto.revenuecat.010'), e);
     }
   },
 
@@ -207,7 +208,7 @@ export const RevenueCatService = {
       const offerings = await this._Purchases.getOfferings();
       return offerings;
     } catch (e) {
-      logger.warn('[RevenueCat] getOfferings hatası:', e);
+      logger.warn(i18n.t('auto.revenuecat.009'), e);
       return MOCK_OFFERINGS; // Fallback
     }
   },
@@ -244,13 +245,13 @@ export const RevenueCatService = {
     if (!__DEV__ && (REVENUECAT_MOCK_MODE || this._dashboardEmpty)) {
       return {
         newTier: null,
-        error: 'Abonelik sistemi henüz aktif değil. Lütfen uygulamayı güncelleyin veya daha sonra tekrar deneyin.',
+        error: i18n.t('auto.revenuecat.008'),
       };
     }
 
     // SDK init tamamlanana kadar bekle
     if (this._initPromise) await this._initPromise;
-    if (!this._Purchases) return { newTier: null, error: 'RevenueCat SDK hazır değil' };
+    if (!this._Purchases) return { newTier: null, error: i18n.t('auto.revenuecat.007') };
 
     try {
       // ★ 2026-04-20: Doğru paketi RevenueCat offerings'ten çek.
@@ -260,12 +261,12 @@ export const RevenueCatService = {
       const offeringId = targetTier === 'Pro' ? 'pro' : 'default';
       const offering = offerings?.all?.[offeringId] || (offeringId === 'default' ? offerings?.current : null);
       if (!offering) {
-        return { newTier: null, error: `${targetTier} paketi bulunamadı. Dashboard yapılandırmasını kontrol edin.` };
+        return { newTier: null, error: i18n.t('auto.revenuecat.006', { 0: targetTier }) };
       }
       const isYearly = billingCycle === 'yearly' || billingCycle === 'annual';
       const packageToUse = isYearly ? offering.annual : offering.monthly;
       if (!packageToUse) {
-        return { newTier: null, error: `${isYearly ? 'Yıllık' : 'Aylık'} paket mevcut değil.` };
+        return { newTier: null, error: `${isYearly ? i18n.t('auto.revenuecat.005') : i18n.t('auto.revenuecat.004')} paket mevcut değil.` };
       }
       const { customerInfo } = await this._Purchases.purchasePackage(packageToUse);
       const newTier = this._extractTierFromCustomerInfo(customerInfo);
@@ -295,7 +296,7 @@ export const RevenueCatService = {
       if (e.userCancelled) {
         return { newTier: null };
       }
-      return { newTier: null, error: e.message || 'Satın alma başarısız' };
+      return { newTier: null, error: e.message || i18n.t('auto.revenuecat.003') };
     }
   },
 
@@ -330,7 +331,7 @@ export const RevenueCatService = {
 
       return { restoredTier: tier || 'Free' };
     } catch (e) {
-      logger.warn('[RevenueCat] restore hatası:', e);
+      logger.warn(i18n.t('auto.revenuecat.002'), e);
       return { restoredTier: 'Free' };
     }
   },
@@ -399,7 +400,7 @@ export const RevenueCatService = {
     try {
       await this._Purchases.logOut();
     } catch (e) {
-      logger.warn('[RevenueCat] logout hatası:', e);
+      logger.warn(i18n.t('auto.revenuecat.001'), e);
     }
   },
 

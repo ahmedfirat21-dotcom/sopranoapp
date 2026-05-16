@@ -13,6 +13,7 @@
 import { logger } from '../utils/logger';
 import { supabase } from '../constants/supabase';
 import { NotifPrefsService, type NotificationCategory } from './notifPrefs';
+import { i18n } from '../../services/i18n';
 
 export type PushType = 'dm' | 'message_request' | 'follow' | 'follow_request' | 'follow_accepted' | 'gift' | 'room_invite' | 'room_live' | 'room_follow' | 'event_reminder' | 'missed_call' | 'incoming_call';
 
@@ -143,7 +144,7 @@ export const PushService = {
         targets.map(userId => this.sendToUser(userId, title, body, data))
       );
     } catch (err: any) {
-      logger.error('[Push] Oda push hatası:', err.message);
+      logger.error(i18n.t('auto.push.010'), err.message);
     }
   },
 
@@ -152,7 +153,7 @@ export const PushService = {
     await this.sendToUser(
       targetUserId,
       '🎙️ Oda Daveti',
-      `${hostName} seni "${roomName}" odasına davet etti!`,
+      i18n.t('auto.push.009', { 0: hostName, 1: roomName }),
       { type: 'room_invite', route: `/room/${roomId}` }
     );
   },
@@ -161,8 +162,8 @@ export const PushService = {
   async sendFollowNotification(targetUserId: string, followerName: string, followerId: string): Promise<void> {
     await this.sendToUser(
       targetUserId,
-      '👥 Yeni Arkadaş',
-      `${followerName} seninle arkadaş oldu`,
+      i18n.t('auto.push.008'),
+      i18n.t('auto.push.007', { 0: followerName }),
       { type: 'follow', route: `/user/${followerId}` }
     );
   },
@@ -171,8 +172,8 @@ export const PushService = {
   async sendGiftNotification(targetUserId: string, senderName: string, giftName: string): Promise<void> {
     await this.sendToUser(
       targetUserId,
-      '🎁 Hediye Aldın!',
-      `${senderName} sana ${giftName} gönderdi`,
+      i18n.t('auto.push.006'),
+      i18n.t('auto.push.005', { 0: senderName, 1: giftName }),
       { type: 'gift', route: '/(tabs)/profile?openSP=1' }
     );
   },
@@ -197,8 +198,8 @@ export const PushService = {
   ): Promise<void> {
     await this.sendToUser(
       targetUserId,
-      '📞 Cevapsız Arama',
-      `${callerName} seni aradı`,
+      i18n.t('auto.push.004'),
+      i18n.t('auto.push.003', { 0: callerName }),
       { type: 'missed_call', route: `/chat/${callerId}` }
     );
   },
@@ -213,8 +214,8 @@ export const PushService = {
   ): Promise<void> {
     await this.sendToUser(
       roomOwnerId,
-      '🏠 Yeni Oda Takipçisi',
-      `${followerName} "${roomName}" odanızı takip etmeye başladı`,
+      i18n.t('auto.push.002'),
+      i18n.t('auto.push.001', { 0: followerName, 1: roomName }),
       { type: 'room_follow', route: `/room/${roomId}` }
     );
   },

@@ -81,7 +81,7 @@ const TYPE_VISUAL: Record<TransferType, TypeVisual> = {
     bgGradient: ['#3a1825', '#1f0a14', '#0a0518'],
     topEdge: 'rgba(248,180,192,0.85)',
     particles: ['💗', '✨', '🎀', '💖', '⭐'],
-    describe: (s) => `${s} sana hediye gönderdi`,
+    describe: (s) => i18n.t('auto.profile.SPReceivedModal.006', { 0: s }),
     icon: 'gift',
   },
   donation: {
@@ -103,7 +103,7 @@ const TYPE_VISUAL: Record<TransferType, TypeVisual> = {
     bgGradient: ['#2a1d4a', '#15102a', '#080418'],
     topEdge: 'rgba(184,164,240,0.85)',
     particles: ['👤', '✨', '🎉', '⭐'],
-    describe: (s) => `${s} odana katıldı`,
+    describe: (s) => i18n.t('auto.profile.SPReceivedModal.005', { 0: s }),
     icon: 'enter',
   },
 };
@@ -366,14 +366,14 @@ export default function SPReceivedModal({
       });
       if (error) {
         if (__DEV__) console.warn('[ThankYou] insert error:', error.message);
-        showToast({ title: i18n.t('profile.spreceivedmodal.007'), message: error.message || 'Teşekkür gönderilemedi.', type: 'error' });
+        showToast({ title: i18n.t('profile.spreceivedmodal.007'), message: error.message || i18n.t('auto.profile.SPReceivedModal.004'), type: 'error' });
         setSending(false);
         return;
       }
       setThanked(reply.emoji);
     } catch (e: any) {
       if (__DEV__) console.warn('[ThankYou] catch:', e);
-      showToast({ title: i18n.t('profile.spreceivedmodal.008'), message: e?.message || 'Yanıtın iletilemedi.', type: 'error' });
+      showToast({ title: i18n.t('profile.spreceivedmodal.008'), message: e?.message || i18n.t('auto.profile.SPReceivedModal.003'), type: 'error' });
       setSending(false);
       return;
     }
@@ -687,7 +687,7 @@ export default function SPReceivedModal({
             <View style={[s.thankedBox, { borderColor: tv.primary + '40' }]}>
               <Text style={s.thankedEmoji}>{thanked}</Text>
               <Text style={s.thankedText}>
-                {alreadyThanked ? 'Daha önce teşekkür ettin' : 'Teşekkürün iletildi'}
+                {alreadyThanked ? i18n.t('auto.profile.SPReceivedModal.002') : i18n.t('auto.profile.SPReceivedModal.001')}
               </Text>
             </View>
           ) : (

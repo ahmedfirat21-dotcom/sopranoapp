@@ -36,18 +36,18 @@ const PLANS = [
     yearly: TIER_DEFINITIONS.Plus.yearlyPrice,
     savePct: 27,
     features: [
-      { text: `${ROOM_TIER_LIMITS.Plus.maxSpeakers} kişi sahne`, included: true },
+      { text: i18n.t('auto.plus.040', { 0: ROOM_TIER_LIMITS.Plus.maxSpeakers }), included: true },
       { text: `${ROOM_TIER_LIMITS.Plus.maxListeners} dinleyici`, included: true },
       { text: `${ROOM_TIER_LIMITS.Plus.maxCameras} kamera`, included: true },
-      { text: `Her oda ${ROOM_TIER_LIMITS.Plus.durationHours} saat açık kalır`, included: true },
-      { text: `Günde ${ROOM_TIER_LIMITS.Plus.dailyRooms} oda açabilirsin`, included: true },
-      { text: 'Tüm oda türleri', included: true },
+      { text: i18n.t('auto.plus.039', { 0: ROOM_TIER_LIMITS.Plus.durationHours }), included: true },
+      { text: i18n.t('auto.plus.038', { 0: ROOM_TIER_LIMITS.Plus.dailyRooms }), included: true },
+      { text: i18n.t('auto.plus.037'), included: true },
       { text: 'HD ses + 720p video', included: true },
-      { text: 'Oda kart görseli + arka plan', included: true },
-      { text: 'Yaş/Dil filtresi', included: true },
-      { text: 'Sadece Arkadaşlar modu', included: true },
-      { text: '3 odanı dondurup tekrar açabilirsin', included: true },
-      { text: '600 SP karşılama bonusu', included: true },
+      { text: i18n.t('auto.plus.036'), included: true },
+      { text: i18n.t('auto.plus.035'), included: true },
+      { text: i18n.t('auto.plus.034'), included: true },
+      { text: i18n.t('auto.plus.033'), included: true },
+      { text: i18n.t('auto.plus.032'), included: true },
     ],
   },
   {
@@ -65,18 +65,18 @@ const PLANS = [
     yearly: TIER_DEFINITIONS.Pro.yearlyPrice,
     savePct: 25,
     features: [
-      { text: `${ROOM_TIER_LIMITS.Pro.maxSpeakers} kişi sahne`, included: true },
-      { text: 'Sınırsız dinleyici', included: true },
+      { text: i18n.t('auto.plus.031', { 0: ROOM_TIER_LIMITS.Pro.maxSpeakers }), included: true },
+      { text: i18n.t('auto.plus.030'), included: true },
       { text: `${ROOM_TIER_LIMITS.Pro.maxCameras} kamera`, included: true },
-      { text: 'Odan 7/24 açık kalır, kapanmaz', included: true },
-      { text: 'Sınırsız oda açabilirsin', included: true },
+      { text: i18n.t('auto.plus.029'), included: true },
+      { text: i18n.t('auto.plus.028'), included: true },
       { text: 'HD stereo ses + 1080p video', included: true },
-      { text: 'Oda müziği + Arka plan', included: true },
-      { text: 'Ghost mode + Kılık', included: true },
-      { text: 'Takipçi-only mod', included: true },
-      { text: 'Seçilmişler konuşma modu', included: true },
-      { text: 'Keşfet boost erişimi', included: true },
-      { text: '1500 SP karşılama bonusu', included: true },
+      { text: i18n.t('auto.plus.027'), included: true },
+      { text: i18n.t('auto.plus.026'), included: true },
+      { text: i18n.t('auto.plus.025'), included: true },
+      { text: i18n.t('auto.plus.024'), included: true },
+      { text: i18n.t('auto.plus.023'), included: true },
+      { text: i18n.t('auto.plus.022'), included: true },
     ],
   },
 ];
@@ -126,7 +126,7 @@ export default function PlusScreen() {
   // ★ Tier hierarchy: Free(0) < Plus(1) < Pro(2). Yön'e göre "Yükselt" / "Düşür" metni.
   const tierRank = (t: string) => (t === 'Pro' ? 2 : t === 'Plus' ? 1 : 0);
   const isUpgrade = tierRank(selectedPlan.tier) > tierRank(currentTier);
-  const actionVerb = isUpgrade ? 'Yükselt' : 'Düşür';
+  const actionVerb = isUpgrade ? i18n.t('auto.plus.021') : i18n.t('auto.plus.020');
 
   const handleActivate = async () => {
     if (!profile?.id) {
@@ -136,19 +136,19 @@ export default function PlusScreen() {
 
     const price = billingCycle === 'monthly'
       ? `${selectedPlan.monthly}₺/ay`
-      : `${selectedPlan.yearly}₺/yıl`;
+      : i18n.t('auto.plus.019', { 0: selectedPlan.yearly });
 
-    const modeText = (REVENUECAT_MOCK_MODE && __DEV__) ? '\n\n⚠️ Test modunda — gerçek ödeme alınmaz.' : '';
+    const modeText = (REVENUECAT_MOCK_MODE && __DEV__) ? i18n.t('auto.plus.018') : '';
 
     setAlertCfg({
       visible: true,
       title: `${selectedPlan.name}'a ${actionVerb}`,
-      message: `${selectedPlan.name} planına geçmek istediğinize emin misiniz?\n\nFiyat: ${price}${modeText}`,
+      message: i18n.t('auto.plus.017', { 0: selectedPlan.name, 1: price, 2: modeText }),
       type: 'info',
       buttons: [
-        { text: 'Vazgeç', style: 'cancel' },
+        { text: i18n.t('auto.plus.016'), style: 'cancel' },
         {
-          text: `${selectedPlan.name}'a Geç`,
+          text: i18n.t('auto.plus.015', { 0: selectedPlan.name }),
           onPress: async () => {
             if (mountedRef.current) setActivating(true);
             try {
@@ -165,15 +165,15 @@ export default function PlusScreen() {
                 if (mountedRef.current) {
                   setSuccessModal({
                     visible: true,
-                    title: `${selectedPlan.name} Üyelik Aktif!`,
-                    subtitle: `Artık ${selectedPlan.name} üyesisiniz — tüm premium özellikler açıldı.`,
+                    title: i18n.t('auto.plus.014', { 0: selectedPlan.name }),
+                    subtitle: i18n.t('auto.plus.013', { 0: selectedPlan.name }),
                     accent: [selectedPlan.headerGradient[0], selectedPlan.headerGradient[1]] as const,
                   });
                 }
               }
             } catch (err: any) {
               if (mountedRef.current) {
-                showToast({ title: i18n.t('plus.005'), message: err.message || 'Üyelik aktifleştirilemedi.', type: 'error' });
+                showToast({ title: i18n.t('plus.005'), message: err.message || i18n.t('auto.plus.012'), type: 'error' });
               }
             } finally {
               if (mountedRef.current) setActivating(false);
@@ -188,12 +188,12 @@ export default function PlusScreen() {
     setAlertCfg({
       visible: true,
       title: i18n.t('plus.006'),
-      message: `Mevcut planınız: ${currentTier}.\n\nFree (ücretsiz) plana dönmek ister misiniz?\nPremium özellikleriniz devre dışı kalacak.`,
+      message: i18n.t('auto.plus.011', { 0: currentTier }),
       type: 'warning',
       buttons: [
-        { text: 'Hayır', style: 'cancel' },
+        { text: i18n.t('auto.plus.010'), style: 'cancel' },
         {
-          text: "Free'ye Dön",
+          text: i18n.t('auto.plus.009'),
           style: 'destructive',
           onPress: async () => {
             if (mountedRef.current) setActivating(true);
@@ -277,7 +277,7 @@ export default function PlusScreen() {
             const isSelected = selectedTier === plan.id;
             const isCurrentPlan = currentTier === plan.tier;
             const price = billingCycle === 'monthly' ? plan.monthly : plan.yearly;
-            const period = billingCycle === 'monthly' ? '/ay' : '/yıl';
+            const period = billingCycle === 'monthly' ? '/ay' : i18n.t('auto.plus.008');
 
             return (
               <Pressable
@@ -345,7 +345,7 @@ export default function PlusScreen() {
                     <Text style={styles.planPeriod}>{period}</Text>
                   </View>
                   {billingCycle === 'yearly' && (
-                    <Text style={styles.planMonthly}>Aylık {(plan.yearly / 12).toFixed(0)}₺</Text>
+                    <Text style={styles.planMonthly}>{i18n.t('auto.plus.007')}{(plan.yearly / 12).toFixed(0)}₺</Text>
                   )}
 
                   {/* Özellik Listesi */}
@@ -372,7 +372,7 @@ export default function PlusScreen() {
                   ) : (
                     <View style={[styles.planSelectBtn, isSelected ? { backgroundColor: 'rgba(255,255,255,0.22)', borderColor: 'rgba(255,255,255,0.50)' } : {}]}>
                       <Text style={[styles.planSelectText, isSelected && { color: '#FFFFFF' }]}>
-                        {isSelected ? '✓ Seçildi' : 'Seç'}
+                        {isSelected ? i18n.t('auto.plus.006') : i18n.t('auto.plus.005')}
                       </Text>
                     </View>
                   )}
@@ -402,10 +402,10 @@ export default function PlusScreen() {
             { label: i18n.t('plus.010'), values: [`${ROOM_TIER_LIMITS.Free.durationHours}sa`, `${ROOM_TIER_LIMITS.Plus.durationHours}sa`, '7/24'] },
             { label: i18n.t('plus.011'), values: [`${ROOM_TIER_LIMITS.Free.dailyRooms}`, `${ROOM_TIER_LIMITS.Plus.dailyRooms}`, '∞'] },
             { label: i18n.t('plus.012'), values: ['—', '3', '∞'] },
-            { label: i18n.t('plus.013'), values: ['Açık + Şifreli', 'Hepsi', 'Hepsi'] },
+            { label: i18n.t('plus.013'), values: [i18n.t('auto.plus.004'), 'Hepsi', 'Hepsi'] },
             { label: 'Ses', values: ['HD Mono', 'HD', 'Stereo'] },
             { label: 'Video', values: ['720p', '720p', '1080p'] },
-            { label: i18n.t('plus.014'), values: ['Temel', 'Tümü', 'Tümü'] },
+            { label: i18n.t('plus.014'), values: ['Temel', i18n.t('auto.plus.003'), i18n.t('auto.plus.002')] },
             { label: i18n.t('plus.015'), values: ['✓', '✓', '✓'] },
             { label: 'Tema', values: ['—', '✓', '✓'] },
             { label: i18n.t('plus.016'), values: ['—', '2', '5'] },
@@ -483,7 +483,7 @@ export default function PlusScreen() {
                   <>
                     <Ionicons name={selectedPlan.icon as any} size={20} color="#fff" style={{ textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4 }} />
                     <Text style={styles.ctaText}>
-                      {selectedPlan.name}'a {actionVerb} — {billingCycle === 'monthly' ? `${selectedPlan.monthly}₺/ay` : `${selectedPlan.yearly}₺/yıl`}
+                      {selectedPlan.name}'a {actionVerb} — {billingCycle === 'monthly' ? `${selectedPlan.monthly}₺/ay` : i18n.t('auto.plus.001', { 0: selectedPlan.yearly })}
                     </Text>
                   </>
                 )}

@@ -138,7 +138,7 @@ export function PasswordPromptSheet({
           </View>
           <View style={{ flex: 1 }}>
             <Text style={st.title}>{i18n.t('access.locked_room')}</Text>
-            <Text style={st.subtitle} numberOfLines={1}>{roomName || 'Bu odaya girmek için şifre gerekiyor'}</Text>
+            <Text style={st.subtitle} numberOfLines={1}>{roomName || i18n.t('auto.room.RoomAccessPrompts.014')}</Text>
           </View>
         </View>
 
@@ -244,7 +244,7 @@ export function RoomEntryPreviewSheet({
           <View style={{ flex: 1 }}>
             <Text style={st.title}>{roomName || 'Bu Oda'}</Text>
             <Text style={st.subtitle} numberOfLines={2}>
-              {hostName ? `${hostName} bu odaya bazı şartlar koymuş:` : 'Bu odaya girmek için şartlar var:'}
+              {hostName ? i18n.t('auto.room.RoomAccessPrompts.013', { 0: hostName }) : i18n.t('auto.room.RoomAccessPrompts.012')}
             </Text>
           </View>
         </View>
@@ -303,7 +303,7 @@ export function InviteRequestPromptSheet({
           <View style={{ flex: 1 }}>
             <Text style={st.title}>{i18n.t('access.invite_room')}</Text>
             <Text style={st.subtitle} numberOfLines={2}>
-              {roomName ? `"${roomName}" davetli kişilere açık.` : 'Bu oda davetli kişilere açık.'} Katılmak için oda sahibine istek gönderebilirsin.
+              {roomName ? i18n.t('auto.room.RoomAccessPrompts.011', { 0: roomName }) : i18n.t('auto.room.RoomAccessPrompts.010')} Katılmak için oda sahibine istek gönderebilirsin.
             </Text>
           </View>
         </View>
@@ -311,7 +311,7 @@ export function InviteRequestPromptSheet({
         <View style={st.statusCard}>
           <Ionicons name="information-circle" size={16} color="#94A3B8" />
           <Text style={st.statusText}>
-            {hostName ? `${hostName} isteğini değerlendirecek.` : 'Oda sahibi isteğini değerlendirecek.'} Onaylanırsa direkt odaya alınırsın.
+            {hostName ? i18n.t('auto.room.RoomAccessPrompts.009', { 0: hostName }) : i18n.t('auto.room.RoomAccessPrompts.008')} Onaylanırsa direkt odaya alınırsın.
           </Text>
         </View>
 
@@ -398,7 +398,7 @@ export function AccessRequestSheet({
               // Sheet'i KAPATMA — kullanıcı CTA butonuna (Host'u Gör / Başka Odalar / Kapat) bassın.
               // CTA yoksa birkaç saniye sonra geri dön.
               if (!onViewHost && !onDiscoverRooms) {
-                setTimeout(() => onRejected('Erişim isteğiniz reddedildi'), 1500);
+                setTimeout(() => onRejected(i18n.t('auto.room.RoomAccessPrompts.007')), 1500);
               }
             }
           }
@@ -444,10 +444,10 @@ export function AccessRequestSheet({
           </Animated.View>
           <View style={{ flex: 1 }}>
             <Text style={st.title}>
-              {status === 'accepted' ? 'Onaylandı!' : status === 'rejected' ? 'Reddedildi' : 'Katılma İsteği'}
+              {status === 'accepted' ? i18n.t('auto.room.RoomAccessPrompts.006') : status === 'rejected' ? 'Reddedildi' : i18n.t('auto.room.RoomAccessPrompts.005')}
             </Text>
             <Text style={st.subtitle} numberOfLines={2}>
-              {status === 'accepted' ? 'Odaya yönlendiriliyorsun...' : status === 'rejected' ? 'Oda yöneticisi isteğini kabul etmedi' : `${roomName || 'Bu oda'} davetli bir oda. İsteğin yöneticilere iletildi.`}
+              {status === 'accepted' ? i18n.t('auto.room.RoomAccessPrompts.004') : status === 'rejected' ? i18n.t('auto.room.RoomAccessPrompts.003') : i18n.t('auto.room.RoomAccessPrompts.002', { 0: roomName || 'Bu oda' })}
             </Text>
           </View>
         </View>
@@ -480,7 +480,7 @@ export function AccessRequestSheet({
               <Pressable style={st.ctaRow} onPress={onViewHost}>
                 <Ionicons name="person-circle-outline" size={16} color="#5EEAD4" />
                 <Text style={st.ctaRowText}>
-                  {hostName ? `${hostName}'ı incele` : "Oda sahibini incele"}
+                  {hostName ? i18n.t('auto.room.RoomAccessPrompts.001', { 0: hostName }) : "Oda sahibini incele"}
                 </Text>
                 <Ionicons name="chevron-forward" size={13} color="#5EEAD4" />
               </Pressable>

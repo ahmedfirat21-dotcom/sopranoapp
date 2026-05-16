@@ -316,7 +316,7 @@ export default function EntryFeeCard({
           <Text style={styles.note}>
             Onaylarsan{' '}
             <Text style={styles.noteStrong}>{fee.toLocaleString('tr-TR')} SP</Text>
-            {' bakiyenden düşülür ve odaya giriş yaparsın.'}
+            {i18n.t('auto.room.EntryFeeCard.001')}
           </Text>
 
           {/* 2 buton: Vazgeç + Öde */}

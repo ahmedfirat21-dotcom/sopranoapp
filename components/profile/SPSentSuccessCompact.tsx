@@ -22,6 +22,7 @@ import SPHexagonIcon from '../SPHexagonIcon';
 import { getSPAmountTier, type SPAmountTier } from '../../constants/spAmountTier';
 import { getAvatarSource } from '../../constants/avatars';
 import { TIER_PALETTES, PANEL_BG_GRADIENT, tierShadow } from '../../constants/tierColors';
+import { i18n } from '../../services/i18n';
 
 const { width: W, height: H } = Dimensions.get('window');
 
@@ -276,7 +277,7 @@ export default function SPSentSuccessCompact({
               ) : null}
               <Text style={s.recipientText} numberOfLines={1}>
                 <Text style={[s.recipientName, { color: palette.accent }]}>{recipientName}</Text>
-                <Text>{'’a gönderildi'}</Text>
+                <Text>{i18n.t('auto.profile.SPSentSuccessCompact.001')}</Text>
               </Text>
             </Animated.View>
 

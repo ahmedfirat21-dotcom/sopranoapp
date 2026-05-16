@@ -143,7 +143,7 @@ export const i18n = {
    */
   get supportedLocales(): { code: SupportedLocale; label: string; flag: string }[] {
     return [
-      { code: 'tr', label: 'Türkçe', flag: '🇹🇷' },
+      { code: 'tr', label: i18n.t('auto.i18n.001'), flag: '🇹🇷' },
       { code: 'en', label: 'English', flag: '🇬🇧' },
     ];
   },

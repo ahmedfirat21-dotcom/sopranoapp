@@ -57,7 +57,7 @@ export default function GiftShowcase({ userId, mode, limit = 8, embedded = false
   if (loading) return null;
   if (gifts.length === 0) return null;
 
-  const titleLabel = mode === 'received' ? 'Aldığı Hediyeler' : 'Verdiği Hediyeler';
+  const titleLabel = mode === 'received' ? i18n.t('auto.profile.GiftShowcase.002') : i18n.t('auto.profile.GiftShowcase.001');
   const titleIcon = mode === 'received' ? 'gift' : 'send';
   const TEAL = '#14B8A6';
 

@@ -5,6 +5,7 @@ import { NativeModules, Platform } from 'react-native';
 import { supabase, SUPABASE_ANON_KEY } from '../constants/supabase';
 import { LIVEKIT_URL, LIVEKIT_TOKEN_ENDPOINT } from '../constants/livekit';
 import { logger } from '../utils/logger';
+import { i18n } from '../../services/i18n';
 
 let _lk: any = null;
 let _globalsRegistered = false;
@@ -94,7 +95,7 @@ async function fetchToken(roomId: string, userId: string, displayName: string): 
   } catch (networkErr: any) {
     // ★ Network hatası (DNS, timeout, offline) — detaylı log
     if (__DEV__) logger.warn('[LiveKit] Token fetch network error:', networkErr?.message);
-    throw new Error(`Ağ hatası: ${networkErr?.message || 'Sunucuya ulaşılamadı'}`);
+    throw new Error(`Ağ hatası: ${networkErr?.message || i18n.t('auto.livekit.009')}`);
   }
 
   if (!response.ok) {
@@ -110,9 +111,9 @@ async function fetchToken(roomId: string, userId: string, displayName: string): 
     if (response.status === 403) {
       throw new Error(errMsg); // "Oda aktif değil", "Bu odadan yasaklandınız" vb.
     } else if (response.status === 404) {
-      throw new Error('Oda bulunamadı');
+      throw new Error(i18n.t('auto.livekit.008'));
     } else if (response.status === 401) {
-      throw new Error('Oturum süresi dolmuş — tekrar giriş yap');
+      throw new Error(i18n.t('auto.livekit.007'));
     } else {
       throw new Error(errMsg);
     }
@@ -779,11 +780,11 @@ export class LiveKitService {
   async toggleScreenShare(): Promise<boolean> {
     if (!this.room?.localParticipant) {
       if (__DEV__) logger.warn('[LiveKit] Ekran paylasimi: room veya localParticipant yok');
-      throw new Error('Ses sunucusuna bağlı değilsiniz');
+      throw new Error(i18n.t('auto.livekit.006'));
     }
     if (this.room.state !== 'connected') {
       if (__DEV__) logger.warn('[LiveKit] Ekran paylasimi: room bagli degil, state:', this.room.state);
-      throw new Error('Ses sunucusuna bağlı değilsiniz');
+      throw new Error(i18n.t('auto.livekit.005'));
     }
     const isSharing = this.isScreenSharing;
     try {
@@ -801,7 +802,7 @@ export class LiveKitService {
           if (__DEV__) logger.log('[LiveKit] setScreenShareEnabled kullanılıyor');
           await Promise.race([
             this.room.localParticipant.setScreenShareEnabled(true),
-            new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Ekran paylaşımı zaman aşımı (15s)')), 15000)),
+            new Promise<never>((_, reject) => setTimeout(() => reject(new Error(i18n.t('auto.livekit.004'))), 15000)),
           ]);
           // Track referansını bul ve sakla
           const LK = getLK();
@@ -820,11 +821,11 @@ export class LiveKitService {
           if (__DEV__) logger.log('[LiveKit] getDisplayMedia fallback kullanılıyor');
           const stream = await Promise.race([
             navigator.mediaDevices.getDisplayMedia(),
-            new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Ekran paylaşımı zaman aşımı (30s)')), 30000)),
+            new Promise<never>((_, reject) => setTimeout(() => reject(new Error(i18n.t('auto.livekit.003'))), 30000)),
           ]) as any;
           const videoTracks = stream.getVideoTracks();
           if (!videoTracks || videoTracks.length === 0) {
-            throw new Error('Ekran video track bulunamadı');
+            throw new Error(i18n.t('auto.livekit.002'));
           }
           this.screenShareStream = stream;
           const LK = getLK();
@@ -837,7 +838,7 @@ export class LiveKitService {
           });
           if (__DEV__) logger.log('[LiveKit] Ekran paylaşımı BAŞLADI (web fallback)');
         } else {
-          throw new Error('Bu cihazda ekran paylaşımı desteklenmiyor');
+          throw new Error(i18n.t('auto.livekit.001'));
         }
       }
     } catch (e: any) {

@@ -150,13 +150,13 @@ export function EmojiReactionBar({ onReaction, onClose }: { onReaction: (emoji: 
       // ★ v86 debug: kullanıcının cihazında neden boş geldiğini görmek için
       if (results.length === 0) {
         Alert.alert(
-          'GIF Yüklenemedi (Debug)',
-          'Tenor API boş döndü. Olası sebepler:\n• İnternet/firewall blok\n• Edge Function 401\n• Tenor erişim engelli\n\nLütfen bu mesajı geliştiriciye iletin.',
+          i18n.t('auto.EmojiReactions.005'),
+          i18n.t('auto.EmojiReactions.004'),
           [{ text: 'Tamam' }],
         );
       }
     } catch (e: any) {
-      Alert.alert('GIF Hatası (Debug)', (e?.message || String(e) || 'Bilinmeyen').slice(0, 300), [{ text: 'Tamam' }]);
+      Alert.alert(i18n.t('auto.EmojiReactions.003'), (e?.message || String(e) || 'Bilinmeyen').slice(0, 300), [{ text: 'Tamam' }]);
     } finally {
       setLoadingGifs(false);
     }
@@ -257,7 +257,7 @@ export function EmojiReactionBar({ onReaction, onClose }: { onReaction: (emoji: 
               })}
               {displayGifs.length === 0 && (
                 <Text style={{ color: 'rgba(255,255,255,0.25)', fontSize: 12, textAlign: 'center', width: '100%', marginTop: 20 }}>
-                  {gifSearch.length >= 2 ? 'Sonuç bulunamadı' : 'Popüler GIFler yükleniyor...'}
+                  {gifSearch.length >= 2 ? i18n.t('auto.EmojiReactions.002') : i18n.t('auto.EmojiReactions.001')}
                 </Text>
               )}
             </ScrollView>

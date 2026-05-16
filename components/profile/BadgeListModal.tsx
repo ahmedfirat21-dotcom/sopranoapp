@@ -32,7 +32,7 @@ const iconShadow = {
 } as const;
 
 const RARITY_LABEL: Record<BadgeRarity, string> = {
-  common: 'Yaygın', rare: 'Nadir', epic: 'Epik', legendary: 'Efsanevi',
+  common: i18n.t('auto.profile.BadgeListModal.002'), rare: 'Nadir', epic: 'Epik', legendary: 'Efsanevi',
 };
 
 // ★ Rarity'e özel gradient palette — metallic feel
@@ -116,7 +116,7 @@ export default function BadgeListModal({ visible, onClose, userId, displayName }
     setAlert({
       visible: true,
       title: b.label,
-      message: `${b.description}\n\n${b.criteriaText ? `📌 ${b.criteriaText}` : ''}${b.spReward > 0 ? `\n\n💎 Ödül: +${b.spReward} SP` : ''}`,
+      message: `${b.description}\n\n${b.criteriaText ? `📌 ${b.criteriaText}` : ''}${b.spReward > 0 ? i18n.t('auto.profile.BadgeListModal.001', { 0: b.spReward }) : ''}`,
       type: 'info',
     });
   };

@@ -16,6 +16,7 @@ import { PushService } from './push';
 import { GamificationService } from './gamification';
 import { logger } from '../utils/logger';
 import { RateLimitService } from './rateLimit';
+import { i18n } from '../../services/i18n';
 
 export type FriendshipStatus = 'pending' | 'accepted' | 'blocked';
 
@@ -73,7 +74,7 @@ export const FriendshipService = {
       //   altta hâlâ duruyor.
       const rl = await RateLimitService.checkAndIncrement('friend_request', userId);
       if (!rl.allowed) {
-        return { success: false, error: rl.message || 'Çok fazla arkadaşlık isteği gönderdin. Bir saat sonra tekrar dene.' };
+        return { success: false, error: rl.message || i18n.t('auto.friendship.012') };
       }
 
       // ★ SEC-FOLLOW-RATE (defense-in-depth): friendships count fallback
@@ -85,7 +86,7 @@ export const FriendshipService = {
         .gte('created_at', oneHourAgoRL);
       if (rateError) throw rateError;
       if ((recentFollowCount || 0) >= 30) {
-        return { success: false, error: 'Çok fazla arkadaşlık isteği gönderdiniz. Lütfen 1 saat sonra tekrar deneyin.' };
+        return { success: false, error: i18n.t('auto.friendship.011') };
       }
 
       // ★ Cooldown kontrolü: Bu kullanıcıya (userId) hedef (targetId) tarafından
@@ -102,7 +103,7 @@ export const FriendshipService = {
         .gte('created_at', cooldownDate)
         .limit(1);
       if (recentReject && recentReject.length > 0) {
-        return { success: false, error: 'Bu kullanıcıya tekrar istek göndermek için 24 saat beklemelisiniz.' };
+        return { success: false, error: i18n.t('auto.friendship.010') };
       }
 
       // ★ blocklist kontrolü: Engellenmişsem istek gönderemem
@@ -114,7 +115,7 @@ export const FriendshipService = {
         .eq('status', 'blocked')
         .maybeSingle();
       if (blocked) {
-        return { success: false, error: 'Bu kullanıcıya istek gönderemezsiniz.' };
+        return { success: false, error: i18n.t('auto.friendship.009') };
       }
 
       const { error } = await supabase
@@ -129,7 +130,7 @@ export const FriendshipService = {
       // Push bildirim gönder
       const { data: follower } = await supabase.from('profiles').select('display_name').eq('id', userId).single();
       const name = follower?.display_name || 'Birisi';
-      PushService.sendToUser(targetId, 'Arkadaşlık İsteği', `${name} seninle arkadaş olmak istiyor`, {
+      PushService.sendToUser(targetId, i18n.t('auto.friendship.008'), i18n.t('auto.friendship.007', { 0: name }), {
         type: 'follow_request',
         route: `/notifications`,
       }).catch(() => {});
@@ -141,7 +142,7 @@ export const FriendshipService = {
           sender_id: userId,
           type: 'follow_request',
           reference_id: null,
-          body: 'seninle arkadaş olmak istiyor',
+          body: i18n.t('auto.friendship.006'),
         });
         if (nErr && __DEV__) console.warn('[Friendship] Bildirim insert hatası:', nErr.message);
       } catch (notifErr) {
@@ -375,7 +376,7 @@ export const FriendshipService = {
       // Onaylayan kullanıcıya bildirim gönder
       const { data: approver } = await supabase.from('profiles').select('display_name').eq('id', userId).single();
       const name = approver?.display_name || 'Birisi';
-      PushService.sendToUser(followerId, 'Arkadaşlık Kabul Edildi', `${name} seninle arkadaş oldu`, {
+      PushService.sendToUser(followerId, i18n.t('auto.friendship.005'), i18n.t('auto.friendship.004', { 0: name }), {
         type: 'follow_accepted',
         route: `/user/${userId}`,
       }).catch(() => {});
@@ -387,7 +388,7 @@ export const FriendshipService = {
           sender_id: userId,
           type: 'follow_accepted',
           reference_id: null,
-          body: 'arkadaşlık isteğini kabul etti',
+          body: i18n.t('auto.friendship.003'),
         });
         if (nErr && __DEV__) console.warn('[Friendship] Onay bildirimi insert hatası:', nErr.message);
       } catch (notifErr) {
@@ -445,7 +446,7 @@ export const FriendshipService = {
           user_id: followerId,
           sender_id: userId,
           type: 'follow_rejected',
-          body: 'arkadaşlık isteğini reddetti',
+          body: i18n.t('auto.friendship.002'),
         });
       } catch { /* silent */ }
 
@@ -731,7 +732,7 @@ export const FriendshipService = {
       }
       return { success: false, error: error.message };
     } catch (e: any) {
-      return { success: false, error: e?.message || 'Arkadaşlık kaldırılamadı' };
+      return { success: false, error: e?.message || i18n.t('auto.friendship.001') };
     }
   },
 

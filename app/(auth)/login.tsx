@@ -19,14 +19,14 @@ try {
   const gsignin = require('@react-native-google-signin/google-signin');
   GoogleSignin = gsignin.GoogleSignin || gsignin.default?.GoogleSignin || gsignin.default || gsignin;
   if (!GoogleSignin || typeof GoogleSignin.signIn !== 'function') {
-    throw new Error('GoogleSignin module yüklendi ama signIn fonksiyonu bulunamadı');
+    throw new Error(i18n.t('auto.auth.login.010'));
   }
 } catch (e) {
   if (__DEV__) console.warn('[GoogleSignin] modül yüklenemedi:', e);
   GoogleSignin = {
     configure: () => {},
     hasPlayServices: async () => true,
-    signIn: async () => { throw new Error('Google ile giriş şu an kullanılamıyor. E-posta ile giriş yapabilirsin.'); },
+    signIn: async () => { throw new Error(i18n.t('auto.auth.login.009')); },
     signOut: async () => {},
     revokeAccess: async () => {},
   };
@@ -230,7 +230,7 @@ export default function LoginScreen() {
       }
     } catch (error: any) {
       if (__DEV__) console.warn('Google login hatasi:', error);
-      showToast({ title: 'Dikkat', message: error?.message || 'Google ile giriş iptal edildi.', type: 'warning' });
+      showToast({ title: 'Dikkat', message: error?.message || i18n.t('auto.auth.login.008'), type: 'warning' });
       setLoading(false);
     }
   };
@@ -549,11 +549,11 @@ export default function LoginScreen() {
               <View style={s.statsRow}>
                 <View style={s.statPill}>
                   <GlowView style={[s.statDot, { backgroundColor: '#4ADE80' }]} />
-                  <Text style={s.statText}>{formatStatNumber(onlineCount)} çevrimiçi</Text>
+                  <Text style={s.statText}>{formatStatNumber(onlineCount)}{i18n.t('auto.auth.login.007')}</Text>
                 </View>
                 <View style={s.statPill}>
                   <GlowView style={[s.statDot, s.statDotLive]} />
-                  <Text style={s.statText}>{formatStatNumber(liveRoomCount)} canlı oda</Text>
+                  <Text style={s.statText}>{formatStatNumber(liveRoomCount)}{i18n.t('auto.auth.login.006')}</Text>
                 </View>
               </View>
             </Animated.View>
@@ -621,7 +621,7 @@ export default function LoginScreen() {
                       onPress={() => setShowPassword(!showPassword)}
                       style={s.eyeBtn}
                       accessibilityRole="button"
-                      accessibilityLabel={showPassword ? 'Şifreyi gizle' : 'Şifreyi göster'}
+                      accessibilityLabel={showPassword ? i18n.t('auto.auth.login.005') : i18n.t('auto.auth.login.004')}
                       accessibilityState={{ checked: showPassword }}
                       hitSlop={8}
                     >
@@ -775,8 +775,8 @@ export default function LoginScreen() {
             </View>
           }
           buttons={[
-            { text: 'İptal', onPress: () => setShowForgotPassword(false) },
-            { text: resetLoading ? 'Gönderiliyor...' : 'Gönder', onPress: handleForgotPassword },
+            { text: i18n.t('auto.auth.login.003'), onPress: () => setShowForgotPassword(false) },
+            { text: resetLoading ? i18n.t('auto.auth.login.002') : i18n.t('auto.auth.login.001'), onPress: handleForgotPassword },
           ]}
         />
       </KeyboardAvoidingView>

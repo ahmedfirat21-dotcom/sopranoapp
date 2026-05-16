@@ -31,46 +31,46 @@ const iconShadow = {
 //   görüyordu. Artık hepsi sade Türkçe.
 function spReasonLabel(reason: string | undefined, amount?: number): string {
   const map: Record<string, string> = {
-    daily_login: 'Günlük giriş',
-    prime_time_return: 'Prime-time dönüş',
-    stage_time: 'Sahne süresi',
-    message_sent: 'Mesaj gönderdin',
-    follower_gain: 'Yeni takipçi',
-    room_create: 'Oda oluşturma',
-    room_entry_fee: 'Oda giriş ücreti',
-    entry_fee_share: 'Oda gelir payı',
-    welcome_bonus: 'Hoşgeldin bonusu',
-    referral_reward: 'Davet ödülü',
+    daily_login: i18n.t('auto.profile.SPHistorySheet.032'),
+    prime_time_return: i18n.t('auto.profile.SPHistorySheet.031'),
+    stage_time: i18n.t('auto.profile.SPHistorySheet.030'),
+    message_sent: i18n.t('auto.profile.SPHistorySheet.029'),
+    follower_gain: i18n.t('auto.profile.SPHistorySheet.028'),
+    room_create: i18n.t('auto.profile.SPHistorySheet.027'),
+    room_entry_fee: i18n.t('auto.profile.SPHistorySheet.026'),
+    entry_fee_share: i18n.t('auto.profile.SPHistorySheet.025'),
+    welcome_bonus: i18n.t('auto.profile.SPHistorySheet.024'),
+    referral_reward: i18n.t('auto.profile.SPHistorySheet.023'),
     referral_bonus: 'Davet bonusu',
     referral_bonus_owner: 'Davet bonusu (sen davet ettin)',
     referral_bonus_referred: 'Davet bonusu (seni davet eden)',
-    gift_received: 'Hediye alındı',
-    gift_sent: 'Hediye gönderildi',
-    donation_sent: 'SP gönderdin',
-    donation_received: 'SP aldın',
-    donation_refund: 'SP iadesi (alıcı alamadı)',
-    donation_stuck: 'SP işlemi takılı',
+    gift_received: i18n.t('auto.profile.SPHistorySheet.022'),
+    gift_sent: i18n.t('auto.profile.SPHistorySheet.021'),
+    donation_sent: i18n.t('auto.profile.SPHistorySheet.020'),
+    donation_received: i18n.t('auto.profile.SPHistorySheet.019'),
+    donation_refund: i18n.t('auto.profile.SPHistorySheet.018'),
+    donation_stuck: i18n.t('auto.profile.SPHistorySheet.017'),
     room_boost: 'Oda boost',
     profile_boost: 'Profil boost',
-    store_purchase: 'Mağaza alışverişi',
+    store_purchase: i18n.t('auto.profile.SPHistorySheet.016'),
     subscription_bonus: 'Abonelik bonusu',
-    achievement: 'Başarım',
-    badge_reward: 'Rozet ödülü',
-    admin_grant: 'Admin ödülü',
-    refund: 'İade',
+    achievement: i18n.t('auto.profile.SPHistorySheet.015'),
+    badge_reward: i18n.t('auto.profile.SPHistorySheet.014'),
+    admin_grant: i18n.t('auto.profile.SPHistorySheet.013'),
+    refund: i18n.t('auto.profile.SPHistorySheet.012'),
     // ★ Power-up'lar — kullanıcıya "Sahne Işığı" gibi sade isim, kod adı değil
-    powerup_extend_room: 'Süre uzatma',
+    powerup_extend_room: i18n.t('auto.profile.SPHistorySheet.011'),
     powerup_message_glow: 'Mesaj parlatma',
-    powerup_stage_light: 'Sahne ışığı',
-    powerup_gold_invite: 'Altın davet',
+    powerup_stage_light: i18n.t('auto.profile.SPHistorySheet.010'),
+    powerup_gold_invite: i18n.t('auto.profile.SPHistorySheet.009'),
   };
-  if (!reason) return amount && amount > 0 ? 'SP kazandın' : amount && amount < 0 ? 'SP harcadın' : 'SP işlemi';
+  if (!reason) return amount && amount > 0 ? i18n.t('auto.profile.SPHistorySheet.008') : amount && amount < 0 ? i18n.t('auto.profile.SPHistorySheet.007') : i18n.t('auto.profile.SPHistorySheet.006');
   // Admin bypass etiketleri (örn. "store_purchase [ADMIN]")
   const clean = reason.replace(/\s*\[ADMIN.*\]\s*/, '').trim();
   if (map[clean]) return map[clean];
   // ★ v92.15 (1 May 2026): Fallback artık raw type döndürmüyor (kullanıcı şikâyet etti).
   //   Yeni eklenen ama map'te olmayan tipler için amount işaretine göre sade etiket.
-  return amount && amount > 0 ? 'SP kazandın' : amount && amount < 0 ? 'SP harcadın' : 'SP işlemi';
+  return amount && amount > 0 ? i18n.t('auto.profile.SPHistorySheet.005') : amount && amount < 0 ? i18n.t('auto.profile.SPHistorySheet.004') : i18n.t('auto.profile.SPHistorySheet.003');
 }
 
 function spReasonIcon(reason: string | undefined, isPositive: boolean): { name: any; color: string } {
@@ -279,7 +279,7 @@ export default function SPHistorySheet({ visible, onClose, balance, history: ini
               // Counterparty adı (v51 sonrası tx.counterparty_name dolabilir)
               const counterpartyName = tx.counterparty_name || tx.partner?.display_name;
               const subline = isGenericDesc
-                ? (counterpartyName ? (isPositive ? `${counterpartyName} gönderdi` : `${counterpartyName}'e gönderdin`) : '')
+                ? (counterpartyName ? (isPositive ? i18n.t('auto.profile.SPHistorySheet.002', { 0: counterpartyName }) : i18n.t('auto.profile.SPHistorySheet.001', { 0: counterpartyName })) : '')
                 : cleanDesc;
               return (
                 <View key={tx.id || i} style={[s.row, isFresh && s.rowFresh]}>

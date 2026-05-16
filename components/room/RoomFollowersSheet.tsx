@@ -148,8 +148,8 @@ export default function RoomFollowersSheet({ visible, onClose, roomId, totalCoun
               <Text style={s.title}>{i18n.t('room.roomfollowerssheet.001')}</Text>
               <Text style={s.subtitle}>
                 {totalCount > 0
-                  ? `${totalCount} kişi bu odayı takip ediyor`
-                  : 'Henüz takipçi yok'}
+                  ? i18n.t('auto.room.RoomFollowersSheet.002', { 0: totalCount })
+                  : i18n.t('auto.room.RoomFollowersSheet.001')}
               </Text>
             </View>
           </View>

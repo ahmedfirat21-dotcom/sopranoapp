@@ -3,6 +3,7 @@ import { Text, StyleSheet, Animated } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { GlowView } from '../skia';
+import { i18n } from '../../services/i18n';
 
 const PREMIUM_GOLD = '#D4AF37';
 const PREMIUM_GLOW = 'rgba(212,175,55,0.4)';
@@ -30,7 +31,7 @@ export default function PremiumEntryBanner({ name, onDone }: { name: string; onD
       <GlowView style={styles.banner}>
         <LinearGradient colors={[PREMIUM_GLOW, 'transparent']} style={StyleSheet.absoluteFill} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} />
         <Ionicons name="diamond" size={14} color={PREMIUM_GOLD} />
-        <Text style={styles.bannerText}> {name} odaya giriş yaptı!</Text>
+        <Text style={styles.bannerText}> {name}{i18n.t('auto.room.PremiumEntryBanner.001')}</Text>
       </GlowView>
     </Animated.View>
   );

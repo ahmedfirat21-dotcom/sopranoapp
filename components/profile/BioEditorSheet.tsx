@@ -70,7 +70,7 @@ export default function BioEditorSheet({ visible, initialBio, maxLength = 150, o
               <View style={s.header} {...panHandlers}>
                 <View style={{ flex: 1 }}>
                   <Text style={s.title}>Bio</Text>
-                  <Text style={s.subtitle}>Kendini kısaca tanıt — {maxLength} karakter</Text>
+                  <Text style={s.subtitle}>{i18n.t('auto.profile.BioEditorSheet.001')}{maxLength} karakter</Text>
                 </View>
                 <Pressable onPress={onClose} hitSlop={10} style={s.closeBtn}>
                   <Ionicons name="close" size={18} color="rgba(255,255,255,0.5)" />

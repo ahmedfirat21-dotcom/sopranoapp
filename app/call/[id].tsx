@@ -201,14 +201,14 @@ export default function CallScreen() {
       } else if (signal.action === 'call_ended') {
         setCallStatus('ended');
         callStatusRef.current = 'ended';
-        setEndReason(duration > 0 ? `Arama Süresi: ${formatDuration(duration)}` : 'Arama Sonlandı'); // ★ CALL-5
+        setEndReason(duration > 0 ? i18n.t('auto.call.id.031', { 0: formatDuration(duration) }) : i18n.t('auto.call.id.030')); // ★ CALL-5
         setActiveCallId(null);
         liveKitService.disconnect().catch(() => {});
         setTimeout(() => { if (mountedRef.current) safeGoBack(router); }, 3000); // ★ CALL-5: 3sn özet
       } else if (signal.action === 'call_busy') {
         setCallStatus('ended');
         callStatusRef.current = 'ended';
-        setEndReason('Meşgul');
+        setEndReason(i18n.t('auto.call.id.029'));
         setActiveCallId(null);
         // ★ Meşgul sesi çal (beep-beep)
         stopRingbackTone();
@@ -241,7 +241,7 @@ export default function CallScreen() {
         if (__DEV__) console.log('[Call] Cached call_busy sinyali bulundu');
         setCallStatus('ended');
         callStatusRef.current = 'ended';
-        setEndReason('Meşgul');
+        setEndReason(i18n.t('auto.call.id.028'));
         setActiveCallId(null);
         setTimeout(() => { if (mountedRef.current) safeGoBack(router); }, 2500);
       }
@@ -268,7 +268,7 @@ export default function CallScreen() {
           if (firebaseUser && id) {
             await CallService.saveMissedCall(
               firebaseUser.uid,
-              profile?.display_name || 'Kullanıcı',
+              profile?.display_name || i18n.t('auto.call.id.027'),
               profile?.avatar_url || undefined,
               id,
               callType
@@ -356,7 +356,7 @@ export default function CallScreen() {
       const connected = await liveKitService.connect(
         roomId,
         firebaseUser.uid,
-        profile?.display_name || 'Kullanıcı',
+        profile?.display_name || i18n.t('auto.call.id.026'),
         {
           onParticipantUpdate: (participants: ParticipantUpdate[]) => {
             if (!mountedRef.current) return;
@@ -390,7 +390,7 @@ export default function CallScreen() {
                 if (!room || room.state === 'disconnected') {
                   setCallStatus('ended');
                   callStatusRef.current = 'ended';
-                  setEndReason('Bağlantı Koptu');
+                  setEndReason(i18n.t('auto.call.id.025'));
                   setTimeout(() => { if (mountedRef.current) safeGoBack(router); }, 3000);
                 }
               }, 5000);
@@ -411,7 +411,7 @@ export default function CallScreen() {
             // 1:1 aramada karşı taraf gidince arama biter
             setCallStatus('ended');
             callStatusRef.current = 'ended';
-            setEndReason('Karşı Taraf Bağlantıyı Kesti');
+            setEndReason(i18n.t('auto.call.id.024'));
             setActiveCallId(null);
             liveKitService.disconnect().catch(() => {});
 
@@ -427,8 +427,8 @@ export default function CallScreen() {
             if (!mountedRef.current) return;
             const label = device === 'microphone' ? 'Mikrofon' : 'Kamera';
             showToast({
-              title: `⚠️ ${label} İzni Gerekli`,
-              message: `Aramada ${label.toLocaleLowerCase('tr-TR')} kullanmak için ayarlardan izin vermelisiniz.`,
+              title: i18n.t('auto.call.id.023', { 0: label }),
+              message: i18n.t('auto.call.id.022', { 0: label.toLocaleLowerCase('tr-TR') }),
               type: 'warning',
             });
             Linking.openSettings().catch(() => {});
@@ -489,7 +489,7 @@ export default function CallScreen() {
     const finalDuration = duration;
     setCallStatus('ended');
     callStatusRef.current = 'ended';
-    setEndReason(finalDuration > 0 ? `Arama Süresi: ${formatDuration(finalDuration)}` : 'Arama Sonlandı'); // ★ CALL-5
+    setEndReason(finalDuration > 0 ? i18n.t('auto.call.id.021', { 0: formatDuration(finalDuration) }) : i18n.t('auto.call.id.020')); // ★ CALL-5
     setActiveCallId(null);
     liveKitService.disconnect().catch(() => {});
     if (firebaseUser && id && callId) {
@@ -499,7 +499,7 @@ export default function CallScreen() {
       if (wasCalling) {
         await CallService.saveMissedCall(
           firebaseUser.uid,
-          profile?.display_name || 'Kullanıcı',
+          profile?.display_name || i18n.t('auto.call.id.019'),
           profile?.avatar_url || undefined,
           id,
           callType
@@ -556,10 +556,10 @@ export default function CallScreen() {
   // ─── Render ───────────────────────────────────────────────
   // ★ WhatsApp tarzı dinamik status text
   const statusText = callStatus === 'calling'
-    ? (receiverOnline ? 'Çalıyor...' : 'Aranıyor...')
-    : callStatus === 'ringing' ? 'Çalıyor...'
+    ? (receiverOnline ? i18n.t('auto.call.id.018') : i18n.t('auto.call.id.017'))
+    : callStatus === 'ringing' ? i18n.t('auto.call.id.016')
     : callStatus === 'connected' ? formatDuration(duration)
-    : endReason || 'Arama Sonlandı';
+    : endReason || i18n.t('auto.call.id.015');
 
   // Video özellikler kaldırıldı — yalnız sesli arama
   const isVideoConnected = false;
@@ -604,7 +604,7 @@ export default function CallScreen() {
           </Animated.View>
 
           {/* İsim */}
-          <Text style={st.calleeName}>{otherUser?.display_name || 'Kullanıcı'}</Text>
+          <Text style={st.calleeName}>{otherUser?.display_name || i18n.t('auto.call.id.014')}</Text>
 
           {/* Durum */}
           <Text style={[
@@ -619,7 +619,7 @@ export default function CallScreen() {
             <View style={st.statusChip}>
               <View style={[st.statusChipDot, { backgroundColor: receiverOnline ? Colors.emerald : '#475569' }]} />
               <Text style={[st.statusChipText, { color: receiverOnline ? Colors.emerald : '#64748B' }]}>
-                {receiverOnline ? 'Çevrimiçi' : 'Çevrimdışı'}
+                {receiverOnline ? i18n.t('auto.call.id.013') : i18n.t('auto.call.id.012')}
               </Text>
             </View>
           )}
@@ -645,7 +645,7 @@ export default function CallScreen() {
                 <View style={[st.ctrlIconWrap, isMuted && st.ctrlIconWrapActive]}>
                   <Ionicons name={isMuted ? 'mic-off' : 'mic'} size={22} color="#FFF" />
                 </View>
-                <Text style={st.ctrlLabel}>{isMuted ? 'Aç' : 'Sustur'}</Text>
+                <Text style={st.ctrlLabel}>{isMuted ? i18n.t('auto.call.id.011') : 'Sustur'}</Text>
               </TouchableOpacity>
 
               {/* Hoparlör */}
@@ -653,7 +653,7 @@ export default function CallScreen() {
                 <View style={[st.ctrlIconWrap, isSpeaker && st.ctrlIconWrapActive]}>
                   <Ionicons name={isSpeaker ? 'volume-high' : 'volume-low'} size={22} color="#FFF" />
                 </View>
-                <Text style={st.ctrlLabel}>{isSpeaker ? 'Hoparlör' : 'Ahize'}</Text>
+                <Text style={st.ctrlLabel}>{isSpeaker ? i18n.t('auto.call.id.010') : 'Ahize'}</Text>
               </TouchableOpacity>
 
               {/* Kamera kaldırıldı — yalnız sesli arama */}
@@ -686,22 +686,22 @@ export default function CallScreen() {
             {/* Üst ikon */}
             <View style={[
               st.endIconCircle,
-              endReason.includes('Süresi') ? { borderColor: 'rgba(5,150,105,0.3)' } : { borderColor: 'rgba(239,68,68,0.3)' }
+              endReason.includes(i18n.t('auto.call.id.009')) ? { borderColor: 'rgba(5,150,105,0.3)' } : { borderColor: 'rgba(239,68,68,0.3)' }
             ]}>
               <Ionicons
                 name="call"
                 size={28}
-                color={endReason.includes('Süresi') ? Colors.emerald : '#EF4444'}
+                color={endReason.includes(i18n.t('auto.call.id.008')) ? Colors.emerald : '#EF4444'}
               />
             </View>
 
             <Text style={st.endTitle}>
-              {endReason.includes('Süresi') ? 'Arama Tamamlandı' : 'Arama Sonlandı'}
+              {endReason.includes(i18n.t('auto.call.id.007')) ? i18n.t('auto.call.id.006') : i18n.t('auto.call.id.005')}
             </Text>
 
             <Text style={[
               st.endReasonText,
-              endReason.includes('Süresi') && { color: Colors.emerald }
+              endReason.includes(i18n.t('auto.call.id.004')) && { color: Colors.emerald }
             ]}>
               {endReason}
             </Text>
@@ -709,7 +709,7 @@ export default function CallScreen() {
             {/* Kullanıcı bilgisi */}
             <View style={st.endUserRow}>
               <Image source={getAvatarSource(otherUser?.avatar_url)} style={st.endUserAvatar} />
-              <Text style={st.endUserName}>{otherUser?.display_name || 'Kullanıcı'}</Text>
+              <Text style={st.endUserName}>{otherUser?.display_name || i18n.t('auto.call.id.003')}</Text>
             </View>
 
             {/* ★ Aksiyonlar: Geri Ara + Kapat (yan yana) */}
@@ -722,13 +722,13 @@ export default function CallScreen() {
                   try {
                     const { callId: newCallId, receiverIsOnline } = await CallService.initiateCall(
                       firebaseUser.uid,
-                      profile?.display_name || 'Kullanıcı',
+                      profile?.display_name || i18n.t('auto.call.id.002'),
                       profile?.avatar_url || undefined,
                       id, 'audio', tier as any
                     );
                     router.replace(`/call/${id}?callId=${newCallId}&callType=audio&isIncoming=false&receiverOnline=${receiverIsOnline}` as any);
                   } catch (err: any) {
-                    showToast({ title: i18n.t('call.id.003'), message: err.message || 'Arama başlatılamadı', type: 'error' });
+                    showToast({ title: i18n.t('call.id.003'), message: err.message || i18n.t('auto.call.id.001'), type: 'error' });
                   }
                 }}
               >

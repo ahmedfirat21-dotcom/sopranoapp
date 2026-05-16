@@ -199,7 +199,7 @@ export default function BoostPickerSheet({ visible, onClose, onBoost, currentSP 
         <View style={s.summaryRow}>
           <View style={s.summaryLeft}>
             <Text style={s.summaryLabel}>{selected.label}</Text>
-            <Text style={s.summaryDesc}>{selected.duration} saatlik görünürlük</Text>
+            <Text style={s.summaryDesc}>{selected.duration}{i18n.t('auto.BoostPickerSheet.001')}</Text>
           </View>
           <View style={s.balancePill}>
             <SPIcon size={12} />

@@ -313,7 +313,7 @@ function RoomListItem({ entry, rank }: { entry: RoomEntry; rank: number }) {
       <StatusAvatar uri={entry.host_avatar} size={46} frameId={entry.host_frame || null} customBadgeId={(entry as any).host_active_badge_id ?? null} />
       <View style={rlS.info}>
         <Text style={rlS.name} numberOfLines={1}>{entry.room_name}</Text>
-        <Text style={rlS.sub}>{entry.host_name} · {entry.count} katılımcı</Text>
+        <Text style={rlS.sub}>{entry.host_name} · {entry.count}{i18n.t('auto.leaderboard.009')}</Text>
       </View>
     </Pressable>
   );
@@ -402,21 +402,21 @@ export default function LeaderboardScreen() {
       ]);
       setWeeklyDonors((donorsRes.data || []).map((r: any) => ({
         user_id: r.user_id,
-        display_name: r.display_name || 'Kullanıcı',
+        display_name: r.display_name || i18n.t('auto.leaderboard.008'),
         avatar_url: r.avatar_url || '',
         tier: r.subscription_tier || 'Free',
         count: Number(r.total_sp) || 0,
       })));
       setWeeklyEarners((earnersRes.data || []).map((r: any) => ({
         user_id: r.user_id,
-        display_name: r.display_name || 'Kullanıcı',
+        display_name: r.display_name || i18n.t('auto.leaderboard.007'),
         avatar_url: r.avatar_url || '',
         tier: r.subscription_tier || 'Free',
         count: Number(r.total_sp) || 0,
       })));
       setWeeklyHosts((hostsRes.data || []).map((r: any) => ({
         user_id: r.user_id,
-        display_name: r.display_name || 'Kullanıcı',
+        display_name: r.display_name || i18n.t('auto.leaderboard.006'),
         avatar_url: r.avatar_url || '',
         tier: r.subscription_tier || 'Free',
         count: Number(r.room_count) || 0,
@@ -434,7 +434,7 @@ export default function LeaderboardScreen() {
       if (spData) {
         setTopReceivers(spData.map((p: any) => ({
           user_id: p.id,
-          display_name: p.display_name || 'Kullanıcı',
+          display_name: p.display_name || i18n.t('auto.leaderboard.005'),
           avatar_url: p.avatar_url || '',
           tier: p.subscription_tier || 'Free',
           active_frame: p.active_frame || null,
@@ -459,7 +459,7 @@ export default function LeaderboardScreen() {
           if (!followerMap[uid]) {
             followerMap[uid] = {
               user_id: uid,
-              display_name: profile?.display_name || 'Kullanıcı',
+              display_name: profile?.display_name || i18n.t('auto.leaderboard.004'),
               avatar_url: profile?.avatar_url || '',
               tier: profile?.subscription_tier || 'Free',
               active_frame: profile?.active_frame || null,
@@ -490,7 +490,7 @@ export default function LeaderboardScreen() {
           if (!roomMap[rid]) {
             roomMap[rid] = {
               room_id: rid,
-              room_name: room?.name || 'İsimsiz Oda',
+              room_name: room?.name || i18n.t('auto.leaderboard.003'),
               host_name: host?.display_name || 'Bilinmeyen',
               host_avatar: host?.avatar_url || '',
               host_frame: host?.active_frame || null,
@@ -521,7 +521,7 @@ export default function LeaderboardScreen() {
           if (!creatorMap[uid]) {
             creatorMap[uid] = {
               user_id: uid,
-              display_name: profile?.display_name || 'Kullanıcı',
+              display_name: profile?.display_name || i18n.t('auto.leaderboard.002'),
               avatar_url: profile?.avatar_url || '',
               tier: profile?.subscription_tier || 'Free',
               active_frame: profile?.active_frame || null,
@@ -668,7 +668,7 @@ export default function LeaderboardScreen() {
                   <View style={{ flex: 1 }}>
                     <Text style={ws.heroTitle}>{i18n.t('leaderboard.002')}</Text>
                     <Text style={ws.heroSubtitle}>
-                      Pazartesi 09:00'da sıfırlanır. Her kategoride <Text style={ws.heroHighlight}>top 3</Text> ödülü:{' '}
+                      Pazartesi 09:00'da sıfırlanır. Her kategoride <Text style={ws.heroHighlight}>top 3</Text>{i18n.t('auto.leaderboard.001')}{' '}
                       <Text style={ws.heroHighlight}>100 / 50 / 25 SP</Text>
                     </Text>
                   </View>

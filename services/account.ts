@@ -14,6 +14,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { auth } from '../constants/firebase';
 import { supabase } from '../constants/supabase';
 import { logger } from '../utils/logger';
+import { i18n } from '../../services/i18n';
 
 // ★ 2026-05-09: Hesap silme sonrası login ekranında Lottie animasyonu
 //   tetiklemek için kullanılan bir kerelik bayrak. Login ekranı mount'ta
@@ -60,7 +61,7 @@ export async function performLogout(): Promise<void> {
  */
 export async function performDeleteAccount(firebaseUser: any): Promise<{ success: boolean; stats?: any }> {
   if (!firebaseUser?.uid) {
-    throw new Error('Kullanıcı kimliği bulunamadı.');
+    throw new Error(i18n.t('auto.account.002'));
   }
   const uid = firebaseUser.uid;
 
@@ -70,7 +71,7 @@ export async function performDeleteAccount(firebaseUser: any): Promise<{ success
   });
   if (rpcError) {
     if (__DEV__) logger.error('[Account] delete_user_cascade RPC fail:', rpcError);
-    throw new Error(rpcError.message || 'Hesap silme işlemi başarısız.');
+    throw new Error(rpcError.message || i18n.t('auto.account.001'));
   }
 
   // 2) Storage cleanup — best effort (DB zaten silindi, orphan'lar admin cleanup ile)

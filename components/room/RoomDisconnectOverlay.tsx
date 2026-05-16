@@ -41,10 +41,10 @@ export default function RoomDisconnectOverlay({ state, onRetry, onLeave }: Props
   if (!visible) return null;
 
   const isReconnecting = state === 'reconnecting';
-  const title = isReconnecting ? 'Bağlantı koptu' : 'Bağlantı kurulamadı';
+  const title = isReconnecting ? i18n.t('auto.room.RoomDisconnectOverlay.004') : i18n.t('auto.room.RoomDisconnectOverlay.003');
   const message = isReconnecting
-    ? 'Ses sunucusuna yeniden bağlanmaya çalışıyoruz...'
-    : 'Birkaç deneme başarısız oldu. Tekrar denemek ister misin?';
+    ? i18n.t('auto.room.RoomDisconnectOverlay.002')
+    : i18n.t('auto.room.RoomDisconnectOverlay.001');
 
   return (
     <Animated.View style={[s.root, { opacity: fade }]} pointerEvents="auto">

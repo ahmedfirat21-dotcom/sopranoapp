@@ -8,6 +8,7 @@
 import { logger } from '../utils/logger';
 import { supabase } from '../constants/supabase';
 import { filterBadWords, containsBadWords } from '../constants/badwords';
+import { i18n } from '../../services/i18n';
 
 export type ReportReason =
   | 'spam' | 'harassment' | 'hate_speech' | 'inappropriate_content'
@@ -30,7 +31,7 @@ export const ModerationService = {
       .eq('reporter_id', reporterId)
       .gte('created_at', oneHourAgo);
     if ((count || 0) >= 5) {
-      throw new Error('Çok fazla şikayet gönderdiniz. Lütfen 1 saat sonra tekrar deneyin.');
+      throw new Error(i18n.t('auto.moderation.019'));
     }
   },
 
@@ -55,7 +56,7 @@ export const ModerationService = {
     if (error) throw error;
 
     // Admin'e bildirim gönder
-    this._notifyAdmins(reporterId, reason, 'user').catch(e => logger.warn('Admin bildirim hatası:', e));
+    this._notifyAdmins(reporterId, reason, 'user').catch(e => logger.warn(i18n.t('auto.moderation.018'), e));
     return true;
   },
 
@@ -70,7 +71,7 @@ export const ModerationService = {
     });
     if (error) throw error;
 
-    this._notifyAdmins(reporterId, reason, 'room').catch(e => logger.warn('Admin bildirim hatası:', e));
+    this._notifyAdmins(reporterId, reason, 'room').catch(e => logger.warn(i18n.t('auto.moderation.017'), e));
     return true;
   },
 
@@ -86,7 +87,7 @@ export const ModerationService = {
     if (error) throw error;
 
     // ★ BUG-C3 FIX: Admin bildirimi eklendi
-    this._notifyAdmins(reporterId, reason, 'post').catch(e => logger.warn('Admin bildirim hatası:', e));
+    this._notifyAdmins(reporterId, reason, 'post').catch(e => logger.warn(i18n.t('auto.moderation.016'), e));
     return true;
   },
 
@@ -102,7 +103,7 @@ export const ModerationService = {
     if (error) throw error;
 
     // ★ BUG-C3 FIX: Admin bildirimi eklendi
-    this._notifyAdmins(reporterId, reason, 'message').catch(e => logger.warn('Admin bildirim hatası:', e));
+    this._notifyAdmins(reporterId, reason, 'message').catch(e => logger.warn(i18n.t('auto.moderation.015'), e));
     return true;
   },
 
@@ -156,17 +157,17 @@ export const ModerationService = {
     const REASON_TR: Record<string, string> = {
       spam: 'Spam',
       harassment: 'Taciz',
-      hate_speech: 'Nefret Söylemi',
-      inappropriate_content: 'Uygunsuz İçerik',
-      impersonation: 'Kimliğe Bürünme',
+      hate_speech: i18n.t('auto.moderation.014'),
+      inappropriate_content: i18n.t('auto.moderation.013'),
+      impersonation: i18n.t('auto.moderation.012'),
       self_harm: 'Kendine Zarar',
-      violence: 'Şiddet',
-      underage: 'Reşit Olmayan',
-      other: 'Diğer',
+      violence: i18n.t('auto.moderation.011'),
+      underage: i18n.t('auto.moderation.010'),
+      other: i18n.t('auto.moderation.009'),
     };
 
-    const targetText = type === 'user' ? 'kullanıcıyı' : type === 'room' ? 'odayı' : 'gönderiyi';
-    const body = `${reporter?.display_name || 'Bir kullanıcı'} bir ${targetText} "${REASON_TR[reason] || reason}" nedeniyle şikayet etti.`;
+    const targetText = type === 'user' ? i18n.t('auto.moderation.008') : type === 'room' ? i18n.t('auto.moderation.007') : i18n.t('auto.moderation.006');
+    const body = `${reporter?.display_name || i18n.t('auto.moderation.005')} bir ${targetText} "${REASON_TR[reason] || reason}" nedeniyle şikayet etti.`;
 
     for (const adminId of adminIds) {
       try {
@@ -453,7 +454,7 @@ export const ModerationService = {
 
     return data.map((ban: any) => ({
       ...ban,
-      user: profileMap.get(ban.user_id) || { id: ban.user_id, display_name: 'Kullanıcı', avatar_url: null },
+      user: profileMap.get(ban.user_id) || { id: ban.user_id, display_name: i18n.t('auto.moderation.004'), avatar_url: null },
       banned_by_user: ban.banned_by ? profileMap.get(ban.banned_by) || { id: ban.banned_by, display_name: 'Yetkili', avatar_url: null } : null,
     }));
   },
@@ -501,13 +502,13 @@ export const ModerationService = {
       if (!room || room.host_id !== executorId) {
         const { data: part } = await supabase.from('room_participants').select('role').eq('room_id', roomId).eq('user_id', executorId).maybeSingle();
         if (!part || !['owner', 'moderator'].includes(part.role)) {
-          throw new Error('Bu işlem için yetkiniz yok.');
+          throw new Error(i18n.t('auto.moderation.003'));
         }
       }
     }
     // ★ SEC-8: Max 60 karakter, HTML/script tag strip
     const sanitized = (newName || '').trim().replace(/<[^>]*>/g, '').slice(0, 60);
-    if (sanitized.length < 1) throw new Error('Oda ismi boş olamaz');
+    if (sanitized.length < 1) throw new Error(i18n.t('auto.moderation.002'));
     await supabase
       .from('rooms')
       .update({ name: sanitized })
@@ -531,7 +532,7 @@ export const ModerationService = {
     if (executorId && room && room.host_id !== executorId) {
       const { data: part } = await supabase.from('room_participants').select('role').eq('room_id', roomId).eq('user_id', executorId).maybeSingle();
       if (!part || !['owner', 'moderator'].includes(part.role)) {
-        throw new Error('Bu işlem için yetkiniz yok.');
+        throw new Error(i18n.t('auto.moderation.001'));
       }
     }
     const settings = (room?.room_settings || {}) as any;

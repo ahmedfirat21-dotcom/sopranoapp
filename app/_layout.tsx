@@ -486,7 +486,7 @@ function RealtimeBadgeProvider({ userId, children }: { userId: string | null; ch
               if (__DEV__) console.log('[FriendRequest] Card tetikleniyor:', n.sender_id, sp?.display_name);
               (global as any).__setIncomingFriendRequest?.({
                 senderId: n.sender_id,
-                senderName: sp?.display_name || 'Kullanıcı',
+                senderName: sp?.display_name || i18n.t('auto._layout.004'),
                 senderAvatar: sp?.avatar_url,
                 notificationId: n.id,
                 currentUserId: userId,
@@ -524,7 +524,7 @@ function RealtimeBadgeProvider({ userId, children }: { userId: string | null; ch
           const itemName = parts[1] || 'sembol';
           showToast({
             title: `${emoji} Sembol Hediye`,
-            message: `${itemName} hediye aldın`,
+            message: i18n.t('auto._layout.003', { 0: itemName }),
             type: 'success',
             id,
           });
@@ -1174,7 +1174,7 @@ export default function RootLayout() {
         // Şimdi state'i set et — child useEffect'ler artık authed Realtime ile abone olur.
         setFirebaseUser(fbUser);
         setUser({
-          name: fbUser.displayName || 'Kullanıcı',
+          name: fbUser.displayName || i18n.t('auto._layout.002'),
           avatar: fbUser.photoURL || '',
         });
         setIsLoggedIn(true);
@@ -1630,7 +1630,7 @@ export default function RootLayout() {
       <View style={styles.container}>
         {/* Status bar her zaman light (koyu tema) */}
         <StatusBar style="light" />
-        <ErrorBoundary fallbackTitle="Ekran Yüklenemedi">
+        <ErrorBoundary fallbackTitle={i18n.t('auto._layout.001')}>
         <AuthGuard>
           <Stack
             screenOptions={{

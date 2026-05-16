@@ -13,6 +13,7 @@
 import React, { useMemo } from 'react';
 import { View, Image, Pressable, ScrollView, Text, StyleSheet, type ViewStyle } from 'react-native';
 import { useEmojiConfig, type EmojiConfig } from '../../services/cosmeticEditorConfigs';
+import { i18n } from '../../services/i18n';
 
 interface PickerProps {
   emojiSetId: string | null | undefined;
@@ -27,7 +28,7 @@ export function CustomEmojiPicker({ emojiSetId, onPick, style }: PickerProps) {
     return (
       <View style={[styles.empty, style]}>
         <Text style={styles.emptyText}>
-          {emojiSetId ? 'Bu sette emoji yok' : 'Önce bir emoji seti seç'}
+          {emojiSetId ? 'Bu sette emoji yok' : i18n.t('auto.skia.CustomEmojiRenderer.001')}
         </Text>
       </View>
     );

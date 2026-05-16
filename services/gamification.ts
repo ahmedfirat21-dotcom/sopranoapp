@@ -16,6 +16,7 @@ import {
   checkCCUMilestones,
 } from '../constants/tiers';
 import type { SubscriptionTier } from '../types';
+import { i18n } from '../../services/i18n';
 
 // ════════════════════════════════════════════════════════════
 // İÇ DURUM — Cooldown & Günlük Cap Takibi
@@ -235,7 +236,7 @@ async function _persistSP(userId: string, amount: number, action: string, extern
         if (status === 'daily_cap') {
           try {
             const { showToast } = require('../components/Toast');
-            showToast({ title: 'Günlük Limit', message: 'Bugün 300 SP kazanım limitine ulaştın. Yarın tekrar dene.', type: 'warning', duration: 3000 });
+            showToast({ title: i18n.t('auto.gamification.006'), message: i18n.t('auto.gamification.005'), type: 'warning', duration: 3000 });
           } catch { /* toast yoksa sessiz */ }
           return false;
         }
@@ -303,7 +304,7 @@ function _logTransaction(userId: string, amount: number, action: string, externa
     user_id: userId,
     amount,
     type: action,
-    description: descriptionOverride || (amount > 0 ? `SP kazanıldı: ${action}` : `SP harcandı: ${action}`),
+    description: descriptionOverride || (amount > 0 ? i18n.t('auto.gamification.004', { 0: action }) : i18n.t('auto.gamification.003', { 0: action })),
   };
   if (externalRef) payload.external_ref = externalRef;
   if (counterpartyId) payload.counterparty_id = counterpartyId;
@@ -379,7 +380,7 @@ async function spendSP(userId: string, amount: number, reason: string, externalR
         .eq('id', userId)
         .single();
 
-      if (!profile) return { success: false, error: 'Profil bulunamadı.' };
+      if (!profile) return { success: false, error: i18n.t('auto.gamification.002') };
       const current = profile.system_points || 0;
       if (current < amount) {
         return { success: false, error: `Yetersiz SP. Mevcut: ${current}, Gerekli: ${amount}` };
@@ -402,7 +403,7 @@ async function spendSP(userId: string, amount: number, reason: string, externalR
       }
     }
 
-    return { success: false, error: 'SP güncelleme başarısız (eşzamanlı işlem çakışması)' };
+    return { success: false, error: i18n.t('auto.gamification.001') };
   } catch (e: any) {
     return { success: false, error: e.message };
   }

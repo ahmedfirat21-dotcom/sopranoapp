@@ -44,7 +44,7 @@ function QueueItem({
   onApprove: () => void;
   onReject: () => void;
 }) {
-  const displayName = participant.user?.display_name || 'Kullanıcı';
+  const displayName = participant.user?.display_name || i18n.t('auto.room.HandRaiseQueuePanel.003');
   const userTier = (participant.user as any)?.subscription_tier || (participant.user as any)?.tier;
   const isPaidTier = userTier && userTier !== 'Free';
   const { openUserProfile } = useUserProfileSheet();
@@ -156,7 +156,7 @@ export default function HandRaiseQueuePanel({
   const handleNextInQueue = () => {
     if (queueList.length === 0 || stageSlotsFull) return;
     const first = queueList[0];
-    onApprove(first.user_id, first.user?.display_name || 'Kullanıcı');
+    onApprove(first.user_id, first.user?.display_name || i18n.t('auto.room.HandRaiseQueuePanel.002'));
   };
 
   if (!mounted) return null;
@@ -237,7 +237,7 @@ export default function HandRaiseQueuePanel({
                 participant={item}
                 index={index}
                 stageSlotsFull={stageSlotsFull}
-                onApprove={() => onApprove(item.user_id, item.user?.display_name || 'Kullanıcı')}
+                onApprove={() => onApprove(item.user_id, item.user?.display_name || i18n.t('auto.room.HandRaiseQueuePanel.001'))}
                 onReject={() => onReject(item.user_id)}
               />
             )}

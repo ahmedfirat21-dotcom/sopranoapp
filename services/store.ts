@@ -5,6 +5,7 @@
 
 import { supabase } from '../constants/supabase';
 import { logger } from '../utils/logger';
+import { i18n } from '../../services/i18n';
 
 export type Rarity = 'divine' | 'mythic' | 'legendary' | 'rare' | 'new';
 
@@ -333,7 +334,7 @@ export const StoreService = {
       };
     } catch (e: any) {
       if (__DEV__) logger.warn('[Store] purchase exception:', e?.message);
-      return { success: false, error: e?.message || 'Bağlantı hatası' };
+      return { success: false, error: e?.message || i18n.t('auto.store.001') };
     }
   },
 };

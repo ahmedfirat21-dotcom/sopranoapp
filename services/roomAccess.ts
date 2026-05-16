@@ -10,6 +10,7 @@ import { getRoomLimits, isTierAtLeast } from '../constants/tiers';
 import * as Crypto from 'expo-crypto';
 import type { Room, RoomSettings, SubscriptionTier, RoomLanguage, ParticipantRole } from '../types';
 import { migrateLegacyTier } from '../types';
+import { i18n } from '../../services/i18n';
 
 // ★ SEC-PWD: Oda şifre hash'leme yardımcıları
 const PWD_SALT = 'soprano_room_v1_'; // Sabit salt — oda şifreleri düşük güvenlik gerektiren alan
@@ -79,12 +80,12 @@ export const RoomAccessService = {
     // ── 1. Ban kontrolü ──
     const isBanned = await ModerationService.isRoomBanned(roomId, userId);
     if (isBanned) {
-      return { allowed: false, reason: 'Bu odadan yasaklanmışsınız.', action: 'banned' };
+      return { allowed: false, reason: i18n.t('auto.roomAccess.022'), action: 'banned' };
     }
 
     // ── 2. Oda kilidi kontrolü ──
     if (settings.is_locked) {
-      return { allowed: false, reason: 'Oda şu anda kilitli. Yeni katılımcı kabul edilmiyor.', action: 'room_locked' };
+      return { allowed: false, reason: i18n.t('auto.roomAccess.021'), action: 'room_locked' };
     }
 
     // ── 3. Sadece arkadaşlar modu kontrolü (Plus+) ──
@@ -94,7 +95,7 @@ export const RoomAccessService = {
       if (!isFriend) {
         return {
           allowed: false,
-          reason: 'Bu oda yalnızca oda sahibinin arkadaşlarına açık.',
+          reason: i18n.t('auto.roomAccess.020'),
           action: 'followers_only',
         };
       }
@@ -119,7 +120,7 @@ export const RoomAccessService = {
       if (serverAllowed === false) {
         return {
           allowed: false,
-          reason: `Bu odaya katılmak için en az ${ageFilterMin} yaşında olmalısınız.`,
+          reason: i18n.t('auto.roomAccess.019', { 0: ageFilterMin }),
           action: 'age_restricted',
         };
       }
@@ -128,7 +129,7 @@ export const RoomAccessService = {
         if (!userAge || userAge < ageFilterMin) {
           return {
             allowed: false,
-            reason: `Bu odaya katılmak için en az ${ageFilterMin} yaşında olmalısınız.`,
+            reason: i18n.t('auto.roomAccess.018', { 0: ageFilterMin }),
             action: 'age_restricted',
           };
         }
@@ -145,7 +146,7 @@ export const RoomAccessService = {
     if (!skipLanguageCheck && roomLang && userLanguage && roomLang !== userLanguage) {
       return {
         allowed: false,
-        reason: 'Oda dili ile sizin diliniz farklı.',
+        reason: i18n.t('auto.roomAccess.017'),
         action: 'language_mismatch',
         roomLanguage: roomLang,
         userLanguage,
@@ -177,11 +178,11 @@ export const RoomAccessService = {
       const hasAcceptedInvite = await this._hasInvite(roomId, userId);
       if (!hasAcceptedInvite) {
         if (!enteredPassword) {
-          return { allowed: false, reason: 'Bu oda şifre korumalı.', action: 'password_required' };
+          return { allowed: false, reason: i18n.t('auto.roomAccess.016'), action: 'password_required' };
         }
         const passwordMatch = await verifyPassword(enteredPassword, storedPassword);
         if (!passwordMatch) {
-          return { allowed: false, reason: 'Yanlış şifre.' };
+          return { allowed: false, reason: i18n.t('auto.roomAccess.015') };
         }
       }
       // Şifre doğru veya davet geçerli → kapasite kontrolüne devam
@@ -208,7 +209,7 @@ export const RoomAccessService = {
       //   çağrılıyordu → kullanıcı yanlışlıkla bastığında istek DB'ye düşüyordu.
       //   Şimdi sadece 'invite_required' döneriz; UI kullanıcıdan onay alır, sonra
       //   sendAccessRequest() açıkça çağrılır.
-      return { allowed: false, reason: 'Bu davetli bir oda. Katılmak için istek göndermek gerekir.', action: 'invite_required' };
+      return { allowed: false, reason: i18n.t('auto.roomAccess.014'), action: 'invite_required' };
     }
 
     // Bilinmeyen tip → izin ver
@@ -240,19 +241,19 @@ export const RoomAccessService = {
     // Banned
     try {
       const isBanned = await ModerationService.isRoomBanned(room.id!, userId);
-      if (isBanned) blockers.push({ action: 'banned', reason: 'Bu odadan yasaklanmışsın.' });
+      if (isBanned) blockers.push({ action: 'banned', reason: i18n.t('auto.roomAccess.013') });
     } catch {}
 
     // Locked
     if (settings.is_locked) {
-      blockers.push({ action: 'room_locked', reason: 'Oda yeni katılımcı kabul etmiyor.' });
+      blockers.push({ action: 'room_locked', reason: i18n.t('auto.roomAccess.012') });
     }
 
     // Followers-only
     if (settings.followers_only && room.host_id) {
       try {
         const isFriend = await this._isFriendWithHost(userId, room.host_id);
-        if (!isFriend) blockers.push({ action: 'followers_only', reason: 'Sadece sahibin arkadaşları.' });
+        if (!isFriend) blockers.push({ action: 'followers_only', reason: i18n.t('auto.roomAccess.011') });
       } catch {}
     }
 
@@ -268,7 +269,7 @@ export const RoomAccessService = {
         if (!error) serverAllowed = !!data;
       } catch {}
       const allowed = serverAllowed !== null ? serverAllowed : (userAge != null && userAge >= ageFilterMin);
-      if (!allowed) blockers.push({ action: 'age_restricted', reason: `En az ${ageFilterMin} yaşında olmalısın.` });
+      if (!allowed) blockers.push({ action: 'age_restricted', reason: i18n.t('auto.roomAccess.010', { 0: ageFilterMin }) });
     }
 
     return blockers;
@@ -300,7 +301,7 @@ export const RoomAccessService = {
       .eq('user_id', userId)
       .gte('created_at', oneHourAgo);
     if ((count || 0) >= 10) {
-      throw new Error('Çok fazla katılma isteği gönderdiniz. Lütfen 1 saat sonra tekrar deneyin.');
+      throw new Error(i18n.t('auto.roomAccess.009'));
     }
 
     // Odadaki yetkili kişileri bul (owner > moderator > speaker sırasıyla)
@@ -342,7 +343,7 @@ export const RoomAccessService = {
       });
 
     if (insertError) {
-      throw new Error('İstek kaydedilemedi: ' + (insertError.message || 'bilinmeyen hata') + (insertError.code ? ` (${insertError.code})` : ''));
+      throw new Error(i18n.t('auto.roomAccess.008') + (insertError.message || 'bilinmeyen hata') + (insertError.code ? ` (${insertError.code})` : ''));
     }
 
     // ★ İstekçinin profil bilgisini çek
@@ -463,7 +464,7 @@ export const RoomAccessService = {
           sender_id: invitedBy,
           type: 'room_invite',
           reference_id: roomId,
-          body: `${inviterName} seni "${roomName}" odasına davet etti`,
+          body: i18n.t('auto.roomAccess.007', { 0: inviterName, 1: roomName }),
         });
         if (notifError && __DEV__) {
           console.warn('[InviteUser] Bildirim insert hatası:', notifError.message, notifError.details);
@@ -503,10 +504,10 @@ export const RoomAccessService = {
         .eq('id', roomId)
         .maybeSingle();
       if (!roomRow) {
-        return { success: false, error: 'Bu oda artık mevcut değil' };
+        return { success: false, error: i18n.t('auto.roomAccess.006') };
       }
       if (roomRow.is_live === false) {
-        return { success: false, error: 'Bu oda şu anda aktif değil' };
+        return { success: false, error: i18n.t('auto.roomAccess.005') };
       }
 
       // room_invites kaydını bul ve güncelle
@@ -517,7 +518,7 @@ export const RoomAccessService = {
         .eq('user_id', userId)
         .eq('status', 'pending')
         .maybeSingle();
-      if (findErr || !invite) return { success: false, error: 'Davet bulunamadı' };
+      if (findErr || !invite) return { success: false, error: i18n.t('auto.roomAccess.004') };
 
       await supabase
         .from('room_invites')
@@ -564,7 +565,7 @@ export const RoomAccessService = {
         .eq('user_id', userId)
         .eq('status', 'pending')
         .maybeSingle();
-      if (findErr || !invite) return { success: false, error: 'Davet bulunamadı' };
+      if (findErr || !invite) return { success: false, error: i18n.t('auto.roomAccess.003') };
 
       await supabase
         .from('room_invites')
@@ -657,7 +658,7 @@ export const RoomAccessService = {
 
       return {
         allowed: true,
-        reason: 'Dinleyici alanı dolu. Seyirci olarak katılıyorsunuz.',
+        reason: i18n.t('auto.roomAccess.002'),
       };
     }
 
@@ -677,7 +678,7 @@ export const RoomAccessService = {
     const deepLink = `sopranochat://room/${roomId}`;
     const webLink = `https://sopranochat.com/room/${roomId}`;
     const name = roomName || 'bir oda';
-    const shareText = `🎤 SopranoChat'te "${name}" odasına katıl!\n${webLink}`;
+    const shareText = i18n.t('auto.roomAccess.001', { 0: name, 1: webLink });
     return { deepLink, webLink, shareText };
   },
 

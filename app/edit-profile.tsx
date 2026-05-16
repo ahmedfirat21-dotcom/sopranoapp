@@ -195,7 +195,7 @@ export default function EditProfileScreen() {
         showToast({ title: i18n.t('editprofile.002'), message: i18n.t('editprofile.003'), type: 'success' });
       }
     } catch (err: any) {
-      showToast({ title: i18n.t('editprofile.004'), message: err.message || 'Görsel yüklenirken sorun oluştu.', type: 'error' });
+      showToast({ title: i18n.t('editprofile.004'), message: err.message || i18n.t('auto.edit_profile.012'), type: 'error' });
     } finally {
       setUploadingAvatar(false);
     }
@@ -511,7 +511,7 @@ export default function EditProfileScreen() {
           </SkiaShadow>
           <Pressable onPress={() => setShowAvatarPicker(!showAvatarPicker)}>
             <Text style={styles.changeAvatarText}>
-              {showAvatarPicker ? 'Kapat' : 'Fotoğrafı Değiştir'}
+              {showAvatarPicker ? 'Kapat' : i18n.t('auto.edit_profile.011')}
             </Text>
           </Pressable>
         </View>
@@ -786,8 +786,8 @@ export default function EditProfileScreen() {
                 <Text style={styles.accountLabel}>{i18n.t('editprofile.004')}</Text>
                 <Text style={styles.fieldHint}>
                   {languages.length === 0 && interests.length === 0
-                    ? 'Konuştuğun dilleri ve ilgi alanlarını ekle'
-                    : `${languages.length} dil · ${interests.length} ilgi alanı`}
+                    ? i18n.t('auto.edit_profile.010')
+                    : i18n.t('auto.edit_profile.009', { 0: languages.length, 1: interests.length })}
                 </Text>
               </View>
             </View>
@@ -875,8 +875,8 @@ export default function EditProfileScreen() {
                 <Text style={styles.accountLabel}>{t('profile.voice_intro')}</Text>
                 <Text style={styles.fieldHint}>
                   {voiceBioUrl
-                    ? `${Math.ceil((voiceBioDurationMs || 0) / 1000)}sn kayıt mevcut · değiştirmek için bas`
-                    : '15-30sn kendini tanıt — yabancı kullanıcılar dinlesin'}
+                    ? i18n.t('auto.edit_profile.008', { 0: Math.ceil((voiceBioDurationMs || 0) / 1000) })
+                    : i18n.t('auto.edit_profile.007')}
                 </Text>
               </View>
             </View>
@@ -901,8 +901,8 @@ export default function EditProfileScreen() {
                 <Text style={styles.accountLabel}>{t('profile.featured_badges')}</Text>
                 <Text style={styles.fieldHint}>
                   {featuredBadgeIds.length > 0
-                    ? `${featuredBadgeIds.length} rozet seçili — profilde büyük gösterilir`
-                    : 'En değer verdiğin 3 rozeti öne çıkar'}
+                    ? i18n.t('auto.edit_profile.006', { 0: featuredBadgeIds.length })
+                    : i18n.t('auto.edit_profile.005')}
                 </Text>
               </View>
             </View>
@@ -945,7 +945,7 @@ export default function EditProfileScreen() {
                 <Text style={styles.fieldHint}>
                   {(() => {
                     const count = [socialLinks.instagram, socialLinks.twitter, socialLinks.website].filter(Boolean).length;
-                    return count > 0 ? `${count} link bağlı` : 'Instagram · X · Web sitesi';
+                    return count > 0 ? i18n.t('auto.edit_profile.004', { 0: count }) : 'Instagram · X · Web sitesi';
                   })()}
                 </Text>
               </View>
@@ -989,11 +989,11 @@ export default function EditProfileScreen() {
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.accountLabel}>{t('profile.profile_privacy')}</Text>
-                <Text style={styles.fieldHint}>{privacyMode === 'public' ? 'Profilini herkes görebilir' : 'Profilini sadece arkadaşların görebilir'}</Text>
+                <Text style={styles.fieldHint}>{privacyMode === 'public' ? i18n.t('auto.edit_profile.003') : i18n.t('auto.edit_profile.002')}</Text>
               </View>
             </View>
             <View style={{ flexDirection: 'row', gap: 8 }}>
-              {([['public', 'Herkes', 'globe-outline'], ['followers_only', 'Arkadaşlar', 'people-outline']] as const).map(([mode, label, icon]) => (
+              {([['public', 'Herkes', 'globe-outline'], ['followers_only', i18n.t('auto.edit_profile.001'), 'people-outline']] as const).map(([mode, label, icon]) => (
                 <Pressable
                   key={mode}
                   style={[{

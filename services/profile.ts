@@ -8,6 +8,7 @@ import { supabase } from '../constants/supabase';
 import { getRoomLimits } from '../constants/tiers';
 import type { Profile, SubscriptionTier } from '../types';
 import { migrateLegacyTier } from '../types';
+import { i18n } from '../../services/i18n';
 
 // ============================================
 // PROFİL İŞLEMLERİ
@@ -151,7 +152,7 @@ export const ProfileService = {
     const { migrateLegacyTier } = require('../types');
     const userTier = migrateLegacyTier(userProfile?.subscription_tier || 'Free');
     if (!isTierAtLeast(userTier, 'Plus')) {
-      throw new Error('Profil boost özelliği Plus ve üzeri üyeliklerde kullanılabilir.');
+      throw new Error(i18n.t('auto.profile.014'));
     }
 
     // ★ GamificationService üzerinden harca — tek kaynak
@@ -314,9 +315,9 @@ export const ProfileService = {
     message?: string,
   ): Promise<{ success: boolean; error?: string }> {
     // Validasyon
-    if (fromUserId === toUserId) return { success: false, error: 'Kendinize SP gönderemezsiniz' };
-    if (!Number.isInteger(amount) || amount < 1) return { success: false, error: 'Geçersiz miktar' };
-    if (amount > 1000) return { success: false, error: 'Tek seferde en fazla 1000 SP gönderilebilir' };
+    if (fromUserId === toUserId) return { success: false, error: i18n.t('auto.profile.013') };
+    if (!Number.isInteger(amount) || amount < 1) return { success: false, error: i18n.t('auto.profile.012') };
+    if (amount > 1000) return { success: false, error: i18n.t('auto.profile.011') };
 
     // ★ v107: Hediye mesajı — sanitize, profanity filter, max 60 karakter.
     //   Ek DB kolonu yok; mevcut description/body alanlarına eklenir.
@@ -342,7 +343,7 @@ export const ProfileService = {
       if (rlErr) {
         if (__DEV__) console.warn('[Donation] Rate limit RPC error:', rlErr.message);
       } else if (rl && (rl as any).ok === false) {
-        return { success: false, error: (rl as any).error || 'Çok fazla bağış yaptınız. Lütfen 1 saat sonra tekrar deneyin.' };
+        return { success: false, error: (rl as any).error || i18n.t('auto.profile.010') };
       }
     } catch (e) {
       if (__DEV__) console.warn('[Donation] Rate limit exception:', e);
@@ -368,8 +369,8 @@ export const ProfileService = {
     } catch {}
     // ★ v107: Mesaj varsa description'a tırnak içinde eklenir — SP history'de görünür
     const msgSuffix = cleanMessage ? `: "${cleanMessage}"` : '';
-    const spendDesc = toName ? `${toName} adlı kişiye gönderdin${msgSuffix}` : undefined;
-    const earnDesc = fromName ? `${fromName} adlı kişiden aldın${msgSuffix}` : undefined;
+    const spendDesc = toName ? i18n.t('auto.profile.009', { 0: toName, 1: msgSuffix }) : undefined;
+    const earnDesc = fromName ? i18n.t('auto.profile.008', { 0: fromName, 1: msgSuffix }) : undefined;
 
     const spResult = await GamificationService.spend(fromUserId, amount, 'donation_sent', `donation_send:${donationId}`, toUserId, spendDesc);
     if (!spResult.success) {
@@ -386,8 +387,8 @@ export const ProfileService = {
       // ★ v107: Hediye mesajı varsa body'ye tırnak içinde eklenir (alıcı drawer'da görür)
       try {
         const notifBody = cleanMessage
-          ? `${amount} SP gönderdi: "${cleanMessage}"`
-          : `${amount} SP gönderdi`;
+          ? i18n.t('auto.profile.007', { 0: amount, 1: cleanMessage })
+          : i18n.t('auto.profile.006', { 0: amount });
         const { error: notifErr } = await supabase.from('notifications').insert({
           user_id: toUserId,
           sender_id: fromUserId,
@@ -412,11 +413,11 @@ export const ProfileService = {
         const senderName = senderProfile?.display_name || 'Biri';
         // ★ v107: Push body'sine de mesaj eklenir — telefon kilitli iken bile görünür
         const pushBody = cleanMessage
-          ? `${senderName} sana ${amount} SP gönderdi: "${cleanMessage}"`
-          : `${senderName} sana ${amount} SP gönderdi`;
+          ? i18n.t('auto.profile.005', { 0: senderName, 1: amount, 2: cleanMessage })
+          : i18n.t('auto.profile.004', { 0: senderName, 1: amount });
         PushService.sendToUser(
           toUserId,
-          '💎 Bağış Aldın!',
+          i18n.t('auto.profile.003'),
           pushBody,
           { type: 'gift', route: '/(tabs)/profile?openSP=1' },
         );
@@ -434,7 +435,7 @@ export const ProfileService = {
         if (attempt === 0) await new Promise(r => setTimeout(r, 300));
       }
       if (refunded > 0) {
-        return { success: false, error: 'Alıcıya ulaşılamadı — SP iade edildi.' };
+        return { success: false, error: i18n.t('auto.profile.002') };
       }
       // Refund da başarısız — manuel destek için log bırak
       try {
@@ -448,7 +449,7 @@ export const ProfileService = {
       } catch { /* log da başarısızsa sessiz */ }
       return {
         success: false,
-        error: 'Bağış işlemi tamamlanamadı. Destek kaydı oluşturuldu; SP iadesi için lütfen destek ile iletişime geçin.',
+        error: i18n.t('auto.profile.001'),
       };
     }
 

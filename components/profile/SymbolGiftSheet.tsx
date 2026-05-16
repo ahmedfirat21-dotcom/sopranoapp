@@ -126,7 +126,7 @@ export default function SymbolGiftSheet({ visible, onClose, senderId, recipientI
     if (senderSP < item.price_sp) {
       showToast({
         title: 'Yetersiz SP',
-        message: `${item.name} için ${item.price_sp} SP gerekli, ${senderSP} SP'n var.`,
+        message: i18n.t('auto.profile.SymbolGiftSheet.004', { 0: item.name, 1: item.price_sp, 2: senderSP }),
         type: 'error',
       });
       return;
@@ -142,14 +142,14 @@ export default function SymbolGiftSheet({ visible, onClose, senderId, recipientI
     if (error || !data?.success) {
       showToast({
         title: i18n.t('profile.symbolgiftsheet.002'),
-        message: data?.error || error?.message || 'Bağlantı hatası',
+        message: data?.error || error?.message || i18n.t('auto.profile.SymbolGiftSheet.003'),
         type: 'error',
       });
       return;
     }
     setSenderSP((prev) => Math.max(0, prev - item.price_sp));
     showToast({
-      title: `${item.art_emoji || '✨'} Gönderildi`,
+      title: i18n.t('auto.profile.SymbolGiftSheet.002', { 0: item.art_emoji || '✨' }),
       message: `${recipientName} → ${item.name} (-${item.price_sp} SP)`,
       type: 'success',
     });
@@ -192,7 +192,7 @@ export default function SymbolGiftSheet({ visible, onClose, senderId, recipientI
             </View>
             <View style={{ flex: 1 }}>
               <Text style={s.headerTitle}>{i18n.t('profile.symbolgiftsheet.001')}</Text>
-              <Text style={s.headerSub}>{recipientName} kişisine</Text>
+              <Text style={s.headerSub}>{recipientName}{i18n.t('auto.profile.SymbolGiftSheet.001')}</Text>
             </View>
           </View>
 

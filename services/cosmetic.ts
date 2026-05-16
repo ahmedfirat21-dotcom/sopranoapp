@@ -10,6 +10,7 @@
 
 import { supabase } from '../constants/supabase';
 import { logger } from '../utils/logger';
+import { i18n } from '../../services/i18n';
 
 export interface EquipResult {
   success: boolean;
@@ -40,7 +41,7 @@ export const CosmeticService = {
         itemName: r?.item_name,
       };
     } catch (e: any) {
-      return { success: false, error: e?.message || 'Bağlantı hatası' };
+      return { success: false, error: e?.message || i18n.t('auto.cosmetic.002') };
     }
   },
 
@@ -64,7 +65,7 @@ export const CosmeticService = {
         itemName: r?.item_name,
       };
     } catch (e: any) {
-      return { success: false, error: e?.message || 'Bağlantı hatası' };
+      return { success: false, error: e?.message || i18n.t('auto.cosmetic.001') };
     }
   },
 
