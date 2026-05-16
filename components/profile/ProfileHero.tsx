@@ -96,7 +96,8 @@ export default function ProfileHero({
   }, [hasUnequippedFrame]);
   // ★ Uzun isimde fontSize otomatik küçülsün (adjustsFontSizeToFit)
   const isBoostActive = !!(boostExpiresAt && new Date(boostExpiresAt) > new Date());
-  const memberSinceText = memberSince ? formatMemberSince(memberSince) : null;
+  // ★ v289 (16 May 2026): memberSinceText (eski "3 ay önce" formatı) dead idi —
+  //   sadece memberSinceJoinedText ("Mart 2026'da katıldı") kullanılıyor (Twitter/X tarzı).
   const memberSinceJoinedText = memberSince ? formatJoinedDate(memberSince) : null;
   // ★ v110.3: Son aktif metni — sadece online değilken gösterilir (online ise yeşil nokta yeterli).
   const lastSeenText = (!isOnline && lastSeen) ? formatLastSeen(lastSeen) : null;
@@ -334,21 +335,8 @@ export default function ProfileHero({
   );
 }
 
-// ★ "Üyelik 3 ay önce" formatter (eski rölatif format — geri uyumluluk için tutuldu)
-function formatMemberSince(iso: string): string {
-  try {
-    const now = new Date();
-    const then = new Date(iso);
-    const diffMs = now.getTime() - then.getTime();
-    const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-    if (days < 1) return i18n.t('auto.profile.ProfileHero.004');
-    if (days < 30) return i18n.t('auto.profile.ProfileHero.003', { 0: days });
-    const months = Math.floor(days / 30);
-    if (months < 12) return i18n.t('auto.profile.ProfileHero.002', { 0: months });
-    const years = Math.floor(months / 12);
-    return i18n.t('auto.profile.ProfileHero.001', { 0: years });
-  } catch { return ''; }
-}
+// ★ v289 (16 May 2026): formatMemberSince ("3 ay önce" eski format) KALDIRILDI —
+//   formatJoinedDate ("Mart 2026'da katıldı") tek kaynak. memberSinceText dead idi.
 
 // ★ v110.3: "Mart 2026'da katıldı" — modern platform standardı (Twitter/X tarzı kesin tarih)
 // v284: i18n key'lere bağlandı (date.month.* + date.month_year_joined)
@@ -401,19 +389,12 @@ const s = StyleSheet.create({
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
     borderRadius: 26,
   },
-  identityRow: {
-    flexDirection: 'row', alignItems: 'flex-start', gap: 12,
-    paddingHorizontal: 16, paddingTop: 18, paddingBottom: 14,
-    paddingRight: 12,
-  },
   // ★ v108.17: Dikey ortalanmış hero — modern Clubhouse/X tarzı, kompakt
+  // ★ v289 (16 May 2026): identityRow + editBtnAbs styles KALDIRILDI (dead).
   identityCenter: {
     alignItems: 'center',
     paddingHorizontal: 14, paddingTop: 16, paddingBottom: 12,
     position: 'relative',
-  },
-  editBtnAbs: {
-    position: 'absolute', top: 12, right: 12, zIndex: 5,
   },
   // ★ v289 (16 May 2026): Paylaş butonu — Edit pill'e taşınınca tek başına sağ üst köşeye geçti.
   shareBtnAbs: {

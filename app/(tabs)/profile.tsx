@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, Modal, TextInput, Image, InteractionManager, Platform, Animated, Easing, Dimensions, type ImageStyle } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, Modal, TextInput, Image, InteractionManager, Animated, PanResponder, type ImageStyle } from 'react-native';
 import AppLoader from '../../components/AppLoader';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -16,10 +16,9 @@ import { FriendshipService } from '../../services/friendship';
 import { FollowService } from '../../services/follows';
 import { showToast } from '../../components/Toast';
 import FollowListModal from '../../components/FollowListModal';
+import BottomSheet from '../../components/BottomSheet';
 import AppBackground from '../../components/AppBackground';
 import { CosmeticBackground } from '../../components/skia';
-import SPHexagonIcon from '../../components/SPHexagonIcon';
-import PlusDiamondIcon from '../../components/PlusDiamondIcon';
 import AnimatedHeaderIconBtn from '../../components/AnimatedHeaderIconBtn';
 import TabBarFadeOut from '../../components/TabBarFadeOut';
 import ProfileHero from '../../components/profile/ProfileHero';
@@ -54,8 +53,6 @@ import { signOut, deleteUser as firebaseDeleteUser } from 'firebase/auth';
 const PROF_SOP_W = 110;
 const PROF_PROF_W = 75;
 const PROF_H = 30;
-// ★ 2026-05-04: stat satırı dar ekranlarda padding kullanır
-const _sw = Dimensions.get('window').width;
 
 let _profilIntroPlayed = false;
 function profilIntroPlayed() { return _profilIntroPlayed; }
@@ -201,6 +198,82 @@ const pliStyles = StyleSheet.create({
     fontSize: 9, fontWeight: '800', color: '#F59E0B', letterSpacing: 0.3,
   },
 });
+
+// ★ v289 (16 May 2026): Avatar Preview Modal — drag-to-dismiss (memory rule).
+//   Önceden sadece tap-to-close vardı, swipe ile kapatma yoktu. Şimdi vertical
+//   drag (yukarı veya aşağı) ile threshold (100px) geçince fade + close.
+function AvatarPreviewModal({
+  visible, onClose, avatarUrl, displayName, tierBorderColor, tapToCloseLabel,
+}: {
+  visible: boolean; onClose: () => void;
+  avatarUrl: string; displayName: string;
+  tierBorderColor: string; tapToCloseLabel: string;
+}) {
+  const translateY = useRef(new Animated.Value(0)).current;
+  const fadeOpacity = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    if (visible) {
+      translateY.setValue(0);
+      fadeOpacity.setValue(1);
+    }
+  }, [visible]);
+
+  const closeWithAnim = useCallback(() => {
+    Animated.timing(fadeOpacity, { toValue: 0, duration: 180, useNativeDriver: true }).start(() => {
+      translateY.setValue(0);
+      onClose();
+    });
+  }, [onClose]);
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dy) > 8 && Math.abs(g.dy) > Math.abs(g.dx),
+      onPanResponderMove: (_, g) => translateY.setValue(g.dy),
+      onPanResponderRelease: (_, g) => {
+        if (Math.abs(g.dy) > 100 || Math.abs(g.vy) > 0.7) {
+          // Threshold geçildi → tetiklenen yönde kaybol
+          const dir = g.dy > 0 ? 600 : -600;
+          Animated.parallel([
+            Animated.timing(translateY, { toValue: dir, duration: 220, useNativeDriver: true }),
+            Animated.timing(fadeOpacity, { toValue: 0, duration: 220, useNativeDriver: true }),
+          ]).start(() => {
+            translateY.setValue(0);
+            onClose();
+          });
+        } else {
+          Animated.spring(translateY, { toValue: 0, useNativeDriver: true, damping: 18, stiffness: 200 }).start();
+        }
+      },
+    })
+  ).current;
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" statusBarTranslucent>
+      <Animated.View style={[styles.avatarPreviewOverlay, { opacity: fadeOpacity }]} {...panResponder.panHandlers}>
+        <Pressable style={StyleSheet.absoluteFillObject} onPress={closeWithAnim} />
+        <Animated.View style={{ transform: [{ translateY }], alignItems: 'center' }} pointerEvents="box-none">
+          <View style={[styles.avatarPreviewGlow, { borderColor: tierBorderColor, shadowColor: tierBorderColor }]}>
+            <Image source={getAvatarSource(avatarUrl)} style={styles.avatarPreviewImage} resizeMode="cover" />
+          </View>
+          <Text style={styles.avatarPreviewName}>{displayName}</Text>
+          <View style={styles.avatarPreviewHint}>
+            <Ionicons name="swap-vertical" size={16} color="rgba(255,255,255,0.7)" />
+            <Text style={styles.avatarPreviewHintText}>{tapToCloseLabel}</Text>
+          </View>
+        </Animated.View>
+      </Animated.View>
+    </Modal>
+  );
+}
+
+// ★ v289 (16 May 2026): Stat sayı formatı — 1.2K, 3.4M tarzı kısaltma.
+//   Profile İstatistikleri kartı için kompakt görünüm.
+function formatStatNum(n: number): string {
+  if (!n || n < 1000) return String(n || 0);
+  if (n < 1_000_000) return `${(n / 1000).toFixed(n < 10_000 ? 1 : 0)}K`;
+  return `${(n / 1_000_000).toFixed(1)}M`;
+}
 
 // ★ SP transaction reason → Türkçe etiket + premium ikon
 function spReasonLabel(reason: string | undefined): string {
@@ -389,7 +462,7 @@ export default function ProfileScreen() {
   const handleLogout = useCallback(() => {
     setDeleteAlert({
       visible: true,
-      title: 'Oturumu Kapat',
+      title: i18n.t('profile.logout_confirm_title'),
       message: i18n.t('tabs.profile.002'),
       type: 'warning',
       buttons: [
@@ -428,7 +501,7 @@ export default function ProfileScreen() {
               router.replace('/(auth)/login' as any);
               showToast({ title: i18n.t('tabs.profile.003'), type: 'success' });
             } catch (err: any) {
-              showToast({ title: i18n.t('tabs.profile.004'), message: err.message || 'Tekrar dene.', type: 'error' });
+              showToast({ title: i18n.t('tabs.profile.004'), message: err.message || i18n.t('common.try_again_short'), type: 'error' });
             }
           },
         },
@@ -445,12 +518,12 @@ export default function ProfileScreen() {
     try {
       const res = await ReferralService.applyCode(referralCodeText, userId);
       if (res.success) {
-        showToast({ title: i18n.t('tabs.profile.005'), message: 'Davet kodu kabul edildi.', type: 'success' });
+        showToast({ title: i18n.t('tabs.profile.005'), message: i18n.t('profile.invite_code_accepted'), type: 'success' });
         setShowReferral(false);
         setReferralCodeText('');
         setUsedReferral({ used: true, code: referralCodeText.trim().toUpperCase(), usedAt: new Date().toISOString() });
       } else {
-        showToast({ title: 'Kod Kabul Edilmedi', message: res.message, type: 'error' });
+        showToast({ title: i18n.t('profile.invite_code_rejected'), message: res.message, type: 'error' });
       }
     } catch (err: any) {
       showToast({ title: i18n.t('tabs.profile.006'), message: err.message || i18n.t('auto.tabs.profile.011'), type: 'error' });
@@ -554,10 +627,9 @@ export default function ProfileScreen() {
   // GodMaster özel tier: tier='GodMaster' VEYA is_admin=true
   const isAdmin = profile?.is_admin || false;
   const isGM = isAdmin || subscriptionTier === 'GodMaster';
-  const displayTier = isGM ? 'GodMaster' : subscriptionTier;
   const tierDef = TIER_DEFINITIONS[subscriptionTier as keyof typeof TIER_DEFINITIONS];
-  const tierGradient = isGM ? ['#DC2626', '#7F1D1D'] : tierDef ? tierDef.gradient : ['#94A3B8', '#64748B'];
-  const tierIcon = isGM ? 'flash' : tierDef?.icon || 'person-outline';
+  // ★ v289 (16 May 2026): displayTier/tierGradient/tierIcon kaldırıldı (dead vars).
+  //   Avatar preview modal'da kullanılan tierBorderColor kaldı.
   const tierBorderColor = isGM ? '#DC2626' : tierDef?.color || '#94A3B8';
 
   const spBalance = profile?.system_points ?? 0;
@@ -721,14 +793,79 @@ export default function ProfileScreen() {
             </Pressable>
           </View>
 
+          {/* ═══ ★ v289 (16 May 2026): Profil İstatistikleri grid (2×2)
+              ProfileService.getProfileStats fetch ediliyordu ama gösterilmiyordu (dead).
+              Sahne dk / Açtığı oda / Toplam dinleyici / Toplam reaksiyon → 4 mini kart. */}
+          {(profileStats.stageMinutes > 0 || profileStats.roomsCreated > 0 ||
+            profileStats.totalListeners > 0 || profileStats.totalReactions > 0) && (
+            <>
+              <ProfileSectionHeader
+                label={t('profile.stats_label')}
+                icon="stats-chart"
+                accentColor="#A78BFA"
+              />
+              <View style={p.statsGrid}>
+                <View style={p.statCard}>
+                  <LinearGradient
+                    colors={['rgba(20,184,166,0.16)', 'rgba(20,184,166,0.04)']}
+                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                    style={StyleSheet.absoluteFillObject}
+                  />
+                  <Ionicons name="mic-outline" size={20} color="#5EEAD4" style={iconShadow} />
+                  <Text style={p.statCardNum}>{formatStatNum(profileStats.stageMinutes)}</Text>
+                  <Text style={p.statCardLabel}>{t('profile.stats_stage_min')}</Text>
+                </View>
+                <View style={p.statCard}>
+                  <LinearGradient
+                    colors={['rgba(167,139,250,0.16)', 'rgba(167,139,250,0.04)']}
+                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                    style={StyleSheet.absoluteFillObject}
+                  />
+                  <Ionicons name="radio-outline" size={20} color="#A78BFA" style={iconShadow} />
+                  <Text style={p.statCardNum}>{formatStatNum(profileStats.roomsCreated)}</Text>
+                  <Text style={p.statCardLabel}>{t('profile.stats_rooms_created')}</Text>
+                </View>
+                <View style={p.statCard}>
+                  <LinearGradient
+                    colors={['rgba(251,191,36,0.16)', 'rgba(251,191,36,0.04)']}
+                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                    style={StyleSheet.absoluteFillObject}
+                  />
+                  <Ionicons name="headset-outline" size={20} color="#FBBF24" style={iconShadow} />
+                  <Text style={p.statCardNum}>{formatStatNum(profileStats.totalListeners)}</Text>
+                  <Text style={p.statCardLabel}>{t('profile.stats_total_listeners')}</Text>
+                </View>
+                <View style={p.statCard}>
+                  <LinearGradient
+                    colors={['rgba(244,114,182,0.16)', 'rgba(244,114,182,0.04)']}
+                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                    style={StyleSheet.absoluteFillObject}
+                  />
+                  <Ionicons name="heart-outline" size={20} color="#F472B6" style={iconShadow} />
+                  <Text style={p.statCardNum}>{formatStatNum(profileStats.totalReactions)}</Text>
+                  <Text style={p.statCardLabel}>{t('profile.stats_total_reactions')}</Text>
+                </View>
+              </View>
+            </>
+          )}
+
           {/* ★ 2026-05-05: Hediye vitrini ProfileHero stats satırına Hediye butonu olarak taşındı.
               Tıklayınca tab'lı GiftDetailModal açılır (Aldığı / Verdiği sekmeleri). */}
 
-          {/* ═══ Tüm Arkadaşlar — SP cüzdanın hemen altında ═══ */}
+          {/* ═══ Tüm Arkadaşlar — SP cüzdanın hemen altında ═══
+              ★ v289 (16 May 2026): Uzun bas tetiği bağlandı — friendActionSheet
+              eskiden ölüydü (state vardı, trigger yoktu). Artık tile'a uzun basınca
+              "Profili Gör / Mesaj / Arkadaşlıktan Çıkar" sheet'i açılır. */}
           <ProfileFriendsList
             friends={allFriends as any}
             onFriendPress={(friendId) => openUserProfile(friendId)}
             onShowAll={() => { setFollowModalTab('friends'); setFollowModalVisible(true); }}
+            onFriendLongPress={(friend) => setFriendActionSheet({
+              id: friend.id,
+              display_name: friend.display_name,
+              avatar_url: friend.avatar_url,
+              is_online: friend.is_online,
+            })}
           />
 
           {/* ═══ Tek aksiyon kartı — NotificationDrawer aile dili (slate + teal halo + soft glow) ═══ */}
@@ -808,24 +945,19 @@ export default function ProfileScreen() {
                artık web admin paneline (sopranochat.com/yonet) taşındı. is_admin için sadece görsel tik kalır. */}
 
 
-          {/* Referans Modal — iki bölümlü: kendi kodum + arkadaş kodu gir (premium) */}
-          <Modal visible={showReferral} transparent animationType="fade">
-            <Pressable style={styles.modalOverlay} onPress={() => setShowReferral(false)}>
-              <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
-                {/* Zemin — odalarım sadeliği, sadece mor aksan */}
-                <View style={StyleSheet.absoluteFillObject as any} />
-                <LinearGradient
-                  colors={['transparent', 'rgba(167,139,250,0.6)', 'transparent']}
-                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                  style={styles.modalTopEdge}
-                />
-                <View style={styles.modalHeader}>
-                  <Text style={styles.modalTitle}>{t('profile.invite_code_modal_title')}</Text>
-                  <Pressable onPress={() => setShowReferral(false)} hitSlop={12} style={styles.modalCloseBtn}>
-                    <Ionicons name="close" size={18} color="rgba(167,139,250,0.8)" style={iconShadow} />
-                  </Pressable>
-                </View>
-
+          {/* ★ v289 (16 May 2026): Davet Kodu modal RN Modal'dan BottomSheet'e çevrildi.
+              Memory rule: "Modallarda drag-to-dismiss ZORUNLU + drag handle + backdrop tap".
+              BottomSheet hepsini sağlıyor — swipe down ile kapanır, X butonu yok (memory
+              feedback_no_x_on_draggable kuralı). */}
+          <BottomSheet
+            visible={showReferral}
+            onClose={() => setShowReferral(false)}
+            title={t('profile.invite_code_modal_title')}
+            icon="gift-outline"
+            accentColor="#A78BFA"
+            maxHeightRatio={0.7}
+          >
+            <View style={{ paddingHorizontal: 16, paddingTop: 4 }}>
                 {/* Bölüm 1: Kendi kodum */}
                 <Text style={[styles.modalSubtitle, { marginTop: 4 }]}>{t('profile.your_invite_code')}</Text>
                 <View style={styles.myCodeRow}>
@@ -880,33 +1012,24 @@ export default function ProfileScreen() {
                       onPress={handleClaimReferral}
                       disabled={!referralCodeText || submittingReferral}
                     >
-                      {submittingReferral ? <AppLoader size="small" color="#fff" /> : <Text style={styles.modalBtnText}>Kodu Kullan (+50 SP)</Text>}
+                      {submittingReferral ? <AppLoader size="small" color="#fff" /> : <Text style={styles.modalBtnText}>{t('profile.use_invite_code_btn')}</Text>}
                     </Pressable>
                   </>
                 )}
-              </Pressable>
-            </Pressable>
-          </Modal>
+            </View>
+          </BottomSheet>
 
-          {/* ★ Avatar Preview Modal — Instagram tarzı yuvarlak + tier glow */}
-          <Modal visible={showAvatarPreview} transparent animationType="fade" statusBarTranslucent>
-            <Pressable style={styles.avatarPreviewOverlay} onPress={() => setShowAvatarPreview(false)}>
-              {/* Dış parıltı halkası */}
-              <View style={[styles.avatarPreviewGlow, { borderColor: tierBorderColor, shadowColor: tierBorderColor }]}>
-                <Image
-                  source={getAvatarSource(avatarUrl)}
-                  style={styles.avatarPreviewImage}
-                  resizeMode="cover"
-                />
-              </View>
-              {/* İsim + tier rozeti */}
-              <Text style={styles.avatarPreviewName}>{displayName}</Text>
-              <View style={styles.avatarPreviewHint}>
-                <Ionicons name="close-circle" size={18} color="rgba(255,255,255,0.8)" />
-                <Text style={styles.avatarPreviewHintText}>{t('profile.tap_to_close')}</Text>
-              </View>
-            </Pressable>
-          </Modal>
+          {/* ★ Avatar Preview Modal — Instagram tarzı yuvarlak + tier glow
+              ★ v289 (16 May 2026): drag-to-dismiss eklendi (memory rule).
+              Avatar'ı aşağı/yukarı sürükleyince kapanır + tap-to-close korundu. */}
+          <AvatarPreviewModal
+            visible={showAvatarPreview}
+            onClose={() => setShowAvatarPreview(false)}
+            avatarUrl={avatarUrl}
+            displayName={displayName}
+            tierBorderColor={tierBorderColor}
+            tapToCloseLabel={t('profile.tap_to_close')}
+          />
 
         </ScrollView>
 
@@ -1057,7 +1180,7 @@ export default function ProfileScreen() {
               await refreshProfile();
               showToast({ title: i18n.t('tabs.profile.018'), type: 'success' });
             } catch (err: any) {
-              showToast({ title: i18n.t('tabs.profile.019'), message: err?.message || 'Tekrar dene.', type: 'error' });
+              showToast({ title: i18n.t('tabs.profile.019'), message: err?.message || i18n.t('common.try_again_short'), type: 'error' });
               throw err;
             }
           }}
@@ -1172,6 +1295,27 @@ const p = StyleSheet.create({
     paddingHorizontal: 14, paddingVertical: 10,
     borderRadius: 14, overflow: 'hidden',
     borderWidth: 1, borderColor: 'rgba(251,191,36,0.28)',
+  },
+  // ★ v289 (16 May 2026): Profil İstatistikleri 2×2 grid — sahne dk, oda, dinleyici, reaksiyon.
+  statsGrid: {
+    flexDirection: 'row', flexWrap: 'wrap',
+    marginHorizontal: 16, marginBottom: 12,
+    gap: 10,
+  },
+  statCard: {
+    flexBasis: '47.5%', // 2 sütun + gap için ~%47
+    height: 78, borderRadius: 14, overflow: 'hidden',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
+    alignItems: 'center', justifyContent: 'center',
+    gap: 4,
+  },
+  statCardNum: {
+    fontSize: 18, fontWeight: '800', color: '#F1F5F9',
+    letterSpacing: 0.3,
+  },
+  statCardLabel: {
+    fontSize: 9, fontWeight: '700', color: 'rgba(241,245,249,0.6)',
+    textTransform: 'uppercase', letterSpacing: 0.5,
   },
   // ★ v289 (16 May 2026): 2 sütun aksiyon satırı — Boost + SP Cüzdan yan yana.
   actionRow: {

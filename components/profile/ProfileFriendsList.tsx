@@ -35,12 +35,15 @@ interface Props {
   friends: Friend[];
   onFriendPress: (friendId: string) => void;
   onShowAll: () => void;
+  /** ★ v289 (16 May 2026): Uzun bas → arkadaş aksiyon sheet'i (Profili Gör /
+   *  Mesaj At / Arkadaşlıktan Çıkar). Önceden tetik yoktu, sheet ölü kalıyordu. */
+  onFriendLongPress?: (friend: Friend) => void;
 }
 
 // ★ Yatay tile sayısı limiti — fazlası scroll'da kalır, son tile "Tümü"
 const PREVIEW_LIMIT = 12;
 
-export default function ProfileFriendsList({ friends, onFriendPress, onShowAll }: Props) {
+export default function ProfileFriendsList({ friends, onFriendPress, onShowAll, onFriendLongPress }: Props) {
   if (friends.length === 0) return null;
 
   // ★ Sıralama: önce son DM (varsa), sonra çevrimiçi olanlar, sonra geri kalan
@@ -102,6 +105,8 @@ export default function ProfileFriendsList({ friends, onFriendPress, onShowAll }
               key={friend.id}
               style={({ pressed }) => [s.tile, pressed && { opacity: 0.7 }]}
               onPress={() => onFriendPress(friend.id)}
+              onLongPress={onFriendLongPress ? () => onFriendLongPress(friend) : undefined}
+              delayLongPress={350}
             >
               <View style={s.avatarWrap}>
                 <StatusAvatar
