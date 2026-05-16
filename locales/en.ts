@@ -856,8 +856,8 @@ const en: Record<string, string> = {
   'roomcreatehintsheet.001': "Yeni Oda Oluştur",  // TODO: translate
   'roomcreatehintsheet.002': "Şimdi değil",  // TODO: translate
   'roomcreatehintsheet.003': "Odalarım'a Git",  // TODO: translate
-  'sessionconflictmodal.001': "Bu hesap az önce başka bir cihazda kullanılmaya başladı. Aynı hesap iki yerden aktif olamaz.",  // TODO: translate
-  'sessionconflictmodal.002': "\"Devam Et\" dersen diğer cihaz oturumdan düşer.",  // TODO: translate
+  'sessionconflictmodal.001': "Your account was opened on another device",
+  'sessionconflictmodal.002': "Sign Out",
   'store.storeitempreviewsheet.001': "GÜNÜN FIRSATI",  // TODO: translate
   'store.storeitempreviewsheet.002': "FİYAT",  // TODO: translate
   'systemsettingsoverlay.001': "Bakım Modu",  // TODO: translate
@@ -2905,7 +2905,9 @@ const en: Record<string, string> = {
   'room.stagesupportsheet.001': "Destek gönderilemedi",  // TODO: translate
   'room.stagesupportsheet.002': "Destek gönderilemedi",  // TODO: translate
   'roomboostsheet.001': "Hızlı Boost",  // TODO: translate
-  'sessionconflictmodal.001': "Bu hesap az önce başka bir cihazda kullanılmaya başladı. Aynı hesap iki yerden aktif olamaz.",  // TODO: translate
-  'sessionconflictmodal.002': "\"Devam Et\" dersen diğer cihaz oturumdan düşer.",  // TODO: translate
+  'roominfoheader.live': "LIVE",
+  'sessionconflictmodal.003': "This account was just used on another device. The same account can't be active in two places.",
+  'sessionconflictmodal.004': "Continue On This Device",
+  'sessionconflictmodal.005': "If you tap \"Continue\", the other device will be signed out.",
 };
 export default en;

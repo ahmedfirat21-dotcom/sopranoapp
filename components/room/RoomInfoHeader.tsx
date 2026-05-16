@@ -220,7 +220,7 @@ export default function RoomInfoHeader({
                 {headerCfg.showLiveIndicator && (
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginRight: 4 }}>
                     <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: headerCfg.liveDotColor }} />
-                    <Text style={{ fontSize: 8, fontWeight: '800', color: headerCfg.liveDotColor, letterSpacing: 0.6 }}>LIVE</Text>
+                    <Text style={{ fontSize: 8, fontWeight: '800', color: headerCfg.liveDotColor, letterSpacing: 0.6 }}>{i18n.t('roominfoheader.live')}</Text>
                   </View>
                 )}
                 <Ionicons name="time-outline" size={8} color="rgba(20,184,166,0.6)" />

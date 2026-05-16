@@ -59,7 +59,7 @@ export default function SessionConflictModal({ visible, onContinueHere, onSignOu
           </View>
 
           <Text style={s.title}>{i18n.t('sessionconflictmodal.001')}</Text>
-          <Text style={s.message}>{i18n.t('sessionconflictmodal.001')}</Text>
+          <Text style={s.message}>{i18n.t('sessionconflictmodal.003')}</Text>
 
           <View style={s.buttons}>
             <Pressable style={s.btnSecondary} onPress={onSignOut}>
@@ -73,11 +73,11 @@ export default function SessionConflictModal({ visible, onContinueHere, onSignOu
                 style={StyleSheet.absoluteFillObject}
               />
               <Ionicons name="checkmark-circle" size={16} color="#FFF" style={iconShadow} />
-              <Text style={s.btnPrimaryText}>Bu Cihazda Devam Et</Text>
+              <Text style={s.btnPrimaryText}>{i18n.t('sessionconflictmodal.004')}</Text>
             </Pressable>
           </View>
 
-          <Text style={s.footnote}>{i18n.t('sessionconflictmodal.002')}</Text>
+          <Text style={s.footnote}>{i18n.t('sessionconflictmodal.005')}</Text>
         </Animated.View>
       </View>
     </Animated.View>

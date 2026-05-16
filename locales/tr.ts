@@ -2913,7 +2913,9 @@ const tr: Record<string, string> = {
   'room.stagesupportsheet.001': "Destek gönderilemedi",
   'room.stagesupportsheet.002': "Destek gönderilemedi",
   'roomboostsheet.001': "Hızlı Boost",
-  'sessionconflictmodal.001': "Bu hesap az önce başka bir cihazda kullanılmaya başladı. Aynı hesap iki yerden aktif olamaz.",
-  'sessionconflictmodal.002': "\"Devam Et\" dersen diğer cihaz oturumdan düşer.",
+  'roominfoheader.live': "CANLI",
+  'sessionconflictmodal.003': "Bu hesap az önce başka bir cihazda kullanılmaya başladı. Aynı hesap iki yerden aktif olamaz.",
+  'sessionconflictmodal.004': "Bu Cihazda Devam Et",
+  'sessionconflictmodal.005': "\"Devam Et\" dersen diğer cihaz oturumdan düşer.",
 };
 export default tr;
