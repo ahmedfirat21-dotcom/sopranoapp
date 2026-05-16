@@ -51,20 +51,20 @@ import type { SubscriptionTier } from '../../types';
 // BİRLEŞİK AKILLI FİLTRE (Kategori + Etiket → Tek Bar)
 // ════════════════════════════════════════════════════════════
 // ★ SMART_FILTERS artık CATEGORY_THEME'den accent alır — tek kaynak
-const SMART_FILTERS: Array<{ id: string; label: string; icon: string; type: 'category'; accent: string }> = [
-  { id: 'chat',  label: 'Sohbet',    icon: 'chatbubbles',     type: 'category', accent: CATEGORY_THEME.chat.accent },
-  { id: 'music', label: 'Müzik',     icon: 'musical-notes',   type: 'category', accent: CATEGORY_THEME.music.accent },
-  { id: 'game',  label: 'Oyun',      icon: 'game-controller', type: 'category', accent: CATEGORY_THEME.game.accent },
-  { id: 'tech',  label: 'Teknik',    icon: 'code-slash',      type: 'category', accent: CATEGORY_THEME.tech.accent },
-  { id: 'book',  label: 'Kitap',     icon: 'book',            type: 'category', accent: CATEGORY_THEME.book.accent },
-  { id: 'film',  label: 'Film',      icon: 'film',            type: 'category', accent: CATEGORY_THEME.film.accent },
-  { id: 'all',   label: 'Tümü',      icon: 'apps',            type: 'category', accent: '#14B8A6' },
+const SMART_FILTERS: Array<{ id: string; labelKey: string; icon: string; type: 'category'; accent: string }> = [
+  { id: 'chat',  labelKey: 'category.chat',  icon: 'chatbubbles',     type: 'category', accent: CATEGORY_THEME.chat.accent },
+  { id: 'music', labelKey: 'category.music', icon: 'musical-notes',   type: 'category', accent: CATEGORY_THEME.music.accent },
+  { id: 'game',  labelKey: 'category.game',  icon: 'game-controller', type: 'category', accent: CATEGORY_THEME.game.accent },
+  { id: 'tech',  labelKey: 'category.tech',  icon: 'code-slash',      type: 'category', accent: CATEGORY_THEME.tech.accent },
+  { id: 'book',  labelKey: 'category.book',  icon: 'book',            type: 'category', accent: CATEGORY_THEME.book.accent },
+  { id: 'film',  labelKey: 'category.film',  icon: 'film',            type: 'category', accent: CATEGORY_THEME.film.accent },
+  { id: 'all',   labelKey: 'category.all',   icon: 'apps',            type: 'category', accent: '#14B8A6' },
 ];
 
 // ═══ Gelişmiş Filtre Seçenekleri ═══
 const ADVANCED_FILTER_OPTIONS = [
-  { id: 'open', label: 'Açık', icon: 'globe-outline' as const },
-  { id: 'closed', label: 'Şifreli', icon: 'lock-closed' as const },
+  { id: 'open', labelKey: 'filter.open', icon: 'globe-outline' as const },
+  { id: 'closed', labelKey: 'filter.closed', icon: 'lock-closed' as const },
   { id: 'invite', label: 'Davetli', icon: 'mail' as const },
   { id: 'age', label: '18+', icon: 'warning' as const },
   { id: 'premium', label: 'Premium', icon: 'trophy' as const },
@@ -1479,10 +1479,10 @@ export default function HomeScreen() {
                       {(() => {
                         const hour = new Date().getHours();
                         const name = profile?.display_name ? `, ${profile.display_name}` : '';
-                        if (hour >= 5 && hour < 12) return `Günaydın${name} ☀️`;
-                        if (hour >= 12 && hour < 18) return `İyi günler${name} 👋`;
-                        if (hour >= 18 && hour < 22) return `İyi akşamlar${name} ✨`;
-                        return `Gece kuşu${name} 🌙`;
+                        if (hour >= 5 && hour < 12) return `${t('home.good_morning')}${name} ☀️`;
+                        if (hour >= 12 && hour < 18) return `${t('home.good_afternoon')}${name} 👋`;
+                        if (hour >= 18 && hour < 22) return `${t('home.good_evening')}${name} ✨`;
+                        return `${t('home.good_night')}${name} 🌙`;
                       })()}
                     </Text>
                     <Text style={s.welcomeSub}>
@@ -1490,12 +1490,12 @@ export default function HomeScreen() {
                         const realRooms = rooms.filter(r => !isSystemRoom(r.id));
                         const totalListeners = realRooms.reduce((sum, r) => sum + (r.listener_count || 0), 0);
                         if (totalListeners > 0) {
-                          return `🔴 ${totalListeners} kişi şu an canlı sohbette`;
+                          return `🔴 ${t('home.live_count', { count: totalListeners })}`;
                         }
                         if (realRooms.length > 0) {
-                          return `🎙️ ${realRooms.length} oda seni bekliyor — ilk katılan sen ol`;
+                          return `🎙️ ${t('home.rooms_waiting', { count: realRooms.length })}`;
                         }
-                        return `🕯️ Sessiz bir an — yakında yeni yayınlar başlar`;
+                        return t('home.quiet_moment');
                       })()}
                     </Text>
                   </View>
@@ -1680,7 +1680,7 @@ export default function HomeScreen() {
                           color={isActive ? '#FFF' : '#94A3B8'}
                         />
                         <Text style={[s.categoryText, isActive && s.categoryTextActive]} numberOfLines={1}>
-                          {filter.label}
+                          {t((filter as any).labelKey)}
                         </Text>
                       </Pressable>
                     );
@@ -1750,7 +1750,7 @@ export default function HomeScreen() {
                           )}
                         >
                           <Ionicons name={opt.icon} size={11} color={isActive ? '#FFF' : '#64748B'} />
-                          <Text style={[s.advFilterText, isActive && s.advFilterTextActive]}>{opt.label}</Text>
+                          <Text style={[s.advFilterText, isActive && s.advFilterTextActive]}>{t((opt as any).labelKey)}</Text>
                         </Pressable>
                       );
                     })}
@@ -1893,8 +1893,8 @@ export default function HomeScreen() {
                   </LinearGradient>
                 </View>
 
-                <Text style={s.unifiedEmptyTitle}>Sahne boş, ilk sen çık</Text>
-                <Text style={s.unifiedEmptySub}>Bir konu seç, tek tıkla yayına başla</Text>
+                <Text style={s.unifiedEmptyTitle}>{t('home.stage_empty_title')}</Text>
+                <Text style={s.unifiedEmptySub}>{t('home.stage_empty_sub')}</Text>
 
                 {/* ★ 2026-04-24: Sosyal ipucu — online arkadaş varsa motivasyonel satır */}
                 {onlineFriends.length > 0 && (
@@ -1911,10 +1911,10 @@ export default function HomeScreen() {
                 {firebaseUser && (
                   <View style={s.unifiedChipsGrid}>
                     {[
-                      { id: 'chat',  label: 'Sohbet', icon: 'chatbubbles' as const,     color: '#3B82F6' },
-                      { id: 'music', label: 'Müzik',  icon: 'musical-notes' as const,   color: '#EC4899' },
-                      { id: 'game',  label: 'Oyun',   icon: 'game-controller' as const, color: '#A78BFA' },
-                      { id: 'tech',  label: 'Teknik', icon: 'code-slash' as const,      color: '#14B8A6' },
+                      { id: 'chat',  labelKey: 'category.chat',  icon: 'chatbubbles' as const,     color: '#3B82F6' },
+                      { id: 'music', labelKey: 'category.music', icon: 'musical-notes' as const,   color: '#EC4899' },
+                      { id: 'game',  labelKey: 'category.game',  icon: 'game-controller' as const, color: '#A78BFA' },
+                      { id: 'tech',  labelKey: 'category.tech',  icon: 'code-slash' as const,      color: '#14B8A6' },
                     ].map((chip) => (
                       <Pressable
                         key={chip.id}
@@ -1928,7 +1928,7 @@ export default function HomeScreen() {
                         ]}
                       >
                         <Ionicons name={chip.icon} size={22} color={chip.color} />
-                        <Text style={[s.unifiedChipText, { color: chip.color }]}>{chip.label}</Text>
+                        <Text style={[s.unifiedChipText, { color: chip.color }]}>{t(chip.labelKey)}</Text>
                       </Pressable>
                     ))}
                   </View>
@@ -1942,7 +1942,7 @@ export default function HomeScreen() {
                   style={({ pressed }) => [s.unifiedDetailLink, pressed && { opacity: 0.6 }]}
                   hitSlop={8}
                 >
-                  <Text style={s.unifiedDetailLinkText}>veya detaylı ayarla</Text>
+                  <Text style={s.unifiedDetailLinkText}>{t('home.detailed_setup')}</Text>
                   <Ionicons name="chevron-forward" size={14} color="#94A3B8" />
                 </Pressable>
 
