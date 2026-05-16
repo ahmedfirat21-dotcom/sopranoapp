@@ -128,6 +128,10 @@ export default function SPDonateSheet({
   // ★ v92 (1 May 2026): Backdrop floating watermark hexagon — gem-aura efekti.
   //   Panel'in üstünde-merkezinde yavaşça yukarı-aşağı süzülerek uçar (parallax).
   const gemFloat = useRef(new Animated.Value(0)).current;
+  // ★ v284 (16 May 2026): Loop instance ref'ler — orphan loop önleme
+  const ringPulseLoopRef = useRef<Animated.CompositeAnimation | null>(null);
+  const ringPulse2LoopRef = useRef<Animated.CompositeAnimation | null>(null);
+  const gemFloatLoopRef = useRef<Animated.CompositeAnimation | null>(null);
   const [amount, setAmount] = useState(10);
   const [loading, setLoading] = useState(false);
   const [balance, setBalance] = useState<number | null>(null);
@@ -160,36 +164,45 @@ export default function SPDonateSheet({
         Animated.spring(translateY, { toValue: 0, useNativeDriver: true, damping: 22, stiffness: 220 }),
         Animated.timing(backdropOpacity, { toValue: 1, duration: 220, useNativeDriver: true }),
       ]).start();
-      // ★ v86: Sinematik pulse loop — halo katmanları için
-      Animated.loop(
+      // ★ v284 (16 May 2026): Loop ref pattern — orphan loop önleme.
+      //   ringPulse + ringPulse2 + gemFloat loop'ları ref'e atanır, kapanışta stop().
+      ringPulseLoopRef.current = Animated.loop(
         Animated.sequence([
           Animated.timing(ringPulse, { toValue: 1, duration: 1800, useNativeDriver: true }),
           Animated.timing(ringPulse, { toValue: 0, duration: 1800, useNativeDriver: true }),
         ]),
-      ).start();
-      Animated.loop(
+      );
+      ringPulseLoopRef.current.start();
+      ringPulse2LoopRef.current = Animated.loop(
         Animated.sequence([
           Animated.timing(ringPulse2, { toValue: 1, duration: 2400, useNativeDriver: true }),
           Animated.timing(ringPulse2, { toValue: 0, duration: 2400, useNativeDriver: true }),
         ]),
-      ).start();
-      // ★ v92: Gem-float (yumuşak yukarı-aşağı süzülme + scale)
-      Animated.loop(
+      );
+      ringPulse2LoopRef.current.start();
+      gemFloatLoopRef.current = Animated.loop(
         Animated.sequence([
           Animated.timing(gemFloat, { toValue: 1, duration: 3500, useNativeDriver: true }),
           Animated.timing(gemFloat, { toValue: 0, duration: 3500, useNativeDriver: true }),
         ]),
-      ).start();
+      );
+      gemFloatLoopRef.current.start();
     } else {
       Animated.parallel([
         Animated.timing(translateY, { toValue: PANEL_HEIGHT, duration: 220, useNativeDriver: true }),
         Animated.timing(backdropOpacity, { toValue: 0, duration: 180, useNativeDriver: true }),
       ]).start();
-      ringPulse.stopAnimation();
-      ringPulse2.stopAnimation();
-      gemFloat.stopAnimation();
+      ringPulseLoopRef.current?.stop(); ringPulseLoopRef.current = null;
+      ringPulse2LoopRef.current?.stop(); ringPulse2LoopRef.current = null;
+      gemFloatLoopRef.current?.stop(); gemFloatLoopRef.current = null;
     }
   }, [visible]);
+  // ★ v284: Unmount cleanup
+  useEffect(() => () => {
+    ringPulseLoopRef.current?.stop();
+    ringPulse2LoopRef.current?.stop();
+    gemFloatLoopRef.current?.stop();
+  }, []);
 
   // Panel kapatma gesture — sadece handle alanında
   const onCloseRef = useRef(onClose);

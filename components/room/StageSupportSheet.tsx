@@ -87,6 +87,12 @@ export default function StageSupportSheet({
   const lightSweep = useRef(new Animated.Value(0)).current;
   // ★ v107.31: 6 ambient drift particle (yıldız) — alttan üste yumuşakça süzülür
   const driftAnims = useRef([0, 1, 2, 3, 4, 5].map(() => new Animated.Value(0))).current;
+  // ★ v284 (16 May 2026): Loop instance ref'ler — orphan loop önleme (5 ana + 6 drift)
+  const spotlightLoopRef = useRef<Animated.CompositeAnimation | null>(null);
+  const avatarBreathLoopRef = useRef<Animated.CompositeAnimation | null>(null);
+  const glowRingLoopRef = useRef<Animated.CompositeAnimation | null>(null);
+  const lightSweepLoopRef = useRef<Animated.CompositeAnimation | null>(null);
+  const driftLoopsRef = useRef<(Animated.CompositeAnimation | null)[]>([]);
 
   const [amount, setAmount] = useState(10);
   const [loading, setLoading] = useState(false);
@@ -123,53 +129,63 @@ export default function StageSupportSheet({
         Animated.spring(translateY, { toValue: 0, useNativeDriver: true, damping: 22, stiffness: 220 }),
         Animated.timing(backdropOpacity, { toValue: 1, duration: 220, useNativeDriver: true }),
       ]).start();
-      // Sahne ışığı huzmesi (yana hafif sallanma + opacity dans)
-      Animated.loop(
+      // ★ v284 (16 May 2026): 5 loop ref pattern — orphan loop önleme
+      spotlightLoopRef.current = Animated.loop(
         Animated.sequence([
           Animated.timing(spotlightFloat, { toValue: 1, duration: 4000, useNativeDriver: true }),
           Animated.timing(spotlightFloat, { toValue: 0, duration: 4000, useNativeDriver: true }),
         ]),
-      ).start();
-      // Avatar breathing
-      Animated.loop(
+      );
+      spotlightLoopRef.current.start();
+      avatarBreathLoopRef.current = Animated.loop(
         Animated.sequence([
           Animated.timing(avatarBreath, { toValue: 1, duration: 1500, useNativeDriver: true }),
           Animated.timing(avatarBreath, { toValue: 0, duration: 1500, useNativeDriver: true }),
         ]),
-      ).start();
-      // Glow ring pulse — sahne ışığı altında halo
-      Animated.loop(
+      );
+      avatarBreathLoopRef.current.start();
+      glowRingLoopRef.current = Animated.loop(
         Animated.sequence([
           Animated.timing(glowRing, { toValue: 1, duration: 1800, useNativeDriver: true }),
           Animated.timing(glowRing, { toValue: 0, duration: 1800, useNativeDriver: true }),
         ]),
-      ).start();
-      // ★ v107.31: Light sweep — panel arkasında diagonal ışık şeridi soldan sağa kayar (5sn loop)
-      Animated.loop(
+      );
+      glowRingLoopRef.current.start();
+      lightSweepLoopRef.current = Animated.loop(
         Animated.timing(lightSweep, { toValue: 1, duration: 5000, useNativeDriver: true }),
-      ).start();
-      // ★ v107.31: 6 ambient drift particle — alttan üste süzülür, stagger
+      );
+      lightSweepLoopRef.current.start();
       driftAnims.forEach((a, i) => {
-        Animated.loop(
+        const l = Animated.loop(
           Animated.sequence([
             Animated.delay(i * 600),
             Animated.timing(a, { toValue: 1, duration: 4500, useNativeDriver: true }),
             Animated.timing(a, { toValue: 0, duration: 0, useNativeDriver: true }),
           ]),
-        ).start();
+        );
+        driftLoopsRef.current[i] = l;
+        l.start();
       });
     } else {
       Animated.parallel([
         Animated.timing(translateY, { toValue: PANEL_HEIGHT, duration: 220, useNativeDriver: true }),
         Animated.timing(backdropOpacity, { toValue: 0, duration: 180, useNativeDriver: true }),
       ]).start();
-      spotlightFloat.stopAnimation();
-      avatarBreath.stopAnimation();
-      glowRing.stopAnimation();
-      lightSweep.stopAnimation();
-      driftAnims.forEach(a => a.stopAnimation());
+      spotlightLoopRef.current?.stop(); spotlightLoopRef.current = null;
+      avatarBreathLoopRef.current?.stop(); avatarBreathLoopRef.current = null;
+      glowRingLoopRef.current?.stop(); glowRingLoopRef.current = null;
+      lightSweepLoopRef.current?.stop(); lightSweepLoopRef.current = null;
+      driftLoopsRef.current.forEach(l => l?.stop());
+      driftLoopsRef.current = [];
     }
   }, [visible]);
+  useEffect(() => () => {
+    spotlightLoopRef.current?.stop();
+    avatarBreathLoopRef.current?.stop();
+    glowRingLoopRef.current?.stop();
+    lightSweepLoopRef.current?.stop();
+    driftLoopsRef.current.forEach(l => l?.stop());
+  }, []);
 
   // Hexagon spring
   useEffect(() => {

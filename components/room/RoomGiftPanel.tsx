@@ -89,6 +89,8 @@ export default function RoomGiftPanel({
   const currentSnapRef = useRef<number>(SNAP_DISMISS);
   // Header watermark + handle pulse
   const giftFloat = useRef(new Animated.Value(0)).current;
+  // ★ v284 (16 May 2026): Loop instance ref — orphan loop önleme
+  const giftFloatLoopRef = useRef<Animated.CompositeAnimation | null>(null);
 
   const [allGifts, setAllGifts] = useState<CosmeticItem[]>([]);
   const [senderSP, setSenderSP] = useState<number>(0);
@@ -162,22 +164,24 @@ export default function RoomGiftPanel({
         Animated.spring(translateY, { toValue: SNAP_HALF, useNativeDriver: true, damping: 22, stiffness: 220 }),
         Animated.timing(backdropOpacity, { toValue: 1, duration: 240, useNativeDriver: true }),
       ]).start();
-      // Floating gift watermark — yumuşak süzülme (4sn cycle)
-      Animated.loop(
+      // ★ v284: Loop ref pattern — orphan önleme
+      giftFloatLoopRef.current = Animated.loop(
         Animated.sequence([
           Animated.timing(giftFloat, { toValue: 1, duration: 4000, useNativeDriver: true }),
           Animated.timing(giftFloat, { toValue: 0, duration: 4000, useNativeDriver: true }),
         ]),
-      ).start();
+      );
+      giftFloatLoopRef.current.start();
     } else {
       currentSnapRef.current = SNAP_DISMISS;
       Animated.parallel([
         Animated.timing(translateY, { toValue: SNAP_DISMISS, duration: 220, useNativeDriver: true }),
         Animated.timing(backdropOpacity, { toValue: 0, duration: 180, useNativeDriver: true }),
       ]).start();
-      giftFloat.stopAnimation();
+      giftFloatLoopRef.current?.stop(); giftFloatLoopRef.current = null;
     }
   }, [visible, PANEL_HEIGHT]);
+  useEffect(() => () => { giftFloatLoopRef.current?.stop(); }, []);
 
   // ★ v108.6: InRoomUserProfile paritesi — capture pattern + 3-snap
   //   onMoveShouldSetPanResponderCapture child Pressable/ScrollView'dan responder ÇALMAYI sağlar.
