@@ -15,6 +15,7 @@ import Svg, {
 import { getAvatarSource } from '../constants/avatars';
 import { TIER_DEFINITIONS } from '../constants/tiers';
 import type { SubscriptionTier } from '../types';
+import { useRoomLayout as _useRoomLayoutSafe } from '../services/roomLayoutConfig';
 import { migrateLegacyTier } from '../types';
 import AvatarFrame from './profile/AvatarFrame';
 import { getFrameAvatarRatio } from '../constants/frameLottieRegistry';
@@ -232,6 +233,12 @@ export default function StatusAvatar({
   const isOnline = isOnlineProp !== undefined ? isOnlineProp : !!user?.is_online;
   const isAdmin = isAdminProp !== undefined ? isAdminProp : !!user?.is_admin;
   const displayName = displayNameProp !== undefined ? displayNameProp : (user?.display_name ?? undefined);
+  // ★ v286 (16 May 2026): Web admin online dot config. useRoomLayout oda dışı
+  //   bağlamlarda DEFAULT_ROOM_LAYOUT döner — Rules of Hooks ihlali olmaz.
+  const _layoutCfg = _useRoomLayoutSafe();
+  const onlineDotEnabled = _layoutCfg.indicators.onlineDotEnabled !== false;
+  const onlineDotColor = _layoutCfg.indicators.onlineDotColor || '#10B981';
+
   // ★ v283 (16 May 2026): shapeOverride (web admin oda düzeni) frame customShape'i
   //   yoksa borderRadius'u belirler. Default 'circle' (size/2).
   const radius = (() => {
@@ -644,8 +651,8 @@ export default function StatusAvatar({
       </View>
 
       {/* ★ v213f: Modern online indicator — gradient nokta + dual halo + glow.
-          Eski tek-ton yeşil dot yerine emerald-teal gradient + iç parlak iz + dış soft glow */}
-      {isOnline && !isSelf && (
+          v286 (16 May 2026): indicators.onlineDotEnabled + color admin'den canlı. */}
+      {isOnline && !isSelf && onlineDotEnabled && (
         <View
           pointerEvents="none"
           style={{

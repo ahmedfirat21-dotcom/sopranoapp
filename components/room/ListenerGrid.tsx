@@ -102,6 +102,10 @@ const ListenerCell = React.memo(function ListenerCell({
   cfgShape, cfgBorderRadius, cfgRingWidth, cfgRingColor, cfgShowName,
   cfgOwnerCrownEnabled, cfgOwnerHighlight,
 }: CellProps) {
+  // ★ v286 (16 May 2026): Listener avatar Skia shadow — config'den okur
+  const cellLayout = useRoomLayout();
+  const cellShadows = cellLayout.shadows;
+  const cellIndicators = cellLayout.indicators;
   // ★ v259 (13 May 2026): ownerScale 1.10 KALDIRILDI — owner avatarı diğer
   //   listener'lardan büyüktü, GlowView wrap'a uyumsuz oluyordu (yarım clip).
   //   Owner için crown rozet (sarı yıldız) tek başına yeterli sinyal. Frame
@@ -153,6 +157,12 @@ const ListenerCell = React.memo(function ListenerCell({
         isSelected && s.avatarSelected,
         showMuteIndicator && s.avatarMuted,
         { borderRadius: cfgRadius },
+        // ★ v286: Listener Skia shadow — admin'den config
+        cellShadows.listenerShadowEnabled && {
+          shadowColor: cellShadows.listenerShadowColor,
+          shadowOpacity: cellShadows.listenerShadowOpacity,
+          shadowRadius: cellShadows.listenerShadowBlur,
+        },
       ]}>
         <StatusAvatar
           uri={(u as any).disguise?.avatar_url || u.user?.avatar_url}

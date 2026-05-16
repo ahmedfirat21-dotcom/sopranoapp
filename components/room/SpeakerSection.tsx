@@ -9,7 +9,7 @@ import { RoleColors } from '../../constants/theme';
 import AvatarPenaltyFlash, { type FlashType } from './AvatarPenaltyFlash';
 import RoomAvatarFrame from './RoomAvatarFrame';
 // ★ v280 (15 May 2026): TierBadge import KALDIRILDI — web admin CosmeticBadge sistemi kullanılıyor.
-import { SkiaShadow, CosmeticBadge } from '../skia';
+import { SkiaShadow, CosmeticBadge, GlowView } from '../skia';
 import { useBadgeConfig, getBadgeRenderSize } from '../../services/cosmeticEditorConfigs';
 import type { RoomParticipant } from '../../services/database';
 import { useRoomLayout, type SpeakersLayoutConfig, type AvatarShape } from '../../services/roomLayoutConfig';
@@ -105,54 +105,114 @@ interface Props {
   onQuickMute?: (user: RoomParticipant) => void;
 }
 
+/* ★ v286 (16 May 2026): Host Halo + Pulse — Skia colored shadow + opsiyonel
+   nefes alma animasyonu. host.halo* + animations.haloPulse* config'lerinden okur. */
+function HostHalo({ size, borderRadius }: { size: number; borderRadius: number }) {
+  const layout = useRoomLayout();
+  const host = layout.host;
+  const anims = layout.animations;
+  const pulseRef = React.useRef(new Animated.Value(0)).current;
+
+  React.useEffect(() => {
+    if (!host.haloEnabled || !anims.haloPulseEnabled) {
+      pulseRef.setValue(0);
+      return;
+    }
+    const dur = Math.max(500, anims.haloPulseSpeed);
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(pulseRef, { toValue: 1, duration: dur / 2, useNativeDriver: true, easing: Easing.inOut(Easing.ease) }),
+      Animated.timing(pulseRef, { toValue: 0, duration: dur / 2, useNativeDriver: true, easing: Easing.inOut(Easing.ease) }),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, [host.haloEnabled, anims.haloPulseEnabled, anims.haloPulseSpeed]);
+
+  if (!host.haloEnabled) return null;
+
+  const amp = Math.max(0.0, Math.min(0.5, anims.haloPulseAmplitude || 0));
+  const scale = pulseRef.interpolate({ inputRange: [0, 1], outputRange: [1, 1 + amp] });
+  const opacity = pulseRef.interpolate({ inputRange: [0, 1], outputRange: [host.haloOpacity * 0.7, host.haloOpacity] });
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={{
+        position: 'absolute',
+        top: 0, left: 0,
+        width: size, height: size,
+        opacity,
+        transform: [{ scale }],
+      }}
+    >
+      <GlowView
+        style={{
+          width: size, height: size,
+          borderRadius,
+          shadowColor: host.haloColor,
+          shadowOpacity: 1, // outer Animated.View opacity ile yönetilir
+          shadowRadius: host.haloBlur,
+        }}
+        pointerEvents="none"
+      />
+    </Animated.View>
+  );
+}
+
 function SpeakingGlow({ speaking, borderRadius = 16 }: { speaking: boolean; borderRadius?: number }) {
   // ★ v107.16: 2 katmanlı DIŞA dalgalanma ringleri (lighthouse pattern) + sabit referans border.
   //   Eski sürümde tek border 1.0↔1.06 pulse → görsel olarak içeri kalıyordu.
   //   Yeni: avatar etrafından dışa doğru genişleyip kaybolan halkalar.
-  //   Android shadow KALDIRILDI (gri görünüyordu). Border opacity ile glow telafi.
+  // ★ v286 (16 May 2026): Web admin animations.speakingPulse* canlı bağlı.
+  const anims = useRoomLayout().animations;
+  const sp = useRoomLayout().speakers;
+  const pulseEnabled = anims.speakingPulseEnabled;
+  const pulseSpeed = Math.max(400, anims.speakingPulseSpeed);
+  const ringExpand = Math.max(1.0, Math.min(2.0, anims.speakingRingExpand || 1.35));
+  const ringColor = sp.speakingRingColor || '#14B8A6';
+
   const ringA = React.useRef(new Animated.Value(0)).current;
   const ringB = React.useRef(new Animated.Value(0)).current;
   const breath = React.useRef(new Animated.Value(0)).current;
 
   React.useEffect(() => {
-    if (!speaking) {
+    if (!speaking || !pulseEnabled) {
       ringA.setValue(0); ringB.setValue(0); breath.setValue(0);
       return;
     }
     const loopA = Animated.loop(Animated.timing(ringA, {
-      toValue: 1, duration: 1400, easing: Easing.out(Easing.quad), useNativeDriver: true,
+      toValue: 1, duration: pulseSpeed, easing: Easing.out(Easing.quad), useNativeDriver: true,
     }));
     const loopB = Animated.loop(Animated.sequence([
-      Animated.delay(700),
-      Animated.timing(ringB, { toValue: 1, duration: 1400, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+      Animated.delay(pulseSpeed / 2),
+      Animated.timing(ringB, { toValue: 1, duration: pulseSpeed, easing: Easing.out(Easing.quad), useNativeDriver: true }),
       Animated.timing(ringB, { toValue: 0, duration: 0, useNativeDriver: true }),
     ]));
     const breathLoop = Animated.loop(Animated.sequence([
-      Animated.timing(breath, { toValue: 1, duration: 600, useNativeDriver: true }),
-      Animated.timing(breath, { toValue: 0, duration: 600, useNativeDriver: true }),
+      Animated.timing(breath, { toValue: 1, duration: Math.round(pulseSpeed * 0.43), useNativeDriver: true }),
+      Animated.timing(breath, { toValue: 0, duration: Math.round(pulseSpeed * 0.43), useNativeDriver: true }),
     ]));
     loopA.start(); loopB.start(); breathLoop.start();
     return () => { loopA.stop(); loopB.stop(); breathLoop.stop(); };
-  }, [speaking]);
+  }, [speaking, pulseEnabled, pulseSpeed]);
 
-  if (!speaking) return null;
+  if (!speaking || !pulseEnabled) return null;
 
-  // Ring A — sürekli dışa expand
-  const ringAScale = ringA.interpolate({ inputRange: [0, 1], outputRange: [1.0, 1.35] });
+  // Ring A — sürekli dışa expand (config-driven ringExpand)
+  const ringAScale = ringA.interpolate({ inputRange: [0, 1], outputRange: [1.0, ringExpand] });
   const ringAOpacity = ringA.interpolate({ inputRange: [0, 0.4, 1], outputRange: [0.85, 0.55, 0] });
   // Ring B — gecikmeli, üst üste binmesin
-  const ringBScale = ringB.interpolate({ inputRange: [0, 1], outputRange: [1.0, 1.35] });
+  const ringBScale = ringB.interpolate({ inputRange: [0, 1], outputRange: [1.0, ringExpand] });
   const ringBOpacity = ringB.interpolate({ inputRange: [0, 0.4, 1], outputRange: [0.85, 0.55, 0] });
   // Sabit referans border — yumuşak nefes
   const breathScale = breath.interpolate({ inputRange: [0, 1], outputRange: [1.0, 1.04] });
 
   return (
     <>
-      {/* Ring A — dışa expand pulse */}
+      {/* Ring A — dışa expand pulse (v286: speakers.speakingRingColor canlı) */}
       <Animated.View
         pointerEvents="none"
         style={[StyleSheet.absoluteFill, {
-          borderRadius, borderWidth: 2, borderColor: '#14B8A6',
+          borderRadius, borderWidth: 2, borderColor: ringColor,
           transform: [{ scale: ringAScale }],
           opacity: ringAOpacity,
         }]}
@@ -161,16 +221,16 @@ function SpeakingGlow({ speaking, borderRadius = 16 }: { speaking: boolean; bord
       <Animated.View
         pointerEvents="none"
         style={[StyleSheet.absoluteFill, {
-          borderRadius, borderWidth: 1.5, borderColor: '#5EEAD4',
+          borderRadius, borderWidth: 1.5, borderColor: ringColor,
           transform: [{ scale: ringBScale }],
           opacity: ringBOpacity,
         }]}
       />
-      {/* Sabit referans border — Skia BlurMask ile cross-platform turkuaz glow (Android dahil) */}
+      {/* Sabit referans border */}
       <Animated.View
         pointerEvents="none"
         style={[StyleSheet.absoluteFill, {
-          borderRadius, borderWidth: 2, borderColor: '#14B8A6',
+          borderRadius, borderWidth: 2, borderColor: ringColor,
           transform: [{ scale: breathScale }],
         }]}
       />
@@ -706,7 +766,35 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, i
     //   Gerçek "kendi konumundan kayma" için FLIP technique gerekir (shared element).
     //   Şimdilik instant — kullanıcı pozisyon değişimini görür, zıplama yok.
     <View style={[s.speakerCard, { width: cardWidth }]}>
-      <Pressable style={({ pressed }) => [{ width: '100%' }, pressed && { opacity: 0.9, transform: [{ scale: 0.97 }] }]} onPress={onPress}>
+      {/* ★ v286 (16 May 2026): Host halo (Skia) + opsiyonel pulse — config-driven.
+          Frame yüklü değilse aktif (frame zaten kendi halkasını taşır). */}
+      {isHost && !activeFrame && (
+        <HostHalo size={cardWidth} borderRadius={avatarShapeRadius} />
+      )}
+      {/* ★ v286: Avatar gölgesi (Skia) — host/speaker ayrı config */}
+      {!activeFrame && (() => {
+        const sh = layout.shadows;
+        const enabled = isHost ? sh.hostShadowOpacity > 0 : sh.speakerShadowEnabled;
+        if (!enabled) return null;
+        const color = isHost ? sh.hostShadowColor : sh.speakerShadowColor;
+        const blur = isHost ? sh.hostShadowBlur : sh.speakerShadowBlur;
+        const opacity = isHost ? sh.hostShadowOpacity : sh.speakerShadowOpacity;
+        return (
+          <GlowView
+            style={{
+              position: 'absolute',
+              top: 0, left: 0,
+              width: cardWidth, height: cardWidth,
+              borderRadius: avatarShapeRadius,
+              shadowColor: color,
+              shadowOpacity: opacity,
+              shadowRadius: blur,
+            }}
+            pointerEvents="none"
+          />
+        );
+      })()}
+      <Pressable style={({ pressed }) => [{ width: '100%' }, pressed && { opacity: 0.9, transform: [{ scale: layout.animations.avatarTapScale || 0.97 }] }]} onPress={onPress}>
       {/* ★ v109.4: Frame wrapper'ı SADECE avatar alanına kilitlendi (top:0, height:cardWidth).
            Eski: absoluteFillObject Pressable'ın tüm yüksekliğini (avatar + label) kapsıyordu
            → flex center label payı kadar aşağı kaydırıyordu, frame avatardan kayıktı.
