@@ -31,10 +31,14 @@ const tr: Record<string, string> = {
   'common.block': 'Engelle',
   'common.unblock': 'Engeli Kaldır',
   'common.coming_soon': 'Çok Yakında',
+  'common.or': 'veya',
+  'common.and': 've',
 
   // ── Tab Bar ────────────────────────────────────────
   'tabs.home': 'Ana Sayfa',
+  'tabs.discover': 'Keşfet',
   'tabs.rooms': 'Odalar',
+  'tabs.myrooms': 'Odalarım',
   'tabs.messages': 'Mesajlar',
   'tabs.profile': 'Profil',
 
@@ -91,6 +95,20 @@ const tr: Record<string, string> = {
 
   // ── Settings ───────────────────────────────────────
   'settings.title': 'Ayarlar',
+  // ★ v284: Bölüm başlıkları (group headers)
+  'settings.section.notifications': 'Bildirimler',
+  'settings.section.appearance': 'Görünüm',
+  'settings.section.audio': 'Ses & Mikrofon',
+  'settings.section.privacy': 'Gizlilik',
+  'settings.section.account': 'Hesap',
+  'settings.section.about': 'Hakkında',
+  'settings.section.subscription': 'Abonelik',
+  'settings.section.session': 'Oturum',
+  // ★ v284: Eksik açıklamalar
+  'settings.hidden_rooms': 'Gizlenen Odalar',
+  'settings.hidden_rooms_desc': 'Gizlediğin odaları geri getir',
+  'settings.private_profile_save_failed': 'Gizli profil ayarı sunucuya iletilemedi. Bağlantını kontrol et.',
+  'settings.delete_account_failed': 'Hesap Silinemedi',
   'settings.notifications': 'Bildirimler',
   'settings.notifications_desc': 'Push bildirimleri aç/kapat',
   'settings.notification_sound': 'Bildirim Sesi',
@@ -147,9 +165,24 @@ const tr: Record<string, string> = {
   'auth.login': 'Giriş Yap',
   'auth.signup': 'Kayıt Ol',
   'auth.google_signin': 'Google ile Devam Et',
+  'auth.email_login': 'E-posta ile Giriş',
   'auth.phone_signin': 'Telefon ile Giriş',
   'auth.welcome': 'Hoş Geldin',
   'auth.welcome_desc': 'Sesli sohbetin yeni adresi',
+  'auth.create_account': 'Yeni Hesap Oluştur',
+  'auth.email_placeholder': 'E-posta adresiniz',
+  'auth.password_placeholder': 'Şifreniz',
+  'auth.password_confirm_placeholder': 'Şifre (Tekrar)',
+  'auth.forgot_password': 'Şifremi Unuttum?',
+  'auth.have_account': 'Zaten hesabın var mı? Giriş Yap',
+  'auth.no_account': 'Hesabın yok mu? Kayıt Ol',
+  'auth.email_not_verified': 'E-posta Doğrulanmadı',
+  'auth.email_not_verified_desc': 'Devam etmek için e-postanızı doğrulayın. Spam klasörünü de kontrol edin.',
+  'auth.resend': 'Tekrar Gönder',
+  'auth.sending': 'Gönderiliyor...',
+  'auth.verified_check': 'Doğruladım',
+  'auth.terms_prefix': 'Devam ederek',
+  'auth.terms_suffix': '\'nı kabul edersiniz.',
 
   // ── Notifications ──────────────────────────────────
   'notif.new_friend': 'Yeni Arkadaş',

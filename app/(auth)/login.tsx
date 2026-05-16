@@ -40,6 +40,7 @@ import AccountDeletedOverlay from '../../components/AccountDeletedOverlay';
 import { consumeAccountJustDeletedFlag } from '../../services/account';
 import { auth, GOOGLE_WEB_CLIENT_ID } from '../../constants/firebase';
 import { useAuth } from '../_layout';
+import { useTranslation } from '../../services/i18n';
 
 const { height: SCREEN_HEIGHT, width: SCREEN_W } = Dimensions.get('window');
 
@@ -91,6 +92,7 @@ const BF_COOLDOWN_KEY = '@soprano_bf_cooldown';
 
 export default function LoginScreen() {
   const { firebaseUser, refreshAuth } = useAuth();
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [resendLoading, setResendLoading] = useState(false);
 
@@ -563,15 +565,15 @@ export default function LoginScreen() {
                 <View style={s.verifyBanner}>
                   <Ionicons name="mail-unread-outline" size={22} color="#F59E0B" />
                   <View style={{ flex: 1, marginLeft: 12 }}>
-                    <Text style={s.verifyTitle}>E-posta Doğrulanmadı</Text>
-                    <Text style={s.verifyDesc}>Devam etmek için e-postanızı doğrulayın. Spam klasörünü de kontrol edin.</Text>
+                    <Text style={s.verifyTitle}>{t('auth.email_not_verified')}</Text>
+                    <Text style={s.verifyDesc}>{t('auth.email_not_verified_desc')}</Text>
                   </View>
                   <View style={s.verifyActions}>
                     <Pressable onPress={handleResendVerification} disabled={resendLoading} style={s.verifyBtn}>
-                      <Text style={s.verifyBtnText}>{resendLoading ? 'Gönderiliyor...' : 'Tekrar Gönder'}</Text>
+                      <Text style={s.verifyBtnText}>{resendLoading ? t('auth.sending') : t('auth.resend')}</Text>
                     </Pressable>
                     <Pressable onPress={handleCheckVerification} style={[s.verifyBtn, s.verifyBtnPrimary]}>
-                      <Text style={[s.verifyBtnText, { color: '#FFF' }]}>Doğruladım</Text>
+                      <Text style={[s.verifyBtnText, { color: '#FFF' }]}>{t('auth.verified_check')}</Text>
                     </Pressable>
                   </View>
                 </View>
@@ -584,7 +586,7 @@ export default function LoginScreen() {
                     <Pressable onPress={() => { setShowEmailForm(false); setIsRegisterMode(false); setPassword(''); setPasswordConfirm(''); setShowPassword(false); setShowPasswordConfirm(false); }} style={s.backBtn}>
                       <Ionicons name="arrow-back" size={18} color="#F1F5F9" />
                     </Pressable>
-                    <Text style={s.formTitle}>{isRegisterMode ? 'Yeni Hesap Oluştur' : 'E-posta ile Giriş'}</Text>
+                    <Text style={s.formTitle}>{isRegisterMode ? t('auth.create_account') : t('auth.email_login')}</Text>
                   </View>
 
                   {/* Email input */}
@@ -592,14 +594,14 @@ export default function LoginScreen() {
                     <Ionicons name="mail-outline" size={18} color="#64748B" style={s.inputIcon} accessibilityElementsHidden importantForAccessibility="no" />
                     <TextInput
                       style={s.glassInput}
-                      placeholder="E-posta adresiniz"
+                      placeholder={t('auth.email_placeholder')}
                       placeholderTextColor="#475569"
                       value={email}
                       onChangeText={setEmail}
                       keyboardType="email-address"
                       autoCapitalize="none"
                       autoComplete="email"
-                      accessibilityLabel="E-posta adresi"
+                      accessibilityLabel={t('auth.email_placeholder')}
                     />
                   </View>
 
@@ -608,12 +610,12 @@ export default function LoginScreen() {
                     <Ionicons name="lock-closed-outline" size={18} color="#64748B" style={s.inputIcon} accessibilityElementsHidden importantForAccessibility="no" />
                     <TextInput
                       style={s.glassInput}
-                      placeholder="Şifreniz"
+                      placeholder={t('auth.password_placeholder')}
                       placeholderTextColor="#475569"
                       value={password}
                       onChangeText={setPassword}
                       secureTextEntry={!showPassword}
-                      accessibilityLabel="Şifre"
+                      accessibilityLabel={t('auth.password_placeholder')}
                     />
                     <Pressable
                       onPress={() => setShowPassword(!showPassword)}
@@ -642,7 +644,7 @@ export default function LoginScreen() {
                       <Ionicons name="lock-closed-outline" size={18} color="#64748B" style={s.inputIcon} />
                       <TextInput
                         style={s.glassInput}
-                        placeholder="Şifre (Tekrar)"
+                        placeholder={t('auth.password_confirm_placeholder')}
                         placeholderTextColor="#475569"
                         value={passwordConfirm}
                         onChangeText={setPasswordConfirm}
@@ -664,27 +666,27 @@ export default function LoginScreen() {
                       start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                       style={s.ctaGradient}
                     >
-                      <Text style={s.ctaBtnText}>{isRegisterMode ? 'Kayıt Ol' : 'Giriş Yap'}</Text>
+                      <Text style={s.ctaBtnText}>{isRegisterMode ? t('auth.signup') : t('auth.login')}</Text>
                     </LinearGradient>
                   </Pressable>
 
                   {/* Şifremi Unuttum */}
                   {!isRegisterMode && (
                     <Pressable style={s.linkBtn} onPress={() => { setShowForgotPassword(true); setResetEmail(email); }}>
-                      <Text style={s.forgotText}>Şifremi Unuttum?</Text>
+                      <Text style={s.forgotText}>{t('auth.forgot_password')}</Text>
                     </Pressable>
                   )}
 
                   {/* veya ayırıcı */}
                   <View style={s.dividerRow}>
                     <View style={s.dividerLine} />
-                    <Text style={s.dividerText}>veya</Text>
+                    <Text style={s.dividerText}>{t('common.or')}</Text>
                     <View style={s.dividerLine} />
                   </View>
 
                   <Pressable style={s.linkBtn} onPress={() => setIsRegisterMode(!isRegisterMode)}>
                     <Text style={s.linkText}>
-                      {isRegisterMode ? 'Zaten hesabın var mı? Giriş Yap' : 'Hesabın yok mu? Kayıt Ol'}
+                      {isRegisterMode ? t('auth.have_account') : t('auth.no_account')}
                     </Text>
                   </Pressable>
                 </View>
@@ -704,7 +706,7 @@ export default function LoginScreen() {
                       <View style={s.socialIconWrap}>
                         <Ionicons name="logo-google" size={20} color="#FFF" />
                       </View>
-                      <Text style={s.socialBtnText}>Google ile Devam Et</Text>
+                      <Text style={s.socialBtnText}>{t('auth.google_signin')}</Text>
                       <Ionicons name="arrow-forward" size={18} color="rgba(255,255,255,0.5)" style={{ position: 'absolute', right: 16 }} />
                     </LinearGradient>
                   </Pressable>
@@ -722,7 +724,7 @@ export default function LoginScreen() {
                       <View style={s.socialIconWrap}>
                         <Ionicons name="mail-outline" size={20} color="#FFF" />
                       </View>
-                      <Text style={s.socialBtnText}>E-posta ile Giriş</Text>
+                      <Text style={s.socialBtnText}>{t('auth.email_login')}</Text>
                       <Ionicons name="arrow-forward" size={18} color="rgba(255,255,255,0.5)" style={{ position: 'absolute', right: 16 }} />
                     </LinearGradient>
                   </Pressable>
@@ -737,9 +739,10 @@ export default function LoginScreen() {
 
             {/* Terms — pasif bilgilendirme */}
             <Text style={s.terms}>
-              Devam ederek{' '}
-              <Text style={s.termsLink} onPress={() => Linking.openURL('https://sopranochat.com/terms')}>Kullanım Koşulları</Text>{' '}ve{' '}
-              <Text style={s.termsLink} onPress={() => Linking.openURL('https://sopranochat.com/privacy')}>Gizlilik Politikası</Text>'nı kabul edersiniz.
+              {t('auth.terms_prefix')}{' '}
+              <Text style={s.termsLink} onPress={() => Linking.openURL('https://sopranochat.com/terms')}>{t('settings.terms')}</Text>{' '}{t('common.and')}{' '}
+              <Text style={s.termsLink} onPress={() => Linking.openURL('https://sopranochat.com/privacy')}>{t('settings.privacy_policy')}</Text>
+              {t('auth.terms_suffix')}
             </Text>
           </View>
         </ScrollView>

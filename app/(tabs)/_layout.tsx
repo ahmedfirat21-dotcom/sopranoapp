@@ -20,6 +20,7 @@ import Animated, {
 export { useAuth } from '../_layout';
 export { useBadges } from '../_layout';
 import { useAuth, useBadges } from '../_layout';
+import { useTranslation } from '../../services/i18n';
 
 // ★ 2026-04-22: Module-level width kullanımı kaldırıldı — fiziksel telefonda (özellikle
 // Android gesture-nav) Dimensions.get('window') modül yüklenirken sistem bar boyutunu
@@ -44,13 +45,14 @@ const darken = (hex: string, pct: number) => lighten(hex, -pct);
 const TAB_CFG: Record<string, {
   activeIcon: any;
   inactiveIcon: any;
-  label: string;
+  /** i18n key (ör. 'tabs.discover'); runtime'da t() ile çevrilir */
+  labelKey: string;
   accent: string;
 }> = {
-  home:     { activeIcon: 'radio',               inactiveIcon: 'radio-outline',               label: 'Keşfet',   accent: '#14B8A6' },
-  myrooms:  { activeIcon: 'home',                inactiveIcon: 'home-outline',                label: 'Odalarım', accent: '#3B82F6' },
-  messages: { activeIcon: 'chatbubble-ellipses', inactiveIcon: 'chatbubble-ellipses-outline', label: 'Mesajlar', accent: '#8B5CF6' },
-  profile:  { activeIcon: 'person',              inactiveIcon: 'person-outline',              label: 'Profil',   accent: '#F59E0B' },
+  home:     { activeIcon: 'radio',               inactiveIcon: 'radio-outline',               labelKey: 'tabs.discover', accent: '#14B8A6' },
+  myrooms:  { activeIcon: 'home',                inactiveIcon: 'home-outline',                labelKey: 'tabs.myrooms',  accent: '#3B82F6' },
+  messages: { activeIcon: 'chatbubble-ellipses', inactiveIcon: 'chatbubble-ellipses-outline', labelKey: 'tabs.messages', accent: '#8B5CF6' },
+  profile:  { activeIcon: 'person',              inactiveIcon: 'person-outline',              labelKey: 'tabs.profile',  accent: '#F59E0B' },
 };
 
 const TABS = ['home', 'myrooms', 'messages', 'profile'];
@@ -121,6 +123,7 @@ function Tab({ isFocused, cfg, badge, onPress, routeName }: {
   onPress: () => void;
   routeName: string;
 }) {
+  const { t } = useTranslation();
   const progress = useSharedValue(isFocused ? 1 : 0);
   // ★ 2026-04-21: Tab-specific animation shared values.
   const iconX = useSharedValue(0);      // translateX wiggle (Keşfet + Mesajlar)
@@ -285,7 +288,7 @@ function Tab({ isFocused, cfg, badge, onPress, routeName }: {
       </Animated.View>
 
       {/* ★ 2026-04-29: Label geri eklendi — pasif ikon altında tab ismi */}
-      <Animated.Text style={[s.label, labelAnim]}>{cfg.label}</Animated.Text>
+      <Animated.Text style={[s.label, labelAnim]}>{t(cfg.labelKey)}</Animated.Text>
     </Pressable>
   );
 }

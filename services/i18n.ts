@@ -24,6 +24,7 @@
  *   - Hiçbir 3. parti bağımlılık yok (react-i18next, expo-localization vb.)
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useEffect, useState, useCallback } from 'react';
 
 // Locale dosyaları — statik import (bundle'a dahil, network gerektirmez)
 import tr from '../locales/tr';
@@ -154,3 +155,37 @@ export const i18n = {
     return locales[currentLocale]?.[key] !== undefined;
   },
 };
+
+/**
+ * ★ v284 (16 May 2026): React hook — locale değişince component re-render olur.
+ *
+ * Kullanım:
+ *   const { t, locale, setLocale } = useTranslation();
+ *   <Text>{t('home.discover')}</Text>
+ *   <Button onPress={() => setLocale('en')}>EN</Button>
+ *
+ * useTranslation() döndüğünde `t` her zaman güncel locale'i kullanır;
+ * locale değişiminde subscriber listesi üzerinden re-render tetiklenir.
+ */
+export function useTranslation() {
+  const [, forceUpdate] = useState(0);
+
+  useEffect(() => {
+    const unsubscribe = i18n.onLocaleChange(() => {
+      forceUpdate(v => v + 1);
+    });
+    return unsubscribe;
+  }, []);
+
+  const t = useCallback(
+    (key: string, params?: Record<string, string | number>) => i18n.t(key, params),
+    // currentLocale değişikliği forceUpdate ile re-render yapacak; t referansı stable
+    [],
+  );
+
+  return {
+    t,
+    locale: i18n.locale,
+    setLocale: i18n.setLocale.bind(i18n),
+  };
+}

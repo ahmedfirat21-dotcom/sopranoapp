@@ -31,10 +31,14 @@ const en: Record<string, string> = {
   'common.block': 'Block',
   'common.unblock': 'Unblock',
   'common.coming_soon': 'Coming Soon',
+  'common.or': 'or',
+  'common.and': 'and',
 
   // ── Tab Bar ────────────────────────────────────────
   'tabs.home': 'Home',
+  'tabs.discover': 'Discover',
   'tabs.rooms': 'Rooms',
+  'tabs.myrooms': 'My Rooms',
   'tabs.messages': 'Messages',
   'tabs.profile': 'Profile',
 
@@ -91,6 +95,20 @@ const en: Record<string, string> = {
 
   // ── Settings ───────────────────────────────────────
   'settings.title': 'Settings',
+  // ★ v284: Section headers
+  'settings.section.notifications': 'Notifications',
+  'settings.section.appearance': 'Appearance',
+  'settings.section.audio': 'Audio & Microphone',
+  'settings.section.privacy': 'Privacy',
+  'settings.section.account': 'Account',
+  'settings.section.about': 'About',
+  'settings.section.subscription': 'Subscription',
+  'settings.section.session': 'Session',
+  // ★ v284: Extra
+  'settings.hidden_rooms': 'Hidden Rooms',
+  'settings.hidden_rooms_desc': 'Restore rooms you hid',
+  'settings.private_profile_save_failed': 'Private profile setting could not be saved. Check your connection.',
+  'settings.delete_account_failed': 'Account Deletion Failed',
   'settings.notifications': 'Notifications',
   'settings.notifications_desc': 'Enable/disable push notifications',
   'settings.notification_sound': 'Notification Sound',
@@ -147,9 +165,24 @@ const en: Record<string, string> = {
   'auth.login': 'Log In',
   'auth.signup': 'Sign Up',
   'auth.google_signin': 'Continue with Google',
+  'auth.email_login': 'Log In with Email',
   'auth.phone_signin': 'Log In with Phone',
   'auth.welcome': 'Welcome',
   'auth.welcome_desc': 'The new home of voice chat',
+  'auth.create_account': 'Create New Account',
+  'auth.email_placeholder': 'Your email address',
+  'auth.password_placeholder': 'Your password',
+  'auth.password_confirm_placeholder': 'Password (Repeat)',
+  'auth.forgot_password': 'Forgot Password?',
+  'auth.have_account': 'Already have an account? Log In',
+  'auth.no_account': 'No account? Sign Up',
+  'auth.email_not_verified': 'Email Not Verified',
+  'auth.email_not_verified_desc': 'Please verify your email to continue. Check your spam folder too.',
+  'auth.resend': 'Resend',
+  'auth.sending': 'Sending...',
+  'auth.verified_check': 'I Verified',
+  'auth.terms_prefix': 'By continuing, you accept',
+  'auth.terms_suffix': '.',
 
   // ── Notifications ──────────────────────────────────
   'notif.new_friend': 'New Friend',

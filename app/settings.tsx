@@ -29,6 +29,7 @@ import AppBackground from '../components/AppBackground';
 import PremiumAlert, { type AlertButton } from '../components/PremiumAlert';
 import BlockedUsersSheet from '../components/BlockedUsersSheet';
 import NotifPreferencesSheet from '../components/NotifPreferencesSheet';
+import { useTranslation, i18n, type SupportedLocale } from '../services/i18n';
 // ★ Version — app.json'dan dinamik okunur, hardcode kaldırıldı (v86 fix)
 //   Eski hardcode "v1.2.4" yüzünden her APK'da aynı görünüyordu, kullanıcı güncellemediğini sanıyordu.
 let APP_VERSION = 'unknown';
@@ -57,8 +58,10 @@ try {
 type SettingItem = {
   key: string;
   icon: string; // MCI name
-  label: string;
-  desc?: string;
+  /** i18n key (ör. 'settings.notifications') — t() ile çevrilir */
+  labelKey: string;
+  /** i18n key (ör. 'settings.notifications_desc') */
+  descKey?: string;
   type: 'toggle' | 'select' | 'action' | 'link';
   color?: string;
   danger?: boolean;
@@ -72,66 +75,65 @@ const ACCENT = '#14B8A6';
 const ACCENT_DANGER = '#EF4444';
 const ICON_COLOR = '#94A3B8';
 
-const SETTING_GROUPS: { title: string; icon: string; color: string; items: SettingItem[] }[] = [
+const SETTING_GROUPS: { titleKey: string; icon: string; color: string; items: SettingItem[] }[] = [
   {
-    title: 'Bildirimler', icon: 'bell-ring', color: ACCENT,
+    titleKey: 'settings.section.notifications', icon: 'bell-ring', color: ACCENT,
     items: [
-      { key: 'notifications_enabled', icon: 'bell', label: 'Bildirimler', desc: 'Push bildirimleri aç/kapat', type: 'toggle' },
-      { key: 'notification_sound', icon: 'music-note', label: 'Bildirim Sesi', desc: 'Bildirim gelince ses çal', type: 'toggle', parentKey: 'notifications_enabled' },
-      { key: 'notification_vibration', icon: 'vibrate', label: 'Titreşim', desc: 'Bildirimde titreşim', type: 'toggle', parentKey: 'notifications_enabled' },
-      { key: 'notification_prefs', icon: 'tune-vertical', label: 'Bildirim Tercihleri', desc: 'DND saati, kategori filtreleme, sadece arkadaşlar', type: 'action' },
+      { key: 'notifications_enabled', icon: 'bell', labelKey: 'settings.notifications', descKey: 'settings.notifications_desc', type: 'toggle' },
+      { key: 'notification_sound', icon: 'music-note', labelKey: 'settings.notification_sound', descKey: 'settings.notification_sound_desc', type: 'toggle', parentKey: 'notifications_enabled' },
+      { key: 'notification_vibration', icon: 'vibrate', labelKey: 'settings.notification_vibration', descKey: 'settings.notification_vibration_desc', type: 'toggle', parentKey: 'notifications_enabled' },
+      { key: 'notification_prefs', icon: 'tune-vertical', labelKey: 'settings.notification_prefs', descKey: 'settings.notification_prefs_desc', type: 'action' },
     ],
   },
   {
-    title: 'Görünüm', icon: 'palette', color: ACCENT,
+    titleKey: 'settings.section.appearance', icon: 'palette', color: ACCENT,
     items: [
-      { key: 'theme', icon: 'palette-swatch', label: 'Tema', desc: 'Koyu tema (aydınlık yakında)', type: 'action' },
-      { key: 'language', icon: 'translate', label: 'Dil', desc: 'Türkçe (İngilizce yakında)', type: 'action' },
-    ],
-  },
-  // ★ 2026-04-25: Faz 3.4 — Ses & Mikrofon ayarları (LiveKit publish options)
-  {
-    title: 'Ses & Mikrofon', icon: 'microphone', color: ACCENT,
-    items: [
-      { key: 'echo_cancellation', icon: 'volume-off', label: 'Yankı Engelleme', desc: 'Yansıyan sesleri filtrele (önerilen)', type: 'toggle' },
-      { key: 'noise_suppression', icon: 'waveform', label: 'Gürültü Bastırma', desc: 'Arka plan gürültüsünü azalt', type: 'toggle' },
-      { key: 'auto_gain', icon: 'tune-vertical', label: 'Otomatik Ses Seviyesi', desc: 'Mikrofonu otomatik dengele', type: 'toggle' },
+      { key: 'theme', icon: 'palette-swatch', labelKey: 'settings.theme', descKey: 'settings.theme_desc', type: 'action' },
+      { key: 'language', icon: 'translate', labelKey: 'settings.language', type: 'select' },
     ],
   },
   {
-    title: 'Gizlilik', icon: 'shield-check', color: ACCENT,
+    titleKey: 'settings.section.audio', icon: 'microphone', color: ACCENT,
     items: [
-      { key: 'show_online_status', icon: 'eye', label: 'Çevrimiçi Durumu', desc: 'Diğerleri seni çevrimiçi görsün', type: 'toggle' },
-      { key: 'profile_private', icon: 'lock', label: 'Gizli Profil', desc: 'Sadece takipçiler', type: 'toggle' },
+      { key: 'echo_cancellation', icon: 'volume-off', labelKey: 'settings.echo_cancellation', descKey: 'settings.echo_cancellation_desc', type: 'toggle' },
+      { key: 'noise_suppression', icon: 'waveform', labelKey: 'settings.noise_suppression', descKey: 'settings.noise_suppression_desc', type: 'toggle' },
+      { key: 'auto_gain', icon: 'tune-vertical', labelKey: 'settings.auto_gain', descKey: 'settings.auto_gain_desc', type: 'toggle' },
     ],
   },
   {
-    title: 'Hesap', icon: 'account-circle', color: ACCENT,
+    titleKey: 'settings.section.privacy', icon: 'shield-check', color: ACCENT,
     items: [
-      { key: 'edit_profile', icon: 'account-edit', label: 'Profili Düzenle', type: 'action' },
-      { key: 'blocked_users', icon: 'account-cancel', label: 'Engellenen Kullanıcılar', desc: 'Engellediğin kişileri yönet', type: 'action' },
-      { key: 'hidden_rooms', icon: 'eye-off', label: 'Gizlenen Odalar', desc: 'Gizlediğin odaları geri getir', type: 'action' },
+      { key: 'show_online_status', icon: 'eye', labelKey: 'settings.online_status', descKey: 'settings.online_status_desc', type: 'toggle' },
+      { key: 'profile_private', icon: 'lock', labelKey: 'settings.private_profile', descKey: 'settings.private_profile_desc', type: 'toggle' },
     ],
   },
   {
-    title: 'Hakkında', icon: 'information', color: ACCENT,
+    titleKey: 'settings.section.account', icon: 'account-circle', color: ACCENT,
     items: [
-      { key: 'terms', icon: 'file-document', label: 'Kullanım Koşulları', type: 'link' },
-      { key: 'privacy', icon: 'shield-lock', label: 'Gizlilik Politikası', type: 'link' },
-      { key: 'version', icon: 'code-tags', label: 'Versiyon', desc: APP_VERSION, type: 'action' },
+      { key: 'edit_profile', icon: 'account-edit', labelKey: 'settings.edit_profile', type: 'action' },
+      { key: 'blocked_users', icon: 'account-cancel', labelKey: 'settings.blocked_users', descKey: 'settings.blocked_users_desc', type: 'action' },
+      { key: 'hidden_rooms', icon: 'eye-off', labelKey: 'settings.hidden_rooms', descKey: 'settings.hidden_rooms_desc', type: 'action' },
     ],
   },
   {
-    title: 'Abonelik', icon: 'credit-card', color: ACCENT,
+    titleKey: 'settings.section.about', icon: 'information', color: ACCENT,
     items: [
-      { key: 'restore_purchases', icon: 'refresh', label: 'Satın Almaları Geri Yükle', desc: 'Cihaz değişikliği sonrası premium\'u geri yükle', type: 'action' },
+      { key: 'terms', icon: 'file-document', labelKey: 'settings.terms', type: 'link' },
+      { key: 'privacy', icon: 'shield-lock', labelKey: 'settings.privacy_policy', type: 'link' },
+      { key: 'version', icon: 'code-tags', labelKey: 'settings.version', type: 'action' },
     ],
   },
   {
-    title: 'Oturum', icon: 'logout-variant', color: ACCENT_DANGER,
+    titleKey: 'settings.section.subscription', icon: 'credit-card', color: ACCENT,
     items: [
-      { key: 'logout', icon: 'logout-variant', label: 'Çıkış Yap', type: 'action', danger: true },
-      { key: 'delete_account', icon: 'trash-can', label: 'Hesabı Sil', desc: 'Tüm veriler kalıcı olarak silinir', type: 'action', danger: true },
+      { key: 'restore_purchases', icon: 'refresh', labelKey: 'settings.restore_purchases', descKey: 'settings.restore_purchases_desc', type: 'action' },
+    ],
+  },
+  {
+    titleKey: 'settings.section.session', icon: 'logout-variant', color: ACCENT_DANGER,
+    items: [
+      { key: 'logout', icon: 'logout-variant', labelKey: 'settings.logout', type: 'action', danger: true },
+      { key: 'delete_account', icon: 'trash-can', labelKey: 'settings.delete_account', descKey: 'settings.delete_account_desc', type: 'action', danger: true },
     ],
   },
 ];
@@ -144,6 +146,7 @@ export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const { firebaseUser, setIsLoggedIn, setUser, profile, refreshProfile } = useAuth();
   const { applyTheme } = useTheme();
+  const { t, locale } = useTranslation();
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [cAlert, setCAlert] = useState<{ visible: boolean; title: string; message: string; type?: 'info' | 'warning' | 'error' | 'success'; buttons?: AlertButton[] }>({ visible: false, title: '', message: '' });
   const [showBlockedSheet, setShowBlockedSheet] = useState(false);
@@ -219,14 +222,27 @@ export default function SettingsScreen() {
           setSettings(prev => prev ? { ...prev, profile_private: !value } : prev);
           await SettingsService.update({ profile_private: !value });
           showToast({
-            title: 'Kaydedilemedi',
-            message: 'Gizli profil ayarı sunucuya iletilemedi. Bağlantını kontrol et.',
+            title: i18n.t('common.error'),
+            message: i18n.t('settings.private_profile_save_failed'),
             type: 'error',
           });
         }
       }
     })();
   }, [firebaseUser, applyTheme, profile]);
+
+  // ★ v284: Dil değiştir — i18n motoru + SettingsService senkron + toast
+  const switchLocale = useCallback(async (next: SupportedLocale) => {
+    if (i18n.locale === next) return;
+    await i18n.setLocale(next);
+    await SettingsService.update({ language: next });
+    setSettings(prev => prev ? { ...prev, language: next } : prev);
+    showToast({
+      title: i18n.t('settings.language_changed'),
+      message: i18n.t('settings.language_restart_hint'),
+      type: 'success',
+    });
+  }, []);
 
   const handleAction = useCallback((key: string) => {
     switch (key) {
@@ -242,13 +258,13 @@ export default function SettingsScreen() {
       case 'logout':
         setCAlert({
           visible: true,
-          title: 'Çıkış Yap',
-          message: 'Hesabından çıkmak istediğine emin misin?',
+          title: t('settings.logout'),
+          message: t('settings.logout_confirm'),
           type: 'warning',
           buttons: [
-            { text: 'İptal', style: 'cancel' },
+            { text: t('common.cancel'), style: 'cancel' },
             {
-              text: 'Çıkış Yap', style: 'destructive',
+              text: t('settings.logout'), style: 'destructive',
               onPress: async () => {
                 try {
                   if (firebaseUser) {
@@ -274,7 +290,7 @@ export default function SettingsScreen() {
                   setUser(null);
                   router.replace('/(auth)/login');
                 } catch (e) {
-                  showToast({ title: 'Çıkış Yapılamadı', message: 'Oturum kapatılamadı, tekrar dene.', type: 'error' });
+                  showToast({ title: t('common.error'), message: t('settings.logout_failed'), type: 'error' });
                 }
               },
             },
@@ -284,16 +300,16 @@ export default function SettingsScreen() {
       case 'restore_purchases':
         (async () => {
           if (!firebaseUser) return;
-          showToast({ title: 'Geri Yükleniyor...', message: 'Satın almalar kontrol ediliyor', type: 'info' });
+          showToast({ title: t('settings.restoring'), message: t('settings.restoring_desc'), type: 'info' });
           try {
             const { restoredTier } = await RevenueCatService.restorePurchases(firebaseUser.uid);
             if (restoredTier && restoredTier !== 'Free') {
-              showToast({ title: 'Başarılı!', message: `${restoredTier} üyeliğin geri yüklendi`, type: 'success' });
+              showToast({ title: t('common.success'), message: t('settings.restore_success', { tier: restoredTier }), type: 'success' });
             } else {
-              showToast({ title: 'Bulunamadı', message: 'Bu hesaba ait aktif abonelik yok', type: 'info' });
+              showToast({ title: t('error.not_found'), message: t('settings.restore_not_found'), type: 'info' });
             }
           } catch {
-            showToast({ title: 'Geri Yükleme Başarısız', message: 'Satın almalar kontrol edilemedi.', type: 'error' });
+            showToast({ title: t('common.error'), message: t('settings.restore_failed'), type: 'error' });
           }
         })();
         break;
@@ -341,11 +357,9 @@ export default function SettingsScreen() {
         })();
         break;
       case 'theme':
-        showToast({ title: 'Çok Yakında', message: 'Aydınlık tema üzerinde çalışıyoruz.', type: 'info' });
+        showToast({ title: t('common.coming_soon'), message: t('settings.theme_desc'), type: 'info' });
         break;
-      case 'language':
-        showToast({ title: 'Çok Yakında', message: 'İngilizce dil desteği üzerinde çalışıyoruz.', type: 'info' });
-        break;
+      // 'language' artık inline toggle (type:'select'); modal yok.
       case 'blocked_users':
         setShowBlockedSheet(true);
         break;
@@ -358,13 +372,13 @@ export default function SettingsScreen() {
       case 'delete_account':
         setCAlert({
           visible: true,
-          title: '⚠️ Hesabını Sil',
-          message: 'Bu işlem GERİ ALINAMAZ. Tüm verilerin, mesajların, odaların ve rozetlerin kalıcı olarak silinecek.',
+          title: `⚠️ ${t('settings.delete_account')}`,
+          message: t('settings.delete_account_confirm'),
           type: 'error',
           buttons: [
-            { text: 'İptal', style: 'cancel' },
+            { text: t('common.cancel'), style: 'cancel' },
             {
-              text: 'Hesabımı Kalıcı Olarak Sil',
+              text: t('settings.delete_account_button'),
               style: 'destructive',
               onPress: async () => {
                 if (!firebaseUser) return;
@@ -378,10 +392,10 @@ export default function SettingsScreen() {
                   setUser(null);
                   router.replace('/(auth)/login' as any);
                   performDeleteAccount(userToDelete).catch((e: any) => {
-                    showToast({ title: 'Hesap Silinemedi', message: e?.message || 'İşlem tamamlanamadı.', type: 'error' });
+                    showToast({ title: t('settings.delete_account_failed'), message: e?.message || t('error.generic'), type: 'error' });
                   });
                 } catch (e: any) {
-                  showToast({ title: 'Hesap Silinemedi', message: e?.message || 'İşlem tamamlanamadı.', type: 'error' });
+                  showToast({ title: t('settings.delete_account_failed'), message: e?.message || t('error.generic'), type: 'error' });
                 }
               },
             },
@@ -401,7 +415,7 @@ export default function SettingsScreen() {
         <Pressable onPress={() => safeGoBack(router)} hitSlop={12}>
           <Ionicons name="chevron-back" size={24} color="#F1F5F9" />
         </Pressable>
-        <Text style={s.headerTitle}>Ayarlar</Text>
+        <Text style={s.headerTitle}>{t('settings.title')}</Text>
         <View style={{ width: 24 }} />
       </View>
 
@@ -418,7 +432,7 @@ export default function SettingsScreen() {
                 textShadowColor: `${group.color}cc`,
                 textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 8,
               }} />
-              <Text style={s.groupTitle}>{group.title}</Text>
+              <Text style={s.groupTitle}>{t(group.titleKey)}</Text>
             </View>
 
             {/* ★ 2026-05-05: NotificationDrawer aile dili — slate diagonal + group color halo + soft glow */}
@@ -472,7 +486,8 @@ export default function SettingsScreen() {
                         if (item.key === 'theme') {
                           updateSetting('theme', settingValue === 'dark' ? 'light' : 'dark');
                         } else if (item.key === 'language') {
-                          updateSetting('language', settingValue === 'tr' ? 'en' : 'tr');
+                          // ★ v284: inline TR↔EN toggle + i18n motorunu tetikle
+                          switchLocale(settingValue === 'tr' ? 'en' : 'tr');
                         }
                       } else if (item.type === 'toggle') {
                         updateSetting(item.key as keyof UserSettings, !settingValue);
@@ -490,10 +505,12 @@ export default function SettingsScreen() {
                     />
                     <View style={s.rowText}>
                       <Text style={[s.rowLabel, item.danger && { color: ACCENT_DANGER }]}>
-                        {item.label}
+                        {t(item.labelKey)}
                       </Text>
-                      {item.desc && (
-                        <Text style={s.rowDesc}>{item.desc}</Text>
+                      {(item.descKey || item.key === 'version') && (
+                        <Text style={s.rowDesc}>
+                          {item.key === 'version' ? APP_VERSION : t(item.descKey!)}
+                        </Text>
                       )}
                     </View>
 
