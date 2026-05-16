@@ -665,28 +665,61 @@ export default function ProfileScreen() {
             />
           )}
 
-          {/* ═══ SP Cüzdan — kompakt tek satır (v108.17) ═══ */}
-          <Pressable style={p.walletCompact} onPress={openSPHistory} accessibilityLabel={i18n.t('auto.tabs.profile.009')}>
-            <LinearGradient
-              colors={['#2A1F12', '#1e160d']}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-              style={StyleSheet.absoluteFillObject}
-            />
-            <LinearGradient
-              colors={['rgba(251,191,36,0.20)', 'rgba(251,191,36,0.04)']}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-              style={StyleSheet.absoluteFillObject}
-            />
-            <SPHexagonIcon size={56} />
-            <View style={{ flex: 1, marginLeft: 14 }}>
-              <Text style={p.walletCompactLabel}>{t('profile.sp_wallet')}</Text>
-              <Text style={p.walletCompactAmount}>{isGM ? '∞' : spBalance.toLocaleString('tr-TR')}</Text>
-            </View>
-            <View style={p.levelBadge}>
-              <Text style={p.levelText}>Lv.{userLevel}</Text>
-            </View>
-            <Ionicons name="time-outline" size={18} color="#FAC775" style={{ marginLeft: 8 }} />
-          </Pressable>
+          {/* ═══ Aksiyon Satırı — 2 sütun: Profili Öne Çıkar (Boost) + SP Cüzdan ═══
+              ★ v289 (16 May 2026): Eski tek satırlık SP Cüzdan kartı yerine
+              modern 2-col aksiyon satırı. Boost (Plus kilitli) sola, SP Cüzdan sağa. */}
+          <View style={p.actionRow}>
+            <Pressable
+              style={p.actionCard}
+              onPress={() => {
+                if (isTierAtLeast(subscriptionTier, 'Plus')) {
+                  setShowBoostPicker(true);
+                } else {
+                  showToast({ title: t('profile.plus_required'), message: t('profile.plus_required_boost'), type: 'info' });
+                  setTimeout(() => router.push('/plus' as any), 800);
+                }
+              }}
+              accessibilityLabel={t('profile.menu.boost')}
+            >
+              <LinearGradient
+                colors={['#2A1B26', '#1E1320']}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                style={StyleSheet.absoluteFillObject}
+              />
+              <LinearGradient
+                colors={['rgba(244,114,182,0.20)', 'rgba(244,114,182,0.04)']}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                style={StyleSheet.absoluteFillObject}
+              />
+              <View style={p.actionCardInner}>
+                <MaterialCommunityIcons name="fire" size={22} color="#F472B6" />
+                <View style={{ flex: 1, marginLeft: 10 }}>
+                  <Text style={p.actionLabel}>{t('profile.menu.boost')}</Text>
+                  <Text style={p.actionSubLabel}>{isTierAtLeast(subscriptionTier, 'Plus') ? t('profile.boost_label') : 'Plus'}</Text>
+                </View>
+              </View>
+            </Pressable>
+
+            <Pressable style={p.actionCard} onPress={openSPHistory} accessibilityLabel={i18n.t('auto.tabs.profile.009')}>
+              <LinearGradient
+                colors={['#2A1F12', '#1e160d']}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                style={StyleSheet.absoluteFillObject}
+              />
+              <LinearGradient
+                colors={['rgba(251,191,36,0.20)', 'rgba(251,191,36,0.04)']}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                style={StyleSheet.absoluteFillObject}
+              />
+              <View style={p.actionCardInner}>
+                <Ionicons name="wallet-outline" size={22} color="#FBBF24" />
+                <View style={{ flex: 1, marginLeft: 10 }}>
+                  <Text style={p.actionLabel}>{t('profile.sp_wallet')}</Text>
+                  <Text style={p.actionSubLabel}>{isGM ? '∞ SP' : `${spBalance.toLocaleString('tr-TR')} SP · Lv.${userLevel}`}</Text>
+                </View>
+              </View>
+            </Pressable>
+          </View>
 
           {/* ★ 2026-05-05: Hediye vitrini ProfileHero stats satırına Hediye butonu olarak taşındı.
               Tıklayınca tab'lı GiftDetailModal açılır (Aldığı / Verdiği sekmeleri). */}
@@ -754,20 +787,8 @@ export default function ProfileScreen() {
               badgeColor="#A78BFA"
               onPress={openReferralModal}
             />
-            <PremiumListItem
-              icon="rocket-launch"
-              iconColor="#F472B6"
-              label={t('profile.menu.boost')}
-              lockedForFree={!isTierAtLeast(subscriptionTier, 'Plus')}
-              onPress={() => {
-                if (isTierAtLeast(subscriptionTier, 'Plus')) {
-                  setShowBoostPicker(true);
-                } else {
-                  showToast({ title: t('profile.plus_required'), message: t('profile.plus_required_boost'), type: 'info' });
-                  setTimeout(() => router.push('/plus' as any), 800);
-                }
-              }}
-            />
+            {/* ★ v289 (16 May 2026): Boost menü item'ı KALDIRILDI — hero altına
+                2-col aksiyon satırına taşındı (SP Cüzdan ile yan yana, daha belirgin). */}
             {/* Tehlikeli aksiyonlar — ince ayırıcı sonrası */}
             {/* ★ 2026-05-09: "Hesabımı Sil" kaldırıldı — Ayarlar menüsündeki ile mükerrerdi.
                  Tek kaynak Ayarlar > Hesabı Sil. */}
@@ -1151,6 +1172,27 @@ const p = StyleSheet.create({
     paddingHorizontal: 14, paddingVertical: 10,
     borderRadius: 14, overflow: 'hidden',
     borderWidth: 1, borderColor: 'rgba(251,191,36,0.28)',
+  },
+  // ★ v289 (16 May 2026): 2 sütun aksiyon satırı — Boost + SP Cüzdan yan yana.
+  actionRow: {
+    flexDirection: 'row', gap: 10,
+    marginHorizontal: 16, marginBottom: 12,
+  },
+  actionCard: {
+    flex: 1, height: 60, borderRadius: 14, overflow: 'hidden',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
+  },
+  actionCardInner: {
+    flex: 1, flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 12,
+  },
+  actionLabel: {
+    fontSize: 12, fontWeight: '700', color: '#F1F5F9',
+    letterSpacing: 0.3,
+  },
+  actionSubLabel: {
+    fontSize: 10, fontWeight: '600', color: 'rgba(241,245,249,0.6)',
+    marginTop: 1,
   },
   walletCompactLabel: {
     fontSize: 9, fontWeight: '700', letterSpacing: 1.2,

@@ -858,11 +858,25 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
               subscriptionTier={tier as any}
               isAdmin={!!userProfile.is_admin}
               userTitle={userTitle}
-              stats={{ followers: stats.followers, rooms: stats.rooms, gifts: stats.gifts }}
+              stats={{ followers: stats.followers, rooms: stats.rooms, badges: stats.badges, gifts: stats.gifts }}
               statsLoading={!dataReady}
               onFollowersPress={() => { setFollowListTab('followers'); setShowFollowList(true); }}
               onRoomsPress={() => {}}
+              onBadgesPress={() => setShowBadgesModal(true)}
               onGiftsPress={() => setShowGiftDetail(true)}
+              // ★ v289 (16 May 2026): Başka kullanıcının profilini paylaş — universal
+              //   deep link (sopranochat://user/<id> + https fallback) native Share ile.
+              onSharePress={() => {
+                try {
+                  const { Share } = require('react-native');
+                  const link = `https://sopranochat.com/user/${userId}`;
+                  const name = userProfile.display_name || userProfile.username || 'SopranoChat kullanıcısı';
+                  Share.share({
+                    message: `${name} profilini SopranoChat'te keşfet:\n${link}`,
+                    url: link,
+                  });
+                } catch {}
+              }}
               memberSince={userProfile.created_at}
               boostExpiresAt={(userProfile as any)?.profile_boost_expires_at}
               isOnline={isFriend && !isOwnProfile ? userProfile.is_online : undefined}

@@ -5,7 +5,7 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Pressable, Animated } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Colors, Shadows } from '../../constants/theme';
 
 const iconShadow = {
@@ -174,17 +174,8 @@ export default function ProfileHero({
             <Ionicons name="share-outline" size={16} color="#14B8A6" style={iconShadow} />
           </Pressable>
         )}
-        {/* Edit butonu — sağ üst absolute */}
-        {onEdit && (
-          <Pressable
-            style={[s.editBtn, s.editBtnAbs]}
-            onPress={onEdit}
-            hitSlop={10}
-            accessibilityLabel={i18n.t('auto.profile.ProfileHero.007')}
-          >
-            <Ionicons name="create-outline" size={16} color="#14B8A6" style={iconShadow} />
-          </Pressable>
-        )}
+        {/* ★ v289 (16 May 2026): Sağ üst Edit ikonu KALDIRILDI — bio altında geniş
+            "Profili Düzenle" pill butonu var. Mockup'tan ilham (Twitter/X tarzı). */}
 
         {/* Avatar */}
         <View style={s.avatarStack}>
@@ -267,11 +258,25 @@ export default function ProfileHero({
         ) : bio ? (
           <Text style={[s.bio, { textAlign: 'center', marginTop: 8 }]} numberOfLines={3}>{bio}</Text>
         ) : null}
+
+        {/* ★ v289 (16 May 2026): Geniş "Profili Düzenle" pill butonu — bio altında,
+            sadece kendi profilde (onEdit varsa). Sağ üst köşedeki küçük ikon yerine
+            modern wide CTA. Mockup'tan ilham. */}
+        {onEdit && (
+          <Pressable style={s.editPill} onPress={onEdit} hitSlop={6}>
+            <LinearGradient
+              colors={['rgba(20,184,166,0.18)', 'rgba(20,184,166,0.08)']}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+              style={StyleSheet.absoluteFillObject}
+            />
+            <Ionicons name="create-outline" size={15} color="#5EEAD4" style={iconShadow} />
+            <Text style={s.editPillText}>{i18n.t('auto.profile.ProfileHero.007')}</Text>
+          </Pressable>
+        )}
       </View>
 
-      {/* Stats satırı — Arkadaş / Oda / Rozet / Hediye (4 stat, touch target min 48px)
-          ★ v289 (16 May 2026): Rozet stat'ı eklendi. Önce stats.badges prop'ta vardı
-          ama UI'da gösterilmiyordu (dead prop). Şimdi 3. stat olarak — Hediye sağa kaydı. */}
+      {/* Stats satırı — ★ v289 (16 May 2026): Modern outline ikon + sayı + etiket dikey.
+          Arkadaş / Oda / Rozet / Hediye (4 stat) — her birinin üstünde ince outline ikon. */}
       <View style={s.statsRow}>
         <Pressable
           style={s.statItem}
@@ -279,6 +284,7 @@ export default function ProfileHero({
           hitSlop={8}
           accessibilityLabel={i18n.t('auto.profile.ProfileHero.005', { 0: stats.followers })}
         >
+          <Ionicons name="people-outline" size={18} color="#5EEAD4" style={s.statIcon} />
           <Text style={s.statNum}>{fmtStat(stats.followers)}</Text>
           <Text style={s.statLabelClickable}>{i18n.t('profile.stat_friend')}</Text>
         </Pressable>
@@ -289,10 +295,10 @@ export default function ProfileHero({
           hitSlop={8}
           accessibilityLabel={`${stats.rooms} oda`}
         >
+          <Ionicons name="mic-outline" size={18} color="#5EEAD4" style={s.statIcon} />
           <Text style={s.statNum}>{fmtStat(stats.rooms)}</Text>
           <Text style={s.statLabelClickable}>{i18n.t('profile.stat_room')}</Text>
         </Pressable>
-        {/* ★ v289: Rozet stat — tıklayınca BadgeListModal açılır (Hediye gibi) */}
         {onBadgesPress && (
           <>
             <View style={s.statDiv} />
@@ -302,12 +308,12 @@ export default function ProfileHero({
               hitSlop={8}
               accessibilityLabel={`${stats.badges || 0} rozet`}
             >
+              <MaterialCommunityIcons name="medal-outline" size={18} color="#A78BFA" style={s.statIcon} />
               <Text style={s.statNum}>{fmtStat(stats.badges)}</Text>
               <Text style={[s.statLabelClickable, { color: '#A78BFA' }]}>{i18n.t('profile.stat_badge')}</Text>
             </Pressable>
           </>
         )}
-        {/* ★ 2026-05-05: 4. stat — Hediye (tıklayınca tab'lı detay modal) */}
         {onGiftsPress && (
           <>
             <View style={s.statDiv} />
@@ -317,6 +323,7 @@ export default function ProfileHero({
               hitSlop={8}
               accessibilityLabel={`${stats.gifts || 0} hediye`}
             >
+              <Ionicons name="gift-outline" size={18} color="#FBBF24" style={s.statIcon} />
               <Text style={s.statNum}>{fmtStat(stats.gifts)}</Text>
               <Text style={[s.statLabelClickable, { color: '#FBBF24' }]}>{i18n.t('profile.stat_gift')}</Text>
             </Pressable>
@@ -408,9 +415,23 @@ const s = StyleSheet.create({
   editBtnAbs: {
     position: 'absolute', top: 12, right: 12, zIndex: 5,
   },
-  // ★ v289: Paylaş butonu Edit'in solunda — sağ üst köşede yan yana iki ikon.
+  // ★ v289 (16 May 2026): Paylaş butonu — Edit pill'e taşınınca tek başına sağ üst köşeye geçti.
   shareBtnAbs: {
-    position: 'absolute', top: 12, right: 52, zIndex: 5,
+    position: 'absolute', top: 12, right: 12, zIndex: 5,
+  },
+  // ★ v289: Geniş "Profili Düzenle" pill — bio altında, modern wide CTA.
+  editPill: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    marginTop: 12, marginHorizontal: 8,
+    height: 36, borderRadius: 18,
+    borderWidth: 1, borderColor: 'rgba(20,184,166,0.35)',
+    overflow: 'hidden',
+    gap: 6,
+  },
+  editPillText: {
+    fontSize: 13, fontWeight: '700', color: '#5EEAD4',
+    letterSpacing: 0.3,
+    ..._textGlow,
   },
   // ★ v108.18: Frame ikon sol üst — edit ile simetrik
   frameIconAbsLeft: {
@@ -528,8 +549,10 @@ const s = StyleSheet.create({
     paddingVertical: 8, paddingHorizontal: 14,
     borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.06)',
   },
-  statItem: { flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 36 },
-  statNum: { fontSize: 14, fontWeight: '700', color: '#F1F5F9', ..._textGlow },
+  statItem: { flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 52, paddingVertical: 4 },
+  // ★ v289: stat ikonu — sayının üstünde, outline stil, hafif aşağı margin.
+  statIcon: { marginBottom: 3, opacity: 0.9 },
+  statNum: { fontSize: 15, fontWeight: '700', color: '#F1F5F9', ..._textGlow },
   statLabelClickable: { fontSize: 9, fontWeight: '600', color: '#5CBFB5', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 1 },
-  statDiv: { width: 0.5, height: 18, backgroundColor: 'rgba(255,255,255,0.08)' },
+  statDiv: { width: 0.5, height: 28, backgroundColor: 'rgba(255,255,255,0.08)' },
 });
