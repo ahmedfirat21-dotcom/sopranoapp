@@ -162,7 +162,7 @@ export default function HandRaiseQueuePanel({
   if (!mounted) return null;
 
   return (
-    <View style={[StyleSheet.absoluteFill, { zIndex: 45 }]} pointerEvents="box-none">
+    <View style={[StyleSheet.absoluteFill, { zIndex: 70, elevation: 70 }]} pointerEvents="box-none">
       {/* Backdrop */}
       <Animated.View style={[s.backdrop, { opacity: fadeAnim }]}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
@@ -264,12 +264,12 @@ const s = StyleSheet.create({
     position: 'absolute',
     left: 6,
     right: 6,
-    zIndex: 50,
+    zIndex: 72,
     borderRadius: 22,
     overflow: 'hidden',
     backgroundColor: '#1a2030',
     paddingBottom: 8,
-    elevation: 12,
+    elevation: 72,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.45,
