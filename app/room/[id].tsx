@@ -4461,10 +4461,10 @@ export default function RoomScreen() {
       style={[
         sty.root,
         { opacity: fadeIn },
-        // ★ v284: web admin global.safePaddingTop / safePaddingBottom / horizontalPadding
-        {
-          paddingHorizontal: roomLayout.global.horizontalPadding,
-        },
+        // ★ v283 (16 May 2026): horizontalPadding root'tan kaldırıldı — header tab
+        //   family ile aynı full-width olmalı (home/odalarım/profil). Padding artık
+        //   sadece avatar grid'leri (SpeakerSection / ListenerGrid) ihtiyacına göre
+        //   içeride uygulanır; header ve gradient'lar full bleed.
       ]}
     >
       <StatusBar hidden />
