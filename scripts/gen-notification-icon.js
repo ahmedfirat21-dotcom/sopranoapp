@@ -26,16 +26,32 @@ const SIZES = {
   const trimmed = await img.clone().trim({ threshold: 5 }).toBuffer({ resolveWithObject: true });
   console.log(`Kırpıldı: ${trimmed.info.width}x${trimmed.info.height}`);
 
+  // ★ 2026-05-16 v284: status bar'da silüet WhatsApp gibi 24dp x 24dp alanı dolsun.
+  //   Silüet 0.80 oranlı (yatayda dar) → kare canvas'a sığarken sağ-sol %18 boşluk.
+  //   Çözüm: silüeti hedef oran 0.94'e gelene kadar YATAYDA stretch et (kırpma yok).
+  //   Aspect değişimi simetrik formlar için göze batmaz; status bar'da görünür alan +%17.
+  const TARGET_ASPECT = 0.94; // width / height — kareye yakın ama tam değil (asimetri korunsun)
+  const origAspect = trimmed.info.width / trimmed.info.height;
+  let stretchedBuf, stretchedW, stretchedH;
+  if (origAspect < TARGET_ASPECT) {
+    stretchedH = trimmed.info.height;
+    stretchedW = Math.round(stretchedH * TARGET_ASPECT);
+    stretchedBuf = await sharp(trimmed.data).resize(stretchedW, stretchedH, { fit: 'fill', kernel: 'lanczos3' }).toBuffer();
+    console.log(`Yatay stretch: ${trimmed.info.width}x${trimmed.info.height} → ${stretchedW}x${stretchedH} (oran ${origAspect.toFixed(2)} → ${TARGET_ASPECT})`);
+  } else {
+    stretchedBuf = trimmed.data;
+    stretchedW = trimmed.info.width;
+    stretchedH = trimmed.info.height;
+  }
+
   // 2) Kareye getir (içerik tam kareye yerleşsin)
-  const maxDim = Math.max(trimmed.info.width, trimmed.info.height);
-  // ★ 2026-05-10: %3 → %0 — status bar'daki ikonu maksimum büyüt (kullanıcı talebi).
-  //   Padding kaldırıldı, silüet tüm canvas'ı dolduruyor.
+  const maxDim = Math.max(stretchedW, stretchedH);
   const padding = 0;
   const canvasSize = maxDim + padding * 2;
   const squared = await sharp({
     create: { width: canvasSize, height: canvasSize, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
   })
-    .composite([{ input: trimmed.data, left: Math.round((canvasSize - trimmed.info.width) / 2), top: Math.round((canvasSize - trimmed.info.height) / 2) }])
+    .composite([{ input: stretchedBuf, left: Math.round((canvasSize - stretchedW) / 2), top: Math.round((canvasSize - stretchedH) / 2) }])
     .png()
     .toBuffer();
   console.log(`Kare canvas: ${canvasSize}x${canvasSize}`);
