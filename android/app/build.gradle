@@ -91,8 +91,8 @@ android {
         applicationId 'com.sopranochat'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 293
-        versionName "1.4.4"
+        versionCode 294
+        versionName "1.4.5"
         // ★ 2026-04-27: APK boyutu küçültme — modern Android (2017+) sadece arm64-v8a kullanır.
         //   Bu sayede 4 ayrı mimari yerine 1 mimari APK'ya dahil olur, ~%40-50 boyut tasarrufu.
         //   Eski 32-bit cihazlar (~2017 öncesi <1% pazar payı) düşer.

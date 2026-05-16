@@ -37,6 +37,16 @@ const iconShadow = {
   textShadowRadius: 4,
 } as const;
 
+// ★ v294 (17 May 2026): Accent color'dan halo gradient'i türetmek için.
+//   accentColor `#FBBF24` (gold) gibi hex → halo amber/gold olur.
+function hexToRgba(hex: string, alpha: number): string {
+  if (!hex?.startsWith('#') || hex.length !== 7) return `rgba(20,184,166,${alpha})`;
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
 export interface BottomSheetProps {
   visible: boolean;
   onClose: () => void;
@@ -137,15 +147,30 @@ export default function BottomSheet({
         ]}
         {...panResponder.panHandlers}
       >
-        {/* Diagonal gradient fon — profil sayfası DNA */}
+        {/* ★ v294 (17 May 2026): NotificationDrawer/ProfileHero aile dili — 3-katman gradient.
+            (1) slate diagonal base + (2) accent halo (üst-sol) + (3) soft accent glow. */}
+        {/* (1) Slate diagonal base */}
         <LinearGradient
-          colors={['#4a5668', '#37414f', '#232a35']}
-          locations={[0, 0.5, 1]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
+          colors={['#3a4658', '#2a3344', '#1a2030']}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
           style={StyleSheet.absoluteFillObject}
+          pointerEvents="none"
         />
-        {/* Üst accent hairline */}
+        {/* (2) Accent halo — üst-sol köşeden inen renkli bulut */}
+        <LinearGradient
+          colors={[hexToRgba(accentColor, 0.20), hexToRgba(accentColor, 0.05), 'transparent']}
+          start={{ x: 0, y: 0 }} end={{ x: 0, y: 0.4 }}
+          style={StyleSheet.absoluteFillObject}
+          pointerEvents="none"
+        />
+        {/* (3) Soft accent glow — çapraz hafif aydınlık */}
+        <LinearGradient
+          colors={[hexToRgba(accentColor, 0.08), 'transparent']}
+          start={{ x: 0, y: 0 }} end={{ x: 0.7, y: 0.6 }}
+          style={StyleSheet.absoluteFillObject}
+          pointerEvents="none"
+        />
+        {/* Üst accent hairline — aile dilindeki ince çizgi */}
         <LinearGradient
           colors={['transparent', `${accentColor}99`, 'transparent']}
           start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
