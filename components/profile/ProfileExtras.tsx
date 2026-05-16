@@ -401,7 +401,9 @@ export function FeaturedBadgesShowcase({ featuredIds, onPress }: FeaturedBadgesS
             onPress={() => onPress?.(d.id)}
             style={({ pressed }) => [fbs.cell, pressed && { opacity: 0.75, transform: [{ scale: 0.97 }] }]}
           >
-            <SkiaShadow shadowColor={d.color} shadowOpacity={0.5} shadowBlur={6} shadowOffsetY={0} borderRadius={16}>
+            {/* ★ v296 (17 May 2026): Android shadow fix — SkiaShadow borderRadius 16→28 (avatar
+                ile aynı yuvarlak), blur 6→18 (daha yumuşak büyük halo), opacity 0.5→0.7. */}
+            <SkiaShadow shadowColor={d.color} shadowOpacity={0.7} shadowBlur={18} shadowOffsetY={0} borderRadius={28}>
               <LinearGradient
                 colors={[d.color + 'CC', d.color + '55']}
                 start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }}
@@ -437,8 +439,10 @@ const fbs = StyleSheet.create({
   iconCircle: {
     width: 56, height: 56, borderRadius: 28,
     alignItems: 'center', justifyContent: 'center',
-    borderWidth: 2, borderColor: 'rgba(255,255,255,0.18)',
-    ...Shadows.card,
+    borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.22)',
+    // ★ v296 (17 May 2026): Shadows.card KALDIRILDI — Android elevation:6 dikdörtgen
+    //   native shadow çiziyordu, yuvarlak avatar etrafında kareli halka görünüyordu.
+    //   Cross-platform glow artık SkiaShadow wrapper (parent) tarafından yönetiliyor.
   },
   label: {
     fontSize: 10, fontWeight: '800' as const,
