@@ -320,47 +320,55 @@ export default function SettingsScreen() {
         })();
         break;
       case 'version':
-        // ★ 2026-04-27 GEÇİCİ: Versiyon + JWT teşhisi (Firebase Third-Party Auth doğrulama)
-        (async () => {
-          try {
-            // ★ Önce Firebase tarafından bilgi al
-            const fbUser = auth.currentUser;
-            const fbUid = fbUser?.uid || '(currentUser NULL)';
-            let tokenPreview = i18n.t('auto.settings.003');
+        // ★ v300.1 (17 May 2026 — GÜVENLİK FİX): Production'da Firebase JWT + UID
+        //   debug ekranı GÖSTERİLMEZ. Token bilgisi public ekrana yansıyordu,
+        //   screenshot/replay attack riski. __DEV__'de tam teşhis, prod'da sade.
+        if (__DEV__) {
+          (async () => {
             try {
-              const tk = fbUser ? await fbUser.getIdToken(true) : null;
-              tokenPreview = tk ? `${tk.slice(0, 20)}...${tk.slice(-10)}` : '(null)';
-            } catch (te: any) {
-              tokenPreview = `(hata: ${te?.message?.slice(0, 30)})`;
+              const fbUser = auth.currentUser;
+              const fbUid = fbUser?.uid || '(currentUser NULL)';
+              let tokenPreview = i18n.t('auto.settings.003');
+              try {
+                const tk = fbUser ? await fbUser.getIdToken(true) : null;
+                tokenPreview = tk ? `${tk.slice(0, 20)}...${tk.slice(-10)}` : '(null)';
+              } catch (te: any) {
+                tokenPreview = `(hata: ${te?.message?.slice(0, 30)})`;
+              }
+              const { data, error } = await supabase.rpc('whoami');
+              const r = data?.[0] || {};
+              const ok = !!r.jwt_present && !!r.app_uid_result && r.app_uid_result !== '(NULL)';
+              setCAlert({
+                visible: true,
+                title: ok ? i18n.t('auto.settings.002') : '❌ JWT Sorunu',
+                message:
+                  `Versiyon: ${APP_VERSION}\n\n` +
+                  `--- FIREBASE ---\n` +
+                  `currentUser.uid: ${fbUid}\n` +
+                  `Token: ${tokenPreview}\n\n` +
+                  `--- SUPABASE whoami ---\n` +
+                  `app_uid: ${r.app_uid_result || '(NULL)'}\n` +
+                  `jwt.sub: ${r.jwt_sub || '(NULL)'}\n` +
+                  `role: ${r.jwt_role || '(NULL)'}\n` +
+                  `JWT var: ${r.jwt_present ? 'EVET' : 'HAYIR'}` +
+                  (error ? `\n\nRPC HATA: ${error.message?.slice(0, 60)}` : ''),
+                type: ok ? 'success' : 'warning',
+                buttons: [{ text: 'Tamam' }],
+              });
+            } catch (e: any) {
+              showToast({ title: i18n.t('settings.001'), message: e?.message || i18n.t('auto.settings.001'), type: 'error' });
             }
-
-            // ★ Sonra whoami RPC
-            const { data, error } = await supabase.rpc('whoami');
-            const r = data?.[0] || {};
-            // ★ Firebase 3PA: role daima 'anon' — önemli olan app_uid() çalışması
-            const ok = !!r.jwt_present && !!r.app_uid_result && r.app_uid_result !== '(NULL)';
-
-            setCAlert({
-              visible: true,
-              title: ok ? i18n.t('auto.settings.002') : '❌ JWT Sorunu',
-              message:
-                `Versiyon: ${APP_VERSION}\n\n` +
-                `--- FIREBASE ---\n` +
-                `currentUser.uid: ${fbUid}\n` +
-                `Token: ${tokenPreview}\n\n` +
-                `--- SUPABASE whoami ---\n` +
-                `app_uid: ${r.app_uid_result || '(NULL)'}\n` +
-                `jwt.sub: ${r.jwt_sub || '(NULL)'}\n` +
-                `role: ${r.jwt_role || '(NULL)'}\n` +
-                `JWT var: ${r.jwt_present ? 'EVET' : 'HAYIR'}` +
-                (error ? `\n\nRPC HATA: ${error.message?.slice(0, 60)}` : ''),
-              type: ok ? 'success' : 'warning',
-              buttons: [{ text: 'Tamam' }],
-            });
-          } catch (e: any) {
-            showToast({ title: i18n.t('settings.001'), message: e?.message || i18n.t('auto.settings.001'), type: 'error' });
-          }
-        })();
+          })();
+        } else {
+          // Production: sadece sürüm bilgisi
+          setCAlert({
+            visible: true,
+            title: 'SopranoChat',
+            message: `Sürüm: ${APP_VERSION}\n\nBeta sürümündesin — geri bildirimin için Ayarlar → Destek & İletişim'den bize yazabilirsin.`,
+            type: 'info',
+            buttons: [{ text: 'Tamam' }],
+          });
+        }
         break;
       case 'theme':
         showToast({ title: t('common.coming_soon'), message: t('settings.theme_desc'), type: 'info' });
