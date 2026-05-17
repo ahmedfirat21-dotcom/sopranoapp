@@ -728,3 +728,61 @@ Android Bundled 27ms C:\SopranoChat\constants\supabase.ts (1 module)
  [90m 1500 |[39m             [33m<[39m[33m/[39m[33mView[39m[33m>[39m
  [90m 1501 |[39m
  [90m 1502 |[39m             {[90m/* Hero Title + Subtitle — text shadow yok, sade */[39m}[0m]
+Android Bundled 134ms C:\SopranoChat\index.ts (1 module)
+ INFO  
+[7m [1m💡 JavaScript logs will be removed from Metro in React Native 0.77![22m Please use React Native DevTools as your default tool. Tip: Type [1mj[22m in the terminal to open (requires Google Chrome or Microsoft Edge).[27m
+ LOG  [RootLayout] Hazırlık süreci başlatıldı...
+ LOG  [RootLayout] Firebase auth listener başlatılıyor...
+Android Bundled 36ms C:\SopranoChat\services\livekit.ts (1 module)
+ LOG  [RootLayout] Firebase auth state: LOGGED_IN
+ LOG  [RootLayout] Firebase user ready, accessToken factory aktif.
+ LOG  [Analytics] userId: I8feZfsmpDO0M0HvbCtWEBot5Jp2
+ LOG  [Analytics] login_success 
+ LOG  [SPSync] channel status: SUBSCRIBED 
+ LOG  [GiftRT] channel status: SUBSCRIBED for user I8feZfsmpDO0M0HvbCtWEBot5Jp2 
+ LOG  [CallService] Call signal kanal durumu: SUBSCRIBED (user: I8feZfsm) 
+ LOG  [DMNotif] dm:user:I8feZfsmpDO0M0HvbCtWEBot5Jp2 → SUBSCRIBED
+ LOG  [Session] Conflict kanalı: SUBSCRIBED
+ LOG  [DEV] Emülatör algılandı — push token denenecek.
+ LOG  [SPSync] Bakiye güncellendi: 0 SP
+ LOG  [SPSync] Bakiye güncellendi: 3 SP
+Android Bundled 25ms C:\SopranoChat\constants\supabase.ts (1 module)
+ LOG  [SPSync] Bakiye güncellendi: 3 SP
+ LOG  [RevenueCat] SDK başlatıldı
+ LOG  [SPSync] Bakiye güncellendi: 3 SP
+Android Bundled 132ms C:\SopranoChat\index.ts (1 module)
+ INFO  
+[7m [1m💡 JavaScript logs will be removed from Metro in React Native 0.77![22m Please use React Native DevTools as your default tool. Tip: Type [1mj[22m in the terminal to open (requires Google Chrome or Microsoft Edge).[27m
+ LOG  [RootLayout] Hazırlık süreci başlatıldı...
+ LOG  [RootLayout] Firebase auth listener başlatılıyor...
+Android Bundled 35ms C:\SopranoChat\services\livekit.ts (1 module)
+ LOG  [RootLayout] Firebase auth state: LOGGED_IN
+ LOG  [RootLayout] Firebase user ready, accessToken factory aktif.
+ LOG  [Analytics] userId: I8feZfsmpDO0M0HvbCtWEBot5Jp2
+ LOG  [Analytics] login_success 
+ LOG  [SPSync] channel status: SUBSCRIBED 
+ LOG  [GiftRT] channel status: SUBSCRIBED for user I8feZfsmpDO0M0HvbCtWEBot5Jp2 
+ LOG  [CallService] Call signal kanal durumu: SUBSCRIBED (user: I8feZfsm) 
+ LOG  [DEV] Emülatör algılandı — push token denenecek.
+ LOG  [DMNotif] dm:user:I8feZfsmpDO0M0HvbCtWEBot5Jp2 → SUBSCRIBED
+Android Bundled 27ms C:\SopranoChat\constants\supabase.ts (1 module)
+ LOG  [RevenueCat] SDK başlatıldı
+ LOG  [SPSync] Bakiye güncellendi: 3 SP
+ LOG  [Session] Conflict kanalı: SUBSCRIBED
+ LOG  [SPSync] Bakiye güncellendi: 6 SP
+ LOG  [SPSync] Bakiye güncellendi: 6 SP
+ LOG  [Broadcast] emoji:b139aaa0-4f72-483d-bb80-522971b06dbd → SUBSCRIBED
+ LOG  [Broadcast] mic_req:b139aaa0-4f72-483d-bb80-522971b06dbd → SUBSCRIBED
+ LOG  [Broadcast] mod_action:b139aaa0-4f72-483d-bb80-522971b06dbd → SUBSCRIBED
+ LOG  [Realtime] room:b139aaa0-4f72-483d-bb80-522971b06dbd status → SUBSCRIBED 
+ LOG  [Realtime] room_status:b139aaa0-4f72-483d-bb80-522971b06dbd status → SUBSCRIBED
+ LOG  [LiveKit] AudioSession modülü hazır
+ LOG  [LiveKit] registerGlobals başarılı
+ LOG  [LiveKit] Client lazily loaded
+ LOG  [LiveKit] AudioSession başlatıldı
+ LOG  [cleanupFrozenRooms] Deleted: 0, Reset: 0
+Android Bundled 2ms C:\SopranoChat\utils\fetchTimeout.ts (1 module)
+ LOG  [LiveKit] Token alındı — roomId=b139aaa0-4f72-483d-bb80-522971b06dbd, role=owner
+ LOG  [LiveKit] Bağlantı başarılı (deneme 1/3)
+ INFO  publishing track {"enabled": true, "kind": "video", "muted": false, "participant": "I8feZfsmpDO0M0HvbCtWEBot5Jp2", "participantID": "PA_2v5jTh9QTcBy", "room": "b139aaa0-4f72-483d-bb80-522971b06dbd", "roomID": "RM_AWNA5intP2D9", "source": "camera", "streamID": "fcf69d9b-71bb-476c-b131-50a31168dd51", "streamTrackID": "fcf69d9b-71bb-476c-b131-50a31168dd51", "trackID": undefined}
+ LOG  [LiveKit] ★ LocalTrackPublished: VIDEO track, source: camera

@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { i18n } from '../../services/i18n';
-import { View, Text, StyleSheet, Pressable, Animated, Easing, Image } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Animated, Easing, Image, ScrollView } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -284,8 +284,16 @@ export default function RoomInfoHeader({
       {/* Satır 2 — Özellik Badge'leri (süre buradan kaldırıldı) */}
       {/* ★ 2026-04-27: Badge'ler bilgilendirici — tıklanınca kullanıcıya detay toast'u gösterir.
           Dil bayrağı için özellikle önemli: kullanıcı oda dilini anlasın. */}
+      {/* ★ v298.5 (17 May 2026): Badge'ler yatay scroll (tek satır). Önceden
+          flexWrap ile wrap edip header aşağı sarkıyordu (filtre çoğaldıkça).
+          Şimdi sabit yükseklik, badge'ler swipe ile kayar. */}
       {badges.length > 0 && (
-        <View style={s.badgeRow}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={s.badgeScroll}
+          contentContainerStyle={s.badgeRow}
+        >
           {badges.map((b, i) => {
             const content = (
               <>

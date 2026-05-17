@@ -782,8 +782,12 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, i
     //   Şimdilik instant — kullanıcı pozisyon değişimini görür, zıplama yok.
     <View style={[s.speakerCard, { width: cardWidth }]}>
       {/* ★ v286 (16 May 2026): Host halo (Skia) + opsiyonel pulse — config-driven.
-          Frame yüklü değilse aktif (frame zaten kendi halkasını taşır). */}
-      {isHost && !activeFrame && (
+          Frame yüklü değilse aktif (frame zaten kendi halkasını taşır).
+          ★ v298.5 (17 May 2026): KAMERA modda halo DEVRE DIŞI — card rectangular
+          (cardWidth wide, cardHeight short), halo square (cardWidth x cardWidth)
+          olarak render edilince card'tan AŞAĞI doğru koni şeklinde taşıyor (dev
+          sarı parıltı bug'ı). Halo sadece audio mod avatar için anlamlı. */}
+      {isHost && !activeFrame && !(cameraOn && videoTrack && VideoView) && (
         <HostHalo size={cardWidth} borderRadius={avatarShapeRadius} />
       )}
       {/* ★ v286: Avatar gölgesi (Skia) — host/speaker ayrı config */}
