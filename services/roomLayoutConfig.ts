@@ -163,6 +163,12 @@ export interface HeaderConfig {
   headerBgOpacity: number;
   headerBorderBottom: boolean;
   headerBorderColor: string;
+  // ★ v300 (17 May 2026): Oda sahibi (host) avatar görsel ayarları — web admin'den
+  //   APK ile birebir senkronize.
+  showHostAvatar: boolean;
+  hostAvatarSize: number;
+  hostAvatarBorderWidth: number;
+  hostAvatarBorderColor: string;
 }
 
 export interface ControlsConfig {
@@ -346,6 +352,11 @@ export const DEFAULT_ROOM_LAYOUT: RoomLayoutConfig = {
     headerBgOpacity: 0.0,
     headerBorderBottom: true,
     headerBorderColor: 'rgba(255,255,255,0.04)',
+    // ★ v300: Host avatar varsayılanları — APK ile birebir.
+    showHostAvatar: true,
+    hostAvatarSize: 36,
+    hostAvatarBorderWidth: 1.5,
+    hostAvatarBorderColor: 'rgba(20,184,166,0.55)',
   },
   controls: {
     barBackground: 'rgba(15,25,38,0.85)',

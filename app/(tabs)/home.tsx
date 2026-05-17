@@ -971,6 +971,11 @@ export default function HomeScreen() {
   // ★ 2026-04-22: Quick-create sheet — FAB ve empty state chip'lerinden tetiklenir.
   const [showQuickCreate, setShowQuickCreate] = useState(false);
   const [creatingRoom, setCreatingRoom] = useState(false);
+  // ★ v299 (17 May 2026): handleJoinRoom double-navigate guard. Önceden hızlı çift
+  //   tıklama router.push'u 2 kez çağırıyor, navigation stack'e aynı route 2 kez
+  //   ekleniyordu (kullanıcı geri tuşuna 2 kez basmak zorunda kalıyordu). Tek
+  //   navigation cycle için kilitliyoruz; sayfa değiştiği için reset gereksiz.
+  const joiningRoomRef = useRef<string | null>(null);
 
   // Hızlı oda açma: limit check → RoomService.quickCreate → navigate.
   // category null ise generic "{ad}'in Odası", kategori varsa o tipte isim üretilir.
@@ -1327,6 +1332,11 @@ export default function HomeScreen() {
       showToast({ title: i18n.t('tabs.home.007'), message: i18n.t('tabs.home.008'), type: 'warning' });
       return;
     }
+    // ★ v299: Double-tap guard — aynı odaya 2 ardışık tıklama tek navigation olarak işlensin.
+    //   1sn sonra reset; kullanıcı geri dönüp başka/aynı odaya tekrar girebilsin.
+    if (joiningRoomRef.current === roomId) return;
+    joiningRoomRef.current = roomId;
+    setTimeout(() => { joiningRoomRef.current = null; }, 1000);
     // ★ 2026-04-21: Audio preview aktifse önce kapat — ana LiveKit bağlantısı çakışmasın
     roomPreviewService.stop().catch(() => {});
     const room = rooms.find(r => r.id === roomId);

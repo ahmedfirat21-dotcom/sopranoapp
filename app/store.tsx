@@ -6,7 +6,7 @@
 // DB-bound: cosmetic_items + collections + user_inventory + store_purchase RPC.
 // Showcase/gallery kart tıklama → Alert onay → SP düş + envantere ekle + toast.
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { i18n } from '../services/i18n';
 import {
   View, Text, StyleSheet, ScrollView, Pressable, Animated, Platform, Dimensions, Easing, TextInput,
@@ -325,16 +325,19 @@ interface SPPack {
   amount: number; bonusAmount?: number; bonusPct?: number;
   fiat: string; popular?: boolean; tierColor: string;
 }
+// ★ v300 (17 May 2026): Eski sp-{tier} ID'leri Google Play product ID formatına
+//   (soprano_sp_{amount}) hizalandı. DB ve RevenueCat ile birebir uyumlu — yoksa
+//   kullanıcı öder ama SP gelmez (purchase_sp_grant DB'de ID bulamıyordu).
 const DEFAULT_SP_PACKS: SPPack[] = [
-  { id: 'sp-bronze', tierName: i18n.t('auto.store.039'), tierKey: 'bronze',
+  { id: 'soprano_sp_100', tierName: i18n.t('auto.store.039'), tierKey: 'bronze',
     amount: 100, fiat: '9,99 ₺', tierColor: '#D4A574' },
-  { id: 'sp-silver', tierName: i18n.t('auto.store.038'), tierKey: 'silver',
+  { id: 'soprano_sp_500', tierName: i18n.t('auto.store.038'), tierKey: 'silver',
     amount: 500, bonusPct: 10, fiat: '39,99 ₺', tierColor: '#D1D5DB' },
-  { id: 'sp-gold', tierName: i18n.t('auto.store.037'), tierKey: 'gold',
+  { id: 'soprano_sp_1500', tierName: i18n.t('auto.store.037'), tierKey: 'gold',
     amount: 1500, bonusAmount: 1800, bonusPct: 20, fiat: '99,99 ₺', popular: true, tierColor: '#FBBF24' },
-  { id: 'sp-platinum', tierName: 'Platin · Loca', tierKey: 'platinum',
+  { id: 'soprano_sp_5000', tierName: 'Platin · Loca', tierKey: 'platinum',
     amount: 5000, bonusAmount: 6750, bonusPct: 35, fiat: '299,99 ₺', tierColor: '#C4B5FD' },
-  { id: 'sp-diamond', tierName: 'Elmas · Maison', tierKey: 'diamond',
+  { id: 'soprano_sp_15000', tierName: 'Elmas · Maison', tierKey: 'diamond',
     amount: 15000, bonusAmount: 22500, bonusPct: 50, fiat: '799,99 ₺', tierColor: '#F9A8D4' },
 ];
 
@@ -357,7 +360,7 @@ function spPackFromDB(p: SPPackDB): SPPack {
 export default function StoreScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { profile, firebaseUser } = useAuth();
+  const { profile, firebaseUser, refreshProfile } = useAuth();
   const sp = (profile as any)?.system_points || 0;
   // ★ v108.21: Tier indirimi — Plus %10, Pro/GodMaster %20
   const tier = (profile as any)?.subscription_tier;
@@ -371,6 +374,13 @@ export default function StoreScreen() {
   const [collections, setCollections] = useState<Collection[]>([]);
   const [inventory, setInventory] = useState<Set<string>>(new Set());
   const [purchasing, setPurchasing] = useState<string | null>(null);
+  // ★ v300 (17 May 2026): SP paket satın alma state'i — kozmetik 'purchasing'den ayrı
+  //   tutulur (farklı RPC: purchase_sp_grant vs store_purchase). Aynı turda 2 ayrı
+  //   tipte satın alma yapılsın diye ayrı state.
+  const [spPurchasing, setSpPurchasing] = useState<string | null>(null);
+  const [spSuccess, setSpSuccess] = useState<{
+    visible: boolean; title: string; subtitle: string; accent: readonly [string, string];
+  }>({ visible: false, title: '', subtitle: '', accent: ['#FBBF24', '#7A5B0E'] });
   // ★ v108.21: Search + Sort
   const [searchQuery, setSearchQuery] = useState('');
   const [sortMode, setSortMode] = useState<'default' | 'price-asc' | 'price-desc' | 'rarity'>('default');
@@ -516,6 +526,56 @@ export default function StoreScreen() {
       default: return ['#14B8A6', '#0E7490'] as const;
     }
   };
+
+  // ★ v300 (17 May 2026): SP paket satın alma — Maison Soprano içinden doğrudan
+  //   RevenueCat consumable IAP → purchase_sp_grant RPC. Eski /sp-store ekranına
+  //   yönlendirme akışı kaldırıldı (asıl mağaza burası).
+  const handleSPPackBuy = useCallback(async (packId: string) => {
+    if (!profile?.id) {
+      showToast({ title: 'Giriş Gerekli', message: 'Önce hesabına gir.', type: 'error' });
+      return;
+    }
+    if (spPurchasing) return;
+    setSpPurchasing(packId);
+    try {
+      const { RevenueCatService } = await import('../services/revenuecat');
+      const result = await RevenueCatService.purchaseSPPackage(profile.id, packId);
+      if (!result.success) {
+        if (result.error === 'iptal_edildi') return;
+        if (result.error === 'already_processed') {
+          showToast({ title: 'Zaten İşlendi', message: 'Bu satın alma daha önce kaydedildi.', type: 'info' });
+          return;
+        }
+        const raw = String(result.error || '');
+        const friendly = /configuration|underlying error/i.test(raw)
+          ? 'Satın alma sistemi henüz hazırlanıyor. Lütfen daha sonra tekrar dene veya Ayarlar → Destek\'ten yaz.'
+          : raw || 'Bilinmeyen hata';
+        showToast({ title: 'Satın Alma Başarısız', message: friendly, type: 'error' });
+        return;
+      }
+      try { await refreshProfile?.(); } catch {}
+      // Success — tier accent renkli kutlama modali
+      const pack = spPacks.find((p) => p.id === packId);
+      const accentMap: Record<string, readonly [string, string]> = {
+        bronze:   ['#D4A574', '#8C6A3F'],
+        silver:   ['#D1D5DB', '#6B7280'],
+        gold:     ['#FBBF24', '#7A5B0E'],
+        platinum: ['#C4B5FD', '#5B21B6'],
+        diamond:  ['#F9A8D4', '#9D174D'],
+      };
+      const accent = (pack && accentMap[pack.tierKey]) || accentMap.gold;
+      setSpSuccess({
+        visible: true,
+        title: `+${result.spAdded?.toLocaleString('tr-TR') ?? 0} SP`,
+        subtitle: `${pack?.tierName ?? 'Paket'} satın alımı başarılı — yeni bakiye ${result.newBalance?.toLocaleString('tr-TR') ?? ''} SP`,
+        accent,
+      });
+    } catch (e: any) {
+      showToast({ title: 'Hata', message: e?.message || 'Beklenmedik hata', type: 'error' });
+    } finally {
+      setSpPurchasing(null);
+    }
+  }, [profile?.id, spPurchasing, spPacks, refreshProfile]);
 
   const handleBundlePurchase = (bundle: CosmeticBundle) => {
     if (!firebaseUser?.uid) return;
@@ -1020,7 +1080,10 @@ export default function StoreScreen() {
             </>
           )}
 
-          {/* Soprano Tezgâhı */}
+          {/* Soprano Tezgâhı — SP Paketleri (asıl mağaza burası, /sp-store kaldırıldı) */}
+          {/* ★ v300 (17 May 2026): Ana mağazada SP paket kartlarına tıklanınca
+              doğrudan RevenueCat satın alma akışı başlar (eski /sp-store ekranına
+              yönlendirme kaldırıldı — tek mağaza ekranı: Maison Soprano). */}
           <View
             onLayout={(e) => { sectionOffsets.current.sp = e.nativeEvent.layout.y; }}
             style={s.tierSection}
@@ -1032,8 +1095,7 @@ export default function StoreScreen() {
               <Text style={s.tierHeaderSub}>{i18n.t('store.019')}</Text>
             </View>
 
-            {/* ★ v109.3: Premium Bonus banner — eski sp-store'dan taşındı.
-                 Plus %10, Pro %20 ekstra SP bilgilendirmesi. */}
+            {/* Premium Bonus banner */}
             <Pressable style={s.spBonusBanner} onPress={() => router.push('/plus' as any)}>
               <LinearGradient
                 colors={['rgba(20,184,166,0.14)', 'rgba(20,184,166,0.04)']}
@@ -1060,15 +1122,9 @@ export default function StoreScreen() {
               <SPPackRow
                 key={pack.id}
                 pack={pack}
-                onPress={() => {
-                  // ★ v109.3: Eski sp-store'a yönlendirme yerine doğrudan burada bilgilendirme.
-                  //   Google Play IAP henüz aktif değil; alpha sürüm boyunca kapalı.
-                  showToast({
-                    title: i18n.t('store.005'),
-                    message: i18n.t('store.006'),
-                    type: 'info',
-                  });
-                }}
+                onPress={() => handleSPPackBuy(pack.id)}
+                disabled={!!spPurchasing}
+                purchasing={spPurchasing === pack.id}
               />
             ))}
           </View>
@@ -1136,6 +1192,14 @@ export default function StoreScreen() {
         subtitle={successModal.subtitle}
         accent={successModal.accent}
         onClose={() => setSuccessModal(p => ({ ...p, visible: false }))}
+      />
+      {/* ★ v300: SP paket satın alma başarı modalı — tier renkli accent */}
+      <PurchaseSuccessModal
+        visible={spSuccess.visible}
+        title={spSuccess.title}
+        subtitle={spSuccess.subtitle}
+        accent={spSuccess.accent}
+        onClose={() => setSpSuccess(p => ({ ...p, visible: false }))}
       />
       {/* ★ v109.5: Ürün önizleme bottom sheet — Daily Deal banner tıklamasında ve
            gelecekteki kart tıklamalarında kullanılır. Sheet'in "Satın Al" butonu
@@ -1803,7 +1867,7 @@ export function GalleryCard({ item, owned, onPress, discountPct = 0, wished, onW
   );
 }
 
-function SPPackRow({ pack, onPress }: { pack: SPPack; onPress: () => void }) {
+function SPPackRow({ pack, onPress, disabled, purchasing }: { pack: SPPack; onPress: () => void; disabled?: boolean; purchasing?: boolean }) {
   const tierAccent: Record<typeof pack.tierKey, string> = {
     bronze: 'rgba(184,100,50,0.3)',
     silver: 'rgba(192,192,192,0.3)',
@@ -1830,7 +1894,11 @@ function SPPackRow({ pack, onPress }: { pack: SPPack; onPress: () => void }) {
   };
 
   return (
-    <Pressable onPress={onPress} style={[s.spPack, { borderColor: tierAccent[pack.tierKey] }]}>
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      style={[s.spPack, { borderColor: tierAccent[pack.tierKey] }, disabled && !purchasing && { opacity: 0.5 }]}
+    >
       <LinearGradient
         colors={tierBg[pack.tierKey]}
         start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
@@ -1870,7 +1938,9 @@ function SPPackRow({ pack, onPress }: { pack: SPPack; onPress: () => void }) {
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
             style={StyleSheet.absoluteFillObject}
           />
-          <Text style={[s.spPackBuyText, { color: buyBtnTextColor[pack.tierKey] }]}>SATIN AL</Text>
+          <Text style={[s.spPackBuyText, { color: buyBtnTextColor[pack.tierKey] }]}>
+            {purchasing ? 'YÜKLENİYOR…' : 'SATIN AL'}
+          </Text>
         </View>
       </View>
     </Pressable>
@@ -2192,7 +2262,7 @@ const s = StyleSheet.create({
   tierHeaderSymbol: { fontSize: 24, marginBottom: 6, color: '#FBBF24' },
   tierHeaderTitle: { color: '#fff', fontFamily: serif, fontSize: 18, fontWeight: '700', letterSpacing: 1 },
   tierHeaderSub: { color: 'rgba(251,191,36,0.7)', fontSize: 9, letterSpacing: 2.5, marginTop: 4, fontWeight: '600' },
-  // ★ v109.3: Premium bonus banner — Soprano Tezgâhı içine eklendi (eski sp-store'dan)
+  // ★ v300: Premium Bonus banner (SP paketlerinin üstünde, üyelik gate)
   spBonusBanner: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
     paddingHorizontal: 12, paddingVertical: 10,

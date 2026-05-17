@@ -311,7 +311,7 @@ export default function FollowListModal({
                   style={st.removeBtn}
                   onPress={() => handleRemoveFriend(item.id, item.display_name)}
                 >
-                  <Text style={st.removeBtnText}>{i18n.t('followlistmodal.001')}</Text>
+                  <Text style={st.removeBtnText}>{i18n.t('followlistmodal.004')}</Text>
                 </Pressable>
                 <Pressable
                   style={st.blockBtn}
@@ -326,7 +326,7 @@ export default function FollowListModal({
                 style={st.removeBtn}
                 onPress={() => handleUnfollow(item.id, item.display_name)}
               >
-                <Text style={st.removeBtnText}>{i18n.t('followlistmodal.002')}</Text>
+                <Text style={st.removeBtnText}>{i18n.t('followlistmodal.005')}</Text>
               </Pressable>
             ) : (
               // followers — sadece engelle aksiyonu

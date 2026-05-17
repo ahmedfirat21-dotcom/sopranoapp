@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { i18n } from '../../services/i18n';
-import { View, Text, StyleSheet, Pressable, Animated, Easing, Image, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Animated, Easing, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -127,6 +127,10 @@ export default function RoomInfoHeader({
 }: Props) {
   const langFlags: Record<string, string> = { tr: '🇹🇷', en: '🇬🇧', de: '🇩🇪', ar: '🇸🇦' };
   const [showRules, setShowRules] = useState(false);
+  // ★ v300 (17 May 2026): Header altındaki badge satırı KALDIRILDI — avatar sağ üst
+  //   köşesindeki küçük altın daire (badge sayısı) ile yer açıldı. Tıklayınca popup
+  //   açılır, tüm durumlar listelenir. Header artık tek satır, sabit yükseklik.
+  const [showStatusPopup, setShowStatusPopup] = useState(false);
   const insets = useSafeAreaInsets();
   // ★ v284 (16 May 2026): Web admin "Oda Düzeni" → header config (title font/color,
   //   live indicator, listener count, border).
@@ -155,9 +159,21 @@ export default function RoomInfoHeader({
     const _label = _langLabels[roomLanguage] || roomLanguage.toUpperCase();
     badges.push({ emoji: langFlags[roomLanguage] || roomLanguage, color: '#3B82F6', bg: 'rgba(59,130,246,0.12)', border: 'rgba(59,130,246,0.25)', info: { title: `${langFlags[roomLanguage] || ''} ${_label}`, message: i18n.t('auto.room.RoomInfoHeader.001', { 0: _label }) } });
   }
-  // Konuşma modu — sadece varsayılandan farklıysa göster, sadece ikon
-  if (speakingMode === 'permission_only') badges.push({ icon: 'hand-left', color: '#F59E0B', bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.25)' });
-  if (speakingMode === 'selected_only') badges.push({ icon: 'shield-checkmark', color: '#A78BFA', bg: 'rgba(167,139,250,0.12)', border: 'rgba(167,139,250,0.3)' });
+  // Konuşma modu — sadece varsayılandan farklıysa göster + popup'ta açıklama.
+  if (speakingMode === 'permission_only') badges.push({
+    icon: 'hand-left',
+    color: '#F59E0B',
+    bg: 'rgba(245,158,11,0.12)',
+    border: 'rgba(245,158,11,0.25)',
+    info: { title: '🤚 İzin Gerekli', message: 'Sahneye çıkmak için el kaldır, host onaylayınca konuşabilirsin.' },
+  });
+  if (speakingMode === 'selected_only') badges.push({
+    icon: 'shield-checkmark',
+    color: '#A78BFA',
+    bg: 'rgba(167,139,250,0.12)',
+    border: 'rgba(167,139,250,0.3)',
+    info: { title: '🛡 Seçilmiş Konuşmacılar', message: 'Bu odada sadece host tarafından sahneye çağrılanlar konuşabilir.' },
+  });
 
   return (
     <View style={[s.wrap, { paddingTop: stableTop + 2 }]}>
@@ -186,19 +202,64 @@ export default function RoomInfoHeader({
       <View style={s.topNav}>
         <View style={s.topLeft}>
           {/* ★ Host avatar + süre göstergesi grubu */}
-          <View style={s.hostAvatarGroup}>
-            <StatusAvatar uri={hostAvatarUrl} size={36} tier={hostTier} borderWidth={1.5} frameId={hostFrameId} customBadgeId={hostActiveBadgeId ?? null} />
-            {/* ★ Kalan süre — avatar altında kum saati */}
-            {roomExpiry ? (
-              <View style={[s.expiryBadge, roomExpiry.includes('doldu') && s.expiryBadgeExpired]}>
-                <Ionicons
-                  name={roomExpiry.includes('doldu') ? 'alarm' : 'hourglass-outline'}
-                  size={7}
-                  color={roomExpiry.includes('doldu') ? '#EF4444' : '#FBBF24'}
+          {/* ★ v300: badges.length > 0 ise group Pressable — sağ üstteki altın daireye
+              tıklayınca durum popup'ı açılır. StatusAvatar kendi onPress'i yok.
+              showHostAvatar=false web admin'den gizlenebilir; size/borderWidth/borderColor
+              de oradan ayarlanır. */}
+          {headerCfg.showHostAvatar !== false ? (
+            badges.length > 0 ? (
+              <Pressable
+                style={s.hostAvatarGroup}
+                onPress={() => setShowStatusPopup((v) => !v)}
+                hitSlop={6}
+                accessibilityLabel={`Oda durumları (${badges.length})`}
+              >
+                <StatusAvatar
+                  uri={hostAvatarUrl}
+                  size={headerCfg.hostAvatarSize ?? 36}
+                  tier={hostTier}
+                  borderWidth={headerCfg.hostAvatarBorderWidth ?? 1.5}
+                  borderColor={headerCfg.hostAvatarBorderColor}
+                  frameId={hostFrameId}
+                  customBadgeId={hostActiveBadgeId ?? null}
                 />
+                {/* ★ v300: Sağ üst köşede durum sayısı — altın daire, tıklanabilir */}
+                <View style={s.statusCountBadge}>
+                  <Text style={s.statusCountText}>{badges.length}</Text>
+                </View>
+                {roomExpiry ? (
+                  <View style={[s.expiryBadge, roomExpiry.includes('doldu') && s.expiryBadgeExpired]}>
+                    <Ionicons
+                      name={roomExpiry.includes('doldu') ? 'alarm' : 'hourglass-outline'}
+                      size={7}
+                      color={roomExpiry.includes('doldu') ? '#EF4444' : '#FBBF24'}
+                    />
+                  </View>
+                ) : null}
+              </Pressable>
+            ) : (
+              <View style={s.hostAvatarGroup}>
+                <StatusAvatar
+                  uri={hostAvatarUrl}
+                  size={headerCfg.hostAvatarSize ?? 36}
+                  tier={hostTier}
+                  borderWidth={headerCfg.hostAvatarBorderWidth ?? 1.5}
+                  borderColor={headerCfg.hostAvatarBorderColor}
+                  frameId={hostFrameId}
+                  customBadgeId={hostActiveBadgeId ?? null}
+                />
+                {roomExpiry ? (
+                  <View style={[s.expiryBadge, roomExpiry.includes('doldu') && s.expiryBadgeExpired]}>
+                    <Ionicons
+                      name={roomExpiry.includes('doldu') ? 'alarm' : 'hourglass-outline'}
+                      size={7}
+                      color={roomExpiry.includes('doldu') ? '#EF4444' : '#FBBF24'}
+                    />
+                  </View>
+                ) : null}
               </View>
-            ) : null}
-          </View>
+            )
+          ) : null}
           {/* ★ Oda ismi + geçen süre tek satırda */}
           <View style={s.nameTimeCol}>
             <Text
@@ -281,44 +342,62 @@ export default function RoomInfoHeader({
         </View>
       </View>
 
-      {/* Satır 2 — Özellik Badge'leri (süre buradan kaldırıldı) */}
-      {/* ★ 2026-04-27: Badge'ler bilgilendirici — tıklanınca kullanıcıya detay toast'u gösterir.
-          Dil bayrağı için özellikle önemli: kullanıcı oda dilini anlasın. */}
-      {/* ★ v298.5 (17 May 2026): Badge'ler yatay scroll (tek satır). Önceden
-          flexWrap ile wrap edip header aşağı sarkıyordu (filtre çoğaldıkça).
-          Şimdi sabit yükseklik, badge'ler swipe ile kayar. */}
-      {badges.length > 0 && (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={s.badgeScroll}
-          contentContainerStyle={s.badgeRow}
-        >
-          {badges.map((b, i) => {
-            const content = (
-              <>
-                {b.emoji ? <Text style={{ fontSize: 10 }}>{b.emoji}</Text> : null}
-                {b.icon ? <Ionicons name={b.icon as any} size={8} color={b.color} /> : null}
-                {b.text ? <Text style={{ fontSize: 8, fontWeight: '700', color: b.color }}>{b.text}</Text> : null}
-              </>
-            );
-            return b.info ? (
-              <Pressable
-                key={i}
-                style={[s.tagBadge, { backgroundColor: b.bg, borderColor: b.border }]}
-                onPress={() => showToast({ title: b.info!.title, message: b.info!.message, type: 'info', duration: 3500 })}
-                hitSlop={6}
-              >
-                {content}
-              </Pressable>
-            ) : (
-              <View key={i} style={[s.tagBadge, { backgroundColor: b.bg, borderColor: b.border }]}>
-                {content}
+      {/* ★ v300 (17 May 2026): Satır 2 (badge scroll) KALDIRILDI — avatar köşesindeki
+          altın daireye taşındı. Popup açılınca tüm durumlar listelenir.
+          NotificationDrawer aile dili: slate diagonal + amber halo + soft glow. */}
+      {showStatusPopup && badges.length > 0 ? (
+        <Pressable onPress={() => setShowStatusPopup(false)}>
+          <View style={s.statusPopup}>
+            {/* 3-katman gradient — modal/sheet aile dili */}
+            <LinearGradient
+              colors={['#3a4658', '#2a3344', '#1a2030']}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+              style={s.statusPopupGlow}
+              pointerEvents="none"
+            />
+            <LinearGradient
+              colors={['rgba(245,158,11,0.18)', 'rgba(245,158,11,0.04)', 'transparent']}
+              start={{ x: 0, y: 0 }} end={{ x: 0, y: 0.5 }}
+              style={s.statusPopupGlow}
+              pointerEvents="none"
+            />
+            <LinearGradient
+              colors={['rgba(245,158,11,0.08)', 'transparent']}
+              start={{ x: 0, y: 0 }} end={{ x: 0.6, y: 0.6 }}
+              style={s.statusPopupGlow}
+              pointerEvents="none"
+            />
+            {/* Sol üstten avatar köşesine işaret eden ok */}
+            <View style={s.statusPopupArrow} />
+            {/* Section header — premium amber stripe */}
+            <View style={s.statusPopupHeader}>
+              <Ionicons name="information-circle" size={12} color="#F59E0B" style={s.iconShadow} />
+              <Text style={s.statusPopupHeaderText}>ODA DURUMU</Text>
+              <View style={s.statusPopupHeaderBadge}>
+                <Text style={s.statusPopupHeaderBadgeText}>{badges.length}</Text>
               </View>
-            );
-          })}
-        </ScrollView>
-      )}
+            </View>
+            {badges.map((b, i) => (
+              <View key={i} style={s.statusPopupRow}>
+                <View style={[s.statusPopupIcon, { backgroundColor: b.bg, borderColor: b.border }]}>
+                  {b.emoji ? <Text style={{ fontSize: 13 }}>{b.emoji}</Text> : null}
+                  {b.icon ? <Ionicons name={b.icon as any} size={13} color={b.color} /> : null}
+                  {b.text && !b.emoji && !b.icon ? <Text style={{ fontSize: 9, fontWeight: '800', color: b.color }}>{b.text}</Text> : null}
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.statusPopupTitle} numberOfLines={1}>
+                    {/* ★ v300: Sol yuvarlak ikon zaten var — title baş emoji'sini strip et (çift gösterim olmasın) */}
+                    {(b.info?.title || b.text || '').replace(/^[\p{Emoji_Presentation}\p{Extended_Pictographic}☀-➿]\s*/u, '')}
+                  </Text>
+                  {b.info?.message ? (
+                    <Text style={s.statusPopupMessage} numberOfLines={2}>{b.info.message}</Text>
+                  ) : null}
+                </View>
+              </View>
+            ))}
+          </View>
+        </Pressable>
+      ) : null}
 
       {/* ★ Oda bilgi balonu — açıklama + kurallar birlikte, tıklayarak kapanır */}
       {showRules && (roomRules || roomDescription) ? (
@@ -389,6 +468,108 @@ const s = StyleSheet.create({
   expiryBadgeExpired: {
     backgroundColor: 'rgba(239,68,68,0.25)',
   },
+  // ★ v300 (17 May 2026): Avatar sağ üst — durum sayısı (kilit/+18/dil vs.).
+  //   Tıklayınca popup açılır, tüm durumlar listelenir. Header tek satır kalır.
+  statusCountBadge: {
+    position: 'absolute', top: -4, right: -4,
+    minWidth: 16, height: 16, borderRadius: 8,
+    backgroundColor: '#F59E0B',
+    borderWidth: 1.5, borderColor: 'rgba(15,23,42,0.95)',
+    alignItems: 'center', justifyContent: 'center',
+    paddingHorizontal: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.4,
+    shadowRadius: 2,
+    elevation: 3,
+  },
+  statusCountText: {
+    fontSize: 9, fontWeight: '900', color: '#0F172A', letterSpacing: -0.2,
+  },
+  // ★ v300: Durum popup — NotificationDrawer aile dili (slate diagonal + amber halo + soft glow).
+  statusPopup: {
+    marginHorizontal: 16, marginTop: 8, marginBottom: 4,
+    borderRadius: 14,
+    borderWidth: 1, borderColor: 'rgba(245,158,11,0.32)',
+    paddingHorizontal: 10, paddingVertical: 8,
+    overflow: 'hidden',
+    backgroundColor: '#1a2030',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.45,
+    shadowRadius: 14,
+    elevation: 10,
+    position: 'relative',
+  },
+  statusPopupGlow: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    borderRadius: 14,
+  },
+  // Sol üst köşede avatar altın daireye işaret eden ok.
+  // Avatar ekran konumu: topNav padding 16 + avatar size 36/2 = 34. Popup margin 16.
+  // Arrow popup içinde left: 34-16 = 18, ortalamak için -6 (arrow width/2) = 12.
+  statusPopupArrow: {
+    position: 'absolute',
+    top: -6,
+    left: 12,
+    width: 0, height: 0,
+    borderLeftWidth: 6, borderRightWidth: 6, borderBottomWidth: 6,
+    borderLeftColor: 'transparent', borderRightColor: 'transparent',
+    borderBottomColor: 'rgba(245,158,11,0.55)',
+    zIndex: 2,
+  },
+  statusPopupHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingBottom: 6,
+    marginBottom: 2,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(245,158,11,0.18)',
+  },
+  statusPopupHeaderText: {
+    flex: 1,
+    fontSize: 10, fontWeight: '800', color: '#F59E0B',
+    letterSpacing: 1.5,
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  statusPopupHeaderBadge: {
+    minWidth: 18, height: 18, borderRadius: 9,
+    backgroundColor: 'rgba(245,158,11,0.18)',
+    borderWidth: 1, borderColor: 'rgba(245,158,11,0.4)',
+    alignItems: 'center', justifyContent: 'center',
+    paddingHorizontal: 5,
+  },
+  statusPopupHeaderBadgeText: {
+    fontSize: 10, fontWeight: '900', color: '#FBBF24', letterSpacing: -0.2,
+  },
+  statusPopupRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 7,
+  },
+  statusPopupIcon: {
+    width: 30, height: 30, borderRadius: 15,
+    borderWidth: 1,
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  statusPopupTitle: {
+    fontSize: 12, fontWeight: '700', color: '#F1F5F9', letterSpacing: 0.1,
+    textShadowColor: 'rgba(0,0,0,0.4)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  statusPopupMessage: {
+    fontSize: 10, color: 'rgba(203,213,225,0.78)', lineHeight: 13, marginTop: 2,
+  },
   nameTimeCol: {
     flex: 1,
     justifyContent: 'center',
@@ -408,18 +589,6 @@ const s = StyleSheet.create({
     fontSize: 8,
     color: 'rgba(255,255,255,0.15)',
     marginHorizontal: 1,
-  },
-  // ★ v298.5 (17 May 2026): Yatay scroll wrapper — header sabit yükseklikte kalır.
-  badgeScroll: {
-    marginBottom: 2,
-    maxHeight: 28,
-  },
-  badgeRow: {
-    flexDirection: 'row',
-    gap: 4,
-    paddingLeft: 36, // host avatar genişliği kadar indent
-    paddingRight: 12,
-    alignItems: 'center',
   },
   hostMiniAvatar: {
     width: 36,

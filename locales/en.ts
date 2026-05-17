@@ -523,6 +523,8 @@ const en: Record<string, string> = {
   'settings.about': 'About',
   'settings.terms': 'Terms of Service',
   'settings.privacy_policy': 'Privacy Policy',
+  'settings.contact_support': 'Support & Contact',
+  'settings.contact_support_desc': 'Report an issue or send feedback',
   'settings.version': 'Version',
   'settings.subscription': 'Subscription',
   'settings.restore_purchases': 'Restore Purchases',
@@ -710,8 +712,6 @@ const en: Record<string, string> = {
   'skiatest.001': "Her sıra: solda mevcut RN yaklaşımı, sağda Skia primitive. Aynı görünmeli.",  // TODO: translate
   'skiatest.002': "Skia native modül APK'da yok",  // TODO: translate
   'skiatest.003': "Sağ taraftaki Skia çıktıları şu an fallback (sade View) gösteriyor. APK'yı Skia ile rebuild ettikten sonra gerçek Skia render'ı çalışacak.",  // TODO: translate
-  'spstore.001': "SP ile profilini öne çıkarabilir, oda giriş ücreti ödeyebilir ve premium özelliklere erişebilirsin.",  // TODO: translate
-  'spstore.002': "🚧 Yakında",  // TODO: translate
   'store.collection.id.001': "Satın Al",  // TODO: translate
   'store.001': "İstek listesi güncellenemedi",  // TODO: translate
   'store.002': "Tüm parçalar sende",  // TODO: translate
@@ -744,14 +744,9 @@ const en: Record<string, string> = {
   'blockeduserssheet.001': "Liste Yüklenemedi",  // TODO: translate
   'blockeduserssheet.002': "Engellenen kullanıcılar çekilemedi.",  // TODO: translate
   'blockeduserssheet.003': "Engel Kaldırıldı",  // TODO: translate
-  'boostpickersheet.001': "Hızlı Boost",  // TODO: translate
   'boostpickersheet.002': "Profilin ve odaların Keşfet'te öne çıkar. Tıklayan kullanıcılar odalarına ulaşır.",  // TODO: translate
   'boostpickersheet.003': "Boost Başlat",  // TODO: translate
-  'createroomcoachmark.001': "butonuna dokun ve ilk odanı aç.",  // TODO: translate
-  'fabhintoverlay.001': "Buradan yeni bir oda açabilirsin. Arkadaşlarını davet et, sohbete başla!",  // TODO: translate
   'fabhintoverlay.002': "Anladım — dokun",  // TODO: translate
-  'followlistmodal.001': "ARKADAŞLAR",  // TODO: translate
-  'followlistmodal.002': "TAKİPÇİLER",  // TODO: translate
   'incomingcalloverlay.001': "Arıyor...",  // TODO: translate
   'profile.badgelistmodal.001': "Henüz rozet kazanmamış",  // TODO: translate
   'profile.badgelistmodal.002': "Oda kur, arkadaş edin, SP gönder — rozetler otomatik gelir.",  // TODO: translate
@@ -794,7 +789,6 @@ const en: Record<string, string> = {
   'profile.voicebiorecorder.004': "Sesli tanıtım kaydedildi",  // TODO: translate
   'profile.voicebiorecorder.005': "Yükleme başarısız",  // TODO: translate
   'profile.welcomebonusmodal.001': "Keşfetmeye Başla",  // TODO: translate
-  'quickcreatesheet.001': "Hızlı Aç",  // TODO: translate
   'reportmodal.001': "Taciz / Zorbalık",  // TODO: translate
   'reportmodal.002': "Nefret Söylemi",  // TODO: translate
   'reportmodal.003': "Uygunsuz İçerik",  // TODO: translate
@@ -807,21 +801,16 @@ const en: Record<string, string> = {
   'room.hostaccesspanel.001': "✅ Ban Kaldırıldı",  // TODO: translate
   'room.hostaccesspanel.002': "Ban Kaldırılamadı",  // TODO: translate
   'room.hostaccesspanel.003': "📨 Davet Gönderildi",  // TODO: translate
-  'room.inroomuserprofile.001': "Bu kullanıcıyı engelledin. Profil içeriği gizli.",  // TODO: translate
   'room.invitefriendsmodal.001': "Arkadaşlar yükleniyor...",  // TODO: translate
   'room.invitefriendsmodal.002': "Keşfet sayfasından yeni insanlar bul ve takip et!",  // TODO: translate
   'room.messageglowpickersheet.001': "Bir stil seç — bir sonraki mesajın o şekilde gönderilir",  // TODO: translate
   'room.messageglowpickersheet.002': "STANDART · MESAJ BAŞI ÜCRET",  // TODO: translate
   'room.messageglowpickersheet.003': "★ PREMIUM · KOLEKSİYON ★",  // TODO: translate
   'room.messageglowpickersheet.004': "SAHİPSİN · FREE",  // TODO: translate
-  'room.powerupssheet.001': "Süre Uzat",  // TODO: translate
-  'room.powerupssheet.002': "Odanın süresini +30 dk uzatır",  // TODO: translate
   'room.roomaccessprompts.001': "Cancel",  // translated
   'room.roomaccessprompts.002': "Erişim kontrol ediliyor…",  // TODO: translate
   'room.roomaccessprompts.003': "Şifreyi girin...",  // TODO: translate
-  'room.roomclosedscreen.001': "Bu oda kapanmış",  // TODO: translate
   'room.roomdisconnectoverlay.001': "Odadan Çık",  // TODO: translate
-  'room.roomentryeffectoverlay.001': "Sonsuz Burç",  // TODO: translate
   'room.roomfollowerssheet.001': "ODA TAKİPÇİLERİ",  // TODO: translate
   'room.roomfollowerssheet.002': "Bu odanın henüz takipçisi yok",  // TODO: translate
   'room.roomfollowerssheet.003': "Odanın altında \"Takip Et\" tıklayanlar burada listelenir.",  // TODO: translate
@@ -849,13 +838,8 @@ const en: Record<string, string> = {
   'room.roomoverlays.014': "Oda Linkini Paylaş",  // TODO: translate
   'room.roomoverlays.015': "İstatistikler & Boost",  // TODO: translate
   'room.roomoverlays.016': "Keşfette Öne Çıkar",  // TODO: translate
-  'room.roomrecordingssheet.001': "Oda yönetim panelinden \"Kaydı Başlat\" ile sesli sohbeti kaydedin.",  // TODO: translate
-  'room.roomrecordingssheet.002': "Kaydı Oynatılamadı",  // TODO: translate
-  'room.roomstatspanel.001': "Anlık katılımcı",  // TODO: translate
-  'room.roomstatspanel.002': "Benzersiz katılımcı",  // TODO: translate
   'room.speakersection.001': "Sahne boş",  // TODO: translate
   'room.stagesupportsheet.001': "Support the Stage",
-  'roomboostsheet.001': "Hızlı Boost",  // TODO: translate
   'roomboostsheet.002': "POPÜLER",  // TODO: translate
   'roomcreatehintsheet.001': "Yeni Oda Oluştur",  // TODO: translate
   'roomcreatehintsheet.002': "Şimdi değil",  // TODO: translate
@@ -1456,7 +1440,6 @@ const en: Record<string, string> = {
   'auto.room.id.121': "Mesaj gönderilemedi",  // TODO: translate
   'auto.room.id.122': "Sesi Aç",  // TODO: translate
   'auto.room.id.123': "Oda müziği",  // TODO: translate
-  'auto.settings.001': "Türkçe",  // TODO: translate
   'auto.settings.002': "✅ JWT Doğrulanıyor",  // TODO: translate
   'auto.settings.003': "(token alınamadı)",  // TODO: translate
   'auto.skia_test.001': "7. SkiaDivider — hairline çizgi",  // TODO: translate
@@ -1482,7 +1465,6 @@ const en: Record<string, string> = {
   'auto.store.collection.id.012': "NADİR",  // TODO: translate
   'auto.store.collection.id.013': "EFSANEVİ",  // TODO: translate
   'auto.store.collection.id.014': "İLAHİ",  // TODO: translate
-  'auto.store.001': "Bağlantı hatası",  // TODO: translate
   'auto.store.002': "LÜTUF",  // TODO: translate
   'auto.store.003': "SÜRE DOLDU",  // TODO: translate
   'auto.store.004': "TÜKENDİ",  // TODO: translate
@@ -2478,9 +2460,10 @@ const en: Record<string, string> = {
   'room.id.173': "Input Error",  // translated
   'room.id.174': "Could Not Submit Request",  // translated
   'settings.001': "Diagnostic error",  // translated
-  'spstore.001': "With SP, you can make your profile stand out, pay room admission, and access premium features.",  // translated
-  'spstore.002': "Coming Up",  // translated
+  'spstore.001': "SP Store",  // translated
+  'spstore.002': "POPULAR",  // translated
   'spstore.003': "The SP store is closed for the alpha version. It will be active on Google Play soon!",  // translated
+  'spstore.004': "With SP, you can make your profile stand out, pay room admission, and access premium features.",  // translated
   'layout.001': "Connection Problem",  // translated
   'layout.002': "We couldn't retrieve your profile from the server. Check your internet connection and try again.",  // translated
   'layout.003': "Live Coverage",  // translated
@@ -2509,7 +2492,8 @@ const en: Record<string, string> = {
   'emojireactions.002': "Faces",  // translated
   'emojireactions.003': "Love",  // translated
   'emojireactions.004': "Nature",  // translated
-  'fabhintoverlay.001': "You can open a new room here. Invite your friends, start chatting!",  // translated
+  'fabhintoverlay.001': "Tip",  // translated
+  'fabhintoverlay.003': "You can open a new room here. Invite your friends, start chatting!",  // translated
   'followlistmodal.001': "ARKADAŞLAR",  // translated
   'followlistmodal.002': "FOLLOWERS",  // translated
   'followlistmodal.003': "FOLLOWING",  // translated

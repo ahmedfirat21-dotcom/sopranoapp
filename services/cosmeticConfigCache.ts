@@ -391,3 +391,14 @@ export function startCosmeticConfigSync() {
     .subscribe();
   return _realtimeSub;
 }
+
+// ★ v299 (17 May 2026): Dev hot reload'da her reload yeni channel açıyordu, eski
+//   ASLA kapanmıyordu (singleton ref kalıyordu). Production'da app lifecycle'da
+//   bir kez çağrıldığı için sorun değil, ama hot reload sırasında duplicate
+//   subscription birikiyor. Cleanup fonksiyonu export edilince root layout veya
+//   HMR boundary'de çağrılabilir.
+export function stopCosmeticConfigSync() {
+  if (!_realtimeSub) return;
+  try { supabase.removeChannel(_realtimeSub); } catch {}
+  _realtimeSub = null;
+}

@@ -93,6 +93,13 @@ export function startEditorConfigSync() {
   return _sub;
 }
 
+// ★ v299 (17 May 2026): Hot reload duplicate sub temizliği — bkz. cosmeticConfigCache.
+export function stopEditorConfigSync() {
+  if (!_sub) return;
+  try { supabase.removeChannel(_sub); } catch {}
+  _sub = null;
+}
+
 /* ═══════════════════════ Tip tanımları ═══════════════════════ */
 export interface GlowMessageConfig {
   bubble_bg_color: string; bubble_bg_gradient_enabled: boolean;

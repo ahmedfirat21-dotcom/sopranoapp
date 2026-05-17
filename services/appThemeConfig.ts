@@ -121,6 +121,13 @@ export function startAppThemeSync() {
   return _sub;
 }
 
+// ★ v299 (17 May 2026): Hot reload duplicate sub temizliği — bkz. cosmeticConfigCache.
+export function stopAppThemeSync() {
+  if (!_sub) return;
+  try { supabase.removeChannel(_sub); } catch {}
+  _sub = null;
+}
+
 /** React hook — tema değişimlerini dinler */
 export function useAppTheme(): AppTheme {
   const [theme, setTheme] = useState<AppTheme>(() => getCachedTheme());

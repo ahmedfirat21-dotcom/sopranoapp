@@ -349,9 +349,16 @@ export const ProfileService = {
       if (__DEV__) console.warn('[Donation] Rate limit exception:', e);
     }
 
-    // ★ Idempotency key: aynı kaynak→hedef→miktar için bu turda unique.
+    // ★ Idempotency key: aynı kaynak→hedef→miktar için 5sn window'da DETERMİNİSTİK.
     // Transaction çifti aynı kök'ü paylaşır — debit/credit/refund hep eşleşir.
-    const donationId = `${fromUserId}:${toUserId}:${amount}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
+    // ★ v299 (17 May 2026): Önceden Date.now() + random eklenmişti — her çağrı unique
+    //   key üretiyordu, server-side duplicate detection devreye giremiyordu. Double-tap
+    //   veya network retry'da 2x SP transfer riski vardı. 5sn time bucket ile aynı
+    //   sender→receiver+amount kombinasyonu pencere içinde tek transfer olarak sayılır.
+    //   GamificationService.spend externalRef ile zaten duplicate fark ediyor — şimdi
+    //   gerçekten tetiklenir.
+    const bucket5s = Math.floor(Date.now() / 5000);
+    const donationId = `${fromUserId}:${toUserId}:${amount}:${bucket5s}`;
 
     // ★ GamificationService üzerinden harca
     // ★ 2026-04-21: counterparty_id ile — SP history'de "kime gönderdin" / "kimden aldın" görünsün

@@ -294,8 +294,6 @@ export default function StatusAvatar({
   useEffect(() => {
     if (!frameId) { setDynFrameCfg(null); return; }
     ensureFrameConfig(frameId, sizeKey).then((cfg) => {
-      // GEÇİCİ DEBUG — parite kontrol
-      if (size >= 100) console.log('[STATUS_AV]', frameId, 'sz', size, 'key', sizeKey, 'pos', cfg?.tier_badge_position, 'scale', cfg?.tier_badge_scale, 'name', cfg?.name_enabled);
       setDynFrameCfg(cfg);
     });
   }, [frameId, sizeKey, size]);

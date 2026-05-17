@@ -279,6 +279,13 @@ export default function SPDonateSheet({
       return;
     }
 
+    // ★ v299 (17 May 2026): Double-tap guard fix — önceden setLoading(true) HİÇ
+    //   çağrılmıyordu, "if (loading) return" guard'ı hep false görüyordu. Optimistic
+    //   akışta sheet anında kapanıyor (onClose), ama component bir süre mount kalıyor;
+    //   hızla yeniden açılırsa aynı state ile tekrar handleDonate tetiklenirdi → 2x
+    //   SP transfer. setLoading(true) ile ikinci giriş engelleniyor.
+    setLoading(true);
+
     // ★ v92.1 (1 May 2026): OPTIMISTIC UI — kullanıcı butona basar basmaz success modal
     //   açılır, DB write arka planda devam eder. Hata olursa balance rollback + toast.
     //   Eski: DB await sonra modal → 800-1500ms gecikme. Yeni: anlık feedback.

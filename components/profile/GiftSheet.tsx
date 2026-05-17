@@ -264,6 +264,12 @@ export default function GiftSheet({
       return;
     }
 
+    // ★ v299 (17 May 2026): Double-tap guard fix — önceden setLoading(true) HİÇ
+    //   çağrılmıyordu, "if (loading) return" guard'ı hep false görüyordu. Optimistic
+    //   akışta sheet anında kapanıyor (onClose), ama component bir süre mount kalıyor;
+    //   hızla yeniden açılırsa aynı state ile tekrar handleGift tetiklenirdi → 2x
+    //   SP transfer. setLoading(true) ile ikinci giriş engelleniyor.
+    setLoading(true);
     Keyboard.dismiss();
 
     // Optimistic: hemen success modalı aç, balance düş, DB write arkada

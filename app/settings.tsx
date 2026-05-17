@@ -119,6 +119,7 @@ const SETTING_GROUPS: { titleKey: string; icon: string; color: string; items: Se
   {
     titleKey: 'settings.section.about', icon: 'information', color: ACCENT,
     items: [
+      { key: 'contact_support', icon: 'email-fast', labelKey: 'settings.contact_support', descKey: 'settings.contact_support_desc', type: 'action' },
       { key: 'terms', icon: 'file-document', labelKey: 'settings.terms', type: 'link' },
       { key: 'privacy', icon: 'shield-lock', labelKey: 'settings.privacy_policy', type: 'link' },
       { key: 'version', icon: 'code-tags', labelKey: 'settings.version', type: 'action' },
@@ -252,6 +253,13 @@ export default function SettingsScreen() {
         break;
       case 'privacy':
         Linking.openURL('https://sopranochat.com/privacy');
+        break;
+      case 'contact_support':
+        // ★ v300 (17 May 2026): Destek artık in-app form ekranı (/support).
+        //   Eski mailto:sopranochat@gmail.com akışı kaldırıldı — kullanıcı destek
+        //   adresini görmesin, doğrudan uygulama içinden talep gönderebilsin.
+        //   Form → support_tickets tablosu → web admin /yonet/destek paneli.
+        router.push('/support' as any);
         break;
       case 'logout':
         setCAlert({

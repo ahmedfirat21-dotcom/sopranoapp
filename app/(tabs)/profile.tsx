@@ -35,7 +35,6 @@ import GiftDetailModal from '../../components/profile/GiftDetailModal';
 import { GiftStatsService } from '../../services/giftStats';
 import BioEditorSheet from '../../components/profile/BioEditorSheet';
 import ProfileFriendsList from '../../components/profile/ProfileFriendsList';
-import ProfileSectionHeader from '../../components/profile/ProfileSectionHeader';
 import SPHistorySheet from '../../components/profile/SPHistorySheet';
 import { useOnlineFriends } from '../../providers/OnlineFriendsProvider';
 
@@ -272,14 +271,6 @@ function AvatarPreviewModal({
   );
 }
 
-// ★ v289 (16 May 2026): Stat sayı formatı — 1.2K, 3.4M tarzı kısaltma.
-//   Profile İstatistikleri kartı için kompakt görünüm.
-function formatStatNum(n: number): string {
-  if (!n || n < 1000) return String(n || 0);
-  if (n < 1_000_000) return `${(n / 1000).toFixed(n < 10_000 ? 1 : 0)}K`;
-  return `${(n / 1_000_000).toFixed(1)}M`;
-}
-
 // ★ SP transaction reason → Türkçe etiket + premium ikon
 function spReasonLabel(reason: string | undefined): string {
   const map: Record<string, string> = {
@@ -351,7 +342,9 @@ export default function ProfileScreen() {
   const [stats, setStats] = useState({ friends: 0, followers: 0, following: 0, rooms: 0, badges: 0, gifts: 0 });
   const [showBadgesModal, setShowBadgesModal] = useState(false);
   const [showGiftDetail, setShowGiftDetail] = useState(false);
-  const [profileStats, setProfileStats] = useState({ stageMinutes: 0, roomsCreated: 0, totalListeners: 0, totalReactions: 0 });
+  // ★ v299 (17 May 2026): profileStats (stageMinutes/roomsCreated/totalListeners/totalReactions)
+  // ve büyük 4'lü stats grid KALDIRILDI — niş veri, sayfayı şişiriyordu.
+  // getProfileStats çağrısı da loadStats'tan çıkarıldı.
   // ★ v110.5: Featured rozetler + konuşma ritmi (kendi profilim)
   const [featuredBadgeIds, setFeaturedBadgeIds] = useState<string[]>([]);
   const [speakingRhythmText, setSpeakingRhythmText] = useState<string | null>(null);
@@ -416,10 +409,9 @@ export default function ProfileScreen() {
   // ★ Paralel fetch — tüm sorgular tek Promise.allSettled'da
   const loadStats = useCallback(async (signal?: { cancelled: boolean }) => {
     if (!userId) return;
-    const [friendRes, roomRes, statsRes, titleRes, followerRes, followingRes, badgeRes, giftRecvRes, giftSentRes, featuredRes, rhythmRes] = await Promise.allSettled([
+    const [friendRes, roomRes, titleRes, followerRes, followingRes, badgeRes, giftRecvRes, giftSentRes, featuredRes, rhythmRes] = await Promise.allSettled([
       FriendshipService.getFriendCount(userId),
       supabase.from('rooms').select('*', { count: 'exact', head: true }).eq('host_id', userId),
-      ProfileService.getProfileStats(userId),
       UserTitleService.getPrimaryTitle(userId),
       FollowService.getFollowerCount(userId),
       FollowService.getFollowingCount(userId),
@@ -445,14 +437,6 @@ export default function ProfileScreen() {
     const sentCount = giftSentRes.status === 'fulfilled' ? giftSentRes.value.count : 0;
     const giftCount = recvCount + sentCount;
     setStats({ friends: friendCount, followers: followerCount, following: followingCount, rooms: roomCount, badges: badgeCount, gifts: giftCount });
-
-    if (statsRes.status === 'fulfilled') {
-      setProfileStats(statsRes.value);
-    } else if (__DEV__) {
-      if (__DEV__) console.warn('[Profile] getProfileStats failed:', statsRes.reason);
-      // Kritik değil ama kullanıcı 0 görürse sebebini bilsin
-      showToast({ title: i18n.t('tabs.profile.001'), type: 'warning' });
-    }
 
     if (titleRes.status === 'fulfilled') setUserTitle(titleRes.value);
 
@@ -798,61 +782,11 @@ export default function ProfileScreen() {
             </Pressable>
           </View>
 
-          {/* ═══ ★ v289 (16 May 2026): Profil İstatistikleri grid (2×2)
-              ProfileService.getProfileStats fetch ediliyordu ama gösterilmiyordu (dead).
-              Sahne dk / Açtığı oda / Toplam dinleyici / Toplam reaksiyon → 4 mini kart. */}
-          {(profileStats.stageMinutes > 0 || profileStats.roomsCreated > 0 ||
-            profileStats.totalListeners > 0 || profileStats.totalReactions > 0) && (
-            <>
-              <ProfileSectionHeader
-                label={t('profile.stats_label')}
-                icon="stats-chart"
-                accentColor="#A78BFA"
-              />
-              <View style={p.statsGrid}>
-                <View style={p.statCard}>
-                  <LinearGradient
-                    colors={['rgba(20,184,166,0.16)', 'rgba(20,184,166,0.04)']}
-                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                    style={StyleSheet.absoluteFillObject}
-                  />
-                  <Ionicons name="mic-outline" size={20} color="#5EEAD4" style={iconShadow} />
-                  <Text style={p.statCardNum}>{formatStatNum(profileStats.stageMinutes)}</Text>
-                  <Text style={p.statCardLabel}>{t('profile.stats_stage_min')}</Text>
-                </View>
-                <View style={p.statCard}>
-                  <LinearGradient
-                    colors={['rgba(167,139,250,0.16)', 'rgba(167,139,250,0.04)']}
-                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                    style={StyleSheet.absoluteFillObject}
-                  />
-                  <Ionicons name="radio-outline" size={20} color="#A78BFA" style={iconShadow} />
-                  <Text style={p.statCardNum}>{formatStatNum(profileStats.roomsCreated)}</Text>
-                  <Text style={p.statCardLabel}>{t('profile.stats_rooms_created')}</Text>
-                </View>
-                <View style={p.statCard}>
-                  <LinearGradient
-                    colors={['rgba(251,191,36,0.16)', 'rgba(251,191,36,0.04)']}
-                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                    style={StyleSheet.absoluteFillObject}
-                  />
-                  <Ionicons name="headset-outline" size={20} color="#FBBF24" style={iconShadow} />
-                  <Text style={p.statCardNum}>{formatStatNum(profileStats.totalListeners)}</Text>
-                  <Text style={p.statCardLabel}>{t('profile.stats_total_listeners')}</Text>
-                </View>
-                <View style={p.statCard}>
-                  <LinearGradient
-                    colors={['rgba(244,114,182,0.16)', 'rgba(244,114,182,0.04)']}
-                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                    style={StyleSheet.absoluteFillObject}
-                  />
-                  <Ionicons name="heart-outline" size={20} color="#F472B6" style={iconShadow} />
-                  <Text style={p.statCardNum}>{formatStatNum(profileStats.totalReactions)}</Text>
-                  <Text style={p.statCardLabel}>{t('profile.stats_total_reactions')}</Text>
-                </View>
-              </View>
-            </>
-          )}
+          {/* ★ v299 (17 May 2026): Profil sayfasındaki büyük 4'lü stats grid
+              (Sahne dk / Açtığı oda / Toplam dinleyici / Toplam reaksiyon) KALDIRILDI.
+              Açtığı oda sayısı zaten ProfileHero stat satırında gösteriliyor;
+              diğer 3 metrik niş veri ve sayfayı şişiriyordu. profileStats fetch'i de
+              kaldırıldı (gereksiz network). */}
 
           {/* ★ 2026-05-05: Hediye vitrini ProfileHero stats satırına Hediye butonu olarak taşındı.
               Tıklayınca tab'lı GiftDetailModal açılır (Aldığı / Verdiği sekmeleri). */}
@@ -1308,27 +1242,6 @@ const p = StyleSheet.create({
     paddingHorizontal: 14, paddingVertical: 10,
     borderRadius: 14, overflow: 'hidden',
     borderWidth: 1, borderColor: 'rgba(251,191,36,0.28)',
-  },
-  // ★ v289 (16 May 2026): Profil İstatistikleri 2×2 grid — sahne dk, oda, dinleyici, reaksiyon.
-  statsGrid: {
-    flexDirection: 'row', flexWrap: 'wrap',
-    marginHorizontal: 16, marginBottom: 12,
-    gap: 10,
-  },
-  statCard: {
-    flexBasis: '47.5%', // 2 sütun + gap için ~%47
-    height: 78, borderRadius: 14, overflow: 'hidden',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
-    alignItems: 'center', justifyContent: 'center',
-    gap: 4,
-  },
-  statCardNum: {
-    fontSize: 18, fontWeight: '800', color: '#F1F5F9',
-    letterSpacing: 0.3,
-  },
-  statCardLabel: {
-    fontSize: 9, fontWeight: '700', color: 'rgba(241,245,249,0.6)',
-    textTransform: 'uppercase', letterSpacing: 0.5,
   },
   // ★ v289 (16 May 2026): 2 sütun aksiyon satırı — Boost + SP Cüzdan yan yana.
   actionRow: {

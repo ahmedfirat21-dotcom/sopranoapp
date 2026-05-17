@@ -173,7 +173,22 @@ export default function PlusScreen() {
               }
             } catch (err: any) {
               if (mountedRef.current) {
-                showToast({ title: i18n.t('plus.005'), message: err.message || i18n.t('auto.plus.012'), type: 'error' });
+                // ★ v300 (17 May 2026): RevenueCat SDK ham hatalarını kullanıcı dostu
+                //   Türkçe mesaja çevir. "There is an issue with your configuration"
+                //   genelde test cihazı Play Console internal track'inde değil veya
+                //   ürünler henüz Play tarafında aktif olmamış demek — kullanıcıyı
+                //   korkutmasın diye bilgilendirici dile çevir.
+                const rawMsg = String(err?.message || '');
+                const friendlyMsg = /configuration|underlying error/i.test(rawMsg)
+                  ? 'Satın alma sistemi henüz hazırlanıyor. Lütfen daha sonra tekrar dene veya destek ekibiyle iletişime geç.'
+                  : /network|connection/i.test(rawMsg)
+                  ? 'İnternet bağlantını kontrol et ve tekrar dene.'
+                  : /cancel|cancelled/i.test(rawMsg)
+                  ? '' // Kullanıcı iptal etti — sessiz geç
+                  : rawMsg || i18n.t('auto.plus.012');
+                if (friendlyMsg) {
+                  showToast({ title: i18n.t('plus.005'), message: friendlyMsg, type: 'error' });
+                }
               }
             } finally {
               if (mountedRef.current) setActivating(false);

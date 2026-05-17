@@ -70,7 +70,6 @@ type ProfileCacheEntry = {
   userProfile: any;
   stats: { friends: number; followers: number; following: number; rooms: number; badges: number; gifts: number };
   friendsPreview: any[];
-  profileStats: { stageMinutes: number; roomsCreated: number; totalListeners: number; totalReactions: number };
   userTitle: any;
   followStatus: any;
   incomingStatus: any;
@@ -171,7 +170,8 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
   const [stats, setStats] = useState({ friends: 0, followers: 0, following: 0, rooms: 0, badges: 0, gifts: 0 });
   const [showGiftDetail, setShowGiftDetail] = useState(false);
   const [friendsPreview, setFriendsPreview] = useState<FriendUser[]>([]);
-  const [profileStats, setProfileStats] = useState({ stageMinutes: 0, roomsCreated: 0, totalListeners: 0, totalReactions: 0 });
+  // ★ v299 (17 May 2026): profileStats (stageMinutes/roomsCreated/...) dead state idi —
+  //   fetch ediliyordu ama hiçbir UI'da render edilmiyordu. Network + state çıkarıldı.
   const [userTitle, setUserTitle] = useState<UserTitle | null>(null);
   const [isUserBlocked, setIsUserBlocked] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
@@ -232,7 +232,6 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
       setUserProfile(cached.userProfile);
       setStats(cached.stats);
       setFriendsPreview(cached.friendsPreview);
-      setProfileStats(cached.profileStats);
       setUserTitle(cached.userTitle);
       setFollowStatus(cached.followStatus);
       setIncomingStatus(cached.incomingStatus);
@@ -256,7 +255,6 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
       setUserProfile(null);
       setFriendsPreview([]);
       setStats({ friends: 0, followers: 0, following: 0, rooms: 0, badges: 0, gifts: 0 });
-      setProfileStats({ stageMinutes: 0, roomsCreated: 0, totalListeners: 0, totalReactions: 0 });
       setUserTitle(null);
       setFollowStatus(null);
       setIncomingStatus(null);
@@ -330,8 +328,6 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
     const myFriendsPromise = (currentUserId && !isOwnProfile)
       ? FriendshipService.getFriends(currentUserId).catch(() => [] as any[])
       : Promise.resolve([] as any[]);
-    const pStatsPromise = ProfileService.getProfileStats(targetUserId)
-      .catch(() => ({ stageMinutes: 0, roomsCreated: 0, totalListeners: 0, totalReactions: 0 }));
     const roomCountPromise = supabase.from('rooms').select('*', { count: 'exact', head: true }).eq('host_id', targetUserId);
     const badgePromise = supabase.from('user_badges').select('*', { count: 'exact', head: true }).eq('user_id', targetUserId);
     const followerNPromise = FollowService.getFollowerCount(targetUserId).catch(() => 0);
@@ -359,11 +355,11 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
     try {
       const [
         profile, blockedIds, detailed, follow, currentRoomData, myLiveRoomData,
-        friends, myFriends, pStats, rc, badge, followerN, followingN, giftR, giftS, title, rooms,
+        friends, myFriends, rc, badge, followerN, followingN, giftR, giftS, title, rooms,
         topSupportersData, mutualRoomsData, featuredBadgesData, personalNoteData, rhythmText,
       ] = await Promise.all([
         profilePromise, blockedPromise, detailedPromise, followPromise, currentRoomPromise, myLiveRoomPromise,
-        friendListPromise, myFriendsPromise, pStatsPromise, roomCountPromise, badgePromise,
+        friendListPromise, myFriendsPromise, roomCountPromise, badgePromise,
         followerNPromise, followingNPromise, giftRecvPromise, giftSentPromise, titlePromise, roomsListPromise,
         topSupportersPromise, mutualRoomsPromise, featuredBadgesPromise, personalNotePromise, speakingRhythmPromise,
       ]);
@@ -427,7 +423,6 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
       setFriendsPreview(visibleFriends);
       setMutualFriendCount(mutualCount);
       setStats(finalStats);
-      setProfileStats(pStats);
       setUserTitle(title);
       setRecentRooms(rooms || []);
       // ★ v110.5
@@ -443,7 +438,6 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
         userProfile: profile,
         stats: finalStats,
         friendsPreview: visibleFriends,
-        profileStats: pStats,
         userTitle: title,
         followStatus: detailed?.outgoing ?? null,
         incomingStatus: detailed?.incoming ?? null,
@@ -858,9 +852,15 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
               subscriptionTier={tier as any}
               isAdmin={!!userProfile.is_admin}
               userTitle={userTitle}
-              stats={{ followers: stats.followers, rooms: stats.rooms, badges: stats.badges, gifts: stats.gifts }}
+              // ★ v299 (17 May 2026): Owner profile.tsx ile tutarlı — followers prop'una
+              //   stats.friends (mutual) gönderiliyor; ProfileHero etiketi "Arkadaş".
+              //   Önce tek yönlü followers gönderiliyordu → visitor yanlış sayı görüyordu.
+              stats={{ followers: stats.friends, rooms: stats.rooms, badges: stats.badges, gifts: stats.gifts }}
               statsLoading={!dataReady}
-              onFollowersPress={() => { setFollowListTab('followers'); setShowFollowList(true); }}
+              onFollowersPress={() => { setFollowListTab('friends'); setShowFollowList(true); }}
+              // ★ v299: Oda sayısına tıklayınca sayfanın altındaki "Son Odalar" bölümüne
+              //   scroll edilebilir; şimdilik noop (visitor için ayrı "kullanıcının odaları"
+              //   route'u yok, recentRooms zaten kart altında görünüyor).
               onRoomsPress={() => {}}
               onBadgesPress={() => setShowBadgesModal(true)}
               onGiftsPress={() => setShowGiftDetail(true)}
