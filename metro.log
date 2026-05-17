@@ -786,3 +786,57 @@ Android Bundled 2ms C:\SopranoChat\utils\fetchTimeout.ts (1 module)
  LOG  [LiveKit] Bağlantı başarılı (deneme 1/3)
  INFO  publishing track {"enabled": true, "kind": "video", "muted": false, "participant": "I8feZfsmpDO0M0HvbCtWEBot5Jp2", "participantID": "PA_2v5jTh9QTcBy", "room": "b139aaa0-4f72-483d-bb80-522971b06dbd", "roomID": "RM_AWNA5intP2D9", "source": "camera", "streamID": "fcf69d9b-71bb-476c-b131-50a31168dd51", "streamTrackID": "fcf69d9b-71bb-476c-b131-50a31168dd51", "trackID": undefined}
  LOG  [LiveKit] ★ LocalTrackPublished: VIDEO track, source: camera
+ ERROR  SyntaxError: C:\SopranoChat\components\room\RoomInfoHeader.tsx: Expected corresponding JSX closing tag for <ScrollView>. (320:8)
+
+  318 |             );
+  319 |           })}
+> 320 |         </View>
+      |         ^
+  321 |       )}
+  322 |
+  323 |       {/* ★ Oda bilgi balonu — açıklama + kurallar birlikte, tıklayarak kapanır */}
+ ERROR  [Error: TransformError SyntaxError: C:\SopranoChat\components\room\RoomInfoHeader.tsx: Expected corresponding JSX closing tag for <ScrollView>. (320:8)
+
+[0m [90m 318 |[39m             )[33m;[39m
+ [90m 319 |[39m           })}
+[31m[1m>[22m[39m[90m 320 |[39m         [33m<[39m[33m/[39m[33mView[39m[33m>[39m
+ [90m     |[39m         [31m[1m^[22m[39m
+ [90m 321 |[39m       )}
+ [90m 322 |[39m
+ [90m 323 |[39m       {[90m/* ★ Oda bilgi balonu — açıklama + kurallar birlikte, tıklayarak kapanır */[39m}[0m]
+ ERROR  SyntaxError: C:\SopranoChat\components\room\RoomInfoHeader.tsx: Expected corresponding JSX closing tag for <ScrollView>. (320:8)
+
+  318 |             );
+  319 |           })}
+> 320 |         </View>
+      |         ^
+  321 |       )}
+  322 |
+  323 |       {/* ★ Oda bilgi balonu — açıklama + kurallar birlikte, tıklayarak kapanır */}
+ ERROR  [Error: TransformError SyntaxError: C:\SopranoChat\components\room\RoomInfoHeader.tsx: Expected corresponding JSX closing tag for <ScrollView>. (320:8)
+
+[0m [90m 318 |[39m             )[33m;[39m
+ [90m 319 |[39m           })}
+[31m[1m>[22m[39m[90m 320 |[39m         [33m<[39m[33m/[39m[33mView[39m[33m>[39m
+ [90m     |[39m         [31m[1m^[22m[39m
+ [90m 321 |[39m       )}
+ [90m 322 |[39m
+ [90m 323 |[39m       {[90m/* ★ Oda bilgi balonu — açıklama + kurallar birlikte, tıklayarak kapanır */[39m}[0m]
+ ERROR  SyntaxError: C:\SopranoChat\components\room\RoomInfoHeader.tsx: Expected corresponding JSX closing tag for <ScrollView>. (320:8)
+
+  318 |             );
+  319 |           })}
+> 320 |         </View>
+      |         ^
+  321 |       )}
+  322 |
+  323 |       {/* ★ Oda bilgi balonu — açıklama + kurallar birlikte, tıklayarak kapanır */}
+ ERROR  [Error: TransformError SyntaxError: C:\SopranoChat\components\room\RoomInfoHeader.tsx: Expected corresponding JSX closing tag for <ScrollView>. (320:8)
+
+[0m [90m 318 |[39m             )[33m;[39m
+ [90m 319 |[39m           })}
+[31m[1m>[22m[39m[90m 320 |[39m         [33m<[39m[33m/[39m[33mView[39m[33m>[39m
+ [90m     |[39m         [31m[1m^[22m[39m
+ [90m 321 |[39m       )}
+ [90m 322 |[39m
+ [90m 323 |[39m       {[90m/* ★ Oda bilgi balonu — açıklama + kurallar birlikte, tıklayarak kapanır */[39m}[0m]

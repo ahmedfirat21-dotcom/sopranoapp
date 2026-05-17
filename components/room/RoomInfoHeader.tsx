@@ -317,7 +317,7 @@ export default function RoomInfoHeader({
               </View>
             );
           })}
-        </View>
+        </ScrollView>
       )}
 
       {/* ★ Oda bilgi balonu — açıklama + kurallar birlikte, tıklayarak kapanır */}
@@ -409,12 +409,17 @@ const s = StyleSheet.create({
     color: 'rgba(255,255,255,0.15)',
     marginHorizontal: 1,
   },
+  // ★ v298.5 (17 May 2026): Yatay scroll wrapper — header sabit yükseklikte kalır.
+  badgeScroll: {
+    marginBottom: 2,
+    maxHeight: 28,
+  },
   badgeRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     gap: 4,
     paddingLeft: 36, // host avatar genişliği kadar indent
-    marginBottom: 2,
+    paddingRight: 12,
+    alignItems: 'center',
   },
   hostMiniAvatar: {
     width: 36,
