@@ -2,7 +2,7 @@
   "expo": {
     "name": "SopranoChat",
     "slug": "SopranoChat",
-    "version": "1.7.8",
+    "version": "1.7.9",
     "privacy": "public",
     "orientation": "portrait",
     "icon": "./assets/app_icon.png",
@@ -34,7 +34,7 @@
         "foregroundImage": "./assets/launcher_icon.png"
       },
       "package": "com.sopranochat",
-      "versionCode": 326,
+      "versionCode": 327,
       "allowBackup": false,
       "softwareKeyboardLayoutMode": "resize",
       "googleServicesFile": "./google-services.json",
@@ -58,15 +58,49 @@
           "action": "VIEW",
           "autoVerify": true,
           "data": [
-            { "scheme": "https", "host": "sopranochat.com", "pathPrefix": "/room" },
-            { "scheme": "https", "host": "www.sopranochat.com", "pathPrefix": "/room" },
-            { "scheme": "https", "host": "sopranochat.com", "pathPrefix": "/user" },
-            { "scheme": "https", "host": "www.sopranochat.com", "pathPrefix": "/user" },
-            { "scheme": "https", "host": "sopranochat.com", "pathPrefix": "/event" },
-            { "scheme": "https", "host": "www.sopranochat.com", "pathPrefix": "/event" },
-            { "scheme": "https", "host": "sopranochat.com", "pathPrefix": "/auth" },
-            { "scheme": "https", "host": "www.sopranochat.com", "pathPrefix": "/auth" },
-            { "scheme": "sopranochat" }
+            {
+              "scheme": "https",
+              "host": "sopranochat.com",
+              "pathPrefix": "/room"
+            },
+            {
+              "scheme": "https",
+              "host": "www.sopranochat.com",
+              "pathPrefix": "/room"
+            },
+            {
+              "scheme": "https",
+              "host": "sopranochat.com",
+              "pathPrefix": "/user"
+            },
+            {
+              "scheme": "https",
+              "host": "www.sopranochat.com",
+              "pathPrefix": "/user"
+            },
+            {
+              "scheme": "https",
+              "host": "sopranochat.com",
+              "pathPrefix": "/event"
+            },
+            {
+              "scheme": "https",
+              "host": "www.sopranochat.com",
+              "pathPrefix": "/event"
+            },
+            {
+              "scheme": "https",
+              "host": "sopranochat.com",
+              "pathPrefix": "/auth"
+            },
+            {
+              "scheme": "https",
+              "host": "www.sopranochat.com",
+              "pathPrefix": "/auth"
+            },
+            {
+              "scheme": "sopranochat"
+            }
           ]
         }
       ]
@@ -102,7 +136,8 @@
           "iosUrlScheme": "com.googleusercontent.apps.236660998634-rk3hae9hu4a75sem79ep4l773ekd9rt2"
         }
       ],
-      "expo-asset"
+      "expo-asset",
+      "@react-native-community/datetimepicker"
     ],
     "experiments": {
       "typedRoutes": true
