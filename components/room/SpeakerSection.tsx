@@ -1204,24 +1204,36 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, i
       </View>
       {/* ★ v109.4.4: İsim ortalı + altında "PRO" pill (sm, label dahil)
           ★ 2026-05-05: Frame Lottie kanat'ları altta kalsın diye z-order yükseltildi.
-          ★ v1.3.54: name_enabled ise default Text gizli — RoomAvatarFrame çerçeve etrafına yazıyor. */}
-      <View style={{ alignItems: 'center', maxWidth: cardWidth, gap: 2, zIndex: 50, elevation: 20 }}>
-        {/* ★ v287 (16 May 2026): speakers.namePosition='hidden' isim hiç render edilmez;
-            speakers.nameFontSize + nameMaxChars admin'den okur. */}
-        {!hideDefaultName && speakersCfg.namePosition !== 'hidden' && (
-          <Text
-            style={[
-              s.speakerName,
-              { maxWidth: cardWidth - 4, fontSize: speakersCfg.nameFontSize || (cardWidth < 95 ? 10 : 11) },
-              isHost && { color: '#FFD700' },
-              isMod && !isHost && { color: layout.accents.moderatorHighlight || '#C4B5FD' },
-            ]}
-            numberOfLines={1}
-            ellipsizeMode="tail"
-          >
-            {speakersCfg.nameMaxChars > 0 ? displayName.slice(0, speakersCfg.nameMaxChars) : displayName}
-          </Text>
-        )}
+          ★ v1.3.54: name_enabled ise default Text gizli — RoomAvatarFrame çerçeve etrafına yazıyor.
+          ★ v1.7.13.7 (19 May 2026): TEK VÜCUT layout — host için ayrı config:
+            isHost ise layout.host.namePosition / nameFontSize / containerPadding
+            kullanılır (eskiden yalnızca speakers config'i okunuyordu, host detayları
+            "Sahne Host" tab'ından ayrılamıyordu). */}
+      <View style={{ alignItems: 'center', maxWidth: cardWidth, gap: 2, zIndex: 50, elevation: 20, paddingTop: isHost ? (layout.host.containerPadding ?? 0) / 4 : 0 }}>
+        {/* ★ v287 (16 May 2026): namePosition='hidden' isim hiç render edilmez.
+            ★ v1.7.13.7: host için host.namePosition / host.nameFontSize precedence. */}
+        {(() => {
+          const namePos = isHost ? layout.host.namePosition : speakersCfg.namePosition;
+          const nameSize = isHost
+            ? (layout.host.nameFontSize || speakersCfg.nameFontSize || (cardWidth < 95 ? 10 : 11))
+            : (speakersCfg.nameFontSize || (cardWidth < 95 ? 10 : 11));
+          const maxChars = speakersCfg.nameMaxChars;
+          if (hideDefaultName || namePos === 'hidden') return null;
+          return (
+            <Text
+              style={[
+                s.speakerName,
+                { maxWidth: cardWidth - 4, fontSize: nameSize },
+                isHost && { color: '#FFD700' },
+                isMod && !isHost && { color: layout.accents.moderatorHighlight || '#C4B5FD' },
+              ]}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
+              {maxChars > 0 ? displayName.slice(0, maxChars) : displayName}
+            </Text>
+          );
+        })()}
         {/* ★ v283 (16 May 2026): "EV SAHİBİ" chip KALDIRILDI (kullanıcı talebi). */}
       </View>
       </Pressable>
