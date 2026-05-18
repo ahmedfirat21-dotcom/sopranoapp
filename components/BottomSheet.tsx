@@ -24,7 +24,7 @@
  */
 import React, { useRef, useEffect, useState, ReactNode } from 'react';
 import {
-  View, Text, StyleSheet, Animated, PanResponder, Pressable,
+  View, Text, StyleSheet, Animated, PanResponder, Pressable, Modal as RNModal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -139,9 +139,14 @@ export default function BottomSheet({
 
   const bottomPad = Math.max(insets.bottom, 14);
 
+  // ★ v319.8 (18 May 2026): RN Modal wrap — kullanıcı feedback: "birden fazla
+  //   modal üst üste açtığımda son modali sürüklerken bir önceki modal scroll
+  //   oluyor". Eski yapı düz View ile zIndex'ti, modal stack pointer event'leri
+  //   alt sheet'in ScrollView'una sızıyordu. RN Modal her instance kendi
+  //   window katmanını alır → alttaki modal etkileşim almaz, scroll yapmaz.
   return (
-    <>
-      <Animated.View style={[StyleSheet.absoluteFill, { zIndex: 100, opacity: backdropOpacity }]}>
+    <RNModal visible={mounted} transparent statusBarTranslucent animationType="none" onRequestClose={onClose}>
+      <Animated.View style={[StyleSheet.absoluteFill, { opacity: backdropOpacity }]}>
         <Pressable style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.6)' }]} onPress={onClose} />
       </Animated.View>
 
@@ -218,7 +223,7 @@ export default function BottomSheet({
           {children}
         </View>
       </Animated.View>
-    </>
+    </RNModal>
   );
 }
 
