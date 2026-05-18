@@ -137,6 +137,7 @@ import { useRoomDM } from '../../hooks/useRoomDM';
 import { useRoomLifecycle } from '../../hooks/useRoomLifecycle';
 import { useRoomGamification } from '../../hooks/useRoomGamification';
 import { useSwipeToDismiss } from '../../hooks/useSwipeToDismiss';
+import { useRoomPresence } from '../../hooks/useRoomPresence';
 import ModerationOverlay, { type ModerationOverlayRef } from '../../components/room/ModerationOverlay';
 import type { FlashType } from '../../components/room/AvatarPenaltyFlash';
 
@@ -2600,6 +2601,15 @@ export default function RoomScreen() {
     setMinimizedRoom,
   });
 
+  // ★ v319.6 (18 May 2026): Hayalet kullanıcı fix — Supabase Realtime Presence.
+  //   WebSocket bağlantısı kopunca (telefon kapanma, crash, network drop)
+  //   sub-second presence_state diğer client'lara yayılır. DB heartbeat
+  //   sistemi paralel kalır (history + cleanup), UI filter presence'a güvenir.
+  const { isOnline: isUserOnline, onlineUserIds } = useRoomPresence(
+    id as string,
+    firebaseUser?.uid || null,
+  );
+
   // ★ 2026-04-23: Arka planda kaçırılan eylemleri yakala — uygulama foreground'a
   //   dönünce room + participants + mic requests full refetch. Aksi halde stage
   //   talepleri, rol değişiklikleri, ban vb. "geçmişte kalıyor" gibi görünür.
@@ -3553,18 +3563,42 @@ export default function RoomScreen() {
       } as any];
     }
     // Banned kullanıcıları filtrele
-    const active = _participants.filter(p => p.role !== 'banned');
+    // ★ v319.6 (18 May 2026): Hayalet kullanıcı fix — presence-based filter.
+    //   Realtime channel'a track edilmiş user_id'ler online sayılır.
+    //   onlineUserIds boşsa (henüz subscribe edilmedi) filter atlanır (graceful start).
+    //   Kendi user_id'm hep dahil edilir (presence sync henüz değilse de UI'da gözükeyim).
+    //   Synthetic host (_synth_orig_host) presence-bypass — asıl sahip her zaman görünebilir.
+    const _presenceReady = onlineUserIds.size > 0;
+    const active = _participants.filter(p => {
+      if (p.role === 'banned') return false;
+      if (!_presenceReady) return true;
+      if (p.user_id === firebaseUser?.uid) return true;
+      if ((p as any)._synthetic) return true;
+      return isUserOnline(p.user_id);
+    });
 
     const stage = active.filter(p => p.role === 'owner' || p.role === 'speaker' || p.role === 'moderator');
     // ★ BUG-C FIX: Listener ve Spectator ayrı — spectator'lar grid'de görünmez
     const listeners = active.filter(p => p.role === 'listener');
     const spectators = active.filter(p => p.role === 'spectator' || p.role === 'guest');
-    const _amIHost = room?.host_id === firebaseUser?.uid;
+    // ★ v319.6 (18 May 2026): amIHost semantic fix — eskiden sadece host_id == me
+    //   kontrolü vardı. Geçici host (host_id transfer almış FIRAT) için TRUE dönüp
+    //   UI'da "host" yetkileri/işaretleri gösteriyordu — kullanıcı feedback:
+    //   "başkasının odasında oda sahibi olarak kalmış". Yeni mantık:
+    //     - orig_host_id varsa: amIHost = (orig_host == me) — sadece asıl sahip
+    //     - orig_host_id yoksa: amIHost = (host_id == me) — legacy oda
+    //   Geçici host artık ayrı _amIActingHost olarak işlenir.
+    const _origHostIdRoom = (room?.room_settings as any)?.original_host_id as string | undefined;
+    const _amIHost = _origHostIdRoom
+      ? _origHostIdRoom === firebaseUser?.uid
+      : room?.host_id === firebaseUser?.uid;
     const _amIMod = active.some(p => p.user_id === firebaseUser?.uid && p.role === 'moderator');
     const _amIGod = profile?.is_admin === true;
-    // ★ Vekil owner kontrolü: participant role='owner' ama rooms.host_id farklı
-    const _amIActingHost = !_amIHost && active.some(p => p.user_id === firebaseUser?.uid && p.role === 'owner');
-    const _isOriginalHost = _amIHost && !room?.room_settings?.original_host_id;
+    // ★ Vekil owner / geçici host: host_id == me ama asıl sahip değilim.
+    //   v319.6: temp host (orig_host varsa) veya participant role='owner' ama host_id farklı.
+    const _amITempHost = !!_origHostIdRoom && room?.host_id === firebaseUser?.uid && _origHostIdRoom !== firebaseUser?.uid;
+    const _amIActingHost = _amITempHost || (!_amIHost && active.some(p => p.user_id === firebaseUser?.uid && p.role === 'owner'));
+    const _isOriginalHost = _amIHost && !_origHostIdRoom;
     const _canMod = _amIHost || _amIActingHost || _amIMod || _amIGod;
     // ★ v92 (1 May 2026): Sahne delegasyonu — odada owner/moderator yoksa sahnedeki
     //   speaker'lar mic istek onayı verebilir (RPC promote_speaker_atomic'te de bu mantık var).
@@ -3576,8 +3610,7 @@ export default function RoomScreen() {
     //   transfer edilmiş odalarda UI "oda sahibi" olarak asıl sahibi göstermeli (Burak DENIZ),
     //   participant listesinde aktif olmasa bile (room.host applyOriginalHostOverride'den
     //   asıl sahibin profile'ını içerir).
-    const _origHostIdUI = (room?.room_settings as any)?.original_host_id as string | undefined;
-    const _targetHostIdUI = _origHostIdUI || room?.host_id;
+    const _targetHostIdUI = _origHostIdRoom || room?.host_id;
     let _hostUser: any = active.find(p => p.user_id === _targetHostIdUI)
       || active.find(p => p.role === 'owner');
     if (!_hostUser && _targetHostIdUI && (room as any)?.host) {
@@ -3605,7 +3638,7 @@ export default function RoomScreen() {
     const _viewerCount = canSeeGhosts ? active.length : visibleTotal;
 
     return { stageUsers: visibleStage, listenerUsers: visibleListeners, spectatorUsers: visibleSpectators, viewerCount: _viewerCount, amIHost: _amIHost || _amIActingHost, amIModerator: _amIMod, amIGodMaster: _amIGod, canModerate: _canMod, isGodOrHost: _isGodOrHost, hostUser: _hostUser, amIActingHost: _amIActingHost, isOriginalHost: _isOriginalHost, isStageDelegate: _isStageDelegate };
-  }, [participants, room, firebaseUser?.uid, profile?.is_admin]);
+  }, [participants, room, firebaseUser?.uid, profile?.is_admin, onlineUserIds, isUserOnline]);
 
   // ★ 2026-04-21: Minimize payload ref her render taze tutulur — toast/upsell closure'larında
   // stale olmaması için gerekli. Toast action'ları 15/5 dk sonra tetikleniyor.
