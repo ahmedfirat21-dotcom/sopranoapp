@@ -196,33 +196,12 @@ const ListenerCell = React.memo(function ListenerCell({
           customBadgeId={!(u as any).disguise ? ((u.user as any)?.active_badge_id ?? null) : null}
         />
       </GlowView>
-      {/* ★ v1.7.13 (19 May 2026): Mute indicator admin field'larından okuma —
-          muteIndicatorEnabled / muteIndicatorColor / muteIndicatorSize.
-          Position 'topLeft' / 'topRight' / 'bottomLeft' / 'bottomRight' admin'den. */}
-      {showMuteIndicator && cellIndicators.muteIndicatorEnabled !== false && (() => {
-        const sz = Math.max(12, Math.min(32, cellIndicators.muteIndicatorSize || 20));
-        const pos = cellIndicators.muteIndicatorPosition || 'topRight';
-        const offset = (cellW - ownerAvatarSize) / 2 - sz * 0.3;
-        const positionStyle = (() => {
-          switch (pos) {
-            case 'topLeft':     return { top: 4, left: offset };
-            case 'bottomLeft':  return { bottom: 4, left: offset };
-            case 'bottomRight': return { bottom: 4, right: offset };
-            case 'topRight':
-            default:            return { top: 4, right: offset };
-          }
-        })();
-        return (
-          <GlowView style={[s.mutedBadge, positionStyle, {
-            width: sz, height: sz, borderRadius: sz / 2,
-            backgroundColor: cellIndicators.muteIndicatorColor || '#EF4444',
-            shadowColor: cellIndicators.muteIndicatorColor || '#EF4444',
-          }]}>
-            <Ionicons name="volume-mute" size={Math.round(sz * 0.45)} color="#FFF" />
-          </GlowView>
-        );
-      })()}
-      {isChatMuted && cellIndicators.muteIndicatorEnabled !== false && (
+      {showMuteIndicator && (
+        <GlowView style={[s.mutedBadge, { right: (cellW - ownerAvatarSize) / 2 - 6 }]}>
+          <Ionicons name="volume-mute" size={9} color="#FFF" />
+        </GlowView>
+      )}
+      {isChatMuted && (
         <GlowView style={[s.chatMutedBadge, { left: (cellW - ownerAvatarSize) / 2 - 6 }]}>
           <Ionicons name="chatbox-outline" size={8} color="#FFF" />
         </GlowView>
