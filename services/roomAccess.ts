@@ -42,6 +42,8 @@ export type AccessCheckResult = {
   /** ★ 2026-04-20: language_mismatch soft warning için oda ve kullanıcı dili */
   roomLanguage?: string;
   userLanguage?: string;
+  /** ★ v1.7.13: Geçici ban — kalan süre UI'da countdown olarak gösterilir. Kalıcı ban → null. */
+  banExpiresAt?: string | null;
 };
 
 export const RoomAccessService = {
@@ -78,9 +80,15 @@ export const RoomAccessService = {
     // Admin bypass ayrı kontrol edilir (profiles tablosunda is_admin)
 
     // ── 1. Ban kontrolü ──
-    const isBanned = await ModerationService.isRoomBanned(roomId, userId);
-    if (isBanned) {
-      return { allowed: false, reason: i18n.t('auto.roomAccess.022'), action: 'banned' };
+    // ★ v1.7.13: getBanStatus expires_at döndürüyor — UI countdown için.
+    const banStatus = await ModerationService.getBanStatus(roomId, userId);
+    if (banStatus.banned) {
+      return {
+        allowed: false,
+        reason: i18n.t('auto.roomAccess.022'),
+        action: 'banned',
+        banExpiresAt: banStatus.expiresAt,
+      };
     }
 
     // ── 2. Oda kilidi kontrolü ──

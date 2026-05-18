@@ -4,7 +4,7 @@
  *   asla oda UI render etme — full-screen kırmızı tonlu animasyonlu uyarı + "Ana Sayfaya Dön".
  *   Pop modal değil, kayan modal değil — sayfa gibi davranır.
  */
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { i18n } from '../../services/i18n';
 import { View, Text, StyleSheet, Pressable, Animated, Easing } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -88,11 +88,88 @@ type Props = {
   onRetry?: () => void;
   /** ★ 2026-04-26: Birden fazla hard-block (örn: hem yaş hem arkadaş) varsa bullet liste şeklinde altta gösterilir. */
   additionalReasons?: { reason: RoomClosedReason; message?: string }[];
+  /** ★ v1.7.13: Geçici ban için kalan süre — ISO datetime. Geçince null. */
+  banExpiresAt?: string | null;
 };
 
-export default function RoomClosedScreen({ reason, onGoHome, customMessage, onRetry, additionalReasons }: Props) {
+// ★ v1.7.13: Geçici ban countdown — saniyede bir tick, dakika:saniye formatı.
+function BanCountdown({ expiresAt }: { expiresAt: string }) {
+  const [remaining, setRemaining] = useState(() => {
+    const ms = new Date(expiresAt).getTime() - Date.now();
+    return Math.max(0, Math.floor(ms / 1000));
+  });
+
+  useEffect(() => {
+    const tick = setInterval(() => {
+      const ms = new Date(expiresAt).getTime() - Date.now();
+      setRemaining(Math.max(0, Math.floor(ms / 1000)));
+    }, 1000);
+    return () => clearInterval(tick);
+  }, [expiresAt]);
+
+  const hours = Math.floor(remaining / 3600);
+  const minutes = Math.floor((remaining % 3600) / 60);
+  const seconds = remaining % 60;
+  const fmt = hours > 0
+    ? `${hours} sa ${String(minutes).padStart(2, '0')} dk`
+    : `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+
+  if (remaining <= 0) {
+    return (
+      <View style={cd.wrap}>
+        <Text style={cd.label}>Yasak süresi doldu</Text>
+        <Text style={cd.hint}>Ana sayfaya dönüp tekrar girebilirsin.</Text>
+      </View>
+    );
+  }
+  return (
+    <View style={cd.wrap}>
+      <Text style={cd.label}>Yasağın bitmesine</Text>
+      <Text style={cd.timer}>{fmt}</Text>
+      <Text style={cd.hint}>Süre dolduğunda odaya tekrar girebilirsin.</Text>
+    </View>
+  );
+}
+
+const cd = StyleSheet.create({
+  wrap: {
+    marginTop: 16,
+    paddingHorizontal: 22,
+    paddingVertical: 16,
+    borderRadius: 16,
+    backgroundColor: 'rgba(239,68,68,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(239,68,68,0.25)',
+    alignItems: 'center',
+  },
+  label: {
+    color: '#FCA5A5',
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+  },
+  timer: {
+    color: '#FFFFFF',
+    fontSize: 36,
+    fontWeight: '900',
+    letterSpacing: 1.5,
+    marginTop: 6,
+    fontVariant: ['tabular-nums'],
+  },
+  hint: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 11,
+    marginTop: 8,
+    textAlign: 'center',
+  },
+});
+
+export default function RoomClosedScreen({ reason, onGoHome, customMessage, onRetry, additionalReasons, banExpiresAt }: Props) {
   const config = REASON_CONFIG[reason];
-  const message = customMessage || config.message;
+  // ★ v1.7.13: Geçici ban — config.message yerine boş bırak, countdown bileşeni gösterilecek
+  const isTempBan = reason === 'banned' && !!banExpiresAt;
+  const message = customMessage || (isTempBan ? 'Bu odada belirli bir süre yasaklandın.' : config.message);
   const hasMultipleReasons = !!(additionalReasons && additionalReasons.length > 0);
   const pulse = useRef(new Animated.Value(1)).current;
   const fade = useRef(new Animated.Value(0)).current;
@@ -141,8 +218,13 @@ export default function RoomClosedScreen({ reason, onGoHome, customMessage, onRe
           </View>
         </Animated.View>
 
-        <Text style={s.title}>{hasMultipleReasons ? 'Bu odaya giremezsin' : config.title}</Text>
+        <Text style={s.title}>{hasMultipleReasons ? 'Bu odaya giremezsin' : (isTempBan ? 'Geçici olarak yasaklandın' : config.title)}</Text>
         <Text style={s.message}>{hasMultipleReasons ? i18n.t('auto.room.RoomClosedScreen.001') : message}</Text>
+
+        {/* ★ v1.7.13: Geçici ban countdown — kalan süreyi canlı gösterir */}
+        {isTempBan && banExpiresAt && (
+          <BanCountdown expiresAt={banExpiresAt} />
+        )}
 
         {hasMultipleReasons && (
           <View style={s.reasonList}>

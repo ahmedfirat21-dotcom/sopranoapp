@@ -1660,6 +1660,8 @@ export default function RoomScreen() {
     reason: RoomClosedReason;
     message?: string;
     additionalReasons?: { reason: RoomClosedReason; message?: string }[];
+    /** ★ v1.7.13: Geçici ban countdown — kalıcı ban için null */
+    banExpiresAt?: string | null;
   } | null>(null);
   // ★ 2026-04-26: Davetli oda onay sheet'i
   const [showInviteConfirm, setShowInviteConfirm] = useState(false);
@@ -2350,6 +2352,7 @@ export default function RoomScreen() {
                 reason: fullscreenReason,
                 message: accessResult.reason || undefined,
                 additionalReasons: additional.length > 0 ? additional : undefined,
+                banExpiresAt: accessResult.banExpiresAt, // ★ v1.7.13: countdown için
               });
               // ★ v1.7.13 (18 May 2026): setLoading(false) zorunlu — eskiden bazı
               //   senaryolarda (özellikle "oda kilitli") loading true kalıyordu →
@@ -2698,9 +2701,18 @@ export default function RoomScreen() {
   }), [qualityLimits]);
 
   // 2 LiveKit Engine
+  // ★ v1.7.13 (18 May 2026): enabled koşuluna `accessGranted === true` eklendi.
+  //   Eskiden enabled = !loading && !!room idi → banlı/şifreli/davetli odada
+  //   checkAccess henüz tamamlanmadan LiveKit token isteği paralel başlıyordu.
+  //   Banlı kullanıcı için server 403 "kullanıcı banlı" döner → "Bağlantı
+  //   kurulamadı" toast → ardından setRoomBlock('banned') → kötü UX zinciri.
+  //   Şimdi access onaylanmadan LiveKit hiç bağlanmıyor; banlı kullanıcı
+  //   doğrudan RoomClosedScreen'i görüyor, ses sunucusuna istek atılmıyor.
+  //   Ayrıca roomBlock varsa enabled false — block tetiklendikten sonra
+  //   geçici şanssız connect attempt'leri engellenmiş olur.
   const lk = useLiveKit({
     roomId: id as string,
-    enabled: !loading && !!room,
+    enabled: !loading && !!room && accessGranted === true && !roomBlock,
     userId: firebaseUser?.uid,
     displayName: profile?.display_name,
     qualityPreset,
@@ -4445,6 +4457,7 @@ export default function RoomScreen() {
         reason={effectiveReason}
         customMessage={roomBlock?.message}
         additionalReasons={roomBlock?.additionalReasons}
+        banExpiresAt={roomBlock?.banExpiresAt}
         onGoHome={() => {
           // ★ v1.7.13 (18 May 2026): router.replace('/(tabs)/home') bazı durumlarda
           //   navigation stack'i çözemeyip sonsuz loading'e takılıyordu (kullanıcı

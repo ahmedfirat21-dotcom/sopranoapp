@@ -413,6 +413,16 @@ export const ModerationService = {
 
   /** Kullanıcı bu odada banlı mı? (süresi dolmuşsa otomatik temizler) */
   async isRoomBanned(roomId: string, userId: string): Promise<boolean> {
+    const status = await this.getBanStatus(roomId, userId);
+    return status.banned;
+  },
+
+  /**
+   * ★ v1.7.13 (18 May 2026): Detaylı ban durumu — UI'da "X dakika kaldı"
+   * göstermek için expires_at döndürür. Geçici ban + countdown gösterimi.
+   * Kalıcı ban için expiresAt === null.
+   */
+  async getBanStatus(roomId: string, userId: string): Promise<{ banned: boolean; expiresAt: string | null }> {
     const { data } = await supabase
       .from('room_bans')
       .select('id, expires_at')
@@ -420,14 +430,14 @@ export const ModerationService = {
       .eq('user_id', userId)
       .maybeSingle();
 
-    if (!data) return false;
+    if (!data) return { banned: false, expiresAt: null };
 
     // Süresi dolduysa otomatik kaldır
     if (data.expires_at && new Date(data.expires_at) < new Date()) {
       await this.unbanFromRoom(roomId, userId);
-      return false;
+      return { banned: false, expiresAt: null };
     }
-    return true;
+    return { banned: true, expiresAt: data.expires_at || null };
   },
 
   /** Odanın banlı kullanıcı listesi — banlanan kullanıcı + banı atan kişi */
