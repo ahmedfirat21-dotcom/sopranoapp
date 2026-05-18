@@ -8,7 +8,10 @@ buildscript {
         targetSdkVersion = Integer.parseInt(findProperty('android.targetSdkVersion') ?: '35')
         kotlinVersion = findProperty('android.kotlinVersion') ?: '1.9.25'
 
-        ndkVersion = "26.1.10909125"
+        // ★ v319.9 (18 May 2026): 16 KB page size için NDK 27+ zorunlu.
+        //   Eski 26.1 derlediği .so'lar 4 KB align (0x1000), 27.x ile 16 KB (0x4000).
+        //   Google Play Production track Kasım 2026'dan itibaren 16 KB zorunlu.
+        ndkVersion = "27.1.12297006"
     }
     repositories {
         google()
