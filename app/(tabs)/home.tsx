@@ -624,14 +624,15 @@ const BigLiveRoomCard = React.memo(function BigLiveRoomCard({ room, onJoin, isFo
 
   // ★ v1.3.66: Persistent/boosted room glow Skia ile çiziliyor — Android'de renkli halo
   //   parite (eski shadowColor + elevation Android'de görünmüyordu).
-  // ★ v319.8 (18 May 2026): Card glow yumuşatıldı — kullanıcı feedback:
-  //   "oda kartın arkasındaki glow çok yapay duruyor". Eski opacity 0.55-0.60
-  //   + blur 20-24 keskin halo bırakıyordu. Yeni: opacity %~40 düşük, blur %~50
-  //   yüksek (daha geniş soft fade) + hafif Y offset (yüzen kart hissi).
+  // ★ v319.8 (18 May 2026): Card glow yumuşatıldı.
+  //   v319.9 (18 May 2026): İkinci pas — alt kenar belirgin sarı çizgi vardı
+  //   ("çizgiler çok belli olmuş, daha çok yansıma gibi olsa yeterli"). Opacity
+  //   yarıya düşürüldü, blur arttırıldı, offset azaltıldı. Sonuç: kartın ardında
+  //   bambaşka katı bir halo değil, çok hafif renkli yansıma.
   const skiaGlowColor = isPersistent ? Colors.premiumGold : (isBoosted ? '#F472B6' : null);
-  const skiaGlowOpacity = isPersistent ? 0.30 : 0.38;
-  const skiaGlowBlur = isPersistent ? 34 : 36;
-  const skiaGlowOffsetY = 6;
+  const skiaGlowOpacity = isPersistent ? 0.15 : 0.20;
+  const skiaGlowBlur = isPersistent ? 48 : 50;
+  const skiaGlowOffsetY = 2;
 
   const cardPressable = (
     <Pressable

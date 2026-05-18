@@ -154,8 +154,16 @@ export default function BottomSheet({
         style={[
           s.sheet,
           {
-            maxHeight: `${maxHeightRatio * 100}%`,
-            ...(minHeightRatio > 0 ? { minHeight: `${minHeightRatio * 100}%` as any } : null),
+            // ★ v319.10 (18 May 2026): scrollableContent=true ise sabit height ver,
+            //   yoksa içerik intrinsic'le flex:1 ScrollView height alamıyordu →
+            //   ScrollView içeriği render eder ama scroll edemez. Sabit height ile
+            //   ScrollView flex:1 doğru hesaplanır.
+            ...(scrollableContent
+              ? { height: `${maxHeightRatio * 100}%` as any }
+              : { maxHeight: `${maxHeightRatio * 100}%` }),
+            ...(minHeightRatio > 0 && !scrollableContent
+              ? { minHeight: `${minHeightRatio * 100}%` as any }
+              : null),
             paddingBottom: bottomPad,
             transform: [{ translateY }],
           },
