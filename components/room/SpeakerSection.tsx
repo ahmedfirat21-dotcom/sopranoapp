@@ -945,12 +945,24 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, i
         s.speakerCardInner,
         {
           width: cardWidth,
-          // ★ v301: cardHeight artık camCfg.heightRatio ile hesaplanır.
-          //   Eski davranış (cardHeight = cardWidth+18) heightRatio≈1.18 default ile birebir.
-          //   Spotlight tile'ları cardHeight'ı kendisi geçer (spotlightH), audio modda kare.
-          height: cameraOn && videoTrack && VideoView
-            ? (cardHeight !== cardWidth ? cardHeight : Math.round(cardWidth * camCfg.heightRatio))
-            : cardWidth,
+          // ★ v1.7.13.11 (19 May 2026): KOK BUG FIX — admin'in spotlightDoubleAspect (1.0=kare)
+          //   ayari heightRatio fallback'ine yenikten çikiyordu.
+          //
+          //   ESKİ HATA:
+          //     height = cardHeight !== cardWidth ? cardHeight : cardWidth * heightRatio
+          //     spotlight cardHeight = cardWidth * 1.0 = cardWidth → "esit" sayilip
+          //     fallback heightRatio (1.63) ile carpiliyordu → tile dikey kaliyordu.
+          //
+          //   DOGRU MANTIK:
+          //     Kameralı + spotlight modunda parent'in verdigi cardHeight'i HER ZAMAN
+          //     kullan. Spotlight kapali ve kamera açık nadiren olur (audio uniform grid
+          //     fallback)— o zaman heightRatio sadece audio modda anlamli olur ama avatar
+          //     zaten kare olduğu için cardWidth yeterli.
+          //
+          //   Kullanici raporu: "web admindeki simulasyon ne guzel calisiyor, senden
+          //   istedigim web admin'de oda duzenindeki konum olcek ve diger tum detaylarin
+          //   APK oda icine yansimasi". Bu fix admin spotlight aspect'i bire bir uyguliyor.
+          height: cameraOn && videoTrack && VideoView ? cardHeight : cardWidth,
           // ★ v291 (16 May 2026): Host için halka GERİ — admin'den ayarlanabilir
           //   (host.ringWidth/ringColor). Frame'li kullanıcı için halka kapanır
           //   (frame önceliği — kural: çerçeve satın alanın halkası gizlenir,

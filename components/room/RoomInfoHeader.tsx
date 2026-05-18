@@ -96,15 +96,28 @@ function ConnectionHeartbeat({ state, viewerCount, onPress }: { state: string, v
   }, [displayState]);
 
   const isOk = displayState === 'connected';
-  // ★ v319.12 (18 May 2026): Admin liveDotColor öncelikli. Connection durumu
-  //   hata renkleri (sarı/kırmızı) admin renkten farklı olduğunda yine de gösterilir.
-  const adminLiveCfg = (useRoomLayout().header as any) || {};
-  const dotColor = isOk
-    ? (adminLiveCfg.liveDotColor || '#22C55E')
-    : (displayState === 'reconnecting' ? '#FBBF24' : '#EF4444');
-  const pulseScale = adminLiveCfg.liveDotPulse === false
-    ? new Animated.Value(1) // pulse devre dışı
-    : pulseAnim;
+  // ★ v1.7.13.10 (19 May 2026): KOK BUG FIX — ConnectionHeartbeat artık tamamen
+  //   bağlantı durumuna bağlı, admin liveDotColor override KALDIRILDI.
+  //
+  //   ESKİ HATA (v319.12):
+  //     Admin liveDotColor field'i bu noktaya yanlislikla baglanmis. Admin DB'de
+  //     '#EF4444' set ettiyse — bağlantı OK iken bile kirmizi gösteriyordu. Bu,
+  //     "LiveKit bağli mi" sinyalini admin renk seçimine kurban ediyordu.
+  //
+  //   DOGRU MANTIK:
+  //     ConnectionHeartbeat = LiveKit bağlantı durumu — semantic sabit:
+  //       connected → yesil (#22C55E)
+  //       reconnecting → sari (#FBBF24)
+  //       disconnected → kirmizi (#EF4444)
+  //     Admin'in liveDotColor field'i farkli bir indicator (canli yayin badge)
+  //     için ayrilmis olmali — ConnectionHeartbeat'te override yetkisi YOK.
+  //
+  //   Kullanici raporu: "modal acan simgede kirmizi nokta — odanin livekit
+  //   baglantisinin isaretiydi diye hatirliyorum". Dogru.
+  const dotColor = isOk ? '#22C55E'
+    : displayState === 'reconnecting' ? '#FBBF24'
+    : '#EF4444';
+  const pulseScale = pulseAnim; // baglantı state'i pulse her zaman bağlı (admin opt-out yok)
 
   const content = (
     <>
