@@ -4879,9 +4879,14 @@ export default function RoomScreen() {
           }} />
       </View>
 
-      {/* ★ v287 (16 May 2026): Stage divider — admin stage.dividerStyle='line'/'gradient'/'none' */}
+      {/* ★ v287 (16 May 2026): Stage divider — admin stage.dividerStyle='line'/'gradient'/'none'
+          ★ v1.7.13 (19 May 2026): marginVertical 4 → 14, web admin preview ile parite.
+            Eskiden sahne (kameralı spotlight) ile listener grid arasi 4px boşluk vardı,
+            spotlight tile'ın altındaki listener avatar isim yazısıyla çakışıyordu
+            (kullanıcı raporu: "dinleyici kameralı tile üzerine binmiş"). 14px aşağı
+            offset listener satırının net ayırımını sağlar. */}
       {roomLayout.stage.dividerStyle !== 'none' && (
-        <View style={{ paddingHorizontal: roomLayout.global.horizontalPadding, marginVertical: 4 }} pointerEvents="none">
+        <View style={{ paddingHorizontal: roomLayout.global.horizontalPadding, marginTop: 10, marginBottom: 6 }} pointerEvents="none">
           {roomLayout.stage.dividerStyle === 'gradient' ? (
             <LinearGradient
               colors={['transparent', roomLayout.stage.dividerColor, roomLayout.stage.dividerColor, 'transparent']}
@@ -4895,8 +4900,10 @@ export default function RoomScreen() {
         </View>
       )}
 
-      {/* Clubhouse modeli: zemin overlay chat KALDIRILDI. */}
-      <View style={{ flex: 1, overflow: 'hidden', paddingHorizontal: roomLayout.global.horizontalPadding }}>
+      {/* Clubhouse modeli: zemin overlay chat KALDIRILDI.
+          ★ v1.7.13: paddingTop 8 — divider 'none' seçilse bile dinleyici-sahne
+          ayırımı görsel olarak korunur. */}
+      <View style={{ flex: 1, overflow: 'hidden', paddingHorizontal: roomLayout.global.horizontalPadding, paddingTop: roomLayout.stage.dividerStyle === 'none' ? 12 : 4 }}>
         <ListenerGrid listeners={listenerUsers} onSelectUser={(u) => { setSelectedUser(u); setInRoomProfileId(u.user_id); }} selectedUserId={selectedUser?.user_id} onShowAllUsers={() => openOverlay(() => setShowAudienceDrawer(true))} maxListeners={getRoomLimits(ownerTier as any).maxListeners} spectatorCount={spectatorUsers.length} roomOwnerId={room?.host_id}
           avatarFlashes={avatarFlashes} onFlashDone={clearAvatarFlash} micRequestUserIds={validMicRequests} />
       </View>
