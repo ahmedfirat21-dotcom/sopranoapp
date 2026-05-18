@@ -196,8 +196,16 @@ export default function RoomInfoHeader({
     info: { title: '🛡 Seçilmiş Konuşmacılar', message: 'Bu odada sadece host tarafından sahneye çağrılanlar konuşabilir.' },
   });
 
+  // ★ v1.7.13.13 (19 May 2026): Üst başlık offset — admin slider yatay/dikey kayma.
+  //   transform translateX/Y kullanılır (layout bozulmaz, diğer elementler kaymaz).
+  const headerOffsetY = (headerCfg as any).offsetY ?? 0;
+  const headerOffsetX = (headerCfg as any).offsetX ?? 0;
+
   return (
-    <View style={[s.wrap, { paddingTop: stableTop + 2 }]}>
+    <View style={[s.wrap, {
+      paddingTop: stableTop + 2,
+      transform: [{ translateX: headerOffsetX }, { translateY: headerOffsetY }],
+    }]}>
       {/* ★ v283 (16 May 2026): home/odalarım/profil tab page'lerinin orijinal
           bombe gradient'ı — slate dikey lineer (locations 0/0.55/1).
           Mesajlar mor halolu varyantını YANLIŞLIKLA baz almıştım; geri alındı. */}

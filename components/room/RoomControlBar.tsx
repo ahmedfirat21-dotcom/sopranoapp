@@ -293,10 +293,19 @@ export default function RoomControlBar({
     }
   }, []);
 
+  // ★ v1.7.13.13 (19 May 2026): Alt kontrol barı offset — admin slider yatay/dikey kayma.
+  //   Reanimated worklet içinde admin değerleri kapatma ile geçiyor (entry animasyonu
+  //   ile transform çakışmasın diye tek useAnimatedStyle'da birleştirildi).
+  const ctrlOffsetY = (controlsCfg as any).offsetY ?? 0;
+  const ctrlOffsetX = (controlsCfg as any).offsetX ?? 0;
+
   const entryStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: entryY.value }],
+    transform: [
+      { translateX: ctrlOffsetX },
+      { translateY: entryY.value + ctrlOffsetY },
+    ],
     opacity: entryOpacity.value,
-  }));
+  }), [ctrlOffsetX, ctrlOffsetY]);
 
   return (
     <ReAnimated.View style={[s.wrap, entryStyle]}>

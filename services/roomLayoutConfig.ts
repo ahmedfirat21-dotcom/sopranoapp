@@ -169,6 +169,10 @@ export interface HeaderConfig {
   hostAvatarSize: number;
   hostAvatarBorderWidth: number;
   hostAvatarBorderColor: string;
+  // ★ v1.7.13.13 (19 May 2026): Üst başlık konum ayarları — admin slider ile
+  //   yatay/dikey offset. translateX/Y uygulanır (layout bozulmaz).
+  offsetY?: number;  // -40..+40 dp (pozitif = aşağı)
+  offsetX?: number;  // -40..+40 dp (pozitif = sağa)
 }
 
 export interface ControlsConfig {
@@ -186,6 +190,10 @@ export interface ControlsConfig {
   leaveButtonColor: string;
   iconColor: string;
   iconSize: number;
+  // ★ v1.7.13.13 (19 May 2026): Alt kontrol barı konum ayarları — admin slider ile
+  //   yatay/dikey offset. translateX/Y uygulanır (pozitif Y = aşağı).
+  offsetY?: number;  // -40..+40 dp (pozitif = aşağı, negatif = yukarı)
+  offsetX?: number;  // -40..+40 dp (pozitif = sağa)
 }
 
 // ★ v289 (16 May 2026): SpeakersAdvancedConfig + NameAdvancedConfig KALDIRILDI.
@@ -405,6 +413,8 @@ export const DEFAULT_ROOM_LAYOUT: RoomLayoutConfig = {
     hostAvatarSize: 36,
     hostAvatarBorderWidth: 1.5,
     hostAvatarBorderColor: 'rgba(20,184,166,0.55)',
+    offsetY: 0,
+    offsetX: 0,
   },
   controls: {
     barBackground: 'rgba(15,25,38,0.85)',
@@ -421,6 +431,8 @@ export const DEFAULT_ROOM_LAYOUT: RoomLayoutConfig = {
     leaveButtonColor: '#EF4444',
     iconColor: '#E2E8F0',
     iconSize: 22,
+    offsetY: 0,
+    offsetX: 0,
   },
   listeners_advanced: {
     maxVisibleSmallScreen: 10,
