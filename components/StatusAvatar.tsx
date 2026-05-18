@@ -244,6 +244,9 @@ export default function StatusAvatar({
   const _layoutCfg = _useRoomLayoutSafe();
   const onlineDotEnabled = _layoutCfg.indicators.onlineDotEnabled !== false;
   const onlineDotColor = _layoutCfg.indicators.onlineDotColor || '#10B981';
+  // ★ v1.7.13 (19 May 2026): onlineDotSize artık glow shadowRadius'a etki ediyor.
+  //   Web admin'de "Online göstergesi boyutu" slider'ı (4-24) — admin canlı kontrol.
+  const onlineDotSize = Math.max(2, Math.min(32, _layoutCfg.indicators.onlineDotSize || 8));
 
   // ★ v319.12 (18 May 2026): Web admin shadow config — host/speaker/listener
   //   role'e göre avatar arkasında Skia gölge. Frame priority kuralı: frame
@@ -576,12 +579,15 @@ export default function StatusAvatar({
           // ★ v319.7 (18 May 2026): Online glow — kullanıcı feedback:
           //   "online olan kullanıcılara yeşil glow ver". Frame priority kuralı
           //   gereği frame satın almış kullanıcıda frame glow korunur, ek glow yok.
+          // ★ v1.7.13: Glow rengi + boyutu admin'den. Önceden hardcoded #22C55E +
+          //   shadowRadius = size*0.22 idi → admin slider değiştirse bile etki yoktu.
+          //   Şimdi onlineDotColor + (onlineDotSize/2 + size*0.10) formülü.
           isOnline && !isSelf && !frameId && onlineDotEnabled && Platform.select({
             ios: {
-              shadowColor: '#22C55E',
+              shadowColor: onlineDotColor,
               shadowOffset: { width: 0, height: 0 },
               shadowOpacity: 0.85,
-              shadowRadius: Math.max(8, size * 0.22),
+              shadowRadius: Math.max(4, onlineDotSize * 0.6 + size * 0.12),
             },
             android: { elevation: 10 },
           }),

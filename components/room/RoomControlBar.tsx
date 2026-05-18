@@ -14,6 +14,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRoomLayout } from '../../services/roomLayoutConfig';
+// ★ v1.7.13 (19 May 2026): BlurView import — admin barBlurEnabled için.
+//   Lazy require: blur paketinin native modülü yoksa düz View fallback.
+let BlurView: any = null;
+try { BlurView = require('expo-blur').BlurView; } catch { /* sessiz */ }
 
 // ★ 2026-04-23 redesign v2: Ana sayfa alt nav (CurvedTabBar) ile birebir tema.
 //   Bar: gradient (#2A3A58→#243250→#1A2540) + teal spotlight + parlak beyaz border + radius 22.
@@ -59,10 +63,15 @@ function CtrlBtn({
 }) {
   // ★ v283 (16 May 2026): Web admin controls.buttonSize/iconSize/iconColor canlı
   //   uygulansın — eski BUBBLE_SIZE/ICON_SIZE sabitleri yerine.
+  // ★ v1.7.13 (19 May 2026): buttonShape + buttonBorderRadius admin field'ları
+  //   eklendi — circle veya rounded. Rounded ise buttonBorderRadius değeri uygulanır.
   const ctrlCfg = useRoomLayout().controls;
   const btnSize = ctrlCfg.buttonSize;
   const iconSize = iconSizeProp ?? ctrlCfg.iconSize;
   const iconCol = inactiveIconColor ?? ctrlCfg.iconColor;
+  const btnRadius = ctrlCfg.buttonShape === 'rounded'
+    ? Math.max(2, Math.min(ctrlCfg.buttonBorderRadius, btnSize / 2))
+    : btnSize / 2;
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const handleIn = () => Animated.spring(scaleAnim, { toValue: 1.1, useNativeDriver: true, damping: 8, stiffness: 300 }).start();
   const handleOut = () => Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true, damping: 12, stiffness: 200 }).start();
@@ -81,14 +90,14 @@ function CtrlBtn({
       accessibilityState={{ selected: !!active }}
       style={s.tab}
     >
-      <Animated.View style={[s.btnBase, { width: btnSize, height: btnSize, borderRadius: btnSize / 2, transform: [{ scale: scaleAnim }] }]}>
+      <Animated.View style={[s.btnBase, { width: btnSize, height: btnSize, borderRadius: btnRadius, transform: [{ scale: scaleAnim }] }]}>
         {filled && fillBase ? (
           // ═══ ACTIVE = Tab bubble stili: 3D gradient + gloss + subtle border
           <>
             <LinearGradient
               colors={[lighten(fillBase, 25), fillBase, darken(fillBase, 30)] as any}
               start={{ x: 0.2, y: 0 }} end={{ x: 0.8, y: 1 }}
-              style={s.bubble}
+              style={[s.bubble, { borderRadius: btnRadius }]}
             >
               <Ionicons name={icon} size={iconSize} color="#FFF" style={s.iconDrop} />
             </LinearGradient>
@@ -97,7 +106,7 @@ function CtrlBtn({
               colors={['rgba(255,255,255,0.28)', 'rgba(255,255,255,0.08)', 'transparent']}
               locations={[0, 0.6, 1]}
               start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
-              style={s.bubbleGloss}
+              style={[s.bubbleGloss, { borderTopLeftRadius: btnRadius, borderTopRightRadius: btnRadius }]}
               pointerEvents="none"
             />
           </>
@@ -298,24 +307,43 @@ export default function RoomControlBar({
     opacity: entryOpacity.value,
   }));
 
+  // ★ v1.7.13 (19 May 2026): Bar wrap admin field'larına bağlandı.
+  //   barBackground (solid), barBlurEnabled/Intensity (BlurView), barBorderTop,
+  //   barPaddingV, buttonGap — hepsi admin canlı kontrol.
+  const barPadV = controlsCfg.barPaddingV;
+  const barGap = controlsCfg.buttonGap;
+  const showBlur = controlsCfg.barBlurEnabled && BlurView;
+  const blurIntensity = Math.max(0, Math.min(100, controlsCfg.barBlurIntensity));
+  const borderTopColor = controlsCfg.barBorderTop;
+
   return (
     <ReAnimated.View style={[s.wrap, entryStyle]}>
-      <View style={[s.bar, { width: barWidth }]}>
-        {/* ★ 2026-04-24: Translucent bombe (ana sayfa ile tutarlı) */}
-        <LinearGradient
-          colors={['rgba(48,65,94,0.92)', 'rgba(26,40,64,0.82)', 'rgba(12,22,40,0.6)']}
-          locations={[0, 0.55, 1]}
-          start={{ x: 0.5, y: 0 }}
-          end={{ x: 0.5, y: 1 }}
-          style={s.barGradient}
-          pointerEvents="none"
-        />
-        {/* ★ 2026-04-24: Üst teal separator — oda için üst header ile simetrik */}
-        <LinearGradient
-          colors={['transparent', 'rgba(20,184,166,0.55)', 'rgba(20,184,166,0.55)', 'transparent']}
-          locations={[0, 0.25, 0.75, 1]}
-          start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-          style={s.barTopSeparator}
+      <View style={[s.bar, { width: barWidth, paddingVertical: barPadV, gap: barGap, backgroundColor: controlsCfg.barBackground, justifyContent: 'center' }]}>
+        {/* ★ v1.7.13: Blur overlay — admin barBlurEnabled=true ise expo-blur ile arkaplan
+            bulanıklaşır (cam efekti). Yoksa düz solid bg (barBackground) gözükür. */}
+        {showBlur && (
+          <BlurView
+            intensity={blurIntensity}
+            tint="dark"
+            style={s.barGradient}
+            pointerEvents="none"
+          />
+        )}
+        {/* ★ 2026-04-24: Translucent bombe (ana sayfa ile tutarlı)
+            ★ v1.7.13: barBackground tam opaque ise gradient'i atla (admin tek renk seçmiş). */}
+        {!showBlur && (
+          <LinearGradient
+            colors={['rgba(48,65,94,0.92)', 'rgba(26,40,64,0.82)', 'rgba(12,22,40,0.6)']}
+            locations={[0, 0.55, 1]}
+            start={{ x: 0.5, y: 0 }}
+            end={{ x: 0.5, y: 1 }}
+            style={s.barGradient}
+            pointerEvents="none"
+          />
+        )}
+        {/* ★ 2026-04-24: Üst separator — admin barBorderTop renginden okuma. */}
+        <View
+          style={[s.barTopSeparator, { backgroundColor: borderTopColor }]}
           pointerEvents="none"
         />
 
@@ -364,13 +392,15 @@ export default function RoomControlBar({
               />
             )}
 
-            {/* Mic primary — kameranın sağında, diğerlerinden 4px daha büyük */}
+            {/* Mic primary — kameranın sağında, diğerlerinden 4px daha büyük
+                ★ v1.7.13: accent + mutedColor admin field'larından okuma —
+                micActiveColor / micMutedColor (eskiden hardcoded #14B8A6 / #991B1B). */}
             <CtrlBtn
               icon={isForcedMuted ? 'mic-off' : (isMicOn ? 'mic' : 'mic-off')}
               onPress={handleMicPress}
               active={isMicOn && !isForcedMuted}
-              accent="#14B8A6"
-              mutedColor={isForcedMuted ? '#991B1B' : undefined}
+              accent={controlsCfg.micActiveColor}
+              mutedColor={isForcedMuted ? controlsCfg.micMutedColor : undefined}
               label={isForcedMuted ? i18n.t('auto.room.RoomControlBar.003') : (isMicOn ? 'Mikrofonu kapat' : i18n.t('auto.room.RoomControlBar.002'))}
               iconSize={MIC_ICON}
             />
