@@ -1206,6 +1206,26 @@ export const RoomService = {
       }
     }
 
+    // ★ v319.7 (18 May 2026): Persist cooldown restore — re-join'de eski cooldown
+    //   varsa stage_expires_at'i geri yükle. Memory: "odadan çıkıp girince sayaç
+    //   sıfırlanmamalı".
+    let _restoreCooldown: string | null = null;
+    try {
+      const { data: cd } = await supabase
+        .from('room_stage_cooldowns')
+        .select('cooldown_until')
+        .eq('room_id', roomId)
+        .eq('user_id', userId)
+        .maybeSingle();
+      if (cd?.cooldown_until && new Date(cd.cooldown_until).getTime() > Date.now()) {
+        _restoreCooldown = cd.cooldown_until as string;
+      } else if (cd) {
+        // Süresi geçmiş — temizle
+        await supabase.from('room_stage_cooldowns')
+          .delete().eq('room_id', roomId).eq('user_id', userId);
+      }
+    } catch { /* tablo yoksa sessiz */ }
+
     // ★ BUG FIX: is_muted default role'a göre.
     // Eskiden hepsi is_muted=true → owner/mod/speaker rejoin sonrası mic görsel
     // olarak "muted" görünüyordu (SpeakerSection dbMuted kontrolü UI'ı kapatıyor).
@@ -1219,6 +1239,7 @@ export const RoomService = {
         user_id: userId,
         role,
         is_muted: false,
+        ...(_restoreCooldown ? { stage_expires_at: _restoreCooldown } : null),
       })
       .select('*, user:profiles!user_id(*)')
       .single();
@@ -1276,10 +1297,28 @@ export const RoomService = {
     // BUG-RD7 FIX: Önce rolü kontrol et, sadece listener/spectator ise sayacı azalt
     const { data: participant } = await supabase
       .from('room_participants')
-      .select('role')
+      .select('role, stage_expires_at')
       .eq('room_id', roomId)
       .eq('user_id', userId)
       .maybeSingle();
+
+    // ★ v319.7 (18 May 2026): Sahne cooldown persist — kullanıcı feedback:
+    //   "sahneye çıktıktan sonra sahneden inen kullanıcı için sayaç sorunu,
+    //   odadan çıkıp yeniden girince sayaç sıfırlanıyor". Eskiden leave DELETE
+    //   ediyordu → cooldown info kaybolur. Şimdi cooldown ileri tarihteyse
+    //   row korunup persist_cooldowns tablosuna yedeklenir (re-join'de geri okunur).
+    const hasActiveCooldown = !!participant?.stage_expires_at
+      && new Date(participant.stage_expires_at).getTime() > Date.now();
+    if (hasActiveCooldown) {
+      // Cooldown'u kalıcı tabloya yedekle (DELETE'ten sonra okuyabilmek için)
+      try {
+        await supabase.from('room_stage_cooldowns').upsert({
+          user_id: userId,
+          room_id: roomId,
+          cooldown_until: participant!.stage_expires_at,
+        }, { onConflict: 'user_id,room_id' });
+      } catch { /* tablo yoksa veya RLS engellerse sessiz */ }
+    }
 
     // Katılımcıyı sil
     await supabase

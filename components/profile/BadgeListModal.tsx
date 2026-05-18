@@ -81,6 +81,7 @@ export default function BadgeListModal({ visible, onClose, userId, displayName }
         badge={badges.length}
         maxHeightRatio={0.82}
         minHeightRatio={0.55}
+        scrollableContent
       >
         {loading ? (
           <View style={st.loading}>
@@ -94,8 +95,10 @@ export default function BadgeListModal({ visible, onClose, userId, displayName }
           </View>
         ) : (
           <ScrollView
+            style={{ flex: 1 }}
             contentContainerStyle={st.scrollContent}
             showsVerticalScrollIndicator={false}
+            nestedScrollEnabled
           >
             <View style={st.grid}>
               {badges.map(b => (

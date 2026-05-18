@@ -465,8 +465,39 @@ export default function StatusAvatar({
     return () => loop.stop();
   }, [glowPulseAnim, dynFrameCfg?.glow_enabled, dynFrameCfg?.glow_pulse]);
 
+  // ★ v319.7 (18 May 2026): Online glow ek halo (Android elevation renksiz olduğu
+  //   için ek bir absolute View ile yeşil halka çiziyoruz). iOS'ta avatar ring
+  //   kendi shadowColor:#22C55E ile glow yapar; Android'de bu halka soft yeşil
+  //   border + elevation kombinasyonu ile aynı etkiyi verir. Frame varsa eklenmez
+  //   (frame priority kuralı).
+  const showOnlineGlow = isOnline && !isSelf && !frameId && onlineDotEnabled;
+
   return (
     <View style={{ width: size, height: size + (showTierBadge ? 8 : 0), position: 'relative' }}>
+      {/* ★ v319.7: Yeşil online halka — avatar'ın hemen dışında, soft border + glow */}
+      {showOnlineGlow && (
+        <View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            left: -3, top: -3,
+            width: size + 6, height: size + 6,
+            borderRadius: customShape ? 0 : (size + 6) / 2,
+            borderWidth: 2.5,
+            borderColor: 'rgba(34,197,94,0.75)',
+            ...Platform.select({
+              ios: {
+                shadowColor: '#22C55E',
+                shadowOffset: { width: 0, height: 0 },
+                shadowOpacity: 0.9,
+                shadowRadius: 14,
+              },
+              android: { elevation: 8 },
+            }),
+            zIndex: 1,
+          }}
+        />
+      )}
       {/* ★ v107.69: Mağaza çerçevesi avatar'dan ÖNCE render — yoksa AvatarFrame'in iç
          koyu cutout'u avatar Image'i kapatıyor (kullanıcı: "profil resmi gidiyor"). */}
       <AvatarFrame
@@ -492,6 +523,18 @@ export default function StatusAvatar({
             borderWidth: frameId ? 0 : borderWidth,
             borderColor: frameId ? 'transparent' : ringColor,
           },
+          // ★ v319.7 (18 May 2026): Online glow — kullanıcı feedback:
+          //   "online olan kullanıcılara yeşil glow ver". Frame priority kuralı
+          //   gereği frame satın almış kullanıcıda frame glow korunur, ek glow yok.
+          isOnline && !isSelf && !frameId && onlineDotEnabled && Platform.select({
+            ios: {
+              shadowColor: '#22C55E',
+              shadowOffset: { width: 0, height: 0 },
+              shadowOpacity: 0.85,
+              shadowRadius: Math.max(8, size * 0.22),
+            },
+            android: { elevation: 10 },
+          }),
           frameId && {
             // ★ v1.3.58: customShape (hexagon/diamond/star) ise wrap borderRadius=0
             //   olduğundan elevation shadow KARE oluşuyordu — Android'de avatar
@@ -648,64 +691,10 @@ export default function StatusAvatar({
         })()}
       </View>
 
-      {/* ★ v213f: Modern online indicator — gradient nokta + dual halo + glow.
-          v286 (16 May 2026): indicators.onlineDotEnabled + color admin'den canlı. */}
-      {isOnline && !isSelf && onlineDotEnabled && (
-        <View
-          pointerEvents="none"
-          style={{
-            position: 'absolute',
-            // ★ v287 (16 May 2026): indicators.onlineDotPosition admin'den okur
-            ...(() => {
-              const pos = _layoutCfg.indicators.onlineDotPosition;
-              const off = 2;
-              if (pos === 'topLeft')     return { top: showTierBadge ? 0 : off, left: off };
-              if (pos === 'bottomLeft')  return { bottom: off, left: off };
-              if (pos === 'bottomRight') return { bottom: off, right: off };
-              return { top: showTierBadge ? 0 : off, right: off }; // topRight default
-            })(),
-            width: dotSize, height: dotSize,
-            zIndex: 3, elevation: 6,
-            alignItems: 'center', justifyContent: 'center',
-          }}
-        >
-          {/* Dış soft glow halo (v287: color admin'den) */}
-          <View style={{
-            position: 'absolute',
-            width: dotSize * 1.6, height: dotSize * 1.6,
-            borderRadius: (dotSize * 1.6) / 2,
-            backgroundColor: onlineDotColor + '2E', // 18% alpha
-          }} />
-          {/* Gradient nokta (v287: color admin'den) */}
-          <LinearGradient
-            colors={[onlineDotColor, onlineDotColor, onlineDotColor]}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-            style={{
-              width: dotSize, height: dotSize,
-              borderRadius: dotRadius,
-              borderWidth: Math.max(1.5, dotBorder),
-              borderColor: 'rgba(255,255,255,0.92)',
-              ...Platform.select({
-                ios: {
-                  shadowColor: '#10B981',
-                  shadowOffset: { width: 0, height: 0 },
-                  shadowOpacity: 0.55,
-                  shadowRadius: dotSize * 0.45,
-                },
-                android: {},
-              }),
-            }}
-          />
-          {/* İç highlight (specular hint) */}
-          <View style={{
-            position: 'absolute',
-            top: dotBorder + 1, left: dotBorder + 1,
-            width: dotSize * 0.32, height: dotSize * 0.32,
-            borderRadius: (dotSize * 0.32) / 2,
-            backgroundColor: 'rgba(255,255,255,0.55)',
-          }} />
-        </View>
-      )}
+      {/* ★ v319.7 (18 May 2026): Online dot KALDIRILDI — kullanıcı feedback:
+          "online status simgesi tüm avatarlardan kaldır, online olan
+          kullanıcılara yeşil glow ver yeterli". Glow render avatar ring
+          shadow'una taşındı (yukarıda style merge). */}
 
       {/* ★ v280 (15 May 2026): CosmeticBadge — web admin rozet editörü.
             Eski TierBadge (hardcoded Plus/Pro pill) KALDIRILDI.

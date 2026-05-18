@@ -56,6 +56,10 @@ export interface BottomSheetProps {
   /** Sheet'in alabileceği MİN yükseklik (ekranın %X'i). İçerik kısa olsa bile
    *  sheet bu seviyenin altına düşmez. Default 0 (içeriğe göre). */
   minHeightRatio?: number;
+  /** ★ v319.7 (18 May 2026): İçerik ScrollView içeriyorsa true ver. Pan responder
+   *  yalnızca header (handle + title) bölümünden drag'i yakalar; content ScrollView
+   *  ile çakışmaz. Aksi halde aşağı kaydırma sheet'i kapatır. */
+  scrollableContent?: boolean;
   /** Swipe-down kapatma eşiği (px). Default: 80 */
   dismissThreshold?: number;
   /** Header'da gösterilecek başlık (UPPERCASE'e zorlanır stil ile) */
@@ -76,6 +80,7 @@ export default function BottomSheet({
   children,
   maxHeightRatio = 0.78,
   minHeightRatio = 0,
+  scrollableContent = false,
   dismissThreshold = 80,
   title,
   icon,
@@ -150,7 +155,7 @@ export default function BottomSheet({
             transform: [{ translateY }],
           },
         ]}
-        {...panResponder.panHandlers}
+        {...(scrollableContent ? {} : panResponder.panHandlers)}
       >
         {/* ★ v294 (17 May 2026): NotificationDrawer/ProfileHero aile dili — 3-katman gradient.
             (1) slate diagonal base + (2) accent halo (üst-sol) + (3) soft accent glow. */}
@@ -182,8 +187,10 @@ export default function BottomSheet({
           style={s.topEdge}
         />
 
-        {/* ★ 2026-04-28: Drag handle/header artık görsel — pan tüm sheet'te (Clubhouse). */}
-        <View>
+        {/* ★ 2026-04-28: Drag handle/header artık görsel — pan tüm sheet'te (Clubhouse).
+            ★ v319.7 (18 May 2026): scrollableContent=true ise pan handler buraya
+            (handle + title) bağlanır — ScrollView altı serbest scroll eder. */}
+        <View {...(scrollableContent ? panResponder.panHandlers : {})}>
           <View style={s.handleWrap}>
             <View style={s.handle} />
           </View>
