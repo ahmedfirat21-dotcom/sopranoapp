@@ -1397,7 +1397,7 @@ export default function SpeakerSection({ stageUsers, getMicStatus, onSelectUser,
             // ★ v288 (16 May 2026): host.avatarSize override — admin'in Boyut slider'ı.
             //   Host'un kendi grid hücresi host.avatarSize değerine çekilir, diğer
             //   konuşmacılar getSpeakerMetrics hesabı (cardWidth).
-            const isHostUser = u.role === 'owner' || u.role === 'host';
+            const isHostUser = u.role === 'owner';
             const hostSize = layout?.host?.avatarSize;
             const renderWidth = isHostUser && hostSize ? Math.max(40, hostSize) : cardWidth;
             const renderHeight = isHostUser && hostSize ? Math.max(40, hostSize) : cardHeight;

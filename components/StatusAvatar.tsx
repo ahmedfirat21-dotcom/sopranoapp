@@ -186,6 +186,11 @@ interface StatusAvatarProps {
   shapeOverride?: 'circle' | 'square' | 'rounded' | 'hex';
   /** Rounded shape için köşe yuvarlama miktarı (cfgBorderRadius). Sadece shapeOverride='rounded' ise etkili. */
   shapeOverrideRadius?: number;
+  /** ★ v319.12 (18 May 2026): Web admin shadow config'ten avatar arkası gölge.
+   *  Frame priority kuralı: frame varsa shadow render ETMEZ. Listener default
+   *  enabled=false, owner her zaman aktif. SpeakerSection/ListenerGrid çağrılırken
+   *  geçilir. */
+  shadowRole?: 'host' | 'speaker' | 'listener';
 }
 
 /**
@@ -222,6 +227,7 @@ export default function StatusAvatar({
   user,
   shapeOverride,
   shapeOverrideRadius,
+  shadowRole,
 }: StatusAvatarProps) {
   // ★ v282 (16 May 2026): user objesi verilirse içinden default'ları al; explicit
   //   prop'lar (frameId/customBadgeId/tier/vb.) öncelikli override. Bu pattern sayesinde
@@ -238,6 +244,26 @@ export default function StatusAvatar({
   const _layoutCfg = _useRoomLayoutSafe();
   const onlineDotEnabled = _layoutCfg.indicators.onlineDotEnabled !== false;
   const onlineDotColor = _layoutCfg.indicators.onlineDotColor || '#10B981';
+
+  // ★ v319.12 (18 May 2026): Web admin shadow config — host/speaker/listener
+  //   role'e göre avatar arkasında Skia gölge. Frame priority kuralı: frame
+  //   varsa shadow yok. Listener default disabled (admin enable etmedikçe).
+  const _shadows = _layoutCfg.shadows;
+  const _shadowEnabled = !!shadowRole && !frameId && (() => {
+    if (shadowRole === 'host') return true; // host her zaman aktif
+    if (shadowRole === 'speaker') return _shadows.speakerShadowEnabled;
+    if (shadowRole === 'listener') return _shadows.listenerShadowEnabled;
+    return false;
+  })();
+  const _shadowColor = shadowRole === 'speaker' ? _shadows.speakerShadowColor
+    : shadowRole === 'listener' ? _shadows.listenerShadowColor
+    : _shadows.hostShadowColor;
+  const _shadowBlur = shadowRole === 'speaker' ? _shadows.speakerShadowBlur
+    : shadowRole === 'listener' ? _shadows.listenerShadowBlur
+    : _shadows.hostShadowBlur;
+  const _shadowOpacity = shadowRole === 'speaker' ? _shadows.speakerShadowOpacity
+    : shadowRole === 'listener' ? _shadows.listenerShadowOpacity
+    : _shadows.hostShadowOpacity;
 
   // ★ v283 (16 May 2026): shapeOverride (web admin oda düzeni) frame customShape'i
   //   yoksa borderRadius'u belirler. Default 'circle' (size/2).
@@ -474,6 +500,30 @@ export default function StatusAvatar({
 
   return (
     <View style={{ width: size, height: size + (showTierBadge ? 8 : 0), position: 'relative' }}>
+      {/* ★ v319.12 (18 May 2026): Admin shadow config (Skia tabanlı, cross-platform).
+          host/speaker/listener role'üne göre admin'in ayarladığı renk/blur/opacity. */}
+      {_shadowEnabled && (
+        <View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            left: 0, top: 0,
+            width: size, height: size,
+            borderRadius: customShape ? 0 : size / 2,
+            ...Platform.select({
+              ios: {
+                shadowColor: _shadowColor,
+                shadowOffset: { width: 0, height: 0 },
+                shadowOpacity: _shadowOpacity,
+                shadowRadius: _shadowBlur,
+              },
+              android: { elevation: Math.max(4, Math.round(_shadowBlur * 0.5)) },
+            }),
+            zIndex: 0,
+            backgroundColor: 'transparent',
+          }}
+        />
+      )}
       {/* ★ v319.7: Yeşil online halka — avatar'ın hemen dışında, soft border + glow */}
       {showOnlineGlow && (
         <View

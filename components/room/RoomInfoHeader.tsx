@@ -96,11 +96,19 @@ function ConnectionHeartbeat({ state, viewerCount, onPress }: { state: string, v
   }, [displayState]);
 
   const isOk = displayState === 'connected';
-  const dotColor = isOk ? '#22C55E' : (displayState === 'reconnecting' ? '#FBBF24' : '#EF4444');
+  // ★ v319.12 (18 May 2026): Admin liveDotColor öncelikli. Connection durumu
+  //   hata renkleri (sarı/kırmızı) admin renkten farklı olduğunda yine de gösterilir.
+  const adminLiveCfg = (useRoomLayout().header as any) || {};
+  const dotColor = isOk
+    ? (adminLiveCfg.liveDotColor || '#22C55E')
+    : (displayState === 'reconnecting' ? '#FBBF24' : '#EF4444');
+  const pulseScale = adminLiveCfg.liveDotPulse === false
+    ? new Animated.Value(1) // pulse devre dışı
+    : pulseAnim;
 
   const content = (
     <>
-      <Animated.View style={[s.liveDot, { backgroundColor: dotColor, transform: [{ scale: pulseAnim }] }]} />
+      <Animated.View style={[s.liveDot, { backgroundColor: dotColor, transform: [{ scale: pulseScale }] }]} />
       <Ionicons name="people" size={12} color="#14B8A6" style={s.iconShadow} />
       <Text style={s.viewerText}>{viewerCount}</Text>
     </>
@@ -152,7 +160,7 @@ export default function RoomInfoHeader({
   if (roomType === 'closed') badges.push({ icon: 'lock-closed', color: '#F59E0B', bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.25)', info: { title: i18n.t('room.roominfoheader.003'), message: i18n.t('room.roominfoheader.004') } });
   if (roomType === 'invite') badges.push({ icon: 'mail', color: '#8B5CF6', bg: 'rgba(139,92,246,0.12)', border: 'rgba(139,92,246,0.25)', info: { title: '📨 Davetli Oda', message: i18n.t('room.roominfoheader.005') } });
   if (isLocked) badges.push({ icon: 'lock-closed', color: '#F59E0B', bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.25)', info: { title: '🔒 Oda Kilitli', message: i18n.t('room.roominfoheader.006') } });
-  if ((entryFeeSp ?? 0) > 0) badges.push({ text: `${entryFeeSp} SP`, color: '#D4AF37', bg: 'rgba(212,175,55,0.12)', border: 'rgba(212,175,55,0.25)', info: { title: i18n.t('auto.room.RoomInfoHeader.004', { 0: entryFeeSp }), message: i18n.t('auto.room.RoomInfoHeader.003', { 0: entryFeeSp }) } });
+  if ((entryFeeSp ?? 0) > 0) badges.push({ text: `${entryFeeSp} SP`, color: '#D4AF37', bg: 'rgba(212,175,55,0.12)', border: 'rgba(212,175,55,0.25)', info: { title: i18n.t('auto.room.RoomInfoHeader.004', { 0: entryFeeSp ?? 0 }), message: i18n.t('auto.room.RoomInfoHeader.003', { 0: entryFeeSp ?? 0 }) } });
   if (followersOnly) badges.push({ icon: 'people', color: '#A78BFA', bg: 'rgba(139,92,246,0.12)', border: 'rgba(139,92,246,0.25)', info: { title: i18n.t('room.roominfoheader.007'), message: i18n.t('room.roominfoheader.008') } });
   if (roomLanguage && roomLanguage !== 'tr') {
     const _langLabels: Record<string, string> = { en: 'English', de: 'Deutsch', ar: 'العربية', fr: i18n.t('auto.room.RoomInfoHeader.002'), es: 'Español', it: 'Italiano', ru: 'Русский', pt: 'Português', ja: '日本語' };
@@ -281,7 +289,11 @@ export default function RoomInfoHeader({
                 {/* ★ v283: CANLI/LIVE pill kaldırıldı — eski v278 yapısı korunsun
                     (kullanıcı tercihi: minimal header, sadece time + duration). */}
                 <Ionicons name="time-outline" size={8} color="rgba(20,184,166,0.6)" />
-                <Text style={s.durationText}>{roomDuration}</Text>
+                {/* ★ v319.12 (18 May 2026): Admin subtitle config (font size + color). */}
+                <Text style={[s.durationText, {
+                  ...(headerCfg.subtitleFontSize ? { fontSize: headerCfg.subtitleFontSize } : null),
+                  ...(headerCfg.subtitleColor ? { color: headerCfg.subtitleColor } : null),
+                }]}>{roomDuration}</Text>
                 {roomExpiry ? (
                   <>
                     <Text style={s.durationSep}>·</Text>

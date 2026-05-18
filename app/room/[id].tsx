@@ -4601,10 +4601,14 @@ export default function RoomScreen() {
       ]}
     >
       <StatusBar hidden />
-      {/* ★ Dinamik Oda Arka Planı — tema + arkaplan görseli desteği */}
+      {/* ★ Dinamik Oda Arka Planı — tema + arkaplan görseli desteği
+          ★ v319.12 (18 May 2026): Web admin global.background config eklendi.
+          Öncelik sırası: 1) Oda özel image_url, 2) admin global.background ('solid'/
+          'gradient'/'image'), 3) theme_id, 4) default room_in_bg.jpg. */}
       {(() => {
         const themeId = (room as any)?.theme_id;
         const bgImageUrl = (room as any)?.room_image_url || (room?.room_settings as any)?.room_image_url;
+        const adminBg = roomLayout.global;
         const THEME_COLORS: Record<string, [string, string]> = {
           ocean: ['#0E4D6F', '#083344'], sunset: ['#7F1D1D', '#4C0519'],
           forest: ['#14532D', '#052E16'], galaxy: ['#312E81', '#1E1B4B'],
@@ -4621,6 +4625,24 @@ export default function RoomScreen() {
             <ImageBackground source={{ uri: bgImageUrl }} style={StyleSheet.absoluteFillObject} resizeMode="cover">
               <LinearGradient colors={['rgba(0,0,0,0.35)', 'rgba(0,0,0,0.55)', 'rgba(0,0,0,0.75)']} style={StyleSheet.absoluteFillObject} pointerEvents="none" />
             </ImageBackground>
+          );
+        }
+        // ★ v319.12: Admin global background — 'image' / 'gradient' / 'solid'
+        if (adminBg.background === 'image' && adminBg.bgImageUrl) {
+          return (
+            <ImageBackground source={{ uri: adminBg.bgImageUrl }} style={StyleSheet.absoluteFillObject} resizeMode="cover">
+              <LinearGradient colors={['rgba(0,0,0,0.35)', 'rgba(0,0,0,0.55)', 'rgba(0,0,0,0.75)']} style={StyleSheet.absoluteFillObject} pointerEvents="none" />
+            </ImageBackground>
+          );
+        }
+        if (adminBg.background === 'gradient' && Array.isArray(adminBg.bgGradient) && adminBg.bgGradient.length >= 2) {
+          return (
+            <LinearGradient colors={adminBg.bgGradient as any} start={{ x: 0, y: 0 }} end={{ x: 0.5, y: 1 }} style={StyleSheet.absoluteFillObject} pointerEvents="none" />
+          );
+        }
+        if (adminBg.background === 'solid' && adminBg.bgColor) {
+          return (
+            <View style={[StyleSheet.absoluteFillObject, { backgroundColor: adminBg.bgColor }]} pointerEvents="none" />
           );
         }
         if (themeColors) {
@@ -4770,6 +4792,14 @@ export default function RoomScreen() {
         // ★ v283 (16 May 2026): Web admin global.horizontalPadding artık SADECE avatar
         //   grid'lere uygulanır (header full bleed kalsın). v284'te root'tan kaldırılmıştı.
         paddingHorizontal: roomLayout.global.horizontalPadding,
+        // ★ v319.12 (18 May 2026): Admin stage config — admin yazıyor, mobile rendere
+        //   yansır. stage.backgroundColor ('transparent' default'a uyumlu),
+        //   stage.borderRadius, stage.padding.
+        ...(roomLayout.stage.backgroundColor && roomLayout.stage.backgroundColor !== 'transparent'
+          ? { backgroundColor: roomLayout.stage.backgroundColor }
+          : null),
+        ...(roomLayout.stage.borderRadius ? { borderRadius: roomLayout.stage.borderRadius } : null),
+        ...(roomLayout.stage.padding ? { padding: roomLayout.stage.padding } : null),
       }}>
         <SpeakerSection stageUsers={stageUsers} getMicStatus={getMicStatus}
           onSelectUser={(u) => { setSelectedUser(u); setInRoomProfileId(u.user_id); }}

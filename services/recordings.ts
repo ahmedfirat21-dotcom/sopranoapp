@@ -137,10 +137,43 @@ export const RecordingService = {
     return { success: true };
   },
 
-  /** Kayıt sil — host-only via RLS. */
+  /** Kayıt sil — host-only via RLS.
+   *  ★ v319.12 (18 May 2026): KVKK uyumluluk — manuel silmede de log yaz.
+   *  Eskiden sadece otomatik expires_at cron'u recording_deletion_log'a yazıyordu;
+   *  kullanıcı UI'dan sildiğinde log oluşmuyordu (6698 KVKK madde 7 ihtarı).
+   *  Şimdi DELETE öncesi log INSERT (storage_cleaned=false, cron sonra true yapacak).
+   */
   async deleteRecording(id: string): Promise<{ success: boolean; error?: string }> {
+    // 1) Önce kaydı oku — log'a host_id + room_id için gerekli
+    let recordingRoomId: string | null = null;
+    let recordingHostId: string | null = null;
+    try {
+      const { data: rec } = await supabase
+        .from('room_recordings')
+        .select('room_id, host_id')
+        .eq('id', id)
+        .maybeSingle();
+      if (rec) {
+        recordingRoomId = (rec as any).room_id ?? null;
+        recordingHostId = (rec as any).host_id ?? null;
+      }
+    } catch { /* sessiz */ }
+
+    // 2) Silme
     const { error } = await supabase.from('room_recordings').delete().eq('id', id);
     if (error) return { success: false, error: error.message };
+
+    // 3) KVKK log (silme başarılı olduktan sonra)
+    try {
+      await supabase.from('recording_deletion_log').insert({
+        recording_id: id,
+        room_id: recordingRoomId,
+        host_id: recordingHostId,
+        deleted_at: new Date().toISOString(),
+        storage_cleaned: false, // cleanup_recording_storage cron sonra true yapar
+      });
+    } catch { /* log fail-safe — silme zaten oldu */ }
+
     return { success: true };
   },
 

@@ -182,6 +182,7 @@ const ListenerCell = React.memo(function ListenerCell({
           frameId={activeFrameId}
           shapeOverride={cfgShape}
           shapeOverrideRadius={cfgBorderRadius}
+          shadowRole="listener"
           // ★ v265 (13 May 2026): showTierBadge HARDCODE KALDIRILDI — frame editör
           //   'tier_badge_enabled' ayarı kontrol etsin. Web admin'den listener override'da
           //   açıp kapatmak artık çalışır. Frame YOKSA default davranış (Free gizli, Pro/Plus
