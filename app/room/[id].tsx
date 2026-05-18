@@ -4879,34 +4879,45 @@ export default function RoomScreen() {
           }} />
       </View>
 
-      {/* ★ v287 (16 May 2026): Stage divider — admin stage.dividerStyle='line'/'gradient'/'none'
-          ★ v1.7.13 (19 May 2026): marginVertical 4 → 14, web admin preview ile parite.
-            Eskiden sahne (kameralı spotlight) ile listener grid arasi 4px boşluk vardı,
-            spotlight tile'ın altındaki listener avatar isim yazısıyla çakışıyordu
-            (kullanıcı raporu: "dinleyici kameralı tile üzerine binmiş"). 14px aşağı
-            offset listener satırının net ayırımını sağlar. */}
-      {roomLayout.stage.dividerStyle !== 'none' && (
-        <View style={{ paddingHorizontal: roomLayout.global.horizontalPadding, marginTop: 10, marginBottom: 6 }} pointerEvents="none">
-          {roomLayout.stage.dividerStyle === 'gradient' ? (
-            <LinearGradient
-              colors={['transparent', roomLayout.stage.dividerColor, roomLayout.stage.dividerColor, 'transparent']}
-              locations={[0, 0.25, 0.75, 1]}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-              style={{ height: 1 }}
-            />
-          ) : (
-            <View style={{ height: 1, backgroundColor: roomLayout.stage.dividerColor }} />
-          )}
-        </View>
-      )}
-
-      {/* Clubhouse modeli: zemin overlay chat KALDIRILDI.
-          ★ v1.7.13: paddingTop 8 — divider 'none' seçilse bile dinleyici-sahne
-          ayırımı görsel olarak korunur. */}
-      <View style={{ flex: 1, overflow: 'hidden', paddingHorizontal: roomLayout.global.horizontalPadding, paddingTop: roomLayout.stage.dividerStyle === 'none' ? 12 : 4 }}>
-        <ListenerGrid listeners={listenerUsers} onSelectUser={(u) => { setSelectedUser(u); setInRoomProfileId(u.user_id); }} selectedUserId={selectedUser?.user_id} onShowAllUsers={() => openOverlay(() => setShowAudienceDrawer(true))} maxListeners={getRoomLimits(ownerTier as any).maxListeners} spectatorCount={spectatorUsers.length} roomOwnerId={room?.host_id}
-          avatarFlashes={avatarFlashes} onFlashDone={clearAvatarFlash} micRequestUserIds={validMicRequests} />
-      </View>
+      {/* ★ v1.7.13 (19 May 2026): TEK VÜCUT — sahne ile listener arasındaki gap
+          artık tamamen admin field'ından okunur: `roomLayout.stage.gapBetweenSpeakersAndListeners`
+          (default 20). Web admin önizleme + APK aynı değeri kullanır.
+          Eskiden manuel hardcoded marginTop:10 + marginBottom:6 + paddingTop:12
+          vardı; web admin preview ile uyumsuzdu. Tek source of truth: DB config.
+          Divider varsa gap divider'ın etrafına yarı yarıya dağıtılır, divider yoksa
+          tamamı listener grid'in paddingTop'una geçer. */}
+      {(() => {
+        const totalGap = Math.max(8, roomLayout.stage.gapBetweenSpeakersAndListeners ?? 20);
+        const dividerVisible = roomLayout.stage.dividerStyle !== 'none';
+        const halfGap = Math.floor(totalGap / 2);
+        return (
+          <>
+            {dividerVisible && (
+              <View style={{ paddingHorizontal: roomLayout.global.horizontalPadding, marginTop: halfGap, marginBottom: 4 }} pointerEvents="none">
+                {roomLayout.stage.dividerStyle === 'gradient' ? (
+                  <LinearGradient
+                    colors={['transparent', roomLayout.stage.dividerColor, roomLayout.stage.dividerColor, 'transparent']}
+                    locations={[0, 0.25, 0.75, 1]}
+                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                    style={{ height: 1 }}
+                  />
+                ) : (
+                  <View style={{ height: 1, backgroundColor: roomLayout.stage.dividerColor }} />
+                )}
+              </View>
+            )}
+            <View style={{
+              flex: 1,
+              overflow: 'hidden',
+              paddingHorizontal: roomLayout.global.horizontalPadding,
+              paddingTop: dividerVisible ? halfGap - 4 : totalGap,
+            }}>
+              <ListenerGrid listeners={listenerUsers} onSelectUser={(u) => { setSelectedUser(u); setInRoomProfileId(u.user_id); }} selectedUserId={selectedUser?.user_id} onShowAllUsers={() => openOverlay(() => setShowAudienceDrawer(true))} maxListeners={getRoomLimits(ownerTier as any).maxListeners} spectatorCount={spectatorUsers.length} roomOwnerId={room?.host_id}
+                avatarFlashes={avatarFlashes} onFlashDone={clearAvatarFlash} micRequestUserIds={validMicRequests} />
+            </View>
+          </>
+        );
+      })()}
 
       {/* ★ Hoş geldin artık toast ile (showToast helper) — banner JSX kaldırıldı */}
 

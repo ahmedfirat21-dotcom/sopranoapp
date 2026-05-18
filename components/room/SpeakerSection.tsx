@@ -1368,11 +1368,11 @@ export default function SpeakerSection({ stageUsers, getMicStatus, onSelectUser,
           row+nowrap+justifyCenter ile tile'lar kesin yan yana, ekran kenarına
           minimal taşma toleransıyla. */}
       {showSpotlight && (
-        // ★ v1.7.13 (19 May 2026): marginBottom gap (4-8) yerine sabit 12 —
-        //   spotlight tile altındaki audio-only/listener grid'in spotlight'a
-        //   binmesini önler. Tile yüksekliği ekran %50'yi kaplayınca daha
-        //   net görsel ayırım gerekiyor.
-        <View style={[s.mainSpeakerGrid, { gap: spotlightGap, marginBottom: 12, flexWrap: 'nowrap', alignItems: 'center' }]}>
+        // ★ v1.7.13 (19 May 2026): TEK VÜCUT — sahne içi spotlight altı küçük spacing
+        //   sahne ile listener arası gap admin'in stage.gapBetweenSpeakersAndListeners
+        //   field'ından gelir (room/[id].tsx içinde). Burada sadece audio-only
+        //   alt-grid ile spotlight arasında 6px (sahne içi sıkı düzen).
+        <View style={[s.mainSpeakerGrid, { gap: spotlightGap, marginBottom: 6, flexWrap: 'nowrap', alignItems: 'center' }]}>
           {cameraUsers.map((u) => {
             const st = getMicStatus(u.user_id);
             const isMe = u.user_id === currentUserId;
