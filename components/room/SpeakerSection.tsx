@@ -14,6 +14,14 @@ import { useBadgeConfig, getBadgeRenderSize } from '../../services/cosmeticEdito
 import type { RoomParticipant } from '../../services/database';
 import { useRoomLayout, type SpeakersLayoutConfig, type AvatarShape } from '../../services/roomLayoutConfig';
 
+// ★ v1.7.13 (19 May 2026): Skia lazy import — StageLightHalo warm aura için.
+//   GlowView/SkiaShadow zaten kullanılıyor ama doğrudan Skia primitive (Canvas,
+//   RadialGradient) gerekiyor. Lazy require + null fallback ile çakışma yok.
+let SkiaMod: any = null;
+try {
+  SkiaMod = require('@shopify/react-native-skia');
+} catch { /* sessiz fallback */ }
+
 // ★ v115: Avatar shape → borderRadius çevirici (config.speakers.avatarShape için)
 function shapeBorderRadius(shape: AvatarShape, size: number, configRadius: number): number {
   switch (shape) {
@@ -242,136 +250,150 @@ function SpeakingGlow({ speaking, borderRadius = 16 }: { speaking: boolean; bord
 }
 
 // ★ v92.14 (1 May 2026): StageLightHalo — Sahne Işığı power-up'ına özel görsel.
-//   - LinearGradient halka (parlaktan koyuya, top-down) → "ışık tüllüsü" hissi.
-//   - 3 katmanlı altın expand-ring (light → mid → deep amber, gradient parite).
-//   - 8 partiküllü TOZ BULUTU (canlı yukarı süzülme, rastgele drift, twinkle scale).
-//   - Android shadow KALDIRILDI (RN Android'de glow render etmiyor, sadece çakışma yapıyor).
-//     Glow hissi gradient + opacity layering ile sağlanıyor.
-const DUST_COUNT = 8;
-const DUST_PARAMS = Array.from({ length: DUST_COUNT }, (_, i) => ({
-  // Avatar etrafına dağılmış başlangıç noktası (rastgele ama deterministik render-stable)
-  startX: Math.cos((i / DUST_COUNT) * Math.PI * 2 + 0.4) * (24 + (i % 3) * 8),
-  startY: Math.sin((i / DUST_COUNT) * Math.PI * 2 + 0.4) * (18 + (i % 3) * 6),
-  driftX: ((i * 37) % 60) - 30,         // -30..+30 yatay drift
-  endY: -85 - (i % 4) * 10,              // yukarı kayar
-  delay: (i * 280) % 2400,               // stagger
-  size: 3 + (i % 3) * 1.2,               // 3..5.4 px
-  color: ['#FFE082', '#FFD700', '#FFF1A8', '#FBBF24'][i % 4],
-  duration: 2400 + (i % 3) * 400,        // 2.4-3.2s
-}));
+// ★ v1.7.13 (19 May 2026): Eski DUST_PARAMS toz bulutu kaldırıldı — yeni
+//   StageLightHalo yıldız twinkle pattern'i kullanıyor (sabit konumlu parıltı).
 
-function StageLightHalo({ active, borderRadius = 16 }: { active: boolean; borderRadius?: number }) {
-  const ringA = React.useRef(new Animated.Value(0)).current;
-  const ringB = React.useRef(new Animated.Value(0)).current;
-  const ringC = React.useRef(new Animated.Value(0)).current;
-  const innerPulse = React.useRef(new Animated.Value(0)).current;
-  const dust = React.useRef(DUST_PARAMS.map(() => new Animated.Value(0))).current;
+// ★ v1.7.13 (19 May 2026): Sahne Işığı — REWRITE.
+//
+// Kullanıcı raporu: "Konuşan biri gibi duruyor, yayılma animasyonu ve baloncuk var,
+// daha şık olamaz mı?". Eskiden 3 katman scale-down halka + 8 toz partikülü vardı;
+// halkalar konuşma pulse'una benziyor, toz "baloncuk" hissi veriyor.
+//
+// YENİ TASARIM — tiyatro spotlight:
+//   • Üstten inen ışık huzmesi (LinearGradient cone) — sahne ışığı hissi
+//   • Sabit warm aura (Skia Canvas + RadialGradient + BlurMask, Skia yoksa
+//     LinearGradient fallback) — pulse'suz, sürekli sıcak parıltı
+//   • Altın hairline border + soft breath (0.7→1.0 opacity, statik konum)
+//   • 5 yıldız parıltısı (twinkle) — yukarı süzülme yok, yerinde parlayıp söner
+//
+// Halkalar tamamen kaldırıldı. Toz partikülleri yerine sabit-konum twinkle.
+// Bu daha sinematik + "konuşmacı pulse" hissi sıfır.
+function StageLightHalo({ active, borderRadius = 16, cardWidth = 140 }: { active: boolean; borderRadius?: number; cardWidth?: number }) {
+  const breath = React.useRef(new Animated.Value(0)).current;
+  // 5 yıldız parıltısı — her biri farklı delay ile twinkle
+  const twinkles = React.useRef([0, 1, 2, 3, 4].map(() => new Animated.Value(0))).current;
 
   React.useEffect(() => {
     if (!active) {
-      ringA.setValue(0); ringB.setValue(0); ringC.setValue(0);
-      innerPulse.setValue(0);
-      dust.forEach((d) => d.setValue(0));
+      breath.setValue(0);
+      twinkles.forEach((t) => t.setValue(0));
       return;
     }
-    const loopA = Animated.loop(Animated.timing(ringA, { toValue: 1, duration: 2400, useNativeDriver: true, easing: Easing.out(Easing.quad) }));
-    const loopB = Animated.loop(Animated.sequence([
-      Animated.delay(800),
-      Animated.timing(ringB, { toValue: 1, duration: 2400, useNativeDriver: true, easing: Easing.out(Easing.quad) }),
+    // Sade breath — pulse hissi yok, sabit aura
+    const breathLoop = Animated.loop(Animated.sequence([
+      Animated.timing(breath, { toValue: 1, duration: 2200, useNativeDriver: true, easing: Easing.inOut(Easing.sin) }),
+      Animated.timing(breath, { toValue: 0, duration: 2200, useNativeDriver: true, easing: Easing.inOut(Easing.sin) }),
     ]));
-    const loopC = Animated.loop(Animated.sequence([
-      Animated.delay(1600),
-      Animated.timing(ringC, { toValue: 1, duration: 2400, useNativeDriver: true, easing: Easing.out(Easing.quad) }),
-    ]));
-    const innerLoop = Animated.loop(Animated.sequence([
-      Animated.timing(innerPulse, { toValue: 1, duration: 1300, useNativeDriver: true, easing: Easing.inOut(Easing.sin) }),
-      Animated.timing(innerPulse, { toValue: 0, duration: 1300, useNativeDriver: true, easing: Easing.inOut(Easing.sin) }),
-    ]));
-
-    // Toz partikülleri — her biri kendi delay/duration'ı ile sürekli yukarı süzülür.
-    const dustLoops = dust.map((d, i) => Animated.loop(Animated.sequence([
-      Animated.delay(DUST_PARAMS[i].delay),
-      Animated.timing(d, { toValue: 1, duration: DUST_PARAMS[i].duration, useNativeDriver: true, easing: Easing.out(Easing.quad) }),
-      Animated.timing(d, { toValue: 0, duration: 0, useNativeDriver: true }),
+    // Yıldız twinkle — staggered, her biri 1.4s + 600ms aralıklı
+    const twinkleLoops = twinkles.map((t, i) => Animated.loop(Animated.sequence([
+      Animated.delay(i * 600 + Math.random() * 400),
+      Animated.timing(t, { toValue: 1, duration: 700, useNativeDriver: true, easing: Easing.inOut(Easing.sin) }),
+      Animated.timing(t, { toValue: 0, duration: 700, useNativeDriver: true, easing: Easing.inOut(Easing.sin) }),
+      Animated.delay(800 + Math.random() * 1200),
     ])));
-
-    loopA.start(); loopB.start(); loopC.start(); innerLoop.start();
-    dustLoops.forEach((l) => l.start());
+    breathLoop.start();
+    twinkleLoops.forEach((l) => l.start());
     return () => {
-      loopA.stop(); loopB.stop(); loopC.stop(); innerLoop.stop();
-      dustLoops.forEach((l) => l.stop());
+      breathLoop.stop();
+      twinkleLoops.forEach((l) => l.stop());
     };
   }, [active]);
 
   if (!active) return null;
 
-  const ringStyle = (anim: Animated.Value, opacityRange: [number, number, number], scaleRange: [number, number]) => ({
-    opacity: anim.interpolate({ inputRange: [0, 0.5, 1], outputRange: opacityRange }),
-    transform: [{ scale: anim.interpolate({ inputRange: [0, 1], outputRange: scaleRange }) }],
-  });
+  // 5 twinkle pozisyonu — avatar etrafında simetrik dağıt
+  const twinklePositions = [
+    { top: '8%',  left: '15%', size: 4 },
+    { top: '12%', left: '78%', size: 5 },
+    { top: '50%', left: '4%',  size: 3 },
+    { top: '50%', left: '92%', size: 4 },
+    { top: '85%', left: '60%', size: 3 },
+  ];
 
   return (
     <>
-      {/* ★ v109: Avatar arkası gradient ışık — scale 1.02→1.08 (dış) yerine 1.0→1.0 sabit,
-           sadece opacity ile breath. Avatar dış sınırını taşmaz. */}
+      {/* ★ KATMAN 1 — Üstten inen ışık huzmesi (tiyatro spotlight).
+          Yukarıdan kaynak, aşağı doğru cone formunda solar. Avatar üst yarısı
+          aydınlık, alt yarısı sıcak gölge. */}
       <Animated.View
         pointerEvents="none"
         style={[StyleSheet.absoluteFill, {
           borderRadius,
-          opacity: innerPulse.interpolate({ inputRange: [0, 1], outputRange: [0.55, 0.9] }),
+          opacity: breath.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1.0] }),
         }]}
       >
         <LinearGradient
-          colors={['rgba(255,241,168,0.55)', 'rgba(255,215,0,0.28)', 'rgba(180,83,9,0)']}
+          colors={[
+            'rgba(255,247,200,0.55)',  // tepe — beyaz-sarı parlak
+            'rgba(255,215,0,0.30)',     // orta — altın
+            'rgba(180,90,20,0.08)',     // alt — sıcak gölge
+          ]}
+          locations={[0, 0.5, 1]}
           start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
           style={[StyleSheet.absoluteFill, { borderRadius }]}
         />
       </Animated.View>
 
-      {/* ★ v109: Halkalar avatar dışına taşmasın — scale outward (1.0 → 1.4) yerine
-           inward contract (1.0 → 0.78). Avatar üzerinde "içe doğru sönen ışık dalgası"
-           hissi. Sarı halka avatar dışında parlamaz, üstüne biner. */}
+      {/* ★ KATMAN 2 — Skia warm aura (yoksa LinearGradient fallback).
+          Avatar arkasında sıcak sürekli parıltı. */}
+      {SkiaMod ? (() => {
+        const { Canvas, Circle, RadialGradient, vec, BlurMask } = SkiaMod;
+        const cx = cardWidth / 2;
+        const cy = cardWidth / 2;
+        return (
+          <View pointerEvents="none" style={[StyleSheet.absoluteFill, { overflow: 'hidden', borderRadius }]}>
+            <Canvas style={{ flex: 1 }}>
+              <Circle cx={cx} cy={cy} r={cardWidth / 2} opacity={0.4}>
+                <RadialGradient
+                  c={vec(cx, cy * 0.6)}
+                  r={cardWidth * 0.7}
+                  colors={['rgba(255,247,200,0.7)', 'rgba(255,215,0,0.35)', 'rgba(180,83,9,0)']}
+                />
+                <BlurMask blur={6} style="normal" />
+              </Circle>
+            </Canvas>
+          </View>
+        );
+      })() : null}
+
+      {/* ★ KATMAN 3 — İnce altın hairline border (sabit, breath pulse opacity'de) */}
       <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, {
-        borderRadius, borderWidth: 2, borderColor: '#FFE082',
-        ...ringStyle(ringA, [0.95, 0.5, 0], [1.0, 0.78]),
+        borderRadius,
+        borderWidth: 1.5,
+        borderColor: '#FFD700',
+        opacity: breath.interpolate({ inputRange: [0, 1], outputRange: [0.75, 1.0] }),
       }]} />
+      {/* ★ KATMAN 4 — Dış soft altın çerçeve, %2 büyük (avatar dışı parıltı) */}
       <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, {
-        borderRadius, borderWidth: 1.6, borderColor: '#FFD700',
-        ...ringStyle(ringB, [0.8, 0.35, 0], [1.0, 0.72]),
-      }]} />
-      <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, {
-        borderRadius, borderWidth: 1.4, borderColor: '#B45309',
-        ...ringStyle(ringC, [0.5, 0.18, 0], [1.0, 0.66]),
+        borderRadius: borderRadius * 1.02,
+        borderWidth: 0.8,
+        borderColor: 'rgba(255,224,130,0.5)',
+        opacity: breath.interpolate({ inputRange: [0, 1], outputRange: [0.4, 0.7] }),
+        transform: [{ scale: 1.02 }],
       }]} />
 
-      {/* İç parlayan altın çerçeve — breath pulse SADECE içe doğru (1.0 → 0.97) */}
-      <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, {
-        borderRadius, borderWidth: 2.5, borderColor: '#FFD700',
-        opacity: innerPulse.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1] }),
-        transform: [{ scale: innerPulse.interpolate({ inputRange: [0, 1], outputRange: [1, 0.97] }) }],
-      }]} />
-
-      {/* ★ Toz bulutu — 8 partikül, kart merkezinden yukarı süzülür, hafif drift, twinkle. */}
-      {DUST_PARAMS.map((p, i) => (
+      {/* ★ KATMAN 5 — Yıldız parıltıları (twinkle, yerinde) */}
+      {twinklePositions.map((pos, i) => (
         <Animated.View
           key={i}
           pointerEvents="none"
           style={{
             position: 'absolute',
-            left: '50%', top: '50%',
-            marginLeft: -p.size / 2, marginTop: -p.size / 2,
-            width: p.size, height: p.size,
-            borderRadius: p.size / 2,
-            backgroundColor: p.color,
-            opacity: dust[i].interpolate({
-              inputRange: [0, 0.12, 0.55, 1],
-              outputRange: [0, 0.95, 0.55, 0],
-            }),
-            transform: [
-              { translateX: dust[i].interpolate({ inputRange: [0, 1], outputRange: [p.startX, p.startX + p.driftX] }) },
-              { translateY: dust[i].interpolate({ inputRange: [0, 1], outputRange: [p.startY, p.endY] }) },
-              { scale: dust[i].interpolate({ inputRange: [0, 0.25, 0.7, 1], outputRange: [0, 1.1, 0.85, 0.3] }) },
-            ],
+            top: pos.top as any,
+            left: pos.left as any,
+            width: pos.size,
+            height: pos.size,
+            borderRadius: pos.size / 2,
+            backgroundColor: '#FFF7C8',
+            opacity: twinkles[i],
+            transform: [{
+              scale: twinkles[i].interpolate({ inputRange: [0, 1], outputRange: [0.4, 1.4] }),
+            }],
+            // iOS shadow + Android hidden — Skia gerekirse ileride eklenir
+            shadowColor: '#FFD700',
+            shadowOpacity: 0.9,
+            shadowRadius: 4,
+            shadowOffset: { width: 0, height: 0 },
           }}
         />
       ))}
@@ -1121,9 +1143,13 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, i
           speaking={speaking && mic}
           borderRadius={cameraOn && videoTrack && VideoView ? cameraRadius(cardWidth) : cardWidth / 2}
         />
+        {/* ★ v1.7.13 (19 May 2026): borderRadius artık avatarShapeRadius —
+            squircle/hex/rounded avatarlarda halo doğru şekilde sarmalanır
+            (eskiden cardWidth/2 hardcoded daire idi). */}
         <StageLightHalo
           active={!!(user as any).stage_light_until && new Date((user as any).stage_light_until).getTime() > Date.now()}
-          borderRadius={cameraOn && videoTrack && VideoView ? cameraRadius(cardWidth) : cardWidth / 2}
+          borderRadius={cameraOn && videoTrack && VideoView ? cameraRadius(cardWidth) : avatarShapeRadius}
+          cardWidth={cardWidth}
         />
         {isGhost && (
           <View style={s.ghostOverlay}>
