@@ -395,8 +395,12 @@ export function PlusMenu({
     try {
       await ModerationService.unbanFromRoom(_roomId, ban.user_id, _hostId);
       setInlineBans(prev => prev.filter(b => b.id !== ban.id));
-      showToast({ title: i18n.t('room.roomoverlays.007'), type: 'success' });
-    } catch { showToast({ title: i18n.t('room.roomoverlays.008'), message: i18n.t('room.roomoverlays.009'), type: 'error' }); }
+      // ★ v1.7.13 (18 May 2026): i18n key shift fix — eskiden 'roomoverlays.007/008/009'
+      //   kullanılıyordu ama bu key'ler "Oda Müzik Linki" / "Arkadaşlarını Davet Et" /
+      //   "Oda Linkini Paylaş" değerlerini taşıyordu (locale dedup shift mağduru).
+      //   Doğru anlamlı key'ler RoomManageSheet'tekilerle aynı: 040/041.
+      showToast({ title: i18n.t('room.roommanagesheet.040'), type: 'success' });
+    } catch { showToast({ title: i18n.t('room.roommanagesheet.041'), message: 'Tekrar dene.', type: 'error' }); }
     finally { setProcessingIds(p => { const n = new Set(p); n.delete(ban.id); return n; }); }
   }, [_roomId, _hostId]);
 
