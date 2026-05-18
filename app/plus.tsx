@@ -94,6 +94,14 @@ export default function PlusScreen() {
   const [subReady, setSubReady] = useState<boolean>(RevenueCatService.isSubscriptionAvailable());
   // ★ Şık animasyonlu başarı modalı (toast yerine)
   const [successModal, setSuccessModal] = useState<{ visible: boolean; title: string; subtitle: string; accent?: readonly [string, string] }>({ visible: false, title: '', subtitle: '' });
+  // ★ v319.11 (18 May 2026): Dinamik fiyat — kullanıcı feedback: "uygulamadaki
+  //   fiyat ile Google'ın aldığı tutar farklı". Eskiden TIER_DEFINITIONS hard-coded
+  //   ₺349.99/899.99 idi. Şimdi RC offerings'ten çekiyoruz — Google Play Console'da
+  //   ne ayarlanmışsa o gözükür, ödeme ekranıyla tutarlı.
+  const [livePrices, setLivePrices] = useState<{
+    plus?: { monthly?: string; yearly?: string };
+    pro?: { monthly?: string; yearly?: string };
+  }>({});
 
   const mountedRef = useRef(true);
   useEffect(() => () => { mountedRef.current = false; }, []);
@@ -105,6 +113,31 @@ export default function PlusScreen() {
       try { await RevenueCatService.init(profile?.id); } catch {}
       if (!cancelled && mountedRef.current) {
         setSubReady(RevenueCatService.isSubscriptionAvailable());
+      }
+      // ★ v319.11: RC offerings'ten gerçek fiyatları çek
+      try {
+        const offerings = await RevenueCatService.getOfferings();
+        if (cancelled || !mountedRef.current) return;
+        const next: any = {};
+        const off: any = offerings as any;
+        // default offering = Plus, 'pro' offering = Pro
+        const plusOff = off?.all?.default || off?.current;
+        const proOff = off?.all?.pro;
+        if (plusOff) {
+          next.plus = {
+            monthly: plusOff.monthly?.product?.priceString,
+            yearly: plusOff.annual?.product?.priceString,
+          };
+        }
+        if (proOff) {
+          next.pro = {
+            monthly: proOff.monthly?.product?.priceString,
+            yearly: proOff.annual?.product?.priceString,
+          };
+        }
+        setLivePrices(next);
+      } catch (e) {
+        if (__DEV__) console.warn('[Plus] Live price fetch failed:', e);
       }
     })();
     return () => { cancelled = true; };
@@ -303,7 +336,13 @@ export default function PlusScreen() {
           {PLANS.map(plan => {
             const isSelected = selectedTier === plan.id;
             const isCurrentPlan = currentTier === plan.tier;
-            const price = billingCycle === 'monthly' ? plan.monthly : plan.yearly;
+            // ★ v319.11: Önce RC offerings'ten gerçek priceString (Play Console'la
+            //   tutarlı). Yoksa hard-coded fallback ("499,99 ₺" formatlı string).
+            const live = livePrices[plan.id as 'plus' | 'pro'];
+            const liveMonthly = live?.monthly;
+            const liveYearly = live?.yearly;
+            const livePrice = billingCycle === 'monthly' ? liveMonthly : liveYearly;
+            const price = livePrice || `${billingCycle === 'monthly' ? plan.monthly : plan.yearly}₺`;
             const period = billingCycle === 'monthly' ? '/ay' : i18n.t('auto.plus.008');
 
             return (
@@ -368,10 +407,12 @@ export default function PlusScreen() {
                 {/* Fiyat & İçerik (cam katman üstünde) */}
                 <View style={styles.planCardBody}>
                   <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'center' }}>
-                    <Text style={styles.planPrice}>{price}₺</Text>
+                    {/* ★ v319.11: livePrice (RC) zaten "₺499,99" formatında — ek ₺ yok.
+                        Fallback ise sayı + ₺. */}
+                    <Text style={styles.planPrice}>{price}</Text>
                     <Text style={styles.planPeriod}>{period}</Text>
                   </View>
-                  {billingCycle === 'yearly' && (
+                  {billingCycle === 'yearly' && !liveYearly && (
                     <Text style={styles.planMonthly}>{i18n.t('auto.plus.007')}{(plan.yearly / 12).toFixed(0)}₺</Text>
                   )}
 

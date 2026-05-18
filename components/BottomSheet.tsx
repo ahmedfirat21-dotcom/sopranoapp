@@ -60,6 +60,11 @@ export interface BottomSheetProps {
    *  yalnızca header (handle + title) bölümünden drag'i yakalar; content ScrollView
    *  ile çakışmaz. Aksi halde aşağı kaydırma sheet'i kapatır. */
   scrollableContent?: boolean;
+  /** ★ v319.11 (18 May 2026): scrollableContent=true iken ScrollView'ın anlık
+   *  scrollOffset değeri. ScrollView yukarıdaysa (offset=0) pan responder content
+   *  alanından da drag yakalar (Clubhouse pattern). Aşağı scroll edilmişse drag
+   *  yakalanmaz, ScrollView normal scroll eder. */
+  scrollOffsetRef?: React.MutableRefObject<number>;
   /** Swipe-down kapatma eşiği (px). Default: 80 */
   dismissThreshold?: number;
   /** Header'da gösterilecek başlık (UPPERCASE'e zorlanır stil ile) */
@@ -81,6 +86,7 @@ export default function BottomSheet({
   maxHeightRatio = 0.78,
   minHeightRatio = 0,
   scrollableContent = false,
+  scrollOffsetRef,
   dismissThreshold = 80,
   title,
   icon,
@@ -118,8 +124,17 @@ export default function BottomSheet({
     PanResponder.create({
       onStartShouldSetPanResponder: () => false,
       onStartShouldSetPanResponderCapture: () => false,
-      onMoveShouldSetPanResponder: (_, gs) => gs.dy > 8 && Math.abs(gs.dy) > Math.abs(gs.dx),
-      onMoveShouldSetPanResponderCapture: (_, gs) => gs.dy > 25 && Math.abs(gs.dy) > Math.abs(gs.dx) * 2,
+      onMoveShouldSetPanResponder: (_, gs) => {
+        if (gs.dy <= 8 || Math.abs(gs.dy) <= Math.abs(gs.dx)) return false;
+        // scrollableContent + scrollOffsetRef varsa: ScrollView yukarıda değilse pan alma
+        if (scrollableContent && scrollOffsetRef && scrollOffsetRef.current > 5) return false;
+        return true;
+      },
+      onMoveShouldSetPanResponderCapture: (_, gs) => {
+        if (gs.dy <= 25 || Math.abs(gs.dy) <= Math.abs(gs.dx) * 2) return false;
+        if (scrollableContent && scrollOffsetRef && scrollOffsetRef.current > 5) return false;
+        return true;
+      },
       onPanResponderTerminationRequest: () => false,
       onPanResponderMove: (_, gs) => {
         translateY.setValue(Math.max(0, gs.dy));
@@ -168,7 +183,7 @@ export default function BottomSheet({
             transform: [{ translateY }],
           },
         ]}
-        {...(scrollableContent ? {} : panResponder.panHandlers)}
+        {...panResponder.panHandlers}
       >
         {/* ★ v294 (17 May 2026): NotificationDrawer/ProfileHero aile dili — 3-katman gradient.
             (1) slate diagonal base + (2) accent halo (üst-sol) + (3) soft accent glow. */}
@@ -200,10 +215,8 @@ export default function BottomSheet({
           style={s.topEdge}
         />
 
-        {/* ★ 2026-04-28: Drag handle/header artık görsel — pan tüm sheet'te (Clubhouse).
-            ★ v319.7 (18 May 2026): scrollableContent=true ise pan handler buraya
-            (handle + title) bağlanır — ScrollView altı serbest scroll eder. */}
-        <View {...(scrollableContent ? panResponder.panHandlers : {})}>
+        {/* ★ 2026-04-28: Drag handle/header artık görsel — pan tüm sheet'te (Clubhouse). */}
+        <View>
           <View style={s.handleWrap}>
             <View style={s.handle} />
           </View>

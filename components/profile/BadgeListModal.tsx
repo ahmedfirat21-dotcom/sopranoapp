@@ -50,6 +50,9 @@ export default function BadgeListModal({ visible, onClose, userId, displayName }
   // ★ v295 (17 May 2026): PremiumAlert kaldırıldı — yeni BadgeDetailModal celebration
   //   tarz Skia medal'lı modal (rarity'e duyarlı, animasyonlu).
   const [selectedBadge, setSelectedBadge] = useState<BadgeDef | null>(null);
+  // ★ v319.11 (18 May 2026): ScrollView offset takip — BottomSheet pan responder
+  //   sadece offset=0 iken content'ten drag yakalar (Clubhouse pattern).
+  const scrollOffsetRef = useRef(0);
 
   // ★ v291 (16 May 2026): Manuel PanResponder + Modal yapısı KALDIRILDI — Davet Kodu
   //   sheet'inde olduğu gibi BottomSheet wrapper kullanıyor. Sebep: önceki manuel
@@ -82,6 +85,7 @@ export default function BadgeListModal({ visible, onClose, userId, displayName }
         maxHeightRatio={0.82}
         minHeightRatio={0.55}
         scrollableContent
+        scrollOffsetRef={scrollOffsetRef}
       >
         {loading ? (
           <View style={st.loading}>
@@ -99,6 +103,8 @@ export default function BadgeListModal({ visible, onClose, userId, displayName }
             contentContainerStyle={st.scrollContent}
             showsVerticalScrollIndicator={false}
             nestedScrollEnabled
+            scrollEventThrottle={16}
+            onScroll={(e) => { scrollOffsetRef.current = e.nativeEvent.contentOffset.y; }}
           >
             <View style={st.grid}>
               {badges.map(b => (

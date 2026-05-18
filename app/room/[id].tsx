@@ -3047,6 +3047,27 @@ export default function RoomScreen() {
   // (2295 civarı) yeniden ekleniyor — TDZ önlemek için.
 
   // ★ Mikrofon AÇ/KAPAT — sadece sahnedeki kişiler (host, mod, speaker) için çağrılır
+  // ★ v319.11 (18 May 2026): Sahne dışı mic ENFORCE.
+  //   Kullanıcı feedback: "sahnede değil ama ses iletiyor". Senaryo:
+  //   - Sahnede iken mic açık
+  //   - Host demote etti / role 'listener' oldu
+  //   - LiveKit publish kapatılmadı → ses hâlâ yayınlanıyor
+  //   Fix: rol değişimini izle, sahne dışında mic AUTO-OFF (güvenlik kapısı).
+  useEffect(() => {
+    if (!firebaseUser?.uid || !lk?.isMicrophoneEnabled) return;
+    const myRole = participants.find(p => p.user_id === firebaseUser.uid)?.role;
+    const onStage = myRole === 'owner' || myRole === 'speaker' || myRole === 'moderator';
+    if (!onStage) {
+      (async () => {
+        try {
+          if (lk.disableMic) await lk.disableMic();
+          else if (lk.toggleMic) await lk.toggleMic();
+          if (__DEV__) console.log('[MicEnforce] Sahne dışı - mic kapatıldı');
+        } catch {}
+      })();
+    }
+  }, [participants, firebaseUser?.uid, lk?.isMicrophoneEnabled]);
+
   // Dinleyiciler artık kontrol çubuğunda ses kısma + el kaldırma butonlarını kullanır
   const handleMicPress = async () => {
     // LiveKit bağlı değilse dokunma — donmayı önle
