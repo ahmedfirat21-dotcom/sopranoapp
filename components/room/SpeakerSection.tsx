@@ -611,13 +611,17 @@ function SpeakerBadgeCenter({ x, y, scale, expected, children }: {
   );
 }
 
-function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, isMe, cardWidth: rawCardWidth, cardHeight: rawCardHeight, VideoView, canModerate, onQuickMute }: {
+function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, isMe, cardWidth: rawCardWidth, cardHeight: rawCardHeight, VideoView, canModerate, onQuickMute, isSpotlight }: {
   canModerate?: boolean;
   onQuickMute?: () => void;
   user: RoomParticipant; micStatus: MicStatus; onPress: () => void;
   onSelfDemote?: () => void;
   onCameraExpand?: (user: RoomParticipant) => void;
   isMe: boolean; cardWidth: number; cardHeight: number; VideoView?: any;
+  /** ★ v1.7.13.12: Spotlight modunda mi (kamerali rectangular tile) yoksa audio
+   *  uniform grid'de mi? Spotlight → parent cardHeight kullanir (admin spotlight
+   *  aspect). Audio uniform + kamera acik → admin heightRatio uygulanir. */
+  isSpotlight?: boolean;
 }) {
   const isHost = user.role === 'owner';
   const isMod = user.role === 'moderator';
@@ -961,8 +965,17 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, i
           //
           //   Kullanici raporu: "web admindeki simulasyon ne guzel calisiyor, senden
           //   istedigim web admin'de oda duzenindeki konum olcek ve diger tum detaylarin
-          //   APK oda icine yansimasi". Bu fix admin spotlight aspect'i bire bir uyguliyor.
-          height: cameraOn && videoTrack && VideoView ? cardHeight : cardWidth,
+          //   APK oda icine yansimasi".
+          //
+          //   ★ v1.7.13.12: Iki mod ayrildi (regression fix):
+          //     • isSpotlight=true (spotlight grid): parent cardHeight = cardWidth *
+          //       admin spotlight*Aspect → direkt kullan
+          //     • isSpotlight=false (audio uniform grid, kamera acik kisi): admin
+          //       heightRatio uygula
+          //   Onceki tek-formul yaklasimi heightRatio'yu kaybetmisti.
+          height: cameraOn && videoTrack && VideoView
+            ? (isSpotlight ? cardHeight : Math.round(cardWidth * camCfg.heightRatio))
+            : cardWidth,
           // ★ v291 (16 May 2026): Host için halka GERİ — admin'den ayarlanabilir
           //   (host.ringWidth/ringColor). Frame'li kullanıcı için halka kapanır
           //   (frame önceliği — kural: çerçeve satın alanın halkası gizlenir,
@@ -1406,7 +1419,8 @@ export default function SpeakerSection({ stageUsers, getMicStatus, onSelectUser,
                 onCameraExpand={onCameraExpand}
                 canModerate={canModerate?.(u) ?? false}
                 onQuickMute={onQuickMute ? () => onQuickMute(u) : undefined}
-                isMe={isMe} cardWidth={spotlightW} cardHeight={spotlightH} VideoView={VideoView} />
+                isMe={isMe} cardWidth={spotlightW} cardHeight={spotlightH} VideoView={VideoView}
+                isSpotlight={true} />
             );
           })}
         </View>
