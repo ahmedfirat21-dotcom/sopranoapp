@@ -53,6 +53,9 @@ export interface BottomSheetProps {
   children: ReactNode;
   /** Maks yükseklik oranı (ekran yüksekliğinin) — 0..1. Default: 0.78 */
   maxHeightRatio?: number;
+  /** Sheet'in alabileceği MİN yükseklik (ekranın %X'i). İçerik kısa olsa bile
+   *  sheet bu seviyenin altına düşmez. Default 0 (içeriğe göre). */
+  minHeightRatio?: number;
   /** Swipe-down kapatma eşiği (px). Default: 80 */
   dismissThreshold?: number;
   /** Header'da gösterilecek başlık (UPPERCASE'e zorlanır stil ile) */
@@ -72,6 +75,7 @@ export default function BottomSheet({
   onClose,
   children,
   maxHeightRatio = 0.78,
+  minHeightRatio = 0,
   dismissThreshold = 80,
   title,
   icon,
@@ -141,6 +145,7 @@ export default function BottomSheet({
           s.sheet,
           {
             maxHeight: `${maxHeightRatio * 100}%`,
+            ...(minHeightRatio > 0 ? { minHeight: `${minHeightRatio * 100}%` as any } : null),
             paddingBottom: bottomPad,
             transform: [{ translateY }],
           },

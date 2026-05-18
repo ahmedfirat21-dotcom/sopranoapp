@@ -577,17 +577,16 @@ function HandRaiseBadge({ color }: { color?: string }) {
 
   return (
     <Animated.View style={[s.handRaiseBadge, { transform: [{ scale: pulseAnim }, { translateY: bounceAnim }] }]}>
-      <View style={{
-        // ★ v287 (16 May 2026): admin'in accents.handRaiseColor verdiğinde pill arka plan,
-        //   yoksa şeffaf (sadece emoji).
-        backgroundColor: color ? color + '33' : 'transparent',
-        borderColor: color || 'transparent',
-        borderWidth: color ? 1.5 : 0,
-        paddingHorizontal: color ? 4 : 0, paddingVertical: color ? 1 : 0,
-        borderRadius: 10,
-      }}>
-        <Text style={{ fontSize: 14 }}>✋</Text>
-      </View>
+      {/* ★ v319.5 (18 May 2026): Pill çerçeve KALDIRILDI — kullanıcı feedback:
+          "el simgesinin çerçevesini kaldır, avatarın yüzünü kapatıyor". Pill arka
+          plan + border avatarın üst kısmıyla bindiriyordu. Sadece emoji + soft
+          textShadow → silüet okunur ama yüze binmez. */}
+      <Text style={{
+        fontSize: 16,
+        textShadowColor: 'rgba(0,0,0,0.65)',
+        textShadowOffset: { width: 0, height: 1 },
+        textShadowRadius: 3,
+      }}>✋</Text>
     </Animated.View>
   );
 }

@@ -24,6 +24,7 @@ import { Colors, Shadows } from '../../constants/theme';
 import { BadgeService } from '../../services/badges';
 import type { BadgeDef, BadgeRarity } from '../../constants/badges';
 import BadgeDetailModal from './BadgeDetailModal';
+import { SkiaShadow } from '../skia';
 
 const iconShadow = {
   textShadowColor: 'rgba(0,0,0,0.5)',
@@ -33,28 +34,6 @@ const iconShadow = {
 
 const RARITY_LABEL: Record<BadgeRarity, string> = {
   common: i18n.t('auto.profile.BadgeListModal.002'), rare: 'Nadir', epic: 'Epik', legendary: 'Efsanevi',
-};
-
-// ★ Rarity'e özel gradient palette — metallic feel
-const RARITY_GRADIENT: Record<BadgeRarity, [string, string, string]> = {
-  common:    ['#475569', '#334155', '#1E293B'],          // slate
-  rare:      ['#CA8A04', '#854D0E', '#451A03'],          // bronze
-  epic:      ['#9CA3AF', '#7C3AED', '#312E81'],          // silver-purple holographic
-  legendary: ['#FCD34D', '#F59E0B', '#92400E'],          // gold metallic
-};
-
-const RARITY_INNER: Record<BadgeRarity, string> = {
-  common:    '#94A3B8',
-  rare:      '#FBBF24',
-  epic:      '#C084FC',
-  legendary: '#FDE68A',
-};
-
-const RARITY_BORDER: Record<BadgeRarity, string> = {
-  common:    'rgba(148,163,184,0.35)',
-  rare:      'rgba(202,138,4,0.65)',
-  epic:      'rgba(192,132,252,0.6)',
-  legendary: 'rgba(252,211,77,0.85)',
 };
 
 interface Props {
@@ -101,6 +80,7 @@ export default function BadgeListModal({ visible, onClose, userId, displayName }
         accentColor="#FCD34D"
         badge={badges.length}
         maxHeightRatio={0.82}
+        minHeightRatio={0.55}
       >
         {loading ? (
           <View style={st.loading}>
@@ -171,101 +151,60 @@ function getRarityTagColor(rarity: BadgeRarity): string {
 // BADGE MEDAL — Rarity-specific composition
 // ═══════════════════════════════════════════════════════════════
 
+// ★ v319.4 (18 May 2026): BadgeMedal sadeleştirildi — eski yoğun multi-layer
+//   (halo + gloss + inner ring + epic dashed outer + rare dot + legendary sparkle)
+//   "çok kasvetli/gri" görünüyordu. Yeni tasarım profil sayfasındaki
+//   FeaturedBadgesShowcase ailesini takip eder: badge.color gradient circle +
+//   SkiaShadow glow + soft pulse animasyonu (her tier). Rarity vurgusu için
+//   ince renkli halka + legendary'de daha güçlü pulse.
 function BadgeMedal({ badge }: { badge: BadgeDef }) {
   const rarity = badge.rarity;
+  const iconColor = badge.color;
 
-  // Legendary için sürekli rotasyonlu sparkle ringi
-  const sparkleRotation = useRef(new Animated.Value(0)).current;
+  // Soft pulse — opacity + scale (1.7sn nefes alma)
+  const pulseAnim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
-    if (rarity !== 'legendary') return;
+    const intensity = rarity === 'legendary' ? 1.0 : rarity === 'epic' ? 0.75 : rarity === 'rare' ? 0.6 : 0.45;
     const loop = Animated.loop(
-      Animated.timing(sparkleRotation, {
-        toValue: 1,
-        duration: 8000,
-        easing: Easing.linear,
-        useNativeDriver: true,
-      })
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: intensity, duration: 850, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 0, duration: 850, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      ])
     );
     loop.start();
     return () => loop.stop();
   }, [rarity]);
-
-  const rotation = sparkleRotation.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0deg', '360deg'],
-  });
-
-  const grad = RARITY_GRADIENT[rarity];
-  const innerColor = RARITY_INNER[rarity];
-  const borderColor = RARITY_BORDER[rarity];
-  const iconColor = badge.color; // badge'in kendi rengi (icon vurgu)
+  const glowOpacity = pulseAnim.interpolate({ inputRange: [0, 1], outputRange: [0.55, 1] });
+  const ringScale = pulseAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.06] });
 
   return (
     <View style={mst.wrap}>
-      {/* ═══ LEGENDARY: dış rotasyonlu sparkle halo ═══ */}
-      {rarity === 'legendary' && (
-        <Animated.View style={[mst.sparkleRing, { transform: [{ rotate: rotation }] }]} pointerEvents="none">
-          <Text style={[mst.sparkle, mst.sparkleTop]}>✦</Text>
-          <Text style={[mst.sparkle, mst.sparkleRight]}>✦</Text>
-          <Text style={[mst.sparkle, mst.sparkleBottom]}>✦</Text>
-          <Text style={[mst.sparkle, mst.sparkleLeft]}>✦</Text>
-        </Animated.View>
-      )}
-
-      {/* ═══ EPIC: çift halka (outer + inner ring) ═══ */}
-      {rarity === 'epic' && (
-        <View style={[mst.epicOuterRing, { borderColor: 'rgba(192,132,252,0.4)' }]} pointerEvents="none" />
-      )}
-
-      {/* ═══ Glow halo (her tier'da, intensity farklı) ═══ */}
-      <View style={[
-        mst.glowHalo,
-        {
-          backgroundColor: badge.color,
-          opacity: rarity === 'legendary' ? 0.22 : rarity === 'epic' ? 0.16 : rarity === 'rare' ? 0.12 : 0.08,
-        },
-      ]} pointerEvents="none" />
-
-      {/* ═══ Asıl medal — tier-specific gradient ═══ */}
-      <LinearGradient
-        colors={grad}
-        start={{ x: 0.2, y: 0 }} end={{ x: 0.8, y: 1 }}
-        style={[mst.medal, {
-          borderColor,
-          shadowColor: rarity === 'legendary' ? '#FCD34D' : badge.color,
-          shadowOpacity: rarity === 'legendary' ? 0.6 : 0.35,
-          shadowRadius: rarity === 'legendary' ? 14 : 8,
-          shadowOffset: { width: 0, height: 4 },
-          elevation: rarity === 'legendary' ? 10 : 5,
-        }]}
-      >
-        {/* Üst gloss highlight (cam yüzey hissi) */}
+      {/* ★ Pulse glow halka — rarity'e göre renk + opacity */}
+      <Animated.View
+        style={[
+          mst.pulseRing,
+          {
+            borderColor: iconColor,
+            opacity: glowOpacity,
+            transform: [{ scale: ringScale }],
+          },
+        ]}
+        pointerEvents="none"
+      />
+      <SkiaShadow shadowColor={iconColor} shadowOpacity={rarity === 'legendary' ? 0.85 : 0.7} shadowBlur={rarity === 'legendary' ? 22 : 16} shadowOffsetY={0} borderRadius={28}>
         <LinearGradient
-          colors={['rgba(255,255,255,0.28)', 'rgba(255,255,255,0)']}
-          start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 0.55 }}
-          style={mst.gloss}
-          pointerEvents="none"
-        />
-
-        {/* İç vurgu halkası — premium frame hissi */}
-        <View style={[mst.innerRing, { borderColor: innerColor }]} pointerEvents="none" />
-
-        {/* Icon — badge'in kendi rengiyle, glow */}
-        <Ionicons
-          name={badge.icon}
-          size={rarity === 'legendary' ? 28 : 24}
-          color={iconColor}
-          style={{
-            textShadowColor: `${iconColor}AA`,
-            textShadowOffset: { width: 0, height: 0 },
-            textShadowRadius: rarity === 'legendary' ? 10 : 6,
-          }}
-        />
-      </LinearGradient>
-
-      {/* ═══ RARE: tepede küçük bronz nokta ═══ */}
-      {rarity === 'rare' && (
-        <View style={mst.rareDot} pointerEvents="none" />
+          colors={[iconColor + 'CC', iconColor + '55']}
+          start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }}
+          style={mst.iconCircle}
+        >
+          <Ionicons name={badge.icon as any} size={26} color="#FFF" style={iconShadow} />
+        </LinearGradient>
+      </SkiaShadow>
+      {/* Legendary için ek crown ikonu — tepede minik */}
+      {rarity === 'legendary' && (
+        <View style={mst.crown} pointerEvents="none">
+          <Ionicons name="star" size={10} color="#FCD34D" style={iconShadow} />
+        </View>
       )}
     </View>
   );
@@ -341,64 +280,28 @@ const st = StyleSheet.create({
 
 const mst = StyleSheet.create({
   wrap: {
-    width: 80, height: 80,
+    width: 76, height: 76,
     alignItems: 'center', justifyContent: 'center',
   },
-  glowHalo: {
+  // ★ v319.4: Pulse halka — badge.color border ile dış parlama
+  pulseRing: {
     position: 'absolute',
-    width: 76, height: 76, borderRadius: 38,
+    width: 70, height: 70, borderRadius: 35,
+    borderWidth: 1.5,
   },
-  // Asıl medal disc
-  medal: {
-    width: 60, height: 60, borderRadius: 30,
-    justifyContent: 'center', alignItems: 'center',
-    borderWidth: 1.2,
-    overflow: 'hidden',
-  },
-  gloss: {
-    position: 'absolute',
-    top: 0, left: 0, right: 0,
-    height: 30,
-    borderTopLeftRadius: 30, borderTopRightRadius: 30,
-  },
-  innerRing: {
-    position: 'absolute',
-    width: 50, height: 50, borderRadius: 25,
-    borderWidth: 0.8,
-    opacity: 0.45,
-  },
-  // Epic outer ring (çift halka)
-  epicOuterRing: {
-    position: 'absolute',
-    width: 72, height: 72, borderRadius: 36,
-    borderWidth: 1, borderStyle: 'dashed',
-  },
-  // Rare bronze dot
-  rareDot: {
-    position: 'absolute',
-    top: 8, right: 14,
-    width: 8, height: 8, borderRadius: 4,
-    backgroundColor: '#FBBF24',
-    borderWidth: 0.8, borderColor: '#854D0E',
-    shadowColor: '#FBBF24', shadowOpacity: 0.8, shadowRadius: 4,
-    elevation: 4,
-  },
-  // Legendary sparkle ring (animated rotation)
-  sparkleRing: {
-    position: 'absolute',
-    width: 80, height: 80,
+  // Ana icon circle (FeaturedBadgesShowcase iconCircle ile aynı boyut)
+  iconCircle: {
+    width: 56, height: 56, borderRadius: 28,
     alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.22)',
   },
-  sparkle: {
+  // Legendary için tepede minik yıldız
+  crown: {
     position: 'absolute',
-    fontSize: 11,
-    color: '#FCD34D',
-    textShadowColor: '#F59E0B',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 6,
+    top: -2,
+    width: 16, height: 16, borderRadius: 8,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'rgba(252,211,77,0.18)',
+    borderWidth: 0.8, borderColor: 'rgba(252,211,77,0.6)',
   },
-  sparkleTop: { top: 0 },
-  sparkleRight: { right: 0 },
-  sparkleBottom: { bottom: 0 },
-  sparkleLeft: { left: 0 },
 });

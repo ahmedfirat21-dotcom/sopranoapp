@@ -1233,18 +1233,41 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
                           <Text style={{ color: 'rgba(255,255,255,0.35)', fontSize: 13, fontStyle: 'italic' }}>
                             🚫 Bu mesaj silindi
                           </Text>
-                        ) : (
-                          <>
-                            <LinkifiedText
-                              text={item.content || ''}
-                              style={{
-                                color: '#F1F5F9', fontSize: 14, lineHeight: 20,
-                                textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
-                              }}
-                            />
-                            {item.content ? <LinkPreviewCard text={item.content} isMe={isMine} /> : null}
-                          </>
-                        )}
+                        ) : (() => {
+                          // ★ v319.5 (18 May 2026): DM mesajında image_url veya content-içi
+                          //   image URL (📷 prefix / image uzantılı / supabase storage URL) varsa
+                          //   Image render et, link metni gösterme. chat/[id].tsx ile aynı pattern.
+                          const c = (item.content || '').trim();
+                          let detected: string | null = null;
+                          if (!item.voice_url && c) {
+                            const cam = c.match(/^📷\s+(https?:\/\/\S+)$/);
+                            if (cam) detected = cam[1];
+                            else if (/^https?:\/\/\S+\.(?:jpg|jpeg|png|gif|webp|heic)(?:\?\S*)?$/i.test(c)) detected = c;
+                            else if (/^https?:\/\/[\w-]+\.supabase\.co\/storage\/v1\/object\/public\/(?:post-images|avatars)\/\S+$/i.test(c)) detected = c;
+                          }
+                          const imgUri = item.image_url || detected;
+                          if (imgUri) {
+                            return (
+                              <Image
+                                source={{ uri: imgUri }}
+                                style={{ width: 220, height: 220, borderRadius: 12, backgroundColor: 'rgba(0,0,0,0.25)' }}
+                                resizeMode="cover"
+                              />
+                            );
+                          }
+                          return (
+                            <>
+                              <LinkifiedText
+                                text={item.content || ''}
+                                style={{
+                                  color: '#F1F5F9', fontSize: 14, lineHeight: 20,
+                                  textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
+                                }}
+                              />
+                              {item.content ? <LinkPreviewCard text={item.content} isMe={isMine} /> : null}
+                            </>
+                          );
+                        })()}
                         {/* Edited */}
                         {isEdited && !isDeletedForEveryone ? (
                           <Text style={{
@@ -3549,7 +3572,26 @@ export default function RoomScreen() {
     const _hasAuthorityInRoom = active.some(p => p.role === 'owner' || p.role === 'moderator');
     const _isStageDelegate = _myRole === 'speaker' && !_hasAuthorityInRoom;
     const _isGodOrHost = _amIHost || _amIActingHost || _amIGod;
-    const _hostUser = active.find(p => p.role === 'owner' || p.user_id === room?.host_id);
+    // ★ v319.5 (18 May 2026): hostUser hesabı orig_host_id'ye öncelik verir — geçici host
+    //   transfer edilmiş odalarda UI "oda sahibi" olarak asıl sahibi göstermeli (Burak DENIZ),
+    //   participant listesinde aktif olmasa bile (room.host applyOriginalHostOverride'den
+    //   asıl sahibin profile'ını içerir).
+    const _origHostIdUI = (room?.room_settings as any)?.original_host_id as string | undefined;
+    const _targetHostIdUI = _origHostIdUI || room?.host_id;
+    let _hostUser: any = active.find(p => p.user_id === _targetHostIdUI)
+      || active.find(p => p.role === 'owner');
+    if (!_hostUser && _targetHostIdUI && (room as any)?.host) {
+      _hostUser = {
+        id: `_synth_orig_host_${_targetHostIdUI}`,
+        room_id: room?.id,
+        user_id: _targetHostIdUI,
+        role: 'owner' as const,
+        is_muted: false,
+        joined_at: new Date().toISOString(),
+        user: (room as any).host,
+        _synthetic: true,
+      };
+    }
 
     // Ghost filtreleme — owner/mod tüm ghost'ları görür, diğerleri görmez
     const canSeeGhosts = _canMod;

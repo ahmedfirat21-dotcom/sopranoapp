@@ -140,17 +140,30 @@ export const MutualRoomsService = {
 export const MAX_FEATURED_BADGES = 3;
 
 export const FeaturedBadgesService = {
-  /** Bir kullanıcının öne çıkardığı rozetleri (max 3) getir */
+  /** Bir kullanıcının öne çıkardığı rozetleri (max 3) getir.
+   *  ★ v319.3 (18 May 2026): Kullanıcı manuel "öne çıkar" seçimi yapmadıysa
+   *  otomatik fallback olarak son kazandığı 3 rozeti döndür — bu sayede her
+   *  profilde "Öne Çıkan Rozetler" bölümü görünür, sadece sopranochat'ın
+   *  manuel seçim yaptığı durumla sınırlı kalmaz. */
   async getFeatured(userId: string): Promise<string[]> {
-    const { data, error } = await supabase
+    const { data: featured } = await supabase
       .from('user_badges')
       .select('badge_id')
       .eq('user_id', userId)
       .eq('is_featured', true)
       .order('awarded_at', { ascending: false })
       .limit(MAX_FEATURED_BADGES);
-    if (error || !data) return [];
-    return data.map((r: any) => r.badge_id);
+    if (featured && featured.length > 0) {
+      return featured.map((r: any) => r.badge_id);
+    }
+    // Auto-fallback: en son kazanılan 3 rozet
+    const { data: recent } = await supabase
+      .from('user_badges')
+      .select('badge_id')
+      .eq('user_id', userId)
+      .order('awarded_at', { ascending: false })
+      .limit(MAX_FEATURED_BADGES);
+    return (recent || []).map((r: any) => r.badge_id);
   },
 
   /** Kullanıcının seçimini topluca güncelle — eskileri kaldır, yenileri set et */

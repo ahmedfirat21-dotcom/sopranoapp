@@ -99,7 +99,10 @@ const MEDAL_SIZE = 180;
 // ★ v297 (17 May 2026): Halo glow Canvas kenarında clip oluyordu (BlurMask
 //   normal style → blur radius'un yarısı canvas dışına taşıyor). GLOW_PAD ile
 //   Canvas büyütüldü, content GLOW_PAD kadar offset'lendi. CosmeticBadge ile aynı pattern.
-const GLOW_PAD = 40;
+// ★ v319.4 (18 May 2026): GLOW_PAD 40 → 100 — en dış halo (r*1.7 + blur 70)
+//   eskiden hâlâ Canvas sınırında "çizgi izi" bırakıyordu. Ek mesafe Mach band
+//   optik yanılgısını da yumuşatır.
+const GLOW_PAD = 100;
 const CANVAS_SIZE = MEDAL_SIZE + GLOW_PAD * 2;
 
 // ★ v297: Hex → rgba helper (multi-layer halo için)
@@ -119,8 +122,40 @@ function PremiumMedal({ rarity }: { rarity: BadgeRarity }) {
   //   render hatası verir.
   const SkiaNS = SkiaMod?.Skia;
 
-  // ★ v297 (17 May 2026): Sparkle ring rotation KALDIRILDI — Animated.View overlay'leri
-  //   silindiği için rotation kullanıcısı yok. Sade gem + halo statik premium görünüm.
+  // ★ v319.4 (18 May 2026): Pulse glow + shimmer animasyonu — kullanıcı feedback:
+  //   "animasyonlu parlama efekti olsun yani çok daha kaliteli görünsün". İki
+  //   bağımsız loop:
+  //     pulseAnim    → halo opacity + scale (1.8 sn nefes alma)
+  //     shimmerAnim  → diagonal beyaz ışık şeridi medal üzerinde geçer (3.2 sn)
+  const pulseAnim = useRef(new Animated.Value(0)).current;
+  const shimmerAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const pulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1, duration: 900, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 0, duration: 900, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      ])
+    );
+    const shimmer = Animated.loop(
+      Animated.sequence([
+        Animated.timing(shimmerAnim, { toValue: 1, duration: 1600, easing: Easing.inOut(Easing.cubic), useNativeDriver: true }),
+        Animated.delay(1600),
+      ])
+    );
+    pulse.start();
+    shimmer.start();
+    return () => { pulse.stop(); shimmer.stop(); };
+  }, []);
+  const haloOpacity = pulseAnim.interpolate({ inputRange: [0, 1], outputRange: [0.75, 1] });
+  const haloScale   = pulseAnim.interpolate({ inputRange: [0, 1], outputRange: [0.98, 1.04] });
+  const shimmerTranslate = shimmerAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-MEDAL_SIZE * 0.8, MEDAL_SIZE * 0.8],
+  });
+  const shimmerOpacity = shimmerAnim.interpolate({
+    inputRange: [0, 0.15, 0.5, 0.85, 1],
+    outputRange: [0, 0.45, 0.7, 0.45, 0],
+  });
 
   // Skia yoksa fallback: RN gradient + Animated.View (Android elevation YOK — keskin shadow olur)
   if (!SkiaMod || !SkiaNS) {
@@ -200,24 +235,44 @@ function PremiumMedal({ rarity }: { rarity: BadgeRarity }) {
 
   return (
     <View style={{ width: MEDAL_SIZE, height: MEDAL_SIZE, alignItems: 'center', justifyContent: 'center' }}>
+      {/* ★ v319.4: Halo Canvas Animated.View ile sarıldı — pulse opacity+scale loop.
+          En dış halo + Canvas (artık 380x380) kart background'una doğal fade,
+          "çizgi izi" artefaktı yok. */}
+      <Animated.View
+        style={{
+          position: 'absolute',
+          left: -GLOW_PAD, top: -GLOW_PAD,
+          width: CANVAS_SIZE, height: CANVAS_SIZE,
+          opacity: haloOpacity,
+          transform: [{ scale: haloScale }],
+        }}
+        pointerEvents="none"
+      >
+        <Canvas style={{ width: CANVAS_SIZE, height: CANVAS_SIZE }}>
+          {/* ★ v319.4: 4 katmanlı halo — en dış çok yumuşak fade (Mach band fix).
+              Eski 3 katmanda en dış r*1.25, blur=36 keskin sınır bırakıyordu. */}
+          <Circle cx={cx} cy={cy} r={haloRadius * 1.75} color={hexToRgba(palette.primary, 0.06)}>
+            <BlurMask blur={70} style="normal" />
+          </Circle>
+          <Circle cx={cx} cy={cy} r={haloRadius * 1.30} color={hexToRgba(palette.primary, 0.18)}>
+            <BlurMask blur={38} style="normal" />
+          </Circle>
+          <Circle cx={cx} cy={cy} r={haloRadius} color={palette.halo}>
+            <BlurMask blur={22} style="normal" />
+          </Circle>
+          <Circle cx={cx} cy={cy} r={haloRadius * 0.9} color={hexToRgba(palette.light, 0.35)}>
+            <BlurMask blur={12} style="normal" />
+          </Circle>
+        </Canvas>
+      </Animated.View>
       <Canvas
         style={{
           position: 'absolute',
           left: -GLOW_PAD, top: -GLOW_PAD,
           width: CANVAS_SIZE, height: CANVAS_SIZE,
         }}
+        pointerEvents="none"
       >
-        {/* ★ v297: Multi-layer halo — soft cross-platform glow (Android elevation YERINE).
-            3 katman: dış+yumuşak, orta+belirgin, iç+parlak. */}
-        <Circle cx={cx} cy={cy} r={haloRadius * 1.25} color={hexToRgba(palette.primary, 0.14)}>
-          <BlurMask blur={36} style="normal" />
-        </Circle>
-        <Circle cx={cx} cy={cy} r={haloRadius} color={palette.halo}>
-          <BlurMask blur={22} style="normal" />
-        </Circle>
-        <Circle cx={cx} cy={cy} r={haloRadius * 0.9} color={hexToRgba(palette.light, 0.35)}>
-          <BlurMask blur={12} style="normal" />
-        </Circle>
 
         {/* Ana medal — KESKIN ÇERÇEVE YOK, sadece soft glow + gradient fill.
             Kullanıcı feedback: "kare çerçeve yapmışsın, glow belirsiz blur tarzı istiyorum". */}
@@ -261,6 +316,30 @@ function PremiumMedal({ rarity }: { rarity: BadgeRarity }) {
           color={palette.deep}
           style={{ textShadowColor: palette.light, textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2, opacity: 0.85 }}
         />
+      </View>
+
+      {/* ★ v319.4: Diagonal shimmer — medal yüzeyinde sweeping beyaz ışık şeridi.
+          Sadece medal alanında görünür (overflow:hidden clip). 3.2sn'de bir geçer. */}
+      <View
+        style={{ position: 'absolute', width: MEDAL_SIZE * 0.72, height: MEDAL_SIZE * 0.72, borderRadius: MEDAL_SIZE * 0.36, overflow: 'hidden' }}
+        pointerEvents="none"
+      >
+        <Animated.View
+          style={{
+            position: 'absolute',
+            top: -MEDAL_SIZE * 0.2,
+            bottom: -MEDAL_SIZE * 0.2,
+            width: MEDAL_SIZE * 0.32,
+            transform: [{ translateX: shimmerTranslate }, { rotate: '20deg' }],
+            opacity: shimmerOpacity,
+          }}
+        >
+          <LinearGradient
+            colors={['transparent', 'rgba(255,255,255,0.65)', 'transparent']}
+            start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }}
+            style={{ flex: 1 }}
+          />
+        </Animated.View>
       </View>
 
       {/* ★ v297 (17 May 2026): Tüm Animated.View rotating sparkle overlay'leri KALDIRILDI.
