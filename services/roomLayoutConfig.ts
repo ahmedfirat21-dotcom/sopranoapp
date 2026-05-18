@@ -391,7 +391,10 @@ export const DEFAULT_ROOM_LAYOUT: RoomLayoutConfig = {
     subtitleFontSize: 11,
     subtitleColor: '#94A3B8',
     showLiveIndicator: true,
-    liveDotColor: '#EF4444',
+    // ★ v1.7.13.9 (19 May 2026): Default kirmizi -> yesil. Kullanici raporu:
+    //   "online kirmizi yaniyor". Eski default kirmizi yaniltici idi.
+    //   Semantik dogru: baglanti OK=yesil, koptu=kirmizi. Admin override eder.
+    liveDotColor: '#22C55E',
     liveDotPulse: true,
     showListenerCount: true,
     headerBgOpacity: 0.0,
