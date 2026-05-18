@@ -4647,6 +4647,13 @@ export default function RoomScreen() {
         //   family ile aynı full-width olmalı (home/odalarım/profil). Padding artık
         //   sadece avatar grid'leri (SpeakerSection / ListenerGrid) ihtiyacına göre
         //   içeride uygulanır; header ve gradient'lar full bleed.
+        // ★ v1.7.13.8 (19 May 2026): global.safePaddingTop/Bottom admin'den okunur.
+        //   StatusBar/notch için üst dolgu, gesture-nav/home indicator için alt dolgu.
+        //   Default 12 — admin slider 0-32 arası ayarlayabilir.
+        {
+          paddingTop: roomLayout.global.safePaddingTop ?? 12,
+          paddingBottom: roomLayout.global.safePaddingBottom ?? 12,
+        },
       ]}
     >
       <StatusBar hidden />
