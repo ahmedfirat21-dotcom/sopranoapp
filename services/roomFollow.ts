@@ -7,6 +7,7 @@ import { supabase } from '../constants/supabase';
 import { PushService } from './push';
 import type { Room } from './database';
 import { i18n } from './i18n';
+import { applyOriginalHostOverride } from './room';
 
 export interface RoomFollow {
   id: string;
@@ -173,10 +174,14 @@ export const RoomFollowService = {
     }
 
     // rooms join'den gelen nested data'yı düzleştir
-    return (data || [])
+    const rooms = (data || [])
       .map((d: any) => d.rooms)
       .filter(Boolean)
       .filter((r: any) => r.is_live || r.is_persistent) as Room[];
+    // ★ v309 (18 May 2026): Asıl sahip override — kullanıcı aynı odayı keşfette ASIL
+    //   sahip (Burak DENİZ) olarak görüyorsa, "Takip Ettiğin Odalar"da da aynı kişi
+    //   görünmeli (geçici host FIRAT değil).
+    return await applyOriginalHostOverride(rooms);
   },
 
   /** Toplu takip durumu sorgulama (N+1 önleme) */

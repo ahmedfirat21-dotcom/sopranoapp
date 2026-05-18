@@ -14,3 +14,54 @@ MOCK_DATA*.sql
 
 # Web admin paneli
 public/
+
+# ★ v300 (17 May 2026): Android lokal build cache (2.7 GB) — EAS Cloud kendi
+# build alır, bu cache upload edilmemeli. Önceki build "Project archive too big"
+# (2.5 GB) hatası verdi.
+android/build/
+android/app/build/
+android/.gradle/
+android/.idea/
+android/.cxx/
+android/app/.cxx/
+android/local.properties
+
+# iOS local build cache (kullanılmıyor)
+ios/build/
+ios/Pods/
+ios/DerivedData/
+
+# Expo / Metro / debug çıktıları
+.expo/
+.expo-shared/
+metro.log
+.metro.log
+.bundle_check.txt
+.bundle_check2.txt
+.metro-cache/
+
+# Lokal build çıktıları
+*.apk
+*.aab
+sopranochat-builds/
+
+# Test / dev araç dizinleri
+.play_screenshots/
+.tmp_*
+
+# IDE
+.vscode/
+.idea/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Genel cache
+.cache/
+.parcel-cache/

@@ -8,6 +8,7 @@ import { View, Text, StyleSheet, Pressable, Modal, Dimensions, Animated, PanResp
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { getAvatarSource } from '../../constants/avatars';
+import { useRoomLayout } from '../../services/roomLayoutConfig';
 import type { RoomParticipant } from '../../types';
 
 const { width: W, height: H } = Dimensions.get('window');
@@ -23,6 +24,8 @@ interface Props {
 
 export default function CameraFullscreenModal({ visible, user, videoTrack, VideoView, isMe, onClose }: Props) {
   const translateY = useRef(new Animated.Value(0)).current;
+  // ★ v301 (18 May 2026): Fullscreen objectFit + mirror admin'den.
+  const camCfg = useRoomLayout().camera;
 
   const panResponder = useRef(
     PanResponder.create({
@@ -55,7 +58,12 @@ export default function CameraFullscreenModal({ visible, user, videoTrack, Video
       <Animated.View style={[styles.backdrop, { transform: [{ translateY }] }]} {...panResponder.panHandlers}>
         {/* Video — tam ekran */}
         {VideoView && videoTrack ? (
-          <VideoView videoTrack={videoTrack} style={StyleSheet.absoluteFill} objectFit="cover" mirror={!!isMe} />
+          <VideoView
+            videoTrack={videoTrack}
+            style={StyleSheet.absoluteFill}
+            objectFit={camCfg.fullscreenObjectFit}
+            mirror={!!isMe && camCfg.mirrorSelf}
+          />
         ) : (
           <View style={[StyleSheet.absoluteFill, styles.fallback]}>
             <Image source={getAvatarSource(avatarUrl)} style={styles.fallbackAvatar} />

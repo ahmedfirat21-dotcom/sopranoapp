@@ -602,6 +602,22 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, i
   // ★ v117: Oda düzen config — avatar shape için kullanılır (line 541 civarı)
   const layout = useRoomLayout();
   const speakersCfg = layout.speakers;
+  // ★ v301 (18 May 2026): Kamera config — eski hardcoded değerleri buradan okur
+  const camCfg = layout.camera;
+  // ★ v301: Kameralı tile köşe yuvarlaması formülü (eski: Math.max(12, cardWidth*0.08))
+  const cameraRadius = (w: number) => Math.max(camCfg.cornerRadiusMin, Math.floor(w * camCfg.cornerRadiusPercent / 100));
+  // ★ v302 (18 May 2026): Kamera indicator köşe konum helper'ı.
+  //   admin'in camera.indicatorPosition değerine göre rozet konumu.
+  const indicatorPosStyle = (size: number) => {
+    const off = -Math.round(size / 4);
+    switch (camCfg.indicatorPosition) {
+      case 'topLeft':     return { top: off, left: off };
+      case 'topRight':    return { top: off, right: off };
+      case 'bottomLeft':  return { bottom: off, left: off };
+      case 'bottomRight':
+      default:            return { bottom: off, right: off };
+    }
+  };
   // ★ v288 (16 May 2026): Host büyüt/küçült — web admin'den ayarlanan host.avatarSize
   //   sadece audio modda (kamerasız) uygulanır; kamera açıkken spotlight tile aspect'i
   //   korunur. Kullanıcının "host büyüt küçült yok" geri bildirimi → defaults.ts 140,
@@ -907,32 +923,50 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, i
         s.speakerCardInner,
         {
           width: cardWidth,
-          height: cameraOn && videoTrack && VideoView ? cardHeight : cardWidth,
+          // ★ v301: cardHeight artık camCfg.heightRatio ile hesaplanır.
+          //   Eski davranış (cardHeight = cardWidth+18) heightRatio≈1.18 default ile birebir.
+          //   Spotlight tile'ları cardHeight'ı kendisi geçer (spotlightH), audio modda kare.
+          height: cameraOn && videoTrack && VideoView
+            ? (cardHeight !== cardWidth ? cardHeight : Math.round(cardWidth * camCfg.heightRatio))
+            : cardWidth,
           // ★ v291 (16 May 2026): Host için halka GERİ — admin'den ayarlanabilir
           //   (host.ringWidth/ringColor). Frame'li kullanıcı için halka kapanır
           //   (frame önceliği — kural: çerçeve satın alanın halkası gizlenir,
           //   host/speaker/moderator hepsi için geçerli).
-          borderColor: activeFrame ? 'transparent' : ringColor,
+          // ★ v301: Kameralı + camCfg.useCustomBorder ise kamera-özel border kullan.
+          borderColor: activeFrame ? 'transparent'
+            : (cameraOn && videoTrack && VideoView && camCfg.useCustomBorder ? camCfg.borderColor : ringColor),
           // ★ v287/v291: speakers.ringWidth admin'den (isMod biraz kalın, host kendi cfg).
-          borderWidth: activeFrame ? 0 : (isMod ? Math.max(2, cfgRingWidth) : cfgRingWidth),
+          // ★ v301: Kameralı + useCustomBorder ise camCfg.borderWidth.
+          borderWidth: activeFrame ? 0
+            : (cameraOn && videoTrack && VideoView && camCfg.useCustomBorder
+              ? camCfg.borderWidth
+              : (isMod ? Math.max(2, cfgRingWidth) : cfgRingWidth)),
           // ★ v283: borderRadius web admin avatarShape'i takip etsin (önceden hep daire).
-          //   Camera açıkken kare-yumuşak (8% radius), audio-only shape mapping.
-          borderRadius: cameraOn && videoTrack && VideoView ? Math.max(12, Math.floor(cardWidth * 0.08)) : avatarShapeRadius,
+          //   Camera açıkken kare-yumuşak (admin'den cornerRadiusPercent/Min), audio-only shape mapping.
+          borderRadius: cameraOn && videoTrack && VideoView ? cameraRadius(cardWidth) : avatarShapeRadius,
           overflow: 'visible',
           // ★ 2026-05-05: Frame artık zIndex 2 ile üstte — speakerCardInner default z'de kalır.
         },
       ]}>
         <Animated.View style={[StyleSheet.absoluteFill, {
           // ★ 2026-05-11: Shape — web admin avatar_shape'e göre borderRadius.
-          //   Camera açıkken kare-yumuşak (8% radius), kapalıyken shape mapping.
-          borderRadius: cameraOn && videoTrack && VideoView ? Math.max(12, Math.floor(cardWidth * 0.08)) : avatarShapeRadius,
+          //   Camera açıkken admin camera config (cornerRadiusPercent + Min), kapalıyken shape mapping.
+          borderRadius: cameraOn && videoTrack && VideoView ? cameraRadius(cardWidth) : avatarShapeRadius,
           overflow: 'hidden',
           // Avatar transform stack — pulse/float/shake/swing/tilt
           transform: avatarTransform.length > 0 ? avatarTransform : undefined,
         }]}>
           <LinearGradient colors={['rgba(30,41,59,0.7)', 'rgba(15,23,42,0.85)']} style={StyleSheet.absoluteFill} />
           {cameraOn && videoTrack && VideoView ? (
-            <VideoView videoTrack={videoTrack} style={StyleSheet.absoluteFill} objectFit="cover" mirror={isMe} />
+            // ★ v301 (18 May 2026): objectFit ve mirror artık web admin Camera config'ten.
+            //   mirrorSelf false ise self-view de mirror'lanmaz; true ise sadece isMe için.
+            <VideoView
+              videoTrack={videoTrack}
+              style={StyleSheet.absoluteFill}
+              objectFit={camCfg.objectFit}
+              mirror={isMe && camCfg.mirrorSelf}
+            />
           ) : (() => {
             // ★ v1.3.55: avatar_ratio uygulanır — frame içindeki avatar görseli web admin'in
             //   "Avatar Oranı" ayarına göre küçülür/büyür. Default 1.0 (frame'i tamamen doldurur).
@@ -1017,7 +1051,7 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, i
             <View pointerEvents="none" style={[StyleSheet.absoluteFill, {
               backgroundColor: 'rgba(200,200,200,0.5)',
               opacity: Math.min(0.6, frameCfg.avatar_blur * 0.12),
-              borderRadius: cameraOn && videoTrack && VideoView ? Math.max(12, Math.floor(cardWidth * 0.08)) : avatarShapeRadius,
+              borderRadius: cameraOn && videoTrack && VideoView ? cameraRadius(cardWidth) : avatarShapeRadius,
             }]} />
           )}
           {/* ★ v1.3.56: avatar_border_enabled — Image etrafında ek halka.
@@ -1037,32 +1071,59 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, i
           )}
           {/* ★ v283 (16 May 2026): EV SAHİBİ altın halka KALDIRILDI (kullanıcı talebi). */}
           {/* ★ 2026-04-24: Kamera açıkken alt + üst gradient overlay — badge'ler video üzerinde okunur kalır. */}
-          {cameraOn && videoTrack && VideoView && (
-            <>
-              <LinearGradient
-                colors={['rgba(0,0,0,0.55)', 'transparent']}
-                style={s.videoGradientTop}
-                pointerEvents="none"
-              />
-              <LinearGradient
-                colors={['transparent', 'rgba(0,0,0,0.6)']}
-                style={s.videoGradientBottom}
-                pointerEvents="none"
-              />
-            </>
+          {/* ★ v301 (18 May 2026): Gradient opaklıkları web admin'den (camCfg.overlayTop/Bottom). */}
+          {cameraOn && videoTrack && VideoView && camCfg.overlayTopOpacity > 0 && (
+            <LinearGradient
+              colors={[`rgba(0,0,0,${camCfg.overlayTopOpacity})`, 'transparent']}
+              style={s.videoGradientTop}
+              pointerEvents="none"
+            />
+          )}
+          {cameraOn && videoTrack && VideoView && camCfg.overlayBottomOpacity > 0 && (
+            <LinearGradient
+              colors={['transparent', `rgba(0,0,0,${camCfg.overlayBottomOpacity})`]}
+              style={s.videoGradientBottom}
+              pointerEvents="none"
+            />
           )}
         </Animated.View>
+        {/* ★ v302/v306 (18 May 2026): Kamera açık rozeti — Animated.View'in
+            overflow:'hidden' özelliği dışına taşındı (kırpılıyordu, "içeriye
+            gömük" görünüyordu). speakerCardInner overflow:'visible' olduğu için
+            burada negative top/right pozisyonlar düzgün dışarı taşıyor. */}
+        {cameraOn && videoTrack && VideoView && camCfg.indicatorEnabled && (
+          <View
+            pointerEvents="none"
+            style={[
+              {
+                position: 'absolute',
+                ...indicatorPosStyle(camCfg.indicatorSize),
+                width: camCfg.indicatorSize,
+                height: camCfg.indicatorSize,
+                borderRadius: camCfg.indicatorSize / 2,
+                backgroundColor: camCfg.indicatorColor,
+                borderWidth: 2,
+                borderColor: 'rgba(15,25,38,1)',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 30,
+              },
+            ]}
+          >
+            <Ionicons name="videocam" size={Math.round(camCfg.indicatorSize * 0.55)} color="#fff" />
+          </View>
+        )}
         {/* ★ v92.13 (1 May 2026): SpeakingGlow yalnızca konuşma için (teal pulse).
             Sahne Işığı power-up'ı ARTIK ayrı component (StageLightHalo) — 3 katmanlı
             altın expand-pulse halka + iç parlayan border. Kullanıcı "vasat" dedi,
             dramatic upgrade yapıldı. */}
         <SpeakingGlow
           speaking={speaking && mic}
-          borderRadius={cameraOn && videoTrack && VideoView ? Math.max(12, Math.floor(cardWidth * 0.08)) : cardWidth / 2}
+          borderRadius={cameraOn && videoTrack && VideoView ? cameraRadius(cardWidth) : cardWidth / 2}
         />
         <StageLightHalo
           active={!!(user as any).stage_light_until && new Date((user as any).stage_light_until).getTime() > Date.now()}
-          borderRadius={cameraOn && videoTrack && VideoView ? Math.max(12, Math.floor(cardWidth * 0.08)) : cardWidth / 2}
+          borderRadius={cameraOn && videoTrack && VideoView ? cameraRadius(cardWidth) : cardWidth / 2}
         />
         {isGhost && (
           <View style={s.ghostOverlay}>
@@ -1214,37 +1275,56 @@ export default function SpeakerSection({ stageUsers, getMicStatus, onSelectUser,
   //   - Karışık sahnede: kameralılar üstte spotlight, audio-only altta küçük listener-stili
   //   Clubhouse her şeyi circle yapsa da audio-only platform; kameralı sahne için
   //   Discord/TikTok pattern doğru — kullanıcı talebi: "kamera açan uygulamalar nasıl ayarlıyor"
-  const cameraUsers = sortedUsers.filter(u => {
+  // ★ v302 (18 May 2026): maxConcurrentCameras UI-level enforcement — admin'in
+  //   "Maks Eşzamanlı Kamera" değeri >0 ise, sortedUsers içinde sıralı ilk N
+  //   kameralı tile olarak render edilir; kalanlar audio-only görünür. LiveKit
+  //   publish katmanı engellenmiyor (track yine yayılır), sadece tile gösterimi
+  //   sınırlanıyor — gerçek publish limit post-launch işi.
+  const maxCams = layout.camera.maxConcurrentCameras || 0; // 0 = sınırsız
+  const cameraUsersRaw = sortedUsers.filter(u => {
     const st = getMicStatus(u.user_id);
     return st.cameraOn && st.videoTrack;
   });
+  const cameraUsers = maxCams > 0 ? cameraUsersRaw.slice(0, maxCams) : cameraUsersRaw;
+  const overLimitCameraIds = new Set(
+    maxCams > 0 ? cameraUsersRaw.slice(maxCams).map(u => u.user_id) : []
+  );
   const audioOnlyUsers = sortedUsers.filter(u => {
     const st = getMicStatus(u.user_id);
-    return !(st.cameraOn && st.videoTrack);
+    // Limit aşan kameralılar audio-only görünür
+    return !(st.cameraOn && st.videoTrack) || overLimitCameraIds.has(u.user_id);
   });
   const camCount = cameraUsers.length;
-  const showSpotlight = VideoView && camCount > 0;
+  // ★ v301 (18 May 2026): Spotlight web admin'den kapatılabilir → uniform circle grid'e döner.
+  //   spotlightEnabled false ise tüm konuşmacılar (kameralı dahil) audio gridde render.
+  const camCfgTop = layout.camera;
+  const showSpotlight = VideoView && camCount > 0 && camCfgTop.spotlightEnabled;
 
-  // Spotlight tile boyutları — kamera sayısına göre referans pattern'leri
-  let spotlightW = 0, spotlightH = 0, spotlightGap = 12;
+  // Spotlight tile boyutları — kamera sayısına göre web admin aspect kuralları
+  // ★ v306 (18 May 2026): SAFETY_BUFFER eklendi — flexbox wrap fix.
+  //   Mathematical olarak tam sınırda (W-32) sığan tile'lar 0.5px stretch ile wrap
+  //   tetikliyordu (Samsung S25 FE 412dp ekran, 2 tile + gap = 380, container 380 tam).
+  //   8px buffer her durumda yan yana garantisi verir.
+  const SAFETY_BUFFER = 8;
+  let spotlightW = 0, spotlightH = 0, spotlightGap = camCfgTop.spotlightGap;
   if (showSpotlight) {
     if (camCount === 1) {
-      spotlightW = W - 32;
-      spotlightH = Math.round(spotlightW * 0.62);  // ~16:10 sinematik (Discord/Twitch)
+      spotlightW = W - 32 - SAFETY_BUFFER;
+      spotlightH = Math.round(spotlightW * camCfgTop.spotlightSingleAspect);
     } else if (camCount === 2) {
-      spotlightW = Math.floor((W - 32 - spotlightGap) / 2);
-      spotlightH = spotlightW;  // 1:1 kare yan yana (TikTok multi-guest)
+      spotlightW = Math.floor((W - 32 - spotlightGap - SAFETY_BUFFER) / 2);
+      spotlightH = Math.round(spotlightW * camCfgTop.spotlightDoubleAspect);
     } else if (camCount === 3) {
-      spotlightW = Math.floor((W - 32 - spotlightGap * 2) / 3);
-      spotlightH = spotlightW;  // 1:1 kare 3 col
+      spotlightW = Math.floor((W - 32 - spotlightGap * 2 - SAFETY_BUFFER) / 3);
+      spotlightH = Math.round(spotlightW * camCfgTop.spotlightTripleAspect);
     } else if (camCount === 4) {
-      spotlightW = Math.floor((W - 32 - spotlightGap) / 2);
-      spotlightH = Math.floor(spotlightW * 1.05);  // 2x2 hafif dikey (WhatsApp)
+      spotlightW = Math.floor((W - 32 - spotlightGap - SAFETY_BUFFER) / 2);
+      spotlightH = Math.round(spotlightW * camCfgTop.spotlightQuadAspect);
     } else {
-      // 5+ kamera: 3 col kompakt grid
-      spotlightW = Math.floor((W - 32 - spotlightGap * 2) / 3);
+      // 5+ kamera: 3 col kompakt grid (admin aspect kullanılmaz, sabit kare)
+      spotlightW = Math.floor((W - 32 - spotlightGap * 2 - SAFETY_BUFFER) / 3);
       spotlightH = spotlightW;
-      spotlightGap = 8;
+      spotlightGap = Math.max(4, spotlightGap - 4);
     }
   }
   // Audio-only listener-stili boyut (spotlight aktifken kompakt circle)
@@ -1256,8 +1336,13 @@ export default function SpeakerSection({ stageUsers, getMicStatus, onSelectUser,
           başlık semantik tekrar. Görsel gürültü azaltıldı. */}
 
       {/* ★ v92.21 SPOTLIGHT — Kameralılar üstte rectangular tile (Discord/Twitch pattern) */}
+      {/* ★ v306 (18 May 2026): flexWrap:'nowrap' — mainSpeakerGrid wrap default ama
+          spotlight için NOWRAP zorlanır. v1.5.7'de SAFETY_BUFFER=8 yetmedi (cihaz
+          width tahmininden farklı render ekstra padding eklemiş). Şimdi flex
+          row+nowrap+justifyCenter ile tile'lar kesin yan yana, ekran kenarına
+          minimal taşma toleransıyla. */}
       {showSpotlight && (
-        <View style={[s.mainSpeakerGrid, { gap: spotlightGap, marginBottom: gap }]}>
+        <View style={[s.mainSpeakerGrid, { gap: spotlightGap, marginBottom: gap, flexWrap: 'nowrap', alignItems: 'center' }]}>
           {cameraUsers.map((u) => {
             const st = getMicStatus(u.user_id);
             const isMe = u.user_id === currentUserId;
@@ -1279,7 +1364,11 @@ export default function SpeakerSection({ stageUsers, getMicStatus, onSelectUser,
       {showSpotlight && audioOnlyUsers.length > 0 && (
         <View style={[s.mainSpeakerGrid, { gap: 8, marginBottom: 4 }]}>
           {audioOnlyUsers.map((u) => {
-            const st = getMicStatus(u.user_id);
+            const rawSt = getMicStatus(u.user_id);
+            // ★ v302: overLimit kameralı → micStatus override (cameraOn=false, audio-only render)
+            const st = overLimitCameraIds.has(u.user_id)
+              ? { ...rawSt, cameraOn: false, videoTrack: null }
+              : rawSt;
             const isMe = u.user_id === currentUserId;
             return (
               <SpeakerCard key={u.id} user={u} micStatus={st} onPress={() => onSelectUser(u)}
@@ -1299,7 +1388,11 @@ export default function SpeakerSection({ stageUsers, getMicStatus, onSelectUser,
       {!showSpotlight && (
         <View style={[s.mainSpeakerGrid, { gap, marginBottom: 4 }]}>
           {sortedUsers.map((u) => {
-            const st = getMicStatus(u.user_id);
+            const rawSt = getMicStatus(u.user_id);
+            // ★ v302: maxConcurrentCameras kontrolü uniform grid'de de geçerli
+            const st = overLimitCameraIds.has(u.user_id)
+              ? { ...rawSt, cameraOn: false, videoTrack: null }
+              : rawSt;
             const isMe = u.user_id === currentUserId;
             // ★ v288 (16 May 2026): host.avatarSize override — admin'in Boyut slider'ı.
             //   Host'un kendi grid hücresi host.avatarSize değerine çekilir, diğer

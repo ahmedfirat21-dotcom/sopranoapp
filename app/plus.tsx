@@ -179,8 +179,20 @@ export default function PlusScreen() {
                 //   ürünler henüz Play tarafında aktif olmamış demek — kullanıcıyı
                 //   korkutmasın diye bilgilendirici dile çevir.
                 const rawMsg = String(err?.message || '');
+                // ★ v309 (18 May 2026): Configuration error'a init + offerings hatalarını
+                //   ekle — gerçek kök sebep (API key wrong / SDK init fail / Dashboard
+                //   ürün yok) ayrıştırılabilsin. Customer logs RC'ye ping atmıyorsa
+                //   init/offerings state'i fail durumunu gösterir.
+                const initErr = RevenueCatService._lastInitError;
+                const offerErr = RevenueCatService._lastOfferingsError;
+                const debugSuffix = [
+                  `Init: ${RevenueCatService._initialized ? 'OK' : 'FAIL'}`,
+                  initErr ? `InitErr: ${initErr.slice(0, 80)}` : null,
+                  offerErr ? `OfferErr: ${offerErr.slice(0, 80)}` : null,
+                ].filter(Boolean).join(' | ');
+
                 const friendlyMsg = /configuration|underlying error/i.test(rawMsg)
-                  ? 'Satın alma sistemi henüz hazırlanıyor. Lütfen daha sonra tekrar dene veya destek ekibiyle iletişime geç.'
+                  ? `Satın alma yapılandırma hatası.\n\nDetay: ${rawMsg.slice(0, 100)}\n\n[${debugSuffix}]`
                   : /network|connection/i.test(rawMsg)
                   ? 'İnternet bağlantını kontrol et ve tekrar dene.'
                   : /cancel|cancelled/i.test(rawMsg)

@@ -204,6 +204,49 @@ export interface ListenersAdvancedConfig {
   showMicRequestPulse: boolean;
 }
 
+/* ★ v301 (18 May 2026): Kamera (video) config — daha önce SpeakerSection'da
+ * ve CameraFullscreenModal'da HARDCODED olan tüm değerler buradan okunur.
+ * Web admin "Oda Düzeni → Kamera" sekmesinden canlı değiştirilebilir. */
+export interface CameraConfig {
+  // ── Tile geometri ──
+  heightRatio: number;          // height / width — 1.0 = kare, 1.25 = 4:5 dikey, 0.5625 = 16:9 yatay
+  cornerRadiusPercent: number;  // 0-30 — cardWidth'in yüzdesi (eski hardcode: 8)
+  cornerRadiusMin: number;      // dp — minimum köşe yuvarlaması (eski hardcode: 12)
+
+  // ── Video davranışı ──
+  objectFit: 'cover' | 'contain';
+  mirrorSelf: boolean;          // kendi yüzünün ayna gösterilsin mi (default true)
+
+  // ── Indicator (avatarın köşesindeki kamera ikonu) ──
+  indicatorEnabled: boolean;
+  indicatorColor: string;
+  indicatorPosition: CornerPosition;
+  indicatorSize: number;
+
+  // ── Border (audio halkadan bağımsız kamera kenarı) ──
+  useCustomBorder: boolean;     // true ise audio ringWidth/Color yerine bu kullanılır
+  borderWidth: number;
+  borderColor: string;
+
+  // ── Overlay gradient (video üzerinde isim/rozet okunabilirliği) ──
+  overlayTopOpacity: number;    // 0-1, eski hardcode: 0.55
+  overlayBottomOpacity: number; // 0-1, eski hardcode: 0.6
+
+  // ── Spotlight (hibrit layout) ──
+  spotlightEnabled: boolean;    // false = uniform circle grid (Clubhouse), true = camera tile spotlight (Discord)
+  spotlightSingleAspect: number;// 1 kamera için H/W (eski: 0.62)
+  spotlightDoubleAspect: number;// 2 kamera için (eski: 1.0)
+  spotlightTripleAspect: number;// 3 kamera için (eski: 1.0)
+  spotlightQuadAspect: number;  // 4 kamera için (eski: 1.05)
+  spotlightGap: number;         // dp (eski: 12)
+
+  // ── Fullscreen modal ──
+  fullscreenObjectFit: 'cover' | 'contain';
+
+  // ── Limit ──
+  maxConcurrentCameras: number; // 0 = sınırsız, default 0
+}
+
 export interface RoomLayoutConfig {
   host: HostLayoutConfig;
   speakers: SpeakersLayoutConfig;
@@ -218,6 +261,8 @@ export interface RoomLayoutConfig {
   header: HeaderConfig;
   controls: ControlsConfig;
   listeners_advanced: ListenersAdvancedConfig;
+  // v301 (18 May 2026): kamera config
+  camera: CameraConfig;
 }
 
 // ── Default fallback (DB fetch fail/loading) — mevcut hard-coded değerler ──
@@ -384,6 +429,31 @@ export const DEFAULT_ROOM_LAYOUT: RoomLayoutConfig = {
     handRaiseBadgePosition: 'topLeft',
     showMicRequestPulse: true,
   },
+  camera: {
+    // ★ v301 (18 May 2026): default'lar eski hardcoded davranışla birebir uyumlu.
+    heightRatio: 1.18,          // cardHeight = cardWidth+18 ~ 1.18 ratio (eski +18 davranışı)
+    cornerRadiusPercent: 8,     // cardWidth * 0.08
+    cornerRadiusMin: 12,
+    objectFit: 'cover',
+    mirrorSelf: true,
+    indicatorEnabled: true,
+    indicatorColor: '#3B82F6',
+    indicatorPosition: 'topRight',
+    indicatorSize: 16,
+    useCustomBorder: false,
+    borderWidth: 2,
+    borderColor: '#3B82F6',
+    overlayTopOpacity: 0.55,
+    overlayBottomOpacity: 0.60,
+    spotlightEnabled: true,     // mevcut hibrit layout
+    spotlightSingleAspect: 0.62,
+    spotlightDoubleAspect: 1.0,
+    spotlightTripleAspect: 1.0,
+    spotlightQuadAspect: 1.05,
+    spotlightGap: 12,
+    fullscreenObjectFit: 'cover',
+    maxConcurrentCameras: 0,    // sınırsız
+  },
 };
 
 const TTL_MS = 5 * 60 * 1000;
@@ -426,6 +496,7 @@ function mergeWithDefaults(raw: any): RoomLayoutConfig {
     header:             mergeNested(DEFAULT_ROOM_LAYOUT.header,             raw.header),
     controls:           mergeNested(DEFAULT_ROOM_LAYOUT.controls,           raw.controls),
     listeners_advanced: mergeNested(DEFAULT_ROOM_LAYOUT.listeners_advanced, raw.listeners_advanced),
+    camera:             mergeNested(DEFAULT_ROOM_LAYOUT.camera,             raw.camera),
   };
 }
 

@@ -11,6 +11,7 @@
  * 4. REVENUECAT_MOCK_MODE = false yap
  */
 import { Platform } from 'react-native';
+import Purchases from 'react-native-purchases';
 import { logger } from '../utils/logger';
 import { supabase } from '../constants/supabase';
 import type { SubscriptionTier } from '../types';
@@ -125,6 +126,12 @@ export const RevenueCatService = {
   _Purchases: null as any,
   _initPromise: null as Promise<void> | null,
   _dashboardEmpty: false, // ★ Dashboard'da ürün yoksa true — mock offerings kullanılır
+  // ★ v309 (18 May 2026): Init hatasını UI'a yansıtmak için public state.
+  //   Sessiz fail RC ping göndermiyordu, "configuration error" UI'da görülüyor ama
+  //   gerçek init error gizliydi. Şimdi Plus.tsx satın al başında bu state kontrol
+  //   edilirse açıklayıcı mesaj kullanıcıya gider.
+  _lastInitError: null as string | null,
+  _lastOfferingsError: null as string | null,
 
   /**
    * ★ 2026-04-20: Abonelik satın alma şu an mümkün mü?
@@ -135,7 +142,13 @@ export const RevenueCatService = {
    */
   isSubscriptionAvailable(): boolean {
     if (__DEV__) return true;
-    return _hasRealKey && !this._dashboardEmpty;
+    // ★ v302 (18 May 2026): _dashboardEmpty kontrolü kaldırıldı — UI butonunu
+    //   "current offering boş" diye kilitlemek yanlıştı. Asıl gereken: gerçek key
+    //   var mı. Offering eksikse satın al butonuna basınca purchasePackage anında
+    //   net error mesajı döner ('Plus için offering bulunamadı'), kullanıcı yine
+    //   bilgilendirilir ama buton kullanılabilir kalır (Dashboard fix sonrası
+    //   uygulama restart gerektirmesin diye).
+    return _hasRealKey;
   },
 
   /**
@@ -153,7 +166,10 @@ export const RevenueCatService = {
 
     this._initPromise = (async () => {
       try {
-        const Purchases = require('react-native-purchases').default;
+        // ★ v309 (18 May 2026): require → top-level import. Hermes optimizer dinamik
+        //   require'da react-native-purchases'ı silent fail ediyordu — last_seen_at
+        //   RC customer records'da v1.3.97'de takılı kalmış, hiç ping atmamış. Top-level
+        //   import static analysis ile native bindings doğru bağlanır.
         this._Purchases = Purchases;
 
         const apiKey = Platform.OS === 'ios' ? REVENUECAT_API_KEY_IOS : REVENUECAT_API_KEY_ANDROID;
@@ -172,13 +188,18 @@ export const RevenueCatService = {
           if (!offerings?.current?.availablePackages?.length) {
             logger.warn(i18n.t('auto.revenuecat.012'));
             this._dashboardEmpty = true;
+            this._lastOfferingsError = 'Offerings boş — Dashboard offering tanımlı değil veya app yapılandırma uyumsuz.';
           }
-        } catch {
+        } catch (e: any) {
           // ConfigurationError (no products registered) — sessiz yakalama
           this._dashboardEmpty = true;
+          // ★ v309: Offerings hatasını state'e kaydet — Plus.tsx mesajına ekle.
+          this._lastOfferingsError = String(e?.message || e || 'Unknown').slice(0, 200);
         }
-      } catch (e) {
+      } catch (e: any) {
         this._initPromise = null; // Hata durumunda tekrar denenebilsin
+        // ★ v309: Init hatasını state'e kaydet — Plus.tsx mesajına ekle.
+        this._lastInitError = String(e?.message || e || 'Unknown').slice(0, 200);
         logger.warn(i18n.t('auto.revenuecat.011'), e);
       }
     })();
@@ -239,10 +260,13 @@ export const RevenueCatService = {
       }
     }
 
-    // ★ 2026-04-20 KRİTİK GUARD: Production'da RevenueCat yapılandırılmamışsa
-    // (placeholder key veya Dashboard'da offering yok) SATIN ALMA ENGELLE.
-    // Aksi halde kullanıcı ödeme yapmadan Plus/Pro tier alırdı.
-    if (!__DEV__ && (REVENUECAT_MOCK_MODE || this._dashboardEmpty)) {
+    // ★ 2026-04-20 KRİTİK GUARD: Production'da RevenueCat yapılandırılmamışsa SATIN ALMA ENGELLE.
+    //   Aksi halde kullanıcı ödeme yapmadan Plus/Pro tier alırdı.
+    // ★ v302 (18 May 2026): `_dashboardEmpty` guard'ı KALDIRILDI — bu flag sadece
+    //   "current" offering boş demek, ama Plus/Pro `all.default` / `all.pro` üzerinden
+    //   de çözülebiliyor (lookup aşağıda). Eğer her ikisi de yoksa zaten offering!=null
+    //   kontrolü doğal error mesajını döner. Mock guard yeterli.
+    if (!__DEV__ && REVENUECAT_MOCK_MODE) {
       return {
         newTier: null,
         error: i18n.t('auto.revenuecat.008'),
@@ -334,7 +358,14 @@ export const RevenueCatService = {
       }
     }
 
-    if (!__DEV__ && (REVENUECAT_MOCK_MODE || this._dashboardEmpty)) {
+    // ★ v302 (18 May 2026): _dashboardEmpty guard'ı SP'den KALDIRILDI.
+    //   Bu flag init'te `offerings.current.availablePackages.length` kontrolüyle
+    //   set ediliyor — yani "abonelik current offering boş mu" demek. SP paketleri
+    //   purchaseProduct(productId) ile DİREKT product'a gidiyor, offering kullanmıyor.
+    //   Dolayısıyla abonelik offering eksik diye SP satın alma engellenmemeli;
+    //   Google Billing ürün yoksa kendi hatasını ('ITEM_UNAVAILABLE') döner ve
+    //   error message kullanıcıya net gösterilir.
+    if (!__DEV__ && REVENUECAT_MOCK_MODE) {
       return { success: false, error: 'RevenueCat yapılandırılmamış. SP satın alma kullanılamıyor.' };
     }
 
@@ -378,10 +409,10 @@ export const RevenueCatService = {
     if (REVENUECAT_MOCK_MODE) {
       return { restoredTier: 'Free' };
     }
-    // ★ 2026-04-20 GUARD: Dashboard yapılandırılmamışsa restore yapılamaz
-    if (this._dashboardEmpty) {
-      return { restoredTier: 'Free' };
-    }
+    // ★ v302 (18 May 2026): _dashboardEmpty kontrolü kaldırıldı — restorePurchases
+    //   `customerInfo`'yu döner (kullanıcının önceki satın almaları). Bu offering
+    //   listesinden bağımsızdır. Dashboard'da offering olmasa bile geçmiş satın
+    //   alma varsa restore edilebilir.
 
     try {
       const { customerInfo } = await this._Purchases.restorePurchases();

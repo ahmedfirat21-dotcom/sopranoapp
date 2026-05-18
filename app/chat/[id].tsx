@@ -287,10 +287,22 @@ function MessageBubble({ message, isMe, senderAvatar, senderName, myAvatar, onDe
   const isDeletedForEveryone = !!message.deleted_for_everyone;
   const isEdited = !!message.edited_at;
   const isForwarded = !!message.forwarded_from_id;
+  // ★ v305 (18 May 2026): Image URL detection genişletildi. Eskiden sadece "📷 <URL>"
+  //   formatı match ediyordu (uploadChatImage'in standart format). Ama düz image URL'leri
+  //   (legacy mesajlar veya 3rd party'den paylaşılanlar) text olarak görünüyordu.
+  //   Üç fallback: 1) standart 📷 prefix, 2) tek başına image uzantılı URL, 3) Supabase
+  //   storage public URL (post-images / avatars / voice-notes bucket'ları).
   const imageUrlFromContent = (() => {
     if (hasVoice || !message.content) return null;
-    const match = message.content.match(/^📷\s+(https?:\/\/\S+)$/);
-    return match ? match[1] : null;
+    const content = message.content.trim();
+    // 1) Standart format
+    const cameraMatch = content.match(/^📷\s+(https?:\/\/\S+)$/);
+    if (cameraMatch) return cameraMatch[1];
+    // 2) Tek başına image uzantılı URL
+    if (/^https?:\/\/\S+\.(?:jpg|jpeg|png|gif|webp|heic)(?:\?\S*)?$/i.test(content)) return content;
+    // 3) Supabase Storage public URL — uzantı olmasa bile (post-images / avatars bucket)
+    if (/^https?:\/\/[\w-]+\.supabase\.co\/storage\/v1\/object\/public\/(?:post-images|avatars)\/\S+$/i.test(content)) return content;
+    return null;
   })();
   const hasImage = !!message.image_url || !!imageUrlFromContent;
   const imageUri = message.image_url || imageUrlFromContent;

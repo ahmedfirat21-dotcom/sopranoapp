@@ -44,6 +44,27 @@ export function isOriginalHostAway(room: { host_id: string; room_settings?: any 
   return !!orig && orig !== room.host_id;
 }
 
+// ★ v308 (18 May 2026): Asıl sahip override helper — geçici host transfer'i olan
+//   odalarda UI'da "sahip" görünmesi gereken kişi original_host_id profilidir.
+//   getLive, getMyRooms ve diğer host join'i kullanan kritik endpoint'lerde kullanılır.
+//   FIRAT (host_id) yerine Burak DENİZ (original_host_id) avatar/display_name görünür.
+// ★ v309: export — diğer servisler de kullanabilsin (RoomFollowService gibi).
+export async function applyOriginalHostOverride<T extends Room>(rooms: T[]): Promise<T[]> {
+  const transferred = rooms.filter(r => {
+    const orig = (r.room_settings as any)?.original_host_id as string | undefined;
+    return !!orig && orig !== r.host_id;
+  });
+  if (transferred.length === 0) return rooms;
+  const origIds = Array.from(new Set(transferred.map(r => (r.room_settings as any).original_host_id as string)));
+  const { data: origHosts } = await supabase.from('profiles').select('*').in('id', origIds);
+  const origMap = new Map((origHosts || []).map((h: any) => [h.id, h]));
+  for (const r of transferred) {
+    const orig = origMap.get((r.room_settings as any).original_host_id);
+    if (orig) (r as any).host = orig;
+  }
+  return rooms;
+}
+
 // ★ D2 FIX: Yetki kontrol yardımcısı — owner veya moderator olmalı
 async function _requireRole(
   roomId: string,
@@ -154,7 +175,15 @@ export const RoomService = {
         ? Math.max(0, new Date((other as any).expires_at).getTime() - nowMs)
         : undefined;
       const mergedSettings: any = { ...((other as any).room_settings || {}) };
-      mergedSettings.original_host_id = hostId;
+      // ★ v309 (18 May 2026) KRİTİK BUG FIX: original_host_id YALNIZCA boşsa atanır.
+      //   Eskiden her freeze'de bu satır overwrite yapıyordu — eğer host_id geçici
+      //   host'a transfer edilmişse, freeze sırasında original_host_id GEÇİCİ HOST'A
+      //   yazılıyordu → ASIL SAHİP DB'DEN KAYBOLUYORDU. Çoklu transfer + freeze ile
+      //   asıl sahip silsile şeklinde yanlış değişiyordu. Şimdi sadece ilk freeze
+      //   (veya yaratımda set edilmediyse) atanır, asıl sahip korunur.
+      if (!mergedSettings.original_host_id) {
+        mergedSettings.original_host_id = hostId;
+      }
       mergedSettings.frozen_at = nowIso;
       if (remainMs !== undefined) mergedSettings.remaining_ms = remainMs;
 
@@ -230,7 +259,10 @@ export const RoomService = {
       .eq('id', roomId)
       .single();
     if (error) throw error;
-    return data as Room;
+    // ★ v308 (18 May 2026): Asıl sahip override — odaya girince UI'da host avatar/isim
+    //   asıl sahip görünür (geçici host transfer olmuş odalar için).
+    const [overridden] = await applyOriginalHostOverride([data as Room]);
+    return overridden;
   },
 
   /**
@@ -258,6 +290,10 @@ export const RoomService = {
       .order('created_at', { ascending: false });
     if (error) throw error;
     let rooms = (data || []) as Room[];
+
+    // ★ v307→v308 (18 May 2026): Asıl sahip override — helper'a refactor edildi
+    //   (getMyRooms ile aynı pattern, kod tekrarı önlendi).
+    rooms = await applyOriginalHostOverride(rooms);
 
     const TRENDING_THRESHOLD = 5; // 5+ dinleyici = trending tier eşiği
 
@@ -371,6 +407,8 @@ export const RoomService = {
             .select('*, host:profiles!host_id(*)')
             .in('id', ids);
           if (roomsData) {
+            // ★ v308: Trending listesi için de asıl sahip override
+            await applyOriginalHostOverride(roomsData as Room[]);
             // RPC sıra korunsun — id → score map ile yeniden sırala
             const scoreMap = new Map<string, number>(scoreRows.map((r: any) => [r.room_id, Number(r.trending_score) || 0]));
             let result = (roomsData as Room[])
@@ -609,11 +647,16 @@ export const RoomService = {
       .order('created_at', { ascending: false });
     if (error) throw error;
     // Client-side guard: orijinal sahip kontrolü
-    return (data || []).filter((r: any) => {
+    const ownedRooms = (data || []).filter((r: any) => {
       const orig = r.room_settings?.original_host_id as string | undefined;
       if (orig) return orig === userId; // Yeni odalar: original_host_id var
       return r.host_id === userId;       // Legacy odalar: original_host_id yok
     }) as Room[];
+
+    // ★ v308 (18 May 2026): Avatar override — host_id geçici hosta transfer edilmişse,
+    //   "Odalarım"daki kart avatar'ı ASIL SAHİBİ göstermeli (FIRAT yerine Burak DENİZ).
+    //   Aynı fix getLive'de var (keşfet); getMyRooms'da da gerek.
+    return await applyOriginalHostOverride(ownedRooms);
   },
 
   /** Uyuyan odayı uyandır.
@@ -624,6 +667,26 @@ export const RoomService = {
   async wakeUpRoom(roomId: string, hostId: string, tier: SubscriptionTier = 'Free'): Promise<Room> {
     const limits = getRoomLimits(tier);
     const now = new Date();
+
+    // ★ v309 (18 May 2026): ASIL SAHİP AUTO-RECLAIM — kullanıcı geçici host transfer'i
+    //   olmuş odanın asıl sahibi ise, host_id'yi otomatik kendisine geri al.
+    //   Senaryo: Burak DENİZ odayı açtı → çıktı → FIRAT temp host oldu →
+    //   Burak DENİZ tekrar girince host_id hâlâ FIRAT, wakeUp UPDATE 0 row yapardı.
+    //   Şimdi: asıl sahip wakeUp denerse host_id kendisine reset edilir.
+    const { data: roomMeta } = await supabase
+      .from('rooms')
+      .select('host_id, room_settings')
+      .eq('id', roomId)
+      .maybeSingle();
+    const origHostId = (roomMeta?.room_settings as any)?.original_host_id;
+    if (origHostId === hostId && roomMeta?.host_id !== hostId) {
+      // Asıl sahip dönüyor, temp host'tan host_id'yi geri al
+      await supabase
+        .from('rooms')
+        .update({ host_id: hostId })
+        .eq('id', roomId)
+        .eq('room_settings->>original_host_id', hostId);
+    }
 
     // ★ 2026-04-23 KRİTİK FIX: Host'un diğer canlı odalarını dondur — aynı anda birden
     //   fazla odada host olamaz. Kullanıcı birden çok odayı uyandırdığında hepsinde
@@ -661,15 +724,25 @@ export const RoomService = {
       room_settings: settings,
     };
 
+    // ★ v305 (18 May 2026): .single() → .maybeSingle() — UPDATE 0 satır etkilerse
+    //   (host_id mismatch / RLS bloke / temp_host_protection trigger) net hata.
+    //   Eskiden PostgREST "Cannot coerce the result to a single JSON object"
+    //   atıyordu, kullanıcı hiçbir şey anlamıyordu. Tipik senaryo: kullanıcı
+    //   başka birinin odasına geçici host olmuş, "Odalarım"da görünüyor ama
+    //   wakeUp UPDATE'i host_id mismatch yüzünden 0 satır etkiliyor.
     const { data, error } = await supabase
       .from('rooms')
       .update(updatePayload)
       .eq('id', roomId)
       .eq('host_id', hostId)
       .select('*, host:profiles!host_id(*)')
-      .single();
+      .maybeSingle();
 
     if (error) throw new Error(i18n.t('auto.room.034') + error.message);
+    if (!data) {
+      // UPDATE 0 row → host_id eşleşmiyor. Kullanıcı bu odanın asıl sahibi değil.
+      throw new Error('Bu odayı uyandırma yetkiniz yok. Asıl sahibi değilsin ya da yetkin kaldırılmış olabilir. Ana sayfadan yeni bir oda oluşturabilirsin.');
+    }
 
     // ★ 2026-04-29 v85: Host'un MEVCUT role'unu koru — sahneden inmiş listener ise
     //   wakeUp sonrası otomatik sahneye geri yükseltmeyelim. Sadece kayıt yoksa 'owner'.
@@ -983,8 +1056,16 @@ export const RoomService = {
       .eq('id', roomId)
       .single();
 
-    const isHost = roomData?.host_id === userId;
-    const isOriginalHost = (roomData?.room_settings as any)?.original_host_id === userId;
+    // ★ v309 (18 May 2026) KRİTİK FIX: original_host_id varsa, host_id geçici host'tur.
+    //   Bu kontrolü "isActualOwner" şeklinde belirginleştir: SADECE asıl sahibi
+    //   owner olarak tanı. Eskiden isHost || isOriginalHost ile geçici host'u da
+    //   owner sayıyordu → odaya girer girmez sahnede gözüküyordu (BUG).
+    const _origHostId = (roomData?.room_settings as any)?.original_host_id as string | undefined;
+    const isOriginalHost = _origHostId === userId;
+    // isHost SADECE original_host_id yoksa (legacy oda) anlamlıdır
+    const isHost = !_origHostId && roomData?.host_id === userId;
+    // Asıl sahip mantığı: original_host varsa o, yoksa host_id
+    const isActualOwner = _origHostId ? isOriginalHost : (roomData?.host_id === userId);
 
     // ── 1. Ban kontrolü ──
     if (!isHost && !isOriginalHost) {
@@ -1009,6 +1090,19 @@ export const RoomService = {
       .maybeSingle();
 
     if (existing) {
+      // ★ v309 (18 May 2026): Geçici host owner row downgrade — host_id transfer
+      //   tarihçesinden kalan stale "owner" kayıtları temizlenir. Asıl sahip
+      //   olmayan kullanıcı odaya girdiğinde otomatik listener'a düşer.
+      //   Memory kuralı: "başkasının odasında host olunmaz".
+      if (existing.role === 'owner' && !isActualOwner) {
+        await supabase
+          .from('room_participants')
+          .update({ role: 'listener' })
+          .eq('room_id', roomId)
+          .eq('user_id', userId);
+        return { ...existing, role: 'listener' } as RoomParticipant;
+      }
+
       // ★ 2026-04-30 FIX v2: Host minimize'dan dönünce mevcut rolü korunsun.
       //   Önceki fix her durumda owner'a yükseltiyordu — sahneden inmiş host
       //   minimize edip geri açınca zorla sahneye çıkıyordu.
@@ -1016,7 +1110,8 @@ export const RoomService = {
       //   Çözüm: last_seen_at son 2dk içindeyse kullanıcı "aktif" — minimize'dan
       //   dönüyor, rolüne dokunma. last_seen_at stale (>2dk) ise gerçekten ayrılmış
       //   ve geri geliyor → owner'a yükselt.
-      if ((isHost || isOriginalHost) && existing.role !== 'owner') {
+      // ★ v309: isActualOwner kullan (geçici host upgrade etmesin)
+      if (isActualOwner && existing.role !== 'owner') {
         const lastSeen = existing.last_seen_at ? new Date(existing.last_seen_at).getTime() : 0;
         const isStale = Date.now() - lastSeen > 2 * 60 * 1000; // 2 dakikadan eski
         
@@ -1049,10 +1144,16 @@ export const RoomService = {
 
     // ── 4. Rol belirleme (roomData zaten elimizde) ──
     // ★ BUG-R5 FIX: roleHint parametresini dikkate al
+    // ★ v309 (18 May 2026): isActualOwner kullan — geçici host (host_id transfer
+    //   edilmiş kişi) owner olarak girmez. Sadece asıl sahip (original_host_id)
+    //   owner role alır. Memory: kullanıcı kuralı "başkasının odasında host olunmaz".
     let role: string = roleHint || 'listener';
     if (roomData) {
+      // ★ v309 (18 May 2026) FIX: settings declaration restored — refactor sırasında
+      //   yanlışlıkla silinmiş, L1187 entryFee referansı undefined → ReferenceError
+      //   → join hang ("Oda hazırlanıyor" sonsuz).
       const settings = (roomData.room_settings || {}) as RoomSettings;
-      if (settings.original_host_id === userId || roomData.host_id === userId) {
+      if (isActualOwner) {
         role = 'owner';
         // Host geri dönüyorsa room'un host_id'sini güncelle
         if (roomData.host_id !== userId) {
@@ -1240,6 +1341,29 @@ export const RoomService = {
       ...p,
       role: normalizeRole(p.role), // Legacy 'host' → 'owner'
     })) as RoomParticipant[];
+
+    // ★ v309 (18 May 2026) ZOMBI FILTER: Kullanıcı app'i force-close ederse veya
+    //   leaveRoom çağrılamadan ölürse, DB'de eski kayıt kalır. Heartbeat 60sn,
+    //   bu yüzden 90sn'den eski last_seen olanları "stale" sayıp UI'da gizliyoruz.
+    //   Aynı kullanıcı tekrar girince yeni heartbeat ile fresh olur. last_seen_at NULL
+    //   ise (just joined) dahil et.
+    const STALE_THRESHOLD_MS = 90 * 1000;
+    const now = Date.now();
+    const staleCutoffIso = new Date(now - STALE_THRESHOLD_MS).toISOString();
+    participants = participants.filter((p: any) => {
+      const lastSeen = p.last_seen_at ? new Date(p.last_seen_at).getTime() : null;
+      if (!lastSeen) return true; // null = yeni katılan, dahil et
+      return now - lastSeen < STALE_THRESHOLD_MS;
+    });
+
+    // ★ v309: Fire-and-forget DB cleanup — stale kayıtları sil ki herkes için temizlensin.
+    //   Sonraki polling round'unda cleanup yapılmış olur. Concurrent DELETE'ler güvenli.
+    supabase.from('room_participants')
+      .delete()
+      .eq('room_id', roomId)
+      .lt('last_seen_at', staleCutoffIso)
+      .then(() => {})
+      .catch(() => {});
 
     // ★ B2 FIX: Ghost kullanıcıları gizle (owner/moderator hariç — onlar görebilir)
     if (viewerId) {

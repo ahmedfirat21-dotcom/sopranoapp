@@ -2593,7 +2593,11 @@ export default function RoomScreen() {
             RoomService.getParticipants(id as string).catch(() => []),
           ]);
           if (roomData) setRoom(roomData);
-          if (freshParticipants && freshParticipants.length > 0) {
+          // ★ v309 (18 May 2026) KRİTİK BUG FIX: length>0 koşulu KALDIRILDI.
+          //   Eskiden: kimse kalmadığında boş array gelir → koşul false → state stale
+          //   → odadan ÇIKAN KULLANICI EKRANDA KALMAYA DEVAM EDİYORDU. Şimdi:
+          //   freshParticipants array'i (boş bile olsa) doğrudan state'e yazılır.
+          if (Array.isArray(freshParticipants)) {
             setParticipants(freshParticipants);
             participantsRef.current = new Set(freshParticipants.map((x: any) => x.user_id));
           }
@@ -2610,6 +2614,27 @@ export default function RoomScreen() {
   //   INSERT/DELETE/UPDATE event'lerini dinliyor ve setParticipants güncelliyor.
   //   İki kanal aynı state'i güncelleyince race condition oluşuyordu +
   //   gereksiz bir Supabase channel slotu tüketiliyordu.
+
+  // ★ v309 (18 May 2026): Periyodik participant polling — Firebase JWT'siz
+  //   realtime postgres_changes DELETE event'leri fail olabiliyor (memory:
+  //   project_dm_broadcast_system_v86). Realtime sync kaçırırsa, 15 saniyelik
+  //   polling güvenlik ağı UI'yı temiz tutar — çıkan kullanıcı en geç 15sn
+  //   içinde ekrandan kaybolur.
+  useEffect(() => {
+    if (!id || isSystemRoom(id as string)) return;
+    const interval = setInterval(() => {
+      if (isMinimizingRef.current) return;
+      RoomService.getParticipants(id as string)
+        .then((fresh) => {
+          if (Array.isArray(fresh)) {
+            setParticipants(fresh);
+            participantsRef.current = new Set(fresh.map((x: any) => x.user_id));
+          }
+        })
+        .catch(() => {});
+    }, 15000);
+    return () => clearInterval(interval);
+  }, [id]);
 
   // ★ Host tier'ına göre ses/video kalite ayarları
   const hostTierForQuality = (room?.host?.subscription_tier as any) || 'Free';
@@ -3471,8 +3496,20 @@ export default function RoomScreen() {
     //   (RoomService.join async, 9sn sürebiliyor) sahne "boş" gözüküyordu. Render seviyesinde
     //   room.host_id varsa host'u synthesize et — owner rolüyle stage'de hep görünsün.
     //   DB'den gerçek kayıt geldiğinde realtime callback override eder.
+    // ★ v309 (18 May 2026) KRİTİK FIX: synthesize SADECE asıl sahip durumda.
+    //   Eskiden tüm kullanıcılar için synthesize yapılıyordu → host odadan çıkınca dahi
+    //   diğer kullanıcılar UI'da sahnede görüyor (ZOMBI HOST). Şimdi:
+    //   - Ben asıl sahip'im: synthesize uygula (kendi loading'imi gizle)
+    //   - Ben asıl sahip değilim: DB'den gerçek katılımları al
+    // ★ v319.2 (18 May 2026) EK FIX: original_host_id varsa, host_id geçici host'tur.
+    //   Geçici host (FIRAT) host_id olsa da synthesize ETMEMELI — kendini sahnede
+    //   "owner" olarak sahte göstermesin. Memory: "başkasının odasında host olunmaz".
     let _participants = participants;
-    if (room?.host_id && !participants.some(p => p.user_id === room.host_id)) {
+    const _origHostIdSynth = (room?.room_settings as any)?.original_host_id as string | undefined;
+    const iAmActualOwner = _origHostIdSynth
+      ? _origHostIdSynth === firebaseUser?.uid
+      : room?.host_id === firebaseUser?.uid;
+    if (iAmActualOwner && room?.host_id && !participants.some(p => p.user_id === room.host_id)) {
       const hj: any = (room as any).host;
       _participants = [...participants, {
         id: `_synth_host_${room.host_id}`,

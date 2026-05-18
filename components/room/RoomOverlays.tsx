@@ -892,7 +892,7 @@ export function PlusMenu({
   // ★ v92 (1 May 2026): Güçlendiriciler — herkese açık (Süre Uzat host-only,
   //   Altın Davet herkese; sheet içinde rol kontrolü yapılır).
   if (onPowerUps) {
-    items.push({ id: 'powerups', icon: 'flash-outline', label: i18n.t('room.roomoverlays.017'), desc: i18n.t('room.roomoverlays.018'), accent: '#FBBF24', onPress: () => { onPowerUps(); onClose(); } });
+    items.push({ id: 'powerups', icon: 'flash-outline', label: i18n.t('room.roomoverlays.017'), accent: '#FBBF24', onPress: () => { onPowerUps(); onClose(); } });
   }
 
   // Takip (listener)
@@ -906,12 +906,12 @@ export function PlusMenu({
 
   // ★ Bağış Yap (host olmayan herkes, bağış açıkken)
   if (!isOwner && isDonationsEnabled && onDonate) {
-    items.push({ id: 'donate', icon: 'heart', label: i18n.t('room.roomoverlays.020'), desc: i18n.t('room.roomoverlays.021'), accent: '#EF4444', onPress: () => { onDonate(); onClose(); } });
+    items.push({ id: 'donate', icon: 'heart', label: i18n.t('room.roomoverlays.020'), accent: '#EF4444', onPress: () => { onDonate(); onClose(); } });
   }
 
   // Dondur & Sil (owner, direkt aksiyon) — geçici host yapamaz
   if (isOwner && !isTempHost && sc?.onFreezeRoom) {
-    items.push({ id: 'freeze', icon: 'snow-outline', label: i18n.t('rooms.menu.freeze'), desc: i18n.t('rooms.menu.freeze_desc'), accent: '#3B82F6', onPress: () => { onClose(); sc.onFreezeRoom?.(); } });
+    items.push({ id: 'freeze', icon: 'snow-outline', label: i18n.t('rooms.menu.freeze'), accent: '#3B82F6', onPress: () => { onClose(); sc.onFreezeRoom?.(); } });
   }
 
   // ★ 2026-05-10 v111b: Mesajları Temizle — sadece Plus/Pro/GodMaster host (geçici host yapamaz)
@@ -920,7 +920,6 @@ export function PlusMenu({
       id: 'clear-messages',
       icon: 'sparkles-outline',
       label: i18n.t('room.roomoverlays.022'),
-      desc: i18n.t('room.roomoverlays.023'),
       accent: '#F59E0B',
       onPress: () => { onClose(); onClearMessages(); },
     });
@@ -932,7 +931,6 @@ export function PlusMenu({
       id: 'leave',
       icon: 'exit-outline',
       label: i18n.t('room.roomoverlays.024'),
-      desc: isOwner ? i18n.t('auto.room.RoomOverlays.002') : i18n.t('auto.room.RoomOverlays.001'),
       accent: '#F59E0B',
       onPress: () => { onClose(); onLeaveRoom(); },
     });
@@ -940,7 +938,7 @@ export function PlusMenu({
 
   // Odayı Sil — yalnız asıl sahip; geçici host göremez
   if (isOwner && !isTempHost && onDeleteRoom) {
-    items.push({ id: 'delete', icon: 'trash-outline', label: i18n.t('rooms.menu.delete'), desc: i18n.t('rooms.menu.delete_desc'), accent: '#EF4444', onPress: () => { onDeleteRoom(); onClose(); }, destructive: true });
+    items.push({ id: 'delete', icon: 'trash-outline', label: i18n.t('rooms.menu.delete'), accent: '#EF4444', onPress: () => { onDeleteRoom(); onClose(); }, destructive: true });
   }
 
   // ★ 2026-04-20: Tüm roller aynı sağdan-kayan drawer kullanır (compact bottom-sheet
