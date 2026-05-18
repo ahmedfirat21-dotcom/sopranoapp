@@ -32,6 +32,15 @@ try {
   LottieView = require('lottie-react-native').default;
 } catch { /* native module yoksa fallback null */ }
 
+// ★ v1.7.13 (18 May 2026): Skia — halo + confetti + emoji shadow için.
+//   Mevcut Skia migration pattern'i (CosmeticParticleEffect, GlowView, SkiaShadow)
+//   ile birebir uyumlu: lazy require + null fallback. Native modül yoksa eski
+//   LinearGradient katmanlarına düşer.
+let SkiaMod: any = null;
+try {
+  SkiaMod = require('@shopify/react-native-skia');
+} catch { /* sessiz fallback */ }
+
 const { width: W, height: H } = Dimensions.get('window');
 
 // ─── Tier Eşikleri ───
@@ -42,16 +51,25 @@ function getGiftTier(priceSP: number): GiftTier {
   return 'mini';
 }
 
-// ★ v110.14: Tier farkı agresifleştirildi — kullanıcı raporu: "düşük/yüksek SP aynı görünüyor".
-//   mini → daha kompakt, mega → daha dramatik. Glow ve scalePeak da farklılaştı.
+// ★ v1.7.13 (18 May 2026): Kullanıcı raporu — "mini hediye neredeyse görünmüyor,
+//   süre kısa, banner küçük, Android shadow yok, FPS drop". Skia migration +
+//   parametre revize ile çözüldü.
+//
+//   DEĞİŞİKLİK ÖZETİ:
+//   - mini: 100→160 px, scalePeak 1.0→1.18, halo eklendi (40), haptic eklendi,
+//     süre 2.2→3.5s, banner font 11→14
+//   - normal: 200→230 px, scalePeak 1.20→1.30, süre 3.2→4.8s, banner 14→17
+//   - mega: 320→340 px, scalePeak 1.45→1.55, süre 4.5→6.5s, banner 18→22
+//   - mini için mini confetti (4 partikül) eklendi → tier farkı korunur
+//   - Tüm timeout'lar +%50 — animasyon ekranda kalma süresi
 const TIER_CONFIG: Record<GiftTier, {
   size: number; duration: number; liftY: number;
-  scalePeak: number; showConfetti: boolean; haptic: boolean;
-  bannerFontSize: number; glowRadius: number; timeout: number;
+  scalePeak: number; showConfetti: boolean; confettiCount: number;
+  haptic: boolean; bannerFontSize: number; glowRadius: number; timeout: number;
 }> = {
-  mini:   { size: 100,  duration: 2200, liftY: -40,  scalePeak: 1.0,  showConfetti: false, haptic: false, bannerFontSize: 11, glowRadius: 0,   timeout: 2800 },
-  normal: { size: 200,  duration: 3200, liftY: -90,  scalePeak: 1.20, showConfetti: false, haptic: true,  bannerFontSize: 14, glowRadius: 60,  timeout: 4000 },
-  mega:   { size: 320,  duration: 4500, liftY: -140, scalePeak: 1.45, showConfetti: true,  haptic: true,  bannerFontSize: 18, glowRadius: 120, timeout: 5500 },
+  mini:   { size: 160, duration: 3500, liftY: -60,  scalePeak: 1.18, showConfetti: true,  confettiCount: 4,  haptic: true, bannerFontSize: 14, glowRadius: 40,  timeout: 4200 },
+  normal: { size: 230, duration: 4800, liftY: -110, scalePeak: 1.30, showConfetti: true,  confettiCount: 6,  haptic: true, bannerFontSize: 17, glowRadius: 90,  timeout: 5800 },
+  mega:   { size: 340, duration: 6500, liftY: -150, scalePeak: 1.55, showConfetti: true,  confettiCount: 12, haptic: true, bannerFontSize: 22, glowRadius: 160, timeout: 7500 },
 };
 
 interface GiftEvent {
@@ -86,9 +104,13 @@ export default function RoomGiftAnimationOverlay({ roomId, stageBottomY, current
     const tier = getGiftTier(evt.priceSP);
     const cfg = TIER_CONFIG[tier];
 
-    // Haptic feedback — normal ve mega hediyeler
+    // ★ v1.7.13: Haptic — mini tek kısa titreşim, normal orta, mega çift güçlü
     if (cfg.haptic) {
-      try { Vibration.vibrate(tier === 'mega' ? [0, 60, 80, 60] : [0, 40]); } catch {}
+      try {
+        if (tier === 'mega') Vibration.vibrate([0, 60, 80, 60]);
+        else if (tier === 'normal') Vibration.vibrate([0, 40]);
+        else Vibration.vibrate(25); // mini — tek kısa puls
+      } catch {}
     }
 
     setActiveAnimations((prev) => [...prev, evt]);
@@ -239,27 +261,76 @@ function ConfettiParticle({ color, delay, side }: { color: string; delay: number
 }
 
 // ═══════════════════════════════════════════════════
-// Glow Halo — Normal ve Mega hediyeler için
+// Glow Halo — Skia Canvas + RadialGradient (cross-platform)
 // ═══════════════════════════════════════════════════
+// ★ v1.7.13: Önceki 4 katman LinearGradient + 2 absolute View = ağır GPU yükü
+//   ve Android'de keskin kırpılma. Skia Canvas tek seferde RadialGradient çiziyor,
+//   blur native CPU katmanında, FPS daha stabil. Skia yoksa eski fallback'e düşer.
 function GlowHalo({ color, size, tier }: { color: string; size: number; tier: GiftTier }) {
   const pulse = useRef(new Animated.Value(0.4)).current;
   useEffect(() => {
-    if (tier === 'mini') return;
     const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(pulse, { toValue: 0.8, duration: 800, useNativeDriver: true, easing: Easing.inOut(Easing.sin) }),
-        Animated.timing(pulse, { toValue: 0.3, duration: 800, useNativeDriver: true, easing: Easing.inOut(Easing.sin) }),
+        Animated.timing(pulse, { toValue: 0.9, duration: tier === 'mega' ? 700 : 900, useNativeDriver: true, easing: Easing.inOut(Easing.sin) }),
+        Animated.timing(pulse, { toValue: 0.35, duration: tier === 'mega' ? 700 : 900, useNativeDriver: true, easing: Easing.inOut(Easing.sin) }),
       ])
     );
     loop.start();
     return () => loop.stop();
   }, [tier]);
 
-  if (tier === 'mini') return null;
-  const haloSize = size * (tier === 'mega' ? 2.6 : 2.0);
+  // Mini için de halo göster (eskiden hiç yoktu)
+  const haloSize = size * (tier === 'mega' ? 2.6 : tier === 'normal' ? 2.0 : 1.6);
 
-  // ★ v108.20: Premium halo — 4 katman soft fade + 2 farklı renkli gradient
-  //   (tier color + altın). Keskin çizgi yok, multi-color geçişli.
+  // ─── Skia varsa: tek Canvas + RadialGradient + altın iç çekirdek ───
+  if (SkiaMod) {
+    const { Canvas, Circle, RadialGradient, vec, Group, BlurMask } = SkiaMod;
+    const cx = haloSize / 2;
+    const cy = haloSize / 2;
+    const outerR = haloSize / 2;
+    const innerR = haloSize / 4;
+    // Tier'a göre opaklık katsayıları (mini soluk, mega doygun)
+    const outerOpacity = tier === 'mega' ? 0.55 : tier === 'normal' ? 0.45 : 0.30;
+    const innerOpacity = tier === 'mega' ? 0.45 : tier === 'normal' ? 0.35 : 0.22;
+    return (
+      <Animated.View
+        pointerEvents="none"
+        style={{
+          position: 'absolute',
+          width: haloSize,
+          height: haloSize,
+          opacity: pulse,
+          top: (size - haloSize) / 2,
+          left: (size - haloSize) / 2,
+        }}
+      >
+        <Canvas style={{ flex: 1 }}>
+          <Group>
+            {/* Dış halo — tier renginde geniş radial fade */}
+            <Circle cx={cx} cy={cy} r={outerR} opacity={outerOpacity}>
+              <RadialGradient
+                c={vec(cx, cy)}
+                r={outerR}
+                colors={[color, color + '60', color + '00']}
+              />
+              <BlurMask blur={tier === 'mega' ? 24 : tier === 'normal' ? 16 : 10} style="normal" />
+            </Circle>
+            {/* İç çekirdek — sıcak altın (#FFE082) parıltı */}
+            <Circle cx={cx} cy={cy} r={innerR} opacity={innerOpacity}>
+              <RadialGradient
+                c={vec(cx, cy)}
+                r={innerR}
+                colors={['#FFE082', '#FBBF24', '#FBBF2400']}
+              />
+              <BlurMask blur={tier === 'mega' ? 14 : 8} style="normal" />
+            </Circle>
+          </Group>
+        </Canvas>
+      </Animated.View>
+    );
+  }
+
+  // ─── Skia yoksa: eski multi-layer fallback (mini için minimal) ───
   return (
     <Animated.View
       pointerEvents="none"
@@ -272,43 +343,21 @@ function GlowHalo({ color, size, tier }: { color: string; size: number; tier: Gi
         left: (size - haloSize) / 2,
       }}
     >
-      {/* Katman 1: en dış — soluk geniş halo */}
       <View style={{
         position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
         borderRadius: haloSize / 2,
-        backgroundColor: color, opacity: 0.08,
+        backgroundColor: color, opacity: 0.10,
       }} />
-      {/* Katman 2: altın çevre — sıcak premium aura */}
       <View style={{
-        position: 'absolute', top: '8%', left: '8%', right: '8%', bottom: '8%',
+        position: 'absolute', top: '20%', left: '20%', right: '20%', bottom: '20%',
         borderRadius: haloSize / 2,
-        backgroundColor: '#FBBF24', opacity: 0.10,
+        backgroundColor: '#FBBF24', opacity: 0.14,
       }} />
-      {/* Katman 3: orta — tier doygun */}
       <View style={{
-        position: 'absolute', top: '18%', left: '18%', right: '18%', bottom: '18%',
+        position: 'absolute', top: '36%', left: '36%', right: '36%', bottom: '36%',
         borderRadius: haloSize / 2,
-        backgroundColor: color, opacity: 0.22,
+        backgroundColor: '#FFE082', opacity: 0.20,
       }} />
-      {/* Katman 4: iç çekirdek — sıcak */}
-      <View style={{
-        position: 'absolute', top: '32%', left: '32%', right: '32%', bottom: '32%',
-        borderRadius: haloSize / 2,
-        backgroundColor: '#FFE082', opacity: 0.18,
-      }} />
-      {/* Vertical multi-color gradient — geçişli renkler (tier → altın → tier) */}
-      <LinearGradient
-        colors={[color + '00', color + '38', '#FBBF2440', color + '38', color + '00']}
-        locations={[0, 0.25, 0.5, 0.75, 1]}
-        start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
-        style={{ position: 'absolute', top: '12%', left: '12%', right: '12%', bottom: '12%', borderRadius: haloSize / 2 }}
-      />
-      {/* Diagonal cross gradient — premium parıltı çapraz */}
-      <LinearGradient
-        colors={['transparent', 'rgba(255,255,255,0.18)', 'transparent']}
-        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-        style={{ position: 'absolute', top: '20%', left: '20%', right: '20%', bottom: '20%', borderRadius: haloSize / 2 }}
-      />
     </Animated.View>
   );
 }
@@ -409,14 +458,17 @@ function FloatingGift({ event, startY, stackIndex }: {
         />
       )}
 
-      {/* Banner: "Sender → Recipient · Item Name" — ★ v108.9: Alt kısımda */}
+      {/* Banner: "Sender → Recipient · Item Name"
+          ★ v1.7.13: Eskiden alt %18'de küçük telefonlarda sahne avatarlarıyla
+          çakışıyordu. Yukarı taşındı: mega ekran ortası (%45), normal/mini %40.
+          Stack offset her üst hediye için 56px yukarı. */}
       <Animated.View
         style={[
           styles.banner,
           {
             opacity: bannerOpacity,
             transform: [{ translateY: bannerSlide }, { scale: bannerScale }],
-            bottom: tier === 'mega' ? H * 0.2 : H * 0.18 + stackIndex * 44,
+            top: (tier === 'mega' ? H * 0.45 : H * 0.40) - stackIndex * 56,
           },
         ]}
       >
@@ -431,9 +483,17 @@ function FloatingGift({ event, startY, stackIndex }: {
           styles.bannerInner,
           tier === 'mega' && styles.bannerInnerMega,
         ]}>
-          {/* Emoji badge */}
-          <View style={[styles.bannerEmoji, { backgroundColor: event.color + '25' }]}>
-            <Text style={{ fontSize: tier === 'mega' ? 18 : 14 }}>{event.emoji}</Text>
+          {/* ★ v1.7.13: Emoji badge tier'a göre dinamik boyut — mini'de de görünür kalsın */}
+          <View style={[
+            styles.bannerEmoji,
+            {
+              backgroundColor: event.color + '25',
+              width: tier === 'mega' ? 44 : tier === 'normal' ? 40 : 36,
+              height: tier === 'mega' ? 44 : tier === 'normal' ? 40 : 36,
+              borderRadius: tier === 'mega' ? 22 : tier === 'normal' ? 20 : 18,
+            },
+          ]}>
+            <Text style={{ fontSize: tier === 'mega' ? 22 : tier === 'normal' ? 19 : 16 }}>{event.emoji}</Text>
           </View>
           <View style={{ flex: 1 }}>
             <Text style={[styles.bannerNames, { fontSize: cfg.bannerFontSize }]} numberOfLines={1}>
@@ -478,34 +538,65 @@ function FloatingGift({ event, startY, stackIndex }: {
         ) : useIllustrationFallback ? (
           <Item3DArt itemId={event.itemId} size={cfg.size} color={event.color} staticMode={false} />
         ) : (
-          <Text
-            style={{
-              fontSize: cfg.size * 0.7,
-              textAlign: 'center',
-              lineHeight: cfg.size,
-              color: event.color,
-              textShadowColor: event.color,
-              textShadowRadius: tier === 'mega' ? 50 : 30,
-              textShadowOffset: { width: 0, height: 0 },
-              ...Platform.select({
-                ios: { shadowColor: event.color, shadowOpacity: 1, shadowRadius: tier === 'mega' ? 40 : 22, shadowOffset: { width: 0, height: 0 } },
-                android: {},
-              }),
-            }}
-          >
-            {event.emoji}
-          </Text>
+          <>
+            {/* ★ v1.7.13: Skia BlurMask glow — Android'de de gerçek renkli halo.
+                Eskiden ios: shadow*, android: {} idi → Android emojisi sade görünüyordu.
+                Şimdi emoji'nin arkasında Skia ile çizilen renkli soft circle var. */}
+            {SkiaMod && (() => {
+              const { Canvas, Circle, BlurMask } = SkiaMod;
+              const glowSize = cfg.size * 0.9;
+              const blurAmount = tier === 'mega' ? 28 : tier === 'normal' ? 20 : 14;
+              return (
+                <View pointerEvents="none" style={{
+                  position: 'absolute',
+                  top: (cfg.size - glowSize) / 2,
+                  left: (cfg.size - glowSize) / 2,
+                  width: glowSize,
+                  height: glowSize,
+                }}>
+                  <Canvas style={{ flex: 1 }}>
+                    <Circle
+                      cx={glowSize / 2}
+                      cy={glowSize / 2}
+                      r={glowSize / 2.5}
+                      color={event.color}
+                      opacity={tier === 'mega' ? 0.45 : tier === 'normal' ? 0.35 : 0.22}
+                    >
+                      <BlurMask blur={blurAmount} style="normal" />
+                    </Circle>
+                  </Canvas>
+                </View>
+              );
+            })()}
+            <Text
+              style={{
+                fontSize: cfg.size * 0.7,
+                textAlign: 'center',
+                lineHeight: cfg.size,
+                color: event.color,
+                textShadowColor: event.color,
+                textShadowRadius: tier === 'mega' ? 50 : 30,
+                textShadowOffset: { width: 0, height: 0 },
+                ...Platform.select({
+                  ios: { shadowColor: event.color, shadowOpacity: 1, shadowRadius: tier === 'mega' ? 40 : 22, shadowOffset: { width: 0, height: 0 } },
+                  android: {},
+                }),
+              }}
+            >
+              {event.emoji}
+            </Text>
+          </>
         )}
       </Animated.View>
 
-      {/* Mega: Confetti parçacıkları */}
+      {/* ★ v1.7.13: Confetti her tier'da, sayı parametrize (mini 4 / normal 6 / mega 12) */}
       {cfg.showConfetti && (
         <>
-          {Array.from({ length: 8 }).map((_, i) => (
+          {Array.from({ length: cfg.confettiCount }).map((_, i) => (
             <ConfettiParticle
               key={`confetti-${event.id}-${i}`}
               color={event.color}
-              delay={200 + i * 120}
+              delay={200 + i * (tier === 'mega' ? 100 : 150)}
               side={i % 2 === 0 ? 'left' : 'right'}
             />
           ))}

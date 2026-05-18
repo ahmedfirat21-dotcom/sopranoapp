@@ -188,7 +188,11 @@ export default function RoomClosedScreen({ reason, onGoHome, customMessage, onRe
               style={StyleSheet.absoluteFillObject}
             />
             <Ionicons name="home" size={16} color="#FFF" style={iconShadow} />
-            <Text style={s.buttonText}>{i18n.t('room.roomclosedscreen.001')}</Text>
+            {/* ★ v1.7.13 (18 May 2026): Eskiden butonda i18n.t('room.roomclosedscreen.001')
+                kullanılıyordu — bu key başlık ("Bu oda kapanmış") metni. Followers-only
+                veya kilit reason'ında "Bu oda kapanmış" butonu yanıltıcıydı. Şimdi
+                tüm reason'lar için anlamlı "Ana Sayfa" eylem etiketi. */}
+            <Text style={s.buttonText}>Ana Sayfa</Text>
           </Pressable>
         )}
       </Animated.View>

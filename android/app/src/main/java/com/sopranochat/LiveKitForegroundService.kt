@@ -10,6 +10,7 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import android.os.PowerManager
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 
@@ -47,18 +48,57 @@ class LiveKitForegroundService : Service() {
         }
     }
 
+    // ★ v1.7.13 (18 May 2026): Partial wake lock — ekran kapanınca CPU'yu uyutmasın.
+    //   Önceden sadece foreground bildirimi vardı, CPU Doze'a girince WebRTC paketleri
+    //   geç kalıyor, LiveKit bağlantısı kopuyor, kullanıcı odadan düşüyordu.
+    //   Wake lock servis ömrü boyunca alınır, stop'ta bırakılır. Bildirim zaten
+    //   görünür olduğu için Android pil iyileştirme uyarısı yok; mikrofon servisi
+    //   için CPU canlı tutmak meşru sebep.
+    private var wakeLock: PowerManager.WakeLock? = null
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_STOP -> {
+                releaseWakeLock()
                 stopForegroundCompat()
                 stopSelf()
                 return START_NOT_STICKY
             }
-            else -> startInForeground()
+            else -> {
+                startInForeground()
+                acquireWakeLock()
+            }
         }
         return START_NOT_STICKY
+    }
+
+    override fun onDestroy() {
+        releaseWakeLock()
+        super.onDestroy()
+    }
+
+    private fun acquireWakeLock() {
+        if (wakeLock?.isHeld == true) return
+        try {
+            val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+            wakeLock = pm.newWakeLock(
+                PowerManager.PARTIAL_WAKE_LOCK,
+                "SopranoChat:LiveKitRoom"
+            ).apply {
+                setReferenceCounted(false)
+                // 1 saat üst limit — emniyet vana (kullanıcı odadan çıkmayı unutsa bile)
+                acquire(60 * 60 * 1000L)
+            }
+        } catch (_: Exception) { /* sessiz fail */ }
+    }
+
+    private fun releaseWakeLock() {
+        try {
+            if (wakeLock?.isHeld == true) wakeLock?.release()
+            wakeLock = null
+        } catch (_: Exception) { /* sessiz fail */ }
     }
 
     private fun startInForeground() {

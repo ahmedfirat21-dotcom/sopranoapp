@@ -1620,7 +1620,12 @@ export default function RoomScreen() {
   const [cameraExpandUser, setCameraExpandUser] = useState<RoomParticipant | null>(null);
   const [entryEffectData, setEntryEffectData] = useState<{ effectId: string; userName: string } | null>(null);
   // Mic permission system (local)
-  const [micRequests, setMicRequests] = useState<string[]>([]); // user_id'ler
+  // ★ 2026-05-18 (v1.7.13): micRequests broadcast event'lerle yönetiliyor; kullanıcı
+  //   aniden disconnect olduğunda (ekran kapanma, app kill, network drop) "mic_request_cancel"
+  //   broadcast'ı gönderemediği için state'te hayalet olarak kalıyordu. Badge "1" gösteriyordu
+  //   ama modal participants ile filtreleyince boş çıkıyordu. Şimdi VALIDATED derived
+  //   value kullanıyoruz — odadaki gerçek participants'a göre filtreliyor.
+  const [micRequests, setMicRequests] = useState<string[]>([]); // user_id'ler (raw broadcast)
   const [showMicRequests, setShowMicRequests] = useState(false);
   const [myMicRequested, setMyMicRequested] = useState(false);
   // ★ 2026-04-21: Oda boost sheet (premium görünüm — basit Alert yerine)
@@ -2005,8 +2010,9 @@ export default function RoomScreen() {
   // ref her render'da taze tutulur (aşağıdaki useEffect).
   const minimizePayloadRef = useRef<{ id: string; name: string; hostName: string; viewerCount: number; isMicOn: boolean } | null>(null);
   const minimizeAndPush = useCallback((path: string) => {
+    // ★ v1.7.13: Bayrak koşulsuz set — handleAutoMinimize ile aynı race fix.
+    isMinimizingRef.current = true;
     if (minimizePayloadRef.current) {
-      isMinimizingRef.current = true;
       setMinimizedRoom(minimizePayloadRef.current);
     }
     router.push(path as any);
@@ -2065,8 +2071,14 @@ export default function RoomScreen() {
   }, [id, topContributorTrigger]);
 
   const handleAutoMinimize = useCallback(() => {
+    // ★ v1.7.13 (18 May 2026): Bayrağı KOŞULSUZ set et. Eskiden sadece
+    //   minimizePayloadRef doluysa set ediliyordu — ilk render-cleanup race
+    //   durumunda bayrak boş kalıp cleanup leave çağırıyordu (kullanıcı
+    //   "minimize edince odadan çıkılıyor" regression'u). minimizePayloadRef
+    //   useEffect'le her render set ediliyor ama mount/cleanup arası timing
+    //   garanti edilemez; bayrak her halükarda korunmalı.
+    isMinimizingRef.current = true;
     if (minimizePayloadRef.current) {
-      isMinimizingRef.current = true;
       setMinimizedRoom(minimizePayloadRef.current);
     }
     router.back();
@@ -2339,10 +2351,16 @@ export default function RoomScreen() {
                 message: accessResult.reason || undefined,
                 additionalReasons: additional.length > 0 ? additional : undefined,
               });
+              // ★ v1.7.13 (18 May 2026): setLoading(false) zorunlu — eskiden bazı
+              //   senaryolarda (özellikle "oda kilitli") loading true kalıyordu →
+              //   isAccessPending early-return'ü "Oda hazırlanıyor..." gösteriyor,
+              //   RoomClosedScreen hiç render edilmiyor (sonsuz takılma raporu).
+              setLoading(false);
               return;
             }
             // Bilinmeyen aksiyon — fallback: not_found
             setRoomBlock({ reason: 'not_found', message: accessResult.reason || undefined });
+            setLoading(false);
             return;
           }
 
@@ -3715,11 +3733,22 @@ export default function RoomScreen() {
     return 'raise_hand';
   }, [participants, firebaseUser?.uid, room?.host_id, speakingMode, myMicRequested, stageLimits.current, stageLimits.max]);
 
+  // ★ 2026-05-18 (v1.7.13): Hayalet el kaldırma fix — odada gerçekten var olan
+  //   participants'a göre micRequests'i filtrele. Disconnect olan kullanıcı
+  //   broadcast cancel gönderemiyor → state'te uid kalıyor → badge "1" gösteriyor
+  //   ama modal boş çıkıyor (modal zaten participants ile filtreliyordu, badge değildi).
+  //   Şimdi badge + queue position + listener grid hand-up vizüel sinyali aynı derived
+  //   value'yu kullanıyor — gerçek odadaki el kaldıranlar.
+  const validMicRequests = useMemo(
+    () => micRequests.filter(uid => participants.some(p => p.user_id === uid)),
+    [micRequests, participants]
+  );
+
   const stageQueuePosition = useMemo(() => {
     if (!myMicRequested || !firebaseUser?.uid) return 0;
-    const idx = micRequests.indexOf(firebaseUser.uid);
+    const idx = validMicRequests.indexOf(firebaseUser.uid);
     return idx >= 0 ? idx + 1 : 0;
-  }, [myMicRequested, micRequests, firebaseUser?.uid]);
+  }, [myMicRequested, validMicRequests, firebaseUser?.uid]);
 
   // ★ 2026-04-22: SERBEST MOD AUTO-PROMOTE
   //   free_for_all + kuyruktayım + kuyruğun ilki benim + sahne müsait → otomatik promote.
@@ -4416,7 +4445,14 @@ export default function RoomScreen() {
         reason={effectiveReason}
         customMessage={roomBlock?.message}
         additionalReasons={roomBlock?.additionalReasons}
-        onGoHome={() => router.replace('/(tabs)/home' as any)}
+        onGoHome={() => {
+          // ★ v1.7.13 (18 May 2026): router.replace('/(tabs)/home') bazı durumlarda
+          //   navigation stack'i çözemeyip sonsuz loading'e takılıyordu (kullanıcı
+          //   raporu: "buton tıklayınca dönmüyor"). dismissAll ile tüm modal/stack
+          //   temizlenip kök '/' a yönlendirilir — _layout otomatik tabs'a alır.
+          try { (router as any).dismissAll?.(); } catch {}
+          router.replace('/' as any);
+        }}
         onRetry={isRecoverable ? () => router.replace({ pathname: '/room/[id]', params: { id: id as string } } as any) : undefined}
       />
     );
@@ -4849,7 +4885,7 @@ export default function RoomScreen() {
       {/* Clubhouse modeli: zemin overlay chat KALDIRILDI. */}
       <View style={{ flex: 1, overflow: 'hidden', paddingHorizontal: roomLayout.global.horizontalPadding }}>
         <ListenerGrid listeners={listenerUsers} onSelectUser={(u) => { setSelectedUser(u); setInRoomProfileId(u.user_id); }} selectedUserId={selectedUser?.user_id} onShowAllUsers={() => openOverlay(() => setShowAudienceDrawer(true))} maxListeners={getRoomLimits(ownerTier as any).maxListeners} spectatorCount={spectatorUsers.length} roomOwnerId={room?.host_id}
-          avatarFlashes={avatarFlashes} onFlashDone={clearAvatarFlash} micRequestUserIds={micRequests} />
+          avatarFlashes={avatarFlashes} onFlashDone={clearAvatarFlash} micRequestUserIds={validMicRequests} />
       </View>
 
       {/* ★ Hoş geldin artık toast ile (showToast helper) — banner JSX kaldırıldı */}
@@ -5078,7 +5114,7 @@ export default function RoomScreen() {
 
         <RoomControlBar isMicOn={lk.isMicrophoneEnabled || false} isCameraOn={lk.isCameraEnabled || false}
           showCamera={(amIHost || amIModerator || stageUsers.some(u => u.user_id === firebaseUser?.uid)) && getRoomLimits(((room as any)?.owner_tier || 'Free') as any).maxCameras > 0}
-          isHandRaised={myMicRequested} handBadgeCount={micRequests.length} canModerate={canModerate || isStageDelegate}
+          isHandRaised={myMicRequested} handBadgeCount={validMicRequests.length} canModerate={canModerate || isStageDelegate}
           stageAction={stageAction} stageQueuePosition={stageQueuePosition}
           isForcedMuted={!amIHost && !!participants.find(p => p.user_id === firebaseUser?.uid)?.is_muted}
           isChatInputDisabled={!!participants.find(p => p.user_id === firebaseUser?.uid)?.is_chat_muted}
@@ -5216,7 +5252,7 @@ export default function RoomScreen() {
           if (!firebaseUser?.uid || !room?.id) return;
           setShowReportModal(true);
         }}
-        micRequestCount={micRequests.length}
+        micRequestCount={validMicRequests.length}
         accessRequestCount={pendingAccessCount}
         userRole={myCurrentRole}
         ownerTier={ownerTier}
@@ -5545,7 +5581,7 @@ export default function RoomScreen() {
           visible={showMicRequests}
           onClose={() => setShowMicRequests(false)}
           roomId={room.id}
-          pendingUserIds={micRequests}
+          pendingUserIds={validMicRequests}
           participants={participants}
           onApprove={(userId, displayName) => {
             approveMicRequest(userId);
