@@ -488,15 +488,47 @@ export default function BadgeDetailModal({ visible, onClose, badge, locked = fal
             </Text>
           )}
 
-          {/* Criteria */}
-          {!!badge.criteriaText && (
+          {/* ★ v1.7.13.46: Locked durumda "Nasıl Kazanırım" + Avantajlar (kazanınca)
+              Earned durumda criteriaText sade pill (geçmiş başarı hint'i) + Avantajlar */}
+
+          {/* Nasıl Kazanırım (locked) — daha vurgulu */}
+          {locked && !!badge.criteriaText && (
+            <View style={styles.howToBox}>
+              <View style={styles.howToHeader}>
+                <Ionicons name="flag" size={12} color="#5EEAD4" />
+                <Text style={styles.howToTitle}>Nasıl Kazanırım</Text>
+              </View>
+              <Text style={styles.howToText}>{badge.criteriaText}</Text>
+            </View>
+          )}
+
+          {/* Criteria pill (earned) — geçmiş başarı */}
+          {!locked && !!badge.criteriaText && (
             <View style={styles.criteriaPill}>
               <Ionicons name="flag-outline" size={12} color="#94A3B8" />
               <Text style={styles.criteriaText} numberOfLines={3}>{badge.criteriaText}</Text>
             </View>
           )}
 
-          {/* SP Reward */}
+          {/* ★ v1.7.13.46: Avantajlar — perks array (her durumda görünür) */}
+          {(badge.perks?.length || 0) > 0 && (
+            <View style={styles.perksBox}>
+              <View style={styles.perksHeader}>
+                <Ionicons name="ribbon" size={12} color="#FBBF24" />
+                <Text style={styles.perksTitle}>
+                  {locked ? 'Kazanınca Sağlayacağı Avantajlar' : 'Bu Rozetin Avantajları'}
+                </Text>
+              </View>
+              {badge.perks!.map((perk, idx) => (
+                <View key={idx} style={styles.perkRow}>
+                  <Ionicons name="checkmark-circle" size={12} color="#5EEAD4" style={{ marginTop: 1 }} />
+                  <Text style={styles.perkText}>{perk}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+
+          {/* SP Reward — earned = "kazandın", locked = "kazanırsın" */}
           {(badge.spReward || 0) > 0 && (
             <View style={styles.rewardChip}>
               <LinearGradient
@@ -505,7 +537,9 @@ export default function BadgeDetailModal({ visible, onClose, badge, locked = fal
                 style={StyleSheet.absoluteFillObject}
               />
               <Ionicons name="sparkles" size={14} color="#FBBF24" />
-              <Text style={styles.rewardText}>+{badge.spReward} SP ödül kazandın</Text>
+              <Text style={styles.rewardText}>
+                +{badge.spReward} SP ödül {locked ? 'kazanırsın' : 'kazandın'}
+              </Text>
             </View>
           )}
 
@@ -609,6 +643,47 @@ const styles = StyleSheet.create({
   },
   criteriaText: {
     fontSize: 11, color: '#94A3B8', flex: 1,
+  },
+  // ★ v1.7.13.46: "Nasıl Kazanırım" — locked rozet için vurgulu kutu
+  howToBox: {
+    width: '100%',
+    paddingHorizontal: 14, paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: 'rgba(94,234,212,0.06)',
+    borderWidth: 1, borderColor: 'rgba(94,234,212,0.18)',
+    marginBottom: 10,
+  },
+  howToHeader: {
+    flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 4,
+  },
+  howToTitle: {
+    fontSize: 10, fontWeight: '900', color: '#5EEAD4',
+    letterSpacing: 1, textTransform: 'uppercase',
+  },
+  howToText: {
+    fontSize: 12, color: '#CBD5E1', lineHeight: 17,
+  },
+  // ★ v1.7.13.46: Avantajlar (perks) kutusu
+  perksBox: {
+    width: '100%',
+    paddingHorizontal: 14, paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: 'rgba(251,191,36,0.04)',
+    borderWidth: 1, borderColor: 'rgba(251,191,36,0.14)',
+    marginBottom: 10,
+  },
+  perksHeader: {
+    flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 6,
+  },
+  perksTitle: {
+    fontSize: 10, fontWeight: '900', color: '#FBBF24',
+    letterSpacing: 1, textTransform: 'uppercase',
+  },
+  perkRow: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginBottom: 4,
+  },
+  perkText: {
+    fontSize: 12, color: '#E2E8F0', flex: 1, lineHeight: 17,
   },
   rewardChip: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
