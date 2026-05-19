@@ -191,10 +191,14 @@ function BoostedProfileCard({ profile: bp, index, friendIds, onlineIds }: { prof
         shadowRadius: boostTier === 'elite' ? 12 : boostTier === 'silver' ? 9 : 7,
         elevation: boostTier === 'elite' ? 9 : 6,
       }}>
+        {/* ★ v1.7.13.47 (19 May 2026): Avatar daire KALDIRILDI. Kullanıcı:
+            'parlama efekti avatarın üzerinden gider, avatar sanki camın
+            içinde'. StatusAvatar circular → Image rectangular full-bleed
+            kartın üst kısmında. Shine sweep zaten avatar üzerinden geçer. */}
         <LinearGradient
           colors={cardGrad}
           start={{ x: 0, y: 0 }} end={{ x: 0.7, y: 1 }}
-          style={{ paddingTop: 8, paddingBottom: 8, paddingHorizontal: 6, alignItems: 'center' }}
+          style={{ flex: 1 }}
         >
           {/* ELITE pill — sadece elite için (24h satın alanlara ayrıcalık) */}
           {boostVis.label && (
@@ -203,37 +207,42 @@ function BoostedProfileCard({ profile: bp, index, friendIds, onlineIds }: { prof
             </View>
           )}
 
-          {/* Avatar + online pulse — kart boyu sabit, avatar daha belirgin */}
-          <View style={{ position: 'relative', marginBottom: 4 }}>
-            {showOnline && (
-              <Animated.View style={{
-                position: 'absolute', top: -4, left: -4, right: -4, bottom: -4,
-                borderRadius: 46, borderWidth: 2, borderColor: accentColor,
-                opacity: pulseAnim,
-              }} />
+          {/* Avatar — full-bleed kart üstü (cam içinde hissi) */}
+          <View style={{ width: '100%', height: 96, overflow: 'hidden', position: 'relative', backgroundColor: accentColor + '22' }}>
+            {bp.avatar_url ? (
+              <Image
+                source={{ uri: bp.avatar_url }}
+                style={{ width: '100%', height: '100%' }}
+                resizeMode="cover"
+              />
+            ) : (
+              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: accentColor + '44' }}>
+                <Text style={{ fontSize: 32, fontWeight: '900', color: '#FFF', textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }}>
+                  {(bp.display_name || '?').charAt(0).toUpperCase()}
+                </Text>
+              </View>
             )}
-            <StatusAvatar uri={bp.avatar_url} size={58} tier={tier} isAdmin={bp.is_admin} frameId={(bp as any).active_frame} customBadgeId={(bp as any).active_badge_id ?? null} />
+            {/* Online dot — sağ-alt köşede, kart içinde */}
             {showOnline && (
-              <GlowView style={{
-                position: 'absolute', bottom: 2, right: 2,
-                width: 13, height: 13, borderRadius: 6.5,
+              <View style={{
+                position: 'absolute', bottom: 4, right: 4,
+                width: 12, height: 12, borderRadius: 6,
                 backgroundColor: '#22C55E',
-                borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.6)',
+                borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.7)',
                 shadowColor: '#22C55E', shadowOpacity: 0.8, shadowRadius: 4, elevation: 3,
               }} />
             )}
           </View>
 
-          {/* ★ v1.7.13.23 (19 May 2026): Display name biraz büyütüldü (11→12),
-              tier pill (PLUS/PRO/GM) KALDIRILDI — kullanıcı: "boost edilen
-              kartlardan plus/pro etiketlerini kaldır". Boost label (sağ üst
-              ELITE pill) bilgi kaynağı olarak yeterli. */}
-          <Text numberOfLines={1} style={{
-            fontSize: 12, fontWeight: '800', color: '#F1F5F9', maxWidth: 94, marginTop: 2,
-            textShadowColor: 'rgba(0,0,0,0.7)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
-          }}>
-            {bp.display_name || i18n.t('auto.tabs.home.013')}
-          </Text>
+          {/* Display name — kart footer */}
+          <View style={{ paddingHorizontal: 6, paddingVertical: 6, alignItems: 'center' }}>
+            <Text numberOfLines={1} style={{
+              fontSize: 12, fontWeight: '800', color: '#F1F5F9', maxWidth: 94,
+              textShadowColor: 'rgba(0,0,0,0.7)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
+            }}>
+              {bp.display_name || i18n.t('auto.tabs.home.013')}
+            </Text>
+          </View>
         </LinearGradient>
 
         {/* Shine sweep overlay — boost tier yoğunluğuna göre */}
