@@ -866,19 +866,11 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
               onRoomsPress={() => {}}
               onBadgesPress={() => setShowBadgesModal(true)}
               onGiftsPress={() => setShowGiftDetail(true)}
-              // ★ v289 (16 May 2026): Başka kullanıcının profilini paylaş — universal
-              //   deep link (sopranochat://user/<id> + https fallback) native Share ile.
-              onSharePress={() => {
-                try {
-                  const { Share } = require('react-native');
-                  const link = `https://sopranochat.com/user/${userId}`;
-                  const name = userProfile.display_name || userProfile.username || 'SopranoChat kullanıcısı';
-                  Share.share({
-                    message: `${name} profilini SopranoChat'te keşfet:\n${link}`,
-                    url: link,
-                  });
-                } catch {}
-              }}
+              // ★ v1.7.13.40 (19 May 2026): onSharePress KALDIRILDI.
+              //   Kullanıcı: 'bazi profillerde iki tane profil paylas dugmesi var'.
+              //   Aşağıda utility row'da Paylaş + Linki Kopyala chip butonları
+              //   zaten var (daha etiketli + ana CTA). ProfileHero üst-sağ
+              //   küçük share ikonu redundant idi.
               memberSince={userProfile.created_at}
               boostExpiresAt={(userProfile as any)?.profile_boost_expires_at}
               isOnline={isFriend && !isOwnProfile ? userProfile.is_online : undefined}

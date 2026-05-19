@@ -22,7 +22,7 @@
  *     <YourContent />
  *   </BottomSheet>
  */
-import React, { useRef, useEffect, useState, ReactNode } from 'react';
+import React, { useRef, useEffect, useState, useCallback, ReactNode } from 'react';
 import {
   View, Text, StyleSheet, Animated, PanResponder, Pressable, Modal as RNModal,
 } from 'react-native';
@@ -116,41 +116,53 @@ export default function BottomSheet({
     }
   }, [visible]);
 
-  // ★ 2026-04-28: Clubhouse pattern — pan tüm sheet'e bağlı, ScrollView/FlatList ile koordineli.
-  //   onStartShouldSetPanResponder=false: tap'ler buton/satırlara ulaşır.
-  //   onMoveShouldSetPanResponder: dy>8 ile küçük scroll'a izin verir, belirgin sürüklemede yakalar.
-  //   onMoveShouldSetPanResponderCapture: dy>25 + güçlü dikey hâkim → iç ScrollView'dan responder çalar.
+  // ★ v1.7.13.40 (19 May 2026): İKİ PAN RESPONDER — kullanıcı 'rozetler modali
+  //   asagiya dokunarak suruklenemeli, kuralimiz var ama uygulanmamis'.
+  //   Eski: Tek pan responder, scrollOffsetRef > 5 ise drag handle bile pan almaz.
+  //   Yeni: Header pan ALWAYS (drag handle/title bölgesi); body pan scroll-aware.
+
+  const onPanMove = useCallback((_: any, gs: any) => {
+    translateY.setValue(Math.max(0, gs.dy));
+  }, [translateY]);
+  const onPanRelease = useCallback((_: any, gs: any) => {
+    if (gs.dy > dismissThreshold || gs.vy > 0.4) {
+      Animated.timing(translateY, { toValue: 1000, duration: 180, useNativeDriver: true })
+        .start(() => onClose());
+    } else {
+      Animated.spring(translateY, { toValue: 0, useNativeDriver: true, damping: 22, stiffness: 220 }).start();
+    }
+  }, [translateY, dismissThreshold, onClose]);
+
+  // Header pan — drag handle + title bölgesi. Scroll offset'i UMURSAMAZ, her zaman çalışır.
+  const headerPanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_, gs) => gs.dy > 6 && Math.abs(gs.dy) > Math.abs(gs.dx),
+      onMoveShouldSetPanResponderCapture: (_, gs) => gs.dy > 6 && Math.abs(gs.dy) > Math.abs(gs.dx),
+      onPanResponderTerminationRequest: () => false,
+      onPanResponderMove: onPanMove,
+      onPanResponderRelease: onPanRelease,
+    })
+  ).current;
+
+  // Body pan — ScrollView/FlatList ile koordineli, sadece top'ta drag alır.
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => false,
       onStartShouldSetPanResponderCapture: () => false,
       onMoveShouldSetPanResponder: (_, gs) => {
         if (gs.dy <= 8 || Math.abs(gs.dy) <= Math.abs(gs.dx)) return false;
-        // scrollableContent + scrollOffsetRef varsa: ScrollView yukarıda değilse pan alma
         if (scrollableContent && scrollOffsetRef && scrollOffsetRef.current > 5) return false;
         return true;
       },
       onMoveShouldSetPanResponderCapture: (_, gs) => {
-        // ★ v1.7.13.34 (19 May 2026): Threshold 25 → 12. Eski 25dp,
-        //   ScrollView'a önce vurup bounce başlatıyordu, drag-to-dismiss
-        //   görünmüyordu. 12dp ile pan responder daha hızlı kapar.
-        //   Kullanıcı: 'rozetler modali aşağıya sürüklenerek kapatılmalı'.
         if (gs.dy <= 12 || Math.abs(gs.dy) <= Math.abs(gs.dx) * 1.5) return false;
         if (scrollableContent && scrollOffsetRef && scrollOffsetRef.current > 5) return false;
         return true;
       },
       onPanResponderTerminationRequest: () => false,
-      onPanResponderMove: (_, gs) => {
-        translateY.setValue(Math.max(0, gs.dy));
-      },
-      onPanResponderRelease: (_, gs) => {
-        if (gs.dy > dismissThreshold || gs.vy > 0.4) {
-          Animated.timing(translateY, { toValue: 1000, duration: 180, useNativeDriver: true })
-            .start(() => onClose());
-        } else {
-          Animated.spring(translateY, { toValue: 0, useNativeDriver: true, damping: 22, stiffness: 220 }).start();
-        }
-      },
+      onPanResponderMove: onPanMove,
+      onPanResponderRelease: onPanRelease,
     })
   ).current;
 
@@ -219,8 +231,10 @@ export default function BottomSheet({
           style={s.topEdge}
         />
 
-        {/* ★ 2026-04-28: Drag handle/header artık görsel — pan tüm sheet'te (Clubhouse). */}
-        <View>
+        {/* ★ v1.7.13.40 (19 May 2026): Drag handle + header bölgesi kendi pan responder'i
+            (scroll offset umurusamadan her zaman drag yakalar). Kullanıcı 'rozetler
+            modali asagiya dokunarak suruklenemeli, kuralimiz var ama uygulanmamis'. */}
+        <View {...headerPanResponder.panHandlers}>
           <View style={s.handleWrap}>
             <View style={s.handle} />
           </View>
