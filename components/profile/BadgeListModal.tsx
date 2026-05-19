@@ -1,24 +1,24 @@
-﻿/**
- * SopranoChat — Rozet Listesi Modal (Faz 6.3 — Premium Tier Design)
+/**
+ * SopranoChat — Rozet Listesi Modal
  * ═══════════════════════════════════════════════════════════════
- * Rarity tier'lara göre 4 farklı görsel dil:
- *   • Common (Yaygın)    → Soft slate disc, minimal
- *   • Rare (Nadir)       → Bronze metallic, etched border, corner accent
- *   • Epic (Epik)        → Silver-purple holographic, outer + inner ring
- *   • Legendary (Efsanevi) → Gold metallic medal + 4 köşe sparkle (animated)
+ * ★ v1.7.13.41 (19 May 2026): BottomSheet wrapper kaldırıldı.
+ *   BottomSheet'in karmaşık 2-pan-responder yapısı drag-to-dismiss'i
+ *   güvenilir çalıştırmıyordu. Şimdi InRoomUserProfile/SymbolGiftSheet
+ *   ile aynı pattern: direkt Modal + tek panResponder + ScrollView.
+ *   Pan'i scrollOffset umursamaz — drag-to-dismiss her zaman çalışır.
  *
- * Tasarım: profil sayfası DNA'sı + rarity'e özel kompozisyon.
- * Tap → PremiumAlert detay modal.
- * Swipe-down ile kapanır.
+ * Rarity tier'lara göre 4 farklı görsel dil:
+ *   • Common (Yaygın), Rare (Nadir), Epic (Epik), Legendary (Efsanevi)
  */
 import React, { useEffect, useState, useRef } from 'react';
 import { i18n } from '../../services/i18n';
 import {
   View, Text, StyleSheet, Pressable, ScrollView, Animated, Easing,
+  Modal, PanResponder, Dimensions, useWindowDimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AppLoader from '../AppLoader';
-import BottomSheet from '../BottomSheet';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Shadows } from '../../constants/theme';
 import { BadgeService } from '../../services/badges';
@@ -40,24 +40,22 @@ interface Props {
   visible: boolean;
   onClose: () => void;
   userId: string;
-  /** Görüntülenen kişinin adı — başlık için */
   displayName?: string;
 }
 
 export default function BadgeListModal({ visible, onClose, userId, displayName }: Props) {
+  const { height: H } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const PANEL_HEIGHT = H * 0.82;
+
   const [badges, setBadges] = useState<BadgeDef[]>([]);
   const [loading, setLoading] = useState(true);
-  // ★ v295 (17 May 2026): PremiumAlert kaldırıldı — yeni BadgeDetailModal celebration
-  //   tarz Skia medal'lı modal (rarity'e duyarlı, animasyonlu).
   const [selectedBadge, setSelectedBadge] = useState<BadgeDef | null>(null);
-  // ★ v319.11 (18 May 2026): ScrollView offset takip — BottomSheet pan responder
-  //   sadece offset=0 iken content'ten drag yakalar (Clubhouse pattern).
-  const scrollOffsetRef = useRef(0);
 
-  // ★ v291 (16 May 2026): Manuel PanResponder + Modal yapısı KALDIRILDI — Davet Kodu
-  //   sheet'inde olduğu gibi BottomSheet wrapper kullanıyor. Sebep: önceki manuel
-  //   yapıda scrollOffsetRef.current <= 0 koşulu çok katıydı (ScrollView'a hafif
-  //   dokunulunca drag iptal oluyordu). BottomSheet pattern garantili çalışır.
+  const translateY = useRef(new Animated.Value(PANEL_HEIGHT)).current;
+  const backdropOpacity = useRef(new Animated.Value(0)).current;
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   useEffect(() => {
     if (!visible || !userId) return;
@@ -67,68 +65,126 @@ export default function BadgeListModal({ visible, onClose, userId, displayName }
       .finally(() => setLoading(false));
   }, [visible, userId]);
 
+  useEffect(() => {
+    if (visible) {
+      Animated.parallel([
+        Animated.spring(translateY, { toValue: 0, useNativeDriver: true, damping: 22, stiffness: 220 }),
+        Animated.timing(backdropOpacity, { toValue: 1, duration: 220, useNativeDriver: true }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(translateY, { toValue: PANEL_HEIGHT, duration: 220, useNativeDriver: true }),
+        Animated.timing(backdropOpacity, { toValue: 0, duration: 180, useNativeDriver: true }),
+      ]).start();
+    }
+  }, [visible, PANEL_HEIGHT]);
+
+  // ★ v1.7.13.41: Tek pan responder, scroll-state umursamaz.
+  //   Modal SymbolGiftSheet pattern: tüm sheet'ten drag yakalanır,
+  //   küçük dokunuşlar (dy<8) child'lara ulaşır.
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_, gs) => gs.dy > 8 && Math.abs(gs.dy) > Math.abs(gs.dx) * 1.5,
+      onPanResponderMove: (_, gs) => { if (gs.dy > 0) translateY.setValue(gs.dy); },
+      onPanResponderRelease: (_, gs) => {
+        if (gs.dy > 60 || gs.vy > 0.5) {
+          Animated.timing(translateY, { toValue: PANEL_HEIGHT, duration: 200, useNativeDriver: true })
+            .start(() => onCloseRef.current());
+        } else {
+          Animated.spring(translateY, { toValue: 0, useNativeDriver: true, damping: 22, stiffness: 220 }).start();
+        }
+      },
+    })
+  ).current;
+
   const showBadgeDetail = (b: BadgeDef) => {
     setSelectedBadge(b);
   };
 
   const title = displayName ? displayName.toLocaleUpperCase('tr-TR') : 'ROZETLER';
 
+  if (!visible) return null;
+
   return (
     <>
-      <BottomSheet
-        visible={visible}
-        onClose={onClose}
-        title={title}
-        icon="ribbon"
-        accentColor="#FCD34D"
-        badge={badges.length}
-        maxHeightRatio={0.82}
-        minHeightRatio={0.55}
-        scrollableContent
-        scrollOffsetRef={scrollOffsetRef}
-      >
-        {loading ? (
-          <View style={st.loading}>
-            <AppLoader size="large" color="#FCD34D" />
-          </View>
-        ) : badges.length === 0 ? (
-          <View style={st.empty}>
-            <Ionicons name="ribbon-outline" size={42} color="rgba(252,211,77,0.25)" />
-            <Text style={st.emptyText}>{i18n.t('profile.badgelistmodal.001')}</Text>
-            <Text style={st.emptyHint}>{i18n.t('profile.badgelistmodal.002')}</Text>
-          </View>
-        ) : (
-          <ScrollView
-            style={{ flex: 1 }}
-            contentContainerStyle={st.scrollContent}
-            showsVerticalScrollIndicator={false}
-            nestedScrollEnabled
-            scrollEventThrottle={16}
-            onScroll={(e) => { scrollOffsetRef.current = e.nativeEvent.contentOffset.y; }}
+      <Modal visible={visible} transparent animationType="none" onRequestClose={onClose} statusBarTranslucent>
+        <View style={StyleSheet.absoluteFillObject as any} pointerEvents="box-none">
+          <Animated.View style={[StyleSheet.absoluteFill, { opacity: backdropOpacity }]}>
+            <Pressable style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.55)' }]} onPress={onClose} />
+          </Animated.View>
+
+          <Animated.View
+            style={[st.panel, { paddingBottom: 24 + insets.bottom, transform: [{ translateY }] }]}
+            {...panResponder.panHandlers}
           >
-            <View style={st.grid}>
-              {badges.map(b => (
-                <Pressable
-                  key={b.id}
-                  onPress={() => showBadgeDetail(b)}
-                  style={({ pressed }) => [
-                    st.gridCard,
-                    pressed && { opacity: 0.85, transform: [{ scale: 0.96 }] },
-                  ]}
-                >
-                  <BadgeMedal badge={b} />
-                  <Text style={[st.cardLabel, { color: getLabelColor(b.rarity) }]} numberOfLines={1}>
-                    {b.label}
-                  </Text>
-                  <Text style={[st.rarityTag, { color: getRarityTagColor(b.rarity) }]} numberOfLines={1}>
-                    {RARITY_LABEL[b.rarity]}
-                  </Text>
-                </Pressable>
-              ))}
+            <LinearGradient
+              colors={['#1e2230', '#15182a', '#0a0b16']}
+              locations={[0, 0.55, 1]}
+              start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
+              style={StyleSheet.absoluteFillObject}
+            />
+            <LinearGradient
+              colors={['transparent', 'rgba(252,211,77,0.85)', 'transparent']}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+              style={st.topEdge}
+            />
+
+            <View style={st.handleWrap}><View style={st.handle} /></View>
+
+            <View style={st.header}>
+              <View style={st.headerAccent} />
+              <Ionicons name="ribbon" size={14} color="#FCD34D" style={iconShadow} />
+              <Text style={st.headerTitle} numberOfLines={1}>{title}</Text>
+              {badges.length > 0 && (
+                <View style={st.countBadge}>
+                  <Text style={st.countText}>{badges.length}</Text>
+                </View>
+              )}
             </View>
-          </ScrollView>
-        )}
-      </BottomSheet>
+
+            {loading ? (
+              <View style={st.loading}>
+                <AppLoader size="large" color="#FCD34D" />
+              </View>
+            ) : badges.length === 0 ? (
+              <View style={st.empty}>
+                <Ionicons name="ribbon-outline" size={42} color="rgba(252,211,77,0.25)" />
+                <Text style={st.emptyText}>{i18n.t('profile.badgelistmodal.001')}</Text>
+                <Text style={st.emptyHint}>{i18n.t('profile.badgelistmodal.002')}</Text>
+              </View>
+            ) : (
+              <ScrollView
+                style={{ flex: 1 }}
+                contentContainerStyle={st.scrollContent}
+                showsVerticalScrollIndicator={false}
+                nestedScrollEnabled
+              >
+                <View style={st.grid}>
+                  {badges.map(b => (
+                    <Pressable
+                      key={b.id}
+                      onPress={() => showBadgeDetail(b)}
+                      style={({ pressed }) => [
+                        st.gridCard,
+                        pressed && { opacity: 0.85, transform: [{ scale: 0.96 }] },
+                      ]}
+                    >
+                      <BadgeMedal badge={b} />
+                      <Text style={[st.cardLabel, { color: getLabelColor(b.rarity) }]} numberOfLines={1}>
+                        {b.label}
+                      </Text>
+                      <Text style={[st.rarityTag, { color: getRarityTagColor(b.rarity) }]} numberOfLines={1}>
+                        {RARITY_LABEL[b.rarity]}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </ScrollView>
+            )}
+          </Animated.View>
+        </View>
+      </Modal>
       <BadgeDetailModal
         visible={!!selectedBadge}
         badge={selectedBadge}
@@ -138,7 +194,6 @@ export default function BadgeListModal({ visible, onClose, userId, displayName }
   );
 }
 
-// ═══ Tier-based label color ═══
 function getLabelColor(rarity: BadgeRarity): string {
   switch (rarity) {
     case 'legendary': return '#FCD34D';
@@ -156,21 +211,10 @@ function getRarityTagColor(rarity: BadgeRarity): string {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════
-// BADGE MEDAL — Rarity-specific composition
-// ═══════════════════════════════════════════════════════════════
-
-// ★ v319.4 (18 May 2026): BadgeMedal sadeleştirildi — eski yoğun multi-layer
-//   (halo + gloss + inner ring + epic dashed outer + rare dot + legendary sparkle)
-//   "çok kasvetli/gri" görünüyordu. Yeni tasarım profil sayfasındaki
-//   FeaturedBadgesShowcase ailesini takip eder: badge.color gradient circle +
-//   SkiaShadow glow + soft pulse animasyonu (her tier). Rarity vurgusu için
-//   ince renkli halka + legendary'de daha güçlü pulse.
 function BadgeMedal({ badge }: { badge: BadgeDef }) {
   const rarity = badge.rarity;
   const iconColor = badge.color;
 
-  // Soft pulse — opacity + scale (1.7sn nefes alma)
   const pulseAnim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     const intensity = rarity === 'legendary' ? 1.0 : rarity === 'epic' ? 0.75 : rarity === 'rare' ? 0.6 : 0.45;
@@ -188,7 +232,6 @@ function BadgeMedal({ badge }: { badge: BadgeDef }) {
 
   return (
     <View style={mst.wrap}>
-      {/* ★ Pulse glow halka — rarity'e göre renk + opacity */}
       <Animated.View
         style={[
           mst.pulseRing,
@@ -209,7 +252,6 @@ function BadgeMedal({ badge }: { badge: BadgeDef }) {
           <Ionicons name={badge.icon as any} size={26} color="#FFF" style={iconShadow} />
         </LinearGradient>
       </SkiaShadow>
-      {/* Legendary için ek crown ikonu — tepede minik */}
       {rarity === 'legendary' && (
         <View style={mst.crown} pointerEvents="none">
           <Ionicons name="star" size={10} color="#FCD34D" style={iconShadow} />
@@ -219,15 +261,11 @@ function BadgeMedal({ badge }: { badge: BadgeDef }) {
   );
 }
 
-// ═══════════════════════════════════════════════════════════════
-// STYLES
-// ═══════════════════════════════════════════════════════════════
-
 const st = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
-  sheet: {
+  panel: {
+    position: 'absolute', left: 0, right: 0, bottom: 0,
+    height: '82%',
     borderTopLeftRadius: 24, borderTopRightRadius: 24,
-    maxHeight: '85%', minHeight: '55%',
     overflow: 'hidden',
     borderWidth: 1, borderBottomWidth: 0,
     borderColor: 'rgba(252,211,77,0.15)',
@@ -235,10 +273,11 @@ const st = StyleSheet.create({
   },
   topEdge: { position: 'absolute', top: 0, left: 0, right: 0, height: 1.5, zIndex: 1 },
   handleWrap: { alignItems: 'center', paddingTop: 10, paddingBottom: 4 },
-  handle: { width: 44, height: 4, borderRadius: 2, backgroundColor: 'rgba(252,211,77,0.22)' },
+  handle: { width: 44, height: 4, borderRadius: 2, backgroundColor: 'rgba(252,211,77,0.32)' },
   header: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
-    paddingHorizontal: 18, paddingTop: 10, paddingBottom: 4,
+    paddingHorizontal: 18, paddingTop: 8, paddingBottom: 12,
+    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)',
   },
   headerAccent: {
     width: 3, height: 18, borderRadius: 2, backgroundColor: '#FCD34D',
@@ -254,17 +293,11 @@ const st = StyleSheet.create({
     borderWidth: 1, borderColor: 'rgba(252,211,77,0.35)',
   },
   countText: { fontSize: 10.5, fontWeight: '900', color: '#FCD34D', letterSpacing: 0.4 },
-  headerSubtitle: {
-    fontSize: 10.5, color: 'rgba(148,163,184,0.7)',
-    paddingHorizontal: 18, paddingBottom: 14,
-    fontStyle: 'italic',
-    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)',
-  },
   loading: { paddingVertical: 80, alignItems: 'center' },
   empty: { paddingVertical: 50, alignItems: 'center', gap: 10, paddingHorizontal: 32 },
   emptyText: { fontSize: 13, fontWeight: '700', color: '#CBD5E1', ...Shadows.text },
   emptyHint: { fontSize: 11, color: '#94A3B8', textAlign: 'center', lineHeight: 16 },
-  scrollContent: { paddingTop: 22, paddingBottom: 32, paddingHorizontal: 4 },
+  scrollContent: { paddingTop: 16, paddingBottom: 16, paddingHorizontal: 4 },
   grid: {
     flexDirection: 'row', flexWrap: 'wrap',
     justifyContent: 'space-around',
@@ -292,19 +325,16 @@ const mst = StyleSheet.create({
     width: 76, height: 76,
     alignItems: 'center', justifyContent: 'center',
   },
-  // ★ v319.4: Pulse halka — badge.color border ile dış parlama
   pulseRing: {
     position: 'absolute',
     width: 70, height: 70, borderRadius: 35,
     borderWidth: 1.5,
   },
-  // Ana icon circle (FeaturedBadgesShowcase iconCircle ile aynı boyut)
   iconCircle: {
     width: 56, height: 56, borderRadius: 28,
     alignItems: 'center', justifyContent: 'center',
     borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.22)',
   },
-  // Legendary için tepede minik yıldız
   crown: {
     position: 'absolute',
     top: -2,
