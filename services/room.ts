@@ -680,12 +680,18 @@ export const RoomService = {
       .maybeSingle();
     const origHostId = (roomMeta?.room_settings as any)?.original_host_id;
     if (origHostId === hostId && roomMeta?.host_id !== hostId) {
-      // Asıl sahip dönüyor, temp host'tan host_id'yi geri al
-      await supabase
-        .from('rooms')
-        .update({ host_id: hostId })
-        .eq('id', roomId)
-        .eq('room_settings->>original_host_id', hostId);
+      // ★ v1.7.13.22 (19 May 2026): Asıl sahip reclaim — RLS bypass için
+      //   SECURITY DEFINER RPC kullan. Eski direct UPDATE RLS tarafından
+      //   reddediliyordu (host_id farklı kişi → "Bu odayı uyandırma yetkiniz
+      //   yok" hatası, Burak kendi odasını uyandıramıyordu).
+      try {
+        await supabase.rpc('reclaim_room_as_original_host', {
+          p_room_id: roomId,
+          p_user_id: hostId,
+        });
+      } catch (e) {
+        if (__DEV__) console.warn('[wakeUpRoom] reclaim RPC fail:', (e as any)?.message);
+      }
     }
 
     // ★ 2026-04-23 KRİTİK FIX: Host'un diğer canlı odalarını dondur — aynı anda birden
