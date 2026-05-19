@@ -9,8 +9,14 @@
  *   - 60s per-user cache — profil sayfasında flicker engellenir
  */
 import { supabase } from '../constants/supabase';
-import { resolveBadges, sortBadgesByRarity, type BadgeDef } from '../constants/badges';
+import { BADGES, resolveBadges, sortBadgesByRarity, type BadgeDef } from '../constants/badges';
 import { i18n } from './i18n';
+
+export interface BadgeWithStatus {
+  badge: BadgeDef;
+  earned: boolean;
+  awardedAt?: string;
+}
 
 interface AwardedBadge {
   badge_id: string;
@@ -115,4 +121,33 @@ export const BadgeService = {
   },
 
   invalidateCache(userId: string) { _cache.delete(userId); },
+
+  /**
+   * ★ v1.7.13.46 (19 May 2026): TÜM rozetleri "earned/locked" status ile döner.
+   * Kullanıcı arayüzünde hem sahip olduğu rozetler hem kilitliler gösterilebilsin.
+   * Sıralama: önce kazanılanlar (rarity DESC), sonra kilitliler (rarity DESC).
+   */
+  async getAllBadgesWithStatus(userId: string): Promise<BadgeWithStatus[]> {
+    if (!userId) {
+      // userId yoksa: hepsi locked olarak dön
+      return sortBadgesByRarity(Object.values(BADGES)).map(b => ({ badge: b, earned: false }));
+    }
+    const { data, error } = await supabase
+      .from('user_badges')
+      .select('badge_id, awarded_at')
+      .eq('user_id', userId);
+    if (error) {
+      if (__DEV__) console.warn('[BadgeService] getAllBadgesWithStatus:', error.message);
+      return sortBadgesByRarity(Object.values(BADGES)).map(b => ({ badge: b, earned: false }));
+    }
+    const earnedMap = new Map<string, string>(
+      ((data as AwardedBadge[] | null) || []).map(r => [r.badge_id, r.awarded_at])
+    );
+    const all = Object.values(BADGES);
+    const earned = sortBadgesByRarity(all.filter(b => earnedMap.has(b.id)))
+      .map(b => ({ badge: b, earned: true, awardedAt: earnedMap.get(b.id) }));
+    const locked = sortBadgesByRarity(all.filter(b => !earnedMap.has(b.id)))
+      .map(b => ({ badge: b, earned: false }));
+    return [...earned, ...locked];
+  },
 };
