@@ -470,7 +470,8 @@ const s = StyleSheet.create({
     // ★ v283 (16 May 2026): paddingHorizontal kaldırıldı — gradient absoluteFillObject
     //   full width yayılsın (home.tsx pattern'i). İçerik kendi paddingHorizontal'ını
     //   topNav style'ında taşır.
-    paddingBottom: 6,
+    // ★ v31+: paddingBottom 6→2 (header ile sahne arasi minimal bosluk)
+    paddingBottom: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.22,

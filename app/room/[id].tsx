@@ -4837,7 +4837,10 @@ export default function RoomScreen() {
           stageUsers.length <= 2 ? H * 0.28 :
           stageUsers.length <= 6 ? H * 0.38 :
           H * 0.46,
-        paddingTop: 8,
+        // ★ v31+: paddingTop 8→0 — kullanici 'ust headar da bosluk var' dedi.
+        //   Stage wrapper'in kendi paddingTop'u kaldirildi; gerekirse admin
+        //   stage.padding ile ekler.
+        paddingTop: 0,
         // ★ v283 (16 May 2026): Web admin global.horizontalPadding artık SADECE avatar
         //   grid'lere uygulanır (header full bleed kalsın). v284'te root'tan kaldırılmıştı.
         paddingHorizontal: roomLayout.global.horizontalPadding,
