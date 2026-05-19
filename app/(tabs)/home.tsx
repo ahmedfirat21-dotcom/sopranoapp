@@ -1549,7 +1549,9 @@ export default function HomeScreen() {
                 const bpTier = bp.subscription_tier || 'Free';
                 const isGM = bp.is_admin || bpTier === 'GodMaster';
                 const bpAccent = isGM ? '#DC2626' : bpTier === 'Pro' ? '#D4AF37' : bpTier === 'Plus' ? '#A78BFA' : '#14B8A6';
-                const bpLabel = isGM ? 'GodMaster' : bpTier === 'Pro' ? 'Pro' : bpTier === 'Plus' ? 'Plus' : '';
+                // ★ v1.7.13.48: tier pill (Plus/Pro/GM) tek boost yatay şeritte de KALDIRILDI.
+                //   Kullanıcı: 'boost edilen kartlardan plus/pro etiketlerini kaldır'.
+                // const bpLabel = ... (kullanılmıyor, kaldırıldı)
                 const bpGrad: [string, string] = isGM
                   ? ['#450A0A', '#1E1B1B'] : bpTier === 'Pro'
                   ? ['#3F2B0A', '#1F1808'] : bpTier === 'Plus'
@@ -1578,11 +1580,7 @@ export default function HomeScreen() {
                           <Text numberOfLines={1} style={{ fontSize: 14, fontWeight: '800', color: '#F1F5F9', flexShrink: 1, textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }}>
                             {bp.display_name || i18n.t('auto.tabs.home.004')}
                           </Text>
-                          {!!bpLabel && (
-                            <View style={{ paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 6, backgroundColor: bpAccent + '25', borderWidth: 0.5, borderColor: bpAccent + '60' }}>
-                              <Text style={{ fontSize: 8, fontWeight: '900', color: bpAccent, letterSpacing: 0.5 }}>{bpLabel}</Text>
-                            </View>
-                          )}
+                          {/* tier pill kaldırıldı v1.7.13.48 */}
                         </View>
                         <Text style={{ fontSize: 10, color: 'rgba(251,191,36,0.65)', fontWeight: '600', marginTop: 2 }}>{i18n.t('tabs.home.001')}</Text>
                       </View>
@@ -1605,11 +1603,11 @@ export default function HomeScreen() {
                       const t = bp.subscription_tier || 'Free';
                       const gm = bp.is_admin || t === 'GodMaster';
                       const ac = gm ? '#DC2626' : t === 'Pro' ? '#D4AF37' : t === 'Plus' ? '#A78BFA' : '#14B8A6';
-                      const tl = gm ? 'GM' : t === 'Pro' ? 'PRO' : t === 'Plus' ? 'PLUS' : '';
                       const gr: [string, string, string] = gm
                         ? ['#7F1D1D', '#450A0A', '#1E1B1B'] : t === 'Pro'
                         ? ['#7C5A12', '#3F2B0A', '#1F1808'] : t === 'Plus'
                         ? ['#4C1D7B', '#2A0F47', '#15081F'] : ['#0F4C5C', '#0A2F3C', '#051920'];
+                      const isOnline = friendIdSet?.has(bp.id) ? onlineIdSet.has(bp.id) : false;
                       return (
                         <Pressable
                           key={bp.id}
@@ -1626,17 +1624,39 @@ export default function HomeScreen() {
                           <LinearGradient
                             colors={gr}
                             start={{ x: 0, y: 0 }} end={{ x: 0.7, y: 1 }}
-                            style={{ alignItems: 'center', paddingVertical: 12, paddingHorizontal: 8 }}
+                            style={{ flex: 1 }}
                           >
-                            <StatusAvatar uri={bp.avatar_url} size={52} tier={t} isAdmin={bp.is_admin} isOnline={friendIdSet?.has(bp.id) ? onlineIdSet.has(bp.id) : undefined} frameId={(bp as any).active_frame || null} customBadgeId={(bp as any).active_badge_id ?? null} />
-                            <Text numberOfLines={1} style={{ fontSize: 12, fontWeight: '800', color: '#F1F5F9', marginTop: 6, maxWidth: '90%', textAlign: 'center', textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }}>
-                              {bp.display_name || i18n.t('auto.tabs.home.003')}
-                            </Text>
-                            {!!tl && (
-                              <View style={{ marginTop: 4, paddingHorizontal: 7, paddingVertical: 1.5, borderRadius: 6, backgroundColor: ac + '28', borderWidth: 0.5, borderColor: ac + '70' }}>
-                                <Text style={{ fontSize: 8, fontWeight: '900', color: ac, letterSpacing: 0.7 }}>{tl}</Text>
-                              </View>
-                            )}
+                            {/* ★ v1.7.13.48: Avatar daire kaldırıldı + tier pill kaldırıldı.
+                                Avatar kartın üst kısmında full-bleed (cam içinde hissi). */}
+                            <View style={{ width: '100%', height: 96, overflow: 'hidden', position: 'relative', backgroundColor: ac + '22' }}>
+                              {bp.avatar_url ? (
+                                <Image
+                                  source={{ uri: bp.avatar_url }}
+                                  style={{ width: '100%', height: '100%' }}
+                                  resizeMode="cover"
+                                />
+                              ) : (
+                                <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: ac + '44' }}>
+                                  <Text style={{ fontSize: 32, fontWeight: '900', color: '#FFF', textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }}>
+                                    {(bp.display_name || '?').charAt(0).toUpperCase()}
+                                  </Text>
+                                </View>
+                              )}
+                              {isOnline && (
+                                <View style={{
+                                  position: 'absolute', bottom: 4, right: 4,
+                                  width: 12, height: 12, borderRadius: 6,
+                                  backgroundColor: '#22C55E',
+                                  borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.7)',
+                                  shadowColor: '#22C55E', shadowOpacity: 0.8, shadowRadius: 4, elevation: 3,
+                                }} />
+                              )}
+                            </View>
+                            <View style={{ paddingHorizontal: 6, paddingVertical: 6, alignItems: 'center' }}>
+                              <Text numberOfLines={1} style={{ fontSize: 12, fontWeight: '800', color: '#F1F5F9', maxWidth: '95%', textAlign: 'center', textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }}>
+                                {bp.display_name || i18n.t('auto.tabs.home.003')}
+                              </Text>
+                            </View>
                           </LinearGradient>
                         </Pressable>
                       );
