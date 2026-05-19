@@ -186,7 +186,7 @@ export default function ProfileHero({
             hitSlop={4}
             accessibilityLabel={i18n.t('auto.profile.ProfileHero.006')}
           >
-            <StatusAvatar uri={avatarUrl} size={160} tier={subscriptionTier} isAdmin={isAdmin} isOnline={isOnline} isSelf={!!onEdit} showTierBadge={showTierBadge} tierBadgeSize="md" frameId={activeFrame} displayName={displayName} contextKey="profile" customBadgeId={activeBadgeId} />
+            <StatusAvatar uri={avatarUrl} size={104} tier={subscriptionTier} isAdmin={isAdmin} isOnline={isOnline} isSelf={!!onEdit} showTierBadge={showTierBadge} tierBadgeSize="sm" frameId={activeFrame} displayName={displayName} contextKey="profile" customBadgeId={activeBadgeId} />
           </Pressable>
         </View>
 
@@ -533,7 +533,10 @@ const s = StyleSheet.create({
   statItem: { flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 52, paddingVertical: 4 },
   // ★ v289: stat ikonu — sayının üstünde, outline stil, hafif aşağı margin.
   statIcon: { marginBottom: 3, opacity: 0.9 },
-  statNum: { fontSize: 15, fontWeight: '700', color: '#F1F5F9', ..._textGlow },
-  statLabelClickable: { fontSize: 9, fontWeight: '600', color: '#5CBFB5', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 1 },
+  statNum: { fontSize: 17, fontWeight: '800', color: '#F1F5F9', ..._textGlow },
+  // ★ v1.7.13.38: textTransform UPPERCASE -> none, letter-spacing düştü.
+  //   UPPERCASE etiketler boş profilde "0 ARKADAŞ" ferah hissi yaratıyordu;
+  //   sentence case daha kompakt + modern.
+  statLabelClickable: { fontSize: 11, fontWeight: '600', color: '#5CBFB5', letterSpacing: 0.1, marginTop: 2 },
   statDiv: { width: 0.5, height: 28, backgroundColor: 'rgba(255,255,255,0.08)' },
 });

@@ -585,32 +585,23 @@ export default function ProfileScreen() {
     }
   }, [params?.openSP, userId, openSPHistory, router]);
 
-  // ★ useFocusEffect: Sayfa her odaklandığında SP + istatistikleri yenile.
-  //   ★ 2026-04-26 PERF: InteractionManager ile ağır DB sorguları tab geçiş
-  //   animasyonu bittikten SONRA çalışır — JS thread animasyon sırasında bloke olmaz.
+  // ★ v1.7.13.38 (19 May 2026): InteractionManager wrap KALDIRILDI — kullanıcı
+  //   'profil sayfasındaki rozetler çok sonradan görünüyor' raporu. Tab animasyon
+  //   beklemeden (300ms) loadStats anında fire eder. Promise.allSettled paralel
+  //   çalışıyor zaten, JS thread bloklanmıyor.
   useFocusEffect(
     useCallback(() => {
       const signal = { cancelled: false };
-      const task = InteractionManager.runAfterInteractions(() => {
-        if (signal.cancelled) return;
-        refreshProfile();
-        loadStats(signal);
-      });
-      return () => { signal.cancelled = true; task.cancel(); };
+      refreshProfile();
+      loadStats(signal);
+      return () => { signal.cancelled = true; };
     }, [loadStats, refreshProfile])
   );
 
   // ★ 2026-04-21: Realtime dual subscription kaldırıldı.
-  //   Önceden profile_friends kanalı + OnlineFriendsProvider kanalı ikisi de friendships
-  //   table'ına subscribe ediyordu (redundant). Şimdi context'in allFriends değişiminde
-  //   loadStats çağrılır — tek kaynak, tek subscription (provider).
   useEffect(() => {
     if (!userId) return;
-    // allFriends referansı değiştikçe stats'ı yenile (yeni arkadaş eklendiyse vs.)
-    const task = InteractionManager.runAfterInteractions(() => {
-      loadStats();
-    });
-    return () => task.cancel();
+    loadStats();
   }, [userId, allFriends.length, loadStats]);
 
   // GodMaster özel tier: tier='GodMaster' VEYA is_admin=true
