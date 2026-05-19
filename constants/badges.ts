@@ -25,6 +25,10 @@ export interface BadgeDef {
   criteriaText?: string;
   /** Rozet kazanıldığında verilen SP ödülü */
   spReward: number;
+  /** ★ v1.7.13.46 (19 May 2026): Rozetin sağladığı somut/görsel avantajlar listesi.
+   *  Detail modal'da "Avantajlar" bölümünde gösterilir. Boş bırakılırsa fallback:
+   *  'Profilde sergilenir' satırı eklenir. */
+  perks?: string[];
 }
 
 export const BADGES: Record<string, BadgeDef> = {
@@ -40,6 +44,11 @@ export const BADGES: Record<string, BadgeDef> = {
     rarity: 'legendary',
     criteriaText: 'Uygulamanın ilk 1000 kullanıcısından birisin',
     spReward: 500,
+    perks: [
+      'Profilde kalıcı altın madalya',
+      'Erken katılım göstergesi',
+      'Topluluğun kurucularından',
+    ],
   },
 
   // ── Host milestone'ları ──
@@ -54,6 +63,10 @@ export const BADGES: Record<string, BadgeDef> = {
     rarity: 'common',
     criteriaText: '1 oda kur',
     spReward: 25,
+    perks: [
+      'Profilde sergilenir',
+      'İlk adım göstergesi',
+    ],
   },
   host_10: {
     id: 'host_10',
@@ -66,6 +79,11 @@ export const BADGES: Record<string, BadgeDef> = {
     rarity: 'rare',
     criteriaText: '10 oda kur',
     spReward: 75,
+    perks: [
+      'Profilde sergilenir',
+      'Avatar yanında ev simgesi',
+      'Tutkulu host kartı',
+    ],
   },
   host_100: {
     id: 'host_100',
@@ -78,6 +96,11 @@ export const BADGES: Record<string, BadgeDef> = {
     rarity: 'epic',
     criteriaText: '100 oda kur',
     spReward: 200,
+    perks: [
+      'Profilde sergilenir',
+      '"Mucit" etiketi avatarda',
+      'Keşfette host önceliği',
+    ],
   },
 
   // ── Sosyal ──
@@ -92,6 +115,11 @@ export const BADGES: Record<string, BadgeDef> = {
     rarity: 'rare',
     criteriaText: '50 arkadaş edin',
     spReward: 75,
+    perks: [
+      'Profilde sergilenir',
+      'Arkadaşlar sekmesinde pembe halka',
+      'Sosyal kelebek kartı',
+    ],
   },
   popular: {
     id: 'popular',
@@ -104,6 +132,11 @@ export const BADGES: Record<string, BadgeDef> = {
     rarity: 'epic',
     criteriaText: '500 takipçi topla',
     spReward: 200,
+    perks: [
+      'Profilde sergilenir',
+      'Keşfette boost önceliği',
+      'Yıldız profil işareti',
+    ],
   },
 
   // ── SP / Hediye ──
@@ -118,6 +151,10 @@ export const BADGES: Record<string, BadgeDef> = {
     rarity: 'common',
     criteriaText: 'En az bir kez SP gönder',
     spReward: 25,
+    perks: [
+      'Profilde sergilenir',
+      'Cömertlik göstergesi',
+    ],
   },
   sp_whale: {
     id: 'sp_whale',
@@ -130,6 +167,11 @@ export const BADGES: Record<string, BadgeDef> = {
     rarity: 'epic',
     criteriaText: '10000 SP harcayarak balinayım de',
     spReward: 200,
+    perks: [
+      'Profilde sergilenir',
+      'Hediye gönderirken altın animasyon',
+      'Balina rütbesi (VIP)',
+    ],
   },
 
   // ── Aktiflik / sahne ──
@@ -144,6 +186,11 @@ export const BADGES: Record<string, BadgeDef> = {
     rarity: 'epic',
     criteriaText: '100 saat sahnede mikrofon aç',
     spReward: 200,
+    perks: [
+      'Profilde sergilenir',
+      'Sahnede ekstra parıltı efekti',
+      'Sahne ustası unvanı',
+    ],
   },
 
   // ── Resmi rozetler ──
@@ -158,6 +205,11 @@ export const BADGES: Record<string, BadgeDef> = {
     rarity: 'legendary',
     criteriaText: 'Resmi olarak doğrulandı (admin atar)',
     spReward: 500,
+    perks: [
+      'İsim yanında kalıcı mavi tik',
+      'Tüm yerlerde doğrulanmış göstergesi',
+      'Resmi hesap güvencesi',
+    ],
   },
   staff: {
     id: 'staff',
@@ -170,6 +222,10 @@ export const BADGES: Record<string, BadgeDef> = {
     rarity: 'legendary',
     criteriaText: 'SopranoChat ekibinden bir kullanıcı',
     spReward: 500,
+    perks: [
+      'Ekip üyesi rozeti',
+      'Topluluğa hizmet kartı',
+    ],
   },
   beta_tester: {
     id: 'beta_tester',
@@ -182,6 +238,11 @@ export const BADGES: Record<string, BadgeDef> = {
     rarity: 'rare',
     criteriaText: 'Kapalı testte yer aldı',
     spReward: 75,
+    perks: [
+      'Profilde sergilenir',
+      'Erken erişim özellikleri',
+      'Test grubu kartı',
+    ],
   },
 
   // ── Streak ──
@@ -196,6 +257,10 @@ export const BADGES: Record<string, BadgeDef> = {
     rarity: 'common',
     criteriaText: 'Üst üste 7 gün giriş yap',
     spReward: 25,
+    perks: [
+      'Profilde sergilenir',
+      'Bağlılık göstergesi',
+    ],
   },
   streak_30: {
     id: 'streak_30',
@@ -208,6 +273,11 @@ export const BADGES: Record<string, BadgeDef> = {
     rarity: 'rare',
     criteriaText: 'Üst üste 30 gün giriş yap',
     spReward: 75,
+    perks: [
+      'Profilde sergilenir',
+      'Sadık kullanıcı kartı',
+      'Aktif topluluk üyesi',
+    ],
   },
 };
 
