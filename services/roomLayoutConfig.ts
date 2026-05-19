@@ -280,10 +280,14 @@ export interface RoomLayoutConfig {
 }
 
 // ── Default fallback (DB fetch fail/loading) — mevcut hard-coded değerler ──
+// ★ v1.7.13.30 (19 May 2026): TÜM VARSAYILANLAR ELDEN GEÇİRİLDİ.
+// Senaryolar düşünülerek: solo host / 2 kişi audio / 4-9 audio grid /
+// 1 kamera + audio / 2 kamera spotlight / 10+ dinleyici. Her birinin
+// görsel olarak iyi gözükmesini sağlayacak değerler.
 export const DEFAULT_ROOM_LAYOUT: RoomLayoutConfig = {
   host: {
     avatarShape: 'circle',
-    avatarSize: 140,
+    avatarSize: 144,         // 140→144: Solo host'ta biraz daha dramatik
     borderRadius: 48,
     ringWidth: 3,
     ringColor: '#FBBF24',
@@ -295,16 +299,16 @@ export const DEFAULT_ROOM_LAYOUT: RoomLayoutConfig = {
     badgePosition: 'topRight',
     haloEnabled: true,
     haloColor: '#FBBF24',
-    haloOpacity: 0.45,
-    haloBlur: 24,
-    containerPadding: 12,
+    haloOpacity: 0.40,       // 0.45→0.40 yumuşak halo
+    haloBlur: 28,            // 24→28 geniş glow
+    containerPadding: 8,     // 12→8 kompakt
   },
   speakers: {
     avatarShape: 'circle',
     borderRadius: 50,
-    maxCols: 4,
-    colGap: 14,
-    rowGap: 16,
+    maxCols: 3,              // 4→3: Clubhouse standardı, 3 col daha okunur
+    colGap: 12,              // 14→12: tile başına daha geniş alan
+    rowGap: 20,              // 16→20: satır arası daha rahat
     ringWidth: 2,
     ringColor: '#14B8A6',
     speakingRingColor: '#10B981',
@@ -313,30 +317,33 @@ export const DEFAULT_ROOM_LAYOUT: RoomLayoutConfig = {
     nameMaxChars: 0,
     showMicIcon: true,
     muteOpacity: 0.55,
-    sizePresets: { small: 84, medium: 100, large: 110 },
+    // 1 audio → 116dp (büyük), 4-9 → 92dp (3 col rahat), 10+ → 76dp
+    sizePresets: { small: 76, medium: 92, large: 116 },
   },
   listeners: {
     avatarShape: 'circle',
     borderRadius: 50,
     maxCols: 6,
     colGap: 10,
-    rowGap: 12,
+    rowGap: 14,              // 12→14: dikey nefes
     showName: true,
     nameFontSize: 10,
     nameMaxChars: 0,
     ringWidth: 0,
     ringColor: 'transparent',
     ownerCrownEnabled: true,
-    ownerScale: 1.10,
-    sizePresets: { small: 42, medium: 50, large: 60 },
+    ownerScale: 1.12,        // 1.10→1.12: owner hafif belirgin
+    sizePresets: { small: 44, medium: 52, large: 64 },
   },
   stage: {
     backgroundColor: 'rgba(15,25,38,0.0)',
     borderRadius: 0,
-    padding: 16,
+    padding: 12,             // 16→12
     dividerStyle: 'none',
     dividerColor: 'rgba(255,255,255,0.08)',
-    gapBetweenSpeakersAndListeners: 20,
+    // ★ KRİTİK FIX: 20→32. Spotlight tile uzun olunca (admin aspect>1)
+    //   listener üstüne biniyordu. 32dp her senaryoda görsel olarak rahat.
+    gapBetweenSpeakersAndListeners: 32,
   },
   global: {
     background: 'gradient',
@@ -350,7 +357,7 @@ export const DEFAULT_ROOM_LAYOUT: RoomLayoutConfig = {
   animations: {
     speakingPulseEnabled: true,
     speakingPulseSpeed: 1400,
-    speakingRingExpand: 1.35,
+    speakingRingExpand: 1.25, // 1.35→1.25 daha rafine, agresif değil
     haloPulseEnabled: false,
     haloPulseSpeed: 2000,
     haloPulseAmplitude: 0.20,
@@ -413,7 +420,7 @@ export const DEFAULT_ROOM_LAYOUT: RoomLayoutConfig = {
     showListenerCount: true,
     headerBgOpacity: 0.0,
     headerBorderBottom: true,
-    headerBorderColor: 'rgba(255,255,255,0.04)',
+    headerBorderColor: 'rgba(20,184,166,0.18)', // teal hafif (önceki çok soluk)
     // ★ v300: Host avatar varsayılanları — APK ile birebir.
     showHostAvatar: true,
     hostAvatarSize: 36,
@@ -453,10 +460,10 @@ export const DEFAULT_ROOM_LAYOUT: RoomLayoutConfig = {
     showMicRequestPulse: true,
   },
   camera: {
-    // ★ v301 (18 May 2026): default'lar eski hardcoded davranışla birebir uyumlu.
-    heightRatio: 1.18,          // cardHeight = cardWidth+18 ~ 1.18 ratio (eski +18 davranışı)
-    cornerRadiusPercent: 8,     // cardWidth * 0.08
-    cornerRadiusMin: 12,
+    // ★ v1.7.13.30 (19 May 2026): Senaryo bazli yenilendi.
+    heightRatio: 1.05,          // 1.18→1.05: kamerali audio fallback daha kare
+    cornerRadiusPercent: 10,    // 8→10: yumuşak köşe
+    cornerRadiusMin: 14,        // 12→14
     objectFit: 'cover',
     mirrorSelf: true,
     indicatorEnabled: true,
@@ -466,18 +473,23 @@ export const DEFAULT_ROOM_LAYOUT: RoomLayoutConfig = {
     useCustomBorder: false,
     borderWidth: 2,
     borderColor: '#3B82F6',
-    overlayTopOpacity: 0.55,
-    overlayBottomOpacity: 0.60,
-    spotlightEnabled: true,     // mevcut hibrit layout
-    spotlightSingleAspect: 0.62,
-    spotlightDoubleAspect: 1.0,
+    overlayTopOpacity: 0.45,    // 0.55→0.45 yazi okunur ama tile dim degil
+    overlayBottomOpacity: 0.55, // 0.60→0.55
+    spotlightEnabled: true,
+    // 1 kamera → 0.66 (was 0.62: biraz daha az dikey, listener'a yer)
+    // 2 kamera → 0.95 (was 1.0: hafif yatay, TikTok pattern)
+    // 3 kamera → 1.0 (kare, ortak)
+    // 4 kamera → 1.0 (was 1.05: 2x2 grid kare)
+    spotlightSingleAspect: 0.66,
+    spotlightDoubleAspect: 0.95,
     spotlightTripleAspect: 1.0,
-    spotlightQuadAspect: 1.05,
-    spotlightGap: 12,
+    spotlightQuadAspect: 1.0,
+    spotlightGap: 8,            // 12→8 daha sıkı
     fullscreenObjectFit: 'cover',
     maxConcurrentCameras: 0,    // sınırsız
-    audioCompactSize: 76,       // spotlight altı audio-only circle (max 76 px)
-    audioCompactGap: 8,         // audio-only avatarlar arası
+    // v1.7.13.29'dan beri audio-only ana grid'te (sizePresets) — bu eski compat
+    audioCompactSize: 100,      // fallback için yine de büyütüldü
+    audioCompactGap: 10,
   },
 };
 
