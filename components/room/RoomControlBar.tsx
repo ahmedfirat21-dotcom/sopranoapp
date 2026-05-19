@@ -19,12 +19,19 @@ import { useRoomLayout } from '../../services/roomLayoutConfig';
 //   Bar: gradient (#2A3A58→#243250→#1A2540) + teal spotlight + parlak beyaz border + radius 22.
 //   Active buton: tab bubble gibi 3D gradient + gloss (accent-based).
 //   Inactive buton: bg yok, sadece ikon + drop shadow (tab'daki pasif ikon gibi).
-const BAR_H = 50;
+// ★ v1.7.13.16 (19 May 2026): Bar ana sayfa/odalarım/mesajlar tab bar AİLESİ ile
+//   AYNI default ölçüler. Kullanıcı talep: "alt ve üst headerları keşfet/
+//   odalarım/mesajlar header ailesi ölçülerine getir (bunlar default olmalı)".
+//   - BAR_H: 50 → 60 (ana sayfa tab BAR_H ile birebir)
+//   - BUBBLE_SIZE: 36 → 58 (ana sayfa BUBBLE ile birebir)
+//   - ICON_SIZE: 20 → 22 (ana sayfa ile uyumlu)
+//   Admin slider'ı bu default'u 32-72 arası override edebilir.
+const BAR_H = 60;
 const BAR_MARGIN = 0;
-const BTN_SIZE = 36;
-const BUBBLE_SIZE = 36;
-const ICON_SIZE = 20;
-const MIC_ICON = 26;
+const BTN_SIZE = 58;
+const BUBBLE_SIZE = 58;
+const ICON_SIZE = 22;
+const MIC_ICON = 28;
 
 // ════════════════════════════════════════════════════════════
 // Renk tonlama helperları — tab bar ile aynı math

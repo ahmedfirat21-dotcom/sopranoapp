@@ -460,7 +460,10 @@ export default function RoomInfoHeader({
 // ★ 2026-05-05: Üst header bar yüksekliği — alt RoomControlBar BAR_H=50 ile eşit.
 //   Kullanıcı talebi: "oda içindeki üst headar boyutlarını alt kontrol barındaki
 //   headar ile eşitle" — top/bottom bar simetrisi sağlanır.
-const HEADER_BAR_H = 50;
+// ★ v1.7.13.16 (19 May 2026): Header height ana sayfa/odalarım/mesajlar tab
+//   header'larıyla AYNI default ölçü (56dp). Kullanıcı: "alt ve üst headerları
+//   keşfet/odalarım/mesajlar header ailesi ölçülerine getir".
+const HEADER_BAR_H = 56;
 
 const s = StyleSheet.create({
   wrap: {

@@ -422,7 +422,7 @@ export const DEFAULT_ROOM_LAYOUT: RoomLayoutConfig = {
     barBlurIntensity: 28,
     barBorderTop: 'rgba(255,255,255,0.05)',
     barPaddingV: 10,
-    buttonSize: 44,
+    buttonSize: 58,
     buttonGap: 12,
     buttonShape: 'circle',
     buttonBorderRadius: 12,
@@ -431,6 +431,8 @@ export const DEFAULT_ROOM_LAYOUT: RoomLayoutConfig = {
     leaveButtonColor: '#EF4444',
     iconColor: '#E2E8F0',
     iconSize: 22,
+    // ★ v1.7.13.16 (19 May 2026): Default ana sayfa BUBBLE (58) ile birebir.
+    //   Admin slider override edebilir (32-72 aralık).
     offsetY: 0,
     offsetX: 0,
   },
