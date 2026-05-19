@@ -3,9 +3,13 @@
   <uses-permission android:name="android.permission.BLUETOOTH"/>
   <uses-permission android:name="android.permission.CAMERA"/>
   <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA"/>
   <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"/>
   <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE"/>
   <uses-permission android:name="android.permission.FOREGROUND_SERVICE_PHONE_CALL"/>
+  <!-- ★ v1.7.13.27 (19 May 2026): Doze mode WebSocket suspend onleme.
+       VoIP/sesli oda kategorisi Play Store icin pil iyilestirme muafiyeti meşru. -->
+  <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/>
   <uses-permission android:name="android.permission.INTERNET"/>
   <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
   <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
@@ -33,7 +37,7 @@
     <meta-data android:name="expo.modules.updates.ENABLED" android:value="false"/>
     <meta-data android:name="expo.modules.updates.EXPO_UPDATES_CHECK_ON_LAUNCH" android:value="ALWAYS"/>
     <meta-data android:name="expo.modules.updates.EXPO_UPDATES_LAUNCH_WAIT_MS" android:value="0"/>
-    <service android:name=".LiveKitForegroundService" android:foregroundServiceType="microphone|mediaPlayback" android:exported="false"/>
+    <service android:name=".LiveKitForegroundService" android:foregroundServiceType="microphone|camera|mediaPlayback" android:exported="false"/>
     <!-- ⛔ KRİTİK: windowSoftInputMode="adjustResize" ASLA DEĞİŞTİRME!
          react-native-keyboard-controller bu mod ile çalışır.
          adjustPan → wallpaper görünür. adjustNothing → event tetiklenmez. -->

@@ -1,6 +1,39 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { AppState, AppStateStatus } from 'react-native';
-import { liveKitService, type ParticipantUpdate, type RoomConnectionState } from '../services/livekit';
+import { Alert, AppState, AppStateStatus, Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+  liveKitService,
+  type ParticipantUpdate,
+  type RoomConnectionState,
+  isBatteryOptimizationIgnored,
+  requestBatteryOptimizationExemption,
+} from '../services/livekit';
+
+// ★ v1.7.13.27 (19 May 2026): Doze mode WebSocket suspend → ekran kapaninca
+//   oda kopmasi sorununun cozumu icin pil iyilestirme muafiyeti.
+//   Foreground service + WAKE_LOCK tek basina yetmiyor (OEM katmanlari OS
+//   Doze'i agresif uyguluyor). Kullaniciya BIR KEZ sorulur, AsyncStorage
+//   flag ile bir daha gosterilmez.
+const BATT_OPT_FLAG = '@soprano:batt_opt_asked';
+async function ensureBatteryExemptionOnce(): Promise<void> {
+  if (Platform.OS !== 'android') return;
+  try {
+    const already = await isBatteryOptimizationIgnored();
+    if (already) return;
+    const asked = await AsyncStorage.getItem(BATT_OPT_FLAG);
+    if (asked === '1') return;
+    await AsyncStorage.setItem(BATT_OPT_FLAG, '1');
+    Alert.alert(
+      'Oda Bağlantısı İçin İzin',
+      'Telefonun ekranı kapandığında sesli odanın kopmaması için "Pil iyileştirmesi yapma" iznine ihtiyacımız var. Açılan ekrandan SopranoChat için "İzin verme" / "Sınırsız" seçeneğini seçmen yeterli.',
+      [
+        { text: 'Sonra', style: 'cancel' },
+        { text: 'Ayara Git', onPress: () => { requestBatteryOptimizationExemption(); } },
+      ],
+      { cancelable: true },
+    );
+  } catch { /* sessiz */ }
+}
 
 interface UseLiveKitOptions {
   roomId: string | undefined;
@@ -48,6 +81,10 @@ export default function useLiveKit({ roomId, enabled = true, userId, displayName
     connectingRef.current = true;
     setConnectFailed(false);
     intentionalLeaveRef.current = false;
+
+    // ★ v1.7.13.27: İlk odaya girişte pil iyileştirme muafiyeti iste (sessizce
+    //   arka planda — bağlantıyı bloklamaz, AsyncStorage flag ile bir kez).
+    ensureBatteryExemptionOnce().catch(() => {});
 
     const success = await liveKitService.connect(roomId, userId, displayName, {
       onConnectionStateChange: (state) => {

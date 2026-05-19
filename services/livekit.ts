@@ -14,7 +14,13 @@ let _audioSessionModule: any = null;
 // ★ 2026-04-27: Android foreground service köprüsü.
 // Uygulama arka plana atıldığında WebRTC bağlantısı OS tarafından kesilmesin diye
 // odadayken bildirim olarak çalışır. JS'ten start/stop edilir.
-const LiveKitFgService: { start: () => Promise<boolean>; stop: () => Promise<boolean> } | null =
+// ★ v1.7.13.27 (19 May 2026): Battery optimization muafiyeti API'leri eklendi.
+const LiveKitFgService: {
+  start: () => Promise<boolean>;
+  stop: () => Promise<boolean>;
+  isIgnoringBatteryOptimizations?: () => Promise<boolean>;
+  requestIgnoreBatteryOptimizations?: () => Promise<boolean>;
+} | null =
   Platform.OS === 'android' ? (NativeModules as any).LiveKitForegroundService ?? null : null;
 
 async function startBgService(): Promise<void> {
@@ -27,6 +33,26 @@ async function stopBgService(): Promise<void> {
   if (!LiveKitFgService) return;
   try { await LiveKitFgService.stop(); }
   catch { /* sessizce geç */ }
+}
+
+// ★ v1.7.13.27: Pil iyileştirme muafiyeti kontrolü ve istek.
+//   Doze mode WebSocket suspend → oda sessizleşmesi/kopması nedenidir.
+//   Foreground service + WAKE_LOCK tek başına yetmiyor; Android 12+ OEM
+//   katmanları (Samsung One UI, Xiaomi MIUI vb.) muafiyet olmadan
+//   ekran kapali iken network'u suspend ediyor.
+export async function isBatteryOptimizationIgnored(): Promise<boolean> {
+  if (!LiveKitFgService?.isIgnoringBatteryOptimizations) return true;
+  try { return await LiveKitFgService.isIgnoringBatteryOptimizations(); }
+  catch { return true; }
+}
+
+export async function requestBatteryOptimizationExemption(): Promise<boolean> {
+  if (!LiveKitFgService?.requestIgnoreBatteryOptimizations) return true;
+  try { return await LiveKitFgService.requestIgnoreBatteryOptimizations(); }
+  catch (e) {
+    if (__DEV__) logger.warn('[LiveKit] battery opt request failed:', (e as any)?.message);
+    return false;
+  }
 }
 
 function getLK(): any {
