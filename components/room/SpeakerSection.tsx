@@ -571,7 +571,7 @@ function CaretakerTimerBadge({ expiresAt }: { expiresAt: string }) {
       isUrgent && s.caretakerTimerUrgent,
       { transform: [{ scale: pulseAnim }] },
     ]}>
-      <Ionicons name="time" size={8} color={isUrgent ? '#FEE2E2' : '#CFFAFE'} />
+      <Ionicons name="time" size={7} color={isUrgent ? '#FEE2E2' : '#CFFAFE'} />
       <Text style={[s.caretakerTimerText, isUrgent && { color: '#FEE2E2' }]}>{label}</Text>
     </Animated.View>
   );
@@ -1226,6 +1226,44 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, i
         })()}
         {/* ★ Owner sadece altın border + biraz büyük kart ile belli. Crown badge + label
             KALDIRILDI (kullanıcı "kötü oldu" dedi, sade olmasını istiyor). */}
+        {/* ★ v1.7.13.25 (19 May 2026): Spotlight modunda isim TILE İÇİNE overlay.
+            Eski yapı: isim her zaman tile DIŞINDA altta (marginTop:6 + ~14px text)
+            spotlight altında ~22px ekstra alan kaplıyordu. Bu, web admin preview
+            ile uyumsuzdu (preview ismi tile içinde bottom-left'te gösteriyor)
+            ve listener row ile çakışmaya yol açıyordu. Şimdi spotlight ise
+            tile içine absolute overlay; audio modda eski davranış korunur. */}
+        {isSpotlight && !hideDefaultName && (isHost ? layout.host.namePosition : speakersCfg.namePosition) !== 'hidden' && (
+          <View
+            pointerEvents="none"
+            style={{
+              position: 'absolute', left: 8, right: 8, bottom: 6,
+              zIndex: 25, elevation: 14,
+            }}
+          >
+            <Text
+              style={[
+                s.speakerName,
+                {
+                  marginTop: 0,
+                  textAlign: 'left',
+                  maxWidth: cardWidth - 16,
+                  fontSize: isHost
+                    ? (layout.host.nameFontSize || speakersCfg.nameFontSize || 11)
+                    : (speakersCfg.nameFontSize || 11),
+                },
+                isHost && { color: '#FFD700' },
+                isMod && !isHost && { color: layout.accents.moderatorHighlight || '#C4B5FD' },
+              ]}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
+              {(() => {
+                const maxChars = speakersCfg.nameMaxChars;
+                return maxChars > 0 ? displayName.slice(0, maxChars) : displayName;
+              })()}
+            </Text>
+          </View>
+        )}
       </View>
       {/* ★ v109.4.4: İsim ortalı + altında "PRO" pill (sm, label dahil)
           ★ 2026-05-05: Frame Lottie kanat'ları altta kalsın diye z-order yükseltildi.
@@ -1233,7 +1271,11 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, i
           ★ v1.7.13.7 (19 May 2026): TEK VÜCUT layout — host için ayrı config:
             isHost ise layout.host.namePosition / nameFontSize / containerPadding
             kullanılır (eskiden yalnızca speakers config'i okunuyordu, host detayları
-            "Sahne Host" tab'ından ayrılamıyordu). */}
+            "Sahne Host" tab'ından ayrılamıyordu).
+          ★ v1.7.13.25 (19 May 2026): Spotlight modunda alttaki isim wrapper TAMAMEN
+            atlanır (yukarıda tile içine overlay edildi) — host paddingTop ve gap
+            boş alan üretmesin. */}
+      {!isSpotlight && (
       <View style={{ alignItems: 'center', maxWidth: cardWidth, gap: 2, zIndex: 50, elevation: 20, paddingTop: isHost ? (layout.host.containerPadding ?? 0) / 4 : 0 }}>
         {/* ★ v287 (16 May 2026): namePosition='hidden' isim hiç render edilmez.
             ★ v1.7.13.7: host için host.namePosition / host.nameFontSize precedence. */}
@@ -1261,6 +1303,7 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, i
         })()}
         {/* ★ v283 (16 May 2026): "EV SAHİBİ" chip KALDIRILDI (kullanıcı talebi). */}
       </View>
+      )}
       </Pressable>
       {/* ★ 2026-04-22: "Sahneden İn" butonu kart içinden KALDIRILDI — parent container'ın
           maxHeight'ı Android'de touch event'i çocuk dışına bırakmıyordu (RN bug).
@@ -1629,14 +1672,16 @@ const s = StyleSheet.create({
     borderRadius: 22,
   },
   // ★ v32 Caretaker timer — avatar sol-üst köşede
+  // ★ v1.7.13.25 (19 May 2026): Daha kompakt — padding 6/2→4/1, gap 3→2,
+  //   ikon 8→7, font 9→8, borderRadius 8→6. Tile içinde daha az yer kaplar.
   caretakerTimer: {
-    position: 'absolute', top: 6, left: 6,
-    flexDirection: 'row', alignItems: 'center', gap: 3,
-    paddingHorizontal: 6, paddingVertical: 2,
-    borderRadius: 8, backgroundColor: 'rgba(20,184,166,0.85)',
-    borderWidth: 1, borderColor: 'rgba(20,184,166,0.35)',
+    position: 'absolute', top: 4, left: 4,
+    flexDirection: 'row', alignItems: 'center', gap: 2,
+    paddingHorizontal: 4, paddingVertical: 1,
+    borderRadius: 6, backgroundColor: 'rgba(20,184,166,0.85)',
+    borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(20,184,166,0.35)',
     shadowColor: '#14B8A6', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.3, shadowRadius: 3, elevation: 3,
+    shadowOpacity: 0.25, shadowRadius: 2, elevation: 2,
   },
   caretakerTimerUrgent: {
     backgroundColor: 'rgba(239,68,68,0.9)',
@@ -1644,8 +1689,8 @@ const s = StyleSheet.create({
     shadowColor: '#EF4444',
   },
   caretakerTimerText: {
-    fontSize: 9, fontWeight: '800', color: '#CFFAFE',
-    letterSpacing: 0.3, fontVariant: ['tabular-nums'],
+    fontSize: 8, fontWeight: '800', color: '#CFFAFE',
+    letterSpacing: 0.2, fontVariant: ['tabular-nums'],
   },
   // ★ 2026-05-05: İsim "pop" — fontWeight 700→800, daha belirgin glow + letterSpacing
   speakerName: {
