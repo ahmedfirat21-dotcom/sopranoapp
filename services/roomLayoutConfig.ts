@@ -418,9 +418,9 @@ export const DEFAULT_ROOM_LAYOUT: RoomLayoutConfig = {
     liveDotColor: '#22C55E',
     liveDotPulse: true,
     showListenerCount: true,
-    headerBgOpacity: 0.0,
+    headerBgOpacity: 0.55,   // ★ v31: 0.0→0.55. Tam şeffafta header'in nerede bittigi belirsizdi.
     headerBorderBottom: true,
-    headerBorderColor: 'rgba(20,184,166,0.18)', // teal hafif (önceki çok soluk)
+    headerBorderColor: 'rgba(20,184,166,0.45)',
     // ★ v300: Host avatar varsayılanları — APK ile birebir.
     showHostAvatar: true,
     hostAvatarSize: 36,
@@ -430,11 +430,12 @@ export const DEFAULT_ROOM_LAYOUT: RoomLayoutConfig = {
     offsetX: 0,
   },
   controls: {
-    barBackground: 'rgba(15,25,38,0.85)',
+    // ★ v31: Alt bar daha belirgin — 0.85→0.92 opaklik, blur 28→36, üst çizgi teal
+    barBackground: 'rgba(15,25,38,0.92)',
     barBlurEnabled: true,
-    barBlurIntensity: 28,
-    barBorderTop: 'rgba(255,255,255,0.05)',
-    barPaddingV: 10,
+    barBlurIntensity: 36,
+    barBorderTop: 'rgba(20,184,166,0.20)',
+    barPaddingV: 12,
     buttonSize: 58,
     buttonGap: 12,
     buttonShape: 'circle',
@@ -466,7 +467,8 @@ export const DEFAULT_ROOM_LAYOUT: RoomLayoutConfig = {
     cornerRadiusMin: 14,        // 12→14
     objectFit: 'cover',
     mirrorSelf: true,
-    indicatorEnabled: true,
+    // ★ v31: Kamera tile uzerine kamera ikonu KAPALI default — tile zaten kamerali oldugu belli
+    indicatorEnabled: false,
     indicatorColor: '#3B82F6',
     indicatorPosition: 'topRight',
     indicatorSize: 16,
@@ -480,8 +482,12 @@ export const DEFAULT_ROOM_LAYOUT: RoomLayoutConfig = {
     // 2 kamera → 0.95 (was 1.0: hafif yatay, TikTok pattern)
     // 3 kamera → 1.0 (kare, ortak)
     // 4 kamera → 1.0 (was 1.05: 2x2 grid kare)
+    // 1 kamera → 0.66 (landscape, sinematik)
+    // 2 kamera → 1.30 (PORTRAIT dikdörtgen — yüz odaklı, kare değil)
+    // 3 kamera → 1.0 (kare, 3 col)
+    // 4 kamera → 1.0 (2x2 kare)
     spotlightSingleAspect: 0.66,
-    spotlightDoubleAspect: 0.95,
+    spotlightDoubleAspect: 1.30,
     spotlightTripleAspect: 1.0,
     spotlightQuadAspect: 1.0,
     spotlightGap: 8,            // 12→8 daha sıkı
