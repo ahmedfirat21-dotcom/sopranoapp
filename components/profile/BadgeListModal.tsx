@@ -79,22 +79,42 @@ export default function BadgeListModal({ visible, onClose, userId, displayName }
     }
   }, [visible, PANEL_HEIGHT]);
 
-  // ★ v1.7.13.41: Tek pan responder, scroll-state umursamaz.
-  //   Modal SymbolGiftSheet pattern: tüm sheet'ten drag yakalanır,
-  //   küçük dokunuşlar (dy<8) child'lara ulaşır.
+  // ★ v1.7.13.42 (19 May 2026): InRoomUserProfile birebir pattern — header
+  //   panResponder (drag handle ALWAYS) + body panResponder (capture phase ile
+  //   ScrollView'dan responder çalar).
+  const onPanMove = (_: any, gs: any) => { if (gs.dy > 0) translateY.setValue(gs.dy); };
+  const onPanRelease = (_: any, gs: any) => {
+    if (gs.dy > 60 || gs.vy > 0.5) {
+      Animated.timing(translateY, { toValue: PANEL_HEIGHT, duration: 200, useNativeDriver: true })
+        .start(() => onCloseRef.current());
+    } else {
+      Animated.spring(translateY, { toValue: 0, useNativeDriver: true, damping: 22, stiffness: 220 }).start();
+    }
+  };
+
+  // Header pan — drag handle + title. dy > 4, scroll umurusamadan ALWAYS drag.
+  const headerPanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onStartShouldSetPanResponderCapture: () => false,
+      onMoveShouldSetPanResponder: (_, gs) => Math.abs(gs.dy) > 4 && Math.abs(gs.dy) > Math.abs(gs.dx),
+      onMoveShouldSetPanResponderCapture: (_, gs) => Math.abs(gs.dy) > 4 && Math.abs(gs.dy) > Math.abs(gs.dx),
+      onPanResponderTerminationRequest: () => false,
+      onPanResponderMove: onPanMove,
+      onPanResponderRelease: onPanRelease,
+    })
+  ).current;
+
+  // Body pan — outer Animated.View. Capture phase ScrollView'dan responder çalar.
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => false,
+      onStartShouldSetPanResponderCapture: () => false,
       onMoveShouldSetPanResponder: (_, gs) => gs.dy > 8 && Math.abs(gs.dy) > Math.abs(gs.dx) * 1.5,
-      onPanResponderMove: (_, gs) => { if (gs.dy > 0) translateY.setValue(gs.dy); },
-      onPanResponderRelease: (_, gs) => {
-        if (gs.dy > 60 || gs.vy > 0.5) {
-          Animated.timing(translateY, { toValue: PANEL_HEIGHT, duration: 200, useNativeDriver: true })
-            .start(() => onCloseRef.current());
-        } else {
-          Animated.spring(translateY, { toValue: 0, useNativeDriver: true, damping: 22, stiffness: 220 }).start();
-        }
-      },
+      onMoveShouldSetPanResponderCapture: (_, gs) => gs.dy > 14 && Math.abs(gs.dy) > Math.abs(gs.dx) * 2,
+      onPanResponderTerminationRequest: () => false,
+      onPanResponderMove: onPanMove,
+      onPanResponderRelease: onPanRelease,
     })
   ).current;
 
@@ -130,17 +150,20 @@ export default function BadgeListModal({ visible, onClose, userId, displayName }
               style={st.topEdge}
             />
 
-            <View style={st.handleWrap}><View style={st.handle} /></View>
-
-            <View style={st.header}>
-              <View style={st.headerAccent} />
-              <Ionicons name="ribbon" size={14} color="#FCD34D" style={iconShadow} />
-              <Text style={st.headerTitle} numberOfLines={1}>{title}</Text>
-              {badges.length > 0 && (
-                <View style={st.countBadge}>
-                  <Text style={st.countText}>{badges.length}</Text>
-                </View>
-              )}
+            {/* ★ v1.7.13.42: Drag handle + title bölgesi headerPanHandlers ile sarıldı.
+                Her zaman drag, scroll umurusamaz. */}
+            <View {...headerPanResponder.panHandlers}>
+              <View style={st.handleWrap}><View style={st.handle} /></View>
+              <View style={st.header}>
+                <View style={st.headerAccent} />
+                <Ionicons name="ribbon" size={14} color="#FCD34D" style={iconShadow} />
+                <Text style={st.headerTitle} numberOfLines={1}>{title}</Text>
+                {badges.length > 0 && (
+                  <View style={st.countBadge}>
+                    <Text style={st.countText}>{badges.length}</Text>
+                  </View>
+                )}
+              </View>
             </View>
 
             {loading ? (
