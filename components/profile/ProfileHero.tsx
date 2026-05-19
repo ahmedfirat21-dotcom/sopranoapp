@@ -29,6 +29,8 @@ interface Props {
   avatarUrl: string;
   subscriptionTier: SubscriptionTier;
   isAdmin: boolean;
+  /** ★ v1.7.13.46: 'verified' rozeti pilot perk — isim yanında mavi tik. */
+  isVerified?: boolean;
   userTitle: UserTitle | null;
   stats: { followers: number; rooms: number; badges?: number; gifts?: number };
   /** ★ v110: true ise sayılar yerine "—" gösterilir (Phase 2 fetch tamamlanana kadar) */
@@ -70,7 +72,7 @@ interface Props {
 }
 
 export default function ProfileHero({
-  displayName, username, bio, avatarUrl, subscriptionTier, isAdmin, userTitle,
+  displayName, username, bio, avatarUrl, subscriptionTier, isAdmin, isVerified, userTitle,
   stats, statsLoading, onEdit, onBioPress, onFollowersPress, onRoomsPress, onBadgesPress, onGiftsPress, onAvatarPress,
   memberSince, boostExpiresAt, isOnline, lastSeen, activeFrame, onFramePress, hasUnequippedFrame,
   showTierBadge = true, activeBadgeId, onSharePress,
@@ -206,6 +208,10 @@ export default function ProfileHero({
           )}
           {isAdmin && (
             <Ionicons name="shield-checkmark" size={16} color="#DC2626" style={[{ marginLeft: 6 }, iconShadow]} />
+          )}
+          {/* ★ v1.7.13.46: Pilot perk — verified rozeti olan isim yanında mavi tik */}
+          {isVerified && !isAdmin && (
+            <Ionicons name="checkmark-circle" size={16} color="#3B82F6" style={[{ marginLeft: 6 }, iconShadow]} />
           )}
         </View>
         {username && <Text style={[s.username, { textAlign: 'center' }]} numberOfLines={1}>@{username.replace(/_[a-zA-Z0-9]{4}$/, "")}</Text>}

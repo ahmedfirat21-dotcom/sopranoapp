@@ -853,6 +853,7 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
               avatarUrl={userProfile.avatar_url || ''}
               subscriptionTier={tier as any}
               isAdmin={!!userProfile.is_admin}
+              isVerified={(userProfile as any)?.is_verified === true}
               userTitle={userTitle}
               // ★ v299 (17 May 2026): Owner profile.tsx ile tutarlı — followers prop'una
               //   stats.friends (mutual) gönderiliyor; ProfileHero etiketi "Arkadaş".

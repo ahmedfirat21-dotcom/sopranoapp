@@ -112,7 +112,10 @@ export type Profile = {
   voice_bio_duration_ms?: number | null;
 
   // ── Trust & Sosyal (v110.5 — Faz C) ──
-  /** Manuel admin onaylı doğrulama tiki */
+  /** Doğrulama durumu. v1.7.13.46'dan itibaren 'verified' user_badge'ten DB
+   *  trigger ile otomatik sync edilir (trg_sync_verified_badge). Manuel admin
+   *  atamasıyla award_badge('verified') çağrılır → bu kolon true olur.
+   *  UI: isim yanında mavi tik gösterimi pilot perk. */
   is_verified?: boolean;
   /** {instagram?, twitter?, website?} — opsiyonel sosyal linkler */
   social_links?: {

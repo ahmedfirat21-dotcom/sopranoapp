@@ -679,6 +679,7 @@ export default function ProfileScreen() {
             avatarUrl={avatarUrl}
             subscriptionTier={subscriptionTier}
             isAdmin={isAdmin}
+            isVerified={(profile as any)?.is_verified === true}
             userTitle={userTitle}
             stats={{ followers: stats.friends, rooms: stats.rooms, badges: stats.badges, gifts: stats.gifts }}
             onEdit={() => router.push('/edit-profile')}
