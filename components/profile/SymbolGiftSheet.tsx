@@ -131,29 +131,33 @@ export default function SymbolGiftSheet({ visible, onClose, senderId, recipientI
       });
       return;
     }
+    // ★ v1.7.13.31 (19 May 2026): OPTIMISTIC akış — kullanıcı taparken hemen
+    //   sheet kapanır, animasyon temiz alanda oynar. RPC arka planda; hata
+    //   olursa toast + balance geri yüklenir.
+    //   Eski akış: RPC bekle → onClose. Bu yüzden büyük hediye animasyonu
+    //   GiftSheet panel'inin ALTINDA oluyor, banner görünmüyordu.
+    setSenderSP((prev) => Math.max(0, prev - item.price_sp));
+    onClose();
     setSending(true);
-    const { data, error } = await supabase.rpc('send_symbol_gift', {
+    const result = await supabase.rpc('send_symbol_gift', {
       p_sender_id: senderId,
       p_recipient_id: recipientId,
       p_item_id: item.id,
       p_room_id: roomId || null,
     });
     setSending(false);
-    if (error || !data?.success) {
+    if (result.error || !result.data?.success) {
+      // Rollback balance + hata toast
+      setSenderSP((prev) => prev + item.price_sp);
       showToast({
         title: i18n.t('profile.symbolgiftsheet.toast_failed'),
-        message: data?.error || error?.message || i18n.t('auto.profile.SymbolGiftSheet.003'),
+        message: result.data?.error || result.error?.message || i18n.t('auto.profile.SymbolGiftSheet.003'),
         type: 'error',
       });
       return;
     }
-    setSenderSP((prev) => Math.max(0, prev - item.price_sp));
-    showToast({
-      title: i18n.t('auto.profile.SymbolGiftSheet.002', { 0: item.art_emoji || '✨' }),
-      message: `${recipientName} → ${item.name} (-${item.price_sp} SP)`,
-      type: 'success',
-    });
-    onClose();
+    // Success toast — opsiyonel, animasyon zaten görsel feedback veriyor
+    // showToast burada YOK, RoomGiftAnimationOverlay banner ile zaten gösteriliyor.
   };
 
   if (!visible) return null;
