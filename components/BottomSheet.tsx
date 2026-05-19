@@ -131,7 +131,11 @@ export default function BottomSheet({
         return true;
       },
       onMoveShouldSetPanResponderCapture: (_, gs) => {
-        if (gs.dy <= 25 || Math.abs(gs.dy) <= Math.abs(gs.dx) * 2) return false;
+        // ★ v1.7.13.34 (19 May 2026): Threshold 25 → 12. Eski 25dp,
+        //   ScrollView'a önce vurup bounce başlatıyordu, drag-to-dismiss
+        //   görünmüyordu. 12dp ile pan responder daha hızlı kapar.
+        //   Kullanıcı: 'rozetler modali aşağıya sürüklenerek kapatılmalı'.
+        if (gs.dy <= 12 || Math.abs(gs.dy) <= Math.abs(gs.dx) * 1.5) return false;
         if (scrollableContent && scrollOffsetRef && scrollOffsetRef.current > 5) return false;
         return true;
       },
