@@ -62,14 +62,17 @@ function getGiftTier(priceSP: number): GiftTier {
 //   - mega: 320→340 px, scalePeak 1.45→1.55, süre 4.5→6.5s, banner 18→22
 //   - mini için mini confetti (4 partikül) eklendi → tier farkı korunur
 //   - Tüm timeout'lar +%50 — animasyon ekranda kalma süresi
+// ★ v1.7.13.33 (19 May 2026): TikTok-style sadeleştirme.
+//   Kullanıcı: "sadece lottie animasyonu ve altta succes ekranı tarzı banner".
+//   Confetti, halo, bg-dim KAPATILDI. Sadece gift visual + alta clean banner.
 const TIER_CONFIG: Record<GiftTier, {
   size: number; duration: number; liftY: number;
   scalePeak: number; showConfetti: boolean; confettiCount: number;
   haptic: boolean; bannerFontSize: number; glowRadius: number; timeout: number;
 }> = {
-  mini:   { size: 160, duration: 3500, liftY: -60,  scalePeak: 1.18, showConfetti: true,  confettiCount: 4,  haptic: true, bannerFontSize: 14, glowRadius: 40,  timeout: 4200 },
-  normal: { size: 230, duration: 4800, liftY: -110, scalePeak: 1.30, showConfetti: true,  confettiCount: 6,  haptic: true, bannerFontSize: 17, glowRadius: 90,  timeout: 5800 },
-  mega:   { size: 340, duration: 6500, liftY: -150, scalePeak: 1.55, showConfetti: true,  confettiCount: 12, haptic: true, bannerFontSize: 22, glowRadius: 160, timeout: 7500 },
+  mini:   { size: 160, duration: 3500, liftY: -60,  scalePeak: 1.18, showConfetti: false, confettiCount: 0,  haptic: true, bannerFontSize: 13, glowRadius: 40,  timeout: 4200 },
+  normal: { size: 230, duration: 4800, liftY: -110, scalePeak: 1.30, showConfetti: false, confettiCount: 0,  haptic: true, bannerFontSize: 15, glowRadius: 90,  timeout: 5800 },
+  mega:   { size: 340, duration: 6500, liftY: -150, scalePeak: 1.55, showConfetti: false, confettiCount: 0,  haptic: true, bannerFontSize: 17, glowRadius: 160, timeout: 7500 },
 };
 
 interface GiftEvent {
@@ -458,57 +461,34 @@ function FloatingGift({ event, startY, stackIndex }: {
         />
       )}
 
-      {/* Banner: "Sender → Recipient · Item Name"
-          ★ v1.7.13: Eskiden alt %18'de küçük telefonlarda sahne avatarlarıyla
-          çakışıyordu. Yukarı taşındı: mega ekran ortası (%45), normal/mini %40.
-          Stack offset her üst hediye için 56px yukarı. */}
+      {/* ★ v1.7.13.33 (19 May 2026): TikTok-style banner ALT KISIMDA, gift altında.
+          Yapı: "Burak DENİZ → Beren Arancak'a 15 SP Konfeti gönderdi"
+          Tek satır doğal Türkçe cümle. Pill bg koyu cam + ince hairline,
+          fancy gradient KALDIRILDI (kullanıcı sadeleştirme istedi). */}
       <Animated.View
         style={[
           styles.banner,
           {
             opacity: bannerOpacity,
             transform: [{ translateY: bannerSlide }, { scale: bannerScale }],
-            top: (tier === 'mega' ? H * 0.45 : H * 0.40) - stackIndex * 56,
+            // Gift center'in ALTINDA — gift effectiveStartY + liftY + size/2 sonrası
+            top: H * 0.62 + stackIndex * 56,
           },
         ]}
       >
-        {/* ★ v108.20: Tier rengiyle 3-stop sıcak gradient — geçişli, tek renk değil */}
-        <LinearGradient
-          colors={[event.color + '00', event.color + '50', '#FFE08220', event.color + '00']}
-          locations={[0, 0.3, 0.6, 1]}
-          start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-          style={[StyleSheet.absoluteFillObject, { borderRadius: 999 }]}
-        />
-        <GlowView style={[
-          styles.bannerInner,
-          tier === 'mega' && styles.bannerInnerMega,
-        ]}>
-          {/* ★ v1.7.13: Emoji badge tier'a göre dinamik boyut — mini'de de görünür kalsın */}
-          <View style={[
-            styles.bannerEmoji,
-            {
-              backgroundColor: event.color + '25',
-              width: tier === 'mega' ? 44 : tier === 'normal' ? 40 : 36,
-              height: tier === 'mega' ? 44 : tier === 'normal' ? 40 : 36,
-              borderRadius: tier === 'mega' ? 22 : tier === 'normal' ? 20 : 18,
-            },
-          ]}>
-            <Text style={{ fontSize: tier === 'mega' ? 22 : tier === 'normal' ? 19 : 16 }}>{event.emoji}</Text>
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.bannerNames, { fontSize: cfg.bannerFontSize }]} numberOfLines={1}>
-              <Text style={{ color: event.color, fontWeight: '900' }}>{event.senderName}</Text>
-              <Text style={{ color: 'rgba(255,255,255,0.6)' }}>{'  →  '}</Text>
-              <Text style={{ color: '#FFF', fontWeight: '800' }}>{event.recipientName}</Text>
-            </Text>
-            <Text style={[styles.bannerItemName, { color: event.color }]} numberOfLines={1}>
-              {event.itemName}
-              {event.priceSP > 0 && (
-                <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10 }}>{`  · ${event.priceSP} SP`}</Text>
-              )}
-            </Text>
-          </View>
-        </GlowView>
+        <View style={[styles.bannerInner, tier === 'mega' && styles.bannerInnerMega]}>
+          <Text style={[styles.bannerSentence, { fontSize: cfg.bannerFontSize }]} numberOfLines={2}>
+            <Text style={{ color: event.color, fontWeight: '900' }}>{event.senderName}</Text>
+            <Text style={{ color: 'rgba(255,255,255,0.55)' }}>{' '}{'→'}{' '}</Text>
+            <Text style={{ color: '#FFF', fontWeight: '800' }}>{event.recipientName}</Text>
+            <Text style={{ color: 'rgba(255,255,255,0.55)' }}>{'\'a '}</Text>
+            {event.priceSP > 0 && (
+              <Text style={{ color: '#FBBF24', fontWeight: '900' }}>{`${event.priceSP} SP `}</Text>
+            )}
+            <Text style={{ color: event.color, fontWeight: '900' }}>{event.itemName}</Text>
+            <Text style={{ color: 'rgba(255,255,255,0.55)' }}>{' gönderdi'}</Text>
+          </Text>
+        </View>
       </Animated.View>
 
       {/* Yükselen hediye görseli */}
@@ -524,9 +504,8 @@ function FloatingGift({ event, startY, stackIndex }: {
           transform: [{ translateY }, { scale }],
         }}
       >
-        {/* Glow Halo — Normal ve Mega */}
-        <GlowHalo color={event.color} size={cfg.size} tier={tier} />
-
+        {/* ★ v1.7.13.33: GlowHalo KAPATILDI — kullanıcı sadeleştirme istedi.
+            Sadece Lottie/3D/emoji görseli kalır, halka/parıltı yok. */}
         {/* Ana görsel */}
         {useLottie ? (
           <LottieView
@@ -609,56 +588,40 @@ function FloatingGift({ event, startY, stackIndex }: {
 const styles = StyleSheet.create({
   banner: {
     position: 'absolute',
-    left: 10, right: 10,
+    left: 16, right: 16,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 101,
   },
-  // ★ v110.14: Banner rafine — koyu cam efekti, ince altın hairline, daha şık
+  // ★ v1.7.13.33: Tek satır TikTok-style — koyu cam pill, ortalı.
   bannerInner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 16,
+    paddingHorizontal: 18,
     paddingVertical: 10,
     borderRadius: 999,
-    backgroundColor: 'rgba(8,12,22,0.88)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.10)',
-    overflow: 'hidden',
-    shadowColor: '#FBBF24',
+    backgroundColor: 'rgba(8,12,22,0.92)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.12)',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.5,
-    shadowRadius: 18,
-    elevation: 10,
+    shadowRadius: 16,
+    elevation: 8,
+    alignSelf: 'center',
+    maxWidth: '100%',
   },
-  // ★ v110.14: Mega — altın hairline + daha kalın padding + güçlü glow
   bannerInnerMega: {
     paddingHorizontal: 22,
     paddingVertical: 13,
-    borderRadius: 999,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255,224,130,0.50)',
-    shadowOpacity: 0.85,
-    shadowRadius: 28,
-  },
-  bannerEmoji: {
-    width: 36, height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
+    borderColor: 'rgba(255,224,130,0.45)',
+    shadowColor: '#FBBF24',
+    shadowOpacity: 0.55,
+    shadowRadius: 22,
   },
-  bannerNames: {
-    fontWeight: '800',
-    letterSpacing: 0.3,
-  },
-  bannerItemName: {
-    fontSize: 12,
-    fontWeight: '900',
-    letterSpacing: 0.6,
-    marginTop: 2,
-    textTransform: 'uppercase',
+  bannerSentence: {
+    textAlign: 'center',
+    fontWeight: '700',
+    letterSpacing: 0.2,
+    lineHeight: 20,
   },
 });
