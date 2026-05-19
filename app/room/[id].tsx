@@ -4694,30 +4694,17 @@ export default function RoomScreen() {
             <LinearGradient colors={[themeColors[0], themeColors[1], '#070B14']} start={{ x: 0, y: 0 }} end={{ x: 0.5, y: 1 }} style={StyleSheet.absoluteFillObject} pointerEvents="none" />
           );
         }
-        // Default: ana sayfa AppBackground radialGlow mode'u ile BİREBİR — 6-stop
-        // gradient + teal + altın accent. Eski 3-stop versiyon "düz lacivert"
-        // hissi veriyordu (kullanıcı raporu). Bu daha zengin geçiş + derinlik.
+        // Default: ana sayfa AppBackground variant='explore' radialGlow={true}
+        // ile BİREBİR. Direkt component'i absoluteFill olarak kullanıyoruz —
+        // 6-stop gradient + teal/altın accent + NeonWaveBackground animasyonu.
+        // Kullanıcı raporu: "düz lacivert" + "diğer sayfalar ile aynı değil,
+        // gradient geçiş yukarıda parlaklık aşağıya doğru koyulaşır" → AppBackground
+        // component'i hepsini içeriyor.
         return (
-          <View style={[StyleSheet.absoluteFillObject, { backgroundColor: '#050A14' }]} pointerEvents="none">
-            <LinearGradient
-              colors={['#3A4B66', '#2B3A54', '#1E2A42', '#131D30', '#0A1322', '#050A14']}
-              locations={[0, 0.22, 0.42, 0.62, 0.82, 1]}
-              start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
-              style={StyleSheet.absoluteFillObject}
-              pointerEvents="none"
-            />
-            <LinearGradient
-              colors={['rgba(20,184,166,0.06)', 'transparent']}
-              start={{ x: 1, y: 0 }} end={{ x: 0.4, y: 0.5 }}
-              style={StyleSheet.absoluteFillObject}
-              pointerEvents="none"
-            />
-            <LinearGradient
-              colors={['transparent', 'rgba(251,191,36,0.04)']}
-              start={{ x: 0.6, y: 0.6 }} end={{ x: 0, y: 1 }}
-              style={StyleSheet.absoluteFillObject}
-              pointerEvents="none"
-            />
+          <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
+            <AppBackground variant="explore" radialGlow>
+              <View style={{ flex: 1 }} />
+            </AppBackground>
           </View>
         );
       })()}
