@@ -121,5 +121,10 @@ export function SkiaShadow({
 
 const styles = StyleSheet.create({
   container: {},
-  contentWrapper: {},
+  // ★ v1.7.13.34 (19 May 2026): contentWrapper flex:1 — boşluk olduğunda parent'tan
+  //   flex/width almıyordu, içerideki flex:1 olan Pressable 0 width ile render
+  //   oluyordu. Bug raporu: "şifreli oda girişinde onay düğmesi yok sadece vazgeç var".
+  //   Sebep: PasswordPromptSheet btnRow gap:10 + btnSecondary flex:1 +
+  //   SkiaShadow {flex:1.4 style} → contentWrapper {} → Pressable flex:1 = 0 width.
+  contentWrapper: { flex: 1 },
 });

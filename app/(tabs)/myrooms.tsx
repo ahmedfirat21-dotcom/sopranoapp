@@ -920,12 +920,13 @@ export default function MyRoomsScreen() {
   // ★ Ref'leri güncel tut — realtime handler'ları için
   useEffect(() => { loadDataRef.current = loadData; }, [loadData]);
 
-  // ★ 2026-04-26 PERF: InteractionManager ile ağır DB sorguları tab geçiş
-  //   animasyonu bittikten SONRA çalışır — JS thread animasyon sırasında bloke olmaz.
+  // ★ v1.7.13.34 (19 May 2026): InteractionManager wrap KALDIRILDI —
+  //   kullanıcı 'odalar listesi çok geç listeleniyor' raporu. Eski yapı
+  //   tab animasyonu (~300ms) bitince loadData başlatıyordu; toplam
+  //   1-1.5sn algılanan gecikme. Şimdi loadData ANINDA fire eder; native
+  //   thread'i bloklamıyor zaten (Promise.allSettled paralel sorgular).
   useFocusEffect(useCallback(() => {
-    const task = InteractionManager.runAfterInteractions(() => {
-      loadData();
-    });
+    loadData();
     // ★ v92 (1 May 2026): RoomCreateHintSheet'ten yönlendirme bayrağı varsa
     //   premium "+ Yeni Oda" coachmark'ını tetikle (bir kez gösterilir).
     (async () => {
@@ -936,7 +937,7 @@ export default function MyRoomsScreen() {
       }
     })();
     // ★ 2026-04-23: Tab'dan çıkınca açık modalı kapat
-    return () => { task.cancel(); setSelectedRoom(null); };
+    return () => { setSelectedRoom(null); };
   }, [loadData, firebaseUser?.uid]));
 
   // ★ Yardımcı: Sadece arkadaşların canlı olduğu odaları yenile (hafif sorgu)
