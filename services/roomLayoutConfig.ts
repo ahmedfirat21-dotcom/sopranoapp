@@ -287,7 +287,11 @@ export interface RoomLayoutConfig {
 export const DEFAULT_ROOM_LAYOUT: RoomLayoutConfig = {
   host: {
     avatarShape: 'circle',
-    avatarSize: 144,         // 140→144: Solo host'ta biraz daha dramatik
+    // ★ v31+: STANDARDIZE — host konuşmacılarla aynı boy (sizePresets.large=116).
+    //   Discord/Clubhouse pattern: tüm konuşmacılar uniform; host SADECE altın
+    //   ring + halo + yıldız ile belli olur. Önce 144'tü → 2 konuşmacıda fırat
+    //   alta düşüyor + listener ile aynı satıra geliyordu.
+    avatarSize: 116,
     borderRadius: 48,
     ringWidth: 3,
     ringColor: '#FBBF24',
@@ -299,9 +303,9 @@ export const DEFAULT_ROOM_LAYOUT: RoomLayoutConfig = {
     badgePosition: 'topRight',
     haloEnabled: true,
     haloColor: '#FBBF24',
-    haloOpacity: 0.40,       // 0.45→0.40 yumuşak halo
-    haloBlur: 28,            // 24→28 geniş glow
-    containerPadding: 8,     // 12→8 kompakt
+    haloOpacity: 0.40,
+    haloBlur: 28,
+    containerPadding: 8,
   },
   speakers: {
     avatarShape: 'circle',
