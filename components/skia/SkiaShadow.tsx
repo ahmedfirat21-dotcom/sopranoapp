@@ -121,10 +121,9 @@ export function SkiaShadow({
 
 const styles = StyleSheet.create({
   container: {},
-  // ★ v1.7.13.34 (19 May 2026): contentWrapper flex:1 — boşluk olduğunda parent'tan
-  //   flex/width almıyordu, içerideki flex:1 olan Pressable 0 width ile render
-  //   oluyordu. Bug raporu: "şifreli oda girişinde onay düğmesi yok sadece vazgeç var".
-  //   Sebep: PasswordPromptSheet btnRow gap:10 + btnSecondary flex:1 +
-  //   SkiaShadow {flex:1.4 style} → contentWrapper {} → Pressable flex:1 = 0 width.
-  contentWrapper: { flex: 1 },
+  // ★ v1.7.13.35 REVERT: Eski {} geri — flex:1 eklemesi profil sayfasi ÖNE ÇIKAN
+  //   ROZETLER bölümünü bozdu (dikey teal şerit). PasswordPromptSheet onay butonu
+  //   bug'ı için ayrıca PasswordPromptSheet'te ayrı düzeltme yapıldı (SkiaShadow yerine
+  //   regular View kullanildi).
+  contentWrapper: {},
 });

@@ -185,26 +185,29 @@ export function PasswordPromptSheet({
           </Text>
         )}
 
+        {/* ★ v1.7.13.35: SkiaShadow wrapper KALDIRILDI — contentWrapper layout
+            bug'ı (SkiaShadow {style:{flex:1.4}} + Pressable {flex:1} = 0 width).
+            Yerine regular View. Shadow zaten btnPrimary style'ında var (elevation +
+            shadowColor/Opacity). Sonuç: hem butonlar görünür hem profil rozet
+            bölümü bozulmaz. */}
         <View style={st.btnRow}>
           <Pressable style={st.btnSecondary} onPress={onDismiss} disabled={submitting}>
             <Text style={st.btnSecondaryText}>{i18n.t('access.cancel')}</Text>
           </Pressable>
-          <SkiaShadow shadowColor="#14B8A6" shadowOpacity={pw.length > 0 && !submitting ? 0.4 : 0} shadowBlur={10} shadowOffsetY={4} borderRadius={12} style={{ flex: 1.4 }}>
-            <Pressable
-              style={[st.btnPrimary, (submitting || pw.length < 1) && { opacity: 0.5 }, { flex: 1 }]}
-              onPress={() => pw.trim() && onSubmit(pw.trim())}
-              disabled={submitting || pw.length < 1}
-            >
-              {submitting ? (
-                <AppLoader color="#FFF" size="small" />
-              ) : (
-                <>
-                  <Ionicons name="log-in-outline" size={14} color="#FFF" />
-                  <Text style={st.btnPrimaryText}>{i18n.t('access.enter')}</Text>
-                </>
-              )}
-            </Pressable>
-          </SkiaShadow>
+          <Pressable
+            style={[st.btnPrimary, (submitting || pw.length < 1) && { opacity: 0.5 }]}
+            onPress={() => pw.trim() && onSubmit(pw.trim())}
+            disabled={submitting || pw.length < 1}
+          >
+            {submitting ? (
+              <AppLoader color="#FFF" size="small" />
+            ) : (
+              <>
+                <Ionicons name="log-in-outline" size={14} color="#FFF" />
+                <Text style={st.btnPrimaryText}>{i18n.t('access.enter')}</Text>
+              </>
+            )}
+          </Pressable>
         </View>
       </View>
     </BaseSheet>
