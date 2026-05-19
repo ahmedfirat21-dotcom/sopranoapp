@@ -1407,28 +1407,32 @@ export default function SpeakerSection({ stageUsers, getMicStatus, onSelectUser,
   const showSpotlight = VideoView && camCount > 0 && camCfgTop.spotlightEnabled;
 
   // Spotlight tile boyutları — kamera sayısına göre web admin aspect kuralları
-  // ★ v306 (18 May 2026): SAFETY_BUFFER eklendi — flexbox wrap fix.
-  //   Mathematical olarak tam sınırda (W-32) sığan tile'lar 0.5px stretch ile wrap
-  //   tetikliyordu (Samsung S25 FE 412dp ekran, 2 tile + gap = 380, container 380 tam).
-  //   8px buffer her durumda yan yana garantisi verir.
-  const SAFETY_BUFFER = 8;
+  // ★ v1.7.13.26 (19 May 2026): Web admin önizlemesi ile BİREBİR — hardcoded 32 yerine
+  //   admin'in global.horizontalPadding * 2 kullanılır. Eskiden 32 (=16*2) sabit idi;
+  //   admin horizontalPadding=0 yaptığında web preview tam ekran tile gösteriyordu ama
+  //   APK 32px daha dar üretiyordu, görsel sapma olusuyordu. Şimdi formül web admin
+  //   `CameraSpotlightGrid` (preview.tsx L597-611) ile aynı.
+  //   SAFETY_BUFFER 8→2: flexbox 0.5px stretch toleransı korunur ama görsel kayıp ihmal.
+  const hp2 = Math.max(0, (layout?.global?.horizontalPadding ?? 16) * 2);
+  const SAFETY_BUFFER = 2;
+  const contentW = W - hp2 - SAFETY_BUFFER;
   let spotlightW = 0, spotlightH = 0, spotlightGap = camCfgTop.spotlightGap;
   if (showSpotlight) {
     if (camCount === 1) {
-      spotlightW = W - 32 - SAFETY_BUFFER;
+      spotlightW = contentW;
       spotlightH = Math.round(spotlightW * camCfgTop.spotlightSingleAspect);
     } else if (camCount === 2) {
-      spotlightW = Math.floor((W - 32 - spotlightGap - SAFETY_BUFFER) / 2);
+      spotlightW = Math.floor((contentW - spotlightGap) / 2);
       spotlightH = Math.round(spotlightW * camCfgTop.spotlightDoubleAspect);
     } else if (camCount === 3) {
-      spotlightW = Math.floor((W - 32 - spotlightGap * 2 - SAFETY_BUFFER) / 3);
+      spotlightW = Math.floor((contentW - spotlightGap * 2) / 3);
       spotlightH = Math.round(spotlightW * camCfgTop.spotlightTripleAspect);
     } else if (camCount === 4) {
-      spotlightW = Math.floor((W - 32 - spotlightGap - SAFETY_BUFFER) / 2);
+      spotlightW = Math.floor((contentW - spotlightGap) / 2);
       spotlightH = Math.round(spotlightW * camCfgTop.spotlightQuadAspect);
     } else {
       // 5+ kamera: 3 col kompakt grid (admin aspect kullanılmaz, sabit kare)
-      spotlightW = Math.floor((W - 32 - spotlightGap * 2 - SAFETY_BUFFER) / 3);
+      spotlightW = Math.floor((contentW - spotlightGap * 2) / 3);
       spotlightH = spotlightW;
       spotlightGap = Math.max(4, spotlightGap - 4);
     }
@@ -1439,7 +1443,7 @@ export default function SpeakerSection({ stageUsers, getMicStatus, onSelectUser,
   //   Şimdi camCfgTop.audioCompactSize + audioCompactGap admin'den.
   const _audioMax = camCfgTop.audioCompactSize ?? 76;
   const _audioGap = camCfgTop.audioCompactGap ?? 8;
-  const audioCompactSize = Math.min(_audioMax, Math.floor((W - 32 - _audioGap * 4) / 5));
+  const audioCompactSize = Math.min(_audioMax, Math.floor((W - hp2 - _audioGap * 4) / 5));
 
   return (
     <View style={s.wrap}>
