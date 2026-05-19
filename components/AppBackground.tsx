@@ -32,9 +32,12 @@ export default function AppBackground({ children, disableWave = false, intensity
         {/* ★ 2026-04-24 v3: Gece yarısı gökyüzü — saf dikey blur geçiş, ana katman.
             Üst horizon parlaklığı → orta derin mavi → alt neredeyse siyah.
             Çok sayıda yakın stop ile çizgi/band hissi engellenir. */}
+        {/* ★ v1.7.13.31 (19 May 2026): Kullanici 'arkaplan parlaktan koyuya
+            dogru' istedi. Top kademe daha vibrant blue-teal (#506E9C → #3A5680),
+            alt 'da neredeyse siyah (#050811). Yumusak 6-stop gecis. */}
         <LinearGradient
-          colors={['#3A4B66', '#2B3A54', '#1E2A42', '#131D30', '#0A1322', '#050A14']}
-          locations={[0, 0.22, 0.42, 0.62, 0.82, 1]}
+          colors={['#506E9C', '#3A5680', '#283F62', '#1A2C49', '#0E1A30', '#050811']}
+          locations={[0, 0.20, 0.40, 0.60, 0.80, 1]}
           start={{ x: 0.5, y: 0 }}
           end={{ x: 0.5, y: 1 }}
           style={StyleSheet.absoluteFillObject}
