@@ -57,6 +57,20 @@ async function _safeAward(userId: string, badgeId: string): Promise<boolean> {
       } catch (e) {
         if (__DEV__) console.warn(`[BadgeEngine] Celebration trigger hatası (${badgeId}):`, e);
       }
+
+      // ★ v1.7.13.46 (19 May 2026): Local push notification — app
+      //   background'a alındıysa veya kullanıcı başka ekrandaysa OS bildirim
+      //   bildirsin. In-app celebration ekran kapalıyken görünmez.
+      try {
+        const { PushNotifications } = require('./pushNotifications');
+        PushNotifications.sendLocalNotification(
+          `🏅 Yeni Rozet: ${badgeDef.label}`,
+          `${badgeDef.description}${badgeDef.spReward > 0 ? ` (+${badgeDef.spReward} SP)` : ''}`,
+          { type: 'badge_earned', badgeId, screen: 'profile' },
+        );
+      } catch (e) {
+        if (__DEV__) console.warn(`[BadgeEngine] Push notification hatası (${badgeId}):`, e);
+      }
     }
     return result.awarded;
   } catch (e) {
