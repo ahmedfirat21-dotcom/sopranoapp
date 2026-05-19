@@ -594,8 +594,19 @@ export default function ProfileScreen() {
       const signal = { cancelled: false };
       refreshProfile();
       loadStats(signal);
+      // ★ v1.7.13.46 (19 May 2026): checkAllBadges catch-up.
+      //   badgeEngine.ts'te checkAllBadges yazılı ama hiçbir yerden çağrılmıyordu;
+      //   eski kullanıcılar hak ettikleri rozetleri geriye dönük alamıyordu.
+      //   Profile her açıldığında çalışır (sadece kendi profilinde — başkasının
+      //   profilini açınca onun rozetlerini kazandırma anlamsız).
+      if (userId && firebaseUser?.uid === userId) {
+        try {
+          const { checkAllBadges } = require('../../services/badgeEngine');
+          checkAllBadges(userId);
+        } catch { /* silent */ }
+      }
       return () => { signal.cancelled = true; };
-    }, [loadStats, refreshProfile])
+    }, [loadStats, refreshProfile, userId, firebaseUser?.uid])
   );
 
   // ★ 2026-04-21: Realtime dual subscription kaldırıldı.

@@ -229,12 +229,24 @@ export const ProfileService = {
         0,
       );
 
-      return {
+      const result = {
         stageMinutes: (stageEventsRes.count || 0) * 10,
         roomsCreated: roomsCreatedRes.count || 0,
         totalListeners,
         totalReactions: totalReactionsRes.count || 0,
       };
+
+      // ★ v1.7.13.46 (19 May 2026): stage_pro rozeti dead trigger fix.
+      //   checkStageBadge fonksiyonu vardı ama hiçbir yerden çağrılmıyordu;
+      //   100 saat sahnede dursan da kazanamıyordun. Artık getDetailedStats
+      //   profile open'da çalışıyor → bu çağrı ile stage_pro otomatik tetiklenir.
+      //   Fire-and-forget — başarısız olursa stat dönüşü etkilenmez.
+      try {
+        const { checkStageBadge } = require('./badgeEngine');
+        checkStageBadge(userId, result.stageMinutes);
+      } catch { /* silent */ }
+
+      return result;
     } catch {
       return { stageMinutes: 0, roomsCreated: 0, totalListeners: 0, totalReactions: 0 };
     }
