@@ -1552,7 +1552,9 @@ export default function SpeakerSection({ stageUsers, getMicStatus, onSelectUser,
 
 const s = StyleSheet.create({
   // ★ v31+: paddingTop 4→0 — header altinda fazla bosluk olusturuyordu
-  wrap: { paddingHorizontal: 16, paddingTop: 0 },
+  // ★ v32: paddingTop 0→12 — kullanici 'host bir tik asagiya indir'.
+  //   Konusmacilar header altina yapismasin, hafif nefes alani.
+  wrap: { paddingHorizontal: 16, paddingTop: 12 },
   headerRow: {
     flexDirection: 'row', alignItems: 'center',
     justifyContent: 'space-between', marginBottom: 8,

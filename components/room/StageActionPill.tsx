@@ -42,7 +42,11 @@ export default function StageActionPill({
 }: Props) {
   // ★ v108.20: Listener için pill geri açıldı — sahne BOŞ veya yer varsa çıkabilir.
   //   stageFull → buton disabled (zaten mevcut). spectator → gizli.
-  if (role === 'spectator' || !role) return null;
+  // ★ v1.7.13.31: Listener için pill TEKRAR GİZLENDİ. Kullanıcı raporu:
+  //   "sahneye cikma yetkisi olmayanlarin ekraninda sahneye cik dugmesi kafa
+  //   karistiriyor. el kaldirma var zaten, el kaldirinca sahne talebi var".
+  //   Clubhouse paterni: dinleyici sadece el kaldirir, host onaylayinca konusmaci olur.
+  if (role === 'spectator' || role === 'listener' || !role) return null;
 
   const isSpeaker = role === 'speaker' || role === 'moderator' || role === 'owner';
   const onCooldown = (cooldownSeconds ?? 0) > 0;

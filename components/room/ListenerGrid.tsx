@@ -348,7 +348,10 @@ export default function ListenerGrid({ listeners, onSelectUser, selectedUserId, 
 
 const s = StyleSheet.create({
   wrap: {
-    paddingHorizontal: 16,
+    // ★ v32: 16→8. Kullanici 'dinleyici biraz daha sola kaydir' dedi.
+    //   Ilk dinleyici avatari ekran soluna daha yakin baslasin.
+    paddingLeft: 8,
+    paddingRight: 16,
     marginTop: 4,
     // ★ v281 (16 May 2026): zIndex:10/elevation:10 yetmedi — ghost-seat dashed border
     //   listener avatarın yıldız rozeti üzerinde çıkmaya devam ediyordu. position:'relative'
@@ -414,6 +417,10 @@ const s = StyleSheet.create({
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    // ★ v1.7.13.31: justifyContent:'flex-start' (default ama vurgulandı) — dinleyici
+    //   ilk avatari soldan baslasin. Center alignment elimizde olsa daha estetik
+    //   olabilir ama kullanici sol hizalamayi istedi.
+    justifyContent: 'flex-start',
   },
   cell: {
     alignItems: 'center',

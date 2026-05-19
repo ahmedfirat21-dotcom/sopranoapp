@@ -356,8 +356,10 @@ export const DEFAULT_ROOM_LAYOUT: RoomLayoutConfig = {
     bgColor: '#0A0F1A',
     bgGradient: ['#0F1926', '#0A0F1A'],
     bgImageUrl: null,
-    safePaddingTop: 12,
-    safePaddingBottom: 12,
+    // ★ v31+: 12→0. Header zaten insets.top alıyor, bu 12 redundant boşluk
+    //   olusturuyordu (kullanici 'ust headerin ustunde bosluk var').
+    safePaddingTop: 0,
+    safePaddingBottom: 0,
     horizontalPadding: 16,
   },
   animations: {
@@ -424,9 +426,11 @@ export const DEFAULT_ROOM_LAYOUT: RoomLayoutConfig = {
     liveDotColor: '#22C55E',
     liveDotPulse: true,
     showListenerCount: true,
-    headerBgOpacity: 0.55,   // ★ v31: 0.0→0.55. Tam şeffafta header'in nerede bittigi belirsizdi.
+    // ★ v31+: 0.55→0.0 — kullanici 'kesfet/odalarim aileyi bozma' dedi.
+    //   headerBgOpacity 0 = gradient tam opak; tab page header'lariyla birebir.
+    headerBgOpacity: 0.0,
     headerBorderBottom: true,
-    headerBorderColor: 'rgba(20,184,166,0.45)',
+    headerBorderColor: 'rgba(20,184,166,0.55)',
     // ★ v300: Host avatar varsayılanları — APK ile birebir.
     showHostAvatar: true,
     hostAvatarSize: 32,                 // 36→32: header padding'ine sigsin (kesilmesin)

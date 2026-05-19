@@ -4694,12 +4694,9 @@ export default function RoomScreen() {
             <LinearGradient colors={[themeColors[0], themeColors[1], '#070B14']} start={{ x: 0, y: 0 }} end={{ x: 0.5, y: 1 }} style={StyleSheet.absoluteFillObject} pointerEvents="none" />
           );
         }
-        // Default: ana sayfa AppBackground variant='explore' radialGlow={true}
-        // ile BİREBİR. Direkt component'i absoluteFill olarak kullanıyoruz —
-        // 6-stop gradient + teal/altın accent + NeonWaveBackground animasyonu.
-        // Kullanıcı raporu: "düz lacivert" + "diğer sayfalar ile aynı değil,
-        // gradient geçiş yukarıda parlaklık aşağıya doğru koyulaşır" → AppBackground
-        // component'i hepsini içeriyor.
+        // ★ v32: Kullanici 'arkaplan rengini eski rengine geri getir'.
+        //   AppBackground radialGlow geri — ana sayfa ile birebir.
+        //   Header gradient'i artik bunun ustunde gorunur (renkler farkli).
         return (
           <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
             <AppBackground variant="explore" radialGlow>
