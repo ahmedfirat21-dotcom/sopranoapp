@@ -826,8 +826,8 @@ const en: Record<string, string> = {
   'room.roomoverlays.002': "Seçili",  // TODO: translate
   'room.roomoverlays.003': "Gün Batımı",  // TODO: translate
   'room.roomoverlays.004': "Gül",  // TODO: translate
-  'room.roomoverlays.005': "Open",  // translated
-  'room.roomoverlays.006': "Şifreli",  // TODO: translate
+  'room.roomoverlays.005': "Public",
+  'room.roomoverlays.006': "Password Protected",
   'room.roomoverlays.007': "✅ Ban Kaldırıldı",  // TODO: translate
   'room.roomoverlays.008': "Ban Kaldırılamadı",  // TODO: translate
   'room.roomoverlays.009': "Bu kullanıcının banı kaldırılamadı.",  // TODO: translate
