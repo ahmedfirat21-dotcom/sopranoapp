@@ -224,26 +224,16 @@ function BoostedProfileCard({ profile: bp, index, friendIds, onlineIds }: { prof
             )}
           </View>
 
-          {/* Display name */}
+          {/* ★ v1.7.13.23 (19 May 2026): Display name biraz büyütüldü (11→12),
+              tier pill (PLUS/PRO/GM) KALDIRILDI — kullanıcı: "boost edilen
+              kartlardan plus/pro etiketlerini kaldır". Boost label (sağ üst
+              ELITE pill) bilgi kaynağı olarak yeterli. */}
           <Text numberOfLines={1} style={{
-            fontSize: 11, fontWeight: '800', color: '#F1F5F9', maxWidth: 94,
+            fontSize: 12, fontWeight: '800', color: '#F1F5F9', maxWidth: 94, marginTop: 2,
             textShadowColor: 'rgba(0,0,0,0.7)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
           }}>
             {bp.display_name || i18n.t('auto.tabs.home.013')}
           </Text>
-
-          {/* Tier pill — altta */}
-          {!!tierLabel && (
-            <View style={{
-              marginTop: 4, paddingHorizontal: 7, paddingVertical: 1.5, borderRadius: 6,
-              backgroundColor: accentColor + '30',
-              borderWidth: 0.5, borderColor: accentColor + '80',
-            }}>
-              <Text style={{ fontSize: 7, fontWeight: '900', color: accentColor, letterSpacing: 0.8 }}>
-                {tierLabel}
-              </Text>
-            </View>
-          )}
         </LinearGradient>
 
         {/* Shine sweep overlay — boost tier yoğunluğuna göre */}
