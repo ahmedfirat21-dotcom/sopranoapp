@@ -61,14 +61,17 @@ function getSpeakerMetrics(count: number, W: number, cfg?: SpeakersLayoutConfig)
   let cols: number, gap: number, maxSize: number;
 
   if (cfg) {
-    // Config aware sizing — count'a göre size preset pick'le
+    // ★ v1.7.13.28 (19 May 2026): Web admin preview.tsx getSpeakerMetrics ile BİREBİR.
+    //   Eski hardcoded col cap (3,3,3,4,5) ve count<=1 için 140 hardcoded kaldırıldı.
+    //   Admin maxCols slider + tüm sizePresets değerleri etkin.
     const presets = cfg.sizePresets;
-    if (count <= 1)       { cols = 1; maxSize = 140; }
-    else if (count <= 3)  { cols = Math.min(3, cfg.maxCols); maxSize = presets.large; }
-    else if (count <= 6)  { cols = Math.min(3, cfg.maxCols); maxSize = presets.medium; }
-    else if (count <= 9)  { cols = Math.min(3, cfg.maxCols); maxSize = Math.round(presets.medium * 0.92); }
-    else if (count <= 12) { cols = Math.min(4, cfg.maxCols); maxSize = presets.small; }
-    else                  { cols = Math.min(5, cfg.maxCols); maxSize = Math.round(presets.small * 0.9); }
+    if (count <= 1)       { cols = 1;                                  maxSize = presets.large; }
+    else if (count <= 3)  { cols = Math.min(count, cfg.maxCols);       maxSize = presets.large; }
+    else if (count <= 6)  { cols = Math.min(3, cfg.maxCols);           maxSize = presets.medium; }
+    else if (count <= 9)  { cols = Math.min(3, cfg.maxCols);           maxSize = Math.round(presets.medium * 0.92); }
+    else if (count <= 12) { cols = Math.min(4, cfg.maxCols);           maxSize = presets.small; }
+    else                  { cols = Math.min(5, cfg.maxCols);           maxSize = Math.round(presets.small * 0.9); }
+    if (count >= 2 && count <= 6) cols = Math.min(count, cfg.maxCols);
     gap = cfg.colGap;
   } else {
     if (count <= 1) { cols = 1; gap = 0; maxSize = 140; }
@@ -1479,31 +1482,40 @@ export default function SpeakerSection({ stageUsers, getMicStatus, onSelectUser,
       )}
 
       {/* ★ v92.21 — Audio-only kişiler:
-          • Spotlight aktif (kamera var): altta KOMPAKT circle satır (Clubhouse listener stili)
-          • Spotlight kapalı (kamera yok): UNIFORM circle grid (Clubhouse pure pattern) */}
-      {showSpotlight && audioOnlyUsers.length > 0 && (
-        <View style={[s.mainSpeakerGrid, { gap: 8, marginBottom: 4 }]}>
-          {audioOnlyUsers.map((u) => {
-            const rawSt = getMicStatus(u.user_id);
-            // ★ v302: overLimit kameralı → micStatus override (cameraOn=false, audio-only render)
-            const st = overLimitCameraIds.has(u.user_id)
-              ? { ...rawSt, cameraOn: false, videoTrack: null }
-              : rawSt;
-            const isMe = u.user_id === currentUserId;
-            return (
-              <SpeakerCard key={u.id} user={u} micStatus={st} onPress={() => onSelectUser(u)}
-                onSelfDemote={onSelfDemote}
-                onCameraExpand={onCameraExpand}
-                canModerate={canModerate?.(u) ?? false}
-                onQuickMute={onQuickMute ? () => onQuickMute(u) : undefined}
-                isMe={isMe}
-                cardWidth={audioCompactSize}
-                cardHeight={audioCompactSize}
-                VideoView={VideoView} />
-            );
-          })}
-        </View>
-      )}
+          • Spotlight aktif (kamera var): altta audio konuşmacılar
+          • Spotlight kapalı (kamera yok): UNIFORM circle grid (Clubhouse pure pattern)
+        ★ v1.7.13.28 (19 May 2026): Audio compact row 76dp hardcoded yerine regular
+          speaker metrics (sizePresets) — web admin preview ile birebir. Eski compact
+          row Clubhouse listener-style küçük circle veriyordu ama admin slider'ları
+          yansıtmıyordu. Şimdi audio-only sayısına göre getSpeakerMetrics çalışır:
+          1 kişi → büyük, 4+ kişi → orta, 10+ → küçük. Spotlight + 1-2 audio
+          önizleme ekranıyla AYNI ölçü. */}
+      {showSpotlight && audioOnlyUsers.length > 0 && (() => {
+        const audioMetrics = getSpeakerMetrics(audioOnlyUsers.length, W, speakersCfg);
+        return (
+          <View style={[s.mainSpeakerGrid, { gap: audioMetrics.gap, marginBottom: 4 }]}>
+            {audioOnlyUsers.map((u) => {
+              const rawSt = getMicStatus(u.user_id);
+              // ★ v302: overLimit kameralı → micStatus override (cameraOn=false, audio-only render)
+              const st = overLimitCameraIds.has(u.user_id)
+                ? { ...rawSt, cameraOn: false, videoTrack: null }
+                : rawSt;
+              const isMe = u.user_id === currentUserId;
+              return (
+                <SpeakerCard key={u.id} user={u} micStatus={st} onPress={() => onSelectUser(u)}
+                  onSelfDemote={onSelfDemote}
+                  onCameraExpand={onCameraExpand}
+                  canModerate={canModerate?.(u) ?? false}
+                  onQuickMute={onQuickMute ? () => onQuickMute(u) : undefined}
+                  isMe={isMe}
+                  cardWidth={audioMetrics.cardWidth}
+                  cardHeight={audioMetrics.cardWidth}
+                  VideoView={VideoView} />
+              );
+            })}
+          </View>
+        );
+      })()}
 
       {!showSpotlight && (
         <View style={[s.mainSpeakerGrid, { gap, marginBottom: 4 }]}>
