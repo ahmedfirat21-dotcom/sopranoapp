@@ -315,7 +315,9 @@ export const DEFAULT_ROOM_LAYOUT: RoomLayoutConfig = {
     namePosition: 'below',
     nameFontSize: 12,
     nameMaxChars: 0,
-    showMicIcon: true,
+    // ★ v31+: Default kapatildi — kullanici "sahnedekilerin uzerinde ses simgesi
+    //   ne ise yariyor" diye sorgulamis; ek bilgi vermeyen gorsel kalabalik.
+    showMicIcon: false,
     muteOpacity: 0.55,
     // 1 audio → 116dp (büyük), 4-9 → 92dp (3 col rahat), 10+ → 76dp
     sizePresets: { small: 76, medium: 92, large: 116 },
@@ -325,24 +327,24 @@ export const DEFAULT_ROOM_LAYOUT: RoomLayoutConfig = {
     borderRadius: 50,
     maxCols: 6,
     colGap: 10,
-    rowGap: 14,              // 12→14: dikey nefes
+    rowGap: 14,
     showName: true,
     nameFontSize: 10,
     nameMaxChars: 0,
-    ringWidth: 0,
-    ringColor: 'transparent',
+    // ★ v31+: Dinleyici çerçevesi default açık (subtle teal halka)
+    ringWidth: 1.5,
+    ringColor: 'rgba(20,184,166,0.40)',
     ownerCrownEnabled: true,
-    ownerScale: 1.12,        // 1.10→1.12: owner hafif belirgin
+    ownerScale: 1.12,
     sizePresets: { small: 44, medium: 52, large: 64 },
   },
   stage: {
     backgroundColor: 'rgba(15,25,38,0.0)',
     borderRadius: 0,
-    padding: 12,             // 16→12
+    // ★ v31+: Header altı boşluk azaltıldı — 12→4. Header bittikten hemen sonra sahne başlasın.
+    padding: 4,
     dividerStyle: 'none',
     dividerColor: 'rgba(255,255,255,0.08)',
-    // ★ KRİTİK FIX: 20→32. Spotlight tile uzun olunca (admin aspect>1)
-    //   listener üstüne biniyordu. 32dp her senaryoda görsel olarak rahat.
     gapBetweenSpeakersAndListeners: 32,
   },
   global: {
@@ -423,7 +425,7 @@ export const DEFAULT_ROOM_LAYOUT: RoomLayoutConfig = {
     headerBorderColor: 'rgba(20,184,166,0.45)',
     // ★ v300: Host avatar varsayılanları — APK ile birebir.
     showHostAvatar: true,
-    hostAvatarSize: 36,
+    hostAvatarSize: 32,                 // 36→32: header padding'ine sigsin (kesilmesin)
     hostAvatarBorderWidth: 1.5,
     hostAvatarBorderColor: 'rgba(20,184,166,0.55)',
     offsetY: 0,
@@ -436,15 +438,17 @@ export const DEFAULT_ROOM_LAYOUT: RoomLayoutConfig = {
     barBlurIntensity: 36,
     barBorderTop: 'rgba(20,184,166,0.20)',
     barPaddingV: 12,
-    buttonSize: 58,
-    buttonGap: 12,
+    // ★ v31+: 8 buton 393dp ekrana sığsın diye boyut/aralık küçültüldü.
+    //   buttonSize 58→42, buttonGap 12→6, iconSize 22→20 (8 * 42 + 7 * 6 = 378dp <  393)
+    buttonSize: 42,
+    buttonGap: 6,
     buttonShape: 'circle',
     buttonBorderRadius: 12,
     micActiveColor: '#10B981',
     micMutedColor: '#475569',
     leaveButtonColor: '#EF4444',
     iconColor: '#E2E8F0',
-    iconSize: 22,
+    iconSize: 20,
     // ★ v1.7.13.16 (19 May 2026): Default ana sayfa BUBBLE (58) ile birebir.
     //   Admin slider override edebilir (32-72 aralık).
     offsetY: 0,
