@@ -208,7 +208,7 @@ export default function ProfileHero({
             <Ionicons name="shield-checkmark" size={16} color="#DC2626" style={[{ marginLeft: 6 }, iconShadow]} />
           )}
         </View>
-        {username && <Text style={[s.username, { textAlign: 'center' }]} numberOfLines={1}>@{username}</Text>}
+        {username && <Text style={[s.username, { textAlign: 'center' }]} numberOfLines={1}>@{username.replace(/_[a-zA-Z0-9]{4}$/, "")}</Text>}
 
         {/* ★ v1.3.58: Tek satır chip rowu — userTitle (Sahne Yıldızı vs.) + BOOST +
             üyelik + son aktif hepsi yan yana. Eski 3 ayrı satır (title pill, metaRow

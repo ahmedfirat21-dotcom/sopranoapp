@@ -334,7 +334,7 @@ export function UserSearchModal({ visible, onClose, currentUserId, onSelectUser,
       <StatusAvatar uri={item.avatar_url} size={48} isOnline={liveOnlineIds.has(item.id)} tier={item.subscription_tier} frameId={(item as any).active_frame || null} customBadgeId={(item as any).active_badge_id ?? null} />
       <View style={s.userInfo}>
         <Text style={s.displayName}>{item.display_name || i18n.t('auto.UserSearchModal.005')}</Text>
-        {item.username && <Text style={s.username}>@{item.username}</Text>}
+        {item.username && <Text style={s.username}>@{item.username.replace(/_[a-zA-Z0-9]{4}$/, "")}</Text>}
       </View>
       <Ionicons name={isDiscover ? 'open-outline' : 'chatbubble-outline'} size={18} color={Colors.teal} />
     </Pressable>
@@ -506,7 +506,7 @@ export function UserSearchModal({ visible, onClose, currentUserId, onSelectUser,
                               <StatusAvatar uri={item.avatar_url} size={48} isOnline={liveOnlineIds.has(item.id)} tier={item.subscription_tier} frameId={(item as any).active_frame || null} customBadgeId={(item as any).active_badge_id ?? null} />
                               <View style={s.userInfo}>
                                 <Text style={s.displayName}>{item.display_name || i18n.t('auto.UserSearchModal.003')}</Text>
-                                {item.username && <Text style={s.username}>@{item.username}</Text>}
+                                {item.username && <Text style={s.username}>@{item.username.replace(/_[a-zA-Z0-9]{4}$/, "")}</Text>}
                               </View>
                               <Ionicons name={isDiscover ? 'open-outline' : 'chatbubble-outline'} size={18} color={Colors.teal} />
                             </Pressable>
@@ -530,7 +530,7 @@ export function UserSearchModal({ visible, onClose, currentUserId, onSelectUser,
                               <StatusAvatar uri={item.avatar_url} size={48} isOnline={liveOnlineIds.has(item.id)} tier={item.subscription_tier} frameId={(item as any).active_frame || null} customBadgeId={(item as any).active_badge_id ?? null} />
                               <View style={s.userInfo}>
                                 <Text style={s.displayName}>{item.display_name || i18n.t('auto.UserSearchModal.001')}</Text>
-                                {item.username && <Text style={s.username}>@{item.username}</Text>}
+                                {item.username && <Text style={s.username}>@{item.username.replace(/_[a-zA-Z0-9]{4}$/, "")}</Text>}
                               </View>
                               <Ionicons name="open-outline" size={18} color={Colors.teal} />
                             </Pressable>

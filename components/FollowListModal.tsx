@@ -297,7 +297,7 @@ export default function FollowListModal({
         <StatusAvatar uri={item.avatar_url} size={40} tier={(item as any).subscription_tier} showTierBadge={false} frameId={(item as any).active_frame || null} customBadgeId={(item as any).active_badge_id ?? null} />
         <View style={{ flex: 1 }}>
           <Text style={st.name} numberOfLines={1}>{item.display_name}</Text>
-          {item.username && <Text style={st.username}>@{item.username}</Text>}
+          {item.username && <Text style={st.username}>@{item.username.replace(/_[a-zA-Z0-9]{4}$/, "")}</Text>}
         </View>
 
         {/* Aksiyonlar — moda göre değişir, sadece kendi profilinde */}
