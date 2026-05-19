@@ -14,7 +14,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { i18n } from '../../services/i18n';
 import {
   View, Text, StyleSheet, Pressable, ScrollView, Animated, Easing,
-  Modal, PanResponder, Dimensions, useWindowDimensions,
+  Modal, PanResponder, useWindowDimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -92,20 +92,25 @@ export default function BadgeListModal({ visible, onClose, userId, displayName }
     }
   };
 
-  // Header pan — drag handle + title. dy > 4, scroll umurusamadan ALWAYS drag.
+  // ★ v1.7.13.45 (19 May 2026): Drag handle bölgesinde (üst 80dp) onStart'ta
+  //   responder DOĞRUDAN yakala. v43 testte 'header onStart' fire ediyor ama
+  //   onMoveShouldSetPanResponder hiç fire etmiyordu (RN Modal'da touchMove
+  //   delivery sorunu). Çözüm: onStartShouldSetPanResponder = TRUE eğer
+  //   locationY < 80. Sonraki tüm move'lar bize gelir, steal gerekmez.
+  const HEADER_HEIGHT = 80;
   const headerPanResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => false,
-      onStartShouldSetPanResponderCapture: () => false,
-      onMoveShouldSetPanResponder: (_, gs) => Math.abs(gs.dy) > 4 && Math.abs(gs.dy) > Math.abs(gs.dx),
-      onMoveShouldSetPanResponderCapture: (_, gs) => Math.abs(gs.dy) > 4 && Math.abs(gs.dy) > Math.abs(gs.dx),
+      onStartShouldSetPanResponder: (e) => e.nativeEvent.locationY < HEADER_HEIGHT,
+      onStartShouldSetPanResponderCapture: (e) => e.nativeEvent.locationY < HEADER_HEIGHT,
+      onMoveShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponderCapture: () => true,
       onPanResponderTerminationRequest: () => false,
       onPanResponderMove: onPanMove,
       onPanResponderRelease: onPanRelease,
     })
   ).current;
 
-  // Body pan — outer Animated.View. Capture phase ScrollView'dan responder çalar.
+  // Body pan — outer Animated.View. Move-only capture ile ScrollView'dan steal.
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => false,
@@ -126,6 +131,12 @@ export default function BadgeListModal({ visible, onClose, userId, displayName }
 
   if (!visible) return null;
 
+  // ★ v1.7.13.44 (19 May 2026): Modal geri restore, ancak pan responder
+  //   onStartShouldSetPanResponder ile touch BAŞINDA responder yakalanır
+  //   (drag handle bölgesinde başlarsa). Böylece sonraki touchMove'lar
+  //   ScrollView'a değil bize gelir. v43 sorunu Modal'in onMove eat etmesiydi
+  //   ama gerçek sebep onMoveShouldSetPanResponder'ın CHILD üzerinde fire
+  //   etmemesiydi — ScrollView/inner Pressable'lar move'u kapıyordu.
   return (
     <>
       <Modal visible={visible} transparent animationType="none" onRequestClose={onClose} statusBarTranslucent>
