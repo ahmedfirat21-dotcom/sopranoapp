@@ -47,7 +47,11 @@ export function UserSearchModal({ visible, onClose, currentUserId, onSelectUser,
   const [results, setResults] = useState<Profile[]>([]);
   const [roomResults, setRoomResults] = useState<any[]>([]);
   const [friends, setFriends] = useState<Profile[]>([]);
-  const [suggestedUsers, setSuggestedUsers] = useState<Profile[]>([]);
+  // ★ v1.7.13.37 (19 May 2026): suggestedUsers KALDIRILDI — kullanıcı mahremiyeti.
+  //   Eski: arama yazılmadan tüm üyelerin son aktif 20'si listeleniyordu (Clubhouse/
+  //   TikTok/Instagram'da yok). Yeni: empty state'te SADECE canlı odalar + mutual
+  //   arkadaşlar. Kişi arama YAZILDIĞINDA explicit niyet ile DB'ye gider.
+  const [trendingRooms, setTrendingRooms] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [friendsLoading, setFriendsLoading] = useState(true);
 
@@ -55,7 +59,7 @@ export function UserSearchModal({ visible, onClose, currentUserId, onSelectUser,
   useEffect(() => {
     if (!visible || !currentUserId) return;
     loadFriends();
-    if (isDiscover) loadSuggestedUsers();
+    if (isDiscover) loadTrendingRooms();
     setQuery('');
     setResults([]);
     setRoomResults([]);
@@ -88,37 +92,20 @@ export function UserSearchModal({ visible, onClose, currentUserId, onSelectUser,
     }
   };
 
-  /** Keşfet modunda — takip edilmeyen online/yeni üyeleri öner */
-  const loadSuggestedUsers = async () => {
+  /** ★ v1.7.13.37: Empty state'te "tüm üyeleri keşfet" yerine canlı odalar.
+   *  Mahremiyet: kullanıcılar arama yazmadan rastgele başkalarını göremez.
+   *  Sektör paterni: Clubhouse / TikTok / Spaces — search-only kişi keşfi. */
+  const loadTrendingRooms = async () => {
     try {
-      // Takip edilen ID'leri al
-      const { data: following } = await supabase
-        .from('friendships')
-        .select('friend_id')
-        .eq('user_id', currentUserId)
-        .eq('status', 'accepted');
-      const followingIds = (following || []).map(f => f.friend_id);
-      followingIds.push(currentUserId); // Kendimi de hariç tut
-
-      // Önce online kullanıcıları getir, sonra son kayıtları
-      const { data: suggested } = await supabase
-        .from('profiles')
-        .select('*')
-        .not('id', 'in', `(${followingIds.join(',')})`)
-        .order('last_seen', { ascending: false, nullsFirst: false })
-        .order('created_at', { ascending: false })
-        .limit(40); // Block filter sonrası 20'ye düşürülecek
-
-      // ★ Block-aware: engellediğin + seni engelleyen kullanıcıları çıkar
-      let filtered = (suggested as Profile[]) || [];
-      try {
-        const { getBlockedUserIds } = await import('../services/blocklist');
-        const blockedSet = await getBlockedUserIds(currentUserId);
-        if (blockedSet.size > 0) filtered = filtered.filter(p => !blockedSet.has(p.id));
-      } catch {}
-      setSuggestedUsers(filtered.slice(0, 20));
+      const { data: rooms } = await supabase
+        .from('rooms')
+        .select('id, name, category, is_live, listener_count, host:profiles!host_id(display_name, avatar_url)')
+        .eq('is_live', true)
+        .order('listener_count', { ascending: false })
+        .limit(5);
+      setTrendingRooms(rooms || []);
     } catch (e) {
-      if (__DEV__) console.warn('[UserSearch] Önerilen kullanıcı hatası:', e);
+      if (__DEV__) console.warn('[UserSearch] Trending oda hatası:', e);
     }
   };
 
@@ -514,36 +501,40 @@ export function UserSearchModal({ visible, onClose, currentUserId, onSelectUser,
                         </>
                       )}
 
-                      {/* Önerilen Üyeler — sadece keşfet modunda */}
-                      {isDiscover && suggestedUsers.length > 0 && (
+                      {/* ★ v1.7.13.37: "Önerilen Üyeler" KALDIRILDI (mahremiyet).
+                          Yerine canlı oda listesi — kullanıcı aktif yerleri görür,
+                          rastgele kişiler değil. */}
+                      {isDiscover && trendingRooms.length > 0 && (
                         <>
                           <View style={[s.sectionHeader, { marginTop: friends.length > 0 ? 8 : 0 }]}>
-                            <Ionicons name="sparkles" size={13} color={Colors.teal} />
-                            <Text style={s.sectionTitle}>{i18n.t('search.discover_all_members')}</Text>
+                            <Ionicons name="radio" size={13} color={Colors.teal} />
+                            <Text style={s.sectionTitle}>Şu An Canlı Odalar</Text>
                           </View>
-                          {suggestedUsers.map((item) => (
+                          {trendingRooms.map((room: any) => (
                             <Pressable
-                              key={item.id}
+                              key={room.id}
                               style={({ pressed }) => [s.userRow, pressed && { opacity: 0.8, backgroundColor: 'rgba(92,225,230,0.06)' }]}
-                              onPress={() => { onSelectUser(item.id, item.display_name || i18n.t('auto.UserSearchModal.002')); onClose(); }}
+                              onPress={() => { onSelectRoom?.(room.id); onClose(); }}
                             >
-                              <StatusAvatar uri={item.avatar_url} size={48} isOnline={liveOnlineIds.has(item.id)} tier={item.subscription_tier} frameId={(item as any).active_frame || null} customBadgeId={(item as any).active_badge_id ?? null} />
-                              <View style={s.userInfo}>
-                                <Text style={s.displayName}>{item.display_name || i18n.t('auto.UserSearchModal.001')}</Text>
-                                {item.username && <Text style={s.username}>@{item.username.replace(/_[a-zA-Z0-9]{4}$/, "")}</Text>}
+                              <View style={[s.avatarWrap, { backgroundColor: 'rgba(20,184,166,0.1)', width: 48, height: 48, borderRadius: 14, justifyContent: 'center', alignItems: 'center' }]}>
+                                <Ionicons name="mic" size={20} color={Colors.teal} />
                               </View>
-                              <Ionicons name="open-outline" size={18} color={Colors.teal} />
+                              <View style={s.userInfo}>
+                                <Text style={s.displayName}>{room.name}</Text>
+                                <Text style={s.username}>{room.host?.display_name || 'Anonim'} · {room.listener_count || 0} dinleyici</Text>
+                              </View>
+                              <Ionicons name="enter-outline" size={18} color={Colors.teal} />
                             </Pressable>
                           ))}
                         </>
                       )}
 
-                      {/* Hiç arkadaş ve öneri yoksa */}
-                      {friends.length === 0 && suggestedUsers.length === 0 && (
+                      {/* Hiç arkadaş ve canlı oda yoksa — açıklayıcı boş state */}
+                      {friends.length === 0 && trendingRooms.length === 0 && (
                         <View style={s.emptyState}>
-                          <Ionicons name="people-outline" size={36} color="rgba(92,225,230,0.2)" />
-                          <Text style={s.emptyText}>{i18n.t('search.no_friends')}</Text>
-                          <Text style={s.emptySubtext}>{i18n.t('usersearchmodal.001')}</Text>
+                          <Ionicons name="search-outline" size={36} color="rgba(92,225,230,0.2)" />
+                          <Text style={s.emptyText}>Kişi veya oda ara</Text>
+                          <Text style={s.emptySubtext}>İsim, kullanıcı adı veya oda adıyla arayabilirsin</Text>
                         </View>
                       )}
                     </>
