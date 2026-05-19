@@ -263,18 +263,9 @@ export default function TieredProfileSections({
               <Text style={s.vipStatLabel}>{i18n.t('profile.engagement')}</Text>
             </View>
           </View>
-          {/* Stereo ses rozeti */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.04)' }}>
-            <View style={{ width: 24, height: 24, borderRadius: 6, backgroundColor: 'rgba(255,107,53,0.15)', alignItems: 'center', justifyContent: 'center' }}>
-              <Ionicons name="headset" size={12} color="#FF6B35" />
-            </View>
-            <Text style={{ fontSize: 11, color: '#FF6B35', fontWeight: '700' }}>{i18n.t('profile.stereo_active')}</Text>
-            <View style={{ flex: 1 }} />
-            <View style={[lk.badge, { borderColor: 'rgba(255,107,53,0.3)', backgroundColor: 'rgba(255,107,53,0.08)' }]}>
-              <Ionicons name="checkmark" size={8} color="#FF6B35" />
-              <Text style={[lk.badgeText, { color: '#FF6B35' }]}>48kHz</Text>
-            </View>
-          </View>
+          {/* ★ v1.7.13.39 (19 May 2026): Stereo 48kHz ses kalitesi rozeti KALDIRILDI.
+              Kullanıcı: 'pro plus gibi ses kalitesine vurgu yapan ifadeler var
+              onlara gerek yok'. Tier subscription vurgusu olarak sade kalır. */}
         </View>
       ) : (
         <LockedFeatureHint label={i18n.t('profile.tieredprofilesections.008')} requiredTier="Pro" icon="stats-chart-outline" />

@@ -408,7 +408,7 @@ const en: Record<string, string> = {
   'profile.section.wallet': 'WALLET',
   'profile.section.my_rooms': 'MY ROOMS',
   'profile.section.their_rooms': 'ROOMS',
-  'profile.tier_pro_features': 'Unlimited rooms · 1080p · Stereo audio',
+  'profile.tier_pro_features': 'Unlimited rooms · Donations · Entry fee',
   'profile.tier_plus_features': 'HD audio · 720p video · All room types',
   'profile.tier_free_features': 'Basic features',
   'profile.tier_member_suffix': '{{tier}} Member',

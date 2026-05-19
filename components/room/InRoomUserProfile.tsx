@@ -786,9 +786,11 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                 <Ionicons name="chevron-down" size={22} color="#F1F5F9" />
               </Pressable>
               <Text style={sty.wizardTitle}>{i18n.t('profile.upper_label')}</Text>
-              <View style={sty.tierChip}>
-                <Text style={sty.tierChipText}>{tier}</Text>
-              </View>
+              {/* ★ v1.7.13.39 (19 May 2026): tierChip KALDIRILDI — başkalarının
+                  profilinde Pro/Plus tier badge gösterilmiyor (kullanıcı mahremiyet
+                  talebi). Sağ alanı boş bırakıyoruz; iconBtn ile simetri için
+                  görünmez placeholder. */}
+              <View style={sty.iconBtn} />
             </View>
           </View>
 
@@ -1357,27 +1359,10 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                   />
                 )}
 
-                {/* ★ 2026-04-25: ÜYELİK — Plus/Pro için premium section header + diagonal gradient kart */}
-                {tier !== 'Free' && (
-                  <>
-                    <ProfileSectionHeader label={i18n.t('profile.section.membership')} icon={tierDef.icon as any} accentColor={tierDef.color} />
-                    <View style={sty.sectionCard}>
-                      <LinearGradient colors={['#3a4658', '#2a3344', '#1a2030']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFillObject} pointerEvents="none" />
-                      <LinearGradient colors={['transparent', tierDef.color + '99', 'transparent']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={sty.sectionTopEdge} />
-                      <View style={sty.tierRow}>
-                        <LinearGradient colors={tierDef.gradient as [string, string]} style={sty.tierIcon}>
-                          <Ionicons name={tierDef.icon as any} size={18} color="#fff" style={iconShadow} />
-                        </LinearGradient>
-                        <View style={{ flex: 1 }}>
-                          <Text style={[sty.tierTitle, { color: tierDef.color }]}>{i18n.t('profile.tier_member_suffix', { tier: tierDef.label })}</Text>
-                          <Text style={sty.tierDesc}>
-                            {tier === 'Pro' ? i18n.t('profile.tier_pro_features') : i18n.t('profile.tier_plus_features')}
-                          </Text>
-                        </View>
-                      </View>
-                    </View>
-                  </>
-                )}
+                {/* ★ v1.7.13.39 (19 May 2026): ÜYELİK section KALDIRILDI.
+                    Kullanıcı: 'pro üye yazıyor ya bunu görmelerine gerek yok bu veriye
+                    de gerek yok'. Tier bilgisi başkalarına gösterilmiyor; sadece ayarlar
+                    + üyelik planları sayfasında kendi tier'ı görüyor. */}
 
                 {/* ★ 2026-04-25: CÜZDANIM — section header + altın gradient kart (sadece own profile) */}
                 {isOwnProfile && (

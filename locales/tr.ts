@@ -415,8 +415,8 @@ const tr: Record<string, string> = {
   'profile.section.wallet': 'CÜZDANIM',
   'profile.section.my_rooms': 'ODALARIM',
   'profile.section.their_rooms': 'ODALARI',
-  'profile.tier_pro_features': 'Sınırsız oda · 1080p · Stereo ses',
-  'profile.tier_plus_features': 'HD ses · 720p video · Tüm oda türleri',
+  'profile.tier_pro_features': 'Sınırsız oda · Bağış · Giriş ücreti',
+  'profile.tier_plus_features': 'Uzun oda · Tüm türler · Davet',
   'profile.tier_free_features': 'Temel özellikler',
   'profile.tier_member_suffix': '{{tier}} Üye',
   // Tarih formatları
