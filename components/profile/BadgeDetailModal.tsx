@@ -368,9 +368,12 @@ interface Props {
   visible: boolean;
   onClose: () => void;
   badge: BadgeDef | null;
+  /** ★ v1.7.13.46: locked=true ise rozet kazanılmamış. Detail modal grayscale
+   *  ikon + "Nasıl kazanırım" + "Avantajlar (kazanınca)" gösterir. */
+  locked?: boolean;
 }
 
-export default function BadgeDetailModal({ visible, onClose, badge }: Props) {
+export default function BadgeDetailModal({ visible, onClose, badge, locked = false }: Props) {
   const scale = useRef(new Animated.Value(0.85)).current;
   const opacity = useRef(new Animated.Value(0)).current;
   const dragY = useRef(new Animated.Value(0)).current;

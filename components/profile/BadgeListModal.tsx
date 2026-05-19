@@ -21,7 +21,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AppLoader from '../AppLoader';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Shadows } from '../../constants/theme';
-import { BadgeService } from '../../services/badges';
+import { BadgeService, type BadgeWithStatus } from '../../services/badges';
 import type { BadgeDef, BadgeRarity } from '../../constants/badges';
 import BadgeDetailModal from './BadgeDetailModal';
 import { SkiaShadow } from '../skia';
@@ -48,9 +48,13 @@ export default function BadgeListModal({ visible, onClose, userId, displayName }
   const insets = useSafeAreaInsets();
   const PANEL_HEIGHT = H * 0.82;
 
-  const [badges, setBadges] = useState<BadgeDef[]>([]);
+  // ★ v1.7.13.46 (19 May 2026): TÜM rozetleri (earned + locked) çek.
+  //   Kullanıcı motivasyon kaynağı: kilitliler görünür, "ne yapmalıyım" hint var.
+  const [items, setItems] = useState<BadgeWithStatus[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedBadge, setSelectedBadge] = useState<BadgeDef | null>(null);
+  const [selectedItem, setSelectedItem] = useState<BadgeWithStatus | null>(null);
+  const earnedCount = items.filter(i => i.earned).length;
+  const totalCount = items.length;
 
   const translateY = useRef(new Animated.Value(PANEL_HEIGHT)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
@@ -60,8 +64,8 @@ export default function BadgeListModal({ visible, onClose, userId, displayName }
   useEffect(() => {
     if (!visible || !userId) return;
     setLoading(true);
-    BadgeService.getBadgesForUser(userId)
-      .then(setBadges)
+    BadgeService.getAllBadgesWithStatus(userId)
+      .then(setItems)
       .finally(() => setLoading(false));
   }, [visible, userId]);
 
@@ -123,8 +127,8 @@ export default function BadgeListModal({ visible, onClose, userId, displayName }
     })
   ).current;
 
-  const showBadgeDetail = (b: BadgeDef) => {
-    setSelectedBadge(b);
+  const showBadgeDetail = (item: BadgeWithStatus) => {
+    setSelectedItem(item);
   };
 
   const title = displayName ? displayName.toLocaleUpperCase('tr-TR') : 'ROZETLER';
@@ -169,9 +173,9 @@ export default function BadgeListModal({ visible, onClose, userId, displayName }
                 <View style={st.headerAccent} />
                 <Ionicons name="ribbon" size={14} color="#FCD34D" style={iconShadow} />
                 <Text style={st.headerTitle} numberOfLines={1}>{title}</Text>
-                {badges.length > 0 && (
+                {totalCount > 0 && (
                   <View style={st.countBadge}>
-                    <Text style={st.countText}>{badges.length}</Text>
+                    <Text style={st.countText}>{earnedCount}/{totalCount}</Text>
                   </View>
                 )}
               </View>
@@ -181,11 +185,10 @@ export default function BadgeListModal({ visible, onClose, userId, displayName }
               <View style={st.loading}>
                 <AppLoader size="large" color="#FCD34D" />
               </View>
-            ) : badges.length === 0 ? (
+            ) : items.length === 0 ? (
               <View style={st.empty}>
                 <Ionicons name="ribbon-outline" size={42} color="rgba(252,211,77,0.25)" />
-                <Text style={st.emptyText}>{i18n.t('profile.badgelistmodal.001')}</Text>
-                <Text style={st.emptyHint}>{i18n.t('profile.badgelistmodal.002')}</Text>
+                <Text style={st.emptyText}>Henüz rozet tanımlanmamış</Text>
               </View>
             ) : (
               <ScrollView
@@ -194,35 +197,75 @@ export default function BadgeListModal({ visible, onClose, userId, displayName }
                 showsVerticalScrollIndicator={false}
                 nestedScrollEnabled
               >
-                <View style={st.grid}>
-                  {badges.map(b => (
-                    <Pressable
-                      key={b.id}
-                      onPress={() => showBadgeDetail(b)}
-                      style={({ pressed }) => [
-                        st.gridCard,
-                        pressed && { opacity: 0.85, transform: [{ scale: 0.96 }] },
-                      ]}
-                    >
-                      <BadgeMedal badge={b} />
-                      <Text style={[st.cardLabel, { color: getLabelColor(b.rarity) }]} numberOfLines={1}>
-                        {b.label}
-                      </Text>
-                      <Text style={[st.rarityTag, { color: getRarityTagColor(b.rarity) }]} numberOfLines={1}>
-                        {RARITY_LABEL[b.rarity]}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
+                {/* ★ v1.7.13.46: Kazanılanlar section */}
+                {earnedCount > 0 && (
+                  <>
+                    <View style={st.sectionHeader}>
+                      <Ionicons name="trophy" size={12} color="#FCD34D" />
+                      <Text style={st.sectionTitle}>KAZANILANLAR · {earnedCount}</Text>
+                    </View>
+                    <View style={st.grid}>
+                      {items.filter(i => i.earned).map(item => (
+                        <Pressable
+                          key={item.badge.id}
+                          onPress={() => showBadgeDetail(item)}
+                          style={({ pressed }) => [
+                            st.gridCard,
+                            pressed && { opacity: 0.85, transform: [{ scale: 0.96 }] },
+                          ]}
+                        >
+                          <BadgeMedal badge={item.badge} locked={false} />
+                          <Text style={[st.cardLabel, { color: getLabelColor(item.badge.rarity) }]} numberOfLines={1}>
+                            {item.badge.label}
+                          </Text>
+                          <Text style={[st.rarityTag, { color: getRarityTagColor(item.badge.rarity) }]} numberOfLines={1}>
+                            {RARITY_LABEL[item.badge.rarity]}
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  </>
+                )}
+
+                {/* ★ v1.7.13.46: Kilitliler section — grayscale */}
+                {(totalCount - earnedCount) > 0 && (
+                  <>
+                    <View style={[st.sectionHeader, { marginTop: 18 }]}>
+                      <Ionicons name="lock-closed" size={12} color="#64748B" />
+                      <Text style={[st.sectionTitle, { color: '#94A3B8' }]}>KİLİTLİ · {totalCount - earnedCount}</Text>
+                    </View>
+                    <View style={st.grid}>
+                      {items.filter(i => !i.earned).map(item => (
+                        <Pressable
+                          key={item.badge.id}
+                          onPress={() => showBadgeDetail(item)}
+                          style={({ pressed }) => [
+                            st.gridCard,
+                            pressed && { opacity: 0.85, transform: [{ scale: 0.96 }] },
+                          ]}
+                        >
+                          <BadgeMedal badge={item.badge} locked={true} />
+                          <Text style={[st.cardLabel, { color: '#64748B' }]} numberOfLines={1}>
+                            {item.badge.label}
+                          </Text>
+                          <Text style={[st.rarityTag, { color: '#475569' }]} numberOfLines={1}>
+                            {RARITY_LABEL[item.badge.rarity]}
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  </>
+                )}
               </ScrollView>
             )}
           </Animated.View>
         </View>
       </Modal>
       <BadgeDetailModal
-        visible={!!selectedBadge}
-        badge={selectedBadge}
-        onClose={() => setSelectedBadge(null)}
+        visible={!!selectedItem}
+        badge={selectedItem?.badge ?? null}
+        locked={selectedItem ? !selectedItem.earned : false}
+        onClose={() => setSelectedItem(null)}
       />
     </>
   );
@@ -245,12 +288,14 @@ function getRarityTagColor(rarity: BadgeRarity): string {
   }
 }
 
-function BadgeMedal({ badge }: { badge: BadgeDef }) {
+function BadgeMedal({ badge, locked = false }: { badge: BadgeDef; locked?: boolean }) {
   const rarity = badge.rarity;
-  const iconColor = badge.color;
+  // ★ v1.7.13.46: locked ise grayscale ton — desature renk + 🔒 overlay.
+  const iconColor = locked ? '#475569' : badge.color;
 
   const pulseAnim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
+    if (locked) return; // kilitlide pulse yok — durağan
     const intensity = rarity === 'legendary' ? 1.0 : rarity === 'epic' ? 0.75 : rarity === 'rare' ? 0.6 : 0.45;
     const loop = Animated.loop(
       Animated.sequence([
@@ -260,35 +305,45 @@ function BadgeMedal({ badge }: { badge: BadgeDef }) {
     );
     loop.start();
     return () => loop.stop();
-  }, [rarity]);
+  }, [rarity, locked]);
   const glowOpacity = pulseAnim.interpolate({ inputRange: [0, 1], outputRange: [0.55, 1] });
   const ringScale = pulseAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.06] });
 
   return (
-    <View style={mst.wrap}>
-      <Animated.View
-        style={[
-          mst.pulseRing,
-          {
-            borderColor: iconColor,
-            opacity: glowOpacity,
-            transform: [{ scale: ringScale }],
-          },
-        ]}
-        pointerEvents="none"
-      />
-      <SkiaShadow shadowColor={iconColor} shadowOpacity={rarity === 'legendary' ? 0.85 : 0.7} shadowBlur={rarity === 'legendary' ? 22 : 16} shadowOffsetY={0} borderRadius={28}>
+    <View style={[mst.wrap, locked && { opacity: 0.45 }]}>
+      {!locked && (
+        <Animated.View
+          style={[
+            mst.pulseRing,
+            { borderColor: iconColor, opacity: glowOpacity, transform: [{ scale: ringScale }] },
+          ]}
+          pointerEvents="none"
+        />
+      )}
+      <SkiaShadow
+        shadowColor={iconColor}
+        shadowOpacity={locked ? 0.15 : (rarity === 'legendary' ? 0.85 : 0.7)}
+        shadowBlur={locked ? 6 : (rarity === 'legendary' ? 22 : 16)}
+        shadowOffsetY={0}
+        borderRadius={28}
+      >
         <LinearGradient
-          colors={[iconColor + 'CC', iconColor + '55']}
+          colors={[iconColor + (locked ? '88' : 'CC'), iconColor + (locked ? '33' : '55')]}
           start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }}
           style={mst.iconCircle}
         >
-          <Ionicons name={badge.icon as any} size={26} color="#FFF" style={iconShadow} />
+          <Ionicons name={badge.icon as any} size={26} color={locked ? '#94A3B8' : '#FFF'} style={iconShadow} />
         </LinearGradient>
       </SkiaShadow>
-      {rarity === 'legendary' && (
+      {!locked && rarity === 'legendary' && (
         <View style={mst.crown} pointerEvents="none">
           <Ionicons name="star" size={10} color="#FCD34D" style={iconShadow} />
+        </View>
+      )}
+      {/* Locked overlay: kilit ikonu sağ-alt köşe */}
+      {locked && (
+        <View style={mst.lockBadge} pointerEvents="none">
+          <Ionicons name="lock-closed" size={10} color="#CBD5E1" />
         </View>
       )}
     </View>
@@ -327,6 +382,15 @@ const st = StyleSheet.create({
     borderWidth: 1, borderColor: 'rgba(252,211,77,0.35)',
   },
   countText: { fontSize: 10.5, fontWeight: '900', color: '#FCD34D', letterSpacing: 0.4 },
+  // ★ v1.7.13.46: 2-section header
+  sectionHeader: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: 18, paddingTop: 14, paddingBottom: 6,
+  },
+  sectionTitle: {
+    fontSize: 11, fontWeight: '900', color: '#FCD34D',
+    letterSpacing: 1.4, textTransform: 'uppercase',
+  },
   loading: { paddingVertical: 80, alignItems: 'center' },
   empty: { paddingVertical: 50, alignItems: 'center', gap: 10, paddingHorizontal: 32 },
   emptyText: { fontSize: 13, fontWeight: '700', color: '#CBD5E1', ...Shadows.text },
@@ -376,5 +440,14 @@ const mst = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
     backgroundColor: 'rgba(252,211,77,0.18)',
     borderWidth: 0.8, borderColor: 'rgba(252,211,77,0.6)',
+  },
+  // ★ v1.7.13.46: Locked rozet için kilit overlay (sağ-alt köşe)
+  lockBadge: {
+    position: 'absolute',
+    bottom: 4, right: 8,
+    width: 18, height: 18, borderRadius: 9,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'rgba(15,23,42,0.92)',
+    borderWidth: 1, borderColor: 'rgba(148,163,184,0.45)',
   },
 });
