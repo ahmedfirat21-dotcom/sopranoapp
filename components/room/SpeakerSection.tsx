@@ -1391,7 +1391,12 @@ export default function SpeakerSection({ stageUsers, getMicStatus, onSelectUser,
     }
   }
   // Audio-only listener-stili boyut (spotlight aktifken kompakt circle)
-  const audioCompactSize = Math.min(76, Math.floor((W - 32 - 8 * 4) / 5));
+  // ★ v1.7.13.24 (19 May 2026): Admin override — eskiden 76 hardcoded idi.
+  //   Kullanıcı: "kamera açık olunca konuşmacı ve dinleyici nasıl görünür ayarı yok".
+  //   Şimdi camCfgTop.audioCompactSize + audioCompactGap admin'den.
+  const _audioMax = camCfgTop.audioCompactSize ?? 76;
+  const _audioGap = camCfgTop.audioCompactGap ?? 8;
+  const audioCompactSize = Math.min(_audioMax, Math.floor((W - 32 - _audioGap * 4) / 5));
 
   return (
     <View style={s.wrap}>

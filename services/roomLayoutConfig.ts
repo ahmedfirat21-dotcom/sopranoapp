@@ -253,6 +253,12 @@ export interface CameraConfig {
 
   // ── Limit ──
   maxConcurrentCameras: number; // 0 = sınırsız, default 0
+
+  // ★ v1.7.13.24 (19 May 2026): Spotlight aktifken audio-only konuşmacılar
+  //   sahnenin altında küçük circle olarak görünür. Boyut + aralık admin'den.
+  //   Kullanıcı talep: "kamera açık olunca konuşmacı ve dinleyici nasıl görünür".
+  audioCompactSize: number;     // dp — audio-only sahne avatarı (max 76 default)
+  audioCompactGap: number;      // dp — audio-only avatarlar arası boşluk (default 8)
 }
 
 export interface RoomLayoutConfig {
@@ -470,6 +476,8 @@ export const DEFAULT_ROOM_LAYOUT: RoomLayoutConfig = {
     spotlightGap: 12,
     fullscreenObjectFit: 'cover',
     maxConcurrentCameras: 0,    // sınırsız
+    audioCompactSize: 76,       // spotlight altı audio-only circle (max 76 px)
+    audioCompactGap: 8,         // audio-only avatarlar arası
   },
 };
 
