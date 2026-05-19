@@ -4657,14 +4657,20 @@ export default function RoomScreen() {
       ]}
     >
       <StatusBar hidden />
-      {/* ★ Dinamik Oda Arka Planı — tema + arkaplan görseli desteği
-          ★ v319.12 (18 May 2026): Web admin global.background config eklendi.
-          Öncelik sırası: 1) Oda özel image_url, 2) admin global.background ('solid'/
-          'gradient'/'image'), 3) theme_id, 4) default room_in_bg.jpg. */}
+      {/* ★ Dinamik Oda Arka Planı
+          ★ v1.7.13.15 (19 May 2026): Admin global.background branch'leri KALDIRILDI.
+            Kullanıcı geri bildirimi: "arkaplan ana sayfa/odalarım ile aynı kalsın,
+            web admin'e arka plan rengi ekleme — kullanıcı zaten oda oluştururken
+            kendi arkaplanını/resmini seçebiliyor".
+
+          Öncelik sırası:
+          1) Oda sahibinin yüklediği özel image (room_image_url)
+          2) Oda theme_id (kullanıcının seçtiği tema)
+          3) Default: ana sayfa/odalarım/profil ile AYNI sade gradient
+             (#122038 → #0F1929 → #0C1424) — uniform marka deneyimi. */}
       {(() => {
         const themeId = (room as any)?.theme_id;
         const bgImageUrl = (room as any)?.room_image_url || (room?.room_settings as any)?.room_image_url;
-        const adminBg = roomLayout.global;
         const THEME_COLORS: Record<string, [string, string]> = {
           ocean: ['#0E4D6F', '#083344'], sunset: ['#7F1D1D', '#4C0519'],
           forest: ['#14532D', '#052E16'], galaxy: ['#312E81', '#1E1B4B'],
@@ -4683,36 +4689,34 @@ export default function RoomScreen() {
             </ImageBackground>
           );
         }
-        // ★ v319.12: Admin global background — 'image' / 'gradient' / 'solid'
-        if (adminBg.background === 'image' && adminBg.bgImageUrl) {
-          return (
-            <ImageBackground source={{ uri: adminBg.bgImageUrl }} style={StyleSheet.absoluteFillObject} resizeMode="cover">
-              <LinearGradient colors={['rgba(0,0,0,0.35)', 'rgba(0,0,0,0.55)', 'rgba(0,0,0,0.75)']} style={StyleSheet.absoluteFillObject} pointerEvents="none" />
-            </ImageBackground>
-          );
-        }
-        if (adminBg.background === 'gradient' && Array.isArray(adminBg.bgGradient) && adminBg.bgGradient.length >= 2) {
-          return (
-            <LinearGradient colors={adminBg.bgGradient as any} start={{ x: 0, y: 0 }} end={{ x: 0.5, y: 1 }} style={StyleSheet.absoluteFillObject} pointerEvents="none" />
-          );
-        }
-        if (adminBg.background === 'solid' && adminBg.bgColor) {
-          return (
-            <View style={[StyleSheet.absoluteFillObject, { backgroundColor: adminBg.bgColor }]} pointerEvents="none" />
-          );
-        }
         if (themeColors) {
           return (
             <LinearGradient colors={[themeColors[0], themeColors[1], '#070B14']} start={{ x: 0, y: 0 }} end={{ x: 0.5, y: 1 }} style={StyleSheet.absoluteFillObject} pointerEvents="none" />
           );
         }
-        // ★ v286 (16 May 2026): Web admin Oda Düzeni'nde "Genel Arka Plan" section
-        //   kaldırıldı — admin'in kontrol etmediği bir alanı DB'den okumak default
-        //   room_in_bg.jpg'yi etkisizleştiriyordu. Artık doğrudan default arka plan.
+        // Default: ana sayfa/odalarım/profil ile AYNI uniform gradient
         return (
-          <ImageBackground source={require('../../assets/images/room_in_bg.jpg')} style={StyleSheet.absoluteFillObject} resizeMode="cover">
-            <LinearGradient colors={['rgba(12,24,41,0.3)', 'rgba(10,21,32,0.5)', 'rgba(7,16,24,0.7)']} style={StyleSheet.absoluteFillObject} pointerEvents="none" />
-          </ImageBackground>
+          <>
+            <LinearGradient
+              colors={['#122038', '#0F1929', '#0C1424']}
+              locations={[0, 0.5, 1]}
+              start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }}
+              style={StyleSheet.absoluteFillObject}
+              pointerEvents="none"
+            />
+            <LinearGradient
+              colors={['rgba(20,184,166,0.05)', 'transparent']}
+              start={{ x: 1, y: 0 }} end={{ x: 0.4, y: 0.5 }}
+              style={StyleSheet.absoluteFillObject}
+              pointerEvents="none"
+            />
+            <LinearGradient
+              colors={['transparent', 'rgba(251,191,36,0.04)']}
+              start={{ x: 0.6, y: 0.6 }} end={{ x: 0, y: 1 }}
+              style={StyleSheet.absoluteFillObject}
+              pointerEvents="none"
+            />
+          </>
         );
       })()}
 
