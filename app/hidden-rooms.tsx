@@ -1,16 +1,16 @@
 /**
- * SopranoChat — Gizlenen Odalar Yönetimi
- * ═══════════════════════════════════════════════════════════════════
- * v107.29 (2 May 2026) — Settings'ten erişilen kalıcı yönetim sayfası.
- * Kullanıcı keşfette swipe ile gizlediği odaları burada tek tek geri getirebilir.
+ * SopranoChat â Gizlenen Odalar YÃ¶netimi
+ * âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+ * v107.29 (2 May 2026) â Settings'ten eriÅilen kalÄ±cÄ± yÃ¶netim sayfasÄ±.
+ * KullanÄ±cÄ± keÅfette swipe ile gizlediÄi odalarÄ± burada tek tek geri getirebilir.
  *
- * Veri kaynağı: AsyncStorage 'ignored_room_ids' (Set<string> JSON serialized)
- * Oda detayı: rooms tablosundan id IN (...) ile çekilir
+ * Veri kaynaÄÄ±: AsyncStorage 'ignored_room_ids' (Set<string> JSON serialized)
+ * Oda detayÄ±: rooms tablosundan id IN (...) ile Ã§ekilir
  *
- * Görünüm:
- *   - Üstte: "Tümünü Geri Getir" buton (X tane gizli)
- *   - Liste: her satır avatar + isim + host + "Geri Getir" buton
- *   - Boş durum: "Hiç gizlediğin oda yok" mesajı
+ * GÃ¶rÃ¼nÃ¼m:
+ *   - Ãstte: "TÃ¼mÃ¼nÃ¼ Geri Getir" buton (X tane gizli)
+ *   - Liste: her satÄ±r avatar + isim + host + "Geri Getir" buton
+ *   - BoÅ durum: "HiÃ§ gizlediÄin oda yok" mesajÄ±
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -57,7 +57,7 @@ export default function HiddenRoomsScreen() {
         setLoading(false);
         return;
       }
-      // Oda detaylarını çek
+      // Oda detaylarÄ±nÄ± Ã§ek
       const { data, error } = await supabase
         .from('rooms')
         .select('id, name, category, host_id, host:profiles!rooms_host_id_fkey(display_name, avatar_url)')
@@ -106,7 +106,7 @@ export default function HiddenRoomsScreen() {
           <View style={{ width: 36 }} />
         </View>
 
-        {/* "Tümünü Geri Getir" — sadece liste boş değilse */}
+        {/* "TÃ¼mÃ¼nÃ¼ Geri Getir" â sadece liste boÅ deÄilse */}
         {!loading && hiddenIds.length > 0 && (
           <View style={styles.actionRow}>
             <Text style={styles.countText}>{hiddenIds.length} gizli oda</Text>
@@ -144,7 +144,7 @@ export default function HiddenRoomsScreen() {
                 <View style={styles.info}>
                   <Text style={styles.roomName} numberOfLines={1}>{item.name}</Text>
                   <Text style={styles.hostName} numberOfLines={1}>
-                    {item.host?.display_name || 'Anonim'}
+                    {item.host?.display_name || i18n.t('common.anonymous')}
                   </Text>
                 </View>
                 <Pressable

@@ -326,9 +326,9 @@ export default function SettingsScreen() {
         setCAlert({
           visible: true,
           title: 'SopranoChat',
-          message: `Sürüm: ${APP_VERSION}\n\nBeta sürümündesin — geri bildirimin için Ayarlar → Destek & İletişim'den bize yazabilirsin.`,
+          message: i18n.t('settings.version_info', { 0: APP_VERSION }),
           type: 'info',
-          buttons: [{ text: 'Tamam' }],
+          buttons: [{ text: t('common.ok') }],
         });
         break;
       case 'theme':

@@ -137,7 +137,7 @@ interface StatusAvatarProps {
   isOnline?: boolean;
   /** Subscription tier — border rengi + pill badge belirler */
   tier?: SubscriptionTier | string | null;
-  /** Admin mi? (GodMaster kırmızı çerçeve) */
+  /** Admin mi? (kırmızı premium çerçeve) */
   isAdmin?: boolean;
   /** Optional border color override (tier yoksa kullanılır) */
   borderColor?: string;
@@ -191,6 +191,14 @@ interface StatusAvatarProps {
    *  enabled=false, owner her zaman aktif. SpeakerSection/ListenerGrid çağrılırken
    *  geçilir. */
   shadowRole?: 'host' | 'speaker' | 'listener';
+  /** ★ v1.7.13.146 (24 May 2026): Clubhouse-style mic-off badge — sağ-alt köşe
+   *  beyaz daire içinde mikrofon kapalı ikonu. Speaker'lar için (listener'a uygulanmaz). */
+  showMicMuted?: boolean;
+  /** ★ v1.7.13.146 (24 May 2026): Sağ-üst köşe "+" takip butonu (Clubhouse pattern).
+   *  isFollowing=true ise gizli; false ise + butonu, basınca onFollowPress tetiklenir. */
+  showFollowButton?: boolean;
+  isFollowing?: boolean;
+  onFollowPress?: () => void;
 }
 
 /**
@@ -228,6 +236,10 @@ export default function StatusAvatar({
   shapeOverride,
   shapeOverrideRadius,
   shadowRole,
+  showMicMuted = false,
+  showFollowButton = false,
+  isFollowing = false,
+  onFollowPress,
 }: StatusAvatarProps) {
   // ★ v282 (16 May 2026): user objesi verilirse içinden default'ları al; explicit
   //   prop'lar (frameId/customBadgeId/tier/vb.) öncelikli override. Bu pattern sayesinde
@@ -283,10 +295,10 @@ export default function StatusAvatar({
   const normalizedTier = tier ? migrateLegacyTier(tier as string) : 'Free';
   const tierDef = TIER_DEFINITIONS[normalizedTier as SubscriptionTier];
   
-  // ★ GodMaster: tier='GodMaster' VEYA isAdmin=true → aynı premium görünüm
-  const isGM = isAdmin || normalizedTier === 'GodMaster';
+  // ★ v1.7.13.132: GodMaster kaldırıldı — isAdmin true ise premium kırmızı çerçeve
+  const isGM = isAdmin;
 
-  // Çerçeve rengi: GodMaster > tier > fallback
+  // Çerçeve rengi: admin > tier > fallback
   const ringColor = isGM
     ? '#DC2626'
     : tierDef
@@ -296,7 +308,7 @@ export default function StatusAvatar({
   // Gradient ve ikon (tier pill için)
   const tierGradient = isGM ? ['#DC2626', '#7F1D1D'] : tierDef ? tierDef.gradient : ['#94A3B8', '#64748B'];
   const tierIcon = isGM ? 'flash' : tierDef?.icon || 'person-outline';
-  const tierLabel = isGM ? '⚡GM' : normalizedTier;
+  const tierLabel = isGM ? '⚡ADMIN' : normalizedTier;
 
   // Avatar source  
   const source: ImageSourcePropType =
@@ -796,6 +808,50 @@ export default function StatusAvatar({
           >
             <CosmeticBadge badgeItemId={customBadgeId} context="avatar" avatarSize={size} />
           </BadgeCenterWrapper>
+        );
+      })()}
+
+      {/* ★ v1.7.13.146 (24 May 2026): Clubhouse-style mic-off badge — sağ-alt köşe. */}
+      {showMicMuted && (() => {
+        const micSize = Math.max(14, Math.round(size * 0.28));
+        return (
+          <View style={{
+            position: 'absolute',
+            right: 0, bottom: 0,
+            width: micSize, height: micSize, borderRadius: micSize / 2,
+            backgroundColor: 'rgba(255,255,255,0.95)',
+            alignItems: 'center', justifyContent: 'center',
+            borderWidth: 1.5, borderColor: 'rgba(255,255,255,1)',
+            shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 2, shadowOffset: { width: 0, height: 1 },
+            elevation: 4,
+          }} pointerEvents="none">
+            <Ionicons name="mic-off" size={Math.round(micSize * 0.6)} color="#6B7280" />
+          </View>
+        );
+      })()}
+
+      {/* ★ v1.7.13.146 (24 May 2026): Clubhouse-style + takip butonu — sağ-üst köşe. */}
+      {showFollowButton && !isFollowing && (() => {
+        const btnSize = Math.max(16, Math.round(size * 0.32));
+        return (
+          <View style={{
+            position: 'absolute',
+            right: -2, top: -2,
+            width: btnSize, height: btnSize, borderRadius: btnSize / 2,
+            backgroundColor: '#14B8A6',
+            alignItems: 'center', justifyContent: 'center',
+            borderWidth: 2, borderColor: 'rgba(8,12,22,0.95)',
+            shadowColor: '#000', shadowOpacity: 0.35, shadowRadius: 3, shadowOffset: { width: 0, height: 1 },
+            elevation: 5,
+          }}>
+            <Ionicons
+              name="add"
+              size={Math.round(btnSize * 0.7)}
+              color="#FFFFFF"
+              onPress={onFollowPress}
+              suppressHighlighting
+            />
+          </View>
         );
       })()}
     </View>

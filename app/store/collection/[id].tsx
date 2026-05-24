@@ -81,7 +81,7 @@ export default function CollectionDetailScreen() {
     setConfirmAlert({
       visible: true,
       title: i18n.t('store.collection.id.001'),
-      message: i18n.t('auto.store.collection.id.010', { 0: item.name, 1: item.price_sp.toLocaleString('tr-TR') }),
+      message: i18n.t('auto.store.collection.id.010', { 0: item.name, 1: item.price_sp.toLocaleString(i18n.locale) }),
       buttons: [
         { text: i18n.t('auto.store.collection.id.009'), style: 'cancel', onPress: () => setConfirmAlert(p => ({ ...p, visible: false })) },
         {
@@ -138,7 +138,7 @@ export default function CollectionDetailScreen() {
             </View>
             <View style={s.balancePill}>
               <SPIcon size={14} />
-              <Text style={s.balanceText}>{sp.toLocaleString('tr-TR')}</Text>
+              <Text style={s.balanceText}>{sp.toLocaleString(i18n.locale)}</Text>
             </View>
           </View>
           <Text style={s.itemCount}>{items.length}{i18n.t('auto.store.collection.id.001')}</Text>

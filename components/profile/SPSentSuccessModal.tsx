@@ -497,7 +497,7 @@ export default function SPSentSuccessModal({
               />
             ) : (
               <View style={[st.recipientAvatar, { backgroundColor: palette.accent + '40', borderColor: palette.accent + '88', alignItems: 'center', justifyContent: 'center' }]}>
-                <Text style={{ color: '#FFF', fontWeight: '800', fontSize: 16 }}>{recipientName.charAt(0)}</Text>
+                <Text style={{ color: '#FFF', fontWeight: '800', fontSize: 16 }}>{(recipientName || '?').charAt(0)}</Text>
               </View>
             )}
             <Text style={st.recipientName} numberOfLines={1}>{recipientName}</Text>
@@ -673,7 +673,7 @@ export default function SPSentSuccessModal({
               ]}
               allowFontScaling={false}
             >
-              +{amount.toLocaleString('tr-TR')}
+              +{amount.toLocaleString(i18n.locale)}
             </Animated.Text>
           </Animated.View>
 
@@ -722,11 +722,11 @@ export default function SPSentSuccessModal({
             >
               <Text style={st.balanceLabel}>Bakiyen</Text>
               <Text style={[st.balanceAmount, { color: palette.amountText }]}>
-                {balanceBefore.toLocaleString('tr-TR')}
+                {balanceBefore.toLocaleString(i18n.locale)}
               </Text>
               <Ionicons name="arrow-forward" size={11} color="rgba(255,255,255,0.4)" />
               <Text style={[st.balanceNew, { color: palette.accent }]}>
-                {balanceNow.toLocaleString('tr-TR')} SP
+                {balanceNow.toLocaleString(i18n.locale)} SP
               </Text>
             </Animated.View>
           )}

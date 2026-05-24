@@ -19,9 +19,14 @@ export interface MinimizedRoom {
   id: string;
   name: string;
   hostName: string;
+  hostUserId?: string;
+  hostAvatar?: string | null;
+  hostTier?: string;
   viewerCount: number;
   isMicOn: boolean;
   isRoomMuted?: boolean;
+  /** ★ v1.7.13.136: Restore'da "Sahne boş" flash'ı önlemek için participants snapshot */
+  participantsSnapshot?: any[];
 }
 
 interface MiniRoomCardProps {

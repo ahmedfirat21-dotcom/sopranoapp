@@ -1,4 +1,4 @@
-﻿import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
 import { i18n } from '../services/i18n';
 import AppLoader from '../components/AppLoader';
@@ -19,6 +19,30 @@ import AppBackground from '../components/AppBackground';
 import PurchaseSuccessModal from '../components/PurchaseSuccessModal';
 
 type AlertConfig = { visible: boolean; title: string; message: string; type?: any; buttons?: AlertButton[] };
+
+// ★ v1.7.13.68 (20 May 2026): SSS — abonelik kararı kolaylaştırma
+const FAQ_ITEMS: { q: string; a: string }[] = [
+  {
+    q: 'Aboneliğimi nasıl iptal edebilirim?',
+    a: 'Google Play Store > Abonelikler\'den ya da bu sayfanın altındaki "Aboneliği İptal Et" seçeneğinden tek tıkla iptal edebilirsin. İptal sonrası mevcut dönem sonuna kadar tüm Premium ayrıcalıkların aktif kalır.',
+  },
+  {
+    q: 'Yıllık ile aylık arasında ne fark var?',
+    a: 'Yıllık abonelik aylığa kıyasla ortalama %30-40 daha avantajlı; tek seferde ödenir, 12 ay kesintisiz çalışır. Aylık ise her ay otomatik yenilenir, esneklik sunar — kısa vadeli denemek istersen mantıklı.',
+  },
+  {
+    q: 'Plus mu Pro mu seçmeliyim?',
+    a: 'Sadece oda yönetmek (kilit, davet, +18, dil, yavaş mod) için → Plus yeter. Stereo ses, 1080p kamera, sınırsız dinleyici, oda içi giriş ücreti/bağış, premium tema → Pro\'ya gerek var.',
+  },
+  {
+    q: 'İade alabilir miyim?',
+    a: 'Google Play Store iade politikası geçerli: satın alma sonrası 48 saat içinde Play Store > Sipariş Geçmişi üzerinden iade talep edebilirsin. Bizim tarafımızdan ek iade yok.',
+  },
+  {
+    q: 'Plan değiştirebilir miyim?',
+    a: 'Evet. Plus\'tan Pro\'ya geçişte (yükseltme) ücret farkı orantılı hesaplanır; Pro\'dan Plus\'a geçiş ise mevcut dönem bitiminde devreye girer.',
+  },
+];
 
 const PLANS = [
   {
@@ -42,7 +66,7 @@ const PLANS = [
       { text: i18n.t('auto.plus.039', { 0: ROOM_TIER_LIMITS.Plus.durationHours }), included: true },
       { text: i18n.t('auto.plus.038', { 0: ROOM_TIER_LIMITS.Plus.dailyRooms }), included: true },
       { text: i18n.t('auto.plus.037'), included: true },
-      { text: 'HD ses + 720p video', included: true },
+      { text: 'HD ses (32kHz)', included: true },
       { text: i18n.t('auto.plus.036'), included: true },
       { text: i18n.t('auto.plus.035'), included: true },
       { text: i18n.t('auto.plus.034'), included: true },
@@ -63,7 +87,7 @@ const PLANS = [
     glowColor: '#F59E0B60',
     monthly: TIER_DEFINITIONS.Pro.monthlyPrice,
     yearly: TIER_DEFINITIONS.Pro.yearlyPrice,
-    savePct: 25,
+    savePct: 10, // ★ v1.7.13.142: 1079.99 / (99.99×12) ≈ %10 — eski %25 yanlıştı (899.99 bazlıydı)
     features: [
       { text: i18n.t('auto.plus.031', { 0: ROOM_TIER_LIMITS.Pro.maxSpeakers }), included: true },
       { text: i18n.t('auto.plus.030'), included: true },
@@ -87,6 +111,8 @@ export default function PlusScreen() {
   const insets = useSafeAreaInsets();
   const [selectedTier, setSelectedTier] = useState<'plus' | 'pro'>('plus');
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('yearly');
+  // ★ v1.7.13.68 (20 May 2026): FAQ accordion — modern abonelik standardı.
+  const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [activating, setActivating] = useState(false);
   const [alertCfg, setAlertCfg] = useState<AlertConfig>({ visible: false, title: '', message: '' });
   // ★ 2026-04-20: Abonelik sistemi prod'da kuruldu mu? RevenueCat Dashboard
@@ -99,8 +125,8 @@ export default function PlusScreen() {
   //   ₺349.99/899.99 idi. Şimdi RC offerings'ten çekiyoruz — Google Play Console'da
   //   ne ayarlanmışsa o gözükür, ödeme ekranıyla tutarlı.
   const [livePrices, setLivePrices] = useState<{
-    plus?: { monthly?: string; yearly?: string };
-    pro?: { monthly?: string; yearly?: string };
+    plus?: { monthly?: string; yearly?: string; monthlyNum?: number; yearlyNum?: number };
+    pro?: { monthly?: string; yearly?: string; monthlyNum?: number; yearlyNum?: number };
   }>({});
 
   const mountedRef = useRef(true);
@@ -127,12 +153,16 @@ export default function PlusScreen() {
           next.plus = {
             monthly: plusOff.monthly?.product?.priceString,
             yearly: plusOff.annual?.product?.priceString,
+            monthlyNum: plusOff.monthly?.product?.price,
+            yearlyNum: plusOff.annual?.product?.price,
           };
         }
         if (proOff) {
           next.pro = {
             monthly: proOff.monthly?.product?.priceString,
             yearly: proOff.annual?.product?.priceString,
+            monthlyNum: proOff.monthly?.product?.price,
+            yearlyNum: proOff.annual?.product?.price,
           };
         }
         setLivePrices(next);
@@ -167,10 +197,8 @@ export default function PlusScreen() {
       return;
     }
 
-    const price = billingCycle === 'monthly'
-      ? `${selectedPlan.monthly}₺/ay`
-      : i18n.t('auto.plus.019', { 0: selectedPlan.yearly });
-
+    const live = livePrices[selectedPlan.id as 'plus' | 'pro'];
+    const price = billingCycle === 'monthly' ? (live?.monthly || `${selectedPlan.monthly}₺`) : (live?.yearly || `${selectedPlan.yearly}₺`);
     const modeText = (REVENUECAT_MOCK_MODE && __DEV__) ? i18n.t('auto.plus.018') : '';
 
     setAlertCfg({
@@ -206,16 +234,7 @@ export default function PlusScreen() {
               }
             } catch (err: any) {
               if (mountedRef.current) {
-                // ★ v300 (17 May 2026): RevenueCat SDK ham hatalarını kullanıcı dostu
-                //   Türkçe mesaja çevir. "There is an issue with your configuration"
-                //   genelde test cihazı Play Console internal track'inde değil veya
-                //   ürünler henüz Play tarafında aktif olmamış demek — kullanıcıyı
-                //   korkutmasın diye bilgilendirici dile çevir.
                 const rawMsg = String(err?.message || '');
-                // ★ v309 (18 May 2026): Configuration error'a init + offerings hatalarını
-                //   ekle — gerçek kök sebep (API key wrong / SDK init fail / Dashboard
-                //   ürün yok) ayrıştırılabilsin. Customer logs RC'ye ping atmıyorsa
-                //   init/offerings state'i fail durumunu gösterir.
                 const initErr = RevenueCatService._lastInitError;
                 const offerErr = RevenueCatService._lastOfferingsError;
                 const debugSuffix = [
@@ -326,7 +345,15 @@ export default function PlusScreen() {
             {billingCycle === 'yearly' && <View style={styles.billingDot} />}
             <Text style={[styles.billingText, billingCycle === 'yearly' && styles.billingTextActive]}>{i18n.t('plus.004')}</Text>
             <View style={styles.saveBadge}>
-              <Text style={styles.saveText}>-{selectedPlan.savePct}%</Text>
+              <Text style={styles.saveText}>
+                -{(() => {
+                  const live = livePrices[selectedPlan.id as 'plus' | 'pro'];
+                  if (live?.monthlyNum && live?.yearlyNum) {
+                    return Math.round((1 - live.yearlyNum / (live.monthlyNum * 12)) * 100);
+                  }
+                  return selectedPlan.savePct;
+                })()}%
+              </Text>
             </View>
           </Pressable>
         </View>
@@ -336,8 +363,6 @@ export default function PlusScreen() {
           {PLANS.map(plan => {
             const isSelected = selectedTier === plan.id;
             const isCurrentPlan = currentTier === plan.tier;
-            // ★ v319.11: Önce RC offerings'ten gerçek priceString (Play Console'la
-            //   tutarlı). Yoksa hard-coded fallback ("499,99 ₺" formatlı string).
             const live = livePrices[plan.id as 'plus' | 'pro'];
             const liveMonthly = live?.monthly;
             const liveYearly = live?.yearly;
@@ -350,7 +375,6 @@ export default function PlusScreen() {
                 key={plan.id}
                 style={({ pressed }) => [
                   styles.planCard,
-                  // ★ Glow shadow — accent rengi ile ambient halo
                   {
                     shadowColor: plan.glowColor.slice(0, 7),
                     shadowOffset: { width: 0, height: 10 },
@@ -364,7 +388,6 @@ export default function PlusScreen() {
                 ]}
                 onPress={() => setSelectedTier(plan.id as any)}
               >
-                {/* ★ 3-stop jewel-tone gradient (kart geneli) */}
                 <LinearGradient
                   colors={plan.gradient}
                   locations={[0, 0.5, 1]}
@@ -372,7 +395,6 @@ export default function PlusScreen() {
                   style={StyleSheet.absoluteFillObject}
                 />
 
-                {/* ★ Üst cam parıltı — glassmorphic shine */}
                 <LinearGradient
                   colors={['rgba(255,255,255,0.20)', 'rgba(255,255,255,0.05)', 'transparent']}
                   locations={[0, 0.4, 0.8]}
@@ -407,8 +429,6 @@ export default function PlusScreen() {
                 {/* Fiyat & İçerik (cam katman üstünde) */}
                 <View style={styles.planCardBody}>
                   <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'center' }}>
-                    {/* ★ v319.11: livePrice (RC) zaten "₺499,99" formatında — ek ₺ yok.
-                        Fallback ise sayı + ₺. */}
                     <Text style={styles.planPrice}>{price}</Text>
                     <Text style={styles.planPeriod}>{period}</Text>
                   </View>
@@ -471,14 +491,16 @@ export default function PlusScreen() {
             { label: i18n.t('plus.011'), values: [`${ROOM_TIER_LIMITS.Free.dailyRooms}`, `${ROOM_TIER_LIMITS.Plus.dailyRooms}`, '∞'] },
             { label: i18n.t('plus.012'), values: ['—', '3', '∞'] },
             { label: i18n.t('plus.013'), values: [i18n.t('auto.plus.004'), 'Hepsi', 'Hepsi'] },
-            { label: 'Ses', values: ['HD Mono', 'HD', 'Stereo'] },
+            { label: 'Ses', values: ['HD Mono', 'HD Mono', 'HD Stereo'] },
             { label: 'Video', values: ['720p', '720p', '1080p'] },
+            { label: 'Ses Hızı', values: ['24kHz', '32kHz', '48kHz'] },
             { label: i18n.t('plus.014'), values: ['Temel', i18n.t('auto.plus.003'), i18n.t('auto.plus.002')] },
             { label: i18n.t('plus.015'), values: ['✓', '✓', '✓'] },
             { label: 'Tema', values: ['—', '✓', '✓'] },
             { label: i18n.t('plus.016'), values: ['—', '2', '5'] },
             { label: i18n.t('plus.017'), values: ['—', '✓', '✓'] },
-            { label: i18n.t('plus.018'), values: ['—', '—', '✓'] },
+            // ★ v1.7.13.134: "Oda Müziği" (plus.018) KALDIRILDI — özellik kod'da yok,
+            //   vaat ile gerçeklik uyumsuzdu. Post-launch implement edilince geri ekle.
           ].map((row, i) => (
             <View key={i} style={[styles.compareRow, i % 2 === 0 && { backgroundColor: 'rgba(255,255,255,0.03)' }]}>
               <Text style={[styles.compareCell, { flex: 1.5, color: Colors.text2 }]}>{row.label}</Text>
@@ -551,7 +573,16 @@ export default function PlusScreen() {
                   <>
                     <Ionicons name={selectedPlan.icon as any} size={20} color="#fff" style={{ textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4 }} />
                     <Text style={styles.ctaText}>
-                      {selectedPlan.name}'a {actionVerb} — {billingCycle === 'monthly' ? `${selectedPlan.monthly}₺/ay` : i18n.t('auto.plus.001', { 0: selectedPlan.yearly })}
+                      {/* ★ v1.7.13.140: CTA fiyatı livePrices (RC offerings) önce, yoksa hardcoded fallback.
+                          Önceden hep hardcoded → plan kartında 1079, butonda 899 → güven sorunu. */}
+                      {(() => {
+                        const live = livePrices[selectedPlan.id as 'plus' | 'pro'];
+                        const liveStr = billingCycle === 'monthly' ? live?.monthly : live?.yearly;
+                        if (liveStr) {
+                          return `${selectedPlan.name}'a ${actionVerb} — ${liveStr}${billingCycle === 'monthly' ? '/ay' : '/yıl'}`;
+                        }
+                        return `${selectedPlan.name}'a ${actionVerb} — ${billingCycle === 'monthly' ? `${selectedPlan.monthly}₺/ay` : i18n.t('auto.plus.001', { 0: selectedPlan.yearly })}`;
+                      })()}
                     </Text>
                   </>
                 )}
@@ -566,6 +597,33 @@ export default function PlusScreen() {
             <Text style={styles.downgradeText}>{i18n.t('plus.010')}</Text>
           </Pressable>
         )}
+
+        {/* ★ v1.7.13.68 (20 May 2026): FAQ Accordion — sıkça sorulan sorular */}
+        <Text style={[styles.sectionTitle, { marginTop: 24 }]}>Sıkça Sorulan Sorular</Text>
+        <View style={faqStyles.faqBox}>
+          {FAQ_ITEMS.map((item, i) => {
+            const isOpen = openFaq === i;
+            return (
+              <View key={i} style={[faqStyles.faqItem, i < FAQ_ITEMS.length - 1 && faqStyles.faqItemBorder]}>
+                <Pressable
+                  onPress={() => setOpenFaq(isOpen ? null : i)}
+                  style={faqStyles.faqHead}
+                  hitSlop={6}
+                >
+                  <Text style={faqStyles.faqQ}>{item.q}</Text>
+                  <Ionicons
+                    name={isOpen ? 'chevron-up' : 'chevron-down'}
+                    size={16}
+                    color={isOpen ? Colors.teal : '#94A3B8'}
+                  />
+                </Pressable>
+                {isOpen && (
+                  <Text style={faqStyles.faqA}>{item.a}</Text>
+                )}
+              </View>
+            );
+          })}
+        </View>
 
         <Text style={styles.disclaimer}>
           Abonelik otomatik yenilenir. İstediğin zaman iptal edebilirsin.{'\n'}
@@ -592,6 +650,40 @@ export default function PlusScreen() {
     </View></AppBackground>
   );
 }
+
+// ★ v1.7.13.68 (20 May 2026): FAQ accordion stilleri
+const faqStyles = StyleSheet.create({
+  faqBox: {
+    marginHorizontal: 16,
+    marginTop: 8,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
+    overflow: 'hidden',
+  },
+  faqItem: {
+    paddingHorizontal: 14, paddingVertical: 14,
+  },
+  faqItemBorder: {
+    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)',
+  },
+  faqHead: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    gap: 12,
+  },
+  faqQ: {
+    flex: 1,
+    fontSize: 13, fontWeight: '700',
+    color: '#E2E8F0',
+    letterSpacing: 0.1,
+  },
+  faqA: {
+    marginTop: 10,
+    fontSize: 12, color: '#94A3B8',
+    lineHeight: 18,
+    letterSpacing: 0.1,
+  },
+});
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: 'transparent' },

@@ -28,7 +28,14 @@ type Props = {
 
 export default function RoomDisconnectOverlay({ state, onRetry, onLeave }: Props) {
   const fade = useRef(new Animated.Value(0)).current;
-  const visible = state !== 'connected' && state !== 'connecting';
+  // ★ v1.7.13.90 (20 May 2026): FLASH FIX — sayfa ilk açıldığında state 'disconnected'
+  //   veya undefined olabilir (LiveKit henüz başlatılmadı). Eski koşul
+  //   (state !== 'connected' && state !== 'connecting') initial state'i de yakalıyordu
+  //   → 1sn "Bağlantı kurulamadı" flash. Şimdi: SADECE gerçek disconnect olaylarında
+  //   göster (reconnecting / failed). 'disconnected' / undefined ignore — bu initial
+  //   state veya temiz çıkış durumudur; room screen'in kendi roomBlock akışı zaten
+  //   gerçek fail durumunu yakalar (3sn grace ile).
+  const visible = state === 'reconnecting' || state === 'failed';
 
   useEffect(() => {
     Animated.timing(fade, {

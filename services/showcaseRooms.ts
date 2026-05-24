@@ -1,41 +1,76 @@
 /**
- * SopranoChat — Vitrin / Sistem Odaları
- * ═══════════════════════════════════════════════════
+ * SopranoChat �?? Vitrin / Sistem Odaları
+ * �?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?�
  * SHOWCASE_ROOMS mock listesi 2026-04-18'de kaldırıldı.
- * Bu modülde kalan canlı API: isSystemRoom() ve getSystemRooms().
+ * 2026-05-21: Soprano Lobi (sentinel UUID) eklendi �?? cold start çözümü.
  */
 import type { Room } from '../types';
+import { supabase } from '../constants/supabase';
 
 /**
- * Placeholder: gelecekte sistem odaları burada tanımlanır.
- * Şu an boş — gerçek kullanıcı odaları dışında listelenmez.
+ * �?? Soprano Lobi UUID �?? 7/24 açık sistem odası.
+ * rooms.id UUID tipi oldu�?u için string prefix kullanamayız (eski `system_` schema'sı dead code'du).
+ * Sentinel UUID DB seed ile sabit; isSystemRoom helper bu listeyi kontrol eder.
  */
-const SHOWCASE_ROOMS: Partial<Room>[] = [];
+export const LOBI_ROOM_ID = '10000000-0000-0000-0000-000000000001';
 
 /**
- * Keşfet sayfası için sistem odalarını Room[] formatında döndürür.
- * Kullanıcı odası yokken Keşfet'te gösterilir.
+ * Tüm bilinen sistem odası UUID'leri. Yeni sistem odası eklenirse bu listeye ekle.
  */
-export function getSystemRooms(): Room[] {
-  const STABLE_COUNTS = [8, 5, 3, 6];
-  const STABLE_DATE = '2026-01-01T00:00:00.000Z';
-  return SHOWCASE_ROOMS.map((room, idx) => ({
-    ...room,
-    host_id: 'system',
-    listener_count: STABLE_COUNTS[idx] || 4,
-    created_at: STABLE_DATE,
-    host: {
-      id: 'system',
-      display_name: 'SopranoChat',
-      username: 'sopranochat',
-      avatar_url: null,
-    },
-  })) as unknown as Room[];
+const SYSTEM_ROOM_IDS = new Set<string>([LOBI_ROOM_ID]);
+
+/**
+ * Verilen oda ID'sinin sistem odası olup olmadı�?ını kontrol eder.
+ * �?? v1.7.13.140 (21 May 2026): Eski `id.startsWith('system_')` revize edildi.
+ *   rooms.id UUID tipi oldu�?u için prefix kontrolü ASLA true dönmüyordu (dead code).
+ *   Yeni: sabit sentinel UUID listesi.
+ */
+export function isSystemRoom(roomId: string): boolean {
+  return SYSTEM_ROOM_IDS.has(roomId);
 }
 
 /**
- * Verilen oda ID'sinin sistem odası olup olmadığını kontrol eder.
+ * Soprano Lobi'nin sistem odası olup olmadı�?ı.
  */
-export function isSystemRoom(roomId: string): boolean {
-  return roomId.startsWith('system_');
+export function isLobiRoom(roomId: string): boolean {
+  return roomId === LOBI_ROOM_ID;
+}
+
+/**
+ * Soprano Lobi room nesnesini DB'den getirir.
+ * Yoksa null döner �?? UI graceful fallback yapmalı (kart gizlenir).
+ */
+export async function getLobiRoom(): Promise<Room | null> {
+  try {
+    const { data, error } = await supabase
+      .from('rooms')
+      .select(`
+        id, name, description, category, type, host_id,
+        is_live, is_persistent, is_system_room,
+        listener_count, room_settings, created_at, owner_tier
+      `)
+      .eq('id', LOBI_ROOM_ID)
+      .maybeSingle();
+    if (error || !data) return null;
+    return data as Room;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Ke�?fet sayfası için sistem odalarını Room[] formatında döndürür.
+ * �?u an bo�? �?? Lobi ayrı LobiCard ile render ediliyor (showcase listesinde de�?il).
+ */
+export function getSystemRooms(): Room[] {
+  return [];
+}
+
+/**
+ * Belirli bir sistem odasını DB'den getirir (ID'ye göre).
+ * room/[id].tsx içindeki sistem odası fallback'i için.
+ */
+export async function getSystemRoomById(roomId: string): Promise<Room | null> {
+  if (roomId === LOBI_ROOM_ID) return getLobiRoom();
+  return null;
 }

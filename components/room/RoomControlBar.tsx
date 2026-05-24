@@ -26,7 +26,7 @@ import { useRoomLayout } from '../../services/roomLayoutConfig';
 //   - BUBBLE_SIZE: 36 → 58 (ana sayfa BUBBLE ile birebir)
 //   - ICON_SIZE: 20 → 22 (ana sayfa ile uyumlu)
 //   Admin slider'ı bu default'u 32-72 arası override edebilir.
-const BAR_H = 60;
+const BAR_H = 72;
 const BAR_MARGIN = 0;
 const BTN_SIZE = 58;
 const BUBBLE_SIZE = 58;
@@ -236,6 +236,7 @@ interface Props {
   onChatPress: () => void; onPlusPress: () => void;
   /** ★ v107: Hediye butonu — odadaki birine sembol/Lottie hediye gönderme paneli */
   onGiftPress?: () => void;
+  isGiftOpen?: boolean;
   onMuteRoomPress?: () => void;
   onLeavePress?: () => void;
   dmBadgeCount?: number;
@@ -256,7 +257,7 @@ export default function RoomControlBar({
   onMicPress, onCameraPress,
   onHandPress, onChatPress, onPlusPress, onGiftPress, onMuteRoomPress,
   onJoinStagePress,
-  dmBadgeCount, plusBadgeCount, onDmPress, isDmOpen, isPlusOpen,
+  dmBadgeCount, plusBadgeCount, onDmPress, isDmOpen, isPlusOpen, isGiftOpen,
 }: Props) {
   const resolvedStageAction: StageAction = stageAction ?? (isHandRaised ? 'waiting' : 'raise_hand');
   // ★ v284: Web admin "Oda Düzeni" → controls config
@@ -422,6 +423,7 @@ export default function RoomControlBar({
           <CtrlBtn
             icon="gift"
             onPress={onGiftPress}
+            active={isGiftOpen}
             accent="#F472B6"
             label={i18n.t('room.roomcontrolbar.008')}
           />

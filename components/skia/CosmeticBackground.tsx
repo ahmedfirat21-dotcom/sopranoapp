@@ -10,14 +10,16 @@
  *     <ProfileContent />
  *   </CosmeticBackground>
  */
-import React, { useEffect } from 'react';
+import React, { Component, useEffect } from 'react';
 import { View, Image as RNImage, StyleSheet, type ViewStyle } from 'react-native';
 import { useBackgroundConfig, type BackgroundConfig } from '../../services/cosmeticEditorConfigs';
 
 let SkiaMod: any = null;
 let ReanimatedMod: any = null;
-try { SkiaMod = require('@shopify/react-native-skia'); } catch {}
-try { ReanimatedMod = require('react-native-reanimated'); } catch {}
+try { SkiaMod = require('@shopify/react-native-skia'); } catch { SkiaMod = null; }
+try { ReanimatedMod = require('react-native-reanimated'); } catch { ReanimatedMod = null; }
+
+
 
 // Reanimated noop fallback — koşulsuz hook çağrısı için
 const _useStableValue = ReanimatedMod?.useSharedValue
@@ -29,7 +31,7 @@ const _useStableDerived = ReanimatedMod?.useDerivedValue
 
 interface Props {
   bgItemId: string | null | undefined;
-  context?: 'profile' | 'room' | 'chat';
+  context?: 'profile' | 'room' | 'chat' | 'home' | 'myrooms';
   children?: React.ReactNode;
   style?: ViewStyle;
 }
@@ -46,7 +48,11 @@ export function CosmeticBackground({ bgItemId, context = 'profile', children, st
 
   if (!cfg || !SkiaMod) return <View style={[styles.fill, style]}>{children}</View>;
 
-  return <BgRender cfg={cfg} style={style}>{children}</BgRender>;
+  return (
+    <SkiaErrorBoundary fallbackStyle={[styles.fill, { backgroundColor: cfg.fallback_color }, style]}>
+      <BgRender cfg={cfg} style={style}>{children}</BgRender>
+    </SkiaErrorBoundary>
+  );
 }
 
 // Skia'nın garanti olduğu component — koşulsuz hook çağrıları
@@ -115,7 +121,8 @@ function BgRender({ cfg, children, style }: { cfg: BackgroundConfig; children?: 
 
   // Image source — koşulsuz hook (Skia guaranteed exists)
   const imageUri = cfg.bg_type === 'image' && cfg.image_url ? cfg.image_url : null;
-  const imageSrc = Skia.useImage(imageUri || '');
+  // ★ v1.7.13.143 FIX: useImage('') → "Expected arraybuffer" crash. null geçince Skia decode atlar.
+  const imageSrc = Skia.useImage(imageUri);
 
   if (size.w === 0 || size.h === 0) {
     return (
@@ -213,3 +220,21 @@ function BgRender({ cfg, children, style }: { cfg: BackgroundConfig; children?: 
 const styles = StyleSheet.create({
   fill: { flex: 1, position: 'relative' },
 });
+
+// ★ v1.7.13.143: Skia Canvas crash'lerini yakala — "Expected arraybuffer" gibi native hatalar
+class SkiaErrorBoundary extends Component<
+  { children: React.ReactNode; fallbackStyle?: any },
+  { hasError: boolean }
+> {
+  state = { hasError: false };
+  static getDerivedStateFromError() { return { hasError: true }; }
+  componentDidCatch(err: any) {
+    if (__DEV__) console.warn('[CosmeticBackground] Skia crash, falling back:', err?.message);
+  }
+  render() {
+    if (this.state.hasError) {
+      return <View style={this.props.fallbackStyle}>{this.props.children}</View>;
+    }
+    return this.props.children;
+  }
+}

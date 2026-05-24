@@ -1,4 +1,4 @@
-﻿/**
+/**
  * SopranoChat â€” Oda Yönetim Drawer
  * â˜… Sağdan kayan panel â€” RoomChatDrawer stili.
  * Oda-içi RoomSettingsSheet'teki TÃœM ayarları içerir + takipçi listesi.

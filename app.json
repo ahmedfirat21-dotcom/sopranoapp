@@ -2,7 +2,7 @@
   "expo": {
     "name": "SopranoChat",
     "slug": "SopranoChat",
-    "version": "1.7.13",
+    "version": "1.7.13.146",
     "privacy": "public",
     "orientation": "portrait",
     "icon": "./assets/app_icon.png",
@@ -30,8 +30,8 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#0F7670",
-        "foregroundImage": "./assets/launcher_icon.png"
+        "backgroundColor": "#2A7B7B",
+        "foregroundImage": "./assets/launcher_icon_padded.png"
       },
       "package": "com.sopranochat",
       "versionCode": 331,

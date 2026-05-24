@@ -129,6 +129,8 @@ export const MessageService = {
         preview = '🚫 Bu mesaj silindi';
       } else if (preview.startsWith('🎤') || preview.includes('voice_messages/')) preview = '🎤 Sesli mesaj';
       else if (preview.startsWith('📷') || preview.match(/^https?.*\.(jpg|png|webp)/i)) preview = i18n.t('auto.messages.009');
+      // ★ v1.7.13.141: GIF URL'leri (Tenor) — inbox'ta 'GIF' önizlemesi
+      else if (preview.match(/^https?:\/\/media\.tenor\.com\//i) || preview.match(/^https?.*\.gif(\?\S*)?$/i)) preview = 'GIF';
       if (isSentByMe && !preview.startsWith('Sen:') && !lastMsg.deleted_for_everyone) preview = `Sen: ${preview}`;
 
       inbox.push({
@@ -189,8 +191,10 @@ export const MessageService = {
     return !!data;
   },
 
-  /** İki kişi arasındaki tüm konuşma geçmişini getir */
-  async getConversation(user1Id: string, user2Id: string, limit = 200) {
+  /** İki kişi arasındaki konuşma geçmişini getir
+   *  ★ v1.7.13.141: Cursor-based pagination — `before` parametresi ile eski mesajlar çekilir.
+   *  before = en eski mesajın created_at değeri → o tarihten öncekiler döner. */
+  async getConversation(user1Id: string, user2Id: string, limit = 200, before?: string) {
     // ★ v110.5.21 (6 May 2026): Mesajlar HER zaman görünür — kullanıcı mesaj
     //   geçmişini kaybolmasın, sadece cevap vermek için engel kaldırma gerek.
     //   Block filter UI tarafında yapılıyor (inbox'ta gizli + chat ekranı banner +
@@ -199,7 +203,7 @@ export const MessageService = {
     // ★ is_deleted sütunu varsa filtrele, yoksa filtresiz — getInbox ile aynı strateji
     const orFilter = `and(sender_id.eq.${user1Id},receiver_id.eq.${user2Id}),and(sender_id.eq.${user2Id},receiver_id.eq.${user1Id})`;
 
-    const { data: d1, error: e1 } = await supabase
+    let query = supabase
       .from('messages')
       .select('*, sender:profiles!sender_id(*)')
       .or(orFilter)
@@ -207,14 +211,23 @@ export const MessageService = {
       .order('created_at', { ascending: true })
       .limit(limit);
 
+    // ★ v1.7.13.141: Cursor — eski mesajlar için created_at filtresi
+    if (before) {
+      query = query.lt('created_at', before);
+    }
+
+    const { data: d1, error: e1 } = await query;
+
     if (e1 && e1.code === '42703') {
       // is_deleted sütunu yok — filtresiz çek
-      const { data: d2, error: e2 } = await supabase
+      let fallbackQuery = supabase
         .from('messages')
         .select('*, sender:profiles!sender_id(*)')
         .or(orFilter)
         .order('created_at', { ascending: true })
         .limit(limit);
+      if (before) fallbackQuery = fallbackQuery.lt('created_at', before);
+      const { data: d2, error: e2 } = await fallbackQuery;
       if (e2) throw e2;
       return (d2 || []) as Message[];
     }
@@ -372,7 +385,10 @@ export const MessageService = {
       .eq('status', 'pending')
       .order('created_at', { ascending: false });
     if (error) throw error;
-    const list = (data || []) as any[];
+    // ★ v1.7.13.49 (20 May 2026): Orphan request'leri filtrele — sender profile silinmişse
+    //   (sender=null) kullanıcıya "Kullanıcı sana yazıyor" gibi anlamsız çıkmasın.
+    //   FK NOT VALID olduğu için bu satırlar DB'de hayalet kalıyor; UI'da gizleniyor.
+    const list = ((data || []) as any[]).filter(r => r.sender && r.sender.id);
     if (list.length === 0) return list;
     // ★ v109: Her istek için ilk mesaj snippet'i — Instagram tarzı önizleme
     const senderIds = list.map(r => r.sender_id);
@@ -647,8 +663,9 @@ export const MessageService = {
 
   /** Okunmamış toplam mesaj sayısı (genel) — is_deleted + engellenenler + gizlenenler + pending istekler hariç */
   async getUnreadCount(userId: string) {
-    // ★ 2026-04-29 v85: Yabancıdan pending request mesajları DM badge'inde sayılmaz —
-    //   "İstekler (N)" chip'i ayrı sayaç tutuyor. Çift sayım engellenir.
+    // ★ 2026-04-29 v85: Yabancıdan pending request mesajları ayrı sayılır.
+    // ★ v1.7.13.161: Pending request sayısı DA toplama ekleniyor — oda içinde
+    //   yabancıdan gelen DM fark edilsin.
     const [blockedIds, hiddenMap, pendingReqRows] = await Promise.all([
       FriendshipService._getBlockedIds(userId),
       this.getHiddenConversations(userId),
@@ -671,13 +688,13 @@ export const MessageService = {
     if (hiddenPartnerIds.length > 0) {
       query = query.not('sender_id', 'in', `(${hiddenPartnerIds.map(id => `"${id}"`).join(',')})`);
     }
-    if (pendingSenderIds.length > 0) {
-      query = query.not('sender_id', 'in', `(${pendingSenderIds.map((id: string) => `"${id}"`).join(',')})`);
-    }
+    // ★ v1.7.13.161: Pending request mesajları ARTIK hariç tutulmuyor — badge'de
+    //   sayılsın ki kullanıcı oda içinde yabancıdan gelen DM'yi fark etsin.
+    //   Eski: pendingSenderIds hariç tutuluyordu.
 
     const { count, error } = await query;
     if (error) throw error;
-    return count || 0;
+    return (count || 0);
   },
 
   /** Realtime Yeni Mesaj Dinleyici

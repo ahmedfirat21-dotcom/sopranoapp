@@ -1,21 +1,21 @@
 /**
- * SopranoChat — Sahne Desteği Sheet (oda host'a SP bağışı)
- * ═══════════════════════════════════════════════════════════════════
- * v107.3 (2 May 2026) — SPDonateSheet'in oda-içi host bağışı ayrımı.
- * Eski tek-modal-her-bağlam yaklaşımı bölündü; bu sheet SADECE oda host'una
- * "sahne desteği" tip atma akışı için (canlı an, anlık, gösterişli).
+ * SopranoChat â Sahne DesteÄi Sheet (oda host'a SP baÄÄ±ÅÄ±)
+ * âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+ * v107.3 (2 May 2026) â SPDonateSheet'in oda-iÃ§i host baÄÄ±ÅÄ± ayrÄ±mÄ±.
+ * Eski tek-modal-her-baÄlam yaklaÅÄ±mÄ± bÃ¶lÃ¼ndÃ¼; bu sheet SADECE oda host'una
+ * "sahne desteÄi" tip atma akÄ±ÅÄ± iÃ§in (canlÄ± an, anlÄ±k, gÃ¶steriÅli).
  *
  * Tema: SAHNE
- *   - Watermark: Üstten yumuşak sahne ışığı huzmesi (tier rengi → transparan dikey)
- *   - Host avatarı sahne ışığı altında parlar (tier glow ring + breathing pulse)
- *   - Oda adı küçük subtitle olarak gösterilir
- *   - Mesaj input YOK (canlı an, hızlı tip — Hediye'den ayrım noktası)
+ *   - Watermark: Ãstten yumuÅak sahne Ä±ÅÄ±ÄÄ± huzmesi (tier rengi â transparan dikey)
+ *   - Host avatarÄ± sahne Ä±ÅÄ±ÄÄ± altÄ±nda parlar (tier glow ring + breathing pulse)
+ *   - Oda adÄ± kÃ¼Ã§Ã¼k subtitle olarak gÃ¶sterilir
+ *   - Mesaj input YOK (canlÄ± an, hÄ±zlÄ± tip â Hediye'den ayrÄ±m noktasÄ±)
  *   - Buton: "Sahneyi Destekle"
  *
- * Tutarlılık (Hediye Sheet ile ortak):
- *   - Tier paleti: constants/tierColors.ts (paylaşılan)
- *   - Yumuşak 4-stop gradient, locations [0, 0.4, 0.75, 1] — keskin geçiş yok
- *   - Android: shadowColor yok, border + iç gradient + tierShadow helper
+ * TutarlÄ±lÄ±k (Hediye Sheet ile ortak):
+ *   - Tier paleti: constants/tierColors.ts (paylaÅÄ±lan)
+ *   - YumuÅak 4-stop gradient, locations [0, 0.4, 0.75, 1] â keskin geÃ§iÅ yok
+ *   - Android: shadowColor yok, border + iÃ§ gradient + tierShadow helper
  *   - Drag-to-dismiss (X butonu YOK)
  *   - Bakiye-aware slider/chip
  */
@@ -44,25 +44,25 @@ import { getAvatarSource } from '../../constants/avatars';
 
 const { width: W } = Dimensions.get('window');
 
-const PANEL_CONTENT_HEIGHT = 480; // mesaj input olmadığı için Hediye'den 60px kısa
+const PANEL_CONTENT_HEIGHT = 480; // mesaj input olmadÄ±ÄÄ± iÃ§in Hediye'den 60px kÄ±sa
 const SLIDER_WIDTH = Math.max(1, W - 80);
 const QUICK_AMOUNTS = [10, 25, 100, 250, 500];
-const MIN_AMOUNT = 10; // ★ v107.18: Min gönderim 10 SP
+const MIN_AMOUNT = 10; // â v107.18: Min gÃ¶nderim 10 SP
 const HARD_MAX = 1000;
 
 interface Props {
   visible: boolean;
   onClose: () => void;
   senderId: string;
-  /** Host kullanıcı ID'si — bağış buraya gider */
+  /** Host kullanÄ±cÄ± ID'si â baÄÄ±Å buraya gider */
   hostId: string;
   /** Host'un display name'i */
   hostName: string;
-  /** Host avatar URL'i — sahne ışığı altında parıldar */
+  /** Host avatar URL'i â sahne Ä±ÅÄ±ÄÄ± altÄ±nda parÄ±ldar */
   hostAvatar?: string;
-  /** Host tier (Plus/Pro) — avatar yanında rozet */
+  /** Host tier (Plus/Pro) â avatar yanÄ±nda rozet */
   hostTier?: string | null;
-  /** Oda adı — alt subtitle */
+  /** Oda adÄ± â alt subtitle */
   roomName?: string;
   onSuccess?: (amount: number) => void;
 }
@@ -76,19 +76,19 @@ export default function StageSupportSheet({
 
   const translateY = useRef(new Animated.Value(PANEL_HEIGHT)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
-  // ★ Sahne ışığı huzmesi — subtle yana sallanır + opacity dans (4sn cycle)
+  // â Sahne Ä±ÅÄ±ÄÄ± huzmesi â subtle yana sallanÄ±r + opacity dans (4sn cycle)
   const spotlightFloat = useRef(new Animated.Value(0)).current;
-  // ★ Host avatar breathing — sahne ışığı altında nefes alır gibi (2sn)
+  // â Host avatar breathing â sahne Ä±ÅÄ±ÄÄ± altÄ±nda nefes alÄ±r gibi (2sn)
   const avatarBreath = useRef(new Animated.Value(0)).current;
-  // ★ Tier glow ring — host avatar etrafında pulse halo (2sn)
+  // â Tier glow ring â host avatar etrafÄ±nda pulse halo (2sn)
   const glowRing = useRef(new Animated.Value(0)).current;
-  // Hexagon scale spring (slider değişiminde)
+  // Hexagon scale spring (slider deÄiÅiminde)
   const hexScale = useRef(new Animated.Value(1)).current;
-  // ★ v107.31: Light sweep — panel arkasında diagonal ışık şeridi soldan sağa kayar (5sn loop)
+  // â v107.31: Light sweep â panel arkasÄ±nda diagonal Ä±ÅÄ±k Åeridi soldan saÄa kayar (5sn loop)
   const lightSweep = useRef(new Animated.Value(0)).current;
-  // ★ v107.31: 6 ambient drift particle (yıldız) — alttan üste yumuşakça süzülür
+  // â v107.31: 6 ambient drift particle (yÄ±ldÄ±z) â alttan Ã¼ste yumuÅakÃ§a sÃ¼zÃ¼lÃ¼r
   const driftAnims = useRef([0, 1, 2, 3, 4, 5].map(() => new Animated.Value(0))).current;
-  // ★ v284 (16 May 2026): Loop instance ref'ler — orphan loop önleme (5 ana + 6 drift)
+  // â v284 (16 May 2026): Loop instance ref'ler â orphan loop Ã¶nleme (5 ana + 6 drift)
   const spotlightLoopRef = useRef<Animated.CompositeAnimation | null>(null);
   const avatarBreathLoopRef = useRef<Animated.CompositeAnimation | null>(null);
   const glowRingLoopRef = useRef<Animated.CompositeAnimation | null>(null);
@@ -110,7 +110,7 @@ export default function StageSupportSheet({
   const sliderActiveRef = useRef(false);
   const lastSliderUpdate = useRef(0);
 
-  // Bakiye-aware slider üst sınırı
+  // Bakiye-aware slider Ã¼st sÄ±nÄ±rÄ±
   const effectiveMax = balance !== null ? Math.max(1, Math.min(HARD_MAX, balance)) : HARD_MAX;
 
   useEffect(() => {
@@ -130,7 +130,7 @@ export default function StageSupportSheet({
         Animated.spring(translateY, { toValue: 0, useNativeDriver: true, damping: 22, stiffness: 220 }),
         Animated.timing(backdropOpacity, { toValue: 1, duration: 220, useNativeDriver: true }),
       ]).start();
-      // ★ v284 (16 May 2026): 5 loop ref pattern — orphan loop önleme
+      // â v284 (16 May 2026): 5 loop ref pattern â orphan loop Ã¶nleme
       spotlightLoopRef.current = Animated.loop(
         Animated.sequence([
           Animated.timing(spotlightFloat, { toValue: 1, duration: 4000, useNativeDriver: true }),
@@ -196,7 +196,7 @@ export default function StageSupportSheet({
     ]).start();
   }, [amount]);
 
-  // Pan responder — drag-to-dismiss
+  // Pan responder â drag-to-dismiss
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
   const panResponder = useRef(
@@ -277,7 +277,7 @@ export default function StageSupportSheet({
     onClose();
 
     try {
-      // Sahne desteği = mesaj yok (4. parametre undefined)
+      // Sahne desteÄi = mesaj yok (4. parametre undefined)
       const result = await ProfileService.donateToUser(senderId, hostId, sentAmount);
       if (!mountedRef.current) return;
       if (!result.success) {
@@ -328,7 +328,7 @@ export default function StageSupportSheet({
   return (
     <View style={StyleSheet.absoluteFillObject as any} pointerEvents="box-none">
       <View style={{ ...StyleSheet.absoluteFillObject, zIndex: 500 }} pointerEvents="box-none">
-        {/* Backdrop — NotificationDrawer dim tonu */}
+        {/* Backdrop â NotificationDrawer dim tonu */}
         <Animated.View style={[StyleSheet.absoluteFill, { opacity: backdropOpacity }]}>
           <BlurView intensity={30} tint="dark" style={StyleSheet.absoluteFill} />
           <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(8,12,22,0.45)' }]} />
@@ -348,8 +348,8 @@ export default function StageSupportSheet({
           ]}
           {...panResponder.panHandlers}
         >
-          {/* ★ 2026-05-05: NotificationDrawer dili — slate diagonal + üst tier halo + soft glow.
-              Sahne ışığı huzmesi + light sweep KORUNUR (sahne karakteri). */}
+          {/* â 2026-05-05: NotificationDrawer dili â slate diagonal + Ã¼st tier halo + soft glow.
+              Sahne Ä±ÅÄ±ÄÄ± huzmesi + light sweep KORUNUR (sahne karakteri). */}
           <LinearGradient
             colors={['#3a4658', '#2a3344', '#1a2030']}
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
@@ -369,9 +369,9 @@ export default function StageSupportSheet({
             pointerEvents="none"
           />
 
-          {/* ★ Sahne ışığı huzmesi — panel üstünden yumuşakça düşer.
-              Tier rengi tepede yoğun, dipte transparan. Yana hafif sallanır (4sn cycle).
-              "Spotlight from above" hissi — sade ve premium. */}
+          {/* â Sahne Ä±ÅÄ±ÄÄ± huzmesi â panel Ã¼stÃ¼nden yumuÅakÃ§a dÃ¼Åer.
+              Tier rengi tepede yoÄun, dipte transparan. Yana hafif sallanÄ±r (4sn cycle).
+              "Spotlight from above" hissi â sade ve premium. */}
           <Animated.View
             pointerEvents="none"
             style={[
@@ -406,8 +406,8 @@ export default function StageSupportSheet({
             />
           </Animated.View>
 
-          {/* ★ v107.31: LIGHT SWEEP — panel arkasında diagonal ışık şeridi soldan sağa kayar.
-               Tier rengi 60% opaklık, skewX -25deg ile kayma efekti. 5sn cycle. */}
+          {/* â v107.31: LIGHT SWEEP â panel arkasÄ±nda diagonal Ä±ÅÄ±k Åeridi soldan saÄa kayar.
+               Tier rengi 60% opaklÄ±k, skewX -25deg ile kayma efekti. 5sn cycle. */}
           <Animated.View
             pointerEvents="none"
             style={[
@@ -428,8 +428,8 @@ export default function StageSupportSheet({
             />
           </Animated.View>
 
-          {/* ★ v107.31: AMBIENT DRIFT — 6 yıldız partikülü panel altından yumuşakça yukarı süzülür.
-               Stagger gecikmeli, fade-in / fade-out, scale 0.6 → 1.2. */}
+          {/* â v107.31: AMBIENT DRIFT â 6 yÄ±ldÄ±z partikÃ¼lÃ¼ panel altÄ±ndan yumuÅakÃ§a yukarÄ± sÃ¼zÃ¼lÃ¼r.
+               Stagger gecikmeli, fade-in / fade-out, scale 0.6 â 1.2. */}
           {driftAnims.map((anim, i) => {
             const startX = ((i * 137) % (W - 80)) + 40;  // pseudo-random distribution
             const drift = ((i * 53) % 60) - 30;
@@ -449,7 +449,7 @@ export default function StageSupportSheet({
                   transform: [{ translateX: tx }, { translateY: ty }, { scale }],
                 }}
               >
-                <Text style={[styles.driftParticle, { color: palette.accent }]} allowFontScaling={false}>✦</Text>
+                <Text style={[styles.driftParticle, { color: palette.accent }]} allowFontScaling={false}>â¦</Text>
               </Animated.View>
             );
           })}
@@ -478,14 +478,14 @@ export default function StageSupportSheet({
             <View style={[styles.balancePill, { backgroundColor: palette.accentTint, borderColor: palette.accent + '40' }]}>
               <Ionicons name="wallet" size={10} color={palette.accent} />
               <Text style={[styles.balanceText, { color: palette.accent }]}>
-                {balance !== null ? balance.toLocaleString('tr-TR') : '...'}
+                {balance !== null ? balance.toLocaleString(i18n.locale) : '...'}
               </Text>
             </View>
           </View>
 
-          {/* Host kartı — avatar sahne ışığı altında parlar */}
+          {/* Host kartÄ± â avatar sahne Ä±ÅÄ±ÄÄ± altÄ±nda parlar */}
           <View style={styles.hostCardWrap}>
-            {/* Glow ring — avatar arkasında pulse halo */}
+            {/* Glow ring â avatar arkasÄ±nda pulse halo */}
             <Animated.View
               pointerEvents="none"
               style={[
@@ -499,7 +499,7 @@ export default function StageSupportSheet({
                 },
               ]}
             />
-            {/* Avatar — breathing pulse */}
+            {/* Avatar â breathing pulse */}
             <Animated.View
               style={[
                 styles.hostAvatarWrap,
@@ -513,7 +513,7 @@ export default function StageSupportSheet({
             >
               <Image source={getAvatarSource(hostAvatar)} style={styles.hostAvatar} />
             </Animated.View>
-            {/* İsim + "Host" etiketi + oda adı */}
+            {/* Ä°sim + "Host" etiketi + oda adÄ± */}
             <View style={styles.hostInfo}>
               <View style={styles.hostNameRow}>
                 <Text style={styles.hostName} numberOfLines={1}>{hostName}</Text>
@@ -540,7 +540,7 @@ export default function StageSupportSheet({
               <SPHexagonIcon size={64} tier={tier as any} />
             </Animated.View>
             <Text style={[styles.amountValue, { color: palette.amountText }]}>
-              {amount.toLocaleString('tr-TR')}
+              {amount.toLocaleString(i18n.locale)}
             </Text>
             <Text style={[styles.amountUnit, { color: palette.accent }]}>SP</Text>
           </View>
@@ -577,11 +577,11 @@ export default function StageSupportSheet({
               />
             </View>
             <Text style={[styles.sliderMax, { color: palette.accent + '70' }]}>
-              {effectiveMax.toLocaleString('tr-TR')}
+              {effectiveMax.toLocaleString(i18n.locale)}
             </Text>
           </View>
 
-          {/* Quick presets — bakiye altıysa sönük */}
+          {/* Quick presets â bakiye altÄ±ysa sÃ¶nÃ¼k */}
           <View style={styles.quickRow}>
             {QUICK_AMOUNTS.map(q => {
               const active = amount === q;
@@ -628,7 +628,7 @@ export default function StageSupportSheet({
                 <>
                   <Ionicons name="sparkles" size={18} color="#FFF" style={iconShadow} />
                   <Text style={styles.sendBtnText}>
-                    {amount.toLocaleString('tr-TR')} SP Sahneyi Destekle
+                    {amount.toLocaleString(i18n.locale)} SP Sahneyi Destekle
                   </Text>
                 </>
               )}
@@ -681,7 +681,7 @@ const styles = StyleSheet.create({
   handle: { alignItems: 'center', paddingVertical: 12 },
   handleBar: { width: 40, height: 4, borderRadius: 2 },
 
-  // ★ Sahne ışığı huzmesi — panel üst kısmında, tier rengi tepede yoğun
+  // â Sahne Ä±ÅÄ±ÄÄ± huzmesi â panel Ã¼st kÄ±smÄ±nda, tier rengi tepede yoÄun
   spotlight: {
     position: 'absolute',
     top: 0,
@@ -689,14 +689,14 @@ const styles = StyleSheet.create({
     height: 280,
     overflow: 'hidden',
   },
-  // ★ v107.31: Light sweep — panel arkasında diagonal ışık şeridi (5sn loop)
+  // â v107.31: Light sweep â panel arkasÄ±nda diagonal Ä±ÅÄ±k Åeridi (5sn loop)
   lightSweep: {
     position: 'absolute',
     top: 0, bottom: 0,
     width: 80,
     opacity: 0.6,
   },
-  // ★ v107.31: Ambient drift particle — alttan üste süzülen yıldız emoji (Text style)
+  // â v107.31: Ambient drift particle â alttan Ã¼ste sÃ¼zÃ¼len yÄ±ldÄ±z emoji (Text style)
   driftParticle: {
     fontSize: 14,
     textShadowColor: 'rgba(0,0,0,0.4)',
@@ -724,7 +724,7 @@ const styles = StyleSheet.create({
   },
   balanceText: { fontSize: 11, fontWeight: '800' },
 
-  // ★ Host kartı — avatar merkezde, sahne ışığı altında parlar
+  // â Host kartÄ± â avatar merkezde, sahne Ä±ÅÄ±ÄÄ± altÄ±nda parlar
   hostCardWrap: {
     alignItems: 'center',
     paddingHorizontal: 18,
@@ -781,7 +781,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 
-  // Amount alanı
+  // Amount alanÄ±
   amountWrap: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
     paddingVertical: 4,

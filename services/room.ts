@@ -11,6 +11,7 @@ import { PushService } from './push';
 import { getBlockedUserIds } from './blocklist';
 import { hashPassword as hashRoomPassword } from './roomAccess';
 import { RateLimitService } from './rateLimit';
+import { isSystemRoom } from './showcaseRooms';
 import { getRoomLimits, isTierAtLeast, getTierLevel } from '../constants/tiers';
 import type {
   Profile, Room, RoomParticipant, RoomSettings,
@@ -137,14 +138,19 @@ export const RoomService = {
    */
   async refreshExpiresForTierChange(hostId: string, newTier: SubscriptionTier): Promise<void> {
     const limits = getRoomLimits(newTier);
-    // Free'e düşürmede dokunma — kullanıcı mevcut süreyi kullanmaya devam etsin
-    if (newTier === 'Free') return;
-    const newExpiresAt = limits.durationHours > 0
-      ? new Date(Date.now() + limits.durationHours * 60 * 60 * 1000).toISOString()
-      : null;
+    // ★ v1.7.13.142: Free downgrade'de de expires_at güncelle — eski Pro odaları 7/24 kalmasın
+    let newExpiresAt: string | null;
+    if (newTier === 'Free') {
+      // Free'e düşen kullanıcının canlı odalarına 3 saat kalan süre ver
+      newExpiresAt = new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString();
+    } else {
+      newExpiresAt = limits.durationHours > 0
+        ? new Date(Date.now() + limits.durationHours * 60 * 60 * 1000).toISOString()
+        : null;
+    }
     await supabase
       .from('rooms')
-      .update({ expires_at: newExpiresAt })
+      .update({ expires_at: newExpiresAt, owner_tier: newTier })
       .eq('host_id', hostId)
       .eq('is_live', true);
   },
@@ -281,9 +287,11 @@ export const RoomService = {
     const now = new Date().toISOString();
     // ★ 2026-04-20: expires_at filtresi — süresi dolmuş odalar keşfette görünmesin
     // (autoCloseExpired henüz çalışmamış olabilir; query seviyesinde de filtre)
+    // ★ v1.7.13.100 (20 May 2026): room_participants(count) embedded — listener_count
+    //   stale olsa bile UI gerçek participant sayısını gösterir (trigger gecikme bypass).
     const { data, error } = await supabase
       .from('rooms')
-      .select('*, host:profiles!host_id(*)')
+      .select('*, host:profiles!host_id(*), room_participants(count)')
       .eq('is_live', true)
       .or(`expires_at.is.null,expires_at.gt.${now}`)
       .order('listener_count', { ascending: false })
@@ -537,12 +545,38 @@ export const RoomService = {
    * ★ Heartbeat — Katılımcının hâlâ aktif olduğunu bildir.
    * room_participants tablosunda last_seen_at günceller.
    */
+  /** ★ v1.7.13.96 (20 May 2026): UPDATE → UPSERT auto-resurrect.
+   *  Eski: heartbeat sadece UPDATE → cleanup_ghost_participants kullanıcıyı silmişse
+   *  0 row affected, sessiz fail. Minimize bar duruyor ama DB'de kayıt yok →
+   *  listener_count=0 görünüyordu. Şimdi: kayıt yoksa otomatik yeniden eklenir
+   *  (listener role default). RoomService.join role hesaplaması yapmadığı için
+   *  UPSERT sırasında role mevcutsa korunur, yoksa 'listener' default.
+   *  Uyarı: bu fonksiyon role belirleme yapmaz — banned/blocked kontrolü join'de. */
   async heartbeat(roomId: string, userId: string): Promise<void> {
-    await supabase
+    const now = new Date().toISOString();
+    const { data: existing } = await supabase
       .from('room_participants')
-      .update({ last_seen_at: new Date().toISOString() })
+      .select('role')
       .eq('room_id', roomId)
-      .eq('user_id', userId);
+      .eq('user_id', userId)
+      .maybeSingle();
+    if (existing) {
+      // Mevcut kayıt — sadece last_seen update (role'e dokunma)
+      await supabase
+        .from('room_participants')
+        .update({ last_seen_at: now })
+        .eq('room_id', roomId)
+        .eq('user_id', userId);
+    } else {
+      // Kayıt yok — auto-resurrect olarak listener ekle
+      await supabase.from('room_participants').insert({
+        room_id: roomId,
+        user_id: userId,
+        role: 'listener',
+        is_muted: false,
+        last_seen_at: now,
+      });
+    }
   },
 
   /**
@@ -665,7 +699,15 @@ export const RoomService = {
    *  - remaining_ms yoksa → tier-based fresh süre
    *  - Pro (sınırsız): expires_at null kalır */
   async wakeUpRoom(roomId: string, hostId: string, tier: SubscriptionTier = 'Free'): Promise<Room> {
-    const limits = getRoomLimits(tier);
+    // ★ v1.7.13.134: Tier'ı client param'a güvenmek yerine DB'den fresh çek.
+    //   Senaryo: Pro user persistent dondurdu → Plus'a düştü → wakeUp yapıyor.
+    //   Eski client'tan gelen `tier='Pro'` stale → CURRENT tier'a göre süre hesaplanmalı.
+    const { data: freshProfile } = await supabase
+      .from('profiles').select('is_admin, subscription_tier').eq('id', hostId).maybeSingle();
+    const freshTier: SubscriptionTier = freshProfile?.is_admin
+      ? 'Pro'
+      : migrateLegacyTier(freshProfile?.subscription_tier || tier);
+    const limits = getRoomLimits(freshTier);
     const now = new Date();
 
     // ★ v309 (18 May 2026): ASIL SAHİP AUTO-RECLAIM — kullanıcı geçici host transfer'i
@@ -841,7 +883,7 @@ export const RoomService = {
     }
     if (options.entry_fee_sp !== undefined) options.entry_fee_sp = Math.max(0, Math.min(options.entry_fee_sp || 0, 10000));
 
-    // ★ Admin (GodMaster) kontrolü — admin odaları Pro limitleriyle oluşturulur
+    // ★ v1.7.13.132: GodMaster kaldırıldı — admin odaları Pro limitleriyle açılır
     let normalizedTier = migrateLegacyTier(tier);
     const { data: creatorProfile } = await supabase
       .from('profiles')
@@ -849,7 +891,7 @@ export const RoomService = {
       .eq('id', hostId)
       .single();
     if (creatorProfile?.is_admin) {
-      normalizedTier = 'GodMaster' as SubscriptionTier;
+      normalizedTier = 'Pro';
     }
 
     const limits = getRoomLimits(normalizedTier);
@@ -879,6 +921,26 @@ export const RoomService = {
       ? new Date(Date.now() + limits.durationHours * 60 * 60 * 1000).toISOString()
       : null; // Sınırsız süre
 
+    // ★ v1.7.13.132: Tier-gated alanları server-side guard ile filtrele.
+    //   UI bypass durumunda Free user'ın Plus/Pro özelliği göndermesi engellenir.
+    //   Sessizce drop ediyoruz (throw değil) çünkü createRoom ana akışı kırılmasın.
+    const tierGated = {
+      // Plus+ gerek
+      card_image_url:   limits.canCustomizeImage ? options.card_image_url   : undefined,
+      room_image_url:   limits.canCustomizeImage ? options.room_image_url   : undefined,
+      theme_id:         limits.canCustomizeTheme ? options.theme_id         : undefined,
+      followers_only:   limits.canUseFollowersOnly ? options.followers_only : undefined,
+      age_restricted:   limits.canUseFilters ? options.age_restricted       : undefined,
+      // ★ speaking_mode 'selected_only' Pro+ gerek (diğer modlar Free OK)
+      speaking_mode: (options.speaking_mode === 'selected_only' && !isTierAtLeast(normalizedTier, 'Pro'))
+        ? undefined : options.speaking_mode,
+      // Pro+ monetizasyon
+      entry_fee_sp:       isTierAtLeast(normalizedTier, 'Pro') ? options.entry_fee_sp       : undefined,
+      donations_enabled:  isTierAtLeast(normalizedTier, 'Pro') ? options.donations_enabled  : undefined,
+      // Pro+ müzik (canUseRoomMusic flag'i)
+      music_link: limits.canUseRoomMusic ? options.music_link : undefined,
+    };
+
     const roomSettings: RoomSettings = {};
     // ★ 2026-04-24 KRİTİK FIX: Oda oluşturulurken original_host_id kaydet —
     //   host çıkıp birisi claim ettiğinde, asıl sahibin geri dönüşte
@@ -886,16 +948,17 @@ export const RoomService = {
     (roomSettings as any).original_host_id = hostId;
     if (options.welcome_message) roomSettings.welcome_message = options.welcome_message;
     if (options.rules) roomSettings.rules = options.rules;
-    if (options.speaking_mode) roomSettings.speaking_mode = options.speaking_mode;
+    if (tierGated.speaking_mode) roomSettings.speaking_mode = tierGated.speaking_mode;
     if (options.scheduled_at) roomSettings.scheduled_at = options.scheduled_at;
-    if (options.entry_fee_sp) roomSettings.entry_fee_sp = options.entry_fee_sp;
-    if (options.donations_enabled) roomSettings.donations_enabled = options.donations_enabled;
-    if (options.followers_only) roomSettings.followers_only = options.followers_only;
-    if (options.card_image_url) (roomSettings as any).card_image_url = options.card_image_url;
-    if (options.music_link) (roomSettings as any).music_link = options.music_link;
-    if (options.age_restricted) (roomSettings as any).age_restricted = options.age_restricted;
+    if (tierGated.entry_fee_sp) roomSettings.entry_fee_sp = tierGated.entry_fee_sp;
+    if (tierGated.donations_enabled) roomSettings.donations_enabled = tierGated.donations_enabled;
+    if (tierGated.followers_only) roomSettings.followers_only = tierGated.followers_only;
+    if (tierGated.card_image_url) (roomSettings as any).card_image_url = tierGated.card_image_url;
+    if (tierGated.music_link) (roomSettings as any).music_link = tierGated.music_link;
+    if (tierGated.age_restricted) (roomSettings as any).age_restricted = tierGated.age_restricted;
     if (options.slow_mode_seconds) (roomSettings as any).slow_mode_seconds = options.slow_mode_seconds;
     if (options.room_language) (roomSettings as any).room_language = options.room_language;
+    if (tierGated.theme_id) (roomSettings as any).theme_id = tierGated.theme_id;
 
     // ★ BUG-T4 FIX: maxPersistentRooms limiti — kalıcı oda sayısı kontrolü
     if (limits.persistent && limits.maxPersistentRooms < 999) {
@@ -1425,7 +1488,7 @@ export const RoomService = {
   /** Oda ayarlarını güncelle — ★ SEC-8b: Input validation */
   async updateSettings(roomId: string, hostId: string, updates: Partial<Room & { room_settings?: Partial<RoomSettings> }>): Promise<void> {
     // Odanın gerçekten bu host'a ait olduğunu doğrula
-    const { data: room } = await supabase.from('rooms').select('host_id, room_settings').eq('id', roomId).single();
+    const { data: room } = await supabase.from('rooms').select('host_id, room_settings, owner_tier').eq('id', roomId).single();
     if (!room || room.host_id !== hostId) throw new Error(i18n.t('auto.room.020'));
 
     // ★ 2026-04-27: Geçici host koruması — devir olmuşsa (asıl sahip ≠ aktif host) ve
@@ -1434,6 +1497,32 @@ export const RoomService = {
     const origHost = (room.room_settings as any)?.original_host_id as string | undefined;
     if (origHost && origHost !== room.host_id && hostId !== origHost) {
       throw new Error(i18n.t('auto.room.019'));
+    }
+
+    // ★ v1.7.13.132: Tier-gated update guard — owner_tier'a göre alan filtrele.
+    //   Admin (is_admin) Pro yetkisi alır.
+    const { data: hostProfile } = await supabase
+      .from('profiles').select('is_admin, subscription_tier').eq('id', hostId).single();
+    const effectiveTier: SubscriptionTier = hostProfile?.is_admin
+      ? 'Pro'
+      : migrateLegacyTier((room as any).owner_tier || hostProfile?.subscription_tier || 'Free');
+    const tLimits = getRoomLimits(effectiveTier);
+
+    if (updates.room_settings) {
+      const s = updates.room_settings as any;
+      if (s.card_image_url && !tLimits.canCustomizeImage) delete s.card_image_url;
+      if (s.followers_only && !tLimits.canUseFollowersOnly) delete s.followers_only;
+      if (s.age_restricted && !tLimits.canUseFilters) delete s.age_restricted;
+      if (s.entry_fee_sp && !isTierAtLeast(effectiveTier, 'Pro')) delete s.entry_fee_sp;
+      if (s.donations_enabled && !isTierAtLeast(effectiveTier, 'Pro')) delete s.donations_enabled;
+      if (s.music_link && !tLimits.canUseRoomMusic) delete s.music_link;
+      if (s.speaking_mode === 'selected_only' && !isTierAtLeast(effectiveTier, 'Pro')) delete s.speaking_mode;
+    }
+    if ((updates as any).theme_id !== undefined && !tLimits.canCustomizeTheme) {
+      delete (updates as any).theme_id;
+    }
+    if ((updates as any).room_image_url !== undefined && !tLimits.canCustomizeImage) {
+      delete (updates as any).room_image_url;
     }
 
     const stripHtml = (s: string) => s.replace(/<[^>]*>/g, '');
@@ -1482,6 +1571,8 @@ export const RoomService = {
 
   /** Odayı sil (kalıcı oda) */
   async deleteRoom(roomId: string, hostId: string): Promise<void> {
+    // ★ v1.7.13.140: Sistem odaları (Soprano Lobi) silinemez.
+    if (isSystemRoom(roomId)) throw new Error('Sistem odası silinemez.');
     const { data: room } = await supabase.from('rooms').select('host_id, room_settings').eq('id', roomId).single();
     if (!room || room.host_id !== hostId) throw new Error(i18n.t('auto.room.017'));
 
@@ -1803,6 +1894,21 @@ export const RoomService = {
       if (/role değişikliği reddedildi|escalation|yetkiniz yok|prevent_role/i.test(error.message || '')) {
         throw new Error(i18n.t('auto.room.008'));
       }
+      // ★ v1.7.13.161: UUID type mismatch — Firebase UID'leri UUID formatında değil.
+      //   RPC parametresi uuid tipinde tanımlanmışsa bu hatayı verir.
+      //   Direct UPDATE fallback kullan.
+      if (/invalid input syntax for type uuid/i.test(error.message || '')) {
+        if (__DEV__) console.warn('[promoteSpeaker] UUID type mismatch, using direct UPDATE fallback');
+        const { error: updateErr } = await supabase
+          .from('room_participants')
+          .update({ role: 'speaker', is_muted: false })
+          .eq('room_id', roomId)
+          .eq('user_id', userId);
+        if (updateErr) throw new Error(updateErr.message);
+        // listener_count düşür
+        try { await supabase.rpc('decrement_listener_count', { room_id_input: roomId }); } catch { /* sessiz */ }
+        return;
+      }
       throw new Error(error.message || i18n.t('auto.room.007'));
     } catch (rpcErr: any) {
       throw rpcErr;
@@ -1944,6 +2050,8 @@ export const RoomService = {
    * Host çıkınca: Yetki zinciri ile devret (Mod → Speaker → Tier-bazlı politika)
    */
   async transferHost(roomId: string, oldHostId: string): Promise<{ newHostId: string | null; keepAlive?: boolean }> {
+    // ★ v1.7.13.140: Sistem odaları için host transfer yok — system_user kalıcı sahip.
+    if (isSystemRoom(roomId)) return { newHostId: null, keepAlive: true };
     // ★ K2/K3 FIX: Atomic RPC (v18). Aday seçimi + 3 adımlı UPDATE/DELETE
     // tek transaction içinde. Eski 3-query flow arada kopunca sahipsiz oda
     // veya çift-owner bırakıyordu.
@@ -1983,7 +2091,7 @@ export const RoomService = {
       .eq('id', oldHostId)
       .single();
     if (hostProfile?.is_admin) {
-      ownerTier = 'GodMaster' as SubscriptionTier;
+      ownerTier = 'Pro'; // ★ v1.7.13.132: GodMaster kaldırıldı
     }
 
     const limits = getRoomLimits(ownerTier);
@@ -2204,13 +2312,56 @@ export const RoomService = {
     }
   },
 
+  /** ★ v1.7.13.49 (20 May 2026): Planlı odalar — gelecek 7 gün için sıralı.
+   *  scheduled_at JSONB içinde (room_settings.scheduled_at). is_live=false; başlamadan
+   *  görünür, başladığında getLive() listesine geçer. UI Keşfet'te ayrı section gösterir. */
+  async getUpcomingScheduled(limit = 10): Promise<Room[]> {
+    try {
+      const now = new Date().toISOString();
+      const weekLater = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+      const { data, error } = await supabase
+        .from('rooms')
+        .select('*, host:profiles!host_id(*)')
+        .eq('is_live', false)
+        .gt('room_settings->>scheduled_at', now)
+        .lt('room_settings->>scheduled_at', weekLater)
+        .order('room_settings->>scheduled_at', { ascending: true })
+        .limit(limit);
+      if (error || !data) return [];
+      return data as Room[];
+    } catch {
+      return [];
+    }
+  },
+
+  /** ★ v1.7.13.58 (20 May 2026): Spam engeli — pending davet varsa true döner.
+   *  Recipient kabul/red edene kadar tekrar davet gönderilemez. */
+  async hasPendingRoomInvite(roomId: string, fromUserId: string, toUserId: string): Promise<boolean> {
+    const { count, error } = await supabase
+      .from('room_invites')
+      .select('id', { count: 'exact', head: true })
+      .eq('room_id', roomId)
+      .eq('invited_by', fromUserId)
+      .eq('user_id', toUserId)
+      .eq('status', 'pending');
+    if (error) return false;
+    return (count ?? 0) > 0;
+  },
+
   // ════════════════════════════════════════════════════════════
   // OWNER SÜPER GÜÇLERİ
   // ════════════════════════════════════════════════════════════
 
-  /** 👻 Ghost Mode — Owner görünmez olur — ★ D1 FIX: Sadece owner kullanabilir */
+  /** 👻 Ghost Mode — Owner görünmez olur — ★ D1 FIX: Sadece owner kullanabilir
+   *  ★ v1.7.13.134: Server-side Pro+ tier check (PostgREST bypass kapatma) */
   async setGhostMode(roomId: string, userId: string, isGhost: boolean): Promise<void> {
     await _requireRole(roomId, userId, ['owner']);
+    const { data: prof } = await supabase
+      .from('profiles').select('is_admin, subscription_tier').eq('id', userId).maybeSingle();
+    const effTier = prof?.is_admin ? 'Pro' : migrateLegacyTier(prof?.subscription_tier);
+    if (!isTierAtLeast(effTier, 'Pro')) {
+      throw new Error('Ghost mode için Pro üyelik gerekiyor.');
+    }
     await supabase
       .from('room_participants')
       .update({ is_ghost: isGhost })
@@ -2218,12 +2369,19 @@ export const RoomService = {
       .eq('user_id', userId);
   },
 
-  /** 🎭 Kılık Değiştirme — Hedef kullanıcının adı/avatarı geçici değişir */
+  /** 🎭 Kılık Değiştirme — Host kendi adı/avatarı geçici değişir
+   *  ★ v1.7.13.134: Server-side Pro+ tier check */
   async setDisguise(
     roomId: string,
     targetUserId: string,
     disguise: { display_name: string; avatar_url: string; applied_by: string } | null,
   ): Promise<void> {
+    const { data: prof } = await supabase
+      .from('profiles').select('is_admin, subscription_tier').eq('id', targetUserId).maybeSingle();
+    const effTier = prof?.is_admin ? 'Pro' : migrateLegacyTier(prof?.subscription_tier);
+    if (!isTierAtLeast(effTier, 'Pro')) {
+      throw new Error('Kılık değiştirme için Pro üyelik gerekiyor.');
+    }
     await supabase
       .from('room_participants')
       .update({
@@ -2419,7 +2577,7 @@ export const RoomService = {
       // Sadece Free + non-persistent odaları aday al
       const candidates = (aliveRooms as any[]).filter(r =>
         !r.is_persistent &&
-        !['Plus', 'Pro', 'GodMaster'].includes(r.owner_tier || 'Free')
+        !['Plus', 'Pro'].includes(r.owner_tier || 'Free')
       );
       if (candidates.length > 0) {
         const ids = candidates.map(r => r.id);
@@ -2522,6 +2680,8 @@ export const RoomService = {
   // ════════════════════════════════════════════════════════════
 
   async closeRoom(roomId: string): Promise<void> {
+    // ★ v1.7.13.140: Sistem odaları (Soprano Lobi) hiç kapanmaz — 7/24 açık.
+    if (isSystemRoom(roomId)) return;
     await supabase.from('rooms').update({ is_live: false, listener_count: 0 }).eq('id', roomId);
     await supabase.from('room_participants').delete().eq('room_id', roomId);
   },

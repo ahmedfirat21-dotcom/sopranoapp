@@ -1,20 +1,20 @@
-﻿// SopranoChat — Power-Ups Sheet v92 (1 May 2026)
-// ═══════════════════════════════════════════════════════════════════
-// Oda içi sarf güçlendiriciler — kullanıcının "SP'm ne işime yarayacak?"
+// SopranoChat  Power-Ups Sheet v92 (1 May 2026)
+// ===================================================================
+// Oda içi sarf güçlendiriciler  kullanıcının "SP'm ne işime yarayacak?"
 // sorusuna anlık tüketim cevabı. Mağaza yok prensibine uyumlu (kalıcı
 // edinim değil, anlık etki).
 //
 // 4 power-up:
-//   1. Süre Uzat (50 SP) — host'un Free oda süresini 30 dk uzatır
-//   2. Altın Davet (10 SP) — premium notification ile sahneye çağrı
-//   3. Mesaj Parlat (25 SP) — sonraki 5 mesaja altın çerçeve [planlandı]
-//   4. Sahne Işığı (30 SP) — 10 dk avatar glow [planlandı]
+//   1. Süre Uzat (50 SP)  host'un Free oda süresini 30 dk uzatır
+//   2. Altın Davet (10 SP)  premium notification ile sahneye çağrı
+//   3. Mesaj Parlat (25 SP)  sonraki 5 mesaja altın çerçeve [planlandı]
+//   4. Sahne Işığı (30 SP)  10 dk avatar glow [planlandı]
 //
 // v92 sadece 1 ve 2 fonksiyonel; 3 ve 4 UI'da görünür ama "Yakında" badge.
 //
 // Tasarım dili: SPDonateSheet ile tutarlı (slate gradient + amber edge,
 // PanResponder swipe-to-dismiss). Android shadow telafisi border + elevation.
-// ═══════════════════════════════════════════════════════════════════
+// ===================================================================
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { i18n } from '../../services/i18n';
@@ -43,7 +43,6 @@ interface PowerUp {
   title: string;
   subtitle: string;
   cost: number;
-  available: boolean; // false → "Yakında" badge
   hostOnly?: boolean;
   needsTarget?: boolean;
 }
@@ -58,13 +57,12 @@ const POWERUPS: PowerUp[] = [
     title: i18n.t('room.powerupssheet.001'),
     subtitle: i18n.t('room.powerupssheet.002'),
     cost: 50,
-    available: true,
     hostOnly: true,
   },
-  // ★ v92.11.1 (1 May 2026): Altın Davet kaldırıldı — kullanıcı talebi.
+  // ? v92.11.1 (1 May 2026): Altın Davet kaldırıldı  kullanıcı talebi.
   //   "Sahne daveti zaten ücretsiz, 10 SP'lik değer üretmiyor" prensibi.
-  // ★ v107 (3 May 2026): Mesaj Parlat KALDIRILDI — yeni 6 stilli sistem input bar'daki
-  //   ✨ butonuna taşındı. Anlık seçim, mesaj başına bağımsız stil/cost. PowerUpsSheet'te
+  // ? v107 (3 May 2026): Mesaj Parlat KALDIRILDI  yeni 6 stilli sistem input bar'daki
+  //   ? butonuna taşındı. Anlık seçim, mesaj başına bağımsız stil/cost. PowerUpsSheet'te
   //   kalması çift trigger karmaşası yaratıyordu.
   {
     id: 'stage_light',
@@ -75,7 +73,6 @@ const POWERUPS: PowerUp[] = [
     title: i18n.t('room.powerupssheet.003'),
     subtitle: i18n.t('room.powerupssheet.004'),
     cost: 30,
-    available: true,
   },
 ];
 
@@ -85,7 +82,7 @@ interface Props {
   roomId: string;
   userId: string;
   isHost: boolean;
-  /** SP balance — yeterlilik kontrolü için */
+  /** SP balance  yeterlilik kontrolü için */
   currentSP: number;
   /** Altın davet için: hedef seçim flow tetikleyici (null verilirse henüz seçim yok) */
   onSelectInviteTarget?: () => void;
@@ -103,7 +100,7 @@ export default function PowerUpsSheet({
   const PANEL_HEIGHT = PANEL_CONTENT_HEIGHT + Math.max(insets.bottom, 0);
   const translateY = useRef(new Animated.Value(PANEL_HEIGHT)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
-  // Ring loop — premium derinlik
+  // Ring loop  premium derinlik
   const ringPulse = useRef(new Animated.Value(0)).current;
   const ringLoopRef = useRef<Animated.CompositeAnimation | null>(null);
   const [loading, setLoading] = useState<string | null>(null);
@@ -158,10 +155,6 @@ export default function PowerUpsSheet({
   ).current;
 
   const handleUse = useCallback(async (pu: PowerUp) => {
-    if (!pu.available) {
-      showToast({ title: i18n.t('room.powerupssheet.005'), message: i18n.t('auto.room.PowerUpsSheet.004', { 0: pu.title }), type: 'info' });
-      return;
-    }
     if (currentSP < pu.cost) {
       showToast({ title: 'Yetersiz SP', message: `${pu.cost - currentSP} SP eksik.`, type: 'warning' });
       return;
@@ -199,7 +192,7 @@ export default function PowerUpsSheet({
       return;
     }
 
-    // ★ v92.11 (1 May 2026): Mesaj Parlat — sonraki 5 mesajda altın çerçeve.
+    // ? v92.11 (1 May 2026): Mesaj Parlat  sonraki 5 mesajda altın çerçeve.
     if (pu.id === 'message_glow') {
       setLoading(pu.id);
       try {
@@ -210,7 +203,7 @@ export default function PowerUpsSheet({
           showToast({ title: i18n.t('room.powerupssheet.009'), message: r?.error || 'Tekrar dene.', type: 'error' });
           return;
         }
-        showToast({ title: '✨ Mesaj Parlat aktif', message: i18n.t('room.powerupssheet.010'), type: 'success' });
+        showToast({ title: '? Mesaj Parlat aktif', message: i18n.t('room.powerupssheet.010'), type: 'success' });
         onBalanceUpdated?.(r.new_balance);
         onClose();
       } catch (e: any) {
@@ -221,7 +214,7 @@ export default function PowerUpsSheet({
       return;
     }
 
-    // ★ v92.11: Sahne Işığı — 10 dk avatar etrafında glow (sahnedeyken).
+    // ? v92.11: Sahne Işığı  10 dk avatar etrafında glow (sahnedeyken).
     if (pu.id === 'stage_light') {
       setLoading(pu.id);
       try {
@@ -249,14 +242,14 @@ export default function PowerUpsSheet({
   return (
     <View style={StyleSheet.absoluteFillObject as any} pointerEvents="box-none">
       <View style={{ ...StyleSheet.absoluteFillObject, zIndex: 520 }} pointerEvents="box-none">
-        {/* Backdrop — BlurView + dim layer (NotificationDrawer dim tonu) */}
+        {/* Backdrop  BlurView + dim layer (NotificationDrawer dim tonu) */}
         <Animated.View style={[StyleSheet.absoluteFill, { opacity: backdropOpacity }]}>
           <BlurView intensity={30} tint="dark" style={StyleSheet.absoluteFill} />
           <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(8,12,22,0.45)' }]} />
           <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
         </Animated.View>
 
-        {/* ★ v92.10.2 (1 May 2026): Pulse halo katmanı KALDIRILDI — Android'de
+        {/* ? v92.10.2 (1 May 2026): Pulse halo katmanı KALDIRILDI  Android'de
             elevation + amber border ile çakışıp çirkin sarı halka oluşturuyordu. */}
 
         {/* Panel */}
@@ -267,7 +260,7 @@ export default function PowerUpsSheet({
           ]}
           {...panResponder.panHandlers}
         >
-          {/* ★ 2026-05-05: NotificationDrawer dili — slate diagonal + üst amber halo.
+          {/* ? 2026-05-05: NotificationDrawer dili  slate diagonal + üst amber halo.
               Karakter: amber (Power-Up premium hissi). 2 katman gradient (FPS koruma). */}
           <LinearGradient
             colors={['#3a4658', '#2a3344', '#1a2030']}
@@ -311,7 +304,7 @@ export default function PowerUpsSheet({
             </View>
             <View style={styles.balancePill}>
               <SPIcon size={14} />
-              <Text style={styles.balanceText}>{currentSP.toLocaleString('tr-TR')}</Text>
+              <Text style={styles.balanceText}>{currentSP.toLocaleString(i18n.locale)}</Text>
             </View>
           </View>
 
@@ -324,7 +317,7 @@ export default function PowerUpsSheet({
             <View style={styles.grid}>
               {POWERUPS.map((pu) => {
                 const insufficient = currentSP < pu.cost;
-                const disabled = !pu.available || insufficient || (pu.hostOnly && !isHost);
+                const disabled = insufficient || (pu.hostOnly && !isHost);
                 const isLoading = loading === pu.id;
                 return (
                   <Pressable
@@ -342,12 +335,6 @@ export default function PowerUpsSheet({
                       start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                       style={StyleSheet.absoluteFillObject}
                     />
-                    {/* "Yakında" badge */}
-                    {!pu.available && (
-                      <View style={styles.soonBadge}>
-                        <Text style={styles.soonText}>YAKINDA</Text>
-                      </View>
-                    )}
                     <View style={[styles.iconCircle, { backgroundColor: pu.iconColor + '22', borderColor: pu.iconColor + '55' }]}>
                       <Ionicons name={pu.icon} size={22} color={pu.iconColor} style={iconShadow} />
                     </View>
@@ -405,7 +392,7 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.55,
         shadowRadius: 18,
       },
-      android: {},  // elevation YOK — FPS için. LinearGradient + slate bg yeterli.
+      android: {},  // elevation YOK  FPS için. LinearGradient + slate bg yeterli.
     }),
   },
   topEdge: {
@@ -413,7 +400,7 @@ const styles = StyleSheet.create({
     top: 0, left: 0, right: 0,
     height: 1.6,
   },
-  // ★ v92.10.2: haloLayer KALDIRILDI (Android sarı halka sorunu).
+  // ? v92.10.2: haloLayer KALDIRILDI (Android sarı halka sorunu).
   handle: {
     alignItems: 'center',
     paddingVertical: 12,
@@ -479,7 +466,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingTop: 14,
     paddingBottom: 12,
-    // ★ v92.10.2: Android'de elevation kaldırıldı (kart border + tier rengi yeterli;
+    // ? v92.10.2: Android'de elevation kaldırıldı (kart border + tier rengi yeterli;
     //   elevation glow halka yapıyordu). iOS shadow korunuyor.
     ...Platform.select({
       ios: {
@@ -532,22 +519,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: 'rgba(255,255,255,0.4)',
     marginLeft: 2,
-  },
-  soonBadge: {
-    position: 'absolute',
-    top: 8, right: 8,
-    paddingHorizontal: 6, paddingVertical: 3,
-    borderRadius: 5,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    borderWidth: 0.5,
-    borderColor: 'rgba(255,255,255,0.18)',
-    zIndex: 2,
-  },
-  soonText: {
-    fontSize: 8.5,
-    fontWeight: '900',
-    color: 'rgba(255,255,255,0.65)',
-    letterSpacing: 1,
   },
   footnote: {
     fontSize: 10.5,

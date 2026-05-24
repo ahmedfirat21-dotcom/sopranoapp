@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { i18n } from '../../services/i18n';
-import { View, Text, StyleSheet, Pressable, Animated, Easing, Image } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Animated, Easing, Image, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -49,6 +49,9 @@ interface Props {
   isBellActive?: boolean;
   /** ★ 2026-04-24: Viewer pill tıklandığında dinleyiciler modalını aç */
   onViewersPress?: () => void;
+  /** ★ v1.7.13.140 (21 May 2026): Sistem odası (Soprano Lobi) ise host avatarı
+   *  çerçevesiz Soprano logosu olarak render edilir (StatusAvatar yerine plain Image). */
+  isSystemRoom?: boolean;
 }
 
 // Kalp atışı (Heartbeat) göstergesi
@@ -144,7 +147,7 @@ export default function RoomInfoHeader({
   donationsEnabled, speakingMode, roomType,
   hostAvatarUrl, hostTier, hostFrameId, hostActiveBadgeId, roomRules, followerCount,
   onBellPress, notifBadgeCount, isBellActive,
-  onViewersPress,
+  onViewersPress, isSystemRoom,
 }: Props) {
   const langFlags: Record<string, string> = { tr: '🇹🇷', en: '🇬🇧', de: '🇩🇪', ar: '🇸🇦' };
   const [showRules, setShowRules] = useState(false);
@@ -153,16 +156,14 @@ export default function RoomInfoHeader({
   //   açılır, tüm durumlar listelenir. Header artık tek satır, sabit yükseklik.
   const [showStatusPopup, setShowStatusPopup] = useState(false);
   const insets = useSafeAreaInsets();
+  // ★ v1.7.13.170: Header SABİT konum — StatusBar hidden olduğu için insets.top=0 döner.
+  //   Sabit 38px Android'de doğru konumu sağlar.
+  const FIXED_TOP = Platform.OS === 'android' ? 38 : insets.top + 8;
   // ★ v284 (16 May 2026): Web admin "Oda Düzeni" → header config (title font/color,
   //   live indicator, listener count, border).
   const headerCfg = useRoomLayout().header;
-  // ★ 2026-05-05: Insets.top monotonik sabit — Android'de Modal (NotificationDrawer)
-  //   açıldığında bir frame için safe-area top düşüp tekrar yükseliyor, üst header
-  //   görsel olarak kayıyordu. Sadece artışa izin ver: header asla yukarı sıçramaz.
-  const [stableTop, setStableTop] = useState(insets.top);
-  useEffect(() => {
-    if (insets.top > stableTop) setStableTop(insets.top);
-  }, [insets.top, stableTop]);
+  // ★ v1.7.13.170: Ana sayfa ile birebir aynı — paddingTop: insets.top
+  //   (home.tsx satır 1392 ile eşleşir).
 
   // ★ 2026-04-26: Header kompakt — yazılar kaldırıldı, sadece ikonlar (header kalabalıklığı çözüldü).
   //   Sadece KRİTİK olanlar (yaş, ücret, dil) yazıyla görünür; oda tipi + konuşma modu sadece ikon olarak.
@@ -186,25 +187,19 @@ export default function RoomInfoHeader({
     color: '#F59E0B',
     bg: 'rgba(245,158,11,0.12)',
     border: 'rgba(245,158,11,0.25)',
-    info: { title: '🤚 İzin Gerekli', message: 'Sahneye çıkmak için el kaldır, host onaylayınca konuşabilirsin.' },
+    info: { title: i18n.t('room.permission_required'), message: i18n.t('room.permission_desc') },
   });
   if (speakingMode === 'selected_only') badges.push({
     icon: 'shield-checkmark',
     color: '#A78BFA',
     bg: 'rgba(167,139,250,0.12)',
     border: 'rgba(167,139,250,0.3)',
-    info: { title: '🛡 Seçilmiş Konuşmacılar', message: 'Bu odada sadece host tarafından sahneye çağrılanlar konuşabilir.' },
+    info: { title: i18n.t('room.selected_speakers'), message: i18n.t('room.selected_speakers_desc') },
   });
-
-  // ★ v1.7.13.13 (19 May 2026): Üst başlık offset — admin slider yatay/dikey kayma.
-  //   transform translateX/Y kullanılır (layout bozulmaz, diğer elementler kaymaz).
-  const headerOffsetY = (headerCfg as any).offsetY ?? 0;
-  const headerOffsetX = (headerCfg as any).offsetX ?? 0;
 
   return (
     <View style={[s.wrap, {
-      paddingTop: stableTop + 2,
-      transform: [{ translateX: headerOffsetX }, { translateY: headerOffsetY }],
+      paddingTop: insets.top,
     }]}>
       {/* ★ v283 (16 May 2026): home/odalarım/profil tab page'lerinin orijinal
           bombe gradient'ı — slate dikey lineer (locations 0/0.55/1).
@@ -243,15 +238,34 @@ export default function RoomInfoHeader({
                 hitSlop={6}
                 accessibilityLabel={`Oda durumları (${badges.length})`}
               >
-                <StatusAvatar
-                  uri={hostAvatarUrl}
-                  size={headerCfg.hostAvatarSize ?? 36}
-                  tier={hostTier}
-                  borderWidth={headerCfg.hostAvatarBorderWidth ?? 1.5}
-                  borderColor={headerCfg.hostAvatarBorderColor}
-                  frameId={hostFrameId}
-                  customBadgeId={hostActiveBadgeId ?? null}
-                />
+                {isSystemRoom ? (
+                  // ★ v1.7.13.140: Sistem odası (Soprano Lobi) — büyük çerçevesiz logo (110px).
+                  //   Container 40x40 layout slot (header 56px'i bozmasın), Image absolute
+                  //   ortalanarak parent bound'ından taşar (overflow:visible chain).
+                  //   Center'a göre offset: x = -(110-40)/2 = -35, y aynı.
+                  <View style={{ width: 40, height: 40, overflow: 'visible' }}>
+                    <Image
+                      source={require('../../assets/app_icon.png')}
+                      style={{
+                        position: 'absolute',
+                        width: 85, height: 85,
+                        top: -22,
+                        left: -22,
+                      }}
+                      resizeMode="contain"
+                    />
+                  </View>
+                ) : (
+                  <StatusAvatar
+                    uri={hostAvatarUrl}
+                    size={headerCfg.hostAvatarSize ?? 36}
+                    tier={hostTier}
+                    borderWidth={headerCfg.hostAvatarBorderWidth ?? 1.5}
+                    borderColor={headerCfg.hostAvatarBorderColor}
+                    frameId={hostFrameId}
+                    customBadgeId={hostActiveBadgeId ?? null}
+                  />
+                )}
                 {/* ★ v300: Sağ üst köşede durum sayısı — altın daire, tıklanabilir */}
                 <View style={s.statusCountBadge}>
                   <Text style={s.statusCountText}>{badges.length}</Text>
@@ -268,15 +282,33 @@ export default function RoomInfoHeader({
               </Pressable>
             ) : (
               <View style={s.hostAvatarGroup}>
-                <StatusAvatar
-                  uri={hostAvatarUrl}
-                  size={headerCfg.hostAvatarSize ?? 36}
-                  tier={hostTier}
-                  borderWidth={headerCfg.hostAvatarBorderWidth ?? 1.5}
-                  borderColor={headerCfg.hostAvatarBorderColor}
-                  frameId={hostFrameId}
-                  customBadgeId={hostActiveBadgeId ?? null}
-                />
+                {isSystemRoom ? (
+                  // ★ v1.7.13.140: Sistem odası (Soprano Lobi) — çerçevesiz büyük logo (110px).
+                  //   Bu branch badges.length===0 senaryosu (Lobi default). Layout slot 40x40,
+                  //   Image absolute ortalanarak parent bound dışına taşar.
+                  <View style={{ width: 40, height: 40, overflow: 'visible' }}>
+                    <Image
+                      source={require('../../assets/app_icon.png')}
+                      style={{
+                        position: 'absolute',
+                        width: 85, height: 85,
+                        top: -22,
+                        left: -22,
+                      }}
+                      resizeMode="contain"
+                    />
+                  </View>
+                ) : (
+                  <StatusAvatar
+                    uri={hostAvatarUrl}
+                    size={headerCfg.hostAvatarSize ?? 36}
+                    tier={hostTier}
+                    borderWidth={headerCfg.hostAvatarBorderWidth ?? 1.5}
+                    borderColor={headerCfg.hostAvatarBorderColor}
+                    frameId={hostFrameId}
+                    customBadgeId={hostActiveBadgeId ?? null}
+                  />
+                )}
                 {roomExpiry ? (
                   <View style={[s.expiryBadge, roomExpiry.includes('doldu') && s.expiryBadgeExpired]}>
                     <Ionicons
@@ -328,10 +360,7 @@ export default function RoomInfoHeader({
         </View>
 
         <View style={s.topActions}>
-          {/* ★ v284: showListenerCount=false ise listener sayısı + heartbeat tamamen gizli */}
-          {headerCfg.showListenerCount && (
-            <ConnectionHeartbeat state={connectionState} viewerCount={viewerCount} onPress={onViewersPress} />
-          )}
+          {/* ★ Kullanıcı sayısı + heartbeat header'dan kaldırıldı — sahne altı bilgi çubuğuna taşındı */}
           {/* ★ 2026-04-25: Bağlantı kalitesi (LiveKit) — sadece bağlıyken göster */}
           {connectionState === 'connected' && (
             <ConnectionQualityIndicator quality={connectionQuality || 'unknown'} size={12} />
@@ -471,7 +500,7 @@ const s = StyleSheet.create({
     //   full width yayılsın (home.tsx pattern'i). İçerik kendi paddingHorizontal'ını
     //   topNav style'ında taşır.
     // ★ v31+: paddingBottom 6→2 (header ile sahne arasi minimal bosluk)
-    paddingBottom: 2,
+    paddingBottom: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.22,
@@ -483,6 +512,7 @@ const s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     height: HEADER_BAR_H,
+    overflow: 'visible', // ★ v1.7.13.140: Lobi logosu header'dan taşabilsin
     paddingHorizontal: 16, // ★ v283: wrap'tan taşındı, gradient full width olsun diye
   },
   topLeft: {
@@ -491,9 +521,11 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    overflow: 'visible', // ★ v1.7.13.140: Lobi logosu header'dan taşabilsin
   },
   hostAvatarGroup: {
     position: 'relative',
+    overflow: 'visible',
   },
   expiryBadge: {
     position: 'absolute', bottom: -3, right: -3,

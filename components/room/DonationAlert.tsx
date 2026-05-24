@@ -1,19 +1,20 @@
 /**
- * SopranoChat — DonationAlert v3 (1 May 2026)
- * ═══════════════════════════════════════════════════
- * ★ v92.10: Eski büyük ekran-ortası premium banner KALDIRILDI.
- * Artık ekranın ALTINDAN slide-up küçük altın chip — odayı boğmayan, ferah.
- * Tab bar'ın hemen üstünde 2.4sn görünür, sonra fade-out.
+ * SopranoChat â DonationAlert v3 (1 May 2026)
+ * âââââââââââââââââââââââââââââââââââââââââââââââââââ
+ * â v92.10: Eski bÃ¼yÃ¼k ekran-ortasÄ± premium banner KALDIRILDI.
+ * ArtÄ±k ekranÄ±n ALTINDAN slide-up kÃ¼Ã§Ã¼k altÄ±n chip â odayÄ± boÄmayan, ferah.
+ * Tab bar'Ä±n hemen Ã¼stÃ¼nde 2.4sn gÃ¶rÃ¼nÃ¼r, sonra fade-out.
  *
- * Format: ✨ Burak → fırat • 50 SP
- * Width: ~ekran genişliğinin %72'si (kompakt)
- * Animasyon: alt → orta slide + opacity 0→1, sonra hold 1.4sn, fade-out.
+ * Format: â¨ Burak â fÄ±rat â¢ 50 SP
+ * Width: ~ekran geniÅliÄinin %72'si (kompakt)
+ * Animasyon: alt â orta slide + opacity 0â1, sonra hold 1.4sn, fade-out.
  */
 import React, { useRef, useState, useCallback, useImperativeHandle, forwardRef, useEffect } from 'react';
 import { View, Text, StyleSheet, Animated, Easing, Dimensions, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { getSPAmountTier, SP_TIER_VISUAL } from '../../constants/spAmountTier';
+import { i18n } from '../../services/i18n';
 
 const { width: W } = Dimensions.get('window');
 
@@ -21,7 +22,7 @@ export interface DonationAlertData {
   senderName: string;
   amount: number;
   recipientName?: string;
-  senderAvatar?: string; // legacy — kullanılmıyor (kompakt chip'te yer yok)
+  senderAvatar?: string; // legacy â kullanÄ±lmÄ±yor (kompakt chip'te yer yok)
 }
 
 export interface DonationAlertRef {
@@ -96,10 +97,10 @@ const DonationAlert = forwardRef<DonationAlertRef>((_, ref) => {
       }} />
       <Text style={[s.text, { color: '#F8FAFC' }]} numberOfLines={1}>
         <Text style={{ fontWeight: '900', color: tv.glow }}>{data.senderName}</Text>
-        <Text>{' → '}</Text>
+        <Text>{' â '}</Text>
         <Text style={{ fontWeight: '900' }}>{data.recipientName || '...'}</Text>
-        <Text style={{ color: 'rgba(255,255,255,0.55)' }}>{'  •  '}</Text>
-        <Text style={{ fontWeight: '900', color: tv.glow }}>{data.amount.toLocaleString('tr-TR')} SP</Text>
+        <Text style={{ color: 'rgba(255,255,255,0.55)' }}>{'  â¢  '}</Text>
+        <Text style={{ fontWeight: '900', color: tv.glow }}>{data.amount.toLocaleString(i18n.locale)} SP</Text>
       </Text>
     </Animated.View>
   );
@@ -112,7 +113,7 @@ const s = StyleSheet.create({
     position: 'absolute',
     left: '14%',
     right: '14%',
-    bottom: 110, // ★ Tab bar (CurvedTabBar ~84) + 26 buffer
+    bottom: 110, // â Tab bar (CurvedTabBar ~84) + 26 buffer
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',

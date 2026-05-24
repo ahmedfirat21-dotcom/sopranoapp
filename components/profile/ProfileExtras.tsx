@@ -205,7 +205,7 @@ export function TopSupportersStrip({ supporters, onSelectUser }: TopSupportersSt
         <View style={{ flex: 1 }} />
         <View style={tss.totalChip}>
           <SPIcon size={11} />
-          <Text style={tss.totalText}>{total.toLocaleString('tr-TR')}</Text>
+          <Text style={tss.totalText}>{total.toLocaleString(i18n.locale)}</Text>
         </View>
       </View>
       <View style={tss.row}>
@@ -234,7 +234,7 @@ export function TopSupportersStrip({ supporters, onSelectUser }: TopSupportersSt
               <Text style={tss.amountText}>
                 {s.total_amount >= 1000
                   ? `${(s.total_amount / 1000).toFixed(1)}k`
-                  : s.total_amount.toLocaleString('tr-TR')}
+                  : s.total_amount.toLocaleString(i18n.locale)}
               </Text>
             </View>
           </Pressable>

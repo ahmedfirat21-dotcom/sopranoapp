@@ -19,11 +19,18 @@ let LottieView: any = null;
 let DELETED_LOTTIE: any = null;
 try {
   LottieView = require('lottie-react-native').default;
-} catch { /* fallback */ }
+  if (__DEV__ && !LottieView) console.warn('[AccountDeletedOverlay] LottieView default export null');
+} catch (e: any) {
+  if (__DEV__) console.warn('[AccountDeletedOverlay] lottie-react-native require failed:', e?.message || e);
+}
 try {
   // ★ v201 fix: Deleted.json (4 harici PNG referanslı) yerine Delete.json (vector-only).
   DELETED_LOTTIE = require('../assets/Delete.json');
-} catch { DELETED_LOTTIE = null; }
+  if (__DEV__ && !DELETED_LOTTIE) console.warn('[AccountDeletedOverlay] Delete.json loaded but null');
+} catch (e: any) {
+  if (__DEV__) console.warn('[AccountDeletedOverlay] Delete.json require failed:', e?.message || e);
+  DELETED_LOTTIE = null;
+}
 
 interface Props {
   /** Animasyon + fade tamamlanınca çağrılır — parent overlay'i unmount edebilir. */

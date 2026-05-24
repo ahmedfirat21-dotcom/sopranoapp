@@ -1,22 +1,22 @@
 /**
- * SopranoChat — Oda Kayıt Servisi (Faz 6.2)
- * ═══════════════════════════════════════════════════
- * room_recordings tablosunun read/write katmanı.
+ * SopranoChat â Oda KayÄ±t Servisi (Faz 6.2)
+ * âââââââââââââââââââââââââââââââââââââââââââââââââââ
+ * room_recordings tablosunun read/write katmanÄ±.
  *
  * KVKK NOTU:
- *   Kaydet özelliği aktif edilince odadaki herkes "🔴 Recording" badge'i görür.
- *   Konuşmacı consent kontrolü UI tarafında yapılır (host kayıt başlatınca
- *   her konuşmacıya consent prompt'u gösterilir).
+ *   Kaydet Ã¶zelliÄi aktif edilince odadaki herkes "ğ´ Recording" badge'i gÃ¶rÃ¼r.
+ *   KonuÅmacÄ± consent kontrolÃ¼ UI tarafÄ±nda yapÄ±lÄ±r (host kayÄ±t baÅlatÄ±nca
+ *   her konuÅmacÄ±ya consent prompt'u gÃ¶sterilir).
  *
  * EGRESS NOTU:
- *   Bu servis kayıt-meta tablosunu okur/yazar. Asıl LiveKit Egress (kaydı
- *   başlat/durdur) Supabase Edge Function aracılığıyla LiveKit Server SDK
- *   üzerinden tetiklenir — şu an stub. LIVEKIT_API_SECRET deploy edildiğinde
- *   `startEgress` / `stopEgress` Edge Function'ları yazılmalı.
+ *   Bu servis kayÄ±t-meta tablosunu okur/yazar. AsÄ±l LiveKit Egress (kaydÄ±
+ *   baÅlat/durdur) Supabase Edge Function aracÄ±lÄ±ÄÄ±yla LiveKit Server SDK
+ *   Ã¼zerinden tetiklenir â Åu an stub. LIVEKIT_API_SECRET deploy edildiÄinde
+ *   `startEgress` / `stopEgress` Edge Function'larÄ± yazÄ±lmalÄ±.
  *
  * Tablo TTL:
- *   expires_at default 7 gün (Free), 30 gün (Plus+), 90 gün (Pro). Cleanup
- *   cron job v68'deki cleanup_expired_recordings() RPC'sini çağırır.
+ *   expires_at default 7 gÃ¼n (Free), 30 gÃ¼n (Plus+), 90 gÃ¼n (Pro). Cleanup
+ *   cron job v68'deki cleanup_expired_recordings() RPC'sini Ã§aÄÄ±rÄ±r.
  */
 import { supabase } from '../constants/supabase';
 import { i18n } from './i18n';
@@ -32,16 +32,16 @@ export interface RoomRecording {
   created_at: string;
 }
 
-/** Tier'a göre kayıt TTL (gün cinsinden). Free TTL kısa, Pro uzun. */
+/** Tier'a gÃ¶re kayÄ±t TTL (gÃ¼n cinsinden). Free TTL kÄ±sa, Pro uzun. */
 export const RECORDING_TTL_DAYS: Record<string, number> = {
   Free: 7,
   Plus: 30,
   Pro: 90,
-  GodMaster: 365,
+  // â v1.7.13.132: GodMaster kaldÄ±rÄ±ldÄ±
 };
 
 export const RecordingService = {
-  /** Belirli bir odanın kayıtları (en yeni → eski). */
+  /** Belirli bir odanÄ±n kayÄ±tlarÄ± (en yeni â eski). */
   async listForRoom(roomId: string, limit = 20): Promise<RoomRecording[]> {
     if (!roomId) return [];
     const { data, error } = await supabase
@@ -58,7 +58,7 @@ export const RecordingService = {
     return (data as RoomRecording[]) || [];
   },
 
-  /** Bir host'un tüm odalarına ait public kayıtlar. */
+  /** Bir host'un tÃ¼m odalarÄ±na ait public kayÄ±tlar. */
   async listForHost(hostId: string, limit = 20): Promise<(RoomRecording & { room_name?: string })[]> {
     if (!hostId) return [];
     const { data, error } = await supabase
@@ -82,7 +82,7 @@ export const RecordingService = {
     }));
   },
 
-  /** Tek kayıt detayı. */
+  /** Tek kayÄ±t detayÄ±. */
   async getRecording(id: string): Promise<RoomRecording | null> {
     if (!id) return null;
     const { data } = await supabase
@@ -90,7 +90,7 @@ export const RecordingService = {
     return (data as RoomRecording) || null;
   },
 
-  /** Atomik dinleme sayacı (RPC). */
+  /** Atomik dinleme sayacÄ± (RPC). */
   async incrementListen(id: string): Promise<number> {
     if (!id) return 0;
     try {
@@ -100,8 +100,8 @@ export const RecordingService = {
   },
 
   /**
-   * Kayıt meta yarat — Egress callback / Edge Function'dan çağrılır.
-   * Direct write yalnızca host yapabilir (RLS room_rec_host_write).
+   * KayÄ±t meta yarat â Egress callback / Edge Function'dan Ã§aÄrÄ±lÄ±r.
+   * Direct write yalnÄ±zca host yapabilir (RLS room_rec_host_write).
    */
   async create(input: {
     roomId: string;
@@ -110,7 +110,22 @@ export const RecordingService = {
     isPublic?: boolean;
     ttlDays?: number;
   }): Promise<{ recording?: RoomRecording; error?: string }> {
-    const ttl = input.ttlDays || 7;
+    // â v1.7.13.135: Tier-bound TTL â input.ttlDays geÃ§irilmediyse host tier'Ä±ndan oku
+    //   (Free 7gÃ¼n, Plus 30gÃ¼n, Pro 90gÃ¼n). Ãnceden sabit 7 idi â Pro vaadi (90gÃ¼n) verilmiyordu.
+    let ttl = input.ttlDays;
+    if (!ttl) {
+      try {
+        const { data: room } = await supabase.from('rooms').select('host_id, owner_tier').eq('id', input.roomId).maybeSingle();
+        let tier = (room as any)?.owner_tier as string | undefined;
+        if (!tier && room?.host_id) {
+          const { data: prof } = await supabase.from('profiles').select('is_admin, subscription_tier, subscription_expires_at').eq('id', room.host_id).maybeSingle();
+          const adminPro = prof?.is_admin ? 'Pro' : null;
+          const expired = (prof as any)?.subscription_expires_at && new Date((prof as any).subscription_expires_at) <= new Date();
+          tier = adminPro || (expired ? 'Free' : (prof?.subscription_tier as string) || 'Free');
+        }
+        ttl = RECORDING_TTL_DAYS[tier === 'GodMaster' ? 'Pro' : (tier || 'Free')] || 7;
+      } catch { ttl = 7; }
+    }
     const expiresAt = new Date(Date.now() + ttl * 86400_000).toISOString();
     const { data, error } = await supabase
       .from('room_recordings')
@@ -127,7 +142,7 @@ export const RecordingService = {
     return { recording: data as RoomRecording };
   },
 
-  /** Görünürlük değiştir (host-only via RLS). */
+  /** GÃ¶rÃ¼nÃ¼rlÃ¼k deÄiÅtir (host-only via RLS). */
   async setPublic(id: string, isPublic: boolean): Promise<{ success: boolean; error?: string }> {
     const { error } = await supabase
       .from('room_recordings')
@@ -137,14 +152,14 @@ export const RecordingService = {
     return { success: true };
   },
 
-  /** Kayıt sil — host-only via RLS.
-   *  ★ v319.12 (18 May 2026): KVKK uyumluluk — manuel silmede de log yaz.
-   *  Eskiden sadece otomatik expires_at cron'u recording_deletion_log'a yazıyordu;
-   *  kullanıcı UI'dan sildiğinde log oluşmuyordu (6698 KVKK madde 7 ihtarı).
-   *  Şimdi DELETE öncesi log INSERT (storage_cleaned=false, cron sonra true yapacak).
+  /** KayÄ±t sil â host-only via RLS.
+   *  â v319.12 (18 May 2026): KVKK uyumluluk â manuel silmede de log yaz.
+   *  Eskiden sadece otomatik expires_at cron'u recording_deletion_log'a yazÄ±yordu;
+   *  kullanÄ±cÄ± UI'dan sildiÄinde log oluÅmuyordu (6698 KVKK madde 7 ihtarÄ±).
+   *  Åimdi DELETE Ã¶ncesi log INSERT (storage_cleaned=false, cron sonra true yapacak).
    */
   async deleteRecording(id: string): Promise<{ success: boolean; error?: string }> {
-    // 1) Önce kaydı oku — log'a host_id + room_id için gerekli
+    // 1) Ãnce kaydÄ± oku â log'a host_id + room_id iÃ§in gerekli
     let recordingRoomId: string | null = null;
     let recordingHostId: string | null = null;
     try {
@@ -163,7 +178,7 @@ export const RecordingService = {
     const { error } = await supabase.from('room_recordings').delete().eq('id', id);
     if (error) return { success: false, error: error.message };
 
-    // 3) KVKK log (silme başarılı olduktan sonra)
+    // 3) KVKK log (silme baÅarÄ±lÄ± olduktan sonra)
     try {
       await supabase.from('recording_deletion_log').insert({
         recording_id: id,
@@ -172,19 +187,19 @@ export const RecordingService = {
         deleted_at: new Date().toISOString(),
         storage_cleaned: false, // cleanup_recording_storage cron sonra true yapar
       });
-    } catch { /* log fail-safe — silme zaten oldu */ }
+    } catch { /* log fail-safe â silme zaten oldu */ }
 
     return { success: true };
   },
 
-  // ── EGRESS TETİKLEME (deferred) ──────────────────────────────
-  // Aşağıdaki iki metod LiveKit Egress'i Supabase Edge Function üzerinden
+  // ââ EGRESS TETÄ°KLEME (deferred) ââââââââââââââââââââââââââââââ
+  // AÅaÄÄ±daki iki metod LiveKit Egress'i Supabase Edge Function Ã¼zerinden
   // tetikler. Edge Function `start-room-egress` / `stop-room-egress`
-  // deploy edilince stub'lar gerçek implementasyona geçecek.
+  // deploy edilince stub'lar gerÃ§ek implementasyona geÃ§ecek.
 
   /**
-   * Oda kaydını başlat — Edge Function `room-egress` üzerinden.
-   * Caller host_id olmalı. Server-side RPC, LIVEKIT_API_SECRET edge'de.
+   * Oda kaydÄ±nÄ± baÅlat â Edge Function `room-egress` Ã¼zerinden.
+   * Caller host_id olmalÄ±. Server-side RPC, LIVEKIT_API_SECRET edge'de.
    */
   async startEgress(roomId: string, hostId: string): Promise<{ success: boolean; egressId?: string; error?: string }> {
     if (!roomId || !hostId) return { success: false, error: i18n.t('auto.recordings.002') };
@@ -202,7 +217,7 @@ export const RecordingService = {
   },
 
   /**
-   * Oda kaydını durdur. Egress webhook (livekit-webhook) tamamlandığında
+   * Oda kaydÄ±nÄ± durdur. Egress webhook (livekit-webhook) tamamlandÄ±ÄÄ±nda
    * room_recordings tablosuna otomatik INSERT eder.
    */
   async stopEgress(roomId: string, hostId: string, egressId: string): Promise<{ success: boolean; error?: string }> {

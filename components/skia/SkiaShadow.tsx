@@ -89,34 +89,52 @@ export function SkiaShadow({
   return (
     <View style={[styles.container, style]}>
       {size.width > 0 && size.height > 0 && (
-        <Canvas
-          style={{
-            position: 'absolute',
-            left: -padding,
-            top: -padding,
-            width: size.width + padding * 2,
-            height: size.height + padding * 2,
-          }}
-          pointerEvents="none"
-        >
-          <RoundedRect
-            x={padding + shadowOffsetX}
-            y={padding + shadowOffsetY}
-            width={size.width}
-            height={size.height}
-            r={borderRadius}
-            color={shadowColor}
-            opacity={shadowOpacity}
+        <SkiaShadowBoundary>
+          <Canvas
+            style={{
+              position: 'absolute',
+              left: -padding,
+              top: -padding,
+              width: size.width + padding * 2,
+              height: size.height + padding * 2,
+            }}
+            pointerEvents="none"
           >
-            <BlurMask blur={cssBlurToSkiaSigma(shadowBlur)} style="normal" />
-          </RoundedRect>
-        </Canvas>
+            <RoundedRect
+              x={padding + shadowOffsetX}
+              y={padding + shadowOffsetY}
+              width={size.width}
+              height={size.height}
+              r={borderRadius}
+              color={shadowColor}
+              opacity={shadowOpacity}
+            >
+              <BlurMask blur={cssBlurToSkiaSigma(shadowBlur)} style="normal" />
+            </RoundedRect>
+          </Canvas>
+        </SkiaShadowBoundary>
       )}
       <View onLayout={onLayout} style={styles.contentWrapper}>
         {children}
       </View>
     </View>
   );
+}
+
+// ★ v1.7.13.143: Skia Canvas crash koruması — "Expected arraybuffer" hatası
+class SkiaShadowBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean }
+> {
+  state = { hasError: false };
+  static getDerivedStateFromError() { return { hasError: true }; }
+  componentDidCatch(err: any) {
+    if (__DEV__) console.warn('[SkiaShadow] Canvas crash, gölge devre dışı:', err?.message);
+  }
+  render() {
+    if (this.state.hasError) return null; // gölge yok, çocuklar zaten ayrı
+    return this.props.children;
+  }
 }
 
 const styles = StyleSheet.create({

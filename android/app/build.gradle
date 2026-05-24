@@ -14,6 +14,7 @@ react {
     hermesCommand = new File(["node", "--print", "require.resolve('react-native/package.json')"].execute(null, rootDir).text.trim()).getParentFile().getAbsolutePath() + "/sdks/hermesc/%OS-BIN%/hermesc"
     codegenDir = new File(["node", "--print", "require.resolve('@react-native/codegen/package.json', { paths: [require.resolve('react-native/package.json')] })"].execute(null, rootDir).text.trim()).getParentFile().getAbsoluteFile()
 
+    enableBundleCompression = (findProperty('android.enableBundleCompression') ?: false).toBoolean()
     // Use Expo CLI to bundle the app, this ensures the Metro config
     // works correctly with Expo projects.
     cliFile = new File(["node", "--print", "require.resolve('@expo/cli', { paths: [require.resolve('expo/package.json')] })"].execute(null, rootDir).text.trim())
@@ -78,7 +79,7 @@ def enableProguardInReleaseBuilds = (findProperty('android.enableProguardInRelea
  * give correct results when using with locales other than en-US. Note that
  * this variant is about 6MiB larger per architecture than default.
  */
-def jscFlavor = 'org.webkit:android-jsc:+'
+def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 
 android {
     ndkVersion rootProject.ext.ndkVersion
@@ -91,18 +92,8 @@ android {
         applicationId 'com.sopranochat'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 353
-        versionName "1.7.13.48"
-        // ★ 2026-04-27: APK boyutu küçültme — modern Android (2017+) sadece arm64-v8a kullanır.
-        //   Bu sayede 4 ayrı mimari yerine 1 mimari APK'ya dahil olur, ~%40-50 boyut tasarrufu.
-        //   Eski 32-bit cihazlar (~2017 öncesi <1% pazar payı) düşer.
-        // ★ 2026-04-28: x86_64 GERİ EKLENDİ — Android Studio emülatörü x86_64,
-        //   APK arm64-only olunca emülatörde "SopranoChat sürekli olarak duruyor" crash.
-        //   Production AAB Play Console'da otomatik device-split yapar (her cihaz
-        //   sadece kendi ABI'sını indirir), boyut sorunu yok.
-        ndk {
-            abiFilters 'arm64-v8a', 'x86_64'
-        }
+        versionCode 370
+        versionName "1.7.13.146"
     }
     signingConfigs {
         debug {
@@ -111,8 +102,6 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
-        // ★ 2026-04-28: Play Store upload keystore — gradle.properties'teki SOPRANOCHAT_UPLOAD_* keyleri
-        //   varsa release imzasında kullanılır. Yoksa debug ile (geliştirme).
         release {
             if (project.hasProperty('SOPRANOCHAT_UPLOAD_STORE_FILE')) {
                 storeFile file(SOPRANOCHAT_UPLOAD_STORE_FILE)
@@ -127,8 +116,7 @@ android {
             signingConfig signingConfigs.debug
         }
         release {
-            // ★ 2026-04-28: Play Store için upload key. gradle.properties'te key yoksa debug fallback.
-            signingConfig project.hasProperty('SOPRANOCHAT_UPLOAD_STORE_FILE') ? signingConfigs.release : signingConfigs.debug
+            signingConfig signingConfigs.release
             shrinkResources (findProperty('android.enableShrinkResourcesInReleaseBuilds')?.toBoolean() ?: false)
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
@@ -175,15 +163,15 @@ dependencies {
 
     if (isGifEnabled) {
         // For animated gif support
-        implementation("com.facebook.fresco:animated-gif:${reactAndroidLibs.versions.fresco.get()}")
+        implementation("com.facebook.fresco:animated-gif:${expoLibs.versions.fresco.get()}")
     }
 
     if (isWebpEnabled) {
         // For webp support
-        implementation("com.facebook.fresco:webpsupport:${reactAndroidLibs.versions.fresco.get()}")
+        implementation("com.facebook.fresco:webpsupport:${expoLibs.versions.fresco.get()}")
         if (isWebpAnimatedEnabled) {
             // Animated webp support
-            implementation("com.facebook.fresco:animated-webp:${reactAndroidLibs.versions.fresco.get()}")
+            implementation("com.facebook.fresco:animated-webp:${expoLibs.versions.fresco.get()}")
         }
     }
 

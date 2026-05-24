@@ -15,18 +15,28 @@ import { GlowView } from '../../components/skia';
 //   Bu v16'da bazen undefined dönüyor → fallback'e düşüp "Expo Go" hatası gösteriliyordu.
 //   Şimdi: hem named export hem default export'tan al, hangisi çalışırsa.
 let GoogleSignin: any;
+let isGoogleSignInAvailable = true;
 try {
   const gsignin = require('@react-native-google-signin/google-signin');
+  // v16 export: { GoogleSignin } named export
   GoogleSignin = gsignin.GoogleSignin || gsignin.default?.GoogleSignin || gsignin.default || gsignin;
   if (!GoogleSignin || typeof GoogleSignin.signIn !== 'function') {
-    throw new Error(i18n.t('auto.auth.login.010'));
+    // v16 bazen farklı export yapısı kullanıyor — tüm key'leri logla
+    if (__DEV__) {
+      console.warn('[GoogleSignin] Export keys:', Object.keys(gsignin));
+      console.warn('[GoogleSignin] GoogleSignin obj:', GoogleSignin);
+      console.warn('[GoogleSignin] signIn type:', typeof GoogleSignin?.signIn);
+    }
+    throw new Error('GoogleSignin.signIn not a function');
   }
-} catch (e) {
-  if (__DEV__) console.warn('[GoogleSignin] modül yüklenemedi:', e);
+  if (__DEV__) console.log('[GoogleSignin] ✅ Modül başarıyla yüklendi');
+} catch (e: any) {
+  if (__DEV__) console.warn('[GoogleSignin] modül yüklenemedi:', e?.message || e);
+  isGoogleSignInAvailable = false;
   GoogleSignin = {
     configure: () => {},
     hasPlayServices: async () => true,
-    signIn: async () => { throw new Error(i18n.t('auto.auth.login.009')); },
+    signIn: async () => { throw new Error('GOOGLE_SIGNIN_UNAVAILABLE'); },
     signOut: async () => {},
     revokeAccess: async () => {},
   };
@@ -230,7 +240,12 @@ export default function LoginScreen() {
       }
     } catch (error: any) {
       if (__DEV__) console.warn('Google login hatasi:', error);
-      showToast({ title: 'Dikkat', message: error?.message || i18n.t('auto.auth.login.008'), type: 'warning' });
+      // ★ v1.7.13.161: Modül yoksa (emülatör) sessiz kal — toast gösterme
+      if (error?.message === 'GOOGLE_SIGNIN_UNAVAILABLE') {
+        // Sessiz — kullanıcıyı rahatsız etme, e-posta ile giriş yapabilir
+      } else {
+        showToast({ title: i18n.t('common.warning'), message: error?.message || i18n.t('auto.auth.login.008'), type: 'warning' });
+      }
       setLoading(false);
     }
   };
@@ -549,11 +564,11 @@ export default function LoginScreen() {
               <View style={s.statsRow}>
                 <View style={s.statPill}>
                   <GlowView style={[s.statDot, { backgroundColor: '#4ADE80' }]} />
-                  <Text style={s.statText}>{formatStatNumber(onlineCount)}{i18n.t('auto.auth.login.007')}</Text>
+                  <Text style={s.statText}>{formatStatNumber(onlineCount)} {i18n.t('auto.auth.login.007')}</Text>
                 </View>
                 <View style={s.statPill}>
                   <GlowView style={[s.statDot, s.statDotLive]} />
-                  <Text style={s.statText}>{formatStatNumber(liveRoomCount)}{i18n.t('auto.auth.login.006')}</Text>
+                  <Text style={s.statText}>{formatStatNumber(liveRoomCount)} {i18n.t('auto.auth.login.006')}</Text>
                 </View>
               </View>
             </Animated.View>
@@ -728,6 +743,7 @@ export default function LoginScreen() {
                       <Ionicons name="arrow-forward" size={18} color="rgba(255,255,255,0.5)" style={{ position: 'absolute', right: 16 }} />
                     </LinearGradient>
                   </Pressable>
+
                 </View>
 
                   {/* ★ v92.28 (2 May 2026): "Dev Hızlı Giriş" butonu TAMAMEN KALDIRILDI.
@@ -852,7 +868,6 @@ const s = StyleSheet.create({
     color: '#FFFFFF', fontSize: 15, fontWeight: '800', letterSpacing: 0.4,
     textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
   },
-
   // ═══ FORM ═══
   formArea: { width: '100%' },
   formHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 24 },

@@ -253,7 +253,7 @@ export default function WelcomeBonusModal({
       <Animated.View style={[StyleSheet.absoluteFill, { opacity: backdropOpacity }]}>
         <BlurView intensity={45} tint="dark" style={StyleSheet.absoluteFill} />
         <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.55)' }]} />
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Kapat" />
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel={i18n.t('common.close')} />
       </Animated.View>
 
       {/* ─── Center stage ─── */}

@@ -25,12 +25,21 @@ import { i18n } from './i18n';
 //   restart'ta sıfırlanır, sadece tek JS runtime ömrü boyunca yaşar.
 export const ACCOUNT_DELETED_FLAG_KEY = '@soprano_account_just_deleted'; // legacy export, no longer used
 
-let _accountJustDeleted = false;
-export function markAccountJustDeleted() { _accountJustDeleted = true; }
+// ★ v1.7.13.47 (24 May 2026): boolean tek-tüketim yerine 3sn timestamp penceresi.
+//   Önceden: login screen unmount/remount olursa (RootLayout auth redirect tetikli
+//   tekrar mount) ilk consume true alır, ikinci consume false döner → animasyon
+//   görünmüyor. Şimdi: markAccountJustDeleted timestamp set eder, 3sn pencere
+//   içinde her consume true döner; sonrasında otomatik invalid.
+let _markedAt = 0;
+const ACCOUNT_DELETED_WINDOW_MS = 3000;
+export function markAccountJustDeleted() { _markedAt = Date.now(); }
 export function consumeAccountJustDeletedFlag(): boolean {
-  const v = _accountJustDeleted;
-  _accountJustDeleted = false;
-  return v;
+  if (_markedAt === 0) return false;
+  if (Date.now() - _markedAt > ACCOUNT_DELETED_WINDOW_MS) {
+    _markedAt = 0;
+    return false;
+  }
+  return true;
 }
 
 /** Full logout flow — state cleanup + navigation caller'da yapılır. */

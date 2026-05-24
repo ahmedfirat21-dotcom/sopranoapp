@@ -8,7 +8,7 @@
  * Tasarım: NotificationDrawer aile dili (slate diagonal + teal halo +
  * soft glow), modal/sheet ile tutarlı.
  */
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, Pressable, TextInput, ScrollView,
   KeyboardAvoidingView, Platform, Animated,
@@ -18,11 +18,12 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { safeGoBack } from '../constants/navigation';
+import { Colors } from '../constants/theme';
 import AppBackground from '../components/AppBackground';
 import { showToast } from '../components/Toast';
 import PurchaseSuccessModal from '../components/PurchaseSuccessModal';
 import { useAuth } from './_layout';
-import { SupportService, type SupportCategory } from '../services/support';
+import { SupportService, type SupportCategory, type SupportTicket } from '../services/support';
 import { useTranslation } from '../services/i18n';
 
 const CATEGORIES: { key: SupportCategory; icon: string; labelTr: string; descTr: string; color: string }[] = [
@@ -44,6 +45,31 @@ export default function SupportScreen() {
   const [message, setMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
+  // ★ v1.7.13.69 (20 May 2026): Geçmiş taleplerim — kullanıcı önceki taleplerinin durumunu görür.
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [tickets, setTickets] = useState<SupportTicket[]>([]);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
+
+  // Sheet açılışta talep sayısını öğrenmek için lazy fetch (toggle açılınca yapılır)
+  const loadHistory = useCallback(async () => {
+    if (!firebaseUser?.uid || historyLoaded) return;
+    setHistoryLoading(true);
+    try {
+      const list = await SupportService.getMyTickets(firebaseUser.uid);
+      setTickets(list);
+      setHistoryLoaded(true);
+    } catch {
+      // sessiz
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, [firebaseUser?.uid, historyLoaded]);
+
+  // Yeni talep gönderildikten sonra history cache'ini invalidate et
+  useEffect(() => {
+    if (success) setHistoryLoaded(false);
+  }, [success]);
 
   const selectedCat = CATEGORIES.find(c => c.key === category) || CATEGORIES[0];
 
@@ -111,6 +137,75 @@ export default function SupportScreen() {
           contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: insets.bottom + 24 }}
           keyboardShouldPersistTaps="handled"
         >
+          {/* ★ v1.7.13.69 (20 May 2026): Geçmiş Taleplerim — kapalı durumda toggle header,
+              açılınca getMyTickets + liste. */}
+          <Pressable
+            style={historyStyles.headerRow}
+            onPress={() => {
+              const next = !historyOpen;
+              setHistoryOpen(next);
+              if (next) loadHistory();
+            }}
+          >
+            <Ionicons name="archive-outline" size={16} color={Colors.teal} />
+            <Text style={historyStyles.headerText}>Geçmiş Taleplerim</Text>
+            {historyLoaded && tickets.length > 0 && (
+              <View style={historyStyles.countPill}>
+                <Text style={historyStyles.countText}>{tickets.length}</Text>
+              </View>
+            )}
+            <Ionicons name={historyOpen ? 'chevron-up' : 'chevron-down'} size={14} color="#94A3B8" />
+          </Pressable>
+
+          {historyOpen && (
+            <View style={historyStyles.listBox}>
+              {historyLoading ? (
+                <Text style={historyStyles.muted}>Yükleniyor…</Text>
+              ) : tickets.length === 0 ? (
+                <Text style={historyStyles.muted}>Henüz talebin yok.</Text>
+              ) : (
+                tickets.slice(0, 10).map((t) => {
+                  const cat = CATEGORIES.find(c => c.key === t.category);
+                  const statusMap: Record<string, { label: string; color: string }> = {
+                    new: { label: 'Yeni', color: '#94A3B8' },
+                    read: { label: 'Okundu', color: '#3B82F6' },
+                    in_progress: { label: 'İşleniyor', color: '#FBBF24' },
+                    resolved: { label: 'Çözüldü', color: '#22C55E' },
+                    closed: { label: 'Kapatıldı', color: '#64748B' },
+                  };
+                  const st = statusMap[t.status] || statusMap.new;
+                  return (
+                    <View key={t.id} style={historyStyles.ticket}>
+                      <View style={historyStyles.ticketHead}>
+                        <MaterialCommunityIcons
+                          name={(cat?.icon as any) || 'message-text'}
+                          size={14}
+                          color={cat?.color || '#94A3B8'}
+                        />
+                        <Text style={historyStyles.ticketSubject} numberOfLines={1}>{t.subject}</Text>
+                        <View style={[historyStyles.statusPill, { borderColor: st.color + '66', backgroundColor: st.color + '22' }]}>
+                          <Text style={[historyStyles.statusText, { color: st.color }]}>{st.label}</Text>
+                        </View>
+                      </View>
+                      <Text style={historyStyles.ticketDate}>
+                        {new Date(t.created_at).toLocaleDateString(i18n.locale, { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </Text>
+                      {t.admin_response && (
+                        <View style={historyStyles.responseBox}>
+                          <Ionicons name="chatbubble-ellipses-outline" size={12} color="#5EEAD4" />
+                          <Text style={historyStyles.responseText}>{t.admin_response}</Text>
+                        </View>
+                      )}
+                    </View>
+                  );
+                })
+              )}
+              {tickets.length > 10 && (
+                <Text style={historyStyles.muted}>+{tickets.length - 10} daha eski talep</Text>
+              )}
+            </View>
+          )}
+
           {/* Kategori seçici */}
           <Text style={s.sectionLabel}>Konu Tipi</Text>
           <View style={s.categoryGrid}>
@@ -217,6 +312,76 @@ export default function SupportScreen() {
     </AppBackground>
   );
 }
+
+// ★ v1.7.13.69 (20 May 2026): Geçmiş Taleplerim stilleri
+const historyStyles = StyleSheet.create({
+  headerRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    marginTop: 12, marginBottom: 4,
+    paddingHorizontal: 12, paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: 'rgba(20,184,166,0.06)',
+    borderWidth: 1, borderColor: 'rgba(20,184,166,0.18)',
+  },
+  headerText: {
+    flex: 1,
+    fontSize: 13, fontWeight: '700', color: '#E2E8F0',
+    letterSpacing: 0.2,
+  },
+  countPill: {
+    paddingHorizontal: 7, paddingVertical: 1,
+    borderRadius: 999,
+    backgroundColor: 'rgba(94,234,212,0.18)',
+    borderWidth: 1, borderColor: 'rgba(94,234,212,0.35)',
+  },
+  countText: {
+    fontSize: 10, fontWeight: '800', color: '#5EEAD4', letterSpacing: 0.4,
+  },
+  listBox: {
+    marginTop: 6, gap: 8,
+  },
+  muted: {
+    fontSize: 11, color: 'rgba(148,163,184,0.7)',
+    textAlign: 'center', paddingVertical: 14,
+  },
+  ticket: {
+    paddingHorizontal: 12, paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
+    gap: 6,
+  },
+  ticketHead: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+  },
+  ticketSubject: {
+    flex: 1,
+    fontSize: 12, fontWeight: '700', color: '#F1F5F9',
+  },
+  statusPill: {
+    paddingHorizontal: 7, paddingVertical: 1.5,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  statusText: {
+    fontSize: 9, fontWeight: '800', letterSpacing: 0.4,
+  },
+  ticketDate: {
+    fontSize: 10, color: 'rgba(148,163,184,0.7)',
+  },
+  responseBox: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: 6,
+    marginTop: 4,
+    paddingHorizontal: 8, paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: 'rgba(94,234,212,0.06)',
+    borderWidth: 1, borderColor: 'rgba(94,234,212,0.15)',
+  },
+  responseText: {
+    flex: 1,
+    fontSize: 11, color: '#CBD5E1', lineHeight: 16, fontStyle: 'italic',
+  },
+});
 
 const s = StyleSheet.create({
   header: {

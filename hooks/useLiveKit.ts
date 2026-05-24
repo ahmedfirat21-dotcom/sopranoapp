@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { Alert, AppState, AppStateStatus, Platform } from 'react-native';
+import { AppState, AppStateStatus, Platform, DeviceEventEmitter } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   liveKitService,
@@ -23,15 +23,10 @@ async function ensureBatteryExemptionOnce(): Promise<void> {
     const asked = await AsyncStorage.getItem(BATT_OPT_FLAG);
     if (asked === '1') return;
     await AsyncStorage.setItem(BATT_OPT_FLAG, '1');
-    Alert.alert(
-      'Oda Bağlantısı İçin İzin',
-      'Telefonun ekranı kapandığında sesli odanın kopmaması için "Pil iyileştirmesi yapma" iznine ihtiyacımız var. Açılan ekrandan SopranoChat için "İzin verme" / "Sınırsız" seçeneğini seçmen yeterli.',
-      [
-        { text: 'Sonra', style: 'cancel' },
-        { text: 'Ayara Git', onPress: () => { requestBatteryOptimizationExemption(); } },
-      ],
-      { cancelable: true },
-    );
+    // ★ v1.7.13.137: Native Alert.alert KALDIRILDI — dark theme uyumsuz.
+    //   DeviceEventEmitter ile global event yay; app/_layout.tsx PremiumAlert
+    //   gösterir (uygulamanın görsel diline uyumlu).
+    DeviceEventEmitter.emit('battery-permission-needed');
   } catch { /* sessiz */ }
 }
 
@@ -82,9 +77,19 @@ export default function useLiveKit({ roomId, enabled = true, userId, displayName
     setConnectFailed(false);
     intentionalLeaveRef.current = false;
 
-    // ★ v1.7.13.27: İlk odaya girişte pil iyileştirme muafiyeti iste (sessizce
-    //   arka planda — bağlantıyı bloklamaz, AsyncStorage flag ile bir kez).
-    ensureBatteryExemptionOnce().catch(() => {});
+    // ★ v1.7.13.146 (24 May 2026): Pil iyileştirme muafiyeti modal'ı KALDIRILDI.
+    //   Clubhouse de istemiyor — foreground service media playback type ile çalışınca
+    //   Android otomatik tolere eder. Kullanıcı isterse Ayarlar > Pil'den manuel verir.
+    //   Eski modal kullanıcıyı uygulamadan çıkarıp Settings'e atıyordu, kötü UX.
+    // ensureBatteryExemptionOnce().catch(() => {});
+
+    // ★ v1.7.13.140 (21 May 2026): SDP collision fix — Lobi gir/çık/gir gibi hızlı
+    //   re-enter akışlarında server eski session'ı henüz cleanup etmemiş olabiliyor.
+    //   Yeni offer "unable to set offer / ERROR_CONTENT" ile reddediliyor.
+    //   Önce explicit disconnect + 250ms server cleanup penceresi.
+    try { await liveKitService.disconnect(); } catch { /* zaten disconnect olabilir */ }
+    await new Promise(r => setTimeout(r, 250));
+    if (!mountedRef.current) { connectingRef.current = false; return; }
 
     const success = await liveKitService.connect(roomId, userId, displayName, {
       onConnectionStateChange: (state) => {

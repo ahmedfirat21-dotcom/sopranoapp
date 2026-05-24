@@ -131,7 +131,7 @@ export default function BadgeListModal({ visible, onClose, userId, displayName }
     setSelectedItem(item);
   };
 
-  const title = displayName ? displayName.toLocaleUpperCase('tr-TR') : 'ROZETLER';
+  const title = displayName ? displayName.toLocaleUpperCase(i18n.locale) : 'ROZETLER';
 
   if (!visible) return null;
 

@@ -1,7 +1,7 @@
 // LiveKit polyfill kaldırıldı — native modül yoksa Hermes'te 'Requiring unknown module' crash'ine sebep oluyordu
 import { useEffect, useState, useRef, useCallback, useMemo, createContext, useContext } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { View, Text, Pressable, StyleSheet, Dimensions, AppState, Platform, PermissionsAndroid, LogBox } from 'react-native';
+import { View, Text, Pressable, StyleSheet, Dimensions, AppState, Platform, PermissionsAndroid, LogBox, DeviceEventEmitter } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 // ★ 2026-04-25: Crashlytics — Firebase ile entegre crash izleme.
@@ -28,6 +28,30 @@ LogBox.ignoreLogs([
   //   yapıyor. LogBox'a düşmesi gereksiz.
   /Received leave request while trying to \(re\)connect/,
   /ConnectionError.*LeaveRequest/,
+  // ★ v1.7.13.140 (21 May 2026): LiveKit SDP renegotiation race — Lobi'ye hızlı
+  //   gir/çık/gir akışında server eski session'ı henüz cleanup etmemişken yeni
+  //   offer geliyor → "unable to set offer" / ERROR_CONTENT. SDK auto-retry yapıyor,
+  //   ikinci denemede bağlanıyor. Dev LogBox spam'ı, kullanıcıya etki yok.
+  /unable to set offer/,
+  /Session error code: ERROR_CONTENT/,
+  /Failed to apply the description/,
+  // ★ v1.7.13.140 (22 May 2026): expo-av ExoPlayer wrong-thread crash — Soprano Lobi
+  //   radyo Sound instance hot reload sırasında AVManager.onHostDestroy'dan tetiklenip
+  //   MQT_native_modules thread'inde release ediliyor (expo-av kütüphane iç bug'ı).
+  //   JS defer çözmüyor (crash Java tarafında). Production'da app force-stop'ta sessizce
+  //   olur, kullanıcı görmez. Dev RedBox spam'ı. expo-audio migration post-launch (memory).
+  /Player is accessed on the wrong thread/,
+  /verifyApplicationThread/,
+  // ★ v1.7.13.135 (21 May 2026): LiveKit trickle ICE — peer connection ready
+  //   olmadan candidate ekleme race condition. SDK internal log, prod'da görünmez,
+  //   bağlantı sonradan kuruluyor (fonksiyonel hata yok). RedBox kullanıcı deneyimini bozar.
+  /cannot send signal request before connected, type: trickle/,
+  // ★ v1.7.13.150: LiveKit WebSocket bağlantı hatası — emülatör/ağ gecikmesinde
+  //   ilk deneme başarısız olur, SDK otomatik retry yapar ve bağlanır.
+  //   Debug'da kırmızı ekran göstermesi gereksiz, kullanıcı deneyimini bozar.
+  /Encountered websocket error/,
+  /ConnectionError.*WebSocket/,
+  /websocket error during connection/,
   // ★ v107.34: Firebase v22 modular SDK migration deprecation uyarıları —
   //   uygulama namespaced API kullanıyor (analytics, getApp, setUserId vs.).
   //   v22'ye geçiş post-launch işi (memory'de kayıtlı). Şimdilik gizle, console kirletmesin.
@@ -63,6 +87,24 @@ const __SUPPRESS_PATTERNS = [
   // ★ 2026-05-09: Reanimated 3.16+ strict mode — shared value render sırasında okuma uyarısı.
   //   Genelde library iç animasyonlarından, app davranışını etkilemiyor.
   /\[Reanimated\] Reading from `value`/,
+  // ★ v1.7.13.49 (20 May 2026): AuthGuard → router.replace('/(tabs)/home') race.
+  //   App force-stop sonrası açılışta (tabs) route mount olmadan AuthGuard yönlendirme
+  //   denemiş olur → "REPLACE with payload not handled" dev warning. Üretimde görünmez,
+  //   fonksiyonel etkisi yok (navigation ready olunca redirect başarılı olur).
+  //   Asıl fix: AuthGuard'da useRootNavigationState bekle — büyük refactor, post-launch.
+  /The action 'REPLACE' with payload .* was not handled/,
+  /Do you have a route named '\(tabs\)'/,
+  // ★ v1.7.13.140: LiveKit SDP renegotiation race — Lobi hızlı re-enter pattern
+  /unable to set offer/,
+  /ERROR_CONTENT/,
+  /Failed to apply the description/,
+  // ★ v1.7.13.140: expo-av wrong-thread (dev hot reload artifact, post-launch expo-audio migration)
+  /Player is accessed on the wrong thread/,
+  /verifyApplicationThread/,
+  // ★ v1.7.13.150: LiveKit WebSocket bağlantı hatası — debug RedBox suppress
+  /Encountered websocket error/,
+  /ConnectionError.*WebSocket/,
+  /websocket error during connection/,
 ];
 const __origWarn = console.warn;
 const __origError = console.error;
@@ -113,7 +155,10 @@ import { Toast, showToast } from '../components/Toast';
 import AppLoader from '../components/AppLoader';
 import SplashSpinner from '../components/SplashSpinner';
 import { IncomingCallOverlay } from '../components/IncomingCallOverlay';
+import PremiumAlert from '../components/PremiumAlert';
+import { requestBatteryOptimizationExemption } from '../services/livekit';
 import MiniRoomCard, { type MinimizedRoom } from '../components/MiniRoomCard';
+import { stopOrphanRadio } from '../hooks/useRadioPlayer';
 import SessionConflictGuard from '../components/SessionConflictGuard';
 import ErrorBoundary from '../components/ErrorBoundary';
 // ★ react-native-keyboard-controller kaldırıldı — native modül linked değildi, app crash'e neden oluyordu.
@@ -140,6 +185,38 @@ import { RoomService } from '../services/database';
 import { liveKitService } from '../services/livekit';
 
 SplashScreen.preventAutoHideAsync();
+
+// ═══════════════════════════════════════════════════════════
+// ★ v1.7.13.140 (22 May 2026) — DEV-MODE expo-av RedBox suppress
+// expo-av AVManager.onHostDestroy hot reload sırasında ExoPlayer.release'i
+// wrong thread'te çalıştırıyor → fatal exception → RedBox. JS tarafında çözüm
+// yok (crash Java side). LogBox.ignoreLogs warning'i etkiler, RedBox fatal'i
+// etkilemez — ErrorUtils.setGlobalHandler ile yakalayıp suppress ediyoruz.
+// Production'a (!__DEV__) etki etmez (alttaki Crashlytics handler ayrı çalışır).
+// Kalıcı çözüm: expo-audio migration (post-launch, memory'de).
+// ═══════════════════════════════════════════════════════════
+if (__DEV__) {
+  try {
+    const _ErrorUtils = (global as any).ErrorUtils;
+    if (_ErrorUtils && typeof _ErrorUtils.getGlobalHandler === 'function') {
+      const prevHandler = _ErrorUtils.getGlobalHandler();
+      _ErrorUtils.setGlobalHandler((error: Error, isFatal?: boolean) => {
+        const msg = (error?.message || '') + ' ' + (error?.stack || '');
+        if (
+          msg.includes('Player is accessed on the wrong thread') ||
+          msg.includes('verifyApplicationThread') ||
+          msg.includes('Encountered websocket error') ||
+          msg.includes('ConnectionError') && msg.includes('WebSocket') ||
+          msg.includes('websocket error during connection')
+        ) {
+          // expo-av + LiveKit WebSocket — dev artifact, yut
+          return;
+        }
+        prevHandler(error, isFatal);
+      });
+    }
+  } catch { /* sessiz */ }
+}
 
 // ═══════════════════════════════════════════════════════════
 // GLOBAL ERROR HANDLER — Production crash'leri logla
@@ -857,6 +934,14 @@ export default function RootLayout() {
   const minimizedRoomRef = useRef<MinimizedRoom | null>(null);
   useEffect(() => { minimizedRoomRef.current = minimizedRoom; }, [minimizedRoom]);
   const [showNotifDrawer, setShowNotifDrawer] = useState(false);
+  // ★ v1.7.13.137: Battery permission native Alert → PremiumAlert (dark theme uyum)
+  const [batteryPrompt, setBatteryPrompt] = useState(false);
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener('battery-permission-needed', () => {
+      setBatteryPrompt(true);
+    });
+    return () => sub.remove();
+  }, []);
   // ★ 2026-04-26: Global kullanıcı profili sheet — her yerden açılır (clubhouse tarzı peek)
   const [profileSheetUserId, setProfileSheetUserId] = useState<string | null>(null);
   const userProfileSheetContextValue = useMemo(() => ({
@@ -954,6 +1039,48 @@ export default function RootLayout() {
       .subscribe();
     return () => { try { supabase.removeChannel(ch); } catch {} };
   }, [minimizedRoom?.id]);
+
+  // ★ v1.7.13.95 (20 May 2026): AppState reconcile — uygulama arka planda uzun süre
+  //   kalınca heartbeat durur, cleanup_ghost_participants 5dk'da kullanıcıyı odadan
+  //   siler. App foreground'a gelince stale minimize bar görünmesin: DB'de hâlâ
+  //   participant olup olmadığını kontrol et, yoksa minimizedRoom'u temizle.
+  useEffect(() => {
+    const checkParticipantStatus = async () => {
+      const mr = minimizedRoomRef.current;
+      if (!mr?.id || !firebaseUser?.uid) return;
+      try {
+        const { count } = await supabase
+          .from('room_participants')
+          .select('user_id', { count: 'exact', head: true })
+          .eq('room_id', mr.id)
+          .eq('user_id', firebaseUser.uid);
+        if (count === 0) {
+          // ★ v1.7.13.96 (20 May 2026): Cleanup sildiyse minimize bar kapatma
+          //   YERİNE auto-rejoin — kullanıcı LiveKit ile hâlâ bağlı, sadece DB
+          //   participant kaydı silinmiş. RoomService.join idempotent + role'ü
+          //   doğru belirler (host → owner, diğer → listener). Hata olursa
+          //   (oda kapanmış vs.) minimize bar'ı temizle.
+          try {
+            await RoomService.join(mr.id, firebaseUser.uid, 'listener');
+            // Başarılı: heartbeat de at, listener_count trigger güncellenir
+            await RoomService.heartbeat(mr.id, firebaseUser.uid).catch(() => {});
+          } catch {
+            // Rejoin başarısız (oda kapanmış / banned / vs) → minimize bar temizle
+            setMinimizedRoom(null);
+          }
+        } else {
+          // Hâlâ odada → heartbeat yolla (sessizliği sürdür)
+          RoomService.heartbeat(mr.id, firebaseUser.uid).catch(() => {});
+        }
+      } catch {/* sessiz */}
+    };
+    const sub = AppState.addEventListener('change', (next) => {
+      if (next === 'active') checkParticipantStatus();
+    });
+    // İlk mount + minimizedRoom değişince kontrol et (race condition fix)
+    checkParticipantStatus();
+    return () => sub.remove();
+  }, [firebaseUser?.uid, minimizedRoom?.id]);
 
   // Gelen arama state
   const [incomingCall, setIncomingCall] = useState<CallSignal | null>(null);
@@ -1194,6 +1321,19 @@ export default function RootLayout() {
         // Supabase profilini bekle (isAuthReady'i burada true yapacak)
         await syncProfile(fbUser);
 
+        // ★ v1.7.13.112 (20 May 2026): Misafir mod — Streak / Push / RevenueCat atla.
+        //   Misafir Supabase profile'a sahip değil; RPC çağrıları RLS reddeder.
+        // ★ v1.7.13.111 (20 May 2026): Streak touch — gün serisini güncelle (sunucu hesaplar)
+        try {
+          const { ProfileService } = require('../services/profile');
+          const streakResult = await ProfileService.touchStreak(fbUser.uid);
+          if (streakResult?.changed) {
+            if (__DEV__) console.log('[Streak]', streakResult.reset ? 'reset → 1' : `+1 → ${streakResult.streak}${streakResult.milestone ? ' MILESTONE!' : ''}`);
+            // Profile state'ini güncel streak ile refresh
+            await syncProfile(fbUser);
+          }
+        } catch (e) { if (__DEV__) console.warn('[Streak] error:', e); }
+
         // ★ v78: Push bildirim token'ı al ve push_tokens tablosuna kaydet (multi-device)
         const pushToken = await PushNotificationService.registerForPushNotifications();
         if (pushToken) {
@@ -1298,9 +1438,30 @@ export default function RootLayout() {
   useEffect(() => {
     if (!firebaseUser) return;
 
-    // ★ Push tıklanınca: incoming_call ise overlay göster, diğerleri route'a yönlendir
+    // ★ Push tıklanınca: incoming_call ise overlay göster, voice_room odaya dön, diğerleri route'a yönlendir
     const responseListener = PushNotificationService.addResponseListener((response) => {
       const data = response.notification.request.content.data;
+      const actionId = response.actionIdentifier;
+
+      // ★ "Odadan Ayrıl" action butonu tıklandı
+      if (actionId === 'leave_room' && data?.type === 'voice_room_ongoing') {
+        const roomId = data.roomId as string;
+        const uid = firebaseUser?.uid;
+        setMinimizedRoom(null);
+        if (uid && roomId) {
+          RoomService.leave(roomId, uid).catch(() => {});
+        }
+        liveKitService.disconnect().catch(() => {});
+        PushNotificationService.dismissVoiceRoomNotification().catch(() => {});
+        return;
+      }
+
+      // ★ Bildirime tıklama — odaya geri dön
+      if (data?.type === 'voice_room_ongoing' && data?.roomId) {
+        routerRef.current?.push(`/room/${data.roomId}` as any);
+        return;
+      }
+
       if (data?.type === 'incoming_call' && data?.callId) {
         // Gelen arama push'u tıklandı → IncomingCallOverlay'ı tetikle
         updateIncomingCall({
@@ -1622,6 +1783,8 @@ export default function RootLayout() {
       <UserSearchSheetContext.Provider value={userSearchSheetContextValue}>
       <ThemeContext.Provider value={themeContextValue}>
       <DynamicThemeProvider themeItemId={(profile as any)?.active_theme_id || null}>
+      {/* ★ v1.7.13.119: Misafir için tüm realtime provider'lar pasif —
+          friends/DM/badge subscriptions misafir uid'sine bağlanmasın (RLS reddedeer). */}
       <RealtimeBadgeProvider userId={firebaseUser?.uid || null}>
       <OnlineFriendsProvider userId={firebaseUser?.uid || null}>
       <DMNotifProvider userId={firebaseUser?.uid || null}>
@@ -1701,7 +1864,7 @@ export default function RootLayout() {
               routerRef.current.push(`/room/${roomId}`);
             }}
             onClose={() => {
-              // ★ Temiz çıkış — LiveKit disconnect + odadan ayrıl
+              // ★ Temiz çıkış — LiveKit disconnect + odadan ayrıl + radyo durdur
               const roomId = minimizedRoom.id;
               const uid = firebaseUser?.uid;
               setMinimizedRoom(null);
@@ -1709,6 +1872,10 @@ export default function RootLayout() {
                 RoomService.leave(roomId, uid).catch(() => {});
               }
               liveKitService.disconnect().catch(() => {});
+              // ★ Canlı bildirim kaldır
+              PushNotificationService.dismissVoiceRoomNotification().catch(() => {});
+              // ★ Lobi'den minimize edilip preserve=true ile orphan kalan radyo sound'unu durdur.
+              stopOrphanRadio().catch(() => {});
             }}
             onMuteToggle={() => {
               // ★ 2026-04-24: Minimize'da oda sesini aç/kapat
@@ -1744,7 +1911,19 @@ export default function RootLayout() {
         )}
         <Toast />
 
-
+        {/* ★ v1.7.13.137: Battery optimization permission — PremiumAlert ile dark theme uyumlu */}
+        <PremiumAlert
+          visible={batteryPrompt}
+          title="Oda Bağlantısı İçin İzin"
+          message='Telefonun ekranı kapandığında sesli odanın kopmaması için "Pil iyileştirmesi yapma" iznine ihtiyacımız var. Açılan ekrandan SopranoChat için "İzin verme" / "Sınırsız" seçeneğini seçmen yeterli.'
+          type="info"
+          icon="battery-charging"
+          buttons={[
+            { text: 'Sonra', style: 'cancel', onPress: () => setBatteryPrompt(false) },
+            { text: 'Ayara Git', style: 'default', onPress: () => { setBatteryPrompt(false); requestBatteryOptimizationExemption(); } },
+          ]}
+          onDismiss={() => setBatteryPrompt(false)}
+        />
 
         {/* ★ BUG-4 FIX: NotificationDrawer artık global — tüm sayfalarda tek instance */}
         <NotificationDrawer
@@ -1859,6 +2038,8 @@ export default function RootLayout() {
 
         {/* ★ Intro Video kaldırıldı */}
         {/* ★ v107 (3 May 2026): Çift oturum uyarısı — başka cihaz takeover algılarsa modal */}
+        {/* ★ v1.7.13.119: Misafir (anonymous) için çift oturum guard pasif —
+            misafir profile RLS-bound RPC çağıramaz, gereksiz noise. */}
         <SessionConflictGuard userId={firebaseUser?.uid || null} />
         {/* ★ F-1 (16 May 2026): Bakım modu / zorunlu güncelleme / banner — en üst overlay */}
         <SystemSettingsOverlay />

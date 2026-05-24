@@ -81,11 +81,11 @@ export const PushNotificationService = {
 
     // Sadece gerçek cihazlarda çalışır (DEV mode'da Google Play'li emülatör için bypass)
     if (!Device.isDevice && !__DEV__) {
-      console.log('Push bildirimler yalnızca gerçek cihazlarda çalışır.');
+      if (__DEV__) console.log('Push bildirimler yalnızca gerçek cihazlarda çalışır.');
       return null;
     }
     if (!Device.isDevice && __DEV__) {
-      console.log('[DEV] Emülatör algılandı — push token denenecek.');
+      if (__DEV__) console.log('[DEV] Emülatör algılandı — push token denenecek.');
     }
 
     // Expo Go'da (SDK 53+) push notification kurulumu uygulamayı çökertir, bu yüzden direkt atla
@@ -157,6 +157,30 @@ export const PushNotificationService = {
         enableLights: true,
         enableVibrate: true,
       });
+
+      // ★ Sesli oda ongoing notification kanalı — düşük öncelik, ses/titreşim yok
+      await Notifications.setNotificationChannelAsync('voice_room', {
+        name: 'Sesli Oda',
+        description: 'Sesli odada olduğunuzu gösteren bildirim',
+        importance: Notifications.AndroidImportance.LOW,
+        enableVibrate: false,
+        sound: null,
+        lightColor: '#14B8A6',
+      });
+
+      // ★ v1.7.13.146 (24 May 2026): Clubhouse-style canlı oda pill kanalı.
+      //   DEFAULT importance — Samsung Now Bar / One UI canlı pill için gerekli.
+      //   Ses/titreşim OFF; sadece görsel olarak prominent.
+      await Notifications.setNotificationChannelAsync('voice_room_live', {
+        name: 'Canlı Sesli Oda',
+        description: 'Odadayken arka planda canlı durum pill',
+        importance: Notifications.AndroidImportance.DEFAULT,
+        enableVibrate: false,
+        sound: null,
+        lightColor: '#14B8A6',
+        lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+        showBadge: false,
+      });
     }
 
     // ★ 2026-04-21: iOS + Android notification category — Kabul/Ret action butonları push'ta
@@ -176,6 +200,9 @@ export const PushNotificationService = {
     } catch (catErr) {
       if (__DEV__) logger.warn('[Push] Notification category set hatası:', catErr);
     }
+
+    // ★ Sesli oda bildirim category — "Odadan Ayrıl" butonu
+    await this.registerVoiceRoomCategory();
 
     // ★ 2026-05-09 FCM v1 MIGRATION: Eski credentials zamanından kalan tokenlar Expo backend'inde
     //   FCM v1 service account ile bağlanmamış → tüm push'lar DeviceNotRegistered ile fail.
@@ -342,5 +369,90 @@ export const PushNotificationService = {
   addReceivedListener(callback: (notification: any) => void) {
     if (!Notifications) return null;
     return Notifications.addNotificationReceivedListener(callback);
+  },
+
+  /**
+   * ★ Sesli oda ongoing notification — arka planda "Şuan sesli odadasınız" gösterir.
+   *   Kullanıcı odadayken üst bildirim çubuğunda kalıcı bildirim.
+   *   Clubhouse paritesi: oda adı, konuşmacılar, dinleyici sayısı.
+   */
+  VOICE_ROOM_NOTIF_ID: 'soprano_voice_room_ongoing',
+
+  async showVoiceRoomNotification(
+    roomName: string,
+    roomId: string,
+    speakers?: string[],
+    listenerCount?: number,
+  ) {
+    if (!Notifications) return;
+    if (Platform.OS !== 'android') return; // iOS'ta ongoing notification yok
+    // ★ v1.7.13.146 (24 May 2026): App foreground'dayken gösterme — kullanıcı zaten oda
+    //   içinde, üst notification pill (Samsung Now Bar dahil) gereksiz. AppState listener
+    //   (room/[id].tsx) background'a geçtiğinde tekrar çağırır.
+    try {
+      const { AppState } = require('react-native');
+      if (AppState.currentState === 'active') return;
+    } catch { /* AppState alınamazsa eski davranış */ }
+
+    // ★ v1.7.13.146 (24 May 2026): Clubhouse-style minimal pill metni.
+    //   "🔴 CANLI" prefix + dinleyici sayısı. Konuşmacı isimleri kaldırıldı
+    //   (Samsung Now Bar 1 satır kısaltma yapıyor, isimler kesiliyordu).
+    let body = '🔴 CANLI';
+    if (listenerCount && listenerCount > 0) {
+      body += ` · ${listenerCount} dinleyici`;
+    }
+    if (speakers && speakers.length > 0) {
+      body += ` · ${speakers.length} konuşmacı`;
+    }
+
+    try {
+      await Notifications.scheduleNotificationAsync({
+        identifier: this.VOICE_ROOM_NOTIF_ID,
+        content: {
+          title: roomName || 'Sesli Oda',
+          body,
+          subtitle: 'SopranoChat sesli oda', // iOS subtitle / Android subText
+          data: { type: 'voice_room_ongoing', roomId },
+          sound: false,
+          sticky: true, // ongoing — kullanıcı kaydırarak kapatamaz
+          autoDismiss: false,
+          categoryIdentifier: 'voice_room_actions',
+          color: '#14B8A6', // ★ SopranoChat teal — ikon aksan rengi (Samsung Now Bar pill rengi)
+          ...(Platform.OS === 'android' ? { channelId: 'voice_room_live' } : {}),
+        },
+        trigger: null,
+      });
+    } catch (e) {
+      if (__DEV__) console.warn('[Push] Voice room notification error:', e);
+    }
+  },
+
+  async dismissVoiceRoomNotification() {
+    if (!Notifications) return;
+    try {
+      await Notifications.dismissNotificationAsync(this.VOICE_ROOM_NOTIF_ID);
+    } catch {}
+    try {
+      await Notifications.cancelScheduledNotificationAsync(this.VOICE_ROOM_NOTIF_ID);
+    } catch {}
+  },
+
+  /**
+   * ★ voice_room_actions category — "Odadan Ayrıl" action butonu
+   *   registerForPushNotifications() içinde çağrılmalı.
+   */
+  async registerVoiceRoomCategory() {
+    if (!Notifications) return;
+    try {
+      await Notifications.setNotificationCategoryAsync('voice_room_actions', [
+        {
+          identifier: 'leave_room',
+          buttonTitle: '✕ Odadan Ayrıl',
+          options: { opensAppToForeground: false, isDestructive: true },
+        },
+      ]);
+    } catch (e) {
+      if (__DEV__) console.warn('[Push] Voice room category error:', e);
+    }
   },
 };

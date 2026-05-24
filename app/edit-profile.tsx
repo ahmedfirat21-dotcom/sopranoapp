@@ -98,6 +98,11 @@ export default function EditProfileScreen() {
   const [privacyMode, setPrivacyMode] = useState<'public' | 'followers_only'>(
     (profile as any)?.privacy_mode === 'private' ? 'followers_only' : ((profile as any)?.privacy_mode || 'public')
   );
+  // ★ v1.7.13.58 (20 May 2026): DM istek kabul — false ise yabancılar yeni istek atamaz.
+  //   Arkadaşlar ve önceden accepted istekler etkilenmez (server RPC içinde gate).
+  const [dmAcceptRequests, setDmAcceptRequests] = useState<boolean>(
+    (profile as any)?.dm_accept_requests !== false
+  );
 
   // === v110.5: Diller + İlgi Alanları ===
   const [languages, setLanguages] = useState<string[]>(
@@ -247,6 +252,7 @@ export default function EditProfileScreen() {
         hide_owned_rooms: hideOwnedRooms,
         privacy_mode: privacyMode,
         is_private: derivedIsPrivate,
+        dm_accept_requests: dmAcceptRequests,
         // ★ v110.5: Diller + İlgi alanları + Sosyal linkler
         languages,
         interests,
@@ -271,6 +277,7 @@ export default function EditProfileScreen() {
         hide_owned_rooms: hideOwnedRooms,
         privacy_mode: privacyMode,
         is_private: derivedIsPrivate,
+        dm_accept_requests: dmAcceptRequests,
         // ★ v110.5
         languages,
         interests,
@@ -423,6 +430,7 @@ export default function EditProfileScreen() {
     avatarUrl !== (profile?.avatar_url || '') ||
     hideOwnedRooms !== ((profile as any)?.hide_owned_rooms || false) ||
     privacyMode !== ((profile as any)?.privacy_mode || 'public') ||
+    dmAcceptRequests !== ((profile as any)?.dm_accept_requests !== false) ||
     JSON.stringify(languages) !== JSON.stringify((profile as any)?.languages || []) ||
     JSON.stringify(interests) !== JSON.stringify((profile as any)?.interests || []) ||
     JSON.stringify(socialLinks) !== JSON.stringify((profile as any)?.social_links || {});
@@ -1010,6 +1018,29 @@ export default function EditProfileScreen() {
                 </Pressable>
               ))}
             </View>
+          </View>
+
+          {/* ★ v1.7.13.58 (20 May 2026): DM istek kabul — yabancılar yeni istek atabilir mi? */}
+          <View style={[styles.accountRow, { justifyContent: 'space-between', marginTop: 16 }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 12 }}>
+              <View style={[styles.accountIcon, { backgroundColor: 'rgba(94,234,212,0.12)' }]}>
+                <Ionicons name="mail-unread-outline" size={18} color={Colors.teal} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.accountLabel}>Mesaj İsteklerini Kabul Et</Text>
+                <Text style={styles.fieldHint}>
+                  {dmAcceptRequests
+                    ? i18n.t('editprofile.msg_privacy_open')
+                    : 'Yabancılar yeni mesaj isteği gönderemez. Arkadaşların yazmaya devam edebilir.'}
+                </Text>
+              </View>
+            </View>
+            <Switch
+              value={dmAcceptRequests}
+              onValueChange={setDmAcceptRequests}
+              trackColor={{ false: 'rgba(255,255,255,0.08)', true: 'rgba(20,184,166,0.4)' }}
+              thumbColor={dmAcceptRequests ? Colors.teal : '#64748B'}
+            />
           </View>
         </View>
       </ScrollView>

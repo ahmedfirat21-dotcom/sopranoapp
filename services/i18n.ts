@@ -52,17 +52,22 @@ export const i18n = {
    * _layout.tsx prepare() içinde çağrılır.
    */
   async init(): Promise<void> {
+    // ★ v1.7.13.161 (23 May 2026): Basit ve güvenilir dil algılama.
+    //   AsyncStorage'da kayıtlı tercih varsa → onu kullan.
+    //   Yoksa (ilk açılış) → Türkçe varsayılan (ana pazar TR).
+    //   Kullanıcı ayarlardan EN seçerse kaydedilir, sonraki açılışta EN gelir.
     try {
       const json = await AsyncStorage.getItem(LOCALE_STORAGE_KEY);
       if (json) {
         const settings = JSON.parse(json);
         if (settings.language && locales[settings.language as SupportedLocale]) {
           currentLocale = settings.language as SupportedLocale;
+          return;
         }
       }
-    } catch {
-      // Okunamazsa varsayılan (TR) ile devam
-    }
+    } catch { /* İlk açılış — tercih yok */ }
+    // Kayıtlı tercih yok → varsayılan Türkçe (ana pazar)
+    currentLocale = 'tr';
   },
 
   /**

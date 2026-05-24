@@ -61,7 +61,7 @@ export const Analytics = {
     if (__DEV__) {
       // Dev'de console'a düşür ki debugging yapılabilsin
       // eslint-disable-next-line no-console
-      console.log(`[Analytics] ${event}`, clean || '');
+      if (__DEV__) console.log(`[Analytics] ${event}`, clean || '');
     }
     if (!isAvailable()) return;
     try {
@@ -81,7 +81,7 @@ export const Analytics = {
   setUserProperty(prop: UserProperty, value: string): void {
     if (__DEV__) {
       // eslint-disable-next-line no-console
-      console.log(`[Analytics] property: ${prop} = ${value}`);
+      if (__DEV__) console.log(`[Analytics] property: ${prop} = ${value}`);
     }
     if (!isAvailable()) return;
     try {
@@ -100,7 +100,7 @@ export const Analytics = {
   setUserId(userId: string | null): void {
     if (__DEV__) {
       // eslint-disable-next-line no-console
-      console.log(`[Analytics] userId: ${userId || '(cleared)'}`);
+      if (__DEV__) console.log(`[Analytics] userId: ${userId || '(cleared)'}`);
     }
     if (!isAvailable()) return;
     try {

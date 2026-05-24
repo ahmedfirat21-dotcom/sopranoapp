@@ -38,8 +38,8 @@ export default class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     if (__DEV__) {
-      console.error('[ErrorBoundary] Crash yakalandı:', error.message);
-      console.error('[ErrorBoundary] Component Stack:', errorInfo.componentStack);
+      if (__DEV__) console.error('[ErrorBoundary] Crash yakalandı:', error.message);
+      if (__DEV__) console.error('[ErrorBoundary] Component Stack:', errorInfo.componentStack);
     }
     // ★ 2026-04-25: Crashlytics'e gönder (sadece prod build'de aktif)
     try {

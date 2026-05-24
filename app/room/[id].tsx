@@ -80,7 +80,7 @@ import useLiveKit from '../../hooks/useLiveKit';
 import { useMicMeter } from '../../hooks/useMicMeter';
 
 import { liveKitService } from '../../services/livekit';
-import { isSystemRoom, getSystemRooms } from '../../services/showcaseRooms';
+import { isSystemRoom, getSystemRoomById } from '../../services/showcaseRooms';
 import type { MicMode, CameraFacing } from '../../types';
 import { PasswordPromptSheet, AccessRequestSheet, AccessGate, InviteRequestPromptSheet, RoomEntryPreviewSheet, type EntryPreviewFilter } from '../../components/room/RoomAccessPrompts';
 import PremiumAlert, { type AlertButton, type AlertType } from '../../components/PremiumAlert';
@@ -95,6 +95,7 @@ import InRoomUserProfile from '../../components/room/InRoomUserProfile';
 import AudienceDrawer from '../../components/room/AudienceDrawer';
 import { FriendshipService } from '../../services/friendship';
 import { PlusMenu, AdvancedSettingsPanel } from '../../components/room/RoomOverlays';
+// ★ v1.7.13.121: KaraokePanel + Mafia* importları kaldırıldı (özellikler askıya alındı).
 import PowerUpsSheet from '../../components/room/PowerUpsSheet';
 import RoomFollowersSheet from '../../components/room/RoomFollowersSheet';
 import HostAccessPanel from '../../components/room/HostAccessPanel';
@@ -102,6 +103,10 @@ import HandRaiseQueuePanel from '../../components/room/HandRaiseQueuePanel';
 import RoomBoostSheet, { type RoomBoostTier } from '../../components/RoomBoostSheet';
 import InviteFriendsModal from '../../components/room/InviteFriendsModal';
 import RoomInfoHeader from '../../components/room/RoomInfoHeader';
+import ConnectionQualityIndicator from '../../components/room/ConnectionQualityIndicator';
+import SopranoRadioPlayer from '../../components/room/SopranoRadioPlayer';
+import RadioChannelSheet from '../../components/room/RadioChannelSheet';
+import { useRadioPlayer } from '../../hooks/useRadioPlayer';
 import SpeakerSection from '../../components/room/SpeakerSection';
 import { CosmeticParticleEffect } from '../../components/skia';
 import CameraFullscreenModal from '../../components/room/CameraFullscreenModal';
@@ -140,6 +145,7 @@ import { useSwipeToDismiss } from '../../hooks/useSwipeToDismiss';
 import { useRoomPresence } from '../../hooks/useRoomPresence';
 import ModerationOverlay, { type ModerationOverlayRef } from '../../components/room/ModerationOverlay';
 import type { FlashType } from '../../components/room/AvatarPenaltyFlash';
+import { PushNotificationService } from '../../services/pushNotifications';
 
 
 // ★ LiveKit VideoView — native modül yoksa null (prod build gerektirmez)
@@ -480,9 +486,12 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
   //   ESKİ SORUN: Her iki platformda da screen-based bottom=kbHeight → Android'de çift küçülme.
   //   Input bar klavyenin arkasına kalıyordu.
   const screenH = Dimensions.get('screen').height;
-  const REST_BOTTOM = 120; // control bar + safe area
-  const REST_TOP = 120;    // status bar + header alanı
-  const restHeight = screenH - REST_BOTTOM - REST_TOP;
+  const windowH = Dimensions.get('window').height;
+  // ★ PlusMenu ile birebir aynı boyut — ROOM_TOP_GAP=70, ROOM_BOTTOM_GAP=90
+  // PlusMenu top/bottom window bazlı, DM panel de window bazlı hesaplamalı
+  const REST_BOTTOM = 90; // PlusMenu: Math.max(insets.bottom + 8, 90)
+  const REST_TOP = 70;    // PlusMenu: Math.max(insets.top + 12, 70)
+  const restHeight = windowH - REST_BOTTOM - REST_TOP;
   const dmPanelBottomAnim = useRef(new Animated.Value(REST_BOTTOM)).current;
   const dmPanelHeightAnim = useRef(new Animated.Value(restHeight)).current;
   // ★ 2026-05-05 FIX: Bir DM kullanıcısı seçilip chat ekranı açılınca, önceki klavye state'i
@@ -495,35 +504,28 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
       dmPanelHeightAnim.setValue(fullScreenH - REST_BOTTOM - REST_TOP);
     }
   }, [chatTarget?.userId]);
-  // ★ v110.5.12 (6 May 2026): Klavye listener — DOĞRU formül.
-  //   Eski yanlış: bottom=0, height=kbScreenY-44 → modal klavye altında kalıyordu.
-  //   Yeni doğru: bottom=kbHeight (modal klavye ÜSTÜNE çık), height=screen-kbHeight-REST_TOP.
-  //   Hem iOS hem Android için tek formül. Modal toplam alan korunur (üstte status bar boşluk).
   useEffect(() => {
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
     const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
     const showSub = Keyboard.addListener(showEvent, (e) => {
       const fullScreenH = Dimensions.get('screen').height;
-      // ★ v110.5.13: Klavye yüksekliği — Android'de .height bazen 0 dönüyor,
-      //   fullScreenH - screenY daha güvenilir (klavyenin üst kenarı = ekran altından
-      //   yukarıdaki mesafe). max ile ikisinden büyüğünü al.
       const reportedH = e.endCoordinates.height || 0;
       const calcH = fullScreenH - (e.endCoordinates.screenY || fullScreenH);
       const kbHeight = Math.max(reportedH, calcH, 0);
-      // Modal alt kenarı = klavyenin üst kenarına yapışsın
-      const newBottom = kbHeight;
-      // Modal yüksekliği = ekran - klavye - üst margin (status bar + mini room header)
-      const newHeight = Math.max(fullScreenH - kbHeight - REST_TOP, 240);
-      // ★ v110.5.14: Animation INSTANT — keyboardDidShow Android'de klavye TAM açıldıktan
-      //   sonra fire ediyor (~300ms+). Üzerine 200ms animation = 1.5sn hissi. Şimdi
-      //   keyboardDidShow gelir gelmez modal anında yerine oturur (duration 0).
-      dmPanelBottomAnim.setValue(newBottom);
-      dmPanelHeightAnim.setValue(newHeight);
+      if (Platform.OS === 'android') {
+        // Android adjustResize: pencere küçülüyor, bottom=0 yeterli
+        dmPanelBottomAnim.setValue(0);
+        dmPanelHeightAnim.setValue(Dimensions.get('window').height - REST_TOP);
+      } else {
+        const newBottom = kbHeight;
+        const newHeight = Math.max(fullScreenH - kbHeight - REST_TOP, 240);
+        dmPanelBottomAnim.setValue(newBottom);
+        dmPanelHeightAnim.setValue(newHeight);
+      }
     });
     const hideSub = Keyboard.addListener(hideEvent, () => {
       const fullScreenH = Dimensions.get('screen').height;
       const rH = fullScreenH - REST_BOTTOM - REST_TOP;
-      // Klavye kapanırken kısa animation (gözden hoş)
       Animated.parallel([
         Animated.timing(dmPanelBottomAnim, {
           toValue: REST_BOTTOM,
@@ -538,7 +540,7 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
       ]).start();
     });
     return () => { showSub.remove(); hideSub.remove(); };
-  }, []);
+  }, [REST_BOTTOM]);
 
   // ★ Swipe-to-dismiss — sağa sürükle
   const { translateValue: dmSwipeX, panHandlers: dmPanHandlers } = useSwipeToDismiss({
@@ -585,6 +587,9 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
       // ★ 2026-04-23 double-drag fix: swipe offset'ini sıfırla ki önceki swipe pozisyonundan
       //   başlamasın (hook artık dismiss'te translateValue'u sıfırlamıyor, parent reset eder)
       dmSwipeX.setValue(0);
+      // ★ Panel boyutlarını her açılışta PlusMenu ile eşitle
+      dmPanelBottomAnim.setValue(REST_BOTTOM);
+      dmPanelHeightAnim.setValue(restHeight);
       Animated.parallel([
         Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true, damping: 18, stiffness: 180 }),
         Animated.timing(fadeAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
@@ -910,7 +915,7 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
   const handleDmCopy = useCallback(async (msg: any) => {
     if (!msg.content) return;
     await Clipboard.setStringAsync(msg.content);
-    showToast({ title: i18n.t('room.id.009'), type: 'success' });
+    // ★ v1.7.13.161: Kopyalama toast'ı kaldırıldı — clipboard UI feedback yeterli.
   }, []);
 
   const handleDmSave = useCallback(async (msg: any) => {
@@ -922,7 +927,7 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
       return next;
     });
     await MessageService.toggleSavedMessage(firebaseUser.uid, msg.id);
-    showToast({ title: wasSaved ? i18n.t('auto.room.id.120') : '🔖 Kaydedildi', type: 'success' });
+    // ★ v1.7.13.161: Kaydetme toast'ı kaldırıldı — ikon zaten toggle oluyor.
   }, [firebaseUser, dmSavedIds]);
 
   // ★ v109: Forward — global user search sheet aç → seçilen kişiye forward RPC
@@ -937,7 +942,7 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
         }
         const r = await MessageService.forwardMessage(firebaseUser.uid, msg.id, targetUserId);
         if (r.success) {
-          showToast({ title: i18n.t('room.id.012'), type: 'success' });
+          // ★ v1.7.13.161: İletme toast'ı kaldırıldı — modal kapanması yeterli feedback.
         } else {
           showToast({ title: i18n.t('room.id.013'), message: r.error || 'Tekrar dene.', type: 'error' });
         }
@@ -1006,13 +1011,16 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
         position: 'absolute', right: 0, bottom: dmPanelBottomAnim,
         height: dmPanelHeightAnim,
         width: DM_PANEL_W,
+        zIndex: 60, elevation: 60,
       }}>
       <Animated.View {...dmPanHandlers} style={{
         flex: 1,
         borderTopLeftRadius: 26, borderBottomLeftRadius: 26,
         overflow: 'hidden',
         backgroundColor: '#1a2030',
-        shadowColor: '#000', shadowOffset: { width: -6, height: 0 }, shadowOpacity: 0.45, shadowRadius: 14, elevation: 10,
+        borderWidth: 1, borderRightWidth: 0,
+        borderColor: 'rgba(139,92,246,0.12)',
+        shadowColor: '#000', shadowOffset: { width: -6, height: 0 }, shadowOpacity: 0.45, shadowRadius: 14, elevation: 60,
         transform: [{ translateX: Animated.add(slideAnim, dmSwipeX) }],
       }}>
         {/* ★ 2026-05-05: NotificationDrawer dili (bildirim modalı ailesi) — 3 katman gradient.
@@ -1245,6 +1253,8 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
                             if (cam) detected = cam[1];
                             else if (/^https?:\/\/\S+\.(?:jpg|jpeg|png|gif|webp|heic)(?:\?\S*)?$/i.test(c)) detected = c;
                             else if (/^https?:\/\/[\w-]+\.supabase\.co\/storage\/v1\/object\/public\/(?:post-images|avatars)\/\S+$/i.test(c)) detected = c;
+                            // ★ v1.7.13.141: Tenor GIF URL — media.tenor.com
+                            else if (/^https?:\/\/media\.tenor\.com\/\S+$/i.test(c)) detected = c;
                           }
                           const imgUri = item.image_url || detected;
                           if (imgUri) {
@@ -1283,7 +1293,7 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
                             fontSize: 9,
                             textShadowColor: 'rgba(0,0,0,0.45)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
                           }}>
-                            {new Date(item.created_at).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
+                            {new Date(item.created_at).toLocaleTimeString(i18n.locale, { hour: '2-digit', minute: '2-digit' })}
                           </Text>
                           {isMine && !isDeletedForEveryone ? (
                             isTemp ? (
@@ -1404,6 +1414,34 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
                 returnKeyType="send"
                 onSubmitEditing={handleSend}
               />
+              {/* ★ v1.7.13.141: Resim gönder butonu — kompakt panel için tek ataç ikonu */}
+              <Pressable
+                style={{ width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.04)' }}
+                onPress={async () => {
+                  try {
+                    const ImagePicker = require('expo-image-picker');
+                    const result = await ImagePicker.launchImageLibraryAsync({
+                      mediaTypes: ['images'],
+                      quality: 0.7,
+                      allowsMultipleSelection: true,
+                      selectionLimit: 5,
+                    });
+                    if (result.canceled || !result.assets?.length) return;
+                    if (!firebaseUser?.uid || !chatTarget) return;
+                    const StorageService = require('../../services/storage').StorageService;
+                    for (const asset of result.assets) {
+                      try {
+                        const imageUrl = await StorageService.uploadChatImage(firebaseUser.uid, asset.uri);
+                        const newMsg = await MessageService.send(firebaseUser.uid, chatTarget.userId, `📷 ${imageUrl}`);
+                        setChatMessages((prev: any[]) => [{ ...newMsg, sender: { display_name: 'Sen', avatar_url: '' } }, ...prev]);
+                      } catch {}
+                    }
+                    MessageService.getInbox(firebaseUser.uid).then(msgs => setDmInboxMessages(msgs)).catch(() => {});
+                  } catch {}
+                }}
+              >
+                <Ionicons name="images-outline" size={18} color="rgba(255,255,255,0.4)" />
+              </Pressable>
               <Pressable
                 onPress={handleSend}
                 style={{
@@ -1585,26 +1623,60 @@ export default function RoomScreen() {
   const [showJustCreated, setShowJustCreated] = useState(justCreated === '1');
   const { unreadNotifs } = useBadges();
   
-  const [room, setRoom] = useState<Room | null>(null);
-  const [participants, setParticipants] = useState<RoomParticipant[]>([]);
-  // ★ v107.30: Sahne ↔ dinleyici geçişlerinde akıcı LayoutAnimation (kullanıcı talebi)
-  //   Eski "flash" davranışı yerine yumuşak spring transition. Android'de UIManager
-  //   experimental flag aktif edilir. Role veya speaker count değişiminde tetiklenir.
-  useEffect(() => {
-    if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-      try { UIManager.setLayoutAnimationEnabledExperimental(true); } catch {}
+  // ★ v1.7.13.135: Minimize'dan restore'da room state'i null kalıyor → "yükleniyor" flash.
+  //   Minimize payload'ından synthetic placeholder room oluştur — gerçek fetch arka planda yenileyecek.
+  // ★ v1.7.13.136: host_id eklendi (boştu → "0 dk + 0 kişi" flash atıyordu).
+  const [room, setRoom] = useState<Room | null>(() => {
+    if (minimizedRoom?.id === id) {
+      const mr = minimizedRoom as any;
+      return {
+        id: id as string,
+        name: mr.name || '',
+        is_live: true,
+        listener_count: mr.viewerCount || 0,
+        host_id: mr.hostUserId || '',
+        host: {
+          id: mr.hostUserId,
+          display_name: mr.hostName,
+          avatar_url: mr.hostAvatar,
+          subscription_tier: mr.hostTier || 'Free',
+        } as any,
+        category: 'chat',
+        type: 'open',
+        room_settings: {},
+      } as any;
     }
-  }, []);
+    return null;
+  });
+  // ★ v1.7.13.136: Minimize'dan restore'da participants snapshot ile başla
+  //   → "Sahne boş" flash önleme. DB fetch arka planda gerçek state'i set edecek.
+  const [participants, setParticipants] = useState<RoomParticipant[]>(() => {
+    const snap = (minimizedRoom as any)?.participantsSnapshot;
+    if (minimizedRoom?.id === id && Array.isArray(snap) && snap.length > 0) {
+      return snap as RoomParticipant[];
+    }
+    return [];
+  });
+  // ★ v1.7.13.146 (24 May 2026): setLayoutAnimationEnabledExperimental kaldırıldı.
+  //   New Architecture'da no-op (console warning); kod LayoutAnimation.* kullanmıyor.
   // Role + count signature — değişince configureNext bir sonraki render için animasyon hazırlar
   const roleSignature = useMemo(
     () => participants.map(p => `${p.user_id}:${p.role}`).sort().join('|'),
     [participants]
   );
-  // ★ v107.38: LayoutAnimation KALDIRILDI — RN translate property'i desteklemiyor,
-  //   "kayma" efekti için Reanimated `Layout.springify()` lazım (büyük refactor).
-  //   ScaleXY veya opacity kullanıcının istemediği fade/patlama. Şimdilik instant geçiş.
-  //   Kayma için Reanimated migration post-launch.
-  // useEffect(() => { ... LayoutAnimation.configureNext ... }, [roleSignature]);
+  // ★ Sahne geçişlerinde akıcı animasyon — easeInEaseOut (fade+scale, translate yok)
+  const prevRoleSignatureRef = useRef(roleSignature);
+  useEffect(() => {
+    if (prevRoleSignatureRef.current !== roleSignature) {
+      prevRoleSignatureRef.current = roleSignature;
+      LayoutAnimation.configureNext({
+        duration: 350,
+        create: { type: LayoutAnimation.Types.easeInEaseOut, property: LayoutAnimation.Properties.opacity },
+        update: { type: LayoutAnimation.Types.easeInEaseOut },
+        delete: { type: LayoutAnimation.Types.easeInEaseOut, property: LayoutAnimation.Properties.opacity },
+      });
+    }
+  }, [roleSignature]);
   // ★ 2026-04-24: Minimize'dan dönüşte loading false ile başlar — oda zaten açık,
   //   yükleniyor ekranı gösterilmez. Data arka planda güncellenir.
   const [loading, setLoading] = useState(() => !(minimizedRoom?.id === id));
@@ -1636,6 +1708,20 @@ export default function RoomScreen() {
 
   const [showAudienceDrawer, setShowAudienceDrawer] = useState(false);
   const [showChatDrawer, setShowChatDrawer] = useState(false);
+  // ★ Klavye açıldığında adjustResize window'u küçültüyor → bottom:0 wrapper klavye top'una
+  //   geliyor. Negatif bottom ile screen bottom'a geri ittiriyoruz (klavyenin arkasına gizleniyor).
+  const [ctrlKbOffsetPx, setCtrlKbOffsetPx] = useState(0);
+  useEffect(() => {
+    const showSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (e) => setCtrlKbOffsetPx(-(e.endCoordinates?.height || 0)),
+    );
+    const hideSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => setCtrlKbOffsetPx(0),
+    );
+    return () => { showSub.remove(); hideSub.remove(); };
+  }, []);
   // ★ v107: Hediye paneli — kontrol barındaki 🎁 butonu açar
   const [showGiftPanel, setShowGiftPanel] = useState(false);
   // ★ v107: Premium mesaj parlat stilleri — kullanıcının envanteri (cosmetic_items.message_art ürünleri)
@@ -1686,6 +1772,7 @@ export default function RoomScreen() {
   const floatingRef = useRef<FloatingReactionsRef>(null);
   const voiceReactionOverlayRef = useRef<VoiceReactionOverlayHandle>(null);
   const [showPlusMenu, setShowPlusMenu] = useState(false);
+  // ★ v1.7.13.121 (21 May 2026): Karaoke + Mafia state/channels kaldırıldı (kullanıcı kararı).
   // ★ v92 (1 May 2026): Power-Ups sheet — sarf güçlendiriciler (Süre Uzat, Altın Davet)
   const [showPowerUps, setShowPowerUps] = useState(false);
   // ★ v92.11: Oda takipçileri liste sheet'i — host görür
@@ -1770,6 +1857,29 @@ export default function RoomScreen() {
   const [roomStats, setRoomStats] = useState({ peakCCU: 0, totalUniqueListeners: 0, totalReactions: 0 });
   const isRoomClosingRef = useRef(false);
 
+  // ★ Sesli oda ongoing notification — SADECE app background'a geçince göster.
+  //   v1.7.13.146 (24 May 2026): Önceden foreground'da da gösteriliyordu, Samsung Now Bar'da
+  //   gereksiz "SopranoChat" pill çıkıyordu. Şimdi AppState ile sadece arka plana atıldığında
+  //   tetikleniyor; foreground'a dönüş = dismiss.
+  useEffect(() => {
+    if (!room?.name) return;
+    const { AppState } = require('react-native');
+    const handleStateChange = (state: string) => {
+      if (state === 'background' || state === 'inactive') {
+        PushNotificationService.showVoiceRoomNotification(room.name, id as string).catch(() => {});
+      } else if (state === 'active') {
+        PushNotificationService.dismissVoiceRoomNotification().catch(() => {});
+      }
+    };
+    const sub = AppState.addEventListener('change', handleStateChange);
+    // Mount anında foreground varsay — pasifte güvence olarak dismiss
+    PushNotificationService.dismissVoiceRoomNotification().catch(() => {});
+    return () => {
+      sub.remove();
+      PushNotificationService.dismissVoiceRoomNotification().catch(() => {});
+    };
+  }, [room?.name, id]);
+
   // ★ SEC-FLOOD: Emoji → chat DB yazma throttle ref
   const _lastEmojiChatWriteRef = useRef(0);
 
@@ -1785,10 +1895,13 @@ export default function RoomScreen() {
     setShowDmPanel(false);
     setShowDonationDrawer(false);
     setShowChatDrawer(false);
+    setShowGiftPanel(false);
     setShowPowerUps(false);
     setShowFollowersSheet(false);
     setSelectedUser(null);
-  }, [setShowDmPanel]);
+    // ★ v1.7.13.170: Global bildirim drawer'ını da kapat — modal çakışması önlenir
+    setShowNotifDrawer(false);
+  }, [setShowDmPanel, setShowNotifDrawer]);
 
   // ★ O11 FIX: Hızlı tıklamada sadece SON opener çalışsın — araya giren rAF'lar
   // aynı frame'de iki modal'ı birden açıyordu.
@@ -1820,7 +1933,7 @@ export default function RoomScreen() {
       if (
         selectedUser || showChatDrawer || showAudienceDrawer || showDmPanel ||
         showSettings || showPlusMenu || showAccessPanel || showMicRequests ||
-        showInviteFriends || showRoomStats || showDonationDrawer
+        showInviteFriends || showRoomStats || showDonationDrawer || showGiftPanel
       ) {
         closeAllOverlays();
         return true;
@@ -1836,7 +1949,7 @@ export default function RoomScreen() {
   }, [
     alertConfig.visible, selectedUser, showChatDrawer, showAudienceDrawer, showDmPanel,
     showSettings, showPlusMenu, showAccessPanel, showMicRequests, showInviteFriends,
-    showRoomStats, showDonationDrawer,
+    showRoomStats, showDonationDrawer, showGiftPanel,
     room?.host_id, firebaseUser?.uid, closeAllOverlays, handleAutoMinimize,
   ]);
 
@@ -1915,7 +2028,12 @@ export default function RoomScreen() {
       });
       // ★ SEC-DOUBLE-CHARGE FIX: Host payı ve SP düşme sadece backend'de (RoomService.join)
     } catch {
-      return true; // SP servisi hata verirse girişe izin ver (graceful degradation)
+      // ★ v1.7.13.140 (2026-05-21): fail-open KAPATILDI.
+      //   Önce: catch → return true → backend SP düşmeyi denedi, sessiz fail, "neden giremiyorum?" raporu.
+      //   Şimdi: bakiye sorgusu çökerse user'a net hata, retry et.
+      showToast({ title: i18n.t('common.error'), message: i18n.t('room.id.115'), type: 'error' });
+      safeGoBack(router);
+      return false;
     }
   }, [router]);
 
@@ -1930,10 +2048,23 @@ export default function RoomScreen() {
   //   onun yerine oda içi DonationAlert zaten tüm katılımcılara aynı animasyonu gösterir.
   useEffect(() => {
     (global as any).__sopranoInRoom = id;
-    return () => { (global as any).__sopranoInRoom = undefined; };
+    // ★ Canlı oda bildirimi — mount'ta göster, çıkışta kaldır
+    PushNotificationService.showVoiceRoomNotification(
+      room?.name || 'Sesli Oda',
+      id as string,
+    ).catch(() => {});
+    return () => {
+      (global as any).__sopranoInRoom = undefined;
+      PushNotificationService.dismissVoiceRoomNotification().catch(() => {});
+    };
   }, [id]);
   // ★ BUG-1 FIX: LiveKit ref — useRoomBroadcast callback'leri güncel lk kullanır (stale closure önleme)
   const lkRef = useRef<any>({ isMicrophoneEnabled: false, toggleMic: async () => {}, enableMic: async () => {}, disableMic: async () => {} });
+  // ★ v1.7.13.140: Soprano Lobi radyo — hook parent'ta, sheet top-level render.
+  //   Sheet'i SopranoRadioPlayer içinde render edersek header parent'ı içinde
+  //   absoluteFill → modal yukarıya fırlıyor. Top-level zorunlu.
+  const radio = useRadioPlayer({ enabled: isSystemRoom(id as string) });
+  const [radioSheetOpen, setRadioSheetOpen] = useState(false);
   // ★ Bağış bildirimi ref
   const donationAlertRef = useRef<DonationAlertRef>(null);
   // ★ O4: Kendi is_chat_muted durumunu takip eden ref — emoji/reaction bypass engeli
@@ -1961,6 +2092,9 @@ export default function RoomScreen() {
     donationAlertRef,
     isChatMutedRef,
   });
+
+  // ★ v1.7.13.121 (21 May 2026): Karaoke realtime kanalı + cursor reset effect kaldırıldı.
+
   // Mikrofon modu değiştiğinde LiveKit'i de güncelle
   const handleMicModeChange = (mode: MicMode) => {
     setMicMode(mode);
@@ -1999,6 +2133,29 @@ export default function RoomScreen() {
 
 
 
+  // ★ v1.7.13.146 (24 May 2026): Clubhouse-style follow button — oda içindeki avatar'lar
+  //   sağ-üst köşesinde + butonu. Tıklayınca FriendshipService.follow + optimistic state.
+  const [followedIds, setFollowedIds] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    if (!firebaseUser?.uid) return;
+    FriendshipService.getFollowing(firebaseUser.uid)
+      .then(list => setFollowedIds(new Set(list.map(u => u.id))))
+      .catch(() => {});
+  }, [firebaseUser?.uid]);
+  const handleRoomFollow = useCallback(async (targetId: string) => {
+    if (!firebaseUser?.uid || targetId === firebaseUser.uid) return;
+    // Optimistic UI — butonu hemen gizle
+    setFollowedIds(prev => new Set(prev).add(targetId));
+    const result = await FriendshipService.follow(firebaseUser.uid, targetId);
+    if (!result.success) {
+      // Geri al
+      setFollowedIds(prev => { const n = new Set(prev); n.delete(targetId); return n; });
+      showToast({ title: i18n.t('common.error'), message: result.error || '', type: 'error' });
+    } else {
+      showToast({ title: '✓ Takip edildi', type: 'success' });
+    }
+  }, [firebaseUser?.uid]);
+
   // ★ Oda müziği artık link paylaşımı — oynatma kodu yok, banner UI aşağıda
 
   const scrollViewRef = useRef<ScrollView>(null);
@@ -2014,17 +2171,18 @@ export default function RoomScreen() {
   const minimizeAndPush = useCallback((path: string) => {
     // ★ v1.7.13: Bayrak koşulsuz set — handleAutoMinimize ile aynı race fix.
     isMinimizingRef.current = true;
+    radio.setPreserve(true); // ★ Radyo minimize’da çalmaya devam etsin
     if (minimizePayloadRef.current) {
       setMinimizedRoom(minimizePayloadRef.current);
     }
     router.push(path as any);
-  }, [setMinimizedRoom, router]);
+  }, [setMinimizedRoom, router, radio]);
 
   // ★ v92.9 (1 May 2026): Otomatik minimize — kullanıcı manuel "Odadan Ayrıl" veya
   //   mini X dışında her şekilde çıkarsa (back tuşu, header geri, navigate) oda
   //   minimize'a düşer. Tam çıkış sadece Plus menü > Odadan Ayrıl veya mini X ile.
   // ★ v92.20 (1 May 2026): Bekleyen oda erişim talebi count — SECURITY DEFINER RPC
-  //   üzerinden POLLING. Önceden REST + RLS ile select count yapılıyordu ama RLS
+  //   uzerinden POLLING. Önceden REST + RLS ile select count yapılıyordu ama RLS
   //   app_uid() Firebase JWT host_id eşleşmesi fail ediyordu → host "0 istek"
   //   görüyordu, DB'de pending kayıt olsa bile. RPC server-side host/mod kontrolü
   //   yapıp güvenli şekilde dönüyor.
@@ -2080,11 +2238,13 @@ export default function RoomScreen() {
     //   useEffect'le her render set ediliyor ama mount/cleanup arası timing
     //   garanti edilemez; bayrak her halükarda korunmalı.
     isMinimizingRef.current = true;
+    // ★ Radyo minimize'da çalmaya devam etsin (back/onBack ile minimize de aynı davranış).
+    radio.setPreserve(true);
     if (minimizePayloadRef.current) {
       setMinimizedRoom(minimizePayloadRef.current);
     }
     router.back();
-  }, [setMinimizedRoom, router]);
+  }, [setMinimizedRoom, router, radio]);
 
   // Oda sesi a/kapat
 
@@ -2094,26 +2254,15 @@ export default function RoomScreen() {
     // Tam ekran odaya girildi — mini kartı kaldır
     setMinimizedRoom(null);
 
-    // System Room fallback — veritabanında yok, local data kullan
-    // ★ 2026-04-26: RoomService.get hata fırlatıyorsa (oda silinmiş) catch ile null'a çevir, sonra not_found tetiklensin.
+    // ★ v1.7.13.140: Sistem odası (Lobi) DB'de gerçek bir kayıt — mock değil.
+    //   Eski getSystemRooms() boş array dönüyordu → "Oda bulunamadı" hatası.
+    //   Eski partPromise mock'u → katılımcı listesi boş + listener_count 0 flash bug'ı.
+    //   Şimdi: Lobi de normal oda gibi gerçek participants çekiyor, RoomService.join
+    //   ile DB'ye listener insert atılıyor (aşağıdaki block'ta).
     const roomPromise: Promise<Room | null> = isSystemRoom(id)
-      ? Promise.resolve(getSystemRooms().find(r => r.id === id) as unknown as Room)
+      ? getSystemRoomById(id as string)
       : RoomService.get(id).catch(() => null);
-    const partPromise = isSystemRoom(id) 
-      ? Promise.resolve([{
-          id: `local_${firebaseUser.uid}`,
-          room_id: id as string,
-          user_id: firebaseUser.uid,
-          role: 'listener' as const,
-          joined_at: new Date().toISOString(),
-          is_muted: false,
-          is_chat_muted: false,
-          user: {
-            display_name: profile?.display_name || i18n.t('auto.room.id.106'),
-            avatar_url: profile?.avatar_url || null,
-          },
-        }] as RoomParticipant[])
-      : RoomService.getParticipants(id as string);
+    const partPromise = RoomService.getParticipants(id as string);
     Promise.all([roomPromise, partPromise]).then(async ([roomData, p]) => {
       // ★ 2026-04-26: roomData null/undefined → oda silinmiş veya hiç yok → RoomClosedScreen
       if (!roomData) {
@@ -2156,7 +2305,12 @@ export default function RoomScreen() {
           return;
         }
       } else {
-        setRoom(roomData); setParticipants(p); participantsRef.current = new Set(p.map(x => x.user_id)); setLoading(false);
+        // ★ v1.7.13.140: Sistem odası (Lobi) için setLoading(false)'ı GECİKTİR —
+        //   auto-join (RoomService.join) henüz başlamadı. Eğer şimdi loader kapanırsa
+        //   UI boş katılımcı listesiyle açılır → 500ms sonra join bitince re-render
+        //   flash yaratıyordu. Şimdi join tamamlanınca aşağıda setLoading(false).
+        setRoom(roomData); setParticipants(p); participantsRef.current = new Set(p.map(x => x.user_id));
+        if (!isSystemRoom(id as string)) setLoading(false);
       }
       // ★ Speaking mode — room_settings'ten oku (oda oluşturma ayarı yansısın)
       const savedMode = roomData.room_settings?.speaking_mode;
@@ -2173,7 +2327,7 @@ export default function RoomScreen() {
       RoomHistoryService.addEntry({
         id: roomData.id,
         name: roomData.name,
-        hostName: roomData.host?.display_name || 'Anonim',
+        hostName: roomData.host?.display_name || i18n.t('common.anonymous'),
         hostAvatar: roomData.host?.avatar_url,
         category: roomData.category,
       }).catch(() => {});
@@ -2201,10 +2355,28 @@ export default function RoomScreen() {
       }
 
       if ((!existing || !trustedExistingRole) && profile) {
-        // Sistem odalarında DB join yapma — lokal katılımcı zaten eklendi
+        // ★ v1.7.13.140: Sistem odası (Lobi) için access flow bypass AMA DB join yapılır.
+        //   Eski davranış: hiç DB insert yok → listener_count 0, kullanıcı listede yok, flash.
+        //   Şimdi: erişim kontrolünü atla, doğrudan join'e geç (open Lobi'de izin zaten var).
         if (isSystemRoom(id as string)) {
-          // Sistem odasında sadece hoş geldin mesajı göster
+          try {
+            const joinedPart = await RoomService.join(id as string, firebaseUser.uid, 'listener');
+            // Participants listesini yeni katılımla güncelle
+            setParticipants(prev => {
+              const exists = prev.some(p => p.user_id === firebaseUser.uid);
+              return exists ? prev : [...prev, joinedPart];
+            });
+            participantsRef.current = new Set([...participantsRef.current, firebaseUser.uid]);
+            // ★ listener_count update sonrası fresh room data — header doğru sayıyı göstersin
+            try {
+              const fresh = await getSystemRoomById(id as string);
+              if (fresh) setRoom(fresh);
+            } catch { /* opsiyonel */ }
+          } catch (e) {
+            if (__DEV__) console.warn('[Lobi] join failed:', e);
+          }
           setAccessGranted(true);
+          setLoading(false); // ★ Auto-join + room refresh tamamlandı → UI tek seferde açılır (flash yok)
           return;
         }
         // ★ 2026-04-21: OPEN + filtresiz odalarda access gate'i komple atla — gereksiz friction.
@@ -2690,8 +2862,11 @@ export default function RoomScreen() {
     return () => clearInterval(interval);
   }, [id]);
 
-  // ★ Host tier'ına göre ses/video kalite ayarları
-  const hostTierForQuality = (room?.host?.subscription_tier as any) || 'Free';
+  // ★ v1.7.13.134: Kalite preset'i ASIL HOST tier'ından oku (room.owner_tier).
+  //   Acting host devri sırasında current host_id değişebilir → o user Free olsa bile
+  //   oda "Pro odası" kaldığı için ses/video kalitesi DÜŞMEMELİ. owner_tier oda
+  //   oluşturulurken snapshot alındı; gerçek sahibin yatırımı korunur.
+  const hostTierForQuality = ((room as any)?.owner_tier || room?.host?.subscription_tier || 'Free') as any;
   const qualityLimits = getRoomLimits(hostTierForQuality);
 
   const qualityPreset = useMemo(() => ({
@@ -2723,7 +2898,7 @@ export default function RoomScreen() {
       setAlertConfig({
         visible: true,
         title: i18n.t('auto.room.id.097', { 0: label }),
-        message: `Sahnede konuşmak için ${label.toLocaleLowerCase('tr-TR')} iznine ihtiyacımız var. İzni reddettiğiniz için ${device === 'microphone' ? i18n.t('auto.room.id.096') : i18n.t('auto.room.id.095')}. Ayarlardan izni açtıktan sonra tekrar deneyin.`,
+        message: `Sahnede konuşmak için ${label.toLocaleLowerCase(i18n.locale)} iznine ihtiyacımız var. İzni reddettiğiniz için ${device === 'microphone' ? i18n.t('auto.room.id.096') : i18n.t('auto.room.id.095')}. Ayarlardan izni açtıktan sonra tekrar deneyin.`,
         type: 'warning',
         icon: device === 'microphone' ? 'mic-off' : 'videocam-off',
         buttons: [
@@ -2917,6 +3092,15 @@ export default function RoomScreen() {
 
   // Gerçek zamanlı mikrofon ses seviyesi (expo-av metering)
   const localAudioLevel = useMicMeter(lk.isMicrophoneEnabled || false);
+  // ★ v1.7.13.140: Lobi'de mic açılınca radyo sesini kıs (ducking), kapanınca eski seviye.
+  useEffect(() => {
+    if (!isSystemRoom(id as string)) return;
+    if (lk.isMicrophoneEnabled) {
+      radio.duck();
+    } else {
+      radio.unduck();
+    }
+  }, [lk.isMicrophoneEnabled, id, radio]);
 
   // BUG-13 FIX: getMicStatus optimizasyonu — localAudioLevel dependency kaldırıldı
   // Ses dalga efekti için audioLevel participant update'lerden gelir 
@@ -3044,11 +3228,7 @@ export default function RoomScreen() {
 
     // Listener akışı — mod'a göre davran
     if (speakingMode === 'selected_only') {
-      showToast({
-        title: '🔒 Sahne Kilitli',
-        message: i18n.t('room.id.023'),
-        type: 'info',
-      });
+      // ★ v1.7.13.161: Toast kaldırıldı — gereksiz bilgi toastı, kontrol barındaki ikon yeterli.
       return;
     }
 
@@ -3062,15 +3242,7 @@ export default function RoomScreen() {
 
     // permission_only / serbest-dolu → sıraya gir veya iptal et
     toggleListenerMicRequest();
-    if (!myMicRequested) {
-      if (speakingMode === 'free_for_all' && stageFull) {
-        showToast({ title: i18n.t('room.id.024'), message: i18n.t('room.id.025'), type: 'info' });
-      } else if (stageFull) {
-        showToast({ title: '⚠️ Sahne Dolu', message: `${stageLimits.current}/${stageLimits.max}. Biri inince yerini alabilirsin.`, type: 'warning' });
-      } else {
-        showToast({ title: i18n.t('room.id.026'), message: i18n.t('room.id.027'), type: 'success' });
-      }
-    }
+    // ★ v1.7.13.161: El kaldırma toast'ları kaldırıldı — kontrol barındaki el ikonu + badge yeterli.
   };
 
   // stageAction / stageQueuePosition memo'ları stageLimits tanımlamasından SONRA
@@ -3290,8 +3462,15 @@ export default function RoomScreen() {
   // ========== MODERATÖR/DİNLEYİCİ ÇIKIŞ ==========
   const handleUserLeave = async () => {
     if (!firebaseUser || !id) return;
-    // Sistem odasında DB ayrılma yok
+    // ★ v1.7.13.140: Sistem odasında (Soprano Lobi) çıkış = DB participant row sil.
+    //   LiveKit identity collision'ı önler — aynı user tekrar Lobi'ye girerken
+    //   eski LiveKit session aktif kalırsa "Bağlantı kurulamadı" verir.
+    //   RoomService.leave participant row'u siler, fresh giriş garanti olur.
     if (isSystemRoom(id as string)) {
+      // ★ v1.7.13.140 (22 May 2026): Radyo Sound'u main thread'de SYNC release et —
+      //   ExoPlayer wrong-thread crash önleme (setTimeout defer yetmiyordu).
+      try { await radio.cleanup(); } catch { /* silent */ }
+      try { await RoomService.leave(id as string, firebaseUser.uid); } catch { /* silent */ }
       liveKitService.disconnect().catch(() => {});
       setMinimizedRoom(null);
       safeGoBack(router);
@@ -3409,7 +3588,7 @@ export default function RoomScreen() {
         type: 'broadcast', event: 'mod_action',
         payload: { action: 'host_claimed', hostName: profile?.display_name || 'Birisi' },
       });
-      showToast({ title: '👑 Host Oldun!', message: i18n.t('room.id.052'), type: 'success' });
+      // ★ v1.7.13.161: Host toast'ı kaldırıldı — UI zaten rol değişimini gösteriyor (taç ikonu).
       // BUG-RM5 FIX: Optimistik state güncelleme
       setRoom(prev => prev ? { ...prev, host_id: firebaseUser.uid } : prev);
       setParticipants(prev => prev.map(p => p.user_id === firebaseUser.uid ? { ...p, role: 'owner' as const } : p));
@@ -3619,12 +3798,19 @@ export default function RoomScreen() {
     //   onlineUserIds boşsa (henüz subscribe edilmedi) filter atlanır (graceful start).
     //   Kendi user_id'm hep dahil edilir (presence sync henüz değilse de UI'da gözükeyim).
     //   Synthetic host (_synth_orig_host) presence-bypass — asıl sahip her zaman görünebilir.
+    // ★ v1.7.13.135 (21 May 2026): STAGE ROLLERİ presence-bypass.
+    //   Minimize edilince Supabase Realtime presence "offline" yayınlıyor → host/speaker
+    //   diğer client'larda sahneden DÜŞÜYOR. Oysa LiveKit Foreground Service ile bağlı,
+    //   ses akıyor. Sahne rolleri (owner/speaker/moderator) LiveKit ile garantili —
+    //   presence WebSocket'ten bağımsız kalsın. Sadece listener'lar presence-bound.
     const _presenceReady = onlineUserIds.size > 0;
     const active = _participants.filter(p => {
       if (p.role === 'banned') return false;
       if (!_presenceReady) return true;
       if (p.user_id === firebaseUser?.uid) return true;
       if ((p as any)._synthetic) return true;
+      // Stage rolleri (owner/speaker/moderator) — minimize'da bile görünür kalır
+      if (p.role === 'owner' || p.role === 'speaker' || p.role === 'moderator') return true;
       return isUserOnline(p.user_id);
     });
 
@@ -3691,6 +3877,26 @@ export default function RoomScreen() {
     return { stageUsers: visibleStage, listenerUsers: visibleListeners, spectatorUsers: visibleSpectators, viewerCount: _viewerCount, amIHost: _amIHost || _amIActingHost, amIModerator: _amIMod, amIGodMaster: _amIGod, canModerate: _canMod, isGodOrHost: _isGodOrHost, hostUser: _hostUser, amIActingHost: _amIActingHost, isOriginalHost: _isOriginalHost, isStageDelegate: _isStageDelegate };
   }, [participants, room, firebaseUser?.uid, profile?.is_admin, onlineUserIds, isUserOnline]);
 
+  // ★ Canlı bildirim güncelleme — konuşmacı/dinleyici değişiminde (debounced 15sn)
+  const notifUpdateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!room?.name) return;
+    if (notifUpdateTimerRef.current) clearTimeout(notifUpdateTimerRef.current);
+    notifUpdateTimerRef.current = setTimeout(() => {
+      const speakerNames = stageUsers
+        .map(u => u.user?.display_name?.split(' ')[0] || '')
+        .filter(Boolean)
+        .slice(0, 5);
+      PushNotificationService.showVoiceRoomNotification(
+        room.name,
+        id as string,
+        speakerNames,
+        listenerUsers.length,
+      ).catch(() => {});
+    }, 15000); // 15sn debounce — ilk mount dışında
+    return () => { if (notifUpdateTimerRef.current) clearTimeout(notifUpdateTimerRef.current); };
+  }, [roleSignature, viewerCount]);
+
   // ★ 2026-04-21: Minimize payload ref her render taze tutulur — toast/upsell closure'larında
   // stale olmaması için gerekli. Toast action'ları 15/5 dk sonra tetikleniyor.
   useEffect(() => {
@@ -3698,9 +3904,15 @@ export default function RoomScreen() {
       id: id as string,
       name: room?.name || 'Oda',
       hostName: hostUser?.user?.display_name || 'Host',
+      hostUserId: hostUser?.user_id || room?.host_id,
+      hostAvatar: hostUser?.user?.avatar_url || null,
+      hostTier: hostUser?.user?.subscription_tier || 'Free',
       viewerCount,
       isMicOn: lk.isMicrophoneEnabled || false,
-    };
+      // ★ v1.7.13.136: Restore'da "Sahne boş" flash önleme — mevcut participants snapshot.
+      //   Mini-player'dan tıklayınca synthetic participants ile başlar, fetch arka planda yenileyecek.
+      participantsSnapshot: participants,
+    } as any;
   });
 
   // ★ Mevcut rolümü belirle (özellik erisiÌ‡mi için)
@@ -3794,7 +4006,7 @@ export default function RoomScreen() {
           type: 'broadcast', event: 'mic_request',
           payload: { type: 'cancel', userId: firebaseUser!.uid },
         });
-        showToast({ title: i18n.t('room.id.067'), message: i18n.t('room.id.068'), type: 'success' });
+        // ★ v1.7.13.161: Otomatik sahneye çıkış toast'ı kaldırıldı — UI zaten rol değişimini gösteriyor.
         setTimeout(() => { lk.enableMic?.().catch(() => {}); }, 500);
       } catch (e: any) {
         // Slot dolu hata gelirse sessiz kal — sonraki tick'te tekrar dener
@@ -3968,9 +4180,7 @@ export default function RoomScreen() {
 
   // ★ Owner tier'ı — oda yönetim özelliklerinin tier kilidini belirler
   const ownerTier = useMemo(() => {
-    // ★ GodMaster FIX: GodMaster tier'ı koruyarak kullan — Pro'ya düşürme
-    if (profile?.subscription_tier === 'GodMaster') return 'GodMaster';
-    // Admin (non-GodMaster) her zaman Pro gibi davranır
+    // ★ v1.7.13.132: GodMaster kaldırıldı — admin = Pro yetkisi
     if (profile?.is_admin) return 'Pro';
     // ★ 2026-04-20 FIX: Oda sahibi kendi odasındaysa CURRENT tier kullan.
     //   Stale rooms.owner_tier column'u (oda kurulurken kaydediliyor, güncellenmiyor)
@@ -4337,10 +4547,12 @@ export default function RoomScreen() {
         staysActiveInBackground: true,
         shouldDuckAndroid: newMuted,
       });
+      // 4. Radyo (Lobi) — oda sesi kapatılınca radyo da sussun.
+      radio.setMuted(newMuted).catch(() => {});
     } catch (e) {
       if (__DEV__) console.warn('[Room] Ses kısma hatası:', e);
     }
-  }, [roomMuted]);
+  }, [roomMuted, radio]);
 
   // ★ 2026-04-21: Oda Boost — eski basit Alert yerine premium bottom sheet (RoomBoostSheet)
   const handleBoostRoom = useCallback(() => {
@@ -4650,9 +4862,12 @@ export default function RoomScreen() {
         // ★ v1.7.13.8 (19 May 2026): global.safePaddingTop/Bottom admin'den okunur.
         //   StatusBar/notch için üst dolgu, gesture-nav/home indicator için alt dolgu.
         //   Default 12 — admin slider 0-32 arası ayarlayabilir.
+        // ★ v1.7.13.161: paddingTop KALDIRILDI — RoomInfoHeader kendi insets.top'ını
+        //   yönetiyor (stableTop). Root'ta ekstra paddingTop üst header üzerinde
+        //   siyah boşluk bırakıyordu (kullanıcı bug raporu).
         {
-          paddingTop: roomLayout.global.safePaddingTop ?? 12,
-          paddingBottom: roomLayout.global.safePaddingBottom ?? 12,
+          paddingTop: 0,
+          paddingBottom: roomLayout.global.safePaddingBottom ?? 0,
         },
       ]}
     >
@@ -4706,7 +4921,14 @@ export default function RoomScreen() {
         );
       })()}
 
-      <View>
+      {/* ★ v1.7.13.161: zIndex:5 — header'ın Lobi logosu (overflow:visible, 85px)
+           ve status popup'ı alt content'in üzerinde render edilsin.
+           Drawer'lar (elevation:8) header'ın üstünde görünür.
+           alignSelf:'stretch' — parent padding olsa bile header full width olsun.
+           ★ v1.7.13.146 (24 May 2026): zIndex 5 → 1. Modal/drawer'lar (elevation 10/100)
+           Android'de header parent'ın zIndex 5'ini geçemiyordu → modal üst kısmı
+           header+radyo altında kalıyordu. Lobi logo overflow için zIndex 1 yeterli. */}
+      <View style={{ zIndex: 1, alignSelf: 'stretch' }}>
         <RoomInfoHeader
           roomName={room?.name || 'Oda'} roomDescription={room?.description} isPremium={(room as any)?.isPremium}
           viewerCount={viewerCount} connectionState={lk.connectionState} connectionQuality={lk.connectionQuality} roomDuration={roomDuration} roomExpiry={roomExpiry}
@@ -4723,15 +4945,14 @@ export default function RoomScreen() {
           hostTier={room?.host?.subscription_tier || room?.owner_tier}
           hostFrameId={(room?.host as any)?.active_frame || null}
           hostActiveBadgeId={(room?.host as any)?.active_badge_id ?? null}
+          isSystemRoom={isSystemRoom(id as string)}
           followerCount={followerCount}
           onBellPress={() => {
-            // ★ Oda header: bir tık aşağı + bir tık sola. RN'de `right: N` = sağ edge'ten N px;
-            //   N büyüdükçe element SOLA gider. Default 8 → 20 (12px sola kaydırma).
-            setNotifDrawerAnchorRight(86);          // bell altı (drawer sola gelince arrow orantılı)
-            setNotifDrawerRight(38);                // 20→38: ~18px daha sola
-            // ★ 2026-05-05: 52→66 — RoomInfoHeader total height = insets.top + 58 (paddingTop 2 + topNav 50 + paddingBottom 6).
-            //   NotificationDrawer artık Modal kullanmıyor → backdrop drawer top - 8'den başlıyor.
-            //   66 = header alt + 8 → backdrop tam header sınırından, header dim/kapalı kalmaz.
+            // ★ v1.7.13.170: Önce tüm yerel overlay'leri kapat — çakışma önlenir
+            closeAllOverlays();
+            // ★ Oda header: bir tık aşağı + bir tık sola.
+            setNotifDrawerAnchorRight(86);
+            setNotifDrawerRight(38);
             setNotifDrawerTop(insets.top + 66);
             setShowNotifDrawer(true);
           }}
@@ -4742,9 +4963,17 @@ export default function RoomScreen() {
             // ★ v92.9: Header geri = otomatik minimize. Tam çıkış sadece Plus menü > Odadan Ayrıl.
             handleAutoMinimize();
           }}
-          onMinimize={() => { isMinimizingRef.current = true; setMinimizedRoom({ id: id as string, name: room?.name || 'Oda', hostName: hostUser?.user?.display_name || 'Host', viewerCount, isMicOn: lk.isMicrophoneEnabled || false }); safeGoBack(router); }}
+          onMinimize={() => { isMinimizingRef.current = true; radio.setPreserve(true); setMinimizedRoom({ id: id as string, name: room?.name || 'Oda', hostName: hostUser?.user?.display_name || 'Host', viewerCount, isMicOn: lk.isMicrophoneEnabled || false }); safeGoBack(router); }}
           onViewersPress={() => openOverlay(() => setShowAudienceDrawer(true))}
         />
+        {/* ★ v1.7.13.140 (21 May 2026): Soprano Lobi radyo player — sadece sistem odasında.
+            Sheet (kanal seçici) ayrı, top-level render edilir (aşağıda). */}
+        {isSystemRoom(id as string) && (
+          <SopranoRadioPlayer
+            player={radio}
+            onOpenChannelSheet={() => setRadioSheetOpen(true)}
+          />
+        )}
       </View>
 
       {/* Header menüsü kaldırıldı — Oda Paylaş ve Ayarlar PlusMenu'dan erişilebilir */}
@@ -4813,7 +5042,7 @@ export default function RoomScreen() {
             textShadowRadius: 5,
           }} />
           <Text style={{ fontSize: 11, fontWeight: '900', color: '#FFE082', letterSpacing: 0.3 }}>
-            {topContributor.total_sp.toLocaleString('tr-TR')}
+            {topContributor.total_sp.toLocaleString(i18n.locale)}
           </Text>
         </Pressable>
       )}
@@ -4825,6 +5054,8 @@ export default function RoomScreen() {
         width={W}
         height={H}
       />
+
+      {/* ★ v1.7.13.121 (21 May 2026): Karaoke paneli kaldırıldı (kullanıcı kararı). */}
 
       {/* ★ 2026-04-21: SAHNE max-height DİNAMİK — konuşmacı sayısına göre,
           chat alanına daha fazla yer kalsın. Avatarlar grid zaten shrink (getSpeakerMetrics). */}
@@ -4876,7 +5107,28 @@ export default function RoomScreen() {
             } else {
               handleTimedMuteUser(u.user_id, name);
             }
+          }}
+          followedIds={followedIds}
+          onFollow={handleRoomFollow} />
+        {/* ★ Sahne sağ üst köşe — kullanıcı sayısı + bağlantı durumu pill (header'dan taşındı) */}
+        <Pressable
+          onPress={() => openOverlay(() => setShowAudienceDrawer(true))}
+          style={{
+            position: 'absolute', top: 4, right: 8,
+            flexDirection: 'row', alignItems: 'center', gap: 5,
+            backgroundColor: 'rgba(15,23,42,0.55)',
+            paddingHorizontal: 8, paddingVertical: 3,
+            borderRadius: 12, borderWidth: 0.5,
+            borderColor: 'rgba(20,184,166,0.2)',
+          }}
+        >
+          <View style={{
+            width: 5, height: 5, borderRadius: 2.5,
+            backgroundColor: lk.connectionState === 'connected' ? '#22C55E' : lk.connectionState === 'reconnecting' ? '#FBBF24' : '#EF4444',
           }} />
+          <Ionicons name="people" size={10} color="rgba(20,184,166,0.6)" />
+          <Text style={{ fontSize: 10, fontWeight: '700', color: 'rgba(20,184,166,0.6)' }}>{viewerCount}</Text>
+        </Pressable>
       </View>
 
       {/* ★ v1.7.13 (19 May 2026): TEK VÜCUT — sahne ile listener arasındaki gap
@@ -4913,7 +5165,8 @@ export default function RoomScreen() {
               paddingTop: dividerVisible ? halfGap - 4 : totalGap,
             }}>
               <ListenerGrid listeners={listenerUsers} onSelectUser={(u) => { setSelectedUser(u); setInRoomProfileId(u.user_id); }} selectedUserId={selectedUser?.user_id} onShowAllUsers={() => openOverlay(() => setShowAudienceDrawer(true))} maxListeners={getRoomLimits(ownerTier as any).maxListeners} spectatorCount={spectatorUsers.length} roomOwnerId={room?.host_id}
-                avatarFlashes={avatarFlashes} onFlashDone={clearAvatarFlash} micRequestUserIds={validMicRequests} />
+                avatarFlashes={avatarFlashes} onFlashDone={clearAvatarFlash} micRequestUserIds={validMicRequests}
+                currentUserId={firebaseUser?.uid} followedIds={followedIds} onFollow={handleRoomFollow} />
             </View>
           </>
         );
@@ -5095,13 +5348,13 @@ export default function RoomScreen() {
       />
 
 
-      <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, paddingBottom: Math.max(insets.bottom, 14) + 8, zIndex: 60, elevation: 60 }}>
-        {/* ★ 2026-04-24: Bar altındaki safe area'yı örten fade-out mask — arka modal görünmesin */}
+      <View style={{ position: 'absolute', bottom: ctrlKbOffsetPx, left: 0, right: 0, paddingBottom: Math.max(insets.bottom, 6), zIndex: 200, elevation: 200 }}>
+        {/* ★ Bar altındaki safe area'yı dolduran gradient — bar'ın devamı gibi görünür */}
         <LinearGradient
-          colors={['rgba(12,22,40,0)', 'rgba(12,22,40,0.7)', 'rgba(12,22,40,0.95)', 'rgba(12,22,40,1)']}
-          locations={[0, 0.3, 0.7, 1]}
+          colors={['rgba(48,65,94,0.92)', 'rgba(26,40,64,0.95)', 'rgba(20,35,58,1)']}
+          locations={[0, 0.4, 1]}
           start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
-          style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: Math.max(insets.bottom, 14) + 8 + 60 }}
+          style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 72 + Math.max(insets.bottom, 6) }}
           pointerEvents="none"
         />
         {/* ★ 2026-04-22: Zeminde control bar üstüne düşen fade-out tamamen kaldırıldı —
@@ -5176,7 +5429,7 @@ export default function RoomScreen() {
             try { lk.toggleCamera?.(); } catch {}
           }}
           onHandPress={handleMicRequest} onChatPress={() => { if (showChatDrawer) setShowChatDrawer(false); else { openOverlay(() => setShowChatDrawer(true)); setChatUnreadCount(0); } }} onPlusPress={() => { if (showPlusMenu) setShowPlusMenu(false); else openOverlay(() => setShowPlusMenu(true)); }}
-          onGiftPress={() => { openOverlay(() => setShowGiftPanel(true)); }}
+          isGiftOpen={showGiftPanel} onGiftPress={() => { if (showGiftPanel) setShowGiftPanel(false); else openOverlay(() => setShowGiftPanel(true)); }}
           onLeavePress={() => {
             setAlertConfig({
               visible: true, title: i18n.t('room.id.107'), message: i18n.t('room.id.108'), type: 'warning', icon: 'exit-outline',
@@ -5184,6 +5437,7 @@ export default function RoomScreen() {
             });
           }} />
       </View>
+
 
       <RoomChatDrawer visible={showChatDrawer} messages={chatMessages as any[]} chatInput={chatInput}
         onChangeInput={setChatInput} onSend={handleSendChat} onClose={() => setShowChatDrawer(false)} bottomInset={insets.bottom}
@@ -5293,6 +5547,7 @@ export default function RoomScreen() {
         onDeleteRoom={() => { closeAllOverlays(); handleDeleteRoom(); }}
         onBoostRoom={() => { closeAllOverlays(); handleBoostRoom(); }}
         onPowerUps={() => { closeAllOverlays(); openOverlay(() => setShowPowerUps(true)); }}
+        /* ★ v1.7.13.121: onMafiaGame + karaokeMode + onToggleKaraoke prop'ları kaldırıldı (askıya alındı) */
         onShowFollowers={() => { closeAllOverlays(); openOverlay(() => setShowFollowersSheet(true)); }}
         onToggleFollow={() => { closeAllOverlays(); handleToggleFollow(); }}
         isFollowingRoom={isFollowingRoom}
@@ -5308,7 +5563,7 @@ export default function RoomScreen() {
               await RoomService.setRoomLock(room.id, newLocked);
               setRoom(prev => prev ? { ...prev, room_settings: { ...(prev.room_settings || {}), is_locked: newLocked } } : prev);
               modChannelRef.current?.send({ type: 'broadcast', event: 'settings_changed', payload: { room_settings: { is_locked: newLocked } } });
-              showToast({ title: newLocked ? '🔒 Oda Kilitlendi' : i18n.t('auto.room.id.044'), type: 'success' });
+              showToast({ title: newLocked ? i18n.t('room.lock.locked') : i18n.t('auto.room.id.044'), type: 'success' });
             } catch { showToast({ title: i18n.t('room.id.111'), message: i18n.t('room.id.112'), type: 'error' }); }
           })();
         } : undefined}
@@ -5325,7 +5580,7 @@ export default function RoomScreen() {
                 await RoomService.updateSettings(room.id, firebaseUser!.uid, { room_settings: { speaking_mode: mode as any } });
                 setRoom(prev => prev ? { ...prev, room_settings: { ...(prev.room_settings || {}), speaking_mode: mode as any } } as any : prev);
                 modChannelRef.current?.send({ type: 'broadcast', event: 'settings_changed', payload: { room_settings: { speaking_mode: mode } } });
-                const labels: Record<string, string> = { free_for_all: 'Serbest Mod', permission_only: i18n.t('auto.room.id.043'), selected_only: i18n.t('auto.room.id.042') };
+                const labels: Record<string, string> = { free_for_all: i18n.t('room.mode.free_for_all'), permission_only: i18n.t('auto.room.id.043'), selected_only: i18n.t('auto.room.id.042') };
                 showToast({ title: labels[mode] || 'Mod', type: 'success' });
               } catch { showToast({ title: i18n.t('room.id.114'), message: i18n.t('room.id.115'), type: 'error' }); }
             }
@@ -5584,6 +5839,18 @@ export default function RoomScreen() {
           onSelectUser={(uid) => { setShowFollowersSheet(false); openUserProfile(uid); }}
         />
       )}
+
+      {/* ★ v1.7.13.140: Soprano Lobi radyo kanal seçici — top-level render. */}
+      {isSystemRoom(id as string) && (
+        <RadioChannelSheet
+          visible={radioSheetOpen}
+          currentChannelId={radio.currentChannel.id}
+          onSelect={radio.changeChannel}
+          onClose={() => setRadioSheetOpen(false)}
+        />
+      )}
+
+      {/* ★ v1.7.13.121 (21 May 2026): MafiaGameSheet + MafiaRoleRevealModal JSX kaldırıldı (kullanıcı kararı). */}
 
       {/* ★ v92 (1 May 2026): Power-Ups sheet — sarf güçlendiriciler */}
       {firebaseUser && room && (

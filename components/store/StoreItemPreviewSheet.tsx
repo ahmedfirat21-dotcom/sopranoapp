@@ -50,7 +50,8 @@ function categoryLabel(cat: string): string {
   return i18n.t('auto.store.StoreItemPreviewSheet.006');
 }
 
-const TIER_RANK: Record<string, number> = { Free: 0, Plus: 1, Pro: 2, GodMaster: 3 };
+// ★ v1.7.13.132: GodMaster kaldırıldı — 3 tier
+const TIER_RANK: Record<string, number> = { Free: 0, Plus: 1, Pro: 2 };
 
 interface Props {
   visible: boolean;
@@ -60,7 +61,7 @@ interface Props {
   /** Tier indirim yüzdesi (Plus/Pro üyelere otomatik kozmetik indirimi) */
   tierDiscountPct: number;
   /** Mevcut kullanıcı tier'ı — tier-lock kontrolü için */
-  currentTier: 'Free' | 'Plus' | 'Pro' | 'GodMaster';
+  currentTier: 'Free' | 'Plus' | 'Pro';
   /** Kullanıcı SP bakiyesi — yetersizse "X SP eksik" uyarısı */
   spBalance: number;
   /** Bu ürün envanterde mi? */
@@ -224,9 +225,9 @@ export default function StoreItemPreviewSheet({
             <Text style={s.priceLabel}>{i18n.t('store.storeitempreviewsheet.002')}</Text>
             <View style={s.priceRow}>
               {totalOff > 0 && (
-                <Text style={s.priceStrike}>{item.price_sp.toLocaleString('tr-TR')}</Text>
+                <Text style={s.priceStrike}>{item.price_sp.toLocaleString(i18n.locale)}</Text>
               )}
-              <Text style={s.priceFinal}>{finalPrice.toLocaleString('tr-TR')}</Text>
+              <Text style={s.priceFinal}>{finalPrice.toLocaleString(i18n.locale)}</Text>
               <SPIcon size={18} />
             </View>
             {totalOff > 0 && (
@@ -258,12 +259,12 @@ export default function StoreItemPreviewSheet({
           <View style={s.balanceRow}>
             <Text style={s.balanceLabel}>Bakiyen:</Text>
             <Text style={[s.balanceValue, insufficientSP && { color: '#F87171' }]}>
-              {spBalance.toLocaleString('tr-TR')}
+              {spBalance.toLocaleString(i18n.locale)}
             </Text>
             <SPIcon size={12} />
             {insufficientSP && (
               <Text style={s.insufficientText}>
-                · {(finalPrice - spBalance).toLocaleString('tr-TR')} SP eksik
+                · {(finalPrice - spBalance).toLocaleString(i18n.locale)} SP eksik
               </Text>
             )}
           </View>
@@ -307,7 +308,7 @@ export default function StoreItemPreviewSheet({
               />
               <Ionicons name="sparkles" size={16} color="#fff" />
               <Text style={s.actionText}>
-                {purchasing ? i18n.t('auto.store.StoreItemPreviewSheet.002') : i18n.t('auto.store.StoreItemPreviewSheet.001', { 0: finalPrice.toLocaleString('tr-TR') })}
+                {purchasing ? i18n.t('auto.store.StoreItemPreviewSheet.002') : i18n.t('auto.store.StoreItemPreviewSheet.001', { 0: finalPrice.toLocaleString(i18n.locale) })}
               </Text>
             </Pressable>
           )}

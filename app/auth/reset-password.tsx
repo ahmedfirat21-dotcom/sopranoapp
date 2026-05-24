@@ -22,7 +22,7 @@ import React, { useState, useEffect } from 'react';
 import { i18n } from '../../services/i18n';
 import { View, Text, StyleSheet, TextInput, Pressable, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { applyActionCode, confirmPasswordReset, verifyPasswordResetCode } from 'firebase/auth';
+import { applyActionCode, confirmPasswordReset, signInWithEmailAndPassword, verifyPasswordResetCode } from 'firebase/auth';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { auth } from '../../constants/firebase';
@@ -116,8 +116,17 @@ export default function ResetPasswordScreen() {
     setSubmitting(true);
     try {
       await confirmPasswordReset(auth, oobCode, newPassword);
-      showToast({ title: i18n.t('auth.resetpassword.011'), message: i18n.t('auth.resetpassword.012'), type: 'success' });
-      router.replace('/(auth)/login');
+      // ★ v1.7.13.49 (20 May 2026): Otomatik giriş — kullanıcı yeni şifreyi tekrar yazmadan
+      //   doğrudan oturum açar. Email zaten verifyPasswordResetCode'dan alındı.
+      //   Auto-login fail olursa (network, vs.) eski davranışa düşeriz: login ekranına dön.
+      try {
+        await signInWithEmailAndPassword(auth, email, newPassword);
+        showToast({ title: i18n.t('auth.resetpassword.011'), message: i18n.t('auth.resetpassword.012'), type: 'success' });
+        // AuthGuard firebaseUser değişikliğini algılar ve home'a yönlendirir — manuel redirect yok.
+      } catch {
+        showToast({ title: i18n.t('auth.resetpassword.011'), message: i18n.t('auth.resetpassword.012'), type: 'success' });
+        router.replace('/(auth)/login');
+      }
     } catch (e: any) {
       if (e?.code === 'auth/expired-action-code') {
         showToast({ title: i18n.t('auth.resetpassword.013'), message: i18n.t('auth.resetpassword.014'), type: 'error' });

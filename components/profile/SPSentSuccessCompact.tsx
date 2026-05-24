@@ -239,7 +239,7 @@ export default function SPSentSuccessCompact({
                 adjustsFontSizeToFit
                 minimumFontScale={0.7}
               >
-                {amount.toLocaleString('tr-TR')} <Text style={[s.spUnit, { color: palette.accent }]}>SP</Text>
+                {amount.toLocaleString(i18n.locale)} <Text style={[s.spUnit, { color: palette.accent }]}>SP</Text>
               </Text>
             </Animated.View>
 

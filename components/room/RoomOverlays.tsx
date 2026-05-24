@@ -1,4 +1,4 @@
-﻿import React, { useRef, useEffect, useState, useCallback } from 'react';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, Pressable, ScrollView, Animated,
   Dimensions, LayoutAnimation, Platform, UIManager, Switch, TextInput, PanResponder,
@@ -18,9 +18,8 @@ import { supabase } from '../../constants/supabase';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { i18n } from '../../services/i18n';
 
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
+// ★ v1.7.13.146 (24 May 2026): setLayoutAnimationEnabledExperimental kaldırıldı —
+//   New Architecture'da no-op, console warning'i üretiyordu.
 
 const { width: W, height: H } = Dimensions.get('window');
 // ★ 2026-04-20: Responsive panel genişlik — küçük telefonlarda daha geniş oran
@@ -166,6 +165,11 @@ type PlusMenuProps = {
   // ★ 2026-04-27: Asıl sahip dışarda iken devralan geçici host. Kritik aksiyonlar
   // (silme, dondurma, boost, oda ayarları) gizlenir; moderasyon erişimi açık.
   isTempHost?: boolean;
+  // ★ v1.7.13.117 (20 May 2026): Karaoke modu toggle
+  karaokeMode?: boolean;
+  onToggleKaraoke?: () => void;
+  // ★ v1.7.13.118 (20 May 2026): Mafia oyunu yardımcısı
+  onMafiaGame?: () => void;
 };
 
 const ROLE_META: Record<string, { labelKey: string; color: string; icon: string }> = {
@@ -314,6 +318,8 @@ export function PlusMenu({
   onClearMessages,
   roomId: _roomId, hostId: _hostId, roomType: _roomType,
   isTempHost = false,
+  karaokeMode = false, onToggleKaraoke,
+  onMafiaGame,
 }: PlusMenuProps) {
   const insets = useSafeAreaInsets();
   const slideAnim = useRef(new Animated.Value(PANEL_W)).current;
@@ -573,8 +579,11 @@ export function PlusMenu({
               <Text style={st.toggleLabel}>Mikrofon Modu</Text>
               <View style={{ flexDirection: 'row', gap: 3 }}>
                 {([
-                  { id: 'normal' as const, label: i18n.t('room.roomoverlays.010') },
-                  { id: 'music' as const, label: i18n.t('room.roomoverlays.011') },
+                  // ★ v1.7.13.146 (24 May 2026): Önceden yanlış key (room.roomoverlays.010/011)
+                  //   = "Oda Takipçileri/İstatistikleri" başka kategoriden gelen değerler.
+                  //   Doğru: konuşma vs müzik.
+                  { id: 'normal' as const, label: i18n.t('manage.tab.speaking') },
+                  { id: 'music' as const, label: i18n.t('category.music') },
                 ]).map(opt => {
                   const active = deviceConfig!.micMode === opt.id;
                   return (
@@ -599,17 +608,30 @@ export function PlusMenu({
         {showDeviceSpeaker && (
           <>
             {(showModControls || showDeviceMic) && <View style={st.sep} />}
+            {/* ★ v1.7.13.146 (24 May 2026): Önceden başlık ve chip aynı kelime gösteriyordu
+                ("Kulaklık" + "Kulaklık" gibi saçma duplicate). Segmented pattern'a alındı:
+                sabit başlık + iki chip (Kulaklık | Hoparlör), aktif olan vurgulu. */}
             <View style={st.toggleRow}>
               <Ionicons name={deviceConfig!.useSpeaker ? 'volume-high' : 'headset'} size={13} color={deviceConfig!.useSpeaker ? '#F59E0B' : '#A78BFA'} />
-              <Text style={st.toggleLabel}>{deviceConfig!.useSpeaker ? i18n.t('auto.room.RoomOverlays.012') : i18n.t('auto.room.RoomOverlays.011')}</Text>
-              <Pressable
-                onPress={() => deviceConfig!.onSpeakerChange(!deviceConfig!.useSpeaker)}
-                style={[st.chip, deviceConfig!.useSpeaker && st.chipActive]}
-              >
-                <Text style={[st.chipText, deviceConfig!.useSpeaker && st.chipTextActive]}>
-                  {deviceConfig!.useSpeaker ? i18n.t('auto.room.RoomOverlays.010') : i18n.t('auto.room.RoomOverlays.009')}
-                </Text>
-              </Pressable>
+              <Text style={st.toggleLabel}>Ses Çıkışı</Text>
+              <View style={{ flexDirection: 'row', gap: 3 }}>
+                <Pressable
+                  onPress={() => deviceConfig!.onSpeakerChange(false)}
+                  style={[st.chip, !deviceConfig!.useSpeaker && st.chipActive]}
+                >
+                  <Text style={[st.chipText, !deviceConfig!.useSpeaker && st.chipTextActive]}>
+                    {i18n.t('auto.room.RoomOverlays.009')}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => deviceConfig!.onSpeakerChange(true)}
+                  style={[st.chip, deviceConfig!.useSpeaker && st.chipActive]}
+                >
+                  <Text style={[st.chipText, deviceConfig!.useSpeaker && st.chipTextActive]}>
+                    {i18n.t('auto.room.RoomOverlays.010')}
+                  </Text>
+                </Pressable>
+              </View>
             </View>
           </>
         )}
@@ -883,7 +905,7 @@ export function PlusMenu({
   if (isOnStage) {
     items.push({ id: 'invite', icon: 'person-add-outline', label: i18n.t('rooms.menu.invite_share'), accent: '#14B8A6', onPress: () => toggle('invite'), expandable: true, renderContent: renderInvite });
   } else {
-    items.push({ id: 'share', icon: 'share-social-outline', label: i18n.t('room.roomoverlays.014'), accent: '#3B82F6', onPress: () => { onShareLink(); onClose(); } });
+    items.push({ id: 'share', icon: 'share-social-outline', label: i18n.t('rooms.menu.share'), accent: '#3B82F6', onPress: () => { onShareLink(); onClose(); } });
   }
 
   // 7. İstatistikler & Boost — geçici host göremez (asıl sahibin yetkisi)
@@ -898,6 +920,9 @@ export function PlusMenu({
   if (onPowerUps) {
     items.push({ id: 'powerups', icon: 'flash-outline', label: i18n.t('room.roomoverlays.017'), accent: '#FBBF24', onPress: () => { onPowerUps(); onClose(); } });
   }
+
+  // ★ v1.7.13.121 (21 May 2026): Karaoke + Mafia kullanıcı kararıyla askıya alındı
+  //   ("basit ve anlamsız" geri bildirimi). Prop'lar duruyor (backward compat) ama menu item üretilmiyor.
 
   // Takip (listener)
   if (!isOwner && onToggleFollow) {
@@ -948,7 +973,7 @@ export function PlusMenu({
   // ★ 2026-04-20: Tüm roller aynı sağdan-kayan drawer kullanır (compact bottom-sheet
   // kaldırıldı — kullanıcı talebi: "listener modal owner gibi yanal açılır olsun")
   return (
-    <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+    <View style={[StyleSheet.absoluteFill, { zIndex: 60, elevation: 60 }]} pointerEvents="box-none">
       <Animated.View style={[s.backdrop, { opacity: fadeAnim }]}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
       </Animated.View>
@@ -968,15 +993,15 @@ export function PlusMenu({
           style={StyleSheet.absoluteFillObject}
           pointerEvents="none"
         />
-        {/* ★ 2026-05-05: 3 katman aile dili — slate + halo + soft glow. Role-based renk. */}
+        {/* ★ Modal ailesi 3 katman: slate + teal halo + teal soft glow */}
         <LinearGradient
-          colors={[`${role.color}33`, `${role.color}0D`, 'transparent']}
+          colors={['rgba(20,184,166,0.20)', 'rgba(20,184,166,0.05)', 'transparent']}
           start={{ x: 0, y: 0 }} end={{ x: 0, y: 0.4 }}
           style={StyleSheet.absoluteFillObject}
           pointerEvents="none"
         />
         <LinearGradient
-          colors={[`${role.color}14`, 'transparent']}
+          colors={['rgba(20,184,166,0.08)', 'transparent']}
           start={{ x: 0, y: 0 }} end={{ x: 0.7, y: 0.6 }}
           style={StyleSheet.absoluteFillObject}
           pointerEvents="none"
@@ -1054,12 +1079,15 @@ const s = StyleSheet.create({
     borderTopLeftRadius: 26, borderBottomLeftRadius: 26,
     overflow: 'hidden',
     backgroundColor: '#1a2030',
-    // ★ 2026-05-05 perf: Android elevation azaltıldı (FPS koruma)
+    borderWidth: 1,
+    borderRightWidth: 0,
+    borderColor: 'rgba(139,92,246,0.12)',
     shadowColor: '#000',
     shadowOffset: { width: -6, height: 0 },
     shadowOpacity: 0.45,
     shadowRadius: 14,
-    elevation: 10,
+    elevation: 60,
+    zIndex: 60,
   },
   compactPanel: {
     position: 'absolute',

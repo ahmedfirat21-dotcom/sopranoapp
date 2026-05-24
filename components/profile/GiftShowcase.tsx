@@ -66,7 +66,7 @@ export default function GiftShowcase({ userId, mode, limit = 8, embedded = false
     <>
       <View style={s.embeddedTotalRow}>
         <Text style={s.totalText}>
-          <Text style={{ color: '#FBBF24', fontWeight: '800' }}>{totalAmount.toLocaleString('tr-TR')} SP</Text>
+          <Text style={{ color: '#FBBF24', fontWeight: '800' }}>{totalAmount.toLocaleString(i18n.locale)} SP</Text>
           <Text style={{ color: 'rgba(255,255,255,0.5)' }}>{i18n.t('profile.giftshowcase.001')}</Text>
         </Text>
       </View>
@@ -121,7 +121,7 @@ export default function GiftShowcase({ userId, mode, limit = 8, embedded = false
         <Text style={[s.title, { color: TEAL }]}>{titleLabel.toUpperCase()}</Text>
         <View style={{ flex: 1 }} />
         <Text style={s.totalText}>
-          <Text style={{ color: TEAL, fontWeight: '800' }}>{totalAmount.toLocaleString('tr-TR')}</Text>
+          <Text style={{ color: TEAL, fontWeight: '800' }}>{totalAmount.toLocaleString(i18n.locale)}</Text>
           <Text style={{ color: 'rgba(255,255,255,0.5)' }}>{i18n.t('profile.giftshowcase.002')}</Text>
         </Text>
       </View>

@@ -2,8 +2,8 @@
 // Avatar + isim + tier + bio + düzenleme butonu + arkadaş/oda sayıları
 // Kendi profilim için (tabs/profile.tsx) kullanılır.
 
-import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Pressable, Animated } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, Text, StyleSheet, Pressable, Animated, TextInput } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Colors, Shadows } from '../../constants/theme';
@@ -37,8 +37,12 @@ interface Props {
   statsLoading?: boolean;
   /** Varsa edit butonunu göster; yoksa başka bir kullanıcının profili */
   onEdit?: () => void;
-  /** ★ 2026-04-21: Bio'ya tap ile inline edit — kendi profilde (callback varsa) */
+  /** ★ 2026-04-21: Bio'ya tap ile inline edit — kendi profilde (callback varsa)
+   *  ★ v1.7.13.57 (20 May 2026): Modal yerine TextInput'a dönüşür — kalem ikonu
+   *  ile yazılabilir olduğu belli. onBioPress legacy (artık kullanılmıyor). */
   onBioPress?: () => void;
+  /** ★ v1.7.13.57: Inline bio save — TextInput submit/blur'da çağrılır. */
+  onBioSave?: (newBio: string) => Promise<void>;
   onFollowersPress: () => void;
   onRoomsPress: () => void;
   onBadgesPress?: () => void;
@@ -69,14 +73,38 @@ interface Props {
   activeBadgeId?: string | null;
   /** ★ v289 (16 May 2026): Profili paylaş — kendi profilinde share butonu açar. */
   onSharePress?: () => void;
+  /** ★ v1.7.13.53 (20 May 2026): FB-tarzı durum balonu (avatar üzerinde).
+   *  null/boş + kendi profil = "Şu anki hissim..." placeholder; başkasındaysa hiç gösterilmez.
+   *  Doluysa her zaman gösterilir. */
+  moodStatus?: string | null;
+  /** ★ Kendi profilinde mood'a tıklayınca tetikler (editor sheet açar). */
+  onMoodPress?: () => void;
+  /** ★ v1.7.13.111 (20 May 2026): Gün serisi (streak). 0 ise gizlenir. */
+  streakDays?: number;
 }
 
 export default function ProfileHero({
   displayName, username, bio, avatarUrl, subscriptionTier, isAdmin, isVerified, userTitle,
-  stats, statsLoading, onEdit, onBioPress, onFollowersPress, onRoomsPress, onBadgesPress, onGiftsPress, onAvatarPress,
+  stats, statsLoading, onEdit, onBioPress, onBioSave, onFollowersPress, onRoomsPress, onBadgesPress, onGiftsPress, onAvatarPress,
   memberSince, boostExpiresAt, isOnline, lastSeen, activeFrame, onFramePress, hasUnequippedFrame,
-  showTierBadge = true, activeBadgeId, onSharePress,
+  showTierBadge = true, activeBadgeId, onSharePress, moodStatus, onMoodPress, streakDays = 0,
 }: Props) {
+  // ★ v1.7.13.57 (20 May 2026): Inline bio edit state.
+  const [editingBio, setEditingBio] = useState(false);
+  const [bioDraft, setBioDraft] = useState(bio || '');
+  const [savingBio, setSavingBio] = useState(false);
+  useEffect(() => { setBioDraft(bio || ''); }, [bio]);
+  const handleBioCommit = async () => {
+    if (!onBioSave) { setEditingBio(false); return; }
+    const trimmed = bioDraft.trim().slice(0, 150);
+    if (trimmed === (bio || '').trim()) { setEditingBio(false); return; }
+    setSavingBio(true);
+    try {
+      await onBioSave(trimmed);
+    } catch { /* parent handles toast */ }
+    setSavingBio(false);
+    setEditingBio(false);
+  };
   // ★ v110: Phase 2 fetch tamamlanana kadar sayı yerine "—" — yanıltıcı 0 flash önlenir.
   const fmtStat = (n: number | undefined) => statsLoading ? '—' : String(n ?? 0);
   // ★ v1.3.54: Frame'in name_enabled aktifse, çerçeve etrafında isim render edilir;
@@ -128,157 +156,182 @@ export default function ProfileHero({
       />
       {/* ★ v108.18: Frame ikon sol üst, edit sağ üst — simetrik */}
       <View style={s.identityCenter}>
-        {/* Frame seç — sol üst köşe (edit ile simetrik) */}
-        {onFramePress && (
-          <Animated.View
-            style={[
-              s.frameIconAbsLeft,
-              { transform: [{ scale: hasUnequippedFrame ? pulseAnim : 1 }] },
-            ]}
-          >
-            <Pressable
-              style={({ pressed }) => [
-                s.frameIconOnly,
-                hasUnequippedFrame && { borderColor: '#22C55E' },
-                pressed && { opacity: 0.7, transform: [{ scale: 0.92 }] },
-              ]}
-              onPress={onFramePress}
-              hitSlop={10}
-              accessibilityLabel={i18n.t('auto.profile.ProfileHero.008')}
-            >
-              <LinearGradient
-                colors={hasUnequippedFrame
-                  ? ['rgba(34,197,94,0.32)', 'rgba(34,197,94,0.08)']
-                  : ['rgba(251,191,36,0.32)', 'rgba(251,191,36,0.10)']}
-                start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
-                style={StyleSheet.absoluteFillObject}
-              />
-              <Ionicons
-                name={hasUnequippedFrame ? 'gift' : 'ribbon'}
-                size={15}
-                color={hasUnequippedFrame ? '#FFFFFF' : '#FBBF24'}
-                style={iconShadow}
-              />
-              {/* ★ v110.14: frameReadyBadge (üst sağ check daire) kaldırıldı —
-                   tek katman olunca "yeni çerçeven hazır" hint'i daha sade. Pulse
-                   animasyonu (frameIconAbsLeft scale) zaten dikkat çekiyor. */}
-            </Pressable>
-          </Animated.View>
-        )}
-        {/* ★ v289 (16 May 2026): Paylaş + Edit ikonları sağ üstte yan yana.
-            Paylaş kullanıcının kendi profil deep link'ini native Share ile gönderir. */}
-        {onSharePress && (
-          <Pressable
-            style={[s.editBtn, s.shareBtnAbs]}
-            onPress={onSharePress}
-            hitSlop={10}
-            accessibilityLabel="Profili paylaş"
-          >
-            <Ionicons name="share-outline" size={16} color="#14B8A6" style={iconShadow} />
-          </Pressable>
-        )}
-        {/* ★ v289 (16 May 2026): Sağ üst Edit ikonu KALDIRILDI — bio altında geniş
-            "Profili Düzenle" pill butonu var. Mockup'tan ilham (Twitter/X tarzı). */}
+        {/* ★ v1.7.13.54 (20 May 2026): Köşeye yapışık floating Çerçeve + Paylaş
+            butonları KALDIRILDI — bio altındaki "Aksiyon Satırı"na taşındı (FB tarzı). */}
 
-        {/* Avatar */}
-        <View style={s.avatarStack}>
-          <Pressable
-            style={s.avatarBox}
-            onPress={onAvatarPress}
-            hitSlop={4}
-            accessibilityLabel={i18n.t('auto.profile.ProfileHero.006')}
-          >
-            <StatusAvatar uri={avatarUrl} size={104} tier={subscriptionTier} isAdmin={isAdmin} isOnline={isOnline} isSelf={!!onEdit} showTierBadge={showTierBadge} tierBadgeSize="sm" frameId={activeFrame} displayName={displayName} contextKey="profile" customBadgeId={activeBadgeId} />
-          </Pressable>
-        </View>
-
-        {/* İsim ortalanmış — frame name_enabled true ise gizli (çerçeve etrafında render edilir) */}
-        {/* ★ v278: Frame name overlay aktifse extra padding — avatar etrafındaki name
-             username/bio gibi alt metinlerin üzerine basmasın. */}
-        <View style={[s.nameRow, frameRendersName && { marginTop: 16 }]}>
-          {!frameRendersName && (
-            <Text
-              style={[s.displayName, isAdmin && { color: '#F87171' }]}
-              numberOfLines={1}
-              adjustsFontSizeToFit
-              minimumFontScale={0.7}
-            >
-              {displayName}
-            </Text>
-          )}
-          {isAdmin && (
-            <Ionicons name="shield-checkmark" size={16} color="#DC2626" style={[{ marginLeft: 6 }, iconShadow]} />
-          )}
-          {/* ★ v1.7.13.46: Pilot perk — verified rozeti olan isim yanında mavi tik */}
-          {isVerified && !isAdmin && (
-            <Ionicons name="checkmark-circle" size={16} color="#3B82F6" style={[{ marginLeft: 6 }, iconShadow]} />
-          )}
-        </View>
-        {username && <Text style={[s.username, { textAlign: 'center' }]} numberOfLines={1}>@{username.replace(/_[a-zA-Z0-9]{4}$/, "")}</Text>}
-
-        {/* ★ v1.3.58: Tek satır chip rowu — userTitle (Sahne Yıldızı vs.) + BOOST +
-            üyelik + son aktif hepsi yan yana. Eski 3 ayrı satır (title pill, metaRow
-            iki kere) → tek yatay metaRow. Daha kompakt + modern. */}
-        {(userTitle || isBoostActive || memberSinceJoinedText || lastSeenText) && (
-          <View style={s.metaRow}>
-            {userTitle && (
-              <View style={[s.metaPill, { borderColor: (userTitle.color || '#FBBF24') + '60', backgroundColor: (userTitle.color || '#FBBF24') + '14' }]}>
-                <Ionicons name="star" size={10} color={userTitle.color || '#FBBF24'} style={iconShadow} />
-                <Text style={[s.metaPillText, { color: userTitle.color || '#FBBF24' }]}>{userTitle.name}</Text>
-              </View>
+        {/* ★ v1.7.13.55 (20 May 2026): YATAY HERO — avatar sola, metinler sağa.
+            v1.7.13.56: Mood bubble avatarın HEMEN ÜSTÜNDE (sol kolonda), damlalar
+            avatara dik düşer. Avatar bubble yüksekliğine göre aşağıda. */}
+        <View style={s.heroHeadRow}>
+          {/* Sol: Mood bubble + 2 damla + Avatar (dikey stack)
+              ★ v1.7.13.106 (20 May 2026): Balon SADECE kendi profilimde gösterilir
+              (onMoodPress var = düzenlenebilir). Başkasının profilinde mood küçük
+              subtitle olarak alt kısımda (göze batmaz) render edilir. */}
+          <View style={s.heroLeft}>
+            {onMoodPress && (
+              <Pressable
+                style={s.moodBubbleWrap}
+                onPress={onMoodPress}
+                hitSlop={6}
+              >
+                <View style={s.moodBubble}>
+                  <LinearGradient
+                    colors={['#FEF3C7', '#FCD34D']}
+                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                    style={StyleSheet.absoluteFillObject}
+                  />
+                  <Text
+                    style={[
+                      s.moodBubbleText,
+                      (!moodStatus || !moodStatus.trim()) && { color: 'rgba(15,23,42,0.55)', fontStyle: 'italic' },
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {moodStatus && moodStatus.trim() ? moodStatus : i18n.t('profile.mood_placeholder')}
+                  </Text>
+                </View>
+                <View style={s.moodBubbleTailBig} />
+                <View style={s.moodBubbleTailSmall} />
+              </Pressable>
             )}
-            {userTitle && (isBoostActive || memberSinceJoinedText || lastSeenText) && <View style={s.metaDot} />}
-            {isBoostActive && (
-              <View style={s.metaPill}>
-                <Ionicons name="rocket-outline" size={10} color="#F472B6" style={iconShadow} />
-                <Text style={[s.metaPillText, { color: '#F472B6' }]}>{i18n.t('profile.boost_label')}</Text>
-              </View>
-            )}
-            {isBoostActive && (memberSinceJoinedText || lastSeenText) && <View style={s.metaDot} />}
-            {memberSinceJoinedText && (
-              <View style={s.metaPill}>
-                <Ionicons name="calendar-outline" size={10} color="rgba(148,163,184,0.85)" style={iconShadow} />
-                <Text style={s.metaPillText}>{memberSinceJoinedText}</Text>
-              </View>
-            )}
-            {memberSinceJoinedText && lastSeenText && <View style={s.metaDot} />}
-            {lastSeenText && (
-              <View style={s.metaPill}>
-                <Ionicons name="ellipse-outline" size={10} color="rgba(148,163,184,0.85)" style={iconShadow} />
-                <Text style={s.metaPillText}>{lastSeenText}</Text>
-              </View>
-            )}
+            <View style={s.avatarStack}>
+              <Pressable
+                style={s.avatarBox}
+                onPress={onAvatarPress}
+                hitSlop={4}
+                accessibilityLabel={i18n.t('auto.profile.ProfileHero.006')}
+              >
+                <StatusAvatar uri={avatarUrl} size={108} tier={subscriptionTier} isAdmin={isAdmin} isOnline={isOnline} isSelf={!!onEdit} showTierBadge={showTierBadge} tierBadgeSize="sm" frameId={activeFrame} displayName={displayName} contextKey="profile" customBadgeId={activeBadgeId} />
+              </Pressable>
+            </View>
           </View>
-        )}
 
-        {/* Bio ortalanmış */}
-        {onBioPress ? (
-          <Pressable onPress={onBioPress} hitSlop={6} style={{ marginTop: 8, alignSelf: 'stretch' }}>
-            <Text style={[s.bio, { textAlign: 'center', marginTop: 0 }]} numberOfLines={3}>
-              {bio || (
-                <Text style={{ color: 'rgba(20,184,166,0.7)', fontStyle: 'italic' }}>
-                  + Bio ekle
+          {/* Sağ: isim + chip'ler (avatar hizasından başlar) */}
+          <View style={s.heroRightCol}>
+            {/* İsim — sol hizalı */}
+            <View style={[s.nameRow, { justifyContent: 'flex-start' }]}>
+              {!frameRendersName && (
+                <Text
+                  style={[s.displayName, isAdmin && { color: '#F87171' }]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.7}
+                >
+                  {displayName}
                 </Text>
               )}
-            </Text>
-          </Pressable>
+              {isAdmin && (
+                <Ionicons name="shield-checkmark" size={16} color="#DC2626" style={[{ marginLeft: 6 }, iconShadow]} />
+              )}
+              {isVerified && !isAdmin && (
+                <Ionicons name="checkmark-circle" size={16} color="#3B82F6" style={[{ marginLeft: 6 }, iconShadow]} />
+              )}
+            </View>
+            {username && <Text style={[s.username, { textAlign: 'left' }]} numberOfLines={1}>@{username.replace(/_[a-zA-Z0-9]{4}$/, "")}</Text>}
+
+            {/* ★ v1.7.13.72 (20 May 2026): BOOST inline chip kaldırıldı — profile.tsx'teki
+                "Boost Aktif + kalan süre" aksiyon kartı zaten bilgiyi gösteriyor, dublikat. */}
+            {userTitle && (
+              <View style={[s.identityInlineRow, { justifyContent: 'flex-start', paddingHorizontal: 0 }]}>
+                <View style={s.identityInlineItem}>
+                  <Ionicons name="star" size={11} color="#FBBF24" style={iconShadow} />
+                  <Text style={[s.identityInlineText, { color: '#FBBF24' }]}>{userTitle.name}</Text>
+                </View>
+              </View>
+            )}
+            {(memberSinceJoinedText || lastSeenText) && (
+              <Text style={[s.metaFootnote, { textAlign: 'left' }]} numberOfLines={1}>
+                {memberSinceJoinedText}
+                {memberSinceJoinedText && lastSeenText ? '  ·  ' : ''}
+                {lastSeenText}
+              </Text>
+            )}
+            {/* ★ v1.7.13.111 (20 May 2026): Streak chip — gün serisi, sıcak amber renk.
+                Sadece streak >= 2 ise gösterilir (1 gün serisi henüz "seri" değil). */}
+            {streakDays >= 2 && (
+              <View style={s.streakChip}>
+                <Text style={s.streakEmoji}>🔥</Text>
+                <Text style={s.streakText}>{i18n.t('profile.streak_days', { 0: streakDays })}</Text>
+              </View>
+            )}
+            {/* ★ v1.7.13.106 (20 May 2026): Başkasının profilinde mood küçük subtle
+                subtitle — kendi profilim balonda göstermiyor (balon kendi profilim için
+                tıklanabilir editor). Göze batmaz, italic + amber. */}
+            {!onMoodPress && moodStatus && moodStatus.trim().length > 0 && (
+              <Text style={s.moodSubtle} numberOfLines={1}>
+                💭 {moodStatus.trim()}
+              </Text>
+            )}
+          </View>
+        </View>
+
+        {/* ★ v1.7.13.57 (20 May 2026): Inline bio edit — modal yok, satır TextInput'a dönüşür.
+            Kalem ikonu yazılabilir olduğunu gösterir. Kendi profilde editable, başkasınkinde read-only. */}
+        {onBioSave ? (
+          editingBio ? (
+            <View style={s.bioEditRow}>
+              <TextInput
+                value={bioDraft}
+                onChangeText={(t) => setBioDraft(t.slice(0, 150))}
+                placeholder={i18n.t('profile.bio_placeholder')}
+                placeholderTextColor="rgba(148,163,184,0.55)"
+                style={s.bioInput}
+                multiline
+                maxLength={150}
+                autoFocus
+                onBlur={handleBioCommit}
+                onSubmitEditing={handleBioCommit}
+                blurOnSubmit
+                editable={!savingBio}
+              />
+              <Pressable onPress={handleBioCommit} hitSlop={8} style={s.bioCheckBtn}>
+                <Ionicons name={savingBio ? 'hourglass-outline' : 'checkmark'} size={16} color="#5EEAD4" />
+              </Pressable>
+            </View>
+          ) : (
+            <Pressable onPress={() => { setBioDraft(bio || ''); setEditingBio(true); }} hitSlop={6} style={s.bioPressRow}>
+              <Text style={[s.bio, { textAlign: 'left', marginTop: 0, flex: 1 }]} numberOfLines={3}>
+                {bio && bio.trim() ? bio : (
+                  <Text style={{ color: 'rgba(20,184,166,0.7)', fontStyle: 'italic' }}>
+                    {i18n.t('profile.bio_placeholder')}
+                  </Text>
+                )}
+              </Text>
+              <Ionicons name="create-outline" size={13} color="rgba(94,234,212,0.65)" style={[{ marginLeft: 6, marginTop: 2 }, iconShadow]} />
+            </Pressable>
+          )
         ) : bio ? (
-          <Text style={[s.bio, { textAlign: 'center', marginTop: 8 }]} numberOfLines={3}>{bio}</Text>
+          <Text style={[s.bio, { textAlign: 'left', marginTop: 10 }]} numberOfLines={3}>{bio}</Text>
         ) : null}
 
-        {/* ★ v289 (16 May 2026): Geniş "Profili Düzenle" pill butonu — bio altında,
-            sadece kendi profilde (onEdit varsa). Sağ üst köşedeki küçük ikon yerine
-            modern wide CTA. Mockup'tan ilham. */}
-        {onEdit && (
-          <Pressable style={s.editPill} onPress={onEdit} hitSlop={6}>
-            <LinearGradient
-              colors={['rgba(20,184,166,0.18)', 'rgba(20,184,166,0.08)']}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-              style={StyleSheet.absoluteFillObject}
-            />
-            <Ionicons name="create-outline" size={15} color="#5EEAD4" style={iconShadow} />
-            <Text style={s.editPillText}>{i18n.t('auto.profile.ProfileHero.007')}</Text>
-          </Pressable>
+        {/* ★ v1.7.13.54 (20 May 2026): Aksiyon satırı — Çerçeve · Düzenle · Paylaş.
+            Eski köşe floating butonların yerini alıyor. Hepsi flat link tarzı,
+            ikon + yazı, ortak dil. FB'nin "Hikayeye ekle / Profili düzenle" satırı
+            paritesi (ama bizimki 3 sütun). */}
+        {(onFramePress || onEdit || onSharePress) && (
+          <View style={s.heroActionRow}>
+            {onFramePress && (
+              <Pressable style={s.heroActionItem} onPress={onFramePress} hitSlop={6}>
+                <View>
+                  <Ionicons name="ribbon-outline" size={15} color={hasUnequippedFrame ? '#22C55E' : '#5EEAD4'} style={iconShadow} />
+                  {hasUnequippedFrame && <View style={s.heroActionDot} />}
+                </View>
+                <Text style={[s.heroActionText, hasUnequippedFrame && { color: '#22C55E' }]}>{i18n.t('profile.action.frame')}</Text>
+              </Pressable>
+            )}
+            {onEdit && (
+              <Pressable style={s.heroActionItem} onPress={onEdit} hitSlop={6}>
+                <Ionicons name="create-outline" size={15} color="#5EEAD4" style={iconShadow} />
+                <Text style={s.heroActionText}>{i18n.t('profile.action.edit')}</Text>
+              </Pressable>
+            )}
+            {onSharePress && (
+              <Pressable style={s.heroActionItem} onPress={onSharePress} hitSlop={6}>
+                <Ionicons name="share-outline" size={15} color="#5EEAD4" style={iconShadow} />
+                <Text style={s.heroActionText}>{i18n.t('profile.action.share')}</Text>
+              </Pressable>
+            )}
+          </View>
         )}
       </View>
 
@@ -300,7 +353,7 @@ export default function ProfileHero({
           style={s.statItem}
           onPress={onRoomsPress}
           hitSlop={8}
-          accessibilityLabel={`${stats.rooms} oda`}
+          accessibilityLabel={`${stats.rooms} ${i18n.t('profile.stat_room')}`}
         >
           <Ionicons name="mic-outline" size={18} color="#5EEAD4" style={s.statIcon} />
           <Text style={s.statNum}>{fmtStat(stats.rooms)}</Text>
@@ -313,7 +366,7 @@ export default function ProfileHero({
               style={s.statItem}
               onPress={onBadgesPress}
               hitSlop={8}
-              accessibilityLabel={`${stats.badges || 0} rozet`}
+              accessibilityLabel={`${stats.badges || 0} ${i18n.t('profile.stat_badge')}`}
             >
               <MaterialCommunityIcons name="medal-outline" size={18} color="#A78BFA" style={s.statIcon} />
               <Text style={s.statNum}>{fmtStat(stats.badges)}</Text>
@@ -328,7 +381,7 @@ export default function ProfileHero({
               style={s.statItem}
               onPress={onGiftsPress}
               hitSlop={8}
-              accessibilityLabel={`${stats.gifts || 0} hediye`}
+              accessibilityLabel={`${stats.gifts || 0} ${i18n.t('profile.stat_gift')}`}
             >
               <Ionicons name="gift-outline" size={18} color="#FBBF24" style={s.statIcon} />
               <Text style={s.statNum}>{fmtStat(stats.gifts)}</Text>
@@ -468,6 +521,150 @@ const s = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: 6,
   },
+  // ★ v1.7.13.52 (20 May 2026): 2 chip max kimlik satırı — üye/aktif chip'leri artık burada DEĞİL.
+  identityChipRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 8, marginTop: 8, paddingHorizontal: 16,
+  },
+  // ★ v1.7.13.53 (20 May 2026): Flat inline (pill yok) kimlik satırı.
+  identityInlineRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 6, marginTop: 8, paddingHorizontal: 16, flexWrap: 'wrap',
+  },
+  identityInlineItem: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+  },
+  identityInlineText: {
+    fontSize: 11, fontWeight: '700', letterSpacing: 0.3,
+    ..._textGlow,
+  },
+  metaFootnote: {
+    fontSize: 11, color: 'rgba(148,163,184,0.7)',
+    marginTop: 6, textAlign: 'center', letterSpacing: 0.2,
+    ..._textGlow,
+  },
+  // ★ v1.7.13.106 (20 May 2026): Başkasının profilinde mood subtle subtitle
+  moodSubtle: {
+    fontSize: 11, color: 'rgba(251,191,36,0.75)',
+    marginTop: 4, fontStyle: 'italic', letterSpacing: 0.2,
+    ..._textGlow,
+  },
+  // ★ v1.7.13.111 (20 May 2026): Streak chip — sıcak amber, alt etiket olarak küçük
+  streakChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    marginTop: 4,
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8, paddingVertical: 3,
+    borderRadius: 999,
+    backgroundColor: 'rgba(251,113,36,0.12)',
+    borderWidth: 1, borderColor: 'rgba(251,113,36,0.3)',
+  },
+  streakEmoji: { fontSize: 11 },
+  streakText: {
+    fontSize: 10, fontWeight: '800', color: '#FB923C',
+    letterSpacing: 0.2,
+    ..._textGlow,
+  },
+  // ★ v1.7.13.55 (20 May 2026): Yatay düzen — avatar sola, metin sağa.
+  //   v1.7.13.58: alignItems CENTER — metin avatar yüksekliğinin ORTASINDA
+  //   konumlanır; mood bubble varsa da (own) yoksa da (başkası) görsel denge oluşur.
+  heroHeadRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'stretch',
+    gap: 14,
+  },
+  heroLeft: {
+    alignItems: 'center',
+    minWidth: 112,
+    overflow: 'visible',
+  },
+  heroRightCol: {
+    flex: 1,
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+  },
+  // ★ v1.7.13.53 (20 May 2026): FB-tarzı durum balonu (Şu anki hissim...) — avatar üzerinde.
+  //   Kuyruk = 2 damla (üçgen DEĞİL), FB messenger paritesi.
+  //   v1.7.13.54: Renk SopranoChat temasına uyduruldu — koyu slate + teal kenarlık.
+  //   v1.7.13.56: Mood bubble avatarın HEMEN üstünde (sol kolonda), damlalar dik düşer.
+  moodBubbleWrap: {
+    flexDirection: 'column',
+    alignItems: 'center',
+    marginBottom: 4,
+    zIndex: 6,
+    overflow: 'visible',
+  },
+  moodBubble: {
+    paddingHorizontal: 12, paddingVertical: 6,
+    borderRadius: 18,
+    backgroundColor: '#FCD34D', // gradient fallback
+    borderWidth: 1, borderColor: 'rgba(251,191,36,0.55)',
+    maxWidth: 160,
+    overflow: 'hidden',
+    shadowColor: '#FBBF24', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.40, shadowRadius: 10, elevation: 5,
+  },
+  moodBubbleText: {
+    fontSize: 11, fontWeight: '600', color: '#0F172A',
+    letterSpacing: 0.1,
+  },
+  // ★ FB tarzı 2 damla — DİKEY: bubble altında, avatara doğru ufalır.
+  //   v1.7.13.56: Warm amber temalı bubble ile aynı renk paleti.
+  moodBubbleTailBig: {
+    width: 9, height: 9, borderRadius: 5,
+    backgroundColor: '#FCD34D',
+    borderWidth: 1, borderColor: 'rgba(251,191,36,0.55)',
+    marginTop: 3,
+    shadowColor: '#FBBF24', shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.35, shadowRadius: 4, elevation: 4,
+  },
+  moodBubbleTailSmall: {
+    width: 5, height: 5, borderRadius: 3,
+    backgroundColor: '#FCD34D',
+    borderWidth: 1, borderColor: 'rgba(251,191,36,0.55)',
+    marginTop: 2,
+    shadowColor: '#FBBF24', shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.30, shadowRadius: 3, elevation: 3,
+  },
+  // ★ v1.7.13.53 (20 May 2026): Flat "Profili düzenle" — pill yerine ikon+text link.
+  editLinkRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 5, marginTop: 12, paddingVertical: 6,
+  },
+  editLinkText: {
+    fontSize: 13, fontWeight: '600', color: '#5EEAD4',
+    letterSpacing: 0.2,
+    ..._textGlow,
+  },
+  // ★ v1.7.13.54 (20 May 2026): Aksiyon satırı — Çerçeve · Düzenle · Paylaş yan yana.
+  heroActionRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    marginTop: 12, marginBottom: 2,
+    paddingHorizontal: 8,
+    borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.06)',
+    paddingTop: 10,
+    alignSelf: 'stretch',
+  },
+  heroActionItem: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: 10, paddingVertical: 6,
+  },
+  heroActionText: {
+    fontSize: 12, fontWeight: '600', color: '#5EEAD4',
+    letterSpacing: 0.2,
+    ..._textGlow,
+  },
+  // Çerçeve'nin yanına yeşil "hazır" işareti
+  heroActionDot: {
+    position: 'absolute',
+    top: -2, right: -3,
+    width: 7, height: 7, borderRadius: 4,
+    backgroundColor: '#22C55E',
+    borderWidth: 1, borderColor: '#0B1829',
+  },
   metaPill: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     paddingHorizontal: 8, paddingVertical: 3,
@@ -499,6 +696,34 @@ const s = StyleSheet.create({
     fontSize: 10, color: 'rgba(148,163,184,0.7)', fontWeight: '500',
   },
   bio: { fontSize: 12, color: '#94A3B8', marginTop: 4, lineHeight: 17, ..._textGlow },
+  // ★ v1.7.13.57 (20 May 2026): Inline bio edit — kalem ikonu + TextInput
+  bioPressRow: {
+    flexDirection: 'row', alignItems: 'flex-start',
+    marginTop: 10, alignSelf: 'stretch',
+    paddingHorizontal: 4, paddingVertical: 4,
+  },
+  bioEditRow: {
+    flexDirection: 'row', alignItems: 'center',
+    marginTop: 10, alignSelf: 'stretch',
+    backgroundColor: 'rgba(20,184,166,0.06)',
+    borderRadius: 12,
+    borderWidth: 1, borderColor: 'rgba(20,184,166,0.30)',
+    paddingHorizontal: 10, paddingVertical: 6,
+  },
+  bioInput: {
+    flex: 1,
+    fontSize: 12, color: '#F1F5F9',
+    lineHeight: 17,
+    paddingVertical: 2,
+    minHeight: 32,
+    maxHeight: 80,
+  },
+  bioCheckBtn: {
+    width: 28, height: 28, borderRadius: 14,
+    backgroundColor: 'rgba(20,184,166,0.14)',
+    alignItems: 'center', justifyContent: 'center',
+    marginLeft: 6,
+  },
   editBtn: {
     width: 34, height: 34, borderRadius: 12,
     backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)',

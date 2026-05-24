@@ -1,4 +1,4 @@
-﻿/**
+/**
  * SopranoChat — Bildirim Dropdown (X.com tarzı)
  * Zil ikonuna yapışık açılan kompakt dropdown panel
  * ★ Sadece oda + arama + hediye bildirimleri gösterilir
@@ -86,6 +86,8 @@ const BELL_NOTIF_TYPES_BASE = [
   'gift', 'symbol_gift', 'thank_you',
   'event_reminder',
   'follow_accepted', 'follow_rejected',
+  // ★ v1.7.13.49 (20 May 2026): message_request drawer'dan KALDIRILDI —
+  //   yabancıdan gelen DM istekleri sadece Mesajlar tab > İstekler bölümünde görünür.
 ];
 const BELL_NOTIF_TYPES_IN_ROOM = [...BELL_NOTIF_TYPES_BASE, 'follow_pending'];
 
@@ -105,6 +107,7 @@ function getNotifIcon(type: string): { name: string; color: string } {
     case 'follow_pending': return { name: 'person-add', color: '#F59E0B' };
     case 'follow_accepted': return { name: 'person-add', color: '#22C55E' };
     case 'follow_rejected': return { name: 'person-remove', color: '#94A3B8' };
+    /* ★ v1.7.13.49 (20 May 2026): message_request drawer'da değil — Mesajlar tab > İstekler bölümünde gösterilir. */
     default: return { name: 'notifications', color: '#94A3B8' };
   }
 }
@@ -164,11 +167,14 @@ export default function NotificationDrawer({ visible, onClose, userId, anchorTop
   //   köşesi tam tab bar üst kenarında biter — FriendsDrawer'daki Tabs-z-order kesişimiyle
   //   birebir aynı görsel boyut. Extra hava boşluğu yok (kullanıcı talebi: çevrimiçi boyu).
   const tabBarSpace = TAB_BAR_BASE + Math.max(insets.bottom, TAB_BAR_MIN_BOTTOM_INSET);
+  // ★ v1.7.13.170: Oda kontrol barı bottom offset — inRoom tanımından sonra hesaplanır.
+  const ROOM_CONTROL_BAR_H = 80 + Math.max(insets.bottom, 14);
   const router = useRouter();
   const { openUserProfile } = useUserProfileSheet();
   const pathname = usePathname();
   // ★ 2026-04-21: Oda içindeyken arkadaşlık istekleri zile düşer; oda dışında arkadaş simgesi gösterir.
   const inRoom = pathname?.startsWith('/room') ?? false;
+  const bottomSpace = inRoom ? ROOM_CONTROL_BAR_H : tabBarSpace;
   const BELL_NOTIF_TYPES = inRoom ? BELL_NOTIF_TYPES_IN_ROOM : BELL_NOTIF_TYPES_BASE;
   const [items, setItems] = useState<NotifItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -440,10 +446,12 @@ export default function NotificationDrawer({ visible, onClose, userId, anchorTop
   useEffect(() => {
     if (visible) {
       isClosingRef.current = false;
-      Animated.parallel([
-        Animated.timing(slideAnim, { toValue: 0, duration: 280, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
-        Animated.timing(fadeAnim, { toValue: 1, duration: 220, useNativeDriver: true }),
-      ]).start();
+      // ★ Backdrop önce görünsün (flash önleme), panel hafif gecikmeli kayar
+      fadeAnim.setValue(0);
+      Animated.timing(fadeAnim, { toValue: 1, duration: 120, useNativeDriver: true }).start();
+      setTimeout(() => {
+        Animated.timing(slideAnim, { toValue: 0, duration: 240, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
+      }, 40);
     } else {
       if (isClosingRef.current) return;
       slideAnim.setValue(DRAWER_W);
@@ -508,18 +516,14 @@ export default function NotificationDrawer({ visible, onClose, userId, anchorTop
     <View style={StyleSheet.absoluteFill} pointerEvents={visible ? 'box-none' : 'none'}>
       {/* Backdrop — koyu dim, tıklayınca animasyonlu kapanır.
           ★ Alt sınır tab bar üstünde biter (dinamik) → tab bar dim altında kalmaz. */}
-      <Animated.View style={[s.backdrop, { bottom: tabBarSpace, opacity: fadeAnim }]}>
+      <Animated.View style={[s.backdrop, { bottom: bottomSpace, opacity: fadeAnim }]}>
         <Pressable style={StyleSheet.absoluteFill} onPress={closeWithAnim} />
       </Animated.View>
 
-      {/* Yan panel — sağdan kayar, FriendsDrawer ile aynı kabuk.
-          ★ 2026-05-05: Alt bölüm FriendsDrawer ile aynı görsel için tab bar'ın üstünde
-          belirgin boşlukla bitsin diye `bottom: tabBarSpace` (dinamik, safe area dahil).
-          FriendsDrawer Tabs z-order'ı sayesinde drawer'ın altını otomatik kesiyor; biz
-          global _layout'ta render ettiğimiz için drawer alt sınırını manuel veriyoruz. */}
+      {/* Yan panel — sağdan kayar */}
       <Animated.View
         {...panResponder.panHandlers}
-        style={[s.panel, { top: topGap, bottom: tabBarSpace, transform: [{ translateX: slideAnim }] }]}
+        style={[s.panel, { top: topGap, bottom: bottomSpace, transform: [{ translateX: slideAnim }] }]}
       >
         {/* Profil sayfası gradient dili — diagonal slate */}
         <LinearGradient
@@ -676,6 +680,14 @@ export default function NotificationDrawer({ visible, onClose, userId, anchorTop
             <Ionicons name="chevron-up" size={14} color="#14B8A6" />
           </Pressable>
         )}
+        {/* ★ Alt fade-out efekti — Çevrimiçi drawer ile aynı koyuluk */}
+        <LinearGradient
+          colors={['transparent', 'rgba(15,20,35,0.85)', 'rgba(10,14,28,0.95)']}
+          locations={[0, 0.6, 1]}
+          start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
+          style={s.bottomFade}
+          pointerEvents="none"
+        />
       </Animated.View>
     </View>
   );
@@ -698,12 +710,7 @@ const s = StyleSheet.create({
     width: DRAWER_W,
     borderTopLeftRadius: 26, borderBottomLeftRadius: 26,
     overflow: 'hidden',
-    backgroundColor: '#1a2030',
-    shadowColor: '#000',
-    shadowOffset: { width: -8, height: 0 },
-    shadowOpacity: 0.55,
-    shadowRadius: 22,
-    elevation: 22,
+    backgroundColor: '#0d1520',
   },
   header: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
@@ -962,5 +969,12 @@ const s = StyleSheet.create({
     backgroundColor: 'rgba(20,184,166,0.08)',
     borderWidth: 1, borderColor: 'rgba(20,184,166,0.15)',
     alignItems: 'center', justifyContent: 'center',
+  },
+  // ★ Alt fade-out koyuluk efekti — Çevrimiçi drawer ile aynı
+  bottomFade: {
+    position: 'absolute',
+    left: 0, right: 0, bottom: 0,
+    height: 60,
+    borderBottomLeftRadius: 26,
   },
 });

@@ -44,6 +44,12 @@ export type FollowUser = {
   active_frame?: string | null;
   /** ★ v284 (16 May 2026): profiles.active_badge_id — mini avatar rozeti */
   active_badge_id?: string | null;
+  /** ★ v1.7.13.91 (20 May 2026): Şu an bulunduğu oda — null=lobi, dolu=odada */
+  current_room_id?: string | null;
+  /** ★ v1.7.13.91 (20 May 2026): Oda adı (JOIN ile) — UI'da gösterilir */
+  current_room_name?: string | null;
+  /** ★ v1.7.13.98 (20 May 2026): Doğrulanmış kullanıcı (mavi tik) */
+  is_verified?: boolean;
 };
 export type FriendUser = FollowUser;
 
@@ -741,16 +747,18 @@ export const FriendshipService = {
    * Hem "beni takip eden accepted" hem "benim takip ettiğim accepted" kayıtlar.
    */
   async getFriends(userId: string): Promise<FriendUser[]> {
-    // Kullanıcı A olarak benim user_id'yim, partner friend_id olur
+    // ★ v1.7.13.91 (20 May 2026): current_room_id eklendi — arkadaşın lobi'de mi
+    // odada mı olduğu UI'da gösterilebilsin. Oda adı için ayrı query ile JOIN
+    // (Supabase nested join FK ile çalışıyor ama complex; basit ayrı sorgu güvenli).
     const [outRes, inRes] = await Promise.all([
       supabase
         .from('friendships')
-        .select('friend_id, friend:profiles!friend_id(id, display_name, avatar_url, username, subscription_tier, is_online, last_seen, active_frame, active_badge_id)')
+        .select('friend_id, friend:profiles!friend_id(id, display_name, avatar_url, username, subscription_tier, is_online, last_seen, active_frame, active_badge_id, current_room_id, is_verified)')
         .eq('user_id', userId)
         .eq('status', 'accepted'),
       supabase
         .from('friendships')
-        .select('user_id, user:profiles!user_id(id, display_name, avatar_url, username, subscription_tier, is_online, last_seen, active_frame, active_badge_id)')
+        .select('user_id, user:profiles!user_id(id, display_name, avatar_url, username, subscription_tier, is_online, last_seen, active_frame, active_badge_id, current_room_id, is_verified)')
         .eq('friend_id', userId)
         .eq('status', 'accepted'),
     ]);
@@ -764,7 +772,26 @@ export const FriendshipService = {
       const p = Array.isArray(r.user) ? r.user[0] : r.user;
       if (p?.id) map.set(p.id, p);
     });
-    return Array.from(map.values());
+
+    // ★ Oda adlarını topla (sadece odada olanlar için tek sorgu, batch)
+    const friends = Array.from(map.values());
+    const roomIds = friends
+      .map(f => (f as any).current_room_id)
+      .filter((id): id is string => !!id);
+    if (roomIds.length > 0) {
+      const { data: rooms } = await supabase
+        .from('rooms')
+        .select('id, name')
+        .in('id', roomIds);
+      const roomNameMap = new Map<string, string>();
+      (rooms || []).forEach((r: any) => roomNameMap.set(r.id, r.name));
+      friends.forEach(f => {
+        const rid = (f as any).current_room_id;
+        if (rid) (f as any).current_room_name = roomNameMap.get(rid) || null;
+      });
+    }
+
+    return friends;
   },
 
   /** Arkadaş sayısı — çift yönlü tekil count. */

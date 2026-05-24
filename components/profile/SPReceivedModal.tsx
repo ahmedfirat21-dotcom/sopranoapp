@@ -35,6 +35,8 @@ import { supabase } from '../../constants/supabase';
 import { getAvatarSource } from '../../constants/avatars';
 import { showToast } from '../Toast';
 import { useSwipeToDismiss } from '../../hooks/useSwipeToDismiss';
+// ★ v1.7.13.49 (20 May 2026): Skia BlurMask ile yumuşak halo (önceki LinearGradient sert kesimliydi).
+import { SkiaShadow } from '../skia';
 
 const { width: W, height: H } = Dimensions.get('window');
 
@@ -466,25 +468,35 @@ export default function SPReceivedModal({
 
           {/* ═══ HEXAGON SAHNESİ — Halo + Rings + Gem + Particles + Door ═══ */}
           <View style={s.gemSection}>
-            {/* Halo (yumuşak nabız) */}
+            {/* ★ v1.7.13.49 (20 May 2026): Halo — Skia BlurMask ile gerçek yumuşak yayılım.
+                 Eski LinearGradient + overflow:hidden sert kenar veriyordu. */}
             <Animated.View
               style={[
                 s.halo,
                 {
-                  width: cfg.hexSize + 60,
-                  height: cfg.hexSize + 60,
-                  borderRadius: (cfg.hexSize + 60) / 2,
+                  width: cfg.hexSize + 80,
+                  height: cfg.hexSize + 80,
                   opacity: haloOpacity,
                   transform: [{ scale: haloScale }],
                 },
               ]}
               pointerEvents="none"
             >
-              <LinearGradient
-                colors={[tv.primary + 'AA', tv.primary + '33', 'transparent']}
-                start={{ x: 0.5, y: 0.5 }} end={{ x: 1, y: 1 }}
-                style={[s.haloGrad, { borderRadius: (cfg.hexSize + 60) / 2 }]}
-              />
+              <SkiaShadow
+                shadowColor={tv.primary}
+                shadowOpacity={0.65}
+                shadowBlur={48}
+                shadowOffsetX={0}
+                shadowOffsetY={0}
+                borderRadius={(cfg.hexSize + 80) / 2}
+              >
+                <View style={{
+                  width: cfg.hexSize + 80,
+                  height: cfg.hexSize + 80,
+                  borderRadius: (cfg.hexSize + 80) / 2,
+                  backgroundColor: tv.primary + '12',
+                }} />
+              </SkiaShadow>
             </Animated.View>
 
             {/* Ring pulse'lar (ringCount kadar, gecikmeli) */}
@@ -656,15 +668,15 @@ export default function SPReceivedModal({
           {/* Amount + SP */}
           <View style={s.amountRow}>
             <Text style={[s.amountValue, { color: tv.primary, textShadowColor: tv.primary + '88' }]}>
-              {display.toLocaleString('tr-TR')}
+              {display.toLocaleString(i18n.locale)}
             </Text>
             <Text style={[s.amountUnit, { color: tv.primary + 'CC' }]}>SP</Text>
           </View>
 
-          {/* Tip-spesifik açıklama */}
+          {/* Tip-spesifik açıklama — ★ v1.7.13.49 (20 May 2026): Duplicate fix.
+              Eskiden 2 Text aynı describe() çağırıyordu ("sana hediye gönderdi sana hediye gönderdi"). */}
           <Text style={[s.description, { color: 'rgba(255,255,255,0.75)' }]} numberOfLines={2}>
             <Text style={[s.descriptionStrong, { color: tv.primary }]}>{senderName}</Text>
-            <Text>{tv.describe('').replace(senderName, '').trim() ? ` ${tv.describe('').replace(senderName, '').trim()}` : ''}</Text>
             <Text>{tv.describe(senderName).replace(senderName, '').replace(/^\s+/, ' ')}</Text>
           </Text>
 
@@ -750,14 +762,17 @@ const s = StyleSheet.create({
   },
 
   // Hexagon sahnesi
+  // ★ v1.7.13.49 (20 May 2026): overflow:'hidden' KALDIRILDI — orbit/rain particles
+  //   240px sınırını aşamayıp "modal altında kalmış" gibi görünüyordu. Skia halo +
+  //   particles serbest taşsın; modal kart border-radius zaten dış kontur.
   gemSection: {
     alignItems: 'center', justifyContent: 'center',
     height: 240, marginVertical: 10,
-    overflow: 'hidden',
   },
   halo: {
     position: 'absolute',
-    overflow: 'hidden',
+    alignItems: 'center', justifyContent: 'center',
+    // ★ v1.7.13.49 (20 May 2026): overflow:hidden KALDIRILDI — Skia BlurMask dışa taşar.
   },
   haloGrad: {
     width: '100%', height: '100%',

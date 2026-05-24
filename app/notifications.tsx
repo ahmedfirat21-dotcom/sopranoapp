@@ -1,9 +1,9 @@
-﻿/**
+/**
  * SopranoChat — Bildirimler Ekranı
  * Instagram tarzı: Üstte Takip İstekleri (Onayla/Reddet), altta bildirimler
  */
-import { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, Pressable, Image, RefreshControl, Animated, Platform } from 'react-native';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { View, Text, StyleSheet, SectionList, Pressable, Image, RefreshControl, Animated, Platform } from 'react-native';
 import AppLoader from '../components/AppLoader';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -19,6 +19,7 @@ import AppBackground from '../components/AppBackground';
 import { CosmeticBackground } from '../components/skia';
 import { useAuth, useBadges, useUserProfileSheet } from './_layout';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Haptics } from '../utils/haptics';
 import { i18n, useTranslation } from '../services/i18n';
 
 type Notification = {
@@ -50,6 +51,31 @@ const NOTIF_CONFIG: Record<string, { icon: string; color: string; verb: string }
   room_live: { icon: 'radio', color: '#14B8A6', verb: i18n.t('auto.notifications.003') },
 };
 
+// ★ v1.7.13.142: Zaman bazlı gruplandırma — Instagram/Twitter pattern
+function getTimeGroup(dateStr: string): string {
+  const now = new Date();
+  const d = new Date(dateStr);
+  const diffMs = now.getTime() - d.getTime();
+  const diffDays = Math.floor(diffMs / 86_400_000);
+  const isToday = d.toDateString() === now.toDateString();
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const isYesterday = d.toDateString() === yesterday.toDateString();
+  if (isToday) return 'today';
+  if (isYesterday) return 'yesterday';
+  if (diffDays <= 7) return 'this_week';
+  return 'older';
+}
+
+const GROUP_LABELS: Record<string, string> = {
+  today: i18n.t('notifications.today'),
+  yesterday: i18n.t('notifications.yesterday'),
+  this_week: 'Bu Hafta',
+  older: 'Daha Eski',
+};
+
+const GROUP_ORDER = ['today', 'yesterday', 'this_week', 'older'];
+
 
 
 export default function NotificationsScreen() {
@@ -65,6 +91,23 @@ export default function NotificationsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [showRequests, setShowRequests] = useState(false);
   const [processingIds, setProcessingIds] = useState<Set<string>>(new Set());
+
+  // ★ v1.7.13.142: Okunmamış sayısı — header'da "Tümünü okundu yap" butonu
+  const unreadCount = useMemo(() => notifications.filter(n => !n.is_read && n.type !== 'follow_rejected').length, [notifications]);
+
+  // ★ v1.7.13.142: Gruplandırılmış bildirimler — SectionList için
+  const groupedSections = useMemo(() => {
+    const filtered = notifications.filter(n => n.type !== 'follow_rejected');
+    const groups: Record<string, Notification[]> = {};
+    for (const n of filtered) {
+      const g = getTimeGroup(n.created_at);
+      if (!groups[g]) groups[g] = [];
+      groups[g].push(n);
+    }
+    return GROUP_ORDER
+      .filter(key => groups[key]?.length)
+      .map(key => ({ title: GROUP_LABELS[key], data: groups[key] }));
+  }, [notifications]);
 
   const loadData = useCallback(async () => {
     if (!firebaseUser) return;
@@ -163,7 +206,7 @@ export default function NotificationsScreen() {
             <View>
               <Text style={styles.pendingTitle}>{t('notif.friend_requests')}</Text>
               <Text style={styles.pendingSubtitle}>
-                {pendingRequests.length} yeni istek
+                {i18n.t('notif.new_requests', { 0: pendingRequests.length })}
               </Text>
             </View>
           </View>
@@ -265,7 +308,29 @@ export default function NotificationsScreen() {
           <Ionicons name="chevron-back" size={24} color={Colors.text} />
         </Pressable>
         <Text style={styles.headerTitle}>{t('notif.title')}</Text>
-        <View style={{ width: 40 }} />
+        {/* ★ v1.7.13.142: Toplu okundu butonu */}
+        {unreadCount > 0 ? (
+          <Pressable
+            style={styles.markReadBtn}
+            onPress={async () => {
+              if (!firebaseUser) return;
+              try {
+                await supabase
+                  .from('notifications')
+                  .update({ is_read: true })
+                  .eq('user_id', firebaseUser.uid)
+                  .eq('is_read', false);
+                setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+                refreshBadges();
+                Haptics.success();
+              } catch {}
+            }}
+          >
+            <Ionicons name="checkmark-done" size={18} color={Colors.teal} />
+          </Pressable>
+        ) : (
+          <View style={{ width: 40 }} />
+        )}
       </View>
 
       {loading ? (
@@ -273,10 +338,16 @@ export default function NotificationsScreen() {
           <AppLoader size={56} color={Colors.teal} />
         </View>
       ) : (
-        <FlatList
-          data={notifications.filter(n => n.type !== 'follow_rejected')}
+        <SectionList
+          sections={groupedSections}
           keyExtractor={(item) => item.id}
           renderItem={renderNotification}
+          renderSectionHeader={({ section: { title } }) => (
+            <View style={styles.sectionHeader}>
+              <View style={styles.sectionAccent} />
+              <Text style={styles.sectionTitle}>{title}</Text>
+            </View>
+          )}
           contentContainerStyle={{ paddingBottom: 40 }}
           ListHeaderComponent={renderPendingSection}
           refreshControl={
@@ -286,7 +357,7 @@ export default function NotificationsScreen() {
             pendingRequests.length === 0 ? (
               <EmptyState
                 icon="notifications-outline"
-                title="Bildirim yok"
+                title={i18n.t('notif.empty_title')}
                 subtitle={i18n.t('notifications.001')}
               />
             ) : null
@@ -297,6 +368,7 @@ export default function NotificationsScreen() {
           updateCellsBatchingPeriod={50}
           windowSize={9}
           removeClippedSubviews={Platform.OS === 'android'}
+          stickySectionHeadersEnabled={false}
         />
       )}
     </View>
@@ -389,13 +461,7 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 10,
   },
-  pendingAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    borderWidth: 2,
-    borderColor: 'rgba(245,158,11,0.25)',
-  },
+
   pendingInfo: {
     flex: 1,
   },
@@ -456,4 +522,35 @@ const styles = StyleSheet.create({
   notifText: { fontSize: 13, color: Colors.text, lineHeight: 18 },
   notifName: { fontWeight: '700' },
   notifTime: { fontSize: 11, color: Colors.text3, marginTop: 2 },
+
+  /* ═══ Section Headers ═══ */
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 20,
+    paddingTop: 18,
+    paddingBottom: 8,
+  },
+  sectionAccent: {
+    width: 3,
+    height: 14,
+    borderRadius: 2,
+    backgroundColor: Colors.teal,
+  },
+  sectionTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#94A3B8',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+  },
+
+  /* ═══ Mark All Read ═══ */
+  markReadBtn: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
 });

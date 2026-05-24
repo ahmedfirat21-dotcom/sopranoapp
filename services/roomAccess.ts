@@ -71,13 +71,8 @@ export const RoomAccessService = {
       return { allowed: true };
     }
 
-    // ★ GodMaster bypass — sistemin tanrısı tüm odaları geçer
-    // Ban, kilit, şifre, kapasite, dil/yaş filtresi — hiçbiri GodMaster'ı durduramaz.
-    const { isGodMaster: _isGM } = require('../constants/tiers');
-    if (_isGM(userTier)) {
-      return { allowed: true };
-    }
-    // Admin bypass ayrı kontrol edilir (profiles tablosunda is_admin)
+    // ★ v1.7.13.132: GodMaster kaldırıldı — admin bypass profiles.is_admin üzerinden
+    //   ayrı bir blok'ta uygulanıyor (isAdmin true ise tüm engelleri geçer).
 
     // ── 1. Ban kontrolü ──
     // ★ v1.7.13: getBanStatus expires_at döndürüyor — UI countdown için.
@@ -241,10 +236,8 @@ export const RoomAccessService = {
     const blockers: { action: string; reason: string }[] = [];
     const settings = (room.room_settings || {}) as RoomSettings;
 
-    // Host/admin/GodMaster bypass — engel yok
+    // ★ v1.7.13.132: GodMaster kaldırıldı — host/original host bypass
     if (room.host_id === userId || (settings as any).original_host_id === userId) return [];
-    const { isGodMaster: _isGM } = require('../constants/tiers');
-    if (_isGM(userTier)) return [];
 
     // Banned
     try {
@@ -445,11 +438,27 @@ export const RoomAccessService = {
     _cache?: { inviterName?: string; roomName?: string },
   ): Promise<{ success: boolean; error?: string }> {
     try {
+      // ★ v1.7.13.86 (20 May 2026): SPAM KORUMA — son 24 saatte daveti REDDETMİŞ
+      // kullanıcıya tekrar davet gönderilmesin. Aksi halde host davet bombardımanı
+      // yapabilir. Kabul ettiyse / pending ise / 24 saat geçmişse tekrar davet OK.
+      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const { data: recentReject } = await supabase
+        .from('room_invites')
+        .select('responded_at')
+        .eq('room_id', roomId)
+        .eq('user_id', invitedUserId)
+        .eq('status', 'rejected')
+        .gte('responded_at', oneDayAgo)
+        .maybeSingle();
+      if (recentReject) {
+        return { success: false, error: i18n.t('room.invite_rejected') };
+      }
+
       const { error } = await supabase.from('room_invites').upsert({
         room_id: roomId,
         user_id: invitedUserId,
         invited_by: invitedBy,
-        status: 'pending', // ★ Tekrar davet edildiğinde 'declined' → 'pending' sıfırla
+        status: 'pending', // ★ Tekrar davet edildiğinde 'declined' → 'pending' sıfırla (24h sonra)
       }, { onConflict: 'room_id,user_id' });
       if (error) throw error;
 
@@ -475,7 +484,7 @@ export const RoomAccessService = {
           body: i18n.t('auto.roomAccess.007', { 0: inviterName, 1: roomName }),
         });
         if (notifError && __DEV__) {
-          console.warn('[InviteUser] Bildirim insert hatası:', notifError.message, notifError.details);
+          if (__DEV__) console.warn('[InviteUser] Bildirim insert hatası:', notifError.message, notifError.details);
         }
       } catch (notifErr: any) {
         if (__DEV__) console.warn('[InviteUser] Bildirim insert exception:', notifErr?.message);
@@ -488,13 +497,17 @@ export const RoomAccessService = {
   },
 
   /** Kullanıcının bu odaya geçerli daveti var mı? (pending veya accepted) */
+  /** ★ v1.7.13.85 (20 May 2026): GÜVENLİK FIX — sadece KABUL EDİLMİŞ davet şifre/erişim
+   *  bypass'ı sağlar. Pending = host davet etti ama kullanıcı henüz kabul etmedi → şifre
+   *  hâlâ sorulmalı. Aksi halde: kullanıcı daveti farkına varmadan/kabul etmeden
+   *  şifreli odaya girebiliyordu (Burak/Firat senaryosu). */
   async _hasInvite(roomId: string, userId: string): Promise<boolean> {
     const { data } = await supabase
       .from('room_invites')
       .select('id')
       .eq('room_id', roomId)
       .eq('user_id', userId)
-      .in('status', ['pending', 'accepted'])
+      .eq('status', 'accepted')
       .maybeSingle();
     return !!data;
   },

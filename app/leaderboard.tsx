@@ -1,4 +1,4 @@
-﻿/**
+/**
  * SopranoChat — Liderlik Tablosu (Leaderboard)
  * ★ Premium glassmorphic dark UI
  *
@@ -491,7 +491,7 @@ export default function LeaderboardScreen() {
             roomMap[rid] = {
               room_id: rid,
               room_name: room?.name || i18n.t('auto.leaderboard.003'),
-              host_name: host?.display_name || 'Bilinmeyen',
+              host_name: host?.display_name || i18n.t('common.unknown'),
               host_avatar: host?.avatar_url || '',
               host_frame: host?.active_frame || null,
               count: 0,

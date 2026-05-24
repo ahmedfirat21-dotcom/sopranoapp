@@ -1,7 +1,7 @@
 /**
  * SopranoChat — Tier Etiketi (v1.3.66 — Skia render)
  * ════════════════════════════════════════════════════════════════════
- * Plus / Pro / GodMaster üyeler için kompakt pill rozet.
+ * Plus / Pro üyeler için kompakt pill rozet. (★ v1.7.13.132: GodMaster kaldırıldı)
  *
  * RENDER:
  *   - Önceki versiyon: expo-linear-gradient + RN shadow & elevation
@@ -25,7 +25,7 @@ import { cssBlurToSkiaSigma } from '../utils/skiaUnits';
 let SkiaMod: any = null;
 try { SkiaMod = require('@shopify/react-native-skia'); } catch (_e) { /* fallback */ }
 
-type Tier = 'Free' | 'Plus' | 'Pro' | 'GodMaster' | string | null | undefined;
+type Tier = 'Free' | 'Plus' | 'Pro' | string | null | undefined;
 
 interface Props {
   tier: Tier;
@@ -62,15 +62,6 @@ const CONFIG: Record<string, {
     glow: 'rgba(251,191,36,0.8)',
     // Koyu kahve tik — premium kontrast
     textColor: '#5C2C0E',
-  },
-  GodMaster: {
-    label: '',
-    icon: 'checkmark',
-    // Pembe → mor (ilahi tier)
-    colors: ['#F9A8D4', '#A855F7'] as const,
-    glow: 'rgba(244,114,182,0.85)',
-    // Koyu mor tik
-    textColor: '#3F1D3E',
   },
 };
 

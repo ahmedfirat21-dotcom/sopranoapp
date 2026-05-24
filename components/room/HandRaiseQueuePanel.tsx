@@ -101,7 +101,7 @@ export default function HandRaiseQueuePanel({
 }: Props) {
   const { height: windowH } = useWindowDimensions();
   // Panelin maksimum yüksekliği: ekranın %60'ı
-  const BAR_OFFSET_INNER = bottomInset + 80; // bar(60) + padding(20)
+  const BAR_OFFSET_INNER = bottomInset + 64; // bar(72) tam üstüne — biraz aşağıya
   const maxPanelH = (windowH - Math.max(bottomInset, 14) - 80 - 40) * 0.7;
   // Kapanış animasyonu için ekranın tamamını kapsıyor
   const CLOSED_Y = windowH;
@@ -173,22 +173,16 @@ export default function HandRaiseQueuePanel({
         {...panResponder.panHandlers}
         style={[s.panel, { bottom: BAR_OFFSET_INNER, maxHeight: maxPanelH, transform: [{ translateY }] }]}
       >
-        {/* ★ 2026-05-05: NotificationDrawer dili — slate diagonal + üst amber halo (el kaldır karakteri). */}
+        {/* ★ Modal ailesi — teal-tinted slate (RoomChatDrawer/NotificationDrawer ile tutarlı) */}
         <LinearGradient
-          colors={['#3a4658', '#2a3344', '#1a2030']}
+          colors={['#2a3a4a', '#1f2d3d', '#1a2030']}
           start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
           style={[StyleSheet.absoluteFillObject, { borderRadius: 22 }]}
           pointerEvents="none"
         />
         <LinearGradient
-          colors={['rgba(251,191,36,0.20)', 'rgba(251,191,36,0.05)', 'transparent']}
+          colors={['rgba(20,184,166,0.15)', 'rgba(20,184,166,0.04)', 'transparent']}
           start={{ x: 0, y: 0 }} end={{ x: 0, y: 0.4 }}
-          style={[StyleSheet.absoluteFillObject, { borderRadius: 22 }]}
-          pointerEvents="none"
-        />
-        <LinearGradient
-          colors={['rgba(251,191,36,0.08)', 'transparent']}
-          start={{ x: 0, y: 0 }} end={{ x: 0.7, y: 0.6 }}
           style={[StyleSheet.absoluteFillObject, { borderRadius: 22 }]}
           pointerEvents="none"
         />

@@ -5,8 +5,13 @@
 import { logger } from '../utils/logger';
 import { supabase } from '../constants/supabase';
 import { filterBadWords } from '../constants/badwords';
-import { isSystemRoom } from './showcaseRooms';
+import { isSystemRoom, isLobiRoom } from './showcaseRooms';
 import { i18n } from './i18n';
+
+// ★ v1.7.13.140 (21 May 2026): Soprano Lobi sistem odası AMA chat açık olmalı.
+//   Mevcut 8 guard sistem odalarında chat'i kapatıyordu — Lobi için exception.
+const isChatDisabledSystemRoom = (roomId: string): boolean =>
+  isSystemRoom(roomId) && !isLobiRoom(roomId);
 
 export type RoomMessage = {
   id: string;
@@ -101,7 +106,7 @@ export const RoomChatService = {
    */
   async getMessages(roomId: string, limit = 50, sinceIso?: string): Promise<RoomMessage[]> {
     // Sistem odalarında DB sorgusu yapma (UUID değil)
-    if (isSystemRoom(roomId)) return [];
+    if (isChatDisabledSystemRoom(roomId)) return [];
     let query = supabase
       .from('messages')
       .select('*, profiles!messages_sender_id_fkey(display_name, avatar_url, active_chat_color, active_frame, active_badge_id, subscription_tier)')
@@ -131,7 +136,7 @@ export const RoomChatService = {
    * @returns silinen mesaj sayısı
    */
   async clearAllMessages(roomId: string, userId: string): Promise<{ success: boolean; deletedCount?: number; error?: string }> {
-    if (isSystemRoom(roomId)) return { success: false, error: i18n.t('auto.roomChat.007') };
+    if (isChatDisabledSystemRoom(roomId)) return { success: false, error: i18n.t('auto.roomChat.007') };
     try {
       const { data, error } = await supabase.rpc('clear_room_messages', {
         p_room_id: roomId,
@@ -156,7 +161,7 @@ export const RoomChatService = {
    * bastığı için DB'de mesajlar duruyor olur (Free için bu fonksiyon boş döner).
    */
   async getMessagesForFrozenRoom(roomId: string, limit = 50): Promise<RoomMessage[]> {
-    if (isSystemRoom(roomId)) return [];
+    if (isChatDisabledSystemRoom(roomId)) return [];
     const { data, error } = await supabase
       .from('messages')
       .select('*, profiles!messages_sender_id_fkey(display_name, avatar_url, active_chat_color, active_frame, active_badge_id, subscription_tier)')
@@ -181,7 +186,7 @@ export const RoomChatService = {
    */
   async send(roomId: string, userId: string, content: string): Promise<RoomMessage | null> {
     // Sistem odalarında DB'ye yazma (UUID değil)
-    if (isSystemRoom(roomId)) return null;
+    if (isChatDisabledSystemRoom(roomId)) return null;
     // ★ SEC-8c: Input sanitization — max 500 char, HTML strip, boş mesaj engelleme
     let sanitized = (content || '').trim().replace(/<[^>]*>/g, '').slice(0, 500);
     if (sanitized.length < 1) return null;
@@ -320,7 +325,7 @@ export const RoomChatService = {
     glowStyle: 'gold' | 'heart' | 'fire' | 'neon' | 'celebration' | 'galaxy'
       | 'constellation' | 'or-ancien' | 'inferno' | 'voltaire' | 'belle-epoque',
   ): Promise<{ success: boolean; error?: string; cost?: number; newBalance?: number; messageId?: string }> {
-    if (isSystemRoom(roomId)) return { success: false, error: i18n.t('auto.roomChat.004') };
+    if (isChatDisabledSystemRoom(roomId)) return { success: false, error: i18n.t('auto.roomChat.004') };
     const cleaned = (content || '').trim().replace(/<[^>]*>/g, '').slice(0, 500);
     if (cleaned.length < 1) return { success: false, error: i18n.t('auto.roomChat.003') };
 
@@ -373,7 +378,7 @@ export const RoomChatService = {
    * type='system'. Chat drawer altın çerçeveyle render eder.
    */
   async sendSystem(roomId: string, content: string, externalRef?: string): Promise<RoomMessage | null> {
-    if (isSystemRoom(roomId)) return null;
+    if (isChatDisabledSystemRoom(roomId)) return null;
     const sanitized = (content || '').trim().slice(0, 500);
     if (sanitized.length < 1) return null;
     try {
@@ -407,7 +412,7 @@ export const RoomChatService = {
     onNewMessage: (msg: RoomMessage) => void,
     onDelete?: (messageId: string) => void,
   ) {
-    if (isSystemRoom(roomId)) return () => {};
+    if (isChatDisabledSystemRoom(roomId)) return () => {};
     const channel = supabase
       .channel(`room_chat:${roomId}`)
       .on(
@@ -534,7 +539,7 @@ export const RoomChatService = {
     roomId: string,
     onChange: (messageId: string) => void,
   ) {
-    if (isSystemRoom(roomId)) return () => {};
+    if (isChatDisabledSystemRoom(roomId)) return () => {};
     const channel = supabase
       .channel(`room_chat_reactions:${roomId}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'message_reactions' }, (p) => {

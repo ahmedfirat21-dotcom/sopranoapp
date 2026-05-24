@@ -1,7 +1,7 @@
-ï»¿// SopranoChat â€” SP BaÄŸÄ±ÅŸ Premium Sheet
-// - Alttan sÃ¼rÃ¼klenerek aÃ§Ä±lÄ±r/kapanÄ±r
-// - Quick preset (5/10/25/50/100) + kaydÄ±rmalÄ± slider
-// - AltÄ±n premium tema (SP marka paleti)
+// SopranoChat — SP Baðýþ Premium Sheet
+// - Alttan sürüklenerek açýlýr/kapanýr
+// - Quick preset (5/10/25/50/100) + kaydýrmalý slider
+// - Altýn premium tema (SP marka paleti)
 // Referans: components/room/DonationDrawer.tsx
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
@@ -27,28 +27,28 @@ import PremiumAlert, { type AlertButton } from '../PremiumAlert';
 import { useRouter } from 'expo-router';
 
 const { width: W } = Dimensions.get('window');
-// â˜… v92: panel iÃ§i bÃ¼yÃ¼k hexagon eklendi (92px) â†’ toplam yÃ¼kseklik artÄ±rÄ±ldÄ±
+// ? v92: panel içi büyük hexagon eklendi (92px) › toplam yükseklik artýrýldý
 const PANEL_CONTENT_HEIGHT = 380;
 const SLIDER_WIDTH = Math.max(1, W - 80);
-// â˜… v87 (1 May 2026): Quick preset'ler yeni tier eÅŸikleriyle senkronize, her tier'Ä±n gateway'i:
+// ? v87 (1 May 2026): Quick preset'ler yeni tier eþikleriyle senkronize, her tier'ýn gateway'i:
 //   10 (basic) / 25 (premium ilk) / 100 (elite ilk) / 250 (elite orta) / 500 (legendary ilk)
 const QUICK_AMOUNTS = [10, 25, 100, 250, 500];
-// â˜… v87: Slider 1-1000 â€” legendary tier (500+) eriÅŸilebilir, Ã¼st limit 2x ile flex alan.
+// ? v87: Slider 1-1000 — legendary tier (500+) eriþilebilir, üst limit 2x ile flex alan.
 const MAX_SLIDER = 1000;
 
-// â˜… v87: Merkezi tier helper kullanÄ±lÄ±yor (constants/spAmountTier.ts) â€” DRY ihlali kaldÄ±rÄ±ldÄ±.
+// ? v87: Merkezi tier helper kullanýlýyor (constants/spAmountTier.ts) — DRY ihlali kaldýrýldý.
 type Tier = SPAmountTier;
 const getTier = getSPAmountTier;
 
-// â˜… v86: Tier-based BlurView intensity â€” sinematik backdrop
+// ? v86: Tier-based BlurView intensity — sinematik backdrop
 const BLUR_INTENSITY: Record<Tier, number> = { basic: 25, premium: 40, elite: 55, legendary: 70 };
-// â˜… v86: Halo katman sayÄ±sÄ± tier baÅŸÄ±na â€” miktar arttÄ±kÃ§a zenginleÅŸen 3D glow
+// ? v86: Halo katman sayýsý tier baþýna — miktar arttýkça zenginleþen 3D glow
 const HALO_LAYERS: Record<Tier, number> = { basic: 0, premium: 1, elite: 2, legendary: 3 };
 
 interface SheetPalette {
   border: string;
   topEdge: string;
-  tintColor: string;       // iÃ§ katman ek tint
+  tintColor: string;       // iç katman ek tint
   amountColor: string;
   accentSolid: string;     // balance pill, active chip
   fillGrad: [string, string, string];
@@ -110,7 +110,7 @@ interface Props {
   senderId: string;
   recipientId: string;
   recipientName: string;
-  /** â˜… v92.6 (1 May 2026): AlÄ±cÄ± avatar URL'i â€” baÅŸarÄ± modalÄ±nda kÃ¼Ã§Ã¼k avatar gÃ¶sterilir */
+  /** ? v92.6 (1 May 2026): Alýcý avatar URL'i — baþarý modalýnda küçük avatar gösterilir */
   recipientAvatar?: string;
   onSuccess?: (amount: number) => void;
 }
@@ -123,13 +123,13 @@ export default function SPDonateSheet({
   const PANEL_HEIGHT = PANEL_CONTENT_HEIGHT + Math.max(insets.bottom, 0);
   const translateY = useRef(new Animated.Value(PANEL_HEIGHT)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
-  // â˜… v86: Sinematik pulse â€” tier-based glow ring loop animasyonu
+  // ? v86: Sinematik pulse — tier-based glow ring loop animasyonu
   const ringPulse = useRef(new Animated.Value(0)).current;
   const ringPulse2 = useRef(new Animated.Value(0)).current;
-  // â˜… v92 (1 May 2026): Backdrop floating watermark hexagon â€” gem-aura efekti.
-  //   Panel'in Ã¼stÃ¼nde-merkezinde yavaÅŸÃ§a yukarÄ±-aÅŸaÄŸÄ± sÃ¼zÃ¼lerek uÃ§ar (parallax).
+  // ? v92 (1 May 2026): Backdrop floating watermark hexagon — gem-aura efekti.
+  //   Panel'in üstünde-merkezinde yavaþça yukarý-aþaðý süzülerek uçar (parallax).
   const gemFloat = useRef(new Animated.Value(0)).current;
-  // â˜… v284 (16 May 2026): Loop instance ref'ler â€” orphan loop Ã¶nleme
+  // ? v284 (16 May 2026): Loop instance ref'ler — orphan loop önleme
   const ringPulseLoopRef = useRef<Animated.CompositeAnimation | null>(null);
   const ringPulse2LoopRef = useRef<Animated.CompositeAnimation | null>(null);
   const gemFloatLoopRef = useRef<Animated.CompositeAnimation | null>(null);
@@ -138,8 +138,8 @@ export default function SPDonateSheet({
   const [balance, setBalance] = useState<number | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
   const [successAmount, setSuccessAmount] = useState(0);
-  // â˜… v92.1 (1 May 2026): Yetersiz bakiye alert â€” toast yerine premium modal,
-  //   "MaÄŸazaya Git" / "Ä°ptal" butonlarÄ± (kullanÄ±cÄ± talebi).
+  // ? v92.1 (1 May 2026): Yetersiz bakiye alert — toast yerine premium modal,
+  //   "Maðazaya Git" / "Ýptal" butonlarý (kullanýcý talebi).
   const [insufficientAlert, setInsufficientAlert] = useState<{ visible: boolean; needed: number }>({ visible: false, needed: 0 });
 
   const sliderRef = useRef<View>(null);
@@ -165,8 +165,8 @@ export default function SPDonateSheet({
         Animated.spring(translateY, { toValue: 0, useNativeDriver: true, damping: 22, stiffness: 220 }),
         Animated.timing(backdropOpacity, { toValue: 1, duration: 220, useNativeDriver: true }),
       ]).start();
-      // â˜… v284 (16 May 2026): Loop ref pattern â€” orphan loop Ã¶nleme.
-      //   ringPulse + ringPulse2 + gemFloat loop'larÄ± ref'e atanÄ±r, kapanÄ±ÅŸta stop().
+      // ? v284 (16 May 2026): Loop ref pattern — orphan loop önleme.
+      //   ringPulse + ringPulse2 + gemFloat loop'larý ref'e atanýr, kapanýþta stop().
       ringPulseLoopRef.current = Animated.loop(
         Animated.sequence([
           Animated.timing(ringPulse, { toValue: 1, duration: 1800, useNativeDriver: true }),
@@ -198,19 +198,19 @@ export default function SPDonateSheet({
       gemFloatLoopRef.current?.stop(); gemFloatLoopRef.current = null;
     }
   }, [visible]);
-  // â˜… v284: Unmount cleanup
+  // ? v284: Unmount cleanup
   useEffect(() => () => {
     ringPulseLoopRef.current?.stop();
     ringPulse2LoopRef.current?.stop();
     gemFloatLoopRef.current?.stop();
   }, []);
 
-  // Panel kapatma gesture â€” sadece handle alanÄ±nda
+  // Panel kapatma gesture — sadece handle alanýnda
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
   const panResponder = useRef(
     PanResponder.create({
-      // â˜… 2026-04-28: Pan tÃ¼m sheet'e baÄŸlÄ± (Clubhouse). Slider yatay, dy kÃ¼Ã§Ã¼k kalÄ±r â†’ Ã§akÄ±ÅŸma yok.
+      // ? 2026-04-28: Pan tüm sheet'e baðlý (Clubhouse). Slider yatay, dy küçük kalýr › çakýþma yok.
       onStartShouldSetPanResponder: () => false,
       onStartShouldSetPanResponderCapture: () => false,
       onMoveShouldSetPanResponder: (_, gs) => gs.dy > 8 && Math.abs(gs.dy) > Math.abs(gs.dx) * 1.5,
@@ -274,21 +274,21 @@ export default function SPDonateSheet({
     if (amount <= 0 || loading) return;
     if (senderId === recipientId) return;
     if (balance !== null && balance < amount) {
-      // â˜… v92.1: Premium alert + "MaÄŸazaya Git" yÃ¶nlendirmesi
+      // ? v92.1: Premium alert + "Maðazaya Git" yönlendirmesi
       setInsufficientAlert({ visible: true, needed: amount - (balance ?? 0) });
       return;
     }
 
-    // â˜… v299 (17 May 2026): Double-tap guard fix â€” Ã¶nceden setLoading(true) HÄ°Ã‡
-    //   Ã§aÄŸrÄ±lmÄ±yordu, "if (loading) return" guard'Ä± hep false gÃ¶rÃ¼yordu. Optimistic
-    //   akÄ±ÅŸta sheet anÄ±nda kapanÄ±yor (onClose), ama component bir sÃ¼re mount kalÄ±yor;
-    //   hÄ±zla yeniden aÃ§Ä±lÄ±rsa aynÄ± state ile tekrar handleDonate tetiklenirdi â†’ 2x
-    //   SP transfer. setLoading(true) ile ikinci giriÅŸ engelleniyor.
+    // ? v299 (17 May 2026): Double-tap guard fix — önceden setLoading(true) HÝÇ
+    //   çaðrýlmýyordu, "if (loading) return" guard'ý hep false görüyordu. Optimistic
+    //   akýþta sheet anýnda kapanýyor (onClose), ama component bir süre mount kalýyor;
+    //   hýzla yeniden açýlýrsa ayný state ile tekrar handleDonate tetiklenirdi › 2x
+    //   SP transfer. setLoading(true) ile ikinci giriþ engelleniyor.
     setLoading(true);
 
-    // â˜… v92.1 (1 May 2026): OPTIMISTIC UI â€” kullanÄ±cÄ± butona basar basmaz success modal
-    //   aÃ§Ä±lÄ±r, DB write arka planda devam eder. Hata olursa balance rollback + toast.
-    //   Eski: DB await sonra modal â†’ 800-1500ms gecikme. Yeni: anlÄ±k feedback.
+    // ? v92.1 (1 May 2026): OPTIMISTIC UI — kullanýcý butona basar basmaz success modal
+    //   açýlýr, DB write arka planda devam eder. Hata olursa balance rollback + toast.
+    //   Eski: DB await sonra modal › 800-1500ms gecikme. Yeni: anlýk feedback.
     const sentAmount = amount;
     setBalance(prev => (prev ?? 0) - sentAmount);
     setSuccessAmount(sentAmount);
@@ -302,8 +302,8 @@ export default function SPDonateSheet({
         // Rollback
         setBalance(prev => (prev ?? 0) + sentAmount);
         setShowSuccess(false);
-        // â˜… v92.28 (2 May 2026): Spesifik hata mesajÄ± â€” kullanÄ±cÄ± neden baÅŸarÄ±sÄ±z
-        //   olduÄŸunu bilmek istiyor (welcome bonus exploit, rate limit, yetersiz, vs.)
+        // ? v92.28 (2 May 2026): Spesifik hata mesajý — kullanýcý neden baþarýsýz
+        //   olduðunu bilmek istiyor (welcome bonus exploit, rate limit, yetersiz, vs.)
         showToast({
           title: i18n.t('profile.spdonatesheet.toast_failed'),
           message: result.error || i18n.t('auto.profile.SPDonateSheet.006'),
@@ -329,13 +329,13 @@ export default function SPDonateSheet({
 
   const canDonate = amount > 0 && balance !== null && balance >= amount && senderId !== recipientId;
   const fillRatio = (amount - 1) / (MAX_SLIDER - 1);
-  // â˜… 2026-04-21: Miktar arttÄ±kÃ§a modal paleti deÄŸiÅŸir
+  // ? 2026-04-21: Miktar arttýkça modal paleti deðiþir
   const tier = getTier(amount);
   const palette = SHEET_PALETTES[tier];
 
   if (!visible && !showSuccess) return null;
 
-  // â˜… BaÅŸarÄ± modalÄ± aktifse sadece onu gÃ¶ster (sheet kapanmÄ±ÅŸ)
+  // ? Baþarý modalý aktifse sadece onu göster (sheet kapanmýþ)
   if (showSuccess) {
     return (
       <SPSentSuccessModal
@@ -349,23 +349,23 @@ export default function SPDonateSheet({
   }
 
   return (
-    // â˜… 2026-04-28: Modal sarmalÄ± kaldÄ±rÄ±ldÄ± (InRoomUserProfile/FollowListModal ile aynÄ± pattern).
+    // ? 2026-04-28: Modal sarmalý kaldýrýldý (InRoomUserProfile/FollowListModal ile ayný pattern).
     //   Modal native dialog Pressable backdrop tap'i + pan responder Capture phase'i Pressable
-    //   child'larla Ã§akÄ±ÅŸÄ±yordu â†’ drag Ã§alÄ±ÅŸmÄ±yor, sadece backdrop tap kapatabiliyordu.
-    //   View overlay zIndex:500 â€” InRoomUserProfile (300) ve FollowListModal (400) Ã¼stÃ¼nde.
+    //   child'larla çakýþýyordu › drag çalýþmýyor, sadece backdrop tap kapatabiliyordu.
+    //   View overlay zIndex:500 — InRoomUserProfile (300) ve FollowListModal (400) üstünde.
     <View style={StyleSheet.absoluteFillObject as any} pointerEvents="box-none">
       <View style={{ ...StyleSheet.absoluteFillObject, zIndex: 500 }} pointerEvents="box-none">
-      {/* â˜… v86: Sinematik backdrop â€” BlurView + tier-based intensity + dim layer */}
+      {/* ? v86: Sinematik backdrop — BlurView + tier-based intensity + dim layer */}
       <Animated.View style={[StyleSheet.absoluteFill, { opacity: backdropOpacity }]}>
         <BlurView intensity={BLUR_INTENSITY[tier]} tint="dark" style={StyleSheet.absoluteFill} />
         <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.45)' }]} />
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
       </Animated.View>
 
-      {/* â˜… v92 (1 May 2026): Floating gem-aura watermark â€” DiscoveryWelcomeSheet
-          kalitesinde panel'in Ã¼stÃ¼nde uÃ§an dev tier-aware hexagon. Parallax: panel
+      {/* ? v92 (1 May 2026): Floating gem-aura watermark — DiscoveryWelcomeSheet
+          kalitesinde panel'in üstünde uçan dev tier-aware hexagon. Parallax: panel
           translateY * 0.35 ile birlikte hareket eder, kendi gem-float animasyonuyla
-          sÃ¼zÃ¼lÃ¼r (3.5sn cycle), tier rengine gÃ¶re paletini deÄŸiÅŸtirir. */}
+          süzülür (3.5sn cycle), tier rengine göre paletini deðiþtirir. */}
       <Animated.View
         pointerEvents="none"
         style={[
@@ -386,8 +386,8 @@ export default function SPDonateSheet({
         <SPHexagonIcon size={240} tier={tier as any} />
       </Animated.View>
 
-      {/* â˜… v86: Tier-based halo katmanlarÄ± â€” panel'in arkasÄ±nda pulsing 3D glow,
-          miktar arttÄ±kÃ§a katman sayÄ±sÄ± artar (premium=1, elite=2, legendary=3) */}
+      {/* ? v86: Tier-based halo katmanlarý — panel'in arkasýnda pulsing 3D glow,
+          miktar arttýkça katman sayýsý artar (premium=1, elite=2, legendary=3) */}
       {HALO_LAYERS[tier] >= 1 && (
         <Animated.View
           pointerEvents="none"
@@ -452,7 +452,7 @@ export default function SPDonateSheet({
         </Animated.View>
       )}
 
-      {/* Panel â€” border/tint/edge tier paletinden gelir */}
+      {/* Panel — border/tint/edge tier paletinden gelir */}
       <Animated.View
         style={[styles.panel, { borderColor: palette.border, paddingBottom: 28 + insets.bottom, transform: [{ translateY }] }]}
         {...panResponder.panHandlers}
@@ -463,7 +463,7 @@ export default function SPDonateSheet({
           start={{ x: 0, y: 0 }} end={{ x: 0.7, y: 1 }}
           style={StyleSheet.absoluteFillObject}
         />
-        {/* Tier tint â€” amount deÄŸiÅŸtikÃ§e renk geÃ§iÅŸi */}
+        {/* Tier tint — amount deðiþtikçe renk geçiþi */}
         <LinearGradient
           colors={[palette.tintColor, palette.tintColor.replace(/[\d.]+\)$/, '0.06)'), 'transparent']}
           start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
@@ -475,16 +475,16 @@ export default function SPDonateSheet({
           style={styles.topEdge}
         />
 
-        {/* â˜… 2026-04-28: Handle artÄ±k gÃ¶rsel â€” pan tÃ¼m sheet'te (Clubhouse). */}
+        {/* ? 2026-04-28: Handle artýk görsel — pan tüm sheet'te (Clubhouse). */}
         <View style={styles.handle}>
           <View style={[styles.handleBar, { backgroundColor: palette.accentSolid + '73' }]} />
         </View>
 
         {/* Header */}
         <View style={styles.header}>
-          {/* â˜… v92 (1 May 2026): Ionicons "diamond" â†’ SPIcon (PNG hexagon) â€” marka tutarlÄ±lÄ±ÄŸÄ±.
-              Hazine baÄŸÄ±ÅŸÄ±nda "planet" korunur (oda hazinesi sembolÃ¼).
-              â˜… v92.1: ikon 20â†’28 bÃ¼yÃ¼tÃ¼ldÃ¼ (header'da daha belirgin). */}
+          {/* ? v92 (1 May 2026): Ionicons "diamond" › SPIcon (PNG hexagon) — marka tutarlýlýðý.
+              Hazine baðýþýnda "planet" korunur (oda hazinesi sembolü).
+              ? v92.1: ikon 20›28 büyütüldü (header'da daha belirgin). */}
           <SPIcon size={28} />
           <Text style={styles.headerTitle}>{i18n.t('profile.spdonatesheet.001')}</Text>
           {palette.labelText && (
@@ -494,24 +494,24 @@ export default function SPDonateSheet({
           )}
           <View style={[styles.balancePill, { backgroundColor: palette.accentSolid + '1A', borderColor: palette.accentSolid + '33' }]}>
             <Ionicons name="wallet" size={10} color={palette.accentSolid} />
-            <Text style={[styles.balanceText, { color: palette.accentSolid }]}>{balance !== null ? balance.toLocaleString('tr-TR') : '...'}</Text>
+            <Text style={[styles.balanceText, { color: palette.accentSolid }]}>{balance !== null ? balance.toLocaleString(i18n.locale) : '...'}</Text>
           </View>
         </View>
 
-        {/* AlÄ±cÄ± */}
+        {/* Alýcý */}
         <Text style={styles.recipientText}>
           <Text style={{ color: palette.accentSolid, fontWeight: '800' }}>{recipientName}</Text>
           <Text>{i18n.t('profile.spdonatesheet.002')}</Text>
         </Text>
 
-        {/* â˜… v92 (1 May 2026): Miktar gÃ¶stergesi â€” tier-aware hexagon + sayÄ±/SP.
-            Hexagon kendi iÃ§inde gem-float + halo + facet-bright animasyonlarÄ±na sahip. */}
+        {/* ? v92 (1 May 2026): Miktar göstergesi — tier-aware hexagon + sayý/SP.
+            Hexagon kendi içinde gem-float + halo + facet-bright animasyonlarýna sahip. */}
         <View style={styles.amountWrap}>
           <View style={styles.amountHexWrap}>
             <SPHexagonIcon size={92} tier={tier as any} />
           </View>
-          {/* â˜… v92.1 (1 May 2026): "SP" alt label kaldÄ±rÄ±ldÄ± â€” modalÄ±n her yerinde SP zaten yazÄ±yor. */}
-          <Text style={[styles.amountValue, { color: palette.amountColor }]}>{amount.toLocaleString('tr-TR')}</Text>
+          {/* ? v92.1 (1 May 2026): "SP" alt label kaldýrýldý — modalýn her yerinde SP zaten yazýyor. */}
+          <Text style={[styles.amountValue, { color: palette.amountColor }]}>{amount.toLocaleString(i18n.locale)}</Text>
         </View>
 
         {/* Slider */}
@@ -559,7 +559,7 @@ export default function SPDonateSheet({
           })}
         </View>
 
-        {/* GÃ¶nder butonu â€” tier gradient + Skia gold glow */}
+        {/* Gönder butonu — tier gradient + Skia gold glow */}
         <SkiaShadow shadowColor="#FBBF24" shadowOpacity={canDonate ? 0.5 : 0} shadowBlur={12} shadowOffsetY={4} borderRadius={14} style={{ marginHorizontal: 18, marginTop: 4 }}>
           <Pressable
             style={[styles.sendBtn, !canDonate && { opacity: 0.4 }, { marginHorizontal: 0, marginTop: 0 }]}
@@ -576,7 +576,7 @@ export default function SPDonateSheet({
               ) : (
                 <>
                   <SPIcon size={26} />
-                  <Text style={styles.sendBtnText}>{amount.toLocaleString('tr-TR')}{i18n.t('auto.profile.SPDonateSheet.004')}</Text>
+                  <Text style={styles.sendBtnText}>{amount.toLocaleString(i18n.locale)}{i18n.t('auto.profile.SPDonateSheet.004')}</Text>
                 </>
               )}
             </LinearGradient>
@@ -585,7 +585,7 @@ export default function SPDonateSheet({
       </Animated.View>
       </View>
 
-      {/* â˜… v92.1 (1 May 2026): Yetersiz bakiye alert â€” "MaÄŸazaya Git" yÃ¶nlendirmesi */}
+      {/* ? v92.1 (1 May 2026): Yetersiz bakiye alert — "Maðazaya Git" yönlendirmesi */}
       <PremiumAlert
         visible={insufficientAlert.visible}
         title="Yetersiz SP"
@@ -622,7 +622,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     borderWidth: Platform.OS === 'android' ? 2 : 1.5,
-    // â˜… v86: Android border parlaklÄ±ÄŸÄ± arttÄ±rÄ±ldÄ±, glow yerine sharp altÄ±n Ã§erÃ§eve
+    // ? v86: Android border parlaklýðý arttýrýldý, glow yerine sharp altýn çerçeve
     borderColor: Platform.OS === 'android' ? 'rgba(251,191,36,0.55)' : 'rgba(251,191,36,0.35)',
     borderBottomWidth: 0,
     overflow: 'hidden',
@@ -634,7 +634,7 @@ const styles = StyleSheet.create({
         shadowRadius: 20,
       },
       android: {
-        // Android elevation Ã¼st gÃ¶lge iÃ§in yetersiz â€” modal'lar iÃ§in subtle elevation yeterli
+        // Android elevation üst gölge için yetersiz — modal'lar için subtle elevation yeterli
         elevation: 12,
       },
     }),
@@ -665,7 +665,7 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
   },
 
-  // â˜… v92: amount alanÄ± yatay layout â€” sol tier-aware hexagon (92Ã—92), saÄŸ sayÄ±+SP yÄ±ÄŸÄ±nÄ±.
+  // ? v92: amount alaný yatay layout — sol tier-aware hexagon (92×92), sað sayý+SP yýðýný.
   amountWrap: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 14,
     paddingVertical: 4,
@@ -711,7 +711,7 @@ const styles = StyleSheet.create({
   sliderFill: {
     position: 'absolute', left: 0, top: 0, bottom: 0,
     borderRadius: 4,
-    // â˜… v86: iOS'ta neon glow, Android'de gÃ¶rÃ¼nmez idi â†’ border highlight
+    // ? v86: iOS'ta neon glow, Android'de görünmez idi › border highlight
     ...Platform.select({
       ios: {
         shadowColor: '#FBBF24', shadowOffset: { width: 0, height: 0 },
@@ -741,13 +741,13 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(251,191,36,0.08)',
     borderWidth: 1, borderColor: 'rgba(251,191,36,0.2)',
   },
-  // â˜… v86: quickBtnActive ve quickTextActive kaldÄ±rÄ±ldÄ± â€” render'da inline override yapÄ±lÄ±yor (kullanÄ±lmÄ±yordu)
+  // ? v86: quickBtnActive ve quickTextActive kaldýrýldý — render'da inline override yapýlýyor (kullanýlmýyordu)
   quickText: { fontSize: 13, fontWeight: '800', color: 'rgba(251,191,36,0.65)' },
 
   sendBtn: {
     marginHorizontal: 18, marginTop: 4,
     borderRadius: 14, overflow: 'hidden',
-    // â˜… v86: Android'de renkli neon glow yok â€” kalÄ±n parlak altÄ±n Ã§erÃ§eve telafi ediyor
+    // ? v86: Android'de renkli neon glow yok — kalýn parlak altýn çerçeve telafi ediyor
     borderWidth: Platform.OS === 'android' ? 2 : 1,
     borderColor: Platform.OS === 'android' ? 'rgba(255,224,130,0.85)' : 'rgba(255,224,130,0.5)',
     ...Platform.select({
@@ -756,7 +756,7 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.45, shadowRadius: 10,
       },
       android: {
-        elevation: 6,  // subtle drop shadow (gri ama varlÄ±ÄŸÄ± belli olsun)
+        elevation: 6,  // subtle drop shadow (gri ama varlýðý belli olsun)
       },
     }),
   },
@@ -769,8 +769,8 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0,0,0,0.45)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
 
-  // â˜… v92 (1 May 2026): Floating gem-aura watermark â€” panel Ã¼stÃ¼ dev hexagon glow.
-  //   DiscoveryWelcomeSheet kalitesinde, parallax + gem-float ile sÃ¼zÃ¼lÃ¼r.
+  // ? v92 (1 May 2026): Floating gem-aura watermark — panel üstü dev hexagon glow.
+  //   DiscoveryWelcomeSheet kalitesinde, parallax + gem-float ile süzülür.
   gemAuraWrap: {
     position: 'absolute',
     top: '20%',
@@ -779,7 +779,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
-  // â˜… v86: Sinematik halo katmanlarÄ± â€” panel'in arkasÄ±nda concentric pulse glow
+  // ? v86: Sinematik halo katmanlarý — panel'in arkasýnda concentric pulse glow
   //   panel translateY ile birlikte hareket eder, scale + opacity ile pulse.
   haloLayer1: {
     position: 'absolute',

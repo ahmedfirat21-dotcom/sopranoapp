@@ -1,15 +1,15 @@
 /**
- * SopranoChat — Destek Talepleri Servisi (v300)
- * ═══════════════════════════════════════════════════════════════════
- * Kullanıcı uygulama içinden destek talebi gönderir → support_tickets
- * tablosuna INSERT. Web admin /yonet/destek panelinde görünür.
+ * SopranoChat â Destek Talepleri Servisi (v300)
+ * âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+ * KullanÄ±cÄ± uygulama iÃ§inden destek talebi gÃ¶nderir â support_tickets
+ * tablosuna INSERT. Web admin /yonet/destek panelinde gÃ¶rÃ¼nÃ¼r.
  *
- * Akış:
- *   APK Form → SupportService.submitTicket(...) → DB insert → trigger
- *     → pg_notify('support_ticket_new', ...) → web admin realtime liste
+ * AkÄ±Å:
+ *   APK Form â SupportService.submitTicket(...) â DB insert â trigger
+ *     â pg_notify('support_ticket_new', ...) â web admin realtime liste
  *
- * RLS: kullanıcı sadece kendi user_id ile INSERT edebilir + kendi
- * ticket'larını SELECT görebilir.
+ * RLS: kullanÄ±cÄ± sadece kendi user_id ile INSERT edebilir + kendi
+ * ticket'larÄ±nÄ± SELECT gÃ¶rebilir.
  */
 import { supabase } from '../constants/supabase';
 import { Platform } from 'react-native';
@@ -42,7 +42,7 @@ export interface SupportTicket {
 
 export const SupportService = {
   /**
-   * Yeni destek talebi gönder.
+   * Yeni destek talebi gÃ¶nder.
    * Validasyon DB CHECK constraint'leri ile de korunuyor (subject 3-120,
    * message 10-2000 karakter, category enum).
    */
@@ -54,13 +54,13 @@ export const SupportService = {
     subject: string;
     message: string;
   }): Promise<{ success: boolean; ticketId?: string; error?: string }> {
-    // Client-side hızlı validasyon (DB tarafı zaten kontrol ediyor)
+    // Client-side hÄ±zlÄ± validasyon (DB tarafÄ± zaten kontrol ediyor)
     const subject = params.subject?.trim() || '';
     const message = params.message?.trim() || '';
-    if (subject.length < 3) return { success: false, error: 'Konu çok kısa (en az 3 karakter).' };
-    if (subject.length > 120) return { success: false, error: 'Konu çok uzun (en fazla 120 karakter).' };
-    if (message.length < 10) return { success: false, error: 'Mesaj çok kısa (en az 10 karakter).' };
-    if (message.length > 2000) return { success: false, error: 'Mesaj çok uzun (en fazla 2000 karakter).' };
+    if (subject.length < 3) return { success: false, error: i18n.t('support.subject_too_short') };
+    if (subject.length > 120) return { success: false, error: i18n.t('support.subject_too_long') };
+    if (message.length < 10) return { success: false, error: i18n.t('support.message_too_short') };
+    if (message.length > 2000) return { success: false, error: i18n.t('support.message_too_long') };
 
     try {
       const { data, error } = await supabase
@@ -88,7 +88,7 @@ export const SupportService = {
   },
 
   /**
-   * Kullanıcının kendi geçmiş ticket'larını getir.
+   * KullanÄ±cÄ±nÄ±n kendi geÃ§miÅ ticket'larÄ±nÄ± getir.
    */
   async getMyTickets(userId: string): Promise<SupportTicket[]> {
     try {

@@ -51,7 +51,7 @@ const RARITY_PALETTE: Record<BadgeRarity, {
   ctaGradient: [string, string];        // CTA button gradient
 }> = {
   common: {
-    label: 'YAYGIN',
+    label: i18n.t('badge.rarity.common'),
     primary: '#94A3B8',
     light: '#CBD5E1',
     deep: '#475569',
@@ -61,7 +61,7 @@ const RARITY_PALETTE: Record<BadgeRarity, {
     ctaGradient: ['#64748B', '#475569'],
   },
   rare: {
-    label: 'NADİR',
+    label: i18n.t('badge.rarity.rare'),
     primary: '#FBBF24',
     light: '#FDE68A',
     deep: '#854D0E',
@@ -71,7 +71,7 @@ const RARITY_PALETTE: Record<BadgeRarity, {
     ctaGradient: ['#D97706', '#92400E'],
   },
   epic: {
-    label: 'EPİK',
+    label: i18n.t('badge.rarity.epic'),
     primary: '#A78BFA',
     light: '#DDD6FE',
     deep: '#5B21B6',
@@ -81,7 +81,7 @@ const RARITY_PALETTE: Record<BadgeRarity, {
     ctaGradient: ['#7C3AED', '#5B21B6'],
   },
   legendary: {
-    label: 'EFSANEVİ',
+    label: i18n.t('badge.rarity.legendary'),
     primary: '#FCD34D',
     light: '#FEF3C7',
     deep: '#78350F',
@@ -496,7 +496,7 @@ export default function BadgeDetailModal({ visible, onClose, badge, locked = fal
             <View style={styles.howToBox}>
               <View style={styles.howToHeader}>
                 <Ionicons name="flag" size={12} color="#5EEAD4" />
-                <Text style={styles.howToTitle}>Nasıl Kazanırım</Text>
+                <Text style={styles.howToTitle}>{i18n.t('badge.how_to_earn')}</Text>
               </View>
               <Text style={styles.howToText}>{badge.criteriaText}</Text>
             </View>
@@ -516,7 +516,7 @@ export default function BadgeDetailModal({ visible, onClose, badge, locked = fal
               <View style={styles.perksHeader}>
                 <Ionicons name="ribbon" size={12} color="#FBBF24" />
                 <Text style={styles.perksTitle}>
-                  {locked ? 'Kazanınca Sağlayacağı Avantajlar' : 'Bu Rozetin Avantajları'}
+                  {locked ? i18n.t('badge.perks_locked') : i18n.t('badge.perks_earned')}
                 </Text>
               </View>
               {badge.perks!.map((perk, idx) => (
@@ -538,7 +538,7 @@ export default function BadgeDetailModal({ visible, onClose, badge, locked = fal
               />
               <Ionicons name="sparkles" size={14} color="#FBBF24" />
               <Text style={styles.rewardText}>
-                +{badge.spReward} SP ödül {locked ? 'kazanırsın' : 'kazandın'}
+                {locked ? i18n.t('badge.sp_reward_locked', { 0: badge.spReward }) : i18n.t('badge.sp_reward_earned', { 0: badge.spReward })}
               </Text>
             </View>
           )}

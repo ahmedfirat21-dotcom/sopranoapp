@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { View, Text, StyleSheet, Image, Pressable, TextInput, FlatList, Platform, Animated, Easing, NativeScrollEvent, NativeSyntheticEvent, Modal, Keyboard, Dimensions, Alert, KeyboardAvoidingView } from 'react-native';
+import { View, Text, StyleSheet, Image, Pressable, TextInput, FlatList, Platform, Animated, Easing, NativeScrollEvent, NativeSyntheticEvent, Modal, Keyboard, Alert } from 'react-native';
+// ★ v1.7.13.141: KeyboardAvoidingView + Dimensions import kaldırıldı — hiçbir yerde kullanılmıyor.
 
 // ★ v92.16: react-native-keyboard-controller kaldırıldı — native modül linked değildi.
-//   RN built-in KeyboardAvoidingView kullanılıyor (RN import'undaki mevcut).
-//   Samsung cihazlarda sorun olursa: behavior="height" + keyboardVerticalOffset ile ayarla.
+//   ★ v1.7.13.141: KAV import da kaldırıldı — hiçbir yerde kullanılmıyordu.
+//   Manuel kbHeight + paddingBottom yaklaşımı kullanılıyor.
 
 import PremiumAlert, { type AlertButton } from '../../components/PremiumAlert';
 import { Ionicons } from '@expo/vector-icons';
@@ -40,6 +41,7 @@ import AppLoader from '../../components/AppLoader';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Haptics } from '../../utils/haptics';
 
 // ★ SEC-MSG: Mesaj sanitizasyonu + flood koruması
 const MSG_MAX_LENGTH = 2000;
@@ -50,6 +52,24 @@ function sanitizeMessage(text: string): string {
 }
 
 
+// ★ v1.7.13.141: Tarih ayırıcı etiketi — WhatsApp tarzı "Bugün", "Dün", "15 Mayıs 2026"
+const TR_MONTHS = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
+function getDateLabel(dateStr: string): string {
+  const d = new Date(dateStr);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const msgDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const diffMs = today.getTime() - msgDay.getTime();
+  const diffDays = Math.round(diffMs / 86400000);
+  if (diffDays === 0) return i18n.t('chat.today');
+  if (diffDays === 1) return i18n.t('chat.yesterday');
+  return `${d.getDate()} ${TR_MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+}
+function isSameDateStr(a: string, b: string): boolean {
+  const da = new Date(a);
+  const db = new Date(b);
+  return da.getFullYear() === db.getFullYear() && da.getMonth() === db.getMonth() && da.getDate() === db.getDate();
+}
 
 function getChatColorStyle(colorId?: string | null) {
   switch (colorId) {
@@ -224,7 +244,7 @@ function MediaLinksModal({ visible, messages, onClose, onImagePress }: {
                 renderItem={({ item }) => (
                   <View style={styles.mediaListItem}>
                     <Ionicons name="mic" size={18} color={Colors.teal} />
-                    <Text style={styles.mediaListText} numberOfLines={1}>{new Date(item.time).toLocaleString('tr-TR')}</Text>
+                    <Text style={styles.mediaListText} numberOfLines={1}>{new Date(item.time).toLocaleString(i18n.locale)}</Text>
                     <Text style={{ fontSize: 11, color: Colors.text3 }}>{item.duration ? `${item.duration}s` : ''}</Text>
                   </View>
                 )}
@@ -279,7 +299,7 @@ function KebabDropdown({ visible, children }: { visible: boolean; children: Reac
 }
 
 function MessageBubble({ message, isMe, senderAvatar, senderName, myAvatar, onDelete, onReport, onAction, onReaction, isReactionActive, onToggleReaction, onImagePress, onAvatarPress, replyToMessage, onOpenActions, onJumpTo }: { message: Message; isMe: boolean; senderAvatar?: string; senderName?: string; myAvatar?: string; onDelete?: (msgId: string) => void; onReport?: (msgId: string) => void; onAction?: (buttons: any[]) => void; onReaction?: (msgId: string, emoji: string) => void; isReactionActive?: boolean; onToggleReaction?: (msgId: string | null) => void; onImagePress?: (uri: string) => void; onAvatarPress?: () => void; replyToMessage?: Message | null; onOpenActions?: (msg: Message) => void; onJumpTo?: (msgId: string) => void }) {
-  const time = new Date(message.created_at).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+  const time = new Date(message.created_at).toLocaleTimeString(i18n.locale, { hour: '2-digit', minute: '2-digit' });
   const customStyle = getChatColorStyle(message.sender?.active_chat_color);
   const isTemp = message.id.startsWith('temp_');
   const hasVoice = !!message.voice_url;
@@ -302,6 +322,8 @@ function MessageBubble({ message, isMe, senderAvatar, senderName, myAvatar, onDe
     if (/^https?:\/\/\S+\.(?:jpg|jpeg|png|gif|webp|heic)(?:\?\S*)?$/i.test(content)) return content;
     // 3) Supabase Storage public URL — uzantı olmasa bile (post-images / avatars bucket)
     if (/^https?:\/\/[\w-]+\.supabase\.co\/storage\/v1\/object\/public\/(?:post-images|avatars)\/\S+$/i.test(content)) return content;
+    // 4) ★ v1.7.13.141: Tenor GIF URL — media.tenor.com (tinygif uzantısız olabiliyor)
+    if (/^https?:\/\/media\.tenor\.com\/\S+$/i.test(content)) return content;
     return null;
   })();
   const hasImage = !!message.image_url || !!imageUrlFromContent;
@@ -537,9 +559,8 @@ export default function ChatScreen() {
   // ★ v109: Disappearing messages timer
   const [disappearingSeconds, setDisappearingSeconds] = useState(0);
   const [showDisappearingPicker, setShowDisappearingPicker] = useState(false);
-  const [chatSearchVisible, setChatSearchVisible] = useState(false);
-  const [chatSearchQuery, setChatSearchQuery] = useState('');
-  const [chatSearchResults, setChatSearchResults] = useState<Message[]>([]);
+  // ★ v1.7.13.141: chatSearchVisible / chatSearchQuery / chatSearchResults kaldırıldı — dead code.
+  //   Aktif arama showMessageSearch + messageSearchQuery kullanıyor (line ~597-598).
   const { openSearch: openUserSearch } = useUserSearchSheet();
   // ★ 2026-04-23: RoomChatDrawer pattern — input bar'ı klavyenin üstüne sabitle (Clubhouse).
   // MiniRoomCard global overlay (z:999) DM üstünde durduğu için, oda minimize iken
@@ -565,15 +586,19 @@ export default function ChatScreen() {
   }, [inputBarHeight]);
   useEffect(() => {
     // ★ v108.31: KAV kaldırıldı — adjustResize + flex yeterli.
-    //   Listener sadece scrollToEnd ve kbHeight flag için (input bar paddingBottom).
+    //   Android: adjustResize window'u zaten küçültüyor → kbHeight KULLANMA (çift kaydırma bug).
+    //   iOS: keyboard overlay yapıyor → paddingBottom:kbHeight gerekli.
+    //   Listener her iki platformda da scrollToEnd tetikler.
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
     const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
     const showSub = Keyboard.addListener(showEvent, (e) => {
-      setKbHeight(e.endCoordinates.height);
+      // ★ FIX: Android'de adjustResize zaten pencereyi küçültüyor,
+      //   paddingBottom eklersek çift kaydırma olur (input bar yukarı zıplar).
+      if (Platform.OS === 'ios') setKbHeight(e.endCoordinates.height);
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: false }), 80);
     });
     const hideSub = Keyboard.addListener(hideEvent, () => {
-      setKbHeight(0);
+      if (Platform.OS === 'ios') setKbHeight(0);
       if (isAtBottomRef.current) {
         setTimeout(() => flatListRef.current?.scrollToEnd({ animated: false }), 80);
       }
@@ -599,6 +624,13 @@ export default function ChatScreen() {
   const [showMediaDrawer, setShowMediaDrawer] = useState(false); // ★ Medya + bağlantılar
   const [isMuted, setIsMuted] = useState(false); // ★ Sessize al
   const [isBlocked, setIsBlocked] = useState(false); // ★ Engel durumu
+  // ★ v1.7.13.141: Scroll-to-bottom FAB state
+  const [showScrollFab, setShowScrollFab] = useState(false);
+  const scrollFabOpacity = useRef(new Animated.Value(0)).current;
+  const [unreadWhileScrolled, setUnreadWhileScrolled] = useState(0);
+  // ★ v1.7.13.141: Pagination — eski mesajları yükle
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const [viewerImage, setViewerImage] = useState<string | null>(null); // ★ Tam ekran görsel
 
   // ★ Cevapsız Arama State (WhatsApp tarzı)
@@ -811,6 +843,8 @@ export default function ChatScreen() {
           ? history.filter(m => new Date(m.created_at) > new Date(clearedBefore))
           : history;
         setMessages(filteredHistory);
+        // ★ v1.7.13.141: İlk yüklemede 50'den az geldiyse daha eski mesaj yok
+        setHasMore(history.length >= 50);
         // ★ v110.5.15: Cache'i fresh data ile güncelle (sonraki açılışlar instant)
         DMCacheService.save(firebaseUser.uid, id, filteredHistory).catch(() => {});
 
@@ -885,9 +919,14 @@ export default function ChatScreen() {
             }
           })().catch(() => {}),
 
-          // Mute durumu
-          AsyncStorage.getItem(`mute_chat_${firebaseUser.uid}_${id}`)
-            .then(val => setIsMuted(val === 'true'))
+          // ★ v1.7.13.141: Mute durumu — MessageService.toggleMute ile tutarlı (conversation_state tablosu)
+          supabase
+            .from('conversation_state')
+            .select('muted_at')
+            .eq('user_id', firebaseUser.uid)
+            .eq('partner_id', id)
+            .maybeSingle()
+            .then(({ data }) => setIsMuted(!!data?.muted_at))
             .catch(() => {}),
         ]);
       } catch (err) {
@@ -910,6 +949,10 @@ export default function ChatScreen() {
           if (existing) return prev;
           return [...prev, newMsg];
         });
+        // ★ v1.7.13.141: Kullanıcı yukarı scroll etmişse unread badge sayacını artır
+        if (!isAtBottomRef.current) {
+          setUnreadWhileScrolled(prev => prev + 1);
+        }
         // ★ v110.5.15: Cache'e ekle (realtime'dan gelen mesaj)
         DMCacheService.append(firebaseUser.uid, id, newMsg).catch(() => {});
         // ★ BUG-6 FIX: Yeni mesaj geldiğinde sadece en alttaysa scroll yap
@@ -1031,6 +1074,32 @@ export default function ChatScreen() {
       MessageService.cleanupTypingChannel(id);
     };
   }, [id, firebaseUser, dmNotif]);
+
+  // ★ v1.7.13.141: Pagination — eski mesajları yükle (FlatList onEndReached tetikler)
+  const loadOlderMessages = useCallback(async () => {
+    if (!firebaseUser || !id || loadingMore || !hasMore) return;
+    if (messages.length === 0) return;
+    setLoadingMore(true);
+    try {
+      const oldestMsg = messages[0]; // ascending sıralı → ilk eleman en eski
+      const older = await MessageService.getConversation(firebaseUser.uid, id, 50, oldestMsg.created_at);
+      if (older.length === 0) {
+        setHasMore(false);
+      } else {
+        // Duplikat önleme
+        const existingIds = new Set(messages.map(m => m.id));
+        const uniqueOlder = older.filter(m => !existingIds.has(m.id));
+        if (uniqueOlder.length > 0) {
+          setMessages(prev => [...uniqueOlder, ...prev]);
+        }
+        if (older.length < 50) setHasMore(false);
+      }
+    } catch (err) {
+      if (__DEV__) console.warn('Eski mesajlar yüklenemedi:', err);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [firebaseUser, id, loadingMore, hasMore, messages]);
 
   // ★ v109: Taslak — chat açıldığında DB'den oku (varsa input'a doldur)
   useEffect(() => {
@@ -1191,13 +1260,15 @@ export default function ChatScreen() {
     });
   }, [firebaseUser, openUserSearch]);
 
-  const handleReportMessage = useCallback((_msg: Message) => {
-    // Mevcut report flow'una bağla — basitçe toast (placeholder, asıl modal başka yerde)
-    showToast({ title: 'Mesaj bildirildi', message: i18n.t('chat.id.016'), type: 'info' });
+  // ★ v1.7.13.141: handleReportMessage — ReportModal açarak mesajı bildirme (eski placeholder toast kaldırıldı)
+  const handleReportMessage = useCallback((msg: Message) => {
+    setReportMessageId(msg.id);
+    setShowReportModal(true);
   }, []);
 
   const handleSend = async () => {
     if (!inputText.trim() || !firebaseUser || !id) return;
+    Haptics.tap();
 
     // ★ SEC-FLOOD: 500ms throttle — flood engeli
     const now = Date.now();
@@ -1353,18 +1424,23 @@ export default function ChatScreen() {
                 <Text style={styles.typingHeaderText}>{i18n.t('chat.id.002')}</Text>
                 <Text style={styles.typingDots}>…</Text>
               </>
-            ) : onlinePresenceIds.has(id as string) ? (
-              <>
-                <View style={styles.onlineDot} />
-                <Text style={styles.onlineText}>{t('messages.online')}</Text>
-              </>
-            ) : (
-              <Text style={styles.offlineText}>
-                {otherUser?.last_seen
-                  ? i18n.t('auto.chat.id.032', { 0: new Date(otherUser.last_seen).toLocaleString('tr-TR', { hour: '2-digit', minute: '2-digit' }) })
-                  : i18n.t('auto.chat.id.031')}
-              </Text>
-            )}
+            ) : isMutualFollow ? (
+              /* ★ v1.7.13.49 (20 May 2026): Privacy — son görülme + online dot SADECE
+                 karşılıklı arkadaşlık varsa gösterilir. Yabancılar/tek yönlü
+                 takipçiler için chat header'da sadece isim görünür. */
+              onlinePresenceIds.has(id as string) ? (
+                <>
+                  <View style={styles.onlineDot} />
+                  <Text style={styles.onlineText}>{t('messages.online')}</Text>
+                </>
+              ) : (
+                <Text style={styles.offlineText}>
+                  {otherUser?.last_seen
+                    ? i18n.t('auto.chat.id.032', { 0: new Date(otherUser.last_seen).toLocaleString(i18n.locale, { hour: '2-digit', minute: '2-digit' }) })
+                    : i18n.t('auto.chat.id.031')}
+                </Text>
+              )
+            ) : null}
           </View>
           </View>
         </Pressable>
@@ -1503,7 +1579,10 @@ export default function ChatScreen() {
               <Ionicons name="close-circle" size={18} color="#F87171" />
               <Text style={msgReqBannerStyles.btnRejectText}>{t('common.delete')}</Text>
             </Pressable>
-            <SkiaShadow shadowColor="#14B8A6" shadowOpacity={0.55} shadowBlur={10} shadowOffsetY={3} borderRadius={10} style={{ flex: 1 }}>
+            {/* ★ v1.7.13.49 (20 May 2026): SkiaShadow wrapper KALDIRILDI — Pressable
+                 flex:1 SkiaShadow contentWrapper içinden iletilmediği için buton 0px
+                 width olup "Kabul Et" yazısı kaybolmuştu. Android'de zaten gölge yoktu
+                 (Platform.select boş), iOS'ta da minor halo — fonksiyon > kozmetik. */}
             <Pressable
               style={[msgReqBannerStyles.btnFull, msgReqBannerStyles.btnAcceptFull]}
               disabled={respondingRequest}
@@ -1522,7 +1601,6 @@ export default function ChatScreen() {
               <Ionicons name="checkmark-circle" size={18} color="#FFF" />
               <Text style={msgReqBannerStyles.btnAcceptText}>{t('common.accept')}</Text>
             </Pressable>
-            </SkiaShadow>
           </View>
         </View>
       )}
@@ -1545,64 +1623,82 @@ export default function ChatScreen() {
         ref={flatListRef}
         data={showMessageSearch && messageSearchQuery.trim() ? messages.filter(m => (m.content || '').toLowerCase().includes(messageSearchQuery.trim().toLowerCase())) : messages}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <MessageBubble
-            message={item}
-            isMe={item.sender_id === firebaseUser?.uid}
-            senderAvatar={item.sender_id !== firebaseUser?.uid ? otherUser?.avatar_url || '' : undefined}
-            senderName={item.sender_id !== firebaseUser?.uid ? otherUser?.display_name || '' : undefined}
-            myAvatar={profile?.avatar_url || ''}
-            isReactionActive={activeReactionMsgId === item.id}
-            onToggleReaction={setActiveReactionMsgId}
-            onAvatarPress={() => { if (id) openUserProfile(id as string); }}
-            replyToMessage={item.reply_to_id ? messages.find(m => m.id === item.reply_to_id) || null : null}
-            onOpenActions={setActionMenuMsg}
-            onJumpTo={(targetId: string) => {
-              const idx = messages.findIndex(m => m.id === targetId);
-              if (idx >= 0) flatListRef.current?.scrollToIndex({ index: idx, animated: true, viewPosition: 0.5 });
-            }}
-            onDelete={async (msgId) => {
-              try {
-                await MessageService.deleteMessage(msgId, firebaseUser!.uid);
-                setMessages(prev => prev.map(m => m.id === msgId ? { ...m, is_deleted: true } as any : m));
-              } catch {
-                showToast({ title: 'Mesaj silinemedi', type: 'error' });
-              }
-            }}
-            onReport={(msgId) => {
-              setReportMessageId(msgId);
-              setShowReportModal(true);
-            }}
-            onAction={(buttons) => {
-              setCAlert({ visible: true, title: i18n.t('chat.id.021'), message: '', type: 'info', buttons });
-            }}
-            onReaction={async (msgId, emoji) => {
-              if (!firebaseUser) return;
-              try {
-                const msg = messages.find(m => m.id === msgId);
-                const existing: Record<string, string[]> = (msg as any)?.reactions ? JSON.parse((msg as any).reactions) : {};
-                
-                const myId = firebaseUser.uid;
-                if (existing[emoji]?.includes(myId)) {
-                  existing[emoji] = existing[emoji].filter(id => id !== myId);
-                  if (existing[emoji].length === 0) delete existing[emoji];
-                } else {
-                  if (!existing[emoji]) existing[emoji] = [];
-                  existing[emoji].push(myId);
-                }
-                
-                const reactionsJson = JSON.stringify(existing);
-                await MessageService.updateReaction(msgId, reactionsJson);
-                setMessages(prev => prev.map(m =>
-                  m.id === msgId ? { ...m, reactions: reactionsJson } as any : m
-                ));
-              } catch (err) {
-                if (__DEV__) console.warn('[Chat] Emoji tepki hatası:', err);
-              }
-            }}
-            onImagePress={(uri) => setViewerImage(uri)}
-          />
-        )}
+        renderItem={({ item, index }) => {
+          // ★ v1.7.13.141: Tarih ayırıcı — önceki mesajdan farklı günse üstte etiket göster
+          const displayData = showMessageSearch && messageSearchQuery.trim()
+            ? messages.filter(m => (m.content || '').toLowerCase().includes(messageSearchQuery.trim().toLowerCase()))
+            : messages;
+          const prevMsg = index > 0 ? displayData[index - 1] : null;
+          const showDateSep = !prevMsg || !isSameDateStr(prevMsg.created_at, item.created_at);
+          return (
+            <>
+              {showDateSep && (
+                <View style={styles.dateSeparator}>
+                  <View style={styles.dateSeparatorPill}>
+                    <Text style={styles.dateSeparatorText}>{getDateLabel(item.created_at)}</Text>
+                  </View>
+                </View>
+              )}
+              <MessageBubble
+                message={item}
+                isMe={item.sender_id === firebaseUser?.uid}
+                senderAvatar={item.sender_id !== firebaseUser?.uid ? otherUser?.avatar_url || '' : undefined}
+                senderName={item.sender_id !== firebaseUser?.uid ? otherUser?.display_name || '' : undefined}
+                myAvatar={profile?.avatar_url || ''}
+                isReactionActive={activeReactionMsgId === item.id}
+                onToggleReaction={setActiveReactionMsgId}
+                onAvatarPress={() => { if (id) openUserProfile(id as string); }}
+                replyToMessage={item.reply_to_id ? messages.find(m => m.id === item.reply_to_id) || null : null}
+                onOpenActions={setActionMenuMsg}
+                onJumpTo={(targetId: string) => {
+                  const idx = messages.findIndex(m => m.id === targetId);
+                  if (idx >= 0) flatListRef.current?.scrollToIndex({ index: idx, animated: true, viewPosition: 0.5 });
+                }}
+                onDelete={async (msgId) => {
+                  try {
+                    await MessageService.deleteMessage(msgId, firebaseUser!.uid);
+                    setMessages(prev => prev.map(m => m.id === msgId ? { ...m, is_deleted: true } as any : m));
+                  } catch {
+                    showToast({ title: 'Mesaj silinemedi', type: 'error' });
+                  }
+                }}
+                onReport={(msgId) => {
+                  setReportMessageId(msgId);
+                  setShowReportModal(true);
+                }}
+                onAction={(buttons) => {
+                  setCAlert({ visible: true, title: i18n.t('chat.id.021'), message: '', type: 'info', buttons });
+                }}
+                onReaction={async (msgId, emoji) => {
+                  if (!firebaseUser) return;
+                  Haptics.selection();
+                  try {
+                    const msg = messages.find(m => m.id === msgId);
+                    const existing: Record<string, string[]> = (msg as any)?.reactions ? JSON.parse((msg as any).reactions) : {};
+                    
+                    const myId = firebaseUser.uid;
+                    if (existing[emoji]?.includes(myId)) {
+                      existing[emoji] = existing[emoji].filter(id => id !== myId);
+                      if (existing[emoji].length === 0) delete existing[emoji];
+                    } else {
+                      if (!existing[emoji]) existing[emoji] = [];
+                      existing[emoji].push(myId);
+                    }
+                    
+                    const reactionsJson = JSON.stringify(existing);
+                    await MessageService.updateReaction(msgId, reactionsJson);
+                    setMessages(prev => prev.map(m =>
+                      m.id === msgId ? { ...m, reactions: reactionsJson } as any : m
+                    ));
+                  } catch (err) {
+                    if (__DEV__) console.warn('[Chat] Emoji tepki hatası:', err);
+                  }
+                }}
+                onImagePress={(uri) => setViewerImage(uri)}
+              />
+            </>
+          );
+        }}
         style={styles.messageList}
         contentContainerStyle={styles.messageContent}
         showsVerticalScrollIndicator={false}
@@ -1621,46 +1717,73 @@ export default function ChatScreen() {
           // ★ 2026-04-26: Eşik 40 → 200 (yumuşak otomatik scroll). Kullanıcı son ~3 mesaj görece altta ise yeni mesajda alta kayar.
           const isBottom = layoutMeasurement.height + contentOffset.y >= contentSize.height - 200;
           isAtBottomRef.current = isBottom;
+          // ★ v1.7.13.141: Scroll-to-bottom FAB — contentOffset.y > 300 iken göster
+          const shouldShowFab = contentOffset.y < (contentSize.height - layoutMeasurement.height - 300);
+          if (shouldShowFab && !showScrollFab) {
+            setShowScrollFab(true);
+            Animated.timing(scrollFabOpacity, { toValue: 1, duration: 200, useNativeDriver: true }).start();
+          } else if (!shouldShowFab && showScrollFab) {
+            Animated.timing(scrollFabOpacity, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => {
+              setShowScrollFab(false);
+              setUnreadWhileScrolled(0);
+            });
+          }
           // ★ Scroll edince emoji bar'ı kapat
           if (activeReactionMsgId) setActiveReactionMsgId(null);
+          // ★ v1.7.13.141: Pagination — üste yakın scroll edince eski mesajları yükle
+          if (contentOffset.y < 200 && hasMore && !loadingMore) {
+            loadOlderMessages();
+          }
         }}
-        scrollEventThrottle={200}
+        scrollEventThrottle={100}
         ListHeaderComponent={
-          missedCalls.length > 0 ? (
-            <View style={styles.missedCallSection}>
-              {missedCalls.map((mc) => {
-                const time = new Date(mc.time);
-                const timeStr = time.toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
-                return (
-                  <View key={mc.id} style={styles.missedCallCard}>
-                    <View style={styles.missedCallIcon}>
-                      <Ionicons
-                        name="call"
-                        size={16}
-                        color="#EF4444"
-                      />
-                    </View>
-                    <View style={styles.missedCallInfo}>
-                      <Text style={styles.missedCallTitle}>{i18n.t('chat.id.004')}</Text>
-                      <Text style={styles.missedCallTime}>{timeStr}</Text>
-                    </View>
-                    <Pressable
-                      style={styles.missedCallBackBtn}
-                      onPress={async () => {
-                        if (!firebaseUser || !id) return;
-                        const tier = profile?.subscription_tier || 'Free';
-                        try {
-                          const { callId, receiverIsOnline } = await CallService.initiateCall(
-                            firebaseUser.uid,
-                            profile?.display_name || i18n.t('auto.chat.id.025'),
-                            profile?.avatar_url || undefined,
-                            id,
-                            mc.callType,
-                            tier as any
-                          );
-                          // Cevapsız arama bildirimini sil
-                          supabase.from('notifications').delete().eq('id', mc.id).then(() => {
-                            setMissedCalls(prev => prev.filter(c => c.id !== mc.id));
+          <>
+            {/* ★ v1.7.13.141: Pagination — eski mesaj yükleniyor spinner */}
+            {loadingMore && (
+              <View style={{ alignItems: 'center', paddingVertical: 12 }}>
+                <AppLoader size="small" color={Colors.text3} />
+              </View>
+            )}
+            {!hasMore && messages.length > 50 && (
+              <View style={{ alignItems: 'center', paddingVertical: 8 }}>
+                <Text style={{ fontSize: 11, color: Colors.text3, fontStyle: 'italic' }}>{i18n.t('chat.no_more_messages')}</Text>
+              </View>
+            )}
+            {missedCalls.length > 0 ? (
+              <View style={styles.missedCallSection}>
+                {missedCalls.map((mc) => {
+                  const time = new Date(mc.time);
+                  const timeStr = time.toLocaleString(i18n.locale, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+                  return (
+                    <View key={mc.id} style={styles.missedCallCard}>
+                      <View style={styles.missedCallIcon}>
+                        <Ionicons
+                          name="call"
+                          size={16}
+                          color="#EF4444"
+                        />
+                      </View>
+                      <View style={styles.missedCallInfo}>
+                        <Text style={styles.missedCallTitle}>{i18n.t('chat.id.004')}</Text>
+                        <Text style={styles.missedCallTime}>{timeStr}</Text>
+                      </View>
+                      <Pressable
+                        style={styles.missedCallBackBtn}
+                        onPress={async () => {
+                          if (!firebaseUser || !id) return;
+                          const tier = profile?.subscription_tier || 'Free';
+                          try {
+                            const { callId, receiverIsOnline } = await CallService.initiateCall(
+                              firebaseUser.uid,
+                              profile?.display_name || i18n.t('auto.chat.id.025'),
+                              profile?.avatar_url || undefined,
+                              id,
+                              mc.callType,
+                              tier as any
+                            );
+                            // Cevapsız arama bildirimini sil
+                            supabase.from('notifications').delete().eq('id', mc.id).then(() => {
+                              setMissedCalls(prev => prev.filter(c => c.id !== mc.id));
                           });
                           router.push(`/call/${id}?callId=${callId}&callType=${mc.callType}&isIncoming=false&receiverOnline=${receiverIsOnline}` as any);
                         } catch (err: any) {
@@ -1676,6 +1799,8 @@ export default function ChatScreen() {
               })}
             </View>
           ) : null
+        }
+          </>
         }
         ListFooterComponent={
           isTyping ? (
@@ -1700,6 +1825,27 @@ export default function ChatScreen() {
         windowSize={11}
         removeClippedSubviews={Platform.OS === 'android'}
       />
+
+      {/* ★ v1.7.13.141: Scroll-to-bottom FAB — kullanıcı yukarı scroll ettiğinde görünür */}
+      {showScrollFab && (
+        <Animated.View style={[styles.scrollFab, { opacity: scrollFabOpacity }]}>
+          <Pressable
+            style={styles.scrollFabBtn}
+            onPress={() => {
+              flatListRef.current?.scrollToEnd({ animated: true });
+              setUnreadWhileScrolled(0);
+            }}
+            hitSlop={8}
+          >
+            <Ionicons name="chevron-down" size={22} color="#FFF" />
+            {unreadWhileScrolled > 0 && (
+              <View style={styles.scrollFabBadge}>
+                <Text style={styles.scrollFabBadgeText}>{unreadWhileScrolled}</Text>
+              </View>
+            )}
+          </Pressable>
+        </Animated.View>
+      )}
 
       {/* ★ 2026-04-30 FIX v7: Normal flex flow — KAV container'ı küçültünce
           FlatList flex:1 küçülür, input bar doğal yerinde kalır. */}
@@ -1836,32 +1982,83 @@ export default function ChatScreen() {
             editable={isMutualFollow || msgRequestInfo.status === 'accepted' || msgRequestInfo.status === 'none'}
           />
           <Pressable style={styles.inputAction} onPress={async () => {
+            // ★ v1.7.13.141: Çoklu resim seçimi — her biri ayrı mesaj olarak gönderilir (WhatsApp pattern)
             try {
               const result = await ImagePicker.launchImageLibraryAsync({
                 mediaTypes: ['images'],
+                quality: 0.7,
+                allowsMultipleSelection: true,
+                selectionLimit: 10,
+                orderedSelection: true,
+              });
+              if (result.canceled || !result.assets?.length) return;
+              if (!firebaseUser || !id) return;
+
+              // Her resmi sırayla gönder
+              for (const asset of result.assets) {
+                const tempId = `temp_img_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+                const optimisticMsg: Message = {
+                  id: tempId, sender_id: firebaseUser.uid, receiver_id: id,
+                  content: i18n.t('auto.chat.id.017'),
+                  is_read: false, created_at: new Date().toISOString(),
+                };
+                setMessages(prev => [...prev, optimisticMsg]);
+                justSentRef.current = true;
+
+                try {
+                  const imageUrl = await StorageService.uploadChatImage(firebaseUser.uid, asset.uri);
+                  // ★ FIX: image_url sütunu yok — URL'yi content içine göm
+                  const newMsg = await MessageService.send(firebaseUser.uid, id, `📷 ${imageUrl}`);
+                  setMessages(prev => prev.map(m => m.id === tempId ? newMsg : m));
+                  // Cache'e ekle
+                  DMCacheService.append(firebaseUser.uid, id, newMsg).catch(() => {});
+                } catch {
+                  // Başarısız olanı temp'ten sil
+                  setMessages(prev => prev.filter(m => m.id !== tempId));
+                }
+              }
+            } catch (err: any) {
+              showToast({ title: i18n.t('chat.id.023'), message: err.message || '', type: 'error' });
+            }
+          }}>
+            <Ionicons name="images-outline" size={22} color={Colors.text3} style={styles.iconShadow} />
+          </Pressable>
+          {/* ★ v1.7.13.141: Kamera ile fotoğraf çekimi */}
+          <Pressable style={styles.inputAction} onPress={async () => {
+            try {
+              const perm = await ImagePicker.getCameraPermissionsAsync();
+              if (!perm.granted) {
+                const req = await ImagePicker.requestCameraPermissionsAsync();
+                if (!req.granted) {
+                  showToast({ title: i18n.t('chat.camera_permission_needed'), type: 'warning' });
+                  return;
+                }
+              }
+              const result = await ImagePicker.launchCameraAsync({
                 quality: 0.7,
                 allowsEditing: true,
               });
               if (result.canceled || !result.assets?.[0]) return;
               if (!firebaseUser || !id) return;
 
-              const tempId = `temp_img_${Date.now()}`;
+              const tempId = `temp_cam_${Date.now()}`;
               const optimisticMsg: Message = {
                 id: tempId, sender_id: firebaseUser.uid, receiver_id: id,
                 content: i18n.t('auto.chat.id.017'),
                 is_read: false, created_at: new Date().toISOString(),
               };
               setMessages(prev => [...prev, optimisticMsg]);
+              justSentRef.current = true;
 
               const imageUrl = await StorageService.uploadChatImage(firebaseUser.uid, result.assets[0].uri);
-              // ★ FIX: image_url sütunu yok — URL'yi content içine göm
               const newMsg = await MessageService.send(firebaseUser.uid, id, `📷 ${imageUrl}`);
               setMessages(prev => prev.map(m => m.id === tempId ? newMsg : m));
+              DMCacheService.append(firebaseUser.uid, id, newMsg).catch(() => {});
             } catch (err: any) {
               showToast({ title: i18n.t('chat.id.023'), message: err.message || '', type: 'error' });
             }
           }}>
-            <Ionicons name="attach" size={22} color={Colors.text3} style={styles.iconShadow} />
+            <Ionicons name="camera-outline" size={21} color={Colors.text3} style={styles.iconShadow} />
           </Pressable>
           {/* 🎙️ Gel Odama Daveti */}
           {activeRoom && (
@@ -1993,13 +2190,26 @@ export default function ChatScreen() {
         }}
       />
 
-      {/* ★ Emoji Picker — input bar wrapper'ının içinde (bar'ın altında) inline panel */}
+      {/* ★ Emoji + GIF Picker — input bar wrapper'ının içinde (bar'ın altında) inline panel */}
       <EmojiPicker
         visible={showEmojiPicker}
         onClose={() => setShowEmojiPicker(false)}
         customEmojiSetId={(profile as any)?.active_emoji_id || null}
         onEmojiSelect={(emoji) => {
           setInputText(prev => prev + emoji);
+        }}
+        onGifSelect={async (gifUrl) => {
+          // ★ v1.7.13.141: GIF gönder — URL'yi mesaj content'i olarak kaydet
+          if (!firebaseUser || !id) return;
+          try {
+            const newMsg = await MessageService.send(firebaseUser.uid, id, gifUrl);
+            setMessages(prev => [...prev, newMsg]);
+            // Cache'e ekle
+            DMCacheService.append(firebaseUser.uid, id, newMsg).catch(() => {});
+            justSentRef.current = true;
+          } catch (err: any) {
+            showToast({ title: i18n.t('chat.id.023'), message: err?.message || '', type: 'error' });
+          }
         }}
       />
       </View>
@@ -2044,7 +2254,7 @@ export default function ChatScreen() {
               }}
             >
               <Ionicons name="search-outline" size={20} color={Colors.text2} />
-              <Text style={styles.kebabItemText}>{t('messages.call')}</Text>
+              <Text style={styles.kebabItemText}>{t('messages.search')}</Text>
             </Pressable>
             {/* ★ Medya ve bağlantılar */}
             <Pressable
@@ -2083,12 +2293,12 @@ export default function ChatScreen() {
                 setShowKebabMenu(false);
                 setCAlert({
                   visible: true,
-                  title: 'Sohbeti Sil',
+                  title: i18n.t('chat.id.delete_chat_title'),
                   message: i18n.t('chat.id.028'),
                   type: 'warning',
                   buttons: [
                     {
-                      text: 'Sil',
+                      text: i18n.t('common.delete'),
                       style: 'destructive',
                       onPress: async () => {
                         try {
@@ -2106,21 +2316,19 @@ export default function ChatScreen() {
               <Text style={[styles.kebabItemText, { color: '#EF4444' }]}>{t('messages.delete_chat')}</Text>
             </Pressable>
 
-            {/* Sessize Al / Sesini Aç */}
+            {/* ★ v1.7.13.141: Sessize Al / Sesini Aç — MessageService.toggleMute ile tutarlı (conversation_state tablosu) */}
             <Pressable
               style={styles.kebabItem}
               onPress={async () => {
                 setShowKebabMenu(false);
                 try {
-                  const muteKey = `mute_chat_${firebaseUser!.uid}_${id}`;
-                  const newVal = !isMuted;
-                  await AsyncStorage.setItem(muteKey, newVal ? 'true' : 'false');
-                  setIsMuted(newVal);
+                  const newMuted = await MessageService.toggleMute(firebaseUser!.uid, id);
+                  setIsMuted(newMuted);
                 } catch {}
               }}
             >
               <Ionicons name={isMuted ? 'notifications-outline' : 'notifications-off-outline'} size={20} color={Colors.text2} />
-              <Text style={styles.kebabItemText}>{isMuted ? i18n.t('auto.chat.id.007') : 'Sessize Al'}</Text>
+              <Text style={styles.kebabItemText}>{isMuted ? i18n.t('auto.chat.id.007') : i18n.t('chat.id.mute')}</Text>
             </Pressable>
 
             {/* Engelle / Engeli Kaldır */}
@@ -2133,7 +2341,7 @@ export default function ChatScreen() {
                   setCAlert({
                     visible: true,
                     title: i18n.t('chat.id.029'),
-                    message: `${otherUser?.display_name || i18n.t('auto.chat.id.006')} engelden çıkarılacak.`,
+                    message: i18n.t('chat.id.unblock_confirm', { 0: otherUser?.display_name || i18n.t('auto.chat.id.006') }),
                     type: 'info',
                     buttons: [
                       {
@@ -2345,11 +2553,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 22,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(20,184,166,0.25)',
+    backgroundColor: 'rgba(15,23,42,0.85)',
+    borderWidth: 1,
+    borderColor: 'rgba(20,184,166,0.20)',
     zIndex: 5,
-    elevation: 5,
+    // ★ v1.7.13.142: elevation kaldırıldı — Android'de kare gri gölge yapıyordu.
+    //   Opak arka plan + ince border ile temiz görünüm sağlandı.
   },
   searchInput: {
     flex: 1,
@@ -2475,6 +2684,59 @@ const styles = StyleSheet.create({
   //   inputBar'a yer bırakır.
   messageList: { flex: 1, flexShrink: 1 },
   messageContent: { padding: 16, gap: 8, flexGrow: 1 },
+  // ★ v1.7.13.141: Tarih ayırıcı stili — WhatsApp tarzı ortalanmış pill
+  dateSeparator: {
+    alignItems: 'center',
+    marginVertical: 12,
+  },
+  dateSeparatorPill: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 4,
+  },
+  dateSeparatorText: {
+    fontSize: 11,
+    fontWeight: '600' as const,
+    color: '#94A3B8',
+    textAlign: 'center' as const,
+  },
+  // ★ v1.7.13.141: Scroll-to-bottom FAB stilleri
+  scrollFab: {
+    position: 'absolute' as const,
+    right: 16,
+    bottom: 110,
+    zIndex: 20,
+  },
+  scrollFabBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#14B8A6',
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+    ...Platform.select({
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 8 },
+      android: { elevation: 8 },
+    }),
+  },
+  scrollFabBadge: {
+    position: 'absolute' as const,
+    top: -6,
+    right: -6,
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#EF4444',
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+    paddingHorizontal: 4,
+  },
+  scrollFabBadgeText: {
+    fontSize: 10,
+    fontWeight: '800' as const,
+    color: '#FFF',
+  },
   bubbleWrap: { marginBottom: 4 },
   bubbleLeft: { alignItems: 'flex-start', flexDirection: 'row', gap: 8 },
   bubbleRight: { alignItems: 'flex-end', flexDirection: 'row-reverse', gap: 8 },

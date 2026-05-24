@@ -287,16 +287,19 @@ const s = StyleSheet.create({
     height: 1.5,
     zIndex: 1,
   },
+  // ★ v1.7.13.64 (20 May 2026): Drag handle tap area büyütüldü — kullanıcı feedback
+  //   "drag çalışmıyor" → handle 40x4 çok ince, parmakla tutulması zor. Tap area
+  //   60x16'ya çıkarıldı (padding artırılarak); görsel çizgi 48x5 daha belirgin.
   handleWrap: {
     alignItems: 'center',
-    paddingTop: 10,
-    paddingBottom: 6,
+    paddingTop: 14,
+    paddingBottom: 10,
   },
   handle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: 'rgba(255,255,255,0.18)',
+    width: 48,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255,255,255,0.28)',
   },
   // Premium section header — profil sayfası pattern
   header: {

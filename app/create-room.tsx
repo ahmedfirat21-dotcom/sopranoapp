@@ -1,4 +1,4 @@
-﻿import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TextInput, Pressable, ScrollView, Image, Animated, Easing, Dimensions, PanResponder, InteractionManager, Platform, KeyboardAvoidingView } from 'react-native';
 import AppLoader from '../components/AppLoader';
 
@@ -30,23 +30,23 @@ import { AUDIENCE_OPTIONS, audienceModeToFields, getAudienceMode, type AudienceM
 import { TagService, normalizeTag, MAX_TAGS_PER_ROOM, SUGGESTED_TAGS } from '../services/tags';
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
 
-// ★ 2026-04-21: Oda adı sanitization — whitespace normalize, HTML strip, length cap.
-//   Küfür kontrolü ayrı (canProceed'de çalışıyor).
+// ? 2026-04-21: Oda ad� sanitization � whitespace normalize, HTML strip, length cap.
+//   K�f�r kontrol� ayr� (canProceed'de �al���yor).
 function sanitizeRoomName(raw: string): string {
   return raw
-    .replace(/<[^>]*>/g, '')         // HTML taglarını kaldır
-    .replace(/\s+/g, ' ')            // Ardışık whitespace'i tek boşluğa indir
+    .replace(/<[^>]*>/g, '')         // HTML taglar�n� kald�r
+    .replace(/\s+/g, ' ')            // Ard���k whitespace'i tek bo�lu�a indir
     .trim()
     .slice(0, 60);                   // Max 60 karakter
 }
 
-// ★ 2026-04-21: Draft save/restore — kullanıcı geri gidip kayboldu ya da crash olduysa
-//   form kaybolmasın. Başarılı oluşturmadan sonra draft temizlenir.
+// ? 2026-04-21: Draft save/restore � kullan�c� geri gidip kayboldu ya da crash olduysa
+//   form kaybolmas�n. Ba�ar�l� olu�turmadan sonra draft temizlenir.
 const DRAFT_KEY = 'soprano_create_room_draft_v1';
 
-// ═══════════════════════════════════════════════════════════════════
+// ===================================================================
 // Tema & Kategori sabitleri
-// ═══════════════════════════════════════════════════════════════════
+// ===================================================================
 const ROOM_THEMES: { id: string; name: string; colors: [string, string] }[] = [
   { id: 'ocean',   name: 'Okyanus',    colors: ['#0E4D6F', '#083344'] },
   { id: 'sunset',  name: i18n.t('createroom.004'), colors: ['#7F1D1D', '#4C0519'] },
@@ -58,17 +58,31 @@ const ROOM_THEMES: { id: string; name: string; colors: [string, string] }[] = [
   { id: 'volcano', name: 'Volkan',     colors: ['#7C2D12', '#431407'] },
 ];
 
+// ? v1.7.13.116 (20 May 2026): TR k�lt�r paketi � yerel kategoriler eklendi.
+//   T�rk Sanat M�zi�i, Arabesk, Halk M�zi�i, Pop & Rap; ek olarak Magazin, Spor,
+//   Edebiyat, Tarih, Yemek, Sanat, Seyahat. Eski sade kategoriler korundu.
 const CATEGORIES = [
-  { id: 'chat',  labelKey: 'category.chat',           icon: 'chatbubbles',          color: '#14B8A6', descKey: 'create.cat.chat.desc' },
-  { id: 'music', labelKey: 'category.music',          icon: 'musical-notes',        color: '#8B5CF6', descKey: 'create.cat.music.desc' },
-  { id: 'game',  labelKey: 'category.game',           icon: 'game-controller',      color: '#EF4444', descKey: 'create.cat.game.desc' },
-  { id: 'tech',  labelKey: 'create.cat.tech.label',   icon: 'code-slash',           color: '#3B82F6', descKey: 'create.cat.tech.desc' },
-  { id: 'book',  labelKey: 'category.book',           icon: 'book',                 color: '#F59E0B', descKey: 'create.cat.book.desc' },
-  { id: 'film',  labelKey: 'category.film',           icon: 'film',                 color: '#EC4899', descKey: 'create.cat.film.desc' },
-  { id: 'other', labelKey: 'create.cat.other.label',  icon: 'ellipsis-horizontal',  color: '#64748B', descKey: 'create.cat.other.desc' },
+  { id: 'chat',     labelKey: 'category.chat',           icon: 'chatbubbles',          color: '#14B8A6', descKey: 'create.cat.chat.desc' },
+  { id: 'music',    labelKey: 'category.music',          icon: 'musical-notes',        color: '#8B5CF6', descKey: 'create.cat.music.desc' },
+  { id: 'tsm',      labelKey: 'category.tsm',            icon: 'musical-note',         color: '#A78BFA', descKey: 'create.cat.tsm.desc' },
+  { id: 'arabesk',  labelKey: 'category.arabesk',        icon: 'flame',                color: '#D97706', descKey: 'create.cat.arabesk.desc' },
+  { id: 'halk',     labelKey: 'category.halk',           icon: 'musical-notes',        color: '#B45309', descKey: 'create.cat.halk.desc' },
+  { id: 'pop',      labelKey: 'category.pop',            icon: 'mic',                  color: '#EC4899', descKey: 'create.cat.pop.desc' },
+  { id: 'film',     labelKey: 'category.film',           icon: 'film',                 color: '#EC4899', descKey: 'create.cat.film.desc' },
+  { id: 'magazin',  labelKey: 'category.magazin',        icon: 'star',                 color: '#FB7185', descKey: 'create.cat.magazin.desc' },
+  { id: 'spor',     labelKey: 'category.spor',           icon: 'football',             color: '#10B981', descKey: 'create.cat.spor.desc' },
+  { id: 'edebiyat', labelKey: 'category.edebiyat',       icon: 'book',                 color: '#F59E0B', descKey: 'create.cat.edebiyat.desc' },
+  { id: 'tarih',    labelKey: 'category.tarih',          icon: 'library',              color: '#92400E', descKey: 'create.cat.tarih.desc' },
+  { id: 'yemek',    labelKey: 'category.yemek',          icon: 'restaurant',           color: '#DC2626', descKey: 'create.cat.yemek.desc' },
+  { id: 'game',     labelKey: 'category.game',           icon: 'game-controller',      color: '#EF4444', descKey: 'create.cat.game.desc' },
+  { id: 'tech',     labelKey: 'create.cat.tech.label',   icon: 'code-slash',           color: '#3B82F6', descKey: 'create.cat.tech.desc' },
+  { id: 'book',     labelKey: 'category.book',           icon: 'book',                 color: '#F59E0B', descKey: 'create.cat.book.desc' },
+  { id: 'sanat',    labelKey: 'category.sanat',          icon: 'color-palette',        color: '#F97316', descKey: 'create.cat.sanat.desc' },
+  { id: 'seyahat',  labelKey: 'category.seyahat',        icon: 'airplane',             color: '#0EA5E9', descKey: 'create.cat.seyahat.desc' },
+  { id: 'other',    labelKey: 'create.cat.other.label',  icon: 'ellipsis-horizontal',  color: '#64748B', descKey: 'create.cat.other.desc' },
 ];
 
-// ★ 2026-04-25: ROOM_TYPES kaldırıldı → constants/audience.ts AUDIENCE_OPTIONS
+// ? 2026-04-25: ROOM_TYPES kald�r�ld� � constants/audience.ts AUDIENCE_OPTIONS
 
 const SPEAKING_MODES = [
   { id: 'free_for_all',    labelKey: 'create.speak.free.label',       icon: 'people',            descKey: 'create.speak.free.desc',       minTier: 'Free' as const },
@@ -76,28 +90,28 @@ const SPEAKING_MODES = [
   { id: 'selected_only',   labelKey: 'create.speak.selected.label',   icon: 'shield-checkmark',  descKey: 'create.speak.selected.desc',   minTier: 'Pro' as const },
 ];
 
-// ═══════════════════════════════════════════════════════════════════
-// Wizard adımları
-// ═══════════════════════════════════════════════════════════════════
+// ===================================================================
+// Wizard ad�mlar�
+// ===================================================================
 type WizardStep = 'basics' | 'category' | 'access' | 'speaking' | 'welcome' | 'visual' | 'monetization' | 'review';
 
-// ★ Her adım için zengin metadata — gradient circle + icon + kendi tema rengi
+// ? Her ad�m i�in zengin metadata � gradient circle + icon + kendi tema rengi
 interface StepMeta {
   id: WizardStep;
-  /** i18n key — runtime'da t() ile çevrilir */
+  /** i18n key � runtime'da t() ile �evrilir */
   titleKey: string;
   subtitleKey: string;
   icon: string;
   iconLib?: 'ionicons' | 'mci'; // material community icons alternatif
   gradient: [string, string, string];
   accent: string;
-  watermark?: string; // arka plan soluk ikon (büyük)
+  watermark?: string; // arka plan soluk ikon (b�y�k)
   skippable?: boolean;
 }
 
-// ★ 2026-05-05: Aile dili refactor — her step'in vibrant gradient'i KALDIRILDI.
-//   Tüm hero ikonlar profil sayfası slate paleti ile (3a4658→2a3344→1a2030),
-//   sadece accent rengi halo ring + icon tint olarak kalıyor. Rainbow → kohezyon.
+// ? 2026-05-05: Aile dili refactor � her step'in vibrant gradient'i KALDIRILDI.
+//   T�m hero ikonlar profil sayfas� slate paleti ile (3a4658�2a3344�1a2030),
+//   sadece accent rengi halo ring + icon tint olarak kal�yor. Rainbow � kohezyon.
 const FAMILY_GRADIENT: [string, string, string] = ['#3a4658', '#2a3344', '#1a2030'];
 const STEPS: StepMeta[] = [
   { id: 'basics',       titleKey: 'create.step.basics.title',       subtitleKey: 'create.step.basics.subtitle',
@@ -119,8 +133,8 @@ const STEPS: StepMeta[] = [
 ];
 
 async function uploadRoomImage(userId: string, localUri: string, prefix: 'card' | 'bg'): Promise<string> {
-  // ★ 2026-04-21: fetch(file://) Android'de "Network request failed" veriyordu.
-  //   StorageService.uploadFile doğru yöntemi kullanır: ImageManipulator resize +
+  // ? 2026-04-21: fetch(file://) Android'de "Network request failed" veriyordu.
+  //   StorageService.uploadFile do�ru y�ntemi kullan�r: ImageManipulator resize +
   //   FileSystem base64 read + ArrayBuffer decode + supabase upload.
   const { StorageService } = require('../services/storage');
   const path = `room-images/${userId}/${prefix}_${Date.now()}.jpg`;
@@ -128,41 +142,42 @@ async function uploadRoomImage(userId: string, localUri: string, prefix: 'card' 
 }
 
 function isTierEnough(userTier: TierName, required: string): boolean {
-  const order = ['Free', 'Plus', 'Pro', 'GodMaster'];
+  // ? v1.7.13.132: GodMaster kald�r�ld� � 3 tier
+  const order = ['Free', 'Plus', 'Pro'];
   return order.indexOf(userTier) >= order.indexOf(required);
 }
 
-// ★ 2026-04-21: Müzik linki validation — yalnızca YouTube/Spotify/SoundCloud/YouTube Music.
-//   Diğer URL'ler DB'ye yazılmasın, hatalı yapıştırmalar erkende yakalansın.
+// ? 2026-04-21: M�zik linki validation � yaln�zca YouTube/Spotify/SoundCloud/YouTube Music.
+//   Di�er URL'ler DB'ye yaz�lmas�n, hatal� yap��t�rmalar erkende yakalans�n.
 const MUSIC_URL_REGEX = /^https?:\/\/(www\.)?(youtube\.com|youtu\.be|music\.youtube\.com|open\.spotify\.com|spotify\.com|soundcloud\.com|m\.soundcloud\.com)\//i;
 function isValidMusicUrl(url: string): boolean {
   const trimmed = url.trim();
-  if (!trimmed) return true; // Boş OK — opsiyonel alan
+  if (!trimmed) return true; // Bo� OK � opsiyonel alan
   return MUSIC_URL_REGEX.test(trimmed);
 }
 
-// ═══════════════════════════════════════════════════════════════════
+// ===================================================================
 // MAIN COMPONENT
-// ═══════════════════════════════════════════════════════════════════
+// ===================================================================
 export default function CreateRoomScreen() {
   const router = useRouter();
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const { firebaseUser, profile } = useAuth();
   const isAdmin = profile?.is_admin === true;
-  // ★ GodMaster FIX: GodMaster tier'ı koruyarak kullan, admin ise Pro'ya yükselt
-  const tier = (profile?.subscription_tier === 'GodMaster' ? 'GodMaster' : (isAdmin ? 'Pro' : (profile?.subscription_tier || 'Free'))) as TierName;
+  // ? v1.7.13.132: GodMaster kald�r�ld� � admin yetkisi Pro'ya y�kseltir
+  const tier = (isAdmin ? 'Pro' : (profile?.subscription_tier || 'Free')) as TierName;
   const limits = useMemo(() => getRoomLimits(tier), [tier]);
 
-  // ── Form state ──
+  // �� Form state ��
   const [name, setName] = useState('');
   const [category, setCategory] = useState('chat');
-  // ★ 2026-04-25: Faz 4.3 — kategori altı serbest etiketler (max 3, optional)
+  // ? 2026-04-25: Faz 4.3 � kategori alt� serbest etiketler (max 3, optional)
   const [tags, setTags] = useState<string[]>([]);
   const [tagDraft, setTagDraft] = useState('');
-  // ★ 2026-04-25: Unified audience mode (public/followers/password/invite).
+  // ? 2026-04-25: Unified audience mode (public/followers/password/invite).
   //   Eski type + followersOnly state'leri tek select'e indi. Submit'te
-  //   audienceModeToFields() ile backend kolonlarına dönüştürülür.
+  //   audienceModeToFields() ile backend kolonlar�na d�n��t�r�l�r.
   const [audienceMode, setAudienceMode] = useState<AudienceMode>('public');
   const [mode, setMode] = useState<'audio' | 'video'>('audio');
   const [description, setDescription] = useState('');
@@ -170,24 +185,24 @@ export default function CreateRoomScreen() {
   const [speakingMode, setSpeakingMode] = useState<'free_for_all' | 'permission_only' | 'selected_only'>('permission_only');
   const [entryFee, setEntryFee] = useState(0);
   const [donationsEnabled, setDonationsEnabled] = useState(false);
-  // ★ 2026-04-20: +18 oda kurulumda set edilebilsin (eskiden sonradan PlusMenu'den yapmak gerekiyordu)
+  // ? 2026-04-20: +18 oda kurulumda set edilebilsin (eskiden sonradan PlusMenu'den yapmak gerekiyordu)
   const [ageRestricted, setAgeRestricted] = useState(false);
-  // ★ 2026-04-20: Dil filtresi — Plus+ (PlusMenu ile parite)
+  // ? 2026-04-20: Dil filtresi � Plus+ (PlusMenu ile parite)
   const [roomLanguage, setRoomLanguage] = useState<string>('tr');
-  // ★ 2026-04-20: Yavaş mod — Plus+ moderasyon aracı (saniye cinsinden, 0 = kapalı)
+  // ? 2026-04-20: Yava� mod � Plus+ moderasyon arac� (saniye cinsinden, 0 = kapal�)
   const [slowModeSeconds, setSlowModeSeconds] = useState(0);
   const [selectedTheme, setSelectedTheme] = useState<string | null>(null);
-  // ★ 2026-04-20: Müzik linki (Pro) — YouTube/Spotify/SoundCloud; herkes kendi platformunda dinler
+  // ? 2026-04-20: M�zik linki (Pro) � YouTube/Spotify/SoundCloud; herkes kendi platformunda dinler
   const [musicLink, setMusicLink] = useState<string>('');
   const [backgroundImage, setBackgroundImage] = useState('');
   const [cardImage, setCardImage] = useState('');
-  // ★ YENİ: welcome_message + rules (agent raporu eksik tespit etti)
+  // ? YEN�: welcome_message + rules (agent raporu eksik tespit etti)
   const [welcomeMessage, setWelcomeMessage] = useState('');
   const [rules, setRules] = useState('');
 
-  // ★ 2026-04-26: Planlı oda — opsiyonel başlangıç zamanı.
-  //   null = hemen başlat (default). Date = belirtilen zamanda canlıya çık.
-  //   ?schedule=1 query param'i varsa default 1 saat sonra setlenir (QuickCreateSheet "Planla" akışı).
+  // ? 2026-04-26: Planl� oda � opsiyonel ba�lang�� zaman�.
+  //   null = hemen ba�lat (default). Date = belirtilen zamanda canl�ya ��k.
+  //   ?schedule=1 query param'i varsa default 1 saat sonra setlenir (QuickCreateSheet "Planla" ak���).
   const searchParams = useLocalSearchParams<{ schedule?: string }>();
   const [scheduledAt, setScheduledAt] = useState<Date | null>(() => {
     if (searchParams?.schedule === '1') {
@@ -204,22 +219,22 @@ export default function CreateRoomScreen() {
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [createdRoomId, setCreatedRoomId] = useState<string | null>(null);
   const [createdRoomName, setCreatedRoomName] = useState('');
-  // ★ 2026-05-05: Caption odaya yönlendirme param'ında geçiyor (oda içinde gösterilir)
+  // ? 2026-05-05: Caption odaya y�nlendirme param'�nda ge�iyor (oda i�inde g�sterilir)
   const [roomSuccessCaption, setRoomSuccessCaption] = useState(i18n.t('auto.create_room.027'));
 
-  // ── Wizard state ──
+  // �� Wizard state ��
   const [step, setStep] = useState<WizardStep>('basics');
   const stepIndex = STEPS.findIndex(s => s.id === step);
   const currentStepMeta = STEPS[stepIndex];
   const totalSteps = STEPS.length;
 
-  // ════════════════════════════════════════════════════════════
-  // ★ 2026-04-23: SHEET presentation — RoomChatDrawer pattern
-  //   - Mount: translateY SCREEN_H → 0 (alt'tan yukarı kayar) + backdrop fade-in
+  // ============================================================
+  // ? 2026-04-23: SHEET presentation � RoomChatDrawer pattern
+  //   - Mount: translateY SCREEN_H � 0 (alt'tan yukar� kayar) + backdrop fade-in
   //   - Unmount: reverse, bitince router.back()
-  //   - Handle drag: yukarıdaki handle barından aşağı sürükle → kapat
-  //   - Minimize btn: header'daki chevron-down → kapat
-  // ════════════════════════════════════════════════════════════
+  //   - Handle drag: yukar�daki handle bar�ndan a�a�� s�r�kle � kapat
+  //   - Minimize btn: header'daki chevron-down � kapat
+  // ============================================================
   const translateY = useRef(new Animated.Value(SCREEN_H)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
 
@@ -230,7 +245,7 @@ export default function CreateRoomScreen() {
     ]).start();
   }, []);
 
-  // Router'a bağımlı closeSheet — ref pattern ile panResponder stable kalır
+  // Router'a ba��ml� closeSheet � ref pattern ile panResponder stable kal�r
   const closeSheetRef = useRef<() => void>(() => {});
   closeSheetRef.current = () => {
     Animated.parallel([
@@ -239,9 +254,9 @@ export default function CreateRoomScreen() {
     ]).start(() => safeGoBack(router));
   };
 
-  // ★ 2026-04-28: Clubhouse pattern — pan tüm wizard sheet'e bağlı.
-  //   Wizard içeriği değişken (ScrollView/TextInput/...); capture eşiği yüksek (>25)
-  //   tutularak küçük scroll/tap'ler engellenmez, belirgin aşağı swipe sheet'i kapatır.
+  // ? 2026-04-28: Clubhouse pattern � pan t�m wizard sheet'e ba�l�.
+  //   Wizard i�eri�i de�i�ken (ScrollView/TextInput/...); capture e�i�i y�ksek (>25)
+  //   tutularak k���k scroll/tap'ler engellenmez, belirgin a�a�� swipe sheet'i kapat�r.
   const panResponder = useRef(PanResponder.create({
     onStartShouldSetPanResponder: () => false,
     onStartShouldSetPanResponderCapture: () => false,
@@ -260,9 +275,9 @@ export default function CreateRoomScreen() {
     },
   })).current;
 
-  // ★ 2026-04-21: Draft restore — wizard açılışında önceki state varsa yükle.
-  //   file:// uri'leri AsyncStorage'a kaydetmiyoruz (cihaz-spesifik, crash olmuş olabilir).
-  //   Yalnızca form değerleri.
+  // ? 2026-04-21: Draft restore � wizard a��l���nda �nceki state varsa y�kle.
+  //   file:// uri'leri AsyncStorage'a kaydetmiyoruz (cihaz-spesifik, crash olmu� olabilir).
+  //   Yaln�zca form de�erleri.
   const draftRestoredRef = useRef(false);
   useEffect(() => {
     if (draftRestoredRef.current) return;
@@ -274,11 +289,11 @@ export default function CreateRoomScreen() {
         if (d?.name) setName(d.name);
         if (d?.category) setCategory(d.category);
         if (Array.isArray(d?.tags)) setTags(d.tags.slice(0, MAX_TAGS_PER_ROOM));
-        // ★ 2026-04-25: Unified audience — yeni draft `audienceMode`, eski draft `type+followersOnly`
+        // ? 2026-04-25: Unified audience � yeni draft `audienceMode`, eski draft `type+followersOnly`
         if (d?.audienceMode) {
           setAudienceMode(d.audienceMode);
         } else if (d?.type || typeof d?.followersOnly === 'boolean') {
-          // Eski draft → unified mode'a dönüştür
+          // Eski draft � unified mode'a d�n��t�r
           setAudienceMode(getAudienceMode({ type: d.type, followers_only: d.followersOnly, has_password: !!d.password }));
         }
         if (d?.description) setDescription(d.description);
@@ -292,13 +307,13 @@ export default function CreateRoomScreen() {
         if (d?.musicLink) setMusicLink(d.musicLink);
         if (d?.welcomeMessage) setWelcomeMessage(d.welcomeMessage);
         if (d?.rules) setRules(d.rules);
-        // Şifre güvenlik sebebiyle restore edilmiyor
+        // �ifre g�venlik sebebiyle restore edilmiyor
       } catch {}
       draftRestoredRef.current = true;
     })();
   }, []);
 
-  // ★ Draft save — form değiştikçe (restore sonrası) yaz. Debounce ile spam önlenir.
+  // ? Draft save � form de�i�tik�e (restore sonras�) yaz. Debounce ile spam �nlenir.
   useEffect(() => {
     if (!draftRestoredRef.current) return;
     const t = setTimeout(() => {
@@ -314,7 +329,7 @@ export default function CreateRoomScreen() {
       ageRestricted, roomLanguage, slowModeSeconds, selectedTheme,
       musicLink, welcomeMessage, rules]);
 
-  // ── Slide animasyonu (step geçişi) ──
+  // �� Slide animasyonu (step ge�i�i) ��
   const slideAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const goToStep = (newStep: WizardStep, direction: 'forward' | 'back' = 'forward') => {
@@ -337,10 +352,10 @@ export default function CreateRoomScreen() {
   };
   const prevStep = () => {
     if (stepIndex > 0) goToStep(STEPS[stepIndex - 1].id, 'back');
-    else closeSheetRef.current(); // ★ 2026-04-23: İlk step'te animasyonlu kapanış
+    else closeSheetRef.current(); // ? 2026-04-23: �lk step'te animasyonlu kapan��
   };
 
-  // ★ 2026-04-21: Oda adı canlı validation — küfür + uzunluk check'i.
+  // ? 2026-04-21: Oda ad� canl� validation � k�f�r + uzunluk check'i.
   const nameValidation = useMemo(() => {
     const sanitized = sanitizeRoomName(name);
     if (sanitized.length < 2) return { ok: false, reason: 'En az 2 karakter' };
@@ -349,7 +364,7 @@ export default function CreateRoomScreen() {
     return { ok: true, reason: null as string | null };
   }, [name]);
 
-  // ── Adım geçerlilik kontrolü (next butonu aktif mi?) ──
+  // �� Ad�m ge�erlilik kontrol� (next butonu aktif mi?) ��
   const canProceed = useMemo(() => {
     switch (step) {
       case 'basics': return nameValidation.ok;
@@ -364,7 +379,7 @@ export default function CreateRoomScreen() {
     }
   }, [step, nameValidation.ok, category, audienceMode, password, speakingMode, welcomeMessage, rules, musicLink]);
 
-  // ── Bugünkü oda açma sayısı (göster özet ekranında) ──
+  // �� Bug�nk� oda a�ma say�s� (g�ster �zet ekran�nda) ��
   const [todayRoomCount, setTodayRoomCount] = useState(0);
   useEffect(() => {
     if (!firebaseUser?.uid || limits.dailyRooms >= 999) return;
@@ -372,23 +387,23 @@ export default function CreateRoomScreen() {
     todayStart.setHours(0, 0, 0, 0);
     (async () => {
       try {
-        // ★ v110.14: room_creation_log'tan say (oda silinince limit yenilenmesin)
+        // ? v110.14: room_creation_log'tan say (oda silinince limit yenilenmesin)
         const { count } = await supabase.from('room_creation_log').select('id', { count: 'exact', head: true }).eq('user_id', firebaseUser.uid).gte('created_at', todayStart.toISOString());
         setTodayRoomCount(count || 0);
       } catch {}
     })();
   }, [firebaseUser?.uid, limits.dailyRooms]);
 
-  // ★ Günlük oda açma limiti dolu mu? (Pro/admin = 999, limitsiz)
+  // ? G�nl�k oda a�ma limiti dolu mu? (Pro/admin = 999, limitsiz)
   const dailyLimitReached = limits.dailyRooms < 999 && todayRoomCount >= limits.dailyRooms;
 
-  // ═══════════════════════════════════════════════════════════════════
+  // ===================================================================
   // ODA YARATMA
-  // ═══════════════════════════════════════════════════════════════════
+  // ===================================================================
   const handleCreate = async () => {
     if (!firebaseUser || creating) return;
 
-    // ★ 2026-04-25: audienceMode → backend type ile tier limit kontrolü
+    // ? 2026-04-25: audienceMode � backend type ile tier limit kontrol�
     const _audienceFields = audienceModeToFields(audienceMode, password);
     if (!limits.allowedTypes.includes(_audienceFields.type)) {
       showToast({ title: i18n.t('createroom.005'), message: i18n.t('createroom.006'), type: 'warning' });
@@ -400,8 +415,8 @@ export default function CreateRoomScreen() {
       return;
     }
 
-    // ★ 2026-04-21: Müzik linki son bir kontrol — canProceed'te yakalanıyor ama
-    //   submit'e kadar geldiyse bir daha doğrula.
+    // ? 2026-04-21: M�zik linki son bir kontrol � canProceed'te yakalan�yor ama
+    //   submit'e kadar geldiyse bir daha do�rula.
     if (musicLink.trim() && !isValidMusicUrl(musicLink)) {
       showToast({ title: i18n.t('createroom.008'), message: 'Sadece YouTube, Spotify veya SoundCloud linki kabul edilir.', type: 'error' });
       return;
@@ -411,29 +426,29 @@ export default function CreateRoomScreen() {
     try {
       let uploadedCardUrl = '';
       let uploadedBgUrl = '';
-      // ★ 2026-04-21: Image upload error'ları ayrı ayrı yakala → user net hata görsün
+      // ? 2026-04-21: Image upload error'lar� ayr� ayr� yakala � user net hata g�rs�n
       if (cardImage && cardImage.startsWith('file://')) {
         try {
           uploadedCardUrl = await uploadRoomImage(firebaseUser.uid, cardImage, 'card');
         } catch (e: any) {
-          throw new Error(`Kart görseli yüklenemedi: ${e?.message || i18n.t('auto.create_room.024')}`);
+          throw new Error(`Kart g�rseli y�klenemedi: ${e?.message || i18n.t('auto.create_room.024')}`);
         }
       }
       if (backgroundImage && backgroundImage.startsWith('file://')) {
         try {
           uploadedBgUrl = await uploadRoomImage(firebaseUser.uid, backgroundImage, 'bg');
         } catch (e: any) {
-          throw new Error(`Arka plan görseli yüklenemedi: ${e?.message || i18n.t('auto.create_room.023')}`);
+          throw new Error(`Arka plan g�rseli y�klenemedi: ${e?.message || i18n.t('auto.create_room.023')}`);
         }
       }
 
-      // ★ 2026-04-21: Sanitize + küfür kontrolü son bir defa
+      // ? 2026-04-21: Sanitize + k�f�r kontrol� son bir defa
       const cleanName = sanitizeRoomName(name);
       if (cleanName.length < 2 || containsBadWords(cleanName)) {
         throw new Error(i18n.t('auto.create_room.022'));
       }
 
-      // ★ 2026-04-25: Unified audience → backend kolonlarına dönüştür
+      // ? 2026-04-25: Unified audience � backend kolonlar�na d�n��t�r
       const audienceFields = audienceModeToFields(audienceMode, password);
 
       const room = await RoomService.create(
@@ -461,24 +476,24 @@ export default function CreateRoomScreen() {
         },
         tier
       );
-      // ★ Faz 4.3 — etiketleri ayrı tabloda kaydet (best-effort, fire-and-forget)
+      // ? Faz 4.3 � etiketleri ayr� tabloda kaydet (best-effort, fire-and-forget)
       if (tags.length > 0) {
         TagService.setRoomTags(room.id, tags).catch(() => {});
       }
       const isScheduled = !!(scheduledAt && scheduledAt.getTime() > Date.now());
-      // ★ PERF FIX: fire-and-forget — SP hesaplama navigasyonu bloklamamalı
+      // ? PERF FIX: fire-and-forget � SP hesaplama navigasyonu bloklamamal�
       GamificationService.onRoomCreate(firebaseUser.uid).catch(() => {});
-      // ★ 2026-04-21: Başarılı oluşturma → draft temizle (tekrar açılışta eski state gelmesin)
+      // ? 2026-04-21: Ba�ar�l� olu�turma � draft temizle (tekrar a��l��ta eski state gelmesin)
       AsyncStorage.removeItem(DRAFT_KEY).catch(() => {});
       setCreatedRoomId(room.id);
       setCreatedRoomName(cleanName);
-      // ★ 2026-05-05: Overlay artık oda içinde gösteriliyor (kullanıcı yazıyı görsün diye).
-      //   Davet modalı önce açılır, oraya yönlendirme room/[id]?justCreated=1 ile geçer.
+      // ? 2026-05-05: Overlay art�k oda i�inde g�steriliyor (kullan�c� yaz�y� g�rs�n diye).
+      //   Davet modal� �nce a��l�r, oraya y�nlendirme room/[id]?justCreated=1 ile ge�er.
       setRoomSuccessCaption(isScheduled ? i18n.t('auto.create_room.021') : i18n.t('auto.create_room.020'));
-      // ★ PERF FIX: Modal açılışını bir sonraki frame'e erte
+      // ? PERF FIX: Modal a��l���n� bir sonraki frame'e erte
       requestAnimationFrame(() => setShowInviteModal(true));
     } catch (err: any) {
-      // ★ 2026-04-21: Detaylı hata gösterimi — "Hata" yerine kullanıcıya net neden bildir.
+      // ? 2026-04-21: Detayl� hata g�sterimi � "Hata" yerine kullan�c�ya net neden bildir.
       const rawMsg = err?.message || i18n.t('auto.create_room.019');
       const friendly =
         /network|fetch|timeout/i.test(rawMsg) ? i18n.t('auto.create_room.018') :
@@ -494,15 +509,15 @@ export default function CreateRoomScreen() {
   const handleInviteFriends = async (selectedUsers: FollowUser[]) => {
     if (!createdRoomId || !firebaseUser || !profile) return;
     const hostName = profile.display_name || 'Birisi';
-    // ★ PERF FIX: Sıralı (sequential) yerine paralel davet gönderimi.
-    // Eski kod: for-of + await → N kişi × 4 DB sorgusu = sıralı bekleme, FPS drop.
-    // Yeni kod: Promise.allSettled ile tümünü aynı anda gönder.
-    // ★ Cache: inviterName + roomName bir kez hesaplanıp tüm çağrılara geçirilir.
+    // ? PERF FIX: S�ral� (sequential) yerine paralel davet g�nderimi.
+    // Eski kod: for-of + await � N ki�i � 4 DB sorgusu = s�ral� bekleme, FPS drop.
+    // Yeni kod: Promise.allSettled ile t�m�n� ayn� anda g�nder.
+    // ? Cache: inviterName + roomName bir kez hesaplan�p t�m �a�r�lara ge�irilir.
     const inviteCache = { inviterName: hostName, roomName: createdRoomName };
     const results = await Promise.allSettled(
       selectedUsers.map(async (user) => {
         const result = await RoomAccessService.inviteUser(createdRoomId, user.id, firebaseUser.uid, inviteCache);
-        // Push notification fire-and-forget — sonucunu beklemeye gerek yok
+        // Push notification fire-and-forget � sonucunu beklemeye gerek yok
         PushService.sendRoomInvite(user.id, hostName, createdRoomName, createdRoomId).catch(() => {});
         return result.success;
       })
@@ -511,14 +526,14 @@ export default function CreateRoomScreen() {
     showToast({ title: i18n.t('createroom.010'), message: i18n.t('auto.create_room.015', { 0: successCount }), type: 'success' });
   };
 
-  // ═══════════════════════════════════════════════════════════════════
+  // ===================================================================
   // STEP RENDER'LARI
-  // ═══════════════════════════════════════════════════════════════════
+  // ===================================================================
 
   // 1. ODANIN ADI
   const renderBasics = () => (
     <View>
-      {/* ★ Oda adı — büyük, minimal, underline-only */}
+      {/* ? Oda ad� � b�y�k, minimal, underline-only */}
       <View style={w.heroInputWrap}>
         <TextInput
           style={w.bigInput}
@@ -531,7 +546,7 @@ export default function CreateRoomScreen() {
         />
         <View style={[w.heroInputLine, name.length > 0 && !nameValidation.ok && { backgroundColor: 'rgba(239,68,68,0.5)' }]} />
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-          {/* ★ 2026-04-21: Canlı hata geri bildirimi — küfür/uzunluk uyarısı */}
+          {/* ? 2026-04-21: Canl� hata geri bildirimi � k�f�r/uzunluk uyar�s� */}
           {name.length > 0 && !nameValidation.ok && nameValidation.reason ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
               <Ionicons name="alert-circle" size={11} color="#EF4444" />
@@ -542,7 +557,7 @@ export default function CreateRoomScreen() {
         </View>
       </View>
 
-      {/* ★ Açıklama — ince kenarlıklı, şeffaf */}
+      {/* ? A��klama � ince kenarl�kl�, �effaf */}
       <View style={{ marginTop: 32 }}>
         <Text style={w.sublabel}>{t('create.desc_label')}</Text>
         <TextInput
@@ -559,7 +574,7 @@ export default function CreateRoomScreen() {
     </View>
   );
 
-  // 2. KATEGORİ + ETİKETLER (Faz 4.3)
+  // 2. KATEGOR� + ET�KETLER (Faz 4.3)
   const addTag = (raw: string) => {
     const norm = normalizeTag(raw);
     if (!norm) return;
@@ -592,11 +607,11 @@ export default function CreateRoomScreen() {
         <Text style={w.categoryHint}>{(() => { const c = CATEGORIES.find(c => c.id === category); return c ? t(c.descKey) : ''; })()}</Text>
       )}
 
-      {/* ★ Faz 4.3 — Etiket chip input (max 3) */}
+      {/* ? Faz 4.3 � Etiket chip input (max 3) */}
       <View style={w.tagSection}>
         <Text style={w.tagSectionLabel}>{i18n.t('createroom.001')}</Text>
         <Text style={w.tagSectionHint}>
-          Odanı 2-30 karakterlik en fazla {MAX_TAGS_PER_ROOM} etiketle tarif et — keşfette aramayı kolaylaştırır.
+          Odan� 2-30 karakterlik en fazla {MAX_TAGS_PER_ROOM} etiketle tarif et � ke�fette aramay� kolayla�t�r�r.
         </Text>
         <View style={w.tagChipsRow}>
           {tags.map(t => (
@@ -637,14 +652,14 @@ export default function CreateRoomScreen() {
     </View>
   );
 
-  // 3. ERİŞİM — unified audience select
-  // ★ 2026-04-25: 3 mod (open/closed/invite) + ayrı followers_only toggle yerine
-  //   tek 4-modlu select. invite Plus+, diğerleri Free.
+  // 3. ER���M � unified audience select
+  // ? 2026-04-25: 3 mod (open/closed/invite) + ayr� followers_only toggle yerine
+  //   tek 4-modlu select. invite Plus+, di�erleri Free.
   const renderAccess = () => (
     <View>
       {AUDIENCE_OPTIONS.map(opt => {
-        // ★ 2026-04-27: 'invite' VE 'followers' modu Plus+ tier gerektiriyor.
-        //   followers = "Sadece Arkadaşlar" — premium oda yönetim aracı.
+        // ? 2026-04-27: 'invite' VE 'followers' modu Plus+ tier gerektiriyor.
+        //   followers = "Sadece Arkada�lar" � premium oda y�netim arac�.
         const requiredTier: TierName | null = (opt.mode === 'invite' || opt.mode === 'followers') ? 'Plus' : null;
         const locked = requiredTier ? !isTierEnough(tier, requiredTier) : false;
         const active = audienceMode === opt.mode;
@@ -657,8 +672,8 @@ export default function CreateRoomScreen() {
                 return;
               }
               setAudienceMode(opt.mode);
-              // ★ 2026-04-27: Audience moduna göre yavaş mod öner — sadece kullanıcı default'taysa.
-              //   Şifreli oda: 5sn (spam koruması). Diğer modlar: 0sn (gerek yok).
+              // ? 2026-04-27: Audience moduna g�re yava� mod �ner � sadece kullan�c� default'taysa.
+              //   �ifreli oda: 5sn (spam korumas�). Di�er modlar: 0sn (gerek yok).
               if (slowModeSeconds === 0 && opt.mode === 'password') {
                 setSlowModeSeconds(5);
                 showToast({ title: i18n.t('createroom.011'), message: i18n.t('createroom.012'), type: 'info' });
@@ -708,18 +723,18 @@ export default function CreateRoomScreen() {
         </View>
       )}
 
-      {/* ★ 2026-04-20: Dil filtresi (Plus+) — PlusMenu ile parite */}
+      {/* ? 2026-04-20: Dil filtresi (Plus+) � PlusMenu ile parite */}
       <View style={{ marginTop: 14 }}>
         <Text style={w.sublabel}>Dil filtresi</Text>
         <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
           {[
-            { id: 'tr', label: '🇹🇷 TR' },
-            { id: 'en', label: '🇬🇧 EN' },
-            { id: 'ar', label: '🇸🇦 AR' },
-            { id: 'de', label: '🇩🇪 DE' },
+            { id: 'tr', label: '???? TR' },
+            { id: 'en', label: '???? EN' },
+            { id: 'ar', label: '???? AR' },
+            { id: 'de', label: '???? DE' },
           ].map(lang => {
             const active = roomLanguage === lang.id;
-            // ★ 2026-04-24: Dil filtresi Free'ye açıldı — temel demografik tercih, tier-lock olmamalı
+            // ? 2026-04-24: Dil filtresi Free'ye a��ld� � temel demografik tercih, tier-lock olmamal�
             const locked = false;
             return (
               <Pressable
@@ -747,7 +762,7 @@ export default function CreateRoomScreen() {
         </View>
       </View>
 
-      {/* ★ 2026-04-24: Yavaş Mod — Free'ye açıldı (moderasyon herkese lazım, spam'den korur) */}
+      {/* ? 2026-04-24: Yava� Mod � Free'ye a��ld� (moderasyon herkese laz�m, spam'den korur) */}
       <View style={{ marginTop: 14 }}>
         <Text style={w.sublabel}>{i18n.t('createroom.003')}</Text>
         <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
@@ -781,9 +796,9 @@ export default function CreateRoomScreen() {
     </View>
   );
 
-  // 4. KONUŞMA MODU
+  // 4. KONU�MA MODU
   const renderSpeaking = () => {
-    // Seçilen moda göre "dinleyicinin ekranda ne göreceği" preview'u
+    // Se�ilen moda g�re "dinleyicinin ekranda ne g�rece�i" preview'u
     const preview = (() => {
       switch (speakingMode) {
         case 'free_for_all':
@@ -836,7 +851,7 @@ export default function CreateRoomScreen() {
             </Pressable>
           );
         })}
-        {/* ★ Seçilen moda göre "gelen kullanıcı ne görür?" preview — UX boşluğunu kapatır */}
+        {/* ? Se�ilen moda g�re "gelen kullan�c� ne g�r�r?" preview � UX bo�lu�unu kapat�r */}
         {preview && (
           <View style={{
             marginTop: 12, paddingVertical: 12, paddingHorizontal: 14, borderRadius: 12,
@@ -859,7 +874,7 @@ export default function CreateRoomScreen() {
     );
   };
 
-  // 5. KARŞILAMA (welcome + rules — opsiyonel)
+  // 5. KAR�ILAMA (welcome + rules � opsiyonel)
   const renderWelcome = () => (
     <View>
       <Text style={w.sublabel}>{i18n.t('createroom.004')}</Text>
@@ -890,15 +905,18 @@ export default function CreateRoomScreen() {
     </View>
   );
 
-  // 6. GÖRSEL
+  // 6. G�RSEL
   const renderVisual = () => (
     <View>
-      {/* Kapak görseli (Kart) — 16:9 yatay, keşfet kartında gösterilir */}
+      {/* Kapak g�rseli (Kart) � 16:9 yatay, ke�fet kart�nda g�sterilir
+          ? v1.7.13.132: canCustomizeImage tier-gate eklendi (Plus+ gerek) */}
       <Text style={w.sublabel}>{i18n.t('createroom.006')}</Text>
       <Text style={w.hint}>{i18n.t('createroom.007')}</Text>
+      {(() => { const cardLocked = !limits.canCustomizeImage; return (
       <Pressable
-        style={[w.cardImageBox, cardImage ? { borderColor: Colors.teal, borderStyle: 'solid' } : {}]}
+        style={[w.cardImageBox, cardImage ? { borderColor: Colors.teal, borderStyle: 'solid' } : {}, cardLocked && { opacity: 0.5 }]}
         onPress={async () => {
+          if (cardLocked) { UpsellService.onFeatureLocked(tier, 'Plus'); return; }
           try {
             const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
             if (!perm.granted) {
@@ -923,13 +941,20 @@ export default function CreateRoomScreen() {
           <View style={w.cardImagePlaceholder}>
             <Ionicons name="image-outline" size={32} color="rgba(255,255,255,0.3)" />
             <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, marginTop: 6 }}>{i18n.t('createroom.008')}</Text>
+            {cardLocked && (
+              <View style={[w.lockBadge, { marginTop: 8 }]}>
+                <Ionicons name="lock-closed" size={9} color="#F59E0B" />
+                <Text style={w.lockText}>Plus+</Text>
+              </View>
+            )}
           </View>
         )}
       </Pressable>
+      ); })()}
 
-      {/* ★ 2026-04-21: Oda içi ARKA PLAN görseli — 9:16 dikey, Plus+ üyelere açık.
-         Önceden sadece state vardı UI yoktu → arka plan görseli hiç kayıt edilemiyordu.
-         Oda içinde (SeatCard/ListenerGrid arkasında) gösterilir. */}
+      {/* ? 2026-04-21: Oda i�i ARKA PLAN g�rseli � 9:16 dikey, Plus+ �yelere a��k.
+         �nceden sadece state vard� UI yoktu � arka plan g�rseli hi� kay�t edilemiyordu.
+         Oda i�inde (SeatCard/ListenerGrid arkas�nda) g�sterilir. */}
       <View style={{ marginTop: 24 }}>
         <Text style={w.sublabel}>{i18n.t('createroom.009')}</Text>
         <Text style={w.hint}>{i18n.t('createroom.010')}</Text>
@@ -973,16 +998,31 @@ export default function CreateRoomScreen() {
         })()}
       </View>
 
-      {/* Tema */}
+      {/* Tema � ? v1.7.13.132: canCustomizeTheme tier-gate (Plus+ gerek) */}
       <View style={{ marginTop: 24 }}>
-        <Text style={w.sublabel}>{i18n.t('createroom.011')}</Text>
-        <View style={w.themeGrid}>
-          <Pressable onPress={() => setSelectedTheme(null)} style={[w.themeCircle, !selectedTheme && { borderColor: Colors.teal }]}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Text style={w.sublabel}>{i18n.t('createroom.011')}</Text>
+          {!limits.canCustomizeTheme && (
+            <View style={w.lockBadge}>
+              <Ionicons name="lock-closed" size={9} color="#F59E0B" />
+              <Text style={w.lockText}>Plus+</Text>
+            </View>
+          )}
+        </View>
+        <View style={[w.themeGrid, !limits.canCustomizeTheme && { opacity: 0.5 }]}>
+          <Pressable
+            onPress={() => { if (!limits.canCustomizeTheme) { UpsellService.onFeatureLocked(tier, 'Plus'); return; } setSelectedTheme(null); }}
+            style={[w.themeCircle, !selectedTheme && { borderColor: Colors.teal }]}
+          >
             <LinearGradient colors={['#0E1420', '#070B14']} style={StyleSheet.absoluteFillObject} />
             <Ionicons name="close-circle" size={14} color="rgba(255,255,255,0.4)" />
           </Pressable>
           {ROOM_THEMES.map(t => (
-            <Pressable key={t.id} onPress={() => setSelectedTheme(t.id)} style={[w.themeCircle, selectedTheme === t.id && { borderColor: Colors.teal }]}>
+            <Pressable
+              key={t.id}
+              onPress={() => { if (!limits.canCustomizeTheme) { UpsellService.onFeatureLocked(tier, 'Plus'); return; } setSelectedTheme(t.id); }}
+              style={[w.themeCircle, selectedTheme === t.id && { borderColor: Colors.teal }]}
+            >
               <LinearGradient colors={t.colors} style={StyleSheet.absoluteFillObject} />
               {selectedTheme === t.id && (
                 <View style={w.themeCheck}><Ionicons name="checkmark" size={10} color="#FFF" /></View>
@@ -992,8 +1032,8 @@ export default function CreateRoomScreen() {
         </View>
       </View>
 
-      {/* ★ 2026-04-20: Müzik linki (Pro) — YouTube/Spotify/SoundCloud
-         ★ 2026-04-21: URL regex validation eklendi; geçersiz linkte uyarı. */}
+      {/* ? 2026-04-20: M�zik linki (Pro) � YouTube/Spotify/SoundCloud
+         ? 2026-04-21: URL regex validation eklendi; ge�ersiz linkte uyar�. */}
       <View style={{ marginTop: 24 }}>
         <Text style={w.sublabel}>{i18n.t('createroom.012')}</Text>
         <Text style={{ fontSize: 11, color: '#64748B', marginBottom: 8 }}>{i18n.t('createroom.001')}</Text>
@@ -1039,10 +1079,10 @@ export default function CreateRoomScreen() {
     </View>
   );
 
-  // 7. MONETİZASYON
+  // 7. MONET�ZASYON
   const renderMonetization = () => (
     <View>
-      {/* Giriş ücreti */}
+      {/* Giri� �creti */}
       <View>
         <Text style={w.sublabel}>{i18n.t('createroom.014')}</Text>
         <Text style={w.hint}>{i18n.t('createroom.015')}</Text>
@@ -1064,7 +1104,7 @@ export default function CreateRoomScreen() {
         </View>
       </View>
 
-      {/* Bağış */}
+      {/* Ba��� */}
       <Pressable
         onPress={() => { if (isTierEnough(tier, 'Pro')) setDonationsEnabled(!donationsEnabled); else UpsellService.onFeatureLocked(tier, 'Pro'); }}
         style={[w.toggleRow, { marginTop: 24 }]}
@@ -1084,10 +1124,10 @@ export default function CreateRoomScreen() {
         )}
       </Pressable>
 
-      {/* ★ 2026-04-25: "Sadece arkadaşlarım" toggle'ı kaldırıldı —
-           audienceMode='followers' ile birleştirildi (Erişim adımında). */}
+      {/* ? 2026-04-25: "Sadece arkada�lar�m" toggle'� kald�r�ld� �
+           audienceMode='followers' ile birle�tirildi (Eri�im ad�m�nda). */}
 
-      {/* ★ 2026-04-20: +18 İçerik (Plus+) */}
+      {/* ? 2026-04-20: +18 ��erik (Plus+) */}
       <Pressable
         onPress={() => { if (isTierEnough(tier, 'Plus')) setAgeRestricted(!ageRestricted); else UpsellService.onFeatureLocked(tier, 'Plus'); }}
         style={w.toggleRow}
@@ -1109,17 +1149,17 @@ export default function CreateRoomScreen() {
     </View>
   );
 
-  // 8. ÖZET
+  // 8. �ZET
   const renderReview = () => {
     const themeObj = ROOM_THEMES.find(t => t.id === selectedTheme);
     const catObj = CATEGORIES.find(c => c.id === category);
-    // ★ 2026-04-25: typeObj → audienceObj (unified mode'dan label/icon)
+    // ? 2026-04-25: typeObj � audienceObj (unified mode'dan label/icon)
     const audienceObj = AUDIENCE_OPTIONS.find(o => o.mode === audienceMode);
     const smObj = SPEAKING_MODES.find(s => s.id === speakingMode);
 
     return (
       <View>
-        {/* Büyük oda kartı önizleme */}
+        {/* B�y�k oda kart� �nizleme */}
         <View style={w.reviewCard}>
           {cardImage ? (
             <>
@@ -1155,8 +1195,8 @@ export default function CreateRoomScreen() {
           </View>
         </View>
 
-        {/* ★ 2026-04-21: Oda içi arka plan preview — Plus+ kullanıcıların yüklediği görsel
-           review ekranında da görünsün (önceden hiç render edilmiyordu). */}
+        {/* ? 2026-04-21: Oda i�i arka plan preview � Plus+ kullan�c�lar�n y�kledi�i g�rsel
+           review ekran�nda da g�r�ns�n (�nceden hi� render edilmiyordu). */}
         {backgroundImage ? (
           <View style={{ marginTop: 12, borderRadius: 14, overflow: 'hidden', height: 120, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' }}>
             <Image source={{ uri: backgroundImage }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
@@ -1171,14 +1211,14 @@ export default function CreateRoomScreen() {
           </View>
         ) : null}
 
-        {/* Özet satırları — profil arkadaşlar kartı ile aynı diagonal gradient stil */}
+        {/* �zet sat�rlar� � profil arkada�lar kart� ile ayn� diagonal gradient stil */}
         <View style={w.summaryBlock}>
           <LinearGradient
             colors={['#4a5668', '#37414f', '#232a35']}
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
             style={StyleSheet.absoluteFillObject}
           />
-          {/* ★ 2026-04-25: Audience özeti — public dışı modlar göster */}
+          {/* ? 2026-04-25: Audience �zeti � public d��� modlar g�ster */}
           {audienceMode !== 'public' && (
             <SummaryRow
               icon="lock-closed"
@@ -1199,7 +1239,7 @@ export default function CreateRoomScreen() {
           {backgroundImage && <SummaryRow icon="image" label="Arka Plan" value={i18n.t('auto.create_room.002')} />}
         </View>
 
-        {/* ★ 2026-04-26: Planlı oda — hemen vs sonra başlat */}
+        {/* ? 2026-04-26: Planl� oda � hemen vs sonra ba�lat */}
         <View style={w.scheduleBlock}>
           <Text style={w.scheduleTitle}>{i18n.t('createroom.021')}</Text>
           <View style={w.scheduleToggleRow}>
@@ -1230,13 +1270,13 @@ export default function CreateRoomScreen() {
               <Pressable onPress={() => setShowDatePicker(true)} style={w.scheduleDateBtn}>
                 <Ionicons name="calendar-outline" size={14} color="#F1F5F9" />
                 <Text style={w.scheduleDateText}>
-                  {scheduledAt.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', weekday: 'short' })}
+                  {scheduledAt.toLocaleDateString(i18n.locale, { day: 'numeric', month: 'long', weekday: 'short' })}
                 </Text>
               </Pressable>
               <Pressable onPress={() => setShowTimePicker(true)} style={w.scheduleDateBtn}>
                 <Ionicons name="time-outline" size={14} color="#F1F5F9" />
                 <Text style={w.scheduleDateText}>
-                  {scheduledAt.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
+                  {scheduledAt.toLocaleTimeString(i18n.locale, { hour: '2-digit', minute: '2-digit' })}
                 </Text>
               </Pressable>
             </View>
@@ -1283,7 +1323,7 @@ export default function CreateRoomScreen() {
     );
   };
 
-  // Adım adım içerik
+  // Ad�m ad�m i�erik
   const renderStepContent = () => {
     switch (step) {
       case 'basics': return renderBasics();
@@ -1297,12 +1337,12 @@ export default function CreateRoomScreen() {
     }
   };
 
-  // ═══════════════════════════════════════════════════════════════════
+  // ===================================================================
   // MAIN RENDER
-  // ═══════════════════════════════════════════════════════════════════
+  // ===================================================================
 
-  // ★ 2026-04-21: Günlük limit dolu ise wizard'ı hiç açma — kullanıcıyı 8 adım sonra
-  //   "limit doldu" ile hayal kırıklığına uğratmayalım. Başta net upsell ekranı göster.
+  // ? 2026-04-21: G�nl�k limit dolu ise wizard'� hi� a�ma � kullan�c�y� 8 ad�m sonra
+  //   "limit doldu" ile hayal k�r�kl���na u�ratmayal�m. Ba�ta net upsell ekran� g�ster.
   if (dailyLimitReached) {
     return (
       <View style={{ flex: 1, backgroundColor: 'transparent' }}>
@@ -1316,7 +1356,7 @@ export default function CreateRoomScreen() {
           style={[w.sheetPanel, { top: Math.max(insets.top, 20) + 10, transform: [{ translateY }] }]}
           {...panResponder.panHandlers}
         >
-          {/* ★ 2026-05-05: Aile dili — slate + amber halo (limit semantik) */}
+          {/* ? 2026-05-05: Aile dili � slate + amber halo (limit semantik) */}
           <LinearGradient
             colors={['#3a4658', '#2a3344', '#1a2030']}
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
@@ -1330,7 +1370,7 @@ export default function CreateRoomScreen() {
             pointerEvents="none"
           />
           <View style={{ flex: 1 }}>
-              {/* ★ 2026-04-28: Handle artık görsel — pan tüm sheet'te (Clubhouse). */}
+              {/* ? 2026-04-28: Handle art�k g�rsel � pan t�m sheet'te (Clubhouse). */}
               <View style={w.sheetHandleWrap}>
                 <View style={w.sheetHandleBar} />
               </View>
@@ -1352,12 +1392,12 @@ export default function CreateRoomScreen() {
                 </View>
                 <Text style={{ fontSize: 22, fontWeight: '800', color: '#F1F5F9', marginBottom: 8, textAlign: 'center' }}>{i18n.t('createroom.003')}</Text>
                 <Text style={{ fontSize: 14, color: '#94A3B8', textAlign: 'center', lineHeight: 20, marginBottom: 24 }}>
-                  Bugün {limits.dailyRooms}/{limits.dailyRooms} oda açtın. Yarın sıfırlanacak — ya da üyeliğini yükselterek daha fazla oda aç.
+                  Bug�n {limits.dailyRooms}/{limits.dailyRooms} oda a�t�n. Yar�n s�f�rlanacak � ya da �yeli�ini y�kselterek daha fazla oda a�.
                 </Text>
                 <Pressable
                   onPress={() => {
-                    // ★ 2026-04-23: Önce sheet'i kapat, sonra /plus'a yönlendir.
-                    //   UpsellService tetiklemeye gerek yok — kullanıcı zaten upgrade sayfasına gidiyor.
+                    // ? 2026-04-23: �nce sheet'i kapat, sonra /plus'a y�nlendir.
+                    //   UpsellService tetiklemeye gerek yok � kullan�c� zaten upgrade sayfas�na gidiyor.
                     Animated.parallel([
                       Animated.timing(translateY, { toValue: SCREEN_H, duration: 220, useNativeDriver: true }),
                       Animated.timing(backdropOpacity, { toValue: 0, duration: 200, useNativeDriver: true }),
@@ -1388,7 +1428,7 @@ export default function CreateRoomScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: 'transparent' }}>
-      {/* ★ Backdrop — tap to close, fade animation (aile dim) */}
+      {/* ? Backdrop � tap to close, fade animation (aile dim) */}
       <Animated.View
         style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(8,12,22,0.45)', opacity: backdropOpacity }]}
         pointerEvents="box-none"
@@ -1396,7 +1436,7 @@ export default function CreateRoomScreen() {
         <Pressable style={{ flex: 1 }} onPress={() => closeSheetRef.current()} />
       </Animated.View>
 
-      {/* ★ 2026-05-05: NotificationDrawer aile dili — slate diagonal + teal halo + soft glow */}
+      {/* ? 2026-05-05: NotificationDrawer aile dili � slate diagonal + teal halo + soft glow */}
       <Animated.View
         style={[w.sheetPanel, { top: Math.max(insets.top, 20) + 10, transform: [{ translateY }] }]}
         {...panResponder.panHandlers}
@@ -1420,23 +1460,23 @@ export default function CreateRoomScreen() {
           pointerEvents="none"
         />
         <View style={{ flex: 1 }}>
-          {/* ★ 2026-04-28: Handle artık görsel — pan tüm sheet'te (Clubhouse). */}
+          {/* ? 2026-04-28: Handle art�k g�rsel � pan t�m sheet'te (Clubhouse). */}
           <View style={w.sheetHandleWrap}>
             <View style={w.sheetHandleBar} />
           </View>
 
-          {/* ── HEADER ── subtle teal tint (DM drawer ile aynı) */}
+          {/* �� HEADER �� subtle teal tint (DM drawer ile ayn�) */}
           <View style={[w.header, w.sheetHeader]}>
             <Pressable onPress={prevStep} style={w.iconBtn} hitSlop={8}>
               <Ionicons name={stepIndex === 0 ? 'chevron-down' : 'chevron-back'} size={22} color="#F1F5F9" />
             </Pressable>
             <Text style={w.stepCounter}>{stepIndex + 1} / {totalSteps}</Text>
             <View style={[w.tierChip, isAdmin && { backgroundColor: 'rgba(239,68,68,0.12)', borderColor: 'rgba(239,68,68,0.25)' }]}>
-              <Text style={[w.tierChipText, isAdmin && { color: '#EF4444' }]}>{isAdmin ? '⚡' : tier}</Text>
+              <Text style={[w.tierChipText, isAdmin && { color: '#EF4444' }]}>{isAdmin ? '?' : tier}</Text>
             </View>
           </View>
 
-        {/* ── PROGRESS DOTS ── */}
+        {/* �� PROGRESS DOTS �� */}
         <View style={w.progressRow}>
           {STEPS.map((s, i) => (
             <View
@@ -1450,15 +1490,15 @@ export default function CreateRoomScreen() {
           ))}
         </View>
 
-        {/* ── CONTENT ── */}
-        {/* ★ Arka plan watermark — büyük soluk ikon (her step'e özel) */}
+        {/* �� CONTENT �� */}
+        {/* ? Arka plan watermark � b�y�k soluk ikon (her step'e �zel) */}
         {currentStepMeta.watermark ? (
           <View pointerEvents="none" style={w.watermarkWrap}>
             <Ionicons name={currentStepMeta.watermark as any} size={280} color={currentStepMeta.accent} style={{ opacity: 0.04 }} />
           </View>
         ) : null}
 
-        {/* ★ v110.5.3: Klavye yönetimi — TextInput odaklanınca scroll otomatik */}
+        {/* ? v110.5.3: Klavye y�netimi � TextInput odaklan�nca scroll otomatik */}
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={{ flex: 1 }}
@@ -1470,14 +1510,14 @@ export default function CreateRoomScreen() {
           contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 160, paddingTop: 12 }}
         >
           <Animated.View style={{ opacity: fadeAnim, transform: [{ translateX: slideAnim }] }}>
-            {/* ★ 2026-05-05: Hero icon — family slate base + accent halo ring (vibrant gradient yerine).
-                 Step renkleri artık SADECE accent ring + ikon tint olarak görünür (sade fark işareti). */}
+            {/* ? 2026-05-05: Hero icon � family slate base + accent halo ring (vibrant gradient yerine).
+                 Step renkleri art�k SADECE accent ring + ikon tint olarak g�r�n�r (sade fark i�areti). */}
             <View style={w.heroIconWrap}>
-              {/* ★ v298.4 (17 May 2026): GlowView wrapper KALDIRILDI — position:absolute
-                  inner View'a düşünce normal flow'a girip iconCircle'ı kaydırıyordu
-                  (kullanıcı feedback: "duplicate icon görüntüsü").
-                  Çözüm: plain absolute View, sadece border ile accent vurgu (renkli
-                  glow YOK — accent rengi border'ında görünür, yeterince premium). */}
+              {/* ? v298.4 (17 May 2026): GlowView wrapper KALDIRILDI � position:absolute
+                  inner View'a d���nce normal flow'a girip iconCircle'� kayd�r�yordu
+                  (kullan�c� feedback: "duplicate icon g�r�nt�s�").
+                  ��z�m: plain absolute View, sadece border ile accent vurgu (renkli
+                  glow YOK � accent rengi border'�nda g�r�n�r, yeterince premium). */}
               <View style={[w.heroAccentRing, {
                 borderColor: currentStepMeta.accent + '70',
               }]} pointerEvents="none" />
@@ -1486,7 +1526,7 @@ export default function CreateRoomScreen() {
                 start={{ x: 0.2, y: 0 }} end={{ x: 0.8, y: 1 }}
                 style={[w.heroIconCircle, { borderColor: currentStepMeta.accent + '40' }]}
               >
-                {/* İç parıltı — üst beyaz, alt koyu → 3D derinlik (slate'te de işe yarar) */}
+                {/* �� par�lt� � �st beyaz, alt koyu � 3D derinlik (slate'te de i�e yarar) */}
                 <LinearGradient
                   colors={['rgba(255,255,255,0.10)', 'transparent', 'rgba(0,0,0,0.20)']}
                   start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
@@ -1496,7 +1536,7 @@ export default function CreateRoomScreen() {
               </LinearGradient>
             </View>
 
-            {/* Hero Title + Subtitle — text shadow yok, sade */}
+            {/* Hero Title + Subtitle � text shadow yok, sade */}
             <Text style={w.heroTitle}>{t(currentStepMeta.titleKey)}</Text>
             <Text style={w.heroSubtitle}>{t(currentStepMeta.subtitleKey)}</Text>
 
@@ -1508,7 +1548,7 @@ export default function CreateRoomScreen() {
         </ScrollView>
         </KeyboardAvoidingView>
 
-        {/* ── FOOTER (Back / Skip / Next) ── */}
+        {/* �� FOOTER (Back / Skip / Next) �� */}
         <View style={[w.footer, { paddingBottom: insets.bottom + 12 }]}>
           {currentStepMeta.skippable && step !== 'review' && (
             <Pressable onPress={nextStep} style={w.skipBtn}>
@@ -1520,7 +1560,7 @@ export default function CreateRoomScreen() {
             <Pressable
               onPress={() => {
                 if (dailyLimitReached) {
-                  // ★ 2026-04-23: Limit dolu → sheet kapan + /plus'a git
+                  // ? 2026-04-23: Limit dolu � sheet kapan + /plus'a git
                   Animated.parallel([
                     Animated.timing(translateY, { toValue: SCREEN_H, duration: 220, useNativeDriver: true }),
                     Animated.timing(backdropOpacity, { toValue: 0, duration: 200, useNativeDriver: true }),
@@ -1570,15 +1610,15 @@ export default function CreateRoomScreen() {
           )}
         </View>
 
-        {/* ── Davet Modalı (oda açıldıktan sonra) ── */}
+        {/* �� Davet Modal� (oda a��ld�ktan sonra) �� */}
         <InviteFriendsModal
           visible={showInviteModal}
           userId={firebaseUser?.uid || ''}
           roomId={createdRoomId || undefined}
           onClose={() => {
             setShowInviteModal(false);
-            // ★ PERF FIX: Modal kapanış animasyonu bitene kadar navigasyonu ertele
-            // Aksi halde room ekranı mount olurken modal fade-out çakışır → FPS drop
+            // ? PERF FIX: Modal kapan�� animasyonu bitene kadar navigasyonu ertele
+            // Aksi halde room ekran� mount olurken modal fade-out �ak���r � FPS drop
             if (createdRoomId) {
               const cap = encodeURIComponent(roomSuccessCaption);
               InteractionManager.runAfterInteractions(() => {
@@ -1604,9 +1644,9 @@ export default function CreateRoomScreen() {
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════
+// ===================================================================
 // SUMMARY ROW
-// ═══════════════════════════════════════════════════════════════════
+// ===================================================================
 function SummaryRow({ icon, label, value }: { icon: string; label: string; value: string }) {
   return (
     <View style={w.summaryRow}>
@@ -1620,11 +1660,11 @@ function SummaryRow({ icon, label, value }: { icon: string; label: string; value
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════
-// STYLES — Apple-like wizard
-// ═══════════════════════════════════════════════════════════════════
+// ===================================================================
+// STYLES � Apple-like wizard
+// ===================================================================
 const w = StyleSheet.create({
-  // ★ 2026-05-05: NotificationDrawer aile standardı — radius 20→26, slate bg, gri border kaldırıldı
+  // ? 2026-05-05: NotificationDrawer aile standard� � radius 20�26, slate bg, gri border kald�r�ld�
   sheetPanel: {
     position: 'absolute',
     left: 0, right: 0, bottom: 0,
@@ -1645,7 +1685,7 @@ const w = StyleSheet.create({
     width: 36, height: 4, borderRadius: 2,
     backgroundColor: 'rgba(255,255,255,0.2)',
   },
-  // ★ 2026-05-05: Aile dili — gradient halo zaten var, ekstra teal bg + border kaldırıldı
+  // ? 2026-05-05: Aile dili � gradient halo zaten var, ekstra teal bg + border kald�r�ld�
   sheetHeader: {
     paddingTop: 4, paddingBottom: 12,
   },
@@ -1667,7 +1707,7 @@ const w = StyleSheet.create({
   },
   tierChipText: { fontSize: 11, fontWeight: '800', color: Colors.teal, textShadowColor: 'rgba(0,0,0,0.3)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
 
-  // Progress dots — aktif olan tema rengiyle glow
+  // Progress dots � aktif olan tema rengiyle glow
   progressRow: {
     flexDirection: 'row', justifyContent: 'center', alignItems: 'center',
     gap: 6, paddingVertical: 14,
@@ -1686,7 +1726,7 @@ const w = StyleSheet.create({
     backgroundColor: 'rgba(20,184,166,0.5)',
   },
 
-  // ★ Hero — gradient circle + koyu yumuşak dağılmış gölge
+  // ? Hero � gradient circle + koyu yumu�ak da��lm�� g�lge
   heroIconWrap: {
     alignItems: 'center', justifyContent: 'center',
     marginBottom: 20, marginTop: 8,
@@ -1696,24 +1736,24 @@ const w = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
     overflow: 'hidden',
     borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.12)',
-    // ★ Ionicons optik kaymasını telafi — ikon tam merkeze oturur
+    // ? Ionicons optik kaymas�n� telafi � ikon tam merkeze oturur
     paddingLeft: 2, paddingTop: 1,
-    // ★ v298.2 (17 May 2026): RN shadow +  KALDIRILDI — Android'de
-    //   dikdörtgen native shadow çiziyordu. Cross-platform gölge artık parent
-    //   SkiaShadow wrapper tarafından yönetiliyor (BlurMask, hem iOS hem Android
-    //   yumuşak yuvarlak halo).
+    // ? v298.2 (17 May 2026): RN shadow +  KALDIRILDI � Android'de
+    //   dikd�rtgen native shadow �iziyordu. Cross-platform g�lge art�k parent
+    //   SkiaShadow wrapper taraf�ndan y�netiliyor (BlurMask, hem iOS hem Android
+    //   yumu�ak yuvarlak halo).
   },
-  // ★ 2026-05-05: Hero accent halo — slate dairenin etrafında step accent rengi soft glow.
-  //   Family slate'i taban, accent ring step renk işareti — rainbow yerine kohezyon.
+  // ? 2026-05-05: Hero accent halo � slate dairenin etraf�nda step accent rengi soft glow.
+  //   Family slate'i taban, accent ring step renk i�areti � rainbow yerine kohezyon.
   heroAccentRing: {
     position: 'absolute',
     width: 100, height: 100, borderRadius: 30,
     borderWidth: 1.2,
-    // ★ v298.2 (17 May 2026): Android  KALDIRILDI — GlowView wrapper
-    //   colored shadow için Skia BlurMask kullanır (RN elevation dikdörtgen
-    //   çiziyordu, halo ring'in rounded estetiğini bozuyordu).
+    // ? v298.2 (17 May 2026): Android  KALDIRILDI � GlowView wrapper
+    //   colored shadow i�in Skia BlurMask kullan�r (RN elevation dikd�rtgen
+    //   �iziyordu, halo ring'in rounded esteti�ini bozuyordu).
   },
-  // Arka plan watermark — her step'e özel büyük soluk ikon
+  // Arka plan watermark � her step'e �zel b�y�k soluk ikon
   watermarkWrap: {
     position: 'absolute',
     top: 80, right: -60,
@@ -1736,8 +1776,8 @@ const w = StyleSheet.create({
     textShadowRadius: 3,
   },
 
-  // ★ Hero input wrapper — oda adı alanı
-  // ★ 2026-05-05: Belirgin glass-pill — underline-only çok soluktu, kullanıcı görmüyordu
+  // ? Hero input wrapper � oda ad� alan�
+  // ? 2026-05-05: Belirgin glass-pill � underline-only �ok soluktu, kullan�c� g�rm�yordu
   heroInputWrap: {
     alignItems: 'stretch',
   },
@@ -1750,7 +1790,7 @@ const w = StyleSheet.create({
     borderWidth: 1.5, borderColor: 'rgba(20,184,166,0.45)',
     borderRadius: 22,
   } as any,
-  // ★ Gradient underline kaldırıldı — pill kabuk yeterli görsel
+  // ? Gradient underline kald�r�ld� � pill kabuk yeterli g�rsel
   heroInputLine: {
     height: 0,
   } as any,
@@ -1766,7 +1806,7 @@ const w = StyleSheet.create({
   sublabel: { fontSize: 11, fontWeight: '800', color: 'rgba(203,213,225,0.85)', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 10, textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
   hint: { fontSize: 12, color: 'rgba(148,163,184,0.75)', marginBottom: 12, lineHeight: 17, textShadowColor: 'rgba(0,0,0,0.3)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
 
-  // Kategori grid — koyu yumuşak dağılmış gölge
+  // Kategori grid � koyu yumu�ak da��lm�� g�lge
   categoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'center' },
   catCardWrap: {
     width: '26%',
@@ -1796,7 +1836,7 @@ const w = StyleSheet.create({
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
   },
-  // ★ Faz 4.3 tag input
+  // ? Faz 4.3 tag input
   tagSection: { marginTop: 22, paddingHorizontal: 8 },
   tagSectionLabel: {
     fontSize: 10, fontWeight: '900', color: '#5CBFB5',
@@ -1844,7 +1884,7 @@ const w = StyleSheet.create({
     fontSize: 10.5, fontWeight: '600', color: 'rgba(203,213,225,0.7)',
   },
 
-  // Erişim / speaking row — kart hissi derinlik
+  // Eri�im / speaking row � kart hissi derinlik
   accessRow: {
     flexDirection: 'row', alignItems: 'center', gap: 14,
     backgroundColor: '#414E5F', borderRadius: 18,
@@ -1873,7 +1913,7 @@ const w = StyleSheet.create({
   },
   lockText: { fontSize: 9, fontWeight: '700', color: '#F59E0B' },
 
-  // Görsel
+  // G�rsel
   cardImageBox: {
     height: 140, borderRadius: 16,
     borderWidth: 1.5, borderColor: 'rgba(149,161,174,0.25)', borderStyle: 'dashed',
@@ -1939,14 +1979,14 @@ const w = StyleSheet.create({
   },
   switchKnobActive: { backgroundColor: Colors.teal, alignSelf: 'flex-end' },
 
-  // Review — premium oda kartı önizleme
+  // Review � premium oda kart� �nizleme
   reviewCard: {
     height: 180, borderRadius: 22, overflow: 'hidden',
     borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.12)',
     padding: 18, justifyContent: 'flex-end',
     marginBottom: 18,
-    // ★ v298.3 (17 May 2026): RN shadow +  KALDIRILDI — Android'de
-    //   dikdörtgen native shadow oluyordu, fade transition'da iz bırakıyordu.
+    // ? v298.3 (17 May 2026): RN shadow +  KALDIRILDI � Android'de
+    //   dikd�rtgen native shadow oluyordu, fade transition'da iz b�rak�yordu.
     //   Border + inner gradient zaten yeterli derinlik veriyor.
   },
   reviewBadge: {
@@ -1954,7 +1994,7 @@ const w = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 5,
     backgroundColor: 'rgba(239,68,68,0.95)',
     paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8,
-    // ★ v298.3: elevation kaldırıldı (Android dikdörtgen shadow iz bırakıyordu).
+    // ? v298.3: elevation kald�r�ld� (Android dikd�rtgen shadow iz b�rak�yordu).
   },
   reviewTitle: { fontSize: 22, fontWeight: '800', color: '#FFF', letterSpacing: 0.2 },
   reviewDesc: { fontSize: 13, color: 'rgba(255,255,255,0.85)', marginTop: 4, lineHeight: 17 },
@@ -1965,8 +2005,8 @@ const w = StyleSheet.create({
   },
   chipMiniText: { fontSize: 10, fontWeight: '700', color: '#E2E8F0' },
 
-  // ★ 2026-04-21: Profil arkadaşlar kartı ile aynı diagonal gradient stil.
-  //   backgroundColor kaldırıldı — LinearGradient absoluteFill ile zemin veriyor.
+  // ? 2026-04-21: Profil arkada�lar kart� ile ayn� diagonal gradient stil.
+  //   backgroundColor kald�r�ld� � LinearGradient absoluteFill ile zemin veriyor.
   summaryBlock: {
     borderRadius: 16, overflow: 'hidden',
     borderWidth: 1, borderColor: Colors.cardBorder,
@@ -1991,7 +2031,7 @@ const w = StyleSheet.create({
   },
   capText: { fontSize: 12, fontWeight: '700', color: Colors.teal, letterSpacing: 0.2 },
 
-  // ★ 2026-04-26: Planlı oda — Hemen / Sonra başlat
+  // ? 2026-04-26: Planl� oda � Hemen / Sonra ba�lat
   scheduleBlock: {
     marginTop: 14, padding: 14, borderRadius: 14,
     backgroundColor: 'rgba(15,23,42,0.5)',
@@ -2023,7 +2063,7 @@ const w = StyleSheet.create({
   scheduleDateText: { fontSize: 13, fontWeight: '700', color: '#F1F5F9' },
   scheduleHint: { fontSize: 11, color: '#94A3B8', marginTop: 8, lineHeight: 16 },
 
-  // ★ 2026-05-05: Aile dili — slate solid + ince üst separator
+  // ? 2026-05-05: Aile dili � slate solid + ince �st separator
   footer: {
     position: 'absolute', left: 0, right: 0, bottom: 0,
     flexDirection: 'row', alignItems: 'center', gap: 10,
@@ -2035,7 +2075,7 @@ const w = StyleSheet.create({
     paddingHorizontal: 18, paddingVertical: 14, borderRadius: 14,
   },
   skipText: { fontSize: 14, fontWeight: '700', color: '#64748B' },
-  // ★ 2026-05-05: Aile dili — radius 14→999 (full pill, NotificationDrawer pattern)
+  // ? 2026-05-05: Aile dili � radius 14�999 (full pill, NotificationDrawer pattern)
   primaryBtn: {
     flex: 1, borderRadius: 999, overflow: 'hidden',
     shadowColor: '#000', shadowOffset: { width: 0, height: 6 },

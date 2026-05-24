@@ -68,6 +68,10 @@ interface Props {
   onFlashDone?: (userId: string) => void;
   /** Mikrofon isteği gönderen kullanıcı ID'leri */
   micRequestUserIds?: string[];
+  /** ★ v1.7.13.146 (24 May 2026): Clubhouse-style + takip butonu için. */
+  currentUserId?: string;
+  followedIds?: Set<string>;
+  onFollow?: (targetUserId: string) => void;
 }
 
 // ★ O10 FIX: Cell bileşeni React.memo ile sarıldı — 100+ listener'da stable props'lu
@@ -94,6 +98,10 @@ type CellProps = {
   cfgShowName?: boolean;
   cfgOwnerCrownEnabled?: boolean;
   cfgOwnerHighlight?: string;
+  // ★ v1.7.13.146 (24 May 2026): Clubhouse + takip butonu
+  showFollowButton?: boolean;
+  isFollowing?: boolean;
+  onFollowPress?: () => void;
 };
 const ListenerCell = React.memo(function ListenerCell({
   u, cellW, avatarSize, nameSize, isSelected, isOwner, showMuteIndicator,
@@ -101,6 +109,7 @@ const ListenerCell = React.memo(function ListenerCell({
   // ★ v117: Web admin oda düzen config'inden gelen propslar
   cfgShape, cfgBorderRadius, cfgRingWidth, cfgRingColor, cfgShowName,
   cfgOwnerCrownEnabled, cfgOwnerHighlight,
+  showFollowButton, isFollowing, onFollowPress,
 }: CellProps) {
   // ★ v286 (16 May 2026): Listener avatar Skia shadow — config'den okur
   const cellLayout = useRoomLayout();
@@ -194,6 +203,9 @@ const ListenerCell = React.memo(function ListenerCell({
           borderColor={ringC}
           borderWidth={finalRingW}
           customBadgeId={!(u as any).disguise ? ((u.user as any)?.active_badge_id ?? null) : null}
+          showFollowButton={showFollowButton}
+          isFollowing={isFollowing}
+          onFollowPress={onFollowPress}
         />
       </GlowView>
       {showMuteIndicator && (
@@ -231,7 +243,7 @@ const ListenerCell = React.memo(function ListenerCell({
   );
 });
 
-export default function ListenerGrid({ listeners, onSelectUser, selectedUserId, onShowAllUsers, maxListeners = 20, spectatorCount = 0, roomOwnerId, avatarFlashes, onFlashDone, micRequestUserIds = [] }: Props) {
+export default function ListenerGrid({ listeners, onSelectUser, selectedUserId, onShowAllUsers, maxListeners = 20, spectatorCount = 0, roomOwnerId, avatarFlashes, onFlashDone, micRequestUserIds = [], currentUserId, followedIds, onFollow }: Props) {
   // ★ 2026-04-22: Runtime window width (useWindowDimensions) — fiziksel cihazda
   //   gesture-nav/rotation durumuna adapte olur.
   // ★ HOOK ORDER FIX: TÜM hook'lar erken return'den ÖNCE çağrılmalı (React rules of hooks).
@@ -320,6 +332,9 @@ export default function ListenerGrid({ listeners, onSelectUser, selectedUserId, 
               cfgOwnerHighlight={layout.accents.ownerHighlight}
               onSelectUser={onSelectUser}
               onFlashDone={onFlashDone}
+              showFollowButton={!!currentUserId && !!onFollow && u.user_id !== currentUserId}
+              isFollowing={!!followedIds?.has(u.user_id)}
+              onFollowPress={() => onFollow?.(u.user_id)}
             />
           );
         })}

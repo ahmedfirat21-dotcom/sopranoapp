@@ -1,7 +1,7 @@
 /**
- * SopranoChat — User Profile Overlay (Clubhouse tarzı)
- * Avatar tıklamasında her yerden açılır (oda içi + dışı).
- * Oda içi: tek dokunuş = profil + moderasyon. Odadan çıkmaz, peek chain.
+ * SopranoChat �?? User Profile Overlay (Clubhouse tarzı)
+ * Avatar tıklamasında her yerden açılır (oda içi + dı�?ı).
+ * Oda içi: tek dokunu�? = profil + moderasyon. Odadan çıkmaz, peek chain.
  */
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
@@ -33,9 +33,9 @@ import ProfileSectionHeader from '../profile/ProfileSectionHeader';
 import BadgeListModal from '../profile/BadgeListModal';
 import GiftDetailModal from '../profile/GiftDetailModal';
 import { GiftStatsService } from '../../services/giftStats';
-// ★ v107: SPDonateSheet → GiftSheet (kişiye hediye akışı kendi sheet'inde)
+// �?? v107: SPDonateSheet �?? GiftSheet (ki�?iye hediye akı�?ı kendi sheet'inde)
 import GiftSheet from '../profile/GiftSheet';
-// ★ v108.7: SymbolGiftSheet kaldırıldı — hediye akışı sadece oda kontrol barındaki
+// �?? v108.7: SymbolGiftSheet kaldırıldı �?? hediye akı�?ı sadece oda kontrol barındaki
 //   RoomGiftPanel üzerinden (envanter sistemi yok, pay-per-send).
 import FollowListModal from '../FollowListModal';
 import { ReportModal } from '../ReportModal';
@@ -57,14 +57,14 @@ import {
 
 const { height: H } = Dimensions.get('window');
 
-// ═══════════════════════════════════════════════════════════════════
-// ★ v110.2 (6 May 2026): Module-level profil cache (5dk TTL)
+// �?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?�
+// �?? v110.2 (6 May 2026): Module-level profil cache (5dk TTL)
 // Aynı kullanıcının profili kısa sürede tekrar açılırsa veriler ANLIK
-// gösterilir — her seferinde sıfırdan fetch + 0 stat flash YOK.
+// gösterilir �?? her seferinde sıfırdan fetch + 0 stat flash YOK.
 // Background'da revalidate olur (stale-while-revalidate pattern).
-// TTL 60sn→5dk: Profil verisi sık değişmez, hızlı geri dönüşlerde
+// TTL 60sn�??5dk: Profil verisi sık de�?i�?mez, hızlı geri dönü�?lerde
 // kullanıcı her seferinde "yükleniyor" hissini almasın.
-// ═══════════════════════════════════════════════════════════════════
+// �?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?�
 type ProfileCacheEntry = {
   ts: number;
   userProfile: any;
@@ -78,9 +78,9 @@ type ProfileCacheEntry = {
   isFollowingUser: boolean;
   mutualFriendCount: number;
   recentRooms: any[];
-  /** ★ v110.3: Mevcut kullanıcının (sheet'i açanın) host'u olduğu CANLI oda — varsa "Davet Et" butonu görünür. */
+  /** �?? v110.3: Mevcut kullanıcının (sheet'i açanın) host'u oldu�?u CANLI oda �?? varsa "Davet Et" butonu görünür. */
   myLiveRoom: { id: string; name: string } | null;
-  // ★ v110.5 (Faz B + C)
+  // �?? v110.5 (Faz B + C)
   topSupporters: Supporter[];
   mutualRooms: MutualRoom[];
   featuredBadges: string[];
@@ -91,12 +91,12 @@ type ProfileCacheEntry = {
 const profileCache = new Map<string, ProfileCacheEntry>();
 const PROFILE_CACHE_TTL_MS = 5 * 60 * 1000;
 
-/** ★ 2026-04-28: Hibrit pattern — Clubhouse 3-snap mekanik + wizard görsel chrome.
- *  - Açılışta SHEET_HALF (yarım gözat). Drag-up → SHEET_FULL. Drag-down → dismiss.
- *  - Sheet stili: top: sheetTop (animated), bottom: 0 — taban ekrana sabit (memory).
+/** �?? 2026-04-28: Hibrit pattern �?? Clubhouse 3-snap mekanik + wizard görsel chrome.
+ *  - Açılı�?ta SHEET_HALF (yarım gözat). Drag-up �?? SHEET_FULL. Drag-down �?? dismiss.
+ *  - Sheet stili: top: sheetTop (animated), bottom: 0 �?? taban ekrana sabit (memory).
  *  - Slate-blue diagonal gradient + chevron-down + tier chip header (wizard ile aynı). */
-const SHEET_HALF = H * 0.45;       // yarım açık başlangıç
-const SHEET_DISMISS = H + 50;      // ekran dışı (kapalı)
+const SHEET_HALF = H * 0.45;       // yarım açık ba�?langıç
+const SHEET_DISMISS = H + 50;      // ekran dı�?ı (kapalı)
 
 const iconShadow = {
   textShadowColor: 'rgba(0,0,0,0.5)',
@@ -104,8 +104,8 @@ const iconShadow = {
   textShadowRadius: 3,
 } as const;
 
-/** ★ 2026-04-26: Oda içi moderasyon aksiyonları — ProfileCard'dan taşındı.
- *  Artık kişiye tıklayınca direkt InRoomUserProfile açılır (tek dokunuş = tam profil + mod). */
+/** �?? 2026-04-26: Oda içi moderasyon aksiyonları �?? ProfileCard'dan ta�?ındı.
+ *  Artık ki�?iye tıklayınca direkt InRoomUserProfile açılır (tek dokunu�? = tam profil + mod). */
 type ModActions = {
   onPromoteToStage?: () => void;
   onRemoveFromStage?: () => void;
@@ -117,7 +117,7 @@ type ModActions = {
   onGhostMode?: () => void;
   isGhost?: boolean;
   onDisguise?: () => void;
-  /** ★ 2026-04-28: Host self-disguise toggle state — label "Bürün/Çıkar" değişimi için */
+  /** �?? 2026-04-28: Host self-disguise toggle state �?? label "Bürün/�?ıkar" de�?i�?imi için */
   isDisguised?: boolean;
   onBanTemp?: () => void;
   onBanPerm?: () => void;
@@ -140,37 +140,39 @@ type Props = {
   userId: string | null;
   currentUserId: string | null;
   onClose: () => void;
-  /** Arkadaş chip tıklanınca parent overlay userId'sini yeni kişiye set eder — peek chain. */
+  /** Arkada�? chip tıklanınca parent overlay userId'sini yeni ki�?iye set eder �?? peek chain. */
   onSelectUser?: (userId: string) => void;
-  /** Oda içi mod + sosyal aksiyonlar — Clubhouse pattern: primer inline + 3-nokta menü. */
+  /** Oda içi mod + sosyal aksiyonlar �?? Clubhouse pattern: primer inline + 3-nokta menü. */
   modActions?: ModActions;
-  /** ★ 2026-04-26: Aynı odadaysak "Şu an dinliyor" banner'ını gizle (gereksiz tekrar bilgi). */
+  /** �?? 2026-04-26: Aynı odadaysak "�?u an dinliyor" banner'ını gizle (gereksiz tekrar bilgi). */
   excludeRoomId?: string;
-  /** ★ 2026-04-26: Backdrop tıklanınca kapansın mı? Oda DIŞI'nda evet (kullanıcı beklentisi),
-   *  oda İÇİ'nde hayır (oda alanı tıklanabilir kalmalı, Clubhouse no-exit). */
+  /** �?? 2026-04-26: Backdrop tıklanınca kapansın mı? Oda DI�?I'nda evet (kullanıcı beklentisi),
+   *  oda İ�?İ'nde hayır (oda alanı tıklanabilir kalmalı, Clubhouse no-exit). */
   closeOnBackdropTap?: boolean;
+  /** Oda DI�?I'nda "Tam Profili Aç" linki için �?? verilirse sheet kapanır + tam profil sayfasına push. */
+  onViewFullProfile?: () => void;
 };
 
-export default function InRoomUserProfile({ visible, userId, currentUserId, onClose, onSelectUser, modActions, excludeRoomId, closeOnBackdropTap = false }: Props) {
+export default function InRoomUserProfile({ visible, userId, currentUserId, onClose, onSelectUser, modActions, excludeRoomId, closeOnBackdropTap = false, onViewFullProfile }: Props) {
   const router = useRouter();
   const [userProfile, setUserProfile] = useState<Profile | null>(null);
-  // ★ v110.14: Kendi profilimde "Envanter / Çerçeve" hızlı butonu — FrameSelectSheet açar.
+  // �?? v110.14: Kendi profilimde "Envanter / �?erçeve" hızlı butonu �?? FrameSelectSheet açar.
   const [showOwnFrameSheet, setShowOwnFrameSheet] = useState(false);
   const [loading, setLoading] = useState(true);
   const [followStatus, setFollowStatus] = useState<FriendshipStatus | null>(null);
   const [incomingStatus, setIncomingStatus] = useState<FriendshipStatus | null>(null);
   const [followLoading, setFollowLoading] = useState(false);
   const [incomingLoading, setIncomingLoading] = useState(false);
-  // ★ v107.23: interactionsReady flag KALDIRILDI (kullanıcı talebi).
+  // �?? v107.23: interactionsReady flag KALDIRILDI (kullanıcı talebi).
   //   Eski sürümde 2sn fetch tamamlanana kadar butonlar yerine spinner gösteriliyordu.
-  //   Yeni: butonlar default state ile (Takip değil / Arkadaş değil) instant açılır,
+  //   Yeni: butonlar default state ile (Takip de�?il / Arkada�? de�?il) instant açılır,
   //   fetch arka planda gerçek state'e güncellenir. Yükleniyor sadece kullanıcının
-  //   tıkladığı sırada (followToggleLoading / followLoading) görünür — bu mantıklı.
-  const interactionsReady = true; // backward compat — diğer kullanım yerleri etkilenmesin
+  //   tıkladı�?ı sırada (followToggleLoading / followLoading) görünür �?? bu mantıklı.
+  const interactionsReady = true; // backward compat �?? di�?er kullanım yerleri etkilenmesin
   const [stats, setStats] = useState({ friends: 0, followers: 0, following: 0, rooms: 0, badges: 0, gifts: 0 });
   const [showGiftDetail, setShowGiftDetail] = useState(false);
   const [friendsPreview, setFriendsPreview] = useState<FriendUser[]>([]);
-  // ★ v299 (17 May 2026): profileStats (stageMinutes/roomsCreated/...) dead state idi —
+  // �?? v299 (17 May 2026): profileStats (stageMinutes/roomsCreated/...) dead state idi �??
   //   fetch ediliyordu ama hiçbir UI'da render edilmiyordu. Network + state çıkarıldı.
   const [userTitle, setUserTitle] = useState<UserTitle | null>(null);
   const [isUserBlocked, setIsUserBlocked] = useState(false);
@@ -180,24 +182,28 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
   const [showSPSheet, setShowSPSheet] = useState(false);
    const [showBadgesModal, setShowBadgesModal] = useState(false);
    const [cAlert, setCAlert] = useState<{ visible: boolean; title: string; message: string; type?: 'info' | 'warning' | 'error' | 'success'; buttons?: AlertButton[] }>({ visible: false, title: '', message: '' });
-   // ★ 2026-04-26: Şu an hangi odada + ortak arkadaş + one-way follow
+   // �?? 2026-04-26: �?u an hangi odada + ortak arkada�? + one-way follow
    const [currentRoom, setCurrentRoom] = useState<{ id: string; name: string } | null>(null);
    const [isFollowingUser, setIsFollowingUser] = useState(false);
    const [followToggleLoading, setFollowToggleLoading] = useState(false);
    const [mutualFriendCount, setMutualFriendCount] = useState(0);
-   // ★ v110 (6 May 2026): Kullanıcının odaları — daha önce sadece /user/[id] sayfasında gösteriliyordu.
+   // �?? v110 (6 May 2026): Kullanıcının odaları �?? daha önce sadece /user/[id] sayfasında gösteriliyordu.
    //   Artık sheet içinde gerçek profil sayfası deneyimini tamamlıyor (full-page'e gerek kalmadı).
    const [recentRooms, setRecentRooms] = useState<any[]>([]);
-   // ★ v110: Tüm "phase 2" verileri (stats, friendship, rooms, mutual) hazır mı?
-   //   FALSE iken: stats "—" gösterir, "Bu hesap gizli" banner'ı render edilmez (flash önleme).
+   // �?? v110: Tüm "phase 2" verileri (stats, friendship, rooms, mutual) hazır mı?
+   //   FALSE iken: stats "�??" gösterir, "Bu hesap gizli" banner'ı render edilmez (flash önleme).
    const [dataReady, setDataReady] = useState(false);
-   /** ★ 2026-04-26: 3-nokta menü açıkken az kullanılan mod aksiyonları görünür (Clubhouse pattern) */
+   /** �?? 2026-04-26: 3-nokta menü açıkken az kullanılan mod aksiyonları görünür (Clubhouse pattern) */
    const [showMoreActions, setShowMoreActions] = useState(false);
-   // ★ v110.3 (6 May 2026): Mevcut kullanıcının canlı oda host'u olup olmadığı —
-   //   "Odama Davet Et" butonunun görünürlüğünü belirler.
-   const [myLiveRoom, setMyLiveRoom] = useState<{ id: string; name: string } | null>(null);
+   // �?? v110.3 (6 May 2026): Mevcut kullanıcının canlı oda host'u olup olmadı�?ı �??
+   //   "Odama Davet Et" butonunun görünürlü�?ünü belirler.
+   const [myLiveRoom, setMyLiveRoom] = useState<{ id: string; name: string; targetIsParticipant?: boolean } | null>(null);
    const [inviteSending, setInviteSending] = useState(false);
-   // ★ v110.5 (Faz B + C)
+   // �?? v1.7.13.58 (20 May 2026): Spam engeli �?? pending davet varsa buton kilitli kalır.
+   //   inviteSent = "Davet Gönderildi" durumu (DB pending). Recipient kabul/red edene
+   //   kadar persistent; yeni davet gönderilemez.
+   const [inviteSent, setInviteSent] = useState(false);
+   // �?? v110.5 (Faz B + C)
    const [topSupporters, setTopSupporters] = useState<Supporter[]>([]);
    const [mutualRooms, setMutualRooms] = useState<MutualRoom[]>([]);
    const [featuredBadges, setFeaturedBadges] = useState<string[]>([]);
@@ -205,9 +211,9 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
    const [invitedBy, setInvitedBy] = useState<{ id: string; display_name: string; avatar_url: string } | null>(null);
    const [speakingRhythmText, setSpeakingRhythmText] = useState<string | null>(null);
 
-  // ★ 2026-04-28: 3-snap mekanik — translateY-based (useNativeDriver:true).
-  //   Önceki top-based JS-driven animation pan gesture ile race ediyordu — sadece handle bar'da çalışıyordu.
-  //   Snap değerleri ekran-mutlak koordinatlar; sheet style top:0, bottom:0 sabit, transform translateY ile kayar.
+  // �?? 2026-04-28: 3-snap mekanik �?? translateY-based (useNativeDriver:true).
+  //   �?nceki top-based JS-driven animation pan gesture ile race ediyordu �?? sadece handle bar'da çalı�?ıyordu.
+  //   Snap de�?erleri ekran-mutlak koordinatlar; sheet style top:0, bottom:0 sabit, transform translateY ile kayar.
   const insets = useSafeAreaInsets();
   const sheetFullRef = useRef<number>(Math.max(insets.top, 20) + 10);
   sheetFullRef.current = Math.max(insets.top, 20) + 10;
@@ -221,14 +227,14 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
 
   const loadProfile = useCallback(async () => {
     if (!userId) return;
-    // ★ v110 (6 May 2026): Module-level cache HIT → tüm veriler ANLIK gelir,
+    // �?? v110 (6 May 2026): Module-level cache HIT �?? tüm veriler ANLIK gelir,
     //   spinner/0-flash görünmez. Background'da hâlâ revalidate olur.
-    const targetUserId = userId; // race condition koruması: userId değişirse eski response ezilmesin
+    const targetUserId = userId; // race condition koruması: userId de�?i�?irse eski response ezilmesin
     const cached = profileCache.get(targetUserId);
     const isFresh = cached && (Date.now() - cached.ts < PROFILE_CACHE_TTL_MS);
 
     if (isFresh && cached) {
-      // Cache'ten hidrasyon — kullanıcı sheet'i açar açmaz tüm profil görünür
+      // Cache'ten hidrasyon �?? kullanıcı sheet'i açar açmaz tüm profil görünür
       setUserProfile(cached.userProfile);
       setStats(cached.stats);
       setFriendsPreview(cached.friendsPreview);
@@ -249,7 +255,7 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
       setSpeakingRhythmText(cached.speakingRhythmText);
       setDataReady(true);
       setLoading(false);
-      // Background revalidation altta devam eder (cached değerler güncellensin)
+      // Background revalidation altta devam eder (cached de�?erler güncellensin)
     } else {
       setLoading(true);
       setUserProfile(null);
@@ -274,15 +280,15 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
     }
     setShowMoreActions(false);
 
-    // ★ v110.5 (6 May 2026): "Hepsi birlikte yüklensin" stratejisi.
-    //   ESKİ: progressive — her .then ayrı state set ederdi → ortak arkadaş, mutual, stats
-    //         farklı zamanlarda flash'lı görünürdü (kullanıcı şikayeti).
-    //   YENİ: Cache MISS durumunda hiçbir state aşamalı set edilmez. Skeleton görünür ta ki
-    //         TÜM kritik veriler hazır → sonra tek seferde her şey render edilir.
-    //         Cache HIT durumunda hidrasyon zaten anlık — revalidation arka planda sessiz.
+    // �?? v110.5 (6 May 2026): "Hepsi birlikte yüklensin" stratejisi.
+    //   ESKİ: progressive �?? her .then ayrı state set ederdi �?? ortak arkada�?, mutual, stats
+    //         farklı zamanlarda flash'lı görünürdü (kullanıcı �?ikayeti).
+    //   YENİ: Cache MISS durumunda hiçbir state a�?amalı set edilmez. Skeleton görünür ta ki
+    //         T�?M kritik veriler hazır �?? sonra tek seferde her �?ey render edilir.
+    //         Cache HIT durumunda hidrasyon zaten anlık �?? revalidation arka planda sessiz.
     const stillCurrent = () => targetUserId === userId;
 
-    // ── Promise'ları başlat (hepsi paralel) ──
+    // �??�?? Promise'ları ba�?lat (hepsi paralel) �??�??
     const profilePromise = ProfileService.get(targetUserId).catch((e: any) => {
       if (__DEV__) console.warn('[Profile fetch fail]', e);
       return null;
@@ -305,22 +311,23 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
         return row?.rooms?.is_live ? { id: row.rooms.id, name: row.rooms.name } : null;
       })
       .catch(() => null as null);
-    // ★ v110.14 (8 May 2026): Hedef kullanıcı zaten odadaysa "Odama Davet" butonu
-    //   gösterilmemeli — odada olan birini odaya davet etmek anlamsız.
+    // �?? v110.14 (8 May 2026): Hedef kullanıcı zaten odadaysa "Odama Davet" butonu
+    //   gösterilmemeli �?? odada olan birini odaya davet etmek anlamsız.
+    // �?? v1.7.13.135: Eskiden target-zaten-odada durumunda da null döndürüyordu �??
+    //   handleInviteToMyRoom "�?nce bir oda aç" diyordu (oda aslında VARDI). �?imdi
+    //   room object dolu döner + targetIsParticipant flag �?? UI butonu do�?ru gizler.
     const myLiveRoomPromise = (currentUserId && !isOwnProfile)
       ? supabase.from('rooms').select('id, name').eq('host_id', currentUserId).eq('is_live', true).limit(1)
           .then(async (r) => {
             const row = r.data?.[0] as any;
             if (!row) return null;
-            // Hedef kullanıcı bu odanın katılımcısı mı? Varsa davet düğmesi gizle.
             const { data: partRow } = await supabase
               .from('room_participants')
               .select('user_id')
               .eq('room_id', row.id)
               .eq('user_id', targetUserId)
               .maybeSingle();
-            if (partRow) return null;
-            return { id: row.id, name: row.name };
+            return { id: row.id, name: row.name, targetIsParticipant: !!partRow };
           })
           .catch(() => null as null)
       : Promise.resolve(null as null);
@@ -337,7 +344,7 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
     const titlePromise = UserTitleService.getPrimaryTitle(targetUserId).catch(() => null);
     const roomsListPromise = ProfileService.getRecentRooms(targetUserId).catch(() => [] as any[]);
 
-    // ★ v110.5 (Faz B + C): Ekstra paralel fetch'ler — hepsi aynı batch'te yüklenir
+    // �?? v110.5 (Faz B + C): Ekstra paralel fetch'ler �?? hepsi aynı batch'te yüklenir
     const topSupportersPromise = SupportersService.getTop(targetUserId, 3).catch(() => [] as Supporter[]);
     const mutualRoomsPromise = (currentUserId && !isOwnProfile)
       ? MutualRoomsService.get(currentUserId, targetUserId, 5).catch(() => [] as MutualRoom[])
@@ -350,8 +357,8 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
       .then(SpeakingRhythmService.derivePrimeTimeText)
       .catch(() => null);
 
-    // ── Hepsi tamamlanınca: TEK seferde state'leri set et + cache yaz + dataReady aç ──
-    //   Skeleton görünüyor olduğundan kullanıcı parça parça flash görmez.
+    // �??�?? Hepsi tamamlanınca: TEK seferde state'leri set et + cache yaz + dataReady aç �??�??
+    //   Skeleton görünüyor oldu�?undan kullanıcı parça parça flash görmez.
     try {
       const [
         profile, blockedIds, detailed, follow, currentRoomData, myLiveRoomData,
@@ -366,13 +373,13 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
 
       if (!stillCurrent()) return;
       if (!profile) {
-        // Profile dönmediyse (silinmiş/RLS) — skeleton kalksın, "Kullanıcı bulunamadı" göster
+        // Profile dönmediyse (silinmi�?/RLS) �?? skeleton kalksın, "Kullanıcı bulunamadı" göster
         setLoading(false);
         setDataReady(true);
         return;
       }
 
-      // ★ v110.5 — Davet eden profil (referred_by varsa fetch)
+      // �?? v110.5 �?? Davet eden profil (referred_by varsa fetch)
       let invitedByData: { id: string; display_name: string; avatar_url: string } | null = null;
       const referrerId = (profile as any).referred_by;
       if (referrerId && referrerId !== targetUserId) {
@@ -392,10 +399,10 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
         } catch { /* sessiz */ }
       }
 
-      // ★ v92.1: Mevcut kullanıcı kendi adını başkasının arkadaş listesinde görmesin
-      // ★ v110.5.20 (6 May 2026): Engellediğim kullanıcılar HİÇBİR LİSTEDE görünmez
-      //   (Instagram pattern — engelli yokmuş gibi). "Arkadaşımın arkadaş listesinde
-      //   görüyorum" şikayeti — bu fix.
+      // �?? v92.1: Mevcut kullanıcı kendi adını ba�?kasının arkada�? listesinde görmesin
+      // �?? v110.5.20 (6 May 2026): Engelledi�?im kullanıcılar Hİ�?BİR LİSTEDE görünmez
+      //   (Instagram pattern �?? engelli yokmu�? gibi). "Arkada�?ımın arkada�? listesinde
+      //   görüyorum" �?ikayeti �?? bu fix.
       const myBlockedSet = new Set(blockedIds);
       const visibleFriends = currentUserId
         ? friends.filter((f: any) => f.id !== currentUserId && !myBlockedSet.has(f.id))
@@ -412,7 +419,7 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
       };
       const isBlocked = blockedIds.includes(targetUserId);
 
-      // ── TEK SEFER batch state update — React 18+ otomatik batch'ler ──
+      // �??�?? TEK SEFER batch state update �?? React 18+ otomatik batch'ler �??�??
       setUserProfile(profile);
       setIsUserBlocked(isBlocked);
       setFollowStatus(detailed?.outgoing ?? null);
@@ -420,12 +427,21 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
       setIsFollowingUser(follow);
       setCurrentRoom(currentRoomData);
       setMyLiveRoom(myLiveRoomData);
+      // �?? v1.7.13.58 (20 May 2026): Pending davet kontrolü �?? spam engeli.
+      //   myLiveRoom + targetUser için zaten pending davet varsa buton kilitli.
+      if (myLiveRoomData && currentUserId && targetUserId && currentUserId !== targetUserId) {
+        RoomService.hasPendingRoomInvite(myLiveRoomData.id, currentUserId, targetUserId)
+          .then(has => { if (has) setInviteSent(true); else setInviteSent(false); })
+          .catch(() => {});
+      } else {
+        setInviteSent(false);
+      }
       setFriendsPreview(visibleFriends);
       setMutualFriendCount(mutualCount);
       setStats(finalStats);
       setUserTitle(title);
       setRecentRooms(rooms || []);
-      // ★ v110.5
+      // �?? v110.5
       setTopSupporters(topSupportersData);
       setMutualRooms(mutualRoomsData);
       setFeaturedBadges(featuredBadgesData);
@@ -447,7 +463,7 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
         mutualFriendCount: mutualCount,
         recentRooms: rooms || [],
         myLiveRoom: myLiveRoomData,
-        // ★ v110.5
+        // �?? v110.5
         topSupporters: topSupportersData,
         mutualRooms: mutualRoomsData,
         featuredBadges: featuredBadgesData,
@@ -463,10 +479,10 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
     }
   }, [userId, currentUserId, isOwnProfile]);
 
-  // ★ 2026-04-28: 3-snap pan — useSwipeToDismiss hook pattern (kanıtlanmış capture mantığı).
+  // �?? 2026-04-28: 3-snap pan �?? useSwipeToDismiss hook pattern (kanıtlanmı�? capture mantı�?ı).
   //   onMoveShouldSetPanResponder (dy>8): child responder yokken parent için (handle/empty alanlar)
-  //   onMoveShouldSetPanResponderCapture (dy>25 + dy/dx>2): Pressable/ScrollView'dan responder ÇALMAK için
-  //   Eski (dy>8) capture eşiği Pressable lock'u kıramıyordu — sadece handle bar'da çalışıyordu.
+  //   onMoveShouldSetPanResponderCapture (dy>25 + dy/dx>2): Pressable/ScrollView'dan responder �?ALMAK için
+  //   Eski (dy>8) capture e�?i�?i Pressable lock'u kıramıyordu �?? sadece handle bar'da çalı�?ıyordu.
   const scrollOffsetRef = useRef(0);
   const handleScroll = useCallback((e: any) => {
     scrollOffsetRef.current = e?.nativeEvent?.contentOffset?.y ?? 0;
@@ -474,10 +490,10 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
 
   const isHalfState = () => currentSnapRef.current !== sheetFullRef.current;
 
-  // ★ 2026-04-28: Header bölgesi için ayrı pan — scroll-aware DEĞİL, her zaman yakala.
-  //   Kullanıcı FULL state'te ScrollView'da scroll yapmışsa scroll-top kontrolü false dönüyor,
-  //   sheet root pan dismiss yakalamıyor → kullanıcı sheet'i aşağı çekemiyor (sadece minimize).
-  //   Header (handle + chevron + başlık + tier chip) her zaman görünür, oradan drag her zaman çalışır.
+  // �?? 2026-04-28: Header bölgesi için ayrı pan �?? scroll-aware DE�?İL, her zaman yakala.
+  //   Kullanıcı FULL state'te ScrollView'da scroll yapmı�?sa scroll-top kontrolü false dönüyor,
+  //   sheet root pan dismiss yakalamıyor �?? kullanıcı sheet'i a�?a�?ı çekemiyor (sadece minimize).
+  //   Header (handle + chevron + ba�?lık + tier chip) her zaman görünür, oradan drag her zaman çalı�?ır.
   const headerPanResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => false,
@@ -517,7 +533,7 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
       onStartShouldSetPanResponder: () => false,
       onStartShouldSetPanResponderCapture: () => false,
 
-      // Small threshold — child responder yokken (handle bar, başlık metin alanı)
+      // Small threshold �?? child responder yokken (handle bar, ba�?lık metin alanı)
       onMoveShouldSetPanResponder: (_, g) => {
         if (Math.abs(g.dy) < 8) return false;
         if (Math.abs(g.dy) <= Math.abs(g.dx)) return false;
@@ -525,7 +541,7 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
         return g.dy > 0 && scrollOffsetRef.current <= 0;
       },
 
-      // Large threshold — Pressable/ScrollView'dan responder ÇAL
+      // Large threshold �?? Pressable/ScrollView'dan responder �?AL
       onMoveShouldSetPanResponderCapture: (_, g) => {
         if (Math.abs(g.dy) < 25) return false;
         if (Math.abs(g.dy) <= Math.abs(g.dx) * 2) return false;
@@ -567,7 +583,11 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
     Animated.parallel([
       Animated.timing(translateY, { toValue: SHEET_DISMISS, duration: 200, useNativeDriver: true }),
       Animated.timing(backdropOpacity, { toValue: 0, duration: 180, useNativeDriver: true }),
-    ]).start(() => onClose());
+      // �?? v1.7.13.140: onClose'u microtask sonrasına defer et �?? React 18 useInsertionEffect
+      //   kuralı: animasyon callback (PanResponder release) içinde sync setState yasak,
+      //   "useInsertionEffect must not schedule updates" warning'i tetikler. setTimeout(0)
+      //   ile React commit cycle'ı dı�?ına çıkar, warning kaybolur.
+    ]).start(() => { setTimeout(() => onClose(), 0); });
   }, [onClose, translateY, backdropOpacity]);
 
   useEffect(() => {
@@ -631,9 +651,9 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
     } catch {} finally { setIncomingLoading(false); }
   };
 
-  /** ★ v110.3 (6 May 2026): Profili paylaş — sistem share sheet (WhatsApp/SMS/kopyala vs.).
-   *  Deep link `https://sopranochat.com/user/<id>` — uygulama yüklüyse direkt sheet açılır,
-   *  yüklü değilse Vercel fallback HTML açılır (mevcut Universal Link altyapısı). */
+  /** �?? v110.3 (6 May 2026): Profili payla�? �?? sistem share sheet (WhatsApp/SMS/kopyala vs.).
+   *  Deep link `https://sopranochat.com/user/<id>` �?? uygulama yüklüyse direkt sheet açılır,
+   *  yüklü de�?ilse Vercel fallback HTML açılır (mevcut Universal Link altyapısı). */
   const handleShareProfile = useCallback(async () => {
     if (!userId || !userProfile) return;
     const url = `https://sopranochat.com/user/${userId}`;
@@ -643,7 +663,7 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
     try {
       await Share.share({ message, url, title: userProfile.display_name || 'SopranoChat Profili' });
     } catch {
-      // Kullanıcı vazgeçti veya sistem reddetti — sessizce yutsuz, link kopyala fallback
+      // Kullanıcı vazgeçti veya sistem reddetti �?? sessizce yutsuz, link kopyala fallback
       try {
         await Clipboard.setStringAsync(url);
         showToast({ title: i18n.t('room.inroomuserprofile.003'), type: 'success' });
@@ -651,7 +671,7 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
     }
   }, [userId, userProfile]);
 
-  /** ★ v110.3 (6 May 2026): Linki direkt kopyala — share sheet açmadan tek tıkla. */
+  /** �?? v110.3 (6 May 2026): Linki direkt kopyala �?? share sheet açmadan tek tıkla. */
   const handleCopyProfileLink = useCallback(async () => {
     if (!userId) return;
     const url = `https://sopranochat.com/user/${userId}`;
@@ -663,18 +683,37 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
     }
   }, [userId]);
 
-  /** ★ v110.3 (6 May 2026): Aktif odama davet et — sadece host iken görünür buton.
-   *  RoomService.sendRoomInvite + push notif tetiklenir. Hedef kullanıcı bildirim alır. */
+  /** �?? v110.3 (6 May 2026): Aktif odama davet et �?? sadece host iken görünür buton.
+   *  RoomService.sendRoomInvite + push notif tetiklenir. Hedef kullanıcı bildirim alır.
+   *  �?? v1.7.13.58 (20 May 2026): Toast yerine buton-içi "Davet Gönderildi" + oda yoksa uyarı. */
   const handleInviteToMyRoom = useCallback(async () => {
-    if (!currentUserId || !userId || !myLiveRoom || inviteSending) return;
+    if (!currentUserId || !userId || inviteSending || inviteSent) return;
+    if (!myLiveRoom) {
+      setCAlert({
+        visible: true,
+        title: '�?nce bir oda aç',
+        message: 'Davet göndermek için açık bir odan olması gerek. �?nce oda aç, sonra davet et.',
+        type: 'info',
+        buttons: [{ text: 'Tamam', style: 'cancel' }],
+      });
+      return;
+    }
+    // �?? v1.7.13.135: Hedef kullanıcı zaten benim odamdaysa davet anlamsız.
+    if (myLiveRoom.targetIsParticipant) {
+      setCAlert({
+        visible: true,
+        title: 'Zaten odanda',
+        message: `${targetUser?.display_name || 'Bu kullanıcı'} zaten "${myLiveRoom.name}" odasında.`,
+        type: 'info',
+        buttons: [{ text: 'Tamam', style: 'cancel' }],
+      });
+      return;
+    }
     setInviteSending(true);
     try {
       await RoomService.sendRoomInvite(myLiveRoom.id, currentUserId, [userId]);
-      showToast({
-        title: i18n.t('room.inroomuserprofile.006'),
-        message: i18n.t('auto.room.InRoomUserProfile.015', { 0: myLiveRoom.name }),
-        type: 'success',
-      });
+      // �?? v1.7.13.58: Persistent �?? recipient kabul/red edene kadar buton kilitli.
+      setInviteSent(true);
     } catch (err: any) {
       showToast({
         title: i18n.t('room.inroomuserprofile.007'),
@@ -684,7 +723,7 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
     } finally {
       setInviteSending(false);
     }
-  }, [currentUserId, userId, myLiveRoom, inviteSending]);
+  }, [currentUserId, userId, myLiveRoom, inviteSending, inviteSent]);
 
   const handleBlock = () => {
     if (!currentUserId || !userId) return;
@@ -740,16 +779,16 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
   if (!visible) return null;
 
   return (
-    // ★ 2026-04-28: Modal sarmalayıcı KALDIRILDI — Modal native dialog Pan responder Capture phase'inde
-    //   Pressable child'larla çakışıyordu (drag handle dışında her yer ölüydü). Create-room.tsx wizard
-    //   da Modal kullanmıyor (route root View) ve sürükleme sorunsuz çalışıyor.
-    //   Global mount _layout.tsx'te → absolute overlay yeterli.
+    // �?? 2026-04-28: Modal sarmalayıcı KALDIRILDI �?? Modal native dialog Pan responder Capture phase'inde
+    //   Pressable child'larla çakı�?ıyordu (drag handle dı�?ında her yer ölüydü). Create-room.tsx wizard
+    //   da Modal kullanmıyor (route root View) ve sürükleme sorunsuz çalı�?ıyor.
+    //   Global mount _layout.tsx'te �?? absolute overlay yeterli.
     <View style={sty.root} pointerEvents="box-none">
       <Animated.View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(8,12,22,0.45)', opacity: backdropOpacity }]} pointerEvents={closeOnBackdropTap ? 'auto' : 'none'}>
         {closeOnBackdropTap && <Pressable style={StyleSheet.absoluteFill} onPress={handleClose} />}
       </Animated.View>
 
-      {/* ★ 2026-05-05: NotificationDrawer aile dili — slate diagonal + amber halo + soft glow.
+      {/* �?? 2026-05-05: NotificationDrawer aile dili �?? slate diagonal + amber halo + soft glow.
           Karakter: amber (profil). Bildirim/mesaj modallarıyla birebir aynı kabuk. */}
       <Animated.View
         style={[sty.sheet, { transform: [{ translateY }] }]}
@@ -774,8 +813,8 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
             pointerEvents="none"
           />
 
-          {/* ★ 2026-04-28: Header bölgesi (handle + chevron + başlık + tier chip) her zaman drag yakalar.
-               FULL state'te scroll-top değilken bile sürükleyerek HALF/dismiss'e inilebilir. */}
+          {/* �?? 2026-04-28: Header bölgesi (handle + chevron + ba�?lık + tier chip) her zaman drag yakalar.
+               FULL state'te scroll-top de�?ilken bile sürükleyerek HALF/dismiss'e inilebilir. */}
           <View {...headerPanResponder.panHandlers}>
             <View style={sty.handleWrap}>
               <View style={sty.dragHandle} />
@@ -786,17 +825,13 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                 <Ionicons name="chevron-down" size={22} color="#F1F5F9" />
               </Pressable>
               <Text style={sty.wizardTitle}>{i18n.t('profile.upper_label')}</Text>
-              {/* ★ v1.7.13.39 (19 May 2026): tierChip KALDIRILDI — başkalarının
-                  profilinde Pro/Plus tier badge gösterilmiyor (kullanıcı mahremiyet
-                  talebi). Sağ alanı boş bırakıyoruz; iconBtn ile simetri için
-                  görünmez placeholder. */}
-              <View style={sty.iconBtn} />
+              <View style={{ width: 36, height: 36 }} />
             </View>
           </View>
 
-        {/* ★ v107.23: AppLoader spinner KALDIRILDI — kullanıcı talebi.
+        {/* �?? v107.23: AppLoader spinner KALDIRILDI �?? kullanıcı talebi.
              Yükleniyor sırasında minimal skeleton göster (avatar + isim + buton placeholder).
-             Spinner sadece OdaPage gibi gerçek bağlantı bekleme sayfalarında olmalı. */}
+             Spinner sadece OdaPage gibi gerçek ba�?lantı bekleme sayfalarında olmalı. */}
         {loading ? (
           <View style={sty.skeletonWrap}>
             {/* Avatar + isim placeholder */}
@@ -854,56 +889,54 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
               subscriptionTier={tier as any}
               isAdmin={!!userProfile.is_admin}
               isVerified={(userProfile as any)?.is_verified === true}
+              streakDays={(userProfile as any)?.streak_days || 0}
               userTitle={userTitle}
-              // ★ v299 (17 May 2026): Owner profile.tsx ile tutarlı — followers prop'una
-              //   stats.friends (mutual) gönderiliyor; ProfileHero etiketi "Arkadaş".
-              //   Önce tek yönlü followers gönderiliyordu → visitor yanlış sayı görüyordu.
+              // �?? v299 (17 May 2026): Owner profile.tsx ile tutarlı �?? followers prop'una
+              //   stats.friends (mutual) gönderiliyor; ProfileHero etiketi "Arkada�?".
+              //   �?nce tek yönlü followers gönderiliyordu �?? visitor yanlı�? sayı görüyordu.
               stats={{ followers: stats.friends, rooms: stats.rooms, badges: stats.badges, gifts: stats.gifts }}
               statsLoading={!dataReady}
               onFollowersPress={() => { setFollowListTab('friends'); setShowFollowList(true); }}
-              // ★ v299: Oda sayısına tıklayınca sayfanın altındaki "Son Odalar" bölümüne
-              //   scroll edilebilir; şimdilik noop (visitor için ayrı "kullanıcının odaları"
+              // �?? v299: Oda sayısına tıklayınca sayfanın altındaki "Son Odalar" bölümüne
+              //   scroll edilebilir; �?imdilik noop (visitor için ayrı "kullanıcının odaları"
               //   route'u yok, recentRooms zaten kart altında görünüyor).
               onRoomsPress={() => {}}
               onBadgesPress={() => setShowBadgesModal(true)}
               onGiftsPress={() => setShowGiftDetail(true)}
-              // ★ v1.7.13.40 (19 May 2026): onSharePress KALDIRILDI.
+              // �?? v1.7.13.40 (19 May 2026): onSharePress KALDIRILDI.
               //   Kullanıcı: 'bazi profillerde iki tane profil paylas dugmesi var'.
-              //   Aşağıda utility row'da Paylaş + Linki Kopyala chip butonları
-              //   zaten var (daha etiketli + ana CTA). ProfileHero üst-sağ
+              //   A�?a�?ıda utility row'da Payla�? + Linki Kopyala chip butonları
+              //   zaten var (daha etiketli + ana CTA). ProfileHero üst-sa�?
               //   küçük share ikonu redundant idi.
               memberSince={userProfile.created_at}
               boostExpiresAt={(userProfile as any)?.profile_boost_expires_at}
               isOnline={isFriend && !isOwnProfile ? userProfile.is_online : undefined}
               lastSeen={(isOwnProfile || isFriend) ? userProfile.last_seen : null}
               activeFrame={(userProfile as any)?.active_frame || null}
-              // ★ v213: Kendi profilinde sol üst envanter (madalya) ve sağ üst düzenleme
-              //   butonları — profil sayfasındakiyle birebir aynı. Modal'dan hızlı erişim.
+              // �?? v213: Kendi profilinde sol üst envanter (madalya) ve sa�? üst düzenleme
+              //   butonları �?? profil sayfasındakiyle birebir aynı. Modal'dan hızlı eri�?im.
               onFramePress={isOwnProfile ? () => setShowOwnFrameSheet(true) : undefined}
               onEdit={isOwnProfile ? () => {
                 handleClose();
                 setTimeout(() => router.push('/edit-profile' as any), 250);
               } : undefined}
+              // �?? v1.7.13.53 (20 May 2026): Mood balonu �?? ba�?kalarında read-only,
+              //   kendi profilinde edit için Profile tab'a yönlendir (in-room edit yok).
+              moodStatus={(userProfile as any)?.mood_status}
             />
 
-            {/* ★ v110.5 (6 May 2026): Diller + İlgi alanları kimlik şeridi
+            {/* �?? v110.5 (6 May 2026): Diller + İlgi alanları kimlik �?eridi
                 Modern sesli platform için kritik. Yabancı kullanıcı hangi dilde
-                konuşulduğunu, hangi konularda aktif olduğunu görsün. */}
-            <ProfileIdentityStrip
-              languages={(userProfile as any)?.languages}
-              interests={(userProfile as any)?.interests}
-              isOwn={isOwnProfile}
-              onEditPress={isOwnProfile ? () => {
-                handleClose();
-                setTimeout(() => router.push('/edit-profile' as any), 250);
-              } : undefined}
-            />
+                konu�?uldu�?unu, hangi konularda aktif oldu�?unu görsün. */}
+            {/* �?? v1.7.13.56 (20 May 2026): ProfileIdentityStrip KALDIRILDI �?? kullanıcı
+                'fazla kalabalık' feedback'i. İlgi alanları edit-profile + ileride
+                expandable section'a ta�?ınır. */}
 
-            {/* ★ v213: Büyük "Envanter" pill butonu kaldırıldı — ProfileHero üstünde
-                profil sayfasındakiyle aynı sol-üst madalya ikonu + sağ-üst düzenleme
+            {/* �?? v213: Büyük "Envanter" pill butonu kaldırıldı �?? ProfileHero üstünde
+                profil sayfasındakiyle aynı sol-üst madalya ikonu + sa�?-üst düzenleme
                 kalemi var. (onFramePress + onEdit props ProfileHero'ya geçildi) */}
 
-            {/* ★ v110.5 — Sesli tanıtım (Voice Bio) */}
+            {/* �?? v110.5 �?? Sesli tanıtım (Voice Bio) */}
             {(userProfile as any)?.voice_bio_url && (
               <VoiceBioPlayer
                 url={(userProfile as any).voice_bio_url}
@@ -911,13 +944,13 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
               />
             )}
 
-            {/* ★ v110.5 — Sosyal linkler (IG/X/web küçük butonlar) */}
+            {/* �?? v110.5 �?? Sosyal linkler (IG/X/web küçük butonlar) */}
             <SocialLinksRow links={(userProfile as any)?.social_links} />
 
-            {/* ★ v110.5 — Konuşma ritmi text */}
+            {/* �?? v110.5 �?? Konu�?ma ritmi text */}
             <SpeakingRhythmHint text={speakingRhythmText} />
 
-            {/* ★ v110.5 — Davet eden satırı (referred_by varsa) */}
+            {/* �?? v110.5 �?? Davet eden satırı (referred_by varsa) */}
             {invitedBy && !isOwnProfile && (
               <InvitedByRow
                 inviterName={invitedBy.display_name}
@@ -935,7 +968,7 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                       <Ionicons name="person-add" size={16} color="#F59E0B" />
                       <Text style={sty.incomingText}>
                         <Text style={{ fontWeight: '800', color: '#F1F5F9' }}>{userProfile.display_name}</Text>
-                        {' '}seninle arkadaş olmak istiyor
+                        {' '}seninle arkada�? olmak istiyor
                       </Text>
                     </View>
                     <View style={sty.incomingActions}>
@@ -956,11 +989,11 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                 )}
 
 
-                {/* ★ v107.48 (3 May 2026): Etkileşim satırı YENİDEN YAZILDI.
-                    Önceki halinde yükseklikler 56/48/48/56 farklı, renk dili karışık,
+                {/* �?? v107.48 (3 May 2026): Etkile�?im satırı YENİDEN YAZILDI.
+                    �?nceki halinde yükseklikler 56/48/48/56 farklı, renk dili karı�?ık,
                     "çok gıcık" görünüyordu (kullanıcı geri bildirimi).
                     Yeni: tüm elemanlar 52 yükseklik, ortak görsel dil:
-                      - Takip + Arkadaş: outline pill (default) → tier renk dolgu (active)
+                      - Takip + Arkada�?: outline pill (default) �?? tier renk dolgu (active)
                       - Chat: outline circle (aynı dil)
                       - SP: hexagon biraz büyütüldü (62), zincirden kopmuyor */}
                 <View style={sty.interactionRow}>
@@ -999,7 +1032,7 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                       </>
                     )}
                   </Pressable>
-                  {/* Arkadaş Ekle / Arkadaş / İstek Gönderildi / Engellendi */}
+                  {/* Arkada�? Ekle / Arkada�? / İstek Gönderildi / Engellendi */}
                   <Pressable
                     onPress={handleFollow}
                     disabled={followLoading || isUserBlocked}
@@ -1039,7 +1072,7 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                       </>
                     )}
                   </Pressable>
-                  {/* DM circle — aynı outline dili */}
+                  {/* DM circle �?? aynı outline dili */}
                   {!isUserBlocked && !isOwnProfile && userId && (
                     <Pressable
                       style={({ pressed }) => [
@@ -1059,7 +1092,7 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                       <Ionicons name="chatbubble-outline" size={20} color="#E2E8F0" />
                     </Pressable>
                   )}
-                  {/* SP hexagon — kendi animasyonu, hafif büyütüldü (62) */}
+                  {/* SP hexagon �?? kendi animasyonu, hafif büyütüldü (62) */}
                   {!isOwnProfile && !isUserBlocked && currentUserId && (
                     <Pressable
                       style={sty.actionHex}
@@ -1069,11 +1102,11 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                       <SPHexagonIcon size={62} static />
                     </Pressable>
                   )}
-                  {/* ★ v108.7: Sembol Hediye butonu kaldırıldı (envanter sistemi kalktı,
-                      hediyeler artık sadece RoomGiftPanel — oda kontrol barından — gönderilir). */}
+                  {/* �?? v108.7: Sembol Hediye butonu kaldırıldı (envanter sistemi kalktı,
+                      hediyeler artık sadece RoomGiftPanel �?? oda kontrol barından �?? gönderilir). */}
                 </View>
 
-                {/* ★ 2026-04-26: Şu an hangi odada — aynı odadaysak gizle (gereksiz tekrar). */}
+                {/* �?? 2026-04-26: �?u an hangi odada �?? aynı odadaysak gizle (gereksiz tekrar). */}
                 {currentRoom && currentRoom.id !== excludeRoomId && (
                   <View style={sty.currentRoomBanner}>
                     <View style={sty.currentRoomDot} />
@@ -1082,7 +1115,7 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                   </View>
                 )}
 
-                {/* ★ 2026-04-26: Ortak arkadaş göstergesi — Clubhouse "mutual friends" */}
+                {/* �?? 2026-04-26: Ortak arkada�? göstergesi �?? Clubhouse "mutual friends" */}
                 {mutualFriendCount > 0 && (
                   <View style={sty.mutualBadge}>
                     <Ionicons name="people" size={13} color="#A78BFA" style={iconShadow} />
@@ -1090,8 +1123,8 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                   </View>
                 )}
 
-                {/* ★ v110.5.4: Yardımcı eylem satırı + 3-nokta TEK SATIR.
-                     Paylaş + Linki Kopyala + (host iken) Odama Davet + 3-nokta (Rapor/Engelle).
+                {/* �?? v110.5.4: Yardımcı eylem satırı + 3-nokta TEK SATIR.
+                     Payla�? + Linki Kopyala + (host iken) Odama Davet + 3-nokta (Rapor/Engelle).
                      Eski "Daha fazla" yazısı kaldırıldı (redundant), sadece "..." ikon. */}
                 {currentUserId && (
                   <View style={sty.utilityRow}>
@@ -1113,19 +1146,26 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                           <Ionicons name="link-outline" size={14} color="#5CBFB5" />
                           <Text style={sty.utilityChipText}>{i18n.t('profile.copy_link')}</Text>
                         </Pressable>
-                        {myLiveRoom && (
+                        {/* �?? v1.7.13.135: Hedef zaten odamdaysa "Odama Davet" butonu GİZLE. */}
+                        {myLiveRoom && !myLiveRoom.targetIsParticipant && (
                           <Pressable
                             onPress={handleInviteToMyRoom}
-                            disabled={inviteSending}
+                            disabled={inviteSending || inviteSent}
                             style={({ pressed }) => [
                               sty.utilityChipPrimary,
                               pressed && { opacity: 0.85, transform: [{ scale: 0.97 }] },
                               inviteSending && { opacity: 0.6 },
+                              inviteSent && { backgroundColor: '#16A34A' },
                             ]}
                             hitSlop={6}
                           >
                             {inviteSending ? (
                               <AppLoader size="small" color="#fff" />
+                            ) : inviteSent ? (
+                              <>
+                                <Ionicons name="checkmark-circle" size={15} color="#FFF" />
+                                <Text style={sty.utilityChipPrimaryText}>Davet Gönderildi</Text>
+                              </>
                             ) : (
                               <>
                                 <Ionicons name="mic-circle" size={15} color="#FFF" />
@@ -1136,10 +1176,9 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                         )}
                       </>
                     )}
-                    {/* Spacer — 3-noktayı sağa it */}
-                    <View style={{ flex: 1 }} />
-                    {/* 3-nokta — Engelle/Rapor menüsünü açar (her zaman görünür yabancı profilde) */}
-                    {!isOwnProfile && (
+                    {/* �?? v1.7.13.58 (20 May 2026): 3-nokta Odama Davet'in yanına geri ta�?ındı.
+                        �?nce sol üste alınmı�?tı ama kullanıcı "Odama Davet yanına koy" dedi. */}
+                    {!isOwnProfile && currentUserId && (
                       <Pressable
                         onPress={() => setShowMoreActions(s => !s)}
                         style={({ pressed }) => [
@@ -1156,14 +1195,14 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                   </View>
                 )}
 
-                {/* ★ v110.3: Aksiyon menüsü — modActions opsiyonel; Engelle/Rapor HER zaman görünür.
-                     Eskiden tüm blok `{modActions && ...}` ile sarılıydı → oda dışında engelle/rapor erişilemiyordu. */}
+                {/* �?? v110.3: Aksiyon menüsü �?? modActions opsiyonel; Engelle/Rapor HER zaman görünür.
+                     Eskiden tüm blok `{modActions && ...}` ile sarılıydı �?? oda dı�?ında engelle/rapor eri�?ilemiyordu. */}
                 {!isOwnProfile && currentUserId && (() => {
-                  // ★ 2026-04-26: Renk paleti standardı — mod aksiyonları MOR (#A855F7),
+                  // �?? 2026-04-26: Renk paleti standardı �?? mod aksiyonları MOR (#A855F7),
                   //   sosyal/info turkuaz, tehlike (kick/ban) kırmızı. Renk kakofonisi giderildi.
                   const MOD = '#A855F7';
                   const DANGER = '#EF4444';
-                  const ma = modActions; // opsiyonel — oda dışında undefined olur
+                  const ma = modActions; // opsiyonel �?? oda dı�?ında undefined olur
 
                   // Primer aksiyon: sadece oda içinde (modActions varsa) anlamlı
                   const primary = ma?.onPromoteToStage
@@ -1183,13 +1222,13 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                     ? { fn: ma.onMute, icon: 'volume-mute' as const, label: 'Sustur', color: MOD }
                     : null;
 
-                  // ★ 2026-04-26: 3-nokta menüsü iki gruba ayrıldı — sade mod (mor) ve tehlikeli yaptırım (kırmızı).
-                  //   Görsel olarak ayraç çizgi ile ayrılır, kullanıcı yanlışlıkla ban/kick'e basmaz.
+                  // �?? 2026-04-26: 3-nokta menüsü iki gruba ayrıldı �?? sade mod (mor) ve tehlikeli yaptırım (kırmızı).
+                  //   Görsel olarak ayraç çizgi ile ayrılır, kullanıcı yanlı�?lıkla ban/kick'e basmaz.
                   type MenuItem = { fn: () => void; icon: keyof typeof Ionicons.glyphMap; label: string; color: string; danger?: boolean; keepSheet?: boolean };
                   const moderationItems: MenuItem[] = [];
                   const enforcementItems: MenuItem[] = [];
 
-                  // Mod aksiyonları — sadece oda içinde
+                  // Mod aksiyonları �?? sadece oda içinde
                   if (ma?.onChatMute) moderationItems.push({ fn: ma.onChatMute, icon: ma.isChatMuted ? 'chatbox' : 'chatbox-outline', label: ma.isChatMuted ? i18n.t('auto.room.InRoomUserProfile.011') : i18n.t('auto.room.InRoomUserProfile.010'), color: MOD });
                   if (ma?.onMakeModerator) moderationItems.push({ fn: ma.onMakeModerator, icon: 'shield', label: ma.displayRole === 'moderator' ? i18n.t('auto.room.InRoomUserProfile.009') : i18n.t('auto.room.InRoomUserProfile.008'), color: MOD });
                   if (ma?.onPersonalMute) moderationItems.push({ fn: ma.onPersonalMute, icon: ma.isPersonallyMuted ? 'volume-high' : 'volume-mute', label: ma.isPersonallyMuted ? i18n.t('auto.room.InRoomUserProfile.007') : i18n.t('auto.room.InRoomUserProfile.006'), color: MOD });
@@ -1201,8 +1240,8 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                     color: MOD,
                   });
 
-                  // Yaptırım — kick/ban sadece oda içinde, RAPOR/ENGELLE HER ZAMAN
-                  //   ★ v110.5.4: keepSheet=true → Rapor/Engelle modallari sheet'in ÜSTÜNE açılır
+                  // Yaptırım �?? kick/ban sadece oda içinde, RAPOR/ENGELLE HER ZAMAN
+                  //   �?? v110.5.4: keepSheet=true �?? Rapor/Engelle modallari sheet'in �?ST�?NE açılır
                   //     (sheet'i kapatınca ReportModal unmount oluyordu, fix bu).
                   if (ma?.onKick) enforcementItems.push({ fn: ma.onKick, icon: 'exit', label: i18n.t('room.inroomuserprofile.012'), color: DANGER, danger: true });
                   if (ma?.onBanTemp) enforcementItems.push({ fn: ma.onBanTemp, icon: 'timer', label: i18n.t('room.inroomuserprofile.013'), color: DANGER, danger: true });
@@ -1213,12 +1252,12 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                   const hasMore = moderationItems.length > 0 || enforcementItems.length > 0;
                   if (!primary && !muteToggle && !hasMore) return null;
 
-                  // ★ v110.3: Engelle/Rapor "tehlikeli" aksiyon — yanlışlıkla basılmasın diye
+                  // �?? v110.3: Engelle/Rapor "tehlikeli" aksiyon �?? yanlı�?lıkla basılmasın diye
                   //   her zaman explicit 3-nokta tıklaması gerekir (auto-expand kaldırıldı).
                   const hasInlineButtons = !!primary || !!muteToggle;
                   const expandMore = showMoreActions;
 
-                  // ★ v110.5.4: keepSheet flag → modal sheet üstünde açılır, parent kapatılmaz
+                  // �?? v110.5.4: keepSheet flag �?? modal sheet üstünde açılır, parent kapatılmaz
                   const fire = (fn?: () => void, keepSheet?: boolean) => {
                     if (!fn) return;
                     if (keepSheet) {
@@ -1233,7 +1272,7 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
 
                   return (
                     <View style={sty.modInlineWrap}>
-                      {/* ★ v110.5.4: 3-nokta kaldırıldı (utility row'a taşındı), modInlineRow sadece primary + mute */}
+                      {/* �?? v110.5.4: 3-nokta kaldırıldı (utility row'a ta�?ındı), modInlineRow sadece primary + mute */}
                       {hasInlineButtons && (
                       <View style={sty.modInlineRow}>
                         {primary && (
@@ -1275,7 +1314,7 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                               <Text style={sty.moreActionLabel}>{it.label}</Text>
                             </Pressable>
                           ))}
-                          {/* ★ 2026-04-26: Tehlikeli yaptırım grubu — kırmızı vurgu + ayraç. Kullanıcı yanlışlıkla ban'a basmasın. */}
+                          {/* �?? 2026-04-26: Tehlikeli yaptırım grubu �?? kırmızı vurgu + ayraç. Kullanıcı yanlı�?lıkla ban'a basmasın. */}
                           {moderationItems.length > 0 && enforcementItems.length > 0 && (
                             <View style={sty.dangerSeparator}>
                               <View style={sty.dangerLine} />
@@ -1301,8 +1340,8 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
               </>
             )}
 
-            {/* ★ v110: Friendship status netleşene kadar (dataReady=false) bu banner gizli kalır.
-                 Önceden Phase 1 (profile yüklendi) ile Phase 2 (friendship yüklendi) arası flash görünüyordu. */}
+            {/* �?? v110: Friendship status netle�?ene kadar (dataReady=false) bu banner gizli kalır.
+                 �?nceden Phase 1 (profile yüklendi) ile Phase 2 (friendship yüklendi) arası flash görünüyordu. */}
             {dataReady && !canSeeFullProfile && (
               <View style={sty.privateBox}>
                 <Ionicons name="lock-closed" size={28} color="#94A3B8" />
@@ -1313,10 +1352,10 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
 
             {canSeeFullProfile && (
               <>
-                {/* ★ 2026-04-26: activityCard kaldırıldı — ProfileHero'nun detay strip'inde
+                {/* �?? 2026-04-26: activityCard kaldırıldı �?? ProfileHero'nun detay strip'inde
                      aynı bilgiler (sahne dk + dinleyici + reaksiyon) zaten gösteriliyor (activityStats prop). */}
 
-                {/* ★ v110.5 — Kişisel not (sadece başkasının profilinde, sadece sahibi görür) */}
+                {/* �?? v110.5 �?? Ki�?isel not (sadece ba�?kasının profilinde, sadece sahibi görür) */}
                 {!isOwnProfile && currentUserId && userId && (
                   <PersonalNoteCard
                     ownerId={currentUserId}
@@ -1325,7 +1364,7 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                   />
                 )}
 
-                {/* ★ v110.5 — Ortak odalar (mutualRooms varsa) */}
+                {/* �?? v110.5 �?? Ortak odalar (mutualRooms varsa) */}
                 {!isOwnProfile && mutualRooms.length > 0 && (
                   <MutualRoomsStrip
                     rooms={mutualRooms}
@@ -1336,15 +1375,11 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                   />
                 )}
 
-                {/* ★ v110.5 — Öne çıkan rozetler */}
-                {featuredBadges.length > 0 && (
-                  <FeaturedBadgesShowcase
-                    featuredIds={featuredBadges}
-                    onPress={() => setShowBadgesModal(true)}
-                  />
-                )}
+                {/* �?? v1.7.13.56 (20 May 2026): FeaturedBadgesShowcase KALDIRILDI �??
+                    kullanıcı 'fazla kalabalık' feedback'i. Rozet eri�?imi hâlâ "Rozet"
+                    stat'ından modal ile açılır. */}
 
-                {/* ★ v110.5 — Top 3 destekçiler */}
+                {/* �?? v110.5 �?? Top 3 destekçiler */}
                 {topSupporters.length > 0 && (
                   <TopSupportersStrip
                     supporters={topSupporters}
@@ -1352,12 +1387,12 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                   />
                 )}
 
-                {/* ★ v1.7.13.39 (19 May 2026): ÜYELİK section KALDIRILDI.
+                {/* �?? v1.7.13.39 (19 May 2026): �?YELİK section KALDIRILDI.
                     Kullanıcı: 'pro üye yazıyor ya bunu görmelerine gerek yok bu veriye
-                    de gerek yok'. Tier bilgisi başkalarına gösterilmiyor; sadece ayarlar
+                    de gerek yok'. Tier bilgisi ba�?kalarına gösterilmiyor; sadece ayarlar
                     + üyelik planları sayfasında kendi tier'ı görüyor. */}
 
-                {/* ★ 2026-04-25: CÜZDANIM — section header + altın gradient kart (sadece own profile) */}
+                {/* �?? 2026-04-25: C�?ZDANIM �?? section header + altın gradient kart (sadece own profile) */}
                 {isOwnProfile && (
                   <>
                     <ProfileSectionHeader label={i18n.t('profile.section.wallet')} icon="diamond" accentColor="#FBBF24" />
@@ -1369,7 +1404,7 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                         <SPIcon size={100} />
                       </View>
                       <View style={sty.walletRow}>
-                        <Text style={sty.walletAmount}>{((userProfile as any)?.system_points ?? 0).toLocaleString('tr-TR')}</Text>
+                        <Text style={sty.walletAmount}>{((userProfile as any)?.system_points ?? 0).toLocaleString(i18n.locale)}</Text>
                         <Text style={sty.walletCurrency}>SP</Text>
                       </View>
                       <Text style={sty.walletSub}>{i18n.t('profile.wallet_sub')}</Text>
@@ -1377,13 +1412,13 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                   </>
                 )}
 
-                {/* ★ v110 (6 May 2026): ODALARI — eskiden /user/[id] sayfasındaydı,
+                {/* �?? v110 (6 May 2026): ODALARI �?? eskiden /user/[id] sayfasındaydı,
                      full-page kaldırıldı, profilin tamamı sheet içinde.
-                     Privacy: own profile'da her zaman görünür; başkasınınkinde
-                     hide_owned_rooms=false VE (arkadaş ya da public) olunca.
-                   ★ v110.5.4 (6 May 2026): Yabancı profilde KAPALI odalar GİZLENİR.
+                     Privacy: own profile'da her zaman görünür; ba�?kasınınkinde
+                     hide_owned_rooms=false VE (arkada�? ya da public) olunca.
+                   �?? v110.5.4 (6 May 2026): Yabancı profilde KAPALI odalar GİZLENİR.
                      Sadece canlı (is_live) veya uyuyan (is_persistent) odalar gösterilir.
-                     Kullanıcı kendi profilinde tüm geçmişi görebilir. */}
+                     Kullanıcı kendi profilinde tüm geçmi�?i görebilir. */}
                 {(() => {
                   const isFriend = followStatus === 'accepted';
                   const isPrivate = !isOwnProfile && (
@@ -1393,7 +1428,7 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                   );
                   const canSeeFullProfile = isOwnProfile || isFriend || !isPrivate;
                   const hideOwned = (userProfile as any)?.hide_owned_rooms;
-                  // ★ v110.5.4: Yabancı profilde sadece canlı veya persistent odalar
+                  // �?? v110.5.4: Yabancı profilde sadece canlı veya persistent odalar
                   const visibleRooms = isOwnProfile
                     ? recentRooms
                     : recentRooms.filter((r: any) => r.is_live || r.is_persistent);
@@ -1554,8 +1589,8 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                   );
                 })()}
 
-                {/* ★ 2026-04-26: ARKADAŞLAR — sadece 2+ arkadaş varsa kart göster.
-                     Tek arkadaş için bütün bir kart açmak yer israfı.
+                {/* �?? 2026-04-26: ARKADA�?LAR �?? sadece 2+ arkada�? varsa kart göster.
+                     Tek arkada�? için bütün bir kart açmak yer israfı.
                      "Tümü" linki sadece 4+ varsa anlamlı (3 chip görünüyor zaten). */}
                 {friendsPreview.length >= 2 && (
                   <>
@@ -1606,15 +1641,15 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                   </>
                 )}
 
-                {/* ★ 2026-04-26: Eski full-width SP Gönder kartı kaldırıldı — interaction row'a yuvarlak altın chip olarak taşındı. */}
+                {/* �?? 2026-04-26: Eski full-width SP Gönder kartı kaldırıldı �?? interaction row'a yuvarlak altın chip olarak ta�?ındı. */}
 
-                {/* ★ v110 (6 May 2026): "Tam Profili Aç" linki KALDIRILDI.
-                     Profilin tüm verileri artık sheet içinde (rooms list dahil) — full-page'e gerek yok.
-                     /user/[id] route bouncer'a dönüştü, deep link gelirse sheet açıp geri navigate eder. */}
+                {/* �?? v110 (6 May 2026): "Tam Profili Aç" linki KALDIRILDI.
+                     Profilin tüm verileri artık sheet içinde (rooms list dahil) �?? full-page'e gerek yok.
+                     /user/[id] route bouncer'a dönü�?tü, deep link gelirse sheet açıp geri navigate eder. */}
 
-                {/* ★ 2026-04-26: Rapor Et / Engelle 3-nokta menüsüne taşındı — alt satırı sil, daha az scroll. */}
+                {/* �?? 2026-04-26: Rapor Et / Engelle 3-nokta menüsüne ta�?ındı �?? alt satırı sil, daha az scroll. */}
 
-                {/* ★ 2026-04-25: Clubhouse modeli — kullanıcı odadan asla çıkmaz.
+                {/* �?? 2026-04-25: Clubhouse modeli �?? kullanıcı odadan asla çıkmaz.
                      Tam profile escape hatch kaldırıldı; tüm peek overlay içinde tamamlanır. */}
               </>
             )}
@@ -1623,11 +1658,11 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
         )}
       </Animated.View>
 
-      {/* ★ v110.14: Kendi profilimde envanter sheet — yukarıdaki Envanter butonu açar */}
-      {/* ★ v213 BUG FIX: onFrameChange + onEntryEffectChange callback'leri eklendi.
-           Önceki sürümde callback'ler yoktu → equip RPC başarılı oluyor ama modal UI
+      {/* �?? v110.14: Kendi profilimde envanter sheet �?? yukarıdaki Envanter butonu açar */}
+      {/* �?? v213 BUG FIX: onFrameChange + onEntryEffectChange callback'leri eklendi.
+           �?nceki sürümde callback'ler yoktu �?? equip RPC ba�?arılı oluyor ama modal UI
            güncellenmiyordu (kullanıcı: "tıklıyorum hala önceki seçili görünüyor").
-           Şimdi userProfile state local olarak güncelleniyor → AKTİF rozeti yer değiştirir. */}
+           �?imdi userProfile state local olarak güncelleniyor �?? AKTİF rozeti yer de�?i�?tirir. */}
       {isOwnProfile && currentUserId && (
         <FrameSelectSheet
           visible={showOwnFrameSheet}
@@ -1662,7 +1697,7 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
         />
       )}
 
-      {/* ★ Faz 6.3 — Rozet Listesi Modal */}
+      {/* �?? Faz 6.3 �?? Rozet Listesi Modal */}
       {userId && userProfile && (
         <BadgeListModal
           visible={showBadgesModal}
@@ -1672,7 +1707,7 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
         />
       )}
 
-      {/* ★ 2026-05-05: Hediye detay modalı — tab'lı (Aldığı / Verdiği) */}
+      {/* �?? 2026-05-05: Hediye detay modalı �?? tab'lı (Aldı�?ı / Verdi�?i) */}
       {userId && userProfile && (
         <GiftDetailModal
           visible={showGiftDetail}
@@ -1711,8 +1746,8 @@ const sty = StyleSheet.create({
     backgroundColor: '#000',
   },
   sheet: {
-    // ★ 2026-05-05: NotificationDrawer aile dili — borderRadius 22→26, gri border kaldırıldı,
-    //   shadowRadius 14, elevation 16→10 (Android FPS).
+    // �?? 2026-05-05: NotificationDrawer aile dili �?? borderRadius 22�??26, gri border kaldırıldı,
+    //   shadowRadius 14, elevation 16�??10 (Android FPS).
     position: 'absolute',
     left: 0,
     right: 0,
@@ -1739,8 +1774,8 @@ const sty = StyleSheet.create({
   wizardHeader: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 16, paddingTop: 4, paddingBottom: 12,
-    // ★ 2026-05-05: Eski teal bg ve borderBottom kaldırıldı — gradient halo zaten görsel
-    //   ayrım sağlıyor, NotificationDrawer aile dili (sade header + separator).
+    // �?? 2026-05-05: Eski teal bg ve borderBottom kaldırıldı �?? gradient halo zaten görsel
+    //   ayrım sa�?lıyor, NotificationDrawer aile dili (sade header + separator).
   },
   iconBtn: {
     width: 36, height: 36, borderRadius: 12,
@@ -1764,7 +1799,7 @@ const sty = StyleSheet.create({
     flex: 1, alignItems: 'center', justifyContent: 'center',
     paddingVertical: 60,
   },
-  // ★ v107.23: Profil yüklenirken spinner yerine minimal skeleton placeholder
+  // �?? v107.23: Profil yüklenirken spinner yerine minimal skeleton placeholder
   skeletonWrap: {
     paddingHorizontal: 18,
     paddingTop: 14,
@@ -1850,7 +1885,7 @@ const sty = StyleSheet.create({
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
   },
   incomingRejectText: { color: '#94A3B8', fontSize: 11, fontWeight: '600' },
-  // ★ v107.48: Yeniden tasarlanan etkileşim satırı.
+  // �?? v107.48: Yeniden tasarlanan etkile�?im satırı.
   //   Tüm elemanlar 52 yükseklik. Ortak görsel dil: outline + active state dolgu.
   interactionRow: {
     flexDirection: 'row',
@@ -1859,7 +1894,7 @@ const sty = StyleSheet.create({
     marginHorizontal: 16,
     marginTop: 10,
   },
-  // ★ Pill base — Takip + Arkadaş için (flex 1, 52 height, rounded full)
+  // �?? Pill base �?? Takip + Arkada�? için (flex 1, 52 height, rounded full)
   actionPill: {
     flex: 1,
     flexDirection: 'row',
@@ -1871,27 +1906,27 @@ const sty = StyleSheet.create({
     paddingHorizontal: 12,
     borderWidth: 1.5,
   },
-  // Default (idle) state — outline, neutral
+  // Default (idle) state �?? outline, neutral
   actionPillIdle: {
     backgroundColor: 'rgba(255,255,255,0.04)',
     borderColor: 'rgba(255,255,255,0.14)',
   },
-  // Takipte — teal active
+  // Takipte �?? teal active
   actionPillActive: {
     backgroundColor: 'rgba(20,184,166,0.12)',
     borderColor: 'rgba(20,184,166,0.45)',
   },
-  // Arkadaş — purple active
+  // Arkada�? �?? purple active
   actionPillFriend: {
     backgroundColor: 'rgba(167,139,250,0.12)',
     borderColor: 'rgba(167,139,250,0.45)',
   },
-  // İstek Gönderildi — amber pending
+  // İstek Gönderildi �?? amber pending
   actionPillPending: {
     backgroundColor: 'rgba(251,191,36,0.10)',
     borderColor: 'rgba(251,191,36,0.40)',
   },
-  // Engellendi — red blocked
+  // Engellendi �?? red blocked
   actionPillBlocked: {
     backgroundColor: 'rgba(239,68,68,0.10)',
     borderColor: 'rgba(239,68,68,0.35)',
@@ -1901,7 +1936,7 @@ const sty = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 0.2,
   },
-  // ★ DM circle — aynı outline dili, 52x52
+  // �?? DM circle �?? aynı outline dili, 52x52
   actionCircle: {
     width: 52,
     height: 52,
@@ -1912,7 +1947,7 @@ const sty = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: 'rgba(255,255,255,0.14)',
   },
-  // ★ SP hexagon container — overflow visible, hexagon kendi içinde 62 (büyütüldü)
+  // �?? SP hexagon container �?? overflow visible, hexagon kendi içinde 62 (büyütüldü)
   actionHex: {
     width: 60,
     height: 60,
@@ -1942,7 +1977,7 @@ const sty = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
   },
-  // ★ tierIcon, tierTitle, tierDesc → aşağıda yeni tanımlar (premium section header rev.)
+  // �?? tierIcon, tierTitle, tierDesc �?? a�?a�?ıda yeni tanımlar (premium section header rev.)
   donateCard: {
     marginHorizontal: 16, marginTop: 14, borderRadius: 16, overflow: 'hidden',
   },
@@ -1963,7 +1998,7 @@ const sty = StyleSheet.create({
   actionBtnText: { color: '#94A3B8', fontSize: 12, fontWeight: '600' },
   actionSep: { width: 1, height: 20, backgroundColor: 'rgba(255,255,255,0.08)' },
 
-  // ★ 2026-04-25: Premium Section Header — profil sayfası ile tutarlı
+  // �?? 2026-04-25: Premium Section Header �?? profil sayfası ile tutarlı
   //   (accent bar + icon + UPPERCASE label + opsiyonel badge/link)
   premiumSectionHeader: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
@@ -1976,7 +2011,7 @@ const sty = StyleSheet.create({
     ...Shadows.text,
   },
 
-  // ★ Kart — diagonal gradient + teal hairline üst + koyu shadow (profile pattern)
+  // �?? Kart �?? diagonal gradient + teal hairline üst + koyu shadow (profile pattern)
   sectionCard: {
     marginHorizontal: 16, padding: 14, borderRadius: 16,
     overflow: 'hidden',
@@ -1987,7 +2022,7 @@ const sty = StyleSheet.create({
     position: 'absolute', top: 0, left: 0, right: 0, height: 1.5,
   },
 
-  // ★ Üyelik iç satır
+  // �?? �?yelik iç satır
   tierRow: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
   },
@@ -2005,7 +2040,7 @@ const sty = StyleSheet.create({
     ...Shadows.textLight,
   },
 
-  // ★ CÜZDAN — altın premium kart (profil sayfasındaki walletCard ile aynı dil)
+  // �?? C�?ZDAN �?? altın premium kart (profil sayfasındaki walletCard ile aynı dil)
   walletCard: {
     marginHorizontal: 16, padding: 14, borderRadius: 16,
     overflow: 'hidden',
@@ -2033,7 +2068,7 @@ const sty = StyleSheet.create({
     ...Shadows.textLight,
   },
 
-  // ★ Arkadaşlar — header içi count (profil sayfası ile aynı pill)
+  // �?? Arkada�?lar �?? header içi count (profil sayfası ile aynı pill)
   friendsCountBadge: {
     backgroundColor: 'rgba(20,184,166,0.12)', borderRadius: 10,
     paddingHorizontal: 8, paddingVertical: 3,
@@ -2045,8 +2080,8 @@ const sty = StyleSheet.create({
     ...Shadows.text,
   },
 
-  // ★ 2026-05-05: ProfileFriendsList tile dili ile birebir aynı (kod tekrarı yerine
-  //   stil senkronu — refactor riski düşük, görsel sonuç tutarlı).
+  // �?? 2026-05-05: ProfileFriendsList tile dili ile birebir aynı (kod tekrarı yerine
+  //   stil senkronu �?? refactor riski dü�?ük, görsel sonuç tutarlı).
   friendsStripCard: {
     marginHorizontal: 16, borderRadius: 26, overflow: 'hidden',
     backgroundColor: '#1a2030',
@@ -2067,18 +2102,18 @@ const sty = StyleSheet.create({
   friendStatusOn: { fontSize: 9, fontWeight: '600', color: '#22C55E' },
   friendStatusOff: { fontSize: 9, fontWeight: '500', color: '#64748B' },
 
-  // ★ v92.1 (1 May 2026): DM butonu — SP chip ile orantılı (56×56).
-  // ★ v107.26: Chat circle followBtn ile uyumlu (48x48)
+  // �?? v92.1 (1 May 2026): DM butonu �?? SP chip ile orantılı (56�?56).
+  // �?? v107.26: Chat circle followBtn ile uyumlu (48x48)
   dmBtn: {
     width: 48, height: 48, borderRadius: 24,
     backgroundColor: 'rgba(255,255,255,0.06)',
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
     alignItems: 'center' as const, justifyContent: 'center' as const,
   },
-  // ★ v92.1 (1 May 2026): SP Gönder — daire/border/zemin kaldırıldı (kullanıcı talebi).
-  //   Hexagon 60, wrapper 56 (overflow visible) → DM butonu ile aynı görsel boyut,
-  //   hexagon kendi glow'uyla biraz dışarı taşar (mücevher hissi).
-  // ★ v107.26: SP chip 88→56 — diğer butonlarla (48) uyumlu, hexagon biraz dışa taşıp
+  // �?? v92.1 (1 May 2026): SP Gönder �?? daire/border/zemin kaldırıldı (kullanıcı talebi).
+  //   Hexagon 60, wrapper 56 (overflow visible) �?? DM butonu ile aynı görsel boyut,
+  //   hexagon kendi glow'uyla biraz dı�?arı ta�?ar (mücevher hissi).
+  // �?? v107.26: SP chip 88�??56 �?? di�?er butonlarla (48) uyumlu, hexagon biraz dı�?a ta�?ıp
   //   "mücevher hissi" versin (overflow visible). Yan yana orantı bozulmaz.
   spChipBtn: {
     width: 56, height: 56,
@@ -2086,7 +2121,7 @@ const sty = StyleSheet.create({
     overflow: 'visible' as const,
   },
 
-  // ★ 2026-04-26: Şu an hangi odada
+  // �?? 2026-04-26: �?u an hangi odada
   currentRoomBanner: {
     flexDirection: 'row' as const, alignItems: 'center' as const, gap: 8,
     marginHorizontal: 16, marginTop: 10,
@@ -2109,7 +2144,7 @@ const sty = StyleSheet.create({
     ...Shadows.text,
   },
 
-  // ★ 2026-04-26: Ortak arkadaş badge
+  // �?? 2026-04-26: Ortak arkada�? badge
   mutualBadge: {
     flexDirection: 'row' as const, alignItems: 'center' as const, gap: 6,
     marginHorizontal: 16, marginTop: 8,
@@ -2123,7 +2158,7 @@ const sty = StyleSheet.create({
     ...Shadows.text,
   },
 
-  // ★ 2026-04-26: Clubhouse pattern — inline mod aksiyonları (primer + mute + 3-nokta)
+  // �?? 2026-04-26: Clubhouse pattern �?? inline mod aksiyonları (primer + mute + 3-nokta)
   modInlineWrap: { marginHorizontal: 16, marginTop: 14, gap: 10 },
   modInlineRow: {
     flexDirection: 'row' as const, alignItems: 'center' as const, gap: 8,
@@ -2146,7 +2181,7 @@ const sty = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.04)',
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
   },
-  // ★ v110.3: Yardımcı eylem satırı — Paylaş / Linki Kopyala / Odama Davet
+  // �?? v110.3: Yardımcı eylem satırı �?? Payla�? / Linki Kopyala / Odama Davet
   utilityRow: {
     flexDirection: 'row' as const, alignItems: 'center' as const, flexWrap: 'wrap' as const,
     gap: 8, marginHorizontal: 16, marginTop: 10,
@@ -2173,14 +2208,14 @@ const sty = StyleSheet.create({
     fontSize: 11, fontWeight: '800' as const, color: '#FFF', letterSpacing: 0.3,
     ...Shadows.text,
   },
-  // ★ v110.5.4: Utility row 3-nokta — sade yuvarlak buton, "Daha fazla" yazısı kaldırıldı
+  // �?? v110.5.4: Utility row 3-nokta �?? sade yuvarlak buton, "Daha fazla" yazısı kaldırıldı
   utilityDots: {
     width: 32, height: 32, borderRadius: 16,
     alignItems: 'center' as const, justifyContent: 'center' as const,
     backgroundColor: 'rgba(255,255,255,0.04)',
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)',
   },
-  // ★ 2026-04-26: 3-nokta menüsü — border + shadow kaldırıldı, sayfa akışkan tek bütün.
+  // �?? 2026-04-26: 3-nokta menüsü �?? border + shadow kaldırıldı, sayfa akı�?kan tek bütün.
   moreActionsCard: {
     borderRadius: 14, overflow: 'hidden' as const,
   },
@@ -2195,7 +2230,7 @@ const sty = StyleSheet.create({
     flex: 1, fontSize: 13, fontWeight: '600' as const, color: '#E2E8F0',
     ...Shadows.text,
   },
-  // ★ 2026-04-26: 3-nokta menüsünde "Moderasyon" ve "Yaptırım" gruplarını ayıran çizgi + başlık.
+  // �?? 2026-04-26: 3-nokta menüsünde "Moderasyon" ve "Yaptırım" gruplarını ayıran çizgi + ba�?lık.
   dangerSeparator: {
     flexDirection: 'row' as const, alignItems: 'center' as const,
     paddingHorizontal: 14, paddingVertical: 8, gap: 8,

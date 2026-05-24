@@ -9,6 +9,7 @@ import { View, Text, StyleSheet, Pressable, Animated, Easing, Dimensions, Platfo
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
+import { i18n } from '../services/i18n';
 
 const { width: W } = Dimensions.get('window');
 
@@ -81,7 +82,7 @@ export default function PurchaseSuccessModal({
       <Pressable
         style={StyleSheet.absoluteFill}
         onPress={onClose}
-        accessibilityLabel="Kapat"
+        accessibilityLabel={i18n.t('common.close')}
       />
       <Animated.View
         style={[

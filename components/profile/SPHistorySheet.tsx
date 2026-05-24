@@ -248,7 +248,7 @@ export default function SPHistorySheet({ visible, onClose, balance, history: ini
             <View style={s.balanceStrip}>
               <Text style={s.balanceLabel}>{i18n.t('profile.sphistorysheet.003')}</Text>
               <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
-                <Text style={s.balanceAmount}>{balance.toLocaleString('tr-TR')}</Text>
+                <Text style={s.balanceAmount}>{balance.toLocaleString(i18n.locale)}</Text>
                 <Text style={s.balanceCurrency}>SP</Text>
               </View>
             </View>
@@ -301,7 +301,7 @@ export default function SPHistorySheet({ visible, onClose, balance, history: ini
                       <Text style={s.subline} numberOfLines={1}>{subline}</Text>
                     )}
                     <Text style={s.date}>
-                      {new Date(tx.created_at).toLocaleDateString('tr-TR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                      {new Date(tx.created_at).toLocaleDateString(i18n.locale, { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
                     </Text>
                   </View>
                   <Text style={[s.amount, { color: isPositive ? '#FFD700' : '#EF4444' }]}>

@@ -7,7 +7,7 @@ import React, { useEffect, useMemo, useRef } from 'react';
 import { i18n } from '../../services/i18n';
 import {
   View, Text, StyleSheet, Pressable, Animated, PanResponder, Dimensions, Platform,
-  ScrollView, useWindowDimensions,
+  ScrollView, useWindowDimensions, Easing,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import SPIcon from '../SPIcon';
 import { GLOW_STYLES, PREMIUM_GLOW_IDS, type GlowStyleId } from './glowStyles';
+import { PANEL_BG_GRADIENT } from '../../constants/tierColors';
 
 const { width: W } = Dimensions.get('window');
 
@@ -44,7 +45,11 @@ export default function MessageGlowPickerSheet({ visible, onClose, currentSP, on
     const maxAllowed = windowH - topPad;
     return Math.max(480, maxAllowed);
   }, [windowH, insets.top, insets.bottom]);
+  // ★ v1.7.13.146 (24 May 2026): 3-snap pattern (HALF/FULL/DISMISS).
+  //   Default açılış HALF (yarım), yukarı çekince FULL, aşağı çekince DISMISS.
+  //   Tam açıkken sürüklenememe sorununu çözer — her zaman aşağı doğru drag aktif.
   const SNAP_FULL = 0;
+  const SNAP_HALF = PANEL_HEIGHT * 0.5;
   const SNAP_DISMISS = PANEL_HEIGHT;
   const translateY = useRef(new Animated.Value(SNAP_DISMISS)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
@@ -52,9 +57,14 @@ export default function MessageGlowPickerSheet({ visible, onClose, currentSP, on
 
   useEffect(() => {
     if (visible) {
-      currentSnapRef.current = SNAP_FULL;
+      currentSnapRef.current = SNAP_HALF;
       Animated.parallel([
-        Animated.spring(translateY, { toValue: SNAP_FULL, useNativeDriver: true, damping: 22, stiffness: 220 }),
+        Animated.timing(translateY, {
+          toValue: SNAP_HALF,
+          duration: 320,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
         Animated.timing(backdropOpacity, { toValue: 1, duration: 240, useNativeDriver: true }),
       ]).start();
     } else {
@@ -76,35 +86,57 @@ export default function MessageGlowPickerSheet({ visible, onClose, currentSP, on
       onPanResponderTerminationRequest: () => false,
       onPanResponderMove: (_, gs) => {
         const newY = currentSnapRef.current + gs.dy;
-        // ★ Sadece üst sınır (FULL'un üstüne çıkma); aşağı hareketi serbest — kullanıcı
-        //   parmağıyla panel'i tam olarak takip edebilsin (kayıp hissi olmasın).
         translateY.setValue(Math.max(SNAP_FULL - 10, newY));
       },
       onPanResponderRelease: (_, gs) => {
         const finalPos = currentSnapRef.current + gs.dy;
         const fastDown = gs.vy > 0.6;
+        const fastUp = gs.vy < -0.6;
 
+        const animateTo = (target: number) => {
+          currentSnapRef.current = target;
+          Animated.timing(translateY, {
+            toValue: target,
+            duration: 240,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+          }).start();
+        };
         const animateDismiss = () => {
           currentSnapRef.current = SNAP_DISMISS;
           Animated.parallel([
-            Animated.spring(translateY, {
+            Animated.timing(translateY, {
               toValue: SNAP_DISMISS,
+              duration: 240,
+              easing: Easing.in(Easing.cubic),
               useNativeDriver: true,
-              damping: 28, stiffness: 180, mass: 0.9,
-              overshootClamping: true,
             }),
             Animated.timing(backdropOpacity, { toValue: 0, duration: 260, useNativeDriver: true }),
           ]).start(() => onCloseRef.current());
         };
-        const animateToFull = () => {
-          currentSnapRef.current = SNAP_FULL;
-          Animated.spring(translateY, { toValue: SNAP_FULL, useNativeDriver: true, damping: 22, stiffness: 220 }).start();
-        };
 
-        // 2-snap: FULL ↔ DISMISS. Hızlı aşağı çek veya yarıdan fazla indi → kapan.
-        const dismissThreshold = PANEL_HEIGHT * 0.30;
-        if (fastDown || finalPos > dismissThreshold) animateDismiss();
-        else animateToFull();
+        // 3-snap: FULL ↔ HALF ↔ DISMISS.
+        //   - Hızlı aşağı: bir snap aşağı (FULL→HALF, HALF→DISMISS)
+        //   - Hızlı yukarı: bir snap yukarı (DISMISS→HALF, HALF→FULL)
+        //   - Bırakıldığı yere göre en yakın snap'e git
+        if (fastDown) {
+          if (currentSnapRef.current === SNAP_FULL) animateTo(SNAP_HALF);
+          else animateDismiss();
+          return;
+        }
+        if (fastUp) {
+          if (currentSnapRef.current === SNAP_HALF) animateTo(SNAP_FULL);
+          else animateTo(SNAP_HALF);
+          return;
+        }
+        // En yakın snap
+        const distFull = Math.abs(finalPos - SNAP_FULL);
+        const distHalf = Math.abs(finalPos - SNAP_HALF);
+        const distDismiss = Math.abs(finalPos - SNAP_DISMISS);
+        const min = Math.min(distFull, distHalf, distDismiss);
+        if (min === distDismiss && distDismiss < PANEL_HEIGHT * 0.25) animateDismiss();
+        else if (min === distFull) animateTo(SNAP_FULL);
+        else animateTo(SNAP_HALF);
       },
     })
   ).current;
@@ -117,8 +149,10 @@ export default function MessageGlowPickerSheet({ visible, onClose, currentSP, on
           RoomChatDrawer sheet'i elevation:58 ile renderlanıyor; picker'ın ScrollView
           alanı drawer ile fiziksel olarak çakıştığı için touch event drawer'a gidiyor,
           scroll çalışmıyordu. zIndex Android'de cross-component stacking için yetmez,
-          elevation şart. 100 → drawer'ın 58'inin çok üstünde. */}
-      <View style={{ ...StyleSheet.absoluteFillObject, zIndex: 540, elevation: 100 }} pointerEvents="box-none">
+          elevation şart.
+          ★ v1.7.13.146 (24 May 2026): 100 → 9999. Soprano Lobi'de radyo bar (header
+          parent zIndex 5) modalın üst kısmını örtüyordu. Garanti için çok yüksek. */}
+      <View style={{ ...StyleSheet.absoluteFillObject, zIndex: 9999, elevation: 9999 }} pointerEvents="box-none">
         {/* Backdrop */}
         <Animated.View style={[StyleSheet.absoluteFill, { opacity: backdropOpacity }]}>
           <BlurView intensity={28} tint="dark" style={StyleSheet.absoluteFill} />
@@ -133,29 +167,20 @@ export default function MessageGlowPickerSheet({ visible, onClose, currentSP, on
             { height: PANEL_HEIGHT, transform: [{ translateY }] },
           ]}
         >
-          {/* ★ 2026-05-05: NotificationDrawer dili — slate diagonal + üst amber halo (mevcut palet).
-              2 katman gradient (FPS koruma). */}
+          {/* ★ v1.7.13.146 (24 May 2026): GiftSheet/SPDonateSheet ile tutarlı modal ailesi.
+              Eski NotificationDrawer dili (slate + ağır amber halo) yerine PANEL_BG_GRADIENT
+              (koyu düz) + sade amber accent line. Kullanıcı geri bildirimi: "modal ailesine
+              uygun değil". */}
           <LinearGradient
-            colors={['#3a4658', '#2a3344', '#1a2030']}
+            colors={PANEL_BG_GRADIENT}
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
             style={StyleSheet.absoluteFillObject}
             pointerEvents="none"
           />
+          {/* ★ v1.7.13.146: Top edge ince sade teal çizgi — GiftSheet/SPDonateSheet
+              ailesine uyumlu (eski amber 0.55 yerine düşük opaklık marka rengi). */}
           <LinearGradient
-            colors={['rgba(251,191,36,0.20)', 'rgba(251,191,36,0.05)', 'transparent']}
-            start={{ x: 0, y: 0 }} end={{ x: 0, y: 0.4 }}
-            style={StyleSheet.absoluteFillObject}
-            pointerEvents="none"
-          />
-          <LinearGradient
-            colors={['rgba(251,191,36,0.08)', 'transparent']}
-            start={{ x: 0, y: 0 }} end={{ x: 0.7, y: 0.6 }}
-            style={StyleSheet.absoluteFillObject}
-            pointerEvents="none"
-          />
-          {/* Top edge altın highlight */}
-          <LinearGradient
-            colors={['transparent', 'rgba(251,191,36,0.85)', 'transparent']}
+            colors={['transparent', 'rgba(20,184,166,0.35)', 'transparent']}
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
             style={s.topEdge}
             pointerEvents="none"
@@ -173,7 +198,7 @@ export default function MessageGlowPickerSheet({ visible, onClose, currentSP, on
               {/* Header */}
               <View style={s.header}>
                 <View style={s.headerIconWrap}>
-                  <Ionicons name="sparkles" size={16} color="#FBBF24" style={iconShadow} />
+                  <Ionicons name="sparkles" size={16} color="#14B8A6" style={iconShadow} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={s.headerTitle}>MESAJINI PARLAT</Text>
@@ -181,7 +206,7 @@ export default function MessageGlowPickerSheet({ visible, onClose, currentSP, on
                 </View>
                 <View style={s.balancePill}>
                   <SPIcon size={14} />
-                  <Text style={s.balanceText}>{currentSP.toLocaleString('tr-TR')}</Text>
+                  <Text style={s.balanceText}>{currentSP.toLocaleString(i18n.locale)}</Text>
                 </View>
               </View>
             </View>
@@ -309,7 +334,7 @@ const s = StyleSheet.create({
     left: 0, right: 0, bottom: 0,
     borderTopLeftRadius: 26, borderTopRightRadius: 26,
     overflow: 'hidden',
-    backgroundColor: '#1a2030',
+    backgroundColor: '#06080d',
     borderBottomWidth: 0,
     ...Platform.select({
       ios: {
@@ -321,24 +346,26 @@ const s = StyleSheet.create({
       // ★ v110.7: Android elevation panel düzeyinde de — outer wrapper 100 yetmezse
       //   panel kendi içinde de chat drawer'ı ezsin. ScrollView'un touch event'i
       //   drawer tarafından çalınmasını engeller.
-      android: { elevation: 100 },
+      // ★ v1.7.13.146 (24 May 2026): 100 → 9999 (radyo bar Z-stacking için).
+      android: { elevation: 9999 },
     }),
   },
   topEdge: { position: 'absolute', top: 0, left: 0, right: 0, height: 1.6 },
   handle: { alignItems: 'center', paddingVertical: 12 },
-  handleBar: { width: 44, height: 4, borderRadius: 2, backgroundColor: 'rgba(251,191,36,0.5)' },
+  handleBar: { width: 44, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.25)' },
   header: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
     paddingHorizontal: 18, paddingBottom: 14,
   },
+  // ★ v1.7.13.146: Modal ailesi (GiftSheet) sadeleştirmesi — amber yerine teal/slate.
   headerIconWrap: {
     width: 36, height: 36, borderRadius: 18,
     alignItems: 'center', justifyContent: 'center',
-    backgroundColor: 'rgba(251,191,36,0.15)',
-    borderWidth: 1, borderColor: 'rgba(251,191,36,0.45)',
+    backgroundColor: 'rgba(20,184,166,0.12)',
+    borderWidth: 1, borderColor: 'rgba(20,184,166,0.30)',
   },
   headerTitle: {
-    fontSize: 13, fontWeight: '900', color: '#FBBF24',
+    fontSize: 13, fontWeight: '900', color: '#F1F5F9',
     letterSpacing: 1.4, ...iconShadow,
   },
   headerSub: { fontSize: 10.5, fontWeight: '600', color: 'rgba(255,255,255,0.5)', marginTop: 2 },

@@ -33,7 +33,7 @@ export interface CosmeticItem {
   sold_count: number;
   launched_at: string | null;
   // ★ v109.2: Tier-lock — Free dışı tier zorunluluğu (divine = Plus min, vb.)
-  min_tier?: 'Free' | 'Plus' | 'Pro' | 'GodMaster' | null;
+  min_tier?: 'Free' | 'Plus' | 'Pro' | null;
 }
 
 export interface Collection {

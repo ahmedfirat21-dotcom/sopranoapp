@@ -123,58 +123,70 @@ function SoundWave() {
     );
   }
 
-  const { useSharedValue, useDerivedValue, withRepeat, withTiming, Easing: REasing } = Reanimated;
+  const { useSharedValue, withRepeat, withTiming, Easing: REasing } = Reanimated;
+  const { usePathValue } = Skia; // ★ Skia 2.x resmi worklet-safe path hook
   const phase = useSharedValue(0);
+  // ★ v1.7.13.127 (21 May 2026): Sürekli akıcı zaman — gif loop hissi yok.
+  //   "time" tek bir uzun linear ramp, worklet içinde sin kombinasyonlarıyla
+  //   modüle edilir. Sequence/withRepeat-restart yok → her döngü başlangıcı
+  //   görünmez, dalgalar nefes alır gibi sürekli akar.
+  const time = useSharedValue(0);
 
   useEffect(() => {
+    // ★ Yumuşak akış hızı — burst zaten titreşim ekliyor, phase yavaş kalsın
     phase.value = withRepeat(
-      withTiming(2 * Math.PI, { duration: 4000, easing: REasing.linear }),
+      withTiming(2 * Math.PI, { duration: 2400, easing: REasing.linear }),
+      -1,
+      false,
+    );
+    // ★ Sürekli zaman — uzun linear, görünür restart yok
+    time.value = withRepeat(
+      withTiming(60, { duration: 60000, easing: REasing.linear }),
       -1,
       false,
     );
   }, []);
 
-  // ★ Path UI thread'de hesaplanır — worklet. React state hiç değişmez.
-  const wave1 = useDerivedValue(() => {
+  // ★ Skia 2.x `usePathValue` — worklet-safe pattern.
+  //   • Path objesi Skia internal olarak useMemo ile JS thread'de oluşturulur
+  //   • Worklet callback'inde path.moveTo/lineTo ile mutate edilir (Path.Make worklet'te ÇAĞRILMAZ)
+  //   • notifyChange Skia internal olarak çağrılır
+  //   ESKİ KOD: worklet içinde `Skia.Path.Make()` → Skia 2.x'te crash ("animation.onStart undefined")
+  // ★ v1.7.13.135 (21 May 2026): GERİ v298 — 3 teal/cyan ton, blur halo, sade akıcı.
+  //   Kullanıcı: "sağdaki gibi (eski telefondaki) hali geri getir". 3 farklı renk
+  //   (mor/pembe/teal) ABANDON edildi; tek aile (teal→cyan→beyaz) ton geçişi.
+  const wave1 = usePathValue((path: any) => {
     'worklet';
-    const path = SkiaNS.Path.Make();
     const cy = WAVE_H / 2;
     for (let i = 0; i <= 40; i++) {
       const x = (i / 40) * WAVE_W;
       const y = cy + Math.sin((i / 40) * 2.5 * Math.PI * 2 + phase.value) * 16;
       if (i === 0) path.moveTo(x, y); else path.lineTo(x, y);
     }
-    return path;
   });
-  const wave2 = useDerivedValue(() => {
+  const wave2 = usePathValue((path: any) => {
     'worklet';
-    const path = SkiaNS.Path.Make();
     const cy = WAVE_H / 2 + 4;
     for (let i = 0; i <= 40; i++) {
       const x = (i / 40) * WAVE_W;
       const y = cy + Math.sin((i / 40) * 3.2 * Math.PI * 2 + phase.value + Math.PI / 2) * 10;
       if (i === 0) path.moveTo(x, y); else path.lineTo(x, y);
     }
-    return path;
   });
-  const wave3 = useDerivedValue(() => {
+  const wave3 = usePathValue((path: any) => {
     'worklet';
-    const path = SkiaNS.Path.Make();
     const cy = WAVE_H / 2 - 6;
     for (let i = 0; i <= 40; i++) {
       const x = (i / 40) * WAVE_W;
       const y = cy + Math.sin((i / 40) * 4.0 * Math.PI * 2 + phase.value + Math.PI) * 6;
       if (i === 0) path.moveTo(x, y); else path.lineTo(x, y);
     }
-    return path;
   });
 
   return (
     <View style={{ width: WAVE_W, height: WAVE_H, alignItems: 'center', justifyContent: 'center' }}>
       <Canvas style={{ width: WAVE_W, height: WAVE_H }}>
-        {/* ★ v298 (17 May 2026): Tüm dalga katmanları gradient ile fade-edge.
-            Önce wave1 solid teal idi → kenarlarda görünür start/end iz bırakıyordu.
-            Şimdi 3'ü de transparent→renkli→transparent → kenar izleri yok. */}
+        {/* ★ v1.7.13.135 (eski v298 hali): Tüm dalgalar teal/cyan ton ailesi + halo blur. */}
         {/* Arka katman — geniş yumuşak halo (fade edges) */}
         <Path path={wave1} style="stroke" strokeWidth={3} strokeCap="round" strokeJoin="round">
           <SkLinearGradient
@@ -194,7 +206,7 @@ function SoundWave() {
             />
           </Path>
         </Group>
-        {/* Üst katman — ince parlak (fade edges) */}
+        {/* Üst katman — ince parlak beyaz parıltı (fade edges) */}
         <Group>
           <Path path={wave3} style="stroke" strokeWidth={1.5} strokeCap="round" strokeJoin="round">
             <SkLinearGradient

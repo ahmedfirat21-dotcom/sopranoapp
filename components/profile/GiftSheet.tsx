@@ -460,7 +460,7 @@ export default function GiftSheet({
               <View style={[styles.balancePill, { backgroundColor: palette.accentTint, borderColor: palette.accent + '40' }]}>
                 <Ionicons name="wallet" size={10} color={palette.accent} />
                 <Text style={[styles.balanceText, { color: palette.accent }]}>
-                  {balance !== null ? balance.toLocaleString('tr-TR') : '...'}
+                  {balance !== null ? balance.toLocaleString(i18n.locale) : '...'}
                 </Text>
               </View>
             </View>
@@ -505,7 +505,7 @@ export default function GiftSheet({
                 <SPHexagonIcon size={64} tier={tier as any} />
               </Animated.View>
               <Text style={[styles.amountValue, { color: palette.amountText }]}>
-                {amount.toLocaleString('tr-TR')}
+                {amount.toLocaleString(i18n.locale)}
               </Text>
               <Text style={[styles.amountUnit, { color: palette.accent }]}>SP</Text>
             </View>
@@ -542,7 +542,7 @@ export default function GiftSheet({
                 />
               </View>
               <Text style={[styles.sliderMax, { color: palette.accent + '70' }]}>
-                {effectiveMax.toLocaleString('tr-TR')}
+                {effectiveMax.toLocaleString(i18n.locale)}
               </Text>
             </View>
 
@@ -613,7 +613,7 @@ export default function GiftSheet({
                   <>
                     <Ionicons name="gift" size={18} color="#FFF" style={iconShadow} />
                     <Text style={styles.sendBtnText}>
-                      {amount.toLocaleString('tr-TR')} SP Hediye Gönder
+                      {amount.toLocaleString(i18n.locale)} SP Hediye Gönder
                     </Text>
                   </>
                 )}

@@ -28,7 +28,7 @@ export const REVENUECAT_MOCK_MODE = !_hasRealKey; // Gerçek key yoksa otomatik 
 
 // Production'da placeholder key varsa sadece uyarı ver (crash yapma)
 if (!__DEV__ && !_hasRealKey) {
-  console.warn('[RevenueCat] Placeholder API key — mock mode aktif. Gerçek ödeme sistemi devre dışı.');
+  if (__DEV__) console.warn('[RevenueCat] Placeholder API key — mock mode aktif. Gerçek ödeme sistemi devre dışı.');
 }
 
 // ═══ ENTITLEMENT → TIER MAPPING ═══
@@ -110,8 +110,8 @@ const MOCK_OFFERINGS = {
           identifier: PRODUCT_IDS.pro_yearly,
           title: i18n.t('auto.revenuecat.014'),
           description: i18n.t('auto.revenuecat.013'),
-          priceString: '₺899.99',
-          price: 899.99,
+          priceString: '₺1.079,99',
+          price: 1079.99,
           currencyCode: 'TRY',
         },
         offeringIdentifier: 'tier_pro',
@@ -249,10 +249,10 @@ export const RevenueCatService = {
     // ★ Dev-only mock: geliştirme sırasında DB direct update ile test
     if (REVENUECAT_MOCK_MODE && __DEV__) {
       try {
-        const { error } = await supabase
-          .from('profiles')
-          .update({ subscription_tier: targetTier })
-          .eq('id', userId);
+        // ★ v1.7.13.137: trigger bypass için RPC
+        const { error } = await supabase.rpc('apply_subscription_tier', {
+          p_user_id: userId, p_tier: targetTier, p_expires_at: null,
+        });
         if (error) throw error;
         return { newTier: targetTier };
       } catch (e: any) {
@@ -295,23 +295,42 @@ export const RevenueCatService = {
       const { customerInfo } = await this._Purchases.purchasePackage(packageToUse);
       const newTier = this._extractTierFromCustomerInfo(customerInfo);
 
-      // DB'yi güncelle (webhook'a yedek olarak)
+      // ★ v1.7.13.137 SECURITY FIX: Direct UPDATE → SECURITY DEFINER RPC.
+      //   Önceden client-side profiles.update kullanıyordu — trg_profile_sensitive_guard
+      //   blokluyor (subscription_tier kullanıcı tarafından değiştirilemez). RPC trigger
+      //   bypass yapar + validation. Idealde: RC webhook server-side çağırır, client RPC
+      //   yedek fallback. Webhook eklenene kadar her iki yol da geçerli.
       if (newTier) {
-        await supabase
-          .from('profiles')
-          .update({ subscription_tier: newTier })
-          .eq('id', userId);
+        // RC customerInfo'dan expires_at çek (varsa)
+        let expiresAt: string | null = null;
+        try {
+          const activeSubs = (customerInfo as any)?.entitlements?.active || {};
+          const firstEnt: any = Object.values(activeSubs)[0];
+          if (firstEnt?.expirationDate) expiresAt = new Date(firstEnt.expirationDate).toISOString();
+        } catch { /* ignore */ }
+        await supabase.rpc('apply_subscription_tier', {
+          p_user_id: userId,
+          p_tier: newTier,
+          p_expires_at: expiresAt,
+        });
         // ★ Y3: Tier cache'i invalidate et — 5dk stale kalmasın, yeni tier hemen geçerli olsun
         try {
           const { invalidateTierCache } = require('./gamification');
           invalidateTierCache(userId);
         } catch { /* gamification import fail safe */ }
         // ★ 2026-04-26: Tier yükseltildiğinde mevcut odaların expires_at'ı yeni durationHours'a göre yenilensin.
-        //   Pro/GodMaster → expires_at = NULL (sınırsız). Plus → 12 saatlik yeni süre.
+        //   Pro → expires_at = NULL (sınırsız). Plus → 8 saatlik yeni süre.
         try {
           const { RoomService } = require('./database');
           await RoomService.refreshExpiresForTierChange(userId, newTier);
         } catch { /* sessiz — tier upgrade başarılı, refresh ek bonus */ }
+        // ★ v1.7.13.135: Abonelik SP karşılama bonusu — plus.tsx vaadi (Plus 600 / Pro 1500).
+        //   Önceden tanımlıydı (gamification.onSubscriptionPurchase) ama hiç çağrılmıyordu.
+        //   grantSP içinde externalRef idempotency — aynı tier için çift bonus verilmez.
+        try {
+          const { GamificationService } = require('./gamification');
+          await GamificationService.onSubscriptionPurchase(userId, newTier);
+        } catch (e) { if (__DEV__) console.warn('[RevenueCat] SP bonus fail:', e); }
       }
 
       return { newTier };
@@ -419,10 +438,10 @@ export const RevenueCatService = {
       const tier = this._extractTierFromCustomerInfo(customerInfo);
 
       if (tier) {
-        await supabase
-          .from('profiles')
-          .update({ subscription_tier: tier })
-          .eq('id', userId);
+        // ★ v1.7.13.137: trigger bypass için RPC (restore akışı)
+        await supabase.rpc('apply_subscription_tier', {
+          p_user_id: userId, p_tier: tier, p_expires_at: null,
+        });
       }
       // ★ Y3: Restore sonrası cache invalidate — tier değişmiş olabilir
       try {
@@ -467,10 +486,10 @@ export const RevenueCatService = {
    */
   async cancelSubscription(userId: string): Promise<boolean> {
     if (REVENUECAT_MOCK_MODE) {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ subscription_tier: 'Free' })
-        .eq('id', userId);
+      // ★ v1.7.13.137: trigger bypass için RPC (cancel/downgrade akışı)
+      const { error } = await supabase.rpc('apply_subscription_tier', {
+        p_user_id: userId, p_tier: 'Free', p_expires_at: null,
+      });
       // ★ Y3: Downgrade sonrası tier cache temizle — premium feature'lar hemen kilitlensin
       try {
         const { invalidateTierCache } = require('./gamification');

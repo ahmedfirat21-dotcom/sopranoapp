@@ -53,7 +53,7 @@ const REASON_CONFIG: Record<RoomClosedReason, { title: string; message: string; 
   },
   // ★ 2026-04-26: Erişim engelleri için pop-modal yerine full-screen anlatım
   room_locked: {
-    title: 'Oda kilitli',
+    title: i18n.t('room.locked'),
     message: i18n.t('room.roomclosedscreen.011'),
     icon: 'lock-closed',
     color: '#EF4444',
@@ -117,16 +117,16 @@ function BanCountdown({ expiresAt }: { expiresAt: string }) {
   if (remaining <= 0) {
     return (
       <View style={cd.wrap}>
-        <Text style={cd.label}>Yasak süresi doldu</Text>
-        <Text style={cd.hint}>Ana sayfaya dönüp tekrar girebilirsin.</Text>
+        <Text style={cd.label}>{i18n.t('ban.expired')}</Text>
+        <Text style={cd.hint}>{i18n.t('ban.expired_hint')}</Text>
       </View>
     );
   }
   return (
     <View style={cd.wrap}>
-      <Text style={cd.label}>Yasağın bitmesine</Text>
+      <Text style={cd.label}>{i18n.t('ban.remaining')}</Text>
       <Text style={cd.timer}>{fmt}</Text>
-      <Text style={cd.hint}>Süre dolduğunda odaya tekrar girebilirsin.</Text>
+      <Text style={cd.hint}>{i18n.t('ban.remaining_hint')}</Text>
     </View>
   );
 }
@@ -169,7 +169,7 @@ export default function RoomClosedScreen({ reason, onGoHome, customMessage, onRe
   const config = REASON_CONFIG[reason];
   // ★ v1.7.13: Geçici ban — config.message yerine boş bırak, countdown bileşeni gösterilecek
   const isTempBan = reason === 'banned' && !!banExpiresAt;
-  const message = customMessage || (isTempBan ? 'Bu odada belirli bir süre yasaklandın.' : config.message);
+  const message = customMessage || (isTempBan ? i18n.t('room.banned_message') : config.message);
   const hasMultipleReasons = !!(additionalReasons && additionalReasons.length > 0);
   const pulse = useRef(new Animated.Value(1)).current;
   const fade = useRef(new Animated.Value(0)).current;
@@ -218,7 +218,7 @@ export default function RoomClosedScreen({ reason, onGoHome, customMessage, onRe
           </View>
         </Animated.View>
 
-        <Text style={s.title}>{hasMultipleReasons ? 'Bu odaya giremezsin' : (isTempBan ? 'Geçici olarak yasaklandın' : config.title)}</Text>
+        <Text style={s.title}>{hasMultipleReasons ? i18n.t('room.cannot_enter') : (isTempBan ? i18n.t('room.temp_banned') : config.title)}</Text>
         <Text style={s.message}>{hasMultipleReasons ? i18n.t('auto.room.RoomClosedScreen.001') : message}</Text>
 
         {/* ★ v1.7.13: Geçici ban countdown — kalan süreyi canlı gösterir */}
@@ -255,11 +255,11 @@ export default function RoomClosedScreen({ reason, onGoHome, customMessage, onRe
                 style={StyleSheet.absoluteFillObject}
               />
               <Ionicons name="refresh" size={16} color="#FFF" style={iconShadow} />
-              <Text style={s.buttonText}>Tekrar Dene</Text>
+              <Text style={s.buttonText}>{i18n.t('room.retry')}</Text>
             </Pressable>
             <Pressable style={[s.button, s.buttonSecondary]} onPress={onGoHome}>
               <Ionicons name="home" size={16} color="#94A3B8" style={iconShadow} />
-              <Text style={[s.buttonText, { color: '#94A3B8' }]}>Ana Sayfa</Text>
+              <Text style={[s.buttonText, { color: '#94A3B8' }]}>{i18n.t('room.home')}</Text>
             </Pressable>
           </View>
         ) : (
@@ -274,7 +274,7 @@ export default function RoomClosedScreen({ reason, onGoHome, customMessage, onRe
                 kullanılıyordu — bu key başlık ("Bu oda kapanmış") metni. Followers-only
                 veya kilit reason'ında "Bu oda kapanmış" butonu yanıltıcıydı. Şimdi
                 tüm reason'lar için anlamlı "Ana Sayfa" eylem etiketi. */}
-            <Text style={s.buttonText}>Ana Sayfa</Text>
+            <Text style={s.buttonText}>{i18n.t('room.home')}</Text>
           </Pressable>
         )}
       </Animated.View>

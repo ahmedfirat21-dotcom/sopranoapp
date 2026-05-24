@@ -1,15 +1,15 @@
 /**
- * SopranoChat — Oda İçi Hızlı Hediye Paneli
- * ═══════════════════════════════════════════════════════════════════
- * v107 (4 May 2026) — Kontrol barındaki 🎁 butonu bunu açar.
- * TikTok/Bigo paritesi: hep elinin altında, tek dokunuşla hediye gönder.
+ * SopranoChat â Oda Ä°Ã§i HÄ±zlÄ± Hediye Paneli
+ * âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+ * v107 (4 May 2026) â Kontrol barÄ±ndaki ğ butonu bunu aÃ§ar.
+ * TikTok/Bigo paritesi: hep elinin altÄ±nda, tek dokunuÅla hediye gÃ¶nder.
  *
- * Akış:
- *   1. Üst kısım: oda speakerlarının (host + mod + speaker) horizontal scroll
- *      avatar listesi. Default seçili: HOST.
- *   2. Alt kısım: kullanıcının envanterindeki hediyeler grid.
- *   3. Bir hediyeye tıkla → onay modal → send_symbol_gift RPC (room_id ile).
- *   4. Tüm odadaki kullanıcılar Lottie animasyonu görür + sohbete sysmsg düşer.
+ * AkÄ±Å:
+ *   1. Ãst kÄ±sÄ±m: oda speakerlarÄ±nÄ±n (host + mod + speaker) horizontal scroll
+ *      avatar listesi. Default seÃ§ili: HOST.
+ *   2. Alt kÄ±sÄ±m: kullanÄ±cÄ±nÄ±n envanterindeki hediyeler grid.
+ *   3. Bir hediyeye tÄ±kla â onay modal â send_symbol_gift RPC (room_id ile).
+ *   4. TÃ¼m odadaki kullanÄ±cÄ±lar Lottie animasyonu gÃ¶rÃ¼r + sohbete sysmsg dÃ¼Åer.
  */
 
 import React, { useEffect, useRef, useState } from 'react';
@@ -41,8 +41,8 @@ try {
 const { width: W, height: H } = Dimensions.get('window');
 const PANEL_HEIGHT_BASE = 540;
 
-// ★ v108.10: Module-level catalog cache — modal her açılışta DB'ye gitmek
-//   yerine 60sn cache'ten döndür. Hediye katalogu nadiren değişir.
+// â v108.10: Module-level catalog cache â modal her aÃ§Ä±lÄ±Åta DB'ye gitmek
+//   yerine 60sn cache'ten dÃ¶ndÃ¼r. Hediye katalogu nadiren deÄiÅir.
 let _catalogCache: { items: CosmeticItem[]; ts: number } | null = null;
 const CATALOG_TTL = 60_000;
 async function getGiftsCached(): Promise<CosmeticItem[]> {
@@ -61,7 +61,7 @@ interface Props {
   onClose: () => void;
   senderId: string;
   roomId: string;
-  /** Hedef seçici için: oda host'u + sahnedeki konuşmacılar */
+  /** Hedef seÃ§ici iÃ§in: oda host'u + sahnedeki konuÅmacÄ±lar */
   participants: RoomParticipant[];
   /** Default selected user (genelde host) */
   defaultRecipientId?: string;
@@ -81,7 +81,7 @@ export default function RoomGiftPanel({
   const router = useRouter();
   const PANEL_HEIGHT = PANEL_HEIGHT_BASE + Math.max(insets.bottom, 0);
 
-  // ★ v108.5: 3-snap drag mekaniği (MessageGlowPickerSheet paritesi)
+  // â v108.5: 3-snap drag mekaniÄi (MessageGlowPickerSheet paritesi)
   const SNAP_FULL = 0;
   const SNAP_HALF = PANEL_HEIGHT * 0.55;
   const SNAP_DISMISS = PANEL_HEIGHT;
@@ -90,6 +90,10 @@ export default function RoomGiftPanel({
   const currentSnapRef = useRef<number>(SNAP_DISMISS);
   // Header watermark + handle pulse
   const giftFloat = useRef(new Animated.Value(0)).current;
+  // ★ Watermark sağa kayma animasyonu
+  const watermarkSlideX = useRef(new Animated.Value(0)).current;
+  // ★ Kapanış animasyonu bitene kadar mount tut
+  const [mounted, setMounted] = useState(visible);
   // ★ v284 (16 May 2026): Loop instance ref — orphan loop önleme
   const giftFloatLoopRef = useRef<Animated.CompositeAnimation | null>(null);
 
@@ -100,13 +104,13 @@ export default function RoomGiftPanel({
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // ★ v108.8: Hedef listesi — odadaki tüm kullanıcılar (sender hariç).
-  //   Önce sahnedekiler (host/speaker/moderator), sonra dinleyiciler — kullanıcı
-  //   istediği kişiye hediye yollayabilsin (TikTok'tan farkı: çoklu hedef seçilebilir).
+  // â v108.8: Hedef listesi â odadaki tÃ¼m kullanÄ±cÄ±lar (sender hariÃ§).
+  //   Ãnce sahnedekiler (host/speaker/moderator), sonra dinleyiciler â kullanÄ±cÄ±
+  //   istediÄi kiÅiye hediye yollayabilsin (TikTok'tan farkÄ±: Ã§oklu hedef seÃ§ilebilir).
   useEffect(() => {
     if (!visible) return;
     const others = participants.filter((p) => p.user_id !== senderId);
-    // Rol önceliği: owner > moderator > speaker > listener
+    // Rol Ã¶nceliÄi: owner > moderator > speaker > listener
     const rolePriority: Record<string, number> = { owner: 0, moderator: 1, speaker: 2, listener: 3 };
     others.sort((a, b) =>
       (rolePriority[a.role] ?? 4) - (rolePriority[b.role] ?? 4)
@@ -118,9 +122,9 @@ export default function RoomGiftPanel({
       role: p.role,
     }));
     setRecipients(list);
-    // ★ v108.8: defaultRecipientId === senderId ise atla (kendine gönderim engeli);
-    //   list ihtimali "list (sender hariç)" olduğu için sender'ın kendisi listede yok,
-    //   ama eski state'ten kalmış selectedRecipientId === senderId olabiliyordu.
+    // â v108.8: defaultRecipientId === senderId ise atla (kendine gÃ¶nderim engeli);
+    //   list ihtimali "list (sender hariÃ§)" olduÄu iÃ§in sender'Ä±n kendisi listede yok,
+    //   ama eski state'ten kalmÄ±Å selectedRecipientId === senderId olabiliyordu.
     const safeDefault = defaultRecipientId && defaultRecipientId !== senderId
       ? list.find((r) => r.id === defaultRecipientId)?.id
       : null;
@@ -131,11 +135,12 @@ export default function RoomGiftPanel({
     setSelectedRecipientId(defaultId);
   }, [visible, participants, senderId, defaultRecipientId]);
 
-  // ★ v108.10: Cache'li yükleme — katalog ilk açılışta fetch, sonrakilerde anında.
-  //   senderSP her açılışta fresh (gönderim sonrası gerçek bakiye doğru olsun).
+  // â v108.10: Cache'li yÃ¼kleme â katalog ilk aÃ§Ä±lÄ±Åta fetch, sonrakilerde anÄ±nda.
+  //   senderSP her aÃ§Ä±lÄ±Åta fresh (gÃ¶nderim sonrasÄ± gerÃ§ek bakiye doÄru olsun).
   useEffect(() => {
     if (!visible) return;
     let cancelled = false;
+    // Cache varsa hemen gÃ¶ster, yoksa loading
     // Cache varsa hemen göster, yoksa loading
     if (_catalogCache && Date.now() - _catalogCache.ts < CATALOG_TTL) {
       setAllGifts(_catalogCache.items);
@@ -159,13 +164,19 @@ export default function RoomGiftPanel({
   // Animasyon
   useEffect(() => {
     if (visible) {
-      // ★ v110.14: Varsayılan açılış HALF — kullanıcı drag-up ile FULL'e çıkartabilir.
-      currentSnapRef.current = SNAP_HALF;
-      Animated.parallel([
-        Animated.spring(translateY, { toValue: SNAP_HALF, useNativeDriver: true, damping: 22, stiffness: 220 }),
-        Animated.timing(backdropOpacity, { toValue: 1, duration: 240, useNativeDriver: true }),
-      ]).start();
-      // ★ v284: Loop ref pattern — orphan önleme
+      // ★ Önce off-screen pozisyona set — component mount olduğunda görünmez
+      translateY.setValue(SNAP_DISMISS);
+      backdropOpacity.setValue(0);
+      watermarkSlideX.setValue(0);
+      setMounted(true);
+      // ★ Bir frame bekle — mount render'ı tamamlandıktan sonra animasyon başlat
+      requestAnimationFrame(() => {
+        currentSnapRef.current = SNAP_HALF;
+        Animated.parallel([
+          Animated.timing(translateY, { toValue: SNAP_HALF, duration: 320, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+          Animated.timing(backdropOpacity, { toValue: 1, duration: 240, useNativeDriver: true }),
+        ]).start();
+      });
       giftFloatLoopRef.current = Animated.loop(
         Animated.sequence([
           Animated.timing(giftFloat, { toValue: 1, duration: 4000, useNativeDriver: true }),
@@ -173,20 +184,24 @@ export default function RoomGiftPanel({
         ]),
       );
       giftFloatLoopRef.current.start();
-    } else {
+    } else if (mounted) {
       currentSnapRef.current = SNAP_DISMISS;
       Animated.parallel([
-        Animated.timing(translateY, { toValue: SNAP_DISMISS, duration: 220, useNativeDriver: true }),
-        Animated.timing(backdropOpacity, { toValue: 0, duration: 180, useNativeDriver: true }),
-      ]).start();
+        Animated.timing(translateY, { toValue: SNAP_DISMISS, duration: 300, easing: Easing.in(Easing.cubic), useNativeDriver: true }),
+        Animated.timing(backdropOpacity, { toValue: 0, duration: 260, useNativeDriver: true }),
+        // ★ Watermark sağa kayarak çıkar
+        Animated.timing(watermarkSlideX, { toValue: 200, duration: 300, easing: Easing.in(Easing.cubic), useNativeDriver: true }),
+      ]).start(({ finished }) => {
+        if (finished) setMounted(false);
+      });
       giftFloatLoopRef.current?.stop(); giftFloatLoopRef.current = null;
     }
   }, [visible, PANEL_HEIGHT]);
   useEffect(() => () => { giftFloatLoopRef.current?.stop(); }, []);
 
-  // ★ v108.6: InRoomUserProfile paritesi — capture pattern + 3-snap
-  //   onMoveShouldSetPanResponderCapture child Pressable/ScrollView'dan responder ÇALMAYI sağlar.
-  //   Capture olmadan grid scrollu/kart Pressable drag'ı engelliyordu.
+  // â v108.6: InRoomUserProfile paritesi â capture pattern + 3-snap
+  //   onMoveShouldSetPanResponderCapture child Pressable/ScrollView'dan responder ÃALMAYI saÄlar.
+  //   Capture olmadan grid scrollu/kart Pressable drag'Ä± engelliyordu.
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
 
@@ -224,7 +239,7 @@ export default function RoomGiftPanel({
     else animateToFull();
   };
 
-  // Header pan — her zaman yakalar (handle bar + başlık alanı)
+  // Header pan â her zaman yakalar (handle bar + baÅlÄ±k alanÄ±)
   const headerPanResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => false,
@@ -242,7 +257,7 @@ export default function RoomGiftPanel({
     })
   ).current;
 
-  // Body pan — küçük threshold normal, büyük threshold capture (Pressable'dan responder çal)
+  // Body pan â kÃ¼Ã§Ã¼k threshold normal, bÃ¼yÃ¼k threshold capture (Pressable'dan responder Ã§al)
   const bodyPanResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => false,
@@ -289,15 +304,15 @@ export default function RoomGiftPanel({
       return;
     }
     setSending(true);
-    // ★ v108.7: Optimistic local play — RPC'yi beklemeden animasyonu başlat.
-    //   Realtime gecikmesi (200-1500ms) sender'a hissettirilmiyor; başarısız olursa
-    //   zaten kısa sürede biter, uyarı toast ile gösterilir.
+    // â v108.7: Optimistic local play â RPC'yi beklemeden animasyonu baÅlat.
+    //   Realtime gecikmesi (200-1500ms) sender'a hissettirilmiyor; baÅarÄ±sÄ±z olursa
+    //   zaten kÄ±sa sÃ¼rede biter, uyarÄ± toast ile gÃ¶sterilir.
     const recipient = recipients.find((r) => r.id === selectedRecipientId);
     const optimisticId = `local-${Date.now()}-${Math.random()}`;
     DeviceEventEmitter.emit('room_gift_local', {
       id: optimisticId,
       itemId: item.id,
-      emoji: item.art_emoji || '✨',
+      emoji: item.art_emoji || 'â¨',
       color: item.art_color || '#FBBF24',
       itemName: item.name,
       senderName: 'Sen',
@@ -306,7 +321,7 @@ export default function RoomGiftPanel({
       priceSP: item.price_sp,
       receivedAt: Date.now(),
     });
-    // Bakiye anında güncelle
+    // Bakiye anÄ±nda gÃ¼ncelle
     setSenderSP((prev) => Math.max(0, prev - item.price_sp));
 
     const { data, error } = await supabase.rpc('send_symbol_gift', {
@@ -317,7 +332,7 @@ export default function RoomGiftPanel({
     });
     setSending(false);
     if (error || !data?.success) {
-      // Rollback bakiye + uyarı
+      // Rollback bakiye + uyarÄ±
       setSenderSP((prev) => prev + item.price_sp);
       showToast({
         title: i18n.t('room.roomgiftpanel.005'),
@@ -326,8 +341,8 @@ export default function RoomGiftPanel({
       });
       return;
     }
-    // ★ v108.11: Animasyon + setTimeout fallback. Animated.timing'in Android'de
-    //   bazen callback'i çalışmıyordu; setTimeout garanti onClose tetikler.
+    // â v108.11: Animasyon + setTimeout fallback. Animated.timing'in Android'de
+    //   bazen callback'i Ã§alÄ±ÅmÄ±yordu; setTimeout garanti onClose tetikler.
     currentSnapRef.current = SNAP_DISMISS;
     Animated.parallel([
       Animated.timing(translateY, {
@@ -341,13 +356,13 @@ export default function RoomGiftPanel({
     setTimeout(() => onCloseRef.current(), 270);
   };
 
-  if (!visible) return null;
+  if (!mounted) return null;
 
-  // ★ v108.6: Modal kaldırıldı (InRoomUserProfile paritesi). Modal pan capture'ı bazı
-  //   Android sürümlerinde bloklar; absolute fill View ile drag her zaman çalışır.
+  // â v108.6: Modal kaldÄ±rÄ±ldÄ± (InRoomUserProfile paritesi). Modal pan capture'Ä± bazÄ±
+  //   Android sÃ¼rÃ¼mlerinde bloklar; absolute fill View ile drag her zaman Ã§alÄ±ÅÄ±r.
   return (
     <View style={StyleSheet.absoluteFillObject as any} pointerEvents="box-none">
-      <View style={[StyleSheet.absoluteFillObject, { zIndex: 600 }]} pointerEvents="box-none">
+      <View style={[StyleSheet.absoluteFillObject, { zIndex: 100, elevation: 100 }]} pointerEvents="box-none">
         {/* Backdrop */}
         <Animated.View style={[StyleSheet.absoluteFill, { opacity: backdropOpacity }]}>
           <BlurView intensity={28} tint="dark" style={StyleSheet.absoluteFill} />
@@ -355,7 +370,7 @@ export default function RoomGiftPanel({
           <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
         </Animated.View>
 
-        {/* ★ v108.5: Floating gift watermark — sağ üst, arkada süzülür */}
+        {/* â v108.5: Floating gift watermark â saÄ Ã¼st, arkada sÃ¼zÃ¼lÃ¼r */}
         <Animated.View
           pointerEvents="none"
           style={[
@@ -370,14 +385,14 @@ export default function RoomGiftPanel({
                     translateY.interpolate({ inputRange: [0, PANEL_HEIGHT], outputRange: [0, -30], extrapolate: 'clamp' }),
                     giftFloat.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, -6, 0] }),
                   ) },
-                { translateX: giftFloat.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, -10, 0] }) },
+                { translateX: Animated.add(giftFloat.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, -10, 0] }), watermarkSlideX) },
                 { scale: giftFloat.interpolate({ inputRange: [0, 0.5, 1], outputRange: [1.0, 1.05, 1.0] }) },
                 { rotate: '-15deg' },
               ],
             },
           ]}
         >
-          <Text style={s.giftWatermarkEmoji} allowFontScaling={false}>🎁</Text>
+          <Text style={s.giftWatermarkEmoji} allowFontScaling={false}>{'\u{1F381}'}</Text>
         </Animated.View>
 
         {/* Panel — body PanResponder ScrollView/Pressable'dan capture eder */}
@@ -385,11 +400,23 @@ export default function RoomGiftPanel({
           style={[s.panel, { paddingBottom: 24 + insets.bottom, transform: [{ translateY }] }]}
           {...bodyPanResponder.panHandlers}
         >
+          {/* ★ Modal ailesi 3 katman gradient: slate diagonal + teal halo + teal soft glow */}
           <LinearGradient
-            colors={['#1e2230', '#15182a', '#0a0b16']}
-            locations={[0, 0.55, 1]}
-            start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
+            colors={['#3a4658', '#2a3344', '#1a2030']}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
             style={StyleSheet.absoluteFillObject}
+          />
+          <LinearGradient
+            colors={['rgba(20,184,166,0.20)', 'rgba(20,184,166,0.05)', 'transparent']}
+            start={{ x: 0, y: 0 }} end={{ x: 0, y: 0.4 }}
+            style={StyleSheet.absoluteFillObject}
+            pointerEvents="none"
+          />
+          <LinearGradient
+            colors={['rgba(20,184,166,0.08)', 'transparent']}
+            start={{ x: 0, y: 0 }} end={{ x: 0.7, y: 0.6 }}
+            style={StyleSheet.absoluteFillObject}
+            pointerEvents="none"
           />
           <LinearGradient
             colors={['transparent', 'rgba(244,114,182,0.85)', 'transparent']}
@@ -397,7 +424,7 @@ export default function RoomGiftPanel({
             style={s.topEdge}
           />
 
-          {/* ★ v108.6: Header pan ayrı — handle + başlık alanında her zaman drag */}
+          {/* â v108.6: Header pan ayrÄ± â handle + baÅlÄ±k alanÄ±nda her zaman drag */}
           <View {...headerPanResponder.panHandlers} collapsable={false}>
             <View style={s.handle}><View style={s.handleBar} /></View>
 
@@ -413,19 +440,19 @@ export default function RoomGiftPanel({
                     : selectedRecipientId
                       ? (() => {
                           const r = recipients.find(x => x.id === selectedRecipientId);
-                          return r ? `→ ${r.display_name}` : i18n.t('auto.room.RoomGiftPanel.002', { 0: recipients.length });
+                          return r ? `â ${r.display_name}` : i18n.t('auto.room.RoomGiftPanel.002', { 0: recipients.length });
                         })()
                       : i18n.t('auto.room.RoomGiftPanel.001', { 0: recipients.length })}
                 </Text>
               </View>
               <View style={s.spPill}>
                 <SPHexagonIcon size={14} />
-                <Text style={s.spPillText}>{senderSP.toLocaleString('tr-TR')}</Text>
+                <Text style={s.spPillText}>{senderSP.toLocaleString(i18n.locale)}</Text>
               </View>
             </View>
           </View>
 
-          {/* ── Hedef seçici (avatar carousel) ── */}
+          {/* ââ Hedef seÃ§ici (avatar carousel) ââ */}
           {recipients.length > 0 && (
             <View>
               <ScrollView
@@ -438,7 +465,7 @@ export default function RoomGiftPanel({
                   const ringColor = r.role === 'owner' ? '#D4AF37'
                     : r.role === 'moderator' ? '#A78BFA'
                     : r.role === 'speaker' ? '#14B8A6'
-                    : 'rgba(148,163,184,0.7)'; // listener — gri
+                    : 'rgba(148,163,184,0.7)'; // listener â gri
                   return (
                     <Pressable
                       key={r.id}
@@ -458,7 +485,7 @@ export default function RoomGiftPanel({
                         )}
                       </GlowView>
                       <Text style={[s.recipientName, isSelected && { color: '#F472B6' }]} numberOfLines={1}>
-                        {r.display_name.split(' ')[0]}
+                        {(r.display_name || i18n.t('common.anonymous')).split(' ')[0]}
                       </Text>
                     </Pressable>
                   );
@@ -467,14 +494,32 @@ export default function RoomGiftPanel({
             </View>
           )}
 
-          {/* ── Hediye grid — loading / katalog / boş ── */}
+          {/* ââ Hediye grid â loading / katalog / boÅ ââ */}
           {loading ? (
-            <View style={s.empty}>
-              <Animated.View style={{ transform: [{ rotate: giftFloat.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }) }] }}>
-                <Ionicons name="gift" size={42} color="rgba(244,114,182,0.6)" />
-              </Animated.View>
-              <Text style={s.emptyText}>{i18n.t('room.roomgiftpanel.002')}</Text>
-            </View>
+            // ★ Skeleton grid — aynı layout + shimmer, kartların yerini tutar
+            //   böylece modal yüksekliği yüklemeden sonra "zıplamaz".
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 12 }}>
+              <View style={s.grid}>
+                {Array.from({ length: 9 }).map((_, i) => (
+                  <Animated.View
+                    key={`sk_${i}`}
+                    style={[
+                      s.giftCard,
+                      {
+                        opacity: giftFloat.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [0.35, 0.7],
+                        }),
+                      },
+                    ]}
+                  >
+                    <View style={[s.giftThumbWrap, { backgroundColor: 'rgba(255,255,255,0.06)' }]} />
+                    <View style={{ height: 10, marginTop: 6, marginHorizontal: 12, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.08)' }} />
+                    <View style={{ height: 8, marginTop: 4, marginHorizontal: 18, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.06)' }} />
+                  </Animated.View>
+                ))}
+              </View>
+            </ScrollView>
           ) : allGifts.length === 0 ? (
             <View style={s.empty}>
               <Ionicons name="bag-outline" size={42} color="rgba(255,255,255,0.3)" />
@@ -502,9 +547,9 @@ export default function RoomGiftPanel({
                       <View style={s.giftThumbWrap}>
                         {hasGiftLottie(item.id) && LottieView ? (
                           <View pointerEvents="none" style={StyleSheet.absoluteFillObject}>
-                            {/* ★ v108.11: autoPlay geri açıldı — bazı Lottie'lerin
-                                 ilk frame'i boştu (Konfeti, Kar Tanesi vb.).
-                                 Görünen kart sayısı max 6 → CPU yükü kabul edilebilir. */}
+                            {/* â v108.11: autoPlay geri aÃ§Ä±ldÄ± â bazÄ± Lottie'lerin
+                                 ilk frame'i boÅtu (Konfeti, Kar Tanesi vb.).
+                                 GÃ¶rÃ¼nen kart sayÄ±sÄ± max 6 â CPU yÃ¼kÃ¼ kabul edilebilir. */}
                             <LottieView source={getGiftLottie(item.id)} autoPlay loop style={{ flex: 1 }} />
                           </View>
                         ) : (
@@ -537,7 +582,7 @@ const s = StyleSheet.create({
     maxHeight: H * 0.85,
     borderTopLeftRadius: 24, borderTopRightRadius: 24,
     overflow: 'hidden',
-    borderWidth: 1.5, borderColor: 'rgba(244,114,182,0.35)',
+    borderWidth: 1, borderColor: 'rgba(20,184,166,0.18)',
     borderBottomWidth: 0,
     ...Platform.select({
       ios: { shadowColor: '#000', shadowOffset: { width: 0, height: -8 }, shadowOpacity: 0.6, shadowRadius: 22 },
@@ -564,7 +609,7 @@ const s = StyleSheet.create({
   },
   spPillText: { color: '#FBBF24', fontSize: 11, fontWeight: '800' },
 
-  // ★ v108.5: Floating gift watermark — sağ üst köşede dışarı taşar, hareketli aksesuar
+  // â v108.5: Floating gift watermark â saÄ Ã¼st kÃ¶Åede dÄ±ÅarÄ± taÅar, hareketli aksesuar
   giftWatermark: {
     position: 'absolute',
     top: '12%',
@@ -579,7 +624,7 @@ const s = StyleSheet.create({
     textAlign: 'center',
   },
 
-  // Hedef seçici
+  // Hedef seÃ§ici
   recipientRow: {
     paddingHorizontal: 14, paddingVertical: 10, gap: 12,
   },
@@ -590,12 +635,12 @@ const s = StyleSheet.create({
     width: 52, height: 52, borderRadius: 26,
     borderWidth: 2, padding: 2,
     position: 'relative',
-    // overflow:hidden KALDIRILDI — ownerCrown rozeti (top:-2/right:-2) halkanın
-    // dışına taşmalı; aksi halde sağ-üst köşede yarım pacman gibi kesilir.
-    // Image kendi borderRadius:23 ile dairesel görünmeye devam eder.
+    // overflow:hidden KALDIRILDI â ownerCrown rozeti (top:-2/right:-2) halkanÄ±n
+    // dÄ±ÅÄ±na taÅmalÄ±; aksi halde saÄ-Ã¼st kÃ¶Åede yarÄ±m pacman gibi kesilir.
+    // Image kendi borderRadius:23 ile dairesel gÃ¶rÃ¼nmeye devam eder.
   },
   recipientAvatarRingActive: {
-    // ★ v1.3.69: Skia GlowView ile cross-platform pink glow (recipient seçili durumu)
+    // â v1.3.69: Skia GlowView ile cross-platform pink glow (recipient seÃ§ili durumu)
     shadowColor: '#F472B6', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.85, shadowRadius: 8,
   },
   recipientAvatar: { width: '100%', height: '100%', borderRadius: 23 },
@@ -611,7 +656,7 @@ const s = StyleSheet.create({
     marginTop: 4, fontWeight: '600', textAlign: 'center',
   },
 
-  // ★ v108.4: Yüzdelik width + space-between → konteyner genişliğine göre garanti 3 kolon
+  // â v108.4: YÃ¼zdelik width + space-between â konteyner geniÅliÄine gÃ¶re garanti 3 kolon
   grid: {
     flexDirection: 'row', flexWrap: 'wrap',
     paddingHorizontal: 12,
@@ -647,7 +692,7 @@ const s = StyleSheet.create({
   },
   giftPriceText: { fontSize: 8, color: '#FFE082', fontWeight: '800' },
 
-  // ★ v108.2: Kilitli hediye için kilit ikonu overlay (envanterde olmayanlar)
+  // â v108.2: Kilitli hediye iÃ§in kilit ikonu overlay (envanterde olmayanlar)
   lockOverlay: {
     position: 'absolute', top: 0, right: 0, bottom: 0, left: 0,
     alignItems: 'center', justifyContent: 'center',

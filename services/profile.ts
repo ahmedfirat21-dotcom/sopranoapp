@@ -51,6 +51,24 @@ export const ProfileService = {
     if (error) throw error;
   },
 
+  /** ★ v1.7.13.111 (20 May 2026): Streak güncelle — app açılışında çağrılır.
+   *  Aynı gün ikinci kez login değişmez; dün de login varsa +1; yoksa 1'e reset.
+   *  Sunucu tarafı tüm hesaplama (timezone Europe/Istanbul tabanlı).
+   *  Response: { streak, changed, milestone?, reset? } */
+  async touchStreak(userId: string): Promise<{ streak: number; changed: boolean; milestone?: boolean; reset?: boolean } | null> {
+    try {
+      const { data, error } = await supabase.rpc('touch_streak', { p_user_id: userId });
+      if (error) {
+        if (__DEV__) console.warn('[touchStreak] err:', error.message);
+        return null;
+      }
+      return data as any;
+    } catch (e: any) {
+      if (__DEV__) console.warn('[touchStreak] exception:', e?.message);
+      return null;
+    }
+  },
+
   async setOnline(userId: string, isOnline: boolean): Promise<void> {
     // ★ ORTA-I: Privacy — show_online_status kapalıysa is_online=false + last_seen NULL.
     // Kullanıcı görünmez modda "yaklaşık son aktiflik" sızdırmasın.
@@ -140,17 +158,18 @@ export const ProfileService = {
     return data as Profile;
   },
 
-  /** Profili öne çıkar (Boost) — süre bazlı fiyatlandırma — ★ SEC-BOOST: Tier kontrolü eklendi */
+  /** Profili öne çıkar (Boost) — süre bazlı fiyatlandırma — ★ SEC-BOOST: Tier kontrolü eklendi
+   *  ★ v1.7.13.137: getEffectiveTier kullan → admin + expires_at kontrolü dahil.
+   *  Önceden migrateLegacyTier ile sadece string okunuyordu; admin user (is_admin=true,
+   *  tier='Free') boost yapamıyordu, ve aboneliği bitmiş Pro user hala bonusu alıyordu. */
   async boostProfile(userId: string, spCost: number = 25, durationHours: number = 1) {
-    // ★ SEC-BOOST: Backend tier kontrolü — Free kullanıcılar boost yapamaz
     const { data: userProfile } = await supabase
       .from('profiles')
-      .select('subscription_tier')
+      .select('subscription_tier, subscription_expires_at, is_admin')
       .eq('id', userId)
       .single();
-    const { isTierAtLeast } = require('../constants/tiers');
-    const { migrateLegacyTier } = require('../types');
-    const userTier = migrateLegacyTier(userProfile?.subscription_tier || 'Free');
+    const { isTierAtLeast, getEffectiveTier } = require('../constants/tiers');
+    const userTier = getEffectiveTier(userProfile);
     if (!isTierAtLeast(userTier, 'Plus')) {
       throw new Error(i18n.t('auto.profile.014'));
     }
@@ -416,9 +435,9 @@ export const ProfileService = {
           reference_id: null,
         });
         if (notifErr && __DEV__) {
-          console.warn('[Donation] Notification insert error:', notifErr.message, notifErr.code, notifErr.details);
+          if (__DEV__) console.warn('[Donation] Notification insert error:', notifErr.message, notifErr.code, notifErr.details);
         } else if (__DEV__) {
-          console.log('[Donation] Notification inserted for', toUserId, amount, 'SP');
+          if (__DEV__) console.log('[Donation] Notification inserted for', toUserId, amount, 'SP');
         }
       } catch (e) {
         if (__DEV__) console.warn('[Donation] Notification catch:', e);

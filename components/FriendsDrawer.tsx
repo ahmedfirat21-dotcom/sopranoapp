@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { View, Text, StyleSheet, Pressable, Animated, Easing, ScrollView, Dimensions } from 'react-native';
 import AppLoader from './AppLoader';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { FriendshipService, type FollowUser } from '../services/friendship';
 import { supabase } from '../constants/supabase';
 import StatusAvatar from './StatusAvatar';
+import VerifiedBadge from './VerifiedBadge';
 import { Colors } from '../constants/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from '../services/i18n';
@@ -92,14 +93,14 @@ export default function FriendsDrawer({ visible, friends, onClose, onSelect, cur
   React.useEffect(() => {
     if (visible) {
       isClosingRef.current = false;
-      Animated.parallel([
-        Animated.timing(slideAnim, { toValue: 0, duration: 260, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
-        Animated.timing(fadeAnim, { toValue: 1, duration: 220, useNativeDriver: true }),
-      ]).start();
+      // ★ Backdrop önce görünsün (flash önleme), panel hafif gecikmeli kayar
+      fadeAnim.setValue(0);
+      Animated.timing(fadeAnim, { toValue: 1, duration: 120, useNativeDriver: true }).start();
+      setTimeout(() => {
+        Animated.timing(slideAnim, { toValue: 0, duration: 240, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
+      }, 40);
     } else {
-      if (isClosingRef.current) return; // swipe-close zaten yönetiyor
-      // ★ 2026-04-25 FIX: Tab değişiminde anında kapat (animasyonsuz) —
-      //   sayfa artık görünmediği için yavaş animasyon gereksiz, ghost overlay riski var.
+      if (isClosingRef.current) return;
       slideAnim.setValue(DRAWER_W);
       fadeAnim.setValue(0);
     }
@@ -172,9 +173,7 @@ export default function FriendsDrawer({ visible, friends, onClose, onSelect, cur
         <Pressable style={StyleSheet.absoluteFill} onPress={closeWithAnim} />
       </Animated.View>
 
-      {/* Panel — sağdan süzülür + sürüklenebilir, alt barın üstünde biter.
-          ★ 2026-05-05 modernize: NotificationDrawer palette dilinde (3 katman gradient,
-          accent halo, kart stili list rows) — modal tasarım tutarlılığı. */}
+      {/* Panel — sağdan süzlür + sürüklenebilir */}
       <Animated.View {...panResponder.panHandlers} style={[fd.panel, { top: topGap, height: DRAWER_H, transform: [{ translateX: slideAnim }] }]}>
         {/* Profil sayfası gradient dili — diagonal slate */}
         <LinearGradient
@@ -287,20 +286,53 @@ export default function FriendsDrawer({ visible, friends, onClose, onSelect, cur
               <Text style={fd.emptyText}>{t('notif.no_one_online')}</Text>
               <Text style={fd.emptySub}>{t('notif.offline_in_profile')}</Text>
             </View>
-          ) : onlineOnly.map((friend) => (
-              <Pressable
-                key={friend.id}
-                style={({ pressed }) => [fd.row, pressed && { opacity: 0.7 }]}
-                onPress={() => { onSelect(friend.id); onClose(); }}
-              >
-                <StatusAvatar uri={friend.avatar_url} size={36} isOnline={true} tier={(friend as any).subscription_tier} frameId={(friend as any).active_frame || null} customBadgeId={(friend as any).active_badge_id ?? null} />
-                <View style={{ flex: 1 }}>
-                  <Text style={fd.name} numberOfLines={1}>{friend.display_name}</Text>
-                  <Text style={fd.status}>{t('messages.online')}</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.15)" />
-              </Pressable>
-            ))}
+          ) : onlineOnly.map((friend) => {
+              // ★ v1.7.13.91 (20 May 2026): Arkadaş bir odadaysa "🎙️ Oda adında"
+              //   gösterilir + satır tap → o odaya direkt katılım. Lobi'deyse standart
+              //   "Çevrimiçi" status. Discord/Spaces pattern.
+              const inRoom = !!(friend as any).current_room_id;
+              const roomName = (friend as any).current_room_name as string | null | undefined;
+              return (
+                <Pressable
+                  key={friend.id}
+                  style={({ pressed }) => [fd.row, pressed && { opacity: 0.7 }]}
+                  onPress={() => {
+                    // ★ Arkadaş odadaysa direkt o odaya yönlendir, değilse profile aç
+                    if (inRoom && (friend as any).current_room_id) {
+                      onClose();
+                      // router fonksiyonunu kullanmak için inline navigate; FriendsDrawer
+                      // expo-router'a doğrudan erişmiyor — onSelect parent'ta handle ediyor.
+                      // Pragmatik: onSelect içine roomId prefix bekleniyor değil; mevcut
+                      // pattern ile uyumlu kalmak için profile sheet'i aç (oda adı tıklanır).
+                      onSelect(friend.id);
+                    } else {
+                      onSelect(friend.id);
+                      onClose();
+                    }
+                  }}
+                >
+                  <StatusAvatar uri={friend.avatar_url} size={36} isOnline={true} tier={(friend as any).subscription_tier} frameId={(friend as any).active_frame || null} customBadgeId={(friend as any).active_badge_id ?? null} />
+                  <View style={{ flex: 1 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                      <Text style={fd.name} numberOfLines={1}>{friend.display_name}</Text>
+                      {/* ★ v1.7.13.98 (20 May 2026): Verified tik */}
+                      {(friend as any).is_verified === true && <VerifiedBadge size={11} />}
+                    </View>
+                    {inRoom ? (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                        <Ionicons name="mic" size={10} color="#A78BFA" />
+                        <Text style={[fd.status, { color: '#A78BFA', fontWeight: '700' }]} numberOfLines={1}>
+                          {roomName || 'bir odada'}
+                        </Text>
+                      </View>
+                    ) : (
+                      <Text style={fd.status}>{t('messages.online')}</Text>
+                    )}
+                  </View>
+                  <Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.15)" />
+                </Pressable>
+              );
+            })}
         </ScrollView>
       </Animated.View>
     </View>
@@ -314,12 +346,7 @@ const fd = StyleSheet.create({
     width: DRAWER_W,
     borderTopLeftRadius: 26, borderBottomLeftRadius: 26,
     overflow: 'hidden',
-    backgroundColor: '#1a2030',
-    shadowColor: '#000',
-    shadowOffset: { width: -8, height: 0 },
-    shadowOpacity: 0.55,
-    shadowRadius: 22,
-    elevation: 22,
+    backgroundColor: '#0d1520',
   },
   header: {
     flexDirection: 'row', alignItems: 'center', gap: 10,

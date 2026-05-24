@@ -428,7 +428,7 @@ export default function CallScreen() {
             const label = device === 'microphone' ? 'Mikrofon' : 'Kamera';
             showToast({
               title: i18n.t('auto.call.id.023', { 0: label }),
-              message: i18n.t('auto.call.id.022', { 0: label.toLocaleLowerCase('tr-TR') }),
+              message: i18n.t('auto.call.id.022', { 0: label.toLocaleLowerCase(i18n.locale) }),
               type: 'warning',
             });
             Linking.openSettings().catch(() => {});

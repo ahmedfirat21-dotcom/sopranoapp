@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView, Modal, TextInput, Image, InteractionManager, Animated, PanResponder, KeyboardAvoidingView, Platform, type ImageStyle } from 'react-native';
+import QRCode from 'react-native-qrcode-svg';
 import AppLoader from '../../components/AppLoader';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -34,6 +35,7 @@ import BadgeListModal from '../../components/profile/BadgeListModal';
 import GiftDetailModal from '../../components/profile/GiftDetailModal';
 import { GiftStatsService } from '../../services/giftStats';
 import BioEditorSheet from '../../components/profile/BioEditorSheet';
+import MoodEditorSheet from '../../components/profile/MoodEditorSheet';
 import ProfileFriendsList from '../../components/profile/ProfileFriendsList';
 import SPHistorySheet from '../../components/profile/SPHistorySheet';
 import { useOnlineFriends } from '../../providers/OnlineFriendsProvider';
@@ -281,10 +283,10 @@ function spReasonLabel(reason: string | undefined): string {
     referral_reward: i18n.t('auto.tabs.profile.022'),
     gift_received: i18n.t('auto.tabs.profile.021'),
     gift_sent: i18n.t('auto.tabs.profile.020'),
-    room_boost: 'Oda boost',
-    profile_boost: 'Profil boost',
+    room_boost: i18n.t('tabs.profile.027'),
+    profile_boost: i18n.t('tabs.profile.028'),
     store_purchase: i18n.t('auto.tabs.profile.019'),
-    subscription_bonus: 'Abonelik bonusu',
+    subscription_bonus: i18n.t('tabs.profile.029'),
     achievement: i18n.t('auto.tabs.profile.018'),
     admin_grant: i18n.t('auto.tabs.profile.017'),
     refund: i18n.t('auto.tabs.profile.016'),
@@ -355,6 +357,12 @@ export default function ProfileScreen() {
   const [submittingReferral, setSubmittingReferral] = useState(false);
   const [myReferralCode, setMyReferralCode] = useState<string | null>(null);
   const [usedReferral, setUsedReferral] = useState<{ used: boolean; code?: string; usedAt?: string }>({ used: false });
+  // ★ v1.7.13.60 (20 May 2026): Davet ettiklerim listesi — sheet açılınca lazy fetch.
+  const [invitedFriends, setInvitedFriends] = useState<Array<{ id: string; username?: string; display_name?: string; avatar_url?: string; created_at: string }>>([]);
+  const [invitedLoaded, setInvitedLoaded] = useState(false);
+  const [invitedLoading, setInvitedLoading] = useState(false);
+  // ★ v1.7.13.65 (20 May 2026): QR kod toggle — kod kutusu altında reveal.
+  const [showInviteQR, setShowInviteQR] = useState(false);
   const [showBoostPicker, setShowBoostPicker] = useState(false);
   const [userTitle, setUserTitle] = useState<UserTitle | null>(null);
 
@@ -394,6 +402,8 @@ export default function ProfileScreen() {
   const hasUnequippedFrame = ownsAnyFrame && !activeFrame;
   // ★ 2026-04-21: Bio inline edit — bio'ya tap ile hafif modal
   const [showBioEditor, setShowBioEditor] = useState(false);
+  // ★ v1.7.13.53 (20 May 2026): Mood/status bubble inline edit
+  const [showMoodEditor, setShowMoodEditor] = useState(false);
   const [showSPHistory, setShowSPHistory] = useState(false);
   const [spHistory, setSPHistory] = useState<any[]>([]);
 
@@ -452,8 +462,8 @@ export default function ProfileScreen() {
     setDeleteAlert({
       visible: true,
       title: i18n.t('profile.logout_confirm_title'),
-      message: i18n.t('tabs.profile.002'),
-      type: 'warning',
+      message: i18n.t('settings.logout_confirm'),
+      type: 'info',
       buttons: [
         { text: i18n.t('auto.tabs.profile.013'), style: 'cancel' },
         {
@@ -522,18 +532,27 @@ export default function ProfileScreen() {
   };
 
   // ★ Referral modal açıldığında kendi kodunu + kullanım durumunu yükle
+  // ★ v1.7.13.60 (20 May 2026): Davet ettiklerim listesi de aynı açılışta fetch edilir (lazy).
   const openReferralModal = useCallback(async () => {
     setShowReferral(true);
     if (!userId) return;
     try {
-      const [code, used] = await Promise.all([
+      const [code, used, invited] = await Promise.all([
         myReferralCode ? Promise.resolve(myReferralCode) : ReferralService.getMyCode(userId),
         ReferralService.hasUsedReferral(userId),
+        invitedLoaded ? Promise.resolve(invitedFriends) : (setInvitedLoading(true), ReferralService.getReferralList(userId)),
       ]);
       if (!myReferralCode) setMyReferralCode(code);
       setUsedReferral(used);
-    } catch { }
-  }, [myReferralCode, userId]);
+      if (!invitedLoaded) {
+        setInvitedFriends(Array.isArray(invited) ? invited : []);
+        setInvitedLoaded(true);
+        setInvitedLoading(false);
+      }
+    } catch {
+      setInvitedLoading(false);
+    }
+  }, [myReferralCode, userId, invitedLoaded, invitedFriends]);
 
   // ★ Kendi kodunu paylaş (native Share)
   const handleShareMyCode = useCallback(async () => {
@@ -555,9 +574,9 @@ export default function ProfileScreen() {
     try {
       const { Share } = require('react-native');
       const link = `https://sopranochat.com/user/${userId}`;
-      const name = displayName || profile?.username || 'SopranoChat kullanıcısı';
+      const name = displayName || profile?.username || i18n.t('common.anonymous');
       await Share.share({
-        message: `${name} profilini SopranoChat'te keşfet:\n${link}`,
+        message: i18n.t('profile.share_message', { 0: name, 1: link }),
         url: link, // iOS Share Sheet için ayrı URL alanı
       });
     } catch { }
@@ -615,13 +634,12 @@ export default function ProfileScreen() {
     loadStats();
   }, [userId, allFriends.length, loadStats]);
 
-  // GodMaster özel tier: tier='GodMaster' VEYA is_admin=true
+  // ★ v1.7.13.132: GodMaster kaldırıldı — admin = isAdmin flag'i
   const isAdmin = profile?.is_admin || false;
-  const isGM = isAdmin || subscriptionTier === 'GodMaster';
   const tierDef = TIER_DEFINITIONS[subscriptionTier as keyof typeof TIER_DEFINITIONS];
   // ★ v289 (16 May 2026): displayTier/tierGradient/tierIcon kaldırıldı (dead vars).
   //   Avatar preview modal'da kullanılan tierBorderColor kaldı.
-  const tierBorderColor = isGM ? '#DC2626' : tierDef?.color || '#94A3B8';
+  const tierBorderColor = isAdmin ? '#DC2626' : tierDef?.color || '#94A3B8';
 
   const spBalance = profile?.system_points ?? 0;
   const userLevel = getLevelFromSP(spBalance, subscriptionTier);
@@ -652,7 +670,7 @@ export default function ProfileScreen() {
                 index={0}
                 style={styles.headerIconBtn}
                 onPress={() => router.push('/settings' as any)}
-                accessibilityLabel="Ayarlar"
+                accessibilityLabel={t('profile.menu.settings')}
               >
                 <Ionicons name="settings-outline" size={22} color="#F1F5F9" />
               </AnimatedHeaderIconBtn>
@@ -681,9 +699,19 @@ export default function ProfileScreen() {
             isAdmin={isAdmin}
             isVerified={(profile as any)?.is_verified === true}
             userTitle={userTitle}
+            streakDays={(profile as any)?.streak_days || 0}
             stats={{ followers: stats.friends, rooms: stats.rooms, badges: stats.badges, gifts: stats.gifts }}
             onEdit={() => router.push('/edit-profile')}
-            onBioPress={() => setShowBioEditor(true)}
+            onBioSave={async (newBio) => {
+              if (!userId) return;
+              try {
+                await supabase.from('profiles').update({ bio: newBio }).eq('id', userId);
+                await refreshProfile();
+              } catch (err: any) {
+                showToast({ title: i18n.t('tabs.profile.019'), message: err?.message || i18n.t('common.try_again_short'), type: 'error' });
+                throw err;
+              }
+            }}
             onFollowersPress={() => { setFollowModalTab('friends'); setFollowModalVisible(true); }}
             onRoomsPress={() => router.push('/(tabs)/myrooms' as any)}
             onBadgesPress={() => setShowBadgesModal(true)}
@@ -697,15 +725,14 @@ export default function ProfileScreen() {
             onFramePress={() => setShowFrameSheet(true)}
             hasUnequippedFrame={hasUnequippedFrame}
             activeBadgeId={(profile as any)?.active_badge_id}
+            moodStatus={(profile as any)?.mood_status}
+            onMoodPress={() => setShowMoodEditor(true)}
           />
 
-          {/* ★ v110.5: Diller + İlgi alanları (sade chip şeridi) */}
-          <ProfileIdentityStrip
-            languages={(profile as any)?.languages}
-            interests={(profile as any)?.interests}
-            isOwn
-            onEditPress={() => router.push('/edit-profile' as any)}
-          />
+          {/* ★ v1.7.13.56 (20 May 2026): ProfileIdentityStrip (Spor/Kitap/Oyun
+              chip'leri) + FeaturedBadgesShowcase (3 büyük rozet) KALDIRILDI
+              — kullanıcı 'fazla kalabalık' feedback'i. İlgi alanları edit-profile'a
+              taşındı; rozetler hâlâ "Rozet" stat'ından modal ile açılır. */}
 
           {/* ★ v110.5: Sesli tanıtım çalar (varsa) */}
           {(profile as any)?.voice_bio_url && (
@@ -721,45 +748,70 @@ export default function ProfileScreen() {
           {/* ★ v110.5: Konuşma ritmi insight */}
           <SpeakingRhythmHint text={speakingRhythmText} />
 
-          {/* ★ v110.5: Öne çıkan rozetler (3 büyük) */}
-          {featuredBadgeIds.length > 0 && (
-            <FeaturedBadgesShowcase
-              featuredIds={featuredBadgeIds}
-              onPress={() => setShowBadgesModal(true)}
-            />
-          )}
-
           {/* ═══ Aksiyon Satırı — 2 sütun: Profili Öne Çıkar (Boost) + SP Cüzdan ═══
               ★ v289 (16 May 2026): Eski tek satırlık SP Cüzdan kartı yerine
-              modern 2-col aksiyon satırı. Boost (Plus kilitli) sola, SP Cüzdan sağa. */}
+              modern 2-col aksiyon satırı. Boost (Plus kilitli) sola, SP Cüzdan sağa.
+              ★ v1.7.13.52 (20 May 2026): Boost aktifse "Boost Aktif" + kalan süre
+              gösterilir; CTA mesajı yanlış sinyal vermez. */}
+          {/* ★ v1.7.13.137: Free user için kart görünür (Spotify/Discord pattern) —
+              gri tonlu + 🔒 ikon + altyazı "Plus üyelik gerek". Tıklayınca direkt
+              üyelik panele → conversion fırsatı. Toast+timeout patterni kaldırıldı. */}
+          {(() => {
+            const boostExpStr = (profile as any)?.profile_boost_expires_at as string | null | undefined;
+            const boostExpMs = boostExpStr ? new Date(boostExpStr).getTime() : 0;
+            const isBoostActive = boostExpMs > Date.now();
+            const remainingMs = isBoostActive ? boostExpMs - Date.now() : 0;
+            const remainingHours = Math.floor(remainingMs / 3_600_000);
+            const remainingMinutes = Math.floor((remainingMs % 3_600_000) / 60_000);
+            const remainingLabel = isBoostActive
+              ? (remainingHours >= 1
+                  ? i18n.t('tabs.profile.032', { 0: remainingHours, 1: remainingMinutes })
+                  : i18n.t('tabs.profile.033', { 0: remainingMinutes }))
+              : null;
+            const isFreeLocked = !isBoostActive && !isTierAtLeast(subscriptionTier, 'Plus');
+            return (
           <View style={p.actionRow}>
             <Pressable
-              style={p.actionCard}
+              style={[
+                p.actionCard,
+                isBoostActive && { borderColor: 'rgba(244,114,182,0.55)', borderWidth: 1.5 },
+                isFreeLocked && { opacity: 0.65 },
+              ]}
               onPress={() => {
-                if (isTierAtLeast(subscriptionTier, 'Plus')) {
+                if (isBoostActive) {
+                  showToast({ title: i18n.t('tabs.profile.030'), message: i18n.t('tabs.profile.031', { 0: remainingLabel || '' }), type: 'success' });
+                } else if (isTierAtLeast(subscriptionTier, 'Plus')) {
                   setShowBoostPicker(true);
                 } else {
-                  showToast({ title: t('profile.plus_required'), message: t('profile.plus_required_boost'), type: 'info' });
-                  setTimeout(() => router.push('/plus' as any), 800);
+                  router.push('/plus' as any);
                 }
               }}
-              accessibilityLabel={t('profile.menu.boost')}
+              accessibilityLabel={isBoostActive ? i18n.t('tabs.profile.035', { 0: remainingLabel || '' }) : isFreeLocked ? i18n.t('tabs.profile.034') : t('profile.menu.boost')}
             >
               <LinearGradient
-                colors={['#2A1B26', '#1E1320']}
+                colors={isBoostActive ? ['#3A1C2D', '#1F1218'] : isFreeLocked ? ['#1F1A1D', '#15101300' as any] : ['#2A1B26', '#1E1320']}
                 start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                 style={StyleSheet.absoluteFillObject}
               />
               <LinearGradient
-                colors={['rgba(244,114,182,0.20)', 'rgba(244,114,182,0.04)']}
+                colors={isBoostActive ? ['rgba(244,114,182,0.32)', 'rgba(244,114,182,0.08)'] : isFreeLocked ? ['rgba(148,163,184,0.10)', 'rgba(148,163,184,0.02)'] : ['rgba(244,114,182,0.20)', 'rgba(244,114,182,0.04)']}
                 start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
                 style={StyleSheet.absoluteFillObject}
               />
               <View style={p.actionCardInner}>
-                <MaterialCommunityIcons name="fire" size={22} color="#F472B6" />
-                <View style={{ flex: 1, marginLeft: 10 }}>
-                  <Text style={p.actionLabel}>{t('profile.menu.boost')}</Text>
-                  <Text style={p.actionSubLabel}>{isTierAtLeast(subscriptionTier, 'Plus') ? t('profile.boost_label') : 'Plus'}</Text>
+                <MaterialCommunityIcons name="fire" size={22} color={isFreeLocked ? '#94A3B8' : '#F472B6'} />
+                <View style={p.actionTextWrap}>
+                  <View style={p.actionLabelRow}>
+                    <Text style={[p.actionLabel, isFreeLocked && { color: '#CBD5E1' }]}>
+                      {isBoostActive ? i18n.t('tabs.profile.030') : t('profile.menu.boost')}
+                    </Text>
+                    {isFreeLocked && (
+                      <Ionicons name="lock-closed" size={11} color="#94A3B8" />
+                    )}
+                  </View>
+                  <Text style={[p.actionSubLabel, isBoostActive && { color: '#F472B6', fontWeight: '700' }, isFreeLocked && { color: '#A78BFA', fontWeight: '700' }]}>
+                    {isBoostActive ? remainingLabel : isFreeLocked ? i18n.t('profile.boost_plus_required') : t('profile.boost_label')}
+                  </Text>
                 </View>
               </View>
             </Pressable>
@@ -777,13 +829,15 @@ export default function ProfileScreen() {
               />
               <View style={p.actionCardInner}>
                 <Ionicons name="wallet-outline" size={22} color="#FBBF24" />
-                <View style={{ flex: 1, marginLeft: 10 }}>
+                <View style={p.actionTextWrap}>
                   <Text style={p.actionLabel}>{t('profile.sp_wallet')}</Text>
-                  <Text style={p.actionSubLabel}>{isGM ? '∞ SP' : `${spBalance.toLocaleString('tr-TR')} SP · Lv.${userLevel}`}</Text>
+                  <Text style={p.actionSubLabel}>{isAdmin ? '∞ SP' : `${spBalance.toLocaleString(i18n.locale)} SP · Lv.${userLevel}`}</Text>
                 </View>
               </View>
             </Pressable>
           </View>
+            );
+          })()}
 
           {/* ★ v299 (17 May 2026): Profil sayfasındaki büyük 4'lü stats grid
               (Sahne dk / Açtığı oda / Toplam dinleyici / Toplam reaksiyon) KALDIRILDI.
@@ -895,14 +949,12 @@ export default function ProfileScreen() {
             visible={showReferral}
             onClose={() => setShowReferral(false)}
             title={t('profile.invite_code_modal_title')}
-            icon="gift-outline"
             accentColor="#A78BFA"
-            maxHeightRatio={0.7}
+            maxHeightRatio={0.78}
           >
-            {/* ★ v289 (16 May 2026): KeyboardAvoidingView — Davet kodu TextInput'una
-                tıklayınca klavye açılıyor, BottomSheet 70% yer kaplıyor, input klavye
-                altında kalmasın. BioEditorSheet pattern: iOS padding, Android height. */}
-            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flexShrink: 1 }}>
+            {/* ★ v1.7.13.63 (20 May 2026): KeyboardAvoidingView çıkarıldı — body pan responder
+                ile çakışıp drag-to-dismiss'i bozuyordu. TextInput klavyesi RN Modal
+                içinde otomatik kaydırma yapıyor zaten. */}
               <View style={{ paddingHorizontal: 16, paddingTop: 4 }}>
                 {/* Bölüm 1: Kendi kodum */}
                 <Text style={[styles.modalSubtitle, { marginTop: 4 }]}>{t('profile.your_invite_code')}</Text>
@@ -923,22 +975,50 @@ export default function ProfileScreen() {
                   >
                     <Ionicons name="copy-outline" size={14} color={Colors.teal} style={iconShadow} />
                   </Pressable>
+                  {/* ★ v1.7.13.65 (20 May 2026): QR toggle butonu */}
+                  <Pressable
+                    style={[styles.myCodeBtn, showInviteQR && { backgroundColor: 'rgba(167,139,250,0.25)', borderColor: 'rgba(167,139,250,0.5)' }]}
+                    onPress={() => setShowInviteQR(v => !v)}
+                  >
+                    <Ionicons name="qr-code-outline" size={14} color={showInviteQR ? '#A78BFA' : Colors.teal} style={iconShadow} />
+                  </Pressable>
                   <Pressable style={[styles.myCodeBtn, { backgroundColor: Colors.teal }]} onPress={handleShareMyCode}>
                     <Ionicons name="share-social-outline" size={14} color="#FFF" style={iconShadow} />
                   </Pressable>
                 </View>
                 <Text style={styles.modalDesc}>{i18n.t('tabs.profile.001')}</Text>
 
+                {/* ★ v1.7.13.65 (20 May 2026): QR Kod reveal — başkasına taratarak hızlı davet.
+                    İçerik: deep link (https://sopranochat.com/invite/CODE) — app URL handler işler. */}
+                {showInviteQR && myReferralCode && (
+                  <View style={qrStyles.qrCard}>
+                    <View style={qrStyles.qrFrame}>
+                      <QRCode
+                        value={`https://sopranochat.com/invite/${myReferralCode}`}
+                        size={160}
+                        backgroundColor="#FFFFFF"
+                        color="#0F172A"
+                      />
+                    </View>
+                    <Text style={qrStyles.qrHint}>
+                      Arkadaşına taratarak hızlıca davet et.
+                    </Text>
+                    <Text style={qrStyles.qrLink} numberOfLines={1}>
+                      sopranochat.com/invite/{myReferralCode}
+                    </Text>
+                  </View>
+                )}
+
                 {/* Bölüm 2: Arkadaş kodu gir — zaten kullanıldıysa kilit göster */}
                 <Text style={[styles.modalSubtitle, { marginTop: 16 }]}>{t('profile.enter_invite_code')}</Text>
                 {usedReferral.used ? (
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, paddingHorizontal: 14, borderRadius: 12, backgroundColor: 'rgba(20,184,166,0.1)', borderWidth: 1, borderColor: 'rgba(20,184,166,0.3)' }}>
+                  <View style={inviteListStyles.usedRow}>
                     <Ionicons name="checkmark-circle" size={20} color={Colors.teal} />
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ color: Colors.teal, fontSize: 12, fontWeight: '700' }}>{t('profile.invite_code_used')}</Text>
-                      <Text style={{ color: Colors.text3, fontSize: 11, marginTop: 2 }}>
-                        {usedReferral.code ? `Kod: ${usedReferral.code}` : i18n.t('auto.tabs.profile.008')}
-                        {usedReferral.usedAt ? ` · ${new Date(usedReferral.usedAt).toLocaleDateString('tr-TR')}` : ''}
+                    <View style={inviteListStyles.usedInfo}>
+                      <Text style={inviteListStyles.usedLabel}>{t('profile.invite_code_used')}</Text>
+                      <Text style={inviteListStyles.usedSub}>
+                        {usedReferral.code ? `${i18n.t('profile.code_label')}: ${usedReferral.code}` : i18n.t('auto.tabs.profile.008')}
+                        {usedReferral.usedAt ? ` · ${new Date(usedReferral.usedAt).toLocaleDateString(i18n.locale)}` : ''}
                       </Text>
                     </View>
                   </View>
@@ -962,8 +1042,73 @@ export default function ProfileScreen() {
                     </Pressable>
                   </>
                 )}
+
+                {/* ★ v1.7.13.60 (20 May 2026): Davet ettiklerim listesi.
+                    Boş durumunda placeholder; doluysa avatar + isim + tarih satırları. */}
+                <View style={inviteListStyles.headerRow}>
+                  <Text style={[styles.modalSubtitle, { marginTop: 16, flex: 1 }]}>
+                    {i18n.t('profile.invited_friends')}
+                  </Text>
+                  {invitedLoaded && invitedFriends.length > 0 && (
+                    <View style={inviteListStyles.countPill}>
+                      <Text style={inviteListStyles.countPillText}>{invitedFriends.length}</Text>
+                    </View>
+                  )}
+                </View>
+
+                {invitedLoading ? (
+                  <View style={inviteListStyles.emptyBox}>
+                    <AppLoader size="small" color={Colors.teal} />
+                  </View>
+                ) : invitedFriends.length === 0 ? (
+                  <View style={inviteListStyles.emptyBox}>
+                    <Ionicons name="people-outline" size={22} color="rgba(148,163,184,0.6)" />
+                    <Text style={inviteListStyles.emptyText}>
+                      {i18n.t('profile.invite_empty')}
+                    </Text>
+                    <Text style={inviteListStyles.emptyHint}>
+                      {i18n.t('profile.invite_hint')}
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={inviteListStyles.listBox}>
+                    {invitedFriends.slice(0, 20).map((f) => (
+                      <Pressable
+                        key={f.id}
+                        style={inviteListStyles.row}
+                        onPress={() => {
+                          setShowReferral(false);
+                          setTimeout(() => f.id && openUserProfile(f.id), 200);
+                        }}
+                      >
+                        <Image
+                          source={getAvatarSource(f.avatar_url || '')}
+                          style={inviteListStyles.avatar}
+                        />
+                        <View style={{ flex: 1 }}>
+                          <Text style={inviteListStyles.name} numberOfLines={1}>
+                            {f.display_name || f.username || i18n.t('common.anonymous')}
+                          </Text>
+                          {f.username && (
+                            <Text style={inviteListStyles.username} numberOfLines={1}>
+                              @{f.username.replace(/_[a-zA-Z0-9]{4}$/, '')}
+                            </Text>
+                          )}
+                        </View>
+                        <Text style={inviteListStyles.date}>
+                          {new Date(f.created_at).toLocaleDateString(i18n.locale, { day: 'numeric', month: 'short' })}
+                        </Text>
+                        <Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.3)" />
+                      </Pressable>
+                    ))}
+                    {invitedFriends.length > 20 && (
+                      <Text style={inviteListStyles.moreNote}>
+                        +{invitedFriends.length - 20} {i18n.t('common.more')}
+                      </Text>
+                    )}
+                  </View>
+                )}
               </View>
-            </KeyboardAvoidingView>
           </BottomSheet>
 
           {/* ★ Avatar Preview Modal — Instagram tarzı yuvarlak + tier glow
@@ -1135,6 +1280,25 @@ export default function ProfileScreen() {
             }
           }}
         />
+        {/* ★ v1.7.13.53 (20 May 2026): Mood/status balonu editörü (FB tarzı). */}
+        <MoodEditorSheet
+          visible={showMoodEditor}
+          initialMood={(profile as any)?.mood_status || ''}
+          onClose={() => setShowMoodEditor(false)}
+          onSave={async (newMood) => {
+            if (!userId) return;
+            try {
+              await supabase.from('profiles').update({
+                mood_status: newMood && newMood.trim().length > 0 ? newMood : null,
+                mood_status_updated_at: new Date().toISOString(),
+              }).eq('id', userId);
+              await refreshProfile();
+            } catch (err: any) {
+              showToast({ title: i18n.t('common.error'), message: err?.message || i18n.t('common.try_again_short'), type: 'error' });
+              throw err;
+            }
+          }}
+        />
         {/* ★ 2026-04-21: Tab bar scroll fade — tüm tab sayfalarında tutarlı */}
         <TabBarFadeOut />
       </View>
@@ -1267,6 +1431,9 @@ const p = StyleSheet.create({
     fontSize: 10, fontWeight: '600', color: 'rgba(241,245,249,0.6)',
     marginTop: 1,
   },
+  // ★ v1.7.13.143: inline'dan çıkarılan stiller — boost/wallet kartları
+  actionTextWrap: { flex: 1, marginLeft: 10 },
+  actionLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   walletCompactLabel: {
     fontSize: 9, fontWeight: '700', letterSpacing: 1.2,
     color: 'rgba(251,191,36,0.7)', textTransform: 'uppercase',
@@ -1338,6 +1505,115 @@ const p = StyleSheet.create({
     marginTop: 3, letterSpacing: 0.3,
     ..._textGlow,
   },
+});
+
+// ★ v1.7.13.65 (20 May 2026): QR davet kodu stilleri — Davet Kodu sheet'inde reveal alanı
+const qrStyles = StyleSheet.create({
+  qrCard: {
+    marginTop: 14,
+    paddingVertical: 16, paddingHorizontal: 12,
+    borderRadius: 14,
+    backgroundColor: 'rgba(167,139,250,0.06)',
+    borderWidth: 1, borderColor: 'rgba(167,139,250,0.25)',
+    alignItems: 'center',
+    gap: 10,
+  },
+  qrFrame: {
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  qrHint: {
+    fontSize: 12, fontWeight: '600', color: '#CBD5E1',
+    textAlign: 'center',
+  },
+  qrLink: {
+    fontSize: 11, color: 'rgba(167,139,250,0.85)',
+    fontWeight: '700', letterSpacing: 0.2,
+  },
+});
+
+// ★ v1.7.13.60 (20 May 2026): Davet ettiklerim listesi stilleri (Davet Kodu sheet alt bölümü)
+const inviteListStyles = StyleSheet.create({
+  headerRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+  },
+  countPill: {
+    marginTop: 16,
+    paddingHorizontal: 8, paddingVertical: 2,
+    borderRadius: 999,
+    backgroundColor: 'rgba(94,234,212,0.15)',
+    borderWidth: 1, borderColor: 'rgba(94,234,212,0.35)',
+  },
+  countPillText: {
+    fontSize: 11, fontWeight: '800', color: '#5EEAD4',
+    letterSpacing: 0.4,
+  },
+  emptyBox: {
+    marginTop: 10,
+    paddingVertical: 24, paddingHorizontal: 16,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
+    alignItems: 'center',
+    gap: 6,
+  },
+  emptyText: {
+    fontSize: 13, fontWeight: '600', color: '#94A3B8',
+    textAlign: 'center',
+  },
+  emptyHint: {
+    fontSize: 11, color: 'rgba(148,163,184,0.7)',
+    textAlign: 'center', marginTop: 2,
+  },
+  listBox: {
+    marginTop: 10,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.02)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)',
+    overflow: 'hidden',
+  },
+  row: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 12, paddingVertical: 10,
+    gap: 12,
+    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.04)',
+  },
+  avatar: {
+    width: 34, height: 34, borderRadius: 17,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+  },
+  name: {
+    fontSize: 13, fontWeight: '700', color: '#F1F5F9',
+    letterSpacing: 0.1,
+  },
+  username: {
+    fontSize: 11, color: '#94A3B8', marginTop: 1,
+  },
+  date: {
+    fontSize: 11, color: 'rgba(148,163,184,0.75)',
+    fontWeight: '600',
+  },
+  moreNote: {
+    fontSize: 11, color: 'rgba(148,163,184,0.7)',
+    fontWeight: '600', textAlign: 'center',
+    paddingVertical: 10,
+  },
+  // ★ v1.7.13.143: Referral "kod kullanıldı" satırı — inline'dan çıkarıldı
+  usedRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingVertical: 12, paddingHorizontal: 14, borderRadius: 12,
+    backgroundColor: 'rgba(20,184,166,0.1)',
+    borderWidth: 1, borderColor: 'rgba(20,184,166,0.3)',
+  },
+  usedInfo: { flex: 1 },
+  usedLabel: { color: '#14B8A6', fontSize: 12, fontWeight: '700' },
+  usedSub: { color: '#94A3B8', fontSize: 11, marginTop: 2 },
 });
 
 const styles = StyleSheet.create({

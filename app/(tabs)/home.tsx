@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   View, Text, StyleSheet, Image, Pressable, FlatList,
   ScrollView, RefreshControl, Dimensions, Animated, Easing, PanResponder, InteractionManager,
@@ -21,13 +21,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 // ★ 2026-04-27: UserSearchModal artık global (app/_layout.tsx) — useUserSearchSheet ile açılır.
 import { useUserSearchSheet } from '../_layout';
 import FriendsDrawer from '../../components/FriendsDrawer';
-import AppLoader from '../../components/AppLoader';
 import NotificationBell from '../../components/NotificationBell';
 import DiscoverWelcomeSheet, { hasSeenDiscoverWelcome, markDiscoverWelcomeSeen } from '../../components/DiscoverWelcomeSheet';
 import RoomCreateHintSheet, { hasSeenRoomCreateHint, markRoomCreateHintSeen } from '../../components/RoomCreateHintSheet';
 import { markCreateRoomCoachmarkPending } from '../../components/CreateRoomCoachmark';
-import FABHintOverlay, { hasSeenFABHint } from '../../components/FABHintOverlay';
 import QuickCreateSheet from '../../components/QuickCreateSheet';
+import BoostPickerSheet, { type BoostTier } from '../../components/BoostPickerSheet';
 import { ReportModal } from '../../components/ReportModal';
 import TabBarFadeOut from '../../components/TabBarFadeOut';
 import { CATEGORY_THEME } from '../../constants/categoryTheme';
@@ -35,16 +34,19 @@ import AppBackground from '../../components/AppBackground';
 import AnimatedLogo from '../../components/AnimatedLogo';
 import AnimatedHeaderIconBtn from '../../components/AnimatedHeaderIconBtn';
 import StatusAvatar from '../../components/StatusAvatar';
+import VerifiedBadge from '../../components/VerifiedBadge';
 import { getAvatarSource } from '../../constants/avatars';
-import { SkiaShadow, GlowView, CosmeticBackground } from '../../components/skia';
+import BoostedProfileCard from '../../components/home/BoostedProfileCard';
+import { SkiaShadow, CosmeticBackground } from '../../components/skia';
 
 import { showToast } from '../../components/Toast';
 import DiscoverEmptyState from '../../components/DiscoverEmptyState';
-import { isSystemRoom } from '../../services/showcaseRooms';
+import HomeScreenSkeleton from '../../components/HomeScreenSkeleton';
+import { isSystemRoom, getLobiRoom, LOBI_ROOM_ID } from '../../services/showcaseRooms';
+import { FriendshipService } from '../../services/friendship';
 import { TIER_DEFINITIONS, getEffectiveTier } from '../../constants/tiers';
 import { roomPreviewService } from '../../services/roomPreview';
-import { UpsellService } from '../../services/upsell';
-import type { SubscriptionTier } from '../../types';
+import { Haptics } from '../../utils/haptics';
 
 
 
@@ -66,10 +68,10 @@ const SMART_FILTERS: Array<{ id: string; labelKey: string; icon: string; type: '
 const ADVANCED_FILTER_OPTIONS = [
   { id: 'open', labelKey: 'filter.open', icon: 'globe-outline' as const },
   { id: 'closed', labelKey: 'filter.closed', icon: 'lock-closed' as const },
-  { id: 'invite', label: 'Davetli', icon: 'mail' as const },
-  { id: 'age', label: '18+', icon: 'warning' as const },
-  { id: 'premium', label: 'Premium', icon: 'trophy' as const },
-  { id: 'myLang', label: 'Dilime Uygun', icon: 'language' as const },
+  { id: 'invite', labelKey: 'filter.invite', icon: 'mail' as const },
+  { id: 'age', labelKey: 'filter.age', icon: 'warning' as const },
+  { id: 'premium', labelKey: 'filter.premium', icon: 'trophy' as const },
+  { id: 'myLang', labelKey: 'filter.my_lang', icon: 'language' as const },
 ] as const;
 
 // ═══ Son Girdiğin Odalar — AsyncStorage Helper ═══
@@ -92,176 +94,8 @@ async function addRecentRoom(room: { id: string; name: string; hostAvatar?: stri
   } catch { /* silent */ }
 }
 
-// ════════════════════════════════════════════════════════════
-// ÖNE ÇIKAN PROFİL — Kompakt Story-Style Avatar
-// ════════════════════════════════════════════════════════════
-const TIER_RING: Record<string, { ring: string; glow: string }> = {
-  Pro:  { ring: '#D4AF37', glow: 'rgba(212,175,55,0.45)' },
-  Plus: { ring: '#A78BFA', glow: 'rgba(167,139,250,0.4)' },
-  Free: { ring: '#14B8A6', glow: 'rgba(20,184,166,0.35)' },
-};
-
-// ★ 2026-04-21: Boosted profil showcase kartı — premium trading-card görünümü.
-//   Alt gradient = kullanıcının subscription tier'ı. Outer glow + shine = boost tier
-//   (kalan süreye göre bronze/silver/gold). "BOOST" etiketi kaldırıldı çünkü bölüm başlığı
-//   "Popüler" zaten bunu iletiyor; sadece ELITE seviye için 💎 pill görünür.
-function BoostedProfileCard({ profile: bp, index, friendIds, onlineIds }: { profile: any; index: number; friendIds?: Set<string>; onlineIds?: Set<string> }) {
-  const { openUserProfile } = useUserProfileSheet();
-  // ★ 2026-04-30: Presence-based online — stale DB flag yerine canlı websocket durumu.
-  const showOnline = onlineIds?.has(bp.id) && friendIds?.has(bp.id);
-  const router = useRouter();
-  const pulseAnim = useRef(new Animated.Value(0.4)).current;
-  const shineAnim = useRef(new Animated.Value(-1)).current;
-  const pulseRef = useRef<Animated.CompositeAnimation | null>(null);
-  const shineRef = useRef<Animated.CompositeAnimation | null>(null);
-
-  // Boost tier — kalan süreye göre (satın alım tam süresi DB'de tutulmuyor, hesapla)
-  const boostExpiresAt = bp.profile_boost_expires_at;
-  const hoursRemaining = boostExpiresAt
-    ? Math.max(0, (new Date(boostExpiresAt).getTime() - Date.now()) / 3_600_000)
-    : 0;
-  // >12h = elite (24h satın aldı, yarıdan fazla kaldı)
-  // 3-12h = silver (6h satın aldı veya 24h son yarısı)
-  // <3h = bronze (1h satın aldı veya tier'ın bitişi)
-  const boostTier: 'elite' | 'silver' | 'bronze' = hoursRemaining > 12 ? 'elite' : hoursRemaining > 3 ? 'silver' : 'bronze';
-
-  const BOOST_VISUALS = {
-    elite:  { glow: '#FBBF24', glowRgba: 'rgba(251,191,36,0.65)', shineOpacity: 0.22, shineCount: 2, label: null },
-    silver: { glow: '#CBD5E1', glowRgba: 'rgba(203,213,225,0.50)', shineOpacity: 0.14, shineCount: 1, label: null },
-    bronze: { glow: '#C2703C', glowRgba: 'rgba(194,112,60,0.45)',  shineOpacity: 0.10, shineCount: 1, label: null },
-  } as const;
-  const boostVis = BOOST_VISUALS[boostTier];
-
-  useEffect(() => {
-    if (showOnline) {
-      pulseRef.current = Animated.loop(
-        Animated.sequence([
-          Animated.timing(pulseAnim, { toValue: 1, duration: 1400, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-          Animated.timing(pulseAnim, { toValue: 0.4, duration: 1400, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-        ])
-      );
-      pulseRef.current.start();
-    }
-    // Shine sweep — boost tier'a göre sıklık (elite daha sık, bronze nadir)
-    const shineDelay = boostTier === 'elite' ? 2200 : boostTier === 'silver' ? 3500 : 5000;
-    shineRef.current = Animated.loop(
-      Animated.sequence([
-        Animated.delay(shineDelay + index * 350),
-        Animated.timing(shineAnim, { toValue: 1, duration: boostTier === 'elite' ? 900 : 1200, easing: Easing.out(Easing.quad), useNativeDriver: true }),
-        Animated.timing(shineAnim, { toValue: -1, duration: 0, useNativeDriver: true }),
-      ])
-    );
-    shineRef.current.start();
-    return () => { pulseRef.current?.stop(); shineRef.current?.stop(); };
-  }, []);
-
-  const tier = bp.subscription_tier || 'Free';
-  const isGM = bp.is_admin || tier === 'GodMaster';
-  // Alt zemin — kullanıcının subscription tier kimliği
-  const cardGrad: [string, string, string] = isGM
-    ? ['#7F1D1D', '#450A0A', '#1E1B1B']
-    : tier === 'Pro'
-      ? ['#7C5A12', '#3F2B0A', '#1F1808']
-      : tier === 'Plus'
-        ? ['#4C1D7B', '#2A0F47', '#15081F']
-        : ['#0F4C5C', '#0A2F3C', '#051920'];
-  const accentColor = isGM ? '#DC2626' : tier === 'Pro' ? '#D4AF37' : tier === 'Plus' ? '#A78BFA' : '#14B8A6';
-  const tierLabel = isGM ? 'GM' : tier === 'Pro' ? 'PRO' : tier === 'Plus' ? 'PLUS' : '';
-
-  const shineX = shineAnim.interpolate({ inputRange: [-1, 1], outputRange: [-100, 180] });
-
-  return (
-    <Pressable
-      style={({ pressed }) => ({
-        width: 88,
-        opacity: pressed ? 0.85 : 1,
-        transform: [{ scale: pressed ? 0.96 : 1 }],
-      })}
-      onPress={() => openUserProfile(bp.id)}
-    >
-      {/* Kart zemini — border + glow boost tier'a göre, shadow boost tier'a göre */}
-      <View style={{
-        borderRadius: 14,
-        overflow: 'hidden',
-        borderWidth: boostTier === 'elite' ? 1.8 : 1.2,
-        borderColor: boostVis.glow + (boostTier === 'elite' ? 'AA' : '66'),
-        shadowColor: boostVis.glow,
-        shadowOffset: { width: 0, height: boostTier === 'elite' ? 4 : 3 },
-        shadowOpacity: boostTier === 'elite' ? 0.7 : boostTier === 'silver' ? 0.5 : 0.35,
-        shadowRadius: boostTier === 'elite' ? 12 : boostTier === 'silver' ? 9 : 7,
-        elevation: boostTier === 'elite' ? 9 : 6,
-      }}>
-        {/* ★ v1.7.13.47 (19 May 2026): Avatar daire KALDIRILDI. Kullanıcı:
-            'parlama efekti avatarın üzerinden gider, avatar sanki camın
-            içinde'. StatusAvatar circular → Image rectangular full-bleed
-            kartın üst kısmında. Shine sweep zaten avatar üzerinden geçer. */}
-        <LinearGradient
-          colors={cardGrad}
-          start={{ x: 0, y: 0 }} end={{ x: 0.7, y: 1 }}
-          style={{ flex: 1 }}
-        >
-          {/* ELITE pill — sadece elite için (24h satın alanlara ayrıcalık) */}
-          {boostVis.label && (
-            <View style={{ position: 'absolute', top: 6, right: 6, backgroundColor: 'rgba(251,191,36,0.22)', borderWidth: 0.8, borderColor: 'rgba(251,191,36,0.55)', paddingHorizontal: 5, paddingVertical: 1.5, borderRadius: 6, zIndex: 5 }}>
-              <Text style={{ fontSize: 7, fontWeight: '900', color: '#FBBF24', letterSpacing: 0.5 }}>{boostVis.label}</Text>
-            </View>
-          )}
-
-          {/* Avatar — full-bleed kart üstü (cam içinde hissi) */}
-          <View style={{ width: '100%', height: 96, overflow: 'hidden', position: 'relative', backgroundColor: accentColor + '22' }}>
-            {bp.avatar_url ? (
-              <Image
-                source={{ uri: bp.avatar_url }}
-                style={{ width: '100%', height: '100%' }}
-                resizeMode="cover"
-              />
-            ) : (
-              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: accentColor + '44' }}>
-                <Text style={{ fontSize: 32, fontWeight: '900', color: '#FFF', textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }}>
-                  {(bp.display_name || '?').charAt(0).toUpperCase()}
-                </Text>
-              </View>
-            )}
-            {/* Online dot — sağ-alt köşede, kart içinde */}
-            {showOnline && (
-              <View style={{
-                position: 'absolute', bottom: 4, right: 4,
-                width: 12, height: 12, borderRadius: 6,
-                backgroundColor: '#22C55E',
-                borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.7)',
-                shadowColor: '#22C55E', shadowOpacity: 0.8, shadowRadius: 4, elevation: 3,
-              }} />
-            )}
-          </View>
-
-          {/* Display name — kart footer */}
-          <View style={{ paddingHorizontal: 6, paddingVertical: 6, alignItems: 'center' }}>
-            <Text numberOfLines={1} style={{
-              fontSize: 12, fontWeight: '800', color: '#F1F5F9', maxWidth: 94,
-              textShadowColor: 'rgba(0,0,0,0.7)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
-            }}>
-              {bp.display_name || i18n.t('auto.tabs.home.013')}
-            </Text>
-          </View>
-        </LinearGradient>
-
-        {/* Shine sweep overlay — boost tier yoğunluğuna göre */}
-        <Animated.View style={{
-          position: 'absolute', top: 0, bottom: 0, width: 40,
-          transform: [{ translateX: shineX }, { skewX: '-20deg' }],
-        }} pointerEvents="none">
-          <LinearGradient
-            colors={['transparent', `rgba(255,255,255,${boostVis.shineOpacity})`, 'transparent']}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-            style={StyleSheet.absoluteFillObject}
-          />
-        </Animated.View>
-      </View>
-    </Pressable>
-  );
-}
-
-
+// ★ Dead code temizliği (21 May 2026): TIER_RING, FourthSlotCard, BoostedProfileCard
+//   kaldırıldı — hiçbir yerde render edilmiyordu (~200 satır kazanç).
 
 // ════════════════════════════════════════════════════════════
 // TAKİP EDİLEN ODA KARTI — Premium Horizontal Scroll
@@ -319,12 +153,14 @@ function FollowedRoomCard({ room, index }: { room: Room; index: number }) {
   const isPersistent = (room as any).is_persistent;
   const ownerTier = (room as any).owner_tier || room.host?.subscription_tier || 'Free';
   const isPremiumOwner = ownerTier === 'Plus' || ownerTier === 'Pro';
+  // ★ v1.7.13.140 SORUN-3: tier ayrımı — Plus mor (#A78BFA), Pro altın (Colors.premiumGold)
+  const tierColor = ownerTier === 'Pro' ? Colors.premiumGold : (ownerTier === 'Plus' ? '#A78BFA' : null);
 
   return (
     <Pressable
       style={({ pressed }) => [
         s.fCard,
-        isPremiumOwner && { borderColor: Colors.premiumGold, borderWidth: 1.5 },
+        tierColor && { borderColor: tierColor, borderWidth: 1.5 },
         pressed && { opacity: 0.92, transform: [{ scale: 0.97 }] },
       ]}
       onPress={() => router.push(`/room/${room.id}`)}
@@ -360,7 +196,8 @@ function FollowedRoomCard({ room, index }: { room: Room; index: number }) {
         {isLive ? (
           <View style={s.fLiveBadge}>
             <View style={s.fLiveDot} />
-            <Text style={s.fLiveText}>CANLI · {room.listener_count}</Text>
+            {/* ★ v1.7.13.139: BUG-2 fix — sayı zaten altta pill'de gösteriliyor (L447-452), çift gösterim. */}
+            <Text style={s.fLiveText}>{i18n.t('rooms.live')}</Text>
           </View>
         ) : isEmpty ? (
           <View style={s.fEmptyBadge}>
@@ -373,10 +210,10 @@ function FollowedRoomCard({ room, index }: { room: Room; index: number }) {
             <Text style={s.fSleepText}>{i18n.t('home.sleeping')}</Text>
           </View>
         ) : null}
-        {isPremiumOwner && (
-          <View style={s.fPremiumBadge}>
-            <Ionicons name="trophy" size={8} color={Colors.premiumGold} />
-            <Text style={s.fPremiumText}>{i18n.t('rooms.premium')}</Text>
+        {isPremiumOwner && tierColor && (
+          <View style={[s.fPremiumBadge, { backgroundColor: `${tierColor}1A`, borderColor: `${tierColor}66` }]}>
+            <Ionicons name={ownerTier === 'Pro' ? 'trophy' : 'star'} size={8} color={tierColor} />
+            <Text style={[s.fPremiumText, { color: tierColor }]}>{ownerTier === 'Pro' ? 'PRO' : 'PLUS'}</Text>
           </View>
         )}
       </View>
@@ -400,7 +237,7 @@ function FollowedRoomCard({ room, index }: { room: Room; index: number }) {
           )}
           <View style={s.fHostRow}>
             <StatusAvatar uri={room.host?.avatar_url} size={28} tier={(room.host as any)?.subscription_tier} frameId={(room.host as any)?.active_frame} customBadgeId={(room.host as any)?.active_badge_id ?? null} />
-            <Text style={s.fHostName} numberOfLines={1}>{room.host?.display_name || 'Anonim'}</Text>
+            <Text style={s.fHostName} numberOfLines={1}>{room.host?.display_name || i18n.t('common.anonymous')}</Text>
             {(room.listener_count || 0) > 0 && (
               <View style={s.fListenerPill}>
                 <Ionicons name="people" size={9} color="rgba(255,255,255,0.6)" />
@@ -544,7 +381,7 @@ function SwipeToHideRow({ children, onHide, onReport }: { children: React.ReactN
   );
 }
 
-const BigLiveRoomCard = React.memo(function BigLiveRoomCard({ room, onJoin, isFollowed, onToggleFollow, onIgnore, participants, currentUserId, currentUserDisplayName, inRoom }: {
+const BigLiveRoomCard = React.memo(function BigLiveRoomCard({ room, onJoin, isFollowed, onToggleFollow, onIgnore, participants, currentUserId, currentUserDisplayName, inRoom, friendInRoom }: {
   room: Room;
   onJoin: (roomId: string) => void;
   isFollowed?: boolean;
@@ -554,6 +391,7 @@ const BigLiveRoomCard = React.memo(function BigLiveRoomCard({ room, onJoin, isFo
   currentUserId?: string;
   currentUserDisplayName?: string;
   inRoom?: boolean; // Kullanıcı başka bir odada mı? → preview engellenir
+  friendInRoom?: { name: string; avatar_url: string | null } | null;
 }) {
   // ★ 2026-04-21: Preview state — karta uzun basınca LiveKit audio preview başlar.
   //   BUG FIX: Önceki versiyonda useEffect closure stale `previewState`'i tuttuğu için
@@ -575,6 +413,7 @@ const BigLiveRoomCard = React.memo(function BigLiveRoomCard({ room, onJoin, isFo
 
   const handleLongPress = () => {
     if (!currentUserId || !room.is_live) return;
+    Haptics.heavy();
     // ★ 2026-04-21: Kullanıcı başka odada (minimize edilmiş) ise preview çalışmaz —
     //   iki LiveKit bağlantısı eşzamanlı = üst üste ses + çifte maliyet.
     if (inRoom) {
@@ -591,8 +430,16 @@ const BigLiveRoomCard = React.memo(function BigLiveRoomCard({ room, onJoin, isFo
   };
 
   const isPersistent = (room as any).is_persistent;
-  const hostName = room.host?.display_name || 'Anonim';
-  const listenerCount = room.listener_count || 0;
+  const hostName = room.host?.display_name || i18n.t('common.anonymous');
+  // ★ v1.7.13.100 (20 May 2026): Yanıltıcı fallback kaldırıldı — DB'de gerçek
+  //   participants count varsa onu kullan (getLive'a embedded count eklendi).
+  //   listener_count alanı stale olabiliyor; participants_count Supabase'in her
+  //   sorguda hesapladığı gerçek count. Fallback yine de raw'a düşer (geri uyum).
+  const embedded = (room as any).room_participants;
+  const actualCount = Array.isArray(embedded) && embedded[0]?.count !== undefined
+    ? Number(embedded[0].count)
+    : (room.listener_count || 0);
+  const listenerCount = actualCount;
   const isSystem = room.id.startsWith('system_');
   const theme = CATEGORY_THEME[room.category] || CATEGORY_THEME.other;
   const isLive = room.is_live && listenerCount > 0;
@@ -623,15 +470,16 @@ const BigLiveRoomCard = React.memo(function BigLiveRoomCard({ room, onJoin, isFo
 
   // ★ v1.3.66: Persistent/boosted room glow Skia ile çiziliyor — Android'de renkli halo
   //   parite (eski shadowColor + elevation Android'de görünmüyordu).
-  // ★ v319.8 (18 May 2026): Card glow yumuşatıldı.
-  //   v319.9 (18 May 2026): İkinci pas — alt kenar belirgin sarı çizgi vardı
-  //   ("çizgiler çok belli olmuş, daha çok yansıma gibi olsa yeterli"). Opacity
-  //   yarıya düşürüldü, blur arttırıldı, offset azaltıldı. Sonuç: kartın ardında
-  //   bambaşka katı bir halo değil, çok hafif renkli yansıma.
+  // ★ v1.7.13.52 (20 May 2026): "Glow yapay ve çirkin" geri bildirimi.
+  //   Wide blur tek başına yetmiyor — renk yoğunluğu yüksek olduğunda kart altında
+  //   "yapışkan etiket" hissi veriyor. Üç değişiklik:
+  //     • Opaklık ~yarıya: persistent 0.20→0.10, boosted 0.28→0.14 (atmosferik).
+  //     • Blur büyüdü: 64-68→100-110 (kenar tamamen erir, halka değil sis).
+  //     • OffsetY 0→8: hafif aşağı kaçış = doğal ışık cast hissi, sticker bitti.
   const skiaGlowColor = isPersistent ? Colors.premiumGold : (isBoosted ? '#F472B6' : null);
-  const skiaGlowOpacity = isPersistent ? 0.15 : 0.20;
-  const skiaGlowBlur = isPersistent ? 48 : 50;
-  const skiaGlowOffsetY = 2;
+  const skiaGlowOpacity = isPersistent ? 0.10 : 0.14;
+  const skiaGlowBlur = isPersistent ? 100 : 110;
+  const skiaGlowOffsetY = 8;
 
   const cardPressable = (
     <Pressable
@@ -665,7 +513,7 @@ const BigLiveRoomCard = React.memo(function BigLiveRoomCard({ room, onJoin, isFo
               color={previewState === 'playing' ? '#FBBF24' : '#94A3B8'}
             />
             <Text style={[s.previewBadgeText, previewState === 'playing' && { color: '#FBBF24' }]}>
-              {previewState === 'playing' ? 'Dinleniyor...' : i18n.t('auto.tabs.home.011')}
+              {previewState === 'playing' ? i18n.t('home.preview_listening') : i18n.t('auto.tabs.home.011')}
             </Text>
           </LinearGradient>
         </View>
@@ -693,13 +541,13 @@ const BigLiveRoomCard = React.memo(function BigLiveRoomCard({ room, onJoin, isFo
       {/* Soluk kategori ikonu — sağ üst köşe (küçültüldü) */}
       {!(room.room_settings as any)?.card_image_url && (
         <View style={s.bigCategoryIconWrap}>
-          <Ionicons name={theme.icon as any} size={48} color="rgba(255,255,255,0.06)" />
+          <Ionicons name={theme.icon as any} size={48} color={theme.accent + '18'} />
         </View>
       )}
 
       {/* === Üst Bar: Sol — CANLI / Boş, Sağ — Premium/Resmi/Boost === */}
       <View style={s.bigTopRow}>
-        {/* Sol: Canlı / Boş badge */}
+        {/* Sol: Canlı / Boş badge + ★ v1.7.13.49 (20 May 2026) kalan süre countdown */}
         <View style={s.bigTopLeft}>
           {room.is_live && listenerCount > 0 ? (
             <View style={s.bigLiveBadge}>
@@ -707,30 +555,37 @@ const BigLiveRoomCard = React.memo(function BigLiveRoomCard({ room, onJoin, isFo
               <Text style={s.bigLiveText}>{i18n.t('rooms.live')}</Text>
             </View>
           ) : room.is_live && listenerCount === 0 ? (
+            // ★ v1.7.13.139 BUG-3 fix: "Yeni Açıldı" yanıltıcı (yeni mi yoksa herkes çıkmış eski mi belirsiz).
+            // FollowedRoomCard'daki "Boş" ile uyumla — semantic doğru, tutarlı.
             <View style={s.bigEmptyBadge}>
-              <Ionicons name="sparkles-outline" size={9} color="#FBBF24" />
-              <Text style={s.bigEmptyText}>{i18n.t('rooms.new')}</Text>
+              <Ionicons name="radio-outline" size={9} color="#94A3B8" />
+              <Text style={s.bigEmptyText}>{i18n.t('home.empty_seat')}</Text>
             </View>
           ) : null}
+          {/* ★ Kalan süre — sadece is_live + expires_at var + persistent değil + future. */}
+          {room.is_live && (room as any).expires_at && !isPersistent && (() => {
+            const expMs = new Date((room as any).expires_at).getTime() - Date.now();
+            if (expMs <= 0) return null;
+            const totalMin = Math.floor(expMs / 60000);
+            const hr = Math.floor(totalMin / 60);
+            const mn = totalMin % 60;
+            const label = hr > 0 ? i18n.t('time.hours_minutes', { hr, mn }) : `${mn}dk`;
+            // Son 15 dakikada uyarı tonu — turuncu/kırmızı
+            const isUrgent = totalMin < 15;
+            return (
+              <View style={[s.bigCountdownPill, isUrgent && s.bigCountdownPillUrgent]}>
+                <Ionicons name="time-outline" size={9} color={isUrgent ? '#FCA5A5' : 'rgba(148,163,184,0.85)'} />
+                <Text style={[s.bigCountdownText, isUrgent && { color: '#FCA5A5' }]}>{label}</Text>
+              </View>
+            );
+          })()}
         </View>
 
-        {/* Sağ: Premium / Resmi / Boost / Trending */}
+        {/* ★ v1.7.13.83 (20 May 2026): Sağ üst — priority-based tek rozet (visual hierarchy).
+            Öncelik: Boost (en eyecatching) > Sistem > Premium > Trending. Eskiden 2-3
+            rozet üst üste bineliyordu, kart kalabalık görünüyordu. */}
         <View style={s.bigTopRight}>
-          {/* ★ 2026-04-21: Premium etiket geri yerleştirildi — kompakt trophy pill.
-             Kart üzerine yapışık değil, normal badge formatında. */}
-          {isPersistent && (
-            <View style={s.bigPremiumPill}>
-              <Ionicons name="trophy" size={9} color="#FDE68A" />
-              <Text style={s.bigPremiumPillText}>{i18n.t('rooms.premium')}</Text>
-            </View>
-          )}
-          {isSystem && (
-            <View style={[s.bigTagBadge, { backgroundColor: 'rgba(20,184,166,0.15)', borderColor: 'rgba(20,184,166,0.3)' }]}>
-              <Ionicons name="shield-checkmark" size={9} color="#14B8A6" />
-              <Text style={[s.bigTagText, { color: '#14B8A6' }]}>{i18n.t('rooms.official')}</Text>
-            </View>
-          )}
-          {isBoosted && (
+          {isBoosted ? (
             <View style={[s.bigTagBadge, { backgroundColor: 'rgba(244,114,182,0.18)', borderColor: 'rgba(244,114,182,0.35)' }]}>
               <Ionicons name="rocket" size={10} color="#F472B6" style={{
                 textShadowColor: 'rgba(244,114,182,0.6)',
@@ -739,39 +594,41 @@ const BigLiveRoomCard = React.memo(function BigLiveRoomCard({ room, onJoin, isFo
               }} />
               <Text style={[s.bigTagText, { color: '#F472B6', fontWeight: '900', letterSpacing: 0.5 }]}>{i18n.t('rooms.boost')}</Text>
             </View>
-          )}
-          {!isBoosted && !isSystem && listenerCount >= 5 && (
+          ) : isSystem ? (
+            <View style={[s.bigTagBadge, { backgroundColor: 'rgba(20,184,166,0.15)', borderColor: 'rgba(20,184,166,0.3)' }]}>
+              <Ionicons name="shield-checkmark" size={9} color="#14B8A6" />
+              <Text style={[s.bigTagText, { color: '#14B8A6' }]}>{i18n.t('rooms.official')}</Text>
+            </View>
+          ) : listenerCount >= 5 ? (
             <View style={[s.bigTagBadge, { backgroundColor: 'rgba(251,191,36,0.15)', borderColor: 'rgba(251,191,36,0.3)' }]}>
               <Ionicons name="star" size={9} color="#FBBF24" />
               <Text style={[s.bigTagText, { color: '#FBBF24' }]}>{i18n.t('rooms.trend')}</Text>
             </View>
-          )}
+          ) : null}
         </View>
       </View>
 
-      {/* === Başlık + Küçük İnline Rozetler (flexWrap ile taşma önleme) === */}
+      {/* === Başlık + Küçük İnline Rozetler === */}
       <View style={s.bigTitleRow}>
         <Text style={s.bigCardTitle} numberOfLines={1}>{room.name}</Text>
         <View style={s.bigBadgeWrap}>
-          {room.type === 'closed' && (
-            <View style={s.bigInlineBadge}>
-              <Ionicons name="lock-closed" size={8} color="#F59E0B" />
-              <Text style={[s.bigInlineBadgeText, { color: '#F59E0B' }]}>{i18n.t('rooms.encrypted')}</Text>
+          {room.type === 'closed' && !!((room.room_settings as any)?.password || (room as any).room_password) && (
+            <View style={s.bigInlineBadgeIcon}>
+              <Ionicons name="lock-closed" size={10} color="#F59E0B" />
             </View>
           )}
           {room.type === 'invite' && (
-            <View style={[s.bigInlineBadge, { backgroundColor: 'rgba(139,92,246,0.12)', borderColor: 'rgba(139,92,246,0.25)' }]}>
-              <Ionicons name="mail" size={8} color="#8B5CF6" />
-              <Text style={[s.bigInlineBadgeText, { color: '#8B5CF6' }]}>{i18n.t('rooms.invite_only')}</Text>
+            <View style={[s.bigInlineBadgeIcon, { backgroundColor: 'rgba(139,92,246,0.12)', borderColor: 'rgba(139,92,246,0.25)' }]}>
+              <Ionicons name="mail" size={10} color="#8B5CF6" />
             </View>
           )}
           {(room.room_settings as any)?.entry_fee_sp > 0 && (
             <View style={[s.bigInlineBadge, { backgroundColor: 'rgba(212,175,55,0.12)', borderColor: 'rgba(212,175,55,0.25)' }]}>
               <Ionicons name="cash" size={8} color="#D4AF37" />
-              <Text style={[s.bigInlineBadgeText, { color: '#D4AF37' }]}>{(room.room_settings as any).entry_fee_sp} SP</Text>
+              <Text style={[s.bigInlineBadgeText, { color: '#D4AF37' }]}>{(room.room_settings as any).entry_fee_sp}</Text>
             </View>
           )}
-          {(room.room_settings as any)?.is_locked && <Ionicons name="lock-closed" size={11} color="#F59E0B" />}
+          {(room.room_settings as any)?.is_locked && <Ionicons name="ban" size={11} color="#EF4444" />}
           {(room.room_settings as any)?.followers_only && <Ionicons name="people" size={11} color="#A78BFA" />}
           {(room.room_settings as any)?.age_restricted && <Text style={{ fontSize: 10 }}>🔞</Text>}
           {(room.room_settings as any)?.donations_enabled && <Ionicons name="heart" size={10} color="#EF4444" />}
@@ -784,11 +641,16 @@ const BigLiveRoomCard = React.memo(function BigLiveRoomCard({ room, onJoin, isFo
           })()}
         </View>
       </View>
-      {/* ★ 2026-04-21: Açıklama keşfet kartında render edilmiyor — farklı odalarda
-         açıklamalı/açıklamasız diye kart yükseklikleri tutmuyordu. Tüm kartlar aynı
-         yükseklikte kalsın, açıklama odaya katıl'da/detay panelinde görünür. */}
 
-      {/* ★ Faz 4.3 — Tag chips (max 3) — BigLiveRoomCard'da da göster */}
+      {/* Arkadaşın Burada badge */}
+      {friendInRoom && (
+        <View style={s.friendBadge}>
+          <View style={s.friendDot} />
+          <Text style={s.friendBadgeText}>{i18n.t('home.friend_in_room', { name: friendInRoom.name })}</Text>
+        </View>
+      )}
+
+      {/* Tag chips */}
       {Array.isArray((room as any).tags) && (room as any).tags.length > 0 && (
         <View style={[s.fTagRow, { paddingHorizontal: 14 }]}>
           {(room as any).tags.slice(0, 3).map((t: string) => (
@@ -799,17 +661,21 @@ const BigLiveRoomCard = React.memo(function BigLiveRoomCard({ room, onJoin, isFo
         </View>
       )}
 
-      {/* === Host + Stats + Katıl — tek satır === */}
+      {/* Host + Stats + Katıl — tek satır */}
       <View style={s.bigHostStatsRow}>
-        <StatusAvatar uri={room.host?.avatar_url} size={36} tier={(room.host as any)?.subscription_tier} frameId={(room.host as any)?.active_frame} customBadgeId={(room.host as any)?.active_badge_id ?? null} />
-        <Text style={[s.bigHostName, { flex: 1, minWidth: 0 }]} numberOfLines={1}>{hostName}</Text>
-        {/* ★ 2026-04-21: Katılımcı avatar stack — Clubhouse tarzı (top 4 + sayı)
-            ★ 2026-04-22 FIX: Profil resmi olmayanlar stack'ten EXCLUDE edilir — slate-gray
-            boş daireler "bug/kötü placeholder" görünümü yaratıyordu. Stack'te sadece gerçek
-            avatarlar, listenerCount zaten "+N" overflow ile toplam sayıyı gösterir. */}
+        <StatusAvatar uri={room.host?.avatar_url} size={44} tier={(room.host as any)?.subscription_tier} frameId={(room.host as any)?.active_frame} customBadgeId={(room.host as any)?.active_badge_id ?? null} />
+        <View style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          <Text style={s.bigHostName} numberOfLines={1}>{hostName}</Text>
+          {(room.host as any)?.is_verified === true && <VerifiedBadge size={12} />}
+          {isPersistent && (
+            <Ionicons name="trophy" size={11} color="#FDE68A" style={{
+              textShadowColor: 'rgba(0,0,0,0.5)',
+              textShadowOffset: { width: 0, height: 1 },
+              textShadowRadius: 2,
+            }} />
+          )}
+        </View>
         {(() => {
-          // ★ 2026-04-22: Katılımcı avatar stack — bozuk / boş URL'lerde getAvatarSource
-          //   fallback default avatar döner (koyu "boş daire" bugu giderildi).
           const list = participants || [];
           if (list.length === 0) {
             return (
@@ -845,7 +711,7 @@ const BigLiveRoomCard = React.memo(function BigLiveRoomCard({ room, onJoin, isFo
           </Pressable>
         )}
         <SkiaShadow shadowColor="#14B8A6" shadowOpacity={0.4} shadowBlur={6} shadowOffsetY={2} borderRadius={11}>
-        <Pressable onPress={() => onJoin(room.id)}>
+        <Pressable onPress={(e) => { e.stopPropagation(); onJoin(room.id); }} onStartShouldSetResponder={() => true}>
           <LinearGradient
             colors={['#14B8A6', '#0D9488', '#065F56']}
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
@@ -857,19 +723,43 @@ const BigLiveRoomCard = React.memo(function BigLiveRoomCard({ room, onJoin, isFo
         </Pressable>
         </SkiaShadow>
       </View>
+      {/* Kategori accent çizgisi — kartın alt kenarı */}
+      <LinearGradient
+        colors={[theme.accent + '00', theme.accent + '60', theme.accent + '00']}
+        start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+        style={{ position: 'absolute', bottom: 0, left: 16, right: 16, height: 2, borderRadius: 1 }}
+      />
     </Pressable>
   );
 
+  // ★ v1.7.13.142: Mount animasyonu — kart fade-in + slide-up (premium hissi)
+  const mountAnim = React.useRef(new Animated.Value(0)).current;
+  React.useEffect(() => {
+    const anim = Animated.timing(mountAnim, {
+      toValue: 1,
+      duration: 350,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    });
+    anim.start();
+    // ★ v1.7.13.143: Memory leak fix — unmount'ta animasyonu durdur
+    return () => anim.stop();
+  }, []);
+
   return (
-    <View style={s.bigCardWrapper}>
+    <Animated.View style={[s.bigCardWrapper, {
+      opacity: mountAnim,
+      transform: [{ translateY: mountAnim.interpolate({ inputRange: [0, 1], outputRange: [18, 0] }) }],
+    }]}>
       {skiaGlowColor ? (
         <SkiaShadow shadowColor={skiaGlowColor} shadowOpacity={skiaGlowOpacity} shadowBlur={skiaGlowBlur} shadowOffsetY={skiaGlowOffsetY} borderRadius={18}>
           {cardPressable}
         </SkiaShadow>
       ) : cardPressable}
-    </View>
+    </Animated.View>
   );
 });
+
 
 // ════════════════════════════════════════════════════════════
 // ANA EKRAN — KEŞFET (SopranoChat v2)
@@ -877,7 +767,8 @@ const BigLiveRoomCard = React.memo(function BigLiveRoomCard({ room, onJoin, isFo
 export default function HomeScreen() {
   const router = useRouter();
   const { t } = useTranslation();
-  const { firebaseUser, profile, setShowNotifDrawer, setNotifDrawerAnchorRight, minimizedRoom, justCompletedOnboarding, setJustCompletedOnboarding, setTabBarCovered } = useAuth();
+  const { firebaseUser, profile, refreshProfile, setShowNotifDrawer, setNotifDrawerAnchorRight, minimizedRoom, justCompletedOnboarding, setJustCompletedOnboarding, setTabBarCovered } = useAuth();
+  const [showBoostPicker, setShowBoostPicker] = useState(false);
   const { openUserProfile } = useUserProfileSheet();
   const insets = useSafeAreaInsets();
   // ★ 2026-04-24: Banner slide-down — sadece uygulama ilk açılışında
@@ -892,9 +783,40 @@ export default function HomeScreen() {
   useTheme();
 
   const [rooms, setRooms] = useState<Room[]>([]);
+  // ★ v1.7.13.143 PERF: roomsRef — handleJoinRoom'un rooms dep'ini kaldırmak için
+  const roomsRef = useRef<Room[]>([]);
+  useEffect(() => { roomsRef.current = rooms; }, [rooms]);
   const [filteredRooms, setFilteredRooms] = useState<Room[]>([]);
   const [followedRooms, setFollowedRooms] = useState<Room[]>([]);
+  // ★ v1.7.13.120: boostedProfiles + topDonorToday state'leri Keşfet sekmesine taşındı.
+  //   FourthSlotCard + BoostedProfileCard sub-component tanımları üstte duruyor (dead code,
+  //   ileride ortak component'e çıkarılacak). Şimdilik dokunulmadı (refactor scope dışı).
+  // ★ v1.7.13.49 (20 May 2026): Planlı (gelecek) odalar — Keşfet'te kompakt yatay scroll.
+  const [scheduledRooms, setScheduledRooms] = useState<Room[]>([]);
+  // ★ v1.7.13.140 (21 May 2026): Soprano Lobi — 7/24 açık sistem odası. Cold start çözümü.
+  const [lobiRoom, setLobiRoom] = useState<Room | null>(null);
+  // ★ v1.7.13.135: Keşfet ASKIYA ALINDIĞINDA boost edilen profiller GÖRÜNMÜYORDU.
+  //   SP harcanan ama hiçbir görünürlük kazanılmayan kritik bug. Ana Sayfa'ya geri.
   const [boostedProfiles, setBoostedProfiles] = useState<any[]>([]);
+  // ★ v1.7.13.146 (24 May 2026): Clubhouse + takip butonu için takip edilen kullanıcılar.
+  const [followedUserIds, setFollowedUserIds] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    if (!firebaseUser?.uid) return;
+    FriendshipService.getFollowing(firebaseUser.uid)
+      .then(list => setFollowedUserIds(new Set(list.map(u => u.id))))
+      .catch(() => {});
+  }, [firebaseUser?.uid]);
+  const handleHomeFollow = useCallback(async (targetId: string) => {
+    if (!firebaseUser?.uid || targetId === firebaseUser.uid) return;
+    setFollowedUserIds(prev => new Set(prev).add(targetId));
+    const result = await FriendshipService.follow(firebaseUser.uid, targetId);
+    if (!result.success) {
+      setFollowedUserIds(prev => { const n = new Set(prev); n.delete(targetId); return n; });
+      showToast({ title: i18n.t('common.error'), message: result.error || '', type: 'error' });
+    } else {
+      showToast({ title: '✓ Takip edildi', type: 'success' });
+    }
+  }, [firebaseUser?.uid]);
   // ★ 2026-04-21: Her oda için top N katılımcı avatarı — keşfet kartında stack gösterilir.
   const [participantAvatars, setParticipantAvatars] = useState<Record<string, { avatar_url: string | null; display_name: string | null }[]>>({});
   // ★ 2026-04-21: recentRooms state kaldırıldı — Keşfet'te hiçbir yerde render
@@ -902,6 +824,7 @@ export default function HomeScreen() {
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
   const { openSearch } = useUserSearchSheet();
   // ★ 2026-04-21: API hatasını empty state'ten ayır — kullanıcı retry görebilsin.
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -957,7 +880,6 @@ export default function HomeScreen() {
   // ★ 2026-04-23: null = kontrol ediliyor, true = göster, false = gösterme
   //   null durumunda tam ekran örtü render edilir → tab bar flash önlenir
   const [showWelcome, setShowWelcome] = useState<boolean | null>(justCompletedOnboarding ? true : null);
-  const [showFABHint, setShowFABHint] = useState(false);
   // ★ 2026-04-29: First-time user "Oda oluştur!" yönlendirmesi — DiscoverWelcome bittikten sonra Keşfet'e düşünce
   const [showRoomHint, setShowRoomHint] = useState(false);
   // ★ 2026-05-09 FLASH FIX v3: Cover şartı değişince tab bar'ı da gizle/göster.
@@ -1002,7 +924,7 @@ export default function HomeScreen() {
       const room = await RoomService.quickCreate(firebaseUser.uid, displayName, category, userTier);
       router.push(`/room/${room.id}` as any);
     } catch (err: any) {
-      showToast({ title: i18n.t('tabs.home.005'), message: err?.message || 'Beklenmedik hata', type: 'error' });
+      showToast({ title: i18n.t('tabs.home.005'), message: err?.message || i18n.t('common.unexpected_error'), type: 'error' });
     } finally {
       setCreatingRoom(false);
     }
@@ -1092,8 +1014,24 @@ export default function HomeScreen() {
 
   // ★ DUP-3 FIX: Online friends artık merkezî provider'dan geliyor
   const { allFriends, onlineFriends, friendIds: friendIdSet } = useOnlineFriends();
-  // ★ 2026-04-30: Presence-based online set — stale DB flag yerine.
-  const onlineIdSet = new Set(onlineFriends.map(f => f.id));
+  // ★ v1.7.13.143 PERF: useMemo — her render'da yeni Set oluşturmayı önle
+  const onlineIdSet = useMemo(() => new Set(onlineFriends.map(f => f.id)), [onlineFriends]);
+
+  // ★ v1.7.13.150 PERF: friendInRoom map önceden hesapla — renderItem'da yeni obje oluşturmayı önle
+  const friendInRoomMap = useMemo(() => {
+    const map: Record<string, { name: string; avatar_url: string | null }> = {};
+    if (!friendIdSet || friendIdSet.size === 0) return map;
+    for (const f of allFriends) {
+      map[f.id] = { name: f.display_name || 'Arkadaşın', avatar_url: f.avatar_url || null };
+    }
+    return map;
+  }, [allFriends, friendIdSet]);
+
+  // ★ v1.7.13.150 PERF: Boosted profiles — self filtre tek sefer hesaplanır
+  const visibleBoostedProfiles = useMemo(
+    () => boostedProfiles.filter(bp => bp.id !== firebaseUser?.uid),
+    [boostedProfiles, firebaseUser?.uid]
+  );
 
   // ★ Realtime kanal bağımlılık fix: loadData'yı ref ile sar
   const loadDataRef = useRef<() => Promise<void>>();
@@ -1102,7 +1040,10 @@ export default function HomeScreen() {
   const loadData = useCallback(async () => {
     try {
       setLoadError(null);
-      const liveRooms = await RoomService.getLive(firebaseUser?.uid);
+      const liveRoomsRaw = await RoomService.getLive(firebaseUser?.uid);
+      // ★ v1.7.13.140: Sistem odaları (Lobi) ana listede gösterilmez —
+      //   LobiCard özel slot ile en üstte zaten render ediliyor.
+      const liveRooms = liveRoomsRaw.filter(r => !isSystemRoom(r.id));
 
       setRooms(liveRooms);
       setFilteredRooms(liveRooms);
@@ -1132,11 +1073,23 @@ export default function HomeScreen() {
       // ★ 2026-04-21: recentRooms fetch'i kaldırıldı — Keşfet'te render edilmiyordu.
       //   addRecentRoom() yazma tarafı yaşamaya devam ediyor (Odalarım okuyor).
 
-      // Öne Çıkan Profiller (herkes görebilir)
+      // ★ v1.7.13.135: Boost profilleri Ana Sayfa'ya geri (Keşfet askıda).
       try {
         const bp = await ProfileService.getBoostedProfiles(8);
-        setBoostedProfiles(bp);
+        setBoostedProfiles(bp || []);
       } catch { }
+
+      // ★ v1.7.13.49 (20 May 2026): Planlı odalar — sonraki 7 gün.
+      try {
+        const sched = await RoomService.getUpcomingScheduled(10);
+        setScheduledRooms(sched);
+      } catch { }
+
+      // ★ v1.7.13.140 (21 May 2026): Soprano Lobi — 7/24 açık. Hata olursa kart gizlenir.
+      try {
+        const lobi = await getLobiRoom();
+        setLobiRoom(lobi);
+      } catch { setLobiRoom(null); }
     } catch (err: any) {
       if (__DEV__) console.warn('[Home] Load error:', err);
       // ★ Kullanıcıya görünür hata — hem toast hem persistent error state
@@ -1146,6 +1099,7 @@ export default function HomeScreen() {
     } finally {
       setLoading(false);
       setRefreshing(false);
+
     }
   }, [firebaseUser]);
 
@@ -1166,22 +1120,11 @@ export default function HomeScreen() {
     };
   }, [loadData]));
 
-  // ★ Periyodik: Free tier boş/süresi dolmuş odaları otomatik kapat
-  // Plus+ odalar muaf — host manuel yönetir (dondur/kapat/sil)
-  useEffect(() => {
-    const cleanup = async () => {
-      try {
-        const count = await RoomService.autoCloseExpired();
-        if (count > 0) {
-          if (__DEV__) console.log(`[Home] AutoClose: ${count} Free oda kapatıldı`);
-          loadData();
-        }
-      } catch { }
-    };
-    cleanup();
-    const interval = setInterval(cleanup, 120000);
-    return () => clearInterval(interval);
-  }, [loadData]);
+  // ★ v1.7.13.87 (20 May 2026): Client-side autoCloseExpired interval KALDIRILDI.
+  //   DB cron `auto-close-free-rooms` zaten her 2 dakikada bir aynı işi yapıyor;
+  //   client interval gereksiz network maliyeti + race condition yaratıyordu.
+  //   Realtime postgres_changes is_live=false update'ini zaten yakalar → loadData
+  //   tetiklenir. Yani UI hâlâ güncel.
 
   // ★ Realtime: Oda oluşturma/kapanma/güncelleme anında keşfet listesini güncelle
   useEffect(() => {
@@ -1212,6 +1155,10 @@ export default function HomeScreen() {
           // is_live false olduysa listeden çıkar
           if (updated.is_live === false) {
             setRooms(prev => prev.filter(r => r.id !== updated.id));
+            // ★ v1.7.13.88 (20 May 2026): Oda kapanınca participant avatar cache temizle
+            setParticipantAvatars(prev => {
+              const n = { ...prev }; delete n[updated.id]; return n;
+            });
           } else {
             // ★ 2026-04-22: Uyandırılan oda (is_live false→true) listede YOK olabilir — mevcut
             //   map update bulamayıp eklemiyordu. Şimdi: listede yoksa full reload (host JOIN ile).
@@ -1225,6 +1172,16 @@ export default function HomeScreen() {
               loadDataRef.current?.();
               return prev;
             });
+            // ★ v1.7.13.88 (20 May 2026): Kullanıcı odadan çıkınca listener_count değişir
+            //   ama participantAvatars cache eski avatarı tutar — stack'te hayalet katılımcı
+            //   görünür. UPDATE event'inde o oda için top participants yeniden fetch edilir.
+            if (typeof updated.listener_count === 'number') {
+              RoomService.getTopParticipants([updated.id], 4)
+                .then(map => {
+                  setParticipantAvatars(prev => ({ ...prev, ...map }));
+                })
+                .catch(() => {});
+            }
           }
         }
       })
@@ -1242,6 +1199,8 @@ export default function HomeScreen() {
       try { supabase.removeChannel(channel); } catch {}
     };
   }, []); // ★ FIX: loadData bağımlılığı kaldırıldı — ref kullanılıyor
+
+  // ★ v1.7.13.120: Boost realtime kanalı Keşfet sekmesine taşındı.
 
   // ★ DUP-3 FIX: Online friends Realtime subscription artık
   // providers/OnlineFriendsProvider.tsx'de merkezileştirildi.
@@ -1263,15 +1222,20 @@ export default function HomeScreen() {
       const { getDeviceLanguage } = require('../../utils/locale');
       const userLocale = getDeviceLanguage();
       base = base.filter(room => {
-        for (const f of advancedFilters) {
-          if (f === 'open' && room.type !== 'open') return false;
-          if (f === 'closed' && room.type !== 'closed') return false;
-          if (f === 'invite' && room.type !== 'invite') return false;
+        // ★ v1.7.13.143 FIX: Oda tipi filtreleri OR mantığıyla çalışmalı
+        // (open + closed seçilince her ikisi de gösterilmeli, AND ile 0 sonuç çıkıyordu)
+        const typeFilters = advancedFilters.filter(f => f === 'open' || f === 'closed' || f === 'invite');
+        const otherFilters = advancedFilters.filter(f => f !== 'open' && f !== 'closed' && f !== 'invite');
+
+        // Tip filtreleri: OR (herhangi biri eşleşmeli)
+        if (typeFilters.length > 0 && !typeFilters.includes(room.type as any)) return false;
+
+        // Diğer filtreler: AND (hepsi sağlanmalı)
+        for (const f of otherFilters) {
           if (f === 'age' && !(room.room_settings as any)?.age_restricted) return false;
           if (f === 'premium' && !(room as any).is_persistent) return false;
           if (f === 'myLang') {
             const rl = (room.room_settings as any)?.room_language;
-            // Oda dili yok sayılırsa (unsetted) tüm kullanıcılar girebilir; filtre dışı sayma
             if (rl && rl !== userLocale) return false;
           }
         }
@@ -1337,6 +1301,9 @@ export default function HomeScreen() {
       showToast({ title: i18n.t('tabs.home.007'), message: i18n.t('tabs.home.008'), type: 'warning' });
       return;
     }
+    // ★ v1.7.13.119 (20 May 2026): Misafir DB satırı var (is_guest=true) → odaya
+    //   listener olarak girebilir. RLS engelleri: chat/gift/follow/donate yasak.
+    //   Persistent/premium-only oda block'u zaten ileride uygulanır.
     // ★ v299: Double-tap guard — aynı odaya 2 ardışık tıklama tek navigation olarak işlensin.
     //   1sn sonra reset; kullanıcı geri dönüp başka/aynı odaya tekrar girebilsin.
     if (joiningRoomRef.current === roomId) return;
@@ -1344,7 +1311,7 @@ export default function HomeScreen() {
     setTimeout(() => { joiningRoomRef.current = null; }, 1000);
     // ★ 2026-04-21: Audio preview aktifse önce kapat — ana LiveKit bağlantısı çakışmasın
     roomPreviewService.stop().catch(() => {});
-    const room = rooms.find(r => r.id === roomId);
+    const room = roomsRef.current.find(r => r.id === roomId);
     // ★ 2026-04-22 FIX: Persistent oda → Free user block KALDIRILDI.
     //   is_persistent, host'un tier özelliği (Plus+ kalıcı oda açabilir) — dinleyici
     //   tier'ıyla ilgisi yok. Free kullanıcılar da kalıcı odalara girebilmeli.
@@ -1363,7 +1330,7 @@ export default function HomeScreen() {
       });
     }
     router.push(`/room/${roomId}`);
-  }, [firebaseUser, rooms, profile, router, addRecentRoom]);
+  }, [firebaseUser, profile, router]);
 
   // ★ Stable follow toggle — BigLiveRoomCard memo'sunu koruyor (inline callback yerine)
   const handleToggleFollow = useCallback(async (roomId: string, currentlyFollowed: boolean) => {
@@ -1383,18 +1350,46 @@ export default function HomeScreen() {
       } else {
         setFollowedRoomIds(prev => { const n = { ...prev }; delete n[roomId]; return n; });
       }
-      showToast({ title: i18n.t('tabs.home.009'), message: currentlyFollowed ? i18n.t('auto.tabs.home.007') : 'Oda takip edilemedi.', type: 'error' });
+      showToast({ title: i18n.t('tabs.home.009'), message: currentlyFollowed ? i18n.t('auto.tabs.home.007') : i18n.t('home.follow_failed'), type: 'error' });
     }
   }, [firebaseUser]);
+
+  // ★ v1.7.13.150 PERF: Stable keyExtractor — inline arrow yerine sabit referans
+  const roomKeyExtractor = useCallback((item: any) => item.id, []);
+
+  // ★ v1.7.13.150 PERF: Stable renderItem — friendInRoom artık map'ten geliyor (yeni obje yok)
+  const renderRoomItem = useCallback(({ item: room }: { item: any }) => {
+    const friendInRoom = friendInRoomMap[room.host_id] || null;
+    return (
+      <SwipeToHideRow
+        onHide={() => ignoreRoom(room.id, room.name)}
+        onReport={() => {
+          if (!firebaseUser) { showToast({ title: i18n.t('tabs.home.010'), message: i18n.t('tabs.home.011'), type: 'warning' }); return; }
+          setReportRoom({ id: room.id, name: room.name });
+        }}
+      >
+        <BigLiveRoomCard
+          room={room}
+          onJoin={handleJoinRoom}
+          isFollowed={!!followedRoomIds[room.id]}
+          onToggleFollow={firebaseUser ? handleToggleFollow : undefined}
+          participants={participantAvatars[room.id]}
+          currentUserId={firebaseUser?.uid}
+          currentUserDisplayName={profile?.display_name || undefined}
+          inRoom={!!minimizedRoom}
+          friendInRoom={friendInRoom}
+        />
+      </SwipeToHideRow>
+    );
+  }, [friendInRoomMap, followedRoomIds, participantAvatars, firebaseUser, profile, minimizedRoom, handleJoinRoom, handleToggleFollow, ignoreRoom]);
+
 
   // ★ 2026-04-21: Profile null race guard — firebaseUser varken profile henüz fetch edilmemişse
   //   (ProfileService gecikmeli), getEffectiveTier/avatar undefined olmasın diye loading göster.
   if (loading || (firebaseUser && !profile)) {
     return (
       <AppBackground variant="explore" radialGlow>
-        <View style={[s.container, { justifyContent: 'center', alignItems: 'center' }]}>
-          <AppLoader size={56} />
-        </View>
+        <HomeScreenSkeleton />
       </AppBackground>
     );
   }
@@ -1430,7 +1425,7 @@ export default function HomeScreen() {
                 mode: 'discover',
                 onSelectUser: (userId) => openUserProfile(userId),
                 onSelectRoom: (roomId) => handleJoinRoom(roomId),
-              })} accessibilityLabel="Ara">
+              })} accessibilityLabel={t('common.search')}>
                 <Ionicons name="search-outline" size={22} color="#F1F5F9" style={s.headerIcon} />
               </AnimatedHeaderIconBtn>
               <AnimatedHeaderIconBtn staticIcon>
@@ -1464,7 +1459,7 @@ export default function HomeScreen() {
 
         <FlatList
           data={filteredRooms}
-          keyExtractor={(item) => item.id}
+          keyExtractor={roomKeyExtractor}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: insets.bottom + 110 }}
           refreshControl={
@@ -1484,6 +1479,9 @@ export default function HomeScreen() {
           //   scroll sınırı artık top bar (logo+ikonlar); diğer her şey rooms ile birlikte kaydırılıyor.
           ListHeaderComponent={
             <>
+              {/* ★ v1.7.13.120 (21 May 2026): Carousel'ler (Karşılama Pilotları, Resmi Tema Odaları,
+                   Yeni Sopranolular, Öne Çıkan, Günün Cömerti) Keşfet sekmesine taşındı.
+                   Ana Sayfa artık SADECE canlı oda listesi + filtreler + Hoşgeldin card. */}
               {/* Hoşgeldin — Glassmorphism konteyner + Zamana göre selamlama
                   ★ v298 (17 May 2026): Welcome card'a "Oda Aç" gradient pill eklendi.
                   Önceki FAB (yuvarlak floating button) kullanıcı tarafından çirkin
@@ -1492,7 +1490,7 @@ export default function HomeScreen() {
               <View style={s.welcomeCard}>
                 <View style={s.welcomeRow}>
                   <Pressable onPress={() => router.push('/(tabs)/profile')}>
-                    <StatusAvatar uri={profile?.avatar_url} size={42} isOnline={true} tier={profile?.subscription_tier} isSelf frameId={(profile as any)?.active_frame} customBadgeId={(profile as any)?.active_badge_id ?? null} />
+                    <StatusAvatar uri={profile?.avatar_url} size={32} isOnline={true} tier={profile?.subscription_tier} isSelf frameId={(profile as any)?.active_frame} customBadgeId={(profile as any)?.active_badge_id ?? null} />
                   </Pressable>
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <Text style={s.welcomeTitle} numberOfLines={1}>
@@ -1508,7 +1506,14 @@ export default function HomeScreen() {
                     <Text style={s.welcomeSub} numberOfLines={1}>
                       {(() => {
                         const realRooms = rooms.filter(r => !isSystemRoom(r.id));
-                        const totalListeners = realRooms.reduce((sum, r) => sum + (r.listener_count || 0), 0);
+                        // ★ v1.7.13.100 (20 May 2026): Embedded count tercih edilir (gerçek)
+                        const totalListeners = realRooms.reduce((sum, r) => {
+                          const embed = (r as any).room_participants;
+                          const count = Array.isArray(embed) && embed[0]?.count !== undefined
+                            ? Number(embed[0].count)
+                            : (r.listener_count || 0);
+                          return sum + count;
+                        }, 0);
                         if (totalListeners > 0) {
                           return `🔴 ${t('home.live_count', { count: totalListeners })}`;
                         }
@@ -1534,7 +1539,7 @@ export default function HomeScreen() {
                       style={StyleSheet.absoluteFillObject}
                     />
                     <Ionicons name="add" size={18} color="#FFF" style={s.welcomeCreatePillIcon} />
-                    <Text style={s.welcomeCreatePillText}>Oda Aç</Text>
+                    <Text style={s.welcomeCreatePillText}>{t('home.create_room')}</Text>
                   </Pressable>
                 </View>
               </View>
@@ -1543,143 +1548,132 @@ export default function HomeScreen() {
                   keşfette zaten "Çevrimiçi" drawer (sağ üst person ikonu) bu işlevi
                   üstleniyor. Mükerrer satır karmaşa yaratıyordu. */}
 
-              {/* ★ 2026-04-21: Tek profilde kompakt strip, 2+ profilde carousel */}
-              {boostedProfiles.length === 1 && (() => {
-                const bp = boostedProfiles[0];
-                const bpTier = bp.subscription_tier || 'Free';
-                const isGM = bp.is_admin || bpTier === 'GodMaster';
-                const bpAccent = isGM ? '#DC2626' : bpTier === 'Pro' ? '#D4AF37' : bpTier === 'Plus' ? '#A78BFA' : '#14B8A6';
-                // ★ v1.7.13.48: tier pill (Plus/Pro/GM) tek boost yatay şeritte de KALDIRILDI.
-                //   Kullanıcı: 'boost edilen kartlardan plus/pro etiketlerini kaldır'.
-                // const bpLabel = ... (kullanılmıyor, kaldırıldı)
-                const bpGrad: [string, string] = isGM
-                  ? ['#450A0A', '#1E1B1B'] : bpTier === 'Pro'
-                  ? ['#3F2B0A', '#1F1808'] : bpTier === 'Plus'
-                  ? ['#2A0F47', '#15081F'] : ['#0A2F3C', '#051920'];
-                return (
-                  <Pressable
-                    style={({ pressed }) => ({
-                      marginHorizontal: 16, marginBottom: 6, borderRadius: 14, overflow: 'hidden',
-                      borderWidth: 1.2, borderColor: bpAccent + '55',
-                      shadowColor: bpAccent, shadowOffset: { width: 0, height: 3 },
-                      shadowOpacity: 0.3, shadowRadius: 8, elevation: 5,
-                      opacity: pressed ? 0.9 : 1, transform: [{ scale: pressed ? 0.985 : 1 }],
-                    })}
-                    onPress={() => openUserProfile(bp.id)}
-                  >
-                    <LinearGradient
-                      colors={[bpGrad[0], bpGrad[1]]}
-                      start={{ x: 0, y: 0 }} end={{ x: 1, y: 0.5 }}
-                      style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 14, gap: 12 }}
-                    >
-                      {/* Sparkle + Başlık */}
-                      <Ionicons name="sparkles" size={12} color="#FBBF24" style={{ position: 'absolute', top: 5, left: 10, opacity: 0.6 }} />
-                      <StatusAvatar uri={bp.avatar_url} size={42} tier={bpTier} isAdmin={bp.is_admin} isOnline={friendIdSet?.has(bp.id) ? onlineIdSet.has(bp.id) : undefined} frameId={(bp as any).active_frame} customBadgeId={(bp as any).active_badge_id ?? null} />
-                      <View style={{ flex: 1, minWidth: 0 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                          <Text numberOfLines={1} style={{ fontSize: 14, fontWeight: '800', color: '#F1F5F9', flexShrink: 1, textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }}>
-                            {bp.display_name || i18n.t('auto.tabs.home.004')}
-                          </Text>
-                          {/* tier pill kaldırıldı v1.7.13.48 */}
-                        </View>
-                        <Text style={{ fontSize: 10, color: 'rgba(251,191,36,0.65)', fontWeight: '600', marginTop: 2 }}>{i18n.t('tabs.home.001')}</Text>
-                      </View>
-                      <View style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, backgroundColor: bpAccent + '20', borderWidth: 0.8, borderColor: bpAccent + '50' }}>
-                        <Ionicons name="chevron-forward" size={14} color={bpAccent} />
-                      </View>
-                    </LinearGradient>
-                  </Pressable>
-                );
-              })()}
-              {/* ★ 2-3 profil → yan yana eşit genişlikte mini kartlar (scroll yok, boşluk yok) */}
-              {boostedProfiles.length >= 2 && boostedProfiles.length <= 3 && (
-                <View style={{ marginBottom: 4 }}>
-                  <View style={s.popularHeader}>
-                    <Ionicons name="sparkles" size={14} color="#FBBF24" />
-                    <Text style={s.popularTitle}>{t('home.featured')}</Text>
+              {/* ★ v1.7.13.140 (21 May 2026): Soprano Lobi kartı — 7/24 açık sistem odası.
+                  Cold start çözümü: uygulama asla "boş" görünmesin. Welcome card'ın hemen
+                  altında öne çıkar. Lobi DB'de yoksa veya yüklenmediyse kart gizlenir. */}
+              {lobiRoom && (lobiRoom as any).is_live !== false && (
+                <Pressable
+                  onPress={() => router.push(`/room/${LOBI_ROOM_ID}`)}
+                  style={({ pressed }) => [s.lobiCard, pressed && { opacity: 0.92, transform: [{ scale: 0.98 }] }]}
+                >
+                  <LinearGradient
+                    colors={['#14B8A6', '#0EA5E9', '#A78BFA']}
+                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                    style={StyleSheet.absoluteFillObject}
+                  />
+                  <View style={s.lobiCardOverlay} />
+                  <View style={s.lobiCardLeft}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <View style={s.lobiLiveDot} />
+                      <Text style={s.lobiCardLabel}>{i18n.t('home.soprano_lobi')}</Text>
+                    </View>
+                    <Text style={s.lobiCardTitle}>{i18n.t('home.lobi_subtitle')}</Text>
+                    <Text style={s.lobiCardSub}>{i18n.t('home.lobi_listeners', { count: lobiRoom.listener_count || 0 })}</Text>
                   </View>
-                  <View style={{ flexDirection: 'row', paddingHorizontal: 16, gap: 10 }}>
-                    {boostedProfiles.map((bp) => {
-                      const t = bp.subscription_tier || 'Free';
-                      const gm = bp.is_admin || t === 'GodMaster';
-                      const ac = gm ? '#DC2626' : t === 'Pro' ? '#D4AF37' : t === 'Plus' ? '#A78BFA' : '#14B8A6';
-                      const gr: [string, string, string] = gm
-                        ? ['#7F1D1D', '#450A0A', '#1E1B1B'] : t === 'Pro'
-                        ? ['#7C5A12', '#3F2B0A', '#1F1808'] : t === 'Plus'
-                        ? ['#4C1D7B', '#2A0F47', '#15081F'] : ['#0F4C5C', '#0A2F3C', '#051920'];
-                      const isOnline = friendIdSet?.has(bp.id) ? onlineIdSet.has(bp.id) : false;
-                      return (
-                        <Pressable
-                          key={bp.id}
-                          style={({ pressed }) => ({
-                            flex: 1,
-                            borderRadius: 14, overflow: 'hidden',
-                            borderWidth: 1.2, borderColor: ac + '55',
-                            shadowColor: ac, shadowOffset: { width: 0, height: 3 },
-                            shadowOpacity: 0.35, shadowRadius: 8, elevation: 5,
-                            opacity: pressed ? 0.88 : 1, transform: [{ scale: pressed ? 0.96 : 1 }],
-                          })}
-                          onPress={() => openUserProfile(bp.id)}
-                        >
-                          <LinearGradient
-                            colors={gr}
-                            start={{ x: 0, y: 0 }} end={{ x: 0.7, y: 1 }}
-                            style={{ flex: 1 }}
-                          >
-                            {/* ★ v1.7.13.48: Avatar daire kaldırıldı + tier pill kaldırıldı.
-                                Avatar kartın üst kısmında full-bleed (cam içinde hissi). */}
-                            <View style={{ width: '100%', height: 96, overflow: 'hidden', position: 'relative', backgroundColor: ac + '22' }}>
-                              {bp.avatar_url ? (
-                                <Image
-                                  source={{ uri: bp.avatar_url }}
-                                  style={{ width: '100%', height: '100%' }}
-                                  resizeMode="cover"
-                                />
-                              ) : (
-                                <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: ac + '44' }}>
-                                  <Text style={{ fontSize: 32, fontWeight: '900', color: '#FFF', textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }}>
-                                    {(bp.display_name || '?').charAt(0).toUpperCase()}
-                                  </Text>
-                                </View>
-                              )}
-                              {isOnline && (
-                                <View style={{
-                                  position: 'absolute', bottom: 4, right: 4,
-                                  width: 12, height: 12, borderRadius: 6,
-                                  backgroundColor: '#22C55E',
-                                  borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.7)',
-                                  shadowColor: '#22C55E', shadowOpacity: 0.8, shadowRadius: 4, elevation: 3,
-                                }} />
-                              )}
-                            </View>
-                            <View style={{ paddingHorizontal: 6, paddingVertical: 6, alignItems: 'center' }}>
-                              <Text numberOfLines={1} style={{ fontSize: 12, fontWeight: '800', color: '#F1F5F9', maxWidth: '95%', textAlign: 'center', textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }}>
-                                {bp.display_name || i18n.t('auto.tabs.home.003')}
-                              </Text>
-                            </View>
-                          </LinearGradient>
-                        </Pressable>
-                      );
-                    })}
+                  <View style={s.lobiCardJoin}>
+                    <Ionicons name="headset" size={22} color="#0F172A" />
+                    <Text style={s.lobiCardJoinText}>{i18n.t('rooms.join')}</Text>
                   </View>
-                </View>
+                </Pressable>
               )}
-              {/* ★ 4+ profil → yatay kaydırmalı carousel */}
-              {boostedProfiles.length >= 4 && (
-                <View style={{ marginBottom: 2 }}>
-                  <View style={s.popularHeader}>
-                    <Ionicons name="sparkles" size={14} color="#FBBF24" />
-                    <Text style={s.popularTitle}>{t('home.featured')}</Text>
+
+              {/* ★ v1.7.13.135: Boost edilen profiller Ana Sayfa'ya GERİ döndü.
+                   Keşfet askıya alındı; SP harcayıp boost satın alan kullanıcılar
+                   görünürlük kaybetmesin diye welcome card altında yatay carousel. */}
+              {visibleBoostedProfiles.length > 0 && (
+                <View style={s.boostedSection}>
+                  <View style={s.boostedHeader}>
+                    <Ionicons name="diamond" size={13} color="#FBBF24" />
+                    <Text style={s.boostedTitle}>
+                      {i18n.t('home.featured_users')}
+                    </Text>
+                    <View style={s.boostedDot} />
+                    <Text style={s.boostedCount}>
+                      {visibleBoostedProfiles.length}
+                    </Text>
                   </View>
                   <ScrollView
                     horizontal
                     showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 8, gap: 10 }}
+                    contentContainerStyle={{ paddingHorizontal: 16, gap: 10 }}
                     decelerationRate="fast"
                   >
-                    {boostedProfiles.map((bp, idx) => (
-                      <BoostedProfileCard key={bp.id} profile={bp} index={idx} friendIds={friendIdSet} onlineIds={onlineIdSet} />
+                    {visibleBoostedProfiles.map((bp) => (
+                      <BoostedProfileCard
+                        key={bp.id}
+                        profile={bp}
+                        isOnline={onlineIdSet.has(bp.id)}
+                        onPress={(uid) => openUserProfile(uid)}
+                        showFollowButton={!!firebaseUser?.uid && bp.id !== firebaseUser.uid}
+                        isFollowing={followedUserIds.has(bp.id)}
+                        onFollowPress={() => handleHomeFollow(bp.id)}
+                      />
                     ))}
+                  </ScrollView>
+                </View>
+              )}
+
+              {/* ★ v1.7.13.49 (20 May 2026): Planlı odalar — sonraki 7 gün, yatay scroll.
+                   Boş state inline link kullanıcı isteği ile kaldırıldı (20 May 2026). */}
+              {scheduledRooms.length > 0 && (
+                <View style={{ marginBottom: 2, marginTop: 8 }}>
+                  <View style={s.popularHeader}>
+                    <Ionicons name="calendar" size={14} color="#A78BFA" />
+                    <Text style={[s.popularTitle, { color: '#A78BFA' }]}>{i18n.t('home.upcoming_rooms')}</Text>
+                    <View style={{ flex: 1 }} />
+                    <Text style={s.refreshHint}>{i18n.t('home.planned_count', { count: scheduledRooms.length })}</Text>
+                  </View>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 10, gap: 10 }}
+                    decelerationRate="fast"
+                  >
+                    {scheduledRooms.map((sr) => {
+                      const schedIso = (sr.room_settings as any)?.scheduled_at as string | undefined;
+                      if (!schedIso) return null;
+                      const schedDate = new Date(schedIso);
+                      const diffMs = schedDate.getTime() - Date.now();
+                      const totalMin = Math.max(0, Math.floor(diffMs / 60000));
+                      const hr = Math.floor(totalMin / 60);
+                      const mn = totalMin % 60;
+                      const day = Math.floor(hr / 24);
+                      const dateLabel = day >= 1
+                        ? schedDate.toLocaleDateString(i18n.locale, { day: 'numeric', month: 'short', weekday: 'short' })
+                        : hr >= 1 ? i18n.t('time.hours_minutes', { hr, mn }) : i18n.t('time.minutes_short', { mn });
+                      const timeLabel = schedDate.toLocaleTimeString(i18n.locale, { hour: '2-digit', minute: '2-digit' });
+                      const hostName = (sr.host as any)?.display_name || i18n.t('common.anonymous');
+                      const hostAvatar = (sr.host as any)?.avatar_url;
+                      return (
+                        <Pressable
+                          key={sr.id}
+                          style={({ pressed }) => [s.scheduledCard, pressed && { opacity: 0.85, transform: [{ scale: 0.97 }] }]}
+                          onPress={() => router.push(`/room/${sr.id}` as any)}
+                        >
+                          <LinearGradient
+                            colors={['rgba(167,139,250,0.18)', 'rgba(167,139,250,0.06)']}
+                            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                            style={StyleSheet.absoluteFillObject}
+                          />
+                          <View style={s.scheduledTopRow}>
+                            <Ionicons name="time-outline" size={11} color="#A78BFA" />
+                            <Text style={s.scheduledTime}>{dateLabel}{day < 1 ? i18n.t('time.from_now') : ''}</Text>
+                          </View>
+                          <Text style={s.scheduledName} numberOfLines={2}>{sr.name}</Text>
+                          <View style={s.scheduledHostRow}>
+                            {hostAvatar ? (
+                              <Image source={getAvatarSource(hostAvatar)} style={s.scheduledHostAvatar} />
+                            ) : (
+                              <View style={[s.scheduledHostAvatar, { backgroundColor: 'rgba(167,139,250,0.3)', alignItems: 'center', justifyContent: 'center' }]}>
+                                <Text style={{ fontSize: 9, fontWeight: '900', color: '#FFF' }}>{(hostName || '?').charAt(0).toUpperCase()}</Text>
+                              </View>
+                            )}
+                            <Text style={s.scheduledHostName} numberOfLines={1}>{hostName}</Text>
+                          </View>
+                          <Text style={s.scheduledClock}>{timeLabel}</Text>
+                        </Pressable>
+                      );
+                    })}
                   </ScrollView>
                 </View>
               )}
@@ -1816,44 +1810,15 @@ export default function HomeScreen() {
                 </View>
               )}
 
-              {/* ═══ Şu An Canlı — Section Title + Gradient Accent
-                   ★ 2026-04-22: Liste boşken başlığı gizle — "Şu An Canlı" + 0 oda
-                   yanıltıcı duruyordu. Empty state kendi başına anlatsın. */}
-              {(filteredRooms.length > 0 || loadError) && (
-                <View style={s.sectionTitleRow}>
-                  <GlowView style={s.sectionAccent} />
-                  <Ionicons name="radio" size={16} color="#EF4444" />
-                  <Text style={s.sectionTitle}>
-                    {activeFilter === 'all'
-                      ? t('home.live_now')
-                      : t('home.category_rooms', { category: t((SMART_FILTERS.find(f => f.id === activeFilter) as any)?.labelKey || 'category.all') })}
-                  </Text>
-                </View>
-              )}
+              {/* ★ v1.7.13.107 (20 May 2026): "Az önce" timestamp tamamen kaldırıldı
+                  (kullanıcı kararı). Carousel + kategori chips + direkt oda listesi —
+                  hiç başlık/timestamp ara katmanı yok. Boşluğu kapatmak için chips ↔
+                  oda kartları arası dikey marj azaldı. */}
             </>
           }
 
           // ═══ Oda Kartları — stable callbacks, React.memo korunur ═══
-          renderItem={({ item: room }) => (
-            <SwipeToHideRow
-              onHide={() => ignoreRoom(room.id, room.name)}
-              onReport={() => {
-                if (!firebaseUser) { showToast({ title: i18n.t('tabs.home.010'), message: i18n.t('tabs.home.011'), type: 'warning' }); return; }
-                setReportRoom({ id: room.id, name: room.name });
-              }}
-            >
-              <BigLiveRoomCard
-                room={room}
-                onJoin={handleJoinRoom}
-                isFollowed={!!followedRoomIds[room.id]}
-                onToggleFollow={firebaseUser ? handleToggleFollow : undefined}
-                participants={participantAvatars[room.id]}
-                currentUserId={firebaseUser?.uid}
-                currentUserDisplayName={profile?.display_name || undefined}
-                inRoom={!!minimizedRoom}
-              />
-            </SwipeToHideRow>
-          )}
+          renderItem={renderRoomItem}
 
           // ═══ Boş/Hata durumu — Error: retry, Empty: oda aç hero ═══
           // ★ 2026-04-21: Error state empty state'ten ayrıldı; kullanıcı retry butonu görüyor.
@@ -1950,7 +1915,7 @@ export default function HomeScreen() {
                 >
                   <Ionicons name="eye-outline" size={14} color="#FBBF24" />
                   <Text style={s.hiddenRoomsBarText}>
-                    {ignoredRoomIds.size} gizli oda var
+                    {i18n.t('home.hidden_rooms', { count: ignoredRoomIds.size })}
                   </Text>
                   <Text style={s.hiddenRoomsBarAction}>{t('home.restore_all')}</Text>
                   <Ionicons name="refresh" size={12} color="#FBBF24" />
@@ -1977,6 +1942,8 @@ export default function HomeScreen() {
                 </ScrollView>
               </View>
             ) : null}
+              {/* Alt boşluk — tab bar'ın altına scroll edemez */}
+              <View style={{ height: 120 }} />
             </>
           }
         />
@@ -2006,10 +1973,6 @@ export default function HomeScreen() {
             //   → cover şartı kesintisiz aktif kalır, Keşfet flash etmez.
             setRoomHintReady(false);
             setShowWelcome(false);
-            // ★ Onboarding bittikten sonra FAB hint'ini göster (ilk kez)
-            hasSeenFABHint().then(seen => {
-              if (!seen) setTimeout(() => setShowFABHint(true), 500);
-            });
           }}
         />
 
@@ -2050,6 +2013,35 @@ export default function HomeScreen() {
           bottomOffset={BAR_BOTTOM_OFFSET}
         />
 
+        {/* ★ v1.7.13.52 (20 May 2026): "Sen de Öne Çık" CTA — store'a yönlendirmek yerine
+             BoostPickerSheet'i direkt açar. SP yeterse 2 tap'ta boost; yetmezse
+             sheet "Yetersiz SP" gösterir. */}
+        <BoostPickerSheet
+          visible={showBoostPicker}
+          onClose={() => setShowBoostPicker(false)}
+          currentSP={Number((profile as any)?.system_points ?? 0)}
+          onBoost={async (tier: BoostTier) => {
+            if (!profile?.id) return;
+            try {
+              const tierName = (profile as any)?.subscription_tier;
+              const isPlus = tierName === 'Plus' || tierName === 'Pro' || (profile as any)?.is_admin;
+              if (!isPlus) {
+                showToast({ title: i18n.t('boost.plus_required_title'), message: i18n.t('boost.plus_required_msg'), type: 'info' });
+                setTimeout(() => router.push('/plus' as any), 800);
+                throw new Error('plus_required');
+              }
+              await ProfileService.boostProfile(profile.id, tier.cost, tier.duration);
+              await refreshProfile();
+              showToast({ title: i18n.t('boost.activated_title'), message: i18n.t('boost.activated_msg', { duration: tier.duration }), type: 'success' });
+            } catch (err: any) {
+              if (err?.message !== 'plus_required') {
+                showToast({ title: i18n.t('boost.error_title'), message: err.message || i18n.t('boost.error_msg'), type: 'error' });
+              }
+              throw err;
+            }
+          }}
+        />
+
         {/* ═══ Oda Bildirme Modal — swipe'dan tetiklenir ═══ */}
         {reportRoom && firebaseUser && (
           <ReportModal
@@ -2079,29 +2071,7 @@ const BAR_BOTTOM_OFFSET = 84;
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: 'transparent' },
 
-  // ★ FAB — Yeni Oda Aç. Tab bar üzerinde, sağ-altta sabit pozisyon.
-  //   Gölge koyu (neutral) — teal kendi rengi gölge yapınca butonu bulanıklaştırıyordu.
-  fab: {
-    position: 'absolute',
-    right: 16,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    zIndex: 50,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.55,
-    shadowRadius: 10,
-    elevation: 14,
-  },
-  fabGradient: {
-    width: '100%', height: '100%',
-    borderRadius: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
-  },
+
 
   // ★ Premium Header — Glassmorphic wrap + SP pill + teal hairline separator
   topBarWrap: {
@@ -2116,18 +2086,7 @@ const s = StyleSheet.create({
   topBarGlass: {
     ...StyleSheet.absoluteFillObject,
   },
-  topBarTopHighlight: {
-    position: 'absolute',
-    top: 0, left: 18, right: 18,
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-  },
-  topBarLampGlow: {
-    position: 'absolute',
-    bottom: -40,
-    left: -8, right: -8,
-    height: 58,
-  },
+
   topBar: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 14, paddingBottom: 4,
@@ -2138,7 +2097,7 @@ const s = StyleSheet.create({
     borderBottomLeftRadius: 20,
     borderBottomRightRadius: 20,
   },
-  logo: { height: 32, width: 150, marginTop: -6 },
+
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   headerIconBtn: {
     width: 44, height: 44,
@@ -2149,58 +2108,86 @@ const s = StyleSheet.create({
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 5,
   },
-  // ★ SP Wallet Pill — premium altın gradient
-  spPill: {
-    borderRadius: 14,
-    overflow: 'hidden',
-    shadowColor: '#F59E0B',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.4,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  spPillGrad: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    paddingHorizontal: 10, paddingVertical: 7,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.25)',
-  },
-  spPillText: {
-    fontSize: 12, fontWeight: '900', color: '#FFF',
-    letterSpacing: 0.3,
-    textShadowColor: 'rgba(0,0,0,0.5)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
-  },
+
   notifBadge: { position: 'absolute', top: -2, right: -2, backgroundColor: '#EF4444', minWidth: 16, height: 16, borderRadius: 8, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3, borderWidth: 1.5, borderColor: Colors.bg },
   notifBadgeText: { fontSize: 9, fontWeight: '800', color: '#FFF' },
 
   // Welcome — Glassmorphism konteyner
+  // ★ v1.7.13.81 (20 May 2026): Kompakt welcome — avatar 42→32, padding 8→5,
+  //   title 15→13, sub 11→10. Toplam yükseklik ~58 → ~42 (%28 ↓).
   welcomeCard: {
     marginHorizontal: 14, marginTop: 0, marginBottom: 4,
-    borderRadius: 14, overflow: 'hidden',
+    borderRadius: 12, overflow: 'hidden',
     backgroundColor: 'rgba(255,255,255,0.04)',
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
   },
   welcomeRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    paddingHorizontal: 12, paddingVertical: 8,
+    flexDirection: 'row', alignItems: 'center', gap: 9,
+    paddingHorizontal: 11, paddingVertical: 5,
   },
-  headerAvatar: {
-    width: 42, height: 42, borderRadius: 21,
-    borderWidth: 2, borderColor: 'rgba(20,184,166,0.4)',
-  },
-  welcomeTitle: { fontSize: 15, fontWeight: '700', color: '#F1F5F9', ...Shadows.text },
-  welcomeSub: { fontSize: 11, color: '#94A3B8', marginTop: 2, ...Shadows.textLight },
+
+  welcomeTitle: { fontSize: 13, fontWeight: '700', color: '#F1F5F9', ...Shadows.text },
+  welcomeSub: { fontSize: 10, color: '#94A3B8', marginTop: 1, ...Shadows.textLight },
   // ★ v298 (17 May 2026): "Oda Aç" gradient pill — welcome card sağında (Clubhouse pattern)
+  // ★ v1.7.13.81 (20 May 2026): Pill kompakt — padding 11/7 → 9/5, fontSize 12 → 11
   welcomeCreatePill: {
     flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 11, paddingVertical: 7,
-    borderRadius: 14, overflow: 'hidden',
+    paddingHorizontal: 9, paddingVertical: 5,
+    borderRadius: 12, overflow: 'hidden',
     borderWidth: 1, borderColor: 'rgba(20,184,166,0.45)',
-    gap: 4,
+    gap: 3,
     shadowColor: '#14B8A6',
     shadowOpacity: 0.35, shadowRadius: 8, shadowOffset: { width: 0, height: 2 },
+  },
+  // ★ v1.7.13.140: Soprano Lobi kart stilleri
+  lobiCard: {
+    marginHorizontal: 16,
+    marginTop: 12,
+    marginBottom: 4,
+    borderRadius: 18,
+    overflow: 'hidden',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16, paddingHorizontal: 16,
+    minHeight: 88,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)',
+    shadowColor: '#14B8A6',
+    shadowOpacity: 0.45, shadowRadius: 14, shadowOffset: { width: 0, height: 4 },
+    elevation: 6,
+  },
+  lobiCardOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.32)',
+  },
+  lobiCardLeft: { flex: 1, gap: 3 },
+  lobiCardLabel: {
+    fontSize: 10, fontWeight: '900', letterSpacing: 1.4,
+    color: 'rgba(255,255,255,0.85)',
+  },
+  lobiCardTitle: {
+    fontSize: 16, fontWeight: '800',
+    color: '#FFFFFF',
+    textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
+  },
+  lobiCardSub: {
+    fontSize: 11, fontWeight: '600',
+    color: 'rgba(255,255,255,0.88)',
+    marginTop: 2,
+  },
+  lobiCardJoin: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 9, paddingHorizontal: 14,
+    borderRadius: 999,
+  },
+  lobiCardJoinText: {
+    fontSize: 13, fontWeight: '800',
+    color: '#0F172A',
+  },
+  lobiLiveDot: {
+    width: 8, height: 8, borderRadius: 4,
+    backgroundColor: '#22C55E',
+    shadowColor: '#22C55E', shadowOpacity: 0.8, shadowRadius: 4,
   },
   welcomeCreatePillIcon: {
     textShadowColor: 'rgba(0,0,0,0.45)',
@@ -2208,101 +2195,13 @@ const s = StyleSheet.create({
     textShadowRadius: 2,
   },
   welcomeCreatePillText: {
-    fontSize: 12, fontWeight: '800', color: '#FFF',
+    fontSize: 11, fontWeight: '800', color: '#FFF',
     letterSpacing: 0.3,
     ...Shadows.text,
   },
-  // ★ 2026-04-24: Online friends pill — welcome card sağında
-  welcomeOnlinePill: {
-    flexDirection: 'row', alignItems: 'center', gap: 5,
-    paddingHorizontal: 9, paddingVertical: 5,
-    borderRadius: 12,
-    backgroundColor: 'rgba(34,197,94,0.12)',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(34,197,94,0.35)',
-  },
-  welcomeOnlineDot: {
-    width: 7, height: 7, borderRadius: 3.5,
-    backgroundColor: '#22C55E',
-    shadowColor: '#22C55E',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.7, shadowRadius: 4,
-    elevation: 2,
-  },
-  welcomeOnlinePillText: {
-    fontSize: 12, fontWeight: '800', color: '#86EFAC',
-    ...Shadows.text,
-  },
-  // ★ v107.48: Online arkadaş yatay şerit — keşif ekranında her zaman görünür sosyal sinyal
-  onlineStripWrap: {
-    marginTop: 4,
-    marginBottom: 6,
-  },
-  onlineStripContent: {
-    paddingHorizontal: 16,
-    gap: 10,
-    alignItems: 'center',
-  },
-  onlineAvatarWrap: {
-    width: 44,
-    height: 44,
-  },
-  onlineMoreBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.14)',
-  },
-  onlineMoreText: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#CBD5E1',
-  },
-  // ★ 2026-04-24: Empty state sosyal ipucu satırı
-  unifiedSocialHint: {
-    flexDirection: 'row', alignItems: 'center', gap: 7,
-    paddingHorizontal: 12, paddingVertical: 7,
-    marginTop: 8,
-    borderRadius: 14,
-    backgroundColor: 'rgba(34,197,94,0.08)',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(34,197,94,0.25)',
-    alignSelf: 'center',
-  },
-  unifiedSocialHintText: {
-    fontSize: 12, fontWeight: '600', color: '#86EFAC', letterSpacing: 0.15,
-    ...Shadows.textLight,
-  },
 
 
-  // ═══ Son Girdiğin Odalar ═══
-  recentCard: {
-    width: 82,
-    alignItems: 'center' as const,
-    paddingVertical: 10,
-    paddingHorizontal: 6,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.04)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    ...Shadows.card,
-  },
-  recentAvatarWrap: {
-    width: 48, height: 48, marginBottom: 5,
-  },
-  recentAvatar: { width: 48, height: 48, borderRadius: 24, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.15)' },
-  recentCatDot: {
-    position: 'absolute' as const, bottom: -2, right: -2,
-    width: 18, height: 18, borderRadius: 9,
-    alignItems: 'center' as const, justifyContent: 'center' as const,
-    borderWidth: 2, borderColor: Colors.bg,
-  },
-  recentName: { fontSize: 10, fontWeight: '700' as const, color: '#F1F5F9', textAlign: 'center' as const, maxWidth: 76, ...Shadows.text },
-  recentHost: { fontSize: 9, color: '#64748B', textAlign: 'center' as const, marginTop: 1, maxWidth: 76 },
+
 
   // ═══ Gelişmiş Filtre Chips ═══
   advFilterChip: {
@@ -2353,7 +2252,7 @@ const s = StyleSheet.create({
   // ═══ Birleşik Akıllı Filtre ═══
   categoryBar: { paddingHorizontal: 14, paddingVertical: 8, gap: 8 },
   categoryChip: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 3, elevation: 2 },
-  categoryChipActive: { /* artık dinamik inline stil kullanılıyor */ },
+
   categoryText: { fontSize: 12, fontWeight: '600', color: '#94A3B8' },
   categoryTextActive: { color: '#FFF' },
 
@@ -2365,8 +2264,9 @@ const s = StyleSheet.create({
   // ═══ Kompakt Canlı Oda Kartı — İyileştirilmiş ═══
   // ★ 2026-04-21 (güncel): marginHorizontal SwipeToHideRow'a taşındı.
   //   Swipe açılınca card'ın sağ margin alanı actions panel'i örtüyordu → Bildir daralıyordu.
+  // ★ v1.7.13.107 (20 May 2026): Kart aşağıdaki boşluk azaltıldı 14→8
   bigCardWrapper: {
-    marginBottom: 14,
+    marginBottom: 8,
   },
   bigCard: {
     borderRadius: 18,
@@ -2416,6 +2316,23 @@ const s = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 8,
+  },
+  // ★ v1.7.13.49 (20 May 2026): Kalan süre countdown pill — bigLiveBadge yanında.
+  bigCountdownPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    paddingHorizontal: 6, paddingVertical: 3,
+    borderRadius: 6,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1, borderColor: 'rgba(148,163,184,0.20)',
+  },
+  bigCountdownPillUrgent: {
+    backgroundColor: 'rgba(239,68,68,0.12)',
+    borderColor: 'rgba(252,165,165,0.40)',
+  },
+  bigCountdownText: {
+    fontSize: 9, fontWeight: '700',
+    color: 'rgba(148,163,184,0.85)',
+    letterSpacing: 0.2,
   },
   bigLiveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#FFF' },
   bigLiveText: { fontSize: 9, fontWeight: '800', color: '#FFF', letterSpacing: 0.5 },
@@ -2489,24 +2406,7 @@ const s = StyleSheet.create({
     color: '#5EEAD4',
     letterSpacing: 0.2,
   },
-  // ★ Premium pill — kompakt altın trophy + "Premium" metni
-  bigPremiumPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderRadius: 6,
-    backgroundColor: 'rgba(212,175,55,0.14)',
-    borderWidth: 1,
-    borderColor: 'rgba(253,230,138,0.35)',
-  },
-  bigPremiumPillText: {
-    fontSize: 8,
-    fontWeight: '800',
-    color: '#FDE68A',
-    letterSpacing: 0.3,
-  },
+
   bigTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -2542,35 +2442,27 @@ const s = StyleSheet.create({
     fontSize: 8,
     fontWeight: '700',
   },
+  // ★ v1.7.13.83 (20 May 2026): Label'sız ikonik mini badge — title row kompakt
+  bigInlineBadgeIcon: {
+    width: 20, height: 20, borderRadius: 10,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'rgba(245,158,11,0.12)',
+    borderWidth: 1, borderColor: 'rgba(245,158,11,0.25)',
+    marginLeft: 6,
+  },
   bigHostStatsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     marginTop: 6,
   },
-  bigHostAvatar: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 1,
-    borderColor: 'rgba(115,194,189,0.4)',
-  },
   bigHostName: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '600',
-    color: '#FFFFFF',
+    color: '#94A3B8',
     flexShrink: 1,
-    minWidth: 0,
-    textShadowColor: 'rgba(0,0,0,0.7)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
   },
-  bigStatDivider: {
-    width: 1,
-    height: 14,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    marginHorizontal: 2,
-  },
+
   bigStatText: {
     fontSize: 11,
     color: '#94A3B8',
@@ -2578,6 +2470,80 @@ const s = StyleSheet.create({
     marginLeft: 1,
     marginRight: 3,
   },
+
+  // ★ 2026-05-22: Clubhouse-style card layout
+  chCardBody: {
+    flexDirection: 'row' as const,
+    paddingHorizontal: 14,
+    paddingTop: 4,
+    gap: 10,
+  },
+  chLeftCol: {
+    flex: 1,
+    minWidth: 0,
+    justifyContent: 'center' as const,
+  },
+  chHostRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 6,
+    marginTop: 8,
+  },
+  chAvatarGrid: {
+    width: 90,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  chGridInner: {
+    flexDirection: 'row' as const,
+    flexWrap: 'wrap' as const,
+    width: 84,
+    gap: 3,
+    justifyContent: 'flex-end' as const,
+  },
+  chGridAvatar: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    overflow: 'hidden' as const,
+    borderWidth: 2,
+    borderColor: 'rgba(15,25,38,0.8)',
+    backgroundColor: '#1E293B',
+  },
+  chGridAvatarImg: {
+    width: '100%' as any,
+    height: '100%' as any,
+  },
+  chGridMore: {
+    backgroundColor: 'rgba(20,184,166,0.15)',
+    borderColor: 'rgba(20,184,166,0.3)',
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  chGridMoreText: {
+    fontSize: 11,
+    fontWeight: '800' as const,
+    color: '#14B8A6',
+  },
+  chEmptyGrid: {
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    gap: 2,
+  },
+  chEmptyCount: {
+    fontSize: 14,
+    fontWeight: '700' as const,
+    color: 'rgba(148,163,184,0.5)',
+  },
+  chBottomBar: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    paddingHorizontal: 14,
+    paddingTop: 6,
+    paddingBottom: 4,
+    gap: 8,
+  },
+
   bigJoinBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -2600,12 +2566,14 @@ const s = StyleSheet.create({
   // ═══ Section ═══
   // ═══ Popüler Başlık ═══
   popularHeader: {
-    flexDirection: 'row' as const, alignItems: 'center' as const, gap: 5,
+    flexDirection: 'row' as const, alignItems: 'baseline' as const, gap: 5,
     paddingHorizontal: 18, paddingTop: 4, paddingBottom: 6,
   },
+  // ★ v1.7.13.109 (20 May 2026): popularTitle daha profesyonel — fontWeight 800,
+  //   letterSpacing 0.5, color slate-200 (daha okunaklı). popularSub silindi (dead).
   popularTitle: {
-    fontSize: 13, fontWeight: '700' as const, color: '#94A3B8',
-    letterSpacing: 0.3,
+    fontSize: 13, fontWeight: '800' as const, color: '#E2E8F0',
+    letterSpacing: 0.5,
   },
   // ═══ Header Gradient Ayırıcı ═══
   headerDivider: {
@@ -2617,17 +2585,51 @@ const s = StyleSheet.create({
     shadowRadius: 6,
     elevation: 4,
   },
-  sectionTitleRow: {
-    flexDirection: 'row' as const, alignItems: 'center' as const, gap: 8,
-    paddingHorizontal: 16, marginTop: 14, marginBottom: 12,
+
+  // ★ v1.7.13.49 (20 May 2026): "Güncellendi: X dk önce" — sade gri yazı.
+  refreshHint: {
+    fontSize: 10, fontWeight: '600' as const,
+    color: 'rgba(148,163,184,0.65)',
+    letterSpacing: 0.2,
   },
-  sectionAccent: {
-    width: 3, height: 20, borderRadius: 2,
-    backgroundColor: '#EF4444',
-    shadowColor: '#EF4444', shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5, shadowRadius: 4,
+  // ★ v1.7.13.49 (20 May 2026): Planlı odalar card stilleri — mor temalı, kompakt.
+  scheduledCard: {
+    width: 150, minHeight: 100, borderRadius: 14,
+    backgroundColor: 'rgba(15,23,42,0.5)',
+    borderWidth: 1, borderColor: 'rgba(167,139,250,0.30)',
+    overflow: 'hidden',
+    padding: 10,
+    position: 'relative',
   },
-  sectionTitle: { fontSize: 18, fontWeight: '800' as const, color: '#F1F5F9', letterSpacing: 0.2, ...Shadows.text },
+  scheduledTopRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+  },
+  scheduledTime: {
+    fontSize: 10, fontWeight: '800',
+    color: '#A78BFA', letterSpacing: 0.3,
+  },
+  scheduledName: {
+    fontSize: 12, fontWeight: '800',
+    color: '#F1F5F9', marginTop: 6,
+    lineHeight: 15,
+  },
+  scheduledHostRow: {
+    flexDirection: 'row', alignItems: 'center',
+    gap: 5, marginTop: 8,
+  },
+  scheduledHostAvatar: {
+    width: 18, height: 18, borderRadius: 9,
+    borderWidth: 1, borderColor: 'rgba(167,139,250,0.40)',
+  },
+  scheduledHostName: {
+    fontSize: 10, fontWeight: '600',
+    color: 'rgba(241,245,249,0.75)', flex: 1,
+  },
+  scheduledClock: {
+    position: 'absolute', top: 8, right: 10,
+    fontSize: 10, fontWeight: '900',
+    color: 'rgba(167,139,250,0.95)', letterSpacing: 0.5,
+  },
 
 
   // ═══ Hero Empty State — RandomRoomButton DNA ═══
@@ -2669,137 +2671,8 @@ const s = StyleSheet.create({
     lineHeight: 17,
   },
 
-  // ═══ Unified Empty State — tek kart: başlık + 2x2 kategori chip grid + detay link ═══
-  unifiedEmpty: {
-    marginHorizontal: 16,
-    marginTop: 4,
-    marginBottom: 8,
-    borderRadius: 20,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(20,184,166,0.18)',
-  },
-  unifiedEmptyGradient: {
-    paddingVertical: 28,
-    paddingHorizontal: 18,
-    alignItems: 'center',
-  },
-  unifiedEmptyIconWrap: {
-    marginBottom: 14,
-  },
-  unifiedEmptyIconGlow: {
-    width: 84,
-    height: 84,
-    borderRadius: 42,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(20,184,166,0.25)',
-  },
-  unifiedEmptyTitle: {
-    fontSize: 19,
-    fontWeight: '800',
-    color: '#F1F5F9',
-    letterSpacing: 0.2,
-    textAlign: 'center',
-    marginBottom: 6,
-    textShadowColor: 'rgba(0,0,0,0.5)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
-  },
-  unifiedEmptySub: {
-    fontSize: 13,
-    color: '#94A3B8',
-    textAlign: 'center',
-    lineHeight: 18,
-    marginBottom: 18,
-    paddingHorizontal: 8,
-  },
-  unifiedChipsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-    width: '100%',
-    justifyContent: 'center',
-  },
-  unifiedChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 13,
-    borderRadius: 14,
-    borderWidth: 1.2,
-    flexGrow: 1,
-    flexBasis: '45%',
-    justifyContent: 'center',
-    minHeight: 52,
-  },
-  unifiedChipText: {
-    fontSize: 14,
-    fontWeight: '800',
-    letterSpacing: 0.2,
-  },
-  unifiedDetailLink: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 18,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-  },
-  // ★ v107.13: Gizlenen odalar — empty state altında kompakt link
-  hiddenRoomsHint: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: 12,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 100,
-    backgroundColor: 'rgba(251,191,36,0.10)',
-    borderWidth: 1,
-    borderColor: 'rgba(251,191,36,0.30)',
-  },
-  hiddenRoomsHintText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#FBBF24',
-    letterSpacing: 0.2,
-  },
-  // ★ v107.13: Gizlenen odalar — liste altında bar (liste doluyken görünür)
-  hiddenRoomsBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginHorizontal: 16,
-    marginTop: 4,
-    marginBottom: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 12,
-    backgroundColor: 'rgba(251,191,36,0.08)',
-    borderWidth: 1,
-    borderColor: 'rgba(251,191,36,0.22)',
-  },
-  hiddenRoomsBarText: {
-    flex: 1,
-    fontSize: 12,
-    fontWeight: '600',
-    color: 'rgba(255,255,255,0.75)',
-  },
-  hiddenRoomsBarAction: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#FBBF24',
-    letterSpacing: 0.3,
-  },
-  unifiedDetailLinkText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#94A3B8',
-    letterSpacing: 0.2,
-  },
+
+
 
   // ═══ Takip Edilen Oda — Premium Horizontal Card ═══
   fCard: {
@@ -2880,10 +2753,7 @@ const s = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
   },
-  fHostAvatar: {
-    width: 20, height: 20, borderRadius: 10,
-    borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.3)',
-  },
+
   fHostName: {
     fontSize: 10, fontWeight: '600', color: '#FFFFFF',
     maxWidth: 80,
@@ -2926,6 +2796,11 @@ const s = StyleSheet.create({
   },
   fPremiumText: { fontSize: 7, fontWeight: '800', color: Colors.premiumGold },
 
+  // ★ 2026-05-22: Arkadaşın Burada badge — BigLiveRoomCard
+  friendBadge: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 4, paddingHorizontal: 14, marginTop: 2 },
+  friendDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#22C55E' },
+  friendBadgeText: { fontSize: 10, fontWeight: '700' as const, color: '#22C55E', ...Shadows.text },
+
   // ═══ Takip Edilen Odalar Panel Header ═══
   followedPanelHeader: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
@@ -2939,6 +2814,63 @@ const s = StyleSheet.create({
     fontSize: 11, fontWeight: '800', color: Colors.accentTeal,
     backgroundColor: 'rgba(20,184,166,0.1)',
     paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8,
+  },
+
+
+
+  hiddenRoomsBar: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    marginHorizontal: 14,
+    marginTop: 8,
+    borderRadius: 12,
+    backgroundColor: 'rgba(251,191,36,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(251,191,36,0.15)',
+  },
+  hiddenRoomsBarText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '600' as const,
+    color: '#FDE68A',
+  },
+  hiddenRoomsBarAction: {
+    fontSize: 11,
+    fontWeight: '700' as const,
+    color: '#FBBF24',
+  },
+  boostedSection: {
+    marginTop: 10,
+    marginBottom: 4,
+  },
+  boostedHeader: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 6,
+    paddingHorizontal: 16,
+    marginBottom: 8,
+  },
+  boostedTitle: {
+    color: '#FBBF24',
+    fontSize: 11,
+    fontWeight: '900' as const,
+    letterSpacing: 0.7,
+  },
+  boostedDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#FBBF24',
+    marginLeft: 4,
+  },
+  boostedCount: {
+    color: '#FBBF24',
+    fontSize: 10,
+    fontWeight: '800' as const,
+    marginLeft: 4,
   },
 });
 

@@ -63,7 +63,7 @@ export const SettingsService = {
         return { ...DEFAULT_SETTINGS, ...JSON.parse(json) };
       }
     } catch (e) {
-      if (__DEV__) console.warn('Ayarlar yüklenemedi:', e);
+      if (__DEV__) console.warn(i18n.t('settings.load_error'), e);
     }
     return { ...DEFAULT_SETTINGS };
   },
@@ -85,7 +85,7 @@ export const SettingsService = {
     try {
       await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(DEFAULT_SETTINGS));
     } catch (e) {
-      if (__DEV__) console.warn('Ayarlar sıfırlanamadı:', e);
+      if (__DEV__) console.warn(i18n.t('settings.reset_error'), e);
     }
     return { ...DEFAULT_SETTINGS };
   },

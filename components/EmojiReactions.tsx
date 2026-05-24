@@ -1,4 +1,4 @@
-﻿/**
+/**
  * SopranoChat — Emoji & GIF Reactions (Premium)
  * Kategorili emoji picker + Tenor GIF entegrasyonu
  * ref.current.spawn(emoji) ile floating emoji tetiklenir.
@@ -75,7 +75,8 @@ function _cacheKey(params: { type: string; q?: string; limit?: number }) {
   return `${params.type}|${params.q || ''}|${params.limit || 30}`;
 }
 
-async function _callTenorProxy(params: { type: 'featured' | 'search'; q?: string; limit?: number }): Promise<any[]> {
+// ★ v1.7.13.141: Export edildi — EmojiPicker (DM) de Tenor GIF araması yapabilsin.
+export async function callTenorProxy(params: { type: 'featured' | 'search'; q?: string; limit?: number }): Promise<any[]> {
   const key = _cacheKey(params);
   const hit = _gifCache.get(key);
   if (hit && Date.now() - hit.at < _GIF_CACHE_TTL_MS) {
@@ -145,7 +146,7 @@ export function EmojiReactionBar({ onReaction, onClose }: { onReaction: (emoji: 
   const fetchTrendingGifs = async () => {
     try {
       setLoadingGifs(true);
-      const results = await _callTenorProxy({ type: 'featured', limit: 30 });
+      const results = await callTenorProxy({ type: 'featured', limit: 30 });
       setTrendingGifs(results);
       // ★ v86 debug: kullanıcının cihazında neden boş geldiğini görmek için
       if (results.length === 0) {
@@ -156,7 +157,7 @@ export function EmojiReactionBar({ onReaction, onClose }: { onReaction: (emoji: 
         );
       }
     } catch (e: any) {
-      Alert.alert(i18n.t('auto.EmojiReactions.003'), (e?.message || String(e) || 'Bilinmeyen').slice(0, 300), [{ text: 'Tamam' }]);
+      Alert.alert(i18n.t('auto.EmojiReactions.003'), (e?.message || String(e) || i18n.t('common.unknown')).slice(0, 300), [{ text: 'Tamam' }]);
     } finally {
       setLoadingGifs(false);
     }
@@ -166,7 +167,7 @@ export function EmojiReactionBar({ onReaction, onClose }: { onReaction: (emoji: 
     if (q.length < 2) { setGifs([]); return; }
     try {
       setLoadingGifs(true);
-      const results = await _callTenorProxy({ type: 'search', q, limit: 30 });
+      const results = await callTenorProxy({ type: 'search', q, limit: 30 });
       setGifs(results);
     } catch { } finally { setLoadingGifs(false); }
   };

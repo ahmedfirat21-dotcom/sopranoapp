@@ -33,7 +33,7 @@ import { i18n } from '../../services/i18n';
 // RoomControlBar: BAR_H=50 + üstündeki wrapper paddingBottom(8) = 58.
 // insets.bottom ayrıca eklenir → sheet tam kontrol barın üstüne oturur.
 // ════════════════════════════════════════════════════════════
-const CONTROL_BAR_AREA = 58;
+const CONTROL_BAR_AREA = 72;         // BAR_H(72) — bar tam üstüne otur
 const HANDLE_H = 28;         // drag handle alanı
 
 interface ChatMsg {
@@ -388,13 +388,14 @@ export default function RoomChatDrawer({
   // ════════════════════════════════════════════════════════════
   const screenH = Dimensions.get('screen').height;
 
-  // Rest bottom (kontrol barı + safe area) — bottom offset olarak hesapla
-  const restBottom = CONTROL_BAR_AREA + Math.max(insets.bottom, 14);
+  // ★ Alt kontrol barının tam üstüne otur — extra gap yok.
+  const restBottom = CONTROL_BAR_AREA + Math.max(insets.bottom, 7);
   // Snap points — screen-based, adjustResize'dan bağımsız
   const availableH = screenH - restBottom - Math.max(insets.top, 20);
   const SNAP_CLOSED = 0;
-  const SNAP_HALF = Math.min(availableH * 0.55, screenH * 0.45);
-  const SNAP_FULL = availableH;
+  const SNAP_HALF = Math.min(availableH * 0.62, screenH * 0.50);
+  // ★ v1.7.13.161: %80 cap — tam yukarı çıkmasın, üstte header görünsün.
+  const SNAP_FULL = Math.min(availableH * 0.80, screenH * 0.65);
 
   // ════════════════════════════════════════════════════════════
   // Input bar — TOP-based konumlandırma (screen-based, adjustResize-proof)
@@ -465,64 +466,23 @@ export default function RoomChatDrawer({
           Animated.timing(sheetBottomAnim, { toValue: targetBottom, duration: 250, useNativeDriver: false }),
         ]).start();
       } else {
-        // ★ v108.32 (6 May 2026): Universal Android keyboard positioning.
-        //
-        // İKİ FARKLI ANDROID DAVRANIŞI:
-        //   1) Eski API (<36): adjustResize window'u küçültür → parent alt kenarı = screenH - kbHeight
-        //   2) Yeni API (36+): edge-to-edge → window sabit kalır → parent alt kenarı = screenH
-        //
-        // HER İKİSİNDE DE ÇALIŞAN ÇÖZÜM:
-        //   kbScreenY = klavyenin üst kenarının mutlak ekran koordinatı (her zaman doğru)
-        //   restScreenY = inputBar'ın olması gereken minimum ekran pozisyonu (kontrol barı üstü)
-        //
-        //   Eğer kbScreenY < restScreenY → klavye kontrol barını örttü → inputBar'ı kbScreenY'ye taşı
-        //   Eğer kbScreenY >= restScreenY → klavye küçük → inputBar restBottom'da kalsın
-        //
-        // HESAPLAMA:
-        //   adjustResize durumu: window küçülmüş, parent bottom = kbScreenY
-        //     bottom:0 = kbScreenY (tam üstü) ✓
-        //   edge-to-edge durumu: window sabit, parent bottom = screenH  
-        //     bottom: (screenH - kbScreenY) = kbHeight (tam üstü) ✓
-        //
-        //   Genel formül: targetBottom = max(restBottom, screenH - kbScreenY)
-        //   Ama adjustResize'da screenH - kbScreenY = kbHeight, ve window küçülmüş.
-        //   Bu yüzden 50ms delay ile gerçek window boyutunu alıp düzeltiyoruz.
-        
-        const kbScreenY = e.endCoordinates?.screenY || (screenH - kbHeight);
-        
-        // Hemen bir ilk pozisyon ayarla (ani atlama hissi olmasın)
-        const immediateTarget = Math.max(0, restBottom);
-        inputBottomAnim.setValue(immediateTarget);
-        sheetBottomAnim.setValue(immediateTarget);
-        
-        // 50ms sonra kesin pozisyon hesapla (adjustResize tamamlansın)
-        setTimeout(() => {
-          const currentWindowH = Dimensions.get('window').height;
-          const windowShrunk = screenH - currentWindowH;
-          
-          let targetBottom: number;
-          if (windowShrunk > 20) {
-            // Eski adjustResize: window küçüldü
-            // bottom:0 artık kbScreenY'de → restBottom'u kompanse et
-            targetBottom = Math.max(0, restBottom - windowShrunk);
-          } else {
-            // Yeni edge-to-edge VEYA window henüz küçülmedi
-            // bottom = screenH - kbScreenY = kbHeight (klavyenin tam üstü)
-            targetBottom = Math.max(restBottom, screenH - kbScreenY);
-          }
+        // ★ v1.7.13.161: Android — adjustResize window'u küçültüyor.
+        //   bottom:0 = küçülen window'un alt kenarı = klavyenin tam üstü.
+        //   Eski karmaşık hesaplama (windowShrunk, kbScreenY) yanlış konumlanmaya sebep oluyordu.
+        const targetBottom = 0;
+        Animated.parallel([
+          Animated.timing(inputBottomAnim, { toValue: targetBottom, duration: 150, useNativeDriver: false }),
+          Animated.timing(sheetBottomAnim, { toValue: targetBottom, duration: 150, useNativeDriver: false }),
+        ]).start();
 
-          Animated.parallel([
-            Animated.timing(inputBottomAnim, { toValue: targetBottom, duration: 120, useNativeDriver: false }),
-            Animated.timing(sheetBottomAnim, { toValue: targetBottom, duration: 120, useNativeDriver: false }),
-          ]).start();
-
-          setKbCompensation(Math.max(windowShrunk, 0));
-        }, 50);
+        setKbCompensation(Math.max(restBottom, 0));
       }
 
       // Sheet height'ını klavye üstüne sığdır
-      const statusBarH = Math.max(insets.top, 20);
-      const visibleArea = screenH - Math.max(kbHeight, restBottom) - statusBarH - INPUT_BAR_H;
+      // ★ topReserve 100dp: API 36 emülatörde sheet TOP status bar altına kaçıyordu;
+      //   100dp ile başlık (Oda Sohbeti) garantili görünür yerde.
+      const topReserve = Math.max(insets.top + 60, 100);
+      const visibleArea = screenH - Math.max(kbHeight, restBottom) - topReserve - INPUT_BAR_H;
       if (currentSnap.current > visibleArea && visibleArea > 0) {
         currentSnap.current = visibleArea;
         Animated.timing(sheetHeight, {
@@ -548,9 +508,12 @@ export default function RoomChatDrawer({
   // Animated sheet height — 0 (closed) → SNAP_HALF → SNAP_FULL
   // ════════════════════════════════════════════════════════════
   const sheetHeight = useRef(new Animated.Value(0)).current;
+  const closeTranslateY = useRef(new Animated.Value(0)).current; // ★ v1.7.13.161: çekmece kapanma
+  const inputBarH = useRef(new Animated.Value(INPUT_BAR_H)).current; // ★ v1.7.13.161: input ezilme (height)
   const currentSnap = useRef(0);
   const backdropOpacity = useRef(new Animated.Value(0)).current;
   const isClosingRef = useRef(false);
+  const lastOpenSnapRef = useRef(SNAP_HALF); // ★ Son açık snap yüksekliği
 
   // ★ Ref'ler — PanResponder stale closure bug'ını önler
   const snapPointsRef = useRef([SNAP_CLOSED, SNAP_HALF, SNAP_FULL]);
@@ -564,26 +527,38 @@ export default function RoomChatDrawer({
 
   const animateTo = useCallback((targetHeight: number, velocity?: number) => {
     const capped = Math.min(targetHeight, availableHRef.current);
-    currentSnap.current = capped;
 
     if (capped === 0) {
-      // ★ KAPAMA — timing ile akıcı slide-down (spring overshoot yapmaz)
+      // ═══ KAPAMA — çekmece animasyonu ═══
+      // closeTranslateY hem sheet'e hem input bar'a uygulanıyor (aynı Animated.Value).
+      // İkisi birlikte aşağı kayarak kontrol barının arkasına girer.
       isClosingRef.current = true;
-      Animated.timing(sheetHeight, {
-        toValue: 0,
-        duration: 280,
-        useNativeDriver: false,
-      }).start(() => {
+      currentSnap.current = 0;
+
+      Animated.parallel([
+        Animated.timing(closeTranslateY, {
+          toValue: lastOpenSnapRef.current + restBottom + INPUT_BAR_H,
+          duration: 280,
+          easing: Easing.in(Easing.cubic),
+          useNativeDriver: false,
+        }),
+        Animated.timing(backdropOpacity, {
+          toValue: 0,
+          duration: 220,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
         isClosingRef.current = false;
+        sheetHeight.setValue(0);
+        closeTranslateY.setValue(0);
+        inputBottomAnim.setValue(restBottom);
+        sheetBottomAnim.setValue(restBottom);
+        onClose();
       });
-      Animated.timing(backdropOpacity, {
-        toValue: 0,
-        duration: 250,
-        useNativeDriver: true,
-      }).start();
-      onClose();
     } else {
-      // ★ AÇMA / GENİŞLEME — spring ile bounce efekti
+      // ═══ AÇMA / GENİŞLEME ═══
+      currentSnap.current = capped;
+      closeTranslateY.setValue(0);
       const speed = velocity ? Math.min(Math.abs(velocity) * 0.5, 2) : 1;
       Animated.spring(sheetHeight, {
         toValue: capped,
@@ -592,6 +567,7 @@ export default function RoomChatDrawer({
         stiffness: 250 * speed,
         mass: 0.8,
       }).start();
+      lastOpenSnapRef.current = capped;
       Animated.timing(backdropOpacity, {
         toValue: 0.4,
         duration: 200,
@@ -606,17 +582,13 @@ export default function RoomChatDrawer({
   // ★ availableH değiştiğinde mevcut snap'i yeniden sınırla
   useEffect(() => {
     if (currentSnap.current > 0) {
-      const capped = Math.min(currentSnap.current, availableH);
-      currentSnap.current = capped;
-      Animated.timing(sheetHeight, {
-        toValue: capped,
-        duration: 200,
-        useNativeDriver: false,
-      }).start();
+      const c = Math.min(currentSnap.current, availableH);
+      currentSnap.current = c;
+      Animated.timing(sheetHeight, { toValue: c, duration: 200, useNativeDriver: false }).start();
     }
   }, [availableH]);
 
-  // En yakın snap noktasını bul (★ ref-based, stale closure yok)
+  // En yakın snap noktasını bul
   const findNearestSnap = useCallback((height: number, velocity: number): number => {
     const pts = snapPointsRef.current;
     if (Math.abs(velocity) > 0.5) {
@@ -628,14 +600,10 @@ export default function RoomChatDrawer({
         return lower.length > 0 ? lower[0] : 0;
       }
     }
-    let closest = pts[0];
-    let minDist = Math.abs(height - closest);
+    let closest = pts[0], minDist = Math.abs(height - closest);
     for (const snap of pts) {
       const dist = Math.abs(height - snap);
-      if (dist < minDist) {
-        minDist = dist;
-        closest = snap;
-      }
+      if (dist < minDist) { minDist = dist; closest = snap; }
     }
     return closest;
   }, []);
@@ -666,27 +634,20 @@ export default function RoomChatDrawer({
   ).current;
 
   // ════════════════════════════════════════════════════════════
-  // visible değiştiğinde animasyon
+  // visible değiştiğinde
   // ════════════════════════════════════════════════════════════
   useEffect(() => {
     if (visible) {
       isClosingRef.current = false;
+      closeTranslateY.setValue(0);
       animateTo(SNAP_HALF);
     } else {
-      // ★ Zaten kapanıyorsa (çevron/backdrop ile) ikinci animasyon başlatma
+      // Çekmece kapanma zaten çalışıyorsa tekrar başlatma
       if (isClosingRef.current) return;
-      // Parent tarafından kapatıldı (control bar ikonu)
-      currentSnap.current = 0;
-      Animated.timing(sheetHeight, {
-        toValue: 0,
-        duration: 280,
-        useNativeDriver: false,
-      }).start();
-      Animated.timing(backdropOpacity, {
-        toValue: 0,
-        duration: 250,
-        useNativeDriver: true,
-      }).start();
+      // Parent kapatma → aynı çekmece animasyonunu kullan
+      if (currentSnap.current > 0) {
+        animateTo(0);
+      }
     }
   }, [visible]);
 
@@ -1020,7 +981,8 @@ export default function RoomChatDrawer({
   }, [reactions, currentUserId, handleToggleReaction, onAvatarPress]);
 
   // Sheet kapalıysa render etme
-  const isOpen = visible || currentSnap.current > 0;
+  // ★ v1.7.13.161: isClosingRef — kapanma animasyonu sırasında component'ı unmount etme
+  const isOpen = visible || currentSnap.current > 0 || isClosingRef.current;
   if (!isOpen) return null;
 
   return (
@@ -1044,6 +1006,7 @@ export default function RoomChatDrawer({
           {
             bottom: sheetBottomAnim,
             height: sheetHeight,
+            transform: [{ translateY: closeTranslateY }],
           },
         ]}
       >
@@ -1076,7 +1039,7 @@ export default function RoomChatDrawer({
           </View>
           <View style={st.header}>
             <View style={st.headerTitleWrap}>
-              <Ionicons name="chatbubble-ellipses" size={18} color="#14B8A6" style={st.headerIcon} />
+              <Ionicons name="chatbubble-ellipses" size={22} color="#14B8A6" style={st.headerIcon} />
               <Text style={st.headerTitle}>{i18n.t('rooms.chat_drawer_title')}</Text>
               <Text style={st.msgCount}>{messages.length}</Text>
             </View>
@@ -1093,7 +1056,7 @@ export default function RoomChatDrawer({
           renderItem={renderMessage}
           style={st.list}
           inverted
-          contentContainerStyle={[st.listContent, { paddingTop: INPUT_BAR_H + 12 }]}
+          contentContainerStyle={[st.listContent, { paddingTop: 4 }]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
@@ -1176,121 +1139,102 @@ export default function RoomChatDrawer({
             />
           </View>
         )}
-      </Animated.View>
 
-      {/* ════════════════════════════════════════════════════════════
-          INPUT BAR — sheet'ten BAĞIMSIZ, Keyboard API ile konumlanır.
-          Klavye kapalı → control bar'ın hemen üstünde (sheet ile birleşik görünür)
-          Klavye açık → klavyenin hemen üstünde (screenY kullanarak)
-          ════════════════════════════════════════════════════════════ */}
-      <Animated.View
-        style={[
-          st.inputBarFloat,
-          {
-            bottom: inputBottomAnim,
-            opacity: sheetHeight.interpolate({
-              inputRange: [0, 50],
-              outputRange: [0, 1],
-              extrapolate: 'clamp',
-            }),
-          },
-        ]}
-      >
-        {/* ★ v107: Pending glow style banner — kullanıcı bir stil seçti, henüz mesaj göndermedi.
-            Cancel için X butonu. Mesaj gönderilince state otomatik temizlenir. */}
-        {pendingGlowStyle && (
-          <View style={st.glowBanner}>
-            <LinearGradient
-              colors={GLOW_STYLES[pendingGlowStyle].bgGradient as any}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-              style={StyleSheet.absoluteFillObject}
-            />
-            <Text style={st.glowBannerIcon}>{GLOW_STYLES[pendingGlowStyle].icon}</Text>
-            <Text style={st.glowBannerLabel}>{GLOW_STYLES[pendingGlowStyle].label}</Text>
-            <View style={st.glowBannerCost}>
-              <SPIcon size={11} />
-              <Text style={st.glowBannerCostText}>{GLOW_STYLES[pendingGlowStyle].cost} SP</Text>
+        {/* ════════════════════════════════════════════════════════════
+            INPUT BAR — sheet'in İÇİNDE, doğal flex ile alt kısımda.
+            Sheet ile birlikte hareket eder (kapanma, translateY, vs).
+            ════════════════════════════════════════════════════════════ */}
+        <View style={st.inputBarInline}>
+          {pendingGlowStyle && (
+            <View style={st.glowBanner}>
+              <LinearGradient
+                colors={GLOW_STYLES[pendingGlowStyle].bgGradient as any}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                style={StyleSheet.absoluteFillObject}
+              />
+              <Text style={st.glowBannerIcon}>{GLOW_STYLES[pendingGlowStyle].icon}</Text>
+              <Text style={st.glowBannerLabel}>{GLOW_STYLES[pendingGlowStyle].label}</Text>
+              <View style={st.glowBannerCost}>
+                <SPIcon size={11} />
+                <Text style={st.glowBannerCostText}>{GLOW_STYLES[pendingGlowStyle].cost} SP</Text>
+              </View>
+              <Pressable onPress={() => setPendingGlowStyle(null)} hitSlop={8} style={st.glowBannerClose}>
+                <Ionicons name="close" size={14} color="rgba(255,255,255,0.85)" />
+              </Pressable>
             </View>
-            <Pressable onPress={() => setPendingGlowStyle(null)} hitSlop={8} style={st.glowBannerClose}>
-              <Ionicons name="close" size={14} color="rgba(255,255,255,0.85)" />
-            </Pressable>
-          </View>
-        )}
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 0 }}>
-        <Pressable
-          onPress={() => {
-            if (!showEmojiPicker) {
+          )}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 0 }}>
+          <Pressable
+            onPress={() => {
+              if (!showEmojiPicker) {
+                inputRef.current?.blur();
+              }
+              setShowEmojiPicker(v => !v);
+            }}
+            style={st.iconBtn}
+            hitSlop={6}
+          >
+            <Ionicons
+              name={showEmojiPicker ? 'close-outline' : 'happy-outline'}
+              size={22}
+              color={showEmojiPicker ? '#5CE1E6' : 'rgba(255,255,255,0.55)'}
+            />
+          </Pressable>
+          <Pressable
+            onPress={() => {
               inputRef.current?.blur();
-            }
-            setShowEmojiPicker(v => !v);
-          }}
-          style={st.iconBtn}
-          hitSlop={6}
-        >
-          <Ionicons
-            name={showEmojiPicker ? 'close-outline' : 'happy-outline'}
-            size={22}
-            color={showEmojiPicker ? '#5CE1E6' : 'rgba(255,255,255,0.55)'}
+              setShowEmojiPicker(false);
+              Keyboard.dismiss();
+              setTimeout(() => setGlowPickerVisible(true), 220);
+            }}
+            style={st.iconBtn}
+            hitSlop={6}
+          >
+            <Ionicons name="sparkles" size={20} color={pendingGlowStyle ? '#FBBF24' : 'rgba(255,255,255,0.55)'} />
+          </Pressable>
+          <TextInput
+            ref={inputRef}
+            style={st.input}
+            placeholder={i18n.t('rooms.chat_input_placeholder')}
+            placeholderTextColor="rgba(255,255,255,0.35)"
+            value={chatInput}
+            onChangeText={onChangeInput}
+            onFocus={() => {
+              setShowEmojiPicker(false);
+              if (currentSnap.current < SNAP_FULL) {
+                animateToRef.current(SNAP_FULL);
+              }
+            }}
+            maxLength={300}
+            returnKeyType="send"
+            blurOnSubmit={false}
+            onSubmitEditing={() => {
+              if (pendingGlowStyle && onSendGlow && chatInput.trim()) {
+                onSendGlow(chatInput, pendingGlowStyle);
+                setPendingGlowStyle(null);
+              } else {
+                onSend();
+              }
+              inputRef.current?.focus();
+            }}
           />
-        </Pressable>
-        {/* ★ v107: Mesaj Parlat — picker aç.
-            Hotfix: Klavye tamamen kapansın diye 220ms gecikme — Android adjustResize
-            ile pencere küçükken sheet açılırsa bottom referansı kayar, "yukarıya fırlar". */}
-        <Pressable
-          onPress={() => {
-            inputRef.current?.blur();
-            setShowEmojiPicker(false);
-            Keyboard.dismiss();
-            setTimeout(() => setGlowPickerVisible(true), 220);
-          }}
-          style={st.iconBtn}
-          hitSlop={6}
-        >
-          <Ionicons name="sparkles" size={20} color={pendingGlowStyle ? '#FBBF24' : 'rgba(255,255,255,0.55)'} />
-        </Pressable>
-        <TextInput
-          ref={inputRef}
-          style={st.input}
-          placeholder={i18n.t('rooms.chat_input_placeholder')}
-          placeholderTextColor="rgba(255,255,255,0.35)"
-          value={chatInput}
-          onChangeText={onChangeInput}
-          onFocus={() => {
-            setShowEmojiPicker(false);
-            // Klavye açılınca tam ekrana geç
-            if (currentSnap.current < SNAP_FULL) {
-              animateToRef.current(SNAP_FULL);
-            }
-          }}
-          maxLength={300}
-          returnKeyType="send"
-          blurOnSubmit={false}
-          onSubmitEditing={() => {
-            if (pendingGlowStyle && onSendGlow && chatInput.trim()) {
-              onSendGlow(chatInput, pendingGlowStyle);
-              setPendingGlowStyle(null);
-            } else {
-              onSend();
-            }
-            inputRef.current?.focus();
-          }}
-        />
-        <Pressable
-          style={[st.sendBtn, !chatInput.trim() && { opacity: 0.35 }]}
-          onPress={() => {
-            if (pendingGlowStyle && onSendGlow && chatInput.trim()) {
-              onSendGlow(chatInput, pendingGlowStyle);
-              setPendingGlowStyle(null);
-            } else {
-              onSend();
-            }
-            inputRef.current?.focus();
-          }}
-          disabled={!chatInput.trim()}
-          hitSlop={6}
-        >
-          <Ionicons name="send" size={16} color="#FFF" />
-        </Pressable>
+          <Pressable
+            style={[st.sendBtn, !chatInput.trim() && { opacity: 0.35 }]}
+            onPress={() => {
+              if (pendingGlowStyle && onSendGlow && chatInput.trim()) {
+                onSendGlow(chatInput, pendingGlowStyle);
+                setPendingGlowStyle(null);
+              } else {
+                onSend();
+              }
+              inputRef.current?.focus();
+            }}
+            disabled={!chatInput.trim()}
+            hitSlop={6}
+          >
+            <Ionicons name="send" size={16} color="#FFF" />
+          </Pressable>
+          </View>
         </View>
       </Animated.View>
 
@@ -1330,8 +1274,8 @@ const st = StyleSheet.create({
     elevation: 58, // z-order için kritik (oda chat üstte kalmalı)
     borderTopLeftRadius: 26,
     borderTopRightRadius: 26,
-    borderBottomLeftRadius: 26,
-    borderBottomRightRadius: 26,
+    borderBottomLeftRadius: 14,
+    borderBottomRightRadius: 14,
     overflow: 'hidden',
     backgroundColor: '#1a2030',
     shadowColor: '#000',
@@ -1362,9 +1306,9 @@ const st = StyleSheet.create({
   },
   // ★ 2026-05-05: NotificationDrawer dili — teal glow ikonda, bold title, count pill.
   headerIcon: {
-    textShadowColor: 'rgba(20,184,166,0.7)',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 5,
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
   },
   headerTitle: {
     fontSize: 15, fontWeight: '800', color: '#F1F5F9', letterSpacing: 0.3,
@@ -1399,7 +1343,7 @@ const st = StyleSheet.create({
     left: 4, right: 4,
     zIndex: 59,
     elevation: 59,
-    flexDirection: 'column',  // ★ v107: banner üstte + input row altta
+    flexDirection: 'column',
     gap: 6,
     paddingHorizontal: 8,
     paddingTop: 8,
@@ -1412,6 +1356,20 @@ const st = StyleSheet.create({
     shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
+  },
+  // ★ v1.7.13.161: Input bar sheet'in içine taşındı — inline style
+  inputBarInline: {
+    flexDirection: 'column' as const,
+    gap: 6,
+    paddingHorizontal: 8,
+    paddingTop: 6,
+    paddingBottom: 8,
+    marginHorizontal: 2,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(149,161,174,0.15)',
+    backgroundColor: 'rgba(55,65,79,0.97)',
+    borderBottomLeftRadius: 14,
+    borderBottomRightRadius: 14,
   },
   iconBtn: {
     width: 34, height: 34, borderRadius: 17,
@@ -1469,6 +1427,7 @@ const st = StyleSheet.create({
     width: 36, height: 36, borderRadius: 18,
     backgroundColor: '#14B8A6',
     alignItems: 'center', justifyContent: 'center',
+    marginRight: 0,
   },
 
   // ── Messages ──

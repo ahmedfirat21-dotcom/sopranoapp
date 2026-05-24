@@ -114,6 +114,9 @@ interface Props {
    *  canModerate: bu user'da mute yetkisi var mı? onQuickMute: tıklayınca toggle. */
   canModerate?: (user: RoomParticipant) => boolean;
   onQuickMute?: (user: RoomParticipant) => void;
+  /** ★ v1.7.13.146 (24 May 2026): Clubhouse + takip butonu — sağ-üst köşede. */
+  followedIds?: Set<string>;
+  onFollow?: (targetUserId: string) => void;
 }
 
 /* ★ v286 (16 May 2026): Host Halo + Pulse — Skia colored shadow + opsiyonel
@@ -614,7 +617,7 @@ function SpeakerBadgeCenter({ x, y, scale, expected, children }: {
   );
 }
 
-function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, isMe, cardWidth: rawCardWidth, cardHeight: rawCardHeight, VideoView, canModerate, onQuickMute, isSpotlight }: {
+function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, isMe, cardWidth: rawCardWidth, cardHeight: rawCardHeight, VideoView, canModerate, onQuickMute, isSpotlight, showFollowButton, isFollowing, onFollowPress }: {
   canModerate?: boolean;
   onQuickMute?: () => void;
   user: RoomParticipant; micStatus: MicStatus; onPress: () => void;
@@ -625,6 +628,10 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, i
    *  uniform grid'de mi? Spotlight → parent cardHeight kullanir (admin spotlight
    *  aspect). Audio uniform + kamera acik → admin heightRatio uygulanir. */
   isSpotlight?: boolean;
+  /** ★ v1.7.13.146 (24 May 2026): Clubhouse + takip butonu */
+  showFollowButton?: boolean;
+  isFollowing?: boolean;
+  onFollowPress?: () => void;
 }) {
   const isHost = user.role === 'owner';
   const isMod = user.role === 'moderator';
@@ -638,7 +645,9 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, i
   // ★ v302 (18 May 2026): Kamera indicator köşe konum helper'ı.
   //   admin'in camera.indicatorPosition değerine göre rozet konumu.
   const indicatorPosStyle = (size: number) => {
-    const off = -Math.round(size / 4);
+    // ★ v1.7.13.161: offset çerçeve İÇİNE — eski negatif offset badge'i çerçeve
+    //   dışına taşırıyordu. Şimdi +6 ile çerçeve kenarından 6px içeride.
+    const off = 6;
     switch (camCfg.indicatorPosition) {
       case 'topLeft':     return { top: off, left: off };
       case 'topRight':    return { top: off, right: off };
@@ -1239,7 +1248,8 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, i
           <View
             pointerEvents="none"
             style={{
-              position: 'absolute', left: 8, right: 8, bottom: 6,
+              // ★ v1.7.13.161: left 8→14 — isim çerçeve sınırının içinde kalsın
+              position: 'absolute', left: 14, right: 14, bottom: 8,
               zIndex: 25, elevation: 14,
             }}
           >
@@ -1307,6 +1317,63 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, i
         {/* ★ v283 (16 May 2026): "EV SAHİBİ" chip KALDIRILDI (kullanıcı talebi). */}
       </View>
       )}
+      {/* ★ v1.7.13.146 (24 May 2026): Clubhouse-style mic-off badge — avatar sağ-altında
+          küçük beyaz daire içinde mikrofon kapalı ikonu. Speaker susturulduğunda anında
+          görünür ipucu. pointerEvents="none" — avatar tap'i bozmaz. */}
+      {!mic && !cameraOn && (() => {
+        const micBadge = Math.max(16, Math.round(cardWidth * 0.26));
+        // Avatar 0..cardWidth alanı kaplıyor (kart üstü). Sağ-alt çeyreğe yerleştir:
+        // circle merkez cardWidth/2, sağ-alt köşe cos45·R, sin45·R ≈ 0.707·(cardWidth/2)
+        const r = cardWidth / 2;
+        const offset = r * 0.71; // 45° açı
+        const cx = r + offset - micBadge / 2;
+        const cy = r + offset - micBadge / 2;
+        return (
+          <View pointerEvents="none" style={{
+            position: 'absolute',
+            top: cy,
+            left: cx,
+            width: micBadge, height: micBadge, borderRadius: micBadge / 2,
+            backgroundColor: 'rgba(255,255,255,0.95)',
+            alignItems: 'center', justifyContent: 'center',
+            borderWidth: 1.5, borderColor: '#FFFFFF',
+            shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 2, shadowOffset: { width: 0, height: 1 },
+            elevation: 6,
+            zIndex: 10,
+          }}>
+            <Ionicons name="mic-off" size={Math.round(micBadge * 0.58)} color="#6B7280" />
+          </View>
+        );
+      })()}
+      {/* ★ v1.7.13.146 (24 May 2026): Clubhouse-style + takip butonu — sağ-üst köşe.
+          Nested Pressable: parent kart Pressable'ı tetiklemez (RN default behavior). */}
+      {showFollowButton && !isFollowing && !isMe && !cameraOn && (() => {
+        const btn = Math.max(18, Math.round(cardWidth * 0.30));
+        const r = cardWidth / 2;
+        const offset = r * 0.71;
+        const cx = r + offset - btn / 2;
+        const cy = r - offset - btn / 2;
+        return (
+          <Pressable
+            onPress={onFollowPress}
+            hitSlop={8}
+            style={{
+              position: 'absolute',
+              top: cy,
+              left: cx,
+              width: btn, height: btn, borderRadius: btn / 2,
+              backgroundColor: '#14B8A6',
+              alignItems: 'center', justifyContent: 'center',
+              borderWidth: 2, borderColor: 'rgba(8,12,22,0.95)',
+              shadowColor: '#000', shadowOpacity: 0.35, shadowRadius: 3, shadowOffset: { width: 0, height: 1 },
+              elevation: 8,
+              zIndex: 11,
+            }}
+          >
+            <Ionicons name="add" size={Math.round(btn * 0.65)} color="#FFFFFF" />
+          </Pressable>
+        );
+      })()}
       </Pressable>
       {/* ★ 2026-04-22: "Sahneden İn" butonu kart içinden KALDIRILDI — parent container'ın
           maxHeight'ı Android'de touch event'i çocuk dışına bırakmıyordu (RN bug).
@@ -1316,7 +1383,7 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, i
 }
 
 
-export default function SpeakerSection({ stageUsers, getMicStatus, onSelectUser, onSelfDemote, currentUserId, VideoView, onGhostSeatPress, showSeatTooltip, avatarFlashes, onFlashDone, onCameraExpand, canModerate, onQuickMute }: Props) {
+export default function SpeakerSection({ stageUsers, getMicStatus, onSelectUser, onSelfDemote, currentUserId, VideoView, onGhostSeatPress, showSeatTooltip, avatarFlashes, onFlashDone, onCameraExpand, canModerate, onQuickMute, followedIds, onFollow }: Props) {
   // ★ 2026-04-22: Runtime window width — fiziksel Android cihazda gesture-nav/
   //   rotation ile değişen dimensions'a adapte olur.
   const { width: W } = useWindowDimensions();
@@ -1475,7 +1542,10 @@ export default function SpeakerSection({ stageUsers, getMicStatus, onSelectUser,
                 canModerate={canModerate?.(u) ?? false}
                 onQuickMute={onQuickMute ? () => onQuickMute(u) : undefined}
                 isMe={isMe} cardWidth={spotlightW} cardHeight={spotlightH} VideoView={VideoView}
-                isSpotlight={true} />
+                isSpotlight={true}
+                showFollowButton={!!currentUserId && !!onFollow && u.user_id !== currentUserId}
+                isFollowing={!!followedIds?.has(u.user_id)}
+                onFollowPress={() => onFollow?.(u.user_id)} />
             );
           })}
         </View>
@@ -1510,7 +1580,10 @@ export default function SpeakerSection({ stageUsers, getMicStatus, onSelectUser,
                   isMe={isMe}
                   cardWidth={audioMetrics.cardWidth}
                   cardHeight={audioMetrics.cardWidth}
-                  VideoView={VideoView} />
+                  VideoView={VideoView}
+                  showFollowButton={!!currentUserId && !!onFollow && u.user_id !== currentUserId}
+                  isFollowing={!!followedIds?.has(u.user_id)}
+                  onFollowPress={() => onFollow?.(u.user_id)} />
               );
             })}
           </View>
@@ -1539,7 +1612,10 @@ export default function SpeakerSection({ stageUsers, getMicStatus, onSelectUser,
                 onCameraExpand={onCameraExpand}
                 canModerate={canModerate?.(u) ?? false}
                 onQuickMute={onQuickMute ? () => onQuickMute(u) : undefined}
-                isMe={isMe} cardWidth={renderWidth} cardHeight={renderHeight} VideoView={VideoView} />
+                isMe={isMe} cardWidth={renderWidth} cardHeight={renderHeight} VideoView={VideoView}
+                showFollowButton={!!currentUserId && !!onFollow && u.user_id !== currentUserId}
+                isFollowing={!!followedIds?.has(u.user_id)}
+                onFollowPress={() => onFollow?.(u.user_id)} />
             );
           })}
         </View>

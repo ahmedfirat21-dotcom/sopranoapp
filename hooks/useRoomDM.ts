@@ -1,10 +1,10 @@
 /**
- * SopranoChat — useRoomDM Hook
- * ═══════════════════════════════════════════════════
- * ★ ARCH-1 FIX: room/[id].tsx God Component decomposition — Hook 5
+ * SopranoChat �?? useRoomDM Hook
+ * �?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?��?�
+ * �?? ARCH-1 FIX: room/[id].tsx God Component decomposition �?? Hook 5
  *
  * Sorumluluk:
- *   - DM okunmamış sayacı (badge)
+ *   - DM okunmamı�? sayacı (badge)
  *   - DM gönderme (engel + takip kontrolü ile)
  *   - DM inbox mesajları
  *
@@ -27,7 +27,7 @@ export function useRoomDM(params: UseRoomDMParams) {
   const { firebaseUser } = params;
   const dmNotif = useDMNotifOptional();
 
-  // ── State ─────────────────────────────────────
+  // �??�?? State �??�??�??�??�??�??�??�??�??�??�??�??�??�??�??�??�??�??�??�??�??�??�??�??�??�??�??�??�??�??�??�??�??�??�??�??�??
   const [dmUnreadCount, setDmUnreadCount] = useState(0);
   const [dmInboxMessages, setDmInboxMessages] = useState<any[]>([]);
   const [dmTarget, setDmTarget] = useState<DmTarget>(null);
@@ -35,9 +35,9 @@ export function useRoomDM(params: UseRoomDMParams) {
   const [dmSending, setDmSending] = useState(false);
   const [showDmPanel, setShowDmPanel] = useState(false);
 
-  // ── DM Okunmamış Sayacı + Inbox Preload ───────
-  // ★ 2026-04-30 v86: postgres_changes anon Realtime'da DM tablolarını görmüyor
-  //   (RLS sender/receiver kontrolü). Çözüm: DMNotifProvider broadcast event'leri.
+  // �??�?? DM Okunmamı�? Sayacı + Inbox Preload �??�??�??�??�??�??�??
+  // �?? 2026-04-30 v86: postgres_changes anon Realtime'da DM tablolarını görmüyor
+  //   (RLS sender/receiver kontrolü). �?özüm: DMNotifProvider broadcast event'leri.
   //   Yeni mesaj gelince refreshDmBadge tetiklenir, sayım + inbox tekrar fetch.
   useEffect(() => {
     if (!firebaseUser?.uid) return;
@@ -54,16 +54,18 @@ export function useRoomDM(params: UseRoomDMParams) {
       }, 250);
     };
 
-    // ★ v110.14: DM broadcast — anlık optimistic +1, ek olarak DB fetch ile teyit.
-    //   Önceden sadece 250ms debounce sonra fetch yapılıyordu, kullanıcı oda içinde
-    //   DM badge'in geç güncellendiğini görüyordu. Şimdi sinyalle birlikte hemen +1,
+    // �?? v110.14: DM broadcast �?? anlık optimistic +1, ek olarak DB fetch ile teyit.
+    //   �?nceden sadece 250ms debounce sonra fetch yapılıyordu, kullanıcı oda içinde
+    //   DM badge'in geç güncellendi�?ini görüyordu. �?imdi sinyalle birlikte hemen +1,
     //   sonra fetch ile düzelt.
     const unsub = dmNotif?.onSignal((signal) => {
-      if (signal.event === 'dm_new' && !signal.is_request) {
-        // Anlık badge artırma (sadece kabul edilmiş DM'ler için)
+      if (signal.event === 'dm_new') {
+        // �?? v1.7.13.161: Hem normal DM hem mesaj iste�?i badge artırsın �??
+        //   oda içinde yabancıdan gelen mesaj fark edilemeyen bug düzeltildi.
+        //   Eski: !signal.is_request ko�?ulu request'leri hariç tutuyordu.
         setDmUnreadCount(prev => prev + 1);
         refreshDmBadge();
-      } else if (signal.event === 'dm_new' || signal.event === 'dm_accepted' || signal.event === 'dm_rejected') {
+      } else if (signal.event === 'dm_accepted' || signal.event === 'dm_rejected') {
         refreshDmBadge();
       }
     });
@@ -74,7 +76,7 @@ export function useRoomDM(params: UseRoomDMParams) {
     };
   }, [firebaseUser?.uid, dmNotif]);
 
-  // ── DM Gönder ─────────────────────────────────
+  // �??�?? DM Gönder �??�??�??�??�??�??�??�??�??�??�??�??�??�??�??�??�??�??�??�??�??�??�??�??�??�??�??�??�??�??�??�??�??
   const handleSendDm = useCallback(async () => {
     if (!dmTarget || !dmText.trim() || dmSending || !firebaseUser) return;
     setDmSending(true);
@@ -93,7 +95,7 @@ export function useRoomDM(params: UseRoomDMParams) {
         }
       } catch {}
 
-      // Takip kontrolü — ★ 2026-04-27 FIX: tek yönlü accepted = arkadaş (OR)
+      // Takip kontrolü �?? �?? 2026-04-27 FIX: tek yönlü accepted = arkada�? (OR)
       let isMessageRequest = false;
       try {
         const { outgoing, incoming } = await FriendshipService.getDetailedStatus(firebaseUser.uid, dmTarget.userId);
@@ -105,13 +107,13 @@ export function useRoomDM(params: UseRoomDMParams) {
       setDmTarget(null);
       setDmText('');
     } catch {
-      // Sessiz hata — UI'da mesaj gönderilmemiş olarak kalır
+      // Sessiz hata �?? UI'da mesaj gönderilmemi�? olarak kalır
     } finally {
       setDmSending(false);
     }
   }, [dmTarget, dmText, dmSending, firebaseUser]);
 
-  // ── DM Panel Aç ───────────────────────────────
+  // �??�?? DM Panel Aç �??�??�??�??�??�??�??�??�??�??�??�??�??�??�??�??�??�??�??�??�??�??�??�??�??�??�??�??�??�??�??
   const toggleDmPanel = useCallback(() => {
     setShowDmPanel(prev => {
       if (!prev && firebaseUser?.uid) {

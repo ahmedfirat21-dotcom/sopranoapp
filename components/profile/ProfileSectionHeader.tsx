@@ -22,7 +22,7 @@ interface Props {
   icon: keyof typeof Ionicons.glyphMap;
   /** Karakter rengi — accent bar + ikon (varsayılan teal) */
   accentColor?: string;
-  /** Başlığın sağında gösterilecek sayı badge (opsiyonel) */
+  /** Başlığın sağında gösterilecek sayı (opsiyonel) — çerçevesiz, sade accent renkli */
   count?: number;
   /** "Tümünü Gör" gibi sağdaki tıklanabilir link metni */
   actionLabel?: string;
@@ -43,8 +43,9 @@ export default function ProfileSectionHeader({
       <Ionicons name={icon} size={13} color={accentColor} style={iconShadow} />
       <Text style={s.label}>{label}</Text>
       {typeof count === 'number' && count > 0 && (
-        <View style={[s.countPill, { backgroundColor: `${accentColor}1F`, borderColor: `${accentColor}40` }]}>
-          <Text style={[s.countText, { color: accentColor }]}>{count}</Text>
+        <View style={s.countWrap}>
+          <View style={[s.countDot, { backgroundColor: accentColor, shadowColor: accentColor }]} />
+          <Text style={[s.countText, { color: accentColor, textShadowColor: `${accentColor}80` }]}>{count}</Text>
         </View>
       )}
       {actionLabel && onActionPress && (
@@ -75,12 +76,23 @@ const s = StyleSheet.create({
     fontSize: 11, fontWeight: '800', color: '#94A3B8',
     letterSpacing: 1, ..._textGlow,
   },
-  countPill: {
-    borderRadius: 10,
-    paddingHorizontal: 8, paddingVertical: 3,
-    borderWidth: 1,
+  countWrap: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    marginLeft: 2,
   },
-  countText: { fontSize: 10, fontWeight: '800' },
+  countDot: {
+    width: 4, height: 4, borderRadius: 2,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.9,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  countText: {
+    fontSize: 11, fontWeight: '900',
+    letterSpacing: 0.4,
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 6,
+  },
   action: {
     flexDirection: 'row', alignItems: 'center', gap: 2,
     marginLeft: 'auto',

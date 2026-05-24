@@ -14,11 +14,11 @@ import { useFocusEffect } from 'expo-router';
 import { useCallback } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import StatusAvatar from '../../components/StatusAvatar';
-// ★ 2026-04-27: UserSearchModal artık global (app/_layout.tsx) — useUserSearchSheet ile açılır.
+// �?? 2026-04-27: UserSearchModal artık global (app/_layout.tsx) �?? useUserSearchSheet ile açılır.
 import { useUserSearchSheet } from '../_layout';
 import AppBackground from '../../components/AppBackground';
 import AnimatedHeaderIconBtn from '../../components/AnimatedHeaderIconBtn';
-// ★ 2026-04-28: AnimatedLogo kaldırıldı — SopranoMesaj branding için inline component.
+// �?? 2026-04-28: AnimatedLogo kaldırıldı �?? SopranoMesaj branding için inline component.
 import { bannerIntroPlayed, markBannerIntroPlayed } from '../../utils/bannerIntro';
 import TabBarFadeOut from '../../components/TabBarFadeOut';
 import { showToast } from '../../components/Toast';
@@ -30,15 +30,16 @@ import ConversationActionSheet, { type SheetAction } from '../../components/Conv
 import { ModerationService } from '../../services/moderation';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ImageStyle } from 'react-native';
+import { Haptics } from '../../utils/haptics';
 
-// ★ 2026-04-28: Mesajlar header logosu — SopranoMesaj (soprano_part + mesaj_part)
+// �?? 2026-04-28: Mesajlar header logosu �?? SopranoMesaj (soprano_part + mesaj_part)
 const MESAJ_SOP_W = 110;
 const MESAJ_MESAJ_W = 73;
 const MESAJ_H = 30;
 
 function AnimatedMesajLogo() {
   const played = bannerIntroPlayed();
-  // ★ 2026-04-29: Soprano sabit (kullanıcı isteği) — sadece Mesaj partner kelime animasyonlu
+  // �?? 2026-04-29: Soprano sabit (kullanıcı iste�?i) �?? sadece Mesaj partner kelime animasyonlu
   const mesajX = useRef(new RNAnimated.Value(played ? 0 : 120)).current;
   const mesajOp = useRef(new RNAnimated.Value(played ? 1 : 0)).current;
   const mesajY = useRef(new RNAnimated.Value(0)).current;
@@ -54,7 +55,7 @@ function AnimatedMesajLogo() {
     return () => { clearTimeout(t2); };
   }, []);
 
-  // ★ 2026-04-29: Tab focus'ta — sadece Mesaj çizgiden yukarı doğar (Soprano sabit)
+  // �?? 2026-04-29: Tab focus'ta �?? sadece Mesaj çizgiden yukarı do�?ar (Soprano sabit)
   useFocusEffect(
     React.useCallback(() => {
       if (!bannerIntroPlayed()) return;
@@ -95,7 +96,7 @@ const mesajLogoS = StyleSheet.create({
   mesaj: { width: MESAJ_MESAJ_W, height: MESAJ_H } as ImageStyle,
 });
 
-// ═══ Skeleton Card — Initial load'da iskelet gösterimi ═══
+// �?��?��?� Skeleton Card �?? Initial load'da iskelet gösterimi �?��?��?�
 function SkeletonCard() {
   const pulseAnim = useRef(new RNAnimated.Value(0.3)).current;
   useEffect(() => {
@@ -141,8 +142,8 @@ const skStyles = StyleSheet.create({
   timePill: { width: 36, height: 10, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.08)' },
 });
 
-// ═══ Memoized Conversation Card — FlatList re-render'ı izole ═══
-// ★ v109: WhatsApp/iMessage tarzı bubble — opacity yerine TRANSLATEY ile "zıplayan"
+// �?��?��?� Memoized Conversation Card �?? FlatList re-render'ı izole �?��?��?�
+// �?? v109: WhatsApp/iMessage tarzı bubble �?? opacity yerine TRANSLATEY ile "zıplayan"
 //   3 nokta. Daha canlı, kompakt. "yazıyor" text'i kaldırıldı, sade bubble.
 function TypingDots({ bubble = false }: { bubble?: boolean }) {
   const d1 = useRef(new RNAnimated.Value(0)).current;
@@ -212,7 +213,7 @@ const ConversationCard = React.memo(function ConversationCard({
   onCallPress: (partnerId: string) => void;
 }) {
   const unread = item.unread_count > 0;
-  // ★ 2026-04-24: Settings kartı ile birleşik — bombe gradient (üst aydınlık → alt koyu)
+  // �?? 2026-04-24: Settings kartı ile birle�?ik �?? bombe gradient (üst aydınlık �?? alt koyu)
   return (
     <SwipeableRow
       containerStyle={[styles.msgCard, isSelected && styles.msgCardSelected, unread && styles.msgCardUnread]}
@@ -225,7 +226,7 @@ const ConversationCard = React.memo(function ConversationCard({
         onLongPress={() => onLongPress(item)}
         delayLongPress={400}
       >
-        {/* ★ 2026-05-05: NotificationDrawer aile dili — slate diagonal + teal halo (DM karakter) */}
+        {/* �?? 2026-05-05: NotificationDrawer aile dili �?? slate diagonal + teal halo (DM karakter) */}
         <LinearGradient
           colors={['#3a4658', '#2a3344', '#1a2030']}
           start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
@@ -253,7 +254,9 @@ const ConversationCard = React.memo(function ConversationCard({
             </View>
           )}
           <Pressable style={styles.avatarWrap} onPress={() => onAvatarPress(item.partner_id)}>
-            <StatusAvatar uri={item.partner_avatar} size={52} isOnline={item.partner_is_online} tier={item.partner_tier} frameId={item.partner_frame} customBadgeId={(item as any).partner_active_badge_id ?? null} />
+            {/* �?? v1.7.13.49 (20 May 2026): Privacy �?? online durumu SADECE arkada�?a göster.
+                Yabancılar (arkada�? olmayan) için isOnline=false zorla �?? online dot çıkmaz. */}
+            <StatusAvatar uri={item.partner_avatar} size={52} isOnline={isFriend ? item.partner_is_online : false} tier={item.partner_tier} frameId={item.partner_frame} customBadgeId={(item as any).partner_active_badge_id ?? null} />
           </Pressable>
           <View style={styles.msgInfo}>
             <View style={styles.msgTop}>
@@ -274,13 +277,13 @@ const ConversationCard = React.memo(function ConversationCard({
             </View>
             <View style={styles.msgPreviewRow}>
               {isTyping ? (
-                // ★ v109: WhatsApp tarzı 3 nokta bubble — "yazıyor" text yok, sade animasyon
+                // �?? v109: WhatsApp tarzı 3 nokta bubble �?? "yazıyor" text yok, sade animasyon
                 <TypingDots bubble />
               ) : item.draft ? (
-                // ★ v109: Taslak göstergesi — kırmızımsı turuncu, "Taslak: ..." önekli
+                // �?? v109: Taslak göstergesi �?? kırmızımsı turuncu, "Taslak: ..." önekli
                 <>
                   <Text style={{ color: '#F87171', fontSize: 13, fontWeight: '700', marginRight: 4 }}>
-                    Taslak:
+                    {i18n.t('tabs.messages.053')}
                   </Text>
                   <Text style={[styles.msgText, { fontStyle: 'italic' }]} numberOfLines={1}>
                     {item.draft}
@@ -289,16 +292,31 @@ const ConversationCard = React.memo(function ConversationCard({
               ) : (
                 <>
                   {item.is_last_msg_mine && (
+                    /* �?? v1.7.13.49 (20 May 2026): WhatsApp pattern �?? tek tik (sent) vs çift mavi tik (read).
+                       Eski hep checkmark-done idi, sadece rengi de�?i�?iyordu �?? kullanıcı "okundu" zannediyordu. */
                     <Ionicons
-                      name="checkmark-done"
+                      name={item.is_last_msg_read ? "checkmark-done" : "checkmark"}
                       size={14}
-                      color={item.is_last_msg_read ? Colors.teal : 'rgba(255,255,255,0.3)'}
+                      color={item.is_last_msg_read ? '#34B7F1' : 'rgba(255,255,255,0.45)'}
                       style={{ marginRight: 2 }}
                     />
                   )}
+                  {/* �?? v1.7.13.142: Medya tipi ikonu �?? ses/resim/GIF */}
+                  {(() => {
+                    const content = item.last_message_content || '';
+                    const youPrefix = `${i18n.t('messages.you_prefix')}: `;
+                    const rawContent = item.is_last_msg_mine ? content.replace(new RegExp(`^${i18n.t('messages.you_prefix')}:\\s*`), '') : content;
+                    if (rawContent.includes('🎤') || rawContent.startsWith(i18n.t('messages.voice_message')))
+                      return <Ionicons name="mic" size={13} color={Colors.teal} style={{ marginRight: 3 }} />;
+                    if (/\.(jpg|jpeg|png|webp|gif)(\?|$)/i.test(rawContent))
+                      return <Ionicons name="image" size={13} color={Colors.teal} style={{ marginRight: 3 }} />;
+                    if (/tenor\.com|giphy\.com/i.test(rawContent))
+                      return <Text style={{ fontSize: 10, fontWeight: '800', color: Colors.teal, marginRight: 3, backgroundColor: 'rgba(20,184,166,0.15)', paddingHorizontal: 4, paddingVertical: 1, borderRadius: 3, overflow: 'hidden' }}>GIF</Text>;
+                    return null;
+                  })()}
                   <Text style={[styles.msgText, unread && styles.msgTextUnread]} numberOfLines={1}>
                     {item.is_last_msg_mine
-                      ? item.last_message_content?.replace(/^Sen:\s*/, '')
+                      ? item.last_message_content?.replace(new RegExp(`^${i18n.t('messages.you_prefix')}:\\s*`), '')
                       : item.last_message_content}
                   </Text>
                 </>
@@ -326,11 +344,11 @@ const ConversationCard = React.memo(function ConversationCard({
   );
 });
 
-// ═══ Pure-RN Swipe-to-Delete Row ═══
+// �?��?��?� Pure-RN Swipe-to-Delete Row �?��?��?�
 function SwipeableRow({ children, onDelete, containerStyle }: { children: React.ReactNode; onDelete: () => void; containerStyle?: any }) {
   const translateX = useRef(new RNAnimated.Value(0)).current;
   const [isOpen, setIsOpen] = useState(false);
-  const hapticTriggeredRef = useRef(false); // Threshold geçişinde sadece 1 kere
+  const hapticTriggeredRef = useRef(false); // Threshold geçi�?inde sadece 1 kere
   const deleteOpacity = translateX.interpolate({ inputRange: [-80, -20, 0], outputRange: [1, 0.6, 0], extrapolate: 'clamp' });
   const panResponder = useRef(
     PanResponder.create({
@@ -339,7 +357,7 @@ function SwipeableRow({ children, onDelete, containerStyle }: { children: React.
       onPanResponderMove: (_, gs) => {
         if (gs.dx < 0) {
           translateX.setValue(Math.max(gs.dx, -90));
-          // ★ 2026-04-21: Swipe threshold geçişinde tek sefer haptic feedback
+          // �?? 2026-04-21: Swipe threshold geçi�?inde tek sefer haptic feedback
           if (gs.dx < -60 && !hapticTriggeredRef.current) {
             hapticTriggeredRef.current = true;
             try {
@@ -380,7 +398,7 @@ function SwipeableRow({ children, onDelete, containerStyle }: { children: React.
         <RNAnimated.View style={{ transform: [{ translateX }] }} {...panResponder.panHandlers}>
           {children}
         </RNAnimated.View>
-        {/* ★ Açık swipe üzerinde overlay — herhangi bir tap snap-back yapar (iOS Mail/WhatsApp pattern) */}
+        {/* �?? Açık swipe üzerinde overlay �?? herhangi bir tap snap-back yapar (iOS Mail/WhatsApp pattern) */}
         {isOpen && (
           <Pressable
             style={[StyleSheet.absoluteFillObject, { right: 80 }]}
@@ -401,13 +419,13 @@ export default function MessagesScreen() {
   const [conversations, setConversations] = useState<InboxItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  // ★ 2026-04-21: Error state — empty state'ten ayır, retry butonu göster.
+  // �?? 2026-04-21: Error state �?? empty state'ten ayır, retry butonu göster.
   const [loadError, setLoadError] = useState<string | null>(null);
   const { openSearch } = useUserSearchSheet();
   const [searchQuery, setSearchQuery] = useState('');
-  // ★ v283 (16 May 2026): Header'da search ikonu, basınca arama pill toggle
+  // �?? v283 (16 May 2026): Header'da search ikonu, basınca arama pill toggle
   const [searchOpen, setSearchOpen] = useState(false);
-  // ★ Debounced sorgu — her karakter 100+ yeniden render yapıyordu
+  // �?? Debounced sorgu �?? her karakter 100+ yeniden render yapıyordu
   const [debouncedQuery, setDebouncedQuery] = useState('');
   useEffect(() => {
     const t = setTimeout(() => setDebouncedQuery(searchQuery), 250);
@@ -424,32 +442,35 @@ export default function MessagesScreen() {
     buttons?: AlertButton[];
   };
   const [cAlert, setCAlert] = useState<AlertState>({ visible: false, title: '', message: '' });
-  // ★ 2026-04-21: Long-press action sheet state — PremiumAlert yerine modern bottom sheet.
+  // �?? 2026-04-21: Long-press action sheet state �?? PremiumAlert yerine modern bottom sheet.
   const [sheetItem, setSheetItem] = useState<InboxItem | null>(null);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  // ★ Yazıyor... — listedeki konuşmalarda canlı typing indicator
+  // �?? Yazıyor... �?? listedeki konu�?malarda canlı typing indicator
   const [typingPartners, setTypingPartners] = useState<Set<string>>(new Set());
   const typingTimeoutsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
-  // ★ Arşiv görünümü — varsayılan: normal (arşivsiz), toggle ile arşivlenenleri göster
+  // �?? Ar�?iv görünümü �?? varsayılan: normal (ar�?ivsiz), toggle ile ar�?ivlenenleri göster
   const [showArchived, setShowArchived] = useState(false);
-  // ★ 2026-04-22: Mesaj istekleri görünümü — Instagram-style "İstekler" bölümü
+  // �?? 2026-04-22: Mesaj istekleri görünümü �?? Instagram-style "İstekler" bölümü
   const [showRequests, setShowRequests] = useState(false);
   const [pendingRequests, setPendingRequests] = useState<any[]>([]);
+  // �?? v1.7.13.142: Okunmadı filtresi �?? WhatsApp pattern
+  const [showUnreadOnly, setShowUnreadOnly] = useState(false);
 
-  // ★ Görünür liste: arşiv modu açık → sadece arşivlenmiş, kapalı → arşivsiz
-  // ★ 2026-04-21: Arama artık son mesaj içeriğinde de çalışıyor (partner_name + last_message_content).
+  // �?? Görünür liste: ar�?iv modu açık �?? sadece ar�?ivlenmi�?, kapalı �?? ar�?ivsiz
+  // �?? 2026-04-21: Arama artık son mesaj içeri�?inde de çalı�?ıyor (partner_name + last_message_content).
   const filteredConversations = useMemo(() => {
-    const base = conversations.filter(c => showArchived ? c.is_archived : !c.is_archived);
+    let base = conversations.filter(c => showArchived ? c.is_archived : !c.is_archived);
+    if (showUnreadOnly) base = base.filter(c => c.unread_count > 0);
     if (!debouncedQuery.trim()) return base;
     const q = debouncedQuery.toLowerCase();
     return base.filter(c =>
       c.partner_name.toLowerCase().includes(q) ||
       (c.last_message_content || '').toLowerCase().includes(q)
     );
-  }, [conversations, debouncedQuery, showArchived]);
+  }, [conversations, debouncedQuery, showArchived, showUnreadOnly]);
 
-  // Arşivlenmiş sohbet sayısı — toggle chip için
+  // Ar�?ivlenmi�? sohbet sayısı �?? toggle chip için
   const archivedCount = useMemo(
     () => conversations.filter(c => c.is_archived).length,
     [conversations]
@@ -466,22 +487,25 @@ export default function MessagesScreen() {
       ]);
       const filtered = inbox
         .filter(c => {
-          // ★ v110.5.24 (6 May 2026): Engellenen kişiyi GÖSTER (eski yazışmalara erişim).
-          //   blocked filter kaldırıldı — getInbox tarafında zaten beni engelleyenleri
+          // �?? v110.5.24 (6 May 2026): Engellenen ki�?iyi G�?STER (eski yazı�?malara eri�?im).
+          //   blocked filter kaldırıldı �?? getInbox tarafında zaten beni engelleyenleri
           //   filtreliyor, BENIM engellediklerim listede görünür.
           if (hiddenMap[c.partner_id]) return false;
           return true;
         })
-        // ★ v109: Taslak varsa item'a yapıştır → kart "Taslak: ..." gösterir
+        // �?? v109: Taslak varsa item'a yapı�?tır �?? kart "Taslak: ..." gösterir
         .map(c => drafts[c.partner_id] ? { ...c, draft: drafts[c.partner_id] } : c);
       setConversations(filtered);
-      // ★ 2026-04-22: Pending mesaj isteklerini paralel çek
+      // �?? 2026-04-22: Pending mesaj isteklerini paralel çek
       try {
         const reqs = await MessageService.getPendingRequests(firebaseUser.uid);
+        if (__DEV__) console.log('[Messages] pendingRequests for', firebaseUser.uid, '�??', reqs?.length || 0, reqs);
         setPendingRequests(reqs || []);
-      } catch {}
+      } catch (e: any) {
+        if (__DEV__) console.warn('[Messages] getPendingRequests FAILED:', e?.code, e?.message);
+      }
     } catch (err: any) {
-      if (__DEV__) console.warn('Mesajlar yüklenemedi:', err);
+      if (__DEV__) console.warn('[Messages] inbox load failed:', err);
       const msg = err?.message || i18n.t('tabs.messages.016');
       setLoadError(msg);
       showToast({ title: i18n.t('tabs.messages.002'), message: msg, type: 'error' });
@@ -491,9 +515,9 @@ export default function MessagesScreen() {
     }
   }, [firebaseUser]);
 
-  // ★ 2026-04-28: InteractionManager kaldırıldı — 250-400ms boş bekleme yapıyordu.
-  //   Supabase network async, tab animasyonunu blokelemez. DB sorgusunu hemen başlat,
-  //   cevap geldiğinde tab animasyonu zaten bitmiş olur.
+  // �?? 2026-04-28: InteractionManager kaldırıldı �?? 250-400ms bo�? bekleme yapıyordu.
+  //   Supabase network async, tab animasyonunu blokelemez. DB sorgusunu hemen ba�?lat,
+  //   cevap geldi�?inde tab animasyonu zaten bitmi�? olur.
   useFocusEffect(
     useCallback(() => {
       loadInbox();
@@ -502,13 +526,13 @@ export default function MessagesScreen() {
     }, [loadInbox, refreshFriends, refreshBadges])
   );
 
-  // ★ v86: DM broadcast — yeni mesaj/accept/reject geldiğinde inbox listesi
-  //   anlık tazelensin (postgres_changes anon Realtime'da çalışmıyor).
-  // ★ v110.14 (8 May 2026): is_request=true sinyallerinde sadece loadInbox() yetmiyor —
-  //   inbox kabul edilmiş sohbetleri çekiyor, pending istekleri "İstekler" sekmesi gösteriyor.
-  //   Yabancıdan ilk mesaj geldiğinde pendingRequests state'i de güncellenmeli ki
-  //   "İstekler (N)" sayacı anında görünsün. Önceden bu kayboluyor, sayfa fokuslanmadan
-  //   alıcıya hiç bildirim ulaşmıyordu.
+  // �?? v86: DM broadcast �?? yeni mesaj/accept/reject geldi�?inde inbox listesi
+  //   anlık tazelensin (postgres_changes anon Realtime'da çalı�?mıyor).
+  // �?? v110.14 (8 May 2026): is_request=true sinyallerinde sadece loadInbox() yetmiyor �??
+  //   inbox kabul edilmi�? sohbetleri çekiyor, pending istekleri "İstekler" sekmesi gösteriyor.
+  //   Yabancıdan ilk mesaj geldi�?inde pendingRequests state'i de güncellenmeli ki
+  //   "İstekler (N)" sayacı anında görünsün. �?nceden bu kayboluyor, sayfa fokuslanmadan
+  //   alıcıya hiç bildirim ula�?mıyordu.
   const dmNotif = useDMNotif();
   useEffect(() => {
     if (!firebaseUser) return;
@@ -551,7 +575,7 @@ export default function MessagesScreen() {
     });
   }, [onlineFriends]);
 
-  // ★ 2026-04-29 v85: pending request sender'larını ref'te tut — her yeni mesajda
+  // �?? 2026-04-29 v85: pending request sender'larını ref'te tut �?? her yeni mesajda
   //   conversations'a eklemeden önce hızlı set kontrolü için (DB round-trip azaltır).
   const pendingSenderIdsRef = useRef<Set<string>>(new Set());
   useEffect(() => {
@@ -565,10 +589,10 @@ export default function MessagesScreen() {
       if (blockedIdsRef.current.has(otherId)) return;
       const isSentByMe = newMsg.sender_id === firebaseUser.uid;
 
-      // ★ 2026-04-29 v85: Yabancıdan pending request mesajı → "Mesajlar" listesine
+      // �?? 2026-04-29 v85: Yabancıdan pending request mesajı �?? "Mesajlar" listesine
       //   EKLEMEZ. "İstekler" sekmesinde görünmesi gerek. Hızlı path: ref'teki sender
       //   set kontrol; cache'de yoksa DB'ye sor (yeni request olabilir, henüz state'e
-      //   yansımamış). Pending varsa pendingRequests yenilenir, refreshBadges tetiklenir.
+      //   yansımamı�?). Pending varsa pendingRequests yenilenir, refreshBadges tetiklenir.
       if (!isSentByMe) {
         if (pendingSenderIdsRef.current.has(otherId)) {
           try {
@@ -578,7 +602,7 @@ export default function MessagesScreen() {
           refreshBadges();
           return;
         }
-        // Cache'de yok ama yeni gelen ilk mesaj olabilir — DB'den teyit
+        // Cache'de yok ama yeni gelen ilk mesaj olabilir �?? DB'den teyit
         try {
           const { data: req } = await supabase
             .from('message_requests')
@@ -636,12 +660,12 @@ export default function MessagesScreen() {
         } catch {}
       }
 
-      // ★ 2026-04-21: Silinen sohbet artık auto-unhide OLMAZ.
-      //   Kullanıcı sildiğinde kalıcı olarak gizli kalır. Sadece explicit olarak (push/profile/search
+      // �?? 2026-04-21: Silinen sohbet artık auto-unhide OLMAZ.
+      //   Kullanıcı sildi�?inde kalıcı olarak gizli kalır. Sadece explicit olarak (push/profile/search
       //   üzerinden) chat ekranına geçerse chat screen hidden entry'yi temizler ve görünür hale gelir.
       const hiddenMap = await MessageService.getHiddenConversations(firebaseUser.uid);
       if (hiddenMap[otherId]) {
-        return; // Hidden kalıyor — inbox'a eklenmez
+        return; // Hidden kalıyor �?? inbox'a eklenmez
       }
 
       setConversations(prev => {
@@ -651,7 +675,7 @@ export default function MessagesScreen() {
           partner_name: partnerName,
           partner_avatar: partnerAvatar,
           partner_is_online: partnerOnline,
-          last_message_content: isSentByMe ? `Sen: ${newMsg.content}` : newMsg.content,
+          last_message_content: isSentByMe ? `${i18n.t('messages.you_prefix')}: ${newMsg.content}` : newMsg.content,
           last_message_time: newMsg.created_at,
           unread_count: isSentByMe
             ? (existingIdx >= 0 ? prev[existingIdx].unread_count : 0)
@@ -681,13 +705,13 @@ export default function MessagesScreen() {
           .single();
         if (data && !(data as Message).is_deleted) updateInbox(data as Message);
       })
-      // ★ UPDATE: Karşı taraf okuduğunda is_read flip olur → ✓ → ✓✓ (teal) anında
+      // �?? UPDATE: Kar�?ı taraf okudu�?unda is_read flip olur �?? �?? �?? �??�?? (teal) anında
       .on('postgres_changes', {
         event: 'UPDATE', schema: 'public', table: 'messages',
         filter: `sender_id=eq.${firebaseUser.uid}`,
       }, (payload) => {
         const updated = payload.new as any;
-        if (!updated.is_read) return; // sadece read=true geçişlerini yakala
+        if (!updated.is_read) return; // sadece read=true geçi�?lerini yakala
         setConversations(prev => prev.map(c => {
           if (c.partner_id !== updated.receiver_id) return c;
           if (!c.is_last_msg_mine) return c;
@@ -695,8 +719,8 @@ export default function MessagesScreen() {
           return { ...c, is_last_msg_read: true };
         }));
       })
-      // ★ 2026-04-29 FIX: Ben okuduğumda (markAsRead) UPDATE event yakalansın
-      //   → conversation kartının unread_count badge'i sıfırlansın. Eskiden bu
+      // �?? 2026-04-29 FIX: Ben okudu�?umda (markAsRead) UPDATE event yakalansın
+      //   �?? conversation kartının unread_count badge'i sıfırlansın. Eskiden bu
       //   listener yoktu, badge "27" gibi takılı kalıyordu.
       .on('postgres_changes', {
         event: 'UPDATE', schema: 'public', table: 'messages',
@@ -714,7 +738,7 @@ export default function MessagesScreen() {
       })
       .subscribe();
 
-    // ★ 2026-04-29 v85: message_requests realtime — INSERT/UPDATE'te "İstekler (N)"
+    // �?? 2026-04-29 v85: message_requests realtime �?? INSERT/UPDATE'te "İstekler (N)"
     //   sayacını anında güncelle. Eskiden sadece useFocusEffect ile yenileniyordu;
     //   yabancı mesaj atınca sayfa fokuslanmadan badge takılı kalıyordu.
     const reqChannelName = `msg_requests_${firebaseUser.uid}`;
@@ -739,14 +763,14 @@ export default function MessagesScreen() {
     };
   }, [firebaseUser, refreshBadges, blockedIdsRef]);
 
-  // ★ Typing broadcast dinleyicisi — listede "yazıyor..." göstergesi
+  // �?? Typing broadcast dinleyicisi �?? listede "yazıyor..." göstergesi
   useEffect(() => {
     if (!firebaseUser) return;
     const timeouts = typingTimeoutsRef.current;
     const typingChannel = MessageService.onTypingStatus(firebaseUser.uid, (payload) => {
       if (payload.conversation_partner_id !== firebaseUser.uid) return;
       const senderId = payload.user_id;
-      // Engellenmişse görmezden gel
+      // Engellenmi�?se görmezden gel
       if (blockedIdsRef.current.has(senderId)) return;
 
       if (payload.is_typing) {
@@ -754,7 +778,7 @@ export default function MessagesScreen() {
           if (prev.has(senderId)) return prev;
           const next = new Set(prev); next.add(senderId); return next;
         });
-        // 3s auto-clear — karşı taraf durduğunda is_typing=false gelmezse
+        // 3s auto-clear �?? kar�?ı taraf durdu�?unda is_typing=false gelmezse
         const existing = timeouts.get(senderId);
         if (existing) clearTimeout(existing);
         timeouts.set(senderId, setTimeout(() => {
@@ -768,7 +792,7 @@ export default function MessagesScreen() {
       }
     });
     return () => {
-      // ★ 2026-04-20 FIX: unsubscribe() kanalı siler ama Supabase client cache'inde
+      // �?? 2026-04-20 FIX: unsubscribe() kanalı siler ama Supabase client cache'inde
       //   referans kalabilir. removeChannel() ile bellek sızıntısını önle.
       typingChannel.unsubscribe();
       supabase.removeChannel(typingChannel);
@@ -778,7 +802,7 @@ export default function MessagesScreen() {
   }, [firebaseUser, blockedIdsRef]);
 
   const insets = useSafeAreaInsets();
-  // ★ 2026-04-24: Banner slide-down — sadece uygulama ilk açılışında
+  // �?? 2026-04-24: Banner slide-down �?? sadece uygulama ilk açılı�?ında
   const bannerTranslateY = useRef(new RNAnimated.Value(bannerIntroPlayed() ? 0 : -140)).current;
   useEffect(() => {
     if (!bannerIntroPlayed()) {
@@ -787,7 +811,7 @@ export default function MessagesScreen() {
     }
   }, []);
 
-  // ═══ Stable card callbacks — React.memo ile birlikte FlatList perf'i sağlar ═══
+  // �?��?��?� Stable card callbacks �?? React.memo ile birlikte FlatList perf'i sa�?lar �?��?��?�
   const handleOpenChat = useCallback((partnerId: string) => {
     router.push(`/chat/${partnerId}` as any);
   }, [router]);
@@ -809,7 +833,7 @@ export default function MessagesScreen() {
       setConversations(prev => prev.filter(c => c.partner_id !== partnerId));
       refreshBadges();
     } catch {
-      showToast({ title: 'Silinemedi', message: 'Sohbet silinemedi, tekrar dene.', type: 'error' });
+      showToast({ title: i18n.t('tabs.messages.054'), message: i18n.t('tabs.messages.055'), type: 'error' });
     }
   }, [firebaseUser, refreshBadges]);
 
@@ -818,8 +842,8 @@ export default function MessagesScreen() {
     openUserProfile(partnerId);
   }, [openUserProfile]);
 
-  // ★ 2026-04-21: initiateCall çağrılıyor — eskiden sadece navigate vardı,
-  //   friendship check ve callId tetiklenmiyordu → arama sessizce bağlanamıyordu.
+  // �?? 2026-04-21: initiateCall ça�?rılıyor �?? eskiden sadece navigate vardı,
+  //   friendship check ve callId tetiklenmiyordu �?? arama sessizce ba�?lanamıyordu.
   const handleCallPress = useCallback(async (partnerId: string) => {
     if (!firebaseUser || !profile) return;
     try {
@@ -837,7 +861,7 @@ export default function MessagesScreen() {
     }
   }, [firebaseUser, profile, router]);
 
-  // ★ Pin toggle — optimistic update + RPC, hata durumunda geri al
+  // �?? Pin toggle �?? optimistic update + RPC, hata durumunda geri al
   const handleTogglePin = useCallback(async (partnerId: string) => {
     const current = conversations.find(c => c.partner_id === partnerId);
     if (!current) return;
@@ -864,7 +888,7 @@ export default function MessagesScreen() {
     }
   }, [conversations]);
 
-  // ★ Archive toggle — optimistic update + RPC
+  // �?? Archive toggle �?? optimistic update + RPC
   const handleToggleArchive = useCallback(async (partnerId: string, partnerName: string) => {
     const current = conversations.find(c => c.partner_id === partnerId);
     if (!current) return;
@@ -885,7 +909,7 @@ export default function MessagesScreen() {
     }
   }, [conversations]);
 
-  // ★ v109: Mute toggle — DB'de muted_at flip, optimistic update + rollback
+  // �?? v109: Mute toggle �?? DB'de muted_at flip, optimistic update + rollback
   const handleToggleMute = useCallback(async (partnerId: string, partnerName: string) => {
     const current = conversations.find(c => c.partner_id === partnerId);
     if (!current || !firebaseUser) return;
@@ -896,7 +920,7 @@ export default function MessagesScreen() {
       await MessageService.toggleMute(firebaseUser.uid, partnerId);
       showToast({
         title: newMuted ? i18n.t('tabs.messages.023', { name: partnerName }) : i18n.t('tabs.messages.024'),
-        message: newMuted ? 'Bu sohbetten bildirim gelmeyecek.' : undefined,
+        message: newMuted ? i18n.t('tabs.messages.056') : undefined,
         type: 'success',
       });
     } catch {
@@ -906,7 +930,7 @@ export default function MessagesScreen() {
     }
   }, [conversations, firebaseUser]);
 
-  // ★ v109: İstek tek-tık reddet — kullanıcı listede bekleyen istekten direkt reddetebilir
+  // �?? v109: İstek tek-tık reddet �?? kullanıcı listede bekleyen istekten direkt reddetebilir
   const handleRejectRequest = useCallback(async (senderId: string, senderName: string) => {
     if (!firebaseUser) return;
     setPendingRequests(prev => prev.filter((r: any) => r.sender_id !== senderId));
@@ -930,9 +954,10 @@ export default function MessagesScreen() {
     }
   }, [firebaseUser]);
 
-  // ★ 2026-04-21: Long-press → bottom sheet (eski PremiumAlert modal'ı yerine).
+  // �?? 2026-04-21: Long-press �?? bottom sheet (eski PremiumAlert modal'ı yerine).
   //   Sheet daha modern, native hissi, swipe-to-dismiss + haptic.
   const handleLongPress = useCallback((item: InboxItem) => {
+    Haptics.heavy();
     setSheetItem(item);
   }, []);
 
@@ -981,13 +1006,13 @@ export default function MessagesScreen() {
 
   return (
     <AppBackground variant="messages" radialGlow>
-    {/* ★ v270 (14 May 2026): Kullanıcı kozmetik arkaplan */}
+    {/* �?? v270 (14 May 2026): Kullanıcı kozmetik arkaplan */}
     <CosmeticBackground bgItemId={(profile as any)?.active_bg_id} context="messages" style={{ flex: 1 }}>
     <View style={[styles.container, { backgroundColor: 'transparent' }]}>
 
-      {/* ═══ Header — Premium Glassmorphic banner (myrooms/home ile tutarlı) ═══ */}
+      {/* �?��?��?� Header �?? Premium Glassmorphic banner (myrooms/home ile tutarlı) �?��?��?� */}
       <RNAnimated.View style={[styles.topBarWrap, { paddingTop: insets.top, transform: [{ translateY: bannerTranslateY }] }]}>
-        {/* ★ 2026-05-05: Aile dili — slate diagonal + mor halo (Mesajlar karakter rengi) */}
+        {/* �?? 2026-05-05: Aile dili �?? slate diagonal + mor halo (Mesajlar karakter rengi) */}
         <LinearGradient
           colors={['#3a4658', '#2a3344', '#1a2030']}
           start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
@@ -1003,7 +1028,7 @@ export default function MessagesScreen() {
         <View style={styles.topBar}>
           <AnimatedMesajLogo />
           <View style={styles.headerRight}>
-            {/* ★ v283 (16 May 2026): Sohbet arama ikonu — home.tsx ile aynı konum
+            {/* �?? v283 (16 May 2026): Sohbet arama ikonu �?? home.tsx ile aynı konum
                 (headerRight içinde EN SOLDA, NotificationBell'den önce). */}
             <AnimatedHeaderIconBtn
               index={0}
@@ -1031,12 +1056,12 @@ export default function MessagesScreen() {
             <AnimatedHeaderIconBtn index={2} style={styles.headerIconBtn} onPress={() => openSearch({
               mode: 'compose',
               onSelectUser: (userId) => router.push(`/chat/${userId}` as any),
-            })} accessibilityLabel="Yeni mesaj">
+            })} accessibilityLabel={i18n.t('tabs.messages.057')}>
               <Ionicons name="create-outline" size={22} color="#F1F5F9" style={styles.headerIcon} />
             </AnimatedHeaderIconBtn>
           </View>
         </View>
-        {/* ★ v283: Search ikonu basıldığında açılan arama pill */}
+        {/* �?? v283: Search ikonu basıldı�?ında açılan arama pill */}
         {searchOpen && (
           <View style={styles.headerSearchRow}>
             <View style={styles.headerSearchPill}>
@@ -1052,7 +1077,7 @@ export default function MessagesScreen() {
                 />
                 {searchQuery.length === 0 && (
                   <View pointerEvents="none" style={styles.searchPlaceholderWrap}>
-                    <Text style={styles.searchPlaceholder}>Sohbet ara...</Text>
+                    <Text style={styles.searchPlaceholder}>{i18n.t('tabs.messages.058')}</Text>
                   </View>
                 )}
               </View>
@@ -1072,11 +1097,11 @@ export default function MessagesScreen() {
         />
       </RNAnimated.View>
 
-      {/* ═══ Sayfa Başlığı — "Mesajlar" başlığı kaldırıldı (header zaten SopranoMesaj diyor) ═══ */}
+      {/* �?��?��?� Sayfa Ba�?lı�?ı �?? "Mesajlar" ba�?lı�?ı kaldırıldı (header zaten SopranoMesaj diyor) �?��?��?� */}
       <View style={styles.pageTitleRow}>
         <View>
           <Text style={styles.headerSub}>
-            {conversations.length > 0 ? `${conversations.length} sohbet` : 'Sohbetlerin'}
+            {conversations.length > 0 ? i18n.t('tabs.messages.059', { 0: conversations.length }) : i18n.t('tabs.messages.060')}
           </Text>
         </View>
         {conversations.length > 0 && (
@@ -1094,10 +1119,10 @@ export default function MessagesScreen() {
         )}
       </View>
 
-      {/* ★ v283: Arama çubuğu header'a taşındı (yukarıda) */}
+      {/* �?? v283: Arama çubu�?u header'a ta�?ındı (yukarıda) */}
 
-      {/* ═══ Online Arkadaşlar — horizontal FlatList (nested ScrollView'den dönüştürüldü) ═══
-         ★ 2026-04-21: ScrollView içinde FlatList = Android momentum glitch + warning.
+      {/* �?��?��?� Online Arkada�?lar �?? horizontal FlatList (nested ScrollView'den dönü�?türüldü) �?��?��?�
+         �?? 2026-04-21: ScrollView içinde FlatList = Android momentum glitch + warning.
          FlatList ile virtualization + keyExtractor. */}
       {onlineFriends.length > 0 && (
         <View style={styles.friendSection}>
@@ -1129,9 +1154,38 @@ export default function MessagesScreen() {
         </View>
       )}
 
-      {/* ═══ 2026-04-22: Mesaj İstekleri + Arşiv chip — yan yana */}
+      {/* �?��?��?� 2026-04-22: Mesaj İstekleri + Ar�?iv + Okunmadı chip �?? yan yana */}
       <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 14, marginTop: 2 }}>
-        {/* İstekler chip — pending request varsa belirginleşir */}
+        {/* Okunmadı filtresi chip �?? WhatsApp pattern */}
+        {(() => {
+          const unreadTotal = conversations.filter(c => !c.is_archived && c.unread_count > 0).length;
+          if (unreadTotal === 0 && !showUnreadOnly) return null;
+          return (
+            <Pressable
+              style={[styles.archiveChip, {
+                flex: 0, paddingHorizontal: 14, marginHorizontal: 0,
+                borderColor: showUnreadOnly ? 'rgba(20,184,166,0.45)' : 'rgba(20,184,166,0.22)',
+                backgroundColor: showUnreadOnly ? 'rgba(20,184,166,0.15)' : 'rgba(20,184,166,0.10)',
+              }]}
+              onPress={() => {
+                setShowUnreadOnly(v => !v);
+                if (!showUnreadOnly) { setShowArchived(false); setShowRequests(false); }
+              }}
+            >
+              <Ionicons
+                name={showUnreadOnly ? 'arrow-back' : 'mail-unread'}
+                size={14}
+                color={Colors.teal}
+              />
+              <Text style={[styles.archiveChipText, { flex: 0 }]}>
+                {showUnreadOnly ? i18n.t('tabs.messages.037') : `${unreadTotal}`}
+              </Text>
+            </Pressable>
+          );
+        })()}
+        {/* İstekler chip �?? pending request varsa belirginle�?ir.
+            �?? v1.7.13.49 (20 May 2026): pending > 0 ise sa�?a küçük kırmızı pulse dot
+            (modern bell badge pattern) �?? kullanıcı bildirimi gözden kaçırmasın. */}
         <Pressable
           style={[styles.archiveChip, styles.requestChip, { flex: 1, marginHorizontal: 0 }, pendingRequests.length === 0 && !showRequests && { opacity: 0.5 }]}
           onPress={() => {
@@ -1143,11 +1197,21 @@ export default function MessagesScreen() {
             if (!showRequests) setShowArchived(false); // tek mod aktif
           }}
         >
-          <Ionicons
-            name={showRequests ? 'arrow-back' : 'mail-unread-outline'}
-            size={16}
-            color={pendingRequests.length === 0 && !showRequests ? 'rgba(94,234,212,0.5)' : '#F59E0B'}
-          />
+          <View style={{ position: 'relative' }}>
+            <Ionicons
+              name={showRequests ? 'arrow-back' : 'mail-unread-outline'}
+              size={16}
+              color={pendingRequests.length === 0 && !showRequests ? 'rgba(94,234,212,0.5)' : '#F59E0B'}
+            />
+            {!showRequests && pendingRequests.length > 0 && (
+              <View style={{
+                position: 'absolute', top: -3, right: -4,
+                width: 8, height: 8, borderRadius: 4,
+                backgroundColor: '#EF4444',
+                borderWidth: 1, borderColor: 'rgba(15,23,42,0.95)',
+              }} />
+            )}
+          </View>
           <Text style={[styles.archiveChipText, { color: '#FBBF24' }]}>
             {showRequests ? i18n.t('tabs.messages.037') : i18n.t('tabs.messages.038', { count: pendingRequests.length })}
           </Text>
@@ -1177,7 +1241,7 @@ export default function MessagesScreen() {
         </Pressable>
       </View>
 
-      {/* ═══ 2026-04-22: Mesaj İstekleri Listesi (showRequests=true iken) ═══ */}
+      {/* �?��?��?� 2026-04-22: Mesaj İstekleri Listesi (showRequests=true iken) �?��?��?� */}
       {showRequests ? (
         pendingRequests.length === 0 ? (
           <View style={{ alignItems: 'center', paddingVertical: 40 }}>
@@ -1192,7 +1256,7 @@ export default function MessagesScreen() {
             contentContainerStyle={{ paddingTop: 6, paddingBottom: 20 }}
             renderItem={({ item }: any) => {
               const sender = item.sender || {};
-              // ★ v109: İlk mesajın snippet'i — Instagram tarzı
+              // �?? v109: İlk mesajın snippet'i �?? Instagram tarzı
               const firstMsg = item.first_message_content || item.last_message_content || '';
               const senderName = sender.display_name || i18n.t('tabs.messages.017');
               return (
@@ -1216,7 +1280,7 @@ export default function MessagesScreen() {
                       <Text style={{ fontSize: 11, color: '#94A3B8', marginTop: 2 }} numberOfLines={1}>{i18n.t('tabs.messages.001')}</Text>
                     )}
                   </Pressable>
-                  {/* ★ v109: Tek-tık reddet butonu */}
+                  {/* �?? v109: Tek-tık reddet butonu */}
                   <Pressable
                     onPress={() => handleRejectRequest(item.sender_id, senderName)}
                     style={{
@@ -1262,7 +1326,7 @@ export default function MessagesScreen() {
           }
           ListEmptyComponent={
             loadError ? (
-              // ★ 2026-04-21: Hata state — empty'den ayrı, retry butonu
+              // �?? 2026-04-21: Hata state �?? empty'den ayrı, retry butonu
               <View style={styles.emptyWrap}>
                 <Ionicons name="cloud-offline-outline" size={64} color="#EF4444" style={styles.emptyIcon} />
                 <Text style={styles.emptyTitle}>{t('messages.connection_issue')}</Text>
@@ -1285,15 +1349,27 @@ export default function MessagesScreen() {
                 <Text style={styles.emptySubtitle}>
                   {i18n.t('tabs.messages.040')}
                 </Text>
-                <Pressable style={styles.emptyActionBtn} onPress={() => router.push('/(tabs)/home')}>
+                {/* �?? v1.7.13.49 (20 May 2026): Primary CTA "Yeni Mesaj" (compose openSearch),
+                     secondary altta link "Odalara göz at" (eski tek Ke�?fet butonunun yerine
+                     ba�?lam-uygun yeni akı�?: empty mesaj listesinde önce yeni sohbet teklif et). */}
+                <Pressable
+                  style={styles.emptyActionBtn}
+                  onPress={() => openSearch({
+                    mode: 'compose',
+                    onSelectUser: (userId) => router.push(`/chat/${userId}` as any),
+                  })}
+                >
                   <LinearGradient
                     colors={['#14B8A6', '#0D9488']}
                     start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                     style={styles.emptyActionGrad}
                   >
-                    <Ionicons name="compass" size={16} color="#FFF" />
-                    <Text style={styles.emptyActionText}>{t('home.discover')}</Text>
+                    <Ionicons name="create-outline" size={16} color="#FFF" />
+                    <Text style={styles.emptyActionText}>{i18n.t('messages.new')}</Text>
                   </LinearGradient>
+                </Pressable>
+                <Pressable onPress={() => router.push('/(tabs)/home')} hitSlop={8}>
+                  <Text style={styles.emptySecondaryLink}>{i18n.t('messages.browse_rooms')}</Text>
                 </Pressable>
               </View>
             )
@@ -1316,7 +1392,7 @@ export default function MessagesScreen() {
         />
       )}
 
-      {/* ═══ Toplu Silme Alt Bar ═══ */}
+      {/* �?��?��?� Toplu Silme Alt Bar �?��?��?� */}
       {selectionMode && selectedIds.size > 0 && (
         <View style={[styles.bulkBar, { paddingBottom: insets.bottom + 12 }]}>
           <Pressable
@@ -1373,11 +1449,11 @@ export default function MessagesScreen() {
         </View>
       )}
 
-      {/* ★ 2026-04-27: UserSearchModal global mount'a taşındı (app/_layout.tsx) */}
+      {/* �?? 2026-04-27: UserSearchModal global mount'a ta�?ındı (app/_layout.tsx) */}
 
       <PremiumAlert {...cAlert} onDismiss={() => setCAlert(prev => ({ ...prev, visible: false }))} />
 
-      {/* ★ 2026-04-21: Modern bottom sheet — DM uzun bas aksiyonları */}
+      {/* �?? 2026-04-21: Modern bottom sheet �?? DM uzun bas aksiyonları */}
       <ConversationActionSheet
         visible={!!sheetItem}
         onClose={() => setSheetItem(null)}
@@ -1391,7 +1467,7 @@ export default function MessagesScreen() {
           : sheetItem?.is_muted ? i18n.t('tabs.messages.043') : undefined}
         actions={sheetActions}
       />
-      {/* ★ 2026-04-21: Tab bar scroll fade — tüm tab sayfalarında tutarlı */}
+      {/* �?? 2026-04-21: Tab bar scroll fade �?? tüm tab sayfalarında tutarlı */}
       <TabBarFadeOut />
     </View>
     </CosmeticBackground>
@@ -1402,7 +1478,7 @@ export default function MessagesScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
 
-  // ─── Header — Premium Glassmorphic banner ───
+  // �??�??�?? Header �?? Premium Glassmorphic banner �??�??�??
   topBarWrap: {
     position: 'relative',
     marginBottom: 6,
@@ -1428,7 +1504,7 @@ const styles = StyleSheet.create({
     height: 58,
   },
   topBar: {
-    // ★ 2026-04-26: paddingHorizontal 16→14 — keşfet/odalarım ile uyumlu, logo aynı pozisyonda kalır.
+    // �?? 2026-04-26: paddingHorizontal 16�??14 �?? ke�?fet/odalarım ile uyumlu, logo aynı pozisyonda kalır.
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 14, paddingBottom: 4,
   },
@@ -1458,7 +1534,7 @@ const styles = StyleSheet.create({
   },
   notifBadgeText: { fontSize: 9, fontWeight: '800', color: '#FFF', ...Shadows.textLight },
 
-  // ─── Sayfa Başlığı ───
+  // �??�??�?? Sayfa Ba�?lı�?ı �??�??�??
   pageTitleRow: {
     paddingHorizontal: 20, paddingTop: 10, paddingBottom: 6,
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
@@ -1477,7 +1553,7 @@ const styles = StyleSheet.create({
   },
   editBtnText: { fontSize: 13, fontWeight: '600', color: Colors.teal, ...Shadows.textLight },
 
-  // ★ v283 (16 May 2026): Header içi arama kutusu — kompakt pill, glassmorphic
+  // �?? v283 (16 May 2026): Header içi arama kutusu �?? kompakt pill, glassmorphic
   headerSearchRow: {
     paddingHorizontal: 14,
     paddingBottom: 8,
@@ -1500,7 +1576,7 @@ const styles = StyleSheet.create({
     color: '#F1F5F9',
     padding: 0,
   },
-  // ─── ESKİ (sayfa gövdesi) arama stili — artık kullanılmıyor, geriye uyum için tutuldu
+  // �??�??�?? ESKİ (sayfa gövdesi) arama stili �?? artık kullanılmıyor, geriye uyum için tutuldu
   searchWrap: {
     flexDirection: 'row', alignItems: 'center',
     marginHorizontal: 16, marginBottom: 12,
@@ -1542,7 +1618,7 @@ const styles = StyleSheet.create({
     right: 0,
   },
 
-  // ─── Online Arkadaşlar ───
+  // �??�??�?? Online Arkada�?lar �??�??�??
   friendSection: { marginBottom: 8 },
   friendSectionHeader: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
@@ -1571,7 +1647,7 @@ const styles = StyleSheet.create({
     marginTop: 5, textAlign: 'center', ...Shadows.text,
   },
 
-  // ─── Empty State (custom, premium hissi) ───
+  // �??�??�?? Empty State (custom, premium hissi) �??�??�??
   emptyWrap: {
     alignItems: 'center', justifyContent: 'center',
     paddingTop: 48, paddingHorizontal: 32, gap: 12,
@@ -1609,8 +1685,14 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
     textShadowColor: 'rgba(0,0,0,0.35)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
   },
+  // �?? v1.7.13.49 (20 May 2026): Empty state secondary link �?? "Odalara göz at"
+  emptySecondaryLink: {
+    fontSize: 13, fontWeight: '600',
+    color: 'rgba(94,234,212,0.75)',
+    marginTop: 14, letterSpacing: 0.3,
+  },
 
-  // ─── Sohbet Kartı (SwipeableRow container) ───
+  // �??�??�?? Sohbet Kartı (SwipeableRow container) �??�??�??
   msgCard: {
     marginHorizontal: 14, marginVertical: 5,
     borderRadius: 20,
@@ -1634,7 +1716,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
 
-  // ─── Sohbet Satırı (iç Pressable) ───
+  // �??�??�?? Sohbet Satırı (iç Pressable) �??�??�??
   msgPressable: {
     overflow: 'hidden',
   },
@@ -1658,7 +1740,7 @@ const styles = StyleSheet.create({
   msgInfo: { flex: 1, justifyContent: 'center', gap: 4 },
   msgTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   msgName: { fontSize: 15, fontWeight: '600', color: '#E2E8F0', flexShrink: 1, ...Shadows.text },
-  // ★ 2026-05-05: Aile dili — radius 12→16, biraz daha belirgin background
+  // �?? 2026-05-05: Aile dili �?? radius 12�??16, biraz daha belirgin background
   archiveChip: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
     marginHorizontal: 14, marginTop: 4, marginBottom: 8,
@@ -1683,7 +1765,7 @@ const styles = StyleSheet.create({
   msgText: { fontSize: 13, fontWeight: '500', color: 'rgba(203,213,225,0.75)', flex: 1, ...Shadows.text },
   msgTextUnread: { color: '#E2E8F0', fontWeight: '600' },
 
-  // ─── Sağ aksiyonlar ───
+  // �??�??�?? Sa�? aksiyonlar �??�??�??
   msgRight: { flexDirection: 'row', alignItems: 'center', gap: 6, marginLeft: 6 },
   msgCallBtn: {
     width: 32, height: 32, borderRadius: 16,
@@ -1699,7 +1781,7 @@ const styles = StyleSheet.create({
   },
   unreadCountText: { color: '#fff', fontSize: 10, fontWeight: '800', ...Shadows.textLight },
 
-  // ─── Swipe-to-Delete ───
+  // �??�??�?? Swipe-to-Delete �??�??�??
   swipeDeleteBtn: {
     position: 'absolute', right: 0, top: 0, bottom: 0, width: 80,
     justifyContent: 'center', alignItems: 'center',
@@ -1708,7 +1790,7 @@ const styles = StyleSheet.create({
   },
   swipeDeleteText: { fontSize: 10, fontWeight: '700', color: '#FFF', ...Shadows.textLight },
 
-  // ─── Toplu Silme ───
+  // �??�??�?? Toplu Silme �??�??�??
   bulkBar: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     paddingHorizontal: 20, paddingTop: 14,
@@ -1722,7 +1804,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#EF4444',
     paddingHorizontal: 18, paddingVertical: 10,
     borderRadius: 20,
-    // ★ v1.3.69: Skia ile cross-platform red glow (dış SkiaShadow wrap)
+    // �?? v1.3.69: Skia ile cross-platform red glow (dı�? SkiaShadow wrap)
   },
   bulkDeleteText: { fontSize: 13, fontWeight: '700', color: '#fff', ...Shadows.textLight },
 });

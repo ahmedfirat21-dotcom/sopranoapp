@@ -362,12 +362,12 @@ export default function StoreScreen() {
   const router = useRouter();
   const { profile, firebaseUser, refreshProfile } = useAuth();
   const sp = (profile as any)?.system_points || 0;
-  // ★ v108.21: Tier indirimi — Plus %10, Pro/GodMaster %20
+  // ★ v108.21: Tier indirimi — Plus %10, Pro %20 (★ v1.7.13.132: GodMaster kaldırıldı)
   const tier = (profile as any)?.subscription_tier;
   const expires = (profile as any)?.subscription_expires_at;
   const tierActive = !expires || new Date(expires) > new Date();
   const tierDiscountPct = tierActive
-    ? (tier === 'Pro' || tier === 'GodMaster' ? 20 : tier === 'Plus' ? 10 : 0)
+    ? (tier === 'Pro' ? 20 : tier === 'Plus' ? 10 : 0)
     : 0;
   const [activeCat, setActiveCat] = useState<CategoryKey>('frames');
   const [items, setItems] = useState<CosmeticItem[]>([]);
@@ -566,8 +566,8 @@ export default function StoreScreen() {
       const accent = (pack && accentMap[pack.tierKey]) || accentMap.gold;
       setSpSuccess({
         visible: true,
-        title: `+${result.spAdded?.toLocaleString('tr-TR') ?? 0} SP`,
-        subtitle: `${pack?.tierName ?? 'Paket'} satın alımı başarılı — yeni bakiye ${result.newBalance?.toLocaleString('tr-TR') ?? ''} SP`,
+        title: `+${result.spAdded?.toLocaleString(i18n.locale) ?? 0} SP`,
+        subtitle: `${pack?.tierName ?? 'Paket'} satın alımı başarılı — yeni bakiye ${result.newBalance?.toLocaleString(i18n.locale) ?? ''} SP`,
         accent,
       });
     } catch (e: any) {
@@ -589,7 +589,7 @@ export default function StoreScreen() {
     setConfirmAlert({
       visible: true,
       title: i18n.t('store.003'),
-      message: i18n.t('auto.store.032', { 0: bundle.name, 1: bundle.item_ids.length, 2: finalPrice.toLocaleString('tr-TR'), 3: totalDiscount, 4: tierDiscountPct > 0 ? ` · ${tier}` : '' }),
+      message: i18n.t('auto.store.032', { 0: bundle.name, 1: bundle.item_ids.length, 2: finalPrice.toLocaleString(i18n.locale), 3: totalDiscount, 4: tierDiscountPct > 0 ? ` · ${tier}` : '' }),
       buttons: [
         { text: i18n.t('auto.store.031'), style: 'cancel', onPress: () => setConfirmAlert(p => ({ ...p, visible: false })) },
         {
@@ -690,13 +690,13 @@ export default function StoreScreen() {
         const dealOff = (dailyDeal && dailyDeal.item_id === item.id) ? dailyDeal.extra_discount_pct : 0;
         const totalOff = Math.min(tierDiscountPct + dealOff, 80);
         if (totalOff === 0) {
-          return i18n.t('auto.store.019', { 0: item.name, 1: item.price_sp.toLocaleString('tr-TR') });
+          return i18n.t('auto.store.019', { 0: item.name, 1: item.price_sp.toLocaleString(i18n.locale) });
         }
         const final = Math.round(item.price_sp * (100 - totalOff) / 100);
         const parts: string[] = [];
         if (tierDiscountPct > 0) parts.push(`${tier} indirimi -%${tierDiscountPct}`);
         if (dealOff > 0) parts.push(i18n.t('auto.store.018', { 0: dealOff }));
-        return i18n.t('auto.store.017', { 0: item.name, 1: final.toLocaleString('tr-TR'), 2: parts.join(' + ') });
+        return i18n.t('auto.store.017', { 0: item.name, 1: final.toLocaleString(i18n.locale), 2: parts.join(' + ') });
       })(),
       buttons: [
         { text: i18n.t('auto.store.016'), style: 'cancel', onPress: () => setConfirmAlert(p => ({ ...p, visible: false })) },
@@ -761,7 +761,7 @@ export default function StoreScreen() {
               />
               <ShimmerOverlay duration={4000} />
               <SPGem size={22} />
-              <Text style={s.balanceNum}>{sp.toLocaleString('tr-TR')}</Text>
+              <Text style={s.balanceNum}>{sp.toLocaleString(i18n.locale)}</Text>
             </View>
           </View>
 
@@ -785,7 +785,7 @@ export default function StoreScreen() {
               />
               <Ionicons name="diamond" size={14} color="#22D3EE" />
               <Text style={s.tierDiscountText}>
-                {tier}{i18n.t('auto.store.014')}<Text style={{ color: '#22D3EE', fontWeight: '800' }}>%{tierDiscountPct}</Text> indirim aktif.
+                {tier} {i18n.t('auto.store.014')} <Text style={{ color: '#22D3EE', fontWeight: '800' }}>%{tierDiscountPct}</Text> indirim aktif.
               </Text>
             </View>
           )}
@@ -894,7 +894,7 @@ export default function StoreScreen() {
           {(catalogLoading || bundles.length > 0) ? (
             <>
               <View onLayout={(e) => { sectionOffsets.current.bundles = e.nativeEvent.layout.y; }} />
-              <SectionDivider label={i18n.t('store.007')} />
+              <SectionDivider label="— SETLER · ÖZEL FIRSAT —" />
               <Text style={s.sectionTitle}>{i18n.t('store.003')}</Text>
               <Text style={s.sectionSub}>{i18n.t('store.004')}</Text>
               {catalogLoading && bundles.length === 0 ? (
@@ -923,7 +923,7 @@ export default function StoreScreen() {
 
           {/* ═══ ÇERÇEVELER — Avatar Frame Koleksiyonu ═══ */}
           <View onLayout={(e) => { sectionOffsets.current.frames = e.nativeEvent.layout.y; }} />
-          <SectionDivider label={i18n.t('store.008')} />
+          <SectionDivider label="— ÇERÇEVELER · PROFİL —" />
           <Text style={s.sectionTitle}>{i18n.t('store.005')}</Text>
           <Text style={s.sectionSub}>{i18n.t('store.006')}</Text>
           {catalogLoading && frameItems.length === 0 ? (
@@ -955,7 +955,7 @@ export default function StoreScreen() {
 
           {/* ═══ GİRİŞ EFEKTLERİ — Odaya Giriş Animasyonları ═══ */}
           <View onLayout={(e) => { sectionOffsets.current.entry_effect = e.nativeEvent.layout.y; }} />
-          <SectionDivider label={i18n.t('store.009')} />
+          <SectionDivider label="— GİRİŞ EFEKTLERİ · ODA —" />
           <Text style={s.sectionTitle}>{i18n.t('store.007')}</Text>
           <Text style={s.sectionSub}>{i18n.t('store.008')}</Text>
           {catalogLoading && entryItems.length === 0 ? (
@@ -1336,8 +1336,8 @@ function DailyDealBanner({
         ) : null}
         {!isOwned ? (
           <View style={s.dailyDealPriceRow}>
-            <Text style={s.dailyDealStrike}>{dealItem.price_sp.toLocaleString('tr-TR')}</Text>
-            <Text style={s.dailyDealFinal}>{finalPrice.toLocaleString('tr-TR')}</Text>
+            <Text style={s.dailyDealStrike}>{dealItem.price_sp.toLocaleString(i18n.locale)}</Text>
+            <Text style={s.dailyDealFinal}>{finalPrice.toLocaleString(i18n.locale)}</Text>
             <Text style={s.dailyDealUnit}>SP</Text>
             <View style={s.dailyDealOff}>
               <Text style={s.dailyDealOffText}>-%{totalOff}</Text>
@@ -1410,14 +1410,13 @@ function getLimitedInfo(item: CosmeticItem): {
 
 // ★ v109.2: Plus/Pro üyelik gerektiren ürünler için kilit rozeti
 function TierLockBadge({ tier, offsetTop = 8, alignRight }: {
-  tier: 'Plus' | 'Pro' | 'GodMaster' | 'Free';
+  tier: 'Plus' | 'Pro' | 'Free';
   offsetTop?: number;
   alignRight?: boolean;
 }) {
   const tierColors: Record<string, [string, string]> = {
     Plus: ['#14B8A6', '#0E7490'],
     Pro: ['#FBBF24', '#854F0B'],
-    GodMaster: ['#F472B6', '#831843'],
     Free: ['#94A3B8', '#475569'],
   };
   const colors = tierColors[tier] || tierColors.Plus;
@@ -1601,16 +1600,16 @@ function ShowcaseCard({ item, owned, purchasing, onPress, discountPct = 0, wishe
         <View style={s.showcasePrice}>
           {discountPct > 0 ? (
             <>
-              <Text style={s.showcasePriceStrike}>{item.price_sp.toLocaleString('tr-TR')}</Text>
+              <Text style={s.showcasePriceStrike}>{item.price_sp.toLocaleString(i18n.locale)}</Text>
               <Text style={[s.showcasePriceNum, { color: '#22D3EE' }]}>
-                {Math.round(item.price_sp * (100 - discountPct) / 100).toLocaleString('tr-TR')}
+                {Math.round(item.price_sp * (100 - discountPct) / 100).toLocaleString(i18n.locale)}
               </Text>
               <Text style={s.showcasePriceUnit}>SP</Text>
               <Text style={s.discountChip}>-%{discountPct}</Text>
             </>
           ) : (
             <>
-              <Text style={s.showcasePriceNum}>{item.price_sp.toLocaleString('tr-TR')}</Text>
+              <Text style={s.showcasePriceNum}>{item.price_sp.toLocaleString(i18n.locale)}</Text>
               <Text style={s.showcasePriceUnit}>SP</Text>
             </>
           )}
@@ -1715,8 +1714,8 @@ function BundleCard({ bundle, items, owned, purchasing, tierDiscountPct, onPress
         <Text style={s.showcaseName}>{bundle.name}</Text>
         {bundle.tagline && <Text style={s.showcaseMeta}>{bundle.tagline}</Text>}
         <View style={s.showcasePrice}>
-          <Text style={s.showcasePriceStrike}>{bundle.total_price_sp.toLocaleString('tr-TR')}</Text>
-          <Text style={[s.showcasePriceNum, { color: '#22D3EE' }]}>{finalPrice.toLocaleString('tr-TR')}</Text>
+          <Text style={s.showcasePriceStrike}>{bundle.total_price_sp.toLocaleString(i18n.locale)}</Text>
+          <Text style={[s.showcasePriceNum, { color: '#22D3EE' }]}>{finalPrice.toLocaleString(i18n.locale)}</Text>
           <Text style={s.showcasePriceUnit}>SP</Text>
         </View>
       </View>
@@ -1919,13 +1918,13 @@ function SPPackRow({ pack, onPress, disabled, purchasing }: { pack: SPPack; onPr
       <View style={{ flex: 1, marginLeft: 12 }}>
         <Text style={[s.spPackTier, { color: pack.tierColor }]}>{pack.tierName.toUpperCase()}</Text>
         <View style={{ flexDirection: 'row', alignItems: 'baseline', marginTop: 2 }}>
-          <Text style={s.spPackAmount}>{pack.amount.toLocaleString('tr-TR')}</Text>
+          <Text style={s.spPackAmount}>{pack.amount.toLocaleString(i18n.locale)}</Text>
           <Text style={s.spPackAmountUnit}>SP</Text>
         </View>
         {pack.bonusPct ? (
           <View style={[s.spPackBonus, { backgroundColor: pack.tierColor + '26' }]}>
             <Text style={[s.spPackBonusText, { color: pack.tierColor }]}>
-              + %{pack.bonusPct}{i18n.t('auto.store.002')}{pack.bonusAmount ? ` · ${pack.bonusAmount.toLocaleString('tr-TR')} SP` : ''}
+              + %{pack.bonusPct}{i18n.t('auto.store.002')}{pack.bonusAmount ? ` · ${pack.bonusAmount.toLocaleString(i18n.locale)} SP` : ''}
             </Text>
           </View>
         ) : null}

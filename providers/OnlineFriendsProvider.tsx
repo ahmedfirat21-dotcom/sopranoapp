@@ -142,6 +142,15 @@ export function OnlineFriendsProvider({ userId, children }: { userId: string | n
 
     // Global shared presence channel — tüm kullanıcılar burada kendilerini track eder.
     // Kanal anahtarı userId; presence event'leri join/leave'de tetiklenir.
+    // ★ v1.7.13.146 (24 May 2026): Reuse race fix — aynı topic'te eski channel
+    //   "joined" durumdaysa yeni .on() reddediyor. Önce mevcut topic'i kapat.
+    try {
+      const existing = supabase.getChannels().find(c => c.topic === 'realtime:online-users');
+      if (existing) {
+        existing.unsubscribe().catch(() => {});
+        supabase.removeChannel(existing);
+      }
+    } catch { /* sessizce geç */ }
     const presenceChannel = supabase.channel('online-users', {
       config: { presence: { key: userId } },
     });

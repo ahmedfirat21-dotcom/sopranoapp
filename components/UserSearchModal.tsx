@@ -1,4 +1,4 @@
-﻿/**
+/**
  * SopranoChat — Keşfet Arama Modalı
  * Oda ve kişi araması — keşfet ekranındaki arama ikonuna bağlı
  * Hem oda hem kullanıcı sonuçlarını listeler
@@ -415,7 +415,7 @@ export function UserSearchModal({ visible, onClose, currentUserId, onSelectUser,
                   </View>
                   <View style={s.userInfo}>
                     <Text style={s.displayName}>{room.name}</Text>
-                    <Text style={s.username}>{room.host?.display_name || 'Anonim'} · {room.listener_count || 0} dinleyici</Text>
+                    <Text style={s.username}>{room.host?.display_name || i18n.t('common.anonymous')} · {room.listener_count || 0} dinleyici</Text>
                   </View>
                   <Ionicons name="enter-outline" size={18} color={Colors.teal} />
                 </Pressable>
@@ -521,7 +521,7 @@ export function UserSearchModal({ visible, onClose, currentUserId, onSelectUser,
                               </View>
                               <View style={s.userInfo}>
                                 <Text style={s.displayName}>{room.name}</Text>
-                                <Text style={s.username}>{room.host?.display_name || 'Anonim'} · {room.listener_count || 0} dinleyici</Text>
+                                <Text style={s.username}>{room.host?.display_name || i18n.t('common.anonymous')} · {room.listener_count || 0} dinleyici</Text>
                               </View>
                               <Ionicons name="enter-outline" size={18} color={Colors.teal} />
                             </Pressable>

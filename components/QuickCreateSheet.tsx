@@ -18,12 +18,23 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Colors } from '../constants/theme';
 
 const { height: SCREEN_H } = Dimensions.get('window');
-const PANEL_HEIGHT = 320;
+// ★ v1.7.13.67 (20 May 2026): Templates row + 2 option = ~400. Templates yoksa boşluk minimal.
+const PANEL_HEIGHT = 400;
+
+/** ★ v1.7.13.67 (20 May 2026): Hızlı şablonlar — tek tap'la kategorili oda açma. */
+export type QuickTemplate = {
+  id: string;
+  emoji: string;
+  label: string;
+  category: string;
+  colors: [string, string];
+};
 
 interface Props {
   visible: boolean;
   onClose: () => void;
-  onQuickCreate: () => void;
+  /** Kategori opsiyonel — varsayılan / şablon. */
+  onQuickCreate: (category?: string) => void;
   onDetailedCreate: () => void;
   bottomInset: number;
   /**
@@ -31,11 +42,13 @@ interface Props {
    * aksi halde CurvedTabBar son seçeneği kırpar. Tabs dışında kullanılırsa 0.
    */
   bottomOffset?: number;
+  /** Hızlı şablon chip'leri — verilmediyse gösterilmez. */
+  templates?: QuickTemplate[];
 }
 
 export default function QuickCreateSheet({
   visible, onClose, onQuickCreate, onDetailedCreate, bottomInset,
-  bottomOffset = 0,
+  bottomOffset = 0, templates,
 }: Props) {
   // ★ Panel artık bottom:0'da ve paddingBottom ile yüksekliği şişiyor;
   // CLOSED_Y tüm görünür yüksekliği + buffer kadar olmalı ki translate off-screen temiz kaysın.
@@ -127,6 +140,31 @@ export default function QuickCreateSheet({
             <Text style={s.headerTitle}>{i18n.t('quickcreatesheet.001')}</Text>
           </View>
         </View>
+
+        {/* ★ v1.7.13.67 (20 May 2026): Hızlı şablon chip'leri — tek tap'la kategorili oda */}
+        {templates && templates.length > 0 && (
+          <View style={s.templatesWrap}>
+            <Text style={s.templatesLabel}>Şablonlar</Text>
+            <View style={s.templatesRow}>
+              {templates.map((tpl) => (
+                <Pressable
+                  key={tpl.id}
+                  style={({ pressed }) => [s.templateChip, pressed && { opacity: 0.85, transform: [{ scale: 0.96 }] }]}
+                  onPress={() => { onClose(); setTimeout(() => onQuickCreate(tpl.category), 160); }}
+                >
+                  <LinearGradient
+                    colors={tpl.colors}
+                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                    style={s.templateChipGrad}
+                  >
+                    <Text style={s.templateChipEmoji}>{tpl.emoji}</Text>
+                    <Text style={s.templateChipLabel} numberOfLines={1}>{tpl.label}</Text>
+                  </LinearGradient>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        )}
 
         <View style={s.optionsWrap}>
           <Option
@@ -256,5 +294,41 @@ const s = StyleSheet.create({
     fontSize: 11,
     color: '#94A3B8',
     lineHeight: 15,
+  },
+  // ★ v1.7.13.67 (20 May 2026): Şablon chip'leri
+  templatesWrap: {
+    paddingHorizontal: 16, paddingTop: 10, paddingBottom: 4,
+  },
+  templatesLabel: {
+    fontSize: 10, fontWeight: '800',
+    color: 'rgba(148,163,184,0.85)',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    marginBottom: 8,
+  },
+  templatesRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 6,
+  },
+  templateChip: {
+    flex: 1,
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+  },
+  templateChipGrad: {
+    paddingVertical: 10, paddingHorizontal: 4,
+    alignItems: 'center', justifyContent: 'center',
+    gap: 3,
+  },
+  templateChipEmoji: {
+    fontSize: 18,
+  },
+  templateChipLabel: {
+    fontSize: 9, fontWeight: '800',
+    color: 'rgba(255,255,255,0.92)',
+    letterSpacing: 0.3,
+    textAlign: 'center',
   },
 });

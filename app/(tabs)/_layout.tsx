@@ -45,11 +45,11 @@ const darken = (hex: string, pct: number) => lighten(hex, -pct);
 const TAB_CFG: Record<string, {
   activeIcon: any;
   inactiveIcon: any;
-  /** i18n key (ör. 'tabs.discover'); runtime'da t() ile çevrilir */
+  /** i18n key (ör. 'tabs.home'); runtime'da t() ile çevrilir */
   labelKey: string;
   accent: string;
 }> = {
-  home:     { activeIcon: 'radio',               inactiveIcon: 'radio-outline',               labelKey: 'tabs.discover', accent: '#14B8A6' },
+  home:     { activeIcon: 'radio',               inactiveIcon: 'radio-outline',               labelKey: 'tabs.home',     accent: '#14B8A6' },
   myrooms:  { activeIcon: 'home',                inactiveIcon: 'home-outline',                labelKey: 'tabs.myrooms',  accent: '#3B82F6' },
   messages: { activeIcon: 'chatbubble-ellipses', inactiveIcon: 'chatbubble-ellipses-outline', labelKey: 'tabs.messages', accent: '#8B5CF6' },
   profile:  { activeIcon: 'person',              inactiveIcon: 'person-outline',              labelKey: 'tabs.profile',  accent: '#F59E0B' },
@@ -298,10 +298,12 @@ function Tab({ isFocused, cfg, badge, onPress, routeName }: {
 // ════════════════════════════════════════════════════════════
 function CurvedTabBar({ state, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
-  const { unreadDMs } = useBadges();
+  // ★ v1.7.13.49 (20 May 2026): Tab badge'leri çoklu sayaç.
+  //   Mesajlar = unreadDMs (mevcut). Profil = pendingFollows + unreadNotifs
+  //   (yeni takipçi istek + bildirimler). Odalarım badge'i yok (room_invites
+  //   useBadges'te yok, post-launch eklenebilir).
+  const { unreadDMs, pendingFollows, unreadNotifs } = useBadges();
   const { tabBarCovered } = useAuth();
-  // ★ 2026-05-09: home.tsx Hoşgeldin/Oda aç ipucu zinciri sırasında tab bar gizlensin.
-  if (tabBarCovered) return null;
   // ★ Runtime width — fiziksel telefonda gesture-nav varken güncellenen değer alınır.
   //   SafeArea insets'i de çıkararak (landscape notch) tam ekran genişliğini kullan.
   const { width: winW } = useWindowDimensions();
@@ -363,6 +365,10 @@ function CurvedTabBar({ state, navigation }: BottomTabBarProps) {
     opacity: entryOpacity.value,
   }));
 
+  // ★ 2026-05-09: home.tsx Hoşgeldin/Oda aç ipucu zinciri sırasında tab bar gizlensin.
+  // ★ v1.7.13.119: Bu kontrol TÜM hook'lardan SONRA olmak ZORUNDA (Rules of Hooks).
+  if (tabBarCovered) return null;
+
   return (
     <Animated.View style={[s.outer, entryStyle]}>
       {/* ★ 2026-04-25: Bar ekran dibine yapışır, safe-area'yı kendi içinde absorbe eder
@@ -411,7 +417,16 @@ function CurvedTabBar({ state, navigation }: BottomTabBarProps) {
               isFocused={state.index === i}
               cfg={cfg}
               routeName={route.name}
-              badge={route.name === 'messages' ? unreadDMs : 0}
+              badge={
+                // ★ v1.7.13.146 (24 May 2026): Profile tab badge ÇİFT GÖSTERİM düzeltildi.
+                //   Önceden pendingFollows + unreadNotifs sayıyordu — ama unreadNotifs
+                //   zaten sağ üst zil ikonunda gösteriliyor (NotificationDrawer). Profile
+                //   sayfasında karşılığı yok → kullanıcı tıkladığında boş. Şimdi sadece
+                //   pendingFollows (gerçek profile-tab içerik = takip istekleri).
+                route.name === 'messages' ? unreadDMs
+                  : route.name === 'profile' ? pendingFollows
+                  : 0
+              }
               onPress={() => {
                 const ev = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
                 if (state.index !== i && !ev.defaultPrevented) navigation.navigate(route.name);

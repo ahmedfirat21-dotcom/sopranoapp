@@ -15,7 +15,10 @@ import { i18n } from '../../services/i18n';
 
 // ★ 2026-05-05: Keşfet drawer dili (NotificationDrawer/FriendsDrawer) — birebir aynı
 //   boyut + 3 katman gradient + slate kabuk. Karakter rengi: teal (insan listesi).
-const ROOM_TOP_GAP = 70;     // RoomInfoHeader altında bitsin
+// ★ v1.7.13.146 (24 May 2026): PlusMenu ile birebir boy — top:max(insets.top+12, 70),
+//   bottom:max(insets.bottom+8, 90). Üst Z-stacking artık (zIndex:9999) ile çözüldü;
+//   konum klasik PlusMenu/NotificationDrawer pattern'inde.
+const ROOM_TOP_GAP = 70;     // RoomInfoHeader altında bitsin (PlusMenu ile aynı)
 const ROOM_BOTTOM_GAP = 90;  // RoomControlBar üstünde bitsin
 
 interface UserItem {
@@ -86,7 +89,10 @@ export default function AudienceDrawer({ visible, users, onClose, onSelectUser, 
   };
 
   return (
-    <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+    // ★ v1.7.13.146 (24 May 2026): zIndex 9999 — header parent zIndex:1 ile çakışıyordu.
+    //   Android'de elevation sadece zIndex set EDİLMEMİŞ kardeşler arası geçerli; header
+    //   zIndex:1 set olunca drawer'ın elevation:100'ü etkisiz kalıyordu. Explicit zIndex.
+    <View style={[StyleSheet.absoluteFill, { zIndex: 9999, elevation: 9999 }]} pointerEvents="box-none">
       {/* Backdrop */}
       <Animated.View style={[s.backdrop, { opacity: fadeAnim }]}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
@@ -97,7 +103,7 @@ export default function AudienceDrawer({ visible, users, onClose, onSelectUser, 
         {...panHandlers}
         style={[s.panel, {
           width: PANEL_W,
-          top: Math.max(insets.top + 12, ROOM_TOP_GAP),
+          top: insets.top + 12,
           bottom: Math.max(insets.bottom + 8, ROOM_BOTTOM_GAP),
           transform: [{ translateX: Animated.add(slideAnim, swipeX) }],
         }]}
@@ -212,11 +218,12 @@ const s = StyleSheet.create({
     overflow: 'hidden',
     backgroundColor: '#1a2030',
     // ★ 2026-05-05 perf: Android elevation 22→10 (GPU pahalı), iOS shadow azaltıldı.
+    // ★ v1.7.13.146 (24 May 2026): 10 → 100. Header+radyo zIndex'ini geçmesi için.
     shadowColor: '#000',
     shadowOffset: { width: -6, height: 0 },
     shadowOpacity: 0.45,
     shadowRadius: 14,
-    elevation: 10,
+    elevation: 100,
   },
   header: {
     flexDirection: 'row',

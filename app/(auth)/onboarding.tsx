@@ -1,4 +1,4 @@
-﻿import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, Image, Pressable, ScrollView, Dimensions, TextInput, KeyboardAvoidingView, Platform, Keyboard, ImageBackground, Animated, Easing } from 'react-native';
 import { i18n } from '../../services/i18n';
 import PremiumAlert from '../../components/PremiumAlert';
@@ -39,6 +39,8 @@ export default function OnboardingScreen() {
   const [birthYear, setBirthYear] = useState('');
   const [interests, setInterests] = useState<string[]>([]);
   const [inviteCode, setInviteCode] = useState('');
+  // ★ v1.7.13.49 (20 May 2026): KVKK uyumlu açık rıza — Step 4'te toggle. Default false.
+  const [marketingConsent, setMarketingConsent] = useState(false);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [tempProfile, setTempProfile] = useState<any>(null);
@@ -56,20 +58,31 @@ export default function OnboardingScreen() {
   //   atama kazandığı için Kadın/Müzik yerine description metni görünüyordu).
   //   "Erkek" / "Belirtmiyorum" zaten hardcoded; "Kadın" / "Müzik" da hardcoded.
   const GENDER_OPTIONS = [
-    { id: 'male' as const, label: 'Erkek', icon: 'male' as const, color: '#3B82F6' },
-    { id: 'female' as const, label: 'Kadın', icon: 'female' as const, color: '#EC4899' },
-    { id: 'unspecified' as const, label: 'Belirtmiyorum', icon: 'person-outline' as const, color: '#64748B' },
+    { id: 'male' as const, label: i18n.t('onboarding.gender.male'), icon: 'male' as const, color: '#3B82F6' },
+    { id: 'female' as const, label: i18n.t('onboarding.gender.female'), icon: 'female' as const, color: '#EC4899' },
+    { id: 'unspecified' as const, label: i18n.t('onboarding.gender.unspecified'), icon: 'person-outline' as const, color: '#64748B' },
   ];
 
+  // ★ v1.7.13.116 (20 May 2026): TR kültür paketi — yerel zevkleri vurgulayan
+  //   ilgi alanları eklendi. Türk Sanat Müziği, Arabesk, Halk Oyunları, Magazin,
+  //   Edebiyat, Yemek, Spor (Türk takımları kapsamlı), Tarih.
   const INTEREST_OPTIONS = [
-    { id: 'chat', label: 'Sohbet', icon: 'chatbubbles', color: '#14B8A6', emoji: '💬' },
-    { id: 'music', label: 'Müzik', icon: 'musical-notes', color: '#8B5CF6', emoji: '🎵' },
-    { id: 'game', label: 'Oyun', icon: 'game-controller', color: '#EF4444', emoji: '🎮' },
-    { id: 'tech', label: 'Teknoloji', icon: 'code-slash', color: '#3B82F6', emoji: '💻' },
-    { id: 'book', label: 'Kitap', icon: 'book', color: '#F59E0B', emoji: '📚' },
-    { id: 'film', label: 'Film & Dizi', icon: 'film', color: '#EC4899', emoji: '🎬' },
-    { id: 'sport', label: 'Spor', icon: 'football', color: '#10B981', emoji: '⚽' },
-    { id: 'art', label: 'Sanat', icon: 'color-palette', color: '#F97316', emoji: '🎨' },
+    { id: 'chat', label: i18n.t('onboarding.interest.chat'), icon: 'chatbubbles', color: '#14B8A6', emoji: '💬' },
+    { id: 'music', label: i18n.t('onboarding.interest.music'), icon: 'musical-notes', color: '#8B5CF6', emoji: '🎵' },
+    { id: 'tsm', label: i18n.t('onboarding.interest.tsm'), icon: 'musical-note', color: '#A78BFA', emoji: '🎼' },
+    { id: 'arabesk', label: i18n.t('onboarding.interest.arabesk'), icon: 'flame', color: '#D97706', emoji: '🌹' },
+    { id: 'halk', label: i18n.t('onboarding.interest.halk'), icon: 'musical-notes', color: '#B45309', emoji: '🪕' },
+    { id: 'pop', label: i18n.t('onboarding.interest.pop'), icon: 'mic', color: '#EC4899', emoji: '🎤' },
+    { id: 'film', label: i18n.t('onboarding.interest.film'), icon: 'film', color: '#EC4899', emoji: '🎬' },
+    { id: 'magazin', label: i18n.t('onboarding.interest.magazin'), icon: 'star', color: '#FB7185', emoji: '✨' },
+    { id: 'spor', label: i18n.t('onboarding.interest.spor'), icon: 'football', color: '#10B981', emoji: '⚽' },
+    { id: 'edebiyat', label: i18n.t('onboarding.interest.edebiyat'), icon: 'book', color: '#F59E0B', emoji: '📖' },
+    { id: 'tarih', label: i18n.t('onboarding.interest.tarih'), icon: 'library', color: '#92400E', emoji: '🏛️' },
+    { id: 'yemek', label: i18n.t('onboarding.interest.yemek'), icon: 'restaurant', color: '#DC2626', emoji: '🍽️' },
+    { id: 'oyun', label: i18n.t('onboarding.interest.oyun'), icon: 'game-controller', color: '#EF4444', emoji: '🎮' },
+    { id: 'tech', label: i18n.t('onboarding.interest.tech'), icon: 'code-slash', color: '#3B82F6', emoji: '💻' },
+    { id: 'sanat', label: i18n.t('onboarding.interest.sanat'), icon: 'color-palette', color: '#F97316', emoji: '🎨' },
+    { id: 'seyahat', label: i18n.t('onboarding.interest.seyahat'), icon: 'airplane', color: '#0EA5E9', emoji: '✈️' },
   ];
 
   useEffect(() => {
@@ -176,14 +189,19 @@ export default function OnboardingScreen() {
           //   DB hatası olursa kullanıcıya bildir, home'a yönlendirme YAPMA.
           //   Eski versiyon error'u sessizce yutuyordu → uygulamadan çıkınca
           //   flag olmadığı için tekrar onboarding açılıyordu.
+          // ★ v1.7.13.49 (20 May 2026): KVKK marketing_consent ile birlikte yaz.
           const { error: updErr } = await supabase
             .from('profiles')
-            .update({ preferences: mergedPrefs })
+            .update({
+              preferences: mergedPrefs,
+              marketing_consent: marketingConsent,
+              marketing_consent_at: marketingConsent ? new Date().toISOString() : null,
+            })
             .eq('id', firebaseUser.uid);
           if (updErr) {
             if (__DEV__) console.warn('[Onboarding] preferences update hata:', updErr.message);
             showToast({
-              title: 'Kaydedilemedi',
+              title: i18n.t('onboarding.save_failed'),
               message: i18n.t('auth.onboarding.003'),
               type: 'error',
             });
@@ -232,7 +250,7 @@ export default function OnboardingScreen() {
         if (!error && (data as any)?.granted === true) {
           bonusGranted = true;
         } else if (__DEV__ && (data as any)?.reason) {
-          console.log('[WelcomeBonus]', (data as any).reason);
+          if (__DEV__) console.log('[WelcomeBonus]', (data as any).reason);
         }
       } catch (e) {
         if (__DEV__) console.warn('[WelcomeBonus] RPC error:', e);
@@ -268,10 +286,10 @@ export default function OnboardingScreen() {
     const result = await ReferralService.applyCode(inviteCode, firebaseUser!.uid, true);
     setSaving(false);
     if (result.success) {
-      showToast({ title: '🎉 Tebrikler!', message: i18n.t('auth.onboarding.008'), type: 'success' });
+      showToast({ title: i18n.t('onboarding.congrats'), message: i18n.t('auth.onboarding.008'), type: 'success' });
       finalizeOnboarding();
     } else {
-      showToast({ title: 'Kod Kabul Edilmedi', message: result.message, type: 'error' });
+      showToast({ title: i18n.t('onboarding.code_rejected'), message: result.message, type: 'error' });
     }
   };
 
@@ -306,7 +324,7 @@ export default function OnboardingScreen() {
     Keyboard.dismiss();
     const trimmedName = displayName.trim();
     if (!trimmedName) {
-      showToast({ title: i18n.t('auth.onboarding.011'), message: 'Bir isim veya lakap gir.', type: 'warning' });
+      showToast({ title: i18n.t('auth.onboarding.011'), message: i18n.t('onboarding.enter_name'), type: 'warning' });
       return;
     }
     // ★ SEC-OB1: Min 2 karakter kontrolü
@@ -330,19 +348,22 @@ export default function OnboardingScreen() {
     // ★ SEC-OB5: Aşırı emoji kontrolü (10'dan fazla emoji = spam)
     const emojiCount = (sanitizedName.match(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu) || []).length;
     if (emojiCount > 10) {
-      showToast({ title: i18n.t('auth.onboarding.018'), message: 'En fazla 10 emoji kullanabilirsin.', type: 'warning' });
+      showToast({ title: i18n.t('auth.onboarding.018'), message: i18n.t('onboarding.max_emoji'), type: 'warning' });
       return;
     }
     if (!firebaseUser) return;
     setSaving(true);
     try {
       const baseUsername = (firebaseUser.email ? firebaseUser.email.split('@')[0] : `user_${firebaseUser.uid.substring(0,6)}`).toLowerCase().replace(/[^a-z0-9_]/g, '');
-      const username = `${baseUsername}_${firebaseUser.uid.substring(0, 4)}`;
-      const baseData = {
+      // ★ v1.7.13.49 (20 May 2026): Username uniqueness retry. UID son 4 char ile
+      //   çakışma olası (1/65536). Çakışırsa rastgele 2 char ekleyip 3 kez dener.
+      //   Mevcut UPSERT akışı korunur — sadece username için fallback.
+      const buildUsername = (suffix?: string) => `${baseUsername}_${firebaseUser.uid.substring(0, 4)}${suffix ? `_${suffix}` : ''}`;
+      const baseData = (uname: string) => ({
         id: firebaseUser.uid,
-        display_name: sanitizedName || 'Misafir',
+        display_name: sanitizedName || i18n.t('onboarding.guest'),
         avatar_url: avatarUrl,
-        username,
+        username: uname,
         is_online: true,
         tier: 'free',
         subscription_tier: 'Free',
@@ -356,17 +377,26 @@ export default function OnboardingScreen() {
         // Önceki default '2000-01-01' idi ve Step 2 tamamlanmasa bile user 26
         // yaşında görünüyordu → +18 oda filtresi hiç tetiklenmiyordu.
         birth_date: null,
-      };
+      });
 
-      // Step 1 isim + avatar + varsayılan cinsiyet/yaş kaydeder
-      const { data, error } = await supabase
-        .from('profiles')
-        .upsert(baseData, { onConflict: 'id' })
-        .select().single();
-      if (!error && data) { setTempProfile(data); animateStep(2); return; }
-      if (__DEV__) console.warn('[Onboarding] Faz 1 hata:', error?.message);
-      // ★ FIX: Fallback kaldırıldı — hata varsa kullanıcıya bildir
-      throw new Error(error?.message || i18n.t('auto.auth.onboarding.004'));
+      // Step 1 isim + avatar + varsayılan cinsiyet/yaş kaydeder — username çakışmasında 3 deneme.
+      const attempts = [undefined, Math.random().toString(36).slice(2, 4), Math.random().toString(36).slice(2, 4)];
+      let lastError: any = null;
+      for (const suffix of attempts) {
+        const username = buildUsername(suffix);
+        const { data, error } = await supabase
+          .from('profiles')
+          .upsert(baseData(username), { onConflict: 'id' })
+          .select().single();
+        if (!error && data) { setTempProfile(data); animateStep(2); return; }
+        lastError = error;
+        // PostgreSQL unique violation kodu 23505 — username_key constraint
+        const isUnique = error?.code === '23505' || /username.*unique|duplicate/i.test(error?.message || '');
+        if (!isUnique) break; // Başka hata türü → retry etme
+        if (__DEV__) console.log('[Onboarding] Username collision, retrying with suffix:', suffix);
+      }
+      if (__DEV__) console.warn('[Onboarding] Faz 1 hata:', lastError?.message);
+      throw new Error(lastError?.message || i18n.t('auto.auth.onboarding.004'));
     } catch (error: any) {
       showToast({ title: i18n.t('auth.onboarding.019'), message: error?.message || 'Daha sonra tekrar dene.', type: 'error' });
     } finally { setSaving(false); }
@@ -375,7 +405,7 @@ export default function OnboardingScreen() {
   const handleSaveGenderAge = async () => {
     // ★ Yaş zorunlu — boş bırakılamaz
     if (!birthYear || birthYear.length < 4) {
-      showToast({ title: 'Zorunlu Alan', message: i18n.t('auth.onboarding.020'), type: 'error' });
+      showToast({ title: i18n.t('onboarding.required_field'), message: i18n.t('auth.onboarding.020'), type: 'error' });
       return;
     }
     const y = parseInt(birthYear, 10);
@@ -449,8 +479,25 @@ export default function OnboardingScreen() {
               <Ionicons name="close" size={20} color="#F1F5F9" />
             </Pressable>
           )}
+          {/* ★ v1.7.13.49 (20 May 2026): Lineer fill yerine 4-segmented modern stepper.
+              Geçmiş adımlar dolu teal, aktif adım pulse glow, gelecek adımlar soluk.
+              Instagram Stories + Stripe Checkout hybrid pattern. */}
           <View style={s.progressTrack}>
-            <Animated.View style={[s.progressFill, { width: `${(step / TOTAL_STEPS) * 100}%` }]} />
+            {Array.from({ length: TOTAL_STEPS }).map((_, i) => {
+              const idx = i + 1;
+              const isDone = idx < step;
+              const isActive = idx === step;
+              return (
+                <View
+                  key={idx}
+                  style={[
+                    s.progressSegment,
+                    isDone && s.progressSegmentDone,
+                    isActive && s.progressSegmentActive,
+                  ]}
+                />
+              );
+            })}
           </View>
           <Text style={s.stepLabel}>
             {step}/{TOTAL_STEPS}
@@ -467,7 +514,7 @@ export default function OnboardingScreen() {
             {/* =================== STEP 1: AVATAR + İSİM =================== */}
             {step === 1 && (
               <View style={s.stepContainer}>
-                <Text style={s.heading}>Merhaba! 👋</Text>
+                <Text style={s.heading}>{i18n.t('onboarding.hello')}</Text>
                 <Text style={s.desc}>{i18n.t('auth.onboarding.001')}</Text>
 
                 {/* Big Avatar */}
@@ -527,10 +574,10 @@ export default function OnboardingScreen() {
             {/* =================== STEP 2: CİNSİYET + YAŞ =================== */}
             {step === 2 && (
               <View style={s.stepContainer}>
-                <Text style={s.heading}>Biraz kendinden bahset</Text>
+                <Text style={s.heading}>{i18n.t('onboarding.about_yourself')}</Text>
                 <Text style={s.desc}>{i18n.t('auth.onboarding.003')}</Text>
 
-                <Text style={s.label}>Cinsiyet</Text>
+                <Text style={s.label}>{i18n.t('onboarding.gender_label')}</Text>
                 <View style={s.genderGrid}>
                   {GENDER_OPTIONS.map((opt) => {
                     const sel = gender === opt.id;
@@ -626,6 +673,23 @@ export default function OnboardingScreen() {
                     onChangeText={setInviteCode}
                   />
                 </View>
+
+                {/* ★ v1.7.13.49 (20 May 2026): KVKK açık rıza toggle.
+                    Default kapalı — kullanıcı bilinçli olarak açar. Hızlı genişleyen
+                    checkbox + açıklayıcı metin (modern Apple/Google opt-in pattern). */}
+                <Pressable
+                  style={({ pressed }) => [s.consentRow, pressed && { opacity: 0.75 }]}
+                  onPress={() => setMarketingConsent(c => !c)}
+                  hitSlop={6}
+                >
+                  <View style={[s.consentCheckbox, marketingConsent && s.consentCheckboxActive]}>
+                    {marketingConsent && <Ionicons name="checkmark" size={14} color="#0F1926" />}
+                  </View>
+                  <View style={{ flex: 1, marginLeft: 12 }}>
+                    <Text style={s.consentTitle}>{i18n.t('onboarding.consent_title')}</Text>
+                    <Text style={s.consentDesc}>{i18n.t('onboarding.consent_desc')}</Text>
+                  </View>
+                </Pressable>
               </View>
             )}
 
@@ -644,7 +708,7 @@ export default function OnboardingScreen() {
                 style={({ pressed }) => [s.secondaryBtn, pressed && { opacity: 0.7 }]}
                 onPress={finalizeOnboarding}
               >
-                <Text style={s.secondaryBtnText}>Atla</Text>
+                <Text style={s.secondaryBtnText}>{i18n.t('onboarding.skip')}</Text>
               </Pressable>
               <Pressable
                 style={({ pressed }) => [s.primaryBtn, { flex: 1 }, pressed && { opacity: 0.9 }]}
@@ -652,14 +716,42 @@ export default function OnboardingScreen() {
                 disabled={saving}
               >
                 <LinearGradient colors={Gradients.teal as [string, string]} start={{x:0,y:0}} end={{x:1,y:1}} style={s.primaryInner}>
-                  {saving ? <AppLoader size="small" color="#fff" /> : <Text style={s.primaryText}>Kodu Uygula</Text>}
+                  {saving ? <AppLoader size="small" color="#fff" /> : <Text style={s.primaryText}>{i18n.t('onboarding.apply_code')}</Text>}
+                </LinearGradient>
+              </Pressable>
+            </View>
+          ) : step === 3 ? (
+            /* ★ v1.7.13.49 (20 May 2026): Step 3 (ilgi alanları) için "Atla" eklendi.
+                Step 4 ile aynı footerRow pattern'i; Atla → davet kodu adımına geçer (skip değil, devam). */
+            <View style={s.footerRow}>
+              <Pressable
+                style={({ pressed }) => [s.secondaryBtn, pressed && { opacity: 0.7 }]}
+                onPress={() => animateStep(4)}
+                disabled={saving}
+              >
+                <Text style={s.secondaryBtnText}>Atla</Text>
+              </Pressable>
+              <Pressable
+                style={({ pressed }) => [s.primaryBtn, { flex: 1 }, pressed && { opacity: 0.9 }]}
+                onPress={handleSaveInterests}
+                disabled={saving}
+              >
+                <LinearGradient colors={Gradients.teal as [string, string]} start={{x:0,y:0}} end={{x:1,y:1}} style={s.primaryInner}>
+                  {saving ? (
+                    <AppLoader size="small" color="#fff" />
+                  ) : (
+                    <>
+                      <Text style={s.primaryText}>{i18n.t('auto.auth.onboarding.002')}</Text>
+                      <Ionicons name="arrow-forward" size={16} color="#FFF" style={{ marginLeft: 8 }} />
+                    </>
+                  )}
                 </LinearGradient>
               </Pressable>
             </View>
           ) : (
             <Pressable
               style={({ pressed }) => [s.primaryBtn, { flex: 1 }, pressed && { opacity: 0.9 }]}
-              onPress={step === 1 ? handleSaveProfile : step === 2 ? handleSaveGenderAge : handleSaveInterests}
+              onPress={step === 1 ? handleSaveProfile : handleSaveGenderAge}
               disabled={saving}
             >
               <LinearGradient colors={Gradients.teal as [string, string]} start={{x:0,y:0}} end={{x:1,y:1}} style={s.primaryInner}>
@@ -667,7 +759,7 @@ export default function OnboardingScreen() {
                   <AppLoader size="small" color="#fff" />
                 ) : (
                   <>
-                    <Text style={s.primaryText}>{step === 1 ? 'Profili Kaydet' : step === 2 ? 'Devam Et' : i18n.t('auto.auth.onboarding.002')}</Text>
+                    <Text style={s.primaryText}>{step === 1 ? i18n.t('onboarding.save_profile') : i18n.t('onboarding.continue')}</Text>
                     <Ionicons name="arrow-forward" size={16} color="#FFF" style={{ marginLeft: 8 }} />
                   </>
                 )}
@@ -692,7 +784,7 @@ export default function OnboardingScreen() {
         type="warning"
         onDismiss={() => setShowCancelAlert(false)}
         buttons={[
-          { text: 'Devam Et', style: 'cancel', icon: 'arrow-forward', onPress: () => setShowCancelAlert(false) },
+          { text: i18n.t('onboarding.alert_continue'), style: 'cancel', icon: 'arrow-forward', onPress: () => setShowCancelAlert(false) },
           { text: i18n.t('auto.auth.onboarding.001'), style: 'destructive', icon: 'log-out-outline', onPress: handleConfirmCancel },
         ]}
       />
@@ -718,17 +810,25 @@ const s = StyleSheet.create({
     justifyContent: 'center', alignItems: 'center',
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
   },
+  // ★ v1.7.13.49 (20 May 2026): Modern 4-segment stepper.
   progressTrack: {
-    flex: 1, height: 4, borderRadius: 2,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    overflow: 'hidden',
+    flex: 1, flexDirection: 'row', gap: 5,
+    height: 4, alignItems: 'center',
   },
-  progressFill: {
-    height: '100%', borderRadius: 2,
+  progressSegment: {
+    flex: 1, height: 4, borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.10)',
+  },
+  progressSegmentDone: {
+    backgroundColor: Colors.teal,
+    opacity: 0.55,
+  },
+  progressSegmentActive: {
     backgroundColor: Colors.teal,
     shadowColor: Colors.teal,
     shadowOffset: { width: 0, height: 0 },
-    shadowRadius: 6, shadowOpacity: 0.6,
+    shadowRadius: 6, shadowOpacity: 0.85,
+    elevation: 4,
   },
   stepLabel: {
     fontSize: 12, fontWeight: '700',
@@ -906,5 +1006,39 @@ const s = StyleSheet.create({
   primaryText: {
     fontSize: 16, fontWeight: '700', color: '#FFF',
     letterSpacing: 0.3,
+  },
+  // ★ v1.7.13.49 (20 May 2026): KVKK marketing consent toggle stilleri.
+  consentRow: {
+    flexDirection: 'row', alignItems: 'flex-start',
+    marginTop: 24, paddingHorizontal: 4,
+    paddingVertical: 12,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
+    paddingLeft: 14, paddingRight: 16,
+  },
+  consentCheckbox: {
+    width: 22, height: 22, borderRadius: 6,
+    borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.25)',
+    backgroundColor: 'rgba(0,0,0,0.25)',
+    alignItems: 'center', justifyContent: 'center',
+    marginTop: 1,
+  },
+  consentCheckboxActive: {
+    backgroundColor: Colors.teal,
+    borderColor: Colors.teal,
+    shadowColor: Colors.teal,
+    shadowOffset: { width: 0, height: 0 },
+    shadowRadius: 6, shadowOpacity: 0.55,
+    elevation: 3,
+  },
+  consentTitle: {
+    fontSize: 13, fontWeight: '700',
+    color: '#F1F5F9', letterSpacing: 0.2,
+  },
+  consentDesc: {
+    fontSize: 11, fontWeight: '500',
+    color: 'rgba(255,255,255,0.55)',
+    lineHeight: 16, marginTop: 4,
   },
 });

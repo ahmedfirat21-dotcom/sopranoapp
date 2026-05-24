@@ -15,6 +15,7 @@ import { GamificationService } from '../services/gamification';
 import { UpsellService } from '../services/upsell';
 import { isSystemRoom } from '../services/showcaseRooms';
 import { showToast } from '../components/Toast';
+import { i18n } from '../services/i18n';
 import type { Room } from '../types';
 
 type RoomStats = {
@@ -79,7 +80,7 @@ export function useRoomGamification(params: UseRoomGamificationParams) {
       const _tier = (profile?.subscription_tier || 'Free') as any;
       UpsellService.onSystemRoomPrompt(_tier);
       showToast({
-        title: '🏠 Kendi Odanı Aç!',
+        title: i18n.t('gamification.open_room'),
         message: 'SopranoChat\'ta kendi kişisel odanı oluştur ve topluluğun lideri ol!',
         type: 'info',
       });
