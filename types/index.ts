@@ -23,9 +23,12 @@
  * Free      → Ücretsiz temel deneyim
  * Plus      → Gelişmiş özellikler, daha yüksek limitler
  * Pro       → Sınırsız güç, maksimum prestij
- * GodMaster → Admin/geliştirici — tüm limitler sonsuz, tüm tier izinleri
+ *
+ * ★ v1.7.13.132 (21 May 2026): GodMaster KALDIRILDI.
+ *   Admin yetkisi getEffectiveTier(is_admin=true) → 'Pro' mapping ile sağlanır.
+ *   Eski 'GodMaster' DB string'i migrateLegacyTier ile 'Pro'ya normalize olur.
  */
-export type SubscriptionTier = 'Free' | 'Plus' | 'Pro' | 'GodMaster';
+export type SubscriptionTier = 'Free' | 'Plus' | 'Pro';
 
 /** Alias — tüm kod tabanında uyumluluk */
 export type TierName = SubscriptionTier;
@@ -45,7 +48,9 @@ export type CameraFacing = 'front' | 'back';
  * ★ 2026-04-20: Tier sistemi Free/Plus/Pro. Bilinmeyen string'ler Free'ye düşer.
  */
 export function migrateLegacyTier(oldTier: string | null | undefined): SubscriptionTier {
-  if (oldTier === 'Plus' || oldTier === 'Pro' || oldTier === 'GodMaster') return oldTier;
+  // ★ v1.7.13.132: GodMaster kaldırıldı → Pro'ya map et (legacy DB satırları için)
+  if (oldTier === 'GodMaster') return 'Pro';
+  if (oldTier === 'Plus' || oldTier === 'Pro') return oldTier;
   return 'Free';
 }
 
@@ -79,6 +84,12 @@ export type Profile = {
   privacy_mode: PrivacyMode;
   /** Sahip olduğu odaları profilinde gizle */
   hide_owned_rooms?: boolean;
+  /** ★ v1.7.13.58 (20 May 2026): DM mesaj isteklerini kabul et — false ise yabancılar yeni istek atamaz. */
+  dm_accept_requests?: boolean;
+  /** ★ v1.7.13.111 (20 May 2026): Streak (gün serisi) sistemi */
+  streak_days?: number;
+  streak_last_date?: string | null;
+  streak_longest?: number;
 
   // ── Durum ──
   is_online: boolean;
@@ -481,9 +492,8 @@ export const ALL_PERMISSIONS: Record<OwnerPermission, PermissionDefinition> = {
   set_followers_only:   { minRole: 'owner', requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false, minTier: 'Pro' },
   ghost_mode:           { minRole: 'owner', requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false, minTier: 'Pro' },
   // ★ 2026-04-28: Self-toggle (host kendi kılığını değiştirir, başkasına uygulanmaz).
-  //   Eski "requiresTarget/hiddenOnSelf:true" başkasına uygula mantığıydı, kaldırıldı.
-  //   minTier Free — test için açık, tier kararı sonra verilebilir (Plus = yönetim aracı kategorisi).
-  disguise_user:        { minRole: 'owner', requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false, minTier: 'Free' },
+  // ★ v1.7.13.134: minTier 'Free'→'Pro' — plus.tsx Pro vaadi "Ghost mode + Kılık" ile birebir uyum.
+  disguise_user:        { minRole: 'owner', requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false, minTier: 'Pro' },
   mute_all:             { minRole: 'owner', requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false, minTier: 'Pro' },
   record_room:          { minRole: 'owner', requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false, minTier: 'Pro' },
   set_entry_fee:        { minRole: 'owner', requiresTarget: false, requiresLowerTarget: false, hiddenOnSelf: false, minTier: 'Pro' },

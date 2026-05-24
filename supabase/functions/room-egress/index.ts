@@ -53,17 +53,47 @@ serve(async (req: Request) => {
     const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
     const body = await req.json();
-    const { action, room_id, host_id, egress_id } = body as {
+    const { action, room_id, egress_id } = body as {
       action: 'start' | 'stop';
       room_id: string;
-      host_id: string;
       egress_id?: string;
     };
 
-    if (!action || !room_id || !host_id) {
+    if (!action || !room_id) {
       return new Response(
-        JSON.stringify({ error: 'action, room_id, host_id zorunlu.' }),
+        JSON.stringify({ error: 'action, room_id zorunlu.' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // ★ v1.7.13.137 SECURITY FIX: host_id artık body'den DEĞİL, JWT'den çekilir.
+    //   Önceden saldırgan başkasının host_id'sini body'de gönderebilirdi.
+    //   Şimdi caller JWT sub claim'i extract → o user host_id olup olmadığı kontrol.
+    const authHeader = req.headers.get('Authorization') || '';
+    if (!authHeader.startsWith('Bearer ')) {
+      return new Response(
+        JSON.stringify({ error: 'Authorization header gerekli.' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    const token = authHeader.slice(7);
+    let callerUid: string | null = null;
+    try {
+      // JWT payload'ından sub claim çek (verify_jwt=true ile Supabase zaten verify etmiş)
+      const parts = token.split('.');
+      if (parts.length !== 3) throw new Error('invalid jwt');
+      const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+      callerUid = payload.sub || payload.user_id || null;
+    } catch {
+      return new Response(
+        JSON.stringify({ error: 'Geçersiz JWT.' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    if (!callerUid) {
+      return new Response(
+        JSON.stringify({ error: 'JWT sub bulunamadı.' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -81,12 +111,13 @@ serve(async (req: Request) => {
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
-    if (room.host_id !== host_id) {
+    if (room.host_id !== callerUid) {
       return new Response(
         JSON.stringify({ error: 'Sadece oda sahibi kayıt başlatabilir.' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+    const host_id = callerUid;
 
     // ── LiveKit Egress client ──
     const egress = new EgressClient(LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET);

@@ -141,16 +141,14 @@ serve(async (req: Request) => {
     }
 
     // ── 4. Publish yetkisi belirle ──
-    // ★ 2026-04-20 FIX: canPublish HER ZAMAN true — token odaya girişte bir kez
-    // üretilir ve rol değiştiğinde (listener→speaker promote) yenilenMEZ.
-    // Bu yüzden listener olarak giren birisi sahneye çıktığında canPublish=false
-    // olan eski token yüzünden mikrofon açamıyordu.
-    // Uygulama katmanı zaten mic erişimini kontrol eder:
-    //   - UI: listener'da mic butonu görünmez
-    //   - Moderatör: broadcast ile force-mute yapabilir
-    //   - Demote: client-side mic kapatılır
+    // ★ v1.7.13.138 SECURITY FIX: canPublish ROLE-BASED.
+    //   Önceden HER ZAMAN true idi (token refresh sorunu için). Sonuç: modifiye
+    //   client listener'ken ses açıp "hayalet ses" yapabiliyordu.
+    //   Şimdi sadece owner/speaker/moderator publish edebilir.
+    //   Promote sonrası client livekit-token RPC'sini yeniden çağırır + fresh
+    //   token alır (services/livekit.ts:refreshTokenForRole helper).
     const effectiveRole = partRow?.role || "listener";
-    const canPublish = true;
+    const canPublish = ['owner', 'speaker', 'moderator'].includes(effectiveRole);
 
     // ── 5. Token oluştur ──
     const token = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET, {
