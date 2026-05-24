@@ -44,6 +44,7 @@ import DiscoverEmptyState from '../../components/DiscoverEmptyState';
 import HomeScreenSkeleton from '../../components/HomeScreenSkeleton';
 import { isSystemRoom, getLobiRoom, LOBI_ROOM_ID } from '../../services/showcaseRooms';
 import { FriendshipService } from '../../services/friendship';
+import { FollowService } from '../../services/follows';
 import { TIER_DEFINITIONS, getEffectiveTier } from '../../constants/tiers';
 import { roomPreviewService } from '../../services/roomPreview';
 import { Haptics } from '../../utils/haptics';
@@ -802,14 +803,16 @@ export default function HomeScreen() {
   const [followedUserIds, setFollowedUserIds] = useState<Set<string>>(new Set());
   useEffect(() => {
     if (!firebaseUser?.uid) return;
-    FriendshipService.getFollowing(firebaseUser.uid)
+    // ★ v1.7.13.146 KRİTİK FIX: FollowService (follows tablo) — profile sayfası
+    //   da burayı sayıyor, FriendshipService ayrı tabloya yazıyordu.
+    FollowService.getFollowing(firebaseUser.uid)
       .then(list => setFollowedUserIds(new Set(list.map(u => u.id))))
       .catch(() => {});
   }, [firebaseUser?.uid]);
   const handleHomeFollow = useCallback(async (targetId: string) => {
     if (!firebaseUser?.uid || targetId === firebaseUser.uid) return;
     setFollowedUserIds(prev => new Set(prev).add(targetId));
-    const result = await FriendshipService.follow(firebaseUser.uid, targetId);
+    const result = await FollowService.addFollow(firebaseUser.uid, targetId);
     if (!result.success) {
       setFollowedUserIds(prev => { const n = new Set(prev); n.delete(targetId); return n; });
       showToast({ title: i18n.t('common.error'), message: result.error || '', type: 'error' });

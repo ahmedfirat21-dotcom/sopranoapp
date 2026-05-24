@@ -132,6 +132,7 @@ import StageSupportSheet from '../../components/room/StageSupportSheet';
 import EntryFeeCard from '../../components/room/EntryFeeCard';
 import RoomStatsPanel from '../../components/room/RoomStatsPanel';
 import { RoomFollowService } from '../../services/roomFollow';
+import { FollowService } from '../../services/follows';
 import { PushService } from '../../services/push';
 import { UpsellService } from '../../services/upsell';
 import SPToast, { type SPToastRef } from '../../components/SPToast';
@@ -2135,10 +2136,14 @@ export default function RoomScreen() {
 
   // ★ v1.7.13.146 (24 May 2026): Clubhouse-style follow button — oda içindeki avatar'lar
   //   sağ-üst köşesinde + butonu. Tıklayınca FriendshipService.follow + optimistic state.
+  // ★ v1.7.13.146 (24 May 2026): KRİTİK FIX — FriendshipService değil FollowService.
+  //   Profile sayfası `follows` tablosundan takipçi sayar; FriendshipService
+  //   `friendships` tablosuna yazıyor (eski mutual-request pattern). İki paralel
+  //   sistem var → oda içi follow buton'u doğru tabloya yazsın diye FollowService.
   const [followedIds, setFollowedIds] = useState<Set<string>>(new Set());
   useEffect(() => {
     if (!firebaseUser?.uid) return;
-    FriendshipService.getFollowing(firebaseUser.uid)
+    FollowService.getFollowing(firebaseUser.uid)
       .then(list => setFollowedIds(new Set(list.map(u => u.id))))
       .catch(() => {});
   }, [firebaseUser?.uid]);
@@ -2146,7 +2151,7 @@ export default function RoomScreen() {
     if (!firebaseUser?.uid || targetId === firebaseUser.uid) return;
     // Optimistic UI — butonu hemen gizle
     setFollowedIds(prev => new Set(prev).add(targetId));
-    const result = await FriendshipService.follow(firebaseUser.uid, targetId);
+    const result = await FollowService.addFollow(firebaseUser.uid, targetId);
     if (!result.success) {
       // Geri al
       setFollowedIds(prev => { const n = new Set(prev); n.delete(targetId); return n; });
