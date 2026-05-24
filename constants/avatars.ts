@@ -25,6 +25,10 @@ export const LOCAL_AVATARS: Record<string, ImageSourcePropType> = {
   'avatar_m_8.png': require('../assets/avatars/avatar_m_8.jpg'),
   'avatar_m_9.png': require('../assets/avatars/avatar_m_9.jpg'),
   'avatar_m_10.png': require('../assets/avatars/avatar_m_10.jpg'),
+
+  // ★ v1.7.13.140 (21 May 2026): Sistem odası host avatarı — Soprano resmi logosu.
+  //   Soprano Lobi (system_user) için kullanılır. profile.avatar_url='system_soprano.png'.
+  'system_soprano.png': require('../assets/app_icon.png'),
 };
 
 export const AVATAR_OPTIONS = Object.keys(LOCAL_AVATARS);

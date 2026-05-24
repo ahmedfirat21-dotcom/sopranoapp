@@ -6,7 +6,8 @@
  *   Altyapı Pro (maksimum) kapasiteye göre tasarlanır,
  *   alt paketler bundan kısıtlanarak (filtrelenerek) oluşturulur.
  *
- * 4 Tier: Free / Plus / Pro / GodMaster
+ * 3 Tier: Free / Plus / Pro
+ * (★ v1.7.13.132: GodMaster kaldırıldı — admin yetkisi is_admin → Pro mapping ile)
  * SP tek ekonomi birimi.
  */
 import type { SubscriptionTier, StageLayout, RoomMusicConfig } from '../types';
@@ -14,7 +15,7 @@ import type { SubscriptionTier, StageLayout, RoomMusicConfig } from '../types';
 export type TierName = SubscriptionTier;
 
 // ════════════════════════════════════════════════════════════
-// ABONELİK TIER TANIMLARI (4 Tier: Free / Plus / Pro / GodMaster)
+// ABONELİK TIER TANIMLARI (3 Tier: Free / Plus / Pro)
 // ════════════════════════════════════════════════════════════
 
 export interface TierDefinition {
@@ -63,45 +64,50 @@ export const TIER_DEFINITIONS: Record<SubscriptionTier, TierDefinition> = {
     color: '#F59E0B',
     gradient: ['#F59E0B', '#D97706'],
     monthlyPrice: 99.99,
-    yearlyPrice: 899.99,
+    yearlyPrice: 1079.99, // ★ v1.7.13.140: Play Console canlı fiyatla sync (RC livePrices fallback'i için)
     tagline: 'Sınırsız güç, maksimum prestij',
-  },
-  GodMaster: {
-    name: 'GodMaster',
-    label: 'GodMaster',
-    emoji: '⚡',
-    icon: 'flash',
-    color: '#EF4444',
-    gradient: ['#EF4444', '#B91C1C'],
-    monthlyPrice: 0,
-    yearlyPrice: 0,
-    tagline: 'Sistemin mutlak hâkimi — sınırsız yetki',
   },
 } as const;
 
 /** Sıralı tier listesi (düşükten yükseğe) */
-export const TIER_ORDER: SubscriptionTier[] = ['Free', 'Plus', 'Pro', 'GodMaster'];
+export const TIER_ORDER: SubscriptionTier[] = ['Free', 'Plus', 'Pro'];
 
-/** ★ GodMaster kontrolü — tek helper */
-export function isGodMaster(tier: SubscriptionTier | string): boolean {
-  return tier === 'GodMaster';
+/**
+ * ★ v1.7.13.132: GodMaster KALDIRILDI. Legacy çağrılar için geriye-uyumlu stub.
+ *   Dönen değer artık her zaman false — kullanan kod yolları ölü dal hâline gelir.
+ *   Yeni kodda KULLANMA: is_admin pattern'ini tercih et.
+ */
+export function isGodMaster(_tier: SubscriptionTier | string): boolean {
+  return false;
 }
 
 /**
- * ★ 2026-04-21: Profile'dan efektif tier hesapla — tüm keşfet/oda/SP kontrollerinde
- *   aynı mantık kullanılsın diye merkezi util.
+ * Profile'dan efektif tier hesapla — tüm keşfet/oda/SP kontrollerinde
+ * aynı mantık kullanılsın diye merkezi util.
  *
- *   Öncelik: subscription_tier === 'GodMaster' → GodMaster
- *            is_admin === true                → Pro (admin = yüksek yetki)
+ * ★ v1.7.13.132: GodMaster KALDIRILDI. Admin yetkisi is_admin → Pro mapping ile.
+ *
+ *   Öncelik: is_admin === true                → Pro (admin = en yüksek tier)
  *            subscription_tier set            → kendisi
+ *            'GodMaster' (eski DB satırı)     → Pro (legacy migration)
  *            default                          → Free
  */
-export function getEffectiveTier(profile: { subscription_tier?: string | null; is_admin?: boolean | null } | null | undefined): SubscriptionTier {
+export function getEffectiveTier(profile: { subscription_tier?: string | null; subscription_expires_at?: string | null; is_admin?: boolean | null } | null | undefined): SubscriptionTier {
   if (!profile) return 'Free';
-  if (profile.subscription_tier === 'GodMaster') return 'GodMaster';
   if (profile.is_admin) return 'Pro';
   const t = profile.subscription_tier;
-  if (t === 'Plus' || t === 'Pro' || t === 'Free') return t;
+  if (t === 'GodMaster') return 'Pro'; // legacy DB satırı
+  // ★ v1.7.13.135: Aboneliğin expires_at kontrolü — webhook gecikse bile süresi
+  //   biten Pro/Plus üye otomatik Free davranır. store_purchase RPC v109 zaten
+  //   server-side check ediyor; bu mobile client tarafı (UI + service guard'lar).
+  if (t === 'Plus' || t === 'Pro') {
+    const exp = profile.subscription_expires_at;
+    if (exp && new Date(exp).getTime() <= Date.now()) {
+      return 'Free';
+    }
+    return t;
+  }
+  if (t === 'Free') return 'Free';
   return 'Free';
 }
 
@@ -241,30 +247,6 @@ export const ROOM_TIER_LIMITS: Record<SubscriptionTier, RoomLimits> = {
     canUseFollowersOnly: true,
     ownerLeavePolicy: 'keep_alive',
   },
-  // ★ GodMaster — Mutlak güç, sınırsız her şey
-  GodMaster: {
-    maxSpeakers: 999,
-    maxListeners: 999,
-    maxSpectators: 999,
-    maxCameras: 999,
-    maxModerators: 999,
-    durationHours: 0,           // ★ 7/24 — süresiz
-    dailyRooms: 999,
-    persistent: true,
-    maxPersistentRooms: 999,
-    allowedTypes: ['open', 'closed', 'invite'] as readonly string[],
-    audioSampleRate: 48000,
-    audioChannels: 2,
-    videoMaxRes: 1080,
-    canCustomizeImage: true,
-    canCustomizeTheme: true,
-    canUseAvatarFrame: true,
-    allowedStageLayouts: ['grid', 'spotlight', 'theater'] as readonly StageLayout[],
-    canUseRoomMusic: true,
-    canUseFilters: true,
-    canUseFollowersOnly: true,
-    ownerLeavePolicy: 'keep_alive',
-  },
 } as const;
 
 export const getRoomLimits = (tier: SubscriptionTier = 'Free'): RoomLimits =>
@@ -288,7 +270,6 @@ export const BROADCAST_TIER_LIMITS: Record<SubscriptionTier, BroadcastLimits> = 
   Free:      { canBroadcast: false, durationMinutes: 0,   dailyBroadcasts: 0,   camera: false, screenShare: false, maxCoHosts: 0, canReceiveGifts: false },
   Plus:      { canBroadcast: true,  durationMinutes: 60,  dailyBroadcasts: 3,   camera: true,  screenShare: false, maxCoHosts: 1, canReceiveGifts: true },
   Pro:       { canBroadcast: true,  durationMinutes: 0,   dailyBroadcasts: 999, camera: true,  screenShare: true,  maxCoHosts: 4, canReceiveGifts: true },
-  GodMaster: { canBroadcast: true,  durationMinutes: 0,   dailyBroadcasts: 999, camera: true,  screenShare: true,  maxCoHosts: 999, canReceiveGifts: true },
 } as const;
 
 export const getBroadcastLimits = (tier: SubscriptionTier = 'Free'): BroadcastLimits =>
@@ -337,7 +318,6 @@ export const SUBSCRIPTION_SP_BONUS: Record<SubscriptionTier, number> = {
   Free: 0,
   Plus: 600,        // (eski 300) +2x — 1 ay = 20 SP/gün ekstra
   Pro: 1500,        // (eski 800) +1.9x — 1 ay = 50 SP/gün ekstra
-  GodMaster: 999999,
 };
 
 /**
@@ -377,7 +357,6 @@ export const CHECKIN_MULTIPLIER: Record<SubscriptionTier, number> = {
   Free:      1,
   Plus:      1.25,
   Pro:       2,
-  GodMaster: 10,
 };
 
 /** Check-in ödülünü hesapla
@@ -393,23 +372,11 @@ export function getCheckinReward(streak: number, tier: SubscriptionTier): number
 
 
 // ════════════════════════════════════════════════════════════
-// GİRİŞ EFEKTLERİ & SOHBET RENKLERİ
-// ════════════════════════════════════════════════════════════
-
-export const ENTRY_EFFECT_ACCESS: Record<SubscriptionTier, 'none' | 'basic' | 'plus' | 'pro'> = {
-  Free:      'none',
-  Plus:      'plus',
-  Pro:       'pro',
-  GodMaster: 'pro',
-};
-
-export const CHAT_COLOR_LIMITS: Record<SubscriptionTier, number> = {
-  Free:      0,
-  Plus:      5,
-  Pro:       999,
-  GodMaster: 999,
-};
-
+// ★ v1.7.13.132: ENTRY_EFFECT_ACCESS ve CHAT_COLOR_LIMITS KALDIRILDI.
+//   Bu sabitler tanımlıydı ama hiçbir yerde okunmuyordu (ölü kod).
+//   Tier-gated kozmetik kontrolü `cosmetic_items.min_tier` (DB) +
+//   `store_purchase` RPC `tier_locked` dönüşü ile yapılır — bkz.
+//   supabase/migrations/20260505_v109_fixes_and_tier_lock.sql.
 // ════════════════════════════════════════════════════════════
 // ODA MÜZİĞİ PRESET'LERİ (Pro+ için)
 // ════════════════════════════════════════════════════════════
@@ -456,7 +423,6 @@ export const SEARCH_PRIORITY: Record<SubscriptionTier, number> = {
   Free:      0,
   Plus:      200,
   Pro:       600,
-  GodMaster: 9999,
 };
 
 /**
