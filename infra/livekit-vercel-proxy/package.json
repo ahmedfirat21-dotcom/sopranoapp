@@ -1,0 +1,19 @@
+{
+  "name": "sopranochat-livekit-proxy",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "LiveKit signaling bridge for the legacy video.sopranochat.com endpoint",
+  "scripts": {
+    "dev": "bun --hot server.ts",
+    "start": "bun server.ts",
+    "type-check": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/bun": "1.3.13",
+    "typescript": "6.0.3"
+  },
+  "engines": {
+    "bun": "1.x"
+  }
+}
