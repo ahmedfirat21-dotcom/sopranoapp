@@ -91,8 +91,8 @@ android {
         applicationId 'com.sopranochat'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 236
-        versionName "1.3.52"
+        versionCode 237
+        versionName "1.3.53"
         // ★ 2026-04-27: APK boyutu küçültme — modern Android (2017+) sadece arm64-v8a kullanır.
         //   Bu sayede 4 ayrı mimari yerine 1 mimari APK'ya dahil olur, ~%40-50 boyut tasarrufu.
         //   Eski 32-bit cihazlar (~2017 öncesi <1% pazar payı) düşer.
@@ -127,8 +127,11 @@ android {
             signingConfig signingConfigs.debug
         }
         release {
-            // ★ 2026-04-28: Play Store için upload key. gradle.properties'te key yoksa debug fallback.
-            signingConfig project.hasProperty('SOPRANOCHAT_UPLOAD_STORE_FILE') ? signingConfigs.release : signingConfigs.debug
+            // Play Store için upload key. CI anahtar olmadan imzasız AAB üretir;
+            // paket daha sonra güvenli ortamda yükleme anahtarıyla imzalanır.
+            if (project.hasProperty('SOPRANOCHAT_UPLOAD_STORE_FILE')) {
+                signingConfig signingConfigs.release
+            }
             shrinkResources (findProperty('android.enableShrinkResourcesInReleaseBuilds')?.toBoolean() ?: false)
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
