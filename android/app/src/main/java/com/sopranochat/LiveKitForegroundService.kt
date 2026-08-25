@@ -1,5 +1,6 @@
 package com.sopranochat
 
+import android.Manifest
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -7,6 +8,7 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
@@ -107,15 +109,28 @@ class LiveKitForegroundService : Service() {
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
                 // Android 14+: foregroundServiceType bit-mask zorunlu.
-                // ★ v1.7.13.27 (19 May 2026): CAMERA tipi eklendi — ekran kapaninca
-                //   kamera capture'i durduruluyordu. Mic + Camera + MediaPlayback
-                //   uclusu Clubhouse/Discord standardi (video+sesli oda).
+                // Yalnızca kullanıcının çalışma zamanı iznini verdiği capture tiplerini
+                // etkinleştir. Aksi halde Android 14+ SecurityException fırlatıp tüm
+                // foreground servisini durdurur; dinleyicilerde ses de arka planda kopar.
+                var serviceTypes = ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
+                if (ContextCompat.checkSelfPermission(
+                        this,
+                        Manifest.permission.RECORD_AUDIO
+                    ) == PackageManager.PERMISSION_GRANTED
+                ) {
+                    serviceTypes = serviceTypes or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+                }
+                if (ContextCompat.checkSelfPermission(
+                        this,
+                        Manifest.permission.CAMERA
+                    ) == PackageManager.PERMISSION_GRANTED
+                ) {
+                    serviceTypes = serviceTypes or ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
+                }
                 startForeground(
                     NOTIFICATION_ID,
                     notification,
-                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE or
-                        ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA or
-                        ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
+                    serviceTypes
                 )
             } else {
                 startForeground(NOTIFICATION_ID, notification)

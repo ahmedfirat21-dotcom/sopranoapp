@@ -2351,7 +2351,7 @@ const tr: Record<string, string> = {
   'discover.empty_hint': "Resmi tema odaları ve yeni üyeler yukarıda — sen de Odalarım'dan bir oda aç, hareket başlasın.",
   'notif.new_requests': "{{0}} yeni istek",
   'notif.empty_title': "Bildirim yok",
-  'settings.version_info': "Sürüm: {{0}}\n\nBeta sürümündesin — geri bildirimin için Ayarlar → Destek & İletişim'den bize yazabilirsin.",
+  'settings.version_info': "Sürüm: {{0}}\n\nGeri bildirimin için Ayarlar → Destek & İletişim'den bize yazabilirsin.",
   // ★ v1.7.13.141: messages.tsx hardcoded string düzeltmeleri
   'tabs.messages.053': "Taslak:",
   'tabs.messages.054': "Silinemedi",
@@ -2607,7 +2607,7 @@ const tr: Record<string, string> = {
   'room.id.173': "Giriş Hatası",
   'room.id.174': "İstek Gönderilemedi",
   'settings.001': "Teşhis hatası",
-  'spstore.003': "SP mağazası alfa sürüm süresince kapalı. Yakında Google Play üzerinden aktif olacak!",
+  'spstore.003': "SP mağazası şu anda kullanıma kapalı. Lütfen daha sonra tekrar dene.",
   'spstore.004': "SP ile profilini öne çıkarabilir, oda giriş ücreti ödeyebilir ve premium özelliklere erişebilirsin.",
   'layout.001': "Bağlantı Sorunu",
   'layout.002': "Profilini sunucudan getiremedik. İnternet bağlantını kontrol edip tekrar dene.",

@@ -775,7 +775,7 @@ const en: Record<string, string> = {
   'store.003': "Set Satın Al",  // TODO: translate
   'store.004': "Satın Al",  // TODO: translate
   'store.005': "🚧 Yakında",  // TODO: translate
-  'store.006': "SP satın alma alfa sürüm süresince kapalı. Yakında Google Play üzerinden aktif olacak!",  // TODO: translate
+  'store.006': "SP purchases are currently unavailable. Please try again later.",
   'store.007': "— SETLER · TEMA PAKETLERİ —",  // TODO: translate
   'store.008': "— ÇERÇEVELER · AVATAR —",  // TODO: translate
   'store.009': "— GİRİŞ EFEKTLERİ · ODA —",  // TODO: translate
@@ -2521,7 +2521,7 @@ const en: Record<string, string> = {
   'settings.001': "Diagnostic error",  // translated
   'spstore.001': "SP Store",  // translated
   'spstore.002': "POPULAR",  // translated
-  'spstore.003': "The SP store is closed for the alpha version. It will be active on Google Play soon!",  // translated
+  'spstore.003': "The SP store is currently unavailable. Please try again later.",
   'spstore.004': "With SP, you can make your profile stand out, pay room admission, and access premium features.",  // translated
   'layout.001': "Connection Problem",  // translated
   'layout.002': "We couldn't retrieve your profile from the server. Check your internet connection and try again.",  // translated
@@ -2836,7 +2836,7 @@ const en: Record<string, string> = {
   'notif.empty_title': 'No notifications',
   'notif.new_requests': '{{0}} new requests',
   'rooms.follower_short': 'follower',
-  'settings.version_info': 'Version: {{0}}\n\nYou are on the beta — you can send us feedback via Settings → Support & Contact.',
+  'settings.version_info': 'Version: {{0}}\n\nYou can send us feedback via Settings → Support & Contact.',
   'tabs.messages.058': 'Search chats...',
   'tabs.messages.059': '{{0}} chats',
   'tabs.messages.060': 'Your Chats',
