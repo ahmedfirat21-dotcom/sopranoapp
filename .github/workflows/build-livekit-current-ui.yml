@@ -1,0 +1,34 @@
+name: Build current UI LiveKit test
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - fix/livekit-current-ui
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: gradle
+      - name: Install dependencies
+        run: npm ci
+      - name: Build Android App Bundle
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew bundleRelease --no-daemon
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sopranochat-1.7.13.150-livekit
+          path: android/app/build/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
