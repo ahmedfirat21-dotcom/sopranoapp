@@ -11,26 +11,32 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
           cache: gradle
+
       - name: Install dependencies
         run: npm ci
+
       - name: Generate Android splash resources
         run: node scripts/gen-splash-logo.js
+
       - name: Build Android App Bundle
         working-directory: android
         run: |
           chmod +x gradlew
           ./gradlew bundleRelease --no-daemon
+
       - uses: actions/upload-artifact@v4
         with:
-          name: sopranochat-1.7.13.150-livekit
+          name: sopranochat-1.7.13.151-stable
           path: android/app/build/outputs/bundle/release/app-release.aab
           if-no-files-found: error
