@@ -29,14 +29,16 @@ jobs:
       - name: Generate Android splash resources
         run: node scripts/gen-splash-logo.js
 
-      - name: Build Android App Bundle
+      - name: Build Android test APK and App Bundle
         working-directory: android
         run: |
           chmod +x gradlew
-          ./gradlew bundleRelease --no-daemon
+          ./gradlew assembleRelease bundleRelease --no-daemon
 
       - uses: actions/upload-artifact@v4
         with:
-          name: sopranochat-1.7.13.151-stable
-          path: android/app/build/outputs/bundle/release/app-release.aab
+          name: sopranochat-1.7.13.151-test-apk-aab
+          path: |
+            android/app/build/outputs/apk/release/app-release.apk
+            android/app/build/outputs/bundle/release/app-release.aab
           if-no-files-found: error
