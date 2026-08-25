@@ -25,7 +25,7 @@ EGRESS_BUCKET="room-recordings"
 
 # LiveKit env (livekit-token edge function'ında zaten var; burada egress için)
 # Bunlar zaten Supabase secrets'ta olmalı — eğer değilse doldur
-LIVEKIT_URL=""                                  # wss://<hetzner-ip>:7880
+LIVEKIT_URL=""                                  # wss://<project>.livekit.cloud
 LIVEKIT_API_KEY=""                              # APIxxxxxxxxxxxx (mevcut)
 LIVEKIT_API_SECRET=""                           # secret (mevcut)
 
@@ -93,17 +93,12 @@ echo "    1. https://resend.com → kayıt ol"
 echo "    2. API key oluştur → bu script'e RESEND_API_KEY olarak yapıştır"
 echo "    3. sopranochat.com domain verify et (DNS TXT record)"
 echo ""
-echo "  ✦ Hetzner LiveKit (egress için):"
-echo "    1. SSH'la sunucuya gir: ssh root@<hetzner-ip>"
-echo "    2. \$ docker ps | grep egress  → egress container çalışıyor mu?"
-echo "    3. Yoksa: livekit-egress docker image'ı ekle (livekit-server'la"
-echo "       paralel — mevcut container'ı KAPATMA)"
-echo "    4. /etc/livekit/livekit.yaml içine webhook URL ekle:"
-echo "       webhook:"
-echo "         api_key: \$LIVEKIT_API_KEY"
-echo "         urls:"
-echo "           - https://${PROJECT_REF}.supabase.co/functions/v1/livekit-webhook"
-echo "    5. systemctl reload livekit  (mevcut bağlantılar etkilenmez)"
+echo "  ✦ LiveKit Cloud (egress için):"
+echo "    1. LiveKit Cloud panelinde Egress ve Webhooks ayarlarını aç"
+echo "    2. Webhook URL olarak şunu ekle:"
+echo "       https://${PROJECT_REF}.supabase.co/functions/v1/livekit-webhook"
+echo "    3. LIVEKIT_URL, LIVEKIT_API_KEY ve LIVEKIT_API_SECRET değerlerinin"
+echo "       Supabase secrets içinde güncel olduğunu doğrula"
 echo ""
 echo "  ✦ pg_cron (haftalık digest için, opsiyonel):"
 echo "    Supabase Dashboard → Database → Extensions → pg_cron enable"

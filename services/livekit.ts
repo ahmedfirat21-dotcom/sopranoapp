@@ -6,6 +6,7 @@ import { supabase, SUPABASE_ANON_KEY } from '../constants/supabase';
 import { LIVEKIT_URL, LIVEKIT_TOKEN_ENDPOINT } from '../constants/livekit';
 import { logger } from '../utils/logger';
 import { i18n } from './i18n';
+import { reportNonFatal } from './crashReporting';
 
 let _lk: any = null;
 let _globalsRegistered = false;
@@ -435,7 +436,14 @@ export class LiveKitService {
           continue;
         }
         
-        // Son deneme de baÅarÄ±sÄ±z
+        // Son deneme de başarısız. Kimlik/token göndermeden Crashlytics'e kaydet.
+        reportNonFatal(err, 'livekit_connection_failed', {
+          attempt,
+          room_id_suffix: roomId.slice(-8),
+          platform: Platform.OS,
+          endpoint: 'livekit_cloud',
+        });
+
         if (this.room) {
           try { if (this.room.state === 'connected' || this.room.state === 'reconnecting') this.room.disconnect(); } catch(_) {}
         }

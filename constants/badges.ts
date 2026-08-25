@@ -227,24 +227,6 @@ export const BADGES: Record<string, BadgeDef> = {
       'Topluluğa hizmet kartı',
     ],
   },
-  beta_tester: {
-    id: 'beta_tester',
-    label: 'Beta Testçi',
-    description: 'Erken erişim test ekibinden',
-    icon: 'flask',
-    emoji: '🧪',
-    color: '#8B5CF6',
-    glow: 'rgba(139,92,246,0.5)',
-    rarity: 'rare',
-    criteriaText: 'Kapalı testte yer aldı',
-    spReward: 75,
-    perks: [
-      'Profilde sergilenir',
-      'Erken erişim özellikleri',
-      'Test grubu kartı',
-    ],
-  },
-
   // ── Streak ──
   streak_7: {
     id: 'streak_7',

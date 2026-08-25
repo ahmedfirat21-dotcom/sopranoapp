@@ -92,8 +92,8 @@ android {
         applicationId 'com.sopranochat'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 377
-        versionName "1.7.13.150"
+        versionCode 378
+        versionName "1.7.13.151"
     }
     signingConfigs {
         debug {
@@ -116,6 +116,7 @@ android {
             signingConfig signingConfigs.debug
         }
         release {
+            // Internal App Sharing re-signs every upload with Google's test key.
             signingConfig project.hasProperty('SOPRANOCHAT_UPLOAD_STORE_FILE') ? signingConfigs.release : signingConfigs.debug
             shrinkResources (findProperty('android.enableShrinkResourcesInReleaseBuilds')?.toBoolean() ?: false)
             minifyEnabled enableProguardInReleaseBuilds

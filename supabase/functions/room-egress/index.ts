@@ -1,8 +1,7 @@
 // SopranoChat — Room Recording Egress (Faz 6.2)
 // ═══════════════════════════════════════════════════
 // LiveKit Egress API ile oda audio kaydını başlatır/durdurur.
-// MEVCUT LİVEKİT BAĞLANTISINA DOKUNMAZ — ayrı Server SDK call'u, sadece
-// Hetzner LiveKit'in egress modülünden fayda alır.
+// MEVCUT LİVEKİT BAĞLANTISINA DOKUNMAZ — ayrı Server SDK çağrısıdır.
 //
 // Deploy:
 //   npx supabase functions deploy room-egress --project-ref kpofiuczyjesjlqjxswh
@@ -12,17 +11,14 @@
 //   POST /room-egress { action: 'stop',  room_id, host_id, egress_id }
 //
 // Gerekli env (Functions secrets):
-//   LIVEKIT_URL          → wss://<hetzner-ip>:7880  (token fonksiyonuyla aynı)
+//   LIVEKIT_URL          → wss://<project>.livekit.cloud (token fonksiyonuyla aynı)
 //   LIVEKIT_API_KEY      → APIxxxxxxxxxx           (token fonksiyonuyla aynı)
 //   LIVEKIT_API_SECRET   → secret                  (token fonksiyonuyla aynı)
 //   EGRESS_BUCKET        → 'room-recordings'        (Supabase Storage public bucket; manuel yarat)
 //   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY   → Supabase otomatik enjekte
 //
-// ÖNEMLİ — Hetzner LiveKit Egress modülü:
-//   Self-hosted LiveKit'te egress ayrı bir Docker container olarak çalışır.
-//   Eğer henüz kurulmadıysa: https://docs.livekit.io/realtime/egress/deployment/
-//   Egress container'ı livekit server'a bağlanır, kayıt streamlerini fileSystem
-//   veya S3-compatible storage'a yazar. Supabase Storage S3-compatible'tır.
+// LiveKit Cloud Egress kayıt akışını S3-compatible depolamaya yazar.
+// Supabase Storage S3-compatible'tır.
 
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';

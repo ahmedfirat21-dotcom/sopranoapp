@@ -3,11 +3,8 @@
 // LiveKit server webhook'larını alır. Şu an sadece egress-completed
 // olayını dinler ve room_recordings tablosuna meta yazar.
 //
-// LiveKit konfigürasyon (Hetzner livekit.yaml):
-//   webhook:
-//     api_key: <LIVEKIT_API_KEY>  (token + egress ile aynı)
-//     urls:
-//       - https://kpofiuczyjesjlqjxswh.supabase.co/functions/v1/livekit-webhook
+// LiveKit Cloud panelindeki webhook URL'i:
+//   https://kpofiuczyjesjlqjxswh.supabase.co/functions/v1/livekit-webhook
 //
 // Deploy:
 //   npx supabase functions deploy livekit-webhook --project-ref kpofiuczyjesjlqjxswh
