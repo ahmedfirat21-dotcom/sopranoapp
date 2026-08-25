@@ -22,6 +22,8 @@ jobs:
           cache: gradle
       - name: Install dependencies
         run: npm ci
+      - name: Generate Android splash resources
+        run: node scripts/gen-splash-logo.js
       - name: Build Android App Bundle
         working-directory: android
         run: |
