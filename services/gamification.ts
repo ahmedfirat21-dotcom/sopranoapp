@@ -240,7 +240,7 @@ async function _persistSP(userId: string, amount: number, action: string, extern
       if (!rpcError) {
         const status = (data as any)?.status;
         if (status === 'duplicate') {
-          if (__DEV__) console.log(`[SP] Idempotent skip â aynÄ± external_ref daha Ã¶nce iÅlendi: ${externalRef}`);
+          if (__DEV__) console.log(`[SP] Idempotent skip — aynı external_ref daha önce işlendi: ${externalRef}`);
           return false;
         }
         // â D4: GÃ¼nlÃ¼k cap durumunda kullanÄ±cÄ±ya aÃ§Ä±k bildirim (sessiz fail yerine)

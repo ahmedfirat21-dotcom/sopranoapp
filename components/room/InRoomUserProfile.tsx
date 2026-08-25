@@ -691,8 +691,8 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
     if (!myLiveRoom) {
       setCAlert({
         visible: true,
-        title: '�?nce bir oda aç',
-        message: 'Davet göndermek için açık bir odan olması gerek. �?nce oda aç, sonra davet et.',
+        title: 'Önce bir oda aç',
+        message: 'Davet göndermek için açık bir odan olması gerek. Önce oda aç, sonra davet et.',
         type: 'info',
         buttons: [{ text: 'Tamam', style: 'cancel' }],
       });
@@ -968,7 +968,7 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
                       <Ionicons name="person-add" size={16} color="#F59E0B" />
                       <Text style={sty.incomingText}>
                         <Text style={{ fontWeight: '800', color: '#F1F5F9' }}>{userProfile.display_name}</Text>
-                        {' '}seninle arkada�? olmak istiyor
+                        {' '}seninle arkadaş olmak istiyor
                       </Text>
                     </View>
                     <View style={sty.incomingActions}>

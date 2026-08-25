@@ -79,17 +79,17 @@ function getLK(): any {
           // â AudioSession modÃ¼lÃ¼nÃ¼ sakla â ses iÃ§in kritik
           if (rnLiveKit.AudioSession) {
             _audioSessionModule = rnLiveKit.AudioSession;
-            if (__DEV__) logger.log('[LiveKit] AudioSession modÃ¼lÃ¼ hazÄ±r');
+            if (__DEV__) logger.log('[LiveKit] AudioSession modülü hazır');
           }
           if (__DEV__) logger.log('[LiveKit] setup + registerGlobals baÅarÄ±lÄ±');
         } catch (rgErr) {
-          if (__DEV__) logger.warn('[LiveKit] registerGlobals yÃ¼klenemedi (native modÃ¼l eksik olabilir):', rgErr);
+          if (__DEV__) logger.warn('[LiveKit] registerGlobals yüklenemedi (native modül eksik olabilir):', rgErr);
         }
       }
       _lk = require('livekit-client');
       if (__DEV__) logger.log('[LiveKit] Client lazily loaded');
     } catch (e) {
-      if (__DEV__) logger.warn('[LiveKit] livekit-client yÃ¼klenemedi â mock modda Ã§alÄ±Åacak:', e);
+      if (__DEV__) logger.warn('[LiveKit] livekit-client yüklenemedi — mock modda çalışacak:', e);
       return null;
     }
   }
@@ -263,7 +263,7 @@ export class LiveKitService {
   ): Promise<boolean> {
     const lk = getLK();
     if (!lk) {
-      if (__DEV__) logger.warn('[LiveKit] ModÃ¼l yok, sahte (mock) moda geÃ§iliyor.');
+      if (__DEV__) logger.warn('[LiveKit] Modül yok, sahte (mock) moda geçiliyor.');
       callbacks.onConnectionStateChange?.('connected'); // Mock devrede
       return false; // GerÃ§ek baÄlantÄ± kurulamadÄ±
     }
@@ -289,7 +289,7 @@ export class LiveKitService {
           callbacks.onTrackStateChange?.(this.isMicrophoneEnabled, this.isCameraEnabled);
           this._doEmitParticipantUpdate(lk);
         } catch (e) { if (__DEV__) logger.warn('[LiveKit] reattach state emit error', e); }
-        if (__DEV__) logger.log(`[LiveKit] Reattach â ${roomId} iÃ§in mevcut baÄlantÄ± kullanÄ±ldÄ± (state=${rs})`);
+        if (__DEV__) logger.log(`[LiveKit] Reattach — ${roomId} için mevcut bağlantı kullanıldı (state=${rs})`);
         return true;
       }
       if (__DEV__) logger.log(`[LiveKit] Stale room (state=${rs}) â full reconnect zorlanÄ±yor`);
@@ -538,7 +538,7 @@ export class LiveKitService {
 
   async disconnect(): Promise<void> {
     if (__DEV__) {
-      if (__DEV__) console.log('[LiveKit] DISCONNECT ÃAÄRILDI');
+      if (__DEV__) console.log('[LiveKit] DISCONNECT ÇAĞRILDI');
       if (__DEV__) console.log('[LiveKit] Stack:', new Error().stack?.split('\n').slice(1, 5).join('\n'));
     }
     // â Ekran paylaÅÄ±mÄ± aÃ§Ä±ksa Ã¶nce temizle â referans sÄ±zÄ±ntÄ±sÄ± Ã¶nleme
@@ -612,7 +612,7 @@ export class LiveKitService {
         new Promise((_, reject) => setTimeout(() => reject(new Error('Mic enable timeout (5s)')), 5000)),
       ]);
     } catch (e) {
-      if (__DEV__) logger.warn('[LiveKit] Mikrofon aÃ§ma hatasÄ±:', (e as any)?.message);
+      if (__DEV__) logger.warn('[LiveKit] Mikrofon açma hatası:', (e as any)?.message);
       if (this._isPermissionError(e)) {
         this.onPermissionDenied?.('microphone');
       }
@@ -681,9 +681,9 @@ export class LiveKitService {
         this.room.localParticipant.setCameraEnabled(true, videoConstraints),
         new Promise((_, reject) => setTimeout(() => reject(new Error('Cam enable timeout')), 5000)),
       ]);
-      if (__DEV__) logger.log('[LiveKit] Kamera yeniden aÃ§Ä±ldÄ± â', this._isFrontCamera ? 'Ã¶n' : 'arka');
+      if (__DEV__) logger.log('[LiveKit] Kamera yeniden açıldı →', this._isFrontCamera ? 'ön' : 'arka');
     } catch (e) {
-      if (__DEV__) logger.warn('[LiveKit] Kamera aÃ§ma hatasÄ±:', (e as any)?.message);
+      if (__DEV__) logger.warn('[LiveKit] Kamera açma hatası:', (e as any)?.message);
       if (this._isPermissionError(e)) {
         this.onPermissionDenied?.('camera');
       }
@@ -797,7 +797,7 @@ export class LiveKitService {
         if (__DEV__) logger.log('[LiveKit] flipCamera: restartTrack â', newFacing);
         await videoTrack.restartTrack({ facingMode: newFacing });
         this._isFrontCamera = !this._isFrontCamera;
-        if (__DEV__) logger.log('[LiveKit] flipCamera baÅarÄ±lÄ± (restartTrack) â', this._isFrontCamera ? 'Ã¶n' : 'arka');
+        if (__DEV__) logger.log('[LiveKit] flipCamera başarılı (restartTrack) →', this._isFrontCamera ? 'ön' : 'arka');
         this.emitParticipantUpdate(getLK());
         return;
       }
@@ -811,11 +811,11 @@ export class LiveKitService {
       await new Promise(r => setTimeout(r, 200));
       await lp.setCameraEnabled(true, { facingMode: newFacing });
       
-      if (__DEV__) logger.log('[LiveKit] flipCamera baÅarÄ±lÄ± (republish) â', this._isFrontCamera ? 'Ã¶n' : 'arka');
+      if (__DEV__) logger.log('[LiveKit] flipCamera başarılı (republish) →', this._isFrontCamera ? 'ön' : 'arka');
       this.onTrackStateChange?.(this.isMicrophoneEnabled, true);
       this.emitParticipantUpdate(getLK());
     } catch (e) {
-      if (__DEV__) logger.warn('[LiveKit] Kamera Ã§evirme hatasÄ±:', (e as any)?.message);
+      if (__DEV__) logger.warn('[LiveKit] Kamera çevirme hatası:', (e as any)?.message);
     }
   }
 

@@ -431,14 +431,14 @@ export default function CreateRoomScreen() {
         try {
           uploadedCardUrl = await uploadRoomImage(firebaseUser.uid, cardImage, 'card');
         } catch (e: any) {
-          throw new Error(`Kart g�rseli y�klenemedi: ${e?.message || i18n.t('auto.create_room.024')}`);
+          throw new Error(`Kart görseli yüklenemedi: ${e?.message || i18n.t('auto.create_room.024')}`);
         }
       }
       if (backgroundImage && backgroundImage.startsWith('file://')) {
         try {
           uploadedBgUrl = await uploadRoomImage(firebaseUser.uid, backgroundImage, 'bg');
         } catch (e: any) {
-          throw new Error(`Arka plan g�rseli y�klenemedi: ${e?.message || i18n.t('auto.create_room.023')}`);
+          throw new Error(`Arka plan görseli yüklenemedi: ${e?.message || i18n.t('auto.create_room.023')}`);
         }
       }
 
@@ -611,7 +611,7 @@ export default function CreateRoomScreen() {
       <View style={w.tagSection}>
         <Text style={w.tagSectionLabel}>{i18n.t('createroom.001')}</Text>
         <Text style={w.tagSectionHint}>
-          Odan� 2-30 karakterlik en fazla {MAX_TAGS_PER_ROOM} etiketle tarif et � ke�fette aramay� kolayla�t�r�r.
+          Odanı 2-30 karakterlik en fazla {MAX_TAGS_PER_ROOM} etiketle tarif et — keşfette aramayı kolaylaştırır.
         </Text>
         <View style={w.tagChipsRow}>
           {tags.map(t => (
@@ -1392,7 +1392,7 @@ export default function CreateRoomScreen() {
                 </View>
                 <Text style={{ fontSize: 22, fontWeight: '800', color: '#F1F5F9', marginBottom: 8, textAlign: 'center' }}>{i18n.t('createroom.003')}</Text>
                 <Text style={{ fontSize: 14, color: '#94A3B8', textAlign: 'center', lineHeight: 20, marginBottom: 24 }}>
-                  Bug�n {limits.dailyRooms}/{limits.dailyRooms} oda a�t�n. Yar�n s�f�rlanacak � ya da �yeli�ini y�kselterek daha fazla oda a�.
+                  Bugün {limits.dailyRooms}/{limits.dailyRooms} oda açtın. Yarın sıfırlanacak — ya da üyeliğini yükselterek daha fazla oda aç.
                 </Text>
                 <Pressable
                   onPress={() => {

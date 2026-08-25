@@ -499,7 +499,7 @@ export default function MessagesScreen() {
       // �?? 2026-04-22: Pending mesaj isteklerini paralel çek
       try {
         const reqs = await MessageService.getPendingRequests(firebaseUser.uid);
-        if (__DEV__) console.log('[Messages] pendingRequests for', firebaseUser.uid, '�??', reqs?.length || 0, reqs);
+        if (__DEV__) console.log('[Messages] pendingRequests for', firebaseUser.uid, '→', reqs?.length || 0, reqs);
         setPendingRequests(reqs || []);
       } catch (e: any) {
         if (__DEV__) console.warn('[Messages] getPendingRequests FAILED:', e?.code, e?.message);
