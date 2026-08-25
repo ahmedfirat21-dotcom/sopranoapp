@@ -351,7 +351,7 @@ export default function EntryFeeCard({
                   <>
                     <Ionicons name="enter" size={16} color="#FFF" style={iconShadow} />
                     <Text style={styles.btnPrimaryText}>
-                      {fee.toLocaleString(i18n.locale)} SP Ãde + Gir
+                      {fee.toLocaleString(i18n.locale)} SP Öde + Gir
                     </Text>
                   </>
                 )}
