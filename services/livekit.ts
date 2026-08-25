@@ -132,7 +132,7 @@ async function fetchToken(roomId: string, userId: string, displayName: string): 
   } catch (networkErr: any) {
     // â Network hatasÄ± (DNS, timeout, offline) â detaylÄ± log
     if (__DEV__) logger.warn('[LiveKit] Token fetch network error:', networkErr?.message);
-    throw new Error(`AÄ hatasÄ±: ${networkErr?.message || i18n.t('auto.livekit.009')}`);
+    throw new Error(`Ağ hatası: ${networkErr?.message || i18n.t('auto.livekit.009')}`);
   }
 
   if (!response.ok) {

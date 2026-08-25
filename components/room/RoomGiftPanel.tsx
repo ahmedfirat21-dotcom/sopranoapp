@@ -312,7 +312,7 @@ export default function RoomGiftPanel({
     DeviceEventEmitter.emit('room_gift_local', {
       id: optimisticId,
       itemId: item.id,
-      emoji: item.art_emoji || 'â¨',
+      emoji: item.art_emoji || '✨',
       color: item.art_color || '#FBBF24',
       itemName: item.name,
       senderName: 'Sen',
@@ -440,7 +440,7 @@ export default function RoomGiftPanel({
                     : selectedRecipientId
                       ? (() => {
                           const r = recipients.find(x => x.id === selectedRecipientId);
-                          return r ? `â ${r.display_name}` : i18n.t('auto.room.RoomGiftPanel.002', { 0: recipients.length });
+                          return r ? `→ ${r.display_name}` : i18n.t('auto.room.RoomGiftPanel.002', { 0: recipients.length });
                         })()
                       : i18n.t('auto.room.RoomGiftPanel.001', { 0: recipients.length })}
                 </Text>

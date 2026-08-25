@@ -97,9 +97,9 @@ const DonationAlert = forwardRef<DonationAlertRef>((_, ref) => {
       }} />
       <Text style={[s.text, { color: '#F8FAFC' }]} numberOfLines={1}>
         <Text style={{ fontWeight: '900', color: tv.glow }}>{data.senderName}</Text>
-        <Text>{' â '}</Text>
+        <Text>{' → '}</Text>
         <Text style={{ fontWeight: '900' }}>{data.recipientName || '...'}</Text>
-        <Text style={{ color: 'rgba(255,255,255,0.55)' }}>{'  â¢  '}</Text>
+        <Text style={{ color: 'rgba(255,255,255,0.55)' }}>{'  •  '}</Text>
         <Text style={{ fontWeight: '900', color: tv.glow }}>{data.amount.toLocaleString(i18n.locale)} SP</Text>
       </Text>
     </Animated.View>

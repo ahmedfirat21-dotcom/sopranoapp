@@ -449,7 +449,7 @@ export default function StageSupportSheet({
                   transform: [{ translateX: tx }, { translateY: ty }, { scale }],
                 }}
               >
-                <Text style={[styles.driftParticle, { color: palette.accent }]} allowFontScaling={false}>â¦</Text>
+                <Text style={[styles.driftParticle, { color: palette.accent }]} allowFontScaling={false}>✦</Text>
               </Animated.View>
             );
           })}
