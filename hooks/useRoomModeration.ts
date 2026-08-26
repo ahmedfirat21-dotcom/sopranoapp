@@ -82,19 +82,21 @@ export function useRoomModeration({
       return;
     }
     try {
-      // ★ Sahneye davet gönder — direkt promote yerine
+      await RoomService.promoteSpeaker(roomId, userId, firebaseUser?.uid);
       modChannelRef.current?.send({
         type: 'broadcast', event: 'mod_action',
         payload: {
-          action: 'stage_invite',
+          action: 'promote',
           targetUserId: userId,
-          inviterName: profile?.display_name || firebaseUser?.displayName || 'Moderatör',
         },
       });
+      setParticipants(prev => prev.map(p => p.user_id === userId
+        ? { ...p, role: 'speaker' as const, is_muted: false, stage_expires_at: null }
+        : p));
       setSelectedUser(null);
-      showToast({ title: '📨 Sahne Daveti Gönderildi', message: `${displayName} sahneye davet edildi.`, type: 'success' });
+      showToast({ title: '🎙️ Sahneye Alındı', message: `${displayName} artık konuşmacı.`, type: 'success' });
     } catch (e) {
-      showToast({ title: 'Davet Gönderilemedi', message: `${displayName} sahneye davet edilemedi.`, type: 'error' });
+      showToast({ title: 'Sahneye Alınamadı', message: `${displayName} sahneye alınamadı.`, type: 'error' });
     }
   }, [roomId, room, participants, modChannelRef, profile, firebaseUser]);
 

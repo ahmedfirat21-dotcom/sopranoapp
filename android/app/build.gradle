@@ -92,8 +92,8 @@ android {
         applicationId 'com.sopranochat'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 378
-        versionName "1.7.13.151"
+        versionCode 380
+        versionName "1.7.13.153"
     }
     signingConfigs {
         debug {

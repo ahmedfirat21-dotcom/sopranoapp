@@ -14,6 +14,13 @@ import type { SubscriptionTier, StageLayout, RoomMusicConfig } from '../types';
 
 export type TierName = SubscriptionTier;
 
+/**
+ * Yeni Plus/Pro abonelik satışı kapalıdır. RevenueCat yalnızca SP paketlerinin
+ * Google Play ödemesi için kullanılmaya devam eder. Eski abonelik kayıtları
+ * rozet/geçmiş uyumluluğu için korunur; uygulama yetkileri üyeliğe bağlanmaz.
+ */
+export const MEMBERSHIPS_ENABLED = false;
+
 // ════════════════════════════════════════════════════════════
 // ABONELİK TIER TANIMLARI (3 Tier: Free / Plus / Pro)
 // ════════════════════════════════════════════════════════════
@@ -113,6 +120,7 @@ export function getEffectiveTier(profile: { subscription_tier?: string | null; s
 
 /** Tier karşılaştırma: userTier >= requiredTier mi? */
 export function isTierAtLeast(userTier: SubscriptionTier, requiredTier: SubscriptionTier): boolean {
+  if (!MEMBERSHIPS_ENABLED) return true;
   return TIER_ORDER.indexOf(userTier) >= TIER_ORDER.indexOf(requiredTier);
 }
 
@@ -177,63 +185,63 @@ export const ROOM_TIER_LIMITS: Record<SubscriptionTier, RoomLimits> = {
     // ★ 2026-04-24 (v3): Free esnetildi — "tap taze platform" stratejisi.
     //   Kullanıcı ücretsiz planla rahat hissetmeli, Plus ekstra güç verir.
     // ★ 2026-05-06 (v110): Free oda süresi 24sa — gün boyu açık kalsın, sonra kapansın.
-    maxSpeakers: 5,
-    maxListeners: 15,
-    maxSpectators: 40,
-    maxCameras: 2,
-    maxModerators: 0,
-    durationHours: 3,    // ★ v110.14: Free 24 → 3 saat (kullanıcı talebi)
-    dailyRooms: 5,
+    maxSpeakers: 20,
+    maxListeners: 999,
+    maxSpectators: 999,
+    maxCameras: 10,
+    maxModerators: 20,
+    durationHours: 0,
+    dailyRooms: 999,
     persistent: false,
     maxPersistentRooms: 0,
-    allowedTypes: ['open', 'closed'] as readonly string[], // ★ Şifreli (parola korumalı) Free'de açıldı
-    audioSampleRate: 24000,
-    audioChannels: 1,
-    videoMaxRes: 720,
-    canCustomizeImage: false,
-    canCustomizeTheme: false,
+    allowedTypes: ['open', 'closed', 'invite'] as readonly string[],
+    audioSampleRate: 48000,
+    audioChannels: 2,
+    videoMaxRes: 1080,
+    canCustomizeImage: true,
+    canCustomizeTheme: true,
     canUseAvatarFrame: true,      // ★ Temel avatar çerçevesi Free'de
-    allowedStageLayouts: ['grid'] as readonly StageLayout[],
-    canUseRoomMusic: false,
+    allowedStageLayouts: ['grid', 'spotlight', 'theater'] as readonly StageLayout[],
+    canUseRoomMusic: true,
     canUseFilters: true,           // ★ Yaş/dil filtresi Free'de
-    canUseFollowersOnly: false,
+    canUseFollowersOnly: true,
     ownerLeavePolicy: 'close',
   },
   Plus: {
-    maxSpeakers: 8,
-    maxListeners: 25,
-    maxSpectators: 200,
-    maxCameras: 6,
-    maxModerators: 2,
-    durationHours: 8,    // ★ v110.14: Plus 12 → 8 saat (kullanıcı talebi)
-    dailyRooms: 10,
-    persistent: true,
-    maxPersistentRooms: 3,
+    maxSpeakers: 20,
+    maxListeners: 999,
+    maxSpectators: 999,
+    maxCameras: 10,
+    maxModerators: 20,
+    durationHours: 0,
+    dailyRooms: 999,
+    persistent: false,
+    maxPersistentRooms: 0,
     allowedTypes: ['open', 'closed', 'invite'] as readonly string[],
-    audioSampleRate: 32000,
-    audioChannels: 1,
-    videoMaxRes: 720,
+    audioSampleRate: 48000,
+    audioChannels: 2,
+    videoMaxRes: 1080,
     canCustomizeImage: true,
     canCustomizeTheme: true,
     canUseAvatarFrame: true,
-    allowedStageLayouts: ['grid', 'spotlight'] as readonly StageLayout[],
-    canUseRoomMusic: false,
+    allowedStageLayouts: ['grid', 'spotlight', 'theater'] as readonly StageLayout[],
+    canUseRoomMusic: true,
     canUseFilters: true,
     // ★ 2026-04-27: Plus'a açıldı — "Sadece Arkadaşlar" oda yönetim aracı (kim girebilir engeli),
     //   monetizasyon değil. +18/kilit/dil ile aynı sınıfta. Pro tier ekstra olarak müzik/stereo ile ayrışır.
     canUseFollowersOnly: true,
-    ownerLeavePolicy: 'keep_alive',
+    ownerLeavePolicy: 'close',
   },
   Pro: {
-    maxSpeakers: 13,
+    maxSpeakers: 20,
     maxListeners: 999,          // ★ Sınırsız dinleyici
     maxSpectators: 999,         // ★ Sınırsız seyirci
     maxCameras: 10,
-    maxModerators: 5,
+    maxModerators: 20,
     durationHours: 0,           // ★ 7/24 açık
     dailyRooms: 999,
-    persistent: true,
-    maxPersistentRooms: 999,
+    persistent: false,
+    maxPersistentRooms: 0,
     allowedTypes: ['open', 'closed', 'invite'] as readonly string[],
     audioSampleRate: 48000,
     audioChannels: 2,           // ★ Stereo ses
@@ -245,7 +253,7 @@ export const ROOM_TIER_LIMITS: Record<SubscriptionTier, RoomLimits> = {
     canUseRoomMusic: true,
     canUseFilters: true,
     canUseFollowersOnly: true,
-    ownerLeavePolicy: 'keep_alive',
+    ownerLeavePolicy: 'close',
   },
 } as const;
 
@@ -267,8 +275,8 @@ export interface BroadcastLimits {
 }
 
 export const BROADCAST_TIER_LIMITS: Record<SubscriptionTier, BroadcastLimits> = {
-  Free:      { canBroadcast: false, durationMinutes: 0,   dailyBroadcasts: 0,   camera: false, screenShare: false, maxCoHosts: 0, canReceiveGifts: false },
-  Plus:      { canBroadcast: true,  durationMinutes: 60,  dailyBroadcasts: 3,   camera: true,  screenShare: false, maxCoHosts: 1, canReceiveGifts: true },
+  Free:      { canBroadcast: true,  durationMinutes: 0,   dailyBroadcasts: 999, camera: true,  screenShare: true,  maxCoHosts: 4, canReceiveGifts: true },
+  Plus:      { canBroadcast: true,  durationMinutes: 0,   dailyBroadcasts: 999, camera: true,  screenShare: true,  maxCoHosts: 4, canReceiveGifts: true },
   Pro:       { canBroadcast: true,  durationMinutes: 0,   dailyBroadcasts: 999, camera: true,  screenShare: true,  maxCoHosts: 4, canReceiveGifts: true },
 } as const;
 

@@ -38,7 +38,6 @@ const layoutAnim = () => LayoutAnimation.configureNext({
 
 // ═══ Sabitler ═══
 const SPEAKING_MODES = [
-  { id: 'free_for_all', label: 'Serbest' },
   { id: 'permission_only', label: i18n.t('room.roomoverlays.001') },
   { id: 'selected_only', label: i18n.t('room.roomoverlays.002') },
 ] as const;
@@ -132,6 +131,7 @@ type PlusMenuProps = {
   onMuteAll?: () => void;
   onUnmuteAll?: () => void;
   onRoomStats?: () => void;
+  onEndRoom?: () => void;
   onDeleteRoom?: () => void;
   onBoostRoom?: () => void;
   /** ★ v92 (1 May 2026): Güçlendiriciler sheet'i açar — Süre Uzat, Altın Davet, vb. */
@@ -308,7 +308,7 @@ export function PlusMenu({
   isRoomLocked, micRequestCount, accessRequestCount,
   userRole = 'listener',
   ownerTier = 'Free',
-  onMuteAll, onUnmuteAll, onRoomStats, onDeleteRoom,
+  onMuteAll, onUnmuteAll, onRoomStats, onEndRoom, onDeleteRoom,
   onBoostRoom, onPowerUps, onShowFollowers, onToggleFollow, isFollowingRoom,
   settingsConfig,
   followerCount = 0,
@@ -508,22 +508,22 @@ export function PlusMenu({
     if (!sc) return null;
     return (
       <View style={st.subWrap}>
-        <SettingChips icon="globe-outline" label="Oda Tipi" options={ROOM_TYPES.map(t => ({ id: t.id, label: t.label }))} value={sc.roomType} onSelect={can('Plus') ? sc.onRoomTypeChange : undefined} locked={!can('Plus')} lockTier="Plus" />
-        {sc.roomType === 'closed' && can('Plus') && (
+        <SettingChips icon="globe-outline" label="Oda Tipi" options={ROOM_TYPES.map(t => ({ id: t.id, label: t.label }))} value={sc.roomType} onSelect={sc.onRoomTypeChange} />
+        {sc.roomType === 'closed' && (
           <>
             <View style={st.sep} />
             <InlineTextEditor icon="key-outline" label={i18n.t('room.roomoverlays.028')} value={sc.roomPassword || ''} onSave={sc.onPasswordChange || (() => {})} placeholder="Min 4 karakter" accent="#F59E0B" secureTextEntry maxLength={20} />
           </>
         )}
         <View style={st.sep} />
-        <SettingToggle icon={isRoomLocked ? 'lock-closed' : 'lock-open-outline'} label={i18n.t('room.roomoverlays.029')} value={!!isRoomLocked} onValueChange={onRoomLock ? () => onRoomLock() : undefined} accent="#F59E0B" locked={!can('Plus')} lockTier="Plus" />
+        <SettingToggle icon={isRoomLocked ? 'lock-closed' : 'lock-open-outline'} label={i18n.t('room.roomoverlays.029')} value={!!isRoomLocked} onValueChange={onRoomLock ? () => onRoomLock() : undefined} accent="#F59E0B" />
         <View style={st.sep} />
-        <SettingToggle icon="warning-outline" label={i18n.t('room.roomoverlays.030')} value={sc.ageRestricted} onValueChange={can('Plus') ? sc.onAgeRestrictedChange : undefined} accent="#EF4444" locked={!can('Plus')} lockTier="Plus" />
+        <SettingToggle icon="warning-outline" label={i18n.t('room.roomoverlays.030')} value={sc.ageRestricted} onValueChange={sc.onAgeRestrictedChange} accent="#EF4444" />
         <View style={st.sep} />
-        <SettingChips icon="language-outline" label="Dil Filtresi" options={LANGUAGES.map(l => ({ id: l.id, label: l.label }))} value={sc.roomLanguage} onSelect={can('Plus') ? sc.onLanguageChange : undefined} locked={!can('Plus')} lockTier="Plus" />
+        <SettingChips icon="language-outline" label="Dil Filtresi" options={LANGUAGES.map(l => ({ id: l.id, label: l.label }))} value={sc.roomLanguage} onSelect={sc.onLanguageChange} />
         <View style={st.sep} />
         {/* ★ 2026-04-27: Pro → Plus indirildi — oda yönetim aracı (kim girebilir engeli). */}
-        <SettingToggle icon="people-outline" label={i18n.t('room.roomoverlays.031')} value={sc.followersOnly} onValueChange={can('Plus') ? sc.onToggleFollowersOnly : undefined} accent="#A78BFA" locked={!can('Plus')} lockTier="Plus" />
+        <SettingToggle icon="people-outline" label={i18n.t('room.roomoverlays.031')} value={sc.followersOnly} onValueChange={sc.onToggleFollowersOnly} accent="#A78BFA" />
       </View>
     );
   };
@@ -540,7 +540,7 @@ export function PlusMenu({
         {/* ── Owner Kontrolleri ── */}
         {showOwnerControls && (
           <>
-            <SettingChips icon="mic-outline" label={i18n.t('room.roomoverlays.032')} options={SPEAKING_MODES.map(m => ({ id: m.id, label: m.label }))} value={sc!.speakingMode} onSelect={(v: any) => { if (v === 'selected_only' && !can('Pro')) return; sc!.onSpeakingModeChange(v); }} />
+            <SettingChips icon="mic-outline" label={i18n.t('room.roomoverlays.032')} options={SPEAKING_MODES.map(m => ({ id: m.id, label: m.label }))} value={sc!.speakingMode} onSelect={(v: any) => sc!.onSpeakingModeChange(v)} />
             <View style={st.sep} />
           </>
         )}
@@ -548,8 +548,8 @@ export function PlusMenu({
         {/* ── Mod Kontrolleri (owner+mod) ── */}
         {showModControls && (
           <>
-            <SettingChips icon="timer-outline" label="Slow Mode" options={SLOW_MODES.map(s => ({ id: s, label: s === 0 ? 'Yok' : `${s}s` }))} value={sc!.slowModeSeconds} onSelect={can('Plus') ? sc!.onSlowModeChange : undefined} locked={!can('Plus')} lockTier="Plus" />
-            {onMuteAll && can('Pro') && (
+            <SettingChips icon="timer-outline" label="Slow Mode" options={SLOW_MODES.map(s => ({ id: s, label: s === 0 ? 'Yok' : `${s}s` }))} value={sc!.slowModeSeconds} onSelect={sc!.onSlowModeChange} />
+            {onMuteAll && (
               <>
                 <View style={st.sep} />
                 <Pressable style={({ pressed }) => [st.actionBtn, pressed && { opacity: 0.7 }]} onPress={() => { onMuteAll(); onClose(); }}>
@@ -558,7 +558,7 @@ export function PlusMenu({
                 </Pressable>
               </>
             )}
-            {onUnmuteAll && can('Pro') && (
+            {onUnmuteAll && (
               <>
                 <View style={st.sep} />
                 <Pressable style={({ pressed }) => [st.actionBtn, pressed && { opacity: 0.7 }]} onPress={() => { onUnmuteAll(); onClose(); }}>
@@ -965,6 +965,18 @@ export function PlusMenu({
     });
   }
 
+  // Clubhouse yaşam döngüsü: sahibi ve moderatör odayı herkes için bitirebilir.
+  if ((isOwner || isMod) && onEndRoom) {
+    items.push({
+      id: 'end-room',
+      icon: 'stop-circle-outline',
+      label: 'Odayı Bitir',
+      accent: '#EF4444',
+      onPress: () => { onClose(); onEndRoom(); },
+      destructive: true,
+    });
+  }
+
   // Odayı Sil — yalnız asıl sahip; geçici host göremez
   if (isOwner && !isTempHost && onDeleteRoom) {
     items.push({ id: 'delete', icon: 'trash-outline', label: i18n.t('rooms.menu.delete'), accent: '#EF4444', onPress: () => { onDeleteRoom(); onClose(); }, destructive: true });
@@ -1020,7 +1032,17 @@ export function PlusMenu({
           </Pressable>
         </View>
 
-        <ScrollView ref={scrollRef} bounces={false} showsVerticalScrollIndicator={true} scrollIndicatorInsets={{ right: 1 }} contentContainerStyle={{ paddingVertical: 4, paddingBottom: 12 }} nestedScrollEnabled>
+        <ScrollView
+          ref={scrollRef}
+          bounces={false}
+          showsVerticalScrollIndicator={true}
+          scrollIndicatorInsets={{ right: 1 }}
+          contentContainerStyle={{ paddingVertical: 4, paddingBottom: 12 + insets.bottom }}
+          nestedScrollEnabled
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          automaticallyAdjustKeyboardInsets
+        >
           {items.map((item, i) => {
             const isExpanded = expandedId === item.id;
             return (

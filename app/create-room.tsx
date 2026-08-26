@@ -85,9 +85,8 @@ const CATEGORIES = [
 // ? 2026-04-25: ROOM_TYPES kald�r�ld� � constants/audience.ts AUDIENCE_OPTIONS
 
 const SPEAKING_MODES = [
-  { id: 'free_for_all',    labelKey: 'create.speak.free.label',       icon: 'people',            descKey: 'create.speak.free.desc',       minTier: 'Free' as const },
   { id: 'permission_only', labelKey: 'create.speak.permission.label', icon: 'hand-left',         descKey: 'create.speak.permission.desc', minTier: 'Free' as const },
-  { id: 'selected_only',   labelKey: 'create.speak.selected.label',   icon: 'shield-checkmark',  descKey: 'create.speak.selected.desc',   minTier: 'Pro' as const },
+  { id: 'selected_only',   labelKey: 'create.speak.selected.label',   icon: 'shield-checkmark',  descKey: 'create.speak.selected.desc',   minTier: 'Free' as const },
 ];
 
 // ===================================================================
@@ -182,7 +181,7 @@ export default function CreateRoomScreen() {
   const [mode, setMode] = useState<'audio' | 'video'>('audio');
   const [description, setDescription] = useState('');
   const [password, setPassword] = useState('');
-  const [speakingMode, setSpeakingMode] = useState<'free_for_all' | 'permission_only' | 'selected_only'>('permission_only');
+  const [speakingMode, setSpeakingMode] = useState<'permission_only' | 'selected_only'>('permission_only');
   const [entryFee, setEntryFee] = useState(0);
   const [donationsEnabled, setDonationsEnabled] = useState(false);
   // ? 2026-04-20: +18 oda kurulumda set edilebilsin (eskiden sonradan PlusMenu'den yapmak gerekiyordu)
@@ -660,7 +659,7 @@ export default function CreateRoomScreen() {
       {AUDIENCE_OPTIONS.map(opt => {
         // ? 2026-04-27: 'invite' VE 'followers' modu Plus+ tier gerektiriyor.
         //   followers = "Sadece Arkada�lar" � premium oda y�netim arac�.
-        const requiredTier: TierName | null = (opt.mode === 'invite' || opt.mode === 'followers') ? 'Plus' : null;
+        const requiredTier: TierName | null = null;
         const locked = requiredTier ? !isTierEnough(tier, requiredTier) : false;
         const active = audienceMode === opt.mode;
         return (
@@ -801,12 +800,6 @@ export default function CreateRoomScreen() {
     // Se�ilen moda g�re "dinleyicinin ekranda ne g�rece�i" preview'u
     const preview = (() => {
       switch (speakingMode) {
-        case 'free_for_all':
-          return {
-            icon: 'mic' as const, color: '#14B8A6',
-            title: i18n.t('createroom.013'),
-            body: i18n.t('auto.create_room.012'),
-          };
         case 'permission_only':
           return {
             icon: 'hand-left' as const, color: '#F59E0B',
@@ -1392,18 +1385,14 @@ export default function CreateRoomScreen() {
                 </View>
                 <Text style={{ fontSize: 22, fontWeight: '800', color: '#F1F5F9', marginBottom: 8, textAlign: 'center' }}>{i18n.t('createroom.003')}</Text>
                 <Text style={{ fontSize: 14, color: '#94A3B8', textAlign: 'center', lineHeight: 20, marginBottom: 24 }}>
-                  Bugün {limits.dailyRooms}/{limits.dailyRooms} oda açtın. Yarın sıfırlanacak — ya da üyeliğini yükselterek daha fazla oda aç.
+                  Oda oluşturma şu anda tamamlanamadı. Lütfen kısa süre sonra yeniden dene.
                 </Text>
                 <Pressable
                   onPress={() => {
-                    // ? 2026-04-23: �nce sheet'i kapat, sonra /plus'a y�nlendir.
-                    //   UpsellService tetiklemeye gerek yok � kullan�c� zaten upgrade sayfas�na gidiyor.
                     Animated.parallel([
                       Animated.timing(translateY, { toValue: SCREEN_H, duration: 220, useNativeDriver: true }),
                       Animated.timing(backdropOpacity, { toValue: 0, duration: 200, useNativeDriver: true }),
-                    ]).start(() => {
-                      router.replace('/plus' as any);
-                    });
+                    ]).start(() => closeSheetRef.current());
                   }}
                   style={({ pressed }) => [{ width: '100%', borderRadius: 14, overflow: 'hidden' }, pressed && { opacity: 0.85 }]}
                 >
@@ -1412,8 +1401,8 @@ export default function CreateRoomScreen() {
                     start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                     style={{ paddingVertical: 14, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 }}
                   >
-                    <Ionicons name="rocket" size={18} color="#FFF" />
-                    <Text style={{ color: '#FFF', fontWeight: '800', fontSize: 15 }}>{i18n.t('createroom.022')}</Text>
+                    <Ionicons name="refresh" size={18} color="#FFF" />
+                    <Text style={{ color: '#FFF', fontWeight: '800', fontSize: 15 }}>Daha Sonra Tekrar Dene</Text>
                   </LinearGradient>
                 </Pressable>
                 <Pressable onPress={() => closeSheetRef.current()} style={{ marginTop: 12, paddingVertical: 12 }}>
@@ -1560,11 +1549,10 @@ export default function CreateRoomScreen() {
             <Pressable
               onPress={() => {
                 if (dailyLimitReached) {
-                  // ? 2026-04-23: Limit dolu � sheet kapan + /plus'a git
                   Animated.parallel([
                     Animated.timing(translateY, { toValue: SCREEN_H, duration: 220, useNativeDriver: true }),
                     Animated.timing(backdropOpacity, { toValue: 0, duration: 200, useNativeDriver: true }),
-                  ]).start(() => router.replace('/plus' as any));
+                  ]).start(() => closeSheetRef.current());
                 } else {
                   handleCreate();
                 }

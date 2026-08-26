@@ -362,7 +362,7 @@ export default function StoreScreen() {
   const router = useRouter();
   const { profile, firebaseUser, refreshProfile } = useAuth();
   const sp = (profile as any)?.system_points || 0;
-  // ★ v108.21: Tier indirimi — Plus %10, Pro %20 (★ v1.7.13.132: GodMaster kaldırıldı)
+  // Eski üyelerin kazanılmış indirimi korunur; yeni üyelik satışı yapılmaz.
   const tier = (profile as any)?.subscription_tier;
   const expires = (profile as any)?.subscription_expires_at;
   const tierActive = !expires || new Date(expires) > new Date();
@@ -651,22 +651,7 @@ export default function StoreScreen() {
       });
       setInventory((prev) => new Set(prev).add(item.id));
     } else if ((r as any).tier_locked) {
-      const reqTier = (r as any).required_tier || 'Plus';
-      setConfirmAlert({
-        visible: true,
-        title: i18n.t('auto.store.024', { 0: reqTier }),
-        message: i18n.t('auto.store.023', { 0: item.name, 1: reqTier, 2: reqTier }),
-        buttons: [
-          { text: i18n.t('auto.store.022'), style: 'cancel', onPress: () => setConfirmAlert(p => ({ ...p, visible: false })) },
-          {
-            text: i18n.t('auto.store.021', { 0: reqTier }), style: 'default', icon: 'star',
-            onPress: () => {
-              setConfirmAlert(p => ({ ...p, visible: false }));
-              router.push('/plus' as any);
-            },
-          },
-        ],
-      });
+      showToast({ title: 'Tekrar dene', message: 'Bu ürün artık SP ile herkese açık. Mağazayı yenileyip yeniden dene.', type: 'info' });
     } else {
       showToast({
         title: 'Hata',
@@ -1095,8 +1080,8 @@ export default function StoreScreen() {
               <Text style={s.tierHeaderSub}>{i18n.t('store.019')}</Text>
             </View>
 
-            {/* Premium Bonus banner */}
-            <Pressable style={s.spBonusBanner} onPress={() => router.push('/plus' as any)}>
+            {/* Tek ekonomi modeli: SP satın al, hediyelerde ve mağazada kullan. */}
+            <View style={s.spBonusBanner}>
               <LinearGradient
                 colors={['rgba(20,184,166,0.14)', 'rgba(20,184,166,0.04)']}
                 start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
@@ -1108,15 +1093,11 @@ export default function StoreScreen() {
                 }} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={s.spBonusTitle}>Premium Bonus</Text>
-                <Text style={s.spBonusDesc}>
-                  {tierDiscountPct >= 20 ? i18n.t('auto.store.009', { 0: tier })
-                    : tierDiscountPct >= 10 ? i18n.t('auto.store.008', { 0: tier })
-                    : 'Plus ile %10, Pro ile %20 ekstra SP kazan'}
-                </Text>
+                <Text style={s.spBonusTitle}>SP & Hediyeler</Text>
+                <Text style={s.spBonusDesc}>SP satın al; hediyelerde ve mağaza ürünlerinde kullan.</Text>
               </View>
-              <Ionicons name="chevron-forward" size={15} color="rgba(255,255,255,0.4)" />
-            </Pressable>
+              <Ionicons name="gift-outline" size={17} color="rgba(255,255,255,0.55)" />
+            </View>
 
             {spPacks.map((pack) => (
               <SPPackRow
@@ -1217,7 +1198,6 @@ export default function StoreScreen() {
         // ★ v109.5: Sheet'in "Satın Al"ı PremiumAlert atlayıp direkt purchase yapar.
         //   Sheet ZATEN onaydır — fiyat, indirim, bakiye hep görünür. İkinci modal friction.
         onPurchase={(it) => { setPreviewItem(null); executePurchase(it); }}
-        onUpgradeTier={() => router.push('/plus' as any)}
       />
     </AppBackground>
   );
@@ -2261,7 +2241,7 @@ const s = StyleSheet.create({
   tierHeaderSymbol: { fontSize: 24, marginBottom: 6, color: '#FBBF24' },
   tierHeaderTitle: { color: '#fff', fontFamily: serif, fontSize: 18, fontWeight: '700', letterSpacing: 1 },
   tierHeaderSub: { color: 'rgba(251,191,36,0.7)', fontSize: 9, letterSpacing: 2.5, marginTop: 4, fontWeight: '600' },
-  // ★ v300: Premium Bonus banner (SP paketlerinin üstünde, üyelik gate)
+  // SP ve hediye ekonomisi bilgi bandı.
   spBonusBanner: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
     paddingHorizontal: 12, paddingVertical: 10,
