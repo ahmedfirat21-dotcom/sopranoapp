@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - fix/livekit-current-ui
+      - test/1.7.13.153-build380
 
 jobs:
   android:
