@@ -920,7 +920,6 @@ export default function HomeScreen() {
       const gate = await RoomService.canCreateToday(firebaseUser.uid, userTier);
       if (!gate.ok) {
         showToast({ title: i18n.t('tabs.home.004'), message: i18n.t('auto.tabs.home.010'), type: 'warning' });
-        setTimeout(() => router.push('/plus' as any), 400);
         return;
       }
       const displayName = profile?.display_name || firebaseUser.displayName || i18n.t('auto.tabs.home.009');
@@ -2026,20 +2025,11 @@ export default function HomeScreen() {
           onBoost={async (tier: BoostTier) => {
             if (!profile?.id) return;
             try {
-              const tierName = (profile as any)?.subscription_tier;
-              const isPlus = tierName === 'Plus' || tierName === 'Pro' || (profile as any)?.is_admin;
-              if (!isPlus) {
-                showToast({ title: i18n.t('boost.plus_required_title'), message: i18n.t('boost.plus_required_msg'), type: 'info' });
-                setTimeout(() => router.push('/plus' as any), 800);
-                throw new Error('plus_required');
-              }
               await ProfileService.boostProfile(profile.id, tier.cost, tier.duration);
               await refreshProfile();
               showToast({ title: i18n.t('boost.activated_title'), message: i18n.t('boost.activated_msg', { duration: tier.duration }), type: 'success' });
             } catch (err: any) {
-              if (err?.message !== 'plus_required') {
-                showToast({ title: i18n.t('boost.error_title'), message: err.message || i18n.t('boost.error_msg'), type: 'error' });
-              }
+              showToast({ title: i18n.t('boost.error_title'), message: err.message || i18n.t('boost.error_msg'), type: 'error' });
               throw err;
             }
           }}
@@ -2876,4 +2866,3 @@ const s = StyleSheet.create({
     marginLeft: 4,
   },
 });
-

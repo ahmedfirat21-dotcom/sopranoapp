@@ -14,7 +14,7 @@
  *  - İsim (serif), kategori meta + nadirlik chip, tagline
  *  - Fiyat bloku: orijinal + indirim chip'leri + final fiyat
  *  - Günün Fırsatı: gece yarısına kadar kalan saat:dk countdown
- *  - Footer: "Satın Al — XXX SP" (sahip ise disabled "Sahipsin", tier-lock ise "Plus Üyelik Gerekli")
+ *  - Footer: "Satın Al — XXX SP" (sahip ise disabled "Sahipsin")
  *
  * Parent (store.tsx, collection/[id].tsx) sadece sheet'i açar; gerçek satın alma
  * akışı hâlâ parent'ta kalır (StoreService.purchase + success modal).
@@ -50,9 +50,6 @@ function categoryLabel(cat: string): string {
   return i18n.t('auto.store.StoreItemPreviewSheet.006');
 }
 
-// ★ v1.7.13.132: GodMaster kaldırıldı — 3 tier
-const TIER_RANK: Record<string, number> = { Free: 0, Plus: 1, Pro: 2 };
-
 interface Props {
   visible: boolean;
   item: CosmeticItem | null;
@@ -71,13 +68,11 @@ interface Props {
   onClose: () => void;
   /** Satın al butonu — parent'ta gerçek StoreService.purchase çağrılır */
   onPurchase: (item: CosmeticItem) => void;
-  /** Plus/Pro yükseltme CTA — tier-lock durumunda */
-  onUpgradeTier?: (requiredTier: string) => void;
 }
 
 export default function StoreItemPreviewSheet({
   visible, item, dailyDeal, tierDiscountPct, currentTier, spBalance, owned,
-  purchasing, onClose, onPurchase, onUpgradeTier,
+  purchasing, onClose, onPurchase,
 }: Props) {
   const insets = useSafeAreaInsets();
   const PANEL_HEIGHT = 580 + Math.max(insets.bottom, 0);
@@ -138,9 +133,8 @@ export default function StoreItemPreviewSheet({
   const rarityLabel = rarity ? RARITY_LABEL[rarity] : '';
   const artColor = item.art_color || rarityColor;
 
-  // Tier-lock kontrolü — min_tier rank > currentTier rank
-  const minTier = item.min_tier || null;
-  const tierLocked = !!(minTier && minTier !== 'Free' && (TIER_RANK[currentTier] ?? 0) < (TIER_RANK[minTier] ?? 0));
+  // Üyelik satışı kaldırıldı: tüm kozmetikler SP ile herkese açıktır.
+  const tierLocked = false;
 
   const heroScale = heroBreath.interpolate({ inputRange: [0, 1], outputRange: [1.0, 1.05] });
 
@@ -202,12 +196,6 @@ export default function StoreItemPreviewSheet({
               <Text style={[s.rarityChipText, { color: rarityColor }]}>{rarityLabel}</Text>
             </View>
           ) : null}
-          {minTier && minTier !== 'Free' && (
-            <View style={[s.rarityChip, { borderColor: 'rgba(34,211,238,0.5)', backgroundColor: 'rgba(34,211,238,0.10)' }]}>
-              <Ionicons name="diamond" size={9} color="#22D3EE" />
-              <Text style={[s.rarityChipText, { color: '#22D3EE' }]}>{minTier}+</Text>
-            </View>
-          )}
         </View>
         <Text style={s.itemName} numberOfLines={2}>{item.name}</Text>
         {item.tagline ? (
@@ -277,14 +265,6 @@ export default function StoreItemPreviewSheet({
               <Ionicons name="checkmark-circle" size={18} color="#5DCAA5" />
               <Text style={[s.actionText, { color: '#5DCAA5' }]}>Sahipsin</Text>
             </View>
-          ) : tierLocked ? (
-            <Pressable
-              onPress={() => { onClose(); setTimeout(() => onUpgradeTier?.(minTier!), 200); }}
-              style={({ pressed }) => [s.actionBtn, { backgroundColor: '#0A0F1A', borderColor: '#22D3EE' }, pressed && { opacity: 0.85 }]}
-            >
-              <Ionicons name="diamond" size={16} color="#22D3EE" />
-              <Text style={[s.actionText, { color: '#22D3EE' }]}>{minTier}{i18n.t('auto.store.StoreItemPreviewSheet.003')}</Text>
-            </Pressable>
           ) : insufficientSP ? (
             <View style={[s.actionBtn, { backgroundColor: 'rgba(248,113,113,0.12)', borderColor: 'rgba(248,113,113,0.5)' }]}>
               <Ionicons name="alert-circle" size={16} color="#F87171" />

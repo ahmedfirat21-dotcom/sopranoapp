@@ -753,9 +753,7 @@ export default function ProfileScreen() {
               modern 2-col aksiyon satırı. Boost (Plus kilitli) sola, SP Cüzdan sağa.
               ★ v1.7.13.52 (20 May 2026): Boost aktifse "Boost Aktif" + kalan süre
               gösterilir; CTA mesajı yanlış sinyal vermez. */}
-          {/* ★ v1.7.13.137: Free user için kart görünür (Spotify/Discord pattern) —
-              gri tonlu + 🔒 ikon + altyazı "Plus üyelik gerek". Tıklayınca direkt
-              üyelik panele → conversion fırsatı. Toast+timeout patterni kaldırıldı. */}
+          {/* Boost herkes için SP ile kullanılabilir. */}
           {(() => {
             const boostExpStr = (profile as any)?.profile_boost_expires_at as string | null | undefined;
             const boostExpMs = boostExpStr ? new Date(boostExpStr).getTime() : 0;
@@ -768,7 +766,7 @@ export default function ProfileScreen() {
                   ? i18n.t('tabs.profile.032', { 0: remainingHours, 1: remainingMinutes })
                   : i18n.t('tabs.profile.033', { 0: remainingMinutes }))
               : null;
-            const isFreeLocked = !isBoostActive && !isTierAtLeast(subscriptionTier, 'Plus');
+            const isFreeLocked = false;
             return (
           <View style={p.actionRow}>
             <Pressable
@@ -780,10 +778,8 @@ export default function ProfileScreen() {
               onPress={() => {
                 if (isBoostActive) {
                   showToast({ title: i18n.t('tabs.profile.030'), message: i18n.t('tabs.profile.031', { 0: remainingLabel || '' }), type: 'success' });
-                } else if (isTierAtLeast(subscriptionTier, 'Plus')) {
-                  setShowBoostPicker(true);
                 } else {
-                  router.push('/plus' as any);
+                  setShowBoostPicker(true);
                 }
               }}
               accessibilityLabel={isBoostActive ? i18n.t('tabs.profile.035', { 0: remainingLabel || '' }) : isFreeLocked ? i18n.t('tabs.profile.034') : t('profile.menu.boost')}
@@ -885,14 +881,6 @@ export default function ProfileScreen() {
               pointerEvents="none"
             />
             {/* ★ v108.20: Header'dan taşınan navigation satırları */}
-            <PremiumListItem
-              icon="crown-outline"
-              iconColor="#FBBF24"
-              label={t('profile.menu.premium')}
-              badge={t('profile.menu.vip_badge')}
-              badgeColor="#FBBF24"
-              onPress={() => router.push('/plus' as any)}
-            />
             <PremiumListItem
               icon="storefront-outline"
               iconColor="#FBBF24"
@@ -1737,4 +1725,3 @@ const styles = StyleSheet.create({
 });
 
 // (spHistStyles → components/profile/SPHistorySheet.tsx'e taşındı)
-

@@ -126,12 +126,6 @@ const SETTING_GROUPS: { titleKey: string; icon: string; color: string; items: Se
     ],
   },
   {
-    titleKey: 'settings.section.subscription', icon: 'credit-card', color: ACCENT,
-    items: [
-      { key: 'restore_purchases', icon: 'refresh', labelKey: 'settings.restore_purchases', descKey: 'settings.restore_purchases_desc', type: 'action' },
-    ],
-  },
-  {
     titleKey: 'settings.section.session', icon: 'logout-variant', color: ACCENT_DANGER,
     items: [
       { key: 'logout', icon: 'logout-variant', labelKey: 'settings.logout', type: 'action', danger: true },

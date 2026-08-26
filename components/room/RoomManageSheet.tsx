@@ -693,8 +693,7 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
           <View style={{ flexDirection: 'row', gap: 3, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
             {AUDIENCE_OPTIONS.map(opt => {
               // ★ 2026-04-27: 'invite' ve 'followers' Plus+ tier — oda yönetim araçları.
-              const requiresPlus = opt.mode === 'invite' || opt.mode === 'followers';
-              const locked = requiresPlus && !can('Plus');
+              const locked = false;
               const active = audienceMode === opt.mode;
               // ★ 2026-04-27: Kilit açıkken audience seçenekleri grileşir + tıklanamaz.
               //   "Önce kilidi kapat" mantığı — yoksa kullanıcı audience değiştirip "neden hala
@@ -769,11 +768,8 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
         )
       )}
 
-      {/* Kilit â€” Plus+ */}
-      {can('Plus') ? (
-        <Row icon="lock-closed" bg="rgba(245,158,11,0.2)" label={isLocked ? 'Oda Kilitli' : i18n.t('auto.room.RoomManageSheet.043')} desc={isLocked ? i18n.t('auto.room.RoomManageSheet.042') : i18n.t('auto.room.RoomManageSheet.041')}
-          right={<Switch value={isLocked} onValueChange={(v) => { setIsLocked(v); RoomService.setRoomLock(room.id, v).then(() => broadcastSettingsChange({ room_settings: { is_locked: v } })).catch(() => {}); }} trackColor={{ false: 'rgba(255,255,255,0.08)', true: 'rgba(245,158,11,0.4)' }} thumbColor={isLocked ? '#F59E0B' : '#475569'} />} />
-      ) : <LockedRow label="Oda Kilitleme" tier="Plus" />}
+      <Row icon="lock-closed" bg="rgba(245,158,11,0.2)" label={isLocked ? 'Oda Kilitli' : i18n.t('auto.room.RoomManageSheet.043')} desc={isLocked ? i18n.t('auto.room.RoomManageSheet.042') : i18n.t('auto.room.RoomManageSheet.041')}
+        right={<Switch value={isLocked} onValueChange={(v) => { setIsLocked(v); RoomService.setRoomLock(room.id, v).then(() => broadcastSettingsChange({ room_settings: { is_locked: v } })).catch(() => {}); }} trackColor={{ false: 'rgba(255,255,255,0.08)', true: 'rgba(245,158,11,0.4)' }} thumbColor={isLocked ? '#F59E0B' : '#475569'} />} />
 
       {/* â˜… Eylem CTA'ları â€” RoomSettingsSheet ile birebir aynı gradient stili */}
       <View style={{ marginTop: 10, gap: 6 }}>
@@ -836,9 +832,9 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
       <Row icon="mic-circle" bg="rgba(20,184,166,0.25)" label={speakingMode === 'free_for_all' ? i18n.t('auto.room.RoomManageSheet.040') : speakingMode === 'selected_only' ? i18n.t('auto.room.RoomManageSheet.039') : i18n.t('auto.room.RoomManageSheet.038')} desc={speakingMode === 'free_for_all' ? i18n.t('auto.room.RoomManageSheet.037') : speakingMode === 'selected_only' ? i18n.t('auto.room.RoomManageSheet.036') : i18n.t('auto.room.RoomManageSheet.035')}
         right={
           <View style={{ flexDirection: 'row', gap: 3 }}>
-            {(['free_for_all', 'permission_only', 'selected_only'] as const).map(m => {
-              const locked = m === 'selected_only' && !can('Pro');
-              const labels: Record<string, string> = { free_for_all: 'Serbest', permission_only: i18n.t('auto.room.RoomManageSheet.034'), selected_only: i18n.t('auto.room.RoomManageSheet.033') };
+            {(['permission_only', 'selected_only'] as const).map(m => {
+              const locked = false;
+              const labels: Record<string, string> = { permission_only: i18n.t('auto.room.RoomManageSheet.034'), selected_only: i18n.t('auto.room.RoomManageSheet.033') };
               return (
                 <Pressable key={m} style={[p.pill, speakingMode === m && p.pillActive, locked && { opacity: 0.35 }]}
                   onPress={() => { if (locked) { showToast({ title: i18n.t('room.roommanagesheet.039'), type: 'info' }); return; } setSpeakingMode(m); updateRS('speaking_mode', m); }}>
@@ -850,8 +846,6 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
         }
       />
 
-      {/* Sahne Düzeni â€” Plus+ locked */}
-      {!can('Plus') && <LockedRow label={i18n.t('room.roommanagesheet.050')} tier="Plus" />}
     </View>
   );
 
@@ -873,9 +867,7 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
         }
       />
 
-      {/* Dil Filtresi â€” Plus+ */}
-      {can('Plus') ? (
-        <Row icon="globe" bg="rgba(192,192,192,0.2)" label={`Oda Dili: ${({ tr: i18n.t('auto.room.RoomManageSheet.031'), en: 'English', de: 'Deutsch', ar: 'Ø§Ù„Ø¹Ø±Ø¨ÙŠØ©' } as any)[roomLang] || roomLang}`} desc="Oda dil tercihini belirle"
+      <Row icon="globe" bg="rgba(192,192,192,0.2)" label={`Oda Dili: ${({ tr: i18n.t('auto.room.RoomManageSheet.031'), en: 'English', de: 'Deutsch', ar: 'Ø§Ù„Ø¹Ø±Ø¨ÙŠØ©' } as any)[roomLang] || roomLang}`} desc="Oda dil tercihini belirle"
           right={
             <View style={{ flexDirection: 'row', gap: 3 }}>
               {['tr', 'en', 'de', 'ar'].map(l => (
@@ -886,22 +878,14 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
             </View>
           }
         />
-      ) : <LockedRow label="Dil Filtresi" tier="Plus" />}
 
-      {/* Yaş Filtresi (+18) â€” Plus+ */}
-      {can('Plus') ? (
-        <Row icon="warning" bg={ageRestricted ? 'rgba(239,68,68,0.2)' : 'rgba(192,192,192,0.2)'} label={ageRestricted ? i18n.t('auto.room.RoomManageSheet.030') : i18n.t('auto.room.RoomManageSheet.029')} desc={ageRestricted ? i18n.t('auto.room.RoomManageSheet.028') : i18n.t('auto.room.RoomManageSheet.027')}
+      <Row icon="warning" bg={ageRestricted ? 'rgba(239,68,68,0.2)' : 'rgba(192,192,192,0.2)'} label={ageRestricted ? i18n.t('auto.room.RoomManageSheet.030') : i18n.t('auto.room.RoomManageSheet.029')} desc={ageRestricted ? i18n.t('auto.room.RoomManageSheet.028') : i18n.t('auto.room.RoomManageSheet.027')}
           right={<Switch value={ageRestricted} onValueChange={(v) => { setAgeRestricted(v); updateRS('age_restricted', v); }} trackColor={{ false: 'rgba(255,255,255,0.08)', true: 'rgba(239,68,68,0.4)' }} thumbColor={ageRestricted ? '#EF4444' : '#475569'} />} />
-      ) : <LockedRow label={i18n.t('room.roommanagesheet.052')} tier="Plus" />}
+
 
       {/* ★ 2026-04-25: "Takipçilere Özel" switch kaldırıldı —
            audienceMode='followers' ile birleştirildi (Genel sekme, Erişim seçeneği). */}
 
-      {/* Tümünü Sustur â€” Pro locked */}
-      {!can('Pro') && <LockedRow label={i18n.t('room.roommanagesheet.053')} tier="Pro" />}
-
-      {/* Gelişmiş Ban â€” Pro locked */}
-      {!can('Pro') && <LockedRow label={i18n.t('room.roommanagesheet.054')} tier="Pro" />}
 
       {/* ��� BANLI KULLANICILAR ��� */}
       <View style={{ marginTop: 12 }}>
@@ -1136,7 +1120,6 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
         right={<View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: 'rgba(139,92,246,0.12)' }}><Text style={{ fontSize: 8, fontWeight: '700', color: '#A78BFA' }}>{limits.maxCameras || '-'}</Text></View>} />
       <Row icon="time" bg="rgba(245,158,11,0.2)" label="Oda Suresi" desc={limits.durationHours === 0 ? 'Suresiz' : `Maks ${limits.durationHours} saat`}
         right={<View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: 'rgba(245,158,11,0.12)' }}><Text style={{ fontSize: 8, fontWeight: '700', color: '#F59E0B' }}>{limits.durationHours === 0 ? '\u221e' : `${limits.durationHours}sa`}</Text></View>} />
-      {!can('Pro') && <LockedRow label="13 Kisilik Sahne" tier="Pro" />}
     </View>
     );
   };
@@ -1265,7 +1248,13 @@ export default function RoomManageSheet({ visible, room, hostId, ownerTier, onCl
         </ScrollView>
 
         {/* Content */}
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: 30 }}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: 30 + insets.bottom }}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          automaticallyAdjustKeyboardInsets
+        >
           {renderContent()}
         </ScrollView>
       </Animated.View>
@@ -1466,4 +1455,3 @@ const p = StyleSheet.create({
     borderWidth: 1, borderColor: 'rgba(20,184,166,0.18)',
   },
 });
-

@@ -12,7 +12,7 @@ import { getBlockedUserIds } from './blocklist';
 import { hashPassword as hashRoomPassword } from './roomAccess';
 import { RateLimitService } from './rateLimit';
 import { isSystemRoom } from './showcaseRooms';
-import { getRoomLimits, isTierAtLeast, getTierLevel } from '../constants/tiers';
+import { getRoomLimits, isTierAtLeast } from '../constants/tiers';
 import type {
   Profile, Room, RoomParticipant, RoomSettings,
   SubscriptionTier,
@@ -931,9 +931,9 @@ export const RoomService = {
       theme_id:         limits.canCustomizeTheme ? options.theme_id         : undefined,
       followers_only:   limits.canUseFollowersOnly ? options.followers_only : undefined,
       age_restricted:   limits.canUseFilters ? options.age_restricted       : undefined,
-      // ★ speaking_mode 'selected_only' Pro+ gerek (diğer modlar Free OK)
-      speaking_mode: (options.speaking_mode === 'selected_only' && !isTierAtLeast(normalizedTier, 'Pro'))
-        ? undefined : options.speaking_mode,
+      // Clubhouse modeli: dinleyici doğrudan sahneye çıkmaz; el kaldırır.
+      speaking_mode: options.speaking_mode === 'free_for_all'
+        ? 'permission_only' : options.speaking_mode,
       // Pro+ monetizasyon
       entry_fee_sp:       isTierAtLeast(normalizedTier, 'Pro') ? options.entry_fee_sp       : undefined,
       donations_enabled:  isTierAtLeast(normalizedTier, 'Pro') ? options.donations_enabled  : undefined,
@@ -1275,26 +1275,6 @@ export const RoomService = {
       }
     }
 
-    // ★ v319.7 (18 May 2026): Persist cooldown restore — re-join'de eski cooldown
-    //   varsa stage_expires_at'i geri yükle. Memory: "odadan çıkıp girince sayaç
-    //   sıfırlanmamalı".
-    let _restoreCooldown: string | null = null;
-    try {
-      const { data: cd } = await supabase
-        .from('room_stage_cooldowns')
-        .select('cooldown_until')
-        .eq('room_id', roomId)
-        .eq('user_id', userId)
-        .maybeSingle();
-      if (cd?.cooldown_until && new Date(cd.cooldown_until).getTime() > Date.now()) {
-        _restoreCooldown = cd.cooldown_until as string;
-      } else if (cd) {
-        // Süresi geçmiş — temizle
-        await supabase.from('room_stage_cooldowns')
-          .delete().eq('room_id', roomId).eq('user_id', userId);
-      }
-    } catch { /* tablo yoksa sessiz */ }
-
     // ★ BUG FIX: is_muted default role'a göre.
     // Eskiden hepsi is_muted=true → owner/mod/speaker rejoin sonrası mic görsel
     // olarak "muted" görünüyordu (SpeakerSection dbMuted kontrolü UI'ı kapatıyor).
@@ -1308,7 +1288,7 @@ export const RoomService = {
         user_id: userId,
         role,
         is_muted: false,
-        ...(_restoreCooldown ? { stage_expires_at: _restoreCooldown } : null),
+        stage_expires_at: null,
       })
       .select('*, user:profiles!user_id(*)')
       .single();
@@ -1366,28 +1346,10 @@ export const RoomService = {
     // BUG-RD7 FIX: Önce rolü kontrol et, sadece listener/spectator ise sayacı azalt
     const { data: participant } = await supabase
       .from('room_participants')
-      .select('role, stage_expires_at')
+      .select('role')
       .eq('room_id', roomId)
       .eq('user_id', userId)
       .maybeSingle();
-
-    // ★ v319.7 (18 May 2026): Sahne cooldown persist — kullanıcı feedback:
-    //   "sahneye çıktıktan sonra sahneden inen kullanıcı için sayaç sorunu,
-    //   odadan çıkıp yeniden girince sayaç sıfırlanıyor". Eskiden leave DELETE
-    //   ediyordu → cooldown info kaybolur. Şimdi cooldown ileri tarihteyse
-    //   row korunup persist_cooldowns tablosuna yedeklenir (re-join'de geri okunur).
-    const hasActiveCooldown = !!participant?.stage_expires_at
-      && new Date(participant.stage_expires_at).getTime() > Date.now();
-    if (hasActiveCooldown) {
-      // Cooldown'u kalıcı tabloya yedekle (DELETE'ten sonra okuyabilmek için)
-      try {
-        await supabase.from('room_stage_cooldowns').upsert({
-          user_id: userId,
-          room_id: roomId,
-          cooldown_until: participant!.stage_expires_at,
-        }, { onConflict: 'user_id,room_id' });
-      } catch { /* tablo yoksa veya RLS engellerse sessiz */ }
-    }
 
     // Katılımcıyı sil
     await supabase
@@ -1516,7 +1478,7 @@ export const RoomService = {
       if (s.entry_fee_sp && !isTierAtLeast(effectiveTier, 'Pro')) delete s.entry_fee_sp;
       if (s.donations_enabled && !isTierAtLeast(effectiveTier, 'Pro')) delete s.donations_enabled;
       if (s.music_link && !tLimits.canUseRoomMusic) delete s.music_link;
-      if (s.speaking_mode === 'selected_only' && !isTierAtLeast(effectiveTier, 'Pro')) delete s.speaking_mode;
+      if (s.speaking_mode === 'free_for_all') s.speaking_mode = 'permission_only';
     }
     if ((updates as any).theme_id !== undefined && !tLimits.canCustomizeTheme) {
       delete (updates as any).theme_id;
@@ -1793,26 +1755,7 @@ export const RoomService = {
    * ★ B4 FIX: speaking_mode backend kontrolü eklendi.
    */
   async requestToSpeak(roomId: string, userId: string): Promise<void> {
-    // ★ B4 FIX: speaking_mode kontrolü
-    const { data: roomData } = await supabase
-      .from('rooms')
-      .select('room_settings, host_id')
-      .eq('id', roomId)
-      .single();
-    const settings = (roomData?.room_settings || {}) as any;
-    const speakingMode = settings.speaking_mode || 'permission_only';
-
-    if (speakingMode === 'selected_only' && roomData?.host_id !== userId) {
-      throw new Error(i18n.t('auto.room.010'));
-    }
-
-    // free_for_all modunda direkt speaker yap (onay gerekmez)
-    if (speakingMode === 'free_for_all') {
-      await this.promoteSpeaker(roomId, userId);
-      return;
-    }
-
-    // permission_only: Normal el kaldırma akışı
+    // Clubhouse modeli: dinleyici doğrudan sahneye çıkamaz; her zaman el kaldırır.
     await supabase
       .from('room_participants')
       .update({ role: 'pending_speaker', hand_raised_at: new Date().toISOString() })
@@ -1831,22 +1774,11 @@ export const RoomService = {
       .select('*, user:profiles!user_id(*)')
       .eq('room_id', roomId)
       .eq('role', 'pending_speaker')
+      .order('hand_raised_at', { ascending: true, nullsFirst: false })
       .order('joined_at', { ascending: true });
     if (error) throw error;
 
-    const participants = (data || []) as (RoomParticipant & { user?: Profile })[];
-
-    // subscription_tier bazlı sıralama (Pro > Plus > Free)
-    participants.sort((a, b) => {
-      const aTier = migrateLegacyTier((a.user as any)?.subscription_tier || (a.user as any)?.tier);
-      const bTier = migrateLegacyTier((b.user as any)?.subscription_tier || (b.user as any)?.tier);
-      const aLevel = getTierLevel(aTier);
-      const bLevel = getTierLevel(bTier);
-      if (aLevel !== bLevel) return bLevel - aLevel; // Yüksek tier önce
-      return 0; // Aynı tier → joined_at sırasını koru
-    });
-
-    return participants;
+    return (data || []) as (RoomParticipant & { user?: Profile })[];
   },
 
   /**
@@ -1880,13 +1812,14 @@ export const RoomService = {
     return (data as number) || 0;
   },
 
-  async promoteSpeaker(roomId: string, userId: string): Promise<void> {
+  async promoteSpeaker(roomId: string, userId: string, executorId?: string): Promise<void> {
     // ★ 2026-04-29: RPC ZORUNLU. Fallback direct UPDATE v19 trigger'a yakalanıyor
     //   ("Role değişikliği reddedildi" hatası). RPC fail ederse net mesaj göster.
     try {
       const { error } = await supabase.rpc('promote_speaker_atomic', {
         p_room_id: roomId,
         p_user_id: userId,
+        p_executor_id: executorId,
       });
       if (!error) return;
       if (__DEV__) console.warn('[promoteSpeaker] RPC error:', error.message);

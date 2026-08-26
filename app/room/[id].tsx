@@ -490,7 +490,7 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
   const windowH = Dimensions.get('window').height;
   // ★ PlusMenu ile birebir aynı boyut — ROOM_TOP_GAP=70, ROOM_BOTTOM_GAP=90
   // PlusMenu top/bottom window bazlı, DM panel de window bazlı hesaplamalı
-  const REST_BOTTOM = 90; // PlusMenu: Math.max(insets.bottom + 8, 90)
+  const REST_BOTTOM = Math.max(bottomInset + 8, 90); // Alt kontrol çubuğu + cihaz safe-area
   const REST_TOP = 70;    // PlusMenu: Math.max(insets.top + 12, 70)
   const restHeight = windowH - REST_BOTTOM - REST_TOP;
   const dmPanelBottomAnim = useRef(new Animated.Value(REST_BOTTOM)).current;
@@ -501,22 +501,38 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
   useEffect(() => {
     if (chatTarget) {
       const fullScreenH = Dimensions.get('screen').height;
-      dmPanelBottomAnim.setValue(REST_BOTTOM);
-      dmPanelHeightAnim.setValue(fullScreenH - REST_BOTTOM - REST_TOP);
+      const liveWindowH = Dimensions.get('window').height;
+      const metrics = (Keyboard as any).metrics?.();
+      if (metrics?.height > 0) {
+        const keyboardTop = metrics.screenY || (fullScreenH - metrics.height);
+        const parentBottomY = Math.min(fullScreenH, liveWindowH);
+        dmPanelBottomAnim.setValue(Platform.OS === 'android' ? Math.max(0, parentBottomY - keyboardTop) : metrics.height);
+        dmPanelHeightAnim.setValue(Math.max(Math.min(parentBottomY, keyboardTop) - REST_TOP, 240));
+      } else {
+        dmPanelBottomAnim.setValue(REST_BOTTOM);
+        dmPanelHeightAnim.setValue(Math.max(liveWindowH - REST_BOTTOM - REST_TOP, 240));
+      }
     }
-  }, [chatTarget?.userId]);
+  }, [chatTarget?.userId, REST_BOTTOM, REST_TOP, dmPanelBottomAnim, dmPanelHeightAnim]);
   useEffect(() => {
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
     const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
     const showSub = Keyboard.addListener(showEvent, (e) => {
       const fullScreenH = Dimensions.get('screen').height;
+      const liveWindowH = Dimensions.get('window').height;
       const reportedH = e.endCoordinates.height || 0;
-      const calcH = fullScreenH - (e.endCoordinates.screenY || fullScreenH);
+      const keyboardTop = e.endCoordinates.screenY || (fullScreenH - reportedH);
+      const calcH = fullScreenH - keyboardTop;
       const kbHeight = Math.max(reportedH, calcH, 0);
       if (Platform.OS === 'android') {
-        // Android adjustResize: pencere küçülüyor, bottom=0 yeterli
-        dmPanelBottomAnim.setValue(0);
-        dmPanelHeightAnim.setValue(Dimensions.get('window').height - REST_TOP);
+        // Android 15/16 edge-to-edge cihazlarda adjustResize davranışı üreticiye göre
+        // değişebiliyor. Bazı cihazlarda window küçülürken bazılarında klavye pencerenin
+        // üstüne biniyor. İki durumda da panelin ALT kenarını keyboardTop'a sabitle.
+        const parentBottomY = Math.min(fullScreenH, liveWindowH);
+        const targetBottom = Math.max(0, parentBottomY - keyboardTop);
+        const visibleBottomY = Math.min(parentBottomY, keyboardTop);
+        dmPanelBottomAnim.setValue(targetBottom);
+        dmPanelHeightAnim.setValue(Math.max(visibleBottomY - REST_TOP, 240));
       } else {
         const newBottom = kbHeight;
         const newHeight = Math.max(fullScreenH - kbHeight - REST_TOP, 240);
@@ -524,24 +540,33 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
         dmPanelHeightAnim.setValue(newHeight);
       }
     });
+    let hideTimer: ReturnType<typeof setTimeout> | null = null;
     const hideSub = Keyboard.addListener(hideEvent, () => {
-      const fullScreenH = Dimensions.get('screen').height;
-      const rH = fullScreenH - REST_BOTTOM - REST_TOP;
-      Animated.parallel([
-        Animated.timing(dmPanelBottomAnim, {
-          toValue: REST_BOTTOM,
-          duration: 150,
-          useNativeDriver: false,
-        }),
-        Animated.timing(dmPanelHeightAnim, {
-          toValue: rH,
-          duration: 150,
-          useNativeDriver: false,
-        }),
-      ]).start();
+      // Android'de keyboardDidHide olayı ile window ölçüsünün eski haline dönmesi aynı
+      // frame'de olmayabiliyor. Bir sonraki layout turunda gerçek pencereyi yeniden ölç.
+      hideTimer = setTimeout(() => {
+        const liveWindowH = Dimensions.get('window').height;
+        const rH = Math.max(liveWindowH - REST_BOTTOM - REST_TOP, 240);
+        Animated.parallel([
+          Animated.timing(dmPanelBottomAnim, {
+            toValue: REST_BOTTOM,
+            duration: 150,
+            useNativeDriver: false,
+          }),
+          Animated.timing(dmPanelHeightAnim, {
+            toValue: rH,
+            duration: 150,
+            useNativeDriver: false,
+          }),
+        ]).start();
+      }, Platform.OS === 'android' ? 40 : 0);
     });
-    return () => { showSub.remove(); hideSub.remove(); };
-  }, [REST_BOTTOM]);
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+      if (hideTimer) clearTimeout(hideTimer);
+    };
+  }, [REST_BOTTOM, REST_TOP, dmPanelBottomAnim, dmPanelHeightAnim]);
 
   // ★ Swipe-to-dismiss — sağa sürükle
   const { translateValue: dmSwipeX, panHandlers: dmPanHandlers } = useSwipeToDismiss({
@@ -1159,6 +1184,8 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
                 windowSize={7}
                 maxToRenderPerBatch={10}
                 removeClippedSubviews
+                keyboardShouldPersistTaps="handled"
+                keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
                 renderItem={({ item }) => {
                   const isMine = item.sender_id === firebaseUser?.uid;
                   const isDeletedForEveryone = !!item.deleted_for_everyone;
@@ -1364,6 +1391,7 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
             <View style={{
               flexDirection: 'column', alignItems: 'stretch', gap: 0,
               paddingHorizontal: 10, paddingVertical: 8,
+              flexShrink: 0,
               borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.06)',
               backgroundColor: 'rgba(30,40,50,0.5)',
             }}>
@@ -2320,7 +2348,7 @@ export default function RoomScreen() {
       // ★ Speaking mode — room_settings'ten oku (oda oluşturma ayarı yansısın)
       const savedMode = roomData.room_settings?.speaking_mode;
       if (savedMode && ['free_for_all', 'permission_only', 'selected_only'].includes(savedMode)) {
-        setSpeakingMode(savedMode);
+        setSpeakingMode(savedMode === 'free_for_all' ? 'permission_only' : savedMode);
       }
       // ★ Takipçi sayısını çek
       RoomFollowService.getFollowerCount(roomData.id).then(c => setFollowerCount(c)).catch(() => {});
@@ -3237,15 +3265,7 @@ export default function RoomScreen() {
       return;
     }
 
-    // ★ 2026-04-22: Serbest mod gerçekten serbest — owner/mod sahnede olsa bile kısıt YOK.
-    //   Sahne müsaitse direkt çıkar; doluysa FIFO kuyruk + auto-promote devreye girer.
-    const stageFull = stageLimits.current >= stageLimits.max;
-    if (speakingMode === 'free_for_all' && !stageFull && !myMicRequested) {
-      handleGhostSeatPress();
-      return;
-    }
-
-    // permission_only / serbest-dolu → sıraya gir veya iptal et
+    // Clubhouse modeli: dinleyici yalnızca el kaldırır; host/mod sahneye alır.
     toggleListenerMicRequest();
     // ★ v1.7.13.161: El kaldırma toast'ları kaldırıldı — kontrol barındaki el ikonu + badge yeterli.
   };
@@ -3316,7 +3336,7 @@ export default function RoomScreen() {
     setMicRequests(prev => prev.filter(u => u !== uid));
     let dbWriteOk = false;
     try {
-      await RoomService.promoteSpeaker(id as string, uid);
+      await RoomService.promoteSpeaker(id as string, uid, firebaseUser?.uid);
       dbWriteOk = true;
       // ★ BUG FIX: Optimistik state güncelleme — listener → speaker (UI anında sahneye taşır)
       setParticipants(prev => prev.map(p => p.user_id === uid ? { ...p, role: 'speaker' as const, is_muted: false } : p));
@@ -3723,7 +3743,6 @@ export default function RoomScreen() {
               type: 'upsell',
               duration: 5000,
               id: 'room_15min_warn',
-              action: { label: i18n.t('room.id.062'), onPress: () => minimizeAndPush('/plus') },
             });
           } else {
             showToast({ title: i18n.t('room.id.063'), message: 'Bu oda 15 dakika sonra kapanacak.', type: 'info', id: 'room_15min_warn' });
@@ -3738,7 +3757,6 @@ export default function RoomScreen() {
               type: 'warning',
               duration: 6000,
               id: 'room_5min_warn',
-              action: { label: i18n.t('room.id.065'), onPress: () => minimizeAndPush('/plus') },
             });
           } else {
             showToast({ title: '🚨 Son 5 dakika!', message: i18n.t('room.id.066'), type: 'warning', id: 'room_5min_warn' });
@@ -3961,10 +3979,6 @@ export default function RoomScreen() {
     if (isOnStage) return 'raise_hand'; // listener değil; prop ignore edilecek
     if (myMicRequested) return 'waiting';
     if (speakingMode === 'selected_only') return 'locked';
-    const stageFull = stageLimits.current >= stageLimits.max;
-    if (speakingMode === 'free_for_all' && !stageFull) {
-      return 'direct_join';
-    }
     return 'raise_hand';
   }, [participants, firebaseUser?.uid, room?.host_id, speakingMode, myMicRequested, stageLimits.current, stageLimits.max]);
 
@@ -4330,16 +4344,6 @@ export default function RoomScreen() {
     const myPart = participants.find(p => p.user_id === firebaseUser.uid);
     const isMod = myPart?.role === 'moderator';
 
-    // ★ v32 Caretaker modu — owner+mod yoksa direkt sahneye (5 dk süreli)
-    if (isCaretakerMode && !isHost && !isMod) {
-      if (stageLimits.current >= stageLimits.max) {
-        showToast({ title: '🚫 Sahne Dolu', message: `${stageLimits.current}/${stageLimits.max} dolu`, type: 'warning' });
-        return;
-      }
-      await handleClaimStage();
-      return;
-    }
-
     // ★ 2026-04-22: Owner/mod dinleyiciye inmişse sahneye geri çıkması için
     //   özel akış (hiyerarşik displacement).
     if (isHost || isMod) {
@@ -4355,7 +4359,7 @@ export default function RoomScreen() {
         showToast({ title: i18n.t('room.id.077'), message: i18n.t('room.id.078'), type: 'warning' });
         return;
       }
-      if (speakingMode === 'permission_only') {
+      if (speakingMode === 'permission_only' || speakingMode === 'free_for_all') {
         if (!myMicRequested) {
           setMyMicRequested(true);
           micReqChannelRef.current?.send({
@@ -4996,14 +5000,6 @@ export default function RoomScreen() {
             <Text style={{ color: '#FCA5A5', fontSize: 12, fontWeight: '700' }}>⏳ Oda {closingCountdown}{i18n.t('auto.room.id.054')}</Text>
             <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 10, marginTop: 2 }}>{i18n.t('room.id.002')}</Text>
           </View>
-          {!amIHost && (
-            <Pressable
-              onPress={handleClaimHost}
-              style={{ backgroundColor: '#14B8A6', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10 }}
-            >
-              <Text style={{ color: '#FFF', fontSize: 11, fontWeight: '800' }}>👑 Host Ol</Text>
-            </Pressable>
-          )}
         </View>
       )}
 
@@ -5566,7 +5562,7 @@ export default function RoomScreen() {
         isDonationsEnabled={!!((room?.room_settings as any)?.donations_enabled)}
         onDonate={() => openOverlay(() => setShowDonationDrawer(true))}
         isRoomLocked={(room?.room_settings as any)?.is_locked || false}
-        onRoomLock={amIHost && isTierAtLeast(ownerTier as any, 'Plus') ? () => {
+        onRoomLock={amIHost ? () => {
           const newLocked = !(room?.room_settings as any)?.is_locked;
           (async () => {
             if (!room) return;
@@ -5581,18 +5577,15 @@ export default function RoomScreen() {
         settingsConfig={amIHost ? {
           speakingMode,
           onSpeakingModeChange: async (mode) => {
-            if (mode === 'selected_only' && !isTierAtLeast(ownerTier as any, 'Pro')) {
-              showToast({ title: '👑 Pro Gerekli', message: i18n.t('room.id.113'), type: 'warning' });
-              return;
-            }
-            setSpeakingMode(mode as any);
+            const normalizedMode = mode === 'free_for_all' ? 'permission_only' : mode;
+            setSpeakingMode(normalizedMode as any);
             if (room) {
               try {
-                await RoomService.updateSettings(room.id, firebaseUser!.uid, { room_settings: { speaking_mode: mode as any } });
-                setRoom(prev => prev ? { ...prev, room_settings: { ...(prev.room_settings || {}), speaking_mode: mode as any } } as any : prev);
-                modChannelRef.current?.send({ type: 'broadcast', event: 'settings_changed', payload: { room_settings: { speaking_mode: mode } } });
+                await RoomService.updateSettings(room.id, firebaseUser!.uid, { room_settings: { speaking_mode: normalizedMode as any } });
+                setRoom(prev => prev ? { ...prev, room_settings: { ...(prev.room_settings || {}), speaking_mode: normalizedMode as any } } as any : prev);
+                modChannelRef.current?.send({ type: 'broadcast', event: 'settings_changed', payload: { room_settings: { speaking_mode: normalizedMode } } });
                 const labels: Record<string, string> = { free_for_all: i18n.t('room.mode.free_for_all'), permission_only: i18n.t('auto.room.id.043'), selected_only: i18n.t('auto.room.id.042') };
-                showToast({ title: labels[mode] || 'Mod', type: 'success' });
+                showToast({ title: labels[normalizedMode] || 'Mod', type: 'success' });
               } catch { showToast({ title: i18n.t('room.id.114'), message: i18n.t('room.id.115'), type: 'error' }); }
             }
           },

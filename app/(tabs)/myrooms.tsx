@@ -807,9 +807,9 @@ const dashS = StyleSheet.create({
 // �?? v1.7.13.141: ROOM_TEMPLATES fonksiyon olarak �?? i18n runtime'da çözülsün
 function getRoomTemplates() {
   return [
-    { id: 'chat', emoji: '💬', label: i18n.t('tabs.myrooms.034'), name: '', category: 'chat', type: 'open', mode: 'audio', speaking: 'free_for_all', colors: ['#14B8A6', '#065F56'] as [string, string] },
+    { id: 'chat', emoji: '💬', label: i18n.t('tabs.myrooms.034'), name: '', category: 'chat', type: 'open', mode: 'audio', speaking: 'permission_only', colors: ['#14B8A6', '#065F56'] as [string, string] },
     { id: 'music', emoji: '🎵', label: i18n.t('tabs.myrooms.001'), name: '', category: 'music', type: 'open', mode: 'audio', speaking: 'permission_only', colors: ['#8B5CF6', '#4C1D95'] as [string, string] },
-    { id: 'game', emoji: '🎮', label: i18n.t('tabs.myrooms.035'), name: '', category: 'game', type: 'open', mode: 'audio', speaking: 'free_for_all', colors: ['#EF4444', '#7F1D1D'] as [string, string] },
+    { id: 'game', emoji: '🎮', label: i18n.t('tabs.myrooms.035'), name: '', category: 'game', type: 'open', mode: 'audio', speaking: 'permission_only', colors: ['#EF4444', '#7F1D1D'] as [string, string] },
     { id: 'private', emoji: '🔒', label: i18n.t('tabs.myrooms.002'), name: '', category: 'chat', type: 'closed', mode: 'audio', speaking: 'permission_only', colors: ['#F59E0B', '#78350F'] as [string, string] },
     { id: 'podcast', emoji: '🎤', label: i18n.t('tabs.myrooms.036'), name: '', category: 'tech', type: 'open', mode: 'audio', speaking: 'selected_only', colors: ['#3B82F6', '#1E3A8A'] as [string, string] },
   ];
@@ -1451,7 +1451,6 @@ export default function MyRoomsScreen() {
       const gate = await RoomService.canCreateToday(firebaseUser.uid, userTier);
       if (!gate.ok) {
         showToast({ title: i18n.t('tabs.myrooms.013'), message: i18n.t('tabs.myrooms.014'), type: 'warning' });
-        setTimeout(() => router.push('/plus' as any), 400);
         return;
       }
       const displayName = profile?.display_name || firebaseUser.displayName || i18n.t('auto.tabs.myrooms.013');
