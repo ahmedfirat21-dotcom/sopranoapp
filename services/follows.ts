@@ -19,6 +19,7 @@
 import { supabase } from '../constants/supabase';
 import type { FollowUser } from './friendship';
 import { i18n } from './i18n';
+import { PushService } from './push';
 
 export const FollowService = {
   /**
@@ -63,6 +64,32 @@ export const FollowService = {
       if (error.code === '23505') return { success: true };
       if (__DEV__) console.warn('[FollowService] addFollow error:', error.message);
       return { success: false, error: error.message };
+    }
+
+    // Clubhouse-style one-way follow notification. Only emit after the first
+    // successful insert, so idempotent duplicate taps never spam the target.
+    try {
+      const { data: follower } = await supabase
+        .from('profiles')
+        .select('display_name')
+        .eq('id', followerId)
+        .single();
+      const followerName = follower?.display_name || 'Birisi';
+
+      const { error: notificationError } = await supabase.from('notifications').insert({
+        user_id: followingId,
+        sender_id: followerId,
+        type: 'follow',
+        reference_id: null,
+        body: `${followerName} seni takip etmeye başladı.`,
+      });
+      if (notificationError && __DEV__) {
+        console.warn('[FollowService] notification error:', notificationError.message);
+      }
+
+      PushService.sendFollowNotification(followingId, followerName, followerId).catch(() => {});
+    } catch (notificationError) {
+      if (__DEV__) console.warn('[FollowService] notification catch:', notificationError);
     }
     return { success: true };
   },

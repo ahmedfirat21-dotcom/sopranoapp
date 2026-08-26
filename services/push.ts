@@ -14,6 +14,7 @@ import { logger } from '../utils/logger';
 import { supabase } from '../constants/supabase';
 import { NotifPrefsService, type NotificationCategory } from './notifPrefs';
 import { i18n } from './i18n';
+import { auth as firebaseAuth } from '../constants/firebase';
 
 export type PushType = 'dm' | 'message_request' | 'follow' | 'follow_request' | 'follow_accepted' | 'gift' | 'room_invite' | 'room_live' | 'room_follow' | 'event_reminder' | 'missed_call' | 'incoming_call';
 
@@ -62,11 +63,17 @@ export const PushService = {
       //   düşürüyordu — kullanıcı şikâyeti: "push hiç gelmiyor". incoming_call
       //   hala bypass.
       const pushType = data?.type;
+      const actorUserId = firebaseAuth.currentUser?.uid;
+      if (!actorUserId) return;
+
+      // Suppress only the exact same event. Different notifications sent to the
+      // same person in quick succession must not cancel one another.
+      const debounceKey = `${targetUserId}:${pushType || 'generic'}:${actorUserId}:${data?.referenceId || data?.route || ''}`;
       if (pushType !== 'incoming_call') {
-        const lastSent = _lastPushTime.get(targetUserId) || 0;
-        if (Date.now() - lastSent < 1500) return;
+        const lastSent = _lastPushTime.get(debounceKey) || 0;
+        if (Date.now() - lastSent < 1000) return;
       }
-      _lastPushTime.set(targetUserId, Date.now());
+      _lastPushTime.set(debounceKey, Date.now());
 
       // ★ Faz 5.1 — Kullanıcı tercihleri gate (DND + kategori toggle + friends_only)
       //   Fail-open: prefs okuma başarısızsa push yine gönderilir (NotifPrefsService).
@@ -92,6 +99,7 @@ export const PushService = {
           body,
           data: data || {},
           is_call: isCall,
+          actor_user_id: actorUserId,
         },
       });
 
@@ -164,7 +172,7 @@ export const PushService = {
       targetUserId,
       i18n.t('auto.push.008'),
       i18n.t('auto.push.007', { 0: followerName }),
-      { type: 'follow', route: `/user/${followerId}` }
+      { type: 'follow', route: `/user/${followerId}`, senderId: followerId }
     );
   },
 
@@ -185,7 +193,7 @@ export const PushService = {
       targetUserId,
       `💬 ${senderName}`,
       msg,
-      { type: 'dm', route: `/chat/${senderId}` }
+      { type: 'dm', route: `/chat/${senderId}`, senderId }
     );
   },
 
@@ -200,7 +208,7 @@ export const PushService = {
       targetUserId,
       i18n.t('auto.push.004'),
       i18n.t('auto.push.003', { 0: callerName }),
-      { type: 'missed_call', route: `/chat/${callerId}` }
+      { type: 'missed_call', route: `/chat/${callerId}`, senderId: callerId }
     );
   },
 
@@ -216,7 +224,7 @@ export const PushService = {
       roomOwnerId,
       i18n.t('auto.push.002'),
       i18n.t('auto.push.001', { 0: followerName, 1: roomName }),
-      { type: 'room_follow', route: `/room/${roomId}` }
+      { type: 'room_follow', route: `/room/${roomId}`, senderId: followerId, referenceId: roomId }
     );
   },
 };

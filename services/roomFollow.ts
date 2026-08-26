@@ -234,8 +234,9 @@ export const RoomFollowService = {
         hostName = hostProfile?.display_name || 'Birisi';
       } catch { /* sessiz */ }
 
-      // Toplu notification insert (max 50 kişi)
-      const batch = followerIds.slice(0, 50).map(uid => ({
+      // Notify every follower. Insert in bounded chunks so large rooms do not
+      // exceed a single PostgREST payload.
+      const batch = followerIds.map(uid => ({
         user_id: uid,
         sender_id: hostUserId,
         type: 'room_live',
@@ -243,24 +244,24 @@ export const RoomFollowService = {
         body: i18n.t('auto.roomFollow.003', { 0: roomName }),
       }));
 
-      const { error } = await supabase.from('notifications').insert(batch);
-      if (error) {
-        if (__DEV__) console.warn('[RoomFollowService] notify error:', error.message);
-        // body kolonu yoksa body olmadan tekrar dene
-        const batchNoBody = batch.map(({ body, ...rest }) => rest);
-        await supabase.from('notifications').insert(batchNoBody);
+      for (let i = 0; i < batch.length; i += 100) {
+        const { error } = await supabase.from('notifications').insert(batch.slice(i, i + 100));
+        if (error && __DEV__) console.warn('[RoomFollowService] notify error:', error.message);
       }
 
-      // ★ v92.16: Push notification — uygulama kapalı/arka plandayken takipçilere haber ver
-      //   Fire-and-forget, DB insert'ten bağımsız. Max 50 kişiye paralel gönderim.
-      Promise.allSettled(
-        followerIds.slice(0, 50).map(uid =>
+      // Push in small batches to avoid dropping follower 51+ or flooding the device.
+      for (let i = 0; i < followerIds.length; i += 25) {
+        await Promise.allSettled(
+          followerIds.slice(i, i + 25).map(uid =>
           PushService.sendToUser(uid, i18n.t('auto.roomFollow.002'), i18n.t('auto.roomFollow.001', { 0: hostName, 1: roomName }), {
             type: 'room_live',
             route: `/room/${roomId}`,
+            senderId: hostUserId,
+            referenceId: roomId,
           })
-        )
-      ).catch(() => { /* sessiz */ });
+          )
+        );
+      }
     } catch (e) {
       if (__DEV__) console.warn('[RoomFollowService] notifyFollowersRoomLive error:', e);
     }

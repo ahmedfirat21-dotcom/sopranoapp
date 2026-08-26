@@ -8,8 +8,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import StatusAvatar from './StatusAvatar';
 import { WelcomeHostService, type WelcomeHost } from '../services/welcomeHost';
-import { FriendshipService } from '../services/friendship';
+import { FollowService } from '../services/follows';
 import { showToast } from './Toast';
+import { i18n } from '../services/i18n';
 
 interface Props {
   currentUserId: string;
@@ -51,7 +52,7 @@ export default function WelcomeMentorCarousel({ currentUserId, onPressUser }: Pr
   const handleFollowOne = useCallback(async (hostId: string) => {
     setFollowedSet(prev => new Set(prev).add(hostId));
     try {
-      const r = await FriendshipService.follow(currentUserId, hostId);
+      const r = await FollowService.addFollow(currentUserId, hostId);
       if (!r.success) {
         showToast({ title: i18n.t('mentor.follow_error'), message: r.error || 'Tekrar dene', type: 'error' });
         setFollowedSet(prev => { const s = new Set(prev); s.delete(hostId); return s; });
@@ -69,7 +70,7 @@ export default function WelcomeMentorCarousel({ currentUserId, onPressUser }: Pr
       const results = await Promise.allSettled(
         hosts
           .filter(h => !followedSet.has(h.id))
-          .map(h => FriendshipService.follow(currentUserId, h.id))
+          .map(h => FollowService.addFollow(currentUserId, h.id))
       );
       const ok = results.filter(r => r.status === 'fulfilled' && (r.value as any)?.success).length;
       setFollowedSet(new Set(hosts.map(h => h.id)));

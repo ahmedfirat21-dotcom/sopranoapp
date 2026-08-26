@@ -82,10 +82,11 @@ interface Props {
 //   sayılıyordu ama drawer okumuyordu → badge "1" kalıyordu. Drawer artık tam kapsam.
 const BELL_NOTIF_TYPES_BASE = [
   'room_live', 'room_invite', 'room_invite_accepted', 'room_invite_rejected',
+  'room_follow',
   'missed_call', 'incoming_call',
   'gift', 'symbol_gift', 'thank_you',
   'event_reminder',
-  'follow_accepted', 'follow_rejected',
+  'follow', 'follow_accepted', 'follow_rejected',
   // ★ v1.7.13.49 (20 May 2026): message_request drawer'dan KALDIRILDI —
   //   yabancıdan gelen DM istekleri sadece Mesajlar tab > İstekler bölümünde görünür.
 ];
@@ -97,6 +98,7 @@ function getNotifIcon(type: string): { name: string; color: string } {
     case 'symbol_gift': return { name: 'sparkles', color: '#F472B6' };
     case 'thank_you': return { name: 'heart', color: '#EC4899' };
     case 'room_live': return { name: 'mic', color: '#EF4444' };
+    case 'room_follow': return { name: 'heart-circle', color: '#14B8A6' };
     case 'room_invite': return { name: 'mail-open', color: '#14B8A6' };
     case 'room_invite_accepted': return { name: 'checkmark-circle', color: '#22C55E' };
     case 'room_invite_rejected': return { name: 'close-circle', color: '#EF4444' };
@@ -105,6 +107,7 @@ function getNotifIcon(type: string): { name: string; color: string } {
     case 'incoming_call': return { name: 'videocam', color: '#60A5FA' };
     case 'event_reminder': return { name: 'calendar', color: '#A78BFA' };
     case 'follow_pending': return { name: 'person-add', color: '#F59E0B' };
+    case 'follow': return { name: 'person-add', color: '#14B8A6' };
     case 'follow_accepted': return { name: 'person-add', color: '#22C55E' };
     case 'follow_rejected': return { name: 'person-remove', color: '#94A3B8' };
     /* ★ v1.7.13.49 (20 May 2026): message_request drawer'da değil — Mesajlar tab > İstekler bölümünde gösterilir. */
@@ -118,6 +121,7 @@ function getDefaultBody(type: string): string {
     case 'symbol_gift': return i18n.t('auto.NotificationDrawer.014');
     case 'thank_you': return i18n.t('auto.NotificationDrawer.013');
     case 'room_live': return i18n.t('auto.NotificationDrawer.012');
+    case 'room_follow': return 'odanı takip etmeye başladı';
     case 'room_invite': return 'seni odaya davet etti';
     case 'room_invite_accepted': return 'oda davetini kabul etti 🎉';
     case 'room_invite_rejected': return 'oda davetini reddetti';
@@ -126,6 +130,7 @@ function getDefaultBody(type: string): string {
     case 'incoming_call': return i18n.t('auto.NotificationDrawer.009');
     case 'event_reminder': return i18n.t('auto.NotificationDrawer.008');
     case 'follow_pending': return i18n.t('auto.NotificationDrawer.007');
+    case 'follow': return 'seni takip etmeye başladı';
     case 'follow_accepted': return i18n.t('auto.NotificationDrawer.006');
     case 'follow_rejected': return i18n.t('auto.NotificationDrawer.005');
     default: return '';
@@ -308,14 +313,14 @@ export default function NotificationDrawer({ visible, onClose, userId, anchorTop
     // room_invite tipinde tıklama ile değil, butonlarla aksiyon alınır
     if (item.type === 'room_invite') return;
     onClose();
-    if (item.type === 'room_live' && item.reference_id) {
+    if ((item.type === 'room_live' || item.type === 'room_follow' || item.type === 'event_reminder') && item.reference_id) {
       router.push(`/room/${item.reference_id}` as any);
     } else if ((item.type === 'room_invite_accepted' || item.type === 'room_invite_rejected') && item.reference_id) {
       router.push(`/room/${item.reference_id}` as any);
     } else if (item.type === 'room_access_request' && item.reference_id) {
       // Host'u odasına yönlendir, moderasyon panelinden istekleri görsün
       router.push(`/room/${item.reference_id}` as any);
-    } else if (item.type === 'missed_call' && item.sender_id) {
+    } else if ((item.type === 'missed_call' || item.type === 'incoming_call' || item.type === 'symbol_gift') && item.sender_id) {
       openUserProfile(item.sender_id);
     } else if (item.type === 'gift' && item.sender_id && onShowGiftModal) {
       // ★ SP hediye: bildirim zilinden tıklayınca SPReceivedModal'ı yeniden aç
@@ -344,7 +349,7 @@ export default function NotificationDrawer({ visible, onClose, userId, anchorTop
       });
       onClose();
       return;
-    } else if (item.type === 'follow_accepted' || item.type === 'follow_rejected' || item.type === 'follow_pending') {
+    } else if (item.type === 'follow' || item.type === 'follow_accepted' || item.type === 'follow_rejected' || item.type === 'follow_pending') {
       if (item.sender_id) openUserProfile(item.sender_id);
     }
   };

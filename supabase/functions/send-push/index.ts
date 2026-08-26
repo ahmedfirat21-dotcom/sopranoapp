@@ -8,9 +8,9 @@
 //   - profiles.push_token kolonu deprecated (v78 migration ile taşındı)
 //
 // ★ Güvenlik:
-//   - Authorization header sadece "Bearer <anon_key>" gate'i (drive-by abuse koruması).
+//   - Authorization header Firebase JWT olarak Google JWKS ile doğrulanır.
 //   - push_tokens tablosu RLS ile korunuyor — sadece service_role okuyabilir.
-//   - İleride: Firebase ID token doğrulaması + sender→target ilişki kontrolü.
+//   - Firebase project audience/issuer + actor identity eşleşmesi zorunlu.
 //
 // ★ v284 (16 May 2026): Status code politikası — beklenen "boş hedef" durumları
 //   (token yok, izin verilmemiş) 200 + skipped döndürür. Bu sayede client tarafında
@@ -18,8 +18,19 @@
 
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createRemoteJWKSet, jwtVerify } from 'npm:jose@5.10.0';
 
 const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
+const FIREBASE_PROJECT_ID = 'sopranochat-5738e';
+const FIREBASE_ISSUER = `https://securetoken.google.com/${FIREBASE_PROJECT_ID}`;
+const FIREBASE_JWKS = createRemoteJWKSet(
+  new URL('https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com'),
+);
+const ALLOWED_PUSH_TYPES = new Set([
+  'dm', 'message_request', 'follow', 'follow_request', 'follow_accepted',
+  'gift', 'room_invite', 'room_live', 'room_follow', 'event_reminder',
+  'missed_call', 'incoming_call',
+]);
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -38,11 +49,24 @@ serve(async (req: Request) => {
   }
 
   try {
-    // Drive-by abuse gate: Authorization header zorunlu.
+    // Firebase third-party JWT is not accepted by the Edge gateway's legacy
+    // verify_jwt check. Validate it here against Google's signed JWKS instead.
     const authHeader = req.headers.get('authorization') ?? '';
     if (!authHeader.toLowerCase().startsWith('bearer ')) {
       return jsonResponse(401, { error: 'Authorization header eksik.' });
     }
+    const token = authHeader.slice(7).trim();
+    let actorUserId = '';
+    try {
+      const { payload } = await jwtVerify(token, FIREBASE_JWKS, {
+        issuer: FIREBASE_ISSUER,
+        audience: FIREBASE_PROJECT_ID,
+      });
+      actorUserId = typeof payload.sub === 'string' ? payload.sub : '';
+    } catch {
+      return jsonResponse(401, { error: 'Geçersiz Firebase oturumu.' });
+    }
+    if (!actorUserId) return jsonResponse(401, { error: 'Kullanıcı kimliği bulunamadı.' });
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
@@ -50,14 +74,33 @@ serve(async (req: Request) => {
       return jsonResponse(500, { error: 'Edge function env eksik.' });
     }
 
-    const { target_user_id, title, body, data, is_call } = await req.json();
+    const { target_user_id, title, body, data, is_call, actor_user_id } = await req.json();
 
     if (!target_user_id || !title || !body) {
       return jsonResponse(400, { error: 'target_user_id, title ve body zorunludur.' });
     }
+    // v1.7.13.153 and older clients do not send actor_user_id yet. Their signed
+    // JWT subject remains authoritative; newer clients get an extra mismatch check.
+    if (actor_user_id && actor_user_id !== actorUserId) {
+      return jsonResponse(403, { error: 'Gönderen kimliği eşleşmiyor.' });
+    }
+    const pushType = data?.type;
+    if (!pushType || !ALLOWED_PUSH_TYPES.has(pushType)) {
+      return jsonResponse(400, { error: 'Desteklenmeyen bildirim türü.' });
+    }
+    if (String(title).length > 120 || String(body).length > 500) {
+      return jsonResponse(400, { error: 'Bildirim içeriği çok uzun.' });
+    }
 
     // Service-role client: RLS bypass ile push_tokens tablosundan okur.
     const adminClient = createClient(supabaseUrl, serviceKey);
+
+    const { data: actorProfile } = await adminClient
+      .from('profiles')
+      .select('id')
+      .eq('id', actorUserId)
+      .maybeSingle();
+    if (!actorProfile) return jsonResponse(403, { error: 'Gönderen profili bulunamadı.' });
 
     // ★ v78: push_tokens tablosundan TÜM aktif cihaz token'larını çek
     const { data: tokens, error: tokensErr } = await adminClient

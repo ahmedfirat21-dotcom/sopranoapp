@@ -453,7 +453,7 @@ function RealtimeBadgeProvider({ userId, children }: { userId: string | null; ch
             .select('*', { count: 'exact', head: true })
             .eq('user_id', userId)
             .eq('is_read', false)
-            .in('type', ['room_live', 'room_invite', 'room_invite_accepted', 'room_invite_rejected', 'missed_call', 'incoming_call', 'gift', 'symbol_gift', 'thank_you', 'event_reminder', 'follow_accepted', 'follow_rejected']);
+            .in('type', ['room_live', 'room_follow', 'room_invite', 'room_invite_accepted', 'room_invite_rejected', 'missed_call', 'incoming_call', 'gift', 'symbol_gift', 'thank_you', 'event_reminder', 'follow', 'follow_accepted', 'follow_rejected']);
           return count || 0;
         })(),
       ]);
@@ -539,7 +539,7 @@ function RealtimeBadgeProvider({ userId, children }: { userId: string | null; ch
     // 3. Notifications realtime — yeni bildirim gelince sayıyı artır + anlık toast
     // ★ Zil badge'ine dahil olan bildirim tipleri (oda + arama + hediye + teşekkür + arkadaşlık yanıtları)
     // ★ 2026-04-21: follow_pending context-aware — oda içindeyken bell badge'e eklenir, dışında arkadaş simgesi ile yetinir.
-    const BELL_NOTIF_TYPES_BASE = ['room_live', 'room_invite', 'room_invite_accepted', 'room_invite_rejected', 'missed_call', 'incoming_call', 'gift', 'symbol_gift', 'thank_you', 'event_reminder', 'follow_accepted', 'follow_rejected'];
+    const BELL_NOTIF_TYPES_BASE = ['room_live', 'room_follow', 'room_invite', 'room_invite_accepted', 'room_invite_rejected', 'missed_call', 'incoming_call', 'gift', 'symbol_gift', 'thank_you', 'event_reminder', 'follow', 'follow_accepted', 'follow_rejected'];
     const notifSub = supabase
       .channel(`badge_notif:${userId}`)
       .on('postgres_changes', {
@@ -592,6 +592,10 @@ function RealtimeBadgeProvider({ userId, children }: { userId: string | null; ch
           showToast({ title: 'Davet Reddedildi', message: body, type: 'warning', id });
         } else if (notifType === 'room_live') {
           showToast({ title: i18n.t('layout.003'), message: body, type: 'info', id });
+        } else if (notifType === 'room_follow') {
+          showToast({ title: 'Yeni Oda Takipçisi', message: body, type: 'success', id });
+        } else if (notifType === 'follow') {
+          showToast({ title: 'Yeni Takipçi', message: body, type: 'success', id });
         } else if (notifType === 'gift') {
           showToast({ title: i18n.t('layout.004'), message: body, type: 'success', id });
         } else if (notifType === 'symbol_gift') {
@@ -651,10 +655,16 @@ function RealtimeBadgeProvider({ userId, children }: { userId: string | null; ch
       })
       .subscribe();
 
+    // Notifications use owner-only RLS. Firebase-backed Realtime cannot safely
+    // impersonate the user with the anonymous socket, so keep badges accurate
+    // with a small foreground poll as a secure fallback.
+    const badgePoll = setInterval(() => { refreshBadges(); }, 15_000);
+
     return () => {
       supabase.removeChannel(dmSub);
       FriendshipService.unsubscribe(friendSub);
       supabase.removeChannel(notifSub);
+      clearInterval(badgePoll);
       (global as any).__sopranoBadgeRefresh = undefined;
     };
   }, [userId]);
