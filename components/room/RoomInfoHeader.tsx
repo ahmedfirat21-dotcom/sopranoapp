@@ -341,7 +341,7 @@ export default function RoomInfoHeader({
               <View style={s.durationInline}>
                 {/* ★ v283: CANLI/LIVE pill kaldırıldı — eski v278 yapısı korunsun
                     (kullanıcı tercihi: minimal header, sadece time + duration). */}
-                <Ionicons name="time-outline" size={8} color="rgba(20,184,166,0.6)" />
+                <Ionicons name={isSystemRoom ? 'infinite-outline' : 'time-outline'} size={8} color="rgba(20,184,166,0.6)" />
                 {/* ★ v319.12 (18 May 2026): Admin subtitle config (font size + color). */}
                 <Text style={[s.durationText, {
                   ...(headerCfg.subtitleFontSize ? { fontSize: headerCfg.subtitleFontSize } : null),

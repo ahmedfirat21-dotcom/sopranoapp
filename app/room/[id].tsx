@@ -3678,6 +3678,12 @@ export default function RoomScreen() {
   const [roomExpiry, setRoomExpiry] = useState('');
   const expiryWarningsRef = useRef<Set<string>>(new Set()); // ★ Tekrar uyarı önleme
   useEffect(() => {
+    // Sistem odaları (Soprano Lobi) kalıcıdır; kuruluş tarihinden süre hesaplanmaz.
+    if (isSystemRoom(id as string)) {
+      setRoomDuration(i18n.t('rooms.always_open'));
+      setRoomExpiry('');
+      return;
+    }
     if (!room?.created_at) return;
     expiryWarningsRef.current.clear();
     const isHost = room.host_id === firebaseUser?.uid;
@@ -3746,7 +3752,7 @@ export default function RoomScreen() {
     const interval = remaining < 120000 ? 5000 : remaining < 1200000 ? 15000 : 30000;
     const timer = setInterval(updateDuration, interval);
     return () => clearInterval(timer);
-  }, [room?.created_at, room?.expires_at]);
+  }, [id, room?.created_at, room?.expires_at]);
   // ★ 2026-04-24: Minimize restore'da expand animasyonu zaten geçişi yaptı →
   //   fadeIn 1 ile başlar (tekrar fade yok). İlk girişte 0 ile başlar.
   //   wasRestoringFromMinimize: mount anındaki isRestoringFromMinimize değerini saklar

@@ -243,6 +243,7 @@ const tr: Record<string, string> = {
   'rooms.chat_input_placeholder': 'Bir mesaj yaz...',
   'rooms.minutes_short': '{{count}} dk',
   'rooms.hours_minutes_short': '{{hours}} sa {{minutes}} dk',
+  'rooms.always_open': '7/24 açık',
   'rooms.minutes_remaining': '{{count}} dk kaldı',
   'rooms.hours_minutes_remaining': '{{hours}} sa {{minutes}} dk kaldı',
   // Plus menu (RoomOverlays)

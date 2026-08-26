@@ -238,6 +238,7 @@ const en: Record<string, string> = {
   'rooms.chat_input_placeholder': 'Type a message...',
   'rooms.minutes_short': '{{count}} min',
   'rooms.hours_minutes_short': '{{hours}}h {{minutes}}m',
+  'rooms.always_open': 'Open 24/7',
   'rooms.minutes_remaining': '{{count}} min left',
   'rooms.hours_minutes_remaining': '{{hours}}h {{minutes}}m left',
   // Plus menu
