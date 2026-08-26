@@ -131,6 +131,7 @@ type PlusMenuProps = {
   onMuteAll?: () => void;
   onUnmuteAll?: () => void;
   onRoomStats?: () => void;
+  onEndRoom?: () => void;
   onDeleteRoom?: () => void;
   onBoostRoom?: () => void;
   /** ★ v92 (1 May 2026): Güçlendiriciler sheet'i açar — Süre Uzat, Altın Davet, vb. */
@@ -307,7 +308,7 @@ export function PlusMenu({
   isRoomLocked, micRequestCount, accessRequestCount,
   userRole = 'listener',
   ownerTier = 'Free',
-  onMuteAll, onUnmuteAll, onRoomStats, onDeleteRoom,
+  onMuteAll, onUnmuteAll, onRoomStats, onEndRoom, onDeleteRoom,
   onBoostRoom, onPowerUps, onShowFollowers, onToggleFollow, isFollowingRoom,
   settingsConfig,
   followerCount = 0,
@@ -961,6 +962,18 @@ export function PlusMenu({
       label: i18n.t('room.roomoverlays.024'),
       accent: '#F59E0B',
       onPress: () => { onClose(); onLeaveRoom(); },
+    });
+  }
+
+  // Clubhouse yaşam döngüsü: sahibi ve moderatör odayı herkes için bitirebilir.
+  if ((isOwner || isMod) && onEndRoom) {
+    items.push({
+      id: 'end-room',
+      icon: 'stop-circle-outline',
+      label: 'Odayı Bitir',
+      accent: '#EF4444',
+      onPress: () => { onClose(); onEndRoom(); },
+      destructive: true,
     });
   }
 

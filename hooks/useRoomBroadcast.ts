@@ -292,6 +292,14 @@ export function useRoomBroadcast(params: UseRoomBroadcastParams) {
           safeGoBack(router);
         }, 2000);
         return;
+      } else if (data.action === 'room_ended') {
+        penaltyRef.current?.show({ type: 'kick', reason: `${data.hostName || 'Moderatör'} odayı bitirdi.` });
+        setTimeout(() => {
+          liveKitService.disconnect().catch(() => {});
+          setMinimizedRoom(null);
+          safeGoBack(router);
+        }, 1200);
+        return;
       }
 
       // ── mute_all ──

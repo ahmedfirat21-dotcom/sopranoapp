@@ -3437,7 +3437,7 @@ export default function RoomScreen() {
     });
   };
 
-  // ========== HOST ÇIKIŞ → YETKİ ZİNCİRİ (Mod → Speaker → Tier-bazlı politika) ==========
+  // ========== HOST ÇIKIŞ → MODERATÖRE DEVİR; MODERATÖR YOKSA ODAYI BİTİR ==========
   const handleHostLeave = async () => {
     if (!firebaseUser || !id) return;
     // Sistem odasında DB ayrılma yok
@@ -3451,7 +3451,7 @@ export default function RoomScreen() {
       // ★ Flag: cleanup effect'in tekrar close çağırmasını engelle
       isRoomClosingRef.current = true;
 
-      // Yetki zinciri ile devret
+      // Clubhouse yaşam döngüsü: yalnız moderatöre devret.
       const result = await RoomService.transferHost(id as string, firebaseUser.uid);
       if (result.newHostId) {
         // ★ Yeni host'a broadcast bildir
@@ -3460,19 +3460,11 @@ export default function RoomScreen() {
           payload: { action: 'host_transferred', targetUserId: result.newHostId, oldHostName: profile?.display_name || 'Oda sahibi' },
         });
         // Başarı toast gereksiz — sayfadan çıkılıyor
-      } else if (result.keepAlive) {
-        // ★ Plus+: Oda açık kalır — sahibi dilediğinde geri dönebilir veya manuel dondurabilir
-        // Başarı toast gereksiz — sayfadan çıkılıyor
-      } else {
-        // ★ 2026-04-22 FIX: Free + devralacak kimse yok → anında close yerine
-        //   60sn COUNTDOWN başlat. Odadakilere broadcast ile uyarı gider, kimse
-        //   aniden kopmaz. 60sn sonunda en yetkili client close() çağırır.
+      } else if (result.roomEnded) {
         modChannelRef.current?.send({
           type: 'broadcast', event: 'mod_action',
-          payload: { action: 'room_closing_countdown', seconds: 60 },
+          payload: { action: 'room_ended', hostName: profile?.display_name || 'Oda sahibi' },
         });
-        // close'u artık burada çağırma — countdown useEffect'i 0'a ulaşınca
-        // amHighestAuth olan kullanıcı close() tetikleyecek.
       }
       liveKitService.disconnect().catch(() => {});
       setMinimizedRoom(null);
@@ -3482,6 +3474,38 @@ export default function RoomScreen() {
       isRoomClosingRef.current = false;
       showToast({ title: i18n.t('room.id.041'), message: i18n.t('room.id.042'), type: 'error' });
     }
+  };
+
+  // ========== OWNER / MODERATOR: ODAYI HERKES İÇİN BİTİR ==========
+  const handleEndRoom = () => {
+    if (!firebaseUser?.uid || !id || isSystemRoom(id as string)) return;
+    if (!amIHost && !amIMod && !profile?.is_admin) return;
+    setAlertConfig({
+      visible: true,
+      title: 'Odayı Bitir',
+      message: 'Oda herkes için kapanacak. Devam etmek istiyor musun?',
+      type: 'warning',
+      icon: 'stop-circle-outline',
+      buttons: [
+        { text: 'Vazgeç', style: 'cancel' },
+        { text: 'Odayı Bitir', style: 'destructive', onPress: async () => {
+          try {
+            isRoomClosingRef.current = true;
+            modChannelRef.current?.send({
+              type: 'broadcast', event: 'mod_action',
+              payload: { action: 'room_ended', hostName: profile?.display_name || 'Moderatör' },
+            });
+            await RoomService.endRoom(id as string, firebaseUser.uid);
+            liveKitService.disconnect().catch(() => {});
+            setMinimizedRoom(null);
+            safeGoBack(router);
+          } catch (e: any) {
+            isRoomClosingRef.current = false;
+            showToast({ title: 'Oda Bitirilemedi', message: e?.message || 'Yetki doğrulanamadı.', type: 'error' });
+          }
+        } },
+      ],
+    });
   };
 
   // ========== MODERATÖR/DİNLEYİCİ ÇIKIŞ ==========
@@ -5551,6 +5575,7 @@ export default function RoomScreen() {
         onMuteAll={handleMuteAll}
         onUnmuteAll={handleUnmuteAll}
         onRoomStats={() => openOverlay(() => setShowRoomStats(true))}
+        onEndRoom={!isSystemRoom(id as string) ? () => { closeAllOverlays(); handleEndRoom(); } : undefined}
         onDeleteRoom={() => { closeAllOverlays(); handleDeleteRoom(); }}
         onBoostRoom={() => { closeAllOverlays(); handleBoostRoom(); }}
         onPowerUps={() => { closeAllOverlays(); openOverlay(() => setShowPowerUps(true)); }}

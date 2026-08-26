@@ -1980,9 +1980,10 @@ export const RoomService = {
   },
 
   /**
-   * Host çıkınca: Yetki zinciri ile devret (Mod → Speaker → Tier-bazlı politika)
+   * Host çıkınca Clubhouse yaşam döngüsü: en eski moderatöre devret;
+   * moderatör yoksa odayı bitir. Konuşmacı otomatik olarak host yapılmaz.
    */
-  async transferHost(roomId: string, oldHostId: string): Promise<{ newHostId: string | null; keepAlive?: boolean }> {
+  async transferHost(roomId: string, oldHostId: string): Promise<{ newHostId: string | null; keepAlive?: boolean; roomEnded?: boolean }> {
     // ★ v1.7.13.140: Sistem odaları için host transfer yok — system_user kalıcı sahip.
     if (isSystemRoom(roomId)) return { newHostId: null, keepAlive: true };
     // ★ K2/K3 FIX: Atomic RPC (v18). Aday seçimi + 3 adımlı UPDATE/DELETE
@@ -1996,10 +1997,11 @@ export const RoomService = {
         p_executor_id: oldHostId,
       });
       if (error) throw error;
-      const result = (data || {}) as { newHostId: string | null; keepAlive: boolean | null; noop?: boolean };
+      const result = (data || {}) as { newHostId: string | null; keepAlive: boolean | null; roomEnded?: boolean; noop?: boolean };
       return {
         newHostId: result.newHostId ?? null,
         keepAlive: result.keepAlive ?? undefined,
+        roomEnded: result.roomEnded ?? undefined,
       };
     } catch (rpcErr: any) {
       // RPC henüz migrate edilmediyse fallback — eski (atomic olmayan) akış.
@@ -2010,24 +2012,12 @@ export const RoomService = {
   },
 
   /** @internal v18 RPC yoksa fallback. Production'da kullanılmamalı. */
-  async _transferHostLegacy(roomId: string, oldHostId: string): Promise<{ newHostId: string | null; keepAlive?: boolean }> {
+  async _transferHostLegacy(roomId: string, oldHostId: string): Promise<{ newHostId: string | null; keepAlive?: boolean; roomEnded?: boolean }> {
     const { data: roomInfo } = await supabase
       .from('rooms')
       .select('is_persistent, owner_tier, room_settings, host_id')
       .eq('id', roomId)
       .single();
-
-    let ownerTier = migrateLegacyTier(roomInfo?.owner_tier);
-    const { data: hostProfile } = await supabase
-      .from('profiles')
-      .select('is_admin, subscription_tier')
-      .eq('id', oldHostId)
-      .single();
-    if (hostProfile?.is_admin) {
-      ownerTier = 'Pro'; // ★ v1.7.13.132: GodMaster kaldırıldı
-    }
-
-    const limits = getRoomLimits(ownerTier);
 
     const { data: mods } = await supabase
       .from('room_participants')
@@ -2039,22 +2029,7 @@ export const RoomService = {
 
     let newHostId: string | null = null;
 
-    if (mods && mods.length > 0) {
-      newHostId = mods[0].user_id;
-    } else {
-      const { data: speakers } = await supabase
-        .from('room_participants')
-        .select('user_id, joined_at')
-        .eq('room_id', roomId)
-        .eq('role', 'speaker')
-        .neq('user_id', oldHostId)
-        .order('joined_at', { ascending: true })
-        .limit(1);
-
-      if (speakers && speakers.length > 0) {
-        newHostId = speakers[0].user_id;
-      }
-    }
+    if (mods && mods.length > 0) newHostId = mods[0].user_id;
 
     if (newHostId) {
       await supabase
@@ -2081,32 +2056,22 @@ export const RoomService = {
       return { newHostId };
     }
 
-    if (limits.ownerLeavePolicy === 'keep_alive') {
-      const updatedSettings = {
-        ...(roomInfo?.room_settings || {}),
-        original_host_id: oldHostId,
-      };
-      await supabase
-        .from('rooms')
-        .update({ room_settings: updatedSettings })
-        .eq('id', roomId);
-
-      await supabase
-        .from('room_participants')
-        .delete()
-        .eq('room_id', roomId)
-        .eq('user_id', oldHostId);
-
-      return { newHostId: null, keepAlive: true };
-    }
-
     await supabase
-      .from('room_participants')
-      .delete()
-      .eq('room_id', roomId)
-      .eq('user_id', oldHostId);
+      .from('rooms')
+      .update({ is_live: false, listener_count: 0, expires_at: null })
+      .eq('id', roomId);
+    await supabase.from('room_participants').delete().eq('room_id', roomId);
+    return { newHostId: null, roomEnded: true };
+  },
 
-    return { newHostId: null };
+  /** Odayı sahibi veya moderatörü herkes için bitirir. */
+  async endRoom(roomId: string, executorId: string): Promise<void> {
+    if (isSystemRoom(roomId)) throw new Error('Sistem odası bitirilemez.');
+    const { error } = await supabase.rpc('end_room_atomic', {
+      p_room_id: roomId,
+      p_executor_id: executorId,
+    });
+    if (error) throw error;
   },
 
   /**
