@@ -15,6 +15,29 @@ import { supabase } from '../constants/supabase';
 export const LOBI_ROOM_ID = '10000000-0000-0000-0000-000000000001';
 
 /**
+ * Home must never lose the permanent lobby card because of a transient REST
+ * error. The database row is seeded separately; this object is only the
+ * read-only UI fallback until the fresh listener count arrives.
+ */
+export const LOBI_FALLBACK_ROOM: Room = {
+  id: LOBI_ROOM_ID,
+  name: 'Soprano Lobi',
+  description: 'Müzik dinle, tanış, konuş',
+  category: 'music',
+  type: 'open',
+  host_id: '',
+  is_live: true,
+  listener_count: 0,
+  max_speakers: 12,
+  created_at: '2026-05-21T00:00:00.000Z',
+  expires_at: null,
+  is_persistent: true,
+  is_system_room: true,
+  owner_tier: 'Pro',
+  room_settings: { auto_mute_on_join: true, allow_hand_raise: true },
+};
+
+/**
  * Tüm bilinen sistem odası UUID'leri. Yeni sistem odası eklenirse bu listeye ekle.
  */
 const SYSTEM_ROOM_IDS = new Set<string>([LOBI_ROOM_ID]);

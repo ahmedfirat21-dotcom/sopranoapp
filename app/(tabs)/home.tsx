@@ -42,7 +42,7 @@ import { SkiaShadow, CosmeticBackground } from '../../components/skia';
 import { showToast } from '../../components/Toast';
 import DiscoverEmptyState from '../../components/DiscoverEmptyState';
 import HomeScreenSkeleton from '../../components/HomeScreenSkeleton';
-import { isSystemRoom, getLobiRoom, LOBI_ROOM_ID } from '../../services/showcaseRooms';
+import { isSystemRoom, getLobiRoom, LOBI_FALLBACK_ROOM, LOBI_ROOM_ID } from '../../services/showcaseRooms';
 import { FriendshipService } from '../../services/friendship';
 import { FollowService } from '../../services/follows';
 import { TIER_DEFINITIONS, getEffectiveTier } from '../../constants/tiers';
@@ -795,7 +795,7 @@ export default function HomeScreen() {
   // ★ v1.7.13.49 (20 May 2026): Planlı (gelecek) odalar — Keşfet'te kompakt yatay scroll.
   const [scheduledRooms, setScheduledRooms] = useState<Room[]>([]);
   // ★ v1.7.13.140 (21 May 2026): Soprano Lobi — 7/24 açık sistem odası. Cold start çözümü.
-  const [lobiRoom, setLobiRoom] = useState<Room | null>(null);
+  const [lobiRoom, setLobiRoom] = useState<Room>(LOBI_FALLBACK_ROOM);
   // ★ v1.7.13.135: Keşfet ASKIYA ALINDIĞINDA boost edilen profiller GÖRÜNMÜYORDU.
   //   SP harcanan ama hiçbir görünürlük kazanılmayan kritik bug. Ana Sayfa'ya geri.
   const [boostedProfiles, setBoostedProfiles] = useState<any[]>([]);
@@ -1087,11 +1087,12 @@ export default function HomeScreen() {
         setScheduledRooms(sched);
       } catch { }
 
-      // ★ v1.7.13.140 (21 May 2026): Soprano Lobi — 7/24 açık. Hata olursa kart gizlenir.
+      // Soprano Lobi 7/24 görünür. Sorgu geçici olarak başarısız olursa
+      // listener sayısı fallback'te 0 kalır; kart hiçbir zaman kaybolmaz.
       try {
         const lobi = await getLobiRoom();
-        setLobiRoom(lobi);
-      } catch { setLobiRoom(null); }
+        if (lobi) setLobiRoom({ ...lobi, is_live: true });
+      } catch { /* kalıcı UI fallback'ini koru */ }
     } catch (err: any) {
       if (__DEV__) console.warn('[Home] Load error:', err);
       // ★ Kullanıcıya görünür hata — hem toast hem persistent error state
@@ -1550,11 +1551,8 @@ export default function HomeScreen() {
                   keşfette zaten "Çevrimiçi" drawer (sağ üst person ikonu) bu işlevi
                   üstleniyor. Mükerrer satır karmaşa yaratıyordu. */}
 
-              {/* ★ v1.7.13.140 (21 May 2026): Soprano Lobi kartı — 7/24 açık sistem odası.
-                  Cold start çözümü: uygulama asla "boş" görünmesin. Welcome card'ın hemen
-                  altında öne çıkar. Lobi DB'de yoksa veya yüklenmediyse kart gizlenir. */}
-              {lobiRoom && (lobiRoom as any).is_live !== false && (
-                <Pressable
+              {/* Soprano Lobi kartı kalıcıdır; DB isteği sürerken de fallback ile görünür. */}
+              <Pressable
                   onPress={() => router.push(`/room/${LOBI_ROOM_ID}`)}
                   style={({ pressed }) => [s.lobiCard, pressed && { opacity: 0.92, transform: [{ scale: 0.98 }] }]}
                 >
@@ -1576,8 +1574,7 @@ export default function HomeScreen() {
                     <Ionicons name="headset" size={22} color="#0F172A" />
                     <Text style={s.lobiCardJoinText}>{i18n.t('rooms.join')}</Text>
                   </View>
-                </Pressable>
-              )}
+              </Pressable>
 
               {/* ★ v1.7.13.135: Boost edilen profiller Ana Sayfa'ya GERİ döndü.
                    Keşfet askıya alındı; SP harcayıp boost satın alan kullanıcılar
