@@ -144,6 +144,7 @@ import { useRoomLifecycle } from '../../hooks/useRoomLifecycle';
 import { useRoomGamification } from '../../hooks/useRoomGamification';
 import { useSwipeToDismiss } from '../../hooks/useSwipeToDismiss';
 import { useRoomPresence } from '../../hooks/useRoomPresence';
+import { useKeyboardOverlap } from '../../hooks/useKeyboardOverlap';
 import ModerationOverlay, { type ModerationOverlayRef } from '../../components/room/ModerationOverlay';
 import type { FlashType } from '../../components/room/AvatarPenaltyFlash';
 import { PushNotificationService } from '../../services/pushNotifications';
@@ -481,92 +482,37 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
   const [msgReq, setMsgReq] = useState<{ status: 'none' | 'pending_incoming' | 'pending_outgoing' | 'accepted' | 'rejected' }>({ status: 'none' });
   const [reqResponding, setReqResponding] = useState(false);
 
-  // ★ v110.6 (6 May 2026): Klavye açıldığında panel boyutunu adjustResize-aware hesapla.
-  //   Android adjustResize: window shrinks → panel bottom=0 yeter (parent altı = klavye üstü).
-  //   iOS: keyboard overlay → bottom shift gerekli (screen-based).
-  //   ESKİ SORUN: Her iki platformda da screen-based bottom=kbHeight → Android'de çift küçülme.
-  //   Input bar klavyenin arkasına kalıyordu.
-  const screenH = Dimensions.get('screen').height;
-  const windowH = Dimensions.get('window').height;
+  // API 36 edge-to-edge: IME pencereyi bazı cihazlarda küçültür, bazılarında örter.
+  // Ortak hook yalnızca gerçek örtüşmeyi döndürür.
+  const { keyboardOverlap, keyboardVisible, windowHeight } = useKeyboardOverlap();
   // ★ PlusMenu ile birebir aynı boyut — ROOM_TOP_GAP=70, ROOM_BOTTOM_GAP=90
   // PlusMenu top/bottom window bazlı, DM panel de window bazlı hesaplamalı
   const REST_BOTTOM = Math.max(bottomInset + 8, 90); // Alt kontrol çubuğu + cihaz safe-area
   const REST_TOP = 70;    // PlusMenu: Math.max(insets.top + 12, 70)
-  const restHeight = windowH - REST_BOTTOM - REST_TOP;
+  const restHeight = windowHeight - REST_BOTTOM - REST_TOP;
   const dmPanelBottomAnim = useRef(new Animated.Value(REST_BOTTOM)).current;
   const dmPanelHeightAnim = useRef(new Animated.Value(restHeight)).current;
-  // ★ 2026-05-05 FIX: Bir DM kullanıcısı seçilip chat ekranı açılınca, önceki klavye state'i
-  //   panel'i yanlış konumda gösteriyordu (input bar üst-orta'da kayma glitch'i). Geçişte
-  //   panel pozisyonunu anında reset et — klavye event'i sonra normal animasyonu yapar.
   useEffect(() => {
-    if (chatTarget) {
-      const fullScreenH = Dimensions.get('screen').height;
-      const liveWindowH = Dimensions.get('window').height;
-      const metrics = (Keyboard as any).metrics?.();
-      if (metrics?.height > 0) {
-        const keyboardTop = metrics.screenY || (fullScreenH - metrics.height);
-        const parentBottomY = Math.min(fullScreenH, liveWindowH);
-        dmPanelBottomAnim.setValue(Platform.OS === 'android' ? Math.max(0, parentBottomY - keyboardTop) : metrics.height);
-        dmPanelHeightAnim.setValue(Math.max(Math.min(parentBottomY, keyboardTop) - REST_TOP, 240));
-      } else {
-        dmPanelBottomAnim.setValue(REST_BOTTOM);
-        dmPanelHeightAnim.setValue(Math.max(liveWindowH - REST_BOTTOM - REST_TOP, 240));
-      }
-    }
-  }, [chatTarget?.userId, REST_BOTTOM, REST_TOP, dmPanelBottomAnim, dmPanelHeightAnim]);
-  useEffect(() => {
-    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
-    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-    const showSub = Keyboard.addListener(showEvent, (e) => {
-      const fullScreenH = Dimensions.get('screen').height;
-      const liveWindowH = Dimensions.get('window').height;
-      const reportedH = e.endCoordinates.height || 0;
-      const keyboardTop = e.endCoordinates.screenY || (fullScreenH - reportedH);
-      const calcH = fullScreenH - keyboardTop;
-      const kbHeight = Math.max(reportedH, calcH, 0);
-      if (Platform.OS === 'android') {
-        // Android 15/16 edge-to-edge cihazlarda adjustResize davranışı üreticiye göre
-        // değişebiliyor. Bazı cihazlarda window küçülürken bazılarında klavye pencerenin
-        // üstüne biniyor. İki durumda da panelin ALT kenarını keyboardTop'a sabitle.
-        const parentBottomY = Math.min(fullScreenH, liveWindowH);
-        const targetBottom = Math.max(0, parentBottomY - keyboardTop);
-        const visibleBottomY = Math.min(parentBottomY, keyboardTop);
-        dmPanelBottomAnim.setValue(targetBottom);
-        dmPanelHeightAnim.setValue(Math.max(visibleBottomY - REST_TOP, 240));
-      } else {
-        const newBottom = kbHeight;
-        const newHeight = Math.max(fullScreenH - kbHeight - REST_TOP, 240);
-        dmPanelBottomAnim.setValue(newBottom);
-        dmPanelHeightAnim.setValue(newHeight);
-      }
-    });
-    let hideTimer: ReturnType<typeof setTimeout> | null = null;
-    const hideSub = Keyboard.addListener(hideEvent, () => {
-      // Android'de keyboardDidHide olayı ile window ölçüsünün eski haline dönmesi aynı
-      // frame'de olmayabiliyor. Bir sonraki layout turunda gerçek pencereyi yeniden ölç.
-      hideTimer = setTimeout(() => {
-        const liveWindowH = Dimensions.get('window').height;
-        const rH = Math.max(liveWindowH - REST_BOTTOM - REST_TOP, 240);
-        Animated.parallel([
-          Animated.timing(dmPanelBottomAnim, {
-            toValue: REST_BOTTOM,
-            duration: 150,
-            useNativeDriver: false,
-          }),
-          Animated.timing(dmPanelHeightAnim, {
-            toValue: rH,
-            duration: 150,
-            useNativeDriver: false,
-          }),
-        ]).start();
-      }, Platform.OS === 'android' ? 40 : 0);
-    });
-    return () => {
-      showSub.remove();
-      hideSub.remove();
-      if (hideTimer) clearTimeout(hideTimer);
-    };
-  }, [REST_BOTTOM, REST_TOP, dmPanelBottomAnim, dmPanelHeightAnim]);
+    const composerActive = keyboardVisible && !!chatTarget;
+    const targetBottom = composerActive ? keyboardOverlap : REST_BOTTOM;
+    const targetHeight = Math.max(windowHeight - targetBottom - REST_TOP, 240);
+
+    Animated.parallel([
+      Animated.timing(dmPanelBottomAnim, {
+        toValue: targetBottom,
+        duration: composerActive ? 160 : 190,
+        useNativeDriver: false,
+      }),
+      Animated.timing(dmPanelHeightAnim, {
+        toValue: targetHeight,
+        duration: composerActive ? 160 : 190,
+        useNativeDriver: false,
+      }),
+    ]).start();
+  }, [
+    chatTarget?.userId, keyboardVisible, keyboardOverlap, windowHeight,
+    REST_BOTTOM, REST_TOP, dmPanelBottomAnim, dmPanelHeightAnim,
+  ]);
 
   // ★ Swipe-to-dismiss — sağa sürükle
   const { translateValue: dmSwipeX, panHandlers: dmPanHandlers } = useSwipeToDismiss({

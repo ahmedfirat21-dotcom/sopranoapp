@@ -42,6 +42,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Haptics } from '../../utils/haptics';
+import { useKeyboardOverlap } from '../../hooks/useKeyboardOverlap';
 
 // ★ SEC-MSG: Mesaj sanitizasyonu + flood koruması
 const MSG_MAX_LENGTH = 2000;
@@ -569,8 +570,9 @@ export default function ChatScreen() {
   //   Input bar her zaman ekranın altında kalır; mini card gerekirse üstüne biner.
   const miniRoomOffset = 0;
   const inputBottomAnim = useRef(new Animated.Value(miniRoomOffset)).current;
-  // ★ 2026-04-24: kbHeight state — FlatList paddingBottom klavyeye göre artar → scroll alanı açılır.
-  const [kbHeight, setKbHeight] = useState(0);
+  // API 36 edge-to-edge: yalnızca pencerenin gerçekten örttüğü IME kısmını uygula.
+  // Böylece adjustResize çalışan cihazlarda çift, Samsung/Android 16'da eksik kayma olmaz.
+  const { keyboardOverlap: kbHeight, keyboardVisible } = useKeyboardOverlap();
   // ★ 2026-04-27: FlatList marginBottom yaklaşımına geçildi (input bar ile çakışma yok).
   //   Default 90 — gerçek input bar'a yakın (gesture nav telefonda ~80-100px). onLayout ile güncellenir.
   //   İlk render'da çok büyük (150) → re-layout sırasında scroll pozisyonu kaymasına yol açıyordu.
@@ -585,26 +587,10 @@ export default function ChatScreen() {
     }
   }, [inputBarHeight]);
   useEffect(() => {
-    // ★ v108.31: KAV kaldırıldı — adjustResize + flex yeterli.
-    //   Android: adjustResize window'u zaten küçültüyor → kbHeight KULLANMA (çift kaydırma bug).
-    //   iOS: keyboard overlay yapıyor → paddingBottom:kbHeight gerekli.
-    //   Listener her iki platformda da scrollToEnd tetikler.
-    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
-    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-    const showSub = Keyboard.addListener(showEvent, (e) => {
-      // ★ FIX: Android'de adjustResize zaten pencereyi küçültüyor,
-      //   paddingBottom eklersek çift kaydırma olur (input bar yukarı zıplar).
-      if (Platform.OS === 'ios') setKbHeight(e.endCoordinates.height);
+    if (keyboardVisible || isAtBottomRef.current) {
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: false }), 80);
-    });
-    const hideSub = Keyboard.addListener(hideEvent, () => {
-      if (Platform.OS === 'ios') setKbHeight(0);
-      if (isAtBottomRef.current) {
-        setTimeout(() => flatListRef.current?.scrollToEnd({ animated: false }), 80);
-      }
-    });
-    return () => { showSub.remove(); hideSub.remove(); };
-  }, []);
+    }
+  }, [keyboardVisible, kbHeight]);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const flatListRef = useRef<FlatList>(null);
   const isAtBottomRef = useRef(true); // ★ BUG-6 FIX: Kullanıcı en altta mı?
@@ -1392,11 +1378,7 @@ export default function ChatScreen() {
 
   return (
     <AppBackground radialGlow>
-    {/* ★ v110.5.23 (6 May 2026): KAV KALDIRILDI — manuel kbHeight ile container paddingBottom.
-         Eski sorun: KAV padding animation timing klavye animation ile farklı → klavye
-         kapanınca input bar'ın altında geçici boşluk kalıyordu.
-         Yeni: kbHeight state setKbHeight ile (keyboardDidHide=0 anlık) → paddingBottom
-         instant 0 → input bar tam yere oturur, geçiş boşluğu yok. */}
+    {/* API 36 edge-to-edge: gerçek IME örtüşmesi kadar padding uygulanır. */}
     <Animated.View style={[styles.container, { opacity: contentOpacity, transform: [{ translateY: contentTranslateY }], paddingBottom: kbHeight }]}>
 
       {/* Header — Ana sayfadaki banner ile aynı (bombe gradient + teal separator) */}

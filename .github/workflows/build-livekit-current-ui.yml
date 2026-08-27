@@ -37,7 +37,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: sopranochat-1.7.13.154-social-notifications-apk-aab
+          name: sopranochat-1.7.13.155-keyboard-insets-apk-aab
           path: |
             android/app/build/outputs/apk/release/app-release.apk
             android/app/build/outputs/bundle/release/app-release.aab

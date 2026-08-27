@@ -28,6 +28,7 @@ import SPIcon from '../SPIcon';
 // ★ v280 (15 May 2026): TierBadge import KALDIRILDI — web admin CosmeticBadge sistemi kullanılıyor.
 import { migrateLegacyTier } from '../../types';
 import { i18n } from '../../services/i18n';
+import { useKeyboardOverlap } from '../../hooks/useKeyboardOverlap';
 
 // Snap points — CONTROL_BAR_AREA: bar + padding alanı (insets.bottom hariç).
 // RoomControlBar: BAR_H=50 + üstündeki wrapper paddingBottom(8) = 58.
@@ -441,6 +442,11 @@ export default function RoomChatDrawer({
 
   const inputBottomAnim = useRef(new Animated.Value(restBottom)).current;
   const sheetBottomAnim = useRef(new Animated.Value(restBottom)).current;
+  const {
+    keyboardOverlap,
+    keyboardVisible,
+    windowHeight,
+  } = useKeyboardOverlap();
 
   // İlk açılışta instant set (animasyonsuz)
   useEffect(() => {
@@ -451,58 +457,51 @@ export default function RoomChatDrawer({
   }, [visible]);
 
   useEffect(() => {
-    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
-    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    if (!visible) return;
 
-    const showSub = Keyboard.addListener(showEvent, (e) => {
-      if (!visible) return;
-      const kbHeight = e.endCoordinates?.height || 0;
+    // API 36 edge-to-edge cihazlarda adjustResize zorunlu olarak çalışmayabilir.
+    // Hook yalnızca klavyenin pencereyi gerçekten örttüğü kısmı verir: pencere
+    // küçülmüşse 0, tam ekran kalmışsa IME yüksekliği. Böylece sheet her iki
+    // durumda da klavyenin tam üstüne oturur.
+    const targetBottom = keyboardVisible ? keyboardOverlap : restBottom;
+    setKbCompensation(keyboardVisible ? Math.max(0, restBottom - targetBottom) : 0);
+    Animated.parallel([
+      Animated.timing(inputBottomAnim, {
+        toValue: targetBottom,
+        duration: keyboardVisible ? 160 : 200,
+        useNativeDriver: false,
+      }),
+      Animated.timing(sheetBottomAnim, {
+        toValue: targetBottom,
+        duration: keyboardVisible ? 160 : 200,
+        useNativeDriver: false,
+      }),
+    ]).start();
 
-      if (Platform.OS === 'ios') {
-        // iOS: adjustResize yok → bottom'a kbHeight ekle (eski mantık)
-        const targetBottom = restBottom + kbHeight;
-        Animated.parallel([
-          Animated.timing(inputBottomAnim, { toValue: targetBottom, duration: 250, useNativeDriver: false }),
-          Animated.timing(sheetBottomAnim, { toValue: targetBottom, duration: 250, useNativeDriver: false }),
-        ]).start();
-      } else {
-        // ★ v1.7.13.161: Android — adjustResize window'u küçültüyor.
-        //   bottom:0 = küçülen window'un alt kenarı = klavyenin tam üstü.
-        //   Eski karmaşık hesaplama (windowShrunk, kbScreenY) yanlış konumlanmaya sebep oluyordu.
-        const targetBottom = 0;
-        Animated.parallel([
-          Animated.timing(inputBottomAnim, { toValue: targetBottom, duration: 150, useNativeDriver: false }),
-          Animated.timing(sheetBottomAnim, { toValue: targetBottom, duration: 150, useNativeDriver: false }),
-        ]).start();
-
-        setKbCompensation(Math.max(restBottom, 0));
-      }
-
-      // Sheet height'ını klavye üstüne sığdır
-      // ★ topReserve 100dp: API 36 emülatörde sheet TOP status bar altına kaçıyordu;
-      //   100dp ile başlık (Oda Sohbeti) garantili görünür yerde.
+    if (keyboardVisible) {
       const topReserve = Math.max(insets.top + 60, 100);
-      const visibleArea = screenH - Math.max(kbHeight, restBottom) - topReserve - INPUT_BAR_H;
+      const visibleArea = windowHeight - keyboardOverlap - topReserve - INPUT_BAR_H;
       if (currentSnap.current > visibleArea && visibleArea > 0) {
         currentSnap.current = visibleArea;
         Animated.timing(sheetHeight, {
           toValue: visibleArea,
-          duration: 220,
+          duration: 180,
           useNativeDriver: false,
         }).start();
       }
-    });
-
-    const hideSub = Keyboard.addListener(hideEvent, () => {
-      setKbCompensation(0);
-      Animated.parallel([
-        Animated.timing(inputBottomAnim, { toValue: restBottom, duration: 200, useNativeDriver: false }),
-        Animated.timing(sheetBottomAnim, { toValue: restBottom, duration: 200, useNativeDriver: false }),
-      ]).start();
-    });
-
-    return () => { showSub.remove(); hideSub.remove(); };
-  }, [visible, restBottom, INPUT_BAR_H, insets.top, screenH]);
+    } else if (currentSnap.current > 0) {
+      const restoredHeight = Math.min(lastOpenSnapRef.current, availableH);
+      currentSnap.current = restoredHeight;
+      Animated.timing(sheetHeight, {
+        toValue: restoredHeight,
+        duration: 200,
+        useNativeDriver: false,
+      }).start();
+    }
+  }, [
+    visible, keyboardVisible, keyboardOverlap, windowHeight, restBottom,
+    INPUT_BAR_H, insets.top, availableH,
+  ]);
 
   // ════════════════════════════════════════════════════════════
   // Animated sheet height — 0 (closed) → SNAP_HALF → SNAP_FULL
