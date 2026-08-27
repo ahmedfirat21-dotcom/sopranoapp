@@ -38,7 +38,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: sopranochat-1.7.13.157-keyboard-root-fix-apk-aab
+          name: sopranochat-1.7.13.158-keyboard-root-fix-apk-aab
           path: |
             android/app/build/outputs/apk/release/app-release.apk
             android/app/build/outputs/bundle/release/app-release.aab
