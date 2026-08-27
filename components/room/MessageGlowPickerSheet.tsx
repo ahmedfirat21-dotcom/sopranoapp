@@ -7,7 +7,7 @@ import React, { useEffect, useMemo, useRef } from 'react';
 import { i18n } from '../../services/i18n';
 import {
   View, Text, StyleSheet, Pressable, Animated, PanResponder, Dimensions, Platform,
-  ScrollView, useWindowDimensions, Easing,
+  ScrollView, useWindowDimensions, Easing, Modal,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
@@ -54,6 +54,8 @@ export default function MessageGlowPickerSheet({ visible, onClose, currentSP, on
   const translateY = useRef(new Animated.Value(SNAP_DISMISS)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
   const currentSnapRef = useRef<number>(SNAP_DISMISS);
+  const snapPointsRef = useRef({ full: SNAP_FULL, half: SNAP_HALF, dismiss: SNAP_DISMISS });
+  snapPointsRef.current = { full: SNAP_FULL, half: SNAP_HALF, dismiss: SNAP_DISMISS };
 
   useEffect(() => {
     if (visible) {
@@ -81,14 +83,19 @@ export default function MessageGlowPickerSheet({ visible, onClose, currentSP, on
   onCloseRef.current = onClose;
   const panResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => false,
+      // Bu responder yalnızca handle+header'a bağlı. Dokunulduğu anda sahiplenmek,
+      // üstteki RoomChatDrawer Modal'ının hareketi yutmasını engeller.
+      onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: (_, gs) => Math.abs(gs.dy) > 8 && Math.abs(gs.dy) > Math.abs(gs.dx) * 1.5,
+      onMoveShouldSetPanResponderCapture: (_, gs) => Math.abs(gs.dy) > 6 && Math.abs(gs.dy) > Math.abs(gs.dx) * 1.3,
       onPanResponderTerminationRequest: () => false,
       onPanResponderMove: (_, gs) => {
+        const { full } = snapPointsRef.current;
         const newY = currentSnapRef.current + gs.dy;
-        translateY.setValue(Math.max(SNAP_FULL - 10, newY));
+        translateY.setValue(Math.max(full - 10, newY));
       },
       onPanResponderRelease: (_, gs) => {
+        const { full, half, dismiss } = snapPointsRef.current;
         const finalPos = currentSnapRef.current + gs.dy;
         const fastDown = gs.vy > 0.6;
         const fastUp = gs.vy < -0.6;
@@ -103,10 +110,10 @@ export default function MessageGlowPickerSheet({ visible, onClose, currentSP, on
           }).start();
         };
         const animateDismiss = () => {
-          currentSnapRef.current = SNAP_DISMISS;
+          currentSnapRef.current = dismiss;
           Animated.parallel([
             Animated.timing(translateY, {
-              toValue: SNAP_DISMISS,
+              toValue: dismiss,
               duration: 240,
               easing: Easing.in(Easing.cubic),
               useNativeDriver: true,
@@ -120,23 +127,23 @@ export default function MessageGlowPickerSheet({ visible, onClose, currentSP, on
         //   - Hızlı yukarı: bir snap yukarı (DISMISS→HALF, HALF→FULL)
         //   - Bırakıldığı yere göre en yakın snap'e git
         if (fastDown) {
-          if (currentSnapRef.current === SNAP_FULL) animateTo(SNAP_HALF);
+          if (currentSnapRef.current === full) animateTo(half);
           else animateDismiss();
           return;
         }
         if (fastUp) {
-          if (currentSnapRef.current === SNAP_HALF) animateTo(SNAP_FULL);
-          else animateTo(SNAP_HALF);
+          if (currentSnapRef.current === half) animateTo(full);
+          else animateTo(half);
           return;
         }
         // En yakın snap
-        const distFull = Math.abs(finalPos - SNAP_FULL);
-        const distHalf = Math.abs(finalPos - SNAP_HALF);
-        const distDismiss = Math.abs(finalPos - SNAP_DISMISS);
+        const distFull = Math.abs(finalPos - full);
+        const distHalf = Math.abs(finalPos - half);
+        const distDismiss = Math.abs(finalPos - dismiss);
         const min = Math.min(distFull, distHalf, distDismiss);
-        if (min === distDismiss && distDismiss < PANEL_HEIGHT * 0.25) animateDismiss();
-        else if (min === distFull) animateTo(SNAP_FULL);
-        else animateTo(SNAP_HALF);
+        if (min === distDismiss && distDismiss < dismiss * 0.25) animateDismiss();
+        else if (min === distFull) animateTo(full);
+        else animateTo(half);
       },
     })
   ).current;
@@ -144,6 +151,16 @@ export default function MessageGlowPickerSheet({ visible, onClose, currentSP, on
   if (!visible) return null;
 
   return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="none"
+      presentationStyle="overFullScreen"
+      statusBarTranslucent
+      navigationBarTranslucent
+      hardwareAccelerated
+      onRequestClose={onClose}
+    >
     <View style={StyleSheet.absoluteFillObject as any} pointerEvents="box-none">
       {/* ★ v110.7 fix (7 May 2026): Android elevation eklendi.
           RoomChatDrawer sheet'i elevation:58 ile renderlanıyor; picker'ın ScrollView
@@ -191,7 +208,7 @@ export default function MessageGlowPickerSheet({ visible, onClose, currentSP, on
               ek View {flex:1} sınır net hale getirir. */}
           <View style={{ flex: 1, minHeight: 0 }}>
             {/* Drag yalnız handle + header'da; ScrollView'a karışmaz */}
-            <View {...panResponder.panHandlers}>
+            <View collapsable={false} {...panResponder.panHandlers}>
               {/* Handle */}
               <View style={s.handle}><View style={s.handleBar} /></View>
 
@@ -319,6 +336,7 @@ export default function MessageGlowPickerSheet({ visible, onClose, currentSP, on
         </Animated.View>
       </View>
     </View>
+    </Modal>
   );
 }
 
