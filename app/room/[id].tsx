@@ -23,6 +23,7 @@ import {
   Keyboard,
   LayoutAnimation,
   UIManager,
+  Modal,
 } from 'react-native';
 import AppLoader from '../../components/AppLoader';
 import BoostSuccessOverlay from '../../components/BoostSuccessOverlay';
@@ -976,13 +977,28 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
   if (!mounted) return null;
 
   return (
-    <View
-      ref={dmKeyboardHostRef}
-      collapsable={false}
-      onLayout={onDmKeyboardHostLayout}
-      style={StyleSheet.absoluteFill}
-      pointerEvents="box-none"
+    <Modal
+      visible={mounted}
+      transparent
+      animationType="none"
+      presentationStyle="overFullScreen"
+      statusBarTranslucent
+      navigationBarTranslucent
+      hardwareAccelerated
+      onRequestClose={() => {
+        if (dmKeyboardVisible) Keyboard.dismiss();
+        else if (dmActionMenuMsg) setDmActionMenuMsg(null);
+        else if (chatTarget) setChatTarget(null);
+        else onClose();
+      }}
     >
+      <View
+        ref={dmKeyboardHostRef}
+        collapsable={false}
+        onLayout={onDmKeyboardHostLayout}
+        style={StyleSheet.absoluteFill}
+        pointerEvents="box-none"
+      >
       {/* Backdrop */}
       <Animated.View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.35)', opacity: fadeAnim }]}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
@@ -1590,7 +1606,8 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
         />
       </Animated.View>
       </Animated.View>
-    </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -3950,19 +3967,21 @@ export default function RoomScreen() {
 
   // ★ v32 Caretaker modu — owner/mod yokken listener sahneye kendi çıkabilir (süreli)
   const isCaretakerMode = useMemo(() => {
-    const hasAuthority = participants.some(p =>
+    const hasAuthority = stageUsers.some(p =>
       (p.role === 'owner' || p.role === 'moderator') && !(p as any).is_ghost
     );
     return !hasAuthority;
-  }, [participants]);
+  }, [stageUsers]);
 
   // Sahnedeki slot sayısı (caretaker buton disable kararı için)
   const stageLimits = useMemo(() => {
     const tier = migrateLegacyTier((room as any)?.owner_tier || room?.host?.subscription_tier || 'Free');
     const limits = getRoomLimits(tier);
-    const current = participants.filter(p => ['owner', 'moderator', 'speaker'].includes(p.role)).length;
+    // UI'da gerçekten görünen/aktif sahneyi esas al. Ham participants listesinde
+    // kalan eski owner/speaker satırları boş sahneyi yanlışlıkla dolu saymamalı.
+    const current = stageUsers.filter(p => !(p as any).is_ghost).length;
     return { current, max: limits.maxSpeakers };
-  }, [participants, room]);
+  }, [stageUsers, room]);
 
   // ★ Listener stage button davranışı — RoomControlBar'a prop olarak geçilir.
   // 'direct_join' | 'raise_hand' | 'waiting' | 'locked'
@@ -3972,10 +3991,11 @@ export default function RoomScreen() {
     const isOnStage = room?.host_id === firebaseUser?.uid
       || myRole === 'moderator' || myRole === 'speaker' || myRole === 'owner';
     if (isOnStage) return 'raise_hand'; // listener değil; prop ignore edilecek
-    if (myMicRequested) return 'waiting';
     // Owner/mod bulunmayan ve sahnesi tamamen boş odada ilk dinleyici caretaker
-    // olarak doğrudan çıkar. İlk konuşmacıdan sonra normal el kaldırma/onay akışı.
+    // olarak doğrudan çıkar. Bu kontrol eski/pending el kaldırma kaydından önce
+    // gelmeli; aksi halde güncelleme sonrası kullanıcı sonsuza dek "bekliyor" kalır.
     if (isCaretakerMode && stageLimits.current === 0 && stageLimits.max > 0) return 'direct_join';
+    if (myMicRequested) return 'waiting';
     if (speakingMode === 'selected_only') return 'locked';
     return 'raise_hand';
   }, [participants, firebaseUser?.uid, room?.host_id, speakingMode, myMicRequested, isCaretakerMode, stageLimits.current, stageLimits.max]);
@@ -4151,6 +4171,12 @@ export default function RoomScreen() {
           ? { ...p, role: 'speaker' as const, stage_expires_at: result.expires_at, is_muted: false }
           : p
       ));
+      setMyMicRequested(false);
+      setMicRequests(prev => prev.filter(uid => uid !== firebaseUser.uid));
+      micReqChannelRef.current?.send({
+        type: 'broadcast', event: 'mic_request',
+        payload: { type: 'cancel', userId: firebaseUser.uid },
+      });
       // ★ 2026-04-20 FIX: Sahneye çıkınca mikrofonu otomatik aç
       setTimeout(() => { lk.enableMic?.().catch(() => {}); }, 500);
     } catch (err: any) {
@@ -4172,6 +4198,12 @@ export default function RoomScreen() {
               ? { ...p, role: 'speaker' as const, stage_expires_at: retry.expires_at, is_muted: false }
               : p
           ));
+          setMyMicRequested(false);
+          setMicRequests(prev => prev.filter(uid => uid !== firebaseUser.uid));
+          micReqChannelRef.current?.send({
+            type: 'broadcast', event: 'mic_request',
+            payload: { type: 'cancel', userId: firebaseUser.uid },
+          });
           setTimeout(() => { lk.enableMic?.().catch(() => {}); }, 500);
           return;
         } catch (retryErr: any) {

@@ -10,7 +10,7 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, Animated, Pressable, TextInput,
-  FlatList, Image, Platform, PanResponder, Keyboard, Dimensions, Easing,
+  FlatList, Image, Platform, PanResponder, Keyboard, Dimensions, Easing, Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -934,13 +934,26 @@ export default function RoomChatDrawer({
   if (!isOpen) return null;
 
   return (
-    <View
-      ref={keyboardHostRef}
-      collapsable={false}
-      onLayout={onKeyboardHostLayout}
-      style={StyleSheet.absoluteFill}
-      pointerEvents="box-none"
+    <Modal
+      visible={isOpen}
+      transparent
+      animationType="none"
+      presentationStyle="overFullScreen"
+      statusBarTranslucent
+      navigationBarTranslucent
+      hardwareAccelerated
+      onRequestClose={() => {
+        if (keyboardVisible) Keyboard.dismiss();
+        else animateTo(SNAP_CLOSED);
+      }}
     >
+      <View
+        ref={keyboardHostRef}
+        collapsable={false}
+        onLayout={onKeyboardHostLayout}
+        style={StyleSheet.absoluteFill}
+        pointerEvents="box-none"
+      >
       {/* Backdrop — hafif karartma, tıklayınca kapat */}
       <Animated.View
         style={[StyleSheet.absoluteFill, { zIndex: 55, elevation: 55, opacity: backdropOpacity, backgroundColor: 'rgba(8,12,22,0.45)' }]}
@@ -1201,7 +1214,8 @@ export default function RoomChatDrawer({
         ownedPremiumIds={ownedPremiumGlowIds}
         onOpenStore={onOpenStore}
       />
-    </View>
+      </View>
+    </Modal>
   );
 }
 
