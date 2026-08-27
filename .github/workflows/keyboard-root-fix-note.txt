@@ -1,0 +1,1 @@
+This temporary marker exists only to trigger the same-repo PR verification after the base workflow gained pull_request support.
