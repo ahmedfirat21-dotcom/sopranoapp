@@ -126,7 +126,13 @@ export function useRadioPlayer({ enabled }: UseRadioPlayerOpts) {
       } catch { /* opsiyonel — başarısız olsa bile devam */ }
 
       const { sound } = await Audio.Sound.createAsync(
-        { uri: channel.streamUrl } as AVPlaybackSource,
+        {
+          uri: channel.streamUrl,
+          headers: {
+            'User-Agent': 'SopranoChat-Android/1.7',
+            'Icy-MetaData': '1',
+          },
+        } as AVPlaybackSource,
         {
           shouldPlay: true,
           // ★ v1.7.13.161: Volume ayarı kaldırıldı — sistem volume’una bırakıldı.

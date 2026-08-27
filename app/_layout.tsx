@@ -1,7 +1,7 @@
 // LiveKit polyfill kaldırıldı — native modül yoksa Hermes'te 'Requiring unknown module' crash'ine sebep oluyordu
 import { useEffect, useState, useRef, useCallback, useMemo, createContext, useContext } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { View, Text, Pressable, StyleSheet, Dimensions, AppState, Platform, PermissionsAndroid, LogBox, DeviceEventEmitter } from 'react-native';
+import { View, Text, Pressable, StyleSheet, Dimensions, AppState, Platform, PermissionsAndroid, LogBox, DeviceEventEmitter, BackHandler, Keyboard } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 // ★ 2026-04-25: Crashlytics — Firebase ile entegre crash izleme.
@@ -125,7 +125,7 @@ console.log = (...args: any[]) => {
   if (__SUPPRESS_PATTERNS.some(p => p.test(msg))) return;
   __origLog(...args);
 };
-import { Stack, useRouter, useSegments } from 'expo-router';
+import { Stack, usePathname, useRouter, useSegments } from 'expo-router';
 // ★ v92.16: react-native-keyboard-controller kaldırıldı — native modül linked değildi,
 //   dev/build'de "doesn't seem to be linked" crash'e neden oluyordu.
 //   RN built-in KeyboardAvoidingView + Keyboard API yeterli.
@@ -815,6 +815,35 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
 
 // ========== ROOT LAYOUT ==========
 const { width, height } = Dimensions.get('window');
+
+// Android 16 safety net: screen-specific handlers still close room overlays
+// first. If Expo Router has no native back entry (for example after a cold deep
+// link), do not terminate the app from a secondary page; return to Home.
+function AndroidBackFallback() {
+  const router = useRouter();
+  const pathname = usePathname();
+
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (Keyboard.isVisible?.()) {
+        Keyboard.dismiss();
+        return true;
+      }
+      if (router.canGoBack()) return false;
+
+      const isHome = pathname === '/' || pathname === '/home' || pathname === '/(tabs)/home';
+      if (!isHome) {
+        router.replace('/(tabs)/home' as any);
+        return true;
+      }
+      return false;
+    });
+    return () => sub.remove();
+  }, [pathname, router]);
+
+  return null;
+}
 
 export default function RootLayout() {
   // Splash kaldırıldı — doğrudan login/home'a geçiş
@@ -1805,6 +1834,7 @@ export default function RootLayout() {
         <StatusBar style="light" />
         <ErrorBoundary fallbackTitle={i18n.t('auto._layout.001')}>
         <AuthGuard>
+          <AndroidBackFallback />
           <Stack
             screenOptions={{
               headerShown: false,

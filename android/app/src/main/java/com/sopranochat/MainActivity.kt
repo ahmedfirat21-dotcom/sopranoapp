@@ -3,6 +3,11 @@ import expo.modules.splashscreen.SplashScreenManager
 
 import android.os.Build
 import android.os.Bundle
+import android.view.View
+import android.view.WindowManager
+
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate
@@ -21,6 +26,30 @@ class MainActivity : ReactActivity() {
     SplashScreenManager.registerOnActivity(this)
     // @generated end expo-splashscreen
     super.onCreate(null)
+
+    // targetSdk 35+ forces edge-to-edge. On Android 15/16 adjustResize does not
+    // reliably resize absolute React Native overlays, so apply the native IME
+    // inset to the React root. This fixes every composer, including room chat
+    // and the in-room DM drawer, from one authoritative keyboard boundary.
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+      window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING)
+      val content = findViewById<View>(android.R.id.content)
+      ViewCompat.setOnApplyWindowInsetsListener(content) { view, insets ->
+        val imeVisible = insets.isVisible(WindowInsetsCompat.Type.ime())
+        val imeBottom = insets.getInsets(WindowInsetsCompat.Type.ime()).bottom
+        val navigationBottom = insets.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom
+        val keyboardBottom = if (imeVisible) {
+          (imeBottom - navigationBottom).coerceAtLeast(0)
+        } else {
+          0
+        }
+        if (view.paddingBottom != keyboardBottom) {
+          view.setPadding(view.paddingLeft, view.paddingTop, view.paddingRight, keyboardBottom)
+        }
+        insets
+      }
+      ViewCompat.requestApplyInsets(content)
+    }
   }
 
   /**
