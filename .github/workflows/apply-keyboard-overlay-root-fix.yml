@@ -1,0 +1,478 @@
+name: Apply measured keyboard overlay fix
+
+on:
+  push:
+    branches:
+      - fix/keyboard-overlay-root
+    paths:
+      - .github/workflows/apply-keyboard-overlay-root-fix.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/keyboard-overlay-root
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: gradle
+
+      - name: Apply root keyboard and overlay fix
+        shell: bash
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          import json, re
+
+          def replace_once(text, old, new, label):
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{label}: expected 1 exact match, found {count}')
+              return text.replace(old, new, 1)
+
+          # 1) Keyboard geometry: keep backward-compatible overlap but also expose
+          #    the IME's absolute screen top so overlays can anchor by measurement.
+          Path('hooks/useKeyboardOverlap.ts').write_text(r'''import { useEffect, useMemo, useRef, useState } from 'react';
+          import { Dimensions, Keyboard, Platform } from 'react-native';
+
+          /**
+           * Keyboard geometry shared by chat surfaces.
+           *
+           * `keyboardOverlap` is kept for older callers. New absolute overlays should
+           * prefer `keyboardTopScreenY` together with a measured host frame because
+           * Android 16/Samsung can report a resized window while an absolute React
+           * Native overlay still occupies the full screen.
+           */
+          export function useKeyboardOverlap() {
+            const initialWindowHeight = Dimensions.get('window').height;
+            const closedWindowHeightRef = useRef(initialWindowHeight);
+            const [windowHeight, setWindowHeight] = useState(initialWindowHeight);
+            const [keyboardHeight, setKeyboardHeight] = useState(0);
+            const [keyboardVisible, setKeyboardVisible] = useState(false);
+            const [keyboardTopScreenY, setKeyboardTopScreenY] = useState<number | null>(null);
+            const keyboardVisibleRef = useRef(false);
+            const restoreTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+            useEffect(() => {
+              const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+              const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+              const showSub = Keyboard.addListener(showEvent, (event) => {
+                if (restoreTimerRef.current) clearTimeout(restoreTimerRef.current);
+                const reportedHeight = Math.max(0, event.endCoordinates?.height || 0);
+                const reportedTop = event.endCoordinates?.screenY;
+                const fallbackTop = Dimensions.get('screen').height - reportedHeight;
+
+                keyboardVisibleRef.current = true;
+                setKeyboardVisible(true);
+                setKeyboardHeight(reportedHeight);
+                setKeyboardTopScreenY(
+                  typeof reportedTop === 'number' && Number.isFinite(reportedTop) && reportedTop > 0
+                    ? reportedTop
+                    : fallbackTop,
+                );
+                setWindowHeight(Dimensions.get('window').height);
+              });
+
+              const hideSub = Keyboard.addListener(hideEvent, () => {
+                keyboardVisibleRef.current = false;
+                setKeyboardVisible(false);
+                setKeyboardHeight(0);
+                setKeyboardTopScreenY(null);
+                setWindowHeight(Dimensions.get('window').height);
+
+                // Samsung can restore window metrics one or two frames after keyboardDidHide.
+                restoreTimerRef.current = setTimeout(() => {
+                  const restoredHeight = Dimensions.get('window').height;
+                  closedWindowHeightRef.current = restoredHeight;
+                  setWindowHeight(restoredHeight);
+                }, Platform.OS === 'android' ? 80 : 0);
+              });
+
+              const dimensionsSub = Dimensions.addEventListener('change', ({ window }) => {
+                setWindowHeight(window.height);
+                if (!keyboardVisibleRef.current) {
+                  closedWindowHeightRef.current = window.height;
+                }
+              });
+
+              return () => {
+                showSub.remove();
+                hideSub.remove();
+                dimensionsSub.remove();
+                if (restoreTimerRef.current) clearTimeout(restoreTimerRef.current);
+              };
+            }, []);
+
+            const keyboardOverlap = useMemo(() => {
+              if (!keyboardVisible || keyboardHeight <= 0) return 0;
+              if (Platform.OS !== 'android') return keyboardHeight;
+
+              const windowShrink = Math.max(0, closedWindowHeightRef.current - windowHeight);
+              return Math.max(0, keyboardHeight - windowShrink);
+            }, [keyboardHeight, keyboardVisible, windowHeight]);
+
+            return {
+              keyboardHeight,
+              keyboardOverlap,
+              keyboardVisible,
+              keyboardTopScreenY,
+              windowHeight,
+            };
+          }
+          '''.replace('\n          ', '\n').lstrip(), encoding='utf-8')
+
+          Path('hooks/useKeyboardAnchor.ts').write_text(r'''import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+          import { Dimensions, Platform, View } from 'react-native';
+          import { useKeyboardOverlap } from './useKeyboardOverlap';
+
+          type HostFrame = { y: number; height: number };
+
+          /**
+           * Anchors an overlay/composer to the real IME top instead of guessing from
+           * window-resize behaviour. The host is measured in screen coordinates, so:
+           * - adjustResize host ending at keyboard top => inset 0
+           * - edge-to-edge/full-screen host behind IME => inset equals covered pixels
+           *
+           * This is intentionally measurement-based to survive Samsung/API 36 OEM
+           * differences and to avoid double-lifting composers.
+           */
+          export function useKeyboardAnchor() {
+            const keyboard = useKeyboardOverlap();
+            const hostRef = useRef<View>(null);
+            const [hostFrame, setHostFrame] = useState<HostFrame>({
+              y: 0,
+              height: Dimensions.get('window').height,
+            });
+
+            const measureHost = useCallback(() => {
+              requestAnimationFrame(() => {
+                hostRef.current?.measureInWindow((_x, y, _w, height) => {
+                  if (!Number.isFinite(y) || !Number.isFinite(height) || height <= 0) return;
+                  setHostFrame(prev =>
+                    Math.abs(prev.y - y) < 0.5 && Math.abs(prev.height - height) < 0.5
+                      ? prev
+                      : { y, height },
+                  );
+                });
+              });
+            }, []);
+
+            useEffect(() => {
+              measureHost();
+              const fast = setTimeout(measureHost, Platform.OS === 'android' ? 32 : 16);
+              const settled = setTimeout(measureHost, Platform.OS === 'android' ? 140 : 80);
+              return () => {
+                clearTimeout(fast);
+                clearTimeout(settled);
+              };
+            }, [keyboard.keyboardVisible, keyboard.keyboardTopScreenY, keyboard.windowHeight, measureHost]);
+
+            const keyboardInset = useMemo(() => {
+              if (!keyboard.keyboardVisible || keyboard.keyboardTopScreenY == null) return 0;
+              const hostBottomScreenY = hostFrame.y + hostFrame.height;
+              const covered = Math.max(0, hostBottomScreenY - keyboard.keyboardTopScreenY);
+              return Math.min(hostFrame.height, covered);
+            }, [keyboard.keyboardVisible, keyboard.keyboardTopScreenY, hostFrame]);
+
+            return {
+              ...keyboard,
+              hostRef,
+              onHostLayout: measureHost,
+              hostTopScreenY: hostFrame.y,
+              hostHeight: hostFrame.height,
+              keyboardInset,
+            };
+          }
+          '''.replace('\n          ', '\n').lstrip(), encoding='utf-8')
+
+          # 2) RoomChatDrawer: measured host + exact control-bar clearance.
+          p = Path('components/room/RoomChatDrawer.tsx')
+          s = p.read_text(encoding='utf-8')
+          s = replace_once(s,
+              "import { useKeyboardOverlap } from '../../hooks/useKeyboardOverlap';",
+              "import { useKeyboardAnchor } from '../../hooks/useKeyboardAnchor';",
+              'RoomChatDrawer import')
+          s = replace_once(s,
+              "  bottomInset: number;\n",
+              "  bottomInset: number;\n  /** Gerçek RoomControlBar wrapper yüksekliği (bar + safe-area). */\n  bottomClearance?: number;\n",
+              'RoomChatDrawer prop')
+          s = replace_once(s,
+              "  visible, messages, chatInput, onChangeInput, onSend, onClose, onSendRaw, currentUserId, roomId, onAvatarPress,\n",
+              "  visible, messages, chatInput, onChangeInput, onSend, onClose, bottomInset, bottomClearance = 0, onSendRaw, currentUserId, roomId, onAvatarPress,\n",
+              'RoomChatDrawer destructure')
+
+          start = s.index("  const screenH = Dimensions.get('screen').height;\n")
+          end_marker = "  // ★ Ref'ler — PanResponder stale closure bug'ını önler\n"
+          end = s.index(end_marker, start)
+          replacement = r'''  const {
+            hostRef: keyboardHostRef,
+            onHostLayout: onKeyboardHostLayout,
+            keyboardInset,
+            keyboardVisible,
+            hostHeight,
+          } = useKeyboardAnchor();
+          const screenH = Dimensions.get('screen').height;
+
+          // Klavye kapalıyken chat sheet gerçek kontrol barının tam üstüne oturur.
+          // Ölçüm henüz gelmediyse eski sabit değer sadece ilk-frame fallback'tir.
+          const fallbackRestBottom = CONTROL_BAR_AREA + Math.max(bottomInset || insets.bottom, 7);
+          const restBottom = Math.max(bottomClearance || 0, fallbackRestBottom);
+          const layoutHeight = Math.max(hostHeight, 320);
+          const anchorBottom = keyboardVisible ? keyboardInset : restBottom;
+          const availableH = Math.max(240, layoutHeight - anchorBottom - Math.max(insets.top, 20));
+          const SNAP_CLOSED = 0;
+          const SNAP_HALF = Math.min(availableH * 0.62, layoutHeight * 0.50);
+          const SNAP_FULL = Math.min(availableH * 0.80, layoutHeight * 0.65);
+
+          const GLOW_BANNER_H = 38;
+          const INPUT_BAR_BASE_H = 54;
+          const INPUT_BAR_H = pendingGlowStyle ? INPUT_BAR_BASE_H + GLOW_BANNER_H : INPUT_BAR_BASE_H;
+
+          // Animated sheet state is declared before keyboard effects so every geometry
+          // update uses one source of truth.
+          const sheetHeight = useRef(new Animated.Value(0)).current;
+          const closeTranslateY = useRef(new Animated.Value(0)).current;
+          const inputBarH = useRef(new Animated.Value(INPUT_BAR_H)).current;
+          const currentSnap = useRef(0);
+          const backdropOpacity = useRef(new Animated.Value(0)).current;
+          const isClosingRef = useRef(false);
+          const lastOpenSnapRef = useRef(SNAP_HALF);
+          const inputBottomAnim = useRef(new Animated.Value(restBottom)).current;
+          const sheetBottomAnim = useRef(new Animated.Value(restBottom)).current;
+
+          useEffect(() => {
+            if (!visible) return;
+            inputBottomAnim.setValue(restBottom);
+            sheetBottomAnim.setValue(restBottom);
+          }, [visible, restBottom, inputBottomAnim, sheetBottomAnim]);
+
+          useEffect(() => {
+            if (!visible) return;
+
+            // The host is measured in screen coordinates. This single formula works
+            // whether Android resized the RN root or left it full-screen behind IME.
+            const targetBottom = keyboardVisible ? keyboardInset : restBottom;
+            Animated.timing(sheetBottomAnim, {
+              toValue: targetBottom,
+              duration: keyboardVisible ? 120 : 170,
+              useNativeDriver: false,
+            }).start();
+
+            if (keyboardVisible) {
+              const topReserve = Math.max(insets.top + 60, 100);
+              const visibleArea = Math.max(240, layoutHeight - targetBottom - topReserve - INPUT_BAR_H);
+              if (currentSnap.current > visibleArea) {
+                currentSnap.current = visibleArea;
+                Animated.timing(sheetHeight, {
+                  toValue: visibleArea,
+                  duration: 140,
+                  useNativeDriver: false,
+                }).start();
+              }
+            } else if (currentSnap.current > 0) {
+              const restoredHeight = Math.min(lastOpenSnapRef.current, availableH);
+              currentSnap.current = restoredHeight;
+              Animated.timing(sheetHeight, {
+                toValue: restoredHeight,
+                duration: 170,
+                useNativeDriver: false,
+              }).start();
+            }
+          }, [
+            visible, keyboardVisible, keyboardInset, restBottom, layoutHeight,
+            INPUT_BAR_H, insets.top, availableH, sheetBottomAnim, sheetHeight,
+          ]);
+
+'''.replace('\n          ', '\n')
+          s = s[:start] + replacement + s[end:]
+
+          s = replace_once(s,
+              "  return (\n    <>\n      {/* Backdrop — hafif karartma, tıklayınca kapat */}",
+              "  return (\n    <View\n      ref={keyboardHostRef}\n      collapsable={false}\n      onLayout={onKeyboardHostLayout}\n      style={StyleSheet.absoluteFill}\n      pointerEvents=\"box-none\"\n    >\n      {/* Backdrop — hafif karartma, tıklayınca kapat */}",
+              'RoomChatDrawer host open')
+          s = replace_once(s,
+              "      />\n    </>\n  );\n}\n\n// ═══════════════════════════════════════════════════\n// STYLES",
+              "      />\n    </View>\n  );\n}\n\n// ═══════════════════════════════════════════════════\n// STYLES",
+              'RoomChatDrawer host close')
+          p.write_text(s, encoding='utf-8')
+
+          # 3) Room screen: same measured keyboard host for DM + measured control bar height.
+          p = Path('app/room/[id].tsx')
+          s = p.read_text(encoding='utf-8')
+          s = replace_once(s,
+              "import { useKeyboardOverlap } from '../../hooks/useKeyboardOverlap';",
+              "import { useKeyboardAnchor } from '../../hooks/useKeyboardAnchor';",
+              'room keyboard import')
+          s = replace_once(s,
+              "function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, dmUnreadCount, firebaseUser, bottomInset, initialChatTarget }: {",
+              "function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, dmUnreadCount, firebaseUser, bottomInset, bottomClearance, initialChatTarget }: {",
+              'DM signature')
+          s = replace_once(s,
+              "  bottomInset: number;\n  initialChatTarget?:",
+              "  bottomInset: number;\n  bottomClearance?: number;\n  initialChatTarget?:",
+              'DM type')
+
+          dm_start = s.index("  // API 36 edge-to-edge: IME pencereyi bazı cihazlarda küçültür, bazılarında örter.\n")
+          dm_end_marker = "  // ★ Swipe-to-dismiss — sağa sürükle\n"
+          dm_end = s.index(dm_end_marker, dm_start)
+          dm_replacement = r'''  const {
+            hostRef: dmKeyboardHostRef,
+            onHostLayout: onDmKeyboardHostLayout,
+            keyboardInset: dmKeyboardInset,
+            keyboardVisible: dmKeyboardVisible,
+            hostHeight: dmHostHeight,
+          } = useKeyboardAnchor();
+
+          // Klavye kapalı: gerçek control-bar yüksekliği kadar yukarıda.
+          // Klavye açık: control bar zaten IME arkasına gizlenir; panelin alt kenarı
+          // doğrudan ölçülmüş klavye üstüne sabitlenir.
+          const FALLBACK_CONTROL_CLEARANCE = 72 + Math.max(bottomInset, 6);
+          const REST_BOTTOM = Math.max(bottomClearance || 0, FALLBACK_CONTROL_CLEARANCE);
+          const REST_TOP = 70;
+          const restHeight = Math.max(dmHostHeight - REST_BOTTOM - REST_TOP, 240);
+          const dmPanelBottomAnim = useRef(new Animated.Value(REST_BOTTOM)).current;
+          const dmPanelHeightAnim = useRef(new Animated.Value(restHeight)).current;
+
+          useEffect(() => {
+            const composerActive = dmKeyboardVisible && !!chatTarget;
+            const targetBottom = composerActive ? dmKeyboardInset : REST_BOTTOM;
+            const targetHeight = Math.max(dmHostHeight - targetBottom - REST_TOP, 240);
+
+            Animated.parallel([
+              Animated.timing(dmPanelBottomAnim, {
+                toValue: targetBottom,
+                duration: composerActive ? 120 : 170,
+                useNativeDriver: false,
+              }),
+              Animated.timing(dmPanelHeightAnim, {
+                toValue: targetHeight,
+                duration: composerActive ? 120 : 170,
+                useNativeDriver: false,
+              }),
+            ]).start();
+          }, [
+            chatTarget?.userId, dmKeyboardVisible, dmKeyboardInset, dmHostHeight,
+            REST_BOTTOM, REST_TOP, dmPanelBottomAnim, dmPanelHeightAnim,
+          ]);
+
+'''.replace('\n          ', '\n')
+          s = s[:dm_start] + dm_replacement + s[dm_end:]
+
+          s = replace_once(s,
+              "    <View style={StyleSheet.absoluteFill} pointerEvents=\"box-none\">\n      {/* Backdrop */}",
+              "    <View\n      ref={dmKeyboardHostRef}\n      collapsable={false}\n      onLayout={onDmKeyboardHostLayout}\n      style={StyleSheet.absoluteFill}\n      pointerEvents=\"box-none\"\n    >\n      {/* Backdrop */}",
+              'DM host')
+
+          control_insert = """  // ★ v107: Hediye paneli — kontrol barındaki 🎁 butonu açar\n"""
+          control_state = """  // Overlay'ler için control bar yüksekliğini tahmin etmiyoruz; gerçek wrapper ölçülür.\n  const [controlBarClearance, setControlBarClearance] = useState(72 + Math.max(insets.bottom, 6));\n  useEffect(() => {\n    setControlBarClearance(72 + Math.max(insets.bottom, 6));\n  }, [insets.bottom]);\n\n  // ★ v107: Hediye paneli — kontrol barındaki 🎁 butonu açar\n"""
+          s = replace_once(s, control_insert, control_state, 'control clearance state')
+
+          s = replace_once(s,
+              "      <View style={{ position: 'absolute', bottom: ctrlKbOffsetPx, left: 0, right: 0, paddingBottom: Math.max(insets.bottom, 6), zIndex: 200, elevation: 200 }}>",
+              "      <View\n        onLayout={(e) => {\n          const h = e.nativeEvent.layout.height;\n          if (h > 0 && Math.abs(h - controlBarClearance) > 0.5) setControlBarClearance(h);\n        }}\n        style={{ position: 'absolute', bottom: ctrlKbOffsetPx, left: 0, right: 0, paddingBottom: Math.max(insets.bottom, 6), zIndex: 200, elevation: 200 }}\n      >",
+              'control wrapper measure')
+
+          s = replace_once(s,
+              "        onChangeInput={setChatInput} onSend={handleSendChat} onClose={() => setShowChatDrawer(false)} bottomInset={insets.bottom}\n",
+              "        onChangeInput={setChatInput} onSend={handleSendChat} onClose={() => setShowChatDrawer(false)} bottomInset={insets.bottom}\n        bottomClearance={controlBarClearance}\n",
+              'RoomChatDrawer clearance pass')
+          s = replace_once(s,
+              "        bottomInset={insets.bottom}\n        initialChatTarget={dmInitialTarget}\n",
+              "        bottomInset={insets.bottom}\n        bottomClearance={controlBarClearance}\n        initialChatTarget={dmInitialTarget}\n",
+              'DM clearance pass')
+          p.write_text(s, encoding='utf-8')
+
+          # 4) Full-screen DM chat: use the same measured host/IME anchor.
+          p = Path('app/chat/[id].tsx')
+          s = p.read_text(encoding='utf-8')
+          s = replace_once(s,
+              "import { useKeyboardOverlap } from '../../hooks/useKeyboardOverlap';",
+              "import { useKeyboardAnchor } from '../../hooks/useKeyboardAnchor';",
+              'chat keyboard import')
+          s = replace_once(s,
+              "  const { keyboardOverlap: kbHeight, keyboardVisible } = useKeyboardOverlap();",
+              "  const {\n    hostRef: keyboardHostRef,\n    onHostLayout: onKeyboardHostLayout,\n    keyboardInset: kbHeight,\n    keyboardVisible,\n  } = useKeyboardAnchor();",
+              'chat keyboard hook')
+          s = replace_once(s,
+              "    <AppBackground radialGlow>\n    {/* API 36 edge-to-edge: gerçek IME örtüşmesi kadar padding uygulanır. */}\n    <Animated.View style={[styles.container, { opacity: contentOpacity, transform: [{ translateY: contentTranslateY }], paddingBottom: kbHeight }]}>\n",
+              "    <AppBackground radialGlow>\n    <View\n      ref={keyboardHostRef}\n      collapsable={false}\n      onLayout={onKeyboardHostLayout}\n      style={styles.keyboardHost}\n    >\n    {/* API 36/Samsung: ölçülen host ile gerçek IME üstüne sabitlenir. */}\n    <Animated.View style={[styles.container, { opacity: contentOpacity, transform: [{ translateY: contentTranslateY }], paddingBottom: kbHeight }]}>\n",
+              'chat host open')
+          s = replace_once(s,
+              "    </Animated.View>\n    </AppBackground>\n  );",
+              "    </Animated.View>\n    </View>\n    </AppBackground>\n  );",
+              'chat host close')
+          s = replace_once(s,
+              "const styles = StyleSheet.create({\n  container: { flex: 1, backgroundColor: 'transparent' },\n",
+              "const styles = StyleSheet.create({\n  keyboardHost: { flex: 1 },\n  container: { flex: 1, backgroundColor: 'transparent' },\n",
+              'chat host style')
+          p.write_text(s, encoding='utf-8')
+
+          # 5) Version bump: 1.7.13.157 / versionCode 384.
+          app = Path('app.json')
+          data = json.loads(app.read_text(encoding='utf-8'))
+          data['expo']['version'] = '1.7.13.157'
+          data['expo']['android']['versionCode'] = 384
+          app.write_text(json.dumps(data, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+
+          p = Path('android/app/build.gradle')
+          s = p.read_text(encoding='utf-8')
+          s = re.sub(r'versionCode\s+383\b', 'versionCode 384', s, count=1)
+          s = re.sub(r'versionName\s+"1\.7\.13\.156"', 'versionName "1.7.13.157"', s, count=1)
+          p.write_text(s, encoding='utf-8')
+
+          p = Path('.github/workflows/build-livekit-current-ui.yml')
+          s = p.read_text(encoding='utf-8')
+          s = s.replace('sopranochat-1.7.13.156-keyboard-and-lobby-apk-aab', 'sopranochat-1.7.13.157-keyboard-root-fix-apk-aab')
+          p.write_text(s, encoding='utf-8')
+
+          # Fail loudly if old broken logic survived in the two affected room surfaces.
+          room = Path('app/room/[id].tsx').read_text(encoding='utf-8')
+          drawer = Path('components/room/RoomChatDrawer.tsx').read_text(encoding='utf-8')
+          assert 'keyboardOverlap, keyboardVisible, windowHeight' not in room
+          assert 'const [kbCompensation' not in drawer
+          assert 'bottomClearance={controlBarClearance}' in room
+          assert 'useKeyboardAnchor' in drawer and 'useKeyboardAnchor' in room
+          PY
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Android splash resources
+        run: node scripts/gen-splash-logo.js
+
+      - name: Build Android APK and App Bundle
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease bundleRelease --no-daemon
+
+      - name: Commit verified patch
+        shell: bash
+        run: |
+          git config user.name "soprano-release-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add hooks/useKeyboardOverlap.ts hooks/useKeyboardAnchor.ts components/room/RoomChatDrawer.tsx app/room/'[id].tsx' app/chat/'[id].tsx' app.json android/app/build.gradle .github/workflows/build-livekit-current-ui.yml
+          git commit -m "fix: anchor message composers to measured keyboard geometry"
+          git push origin HEAD:fix/keyboard-overlay-root
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sopranochat-1.7.13.157-keyboard-root-fix-apk-aab
+          path: |
+            android/app/build/outputs/apk/release/app-release.apk
+            android/app/build/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
