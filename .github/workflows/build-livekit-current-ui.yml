@@ -5,12 +5,26 @@ on:
   push:
     branches:
       - fix/livekit-current-ui
+  pull_request:
+    branches:
+      - fix/livekit-current-ui
+
+permissions:
+  contents: write
 
 jobs:
   android:
+    # The write-back path is intentionally restricted to our same-repo keyboard fix branch.
+    if: >-
+      github.event_name != 'pull_request' ||
+      (github.event.pull_request.head.repo.full_name == github.repository &&
+       github.head_ref == 'fix/keyboard-overlay-root')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -22,6 +36,10 @@ jobs:
           distribution: temurin
           java-version: 17
           cache: gradle
+
+      - name: Apply measured keyboard patch for verification
+        if: github.event_name == 'pull_request' && github.head_ref == 'fix/keyboard-overlay-root'
+        run: python3 scripts/apply_keyboard_overlay_root_fix.py
 
       - name: Install dependencies
         run: npm ci
@@ -35,9 +53,23 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleRelease bundleRelease --no-daemon
 
+      - name: Commit verified keyboard patch back to feature branch
+        if: github.event_name == 'pull_request' && github.head_ref == 'fix/keyboard-overlay-root'
+        shell: bash
+        run: |
+          git config user.name "soprano-release-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add hooks/useKeyboardOverlap.ts hooks/useKeyboardAnchor.ts components/room/RoomChatDrawer.tsx app/room/'[id].tsx' app/chat/'[id].tsx' app.json android/app/build.gradle .github/workflows/build-livekit-current-ui.yml
+          if git diff --cached --quiet; then
+            echo "No patch changes to commit"
+          else
+            git commit -m "fix: anchor message composers to measured keyboard geometry"
+            git push origin HEAD:fix/keyboard-overlay-root
+          fi
+
       - uses: actions/upload-artifact@v4
         with:
-          name: sopranochat-1.7.13.156-keyboard-and-lobby-apk-aab
+          name: ${{ github.event_name == 'pull_request' && 'sopranochat-1.7.13.157-keyboard-root-fix-apk-aab' || 'sopranochat-current-ui-apk-aab' }}
           path: |
             android/app/build/outputs/apk/release/app-release.apk
             android/app/build/outputs/bundle/release/app-release.aab
