@@ -1,11 +1,9 @@
 name: Apply measured keyboard overlay fix
 
+# One-shot recovery helper retained for audit/manual use. The measured fix is
+# already committed, so normal branch pushes must not try to apply it again.
 on:
-  push:
-    branches:
-      - fix/keyboard-overlay-root
-    paths:
-      - .github/workflows/apply-keyboard-overlay-root-fix.yml
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -297,7 +295,7 @@ jobs:
             INPUT_BAR_H, insets.top, availableH, sheetBottomAnim, sheetHeight,
           ]);
 
-'''.replace('\n          ', '\n')
+          '''.replace('\n          ', '\n')
           s = s[:start] + replacement + s[end:]
 
           s = replace_once(s,
@@ -369,7 +367,7 @@ jobs:
             REST_BOTTOM, REST_TOP, dmPanelBottomAnim, dmPanelHeightAnim,
           ]);
 
-'''.replace('\n          ', '\n')
+          '''.replace('\n          ', '\n')
           s = s[:dm_start] + dm_replacement + s[dm_end:]
 
           s = replace_once(s,
