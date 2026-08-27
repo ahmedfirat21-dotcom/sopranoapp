@@ -144,7 +144,7 @@ import { useRoomLifecycle } from '../../hooks/useRoomLifecycle';
 import { useRoomGamification } from '../../hooks/useRoomGamification';
 import { useSwipeToDismiss } from '../../hooks/useSwipeToDismiss';
 import { useRoomPresence } from '../../hooks/useRoomPresence';
-import { useKeyboardOverlap } from '../../hooks/useKeyboardOverlap';
+import { useKeyboardAnchor } from '../../hooks/useKeyboardAnchor';
 import ModerationOverlay, { type ModerationOverlayRef } from '../../components/room/ModerationOverlay';
 import type { FlashType } from '../../components/room/AvatarPenaltyFlash';
 import { PushNotificationService } from '../../services/pushNotifications';
@@ -450,7 +450,7 @@ const dmSwipeS = StyleSheet.create({
 // DM PANEL DRAWER — Sağdan kayan DM paneli (inbox + sohbet görünümü)
 // ★ Swipe-to-action aksiyonlar: engelle, sil, sessize al
 // ════════════════════════════════════════════════════════════
-function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, dmUnreadCount, firebaseUser, bottomInset, initialChatTarget }: {
+function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, dmUnreadCount, firebaseUser, bottomInset, bottomClearance, initialChatTarget }: {
   visible: boolean;
   onClose: () => void;
   dmInboxMessages: any[];
@@ -458,6 +458,7 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
   dmUnreadCount: number;
   firebaseUser: any;
   bottomInset: number;
+  bottomClearance?: number;
   initialChatTarget?: { userId: string; name: string; avatar?: string } | null;
 }) {
   const slideAnim = useRef(new Animated.Value(DM_PANEL_W)).current;
@@ -482,35 +483,42 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
   const [msgReq, setMsgReq] = useState<{ status: 'none' | 'pending_incoming' | 'pending_outgoing' | 'accepted' | 'rejected' }>({ status: 'none' });
   const [reqResponding, setReqResponding] = useState(false);
 
-  // API 36 edge-to-edge: IME pencereyi bazı cihazlarda küçültür, bazılarında örter.
-  // Ortak hook yalnızca gerçek örtüşmeyi döndürür.
-  const { keyboardOverlap, keyboardVisible, windowHeight } = useKeyboardOverlap();
-  // ★ PlusMenu ile birebir aynı boyut — ROOM_TOP_GAP=70, ROOM_BOTTOM_GAP=90
-  // PlusMenu top/bottom window bazlı, DM panel de window bazlı hesaplamalı
-  const REST_BOTTOM = Math.max(bottomInset + 8, 90); // Alt kontrol çubuğu + cihaz safe-area
-  const REST_TOP = 70;    // PlusMenu: Math.max(insets.top + 12, 70)
-  const restHeight = windowHeight - REST_BOTTOM - REST_TOP;
+  const {
+    hostRef: dmKeyboardHostRef,
+    onHostLayout: onDmKeyboardHostLayout,
+    keyboardInset: dmKeyboardInset,
+    keyboardVisible: dmKeyboardVisible,
+    hostHeight: dmHostHeight,
+  } = useKeyboardAnchor();
+
+  // Keyboard closed: clear the actual measured RoomControlBar wrapper.
+  // Keyboard open: the control bar is moved behind IME; anchor directly to IME top.
+  const FALLBACK_CONTROL_CLEARANCE = 72 + Math.max(bottomInset, 6);
+  const REST_BOTTOM = Math.max(bottomClearance || 0, FALLBACK_CONTROL_CLEARANCE);
+  const REST_TOP = 70;
+  const restHeight = Math.max(dmHostHeight - REST_BOTTOM - REST_TOP, 240);
   const dmPanelBottomAnim = useRef(new Animated.Value(REST_BOTTOM)).current;
   const dmPanelHeightAnim = useRef(new Animated.Value(restHeight)).current;
+
   useEffect(() => {
-    const composerActive = keyboardVisible && !!chatTarget;
-    const targetBottom = composerActive ? keyboardOverlap : REST_BOTTOM;
-    const targetHeight = Math.max(windowHeight - targetBottom - REST_TOP, 240);
+    const composerActive = dmKeyboardVisible && !!chatTarget;
+    const targetBottom = composerActive ? dmKeyboardInset : REST_BOTTOM;
+    const targetHeight = Math.max(dmHostHeight - targetBottom - REST_TOP, 240);
 
     Animated.parallel([
       Animated.timing(dmPanelBottomAnim, {
         toValue: targetBottom,
-        duration: composerActive ? 160 : 190,
+        duration: composerActive ? 120 : 170,
         useNativeDriver: false,
       }),
       Animated.timing(dmPanelHeightAnim, {
         toValue: targetHeight,
-        duration: composerActive ? 160 : 190,
+        duration: composerActive ? 120 : 170,
         useNativeDriver: false,
       }),
     ]).start();
   }, [
-    chatTarget?.userId, keyboardVisible, keyboardOverlap, windowHeight,
+    chatTarget?.userId, dmKeyboardVisible, dmKeyboardInset, dmHostHeight,
     REST_BOTTOM, REST_TOP, dmPanelBottomAnim, dmPanelHeightAnim,
   ]);
 
@@ -968,7 +976,13 @@ function DmPanelDrawer({ visible, onClose, dmInboxMessages, setDmInboxMessages, 
   if (!mounted) return null;
 
   return (
-    <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+    <View
+      ref={dmKeyboardHostRef}
+      collapsable={false}
+      onLayout={onDmKeyboardHostLayout}
+      style={StyleSheet.absoluteFill}
+      pointerEvents="box-none"
+    >
       {/* Backdrop */}
       <Animated.View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.35)', opacity: fadeAnim }]}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
@@ -1697,6 +1711,12 @@ export default function RoomScreen() {
     );
     return () => { showSub.remove(); hideSub.remove(); };
   }, []);
+  // Overlay clearances use the real rendered control-bar wrapper height.
+  const [controlBarClearance, setControlBarClearance] = useState(72 + Math.max(insets.bottom, 6));
+  useEffect(() => {
+    setControlBarClearance(72 + Math.max(insets.bottom, 6));
+  }, [insets.bottom]);
+
   // ★ v107: Hediye paneli — kontrol barındaki 🎁 butonu açar
   const [showGiftPanel, setShowGiftPanel] = useState(false);
   // ★ v107: Premium mesaj parlat stilleri — kullanıcının envanteri (cosmetic_items.message_art ürünleri)
@@ -5325,7 +5345,13 @@ export default function RoomScreen() {
       />
 
 
-      <View style={{ position: 'absolute', bottom: ctrlKbOffsetPx, left: 0, right: 0, paddingBottom: Math.max(insets.bottom, 6), zIndex: 200, elevation: 200 }}>
+      <View
+        onLayout={(e) => {
+          const h = e.nativeEvent.layout.height;
+          if (h > 0 && Math.abs(h - controlBarClearance) > 0.5) setControlBarClearance(h);
+        }}
+        style={{ position: 'absolute', bottom: ctrlKbOffsetPx, left: 0, right: 0, paddingBottom: Math.max(insets.bottom, 6), zIndex: 200, elevation: 200 }}
+      >
         {/* ★ Bar altındaki safe area'yı dolduran gradient — bar'ın devamı gibi görünür */}
         <LinearGradient
           colors={['rgba(48,65,94,0.92)', 'rgba(26,40,64,0.95)', 'rgba(20,35,58,1)']}
@@ -5418,6 +5444,7 @@ export default function RoomScreen() {
 
       <RoomChatDrawer visible={showChatDrawer} messages={chatMessages as any[]} chatInput={chatInput}
         onChangeInput={setChatInput} onSend={handleSendChat} onClose={() => setShowChatDrawer(false)} bottomInset={insets.bottom}
+        bottomClearance={controlBarClearance}
         onAvatarPress={(uid) => {
           // ★ 2026-04-26: Mesaj balonu avatar/isim tıklanınca profil sheet — diğer platformlar gibi.
           const target = participants.find(p => p.user_id === uid);
@@ -5461,6 +5488,7 @@ export default function RoomScreen() {
         dmUnreadCount={dmUnreadCount}
         firebaseUser={firebaseUser}
         bottomInset={insets.bottom}
+        bottomClearance={controlBarClearance}
         initialChatTarget={dmInitialTarget}
       />
 

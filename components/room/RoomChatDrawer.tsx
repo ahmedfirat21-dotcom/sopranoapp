@@ -28,7 +28,7 @@ import SPIcon from '../SPIcon';
 // ★ v280 (15 May 2026): TierBadge import KALDIRILDI — web admin CosmeticBadge sistemi kullanılıyor.
 import { migrateLegacyTier } from '../../types';
 import { i18n } from '../../services/i18n';
-import { useKeyboardOverlap } from '../../hooks/useKeyboardOverlap';
+import { useKeyboardAnchor } from '../../hooks/useKeyboardAnchor';
 
 // Snap points — CONTROL_BAR_AREA: bar + padding alanı (insets.bottom hariç).
 // RoomControlBar: BAR_H=50 + üstündeki wrapper paddingBottom(8) = 58.
@@ -346,6 +346,8 @@ interface Props {
   onSend: () => void;
   onClose: () => void;
   bottomInset: number;
+  /** Actual RoomControlBar wrapper height (bar + device safe-area). */
+  bottomClearance?: number;
   onSendRaw?: (content: string) => void;
   /** ★ v56: reaksiyon için çağıran kullanıcının Firebase UID'si */
   currentUserId?: string;
@@ -364,7 +366,7 @@ interface Props {
 }
 
 export default function RoomChatDrawer({
-  visible, messages, chatInput, onChangeInput, onSend, onClose, onSendRaw, currentUserId, roomId, onAvatarPress,
+  visible, messages, chatInput, onChangeInput, onSend, onClose, bottomInset, bottomClearance = 0, onSendRaw, currentUserId, roomId, onAvatarPress,
   currentSP = 0, onSendGlow, ownedPremiumGlowIds, onOpenStore,
 }: Props) {
   const insets = useSafeAreaInsets();
@@ -387,105 +389,63 @@ export default function RoomChatDrawer({
   //   Klavye açık → top = e.endCoordinates.screenY - inputBarH
   //   Bu değerler parent boyutundan bağımsız, her cihazda aynı.
   // ════════════════════════════════════════════════════════════
-  const screenH = Dimensions.get('screen').height;
+  const {
+    hostRef: keyboardHostRef,
+    onHostLayout: onKeyboardHostLayout,
+    keyboardInset,
+    keyboardVisible,
+    hostHeight,
+  } = useKeyboardAnchor();
 
-  // ★ Alt kontrol barının tam üstüne otur — extra gap yok.
-  const restBottom = CONTROL_BAR_AREA + Math.max(insets.bottom, 7);
-  // Snap points — screen-based, adjustResize'dan bağımsız
-  const availableH = screenH - restBottom - Math.max(insets.top, 20);
+  // Closed keyboard: sit exactly above the real room control bar.
+  // Open keyboard: use the physically measured IME overlap of this overlay host.
+  const fallbackRestBottom = CONTROL_BAR_AREA + Math.max(bottomInset || insets.bottom, 7);
+  const restBottom = Math.max(bottomClearance || 0, fallbackRestBottom);
+  const layoutHeight = Math.max(hostHeight, 320);
+  const anchorBottom = keyboardVisible ? keyboardInset : restBottom;
+  const availableH = Math.max(240, layoutHeight - anchorBottom - Math.max(insets.top, 20));
   const SNAP_CLOSED = 0;
-  const SNAP_HALF = Math.min(availableH * 0.62, screenH * 0.50);
-  // ★ v1.7.13.161: %80 cap — tam yukarı çıkmasın, üstte header görünsün.
-  const SNAP_FULL = Math.min(availableH * 0.80, screenH * 0.65);
+  const SNAP_HALF = Math.min(availableH * 0.62, layoutHeight * 0.50);
+  const SNAP_FULL = Math.min(availableH * 0.80, layoutHeight * 0.65);
 
-  // ════════════════════════════════════════════════════════════
-  // Input bar — TOP-based konumlandırma (screen-based, adjustResize-proof)
-  // ════════════════════════════════════════════════════════════
   const GLOW_BANNER_H = 38;
   const INPUT_BAR_BASE_H = 54;
   const INPUT_BAR_H = pendingGlowStyle ? INPUT_BAR_BASE_H + GLOW_BANNER_H : INPUT_BAR_BASE_H;
 
-  // ★ Rest (klavye kapalı): input bar kontrol barının hemen üstünde
-  //   top = screenH - restBottom - INPUT_BAR_H (screen'in en altından itibaren)
-  //   Ama position:absolute + top → PARENT'ın üst kenarından ölçer.
-  //   Parent top = statusBar üstü ≈ 0 (SafeAreaView parent'ında)
-  //   Ancak room page'de parent tam ekran.
-  //   → top = screenH - restBottom - INPUT_BAR_H parent'ın nerede olduğuna bakmaz
-  //   ÇÜNKÜ adjustResize parent'ı küçültür → top değeri fiziksel olarak window içinde
-  //   daha aşağıda kalır ama window'un bottom'u zaten yukarı çıkar...
-  //
-  //   ★ DOĞRU ÇÖZÜM: `bottom` kullan AMA adjustResize'ı BU ekran için kapat.
-  //   adjustNothing/adjustPan ile window küçülmez → bottom değerleri stabil kalır.
-  //   Bunun için softwareKeyboardLayoutMode'u runtime'da değiştirmek yerine,
-  //   daha pragmatik bir yol: inputBar ve sheet'i React Native Modal içinde render et
-  //   (Modal kendi Window'unu kullanır, adjustResize etkisinden bağımsız).
-  //
-  // ★★ PRAGMATIK FIX: Tüm bu karmaşıklığı bypass etmek için:
-  //   adjustResize window'u H kadar küçültür (kbHeight kadar)
-  //   → parent bottom = screen bottom - kbHeight
-  //   → bottom:X → screen bottom'dan X + kbHeight yukarıda
-  //   AMA biz bottom:restBottom diyoruz → screen bottom'dan restBottom + kbHeight yukarıda
-  //   İstediğimiz: screen bottom'dan restBottom yukarıda (klavye kapalı), kbHeight yukarıda (klavye açık)
-  //
-  //   adjustResize OTOMATIK olarak kbHeight eklediği için:
-  //   Klavye kapalı: bottom:restBottom → ekranın altından restBottom px yukarıda ✓
-  //   Klavye açık: window küçülüyor → bottom:restBottom → ekranın altından restBottom + kbHeight yukarıda ✗ (çok yukarı!)
-  //   Düzeltme: Klavye açıkken bottom değerini adjustResize etkisini compense edecek şekilde DÜŞÜR.
-  //   Klavye açık hedef: bottom = max(kbHeight, restBottom)  (ekranın altından)
-  //   adjustResize zaten kbHeight ekliyor → bottom = max(kbHeight, restBottom) - kbHeight
-  //   VEYA: bottom = 0 (adjustResize + 0 = kbHeight'ta, bu klavyenin tam üstü)
-  //   VEYA: bottom = max(0, restBottom - kbHeight) (kontrol bar alanı > klavye ise restBottom tut)
-  //
-  // SONUÇ: adjustResize'ı KOMPENSE et — kbHeight kadar bottom'u düşür.
-  const [kbCompensation, setKbCompensation] = useState(0);
-  const adjustedBottom = restBottom - kbCompensation;
-
+  const sheetHeight = useRef(new Animated.Value(0)).current;
+  const closeTranslateY = useRef(new Animated.Value(0)).current;
+  const inputBarH = useRef(new Animated.Value(INPUT_BAR_H)).current;
+  const currentSnap = useRef(0);
+  const backdropOpacity = useRef(new Animated.Value(0)).current;
+  const isClosingRef = useRef(false);
+  const lastOpenSnapRef = useRef(SNAP_HALF);
   const inputBottomAnim = useRef(new Animated.Value(restBottom)).current;
   const sheetBottomAnim = useRef(new Animated.Value(restBottom)).current;
-  const {
-    keyboardOverlap,
-    keyboardVisible,
-    windowHeight,
-  } = useKeyboardOverlap();
-
-  // İlk açılışta instant set (animasyonsuz)
-  useEffect(() => {
-    if (!visible) return;
-    inputBottomAnim.setValue(restBottom);
-    sheetBottomAnim.setValue(restBottom);
-    setKbCompensation(0);
-  }, [visible]);
 
   useEffect(() => {
     if (!visible) return;
+    inputBottomAnim.setValue(keyboardVisible ? keyboardInset : restBottom);
+    sheetBottomAnim.setValue(keyboardVisible ? keyboardInset : restBottom);
+  }, [visible, keyboardVisible, keyboardInset, restBottom, inputBottomAnim, sheetBottomAnim]);
 
-    // API 36 edge-to-edge cihazlarda adjustResize zorunlu olarak çalışmayabilir.
-    // Hook yalnızca klavyenin pencereyi gerçekten örttüğü kısmı verir: pencere
-    // küçülmüşse 0, tam ekran kalmışsa IME yüksekliği. Böylece sheet her iki
-    // durumda da klavyenin tam üstüne oturur.
-    const targetBottom = keyboardVisible ? keyboardOverlap : restBottom;
-    setKbCompensation(keyboardVisible ? Math.max(0, restBottom - targetBottom) : 0);
-    Animated.parallel([
-      Animated.timing(inputBottomAnim, {
-        toValue: targetBottom,
-        duration: keyboardVisible ? 160 : 200,
-        useNativeDriver: false,
-      }),
-      Animated.timing(sheetBottomAnim, {
-        toValue: targetBottom,
-        duration: keyboardVisible ? 160 : 200,
-        useNativeDriver: false,
-      }),
-    ]).start();
+  useEffect(() => {
+    if (!visible) return;
+    const targetBottom = keyboardVisible ? keyboardInset : restBottom;
+
+    Animated.timing(sheetBottomAnim, {
+      toValue: targetBottom,
+      duration: keyboardVisible ? 120 : 170,
+      useNativeDriver: false,
+    }).start();
 
     if (keyboardVisible) {
       const topReserve = Math.max(insets.top + 60, 100);
-      const visibleArea = windowHeight - keyboardOverlap - topReserve - INPUT_BAR_H;
-      if (currentSnap.current > visibleArea && visibleArea > 0) {
+      const visibleArea = Math.max(240, layoutHeight - targetBottom - topReserve - INPUT_BAR_H);
+      if (currentSnap.current > visibleArea) {
         currentSnap.current = visibleArea;
         Animated.timing(sheetHeight, {
           toValue: visibleArea,
-          duration: 180,
+          duration: 140,
           useNativeDriver: false,
         }).start();
       }
@@ -494,25 +454,14 @@ export default function RoomChatDrawer({
       currentSnap.current = restoredHeight;
       Animated.timing(sheetHeight, {
         toValue: restoredHeight,
-        duration: 200,
+        duration: 170,
         useNativeDriver: false,
       }).start();
     }
   }, [
-    visible, keyboardVisible, keyboardOverlap, windowHeight, restBottom,
-    INPUT_BAR_H, insets.top, availableH,
+    visible, keyboardVisible, keyboardInset, restBottom, layoutHeight,
+    INPUT_BAR_H, insets.top, availableH, sheetBottomAnim, sheetHeight,
   ]);
-
-  // ════════════════════════════════════════════════════════════
-  // Animated sheet height — 0 (closed) → SNAP_HALF → SNAP_FULL
-  // ════════════════════════════════════════════════════════════
-  const sheetHeight = useRef(new Animated.Value(0)).current;
-  const closeTranslateY = useRef(new Animated.Value(0)).current; // ★ v1.7.13.161: çekmece kapanma
-  const inputBarH = useRef(new Animated.Value(INPUT_BAR_H)).current; // ★ v1.7.13.161: input ezilme (height)
-  const currentSnap = useRef(0);
-  const backdropOpacity = useRef(new Animated.Value(0)).current;
-  const isClosingRef = useRef(false);
-  const lastOpenSnapRef = useRef(SNAP_HALF); // ★ Son açık snap yüksekliği
 
   // ★ Ref'ler — PanResponder stale closure bug'ını önler
   const snapPointsRef = useRef([SNAP_CLOSED, SNAP_HALF, SNAP_FULL]);
@@ -985,7 +934,13 @@ export default function RoomChatDrawer({
   if (!isOpen) return null;
 
   return (
-    <>
+    <View
+      ref={keyboardHostRef}
+      collapsable={false}
+      onLayout={onKeyboardHostLayout}
+      style={StyleSheet.absoluteFill}
+      pointerEvents="box-none"
+    >
       {/* Backdrop — hafif karartma, tıklayınca kapat */}
       <Animated.View
         style={[StyleSheet.absoluteFill, { zIndex: 55, elevation: 55, opacity: backdropOpacity, backgroundColor: 'rgba(8,12,22,0.45)' }]}
@@ -1246,7 +1201,7 @@ export default function RoomChatDrawer({
         ownedPremiumIds={ownedPremiumGlowIds}
         onOpenStore={onOpenStore}
       />
-    </>
+    </View>
   );
 }
 

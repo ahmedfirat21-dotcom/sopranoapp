@@ -42,7 +42,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Haptics } from '../../utils/haptics';
-import { useKeyboardOverlap } from '../../hooks/useKeyboardOverlap';
+import { useKeyboardAnchor } from '../../hooks/useKeyboardAnchor';
 
 // ★ SEC-MSG: Mesaj sanitizasyonu + flood koruması
 const MSG_MAX_LENGTH = 2000;
@@ -572,7 +572,12 @@ export default function ChatScreen() {
   const inputBottomAnim = useRef(new Animated.Value(miniRoomOffset)).current;
   // API 36 edge-to-edge: yalnızca pencerenin gerçekten örttüğü IME kısmını uygula.
   // Böylece adjustResize çalışan cihazlarda çift, Samsung/Android 16'da eksik kayma olmaz.
-  const { keyboardOverlap: kbHeight, keyboardVisible } = useKeyboardOverlap();
+  const {
+    hostRef: keyboardHostRef,
+    onHostLayout: onKeyboardHostLayout,
+    keyboardInset: kbHeight,
+    keyboardVisible,
+  } = useKeyboardAnchor();
   // ★ 2026-04-27: FlatList marginBottom yaklaşımına geçildi (input bar ile çakışma yok).
   //   Default 90 — gerçek input bar'a yakın (gesture nav telefonda ~80-100px). onLayout ile güncellenir.
   //   İlk render'da çok büyük (150) → re-layout sırasında scroll pozisyonu kaymasına yol açıyordu.
@@ -1378,8 +1383,14 @@ export default function ChatScreen() {
 
   return (
     <AppBackground radialGlow>
-    {/* API 36 edge-to-edge: gerçek IME örtüşmesi kadar padding uygulanır. */}
-    <Animated.View style={[styles.container, { opacity: contentOpacity, transform: [{ translateY: contentTranslateY }], paddingBottom: kbHeight }]}>
+    <View
+      ref={keyboardHostRef}
+      collapsable={false}
+      onLayout={onKeyboardHostLayout}
+      style={styles.keyboardHost}
+    >
+    {/* API 36/Samsung: measured host is anchored to the physical IME top. */}
+    <Animated.View style={[styles.container, { opacity: contentOpacity, transform: [{ translateY: contentTranslateY }], paddingBottom: kbHeight }] }>
 
       {/* Header — Ana sayfadaki banner ile aynı (bombe gradient + teal separator) */}
       <View style={[styles.headerWrap, { paddingTop: insets.top }]}>
@@ -2414,6 +2425,7 @@ export default function ChatScreen() {
         </View>
       </Modal>
     </Animated.View>
+    </View>
     </AppBackground>
   );
 }
@@ -2476,6 +2488,7 @@ const msgReqBannerStyles = StyleSheet.create({
 });
 
 const styles = StyleSheet.create({
+  keyboardHost: { flex: 1 },
   container: { flex: 1, backgroundColor: 'transparent' },
 
   // Header
