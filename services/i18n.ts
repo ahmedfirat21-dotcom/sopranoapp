@@ -34,7 +34,22 @@ export type SupportedLocale = 'tr' | 'en';
 
 const LOCALE_STORAGE_KEY = '@soprano_settings';
 
-const locales: Record<SupportedLocale, Record<string, string>> = { tr, en };
+// Kararlı sürümde kullanıcıya test/beta altyapısı bilgisi gösterilmez.
+// Büyük locale dosyalarına sürüm bazlı metin gömmek yerine, yalnızca release-kopyası
+// burada nötr tutulur; sürüm numarası APP_VERSION üzerinden dinamik gelmeye devam eder.
+const releaseCopyOverrides: Record<SupportedLocale, Record<string, string>> = {
+  tr: {
+    'settings.version_info': 'Sürüm: {{0}}',
+  },
+  en: {
+    'settings.version_info': 'Version: {{0}}',
+  },
+};
+
+const locales: Record<SupportedLocale, Record<string, string>> = {
+  tr: { ...tr, ...releaseCopyOverrides.tr },
+  en: { ...en, ...releaseCopyOverrides.en },
+};
 
 // ★ Fallback sırası: seçilen dil → TR → key kendisi
 const fallbackLocale: SupportedLocale = 'tr';

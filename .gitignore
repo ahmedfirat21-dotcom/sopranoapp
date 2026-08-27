@@ -17,6 +17,20 @@ webdev.*.log
 *.metro.err.log
 i18n-scan-report.json
 
+# Stable release cleanup: ad-hoc diagnostics / local inspection output
+.bundle_check*.txt
+.last_bundle_sha
+.tmp_logcat*.txt
+.tmp_screens/
+bugreport-*.zip
+build-debug.log
+metro.log
+.metro.log
+web-admin-dev.log
+i18n-scan*-report.json
+page_dump.html
+ui_dump.xml
+
 # ★ 7 May 2026: web-admin junction (Desktop\sopranochatnorolji'ye link).
 #   Ayrı git repo, ayrı remote, ayrı Vercel deploy — bu repo'nun parçası DEĞİL.
 web-admin/
