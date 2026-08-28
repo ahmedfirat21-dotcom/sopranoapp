@@ -1,4 +1,4 @@
-name: Build current UI LiveKit test
+name: Build signed Android release
 
 on:
   workflow_dispatch:
@@ -9,9 +9,13 @@ on:
       - fix/critical-audit-162
       - fix/system-lobby-stage-163
 
+permissions:
+  contents: read
+
 jobs:
   android:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 
@@ -32,20 +36,57 @@ jobs:
       - name: Generate Android splash resources
         run: node scripts/gen-splash-logo.js
 
+      - name: Restore encrypted Play upload key
+        shell: bash
+        env:
+          UPLOAD_KEYSTORE_BASE64: ${{ secrets.SOPRANOCHAT_UPLOAD_KEYSTORE_BASE64 }}
+          UPLOAD_STORE_PASSWORD: ${{ secrets.SOPRANOCHAT_UPLOAD_STORE_PASSWORD }}
+          UPLOAD_KEY_ALIAS: ${{ secrets.SOPRANOCHAT_UPLOAD_KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          test -n "$UPLOAD_KEYSTORE_BASE64"
+          test -n "$UPLOAD_STORE_PASSWORD"
+          test -n "$UPLOAD_KEY_ALIAS"
+          printf '%s' "$UPLOAD_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/sopranochat-upload.jks"
+          chmod 600 "$RUNNER_TEMP/sopranochat-upload.jks"
+          actual_sha256="$(keytool -list -v             -keystore "$RUNNER_TEMP/sopranochat-upload.jks"             -storepass "$UPLOAD_STORE_PASSWORD"             -alias "$UPLOAD_KEY_ALIAS" 2>/dev/null |
+            sed -n 's/^[[:space:]]*SHA256: //p')"
+          expected_sha256="86:EF:68:F4:AD:44:47:01:0D:7A:F8:B0:43:45:25:A8:81:81:22:AB:3E:F6:7D:90:C2:0C:13:C4:A8:0C:EC:1C"
+          test "$actual_sha256" = "$expected_sha256"
+          echo "Play upload certificate verified: $actual_sha256"
+
       - name: Build standalone Android test APK
         working-directory: android
         run: |
           chmod +x gradlew
           ./gradlew assembleRelease --no-daemon -PSOPRANOCHAT_TEST_RELEASE_WITH_DEBUG_KEY=true
 
-      - name: Build unsigned Android App Bundle
+      - name: Build signed Google Play App Bundle
         working-directory: android
+        env:
+          ORG_GRADLE_PROJECT_SOPRANOCHAT_UPLOAD_STORE_FILE: ${{ runner.temp }}/sopranochat-upload.jks
+          ORG_GRADLE_PROJECT_SOPRANOCHAT_UPLOAD_STORE_PASSWORD: ${{ secrets.SOPRANOCHAT_UPLOAD_STORE_PASSWORD }}
+          ORG_GRADLE_PROJECT_SOPRANOCHAT_UPLOAD_KEY_ALIAS: ${{ secrets.SOPRANOCHAT_UPLOAD_KEY_ALIAS }}
+          ORG_GRADLE_PROJECT_SOPRANOCHAT_UPLOAD_KEY_PASSWORD: ${{ secrets.SOPRANOCHAT_UPLOAD_KEY_PASSWORD }}
         run: ./gradlew bundleRelease --no-daemon
+
+      - name: Verify signed bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          bundle="android/app/build/outputs/bundle/release/app-release.aab"
+          jarsigner -verify "$bundle"
+          actual_sha256="$(keytool -printcert -jarfile "$bundle" 2>/dev/null |
+            sed -n 's/^[[:space:]]*SHA256: //p')"
+          expected_sha256="86:EF:68:F4:AD:44:47:01:0D:7A:F8:B0:43:45:25:A8:81:81:22:AB:3E:F6:7D:90:C2:0C:13:C4:A8:0C:EC:1C"
+          test "$actual_sha256" = "$expected_sha256"
+          echo "Signed bundle certificate verified: $actual_sha256"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: sopranochat-1.7.13.163-standalone-release-apk-aab
+          name: sopranochat-1.7.13.163-signed-play-bundle
           path: |
             android/app/build/outputs/apk/release/app-release.apk
             android/app/build/outputs/bundle/release/app-release.aab
           if-no-files-found: error
+          retention-days: 14
